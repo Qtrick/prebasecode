@@ -1,0 +1,1022 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+import * as DOM from '../../../../base/browser/dom.js';
+import { DisposableStore } from '../../../../base/common/lifecycle.js';
+import { URI } from '../../../../base/common/uri.js';
+import { localize, localize2 } from '../../../../nls.js';
+import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
+import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
+import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
+import { IHoverService } from '../../../../platform/hover/browser/hover.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
+import { IOpenerService } from '../../../../platform/opener/common/opener.js';
+import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
+import { ViewPane } from '../../../browser/parts/views/viewPane.js';
+import { IViewletViewOptions } from '../../../browser/parts/views/viewsViewlet.js';
+import { IViewDescriptorService } from '../../../common/views.js';
+import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { computeLanguageStats } from '../common/graph/languageStats.js';
+import type { GraphNode, LayoutMode } from '../common/graph/types.js';
+import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
+import { IPreBaseGraphService } from './prebaseGraphService.js';
+
+type ArchitectureModeId = 'product' | 'file' | 'dependency' | 'state' | 'infrastructure' | 'overview';
+type GraphFilterId = 'all' | 'files' | 'components' | 'dependencies';
+type ExplorerViewMode = 'flat' | 'tree';
+
+interface ArchitectureModeDef {
+	id: ArchitectureModeId;
+	label: string;
+	blurb: string;
+	question: string;
+}
+
+const ARCHITECTURE_MODES: ArchitectureModeDef[] = [
+	{ id: 'product', label: 'Product', blurb: 'Entry → routes → features → hooks → data', question: 'How is the product structured?' },
+	{ id: 'file', label: 'File', blurb: 'Important source files, primitives collapsed', question: 'What files make up this part of the project?' },
+	{ id: 'dependency', label: 'Dependency', blurb: 'Imports & exports, top connections only', question: 'What depends on what?' },
+	{ id: 'state', label: 'State / Data', blurb: 'Hooks, context, stores, APIs, data clients', question: 'Where does data come from and how does state flow?' },
+	{ id: 'infrastructure', label: 'Infrastructure', blurb: 'Configs, build tools, package & env files', question: 'How is this project built, configured, and run?' },
+	{ id: 'overview', label: 'Overview', blurb: 'How the architecture modes relate', question: 'How do the architecture layers connect?' },
+];
+
+const FILTERS: { id: GraphFilterId; label: string }[] = [
+	{ id: 'all', label: 'All' },
+	{ id: 'files', label: 'Files' },
+	{ id: 'components', label: 'Components' },
+	{ id: 'dependencies', label: 'Dependencies' },
+];
+
+const ACCENT = '#2dd4bf';
+const ACCENT_SOFT = '#2dd4bf22';
+const MUTED = '#94a3b8';
+const SURFACE = '#1e293b';
+const SURFACE_OVERLAY = '#0f172a';
+const BORDER = '#334155';
+
+interface ExplorerDirNode {
+	type: 'dir';
+	name: string;
+	fullPath: string;
+	children: ExplorerTreeNode[];
+}
+
+interface ExplorerFileNode {
+	type: 'file';
+	name: string;
+	node: GraphNode;
+}
+
+type ExplorerTreeNode = ExplorerDirNode | ExplorerFileNode;
+
+export class PreBaseMapsViewPane extends ViewPane {
+	static readonly ID = 'workbench.view.prebase.maps.explorer';
+	static readonly LABEL = localize2('prebase.maps.view', "Graph");
+
+	private _scroll: HTMLElement | undefined;
+	private _archModeSection: HTMLElement | undefined;
+	private _archBlurb: HTMLElement | undefined;
+	private _langSection: HTMLElement | undefined;
+	private _filterSection: HTMLElement | undefined;
+	private _layoutSection: HTMLElement | undefined;
+	private _networkSection: HTMLElement | undefined;
+	private _displaySection: HTMLElement | undefined;
+	private _explorerList: HTMLElement | undefined;
+	private _diag: HTMLElement | undefined;
+
+	private _modeArchBtn: HTMLButtonElement | undefined;
+	private _modeNetBtn: HTMLButtonElement | undefined;
+	private _graphModeHelper: HTMLElement | undefined;
+	private _graphModeOpenBtn: HTMLButtonElement | undefined;
+	private _searchInput: HTMLInputElement | undefined;
+	private _idleRotateCheckbox: HTMLInputElement | undefined;
+	private _legendCheckbox: HTMLInputElement | undefined;
+	private _displayBody: HTMLElement | undefined;
+
+	private readonly _archModeButtons = new Map<ArchitectureModeId, HTMLButtonElement>();
+	private readonly _filterButtons = new Map<GraphFilterId, HTMLButtonElement>();
+	private readonly _layoutButtons = new Map<LayoutMode, HTMLButtonElement>();
+	private readonly _networkLayoutButtons = new Map<string, HTMLButtonElement>();
+	private readonly _explorerModeButtons = new Map<ExplorerViewMode, HTMLButtonElement>();
+	private readonly _expandedDirs = new Set<string>(['src']);
+	private readonly _explorerDisposables = this._register(new DisposableStore());
+
+	private _searchQuery = '';
+
+	constructor(
+		options: IViewletViewOptions,
+		@IKeybindingService keybindingService: IKeybindingService,
+		@IContextMenuService contextMenuService: IContextMenuService,
+		@IConfigurationService configurationService: IConfigurationService,
+		@IContextKeyService contextKeyService: IContextKeyService,
+		@IViewDescriptorService viewDescriptorService: IViewDescriptorService,
+		@IInstantiationService instantiationService: IInstantiationService,
+		@IOpenerService openerService: IOpenerService,
+		@IThemeService themeService: IThemeService,
+		@IHoverService hoverService: IHoverService,
+		@IPreBaseGraphService private readonly graphService: IPreBaseGraphService,
+		@ICommandService private readonly commandService: ICommandService,
+		@IEditorService private readonly editorService: IEditorService,
+		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
+	) {
+		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
+		this._register(this.graphService.onDidChangeDiagnostics(() => this._refresh()));
+		this._register(this.graphService.onDidChangeViewState(() => this._refresh()));
+		this._register(this.graphService.onDidChangeSnapshot(() => this._refresh()));
+		this._register(this.workspaceContextService.onDidChangeWorkbenchState(() => this._refresh()));
+		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => this._refresh()));
+		this._register(this.configurationService.onDidChangeConfiguration(e => {
+			if (
+				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkIdleAutoRotate) ||
+				e.affectsConfiguration(PreBaseConfigKeys.GraphShowLegend) ||
+				e.affectsConfiguration(PreBaseConfigKeys.GraphArchitectureMode) ||
+				e.affectsConfiguration(PreBaseConfigKeys.GraphFilter) ||
+				e.affectsConfiguration(PreBaseConfigKeys.GraphExplorerViewMode) ||
+				e.affectsConfiguration(PreBaseConfigKeys.GraphDefaultArchitectureLayout) ||
+				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkLayoutMode)
+			) {
+				this._refresh();
+			}
+		}));
+	}
+
+	protected override renderBody(container: HTMLElement): void {
+		super.renderBody(container);
+
+		this._scroll = DOM.append(container, DOM.$('.prebase-maps-view'));
+		this._scroll.style.padding = '8px';
+		this._scroll.style.display = 'flex';
+		this._scroll.style.flexDirection = 'column';
+		this._scroll.style.gap = '10px';
+		this._scroll.style.overflowY = 'auto';
+		this._scroll.style.height = '100%';
+		this._scroll.style.boxSizing = 'border-box';
+
+		this._renderGraphMode();
+		this._renderArchitectureModes();
+		this._renderLanguages();
+		this._renderSearch();
+		this._renderFilter();
+		this._renderArchitectureLayout();
+		this._renderNetwork();
+		this._renderDisplay();
+		this._renderExplorer();
+		this._renderActions();
+		this._renderDiagnostics();
+		this._refresh();
+
+		if (
+			this._hasOpenProject() &&
+			this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphAutoScan) !== false &&
+			!this.graphService.getSnapshot() &&
+			this.graphService.getDiagnostics().status !== 'scanning'
+		) {
+			void this.graphService.scanWorkspace();
+		}
+	}
+
+	protected override layoutBody(height: number, width: number): void {
+		super.layoutBody(height, width);
+		if (this._scroll) {
+			this._scroll.style.width = `${width}px`;
+			this._scroll.style.height = `${height}px`;
+		}
+	}
+
+	private _renderGraphMode(): void {
+		const section = DOM.append(this._scroll!, DOM.$('div'));
+		this._sectionLabel(section, localize('prebase.maps.graphMode', "Graph mode"));
+		const row = DOM.append(section, DOM.$('div'));
+		this._segmentTrack(row);
+		this._modeArchBtn = this._segmentBtn(row, localize('prebase.maps.architecture', "Architecture"), () => {
+			if (!this._hasOpenProject()) {
+				return;
+			}
+			this.commandService.executeCommand('prebase.graph.openArchitecture');
+		});
+		this._modeNetBtn = this._segmentBtn(row, localize('prebase.maps.network', "Network"), () => {
+			if (!this._hasOpenProject()) {
+				return;
+			}
+			this.commandService.executeCommand('prebase.graph.openNetwork');
+		});
+
+		this._graphModeHelper = DOM.append(section, DOM.$('p'));
+		this._graphModeHelper.style.fontSize = '10px';
+		this._graphModeHelper.style.color = MUTED;
+		this._graphModeHelper.style.margin = '6px 2px 0';
+		this._graphModeHelper.style.lineHeight = '1.4';
+		this._graphModeHelper.textContent = localize(
+			'prebase.maps.openProjectHint',
+			"Open a project to choose a graph mode and generate its visualization."
+		);
+
+		this._graphModeOpenBtn = DOM.append(section, DOM.$('button')) as HTMLButtonElement;
+		this._graphModeOpenBtn.type = 'button';
+		this._graphModeOpenBtn.textContent = localize('prebase.maps.openFolder', "Open Folder");
+		this._graphModeOpenBtn.style.marginTop = '6px';
+		this._graphModeOpenBtn.style.padding = '4px 8px';
+		this._graphModeOpenBtn.style.fontSize = '10px';
+		this._graphModeOpenBtn.style.borderRadius = '6px';
+		this._graphModeOpenBtn.style.cursor = 'pointer';
+		this._graphModeOpenBtn.style.border = `1px solid ${ACCENT}66`;
+		this._graphModeOpenBtn.style.background = ACCENT_SOFT;
+		this._graphModeOpenBtn.style.color = ACCENT;
+		this._register(DOM.addDisposableListener(this._graphModeOpenBtn, 'click', () => {
+			void this.commandService.executeCommand('workbench.action.files.openFolder');
+		}));
+	}
+
+	private _renderArchitectureModes(): void {
+		this._archModeSection = DOM.append(this._scroll!, DOM.$('div'));
+		this._sectionLabel(this._archModeSection, localize('prebase.maps.architectureMode', "Architecture mode"));
+		const grid = DOM.append(this._archModeSection, DOM.$('div'));
+		grid.style.display = 'grid';
+		grid.style.gridTemplateColumns = '1fr 1fr';
+		grid.style.gap = '4px';
+		for (const mode of ARCHITECTURE_MODES) {
+			const btn = DOM.append(grid, DOM.$('button')) as HTMLButtonElement;
+			btn.type = 'button';
+			btn.textContent = mode.label;
+			btn.title = mode.question;
+			btn.style.padding = '5px 8px';
+			btn.style.fontSize = '10px';
+			btn.style.fontWeight = '500';
+			btn.style.textAlign = 'left';
+			btn.style.borderRadius = '6px';
+			btn.style.cursor = 'pointer';
+			btn.style.border = 'none';
+			this._register(DOM.addDisposableListener(btn, 'click', () => {
+				void this.configurationService.updateValue(PreBaseConfigKeys.GraphArchitectureMode, mode.id);
+			}));
+			this._archModeButtons.set(mode.id, btn);
+		}
+		this._archBlurb = DOM.append(this._archModeSection, DOM.$('p'));
+		this._archBlurb.style.fontSize = '10px';
+		this._archBlurb.style.color = MUTED;
+		this._archBlurb.style.margin = '4px 2px 0';
+		this._archBlurb.style.lineHeight = '1.35';
+	}
+
+	private _renderLanguages(): void {
+		this._langSection = DOM.append(this._scroll!, DOM.$('div'));
+	}
+
+	private _renderSearch(): void {
+		const section = DOM.append(this._scroll!, DOM.$('div'));
+		this._searchInput = DOM.append(section, DOM.$('input')) as HTMLInputElement;
+		this._searchInput.type = 'search';
+		this._searchInput.placeholder = localize('prebase.maps.searchFiles', "Search files…");
+		this._searchInput.style.width = '100%';
+		this._searchInput.style.boxSizing = 'border-box';
+		this._searchInput.style.padding = '6px 8px';
+		this._searchInput.style.fontSize = '11px';
+		this._searchInput.style.borderRadius = '6px';
+		this._searchInput.style.border = `1px solid ${BORDER}`;
+		this._searchInput.style.background = SURFACE_OVERLAY;
+		this._searchInput.style.color = '#e2e8f0';
+		this._register(DOM.addDisposableListener(this._searchInput, 'input', () => {
+			this._searchQuery = this._searchInput?.value.trim().toLowerCase() ?? '';
+			this._refreshExplorerList();
+		}));
+	}
+
+	private _renderFilter(): void {
+		this._filterSection = DOM.append(this._scroll!, DOM.$('div'));
+		this._sectionLabel(this._filterSection, localize('prebase.maps.filter', "Filter"));
+		const row = DOM.append(this._filterSection, DOM.$('div'));
+		row.style.display = 'flex';
+		row.style.flexWrap = 'wrap';
+		row.style.gap = '4px';
+		for (const f of FILTERS) {
+			const btn = this._chipBtn(row, f.label, () => {
+				void this.configurationService.updateValue(PreBaseConfigKeys.GraphFilter, f.id);
+			});
+			this._filterButtons.set(f.id, btn);
+		}
+	}
+
+	private _renderArchitectureLayout(): void {
+		this._layoutSection = DOM.append(this._scroll!, DOM.$('div'));
+		this._sectionLabel(this._layoutSection, localize('prebase.maps.layout', "Architecture Layout"));
+		const col = DOM.append(this._layoutSection, DOM.$('div'));
+		col.style.display = 'flex';
+		col.style.flexDirection = 'column';
+		col.style.gap = '2px';
+		for (const mode of ['hierarchy', 'pyramid', 'scattered'] as LayoutMode[]) {
+			const label = mode === 'hierarchy' ? localize('prebase.maps.hierarchy', "Hierarchy")
+				: mode === 'pyramid' ? localize('prebase.maps.pyramid', "Pyramid")
+					: localize('prebase.maps.scattered', "Scattered");
+			const btn = this._chipBtn(col, label, () => {
+				if (!this._hasOpenProject()) {
+					return;
+				}
+				this.commandService.executeCommand('prebase.graph.switchLayout', mode);
+			}, true, true);
+			this._layoutButtons.set(mode, btn);
+		}
+	}
+
+	private _renderNetwork(): void {
+		this._networkSection = DOM.append(this._scroll!, DOM.$('div'));
+		this._sectionLabel(this._networkSection, localize('prebase.maps.networkSection', "Network"));
+
+		this._sectionLabel(this._networkSection, localize('prebase.maps.networkLayout', "Network Layout"));
+		const layoutCol = DOM.append(this._networkSection, DOM.$('div'));
+		layoutCol.style.display = 'flex';
+		layoutCol.style.flexDirection = 'column';
+		layoutCol.style.gap = '2px';
+		layoutCol.style.marginBottom = '8px';
+		const modes: { id: string; label: string }[] = [
+			{ id: 'organic', label: localize('prebase.maps.net.organic', "Organic") },
+			{ id: 'sphere', label: localize('prebase.maps.net.sphere', "Sphere") },
+			{ id: 'constellation', label: localize('prebase.maps.net.constellation', "Constellation") },
+			{ id: 'clustered', label: localize('prebase.maps.net.clustered', "Clustered") },
+			{ id: 'radial', label: localize('prebase.maps.net.radial', "Radial") },
+		];
+		for (const m of modes) {
+			const btn = this._chipBtn(layoutCol, m.label, () => {
+				void this.configurationService.updateValue(PreBaseConfigKeys.GraphNetworkLayoutMode, m.id);
+			}, true, true);
+			btn.dataset['networkLayout'] = m.id;
+			this._networkLayoutButtons.set(m.id, btn);
+		}
+
+		const idleRow = DOM.append(this._networkSection, DOM.$('label'));
+		idleRow.style.display = 'flex';
+		idleRow.style.alignItems = 'center';
+		idleRow.style.gap = '8px';
+		idleRow.style.fontSize = '11px';
+		idleRow.style.color = '#cbd5e1';
+		idleRow.style.cursor = 'pointer';
+		idleRow.style.marginBottom = '6px';
+		this._idleRotateCheckbox = DOM.append(idleRow, DOM.$('input')) as HTMLInputElement;
+		this._idleRotateCheckbox.type = 'checkbox';
+		this._idleRotateCheckbox.style.accentColor = ACCENT;
+		DOM.append(idleRow, DOM.$('span')).textContent = localize('prebase.maps.idleAutoRotate', "Idle auto-rotate");
+		this._register(DOM.addDisposableListener(this._idleRotateCheckbox, 'change', () => {
+			void this.configurationService.updateValue(
+				PreBaseConfigKeys.GraphNetworkIdleAutoRotate,
+				!!this._idleRotateCheckbox?.checked
+			);
+		}));
+
+		const netActions = DOM.append(this._networkSection, DOM.$('div'));
+		netActions.style.display = 'flex';
+		netActions.style.gap = '6px';
+		netActions.style.flexWrap = 'wrap';
+		this._chipBtn(netActions, localize('prebase.maps.resetView', "Reset View"), () => {
+			this.commandService.executeCommand('prebase.graph.resetView');
+		});
+		this._chipBtn(netActions, localize('prebase.maps.fitView', "Fit View"), () => {
+			this.commandService.executeCommand('prebase.graph.fitView');
+		});
+	}
+
+	private _renderDisplay(): void {
+		this._displaySection = DOM.append(this._scroll!, DOM.$('div'));
+		const header = DOM.append(this._displaySection, DOM.$('button')) as HTMLButtonElement;
+		header.type = 'button';
+		header.textContent = localize('prebase.maps.display', "▸ Display");
+		header.style.all = 'unset';
+		header.style.fontSize = '10px';
+		header.style.fontWeight = '600';
+		header.style.letterSpacing = '0.06em';
+		header.style.textTransform = 'uppercase';
+		header.style.color = MUTED;
+		header.style.cursor = 'pointer';
+		header.style.marginBottom = '4px';
+		header.style.display = 'block';
+
+		this._displayBody = DOM.append(this._displaySection, DOM.$('div'));
+		this._displayBody.style.display = 'none';
+		this._displayBody.style.paddingLeft = '2px';
+
+		const legendRow = DOM.append(this._displayBody, DOM.$('label'));
+		legendRow.style.display = 'flex';
+		legendRow.style.alignItems = 'center';
+		legendRow.style.gap = '8px';
+		legendRow.style.fontSize = '11px';
+		legendRow.style.color = '#cbd5e1';
+		legendRow.style.cursor = 'pointer';
+		this._legendCheckbox = DOM.append(legendRow, DOM.$('input')) as HTMLInputElement;
+		this._legendCheckbox.type = 'checkbox';
+		this._legendCheckbox.style.accentColor = ACCENT;
+		DOM.append(legendRow, DOM.$('span')).textContent = localize('prebase.maps.showLegend', "Show legend");
+		this._register(DOM.addDisposableListener(this._legendCheckbox, 'change', () => {
+			void this.configurationService.updateValue(
+				PreBaseConfigKeys.GraphShowLegend,
+				!!this._legendCheckbox?.checked
+			);
+		}));
+
+		this._register(DOM.addDisposableListener(header, 'click', () => {
+			const open = this._displayBody?.style.display !== 'none';
+			if (this._displayBody) {
+				this._displayBody.style.display = open ? 'none' : 'block';
+			}
+			header.textContent = open
+				? localize('prebase.maps.display', "▸ Display")
+				: localize('prebase.maps.displayOpen', "▾ Display");
+		}));
+	}
+
+	private _renderExplorer(): void {
+		const section = DOM.append(this._scroll!, DOM.$('div'));
+		section.style.borderTop = `1px solid ${BORDER}99`;
+		section.style.paddingTop = '8px';
+
+		const header = DOM.append(section, DOM.$('div'));
+		header.style.display = 'flex';
+		header.style.alignItems = 'center';
+		header.style.justifyContent = 'space-between';
+		header.style.marginBottom = '6px';
+		header.style.gap = '6px';
+
+		const title = DOM.append(header, DOM.$('span'));
+		title.textContent = localize('prebase.maps.explorer', "Project Explorer");
+		title.style.fontSize = '10px';
+		title.style.fontWeight = '600';
+		title.style.letterSpacing = '0.06em';
+		title.style.textTransform = 'uppercase';
+		title.style.color = MUTED;
+
+		const toggle = DOM.append(header, DOM.$('div'));
+		this._segmentTrack(toggle);
+		toggle.style.width = 'auto';
+		for (const mode of ['flat', 'tree'] as ExplorerViewMode[]) {
+			const label = mode === 'flat'
+				? localize('prebase.maps.flat', "Flat")
+				: localize('prebase.maps.tree', "Tree");
+			const btn = this._segmentBtn(toggle, label, () => {
+				void this.configurationService.updateValue(PreBaseConfigKeys.GraphExplorerViewMode, mode);
+			});
+			btn.style.padding = '3px 8px';
+			this._explorerModeButtons.set(mode, btn);
+		}
+
+		this._explorerList = DOM.append(section, DOM.$('div'));
+		this._explorerList.style.maxHeight = '240px';
+		this._explorerList.style.overflowY = 'auto';
+		this._explorerList.style.border = `1px solid ${BORDER}66`;
+		this._explorerList.style.borderRadius = '6px';
+		this._explorerList.style.background = SURFACE_OVERLAY;
+		this._explorerList.style.padding = '4px';
+	}
+
+	private _renderActions(): void {
+		const actions = DOM.append(this._scroll!, DOM.$('div'));
+		actions.style.display = 'flex';
+		actions.style.gap = '6px';
+		actions.style.flexWrap = 'wrap';
+		this._chipBtn(actions, localize('prebase.maps.rescan', "Rescan"), () => {
+			this.commandService.executeCommand('prebase.graph.rescanWorkspace');
+		});
+		this._chipBtn(actions, localize('prebase.maps.cancel', "Cancel"), () => {
+			this.commandService.executeCommand('prebase.graph.cancelScan');
+		});
+		this._chipBtn(actions, localize('prebase.maps.diagnostics', "Diagnostics"), () => {
+			this.commandService.executeCommand('prebase.graph.showDiagnostics');
+		});
+		this._chipBtn(actions, localize('prebase.maps.openSettings', "PreBase Settings"), () => {
+			if (CommandsRegistry.getCommand('prebase.settings.open')) {
+				this.commandService.executeCommand('prebase.settings.open');
+			} else {
+				this.commandService.executeCommand('workbench.action.openSettings', 'prebase.');
+			}
+		});
+	}
+
+	private _renderDiagnostics(): void {
+		this._diag = DOM.append(this._scroll!, DOM.$('.prebase-maps-diag'));
+		this._diag.style.fontSize = '11px';
+		this._diag.style.opacity = '0.9';
+		this._diag.style.lineHeight = '1.45';
+		this._diag.style.whiteSpace = 'pre-wrap';
+		this._diag.style.color = MUTED;
+	}
+
+	private _refresh(): void {
+		const state = this.graphService.getViewState();
+		const diag = this.graphService.getDiagnostics();
+		const isNetwork = state.graphType === 'network';
+		const archMode = this._getArchitectureMode();
+		const isOverview = !isNetwork && archMode === 'overview';
+		const hasProject = this._hasOpenProject();
+		const scanStatus = diag.status;
+
+		this._styleSegmentActive(this._modeArchBtn, state.graphType === 'architecture');
+		this._styleSegmentActive(this._modeNetBtn, isNetwork);
+		this._setModeEnabled(this._modeArchBtn, hasProject);
+		this._setModeEnabled(this._modeNetBtn, hasProject);
+
+		if (this._graphModeHelper) {
+			if (!hasProject) {
+				this._graphModeHelper.style.display = 'block';
+				this._graphModeHelper.textContent = localize(
+					'prebase.maps.openProjectHint',
+					"Open a project to choose a graph mode and generate its visualization."
+				);
+			} else if (scanStatus === 'scanning') {
+				this._graphModeHelper.style.display = 'block';
+				this._graphModeHelper.textContent = localize('prebase.maps.scanningHint', "Scanning this project…");
+			} else if (scanStatus === 'error') {
+				this._graphModeHelper.style.display = 'block';
+				this._graphModeHelper.textContent = diag.message
+					|| localize('prebase.maps.scanFailedHint', "Scan failed. Use Rescan to try again.");
+			} else if (!this.graphService.getSnapshot() && scanStatus !== 'ready') {
+				this._graphModeHelper.style.display = 'block';
+				this._graphModeHelper.textContent = localize(
+					'prebase.maps.scanProjectHint',
+					"Scan this project to generate the graph."
+				);
+			} else {
+				this._graphModeHelper.style.display = 'none';
+			}
+		}
+		if (this._graphModeOpenBtn) {
+			this._graphModeOpenBtn.style.display = hasProject ? 'none' : 'inline-block';
+		}
+
+		if (this._archModeSection) {
+			this._archModeSection.style.display = isNetwork || !hasProject ? 'none' : 'block';
+		}
+		for (const [id, btn] of this._archModeButtons) {
+			this._styleChipActive(btn, id === archMode);
+			btn.disabled = !hasProject;
+			btn.style.opacity = hasProject ? '1' : '0.45';
+			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';
+		}
+		if (this._archBlurb) {
+			this._archBlurb.textContent = ARCHITECTURE_MODES.find(m => m.id === archMode)?.blurb ?? '';
+		}
+
+		this._refreshLanguages();
+
+		if (this._filterSection) {
+			this._filterSection.style.display = isOverview || !hasProject ? 'none' : 'block';
+		}
+		const filter = this._getFilter();
+		for (const [id, btn] of this._filterButtons) {
+			this._styleChipActive(btn, id === filter);
+		}
+
+		if (this._layoutSection) {
+			this._layoutSection.style.display = isNetwork || isOverview || !hasProject ? 'none' : 'block';
+		}
+		if (this._networkSection) {
+			this._networkSection.style.display = isNetwork && hasProject ? 'block' : 'none';
+		}
+		if (this._displaySection) {
+			this._displaySection.style.display = hasProject ? 'block' : 'none';
+		}
+
+		if (this._idleRotateCheckbox) {
+			this._idleRotateCheckbox.checked = !!this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphNetworkIdleAutoRotate);
+		}
+		if (this._legendCheckbox) {
+			this._legendCheckbox.checked = this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphShowLegend) !== false;
+		}
+
+		for (const [mode, btn] of this._layoutButtons) {
+			this._styleChipActive(btn, mode === state.layoutMode, true);
+			btn.disabled = !hasProject;
+			btn.style.opacity = hasProject ? '1' : '0.45';
+			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';
+		}
+
+		const networkLayout = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphNetworkLayoutMode) || 'organic';
+		for (const [mode, btn] of this._networkLayoutButtons) {
+			this._styleChipActive(btn, mode === networkLayout, true);
+			btn.disabled = !hasProject;
+			btn.style.opacity = hasProject ? '1' : '0.45';
+			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';
+		}
+
+		const explorerMode = this._getExplorerViewMode();
+		for (const [mode, btn] of this._explorerModeButtons) {
+			this._styleSegmentActive(btn, mode === explorerMode);
+		}
+
+		this._refreshExplorerList();
+
+		if (this._diag) {
+			this._diag.textContent = [
+				localize('prebase.maps.status', "Status: {0}", diag.status),
+				diag.message || '',
+				localize('prebase.maps.counts', "Files {0} · Nodes {1} · Edges {2}", diag.fileCount, diag.nodeCount, diag.edgeCount)
+			].filter(Boolean).join('\n');
+		}
+	}
+
+	private _hasOpenProject(): boolean {
+		return this.workspaceContextService.getWorkspace().folders.length > 0;
+	}
+
+	private _setModeEnabled(btn: HTMLButtonElement | undefined, enabled: boolean): void {
+		if (!btn) {
+			return;
+		}
+		btn.disabled = !enabled;
+		btn.style.opacity = enabled ? '1' : '0.45';
+		btn.style.cursor = enabled ? 'pointer' : 'not-allowed';
+		btn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
+	}
+
+	private _refreshLanguages(): void {
+		if (!this._langSection) {
+			return;
+		}
+		DOM.clearNode(this._langSection);
+		const snapshot = this.graphService.getSnapshot();
+		const stats = computeLanguageStats(snapshot?.nodes);
+		if (!snapshot || stats.length === 0) {
+			return;
+		}
+
+		const totalFiles = stats.reduce((s, x) => s + x.count, 0);
+		if (totalFiles <= 0) {
+			return;
+		}
+
+		this._sectionLabel(this._langSection, localize('prebase.maps.languages', "Languages"));
+		const top = stats.slice(0, 8);
+		const otherCount = stats.slice(8).reduce((s, x) => s + x.count, 0);
+		const display = otherCount > 0
+			? [...top, {
+				id: 'other-group',
+				name: 'Other',
+				count: otherCount,
+				percent: Math.round((otherCount / totalFiles) * 1000) / 10,
+				color: '#52525b',
+			}]
+			: top;
+
+		const meta = DOM.append(this._langSection, DOM.$('div'));
+		meta.style.display = 'flex';
+		meta.style.justifyContent = 'flex-end';
+		meta.style.marginBottom = '4px';
+		meta.style.fontSize = '9px';
+		meta.style.color = MUTED;
+		meta.textContent = localize('prebase.maps.langFiles', "{0} files", totalFiles);
+
+		const bar = DOM.append(this._langSection, DOM.$('div'));
+		bar.style.display = 'flex';
+		bar.style.height = '10px';
+		bar.style.borderRadius = '999px';
+		bar.style.overflow = 'hidden';
+		bar.style.background = `${SURFACE}cc`;
+		bar.style.border = `1px solid ${BORDER}66`;
+		for (const seg of display) {
+			const slice = DOM.append(bar, DOM.$('div'));
+			slice.style.width = `${Math.max(seg.percent, seg.count > 0 ? 2 : 0)}%`;
+			slice.style.backgroundColor = seg.color;
+			slice.title = `${seg.name}: ${seg.percent}% · ${seg.count}`;
+		}
+
+		const legend = DOM.append(this._langSection, DOM.$('div'));
+		legend.style.display = 'flex';
+		legend.style.flexWrap = 'wrap';
+		legend.style.gap = '2px 10px';
+		legend.style.marginTop = '6px';
+		for (const seg of top.slice(0, 5)) {
+			const item = DOM.append(legend, DOM.$('span'));
+			item.style.fontSize = '9px';
+			item.style.color = MUTED;
+			const swatch = DOM.append(item, DOM.$('span'));
+			swatch.style.display = 'inline-block';
+			swatch.style.width = '6px';
+			swatch.style.height = '6px';
+			swatch.style.borderRadius = '50%';
+			swatch.style.backgroundColor = seg.color;
+			swatch.style.marginRight = '4px';
+			swatch.style.verticalAlign = 'middle';
+			DOM.append(item, DOM.$('span')).textContent = `${seg.name} ${seg.percent}%`;
+		}
+	}
+
+	private _refreshExplorerList(): void {
+		if (!this._explorerList) {
+			return;
+		}
+		this._explorerDisposables.clear();
+		DOM.clearNode(this._explorerList);
+		const snapshot = this.graphService.getSnapshot();
+		if (!snapshot) {
+			const empty = DOM.append(this._explorerList, DOM.$('div'));
+			empty.textContent = localize('prebase.maps.explorerEmpty', "Scan a workspace to browse files.");
+			empty.style.fontSize = '11px';
+			empty.style.color = MUTED;
+			empty.style.padding = '8px';
+			return;
+		}
+
+		const filter = this._getFilter();
+		const query = this._searchQuery;
+		const nodes = (snapshot.nodes ?? []).filter(n => {
+			if (!n || n.kind === 'folder') {
+				return false;
+			}
+			if (!n.path) {
+				return false;
+			}
+			if (filter === 'files' && n.kind !== 'file') {
+				return false;
+			}
+			if (filter === 'components' && n.kind !== 'component' && !n.meta?.isComponent) {
+				return false;
+			}
+			if (filter === 'dependencies' && n.kind !== 'module' && n.kind !== 'service') {
+				return false;
+			}
+			if (query) {
+				const hay = `${n.label} ${n.path}`.toLowerCase();
+				if (!hay.includes(query)) {
+					return false;
+				}
+			}
+			return true;
+		});
+
+		const mode = this._getExplorerViewMode();
+		if (mode === 'flat') {
+			nodes
+				.slice()
+				.sort((a, b) => (a.path || a.label).localeCompare(b.path || b.label))
+				.forEach(node => this._appendFileRow(this._explorerList!, node, 0));
+			if (nodes.length === 0) {
+				this._appendEmptyExplorer();
+			}
+			return;
+		}
+
+		const tree = this._buildTree(nodes);
+		if (tree.length === 0) {
+			this._appendEmptyExplorer();
+			return;
+		}
+		for (const entry of tree) {
+			this._appendTreeEntry(this._explorerList!, entry, 0);
+		}
+	}
+
+	private _appendEmptyExplorer(): void {
+		const empty = DOM.append(this._explorerList!, DOM.$('div'));
+		empty.textContent = localize('prebase.maps.explorerNoMatch', "No matching files.");
+		empty.style.fontSize = '11px';
+		empty.style.color = MUTED;
+		empty.style.padding = '8px';
+	}
+
+	private _buildTree(nodes: GraphNode[]): ExplorerTreeNode[] {
+		const root: ExplorerDirNode = { type: 'dir', name: '', fullPath: '', children: [] };
+		const dirs = new Map<string, ExplorerDirNode>();
+		dirs.set('', root);
+
+		const ensureDir = (fullPath: string): ExplorerDirNode => {
+			const existing = dirs.get(fullPath);
+			if (existing) {
+				return existing;
+			}
+			const parts = fullPath.split('/');
+			const name = parts[parts.length - 1] || fullPath;
+			const parentPath = parts.slice(0, -1).join('/');
+			const parent = ensureDir(parentPath);
+			const dir: ExplorerDirNode = { type: 'dir', name, fullPath, children: [] };
+			parent.children.push(dir);
+			dirs.set(fullPath, dir);
+			return dir;
+		};
+
+		for (const node of nodes) {
+			const rel = (node.path || node.label).replace(/\\/g, '/');
+			const parts = rel.split('/');
+			const fileName = parts.pop() || rel;
+			const dirPath = parts.join('/');
+			const parent = ensureDir(dirPath);
+			parent.children.push({ type: 'file', name: fileName, node });
+		}
+
+		const sortChildren = (entries: ExplorerTreeNode[]) => {
+			entries.sort((a, b) => {
+				if (a.type !== b.type) {
+					return a.type === 'dir' ? -1 : 1;
+				}
+				return a.name.localeCompare(b.name);
+			});
+			for (const e of entries) {
+				if (e.type === 'dir') {
+					sortChildren(e.children);
+				}
+			}
+		};
+		sortChildren(root.children);
+		return root.children;
+	}
+
+	private _appendTreeEntry(parent: HTMLElement, entry: ExplorerTreeNode, depth: number): void {
+		if (entry.type === 'file') {
+			this._appendFileRow(parent, entry.node, depth);
+			return;
+		}
+		const row = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
+		row.type = 'button';
+		const expanded = this._expandedDirs.has(entry.fullPath) || this._searchQuery.length > 0;
+		row.textContent = `${expanded ? '▾' : '▸'} ${entry.name || '/'}`;
+		row.style.display = 'block';
+		row.style.width = '100%';
+		row.style.textAlign = 'left';
+		row.style.padding = `3px 6px 3px ${6 + depth * 12}px`;
+		row.style.fontSize = '11px';
+		row.style.color = '#cbd5e1';
+		row.style.background = 'transparent';
+		row.style.border = 'none';
+		row.style.borderRadius = '4px';
+		row.style.cursor = 'pointer';
+		this._explorerDisposables.add(DOM.addDisposableListener(row, 'click', () => {
+			if (this._expandedDirs.has(entry.fullPath)) {
+				this._expandedDirs.delete(entry.fullPath);
+			} else {
+				this._expandedDirs.add(entry.fullPath);
+			}
+			this._refreshExplorerList();
+		}));
+		if (expanded) {
+			for (const child of entry.children) {
+				this._appendTreeEntry(parent, child, depth + 1);
+			}
+		}
+	}
+
+	private _appendFileRow(parent: HTMLElement, node: GraphNode, depth: number): void {
+		const row = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
+		row.type = 'button';
+		const selected = this.graphService.getSelectedNodeId() === node.id;
+		row.textContent = node.label || (node.path?.split(/[/\\]/).pop() ?? node.id);
+		row.title = node.path || node.label;
+		row.style.display = 'block';
+		row.style.width = '100%';
+		row.style.textAlign = 'left';
+		row.style.padding = `3px 6px 3px ${6 + depth * 12}px`;
+		row.style.fontSize = '11px';
+		row.style.color = selected ? ACCENT : '#e2e8f0';
+		row.style.fontWeight = selected ? '600' : '400';
+		row.style.background = selected ? ACCENT_SOFT : 'transparent';
+		row.style.border = 'none';
+		row.style.borderRadius = '4px';
+		row.style.cursor = 'pointer';
+		row.style.overflow = 'hidden';
+		row.style.textOverflow = 'ellipsis';
+		row.style.whiteSpace = 'nowrap';
+		this._explorerDisposables.add(DOM.addDisposableListener(row, 'click', () => {
+			this.graphService.setSelectedNodeId(node.id);
+			void this._openNode(node);
+			this._refreshExplorerList();
+		}));
+	}
+
+	private async _openNode(node: GraphNode): Promise<void> {
+		const path = node.path;
+		if (!path) {
+			return;
+		}
+		const snapshot = this.graphService.getSnapshot();
+		const folder = snapshot?.projectPath
+			|| this.workspaceContextService.getWorkspace().folders[0]?.uri.fsPath;
+		let uri: URI;
+		if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) {
+			uri = URI.file(path);
+		} else if (folder) {
+			uri = URI.joinPath(URI.file(folder), path);
+		} else {
+			uri = URI.file(path.replace(/^file:/, ''));
+		}
+		try {
+			await this.editorService.openEditor({ resource: uri, options: { pinned: false } });
+		} catch {
+			// ignore missing files
+		}
+	}
+
+	private _getArchitectureMode(): ArchitectureModeId {
+		const v = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphArchitectureMode);
+		const match = ARCHITECTURE_MODES.find(m => m.id === v);
+		return match?.id ?? 'product';
+	}
+
+	private _getFilter(): GraphFilterId {
+		const v = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphFilter);
+		const match = FILTERS.find(f => f.id === v);
+		return match?.id ?? 'all';
+	}
+
+	private _getExplorerViewMode(): ExplorerViewMode {
+		const v = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphExplorerViewMode);
+		return v === 'flat' ? 'flat' : 'tree';
+	}
+
+	private _sectionLabel(parent: HTMLElement, text: string): HTMLElement {
+		const label = DOM.append(parent, DOM.$('div'));
+		label.textContent = text;
+		label.style.fontSize = '10px';
+		label.style.fontWeight = '600';
+		label.style.letterSpacing = '0.06em';
+		label.style.textTransform = 'uppercase';
+		label.style.color = MUTED;
+		label.style.marginBottom = '4px';
+		label.style.paddingLeft = '2px';
+		return label;
+	}
+
+	private _segmentTrack(row: HTMLElement): void {
+		row.style.display = 'flex';
+		row.style.gap = '2px';
+		row.style.padding = '2px';
+		row.style.background = SURFACE_OVERLAY;
+		row.style.borderRadius = '8px';
+		row.style.border = `1px solid ${BORDER}`;
+	}
+
+	private _segmentBtn(parent: HTMLElement, label: string, onClick: () => void): HTMLButtonElement {
+		const btn = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
+		btn.type = 'button';
+		btn.textContent = label;
+		btn.style.flex = '1';
+		btn.style.padding = '5px 8px';
+		btn.style.fontSize = '10px';
+		btn.style.fontWeight = '500';
+		btn.style.borderRadius = '6px';
+		btn.style.cursor = 'pointer';
+		btn.style.border = 'none';
+		btn.style.background = 'transparent';
+		btn.style.color = MUTED;
+		this._register(DOM.addDisposableListener(btn, 'click', onClick));
+		return btn;
+	}
+
+	private _chipBtn(parent: HTMLElement, label: string, onClick: () => void, block = false, center = false): HTMLButtonElement {
+		const btn = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
+		btn.type = 'button';
+		btn.textContent = label;
+		if (block) {
+			btn.style.display = center ? 'flex' : 'block';
+			btn.style.width = '100%';
+			btn.style.boxSizing = 'border-box';
+			if (center) {
+				btn.style.alignItems = 'center';
+				btn.style.justifyContent = 'center';
+				btn.style.textAlign = 'center';
+				btn.style.minHeight = '28px';
+			} else {
+				btn.style.textAlign = 'left';
+			}
+		}
+		btn.style.padding = '5px 8px';
+		btn.style.fontSize = '10px';
+		btn.style.borderRadius = '6px';
+		btn.style.cursor = 'pointer';
+		btn.style.border = `1px solid ${BORDER}`;
+		btn.style.background = SURFACE;
+		btn.style.color = '#e2e8f0';
+		this._register(DOM.addDisposableListener(btn, 'click', onClick));
+		return btn;
+	}
+
+	private _styleSegmentActive(btn: HTMLButtonElement | undefined, active: boolean): void {
+		if (!btn) {
+			return;
+		}
+		if (active) {
+			btn.style.background = ACCENT_SOFT;
+			btn.style.color = ACCENT;
+			btn.style.boxShadow = `0 0 0 1px ${ACCENT}55`;
+		} else {
+			btn.style.background = 'transparent';
+			btn.style.color = MUTED;
+			btn.style.boxShadow = 'none';
+		}
+	}
+
+	private _styleChipActive(btn: HTMLButtonElement | undefined, active: boolean, block = false): void {
+		if (!btn) {
+			return;
+		}
+		if (active) {
+			btn.style.background = ACCENT_SOFT;
+			btn.style.borderColor = ACCENT;
+			btn.style.color = ACCENT;
+			btn.style.boxShadow = block ? `0 0 0 1px ${ACCENT}55` : 'none';
+		} else {
+			btn.style.background = SURFACE;
+			btn.style.borderColor = BORDER;
+			btn.style.color = '#e2e8f0';
+			btn.style.boxShadow = 'none';
+		}
+	}
+}

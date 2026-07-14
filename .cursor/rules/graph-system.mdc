@@ -1,0 +1,14 @@
+---
+description: Use this rule when working on the PreBase graph visualization system, including node rendering, dependency graphs, code maps, graph interactions, camera movement, zoom, drag, rotation, 3D visualization, graph performance, memory usage, rendering issues, node selection, graph physics, and graph-related debugging.
+alwaysApply: false
+---
+When modifying graph code:
+
+- Preserve node selection.
+- Preserve zoom behavior.
+- Preserve camera centering.
+- Preserve graph stability.
+- Verify 3D rotation.
+- Check rendering performance.
+- Check memory usage.
+- Investigate console warnings.

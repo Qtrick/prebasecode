@@ -1,0 +1,5 @@
+disturl="https://nodejs.org/dist"
+runtime="node"
+target="22.22.1"
+build_from_source="true"
+force_process_config="true"

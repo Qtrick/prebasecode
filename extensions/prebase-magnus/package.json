@@ -1,0 +1,277 @@
+{
+  "name": "magnus",
+  "displayName": "Magnus",
+  "description": "PreBase Magnus AI chat \u2014 Gemini-backed language models and workspace tools",
+  "version": "0.1.0",
+  "publisher": "prebase",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.128.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "activationEvents": [
+    "onStartupFinished",
+    "onLanguageModelChat:magnus",
+    "onChatParticipant:prebase.magnus.ask",
+    "onChatParticipant:prebase.magnus.edit",
+    "onChatParticipant:prebase.magnus.agent",
+    "onCommand:prebase.magnus.describeFile",
+    "onCommand:prebase.magnus.checkConfiguration",
+    "onCommand:prebase.magnus.hasApiKey"
+  ],
+  "main": "./out/extension.js",
+  "enabledApiProposals": [
+    "defaultChatParticipant",
+    "chatParticipantAdditions",
+    "chatParticipantPrivate",
+    "chatProvider",
+    "languageModelSystem",
+    "languageModelCapabilities",
+    "languageModelThinkingPart"
+  ],
+	"contributes": {
+		"languageModelChatProviders": [
+			{
+				"vendor": "magnus",
+				"displayName": "Magnus",
+				"isDefault": true
+			}
+		],
+		"chatViewsWelcome": [
+			{
+				"icon": "$(sparkle)",
+				"title": "Magnus Agents",
+				"content": "Ask, plan, edit, and verify with Magnus.\n\nKeys load from the project `.env` — paste Gemini, OpenAI, Claude, or any listed provider (at least one).",
+				"when": "!chatSetupHidden"
+			}
+		],
+		"chatParticipants": [
+      {
+        "id": "prebase.magnus.ask",
+        "name": "Magnus",
+        "fullName": "Magnus",
+        "description": "Ask Magnus about your project (read-only)",
+        "isDefault": true,
+        "locations": [
+          "panel"
+        ],
+        "modes": [
+          "ask"
+        ]
+      },
+      {
+        "id": "prebase.magnus.edit",
+        "name": "Magnus",
+        "fullName": "Magnus",
+        "description": "Edit code with Magnus",
+        "isDefault": true,
+        "locations": [
+          "panel"
+        ],
+        "modes": [
+          "edit"
+        ]
+      },
+      {
+        "id": "prebase.magnus.agent",
+        "name": "agent",
+        "fullName": "Magnus",
+        "description": "Agent mode \u2014 plan, edit, and verify with Magnus",
+        "isDefault": true,
+        "isAgent": true,
+        "locations": [
+          "panel"
+        ],
+        "modes": [
+          "agent"
+        ],
+        "when": "config.chat.agent.enabled"
+      }
+    ],
+    "commands": [
+      {
+        "command": "prebase.magnus.open",
+        "title": "Open Magnus",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.setApiKey",
+        "title": "Open API Keys (.env)",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.clearApiKey",
+        "title": "Clear Legacy API Key Secret",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.checkConfiguration",
+        "title": "Check Configuration",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.newSession",
+        "title": "New Session",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.selectModel",
+        "title": "Select Model",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.selectMode",
+        "title": "Select Mode",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.cancel",
+        "title": "Cancel",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.attachCurrentFile",
+        "title": "Attach Current File",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.attachGraphSelection",
+        "title": "Attach Graph Selection",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.attachRuntimeContext",
+        "title": "Attach Runtime Context",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.describeFile",
+        "title": "Describe File (Graph)",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.hasApiKey",
+        "title": "Has API Key",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.open.walkthrough",
+        "title": "Open Walkthrough",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.refreshToken",
+        "title": "Refresh Token",
+        "category": "Magnus"
+      },
+      {
+        "command": "prebase.magnus.toggleStatusMenu",
+        "title": "Toggle Status Menu",
+        "category": "Magnus"
+      }
+    ],
+    "configuration": {
+      "title": "Magnus",
+      "properties": {
+        "prebase.magnus.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Enable Magnus AI chat."
+        },
+        "prebase.magnus.defaultModel": {
+          "type": "string",
+          "default": "auto",
+          "enum": [
+            "auto",
+            "gemini-2.5-pro",
+            "gemini-2.5-flash",
+            "gemini-2.0-flash",
+            "gemini-1.5-pro",
+            "gemini-1.5-flash"
+          ],
+          "enumDescriptions": [
+            "Auto",
+            "Gemini 2.5 Pro",
+            "Gemini 2.5 Flash",
+            "Gemini 2.0 Flash",
+            "Gemini 1.5 Pro",
+            "Gemini 1.5 Flash"
+          ],
+          "description": "Default Magnus language model."
+        },
+        "prebase.magnus.defaultMode": {
+          "type": "string",
+          "default": "ask",
+          "enum": [
+            "ask",
+            "plan",
+            "patch",
+            "runtime",
+            "agent"
+          ],
+          "enumDescriptions": [
+            "Ask \u2014 read-only Q&A",
+            "Plan \u2014 architecture planning without edits",
+            "Edit \u2014 propose and apply code edits",
+            "Test \u2014 runtime / UI testing focus",
+            "Agent \u2014 full tool loop"
+          ],
+          "description": "Default Magnus agent mode (Plan/Test map via this setting or Select Mode)."
+        },
+		"prebase.magnus.panelLocation": {
+			"type": "string",
+			"default": "sidebar",
+			"enum": [
+				"panel",
+				"sidebar"
+			],
+			"description": "Preferred Magnus chat panel location (sidebar = Agents auxiliary bar)."
+		},
+        "prebase.magnus.requireEditApproval": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require user approval before applying file edits."
+        },
+        "prebase.magnus.requireTerminalApproval": {
+          "type": "boolean",
+          "default": true,
+          "description": "Require user approval before running terminal commands."
+        },
+        "prebase.magnus.maxToolIterations": {
+          "type": "number",
+          "default": 12,
+          "minimum": 1,
+          "maximum": 50,
+          "description": "Maximum tool-loop iterations per chat request."
+        },
+        "prebase.magnus.includeGraphContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include PreBase graph selection in chat context when available."
+        },
+        "prebase.magnus.includeRuntimeContext": {
+          "type": "boolean",
+          "default": true,
+          "description": "Include Runtime Preview context in chat when available."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "gulp compile-extension:prebase-magnus",
+    "watch": "gulp watch-extension:prebase-magnus"
+  },
+  "devDependencies": {
+    "@types/node": "24.x"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/microsoft/vscode.git"
+  },
+  "extensionKind": [
+    "ui",
+    "workspace"
+  ]
+}
