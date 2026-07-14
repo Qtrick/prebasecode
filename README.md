@@ -1,78 +1,198 @@
-# Visual Studio Code - Open Source ("Code - OSS")
-[![Feature Requests](https://img.shields.io/github/issues/microsoft/vscode/feature-request.svg)](https://github.com/microsoft/vscode/issues?q=is%3Aopen+is%3Aissue+label%3Afeature-request+sort%3Areactions-%2B1-desc)
-[![Bugs](https://img.shields.io/github/issues/microsoft/vscode/bug.svg)](https://github.com/microsoft/vscode/issues?utf8=✓&q=is%3Aissue+is%3Aopen+label%3Abug)
-[![Gitter](https://img.shields.io/badge/chat-on%20gitter-yellow.svg)](https://gitter.im/Microsoft/vscode)
+# PreBase IDE
 
-## The Repository
+PreBase is an AI-assisted desktop IDE and code visualization platform. It helps you write code, see how a project is structured as interactive graphs, preview running apps, and work with an in-editor AI assistant (Magnus).
 
-This repository ("`Code - OSS`") is where we (Microsoft) develop the [Visual Studio Code](https://code.visualstudio.com) product together with the community. Not only do we work on code and issues here, but we also publish our [roadmap](https://github.com/microsoft/vscode/wiki/Roadmap), [monthly iteration plans](https://github.com/microsoft/vscode/wiki/Iteration-Plans), and our [endgame plans](https://github.com/microsoft/vscode/wiki/Running-the-Endgame). This source code is available to everyone under the standard [MIT license](https://github.com/microsoft/vscode/blob/main/LICENSE.txt).
+PreBase is built on the open-source Code - OSS editor platform (MIT), with PreBase-specific workbench features layered on top.
 
-## Visual Studio Code
+## What PreBase adds
 
-<p align="center">
-  <img alt="VS Code in action" src="https://github.com/user-attachments/assets/56af271c-949d-454c-a3ea-16188c063414">
-</p>
+These features are **not** part of stock Code - OSS / typical editor builds. They live mainly under `src/vs/workbench/contrib/prebase/` and `extensions/prebase-magnus/`.
 
-[Visual Studio Code](https://code.visualstudio.com) is a distribution of the `Code - OSS` repository with Microsoft-specific customizations released under a traditional [Microsoft product license](https://code.visualstudio.com/License/).
+| Feature | What it is |
+|--------|------------|
+| **Home** | PreBase landing page with native recent projects |
+| **PreBase Maps** | Architecture & Network graphs of your workspace |
+| **Runtime Preview** | In-IDE localhost preview for Vite / Next / similar apps |
+| **Magnus** | Gemini-backed AI chat + graph file descriptions |
+| **Account & Onboarding** | Optional PreBase account + first-run walkthrough |
+| **PreBase Settings** | Dedicated settings for maps, runtime, and graph behavior |
 
-[Visual Studio Code](https://code.visualstudio.com) combines the simplicity of a code editor with what developers need for their core edit-build-debug cycle. It provides comprehensive code editing, navigation, and understanding support along with lightweight debugging, a rich extensibility model, and lightweight integration with existing tools.
+---
 
-Visual Studio Code is updated monthly with new features and bug fixes. You can download it for Windows, macOS, and Linux on [Visual Studio Code's website](https://code.visualstudio.com/Download). To get the latest releases every day, install the [Insiders build](https://code.visualstudio.com/insiders).
+## Quick start (from source)
 
-## Contributing
+```bash
+# Install dependencies (first time)
+npm install
 
-There are many ways in which you can participate in this project, for example:
+# Fast build: transpile client + extensions + Magnus
+npm run build-fast
 
-* [Submit bugs and feature requests](https://github.com/microsoft/vscode/issues), and help us verify as they are checked in
-* Review [source code changes](https://github.com/microsoft/vscode/pulls)
-* Review the [documentation](https://github.com/microsoft/vscode-docs) and make pull requests for anything from typos to new content.
+# Or full compile
+npm run compile
 
-If you are interested in fixing issues and contributing directly to the code base,
-please see the document [How to Contribute](https://github.com/microsoft/vscode/wiki/How-to-Contribute), which covers the following:
+# Launch PreBase with an isolated profile
+./scripts/code.sh
+```
 
-* [How to build and run from source](https://github.com/microsoft/vscode/wiki/How-to-Contribute)
-* [The development workflow, including debugging and running tests](https://github.com/microsoft/vscode/wiki/How-to-Contribute#debugging)
-* [Coding guidelines](https://github.com/microsoft/vscode/wiki/Coding-Guidelines)
-* [Submitting pull requests](https://github.com/microsoft/vscode/wiki/How-to-Contribute#pull-requests)
-* [Finding an issue to work on](https://github.com/microsoft/vscode/wiki/How-to-Contribute#where-to-contribute)
-* [Contributing to translations](https://aka.ms/vscodeloc)
+Useful scripts:
 
-## Feedback
+| Script | Purpose |
+|--------|---------|
+| `npm run watch` | Watch client, extensions, and Magnus |
+| `npm run typecheck-client` | Typecheck the workbench |
+| `npm run compile-magnus` | Build the Magnus extension only |
+| `./scripts/code.sh` | Run the desktop app |
 
-* Ask a question on [Stack Overflow](https://stackoverflow.com/questions/tagged/vscode)
-* [Request a new feature](CONTRIBUTING.md)
-* Upvote [popular feature requests](https://github.com/microsoft/vscode/issues?q=is%3Aopen+is%3Aissue+label%3Afeature-request+sort%3Areactions-%2B1-desc)
-* [File an issue](https://github.com/microsoft/vscode/issues)
-* Connect with the extension author community on [GitHub Discussions](https://github.com/microsoft/vscode-discussions/discussions) or [Slack](https://aka.ms/vscode-dev-community)
-* Follow [@code](https://x.com/code) and let us know what you think!
+Data for this build is stored under `.prebase` / `.prebase-shared` (see `product.json`), not the stock editor data folders.
 
-See our [wiki](https://github.com/microsoft/vscode/wiki/Feedback-Channels) for a description of each of these channels and information on some other available community-driven channels.
+---
 
-## Related Projects
+## Feature guides
 
-Many of the core components and extensions to VS Code live in their own repositories on GitHub. For example, the [node debug adapter](https://github.com/microsoft/vscode-node-debug) and the [mono debug adapter](https://github.com/microsoft/vscode-mono-debug) repositories are separate from each other. For a complete list, please visit the [Related Projects](https://github.com/microsoft/vscode/wiki/Related-Projects) page on our [wiki](https://github.com/microsoft/vscode/wiki).
+### 1. Home & recent projects
 
-## Bundled Extensions
+**What:** A PreBase Home editor that lists recent folders/workspaces using the **native** recent-projects service (same authority as File → Open Recent). No separate recents database.
 
-VS Code includes a set of built-in extensions located in the [extensions](extensions) folder, including grammars and snippets for many languages. Extensions that provide rich language support (inline suggestions, Go to Definition) for a language have the suffix `language-features`. For example, the `json` extension provides coloring for `JSON` and the `json-language-features` extension provides rich language support for `JSON`.
+**Try it:**
 
-## Development Container
+1. Launch PreBase and open a folder once (`File → Open Folder…`).
+2. Command Palette → **PreBase: Open Home**.
+3. Click a recent project to reopen it, or use **Open Folder** from Home.
+4. Empty workspaces can auto-show Home when `prebase.home.openWhenEditorsEmpty` is enabled.
 
-This repository includes a Visual Studio Code Dev Containers / GitHub Codespaces development container.
+---
 
-* For [Dev Containers](https://aka.ms/vscode-remote/download/containers), use the **Dev Containers: Clone Repository in Container Volume...** command which creates a Docker volume for better disk I/O on macOS and Windows.
-  * If you already have VS Code and Docker installed, you can also click [here](https://vscode.dev/redirect?url=vscode://ms-vscode-remote.remote-containers/cloneInVolume?url=https://github.com/microsoft/vscode) to get started. This will cause VS Code to automatically install the Dev Containers extension if needed, clone the source code into a container volume, and spin up a dev container for use.
+### 2. PreBase Maps (Architecture & Network)
 
-* For Codespaces, install the [GitHub Codespaces](https://marketplace.visualstudio.com/items?itemName=GitHub.codespaces) extension in VS Code, and use the **Codespaces: Create New Codespace** command.
+**What:** Visual maps of your codebase.
 
-Docker / the Codespace should have at least **4 cores and 6 GB of RAM (8 GB recommended)** to run a full build. See the [development container README](.devcontainer/README.md) for more information.
+- **Architecture graph** — layers and file relationships in Hierarchy / Pyramid / Scattered layouts.
+- **Network graph** — 3D-ish spatial view (Organic, Sphere, Constellation, Clustered, Radial) with selection, pan/zoom, and optional idle rotation (off by default).
 
-## Code of Conduct
+**Try it:**
 
-This project has adopted the [Microsoft Open Source Code of Conduct](https://opensource.microsoft.com/codeofconduct/). For more information see the [Code of Conduct FAQ](https://opensource.microsoft.com/codeofconduct/faq/) or contact [opencode@microsoft.com](mailto:opencode@microsoft.com) with any additional questions or comments.
+1. Open a folder with source files.
+2. Open the **PreBase Maps** view in the Activity Bar / sidebar.
+3. Run **PreBase: Scan Workspace** (or open Architecture / Network from the palette).
+4. Switch layout with the chips in Maps, or **PreBase: Switch Architecture Layout** / Network layout settings.
+5. Click a node to select it; use the popup to open/reveal the file or attach context to Magnus.
+6. **PreBase: Fit Graph View** / **Reset Graph View** if the camera drifts.
+
+**Tips:**
+
+- Large repos: lower max rendered nodes/edges in PreBase Settings if the map feels heavy.
+- **PreBase: Show Graph Diagnostics** explains scan status and truncation.
+- Empty projects show a helper to open a folder before scanning.
+
+---
+
+### 3. Node descriptions (Magnus-backed)
+
+**What:** Selecting a graph node can show a short structural overview plus an optional AI description from Magnus.
+
+**Try it:**
+
+1. Configure Magnus (see below) with `GEMINI_API_KEY` in `.env`.
+2. Open Architecture or Network, select a file node.
+3. Read the overview; if Magnus is configured, an AI blurb appears (cached per file/content).
+4. **PreBase: Regenerate Selected Node Description** forces a fresh AI pass.
+5. **PreBase: Clear Graph Description Cache** drops cached blurbs.
+
+Without an API key, the structural overview still works; AI text shows as unavailable.
+
+---
+
+### 4. Runtime Preview
+
+**What:** Detects common front-end stacks (Vite + React, Next.js, etc.), starts the project’s `dev` / `start` script in a PreBase terminal, picks a sensible localhost URL (e.g. Vite → `:5173`), and shows the app in an in-IDE preview panel.
+
+**Try it:**
+
+1. Open a web app folder (`package.json` with `dev` / Vite / Next).
+2. Open **Runtime Preview** from the Activity Bar / Maps-adjacent sidebar, or Command Palette → PreBase runtime commands.
+3. Prefer **Start** so PreBase launches the detected script (not Connect alone with nothing listening).
+4. When the server prints a local URL, PreBase auto-detects it and loads the preview.
+5. Use the toolbar: Back / Forward / Reload / External / Copy URL; set viewport presets in Runtime / Settings.
+
+**Tips:**
+
+- **Connect** only marks “connected” when something is actually listening; if you see *Waiting…*, Start the server or fix the URL.
+- Vite projects should default to `http://localhost:5173`, not `3000`.
+- Preview runs in a workbench webview (localhost HTTP), similar to a dedicated browser panel.
+
+---
+
+### 5. Magnus AI
+
+**What:** PreBase’s chat assistant (Ask / Edit / Agent participants) backed by Google Gemini. Keys are resolved from a gitignored `.env` (workspace or product root), not mixed with PreBase Account tokens.
+
+**Setup:**
+
+1. Add to the product or workspace `.env` (never commit this file):
+
+   ```bash
+   GEMINI_API_KEY=your_key_here
+   ```
+
+   `GOOGLE_API_KEY` is also accepted for Gemini.
+
+2. Command Palette → **Magnus: Check Configuration** — you should see the key variable and `env-file` source (value is never shown in UI as a secret dump).
+3. **Magnus: Open API Keys (.env)** opens the preferred `.env` for editing; save to hot-reload.
+4. **Magnus: Open** opens chat; pick model/mode via **Magnus: Select Model** / **Select Mode**.
+
+**Use with Maps / Runtime:**
+
+- **Magnus: Attach Graph Selection** — after selecting a node in Maps.
+- **Magnus: Attach Runtime Context** — attach preview/session context from Runtime Preview.
+- Graph node descriptions call `prebase.magnus.describeFile` when Magnus is configured.
+
+---
+
+### 6. Account, onboarding & settings
+
+**Account**
+
+- Optional PreBase cloud account via **Accounts** menu / **PreBase: Sign In…**.
+- Requires a configured HTTPS `prebase.account.apiBaseUrl`. If unset, sign-in stays unconfigured (no fake local login).
+- Magnus API keys and PreBase Account sessions are separate stores.
+
+**Onboarding**
+
+- **PreBase: Open PreBase Onboarding** walks through Home, Maps, Runtime, Magnus, and account setup.
+- **PreBase: Reset Onboarding** runs the tour again.
+
+**Settings**
+
+- **PreBase: Open PreBase Settings** — maps layouts, network options, runtime defaults, description cache, and related toggles in one place.
+- Or search `prebase.` in the normal Settings UI.
+
+---
+
+## Repository layout (PreBase-focused)
+
+```
+src/vs/workbench/contrib/prebase/   # Home, Maps, Runtime, account, settings, graphs
+extensions/prebase-magnus/          # Magnus AI extension
+product.json                        # PreBase branding & app identity
+scripts/code.sh                     # Launch desktop PreBase from source
+```
+
+Core editor, terminal, git, and extension host behavior still come from the shared Code - OSS tree under `src/vs/` and `extensions/`.
+
+---
+
+## Development notes
+
+- Prefer the existing workbench service patterns (configuration, editor panes, webview `postMessage`, SecretStorage). Do not introduce a second recents DB or fake signed-in state.
+- After editing TypeScript under `src/`, run `npm run transpile-client` or `npm run watch` so `out/` stays in sync before launching.
+- Magnus changes: `npm run compile-magnus` (or `watch-magnus`).
+- Coding expectations for this tree: see `.cursor/rules/prebase-development.mdc` and `.github/copilot-instructions.md` when present.
+
+---
 
 ## License
 
-Copyright (c) Microsoft Corporation. All rights reserved.
+PreBase builds on Code - OSS components licensed under the [MIT](LICENSE.txt) license. See `LICENSE.txt` and third-party notices in the repository for details.
 
-Licensed under the [MIT](LICENSE.txt) license.
+Copyright for PreBase-specific contributions: PreBase contributors. Upstream Code - OSS portions: copyright their respective authors (including Microsoft Corporation for the original Code - OSS project).
