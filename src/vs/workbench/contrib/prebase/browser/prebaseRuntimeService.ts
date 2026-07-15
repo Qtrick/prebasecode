@@ -745,7 +745,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			magnusAttached: true,
 			consoleEntries: [
 				...this._session.consoleEntries,
-				localize('prebase.runtime.magnus', "Attached runtime context to Magnus")
+				localize('prebase.runtime.magnus', "Attached runtime context to Agents")
 			]
 		};
 		this._fire();

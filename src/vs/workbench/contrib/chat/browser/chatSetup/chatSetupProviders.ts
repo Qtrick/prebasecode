@@ -270,6 +270,7 @@ export class SetupAgent extends Disposable implements IChatAgentImplementation {
 			entitlement: this.context.state.entitlement,
 			anonymous: this.chatEntitlementService.anonymous,
 			hasByokModels: this.chatEntitlementService.hasByokModels,
+			allowUnsignedWithLocalKeys: isMagnusDefaultChatAgent(),
 		})) {
 			return this.doInvokeWithSetup(request, progress, chatService, languageModelsService, chatWidgetService, chatAgentService, languageModelToolsService, defaultAccountService);
 		}

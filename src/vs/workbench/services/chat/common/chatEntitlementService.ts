@@ -174,6 +174,12 @@ export interface IChatSetupRequirement {
 	readonly anonymous: boolean;
 	/** Whether BYOK models are available. */
 	readonly hasByokModels: boolean;
+	/**
+	 * When true, GitHub Copilot entitlement/completion checks do not force setup.
+	 * Used by PreBase Magnus, which authenticates via local `.env` API keys (same idea as
+	 * V1.1's main-process `apiKeyLoader`) rather than GitHub sign-in.
+	 */
+	readonly allowUnsignedWithLocalKeys?: boolean;
 }
 
 /**
@@ -185,14 +191,17 @@ export interface IChatSetupRequirement {
  */
 export function chatRequiresSetup(context: IChatSetupRequirement): boolean {
 	return (
-		(!context.completed && !context.hasByokModels) ||			// Setup not completed (unless BYOK models are available)
+		// Setup not completed (unless BYOK models are available, or the product
+		// uses local `.env` keys instead of GitHub Copilot signup — PreBase Magnus).
+		(!context.completed && !context.hasByokModels && !context.allowUnsignedWithLocalKeys) ||
 		context.disabled ||											// Extension disabled: run setup to enable
 		context.untrusted ||										// Workspace untrusted: run setup to ask for trust
 		context.entitlement === ChatEntitlement.Available ||		// Entitlement available: run setup to sign up
 		(
 			context.entitlement === ChatEntitlement.Unknown &&		// Entitlement unknown: run setup to sign in / sign up
 			!context.anonymous &&									// unless anonymous access is enabled
-			!context.hasByokModels									// unless BYOK models are available
+			!context.hasByokModels &&								// unless BYOK models are available
+			!context.allowUnsignedWithLocalKeys						// unless product uses local `.env` keys (Magnus)
 		)
 	);
 }

@@ -9,7 +9,7 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { Codicon } from '../../../../base/common/codicons.js';
 import { KeyCode } from '../../../../base/common/keyCodes.js';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
-import { Schemas } from '../../../../base/common/network.js';
+import { FileAccess, Schemas } from '../../../../base/common/network.js';
 import { ThemeIcon } from '../../../../base/common/themables.js';
 import { URI } from '../../../../base/common/uri.js';
 import { splitRecentLabel } from '../../../../base/common/labels.js';
@@ -142,7 +142,7 @@ export class PreBaseHomeEditor extends EditorPane {
 			? undefined
 			: this.labelService.getWorkspaceLabel(this.workspaceContextService.getWorkspace(), { verbose: Verbosity.SHORT });
 
-		const cards = await this._buildRecentCards(emptyWorkbench);
+		const cards = await this._buildRecentCards();
 		if (generation !== this._renderGeneration || !this._body || !this.input) {
 			return;
 		}
@@ -152,7 +152,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		DOM.clearNode(this._body);
 		this._renderHero(emptyWorkbench, workspaceName);
 		this._renderQuickActions(emptyWorkbench);
-		this._renderRecentSection(emptyWorkbench, cards);
+		this._renderRecentSection(cards);
 	}
 
 	private _renderHero(emptyWorkbench: boolean, workspaceName: string | undefined): void {
@@ -167,14 +167,24 @@ export class PreBaseHomeEditor extends EditorPane {
 		badge.style.width = '72px';
 		badge.style.height = '72px';
 		badge.style.borderRadius = '18px';
-		badge.style.display = 'flex';
-		badge.style.alignItems = 'center';
-		badge.style.justifyContent = 'center';
-		badge.style.border = `1px solid ${BORDER}`;
-		badge.style.background = 'rgba(15,23,42,0.75)';
-		badge.style.color = ACCENT;
-		badge.style.fontSize = '28px';
-		badge.classList.add(...ThemeIcon.asClassNameArray(Codicon.home));
+		badge.style.display = 'block';
+		badge.style.boxSizing = 'border-box';
+		badge.style.border = '1px solid rgba(148,163,184,0.35)';
+		badge.style.background = '#000';
+		badge.style.overflow = 'hidden';
+		badge.style.flexShrink = '0';
+		badge.style.lineHeight = '0';
+		const logo = DOM.append(badge, DOM.$('img')) as HTMLImageElement;
+		logo.src = FileAccess.asBrowserUri('vs/workbench/contrib/prebase/browser/media/prebase-logo.png').toString(true);
+		logo.alt = this.productService.nameLong || 'PreBase';
+		logo.draggable = false;
+		logo.style.display = 'block';
+		logo.style.width = '100%';
+		logo.style.height = '100%';
+		logo.style.objectFit = 'cover';
+		logo.style.objectPosition = 'center';
+		logo.style.userSelect = 'none';
+		logo.style.pointerEvents = 'none';
 
 		const title = DOM.append(hero, DOM.$('h1'));
 		title.textContent = this.productService.nameLong || 'PreBase';
@@ -239,13 +249,13 @@ export class PreBaseHomeEditor extends EditorPane {
 			this._actionButton(row, localize('prebase.home.runtime', "Runtime Preview"), () => {
 				void this.commandService.executeCommand('prebase.runtime.open');
 			});
-			this._actionButton(row, localize('prebase.home.magnus', "Magnus"), () => {
+			this._actionButton(row, localize('prebase.home.magnus', "Agents"), () => {
 				void this.commandService.executeCommand('workbench.action.chat.open');
 			});
 		}
 	}
 
-	private _renderRecentSection(emptyWorkbench: boolean, cards: RecentCardModel[]): void {
+	private _renderRecentSection(cards: RecentCardModel[]): void {
 		const section = DOM.append(this._body!, DOM.$('section'));
 		section.style.display = 'flex';
 		section.style.flexDirection = 'column';
@@ -259,9 +269,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		header.style.flexWrap = 'wrap';
 
 		const title = DOM.append(header, DOM.$('h2'));
-		title.textContent = emptyWorkbench
-			? localize('prebase.home.recent', "Recent projects")
-			: localize('prebase.home.otherRecent', "Other recent projects");
+		title.textContent = localize('prebase.home.recent', "Recent projects");
 		title.style.margin = '0';
 		title.style.fontSize = '11px';
 		title.style.fontWeight = '600';
@@ -312,26 +320,16 @@ export class PreBaseHomeEditor extends EditorPane {
 		}
 	}
 
-	private async _buildRecentCards(emptyWorkbench: boolean): Promise<RecentCardModel[]> {
+	private async _buildRecentCards(): Promise<RecentCardModel[]> {
 		const { workspaces } = await this.workspacesService.getRecentlyOpened();
-		const currentFolderUris = new Set(
-			this.workspaceContextService.getWorkspace().folders.map(f => f.uri.toString())
-		);
-		const currentWorkspaceConfig = this.workspaceContextService.getWorkspace().configuration?.toString();
 
 		const models: RecentCardModel[] = [];
 		for (const recent of workspaces) {
 			if (!isRecentFolder(recent) && !isRecentWorkspace(recent)) {
 				continue;
 			}
-			if (!emptyWorkbench) {
-				if (isRecentFolder(recent) && currentFolderUris.has(recent.folderUri.toString())) {
-					continue;
-				}
-				if (isRecentWorkspace(recent) && currentWorkspaceConfig && recent.workspace.configPath.toString() === currentWorkspaceConfig) {
-					continue;
-				}
-			}
+			// Include the current workspace so a single recent open still appears on Home
+			// (VS Code "Open Recent" excludes the active one; Home should show it).
 			models.push(this._toCardModel(recent, models.length === 0));
 			if (models.length >= HOME_CARD_LIMIT) {
 				break;

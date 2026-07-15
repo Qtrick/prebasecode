@@ -275,7 +275,7 @@ export class PreBaseGraphEditor extends EditorPane {
 				await reply({
 					ok: !!summary,
 					message: summary
-						? localize('prebase.graph.magnusAttached', "Graph selection attached to Magnus.")
+						? localize('prebase.graph.magnusAttached', "Graph selection attached to Agents.")
 						: localize('prebase.graph.magnusNoSelection', "Select a node first.")
 				});
 				break;
@@ -345,7 +345,7 @@ html, body { margin:0; height:100%; background:#070b14; color:#e2e8f0; font-fami
 	<div class="actions">
 		<button class="primary" id="popupOpen" type="button">Open File</button>
 		<button id="popupReveal" type="button">Reveal</button>
-		<button id="popupMagnus" type="button">Attach to Magnus</button>
+		<button id="popupMagnus" type="button">Attach to Agents</button>
 	</div>
 </div>
 <div id="toolbar">

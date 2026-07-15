@@ -86,14 +86,14 @@ export function getMagnusPlaceholder(mode: MagnusAgentMode): string {
 		case 'ask':
 			return 'Ask about this project, file, graph, or runtime…';
 		case 'plan':
-			return 'Ask Magnus to inspect and plan before editing…';
+			return 'Ask Agents to inspect and plan before editing…';
 		case 'patch':
-			return 'Describe the code change Magnus should propose…';
+			return 'Describe the code change Agents should propose…';
 		case 'runtime':
-			return 'Tell Magnus what page, flow, or UI to test…';
+			return 'Tell Agents what page, flow, or UI to test…';
 		case 'agent':
-			return 'Give Magnus a task to plan, edit, test, and verify…';
+			return 'Give Agents a task to plan, edit, test, and verify…';
 		default:
-			return 'Ask Magnus…';
+			return 'Ask Agents…';
 	}
 }

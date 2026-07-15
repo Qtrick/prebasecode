@@ -29,7 +29,7 @@ const STEPS = [
 	localize('prebase.onboarding.step.project', "First project"),
 	localize('prebase.onboarding.step.graph', "Codebase maps"),
 	localize('prebase.onboarding.step.build', "Build & test"),
-	localize('prebase.onboarding.step.magnus', "Magnus"),
+	localize('prebase.onboarding.step.magnus', "Agents"),
 	localize('prebase.onboarding.step.finish', "Finish"),
 ];
 
@@ -114,7 +114,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		title.style.fontWeight = '600';
 
 		const sub = DOM.append(this._body, DOM.$('p'));
-		sub.textContent = localize('prebase.onboarding.support', "Set up your workspace. You can skip account setup and configure Magnus later.");
+		sub.textContent = localize('prebase.onboarding.support', "Set up your workspace. You can skip account setup and configure Agents later.");
 		sub.style.color = MUTED;
 		sub.style.margin = '0 0 18px';
 		sub.style.fontSize = '13px';
@@ -192,7 +192,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		} else if (state === 'signedIn' && this.accountService.account) {
 			note.textContent = localize('prebase.onboarding.accountSignedIn', "Signed in as {0}.", this.accountService.account.displayName);
 		} else {
-			note.textContent = localize('prebase.onboarding.accountOptional', "Optional. Editor, graphs, terminal, and Magnus do not require a PreBase account.");
+			note.textContent = localize('prebase.onboarding.accountOptional', "Optional. Editor, graphs, terminal, and Agents do not require a PreBase account.");
 		}
 
 		const actions = DOM.append(panel, DOM.$('div'));
@@ -287,16 +287,16 @@ export class PreBaseOnboardingEditor extends EditorPane {
 	}
 
 	private _renderMagnus(panel: HTMLElement): void {
-		DOM.append(panel, DOM.$('h2')).textContent = localize('prebase.onboarding.magnusTitle', "Magnus (optional)");
+		DOM.append(panel, DOM.$('h2')).textContent = localize('prebase.onboarding.magnusTitle', "Agents (optional)");
 		const p = DOM.append(panel, DOM.$('p'));
 		p.style.color = MUTED;
 		p.style.fontSize = '12px';
-		p.textContent = localize('prebase.onboarding.magnusBody', "Configure a Magnus API key when you want AI assistance. Magnus uses its own SecretStorage key and does not require a PreBase account.");
+		p.textContent = localize('prebase.onboarding.magnusBody', "Configure an API key for Agents when you want AI assistance. Agents uses its own SecretStorage key and does not require a PreBase account.");
 		const row = DOM.append(panel, DOM.$('div'));
 		row.style.display = 'flex';
 		row.style.gap = '8px';
 		row.style.flexWrap = 'wrap';
-		this._btn(row, localize('prebase.onboarding.magnusConfig', "Configure Magnus"), () => void this.commandService.executeCommand('prebase.magnus.setApiKey'), true);
+		this._btn(row, localize('prebase.onboarding.magnusConfig', "Configure Agents"), () => void this.commandService.executeCommand('prebase.magnus.setApiKey'), true);
 		this._btn(row, localize('prebase.onboarding.magnusSkip', "Skip for now"), () => this._advance(true));
 	}
 

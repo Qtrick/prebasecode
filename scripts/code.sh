@@ -60,11 +60,17 @@ function code() {
 		DISABLE_TEST_EXTENSION=""
 	fi
 
-	# Ensure PreBase Magnus loads in DEV (forces activation + proposed APIs).
+	# Enable Magnus proposed APIs in DEV. Do NOT pass --extensionDevelopmentPath by
+	# default: that marks the window as an extension host and VS Code intentionally
+	# skips writing workspace opens into history.recentlyOpenedPathsList (Home
+	# recent projects would stay empty). Opt in with PREBASE_MAGNUS_EXT_DEV=1.
 	MAGNUS_DEV_PATH="$ROOT/extensions/prebase-magnus"
 	MAGNUS_DEV_ARG=()
-	if [[ -d "$MAGNUS_DEV_PATH" && "$@" != *"--extensionDevelopmentPath"* ]]; then
-		MAGNUS_DEV_ARG=(--extensionDevelopmentPath="$MAGNUS_DEV_PATH" --enable-proposed-api=prebase.magnus)
+	if [[ -d "$MAGNUS_DEV_PATH" && "$@" != *"--enable-proposed-api"* ]]; then
+		MAGNUS_DEV_ARG=(--enable-proposed-api=prebase.magnus)
+	fi
+	if [[ "${PREBASE_MAGNUS_EXT_DEV:-}" == "1" && -d "$MAGNUS_DEV_PATH" && "$@" != *"--extensionDevelopmentPath"* ]]; then
+		MAGNUS_DEV_ARG+=(--extensionDevelopmentPath="$MAGNUS_DEV_PATH")
 	fi
 
 	# Launch Code

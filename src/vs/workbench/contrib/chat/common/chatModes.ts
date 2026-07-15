@@ -715,10 +715,10 @@ export namespace ChatMode {
 		? localize('chatDescription.magnus', "Ask about this project, file, graph, or runtime")
 		: localize('chatDescription', "Explore and understand your code"), Codicon.question);
 	export const Edit = new BuiltinChatMode(ChatModeKind.Edit, 'Edit', magnus
-		? localize('editsDescription.magnus', "Describe the code change Magnus should propose")
+		? localize('editsDescription.magnus', "Describe the code change Agents should propose")
 		: localize('editsDescription', "Edit or refactor selected code"), Codicon.edit);
 	export const Agent = new BuiltinChatMode(ChatModeKind.Agent, 'Agent', magnus
-		? localize('agentDescription.magnus', "Give Magnus a task to plan, edit, test, and verify")
+		? localize('agentDescription.magnus', "Give Agents a task to plan, edit, test, and verify")
 		: localize('agentDescription', "Describe what to build"), Codicon.agent);
 }
 

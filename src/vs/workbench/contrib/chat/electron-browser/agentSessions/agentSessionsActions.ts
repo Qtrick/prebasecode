@@ -444,16 +444,16 @@ export class AgentsHandoffInputTipContribution extends Disposable implements IWo
 		// run without a folder, so frame the tip as the path forward rather
 		// than a generic "continue in agents" upsell.
 		const useEmptyWorkspaceCopy = emptyWorkspaceEligible && !eligible;
-		const magnus = product.defaultChatAgent?.provider?.default?.name === 'Magnus'
+		const magnus = product.defaultChatAgent?.provider?.default?.name === 'Agents'
 			|| product.defaultChatAgent?.extensionId === 'prebase.magnus';
 		const message = useEmptyWorkspaceCopy
 			? (magnus
-				? localize('chat.agentsHandoff.tip.emptyWorkspace.message.magnus', "Magnus Agent Host needs an open folder")
+				? localize('chat.agentsHandoff.tip.emptyWorkspace.message.magnus', "Agents needs an open folder")
 				: localize('chat.agentsHandoff.tip.emptyWorkspace.message', "Copilot CLI [Agent Host] isn't available without an open folder"))
 			: localize('chat.agentsHandoff.tip.message', "Continue this session in the Agents Window");
 		const description = useEmptyWorkspaceCopy
 			? (magnus
-				? localize('chat.agentsHandoff.tip.emptyWorkspace.description.magnus', "Open the Agents Window to start a Magnus session.")
+				? localize('chat.agentsHandoff.tip.emptyWorkspace.description.magnus', "Open the Agents Window to start an Agents session.")
 				: localize('chat.agentsHandoff.tip.emptyWorkspace.description', "Open the Agents Window to start a Copilot CLI session."))
 			: mode === AgentsHandoffTipMode.Custom
 				? (magnus
@@ -464,7 +464,7 @@ export class AgentsHandoffInputTipContribution extends Disposable implements IWo
 			? localize('chat.agentsHandoff.tip.action', "Open in Agents Window")
 			: mode === AgentsHandoffTipMode.Custom
 				? (magnus
-					? localize('chat.agentsHandoff.tip.action.custom.magnus', "Give Magnus more room?")
+					? localize('chat.agentsHandoff.tip.action.custom.magnus', "Give Agents more room?")
 					: localize('chat.agentsHandoff.tip.action.custom', "Give your agent more room?"))
 				: localize('chat.agentsHandoff.tip.action.default', "Continue in Agents Window");
 

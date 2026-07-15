@@ -101,7 +101,7 @@
 	"defaultChatAgent": {
 		"extensionId": "prebase.magnus",
 		"chatExtensionId": "prebase.magnus",
-		"chatExtensionOutputId": "prebase.magnus.PreBase Magnus.log",
+		"chatExtensionOutputId": "prebase.magnus.PreBase Agents.log",
 		"chatExtensionOutputExtensionStateCommand": "prebase.magnus.debug.extensionState",
 		"documentationUrl": "",
 		"termsStatementUrl": "",
@@ -115,7 +115,7 @@
 		"provider": {
 			"default": {
 				"id": "magnus",
-				"name": "Magnus"
+				"name": "Agents"
 			},
 			"enterprise": {
 				"id": "github-enterprise",

@@ -214,7 +214,7 @@ const supportsAllAttachments: Required<IChatAgentAttachmentCapabilities> = {
 };
 
 const DISCLAIMER = localize('chatDisclaimer', "AI responses may be inaccurate");
-const MAGNUS_DISCLAIMER = localize('chatDisclaimer.magnus', "Magnus may be inaccurate — review edits before applying");
+const MAGNUS_DISCLAIMER = localize('chatDisclaimer.magnus', "Agents may be inaccurate — review edits before applying");
 
 export class ChatWidget extends Disposable implements IChatWidget {
 
@@ -1274,15 +1274,15 @@ export class ChatWidget extends Disposable implements IChatWidget {
 		const magnus = isMagnusDefaultChatAgent();
 		if (this.input.currentModeKind === ChatModeKind.Ask) {
 			title = magnus
-				? localize('chatDescription.magnusWelcome', "Ask Magnus")
+				? localize('chatDescription.magnusWelcome', "Ask Agents")
 				: localize('chatDescription', "Ask about your code");
 		} else if (this.input.currentModeKind === ChatModeKind.Edit) {
 			title = magnus
-				? localize('editsTitle.magnus', "Edit with Magnus")
+				? localize('editsTitle.magnus', "Edit with Agents")
 				: localize('editsTitle', "Edit in context");
 		} else {
 			title = magnus
-				? localize('agentTitle.magnus', "Build with Magnus")
+				? localize('agentTitle.magnus', "Build with Agents")
 				: localize('agentTitle', "Build with Agent");
 		}
 

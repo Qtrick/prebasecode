@@ -1,7 +1,7 @@
 {
   "name": "magnus",
-  "displayName": "Magnus",
-  "description": "PreBase Magnus AI chat \u2014 Gemini-backed language models and workspace tools",
+  "displayName": "Agents",
+  "description": "PreBase Agents AI chat \u2014 Gemini-backed language models and workspace tools",
   "version": "0.1.0",
   "publisher": "prebase",
   "license": "MIT",
@@ -13,7 +13,7 @@
   ],
   "activationEvents": [
     "onStartupFinished",
-    "onLanguageModelChat:magnus",
+    "onLanguageModelChatProvider:magnus",
     "onChatParticipant:prebase.magnus.ask",
     "onChatParticipant:prebase.magnus.edit",
     "onChatParticipant:prebase.magnus.agent",
@@ -35,24 +35,24 @@
 		"languageModelChatProviders": [
 			{
 				"vendor": "magnus",
-				"displayName": "Magnus",
+				"displayName": "Agents",
 				"isDefault": true
 			}
 		],
 		"chatViewsWelcome": [
 			{
 				"icon": "$(sparkle)",
-				"title": "Magnus Agents",
-				"content": "Ask, plan, edit, and verify with Magnus.\n\nKeys load from the project `.env` — paste Gemini, OpenAI, Claude, or any listed provider (at least one).",
+				"title": "Agents",
+				"content": "Ask, plan, edit, and verify with Agents.\n\nKeys load from the project `.env` — paste Gemini, OpenAI, Claude, or any listed provider (at least one).",
 				"when": "!chatSetupHidden"
 			}
 		],
 		"chatParticipants": [
       {
         "id": "prebase.magnus.ask",
-        "name": "Magnus",
-        "fullName": "Magnus",
-        "description": "Ask Magnus about your project (read-only)",
+        "name": "Agents",
+        "fullName": "Agents",
+        "description": "Ask Agents about your project (read-only)",
         "isDefault": true,
         "locations": [
           "panel"
@@ -63,9 +63,9 @@
       },
       {
         "id": "prebase.magnus.edit",
-        "name": "Magnus",
-        "fullName": "Magnus",
-        "description": "Edit code with Magnus",
+        "name": "Agents",
+        "fullName": "Agents",
+        "description": "Edit code with Agents",
         "isDefault": true,
         "locations": [
           "panel"
@@ -77,8 +77,8 @@
       {
         "id": "prebase.magnus.agent",
         "name": "agent",
-        "fullName": "Magnus",
-        "description": "Agent mode \u2014 plan, edit, and verify with Magnus",
+        "fullName": "Agents",
+        "description": "Agent mode \u2014 plan, edit, and verify with Agents",
         "isDefault": true,
         "isAgent": true,
         "locations": [
@@ -93,92 +93,92 @@
     "commands": [
       {
         "command": "prebase.magnus.open",
-        "title": "Open Magnus",
-        "category": "Magnus"
+        "title": "Open Agents",
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.setApiKey",
         "title": "Open API Keys (.env)",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.clearApiKey",
         "title": "Clear Legacy API Key Secret",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.checkConfiguration",
         "title": "Check Configuration",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.newSession",
         "title": "New Session",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.selectModel",
         "title": "Select Model",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.selectMode",
         "title": "Select Mode",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.cancel",
         "title": "Cancel",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.attachCurrentFile",
         "title": "Attach Current File",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.attachGraphSelection",
         "title": "Attach Graph Selection",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.attachRuntimeContext",
         "title": "Attach Runtime Context",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.describeFile",
         "title": "Describe File (Graph)",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.hasApiKey",
         "title": "Has API Key",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.open.walkthrough",
         "title": "Open Walkthrough",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.refreshToken",
         "title": "Refresh Token",
-        "category": "Magnus"
+        "category": "Agents"
       },
       {
         "command": "prebase.magnus.toggleStatusMenu",
         "title": "Toggle Status Menu",
-        "category": "Magnus"
+        "category": "Agents"
       }
     ],
     "configuration": {
-      "title": "Magnus",
+      "title": "Agents",
       "properties": {
         "prebase.magnus.enabled": {
           "type": "boolean",
           "default": true,
-          "description": "Enable Magnus AI chat."
+          "description": "Enable Agents AI chat."
         },
         "prebase.magnus.defaultModel": {
           "type": "string",
@@ -199,7 +199,7 @@
             "Gemini 1.5 Pro",
             "Gemini 1.5 Flash"
           ],
-          "description": "Default Magnus language model."
+          "description": "Default Agents language model."
         },
         "prebase.magnus.defaultMode": {
           "type": "string",
@@ -218,7 +218,7 @@
             "Test \u2014 runtime / UI testing focus",
             "Agent \u2014 full tool loop"
           ],
-          "description": "Default Magnus agent mode (Plan/Test map via this setting or Select Mode)."
+          "description": "Default Agents agent mode (Plan/Test map via this setting or Select Mode)."
         },
 		"prebase.magnus.panelLocation": {
 			"type": "string",
@@ -227,7 +227,7 @@
 				"panel",
 				"sidebar"
 			],
-			"description": "Preferred Magnus chat panel location (sidebar = Agents auxiliary bar)."
+			"description": "Preferred Agents chat panel location (sidebar = Agents auxiliary bar)."
 		},
         "prebase.magnus.requireEditApproval": {
           "type": "boolean",

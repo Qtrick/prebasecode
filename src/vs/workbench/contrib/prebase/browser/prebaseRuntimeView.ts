@@ -193,9 +193,9 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		});
 
 		// --- Magnus
-		this._section(localize('prebase.runtime.magnus', "Magnus"), (section) => {
+		this._section(localize('prebase.runtime.magnus', "Agents"), (section) => {
 			this._btn(section, localize('prebase.runtime.attachMagnus', "Attach Runtime Context"), () => this.commandService.executeCommand('prebase.runtime.attachToMagnus'));
-			this._btn(section, localize('prebase.runtime.testMagnus', "Test with Magnus"), () => this.commandService.executeCommand('prebase.runtime.testWithMagnus'));
+			this._btn(section, localize('prebase.runtime.testMagnus', "Test with Agents"), () => this.commandService.executeCommand('prebase.runtime.testWithMagnus'));
 			this._btn(section, localize('prebase.runtime.explainElement', "Explain Element"), () => this.commandService.executeCommand('prebase.runtime.explainElement'));
 		});
 

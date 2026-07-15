@@ -260,4 +260,4 @@ export const ENV_KEY_HELP =
 	'Add at least one API key to the project `.env` file (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, …).';
 
 export const ENV_KEY_EMPTY_HELP =
-	'`GEMINI_API_KEY` (or another provider key) is listed in `.env` but its value is empty. Paste the key after `=`, save the file, then run Magnus: Check Configuration.';
+	'`GEMINI_API_KEY` (or another provider key) is listed in `.env` but its value is empty. Paste the key after `=`, save the file, then run Agents: Check Configuration.';

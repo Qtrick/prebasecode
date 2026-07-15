@@ -99,7 +99,7 @@ export class MagnusSecretStorage {
 			await vscode.workspace.fs.stat(uri);
 		} catch {
 			const template = [
-				'# PreBase / Magnus API keys — paste at least ONE key',
+				'# PreBase / Agents API keys — paste at least ONE key',
 				'GEMINI_API_KEY=',
 				'OPENAI_API_KEY=',
 				'ANTHROPIC_API_KEY=',

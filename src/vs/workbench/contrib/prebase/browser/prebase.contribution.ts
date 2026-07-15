@@ -43,6 +43,7 @@ import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
 import { PreBaseHomeEditor } from './prebaseHomeEditor.js';
 import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
 import './prebaseHomeEmptyEditors.js';
+import './prebaseRecentHistory.js';
 // Onboarding editor kept in tree for a later release; not registered in the workbench right now.
 
 // --- services
@@ -673,7 +674,7 @@ registerAction2(class extends Action2 {
 
 registerAction2(class extends Action2 {
 	constructor() {
-		super({ id: 'prebase.graph.getSelectionForMagnus', title: localize2('prebase.graph.getSelectionForMagnus', "Get Graph Selection for Magnus"), category: localize2('prebase.category', "PreBase"), f1: false });
+		super({ id: 'prebase.graph.getSelectionForMagnus', title: localize2('prebase.graph.getSelectionForMagnus', "Get Graph Selection for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
 	run(accessor: ServicesAccessor) {
 		return accessor.get(IPreBaseGraphService).getSelectionSummaryForMagnus();
@@ -682,7 +683,7 @@ registerAction2(class extends Action2 {
 
 registerAction2(class extends Action2 {
 	constructor() {
-		super({ id: 'prebase.runtime.getContextForMagnus', title: localize2('prebase.runtime.getContextForMagnus', "Get Runtime Context for Magnus"), category: localize2('prebase.category', "PreBase"), f1: false });
+		super({ id: 'prebase.runtime.getContextForMagnus', title: localize2('prebase.runtime.getContextForMagnus', "Get Runtime Context for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
 	run(accessor: ServicesAccessor) {
 		return accessor.get(IPreBaseRuntimeService).getContextSummaryForMagnus();
@@ -691,7 +692,7 @@ registerAction2(class extends Action2 {
 
 registerAction2(class extends Action2 {
 	constructor() {
-		super({ id: 'prebase.graph.attachSelectionToMagnus', title: localize2('prebase.graph.attachSelectionToMagnus', "Attach Graph Selection to Magnus"), category: localize2('prebase.category', "PreBase"), f1: true });
+		super({ id: 'prebase.graph.attachSelectionToMagnus', title: localize2('prebase.graph.attachSelectionToMagnus', "Attach Graph Selection to Agents"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	async run(accessor: ServicesAccessor) {
 		const summary = accessor.get(IPreBaseGraphService).getSelectionSummaryForMagnus();
@@ -874,21 +875,21 @@ registerAction2(class extends Action2 {
 
 registerAction2(class extends Action2 {
 	constructor() {
-		super({ id: 'prebase.runtime.attachToMagnus', title: localize2('prebase.runtime.attachToMagnusCmd', "Attach Runtime to Magnus"), category: localize2('prebase.category', "PreBase"), f1: true });
+		super({ id: 'prebase.runtime.attachToMagnus', title: localize2('prebase.runtime.attachToMagnusCmd', "Attach Runtime to Agents"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	run(accessor: ServicesAccessor) { accessor.get(IPreBaseRuntimeService).attachToMagnus(); }
 });
 
 registerAction2(class extends Action2 {
 	constructor() {
-		super({ id: 'prebase.runtime.testWithMagnus', title: localize2('prebase.runtime.testWithMagnusCmd', "Test Runtime with Magnus"), category: localize2('prebase.category', "PreBase"), f1: true });
+		super({ id: 'prebase.runtime.testWithMagnus', title: localize2('prebase.runtime.testWithMagnusCmd', "Test Runtime with Agents"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	run(accessor: ServicesAccessor) { accessor.get(IPreBaseRuntimeService).testWithMagnus(); }
 });
 
 registerAction2(class extends Action2 {
 	constructor() {
-		super({ id: 'prebase.runtime.explainElement', title: localize2('prebase.runtime.explainElementCmd', "Explain Runtime Element with Magnus"), category: localize2('prebase.category', "PreBase"), f1: true });
+		super({ id: 'prebase.runtime.explainElement', title: localize2('prebase.runtime.explainElementCmd', "Explain Runtime Element with Agents"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	run(accessor: ServicesAccessor) { accessor.get(IPreBaseRuntimeService).explainElement(); }
 });

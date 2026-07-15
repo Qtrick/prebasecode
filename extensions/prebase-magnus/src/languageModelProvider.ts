@@ -4,7 +4,7 @@
 
 import * as vscode from 'vscode';
 import { streamGenerateContent, type GeminiContent } from './geminiClient';
-import { getModelOption, MAGNUS_MODELS, resolveApiModel } from './models';
+import { getModelOption, MAGNUS_MODELS, formatContextWindowLabel, resolveApiModel } from './models';
 import type { MagnusSecretStorage } from './secretStorage';
 
 function extractText(message: vscode.LanguageModelChatRequestMessage): string {
@@ -34,7 +34,6 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		_token: vscode.CancellationToken,
 	): Promise<vscode.LanguageModelChatInformation[]> {
 		const hasKey = await this.secrets.hasApiKey();
-		// Labels only in the model picker — no detail/description strings.
 		return MAGNUS_MODELS.map((m, index) => ({
 			id: m.id,
 			name: m.name,
@@ -42,14 +41,22 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 			version: '1.0.0',
 			maxInputTokens: m.maxInputTokens,
 			maxOutputTokens: m.maxOutputTokens,
+			// Shown inline in the model list (secondary text).
+			detail: formatContextWindowLabel(m.maxInputTokens),
+			// Shown in the Cursor-style hover tooltip.
+			tooltip: hasKey
+				? m.description
+				: `${m.description}\n\nAdd at least one API key to the project \`.env\` file.`,
 			capabilities: {
-				toolCalling: false,
+				// Magnus Agent mode uses its own workspace tool loop. The workbench
+				// model picker filters Agent sessions to models with toolCalling —
+				// without this, Agent mode only shows synthetic "Auto".
+				toolCalling: true,
 				imageInput: false,
 			},
 			isDefault: index === 0,
 			isUserSelectable: true,
 			isBYOK: true,
-			tooltip: hasKey ? undefined : 'Add at least one API key to the project `.env` file',
 		}));
 	}
 
@@ -62,7 +69,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 	): Promise<void> {
 		const gemini = await this.secrets.getGeminiKeyOrMessage();
 		if (!gemini.key) {
-			throw new Error(gemini.message || 'Magnus: no API key configured in `.env`.');
+			throw new Error(gemini.message || 'Agents: no API key configured in `.env`.');
 		}
 		const apiKey = gemini.key;
 

@@ -203,11 +203,12 @@ export async function* streamGenerateContent(
 	}
 
 	const full = await generateContent(apiKey, model, body, token);
-	const chunkSize = 48;
-	for (let i = 0; i < full.length; i += chunkSize) {
+	// Match paced UI fallback (~3 chars / 22ms) when SSE is unavailable.
+	for (let i = 0; i < full.length; i += 3) {
 		if (token?.isCancellationRequested) {
 			return;
 		}
-		yield full.slice(i, i + chunkSize);
+		yield full.slice(i, i + 3);
+		await new Promise(resolve => setTimeout(resolve, 22));
 	}
 }

@@ -391,7 +391,9 @@ function createModelAction(
 	const priceCategoryLabel = getPriceCategoryLabel(model.metadata.priceCategory);
 	// Strip the detail when suppressVendorInDetail is set — the vendor is
 	// shown either inline (promoted) or in a section header (Other Models).
-	const detail = suppressVendorInDetail ? undefined : model.metadata.detail;
+	// For PreBase Agents, keep context-window detail even when vendor is suppressed.
+	const keepMagnusDetail = isMagnusDefaultChatAgent() && !!model.metadata.detail;
+	const detail = (suppressVendorInDetail && !keepMagnusDetail) ? undefined : model.metadata.detail;
 	const textParts = [detail, pricingForDescription].filter(Boolean);
 	const textDescription = textParts.length > 0 ? textParts.join(' · ') : undefined;
 
@@ -402,14 +404,14 @@ function createModelAction(
 		checked: model.identifier === selectedModelId,
 		class: undefined,
 		description: textDescription,
-		tooltip: model.metadata.name,
+		tooltip: model.metadata.tooltip || model.metadata.name,
 		label: model.metadata.name,
 		section,
 		run: () => onSelect(model),
 	};
-	const ariaDescription = priceCategoryLabel
-		? (textDescription ? textDescription + ' · ' + priceCategoryLabel : priceCategoryLabel)
-		: undefined;
+	const ariaDescription = [textDescription, priceCategoryLabel, model.metadata.tooltip]
+		.filter((part): part is string => !!part)
+		.join(' · ') || undefined;
 	return { action, ariaDescription };
 }
 
@@ -1187,6 +1189,7 @@ export class ModelPickerWidget extends Disposable {
 			entitlement: this._entitlementService.entitlement,
 			anonymous: this._entitlementService.anonymous,
 			hasByokModels: this._entitlementService.hasByokModels,
+			allowUnsignedWithLocalKeys: isMagnusDefaultChatAgent(),
 		});
 	}
 
@@ -1226,8 +1229,16 @@ export class ModelPickerWidget extends Disposable {
 	 * Starts the Chat setup / sign-in flow (same command as the title-bar Sign In
 	 * affordance). On completion the entitlement and model registry change, which
 	 * refreshes the picker.
+	 *
+	 * PreBase Agents authenticates via local `.env` keys (like V1.1's main-process
+	 * apiKeyLoader), so open that file instead of the Copilot sign-in flow.
 	 */
 	private _requestSetup(): void {
+		if (isMagnusDefaultChatAgent()) {
+			// Open API Keys (.env) — same path Magnus uses; not the chat panel.
+			this._commandService.executeCommand('prebase.magnus.setApiKey');
+			return;
+		}
 		this._commandService.executeCommand(CHAT_SETUP_ACTION_ID);
 	}
 
@@ -1583,7 +1594,7 @@ export class ModelPickerWidget extends Disposable {
 			? localize('chat.modelPicker.ariaLabelRestricted', "Models, unavailable while in Restricted mode")
 			: setupRequired
 				? (isMagnusDefaultChatAgent()
-					? localize('chat.modelPicker.ariaLabelSetupRequiredMagnus', "Models, configure Magnus")
+					? localize('chat.modelPicker.ariaLabelSetupRequiredMagnus', "Models, configure Agents")
 					: localize('chat.modelPicker.ariaLabelSetupRequired', "Models, sign in to use Copilot"))
 				: localize('chat.modelPicker.ariaLabel', "Models, {0}", modelLabel);
 	}
@@ -1943,8 +1954,13 @@ export function getModelHoverContent(model: ILanguageModelChatMetadataAndIdentif
 		container.appendChild(rendered.element);
 	}
 
-	// --- Context size (only when not already shown in the cost table) ---
-	if (!isAuto && !costTableRendered && (model.metadata.maxInputTokens || model.metadata.maxOutputTokens)) {
+	// --- Context window (Cursor-style): prefer input context size ---
+	if (!costTableRendered && model.metadata.maxInputTokens) {
+		const contextSection = dom.$('.chat-model-hover-context');
+		contextSection.appendChild(dom.$('.chat-model-hover-context-label', undefined, localize('models.contextWindow', "Context window")));
+		contextSection.appendChild(dom.$('.chat-model-hover-context-value', undefined, formatTokenCount(model.metadata.maxInputTokens)));
+		container.appendChild(contextSection);
+	} else if (!isAuto && !costTableRendered && model.metadata.maxOutputTokens) {
 		const totalTokens = (model.metadata.maxInputTokens ?? 0) + (model.metadata.maxOutputTokens ?? 0);
 		const contextSection = dom.$('.chat-model-hover-context');
 		contextSection.appendChild(dom.$('.chat-model-hover-context-label', undefined, localize('models.contextSize', "Max context")));

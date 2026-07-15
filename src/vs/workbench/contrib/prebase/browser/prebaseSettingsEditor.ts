@@ -576,23 +576,23 @@ export class PreBaseSettingsEditor extends EditorPane {
 		}));
 		this._row(
 			card,
-			localize('prebase.settings.magnusDisplay', "Magnus AI display"),
-			localize('prebase.settings.magnusDisplayHint', "Float keeps Magnus as a draggable bubble. Sidebar pins it as a resizable right panel."),
+			localize('prebase.settings.magnusDisplay', "Agents AI display"),
+			localize('prebase.settings.magnusDisplayHint', "Float keeps Agents as a draggable bubble. Sidebar pins it as a resizable right panel."),
 			magnus
 		);
 
 		const modelCtrl = document.createElement('div');
 		Object.assign(modelCtrl.style, { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' });
 		const modelNote = DOM.append(modelCtrl, DOM.$('span'));
-		modelNote.textContent = localize('prebase.settings.magnusModelNote', "Configure in Extensions → Magnus");
+		modelNote.textContent = localize('prebase.settings.magnusModelNote', "Configure in Extensions → Agents");
 		Object.assign(modelNote.style, { fontSize: '11px', color: COLORS.textMuted, maxWidth: '180px', textAlign: 'right' });
-		modelCtrl.appendChild(this._linkBtn(localize('prebase.settings.openMagnusSettings', "Magnus model settings…"), () => {
+		modelCtrl.appendChild(this._linkBtn(localize('prebase.settings.openMagnusSettings', "Agents model settings…"), () => {
 			void this.commandService.executeCommand('workbench.action.openSettings', 'prebase.magnus');
 		}));
 		this._row(
 			card,
-			localize('prebase.settings.magnusModel', "Magnus AI model"),
-			localize('prebase.settings.magnusModelHint', "Choose which model Magnus uses. Managed by the Magnus extension — not duplicated here. API keys belong in .env, never in this UI."),
+			localize('prebase.settings.magnusModel', "Agents AI model"),
+			localize('prebase.settings.magnusModelHint', "Choose which model Agents uses. Managed by the Agents extension — not duplicated here. API keys belong in .env, never in this UI."),
 			modelCtrl
 		);
 	}

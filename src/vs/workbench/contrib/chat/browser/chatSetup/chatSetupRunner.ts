@@ -104,7 +104,7 @@ export class ChatSetup {
 		const dialogSkipped = this.skipDialogOnce;
 		this.skipDialogOnce = false;
 
-		// PreBase Magnus: never force GitHub Copilot sign-in. Prefer API key setup.
+		// PreBase Agents: never force GitHub Copilot sign-in. Prefer API key setup.
 		if (isMagnusDefaultChatAgent()) {
 			return this.doRunMagnusSetup(options, dialogSkipped);
 		}
@@ -351,7 +351,7 @@ export class ChatSetup {
 
 		if (this.context.state.entitlement === ChatEntitlement.Unknown || options?.forceSignInDialog) {
 			return isMagnusDefaultChatAgent()
-				? localize('configureMagnus', "Continue with Magnus")
+				? localize('configureMagnus', "Continue with Agents")
 				: localize('signIn', "Sign in to use GitHub Copilot");
 		}
 

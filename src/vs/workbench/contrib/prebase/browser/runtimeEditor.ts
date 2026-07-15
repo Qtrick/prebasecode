@@ -225,7 +225,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 				localize('prebase.runtime.frameworkState', "Framework: {0}", session.framework?.label ?? '—'),
 				localize('prebase.runtime.viewportStateSide', "Viewport: {0} {1}×{2}", session.viewport.preset, session.viewport.width, session.viewport.height),
 				localize('prebase.runtime.errorsState', "Errors: {0}", session.consoleErrorCount),
-				localize('prebase.runtime.magnusState', "Magnus: {0}", session.magnusAttached ? 'attached' : 'idle')
+				localize('prebase.runtime.magnusState', "Agents: {0}", session.magnusAttached ? 'attached' : 'idle')
 			]);
 		}
 	}

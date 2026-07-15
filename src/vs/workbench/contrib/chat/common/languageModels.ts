@@ -973,7 +973,10 @@ export class LanguageModelsService implements ILanguageModelsService {
 				managementCommand: item.managementCommand,
 				deprecation: item.deprecation,
 				when: item.when,
+				// Copilot is always the platform default; PreBase also treats the
+				// product defaultChatAgent provider id (`magnus`) as default.
 				isDefault: item.vendor === COPILOT_VENDOR_ID
+					|| item.vendor === this._productService.defaultChatAgent?.provider?.default?.id
 			};
 			this._vendors.set(item.vendor, vendor);
 			addedVendorIds.push(item.vendor);

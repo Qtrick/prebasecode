@@ -61,4 +61,22 @@ suite('chatRequiresSetup', () => {
 	test('signed out but BYOK models present does not require setup', () => {
 		assert.strictEqual(chatRequiresSetup(context({ completed: false, entitlement: ChatEntitlement.Unknown, hasByokModels: true })), false);
 	});
+
+	test('signed out with local .env keys (Magnus) and setup completed does not require setup', () => {
+		assert.strictEqual(chatRequiresSetup(context({
+			completed: true,
+			entitlement: ChatEntitlement.Unknown,
+			allowUnsignedWithLocalKeys: true,
+		})), false);
+	});
+
+	test('local .env keys (Magnus) skip Copilot setup even when not marked completed', () => {
+		// V1.1 loaded keys in the main process with no Copilot entitlement gate.
+		// PreBase Magnus mirrors that: local `.env` keys satisfy setup.
+		assert.strictEqual(chatRequiresSetup(context({
+			completed: false,
+			entitlement: ChatEntitlement.Unknown,
+			allowUnsignedWithLocalKeys: true,
+		})), false);
+	});
 });

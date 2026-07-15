@@ -154,7 +154,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					return {
 						overview,
 						aiStatus: 'unavailable',
-						aiMessage: localize('prebase.desc.configureMagnus', "Configure Magnus for an AI-generated description."),
+						aiMessage: localize('prebase.desc.configureMagnus', "Configure Agents for an AI-generated description."),
 						cacheHit: false,
 					};
 				}

@@ -32,6 +32,29 @@ async function ensureNodeModules() {
 	}
 }
 
+async function syncDarwinAppIcon() {
+	if (process.platform !== 'darwin') {
+		return;
+	}
+	const src = path.join(rootDir, 'resources', 'darwin', 'code.icns');
+	const appDir = path.join(rootDir, '.build', 'electron');
+	try {
+		const entries = await fs.readdir(appDir);
+		const appName = entries.find(e => e.endsWith('.app'));
+		if (!appName) {
+			return;
+		}
+		const dest = path.join(appDir, appName, 'Contents', 'Resources', 'PreBase.icns');
+		await fs.copyFile(src, dest);
+		// Bump mtime so macOS Dock / Finder refresh their icon cache.
+		const appPath = path.join(appDir, appName);
+		const now = new Date();
+		await fs.utimes(appPath, now, now);
+	} catch {
+		// Electron not installed yet, or non-PreBase bundle — ignore.
+	}
+}
+
 async function getElectron() {
 	// `npm run electron` deletes and re-downloads `.build/electron` on every
 	// invocation. When preLaunch runs repeatedly (e.g. once per integration test
@@ -40,10 +63,12 @@ async function getElectron() {
 	// directory is being removed and re-extracted. Skip the refresh when the
 	// already-present Electron matches the expected version; any detection
 	// failure falls back to a (re)download to preserve the previous behavior.
-	if (await isExpectedElectronInstalled()) {
-		return;
+	if (!(await isExpectedElectronInstalled())) {
+		await runProcess(npm, ['run', 'electron']);
 	}
-	await runProcess(npm, ['run', 'electron']);
+	// `npm run electron` skips when versions match, so logo updates in
+	// resources/darwin/code.icns would never reach the running .app otherwise.
+	await syncDarwinAppIcon();
 }
 
 async function isExpectedElectronInstalled(): Promise<boolean> {

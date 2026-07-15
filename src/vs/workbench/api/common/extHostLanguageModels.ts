@@ -393,10 +393,30 @@ export class ExtHostLanguageModels implements ExtHostLanguageModelsShape {
 			await this.selectLanguageModels(extension, {});
 		}
 
+		// Prefer a default model contributed by the invoking extension (e.g. PreBase Magnus).
 		for (const [modelIdentifier, modelData] of this._localModels) {
-			if (modelData.metadata.isDefaultForLocation[ChatAgentLocation.Chat] && modelData.metadata.vendor === COPILOT_VENDOR_ID) {
+			if (modelData.metadata.isDefaultForLocation[ChatAgentLocation.Chat]
+				&& ExtensionIdentifier.equals(modelData.metadata.extension, extension.identifier)) {
 				defaultModelId = modelIdentifier;
 				break;
+			}
+		}
+		// Then GitHub Copilot's default (historical VS Code behavior).
+		if (!defaultModelId) {
+			for (const [modelIdentifier, modelData] of this._localModels) {
+				if (modelData.metadata.isDefaultForLocation[ChatAgentLocation.Chat] && modelData.metadata.vendor === COPILOT_VENDOR_ID) {
+					defaultModelId = modelIdentifier;
+					break;
+				}
+			}
+		}
+		// Finally any default model (BYOK / third-party).
+		if (!defaultModelId) {
+			for (const [modelIdentifier, modelData] of this._localModels) {
+				if (modelData.metadata.isDefaultForLocation[ChatAgentLocation.Chat]) {
+					defaultModelId = modelIdentifier;
+					break;
+				}
 			}
 		}
 		if (!defaultModelId && !forceResolveModels) {

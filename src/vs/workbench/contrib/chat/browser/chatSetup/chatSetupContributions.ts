@@ -192,7 +192,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 		const growthSessionDisposables = markAsSingleton(new MutableDisposable());
 
 		const updateGrowthSession = () => {
-			// PreBase Magnus: never surface the Copilot "Try Copilot" growth session.
+			// PreBase Agents: never surface the Copilot "Try Copilot" growth session.
 			if (isMagnusDefaultChatAgent()) {
 				growthSessionDisposables.clear();
 				return;
@@ -231,7 +231,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 		class ChatSetupTriggerAction extends Action2 {
 
 			static CHAT_SETUP_ACTION_LABEL = isMagnusDefaultChatAgent()
-				? localize2('triggerChatSetupMagnus', "Use AI Features with Magnus...")
+				? localize2('triggerChatSetupMagnus', "Use AI Features with Agents...")
 				: localize2('triggerChatSetup', "Use AI Features with Copilot for free...");
 
 			constructor() {
@@ -357,7 +357,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 				super({
 					id: 'workbench.action.chat.triggerSetupForceSignIn',
 					title: isMagnusDefaultChatAgent()
-						? localize2('forceConfigureMagnus', "Configure Magnus")
+						? localize2('forceConfigureMagnus', "Configure Agents")
 						: localize2('forceSignIn', "Sign in to use GitHub Copilot")
 				});
 			}
@@ -397,7 +397,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 				super({
 					id: 'workbench.action.chat.triggerSetupFromAccounts',
 					title: isMagnusDefaultChatAgent()
-						? localize2('triggerChatSetupFromAccountsMagnus', "Configure Magnus...")
+						? localize2('triggerChatSetupFromAccountsMagnus', "Configure Agents...")
 						: localize2('triggerChatSetupFromAccounts', "Sign in to use GitHub Copilot..."),
 					menu: {
 						id: MenuId.AccountsContext,
@@ -437,7 +437,7 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 						order: 0, // same position as the update button
 						when: ContextKeyExpr.and(
 							IsWebContext.negate(),
-							// PreBase Magnus uses API-key setup, not GitHub Copilot sign-in.
+							// PreBase Agents uses API-key setup, not GitHub Copilot sign-in.
 							isMagnusDefaultChatAgent() ? ContextKeyExpr.false() : ContextKeyExpr.true(),
 							ChatContextKeys.Entitlement.signedOut,
 							CONTEXT_DEFAULT_ACCOUNT_STATE.notEqualsTo(DefaultAccountStatus.Available), // hide only when signed in (a default GitHub account is present); still shown while signed out or before the account state resolves, incl. untrusted workspaces — no auth prompt
@@ -467,10 +467,10 @@ export class ChatSetupContribution extends Disposable implements IWorkbenchContr
 				super(
 					ChatConfiguration.TitleBarSignInEnabled,
 					isMagnusDefaultChatAgent()
-						? localize('toggle.chatSignInMagnus', 'Magnus Setup')
+						? localize('toggle.chatSignInMagnus', 'Agents Setup')
 						: localize('toggle.chatSignIn', 'Copilot Sign In'),
 					isMagnusDefaultChatAgent()
-						? localize('toggle.chatSignInDescriptionMagnus', "Toggle visibility of the Magnus setup button in title bar")
+						? localize('toggle.chatSignInDescriptionMagnus', "Toggle visibility of the Agents setup button in title bar")
 						: localize('toggle.chatSignInDescription', "Toggle visibility of the Copilot Sign In button in title bar"),
 					3,
 					ContextKeyExpr.and(

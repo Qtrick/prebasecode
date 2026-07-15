@@ -225,10 +225,10 @@ export const startEntries: GettingStartedStartEntryContent = [
 
 const Button = (title: string, href: string) => `[${title}](${href})`;
 
-const MagnusStepTitle = localize('gettingStarted.copilotSetup.title', "Use AI features with PreBase Magnus");
-const MagnusDescription = localize({ key: 'gettingStarted.copilotSetup.description', comment: ['{Locked="["}', '{Locked="]({0})"}'] }, "You can use PreBase Magnus to generate code across multiple files, fix errors, ask questions about your code, and much more using natural language.");
+const MagnusStepTitle = localize('gettingStarted.copilotSetup.title', "Use AI features with PreBase Agents");
+const MagnusDescription = localize({ key: 'gettingStarted.copilotSetup.description', comment: ['{Locked="["}', '{Locked="]({0})"}'] }, "You can use PreBase Agents to generate code across multiple files, fix errors, ask questions about your code, and much more using natural language.");
 const MagnusConfigureButton = Button(localize('setupMagnusButton.configure', "Open API Keys (.env)"), `command:prebase.magnus.setApiKey`);
-const MagnusOpenButton = Button(localize('setupMagnusButton.open', "Open Magnus"), `command:prebase.magnus.open`);
+const MagnusOpenButton = Button(localize('setupMagnusButton.open', "Open Agents"), `command:prebase.magnus.open`);
 const MagnusStartChatButton = Button(localize('setupMagnusButton.chat', "Start to Chat"), 'command:prebase.magnus.open');
 
 function createMagnusSetupStep(id: string, button: string, when: string): BuiltinGettingStartedStep {
@@ -238,7 +238,7 @@ function createMagnusSetupStep(id: string, button: string, when: string): Builti
 		description: `${MagnusDescription}\n${button}`,
 		when: `${when} && !chatSetupHidden && !chatSetupDisabledInWorkspace`,
 		media: {
-			type: 'svg', altText: 'PreBase Magnus multi file edits', path: 'multi-file-edits.svg'
+			type: 'svg', altText: 'PreBase Agents multi file edits', path: 'multi-file-edits.svg'
 		},
 	};
 }
@@ -287,23 +287,23 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
 				{
 					id: 'prebaseRuntimePreview',
 					title: localize('gettingStarted.prebaseRuntime.title', "Open Runtime Preview"),
-					description: localize('gettingStarted.prebaseRuntime.description.interpolated', "Preview and verify your app while Magnus uses live runtime evidence.\n{0}", Button(localize('openRuntimePreview', "Open Runtime Preview"), 'command:prebase.runtime.openPreview')),
+					description: localize('gettingStarted.prebaseRuntime.description.interpolated', "Preview and verify your app while Agents uses live runtime evidence.\n{0}", Button(localize('openRuntimePreview', "Open Runtime Preview"), 'command:prebase.runtime.openPreview')),
 					completionEvents: ['onCommand:prebase.runtime.openPreview'],
 					media: { type: 'svg', altText: 'Runtime Preview', path: 'runTask.svg' },
 				},
 				{
 					id: 'prebaseOpenMagnus',
-					title: localize('gettingStarted.prebaseOpenMagnus.title', "Open Magnus"),
-					description: localize('gettingStarted.prebaseOpenMagnus.description.interpolated', "Chat with Magnus about your codebase, architecture, and runtime.\n{0}", MagnusOpenButton),
+					title: localize('gettingStarted.prebaseOpenMagnus.title', "Open Agents"),
+					description: localize('gettingStarted.prebaseOpenMagnus.description.interpolated', "Chat with Agents about your codebase, architecture, and runtime.\n{0}", MagnusOpenButton),
 					completionEvents: ['onCommand:prebase.magnus.open'],
-					media: { type: 'svg', altText: 'PreBase Magnus', path: 'multi-file-edits.svg' },
+					media: { type: 'svg', altText: 'PreBase Agents', path: 'multi-file-edits.svg' },
 				},
 				{
 					id: 'prebaseConfigureMagnus',
-					title: localize('gettingStarted.prebaseConfigureMagnus.title', "Configure Magnus"),
+					title: localize('gettingStarted.prebaseConfigureMagnus.title', "Configure Agents"),
 					description: localize('gettingStarted.prebaseConfigureMagnus.description.interpolated', "Paste at least one provider API key into `.env` (Gemini, OpenAI, Claude, …).\n{0}", MagnusConfigureButton),
 					completionEvents: ['onCommand:prebase.magnus.setApiKey'],
-					media: { type: 'svg', altText: 'Configure Magnus', path: 'customize-ai.svg' },
+					media: { type: 'svg', altText: 'Configure Agents', path: 'customize-ai.svg' },
 				},
 				{
 					id: 'videoTutorial',

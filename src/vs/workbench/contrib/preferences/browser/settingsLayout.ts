@@ -528,7 +528,7 @@ export const tocData: ITOCEntry<string> = {
 				},
 				{
 					id: 'prebase/magnus',
-					label: localize('prebaseMagnus', "Magnus"),
+					label: localize('prebaseMagnus', "Agents"),
 					settings: ['prebase.magnus.*']
 				}
 			]

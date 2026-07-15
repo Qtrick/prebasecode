@@ -119,11 +119,11 @@ configurationRegistry.registerConfiguration({
 			type: 'string',
 			enum: ['float', 'sidebar'],
 			enumDescriptions: [
-				localize('prebase.ui.magnusDisplay.float', "Float keeps Magnus as a draggable bubble."),
-				localize('prebase.ui.magnusDisplay.sidebar', "Sidebar pins Magnus as a resizable right panel."),
+				localize('prebase.ui.magnusDisplay.float', "Float keeps Agents as a draggable bubble."),
+				localize('prebase.ui.magnusDisplay.sidebar', "Sidebar pins Agents as a resizable right panel."),
 			],
 			default: 'sidebar',
-			description: localize('prebase.ui.magnusDisplay', "How Magnus AI is displayed in the PreBase workbench."),
+			description: localize('prebase.ui.magnusDisplay', "How Agents AI is displayed in the PreBase workbench."),
 		},
 		[PreBaseConfigKeys.GraphReduceMotion]: {
 			type: 'boolean',

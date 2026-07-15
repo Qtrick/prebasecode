@@ -186,7 +186,7 @@ export class MagnusWorkspaceTools {
 
 		if (this.requireEditApproval) {
 			const choice = await vscode.window.showWarningMessage(
-				`Magnus wants to write ${vscode.workspace.asRelativePath(uri)}. Allow?`,
+				`Agents wants to write ${vscode.workspace.asRelativePath(uri)}. Allow?`,
 				{ modal: true },
 				'Allow',
 				'Deny',

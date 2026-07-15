@@ -50,8 +50,10 @@ export function activate(context: vscode.ExtensionContext): void {
 		context.subscriptions.push(
 			vscode.lm.registerLanguageModelChatProvider('magnus', lmProvider),
 		);
-	} catch {
-		// Proposed chatProvider API may be missing in some hosts; participants still work.
+		// Kick an immediate model refresh so the workbench picker can list Magnus models.
+		lmProvider.notifyChanged();
+	} catch (err) {
+		console.error('[Agents] language model provider registration failed:', err);
 	}
 
 	const refreshKeys = () => {
@@ -126,7 +128,7 @@ export function activate(context: vscode.ExtensionContext): void {
 				`Default model: ${state.modelId}`,
 				`Default mode: ${state.mode}`,
 				`Env file (on disk): ${envPath}`,
-				'Tip: save `.env` (⌘S / Ctrl+S) before checking — Magnus reads the file on disk, not an unsaved editor tab.',
+				'Tip: save `.env` (⌘S / Ctrl+S) before checking — Agents reads the file on disk, not an unsaved editor tab.',
 			];
 			void vscode.window.showInformationMessage(lines.join(' · '));
 		}),
@@ -168,18 +170,18 @@ export function activate(context: vscode.ExtensionContext): void {
 			state.cancellation?.dispose();
 			state.cancellation = undefined;
 			await vscode.commands.executeCommand('workbench.action.chat.newChat');
-			void vscode.window.showInformationMessage('Magnus session cleared.');
+			void vscode.window.showInformationMessage('Agents session cleared.');
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.selectModel', async () => {
 			const picked = await vscode.window.showQuickPick(
 				MAGNUS_MODELS.map(m => ({ label: m.name, id: m.id })),
-				{ title: 'Select Magnus Model' },
+				{ title: 'Select Agents Model' },
 			);
 			if (picked) {
 				state.modelId = picked.id;
 				await vscode.workspace.getConfiguration('prebase.magnus').update('defaultModel', picked.id, vscode.ConfigurationTarget.Global);
-				void vscode.window.showInformationMessage(`Magnus model: ${picked.label}`);
+				void vscode.window.showInformationMessage(`Agents model: ${picked.label}`);
 			}
 		}),
 
@@ -189,18 +191,18 @@ export function activate(context: vscode.ExtensionContext): void {
 					label: m.label,
 					id: m.id,
 				})),
-				{ title: 'Select Magnus Mode' },
+				{ title: 'Select Agents Mode' },
 			);
 			if (picked) {
 				state.mode = picked.id;
 				await vscode.workspace.getConfiguration('prebase.magnus').update('defaultMode', picked.id, vscode.ConfigurationTarget.Global);
-				void vscode.window.showInformationMessage(`Magnus mode: ${picked.label}`);
+				void vscode.window.showInformationMessage(`Agents mode: ${picked.label}`);
 			}
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.cancel', () => {
 			state.cancellation?.cancel();
-			void vscode.window.showInformationMessage('Magnus cancellation requested.');
+			void vscode.window.showInformationMessage('Agents cancellation requested.');
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.attachCurrentFile', async () => {
@@ -254,21 +256,21 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('prebase.magnus.refreshToken', async () => {
 			lmProvider.notifyChanged();
 			const hasKey = await secrets.hasApiKey();
-			void vscode.window.showInformationMessage(hasKey ? 'Magnus API key(s) detected.' : ENV_KEY_HELP);
+			void vscode.window.showInformationMessage(hasKey ? 'Agents API key(s) detected.' : ENV_KEY_HELP);
 		}),
 		vscode.commands.registerCommand('prebase.magnus.toggleStatusMenu', async () => {
 			await vscode.commands.executeCommand('prebase.magnus.checkConfiguration');
 		}),
 		vscode.commands.registerCommand('prebase.magnus.git.generateCommitMessage', async () => {
-			void vscode.window.showInformationMessage('Magnus commit-message generation is not enabled yet.');
+			void vscode.window.showInformationMessage('Agents commit-message generation is not enabled yet.');
 		}),
 		vscode.commands.registerCommand('prebase.magnus.git.resolveMergeConflicts', async () => {
-			void vscode.window.showInformationMessage('Magnus merge-conflict resolution is not enabled yet.');
+			void vscode.window.showInformationMessage('Agents merge-conflict resolution is not enabled yet.');
 		}),
 		vscode.commands.registerCommand('prebase.magnus.debug.extensionState', async () => {
 			const any = await secrets.getAnyKey();
 			void vscode.window.showInformationMessage(
-				`Magnus: active · key=${any ? `${any.varName}/${any.provider}` : 'no'} · model=${state.modelId} · mode=${state.mode}`,
+				`Agents: active · key=${any ? `${any.varName}/${any.provider}` : 'no'} · model=${state.modelId} · mode=${state.mode}`,
 			);
 		}),
 	);
