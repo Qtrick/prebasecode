@@ -119,7 +119,7 @@ function fibonacciShell(
 	return positions
 }
 
-/** Balanced cloud — initialize on a 3D shell, then 3D repulsion + link springs. */
+/** Balanced cloud — 2D force layout with mild depth (V1.1), distinct from fibonacci sphere. */
 function layoutOrganic(
 	nodes: NetworkLayoutNode[],
 	links: NetworkLayoutLink[],
@@ -136,22 +136,27 @@ function layoutOrganic(
 		degree.set(link.target, (degree.get(link.target) ?? 0) + 1)
 	}
 	const maxDeg = Math.max(1, ...degree.values())
-	const maxR = sphereRadius * 0.88
-	const minDist = Math.max(16, sphereRadius / Math.max(8, Math.sqrt(n) * 1.15))
-	const linkIdeal = minDist * 2.0
+	const maxR = sphereRadius * 0.82
+	const minDist = Math.max(14, sphereRadius / Math.max(8, Math.sqrt(n) * 1.25))
+	const linkIdeal = minDist * 2.1
+	const zSpread = sphereRadius * 0.18
 
-	// Seed from an even 3D distribution so the result cannot collapse to a plane.
-	const seed = fibonacciShell(nodes, sphereRadius, (node) => {
+	for (const node of nodes) {
 		const d = degree.get(node.id) ?? 0
 		const hubT = d / maxDeg
-		return 0.28 + 0.55 * (1 - hubT) + hash01(node.id, 3) * 0.12
-	})
-	for (const [id, p] of seed) {
-		positions.set(id, { ...p })
+		const r = maxR * (0.06 + 0.58 * (1 - hubT) + hash01(node.id, 3) * 0.22)
+		const angle = hash01(node.id, 1) * Math.PI * 2 + hash01(node.id, 9) * 0.4
+		// Decorrelate Z from sequential ids (plain hash01(id,5) collapses for n0,n1,…).
+		const zT = (hash01(`${node.id}|z`, 5) * 0.55 + hash01(node.id, 17) * 0.45)
+		positions.set(node.id, {
+			x: Math.cos(angle) * r,
+			y: Math.sin(angle) * r * (0.82 + hash01(node.id, 4) * 0.18),
+			z: (zT - 0.5) * zSpread
+		})
 	}
 
 	const ids = [...positions.keys()]
-	const iterations = Math.min(120, 50 + Math.floor(n * 0.45))
+	const iterations = Math.min(100, 45 + Math.floor(n * 0.4))
 
 	for (let iter = 0; iter < iterations; iter++) {
 		const cooling = 1 - iter / iterations
@@ -162,30 +167,24 @@ function layoutOrganic(
 				const b = positions.get(ids[j])!
 				let dx = b.x - a.x
 				let dy = b.y - a.y
-				let dz = b.z - a.z
-				let dist = Math.hypot(dx, dy, dz)
+				let dist = Math.hypot(dx, dy)
 				if (dist < 0.001) {
 					dx = hash01(ids[i], j) - 0.5
 					dy = hash01(ids[j], i) - 0.5
-					dz = hash01(ids[i], i + j) - 0.5
 					dist = 0.15
 				}
 				if (dist < minDist) {
-					const push = ((minDist - dist) / dist) * 0.55 * cooling
+					const push = ((minDist - dist) / dist) * 0.6 * cooling
 					a.x -= dx * push
 					a.y -= dy * push
-					a.z -= dz * push
 					b.x += dx * push
 					b.y += dy * push
-					b.z += dz * push
-				} else if (dist < minDist * 2.4) {
-					const push = ((minDist * 2.4 - dist) / dist) * 0.1 * cooling
+				} else if (dist < minDist * 2.5) {
+					const push = ((minDist * 2.5 - dist) / dist) * 0.12 * cooling
 					a.x -= dx * push
 					a.y -= dy * push
-					a.z -= dz * push
 					b.x += dx * push
 					b.y += dy * push
-					b.z += dz * push
 				}
 			}
 		}
@@ -196,19 +195,30 @@ function layoutOrganic(
 			if (!s || !t) continue
 			const dx = t.x - s.x
 			const dy = t.y - s.y
-			const dz = t.z - s.z
-			const dist = Math.hypot(dx, dy, dz) || 0.001
-			const pull = ((dist - linkIdeal) / dist) * 0.05 * cooling
+			const dist = Math.hypot(dx, dy) || 0.001
+			const pull = ((dist - linkIdeal) / dist) * 0.055 * cooling
 			s.x += dx * pull
 			s.y += dy * pull
-			s.z += dz * pull
 			t.x -= dx * pull
 			t.y -= dy * pull
-			t.z -= dz * pull
 		}
 
-		for (const [id, p] of positions) {
-			positions.set(id, clampToSphere(p, maxR))
+		for (const p of positions.values()) {
+			const d = Math.hypot(p.x, p.y)
+			if (d < minDist * 0.4) {
+				const k = (minDist * 0.4 - d) / (d || 0.1)
+				p.x -= p.x * k * 0.5
+				p.y -= p.y * k * 0.5
+			}
+			if (d > maxR) {
+				const k = (d - maxR) / d
+				p.x *= 1 - k * 0.9
+				p.y *= 1 - k * 0.9
+			} else if (d > maxR * 0.78) {
+				const k = ((d - maxR * 0.78) / (maxR * 0.22)) * 0.15 * cooling
+				p.x *= 1 - k
+				p.y *= 1 - k
+			}
 		}
 	}
 
@@ -216,12 +226,12 @@ function layoutOrganic(
 
 	let maxDist = 0
 	for (const p of positions.values()) {
-		maxDist = Math.max(maxDist, Math.hypot(p.x, p.y, p.z))
+		maxDist = Math.max(maxDist, Math.hypot(p.x, p.y))
 	}
 	if (maxDist > maxR && maxDist > 0) {
 		const scale = maxR / maxDist
 		for (const [id, p] of positions) {
-			positions.set(id, { x: p.x * scale, y: p.y * scale, z: p.z * scale })
+			positions.set(id, { x: p.x * scale, y: p.y * scale, z: p.z * 0.85 })
 		}
 	}
 

@@ -4,8 +4,10 @@
 
 import * as vscode from 'vscode';
 import {
+	ENV_KEY_EMPTY_HELP,
 	ENV_KEY_HELP,
 	hasAnyApiKey,
+	hasEmptyApiKeyPlaceholders,
 	resolveAnyApiKey,
 	resolveGeminiApiKey,
 	resolvePreferredEnvFilePath,
@@ -72,6 +74,9 @@ export class MagnusSecretStorage {
 			return {
 				message: `Found ${any.varName}, but Gemini models need \`GEMINI_API_KEY\` (or \`GOOGLE_API_KEY\`) in \`.env\`. ${ENV_KEY_HELP}`,
 			};
+		}
+		if (hasEmptyApiKeyPlaceholders(this.extensionUri)) {
+			return { message: ENV_KEY_EMPTY_HELP };
 		}
 		return { message: ENV_KEY_HELP };
 	}

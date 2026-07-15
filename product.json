@@ -211,9 +211,69 @@
 			"type": "dark"
 		},
 		{
-			"id": "dark-2026",
+			"id": "dark-modern",
 			"label": "Dark Modern",
 			"themeId": "Dark Modern",
+			"type": "dark"
+		},
+		{
+			"id": "dark-plus",
+			"label": "Dark+",
+			"themeId": "Dark+",
+			"type": "dark"
+		},
+		{
+			"id": "dark-vs",
+			"label": "Dark (Visual Studio)",
+			"themeId": "Visual Studio Dark",
+			"type": "dark"
+		},
+		{
+			"id": "dark-2026",
+			"label": "Dark 2026",
+			"themeId": "Dark 2026",
+			"type": "dark"
+		},
+		{
+			"id": "abyss",
+			"label": "Abyss",
+			"themeId": "Abyss",
+			"type": "dark"
+		},
+		{
+			"id": "monokai",
+			"label": "Monokai",
+			"themeId": "Monokai",
+			"type": "dark"
+		},
+		{
+			"id": "monokai-dimmed",
+			"label": "Monokai Dimmed",
+			"themeId": "Monokai Dimmed",
+			"type": "dark"
+		},
+		{
+			"id": "kimbie-dark",
+			"label": "Kimbie Dark",
+			"themeId": "Kimbie Dark",
+			"type": "dark"
+		},
+		{
+			"id": "solarized-dark",
+			"label": "Solarized Dark",
+			"themeId": "Solarized Dark",
+			"type": "dark"
+		},
+		{
+			"id": "tomorrow-night-blue",
+			"label": "Tomorrow Night Blue",
+			"themeId": "Tomorrow Night Blue",
+			"type": "dark"
+		},
+		{
+			"id": "red",
+			"label": "Red",
+			"themeId": "Red",
 			"type": "dark"
 		},
 		{
@@ -229,9 +289,39 @@
 			"type": "light"
 		},
 		{
-			"id": "light-2026",
+			"id": "light-modern",
 			"label": "Light Modern",
 			"themeId": "Light Modern",
+			"type": "light"
+		},
+		{
+			"id": "light-plus",
+			"label": "Light+",
+			"themeId": "Light+",
+			"type": "light"
+		},
+		{
+			"id": "light-vs",
+			"label": "Light (Visual Studio)",
+			"themeId": "Visual Studio Light",
+			"type": "light"
+		},
+		{
+			"id": "light-2026",
+			"label": "Light 2026",
+			"themeId": "Light 2026",
+			"type": "light"
+		},
+		{
+			"id": "quiet-light",
+			"label": "Quiet Light",
+			"themeId": "Quiet Light",
+			"type": "light"
+		},
+		{
+			"id": "solarized-light",
+			"label": "Solarized Light",
+			"themeId": "Solarized Light",
 			"type": "light"
 		},
 		{

@@ -73,10 +73,10 @@ suite('PreBase networkLayout', () => {
 			}
 			const m = metrics(a);
 			assert.ok(Math.hypot(m.cx, m.cy, m.cz) < 1e-6);
-			// Not a flat plane: all three axes have meaningful variance.
+			// XY always spreads; Z is full-shell for most modes, mild depth for organic (V1.1).
 			assert.ok(m.vars[0] > 1);
 			assert.ok(m.vars[1] > 1);
-			assert.ok(m.vars[2] > 1);
+			assert.ok(m.vars[2] > (mode === 'organic' ? 0.5 : 1));
 			assert.ok(m.minNN > 0.5);
 		});
 	}

@@ -63,13 +63,17 @@ function stripQuotes(value: string): string {
 	return trimmed;
 }
 
-/** Minimal .env parser (KEY=VALUE). Ignores comments and blank lines. */
+/** Minimal .env parser (KEY=VALUE). Supports optional `export `. Ignores comments and blank lines. */
 export function parseEnvFileContents(raw: string): Record<string, string> {
 	const out: Record<string, string> = {};
-	for (const line of raw.split(/\r?\n/)) {
-		const trimmed = line.trim();
+	const text = raw.replace(/^\uFEFF/, '');
+	for (const line of text.split(/\r?\n/)) {
+		let trimmed = line.trim();
 		if (!trimmed || trimmed.startsWith('#')) {
 			continue;
+		}
+		if (trimmed.startsWith('export ')) {
+			trimmed = trimmed.slice('export '.length).trim();
 		}
 		const eq = trimmed.indexOf('=');
 		if (eq <= 0) {
@@ -82,6 +86,29 @@ export function parseEnvFileContents(raw: string): Record<string, string> {
 		out[key] = stripQuotes(trimmed.slice(eq + 1));
 	}
 	return out;
+}
+
+/** True when a known key name exists in `.env` but every candidate value is empty. */
+export function hasEmptyApiKeyPlaceholders(extensionUri: vscode.Uri): boolean {
+	for (const filePath of candidateEnvPaths(extensionUri)) {
+		const parsed = readEnvFile(filePath);
+		if (!parsed) {
+			continue;
+		}
+		let sawName = false;
+		for (const varName of MAGNUS_API_KEY_VARS) {
+			if (Object.prototype.hasOwnProperty.call(parsed, varName)) {
+				sawName = true;
+				if (parsed[varName]?.trim()) {
+					return false;
+				}
+			}
+		}
+		if (sawName) {
+			return true;
+		}
+	}
+	return false;
 }
 
 function readEnvFile(filePath: string): Record<string, string> | undefined {
@@ -123,6 +150,13 @@ function candidateEnvPaths(extensionUri: vscode.Uri): string[] {
 		const productRoot = path.resolve(extFs, '..', '..');
 		push(path.join(productRoot, '.env'));
 		push(path.join(productRoot, '.env.local'));
+	}
+
+	// Launch cwd / VSCODE_CWD (scripts/code.sh sets cwd to product root).
+	const cwdRoot = process.env.VSCODE_CWD || process.cwd();
+	if (cwdRoot) {
+		push(path.join(cwdRoot, '.env'));
+		push(path.join(cwdRoot, '.env.local'));
 	}
 
 	return paths;
@@ -224,3 +258,6 @@ export function resolvePreferredEnvFilePath(extensionUri: vscode.Uri): string {
 
 export const ENV_KEY_HELP =
 	'Add at least one API key to the project `.env` file (GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, …).';
+
+export const ENV_KEY_EMPTY_HELP =
+	'`GEMINI_API_KEY` (or another provider key) is listed in `.env` but its value is empty. Paste the key after `=`, save the file, then run Magnus: Check Configuration.';

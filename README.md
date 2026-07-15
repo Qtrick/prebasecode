@@ -2,7 +2,7 @@
 
 PreBase is an AI-assisted desktop IDE and code visualization platform. It helps you write code, see how a project is structured as interactive graphs, preview running apps, and work with an in-editor AI assistant (Magnus).
 
-PreBase is built on the open-source Code - OSS editor platform (MIT), with PreBase-specific workbench features layered on top.
+PreBase is built on the open-source [Code - OSS / Visual Studio Code](https://github.com/microsoft/vscode) editor platform (MIT), with PreBase-specific workbench features layered on top. Upstream source and history live in that repository.
 
 ## What PreBase adds
 
@@ -14,8 +14,8 @@ These features are **not** part of stock Code - OSS / typical editor builds. The
 | **PreBase Maps** | Architecture & Network graphs of your workspace |
 | **Runtime Preview** | In-IDE localhost preview for Vite / Next / similar apps |
 | **Magnus** | Gemini-backed AI chat + graph file descriptions |
-| **Account & Onboarding** | Optional PreBase account + first-run walkthrough |
-| **PreBase Settings** | Dedicated settings for maps, runtime, and graph behavior |
+| **Account** | Optional sign-in from the Activity Bar Accounts / profile control |
+| **PreBase Settings** | Dedicated settings for maps, runtime, themes, and graph behavior |
 
 ---
 
@@ -149,23 +149,20 @@ Without an API key, the structural overview still works; AI text shows as unavai
 
 ---
 
-### 6. Account, onboarding & settings
+### 6. Account & settings
 
 **Account**
 
-- Optional PreBase cloud account via **Accounts** menu / **PreBase: Sign In…**.
-- Requires a configured HTTPS `prebase.account.apiBaseUrl`. If unset, sign-in stays unconfigured (no fake local login).
+- Use the **Accounts / profile** control at the bottom of the left Activity Bar.
+- Menu options: **Sign In…**, **Create Account…**, and when signed in **Manage Account** / **Sign Out**.
+- Requires a configured HTTPS `prebase.account.apiBaseUrl`. If unset, Sign In opens that setting (no fake local login).
 - Magnus API keys and PreBase Account sessions are separate stores.
+- First-run onboarding is deferred for now (source kept for a later release).
 
-**Onboarding**
+**Settings & themes**
 
-- **PreBase: Open PreBase Onboarding** walks through Home, Maps, Runtime, Magnus, and account setup.
-- **PreBase: Reset Onboarding** runs the tour again.
-
-**Settings**
-
-- **PreBase: Open PreBase Settings** — maps layouts, network options, runtime defaults, description cache, and related toggles in one place.
-- Or search `prebase.` in the normal Settings UI.
+- **PreBase: Open PreBase Settings** → Appearance for quick themes (PreBase + VS Code classics: Dark+, Light+, Abyss, Monokai, Solarized, …) or **Browse all themes…**.
+- Or Command Palette → **Preferences: Color Theme** / search `prebase.` in Settings.
 
 ---
 
@@ -193,6 +190,6 @@ Core editor, terminal, git, and extension host behavior still come from the shar
 
 ## License
 
-PreBase builds on Code - OSS components licensed under the [MIT](LICENSE.txt) license. See `LICENSE.txt` and third-party notices in the repository for details.
+PreBase builds on [Code - OSS (microsoft/vscode)](https://github.com/microsoft/vscode) components licensed under the [MIT](LICENSE.txt) license. See `LICENSE.txt` and third-party notices in the repository for details.
 
 Copyright for PreBase-specific contributions: PreBase contributors. Upstream Code - OSS portions: copyright their respective authors (including Microsoft Corporation for the original Code - OSS project).

@@ -109,15 +109,24 @@ export function activate(context: vscode.ExtensionContext): void {
 
 		vscode.commands.registerCommand('prebase.magnus.checkConfiguration', async () => {
 			const any = await secrets.getAnyKey();
+			const gemini = await secrets.getGeminiKeyOrMessage();
 			const enabled = vscode.workspace.getConfiguration('prebase.magnus').get('enabled', true);
+			const envPath = secrets.getEnvFilePath();
+			let keyStatus: string;
+			if (any) {
+				keyStatus = `API key: ${any.varName} (${any.provider}) via ${any.source}`;
+			} else if (gemini.message) {
+				keyStatus = `API key: ${gemini.message}`;
+			} else {
+				keyStatus = `API key: missing — ${ENV_KEY_HELP}`;
+			}
 			const lines = [
 				`Enabled: ${enabled}`,
-				any
-					? `API key: ${any.varName} (${any.provider}) via ${any.source}`
-					: `API key: missing — ${ENV_KEY_HELP}`,
+				keyStatus,
 				`Default model: ${state.modelId}`,
 				`Default mode: ${state.mode}`,
-				`Env file: ${secrets.getEnvFilePath()}`,
+				`Env file (on disk): ${envPath}`,
+				'Tip: save `.env` (⌘S / Ctrl+S) before checking — Magnus reads the file on disk, not an unsaved editor tab.',
 			];
 			void vscode.window.showInformationMessage(lines.join(' · '));
 		}),

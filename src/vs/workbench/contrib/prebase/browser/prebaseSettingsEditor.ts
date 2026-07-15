@@ -18,11 +18,37 @@ import { IThemeService } from '../../../../platform/theme/common/themeService.js
 import { EditorPane } from '../../../browser/parts/editor/editorPane.js';
 import { IEditorOpenContext } from '../../../common/editor.js';
 import { IEditorGroup } from '../../../services/editor/common/editorGroupsService.js';
+import { IWorkbenchThemeService } from '../../../services/themes/common/workbenchThemeService.js';
 import { MANAGE_TRUST_COMMAND_ID } from '../../workspace/common/workspace.js';
 import { PREBASE_RESETTABLE_CONFIG_KEYS, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import type { LayoutMode } from '../common/graph/types.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
+
+/** Popular built-in themes (PreBase + stock VS Code / Code - OSS classics). */
+const QUICK_THEMES: { id: string; label: string }[] = [
+	{ id: 'PreBase Dark', label: 'PreBase Night' },
+	{ id: 'PreBase Light', label: 'PreBase Dawn' },
+	{ id: 'Dark Modern', label: 'Dark Modern' },
+	{ id: 'Light Modern', label: 'Light Modern' },
+	{ id: 'Dark+', label: 'Dark+' },
+	{ id: 'Light+', label: 'Light+' },
+	{ id: 'Visual Studio Dark', label: 'VS Dark' },
+	{ id: 'Visual Studio Light', label: 'VS Light' },
+	{ id: 'Dark 2026', label: 'Dark 2026' },
+	{ id: 'Light 2026', label: 'Light 2026' },
+	{ id: 'Abyss', label: 'Abyss' },
+	{ id: 'Monokai', label: 'Monokai' },
+	{ id: 'Monokai Dimmed', label: 'Monokai Dimmed' },
+	{ id: 'Kimbie Dark', label: 'Kimbie Dark' },
+	{ id: 'Solarized Dark', label: 'Solarized Dark' },
+	{ id: 'Solarized Light', label: 'Solarized Light' },
+	{ id: 'Quiet Light', label: 'Quiet Light' },
+	{ id: 'Tomorrow Night Blue', label: 'Tomorrow Night Blue' },
+	{ id: 'Red', label: 'Red' },
+	{ id: 'Default High Contrast', label: 'HC Dark' },
+	{ id: 'Default High Contrast Light', label: 'HC Light' },
+];
 
 type SettingsCategory =
 	| 'appearance'
@@ -107,10 +133,16 @@ export class PreBaseSettingsEditor extends EditorPane {
 		@IProductService private readonly productService: IProductService,
 		@INotificationService private readonly notificationService: INotificationService,
 		@IPreBaseGraphService private readonly graphService: IPreBaseGraphService,
+		@IWorkbenchThemeService private readonly workbenchThemeService: IWorkbenchThemeService,
 	) {
 		super(PreBaseSettingsEditor.ID, group, telemetryService, themeService, storageService);
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
-			if (e.affectsConfiguration('prebase') || e.affectsConfiguration('editor')) {
+			if (e.affectsConfiguration('prebase') || e.affectsConfiguration('editor') || e.affectsConfiguration('workbench.colorTheme')) {
+				this._render();
+			}
+		}));
+		this._register(this.workbenchThemeService.onDidColorThemeChange(() => {
+			if (this._category === 'appearance') {
 				this._render();
 			}
 		}));
@@ -448,15 +480,55 @@ export class PreBaseSettingsEditor extends EditorPane {
 			localize('prebase.settings.appearance.desc', "Theme, density, and motion preferences.")
 		);
 
+		const currentThemeId = this.workbenchThemeService.getColorTheme().settingsId
+			|| this.workbenchThemeService.getColorTheme().id;
 		const themeCtrl = document.createElement('div');
-		Object.assign(themeCtrl.style, { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '4px' });
+		Object.assign(themeCtrl.style, { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', maxWidth: '420px' });
+
+		const chips = DOM.append(themeCtrl, DOM.$('div'));
+		Object.assign(chips.style, { display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' });
+		for (const theme of QUICK_THEMES) {
+			const btn = DOM.append(chips, DOM.$('button')) as HTMLButtonElement;
+			btn.type = 'button';
+			btn.textContent = theme.label;
+			const active = currentThemeId === theme.id || currentThemeId.endsWith(theme.id);
+			Object.assign(btn.style, {
+				background: active ? '#155e75' : '#0f172a',
+				color: active ? '#ecfeff' : '#cbd5e1',
+				border: active ? '1px solid #22d3ee88' : '1px solid #334155',
+				borderRadius: '999px',
+				padding: '4px 10px',
+				fontSize: '11px',
+				cursor: 'pointer',
+			});
+			this._renderDisposables.add(DOM.addDisposableListener(btn, 'click', () => {
+				void this.workbenchThemeService.setColorTheme(theme.id, 'auto').then(result => {
+					if (!result) {
+						this.notificationService.info(localize(
+							'prebase.settings.themeMissing',
+							"Theme “{0}” is not available yet. Use the full theme picker, or ensure built-in theme extensions are built.",
+							theme.label
+						));
+					}
+				});
+			}));
+		}
+
 		const themeNote = DOM.append(themeCtrl, DOM.$('span'));
-		themeNote.textContent = localize('prebase.settings.themeUsesWorkbench', "Uses workbench Color Theme");
-		Object.assign(themeNote.style, { fontSize: '11px', color: COLORS.textMuted });
-		themeCtrl.appendChild(this._linkBtn(localize('prebase.settings.openTheme', "Open theme picker…"), () => {
+		themeNote.textContent = localize(
+			'prebase.settings.themeUsesWorkbench',
+			"Includes PreBase + VS Code classics (Dark+, Light+, Abyss, Monokai, …)"
+		);
+		Object.assign(themeNote.style, { fontSize: '11px', color: COLORS.textMuted, textAlign: 'right' });
+		themeCtrl.appendChild(this._linkBtn(localize('prebase.settings.openTheme', "Browse all themes…"), () => {
 			void this.commandService.executeCommand('workbench.action.selectTheme');
 		}));
-		this._row(card, localize('prebase.settings.theme', "Theme"), localize('prebase.settings.themeHint', "PreBase follows the workbench color theme."), themeCtrl);
+		this._row(
+			card,
+			localize('prebase.settings.theme', "Theme"),
+			localize('prebase.settings.themeHint', "Pick a built-in theme or open the full Color Theme picker."),
+			themeCtrl
+		);
 
 		const density = document.createElement('select');
 		this._selectStyle(density);

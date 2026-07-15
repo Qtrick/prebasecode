@@ -74,13 +74,21 @@ async function tryAuth(
 	return json.candidates?.[0];
 }
 
+function authMethodsForKey(apiKey: string): Array<'header' | 'query' | 'bearer'> {
+	// Newer Google AI Studio credentials often start with "AQ" / "AQ." and need Bearer.
+	if (/^AQ[.A-Za-z0-9_-]/i.test(apiKey.trim())) {
+		return ['bearer', 'header', 'query'];
+	}
+	return ['header', 'query', 'bearer'];
+}
+
 async function generateCandidate(
 	apiKey: string,
 	model: string,
 	body: GenerateRequest,
 	token?: { isCancellationRequested: boolean },
 ): Promise<GeminiResponseCandidate | undefined> {
-	const methods: Array<'header' | 'query' | 'bearer'> = ['header', 'query', 'bearer'];
+	const methods = authMethodsForKey(apiKey);
 	let lastError: Error | undefined;
 
 	for (const method of methods) {
@@ -146,7 +154,7 @@ export async function* streamGenerateContent(
 		return res;
 	};
 
-	for (const method of ['header', 'query', 'bearer'] as const) {
+	for (const method of authMethodsForKey(apiKey)) {
 		try {
 			const res = await tryStream(method);
 			if (!res?.body) {

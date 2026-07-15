@@ -104,9 +104,9 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 	get lastError(): string | undefined { return this._lastError; }
 	get apiConfigured(): boolean { return !!this._apiBase(); }
 
+	/** Onboarding UI is deferred; always complete so nothing auto-opens it. */
 	isOnboardingComplete(): boolean {
-		const v = this.storageService.getNumber(STORAGE_ONBOARDING, StorageScope.APPLICATION, 0);
-		return v >= ONBOARDING_VERSION;
+		return true;
 	}
 
 	markOnboardingComplete(): void {

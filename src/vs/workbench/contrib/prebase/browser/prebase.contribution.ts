@@ -13,7 +13,7 @@ import { EditorPaneDescriptor, IEditorPaneRegistry } from '../../../browser/edit
 import { EditorExtensions, IEditorFactoryRegistry, IEditorSerializer } from '../../../common/editor.js';
 import { EditorInput } from '../../../common/editor/editorInput.js';
 import { IInstantiationService, ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
-import { Action2, MenuId, MenuRegistry, registerAction2 } from '../../../../platform/actions/common/actions.js';
+import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
@@ -22,8 +22,6 @@ import { IOutputService } from '../../../services/output/common/output.js';
 import { IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import '../common/prebaseConfiguration.js';
 import { PREBASE_GRAPH_CHANNEL_ID, PREBASE_GRAPH_CHANNEL_LABEL, PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import type { LayoutMode } from '../common/graph/types.js';
@@ -44,9 +42,8 @@ import { PreBaseSettingsEditor } from './prebaseSettingsEditor.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
 import { PreBaseHomeEditor } from './prebaseHomeEditor.js';
 import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
-import { PreBaseOnboardingEditor } from './prebaseOnboardingEditor.js';
-import { PreBaseOnboardingEditorInput } from './prebaseOnboardingEditorInput.js';
 import './prebaseHomeEmptyEditors.js';
+// Onboarding editor kept in tree for a later release; not registered in the workbench right now.
 
 // --- services
 
@@ -150,15 +147,6 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 	[new SyncDescriptor(PreBaseHomeEditorInput)]
 );
 
-Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
-	EditorPaneDescriptor.create(
-		PreBaseOnboardingEditor,
-		PreBaseOnboardingEditor.ID,
-		localize('prebase.onboarding.editor', "PreBase Onboarding")
-	),
-	[new SyncDescriptor(PreBaseOnboardingEditorInput)]
-);
-
 class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
 	canSerialize(editor: EditorInput): boolean {
 		return editor instanceof PreBaseGraphEditorInput;
@@ -212,18 +200,6 @@ class PreBaseHomeEditorInputSerializer implements IEditorSerializer {
 	}
 }
 
-class PreBaseOnboardingEditorInputSerializer implements IEditorSerializer {
-	canSerialize(editor: EditorInput): boolean {
-		return editor instanceof PreBaseOnboardingEditorInput;
-	}
-	serialize(): string {
-		return '{}';
-	}
-	deserialize(): EditorInput {
-		return new PreBaseOnboardingEditorInput();
-	}
-}
-
 Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
 	PreBaseGraphEditorInput.TypeID,
 	PreBaseGraphEditorInputSerializer
@@ -239,10 +215,6 @@ Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEdit
 Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
 	PreBaseHomeEditorInput.TypeID,
 	PreBaseHomeEditorInputSerializer
-);
-Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
-	PreBaseOnboardingEditorInput.TypeID,
-	PreBaseOnboardingEditorInputSerializer
 );
 
 // --- helpers
@@ -326,7 +298,7 @@ registerAction2(class extends Action2 {
 	}
 });
 
-// --- account / onboarding (distinct from Copilot/GitHub AccountsContext entries)
+// --- account menu on the Activity Bar profile / Accounts button (onboarding deferred)
 
 async function promptCredentials(quickInput: IQuickInputService, includeDisplayName: boolean): Promise<{ email: string; password: string; displayName?: string } | undefined> {
 	const email = await quickInput.input({
@@ -355,64 +327,45 @@ async function promptCredentials(quickInput: IQuickInputService, includeDisplayN
 	return { email, password, displayName };
 }
 
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'prebase.account.configureService',
-			title: localize2('prebase.account.configureService', "Configure PreBase Account Service…"),
-			category: localize2('prebase.category', "PreBase"),
-			f1: true,
-			menu: {
-				id: MenuId.AccountsContext,
-				group: '0_prebase',
-				order: 1,
-				when: PreBaseAccountContext.unconfigured,
-			}
-		});
+async function ensureAccountConfigured(accessor: ServicesAccessor): Promise<boolean> {
+	const accounts = accessor.get(IPreBaseAccountService);
+	if (accounts.apiConfigured) {
+		return true;
 	}
-	async run(accessor: ServicesAccessor) {
-		const notify = accessor.get(INotificationService);
-		notify.notify({
-			severity: Severity.Info,
-			message: localize('prebase.account.unconfiguredMenu', "PreBase account service is not configured. Set prebase.account.apiBaseUrl to an https endpoint, or continue without signing in."),
-		});
-		await accessor.get(ICommandService).executeCommand('workbench.action.openSettings', PreBaseConfigKeys.AccountApiBaseUrl);
-	}
-});
+	accessor.get(INotificationService).notify({
+		severity: Severity.Info,
+		message: localize('prebase.account.unconfiguredMenu', "PreBase account service is not configured. Set prebase.account.apiBaseUrl to an https endpoint to enable sign-in."),
+	});
+	await accessor.get(ICommandService).executeCommand('workbench.action.openSettings', PreBaseConfigKeys.AccountApiBaseUrl);
+	return false;
+}
 
 registerAction2(class extends Action2 {
 	constructor() {
 		super({
 			id: 'prebase.account.signIn',
-			title: localize2('prebase.account.signIn', "Sign In to PreBase Account"),
+			title: localize2('prebase.account.signIn', "Sign In…"),
 			category: localize2('prebase.category', "PreBase"),
 			f1: true,
-			precondition: ContextKeyExpr.and(PreBaseAccountContext.configured, PreBaseAccountContext.notSignedIn),
 			menu: {
 				id: MenuId.AccountsContext,
 				group: '0_prebase',
 				order: 1,
-				when: ContextKeyExpr.and(PreBaseAccountContext.configured, PreBaseAccountContext.notSignedIn),
+				when: PreBaseAccountContext.notSignedIn,
 			}
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		const accounts = accessor.get(IPreBaseAccountService);
-		const notify = accessor.get(INotificationService);
-		if (!accounts.apiConfigured) {
-			notify.notify({
-				severity: Severity.Info,
-				message: localize('prebase.account.unconfiguredMenu', "PreBase account service is not configured. Set prebase.account.apiBaseUrl to an https endpoint, or continue without signing in."),
-			});
-			await accessor.get(ICommandService).executeCommand('workbench.action.openSettings', PreBaseConfigKeys.AccountApiBaseUrl);
+		if (!(await ensureAccountConfigured(accessor))) {
 			return;
 		}
+		const notify = accessor.get(INotificationService);
 		const creds = await promptCredentials(accessor.get(IQuickInputService), false);
 		if (!creds) {
 			return;
 		}
 		try {
-			await accounts.signIn(creds.email, creds.password);
+			await accessor.get(IPreBaseAccountService).signIn(creds.email, creds.password);
 			notify.info(localize('prebase.account.signedIn', "Signed in to PreBase."));
 		} catch (err) {
 			notify.error(err instanceof Error ? err.message : String(err));
@@ -424,35 +377,28 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({
 			id: 'prebase.account.signUp',
-			title: localize2('prebase.account.signUp', "Create a PreBase Account"),
+			title: localize2('prebase.account.signUp', "Create Account…"),
 			category: localize2('prebase.category', "PreBase"),
 			f1: true,
-			precondition: ContextKeyExpr.and(PreBaseAccountContext.configured, PreBaseAccountContext.notSignedIn),
 			menu: {
 				id: MenuId.AccountsContext,
 				group: '0_prebase',
 				order: 2,
-				when: ContextKeyExpr.and(PreBaseAccountContext.configured, PreBaseAccountContext.notSignedIn),
+				when: PreBaseAccountContext.notSignedIn,
 			}
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		const accounts = accessor.get(IPreBaseAccountService);
-		const notify = accessor.get(INotificationService);
-		if (!accounts.apiConfigured) {
-			notify.notify({
-				severity: Severity.Info,
-				message: localize('prebase.account.unconfiguredMenu', "PreBase account service is not configured. Set prebase.account.apiBaseUrl to an https endpoint, or continue without signing in."),
-			});
-			await accessor.get(ICommandService).executeCommand('workbench.action.openSettings', PreBaseConfigKeys.AccountApiBaseUrl);
+		if (!(await ensureAccountConfigured(accessor))) {
 			return;
 		}
+		const notify = accessor.get(INotificationService);
 		const creds = await promptCredentials(accessor.get(IQuickInputService), true);
 		if (!creds) {
 			return;
 		}
 		try {
-			await accounts.signUp(creds.email, creds.password, creds.displayName);
+			await accessor.get(IPreBaseAccountService).signUp(creds.email, creds.password, creds.displayName);
 			notify.info(localize('prebase.account.created', "PreBase account created."));
 		} catch (err) {
 			notify.error(err instanceof Error ? err.message : String(err));
@@ -463,8 +409,33 @@ registerAction2(class extends Action2 {
 registerAction2(class extends Action2 {
 	constructor() {
 		super({
+			id: 'prebase.account.manage',
+			title: localize2('prebase.account.manage', "Manage Account"),
+			category: localize2('prebase.category', "PreBase"),
+			f1: true,
+			precondition: PreBaseAccountContext.signedIn,
+			menu: {
+				id: MenuId.AccountsContext,
+				group: '0_prebase',
+				order: 3,
+				when: PreBaseAccountContext.signedIn,
+			}
+		});
+	}
+	async run(accessor: ServicesAccessor) {
+		const accounts = accessor.get(IPreBaseAccountService);
+		const notify = accessor.get(INotificationService);
+		if (accounts.state === 'signedIn' && accounts.account) {
+			notify.info(localize('prebase.account.manageInfo', "{0}{1}", accounts.account.displayName, accounts.account.email ? ` · ${accounts.account.email}` : ''));
+		}
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
 			id: 'prebase.account.signOut',
-			title: localize2('prebase.account.signOut', "Sign Out of PreBase Account"),
+			title: localize2('prebase.account.signOut', "Sign Out"),
 			category: localize2('prebase.category', "PreBase"),
 			f1: true,
 			precondition: PreBaseAccountContext.signedIn,
@@ -485,88 +456,21 @@ registerAction2(class extends Action2 {
 registerAction2(class extends Action2 {
 	constructor() {
 		super({
-			id: 'prebase.account.manage',
-			title: localize2('prebase.account.manage', "Manage PreBase Account"),
+			id: 'prebase.account.configureService',
+			title: localize2('prebase.account.configureService', "Configure Account Service…"),
 			category: localize2('prebase.category', "PreBase"),
 			f1: true,
-			precondition: PreBaseAccountContext.signedIn,
 			menu: {
 				id: MenuId.AccountsContext,
 				group: '0_prebase',
-				order: 3,
-				when: PreBaseAccountContext.signedIn,
+				order: 10,
+				when: ContextKeyExpr.and(PreBaseAccountContext.unconfigured, PreBaseAccountContext.notSignedIn),
 			}
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		const accounts = accessor.get(IPreBaseAccountService);
-		const notify = accessor.get(INotificationService);
-		if (accounts.state === 'signedIn' && accounts.account) {
-			notify.info(localize('prebase.account.manageInfo', "{0}{1}", accounts.account.displayName, accounts.account.email ? ` · ${accounts.account.email}` : ''));
-		} else {
-			await accessor.get(IEditorService).openEditor(new PreBaseOnboardingEditorInput(), { pinned: true });
-		}
+		await ensureAccountConfigured(accessor);
 	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'prebase.onboarding.open',
-			title: localize2('prebase.onboarding.open', "Open PreBase Onboarding"),
-			category: localize2('prebase.category', "PreBase"),
-			f1: true,
-			menu: { id: MenuId.AccountsContext, group: '0_prebase', order: 5 }
-		});
-	}
-	async run(accessor: ServicesAccessor) {
-		await accessor.get(IEditorService).openEditor(new PreBaseOnboardingEditorInput(), { pinned: true, revealIfOpened: true });
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'prebase.onboarding.reset',
-			title: localize2('prebase.onboarding.reset', "Reset Onboarding"),
-			category: localize2('prebase.category', "PreBase"),
-			f1: true
-		});
-	}
-	async run(accessor: ServicesAccessor) {
-		accessor.get(IPreBaseAccountService).resetOnboarding();
-		await accessor.get(IEditorService).openEditor(new PreBaseOnboardingEditorInput(), { pinned: true });
-	}
-});
-
-class PreBaseFirstRunOnboardingContribution extends Disposable implements IWorkbenchContribution {
-	static readonly ID = 'workbench.contrib.prebase.firstRunOnboarding';
-
-	constructor(
-		@IPreBaseAccountService accountService: IPreBaseAccountService,
-		@IEditorService editorService: IEditorService,
-	) {
-		super();
-		if (!accountService.isOnboardingComplete()) {
-			void editorService.openEditor(new PreBaseOnboardingEditorInput(), { pinned: true, revealIfOpened: true });
-		}
-	}
-}
-
-registerWorkbenchContribution2(
-	PreBaseFirstRunOnboardingContribution.ID,
-	PreBaseFirstRunOnboardingContribution,
-	WorkbenchPhase.AfterRestored
-);
-
-MenuRegistry.appendMenuItem(MenuId.AccountsContext, {
-	group: '0_prebase',
-	order: 0,
-	command: {
-		id: 'prebase.onboarding.open',
-		title: localize('prebase.account.section', "PreBase Account"),
-	},
-	when: undefined,
 });
 
 registerAction2(class extends Action2 {

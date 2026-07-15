@@ -374,7 +374,9 @@ const popupAi = document.getElementById('popupAi');
 let popupNode = null;
 let pointerDownNode = null;
 let pointerDownX = 0, pointerDownY = 0;
-const CLICK_PX = 5;
+let armedRotate = false;
+const CLICK_PX = 10;
+const NODE_SCALE = 1;
 
 const FOCAL = 1100;
 const IDLE_YAW = 0.08;
@@ -703,7 +705,8 @@ function renderArchitecture(s) {
 		g.appendChild(icon);
 		g.addEventListener('click', function (ev) {
 			ev.stopPropagation();
-			if (moved) return;
+			const dist = Math.hypot(ev.clientX - pointerDownX, ev.clientY - pointerDownY);
+			if (moved && dist > CLICK_PX) return;
 			openNodePopup(node, ev.clientX, ev.clientY);
 		});
 		g.addEventListener('dblclick', function (ev) {
@@ -770,26 +773,54 @@ function drawNetworkFrame() {
 		const node = nodes[i];
 		const p = projected[node.id];
 		if (!p) continue;
-		const r = 7 + 7 * (p.depthScale || 1);
+		const r = networkDrawRadius(node, p.depthScale || 1);
 		const color = nodeColor(node, snapshot.entryNodeId);
-		if (node.id === selectedNodeId || node.id === snapshot.entryNodeId) {
+		const isSelected = node.id === selectedNodeId;
+		const isEntry = node.id === snapshot.entryNodeId;
+		// Dim non-neighbors when a node is selected (easier reselection).
+		let alpha = 0.55 + 0.45 * Math.max(0.82, Math.min(1.14, 0.86 + normalizeDepthScale(p.depthScale || 1) * 0.28));
+		if (selectedNodeId && !isSelected) {
+			alpha *= 0.35;
+		}
+		if (isSelected || isEntry) {
 			ctx.beginPath();
-			ctx.fillStyle = node.id === selectedNodeId ? 'rgba(45,212,191,0.35)' : 'rgba(232,184,74,0.28)';
-			ctx.arc(p.x, p.y, r + 5, 0, Math.PI * 2);
+			ctx.fillStyle = isSelected ? 'rgba(45,212,191,0.35)' : 'rgba(232,184,74,0.28)';
+			ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
 			ctx.fill();
 		}
 		ctx.beginPath();
 		ctx.fillStyle = color;
-		ctx.globalAlpha = 0.55 + 0.45 * (p.depthScale || 1);
+		ctx.globalAlpha = alpha;
 		ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
 		ctx.fill();
 		ctx.globalAlpha = 1;
-		ctx.lineWidth = 1.5 / transform.k;
-		ctx.strokeStyle = node.id === selectedNodeId ? '#2dd4bf' : 'rgba(255,255,255,0.25)';
+		ctx.lineWidth = 1.25 / transform.k;
+		ctx.strokeStyle = isSelected ? '#2dd4bf' : 'rgba(255,255,255,0.22)';
 		ctx.stroke();
 	}
 	ctx.restore();
 	dirty = false;
+}
+
+function normalizeDepthScale(depthScale) {
+	return Math.max(0, Math.min(1, (depthScale - 0.72) / 0.48));
+}
+
+function networkNodeVal(node) {
+	if (typeof node.val === 'number' && node.val > 0) return node.val;
+	const imp = node.meta && typeof node.meta.importance === 'number' ? node.meta.importance : 0;
+	if (imp > 0) return Math.max(1.5, 1.2 + Math.sqrt(imp) * 1.4);
+	if (node.isEntry) return 10;
+	return 1.5;
+}
+
+function networkDrawRadius(node, depthScale) {
+	const scaleMul = Math.max(0.82, Math.min(1.14, 0.86 + normalizeDepthScale(depthScale) * 0.28));
+	return (Math.sqrt(networkNodeVal(node)) * NODE_SCALE * 1.7 + 1.6) * scaleMul;
+}
+
+function networkPickRadius(node) {
+	return Math.max(18, Math.sqrt(networkNodeVal(node)) * NODE_SCALE * 3.2 + 10);
 }
 
 function pickNetworkNode(clientX, clientY) {
@@ -803,8 +834,8 @@ function pickNetworkNode(clientX, clientY) {
 		const p = projected[nodes[i].id];
 		if (!p) continue;
 		const d = Math.hypot(p.x - x, p.y - y);
-		const r = 8 + 8 * (p.depthScale || 1);
-		if (d <= r + 4) {
+		const r = networkPickRadius(nodes[i]);
+		if (d <= r) {
 			// Frontmost: prefer smaller projected z (closer to camera), then nearer hit.
 			const score = -(typeof p.z === 'number' ? p.z : 0) * 1000 - d;
 			if (score > bestScore) { bestScore = score; best = nodes[i]; }
@@ -928,42 +959,51 @@ async function openNodePopup(node, clientX, clientY) {
 
 function onPointerDown(e, host) {
 	if (e.button !== 0 && e.button !== 1) return;
+	if (popup.style.display !== 'none') {
+		closePopup();
+	}
 	dragging = true; moved = false; lastX = e.clientX; lastY = e.clientY;
 	pointerDownX = e.clientX; pointerDownY = e.clientY;
 	pointerDownNode = isNetwork() ? pickNetworkNode(e.clientX, e.clientY) : null;
 	const wantPan = e.button === 1 || e.shiftKey || !isNetwork();
 	panning = wantPan;
-	rotating = isNetwork() && !wantPan;
+	// Defer rotate until drag exceeds click threshold so node reselection works.
+	rotating = false;
+	armedRotate = isNetwork() && !wantPan;
 	host.classList.add('dragging');
-	if (rotating || panning) scheduleIdleResume();
+	if (panning) scheduleIdleResume();
 }
 function onPointerUp(e) {
 	const wasMoved = moved;
-	const downNode = pointerDownNode;
-	dragging = false; panning = false; rotating = false;
+	dragging = false; panning = false; rotating = false; armedRotate = false;
 	pointerDownNode = null;
 	archSvg.classList.remove('dragging'); archSvg.classList.remove('panning');
 	netCanvas.classList.remove('dragging');
 	const dist = e ? Math.hypot((e.clientX || 0) - pointerDownX, (e.clientY || 0) - pointerDownY) : 99;
 	if (isNetwork() && e && !wasMoved && dist <= CLICK_PX) {
 		const node = pickNetworkNode(e.clientX, e.clientY);
-		if (node && (!downNode || downNode.id === node.id)) {
+		if (node) {
+			// Always take the frontmost node under the cursor (allows switching selection).
 			openNodePopup(node, e.clientX, e.clientY);
 			return;
 		}
-		if (!node) {
-			selectedNodeId = null;
-			request('selectNode', { nodeId: null });
-			closePopup();
-			dirty = true; drawNetworkFrame();
-		}
+		selectedNodeId = null;
+		request('selectNode', { nodeId: null });
+		closePopup();
+		dirty = true; drawNetworkFrame();
 	}
 	if (isNetwork()) scheduleIdleResume();
 }
 function onPointerMove(e) {
 	if (!dragging) return;
 	const dx = e.clientX - lastX, dy = e.clientY - lastY;
-	if (Math.abs(dx) + Math.abs(dy) > 2) moved = true;
+	const total = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
+	if (total > CLICK_PX) moved = true;
+	if (armedRotate && moved) {
+		rotating = true;
+		armedRotate = false;
+		scheduleIdleResume();
+	}
 	lastX = e.clientX; lastY = e.clientY;
 	if (rotating && isNetwork()) {
 		rotation.yaw += dx * 0.005;
@@ -975,6 +1015,7 @@ function onPointerMove(e) {
 		drawNetworkFrame();
 		return;
 	}
+	if (!moved) return;
 	transform.x += dx; transform.y += dy;
 	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else applyArchTransform();
 }

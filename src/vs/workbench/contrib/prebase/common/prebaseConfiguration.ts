@@ -365,7 +365,7 @@ configurationRegistry.registerConfiguration({
 		},
 		[PreBaseConfigKeys.GraphNetworkSpreadScale]: {
 			type: 'number',
-			default: 1,
+			default: 1.2,
 			minimum: 0.4,
 			maximum: 2.5,
 			description: localize('prebase.graph.networkSpreadScale', "Overall spread scale for Network Graph layouts."),
