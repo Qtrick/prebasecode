@@ -179,12 +179,16 @@ export class PreBaseGraphEditor extends EditorPane {
 		const quality = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphQuality) || 'auto';
 		const maxNodes = this.configurationService.getValue<number>(PreBaseConfigKeys.GraphMaxRenderedNodes) || 280;
 		const maxEdges = this.configurationService.getValue<number>(PreBaseConfigKeys.GraphMaxRenderedEdges) || 420;
+		const networkDragDirection = this.configurationService.getValue<string>(PreBaseConfigKeys.InteractionNetworkDragDirection) === 'inverted'
+			? 'inverted'
+			: 'natural';
 		return {
 			showLegend: this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphShowLegend) !== false,
 			showMinimap: this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphShowMinimap),
 			initialZoom: this.configurationService.getValue<number>(PreBaseConfigKeys.GraphInitialZoom) || 1,
 			reduceMotion: this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphReduceMotion) === true,
 			networkIdleAutoRotate: !!this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphNetworkIdleAutoRotate),
+			networkDragDirection,
 			maxRenderedEdges: quality === 'performance' ? Math.min(280, maxEdges) : maxEdges,
 			maxRenderedNodes: (quality === 'performance') ? Math.min(180, maxNodes) : maxNodes,
 			quality
@@ -296,7 +300,7 @@ export class PreBaseGraphEditor extends EditorPane {
 <style nonce="${nonce}">
 html, body { margin:0; height:100%; background:#070b14; color:#e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; overflow:hidden; }
 #stage { position:absolute; inset:0; }
-#archSvg, #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; }
+#archSvg, #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; }
 #archSvg { cursor:grab; }
 #archSvg.dragging, #archSvg.panning { cursor:grabbing; }
 #netCanvas { cursor:grab; }
@@ -374,11 +378,11 @@ const popupAi = document.getElementById('popupAi');
 let popupNode = null;
 let pointerDownNode = null;
 let pointerDownX = 0, pointerDownY = 0;
-let armedRotate = false;
-const CLICK_PX = 10;
+let interactionState = 'idle';
+let dragThreshold = 4;
 const NODE_SCALE = 1;
 
-const FOCAL = 1100;
+const FOCAL = 640;
 const IDLE_YAW = 0.08;
 const IDLE_RESUME_MS = 1400;
 const ARCH_W = 28, ARCH_H = 28;
@@ -389,14 +393,15 @@ const FILE_COLORS = {
 };
 
 let transform = { x: 0, y: 0, k: 1 };
-let rotation = { yaw: 0, pitch: 0.18 };
+let rotation = { yaw: 0.55, pitch: 0.28 };
 let snapshot = null;
 let diagnostics = null;
 let selectedNodeId = null;
-let settings = { showLegend:true, reduceMotion:false, networkIdleAutoRotate:false, maxRenderedEdges:420, maxRenderedNodes:280, quality:'auto' };
+let settings = { showLegend:true, reduceMotion:false, networkIdleAutoRotate:false, networkDragDirection:'natural', maxRenderedEdges:420, maxRenderedNodes:280, quality:'auto' };
 let graphType = 'architecture';
 let dragging = false, panning = false, rotating = false;
 let lastX = 0, lastY = 0, moved = false;
+let activePointerId = null, activePointerHost = null;
 let layoutKey = '';
 let base3d = Object.create(null);
 let centroid = { x:0, y:0 };
@@ -417,6 +422,26 @@ function request(type, payload) {
 }
 
 function isNetwork() { return graphType === 'network' || (snapshot && snapshot.graphType === 'network'); }
+
+function thresholdForPointer(pointerType) {
+	if (pointerType === 'touch') return 8;
+	if (pointerType === 'pen') return 6;
+	return 4;
+}
+
+// Screen Y increases downward. The graph is grabbed directly: dragging right
+// brings its left side forward, while dragging down rolls the graph upward.
+// The inverted setting flips this single mapping for both axes.
+function mapPointerDeltaToGraphRotation(dx, dy) {
+	const direction = settings.networkDragDirection === 'inverted' ? -1 : 1;
+	const sensitivity = 0.005 * direction;
+	return { yaw: -dx * sensitivity, pitch: dy * sensitivity };
+}
+
+function wrapRotationAngle(angle) {
+	const fullTurn = Math.PI * 2;
+	return ((angle + Math.PI) % fullTurn + fullTurn) % fullTurn - Math.PI;
+}
 
 function fileType(path) {
 	if (!path) return { id:'other', name:'Other', color:FILE_COLORS.other };
@@ -450,7 +475,7 @@ function projectPoint(x, y, z, yaw, pitch) {
 	const cy = Math.cos(yaw), sy = Math.sin(yaw);
 	const x2 = x * cy + z1 * sy;
 	const z2 = -x * sy + z1 * cy;
-	const depthScale = FOCAL / (FOCAL + z2);
+	const depthScale = FOCAL / Math.max(FOCAL * 0.42, FOCAL + z2);
 	return { x: x2 * depthScale, y: y1 * depthScale, z: z2, depthScale: depthScale };
 }
 
@@ -473,7 +498,7 @@ function clearIdleTimers() {
 }
 
 function resetCamera(preserveZoom) {
-	rotation = { yaw: 0, pitch: 0.18 };
+	rotation = { yaw: 0.55, pitch: 0.28 };
 	if (!preserveZoom) transform = { x: 0, y: 0, k: settings.initialZoom || 1 };
 	scheduleIdleResume();
 	dirty = true;
@@ -706,7 +731,7 @@ function renderArchitecture(s) {
 		g.addEventListener('click', function (ev) {
 			ev.stopPropagation();
 			const dist = Math.hypot(ev.clientX - pointerDownX, ev.clientY - pointerDownY);
-			if (moved && dist > CLICK_PX) return;
+			if (moved && dist > dragThreshold) return;
 			openNodePopup(node, ev.clientX, ev.clientY);
 		});
 		g.addEventListener('dblclick', function (ev) {
@@ -755,10 +780,11 @@ function drawNetworkFrame() {
 		const a = projected[e.source], b = projected[e.target];
 		if (!a || !b) continue;
 		const avg = ((a.depthScale || 1) + (b.depthScale || 1)) / 2;
+		const edgeAlpha = Math.max(0.16, Math.min(0.78, 0.2 + 0.38 * avg));
 		ctx.beginPath();
 		ctx.strokeStyle = e.kind === 'contains'
-			? 'rgba(167,139,250,' + (0.2 + 0.45 * avg) + ')'
-			: 'rgba(125,170,220,' + (0.18 + 0.4 * avg) + ')';
+			? 'rgba(167,139,250,' + edgeAlpha + ')'
+			: 'rgba(125,170,220,' + edgeAlpha + ')';
 		ctx.lineWidth = 1 / transform.k;
 		ctx.moveTo(a.x, a.y);
 		ctx.lineTo(b.x, b.y);
@@ -767,7 +793,8 @@ function drawNetworkFrame() {
 
 	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
 	const nodes = (snapshot.nodes || []).slice(0, maxNodes).slice().sort(function (a, b) {
-		return ((projected[a.id] && projected[a.id].z) || 0) - ((projected[b.id] && projected[b.id].z) || 0);
+		// Far nodes first, then nearer nodes on top for visible occlusion.
+		return ((projected[b.id] && projected[b.id].z) || 0) - ((projected[a.id] && projected[a.id].z) || 0);
 	});
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
@@ -778,7 +805,7 @@ function drawNetworkFrame() {
 		const isSelected = node.id === selectedNodeId;
 		const isEntry = node.id === snapshot.entryNodeId;
 		// Dim non-neighbors when a node is selected (easier reselection).
-		let alpha = 0.55 + 0.45 * Math.max(0.82, Math.min(1.14, 0.86 + normalizeDepthScale(p.depthScale || 1) * 0.28));
+		let alpha = 0.42 + normalizeDepthScale(p.depthScale || 1) * 0.58;
 		if (selectedNodeId && !isSelected) {
 			alpha *= 0.35;
 		}
@@ -803,7 +830,7 @@ function drawNetworkFrame() {
 }
 
 function normalizeDepthScale(depthScale) {
-	return Math.max(0, Math.min(1, (depthScale - 0.72) / 0.48));
+	return Math.max(0, Math.min(1, (depthScale - 0.62) / 1.15));
 }
 
 function networkNodeVal(node) {
@@ -815,7 +842,7 @@ function networkNodeVal(node) {
 }
 
 function networkDrawRadius(node, depthScale) {
-	const scaleMul = Math.max(0.82, Math.min(1.14, 0.86 + normalizeDepthScale(depthScale) * 0.28));
+	const scaleMul = Math.max(0.76, Math.min(1.38, 0.76 + normalizeDepthScale(depthScale) * 0.62));
 	return (Math.sqrt(networkNodeVal(node)) * NODE_SCALE * 1.7 + 1.6) * scaleMul;
 }
 
@@ -958,10 +985,15 @@ async function openNodePopup(node, clientX, clientY) {
 }
 
 function onPointerDown(e, host) {
-	if (e.button !== 0 && e.button !== 1) return;
+	if (!e.isPrimary || (e.button !== 0 && e.button !== 1)) return;
 	if (popup.style.display !== 'none') {
 		closePopup();
 	}
+	host.setPointerCapture(e.pointerId);
+	activePointerId = e.pointerId;
+	activePointerHost = host;
+	interactionState = 'pressed';
+	dragThreshold = thresholdForPointer(e.pointerType);
 	dragging = true; moved = false; lastX = e.clientX; lastY = e.clientY;
 	pointerDownX = e.clientX; pointerDownY = e.clientY;
 	pointerDownNode = isNetwork() ? pickNetworkNode(e.clientX, e.clientY) : null;
@@ -969,18 +1001,23 @@ function onPointerDown(e, host) {
 	panning = wantPan;
 	// Defer rotate until drag exceeds click threshold so node reselection works.
 	rotating = false;
-	armedRotate = isNetwork() && !wantPan;
 	host.classList.add('dragging');
 	if (panning) scheduleIdleResume();
 }
-function onPointerUp(e) {
-	const wasMoved = moved;
-	dragging = false; panning = false; rotating = false; armedRotate = false;
+function onPointerUp(e, cancelled) {
+	if (e.pointerId !== activePointerId) return;
+	const pointerHost = activePointerHost;
+	activePointerId = null;
+	activePointerHost = null;
+	if (pointerHost && pointerHost.hasPointerCapture(e.pointerId)) pointerHost.releasePointerCapture(e.pointerId);
+	const wasMoved = moved || cancelled;
+	dragging = false; panning = false; rotating = false;
+	interactionState = cancelled ? 'cancelled' : 'idle';
 	pointerDownNode = null;
 	archSvg.classList.remove('dragging'); archSvg.classList.remove('panning');
 	netCanvas.classList.remove('dragging');
 	const dist = e ? Math.hypot((e.clientX || 0) - pointerDownX, (e.clientY || 0) - pointerDownY) : 99;
-	if (isNetwork() && e && !wasMoved && dist <= CLICK_PX) {
+	if (isNetwork() && e && !wasMoved && dist <= dragThreshold) {
 		const node = pickNetworkNode(e.clientX, e.clientY);
 		if (node) {
 			// Always take the frontmost node under the cursor (allows switching selection).
@@ -995,29 +1032,27 @@ function onPointerUp(e) {
 	if (isNetwork()) scheduleIdleResume();
 }
 function onPointerMove(e) {
-	if (!dragging) return;
+	if (!dragging || e.pointerId !== activePointerId) return;
 	const dx = e.clientX - lastX, dy = e.clientY - lastY;
 	const total = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
-	if (total > CLICK_PX) moved = true;
-	if (armedRotate && moved) {
+	if (total > dragThreshold) moved = true;
+	if (interactionState === 'pressed' && !panning && isNetwork() && moved) {
 		rotating = true;
-		armedRotate = false;
+		interactionState = 'rotating';
 		scheduleIdleResume();
 	}
 	lastX = e.clientX; lastY = e.clientY;
 	if (rotating && isNetwork()) {
-		rotation.yaw += dx * 0.005;
-		rotation.pitch += dy * 0.005;
-		const limit = Math.PI / 2 - 0.05;
-		if (rotation.pitch > limit) rotation.pitch = limit;
-		if (rotation.pitch < -limit) rotation.pitch = -limit;
+		const mapped = mapPointerDeltaToGraphRotation(dx, dy);
+		rotation.yaw = wrapRotationAngle(rotation.yaw + mapped.yaw);
+		rotation.pitch = wrapRotationAngle(rotation.pitch + mapped.pitch);
 		dirty = true;
-		drawNetworkFrame();
 		return;
 	}
 	if (!moved) return;
+	interactionState = 'panning';
 	transform.x += dx; transform.y += dy;
-	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else applyArchTransform();
+	if (isNetwork()) { dirty = true; } else applyArchTransform();
 }
 function onWheel(e) {
 	e.preventDefault();
@@ -1033,14 +1068,20 @@ function onWheel(e) {
 	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else applyArchTransform();
 }
 
-archSvg.addEventListener('mousedown', function (e) { onPointerDown(e, archSvg); });
-netCanvas.addEventListener('mousedown', function (e) { onPointerDown(e, netCanvas); });
+archSvg.addEventListener('pointerdown', function (e) { onPointerDown(e, archSvg); });
+netCanvas.addEventListener('pointerdown', function (e) { onPointerDown(e, netCanvas); });
+archSvg.addEventListener('pointermove', onPointerMove);
+netCanvas.addEventListener('pointermove', onPointerMove);
+archSvg.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
+netCanvas.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
+archSvg.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
+netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
+archSvg.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
+netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
 netCanvas.addEventListener('dblclick', function (e) {
 	const node = pickNetworkNode(e.clientX, e.clientY);
 	if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
 });
-window.addEventListener('mouseup', onPointerUp);
-window.addEventListener('mousemove', onPointerMove);
 document.getElementById('popupClose').onclick = function () { closePopup(); };
 document.getElementById('popupOpen').onclick = function () {
 	if (popupNode) request('openFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });

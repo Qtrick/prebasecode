@@ -1,7 +1,7 @@
 {
   "name": "magnus",
   "displayName": "Agents",
-  "description": "PreBase Agents AI chat \u2014 Gemini-backed language models and workspace tools",
+  "description": "PreBase Agents AI chat with frontier language models and workspace tools",
   "version": "0.1.0",
   "publisher": "prebase",
   "license": "MIT",
@@ -29,7 +29,8 @@
     "chatProvider",
     "languageModelSystem",
     "languageModelCapabilities",
-    "languageModelThinkingPart"
+    "languageModelThinkingPart",
+    "findTextInFiles"
   ],
 	"contributes": {
 		"languageModelChatProviders": [
@@ -43,7 +44,7 @@
 			{
 				"icon": "$(sparkle)",
 				"title": "Agents",
-				"content": "Ask, plan, edit, and verify with Agents.\n\nKeys load from the project `.env` — paste Gemini, OpenAI, Claude, or any listed provider (at least one).",
+        "content": "Ask, plan, edit, and verify with Agents. Configure a model provider from the visible Agents command when needed.",
 				"when": "!chatSetupHidden"
 			}
 		],
@@ -90,6 +91,36 @@
         "when": "config.chat.agent.enabled"
       }
     ],
+    "languageModelTools": [
+      { "name": "prebase_graph_search_nodes", "displayName": "Search PreBase Graph", "toolReferenceName": "prebase_graph_search_nodes", "canBeReferencedInPrompt": true, "modelDescription": "Searches the current, locally indexed PreBase graph. Returns bounded node metadata and graph freshness; never uploads the graph.", "userDescription": "Search the local PreBase graph.", "inputSchema": { "type": "object", "properties": { "query": { "type": "string" }, "maximumResults": { "type": "number", "minimum": 1, "maximum": 50 } }, "required": ["query"] } },
+      { "name": "prebase_graph_get_node", "displayName": "Get PreBase Graph Node", "toolReferenceName": "prebase_graph_get_node", "canBeReferencedInPrompt": true, "modelDescription": "Gets bounded metadata, imports, and dependents for a local PreBase graph node by id or relative path.", "userDescription": "Inspect a graph node.", "inputSchema": { "type": "object", "properties": { "node": { "type": "string" } }, "required": ["node"] } },
+      { "name": "prebase_graph_get_dependencies", "displayName": "Get PreBase Graph Dependencies", "toolReferenceName": "prebase_graph_get_dependencies", "canBeReferencedInPrompt": true, "modelDescription": "Traverses the current local PreBase graph with explicit bounded depth and result limits.", "userDescription": "Inspect graph dependencies.", "inputSchema": { "type": "object", "properties": { "node": { "type": "string" }, "direction": { "type": "string", "enum": ["incoming", "outgoing", "both"] }, "depth": { "type": "number", "minimum": 1, "maximum": 8 }, "maximumNodes": { "type": "number", "minimum": 1, "maximum": 100 } }, "required": ["node"] } },
+      { "name": "prebase_graph_get_overview", "displayName": "Get PreBase Graph Overview", "toolReferenceName": "prebase_graph_get_overview", "canBeReferencedInPrompt": true, "modelDescription": "Returns a bounded local graph overview, including freshness and high-degree nodes.", "userDescription": "Summarize the local graph.", "inputSchema": { "type": "object" } },
+      { "name": "prebase_workspace_read_file", "displayName": "Read Workspace File", "toolReferenceName": "prebase_workspace_read_file", "canBeReferencedInPrompt": true, "modelDescription": "Reads a bounded non-secret text file inside the current workspace only.", "userDescription": "Read a workspace file.", "inputSchema": { "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"] } },
+      { "name": "prebase_workspace_search_text", "displayName": "Search Workspace", "toolReferenceName": "prebase_workspace_search_text", "canBeReferencedInPrompt": true, "modelDescription": "Searches filenames and bounded text content within the current workspace while excluding secret files.", "userDescription": "Search the workspace.", "inputSchema": { "type": "object", "properties": { "query": { "type": "string" } }, "required": ["query"] } },
+      { "name": "prebase_workspace_list_files", "displayName": "List Workspace Files", "toolReferenceName": "prebase_workspace_list_files", "canBeReferencedInPrompt": true, "modelDescription": "Lists bounded non-secret files using VS Code workspace search.", "userDescription": "List project files.", "inputSchema": { "type": "object", "properties": { "include": { "type": "string" }, "exclude": { "type": "string" }, "maximumResults": { "type": "number", "minimum": 1, "maximum": 500 } } } },
+      { "name": "prebase_workspace_search_text_rich", "displayName": "Search Workspace Text", "toolReferenceName": "prebase_workspace_search_text_rich", "canBeReferencedInPrompt": true, "modelDescription": "Uses VS Code text search to return bounded path, preview, and range matches while excluding secrets.", "userDescription": "Search project text.", "inputSchema": { "type": "object", "properties": { "query": { "type": "string", "minLength": 1, "maxLength": 512 }, "isRegex": { "type": "boolean" }, "isCaseSensitive": { "type": "boolean" }, "isWordMatch": { "type": "boolean" }, "include": { "type": "string" }, "exclude": { "type": "string" }, "maximumResults": { "type": "number", "minimum": 1, "maximum": 200 } }, "required": ["query"] } },
+      { "name": "prebase_workspace_read_file_range", "displayName": "Read Workspace File Range", "toolReferenceName": "prebase_workspace_read_file_range", "canBeReferencedInPrompt": true, "modelDescription": "Reads a bounded line range from a non-secret workspace file, including current open-document version.", "userDescription": "Read a project file range.", "inputSchema": { "type": "object", "properties": { "path": { "type": "string" }, "startLine": { "type": "number", "minimum": 0 }, "endLine": { "type": "number", "minimum": 0 }, "maximumCharacters": { "type": "number", "minimum": 1, "maximum": 120000 } }, "required": ["path"] } },
+      { "name": "prebase_workspace_search_symbols", "displayName": "Search Workspace Symbols", "toolReferenceName": "prebase_workspace_search_symbols", "canBeReferencedInPrompt": true, "modelDescription": "Uses VS Code language providers to search workspace symbols or list document symbols.", "userDescription": "Find source symbols.", "inputSchema": { "type": "object", "properties": { "query": { "type": "string" }, "path": { "type": "string" }, "maximumResults": { "type": "number", "minimum": 1, "maximum": 300 } } } },
+      { "name": "prebase_workspace_get_definition", "displayName": "Get Symbol Definition", "toolReferenceName": "prebase_workspace_get_definition", "canBeReferencedInPrompt": true, "modelDescription": "Uses VS Code definition providers at an exact file position.", "userDescription": "Find a symbol definition.", "inputSchema": { "type": "object", "properties": { "path": { "type": "string" }, "position": { "type": "object", "properties": { "line": { "type": "number", "minimum": 0 }, "character": { "type": "number", "minimum": 0 } }, "required": ["line", "character"] } }, "required": ["path", "position"] } },
+      { "name": "prebase_workspace_get_references", "displayName": "Get Symbol References", "toolReferenceName": "prebase_workspace_get_references", "canBeReferencedInPrompt": true, "modelDescription": "Uses VS Code reference providers at an exact file position.", "userDescription": "Find symbol references.", "inputSchema": { "type": "object", "properties": { "path": { "type": "string" }, "position": { "type": "object", "properties": { "line": { "type": "number", "minimum": 0 }, "character": { "type": "number", "minimum": 0 } }, "required": ["line", "character"] } }, "required": ["path", "position"] } },
+      { "name": "prebase_workspace_get_diagnostics", "displayName": "Get Workspace Diagnostics", "toolReferenceName": "prebase_workspace_get_diagnostics", "canBeReferencedInPrompt": true, "modelDescription": "Returns current VS Code diagnostics for a file or the workspace without reading secret files.", "userDescription": "Inspect project diagnostics.", "inputSchema": { "type": "object", "properties": { "path": { "type": "string" } } } },
+      { "name": "prebase_edit_apply_file", "displayName": "Edit Workspace File", "toolReferenceName": "prebase_edit_apply_file", "canBeReferencedInPrompt": true, "modelDescription": "Replaces the contents of one non-secret workspace file through WorkspaceEdit. Requires Workspace Trust and explicit user confirmation.", "userDescription": "Edit a workspace file after confirmation.", "inputSchema": { "type": "object", "properties": { "path": { "type": "string" }, "content": { "type": "string" } }, "required": ["path", "content"] } }
+      ,{ "name": "prebase_edit_apply", "displayName": "Apply Version-Checked Edits", "toolReferenceName": "prebase_edit_apply", "canBeReferencedInPrompt": true, "modelDescription": "Applies a reviewed multi-file WorkspaceEdit only when every expected document version matches. Requires Workspace Trust and confirmation.", "userDescription": "Apply reviewed workspace edits.", "inputSchema": { "type": "object", "properties": { "label": { "type": "string" }, "files": { "type": "array", "minItems": 1, "maxItems": 50, "items": { "type": "object", "properties": { "path": { "type": "string" }, "expectedVersion": { "type": "number", "minimum": 1 }, "edits": { "type": "array", "minItems": 1, "items": { "type": "object", "properties": { "start": { "type": "object" }, "end": { "type": "object" }, "text": { "type": "string" } }, "required": ["start", "end", "text"] } } }, "required": ["path", "expectedVersion", "edits"] } } }, "required": ["files"] } }
+      ,{ "name": "prebase_edit_create_file", "displayName": "Create Workspace File", "toolReferenceName": "prebase_edit_create_file", "canBeReferencedInPrompt": true, "modelDescription": "Creates a non-secret workspace file without overwriting. Requires Workspace Trust and confirmation.", "userDescription": "Create a project file.", "inputSchema": { "type": "object", "properties": { "path": { "type": "string" }, "content": { "type": "string", "maxLength": 1000000 } }, "required": ["path", "content"] } }
+      ,{ "name": "prebase_edit_rename_file", "displayName": "Rename Workspace File", "toolReferenceName": "prebase_edit_rename_file", "canBeReferencedInPrompt": true, "modelDescription": "Renames a non-secret workspace file without overwriting its destination. Requires Workspace Trust and confirmation.", "userDescription": "Rename a project file.", "inputSchema": { "type": "object", "properties": { "from": { "type": "string" }, "to": { "type": "string" } }, "required": ["from", "to"] } }
+      ,{ "name": "prebase_edit_delete_file", "displayName": "Delete Workspace File", "toolReferenceName": "prebase_edit_delete_file", "canBeReferencedInPrompt": true, "modelDescription": "Deletes one non-secret workspace file after explicit confirmation. Requires Workspace Trust.", "userDescription": "Delete a project file.", "inputSchema": { "type": "object", "properties": { "path": { "type": "string" } }, "required": ["path"] } }
+      ,{ "name": "prebase_runtime_get_state", "displayName": "Get Runtime Preview State", "toolReferenceName": "prebase_runtime_get_state", "canBeReferencedInPrompt": true, "modelDescription": "Returns the current Runtime Preview session context without inspecting or uploading page content.", "userDescription": "Inspect Runtime Preview state.", "inputSchema": { "type": "object" } }
+      ,{ "name": "prebase_runtime_navigate", "displayName": "Navigate Runtime Preview", "toolReferenceName": "prebase_runtime_navigate", "canBeReferencedInPrompt": true, "modelDescription": "Navigates the current Runtime Preview to a relative path or allowed URL. External origins require confirmation; unsafe schemes are rejected.", "userDescription": "Navigate Runtime Preview.", "inputSchema": { "type": "object", "properties": { "url": { "type": "string", "minLength": 1, "maxLength": 4096 } }, "required": ["url"] } }
+      ,{ "name": "prebase_runtime_inspect_page", "displayName": "Inspect Runtime Preview Page", "toolReferenceName": "prebase_runtime_inspect_page", "canBeReferencedInPrompt": true, "modelDescription": "Reads a bounded local Runtime Preview response outline and redacted console/network summary. External origins, redirects, and error responses are not inspected.", "userDescription": "Inspect the current Runtime Preview page.", "inputSchema": { "type": "object" } }
+      ,{ "name": "prebase_runtime_get_evidence", "displayName": "Get Runtime Preview Evidence", "toolReferenceName": "prebase_runtime_get_evidence", "canBeReferencedInPrompt": true, "modelDescription": "Returns bounded, redacted Runtime Preview console or network evidence collected by the current session.", "userDescription": "Read Runtime Preview console or network evidence.", "inputSchema": { "type": "object", "properties": { "kind": { "type": "string", "enum": ["console", "network"] }, "maximumEntries": { "type": "number", "minimum": 1, "maximum": 100 } }, "required": ["kind"] } }
+      ,{ "name": "prebase_runtime_control_test", "displayName": "Control Runtime Preview Test", "toolReferenceName": "prebase_runtime_control_test", "canBeReferencedInPrompt": true, "modelDescription": "Begins, finalizes, or replays the local Runtime Preview test session and returns recorded evidence status.", "userDescription": "Control a Runtime Preview test session.", "inputSchema": { "type": "object", "properties": { "action": { "type": "string", "enum": ["begin", "finalize", "replay"] } }, "required": ["action"] } }
+      ,{ "name": "prebase_runtime_server", "displayName": "Control Runtime Preview Server", "toolReferenceName": "prebase_runtime_server", "canBeReferencedInPrompt": true, "modelDescription": "Starts, stops, or restarts only the selected project Runtime Preview server. Requires Workspace Trust and explicit confirmation.", "userDescription": "Control the project Runtime Preview server after confirmation.", "inputSchema": { "type": "object", "properties": { "action": { "type": "string", "enum": ["start", "stop", "restart"] } }, "required": ["action"] } }
+      ,{ "name": "prebase_terminal_get_project_environment", "displayName": "Inspect Project Environment", "toolReferenceName": "prebase_terminal_get_project_environment", "canBeReferencedInPrompt": true, "modelDescription": "Reads project package-manager, scripts, and declared Node-version metadata without executing a command. The reported Node runtime is the extension host, not a project shell probe.", "userDescription": "Inspect project environment.", "inputSchema": { "type": "object" } }
+      ,{ "name": "prebase_terminal_install_dependencies", "displayName": "Install or Update Project Dependencies", "toolReferenceName": "prebase_terminal_install_dependencies", "canBeReferencedInPrompt": true, "modelDescription": "Runs only the detected project package manager's install or update command in a visible task. Always requires Workspace Trust and explicit confirmation because it can use the network, execute lifecycle scripts, and change lockfiles.", "userDescription": "Install or update project dependencies after confirmation.", "inputSchema": { "type": "object", "properties": { "operation": { "type": "string", "enum": ["install", "update"] } }, "required": ["operation"] } }
+      ,{ "name": "prebase_terminal_run_declared_node_version", "displayName": "Use Declared Node Version", "toolReferenceName": "prebase_terminal_run_declared_node_version", "canBeReferencedInPrompt": true, "modelDescription": "Runs only a declared numeric or LTS nvm use/install action in a visible project task after explicit confirmation. It never edits shell startup files; nvm use applies only to that task and does not persist to later VS Code tasks.", "userDescription": "Use or install the project-declared Node version after confirmation.", "inputSchema": { "type": "object", "properties": { "action": { "type": "string", "enum": ["use", "install"] }, "version": { "type": "string", "minLength": 1, "maxLength": 40 } }, "required": ["action", "version"] } }
+      ,{ "name": "prebase_terminal_run_project_script", "displayName": "Run Project Script", "toolReferenceName": "prebase_terminal_run_project_script", "canBeReferencedInPrompt": true, "modelDescription": "Runs one declared, reviewed workspace package script through a visible VS Code task. Rejects arbitrary shell input, dangerous commands, shell operators, dependency installation, and untrusted workspaces. Requires confirmation and returns the actual exit code.", "userDescription": "Run a safe declared project script after confirmation.", "inputSchema": { "type": "object", "properties": { "script": { "type": "string", "minLength": 1, "maxLength": 120 } }, "required": ["script"] } }
+    ],
     "commands": [
       {
         "command": "prebase.magnus.open",
@@ -98,12 +129,12 @@
       },
       {
         "command": "prebase.magnus.setApiKey",
-        "title": "Open API Keys (.env)",
+        "title": "Configure Model Provider",
         "category": "Agents"
       },
       {
         "command": "prebase.magnus.clearApiKey",
-        "title": "Clear Legacy API Key Secret",
+        "title": "Clear Model Provider",
         "category": "Agents"
       },
       {
@@ -123,7 +154,7 @@
       },
       {
         "command": "prebase.magnus.selectMode",
-        "title": "Select Mode",
+        "title": "Select Mode (legacy)",
         "category": "Agents"
       },
       {

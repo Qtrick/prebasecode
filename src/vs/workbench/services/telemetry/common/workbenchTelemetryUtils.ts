@@ -5,8 +5,6 @@
 
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
-import { TelemetryLevel } from '../../../../platform/telemetry/common/telemetry.js';
-import { getTelemetryLevel } from '../../../../platform/telemetry/common/telemetryUtils.js';
 import { IWorkbenchEnvironmentService } from '../../environment/common/environmentService.js';
 
 /**
@@ -18,10 +16,11 @@ export function experimentsEnabled(
 	productService: IProductService,
 	environmentService: IWorkbenchEnvironmentService
 ): boolean {
-	return getTelemetryLevel(configurationService) === TelemetryLevel.USAGE &&
-		!!productService.tasConfig &&
-		!environmentService.disableExperiments &&
-		!environmentService.extensionTestsLocationURI &&
-		!environmentService.enableSmokeTestDriver &&
-		configurationService.getValue('workbench.enableExperiments') === true;
+	// PreBase is intentionally a non-experimenting build. Keep this source-level
+	// boundary independent of product configuration and user settings so no
+	// experiment-assignment client can initialize or make a network request.
+	void configurationService;
+	void productService;
+	void environmentService;
+	return false;
 }

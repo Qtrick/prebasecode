@@ -94,11 +94,10 @@ export interface URIDescriptor {
  * @returns false - telemetry is completely disabled, true - telemetry is logged locally, but may not be sent
  */
 export function supportsTelemetry(productService: IProductService, environmentService: IEnvironmentService): boolean {
-	// If it's OSS and telemetry isn't disabled via the CLI we will allow it for logging only purposes
-	if (!environmentService.isBuilt && !environmentService.disableTelemetry) {
-		return true;
-	}
-	return !(environmentService.disableTelemetry || !productService.enableTelemetry);
+	// PreBase uses product configuration as the hard privacy boundary. Unlike a
+	// stock OSS build, development mode must not turn telemetry back on merely
+	// to write local diagnostic logs.
+	return productService.enableTelemetry === true && !environmentService.disableTelemetry;
 }
 
 /**
@@ -109,6 +108,9 @@ export function supportsTelemetry(productService: IProductService, environmentSe
  * @returns True if telemetry is actually disabled and we're only logging for debug purposes
  */
 export function isLoggingOnly(productService: IProductService, environmentService: IEnvironmentService): boolean {
+	if (!productService.enableTelemetry) {
+		return false;
+	}
 	// If we're testing an extension, log telemetry for debug purposes
 	if (environmentService.extensionTestsLocationURI) {
 		return true;

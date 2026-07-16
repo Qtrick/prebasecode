@@ -25,7 +25,7 @@ function workspaceRoots(): vscode.Uri[] {
 	return vscode.workspace.workspaceFolders?.map(f => f.uri) ?? [];
 }
 
-function isUnderWorkspace(uri: vscode.Uri): boolean {
+export function isUnderWorkspace(uri: vscode.Uri): boolean {
 	const roots = workspaceRoots();
 	if (roots.length === 0) {
 		return false;
@@ -37,7 +37,7 @@ function isUnderWorkspace(uri: vscode.Uri): boolean {
 	});
 }
 
-function isSecretPath(uri: vscode.Uri): boolean {
+export function isSecretPath(uri: vscode.Uri): boolean {
 	const base = path.basename(uri.fsPath).toLowerCase();
 	if (SECRET_BASENAMES.has(base)) {
 		return true;
@@ -55,9 +55,12 @@ function isSecretPath(uri: vscode.Uri): boolean {
 	return false;
 }
 
-function resolveWorkspaceUri(relativeOrAbsolute: string): vscode.Uri | undefined {
+export function resolveWorkspaceUri(relativeOrAbsolute: string): vscode.Uri | undefined {
 	const roots = workspaceRoots();
 	if (roots.length === 0) {
+		return undefined;
+	}
+	if (typeof relativeOrAbsolute !== 'string') {
 		return undefined;
 	}
 	const cleaned = relativeOrAbsolute.trim().replace(/\\/g, '/');
@@ -112,8 +115,8 @@ export class MagnusWorkspaceTools {
 		if (token.isCancellationRequested) {
 			return { ok: false, output: 'Cancelled' };
 		}
-		if (!query.trim()) {
-			return { ok: false, output: 'Empty search query.' };
+		if (typeof query !== 'string' || !query.trim() || query.length > 512) {
+			return { ok: false, output: 'Search query must contain 1 to 512 characters.' };
 		}
 		try {
 			const results = await vscode.workspace.findFiles('**/*', '**/node_modules/**', 200, token);
@@ -176,6 +179,12 @@ export class MagnusWorkspaceTools {
 		if (token.isCancellationRequested) {
 			return { ok: false, output: 'Cancelled' };
 		}
+		if (!vscode.workspace.isTrusted) {
+			return { ok: false, output: 'Workspace Trust is required before Agents can edit files.' };
+		}
+		if (typeof newContent !== 'string' || newContent.length > 1_000_000) {
+			return { ok: false, output: 'Edit content must be text no larger than 1 MB.' };
+		}
 		const uri = resolveWorkspaceUri(relativePath);
 		if (!uri || !isUnderWorkspace(uri)) {
 			return { ok: false, output: 'Path is outside the workspace.' };
@@ -198,6 +207,8 @@ export class MagnusWorkspaceTools {
 
 		try {
 			const edit = new vscode.WorkspaceEdit();
+			let existingDocument: vscode.TextDocument | undefined;
+			let expectedVersion: number | undefined;
 			let exists = true;
 			try {
 				await vscode.workspace.fs.stat(uri);
@@ -206,10 +217,18 @@ export class MagnusWorkspaceTools {
 			}
 
 			if (!exists) {
-				edit.createFile(uri, { ignoreIfExists: true });
+				edit.createFile(uri, { overwrite: false, ignoreIfExists: false });
 				edit.insert(uri, new vscode.Position(0, 0), newContent);
 			} else {
 				const doc = await vscode.workspace.openTextDocument(uri);
+				if (token.isCancellationRequested) {
+					return { ok: false, output: 'Cancelled' };
+				}
+				if (doc.isDirty) {
+					return { ok: false, output: 'Refusing to overwrite unsaved editor changes.' };
+				}
+				existingDocument = doc;
+				expectedVersion = doc.version;
 				const fullRange = new vscode.Range(
 					doc.positionAt(0),
 					doc.positionAt(doc.getText().length),
@@ -217,6 +236,12 @@ export class MagnusWorkspaceTools {
 				edit.replace(uri, fullRange, newContent);
 			}
 
+			if (token.isCancellationRequested) {
+				return { ok: false, output: 'Cancelled' };
+			}
+			if (existingDocument && (existingDocument.isDirty || existingDocument.version !== expectedVersion)) {
+				return { ok: false, output: 'Refusing to overwrite changes made after the file was read.' };
+			}
 			const applied = await vscode.workspace.applyEdit(edit);
 			return applied
 				? { ok: true, output: `Updated ${vscode.workspace.asRelativePath(uri)}` }
@@ -226,22 +251,4 @@ export class MagnusWorkspaceTools {
 		}
 	}
 
-	/**
-	 * Parse simple tool directives from model output:
-	 * ```tool read path/to/file.ts```
-	 * ```tool search query text```
-	 * ```tool edit path/to/file.ts\n...content...```
-	 */
-	parseToolCalls(text: string): Array<{ kind: 'read' | 'search' | 'edit'; arg: string; body?: string }> {
-		const calls: Array<{ kind: 'read' | 'search' | 'edit'; arg: string; body?: string }> = [];
-		const blockRe = /```tool\s+(read|search|edit)\s+([^\n]+)(?:\n([\s\S]*?))?```/gi;
-		let match: RegExpExecArray | null;
-		while ((match = blockRe.exec(text)) !== null) {
-			const kind = match[1].toLowerCase() as 'read' | 'search' | 'edit';
-			const arg = match[2].trim();
-			const body = match[3]?.trim();
-			calls.push({ kind, arg, body });
-		}
-		return calls;
-	}
 }

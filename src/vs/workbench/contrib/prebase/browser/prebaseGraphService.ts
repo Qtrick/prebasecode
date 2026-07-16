@@ -96,6 +96,11 @@ export interface IPreBaseGraphService {
 	getSelectedNodeId(): string | undefined;
 	setSelectedNodeId(nodeId: string | undefined): void;
 	getSelectionSummaryForMagnus(): string | undefined;
+	searchForMagnus(query: string, maximumResults?: number): string;
+	getNodeDetailsForMagnus(nodeIdOrPath: string): string | undefined;
+	getDependenciesForMagnus(nodeIdOrPath: string, direction?: 'incoming' | 'outgoing' | 'both', depth?: number, maximumNodes?: number): string | undefined;
+	getOverviewForMagnus(): string;
+	focusNodeForMagnus(nodeIdOrPath: string): boolean;
 
 	requestResetView(): void;
 	requestFitView(): void;
@@ -219,6 +224,136 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			`Kind: ${node.kind}`,
 			`Connected edges: ${edges.length}`,
 		].join('\n');
+	}
+
+	searchForMagnus(query: string, maximumResults = 20): string {
+		const snapshot = this._snapshot;
+		const normalized = typeof query === 'string' && query.length <= 512 ? query.trim().toLowerCase() : '';
+		if (!snapshot || !normalized) {
+			return JSON.stringify({ graph: this._freshness(), nodes: [] });
+		}
+		const boundedMaximum = typeof maximumResults === 'number' && Number.isFinite(maximumResults)
+			? Math.max(1, Math.min(Math.floor(maximumResults), 50))
+			: 20;
+		const degree = this._degrees(snapshot);
+		const nodes = snapshot.nodes
+			.filter(node => [node.id, node.label, node.path, node.kind, node.meta?.language, node.meta?.architectureLayer]
+				.some(value => value?.toLowerCase().includes(normalized)))
+			.slice(0, boundedMaximum)
+			.map(node => ({
+				id: node.id,
+				label: node.label,
+				path: node.path,
+				kind: node.kind,
+				language: node.meta?.language,
+				layer: node.meta?.architectureLayer,
+				isEntry: !!node.isEntry,
+				degree: degree.get(node.id) ?? 0,
+			}));
+		return JSON.stringify({ graph: this._freshness(), nodes });
+	}
+
+	getNodeDetailsForMagnus(nodeIdOrPath: string): string | undefined {
+		const snapshot = this._snapshot;
+		const node = this._findNode(nodeIdOrPath);
+		if (!snapshot || !node) {
+			return undefined;
+		}
+		const edges = snapshot.edges.filter(edge => edge.source === node.id || edge.target === node.id);
+		return JSON.stringify({
+			graph: this._freshness(),
+			node,
+			imports: edges.filter(edge => edge.source === node.id).map(edge => ({ kind: edge.kind, target: edge.target })),
+			dependents: edges.filter(edge => edge.target === node.id).map(edge => ({ kind: edge.kind, source: edge.source })),
+		});
+	}
+
+	getDependenciesForMagnus(nodeIdOrPath: string, direction: 'incoming' | 'outgoing' | 'both' = 'both', depth = 1, maximumNodes = 50): string | undefined {
+		const snapshot = this._snapshot;
+		const root = this._findNode(nodeIdOrPath);
+		if (!snapshot || !root) {
+			return undefined;
+		}
+		const boundedDirection = direction === 'incoming' || direction === 'outgoing' || direction === 'both' ? direction : 'both';
+		const boundedDepth = typeof depth === 'number' && Number.isFinite(depth) ? Math.max(1, Math.min(Math.floor(depth), 8)) : 1;
+		const maximum = typeof maximumNodes === 'number' && Number.isFinite(maximumNodes) ? Math.max(1, Math.min(Math.floor(maximumNodes), 100)) : 50;
+		const visited = new Set<string>([root.id]);
+		const queue: Array<{ id: string; depth: number }> = [{ id: root.id, depth: 0 }];
+		const relationships: Array<{ from: string; to: string; kind: string }> = [];
+		while (queue.length && visited.size <= maximum) {
+			const current = queue.shift()!;
+			if (current.depth >= boundedDepth) {
+				continue;
+			}
+			for (const edge of snapshot.edges) {
+				const forward = edge.source === current.id;
+				const backward = edge.target === current.id;
+				if (!((boundedDirection !== 'incoming' && forward) || (boundedDirection !== 'outgoing' && backward))) {
+					continue;
+				}
+				const next = forward ? edge.target : edge.source;
+				relationships.push({ from: current.id, to: next, kind: edge.kind });
+				if (!visited.has(next) && visited.size < maximum) {
+					visited.add(next);
+					queue.push({ id: next, depth: current.depth + 1 });
+				}
+			}
+		}
+		return JSON.stringify({
+			graph: this._freshness(),
+			root: root.id,
+			nodes: [...visited].map(id => snapshot.nodes.find(node => node.id === id)).filter(Boolean),
+			relationships: relationships.slice(0, maximum * 3),
+		});
+	}
+
+	getOverviewForMagnus(): string {
+		const snapshot = this._snapshot;
+		if (!snapshot) {
+			return JSON.stringify({ graph: this._freshness(), available: false });
+		}
+		const degree = this._degrees(snapshot);
+		const languages = [...new Set(snapshot.nodes.map(node => node.meta?.language).filter((value): value is string => !!value))];
+		const highDegree = [...degree.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)
+			.map(([id, count]) => ({ id, degree: count, path: snapshot.nodes.find(node => node.id === id)?.path }));
+		return JSON.stringify({ graph: this._freshness(), available: true, languages, highDegree });
+	}
+
+	focusNodeForMagnus(nodeIdOrPath: string): boolean {
+		const node = this._findNode(nodeIdOrPath);
+		if (!node) {
+			return false;
+		}
+		this.setSelectedNodeId(node.id);
+		return true;
+	}
+
+	private _findNode(nodeIdOrPath: string): GraphNode | undefined {
+		if (typeof nodeIdOrPath !== 'string') {
+			return undefined;
+		}
+		const value = nodeIdOrPath.trim();
+		if (!value || value.length > 4096) {
+			return undefined;
+		}
+		return this._snapshot?.nodes.find(node => node.id === value || node.path === value || `file:${node.path}` === value);
+	}
+
+	private _degrees(snapshot: PreBaseEnrichedSnapshot): Map<string, number> {
+		const degree = new Map<string, number>();
+		for (const edge of snapshot.edges) {
+			degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
+			degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
+		}
+		return degree;
+	}
+
+	private _freshness(): { scannedAt: number | null; status: PreBaseGraphDiagnostics['status']; projectPath: string | undefined } {
+		return {
+			scannedAt: this._diagnostics.scannedAt,
+			status: this._diagnostics.status,
+			projectPath: this._snapshot?.projectPath,
+		};
 	}
 
 	override dispose(): void {

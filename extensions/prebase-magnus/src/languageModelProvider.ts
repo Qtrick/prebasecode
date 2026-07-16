@@ -46,7 +46,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 			// Shown in the Cursor-style hover tooltip.
 			tooltip: hasKey
 				? m.description
-				: `${m.description}\n\nAdd at least one API key to the project \`.env\` file.`,
+				: `${m.description}\n\nConfigure a model provider in secure storage before using Agents.`,
 			capabilities: {
 				// Magnus Agent mode uses its own workspace tool loop. The workbench
 				// model picker filters Agent sessions to models with toolCalling —
@@ -69,7 +69,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 	): Promise<void> {
 		const gemini = await this.secrets.getGeminiKeyOrMessage();
 		if (!gemini.key) {
-			throw new Error(gemini.message || 'Agents: no API key configured in `.env`.');
+			throw new Error(gemini.message || 'Agents: no model provider configured.');
 		}
 		const apiKey = gemini.key;
 

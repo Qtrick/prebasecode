@@ -136,21 +136,21 @@ function layoutOrganic(
 		degree.set(link.target, (degree.get(link.target) ?? 0) + 1)
 	}
 	const maxDeg = Math.max(1, ...degree.values())
-	const maxR = sphereRadius * 0.82
-	const minDist = Math.max(14, sphereRadius / Math.max(8, Math.sqrt(n) * 1.25))
-	const linkIdeal = minDist * 2.1
-	const zSpread = sphereRadius * 0.18
+	const maxR = sphereRadius * 0.88
+	const minDist = Math.max(22, sphereRadius / Math.max(6, Math.sqrt(n) * 1.05))
+	const linkIdeal = minDist * 2.35
+	const zSpread = sphereRadius * 0.9
 
 	for (const node of nodes) {
 		const d = degree.get(node.id) ?? 0
 		const hubT = d / maxDeg
-		const r = maxR * (0.06 + 0.58 * (1 - hubT) + hash01(node.id, 3) * 0.22)
+		const r = maxR * (0.08 + 0.62 * (1 - hubT) + hash01(node.id, 3) * 0.22)
 		const angle = hash01(node.id, 1) * Math.PI * 2 + hash01(node.id, 9) * 0.4
 		// Decorrelate Z from sequential ids (plain hash01(id,5) collapses for n0,n1,…).
 		const zT = (hash01(`${node.id}|z`, 5) * 0.55 + hash01(node.id, 17) * 0.45)
 		positions.set(node.id, {
 			x: Math.cos(angle) * r,
-			y: Math.sin(angle) * r * (0.82 + hash01(node.id, 4) * 0.18),
+			y: Math.sin(angle) * r * (0.92 + hash01(node.id, 4) * 0.16),
 			z: (zT - 0.5) * zSpread
 		})
 	}
@@ -231,7 +231,7 @@ function layoutOrganic(
 	if (maxDist > maxR && maxDist > 0) {
 		const scale = maxR / maxDist
 		for (const [id, p] of positions) {
-			positions.set(id, { x: p.x * scale, y: p.y * scale, z: p.z * 0.85 })
+			positions.set(id, { x: p.x * scale, y: p.y * scale, z: p.z })
 		}
 	}
 
@@ -258,7 +258,8 @@ function layoutConstellation(
 	const positions = fibonacciShell(nodes, sphereRadius, (node, i) =>
 		0.35 + 0.45 * (((node.id.charCodeAt(0) + i * 7) % 97) / 97)
 	)
-	relaxLinks(positions, links, sphereRadius, 22, 0.06)
+	// Light link pull only — heavy relax was crushing Z into a flat sheet.
+	relaxLinks(positions, links, sphereRadius, 6, 0.02)
 	centerPositions(positions)
 	return positions
 }
@@ -351,7 +352,7 @@ function layoutRadial(
 }
 
 export function computeNetworkSphereRadius(nodeCount: number, spreadScale: number): number {
-	return Math.max(190, Math.min(310, Math.sqrt(Math.max(1, nodeCount)) * 22)) * spreadScale;
+	return Math.max(220, Math.min(420, Math.sqrt(Math.max(1, nodeCount)) * 26)) * spreadScale;
 }
 
 export function layoutNetworkGraph(

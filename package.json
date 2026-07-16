@@ -23,6 +23,7 @@
     "compile-client": "npm run gulp compile",
     "compile-copilot": "npm --prefix extensions/copilot run compile",
     "compile-magnus": "npm run gulp compile-extension:prebase-magnus",
+    "assert-open-vsx": "node build/assert-open-vsx.mjs",
     "build-fast": "npm-run-all2 -lp transpile-client build-fast-extensions compile-magnus",
     "build-fast-extensions": "npm run gulp copy-codicons compile-extensions compile-extension-media",
     "typecheck-client": "tsgo --project ./src/tsconfig.json --noEmit --skipLibCheck",

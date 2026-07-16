@@ -1034,8 +1034,8 @@ export class PreBaseSettingsEditor extends EditorPane {
 			wrap.append(range, label);
 			this._row(
 				card,
-				localize('prebase.settings.intentHover', "Intent hover delay"),
-				localize('prebase.settings.intentHoverHint', "Deliberate hover (ms) before a node enters focus and becomes draggable."),
+				localize('prebase.settings.nodeDragHover', "Node drag hover delay"),
+				localize('prebase.settings.nodeDragHoverHint', "Hover delay (ms) before a graph node becomes draggable. Unrelated to Agents chat modes."),
 				wrap
 			);
 		}

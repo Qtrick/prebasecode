@@ -3,12 +3,12 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { ENV_KEY_HELP } from './apiKeys';
 import { registerMagnusChatParticipants, type MagnusChatState } from './chatParticipant';
 import { generateContent } from './geminiClient';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
 import { MAGNUS_MODELS, resolveApiModel } from './models';
 import { DEFAULT_MAGNUS_AGENT_MODE, MAGNUS_AGENT_MODES, isMagnusAgentMode } from './modes';
+import { registerMagnusLanguageModelTools } from './nativeTools';
 import { MagnusSecretStorage } from './secretStorage';
 
 const CHAT_MARK_SETUP_COMPLETED = 'workbench.action.chat.markSetupCompleted';
@@ -30,7 +30,7 @@ async function tryGetCommandResult<T>(command: string): Promise<T | undefined> {
 }
 
 export function activate(context: vscode.ExtensionContext): void {
-	const secrets = new MagnusSecretStorage(context.secrets, context.extensionUri);
+	const secrets = new MagnusSecretStorage(context.secrets);
 	const config = vscode.workspace.getConfiguration('prebase.magnus');
 
 	const state: MagnusChatState = {
@@ -44,6 +44,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	// Register chat participants first so Ask/Edit/Agent appear even if the LM
 	// provider proposal is unavailable or no API key is configured yet.
 	registerMagnusChatParticipants(context, secrets, state);
+	registerMagnusLanguageModelTools(context);
 
 	const lmProvider = new MagnusLanguageModelProvider(secrets);
 	try {
@@ -55,32 +56,6 @@ export function activate(context: vscode.ExtensionContext): void {
 	} catch (err) {
 		console.error('[Agents] language model provider registration failed:', err);
 	}
-
-	const refreshKeys = () => {
-		lmProvider.notifyChanged();
-		void secrets.hasApiKey().then(hasKey => {
-			if (hasKey) {
-				void markChatSetupCompleted();
-			}
-		});
-	};
-
-	// Hot-reload when the user edits `.env` in the workspace or product root.
-	const envWatcher = vscode.workspace.createFileSystemWatcher('**/.env');
-	const productRoot = vscode.Uri.joinPath(context.extensionUri, '..', '..');
-	const productEnvWatcher = vscode.workspace.createFileSystemWatcher(
-		new vscode.RelativePattern(productRoot, '.env'),
-	);
-	context.subscriptions.push(
-		envWatcher,
-		envWatcher.onDidChange(refreshKeys),
-		envWatcher.onDidCreate(refreshKeys),
-		envWatcher.onDidDelete(refreshKeys),
-		productEnvWatcher,
-		productEnvWatcher.onDidChange(refreshKeys),
-		productEnvWatcher.onDidCreate(refreshKeys),
-		productEnvWatcher.onDidDelete(refreshKeys),
-	);
 
 	context.subscriptions.push(
 		vscode.commands.registerCommand('prebase.magnus.open', async () => {
@@ -96,16 +71,23 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.setApiKey', async () => {
-			await secrets.openEnvFile();
-			void vscode.window.showInformationMessage(
-				'Paste any provider API key into `.env` (at least one required). Save the file to apply.',
-			);
+			const value = await vscode.window.showInputBox({
+				title: 'Configure Agents Model Provider',
+				prompt: 'Enter the model-provider credential to store securely on this device.',
+				password: true,
+				ignoreFocusOut: true,
+			});
+			if (!value) {
+				return;
+			}
+			await secrets.setApiKey(value);
+			lmProvider.notifyChanged();
+			void vscode.window.showInformationMessage('Agents model provider configured in secure storage.');
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.clearApiKey', async () => {
 			await secrets.clearApiKey();
-			await secrets.openEnvFile();
-			void vscode.window.showInformationMessage('Cleared legacy secret storage. Remove keys from `.env` if needed.');
+			void vscode.window.showInformationMessage('Cleared the configured Agents model provider.');
 			lmProvider.notifyChanged();
 		}),
 
@@ -113,22 +95,20 @@ export function activate(context: vscode.ExtensionContext): void {
 			const any = await secrets.getAnyKey();
 			const gemini = await secrets.getGeminiKeyOrMessage();
 			const enabled = vscode.workspace.getConfiguration('prebase.magnus').get('enabled', true);
-			const envPath = secrets.getEnvFilePath();
 			let keyStatus: string;
 			if (any) {
-				keyStatus = `API key: ${any.varName} (${any.provider}) via ${any.source}`;
+				keyStatus = 'Model provider: configured in secure storage';
 			} else if (gemini.message) {
-				keyStatus = `API key: ${gemini.message}`;
+				keyStatus = `Model provider: ${gemini.message}`;
 			} else {
-				keyStatus = `API key: missing — ${ENV_KEY_HELP}`;
+				keyStatus = 'Model provider: not configured';
 			}
 			const lines = [
 				`Enabled: ${enabled}`,
 				keyStatus,
 				`Default model: ${state.modelId}`,
 				`Default mode: ${state.mode}`,
-				`Env file (on disk): ${envPath}`,
-				'Tip: save `.env` (⌘S / Ctrl+S) before checking — Agents reads the file on disk, not an unsaved editor tab.',
+				'Model credentials are never read from workspace files.',
 			];
 			void vscode.window.showInformationMessage(lines.join(' · '));
 		}),
@@ -256,7 +236,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('prebase.magnus.refreshToken', async () => {
 			lmProvider.notifyChanged();
 			const hasKey = await secrets.hasApiKey();
-			void vscode.window.showInformationMessage(hasKey ? 'Agents API key(s) detected.' : ENV_KEY_HELP);
+			void vscode.window.showInformationMessage(hasKey ? 'Agents model provider configured.' : 'Agents model provider is not configured.');
 		}),
 		vscode.commands.registerCommand('prebase.magnus.toggleStatusMenu', async () => {
 			await vscode.commands.executeCommand('prebase.magnus.checkConfiguration');

@@ -478,7 +478,7 @@ configurationRegistry.registerConfiguration({
 			default: 200,
 			minimum: 80,
 			maximum: 400,
-			description: localize('prebase.interaction.nodeDragDelayMs', "Deliberate hover delay (ms) before a node enters focus and becomes draggable."),
+			description: localize('prebase.interaction.nodeDragDelayMs', "Hover delay (ms) before a graph node becomes draggable. Unrelated to Agents chat modes."),
 		},
 		[PreBaseConfigKeys.InteractionTerminalVisibilityGraph]: {
 			type: 'boolean',

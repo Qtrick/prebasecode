@@ -16,7 +16,7 @@ import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
-import { IRequestService } from '../../../../platform/request/common/request.js';
+import { asTextOrError, IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { IOutputService } from '../../../services/output/common/output.js';
@@ -100,6 +100,12 @@ export interface IPreBaseRuntimeService {
 	testWithMagnus(): void;
 	explainElement(): void;
 	getContextSummaryForMagnus(): string;
+	getStateForMagnus(): Record<string, unknown>;
+	controlServerForMagnus(action: 'start' | 'stop' | 'restart'): Promise<Record<string, unknown>>;
+	navigateForMagnus(url: string): Promise<Record<string, unknown>>;
+	inspectPageForMagnus(token?: CancellationToken): Promise<Record<string, unknown>>;
+	getEvidenceForMagnus(kind: 'console' | 'network', maximumEntries?: number): Record<string, unknown>;
+	controlTestForMagnus(action: 'begin' | 'finalize' | 'replay'): Record<string, unknown>;
 	openPreviewEditor(): Promise<void>;
 	recordConsoleError(message: string): void;
 	/** Called by the preview webview after iframe load/error. */
@@ -126,6 +132,38 @@ const PROBE_PATHS = [
 	'apps/client',
 	'packages/web',
 ];
+
+function redactRuntimeEvidence(value: string): string {
+	return value
+		.replace(/\b(authorization|cookie|set-cookie)\b\s*[:=]\s*[^\r\n]*/gi, '$1=[redacted]')
+		.replace(/\b(token|access[_-]?token|id[_-]?token|refresh[_-]?token|api[_-]?key|client[_-]?secret|secret|password)\b\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;&]+)/gi, '$1=[redacted]')
+		.replace(/([?&](?:token|access_token|id_token|refresh_token|key|code|password|secret)=)[^&#\s]+/gi, '$1[redacted]');
+}
+
+function pageOutline(html: string): { title: string | undefined; visibleText: string; elements: Array<Record<string, string | undefined>> } {
+	const title = html.match(/<title[^>]*>([\s\S]*?)<\/title>/i)?.[1]?.replace(/\s+/g, ' ').trim();
+	const visibleText = redactRuntimeEvidence(html
+		.replace(/<script[\s\S]*?<\/script>/gi, ' ')
+		.replace(/<style[\s\S]*?<\/style>/gi, ' ')
+		.replace(/<[^>]+>/g, ' ')
+		.replace(/\s+/g, ' ')
+		.trim()
+		.slice(0, 8_000));
+	const elements: Array<Record<string, string | undefined>> = [];
+	const matcher = /<(button|a|input|select|textarea|summary|details|label)\b([^>]*)>([\s\S]*?)<\/\1>|<(input|textarea|select)\b([^>]*)\/?>(?!<\/\4>)/gi;
+	for (let match = matcher.exec(html); match && elements.length < 100; match = matcher.exec(html)) {
+		const tag = (match[1] ?? match[4]).toLowerCase();
+		const attributes = match[2] ?? match[5] ?? '';
+		const text = redactRuntimeEvidence((match[3] ?? '').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()).slice(0, 300);
+		const attribute = (name: string) => {
+			const value = attributes.match(new RegExp(`\\b${name}\\s*=\\s*["']([^"']*)["']`, 'i'))?.[1];
+			return value === undefined ? undefined : redactRuntimeEvidence(value);
+		};
+		const inputType = attribute('type');
+		elements.push({ tag, text: text || undefined, role: attribute('role'), label: attribute('aria-label') ?? attribute('name'), testId: attribute('data-testid'), placeholder: inputType === 'password' ? undefined : attribute('placeholder'), type: inputType });
+	}
+	return { title: title === undefined ? undefined : redactRuntimeEvidence(title), visibleText, elements };
+}
 
 export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntimeService {
 	declare readonly _serviceBrand: undefined;
@@ -795,6 +833,139 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			...(s.networkEntries.slice(-20).map(line => `  ${line}`)),
 			s.reports.length ? `Reports:\n${s.reports.slice(0, 5).map(r => `  ${r}`).join('\n')}` : ''
 		].filter(Boolean).join('\n');
+	}
+
+	getStateForMagnus(): Record<string, unknown> {
+		const s = this._session;
+		const ownsServer = !!this._devTerminal && !this._devTerminal.isDisposed;
+		return {
+			url: redactRuntimeEvidence(s.url),
+			previewConnected: s.previewConnected,
+			serverRunning: s.serverRunning,
+			serverOwnedByPreBase: ownsServer,
+			framework: s.framework?.label ?? 'unknown',
+			workspaceRoot: s.workspaceRoot || undefined,
+			script: s.selectedScriptName,
+			packageManager: s.packageManager,
+			viewport: s.viewport,
+			consoleCapture: s.consoleCapture,
+			networkCapture: s.networkCapture,
+			consoleErrorCount: s.consoleErrorCount,
+			testSession: s.testSessionActive ? 'active' : 'idle',
+		};
+	}
+
+	async controlServerForMagnus(action: 'start' | 'stop' | 'restart'): Promise<Record<string, unknown>> {
+		if (action !== 'start' && action !== 'stop' && action !== 'restart') {
+			return { ok: false, action, reason: 'Unsupported Runtime Preview action.', state: this.getStateForMagnus() };
+		}
+		if (action === 'stop' || action === 'restart') {
+			if (!this._devTerminal || this._devTerminal.isDisposed) {
+				return { ok: false, action, reason: 'No PreBase-owned Runtime Preview server is running; no process was stopped.', state: this.getStateForMagnus() };
+			}
+		}
+
+		if (action === 'start') {
+			await this.start();
+		} else if (action === 'stop') {
+			await this.stop();
+		} else {
+			await this.restart();
+		}
+		const state = this.getStateForMagnus();
+		if (action === 'start' && state.serverOwnedByPreBase !== true) {
+			return { ok: false, action, reason: 'Runtime Preview did not start a PreBase-owned dev server.', state };
+		}
+		return { ok: true, action, state };
+	}
+
+	async navigateForMagnus(url: string): Promise<Record<string, unknown>> {
+		if (typeof url !== 'string' || !url.trim()) {
+			return { ok: false, reason: 'A preview URL or path is required.', state: this.getStateForMagnus() };
+		}
+		let target = url.trim();
+		if (target.startsWith('/')) {
+			try {
+				target = new URL(target, this._session.url).toString();
+			} catch {
+				return { ok: false, reason: 'The relative preview path is not valid.', state: this.getStateForMagnus() };
+			}
+		}
+		const allowed = await this.connectUrl(target);
+		return allowed
+			? { ok: true, state: this.getStateForMagnus() }
+			: { ok: false, reason: 'Runtime Preview rejected or could not connect to that URL.', state: this.getStateForMagnus() };
+	}
+
+	async inspectPageForMagnus(token: CancellationToken = CancellationToken.None): Promise<Record<string, unknown>> {
+		if (token.isCancellationRequested) {
+			return { ok: false, reason: 'Cancelled', state: this.getStateForMagnus() };
+		}
+		const session = this._session;
+		if (!session.previewConnected) {
+			return { ok: false, reason: 'Runtime Preview is not connected.', state: this.getStateForMagnus() };
+		}
+		const validated = validatePreviewUrl(session.url);
+		if (!validated.ok) {
+			return { ok: false, reason: validated.reason, state: this.getStateForMagnus() };
+		}
+		if (!validated.isLocal) {
+			return { ok: false, reason: 'Page inspection is restricted to local Runtime Preview origins.', state: this.getStateForMagnus() };
+		}
+		try {
+			const context = await this.requestService.request({ type: 'GET', url: validated.url, timeout: 5000, followRedirects: 0, callSite: 'PreBaseRuntimeService.inspectPageForMagnus' }, token);
+			const statusCode = context.res.statusCode ?? 0;
+			if (statusCode < 200 || statusCode >= 300) {
+				return { ok: false, reason: `Runtime Preview returned HTTP ${statusCode}; redirects and error responses are not inspected.`, state: this.getStateForMagnus() };
+			}
+			const response = (await asTextOrError(context) ?? '').slice(0, 200_000);
+			if (token.isCancellationRequested) {
+				return { ok: false, reason: 'Cancelled', state: this.getStateForMagnus() };
+			}
+			const outline = pageOutline(response);
+			return {
+				ok: true,
+				url: redactRuntimeEvidence(validated.url),
+				title: outline.title,
+				visibleText: outline.visibleText,
+				interactiveElements: outline.elements,
+				viewport: session.viewport,
+				console: session.consoleEntries.slice(-20).map(redactRuntimeEvidence),
+				network: session.networkEntries.slice(-20).map(redactRuntimeEvidence),
+				consoleErrorCount: session.consoleErrorCount,
+				limitation: 'Inspection reads the current preview response. Cross-origin iframe DOM actions are intentionally unavailable without a page-side automation bridge.',
+			};
+		} catch (error) {
+			return { ok: false, reason: error instanceof Error ? error.message : String(error), state: this.getStateForMagnus() };
+		}
+	}
+
+	getEvidenceForMagnus(kind: 'console' | 'network', maximumEntries = 50): Record<string, unknown> {
+		if (kind !== 'console' && kind !== 'network') {
+			return { ok: false, reason: 'Unsupported Runtime Preview evidence kind.' };
+		}
+		const requestedMaximum = typeof maximumEntries === 'number' && Number.isFinite(maximumEntries) ? maximumEntries : 50;
+		const maximum = Math.max(1, Math.min(100, Math.floor(requestedMaximum)));
+		const entries = kind === 'console' ? this._session.consoleEntries : this._session.networkEntries;
+		return {
+			kind,
+			entries: entries.slice(-maximum).map(redactRuntimeEvidence),
+			consoleErrorCount: this._session.consoleErrorCount,
+			truncated: entries.length > maximum,
+		};
+	}
+
+	controlTestForMagnus(action: 'begin' | 'finalize' | 'replay'): Record<string, unknown> {
+		if (action === 'begin') {
+			this.startTestSession();
+		} else if (action === 'finalize') {
+			this.stopTestSession();
+		} else if (action === 'replay') {
+			this.replayTest();
+		} else {
+			return { ok: false, reason: 'Unsupported Runtime Preview test action.' };
+		}
+		return { ok: true, action, testSession: this._session.testSessionActive ? 'active' : 'idle', reports: this._session.reports.slice(0, 10).map(redactRuntimeEvidence), consoleErrorCount: this._session.consoleErrorCount };
 	}
 
 	async openPreviewEditor(): Promise<void> {

@@ -229,6 +229,12 @@ const baseHeaders = {
 };
 
 export function fromMarketplace(serviceUrl: string, { name: extensionName, version, sha256, metadata }: IExtensionDefinition): Stream {
+	if (!/open-vsx\.org/i.test(serviceUrl)) {
+		throw new Error(
+			`Refusing marketplace download from non-Open-VSX URL: ${serviceUrl}. ` +
+			`PreBase uses https://open-vsx.org only (not marketplace.visualstudio.com).`
+		);
+	}
 	const [publisher, name] = extensionName.split('.');
 	const url = `${serviceUrl}/publishers/${publisher}/vsextensions/${name}/${version}/vspackage`;
 

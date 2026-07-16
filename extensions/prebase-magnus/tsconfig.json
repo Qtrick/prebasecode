@@ -20,6 +20,8 @@
 		"../../src/vscode-dts/vscode.proposed.chatProvider.d.ts",
 		"../../src/vscode-dts/vscode.proposed.languageModelSystem.d.ts",
 		"../../src/vscode-dts/vscode.proposed.languageModelCapabilities.d.ts",
-		"../../src/vscode-dts/vscode.proposed.languageModelThinkingPart.d.ts"
+		"../../src/vscode-dts/vscode.proposed.languageModelThinkingPart.d.ts",
+		"../../src/vscode-dts/vscode.proposed.textSearchProvider.d.ts",
+		"../../src/vscode-dts/vscode.proposed.findTextInFiles.d.ts"
 	]
 }

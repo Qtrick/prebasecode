@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { localize, localize2 } from '../../../../nls.js';
+import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
 import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
@@ -65,6 +66,33 @@ Registry.as<IOutputChannelRegistry>(OutputExtensions.OutputChannels).registerCha
 	id: PREBASE_RUNTIME_CHANNEL_ID,
 	label: PREBASE_RUNTIME_CHANNEL_LABEL,
 	log: false
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.privacy.status', title: localize2('prebase.privacy.status', "PreBase: Privacy Status"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	run(accessor: ServicesAccessor) {
+		accessor.get(INotificationService).info(localize('prebase.privacy.statusMessage', 'Privacy Status: telemetry and experiment assignments are disabled. Crash dumps are written locally only when explicitly requested with --crash-reporter-directory; no crash upload endpoint is configured.'));
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.getEvidenceForMagnus', title: localize2('prebase.runtime.getEvidenceForMagnus', "Get Runtime Preview Evidence for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, kind: 'console' | 'network', maximumEntries?: number) {
+		return accessor.get(IPreBaseRuntimeService).getEvidenceForMagnus(kind, maximumEntries);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.controlTestForMagnus', title: localize2('prebase.runtime.controlTestForMagnus', "Control Runtime Preview Test for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, action: 'begin' | 'finalize' | 'replay') {
+		return accessor.get(IPreBaseRuntimeService).controlTestForMagnus(action);
+	}
 });
 
 // --- view containers
@@ -683,10 +711,82 @@ registerAction2(class extends Action2 {
 
 registerAction2(class extends Action2 {
 	constructor() {
+		super({ id: 'prebase.graph.searchForMagnus', title: localize2('prebase.graph.searchForMagnus', "Search Graph for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, query: string, maximumResults?: number) {
+		return accessor.get(IPreBaseGraphService).searchForMagnus(query, maximumResults);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.graph.getNodeForMagnus', title: localize2('prebase.graph.getNodeForMagnus', "Get Graph Node for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, nodeIdOrPath: string) {
+		return accessor.get(IPreBaseGraphService).getNodeDetailsForMagnus(nodeIdOrPath);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.graph.getDependenciesForMagnus', title: localize2('prebase.graph.getDependenciesForMagnus', "Get Graph Dependencies for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, nodeIdOrPath: string, direction?: 'incoming' | 'outgoing' | 'both', depth?: number, maximumNodes?: number) {
+		return accessor.get(IPreBaseGraphService).getDependenciesForMagnus(nodeIdOrPath, direction, depth, maximumNodes);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.graph.getOverviewForMagnus', title: localize2('prebase.graph.getOverviewForMagnus', "Get Graph Overview for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor) {
+		return accessor.get(IPreBaseGraphService).getOverviewForMagnus();
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.graph.focusForMagnus', title: localize2('prebase.graph.focusForMagnus', "Focus Graph Node for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, nodeIdOrPath: string) {
+		return accessor.get(IPreBaseGraphService).focusNodeForMagnus(nodeIdOrPath);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
 		super({ id: 'prebase.runtime.getContextForMagnus', title: localize2('prebase.runtime.getContextForMagnus', "Get Runtime Context for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
 	run(accessor: ServicesAccessor) {
-		return accessor.get(IPreBaseRuntimeService).getContextSummaryForMagnus();
+		return accessor.get(IPreBaseRuntimeService).getStateForMagnus();
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.controlForMagnus', title: localize2('prebase.runtime.controlForMagnus', "Control Runtime Preview for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, action: 'start' | 'stop' | 'restart') {
+		return accessor.get(IPreBaseRuntimeService).controlServerForMagnus(action);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.navigateForMagnus', title: localize2('prebase.runtime.navigateForMagnus', "Navigate Runtime Preview for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, url: string) {
+		return accessor.get(IPreBaseRuntimeService).navigateForMagnus(url);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.inspectForMagnus', title: localize2('prebase.runtime.inspectForMagnus', "Inspect Runtime Preview for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, token?: CancellationToken) {
+		return accessor.get(IPreBaseRuntimeService).inspectPageForMagnus(token);
 	}
 });
 

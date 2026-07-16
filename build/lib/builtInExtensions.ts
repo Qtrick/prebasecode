@@ -70,16 +70,28 @@ function isUpToDate(extension: IExtensionDefinition): boolean {
 
 function getExtensionDownloadStream(extension: IExtensionDefinition) {
 	let input: Stream;
+	const galleryServiceUrl = productjson.extensionsGallery?.serviceUrl;
 
 	if (extension.vsix) {
 		input = ext.fromVsix(path.join(root, extension.vsix), extension);
-	} else if (productjson.extensionsGallery?.serviceUrl) {
-		input = ext.fromMarketplace(productjson.extensionsGallery.serviceUrl, extension);
-	} else {
+	} else if (extension.repo) {
+		// Prefer GitHub release VSIXes for built-ins — avoids Microsoft Marketplace
+		// and keeps ship-with extensions on open-source download paths.
 		input = ext.fromGithub(extension);
+	} else if (isOpenVsxGalleryUrl(galleryServiceUrl)) {
+		input = ext.fromMarketplace(galleryServiceUrl, extension);
+	} else {
+		throw new Error(
+			`Refusing to download built-in extension '${extension.name}' from a non-Open-VSX gallery. ` +
+			`Set extension.repo (GitHub) or point product.json extensionsGallery at https://open-vsx.org.`
+		);
 	}
 
 	return input.pipe(rename(p => p.dirname = `${extension.name}/${p.dirname}`));
+}
+
+function isOpenVsxGalleryUrl(serviceUrl: string | undefined): serviceUrl is string {
+	return typeof serviceUrl === 'string' && /open-vsx\.org/i.test(serviceUrl);
 }
 
 export function getExtensionStream(extension: IExtensionDefinition) {
@@ -94,8 +106,7 @@ export function getExtensionStream(extension: IExtensionDefinition) {
 }
 
 function syncMarketplaceExtension(extension: IExtensionDefinition): Stream {
-	const galleryServiceUrl = productjson.extensionsGallery?.serviceUrl;
-	const source = ansiColors.blue(galleryServiceUrl ? '[marketplace]' : '[github]');
+	const source = ansiColors.blue(extension.repo ? '[github]' : (isOpenVsxGalleryUrl(productjson.extensionsGallery?.serviceUrl) ? '[open-vsx]' : '[unavailable]'));
 	if (isUpToDate(extension)) {
 		log(source, `${extension.name}@${extension.version}`, ansiColors.green('✔︎'));
 		return es.readArray([]);
