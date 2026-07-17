@@ -37,6 +37,8 @@ export interface FrameworkProfile {
 }
 
 export interface PackageJsonShape {
+	name?: string;
+	main?: string;
 	dependencies?: Record<string, string>;
 	devDependencies?: Record<string, string>;
 	scripts?: Record<string, string>;

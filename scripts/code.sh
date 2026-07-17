@@ -73,8 +73,14 @@ function code() {
 		MAGNUS_DEV_ARG+=(--extensionDevelopmentPath="$MAGNUS_DEV_PATH")
 	fi
 
+	# Never send usage/crash telemetry to Microsoft or other third parties.
+	TELEMETRY_ARG=()
+	if [[ "$@" != *"--disable-telemetry"* ]]; then
+		TELEMETRY_ARG=(--disable-telemetry)
+	fi
+
 	# Launch Code
-	exec "$CODE" . $DISABLE_TEST_EXTENSION "${MAGNUS_DEV_ARG[@]}" "$@"
+	exec "$CODE" . $DISABLE_TEST_EXTENSION "${MAGNUS_DEV_ARG[@]}" "${TELEMETRY_ARG[@]}" "$@"
 }
 
 function code-wsl()

@@ -5,6 +5,7 @@
 
 import { localize, localize2 } from '../../../../nls.js';
 import { CancellationToken } from '../../../../base/common/cancellation.js';
+import { URI } from '../../../../base/common/uri.js';
 import { SyncDescriptor } from '../../../../platform/instantiation/common/descriptors.js';
 import { InstantiationType, registerSingleton } from '../../../../platform/instantiation/common/extensions.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
@@ -19,6 +20,7 @@ import { ICommandService } from '../../../../platform/commands/common/commands.j
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { IOutputService } from '../../../services/output/common/output.js';
 import { IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
@@ -29,6 +31,9 @@ import type { LayoutMode } from '../common/graph/types.js';
 import type { PreBaseViewportPreset } from '../common/runtime/viewportPresets.js';
 import { IPreBaseGraphService, PreBaseGraphService, type PreBaseGraphType } from './prebaseGraphService.js';
 import { IPreBaseRuntimeService, PreBaseRuntimeService } from './prebaseRuntimeService.js';
+import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
+import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
+import { isWeb } from '../../../../base/common/platform.js';
 import { IPreBaseAccountService, PreBaseAccountContext, PreBaseAccountService } from './prebaseAccountService.js';
 import { IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
 import { prebaseMapsViewIcon, prebaseRuntimeViewIcon } from './prebaseIcons.js';
@@ -43,8 +48,10 @@ import { PreBaseSettingsEditor } from './prebaseSettingsEditor.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
 import { PreBaseHomeEditor } from './prebaseHomeEditor.js';
 import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
-import './prebaseHomeEmptyEditors.js';
 import './prebaseRecentHistory.js';
+import { PreBaseWorkspaceOpeningEditor } from './prebaseWorkspaceOpeningEditor.js';
+import { PreBaseWorkspaceOpeningEditorInput } from './prebaseWorkspaceOpeningEditorInput.js';
+import type { PreBaseWorkspaceOpenPhase } from './prebaseWorkspaceOpening.js';
 // Onboarding editor kept in tree for a later release; not registered in the workbench right now.
 
 // --- services
@@ -176,6 +183,19 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 	[new SyncDescriptor(PreBaseHomeEditorInput)]
 );
 
+Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
+	EditorPaneDescriptor.create(
+		PreBaseWorkspaceOpeningEditor,
+		PreBaseWorkspaceOpeningEditor.ID,
+		localize('prebase.workspace.opening.editor', "Opening Project")
+	),
+	[new SyncDescriptor(PreBaseWorkspaceOpeningEditorInput)]
+);
+
+// Contributions that open editors must load after pane registration above.
+import './prebaseHomeEmptyEditors.js';
+import './prebaseWorkspaceOpening.js';
+
 class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
 	canSerialize(editor: EditorInput): boolean {
 		return editor instanceof PreBaseGraphEditorInput;
@@ -229,6 +249,32 @@ class PreBaseHomeEditorInputSerializer implements IEditorSerializer {
 	}
 }
 
+class PreBaseWorkspaceOpeningEditorInputSerializer implements IEditorSerializer {
+	canSerialize(editor: EditorInput): boolean {
+		return editor instanceof PreBaseWorkspaceOpeningEditorInput;
+	}
+	serialize(editor: EditorInput): string {
+		const input = editor as PreBaseWorkspaceOpeningEditorInput;
+		return JSON.stringify({
+			projectLabel: input.projectLabel,
+			resourceUri: input.resourceUri?.toString(),
+			phase: input.phase,
+		});
+	}
+	deserialize(_instantiationService: IInstantiationService, raw: string): EditorInput | undefined {
+		try {
+			const data = JSON.parse(raw) as { projectLabel?: string; resourceUri?: string; phase?: string };
+			return new PreBaseWorkspaceOpeningEditorInput(
+				data.projectLabel ?? '',
+				data.resourceUri ? URI.parse(data.resourceUri) : undefined,
+				(data.phase as PreBaseWorkspaceOpenPhase | undefined) ?? 'restoringWorkbench',
+			);
+		} catch {
+			return undefined;
+		}
+	}
+}
+
 Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
 	PreBaseGraphEditorInput.TypeID,
 	PreBaseGraphEditorInputSerializer
@@ -244,6 +290,10 @@ Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEdit
 Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
 	PreBaseHomeEditorInput.TypeID,
 	PreBaseHomeEditorInputSerializer
+);
+Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
+	PreBaseWorkspaceOpeningEditorInput.TypeID,
+	PreBaseWorkspaceOpeningEditorInputSerializer
 );
 
 // --- helpers
@@ -684,6 +734,73 @@ registerAction2(class extends Action2 {
 	}
 });
 
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.graph.clearSelection', title: localize2('prebase.graph.clearSelection', "Clear Graph Selection"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	run(accessor: ServicesAccessor) {
+		accessor.get(IPreBaseGraphService).setSelectedNodeId(undefined);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.graph.openSelectedNode', title: localize2('prebase.graph.openSelectedNode', "Open Selected Graph Node"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	async run(accessor: ServicesAccessor) {
+		const graph = accessor.get(IPreBaseGraphService);
+		const notify = accessor.get(INotificationService);
+		const id = graph.getSelectedNodeId();
+		const snapshot = graph.getSnapshot();
+		const node = id && snapshot ? snapshot.nodes.find(n => n.id === id) : undefined;
+		if (!node) {
+			notify.info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
+			return;
+		}
+		// Match prebaseMapsView._openNode: absolute (POSIX/Windows) vs project-relative.
+		const path = (node.path || node.id.replace(/^file:/, '')).replace(/\\/g, '/');
+		if (!path) {
+			notify.info(localize('prebase.graph.noSelectedNodePath', "Selected graph node has no file path."));
+			return;
+		}
+		const folder = snapshot!.projectPath
+			|| accessor.get(IWorkspaceContextService).getWorkspace().folders[0]?.uri.fsPath;
+		let uri: URI;
+		if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) {
+			uri = URI.file(path);
+		} else if (folder) {
+			uri = URI.joinPath(URI.file(folder), path);
+		} else {
+			notify.info(localize('prebase.graph.noSelectedNodePath', "Selected graph node has no file path."));
+			return;
+		}
+		try {
+			await accessor.get(IEditorService).openEditor({ resource: uri, options: { pinned: false } });
+		} catch {
+			// ignore missing files
+		}
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.graph.focusSelectedNode', title: localize2('prebase.graph.focusSelectedNode', "Focus Selected Graph Node"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	run(accessor: ServicesAccessor) {
+		const graph = accessor.get(IPreBaseGraphService);
+		const id = graph.getSelectedNodeId();
+		const node = id ? graph.getSnapshot()?.nodes.find(n => n.id === id) : undefined;
+		if (!node) {
+			accessor.get(INotificationService).info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
+			return;
+		}
+		// setSelectedNodeId no-ops on the same id; clear first so listeners re-apply highlight.
+		graph.setSelectedNodeId(undefined);
+		graph.setSelectedNodeId(node.id);
+		graph.requestFitView();
+	}
+});
+
 // --- runtime commands
 
 registerAction2(class extends Action2 {
@@ -992,4 +1109,179 @@ registerAction2(class extends Action2 {
 		super({ id: 'prebase.runtime.explainElement', title: localize2('prebase.runtime.explainElementCmd', "Explain Runtime Element with Agents"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	run(accessor: ServicesAccessor) { accessor.get(IPreBaseRuntimeService).explainElement(); }
+});
+
+function getDesktopRuntimeService(accessor: ServicesAccessor): IPreBaseDesktopRuntimeService | undefined {
+	if (isWeb) {
+		return undefined;
+	}
+	try {
+		return accessor.get(IPreBaseDesktopRuntimeService);
+	} catch {
+		return undefined;
+	}
+}
+
+async function ensureDesktopDetected(accessor: ServicesAccessor, desktop: IPreBaseDesktopRuntimeService): Promise<boolean> {
+	if (desktop.getProfile()?.isElectron) {
+		return true;
+	}
+	await accessor.get(IPreBaseRuntimeService).detectConfigurations();
+	return Boolean(desktop.getProfile()?.isElectron);
+}
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.startDesktop', title: localize2('prebase.runtime.startDesktopCmd', "Start Desktop Application"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	async run(accessor: ServicesAccessor) {
+		const desktop = getDesktopRuntimeService(accessor);
+		if (desktop) {
+			if (!(await ensureDesktopDetected(accessor, desktop))) {
+				return undefined;
+			}
+			return desktop.start();
+		}
+		return accessor.get(IPreBaseRuntimeService).start();
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.stopDesktop', title: localize2('prebase.runtime.stopDesktopCmd', "Stop Desktop Application"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	run(accessor: ServicesAccessor) {
+		const desktop = getDesktopRuntimeService(accessor);
+		if (desktop) {
+			return desktop.stop();
+		}
+		return accessor.get(IPreBaseRuntimeService).stop();
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.restartDesktop', title: localize2('prebase.runtime.restartDesktopCmd', "Restart Desktop Application"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	async run(accessor: ServicesAccessor) {
+		const desktop = getDesktopRuntimeService(accessor);
+		if (desktop) {
+			if (!(await ensureDesktopDetected(accessor, desktop))) {
+				return undefined;
+			}
+			return desktop.restart();
+		}
+		return accessor.get(IPreBaseRuntimeService).restart();
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.killDesktopSession', title: localize2('prebase.runtime.killDesktopSessionCmd', "Kill Desktop Session"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	run(accessor: ServicesAccessor) {
+		return getDesktopRuntimeService(accessor)?.kill();
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.selectDesktopLaunchMode', title: localize2('prebase.runtime.selectDesktopLaunchModeCmd', "Select Desktop Launch Mode"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, mode: DesktopLaunchMode) {
+		if (mode !== 'managed' && mode !== 'external') {
+			return;
+		}
+		const runtime = accessor.get(IPreBaseRuntimeService);
+		return runtime.setDesktopLaunchMode(mode);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopListSessionsForMagnus', title: localize2('prebase.runtime.desktopListSessionsForMagnus', "List Desktop Sessions for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor) {
+		const desktop = getDesktopRuntimeService(accessor);
+		if (!desktop) {
+			return { ok: false, reason: 'Desktop runtime unavailable in this host.' };
+		}
+		return { ok: true, sessions: desktop.getSessions().map(s => desktop.getSessionSummaryForMagnus(s.id)) };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopGetSessionForMagnus', title: localize2('prebase.runtime.desktopGetSessionForMagnus', "Get Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, sessionId?: string) {
+		return getDesktopRuntimeService(accessor)?.getSessionSummaryForMagnus(sessionId) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopInspectForMagnus', title: localize2('prebase.runtime.desktopInspectForMagnus', "Inspect Desktop Window for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, sessionId?: string) {
+		return getDesktopRuntimeService(accessor)?.inspectForMagnus(sessionId) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopReloadForMagnus', title: localize2('prebase.runtime.desktopReloadForMagnus', "Reload Desktop Window for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	async run(accessor: ServicesAccessor, _sessionId?: string) {
+		const desktop = getDesktopRuntimeService(accessor);
+		if (!desktop) {
+			return { ok: false, reason: 'Desktop runtime unavailable.' };
+		}
+		const reloaded = await desktop.reload();
+		if (!reloaded) {
+			return { ok: false, reason: 'Reload is only supported for managed desktop sessions.' };
+		}
+		return { ok: true };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopRestartForMagnus', title: localize2('prebase.runtime.desktopRestartForMagnus', "Restart Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	async run(accessor: ServicesAccessor, _sessionId?: string) {
+		const desktop = getDesktopRuntimeService(accessor);
+		if (!desktop) {
+			return { ok: false, reason: 'Desktop runtime unavailable.' };
+		}
+		await desktop.restart();
+		return { ok: true, session: desktop.getSessionSummaryForMagnus() };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopStopForMagnus', title: localize2('prebase.runtime.desktopStopForMagnus', "Stop Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	async run(accessor: ServicesAccessor, _sessionId?: string, force?: boolean) {
+		const desktop = getDesktopRuntimeService(accessor);
+		if (!desktop) {
+			return { ok: false, reason: 'Desktop runtime unavailable.' };
+		}
+		if (force) {
+			await desktop.stop();
+		} else {
+			await desktop.kill();
+		}
+		return { ok: true };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopCdpEvaluateForMagnus', title: localize2('prebase.runtime.desktopCdpEvaluateForMagnus', "Evaluate in Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, sessionId: string | undefined, expression: string) {
+		return getDesktopRuntimeService(accessor)?.evaluateForMagnus(sessionId, expression) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
+	}
 });

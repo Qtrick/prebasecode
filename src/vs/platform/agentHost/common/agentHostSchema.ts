@@ -649,7 +649,7 @@ export const platformRootSchema = createSchema({
 		title: localize('agentHost.config.telemetryLevel.title', "Telemetry Level"),
 		description: localize('agentHost.config.telemetryLevel.description', "Most restrictive telemetry level requested by connected clients."),
 		enum: [TelemetryConfiguration.ON, TelemetryConfiguration.ERROR, TelemetryConfiguration.CRASH, TelemetryConfiguration.OFF],
-		default: TelemetryConfiguration.ON,
+		default: TelemetryConfiguration.OFF,
 	}),
 	[AgentHostSessionSyncEnabledConfigKey]: schemaProperty<boolean>({
 		type: 'boolean',

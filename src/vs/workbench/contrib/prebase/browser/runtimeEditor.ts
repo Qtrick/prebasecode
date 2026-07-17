@@ -41,6 +41,8 @@ export class PreBaseRuntimeEditor extends EditorPane {
 	private readonly _sessionDisposables = this._register(new DisposableStore());
 	private _loadedUrl: string | undefined;
 	private _webviewReady = false;
+	private _hostResizeObserver: ResizeObserver | undefined;
+	private _responsiveSyncTimer: number | undefined;
 
 	constructor(
 		group: IEditorGroup,
@@ -75,15 +77,18 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._root.style.display = 'flex';
 		this._root.style.flexDirection = 'column';
 		this._root.style.height = '100%';
-		this._root.style.background = '#0b1220';
-		this._root.style.color = '#e2e8f0';
+		this._root.style.minWidth = '0';
+		this._root.style.minHeight = '0';
+		this._root.style.background = 'var(--vscode-editor-background, #0b1220)';
+		this._root.style.color = 'var(--vscode-foreground, #e2e8f0)';
 
 		this._toolbar = DOM.append(this._root, DOM.$('.prebase-runtime-toolbar'));
 		this._toolbar.style.display = 'flex';
 		this._toolbar.style.gap = '6px';
 		this._toolbar.style.padding = '8px';
-		this._toolbar.style.borderBottom = '1px solid #1e293b';
+		this._toolbar.style.borderBottom = '1px solid var(--vscode-panel-border, #1e293b)';
 		this._toolbar.style.alignItems = 'center';
+		this._toolbar.style.flexShrink = '0';
 
 		const mkBtn = (label: string, onClick: () => void) => {
 			const btn = DOM.append(this._toolbar!, DOM.$('button')) as HTMLButtonElement;
@@ -107,9 +112,10 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._urlInput = DOM.append(this._toolbar, DOM.$('input')) as HTMLInputElement;
 		this._urlInput.type = 'text';
 		this._urlInput.style.flex = '1';
-		this._urlInput.style.background = '#020617';
-		this._urlInput.style.color = '#e2e8f0';
-		this._urlInput.style.border = '1px solid #334155';
+		this._urlInput.style.minWidth = '0';
+		this._urlInput.style.background = 'var(--vscode-input-background, #020617)';
+		this._urlInput.style.color = 'var(--vscode-input-foreground, #e2e8f0)';
+		this._urlInput.style.border = '1px solid var(--vscode-input-border, #334155)';
 		this._urlInput.style.borderRadius = '6px';
 		this._urlInput.style.padding = '6px 8px';
 		this._register(DOM.addDisposableListener(this._urlInput, 'keydown', async (e) => {
@@ -127,29 +133,54 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		body.style.display = 'flex';
 		body.style.flex = '1';
 		body.style.minHeight = '0';
+		body.style.minWidth = '0';
 
 		this._frameHost = DOM.append(body, DOM.$('.prebase-runtime-frame-host'));
 		this._frameHost.style.flex = '1';
 		this._frameHost.style.display = 'flex';
 		this._frameHost.style.alignItems = 'center';
 		this._frameHost.style.justifyContent = 'center';
-		this._frameHost.style.overflow = 'auto';
-		this._frameHost.style.padding = '12px';
+		this._frameHost.style.overflow = 'hidden';
+		this._frameHost.style.minWidth = '0';
+		this._frameHost.style.minHeight = '0';
+		this._frameHost.style.padding = '0';
+		this._frameHost.style.boxSizing = 'border-box';
+		this._frameHost.style.background = 'var(--vscode-editor-background, #0b1220)';
 
 		this._frameShell = DOM.append(this._frameHost, DOM.$('.prebase-runtime-frame-shell'));
-		this._frameShell.style.background = '#020617';
-		this._frameShell.style.border = '1px solid #334155';
-		this._frameShell.style.boxShadow = '0 8px 24px #0006';
+		this._frameShell.style.background = 'var(--vscode-editor-background, #020617)';
+		this._frameShell.style.border = '0';
+		this._frameShell.style.boxShadow = 'none';
 		this._frameShell.style.overflow = 'hidden';
-		this._frameShell.style.transformOrigin = 'top center';
+		this._frameShell.style.transformOrigin = 'center center';
 		this._frameShell.style.position = 'relative';
+		this._frameShell.style.minWidth = '0';
+		this._frameShell.style.minHeight = '0';
+		this._frameShell.style.boxSizing = 'border-box';
 
 		this._sidePanel = DOM.append(body, DOM.$('.prebase-runtime-side'));
 		this._sidePanel.style.width = '260px';
-		this._sidePanel.style.borderLeft = '1px solid #1e293b';
+		this._sidePanel.style.flexShrink = '0';
+		this._sidePanel.style.borderLeft = '1px solid var(--vscode-panel-border, #1e293b)';
 		this._sidePanel.style.padding = '10px';
 		this._sidePanel.style.overflow = 'auto';
 		this._sidePanel.style.fontSize = '12px';
+		this._sidePanel.style.background = 'var(--vscode-sideBar-background, transparent)';
+
+		if (typeof ResizeObserver !== 'undefined') {
+			this._hostResizeObserver = new ResizeObserver(() => this._scheduleResponsiveSync());
+			this._hostResizeObserver.observe(this._frameHost);
+		}
+		this._register({
+			dispose: () => {
+				this._hostResizeObserver?.disconnect();
+				this._hostResizeObserver = undefined;
+				if (this._responsiveSyncTimer !== undefined) {
+					window.clearTimeout(this._responsiveSyncTimer);
+					this._responsiveSyncTimer = undefined;
+				}
+			}
+		});
 	}
 
 	override async setInput(input: PreBaseRuntimeEditorInput, options: IEditorOptions | undefined, context: IEditorOpenContext, token: CancellationToken): Promise<void> {
@@ -175,6 +206,65 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			this._root.style.width = `${dimension.width}px`;
 			this._root.style.height = `${dimension.height}px`;
 		}
+		this._scheduleResponsiveSync();
+		this._applyViewportChrome();
+	}
+
+	private _scheduleResponsiveSync(): void {
+		if (this._responsiveSyncTimer !== undefined) {
+			window.clearTimeout(this._responsiveSyncTimer);
+		}
+		this._responsiveSyncTimer = window.setTimeout(() => {
+			this._responsiveSyncTimer = undefined;
+			this._syncResponsiveViewportFromHost();
+			this._applyViewportChrome();
+		}, 50);
+	}
+
+	private _syncResponsiveViewportFromHost(): void {
+		if (!this._frameHost) {
+			return;
+		}
+		const session = this.runtimeService.getSession();
+		if (session.viewport.preset !== 'responsive' || session.viewport.rotated) {
+			return;
+		}
+		const w = Math.max(1, Math.round(this._frameHost.clientWidth));
+		const h = Math.max(1, Math.round(this._frameHost.clientHeight));
+		// Mirror setViewportSize clamp [100,4000] so tiny hosts don't re-fire forever.
+		const clampedW = Math.max(100, Math.min(4000, w));
+		const clampedH = Math.max(100, Math.min(4000, h));
+		if (Math.abs(clampedW - session.viewport.width) > 1 || Math.abs(clampedH - session.viewport.height) > 1) {
+			this.runtimeService.setViewportSize(clampedW, clampedH);
+		}
+	}
+
+	private _applyViewportChrome(): void {
+		if (!this._frameShell || !this._frameHost) {
+			return;
+		}
+		const session = this.runtimeService.getSession();
+		const { width, height, zoom, preset } = session.viewport;
+		const responsive = preset === 'responsive' && !session.viewport.rotated;
+		if (responsive) {
+			this._frameHost.style.padding = '0';
+			this._frameHost.style.overflow = 'hidden';
+			this._frameShell.style.width = '100%';
+			this._frameShell.style.height = '100%';
+			this._frameShell.style.border = '0';
+			this._frameShell.style.boxShadow = 'none';
+			this._frameShell.style.maxWidth = 'none';
+			this._frameShell.style.maxHeight = 'none';
+		} else {
+			// Fixed device: themed letterbox (editor background), not white gutters.
+			this._frameHost.style.padding = '12px';
+			this._frameHost.style.overflow = 'auto';
+			this._frameShell.style.width = `${width}px`;
+			this._frameShell.style.height = `${height}px`;
+			this._frameShell.style.border = '1px solid var(--vscode-panel-border, #334155)';
+			this._frameShell.style.boxShadow = '0 8px 24px #0006';
+		}
+		this._frameShell.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
 	}
 
 	private _renderSession(): void {
@@ -191,17 +281,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			].filter(Boolean).join(' · ');
 		}
 
-		if (this._frameShell) {
-			const { width, height, zoom, preset } = session.viewport;
-			if (preset === 'responsive' && !session.viewport.rotated && width >= 1200) {
-				this._frameShell.style.width = '100%';
-				this._frameShell.style.height = '100%';
-			} else {
-				this._frameShell.style.width = `${width}px`;
-				this._frameShell.style.height = `${height}px`;
-			}
-			this._frameShell.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
-		}
+		this._applyViewportChrome();
 
 		if (this._sidePanel) {
 			this._sidePanel.innerText = '';
@@ -303,11 +383,12 @@ export class PreBaseRuntimeEditor extends EditorPane {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-src * http: https:;">
 <style nonce="${nonce}">
-html, body { margin:0; height:100%; background:#fff; overflow:hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
-#frame { border:0; width:100%; height:100%; display:block; background:#fff; }
+html, body { margin:0; height:100%; width:100%; background:transparent; overflow:hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+#frame { border:0; width:100%; height:100%; display:block; margin:0; padding:0; background:transparent; }
 #overlay {
 	position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-	padding:24px; text-align:center; color:#334155; background:#f8fafc; font-size:14px; line-height:1.45;
+	padding:24px; text-align:center; color:var(--vscode-descriptionForeground, #94a3b8);
+	background:var(--vscode-editor-background, #0b1220); font-size:14px; line-height:1.45;
 }
 #overlay.hidden { display:none; }
 </style>

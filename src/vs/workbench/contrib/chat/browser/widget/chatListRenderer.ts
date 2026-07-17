@@ -124,6 +124,7 @@ import { AgentSessionProviders, isAgentHostTarget } from '../agentSessions/agent
 const $ = dom.$;
 
 const COPILOT_USERNAME = 'GitHub Copilot';
+const AGENTS_USERNAME = 'Agents';
 const WORKING_CAUGHT_UP_DEBOUNCE_MS = 750;
 const DEFAULT_CHAT_ITEM_HORIZONTAL_PADDING = 40;
 
@@ -254,6 +255,7 @@ const mostRecentResponseClassName = 'chat-most-recent-response';
 export function shouldHideChatUserIdentity(username: string, sessionResource: URI, isResponse: boolean, isSessionsWindow: boolean, isSystemInitiatedRequest: boolean): boolean {
 	const sessionType = getChatSessionType(sessionResource);
 	return username === COPILOT_USERNAME ||
+		username === AGENTS_USERNAME ||
 		(isResponse && isAgentHostCopilotSessionType(sessionType)) ||
 		isSessionsWindow ||
 		isSystemInitiatedRequest;
@@ -911,20 +913,25 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 			}
 		}));
 
+		const isSystemInitiatedRequest = isRequestVM(element) && !!element.isSystemInitiated;
+		const hideChatUserIdentity = shouldHideChatUserIdentity(element.username, element.sessionResource, isResponseVM(element), this.environmentService.isSessionsWindow, isSystemInitiatedRequest);
+
 		if (!this.rendererOptions.noHeader) {
-			this.renderAvatar(element, templateData);
+			if (!hideChatUserIdentity) {
+				this.renderAvatar(element, templateData);
+			} else {
+				templateData.avatarContainer.replaceChildren();
+			}
 		}
 
-		const isSystemInitiatedRequest = isRequestVM(element) && !!element.isSystemInitiated;
-
 		templateData.username.textContent = element.username;
-		const hideChatUserIdentity = shouldHideChatUserIdentity(element.username, element.sessionResource, isResponseVM(element), this.environmentService.isSessionsWindow, isSystemInitiatedRequest);
 		templateData.username.classList.toggle('hidden', hideChatUserIdentity);
 		templateData.avatarContainer.classList.toggle('hidden', hideChatUserIdentity);
+		templateData.header?.classList.toggle('header-identity-hidden', hideChatUserIdentity);
 
 		this.hoverHidden(templateData.requestHover);
 		dom.clearNode(templateData.detail);
-		if (isResponseVM(element)) {
+		if (isResponseVM(element) && !hideChatUserIdentity) {
 			this.renderDetail(element, templateData);
 		}
 

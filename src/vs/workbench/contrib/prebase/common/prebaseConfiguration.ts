@@ -92,6 +92,15 @@ export enum PreBaseConfigKeys {
 	RuntimeConfirmCommands = 'prebase.runtime.confirmCommands',
 	RuntimePreserveSession = 'prebase.runtime.preserveSession',
 	RuntimeReportHistoryLimit = 'prebase.runtime.reportHistoryLimit',
+
+	// Desktop runtime
+	RuntimeDesktopLaunchMode = 'prebase.runtime.desktopLaunchMode',
+	RuntimeRememberDesktopLaunchMode = 'prebase.runtime.rememberDesktopLaunchMode',
+	RuntimeStopManagedAppsOnExit = 'prebase.runtime.stopManagedAppsOnExit',
+	RuntimeStopExternalAppsOnExit = 'prebase.runtime.stopExternalAppsOnExit',
+	RuntimeEnableDesktopAutomation = 'prebase.runtime.enableDesktopAutomation',
+	RuntimeConfirmApplicationTermination = 'prebase.runtime.confirmApplicationTermination',
+	RuntimeManagedApplicationBar = 'prebase.runtime.managedApplicationBar',
 }
 
 /** All `prebase.*` keys owned by PreBase settings (for Reset all). Excludes extension-owned `prebase.magnus.*`. */
@@ -561,6 +570,46 @@ configurationRegistry.registerConfiguration({
 			minimum: 1,
 			maximum: 200,
 			description: localize('prebase.runtime.reportHistoryLimit', "Maximum number of Runtime Preview test reports to keep."),
+		},
+		[PreBaseConfigKeys.RuntimeDesktopLaunchMode]: {
+			type: 'string',
+			enum: ['managed', 'external'],
+			enumDescriptions: [
+				localize('prebase.runtime.desktopLaunchMode.managed', "Open Electron apps in a PreBase-managed native window with a management strip."),
+				localize('prebase.runtime.desktopLaunchMode.external', "Spawn the project's Electron process with a localhost CDP debugging port."),
+			],
+			default: 'managed',
+			description: localize('prebase.runtime.desktopLaunchMode', "How PreBase launches detected Electron desktop applications."),
+		},
+		[PreBaseConfigKeys.RuntimeRememberDesktopLaunchMode]: {
+			type: 'boolean',
+			default: true,
+			description: localize('prebase.runtime.rememberDesktopLaunchMode', "Remember the selected desktop launch mode in settings."),
+		},
+		[PreBaseConfigKeys.RuntimeStopManagedAppsOnExit]: {
+			type: 'boolean',
+			default: true,
+			description: localize('prebase.runtime.stopManagedAppsOnExit', "Close PreBase-managed desktop windows when PreBase exits."),
+		},
+		[PreBaseConfigKeys.RuntimeStopExternalAppsOnExit]: {
+			type: 'boolean',
+			default: false,
+			description: localize('prebase.runtime.stopExternalAppsOnExit', "Stop externally launched Electron processes when PreBase exits."),
+		},
+		[PreBaseConfigKeys.RuntimeEnableDesktopAutomation]: {
+			type: 'boolean',
+			default: false,
+			description: localize('prebase.runtime.enableDesktopAutomation', "Allow Agents/Magnus to inspect and evaluate JavaScript in PreBase-owned desktop application sessions (managed executeJavaScript or external localhost CDP)."),
+		},
+		[PreBaseConfigKeys.RuntimeConfirmApplicationTermination]: {
+			type: 'boolean',
+			default: true,
+			description: localize('prebase.runtime.confirmApplicationTermination', "Confirm before stopping a launched desktop application."),
+		},
+		[PreBaseConfigKeys.RuntimeManagedApplicationBar]: {
+			type: 'boolean',
+			default: true,
+			description: localize('prebase.runtime.managedApplicationBar', "Show the PreBase management strip in managed desktop windows."),
 		},
 	}
 });

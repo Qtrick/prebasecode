@@ -63,7 +63,7 @@ else {
 		Object.assign(product, {
 			version: '1.104.0-dev',
 			nameShort: 'PreBase Dev',
-			nameLong: 'PreBase IDE Dev',
+			nameLong: 'PreBase Dev',
 			applicationName: 'prebase',
 			dataFolderName: '.prebase',
 			urlProtocol: 'prebase',

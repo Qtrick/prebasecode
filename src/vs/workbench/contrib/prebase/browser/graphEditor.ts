@@ -208,7 +208,8 @@ export class PreBaseGraphEditor extends EditorPane {
 				diagnostics,
 				settings: this._graphSettings(),
 				graphType: this._inputType,
-				selectedNodeId: this.graphService.getSelectedNodeId()
+				// Always send string|null (never undefined) so webview can clear selection.
+				selectedNodeId: this.graphService.getSelectedNodeId() ?? null
 			}
 		});
 	}
@@ -227,13 +228,13 @@ export class PreBaseGraphEditor extends EditorPane {
 					snapshot: this.graphService.getSnapshot(),
 					diagnostics: this.graphService.getDiagnostics(),
 					viewState: this.graphService.getViewState(),
-					selectedNodeId: this.graphService.getSelectedNodeId(),
+					selectedNodeId: this.graphService.getSelectedNodeId() ?? null,
 					settings: this._graphSettings()
 				});
 				break;
 			case 'selectNode': {
-				const nodeId = (message.payload as { nodeId?: string } | undefined)?.nodeId;
-				this.graphService.setSelectedNodeId(nodeId);
+				const nodeId = (message.payload as { nodeId?: string | null } | undefined)?.nodeId;
+				this.graphService.setSelectedNodeId(nodeId || undefined);
 				await reply({ ok: true });
 				break;
 			}
@@ -326,9 +327,13 @@ html, body { margin:0; height:100%; background:#070b14; color:#e2e8f0; font-fami
 #popup button { font-size:11px; border-radius:7px; border:1px solid #334155; background:#0b1220; color:#e2e8f0; padding:5px 8px; cursor:pointer; }
 #popup button.primary { border-color:#2dd4bf; color:#042f2e; background:#2dd4bf; }
 #popup #popupClose { float:right; border:0; background:transparent; color:#94a3b8; font-size:16px; }
+.ring, .pyramid-band, .edge { pointer-events:none; }
 .ring { fill:none; opacity:.55; }
 .node-label { fill:#ecfeff; font-size:10px; pointer-events:none; }
 .edge { fill:none; opacity:.45; }
+.arch-node { cursor:pointer; }
+.arch-node.is-entry rect.node-face { stroke-width:2.4; }
+.arch-node.is-selected rect.node-face { stroke:#2dd4bf; stroke-width:2.6; filter:url(#glow); }
 </style>
 </head>
 <body>
@@ -385,7 +390,10 @@ const NODE_SCALE = 1;
 const FOCAL = 640;
 const IDLE_YAW = 0.08;
 const IDLE_RESUME_MS = 1400;
+// Keep ARCH_* in sync with architecturePick.ts (screen-space hit testing).
 const ARCH_W = 28, ARCH_H = 28;
+/** Minimum Architecture node hit radius in CSS pixels (screen space), independent of zoom. */
+const ARCH_MIN_HIT_PX = 10;
 const ENTRY = '#e8b84a';
 const FILE_COLORS = {
 	typescript:'#3178c6', javascript:'#f1e05a', css:'#a371f7', html:'#e34c26',
@@ -647,11 +655,76 @@ function updateLegend(s, network) {
 	legend.style.display = 'block';
 }
 
+function architectureHitRadiusScreen() {
+	// Screen-space radius (CSS px): visual half-diagonal + pad, floored at ARCH_MIN_HIT_PX.
+	// Convert to world with (screen / zoom) in pickArchitectureNode — do not use a fixed world radius.
+	const visual = Math.hypot(ARCH_W / 2, ARCH_H / 2) * Math.max(0.001, transform.k);
+	return Math.max(ARCH_MIN_HIT_PX, visual + 4);
+}
+
+function pickArchitectureNode(clientX, clientY) {
+	// Mirrors pickArchitectureNodeAt in architecturePick.ts (closest center within screen-space halo).
+	if (!snapshot || isNetwork()) return null;
+	const rect = archSvg.getBoundingClientRect();
+	const sx = clientX - rect.left;
+	const sy = clientY - rect.top;
+	const k = Math.max(0.001, transform.k);
+	const wx = (sx - transform.x) / k;
+	const wy = (sy - transform.y) / k;
+	const hitWorld = architectureHitRadiusScreen() / k;
+	let best = null;
+	let bestDist = Infinity;
+	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
+	const nodes = (snapshot.nodes || []).slice(0, maxNodes);
+	for (let i = 0; i < nodes.length; i++) {
+		const node = nodes[i];
+		const p = snapshot.positions[node.id];
+		if (!p) continue;
+		const cx = p.x + ARCH_W / 2;
+		const cy = p.y + ARCH_H / 2;
+		const d = Math.hypot(wx - cx, wy - cy);
+		if (d <= hitWorld && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
+			bestDist = d;
+			best = node;
+		}
+	}
+	return best;
+}
+
+/** Toggle selection styling only — never rebuild SVG / positions on select. */
+function updateArchitectureSelection() {
+	if (isNetwork()) return;
+	const groups = archSvg.querySelectorAll('.arch-node');
+	for (let i = 0; i < groups.length; i++) {
+		const g = groups[i];
+		const id = g.getAttribute('data-node-id');
+		if (id && id === selectedNodeId) g.classList.add('is-selected');
+		else g.classList.remove('is-selected');
+	}
+}
+
 function renderArchitecture(s) {
 	archSvg.style.display = 'block';
 	netCanvas.style.display = 'none';
 	idleToggleWrap.style.display = 'none';
 	archSvg.innerHTML = '';
+	const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+	const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
+	filter.setAttribute('id', 'glow');
+	filter.setAttribute('x', '-50%'); filter.setAttribute('y', '-50%');
+	filter.setAttribute('width', '200%'); filter.setAttribute('height', '200%');
+	const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
+	blur.setAttribute('stdDeviation', '2.2'); blur.setAttribute('result', 'coloredBlur');
+	const merge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
+	const m1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+	m1.setAttribute('in', 'coloredBlur');
+	const m2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
+	m2.setAttribute('in', 'SourceGraphic');
+	merge.appendChild(m1); merge.appendChild(m2);
+	filter.appendChild(blur); filter.appendChild(merge);
+	defs.appendChild(filter);
+	archSvg.appendChild(defs);
+
 	const world = document.createElementNS('http://www.w3.org/2000/svg', 'g');
 	world.setAttribute('id', 'world');
 	archSvg.appendChild(world);
@@ -677,6 +750,7 @@ function renderArchitecture(s) {
 		for (let i = 0; i < s.pyramidBands.length; i++) {
 			const band = s.pyramidBands[i];
 			const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+			rect.setAttribute('class', 'pyramid-band');
 			rect.setAttribute('x', String(band.x));
 			rect.setAttribute('y', String(band.y));
 			rect.setAttribute('width', String(band.width));
@@ -709,17 +783,22 @@ function renderArchitecture(s) {
 		const p = s.positions[node.id];
 		if (!p) continue;
 		const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+		let cls = 'arch-node';
+		if (node.id === s.entryNodeId) cls += ' is-entry';
+		if (node.id === selectedNodeId) cls += ' is-selected';
+		g.setAttribute('class', cls);
+		g.setAttribute('data-node-id', node.id);
 		g.setAttribute('transform', 'translate(' + p.x + ',' + p.y + ')');
-		g.style.cursor = 'pointer';
 		const color = nodeColor(node, s.entryNodeId);
+		// Visual size stays ARCH_W×ARCH_H; hit testing is screen-space pickArchitectureNode (not DOM discs).
 		const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+		rect.setAttribute('class', 'node-face');
 		rect.setAttribute('width', String(ARCH_W));
 		rect.setAttribute('height', String(ARCH_H));
 		rect.setAttribute('rx', '4');
 		rect.setAttribute('fill', '#0b1220');
 		rect.setAttribute('stroke', color);
-		rect.setAttribute('stroke-width', node.id === selectedNodeId || node.id === s.entryNodeId ? '2.4' : '1.4');
-		if (node.id === selectedNodeId) rect.setAttribute('filter', 'url(#glow)');
+		rect.setAttribute('stroke-width', '1.4');
 		g.appendChild(rect);
 		const icon = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
 		icon.setAttribute('x', '7'); icon.setAttribute('y', '7');
@@ -727,17 +806,8 @@ function renderArchitecture(s) {
 		icon.setAttribute('rx', '2');
 		icon.setAttribute('fill', color);
 		icon.setAttribute('opacity', '0.85');
+		icon.setAttribute('pointer-events', 'none');
 		g.appendChild(icon);
-		g.addEventListener('click', function (ev) {
-			ev.stopPropagation();
-			const dist = Math.hypot(ev.clientX - pointerDownX, ev.clientY - pointerDownY);
-			if (moved && dist > dragThreshold) return;
-			openNodePopup(node, ev.clientX, ev.clientY);
-		});
-		g.addEventListener('dblclick', function (ev) {
-			ev.stopPropagation();
-			request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
-		});
 		world.appendChild(g);
 	}
 	applyArchTransform();
@@ -910,12 +980,15 @@ function onSnapshotMessage(payload) {
 	const prevLayout = snapshot && snapshot.layoutMode;
 	const prevNetLayout = snapshot && snapshot.networkLayoutMode;
 	const prevType = snapshot && snapshot.graphType;
+	const prevMaxNodes = settings.maxRenderedNodes;
+	const prevMaxEdges = settings.maxRenderedEdges;
 	snapshot = payload && payload.snapshot;
 	diagnostics = payload && payload.diagnostics;
 	settings = (payload && payload.settings) || settings;
 	if (payload && payload.graphType) graphType = payload.graphType;
 	else if (snapshot && snapshot.graphType) graphType = snapshot.graphType;
-	if (payload && payload.selectedNodeId !== undefined) selectedNodeId = payload.selectedNodeId;
+	// Host clears with null; must apply even when falsy (old !== undefined missed undefined clears).
+	if (payload && 'selectedNodeId' in payload) selectedNodeId = payload.selectedNodeId || null;
 	idleToggle.checked = !!settings.networkIdleAutoRotate;
 	if (!settings.networkIdleAutoRotate || settings.reduceMotion) idlePaused = true;
 	else if (isNetwork()) scheduleIdleResume();
@@ -925,6 +998,21 @@ function onSnapshotMessage(payload) {
 	const nextNetLayout = snapshot && snapshot.networkLayoutMode;
 	const nextType = snapshot && snapshot.graphType;
 	const layoutChanged = prevScan !== nextScan || prevLayout !== nextLayout || prevNetLayout !== nextNetLayout || prevType !== nextType || !prevScan;
+	const renderBudgetChanged = prevMaxNodes !== settings.maxRenderedNodes || prevMaxEdges !== settings.maxRenderedEdges;
+	// Selection / diagnostics-only pushes must not rebuild Architecture DOM (no relayout on select).
+	if (!layoutChanged && !renderBudgetChanged && snapshot && (snapshot.nodes || []).length) {
+		empty.style.display = 'none';
+		status.textContent = ((diagnostics && diagnostics.message) || (snapshot.nodes.length + ' nodes · ' + (snapshot.edges || []).length + ' links'))
+			+ (isNetwork() ? ' · drag to rotate · scroll to zoom' : '');
+		updateLegend(snapshot, isNetwork());
+		if (isNetwork()) {
+			dirty = true;
+			drawNetworkFrame();
+		} else {
+			updateArchitectureSelection();
+		}
+		return;
+	}
 	if (layoutChanged && isNetwork()) resetCamera(false);
 	render(layoutChanged);
 	if (layoutChanged && snapshot && snapshot.nodes && snapshot.nodes.length) fitView();
@@ -973,7 +1061,7 @@ async function openNodePopup(node, clientX, clientY) {
 	popupAi.textContent = '…';
 	placePopupNear(clientX, clientY);
 	request('selectNode', { nodeId: node.id });
-	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else render(true);
+	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection();
 	const desc = await request('describeNode', { nodeId: node.id });
 	if (!popupNode || popupNode.id !== node.id) return;
 	popupOverview.textContent = (desc && desc.overview) || 'No overview.';
@@ -996,13 +1084,20 @@ function onPointerDown(e, host) {
 	dragThreshold = thresholdForPointer(e.pointerType);
 	dragging = true; moved = false; lastX = e.clientX; lastY = e.clientY;
 	pointerDownX = e.clientX; pointerDownY = e.clientY;
-	pointerDownNode = isNetwork() ? pickNetworkNode(e.clientX, e.clientY) : null;
-	const wantPan = e.button === 1 || e.shiftKey || !isNetwork();
+	pointerDownNode = isNetwork()
+		? pickNetworkNode(e.clientX, e.clientY)
+		: pickArchitectureNode(e.clientX, e.clientY);
+	// Architecture: pan only from background (or middle/shift). Node press must not pan,
+	// or tiny moves cancel selection.
+	const wantPan = e.button === 1 || e.shiftKey || (!isNetwork() && !pointerDownNode);
 	panning = wantPan;
 	// Defer rotate until drag exceeds click threshold so node reselection works.
 	rotating = false;
 	host.classList.add('dragging');
-	if (panning) scheduleIdleResume();
+	if (panning) {
+		host.classList.add('panning');
+		scheduleIdleResume();
+	}
 }
 function onPointerUp(e, cancelled) {
 	if (e.pointerId !== activePointerId) return;
@@ -1017,17 +1112,28 @@ function onPointerUp(e, cancelled) {
 	archSvg.classList.remove('dragging'); archSvg.classList.remove('panning');
 	netCanvas.classList.remove('dragging');
 	const dist = e ? Math.hypot((e.clientX || 0) - pointerDownX, (e.clientY || 0) - pointerDownY) : 99;
-	if (isNetwork() && e && !wasMoved && dist <= dragThreshold) {
-		const node = pickNetworkNode(e.clientX, e.clientY);
-		if (node) {
-			// Always take the frontmost node under the cursor (allows switching selection).
-			openNodePopup(node, e.clientX, e.clientY);
-			return;
+	if (e && !wasMoved && dist <= dragThreshold) {
+		if (isNetwork()) {
+			const node = pickNetworkNode(e.clientX, e.clientY);
+			if (node) {
+				openNodePopup(node, e.clientX, e.clientY);
+				return;
+			}
+			selectedNodeId = null;
+			request('selectNode', { nodeId: null });
+			closePopup();
+			dirty = true; drawNetworkFrame();
+		} else {
+			const node = pickArchitectureNode(e.clientX, e.clientY);
+			if (node) {
+				openNodePopup(node, e.clientX, e.clientY);
+				return;
+			}
+			selectedNodeId = null;
+			request('selectNode', { nodeId: null });
+			closePopup();
+			updateArchitectureSelection();
 		}
-		selectedNodeId = null;
-		request('selectNode', { nodeId: null });
-		closePopup();
-		dirty = true; drawNetworkFrame();
 	}
 	if (isNetwork()) scheduleIdleResume();
 }
@@ -1050,6 +1156,12 @@ function onPointerMove(e) {
 		return;
 	}
 	if (!moved) return;
+	if (!panning && !isNetwork() && pointerDownNode) {
+		// Node gesture exceeded click threshold: treat as cancelled click, do not pan.
+		interactionState = 'cancelled';
+		return;
+	}
+	if (!panning) return;
 	interactionState = 'panning';
 	transform.x += dx; transform.y += dy;
 	if (isNetwork()) { dirty = true; } else applyArchTransform();
@@ -1078,9 +1190,25 @@ archSvg.addEventListener('pointercancel', function (e) { onPointerUp(e, true); }
 netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
 archSvg.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
 netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
+archSvg.addEventListener('dblclick', function (e) {
+	const node = pickArchitectureNode(e.clientX, e.clientY);
+	if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
+});
+archSvg.addEventListener('contextmenu', function (e) {
+	const node = pickArchitectureNode(e.clientX, e.clientY);
+	if (!node) return;
+	e.preventDefault();
+	openNodePopup(node, e.clientX, e.clientY);
+});
 netCanvas.addEventListener('dblclick', function (e) {
 	const node = pickNetworkNode(e.clientX, e.clientY);
 	if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
+});
+// Hover cursor for architecture without selecting
+archSvg.addEventListener('pointermove', function (e) {
+	if (dragging) return;
+	const node = pickArchitectureNode(e.clientX, e.clientY);
+	archSvg.style.cursor = node ? 'pointer' : 'grab';
 });
 document.getElementById('popupClose').onclick = function () { closePopup(); };
 document.getElementById('popupOpen').onclick = function () {
@@ -1091,7 +1219,7 @@ document.getElementById('popupReveal').onclick = function () {
 };
 document.getElementById('popupMagnus').onclick = function () { request('attachToMagnus', {}); };
 window.addEventListener('keydown', function (e) {
-	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); if (isNetwork()) { dirty = true; drawNetworkFrame(); } }
+	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection(); }
 });
 archSvg.addEventListener('wheel', onWheel, { passive: false });
 netCanvas.addEventListener('wheel', onWheel, { passive: false });
@@ -1135,7 +1263,7 @@ document.addEventListener('visibilitychange', function () {
 request('getSnapshot').then(function (res) {
 	snapshot = res && res.snapshot;
 	diagnostics = res && res.diagnostics;
-	selectedNodeId = res && res.selectedNodeId;
+	selectedNodeId = (res && res.selectedNodeId) || null;
 	if (res && res.settings) settings = res.settings;
 	if (snapshot && snapshot.graphType) graphType = snapshot.graphType;
 	if (isNetwork()) resetCamera(false);

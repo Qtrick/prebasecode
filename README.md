@@ -1,4 +1,4 @@
-# PreBase IDE
+# PreBase
 
 PreBase is an AI-assisted desktop IDE and code visualization platform. It combines a full VS Code workbench with interactive codebase maps, in-IDE runtime preview, and an Agents chat panel.
 

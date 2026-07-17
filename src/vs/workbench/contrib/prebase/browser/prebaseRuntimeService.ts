@@ -15,6 +15,8 @@ import { IConfigurationService } from '../../../../platform/configuration/common
 import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
+import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { isWeb } from '../../../../base/common/platform.js';
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { asTextOrError, IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
@@ -23,12 +25,17 @@ import { IOutputService } from '../../../services/output/common/output.js';
 import { ITerminalInstance, ITerminalService } from '../../terminal/browser/terminal.js';
 import { latestDevServerUrl } from '../common/runtime/devServerUrlParser.js';
 import { detectFramework } from '../common/runtime/frameworkDetector.js';
+import { detectElectronProject } from '../common/runtime/electronDetector.js';
+import type { ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
+import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { classifyNavigateUrl, classifyTerminalCommand, validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
 import { detectDevScripts, selectDefaultScript } from '../common/runtime/scriptDetector.js';
+import { managedRendererDevCommand, scriptLaunchesElectronApp } from '../common/runtime/managedRendererCommand.js';
 import type { DetectedDevScript, FrameworkProfile, PackageJsonShape, PackageManager, ProjectProbe } from '../common/runtime/types.js';
 import { type PreBaseViewportPreset, resolveViewportSize, VIEWPORT_PRESET_SIZES } from '../common/runtime/viewportPresets.js';
 import { PREBASE_RUNTIME_CHANNEL_ID, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import { PreBaseRuntimeEditorInput } from './runtimeEditorInput.js';
+import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
 
 export type { PreBaseViewportPreset };
 
@@ -62,6 +69,11 @@ export interface PreBaseRuntimeSession {
 	selectedScriptName: string | undefined;
 	packageManager: PackageManager | undefined;
 	terminalInstanceId: number | undefined;
+	electronProfile: ElectronProjectProfile | null;
+	desktopLaunchMode: DesktopLaunchMode;
+	desktopSessionActive: boolean;
+	desktopSessionState?: string;
+	desktopSessionPid?: number;
 }
 
 export const IPreBaseRuntimeService = createDecorator<IPreBaseRuntimeService>('prebaseRuntimeService');
@@ -79,6 +91,7 @@ export interface IPreBaseRuntimeService {
 	setZoom(zoom: number): void;
 	rotateViewport(): void;
 	selectScript(scriptName: string): void;
+	setDesktopLaunchMode(mode: DesktopLaunchMode): Promise<void>;
 	detectConfigurations(): Promise<string[]>;
 	start(): Promise<void>;
 	stop(): Promise<void>;
@@ -195,6 +208,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		@IOpenerService private readonly openerService: IOpenerService,
 		@IClipboardService private readonly clipboardService: IClipboardService,
 		@IRequestService private readonly requestService: IRequestService,
+		@IInstantiationService private readonly instantiationService: IInstantiationService,
 	) {
 		super();
 		const defaultUrl = this.configurationService.getValue<string>(PreBaseConfigKeys.RuntimeDefaultUrl) || 'http://localhost:5173';
@@ -227,7 +241,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			scripts: [],
 			selectedScriptName: undefined,
 			packageManager: undefined,
-			terminalInstanceId: undefined
+			terminalInstanceId: undefined,
+			electronProfile: null,
+			desktopLaunchMode: (this.configurationService.getValue<DesktopLaunchMode>(PreBaseConfigKeys.RuntimeDesktopLaunchMode) ?? 'managed'),
+			desktopSessionActive: false,
 		};
 
 		this._register(this.terminalService.onDidDisposeInstance(instance => {
@@ -254,11 +271,34 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 				};
 				this._fire();
 			}
+			if (e.affectsConfiguration(PreBaseConfigKeys.RuntimeDesktopLaunchMode)) {
+				const mode = this.configurationService.getValue<DesktopLaunchMode>(PreBaseConfigKeys.RuntimeDesktopLaunchMode) ?? 'managed';
+				this._session = { ...this._session, desktopLaunchMode: mode };
+				this._fire();
+			}
 		}));
 
 		if (this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeAutoDetect)) {
 			void this.detectConfigurations();
 		}
+		this._registerDesktopSessionSync();
+	}
+
+	private _registerDesktopSessionSync(): void {
+		const desktop = this._desktopService();
+		if (!desktop) {
+			return;
+		}
+		this._register(desktop.onDidChangeSession(session => {
+			this._session = {
+				...this._session,
+				desktopSessionActive: session?.state === 'running',
+				desktopSessionState: session?.state,
+				desktopSessionPid: session?.pid,
+				desktopLaunchMode: session?.launchMode ?? this._session.desktopLaunchMode,
+			};
+			this._fire();
+		}));
 	}
 
 	getSession(): PreBaseRuntimeSession {
@@ -479,6 +519,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		};
 
 		const framework = detectFramework(probe);
+		const electronProfile = this._desktopService()?.detect(probe) ?? detectElectronProject(probe);
 		const scripts = detectDevScripts(probe);
 		const selected = selectDefaultScript(scripts);
 		const defaultUrl = this.configurationService.getValue<string>(PreBaseConfigKeys.RuntimeDefaultUrl) || 'http://localhost:5173';
@@ -503,6 +544,8 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		this._session = {
 			...this._session,
 			framework,
+			electronProfile,
+			desktopLaunchMode: this.configurationService.getValue<DesktopLaunchMode>(PreBaseConfigKeys.RuntimeDesktopLaunchMode) ?? 'managed',
 			workspaceRoot: folder.uri.fsPath || folder.uri.path,
 			scripts,
 			selectedScriptName: selected?.scriptName,
@@ -513,10 +556,11 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 
 		this._log(localize(
 			'prebase.runtime.detectedSummary',
-			"Detected {0} · {1} script(s) · default {2}",
+			"Detected {0} · {1} script(s) · default {2}{3}",
 			framework.label,
 			scripts.length,
-			selected?.scriptName ?? 'none'
+			selected?.scriptName ?? 'none',
+			electronProfile.isElectron ? ` · Electron (${electronProfile.confidence})` : ''
 		));
 		this._fire();
 
@@ -543,6 +587,89 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			if (!this._session.scripts.length) {
 				await this.detectConfigurations();
 			}
+
+			const electronProfile = this._session.electronProfile;
+			const launchMode = this._session.desktopLaunchMode;
+			const desktop = this._desktopService();
+			if (electronProfile?.isElectron && desktop) {
+				if (launchMode === 'managed') {
+					const script = this._session.scripts.find(s => s.scriptName === this._session.selectedScriptName)
+						?? selectDefaultScript(this._session.scripts);
+					if (script) {
+						const rendererCommand = managedRendererDevCommand(script);
+						if (!rendererCommand) {
+							this._log(localize(
+								'prebase.runtime.managedNoRendererServer',
+								"Managed launch needs a renderer dev server. The selected script opens Electron directly; start a Vite/renderer server first, or use Open externally."
+							));
+							this._fire();
+							return;
+						}
+						// If a previous Start launched full Electron, kill it before renderer-only.
+						if (this._session.serverRunning && this._devTerminal && !this._devTerminal.isDisposed) {
+							const prior = (this._session.selectedScriptName && this._session.scripts.find(s => s.scriptName === this._session.selectedScriptName)?.scriptBody) || '';
+							if (scriptLaunchesElectronApp(prior) || scriptLaunchesElectronApp(script.scriptBody)) {
+								this._log(localize(
+									'prebase.runtime.managedRestartRendererOnly',
+									"Stopping Electron-launching server so managed mode can start renderer-only."
+								));
+								await this._stopTerminal();
+								this._session = { ...this._session, serverRunning: false, terminalInstanceId: undefined };
+							}
+						}
+						if (!this._session.serverRunning) {
+							if (scriptLaunchesElectronApp(script.scriptBody)) {
+								this._log(localize(
+									'prebase.runtime.managedRendererOnly',
+									"Managed mode starts the renderer only (no Electron window): {0}",
+									rendererCommand
+								));
+							}
+							await this._startDevServerOnly({
+								...script,
+								command: rendererCommand,
+								scriptBody: rendererCommand,
+								label: `${script.scriptName} (renderer only)`,
+							});
+						}
+					}
+					const rendererUrl = this._session.url || electronProfile.rendererUrlHint || `http://localhost:${electronProfile.likelyDevPort}`;
+					const ready = await this._waitForUrl(rendererUrl, 45_000);
+					if (!ready) {
+						this._log(localize(
+							'prebase.runtime.managedWaitFailed',
+							"Timed out waiting for renderer at {0}. Managed window will still open; use Reload once the server is ready.",
+							rendererUrl
+						));
+					}
+					const session = await desktop.start({ launchMode: 'managed', rendererUrl });
+					this._session = {
+						...this._session,
+						url: rendererUrl,
+						desktopSessionActive: Boolean(session && session.state === 'running'),
+						running: Boolean(session && session.state === 'running'),
+					};
+					this._fire();
+					return;
+				}
+				if (launchMode === 'external') {
+					const script = this._session.scripts.find(s => s.scriptName === this._session.selectedScriptName)
+						?? selectDefaultScript(this._session.scripts);
+					const session = await desktop.start({
+						launchMode: 'external',
+						rendererUrl: this._session.url,
+						command: script?.command,
+					});
+					this._session = {
+						...this._session,
+						desktopSessionActive: Boolean(session && session.state === 'running'),
+						running: Boolean(session && session.state === 'running'),
+					};
+					this._fire();
+					return;
+				}
+			}
+
 			const script = this._session.scripts.find(s => s.scriptName === this._session.selectedScriptName)
 				?? selectDefaultScript(this._session.scripts);
 
@@ -636,6 +763,13 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	async stop(): Promise<void> {
+		if (this._session.desktopSessionActive) {
+			await this._desktopService()?.stop();
+			this._session = {
+				...this._session,
+				desktopSessionActive: false,
+			};
+		}
 		await this._stopTerminal();
 		this._session = {
 			...this._session,
@@ -979,6 +1113,69 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			consoleEntries: [...this._session.consoleEntries, `[error] ${message}`]
 		};
 		this._fire();
+	}
+
+	async setDesktopLaunchMode(mode: DesktopLaunchMode): Promise<void> {
+		await this._desktopService()?.setLaunchMode(mode);
+		this._session = { ...this._session, desktopLaunchMode: mode };
+		this._fire();
+	}
+
+	private _desktopService(): IPreBaseDesktopRuntimeService | undefined {
+		if (isWeb) {
+			return undefined;
+		}
+		try {
+			return this.instantiationService.invokeFunction(accessor => accessor.get(IPreBaseDesktopRuntimeService));
+		} catch {
+			return undefined;
+		}
+	}
+
+	private async _startDevServerOnly(script: DetectedDevScript): Promise<void> {
+		if (this._devTerminal && !this._devTerminal.isDisposed) {
+			this._session = { ...this._session, serverRunning: true };
+			return;
+		}
+		const cwd = this._workspaceFolderUri ?? this.workspaceService.getWorkspace().folders[0]?.uri;
+		const instance = await this.terminalService.createTerminal({
+			config: { name: localize('prebase.runtime.terminalName', "PreBase Dev Server"), cwd },
+			cwd,
+		});
+		this._devTerminal = instance;
+		this._attachTerminal(instance);
+		await instance.sendText(script.command, true);
+		this._session = {
+			...this._session,
+			serverRunning: true,
+			selectedScriptName: script.scriptName,
+			packageManager: script.packageManager,
+			terminalInstanceId: instance.instanceId,
+		};
+	}
+
+	/** Poll until the renderer URL responds or timeout (managed launch must not race Electron). */
+	private async _waitForUrl(url: string, timeoutMs: number): Promise<boolean> {
+		const deadline = Date.now() + timeoutMs;
+		while (Date.now() < deadline) {
+			try {
+				const context = await this.requestService.request({
+					type: 'GET',
+					url,
+					timeout: 2000,
+					followRedirects: 3,
+					callSite: 'PreBaseRuntimeService._waitForUrl',
+				}, CancellationToken.None);
+				const status = context.res.statusCode ?? 0;
+				if (status > 0 && status < 500) {
+					return true;
+				}
+			} catch {
+				// keep waiting
+			}
+			await new Promise(resolve => setTimeout(resolve, 500));
+		}
+		return false;
 	}
 
 	private async _stopTerminal(): Promise<void> {

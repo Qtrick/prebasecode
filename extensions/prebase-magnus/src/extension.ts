@@ -8,6 +8,7 @@ import { generateContent } from './geminiClient';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
 import { MAGNUS_MODELS, resolveApiModel } from './models';
 import { DEFAULT_MAGNUS_AGENT_MODE, MAGNUS_AGENT_MODES, isMagnusAgentMode } from './modes';
+import { registerMagnusDesktopTools } from './desktopTools';
 import { registerMagnusLanguageModelTools } from './nativeTools';
 import { MagnusSecretStorage } from './secretStorage';
 
@@ -45,6 +46,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	// provider proposal is unavailable or no API key is configured yet.
 	registerMagnusChatParticipants(context, secrets, state);
 	registerMagnusLanguageModelTools(context);
+	registerMagnusDesktopTools(context);
 
 	const lmProvider = new MagnusLanguageModelProvider(secrets);
 	try {

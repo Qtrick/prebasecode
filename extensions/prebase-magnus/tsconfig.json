@@ -23,5 +23,8 @@
 		"../../src/vscode-dts/vscode.proposed.languageModelThinkingPart.d.ts",
 		"../../src/vscode-dts/vscode.proposed.textSearchProvider.d.ts",
 		"../../src/vscode-dts/vscode.proposed.findTextInFiles.d.ts"
+	],
+	"exclude": [
+		"src/**/*.test.ts"
 	]
 }

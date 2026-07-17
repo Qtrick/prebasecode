@@ -1,0 +1,35 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
+import { Event } from '../../../base/common/event.js';
+import { createDecorator } from '../../instantiation/common/instantiation.js';
+import type { DesktopLaunchRequest, IPreBaseDesktopSpawnResult, ManagedWindowState } from './prebaseDesktopTypes.js';
+
+export const PREBASE_DESKTOP_CHANNEL_NAME = 'prebaseDesktop';
+
+export type { DesktopLaunchRequest, IPreBaseDesktopSpawnResult, ManagedWindowState };
+
+export interface IPreBaseDesktopMainService {
+	readonly _serviceBrand: undefined;
+
+	readonly onDidCloseManagedWindow: Event<{ sessionId: string }>;
+	readonly onDidStripAction: Event<{ sessionId: string; action: 'reload' | 'restart' | 'inspect' | 'kill' }>;
+
+	openManagedWindow(request: DesktopLaunchRequest): Promise<ManagedWindowState>;
+	closeManagedWindow(sessionId: string): Promise<void>;
+	reloadManagedWindow(sessionId: string): Promise<void>;
+	restartManagedWindow(sessionId: string, request: DesktopLaunchRequest): Promise<ManagedWindowState>;
+	inspectManagedWindow(sessionId: string): Promise<void>;
+	evaluateInManagedWindow(sessionId: string, expression: string): Promise<unknown>;
+	/** PNG screenshot of app content only, base64-encoded. */
+	captureManagedScreenshot(sessionId: string): Promise<string>;
+
+	spawnExternal(command: string, cwd: string, debugPort: number, env?: Record<string, string>): Promise<IPreBaseDesktopSpawnResult>;
+	evaluateViaCdp(debugPort: number, expression: string): Promise<unknown>;
+	killOwnedProcess(pid: number): Promise<void>;
+	killAllOwned(): Promise<void>;
+}
+
+export const IPreBaseDesktopMainService = createDecorator<IPreBaseDesktopMainService>('prebaseDesktopMainService');

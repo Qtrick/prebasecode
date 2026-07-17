@@ -1,6 +1,6 @@
 {
 	"nameShort": "PreBase",
-	"nameLong": "PreBase IDE",
+	"nameLong": "PreBase",
 	"applicationName": "prebase",
 	"dataFolderName": ".prebase",
 	"sharedDataFolderName": ".prebase-shared",

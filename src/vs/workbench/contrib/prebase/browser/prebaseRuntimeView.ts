@@ -35,6 +35,10 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 	private _diagMeta: HTMLElement | undefined;
 	private _testMeta: HTMLElement | undefined;
 	private _reportsList: HTMLElement | undefined;
+	private _desktopSection: HTMLElement | undefined;
+	private _desktopMeta: HTMLElement | undefined;
+	private _desktopManagedBtn: HTMLButtonElement | undefined;
+	private _desktopExternalBtn: HTMLButtonElement | undefined;
 
 	constructor(
 		options: IViewletViewOptions,
@@ -86,6 +90,29 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			this._btn(row, localize('prebase.runtime.openTerminal', "Open Terminal"), () => this.commandService.executeCommand('prebase.runtime.openTerminal'));
 			this._btn(section, localize('prebase.runtime.detect', "Detect Configurations"), () => this.commandService.executeCommand('prebase.runtime.detectConfigurations'));
 		});
+
+		// --- Desktop launch (Electron)
+		this._desktopSection = this._section(localize('prebase.runtime.desktopLaunch', "Desktop Launch"), (section) => {
+			const modeRow = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
+			modeRow.style.display = 'grid';
+			modeRow.style.gridTemplateColumns = '1fr 1fr';
+			modeRow.style.gap = '4px';
+			this._desktopManagedBtn = this._btn(modeRow, localize('prebase.runtime.desktopManaged', "Open through PreBase"), () => this.commandService.executeCommand('prebase.runtime.selectDesktopLaunchMode', 'managed'));
+			this._desktopExternalBtn = this._btn(modeRow, localize('prebase.runtime.desktopExternal', "Open externally"), () => this.commandService.executeCommand('prebase.runtime.selectDesktopLaunchMode', 'external'));
+
+			this._desktopMeta = DOM.append(section, DOM.$('div'));
+			this._styleMeta(this._desktopMeta);
+
+			const desktopRow = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
+			desktopRow.style.display = 'grid';
+			desktopRow.style.gridTemplateColumns = '1fr 1fr';
+			desktopRow.style.gap = '4px';
+			this._btn(desktopRow, localize('prebase.runtime.desktopStart', "Start Desktop"), () => this.commandService.executeCommand('prebase.runtime.startDesktop'));
+			this._btn(desktopRow, localize('prebase.runtime.desktopStop', "Stop Desktop"), () => this.commandService.executeCommand('prebase.runtime.stopDesktop'));
+			this._btn(desktopRow, localize('prebase.runtime.desktopRestart', "Restart Desktop"), () => this.commandService.executeCommand('prebase.runtime.restartDesktop'));
+			this._btn(desktopRow, localize('prebase.runtime.desktopKill', "Kill Session"), () => this.commandService.executeCommand('prebase.runtime.killDesktopSession'));
+		});
+		this._desktopSection.style.display = 'none';
 
 		// --- Session
 		this._section(localize('prebase.runtime.session', "Session"), (section) => {
@@ -215,7 +242,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		}
 	}
 
-	private _section(title: string, fill: (section: HTMLElement) => void): void {
+	private _section(title: string, fill: (section: HTMLElement) => void): HTMLElement {
 		const section = DOM.append(this._body!, DOM.$('.prebase-runtime-section'));
 		const heading = DOM.append(section, DOM.$('div'));
 		heading.textContent = title;
@@ -226,6 +253,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		heading.style.textTransform = 'uppercase';
 		heading.style.opacity = '0.85';
 		fill(section);
+		return section;
 	}
 
 	private _styleControl(el: HTMLElement): void {
@@ -266,6 +294,32 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 	private _refresh(): void {
 		const session = this.runtimeService.getSession();
+		const electron = session.electronProfile;
+
+		if (this._desktopSection) {
+			this._desktopSection.style.display = electron?.isElectron ? 'block' : 'none';
+		}
+		if (this._desktopMeta && electron?.isElectron) {
+			const mode = session.desktopLaunchMode;
+			const managedOk = electron.capabilities.supportsManagedLaunch;
+			const externalOk = electron.capabilities.supportsExternalLaunch;
+			this._desktopMeta.textContent = [
+				localize('prebase.runtime.desktopConfidence', "Electron confidence: {0}", electron.confidence),
+				localize('prebase.runtime.desktopMode', "Launch mode: {0}", mode),
+				localize('prebase.runtime.desktopManagedCap', "Managed: {0}", managedOk ? 'supported' : `blocked — ${electron.capabilities.managedLaunchBlockers.join('; ')}`),
+				localize('prebase.runtime.desktopExternalCap', "External: {0}", externalOk ? 'supported' : 'blocked'),
+				electron.capabilities.limitations[0] ?? '',
+				session.desktopSessionActive
+					? localize('prebase.runtime.desktopSession', "Desktop session: {0}{1}", session.desktopSessionState ?? 'running', session.desktopSessionPid ? ` · pid ${session.desktopSessionPid}` : '')
+					: localize('prebase.runtime.desktopSessionIdle', "Desktop session: idle"),
+			].filter(Boolean).join('\n');
+		}
+		if (this._desktopManagedBtn) {
+			this._desktopManagedBtn.style.outline = session.desktopLaunchMode === 'managed' ? '2px solid #67e8f9' : '';
+		}
+		if (this._desktopExternalBtn) {
+			this._desktopExternalBtn.style.outline = session.desktopLaunchMode === 'external' ? '2px solid #67e8f9' : '';
+		}
 
 		if (this._targetMeta) {
 			this._targetMeta.textContent = [

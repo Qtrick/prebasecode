@@ -3621,8 +3621,7 @@ have to be updated for changes to the rules above, or to support more deeply nes
 	}
 
 	.interactive-item-container.interactive-request {
-		align-items: flex-end;
-
+		align-items: stretch;
 	}
 
 	.interactive-item-container.interactive-request:not(.editing):hover .request-hover {
@@ -3640,22 +3639,38 @@ have to be updated for changes to the rules above, or to support more deeply nes
 	.interactive-item-container.interactive-request .value {
 		display: flex !important;
 		flex-direction: column !important;
-		align-items: flex-end !important;
+		align-items: stretch !important;
+		width: 100%;
 	}
 
 	.interactive-item-container.interactive-request .value .rendered-markdown {
+		/* Task card: full-width request surface (Cursor-style task box), not a tiny bubble */
 		background-color: var(--vscode-chat-requestBubbleBackground);
-		border-radius: var(--vscode-cornerRadius-xLarge);
-		padding: 8px 12px;
-		max-width: 90%;
-		margin-left: auto;
-		width: fit-content;
-		margin-bottom: 5px;
+		border: 1px solid var(--vscode-panel-border, var(--vscode-widget-border));
+		border-radius: var(--vscode-cornerRadius-large, 10px);
+		padding: 10px 14px;
+		max-width: 100%;
+		margin-left: 0;
+		margin-right: 0;
+		width: 100%;
+		box-sizing: border-box;
+		margin-bottom: 8px;
 		position: relative;
 	}
 
-	.interactive-item-container.interactive-request .value .rendered-markdown {
-		margin-left: auto;
+	/* Grouped tool / thinking work sits as compact timeline under the task */
+	.interactive-item-container.interactive-response .chat-thinking-box,
+	.interactive-item-container.interactive-response .chat-used-context,
+	.interactive-item-container.interactive-response .chat-tool-invocation-part {
+		border-left: 2px solid var(--vscode-charts-green, #2dd4bf);
+		padding-left: 10px;
+		margin: 4px 0 4px 2px;
+	}
+
+	.interactive-item-container.interactive-response.chat-most-recent-response .rendered-markdown:last-child {
+		margin-top: 10px;
+		padding-top: 8px;
+		border-top: 1px solid var(--vscode-panel-border, transparent);
 	}
 
 	.interactive-item-container.interactive-request .value .rendered-markdown.clickable:hover {
@@ -3677,14 +3692,14 @@ have to be updated for changes to the rules above, or to support more deeply nes
 	}
 
 	.interactive-item-container.interactive-request .value > .rendered-markdown p {
-		width: fit-content;
+		width: 100%;
 	}
 
 	.interactive-item-container.interactive-request .chat-attached-context {
 		max-width: 100%;
-		width: fit-content;
-		justify-content: flex-end;
-		margin-left: auto;
+		width: 100%;
+		justify-content: flex-start;
+		margin-left: 0;
 		padding-bottom: 5px;
 	}
 
@@ -3849,6 +3864,16 @@ have to be updated for changes to the rules above, or to support more deeply nes
 	.checkpoint-container.has-no-actions,
 	.checkpoint-restore-container.hidden {
 		display: none;
+	}
+
+	.interactive-response .header.header-identity-hidden .detail-container,
+	.interactive-response .header.header-identity-hidden .user {
+		display: none;
+	}
+
+	.interactive-response .header.header-identity-hidden {
+		margin-bottom: 0;
+		min-height: 0;
 	}
 
 	.interactive-request .header.partially-disabled .avatar-container,

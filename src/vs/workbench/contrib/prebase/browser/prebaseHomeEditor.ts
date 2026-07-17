@@ -22,6 +22,7 @@ import { ILabelService, Verbosity } from '../../../../platform/label/common/labe
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
 import { IStorageService } from '../../../../platform/storage/common/storage.js';
+import { storePendingWorkspaceOpen } from './prebaseWorkspaceOpening.js';
 import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 import { asCssVariable } from '../../../../platform/theme/common/colorUtils.js';
@@ -70,7 +71,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		group: IEditorGroup,
 		@ITelemetryService telemetryService: ITelemetryService,
 		@IThemeService themeService: IThemeService,
-		@IStorageService storageService: IStorageService,
+		@IStorageService private readonly appStorageService: IStorageService,
 		@IWorkspacesService private readonly workspacesService: IWorkspacesService,
 		@ILabelService private readonly labelService: ILabelService,
 		@IHostService private readonly hostService: IHostService,
@@ -81,7 +82,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
 		@IProductService private readonly productService: IProductService,
 	) {
-		super(PreBaseHomeEditor.ID, group, telemetryService, themeService, storageService);
+		super(PreBaseHomeEditor.ID, group, telemetryService, themeService, appStorageService);
 		this._register(this.workspacesService.onDidChangeRecentlyOpened(() => void this._render()));
 		this._register(this.workspaceContextService.onDidChangeWorkbenchState(() => void this._render()));
 		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => void this._render()));
@@ -125,10 +126,6 @@ export class PreBaseHomeEditor extends EditorPane {
 	override layout(dimension: DOM.Dimension): void {
 		if (this._root) {
 			this._root.style.height = `${dimension.height}px`;
-		}
-		if (this._body) {
-			const cols = dimension.width < 560 ? 1 : dimension.width < 860 ? 2 : 3;
-			this._body.style.setProperty('--prebase-home-cols', String(cols));
 		}
 	}
 
@@ -222,9 +219,17 @@ export class PreBaseHomeEditor extends EditorPane {
 
 		if (emptyWorkbench) {
 			this._actionButton(row, localize('prebase.home.openFolder', "Open Folder"), () => {
+				storePendingWorkspaceOpen(this.appStorageService, {
+					label: localize('prebase.home.openFolderPending', "folder"),
+					action: 'openFolder',
+				});
 				void this.commandService.executeCommand('workbench.action.files.openFolder');
 			}, true);
 			this._actionButton(row, localize('prebase.home.openWorkspace', "Open Workspace"), () => {
+				storePendingWorkspaceOpen(this.appStorageService, {
+					label: localize('prebase.home.openWorkspacePending', "workspace"),
+					action: 'openWorkspace',
+				});
 				void this.commandService.executeCommand('workbench.action.openWorkspace');
 			});
 			this._actionButton(row, localize('prebase.home.clone', "Clone Repository"), () => {
@@ -313,8 +318,10 @@ export class PreBaseHomeEditor extends EditorPane {
 
 		const grid = DOM.append(section, DOM.$('div'));
 		grid.style.display = 'grid';
-		grid.style.gridTemplateColumns = 'repeat(var(--prebase-home-cols, 3), minmax(0, 1fr))';
-		grid.style.gap = '12px';
+		// Fixed-ish card width so a single recent project does not stretch into a huge tile.
+		grid.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 260px))';
+		grid.style.gap = '10px';
+		grid.style.justifyContent = 'start';
 		for (const card of cards) {
 			this._renderCard(grid, card);
 		}
@@ -388,43 +395,32 @@ export class PreBaseHomeEditor extends EditorPane {
 		btn.style.display = 'flex';
 		btn.style.flexDirection = 'column';
 		btn.style.alignItems = 'stretch';
-		btn.style.gap = '10px';
+		btn.style.gap = '6px';
 		btn.style.textAlign = 'left';
-		btn.style.padding = '14px';
-		btn.style.borderRadius = '12px';
+		btn.style.padding = '10px 12px';
+		btn.style.borderRadius = '10px';
 		btn.style.cursor = 'pointer';
 		btn.style.background = card.isLastOpened ? 'rgba(15,23,42,0.85)' : 'rgba(15,23,42,0.55)';
 		btn.style.border = card.isLastOpened ? `1px solid rgba(45,212,191,0.45)` : `1px solid ${BORDER}`;
 		btn.style.color = TEXT;
 		btn.style.opacity = card.missing ? '0.72' : '1';
 		btn.style.outline = 'none';
+		btn.style.width = '100%';
+		btn.style.maxWidth = '260px';
+		btn.style.boxSizing = 'border-box';
 		btn.setAttribute('aria-label', localize('prebase.home.cardAria', "Open {0} at {1}", card.name, card.pathLabel));
 		this._attachFocusRing(btn);
 
-		if (card.isLastOpened) {
-			const badge = DOM.append(btn, DOM.$('span'));
-			badge.textContent = localize('prebase.home.lastOpened', "Last opened");
-			badge.style.alignSelf = 'flex-end';
-			badge.style.fontSize = '9px';
-			badge.style.letterSpacing = '0.06em';
-			badge.style.textTransform = 'uppercase';
-			badge.style.color = ACCENT;
-			badge.style.border = '1px solid rgba(45,212,191,0.25)';
-			badge.style.background = 'rgba(45,212,191,0.1)';
-			badge.style.borderRadius = '999px';
-			badge.style.padding = '2px 8px';
-		}
-
 		const top = DOM.append(btn, DOM.$('div'));
 		top.style.display = 'flex';
-		top.style.gap = '10px';
+		top.style.gap = '8px';
 		top.style.alignItems = 'flex-start';
 
 		const icon = DOM.append(top, DOM.$('span'));
 		icon.classList.add(...ThemeIcon.asClassNameArray(card.kind === 'workspace' ? Codicon.folderLibrary : Codicon.folderOpened));
-		icon.style.width = '34px';
-		icon.style.height = '34px';
-		icon.style.borderRadius = '8px';
+		icon.style.width = '26px';
+		icon.style.height = '26px';
+		icon.style.borderRadius = '6px';
 		icon.style.display = 'flex';
 		icon.style.alignItems = 'center';
 		icon.style.justifyContent = 'center';
@@ -432,26 +428,56 @@ export class PreBaseHomeEditor extends EditorPane {
 		icon.style.background = card.isLastOpened ? 'rgba(45,212,191,0.1)' : 'rgba(30,41,59,0.5)';
 		icon.style.color = card.isLastOpened ? ACCENT : MUTED;
 		icon.style.flexShrink = '0';
+		icon.style.fontSize = '14px';
 
 		const textCol = DOM.append(top, DOM.$('div'));
 		textCol.style.minWidth = '0';
 		textCol.style.flex = '1';
-		const nameEl = DOM.append(textCol, DOM.$('div'));
+		textCol.style.display = 'flex';
+		textCol.style.flexDirection = 'column';
+		textCol.style.gap = '2px';
+
+		const titleRow = DOM.append(textCol, DOM.$('div'));
+		titleRow.style.display = 'flex';
+		titleRow.style.alignItems = 'center';
+		titleRow.style.gap = '6px';
+		titleRow.style.minWidth = '0';
+
+		const nameEl = DOM.append(titleRow, DOM.$('div'));
 		nameEl.textContent = card.name;
-		nameEl.style.fontSize = '13px';
+		nameEl.style.fontSize = '12px';
 		nameEl.style.fontWeight = '600';
 		nameEl.style.overflow = 'hidden';
 		nameEl.style.textOverflow = 'ellipsis';
 		nameEl.style.whiteSpace = 'nowrap';
+		nameEl.style.minWidth = '0';
+		nameEl.style.flex = '1';
 
-		const pathEl = DOM.append(btn, DOM.$('div'));
+		if (card.isLastOpened) {
+			const badge = DOM.append(titleRow, DOM.$('span'));
+			badge.textContent = localize('prebase.home.lastOpened', "Last opened");
+			badge.style.flexShrink = '0';
+			badge.style.fontSize = '8px';
+			badge.style.letterSpacing = '0.05em';
+			badge.style.textTransform = 'uppercase';
+			badge.style.color = ACCENT;
+			badge.style.border = '1px solid rgba(45,212,191,0.25)';
+			badge.style.background = 'rgba(45,212,191,0.1)';
+			badge.style.borderRadius = '999px';
+			badge.style.padding = '1px 6px';
+			badge.style.lineHeight = '1.4';
+		}
+
+		const pathEl = DOM.append(textCol, DOM.$('div'));
 		pathEl.textContent = card.pathLabel.replace(/\//g, '/\u200B');
 		pathEl.title = card.pathLabel;
 		pathEl.style.fontSize = '10px';
 		pathEl.style.fontFamily = 'var(--monaco-monospace-font, monospace)';
 		pathEl.style.color = MUTED2;
-		pathEl.style.lineHeight = '1.45';
-		pathEl.style.wordBreak = 'break-word';
+		pathEl.style.lineHeight = '1.35';
+		pathEl.style.overflow = 'hidden';
+		pathEl.style.textOverflow = 'ellipsis';
+		pathEl.style.whiteSpace = 'nowrap';
 
 		const meta = DOM.append(btn, DOM.$('div'));
 		meta.style.display = 'flex';
@@ -460,7 +486,8 @@ export class PreBaseHomeEditor extends EditorPane {
 		meta.style.fontSize = '10px';
 		meta.style.color = MUTED;
 		meta.style.borderTop = `1px solid ${BORDER}99`;
-		meta.style.paddingTop = '8px';
+		meta.style.paddingTop = '6px';
+		meta.style.marginTop = '2px';
 		DOM.append(meta, DOM.$('span')).textContent = card.kind === 'workspace'
 			? localize('prebase.home.kindWorkspace', "Workspace")
 			: localize('prebase.home.kindFolder', "Folder");
@@ -499,6 +526,11 @@ export class PreBaseHomeEditor extends EditorPane {
 			});
 			return;
 		}
+		storePendingWorkspaceOpen(this.appStorageService, {
+			label: card.name || card.pathLabel,
+			uri: card.resource.toString(),
+			action: 'openRecent',
+		});
 		await this.hostService.openWindow([card.openable], {
 			forceNewWindow,
 			remoteAuthority: card.remoteAuthority || null,

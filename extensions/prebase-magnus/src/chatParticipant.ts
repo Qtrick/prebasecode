@@ -14,6 +14,7 @@ import {
 } from './modes';
 import type { MagnusSecretStorage } from './secretStorage';
 import { paceTextStream } from './streamPace';
+import { runHeaderLabel, type MagnusTaskRun } from './taskRunModel';
 
 export interface MagnusChatState {
 	mode: MagnusAgentMode;
@@ -29,6 +30,7 @@ function buildSystemPrompt(mode: MagnusAgentMode, extras: string[]): string {
 		'You are Agents, the PreBase AI coding assistant inside VS Code.',
 		getAgentModePromptBlock(mode),
 		'Use only the structured VS Code tools that are explicitly available in this chat. Never encode tool calls in Markdown or code fences, and never invent tool results.',
+		'Structure your final answer for a task-run UI: lead with the direct result, then optional Changed / Verified / Remaining subsections when you edited or tested code. Do not narrate hidden chain-of-thought.',
 	];
 	if (!allowsEdits(mode)) {
 		parts.push('Edits are forbidden in this mode.');
@@ -79,7 +81,8 @@ export function registerMagnusChatParticipants(
 		const participant = vscode.chat.createChatParticipant(id, async (request, _ctx, response, token) => {
 			return handleChatRequest(id, request, response, token, secrets, state);
 		});
-		participant.iconPath = vscode.Uri.joinPath(context.extensionUri, 'media', 'magnus.png');
+		// ThemeIcon — never a PNG <img> (avoids broken-image placeholder in Agents header).
+		participant.iconPath = new vscode.ThemeIcon('sparkle');
 		context.subscriptions.push(participant);
 	}
 }
@@ -140,10 +143,19 @@ async function handleChatRequest(
 	const cancelSub = token.onCancellationRequested(() => requestCts.cancel());
 	const effectiveToken = requestCts.token;
 
+	const run: MagnusTaskRun = {
+		runId: `run-${Date.now()}`,
+		userTask: request.prompt,
+		status: 'planning',
+		submittedAt: Date.now(),
+		workGroups: [],
+	};
+
 	try {
-		emitThought(response, `Planning with ${modelLabel}…`);
+		emitThought(response, `Planning with ${modelLabel}…`, 'magnus-planning');
 		let rawText = '';
 		let visibleEmitted = 0;
+		let enteredRunning = false;
 		try {
 			const paced = paceTextStream(
 				streamGenerateContent(apiKey, apiModel, { contents, systemInstruction: { parts: [{ text: buildSystemPrompt(mode, extras) }] } }, effectiveToken),
@@ -151,7 +163,12 @@ async function handleChatRequest(
 			);
 			for await (const chunk of paced) {
 				if (effectiveToken.isCancellationRequested) {
-					response.markdown('\n\n_Cancelled._');
+					run.status = 'cancelled';
+					run.completedAt = Date.now();
+					finishThought(response, 'magnus-planning');
+					emitThought(response, runHeaderLabel(run), 'magnus-run-header');
+					finishThought(response, 'magnus-run-header');
+					response.markdown(`\n\n_${runHeaderLabel(run)}._`);
 					return {};
 				}
 				if (!chunk) {
@@ -160,8 +177,14 @@ async function handleChatRequest(
 				rawText += chunk;
 				const visible = visibleAssistantText(rawText);
 				if (visible.length > visibleEmitted) {
-					if (visibleEmitted === 0) {
-						finishThought(response);
+					if (!enteredRunning) {
+						enteredRunning = true;
+						run.status = 'running';
+						run.startedAt = Date.now();
+						finishThought(response, 'magnus-planning');
+						emitThought(response, runHeaderLabel(run), 'magnus-run-header');
+						// Final response starts after the work header — mark identity without a logo image.
+						response.markdown('### Result\n\n');
 					}
 					response.markdown(visible.slice(visibleEmitted));
 					visibleEmitted = visible.length;
@@ -169,17 +192,35 @@ async function handleChatRequest(
 			}
 		} catch (err) {
 			if (effectiveToken.isCancellationRequested) {
-				response.markdown('\n\n_Cancelled._');
+				run.status = 'cancelled';
+				run.completedAt = Date.now();
+				finishThought(response, 'magnus-planning');
+				emitThought(response, runHeaderLabel(run), 'magnus-run-header');
+				finishThought(response, 'magnus-run-header');
+				response.markdown(`\n\n_${runHeaderLabel(run)}._`);
 				return {};
 			}
-			finishThought(response);
-			response.markdown(`Agents request failed: ${err instanceof Error ? err.message : String(err)}`);
+			run.status = 'failed';
+			run.completedAt = Date.now();
+			run.error = err instanceof Error ? err.message : String(err);
+			finishThought(response, 'magnus-planning');
+			emitThought(response, runHeaderLabel(run), 'magnus-run-header');
+			finishThought(response, 'magnus-run-header');
+			response.markdown(`Agents request failed: ${run.error}`);
 			return {};
 		}
 
-		finishThought(response);
-		const finalVisible = visibleAssistantText(rawText);
+		run.status = 'completed';
+		run.completedAt = Date.now();
+		run.finalResponse = visibleAssistantText(rawText);
+		finishThought(response, 'magnus-planning');
+		emitThought(response, runHeaderLabel(run), 'magnus-run-header');
+		finishThought(response, 'magnus-run-header');
+		const finalVisible = run.finalResponse;
 		if (finalVisible.length > visibleEmitted) {
+			if (!enteredRunning) {
+				response.markdown('### Result\n\n');
+			}
 			response.markdown(finalVisible.slice(visibleEmitted));
 		}
 		return {};

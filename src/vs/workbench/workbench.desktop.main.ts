@@ -207,6 +207,9 @@ import './contrib/keybindingsExport/electron-browser/keybindingsExport.contribut
 // System-wide (OS global) Keybindings
 import './contrib/keybindings/electron-browser/systemWideKeybindings.contribution.js';
 
+// PreBase Desktop Runtime
+import './contrib/prebase/electron-browser/prebase.desktop.contribution.js';
+
 //#endregion
 
 

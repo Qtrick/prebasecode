@@ -40,6 +40,8 @@ import { ipcBrowserViewChannelName } from '../../platform/browserView/common/bro
 import { ipcBrowserViewGroupChannelName } from '../../platform/browserView/common/browserViewGroup.js';
 import { BrowserViewMainService, IBrowserViewMainService } from '../../platform/browserView/electron-main/browserViewMainService.js';
 import { BrowserViewGroupMainService, IBrowserViewGroupMainService } from '../../platform/browserView/electron-main/browserViewGroupMainService.js';
+import { PREBASE_DESKTOP_CHANNEL_NAME, IPreBaseDesktopMainService } from '../../platform/prebaseDesktop/common/prebaseDesktop.js';
+import { PreBaseDesktopMainService } from '../../platform/prebaseDesktop/electron-main/prebaseDesktopMainService.js';
 import { NativeParsedArgs } from '../../platform/environment/common/argv.js';
 import { IEnvironmentMainService } from '../../platform/environment/electron-main/environmentMainService.js';
 import { isLaunchedFromCli } from '../../platform/environment/node/argvHelper.js';
@@ -1125,6 +1127,9 @@ export class CodeApplication extends Disposable {
 		services.set(IBrowserViewMainService, new SyncDescriptor(BrowserViewMainService, undefined, false /* proxied to other processes */));
 		services.set(IBrowserViewGroupMainService, new SyncDescriptor(BrowserViewGroupMainService, undefined, false /* proxied to other processes */));
 
+		// PreBase Desktop Runtime
+		services.set(IPreBaseDesktopMainService, new SyncDescriptor(PreBaseDesktopMainService, undefined, false /* proxied to other processes */));
+
 		// Keyboard Layout
 		services.set(IKeyboardLayoutMainService, new SyncDescriptor(KeyboardLayoutMainService));
 
@@ -1312,6 +1317,10 @@ export class CodeApplication extends Disposable {
 		const browserViewGroupChannel = ProxyChannel.fromService(accessor.get(IBrowserViewGroupMainService), disposables);
 		mainProcessElectronServer.registerChannel(ipcBrowserViewGroupChannelName, browserViewGroupChannel);
 		sharedProcessClient.then(client => client.registerChannel(ipcBrowserViewGroupChannelName, browserViewGroupChannel));
+
+		// PreBase Desktop Runtime
+		const prebaseDesktopChannel = ProxyChannel.fromService(accessor.get(IPreBaseDesktopMainService), disposables);
+		mainProcessElectronServer.registerChannel(PREBASE_DESKTOP_CHANNEL_NAME, prebaseDesktopChannel);
 
 		// Signing
 		const signChannel = ProxyChannel.fromService(accessor.get(ISignService), disposables);
