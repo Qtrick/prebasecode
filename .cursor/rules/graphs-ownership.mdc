@@ -1,0 +1,18 @@
+---
+description: All Architecture Graph and Network Graph implementation must live under root graphs/
+alwaysApply: true
+---
+
+# Graph Ownership Boundary
+
+All PreBase-owned Architecture Graph and Network Graph implementation must live under the repository root folder named exactly `graphs/`.
+
+This includes code, styles, tests, fixtures, scripts, settings definitions, commands, host adapters, Magnus graph tools (implementation owned by graphs), diagnostics, and graph documentation.
+
+Generic VS Code services (files, workspace, editor, configuration, webview infrastructure) may remain outside `graphs/`. PreBase adapters that connect those services to graphs are graph-owned and belong under `graphs/`.
+
+A minimal host bootstrap outside `graphs/` is allowed only when required by the workbench entrypoint. It must contain no graph logic/state/settings/rendering/business rules, only register/import the graph package, and must be listed in the graph-boundary allowlist.
+
+Before adding a graph file elsewhere, document why it is generic infrastructure rather than graph-owned.
+
+Enforce with `graphs/scripts/verify-boundary/` (see `graphs/OWNERSHIP.md` for interim legacy paths under `src/vs/workbench/contrib/prebase/` until BETA-001 migration completes).

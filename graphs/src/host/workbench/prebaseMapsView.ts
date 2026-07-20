@@ -3,27 +3,27 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import * as DOM from '../../../../base/browser/dom.js';
-import { DisposableStore } from '../../../../base/common/lifecycle.js';
-import { URI } from '../../../../base/common/uri.js';
-import { localize, localize2 } from '../../../../nls.js';
-import { CommandsRegistry, ICommandService } from '../../../../platform/commands/common/commands.js';
-import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
-import { IContextKeyService } from '../../../../platform/contextkey/common/contextkey.js';
-import { IContextMenuService } from '../../../../platform/contextview/browser/contextView.js';
-import { IHoverService } from '../../../../platform/hover/browser/hover.js';
-import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
-import { IKeybindingService } from '../../../../platform/keybinding/common/keybinding.js';
-import { IOpenerService } from '../../../../platform/opener/common/opener.js';
-import { IThemeService } from '../../../../platform/theme/common/themeService.js';
-import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
-import { ViewPane } from '../../../browser/parts/views/viewPane.js';
-import { IViewletViewOptions } from '../../../browser/parts/views/viewsViewlet.js';
-import { IViewDescriptorService } from '../../../common/views.js';
-import { IEditorService } from '../../../services/editor/common/editorService.js';
-import { computeLanguageStats } from '../common/graph/languageStats.js';
-import type { GraphNode, LayoutMode } from '../common/graph/types.js';
-import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
+import * as DOM from '../../../../../../base/browser/dom.js';
+import { DisposableStore } from '../../../../../../base/common/lifecycle.js';
+import { URI } from '../../../../../../base/common/uri.js';
+import { localize, localize2 } from '../../../../../../nls.js';
+import { CommandsRegistry, ICommandService } from '../../../../../../platform/commands/common/commands.js';
+import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
+import { IContextKeyService } from '../../../../../../platform/contextkey/common/contextkey.js';
+import { IContextMenuService } from '../../../../../../platform/contextview/browser/contextView.js';
+import { IHoverService } from '../../../../../../platform/hover/browser/hover.js';
+import { IInstantiationService } from '../../../../../../platform/instantiation/common/instantiation.js';
+import { IKeybindingService } from '../../../../../../platform/keybinding/common/keybinding.js';
+import { IOpenerService } from '../../../../../../platform/opener/common/opener.js';
+import { IThemeService } from '../../../../../../platform/theme/common/themeService.js';
+import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
+import { ViewPane } from '../../../../../browser/parts/views/viewPane.js';
+import { IViewletViewOptions } from '../../../../../browser/parts/views/viewsViewlet.js';
+import { IViewDescriptorService } from '../../../../../common/views.js';
+import { IEditorService } from '../../../../../services/editor/common/editorService.js';
+import { computeLanguageStats } from '../../core/languageStats.js';
+import type { GraphNode, LayoutMode } from '../../core/types.js';
+import { PreBaseConfigKeys } from '../../../common/prebaseConfiguration.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
 
 type ArchitectureModeId = 'product' | 'file' | 'dependency' | 'state' | 'infrastructure' | 'overview';

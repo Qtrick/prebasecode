@@ -3,12 +3,12 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { ThemeIcon } from '../../../../base/common/themables.js';
-import { URI } from '../../../../base/common/uri.js';
-import { localize } from '../../../../nls.js';
-import { EditorInputCapabilities, IUntypedEditorInput } from '../../../common/editor.js';
-import { EditorInput } from '../../../common/editor/editorInput.js';
-import { prebaseArchitectureEditorIcon, prebaseNetworkEditorIcon } from './prebaseIcons.js';
+import { ThemeIcon } from '../../../../../../base/common/themables.js';
+import { URI } from '../../../../../../base/common/uri.js';
+import { localize } from '../../../../../../nls.js';
+import { EditorInputCapabilities, IUntypedEditorInput } from '../../../../../common/editor.js';
+import { EditorInput } from '../../../../../common/editor/editorInput.js';
+import { prebaseArchitectureEditorIcon, prebaseNetworkEditorIcon } from '../../../browser/prebaseIcons.js';
 import type { PreBaseGraphType } from './prebaseGraphService.js';
 
 export const PREBASE_GRAPH_SCHEME = 'prebase-graph';

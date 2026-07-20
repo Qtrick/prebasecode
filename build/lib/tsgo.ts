@@ -24,7 +24,8 @@ export function spawnTsgo(projectPath: string, config: { taskName: string; noEmi
 		}
 	}
 
-	const args = ['tsgo', '--project', projectPath, '--pretty', 'false', '--incremental'];
+	// Prefer TypeScript 7 CLI (`tsc` from `@typescript/native`). Fall back to `tsc6` only if needed.
+	const args = ['tsc', '--project', projectPath, '--pretty', 'false', '--incremental'];
 	if (config.noEmit) {
 		args.push('--noEmit');
 	} else {
@@ -61,7 +62,7 @@ export function spawnTsgo(projectPath: string, config: { taskName: string; noEmi
 			if (code === 0) {
 				Promise.resolve(onComplete?.()).then(() => resolve(), reject);
 			} else {
-				reject(new Error(`tsgo exited with code ${code ?? 'unknown'}`));
+				reject(new Error(`tsc (TypeScript 7) exited with code ${code ?? 'unknown'}`));
 			}
 		});
 

@@ -1,0 +1,21 @@
+---
+description: Every final agent response must remind the user of remaining PreBase beta requirements
+alwaysApply: true
+---
+
+# Beta Readiness Reminder
+
+Every final agent response for this repository must end with a concise section titled:
+
+`Beta Readiness Reminder`
+
+Requirements:
+
+1. Read `docs/BETA_READINESS.md` (canonical backlog).
+2. List the highest-priority unresolved beta items (Blocker/Critical first).
+3. Mention newly discovered blockers from the current task, if any.
+4. Mention items completed by the current task, if any.
+5. Never claim beta readiness without verification evidence.
+6. Keep the section short and useful; link to `docs/BETA_READINESS.md`.
+
+This rule must not change user-visible application behavior.

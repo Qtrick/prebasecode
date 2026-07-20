@@ -547,15 +547,18 @@ async function copyAllNonTsFiles(outDir: string, excludeTests: boolean): Promise
 		ignorePatterns.push('**/test/**');
 	}
 
+	// follow: true — include PreBase graphs package via src/.../prebase/graphs symlink
 	const files = await globAsync('**/*', {
 		cwd: path.join(REPO_ROOT, SRC_DIR),
 		nodir: true,
+		follow: true,
 		ignore: ignorePatterns,
 	});
 
 	// Re-include .d.ts files that were excluded by the *.ts ignore
 	const dtsFiles = await globAsync('**/*.d.ts', {
 		cwd: path.join(REPO_ROOT, SRC_DIR),
+		follow: true,
 		ignore: excludeTests ? ['**/test/**'] : [],
 	});
 
@@ -750,8 +753,10 @@ async function transpile(outDir: string, excludeTests: boolean): Promise<void> {
 		ignorePatterns.push('**/test/**');
 	}
 
+	// follow: true — include PreBase graphs package via src/.../prebase/graphs symlink
 	const files = await globAsync('**/*.ts', {
 		cwd: path.join(REPO_ROOT, SRC_DIR),
+		follow: true,
 		ignore: ignorePatterns,
 	});
 
@@ -1156,7 +1161,11 @@ async function watch(): Promise<void> {
 	// Watch src directory using existing gulp-watch based watcher
 	let debounceTimer: ReturnType<typeof setTimeout> | undefined;
 	const srcDir = path.join(REPO_ROOT, SRC_DIR);
+	const graphsSrcDir = path.join(REPO_ROOT, 'graphs', 'src');
+	const graphsOutPrefix = path.join('vs', 'workbench', 'contrib', 'prebase', 'graphs');
 	const watchStream = gulpWatch('src/**', { base: srcDir, readDelay: 200 });
+	// Root graphs/ is the authoritative package (symlinked into src); watch the real tree.
+	const graphsWatchStream = gulpWatch('graphs/src/**', { cwd: REPO_ROOT, readDelay: 200 });
 
 	watchStream.on('data', (file: { path: string }) => {
 		if (file.path.endsWith('.ts') && !file.path.endsWith('.d.ts')) {
@@ -1172,12 +1181,34 @@ async function watch(): Promise<void> {
 		}
 	});
 
-	console.log('[watch] Watching src/**/*.{ts,css,...} (Ctrl+C to stop)');
+	graphsWatchStream.on('data', (file: { path: string }) => {
+		const srcPath = file.path;
+		const relativeUnderGraphs = path.relative(graphsSrcDir, srcPath).split(path.sep).join('/');
+		if (!relativeUnderGraphs || relativeUnderGraphs.startsWith('..')) {
+			return;
+		}
+		const outRel = path.join(graphsOutPrefix, relativeUnderGraphs);
+		if (srcPath.endsWith('.ts') && !srcPath.endsWith('.d.ts')) {
+			const destPath = path.join(REPO_ROOT, OUT_DIR, outRel.replace(/\.ts$/, '.js'));
+			void transpileFile(srcPath, destPath)
+				.then(() => console.log(`[watch] graphs ${relativeUnderGraphs}`))
+				.catch(err => console.error(err));
+		} else {
+			const destPath = path.join(REPO_ROOT, OUT_DIR, outRel);
+			void fs.promises.mkdir(path.dirname(destPath), { recursive: true })
+				.then(() => fs.promises.copyFile(srcPath, destPath))
+				.then(() => console.log(`[watch] graphs copy ${relativeUnderGraphs}`))
+				.catch(err => console.error(err));
+		}
+	});
+
+	console.log('[watch] Watching src/** and graphs/src/** (Ctrl+C to stop)');
 
 	// Keep process alive
 	process.on('SIGINT', () => {
 		console.log('\n[watch] Stopping...');
 		watchStream.end();
+		graphsWatchStream.end();
 		process.exit(0);
 	});
 }

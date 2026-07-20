@@ -65,10 +65,10 @@
     "vscode:prepublish": "node ../../node_modules/gulp/bin/gulp.js --gulpfile ../../build/gulpfile.extensions.mjs compile-extension:typescript-language-features",
     "compile-web": "npm-run-all2 -lp bundle-web typecheck-web",
     "bundle-web": "node ./esbuild.browser.mts",
-    "typecheck-web": "tsgo --project ./tsconfig.browser.json --noEmit",
+    "typecheck-web": "tsc --project ./tsconfig.browser.json --noEmit",
     "watch-web": "npm-run-all2 -lp watch-bundle-web watch-typecheck-web",
     "watch-bundle-web": "node ./esbuild.browser.mts --watch",
-    "watch-typecheck-web": "tsgo --project ./tsconfig.browser.json --noEmit --watch"
+    "watch-typecheck-web": "tsc --project ./tsconfig.browser.json --noEmit --watch"
   },
   "activationEvents": [
     "onLanguage:javascript",
@@ -222,15 +222,15 @@
             "enumDescriptions": [
               "%typescript.locale.auto%",
               "Deutsch",
-              "español",
+              "espa\u00f1ol",
               "English",
-              "français",
+              "fran\u00e7ais",
               "italiano",
-              "日本語",
-              "한국어",
-              "русский",
-              "中文(简体)",
-              "中文(繁體)"
+              "\u65e5\u672c\u8a9e",
+              "\ud55c\uad6d\uc5b4",
+              "\u0440\u0443\u0441\u0441\u043a\u0438\u0439",
+              "\u4e2d\u6587(\u7b80\u4f53)",
+              "\u4e2d\u6587(\u7e41\u9ad4)"
             ],
             "markdownDescription": "%typescript.locale%",
             "scope": "window",
@@ -258,15 +258,15 @@
             "enumDescriptions": [
               "%typescript.locale.auto%",
               "Deutsch",
-              "español",
+              "espa\u00f1ol",
               "English",
-              "français",
+              "fran\u00e7ais",
               "italiano",
-              "日本語",
-              "한국어",
-              "русский",
-              "中文(简体)",
-              "中文(繁體)"
+              "\u65e5\u672c\u8a9e",
+              "\ud55c\uad6d\uc5b4",
+              "\u0440\u0443\u0441\u0441\u043a\u0438\u0439",
+              "\u4e2d\u6587(\u7b80\u4f53)",
+              "\u4e2d\u6587(\u7e41\u9ad4)"
             ],
             "markdownDescription": "%typescript.locale%",
             "markdownDeprecationMessage": "%typescript.locale.unifiedDeprecationMessage%",
@@ -3131,10 +3131,10 @@
         "background": {
           "activeOnStart": true,
           "beginsPattern": {
-            "regexp": "^\\s*(?:message TS6032:|\\[?\\D*.{1,2}[:.].{1,2}[:.].{1,2}\\D*(├\\D*\\d{1,2}\\D+┤)?(?:\\]| -)) (Starting compilation in watch mode|File change detected\\. Starting incremental compilation)\\.\\.\\."
+            "regexp": "^\\s*(?:message TS6032:|\\[?\\D*.{1,2}[:.].{1,2}[:.].{1,2}\\D*(\u251c\\D*\\d{1,2}\\D+\u2524)?(?:\\]| -)) (Starting compilation in watch mode|File change detected\\. Starting incremental compilation)\\.\\.\\."
           },
           "endsPattern": {
-            "regexp": "^\\s*(?:message TS6042:|\\[?\\D*.{1,2}[:.].{1,2}[:.].{1,2}\\D*(├\\D*\\d{1,2}\\D+┤)?(?:\\]| -)) (?:Compilation complete\\.|Found \\d+ errors?\\.) Watching for file changes\\."
+            "regexp": "^\\s*(?:message TS6042:|\\[?\\D*.{1,2}[:.].{1,2}[:.].{1,2}\\D*(\u251c\\D*\\d{1,2}\\D+\u2524)?(?:\\]| -)) (?:Compilation complete\\.|Found \\d+ errors?\\.) Watching for file changes\\."
           }
         }
       }

@@ -9,7 +9,7 @@ import {
 	ARCH_NODE_W,
 	architectureHitRadiusScreen,
 	pickArchitectureNodeAt,
-} from '../../common/graph/architecturePick.js';
+} from '../../core/architecturePick.js';
 
 suite('Architecture pick', () => {
 	test('hit radius never drops below min CSS pixels when zoomed out', () => {

@@ -3,45 +3,45 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { timeout } from '../../../../base/common/async.js';
-import { CancellationToken, CancellationTokenSource } from '../../../../base/common/cancellation.js';
-import { Emitter, Event } from '../../../../base/common/event.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
-import { URI } from '../../../../base/common/uri.js';
-import { localize } from '../../../../nls.js';
-import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
-import { IFileService, IFileStat } from '../../../../platform/files/common/files.js';
-import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
-import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
-import { IOutputService } from '../../../services/output/common/output.js';
-import { match as matchGlob } from '../../../../base/common/glob.js';
-import { PreBaseConfigKeys, PREBASE_GRAPH_CHANNEL_ID } from '../common/prebaseConfiguration.js';
-import { detectEntryNodeId } from '../common/graph/entryDetector.js';
-import { GraphGenerator } from '../common/graph/graphGenerator.js';
-import { DEFAULT_IGNORE_PATTERNS } from '../common/graph/ignorePatterns.js';
-import { extractImportsForFile, extractPackageName } from '../common/graph/importExtractors.js';
-import { LayoutEngine } from '../common/graph/layoutEngine.js';
+import { timeout } from '../../../../../../base/common/async.js';
+import { CancellationToken, CancellationTokenSource } from '../../../../../../base/common/cancellation.js';
+import { Emitter, Event } from '../../../../../../base/common/event.js';
+import { Disposable } from '../../../../../../base/common/lifecycle.js';
+import { URI } from '../../../../../../base/common/uri.js';
+import { localize } from '../../../../../../nls.js';
+import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
+import { IFileService, IFileStat } from '../../../../../../platform/files/common/files.js';
+import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
+import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
+import { IOutputService } from '../../../../../services/output/common/output.js';
+import { match as matchGlob } from '../../../../../../base/common/glob.js';
+import { PreBaseConfigKeys, PREBASE_GRAPH_CHANNEL_ID } from '../../../common/prebaseConfiguration.js';
+import { detectEntryNodeId } from '../../core/entryDetector.js';
+import { GraphGenerator } from '../../core/graphGenerator.js';
+import { DEFAULT_IGNORE_PATTERNS } from '../../core/ignorePatterns.js';
+import { extractImportsForFile, extractPackageName } from '../../core/importExtractors.js';
+import { LayoutEngine } from '../../core/layoutEngine.js';
 import {
 	computeNetworkSphereRadius,
 	layoutNetworkGraph,
 	type NetworkLayoutMode,
-} from '../common/graph/networkLayout.js';
-import { getFileTypeInfo } from '../common/graph/fileTypeColors.js';
+} from '../../core/networkLayout.js';
+import { getFileTypeInfo } from '../../core/fileTypeColors.js';
 import {
 	assignLayersToNodes,
 	computeNodeImportance,
 	filterNodesForArchitectureMode
-} from '../common/graph/architectureLayers.js';
+} from '../../core/architectureLayers.js';
 import {
 	getHierarchyRingBandsForSnapshot,
 	getPyramidDepthBands,
 	type HierarchyRingBand,
 	type PyramidDepthBand
-} from '../common/graph/hierarchyLayout.js';
-import { isGraphRelevantFile } from '../common/graph/projectFiles.js';
-import { basename, normalizePath } from '../common/graph/paths.js';
-import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode, ParseResult, ScannedFile } from '../common/graph/types.js';
-import { depthLevelColor } from '../common/graph/layoutDepthColors.js';
+} from '../../core/hierarchyLayout.js';
+import { isGraphRelevantFile } from '../../core/projectFiles.js';
+import { basename, normalizePath } from '../../core/paths.js';
+import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode, ParseResult, ScannedFile } from '../../core/types.js';
+import { depthLevelColor } from '../../core/layoutDepthColors.js';
 
 export type PreBaseGraphType = 'architecture' | 'network';
 

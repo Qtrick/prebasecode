@@ -9,6 +9,7 @@
 		"resolveJsonModule": true,
 		"isolatedModules": false,
 		"skipLibCheck": true,
+		"preserveSymlinks": true,
 		"outDir": "../out/vs",
 		"types": [
 			"@webgpu/types",

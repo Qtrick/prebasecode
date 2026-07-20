@@ -2,6 +2,8 @@
 description: Use this rule when working on the PreBase graph visualization system, including node rendering, dependency graphs, code maps, graph interactions, camera movement, zoom, drag, rotation, 3D visualization, graph performance, memory usage, rendering issues, node selection, graph physics, and graph-related debugging.
 alwaysApply: false
 ---
+All graph-owned implementation must live under root `graphs/` (see `graphs/README.md`, `graphs/OWNERSHIP.md`, and `.cursor/rules/graphs-ownership.mdc`).
+
 When modifying graph code:
 
 - Preserve node selection.
@@ -12,3 +14,4 @@ When modifying graph code:
 - Check rendering performance.
 - Check memory usage.
 - Investigate console warnings.
+- Do not leave a second authoritative implementation outside `graphs/`.

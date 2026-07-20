@@ -1,0 +1,22 @@
+{
+  "extends": "../src/tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "rootDir": ".",
+    "types": ["mocha"],
+    "skipLibCheck": true,
+    "preserveSymlinks": true,
+    "ignoreDeprecations": "6.0"
+  },
+  "include": [
+    "src/core/**/*.ts",
+    "src/index.ts",
+    "src/node.ts"
+  ],
+  "exclude": [
+    "scripts",
+    "src/host/**",
+    "src/browser.ts",
+    "src/tests/**"
+  ]
+}

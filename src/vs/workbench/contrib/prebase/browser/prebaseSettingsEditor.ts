@@ -21,8 +21,8 @@ import { IEditorGroup } from '../../../services/editor/common/editorGroupsServic
 import { IWorkbenchThemeService } from '../../../services/themes/common/workbenchThemeService.js';
 import { MANAGE_TRUST_COMMAND_ID } from '../../workspace/common/workspace.js';
 import { PREBASE_RESETTABLE_CONFIG_KEYS, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
-import type { LayoutMode } from '../common/graph/types.js';
-import { IPreBaseGraphService } from './prebaseGraphService.js';
+import type { LayoutMode } from '../graphs/core/types.js';
+import { IPreBaseGraphService } from '../graphs/host/workbench/prebaseGraphService.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
 
 /** Popular built-in themes (PreBase + stock VS Code / Code - OSS classics). */

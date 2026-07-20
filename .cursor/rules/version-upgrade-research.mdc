@@ -1,0 +1,28 @@
+---
+description: Require official version research before upgrading compilers, runtimes, or major toolchains
+alwaysApply: true
+---
+
+# Version Upgrade Research
+
+Before changing the version of a compiler, language runtime, package manager, build system, Electron, Node, Rust, Go, Python, Java, or similarly important tool:
+
+1. Inspect the current project version (manifest, lockfile, CI, local toolchain).
+2. Research the latest official stable version from primary sources (release notes, docs, registries, security advisories).
+3. Read official migration/breaking-change notes.
+4. Inventory affected integrations (build, tests, editor, packaging, native binaries).
+5. Report risks and a rollback plan to the user **before** upgrading.
+6. Run baseline tests on the current toolchain.
+7. Perform the upgrade in a separate phase from unrelated refactors.
+8. Run complete assurance tests after the upgrade.
+9. Update `docs/TECHNOLOGY_VERSIONS.md`.
+
+Do not upgrade unrelated toolchains merely because newer versions exist.
+
+## Final response requirement
+
+Any version-upgrade task final response must include a section titled:
+
+`Version Research Summary`
+
+with: old version, new version, official sources consulted, breaking changes, compatibility work, tests run, remaining follow-up work.

@@ -4,13 +4,13 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 import {
 	computeNetworkSphereRadius,
 	layoutNetworkGraph,
 	type NetworkLayoutMode,
 	type Point3D,
-} from '../../common/graph/networkLayout.js';
+} from '../../core/networkLayout.js';
 
 suite('PreBase networkLayout', () => {
 	ensureNoDisposablesAreLeakedInTestSuite();
