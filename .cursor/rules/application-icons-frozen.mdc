@@ -1,0 +1,53 @@
+---
+description: Freeze PreBase application/Dock/installer icons — never modify unless user explicitly approves new art AND manifest update
+alwaysApply: true
+---
+
+# Application Icons Are Frozen
+
+The approved PreBase application icon is the **sheened** monogram artwork (soft glow on the white PB mark + subtle tile edge). It must stay frozen.
+
+## Absolute prohibition
+
+Do **not** modify application icons unless the user explicitly says both:
+
+1. they want new icon artwork, **and**
+2. they authorize updating `build/icons/icon-integrity.sha256`
+
+This applies even during packaging, graph work, branding cleanup, “make it bigger/smaller,” or Dock appearance complaints.
+
+## Never touch
+
+- `resources/darwin/code.icns`
+- `resources/darwin/code.iconset/**`
+- `resources/win32/code.ico`
+- `resources/linux/code.png`
+- Other platform/installer/Dock/taskbar/Start-menu application icons
+- Server favicons used as the product app identity
+- Icon-generation or icon-conversion scripts that rewrite those assets
+- `product.json` (or packaging config) fields that select the platform application icon
+- `build/icons/icon-integrity.sha256` (except when the user explicitly approved new bytes)
+
+## Never do
+
+- Regenerate, optimize, reencode, rename, move, pad, crop, or “fix” these icons
+- Replace the sheened icon with a flat black/white variant
+- Scale the icon to “Apple template” margins in a way that shrinks Dock presence without explicit approval
+- Restore icons from upstream VS Code or an older flat commit
+- Update the integrity manifest merely to make `verify:icons` pass after an accidental change — restore the approved bytes instead
+
+## If icons drift
+
+1. Stop
+2. Restore the approved frozen bytes (do not invent new art)
+3. Run `npm run verify:icons`
+4. Do not rewrite the manifest unless the user explicitly approved a new icon
+
+## Dock cache is not a source change
+
+If the Dock shows a flat/old icon while `verify:icons` passes, that is a **macOS/app-bundle cache** issue. Do not edit icon sources to “fix” it. Advise rebuild/relaunch and icon-cache refresh only.
+
+## Enforcement
+
+- Manifest: `build/icons/icon-integrity.sha256`
+- Verify: `npm run verify:icons` (part of `assurance:quick`)

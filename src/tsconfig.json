@@ -1,4 +1,5 @@
 {
+	// Phase D: graphs core paths live under graphs/src/{core,layouts,common,architecture} (symlink via prebase/graphs).
 	"extends": "./tsconfig.base.json",
 	"compilerOptions": {
 		"esModuleInterop": true,

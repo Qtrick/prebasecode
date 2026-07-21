@@ -16,7 +16,7 @@ This repository is the PreBase IDE product (VS Code–based). Treat it as a firs
 1. **Version research** — Before upgrading compilers/runtimes/major tools, research official sources, report risks, baseline, then upgrade. See `.cursor/rules/version-upgrade-research.mdc`.
 2. **Beta reminder** — Every final agent response must end with `Beta Readiness Reminder` sourced from `docs/BETA_READINESS.md`. See `.cursor/rules/beta-readiness-reminder.mdc`.
 3. **Graph ownership** — All Architecture/Network graph implementation lives under root `graphs/`. See `.cursor/rules/graphs-ownership.mdc` and `graphs/OWNERSHIP.md`.
-4. **Application icons** — Never modify Dock/application/installer icons or icon-selection product fields unless the user explicitly requests icon work.
+4. **Application icons (FROZEN)** — Never modify Dock/application/installer icons, icon sources, or `build/icons/icon-integrity.sha256` unless the user explicitly requests new icon artwork **and** authorizes a manifest update. Approved art is the sheened PreBase monogram. See `.cursor/rules/application-icons-frozen.mdc`. Dock cache mismatches are not a reason to edit sources.
 
 ## Graph subsystem
 
