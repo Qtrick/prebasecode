@@ -25,7 +25,7 @@ Research date: **2026-07-20**
 ### 1. Primary compiler lane (authoritative)
 
 - Package alias: `"@typescript/native": "npm:typescript@^7.0.2"` → **`tsc` Version 7.0.2**.
-- Used by: `typecheck-client`, `typecheck:ts7`, `assurance`, `graphs` package `typecheck`, monaco/dts/layers checks, `build/package.json` `typecheck`, gulp `build/lib/tsgo.ts` (spawns `npx tsc`).
+- Used by: `typecheck-client`, `typecheck:ts7`, `assurance`, `graphs` package `typecheck`, monaco/dts/layers checks, `build/package.json` `typecheck`, gulp `build/lib/typescriptCompiler.ts` (spawns `npx tsc`).
 - Scripts: `typecheck:ts7`, `verify:typescript` (`graphs/scripts/verify-typescript-lanes.mjs`).
 
 ### 2. Compatibility API lane
@@ -77,12 +77,12 @@ Research method: search root `package.json` scripts, `build/package.json`, `buil
 |---|---|---|
 | `typecheck` | `cd .. && npx tsc --project build/tsconfig.json` | Wired to TS7; not in `assurance` |
 
-### Build — gulp TS7 stream (`build/lib/tsgo.ts`)
+### Build — gulp TS7 stream (`build/lib/typescriptCompiler.ts`)
 
 | Consumer | Path | Role | Verified |
 |---|---|---|---|
-| Gulp TS7 stream | `build/lib/tsgo.ts` | Spawns **`npx tsc`** for extension compile pipelines | Code + `transpile-client` in `assurance` |
-| Extension gulpfile | `build/gulpfile.extensions.ts` | `createTsgoStream`, `spawnTsgo` (names legacy; uses `tsc`) | Not full `compile-extensions` in assurance |
+| Gulp TS7 stream | `build/lib/typescriptCompiler.ts` | Spawns **`npx tsc`** for extension compile pipelines | Code + `transpile-client` in `assurance` |
+| Extension gulpfile | `build/gulpfile.extensions.ts` | `createTypeScriptCompilerStream`, `spawnTypeScriptCompiler` | Not full `compile-extensions` in assurance |
 
 ### Build — compiler API (`import … from 'typescript'`)
 
@@ -138,7 +138,7 @@ After dual-lane install, these resolve to **compat** `tsc6` (verified: `tsc6 --v
 
 ### Extensions — `typecheck-web` / gulp
 
-Built-in extension **package.json** scripts no longer depend on `@typescript/native-preview`. Gulp extension typecheck uses `build/lib/tsgo.ts` → **`tsc`**. Full `compile-extensions` / per-extension `typecheck-web` not re-run in this checkpoint (see BETA-029).
+Built-in extension **package.json** scripts no longer depend on `@typescript/native-preview`. Gulp extension typecheck uses `build/lib/typescriptCompiler.ts` → **`tsc`**. Full `compile-extensions` / per-extension `typecheck-web` not re-run in this checkpoint (see BETA-029).
 
 ### Lint
 
@@ -159,7 +159,7 @@ Built-in extension **package.json** scripts no longer depend on `@typescript/nat
 
 | Lane | Approx. sites |
 |---|---|
-| CLI TS7 `tsc` | Root scripts + `build/package.json` + gulp `tsgo.ts` stream + assurance |
+| CLI TS7 `tsc` | Root scripts + `build/package.json` + gulp `typescriptCompiler.ts` stream + assurance |
 | API compat required | 20 `build/` + html-language-features + TS extension web + scripts/selfhost |
 | `tsc6` binary (test harness) | 5+ test packages |
 
@@ -174,8 +174,23 @@ Built-in extension **package.json** scripts no longer depend on `@typescript/nat
 | 5. Wire `typecheck:ts7` / replace preview CLI | **Done** — root + build `tsc`; preview removed |
 | 6. Fix CLI path assumptions; keep API on compat | **Done** — `verify:typescript` |
 | 7. Repair tsconfigs for removed/changed options | **Done** for client lane (`assurance` pass) |
-| 8. Assurance + editor smoke | **Partial** — `npm run assurance` pass; manual IDE smoke open (BETA-010+) |
+| 8. Assurance + editor smoke | **Partial** — `npm run assurance` pass; editor checklist in `docs/TYPESCRIPT_EDITOR_VERIFICATION.md` (manual items open) |
 | 9. Document residual TS6 consumers and 7.1 removal plan | **Done** — this doc + BETA-021 |
+| **F. Phase F verification (2026-07-20)** | **Done** — see [Version research summary](#version-research-summary-phase-f) below |
+
+## Version research summary (Phase F)
+
+| Field | Installed | Latest stable researched | Action |
+|---|---|---|---|
+| Primary CLI (`@typescript/native` → `typescript`) | **7.0.2** (`tsc --version`) | **7.0.2** | **No upgrade** — already on latest stable |
+| Compat API (`typescript` → `@typescript/typescript6`) | **6.0.2** (import API **6.0.3**; `tsc6`) | **6.0.2** | **No upgrade** — required until TS **7.1** programmatic API |
+| `@typescript/native-preview` / `tsgo` | Removed | Superseded by stable `typescript@7` | N/A |
+
+**Official sources (unchanged from install):** [Announcing TypeScript 7.0](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/), [npm `typescript` 7.0.2](https://www.npmjs.com/package/typescript), [npm `@typescript/typescript6` 6.0.2](https://www.npmjs.com/package/@typescript/typescript6).
+
+**Rollback plan:** Restore root `package.json` + `package-lock.json` from the last pre-TS7 checkpoint; run `npm ci`; re-run `npm run verify:typescript` and `npm run assurance`. Keep `graphs/` migration intact.
+
+**Phase F automated evidence:** `verify:typescript`, `typecheck-client`, `typecheck:graphs`, `compile-magnus`, `compile-extension:typescript-language-features`, `extensions/typescript-language-features` `typecheck-web`. ESLint: migration-touched `build/lib/typescriptCompiler.ts` clean; scoped `graphs/**` header policy in `eslint.config.js`; full-repo `npm run eslint` still fails on pre-existing warnings (see BETA-009). Editor UI: [`docs/TYPESCRIPT_EDITOR_VERIFICATION.md`](TYPESCRIPT_EDITOR_VERIFICATION.md).
 
 ## Rollback plan
 

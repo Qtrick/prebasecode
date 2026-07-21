@@ -452,7 +452,6 @@ export const tocData: ITOCEntry<string> = {
 						'prebase.ui.magnusDisplay',
 						'prebase.ui.compactGraphControls',
 						'prebase.ui.showStatusItems',
-						'prebase.graph.reduceMotion',
 						'prebase.magnus.panelLocation'
 					]
 				},
@@ -461,13 +460,13 @@ export const tocData: ITOCEntry<string> = {
 					label: localize('prebaseGraph', "Graph"),
 					settings: [
 						'prebase.graph.defaultType',
+						'prebase.graph.reduceMotion',
 						'prebase.graph.defaultArchitectureLayout',
 						'prebase.graph.architectureMode',
 						'prebase.graph.filter',
 						'prebase.graph.explorerViewMode',
 						'prebase.graph.autoScan',
 						'prebase.graph.showLegend',
-						'prebase.graph.showMinimap',
 						'prebase.graph.hideLowImportance',
 						'prebase.graph.showEdgeLabels',
 						'prebase.graph.initialZoom',

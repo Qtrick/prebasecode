@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { timeout } from '../../../../../../base/common/async.js';
@@ -15,33 +14,33 @@ import { createDecorator } from '../../../../../../platform/instantiation/common
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 import { IOutputService } from '../../../../../services/output/common/output.js';
 import { match as matchGlob } from '../../../../../../base/common/glob.js';
-import { PreBaseConfigKeys, PREBASE_GRAPH_CHANNEL_ID } from '../../../common/prebaseConfiguration.js';
-import { detectEntryNodeId } from '../../core/entryDetector.js';
-import { GraphGenerator } from '../../core/graphGenerator.js';
-import { DEFAULT_IGNORE_PATTERNS } from '../../core/ignorePatterns.js';
-import { extractImportsForFile, extractPackageName } from '../../core/importExtractors.js';
-import { LayoutEngine } from '../../core/layoutEngine.js';
+import { PreBaseGraphConfigKeys, PREBASE_GRAPH_CHANNEL_ID } from '../../common/configuration/graphConfigKeys.js';
+import { detectEntryNodeId } from '../../core/analysis/entryDetector.js';
+import { GraphGenerator } from '../../core/generation/graphGenerator.js';
+import { DEFAULT_IGNORE_PATTERNS } from '../../core/scanning/ignorePatterns.js';
+import { extractImportsForFile, extractPackageName } from '../../core/parsing/importExtractors.js';
+import { LayoutEngine } from '../../layouts/architecture/layoutEngine.js';
 import {
 	computeNetworkSphereRadius,
 	layoutNetworkGraph,
 	type NetworkLayoutMode,
-} from '../../core/networkLayout.js';
-import { getFileTypeInfo } from '../../core/fileTypeColors.js';
+} from '../../layouts/network/index.js';
+import { getFileTypeInfo } from '../../common/constants/fileTypeColors.js';
 import {
 	assignLayersToNodes,
 	computeNodeImportance,
 	filterNodesForArchitectureMode
-} from '../../core/architectureLayers.js';
+} from '../../core/analysis/architectureLayers.js';
 import {
 	getHierarchyRingBandsForSnapshot,
 	getPyramidDepthBands,
 	type HierarchyRingBand,
 	type PyramidDepthBand
-} from '../../core/hierarchyLayout.js';
-import { isGraphRelevantFile } from '../../core/projectFiles.js';
-import { basename, normalizePath } from '../../core/paths.js';
-import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode, ParseResult, ScannedFile } from '../../core/types.js';
-import { depthLevelColor } from '../../core/layoutDepthColors.js';
+} from '../../layouts/architecture/hierarchy/hierarchyLayout.js';
+import { isGraphRelevantFile } from '../../core/scanning/projectFiles.js';
+import { basename, normalizePath } from '../../core/resolution/paths.js';
+import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode, ParseResult, ScannedFile } from '../../common/types/graphTypes.js';
+import { depthLevelColor } from '../../layouts/shared/layoutDepthColors.js';
 
 export type PreBaseGraphType = 'architecture' | 'network';
 
@@ -143,15 +142,15 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	) {
 		super();
 		this._viewState = {
-			graphType: this.configurationService.getValue<PreBaseGraphType>(PreBaseConfigKeys.GraphDefaultType) || 'architecture',
-			layoutMode: this.configurationService.getValue<LayoutMode>(PreBaseConfigKeys.GraphDefaultArchitectureLayout) || 'hierarchy'
+			graphType: this.configurationService.getValue<PreBaseGraphType>(PreBaseGraphConfigKeys.GraphDefaultType) || 'architecture',
+			layoutMode: this.configurationService.getValue<LayoutMode>(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout) || 'hierarchy'
 		};
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (
-				e.affectsConfiguration(PreBaseConfigKeys.GraphHideLowImportance) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphMaxRenderedNodes) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphMaxRenderedEdges) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphArchitectureMode)
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphHideLowImportance) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedNodes) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedEdges) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphArchitectureMode)
 			) {
 				if (this._rawSnapshot) {
 					const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
@@ -160,11 +159,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 					this._setDiagnostics(enriched.diagnostics);
 				}
 			} else if (
-				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkForceStrength) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkLinkDistance) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkAlphaDecay) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkLayoutMode) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkSpreadScale)
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkForceStrength) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkAlphaDecay) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkSpreadScale)
 			) {
 				if (this._viewState.graphType === 'network' && this._rawSnapshot) {
 					void this.relayout();
@@ -588,9 +587,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	private _scanLimits(): { maxScanFiles: number; maxLayoutNodes: number; maxNodes: number; maxEdges: number } {
-		const quality = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphQuality) || 'auto';
-		const configuredNodes = this.configurationService.getValue<number>(PreBaseConfigKeys.GraphMaxRenderedNodes) || 280;
-		const configuredEdges = this.configurationService.getValue<number>(PreBaseConfigKeys.GraphMaxRenderedEdges) || 420;
+		const quality = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphQuality) || 'auto';
+		const configuredNodes = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphMaxRenderedNodes) || 280;
+		const configuredEdges = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphMaxRenderedEdges) || 420;
 		if (quality === 'performance') {
 			return {
 				maxScanFiles: Math.min(220, configuredNodes + 40),
@@ -643,11 +642,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	private _layoutRuntimeForMode(mode: LayoutMode) {
-		const quality = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphQuality) || 'auto';
+		const quality = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphQuality) || 'auto';
 		const spacingScale = mode === 'scattered'
-			? Math.max(0.5, Math.min(2.5, (this.configurationService.getValue<number>(PreBaseConfigKeys.GraphNetworkLinkDistance) || 80) / 80))
+			? Math.max(0.5, Math.min(2.5, (this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) || 80) / 80))
 			: 1;
-		const force = this.configurationService.getValue<number>(PreBaseConfigKeys.GraphNetworkForceStrength) || 0.35;
+		const force = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkForceStrength) || 0.35;
 		const relaxBase = quality === 'performance' ? 4 : quality === 'quality' ? 14 : 8;
 		return {
 			spacingScale: mode === 'scattered' ? spacingScale * (0.7 + force) : spacingScale,
@@ -707,7 +706,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const limits = this._scanLimits();
 		const maxNodes = limits.maxNodes;
 		const maxEdges = limits.maxEdges;
-		const hideLow = this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphHideLowImportance) === true;
+		const hideLow = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphHideLowImportance) === true;
 
 		let nodes = layoutNodes;
 		if (hideLow && snapshot.entryNodeId) {
@@ -721,7 +720,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		}
 		// Architecture sidebar mode: filter which layers/nodes are rendered (layout geometry unchanged).
 		if (this._viewState.graphType === 'architecture') {
-			const archMode = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphArchitectureMode);
+			const archMode = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphArchitectureMode);
 			nodes = filterNodesForArchitectureMode(nodes, layoutEdges, archMode, snapshot.entryNodeId);
 		}
 		if (nodes.length > maxNodes) {
@@ -777,7 +776,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	private _getNetworkLayoutMode(): NetworkLayoutMode {
-		const mode = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphNetworkLayoutMode) || 'organic';
+		const mode = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
 		const valid: NetworkLayoutMode[] = ['organic', 'sphere', 'constellation', 'clustered', 'radial'];
 		return (valid.includes(mode as NetworkLayoutMode) ? mode : 'organic') as NetworkLayoutMode;
 	}
@@ -804,7 +803,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const links = edges
 			.filter(e => (e.kind === 'import' || e.kind === 'dependency') && nodeIds.has(e.source) && nodeIds.has(e.target))
 			.map(e => ({ source: e.source, target: e.target }));
-		const spread = Math.max(0.4, Math.min(2.5, this.configurationService.getValue<number>(PreBaseConfigKeys.GraphNetworkSpreadScale) || 1));
+		const spread = Math.max(0.4, Math.min(2.5, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkSpreadScale) || 1));
 		const radius = computeNetworkSphereRadius(layoutNodes.length, spread);
 		const layout = layoutNetworkGraph(mode, layoutNodes, links, radius);
 		const positions2d: GraphSnapshot['positions'] = {};

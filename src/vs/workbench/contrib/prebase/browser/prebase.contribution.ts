@@ -17,31 +17,24 @@ import { EditorInput } from '../../../common/editor/editorInput.js';
 import { IInstantiationService, ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
-import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
-import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { IOutputService } from '../../../services/output/common/output.js';
 import { IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
 import '../common/prebaseConfiguration.js';
-import { PREBASE_GRAPH_CHANNEL_ID, PREBASE_GRAPH_CHANNEL_LABEL, PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
-import type { LayoutMode } from '../graphs/core/types.js';
+import { registerPreBaseGraphContribution } from '../graphs/host/workbench/graphContribution.js';
+import { PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import type { PreBaseViewportPreset } from '../common/runtime/viewportPresets.js';
-import { IPreBaseGraphService, PreBaseGraphService, type PreBaseGraphType } from '../graphs/host/workbench/prebaseGraphService.js';
 import { IPreBaseRuntimeService, PreBaseRuntimeService } from './prebaseRuntimeService.js';
 import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
 import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IPreBaseAccountService, PreBaseAccountContext, PreBaseAccountService } from './prebaseAccountService.js';
-import { IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService } from '../graphs/host/workbench/prebaseGraphDescriptionService.js';
-import { prebaseMapsViewIcon, prebaseRuntimeViewIcon } from './prebaseIcons.js';
+import { prebaseRuntimeViewIcon } from './prebaseIcons.js';
 import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
-import { PreBaseMapsViewPane } from '../graphs/host/workbench/prebaseMapsView.js';
 import { PreBaseRuntimeViewPane } from './prebaseRuntimeView.js';
-import { PreBaseGraphEditor } from '../graphs/host/workbench/graphEditor.js';
-import { PreBaseGraphEditorInput } from '../graphs/host/workbench/graphEditorInput.js';
 import { PreBaseRuntimeEditor } from './runtimeEditor.js';
 import { PreBaseRuntimeEditorInput } from './runtimeEditorInput.js';
 import { PreBaseSettingsEditor } from './prebaseSettingsEditor.js';
@@ -54,20 +47,14 @@ import { PreBaseWorkspaceOpeningEditorInput } from './prebaseWorkspaceOpeningEdi
 import type { PreBaseWorkspaceOpenPhase } from './prebaseWorkspaceOpening.js';
 // Onboarding editor kept in tree for a later release; not registered in the workbench right now.
 
+registerPreBaseGraphContribution();
+
 // --- services
 
-registerSingleton(IPreBaseGraphService, PreBaseGraphService, InstantiationType.Delayed);
 registerSingleton(IPreBaseRuntimeService, PreBaseRuntimeService, InstantiationType.Delayed);
 registerSingleton(IPreBaseAccountService, PreBaseAccountService, InstantiationType.Delayed);
-registerSingleton(IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService, InstantiationType.Delayed);
 
 // --- output channel
-
-Registry.as<IOutputChannelRegistry>(OutputExtensions.OutputChannels).registerChannel({
-	id: PREBASE_GRAPH_CHANNEL_ID,
-	label: PREBASE_GRAPH_CHANNEL_LABEL,
-	log: false
-});
 
 Registry.as<IOutputChannelRegistry>(OutputExtensions.OutputChannels).registerChannel({
 	id: PREBASE_RUNTIME_CHANNEL_ID,
@@ -102,19 +89,11 @@ registerAction2(class extends Action2 {
 	}
 });
 
+export { PREBASE_MAPS_VIEW_CONTAINER_ID } from '../graphs/host/workbench/graphContribution.js';
+
 // --- view containers
 
-export const PREBASE_MAPS_VIEW_CONTAINER_ID = 'workbench.view.prebase.maps';
 export const PREBASE_RUNTIME_VIEW_CONTAINER_ID = 'workbench.view.prebase.runtime';
-
-const mapsContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer({
-	id: PREBASE_MAPS_VIEW_CONTAINER_ID,
-	title: localize2('prebase.maps.container', "PreBase Maps"),
-	ctorDescriptor: new SyncDescriptor(ViewPaneContainer, [PREBASE_MAPS_VIEW_CONTAINER_ID, { mergeViewWithContainerWhenSingleView: true }]),
-	icon: prebaseMapsViewIcon,
-	order: 8,
-	hideIfEmpty: false,
-}, ViewContainerLocation.Sidebar, { isDefault: false });
 
 const runtimeContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.ViewContainersRegistry).registerViewContainer({
 	id: PREBASE_RUNTIME_VIEW_CONTAINER_ID,
@@ -124,16 +103,6 @@ const runtimeContainer = Registry.as<IViewContainersRegistry>(ViewExtensions.Vie
 	order: 9,
 	hideIfEmpty: false,
 }, ViewContainerLocation.Sidebar, { isDefault: false });
-
-Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
-	id: PreBaseMapsViewPane.ID,
-	name: PreBaseMapsViewPane.LABEL,
-	containerIcon: prebaseMapsViewIcon,
-	ctorDescriptor: new SyncDescriptor(PreBaseMapsViewPane),
-	canToggleVisibility: false,
-	canMoveView: true,
-	order: 1,
-}], mapsContainer);
 
 Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
 	id: PreBaseRuntimeViewPane.ID,
@@ -146,15 +115,6 @@ Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry).registerViews([{
 }], runtimeContainer);
 
 // --- editors
-
-Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
-	EditorPaneDescriptor.create(
-		PreBaseGraphEditor,
-		PreBaseGraphEditor.ID,
-		localize('prebase.graph.editor', "PreBase Graph")
-	),
-	[new SyncDescriptor(PreBaseGraphEditorInput)]
-);
 
 Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
 	EditorPaneDescriptor.create(
@@ -195,23 +155,6 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 // Contributions that open editors must load after pane registration above.
 import './prebaseHomeEmptyEditors.js';
 import './prebaseWorkspaceOpening.js';
-
-class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
-	canSerialize(editor: EditorInput): boolean {
-		return editor instanceof PreBaseGraphEditorInput;
-	}
-	serialize(editor: EditorInput): string {
-		return JSON.stringify({ graphType: (editor as PreBaseGraphEditorInput).graphType });
-	}
-	deserialize(instantiationService: IInstantiationService, raw: string): EditorInput | undefined {
-		try {
-			const data = JSON.parse(raw) as { graphType: PreBaseGraphType };
-			return PreBaseGraphEditorInput.create(data.graphType || 'architecture');
-		} catch {
-			return undefined;
-		}
-	}
-}
 
 class PreBaseRuntimeEditorInputSerializer implements IEditorSerializer {
 	canSerialize(editor: EditorInput): boolean {
@@ -276,10 +219,6 @@ class PreBaseWorkspaceOpeningEditorInputSerializer implements IEditorSerializer 
 }
 
 Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
-	PreBaseGraphEditorInput.TypeID,
-	PreBaseGraphEditorInputSerializer
-);
-Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
 	PreBaseRuntimeEditorInput.TypeID,
 	PreBaseRuntimeEditorInputSerializer
 );
@@ -297,14 +236,6 @@ Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEdit
 );
 
 // --- helpers
-
-async function openGraphEditor(accessor: ServicesAccessor, graphType: PreBaseGraphType): Promise<void> {
-	const editorService = accessor.get(IEditorService);
-	const graphService = accessor.get(IPreBaseGraphService);
-	// Open immediately; the editor pane kicks off scan/relayout without blocking close/UI.
-	await graphService.setGraphType(graphType);
-	await editorService.openEditor(PreBaseGraphEditorInput.create(graphType), { pinned: true });
-}
 
 async function openRuntimeEditor(accessor: ServicesAccessor): Promise<void> {
 	const runtimeService = accessor.get(IPreBaseRuntimeService);
@@ -552,255 +483,6 @@ registerAction2(class extends Action2 {
 	}
 });
 
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'prebase.graph.clearDescriptionCache',
-			title: localize2('prebase.graph.clearDescriptionCache', "Clear Graph Description Cache"),
-			category: localize2('prebase.category', "PreBase"),
-			f1: true
-		});
-	}
-	run(accessor: ServicesAccessor) {
-		accessor.get(IPreBaseGraphDescriptionService).clearCache();
-		accessor.get(INotificationService).info(localize('prebase.graph.descriptionCacheCleared', "Graph description cache cleared."));
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'prebase.graph.regenerateDescription',
-			title: localize2('prebase.graph.regenerateDescription', "Regenerate Selected Node Description"),
-			category: localize2('prebase.category', "PreBase"),
-			f1: true
-		});
-	}
-	async run(accessor: ServicesAccessor) {
-		const graph = accessor.get(IPreBaseGraphService);
-		const desc = accessor.get(IPreBaseGraphDescriptionService);
-		const notify = accessor.get(INotificationService);
-		const id = graph.getSelectedNodeId();
-		const node = graph.getSnapshot()?.nodes.find(n => n.id === id);
-		if (!node) {
-			notify.info(localize('prebase.graph.noNodeForDesc', "Select a graph node first."));
-			return;
-		}
-		const result = await desc.describeNode(node, undefined, { force: true });
-		notify.info(result.aiDescription || result.overview);
-	}
-});
-
-// --- graph commands
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.openArchitecture', title: localize2('prebase.graph.openArchitecture', "Open Architecture Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) { return openGraphEditor(accessor, 'architecture'); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.openNetwork', title: localize2('prebase.graph.openNetwork', "Open Network Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) { return openGraphEditor(accessor, 'network'); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.scanWorkspace', title: localize2('prebase.graph.scanWorkspace', "Scan Workspace"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) { return accessor.get(IPreBaseGraphService).scanWorkspace(); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.rescanWorkspace', title: localize2('prebase.graph.rescanWorkspace', "Rescan Workspace"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) { return accessor.get(IPreBaseGraphService).rescanWorkspace(); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.cancelScan', title: localize2('prebase.graph.cancelScan', "Cancel Graph Scan"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) { accessor.get(IPreBaseGraphService).cancelScan(); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.switchType', title: localize2('prebase.graph.switchType', "Switch Graph Type"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	async run(accessor: ServicesAccessor, graphType?: PreBaseGraphType) {
-		const service = accessor.get(IPreBaseGraphService);
-		const next = graphType ?? (service.getViewState().graphType === 'architecture' ? 'network' : 'architecture');
-		await openGraphEditor(accessor, next);
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.switchLayout', title: localize2('prebase.graph.switchLayout', "Switch Architecture Layout"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	async run(accessor: ServicesAccessor, layoutMode?: LayoutMode) {
-		const service = accessor.get(IPreBaseGraphService);
-		const current = service.getViewState().layoutMode;
-		const order: LayoutMode[] = ['hierarchy', 'pyramid', 'scattered'];
-		const next = layoutMode ?? order[(order.indexOf(current) + 1) % order.length];
-		await service.setLayoutMode(next);
-		await openGraphEditor(accessor, 'architecture');
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.fitView', title: localize2('prebase.graph.fitView', "Fit Graph View"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) { accessor.get(IPreBaseGraphService).requestFitView(); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.resetView', title: localize2('prebase.graph.resetView', "Reset Graph View"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) { accessor.get(IPreBaseGraphService).requestResetView(); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.toggleLegend', title: localize2('prebase.graph.toggleLegend', "Toggle Graph Legend"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	async run(accessor: ServicesAccessor) {
-		const config = accessor.get(IConfigurationService);
-		const current = config.getValue<boolean>(PreBaseConfigKeys.GraphShowLegend) !== false;
-		await config.updateValue(PreBaseConfigKeys.GraphShowLegend, !current);
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.toggleMinimap', title: localize2('prebase.graph.toggleMinimap', "Toggle Graph Minimap"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	async run(accessor: ServicesAccessor) {
-		// Setting is retained for future parity; minimap is not rendered yet — do not flip a no-op boolean.
-		accessor.get(INotificationService).info(localize('prebase.graph.minimapUnavailable', "Graph minimap is not available yet."));
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.showDiagnostics', title: localize2('prebase.graph.showDiagnostics', "Show Graph Diagnostics"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	async run(accessor: ServicesAccessor) {
-		const diag = accessor.get(IPreBaseGraphService).getDiagnostics();
-		const output = accessor.get(IOutputService);
-		await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
-		accessor.get(INotificationService).info(diag.message || localize('prebase.graph.diagFallback', "Status: {0}", diag.status));
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.clearCache', title: localize2('prebase.graph.clearCache', "Clear Graph Cache"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) { accessor.get(IPreBaseGraphService).clearCache(); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.focusCurrentFile', title: localize2('prebase.graph.focusCurrentFile', "Focus Current File in Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) {
-		const editor = accessor.get(IEditorService).activeEditor;
-		const resource = editor?.resource;
-		const graph = accessor.get(IPreBaseGraphService);
-		const snapshot = graph.getSnapshot();
-		if (!resource || !snapshot) {
-			accessor.get(INotificationService).info(localize('prebase.graph.focusNone', "No active file to focus."));
-			return;
-		}
-		const folder = snapshot.projectPath;
-		const rel = folder && resource.scheme === 'file'
-			? resource.fsPath.replace(/\\/g, '/').replace(folder.replace(/\\/g, '/').replace(/\/$/, '') + '/', '')
-			: resource.path.replace(/^\//, '');
-		const node = snapshot.nodes.find(n => n.path === rel || n.id === `file:${rel}` || n.path === resource.fsPath);
-		if (node) {
-			graph.setSelectedNodeId(node.id);
-			accessor.get(INotificationService).info(localize('prebase.graph.focusFile', "Focus requested for {0}", node.label || rel));
-		} else {
-			accessor.get(INotificationService).info(localize('prebase.graph.focusMissing', "File not found in graph: {0}", rel));
-		}
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.clearSelection', title: localize2('prebase.graph.clearSelection', "Clear Graph Selection"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) {
-		accessor.get(IPreBaseGraphService).setSelectedNodeId(undefined);
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.openSelectedNode', title: localize2('prebase.graph.openSelectedNode', "Open Selected Graph Node"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	async run(accessor: ServicesAccessor) {
-		const graph = accessor.get(IPreBaseGraphService);
-		const notify = accessor.get(INotificationService);
-		const id = graph.getSelectedNodeId();
-		const snapshot = graph.getSnapshot();
-		const node = id && snapshot ? snapshot.nodes.find(n => n.id === id) : undefined;
-		if (!node) {
-			notify.info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
-			return;
-		}
-		// Match prebaseMapsView._openNode: absolute (POSIX/Windows) vs project-relative.
-		const path = (node.path || node.id.replace(/^file:/, '')).replace(/\\/g, '/');
-		if (!path) {
-			notify.info(localize('prebase.graph.noSelectedNodePath', "Selected graph node has no file path."));
-			return;
-		}
-		const folder = snapshot!.projectPath
-			|| accessor.get(IWorkspaceContextService).getWorkspace().folders[0]?.uri.fsPath;
-		let uri: URI;
-		if (path.startsWith('/') || /^[A-Za-z]:/.test(path)) {
-			uri = URI.file(path);
-		} else if (folder) {
-			uri = URI.joinPath(URI.file(folder), path);
-		} else {
-			notify.info(localize('prebase.graph.noSelectedNodePath', "Selected graph node has no file path."));
-			return;
-		}
-		try {
-			await accessor.get(IEditorService).openEditor({ resource: uri, options: { pinned: false } });
-		} catch {
-			// ignore missing files
-		}
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.focusSelectedNode', title: localize2('prebase.graph.focusSelectedNode', "Focus Selected Graph Node"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	run(accessor: ServicesAccessor) {
-		const graph = accessor.get(IPreBaseGraphService);
-		const id = graph.getSelectedNodeId();
-		const node = id ? graph.getSnapshot()?.nodes.find(n => n.id === id) : undefined;
-		if (!node) {
-			accessor.get(INotificationService).info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
-			return;
-		}
-		// setSelectedNodeId no-ops on the same id; clear first so listeners re-apply highlight.
-		graph.setSelectedNodeId(undefined);
-		graph.setSelectedNodeId(node.id);
-		graph.requestFitView();
-	}
-});
-
 // --- runtime commands
 
 registerAction2(class extends Action2 {
@@ -815,60 +497,6 @@ registerAction2(class extends Action2 {
 		super({ id: 'prebase.runtime.openPreview', title: localize2('prebase.runtime.openPreview', "Open Runtime Preview"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	run(accessor: ServicesAccessor) { return openRuntimeEditor(accessor); }
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.getSelectionForMagnus', title: localize2('prebase.graph.getSelectionForMagnus', "Get Graph Selection for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
-	}
-	run(accessor: ServicesAccessor) {
-		return accessor.get(IPreBaseGraphService).getSelectionSummaryForMagnus();
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.searchForMagnus', title: localize2('prebase.graph.searchForMagnus', "Search Graph for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
-	}
-	run(accessor: ServicesAccessor, query: string, maximumResults?: number) {
-		return accessor.get(IPreBaseGraphService).searchForMagnus(query, maximumResults);
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.getNodeForMagnus', title: localize2('prebase.graph.getNodeForMagnus', "Get Graph Node for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
-	}
-	run(accessor: ServicesAccessor, nodeIdOrPath: string) {
-		return accessor.get(IPreBaseGraphService).getNodeDetailsForMagnus(nodeIdOrPath);
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.getDependenciesForMagnus', title: localize2('prebase.graph.getDependenciesForMagnus', "Get Graph Dependencies for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
-	}
-	run(accessor: ServicesAccessor, nodeIdOrPath: string, direction?: 'incoming' | 'outgoing' | 'both', depth?: number, maximumNodes?: number) {
-		return accessor.get(IPreBaseGraphService).getDependenciesForMagnus(nodeIdOrPath, direction, depth, maximumNodes);
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.getOverviewForMagnus', title: localize2('prebase.graph.getOverviewForMagnus', "Get Graph Overview for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
-	}
-	run(accessor: ServicesAccessor) {
-		return accessor.get(IPreBaseGraphService).getOverviewForMagnus();
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.focusForMagnus', title: localize2('prebase.graph.focusForMagnus', "Focus Graph Node for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
-	}
-	run(accessor: ServicesAccessor, nodeIdOrPath: string) {
-		return accessor.get(IPreBaseGraphService).focusNodeForMagnus(nodeIdOrPath);
-	}
 });
 
 registerAction2(class extends Action2 {
@@ -904,20 +532,6 @@ registerAction2(class extends Action2 {
 	}
 	run(accessor: ServicesAccessor, token?: CancellationToken) {
 		return accessor.get(IPreBaseRuntimeService).inspectPageForMagnus(token);
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({ id: 'prebase.graph.attachSelectionToMagnus', title: localize2('prebase.graph.attachSelectionToMagnus', "Attach Graph Selection to Agents"), category: localize2('prebase.category', "PreBase"), f1: true });
-	}
-	async run(accessor: ServicesAccessor) {
-		const summary = accessor.get(IPreBaseGraphService).getSelectionSummaryForMagnus();
-		if (!summary) {
-			accessor.get(INotificationService).info(localize('prebase.graph.noSelection', "Select a node in the graph first."));
-			return;
-		}
-		await accessor.get(ICommandService).executeCommand('prebase.magnus.attachGraphSelection', summary);
 	}
 });
 

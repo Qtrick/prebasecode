@@ -8,6 +8,8 @@ This repository is the PreBase IDE product (VS Code–based). Treat it as a firs
 - [Technology versions](docs/TECHNOLOGY_VERSIONS.md) — researched toolchain versions
 - [TypeScript 7 migration](docs/TYPESCRIPT_7_MIGRATION.md) — compiler lanes and compatibility
 - [Beta readiness backlog](docs/BETA_READINESS.md) — canonical beta blockers and validation
+- [Assurance scripts](docs/ASSURANCE.md) — `npm run assurance` tiers and privacy/icon gates
+- [Packaging](docs/PACKAGING.md) and [release signing](docs/RELEASE_SIGNING.md) — gulp tasks and PreBase signing preflight
 
 ## Persistent policies
 

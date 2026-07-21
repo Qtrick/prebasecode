@@ -4,10 +4,11 @@ PreBase **owns** the Architecture Graph and Network Graph product surface. Imple
 
 ## In scope (must live under `graphs/`)
 
-- Graph data model, parsing, import resolution, layout engines
+- Graph data model, parsing, import resolution, layout engines (`graphs/src/core/`, `graphs/src/layouts/`, `graphs/src/common/`)
 - Architecture vs Network graph modes, picks, depth/layer visuals
-- Graph settings definitions consumed by the IDE (graph-specific keys) — **target** `graphs/src/settings/`; still registered from allowlisted `prebaseConfiguration.ts` until extracted
-- Commands, keybindings, and Magnus tools that manipulate graph state — **target** `graphs/src/commands/`; still in allowlisted `prebase.contribution.ts` until extracted
+- Graph settings definitions consumed by the IDE (graph-specific keys) — `graphs/src/common/configuration/`, `graphs/src/host/workbench/graphConfigurationContribution.ts`, re-exported from `graphs/src/settings/`
+- Graph canvas interaction keys: `prebase.interaction.panSensitivity`, `zoomSensitivity`, `networkDragDirection`, `nodeDragDelayMs` (not `prebase.interaction.terminalVisibility.*`, which are workbench shell)
+- Commands, keybindings, and Magnus tools that manipulate graph state — `graphs/src/commands/`, `graphs/src/host/workbench/graphContribution.ts`
 - Webview/canvas rendering and interaction (zoom, drag, rotation, selection)
 - Graph diagnostics, logging, and performance instrumentation
 - Graph unit/integration tests and fixtures
@@ -33,12 +34,12 @@ These files may stay outside `graphs/` **only** as thin bootstrap or mixed PreBa
 
 | Path | Purpose |
 |---|---|
-| `src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts` | Workbench contribution; **still registers graph commands/views** (extraction pending) |
+| `src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts` | Thin bootstrap: `registerPreBaseGraphContribution()` + runtime/home/settings/account |
 | `src/vs/workbench/contrib/prebase/electron-browser/prebase.desktop.contribution.ts` | Desktop entry |
 | `src/vs/workbench/workbench.common.main.ts` | Workbench entry import |
 | `src/vs/workbench/workbench.desktop.main.ts` | Desktop workbench entry import |
 | `src/vs/workbench/contrib/prebase/graphs` (symlink → `graphs/src`) | Build bridge; no logic |
-| `src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts` | Mixed PreBase settings; **all `prebase.graph.*` keys still here** (extraction pending) |
+| `src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts` | Mixed PreBase settings bootstrap; calls `registerPreBaseGraphConfiguration()`; terminal visibility + runtime/home keys only |
 | `src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts` | Settings UI shell; imports graph types/service from `../graphs/` |
 | `src/vs/workbench/contrib/prebase/browser/prebaseIcons.ts` | Shared PreBase icons including Maps/Architecture/Network glyphs |
 | Settings TOC / getting-started | Shell wiring to stable command IDs |

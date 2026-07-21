@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as DOM from '../../../../../../base/browser/dom.js';
@@ -20,7 +19,7 @@ import { IEditorOpenContext } from '../../../../../common/editor.js';
 import { IEditorGroup } from '../../../../../services/editor/common/editorGroupsService.js';
 import { IEditorService } from '../../../../../services/editor/common/editorService.js';
 import { IWebviewElement, IWebviewService } from '../../../../webview/browser/webview.js';
-import { PreBaseConfigKeys } from '../../../common/prebaseConfiguration.js';
+import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
@@ -61,7 +60,7 @@ export class PreBaseGraphEditor extends EditorPane {
 			this._webview?.postMessage({ type: action === 'reset' ? 'resetView' : 'fitView' });
 		}));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
-			if (e.affectsConfiguration('prebase.graph')) {
+			if (e.affectsConfiguration('prebase.graph') || e.affectsConfiguration('prebase.interaction')) {
 				this._pushSnapshot();
 			}
 		}));
@@ -176,18 +175,17 @@ export class PreBaseGraphEditor extends EditorPane {
 	}
 
 	private _graphSettings() {
-		const quality = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphQuality) || 'auto';
-		const maxNodes = this.configurationService.getValue<number>(PreBaseConfigKeys.GraphMaxRenderedNodes) || 280;
-		const maxEdges = this.configurationService.getValue<number>(PreBaseConfigKeys.GraphMaxRenderedEdges) || 420;
-		const networkDragDirection = this.configurationService.getValue<string>(PreBaseConfigKeys.InteractionNetworkDragDirection) === 'inverted'
+		const quality = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphQuality) || 'auto';
+		const maxNodes = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphMaxRenderedNodes) || 280;
+		const maxEdges = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphMaxRenderedEdges) || 420;
+		const networkDragDirection = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.InteractionNetworkDragDirection) === 'inverted'
 			? 'inverted'
 			: 'natural';
 		return {
-			showLegend: this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphShowLegend) !== false,
-			showMinimap: this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphShowMinimap),
-			initialZoom: this.configurationService.getValue<number>(PreBaseConfigKeys.GraphInitialZoom) || 1,
-			reduceMotion: this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphReduceMotion) === true,
-			networkIdleAutoRotate: !!this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphNetworkIdleAutoRotate),
+			showLegend: this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphShowLegend) !== false,
+			initialZoom: this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphInitialZoom) || 1,
+			reduceMotion: this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphReduceMotion) === true,
+			networkIdleAutoRotate: !!this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate),
 			networkDragDirection,
 			maxRenderedEdges: quality === 'performance' ? Math.min(280, maxEdges) : maxEdges,
 			maxRenderedNodes: (quality === 'performance') ? Math.min(180, maxNodes) : maxNodes,
@@ -268,7 +266,7 @@ export class PreBaseGraphEditor extends EditorPane {
 			}
 			case 'setNetworkIdleAutoRotate': {
 				const enabled = !!(message.payload as { enabled?: boolean } | undefined)?.enabled;
-				await this.configurationService.updateValue(PreBaseConfigKeys.GraphNetworkIdleAutoRotate, enabled);
+				await this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, enabled);
 				await reply({ ok: true });
 				break;
 			}

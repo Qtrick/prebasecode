@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { CancellationToken, CancellationTokenSource } from '../../../../../../base/common/cancellation.js';
@@ -13,8 +12,8 @@ import { IFileService } from '../../../../../../platform/files/common/files.js';
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../../../platform/storage/common/storage.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
-import { inferFileDescription } from '../../core/fileDescription.js';
-import type { GraphNode } from '../../core/types.js';
+import { inferFileDescription } from '../../core/analysis/fileDescription.js';
+import type { GraphNode } from '../../common/types/graphTypes.js';
 
 export const IPreBaseGraphDescriptionService = createDecorator<IPreBaseGraphDescriptionService>('prebaseGraphDescriptionService');
 

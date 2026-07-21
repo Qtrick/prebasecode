@@ -14,7 +14,7 @@ const REPO_ROOT = path.resolve(__dirname, '../../..');
 const ALLOWLIST = [
 	{
 		path: 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts',
-		reason: 'Workbench contribution bootstrap; registers graphs package',
+		reason: 'Thin workbench bootstrap; calls registerPreBaseGraphContribution() only',
 		owner: 'PreBase',
 		reviewDate: '2026-08-20',
 		removalPlan: 'Keep as thin import/register only',
@@ -63,10 +63,10 @@ const ALLOWLIST = [
 	},
 	{
 		path: 'src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts',
-		reason: 'Mixed PreBase config; graph keys still registered here pending extraction',
+		reason: 'Mixed PreBase config bootstrap; imports registerPreBaseGraphConfiguration from graphs; terminalVisibility.* + runtime/home keys',
 		owner: 'PreBase',
 		reviewDate: '2026-08-20',
-		removalPlan: 'Move prebase.graph.* definitions to graphs/src/settings',
+		removalPlan: 'Keep thin bootstrap; graph registry lives under graphs/',
 	},
 	{
 		path: 'extensions/prebase-magnus',
@@ -147,14 +147,73 @@ for (const root of scanRoots) {
 }
 
 // 3) Ensure authoritative package exists
-if (!fs.existsSync(path.join(REPO_ROOT, 'graphs/src/core/types.ts'))) {
-	failures.push('Missing graphs/src/core/types.ts — graphs package incomplete');
+if (!fs.existsSync(path.join(REPO_ROOT, 'graphs/src/common/types/graphTypes.ts'))) {
+	failures.push('Missing graphs/src/common/types/graphTypes.ts — graphs package incomplete');
 }
 if (!fs.existsSync(path.join(REPO_ROOT, 'graphs/src/host/workbench/graphEditor.ts'))) {
 	failures.push('Missing graphs/src/host/workbench/graphEditor.ts');
 }
+if (!fs.existsSync(path.join(REPO_ROOT, 'graphs/src/host/workbench/graphContribution.ts'))) {
+	failures.push('Missing graphs/src/host/workbench/graphContribution.ts');
+}
 
-// 4) Symlink bridge must point at graphs/src
+const GRAPH_COMMAND_DEF_ID_RE = /\bid:\s*['"`]prebase\.graph\.[^'"`]+['"`]/g;
+const REGISTER_ACTION2_RE = /registerAction2\s*\(/;
+
+const COMMAND_DEF_SCAN_ROOTS = [
+	path.join(REPO_ROOT, 'src/vs/workbench'),
+	path.join(REPO_ROOT, 'extensions'),
+];
+
+for (const root of COMMAND_DEF_SCAN_ROOTS) {
+	if (!fs.existsSync(root)) {
+		continue;
+	}
+	for (const full of walk(root)) {
+		if (!/\.(ts|tsx|js|jsx|mjs)$/.test(full)) {
+			continue;
+		}
+		const rel = path.relative(REPO_ROOT, full).split(path.sep).join('/');
+		if (isUnderGraphs(rel) || rel.includes('/prebase/graphs/')) {
+			continue;
+		}
+		if (isAllowlisted(rel)) {
+			continue;
+		}
+		const content = fs.readFileSync(full, 'utf8');
+		if (!REGISTER_ACTION2_RE.test(content)) {
+			continue;
+		}
+		const matches = content.match(GRAPH_COMMAND_DEF_ID_RE);
+		if (matches?.length) {
+			failures.push(`Graph command Action2 definition outside graphs/: ${rel} (${[...new Set(matches)].join(', ')})`);
+		}
+	}
+}
+
+// 5) Mixed bootstrap must not register graph setting properties
+const PREBASE_CONFIG_BOOTSTRAP = path.join(REPO_ROOT, 'src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts');
+if (fs.existsSync(PREBASE_CONFIG_BOOTSTRAP)) {
+	const bootstrapContent = fs.readFileSync(PREBASE_CONFIG_BOOTSTRAP, 'utf8');
+	if (/['"`]prebase\.graph\.[^'"`]+['"`]\s*:/.test(bootstrapContent)) {
+		failures.push('Graph setting property definitions found in prebaseConfiguration.ts — use graphs/src/host/workbench/graphConfigurationContribution.ts');
+	}
+	const graphInteractionInBootstrap = /['"`]prebase\.interaction\.(?:panSensitivity|zoomSensitivity|networkDragDirection|nodeDragDelayMs)['"`]\s*:/.test(bootstrapContent);
+	if (graphInteractionInBootstrap) {
+		failures.push('Graph interaction keys must register from graphs/, not prebaseConfiguration.ts');
+	}
+}
+
+// 6) Graph package must not register a second prebaseInteraction section (terminal visibility only in bootstrap)
+const GRAPH_CONFIG_CONTRIB = path.join(REPO_ROOT, 'graphs/src/host/workbench/graphConfigurationContribution.ts');
+if (fs.existsSync(GRAPH_CONFIG_CONTRIB)) {
+	const graphConfigContent = fs.readFileSync(GRAPH_CONFIG_CONTRIB, 'utf8');
+	if (/id:\s*['"`]prebaseInteraction['"`]/.test(graphConfigContent)) {
+		failures.push('graphConfigurationContribution.ts must not register id prebaseInteraction (reserved for terminal visibility in prebaseConfiguration.ts)');
+	}
+}
+
+// 7) Symlink bridge must point at graphs/src
 const link = path.join(REPO_ROOT, 'src/vs/workbench/contrib/prebase/graphs');
 if (!fs.existsSync(link)) {
 	failures.push('Missing workbench graphs symlink at src/vs/workbench/contrib/prebase/graphs');

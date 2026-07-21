@@ -20,7 +20,7 @@ import * as jsoncParser from 'jsonc-parser';
 import { getProductionDependencies } from './dependencies.ts';
 import { type IExtensionDefinition, getExtensionStream } from './builtInExtensions.ts';
 import { fetchUrls, fetchGithub } from './fetch.ts';
-import { createTsgoStream, spawnTsgo } from './tsgo.ts';
+import { createTypeScriptCompilerStream, spawnTypeScriptCompiler } from './typescriptCompiler.ts';
 import watcher from './watch/index.ts';
 
 import { createRequire } from 'module';
@@ -115,13 +115,13 @@ function fromLocal(extensionPath: string, forWeb: boolean, _disableMangle: boole
 export function typeCheckExtension(extensionPath: string, forWeb: boolean): Promise<void> {
 	const tsconfigFileName = forWeb ? 'tsconfig.browser.json' : 'tsconfig.json';
 	const tsconfigPath = path.join(extensionPath, tsconfigFileName);
-	return spawnTsgo(tsconfigPath, { taskName: 'typechecking extension (tsgo)', noEmit: true });
+	return spawnTypeScriptCompiler(tsconfigPath, { taskName: 'typechecking extension (TypeScript 7)', noEmit: true });
 }
 
 export function typeCheckExtensionStream(extensionPath: string, forWeb: boolean): Stream {
 	const tsconfigFileName = forWeb ? 'tsconfig.browser.json' : 'tsconfig.json';
 	const tsconfigPath = path.join(extensionPath, tsconfigFileName);
-	return createTsgoStream(tsconfigPath, { taskName: 'typechecking extension (tsgo)', noEmit: true });
+	return createTypeScriptCompilerStream(tsconfigPath, { taskName: 'typechecking extension (TypeScript 7)', noEmit: true });
 }
 
 
@@ -643,9 +643,9 @@ export function buildExtensionMedia(isWatch: boolean, outputRoot?: string): Prom
 
 	const typeCheckTasks = esbuildMediaScripts.map(({ tsconfig }) => {
 		const tsconfigPath = path.join(extensionsPath, tsconfig);
-		const config = { taskName: 'typechecking extension media (tsgo)', noEmit: true };
+		const config = { taskName: 'typechecking extension media (TypeScript 7)', noEmit: true };
 		if (!isWatch) {
-			return spawnTsgo(tsconfigPath, config);
+			return spawnTypeScriptCompiler(tsconfigPath, config);
 		} else {
 			return watchTypeCheckExtensionMedia(tsconfigPath, config);
 		}
@@ -665,13 +665,13 @@ function watchTypeCheckExtensionMedia(tsconfigPath: string, config: { taskName: 
 	], { cwd: root, base: srcDir, dot: true, readDelay: 200 });
 	const stream = watchInput
 		.pipe(util2.debounce(() => {
-			const tsgoStream = createTsgoStream(tsconfigPath, config);
-			// Always emit 'end' (even on tsgo error) so the debounce resets to idle
+			const typeScriptCompileStream = createTypeScriptCompilerStream(tsconfigPath, config);
+			// Always emit 'end' (even on TypeScript compile error) so the debounce resets to idle
 			// and can process future file changes. Errors are already logged by
-			// spawnTsgo's runReporter, so swallowing the stream error is safe.
+			// spawnTypeScriptCompiler's runReporter, so swallowing the stream error is safe.
 			const result = es.through();
-			tsgoStream.on('end', () => result.emit('end'));
-			tsgoStream.on('error', () => result.emit('end'));
+			typeScriptCompileStream.on('end', () => result.emit('end'));
+			typeScriptCompileStream.on('error', () => result.emit('end'));
 			return result;
 		}, 200));
 

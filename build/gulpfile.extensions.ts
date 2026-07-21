@@ -19,7 +19,7 @@ import { getVersion } from './lib/getVersion.ts';
 import { createReporter } from './lib/reporter.ts';
 import * as task from './lib/gulp/task.ts';
 import * as tsb from './lib/tsb/index.ts';
-import { createTsgoStream, spawnTsgo } from './lib/tsgo.ts';
+import { createTypeScriptCompilerStream, spawnTypeScriptCompiler } from './lib/typescriptCompiler.ts';
 import * as util from './lib/util.ts';
 import watcher from './lib/watch/index.ts';
 
@@ -101,7 +101,7 @@ const compilations = [
 
 const getBaseUrl = (out: string) => `https://main.vscode-cdn.net/sourcemaps/${commit}/${out}`;
 
-function rewriteTsgoSourceMappingUrlsIfNeeded(build: boolean, out: string, baseUrl: string): Promise<void> {
+function rewriteTypeScriptCompileSourceMappingUrlsIfNeeded(build: boolean, out: string, baseUrl: string): Promise<void> {
 	if (!build) {
 		return Promise.resolve();
 	}
@@ -193,22 +193,22 @@ const createExtensionCompilationTasks = (tsconfigFile: string) => {
 	const compileTask = task.define(`compile-extension:${name}`, task.series(cleanTask, async () => {
 		const nonts = gulp.src(src, srcOpts).pipe(filter(['**', '!**/*.ts'], { dot: true }));
 		const copyNonTs = util.streamToPromise(nonts.pipe(gulp.dest(out)));
-		const tsgo = spawnTsgo(absolutePath, { taskName: 'extensions' }, () => rewriteTsgoSourceMappingUrlsIfNeeded(false, out, baseUrl));
+		const typeScriptCompile = spawnTypeScriptCompiler(absolutePath, { taskName: 'extensions' }, () => rewriteTypeScriptCompileSourceMappingUrlsIfNeeded(false, out, baseUrl));
 
-		await Promise.all([copyNonTs, tsgo]);
+		await Promise.all([copyNonTs, typeScriptCompile]);
 	}));
 
 	const watchTask = task.define(`watch-extension:${name}`, task.series(cleanTask, () => {
 		const nonts = gulp.src(src, srcOpts).pipe(filter(['**', '!**/*.ts'], { dot: true }));
 		const watchInput = watcher(src, { ...srcOpts, ...{ readDelay: 200 } });
 		const watchNonTs = watchInput.pipe(filter(['**', '!**/*.ts'], { dot: true })).pipe(gulp.dest(out));
-		const tsgoStream = watchInput.pipe(util.debounce(() => {
+		const typeScriptCompileStream = watchInput.pipe(util.debounce(() => {
 			onExtensionCompilationStart();
-			const stream = createTsgoStream(absolutePath, { taskName: 'extensions' }, () => rewriteTsgoSourceMappingUrlsIfNeeded(false, out, baseUrl));
+			const stream = createTypeScriptCompilerStream(absolutePath, { taskName: 'extensions' }, () => rewriteTypeScriptCompileSourceMappingUrlsIfNeeded(false, out, baseUrl));
 			// Wrap in a result stream that always emits 'end' (even on
 			// error) so the debounce resets to idle and can process future
-			// file changes. Errors from tsgo (e.g. type errors causing a
-			// non-zero exit code) are already reported by spawnTsgo's
+			// file changes. Errors from TypeScript 7 (e.g. type errors causing a
+			// non-zero exit code) are already reported by spawnTypeScriptCompiler's
 			// runReporter, so swallowing the stream error is safe.
 			const result = es.through();
 			stream.on('end', () => {
@@ -221,7 +221,7 @@ const createExtensionCompilationTasks = (tsconfigFile: string) => {
 			});
 			return result;
 		}, 200));
-		const watchStream = es.merge(nonts.pipe(gulp.dest(out)), watchNonTs, tsgoStream);
+		const watchStream = es.merge(nonts.pipe(gulp.dest(out)), watchNonTs, typeScriptCompileStream);
 
 		return watchStream;
 	}));

@@ -1,20 +1,16 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 import {
 	computeNetworkSphereRadius,
 	layoutNetworkGraph,
 	type NetworkLayoutMode,
 	type Point3D,
-} from '../../core/networkLayout.js';
+} from '../../layouts/network/index.js';
 
 suite('PreBase networkLayout', () => {
-	ensureNoDisposablesAreLeakedInTestSuite();
-
 	function makeGraph(n: number) {
 		const nodes = Array.from({ length: n }, (_, i) => ({
 			id: `n${i}`,

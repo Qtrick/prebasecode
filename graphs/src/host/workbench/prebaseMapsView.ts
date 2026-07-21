@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as DOM from '../../../../../../base/browser/dom.js';
@@ -21,9 +20,9 @@ import { ViewPane } from '../../../../../browser/parts/views/viewPane.js';
 import { IViewletViewOptions } from '../../../../../browser/parts/views/viewsViewlet.js';
 import { IViewDescriptorService } from '../../../../../common/views.js';
 import { IEditorService } from '../../../../../services/editor/common/editorService.js';
-import { computeLanguageStats } from '../../core/languageStats.js';
-import type { GraphNode, LayoutMode } from '../../core/types.js';
-import { PreBaseConfigKeys } from '../../../common/prebaseConfiguration.js';
+import { computeLanguageStats } from '../../core/analysis/languageStats.js';
+import type { GraphNode, LayoutMode } from '../../common/types/graphTypes.js';
+import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
 
 type ArchitectureModeId = 'product' | 'file' | 'dependency' | 'state' | 'infrastructure' | 'overview';
@@ -133,13 +132,13 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => this._refresh()));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (
-				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkIdleAutoRotate) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphShowLegend) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphArchitectureMode) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphFilter) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphExplorerViewMode) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphDefaultArchitectureLayout) ||
-				e.affectsConfiguration(PreBaseConfigKeys.GraphNetworkLayoutMode)
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphShowLegend) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphArchitectureMode) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphFilter) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphExplorerViewMode) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode)
 			) {
 				this._refresh();
 			}
@@ -173,7 +172,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		if (
 			this._hasOpenProject() &&
-			this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphAutoScan) !== false &&
+			this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphAutoScan) !== false &&
 			!this.graphService.getSnapshot() &&
 			this.graphService.getDiagnostics().status !== 'scanning'
 		) {
@@ -253,7 +252,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			btn.style.cursor = 'pointer';
 			btn.style.border = 'none';
 			this._register(DOM.addDisposableListener(btn, 'click', () => {
-				void this.configurationService.updateValue(PreBaseConfigKeys.GraphArchitectureMode, mode.id);
+				void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphArchitectureMode, mode.id);
 			}));
 			this._archModeButtons.set(mode.id, btn);
 		}
@@ -296,7 +295,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		row.style.gap = '4px';
 		for (const f of FILTERS) {
 			const btn = this._chipBtn(row, f.label, () => {
-				void this.configurationService.updateValue(PreBaseConfigKeys.GraphFilter, f.id);
+				void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphFilter, f.id);
 			});
 			this._filterButtons.set(f.id, btn);
 		}
@@ -342,7 +341,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		];
 		for (const m of modes) {
 			const btn = this._chipBtn(layoutCol, m.label, () => {
-				void this.configurationService.updateValue(PreBaseConfigKeys.GraphNetworkLayoutMode, m.id);
+				void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, m.id);
 			}, true, true);
 			btn.dataset['networkLayout'] = m.id;
 			this._networkLayoutButtons.set(m.id, btn);
@@ -362,7 +361,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		DOM.append(idleRow, DOM.$('span')).textContent = localize('prebase.maps.idleAutoRotate', "Idle auto-rotate");
 		this._register(DOM.addDisposableListener(this._idleRotateCheckbox, 'change', () => {
 			void this.configurationService.updateValue(
-				PreBaseConfigKeys.GraphNetworkIdleAutoRotate,
+				PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate,
 				!!this._idleRotateCheckbox?.checked
 			);
 		}));
@@ -411,7 +410,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		DOM.append(legendRow, DOM.$('span')).textContent = localize('prebase.maps.showLegend', "Show legend");
 		this._register(DOM.addDisposableListener(this._legendCheckbox, 'change', () => {
 			void this.configurationService.updateValue(
-				PreBaseConfigKeys.GraphShowLegend,
+				PreBaseGraphConfigKeys.GraphShowLegend,
 				!!this._legendCheckbox?.checked
 			);
 		}));
@@ -455,7 +454,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 				? localize('prebase.maps.flat', "Flat")
 				: localize('prebase.maps.tree', "Tree");
 			const btn = this._segmentBtn(toggle, label, () => {
-				void this.configurationService.updateValue(PreBaseConfigKeys.GraphExplorerViewMode, mode);
+				void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphExplorerViewMode, mode);
 			});
 			btn.style.padding = '3px 8px';
 			this._explorerModeButtons.set(mode, btn);
@@ -578,10 +577,10 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}
 
 		if (this._idleRotateCheckbox) {
-			this._idleRotateCheckbox.checked = !!this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphNetworkIdleAutoRotate);
+			this._idleRotateCheckbox.checked = !!this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate);
 		}
 		if (this._legendCheckbox) {
-			this._legendCheckbox.checked = this.configurationService.getValue<boolean>(PreBaseConfigKeys.GraphShowLegend) !== false;
+			this._legendCheckbox.checked = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphShowLegend) !== false;
 		}
 
 		for (const [mode, btn] of this._layoutButtons) {
@@ -591,7 +590,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';
 		}
 
-		const networkLayout = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphNetworkLayoutMode) || 'organic';
+		const networkLayout = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
 		for (const [mode, btn] of this._networkLayoutButtons) {
 			this._styleChipActive(btn, mode === networkLayout, true);
 			btn.disabled = !hasProject;
@@ -905,19 +904,19 @@ export class PreBaseMapsViewPane extends ViewPane {
 	}
 
 	private _getArchitectureMode(): ArchitectureModeId {
-		const v = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphArchitectureMode);
+		const v = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphArchitectureMode);
 		const match = ARCHITECTURE_MODES.find(m => m.id === v);
 		return match?.id ?? 'product';
 	}
 
 	private _getFilter(): GraphFilterId {
-		const v = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphFilter);
+		const v = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphFilter);
 		const match = FILTERS.find(f => f.id === v);
 		return match?.id ?? 'all';
 	}
 
 	private _getExplorerViewMode(): ExplorerViewMode {
-		const v = this.configurationService.getValue<string>(PreBaseConfigKeys.GraphExplorerViewMode);
+		const v = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphExplorerViewMode);
 		return v === 'flat' ? 'flat' : 'tree';
 	}
 

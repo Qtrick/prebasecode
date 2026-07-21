@@ -2,18 +2,23 @@
 
 Architecture Graph and Network Graph implementation for PreBase. **All graph-owned code must live under this directory** (see [OWNERSHIP.md](./OWNERSHIP.md) and `.cursor/rules/graphs-ownership.mdc`).
 
-## Current status (2026-07-20, checkpoint 3+4)
+## Current status (2026-07-20, Phase K)
 
-**Migration:** Core and host sources live under `graphs/src/`. Workbench compiles them through a symlink bridge (see below). Legacy `common/graph/` and graph-only `browser/*` modules are **removed**.
+**Migration:** Core, layouts, host adapters, graph settings registration (`graphConfigurationContribution.ts`), and graph commands (`graphContribution.ts`) live under `graphs/src/`. Workbench compiles them through a symlink bridge (see below). Legacy `common/graph/` and graph-only `browser/*` modules are **removed**.
 
 | Role | Path |
 |---|---|
-| Core (parsing, layout, types) | `graphs/src/core/` (27 modules; flat layout for now) |
+| Shared types & constants | `graphs/src/common/types/`, `graphs/src/common/constants/`, `graphs/src/common/configuration/` |
+| Settings keys + `registerPreBaseGraphConfiguration` | `graphs/src/host/workbench/graphConfigurationContribution.ts` (re-exported from `graphs/src/settings/`) |
+| Command IDs + `registerPreBaseGraphContribution` | `graphs/src/commands/graphCommandIds.ts`, `graphs/src/host/workbench/graphContribution.ts` |
+| Scanning, parsing, resolution, generation, analysis | `graphs/src/core/{scanning,parsing,resolution,generation,analysis}/` |
+| Architecture & network layouts | `graphs/src/layouts/` (`shared/`, `architecture/`, `network/`) |
+| Architecture interaction (pick/hit-test) | `graphs/src/architecture/interaction/` |
 | Host (editors, webview, services) | `graphs/src/host/workbench/` |
 | Unit tests | `graphs/src/tests/unit/` (`architecturePick`, `networkLayout`) |
 | Boundary verifier | `graphs/scripts/verify-boundary/verify.mjs` → `npm run verify:graphs-boundary` |
 
-**Not extracted yet (documented allowlist):** graph settings registration remains in `src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts`; graph commands/actions remain in `src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts`. See [docs/MIGRATION.md](./docs/MIGRATION.md#bootstrap-allowlist-outside-graphs).
+**Still allowlisted outside `graphs/` (thin bootstrap only):** `prebase.contribution.ts` imports `registerPreBaseGraphContribution()`; `prebaseConfiguration.ts` imports `registerPreBaseGraphConfiguration()` and owns runtime/home/terminal-visibility keys; `prebaseSettingsEditor.ts` hosts the Graph settings UI shell. See [docs/MIGRATION.md](./docs/MIGRATION.md).
 
 ### Workbench integration
 
@@ -34,9 +39,12 @@ graphs/
 ├── package.json
 ├── tsconfig.json             # Core-only typecheck lane
 ├── src/
-│   ├── core/                 # Graph algorithms, parsing, layout
+│   ├── common/               # graphTypes, fileTypeColors, configuration keys
+│   ├── core/                 # scanning, parsing, resolution, generation, analysis
+│   ├── layouts/              # architecture + network layout engines
+│   ├── architecture/         # interaction helpers (e.g. pick)
 │   ├── host/workbench/       # Workbench adapters (webview, services, maps)
-│   ├── tests/unit/           # Node/mocha unit tests (run via workbench test harness)
+│   ├── tests/unit/           # Node/mocha unit tests
 │   ├── index.ts              # Public core exports
 │   ├── browser.ts            # Host re-exports (typechecked via main src/)
 │   └── node.ts               # Node-safe core exports
@@ -55,8 +63,9 @@ Thin registration and mixed PreBase settings shell — full allowlist in [OWNERS
 
 - `npm run verify:graphs-boundary` (repo root) — graph boundary verifier (BETA-002).
 - `npm run verify:typescript` (repo root) — dual-lane audit (TS7 `tsc` + TS6 API `tsc6`); exits non-zero if primary lane missing.
-- `cd graphs && npm run typecheck` — graph **core** only.
+- `npm run typecheck:graphs` — graph **core** only (`common/`, `core/`, `layouts/`, `architecture/`).
 - `npm run typecheck-client` — full workbench including graph host via symlink.
+- `npm run test:graphs` — unit tests under `graphs/src/tests/unit/` (Node strip-types; no `out/` compile required).
 
 ## Related docs
 

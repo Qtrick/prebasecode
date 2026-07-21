@@ -21,7 +21,7 @@ import type { RawSourceMap } from 'source-map';
 import ts from 'typescript';
 import watch from './watch/index.ts';
 import * as tsb from './tsb/index.ts';
-import { createTsgoStream, spawnTsgo } from './tsgo.ts';
+import { createTypeScriptCompilerStream, spawnTypeScriptCompiler } from './typescriptCompiler.ts';
 
 
 import { extractExtensionPointNamesFromFile } from './extractExtensionPoints.ts';
@@ -128,7 +128,7 @@ export function compileTask(src: string, out: string, build: boolean, options: {
 			throw new Error('compilation requires 4GB of RAM');
 		}
 
-		// For dev builds we can transpile with esbuild for speed and type-check with tsgo (no emit).
+		// For dev builds we can transpile with esbuild for speed and type-check with TypeScript 7 (no emit).
 		// For `build`, keep the full tsb pipeline because the NLS step requires `file.sourceMap`.
 		const compile = createCompile(src, { build, emitError: true, transpileOnly: build ? false : { esbuild: true }, preserveEnglish: !!options.preserveEnglish });
 		const srcPipe = gulp.src(`${src}/**`, { base: `${src}` });
@@ -166,7 +166,7 @@ export function compileTask(src: string, out: string, build: boolean, options: {
 			.pipe(compile())
 			.pipe(gulp.dest(out)));
 
-		const typecheck = spawnTsgo(compile.projectPath, { taskName: `compile-${path.basename(src)}`, noEmit: true });
+		const typecheck = spawnTypeScriptCompiler(compile.projectPath, { taskName: `compile-${path.basename(src)}`, noEmit: true });
 
 		await Promise.all([emit, typecheck]);
 	};
@@ -181,20 +181,20 @@ export function watchTypeCheckTask(src: string): task.Task {
 		const generator = new MonacoGenerator(true);
 		generator.execute();
 		const watchInput = watch(`${src}/**`, { base: src, readDelay: 200 });
-		const tsgoStream = watchInput.pipe(generator.stream).pipe(util.debounce(() => {
-			const stream = createTsgoStream(projectPath, { taskName: 'watch-client-noEmit', noEmit: true });
+		const typeScriptCompileStream = watchInput.pipe(generator.stream).pipe(util.debounce(() => {
+			const stream = createTypeScriptCompilerStream(projectPath, { taskName: 'watch-client-noEmit', noEmit: true });
 			const result = es.through();
 			stream.on('end', () => {
 				result.emit('end');
 			});
 			stream.on('error', err => {
 				reporter(err);
-				fancyLog.error(ansiColors.red('[tsgo] watch-client-noEmit failed'));
+				fancyLog.error(ansiColors.red('[typescript] watch-client-noEmit failed'));
 				result.emit('end');
 			});
 			return result.pipe(reporter.end(false));
 		}));
-		return tsgoStream;
+		return typeScriptCompileStream;
 	});
 }
 

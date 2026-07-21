@@ -8,10 +8,11 @@
     ".": "./src/index.ts",
     "./browser": "./src/browser.ts",
     "./node": "./src/node.ts",
-    "./types": "./src/core/types.ts"
+    "./types": "./src/common/types/graphTypes.ts"
   },
   "scripts": {
     "typecheck": "tsc -p ./tsconfig.json --noEmit",
-    "verify-boundary": "node ./scripts/verify-boundary/verify.mjs"
+    "verify-boundary": "node ./scripts/verify-boundary/verify.mjs",
+    "test": "npm run test:graphs --prefix .."
   }
 }

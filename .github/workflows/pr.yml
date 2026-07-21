@@ -17,6 +17,38 @@ env:
   VSCODE_QUALITY: 'oss'
 
 jobs:
+  prebase-assurance:
+    name: PreBase assurance (fast)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install dependencies
+        run: |
+          set -e
+          for i in {1..5}; do
+            npm ci && break
+            if [ $i -eq 5 ]; then
+              echo "npm ci failed" >&2
+              exit 1
+            fi
+            echo "npm ci failed $i, retrying..."
+          done
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: 1
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: 1
+
+      - name: PreBase assurance quick + privacy
+        run: |
+          npm run assurance:quick
+          npm run assurance:privacy
+
   compile:
     name: Compile & Hygiene
     runs-on: [ self-hosted, 1ES.Pool=1es-vscode-oss-ubuntu-22.04-x64, "JobId=compile-${{ github.run_id }}-${{ github.run_number }}-${{ github.run_attempt }}" ]

@@ -34,7 +34,7 @@ import { useEsbuildTranspile } from './buildConfig.ts';
 import { promisify } from 'util';
 import globCallback from 'glob';
 import rceditCallback from 'rcedit';
-import { spawnTsgo } from './lib/tsgo.ts';
+import { spawnTypeScriptCompiler } from './lib/typescriptCompiler.ts';
 import { runEsbuildTranspile, runEsbuildBundle } from './lib/esbuild.ts';
 
 
@@ -188,8 +188,8 @@ task.task(task.define('core-ci', task.series(
 	compileNonNativeExtensionsBuildTask,
 	compileExtensionMediaBuildTask,
 	writeISODate('out-build'),
-	// Type-check with tsgo (no emit)
-	task.define('tsgo-typecheck', () => spawnTsgo(path.join(root, 'src', 'tsconfig.json'), { taskName: 'tsgo-typecheck', noEmit: true })),
+	// Type-check with TypeScript 7 (no emit)
+	task.define('typescript-typecheck', () => spawnTypeScriptCompiler(path.join(root, 'src', 'tsconfig.json'), { taskName: 'typescript-typecheck', noEmit: true })),
 	// Transpile individual files to out-build first (for unit tests)
 	task.define('esbuild-out-build', () => runEsbuildTranspile('out-build', false)),
 	// Then bundle for shipping (bundles also write NLS files to out-build)

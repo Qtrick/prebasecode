@@ -20,8 +20,8 @@ import { IEditorOpenContext } from '../../../common/editor.js';
 import { IEditorGroup } from '../../../services/editor/common/editorGroupsService.js';
 import { IWorkbenchThemeService } from '../../../services/themes/common/workbenchThemeService.js';
 import { MANAGE_TRUST_COMMAND_ID } from '../../workspace/common/workspace.js';
-import { PREBASE_RESETTABLE_CONFIG_KEYS, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
-import type { LayoutMode } from '../graphs/core/types.js';
+import { PREBASE_RESETTABLE_CONFIG_KEYS, PreBaseConfigKeys, PreBaseGraphConfigKeys } from '../common/prebaseConfiguration.js';
+import type { LayoutMode } from '../graphs/common/types/graphTypes.js';
 import { IPreBaseGraphService } from '../graphs/host/workbench/prebaseGraphService.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
 
@@ -543,8 +543,8 @@ export class PreBaseSettingsEditor extends EditorPane {
 		this._row(card, localize('prebase.settings.uiDensity', "UI density"), localize('prebase.settings.uiDensityHint', "Reserved — Maps/Runtime UI does not read this setting yet."), density);
 
 		const reduce = this._accentCheckbox();
-		reduce.checked = this._get(PreBaseConfigKeys.GraphReduceMotion, false);
-		this._renderDisposables.add(DOM.addDisposableListener(reduce, 'change', () => void this._set(PreBaseConfigKeys.GraphReduceMotion, reduce.checked)));
+		reduce.checked = this._get(PreBaseGraphConfigKeys.GraphReduceMotion, false);
+		this._renderDisposables.add(DOM.addDisposableListener(reduce, 'change', () => void this._set(PreBaseGraphConfigKeys.GraphReduceMotion, reduce.checked)));
 		this._row(card, localize('prebase.settings.reduceMotion', "Reduce motion"), localize('prebase.settings.reduceMotionHint', "Minimizes graph and UI animations."), reduce);
 
 		const magnus = document.createElement('select');
@@ -612,10 +612,10 @@ export class PreBaseSettingsEditor extends EditorPane {
 			opt.textContent = m;
 			layout.appendChild(opt);
 		}
-		layout.value = this._get(PreBaseConfigKeys.GraphDefaultArchitectureLayout, 'hierarchy');
+		layout.value = this._get(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout, 'hierarchy');
 		this._renderDisposables.add(DOM.addDisposableListener(layout, 'change', async () => {
 			const mode = layout.value as LayoutMode;
-			await this._set(PreBaseConfigKeys.GraphDefaultArchitectureLayout, mode);
+			await this._set(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout, mode);
 			await this.graphService.setLayoutMode(mode);
 		}));
 		this._row(card, localize('prebase.settings.defaultLayout', "Default layout"), undefined, layout);
@@ -625,25 +625,25 @@ export class PreBaseSettingsEditor extends EditorPane {
 		Object.assign(session.style, { fontSize: '12px', color: COLORS.accent, textTransform: 'capitalize' });
 		this._row(card, localize('prebase.settings.sessionLayout', "Session layout"), localize('prebase.settings.sessionLayoutHint', "Active layout for the current project."), session);
 
-		const zoom = this._range(0.5, 1.4, 0.02, this._get(PreBaseConfigKeys.GraphInitialZoom, 0.92));
-		this._renderDisposables.add(DOM.addDisposableListener(zoom, 'input', () => void this._set(PreBaseConfigKeys.GraphInitialZoom, Number(zoom.value))));
+		const zoom = this._range(0.5, 1.4, 0.02, this._get(PreBaseGraphConfigKeys.GraphInitialZoom, 0.92));
+		this._renderDisposables.add(DOM.addDisposableListener(zoom, 'input', () => void this._set(PreBaseGraphConfigKeys.GraphInitialZoom, Number(zoom.value))));
 		this._row(card, localize('prebase.settings.initialZoom', "Initial zoom"), localize('prebase.settings.initialZoomHint', "Camera zoom when a project first loads."), zoom);
 
 		const edgeLabels = this._accentCheckbox();
-		edgeLabels.checked = this._get(PreBaseConfigKeys.GraphShowEdgeLabels, false);
-		this._renderDisposables.add(DOM.addDisposableListener(edgeLabels, 'change', () => void this._set(PreBaseConfigKeys.GraphShowEdgeLabels, edgeLabels.checked)));
+		edgeLabels.checked = this._get(PreBaseGraphConfigKeys.GraphShowEdgeLabels, false);
+		this._renderDisposables.add(DOM.addDisposableListener(edgeLabels, 'change', () => void this._set(PreBaseGraphConfigKeys.GraphShowEdgeLabels, edgeLabels.checked)));
 		this._row(card, localize('prebase.settings.edgeLabels', "Edge import labels"), localize('prebase.settings.edgeLabelsHint', "Show import paths on dependency edges."), edgeLabels);
 
 		const dimWrap = document.createElement('div');
 		Object.assign(dimWrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-		const dimVal = this._get(PreBaseConfigKeys.GraphLegendInteractionDim, 40);
+		const dimVal = this._get(PreBaseGraphConfigKeys.GraphLegendInteractionDim, 40);
 		const dim = this._range(0, 80, 5, dimVal);
 		const dimLabel = document.createElement('span');
 		dimLabel.textContent = `${dimVal}%`;
 		Object.assign(dimLabel.style, { fontSize: '10px', color: COLORS.textMuted, fontVariantNumeric: 'tabular-nums' });
 		this._renderDisposables.add(DOM.addDisposableListener(dim, 'input', () => {
 			dimLabel.textContent = `${dim.value}%`;
-			void this._set(PreBaseConfigKeys.GraphLegendInteractionDim, Number(dim.value));
+			void this._set(PreBaseGraphConfigKeys.GraphLegendInteractionDim, Number(dim.value));
 		}));
 		dimWrap.append(dim, dimLabel);
 		this._row(
@@ -831,15 +831,15 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const card = this._panel(
 			this._main!,
 			localize('prebase.settings.interaction.title', "Interaction"),
-			localize('prebase.settings.interaction.desc', "Pan and zoom behavior.")
+			localize('prebase.settings.interaction.desc', "Pan and zoom behavior. Pan/zoom sliders are reserved until the graph webview reads them.")
 		);
 
-		const pan = this._range(0.5, 2, 0.1, this._get(PreBaseConfigKeys.InteractionPanSensitivity, 1));
-		this._renderDisposables.add(DOM.addDisposableListener(pan, 'input', () => void this._set(PreBaseConfigKeys.InteractionPanSensitivity, Number(pan.value))));
+		const pan = this._range(0.5, 2, 0.1, this._get(PreBaseGraphConfigKeys.InteractionPanSensitivity, 1));
+		this._renderDisposables.add(DOM.addDisposableListener(pan, 'input', () => void this._set(PreBaseGraphConfigKeys.InteractionPanSensitivity, Number(pan.value))));
 		this._row(card, localize('prebase.settings.panSensitivity', "Pan sensitivity"), undefined, pan);
 
-		const zoom = this._range(0.5, 2, 0.1, this._get(PreBaseConfigKeys.InteractionZoomSensitivity, 1));
-		this._renderDisposables.add(DOM.addDisposableListener(zoom, 'input', () => void this._set(PreBaseConfigKeys.InteractionZoomSensitivity, Number(zoom.value))));
+		const zoom = this._range(0.5, 2, 0.1, this._get(PreBaseGraphConfigKeys.InteractionZoomSensitivity, 1));
+		this._renderDisposables.add(DOM.addDisposableListener(zoom, 'input', () => void this._set(PreBaseGraphConfigKeys.InteractionZoomSensitivity, Number(zoom.value))));
 		this._row(card, localize('prebase.settings.zoomSensitivity', "Zoom sensitivity"), undefined, zoom);
 
 		const drag = document.createElement('select');
@@ -850,8 +850,8 @@ export class PreBaseSettingsEditor extends EditorPane {
 			opt.textContent = label;
 			drag.appendChild(opt);
 		}
-		drag.value = this._get(PreBaseConfigKeys.InteractionNetworkDragDirection, 'natural');
-		this._renderDisposables.add(DOM.addDisposableListener(drag, 'change', () => void this._set(PreBaseConfigKeys.InteractionNetworkDragDirection, drag.value)));
+		drag.value = this._get(PreBaseGraphConfigKeys.InteractionNetworkDragDirection, 'natural');
+		this._renderDisposables.add(DOM.addDisposableListener(drag, 'change', () => void this._set(PreBaseGraphConfigKeys.InteractionNetworkDragDirection, drag.value)));
 		this._row(
 			card,
 			localize('prebase.settings.networkDrag', "Network drag direction"),
@@ -895,9 +895,9 @@ export class PreBaseSettingsEditor extends EditorPane {
 			opt.textContent = label;
 			quality.appendChild(opt);
 		}
-		const q = this._get<string>(PreBaseConfigKeys.GraphQuality, 'balanced');
+		const q = this._get<string>(PreBaseGraphConfigKeys.GraphQuality, 'balanced');
 		quality.value = (q === 'performance') ? 'performance' : 'balanced';
-		this._renderDisposables.add(DOM.addDisposableListener(quality, 'change', () => void this._set(PreBaseConfigKeys.GraphQuality, quality.value)));
+		this._renderDisposables.add(DOM.addDisposableListener(quality, 'change', () => void this._set(PreBaseGraphConfigKeys.GraphQuality, quality.value)));
 		this._row(card, localize('prebase.settings.graphQuality', "Graph quality"), localize('prebase.settings.graphQualityHint', "Performance mode reduces edge animation."), quality);
 	}
 
@@ -987,14 +987,14 @@ export class PreBaseSettingsEditor extends EditorPane {
 		Object.assign(d.style, { margin: '2px 0 0', fontSize: '11px', color: COLORS.textMuted });
 
 		if (this._category === 'graph') {
-			this._advNumber(card, localize('prebase.settings.layoutAnim', "Layout animation"), localize('prebase.settings.layoutAnimHint', "Fit-view duration in milliseconds."), PreBaseConfigKeys.GraphLayoutAnimationDuration, 750, 0, 2000, 50);
-			this._advRange(card, localize('prebase.settings.layerRadius', "Layer radius scale"), localize('prebase.settings.layerRadiusHint', "Scales concentric ring radii."), PreBaseConfigKeys.GraphLayerRadiusScale, 1, 0.7, 1.4, 0.05);
-			this._advNumber(card, localize('prebase.settings.maxPerLayer', "Max nodes per layer"), localize('prebase.settings.maxPerLayerHint', "Before an overflow sub-ring is added."), PreBaseConfigKeys.GraphMaxNodesPerLayer, 24, 8, 48, 1);
-			this._advNumber(card, localize('prebase.settings.layerGap', "Layer gap"), localize('prebase.settings.layerGapHint', "Distance between dependency rings."), PreBaseConfigKeys.GraphLayerGap, 96, 80, 200, 4);
-			this._advNumber(card, localize('prebase.settings.centerClearance', "Center clearance"), localize('prebase.settings.centerClearanceHint', "Radius of the innermost ring."), PreBaseConfigKeys.GraphCenterClearance, 80, 64, 160, 4);
-			this._advNumber(card, localize('prebase.settings.scatterPasses', "Scatter balance passes"), localize('prebase.settings.scatterPassesHint', "Spacing relaxation iterations."), PreBaseConfigKeys.GraphScatterRelaxIterations, 10, 4, 24, 1);
-			this._advRange(card, localize('prebase.settings.folderRadius', "Folder expansion radius"), localize('prebase.settings.folderRadiusHint', "Tree mode radial child layout."), PreBaseConfigKeys.GraphFolderExpansionRadius, 82, 48, 160, 4);
-			this._advRange(card, localize('prebase.settings.visibleRelated', "Visible related connections"), localize('prebase.settings.visibleRelatedHint', "Root link always shown; controls extra ranked links per file (0–2)."), PreBaseConfigKeys.GraphVisibleRelatedConnections, 1, 0, 2, 1, true);
+			this._advNumber(card, localize('prebase.settings.layoutAnim', "Layout animation"), localize('prebase.settings.layoutAnimHint', "Fit-view duration in milliseconds."), PreBaseGraphConfigKeys.GraphLayoutAnimationDuration, 750, 0, 2000, 50);
+			this._advRange(card, localize('prebase.settings.layerRadius', "Layer radius scale"), localize('prebase.settings.layerRadiusHint', "Scales concentric ring radii."), PreBaseGraphConfigKeys.GraphLayerRadiusScale, 1, 0.7, 1.4, 0.05);
+			this._advNumber(card, localize('prebase.settings.maxPerLayer', "Max nodes per layer"), localize('prebase.settings.maxPerLayerHint', "Before an overflow sub-ring is added."), PreBaseGraphConfigKeys.GraphMaxNodesPerLayer, 24, 8, 48, 1);
+			this._advNumber(card, localize('prebase.settings.layerGap', "Layer gap"), localize('prebase.settings.layerGapHint', "Distance between dependency rings."), PreBaseGraphConfigKeys.GraphLayerGap, 96, 80, 200, 4);
+			this._advNumber(card, localize('prebase.settings.centerClearance', "Center clearance"), localize('prebase.settings.centerClearanceHint', "Radius of the innermost ring."), PreBaseGraphConfigKeys.GraphCenterClearance, 80, 64, 160, 4);
+			this._advNumber(card, localize('prebase.settings.scatterPasses', "Scatter balance passes"), localize('prebase.settings.scatterPassesHint', "Spacing relaxation iterations."), PreBaseGraphConfigKeys.GraphScatterRelaxIterations, 10, 4, 24, 1);
+			this._advRange(card, localize('prebase.settings.folderRadius', "Folder expansion radius"), localize('prebase.settings.folderRadiusHint', "Tree mode radial child layout."), PreBaseGraphConfigKeys.GraphFolderExpansionRadius, 82, 48, 160, 4);
+			this._advRange(card, localize('prebase.settings.visibleRelated', "Visible related connections"), localize('prebase.settings.visibleRelatedHint', "Root link always shown; controls extra ranked links per file (0–2)."), PreBaseGraphConfigKeys.GraphVisibleRelatedConnections, 1, 0, 2, 1, true);
 
 			const netHead = DOM.append(card, DOM.$('div'));
 			Object.assign(netHead.style, { padding: '8px 0', borderBottom: `1px solid rgba(30, 41, 59, 0.6)` });
@@ -1003,12 +1003,12 @@ export class PreBaseSettingsEditor extends EditorPane {
 			Object.assign(nh.style, { margin: '0', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: COLORS.textMuted });
 
 			const autoRotate = this._accentCheckbox();
-			autoRotate.checked = this._get(PreBaseConfigKeys.GraphNetworkIdleAutoRotate, false);
-			this._renderDisposables.add(DOM.addDisposableListener(autoRotate, 'change', () => void this._set(PreBaseConfigKeys.GraphNetworkIdleAutoRotate, autoRotate.checked)));
+			autoRotate.checked = this._get(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, false);
+			this._renderDisposables.add(DOM.addDisposableListener(autoRotate, 'change', () => void this._set(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, autoRotate.checked)));
 			this._row(card, localize('prebase.settings.autoRotate', "Auto-rotate when idle"), localize('prebase.settings.autoRotateHint', "Slowly rotates the network graph when you are not interacting."), autoRotate);
 
-			this._advRange(card, localize('prebase.settings.physics', "Physics strength"), localize('prebase.settings.physicsHint', "Scales repulsion and centering forces in the network view."), PreBaseConfigKeys.GraphNetworkPhysicsStrength, 1, 0.5, 2, 0.05, true);
-			this._advRange(card, localize('prebase.settings.edgeOpacity', "Edge opacity"), localize('prebase.settings.edgeOpacityHint', "Network link visibility. Higher is more readable."), PreBaseConfigKeys.GraphNetworkEdgeOpacity, 0.55, 0.2, 0.9, 0.05, true);
+			this._advRange(card, localize('prebase.settings.physics', "Physics strength"), localize('prebase.settings.physicsHint', "Reserved — not applied yet (layout uses network force/link distance)."), PreBaseGraphConfigKeys.GraphNetworkPhysicsStrength, 1, 0.5, 2, 0.05, true);
+			this._advRange(card, localize('prebase.settings.edgeOpacity', "Edge opacity"), localize('prebase.settings.edgeOpacityHint', "Reserved — not applied by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity, 0.55, 0.2, 0.9, 0.05, true);
 
 			const applyRow = DOM.append(card, DOM.$('div'));
 			Object.assign(applyRow.style, { padding: '12px 0' });
@@ -1022,29 +1022,29 @@ export class PreBaseSettingsEditor extends EditorPane {
 		if (this._category === 'interaction') {
 			const wrap = document.createElement('div');
 			Object.assign(wrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-			const delay = this._get(PreBaseConfigKeys.InteractionNodeDragDelayMs, 200);
+			const delay = this._get(PreBaseGraphConfigKeys.InteractionNodeDragDelayMs, 200);
 			const range = this._range(80, 400, 10, delay);
 			const label = document.createElement('span');
 			label.textContent = `${delay}ms`;
 			Object.assign(label.style, { fontSize: '10px', color: COLORS.textMuted, width: '40px', textAlign: 'right' });
 			this._renderDisposables.add(DOM.addDisposableListener(range, 'input', () => {
 				label.textContent = `${range.value}ms`;
-				void this._set(PreBaseConfigKeys.InteractionNodeDragDelayMs, Number(range.value) || 200);
+				void this._set(PreBaseGraphConfigKeys.InteractionNodeDragDelayMs, Number(range.value) || 200);
 			}));
 			wrap.append(range, label);
 			this._row(
 				card,
 				localize('prebase.settings.nodeDragHover', "Node drag hover delay"),
-				localize('prebase.settings.nodeDragHoverHint', "Hover delay (ms) before a graph node becomes draggable. Unrelated to Agents chat modes."),
+				localize('prebase.settings.nodeDragHoverHint', "Hover delay (ms) before a graph node becomes draggable. Reserved — not read by the graph webview yet. Unrelated to Agents chat modes."),
 				wrap
 			);
 		}
 
 		if (this._category === 'performance') {
-			this._advNumber(card, localize('prebase.settings.maxNodes', "Max rendered nodes"), localize('prebase.settings.maxNodesHint', "Caps visible nodes by importance."), PreBaseConfigKeys.GraphMaxRenderedNodes, 280, 50, 2000, 50);
-			this._advNumber(card, localize('prebase.settings.renderThrottle', "Render throttle"), localize('prebase.settings.renderThrottleHint', "Delays graph node/edge sync (ms)."), PreBaseConfigKeys.GraphRenderThrottleMs, 0, 0, 100, 1);
-			this._advNumber(card, localize('prebase.settings.networkLod', "Network LOD threshold"), localize('prebase.settings.networkLodHint', "Above this node count, network view uses performance mode."), PreBaseConfigKeys.GraphNetworkLodNodeThreshold, 900, 400, 3000, 100);
-			this._advNumber(card, localize('prebase.settings.simTicks', "Network simulation ticks"), localize('prebase.settings.simTicksHint', "Force layout warmup/cooldown scale."), PreBaseConfigKeys.GraphNetworkSimulationTicks, 80, 20, 200, 1);
+			this._advNumber(card, localize('prebase.settings.maxNodes', "Max rendered nodes"), localize('prebase.settings.maxNodesHint', "Caps visible nodes by importance."), PreBaseGraphConfigKeys.GraphMaxRenderedNodes, 280, 50, 2000, 50);
+			this._advNumber(card, localize('prebase.settings.renderThrottle', "Render throttle"), localize('prebase.settings.renderThrottleHint', "Reserved — not read by the graph webview yet."), PreBaseGraphConfigKeys.GraphRenderThrottleMs, 0, 0, 100, 1);
+			this._advNumber(card, localize('prebase.settings.networkLod', "Network LOD threshold"), localize('prebase.settings.networkLodHint', "Reserved — not read by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkLodNodeThreshold, 900, 400, 3000, 100);
+			this._advNumber(card, localize('prebase.settings.simTicks', "Network simulation ticks"), localize('prebase.settings.simTicksHint', "Reserved — not applied by the current layout engine."), PreBaseGraphConfigKeys.GraphNetworkSimulationTicks, 80, 20, 200, 1);
 		}
 	}
 

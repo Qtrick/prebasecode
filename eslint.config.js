@@ -2954,4 +2954,32 @@ export default defineConfig(
 		rules: {
 			'local/code-no-new-javascript-files': 'error',
 		},
+	},
+	// PreBase-owned graph package (`graphs/`) — PreBase copyright header
+	{
+		files: [
+			'graphs/**/*.{ts,tsx,mts,cts}',
+		],
+		rules: {
+			'header/header': [
+				2,
+				'block',
+				[
+					'---------------------------------------------------------------------------------------------',
+					' *  Copyright (c) PreBase. All rights reserved.',
+					' *--------------------------------------------------------------------------------------------'
+				]
+			]
+		}
+	},
+	// Graph package Node harness scripts (shebang + ESM `.mjs`)
+	{
+		files: [
+			'graphs/**/*.mjs',
+			'graphs/**/*.js',
+		],
+		rules: {
+			'header/header': 'off',
+			'local/code-no-new-javascript-files': 'off',
+		}
 	});

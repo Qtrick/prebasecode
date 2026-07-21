@@ -9,7 +9,11 @@
     "ignoreDeprecations": "6.0"
   },
   "include": [
+    "src/common/types/**/*.ts",
+    "src/common/constants/**/*.ts",
     "src/core/**/*.ts",
+    "src/layouts/**/*.ts",
+    "src/architecture/**/*.ts",
     "src/index.ts",
     "src/node.ts"
   ],

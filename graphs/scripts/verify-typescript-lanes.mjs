@@ -43,7 +43,7 @@ console.log('[primary CLI]');
 console.log(`  package.json: ${dd['@typescript/native'] ?? '(missing @typescript/native)'}`);
 console.log(`  installed:    ${nativeMeta ? `${nativeMeta.name}@${nativeMeta.version}` : '(missing)'}`);
 console.log(`  executable:   ${binVersion('tsc')}`);
-console.log('  used by:      typecheck-client, typecheck:ts7, build/lib/tsgo.ts → tsc, monaco/valid-layers checks');
+console.log('  used by:      typecheck-client, typecheck:ts7, build/lib/typescriptCompiler.ts → tsc, monaco/valid-layers checks');
 console.log('');
 console.log('[compat API / tsc6]');
 console.log(`  package.json: ${dd.typescript ?? '(missing typescript)'}`);
