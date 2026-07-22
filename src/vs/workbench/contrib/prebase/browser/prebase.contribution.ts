@@ -43,11 +43,12 @@ import { PreBaseSettingsEditor } from './prebaseSettingsEditor.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
 import { PreBaseHomeEditor } from './prebaseHomeEditor.js';
 import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
+import { PreBaseOnboardingEditor } from './prebaseOnboardingEditor.js';
+import { PreBaseOnboardingEditorInput } from './prebaseOnboardingEditorInput.js';
 import './prebaseRecentHistory.js';
 import { PreBaseWorkspaceOpeningEditor } from './prebaseWorkspaceOpeningEditor.js';
 import { PreBaseWorkspaceOpeningEditorInput } from './prebaseWorkspaceOpeningEditorInput.js';
 import type { PreBaseWorkspaceOpenPhase } from './prebaseWorkspaceOpening.js';
-// Onboarding editor kept in tree for a later release; not registered in the workbench right now.
 
 registerPreBaseGraphContribution();
 
@@ -148,6 +149,15 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 
 Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
 	EditorPaneDescriptor.create(
+		PreBaseOnboardingEditor,
+		PreBaseOnboardingEditor.ID,
+		localize('prebase.onboarding.editor', "Welcome to PreBase")
+	),
+	[new SyncDescriptor(PreBaseOnboardingEditorInput)]
+);
+
+Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane(
+	EditorPaneDescriptor.create(
 		PreBaseWorkspaceOpeningEditor,
 		PreBaseWorkspaceOpeningEditor.ID,
 		localize('prebase.workspace.opening.editor', "Opening Project")
@@ -155,7 +165,10 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 	[new SyncDescriptor(PreBaseWorkspaceOpeningEditorInput)]
 );
 
-// Contributions that open editors must load after pane registration above.
+// Contributions that open editors / prove AfterRestored must load after pane registration above.
+// Onboarding before Home empty editors so first-run yield ordering is deterministic.
+import './prebaseWorkbenchReadyContribution.js';
+import './prebaseOnboardingContribution.js';
 import './prebaseHomeEmptyEditors.js';
 import './prebaseWorkspaceOpening.js';
 
@@ -192,6 +205,18 @@ class PreBaseHomeEditorInputSerializer implements IEditorSerializer {
 	}
 	deserialize(): EditorInput {
 		return new PreBaseHomeEditorInput();
+	}
+}
+
+class PreBaseOnboardingEditorInputSerializer implements IEditorSerializer {
+	canSerialize(editor: EditorInput): boolean {
+		return editor instanceof PreBaseOnboardingEditorInput;
+	}
+	serialize(): string {
+		return '{}';
+	}
+	deserialize(): EditorInput {
+		return new PreBaseOnboardingEditorInput();
 	}
 }
 
@@ -234,6 +259,10 @@ Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEdit
 	PreBaseHomeEditorInputSerializer
 );
 Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
+	PreBaseOnboardingEditorInput.TypeID,
+	PreBaseOnboardingEditorInputSerializer
+);
+Registry.as<IEditorFactoryRegistry>(EditorExtensions.EditorFactory).registerEditorSerializer(
 	PreBaseWorkspaceOpeningEditorInput.TypeID,
 	PreBaseWorkspaceOpeningEditorInputSerializer
 );
@@ -253,6 +282,11 @@ async function openSettingsEditor(accessor: ServicesAccessor): Promise<void> {
 async function openHomeEditor(accessor: ServicesAccessor): Promise<void> {
 	const editorService = accessor.get(IEditorService);
 	await editorService.openEditor(new PreBaseHomeEditorInput(), { pinned: true, revealIfOpened: true });
+}
+
+async function openOnboardingEditor(accessor: ServicesAccessor): Promise<void> {
+	const editorService = accessor.get(IEditorService);
+	await editorService.openEditor(new PreBaseOnboardingEditorInput(), { pinned: true, revealIfOpened: true });
 }
 
 // --- settings command
@@ -286,6 +320,33 @@ registerAction2(class extends Action2 {
 registerAction2(class extends Action2 {
 	constructor() {
 		super({
+			id: 'prebase.onboarding.open',
+			title: localize2('prebase.onboarding.open', "Open Welcome / Onboarding"),
+			category: localize2('prebase.category', "PreBase"),
+			f1: true
+		});
+	}
+	run(accessor: ServicesAccessor) { return openOnboardingEditor(accessor); }
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.onboarding.reset',
+			title: localize2('prebase.onboarding.reset', "Reset Welcome / Onboarding"),
+			category: localize2('prebase.category', "PreBase"),
+			f1: true
+		});
+	}
+	run(accessor: ServicesAccessor) {
+		accessor.get(IPreBaseAccountService).resetOnboarding();
+		return openOnboardingEditor(accessor);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
 			id: 'prebase.home.openRecent',
 			title: localize2('prebase.home.openRecent', "Open Recent Project"),
 			category: localize2('prebase.category', "PreBase"),
@@ -311,7 +372,7 @@ registerAction2(class extends Action2 {
 	}
 });
 
-// --- account menu on the Activity Bar profile / Accounts button (onboarding deferred)
+// --- account menu on the Activity Bar profile / Accounts button
 
 async function promptCredentials(quickInput: IQuickInputService, includeDisplayName: boolean): Promise<{ email: string; password: string; displayName?: string } | undefined> {
 	const email = await quickInput.input({

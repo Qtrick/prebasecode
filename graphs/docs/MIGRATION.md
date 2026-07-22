@@ -99,8 +99,8 @@ Registry section `prebaseInteraction` is mixed today; Phase B should **split reg
 
 | Path | Graph dependency |
 |---|---|
-| `browser/prebaseSettingsEditor.ts` | `LayoutMode` from `types.ts` |
-| `browser/prebase.contribution.ts` | types, services, editors (becomes thin bootstrap) |
+| `browser/prebaseSettingsEditor.ts` | Routes to `graphs/host/workbench/settings/graphSettingsUi.ts` (no direct graph key binds) |
+| `browser/prebase.contribution.ts` | Thin bootstrap → `registerPreBaseGraphContribution()` |
 
 ## Planned layout (adapted to real code)
 
@@ -176,11 +176,12 @@ Initial move kept a flatter `graphs/src/core/*.ts` layout; **Phase D (2026-07-20
 | Graph keys in `prebaseConfiguration.ts` | `graphs/src/host/workbench/graphConfigurationContribution.ts` + `graphs/src/settings/index.ts` | Settings | registry | bootstrap import | — | **Extracted** (Phase B) | Allowlisted mixed file retains terminal/runtime keys only | Pass |
 | Graph interaction keys (pan/zoom/network drag/node drag delay) | `graphConfigurationContribution.ts` under `prebaseGraph` | Interaction | graphEditor, settings UI | bootstrap | — | **Extracted** (Phase B) | Terminal visibility keys remain in mixed file | Pass |
 | Graph cmds in `prebase.contribution.ts` | `graphs/src/host/workbench/graphContribution.ts` + `graphs/src/commands/graphCommandIds.ts` | Commands | contribution | bootstrap | — | **Extracted** (Phase C) | `verify:graphs-boundary` Action2 scan | Done |
-| `.../browser/prebaseSettingsEditor.ts` | _(no move — import-only)_ | Settings UI | `LayoutMode` type import | — | — | Complete | Retain file | Pass |
+| `.../browser/prebaseSettingsEditor.ts` | Graph panels → `graphs/src/host/workbench/settings/graphSettingsUi.ts` | Settings shell routes only | Host bridge | — | graphOwnershipBoundary.test | **Extracted** (Phase A, 2026-07-21) | Shell retained; no `PreBaseGraphConfigKeys` binds | Pass |
+| Phase D flat `graphs/src/core/*.ts` shims | Deleted; canonical paths under `core/*/` subdirs | Compatibility | — | — | boundary + ownership test | **Removed** (Phase A) | Deleted | Pass |
 
 `...` = `src/vs/workbench/contrib/prebase`
 
-**Inventory coverage (2026-07-20):** sources under `graphs/src/` with Phase D layout; settings/commands extracted (Phases B–C). Remaining allowlist: mixed `prebaseConfiguration.ts` bootstrap + settings UI shell.
+**Inventory coverage (2026-07-21):** sources under `graphs/src/` with Phase D layout; settings registration/commands (Phases B–C) and Settings UI + shim removal (Phase A) extracted. Remaining allowlist: mixed `prebaseConfiguration.ts` bootstrap + Settings **shell** only.
 
 ## Bootstrap allowlist (outside `graphs/`)
 
@@ -191,9 +192,9 @@ Initial move kept a flatter `graphs/src/core/*.ts` layout; **Phase D (2026-07-20
 | `src/vs/workbench/workbench.common.main.ts` | Entrypoint import | PreBase | 2026-08-20 | Keep |
 | `src/vs/workbench/workbench.desktop.main.ts` | Entrypoint import | PreBase | 2026-08-20 | Keep |
 | `src/vs/workbench/contrib/prebase/graphs` (symlink) | Build integration bridge | PreBase | 2026-08-20 | Keep while vs-relative imports required |
-| `src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts` | Settings shell; graph category UI | PreBase | 2026-08-20 | Keep; import graph types from `../graphs/` |
+| `src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts` | Settings shell; routes graph panels to `graphs/.../settings/graphSettingsUi.ts`; owns terminal visibility UI | PreBase | 2026-08-20 | Keep shell; do not reintroduce graph panel bodies |
 | `src/vs/workbench/contrib/prebase/browser/prebaseIcons.ts` | Shared icons incl. Maps/Architecture/Network | PreBase | 2026-08-20 | Optional split later |
-| `src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts` | **All `prebase.graph.*` registry entries** (mixed file); terminal visibility interaction keys stay here after Phase B | PreBase | 2026-08-20 | Phase B: extract graph + graph-interaction keys to `graphs/src/settings/graphConfiguration.ts` |
+| `src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts` | Mixed bootstrap: calls `registerPreBaseGraphConfiguration()`; terminal visibility + runtime/home keys only | PreBase | 2026-08-20 | Keep thin; graph registry lives under `graphs/` |
 | Settings TOC / getting-started references | Shell wiring to command IDs | PreBase | 2026-08-20 | Keep keys/IDs only |
 | `extensions/prebase-magnus` graph tools | Extension host; calls commands | Magnus | 2026-08-20 | Optional later move of tool defs |
 

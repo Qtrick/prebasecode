@@ -30,6 +30,7 @@ product.overrides.json
 *.snap.actual
 *.tsbuildinfo
 .eslintcache
+.eslintcache-prebase
 .vscode-test
 .chat-simulation-data
 vscode-telemetry-docs/

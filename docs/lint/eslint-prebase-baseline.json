@@ -1,0 +1,15 @@
+{
+	"generatedAt": "2026-07-22T04:09:59.757Z",
+	"note": "PreBase-path ratchet only. Does not claim full-repo npm run eslint is clean.",
+	"targets": [
+		"graphs/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
+		"src/vs/workbench/contrib/prebase/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
+		"scripts/privacy/**/*.{ts,js,mjs,cjs}",
+		"scripts/startup/**/*.{ts,js,mjs,cjs}",
+		"scripts/supabase/**/*.{ts,js,mjs,cjs}",
+		"scripts/assurance/**/*.{ts,js,mjs,cjs}"
+	],
+	"errorCount": 64,
+	"warningCount": 2168,
+	"fileCount": 114
+}

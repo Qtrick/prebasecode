@@ -12,7 +12,9 @@ import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase 
 import { EditorInput } from '../../../common/editor/editorInput.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
+import { IPreBaseAccountService } from './prebaseAccountService.js';
 import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
+import { PreBaseOnboardingEditorInput } from './prebaseOnboardingEditorInput.js';
 import { PreBaseWorkspaceOpeningEditorInput } from './prebaseWorkspaceOpeningEditorInput.js';
 import { readPendingWorkspaceOpen } from './prebaseWorkspaceOpening.js';
 
@@ -23,6 +25,9 @@ import { readPendingWorkspaceOpen } from './prebaseWorkspaceOpening.js';
  *
  * Important: do NOT latch dismiss on a 0ms settle race during workspace open —
  * that produces a blank editor area (sidebar + empty center + Agents).
+ *
+ * First-run onboarding (incomplete versioned storage) owns the empty center;
+ * this contribution yields until onboarding is visible or dismissed, then may open Home.
  */
 export class PreBaseHomeEmptyEditorsContribution extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.prebase.homeEmptyEditors';
@@ -31,7 +36,9 @@ export class PreBaseHomeEmptyEditorsContribution extends Disposable implements I
 
 	private _dismissedForCurrentEmpty = false;
 	private _homeWasOpen = false;
+	private _onboardingWasOpen = false;
 	private _opening = false;
+	private _yieldingToOnboarding = false;
 	private _homeOpenAttempts = 0;
 	private readonly _openSettle = this._register(new DisposableStore());
 
@@ -40,9 +47,11 @@ export class PreBaseHomeEmptyEditorsContribution extends Disposable implements I
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 		@IStorageService private readonly storageService: IStorageService,
+		@IPreBaseAccountService private readonly accountService: IPreBaseAccountService,
 	) {
 		super();
 		this._homeWasOpen = this._hasHomeOpen();
+		this._onboardingWasOpen = this._hasOnboardingOpen();
 		this._register(this.editorService.onDidVisibleEditorsChange(() => this._onEditorsChanged()));
 		// Workspace transitions clear dismiss so Home/loading can fill the center again.
 		this._register(this.workspaceService.onDidChangeWorkbenchState(() => {
@@ -72,7 +81,15 @@ export class PreBaseHomeEmptyEditorsContribution extends Disposable implements I
 	}
 
 	private _meaningfulEditors(): readonly EditorInput[] {
-		return this.editorService.visibleEditors.filter(e => !(e instanceof PreBaseHomeEditorInput) && !this._isLoadingSurface(e));
+		return this.editorService.visibleEditors.filter(e =>
+			!(e instanceof PreBaseHomeEditorInput)
+			&& !(e instanceof PreBaseOnboardingEditorInput)
+			&& !this._isLoadingSurface(e));
+	}
+
+	private _hasOnboardingOpen(): boolean {
+		return this.editorService.editors.some(e => e instanceof PreBaseOnboardingEditorInput)
+			|| this.editorService.visibleEditors.some(e => e instanceof PreBaseOnboardingEditorInput);
 	}
 
 	private _hasHomeOpen(): boolean {
@@ -84,6 +101,17 @@ export class PreBaseHomeEmptyEditorsContribution extends Disposable implements I
 		const openingInProgress = this._workspaceOpenInProgress();
 		const meaningful = this._meaningfulEditors();
 		const homeOpen = this._hasHomeOpen();
+		const onboardingOpen = this._hasOnboardingOpen();
+
+		if (onboardingOpen) {
+			this._onboardingWasOpen = true;
+			this._yieldingToOnboarding = false;
+			this._dismissedForCurrentEmpty = false;
+			this._homeWasOpen = homeOpen;
+			this._homeOpenAttempts = 0;
+			this._openSettle.clear();
+			return;
+		}
 
 		if (meaningful.length > 0) {
 			this._dismissedForCurrentEmpty = false;
@@ -94,6 +122,12 @@ export class PreBaseHomeEmptyEditorsContribution extends Disposable implements I
 
 		if (openingInProgress) {
 			this._openSettle.clear();
+			return;
+		}
+
+		// First-run: yield to PreBaseOnboardingContribution so Home does not steal the center.
+		if (!this.accountService.isOnboardingComplete() && !this._onboardingWasOpen) {
+			this._scheduleOnboardingYield();
 			return;
 		}
 
@@ -112,6 +146,28 @@ export class PreBaseHomeEmptyEditorsContribution extends Disposable implements I
 		}
 
 		this._scheduleOpenHome();
+	}
+
+	/**
+	 * Wait briefly for auto-opened onboarding. If it never appears (or user already
+	 * closed it before visibility), treat as dismissed and allow Home to fill empty.
+	 */
+	private _scheduleOnboardingYield(): void {
+		if (this._yieldingToOnboarding || this._workspaceOpenInProgress()) {
+			return;
+		}
+		this._yieldingToOnboarding = true;
+		this._openSettle.clear();
+		this._openSettle.add(disposableTimeout(() => {
+			this._yieldingToOnboarding = false;
+			if (this._hasOnboardingOpen()) {
+				this._onboardingWasOpen = true;
+				return;
+			}
+			// Onboarding did not stick — allow Home path on next evaluation.
+			this._onboardingWasOpen = true;
+			this._onEditorsChanged();
+		}, 250));
 	}
 
 	private _scheduleOpenHome(): void {

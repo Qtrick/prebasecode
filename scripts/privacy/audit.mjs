@@ -104,16 +104,53 @@ function auditProductJson() {
 }
 
 function auditSecretStorage() {
+	// Tokens live in SecretStorage via adapter + cloud service — not in PreBaseAccountService.
+	const adapterPath = 'src/vs/workbench/contrib/prebase/browser/cloud/secretStorageSessionAdapter.ts';
+	const cloudPath = 'src/vs/workbench/contrib/prebase/browser/cloud/prebaseCloudService.ts';
 	const accountPath = 'src/vs/workbench/contrib/prebase/browser/prebaseAccountService.ts';
-	const account = read(accountPath);
-	if (!account.includes('ISecretStorageService')) {
-		fail(`${accountPath}: expected ISecretStorageService for account tokens`);
+
+	const adapter = read(adapterPath);
+	if (!adapter.includes('secretStorageService')) {
+		fail(`${adapterPath}: expected SecretStorage-backed session adapter`);
 	}
-	const badAccountPatterns = [
+	if (!adapter.includes('PREBASE_ACCOUNT_SECRET_ACCESS') || !adapter.includes('PREBASE_ACCOUNT_SECRET_REFRESH')) {
+		fail(`${adapterPath}: expected canonical prebase.account.accessToken / refreshToken secret keys`);
+	}
+	if (/IStorageService|storageService\.(store|get|remove)/.test(adapter)) {
+		fail(`${adapterPath}: session adapter must not use IStorageService for tokens`);
+	}
+	if (/localStorage\.setItem/i.test(adapter)) {
+		fail(`${adapterPath}: must not persist tokens in localStorage`);
+	}
+
+	const cloud = read(cloudPath);
+	if (!cloud.includes('ISecretStorageService')) {
+		fail(`${cloudPath}: expected ISecretStorageService injection for session secrets`);
+	}
+	if (!cloud.includes('PreBaseCloudSessionAdapter') || !cloud.includes('secretStorageSessionAdapter')) {
+		fail(`${cloudPath}: expected PreBaseCloudSessionAdapter wiring`);
+	}
+
+	const account = read(accountPath);
+	if (!account.includes('getSessionAdapter()')) {
+		fail(`${accountPath}: expected session tokens via cloud getSessionAdapter()`);
+	}
+	// Profile cache may use IStorageService; access/refresh tokens must not.
+	const tokenInIStorage = [
+		/storageService\.store\s*\(\s*['"`][^'"`]*(accessToken|refreshToken)/i,
+		/storageService\.store\s*\([^;]{0,120}(accessToken|refreshToken)[^;]{0,120}\)/i,
+		/JSON\.stringify\s*\(\s*\{[^}]*accessToken[\s\S]{0,200}?storageService\.store/i,
+	];
+	for (const re of tokenInIStorage) {
+		if (re.test(account)) {
+			fail(`${accountPath}: access/refresh tokens must not be written via IStorageService (${re})`);
+		}
+	}
+	const badPlaintext = [
 		/localStorage\.setItem\s*\([^)]*token/i,
 		/globalStorage\.(set|update)[^;]*accessToken/i,
 	];
-	for (const re of badAccountPatterns) {
+	for (const re of badPlaintext) {
 		if (re.test(account)) {
 			fail(`${accountPath}: possible plaintext token storage (${re})`);
 		}
@@ -127,7 +164,7 @@ function auditSecretStorage() {
 	if (/localStorage|writeFileSync|settings\.json.*apiKey/i.test(magnus)) {
 		fail(`${magnusPath}: possible plaintext credential persistence`);
 	}
-	console.log('privacy: account + Magnus secret storage patterns OK');
+	console.log('privacy: session adapter + cloud SecretStorage + Magnus patterns OK');
 }
 
 function auditWebviewCsp() {

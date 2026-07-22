@@ -109,7 +109,8 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 	get apiConfigured(): boolean { return this.cloudService.isAuthConfigured(); }
 
 	isOnboardingComplete(): boolean {
-		return true;
+		const completed = this.storageService.getNumber(STORAGE_ONBOARDING, StorageScope.APPLICATION, 0);
+		return Number.isFinite(completed) && completed >= ONBOARDING_VERSION;
 	}
 
 	markOnboardingComplete(): void {

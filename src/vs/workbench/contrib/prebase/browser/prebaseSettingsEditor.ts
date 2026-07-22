@@ -20,9 +20,17 @@ import { IEditorOpenContext } from '../../../common/editor.js';
 import { IEditorGroup } from '../../../services/editor/common/editorGroupsService.js';
 import { IWorkbenchThemeService } from '../../../services/themes/common/workbenchThemeService.js';
 import { MANAGE_TRUST_COMMAND_ID } from '../../workspace/common/workspace.js';
-import { PREBASE_RESETTABLE_CONFIG_KEYS, PreBaseConfigKeys, PreBaseGraphConfigKeys } from '../common/prebaseConfiguration.js';
-import type { LayoutMode } from '../graphs/common/types/graphTypes.js';
+import { PREBASE_RESETTABLE_CONFIG_KEYS, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import { IPreBaseGraphService } from '../graphs/host/workbench/prebaseGraphService.js';
+import {
+	GRAPH_SUPPORTED_LANGUAGES,
+	type IPreBaseGraphSettingsUiHost,
+	renderGraphAdvanced,
+	renderGraphCategory,
+	renderGraphInteractionControls,
+	renderGraphPerformanceCategory,
+	renderGraphReduceMotionRow,
+} from '../graphs/host/workbench/settings/graphSettingsUi.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
 
 /** Popular built-in themes (PreBase + stock VS Code / Code - OSS classics). */
@@ -69,23 +77,6 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: string }[] = [
 	{ id: 'interaction', label: localize('prebase.settings.cat.interaction', "Interaction"), icon: '$(target)' },
 	{ id: 'performance', label: localize('prebase.settings.cat.performance', "Performance"), icon: '$(dashboard)' },
 	{ id: 'about', label: localize('prebase.settings.cat.about', "About"), icon: '$(info)' },
-];
-
-const LAYOUT_PRESETS: LayoutMode[] = ['hierarchy', 'pyramid', 'scattered'];
-
-const GRAPH_LANGUAGES: { name: string; extensions: string }[] = [
-	{ name: 'TypeScript', extensions: '.ts .tsx .mts .cts' },
-	{ name: 'JavaScript', extensions: '.js .jsx .mjs .cjs' },
-	{ name: 'Java', extensions: '.java' },
-	{ name: 'Kotlin', extensions: '.kt .kts' },
-	{ name: 'Python', extensions: '.py' },
-	{ name: 'Go', extensions: '.go' },
-	{ name: 'Rust', extensions: '.rs' },
-	{ name: 'C#', extensions: '.cs' },
-	{ name: 'C / C++', extensions: '.c .cpp .cc .cxx .h .hpp' },
-	{ name: 'Swift', extensions: '.swift' },
-	{ name: 'PHP', extensions: '.php' },
-	{ name: 'Ruby', extensions: '.rb' },
 ];
 
 const COLORS = {
@@ -283,6 +274,32 @@ export class PreBaseSettingsEditor extends EditorPane {
 
 	private async _set(key: string, value: unknown): Promise<void> {
 		await this.configurationService.updateValue(key, value);
+	}
+
+	/** Bridge for graph-owned Settings panels (keeps shell helpers here). */
+	private _graphSettingsHost(): IPreBaseGraphSettingsUiHost {
+		return {
+			main: this._main!,
+			advanced: this._advanced!,
+			category: this._category,
+			colors: { border: COLORS.border, textMuted: COLORS.textMuted, accent: COLORS.accent },
+			get: <T>(key: string, fallback: T) => this._get(key, fallback),
+			set: (key, value) => this._set(key, value),
+			track: (d) => { this._renderDisposables.add(d); },
+			on: (el, type, listener) => {
+				this._renderDisposables.add(DOM.addDisposableListener(el, type, listener));
+			},
+			panel: (parent, title, description) => this._panel(parent, title, description),
+			row: (parent, label, hint, control) => this._row(parent, label, hint, control),
+			selectStyle: (el) => this._selectStyle(el),
+			inputStyle: (el) => this._inputStyle(el),
+			accentCheckbox: () => this._accentCheckbox(),
+			range: (min, max, step, value) => this._range(min, max, step, value),
+			btn: (label, primary) => this._btn(label, primary),
+			sessionLayoutMode: () => this.graphService.getViewState().layoutMode,
+			setLayoutMode: (mode) => this.graphService.setLayoutMode(mode),
+			relayout: async () => { await this.graphService.relayout(); },
+		};
 	}
 
 	private async _resetAll(): Promise<void> {
@@ -542,10 +559,8 @@ export class PreBaseSettingsEditor extends EditorPane {
 		this._renderDisposables.add(DOM.addDisposableListener(density, 'change', () => void this._set(PreBaseConfigKeys.UiDensity, density.value)));
 		this._row(card, localize('prebase.settings.uiDensity', "UI density"), localize('prebase.settings.uiDensityHint', "Reserved — Maps/Runtime UI does not read this setting yet."), density);
 
-		const reduce = this._accentCheckbox();
-		reduce.checked = this._get(PreBaseGraphConfigKeys.GraphReduceMotion, false);
-		this._renderDisposables.add(DOM.addDisposableListener(reduce, 'change', () => void this._set(PreBaseGraphConfigKeys.GraphReduceMotion, reduce.checked)));
-		this._row(card, localize('prebase.settings.reduceMotion', "Reduce motion"), localize('prebase.settings.reduceMotionHint', "Minimizes graph and UI animations."), reduce);
+		const reduceCard = card;
+		renderGraphReduceMotionRow(this._graphSettingsHost(), reduceCard);
 
 		const magnus = document.createElement('select');
 		this._selectStyle(magnus);
@@ -598,60 +613,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 	}
 
 	private _renderGraph(): void {
-		const card = this._panel(
-			this._main!,
-			localize('prebase.settings.graph.title', "Graph"),
-			localize('prebase.settings.graph.desc', "Default layout and architecture map display.")
-		);
-
-		const layout = document.createElement('select');
-		this._selectStyle(layout);
-		for (const m of LAYOUT_PRESETS) {
-			const opt = document.createElement('option');
-			opt.value = m;
-			opt.textContent = m;
-			layout.appendChild(opt);
-		}
-		layout.value = this._get(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout, 'hierarchy');
-		this._renderDisposables.add(DOM.addDisposableListener(layout, 'change', async () => {
-			const mode = layout.value as LayoutMode;
-			await this._set(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout, mode);
-			await this.graphService.setLayoutMode(mode);
-		}));
-		this._row(card, localize('prebase.settings.defaultLayout', "Default layout"), undefined, layout);
-
-		const session = document.createElement('span');
-		session.textContent = this.graphService.getViewState().layoutMode;
-		Object.assign(session.style, { fontSize: '12px', color: COLORS.accent, textTransform: 'capitalize' });
-		this._row(card, localize('prebase.settings.sessionLayout', "Session layout"), localize('prebase.settings.sessionLayoutHint', "Active layout for the current project."), session);
-
-		const zoom = this._range(0.5, 1.4, 0.02, this._get(PreBaseGraphConfigKeys.GraphInitialZoom, 0.92));
-		this._renderDisposables.add(DOM.addDisposableListener(zoom, 'input', () => void this._set(PreBaseGraphConfigKeys.GraphInitialZoom, Number(zoom.value))));
-		this._row(card, localize('prebase.settings.initialZoom', "Initial zoom"), localize('prebase.settings.initialZoomHint', "Camera zoom when a project first loads."), zoom);
-
-		const edgeLabels = this._accentCheckbox();
-		edgeLabels.checked = this._get(PreBaseGraphConfigKeys.GraphShowEdgeLabels, false);
-		this._renderDisposables.add(DOM.addDisposableListener(edgeLabels, 'change', () => void this._set(PreBaseGraphConfigKeys.GraphShowEdgeLabels, edgeLabels.checked)));
-		this._row(card, localize('prebase.settings.edgeLabels', "Edge import labels"), localize('prebase.settings.edgeLabelsHint', "Show import paths on dependency edges."), edgeLabels);
-
-		const dimWrap = document.createElement('div');
-		Object.assign(dimWrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-		const dimVal = this._get(PreBaseGraphConfigKeys.GraphLegendInteractionDim, 40);
-		const dim = this._range(0, 80, 5, dimVal);
-		const dimLabel = document.createElement('span');
-		dimLabel.textContent = `${dimVal}%`;
-		Object.assign(dimLabel.style, { fontSize: '10px', color: COLORS.textMuted, fontVariantNumeric: 'tabular-nums' });
-		this._renderDisposables.add(DOM.addDisposableListener(dim, 'input', () => {
-			dimLabel.textContent = `${dim.value}%`;
-			void this._set(PreBaseGraphConfigKeys.GraphLegendInteractionDim, Number(dim.value));
-		}));
-		dimWrap.append(dim, dimLabel);
-		this._row(
-			card,
-			localize('prebase.settings.legendDim', "Legend dim during interaction"),
-			localize('prebase.settings.legendDimHint', "How much the architecture legend fades while panning, zooming, or selecting."),
-			dimWrap
-		);
+		renderGraphCategory(this._graphSettingsHost());
 	}
 
 	private _renderSidebar(): void {
@@ -828,36 +790,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 	}
 
 	private _renderInteraction(): void {
-		const card = this._panel(
-			this._main!,
-			localize('prebase.settings.interaction.title', "Interaction"),
-			localize('prebase.settings.interaction.desc', "Pan and zoom behavior. Pan/zoom sliders are reserved until the graph webview reads them.")
-		);
-
-		const pan = this._range(0.5, 2, 0.1, this._get(PreBaseGraphConfigKeys.InteractionPanSensitivity, 1));
-		this._renderDisposables.add(DOM.addDisposableListener(pan, 'input', () => void this._set(PreBaseGraphConfigKeys.InteractionPanSensitivity, Number(pan.value))));
-		this._row(card, localize('prebase.settings.panSensitivity', "Pan sensitivity"), undefined, pan);
-
-		const zoom = this._range(0.5, 2, 0.1, this._get(PreBaseGraphConfigKeys.InteractionZoomSensitivity, 1));
-		this._renderDisposables.add(DOM.addDisposableListener(zoom, 'input', () => void this._set(PreBaseGraphConfigKeys.InteractionZoomSensitivity, Number(zoom.value))));
-		this._row(card, localize('prebase.settings.zoomSensitivity', "Zoom sensitivity"), undefined, zoom);
-
-		const drag = document.createElement('select');
-		this._selectStyle(drag);
-		for (const [v, label] of [['natural', 'Natural'], ['inverted', 'Inverted']] as const) {
-			const opt = document.createElement('option');
-			opt.value = v;
-			opt.textContent = label;
-			drag.appendChild(opt);
-		}
-		drag.value = this._get(PreBaseGraphConfigKeys.InteractionNetworkDragDirection, 'natural');
-		this._renderDisposables.add(DOM.addDisposableListener(drag, 'change', () => void this._set(PreBaseGraphConfigKeys.InteractionNetworkDragDirection, drag.value)));
-		this._row(
-			card,
-			localize('prebase.settings.networkDrag', "Network drag direction"),
-			localize('prebase.settings.networkDragHint', "Natural follows cursor drag like grabbing the sphere; Inverted rotates opposite to cursor."),
-			drag
-		);
+		renderGraphInteractionControls(this._graphSettingsHost());
 
 		const term = this._panel(
 			this._main!,
@@ -881,24 +814,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 	}
 
 	private _renderPerformance(): void {
-		const card = this._panel(
-			this._main!,
-			localize('prebase.settings.performance.title', "Performance"),
-			localize('prebase.settings.performance.desc', "Rendering quality and graph limits.")
-		);
-
-		const quality = document.createElement('select');
-		this._selectStyle(quality);
-		for (const [v, label] of [['balanced', 'Balanced'], ['performance', 'Performance']] as const) {
-			const opt = document.createElement('option');
-			opt.value = v;
-			opt.textContent = label;
-			quality.appendChild(opt);
-		}
-		const q = this._get<string>(PreBaseGraphConfigKeys.GraphQuality, 'balanced');
-		quality.value = (q === 'performance') ? 'performance' : 'balanced';
-		this._renderDisposables.add(DOM.addDisposableListener(quality, 'change', () => void this._set(PreBaseGraphConfigKeys.GraphQuality, quality.value)));
-		this._row(card, localize('prebase.settings.graphQuality', "Graph quality"), localize('prebase.settings.graphQualityHint', "Performance mode reduces edge animation."), quality);
+		renderGraphPerformanceCategory(this._graphSettingsHost());
 	}
 
 	private _renderAbout(): void {
@@ -949,7 +865,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		);
 		const list = DOM.append(langs, DOM.$('div'));
 		Object.assign(list.style, { padding: '8px 0', maxHeight: '256px', overflowY: 'auto' });
-		for (const lang of GRAPH_LANGUAGES) {
+		for (const lang of GRAPH_SUPPORTED_LANGUAGES) {
 			const item = DOM.append(list, DOM.$('div'));
 			Object.assign(item.style, {
 				display: 'flex',
@@ -968,120 +884,6 @@ export class PreBaseSettingsEditor extends EditorPane {
 	}
 
 	private _renderAdvanced(): void {
-		const card = DOM.append(this._advanced!, DOM.$('div'));
-		Object.assign(card.style, {
-			borderRadius: '12px',
-			border: `1px solid ${COLORS.border}`,
-			background: 'rgba(17, 24, 39, 0.35)',
-			padding: '0 16px',
-		});
-		const head = DOM.append(card, DOM.$('div'));
-		Object.assign(head.style, { padding: '12px 0', borderBottom: `1px solid rgba(30, 41, 59, 0.6)`, marginBottom: '4px' });
-		const h = DOM.append(head, DOM.$('h3'));
-		h.textContent = localize('prebase.settings.advanced', "Advanced");
-		Object.assign(h.style, { margin: '0', fontSize: '13px', fontWeight: '600' });
-		const d = DOM.append(head, DOM.$('p'));
-		d.textContent = this._category === 'graph'
-			? localize('prebase.settings.advancedGraphHint', "Layout changes apply after relayout.")
-			: localize('prebase.settings.advancedHint', "Fine-tuned controls for this category.");
-		Object.assign(d.style, { margin: '2px 0 0', fontSize: '11px', color: COLORS.textMuted });
-
-		if (this._category === 'graph') {
-			this._advNumber(card, localize('prebase.settings.layoutAnim', "Layout animation"), localize('prebase.settings.layoutAnimHint', "Fit-view duration in milliseconds."), PreBaseGraphConfigKeys.GraphLayoutAnimationDuration, 750, 0, 2000, 50);
-			this._advRange(card, localize('prebase.settings.layerRadius', "Layer radius scale"), localize('prebase.settings.layerRadiusHint', "Scales concentric ring radii."), PreBaseGraphConfigKeys.GraphLayerRadiusScale, 1, 0.7, 1.4, 0.05);
-			this._advNumber(card, localize('prebase.settings.maxPerLayer', "Max nodes per layer"), localize('prebase.settings.maxPerLayerHint', "Before an overflow sub-ring is added."), PreBaseGraphConfigKeys.GraphMaxNodesPerLayer, 24, 8, 48, 1);
-			this._advNumber(card, localize('prebase.settings.layerGap', "Layer gap"), localize('prebase.settings.layerGapHint', "Distance between dependency rings."), PreBaseGraphConfigKeys.GraphLayerGap, 96, 80, 200, 4);
-			this._advNumber(card, localize('prebase.settings.centerClearance', "Center clearance"), localize('prebase.settings.centerClearanceHint', "Radius of the innermost ring."), PreBaseGraphConfigKeys.GraphCenterClearance, 80, 64, 160, 4);
-			this._advNumber(card, localize('prebase.settings.scatterPasses', "Scatter balance passes"), localize('prebase.settings.scatterPassesHint', "Spacing relaxation iterations."), PreBaseGraphConfigKeys.GraphScatterRelaxIterations, 10, 4, 24, 1);
-			this._advRange(card, localize('prebase.settings.folderRadius', "Folder expansion radius"), localize('prebase.settings.folderRadiusHint', "Tree mode radial child layout."), PreBaseGraphConfigKeys.GraphFolderExpansionRadius, 82, 48, 160, 4);
-			this._advRange(card, localize('prebase.settings.visibleRelated', "Visible related connections"), localize('prebase.settings.visibleRelatedHint', "Root link always shown; controls extra ranked links per file (0–2)."), PreBaseGraphConfigKeys.GraphVisibleRelatedConnections, 1, 0, 2, 1, true);
-
-			const netHead = DOM.append(card, DOM.$('div'));
-			Object.assign(netHead.style, { padding: '8px 0', borderBottom: `1px solid rgba(30, 41, 59, 0.6)` });
-			const nh = DOM.append(netHead, DOM.$('p'));
-			nh.textContent = localize('prebase.settings.networkGraph', "Network graph");
-			Object.assign(nh.style, { margin: '0', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: COLORS.textMuted });
-
-			const autoRotate = this._accentCheckbox();
-			autoRotate.checked = this._get(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, false);
-			this._renderDisposables.add(DOM.addDisposableListener(autoRotate, 'change', () => void this._set(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, autoRotate.checked)));
-			this._row(card, localize('prebase.settings.autoRotate', "Auto-rotate when idle"), localize('prebase.settings.autoRotateHint', "Slowly rotates the network graph when you are not interacting."), autoRotate);
-
-			this._advRange(card, localize('prebase.settings.physics', "Physics strength"), localize('prebase.settings.physicsHint', "Reserved — not applied yet (layout uses network force/link distance)."), PreBaseGraphConfigKeys.GraphNetworkPhysicsStrength, 1, 0.5, 2, 0.05, true);
-			this._advRange(card, localize('prebase.settings.edgeOpacity', "Edge opacity"), localize('prebase.settings.edgeOpacityHint', "Reserved — not applied by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity, 0.55, 0.2, 0.9, 0.05, true);
-
-			const applyRow = DOM.append(card, DOM.$('div'));
-			Object.assign(applyRow.style, { padding: '12px 0' });
-			const apply = this._btn(localize('prebase.settings.applyLayout', "Apply layout now"), true);
-			this._renderDisposables.add(DOM.addDisposableListener(apply, 'click', () => {
-				void this.graphService.relayout();
-			}));
-			applyRow.appendChild(apply);
-		}
-
-		if (this._category === 'interaction') {
-			const wrap = document.createElement('div');
-			Object.assign(wrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-			const delay = this._get(PreBaseGraphConfigKeys.InteractionNodeDragDelayMs, 200);
-			const range = this._range(80, 400, 10, delay);
-			const label = document.createElement('span');
-			label.textContent = `${delay}ms`;
-			Object.assign(label.style, { fontSize: '10px', color: COLORS.textMuted, width: '40px', textAlign: 'right' });
-			this._renderDisposables.add(DOM.addDisposableListener(range, 'input', () => {
-				label.textContent = `${range.value}ms`;
-				void this._set(PreBaseGraphConfigKeys.InteractionNodeDragDelayMs, Number(range.value) || 200);
-			}));
-			wrap.append(range, label);
-			this._row(
-				card,
-				localize('prebase.settings.nodeDragHover', "Node drag hover delay"),
-				localize('prebase.settings.nodeDragHoverHint', "Hover delay (ms) before a graph node becomes draggable. Reserved — not read by the graph webview yet. Unrelated to Agents chat modes."),
-				wrap
-			);
-		}
-
-		if (this._category === 'performance') {
-			this._advNumber(card, localize('prebase.settings.maxNodes', "Max rendered nodes"), localize('prebase.settings.maxNodesHint', "Caps visible nodes by importance."), PreBaseGraphConfigKeys.GraphMaxRenderedNodes, 280, 50, 2000, 50);
-			this._advNumber(card, localize('prebase.settings.renderThrottle', "Render throttle"), localize('prebase.settings.renderThrottleHint', "Reserved — not read by the graph webview yet."), PreBaseGraphConfigKeys.GraphRenderThrottleMs, 0, 0, 100, 1);
-			this._advNumber(card, localize('prebase.settings.networkLod', "Network LOD threshold"), localize('prebase.settings.networkLodHint', "Reserved — not read by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkLodNodeThreshold, 900, 400, 3000, 100);
-			this._advNumber(card, localize('prebase.settings.simTicks', "Network simulation ticks"), localize('prebase.settings.simTicksHint', "Reserved — not applied by the current layout engine."), PreBaseGraphConfigKeys.GraphNetworkSimulationTicks, 80, 20, 200, 1);
-		}
-	}
-
-	private _advNumber(parent: HTMLElement, label: string, hint: string, key: string, fallback: number, min: number, max: number, step: number): void {
-		const input = document.createElement('input');
-		input.type = 'number';
-		input.min = String(min);
-		input.max = String(max);
-		input.step = String(step);
-		this._inputStyle(input);
-		input.value = String(this._get(key, fallback));
-		this._renderDisposables.add(DOM.addDisposableListener(input, 'change', () => {
-			const n = Number(input.value);
-			void this._set(key, Number.isFinite(n) ? Math.min(max, Math.max(min, n)) : fallback);
-		}));
-		this._row(parent, label, hint, input);
-	}
-
-	private _advRange(parent: HTMLElement, label: string, hint: string, key: string, fallback: number, min: number, max: number, step: number, showValue = false): void {
-		const wrap = document.createElement('div');
-		Object.assign(wrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-		const value = this._get(key, fallback);
-		const range = this._range(min, max, step, value);
-		const valEl = document.createElement('span');
-		valEl.textContent = showValue ? String(Number(Number(value).toFixed(2))) : '';
-		Object.assign(valEl.style, { fontSize: '10px', color: COLORS.textMuted, width: showValue ? '28px' : '0', textAlign: 'right' });
-		this._renderDisposables.add(DOM.addDisposableListener(range, 'input', () => {
-			const n = Number(range.value);
-			if (showValue) {
-				valEl.textContent = String(Number(n.toFixed(2)));
-			}
-			void this._set(key, n);
-		}));
-		wrap.appendChild(range);
-		if (showValue) {
-			wrap.appendChild(valEl);
-		}
-		this._row(parent, label, hint, wrap);
+		renderGraphAdvanced(this._graphSettingsHost());
 	}
 }

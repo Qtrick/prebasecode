@@ -7,7 +7,7 @@ How desktop, server (REH), and web artifacts are produced from this repository. 
 - Node version from [`.nvmrc`](../.nvmrc); `npm ci` at repo root (and distro mixin steps for full Microsoft-style CI).
 - Compiled output: packaging tasks read from `out-vscode` / `out-vscode-min` (produced by `bundle-vscode` or esbuild bundle + minify).
 - **Full** `vscode-*` tasks also run extension build, Copilot extension build, extension media, and native extensions — expect long runtimes and large disk use.
-- Local dev without the Copilot submodule may fail hygiene tasks that read `extensions/copilot/package.json`; that does not change the gulp task names.
+- Local hygiene that reads `extensions/copilot/package.json` may fail: the tree is tracked (~4k files) but the manifest is `package.json.disabled` (root `compile-copilot` / `watch-copilot` / `copilot:*` scripts removed). Do not mass-delete without a dedicated safe audit; that does not change gulp packaging task names.
 
 ## npm script shortcuts
 

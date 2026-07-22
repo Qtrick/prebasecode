@@ -100,7 +100,7 @@ The workbench uses **delayed** cloud init (`IPreBaseCloudService` + `PreBaseAcco
 1. **No network at module import** and no Supabase calls before the workbench shell mounts; `restoreSession()` runs asynchronously and must not throw.
 2. **Unconfigured by default** — missing `prebase.cloud.url` / `prebase.cloud.publishableKey` keeps account menus in “Continue without signing in” mode.
 3. Load URL + publishable key from **user settings** (`prebase.cloud.*`) or optional `product.json` fields (`prebaseCloudUrl`, `prebaseCloudPublishableKey`) — never commit keys.
-4. Session **access/refresh tokens only** in `ISecretStorageService` (`prebase.account.accessToken` / `prebase.account.refreshToken`).
+4. Session **access/refresh tokens only** in `ISecretStorageService` via `secretStorageSessionAdapter.ts` + `PreBaseCloudService` (`prebase.account.accessToken` / `prebase.account.refreshToken`). Profile display fields may use `IStorageService`; tokens must not.
 5. Attach the user JWT per REST request; refresh via GoTrue `grant_type=refresh_token` when `/user` returns 401.
 
 ### REST adapter (no supabase-js in workbench)

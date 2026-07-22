@@ -49,10 +49,10 @@ const ALLOWLIST = [
 	},
 	{
 		path: 'src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts',
-		reason: 'Settings shell still hosts Graph category UI; imports graphs types/service',
+		reason: 'Generic PreBase Settings shell; graph category UI rendered via graphs/src/host/workbench/settings/graphSettingsUi.ts',
 		owner: 'PreBase',
 		reviewDate: '2026-08-20',
-		removalPlan: 'Extract graph settings panel into graphs/src/settings when practical',
+		removalPlan: 'Keep shell; do not reintroduce graph-specific panel bodies here',
 	},
 	{
 		path: 'src/vs/workbench/contrib/prebase/browser/prebaseIcons.ts',
@@ -228,6 +228,70 @@ if (!fs.existsSync(link)) {
 		if (path.normalize(resolved) !== path.normalize(expected)) {
 			failures.push(`graphs symlink resolves to ${resolved}, expected ${expected} (readlink=${target})`);
 		}
+	}
+}
+
+// 8) No flat files under graphs/src/core/*.ts (Phase D layout uses subdirs only; flat files were shims)
+const CORE_DIR = path.join(REPO_ROOT, 'graphs/src/core');
+if (fs.existsSync(CORE_DIR)) {
+	for (const name of fs.readdirSync(CORE_DIR)) {
+		const full = path.join(CORE_DIR, name);
+		if (!fs.statSync(full).isFile()) {
+			continue;
+		}
+		if (name.endsWith('.ts') || name.endsWith('.js') || name.endsWith('.tsx') || name.endsWith('.jsx')) {
+			failures.push(`Forbidden flat graphs/src/core/${name} — use domain subdirs (analysis/generation/parsing/resolution/scanning); Phase D shims must not return`);
+		}
+	}
+}
+
+// 9) Settings shell must not own graph panel bodies (route through graphSettingsUi)
+const GRAPH_SETTINGS_UI = path.join(REPO_ROOT, 'graphs/src/host/workbench/settings/graphSettingsUi.ts');
+if (!fs.existsSync(GRAPH_SETTINGS_UI)) {
+	failures.push('Missing graphs/src/host/workbench/settings/graphSettingsUi.ts');
+} else {
+	const uiText = fs.readFileSync(GRAPH_SETTINGS_UI, 'utf8');
+	for (const exportName of [
+		'renderGraphCategory',
+		'renderGraphInteractionControls',
+		'renderGraphPerformanceCategory',
+		'renderGraphAdvanced',
+		'renderGraphReduceMotionRow',
+		'GRAPH_SUPPORTED_LANGUAGES',
+		'IPreBaseGraphSettingsUiHost',
+	]) {
+		if (!uiText.includes(exportName)) {
+			failures.push(`graphSettingsUi.ts must export ${exportName}`);
+		}
+	}
+}
+
+const SETTINGS_INDEX = path.join(REPO_ROOT, 'graphs/src/settings/index.ts');
+if (fs.existsSync(SETTINGS_INDEX)) {
+	const indexText = fs.readFileSync(SETTINGS_INDEX, 'utf8');
+	if (/from\s+['"][^'"]*graphSettingsUi/.test(indexText) || /import\s+[^;]*graphSettingsUi/.test(indexText)) {
+		failures.push('graphs/src/settings/index.ts must stay DOM-free — re-export Settings UI from settings/ui.ts only');
+	}
+}
+
+const SETTINGS_UI_BARREL = path.join(REPO_ROOT, 'graphs/src/settings/ui.ts');
+if (!fs.existsSync(SETTINGS_UI_BARREL)) {
+	failures.push('Missing graphs/src/settings/ui.ts (public Settings UI re-export)');
+} else {
+	const uiBarrel = fs.readFileSync(SETTINGS_UI_BARREL, 'utf8');
+	if (!uiBarrel.includes('graphSettingsUi')) {
+		failures.push('graphs/src/settings/ui.ts must re-export from graphSettingsUi.ts');
+	}
+}
+
+const SETTINGS_EDITOR = path.join(REPO_ROOT, 'src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts');
+if (fs.existsSync(SETTINGS_EDITOR)) {
+	const settingsText = fs.readFileSync(SETTINGS_EDITOR, 'utf8');
+	if (!settingsText.includes('graphSettingsUi')) {
+		failures.push('prebaseSettingsEditor.ts must import graph-owned settings UI from graphs/.../graphSettingsUi');
+	}
+	if (/\bPreBaseGraphConfigKeys\b/.test(settingsText)) {
+		failures.push('prebaseSettingsEditor.ts must not reference PreBaseGraphConfigKeys; use graphs/src/host/workbench/settings/graphSettingsUi.ts');
 	}
 }
 

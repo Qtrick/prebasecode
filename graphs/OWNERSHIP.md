@@ -7,6 +7,7 @@ PreBase **owns** the Architecture Graph and Network Graph product surface. Imple
 - Graph data model, parsing, import resolution, layout engines (`graphs/src/core/`, `graphs/src/layouts/`, `graphs/src/common/`)
 - Architecture vs Network graph modes, picks, depth/layer visuals
 - Graph settings definitions consumed by the IDE (graph-specific keys) — `graphs/src/common/configuration/`, `graphs/src/host/workbench/graphConfigurationContribution.ts`, re-exported from `graphs/src/settings/`
+- Graph Settings panels — `graphs/src/host/workbench/settings/graphSettingsUi.ts` (public re-export `graphs/src/settings/ui.ts`; generic PreBase Settings shell may route only)
 - Graph canvas interaction keys: `prebase.interaction.panSensitivity`, `zoomSensitivity`, `networkDragDirection`, `nodeDragDelayMs` (not `prebase.interaction.terminalVisibility.*`, which are workbench shell)
 - Commands, keybindings, and Magnus tools that manipulate graph state — `graphs/src/commands/`, `graphs/src/host/workbench/graphContribution.ts`
 - Webview/canvas rendering and interaction (zoom, drag, rotation, selection)
@@ -40,7 +41,7 @@ These files may stay outside `graphs/` **only** as thin bootstrap or mixed PreBa
 | `src/vs/workbench/workbench.desktop.main.ts` | Desktop workbench entry import |
 | `src/vs/workbench/contrib/prebase/graphs` (symlink → `graphs/src`) | Build bridge; no logic |
 | `src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts` | Mixed PreBase settings bootstrap; calls `registerPreBaseGraphConfiguration()`; terminal visibility + runtime/home keys only |
-| `src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts` | Settings UI shell; imports graph types/service from `../graphs/` |
+| `src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts` | Settings UI shell; routes graph categories to `graphs/.../settings/graphSettingsUi.ts` |
 | `src/vs/workbench/contrib/prebase/browser/prebaseIcons.ts` | Shared PreBase icons including Maps/Architecture/Network glyphs |
 | Settings TOC / getting-started | Shell wiring to stable command IDs |
 | `extensions/prebase-magnus` | Extension host; invokes `prebase.graph.*` command IDs |

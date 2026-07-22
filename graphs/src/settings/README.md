@@ -6,23 +6,25 @@
 |---|---|
 | Configuration keys enum | `graphs/src/common/configuration/graphConfigKeys.ts` |
 | Registry contribution | `graphs/src/host/workbench/graphConfigurationContribution.ts` |
-| Public package surface | `graphs/src/settings/index.ts` |
+| Settings UI panels | `graphs/src/host/workbench/settings/graphSettingsUi.ts` |
+| Public registration surface | `graphs/src/settings/index.ts` (DOM-free) |
+| Public Settings UI surface | `graphs/src/settings/ui.ts` |
+| Setting → UI/runtime map | [docs/GRAPH_SETTINGS_MAP.md](../docs/GRAPH_SETTINGS_MAP.md) |
 
 `registerPreBaseGraphConfiguration()` is invoked from allowlisted `prebaseConfiguration.ts` (mixed PreBase bootstrap). **Do not** register `prebase.graph.*` keys twice.
 
-## Settings UI (allowlisted host shell)
+## Settings UI ownership (Phase A complete)
 
-The **PreBase Settings** editor graph category (`_renderGraph`, interaction sliders, performance controls) lives in:
+Graph category panels live under `graphs/`:
 
-`src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts`
+`graphs/src/host/workbench/settings/graphSettingsUi.ts`
 
-This is intentional per [OWNERSHIP.md](../OWNERSHIP.md) and [docs/MIGRATION.md](../docs/MIGRATION.md#bootstrap-allowlist-outside-graphs). The shell:
+The allowlisted shell `prebaseSettingsEditor.ts` only:
 
-- Imports `PreBaseGraphConfigKeys` from `prebaseConfiguration.ts` (re-export of graph keys only).
-- Uses `IPreBaseGraphService` for session layout mode display.
-- Does **not** duplicate default values — defaults remain in `graphConfigurationContribution.ts` property schema.
-
-**Extraction target (post-beta or BETA-001):** move graph panel DOM builders into `graphs/src/settings/` as a workbench-facing helper; keep thin registration in `prebaseSettingsEditor.ts`.
+- Routes Graph / Interaction (graph controls) / Performance / Advanced through `IPreBaseGraphSettingsUiHost`
+- Keeps non-graph categories (Appearance chrome, Sidebar, Editor, Extensions, About) and **terminal visibility** toggles
+- Uses `IPreBaseGraphService` for session layout / relayout via the host bridge
+- Does **not** import or bind `PreBaseGraphConfigKeys`
 
 ## Defaults single source
 
