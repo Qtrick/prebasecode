@@ -33,6 +33,7 @@ if (dupes.length) {
 const configKeys = [
 	...enumKeysFromFile('graphs/src/common/configuration/graphConfigKeys.ts'),
 	...enumKeysFromFile('src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts'),
+	...enumKeysFromFile('src/vs/workbench/contrib/prebase/common/cloud/cloudConfiguration.ts'),
 ];
 const seenKeys = new Map();
 for (const k of configKeys) {

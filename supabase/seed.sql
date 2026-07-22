@@ -1,0 +1,3 @@
+-- PreBase local seed — intentionally empty.
+-- Do not insert real emails or production data here.
+-- Use Supabase Studio / Auth admin API locally to create test users.

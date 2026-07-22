@@ -5,15 +5,15 @@ Canonical PreBase beta readiness tracker. Do not mark an item **Complete** witho
 Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`  
 Severities: `Blocker` | `Critical` | `High` | `Medium` | `Low`
 
-Last audit: **2026-07-20**
+Last audit: **2026-07-21**
 
 ## Summary
 
 | Severity | Open count (approx.) |
 |---|---|
-| Blocker | 3 (graphs root extraction, privacy, packaging) |
-| Critical | 10+ (graphs CI/acceptance, core IDE, Magnus, runtime, security, …) |
-| High | 10+ (toolchain, quality, a11y, release, perf, …) |
+| Blocker | 4 (graphs root extraction, privacy, packaging, hosted-agent quota before public hosted) |
+| Critical | 10+ (graphs CI/acceptance, core IDE, Magnus, runtime, security, RLS runtime, …) |
+| High | 10+ (toolchain, quality, a11y, release, perf, cloud sync, …) |
 
 ### Categories (coverage)
 
@@ -47,7 +47,12 @@ Last audit: **2026-07-20**
 | BETA-007 | Toolchain | TS6 compatibility lane for compiler API consumers | Critical | Complete | — | — | Inventory + compat resolve | `@typescript/typescript6@6.0.2`, import API 6.0.3, `tsc6` 6.0.3; `verify:typescript` | Pre-beta | 2026-07-20 | 2026-07-20 |
 | BETA-008 | Toolchain | Replace `@typescript/native-preview`/`tsgo` with stable TS7 entrypoints | High | Needs Verification | — | Extension compile matrix | Scripts use TS7 `tsc` | Phase F/K: `typescriptCompiler.ts`→`npx tsc`; no `build/lib/tsgo` refs; `assurance:quick` pass 2026-07-20; full `compile-extensions` not run | Pre-beta | 2026-07-20 | — |
 | BETA-009 | Toolchain | typescript-eslint typed lint on compat API | High | Needs Verification | — | Compat package | `npm run eslint` | Compat lane OK; full `npm run eslint` fails ~80k pre-existing warnings; scoped `graphs/**` **0 errors** (Phase F header policy); `.tmp/**` excluded | Pre-beta | 2026-07-20 | — |
-| BETA-010 | Core | Clean startup / workspace open / crash recovery | Critical | Needs Verification | — | GUI launch | Fresh + existing profile launch | Checklist: [CORE_IDE_ACCEPTANCE.md](CORE_IDE_ACCEPTANCE.md) C1–C5 | Pre-beta | 2026-07-20 | — |
+| BETA-010 | Core | Clean startup / workspace open / crash recovery | Critical | Needs Verification | — | GUI launch | Fresh + existing profile launch | 2026-07-21: blank workbench root cause = stale `out/` missing graphs modules; fixed by `transpile-client`; fresh-profile extension host started; `verify:startup` added — full C1–C5 GUI still Needs Verification | Pre-beta | 2026-07-20 | — |
+| BETA-032 | Core | Startup `out/` graphs emit gate (blank-workbench regression) | Critical | In Progress | — | CI transpile before assurance | `verify:startup` / `verify:graphs-out` | Scripts + `assurance:quick` + PR `transpile-client` 2026-07-21; optional `PREBASE_STARTUP_LAUNCH=1` | Pre-beta | 2026-07-21 | — |
+| BETA-033 | Cloud | Supabase Auth (email/password) + SecretStorage sessions | Blocker | In Progress | — | Hosted sign-in smoke | Sign-up/in/out/restore offline | REST client + `PreBaseAccountService` routing; configure via user settings only — GUI smoke open | Pre-beta | 2026-07-21 | — |
+| BETA-034 | Cloud | Database migrations + RLS (profiles, prefs, sessions, usage) | Blocker | In Progress | — | Adversarial two-user runtime | Migrations applied + static RLS verify | Applied on `mvfopbkhftgmcwdpqrww`; `verify:supabase-migrations` + `verify:supabase-rls-static`; runtime adversarial **open** | Pre-beta | 2026-07-21 | — |
+| BETA-035 | Cloud | Hosted Magnus agent-gateway (auth, quotas, provider secrets) | Blocker | Not Started | — | Edge Function deploy + secrets | Authenticated gateway + rate/quota | Skeleton `supabase/functions/agent-gateway` returns 501 after auth; no client wiring | Pre-beta | 2026-07-21 | — |
+| BETA-036 | Cloud | Opt-in agent history sync + export/delete | High | Deferred After Beta | — | Privacy disclosure | Opt-in default false | Schema `agent_events` ready; client sync UI not built | After local IDE beta OK | 2026-07-21 | — |
 | BETA-011 | Core | Native editor reliability (save, undo, search, SCM, terminal, debug) | Critical | Needs Verification | — | GUI smoke | Manual smoke | Checklist: [CORE_IDE_ACCEPTANCE.md](CORE_IDE_ACCEPTANCE.md) E1–E6 | Pre-beta | 2026-07-20 | — |
 | BETA-012 | Magnus | Ask/Plan/Edit/Agent + graph tools reliability | Critical | Needs Verification | — | GUI + Magnus ext | Tool smoke | Checklist: [CORE_IDE_ACCEPTANCE.md](CORE_IDE_ACCEPTANCE.md) P5; no agent session evidence yet | Pre-beta | 2026-07-20 | — |
 | BETA-013 | Runtime Preview | Web/Electron managed+external lifecycle cleanup | Critical | Needs Verification | — | GUI smoke | Manual + unit | Checklist: [CORE_IDE_ACCEPTANCE.md](CORE_IDE_ACCEPTANCE.md) P4; static CSP via `verify:privacy` only | Pre-beta | 2026-07-20 | — |

@@ -188,7 +188,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		note.style.fontSize = '12px';
 		note.style.margin = '0 0 12px';
 		if (state === 'unconfigured') {
-			note.textContent = localize('prebase.onboarding.accountUnconfigured', "Account service is not configured (prebase.account.apiBaseUrl). You can continue without signing in.");
+			note.textContent = localize('prebase.onboarding.accountUnconfigured', "Cloud sign-in is not configured (prebase.cloud.url + prebase.cloud.publishableKey). You can continue without signing in.");
 		} else if (state === 'signedIn' && this.accountService.account) {
 			note.textContent = localize('prebase.onboarding.accountSignedIn', "Signed in as {0}.", this.accountService.account.displayName);
 		} else {

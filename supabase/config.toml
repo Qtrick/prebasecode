@@ -1,0 +1,29 @@
+# PreBase cloud backend — local Supabase CLI config (no secrets).
+# Linked hosted project ref: mvfopbkhftgmcwdpqrww (development).
+# Docs: https://supabase.com/docs/guides/local-development/cli-workflows
+
+project_id = "mvfopbkhftgmcwdpqrww"
+
+[api]
+enabled = true
+port = 54321
+schemas = ["public", "graphql_public"]
+
+[db]
+port = 54322
+major_version = 15
+
+[db.seed]
+enabled = true
+sql_paths = ["./seed.sql"]
+
+[studio]
+enabled = true
+port = 54323
+
+[auth]
+enabled = true
+site_url = "http://127.0.0.1:54321"
+
+[functions.agent-gateway]
+verify_jwt = true

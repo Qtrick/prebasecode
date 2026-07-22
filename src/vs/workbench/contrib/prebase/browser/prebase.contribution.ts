@@ -25,13 +25,15 @@ import { IWorkspacesService } from '../../../../platform/workspaces/common/works
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
 import '../common/prebaseConfiguration.js';
 import { registerPreBaseGraphContribution } from '../graphs/host/workbench/graphContribution.js';
-import { PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
+import { PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL } from '../common/prebaseConfiguration.js';
 import type { PreBaseViewportPreset } from '../common/runtime/viewportPresets.js';
 import { IPreBaseRuntimeService, PreBaseRuntimeService } from './prebaseRuntimeService.js';
 import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
 import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { isWeb } from '../../../../base/common/platform.js';
+import { IPreBaseCloudService, PreBaseCloudService } from './cloud/prebaseCloudService.js';
 import { IPreBaseAccountService, PreBaseAccountContext, PreBaseAccountService } from './prebaseAccountService.js';
+import { PreBaseCloudConfigKeys } from '../common/cloud/cloudConfiguration.js';
 import { prebaseRuntimeViewIcon } from './prebaseIcons.js';
 import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
 import { PreBaseRuntimeViewPane } from './prebaseRuntimeView.js';
@@ -52,6 +54,7 @@ registerPreBaseGraphContribution();
 // --- services
 
 registerSingleton(IPreBaseRuntimeService, PreBaseRuntimeService, InstantiationType.Delayed);
+registerSingleton(IPreBaseCloudService, PreBaseCloudService, InstantiationType.Delayed);
 registerSingleton(IPreBaseAccountService, PreBaseAccountService, InstantiationType.Delayed);
 
 // --- output channel
@@ -344,9 +347,9 @@ async function ensureAccountConfigured(accessor: ServicesAccessor): Promise<bool
 	}
 	accessor.get(INotificationService).notify({
 		severity: Severity.Info,
-		message: localize('prebase.account.unconfiguredMenu', "PreBase account service is not configured. Set prebase.account.apiBaseUrl to an https endpoint to enable sign-in."),
+		message: localize('prebase.account.unconfiguredMenu', "PreBase account service is not configured. Set prebase.cloud.url and prebase.cloud.publishableKey (Supabase) or the deprecated prebase.account.apiBaseUrl to enable sign-in."),
 	});
-	await accessor.get(ICommandService).executeCommand('workbench.action.openSettings', PreBaseConfigKeys.AccountApiBaseUrl);
+	await accessor.get(ICommandService).executeCommand('workbench.action.openSettings', PreBaseCloudConfigKeys.Url);
 	return false;
 }
 

@@ -7,7 +7,7 @@ Repeatable static checks for graph boundary, toolchain lanes, icons, privacy, an
 | Script | Purpose |
 |--------|---------|
 | `npm run assurance` | Alias for `assurance:quick` |
-| `npm run assurance:quick` | Boundary + TS lanes + icon manifest + `typecheck:graphs` + `typecheck-client` + `test:graphs` |
+| `npm run assurance:quick` | Boundary + startup graphs `out/` + TS lanes + icon manifest + Supabase migration static audit + `typecheck:graphs` + `typecheck-client` + `test:graphs` (run `transpile-client` first so `verify:startup` sees current `out/`) |
 | `npm run assurance:graphs` | Boundary + graph typecheck + graph unit tests |
 | `npm run assurance:static` | `assurance:quick` + configuration/command uniqueness |
 | `npm run assurance:privacy` | Static privacy audit (`verify:privacy`) |
@@ -18,6 +18,8 @@ Repeatable static checks for graph boundary, toolchain lanes, icons, privacy, an
 Individual verifiers:
 
 - `verify:graphs-boundary` — graph ownership under `graphs/`
+- `verify:graphs-out` — graphs symlink + canonical transpiled modules under `out/` (run `transpile-client` first locally)
+- `verify:startup` — `verify:graphs-out` + workbench entry `out/` files; optional launch with `PREBASE_STARTUP_LAUNCH=1`
 - `verify:typescript` — TS7 primary + TS6 compat lane versions
 - `verify:icons` — SHA-256 manifest at `build/icons/icon-integrity.sha256` (read-only; does not rewrite icons)
 - `verify:privacy` — product telemetry flags, forbidden endpoints, secret-storage patterns, webview CSP
@@ -52,7 +54,7 @@ Record findings in [BETA_READINESS.md](BETA_READINESS.md) under BETA-014.
 
 ## CI
 
-Pull requests run the **PreBase assurance (fast)** job in [`.github/workflows/pr.yml`](../.github/workflows/pr.yml) (`npm run assurance:quick` + `assurance:privacy`) on `ubuntu-latest` after `npm ci` (Electron download skipped).
+Pull requests run the **PreBase assurance (fast)** job in [`.github/workflows/pr.yml`](../.github/workflows/pr.yml) on `ubuntu-latest`: `npm ci` (Electron download skipped), then `npm run transpile-client` (populates `out/` for `verify:startup`), then `assurance:quick` + `assurance:privacy`. Optional GUI launch is **not** run in CI (`PREBASE_STARTUP_LAUNCH` unset).
 
 Full upstream compile/hygiene remains in the existing **Compile & Hygiene** job.
 

@@ -8,6 +8,7 @@ import { Extensions as ConfigurationExtensions, IConfigurationRegistry } from '.
 import { Registry } from '../../../../platform/registry/common/platform.js';
 import { registerPreBaseGraphConfiguration } from '../graphs/host/workbench/graphConfigurationContribution.js';
 import { PREBASE_GRAPH_RESETTABLE_CONFIG_KEYS } from '../graphs/common/configuration/graphConfigKeys.js';
+import { PreBaseCloudConfigKeys, registerPreBaseCloudConfiguration } from './cloud/cloudConfiguration.js';
 
 export {
 	PREBASE_GRAPH_CHANNEL_ID,
@@ -67,12 +68,13 @@ export enum PreBaseConfigKeys {
 
 /** All `prebase.*` keys owned by PreBase settings (for Reset all). Excludes extension-owned `prebase.magnus.*`. */
 export const PREBASE_RESETTABLE_CONFIG_KEYS: readonly string[] = [
-	...new Set([...Object.values(PreBaseConfigKeys), ...PREBASE_GRAPH_RESETTABLE_CONFIG_KEYS]),
+	...new Set([...Object.values(PreBaseConfigKeys), ...Object.values(PreBaseCloudConfigKeys), ...PREBASE_GRAPH_RESETTABLE_CONFIG_KEYS]),
 ];
 
 const configurationRegistry = Registry.as<IConfigurationRegistry>(ConfigurationExtensions.Configuration);
 
 registerPreBaseGraphConfiguration();
+registerPreBaseCloudConfiguration();
 
 configurationRegistry.registerConfiguration({
 	id: 'prebaseAppearance',
@@ -307,7 +309,7 @@ configurationRegistry.registerConfiguration({
 		[PreBaseConfigKeys.AccountApiBaseUrl]: {
 			type: 'string',
 			default: '',
-			description: localize('prebase.account.apiBaseUrl', "HTTPS base URL for PreBase account sign-in/sign-up. When empty, account credential forms stay disabled and Continue without signing in still works."),
+			description: localize('prebase.account.apiBaseUrl', "Deprecated legacy HTTPS account API base URL. Prefer prebase.cloud.url and prebase.cloud.publishableKey for Supabase Auth. When all account settings are empty, credential forms stay disabled and Continue without signing in still works."),
 		},
 	}
 });
