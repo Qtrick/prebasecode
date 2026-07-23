@@ -296,8 +296,9 @@ export class PreBaseSettingsEditor extends EditorPane {
 			accentCheckbox: () => this._accentCheckbox(),
 			range: (min, max, step, value) => this._range(min, max, step, value),
 			btn: (label, primary) => this._btn(label, primary),
-			sessionLayoutMode: () => this.graphService.getViewState().layoutMode,
-			setLayoutMode: (mode) => this.graphService.setLayoutMode(mode),
+			sessionLayoutMode: () => this.graphService.getSnapshot()?.networkLayoutMode || 'community',
+			// Code Graph layouts use GraphNetworkLayoutMode via host.set — Architecture setLayoutMode is unused.
+			setLayoutMode: async () => { /* no-op for Code Graph */ },
 			relayout: async () => { await this.graphService.relayout(); },
 		};
 	}
@@ -821,7 +822,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const card = this._panel(
 			this._main!,
 			localize('prebase.settings.about.title', "About PreBase"),
-			localize('prebase.settings.about.desc', "Architecture intelligence for your codebase.")
+			localize('prebase.settings.about.desc', "Code Graph intelligence for your codebase.")
 		);
 		const block = DOM.append(card, DOM.$('div'));
 		Object.assign(block.style, { padding: '12px 0', display: 'flex', flexDirection: 'column', gap: '12px' });
@@ -854,7 +855,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const tagline = DOM.append(block, DOM.$('p'));
 		tagline.textContent = localize(
 			'prebase.settings.tagline',
-			"Real-time software architecture visualization built on the VS Code workbench with PreBase graph and runtime tooling."
+			"Real-time Code Graph visualization built on the VS Code workbench with PreBase graph and runtime tooling."
 		);
 		Object.assign(tagline.style, { margin: '0', fontSize: '13px', color: COLORS.textSecondary, lineHeight: '1.5' });
 

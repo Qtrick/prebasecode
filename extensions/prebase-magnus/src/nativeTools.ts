@@ -54,6 +54,70 @@ class GraphOverviewTool implements vscode.LanguageModelTool<Record<string, never
 	}
 }
 
+class GraphFindPathTool implements vscode.LanguageModelTool<{ from: string; to: string }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ from: string; to: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested || !options.input.from?.trim() || !options.input.to?.trim()) {
+			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Both from and to graph node ids or relative paths are required.');
+		}
+		return commandResult(await vscode.commands.executeCommand('prebase.graph.findPathForMagnus', options.input.from.trim(), options.input.to.trim()));
+	}
+}
+
+class GraphAffectedTool implements vscode.LanguageModelTool<{ node: string; maximumNodes?: number }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ node: string; maximumNodes?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested || !options.input.node?.trim()) {
+			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'A graph node id or relative path is required.');
+		}
+		return commandResult(await vscode.commands.executeCommand('prebase.graph.getAffectedForMagnus', options.input.node.trim(), options.input.maximumNodes ?? 50));
+	}
+}
+
+class GraphExplainTool implements vscode.LanguageModelTool<{ node?: string }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ node?: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const node = options.input.node?.trim();
+		return commandResult(await vscode.commands.executeCommand('prebase.graph.explainForMagnus', node || undefined));
+	}
+}
+
+class GraphImportantTool implements vscode.LanguageModelTool<{ limit?: number }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ limit?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		return commandResult(await vscode.commands.executeCommand('prebase.graph.getImportantForMagnus', options.input.limit ?? 10));
+	}
+}
+
+class GraphCommunitiesTool implements vscode.LanguageModelTool<{ limit?: number }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ limit?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		return commandResult(await vscode.commands.executeCommand('prebase.graph.getCommunitiesForMagnus', options.input.limit ?? 30));
+	}
+}
+
+class GraphBridgesTool implements vscode.LanguageModelTool<{ limit?: number }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ limit?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		return commandResult(await vscode.commands.executeCommand('prebase.graph.getBridgesForMagnus', options.input.limit ?? 20));
+	}
+}
+
+class GraphSurprisingTool implements vscode.LanguageModelTool<{ limit?: number }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ limit?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		return commandResult(await vscode.commands.executeCommand('prebase.graph.getSurprisingForMagnus', options.input.limit ?? 10));
+	}
+}
+
 class WorkspaceReadTool implements vscode.LanguageModelTool<{ path: string }> {
 	private readonly workspace = new MagnusWorkspaceTools(1, false);
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
@@ -589,6 +653,13 @@ export function registerMagnusLanguageModelTools(context: vscode.ExtensionContex
 		vscode.lm.registerTool('prebase_graph_get_node', new GraphNodeTool()),
 		vscode.lm.registerTool('prebase_graph_get_dependencies', new GraphDependenciesTool()),
 		vscode.lm.registerTool('prebase_graph_get_overview', new GraphOverviewTool()),
+		vscode.lm.registerTool('prebase_graph_find_path', new GraphFindPathTool()),
+		vscode.lm.registerTool('prebase_graph_get_affected', new GraphAffectedTool()),
+		vscode.lm.registerTool('prebase_graph_explain_node', new GraphExplainTool()),
+		vscode.lm.registerTool('prebase_graph_get_important', new GraphImportantTool()),
+		vscode.lm.registerTool('prebase_graph_get_communities', new GraphCommunitiesTool()),
+		vscode.lm.registerTool('prebase_graph_get_bridges', new GraphBridgesTool()),
+		vscode.lm.registerTool('prebase_graph_get_surprising', new GraphSurprisingTool()),
 		vscode.lm.registerTool('prebase_workspace_read_file', new WorkspaceReadTool()),
 		vscode.lm.registerTool('prebase_workspace_search_text', new WorkspaceSearchTool()),
 		vscode.lm.registerTool('prebase_workspace_list_files', new WorkspaceListFilesTool()),

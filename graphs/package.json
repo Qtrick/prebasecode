@@ -2,7 +2,7 @@
   "name": "@prebase/graphs",
   "version": "0.1.0",
   "private": true,
-  "description": "PreBase Architecture Graph and Network Graph subsystem",
+  "description": "PreBase Code Graph subsystem (unified Architecture/Network product surface)",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",
@@ -12,6 +12,7 @@
   },
   "scripts": {
     "typecheck": "tsc -p ./tsconfig.json --noEmit",
+    "typecheck:preserved": "tsc -p ./tsconfig.preserved-architecture.json --noEmit",
     "verify-boundary": "node ./scripts/verify-boundary/verify.mjs",
     "test": "npm run test:graphs --prefix .."
   }

@@ -84,8 +84,51 @@ const FORBIDDEN_DIR_FRAGMENTS = [
 	'src/vs/workbench/contrib/prebase/browser/prebaseMaps',
 ];
 
-const GRAPH_FILE_NAME_RE = /(?:^|\/)(graphEditor|graphEditorInput|prebaseGraphService|prebaseGraphDescriptionService|prebaseMapsView|networkLayout|architecturePick|hierarchyLayout)\.(ts|js|tsx|jsx)$/;
+const GRAPH_FILE_NAME_RE = /(?:^|\/)(graphEditor|graphEditorInput|prebaseGraphService|prebaseGraphDescriptionService|prebaseMapsView|networkLayout)\.(ts|js|tsx|jsx)$/;
 
+/**
+ * One-Graph-Type: Architecture Graph is unavailable in-app, but sources are PRESERVED
+ * under graphs/src/preserved/architecture/ (not deleted). Active product paths below
+ * must stay empty. Allowed elsewhere (do not treat as live Architecture product):
+ * - command id aliases: openArchitecture / openNetwork → Code Graph
+ * - deprecated settings keys (included:false): GraphDefaultArchitectureLayout, GraphArchitectureMode, …
+ * - serializer / normalizeToCodeGraphType coerce-to-code
+ * - graphs/src/core/analysis/architectureLayers.ts (metadata enrichment for Code Graph)
+ * - graphs/src/preserved/architecture/** (archive only — must not be imported by active code)
+ */
+const FORBIDDEN_ARCHITECTURE_PRODUCT_PATHS = [
+	'graphs/src/layouts/architecture',
+	'graphs/src/architecture',
+	// Arch-only helpers live under preserved/; Code Graph uses layouts/network only.
+	'graphs/src/layouts/shared',
+	'graphs/src/core/analysis/dependencyDepth.ts',
+	'graphs/src/tests/unit/architecturePick.test.ts',
+];
+
+const PRESERVED_ARCHITECTURE_ROOT = 'graphs/src/preserved/architecture';
+
+/** Required preservation docs + representative sources (must exist). */
+const REQUIRED_PRESERVED_ARCHITECTURE_PATHS = [
+	`${PRESERVED_ARCHITECTURE_ROOT}/README.md`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/ASSET_MANIFEST.md`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/LEGACY_SETTINGS.md`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/interaction/architecturePick.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/analysis/dependencyDepth.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/layouts/layoutEngine.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/layouts/hierarchy/hierarchyLayout.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/layouts/hierarchy/hierarchyDepthVisuals.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/layouts/shared/layoutConfig.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/layouts/shared/layoutConstraints.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/layouts/shared/layoutDepthColors.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/layouts/shared/layoutOrganization.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/tests/architecturePick.test.ts`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/legacy-first-test/README.md`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/legacy-first-test/components/graph/PyramidLabels.tsx`,
+	`${PRESERVED_ARCHITECTURE_ROOT}/legacy-first-test/components/nodes/ArchitectureNode.tsx`,
+];
+
+/** Import/require of preserved Architecture archive from active graphs sources. */
+const PRESERVED_IMPORT_RE = /(?:from\s+['"][^'"]*preserved\/architecture[^'"]*['"]|require\(\s*['"][^'"]*preserved\/architecture[^'"]*['"]\s*\))/;
 function isUnderGraphs(relPosix) {
 	return relPosix === 'graphs' || relPosix.startsWith('graphs/');
 }
@@ -160,6 +203,8 @@ if (!fs.existsSync(path.join(REPO_ROOT, 'graphs/src/host/workbench/graphContribu
 const GRAPH_COMMAND_DEF_ID_RE = /\bid:\s*['"`]prebase\.graph\.[^'"`]+['"`]/g;
 const REGISTER_ACTION2_RE = /registerAction2\s*\(/;
 
+// Allowlist: openArchitecture / openNetwork remain aliases → Code Graph (see PreBaseGraphCommandIds).
+// Reject restoring a separate Architecture product command surface outside graphs/.
 const COMMAND_DEF_SCAN_ROOTS = [
 	path.join(REPO_ROOT, 'src/vs/workbench'),
 	path.join(REPO_ROOT, 'extensions'),
@@ -245,6 +290,53 @@ if (fs.existsSync(CORE_DIR)) {
 	}
 }
 
+// 8b) Architecture Graph must stay unavailable on active product paths (preserved archive is required)
+for (const frag of FORBIDDEN_ARCHITECTURE_PRODUCT_PATHS) {
+	const full = path.join(REPO_ROOT, frag);
+	if (fs.existsSync(full)) {
+		failures.push(`Forbidden active Architecture Graph product path: ${frag} (move under ${PRESERVED_ARCHITECTURE_ROOT}/; keep openArchitecture/openNetwork aliases + deprecated settings + architectureLayers.ts)`);
+	}
+}
+
+for (const rel of REQUIRED_PRESERVED_ARCHITECTURE_PATHS) {
+	const full = path.join(REPO_ROOT, rel);
+	if (!fs.existsSync(full)) {
+		failures.push(`Missing preserved Architecture asset: ${rel} (Architecture sources must be preserved, not deleted)`);
+	}
+}
+
+// 8c) Active graphs sources must not import the preserved Architecture archive
+const ACTIVE_GRAPH_SCAN_ROOTS = [
+	path.join(REPO_ROOT, 'graphs/src/common'),
+	path.join(REPO_ROOT, 'graphs/src/core'),
+	path.join(REPO_ROOT, 'graphs/src/layouts'),
+	path.join(REPO_ROOT, 'graphs/src/host'),
+	path.join(REPO_ROOT, 'graphs/src/commands'),
+	path.join(REPO_ROOT, 'graphs/src/settings'),
+	path.join(REPO_ROOT, 'graphs/src/tests'),
+	path.join(REPO_ROOT, 'graphs/src/index.ts'),
+	path.join(REPO_ROOT, 'graphs/src/node.ts'),
+	path.join(REPO_ROOT, 'graphs/src/browser.ts'),
+];
+for (const root of ACTIVE_GRAPH_SCAN_ROOTS) {
+	if (!fs.existsSync(root)) {
+		continue;
+	}
+	const files = fs.statSync(root).isDirectory() ? walk(root) : [root];
+	for (const full of files) {
+		if (!/\.(ts|tsx|js|jsx|mjs)$/.test(full)) {
+			continue;
+		}
+		const rel = path.relative(REPO_ROOT, full).split(path.sep).join('/');
+		if (rel.startsWith(`${PRESERVED_ARCHITECTURE_ROOT}/`)) {
+			continue;
+		}
+		const content = fs.readFileSync(full, 'utf8');
+		if (PRESERVED_IMPORT_RE.test(content)) {
+			failures.push(`Active graph source imports preserved Architecture archive: ${rel}`);
+		}
+	}
+}
 // 9) Settings shell must not own graph panel bodies (route through graphSettingsUi)
 const GRAPH_SETTINGS_UI = path.join(REPO_ROOT, 'graphs/src/host/workbench/settings/graphSettingsUi.ts');
 if (!fs.existsSync(GRAPH_SETTINGS_UI)) {

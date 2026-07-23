@@ -6,6 +6,8 @@
 export const PreBaseGraphCommandIds = {
 	clearDescriptionCache: 'prebase.graph.clearDescriptionCache',
 	regenerateDescription: 'prebase.graph.regenerateDescription',
+	/** Canonical Code Graph open — registered in graphContribution (Phase D). */
+	open: 'prebase.graph.open',
 	openArchitecture: 'prebase.graph.openArchitecture',
 	openNetwork: 'prebase.graph.openNetwork',
 	scanWorkspace: 'prebase.graph.scanWorkspace',
@@ -30,4 +32,16 @@ export const PreBaseGraphCommandIds = {
 	getOverviewForMagnus: 'prebase.graph.getOverviewForMagnus',
 	focusForMagnus: 'prebase.graph.focusForMagnus',
 	attachSelectionToMagnus: 'prebase.graph.attachSelectionToMagnus',
+	findPathForMagnus: 'prebase.graph.findPathForMagnus',
+	getAffectedForMagnus: 'prebase.graph.getAffectedForMagnus',
+	explainSelectedNode: 'prebase.graph.explainSelectedNode',
+	showImportantNodes: 'prebase.graph.showImportantNodes',
+	showBridgeNodes: 'prebase.graph.showBridgeNodes',
+	showCommunities: 'prebase.graph.showCommunities',
+	explainForMagnus: 'prebase.graph.explainForMagnus',
+	getImportantForMagnus: 'prebase.graph.getImportantForMagnus',
+	getCommunitiesForMagnus: 'prebase.graph.getCommunitiesForMagnus',
+	getBridgesForMagnus: 'prebase.graph.getBridgesForMagnus',
+	getSurprisingForMagnus: 'prebase.graph.getSurprisingForMagnus',
+	showSurprisingConnections: 'prebase.graph.showSurprisingConnections',
 } as const;

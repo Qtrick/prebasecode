@@ -25,9 +25,9 @@ import azureStorage_ from 'gulp-azure-storage';
 import bom_ from 'gulp-bom';
 import buffer_ from 'gulp-buffer';
 import vinylZip_ from 'gulp-vinyl-zip';
-import svgmin_ from 'gulp-svgmin';
 import sort_ from 'gulp-sort';
 import g from 'gulp';
+import { svgmin as svgmin_ } from './svgmin.ts';
 
 export const filter = filter_;
 export type { FileFunction } from 'gulp-filter';

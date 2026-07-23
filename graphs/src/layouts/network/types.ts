@@ -5,6 +5,8 @@
 export interface NetworkLayoutNode {
 	id: string;
 	fileTypeId?: string;
+	/** Label-propagation community id (Community Force layout). */
+	communityId?: number;
 	val?: number;
 	isEntry?: boolean;
 }
@@ -15,6 +17,7 @@ export interface NetworkLayoutLink {
 }
 
 export type NetworkLayoutMode =
+	| 'community'
 	| 'organic'
 	| 'sphere'
 	| 'constellation'

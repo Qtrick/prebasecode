@@ -271,18 +271,11 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
 				createMagnusSetupStep('MagnusSetupComplete', MagnusStartChatButton, 'chatSetupCompleted && !chatSetupDisabled'),
 				createMagnusSetupStep('MagnusSetupSignedIn', MagnusOpenButton, 'false'),
 				{
-					id: 'prebaseArchitectureGraph',
-					title: localize('gettingStarted.prebaseArchitecture.title', "Open Architecture Graph"),
-					description: localize('gettingStarted.prebaseArchitecture.description.interpolated', "Explore how modules and layers connect across your project.\n{0}", Button(localize('openArchitectureGraph', "Open Architecture Graph"), 'command:prebase.graph.openArchitecture')),
-					completionEvents: ['onCommand:prebase.graph.openArchitecture'],
-					media: { type: 'svg', altText: 'Architecture Graph', path: 'learn.svg' },
-				},
-				{
-					id: 'prebaseNetworkGraph',
-					title: localize('gettingStarted.prebaseNetwork.title', "Open Network Graph"),
-					description: localize('gettingStarted.prebaseNetwork.description.interpolated', "Inspect dependency relationships as a network of connected files.\n{0}", Button(localize('openNetworkGraph', "Open Network Graph"), 'command:prebase.graph.openNetwork')),
-					completionEvents: ['onCommand:prebase.graph.openNetwork'],
-					media: { type: 'svg', altText: 'Network Graph', path: 'learn.svg' },
+					id: 'prebaseCodeGraph',
+					title: localize('gettingStarted.prebaseCodeGraph.title', "Open Code Graph"),
+					description: localize('gettingStarted.prebaseCodeGraph.description.interpolated', "Explore how files and dependencies connect across your project.\n{0}", Button(localize('openCodeGraph', "Open Code Graph"), 'command:prebase.graph.open')),
+					completionEvents: ['onCommand:prebase.graph.open'],
+					media: { type: 'svg', altText: 'Code Graph', path: 'learn.svg' },
 				},
 				{
 					id: 'prebaseRuntimePreview',

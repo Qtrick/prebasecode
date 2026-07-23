@@ -1,8 +1,8 @@
 # PreBase graphs package
 
-Architecture Graph and Network Graph implementation for PreBase. **All graph-owned code must live under this directory** (see [OWNERSHIP.md](./OWNERSHIP.md) and `.cursor/rules/graphs-ownership.mdc`).
+Architecture / Network Graph implementation for PreBase is unified as **Code Graph**. **All graph-owned code must live under this directory** (see [OWNERSHIP.md](./OWNERSHIP.md) and `.cursor/rules/graphs-ownership.mdc`).
 
-## Current status (2026-07-21, Phase A Settings UI + shim removal)
+## Current status (2026-07-22, One-Graph-Type Code Graph)
 
 **Migration:** Core, layouts, host adapters, graph settings registration (`graphConfigurationContribution.ts`), graph Settings UI (`settings/graphSettingsUi.ts`), and graph commands (`graphContribution.ts`) live under `graphs/src/`. Workbench compiles them through a symlink bridge (see below). Legacy `common/graph/`, graph-only `browser/*`, and Phase D flat `core/*.ts` shims are **removed**.
 
@@ -13,10 +13,10 @@ Architecture Graph and Network Graph implementation for PreBase. **All graph-own
 | Settings UI panels | `graphs/src/host/workbench/settings/graphSettingsUi.ts` |
 | Command IDs + `registerPreBaseGraphContribution` | `graphs/src/commands/graphCommandIds.ts`, `graphs/src/host/workbench/graphContribution.ts` |
 | Scanning, parsing, resolution, generation, analysis | `graphs/src/core/{scanning,parsing,resolution,generation,analysis}/` |
-| Architecture & network layouts | `graphs/src/layouts/` (`shared/`, `architecture/`, `network/`) |
-| Architecture interaction (pick/hit-test) | `graphs/src/architecture/interaction/` |
+| Network / Code Graph layouts | `graphs/src/layouts/network/` — Architecture layouts unavailable in-app; sources preserved under `graphs/src/preserved/architecture/` |
+| Preserved Architecture archive | `graphs/src/preserved/architecture/` — LayoutEngine, hierarchy, pick, Arch-only shared helpers (not imported by active runtime) |
 | Host (editors, webview, services) | `graphs/src/host/workbench/` |
-| Unit tests | `graphs/src/tests/unit/` (`architecturePick`, `networkLayout`, `graphOwnershipBoundary`) |
+| Unit tests | `graphs/src/tests/unit/` (`networkLayout`, `communities`, `graphProduct`, ownership boundary, …) |
 | Boundary verifier | `graphs/scripts/verify-boundary/verify.mjs` → `npm run verify:graphs-boundary` |
 
 **Still allowlisted outside `graphs/` (thin bootstrap only):** `prebase.contribution.ts` imports `registerPreBaseGraphContribution()`; `prebaseConfiguration.ts` imports `registerPreBaseGraphConfiguration()` and owns runtime/home/terminal-visibility keys; `prebaseSettingsEditor.ts` is the Settings **shell** (routes graph panels into `graphSettingsUi.ts`). See [docs/MIGRATION.md](./docs/MIGRATION.md).
@@ -42,8 +42,8 @@ graphs/
 ├── src/
 │   ├── common/               # graphTypes, fileTypeColors, configuration keys
 │   ├── core/                 # scanning, parsing, resolution, generation, analysis
-│   ├── layouts/              # architecture + network layout engines
-│   ├── architecture/         # interaction helpers (e.g. pick)
+│   ├── layouts/              # network layout engines (Code Graph)
+│   ├── preserved/architecture/ # Architecture Graph archive (unavailable in-app)
 │   ├── host/workbench/       # Workbench adapters + settings/graphSettingsUi.ts
 │   ├── settings/             # Public settings re-exports
 │   ├── tests/unit/           # Node/mocha unit tests
@@ -66,7 +66,7 @@ Thin registration and mixed PreBase settings shell — full allowlist in [OWNERS
 
 - `npm run verify:graphs-boundary` (repo root) — graph boundary verifier (BETA-002).
 - `npm run verify:typescript` (repo root) — dual-lane audit (TS7 `tsc` + TS6 API `tsc6`); exits non-zero if primary lane missing.
-- `npm run typecheck:graphs` — graph **core** only (`common/`, `core/`, `layouts/`, `architecture/`).
+- `npm run typecheck:graphs` — graph **core** only (`common/`, `core/`, `layouts/network/`).
 - `npm run typecheck-client` — full workbench including graph host via symlink.
 - `npm run test:graphs` — unit tests under `graphs/src/tests/unit/` (Node strip-types; no `out/` compile required).
 

@@ -27,7 +27,7 @@ Research/migration date: **2026-07-20**
 | Commands extract → `graphs/src/commands/` + `graphContribution.ts` | **Done** (Phase C, 2026-07-20) |
 | Unit tests | `graphs/src/tests/unit/` (runner via workbench node harness) |
 | On-disk core layout | Phase D: `common/`, `core/*/` subdirs, `layouts/`, `architecture/interaction/` (2026-07-20) |
-| `hierarchyLayout.ts` split | **Intentionally single file** under `layouts/architecture/hierarchy/` — hierarchy, pyramid, and scatter share depth bands, ring guides, and `layoutConstraints` finalize helpers; extracting modes would duplicate private placement logic or change behavior |
+| `hierarchyLayout.ts` split | **Preserved** under `graphs/src/preserved/architecture/layouts/hierarchy/` (One-Graph-Type). Do not restore under active `layouts/architecture/`. |
 
 ### Checkpoint 1 — pre-extraction plan (2026-07-20)
 
@@ -91,7 +91,7 @@ Registry section `prebaseInteraction` is mixed today; Phase B should **split reg
 
 | Old prefix (from `browser/` or `common/`) | New prefix (after move) |
 |---|---|
-| `../common/graph/<file>.js` | See [Phase D inventory](#inventory-table) — e.g. `../graphs/common/types/graphTypes.js`, `../graphs/core/analysis/dependencyDepth.js`, `../graphs/layouts/network/index.js` |
+| `../common/graph/<file>.js` | See [Phase D inventory](#inventory-table) — e.g. `../graphs/common/types/graphTypes.js`, `../graphs/core/analysis/architectureLayers.js`, `../graphs/layouts/network/index.js` |
 | `./graphEditor.js` (contribution) | `../graphs/host/workbench/graphEditor.js` |
 | `../../common/graph/*` (unit tests) | `../../../graphs/layouts/...` or `../../../graphs/core/...` (per module) |
 

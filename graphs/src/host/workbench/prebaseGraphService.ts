@@ -16,10 +16,15 @@ import { IOutputService } from '../../../../../services/output/common/output.js'
 import { match as matchGlob } from '../../../../../../base/common/glob.js';
 import { PreBaseGraphConfigKeys, PREBASE_GRAPH_CHANNEL_ID } from '../../common/configuration/graphConfigKeys.js';
 import { detectEntryNodeId } from '../../core/analysis/entryDetector.js';
+import { findBridgeNodes } from '../../core/analysis/bridgeNodes.js';
+import { applyCommunitiesToNodes, countCommunities, isNodeCommunityHidden, listCommunitySummaries, normalizeHiddenCommunityIds } from '../../core/analysis/communities.js';
+import { explainNode } from '../../core/analysis/explainNode.js';
+import { rankImportantNodes } from '../../core/analysis/importantNodes.js';
+import { findSurprisingConnections } from '../../core/analysis/surprisingConnections.js';
 import { GraphGenerator } from '../../core/generation/graphGenerator.js';
+import { affectedNodes, searchNodes, shortestPath } from '../../core/query/graphQuery.js';
 import { DEFAULT_IGNORE_PATTERNS } from '../../core/scanning/ignorePatterns.js';
 import { extractImportsForFile, extractPackageName } from '../../core/parsing/importExtractors.js';
-import { LayoutEngine } from '../../layouts/architecture/layoutEngine.js';
 import {
 	computeNetworkSphereRadius,
 	layoutNetworkGraph,
@@ -28,21 +33,14 @@ import {
 import { getFileTypeInfo } from '../../common/constants/fileTypeColors.js';
 import {
 	assignLayersToNodes,
-	computeNodeImportance,
-	filterNodesForArchitectureMode
+	buildImportanceByNode,
 } from '../../core/analysis/architectureLayers.js';
-import {
-	getHierarchyRingBandsForSnapshot,
-	getPyramidDepthBands,
-	type HierarchyRingBand,
-	type PyramidDepthBand
-} from '../../layouts/architecture/hierarchy/hierarchyLayout.js';
 import { isGraphRelevantFile } from '../../core/scanning/projectFiles.js';
 import { basename, normalizePath } from '../../core/resolution/paths.js';
 import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode, ParseResult, ScannedFile } from '../../common/types/graphTypes.js';
-import { depthLevelColor } from '../../layouts/shared/layoutDepthColors.js';
+import { isCodeGraphCanvas, normalizeToCodeGraphType, type PreBaseGraphType } from '../../common/types/graphProduct.js';
 
-export type PreBaseGraphType = 'architecture' | 'network';
+export type { PreBaseGraphType } from '../../common/types/graphProduct.js';
 
 export interface PreBaseGraphViewState {
 	graphType: PreBaseGraphType;
@@ -53,8 +51,9 @@ export interface PreBaseEnrichedSnapshot extends GraphSnapshot {
 	graphType: PreBaseGraphType;
 	layoutMode: LayoutMode;
 	networkLayoutMode?: NetworkLayoutMode;
-	ringBands: Array<HierarchyRingBand & { color: string }>;
-	pyramidBands: Array<PyramidDepthBand & { color: string }>;
+	/** Always empty after Architecture Graph removal; kept for webview message back-compat. */
+	ringBands: Array<{ color: string }>;
+	pyramidBands: Array<{ color: string }>;
 	diagnostics: PreBaseGraphDiagnostics;
 }
 
@@ -78,10 +77,13 @@ export interface IPreBaseGraphService {
 	readonly onDidChangeViewState: Event<PreBaseGraphViewState>;
 	readonly onDidChangeDiagnostics: Event<PreBaseGraphDiagnostics>;
 	readonly onDidRequestCameraAction: Event<PreBaseGraphCameraAction>;
+	readonly onDidChangeHiddenCommunities: Event<readonly number[]>;
 
 	getSnapshot(): PreBaseEnrichedSnapshot | undefined;
 	getViewState(): PreBaseGraphViewState;
 	getDiagnostics(): PreBaseGraphDiagnostics;
+	getHiddenCommunityIds(): readonly number[];
+	setHiddenCommunityIds(ids: number[]): void;
 
 	scanWorkspace(token?: CancellationToken): Promise<PreBaseEnrichedSnapshot | undefined>;
 	rescanWorkspace(token?: CancellationToken): Promise<PreBaseEnrichedSnapshot | undefined>;
@@ -99,6 +101,14 @@ export interface IPreBaseGraphService {
 	getNodeDetailsForMagnus(nodeIdOrPath: string): string | undefined;
 	getDependenciesForMagnus(nodeIdOrPath: string, direction?: 'incoming' | 'outgoing' | 'both', depth?: number, maximumNodes?: number): string | undefined;
 	getOverviewForMagnus(): string;
+	findPathForMagnus(fromIdOrPath: string, toIdOrPath: string): string | undefined;
+	getAffectedForMagnus(nodeIdOrPath: string, maximumNodes?: number): string | undefined;
+	explainSelectedForMagnus(): string | undefined;
+	explainNodeForMagnus(nodeIdOrPath: string): string | undefined;
+	getImportantNodesForMagnus(limit?: number): string;
+	getCommunitiesForMagnus(limit?: number): string;
+	getBridgeNodesForMagnus(limit?: number): string;
+	getSurprisingConnectionsForMagnus(limit?: number): string;
 	focusNodeForMagnus(nodeIdOrPath: string): boolean;
 
 	requestResetView(): void;
@@ -120,10 +130,14 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	private readonly _onDidRequestCameraAction = this._register(new Emitter<PreBaseGraphCameraAction>());
 	readonly onDidRequestCameraAction = this._onDidRequestCameraAction.event;
 
+	private readonly _onDidChangeHiddenCommunities = this._register(new Emitter<readonly number[]>());
+	readonly onDidChangeHiddenCommunities = this._onDidChangeHiddenCommunities.event;
+
 	private _snapshot: PreBaseEnrichedSnapshot | undefined;
 	private _rawSnapshot: GraphSnapshot | undefined;
 	private _scanCts: CancellationTokenSource | undefined;
 	private _selectedNodeId: string | undefined;
+	private _hiddenCommunityIds: number[] = [];
 	private _viewState: PreBaseGraphViewState;
 	private _diagnostics: PreBaseGraphDiagnostics = {
 		fileCount: 0,
@@ -142,15 +156,15 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	) {
 		super();
 		this._viewState = {
-			graphType: this.configurationService.getValue<PreBaseGraphType>(PreBaseGraphConfigKeys.GraphDefaultType) || 'architecture',
-			layoutMode: this.configurationService.getValue<LayoutMode>(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout) || 'hierarchy'
+			graphType: normalizeToCodeGraphType(this.configurationService.getValue<PreBaseGraphType>(PreBaseGraphConfigKeys.GraphDefaultType)),
+			// Legacy Arch layout field kept for webview message shape only — do not read deprecated Arch settings.
+			layoutMode: 'hierarchy'
 		};
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphHideLowImportance) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedNodes) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedEdges) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphArchitectureMode)
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedEdges)
 			) {
 				if (this._rawSnapshot) {
 					const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
@@ -159,13 +173,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 					this._setDiagnostics(enriched.diagnostics);
 				}
 			} else if (
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkForceStrength) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkAlphaDecay) ||
+				// ponytail: force/link/alphaDecay keys exist for migration but layouts ignore them — do not relayout on no-ops.
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkSpreadScale)
 			) {
-				if (this._viewState.graphType === 'network' && this._rawSnapshot) {
+				if (isCodeGraphCanvas(this._viewState.graphType) && this._rawSnapshot) {
 					void this.relayout();
 				}
 			}
@@ -188,7 +200,41 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		return this._selectedNodeId;
 	}
 
+	getHiddenCommunityIds(): readonly number[] {
+		return this._hiddenCommunityIds;
+	}
+
+	setHiddenCommunityIds(ids: number[]): void {
+		const next = normalizeHiddenCommunityIds(ids);
+		if (
+			next.length === this._hiddenCommunityIds.length &&
+			next.every((id, i) => id === this._hiddenCommunityIds[i])
+		) {
+			return;
+		}
+		this._hiddenCommunityIds = next;
+		let clearedSelection = false;
+		if (this._selectedNodeId && this._snapshot) {
+			const node = this._snapshot.nodes.find(n => n.id === this._selectedNodeId);
+			if (node && isNodeCommunityHidden(node.meta?.communityId, next)) {
+				this._selectedNodeId = undefined;
+				clearedSelection = true;
+			}
+		}
+		this._onDidChangeHiddenCommunities.fire(this._hiddenCommunityIds);
+		// Selection consumers listen to snapshot — notify when hide cleared the selection.
+		if (clearedSelection && this._snapshot) {
+			this._onDidChangeSnapshot.fire(this._snapshot);
+		}
+	}
+
 	setSelectedNodeId(nodeId: string | undefined): void {
+		if (nodeId && this._snapshot) {
+			const node = this._snapshot.nodes.find(n => n.id === nodeId);
+			if (!node || isNodeCommunityHidden(node.meta?.communityId, this._hiddenCommunityIds)) {
+				nodeId = undefined;
+			}
+		}
 		if (this._selectedNodeId === nodeId) {
 			return;
 		}
@@ -215,9 +261,10 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			return undefined;
 		}
 		const edges = this._snapshot.edges.filter(e => e.source === node.id || e.target === node.id);
+		const layout = this._snapshot.networkLayoutMode || this._getNetworkLayoutMode();
 		return [
-			`Graph type: ${this._snapshot.graphType}`,
-			`Layout: ${this._snapshot.layoutMode}`,
+			`Graph: Code Graph`,
+			`Layout: ${layout}`,
 			`Selected node: ${node.label || node.id}`,
 			`Path: ${node.path || node.id}`,
 			`Kind: ${node.kind}`,
@@ -227,29 +274,33 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	searchForMagnus(query: string, maximumResults = 20): string {
 		const snapshot = this._snapshot;
-		const normalized = typeof query === 'string' && query.length <= 512 ? query.trim().toLowerCase() : '';
-		if (!snapshot || !normalized) {
-			return JSON.stringify({ graph: this._freshness(), nodes: [] });
+		const rawQuery = typeof query === 'string' && query.length <= 512 ? query.trim() : '';
+		if (!snapshot || !rawQuery) {
+			return JSON.stringify({ graph: this._freshness(), nodes: [], truncated: false });
 		}
 		const boundedMaximum = typeof maximumResults === 'number' && Number.isFinite(maximumResults)
 			? Math.max(1, Math.min(Math.floor(maximumResults), 50))
 			: 20;
-		const degree = this._degrees(snapshot);
-		const nodes = snapshot.nodes
-			.filter(node => [node.id, node.label, node.path, node.kind, node.meta?.language, node.meta?.architectureLayer]
-				.some(value => value?.toLowerCase().includes(normalized)))
-			.slice(0, boundedMaximum)
-			.map(node => ({
-				id: node.id,
-				label: node.label,
-				path: node.path,
-				kind: node.kind,
-				language: node.meta?.language,
-				layer: node.meta?.architectureLayer,
-				isEntry: !!node.isEntry,
-				degree: degree.get(node.id) ?? 0,
-			}));
-		return JSON.stringify({ graph: this._freshness(), nodes });
+		const result = searchNodes(snapshot.nodes, rawQuery, boundedMaximum);
+		const nodes = result.nodes.map(node => ({
+			id: node.id,
+			label: node.label,
+			path: node.path,
+			kind: node.kind,
+			language: node.meta?.language,
+			layer: node.meta?.architectureLayer,
+			communityId: node.meta?.communityId,
+			communityLabel: node.meta?.communityLabel,
+			isEntry: !!node.isEntry,
+			degree: node.meta?.degree ?? 0,
+		}));
+		return JSON.stringify({
+			graph: this._freshness(),
+			nodes,
+			truncated: result.truncated,
+			seedMatch: !!result.seedMatch,
+			notice: result.truncated ? `Results truncated to ${boundedMaximum}.` : undefined,
+		});
 	}
 
 	getNodeDetailsForMagnus(nodeIdOrPath: string): string | undefined {
@@ -258,12 +309,27 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		if (!snapshot || !node) {
 			return undefined;
 		}
-		const edges = snapshot.edges.filter(edge => edge.source === node.id || edge.target === node.id);
+		const maxNeighbors = 50;
+		const outgoing = snapshot.edges
+			.filter(edge => edge.source === node.id)
+			.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+			.map(edge => ({ kind: edge.kind, target: edge.target, confidence: edge.meta?.confidence }));
+		const incoming = snapshot.edges
+			.filter(edge => edge.target === node.id)
+			.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
+			.map(edge => ({ kind: edge.kind, source: edge.source, confidence: edge.meta?.confidence }));
+		const importsTruncated = outgoing.length > maxNeighbors;
+		const dependentsTruncated = incoming.length > maxNeighbors;
+		const truncated = importsTruncated || dependentsTruncated;
 		return JSON.stringify({
 			graph: this._freshness(),
 			node,
-			imports: edges.filter(edge => edge.source === node.id).map(edge => ({ kind: edge.kind, target: edge.target })),
-			dependents: edges.filter(edge => edge.target === node.id).map(edge => ({ kind: edge.kind, source: edge.source })),
+			imports: outgoing.slice(0, maxNeighbors),
+			dependents: incoming.slice(0, maxNeighbors),
+			truncated,
+			notice: truncated
+				? `Neighbor lists truncated to ${maxNeighbors} each (imports ${outgoing.length}, dependents ${incoming.length}).`
+				: undefined,
 		});
 	}
 
@@ -279,7 +345,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const visited = new Set<string>([root.id]);
 		const queue: Array<{ id: string; depth: number }> = [{ id: root.id, depth: 0 }];
 		const relationships: Array<{ from: string; to: string; kind: string }> = [];
-		while (queue.length && visited.size <= maximum) {
+		let truncated = false;
+		while (queue.length) {
 			const current = queue.shift()!;
 			if (current.depth >= boundedDepth) {
 				continue;
@@ -291,31 +358,185 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 					continue;
 				}
 				const next = forward ? edge.target : edge.source;
-				relationships.push({ from: current.id, to: next, kind: edge.kind });
-				if (!visited.has(next) && visited.size < maximum) {
+				if (!visited.has(next)) {
+					if (visited.size >= maximum) {
+						truncated = true;
+						continue;
+					}
 					visited.add(next);
 					queue.push({ id: next, depth: current.depth + 1 });
 				}
+				relationships.push({ from: current.id, to: next, kind: edge.kind });
 			}
+		}
+		const relationshipCap = maximum * 3;
+		const boundedRelationships = relationships.slice(0, relationshipCap);
+		if (relationships.length > boundedRelationships.length) {
+			truncated = true;
 		}
 		return JSON.stringify({
 			graph: this._freshness(),
 			root: root.id,
 			nodes: [...visited].map(id => snapshot.nodes.find(node => node.id === id)).filter(Boolean),
-			relationships: relationships.slice(0, maximum * 3),
+			relationships: boundedRelationships,
+			truncated,
+			notice: truncated ? `Dependency neighborhood truncated to ${maximum} nodes.` : undefined,
 		});
 	}
 
 	getOverviewForMagnus(): string {
 		const snapshot = this._snapshot;
 		if (!snapshot) {
-			return JSON.stringify({ graph: this._freshness(), available: false });
+			return JSON.stringify({ product: 'code', graph: this._freshness(), available: false });
 		}
-		const degree = this._degrees(snapshot);
 		const languages = [...new Set(snapshot.nodes.map(node => node.meta?.language).filter((value): value is string => !!value))];
-		const highDegree = [...degree.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)
-			.map(([id, count]) => ({ id, degree: count, path: snapshot.nodes.find(node => node.id === id)?.path }));
-		return JSON.stringify({ graph: this._freshness(), available: true, languages, highDegree });
+		const important = rankImportantNodes(snapshot.nodes, snapshot.edges, 10);
+		return JSON.stringify({
+			product: 'code',
+			graph: this._freshness(),
+			available: true,
+			layout: snapshot.networkLayoutMode || this._getNetworkLayoutMode(),
+			schemaVersion: snapshot.schemaVersion ?? 2,
+			languages,
+			communityCount: countCommunities(snapshot.nodes),
+			importantNodes: important,
+			highDegree: important.map(hit => ({ id: hit.id, degree: hit.degree, path: hit.path, reason: hit.reason })),
+		});
+	}
+
+	findPathForMagnus(fromIdOrPath: string, toIdOrPath: string): string | undefined {
+		const snapshot = this._snapshot;
+		const from = this._findNode(fromIdOrPath);
+		const to = this._findNode(toIdOrPath);
+		if (!snapshot || !from || !to) {
+			return undefined;
+		}
+		// Link edges only — contains/folder deps must not invent false import paths.
+		const linkEdges = snapshot.edges.filter(e => e.kind === 'import' || e.kind === 'dependency');
+		const path = shortestPath(snapshot.nodes, linkEdges, from.id, to.id, 5000);
+		return JSON.stringify({
+			graph: this._freshness(),
+			from: from.id,
+			to: to.id,
+			...path,
+			notice: path.budgetExceeded
+				? 'Path search hit the visit budget before finding a route.'
+				: undefined,
+		});
+	}
+
+	getAffectedForMagnus(nodeIdOrPath: string, maximumNodes = 50): string | undefined {
+		const snapshot = this._snapshot;
+		const root = this._findNode(nodeIdOrPath);
+		if (!snapshot || !root) {
+			return undefined;
+		}
+		const maximum = typeof maximumNodes === 'number' && Number.isFinite(maximumNodes)
+			? Math.max(1, Math.min(Math.floor(maximumNodes), 100))
+			: 50;
+		const linkEdges = snapshot.edges.filter(e => e.kind === 'import' || e.kind === 'dependency');
+		const result = affectedNodes(linkEdges, root.id, maximum);
+		return JSON.stringify({
+			graph: this._freshness(),
+			root: root.id,
+			nodeIds: result.nodeIds,
+			truncated: result.truncated,
+			notice: result.truncated ? `Affected set truncated to ${maximum}.` : undefined,
+		});
+	}
+
+	explainSelectedForMagnus(): string | undefined {
+		const id = this._selectedNodeId;
+		if (!id) {
+			return undefined;
+		}
+		return this.explainNodeForMagnus(id);
+	}
+
+	explainNodeForMagnus(nodeIdOrPath: string): string | undefined {
+		const snapshot = this._snapshot;
+		const node = this._findNode(nodeIdOrPath);
+		if (!snapshot || !node) {
+			return undefined;
+		}
+		const explanation = explainNode(snapshot.nodes, snapshot.edges, node.id);
+		return JSON.stringify({
+			graph: this._freshness(),
+			...explanation,
+		});
+	}
+
+	getImportantNodesForMagnus(limit = 10): string {
+		const snapshot = this._snapshot;
+		const maximum = typeof limit === 'number' && Number.isFinite(limit)
+			? Math.max(1, Math.min(Math.floor(limit), 50))
+			: 10;
+		if (!snapshot) {
+			return JSON.stringify({ graph: this._freshness(), nodes: [], truncated: false });
+		}
+		const all = rankImportantNodes(snapshot.nodes, snapshot.edges, 100);
+		const nodes = all.slice(0, maximum);
+		return JSON.stringify({
+			graph: this._freshness(),
+			nodes,
+			truncated: all.length > maximum,
+			notice: all.length > maximum ? `Important nodes truncated to ${maximum}.` : undefined,
+		});
+	}
+
+	getCommunitiesForMagnus(limit = 30): string {
+		const snapshot = this._snapshot;
+		const maximum = typeof limit === 'number' && Number.isFinite(limit)
+			? Math.max(1, Math.min(Math.floor(limit), 100))
+			: 30;
+		if (!snapshot) {
+			return JSON.stringify({ graph: this._freshness(), communities: [], truncated: false, communityCount: 0 });
+		}
+		const all = listCommunitySummaries(snapshot.nodes);
+		const communities = all.slice(0, maximum);
+		return JSON.stringify({
+			graph: this._freshness(),
+			communityCount: all.length,
+			communities,
+			truncated: all.length > maximum,
+			notice: all.length > maximum ? `Communities truncated to ${maximum}.` : undefined,
+		});
+	}
+
+	getBridgeNodesForMagnus(limit = 20): string {
+		const snapshot = this._snapshot;
+		const maximum = typeof limit === 'number' && Number.isFinite(limit)
+			? Math.max(1, Math.min(Math.floor(limit), 50))
+			: 20;
+		if (!snapshot) {
+			return JSON.stringify({ graph: this._freshness(), nodes: [], truncated: false });
+		}
+		const all = findBridgeNodes(snapshot.nodes, snapshot.edges, 100);
+		const nodes = all.slice(0, maximum);
+		return JSON.stringify({
+			graph: this._freshness(),
+			nodes,
+			truncated: all.length > maximum,
+			notice: all.length > maximum ? `Bridge nodes truncated to ${maximum}.` : undefined,
+		});
+	}
+
+	getSurprisingConnectionsForMagnus(limit = 10): string {
+		const snapshot = this._snapshot;
+		const maximum = typeof limit === 'number' && Number.isFinite(limit)
+			? Math.max(1, Math.min(Math.floor(limit), 50))
+			: 10;
+		if (!snapshot) {
+			return JSON.stringify({ graph: this._freshness(), edges: [], truncated: false });
+		}
+		const all = findSurprisingConnections(snapshot.nodes, snapshot.edges, 100);
+		const edges = all.slice(0, maximum);
+		return JSON.stringify({
+			graph: this._freshness(),
+			edges,
+			truncated: all.length > maximum,
+			notice: all.length > maximum ? `Surprising connections truncated to ${maximum}.` : undefined,
+		});
 	}
 
 	focusNodeForMagnus(nodeIdOrPath: string): boolean {
@@ -338,21 +559,23 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		return this._snapshot?.nodes.find(node => node.id === value || node.path === value || `file:${node.path}` === value);
 	}
 
-	private _degrees(snapshot: PreBaseEnrichedSnapshot): Map<string, number> {
-		const degree = new Map<string, number>();
-		for (const edge of snapshot.edges) {
-			degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
-			degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
-		}
-		return degree;
-	}
-
-	private _freshness(): { scannedAt: number | null; status: PreBaseGraphDiagnostics['status']; projectPath: string | undefined } {
+	private _freshness(): {
+		scannedAt: number | null
+		status: PreBaseGraphDiagnostics['status']
+		projectPath: string | undefined
+		scanComplete: boolean
+		schemaVersion: number
+	} {
+		const status = this._diagnostics.status
+		const snapshot = this._snapshot
 		return {
 			scannedAt: this._diagnostics.scannedAt,
-			status: this._diagnostics.status,
-			projectPath: this._snapshot?.projectPath,
-		};
+			status,
+			projectPath: snapshot?.projectPath,
+			scanComplete: status === 'ready' && !!snapshot,
+			// Do not claim schema 2 when no snapshot exists (Magnus freshness honesty).
+			schemaVersion: snapshot ? (snapshot.schemaVersion ?? 2) : 0,
+		}
 	}
 
 	override dispose(): void {
@@ -388,35 +611,26 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async setGraphType(graphType: PreBaseGraphType): Promise<void> {
-		if (this._viewState.graphType === graphType) {
+		// Phase D: coerce Architecture/Network product types to Code Graph.
+		const next = normalizeToCodeGraphType(graphType);
+		if (this._viewState.graphType === next) {
 			return;
 		}
-		const previous = this._viewState.graphType;
-		this._viewState = { ...this._viewState, graphType };
+		this._viewState = { ...this._viewState, graphType: next };
 		this._onDidChangeViewState.fire(this._viewState);
 		if (!this._rawSnapshot) {
 			return;
 		}
-		// Network uses a different layout; architecture can re-enrich in place.
-		if (previous === 'network' || graphType === 'network') {
-			void this.relayout();
-			return;
-		}
-		const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
-		this._snapshot = enriched;
-		this._onDidChangeSnapshot.fire(enriched);
-		this._setDiagnostics(enriched.diagnostics);
+		void this.relayout();
 	}
 
 	async setLayoutMode(layoutMode: LayoutMode): Promise<void> {
+		// ponytail: hierarchy/pyramid/scattered are legacy Architecture modes — store for compat, no layout work.
 		if (this._viewState.layoutMode === layoutMode) {
 			return;
 		}
 		this._viewState = { ...this._viewState, layoutMode };
 		this._onDidChangeViewState.fire(this._viewState);
-		if (this._rawSnapshot) {
-			void this.relayout();
-		}
 	}
 
 	async rescanWorkspace(token?: CancellationToken): Promise<PreBaseEnrichedSnapshot | undefined> {
@@ -477,9 +691,14 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 			const entryNodeId = detectEntryNodeId(projectPath, partial.nodes, partial.edges, packageMain);
 			const layeredNodes = assignLayersToNodes(partial.nodes, entryNodeId);
-			const layoutNodes = this._pickLayoutNodes(layeredNodes, partial.edges, entryNodeId, limits.maxLayoutNodes);
+			let layoutNodes = this._pickLayoutNodes(layeredNodes, partial.edges, entryNodeId, limits.maxLayoutNodes);
 			const layoutNodeIds = new Set(layoutNodes.map(n => n.id));
 			const layoutEdges = partial.edges.filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target));
+
+			// Code Graph: communities + degree stats after build, before layout (cheap O(n+m)).
+			if (isCodeGraphCanvas(this._viewState.graphType)) {
+				layoutNodes = applyCommunitiesToNodes(layoutNodes, layoutEdges);
+			}
 
 			this._setDiagnostics({
 				fileCount: files.length,
@@ -490,24 +709,10 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			});
 			await timeout(0);
 
-			const layoutMode = this._viewState.layoutMode;
-			let positions: GraphSnapshot['positions'];
-			let positions3d: GraphSnapshot['positions3d'] | undefined;
-			let networkLayoutMode: NetworkLayoutMode | undefined;
-
-			if (this._viewState.graphType === 'network') {
-				networkLayoutMode = this._getNetworkLayoutMode();
-				const computed = this._computeNetworkPositions(layoutNodes, layoutEdges, networkLayoutMode);
-				positions = computed.positions2d;
-				positions3d = computed.positions3d;
-			} else {
-				const layoutEngine = new LayoutEngine();
-				positions = await layoutEngine.layout(layoutNodes, layoutEdges, {
-					mode: layoutMode,
-					entryNodeId,
-					runtime: this._layoutRuntimeForMode(layoutMode)
-				});
-			}
+			const networkLayoutMode = this._getNetworkLayoutMode();
+			const computed = this._computeNetworkPositions(layoutNodes, layoutEdges, networkLayoutMode);
+			const positions = computed.positions2d;
+			const positions3d = computed.positions3d;
 			await timeout(0);
 
 			// Reject stale completions that lost the scan slot to a newer run.
@@ -518,6 +723,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 			this._rawSnapshot = {
 				...partial,
+				schemaVersion: partial.schemaVersion ?? 2,
 				nodes: layoutNodes,
 				edges: layoutEdges,
 				positions,
@@ -559,25 +765,14 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			message: localize('prebase.graph.relayout', "Updating layout…")
 		});
 		await timeout(0);
-		if (this._viewState.graphType === 'network') {
-			const networkLayoutMode = this._getNetworkLayoutMode();
-			const computed = this._computeNetworkPositions(this._rawSnapshot.nodes, this._rawSnapshot.edges, networkLayoutMode);
-			this._rawSnapshot = {
-				...this._rawSnapshot,
-				positions: computed.positions2d,
-				positions3d: computed.positions3d,
-				networkLayoutMode,
-			};
-		} else {
-			const layoutEngine = new LayoutEngine();
-			const mode = this._viewState.layoutMode;
-			const positions = await layoutEngine.layout(this._rawSnapshot.nodes, this._rawSnapshot.edges, {
-				mode,
-				entryNodeId: this._rawSnapshot.entryNodeId,
-				runtime: this._layoutRuntimeForMode(mode)
-			});
-			this._rawSnapshot = { ...this._rawSnapshot, positions, positions3d: undefined, networkLayoutMode: undefined };
-		}
+		const networkLayoutMode = this._getNetworkLayoutMode();
+		const computed = this._computeNetworkPositions(this._rawSnapshot.nodes, this._rawSnapshot.edges, networkLayoutMode);
+		this._rawSnapshot = {
+			...this._rawSnapshot,
+			positions: computed.positions2d,
+			positions3d: computed.positions3d,
+			networkLayoutMode,
+		};
 		await timeout(0);
 		const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
 		this._snapshot = enriched;
@@ -625,8 +820,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		if (fileNodes.length <= maxNodes) {
 			return fileNodes;
 		}
+		const importance = buildImportanceByNode(edges);
 		const scored = fileNodes.map(n => {
-			const imp = computeNodeImportance(n.id, edges);
+			const imp = importance.get(n.id) ?? { inDegree: 0, outDegree: 0, score: 0 };
 			const entryBoost = entryNodeId && (n.id === entryNodeId || n.isEntry) ? 1_000_000 : 0;
 			return { n, score: imp.score + entryBoost };
 		});
@@ -641,19 +837,6 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		return picked;
 	}
 
-	private _layoutRuntimeForMode(mode: LayoutMode) {
-		const quality = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphQuality) || 'auto';
-		const spacingScale = mode === 'scattered'
-			? Math.max(0.5, Math.min(2.5, (this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) || 80) / 80))
-			: 1;
-		const force = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkForceStrength) || 0.35;
-		const relaxBase = quality === 'performance' ? 4 : quality === 'quality' ? 14 : 8;
-		return {
-			spacingScale: mode === 'scattered' ? spacingScale * (0.7 + force) : spacingScale,
-			scatterRelaxIterations: relaxBase
-		};
-	}
-
 	private _isActiveScan(cts: CancellationTokenSource): boolean {
 		return this._scanCts === cts;
 	}
@@ -666,42 +849,13 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private _enrich(snapshot: GraphSnapshot, fileCount: number): PreBaseEnrichedSnapshot {
 		const layoutMode = this._viewState.layoutMode;
-		const networkLayoutMode = this._viewState.graphType === 'network'
-			? (snapshot.networkLayoutMode as NetworkLayoutMode | undefined) || this._getNetworkLayoutMode()
-			: undefined;
-		let ringBands: Array<HierarchyRingBand & { color: string }> = [];
-		let pyramidBands: Array<PyramidDepthBand & { color: string }> = [];
+		const networkLayoutMode = (snapshot.networkLayoutMode as NetworkLayoutMode | undefined) || this._getNetworkLayoutMode();
+		// ponytail: Architecture ring/pyramid bands removed with LayoutEngine; empty for message back-compat.
+		const ringBands: Array<{ color: string }> = [];
+		const pyramidBands: Array<{ color: string }> = [];
 
-		// Use file nodes only so folder stubs don't distort ring/pyramid geometry.
-		const layoutNodes = snapshot.nodes.filter(n => {
-			if (n.kind === 'folder') {
-				return false;
-			}
-			// Network layout drops function stubs; keep Architecture flexible.
-			if (this._viewState.graphType === 'network' && n.kind === 'function') {
-				return false;
-			}
-			return true;
-		});
+		const layoutNodes = snapshot.nodes.filter(n => n.kind !== 'folder' && n.kind !== 'function');
 		const layoutEdges = snapshot.edges.filter(e => e.kind === 'import');
-
-		if (snapshot.entryNodeId && this._viewState.graphType === 'architecture') {
-			if (layoutMode === 'hierarchy') {
-				ringBands = getHierarchyRingBandsForSnapshot(
-					layoutNodes,
-					layoutEdges,
-					snapshot.entryNodeId,
-					snapshot.positions
-				).map(band => ({ ...band, color: depthLevelColor(band.semanticDepth) }));
-			} else if (layoutMode === 'pyramid') {
-				pyramidBands = getPyramidDepthBands(
-					layoutNodes,
-					layoutEdges,
-					snapshot.entryNodeId,
-					snapshot.positions
-				).map(band => ({ ...band, color: depthLevelColor(band.depth) }));
-			}
-		}
 
 		const limits = this._scanLimits();
 		const maxNodes = limits.maxNodes;
@@ -710,18 +864,14 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 		let nodes = layoutNodes;
 		if (hideLow && snapshot.entryNodeId) {
+			const importance = buildImportanceByNode(layoutEdges);
 			nodes = layoutNodes.filter(n => {
 				if (n.id === snapshot.entryNodeId || n.isEntry) {
 					return true;
 				}
-				const imp = computeNodeImportance(n.id, layoutEdges);
+				const imp = importance.get(n.id) ?? { inDegree: 0, outDegree: 0, score: 0 };
 				return imp.score >= 1;
 			});
-		}
-		// Architecture sidebar mode: filter which layers/nodes are rendered (layout geometry unchanged).
-		if (this._viewState.graphType === 'architecture') {
-			const archMode = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphArchitectureMode);
-			nodes = filterNodesForArchitectureMode(nodes, layoutEdges, archMode, snapshot.entryNodeId);
 		}
 		if (nodes.length > maxNodes) {
 			nodes = this._pickLayoutNodes(nodes, layoutEdges, snapshot.entryNodeId, maxNodes);
@@ -755,17 +905,13 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				positions3d[node.id] = p;
 			}
 		}
-		// Network always exposes positions3d (even empty) so the webview never hash01-synthesizes Z.
-		const resolvedPositions3d = this._viewState.graphType === 'network'
-			? positions3d
-			: (Object.keys(positions3d).length ? positions3d : undefined);
 
 		return {
 			...snapshot,
 			nodes,
 			edges,
 			positions,
-			positions3d: resolvedPositions3d,
+			positions3d,
 			networkLayoutMode,
 			graphType: this._viewState.graphType,
 			layoutMode,
@@ -776,9 +922,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	private _getNetworkLayoutMode(): NetworkLayoutMode {
-		const mode = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
-		const valid: NetworkLayoutMode[] = ['organic', 'sphere', 'constellation', 'clustered', 'radial'];
-		return (valid.includes(mode as NetworkLayoutMode) ? mode : 'organic') as NetworkLayoutMode;
+		const mode = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'community';
+		const valid: NetworkLayoutMode[] = ['community', 'organic', 'sphere', 'constellation', 'clustered', 'radial'];
+		return (valid.includes(mode as NetworkLayoutMode) ? mode : 'community') as NetworkLayoutMode;
 	}
 
 	private _computeNetworkPositions(
@@ -786,15 +932,17 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		edges: GraphEdge[],
 		mode: NetworkLayoutMode
 	): { positions2d: GraphSnapshot['positions']; positions3d: NonNullable<GraphSnapshot['positions3d']> } {
+		const importance = buildImportanceByNode(edges);
 		const layoutNodes = nodes
 			.filter(n => n.kind !== 'folder' && n.kind !== 'function')
 			.map(n => {
 				const ft = getFileTypeInfo(n.path);
-				const imp = computeNodeImportance(n.id, edges);
+				const imp = importance.get(n.id) ?? { inDegree: 0, outDegree: 0, score: 0 };
 				const degree = imp.inDegree + imp.outDegree;
 				return {
 					id: n.id,
 					fileTypeId: ft.id,
+					communityId: typeof n.meta?.communityId === 'number' ? n.meta.communityId : undefined,
 					isEntry: !!n.isEntry,
 					val: n.isEntry ? 10 : Math.max(1.5, 1.2 + Math.sqrt(degree) * 1.4),
 				};

@@ -12,7 +12,7 @@ Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; be
 | Severity | Open count (approx.) |
 |---|---|
 | Blocker | 2 for local desktop beta (privacy runtime, packaging); hosted Magnus **Disabled** until BETA-035 (not a local-ship gate while picker absent) |
-| Critical | 10+ (graphs CI/acceptance, core IDE, Magnus, runtime, security/supply-chain In Progress, RLS runtime, …) |
+| Critical | 10+ (graphs CI/acceptance, core IDE, Magnus, runtime, security Needs Verification, RLS runtime, …) |
 | High | 10+ (toolchain, quality, a11y, release, perf, cloud sync, …) |
 
 ### Categories (coverage)
@@ -42,7 +42,7 @@ Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; be
 | BETA-002 | Graphs | Graph boundary verifier in assurance/CI | Critical | Needs Verification | — | CI wiring (BETA-027) | `npm run verify:graphs-boundary` | `assurance:quick` + PR job `prebase-assurance` 2026-07-20 | Pre-beta | 2026-07-20 | — |
 | BETA-003 | Graphs | Architecture Graph manual acceptance (layouts, selection, minimap stub, settings) | Critical | Needs Verification | — | GUI smoke | Manual smoke on Architecture Graph | Template: [GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md) (all rows Needs Verification) | Pre-beta | 2026-07-20 | — |
 | BETA-004 | Graphs | Network Graph manual acceptance (layouts, rotation, drag, idle rotate) | Critical | Needs Verification | — | GUI smoke | Manual smoke on Network Graph | Template: [GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md) Network section | Pre-beta | 2026-07-20 | — |
-| BETA-005 | Graphs | Graph unit tests (`architecturePick`, `networkLayout`, ownership boundary) under `graphs/src/tests/unit` | High | Needs Verification | — | CI gate green on PR | Mocha/node harness green | `npm run test:graphs` includes ownership boundary checks (Phase A 2026-07-21); PR job green not confirmed here | Pre-beta | 2026-07-20 | — |
+| BETA-005 | Graphs | Graph unit tests (`networkLayout`, communities, graphProduct, ownership boundary; `architecturePick` removed on One-Graph-Type) under `graphs/src/tests/unit` | High | Needs Verification | — | CI gate green on PR | Mocha/node harness green | `npm run test:graphs` includes ownership boundary checks (Phase A 2026-07-21); PR job green not confirmed here | Pre-beta | 2026-07-20 | — |
 | BETA-006 | Toolchain | TypeScript 7.0.2 primary compiler lane | Blocker | Complete | — | — | `tsc`/`typecheck` invoke TS7 | `tsc` 7.0.2; `verify:typescript`; `typecheck-client` + `assurance` 2026-07-20 | Pre-beta | 2026-07-20 | 2026-07-20 |
 | BETA-007 | Toolchain | TS6 compatibility lane for compiler API consumers | Critical | Complete | — | — | Inventory + compat resolve | `@typescript/typescript6@6.0.2`, import API 6.0.3, `tsc6` 6.0.3; `verify:typescript` | Pre-beta | 2026-07-20 | 2026-07-20 |
 | BETA-008 | Toolchain | Replace `@typescript/native-preview`/`tsgo` with stable TS7 entrypoints | High | Needs Verification | — | Extension compile matrix | Scripts use TS7 `tsc` | Phase F/K: `typescriptCompiler.ts`→`npx tsc`; no `build/lib/tsgo` refs; `assurance:quick` pass 2026-07-20; full `compile-extensions` not run | Pre-beta | 2026-07-20 | — |
@@ -65,7 +65,7 @@ Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; be
 | BETA-020 | Graphs | Minimap implementation (setting exists, UI stub) | Medium | Deferred After Beta | — | Product decision | Feature or remove setting | **Option 2 locked** in [BETA_SCOPE.md](BETA_SCOPE.md): keep hidden; no fake UI; BETA-020 defer | After beta OK | 2026-07-20 | — |
 | BETA-021 | Toolchain | Remove TS6 compat after TS 7.1 API | Medium | Not Started | — | TS 7.1 GA | Re-inventory API consumers | — | Post TS 7.1 | 2026-07-20 | — |
 | BETA-022 | Core | Onboarding + account lifecycle | High | Needs Verification | — | Assurance | Sign-in/out smoke | 2026-07-22: versioned `prebase.onboarding.completedVersion`; editor + open/reset commands registered; first-run yield vs Home; **P2/P3 GUI smoke still Needs Verification — not Complete** | Pre-beta | 2026-07-20 | — |
-| BETA-023 | Security | Dependency audit + supply-chain review | Critical | In Progress | — | Lockfile review after TS7 | `npm audit` + review | 2026-07-22: [SECURITY_AND_SUPPLY_CHAIN.md](SECURITY_AND_SUPPLY_CHAIN.md) records `shell-quote` (high) + `tar` (critical) from `npm audit --omit=dev`; remediation not applied — **not Complete** | Pre-beta | 2026-07-20 | — |
+| BETA-023 | Security | Dependency audit + supply-chain review | Critical | Needs Verification | — | Lockfile review after TS7 | `npm audit` + review | 2026-07-22: remediated `shell-quote`/`tar`/transitive advisories via overrides + local `svgo` gulp wrapper; root `npm audit` **0**; `allowScripts` allowlisted; evidence in [SECURITY_AND_SUPPLY_CHAIN.md](SECURITY_AND_SUPPLY_CHAIN.md) — CI/repro confirmation still open before Complete | Pre-beta | 2026-07-20 | — |
 | BETA-024 | Graphs | Large-project graph performance/memory | High | In Progress | — | GUI FPS + memory | Perf sample | CPU layout micro-benchmark [GRAPH_PERFORMANCE.md](GRAPH_PERFORMANCE.md) 2026-07-20 (organic ~307 ms @ 500 synthetic nodes); no render/FPS evidence | Pre-beta | 2026-07-20 | — |
 | BETA-025 | Release | Third-party notices / license inventory for new packages | Medium | In Progress | — | Legal review | Notices update | `@typescript/typescript6` in lockfile; upstream CI pulls CG NOTICE before package — PreBase release pipeline **not wired**; see [PACKAGING.md](PACKAGING.md) | Pre-beta | 2026-07-20 | — |
 | BETA-026 | Documentation | Agent/dev docs (`AGENTS.md`, `graphs/*`, TS migration) kept current with repo | Medium | In Progress | — | — | Review on each checkpoint | Checkpoint 1 + Phase K: `graphs/README.md` bootstrap/status corrected 2026-07-20 | Pre-beta | 2026-07-20 | — |
@@ -73,7 +73,7 @@ Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; be
 | BETA-028 | Localization | PreBase-specific UI strings / NLS for graphs, Magnus, onboarding | Medium | Not Started | — | Product copy | NLS export smoke | — | Pre-beta | 2026-07-20 | — |
 | BETA-029 | Extensions | Built-in extensions `typecheck-web` / gulp compile under dual TS lanes | High | Needs Verification | — | Full compile-extensions | `compile-extensions` + spot typecheck | Phase F: gulp `compile-extension:prebase-magnus` + `compile-extension:typescript-language-features` 0 errors; `typecheck-web` on TS ext pass; matrix incomplete | Pre-beta | 2026-07-20 | — |
 | BETA-030 | Infrastructure | Remote / web (REH) smoke: extension host, web client | High | Not Started | — | Platform matrix | REH manual or CI smoke | — | Pre-beta | 2026-07-20 | — |
-| BETA-031 | Toolchain | npm 12 migration: allowScripts allowlist + lift `preinstall` `<12` guard | High | Not Started | — | Native deps / postinstall | `npm install` on 12.x builds natives; document engines | Blocked 2026-07-20: npm 12.0.1 rejected by preinstall; rolled back to 11.18.0 | Pre-beta | 2026-07-20 | — |
+| BETA-031 | Toolchain | npm 12 migration: allowScripts allowlist + lift `preinstall` `<12` guard | High | In Progress | — | Native deps / postinstall | `npm install` on 12.x builds natives; document engines | 2026-07-22: root (+ nested) `allowScripts` committed via `npm install-scripts approve`; preinstall **still** rejects npm ≥12 pending full 12.x native rebuild validation; stay on **11.18.0** | Pre-beta | 2026-07-20 | — |
 
 ## Newly discovered during 2026-07-20 audit
 
@@ -131,7 +131,7 @@ Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; be
 - Docs: [HOSTED_MAGNUS.md](HOSTED_MAGNUS.md), [SECURITY_AND_SUPPLY_CHAIN.md](SECURITY_AND_SUPPLY_CHAIN.md), [SUPABASE_RLS_RUNTIME.md](SUPABASE_RLS_RUNTIME.md), [ASSURANCE.md](ASSURANCE.md) — honesty pass (no Complete without evidence).
 - Hosted Magnus **Disabled**; gateway still `501`; no lying client hosted picker (BETA-035 → Deferred After Beta).
 - `assurance:release` + `verify:eslint-prebase` = PreBase-path eslint **ratchet** (fixed no-op that called full-repo `npm run eslint`); baseline debt recorded — **not** full-eslint clean.
-- BETA-014 **partial** (static privacy/secrets/CSP); runtime observation open. BETA-023 **In Progress** (docs + ratchet; `npm audit` open).
+- BETA-014 **partial** (static privacy/secrets/CSP); runtime observation open. BETA-023 **Needs Verification** (remediation applied; root `npm audit` 0 — see [SECURITY_AND_SUPPLY_CHAIN.md](SECURITY_AND_SUPPLY_CHAIN.md)).
 - `PREBASE_STARTUP_LAUNCH=1` passed **outside sandbox** (extension host + workbench restored) — still **not** BETA-010 Complete without CORE_IDE matrix.
 - Icons untouched.
 
@@ -156,7 +156,7 @@ Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; be
 | BETA-015 (partial) | Phase J docs + `scripts/release/signing-preflight.mjs` + `package-smoke.mjs`; gulp tasks verified; signing blocked without creds |
 | BETA-025 (partial) | Packaging doc references upstream NOTICE flow; legal inventory still open |
 | BETA-014 (partial) | `scripts/privacy/audit.mjs` static PASS 2026-07-21 (adapter + cloud SecretStorage; Checkpoint #1 retarget); Checkpoint #5: privacy/CSP/secrets docs + `assurance:privacy`; runtime network observation still Needs Verification |
-| BETA-023 (partial) | Checkpoint #5–#12: [SECURITY_AND_SUPPLY_CHAIN.md](SECURITY_AND_SUPPLY_CHAIN.md) + `assurance:release` / PreBase eslint ratchet; `npm audit --omit=dev` findings recorded (`shell-quote` high, `tar` critical); reachability/remediation still open — **not Complete** |
+| BETA-023 (Needs Verification) | 2026-07-22: remediated via overrides + local `svgo` wrapper + nested lockfile bumps; root `npm audit` **0**; `allowScripts` allowlisted ([SECURITY_AND_SUPPLY_CHAIN.md](SECURITY_AND_SUPPLY_CHAIN.md)); CI re-confirm before Complete |
 | BETA-035 (disabled) | Checkpoint #5: [HOSTED_MAGNUS.md](HOSTED_MAGNUS.md); gateway `501`; Deferred After Beta — not Complete |
 | BETA-009/017 (partial) | Checkpoint #5: `assurance:release` + honest `verify:eslint-prebase` baseline (114 files; debt ratchet) |
 | BETA-017 (partial) | Assurance tiers + [ASSURANCE.md](ASSURANCE.md) 2026-07-20 |

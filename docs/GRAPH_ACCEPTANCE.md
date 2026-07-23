@@ -40,13 +40,13 @@ Settings registration lives under `graphs/` (`registerPreBaseGraphConfiguration`
 | N4 | Node drag | Drag node | Position updates; `networkDragDirection` respected | Needs Verification | — |
 | N5 | Idle auto-rotate | Wait with `networkIdleAutoRotate` enabled | Idle rotation when configured | Needs Verification | — |
 | N6 | Physics settings | Adjust force/link/charge in settings | Simulation behavior changes | Needs Verification | — |
-| N7 | Pick hit test | Click small node while zoomed out | Node picked (see unit tests `architecturePick`) | Needs Verification | — |
+| N7 | Pick hit test | Click small node while zoomed out | Node picked (Code Graph canvas pick; former `architecturePick` suite removed) | Needs Verification | — |
 
 ## Automated coverage (2026-07-20)
 
 | Check | Command | Result |
 |---|---|---|
-| Unit tests | `npm run test:graphs` | Pass — architecture pick (7), network layout (6) |
+| Unit tests | `npm run test:graphs` | Pass — network layout, communities, graphProduct, ownership (no architecturePick) |
 | Boundary | `npm run verify:graphs-boundary` | Pass |
 | Typecheck | `npm run typecheck:graphs` + `typecheck-client` | Pass |
 

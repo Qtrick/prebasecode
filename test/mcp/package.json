@@ -22,5 +22,12 @@
     "@types/node": "24.x",
     "@types/node-fetch": "^2.5.10",
     "npm-run-all2": "^8.0.4"
+  },
+  "overrides": {
+    "shell-quote": "^1.10.0",
+    "body-parser": "^2.3.0",
+    "fast-uri": "^3.1.4",
+    "hono": "^4.12.31",
+    "@hono/node-server": "^2.0.11"
   }
 }

@@ -22,13 +22,13 @@ export const prebaseRuntimeViewIcon = registerIcon(
 export const prebaseArchitectureEditorIcon = registerIcon(
 	'prebase-architecture-editor-icon',
 	Codicon.symbolNamespace,
-	localize('prebaseArchitectureEditorIcon', "Icon of the Architecture Graph editor.")
+	localize('prebaseArchitectureEditorIcon', "Legacy icon of the Architecture Graph editor (unused; Code Graph uses the shared graph editor icon).")
 );
 
 export const prebaseNetworkEditorIcon = registerIcon(
 	'prebase-network-editor-icon',
 	Codicon.typeHierarchy,
-	localize('prebaseNetworkEditorIcon', "Icon of the Network Graph editor.")
+	localize('prebaseNetworkEditorIcon', "Icon of the Code Graph editor.")
 );
 
 export const prebaseRuntimeEditorIcon = registerIcon(

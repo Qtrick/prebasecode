@@ -4,10 +4,8 @@
 
 import { localize } from '../../../../../../../nls.js';
 import type { IDisposable } from '../../../../../../../base/common/lifecycle.js';
-import type { LayoutMode } from '../../../common/types/graphTypes.js';
 import { PreBaseGraphConfigKeys } from '../../../common/configuration/graphConfigKeys.js';
-
-const LAYOUT_PRESETS: LayoutMode[] = ['hierarchy', 'pyramid', 'scattered'];
+import { NETWORK_LAYOUT_OPTIONS, type NetworkLayoutMode } from '../../../layouts/network/index.js';
 
 /** Languages surfaced in PreBase Settings → About (graph analysis coverage). */
 export const GRAPH_SUPPORTED_LANGUAGES: ReadonlyArray<{ name: string; extensions: string }> = [
@@ -50,7 +48,8 @@ export interface IPreBaseGraphSettingsUiHost {
 	range(min: number, max: number, step: number, value: number): HTMLInputElement;
 	btn(label: string, primary?: boolean): HTMLButtonElement;
 	sessionLayoutMode(): string;
-	setLayoutMode(mode: LayoutMode): Promise<void>;
+	/** @deprecated Architecture layout setter — Code Graph uses network layout keys. */
+	setLayoutMode(mode: string): Promise<void>;
 	relayout(): Promise<void>;
 }
 
@@ -65,59 +64,39 @@ export function renderGraphCategory(host: IPreBaseGraphSettingsUiHost): void {
 	const card = host.panel(
 		host.main,
 		localize('prebase.settings.graph.title', "Graph"),
-		localize('prebase.settings.graph.desc', "Default layout and architecture map display.")
+		localize('prebase.settings.graph.desc', "Code Graph layout and display.")
 	);
 
 	const layout = document.createElement('select');
 	host.selectStyle(layout);
-	for (const m of LAYOUT_PRESETS) {
+	for (const m of NETWORK_LAYOUT_OPTIONS) {
 		const opt = document.createElement('option');
-		opt.value = m;
-		opt.textContent = m;
+		opt.value = m.id;
+		opt.textContent = m.label;
 		layout.appendChild(opt);
 	}
-	layout.value = host.get(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout, 'hierarchy');
+	layout.value = host.get(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, 'community');
 	host.on(layout, 'change', () => {
 		void (async () => {
-			const mode = layout.value as LayoutMode;
-			await host.set(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout, mode);
-			await host.setLayoutMode(mode);
+			await host.set(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, layout.value as NetworkLayoutMode);
+			await host.relayout();
 		})();
 	});
-	host.row(card, localize('prebase.settings.defaultLayout', "Default layout"), undefined, layout);
+	host.row(card, localize('prebase.settings.defaultLayout', "Default layout"), localize('prebase.settings.defaultLayoutHint', "Code Graph arrangement (Community Force, Organic, Sphere, …)."), layout);
 
 	const session = document.createElement('span');
-	session.textContent = host.sessionLayoutMode();
-	Object.assign(session.style, { fontSize: '12px', color: host.colors.accent, textTransform: 'capitalize' });
-	host.row(card, localize('prebase.settings.sessionLayout', "Session layout"), localize('prebase.settings.sessionLayoutHint', "Active layout for the current project."), session);
+	// Live snapshot mode (not the saved default) — match NETWORK_LAYOUT_OPTIONS labels.
+	const sessionModeId = host.sessionLayoutMode() || host.get(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, 'community');
+	const sessionOpt = NETWORK_LAYOUT_OPTIONS.find(m => m.id === sessionModeId);
+	session.textContent = sessionOpt?.label || sessionModeId;
+	Object.assign(session.style, { fontSize: '12px', color: host.colors.accent });
+	host.row(card, localize('prebase.settings.sessionLayout', "Session layout"), localize('prebase.settings.sessionLayoutHint', "Active Code Graph layout for the current project."), session);
 
 	const zoom = host.range(0.5, 1.4, 0.02, host.get(PreBaseGraphConfigKeys.GraphInitialZoom, 0.92));
 	host.on(zoom, 'input', () => void host.set(PreBaseGraphConfigKeys.GraphInitialZoom, Number(zoom.value)));
 	host.row(card, localize('prebase.settings.initialZoom', "Initial zoom"), localize('prebase.settings.initialZoomHint', "Camera zoom when a project first loads."), zoom);
 
-	const edgeLabels = host.accentCheckbox();
-	edgeLabels.checked = host.get(PreBaseGraphConfigKeys.GraphShowEdgeLabels, false);
-	host.on(edgeLabels, 'change', () => void host.set(PreBaseGraphConfigKeys.GraphShowEdgeLabels, edgeLabels.checked));
-	host.row(card, localize('prebase.settings.edgeLabels', "Edge import labels"), localize('prebase.settings.edgeLabelsHint', "Show import paths on dependency edges."), edgeLabels);
-
-	const dimWrap = document.createElement('div');
-	Object.assign(dimWrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-	const dimVal = host.get(PreBaseGraphConfigKeys.GraphLegendInteractionDim, 40);
-	const dim = host.range(0, 80, 5, dimVal);
-	const dimLabel = document.createElement('span');
-	dimLabel.textContent = `${dimVal}%`;
-	Object.assign(dimLabel.style, { fontSize: '10px', color: host.colors.textMuted, fontVariantNumeric: 'tabular-nums' });
-	host.on(dim, 'input', () => {
-		dimLabel.textContent = `${dim.value}%`;
-		void host.set(PreBaseGraphConfigKeys.GraphLegendInteractionDim, Number(dim.value));
-	});
-	dimWrap.append(dim, dimLabel);
-	host.row(
-		card,
-		localize('prebase.settings.legendDim', "Legend dim during interaction"),
-		localize('prebase.settings.legendDimHint', "How much the architecture legend fades while panning, zooming, or selecting."),
-		dimWrap
-	);
+	// ponytail: showEdgeLabels + legendInteractionDim stay registered (included:false) — do not surface no-op controls.
 }
 
 /** Graph canvas interaction controls (terminal visibility stays in the Settings shell). */
@@ -125,16 +104,8 @@ export function renderGraphInteractionControls(host: IPreBaseGraphSettingsUiHost
 	const card = host.panel(
 		host.main,
 		localize('prebase.settings.interaction.title', "Interaction"),
-		localize('prebase.settings.interaction.desc', "Pan and zoom behavior. Pan/zoom sliders are reserved until the graph webview reads them.")
+		localize('prebase.settings.interaction.desc', "Code Graph drag behavior.")
 	);
-
-	const pan = host.range(0.5, 2, 0.1, host.get(PreBaseGraphConfigKeys.InteractionPanSensitivity, 1));
-	host.on(pan, 'input', () => void host.set(PreBaseGraphConfigKeys.InteractionPanSensitivity, Number(pan.value)));
-	host.row(card, localize('prebase.settings.panSensitivity', "Pan sensitivity"), undefined, pan);
-
-	const zoom = host.range(0.5, 2, 0.1, host.get(PreBaseGraphConfigKeys.InteractionZoomSensitivity, 1));
-	host.on(zoom, 'input', () => void host.set(PreBaseGraphConfigKeys.InteractionZoomSensitivity, Number(zoom.value)));
-	host.row(card, localize('prebase.settings.zoomSensitivity', "Zoom sensitivity"), undefined, zoom);
 
 	const drag = document.createElement('select');
 	host.selectStyle(drag);
@@ -148,7 +119,7 @@ export function renderGraphInteractionControls(host: IPreBaseGraphSettingsUiHost
 	host.on(drag, 'change', () => void host.set(PreBaseGraphConfigKeys.InteractionNetworkDragDirection, drag.value));
 	host.row(
 		card,
-		localize('prebase.settings.networkDrag', "Network drag direction"),
+		localize('prebase.settings.networkDrag', "Code Graph drag direction"),
 		localize('prebase.settings.networkDragHint', "Natural follows cursor drag like grabbing the sphere; Inverted rotates opposite to cursor."),
 		drag
 	);
@@ -199,30 +170,17 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 	Object.assign(d.style, { margin: '2px 0 0', fontSize: '11px', color: host.colors.textMuted });
 
 	if (host.category === 'graph') {
+		// Phase E: architecture-only layer/scatter advanced controls removed from Settings UI
+		// (keys remain registered/readable for migration).
 		advNumber(host, card, localize('prebase.settings.layoutAnim', "Layout animation"), localize('prebase.settings.layoutAnimHint', "Fit-view duration in milliseconds."), PreBaseGraphConfigKeys.GraphLayoutAnimationDuration, 750, 0, 2000, 50);
-		advRange(host, card, localize('prebase.settings.layerRadius', "Layer radius scale"), localize('prebase.settings.layerRadiusHint', "Scales concentric ring radii."), PreBaseGraphConfigKeys.GraphLayerRadiusScale, 1, 0.7, 1.4, 0.05);
-		advNumber(host, card, localize('prebase.settings.maxPerLayer', "Max nodes per layer"), localize('prebase.settings.maxPerLayerHint', "Before an overflow sub-ring is added."), PreBaseGraphConfigKeys.GraphMaxNodesPerLayer, 24, 8, 48, 1);
-		advNumber(host, card, localize('prebase.settings.layerGap', "Layer gap"), localize('prebase.settings.layerGapHint', "Distance between dependency rings."), PreBaseGraphConfigKeys.GraphLayerGap, 96, 80, 200, 4);
-		advNumber(host, card, localize('prebase.settings.centerClearance', "Center clearance"), localize('prebase.settings.centerClearanceHint', "Radius of the innermost ring."), PreBaseGraphConfigKeys.GraphCenterClearance, 80, 64, 160, 4);
-		advNumber(host, card, localize('prebase.settings.scatterPasses', "Scatter balance passes"), localize('prebase.settings.scatterPassesHint', "Spacing relaxation iterations."), PreBaseGraphConfigKeys.GraphScatterRelaxIterations, 10, 4, 24, 1);
-		advRange(host, card, localize('prebase.settings.folderRadius', "Folder expansion radius"), localize('prebase.settings.folderRadiusHint', "Tree mode radial child layout."), PreBaseGraphConfigKeys.GraphFolderExpansionRadius, 82, 48, 160, 4);
 		advRange(host, card, localize('prebase.settings.visibleRelated', "Visible related connections"), localize('prebase.settings.visibleRelatedHint', "Root link always shown; controls extra ranked links per file (0–2)."), PreBaseGraphConfigKeys.GraphVisibleRelatedConnections, 1, 0, 2, 1, true);
-
-		const netHead = document.createElement('div');
-		card.appendChild(netHead);
-		Object.assign(netHead.style, { padding: '8px 0', borderBottom: `1px solid rgba(30, 41, 59, 0.6)` });
-		const nh = document.createElement('p');
-		netHead.appendChild(nh);
-		nh.textContent = localize('prebase.settings.networkGraph', "Network graph");
-		Object.assign(nh.style, { margin: '0', fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.06em', color: host.colors.textMuted });
 
 		const autoRotate = host.accentCheckbox();
 		autoRotate.checked = host.get(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, false);
 		host.on(autoRotate, 'change', () => void host.set(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, autoRotate.checked));
-		host.row(card, localize('prebase.settings.autoRotate', "Auto-rotate when idle"), localize('prebase.settings.autoRotateHint', "Slowly rotates the network graph when you are not interacting."), autoRotate);
+		host.row(card, localize('prebase.settings.autoRotate', "Auto-rotate when idle"), localize('prebase.settings.autoRotateHint', "Slowly rotates the Code Graph when you are not interacting."), autoRotate);
 
-		advRange(host, card, localize('prebase.settings.physics', "Physics strength"), localize('prebase.settings.physicsHint', "Reserved — not applied yet (layout uses network force/link distance)."), PreBaseGraphConfigKeys.GraphNetworkPhysicsStrength, 1, 0.5, 2, 0.05, true);
-		advRange(host, card, localize('prebase.settings.edgeOpacity', "Edge opacity"), localize('prebase.settings.edgeOpacityHint', "Reserved — not applied by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity, 0.55, 0.2, 0.9, 0.05, true);
+		// ponytail: physics/edgeOpacity reserved keys stay registered (included:false) — do not surface no-op sliders.
 
 		const applyRow = document.createElement('div');
 		card.appendChild(applyRow);
@@ -232,32 +190,8 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 		applyRow.appendChild(apply);
 	}
 
-	if (host.category === 'interaction') {
-		const wrap = document.createElement('div');
-		Object.assign(wrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-		const delay = host.get(PreBaseGraphConfigKeys.InteractionNodeDragDelayMs, 200);
-		const range = host.range(80, 400, 10, delay);
-		const label = document.createElement('span');
-		label.textContent = `${delay}ms`;
-		Object.assign(label.style, { fontSize: '10px', color: host.colors.textMuted, width: '40px', textAlign: 'right' });
-		host.on(range, 'input', () => {
-			label.textContent = `${range.value}ms`;
-			void host.set(PreBaseGraphConfigKeys.InteractionNodeDragDelayMs, Number(range.value) || 200);
-		});
-		wrap.append(range, label);
-		host.row(
-			card,
-			localize('prebase.settings.nodeDragHover', "Node drag hover delay"),
-			localize('prebase.settings.nodeDragHoverHint', "Hover delay (ms) before a graph node becomes draggable. Reserved — not read by the graph webview yet. Unrelated to Agents chat modes."),
-			wrap
-		);
-	}
-
 	if (host.category === 'performance') {
 		advNumber(host, card, localize('prebase.settings.maxNodes', "Max rendered nodes"), localize('prebase.settings.maxNodesHint', "Caps visible nodes by importance."), PreBaseGraphConfigKeys.GraphMaxRenderedNodes, 280, 50, 2000, 50);
-		advNumber(host, card, localize('prebase.settings.renderThrottle', "Render throttle"), localize('prebase.settings.renderThrottleHint', "Reserved — not read by the graph webview yet."), PreBaseGraphConfigKeys.GraphRenderThrottleMs, 0, 0, 100, 1);
-		advNumber(host, card, localize('prebase.settings.networkLod', "Network LOD threshold"), localize('prebase.settings.networkLodHint', "Reserved — not read by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkLodNodeThreshold, 900, 400, 3000, 100);
-		advNumber(host, card, localize('prebase.settings.simTicks', "Network simulation ticks"), localize('prebase.settings.simTicksHint', "Reserved — not applied by the current layout engine."), PreBaseGraphConfigKeys.GraphNetworkSimulationTicks, 80, 20, 200, 1);
 	}
 }
 

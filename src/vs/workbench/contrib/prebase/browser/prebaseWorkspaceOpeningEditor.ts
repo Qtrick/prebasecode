@@ -109,7 +109,7 @@ export class PreBaseWorkspaceOpeningEditor extends EditorPane {
 		const note = DOM.append(card, DOM.$('p'));
 		note.textContent = localize(
 			'prebase.workspace.openingNote',
-			"The workbench stays available. Architecture map and Runtime Preview continue loading in the background."
+			"The workbench stays available. Code Graph and Runtime Preview continue loading in the background."
 		);
 		note.style.margin = '8px 0 0';
 		note.style.fontSize = '12px';

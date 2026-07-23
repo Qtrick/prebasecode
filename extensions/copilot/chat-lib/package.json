@@ -68,5 +68,12 @@
 		"publish": "npm publish",
 		"test": "vitest run",
 		"test:watch": "vitest"
+	},
+	"overrides": {
+		"brace-expansion@1": "1.1.16",
+		"brace-expansion@2": "2.1.2",
+		"brace-expansion@5": "5.0.7",
+		"shell-quote": "^1.10.0",
+		"@opentelemetry/core": "^2.8.0"
 	}
 }

@@ -459,34 +459,18 @@ export const tocData: ITOCEntry<string> = {
 					id: 'prebase/graph',
 					label: localize('prebaseGraph', "Graph"),
 					settings: [
-						'prebase.graph.defaultType',
 						'prebase.graph.reduceMotion',
-						'prebase.graph.defaultArchitectureLayout',
-						'prebase.graph.architectureMode',
+						'prebase.graph.networkLayoutMode',
 						'prebase.graph.filter',
 						'prebase.graph.explorerViewMode',
 						'prebase.graph.autoScan',
 						'prebase.graph.showLegend',
 						'prebase.graph.hideLowImportance',
-						'prebase.graph.showEdgeLabels',
 						'prebase.graph.initialZoom',
-						'prebase.graph.legendInteractionDim',
 						'prebase.graph.layoutAnimationDuration',
-						'prebase.graph.layerRadiusScale',
-						'prebase.graph.maxNodesPerLayer',
-						'prebase.graph.layerGap',
-						'prebase.graph.centerClearance',
-						'prebase.graph.scatterRelaxIterations',
-						'prebase.graph.folderExpansionRadius',
 						'prebase.graph.visibleRelatedConnections',
 						'prebase.graph.networkIdleAutoRotate',
-						'prebase.graph.networkPhysicsStrength',
-						'prebase.graph.networkEdgeOpacity',
-						'prebase.graph.networkForceStrength',
-						'prebase.graph.networkLinkDistance',
-						'prebase.graph.networkCharge',
-						'prebase.graph.networkCollisionRadius',
-						'prebase.graph.networkAlphaDecay',
+						'prebase.graph.networkSpreadScale',
 						'prebase.graph.maxRenderedEdges'
 					]
 				},
@@ -506,7 +490,8 @@ export const tocData: ITOCEntry<string> = {
 					id: 'prebase/interaction',
 					label: localize('prebaseInteraction', "Interaction"),
 					settings: [
-						'prebase.interaction.*'
+						'prebase.interaction.networkDragDirection',
+						'prebase.interaction.terminalVisibility.*'
 					]
 				},
 				{
@@ -514,10 +499,7 @@ export const tocData: ITOCEntry<string> = {
 					label: localize('prebasePerformance', "Performance"),
 					settings: [
 						'prebase.graph.quality',
-						'prebase.graph.maxRenderedNodes',
-						'prebase.graph.renderThrottleMs',
-						'prebase.graph.networkLodNodeThreshold',
-						'prebase.graph.networkSimulationTicks'
+						'prebase.graph.maxRenderedNodes'
 					]
 				},
 				{
