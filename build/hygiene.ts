@@ -23,6 +23,51 @@ const copyrightHeaderLines = [
 	' *--------------------------------------------------------------------------------------------*/',
 ];
 
+/**
+ * PreBase-owned sources carry a PreBase copyright header instead of the
+ * upstream Microsoft one. Both variants below are in active use: the graph
+ * package omits the licence line, the workbench sources include it.
+ */
+const preBaseCopyrightHeaderVariants = [
+	[
+		'/*---------------------------------------------------------------------------------------------',
+		' *  Copyright (c) PreBase. All rights reserved.',
+		' *  Licensed under the MIT License. See License.txt in the project root for license information.',
+		' *--------------------------------------------------------------------------------------------*/',
+	],
+	[
+		'/*---------------------------------------------------------------------------------------------',
+		' *  Copyright (c) PreBase. All rights reserved.',
+		' *--------------------------------------------------------------------------------------------*/',
+	],
+];
+
+/** Paths whose header is validated against the PreBase variants. */
+const preBaseOwnedPrefixes = [
+	'graphs/',
+	'src/vs/workbench/contrib/prebase/',
+	'extensions/prebase-magnus/',
+];
+
+/**
+ * PreBase Node harness scripts follow the shebang-plus-docblock convention of
+ * the graph scripts and intentionally carry no copyright banner.
+ */
+const headerExemptPrefixes = [
+	'graphs/scripts/',
+	'scripts/assurance/',
+	'scripts/icons/',
+	'scripts/privacy/',
+	'scripts/release/',
+	'scripts/startup/',
+	'scripts/supabase/',
+	'scripts/theme/',
+];
+
+function hasHeader(lines: string[], header: string[]): boolean {
+	return header.every((expected, index) => lines[index] === expected);
+}
+
 interface VinylFileWithLines extends VinylFile {
 	__lines: string[];
 }
@@ -32,8 +77,13 @@ interface VinylFileWithLines extends VinylFile {
  * Returns an error message if mismatched, or undefined if OK.
  */
 export function checkCopilotEnginesVersion(repoRoot: string): string | undefined {
+	const copilotPkgPath = path.join(repoRoot, 'extensions/copilot/package.json');
+	if (!fs.existsSync(copilotPkgPath)) {
+		// PreBase does not bundle the Copilot extension; nothing to keep in sync.
+		return undefined;
+	}
 	const rootPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
-	const copilotPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'extensions/copilot/package.json'), 'utf8'));
+	const copilotPkg = JSON.parse(fs.readFileSync(copilotPkgPath, 'utf8'));
 	const expected = `^${rootPkg.version}`;
 	const actual = copilotPkg?.engines?.vscode;
 	if (actual !== expected) {
@@ -158,12 +208,15 @@ export function hygiene(some: NodeJS.ReadWriteStream | string[] | undefined, run
 
 	const copyrights = es.through(function (file: VinylFileWithLines) {
 		const lines = file.__lines;
+		const relative = file.relative.split(path.sep).join('/');
 
-		for (let i = 0; i < copyrightHeaderLines.length; i++) {
-			if (lines[i] !== copyrightHeaderLines[i]) {
+		if (!headerExemptPrefixes.some(prefix => relative.startsWith(prefix))) {
+			const accepted = preBaseOwnedPrefixes.some(prefix => relative.startsWith(prefix))
+				? preBaseCopyrightHeaderVariants
+				: [copyrightHeaderLines];
+			if (!accepted.some(header => hasHeader(lines, header))) {
 				console.error(file.relative + ': Missing or bad copyright statement');
 				errorCount++;
-				break;
 			}
 		}
 
