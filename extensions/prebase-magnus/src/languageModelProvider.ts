@@ -12,18 +12,27 @@ function extractText(message: vscode.LanguageModelChatRequestMessage): string {
 	for (const part of message.content) {
 		if (part instanceof vscode.LanguageModelTextPart) {
 			parts.push(part.value);
-		} else if (typeof part === 'object' && part && 'value' in part && typeof (part as { value: unknown }).value === 'string') {
-			parts.push((part as { value: string }).value);
+		} else {
+			// Older hosts hand back plain `{ value }` objects rather than a
+			// LanguageModelTextPart instance.
+			const value = (part as { value?: unknown }).value;
+			if (typeof value === 'string') {
+				parts.push(value);
+			}
 		}
 	}
 	return parts.join('');
 }
 
-export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProvider {
+export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProvider, vscode.Disposable {
 	private readonly _onDidChange = new vscode.EventEmitter<void>();
 	readonly onDidChangeLanguageModelChatInformation = this._onDidChange.event;
 
 	constructor(private readonly secrets: MagnusSecretStorage) { }
+
+	dispose(): void {
+		this._onDidChange.dispose();
+	}
 
 	notifyChanged(): void {
 		this._onDidChange.fire();

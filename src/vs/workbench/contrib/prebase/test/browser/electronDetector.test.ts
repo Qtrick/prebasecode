@@ -1,8 +1,10 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import { detectElectronProject } from '../../common/runtime/electronDetector.js';
 import type { PackageJsonShape, ProjectProbe } from '../../common/runtime/types.js';
 
@@ -20,6 +22,8 @@ function probe(overrides: {
 }
 
 suite('electronDetector', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+
 	test('detects direct electron dependency with main entry', () => {
 		const profile = detectElectronProject(probe({
 			packageJson: {

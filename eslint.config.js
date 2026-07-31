@@ -2975,10 +2975,13 @@ export default defineConfig(
 			]
 		}
 	},
-	// PreBase-owned graph package (`graphs/`) — PreBase copyright header
+	// PreBase-owned graph package (`graphs/`) and the Magnus extension —
+	// PreBase copyright header without the licence line. Kept in sync with
+	// `preBaseCopyrightHeaderVariants` / `preBaseOwnedPrefixes` in build/hygiene.ts.
 	{
 		files: [
 			'graphs/**/*.{ts,tsx,mts,cts}',
+			'extensions/prebase-magnus/src/**/*.{ts,tsx,mts,cts}',
 		],
 		rules: {
 			'header/header': [

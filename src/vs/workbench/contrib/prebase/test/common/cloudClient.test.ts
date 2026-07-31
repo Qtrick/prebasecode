@@ -1,12 +1,16 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { resolvePreBaseCloudAuthConfig } from '../cloudConfiguration.js';
-import { buildSupabaseAuthUrl, redactSensitiveForLog } from '../supabaseAuthRest.js';
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
+import { resolvePreBaseCloudAuthConfig } from '../../common/cloud/cloudConfiguration.js';
+import { buildSupabaseAuthUrl, redactSensitiveForLog } from '../../common/cloud/supabaseAuthRest.js';
 
 suite('PreBase cloud configuration', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+
 	test('missing url and key yields unconfigured', () => {
 		const cfg = resolvePreBaseCloudAuthConfig(() => undefined);
 		assert.strictEqual(cfg.mode, 'unconfigured');
@@ -46,6 +50,8 @@ suite('PreBase cloud configuration', () => {
 });
 
 suite('PreBase Supabase auth client helpers', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+
 	test('buildSupabaseAuthUrl normalizes trailing slash', () => {
 		const url = buildSupabaseAuthUrl('https://ref.supabase.co/', '/token?grant_type=password');
 		assert.strictEqual(url, 'https://ref.supabase.co/auth/v1/token?grant_type=password');

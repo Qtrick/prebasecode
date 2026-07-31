@@ -33,11 +33,22 @@ function relative(uri: vscode.Uri): string {
 	return vscode.workspace.asRelativePath(uri, false);
 }
 
+function asLocationLink(location: vscode.Location | vscode.LocationLink): vscode.LocationLink | undefined {
+	const link = location as vscode.LocationLink;
+	return link.targetUri ? link : undefined;
+}
+
+function locationUri(location: vscode.Location | vscode.LocationLink): vscode.Uri {
+	return asLocationLink(location)?.targetUri ?? (location as vscode.Location).uri;
+}
+
 function locationJson(location: vscode.Location | vscode.LocationLink): Record<string, unknown> {
-	if ('targetUri' in location) {
-		return { path: relative(location.targetUri), range: rangeJson(location.targetSelectionRange ?? location.targetRange) };
+	const link = asLocationLink(location);
+	if (link) {
+		return { path: relative(link.targetUri), range: rangeJson(link.targetSelectionRange ?? link.targetRange) };
 	}
-	return { path: relative(location.uri), range: rangeJson(location.range) };
+	const plain = location as vscode.Location;
+	return { path: relative(plain.uri), range: rangeJson(plain.range) };
 }
 
 function diagnosticCode(diagnostic: vscode.Diagnostic): string | number | undefined {
@@ -71,10 +82,12 @@ export class WorkspaceIntelligence {
 			{ pattern: input.query, isRegExp: input.isRegex === true, isCaseSensitive: input.isCaseSensitive === true, isWordMatch: input.isWordMatch === true },
 			{ include: input.include?.trim() || undefined, exclude: input.exclude?.trim() || undefined, maxResults: maximum, useDefaultExcludes: true, useIgnoreFiles: true },
 			entry => {
-				if (token.isCancellationRequested || !('preview' in entry) || !isUnderWorkspace(entry.uri) || isSecretPath(entry.uri) || matches.length >= maximum) {
+				// Context lines carry no preview; only real matches are reported.
+				const match = entry as vscode.TextSearchMatch;
+				if (token.isCancellationRequested || !match.preview || !isUnderWorkspace(match.uri) || isSecretPath(match.uri) || matches.length >= maximum) {
 					return;
 				}
-				matches.push({ path: relative(entry.uri), preview: entry.preview.text.slice(0, 500), ranges: entry.ranges instanceof vscode.Range ? [rangeJson(entry.ranges)] : entry.ranges.map(rangeJson) });
+				matches.push({ path: relative(match.uri), preview: match.preview.text.slice(0, 500), ranges: match.ranges instanceof vscode.Range ? [rangeJson(match.ranges)] : match.ranges.map(rangeJson) });
 			},
 			token,
 		);
@@ -93,11 +106,15 @@ export class WorkspaceIntelligence {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
+		// `endLine` is inclusive, matching how the tool schema reads and how
+		// callers cite line numbers. An exclusive end silently dropped the last
+		// requested line, so edits were proposed against truncated context.
+		const lastIndex = Math.max(0, document.lineCount - 1);
 		const requestedStart = typeof startLine === 'number' && Number.isFinite(startLine) ? startLine : 0;
-		const requestedEnd = typeof endLine === 'number' && Number.isFinite(endLine) ? endLine : document.lineCount;
-		const first = Math.max(0, Math.min(document.lineCount, Math.floor(requestedStart)));
-		const last = Math.min(document.lineCount, Math.max(first, Math.floor(requestedEnd)));
-		const text = document.getText(new vscode.Range(first, 0, last, 0));
+		const requestedEnd = typeof endLine === 'number' && Number.isFinite(endLine) ? endLine : lastIndex;
+		const first = Math.max(0, Math.min(lastIndex, Math.floor(requestedStart)));
+		const last = Math.min(lastIndex, Math.max(first, Math.floor(requestedEnd)));
+		const text = document.getText(new vscode.Range(first, 0, last, document.lineAt(last).text.length));
 		const maximum = bounded(maximumCharacters, 80_000, 120_000);
 		return { path: relative(uri), version: document.version, lineStart: first, lineEnd: last, text: text.slice(0, maximum), truncated: text.length > maximum };
 	}
@@ -122,10 +139,12 @@ export class WorkspaceIntelligence {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-		return { definitions: (locations ?? []).filter(location => {
-			const uri = 'targetUri' in location ? location.targetUri : location.uri;
-			return isUnderWorkspace(uri) && !isSecretPath(uri);
-		}).slice(0, 100).map(locationJson) };
+		return {
+			definitions: (locations ?? []).filter(location => {
+				const target = locationUri(location);
+				return isUnderWorkspace(target) && !isSecretPath(target);
+			}).slice(0, 100).map(locationJson)
+		};
 	}
 
 	async getReferences(path: string, at: WorkspacePosition, token: vscode.CancellationToken): Promise<Record<string, unknown>> {
