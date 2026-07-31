@@ -21,6 +21,7 @@ import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import { validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
 import { PreBaseRuntimeEditorInput } from './runtimeEditorInput.js';
 import { IPreBaseRuntimeService } from './prebaseRuntimeService.js';
+import { PreBaseBorder, PreBaseControl, PreBaseForeground, PreBaseSurface } from './prebaseSurfaces.js';
 
 /**
  * Runtime Preview surfaces localhost HTTP inside a workbench webview iframe.
@@ -79,23 +80,24 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._root.style.height = '100%';
 		this._root.style.minWidth = '0';
 		this._root.style.minHeight = '0';
-		this._root.style.background = 'var(--vscode-editor-background, #0b1220)';
-		this._root.style.color = 'var(--vscode-foreground, #e2e8f0)';
+		this._root.style.background = PreBaseSurface.deep;
+		this._root.style.color = PreBaseForeground.primary;
 
 		this._toolbar = DOM.append(this._root, DOM.$('.prebase-runtime-toolbar'));
 		this._toolbar.style.display = 'flex';
 		this._toolbar.style.gap = '6px';
 		this._toolbar.style.padding = '8px';
-		this._toolbar.style.borderBottom = '1px solid var(--vscode-panel-border, #1e293b)';
+		this._toolbar.style.borderBottom = `1px solid ${PreBaseBorder.subtle}`;
+		this._toolbar.style.background = PreBaseSurface.chrome;
 		this._toolbar.style.alignItems = 'center';
 		this._toolbar.style.flexShrink = '0';
 
 		const mkBtn = (label: string, onClick: () => void) => {
 			const btn = DOM.append(this._toolbar!, DOM.$('button')) as HTMLButtonElement;
 			btn.textContent = label;
-			btn.style.background = '#155e75';
-			btn.style.color = '#ecfeff';
-			btn.style.border = '1px solid #22d3ee55';
+			btn.style.background = PreBaseControl.secondaryBackground;
+			btn.style.color = PreBaseControl.secondaryForeground;
+			btn.style.border = `1px solid ${PreBaseBorder.subtle}`;
 			btn.style.borderRadius = '6px';
 			btn.style.padding = '4px 10px';
 			btn.style.cursor = 'pointer';
@@ -113,9 +115,9 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._urlInput.type = 'text';
 		this._urlInput.style.flex = '1';
 		this._urlInput.style.minWidth = '0';
-		this._urlInput.style.background = 'var(--vscode-input-background, #020617)';
-		this._urlInput.style.color = 'var(--vscode-input-foreground, #e2e8f0)';
-		this._urlInput.style.border = '1px solid var(--vscode-input-border, #334155)';
+		this._urlInput.style.background = PreBaseControl.inputBackground;
+		this._urlInput.style.color = PreBaseControl.inputForeground;
+		this._urlInput.style.border = `1px solid ${PreBaseControl.inputBorder}`;
 		this._urlInput.style.borderRadius = '6px';
 		this._urlInput.style.padding = '6px 8px';
 		this._register(DOM.addDisposableListener(this._urlInput, 'keydown', async (e) => {
@@ -145,10 +147,10 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._frameHost.style.minHeight = '0';
 		this._frameHost.style.padding = '0';
 		this._frameHost.style.boxSizing = 'border-box';
-		this._frameHost.style.background = 'var(--vscode-editor-background, #0b1220)';
+		this._frameHost.style.background = PreBaseSurface.chrome;
 
 		this._frameShell = DOM.append(this._frameHost, DOM.$('.prebase-runtime-frame-shell'));
-		this._frameShell.style.background = 'var(--vscode-editor-background, #020617)';
+		this._frameShell.style.background = PreBaseSurface.deep;
 		this._frameShell.style.border = '0';
 		this._frameShell.style.boxShadow = 'none';
 		this._frameShell.style.overflow = 'hidden';
@@ -161,11 +163,11 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._sidePanel = DOM.append(body, DOM.$('.prebase-runtime-side'));
 		this._sidePanel.style.width = '260px';
 		this._sidePanel.style.flexShrink = '0';
-		this._sidePanel.style.borderLeft = '1px solid var(--vscode-panel-border, #1e293b)';
+		this._sidePanel.style.borderLeft = `1px solid ${PreBaseBorder.subtle}`;
 		this._sidePanel.style.padding = '10px';
 		this._sidePanel.style.overflow = 'auto';
 		this._sidePanel.style.fontSize = '12px';
-		this._sidePanel.style.background = 'var(--vscode-sideBar-background, transparent)';
+		this._sidePanel.style.background = PreBaseSurface.chrome;
 
 		if (typeof ResizeObserver !== 'undefined') {
 			this._hostResizeObserver = new ResizeObserver(() => this._scheduleResponsiveSync());
@@ -176,7 +178,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 				this._hostResizeObserver?.disconnect();
 				this._hostResizeObserver = undefined;
 				if (this._responsiveSyncTimer !== undefined) {
-					window.clearTimeout(this._responsiveSyncTimer);
+					DOM.getWindow(this._root).clearTimeout(this._responsiveSyncTimer);
 					this._responsiveSyncTimer = undefined;
 				}
 			}
@@ -211,10 +213,11 @@ export class PreBaseRuntimeEditor extends EditorPane {
 	}
 
 	private _scheduleResponsiveSync(): void {
+		const targetWindow = DOM.getWindow(this._root);
 		if (this._responsiveSyncTimer !== undefined) {
-			window.clearTimeout(this._responsiveSyncTimer);
+			targetWindow.clearTimeout(this._responsiveSyncTimer);
 		}
-		this._responsiveSyncTimer = window.setTimeout(() => {
+		this._responsiveSyncTimer = targetWindow.setTimeout(() => {
 			this._responsiveSyncTimer = undefined;
 			this._syncResponsiveViewportFromHost();
 			this._applyViewportChrome();
@@ -261,15 +264,15 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			this._frameHost.style.overflow = 'auto';
 			this._frameShell.style.width = `${width}px`;
 			this._frameShell.style.height = `${height}px`;
-			this._frameShell.style.border = '1px solid var(--vscode-panel-border, #334155)';
-			this._frameShell.style.boxShadow = '0 8px 24px #0006';
+			this._frameShell.style.border = `1px solid ${PreBaseBorder.subtle}`;
+			this._frameShell.style.boxShadow = `0 8px 24px ${PreBaseControl.shadow}`;
 		}
 		this._frameShell.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
 	}
 
 	private _renderSession(): void {
 		const session = this.runtimeService.getSession();
-		if (this._urlInput && this._urlInput !== document.activeElement) {
+		if (this._urlInput && this._urlInput !== DOM.getActiveElement()) {
 			this._urlInput.value = session.url;
 		}
 		if (this._statusBadge) {
@@ -387,8 +390,8 @@ html, body { margin:0; height:100%; width:100%; background:transparent; overflow
 #frame { border:0; width:100%; height:100%; display:block; margin:0; padding:0; background:transparent; }
 #overlay {
 	position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-	padding:24px; text-align:center; color:var(--vscode-descriptionForeground, #94a3b8);
-	background:var(--vscode-editor-background, #0b1220); font-size:14px; line-height:1.45;
+	padding:24px; text-align:center; color:var(--vscode-descriptionForeground);
+	background:var(--vscode-editor-background); font-size:14px; line-height:1.45;
 }
 #overlay.hidden { display:none; }
 </style>

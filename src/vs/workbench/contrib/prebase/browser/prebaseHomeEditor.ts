@@ -35,13 +35,13 @@ import { EditorPane } from '../../../browser/parts/editor/editorPane.js';
 import { IEditorOpenContext } from '../../../common/editor.js';
 import { IEditorGroup } from '../../../services/editor/common/editorGroupsService.js';
 import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
+import { PreBaseBorder, PreBaseControl, PreBaseForeground, PreBaseSurface } from './prebaseSurfaces.js';
 
-const ACCENT = '#2dd4bf';
-const SURFACE = '#0f172a';
-const BORDER = '#1e293b';
-const TEXT = '#e2e8f0';
-const MUTED = '#94a3b8';
-const MUTED2 = '#64748b';
+const ACCENT = PreBaseForeground.link;
+const OVERLAY = PreBaseSurface.overlay;
+const BORDER = PreBaseBorder.subtle;
+const TEXT = PreBaseForeground.primary;
+const MUTED = PreBaseForeground.secondary;
 
 const HOME_CARD_LIMIT = 6;
 
@@ -94,7 +94,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		this._root.style.height = '100%';
 		this._root.style.overflow = 'auto';
 		this._root.style.boxSizing = 'border-box';
-		this._root.style.background = 'radial-gradient(ellipse at center, rgba(45,212,191,0.08) 0%, transparent 65%), #0b1220';
+		this._root.style.background = `radial-gradient(ellipse at center, rgba(45,212,191,0.08) 0%, transparent 65%), ${PreBaseSurface.deep}`;
 		this._root.style.color = TEXT;
 		this._body = DOM.append(this._root, DOM.$('.prebase-home-body'));
 		this._body.style.maxWidth = '960px';
@@ -167,7 +167,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		badge.style.display = 'block';
 		badge.style.boxSizing = 'border-box';
 		badge.style.border = '1px solid rgba(148,163,184,0.35)';
-		badge.style.background = '#000';
+		badge.style.background = PreBaseSurface.deep;
 		badge.style.overflow = 'hidden';
 		badge.style.flexShrink = '0';
 		badge.style.lineHeight = '0';
@@ -299,7 +299,7 @@ export class PreBaseHomeEditor extends EditorPane {
 			empty.style.borderRadius = '12px';
 			empty.style.padding = '24px';
 			empty.style.textAlign = 'center';
-			empty.style.background = 'rgba(15,23,42,0.45)';
+			empty.style.background = PreBaseSurface.tile;
 			const p1 = DOM.append(empty, DOM.$('p'));
 			p1.style.margin = '0';
 			p1.style.fontSize = '12px';
@@ -308,7 +308,7 @@ export class PreBaseHomeEditor extends EditorPane {
 			const p2 = DOM.append(empty, DOM.$('p'));
 			p2.style.margin = '6px 0 0';
 			p2.style.fontSize = '11px';
-			p2.style.color = MUTED2;
+			p2.style.color = MUTED;
 			p2.textContent = localize('prebase.home.noRecentsHint', "Open a folder to begin mapping your codebase.");
 			return;
 		}
@@ -397,8 +397,8 @@ export class PreBaseHomeEditor extends EditorPane {
 		btn.style.padding = '10px 12px';
 		btn.style.borderRadius = '10px';
 		btn.style.cursor = 'pointer';
-		btn.style.background = card.isLastOpened ? 'rgba(15,23,42,0.85)' : 'rgba(15,23,42,0.55)';
-		btn.style.border = card.isLastOpened ? `1px solid rgba(45,212,191,0.45)` : `1px solid ${BORDER}`;
+		btn.style.background = card.isLastOpened ? PreBaseSurface.tileHover : PreBaseSurface.tile;
+		btn.style.border = card.isLastOpened ? `1px solid ${ACCENT}` : `1px solid ${BORDER}`;
 		btn.style.color = TEXT;
 		btn.style.opacity = card.missing ? '0.72' : '1';
 		btn.style.outline = 'none';
@@ -421,8 +421,8 @@ export class PreBaseHomeEditor extends EditorPane {
 		icon.style.display = 'flex';
 		icon.style.alignItems = 'center';
 		icon.style.justifyContent = 'center';
-		icon.style.border = `1px solid ${card.isLastOpened ? 'rgba(45,212,191,0.3)' : BORDER}`;
-		icon.style.background = card.isLastOpened ? 'rgba(45,212,191,0.1)' : 'rgba(30,41,59,0.5)';
+		icon.style.border = `1px solid ${card.isLastOpened ? ACCENT : BORDER}`;
+		icon.style.background = OVERLAY;
 		icon.style.color = card.isLastOpened ? ACCENT : MUTED;
 		icon.style.flexShrink = '0';
 		icon.style.fontSize = '14px';
@@ -458,8 +458,8 @@ export class PreBaseHomeEditor extends EditorPane {
 			badge.style.letterSpacing = '0.05em';
 			badge.style.textTransform = 'uppercase';
 			badge.style.color = ACCENT;
-			badge.style.border = '1px solid rgba(45,212,191,0.25)';
-			badge.style.background = 'rgba(45,212,191,0.1)';
+			badge.style.border = `1px solid ${ACCENT}`;
+			badge.style.background = 'transparent';
 			badge.style.borderRadius = '999px';
 			badge.style.padding = '1px 6px';
 			badge.style.lineHeight = '1.4';
@@ -470,7 +470,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		pathEl.title = card.pathLabel;
 		pathEl.style.fontSize = '10px';
 		pathEl.style.fontFamily = 'var(--monaco-monospace-font, monospace)';
-		pathEl.style.color = MUTED2;
+		pathEl.style.color = MUTED;
 		pathEl.style.lineHeight = '1.35';
 		pathEl.style.overflow = 'hidden';
 		pathEl.style.textOverflow = 'ellipsis';
@@ -482,7 +482,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		meta.style.flexWrap = 'wrap';
 		meta.style.fontSize = '10px';
 		meta.style.color = MUTED;
-		meta.style.borderTop = `1px solid ${BORDER}99`;
+		meta.style.borderTop = `1px solid ${BORDER}`;
 		meta.style.paddingTop = '6px';
 		meta.style.marginTop = '2px';
 		DOM.append(meta, DOM.$('span')).textContent = card.kind === 'workspace'
@@ -494,7 +494,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		if (card.missing) {
 			const miss = DOM.append(meta, DOM.$('span'));
 			miss.textContent = localize('prebase.home.unavailable', "Unavailable");
-			miss.style.color = '#fca5a5';
+			miss.style.color = PreBaseForeground.error;
 		}
 
 		this._renderDisposables.add(DOM.addDisposableListener(btn, 'click', () => void this._openCard(card, false)));
@@ -519,6 +519,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		if (card.missing && (card.resource.scheme === Schemas.file || card.resource.scheme === Schemas.vscodeUserData)) {
 			this.notificationService.notify({
 				severity: Severity.Error,
+				// allow-any-unicode-next-line
 				message: localize('prebase.home.missingOpen', "Could not open “{0}”. The folder or workspace is no longer available.", card.name),
 			});
 			return;
@@ -546,8 +547,8 @@ export class PreBaseHomeEditor extends EditorPane {
 		menu.style.minWidth = '210px';
 		menu.style.padding = '4px 0';
 		menu.style.borderRadius = '10px';
-		menu.style.border = `1px solid ${BORDER}`;
-		menu.style.background = SURFACE;
+		menu.style.border = `1px solid ${PreBaseBorder.default}`;
+		menu.style.background = PreBaseSurface.overlay;
 		menu.style.boxShadow = '0 12px 40px rgba(0,0,0,0.45)';
 
 		const addItem = (label: string, run: () => void, danger = false) => {
@@ -561,7 +562,7 @@ export class PreBaseHomeEditor extends EditorPane {
 			item.style.padding = '8px 12px';
 			item.style.border = 'none';
 			item.style.background = 'transparent';
-			item.style.color = danger ? '#fca5a5' : MUTED;
+			item.style.color = danger ? PreBaseForeground.error : MUTED;
 			item.style.fontSize = '12px';
 			item.style.cursor = 'pointer';
 			item.style.outline = 'none';
@@ -628,9 +629,9 @@ export class PreBaseHomeEditor extends EditorPane {
 		btn.style.fontSize = '12px';
 		btn.style.fontWeight = '550';
 		btn.style.cursor = 'pointer';
-		btn.style.border = primary ? `1px solid ${ACCENT}` : `1px solid ${BORDER}`;
-		btn.style.background = primary ? ACCENT : SURFACE;
-		btn.style.color = primary ? '#042f2e' : TEXT;
+		btn.style.border = primary ? '1px solid transparent' : `1px solid ${BORDER}`;
+		btn.style.background = primary ? PreBaseControl.accentBackground : PreBaseControl.secondaryBackground;
+		btn.style.color = primary ? PreBaseControl.accentForeground : PreBaseControl.secondaryForeground;
 		btn.style.outline = 'none';
 		this._attachFocusRing(btn);
 		this._renderDisposables.add(DOM.addDisposableListener(btn, 'click', onClick));

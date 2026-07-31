@@ -18,6 +18,7 @@ import { ViewPane } from '../../../browser/parts/views/viewPane.js';
 import { IViewletViewOptions } from '../../../browser/parts/views/viewsViewlet.js';
 import { IViewDescriptorService } from '../../../common/views.js';
 import { IPreBaseRuntimeService, type PreBaseViewportPreset } from './prebaseRuntimeService.js';
+import { PreBaseBorder, PreBaseControl, PreBaseForeground } from './prebaseSurfaces.js';
 
 export class PreBaseRuntimeViewPane extends ViewPane {
 	static readonly ID = 'workbench.view.prebase.runtime.explorer';
@@ -262,9 +263,9 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		el.style.marginBottom = '6px';
 		el.style.padding = '6px 8px';
 		el.style.borderRadius = '6px';
-		el.style.border = '1px solid #334155';
-		el.style.background = '#020617';
-		el.style.color = '#e2e8f0';
+		el.style.border = `1px solid ${PreBaseControl.inputBorder}`;
+		el.style.background = PreBaseControl.inputBackground;
+		el.style.color = PreBaseControl.inputForeground;
 	}
 
 	private _styleMeta(el: HTMLElement): void {
@@ -283,9 +284,9 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		btn.style.marginBottom = '4px';
 		btn.style.padding = '7px 8px';
 		btn.style.borderRadius = '6px';
-		btn.style.border = '1px solid #334155';
-		btn.style.background = '#155e75';
-		btn.style.color = '#ecfeff';
+		btn.style.border = `1px solid ${PreBaseBorder.subtle}`;
+		btn.style.background = PreBaseControl.secondaryBackground;
+		btn.style.color = PreBaseControl.secondaryForeground;
 		btn.style.cursor = 'pointer';
 		btn.style.fontSize = '12px';
 		this._register(DOM.addDisposableListener(btn, 'click', onClick));
@@ -315,10 +316,10 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			].filter(Boolean).join('\n');
 		}
 		if (this._desktopManagedBtn) {
-			this._desktopManagedBtn.style.outline = session.desktopLaunchMode === 'managed' ? '2px solid #67e8f9' : '';
+			this._desktopManagedBtn.style.outline = session.desktopLaunchMode === 'managed' ? `2px solid ${PreBaseForeground.link}` : '';
 		}
 		if (this._desktopExternalBtn) {
-			this._desktopExternalBtn.style.outline = session.desktopLaunchMode === 'external' ? '2px solid #67e8f9' : '';
+			this._desktopExternalBtn.style.outline = session.desktopLaunchMode === 'external' ? `2px solid ${PreBaseForeground.link}` : '';
 		}
 
 		if (this._targetMeta) {
@@ -351,7 +352,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			}
 		}
 
-		if (this._urlInput && this._urlInput !== document.activeElement) {
+		if (this._urlInput && this._urlInput !== DOM.getActiveElement()) {
 			this._urlInput.value = session.url;
 		}
 
@@ -365,13 +366,13 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			].filter(Boolean).join('\n');
 		}
 
-		if (this._widthInput && this._widthInput !== document.activeElement) {
+		if (this._widthInput && this._widthInput !== DOM.getActiveElement()) {
 			this._widthInput.value = String(session.viewport.width);
 		}
-		if (this._heightInput && this._heightInput !== document.activeElement) {
+		if (this._heightInput && this._heightInput !== DOM.getActiveElement()) {
 			this._heightInput.value = String(session.viewport.height);
 		}
-		if (this._zoomInput && this._zoomInput !== document.activeElement) {
+		if (this._zoomInput && this._zoomInput !== DOM.getActiveElement()) {
 			this._zoomInput.value = String(session.viewport.zoom);
 		}
 		if (this._viewportMeta) {

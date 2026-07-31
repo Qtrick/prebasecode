@@ -346,36 +346,43 @@ export class PreBaseGraphEditor extends EditorPane {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style nonce="${nonce}">
-html, body { margin:0; height:100%; background:#070b14; color:#e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; overflow:hidden; }
+/* Surfaces come from the workbench theme (webviews receive --vscode-* variables),
+   so the graph follows PreBase's dark surface roles, user colour customizations
+   and High Contrast themes instead of a private palette. */
+html, body { margin:0; height:100%; background:var(--vscode-editor-background); color:var(--vscode-foreground); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); overflow:hidden; }
 #stage { position:absolute; inset:0; }
 #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; cursor:grab; }
 #netCanvas.dragging { cursor:grabbing; }
-#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:rgba(15,23,42,.82); border:1px solid #334155; border-radius:8px; padding:4px; }
-#toolbar button, #toolbar label { background:transparent; color:#e2e8f0; border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
-#toolbar button:hover { background:#1e293b; }
+:focus-visible { outline:1px solid var(--vscode-focusBorder); outline-offset:1px; }
+#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:var(--vscode-editorWidget-background); border:1px solid var(--vscode-editorWidget-border); border-radius:8px; padding:4px; box-shadow:0 2px 8px var(--vscode-widget-shadow); }
+#toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground); border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
+#toolbar button:hover { background:var(--vscode-toolbar-hoverBackground); }
 /* More specific than #toolbar label so Idle stays hidden before script runs. */
 #toolbar label { gap:4px; align-items:center; user-select:none; opacity:.9; }
 #toolbar label#idleToggleWrap { display:none; }
 #toolbar label#idleToggleWrap.is-visible { display:flex; }
-#status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:rgba(15,23,42,.88); border:1px solid #334155; border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
-#legend { position:absolute; left:12px; bottom:100px; z-index:4; background:rgba(15,23,42,.88); border:1px solid #334155; border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
+#status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:var(--vscode-editorWidget-background); border:1px solid var(--vscode-editorWidget-border); border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
+#legend { position:absolute; left:12px; bottom:100px; z-index:4; background:var(--vscode-editorWidget-background); border:1px solid var(--vscode-editorWidget-border); border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
 #legend .title { font-weight:700; margin-bottom:6px; letter-spacing:.02em; text-transform:uppercase; opacity:.75; font-size:10px; }
 #legend .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
 #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
 #legend .swatch.circle { border-radius:50%; }
 #legend .swatch.line { height:2px; width:16px; border-radius:1px; }
-#legend .swatch.line.dashed { background:transparent; height:0; border-radius:0; border-top:2px dashed #94a3b8; }
-#legend .swatch.line.dotted { background:transparent; height:0; border-radius:0; border-top:2px dotted #94a3b8; }
-#empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:#94a3b8; font-size:14px; line-height:1.5; }
-#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:rgba(15,23,42,.96); border:1px solid #334155; border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
+#legend .swatch.line.dashed { background:transparent; height:0; border-radius:0; border-top:2px dashed var(--prebase-edge-line); }
+#legend .swatch.line.dotted { background:transparent; height:0; border-radius:0; border-top:2px dotted var(--prebase-edge-line); }
+#empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground); font-size:14px; line-height:1.5; }
+/* The inspector floats above the canvas, so it uses the most elevated surface role. */
+#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorHoverWidget-background); border:1px solid var(--vscode-editorHoverWidget-border); border-radius:12px; padding:12px; box-shadow:0 16px 40px var(--vscode-widget-shadow); }
 #popup h3 { margin:0 0 4px; font-size:13px; }
-#popup .meta { color:#94a3b8; font-size:11px; margin-bottom:8px; word-break:break-word; }
-#popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:10px 0 4px; }
-#popup p { margin:0; font-size:12px; line-height:1.45; color:#cbd5e1; white-space:pre-wrap; }
+#popup .meta { color:var(--vscode-descriptionForeground); font-size:11px; margin-bottom:8px; word-break:break-word; }
+#popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-descriptionForeground); margin:10px 0 4px; }
+#popup p { margin:0; font-size:12px; line-height:1.45; color:var(--vscode-foreground); white-space:pre-wrap; }
 #popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-#popup button { font-size:11px; border-radius:7px; border:1px solid #334155; background:#0b1220; color:#e2e8f0; padding:5px 8px; cursor:pointer; }
-#popup button.primary { border-color:#2dd4bf; color:#042f2e; background:#2dd4bf; }
-#popup #popupClose { float:right; border:0; background:transparent; color:#94a3b8; font-size:16px; }
+#popup button { font-size:11px; border-radius:7px; border:1px solid var(--vscode-editorWidget-border); background:var(--vscode-button-secondaryBackground); color:var(--vscode-button-secondaryForeground); padding:5px 8px; cursor:pointer; }
+#popup button:hover { background:var(--vscode-button-secondaryHoverBackground); }
+#popup button.primary { border-color:var(--vscode-button-border, transparent); color:var(--vscode-button-foreground); background:var(--vscode-button-background); }
+#popup button.primary:hover { background:var(--vscode-button-hoverBackground); }
+#popup #popupClose { float:right; border:0; background:transparent; color:var(--vscode-descriptionForeground); font-size:16px; }
 </style>
 </head>
 <body>
@@ -432,6 +439,12 @@ const FOCAL = 640;
 const IDLE_YAW = 0.08;
 const IDLE_RESUME_MS = 1400;
 const ENTRY = '#e8b84a';
+// Edge colours are shared by the canvas renderer and the legend so the two cannot drift.
+const EDGE_IMPORT_RGB = '125,170,220';
+const EDGE_CONTAINS_RGB = '167,139,250';
+const EDGE_IMPORT = 'rgb(' + EDGE_IMPORT_RGB + ')';
+const EDGE_CONTAINS = 'rgb(' + EDGE_CONTAINS_RGB + ')';
+document.documentElement.style.setProperty('--prebase-edge-line', EDGE_IMPORT);
 const FILE_COLORS = {
 	typescript:'#3178c6', javascript:'#f1e05a', css:'#a371f7', html:'#e34c26',
 	markdown:'#519aba', image:'#c678dd', config:'#6b7280', other:'#71717a'
@@ -667,10 +680,10 @@ function updateLegend(s, network) {
 	html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:hsl(94 62% 52%)"></span>Community (default)</div>';
 	html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:' + ENTRY + '"></span>Entry</div>';
 	html += '<div class="title" style="margin-top:8px">Visible edges</div>';
-	html += '<div class="row"><span class="swatch line" style="background:#94a3b8"></span>Import / dependency</div>';
-	html += '<div class="row"><span class="swatch line" style="background:#a78bfa"></span>Contains</div>';
+	html += '<div class="row"><span class="swatch line" style="background:' + EDGE_IMPORT + '"></span>Import / dependency</div>';
+	html += '<div class="row"><span class="swatch line" style="background:' + EDGE_CONTAINS + '"></span>Contains</div>';
 	html += '<div class="title" style="margin-top:8px">Confidence</div>';
-	html += '<div class="row"><span class="swatch line" style="background:#94a3b8"></span>EXTRACTED (solid)</div>';
+	html += '<div class="row"><span class="swatch line" style="background:' + EDGE_IMPORT + '"></span>EXTRACTED (solid)</div>';
 	html += '<div class="row"><span class="swatch line dashed"></span>INFERRED (dashed)</div>';
 	html += '<div class="row"><span class="swatch line dotted"></span>AMBIGUOUS (dotted)</div>';
 	html += '<div class="title" style="margin-top:8px">File type fallback</div>';
@@ -728,9 +741,7 @@ function drawNetworkFrame() {
 		const confMul = conf === 'AMBIGUOUS' ? 0.55 : conf === 'INFERRED' ? 0.78 : 1;
 		const edgeAlpha = Math.max(0.14, Math.min(0.78, (0.2 + 0.38 * avg) * confMul));
 		ctx.beginPath();
-		ctx.strokeStyle = e.kind === 'contains'
-			? 'rgba(167,139,250,' + edgeAlpha + ')'
-			: 'rgba(125,170,220,' + edgeAlpha + ')';
+		ctx.strokeStyle = 'rgba(' + (e.kind === 'contains' ? EDGE_CONTAINS_RGB : EDGE_IMPORT_RGB) + ',' + edgeAlpha + ')';
 		ctx.lineWidth = (conf === 'EXTRACTED' || !conf ? 1.15 : 1) / transform.k;
 		const dash = edgeDashForConfidence(conf);
 		if (dash) {
