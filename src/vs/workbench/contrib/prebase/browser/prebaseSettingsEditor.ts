@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as DOM from '../../../../base/browser/dom.js';
+import { disposableTimeout } from '../../../../base/common/async.js';
 import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { localize } from '../../../../nls.js';
@@ -696,7 +697,10 @@ export class PreBaseSettingsEditor extends EditorPane {
 			draft.inspector = clamp(draft.inspector);
 			if (this._sidebarSavedEl) {
 				this._sidebarSavedEl.style.display = '';
-				setTimeout(() => { if (this._sidebarSavedEl) { this._sidebarSavedEl.style.display = 'none'; } }, 2000);
+				this._renderDisposables.add(disposableTimeout(
+					() => { if (this._sidebarSavedEl) { this._sidebarSavedEl.style.display = 'none'; } },
+					2000
+				));
 			}
 		}));
 		saveRow.appendChild(saveBtn);

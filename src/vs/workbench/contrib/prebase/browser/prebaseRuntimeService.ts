@@ -3,7 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { CancellationToken } from '../../../../base/common/cancellation.js';
+import { timeout } from '../../../../base/common/async.js';
+import { CancellationToken, CancellationTokenSource } from '../../../../base/common/cancellation.js';
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable, DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
 import { removeAnsiEscapeCodes } from '../../../../base/common/strings.js';
@@ -187,11 +188,19 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 
 	private _session: PreBaseRuntimeSession;
 	private _devTerminal: ITerminalInstance | undefined;
+	/** Terminal opened by "Open Terminal" with no dev server running. */
+	private _idleTerminal: ITerminalInstance | undefined;
 	private readonly _terminalListeners = this._register(new MutableDisposable<DisposableStore>());
 	private _terminalBuffer = '';
 	private _urlAutoApplied = false;
 	private _workspaceFolderUri: URI | undefined;
 	private _startInFlight: Promise<void> | undefined;
+	/**
+	 * Start can wait up to 45s for a renderer. Without this, a Stop issued in
+	 * that window would tear down the terminal and then have a managed Electron
+	 * window opened behind it by the start that was still running.
+	 */
+	private _startCts: CancellationTokenSource | undefined;
 	private _detectInFlight: Promise<string[]> | undefined;
 
 	constructor(
@@ -572,15 +581,21 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		if (this._startInFlight) {
 			return this._startInFlight;
 		}
-		this._startInFlight = this._startImpl();
+		const cts = new CancellationTokenSource();
+		this._startCts = cts;
+		this._startInFlight = this._startImpl(cts.token);
 		try {
 			await this._startInFlight;
 		} finally {
 			this._startInFlight = undefined;
+			if (this._startCts === cts) {
+				this._startCts = undefined;
+			}
+			cts.dispose();
 		}
 	}
 
-	private async _startImpl(): Promise<void> {
+	private async _startImpl(token: CancellationToken): Promise<void> {
 		try {
 			if (!this._session.scripts.length) {
 				await this.detectConfigurations();
@@ -632,7 +647,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 						}
 					}
 					const rendererUrl = this._session.url || electronProfile.rendererUrlHint || `http://localhost:${electronProfile.likelyDevPort}`;
-					const ready = await this._waitForUrl(rendererUrl, 45_000);
+					const ready = await this._waitForUrl(rendererUrl, 45_000, token);
+					if (token.isCancellationRequested) {
+						return;
+					}
 					if (!ready) {
 						this._log(localize(
 							'prebase.runtime.managedWaitFailed',
@@ -641,6 +659,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 						));
 					}
 					const session = await desktop.start({ launchMode: 'managed', rendererUrl });
+					if (token.isCancellationRequested) {
+						await desktop.stop();
+						return;
+					}
 					this._session = {
 						...this._session,
 						url: rendererUrl,
@@ -658,6 +680,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 						rendererUrl: this._session.url,
 						command: script?.command,
 					});
+					if (token.isCancellationRequested) {
+						await desktop.stop();
+						return;
+					}
 					this._session = {
 						...this._session,
 						desktopSessionActive: Boolean(session && session.state === 'running'),
@@ -698,7 +724,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 					detail: localize('prebase.runtime.confirmRunDetail', "PreBase will run:\n{0}\n\n{1}", script.command, check.reason),
 					primaryButton: localize('prebase.runtime.confirmRunBtn', "Start")
 				});
-				if (!result.confirmed) {
+				if (!result.confirmed || token.isCancellationRequested) {
 					return;
 				}
 			}
@@ -761,6 +787,9 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	async stop(): Promise<void> {
+		// Abandon a start that is still waiting for the renderer, otherwise it
+		// opens a window after the user asked to stop.
+		this._startCts?.cancel();
 		if (this._session.desktopSessionActive) {
 			await this._desktopService()?.stop();
 			this._session = {
@@ -818,8 +847,11 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	async openTerminal(): Promise<void> {
-		if (this._devTerminal && !this._devTerminal.isDisposed) {
-			await this.terminalService.setActiveInstance(this._devTerminal);
+		const existing = (this._devTerminal && !this._devTerminal.isDisposed)
+			? this._devTerminal
+			: (this._idleTerminal && !this._idleTerminal.isDisposed ? this._idleTerminal : undefined);
+		if (existing) {
+			await this.terminalService.setActiveInstance(existing);
 			await this.terminalService.revealActiveTerminal();
 			return;
 		}
@@ -831,6 +863,9 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			},
 			cwd
 		});
+		// Tracked so repeated clicks reuse one terminal instead of leaking a new
+		// one each time, and so dispose() can clean it up.
+		this._idleTerminal = instance;
 		await this.terminalService.setActiveInstance(instance);
 		await this.terminalService.revealActiveTerminal();
 	}
@@ -995,6 +1030,16 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			if (!this._devTerminal || this._devTerminal.isDisposed) {
 				return { ok: false, action, reason: 'No PreBase-owned Runtime Preview server is running; no process was stopped.', state: this.getStateForMagnus() };
 			}
+			// stop() also tears down a managed Electron session. An agent asking to
+			// stop the dev server must not silently close the user's app window.
+			if (this._session.desktopSessionActive) {
+				return {
+					ok: false,
+					action,
+					reason: 'A managed desktop session is running; stopping the dev server would also close that window. Stop it from Runtime Preview instead.',
+					state: this.getStateForMagnus()
+				};
+			}
 		}
 
 		if (action === 'start') {
@@ -1024,9 +1069,15 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			}
 		}
 		const allowed = await this.connectUrl(target);
-		return allowed
-			? { ok: true, state: this.getStateForMagnus() }
-			: { ok: false, reason: 'Runtime Preview rejected or could not connect to that URL.', state: this.getStateForMagnus() };
+		const state = this.getStateForMagnus();
+		if (!allowed) {
+			return { ok: false, reason: 'Runtime Preview rejected that URL.', state };
+		}
+		// connectUrl keeps the preview open so the user can retry, but an agent
+		// must not be told navigation succeeded when nothing is listening.
+		return state.previewConnected === true
+			? { ok: true, state }
+			: { ok: false, reason: 'Runtime Preview accepted the URL but nothing is listening at it yet.', state };
 	}
 
 	async inspectPageForMagnus(token: CancellationToken = CancellationToken.None): Promise<Record<string, unknown>> {
@@ -1153,9 +1204,9 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	/** Poll until the renderer URL responds or timeout (managed launch must not race Electron). */
-	private async _waitForUrl(url: string, timeoutMs: number): Promise<boolean> {
+	private async _waitForUrl(url: string, timeoutMs: number, token: CancellationToken): Promise<boolean> {
 		const deadline = Date.now() + timeoutMs;
-		while (Date.now() < deadline) {
+		while (Date.now() < deadline && !token.isCancellationRequested) {
 			try {
 				const context = await this.requestService.request({
 					type: 'GET',
@@ -1163,7 +1214,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 					timeout: 2000,
 					followRedirects: 3,
 					callSite: 'PreBaseRuntimeService._waitForUrl',
-				}, CancellationToken.None);
+				}, token);
 				const status = context.res.statusCode ?? 0;
 				if (status > 0 && status < 500) {
 					return true;
@@ -1171,7 +1222,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			} catch {
 				// keep waiting
 			}
-			await new Promise(resolve => setTimeout(resolve, 500));
+			await timeout(500, token).catch(() => undefined);
 		}
 		return false;
 	}
@@ -1311,15 +1362,19 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	override dispose(): void {
+		this._startCts?.cancel();
 		this._detachTerminal(true);
-		if (this._devTerminal && !this._devTerminal.isDisposed) {
-			try {
-				this._devTerminal.dispose();
-			} catch {
-				// ignore
+		for (const terminal of [this._devTerminal, this._idleTerminal]) {
+			if (terminal && !terminal.isDisposed) {
+				try {
+					terminal.dispose();
+				} catch {
+					// ignore
+				}
 			}
 		}
 		this._devTerminal = undefined;
+		this._idleTerminal = undefined;
 		super.dispose();
 	}
 }

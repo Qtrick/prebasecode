@@ -404,6 +404,15 @@ const vscode = acquireVsCodeApi();
 const iframe = document.getElementById('frame');
 const overlay = document.getElementById('overlay');
 let currentUrl = '';
+let loadTimer = null;
+const LOAD_TIMEOUT_MS = 15000;
+
+function clearLoadTimer() {
+	if (loadTimer) {
+		clearTimeout(loadTimer);
+		loadTimer = null;
+	}
+}
 
 function showOverlay(text) {
 	overlay.textContent = text;
@@ -419,13 +428,30 @@ window.addEventListener('message', function (event) {
 	if (msg.type === 'setUrl' && msg.url) {
 		currentUrl = msg.url;
 		showOverlay('Loading ' + msg.url + '…');
+		clearLoadTimer();
+		const url = msg.url;
+		// A refused connection frequently never fires load or error, which used
+		// to leave the overlay on "Loading…" with no way out.
+		loadTimer = setTimeout(function () {
+			loadTimer = null;
+			if (currentUrl !== url) return;
+			showOverlay('No response from ' + url + '. Start the dev server, then Reload.');
+			vscode.postMessage({ type: 'error', url: url, detail: 'timeout' });
+		}, LOAD_TIMEOUT_MS);
 		iframe.onload = function () {
+			clearLoadTimer();
 			hideOverlay();
 			vscode.postMessage({ type: 'load', url: currentUrl });
+		};
+		iframe.onerror = function () {
+			clearLoadTimer();
+			showOverlay('Failed to load ' + url);
+			vscode.postMessage({ type: 'error', url: url, detail: 'load-error' });
 		};
 		try {
 			iframe.src = msg.url;
 		} catch (err) {
+			clearLoadTimer();
 			showOverlay('Failed to navigate to ' + msg.url);
 			vscode.postMessage({ type: 'error', url: currentUrl, detail: String(err) });
 		}
@@ -433,6 +459,7 @@ window.addEventListener('message', function (event) {
 	}
 	if (msg.type === 'clear') {
 		currentUrl = '';
+		clearLoadTimer();
 		iframe.removeAttribute('src');
 		showOverlay(msg.reason || 'Start the preview server or Connect to a local URL.');
 		return;
