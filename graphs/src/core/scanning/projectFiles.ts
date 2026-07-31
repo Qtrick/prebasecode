@@ -67,7 +67,7 @@ const METADATA_FILENAMES = new Set([
 	'.env.local',
 	'.env.development',
 	'.env.production'
-])
+]);
 
 const CODE_EXTENSIONS = new Set([
 	'.ts',
@@ -99,7 +99,7 @@ const CODE_EXTENSIONS = new Set([
 	'.scala',
 	'.vue',
 	'.svelte'
-])
+]);
 
 const METADATA_NAME_PATTERNS = [
 	/^vite\.config\.(ts|js|mts|mjs|cjs)$/i,
@@ -110,51 +110,51 @@ const METADATA_NAME_PATTERNS = [
 	/^electron\.vite\.config\.(ts|js)$/i,
 	/^tsconfig\.[\w.-]+\.json$/i,
 	/^\.env\..+$/i
-]
+];
 
 function basename(relativePath: string): string {
-	const parts = relativePath.replace(/\\/g, '/').split('/')
-	return parts[parts.length - 1] ?? relativePath
+	const parts = relativePath.replace(/\\/g, '/').split('/');
+	return parts[parts.length - 1] ?? relativePath;
 }
 
 function extname(relativePath: string): string {
-	const name = basename(relativePath)
-	const i = name.lastIndexOf('.')
-	return i >= 0 ? name.slice(i).toLowerCase() : ''
+	const name = basename(relativePath);
+	const i = name.lastIndexOf('.');
+	return i >= 0 ? name.slice(i).toLowerCase() : '';
 }
 
 export function isCodeFile(relativePath: string): boolean {
-	return CODE_EXTENSIONS.has(extname(relativePath))
+	return CODE_EXTENSIONS.has(extname(relativePath));
 }
 
 export function isMetadataFile(relativePath: string): boolean {
-	const name = basename(relativePath).toLowerCase()
-	if (METADATA_FILENAMES.has(name)) return true
-	return METADATA_NAME_PATTERNS.some((re) => re.test(basename(relativePath)))
+	const name = basename(relativePath).toLowerCase();
+	if (METADATA_FILENAMES.has(name)) {return true;}
+	return METADATA_NAME_PATTERNS.some((re) => re.test(basename(relativePath)));
 }
 
 /** Whether a path should be scanned and represented as a graph node. */
 export function isGraphRelevantFile(relativePath: string): boolean {
-	if (isCodeFile(relativePath)) return true
-	return isMetadataFile(relativePath)
+	if (isCodeFile(relativePath)) {return true;}
+	return isMetadataFile(relativePath);
 }
 
 export function metadataKind(relativePath: string): 'config' | 'lock' | 'env' | 'docs' | 'build' {
-	const name = basename(relativePath).toLowerCase()
-	if (/\.lock$|^go\.sum$|^cargo\.lock$/.test(name)) return 'lock'
-	if (/^\.env/.test(name)) return 'env'
-	if (/readme|license|changelog|contributing/.test(name)) return 'docs'
+	const name = basename(relativePath).toLowerCase();
+	if (/\.lock$|^go\.sum$|^cargo\.lock$/.test(name)) {return 'lock';}
+	if (/^\.env/.test(name)) {return 'env';}
+	if (/readme|license|changelog|contributing/.test(name)) {return 'docs';}
 	if (/dockerfile|docker-compose|makefile|gradle|pom\.xml|cargo\.toml|go\.mod/.test(name)) {
-		return 'build'
+		return 'build';
 	}
-	return 'config'
+	return 'config';
 }
 
 export function inferLanguageFromPath(relativePath: string): string | undefined {
-	const ext = extname(relativePath)
-	if (ext) return ext.slice(1)
-	const name = basename(relativePath).toLowerCase()
-	if (name === 'dockerfile') return 'dockerfile'
-	if (name === 'makefile') return 'makefile'
-	return undefined
+	const ext = extname(relativePath);
+	if (ext) {return ext.slice(1);}
+	const name = basename(relativePath).toLowerCase();
+	if (name === 'dockerfile') {return 'dockerfile';}
+	if (name === 'makefile') {return 'makefile';}
+	return undefined;
 }

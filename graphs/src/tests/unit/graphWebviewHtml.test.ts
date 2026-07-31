@@ -20,7 +20,7 @@ suite('Code Graph webview HTML', () => {
 		const match = html.match(/<script[^>]*>([\s\S]*)<\/script>/i);
 		assert.ok(match, 'webview <script> block missing');
 		assert.doesNotThrow(() => {
-			// eslint-disable-next-line no-new-func
+			 
 			new Function(match[1]);
 		}, 'webview script must be valid JS after template evaluation');
 		assert.ok(html.includes("style-src 'unsafe-inline'"), 'style-src must allow element.style / attributes');

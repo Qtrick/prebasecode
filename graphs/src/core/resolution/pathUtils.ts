@@ -7,109 +7,109 @@
  */
 
 function normalizeSlashes(p: string): string {
-	return p.replace(/\\/g, '/')
+	return p.replace(/\\/g, '/');
 }
 
 function isAbsolutePath(filePath: string): boolean {
-	return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath)
+	return filePath.startsWith('/') || /^[A-Za-z]:[\\/]/.test(filePath);
 }
 
 function resolvePath(base: string, ...parts: string[]): string {
-	const stack: string[] = []
+	const stack: string[] = [];
 	const push = (segment: string) => {
 		if (!segment || segment === '.') {
-			return
+			return;
 		}
 		if (segment === '..') {
 			if (stack.length) {
-				stack.pop()
+				stack.pop();
 			}
-			return
+			return;
 		}
-		stack.push(segment)
-	}
+		stack.push(segment);
+	};
 
-	const seed = normalizeSlashes(base)
+	const seed = normalizeSlashes(base);
 	if (seed.startsWith('/')) {
-		stack.push('')
+		stack.push('');
 	}
 	for (const part of seed.split('/')) {
-		push(part)
+		push(part);
 	}
 	for (const part of parts) {
 		for (const segment of normalizeSlashes(part).split('/')) {
-			push(segment)
+			push(segment);
 		}
 	}
 	if (stack.length === 1 && stack[0] === '') {
-		return '/'
+		return '/';
 	}
-	const joined = stack.join('/')
+	const joined = stack.join('/');
 	if (/^[A-Za-z]:$/.test(joined)) {
-		return joined + '/'
+		return joined + '/';
 	}
-	return joined || '.'
+	return joined || '.';
 }
 
 function relativePath(from: string, to: string): string {
-	const fromParts = resolvePath(from).split('/').filter((p, i) => p.length > 0 || i === 0)
-	const toParts = resolvePath(to).split('/').filter((p, i) => p.length > 0 || i === 0)
-	let i = 0
+	const fromParts = resolvePath(from).split('/').filter((p, i) => p.length > 0 || i === 0);
+	const toParts = resolvePath(to).split('/').filter((p, i) => p.length > 0 || i === 0);
+	let i = 0;
 	while (i < fromParts.length && i < toParts.length && fromParts[i] === toParts[i]) {
-		i++
+		i++;
 	}
-	const ups = fromParts.length - i
-	const downs = toParts.slice(i)
-	return [...Array(ups).fill('..'), ...downs].join('/') || '.'
+	const ups = fromParts.length - i;
+	const downs = toParts.slice(i);
+	return [...Array(ups).fill('..'), ...downs].join('/') || '.';
 }
 
 /** True when `targetPath` resolves inside `rootPath` (no traversal escape). */
 export function isPathContainedInRoot(rootPath: string, targetPath: string): boolean {
-	const root = normalizeSlashes(resolvePath(rootPath)).replace(/\/$/, '')
-	const target = normalizeSlashes(resolvePath(targetPath)).replace(/\/$/, '')
+	const root = normalizeSlashes(resolvePath(rootPath)).replace(/\/$/, '');
+	const target = normalizeSlashes(resolvePath(targetPath)).replace(/\/$/, '');
 	if (target === root) {
-		return true
+		return true;
 	}
-	return target.startsWith(root + '/')
+	return target.startsWith(root + '/');
 }
 
 function hasParentTraversalSegments(relative: string): boolean {
-	return relative.split(/[/\\]/).some((segment) => segment === '..')
+	return relative.split(/[/\\]/).some((segment) => segment === '..');
 }
 
 /** Normalize a graph node path to a project-relative path for filesystem reads. */
 export function toProjectRelativePath(projectPath: string, filePath: string): string | null {
 	if (!filePath) {
-		return null
+		return null;
 	}
 
-	const normalizedFile = normalizeSlashes(filePath)
+	const normalizedFile = normalizeSlashes(filePath);
 
 	if (isAbsolutePath(filePath) || /^[A-Za-z]:\//.test(normalizedFile)) {
-		const rel = relativePath(projectPath, filePath)
+		const rel = relativePath(projectPath, filePath);
 		if (rel.startsWith('..') || rel === '' || hasParentTraversalSegments(rel)) {
-			return null
+			return null;
 		}
-		return normalizeSlashes(rel)
+		return normalizeSlashes(rel);
 	}
 
-	const rel = normalizedFile.replace(/^\//, '')
+	const rel = normalizedFile.replace(/^\//, '');
 	if (!rel || hasParentTraversalSegments(rel)) {
-		return null
+		return null;
 	}
-	return rel
+	return rel;
 }
 
 export function resolveProjectFilePath(projectPath: string, filePath: string): string | null {
-	const rel = toProjectRelativePath(projectPath, filePath)
+	const rel = toProjectRelativePath(projectPath, filePath);
 	if (!rel) {
-		return null
+		return null;
 	}
-	const resolved = resolvePath(projectPath, rel)
+	const resolved = resolvePath(projectPath, rel);
 	if (!isPathContainedInRoot(projectPath, resolved)) {
-		return null
+		return null;
 	}
-	return resolved
+	return resolved;
 }
 
 /**
@@ -121,13 +121,13 @@ export async function resolveProjectFilePathSafe(
 	filePath: string,
 	options: { mustExist?: boolean } = {}
 ): Promise<string | null> {
-	const resolved = resolveProjectFilePath(projectPath, filePath)
+	const resolved = resolveProjectFilePath(projectPath, filePath);
 	if (!resolved) {
-		return null
+		return null;
 	}
 	if (options.mustExist) {
 		// Existence checks require a file service; without one, treat as unresolved.
-		return null
+		return null;
 	}
-	return resolved
+	return resolved;
 }

@@ -49,7 +49,7 @@ suite('PreBase explainNode', () => {
 
 		const result = explainNode(nodes, edges, 'hub.ts');
 		assert.strictEqual(result.found, true);
-		if (!result.found) return;
+		if (!result.found) {return;}
 		assert.strictEqual(result.label, 'hub.ts');
 		assert.strictEqual(result.communityId, 1);
 		assert.strictEqual(result.communityLabel, 'core');
@@ -73,7 +73,7 @@ suite('PreBase explainNode', () => {
 		];
 		const result = explainNode(nodes, edges, 'hub');
 		assert.strictEqual(result.found, true);
-		if (!result.found) return;
+		if (!result.found) {return;}
 		assert.ok(result.important);
 		assert.strictEqual(result.important!.rank, 1);
 	});
@@ -92,7 +92,7 @@ suite('PreBase explainNode', () => {
 		];
 		const result = explainNode(nodes, edges, 'hub');
 		assert.strictEqual(result.found, true);
-		if (!result.found) return;
+		if (!result.found) {return;}
 		assert.strictEqual(result.degrees.degree, 2);
 		assert.strictEqual(result.degrees.inDegree, 1);
 		assert.strictEqual(result.degrees.outDegree, 1);
@@ -109,7 +109,7 @@ suite('PreBase explainNode', () => {
 		const edges = Array.from({ length: 14 }, (_, i) => edge('hub', `leaf${i}`, 'import', 'EXTRACTED'));
 		const result = explainNode(nodes, edges, 'hub');
 		assert.strictEqual(result.found, true);
-		if (!result.found) return;
+		if (!result.found) {return;}
 		assert.strictEqual(result.outbound['import']?.length, 12);
 		assert.strictEqual(result.truncated, true);
 		assert.ok(result.notice?.includes('truncated'));

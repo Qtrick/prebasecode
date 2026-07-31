@@ -84,17 +84,17 @@ suite('PreBase networkLayout', () => {
 	}
 
 	test('community empty and one-node graphs stay finite and deterministic', () => {
-		const empty = layoutNetworkGraph('community', [], [], 240)
-		assert.strictEqual(empty.size, 0)
+		const empty = layoutNetworkGraph('community', [], [], 240);
+		assert.strictEqual(empty.size, 0);
 
-		const one = [{ id: 'solo', communityId: 0, fileTypeId: 'typescript', val: 2 }]
-		const a = layoutNetworkGraph('community', one, [], Number.NaN)
-		const b = layoutNetworkGraph('community', one, [], -10)
-		assert.strictEqual(a.size, 1)
-		assert.deepStrictEqual(a.get('solo'), b.get('solo'))
-		const p = a.get('solo')!
-		assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z))
-	})
+		const one = [{ id: 'solo', communityId: 0, fileTypeId: 'typescript', val: 2 }];
+		const a = layoutNetworkGraph('community', one, [], Number.NaN);
+		const b = layoutNetworkGraph('community', one, [], -10);
+		assert.strictEqual(a.size, 1);
+		assert.deepStrictEqual(a.get('solo'), b.get('solo'));
+		const p = a.get('solo')!;
+		assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z));
+	});
 
 	test('community Force keeps members closer than random pairs', () => {
 		const nodes = Array.from({ length: 40 }, (_, i) => ({

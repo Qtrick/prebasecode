@@ -7,15 +7,15 @@ export type {
 	NetworkLayoutMode,
 	NetworkLayoutNode,
 	Point3D,
-} from './types.js'
+} from './types.js';
 
-import type { NetworkLayoutLink, NetworkLayoutMode, NetworkLayoutNode, Point3D } from './types.js'
-import { layoutClustered } from './clusteredLayout.js'
-import { layoutCommunityForce } from './communityForceLayout.js'
-import { layoutConstellation } from './constellationLayout.js'
-import { layoutOrganic } from './organicLayout.js'
-import { layoutRadial } from './radialLayout.js'
-import { layoutSphere } from './sphereLayout.js'
+import type { NetworkLayoutLink, NetworkLayoutMode, NetworkLayoutNode, Point3D } from './types.js';
+import { layoutClustered } from './clusteredLayout.js';
+import { layoutCommunityForce } from './communityForceLayout.js';
+import { layoutConstellation } from './constellationLayout.js';
+import { layoutOrganic } from './organicLayout.js';
+import { layoutRadial } from './radialLayout.js';
+import { layoutSphere } from './sphereLayout.js';
 
 export function computeNetworkSphereRadius(nodeCount: number, spreadScale: number): number {
 	return Math.max(220, Math.min(420, Math.sqrt(Math.max(1, nodeCount)) * 26)) * spreadScale;
@@ -29,25 +29,25 @@ export function layoutNetworkGraph(
 ): Map<string, Point3D> {
 	switch (mode) {
 		case 'community':
-			return layoutCommunityForce(nodes, links, sphereRadius)
+			return layoutCommunityForce(nodes, links, sphereRadius);
 		case 'sphere':
-			return layoutSphere(nodes, links, sphereRadius)
+			return layoutSphere(nodes, links, sphereRadius);
 		case 'constellation':
-			return layoutConstellation(nodes, links, sphereRadius)
+			return layoutConstellation(nodes, links, sphereRadius);
 		case 'clustered':
-			return layoutClustered(nodes, links, sphereRadius)
+			return layoutClustered(nodes, links, sphereRadius);
 		case 'radial':
-			return layoutRadial(nodes, links, sphereRadius)
+			return layoutRadial(nodes, links, sphereRadius);
 		case 'organic':
 		default:
-			return layoutOrganic(nodes, links, sphereRadius)
+			return layoutOrganic(nodes, links, sphereRadius);
 	}
 }
 
 export const NETWORK_LAYOUT_OPTIONS: {
-	id: NetworkLayoutMode
-	label: string
-	blurb: string
+	id: NetworkLayoutMode;
+	label: string;
+	blurb: string;
 }[] = [
 	{
 		id: 'community',
@@ -79,4 +79,4 @@ export const NETWORK_LAYOUT_OPTIONS: {
 		label: 'Radial',
 		blurb: 'Important files near center, others outward.'
 	}
-]
+];

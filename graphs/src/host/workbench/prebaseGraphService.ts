@@ -560,14 +560,14 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	private _freshness(): {
-		scannedAt: number | null
-		status: PreBaseGraphDiagnostics['status']
-		projectPath: string | undefined
-		scanComplete: boolean
-		schemaVersion: number
+		scannedAt: number | null;
+		status: PreBaseGraphDiagnostics['status'];
+		projectPath: string | undefined;
+		scanComplete: boolean;
+		schemaVersion: number;
 	} {
-		const status = this._diagnostics.status
-		const snapshot = this._snapshot
+		const status = this._diagnostics.status;
+		const snapshot = this._snapshot;
 		return {
 			scannedAt: this._diagnostics.scannedAt,
 			status,
@@ -575,7 +575,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			scanComplete: status === 'ready' && !!snapshot,
 			// Do not claim schema 2 when no snapshot exists (Magnus freshness honesty).
 			schemaVersion: snapshot ? (snapshot.schemaVersion ?? 2) : 0,
-		}
+		};
 	}
 
 	override dispose(): void {
