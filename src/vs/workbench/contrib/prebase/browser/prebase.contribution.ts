@@ -19,13 +19,12 @@ import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/c
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
-import { IOutputService } from '../../../services/output/common/output.js';
-import { IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
+import { IOutputService, IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
-import '../common/prebaseConfiguration.js';
-import { registerPreBaseGraphContribution } from '../graphs/host/workbench/graphContribution.js';
+// Must stay above the graph contribution so PreBase settings are registered first.
 import { PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL } from '../common/prebaseConfiguration.js';
+import { registerPreBaseGraphContribution } from '../graphs/host/workbench/graphContribution.js';
 import type { PreBaseViewportPreset } from '../common/runtime/viewportPresets.js';
 import { IPreBaseRuntimeService, PreBaseRuntimeService } from './prebaseRuntimeService.js';
 import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
@@ -170,6 +169,7 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 import './prebaseWorkbenchReadyContribution.js';
 import './prebaseOnboardingContribution.js';
 import './prebaseHomeEmptyEditors.js';
+// eslint-disable-next-line no-duplicate-imports -- the earlier import is type-only; this side-effect import must stay in registration order.
 import './prebaseWorkspaceOpening.js';
 
 class PreBaseRuntimeEditorInputSerializer implements IEditorSerializer {
@@ -401,16 +401,35 @@ async function promptCredentials(quickInput: IQuickInputService, includeDisplayN
 	return { email, password, displayName };
 }
 
-async function ensureAccountConfigured(accessor: ServicesAccessor): Promise<boolean> {
-	const accounts = accessor.get(IPreBaseAccountService);
-	if (accounts.apiConfigured) {
+/**
+ * A `ServicesAccessor` is only valid for the synchronous part of a command
+ * handler, so the account commands resolve everything they need up front.
+ */
+interface AccountCommandServices {
+	readonly accounts: IPreBaseAccountService;
+	readonly notifications: INotificationService;
+	readonly quickInput: IQuickInputService;
+	readonly commands: ICommandService;
+}
+
+function accountCommandServices(accessor: ServicesAccessor): AccountCommandServices {
+	return {
+		accounts: accessor.get(IPreBaseAccountService),
+		notifications: accessor.get(INotificationService),
+		quickInput: accessor.get(IQuickInputService),
+		commands: accessor.get(ICommandService),
+	};
+}
+
+async function ensureAccountConfigured(services: AccountCommandServices): Promise<boolean> {
+	if (services.accounts.apiConfigured) {
 		return true;
 	}
-	accessor.get(INotificationService).notify({
+	services.notifications.notify({
 		severity: Severity.Info,
 		message: localize('prebase.account.unconfiguredMenu', "PreBase account service is not configured. Set prebase.cloud.url and prebase.cloud.publishableKey (Supabase) or the deprecated prebase.account.apiBaseUrl to enable sign-in."),
 	});
-	await accessor.get(ICommandService).executeCommand('workbench.action.openSettings', PreBaseCloudConfigKeys.Url);
+	await services.commands.executeCommand('workbench.action.openSettings', PreBaseCloudConfigKeys.Url);
 	return false;
 }
 
@@ -430,19 +449,19 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		if (!(await ensureAccountConfigured(accessor))) {
+		const services = accountCommandServices(accessor);
+		if (!(await ensureAccountConfigured(services))) {
 			return;
 		}
-		const notify = accessor.get(INotificationService);
-		const creds = await promptCredentials(accessor.get(IQuickInputService), false);
+		const creds = await promptCredentials(services.quickInput, false);
 		if (!creds) {
 			return;
 		}
 		try {
-			await accessor.get(IPreBaseAccountService).signIn(creds.email, creds.password);
-			notify.info(localize('prebase.account.signedIn', "Signed in to PreBase."));
+			await services.accounts.signIn(creds.email, creds.password);
+			services.notifications.info(localize('prebase.account.signedIn', "Signed in to PreBase."));
 		} catch (err) {
-			notify.error(err instanceof Error ? err.message : String(err));
+			services.notifications.error(err instanceof Error ? err.message : String(err));
 		}
 	}
 });
@@ -463,19 +482,19 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		if (!(await ensureAccountConfigured(accessor))) {
+		const services = accountCommandServices(accessor);
+		if (!(await ensureAccountConfigured(services))) {
 			return;
 		}
-		const notify = accessor.get(INotificationService);
-		const creds = await promptCredentials(accessor.get(IQuickInputService), true);
+		const creds = await promptCredentials(services.quickInput, true);
 		if (!creds) {
 			return;
 		}
 		try {
-			await accessor.get(IPreBaseAccountService).signUp(creds.email, creds.password, creds.displayName);
-			notify.info(localize('prebase.account.created', "PreBase account created."));
+			await services.accounts.signUp(creds.email, creds.password, creds.displayName);
+			services.notifications.info(localize('prebase.account.created', "PreBase account created."));
 		} catch (err) {
-			notify.error(err instanceof Error ? err.message : String(err));
+			services.notifications.error(err instanceof Error ? err.message : String(err));
 		}
 	}
 });
@@ -522,8 +541,10 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		await accessor.get(IPreBaseAccountService).signOut();
-		accessor.get(INotificationService).info(localize('prebase.account.signedOut', "Signed out of PreBase."));
+		const accounts = accessor.get(IPreBaseAccountService);
+		const notifications = accessor.get(INotificationService);
+		await accounts.signOut();
+		notifications.info(localize('prebase.account.signedOut', "Signed out of PreBase."));
 	}
 });
 
@@ -543,7 +564,7 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		await ensureAccountConfigured(accessor);
+		await ensureAccountConfigured(accountCommandServices(accessor));
 	}
 });
 
@@ -604,10 +625,12 @@ registerAction2(class extends Action2 {
 		super({ id: 'prebase.runtime.detectConfigurations', title: localize2('prebase.runtime.detectConfigurations', "Detect Runtime Configurations"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	async run(accessor: ServicesAccessor) {
-		const urls = await accessor.get(IPreBaseRuntimeService).detectConfigurations();
+		const runtime = accessor.get(IPreBaseRuntimeService);
 		const output = accessor.get(IOutputService);
+		const notifications = accessor.get(INotificationService);
+		const urls = await runtime.detectConfigurations();
 		await output.showChannel(PREBASE_RUNTIME_CHANNEL_ID);
-		accessor.get(INotificationService).info(localize('prebase.runtime.detectedNotify', "Detected: {0}", urls.join(', ')));
+		notifications.info(localize('prebase.runtime.detectedNotify', "Detected: {0}", urls.join(', ')));
 	}
 });
 
@@ -761,8 +784,10 @@ registerAction2(class extends Action2 {
 	}
 	async run(accessor: ServicesAccessor) {
 		const reports = accessor.get(IPreBaseRuntimeService).showReports();
-		await accessor.get(IOutputService).showChannel(PREBASE_RUNTIME_CHANNEL_ID);
-		accessor.get(INotificationService).info(reports.length
+		const output = accessor.get(IOutputService);
+		const notifications = accessor.get(INotificationService);
+		await output.showChannel(PREBASE_RUNTIME_CHANNEL_ID);
+		notifications.info(reports.length
 			? reports.join('\n')
 			: localize('prebase.runtime.noReports', "No runtime reports yet."));
 	}

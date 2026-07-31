@@ -1,5 +1,5 @@
 {
-	"generatedAt": "2026-07-22T04:09:59.757Z",
+	"generatedAt": "2026-07-31T23:42:24.494Z",
 	"note": "PreBase-path ratchet only. Does not claim full-repo npm run eslint is clean.",
 	"targets": [
 		"graphs/**/*.{ts,tsx,mts,cts,js,mjs,cjs}",
@@ -9,7 +9,10 @@
 		"scripts/supabase/**/*.{ts,js,mjs,cjs}",
 		"scripts/assurance/**/*.{ts,js,mjs,cjs}"
 	],
-	"errorCount": 64,
-	"warningCount": 2168,
-	"fileCount": 114
+	"ignores": [
+		"graphs/src/preserved/**"
+	],
+	"errorCount": 0,
+	"warningCount": 0,
+	"fileCount": 122
 }

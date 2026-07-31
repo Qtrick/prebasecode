@@ -99,7 +99,8 @@ export class PreBaseWorkspaceOpeningEditor extends EditorPane {
 		fill.style.height = '100%';
 		fill.style.width = '40%';
 		fill.style.background = 'var(--vscode-progressBar-background, #2dd4bf)';
-		const reduceMotion = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+		const targetWindow = DOM.getWindow(this._root);
+		const reduceMotion = targetWindow.matchMedia('(prefers-reduced-motion: reduce)').matches;
 		if (!reduceMotion) {
 			fill.style.animation = 'prebase-workspace-opening-indeterminate 1.2s ease-in-out infinite';
 			const style = DOM.append(this._root, DOM.$('style'));

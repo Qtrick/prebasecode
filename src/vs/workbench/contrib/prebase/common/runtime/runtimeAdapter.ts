@@ -4,8 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { Event } from '../../../../../base/common/event.js';
-import type { DesktopLaunchMode, PreBaseDesktopSession } from './desktopTypes.js';
-import type { ElectronProjectProfile } from './desktopTypes.js';
+import type { DesktopLaunchMode, ElectronProjectProfile, PreBaseDesktopSession } from './desktopTypes.js';
 import type { ProjectProbe } from './types.js';
 
 export interface PreBaseDesktopLaunchOptions {

@@ -30,12 +30,21 @@ const TARGETS = [
 	'scripts/assurance/**/*.{ts,js,mjs,cjs}',
 ];
 
+/**
+ * `graphs/src/preserved/` is the archived Architecture Graph. It is excluded
+ * from the client typecheck lane for the same reason: it ships no code and is
+ * kept verbatim for future revival, so restyling it would destroy the archive
+ * without improving the product.
+ */
+const IGNORES = ['graphs/src/preserved/**'];
+
 async function main() {
 	console.log('verify:eslint-prebase: PreBase-path ratchet only — NOT full-repo eslint');
 	console.log(`  targets (${TARGETS.length}):`);
 	for (const t of TARGETS) {
 		console.log(`    - ${t}`);
 	}
+	console.log(`  ignored (${IGNORES.length}): ${IGNORES.join(', ')}`);
 
 	const linter = new ESLint({
 		cwd: REPO_ROOT,
@@ -43,6 +52,7 @@ async function main() {
 		cacheLocation: path.join(REPO_ROOT, '.eslintcache-prebase'),
 		cacheStrategy: 'content',
 		errorOnUnmatchedPattern: false,
+		overrideConfig: [{ ignores: IGNORES }],
 	});
 
 	let results;
@@ -65,6 +75,7 @@ async function main() {
 		generatedAt: new Date().toISOString(),
 		note: 'PreBase-path ratchet only. Does not claim full-repo npm run eslint is clean.',
 		targets: TARGETS,
+		ignores: IGNORES,
 		errorCount,
 		warningCount,
 		fileCount: results.length,

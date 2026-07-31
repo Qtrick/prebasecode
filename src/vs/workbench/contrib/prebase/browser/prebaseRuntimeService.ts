@@ -14,8 +14,7 @@ import { ICommandService } from '../../../../platform/commands/common/commands.j
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
-import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
-import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { createDecorator, IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { asTextOrError, IRequestService } from '../../../../platform/request/common/request.js';
@@ -26,8 +25,7 @@ import { ITerminalInstance, ITerminalService } from '../../terminal/browser/term
 import { latestDevServerUrl } from '../common/runtime/devServerUrlParser.js';
 import { detectFramework } from '../common/runtime/frameworkDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
-import type { ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
-import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
+import type { DesktopLaunchMode, ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
 import { classifyNavigateUrl, classifyTerminalCommand, validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
 import { detectDevScripts, selectDefaultScript } from '../common/runtime/scriptDetector.js';
 import { managedRendererDevCommand, scriptLaunchesElectronApp } from '../common/runtime/managedRendererCommand.js';

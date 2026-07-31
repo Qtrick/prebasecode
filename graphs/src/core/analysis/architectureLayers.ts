@@ -151,16 +151,11 @@ export function assignLayersToNodes(nodes: GraphNode[], entryNodeId: string | nu
 }
 
 export function buildDefaultLayerVisibility(): Record<ArchitectureLayerId, boolean> {
-	const vis = {} as Record<ArchitectureLayerId, boolean>;
-	for (const layer of ARCHITECTURE_LAYERS) {
-		vis[layer.id] = layer.defaultEnabled;
-	}
-	return vis;
+	return Object.fromEntries(ARCHITECTURE_LAYERS.map(layer => [layer.id, layer.defaultEnabled])) as Record<ArchitectureLayerId, boolean>;
 }
 
 export function countNodesPerLayer(nodes: GraphNode[]): Record<ArchitectureLayerId, number> {
-	const counts = {} as Record<ArchitectureLayerId, number>;
-	for (const layer of ARCHITECTURE_LAYERS) {counts[layer.id] = 0;}
+	const counts = Object.fromEntries(ARCHITECTURE_LAYERS.map(layer => [layer.id, 0])) as Record<ArchitectureLayerId, number>;
 	for (const n of nodes) {
 		const id = (n.meta?.architectureLayer as ArchitectureLayerId) ?? 'other';
 		counts[id] = (counts[id] ?? 0) + 1;

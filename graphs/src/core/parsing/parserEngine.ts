@@ -3,8 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { parse, type ParserOptions } from '@babel/parser';
-import babelTraverse from '@babel/traverse';
-import type { NodePath } from '@babel/traverse';
+import babelTraverse, { type NodePath } from '@babel/traverse';
 import * as t from '@babel/types';
 import type { ParseResult, ScannedFile } from '../../common/types/graphTypes.js';
 import { runNativeParseBatch } from './parseHooks.js';
@@ -74,7 +73,7 @@ export class ParserEngine {
 		let isComponentFile = file.extension === '.tsx' || file.extension === '.jsx';
 
 		const noteLine = (name: string, line?: number | null) => {
-			if (name && typeof line === 'number' && symbolLines[name] == null) {
+			if (name && typeof line === 'number' && symbolLines[name] === undefined) {
 				symbolLines[name] = line;
 			}
 		};
@@ -246,7 +245,7 @@ export class ParserEngine {
 	): void {
 		void components;
 		const note = (name: string, line?: number | null) => {
-			if (symbolLines && name && typeof line === 'number' && symbolLines[name] == null) {
+			if (symbolLines && name && typeof line === 'number' && symbolLines[name] === undefined) {
 				symbolLines[name] = line;
 			}
 		};

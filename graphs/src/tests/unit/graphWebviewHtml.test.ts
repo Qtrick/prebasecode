@@ -23,7 +23,7 @@ suite('Code Graph webview HTML', () => {
 			 
 			new Function(match[1]);
 		}, 'webview script must be valid JS after template evaluation');
-		assert.ok(html.includes("style-src 'unsafe-inline'"), 'style-src must allow element.style / attributes');
+		assert.ok(html.includes(`style-src 'unsafe-inline'`), 'style-src must allow element.style / attributes');
 		assert.ok(html.includes('#toolbar label#idleToggleWrap'), 'Idle must be CSS-hidden before script runs');
 	});
 });
