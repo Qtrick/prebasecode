@@ -76,11 +76,10 @@ export function renderGraphCategory(host: IPreBaseGraphSettingsUiHost): void {
 		layout.appendChild(opt);
 	}
 	layout.value = host.get(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, 'community');
+	// The graph service relayouts on its own when this key changes; calling
+	// relayout() here as well would run the O(n^2) layout kernel twice.
 	host.on(layout, 'change', () => {
-		void (async () => {
-			await host.set(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, layout.value as NetworkLayoutMode);
-			await host.relayout();
-		})();
+		void host.set(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, layout.value as NetworkLayoutMode);
 	});
 	host.row(card, localize('prebase.settings.defaultLayout', "Default layout"), localize('prebase.settings.defaultLayoutHint', "Code Graph arrangement (Community Force, Organic, Sphere, …)."), layout);
 

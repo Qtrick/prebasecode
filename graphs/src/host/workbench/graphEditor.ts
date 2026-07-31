@@ -186,7 +186,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		}));
 		webview.mountTo(this._container, this.window);
 		webview.setHtml(this._buildHtml());
-		this._webviewDisposables.add(webview.onMessage(e => this._onMessage(e.message as IBridgeRequest)));
+		this._webviewDisposables.add(webview.onMessage(e => { void this._onMessage(e.message as IBridgeRequest); }));
 		this._webview = webview;
 	}
 
@@ -236,7 +236,16 @@ export class PreBaseGraphEditor extends EditorPane {
 		const reply = async (payload: unknown) => {
 			this._webview?.postMessage({ type: 'response', requestId: message.requestId, payload });
 		};
+		try {
+			await this._handleMessage(message, reply);
+		} catch (err) {
+			// The webview keeps an unsettled promise per request, so a handler that
+			// throws would leave its popup stuck on a loading state forever.
+			await reply({ error: err instanceof Error ? err.message : String(err) });
+		}
+	}
 
+	private async _handleMessage(message: IBridgeRequest, reply: (payload: unknown) => Promise<void>): Promise<void> {
 		switch (message.type) {
 			case 'getSnapshot':
 				await reply({
@@ -469,13 +478,36 @@ let idlePaused = true;
 let idleResumeTimer = null;
 let lastRafTs = 0;
 let dirty = true;
+let rafHandle = 0;
 let dpr = Math.min(2, window.devicePixelRatio || 1);
 const pending = new Map();
 
+// The render loop parks itself when the scene is static so an open, idle graph
+// tab does not keep the compositor awake at 60Hz. Anything that invalidates the
+// scene must go through markDirty() so the loop is restarted.
+function wakeRaf() {
+	if (rafHandle) return;
+	lastRafTs = 0;
+	rafHandle = requestAnimationFrame(rafLoop);
+}
+function markDirty() {
+	dirty = true;
+	wakeRaf();
+}
+
+// If the host never answers (editor disposed mid-request, handler crash) the
+// caller must still settle, otherwise the UI waiting on it stays on a spinner.
+const REQUEST_TIMEOUT_MS = 20000;
 function request(type, payload) {
 	const requestId = Math.random().toString(36).slice(2);
 	return new Promise(function (resolve) {
-		pending.set(requestId, resolve);
+		const timer = setTimeout(function () {
+			if (pending.delete(requestId)) resolve({ error: 'timeout' });
+		}, REQUEST_TIMEOUT_MS);
+		pending.set(requestId, function (value) {
+			clearTimeout(timer);
+			resolve(value);
+		});
 		vscode.postMessage({ requestId: requestId, type: type, payload: payload });
 	});
 }
@@ -562,13 +594,16 @@ function projectPoint(x, y, z, yaw, pitch) {
 
 function scheduleIdleResume() {
 	idlePaused = true;
-	dirty = true;
+	markDirty();
 	if (idleResumeTimer) clearTimeout(idleResumeTimer);
 	idleResumeTimer = null;
 	if (!settings.networkIdleAutoRotate || settings.reduceMotion) return;
 	idleResumeTimer = setTimeout(function () {
 		idleResumeTimer = null;
-		if (settings.networkIdleAutoRotate && !settings.reduceMotion && !dragging) idlePaused = false;
+		if (settings.networkIdleAutoRotate && !settings.reduceMotion && !dragging) {
+			idlePaused = false;
+			wakeRaf();
+		}
 	}, IDLE_RESUME_MS);
 }
 
@@ -582,7 +617,7 @@ function resetCamera(preserveZoom) {
 	rotation = { yaw: 0.55, pitch: 0.28 };
 	if (!preserveZoom) transform = { x: 0, y: 0, k: settings.initialZoom || 1 };
 	scheduleIdleResume();
-	dirty = true;
+	markDirty();
 }
 
 function resizeCanvas() {
@@ -592,7 +627,7 @@ function resizeCanvas() {
 	netCanvas.width = Math.max(1, Math.floor(w * dpr));
 	netCanvas.height = Math.max(1, Math.floor(h * dpr));
 	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-	dirty = true;
+	markDirty();
 }
 
 function rebuildBase3d(s) {
@@ -662,7 +697,7 @@ function fitView() {
 	const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
 	const k = Math.min(vw / (bw + 120), vh / (bh + 120), 1.8) * (settings.initialZoom || 1);
 	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
-	dirty = true;
+	markDirty();
 }
 
 function updateLegend(s, network) {
@@ -879,7 +914,7 @@ function render(full) {
 	rebuildBase3d(snapshot);
 	resizeCanvas();
 	projectAll();
-	dirty = true;
+	markDirty();
 	drawNetworkFrame();
 }
 
@@ -914,7 +949,7 @@ function onSnapshotMessage(payload) {
 		empty.style.display = 'none';
 		status.textContent = graphStatusLine();
 		updateLegend(snapshot, true);
-		dirty = true;
+		markDirty();
 		drawNetworkFrame();
 		return;
 	}
@@ -932,8 +967,8 @@ window.addEventListener('message', function (event) {
 		return;
 	}
 	if (msg.type === 'snapshot') { onSnapshotMessage(msg.payload); return; }
-	if (msg.type === 'resetView') { resetCamera(false); projectAll(); dirty = true; drawNetworkFrame(); fitView(); return; }
-	if (msg.type === 'fitView') { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
+	if (msg.type === 'resetView') { resetCamera(false); projectAll(); markDirty(); drawNetworkFrame(); fitView(); return; }
+	if (msg.type === 'fitView') { projectAll(); fitView(); markDirty(); drawNetworkFrame(); }
 });
 
 function closePopup() {
@@ -970,7 +1005,7 @@ async function openNodePopup(node, clientX, clientY) {
 	placePopupNear(clientX, clientY);
 	// selectNode cancels any in-flight AI describe; explainNode is local-only.
 	request('selectNode', { nodeId: node.id });
-	dirty = true; drawNetworkFrame();
+	markDirty(); drawNetworkFrame();
 
 	const explained = await request('explainNode', { nodeId: node.id });
 	if (!popupNode || popupNode.id !== node.id) return;
@@ -1052,7 +1087,7 @@ function onPointerUp(e, cancelled) {
 		selectedNodeId = null;
 		request('selectNode', { nodeId: null });
 		closePopup();
-		dirty = true; drawNetworkFrame();
+		markDirty(); drawNetworkFrame();
 	}
 	scheduleIdleResume();
 }
@@ -1071,14 +1106,14 @@ function onPointerMove(e) {
 		const mapped = mapPointerDeltaToGraphRotation(dx, dy);
 		rotation.yaw = wrapRotationAngle(rotation.yaw + mapped.yaw);
 		rotation.pitch = wrapRotationAngle(rotation.pitch + mapped.pitch);
-		dirty = true;
+		markDirty();
 		return;
 	}
 	if (!moved) return;
 	if (!panning) return;
 	interactionState = 'panning';
 	transform.x += dx; transform.y += dy;
-	dirty = true;
+	markDirty();
 }
 function onWheel(e) {
 	e.preventDefault();
@@ -1090,7 +1125,8 @@ function onWheel(e) {
 	const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 	transform.x = mx - (mx - transform.x) * (transform.k / prev);
 	transform.y = my - (my - transform.y) * (transform.k / prev);
-	dirty = true; drawNetworkFrame();
+	// Trackpads emit wheel events far faster than 60Hz; let the render loop coalesce.
+	markDirty();
 }
 
 netCanvas.addEventListener('pointerdown', function (e) { onPointerDown(e, netCanvas); });
@@ -1123,21 +1159,21 @@ document.getElementById('popupExplainAi').onclick = async function () {
 	}
 };
 window.addEventListener('keydown', function (e) {
-	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); dirty = true; drawNetworkFrame(); }
+	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); markDirty(); drawNetworkFrame(); }
 });
 netCanvas.addEventListener('wheel', onWheel, { passive: false });
-window.addEventListener('resize', function () { resizeCanvas(); dirty = true; drawNetworkFrame(); });
+window.addEventListener('resize', function () { resizeCanvas(); markDirty(); drawNetworkFrame(); });
 
 document.getElementById('zoomIn').onclick = function () {
-	transform.k = Math.min(3.5, transform.k * 1.15); dirty = true;
+	transform.k = Math.min(3.5, transform.k * 1.15); markDirty();
 	drawNetworkFrame();
 };
 document.getElementById('zoomOut').onclick = function () {
-	transform.k = Math.max(0.15, transform.k / 1.15); dirty = true;
+	transform.k = Math.max(0.15, transform.k / 1.15); markDirty();
 	drawNetworkFrame();
 };
-document.getElementById('fit').onclick = function () { projectAll(); fitView(); dirty = true; drawNetworkFrame(); };
-document.getElementById('reset').onclick = function () { resetCamera(false); projectAll(); dirty = true; drawNetworkFrame(); fitView(); };
+document.getElementById('fit').onclick = function () { projectAll(); fitView(); markDirty(); drawNetworkFrame(); };
+document.getElementById('reset').onclick = function () { resetCamera(false); projectAll(); markDirty(); drawNetworkFrame(); fitView(); };
 idleToggle.addEventListener('change', function () {
 	settings.networkIdleAutoRotate = !!idleToggle.checked;
 	request('setNetworkIdleAutoRotate', { enabled: settings.networkIdleAutoRotate });
@@ -1145,6 +1181,7 @@ idleToggle.addEventListener('change', function () {
 });
 
 function rafLoop(ts) {
+	rafHandle = 0;
 	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
 	lastRafTs = ts;
 	const animating = settings.networkIdleAutoRotate && !settings.reduceMotion && !idlePaused && !dragging && !document.hidden && snapshot;
@@ -1153,9 +1190,9 @@ function rafLoop(ts) {
 		dirty = true;
 	}
 	if (dirty && snapshot) drawNetworkFrame();
-	requestAnimationFrame(rafLoop);
+	if (animating || dirty) wakeRaf();
 }
-requestAnimationFrame(rafLoop);
+wakeRaf();
 
 window.addEventListener('pagehide', clearIdleTimers);
 document.addEventListener('visibilitychange', function () {
