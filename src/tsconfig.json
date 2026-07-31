@@ -36,6 +36,10 @@
 		"./vscode-dts/vscode.d.ts"
 	],
 	"exclude": [
-		"vs/workbench/contrib/webview/browser/pre/service-worker.js"
+		"vs/workbench/contrib/webview/browser/pre/service-worker.js",
+		// Archived Architecture Graph assets reached through the graphs symlink. They are not
+		// compiled into the workbench and are checked separately by `typecheck:graphs-preserved`.
+		"vs/workbench/contrib/prebase/graphs/preserved/**",
+		"vs/workbench/contrib/prebase/graphs/tests/**"
 	]
 }
