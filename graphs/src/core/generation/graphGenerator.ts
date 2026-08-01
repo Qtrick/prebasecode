@@ -8,29 +8,29 @@ import type {
 	GraphSnapshot,
 	IncrementalUpdate,
 	ParseResult
-} from '../../common/types/graphTypes.js'
+} from '../../common/types/graphTypes.js';
 import {
 	buildImportResolutionContext,
 	resolveImportWithContext,
 	type PathMappings
-} from '../resolution/importResolution.js'
+} from '../resolution/importResolution.js';
 import {
 	basename,
 	folderIdForPath,
 	getParentFolderPath,
 	nodeIdForPath
-} from '../resolution/paths.js'
-import { inferLanguageFromPath, isMetadataFile } from '../scanning/projectFiles.js'
+} from '../resolution/paths.js';
+import { inferLanguageFromPath, isMetadataFile } from '../scanning/projectFiles.js';
 
 export interface GraphGeneratorOptions {
-	includeFolders?: boolean
-	includeFunctions?: boolean
-	maxFunctionNodesPerFile?: number
-	pathMappings?: PathMappings
+	includeFolders?: boolean;
+	includeFunctions?: boolean;
+	maxFunctionNodesPerFile?: number;
+	pathMappings?: PathMappings;
 }
 
 export class GraphGenerator {
-	private options: Required<GraphGeneratorOptions>
+	private options: Required<GraphGeneratorOptions>;
 
 	constructor(options: GraphGeneratorOptions = {}) {
 		this.options = {
@@ -38,7 +38,7 @@ export class GraphGenerator {
 			includeFunctions: options.includeFunctions ?? false,
 			maxFunctionNodesPerFile: options.maxFunctionNodesPerFile ?? 8,
 			pathMappings: options.pathMappings ?? {}
-		}
+		};
 	}
 
 	buildFromParseResults(
@@ -46,52 +46,52 @@ export class GraphGenerator {
 		projectName: string,
 		results: ParseResult[]
 	): Omit<GraphSnapshot, 'positions' | 'entryNodeId'> {
-		const nodes: GraphNode[] = []
-		const edges: GraphEdge[] = []
-		const nodeIds = new Set<string>()
-		const folderIds = new Set<string>()
+		const nodes: GraphNode[] = [];
+		const edges: GraphEdge[] = [];
+		const nodeIds = new Set<string>();
+		const folderIds = new Set<string>();
 
 		const ensureFolder = (folderPath: string) => {
-			const id = folderIdForPath(folderPath)
-			if (folderIds.has(id)) return
-			folderIds.add(id)
-			const parent = getParentFolderPath(folderPath)
+			const id = folderIdForPath(folderPath);
+			if (folderIds.has(id)) {return;}
+			folderIds.add(id);
+			const parent = getParentFolderPath(folderPath);
 			nodes.push({
 				id,
 				kind: 'folder',
 				label: folderPath ? basename(folderPath) : projectName,
 				path: folderPath || undefined,
 				parentId: parent ? folderIdForPath(parent) : undefined
-			})
+			});
 			if (parent !== null) {
-				ensureFolder(parent)
+				ensureFolder(parent);
 				edges.push({
 					id: `contains:${folderIdForPath(parent)}->${id}`,
 					source: folderIdForPath(parent),
 					target: id,
 					kind: 'contains',
 					meta: { confidence: 'EXTRACTED' }
-				})
+				});
 			}
-		}
+		};
 
 		if (this.options.includeFolders) {
 			// Folders are created only as ancestors of scanned files — no synthetic root.
 		}
 
-		const resolutionCtx = buildImportResolutionContext(projectPath, results)
+		const resolutionCtx = buildImportResolutionContext(projectPath, results);
 
 		// ── Pass 1: create a real node for EVERY scanned file ────────────────
 		// This must happen before import resolution so that a file imported by an
 		// earlier-processed file is never left as a stub `module` node (which would
 		// drop it from the completeness audit and lose its real metadata).
 		for (const result of results) {
-			const fileId = nodeIdForPath(result.relativePath)
+			const fileId = nodeIdForPath(result.relativePath);
 			if (!nodeIds.has(fileId)) {
-				nodeIds.add(fileId)
-				const parentFolder = getParentFolderPath(result.relativePath)
+				nodeIds.add(fileId);
+				const parentFolder = getParentFolderPath(result.relativePath);
 				if (this.options.includeFolders && parentFolder !== null) {
-					ensureFolder(parentFolder)
+					ensureFolder(parentFolder);
 				}
 
 				nodes.push({
@@ -112,7 +112,7 @@ export class GraphGenerator {
 						functionCount: result.functions.length,
 						componentCount: result.components.length
 					}
-				})
+				});
 
 				if (this.options.includeFolders && parentFolder !== null) {
 					edges.push({
@@ -121,7 +121,7 @@ export class GraphGenerator {
 						target: fileId,
 						kind: 'contains',
 						meta: { confidence: 'EXTRACTED' }
-					})
+					});
 				}
 			}
 
@@ -129,25 +129,25 @@ export class GraphGenerator {
 				const fnNames = [...result.functions, ...result.components].slice(
 					0,
 					this.options.maxFunctionNodesPerFile
-				)
+				);
 				for (const fn of fnNames) {
-					const fnId = `${fileId}:fn:${fn}`
-					if (nodeIds.has(fnId)) continue
-					nodeIds.add(fnId)
+					const fnId = `${fileId}:fn:${fn}`;
+					if (nodeIds.has(fnId)) {continue;}
+					nodeIds.add(fnId);
 					nodes.push({
 						id: fnId,
 						kind: result.components.includes(fn) ? 'component' : 'function',
 						label: fn,
 						path: result.relativePath,
 						parentId: fileId
-					})
+					});
 					edges.push({
 						id: `contains:${fileId}->${fnId}`,
 						source: fileId,
 						target: fnId,
 						kind: 'contains',
 						meta: { confidence: 'EXTRACTED' }
-					})
+					});
 				}
 			}
 		}
@@ -157,7 +157,7 @@ export class GraphGenerator {
 		// (from pass 1); only genuinely external/unscanned targets become `module`
 		// stub nodes here.
 		for (const result of results) {
-			const fileId = nodeIdForPath(result.relativePath)
+			const fileId = nodeIdForPath(result.relativePath);
 			for (const imp of result.imports) {
 				const resolved = resolveImportWithContext(
 					projectPath,
@@ -165,15 +165,15 @@ export class GraphGenerator {
 					imp.source,
 					this.options.pathMappings,
 					resolutionCtx
-				)
-				if (!resolved) continue
-				const targetId = nodeIdForPath(resolved)
-				if (targetId === fileId) continue
+				);
+				if (!resolved) {continue;}
+				const targetId = nodeIdForPath(resolved);
+				if (targetId === fileId) {continue;}
 				if (!nodeIds.has(targetId)) {
-					nodeIds.add(targetId)
-					const parentFolder = getParentFolderPath(resolved)
+					nodeIds.add(targetId);
+					const parentFolder = getParentFolderPath(resolved);
 					if (this.options.includeFolders && parentFolder !== null) {
-						ensureFolder(parentFolder)
+						ensureFolder(parentFolder);
 					}
 					nodes.push({
 						id: targetId,
@@ -185,7 +185,7 @@ export class GraphGenerator {
 								? folderIdForPath(parentFolder)
 								: undefined,
 						meta: { imports: [], exports: [] }
-					})
+					});
 					if (this.options.includeFolders && parentFolder !== null) {
 						edges.push({
 							id: `contains:${folderIdForPath(parentFolder)}->${targetId}`,
@@ -193,16 +193,16 @@ export class GraphGenerator {
 							target: targetId,
 							kind: 'contains',
 							meta: { confidence: 'EXTRACTED' }
-						})
+						});
 					}
 				}
-				const edgeId = `import:${fileId}->${targetId}:${imp.source}`
+				const edgeId = `import:${fileId}->${targetId}:${imp.source}`;
 				// Dedup via nodeIds set (same set used for node ids — edge ids never collide with file: paths).
-				if (nodeIds.has(edgeId)) continue
-				nodeIds.add(edgeId)
+				if (nodeIds.has(edgeId)) {continue;}
+				nodeIds.add(edgeId);
 				// ponytail: trust parser `isDynamic` (import()); `?` marks query-like module ids.
 				// Do not treat a local binding named "dynamic" as a dynamic import.
-				const isDynamic = !!imp.isDynamic || imp.source.includes('?')
+				const isDynamic = !!imp.isDynamic || imp.source.includes('?');
 				edges.push({
 					id: edgeId,
 					source: fileId,
@@ -219,15 +219,15 @@ export class GraphGenerator {
 						sourceLine: imp.line,
 						reason: isDynamic ? 'Dynamic or query-like import' : undefined,
 					}
-				})
+				});
 			}
 		}
 
 		if (this.options.includeFolders) {
-			this.pruneEmptyFolders(nodes, edges)
+			this.pruneEmptyFolders(nodes, edges);
 		}
 
-		this.addFolderDependencyEdges(nodes, edges)
+		this.addFolderDependencyEdges(nodes, edges);
 
 		return {
 			nodes,
@@ -236,72 +236,72 @@ export class GraphGenerator {
 			projectPath,
 			projectName,
 			scannedAt: Date.now()
-		}
+		};
 	}
 
 	/** Remove folders with no files or nested folders containing files. */
 	private pruneEmptyFolders(nodes: GraphNode[], edges: GraphEdge[]): void {
 		const folderHasContent = (folderId: string): boolean => {
 			for (const n of nodes) {
-				if (n.parentId !== folderId) continue
-				if (n.kind !== 'folder') return true
-				if (folderHasContent(n.id)) return true
+				if (n.parentId !== folderId) {continue;}
+				if (n.kind !== 'folder') {return true;}
+				if (folderHasContent(n.id)) {return true;}
 			}
-			return false
-		}
+			return false;
+		};
 
-		let changed = true
+		let changed = true;
 		while (changed) {
-			changed = false
+			changed = false;
 			for (let i = nodes.length - 1; i >= 0; i--) {
-				const n = nodes[i]
-				if (n.kind !== 'folder') continue
+				const n = nodes[i];
+				if (n.kind !== 'folder') {continue;}
 				if (!folderHasContent(n.id)) {
-					nodes.splice(i, 1)
-					changed = true
+					nodes.splice(i, 1);
+					changed = true;
 				}
 			}
 		}
 
-		const validIds = new Set(nodes.map((n) => n.id))
+		const validIds = new Set(nodes.map((n) => n.id));
 		for (let i = edges.length - 1; i >= 0; i--) {
 			if (!validIds.has(edges[i].source) || !validIds.has(edges[i].target)) {
-				edges.splice(i, 1)
+				edges.splice(i, 1);
 			}
 		}
 
 		for (const n of nodes) {
-			if (!n.parentId || validIds.has(n.parentId)) continue
-			let p: string | undefined = n.parentId
+			if (!n.parentId || validIds.has(n.parentId)) {continue;}
+			let p: string | undefined = n.parentId;
 			while (p && !validIds.has(p)) {
-				const parent = nodes.find((x) => x.id === p)
-				p = parent?.parentId
+				const parent = nodes.find((x) => x.id === p);
+				p = parent?.parentId;
 			}
-			n.parentId = p && validIds.has(p) ? p : undefined
+			n.parentId = p && validIds.has(p) ? p : undefined;
 		}
 	}
 
 	/** Aggregate file imports into folder-to-folder architecture links. */
 	private addFolderDependencyEdges(nodes: GraphNode[], edges: GraphEdge[]): void {
-		const nodeById = new Map(nodes.map((n) => [n.id, n]))
+		const nodeById = new Map(nodes.map((n) => [n.id, n]));
 		const folderOfFile = (nodeId: string): string | null => {
-			let current = nodeById.get(nodeId)
+			let current = nodeById.get(nodeId);
 			while (current?.parentId) {
-				if (current.parentId.startsWith('folder:')) return current.parentId
-				current = nodeById.get(current.parentId)
+				if (current.parentId.startsWith('folder:')) {return current.parentId;}
+				current = nodeById.get(current.parentId);
 			}
-			return null
-		}
+			return null;
+		};
 
-		const seen = new Set<string>()
+		const seen = new Set<string>();
 		for (const edge of [...edges]) {
-			if (edge.kind !== 'import') continue
-			const sourceFolder = folderOfFile(edge.source)
-			const targetFolder = folderOfFile(edge.target)
-			if (!sourceFolder || !targetFolder || sourceFolder === targetFolder) continue
-			const id = `folder-link:${sourceFolder}->${targetFolder}`
-			if (seen.has(id)) continue
-			seen.add(id)
+			if (edge.kind !== 'import') {continue;}
+			const sourceFolder = folderOfFile(edge.source);
+			const targetFolder = folderOfFile(edge.target);
+			if (!sourceFolder || !targetFolder || sourceFolder === targetFolder) {continue;}
+			const id = `folder-link:${sourceFolder}->${targetFolder}`;
+			if (seen.has(id)) {continue;}
+			seen.add(id);
 			edges.push({
 				id,
 				source: sourceFolder,
@@ -311,7 +311,7 @@ export class GraphGenerator {
 					confidence: 'INFERRED',
 					reason: 'Aggregated from file-level import edges between folders',
 				}
-			})
+			});
 		}
 	}
 
@@ -319,29 +319,29 @@ export class GraphGenerator {
 		oldSnapshot: Pick<GraphSnapshot, 'nodes' | 'edges'>,
 		newSnapshot: Pick<GraphSnapshot, 'nodes' | 'edges'>
 	): IncrementalUpdate {
-		const oldNodeMap = new Map(oldSnapshot.nodes.map((n) => [n.id, n]))
-		const newNodeMap = new Map(newSnapshot.nodes.map((n) => [n.id, n]))
-		const oldEdgeIds = new Set(oldSnapshot.edges.map((e) => e.id))
-		const newEdgeIds = new Set(newSnapshot.edges.map((e) => e.id))
+		const oldNodeMap = new Map(oldSnapshot.nodes.map((n) => [n.id, n]));
+		const newNodeMap = new Map(newSnapshot.nodes.map((n) => [n.id, n]));
+		const oldEdgeIds = new Set(oldSnapshot.edges.map((e) => e.id));
+		const newEdgeIds = new Set(newSnapshot.edges.map((e) => e.id));
 
-		const addedNodes: GraphNode[] = []
-		const removedNodeIds: string[] = []
-		const updatedNodes: GraphNode[] = []
+		const addedNodes: GraphNode[] = [];
+		const removedNodeIds: string[] = [];
+		const updatedNodes: GraphNode[] = [];
 
 		for (const [id, node] of newNodeMap) {
-			if (!oldNodeMap.has(id)) addedNodes.push(node)
+			if (!oldNodeMap.has(id)) {addedNodes.push(node);}
 			else if (JSON.stringify(oldNodeMap.get(id)) !== JSON.stringify(node)) {
-				updatedNodes.push(node)
+				updatedNodes.push(node);
 			}
 		}
 		for (const id of oldNodeMap.keys()) {
-			if (!newNodeMap.has(id)) removedNodeIds.push(id)
+			if (!newNodeMap.has(id)) {removedNodeIds.push(id);}
 		}
 
-		const addedEdges = newSnapshot.edges.filter((e) => !oldEdgeIds.has(e.id))
+		const addedEdges = newSnapshot.edges.filter((e) => !oldEdgeIds.has(e.id));
 		const removedEdgeIds = oldSnapshot.edges
 			.filter((e) => !newEdgeIds.has(e.id))
-			.map((e) => e.id)
+			.map((e) => e.id);
 
 		return {
 			addedNodes,
@@ -349,6 +349,6 @@ export class GraphGenerator {
 			addedEdges,
 			removedEdgeIds,
 			updatedNodes
-		}
+		};
 	}
 }

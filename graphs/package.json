@@ -11,7 +11,7 @@
     "./types": "./src/common/types/graphTypes.ts"
   },
   "scripts": {
-    "typecheck": "tsc -p ./tsconfig.json --noEmit",
+    "typecheck": "tsc -p ./tsconfig.json --noEmit && tsc -p ./tsconfig.tests.json --noEmit",
     "typecheck:preserved": "tsc -p ./tsconfig.preserved-architecture.json --noEmit",
     "verify-boundary": "node ./scripts/verify-boundary/verify.mjs",
     "test": "npm run test:graphs --prefix .."

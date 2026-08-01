@@ -19,8 +19,7 @@ import { IConfigurationService } from '../../../../../../platform/configuration/
 import { IEditorService } from '../../../../../services/editor/common/editorService.js';
 import { INotificationService } from '../../../../../../platform/notification/common/notification.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
-import { IOutputService } from '../../../../../services/output/common/output.js';
-import { IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../../../services/output/common/output.js';
+import { IOutputService, IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../../../services/output/common/output.js';
 import { prebaseMapsViewIcon } from '../../../browser/prebaseIcons.js';
 import { PREBASE_GRAPH_CHANNEL_ID, PREBASE_GRAPH_CHANNEL_LABEL, PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { PreBaseGraphCommandIds } from '../../commands/graphCommandIds.js';
@@ -50,11 +49,26 @@ function appendGraphChannel(output: IOutputService, header: string, lines: strin
 	}
 }
 
+/**
+ * A `ServicesAccessor` is only valid synchronously, so commands that await
+ * before opening the graph resolve these services first.
+ */
+interface GraphEditorOpener {
+	readonly editorService: IEditorService;
+	readonly graphService: IPreBaseGraphService;
+}
+
+function graphEditorOpener(accessor: ServicesAccessor): GraphEditorOpener {
+	return { editorService: accessor.get(IEditorService), graphService: accessor.get(IPreBaseGraphService) };
+}
+
+async function openGraphEditorWith(opener: GraphEditorOpener): Promise<void> {
+	await opener.graphService.setGraphType('code');
+	await opener.editorService.openEditor(PreBaseGraphEditorInput.create('code'), { pinned: true });
+}
+
 async function openGraphEditor(accessor: ServicesAccessor, _graphType?: PreBaseGraphType): Promise<void> {
-	const editorService = accessor.get(IEditorService);
-	const graphService = accessor.get(IPreBaseGraphService);
-	await graphService.setGraphType('code');
-	await editorService.openEditor(PreBaseGraphEditorInput.create('code'), { pinned: true });
+	return openGraphEditorWith(graphEditorOpener(accessor));
 }
 
 class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
@@ -225,6 +239,7 @@ function registerGraphActions(): void {
 		}
 		async run(accessor: ServicesAccessor, layoutMode?: NetworkLayoutMode | string) {
 			const config = accessor.get(IConfigurationService);
+			const opener = graphEditorOpener(accessor);
 			const order = NETWORK_LAYOUT_OPTIONS.map(o => o.id);
 			const current = (config.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'community') as NetworkLayoutMode;
 			const asNetwork = typeof layoutMode === 'string' && order.includes(layoutMode as NetworkLayoutMode)
@@ -232,7 +247,7 @@ function registerGraphActions(): void {
 				: undefined;
 			const next = asNetwork ?? order[(Math.max(0, order.indexOf(current)) + 1) % order.length];
 			await config.updateValue(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, next);
-			await openGraphEditor(accessor);
+			await openGraphEditorWith(opener);
 		}
 	});
 	registerAction2(class extends Action2 {
@@ -276,8 +291,9 @@ function registerGraphActions(): void {
 		async run(accessor: ServicesAccessor) {
 			const diag = accessor.get(IPreBaseGraphService).getDiagnostics();
 			const output = accessor.get(IOutputService);
+			const notify = accessor.get(INotificationService);
 			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
-			accessor.get(INotificationService).info(diag.message || localize('prebase.graph.diagFallback', "Status: {0}", diag.status));
+			notify.info(diag.message || localize('prebase.graph.diagFallback', "Status: {0}", diag.status));
 		}
 	});
 
@@ -492,6 +508,7 @@ function registerGraphActions(): void {
 		}
 		async run(accessor: ServicesAccessor) {
 			const output = accessor.get(IOutputService);
+			const notify = accessor.get(INotificationService);
 			const raw = accessor.get(IPreBaseGraphService).getImportantNodesForMagnus(10);
 			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
 			try {
@@ -502,13 +519,13 @@ function registerGraphActions(): void {
 					lines.push(parsed.notice);
 				}
 				appendGraphChannel(output, `Important nodes (${nodeCount})`, lines);
-				accessor.get(INotificationService).info(
+				notify.info(
 					nodeCount
 						? localize('prebase.graph.importantSummary', "Important nodes:\n{0}", lines.join('\n'))
 						: localize('prebase.graph.importantEmpty', "No important nodes yet — scan the Code Graph first.")
 				);
 			} catch {
-				accessor.get(INotificationService).info(localize('prebase.graph.importantEmpty', "No important nodes yet — scan the Code Graph first."));
+				notify.info(localize('prebase.graph.importantEmpty', "No important nodes yet — scan the Code Graph first."));
 			}
 		}
 	});
@@ -519,6 +536,7 @@ function registerGraphActions(): void {
 		}
 		async run(accessor: ServicesAccessor) {
 			const output = accessor.get(IOutputService);
+			const notify = accessor.get(INotificationService);
 			const raw = accessor.get(IPreBaseGraphService).getBridgeNodesForMagnus(10);
 			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
 			try {
@@ -532,13 +550,13 @@ function registerGraphActions(): void {
 					lines.push(parsed.notice);
 				}
 				appendGraphChannel(output, `Bridge nodes (${nodeCount})`, lines);
-				accessor.get(INotificationService).info(
+				notify.info(
 					nodeCount
 						? localize('prebase.graph.bridgeSummary', "Bridge nodes:\n{0}", lines.join('\n'))
 						: localize('prebase.graph.bridgeEmpty', "No bridge nodes yet — scan the Code Graph first.")
 				);
 			} catch {
-				accessor.get(INotificationService).info(localize('prebase.graph.bridgeEmpty', "No bridge nodes yet — scan the Code Graph first."));
+				notify.info(localize('prebase.graph.bridgeEmpty', "No bridge nodes yet — scan the Code Graph first."));
 			}
 		}
 	});
@@ -549,6 +567,7 @@ function registerGraphActions(): void {
 		}
 		async run(accessor: ServicesAccessor) {
 			const output = accessor.get(IOutputService);
+			const notify = accessor.get(INotificationService);
 			const raw = accessor.get(IPreBaseGraphService).getCommunitiesForMagnus(20);
 			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
 			try {
@@ -559,13 +578,13 @@ function registerGraphActions(): void {
 					lines.push(parsed.notice);
 				}
 				appendGraphChannel(output, `Communities (${communityCount})`, lines);
-				accessor.get(INotificationService).info(
+				notify.info(
 					(parsed.communities?.length ?? 0)
 						? localize('prebase.graph.communitiesSummary', "{0} communities:\n{1}", communityCount, lines.join('\n'))
 						: localize('prebase.graph.communitiesEmpty', "No communities yet — scan the Code Graph first.")
 				);
 			} catch {
-				accessor.get(INotificationService).info(localize('prebase.graph.communitiesEmpty', "No communities yet — scan the Code Graph first."));
+				notify.info(localize('prebase.graph.communitiesEmpty', "No communities yet — scan the Code Graph first."));
 			}
 		}
 	});
@@ -626,6 +645,7 @@ function registerGraphActions(): void {
 		async run(accessor: ServicesAccessor) {
 			const raw = accessor.get(IPreBaseGraphService).getSurprisingConnectionsForMagnus(10);
 			const output = accessor.get(IOutputService);
+			const notify = accessor.get(INotificationService);
 			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
 			const channel = output.getChannel(PREBASE_GRAPH_CHANNEL_ID);
 			try {
@@ -651,13 +671,13 @@ function registerGraphActions(): void {
 				if (edges.length === 0) {
 					channel?.append('  (none — scan the Code Graph first, or no cross-community imports)\n');
 				}
-				accessor.get(INotificationService).info(
+				notify.info(
 					edges.length
 						? localize('prebase.graph.surprisingSummary', "Cross-community: {0} surprising connection(s) (see PreBase Graph output).", edges.length)
 						: localize('prebase.graph.surprisingEmpty', "No surprising cross-community connections yet — scan the Code Graph first.")
 				);
 			} catch {
-				accessor.get(INotificationService).info(localize('prebase.graph.surprisingEmpty', "No surprising cross-community connections yet — scan the Code Graph first."));
+				notify.info(localize('prebase.graph.surprisingEmpty', "No surprising cross-community connections yet — scan the Code Graph first."));
 			}
 		}
 	});

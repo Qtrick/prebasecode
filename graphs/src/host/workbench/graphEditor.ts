@@ -186,7 +186,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		}));
 		webview.mountTo(this._container, this.window);
 		webview.setHtml(this._buildHtml());
-		this._webviewDisposables.add(webview.onMessage(e => this._onMessage(e.message as IBridgeRequest)));
+		this._webviewDisposables.add(webview.onMessage(e => { void this._onMessage(e.message as IBridgeRequest); }));
 		this._webview = webview;
 	}
 
@@ -236,7 +236,16 @@ export class PreBaseGraphEditor extends EditorPane {
 		const reply = async (payload: unknown) => {
 			this._webview?.postMessage({ type: 'response', requestId: message.requestId, payload });
 		};
+		try {
+			await this._handleMessage(message, reply);
+		} catch (err) {
+			// The webview keeps an unsettled promise per request, so a handler that
+			// throws would leave its popup stuck on a loading state forever.
+			await reply({ error: err instanceof Error ? err.message : String(err) });
+		}
+	}
 
+	private async _handleMessage(message: IBridgeRequest, reply: (payload: unknown) => Promise<void>): Promise<void> {
 		switch (message.type) {
 			case 'getSnapshot':
 				await reply({
@@ -346,36 +355,43 @@ export class PreBaseGraphEditor extends EditorPane {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style nonce="${nonce}">
-html, body { margin:0; height:100%; background:#070b14; color:#e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; overflow:hidden; }
+/* Surfaces come from the workbench theme (webviews receive --vscode-* variables),
+   so the graph follows PreBase's dark surface roles, user colour customizations
+   and High Contrast themes instead of a private palette. */
+html, body { margin:0; height:100%; background:var(--vscode-editor-background); color:var(--vscode-foreground); font-family: var(--vscode-font-family); font-size: var(--vscode-font-size); overflow:hidden; }
 #stage { position:absolute; inset:0; }
 #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; cursor:grab; }
 #netCanvas.dragging { cursor:grabbing; }
-#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:rgba(15,23,42,.82); border:1px solid #334155; border-radius:8px; padding:4px; }
-#toolbar button, #toolbar label { background:transparent; color:#e2e8f0; border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
-#toolbar button:hover { background:#1e293b; }
+:focus-visible { outline:1px solid var(--vscode-focusBorder); outline-offset:1px; }
+#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:var(--vscode-editorWidget-background); border:1px solid var(--vscode-editorWidget-border); border-radius:8px; padding:4px; box-shadow:0 2px 8px var(--vscode-widget-shadow, transparent); }
+#toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground); border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
+#toolbar button:hover { background:var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
 /* More specific than #toolbar label so Idle stays hidden before script runs. */
 #toolbar label { gap:4px; align-items:center; user-select:none; opacity:.9; }
 #toolbar label#idleToggleWrap { display:none; }
 #toolbar label#idleToggleWrap.is-visible { display:flex; }
-#status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:rgba(15,23,42,.88); border:1px solid #334155; border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
-#legend { position:absolute; left:12px; bottom:100px; z-index:4; background:rgba(15,23,42,.88); border:1px solid #334155; border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
+#status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:var(--vscode-editorWidget-background); border:1px solid var(--vscode-editorWidget-border); border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
+#legend { position:absolute; left:12px; bottom:100px; z-index:4; background:var(--vscode-editorWidget-background); border:1px solid var(--vscode-editorWidget-border); border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
 #legend .title { font-weight:700; margin-bottom:6px; letter-spacing:.02em; text-transform:uppercase; opacity:.75; font-size:10px; }
 #legend .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
 #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
 #legend .swatch.circle { border-radius:50%; }
 #legend .swatch.line { height:2px; width:16px; border-radius:1px; }
-#legend .swatch.line.dashed { background:transparent; height:0; border-radius:0; border-top:2px dashed #94a3b8; }
-#legend .swatch.line.dotted { background:transparent; height:0; border-radius:0; border-top:2px dotted #94a3b8; }
-#empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:#94a3b8; font-size:14px; line-height:1.5; }
-#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:rgba(15,23,42,.96); border:1px solid #334155; border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
+#legend .swatch.line.dashed { background:transparent; height:0; border-radius:0; border-top:2px dashed var(--prebase-edge-line); }
+#legend .swatch.line.dotted { background:transparent; height:0; border-radius:0; border-top:2px dotted var(--prebase-edge-line); }
+#empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground); font-size:14px; line-height:1.5; }
+/* The inspector floats above the canvas, so it uses the most elevated surface role. */
+#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorHoverWidget-background); border:1px solid var(--vscode-editorHoverWidget-border); border-radius:12px; padding:12px; box-shadow:0 16px 40px var(--vscode-widget-shadow, transparent); }
 #popup h3 { margin:0 0 4px; font-size:13px; }
-#popup .meta { color:#94a3b8; font-size:11px; margin-bottom:8px; word-break:break-word; }
-#popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:10px 0 4px; }
-#popup p { margin:0; font-size:12px; line-height:1.45; color:#cbd5e1; white-space:pre-wrap; }
+#popup .meta { color:var(--vscode-descriptionForeground); font-size:11px; margin-bottom:8px; word-break:break-word; }
+#popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-descriptionForeground); margin:10px 0 4px; }
+#popup p { margin:0; font-size:12px; line-height:1.45; color:var(--vscode-foreground); white-space:pre-wrap; }
 #popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-#popup button { font-size:11px; border-radius:7px; border:1px solid #334155; background:#0b1220; color:#e2e8f0; padding:5px 8px; cursor:pointer; }
-#popup button.primary { border-color:#2dd4bf; color:#042f2e; background:#2dd4bf; }
-#popup #popupClose { float:right; border:0; background:transparent; color:#94a3b8; font-size:16px; }
+#popup button { font-size:11px; border-radius:7px; border:1px solid var(--vscode-editorWidget-border); background:var(--vscode-button-secondaryBackground, transparent); color:var(--vscode-button-secondaryForeground); padding:5px 8px; cursor:pointer; }
+#popup button:hover { background:var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground)); }
+#popup button.primary { border-color:var(--vscode-button-border, transparent); color:var(--vscode-button-foreground); background:var(--vscode-button-background); }
+#popup button.primary:hover { background:var(--vscode-button-hoverBackground); }
+#popup #popupClose { float:right; border:0; background:transparent; color:var(--vscode-descriptionForeground); font-size:16px; }
 </style>
 </head>
 <body>
@@ -432,6 +448,12 @@ const FOCAL = 640;
 const IDLE_YAW = 0.08;
 const IDLE_RESUME_MS = 1400;
 const ENTRY = '#e8b84a';
+// Edge colours are shared by the canvas renderer and the legend so the two cannot drift.
+const EDGE_IMPORT_RGB = '125,170,220';
+const EDGE_CONTAINS_RGB = '167,139,250';
+const EDGE_IMPORT = 'rgb(' + EDGE_IMPORT_RGB + ')';
+const EDGE_CONTAINS = 'rgb(' + EDGE_CONTAINS_RGB + ')';
+document.documentElement.style.setProperty('--prebase-edge-line', EDGE_IMPORT);
 const FILE_COLORS = {
 	typescript:'#3178c6', javascript:'#f1e05a', css:'#a371f7', html:'#e34c26',
 	markdown:'#519aba', image:'#c678dd', config:'#6b7280', other:'#71717a'
@@ -456,13 +478,36 @@ let idlePaused = true;
 let idleResumeTimer = null;
 let lastRafTs = 0;
 let dirty = true;
+let rafHandle = 0;
 let dpr = Math.min(2, window.devicePixelRatio || 1);
 const pending = new Map();
 
+// The render loop parks itself when the scene is static so an open, idle graph
+// tab does not keep the compositor awake at 60Hz. Anything that invalidates the
+// scene must go through markDirty() so the loop is restarted.
+function wakeRaf() {
+	if (rafHandle) return;
+	lastRafTs = 0;
+	rafHandle = requestAnimationFrame(rafLoop);
+}
+function markDirty() {
+	dirty = true;
+	wakeRaf();
+}
+
+// If the host never answers (editor disposed mid-request, handler crash) the
+// caller must still settle, otherwise the UI waiting on it stays on a spinner.
+const REQUEST_TIMEOUT_MS = 20000;
 function request(type, payload) {
 	const requestId = Math.random().toString(36).slice(2);
 	return new Promise(function (resolve) {
-		pending.set(requestId, resolve);
+		const timer = setTimeout(function () {
+			if (pending.delete(requestId)) resolve({ error: 'timeout' });
+		}, REQUEST_TIMEOUT_MS);
+		pending.set(requestId, function (value) {
+			clearTimeout(timer);
+			resolve(value);
+		});
 		vscode.postMessage({ requestId: requestId, type: type, payload: payload });
 	});
 }
@@ -549,13 +594,16 @@ function projectPoint(x, y, z, yaw, pitch) {
 
 function scheduleIdleResume() {
 	idlePaused = true;
-	dirty = true;
+	markDirty();
 	if (idleResumeTimer) clearTimeout(idleResumeTimer);
 	idleResumeTimer = null;
 	if (!settings.networkIdleAutoRotate || settings.reduceMotion) return;
 	idleResumeTimer = setTimeout(function () {
 		idleResumeTimer = null;
-		if (settings.networkIdleAutoRotate && !settings.reduceMotion && !dragging) idlePaused = false;
+		if (settings.networkIdleAutoRotate && !settings.reduceMotion && !dragging) {
+			idlePaused = false;
+			wakeRaf();
+		}
 	}, IDLE_RESUME_MS);
 }
 
@@ -569,7 +617,7 @@ function resetCamera(preserveZoom) {
 	rotation = { yaw: 0.55, pitch: 0.28 };
 	if (!preserveZoom) transform = { x: 0, y: 0, k: settings.initialZoom || 1 };
 	scheduleIdleResume();
-	dirty = true;
+	markDirty();
 }
 
 function resizeCanvas() {
@@ -579,7 +627,7 @@ function resizeCanvas() {
 	netCanvas.width = Math.max(1, Math.floor(w * dpr));
 	netCanvas.height = Math.max(1, Math.floor(h * dpr));
 	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-	dirty = true;
+	markDirty();
 }
 
 function rebuildBase3d(s) {
@@ -649,7 +697,7 @@ function fitView() {
 	const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
 	const k = Math.min(vw / (bw + 120), vh / (bh + 120), 1.8) * (settings.initialZoom || 1);
 	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
-	dirty = true;
+	markDirty();
 }
 
 function updateLegend(s, network) {
@@ -667,10 +715,10 @@ function updateLegend(s, network) {
 	html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:hsl(94 62% 52%)"></span>Community (default)</div>';
 	html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:' + ENTRY + '"></span>Entry</div>';
 	html += '<div class="title" style="margin-top:8px">Visible edges</div>';
-	html += '<div class="row"><span class="swatch line" style="background:#94a3b8"></span>Import / dependency</div>';
-	html += '<div class="row"><span class="swatch line" style="background:#a78bfa"></span>Contains</div>';
+	html += '<div class="row"><span class="swatch line" style="background:' + EDGE_IMPORT + '"></span>Import / dependency</div>';
+	html += '<div class="row"><span class="swatch line" style="background:' + EDGE_CONTAINS + '"></span>Contains</div>';
 	html += '<div class="title" style="margin-top:8px">Confidence</div>';
-	html += '<div class="row"><span class="swatch line" style="background:#94a3b8"></span>EXTRACTED (solid)</div>';
+	html += '<div class="row"><span class="swatch line" style="background:' + EDGE_IMPORT + '"></span>EXTRACTED (solid)</div>';
 	html += '<div class="row"><span class="swatch line dashed"></span>INFERRED (dashed)</div>';
 	html += '<div class="row"><span class="swatch line dotted"></span>AMBIGUOUS (dotted)</div>';
 	html += '<div class="title" style="margin-top:8px">File type fallback</div>';
@@ -728,9 +776,7 @@ function drawNetworkFrame() {
 		const confMul = conf === 'AMBIGUOUS' ? 0.55 : conf === 'INFERRED' ? 0.78 : 1;
 		const edgeAlpha = Math.max(0.14, Math.min(0.78, (0.2 + 0.38 * avg) * confMul));
 		ctx.beginPath();
-		ctx.strokeStyle = e.kind === 'contains'
-			? 'rgba(167,139,250,' + edgeAlpha + ')'
-			: 'rgba(125,170,220,' + edgeAlpha + ')';
+		ctx.strokeStyle = 'rgba(' + (e.kind === 'contains' ? EDGE_CONTAINS_RGB : EDGE_IMPORT_RGB) + ',' + edgeAlpha + ')';
 		ctx.lineWidth = (conf === 'EXTRACTED' || !conf ? 1.15 : 1) / transform.k;
 		const dash = edgeDashForConfidence(conf);
 		if (dash) {
@@ -868,7 +914,7 @@ function render(full) {
 	rebuildBase3d(snapshot);
 	resizeCanvas();
 	projectAll();
-	dirty = true;
+	markDirty();
 	drawNetworkFrame();
 }
 
@@ -903,7 +949,7 @@ function onSnapshotMessage(payload) {
 		empty.style.display = 'none';
 		status.textContent = graphStatusLine();
 		updateLegend(snapshot, true);
-		dirty = true;
+		markDirty();
 		drawNetworkFrame();
 		return;
 	}
@@ -921,8 +967,8 @@ window.addEventListener('message', function (event) {
 		return;
 	}
 	if (msg.type === 'snapshot') { onSnapshotMessage(msg.payload); return; }
-	if (msg.type === 'resetView') { resetCamera(false); projectAll(); dirty = true; drawNetworkFrame(); fitView(); return; }
-	if (msg.type === 'fitView') { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
+	if (msg.type === 'resetView') { resetCamera(false); projectAll(); markDirty(); drawNetworkFrame(); fitView(); return; }
+	if (msg.type === 'fitView') { projectAll(); fitView(); markDirty(); drawNetworkFrame(); }
 });
 
 function closePopup() {
@@ -959,7 +1005,7 @@ async function openNodePopup(node, clientX, clientY) {
 	placePopupNear(clientX, clientY);
 	// selectNode cancels any in-flight AI describe; explainNode is local-only.
 	request('selectNode', { nodeId: node.id });
-	dirty = true; drawNetworkFrame();
+	markDirty(); drawNetworkFrame();
 
 	const explained = await request('explainNode', { nodeId: node.id });
 	if (!popupNode || popupNode.id !== node.id) return;
@@ -1041,7 +1087,7 @@ function onPointerUp(e, cancelled) {
 		selectedNodeId = null;
 		request('selectNode', { nodeId: null });
 		closePopup();
-		dirty = true; drawNetworkFrame();
+		markDirty(); drawNetworkFrame();
 	}
 	scheduleIdleResume();
 }
@@ -1060,14 +1106,14 @@ function onPointerMove(e) {
 		const mapped = mapPointerDeltaToGraphRotation(dx, dy);
 		rotation.yaw = wrapRotationAngle(rotation.yaw + mapped.yaw);
 		rotation.pitch = wrapRotationAngle(rotation.pitch + mapped.pitch);
-		dirty = true;
+		markDirty();
 		return;
 	}
 	if (!moved) return;
 	if (!panning) return;
 	interactionState = 'panning';
 	transform.x += dx; transform.y += dy;
-	dirty = true;
+	markDirty();
 }
 function onWheel(e) {
 	e.preventDefault();
@@ -1079,7 +1125,8 @@ function onWheel(e) {
 	const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 	transform.x = mx - (mx - transform.x) * (transform.k / prev);
 	transform.y = my - (my - transform.y) * (transform.k / prev);
-	dirty = true; drawNetworkFrame();
+	// Trackpads emit wheel events far faster than 60Hz; let the render loop coalesce.
+	markDirty();
 }
 
 netCanvas.addEventListener('pointerdown', function (e) { onPointerDown(e, netCanvas); });
@@ -1112,21 +1159,21 @@ document.getElementById('popupExplainAi').onclick = async function () {
 	}
 };
 window.addEventListener('keydown', function (e) {
-	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); dirty = true; drawNetworkFrame(); }
+	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); markDirty(); drawNetworkFrame(); }
 });
 netCanvas.addEventListener('wheel', onWheel, { passive: false });
-window.addEventListener('resize', function () { resizeCanvas(); dirty = true; drawNetworkFrame(); });
+window.addEventListener('resize', function () { resizeCanvas(); markDirty(); drawNetworkFrame(); });
 
 document.getElementById('zoomIn').onclick = function () {
-	transform.k = Math.min(3.5, transform.k * 1.15); dirty = true;
+	transform.k = Math.min(3.5, transform.k * 1.15); markDirty();
 	drawNetworkFrame();
 };
 document.getElementById('zoomOut').onclick = function () {
-	transform.k = Math.max(0.15, transform.k / 1.15); dirty = true;
+	transform.k = Math.max(0.15, transform.k / 1.15); markDirty();
 	drawNetworkFrame();
 };
-document.getElementById('fit').onclick = function () { projectAll(); fitView(); dirty = true; drawNetworkFrame(); };
-document.getElementById('reset').onclick = function () { resetCamera(false); projectAll(); dirty = true; drawNetworkFrame(); fitView(); };
+document.getElementById('fit').onclick = function () { projectAll(); fitView(); markDirty(); drawNetworkFrame(); };
+document.getElementById('reset').onclick = function () { resetCamera(false); projectAll(); markDirty(); drawNetworkFrame(); fitView(); };
 idleToggle.addEventListener('change', function () {
 	settings.networkIdleAutoRotate = !!idleToggle.checked;
 	request('setNetworkIdleAutoRotate', { enabled: settings.networkIdleAutoRotate });
@@ -1134,6 +1181,7 @@ idleToggle.addEventListener('change', function () {
 });
 
 function rafLoop(ts) {
+	rafHandle = 0;
 	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
 	lastRafTs = ts;
 	const animating = settings.networkIdleAutoRotate && !settings.reduceMotion && !idlePaused && !dragging && !document.hidden && snapshot;
@@ -1141,10 +1189,13 @@ function rafLoop(ts) {
 		rotation.yaw += IDLE_YAW * dt;
 		dirty = true;
 	}
+	// Without a snapshot there is nothing to draw, so staying awake for a dirty
+	// flag we cannot clear would spin at 60Hz forever if getSnapshot never
+	// answers. render() marks dirty again once a snapshot arrives.
 	if (dirty && snapshot) drawNetworkFrame();
-	requestAnimationFrame(rafLoop);
+	if (animating || (dirty && snapshot)) wakeRaf();
 }
-requestAnimationFrame(rafLoop);
+wakeRaf();
 
 window.addEventListener('pagehide', clearIdleTimers);
 document.addEventListener('visibilitychange', function () {

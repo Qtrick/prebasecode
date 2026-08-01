@@ -3,7 +3,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { streamGenerateContent, type GeminiContent } from './geminiClient';
+import { streamGenerateContent, GeminiRequestError, type GeminiContent } from './geminiClient';
+import { isSecretPath, isUnderWorkspace, resolveWorkspaceUri } from './tools';
 import { getModelOption, resolveApiModel } from './models';
 import {
 	allowsEdits,
@@ -22,7 +23,66 @@ export interface MagnusChatState {
 	attachedFiles: string[];
 	graphSelection?: string;
 	runtimeContext?: string;
-	cancellation?: vscode.CancellationTokenSource;
+	/**
+	 * Every in-flight request. A single shared token source let a new request
+	 * dispose the previous one, which detached its cancellation listeners and
+	 * left the older request running with no way to stop it.
+	 */
+	activeRequests: Set<vscode.CancellationTokenSource>;
+}
+
+/** Cancels every in-flight Agents request. Used by Cancel and New Session. */
+export function cancelActiveMagnusRequests(state: MagnusChatState): void {
+	for (const cts of [...state.activeRequests]) {
+		cts.cancel();
+	}
+}
+
+/** Keeps a single attachment from consuming the whole prompt budget. */
+const ATTACHED_FILE_CHARACTER_LIMIT = 40_000;
+
+/** Keeps a pile of attachments from consuming it either. */
+const ATTACHED_FILES_CHARACTER_BUDGET = 120_000;
+
+/**
+ * Resolves an attached path to its contents. Attaching a file previously only
+ * sent the path, so the model never saw the code it was asked about.
+ *
+ * `budget` is the characters of file content still available across all
+ * attachments in this request; the caller decrements it by the returned
+ * `used`.
+ */
+async function readAttachedFile(file: string, budget: number, token: vscode.CancellationToken): Promise<{ text: string; used: number }> {
+	const uri = resolveWorkspaceUri(file);
+	if (!uri || !isUnderWorkspace(uri)) {
+		return { text: `Attached file (unavailable, outside the workspace): ${file}`, used: 0 };
+	}
+	if (isSecretPath(uri)) {
+		return { text: `Attached file (withheld, may contain secrets): ${file}`, used: 0 };
+	}
+	if (budget <= 0) {
+		return { text: `Attached file (omitted, attachment budget exhausted): ${file}`, used: 0 };
+	}
+	try {
+		const document = await vscode.workspace.openTextDocument(uri);
+		if (token.isCancellationRequested) {
+			return { text: `Attached file: ${file}`, used: 0 };
+		}
+		const text = document.getText();
+		const limit = Math.min(ATTACHED_FILE_CHARACTER_LIMIT, budget);
+		const body = text.slice(0, limit);
+		return {
+			text: [
+				`Attached file: ${file}${body.length < text.length ? ' (truncated)' : ''}`,
+				'```',
+				body,
+				'```',
+			].join('\n'),
+			used: body.length,
+		};
+	} catch {
+		return { text: `Attached file (could not be read): ${file}`, used: 0 };
+	}
 }
 
 function buildSystemPrompt(mode: MagnusAgentMode, extras: string[]): string {
@@ -123,8 +183,11 @@ async function handleChatRequest(
 	const modelLabel = getModelOption(modelId).name;
 
 	const extras: string[] = [];
+	let attachmentBudget = ATTACHED_FILES_CHARACTER_BUDGET;
 	for (const file of state.attachedFiles) {
-		extras.push(`Attached file: ${file}`);
+		const attachment = await readAttachedFile(file, attachmentBudget, token);
+		attachmentBudget -= attachment.used;
+		extras.push(attachment.text);
 	}
 	if (state.graphSelection && vscode.workspace.getConfiguration('prebase.magnus').get('includeGraphContext', true)) {
 		extras.push(`Graph selection:\n${state.graphSelection}`);
@@ -137,9 +200,8 @@ async function handleChatRequest(
 		{ role: 'user', parts: [{ text: request.prompt }] },
 	];
 
-	state.cancellation?.dispose();
-	state.cancellation = new vscode.CancellationTokenSource();
-	const requestCts = state.cancellation;
+	const requestCts = new vscode.CancellationTokenSource();
+	state.activeRequests.add(requestCts);
 	const cancelSub = token.onCancellationRequested(() => requestCts.cancel());
 	const effectiveToken = requestCts.token;
 
@@ -202,7 +264,14 @@ async function handleChatRequest(
 			}
 			run.status = 'failed';
 			run.completedAt = Date.now();
-			run.error = err instanceof Error ? err.message : String(err);
+			// Show the actionable message; keep the raw API payload out of chat
+			// because it can quote request content and internal status strings.
+			run.error = err instanceof GeminiRequestError
+				? err.message
+				: err instanceof Error ? err.message : String(err);
+			if (err instanceof GeminiRequestError) {
+				console.error(`[Agents] Gemini request failed (HTTP ${err.status}): ${err.detail}`);
+			}
 			finishThought(response, 'magnus-planning');
 			emitThought(response, runHeaderLabel(run), 'magnus-run-header');
 			finishThought(response, 'magnus-run-header');
@@ -226,11 +295,7 @@ async function handleChatRequest(
 		return {};
 	} finally {
 		cancelSub.dispose();
-		if (state.cancellation === requestCts) {
-			state.cancellation.dispose();
-			state.cancellation = undefined;
-		} else {
-			requestCts.dispose();
-		}
+		state.activeRequests.delete(requestCts);
+		requestCts.dispose();
 	}
 }

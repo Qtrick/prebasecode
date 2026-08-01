@@ -17,10 +17,9 @@ import { asJson, IRequestService } from '../../../../platform/request/common/req
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { PREBASE_DESKTOP_CHANNEL_NAME, type IPreBaseDesktopMainService } from '../../../../platform/prebaseDesktop/common/prebaseDesktop.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
-import type { CdpTarget, DesktopLaunchMode, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
+import type { CdpTarget, DesktopLaunchMode, ElectronProjectProfile, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
 import type { IPreBaseRuntimeAdapter, PreBaseDesktopLaunchOptions } from '../common/runtime/runtimeAdapter.js';
-import type { ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
 import type { ProjectProbe } from '../common/runtime/types.js';
 import { validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
 

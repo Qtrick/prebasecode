@@ -22,10 +22,10 @@ export type NetworkLayoutMode =
 	| 'sphere'
 	| 'constellation'
 	| 'clustered'
-	| 'radial'
+	| 'radial';
 
 export interface Point3D {
-	x: number
-	y: number
-	z: number
+	x: number;
+	y: number;
+	z: number;
 }

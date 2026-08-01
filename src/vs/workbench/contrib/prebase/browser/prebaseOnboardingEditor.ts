@@ -22,6 +22,7 @@ import { IEditorService } from '../../../services/editor/common/editorService.js
 import { IPreBaseAccountService } from './prebaseAccountService.js';
 import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
 import { PreBaseOnboardingEditorInput } from './prebaseOnboardingEditorInput.js';
+import { PreBaseBorder, PreBaseControl, PreBaseForeground, PreBaseSurface } from './prebaseSurfaces.js';
 
 const STEPS = [
 	localize('prebase.onboarding.step.account', "Account"),
@@ -33,11 +34,11 @@ const STEPS = [
 	localize('prebase.onboarding.step.finish', "Finish"),
 ];
 
-const ACCENT = '#2dd4bf';
-const MUTED = '#94a3b8';
-const TEXT = '#e2e8f0';
-const SURFACE = '#0f172a';
-const BORDER = '#1e293b';
+const ACCENT = PreBaseForeground.link;
+const MUTED = PreBaseForeground.secondary;
+const TEXT = PreBaseForeground.primary;
+const SURFACE = PreBaseSurface.raised;
+const BORDER = PreBaseBorder.subtle;
 
 export class PreBaseOnboardingEditor extends EditorPane {
 	static readonly ID = 'workbench.editor.prebaseOnboarding';
@@ -71,7 +72,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		this._root = DOM.append(parent, DOM.$('.prebase-onboarding'));
 		this._root.style.height = '100%';
 		this._root.style.overflow = 'auto';
-		this._root.style.background = 'radial-gradient(ellipse at top, rgba(45,212,191,0.1) 0%, transparent 55%), #0b1220';
+		this._root.style.background = `radial-gradient(ellipse at top, rgba(45,212,191,0.1) 0%, transparent 55%), ${PreBaseSurface.deep}`;
 		this._root.style.color = TEXT;
 		this._body = DOM.append(this._root, DOM.$('.prebase-onboarding-body'));
 		this._body.style.maxWidth = '720px';
@@ -133,7 +134,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 			pill.style.borderRadius = '999px';
 			pill.style.border = `1px solid ${i === this._step ? ACCENT : BORDER}`;
 			pill.style.color = i === this._step ? ACCENT : MUTED;
-			pill.style.background = i === this._step ? 'rgba(45,212,191,0.12)' : 'transparent';
+			pill.style.background = i === this._step ? PreBaseSurface.overlay : 'transparent';
 		});
 
 		const panel = DOM.append(this._body, DOM.$('div'));
@@ -218,7 +219,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		if (this.accountService.lastError) {
 			const err = DOM.append(panel, DOM.$('p'));
 			err.textContent = this.accountService.lastError;
-			err.style.color = '#fca5a5';
+			err.style.color = PreBaseForeground.error;
 			err.style.fontSize = '12px';
 			err.style.marginTop = '10px';
 		}
@@ -332,9 +333,9 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		btn.textContent = label;
 		btn.style.padding = '8px 12px';
 		btn.style.borderRadius = '8px';
-		btn.style.border = primary ? `1px solid ${ACCENT}` : `1px solid ${BORDER}`;
-		btn.style.background = primary ? ACCENT : 'transparent';
-		btn.style.color = primary ? '#042f2e' : TEXT;
+		btn.style.border = primary ? '1px solid transparent' : `1px solid ${BORDER}`;
+		btn.style.background = primary ? PreBaseControl.accentBackground : PreBaseControl.secondaryBackground;
+		btn.style.color = primary ? PreBaseControl.accentForeground : PreBaseControl.secondaryForeground;
 		btn.style.cursor = 'pointer';
 		btn.style.fontSize = '12px';
 		this._ui.add(DOM.addDisposableListener(btn, 'click', () => {

@@ -66,10 +66,38 @@ class DesktopStopTool implements vscode.LanguageModelTool<{ sessionId?: string; 
 	}
 }
 
+/** Longest expression shown verbatim in the confirmation dialog. */
+const CDP_EXPRESSION_PREVIEW_LIMIT = 2_000;
+
 class DesktopCdpEvalTool implements vscode.LanguageModelTool<{ sessionId?: string; expression: string }> {
+	/**
+	 * This runs model-authored JavaScript inside the application under test, so
+	 * it needs the same explicit approval as editing files or controlling the
+	 * server — and the user must be able to read the exact expression first.
+	 */
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ sessionId?: string; expression: string }>): vscode.PreparedToolInvocation {
+		const expression = options.input.expression?.trim() ?? '';
+		const preview = expression.length > CDP_EXPRESSION_PREVIEW_LIMIT
+			? `${expression.slice(0, CDP_EXPRESSION_PREVIEW_LIMIT)}\n… (truncated)`
+			: expression;
+		return {
+			invocationMessage: 'Evaluate JavaScript in the desktop session',
+			confirmationMessages: {
+				title: 'Run JavaScript in the desktop app?',
+				message: new vscode.MarkdownString(
+					'Agents wants to evaluate this expression in the running desktop session. It has full access to that page.\n\n'
+					+ '```js\n' + preview.replace(/```/g, '`\u200b``') + '\n```',
+				),
+			},
+		};
+	}
+
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ sessionId?: string; expression: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
+		}
+		if (!vscode.workspace.isTrusted) {
+			throw new Error('Workspace Trust is required before Agents can evaluate JavaScript in a desktop session.');
 		}
 		const expression = options.input.expression?.trim();
 		if (!expression) {

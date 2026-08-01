@@ -10,6 +10,7 @@
 
 .github/skills/heap-snapshot-analysis/helpers/streamSnapshot.mjs
 .vscode-test.js
+build/assert-open-vsx.mjs
 build/azure-pipelines/common/installPlaywright.js
 build/azure-pipelines/github-check-run.js
 build/builtin/browser-main.js
@@ -84,7 +85,15 @@ extensions/vscode-api-tests/testWorkspace/worker.js
 extensions/vscode-colorize-tests/test/colorize-fixtures/test.js
 extensions/vscode-colorize-tests/test/colorize-fixtures/test6916.js
 extensions/yaml/build/update-grammar.js
+graphs/scripts/benchmark-network-layouts.mjs
+graphs/scripts/graphs-test-loader.mjs
+graphs/scripts/graphs-test-register.mjs
+graphs/scripts/run-unit-tests.mjs
+graphs/scripts/verify-boundary/verify.mjs
+graphs/scripts/verify-typescript-lanes.mjs
 gulpfile.mjs
+scripts/assurance/verify-config-uniqueness.mjs
+scripts/assurance/verify-eslint-prebase.mjs
 scripts/chat-simulation/common/perf-scenarios.js
 scripts/chat-simulation/common/utils.js
 scripts/chat-simulation/merge-ci-summary.js
@@ -95,6 +104,20 @@ scripts/code-perf.js
 scripts/code-server.js
 scripts/code-sessions-web.js
 scripts/code-web.js
+scripts/icons/verify-icons.mjs
+scripts/privacy/audit.mjs
+scripts/release/package-smoke.mjs
+scripts/release/signing-preflight.mjs
+scripts/startup/verify-graphs-out.mjs
+scripts/startup/verify-workbench-startup.mjs
+scripts/supabase/gen-types.mjs
+scripts/supabase/verify-migrations.mjs
+scripts/supabase/verify-no-secrets-in-source.mjs
+scripts/supabase/verify-rls-static.mjs
+scripts/theme/contrast.mjs
+scripts/theme/jsonc.mjs
+scripts/theme/nullDefaults.mjs
+scripts/theme/verify-surfaces.mjs
 scripts/xterm-update.js
 src/vs/base/browser/dompurify/dompurify.js
 src/vs/base/common/marked/marked.js
@@ -139,6 +162,7 @@ src/vs/workbench/services/search/test/node/fixtures/examples/employee.js
 src/vs/workbench/services/search/test/node/fixtures/examples/small.js
 test/automation/tools/copy-driver-definition.js
 test/automation/tools/copy-package-version.js
+test/fixtures/typescript-lanes/src/js-check.js
 test/integration/electron/testrunner.js
 test/monaco/core.js
 test/monaco/esm-check/esm-check.js

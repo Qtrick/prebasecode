@@ -15,9 +15,27 @@ const DESTRUCTIVE_PATTERNS = [
 	/\bgit\s+clean\s+-fd\b/i
 ];
 
-const LOCAL_HOST_RE = /^(localhost|127\.0\.0\.1|\[::1\]|0\.0\.0\.0)$/i;
+const LOCAL_HOST_RE = /^(localhost|127(?:\.\d{1,3}){3}|\[::1\])$/i;
 
-/** Validate that a URL uses http/https only and is parseable. */
+/**
+ * Wildcard bind addresses. Dev servers print these to say "listening on every
+ * interface", but they are not routable destinations: Chromium refuses `[::]`
+ * and Windows cannot connect to `0.0.0.0`. Rewrite them to the loopback address
+ * the server is necessarily also listening on.
+ */
+const WILDCARD_HOST_TO_LOOPBACK = new Map([
+	['0.0.0.0', '127.0.0.1'],
+	['[::]', '[::1]']
+]);
+
+/**
+ * Validate that a URL uses http/https only and is parseable.
+ *
+ * `url` is the canonical form to navigate to: trailing slash removed and any
+ * wildcard bind host rewritten to loopback. `isLocal` decides whether the
+ * external-navigation confirmation is skipped, so it must only ever be true for
+ * a host that is genuinely loopback after that rewrite.
+ */
 export function validatePreviewUrl(raw: string): { ok: true; url: string; isLocal: boolean } | { ok: false; reason: string } {
 	const trimmed = raw.trim();
 	if (!trimmed) {
@@ -32,8 +50,12 @@ export function validatePreviewUrl(raw: string): { ok: true; url: string; isLoca
 	if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
 		return { ok: false, reason: 'Only http and https URLs are allowed.' };
 	}
+	const loopback = WILDCARD_HOST_TO_LOOPBACK.get(parsed.hostname.toLowerCase());
+	if (loopback) {
+		parsed.hostname = loopback;
+	}
 	const isLocal = LOCAL_HOST_RE.test(parsed.hostname);
-	const normalized = trimmed.replace(/\/$/, '');
+	const normalized = (loopback ? parsed.toString() : trimmed).replace(/\/$/, '');
 	return { ok: true, url: normalized || parsed.origin, isLocal };
 }
 

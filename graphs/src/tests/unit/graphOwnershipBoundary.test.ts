@@ -121,7 +121,7 @@ suite('Graph ownership boundary (Phase A)', () => {
 
 		const uiPath = path.join(GRAPHS_SRC, 'settings/ui.ts');
 		const uiText = fs.readFileSync(uiPath, 'utf8');
-		assert.ok(uiText.includes("from '../host/workbench/settings/graphSettingsUi.js'"));
+		assert.ok(uiText.includes(`from '../host/workbench/settings/graphSettingsUi.js'`));
 		assert.ok(uiText.includes('renderGraphCategory'));
 		assert.ok(uiText.includes('IPreBaseGraphSettingsUiHost'));
 	});

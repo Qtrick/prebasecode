@@ -429,9 +429,15 @@ async function packageManagerFor(folder: vscode.WorkspaceFolder): Promise<'npm' 
 	const packageUri = vscode.Uri.joinPath(folder.uri, 'package.json');
 	const raw = Buffer.from(await vscode.workspace.fs.readFile(packageUri)).toString('utf8');
 	const parsed = JSON.parse(raw) as { packageManager?: string };
-	if (parsed.packageManager?.startsWith('pnpm@')) return 'pnpm';
-	if (parsed.packageManager?.startsWith('yarn@')) return 'yarn';
-	if (parsed.packageManager?.startsWith('bun@')) return 'bun';
+	if (parsed.packageManager?.startsWith('pnpm@')) {
+		return 'pnpm';
+	}
+	if (parsed.packageManager?.startsWith('yarn@')) {
+		return 'yarn';
+	}
+	if (parsed.packageManager?.startsWith('bun@')) {
+		return 'bun';
+	}
 	for (const [name, manager] of [['bun.lock', 'bun'], ['bun.lockb', 'bun'], ['pnpm-lock.yaml', 'pnpm'], ['yarn.lock', 'yarn']] as const) {
 		try {
 			await vscode.workspace.fs.stat(vscode.Uri.joinPath(folder.uri, name));
@@ -459,32 +465,48 @@ async function workspaceFolderForTerminal(): Promise<vscode.WorkspaceFolder> {
 	return folder;
 }
 
-async function runVisibleTask(task: vscode.Task, token: vscode.CancellationToken): Promise<{ cancelled: boolean; exitCode: number | undefined }> {
+/** Upper bound for a single Agents-initiated task, so a tool call cannot hang forever. */
+const VISIBLE_TASK_TIMEOUT_MS = 10 * 60 * 1000;
+
+async function runVisibleTask(task: vscode.Task, token: vscode.CancellationToken): Promise<{ cancelled: boolean; exitCode: number | undefined; timedOut?: boolean }> {
 	const execution = await vscode.tasks.executeTask(task);
 	return new Promise(resolve => {
 		let settled = false;
-		let end: vscode.Disposable | undefined;
-		let cancel: vscode.Disposable | undefined;
-		const finish = (cancelled: boolean, exitCode: number | undefined) => {
+		const subscriptions: vscode.Disposable[] = [];
+		const finish = (cancelled: boolean, exitCode: number | undefined, timedOut = false) => {
 			if (settled) {
 				return;
 			}
 			settled = true;
-			end?.dispose();
-			cancel?.dispose();
-			resolve({ cancelled, exitCode });
+			for (const subscription of subscriptions) {
+				subscription.dispose();
+			}
+			resolve({ cancelled, exitCode, timedOut: timedOut || undefined });
 		};
-		end = vscode.tasks.onDidEndTaskProcess(event => {
+
+		subscriptions.push(vscode.tasks.onDidEndTaskProcess(event => {
 			if (event.execution === execution) {
 				finish(false, event.exitCode);
 			}
-		});
-		cancel = token.onCancellationRequested(() => {
+		}));
+		// A task that never spawns a process (bad shell, missing binary) emits
+		// onDidEndTask but never onDidEndTaskProcess, which used to hang the tool.
+		// Settling is deferred by a macrotask so a process-end event delivered in
+		// the same turn still gets to supply the exit code. A process end that
+		// arrives later yields `exitCode: undefined`, reported as 'unknown'.
+		subscriptions.push(vscode.tasks.onDidEndTask(event => {
+			if (event.execution !== execution) {
+				return;
+			}
+			const noExitCode = setTimeout(() => finish(false, undefined), 0);
+			subscriptions.push(new vscode.Disposable(() => clearTimeout(noExitCode)));
+		}));
+		subscriptions.push(token.onCancellationRequested(() => {
 			execution.terminate();
 			finish(true, undefined);
-		});
+		}));
+
 		if (settled) {
-			cancel.dispose();
 			return;
 		}
 		// Cancellation may arrive between executeTask and registration of the
@@ -492,8 +514,27 @@ async function runVisibleTask(task: vscode.Task, token: vscode.CancellationToken
 		if (token.isCancellationRequested) {
 			execution.terminate();
 			finish(true, undefined);
+			return;
 		}
+		const timeout = setTimeout(() => {
+			execution.terminate();
+			finish(false, undefined, true);
+		}, VISIBLE_TASK_TIMEOUT_MS);
+		subscriptions.push({ dispose: () => clearTimeout(timeout) });
 	});
+}
+
+function taskStatus(outcome: { cancelled: boolean; exitCode: number | undefined; timedOut?: boolean }): string {
+	if (outcome.cancelled) {
+		return 'cancelled';
+	}
+	if (outcome.timedOut) {
+		return 'timed-out';
+	}
+	if (outcome.exitCode === undefined) {
+		return 'unknown';
+	}
+	return outcome.exitCode === 0 ? 'passed' : 'failed';
 }
 
 class ProjectEnvironmentTool implements vscode.LanguageModelTool<Record<string, never>> {
@@ -552,7 +593,7 @@ class InstallDependenciesTool implements vscode.LanguageModelTool<{ operation: '
 		}
 		const task = new vscode.Task({ type: 'prebase-agent-dependencies', manager, command }, folder, `Agents: ${manager} ${command}`, 'PreBase Agents', new vscode.ShellExecution(manager, [command], { cwd: folder.uri.fsPath }));
 		const outcome = await runVisibleTask(task, token);
-		return result(JSON.stringify({ command: `${manager} ${command}`, cwd: folder.uri.fsPath, networkRequired: true, lifecycleScriptsMayRun: true, status: outcome.cancelled ? 'cancelled' : outcome.exitCode === 0 ? 'passed' : outcome.exitCode === undefined ? 'unknown' : 'failed', exitCode: outcome.exitCode }));
+		return result(JSON.stringify({ command: `${manager} ${command}`, cwd: folder.uri.fsPath, networkRequired: true, lifecycleScriptsMayRun: true, status: taskStatus(outcome), exitCode: outcome.exitCode }));
 	}
 }
 
@@ -578,7 +619,7 @@ class DeclaredNodeVersionTool implements vscode.LanguageModelTool<{ action: 'use
 		const parsed = packageJson ? JSON.parse(packageJson) as { volta?: { node?: string } } : undefined;
 		const declared = (await textFile(folder, '.nvmrc')) ?? (await textFile(folder, '.node-version')) ?? parsed?.volta?.node;
 		if (!declared || declared.replace(/^v/, '') !== options.input.version.replace(/^v/, '')) {
-			throw new Error('The requested Node version does not exactly match this project’s declared .nvmrc, .node-version, or Volta version.');
+			throw new Error('The requested Node version does not exactly match the declared .nvmrc, .node-version, or Volta version.');
 		}
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
@@ -588,7 +629,7 @@ class DeclaredNodeVersionTool implements vscode.LanguageModelTool<{ action: 'use
 		const command = `nvm ${options.input.action} '${options.input.version}'`;
 		const task = new vscode.Task({ type: 'prebase-agent-node', action: options.input.action, version: options.input.version }, folder, `Agents: ${command}`, 'PreBase Agents', new vscode.ShellExecution(command, { cwd: folder.uri.fsPath }));
 		const outcome = await runVisibleTask(task, token);
-		return result(JSON.stringify({ command: `nvm ${options.input.action} ${options.input.version}`, cwd: folder.uri.fsPath, nodeVersionScope: options.input.action === 'use' ? 'task-only; this does not persist to future VS Code tasks' : 'installed by nvm if successful', networkRequired: options.input.action === 'install', status: outcome.cancelled ? 'cancelled' : outcome.exitCode === 0 ? 'passed' : outcome.exitCode === undefined ? 'unknown' : 'failed', exitCode: outcome.exitCode }));
+		return result(JSON.stringify({ command: `nvm ${options.input.action} ${options.input.version}`, cwd: folder.uri.fsPath, nodeVersionScope: options.input.action === 'use' ? 'task-only; this does not persist to future VS Code tasks' : 'installed by nvm if successful', networkRequired: options.input.action === 'install', status: taskStatus(outcome), exitCode: outcome.exitCode }));
 	}
 }
 
@@ -642,7 +683,7 @@ class ProjectScriptTool implements vscode.LanguageModelTool<{ script: string }> 
 		if (outcome.cancelled) {
 			return result(JSON.stringify({ command: `${manager} run ${script}`, cwd: folder.uri.fsPath, status: 'cancelled' }));
 		}
-		return result(JSON.stringify({ command: `${manager} run ${script}`, cwd: folder.uri.fsPath, exitCode: outcome.exitCode, status: outcome.exitCode === 0 ? 'passed' : outcome.exitCode === undefined ? 'unknown' : 'failed' }));
+		return result(JSON.stringify({ command: `${manager} run ${script}`, cwd: folder.uri.fsPath, exitCode: outcome.exitCode, status: taskStatus(outcome) }));
 	}
 }
 

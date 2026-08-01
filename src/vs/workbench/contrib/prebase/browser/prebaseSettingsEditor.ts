@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as DOM from '../../../../base/browser/dom.js';
+import { disposableTimeout } from '../../../../base/common/async.js';
 import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { DisposableStore } from '../../../../base/common/lifecycle.js';
 import { localize } from '../../../../nls.js';
@@ -32,6 +33,7 @@ import {
 	renderGraphReduceMotionRow,
 } from '../graphs/host/workbench/settings/graphSettingsUi.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
+import { PreBaseBorder, PreBaseControl, PreBaseForeground, PreBaseSurface } from './prebaseSurfaces.js';
 
 /** Popular built-in themes (PreBase + stock VS Code / Code - OSS classics). */
 const QUICK_THEMES: { id: string; label: string }[] = [
@@ -79,19 +81,22 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: string }[] = [
 	{ id: 'about', label: localize('prebase.settings.cat.about', "About"), icon: '$(info)' },
 ];
 
+/**
+ * Semantic surface roles for the PreBase Settings editor. The page itself is a
+ * content well, so grouped controls sit on the raised surface to stay
+ * identifiable against it.
+ */
 const COLORS = {
-	bg: '#0b1220',
-	surface: '#0f172a',
-	overlay: '#111827',
-	border: '#1e293b',
-	muted: '#1e293b',
-	text: '#e2e8f0',
-	textSecondary: '#94a3b8',
-	textMuted: '#64748b',
-	accent: '#2dd4bf',
-	accentDim: 'rgba(45, 212, 191, 0.15)',
-	accentBorder: 'rgba(45, 212, 191, 0.28)',
-	navActive: '#1e293b',
+	bg: PreBaseSurface.deep,
+	surface: PreBaseSurface.chrome,
+	overlay: PreBaseSurface.overlay,
+	border: PreBaseBorder.subtle,
+	muted: PreBaseSurface.raised,
+	text: PreBaseForeground.primary,
+	textSecondary: PreBaseForeground.secondary,
+	textMuted: PreBaseForeground.secondary,
+	accent: PreBaseForeground.link,
+	navActive: PreBaseSurface.selected,
 };
 
 interface SidebarDraft {
@@ -109,6 +114,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 	private _nav: HTMLElement | undefined;
 	private _main: HTMLElement | undefined;
 	private _advanced: HTMLElement | undefined;
+	private _grid: HTMLElement | undefined;
 	private _category: SettingsCategory = 'appearance';
 	private readonly _renderDisposables = this._register(new DisposableStore());
 	private _sidebarDraft: SidebarDraft | undefined;
@@ -195,6 +201,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		});
 		const resetBtn = DOM.append(resetWrap, DOM.$('button')) as HTMLButtonElement;
 		resetBtn.type = 'button';
+		// allow-any-unicode-next-line
 		resetBtn.textContent = localize('prebase.settings.resetAll', "⟳  Reset all");
 		Object.assign(resetBtn.style, {
 			background: 'transparent',
@@ -218,6 +225,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		});
 
 		const grid = DOM.append(body, DOM.$('.prebase-settings-grid'));
+		this._grid = grid;
 		Object.assign(grid.style, {
 			display: 'grid',
 			gridTemplateColumns: 'minmax(0, 1fr) 280px',
@@ -253,7 +261,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		if (this._advanced) {
 			this._advanced.style.display = showAdvanced && this._hasAdvanced() ? 'block' : 'none';
 		}
-		const grid = this._root.querySelector('.prebase-settings-grid') as HTMLElement | null;
+		const grid = this._grid;
 		if (grid) {
 			grid.style.gridTemplateColumns = showAdvanced && this._hasAdvanced()
 				? 'minmax(0, 1fr) 280px'
@@ -478,9 +486,9 @@ export class PreBaseSettingsEditor extends EditorPane {
 			padding: '6px 12px',
 			borderRadius: '8px',
 			cursor: 'pointer',
-			border: primary ? `1px solid ${COLORS.accentBorder}` : `1px solid ${COLORS.border}`,
-			background: primary ? COLORS.accentDim : COLORS.muted,
-			color: primary ? COLORS.accent : COLORS.text,
+			border: primary ? '1px solid transparent' : `1px solid ${COLORS.border}`,
+			background: primary ? PreBaseControl.accentBackground : COLORS.muted,
+			color: primary ? PreBaseControl.accentForeground : COLORS.text,
 		});
 		return btn;
 	}
@@ -511,9 +519,9 @@ export class PreBaseSettingsEditor extends EditorPane {
 			btn.textContent = theme.label;
 			const active = currentThemeId === theme.id || currentThemeId.endsWith(theme.id);
 			Object.assign(btn.style, {
-				background: active ? '#155e75' : '#0f172a',
-				color: active ? '#ecfeff' : '#cbd5e1',
-				border: active ? '1px solid #22d3ee88' : '1px solid #334155',
+				background: active ? PreBaseSurface.selected : COLORS.muted,
+				color: active ? PreBaseForeground.onSelected : COLORS.textSecondary,
+				border: `1px solid ${active ? 'transparent' : COLORS.border}`,
 				borderRadius: '999px',
 				padding: '4px 10px',
 				fontSize: '11px',
@@ -524,6 +532,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 					if (!result) {
 						this.notificationService.info(localize(
 							'prebase.settings.themeMissing',
+							// allow-any-unicode-next-line
 							"Theme “{0}” is not available yet. Use the full theme picker, or ensure built-in theme extensions are built.",
 							theme.label
 						));
@@ -688,7 +697,10 @@ export class PreBaseSettingsEditor extends EditorPane {
 			draft.inspector = clamp(draft.inspector);
 			if (this._sidebarSavedEl) {
 				this._sidebarSavedEl.style.display = '';
-				setTimeout(() => { if (this._sidebarSavedEl) { this._sidebarSavedEl.style.display = 'none'; } }, 2000);
+				this._renderDisposables.add(disposableTimeout(
+					() => { if (this._sidebarSavedEl) { this._sidebarSavedEl.style.display = 'none'; } },
+					2000
+				));
 			}
 		}));
 		saveRow.appendChild(saveBtn);
@@ -761,6 +773,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const meta = DOM.append(gallery, DOM.$('p'));
 		meta.textContent = localize(
 			'prebase.settings.extMetaNote',
+			// allow-any-unicode-next-line
 			"Icons and READMEs come from Open VSX package metadata when published. If a listing has no icon or README, PreBase shows the default icon or “No README available” — content is never invented. Install, uninstall, enable, and disable use the real workbench extension management path; details open in the editor, not inside this sidebar."
 		);
 		Object.assign(meta.style, { fontSize: '11px', color: COLORS.textMuted, padding: '4px 0 8px', lineHeight: '1.45', margin: '0' });
@@ -768,6 +781,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const host = DOM.append(gallery, DOM.$('p'));
 		host.textContent = localize(
 			'prebase.settings.extHostNote',
+			// allow-any-unicode-next-line
 			"PreBase runs a real Extension Host (not V1.1’s partial shim). There is no “Needs host” badge: installed extensions either activate, stay disabled, need a reload, or fail for a concrete enablement/API reason. Extension code does not run in the renderer, and AI provider keys are not exposed to extensions."
 		);
 		Object.assign(host.style, { fontSize: '11px', color: COLORS.textMuted, padding: '0 0 12px', lineHeight: '1.45', margin: '0' });

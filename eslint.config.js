@@ -1836,6 +1836,12 @@ export default defineConfig(
 						'vs/sessions/~',
 						'vs/workbench/contrib/terminal/terminalContribChatExports*',
 						'vs/workbench/contrib/terminal/terminalContribExports*',
+						// PreBase graph package, reached through the graphs/ symlink (see
+						// graphs/OWNERSHIP.md). Only the documented entrypoints — the graph
+						// internals stay private to the package.
+						'vs/workbench/contrib/prebase/graphs/common/configuration/*',
+						'vs/workbench/contrib/prebase/graphs/host/workbench/*',
+						'vs/workbench/contrib/prebase/graphs/host/workbench/settings/*',
 						'vscode-notebook-renderer', // Type only import
 						'@vscode/tree-sitter-wasm', // type import
 						{
@@ -2955,10 +2961,31 @@ export default defineConfig(
 			'local/code-no-new-javascript-files': 'error',
 		},
 	},
-	// PreBase-owned graph package (`graphs/`) — PreBase copyright header
+	// PreBase-owned workbench sources — PreBase copyright header (with licence line)
+	{
+		files: [
+			'src/vs/workbench/contrib/prebase/**/*.{ts,tsx,mts,cts}',
+		],
+		rules: {
+			'header/header': [
+				2,
+				'block',
+				[
+					'---------------------------------------------------------------------------------------------',
+					' *  Copyright (c) PreBase. All rights reserved.',
+					' *  Licensed under the MIT License. See License.txt in the project root for license information.',
+					' *--------------------------------------------------------------------------------------------'
+				]
+			]
+		}
+	},
+	// PreBase-owned graph package (`graphs/`) and the Magnus extension —
+	// PreBase copyright header without the licence line. Kept in sync with
+	// `preBaseCopyrightHeaderVariants` / `preBaseOwnedPrefixes` in build/hygiene.ts.
 	{
 		files: [
 			'graphs/**/*.{ts,tsx,mts,cts}',
+			'extensions/prebase-magnus/src/**/*.{ts,tsx,mts,cts}',
 		],
 		rules: {
 			'header/header': [
@@ -2977,6 +3004,13 @@ export default defineConfig(
 		files: [
 			'graphs/**/*.mjs',
 			'graphs/**/*.js',
+			'scripts/assurance/**/*.mjs',
+			'scripts/icons/**/*.mjs',
+			'scripts/privacy/**/*.mjs',
+			'scripts/release/**/*.mjs',
+			'scripts/startup/**/*.mjs',
+			'scripts/supabase/**/*.mjs',
+			'scripts/theme/**/*.mjs',
 		],
 		rules: {
 			'header/header': 'off',

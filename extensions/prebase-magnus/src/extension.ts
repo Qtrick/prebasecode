@@ -3,7 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { registerMagnusChatParticipants, type MagnusChatState } from './chatParticipant';
+import { cancelActiveMagnusRequests, registerMagnusChatParticipants, type MagnusChatState } from './chatParticipant';
 import { generateContent } from './geminiClient';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
 import { MAGNUS_MODELS, resolveApiModel } from './models';
@@ -40,6 +40,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			: DEFAULT_MAGNUS_AGENT_MODE,
 		modelId: config.get('defaultModel', 'auto') ?? 'auto',
 		attachedFiles: [],
+		activeRequests: new Set(),
 	};
 
 	// Register chat participants first so Ask/Edit/Agent appear even if the LM
@@ -49,6 +50,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	registerMagnusDesktopTools(context);
 
 	const lmProvider = new MagnusLanguageModelProvider(secrets);
+	context.subscriptions.push(lmProvider);
 	try {
 		context.subscriptions.push(
 			vscode.lm.registerLanguageModelChatProvider('magnus', lmProvider),
@@ -148,9 +150,7 @@ export function activate(context: vscode.ExtensionContext): void {
 			state.attachedFiles = [];
 			state.graphSelection = undefined;
 			state.runtimeContext = undefined;
-			state.cancellation?.cancel();
-			state.cancellation?.dispose();
-			state.cancellation = undefined;
+			cancelActiveMagnusRequests(state);
 			await vscode.commands.executeCommand('workbench.action.chat.newChat');
 			void vscode.window.showInformationMessage('Agents session cleared.');
 		}),
@@ -183,7 +183,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.cancel', () => {
-			state.cancellation?.cancel();
+			cancelActiveMagnusRequests(state);
 			void vscode.window.showInformationMessage('Agents cancellation requested.');
 		}),
 

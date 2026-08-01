@@ -136,6 +136,15 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	private _snapshot: PreBaseEnrichedSnapshot | undefined;
 	private _rawSnapshot: GraphSnapshot | undefined;
 	private _scanCts: CancellationTokenSource | undefined;
+	/**
+	 * Relayout has no cancellation token of its own because the layout kernels
+	 * are synchronous. A monotonic generation lets a newer relayout, a scan or
+	 * an explicit cancel abandon an older one instead of racing it to the
+	 * snapshot.
+	 */
+	private _relayoutGeneration = 0;
+	/** Generation of the relayout currently running, or -1 when none is. */
+	private _relayoutInFlightGeneration = -1;
 	private _selectedNodeId: string | undefined;
 	private _hiddenCommunityIds: number[] = [];
 	private _viewState: PreBaseGraphViewState;
@@ -177,6 +186,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkSpreadScale)
 			) {
+				// `_rawSnapshot` guard: with nothing laid out yet `relayout()`
+				// falls through to a full workspace scan, and this listener also
+				// fires for settings sync, profile switches and workspace
+				// settings edits. Opening the graph scans with the new value
+				// anyway, so there is nothing to recompute here.
 				if (isCodeGraphCanvas(this._viewState.graphType) && this._rawSnapshot) {
 					void this.relayout();
 				}
@@ -560,14 +574,14 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	private _freshness(): {
-		scannedAt: number | null
-		status: PreBaseGraphDiagnostics['status']
-		projectPath: string | undefined
-		scanComplete: boolean
-		schemaVersion: number
+		scannedAt: number | null;
+		status: PreBaseGraphDiagnostics['status'];
+		projectPath: string | undefined;
+		scanComplete: boolean;
+		schemaVersion: number;
 	} {
-		const status = this._diagnostics.status
-		const snapshot = this._snapshot
+		const status = this._diagnostics.status;
+		const snapshot = this._snapshot;
 		return {
 			scannedAt: this._diagnostics.scannedAt,
 			status,
@@ -575,7 +589,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			scanComplete: status === 'ready' && !!snapshot,
 			// Do not claim schema 2 when no snapshot exists (Magnus freshness honesty).
 			schemaVersion: snapshot ? (snapshot.schemaVersion ?? 2) : 0,
-		}
+		};
 	}
 
 	override dispose(): void {
@@ -584,8 +598,19 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	cancelScan(): void {
+		// Abandon any relayout too, otherwise it finishes and reports 'ready'
+		// after the user asked to stop. Comparing generations rather than
+		// keeping a flag means a relayout already superseded by a scan is not
+		// mistaken for one this call abandoned.
+		const abandonedRelayout = this._relayoutInFlightGeneration === this._relayoutGeneration;
+		this._relayoutGeneration++;
 		const cts = this._scanCts;
 		if (!cts) {
+			if (abandonedRelayout) {
+				// The abandoned relayout returns without touching diagnostics, so
+				// nothing else would clear "Updating layout…".
+				this._setDiagnostics({ status: 'cancelled', message: localize('prebase.graph.layoutCancelled', "Layout cancelled.") });
+			}
 			return;
 		}
 		cts.cancel();
@@ -639,6 +664,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async scanWorkspace(token?: CancellationToken): Promise<PreBaseEnrichedSnapshot | undefined> {
+		// A scan recomputes positions itself, so any in-flight relayout is stale.
+		this._relayoutGeneration++;
 		// Cancel any in-flight scan without marking the UI cancelled (a newer scan is starting).
 		if (this._scanCts) {
 			this._scanCts.cancel();
@@ -760,25 +787,49 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		if (!this._rawSnapshot) {
 			return this.scanWorkspace();
 		}
+		const generation = ++this._relayoutGeneration;
+		this._relayoutInFlightGeneration = generation;
 		this._setDiagnostics({
 			status: 'scanning',
 			message: localize('prebase.graph.relayout', "Updating layout…")
 		});
-		await timeout(0);
-		const networkLayoutMode = this._getNetworkLayoutMode();
-		const computed = this._computeNetworkPositions(this._rawSnapshot.nodes, this._rawSnapshot.edges, networkLayoutMode);
-		this._rawSnapshot = {
-			...this._rawSnapshot,
-			positions: computed.positions2d,
-			positions3d: computed.positions3d,
-			networkLayoutMode,
-		};
-		await timeout(0);
-		const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
-		this._snapshot = enriched;
-		this._onDidChangeSnapshot.fire(enriched);
-		this._setDiagnostics(enriched.diagnostics);
-		return enriched;
+		try {
+			await timeout(0);
+			const base = this._rawSnapshot;
+			if (this._relayoutGeneration !== generation || !base) {
+				return undefined;
+			}
+			const networkLayoutMode = this._getNetworkLayoutMode();
+			const computed = this._computeNetworkPositions(base.nodes, base.edges, networkLayoutMode);
+			await timeout(0);
+			if (this._relayoutGeneration !== generation || this._rawSnapshot !== base) {
+				return undefined;
+			}
+			this._rawSnapshot = {
+				...base,
+				positions: computed.positions2d,
+				positions3d: computed.positions3d,
+				networkLayoutMode,
+			};
+			const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
+			this._snapshot = enriched;
+			this._onDidChangeSnapshot.fire(enriched);
+			this._setDiagnostics(enriched.diagnostics);
+			return enriched;
+		} catch (err) {
+			if (this._relayoutGeneration !== generation) {
+				return undefined;
+			}
+			const message = err instanceof Error ? err.message : String(err);
+			// Without this the diagnostics stay on "Updating layout…" forever.
+			this._setDiagnostics({ status: 'error', message });
+			this._log(localize('prebase.graph.logRelayoutError', "Layout failed: {0}", message));
+			return undefined;
+		} finally {
+			if (this._relayoutInFlightGeneration === generation) {
+				this._relayoutInFlightGeneration = -1;
+			}
+		}
 	}
 
 	private _scanLimits(): { maxScanFiles: number; maxLayoutNodes: number; maxNodes: number; maxEdges: number } {

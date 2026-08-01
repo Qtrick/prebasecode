@@ -1,8 +1,10 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import { managedRendererDevCommand, scriptLaunchesElectronApp } from '../../common/runtime/managedRendererCommand.js';
 import type { DetectedDevScript } from '../../common/runtime/types.js';
 
@@ -17,6 +19,8 @@ function script(partial: Partial<DetectedDevScript> & Pick<DetectedDevScript, 's
 }
 
 suite('managedRendererCommand', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+
 	test('detects electron-vite as Electron launch', () => {
 		assert.strictEqual(scriptLaunchesElectronApp('electron-vite dev'), true);
 		assert.strictEqual(scriptLaunchesElectronApp('electron-vite --rendererOnly'), false);
