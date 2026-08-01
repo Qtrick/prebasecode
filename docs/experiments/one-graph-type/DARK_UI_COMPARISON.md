@@ -164,6 +164,40 @@ collapsed section headers to `#2B2B2B` was tried and reverted, because it puts
 a band of raised surface on every collapsed view in the Explorer for no
 elevation meaning. The headers keep their `#ffffff14` border instead.
 
+## 8 — High Contrast Dark
+
+`screenshots/11-high-contrast.png`
+
+Switched at runtime through the normal `Preferences: Color Theme` picker, not
+by editing settings, so this exercises the path a user takes.
+
+* The workbench renders pure black with the High Contrast border treatment on
+  every control, exactly as upstream intends.
+* The PreBase Onboarding editor — a PreBase custom UI — follows: its card is
+  black with a white outline and its buttons get High Contrast borders. This
+  is the payoff from moving those editors off their own slate palette and onto
+  workbench theme tokens; before this pass they would have painted their own
+  greys over High Contrast.
+* Pixel audit of the full frame: 920,298 pure-black pixels, and 176 pixels
+  total matching any of the four PreBase surface values — all of them
+  antialiasing fringes on text and borders, not surfaces.
+
+## 9 — PreBase Home and keyboard focus
+
+`screenshots/12-keyboard-focus.png`
+
+* Changed surfaces: body `#1B1C1E`, recent-project card `#2B2B2B`, primary
+  action on the `#2dd4bf` accent with `#1B1C1E` text (9.16:1), secondary
+  actions on the raised surface.
+* The screenshot was taken after five `Tab` presses with no mouse input. The
+  focused recent-project card carries the `#2dd4bf` focus ring, which is
+  7.6:1 against the `#2B2B2B` card behind it and comfortably clears the WCAG
+  2.2 1.4.11 non-text contrast floor of 3:1. Focus rings were not softened
+  anywhere in this pass; the accent ring is asserted against the editor,
+  sidebar and menu surfaces by `verify:theme-surfaces`.
+* Home is one of the editors that previously painted its own slate palette;
+  the card here is a theme token, not a hardcoded value.
+
 ## What did not change
 
 * Syntax highlighting: inherited from `dark_plus`, unmodified.
