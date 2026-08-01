@@ -128,6 +128,18 @@ const SOURCE_IGNORE = [/\/preserved\//, /\/tests?\//, /\.test\.ts$/];
 const failures = [];
 const notes = [];
 
+/**
+ * Flatten a theme and everything it includes into the colours it resolves to.
+ *
+ * @param {string} file
+ * @returns {Record<string, string>}
+ */
+function resolveTheme(file) {
+	const data = readJsonc(file);
+	const base = data.include ? resolveTheme(path.join(path.dirname(file), data.include)) : {};
+	return { ...base, ...(data.colors ?? {}) };
+}
+
 // ---------------------------------------------------------------------------
 // 1) Palette allowlist
 // ---------------------------------------------------------------------------
@@ -233,6 +245,36 @@ for (const hc of ['hc_black.json', 'hc_light.json']) {
 	}
 	if ((theme.include ?? '').includes(hc)) {
 		failures.push(`high contrast: PreBase Night must not extend ${hc}`);
+	}
+}
+
+// ---------------------------------------------------------------------------
+// 5) Startup colours must match the themes they stand in for
+// ---------------------------------------------------------------------------
+// `COLOR_THEME_*_INITIAL_COLORS` paints the workbench on a cold start, before
+// the theme extension is registered. When it drifts from the theme the first
+// frame flashes a different palette.
+{
+	const file = path.join(REPO_ROOT, 'src/vs/workbench/services/themes/common/workbenchThemeService.ts');
+	const source = fs.readFileSync(file, 'utf8');
+	for (const [constant, themeFile] of [
+		['COLOR_THEME_DARK_INITIAL_COLORS', 'prebase_dark.json'],
+		['COLOR_THEME_LIGHT_INITIAL_COLORS', 'prebase_light.json']
+	]) {
+		const block = source.match(new RegExp(`export const ${constant} = \\{\\n([\\s\\S]*?)\\n\\};`));
+		if (!block) {
+			failures.push(`startup: ${constant} not found in workbenchThemeService.ts`);
+			continue;
+		}
+		const resolved = resolveTheme(path.join(REPO_ROOT, 'extensions/theme-defaults/themes', themeFile));
+		for (const [, token, value] of block[1].matchAll(/'([^']+)':\s*'([^']+)'/g)) {
+			const expected = resolved[token];
+			if (expected === undefined) {
+				failures.push(`startup: ${constant} sets ${token}, which ${themeFile} does not define`);
+			} else if (expected.toLowerCase() !== value.toLowerCase()) {
+				failures.push(`startup: ${constant} ${token} is ${value} but ${themeFile} resolves to ${expected}`);
+			}
+		}
 	}
 }
 
