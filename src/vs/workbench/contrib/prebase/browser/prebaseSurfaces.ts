@@ -19,10 +19,12 @@
  *
  * Some native tokens are registered with a `null` default for one or more theme
  * kinds (`input.border` and `widget.border` in dark and light, `widget.shadow`
- * and `list.activeSelectionForeground` in High Contrast, and so on). An
- * undefined custom property makes the whole declaration invalid, which silently
- * drops the property rather than falling back, so every such role below carries
- * an explicit fallback chain that ends in a token defined for all theme kinds.
+ * and `list.activeSelectionBackground` in High Contrast, and so on). An
+ * undefined custom property makes the whole declaration invalid, which drops
+ * the property — or, for a shorthand such as `border`, resets every longhand —
+ * rather than falling back. Every such role below therefore carries an explicit
+ * fallback chain ending in a token defined for all four theme kinds. This is
+ * enforced by `npm run verify:theme-surfaces`, not left to review.
  */
 export const PreBaseSurface = {
 	/** Deepest content well: page canvases, editor-like bodies, code blocks. */
@@ -37,7 +39,7 @@ export const PreBaseSurface = {
 	tile: 'var(--vscode-welcomePage-tileBackground)',
 	tileHover: 'var(--vscode-welcomePage-tileHoverBackground, var(--vscode-list-hoverBackground))',
 	/** Selected navigation entry or toggled control. */
-	selected: 'var(--vscode-list-activeSelectionBackground)',
+	selected: 'var(--vscode-list-activeSelectionBackground, var(--vscode-list-hoverBackground))',
 	/** Hover state for rows on a chrome surface. */
 	hover: 'var(--vscode-list-hoverBackground)'
 } as const;
@@ -67,7 +69,7 @@ export const PreBaseControl = {
 	accentHoverBackground: 'var(--vscode-button-hoverBackground)',
 	secondaryBackground: 'var(--vscode-button-secondaryBackground, transparent)',
 	secondaryForeground: 'var(--vscode-button-secondaryForeground)',
-	secondaryHoverBackground: 'var(--vscode-button-secondaryHoverBackground)',
+	secondaryHoverBackground: 'var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground))',
 	inputBackground: 'var(--vscode-input-background)',
 	inputForeground: 'var(--vscode-input-foreground)',
 	inputBorder: 'var(--vscode-input-border, var(--vscode-contrastBorder, var(--vscode-panel-border)))',

@@ -214,15 +214,21 @@ by editing settings, so this exercises the path a user takes.
   ring silently. Measured in the running product after the fix, the selected
   layout reports `box-shadow: rgb(34, 211, 238) 0px 0px 0px 1px`; before it
   reported `none`.
-* The same review found six semantic roles in `prebaseSurfaces.ts` mapping to
+* The same review found seven semantic roles in `prebaseSurfaces.ts` mapping to
   native tokens that are registered with a `null` default for at least one
   theme kind. Confirmed in the running product by switching to a theme that
-  does not define `input.border`: the bare `var()` resolved to `currentColor`
-  (`rgb(204, 204, 204)` — a glaring near-white outline), while the fallback
-  chain resolves to `panel.border` (`rgba(128, 128, 128, 0.35)`). Both
-  behaviours are invisible under PreBase Night, which defines every one of
-  those tokens, which is exactly why a screenshot audit of the default theme
-  could not have caught it.
+  does not define `input.border`: the bare `var()` is invalid at
+  computed-value time, so the `border` shorthand resets every longhand and
+  nothing is painted, while the fallback chain resolves to `panel.border`
+  (`rgba(128, 128, 128, 0.35)`) and paints the boundary the input needs.
+  (Reading `borderColor` back reports `rgb(204, 204, 204)` in the broken case,
+  but that is `currentColor` on a border whose style is now `none` — a red
+  herring, not a visible outline.) Both behaviours are invisible under PreBase
+  Night, which defines every one of those tokens, which is exactly why a
+  screenshot audit of the default theme could not have caught it. The
+  invariant is now a build gate rather than a comment: `verify:theme-surfaces`
+  parses every `registerColor` default and fails if a role uses a
+  null-defaulted token without a fallback.
 
 ## What did not change
 

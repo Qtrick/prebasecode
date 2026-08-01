@@ -609,8 +609,16 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 
 	private async _startImpl(token: CancellationToken): Promise<void> {
 		try {
+			// A start chained behind a cancelled one is published before it runs,
+			// so a stop arriving in that window has already cancelled this token.
+			if (token.isCancellationRequested) {
+				return;
+			}
 			if (!this._session.scripts.length) {
 				await this.detectConfigurations();
+			}
+			if (token.isCancellationRequested) {
+				return;
 			}
 
 			const electronProfile = this._session.electronProfile;
@@ -747,6 +755,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 				this._session = { ...this._session, serverRunning: true, running: true };
 				this._fire();
 				await this.openPreviewEditor();
+				return;
+			}
+
+			if (token.isCancellationRequested) {
 				return;
 			}
 

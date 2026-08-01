@@ -1,0 +1,12 @@
+{
+  // Separate lane so `@types/node` globals stay out of the browser-facing
+  // sources: the tests read fixtures from disk, the graph core must not.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["mocha", "node"]
+  },
+  "include": [
+    "src/tests/**/*.ts"
+  ],
+  "exclude": []
+}

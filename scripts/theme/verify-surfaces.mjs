@@ -279,6 +279,58 @@ for (const hc of ['hc_black.json', 'hc_light.json']) {
 }
 
 // ---------------------------------------------------------------------------
+// 6) Semantic roles must survive themes that leave their token undefined
+// ---------------------------------------------------------------------------
+// A colour ID registered with a `null` default for some theme kind emits no CSS
+// custom property under that kind. A bare `var(--vscode-x)` then makes the whole
+// declaration invalid, so the property is dropped (or, for a shorthand,
+// silently reset) rather than falling back. Every role that maps to such a
+// token must therefore supply its own fallback.
+{
+	const registrations = new Map();
+	for (const file of walk(path.join(REPO_ROOT, 'src/vs/platform/theme/common/colors'))) {
+		collectNullDefaults(fs.readFileSync(file, 'utf8'), registrations);
+	}
+	for (const rel of [
+		'src/vs/workbench/common/theme.ts',
+		'src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedColors.ts'
+	]) {
+		collectNullDefaults(fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8'), registrations);
+	}
+
+	const rel = 'src/vs/workbench/contrib/prebase/browser/prebaseSurfaces.ts';
+	const source = fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
+	for (const [index, line] of source.split('\n').entries()) {
+		const match = line.match(/'var\(--vscode-([A-Za-z]+)-([A-Za-z]+)([^']*)\)'/);
+		if (!match) {
+			continue;
+		}
+		const [, group, name, rest] = match;
+		const token = `${group}.${name}`;
+		const kinds = registrations.get(token);
+		if (kinds && !rest.includes(',')) {
+			failures.push(`roles: ${rel}:${index + 1} uses ${token} bare, but it has no default for ${kinds.join(', ')}; add a fallback`);
+		}
+	}
+	notes.push(`roles: ${registrations.size} colour IDs have a null default for at least one theme kind`);
+}
+
+/**
+ * Record every `registerColor` whose defaults object leaves a theme kind null.
+ *
+ * @param {string} source
+ * @param {Map<string, string[]>} into
+ */
+function collectNullDefaults(source, into) {
+	for (const match of source.matchAll(/registerColor\(\s*'([^']+)',\s*\{([^}]*)\}/g)) {
+		const kinds = [...match[2].matchAll(/(\w+):\s*null\b/g)].map(m => m[1]);
+		if (kinds.length > 0) {
+			into.set(match[1], kinds);
+		}
+	}
+}
+
+// ---------------------------------------------------------------------------
 
 if (process.argv.includes('--verbose')) {
 	for (const note of notes) {

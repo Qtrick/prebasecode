@@ -143,7 +143,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	 * snapshot.
 	 */
 	private _relayoutGeneration = 0;
-	private _relayoutInFlight = false;
+	/** Generation of the relayout currently running, or -1 when none is. */
+	private _relayoutInFlightGeneration = -1;
 	private _selectedNodeId: string | undefined;
 	private _hiddenCommunityIds: number[] = [];
 	private _viewState: PreBaseGraphViewState;
@@ -185,10 +186,12 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkSpreadScale)
 			) {
-				// No `_rawSnapshot` guard: `relayout()` falls back to a scan when
-				// there is nothing to lay out, which is what changing the layout
-				// before the first scan used to do from the settings UI.
-				if (isCodeGraphCanvas(this._viewState.graphType)) {
+				// `_rawSnapshot` guard: with nothing laid out yet `relayout()`
+				// falls through to a full workspace scan, and this listener also
+				// fires for settings sync, profile switches and workspace
+				// settings edits. Opening the graph scans with the new value
+				// anyway, so there is nothing to recompute here.
+				if (isCodeGraphCanvas(this._viewState.graphType) && this._rawSnapshot) {
 					void this.relayout();
 				}
 			}
@@ -596,10 +599,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	cancelScan(): void {
 		// Abandon any relayout too, otherwise it finishes and reports 'ready'
-		// after the user asked to stop.
+		// after the user asked to stop. Comparing generations rather than
+		// keeping a flag means a relayout already superseded by a scan is not
+		// mistaken for one this call abandoned.
+		const abandonedRelayout = this._relayoutInFlightGeneration === this._relayoutGeneration;
 		this._relayoutGeneration++;
-		const abandonedRelayout = this._relayoutInFlight;
-		this._relayoutInFlight = false;
 		const cts = this._scanCts;
 		if (!cts) {
 			if (abandonedRelayout) {
@@ -784,7 +788,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			return this.scanWorkspace();
 		}
 		const generation = ++this._relayoutGeneration;
-		this._relayoutInFlight = true;
+		this._relayoutInFlightGeneration = generation;
 		this._setDiagnostics({
 			status: 'scanning',
 			message: localize('prebase.graph.relayout', "Updating layout…")
@@ -822,8 +826,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			this._log(localize('prebase.graph.logRelayoutError', "Layout failed: {0}", message));
 			return undefined;
 		} finally {
-			if (this._relayoutGeneration === generation) {
-				this._relayoutInFlight = false;
+			if (this._relayoutInFlightGeneration === generation) {
+				this._relayoutInFlightGeneration = -1;
 			}
 		}
 	}

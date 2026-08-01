@@ -18,15 +18,23 @@ Status values: `fixed`, `fixed (test)`, `deferred`, `intentional`,
 | --- | --- | --- | --- |
 | Blocker | 3 | 3 | 0 |
 | Critical | 6 | 6 | 0 |
-| High | 15 | 15 | 0 |
-| Medium | 15 | 14 | 1 |
-| Low | 7 | 6 | 1 |
-| **Total** | **46** | **44** | **2** |
+| High | 16 | 16 | 0 |
+| Medium | 18 | 17 | 1 |
+| Low | 8 | 6 | 1 |
+| Cosmetic | 1 | 1 | 0 |
+| **Total** | **52** | **49** | **2** |
 
-Twelve findings — `H-12` through `L-07` — came out of reviewing this pass's own
-diff rather than the original audit. Most of them are regressions that the
-earlier fixes in this same pass introduced or exposed, which is the reason the
-review ran against the whole diff and not only the audit's fix list.
+One finding, `L-05`, is closed as **intentional**: the change it asked for was
+made and then reverted, because it turned out to be worse than the behaviour it
+replaced. That is counted in "found" but in neither "fixed" nor "deferred".
+
+Eighteen findings — `H-12` through `L-09` — came out of reviewing this pass's
+own diff rather than the original audit, across two review rounds. Most are
+regressions that earlier fixes in this same pass introduced or exposed, which is
+why the reviews ran against the whole diff and not only the audit's fix list.
+The second round exists because the first round's *corrections* needed
+reviewing too: `H-16`, `M-17`, `M-18`, `L-08` and `L-09` are all defects in
+fixes, not in the original code.
 
 ## Findings
 
@@ -76,7 +84,12 @@ review ran against the whole diff and not only the audit's fix list.
 | M-14 | Runtime Preview | after H-13, two callers arriving during a cancelled start's unwind each began their own launch | Medium | both would pass the `await inFlight` and construct separate token sources, with `_startInFlight` tracking only the second | the recovery awaited before republishing the in-flight promise | chain the fresh start onto the unwind and publish it synchronously, so later callers join it | — | fixed |
 | M-15 | Lint ratchet | `extensions/prebase-magnus/**` was not a ratchet target even though it is the largest behavioural change in this pass | Medium | `TARGETS` in `verify-eslint-prebase.mjs` | the extension pre-dates the ratchet | added; the gate now covers 136 files, still at 0 errors / 0 warnings | `npm run verify:eslint-prebase` | fixed |
 | M-16 | Runtime Preview | the M-03 load timeout reported failure after 15s, so a cold Vite/Next compile marked a healthy preview disconnected and told Magnus so | Medium | the timeout posted `{type:'error'}`, which clears `previewConnected` | the timeout conflated "has not painted yet" with "is not there" | 60s, and overlay-only: connectivity stays probe-owned | — | fixed |
-| L-05 | Graph | after M-01, changing the layout before the first scan did nothing | Low | the configuration listener is guarded on `_rawSnapshot`, whereas the removed direct call fell through to a scan | the guard duplicated a check `relayout()` already makes | drop the `_rawSnapshot` guard; `relayout()` owns the no-snapshot case | — | fixed |
+| L-05 | Graph | after M-01, changing the layout before the first scan did nothing | Low | the configuration listener is guarded on `_rawSnapshot`, whereas the removed direct call fell through to a scan | the guard duplicated a check `relayout()` already makes | **none — the guard was restored.** Dropping it made the listener start a full workspace scan for any change to those keys, including settings sync, a profile switch and a `.vscode/settings.json` edit, with no graph on screen. Opening the graph scans with the new value anyway, so the no-op is the correct behaviour | — | intentional |
+| H-16 | PreBase custom UI | `list.activeSelectionBackground` has no High Contrast Dark default, so the selected graph filter chip, the selected layout and the active theme chip all lost their background in HC Dark | High | `listColors.ts` registers it `hcDark: null`; the H-15 fix missed this role, and the file only *asserted* the invariant in a comment | the invariant was documented rather than enforced | add the fallback, and make `verify:theme-surfaces` parse every `registerColor` default and fail any role that uses a null-defaulted token bare | `verify:theme-surfaces` section 6; negative-tested by reintroducing a bare `var()` | fixed (test) |
+| M-17 | Graph | `_relayoutInFlight` stayed `true` when a scan superseded a relayout, so a later cancel overwrote a healthy "ready" status with "Layout cancelled" | Medium | `scanWorkspace()` bumps the generation but the superseded relayout's `finally` then skips the clear | a boolean cannot express which relayout it belongs to | track the owning generation and compare it against the current one | — | fixed |
+| M-18 | Runtime Preview | the M-14 chain published its token source before the chained start ran, so a stop arriving in that window cancelled a token that `_startImpl` never checked, and a new dev-server terminal spawned behind the teardown | Medium | `_startImpl` had no entry check; the first check was inside an optional confirm branch | the cancellation added by C-07 only covered the paths that already awaited | check the token on entry, after `detectConfigurations()`, and before creating the terminal | — | fixed |
+| L-08 | Build / assurance | the M-13 fix put `@types/node` in scope for the browser-facing graph core, so a `process` or `Buffer` use that fails in the renderer would have type-checked | Low | `graphs/tsconfig.json` `types: ["mocha", "node"]` | the tests and the core shared one lane | split the tests into `graphs/tsconfig.tests.json`; the core lane is DOM-only again | negative-tested: `process.cwd()` in the core now fails `typecheck:graphs` | fixed |
+| L-09 | Build / Magnus | two comments written during this pass stated things that are not true (the Copilot manifest is disabled, not generated; task-end ordering cannot be guaranteed by deferral) | Cosmetic | `build/hygiene.ts`, `nativeTools.ts` | — | corrected to describe the actual condition | — | fixed |
 | L-06 | Magnus | a `null` entry in `message.content` would throw instead of being skipped | Low | `languageModelProvider.extractText` dropped an `in` guard during the lint pass | — | restore an object guard before the property read | — | fixed |
 | L-07 | Build / lint config | the graph import allowance let any contribution deep-import any graph internal | Low | `eslint.config.js` allowed `vs/workbench/contrib/prebase/graphs/**` | the pattern was written broadly to unblock one import | narrow it to the documented entrypoints | the import-pattern rule itself | fixed |
 
