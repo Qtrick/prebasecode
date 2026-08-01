@@ -1189,8 +1189,11 @@ function rafLoop(ts) {
 		rotation.yaw += IDLE_YAW * dt;
 		dirty = true;
 	}
+	// Without a snapshot there is nothing to draw, so staying awake for a dirty
+	// flag we cannot clear would spin at 60Hz forever if getSnapshot never
+	// answers. render() marks dirty again once a snapshot arrives.
 	if (dirty && snapshot) drawNetworkFrame();
-	if (animating || dirty) wakeRaf();
+	if (animating || (dirty && snapshot)) wakeRaf();
 }
 wakeRaf();
 

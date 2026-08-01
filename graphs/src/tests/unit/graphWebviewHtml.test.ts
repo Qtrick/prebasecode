@@ -24,6 +24,36 @@ function webviewScript(): string {
 	return match[1];
 }
 
+/**
+ * Execute the webview's own `rafLoop` body once against a stub scene and report
+ * how many frames it drew and whether it rescheduled itself.
+ */
+function runRafLoop(script: string, scene: { dirty: boolean; snapshot: unknown; autoRotate: boolean; idlePaused: boolean }): { draws: number; wakes: number } {
+	const body = script.match(/function rafLoop\(ts\) \{[\s\S]*?\n\}/);
+	assert.ok(body, 'rafLoop not found in the webview script');
+	 
+	const harness = new Function('scene', `
+		const IDLE_YAW = 0.1;
+		const document = { hidden: false };
+		const settings = { networkIdleAutoRotate: scene.autoRotate, reduceMotion: false };
+		const rotation = { yaw: 0, pitch: 0 };
+		let snapshot = scene.snapshot;
+		let idlePaused = scene.idlePaused;
+		let dragging = false;
+		let dirty = scene.dirty;
+		let lastRafTs = 0;
+		let rafHandle = 1;
+		let draws = 0;
+		let wakes = 0;
+		function drawNetworkFrame() { draws++; dirty = false; }
+		function wakeRaf() { if (rafHandle) { return; } rafHandle = 1; wakes++; }
+		${body[0]}
+		rafLoop(16);
+		return { draws, wakes };
+	`) as (scene: unknown) => { draws: number; wakes: number };
+	return harness(scene);
+}
+
 suite('Code Graph webview HTML', () => {
 	test('embedded webview script parses (template-literal escapes must survive)', () => {
 		const html = webviewHtml();
@@ -39,9 +69,24 @@ suite('Code Graph webview HTML', () => {
 
 	test('render loop parks when the scene is static', () => {
 		const script = webviewScript();
-		assert.ok(/if \(animating \|\| dirty\) wakeRaf\(\);/.test(script), 'rafLoop must only reschedule while animating or dirty');
 		assert.ok(!/^\s*requestAnimationFrame\(rafLoop\);\s*$/m.test(script), 'rafLoop must not be rescheduled unconditionally');
 		assert.ok(/function markDirty\(\)/.test(script), 'invalidation must funnel through markDirty so the parked loop restarts');
+
+		// Run the real rafLoop body against a stub scene so this asserts
+		// behaviour rather than the shape of one source line.
+		const frame = (scene: { dirty: boolean; snapshot: unknown; autoRotate: boolean; idlePaused: boolean }) => runRafLoop(script, scene);
+
+		const idle = frame({ dirty: false, snapshot: {}, autoRotate: false, idlePaused: true });
+		assert.deepStrictEqual(idle, { draws: 0, wakes: 0 }, 'a static scene must neither draw nor reschedule');
+
+		const invalidated = frame({ dirty: true, snapshot: {}, autoRotate: false, idlePaused: true });
+		assert.deepStrictEqual(invalidated, { draws: 1, wakes: 0 }, 'a dirty scene draws once and then parks');
+
+		const rotating = frame({ dirty: false, snapshot: {}, autoRotate: true, idlePaused: false });
+		assert.deepStrictEqual(rotating, { draws: 1, wakes: 1 }, 'auto-rotate keeps the loop alive');
+
+		const noSnapshot = frame({ dirty: true, snapshot: null, autoRotate: false, idlePaused: true });
+		assert.deepStrictEqual(noSnapshot, { draws: 0, wakes: 0 }, 'a dirty flag with nothing to draw must not spin the loop');
 	});
 
 	test('host requests always settle', () => {
