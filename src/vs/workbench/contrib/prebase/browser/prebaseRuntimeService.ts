@@ -578,8 +578,19 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	async start(): Promise<void> {
-		if (this._startInFlight) {
-			return this._startInFlight;
+		const inFlight = this._startInFlight;
+		if (inFlight) {
+			if (!this._startCts?.token.isCancellationRequested) {
+				return inFlight;
+			}
+			// Restart cancels the in-flight start and immediately starts again.
+			// Joining the cancelled one would hand the caller a start that is
+			// guaranteed to return without launching anything, so let it unwind
+			// first and then begin a fresh one.
+			await inFlight.catch(() => undefined);
+			if (this._startInFlight === inFlight) {
+				this._startInFlight = undefined;
+			}
 		}
 		const cts = new CancellationTokenSource();
 		this._startCts = cts;
