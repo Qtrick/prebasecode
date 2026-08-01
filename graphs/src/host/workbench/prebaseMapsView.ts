@@ -54,10 +54,11 @@ const FILTERS: { id: GraphFilterId; label: string }[] = [
 
 const ACCENT = '#2dd4bf';
 const ACCENT_SOFT = '#2dd4bf22';
-const MUTED = '#94a3b8';
-const SURFACE = '#1e293b';
-const SURFACE_OVERLAY = '#0f172a';
-const BORDER = '#334155';
+const TEXT = 'var(--vscode-foreground)';
+const MUTED = 'var(--vscode-descriptionForeground)';
+const SURFACE = 'var(--vscode-input-background)';
+const SURFACE_OVERLAY = 'var(--vscode-editorWidget-background)';
+const BORDER = 'var(--vscode-input-border, var(--vscode-widget-border))';
 
 interface ExplorerDirNode {
 	type: 'dir';
@@ -279,7 +280,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._searchInput.style.borderRadius = '6px';
 		this._searchInput.style.border = `1px solid ${BORDER}`;
 		this._searchInput.style.background = SURFACE_OVERLAY;
-		this._searchInput.style.color = '#e2e8f0';
+		this._searchInput.style.color = TEXT;
 		this._register(DOM.addDisposableListener(this._searchInput, 'input', () => {
 			this._searchQuery = this._searchInput?.value.trim().toLowerCase() ?? '';
 			this._refreshExplorerList();
@@ -352,7 +353,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		idleRow.style.alignItems = 'center';
 		idleRow.style.gap = '8px';
 		idleRow.style.fontSize = '11px';
-		idleRow.style.color = '#cbd5e1';
+		idleRow.style.color = TEXT;
 		idleRow.style.cursor = 'pointer';
 		idleRow.style.marginBottom = '6px';
 		this._idleRotateCheckbox = DOM.append(idleRow, DOM.$('input')) as HTMLInputElement;
@@ -402,7 +403,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		legendRow.style.alignItems = 'center';
 		legendRow.style.gap = '8px';
 		legendRow.style.fontSize = '11px';
-		legendRow.style.color = '#cbd5e1';
+		legendRow.style.color = TEXT;
 		legendRow.style.cursor = 'pointer';
 		this._legendCheckbox = DOM.append(legendRow, DOM.$('input')) as HTMLInputElement;
 		this._legendCheckbox.type = 'checkbox';
@@ -428,7 +429,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 	private _renderExplorer(): void {
 		const section = DOM.append(this._scroll!, DOM.$('div'));
-		section.style.borderTop = `1px solid ${BORDER}99`;
+		section.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
 		section.style.paddingTop = '8px';
 
 		const header = DOM.append(section, DOM.$('div'));
@@ -463,7 +464,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._explorerList = DOM.append(section, DOM.$('div'));
 		this._explorerList.style.maxHeight = '240px';
 		this._explorerList.style.overflowY = 'auto';
-		this._explorerList.style.border = `1px solid ${BORDER}66`;
+		this._explorerList.style.border = `1px solid color-mix(in srgb, ${BORDER} 40%, transparent)`;
 		this._explorerList.style.borderRadius = '6px';
 		this._explorerList.style.background = SURFACE_OVERLAY;
 		this._explorerList.style.padding = '4px';
@@ -670,8 +671,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 		bar.style.height = '10px';
 		bar.style.borderRadius = '999px';
 		bar.style.overflow = 'hidden';
-		bar.style.background = `${SURFACE}cc`;
-		bar.style.border = `1px solid ${BORDER}66`;
+		bar.style.background = `color-mix(in srgb, ${SURFACE} 80%, transparent)`;
+		bar.style.border = `1px solid color-mix(in srgb, ${BORDER} 40%, transparent)`;
 		for (const seg of display) {
 			const slice = DOM.append(bar, DOM.$('div'));
 			slice.style.width = `${Math.max(seg.percent, seg.count > 0 ? 2 : 0)}%`;
@@ -833,7 +834,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		row.style.textAlign = 'left';
 		row.style.padding = `3px 6px 3px ${6 + depth * 12}px`;
 		row.style.fontSize = '11px';
-		row.style.color = '#cbd5e1';
+		row.style.color = TEXT;
 		row.style.background = 'transparent';
 		row.style.border = 'none';
 		row.style.borderRadius = '4px';
@@ -864,7 +865,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		row.style.textAlign = 'left';
 		row.style.padding = `3px 6px 3px ${6 + depth * 12}px`;
 		row.style.fontSize = '11px';
-		row.style.color = selected ? ACCENT : '#e2e8f0';
+		row.style.color = selected ? ACCENT : TEXT;
 		row.style.fontWeight = selected ? '600' : '400';
 		row.style.background = selected ? ACCENT_SOFT : 'transparent';
 		row.style.border = 'none';
@@ -982,7 +983,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		btn.style.cursor = 'pointer';
 		btn.style.border = `1px solid ${BORDER}`;
 		btn.style.background = SURFACE;
-		btn.style.color = '#e2e8f0';
+		btn.style.color = TEXT;
 		this._register(DOM.addDisposableListener(btn, 'click', onClick));
 		return btn;
 	}
@@ -1014,7 +1015,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		} else {
 			btn.style.background = SURFACE;
 			btn.style.borderColor = BORDER;
-			btn.style.color = '#e2e8f0';
+			btn.style.color = TEXT;
 			btn.style.boxShadow = 'none';
 		}
 	}

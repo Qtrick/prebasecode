@@ -34,10 +34,11 @@ const STEPS = [
 ];
 
 const ACCENT = '#2dd4bf';
-const MUTED = '#94a3b8';
-const TEXT = '#e2e8f0';
-const SURFACE = '#0f172a';
-const BORDER = '#1e293b';
+const MUTED = 'var(--vscode-descriptionForeground)';
+const TEXT = 'var(--vscode-foreground)';
+const SURFACE = 'var(--vscode-sideBar-background)';
+const BORDER = 'var(--vscode-input-border, var(--vscode-widget-border))';
+const PAGE_BG = 'var(--vscode-editor-background)';
 
 export class PreBaseOnboardingEditor extends EditorPane {
 	static readonly ID = 'workbench.editor.prebaseOnboarding';
@@ -71,7 +72,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		this._root = DOM.append(parent, DOM.$('.prebase-onboarding'));
 		this._root.style.height = '100%';
 		this._root.style.overflow = 'auto';
-		this._root.style.background = 'radial-gradient(ellipse at top, rgba(45,212,191,0.1) 0%, transparent 55%), #0b1220';
+		this._root.style.background = `radial-gradient(ellipse at top, rgba(45,212,191,0.1) 0%, transparent 55%), ${PAGE_BG}`;
 		this._root.style.color = TEXT;
 		this._body = DOM.append(this._root, DOM.$('.prebase-onboarding-body'));
 		this._body.style.maxWidth = '720px';

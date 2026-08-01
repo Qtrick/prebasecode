@@ -297,41 +297,42 @@ export class PreBaseGraphEditor extends EditorPane {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
 <style nonce="${nonce}">
-html, body { margin:0; height:100%; background:#070b14; color:#e2e8f0; font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; overflow:hidden; }
+html, body { margin:0; height:100%; background:var(--vscode-editor-background, #1B1C1E); color:var(--vscode-foreground, #f4f4f5); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; overflow:hidden; }
 #stage { position:absolute; inset:0; }
 #archSvg, #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; }
 #archSvg { cursor:grab; }
 #archSvg.dragging, #archSvg.panning { cursor:grabbing; }
 #netCanvas { cursor:grab; }
 #netCanvas.dragging { cursor:grabbing; }
-#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:rgba(15,23,42,.82); border:1px solid #334155; border-radius:8px; padding:4px; }
-#toolbar button, #toolbar label { background:transparent; color:#e2e8f0; border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
-#toolbar button:hover { background:#1e293b; }
+#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 88%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:4px; }
+#toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
+#toolbar button:hover { background:var(--vscode-toolbar-hoverBackground, #303030); }
 #toolbar label { display:flex; gap:4px; align-items:center; user-select:none; opacity:.9; }
-#status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:rgba(15,23,42,.88); border:1px solid #334155; border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
-#legend { position:absolute; left:12px; bottom:100px; z-index:4; background:rgba(15,23,42,.88); border:1px solid #334155; border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
+#status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
+#legend { position:absolute; left:12px; bottom:100px; z-index:4; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
 #legend .title { font-weight:700; margin-bottom:6px; letter-spacing:.02em; text-transform:uppercase; opacity:.75; font-size:10px; }
 #legend .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
 #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
 #legend .swatch.circle { border-radius:50%; }
 #legend .swatch.line { height:2px; width:16px; border-radius:1px; }
-#empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:#94a3b8; font-size:14px; line-height:1.5; }
-#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:rgba(15,23,42,.96); border:1px solid #334155; border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
+#empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
+#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #303030); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
 #popup h3 { margin:0 0 4px; font-size:13px; }
-#popup .meta { color:#94a3b8; font-size:11px; margin-bottom:8px; word-break:break-word; }
-#popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:#64748b; margin:10px 0 4px; }
-#popup p { margin:0; font-size:12px; line-height:1.45; color:#cbd5e1; }
+#popup .meta { color:var(--vscode-descriptionForeground, #a1a1aa); font-size:11px; margin-bottom:8px; word-break:break-word; }
+#popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-disabledForeground, #71717a); margin:10px 0 4px; }
+#popup p { margin:0; font-size:12px; line-height:1.45; color:var(--vscode-foreground, #f4f4f5); }
 #popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-#popup button { font-size:11px; border-radius:7px; border:1px solid #334155; background:#0b1220; color:#e2e8f0; padding:5px 8px; cursor:pointer; }
-#popup button.primary { border-color:#2dd4bf; color:#042f2e; background:#2dd4bf; }
-#popup #popupClose { float:right; border:0; background:transparent; color:#94a3b8; font-size:16px; }
+#popup button { font-size:11px; border-radius:7px; border:1px solid var(--vscode-widget-border, #3C3C3C); background:var(--vscode-input-background, #303030); color:var(--vscode-foreground, #f4f4f5); padding:5px 8px; cursor:pointer; }
+#popup button.primary { border-color:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); background:var(--vscode-button-background, #2dd4bf); }
+#popup #popupClose { float:right; border:0; background:transparent; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:16px; }
 .ring, .pyramid-band, .edge { pointer-events:none; }
 .ring { fill:none; opacity:.55; }
-.node-label { fill:#ecfeff; font-size:10px; pointer-events:none; }
+.node-label { fill:var(--vscode-foreground, #ecfeff); font-size:10px; pointer-events:none; }
 .edge { fill:none; opacity:.45; }
 .arch-node { cursor:pointer; }
 .arch-node.is-entry rect.node-face { stroke-width:2.4; }
 .arch-node.is-selected rect.node-face { stroke:#2dd4bf; stroke-width:2.6; filter:url(#glow); }
+.arch-node rect.node-face { fill:var(--vscode-editor-background, #1B1C1E); }
 </style>
 </head>
 <body>
@@ -416,6 +417,7 @@ let idlePaused = true;
 let idleResumeTimer = null;
 let lastRafTs = 0;
 let dirty = true;
+let rafScheduled = false;
 let dpr = Math.min(2, window.devicePixelRatio || 1);
 const pending = new Map();
 
@@ -488,13 +490,23 @@ function projectPoint(x, y, z, yaw, pitch) {
 function scheduleIdleResume() {
 	idlePaused = true;
 	dirty = true;
+	kickRaf();
 	if (idleResumeTimer) clearTimeout(idleResumeTimer);
 	idleResumeTimer = null;
 	if (!settings.networkIdleAutoRotate || settings.reduceMotion || !isNetwork()) return;
 	idleResumeTimer = setTimeout(function () {
 		idleResumeTimer = null;
-		if (settings.networkIdleAutoRotate && !settings.reduceMotion && !dragging) idlePaused = false;
+		if (settings.networkIdleAutoRotate && !settings.reduceMotion && !dragging) {
+			idlePaused = false;
+			kickRaf();
+		}
 	}, IDLE_RESUME_MS);
+}
+
+function kickRaf() {
+	if (rafScheduled) return;
+	rafScheduled = true;
+	requestAnimationFrame(rafLoop);
 }
 
 function clearIdleTimers() {
@@ -623,6 +635,7 @@ function fitView() {
 	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 	dirty = true;
 	if (!isNetwork()) applyArchTransform();
+	else kickRaf();
 }
 
 function applyArchTransform() {
@@ -794,7 +807,6 @@ function renderArchitecture(s) {
 		rect.setAttribute('width', String(ARCH_W));
 		rect.setAttribute('height', String(ARCH_H));
 		rect.setAttribute('rx', '4');
-		rect.setAttribute('fill', '#0b1220');
 		rect.setAttribute('stroke', color);
 		rect.setAttribute('stroke-width', '1.4');
 		g.appendChild(rect);
@@ -1025,7 +1037,12 @@ window.addEventListener('message', function (event) {
 		return;
 	}
 	if (msg.type === 'snapshot') { onSnapshotMessage(msg.payload); return; }
-	if (msg.type === 'resetView') { resetCamera(false); if (isNetwork()) { projectAll(); dirty = true; drawNetworkFrame(); } fitView(); return; }
+	if (msg.type === 'resetView') {
+		resetCamera(false);
+		if (isNetwork()) { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
+		else fitView();
+		return;
+	}
 	if (msg.type === 'fitView') { if (isNetwork()) projectAll(); fitView(); if (isNetwork()) { dirty = true; drawNetworkFrame(); } }
 });
 
@@ -1151,6 +1168,7 @@ function onPointerMove(e) {
 		rotation.yaw = wrapRotationAngle(rotation.yaw + mapped.yaw);
 		rotation.pitch = wrapRotationAngle(rotation.pitch + mapped.pitch);
 		dirty = true;
+		kickRaf();
 		return;
 	}
 	if (!moved) return;
@@ -1162,7 +1180,7 @@ function onPointerMove(e) {
 	if (!panning) return;
 	interactionState = 'panning';
 	transform.x += dx; transform.y += dy;
-	if (isNetwork()) { dirty = true; } else applyArchTransform();
+	if (isNetwork()) { dirty = true; kickRaf(); } else applyArchTransform();
 }
 function onWheel(e) {
 	e.preventDefault();
@@ -1232,7 +1250,11 @@ document.getElementById('zoomOut').onclick = function () {
 	if (isNetwork()) drawNetworkFrame(); else applyArchTransform();
 };
 document.getElementById('fit').onclick = function () { if (isNetwork()) projectAll(); fitView(); if (isNetwork()) { dirty = true; drawNetworkFrame(); } };
-document.getElementById('reset').onclick = function () { resetCamera(false); if (isNetwork()) { projectAll(); dirty = true; drawNetworkFrame(); } fitView(); };
+document.getElementById('reset').onclick = function () {
+	resetCamera(false);
+	if (isNetwork()) { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
+	else fitView();
+};
 idleToggle.addEventListener('change', function () {
 	settings.networkIdleAutoRotate = !!idleToggle.checked;
 	request('setNetworkIdleAutoRotate', { enabled: settings.networkIdleAutoRotate });
@@ -1240,6 +1262,7 @@ idleToggle.addEventListener('change', function () {
 });
 
 function rafLoop(ts) {
+	rafScheduled = false;
 	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
 	lastRafTs = ts;
 	const animating = isNetwork() && settings.networkIdleAutoRotate && !settings.reduceMotion && !idlePaused && !dragging && !document.hidden && snapshot;
@@ -1248,9 +1271,10 @@ function rafLoop(ts) {
 		dirty = true;
 	}
 	if (dirty && isNetwork() && snapshot) drawNetworkFrame();
-	requestAnimationFrame(rafLoop);
+	// Keep the loop alive only while idle rotation is actively advancing frames.
+	if (animating) kickRaf();
 }
-requestAnimationFrame(rafLoop);
+kickRaf();
 
 window.addEventListener('pagehide', clearIdleTimers);
 document.addEventListener('visibilitychange', function () {

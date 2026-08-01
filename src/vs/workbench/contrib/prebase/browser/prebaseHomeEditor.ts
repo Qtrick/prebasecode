@@ -37,11 +37,12 @@ import { IEditorGroup } from '../../../services/editor/common/editorGroupsServic
 import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
 
 const ACCENT = '#2dd4bf';
-const SURFACE = '#0f172a';
-const BORDER = '#1e293b';
-const TEXT = '#e2e8f0';
-const MUTED = '#94a3b8';
-const MUTED2 = '#64748b';
+const SURFACE = 'var(--vscode-sideBar-background)';
+const OVERLAY = 'var(--vscode-editorWidget-background)';
+const BORDER = 'var(--vscode-input-border, var(--vscode-widget-border))';
+const TEXT = 'var(--vscode-foreground)';
+const MUTED = 'var(--vscode-descriptionForeground)';
+const PAGE_BG = 'var(--vscode-editor-background)';
 
 const HOME_CARD_LIMIT = 6;
 
@@ -94,7 +95,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		this._root.style.height = '100%';
 		this._root.style.overflow = 'auto';
 		this._root.style.boxSizing = 'border-box';
-		this._root.style.background = 'radial-gradient(ellipse at center, rgba(45,212,191,0.08) 0%, transparent 65%), #0b1220';
+		this._root.style.background = `radial-gradient(ellipse at center, rgba(45,212,191,0.08) 0%, transparent 65%), ${PAGE_BG}`;
 		this._root.style.color = TEXT;
 		this._body = DOM.append(this._root, DOM.$('.prebase-home-body'));
 		this._body.style.maxWidth = '960px';
@@ -166,8 +167,8 @@ export class PreBaseHomeEditor extends EditorPane {
 		badge.style.borderRadius = '18px';
 		badge.style.display = 'block';
 		badge.style.boxSizing = 'border-box';
-		badge.style.border = '1px solid rgba(148,163,184,0.35)';
-		badge.style.background = '#000';
+		badge.style.border = `1px solid ${BORDER}`;
+		badge.style.background = 'var(--vscode-editor-background)';
 		badge.style.overflow = 'hidden';
 		badge.style.flexShrink = '0';
 		badge.style.lineHeight = '0';
@@ -302,7 +303,7 @@ export class PreBaseHomeEditor extends EditorPane {
 			empty.style.borderRadius = '12px';
 			empty.style.padding = '24px';
 			empty.style.textAlign = 'center';
-			empty.style.background = 'rgba(15,23,42,0.45)';
+			empty.style.background = `color-mix(in srgb, ${OVERLAY} 45%, transparent)`;
 			const p1 = DOM.append(empty, DOM.$('p'));
 			p1.style.margin = '0';
 			p1.style.fontSize = '12px';
@@ -311,7 +312,7 @@ export class PreBaseHomeEditor extends EditorPane {
 			const p2 = DOM.append(empty, DOM.$('p'));
 			p2.style.margin = '6px 0 0';
 			p2.style.fontSize = '11px';
-			p2.style.color = MUTED2;
+			p2.style.color = MUTED;
 			p2.textContent = localize('prebase.home.noRecentsHint', "Open a folder to begin mapping your codebase.");
 			return;
 		}
@@ -400,7 +401,9 @@ export class PreBaseHomeEditor extends EditorPane {
 		btn.style.padding = '10px 12px';
 		btn.style.borderRadius = '10px';
 		btn.style.cursor = 'pointer';
-		btn.style.background = card.isLastOpened ? 'rgba(15,23,42,0.85)' : 'rgba(15,23,42,0.55)';
+		btn.style.background = card.isLastOpened
+			? `color-mix(in srgb, ${OVERLAY} 88%, transparent)`
+			: `color-mix(in srgb, ${SURFACE} 70%, transparent)`;
 		btn.style.border = card.isLastOpened ? `1px solid rgba(45,212,191,0.45)` : `1px solid ${BORDER}`;
 		btn.style.color = TEXT;
 		btn.style.opacity = card.missing ? '0.72' : '1';
@@ -425,7 +428,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		icon.style.alignItems = 'center';
 		icon.style.justifyContent = 'center';
 		icon.style.border = `1px solid ${card.isLastOpened ? 'rgba(45,212,191,0.3)' : BORDER}`;
-		icon.style.background = card.isLastOpened ? 'rgba(45,212,191,0.1)' : 'rgba(30,41,59,0.5)';
+		icon.style.background = card.isLastOpened ? 'rgba(45,212,191,0.1)' : `color-mix(in srgb, ${SURFACE} 55%, transparent)`;
 		icon.style.color = card.isLastOpened ? ACCENT : MUTED;
 		icon.style.flexShrink = '0';
 		icon.style.fontSize = '14px';
@@ -473,7 +476,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		pathEl.title = card.pathLabel;
 		pathEl.style.fontSize = '10px';
 		pathEl.style.fontFamily = 'var(--monaco-monospace-font, monospace)';
-		pathEl.style.color = MUTED2;
+		pathEl.style.color = MUTED;
 		pathEl.style.lineHeight = '1.35';
 		pathEl.style.overflow = 'hidden';
 		pathEl.style.textOverflow = 'ellipsis';
@@ -485,7 +488,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		meta.style.flexWrap = 'wrap';
 		meta.style.fontSize = '10px';
 		meta.style.color = MUTED;
-		meta.style.borderTop = `1px solid ${BORDER}99`;
+		meta.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
 		meta.style.paddingTop = '6px';
 		meta.style.marginTop = '2px';
 		DOM.append(meta, DOM.$('span')).textContent = card.kind === 'workspace'

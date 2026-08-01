@@ -181,12 +181,12 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 	Object.assign(card.style, {
 		borderRadius: '12px',
 		border: `1px solid ${host.colors.border}`,
-		background: 'rgba(17, 24, 39, 0.35)',
+		background: 'transparent',
 		padding: '0 16px',
 	});
 	const head = document.createElement('div');
 	card.appendChild(head);
-	Object.assign(head.style, { padding: '12px 0', borderBottom: `1px solid rgba(30, 41, 59, 0.6)`, marginBottom: '4px' });
+	Object.assign(head.style, { padding: '12px 0', borderBottom: `1px solid color-mix(in srgb, ${host.colors.border} 55%, transparent)`, marginBottom: '4px' });
 	const h = document.createElement('h3');
 	head.appendChild(h);
 	h.textContent = localize('prebase.settings.advanced', "Advanced");
@@ -210,7 +210,7 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 
 		const netHead = document.createElement('div');
 		card.appendChild(netHead);
-		Object.assign(netHead.style, { padding: '8px 0', borderBottom: `1px solid rgba(30, 41, 59, 0.6)` });
+		Object.assign(netHead.style, { padding: '8px 0', borderBottom: `1px solid color-mix(in srgb, ${host.colors.border} 55%, transparent)` });
 		const nh = document.createElement('p');
 		netHead.appendChild(nh);
 		nh.textContent = localize('prebase.settings.networkGraph', "Network graph");

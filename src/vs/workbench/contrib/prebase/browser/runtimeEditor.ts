@@ -79,14 +79,14 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._root.style.height = '100%';
 		this._root.style.minWidth = '0';
 		this._root.style.minHeight = '0';
-		this._root.style.background = 'var(--vscode-editor-background, #0b1220)';
-		this._root.style.color = 'var(--vscode-foreground, #e2e8f0)';
+		this._root.style.background = 'var(--vscode-editor-background, #1B1C1E)';
+		this._root.style.color = 'var(--vscode-foreground, #f4f4f5)';
 
 		this._toolbar = DOM.append(this._root, DOM.$('.prebase-runtime-toolbar'));
 		this._toolbar.style.display = 'flex';
 		this._toolbar.style.gap = '6px';
 		this._toolbar.style.padding = '8px';
-		this._toolbar.style.borderBottom = '1px solid var(--vscode-panel-border, #1e293b)';
+		this._toolbar.style.borderBottom = '1px solid var(--vscode-panel-border, #2B2B2B)';
 		this._toolbar.style.alignItems = 'center';
 		this._toolbar.style.flexShrink = '0';
 
@@ -113,9 +113,9 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._urlInput.type = 'text';
 		this._urlInput.style.flex = '1';
 		this._urlInput.style.minWidth = '0';
-		this._urlInput.style.background = 'var(--vscode-input-background, #020617)';
-		this._urlInput.style.color = 'var(--vscode-input-foreground, #e2e8f0)';
-		this._urlInput.style.border = '1px solid var(--vscode-input-border, #334155)';
+		this._urlInput.style.background = 'var(--vscode-input-background, #303030)';
+		this._urlInput.style.color = 'var(--vscode-input-foreground, #f4f4f5)';
+		this._urlInput.style.border = '1px solid var(--vscode-input-border, #3C3C3C)';
 		this._urlInput.style.borderRadius = '6px';
 		this._urlInput.style.padding = '6px 8px';
 		this._register(DOM.addDisposableListener(this._urlInput, 'keydown', async (e) => {
@@ -145,10 +145,10 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._frameHost.style.minHeight = '0';
 		this._frameHost.style.padding = '0';
 		this._frameHost.style.boxSizing = 'border-box';
-		this._frameHost.style.background = 'var(--vscode-editor-background, #0b1220)';
+		this._frameHost.style.background = 'var(--vscode-editor-background, #1B1C1E)';
 
 		this._frameShell = DOM.append(this._frameHost, DOM.$('.prebase-runtime-frame-shell'));
-		this._frameShell.style.background = 'var(--vscode-editor-background, #020617)';
+		this._frameShell.style.background = 'var(--vscode-editor-background, #1B1C1E)';
 		this._frameShell.style.border = '0';
 		this._frameShell.style.boxShadow = 'none';
 		this._frameShell.style.overflow = 'hidden';
@@ -161,7 +161,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		this._sidePanel = DOM.append(body, DOM.$('.prebase-runtime-side'));
 		this._sidePanel.style.width = '260px';
 		this._sidePanel.style.flexShrink = '0';
-		this._sidePanel.style.borderLeft = '1px solid var(--vscode-panel-border, #1e293b)';
+		this._sidePanel.style.borderLeft = '1px solid var(--vscode-panel-border, #2B2B2B)';
 		this._sidePanel.style.padding = '10px';
 		this._sidePanel.style.overflow = 'auto';
 		this._sidePanel.style.fontSize = '12px';
@@ -261,7 +261,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			this._frameHost.style.overflow = 'auto';
 			this._frameShell.style.width = `${width}px`;
 			this._frameShell.style.height = `${height}px`;
-			this._frameShell.style.border = '1px solid var(--vscode-panel-border, #334155)';
+			this._frameShell.style.border = '1px solid var(--vscode-panel-border, #2B2B2B)';
 			this._frameShell.style.boxShadow = '0 8px 24px #0006';
 		}
 		this._frameShell.style.transform = zoom === 1 ? '' : `scale(${zoom})`;
@@ -387,8 +387,8 @@ html, body { margin:0; height:100%; width:100%; background:transparent; overflow
 #frame { border:0; width:100%; height:100%; display:block; margin:0; padding:0; background:transparent; }
 #overlay {
 	position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
-	padding:24px; text-align:center; color:var(--vscode-descriptionForeground, #94a3b8);
-	background:var(--vscode-editor-background, #0b1220); font-size:14px; line-height:1.45;
+	padding:24px; text-align:center; color:var(--vscode-descriptionForeground, #a1a1aa);
+	background:var(--vscode-editor-background, #1B1C1E); font-size:14px; line-height:1.45;
 }
 #overlay.hidden { display:none; }
 </style>

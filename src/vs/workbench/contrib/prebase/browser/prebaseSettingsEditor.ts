@@ -80,18 +80,18 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: string }[] = [
 ];
 
 const COLORS = {
-	bg: '#0b1220',
-	surface: '#0f172a',
-	overlay: '#111827',
-	border: '#1e293b',
-	muted: '#1e293b',
-	text: '#e2e8f0',
-	textSecondary: '#94a3b8',
-	textMuted: '#64748b',
+	bg: 'var(--vscode-editor-background)',
+	surface: 'var(--vscode-sideBar-background)',
+	overlay: 'var(--vscode-editorWidget-background)',
+	border: 'var(--vscode-input-border, var(--vscode-widget-border))',
+	muted: 'var(--vscode-input-background)',
+	text: 'var(--vscode-foreground)',
+	textSecondary: 'var(--vscode-descriptionForeground)',
+	textMuted: 'var(--vscode-descriptionForeground)',
 	accent: '#2dd4bf',
 	accentDim: 'rgba(45, 212, 191, 0.15)',
 	accentBorder: 'rgba(45, 212, 191, 0.28)',
-	navActive: '#1e293b',
+	navActive: 'var(--vscode-list-inactiveSelectionBackground, var(--vscode-input-background))',
 };
 
 interface SidebarDraft {
@@ -161,7 +161,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 			width: '208px',
 			flexShrink: '0',
 			borderRight: `1px solid ${COLORS.border}`,
-			background: 'rgba(15, 23, 42, 0.55)',
+			background: COLORS.surface,
 			display: 'flex',
 			flexDirection: 'column',
 		});
@@ -348,7 +348,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 			this._renderDisposables.add(DOM.addDisposableListener(btn, 'mouseenter', () => {
 				if (!active) {
 					btn.style.color = COLORS.textSecondary;
-					btn.style.background = 'rgba(30, 41, 59, 0.45)';
+					btn.style.background = 'color-mix(in srgb, var(--vscode-list-hoverBackground, var(--vscode-input-background)) 70%, transparent)';
 				}
 			}));
 			this._renderDisposables.add(DOM.addDisposableListener(btn, 'mouseleave', () => {
@@ -395,7 +395,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 			marginTop: '16px',
 			borderRadius: '12px',
 			border: `1px solid ${COLORS.border}`,
-			background: 'rgba(17, 24, 39, 0.45)',
+			background: 'transparent',
 			padding: '0 16px',
 		});
 		return card;
@@ -409,7 +409,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 			justifyContent: 'space-between',
 			gap: '24px',
 			padding: '10px 0',
-			borderBottom: `1px solid rgba(30, 41, 59, 0.6)`,
+			borderBottom: `1px solid color-mix(in srgb, ${COLORS.border} 55%, transparent)`,
 		});
 		const left = DOM.append(row, DOM.$('div'));
 		Object.assign(left.style, { minWidth: '0', flex: '1' });
@@ -510,9 +510,9 @@ export class PreBaseSettingsEditor extends EditorPane {
 			btn.textContent = theme.label;
 			const active = currentThemeId === theme.id || currentThemeId.endsWith(theme.id);
 			Object.assign(btn.style, {
-				background: active ? '#155e75' : '#0f172a',
-				color: active ? '#ecfeff' : '#cbd5e1',
-				border: active ? '1px solid #22d3ee88' : '1px solid #334155',
+				background: active ? 'color-mix(in srgb, #155e75 85%, var(--vscode-editor-background))' : COLORS.surface,
+				color: active ? '#ecfeff' : COLORS.text,
+				border: active ? '1px solid #22d3ee88' : `1px solid ${COLORS.border}`,
 				borderRadius: '999px',
 				padding: '4px 10px',
 				fontSize: '11px',

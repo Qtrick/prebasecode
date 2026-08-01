@@ -143,6 +143,13 @@ Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; be
 - Icons: `verify:icons` **101/101 PASS**; `verify:privacy` PASS (runtime warning); `assurance:quick` PASS (test:graphs 17).
 - **Beta candidate claim: FORBIDDEN.** Not GO for ship.
 
+### Dark UI / cleansing pass (2026-08-01, main)
+
+- PreBase Night semantic surface ladder applied (`#1B1C1E` / `#1F1F1F` / `#2B2B2B` / `#303030`) via `prebase_dark.json` + `COLOR_THEME_DARK_INITIAL_COLORS`; custom Home/Settings/Onboarding/graph chrome migrated toward `--vscode-*` vars.
+- Network graph idle `requestAnimationFrame` gated (CLN-005).
+- Docs: `DARK_UI_RESEARCH.md`, `DARK_SURFACE_AUDIT.md`, `DARK_SURFACE_TOKENS.md`, `DARK_UI_COMPARISON.md`, `CLEANUP_AUDIT.md`, `DARK_UI_PHASE_A_PLAN.md`.
+- **Honesty:** interactive screenshot matrix + CORE_IDE/GRAPH acceptance still open; BETA-018 a11y not Complete; **beta candidate claim still forbidden**. Icons 101/101 unchanged.
+
 ## Completed this task
 
 | ID | Evidence |
