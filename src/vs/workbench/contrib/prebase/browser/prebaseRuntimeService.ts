@@ -663,8 +663,14 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 								command: rendererCommand,
 								scriptBody: rendererCommand,
 								label: `${script.scriptName} (renderer only)`,
-							});
+							}, token);
 						}
+					}
+					if (token.isCancellationRequested) {
+						await this._stopTerminal();
+						this._session = { ...this._session, serverRunning: false, terminalInstanceId: undefined };
+						this._fire();
+						return;
 					}
 					const rendererUrl = this._session.url || electronProfile.rendererUrlHint || `http://localhost:${electronProfile.likelyDevPort}`;
 					const ready = await this._waitForUrl(rendererUrl, 45_000, token);
@@ -681,6 +687,12 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 					const session = await desktop.start({ launchMode: 'managed', rendererUrl });
 					if (token.isCancellationRequested) {
 						await desktop.stop();
+						// Anything still alive was started by this cancelled start:
+						// the stop that cancelled the token tore down whatever came
+						// before it.
+						await this._stopTerminal();
+						this._session = { ...this._session, serverRunning: false, terminalInstanceId: undefined };
+						this._fire();
 						return;
 					}
 					this._session = {
@@ -1205,9 +1217,15 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		}
 	}
 
-	private async _startDevServerOnly(script: DetectedDevScript): Promise<void> {
+	private async _startDevServerOnly(script: DetectedDevScript, token: CancellationToken): Promise<void> {
 		if (this._devTerminal && !this._devTerminal.isDisposed) {
 			this._session = { ...this._session, serverRunning: true };
+			return;
+		}
+		// Tearing down a prior Electron-launching server takes hundreds of
+		// milliseconds, which is long enough for a stop to arrive. Without this
+		// the stop would be followed by a brand new dev server behind it.
+		if (token.isCancellationRequested) {
 			return;
 		}
 		const cwd = this._workspaceFolderUri ?? this.workspaceService.getWorkspace().folders[0]?.uri;

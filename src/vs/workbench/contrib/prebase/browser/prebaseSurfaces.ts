@@ -19,12 +19,16 @@
  *
  * Some native tokens are registered with a `null` default for one or more theme
  * kinds (`input.border` and `widget.border` in dark and light, `widget.shadow`
- * and `list.activeSelectionBackground` in High Contrast, and so on). An
+ * in both High Contrast kinds, `list.activeSelectionBackground` in High
+ * Contrast Dark, and so on — nullness is inherited, so a colour whose default
+ * is another colour is null wherever that one is). An
  * undefined custom property makes the whole declaration invalid, which drops
  * the property — or, for a shorthand such as `border`, resets every longhand —
  * rather than falling back. Every such role below therefore carries an explicit
- * fallback chain ending in a token defined for all four theme kinds. This is
- * enforced by `npm run verify:theme-surfaces`, not left to review.
+ * fallback chain that bottoms out somewhere defined. This is enforced by
+ * `npm run verify:theme-surfaces`, which resolves every `registerColor` default
+ * (including inherited ones) and walks every `var()` chain in PreBase-owned UI,
+ * not just this file.
  */
 export const PreBaseSurface = {
 	/** Deepest content well: page canvases, editor-like bodies, code blocks. */

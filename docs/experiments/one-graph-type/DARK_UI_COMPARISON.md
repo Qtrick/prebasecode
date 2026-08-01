@@ -214,7 +214,7 @@ by editing settings, so this exercises the path a user takes.
   ring silently. Measured in the running product after the fix, the selected
   layout reports `box-shadow: rgb(34, 211, 238) 0px 0px 0px 1px`; before it
   reported `none`.
-* The same review found seven semantic roles in `prebaseSurfaces.ts` mapping to
+* The same review found eight semantic roles in `prebaseSurfaces.ts` mapping to
   native tokens that are registered with a `null` default for at least one
   theme kind. Confirmed in the running product by switching to a theme that
   does not define `input.border`: the bare `var()` is invalid at
@@ -227,8 +227,14 @@ by editing settings, so this exercises the path a user takes.
   Night, which defines every one of those tokens, which is exactly why a
   screenshot audit of the default theme could not have caught it. The
   invariant is now a build gate rather than a comment: `verify:theme-surfaces`
-  parses every `registerColor` default and fails if a role uses a
-  null-defaulted token without a fallback.
+  resolves all 916 `registerColor` defaults — including the inherited ones,
+  where a colour's default is another colour, and wrappers like
+  `transparent(x, .5)` — finds the 310 that are null under at least one theme
+  kind, and walks every `var()` chain in PreBase-owned UI to check it bottoms
+  out somewhere defined. Pointing that gate at the graph webview immediately
+  found five more live High Contrast defects that no amount of reading had:
+  the graph toolbar hover, the node-inspector buttons and their hover, and two
+  widget shadows.
 
 ## What did not change
 

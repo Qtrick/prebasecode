@@ -116,6 +116,7 @@ scripts/supabase/verify-no-secrets-in-source.mjs
 scripts/supabase/verify-rls-static.mjs
 scripts/theme/contrast.mjs
 scripts/theme/jsonc.mjs
+scripts/theme/nullDefaults.mjs
 scripts/theme/verify-surfaces.mjs
 scripts/xterm-update.js
 src/vs/base/browser/dompurify/dompurify.js

@@ -491,8 +491,9 @@ async function runVisibleTask(task: vscode.Task, token: vscode.CancellationToken
 		}));
 		// A task that never spawns a process (bad shell, missing binary) emits
 		// onDidEndTask but never onDidEndTaskProcess, which used to hang the tool.
-		// Settling is deferred by a macrotask so that a process-end event already
-		// queued behind task-end still gets to supply the exit code.
+		// Settling is deferred by a macrotask so a process-end event delivered in
+		// the same turn still gets to supply the exit code. A process end that
+		// arrives later yields `exitCode: undefined`, reported as 'unknown'.
 		subscriptions.push(vscode.tasks.onDidEndTask(event => {
 			if (event.execution !== execution) {
 				return;

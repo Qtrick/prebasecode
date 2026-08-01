@@ -363,9 +363,9 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background); 
 #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; cursor:grab; }
 #netCanvas.dragging { cursor:grabbing; }
 :focus-visible { outline:1px solid var(--vscode-focusBorder); outline-offset:1px; }
-#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:var(--vscode-editorWidget-background); border:1px solid var(--vscode-editorWidget-border); border-radius:8px; padding:4px; box-shadow:0 2px 8px var(--vscode-widget-shadow); }
+#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:var(--vscode-editorWidget-background); border:1px solid var(--vscode-editorWidget-border); border-radius:8px; padding:4px; box-shadow:0 2px 8px var(--vscode-widget-shadow, transparent); }
 #toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground); border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
-#toolbar button:hover { background:var(--vscode-toolbar-hoverBackground); }
+#toolbar button:hover { background:var(--vscode-toolbar-hoverBackground, var(--vscode-list-hoverBackground)); }
 /* More specific than #toolbar label so Idle stays hidden before script runs. */
 #toolbar label { gap:4px; align-items:center; user-select:none; opacity:.9; }
 #toolbar label#idleToggleWrap { display:none; }
@@ -381,14 +381,14 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background); 
 #legend .swatch.line.dotted { background:transparent; height:0; border-radius:0; border-top:2px dotted var(--prebase-edge-line); }
 #empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground); font-size:14px; line-height:1.5; }
 /* The inspector floats above the canvas, so it uses the most elevated surface role. */
-#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorHoverWidget-background); border:1px solid var(--vscode-editorHoverWidget-border); border-radius:12px; padding:12px; box-shadow:0 16px 40px var(--vscode-widget-shadow); }
+#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorHoverWidget-background); border:1px solid var(--vscode-editorHoverWidget-border); border-radius:12px; padding:12px; box-shadow:0 16px 40px var(--vscode-widget-shadow, transparent); }
 #popup h3 { margin:0 0 4px; font-size:13px; }
 #popup .meta { color:var(--vscode-descriptionForeground); font-size:11px; margin-bottom:8px; word-break:break-word; }
 #popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-descriptionForeground); margin:10px 0 4px; }
 #popup p { margin:0; font-size:12px; line-height:1.45; color:var(--vscode-foreground); white-space:pre-wrap; }
 #popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-#popup button { font-size:11px; border-radius:7px; border:1px solid var(--vscode-editorWidget-border); background:var(--vscode-button-secondaryBackground); color:var(--vscode-button-secondaryForeground); padding:5px 8px; cursor:pointer; }
-#popup button:hover { background:var(--vscode-button-secondaryHoverBackground); }
+#popup button { font-size:11px; border-radius:7px; border:1px solid var(--vscode-editorWidget-border); background:var(--vscode-button-secondaryBackground, transparent); color:var(--vscode-button-secondaryForeground); padding:5px 8px; cursor:pointer; }
+#popup button:hover { background:var(--vscode-button-secondaryHoverBackground, var(--vscode-list-hoverBackground)); }
 #popup button.primary { border-color:var(--vscode-button-border, transparent); color:var(--vscode-button-foreground); background:var(--vscode-button-background); }
 #popup button.primary:hover { background:var(--vscode-button-hoverBackground); }
 #popup #popupClose { float:right; border:0; background:transparent; color:var(--vscode-descriptionForeground); font-size:16px; }

@@ -17,6 +17,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readJsonc } from './jsonc.mjs';
+import { collectNullDefaults, unsafeVarChains } from './nullDefaults.mjs';
 import { contrastRatio, truncate2 } from './contrast.mjs';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -279,55 +280,32 @@ for (const hc of ['hc_black.json', 'hc_light.json']) {
 }
 
 // ---------------------------------------------------------------------------
-// 6) Semantic roles must survive themes that leave their token undefined
+// 6) PreBase UI must survive themes that leave a token undefined
 // ---------------------------------------------------------------------------
 // A colour ID registered with a `null` default for some theme kind emits no CSS
-// custom property under that kind. A bare `var(--vscode-x)` then makes the whole
-// declaration invalid, so the property is dropped (or, for a shorthand,
-// silently reset) rather than falling back. Every role that maps to such a
-// token must therefore supply its own fallback.
+// custom property under that kind. A bare `var(--vscode-x)` is then invalid at
+// computed-value time, which drops the declaration — or, for a shorthand such
+// as `border`, resets every longhand — rather than falling back. Every use of
+// such a token in PreBase-owned UI must therefore carry a fallback chain that
+// bottoms out somewhere defined.
 {
-	const registrations = new Map();
-	for (const file of walk(path.join(REPO_ROOT, 'src/vs/platform/theme/common/colors'))) {
-		collectNullDefaults(fs.readFileSync(file, 'utf8'), registrations);
-	}
-	for (const rel of [
-		'src/vs/workbench/common/theme.ts',
-		'src/vs/workbench/contrib/welcomeGettingStarted/browser/gettingStartedColors.ts'
-	]) {
-		collectNullDefaults(fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8'), registrations);
-	}
-
-	const rel = 'src/vs/workbench/contrib/prebase/browser/prebaseSurfaces.ts';
-	const source = fs.readFileSync(path.join(REPO_ROOT, rel), 'utf8');
-	for (const [index, line] of source.split('\n').entries()) {
-		const match = line.match(/'var\(--vscode-([A-Za-z]+)-([A-Za-z]+)([^']*)\)'/);
-		if (!match) {
-			continue;
-		}
-		const [, group, name, rest] = match;
-		const token = `${group}.${name}`;
-		const kinds = registrations.get(token);
-		if (kinds && !rest.includes(',')) {
-			failures.push(`roles: ${rel}:${index + 1} uses ${token} bare, but it has no default for ${kinds.join(', ')}; add a fallback`);
+	const { nullKinds, count } = collectNullDefaults(path.join(REPO_ROOT, 'src/vs'));
+	let scanned = 0;
+	for (const root of SOURCE_ROOTS) {
+		for (const file of walk(path.join(REPO_ROOT, root))) {
+			const rel = path.relative(REPO_ROOT, file).split(path.sep).join('/');
+			if (SOURCE_IGNORE.some(re => re.test('/' + rel))) {
+				continue;
+			}
+			scanned++;
+			const text = fs.readFileSync(file, 'utf8');
+			for (const { index, chain, unsafe } of unsafeVarChains(text, nullKinds)) {
+				const line = text.slice(0, index).split('\n').length;
+				failures.push(`roles: ${rel}:${line} uses ${chain.join(' → ')}, which resolves to nothing in ${unsafe.join(', ')}; add a fallback`);
+			}
 		}
 	}
-	notes.push(`roles: ${registrations.size} colour IDs have a null default for at least one theme kind`);
-}
-
-/**
- * Record every `registerColor` whose defaults object leaves a theme kind null.
- *
- * @param {string} source
- * @param {Map<string, string[]>} into
- */
-function collectNullDefaults(source, into) {
-	for (const match of source.matchAll(/registerColor\(\s*'([^']+)',\s*\{([^}]*)\}/g)) {
-		const kinds = [...match[2].matchAll(/(\w+):\s*null\b/g)].map(m => m[1]);
-		if (kinds.length > 0) {
-			into.set(match[1], kinds);
-		}
-	}
+	notes.push(`roles: ${nullKinds.size} of ${count} registered colour IDs are null for at least one theme kind; ${scanned} PreBase files scanned`);
 }
 
 // ---------------------------------------------------------------------------

@@ -18,23 +18,29 @@ Status values: `fixed`, `fixed (test)`, `deferred`, `intentional`,
 | --- | --- | --- | --- |
 | Blocker | 3 | 3 | 0 |
 | Critical | 6 | 6 | 0 |
-| High | 16 | 16 | 0 |
-| Medium | 18 | 17 | 1 |
+| High | 18 | 18 | 0 |
+| Medium | 19 | 18 | 1 |
 | Low | 8 | 6 | 1 |
 | Cosmetic | 1 | 1 | 0 |
-| **Total** | **52** | **49** | **2** |
+| **Total** | **55** | **52** | **2** |
 
 One finding, `L-05`, is closed as **intentional**: the change it asked for was
 made and then reverted, because it turned out to be worse than the behaviour it
 replaced. That is counted in "found" but in neither "fixed" nor "deferred".
 
-Eighteen findings — `H-12` through `L-09` — came out of reviewing this pass's
-own diff rather than the original audit, across two review rounds. Most are
+Twenty-one findings — everything numbered `H-12` and above, plus `M-11` through
+`M-19` and `L-05` through `L-09` — came out of reviewing this pass's own diff
+rather than the original audit, across three review rounds. Most are
 regressions that earlier fixes in this same pass introduced or exposed, which is
 why the reviews ran against the whole diff and not only the audit's fix list.
-The second round exists because the first round's *corrections* needed
-reviewing too: `H-16`, `M-17`, `M-18`, `L-08` and `L-09` are all defects in
-fixes, not in the original code.
+
+Each round existed because the previous round's *corrections* needed reviewing
+too. Round two found `H-16`, `M-17`, `M-18`, `L-08` and `L-09` — all defects in
+fixes rather than in the original code. Round three found that `H-16`'s new
+gate was itself unsound (`H-18`), and rewriting it immediately surfaced `H-17`,
+five live High Contrast defects in the graph webview that three rounds of
+reading had not. That is the clearest argument in this document for preferring
+an executable gate over a reviewed invariant.
 
 ## Findings
 
@@ -89,7 +95,10 @@ fixes, not in the original code.
 | M-17 | Graph | `_relayoutInFlight` stayed `true` when a scan superseded a relayout, so a later cancel overwrote a healthy "ready" status with "Layout cancelled" | Medium | `scanWorkspace()` bumps the generation but the superseded relayout's `finally` then skips the clear | a boolean cannot express which relayout it belongs to | track the owning generation and compare it against the current one | — | fixed |
 | M-18 | Runtime Preview | the M-14 chain published its token source before the chained start ran, so a stop arriving in that window cancelled a token that `_startImpl` never checked, and a new dev-server terminal spawned behind the teardown | Medium | `_startImpl` had no entry check; the first check was inside an optional confirm branch | the cancellation added by C-07 only covered the paths that already awaited | check the token on entry, after `detectConfigurations()`, and before creating the terminal | — | fixed |
 | L-08 | Build / assurance | the M-13 fix put `@types/node` in scope for the browser-facing graph core, so a `process` or `Buffer` use that fails in the renderer would have type-checked | Low | `graphs/tsconfig.json` `types: ["mocha", "node"]` | the tests and the core shared one lane | split the tests into `graphs/tsconfig.tests.json`; the core lane is DOM-only again | negative-tested: `process.cwd()` in the core now fails `typecheck:graphs` | fixed |
-| L-09 | Build / Magnus | two comments written during this pass stated things that are not true (the Copilot manifest is disabled, not generated; task-end ordering cannot be guaranteed by deferral) | Cosmetic | `build/hygiene.ts`, `nativeTools.ts` | — | corrected to describe the actual condition | — | fixed |
+| L-09 | Build / Magnus | comments written during this pass stated things that are not true (the Copilot manifest is disabled, not generated; task-end ordering cannot be guaranteed by deferral; `list.activeSelectionBackground` is null in HC Dark only) | Cosmetic | `build/hygiene.ts`, `nativeTools.ts`, `prebaseSurfaces.ts` | — | corrected to describe the actual condition | — | fixed |
+| H-17 | Graph webview | the graph toolbar lost its hover feedback and the node-inspector buttons lost their background and hover in High Contrast | High | `graphEditor.ts` used `toolbar.hoverBackground`, `button.secondaryBackground` and `button.secondaryHoverBackground` bare; all are null in at least one HC kind | the H-16 gate only inspected `prebaseSurfaces.ts`, so the largest custom surface in the product was unchecked | fallbacks at all five sites, including two `widget.shadow` uses | found *by* the strengthened gate in section 6 of `verify:theme-surfaces`, which now scans every PreBase-owned file; then confirmed in a live High Contrast Dark session — toolbar hover measured `rgba(0, 0, 0, 0)` bare against `rgba(255, 255, 255, 0.1)` with the fallback (`screenshots/17-high-contrast-graph.png`) | fixed (test) |
+| H-18 | Build / assurance | the H-16 gate passed only because the one file it read happened to use the one token shape it could parse | High | it required an object-literal default, so it missed 179 of 421 registrations — 22 of them transitively null, including `menu.selectionBackground` and `button.border`; it could not express single-segment IDs such as `contrastBorder` (null in dark *and* light) or three-segment IDs; it accepted "contains a comma" as proof of a fallback without checking where the chain ended; and it ignored `var()` inside a composite value such as `1px solid var(…)` — the exact shape the bug takes | the gate was written as a line regex over one file | rewrite as `scripts/theme/nullDefaults.mjs`: balanced-paren parsing of every `registerColor` in `src/vs`, fixed-point resolution of inherited and wrapped defaults, and a real `var()` chain walk over all PreBase source roots. 916 registrations, 310 null somewhere | it caught H-17 on its first run | fixed (test) |
+| M-19 | Runtime Preview | the managed-Electron path could still spawn a dev server behind a stop, and leaked the terminal it created | Medium | `_startDevServerOnly` took no token, and the `await this._stopTerminal()` before it sleeps for hundreds of milliseconds; the cancelled-after-`desktop.start()` return stopped Electron but not the terminal | M-18 guarded the plain-terminal path and missed its sibling | thread the token into `_startDevServerOnly`, and tear the terminal down and fire on both cancelled returns | — | fixed |
 | L-06 | Magnus | a `null` entry in `message.content` would throw instead of being skipped | Low | `languageModelProvider.extractText` dropped an `in` guard during the lint pass | — | restore an object guard before the property read | — | fixed |
 | L-07 | Build / lint config | the graph import allowance let any contribution deep-import any graph internal | Low | `eslint.config.js` allowed `vs/workbench/contrib/prebase/graphs/**` | the pattern was written broadly to unblock one import | narrow it to the documented entrypoints | the import-pattern rule itself | fixed |
 
