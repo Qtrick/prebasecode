@@ -18,10 +18,14 @@ Status values: `fixed`, `fixed (test)`, `deferred`, `intentional`,
 | --- | --- | --- | --- |
 | Blocker | 3 | 3 | 0 |
 | Critical | 6 | 6 | 0 |
-| High | 11 | 11 | 0 |
-| Medium | 9 | 8 | 1 |
+| High | 13 | 13 | 0 |
+| Medium | 11 | 10 | 1 |
 | Low | 4 | 3 | 1 |
-| **Total** | **33** | **31** | **2** |
+| **Total** | **37** | **35** | **2** |
+
+The three findings numbered `H-12`, `H-13` and `M-11` came out of reviewing
+this pass's own diff, not the original audit: two of them are regressions the
+earlier fixes in this same pass introduced or exposed.
 
 ## Findings
 
@@ -61,6 +65,9 @@ Status values: `fixed`, `fixed (test)`, `deferred`, `intentional`,
 | L-03 | Tests | PreBase test suites did not call `ensureNoDisposablesAreLeakedInTestSuite()` | Low | `test/browser/*.test.ts` | — | added | the leak detector itself | fixed |
 | L-04 | Settings editor | inputs and the settings body share `#1B1C1E` | Low | measured from the running product | the sunken-input model is what keeps `input.placeholderForeground` at 4.5:1 | none — see below | — | deferred |
 | M-10 | Graph | the legend is a tall fixed overlay that occludes the scene at small window sizes | Medium | `screenshots/08-graph.png` | pre-existing layout, not colour | none — layout work, out of scope for this pass | — | deferred |
+| H-12 | Graph webview | the parked render loop still spun at 60Hz forever if `getSnapshot` never answered | High | `rafLoop` rescheduled on `dirty`, but the draw is guarded on `snapshot`, so nothing could clear `dirty` | the parking condition and the draw condition were not the same condition | reschedule only when there is something to draw | `graphWebviewHtml.test.ts` now executes the real `rafLoop` body against a stub scene (static / dirty / auto-rotate / no-snapshot) instead of matching a source line | fixed (test) |
+| H-13 | Runtime Preview | Restart during an in-flight start launched nothing | High | `restart()` is `stop()` then `start()`; `stop()` cancels the start, `start()` returns the existing in-flight promise | the join in `start()` predates the cancellation work added by C-07 | wait for a cancelled start to unwind before beginning a new one | — | fixed |
+| M-11 | Magnus | the per-attachment 40k cap was not matched by a total cap, so many attachments could push a multi-megabyte prompt at the model | Medium | `chatParticipant.ts` looped over `state.attachedFiles` unbounded | — | a 120k budget shared across one request's attachments, with omitted files named | — | fixed |
 
 ## Deferred, with reasons
 
