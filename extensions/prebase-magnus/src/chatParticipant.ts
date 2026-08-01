@@ -41,33 +41,47 @@ export function cancelActiveMagnusRequests(state: MagnusChatState): void {
 /** Keeps a single attachment from consuming the whole prompt budget. */
 const ATTACHED_FILE_CHARACTER_LIMIT = 40_000;
 
+/** Keeps a pile of attachments from consuming it either. */
+const ATTACHED_FILES_CHARACTER_BUDGET = 120_000;
+
 /**
  * Resolves an attached path to its contents. Attaching a file previously only
  * sent the path, so the model never saw the code it was asked about.
+ *
+ * `budget` is the characters of file content still available across all
+ * attachments in this request; the caller decrements it by the returned
+ * `used`.
  */
-async function readAttachedFile(file: string, token: vscode.CancellationToken): Promise<string> {
+async function readAttachedFile(file: string, budget: number, token: vscode.CancellationToken): Promise<{ text: string; used: number }> {
 	const uri = resolveWorkspaceUri(file);
 	if (!uri || !isUnderWorkspace(uri)) {
-		return `Attached file (unavailable, outside the workspace): ${file}`;
+		return { text: `Attached file (unavailable, outside the workspace): ${file}`, used: 0 };
 	}
 	if (isSecretPath(uri)) {
-		return `Attached file (withheld, may contain secrets): ${file}`;
+		return { text: `Attached file (withheld, may contain secrets): ${file}`, used: 0 };
+	}
+	if (budget <= 0) {
+		return { text: `Attached file (omitted, attachment budget exhausted): ${file}`, used: 0 };
 	}
 	try {
 		const document = await vscode.workspace.openTextDocument(uri);
 		if (token.isCancellationRequested) {
-			return `Attached file: ${file}`;
+			return { text: `Attached file: ${file}`, used: 0 };
 		}
 		const text = document.getText();
-		const truncated = text.length > ATTACHED_FILE_CHARACTER_LIMIT;
-		return [
-			`Attached file: ${file}${truncated ? ' (truncated)' : ''}`,
-			'```',
-			text.slice(0, ATTACHED_FILE_CHARACTER_LIMIT),
-			'```',
-		].join('\n');
+		const limit = Math.min(ATTACHED_FILE_CHARACTER_LIMIT, budget);
+		const body = text.slice(0, limit);
+		return {
+			text: [
+				`Attached file: ${file}${body.length < text.length ? ' (truncated)' : ''}`,
+				'```',
+				body,
+				'```',
+			].join('\n'),
+			used: body.length,
+		};
 	} catch {
-		return `Attached file (could not be read): ${file}`;
+		return { text: `Attached file (could not be read): ${file}`, used: 0 };
 	}
 }
 
@@ -169,8 +183,11 @@ async function handleChatRequest(
 	const modelLabel = getModelOption(modelId).name;
 
 	const extras: string[] = [];
+	let attachmentBudget = ATTACHED_FILES_CHARACTER_BUDGET;
 	for (const file of state.attachedFiles) {
-		extras.push(await readAttachedFile(file, token));
+		const attachment = await readAttachedFile(file, attachmentBudget, token);
+		attachmentBudget -= attachment.used;
+		extras.push(attachment.text);
 	}
 	if (state.graphSelection && vscode.workspace.getConfiguration('prebase.magnus').get('includeGraphContext', true)) {
 		extras.push(`Graph selection:\n${state.graphSelection}`);
