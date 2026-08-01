@@ -11,7 +11,7 @@ Related: [README.md](./README.md) · [MIGRATION_PLAN.md](./MIGRATION_PLAN.md) ·
 
 Legacy IDs `OG-001…OG-014` map 1:1 to `OGT-001…OGT-014`. **OGT-015** is new (analysis/UX polish).
 
-Last review: **2026-07-22** (final whole-diff defect review — dynamic-import honesty, settings fallback, perf, a11y partial)
+Last review: **2026-07-31** (dark surface system + application-wide cleansing pass — see [CLEANUP_AUDIT.md](./CLEANUP_AUDIT.md) and [DARK_UI_COMPARISON.md](./DARK_UI_COMPARISON.md))
 
 ## Main beta honesty
 
@@ -42,6 +42,63 @@ Last review: **2026-07-22** (final whole-diff defect review — dynamic-import h
 | OGT-013 | Graphify license/attribution | Blocker | Needs Verification | B / F–H | Concepts only; no source copied — see attribution doc |
 | OGT-014 | Branch vs main comparison / merge advice | High | Needs Verification | Final | [COMPARISON_TO_MAIN.md](./COMPARISON_TO_MAIN.md) — recommendation **Continue experimenting**; **no merge claim**; revisit after OGT-010 |
 | OGT-015 | Analysis/UX polish: explain, bridge/surprising nodes, Community Force layout, Maps analysis sections | High | Needs Verification | I | explain + bridgeNodes + surprisingConnections + Community Force + Maps Analysis (incl. Cross-community → Output) with unit coverage; **GUI not verified** |
+
+## Verification this pass (2026-07-31 — dark surface system + cleansing)
+
+| Check | Result |
+|---|---|
+| `npm run verify:icons` | **101/101 OK** (no icon edits, byte-identical) |
+| `npm run verify:graphs-boundary` | **OK** |
+| `npm run verify:startup` | **PASS** |
+| `npm run verify:typescript` | **PASS** |
+| `npm run verify:theme-surfaces` | **OK** — 235 tokens, 42 WCAG 2.2 contrast pairs |
+| `npm run verify:supabase-migrations` / `-rls-static` | **OK** — 5 migrations, 6 tables, RLS |
+| `npm run verify:config-uniqueness` | **OK** — 39 command IDs, 78 configuration keys |
+| `npm run verify:privacy` | **PASS** (1 warning) |
+| `npm run verify:supabase-secrets` | **PASS** |
+| `npm run verify:eslint-prebase` | **PASS** — 122 files, 0 errors, 0 warnings (baseline reseeded from a failing ratchet) |
+| `npm run typecheck:graphs` / `typecheck-client` | **Pass** |
+| `npm run test:graphs` | **Pass** (**50** tests; +behavioural render-loop parking test) |
+| `npm run assurance:release` | **Pass** end to end |
+
+### GUI evidence captured this pass (partial OGT-010)
+
+Built product under Xvfb at 1440×900 on the `/workspace` checkout, driven over
+CDP. Screenshots in `screenshots/`.
+
+| Flow | Evidence | Result |
+|---|---|---|
+| Workbench, project open | `02-workbench-after.png` | renders; measured surfaces match the theme |
+| Editor with a TypeScript file | `06-editor.png` | opens; syntax legible on the new canvas |
+| Terminal panel | `07-panel-terminal.png` | opens; terminal body on the deep surface |
+| Command Palette / quick open | `04-command-palette.png`, `04b-quick-open.png` | filters and selects |
+| Context menu | `10-context-menu.png` | elevated over the sidebar |
+| Code Graph open + scan + render | `08-graph.png`, `13-final-graph.png` | 360 files, 280 nodes, 109 edges |
+| PreBase Settings | `09-settings.png` | opens in a floating window |
+| PreBase Home + keyboard focus | `12-keyboard-focus.png` | focus ring visible after Tab-only navigation |
+| High Contrast Dark | `11-high-contrast.png` | switches through the normal picker; no PreBase greys leak |
+
+**Still not claimed for OGT-010:** graph search/selection/path/affected flows,
+layout switching, inspector, Magnus agent session smoke, Runtime Preview
+(web / managed Electron / external Electron), SCM, debug, and extension
+activation. The acceptance matrix in [ACCEPTANCE.md](./ACCEPTANCE.md) remains
+unfilled.
+
+### Performance evidence (partial OGT-011)
+
+First measured samples exist: idle renderer CPU with the Code Graph open is
+**0 jiffies over 15s**, and 10 open/close cycles of both the Code Graph and
+PreBase Settings show flat listener, DOM and heap counts. See
+[PERFORMANCE.md](./PERFORMANCE.md). Scan / layout / first-paint / interaction
+FPS on large repositories are **still unmeasured**, so OGT-011 stays open.
+
+### Accessibility evidence (partial OGT-012)
+
+42 contrast pairs are asserted in CI, keyboard focus is visible on PreBase
+custom UI without a mouse, and High Contrast Dark is verified intact by both a
+static gate and a pixel audit of a live frame. The full accessibility matrix
+(screen reader, zoom, reduced motion across every graph control) is still
+open.
 
 ## Verification this pass (2026-07-22 — final whole-diff defect review)
 
