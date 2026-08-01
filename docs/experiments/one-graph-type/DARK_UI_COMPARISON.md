@@ -198,6 +198,32 @@ by editing settings, so this exercises the path a user takes.
 * Home is one of the editors that previously painted its own slate palette;
   the card here is a theme token, not a hardcoded value.
 
+## 10 — Maps view controls, and what the review caught
+
+`screenshots/14-maps-accent-ring.png`
+
+* Changed surfaces: sidebar `#1F1F1F`, inactive filter chips and layout rows
+  `#2B2B2B` with a `#ffffff14` boundary, the selected chip and the selected
+  layout on the accent-tinted `list.activeSelectionBackground` with a `#22d3ee`
+  ring.
+* This screenshot exists because the whole-diff review found the ring was
+  **not** being painted. Migrating the accent from a literal to a theme
+  variable left two call sites appending an alpha suffix, producing
+  `box-shadow: 0 0 0 1px var(--vscode-textLink-foreground)55`. That is invalid
+  CSS, so the browser dropped the declaration and the active layout lost its
+  ring silently. Measured in the running product after the fix, the selected
+  layout reports `box-shadow: rgb(34, 211, 238) 0px 0px 0px 1px`; before it
+  reported `none`.
+* The same review found six semantic roles in `prebaseSurfaces.ts` mapping to
+  native tokens that are registered with a `null` default for at least one
+  theme kind. Confirmed in the running product by switching to a theme that
+  does not define `input.border`: the bare `var()` resolved to `currentColor`
+  (`rgb(204, 204, 204)` — a glaring near-white outline), while the fallback
+  chain resolves to `panel.border` (`rgba(128, 128, 128, 0.35)`). Both
+  behaviours are invisible under PreBase Night, which defines every one of
+  those tokens, which is exactly why a screenshot audit of the default theme
+  could not have caught it.
+
 ## What did not change
 
 * Syntax highlighting: inherited from `dark_plus`, unmodified.
