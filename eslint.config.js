@@ -1836,8 +1836,12 @@ export default defineConfig(
 						'vs/sessions/~',
 						'vs/workbench/contrib/terminal/terminalContribChatExports*',
 						'vs/workbench/contrib/terminal/terminalContribExports*',
-						// PreBase graph package, reached through the graphs/ symlink (see graphs/OWNERSHIP.md).
-						'vs/workbench/contrib/prebase/graphs/**',
+						// PreBase graph package, reached through the graphs/ symlink (see
+						// graphs/OWNERSHIP.md). Only the documented entrypoints — the graph
+						// internals stay private to the package.
+						'vs/workbench/contrib/prebase/graphs/common/configuration/*',
+						'vs/workbench/contrib/prebase/graphs/host/workbench/*',
+						'vs/workbench/contrib/prebase/graphs/host/workbench/settings/*',
 						'vscode-notebook-renderer', // Type only import
 						'@vscode/tree-sitter-wasm', // type import
 						{

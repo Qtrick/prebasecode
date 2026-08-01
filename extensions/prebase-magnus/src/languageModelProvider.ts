@@ -12,9 +12,10 @@ function extractText(message: vscode.LanguageModelChatRequestMessage): string {
 	for (const part of message.content) {
 		if (part instanceof vscode.LanguageModelTextPart) {
 			parts.push(part.value);
-		} else {
+		} else if (part && typeof part === 'object') {
 			// Older hosts hand back plain `{ value }` objects rather than a
-			// LanguageModelTextPart instance.
+			// LanguageModelTextPart instance, so the declared type is exactly
+			// what cannot be trusted here.
 			const value = (part as { value?: unknown }).value;
 			if (typeof value === 'string') {
 				parts.push(value);

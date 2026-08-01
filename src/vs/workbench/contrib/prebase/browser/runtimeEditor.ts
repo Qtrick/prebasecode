@@ -405,7 +405,9 @@ const iframe = document.getElementById('frame');
 const overlay = document.getElementById('overlay');
 let currentUrl = '';
 let loadTimer = null;
-const LOAD_TIMEOUT_MS = 15000;
+// A cold Vite/Next compile routinely takes tens of seconds, so this is a hint
+// that the page has not painted yet, not a verdict that the server is down.
+const LOAD_HINT_MS = 60000;
 
 function clearLoadTimer() {
 	if (loadTimer) {
@@ -431,13 +433,14 @@ window.addEventListener('message', function (event) {
 		clearLoadTimer();
 		const url = msg.url;
 		// A refused connection frequently never fires load or error, which used
-		// to leave the overlay on "Loading…" with no way out.
+		// to leave the overlay on "Loading…" with no way out. Only the overlay
+		// changes: reporting a failure here would mark a slow-but-healthy dev
+		// server as disconnected, and connectivity stays probe-owned.
 		loadTimer = setTimeout(function () {
 			loadTimer = null;
 			if (currentUrl !== url) return;
-			showOverlay('No response from ' + url + '. Start the dev server, then Reload.');
-			vscode.postMessage({ type: 'error', url: url, detail: 'timeout' });
-		}, LOAD_TIMEOUT_MS);
+			showOverlay('Still waiting for ' + url + '. If the dev server is not running, start it and then Reload.');
+		}, LOAD_HINT_MS);
 		iframe.onload = function () {
 			clearLoadTimer();
 			hideOverlay();

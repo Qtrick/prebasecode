@@ -579,26 +579,27 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 
 	async start(): Promise<void> {
 		const inFlight = this._startInFlight;
-		if (inFlight) {
-			if (!this._startCts?.token.isCancellationRequested) {
-				return inFlight;
-			}
-			// Restart cancels the in-flight start and immediately starts again.
-			// Joining the cancelled one would hand the caller a start that is
-			// guaranteed to return without launching anything, so let it unwind
-			// first and then begin a fresh one.
-			await inFlight.catch(() => undefined);
-			if (this._startInFlight === inFlight) {
-				this._startInFlight = undefined;
-			}
+		if (inFlight && !this._startCts?.token.isCancellationRequested) {
+			return inFlight;
 		}
 		const cts = new CancellationTokenSource();
 		this._startCts = cts;
-		this._startInFlight = this._startImpl(cts.token);
+		// Restart cancels the in-flight start and immediately starts again.
+		// Joining the cancelled one would hand the caller a start that is
+		// guaranteed to return without launching anything, so chain the fresh
+		// start onto its unwind instead. The chained promise is published
+		// synchronously so a caller arriving mid-unwind joins it rather than
+		// racing a second launch past the "already running" checks.
+		const started = inFlight
+			? inFlight.catch(() => undefined).then(() => this._startImpl(cts.token))
+			: this._startImpl(cts.token);
+		this._startInFlight = started;
 		try {
-			await this._startInFlight;
+			await started;
 		} finally {
-			this._startInFlight = undefined;
+			if (this._startInFlight === started) {
+				this._startInFlight = undefined;
+			}
 			if (this._startCts === cts) {
 				this._startCts = undefined;
 			}

@@ -24,6 +24,7 @@ const BASELINE_PATH = path.join(REPO_ROOT, 'docs/lint/eslint-prebase-baseline.js
 const TARGETS = [
 	'graphs/**/*.{ts,tsx,mts,cts,js,mjs,cjs}',
 	'src/vs/workbench/contrib/prebase/**/*.{ts,tsx,mts,cts,js,mjs,cjs}',
+	'extensions/prebase-magnus/src/**/*.{ts,tsx,mts,cts,js,mjs,cjs}',
 	'scripts/privacy/**/*.{ts,js,mjs,cjs}',
 	'scripts/startup/**/*.{ts,js,mjs,cjs}',
 	'scripts/supabase/**/*.{ts,js,mjs,cjs}',

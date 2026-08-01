@@ -31,7 +31,7 @@ function webviewScript(): string {
 function runRafLoop(script: string, scene: { dirty: boolean; snapshot: unknown; autoRotate: boolean; idlePaused: boolean }): { draws: number; wakes: number } {
 	const body = script.match(/function rafLoop\(ts\) \{[\s\S]*?\n\}/);
 	assert.ok(body, 'rafLoop not found in the webview script');
-	 
+
 	const harness = new Function('scene', `
 		const IDLE_YAW = 0.1;
 		const document = { hidden: false };
@@ -60,7 +60,7 @@ suite('Code Graph webview HTML', () => {
 		const match = html.match(/<script[^>]*>([\s\S]*)<\/script>/i);
 		assert.ok(match, 'webview <script> block missing');
 		assert.doesNotThrow(() => {
-			 
+
 			new Function(match[1]);
 		}, 'webview script must be valid JS after template evaluation');
 		assert.ok(html.includes(`style-src 'unsafe-inline'`), 'style-src must allow element.style / attributes');

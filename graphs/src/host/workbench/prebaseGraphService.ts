@@ -143,6 +143,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	 * snapshot.
 	 */
 	private _relayoutGeneration = 0;
+	private _relayoutInFlight = false;
 	private _selectedNodeId: string | undefined;
 	private _hiddenCommunityIds: number[] = [];
 	private _viewState: PreBaseGraphViewState;
@@ -184,7 +185,10 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkSpreadScale)
 			) {
-				if (isCodeGraphCanvas(this._viewState.graphType) && this._rawSnapshot) {
+				// No `_rawSnapshot` guard: `relayout()` falls back to a scan when
+				// there is nothing to lay out, which is what changing the layout
+				// before the first scan used to do from the settings UI.
+				if (isCodeGraphCanvas(this._viewState.graphType)) {
 					void this.relayout();
 				}
 			}
@@ -594,8 +598,15 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		// Abandon any relayout too, otherwise it finishes and reports 'ready'
 		// after the user asked to stop.
 		this._relayoutGeneration++;
+		const abandonedRelayout = this._relayoutInFlight;
+		this._relayoutInFlight = false;
 		const cts = this._scanCts;
 		if (!cts) {
+			if (abandonedRelayout) {
+				// The abandoned relayout returns without touching diagnostics, so
+				// nothing else would clear "Updating layout…".
+				this._setDiagnostics({ status: 'cancelled', message: localize('prebase.graph.layoutCancelled', "Layout cancelled.") });
+			}
 			return;
 		}
 		cts.cancel();
@@ -773,6 +784,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			return this.scanWorkspace();
 		}
 		const generation = ++this._relayoutGeneration;
+		this._relayoutInFlight = true;
 		this._setDiagnostics({
 			status: 'scanning',
 			message: localize('prebase.graph.relayout', "Updating layout…")
@@ -809,6 +821,10 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			this._setDiagnostics({ status: 'error', message });
 			this._log(localize('prebase.graph.logRelayoutError', "Layout failed: {0}", message));
 			return undefined;
+		} finally {
+			if (this._relayoutGeneration === generation) {
+				this._relayoutInFlight = false;
+			}
 		}
 	}
 

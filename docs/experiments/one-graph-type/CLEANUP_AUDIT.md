@@ -18,14 +18,15 @@ Status values: `fixed`, `fixed (test)`, `deferred`, `intentional`,
 | --- | --- | --- | --- |
 | Blocker | 3 | 3 | 0 |
 | Critical | 6 | 6 | 0 |
-| High | 13 | 13 | 0 |
-| Medium | 11 | 10 | 1 |
-| Low | 4 | 3 | 1 |
-| **Total** | **37** | **35** | **2** |
+| High | 15 | 15 | 0 |
+| Medium | 15 | 14 | 1 |
+| Low | 7 | 6 | 1 |
+| **Total** | **46** | **44** | **2** |
 
-The three findings numbered `H-12`, `H-13` and `M-11` came out of reviewing
-this pass's own diff, not the original audit: two of them are regressions the
-earlier fixes in this same pass introduced or exposed.
+Twelve findings — `H-12` through `L-07` — came out of reviewing this pass's own
+diff rather than the original audit. Most of them are regressions that the
+earlier fixes in this same pass introduced or exposed, which is the reason the
+review ran against the whole diff and not only the audit's fix list.
 
 ## Findings
 
@@ -68,6 +69,16 @@ earlier fixes in this same pass introduced or exposed.
 | H-12 | Graph webview | the parked render loop still spun at 60Hz forever if `getSnapshot` never answered | High | `rafLoop` rescheduled on `dirty`, but the draw is guarded on `snapshot`, so nothing could clear `dirty` | the parking condition and the draw condition were not the same condition | reschedule only when there is something to draw | `graphWebviewHtml.test.ts` now executes the real `rafLoop` body against a stub scene (static / dirty / auto-rotate / no-snapshot) instead of matching a source line | fixed (test) |
 | H-13 | Runtime Preview | Restart during an in-flight start launched nothing | High | `restart()` is `stop()` then `start()`; `stop()` cancels the start, `start()` returns the existing in-flight promise | the join in `start()` predates the cancellation work added by C-07 | wait for a cancelled start to unwind before beginning a new one | — | fixed |
 | M-11 | Magnus | the per-attachment 40k cap was not matched by a total cap, so many attachments could push a multi-megabyte prompt at the model | Medium | `chatParticipant.ts` looped over `state.attachedFiles` unbounded | — | a 120k budget shared across one request's attachments, with omitted files named | — | fixed |
+| H-14 | Graph Maps view | the active segmented-control and blocked-chip rings vanished | High | `prebaseMapsView.ts` produced `box-shadow: 0 0 0 1px var(--vscode-textLink-foreground)55` | the theme migration replaced a literal accent with a CSS variable but left two `55` alpha suffixes appended, which makes the declaration invalid so the browser drops it | drop the suffixes; the ring uses the accent variable directly | `verify:theme-surfaces` forbids raw palette literals in these files | fixed |
+| H-15 | PreBase custom UI | six semantic roles resolved to nothing outside the PreBase Night theme, silently dropping input borders, the Home context-menu border and High Contrast secondary buttons | High | `input.border`, `widget.border`, `widget.shadow`, `button.secondaryBackground`, `list.activeSelectionForeground` and `welcomePage.tileHoverBackground` are registered with a `null` default for at least one theme kind | `prebaseSurfaces.ts` emitted bare `var(--vscode-…)`, and an undefined custom property invalidates the whole declaration rather than falling back | every such role carries a fallback chain ending in a token defined for all theme kinds | — | fixed |
+| M-12 | Graph | cancelling while a relayout was in flight left the status pinned on "Updating layout…" | Medium | `cancelScan()` bumps the generation and returns early when no scan is running; the abandoned relayout returns without touching diagnostics | the C-09 fix covered the throwing path but not the cancel path | track whether a relayout is in flight and report a terminal status when one is abandoned | — | fixed |
+| M-13 | Build / assurance | after C-01 the graph unit tests were type-checked by no lane at all | Medium | `src/tsconfig.json` excluded them and `graphs/tsconfig.json` already did | C-01 excluded `preserved/` and `tests/` together, but only `preserved/` has its own lane | include `src/tests/**` in the graphs lane (with `node` types); `src/tsconfig.json` keeps the exclusion, now with the reason recorded | `npm run typecheck:graphs` | fixed |
+| M-14 | Runtime Preview | after H-13, two callers arriving during a cancelled start's unwind each began their own launch | Medium | both would pass the `await inFlight` and construct separate token sources, with `_startInFlight` tracking only the second | the recovery awaited before republishing the in-flight promise | chain the fresh start onto the unwind and publish it synchronously, so later callers join it | — | fixed |
+| M-15 | Lint ratchet | `extensions/prebase-magnus/**` was not a ratchet target even though it is the largest behavioural change in this pass | Medium | `TARGETS` in `verify-eslint-prebase.mjs` | the extension pre-dates the ratchet | added; the gate now covers 136 files, still at 0 errors / 0 warnings | `npm run verify:eslint-prebase` | fixed |
+| M-16 | Runtime Preview | the M-03 load timeout reported failure after 15s, so a cold Vite/Next compile marked a healthy preview disconnected and told Magnus so | Medium | the timeout posted `{type:'error'}`, which clears `previewConnected` | the timeout conflated "has not painted yet" with "is not there" | 60s, and overlay-only: connectivity stays probe-owned | — | fixed |
+| L-05 | Graph | after M-01, changing the layout before the first scan did nothing | Low | the configuration listener is guarded on `_rawSnapshot`, whereas the removed direct call fell through to a scan | the guard duplicated a check `relayout()` already makes | drop the `_rawSnapshot` guard; `relayout()` owns the no-snapshot case | — | fixed |
+| L-06 | Magnus | a `null` entry in `message.content` would throw instead of being skipped | Low | `languageModelProvider.extractText` dropped an `in` guard during the lint pass | — | restore an object guard before the property read | — | fixed |
+| L-07 | Build / lint config | the graph import allowance let any contribution deep-import any graph internal | Low | `eslint.config.js` allowed `vs/workbench/contrib/prebase/graphs/**` | the pattern was written broadly to unblock one import | narrow it to the documented entrypoints | the import-pattern rule itself | fixed |
 
 ## Deferred, with reasons
 

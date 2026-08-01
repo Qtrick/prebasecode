@@ -1280,7 +1280,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		if (active) {
 			btn.style.background = ACCENT_SOFT;
 			btn.style.color = ACCENT;
-			btn.style.boxShadow = `0 0 0 1px ${ACCENT}55`;
+			btn.style.boxShadow = `0 0 0 1px ${ACCENT}`;
 		} else {
 			btn.style.background = 'transparent';
 			btn.style.color = MUTED;
@@ -1296,7 +1296,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			btn.style.background = ACCENT_SOFT;
 			btn.style.borderColor = ACCENT;
 			btn.style.color = ACCENT;
-			btn.style.boxShadow = block ? `0 0 0 1px ${ACCENT}55` : 'none';
+			btn.style.boxShadow = block ? `0 0 0 1px ${ACCENT}` : 'none';
 		} else {
 			btn.style.background = SURFACE;
 			btn.style.borderColor = BORDER;

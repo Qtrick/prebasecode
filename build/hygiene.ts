@@ -79,7 +79,9 @@ interface VinylFileWithLines extends VinylFile {
 export function checkCopilotEnginesVersion(repoRoot: string): string | undefined {
 	const copilotPkgPath = path.join(repoRoot, 'extensions/copilot/package.json');
 	if (!fs.existsSync(copilotPkgPath)) {
-		// PreBase does not bundle the Copilot extension; nothing to keep in sync.
+		// The manifest is generated, so it is absent in a fresh PreBase checkout
+		// and there is no version to keep in sync. Reading it unconditionally
+		// crashed the pre-commit hook with ENOENT.
 		return undefined;
 	}
 	const rootPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));

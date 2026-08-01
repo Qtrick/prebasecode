@@ -16,6 +16,13 @@
  *
  * Do not add literal colours here. If a role is missing, map it to the closest
  * native theme token instead of inventing a new palette value.
+ *
+ * Some native tokens are registered with a `null` default for one or more theme
+ * kinds (`input.border` and `widget.border` in dark and light, `widget.shadow`
+ * and `list.activeSelectionForeground` in High Contrast, and so on). An
+ * undefined custom property makes the whole declaration invalid, which silently
+ * drops the property rather than falling back, so every such role below carries
+ * an explicit fallback chain that ends in a token defined for all theme kinds.
  */
 export const PreBaseSurface = {
 	/** Deepest content well: page canvases, editor-like bodies, code blocks. */
@@ -28,7 +35,7 @@ export const PreBaseSurface = {
 	overlay: 'var(--vscode-editorHoverWidget-background)',
 	/** Welcome-style tiles (Home, Onboarding) and their hover state. */
 	tile: 'var(--vscode-welcomePage-tileBackground)',
-	tileHover: 'var(--vscode-welcomePage-tileHoverBackground)',
+	tileHover: 'var(--vscode-welcomePage-tileHoverBackground, var(--vscode-list-hoverBackground))',
 	/** Selected navigation entry or toggled control. */
 	selected: 'var(--vscode-list-activeSelectionBackground)',
 	/** Hover state for rows on a chrome surface. */
@@ -39,7 +46,7 @@ export const PreBaseBorder = {
 	/** Structural separators between regions. Intentionally low contrast. */
 	subtle: 'var(--vscode-panel-border)',
 	/** Boundaries that identify a control or a floating surface. */
-	default: 'var(--vscode-widget-border)',
+	default: 'var(--vscode-widget-border, var(--vscode-contrastBorder, var(--vscode-panel-border)))',
 	/** Keyboard focus indicator. Never dim this for aesthetic reasons. */
 	focus: 'var(--vscode-focusBorder)'
 } as const;
@@ -49,7 +56,7 @@ export const PreBaseForeground = {
 	secondary: 'var(--vscode-descriptionForeground)',
 	/** Only for genuinely disabled controls (WCAG 1.4.3 exempts these). */
 	disabled: 'var(--vscode-disabledForeground)',
-	onSelected: 'var(--vscode-list-activeSelectionForeground)',
+	onSelected: 'var(--vscode-list-activeSelectionForeground, var(--vscode-foreground))',
 	link: 'var(--vscode-textLink-foreground)',
 	error: 'var(--vscode-errorForeground)'
 } as const;
@@ -58,12 +65,13 @@ export const PreBaseControl = {
 	accentBackground: 'var(--vscode-button-background)',
 	accentForeground: 'var(--vscode-button-foreground)',
 	accentHoverBackground: 'var(--vscode-button-hoverBackground)',
-	secondaryBackground: 'var(--vscode-button-secondaryBackground)',
+	secondaryBackground: 'var(--vscode-button-secondaryBackground, transparent)',
 	secondaryForeground: 'var(--vscode-button-secondaryForeground)',
 	secondaryHoverBackground: 'var(--vscode-button-secondaryHoverBackground)',
 	inputBackground: 'var(--vscode-input-background)',
 	inputForeground: 'var(--vscode-input-foreground)',
-	inputBorder: 'var(--vscode-input-border)',
+	inputBorder: 'var(--vscode-input-border, var(--vscode-contrastBorder, var(--vscode-panel-border)))',
 	inputPlaceholder: 'var(--vscode-input-placeholderForeground)',
-	shadow: 'var(--vscode-widget-shadow)'
+	/** Absent in High Contrast by design: those themes separate with borders. */
+	shadow: 'var(--vscode-widget-shadow, transparent)'
 } as const;

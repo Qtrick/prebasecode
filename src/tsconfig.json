@@ -40,6 +40,8 @@
 		// Archived Architecture Graph assets reached through the graphs symlink. They are not
 		// compiled into the workbench and are checked separately by `typecheck:graphs-preserved`.
 		"vs/workbench/contrib/prebase/graphs/preserved/**",
+		// Graph unit tests reached through the same symlink. They are not part of the
+		// workbench bundle and are checked by `typecheck:graphs`.
 		"vs/workbench/contrib/prebase/graphs/tests/**"
 	]
 }

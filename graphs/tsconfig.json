@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "rootDir": ".",
-    "types": ["mocha"],
+    "types": ["mocha", "node"],
     "skipLibCheck": true,
     "preserveSymlinks": true,
     "ignoreDeprecations": "6.0"
@@ -14,12 +14,12 @@
     "src/core/**/*.ts",
     "src/layouts/**/*.ts",
     "src/index.ts",
-    "src/node.ts"
+    "src/node.ts",
+    "src/tests/**/*.ts"
   ],
   "exclude": [
     "scripts",
     "src/host/**",
-    "src/browser.ts",
-    "src/tests/**"
+    "src/browser.ts"
   ]
 }
