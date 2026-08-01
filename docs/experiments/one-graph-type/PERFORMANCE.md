@@ -82,3 +82,12 @@ Not measured here, and therefore not claimed: cold/warm startup timings,
 graph scan/layout wall-clock on large repositories, interaction FPS, and
 Runtime Preview lifecycle timings. The `Required measurements` table above is
 still unfilled and remains the acceptance gate for Code Graph performance.
+
+### Idle CPU with the Code Graph open
+
+With the Code Graph editor open on the `/workspace` graph (280 nodes, 109
+edges), idle auto-rotate off, and no input for 15 seconds, the renderer
+process consumed **0 jiffies** of CPU (`/proc/<pid>/stat` utime+stime delta)
+— the parked render loop is not scheduling frames at all. Before the parking
+work the loop rescheduled itself unconditionally every frame, so an open,
+idle graph tab kept the compositor awake at the display refresh rate.
