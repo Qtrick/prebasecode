@@ -1,10 +1,12 @@
 # Graph acceptance (Phase I)
 
-Manual acceptance templates for Architecture and Network graphs. **Do not mark a row Complete without dated evidence** (screenshot, screen recording, or signed test log with build ID).
+Manual acceptance for the **Code Graph** (Network-based single product). Architecture Graph product scenarios below are **historical** — the Architecture Graph is no longer exposed; assets live under `graphs/src/preserved/architecture/`.
+
+**Do not mark a row Complete without dated evidence** (screenshot, screen recording, or signed test log with build ID).
 
 Automated gates (not a substitute for GUI smoke): `npm run assurance:graphs`, `npm run verify:graphs-boundary`.
 
-Settings registration lives under `graphs/` (`registerPreBaseGraphConfiguration`). The **PreBase Settings** graph panel UI remains in allowlisted `prebaseSettingsEditor.ts` — see [`graphs/src/settings/README.md`](../graphs/src/settings/README.md).
+See also: [MAIN_ONE_GRAPH_MIGRATION.md](MAIN_ONE_GRAPH_MIGRATION.md), [GRAPH_NODE_MORPH_RESEARCH.md](GRAPH_NODE_MORPH_RESEARCH.md).
 
 ## Evidence standard
 
@@ -16,28 +18,30 @@ Settings registration lives under `graphs/` (`registerPreBaseGraphConfiguration`
 | Result | Pass / Fail / Blocked |
 | Notes | Steps, regressions, linked issue |
 
-## Architecture Graph
+## Architecture Graph (historical / superseded)
+
+> Product surface removed 2026-08-01 (BETA-003 Deferred). Rows kept for audit history only.
 
 | # | Scenario | Steps | Expected | Status | Evidence |
 |---|---|---|---|---|---|
-| A1 | Open Maps / Architecture | Open folder workspace → PreBase Maps → Architecture view | Graph loads; no blank webview | Needs Verification | — |
-| A2 | Hierarchy layout | Default or switch to hierarchy | Nodes on depth rings; entry near center | Needs Verification | — |
-| A3 | Pyramid / scatter modes | Toggle architecture layout modes in toolbar or settings | Positions update; no throw in devtools | Needs Verification | — |
-| A4 | Selection | Click node | Inspector/sidebar highlights file; selection visible on canvas | Needs Verification | — |
-| A5 | Zoom / pan | Wheel + drag | Smooth navigation; settings sensitivities apply when wired | Needs Verification | — |
-| A6 | Edge labels setting | Toggle `prebase.graph.showEdgeLabels` | Labels show/hide per setting | Needs Verification | — |
-| A7 | Minimap setting | Toggle `prebase.graph.showMinimap` | **Known stub** (BETA-020); no false promise of minimap UI | Needs Verification | — |
-| A8 | Reduce motion | Enable `prebase.graph.reduceMotion` | Animations reduced where implemented | Needs Verification | — |
-| A9 | Large project smoke | Repo with 500+ source files | Graph remains usable; caps from `maxRenderedNodes` respected | Needs Verification | — |
+| A1 | Open Maps / Architecture | Open folder workspace → PreBase Maps → Architecture view | Graph loads; no blank webview | Superseded | Product removed |
+| A2–A9 | Legacy Arch scenarios | — | — | Superseded | See preserved assets |
 
-## Network Graph
+## Code Graph (primary — was Network Graph)
 
 | # | Scenario | Steps | Expected | Status | Evidence |
 |---|---|---|---|---|---|
-| N1 | Open Network view | Maps → Network | 3D graph visible | Needs Verification | — |
-| N2 | Layout modes | organic, sphere, constellation, clustered, radial | Deterministic relayout; mode persists in session | Needs Verification | — |
-| N3 | Rotate | Drag on background / orbit controls | Camera rotates; no stuck pointer | Needs Verification | — |
-| N4 | Node drag | Drag node | Position updates; `networkDragDirection` respected | Needs Verification | — |
+| N1 | Open Code Graph | Maps → Open Code Graph / `prebase.graph.open` | One Code Graph tab; 3D canvas | Needs Verification | — |
+| N2 | Layout modes | Community Force, Organic, Sphere, Constellation, Clustered, Radial | Deterministic relayout; mode persists | Needs Verification | — |
+| N3 | Rotate | Drag on background | Camera rotates; no stuck pointer | Needs Verification | — |
+| N4 | Node morph select | Click idle dot | Dot morphs to ~64×62 Architecture-style card from center | Needs Verification | — |
+| N5 | Rapid switch | Select A then B mid-expand | A contracts from current t; B expands; no snap/duplicate | Needs Verification | — |
+| N6 | Deselect / Escape | Background click or Escape | Card contracts to dot; inspector clears | Needs Verification | — |
+| N7 | Reduced motion | Enable reduceMotion | Immediate or non-spatial swap; still clear selection | Needs Verification | — |
+| N8 | Idle RAF | After morph + no rotate | CPU idle; no permanent 60 Hz loop | Needs Verification | — |
+| N9 | Legacy restore | Restore Arch/Net tab | Opens single Code Graph; no loop/dup | Needs Verification | — |
+| N10 | Large project | 500+ files | Usable; caps respected | Needs Verification | — |
+
 | N5 | Idle auto-rotate | Wait with `networkIdleAutoRotate` enabled | Idle rotation when configured | Needs Verification | — |
 | N6 | Physics settings | Adjust force/link/charge in settings | Simulation behavior changes | Needs Verification | — |
 | N7 | Pick hit test | Click small node while zoomed out | Node picked (see unit tests `architecturePick`) | Needs Verification | — |

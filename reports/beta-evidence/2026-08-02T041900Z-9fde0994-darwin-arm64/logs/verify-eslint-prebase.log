@@ -1,0 +1,15 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:eslint-prebase
+> node scripts/assurance/verify-eslint-prebase.mjs
+
+verify:eslint-prebase: PreBase-path ratchet only — NOT full-repo eslint
+  targets (6):
+    - graphs/**/*.{ts,tsx,mts,cts,js,mjs,cjs}
+    - src/vs/workbench/contrib/prebase/**/*.{ts,tsx,mts,cts,js,mjs,cjs}
+    - scripts/privacy/**/*.{ts,js,mjs,cjs}
+    - scripts/startup/**/*.{ts,js,mjs,cjs}
+    - scripts/supabase/**/*.{ts,js,mjs,cjs}
+    - scripts/assurance/**/*.{ts,js,mjs,cjs}
+verify:eslint-prebase: FAIL errors increased 64 → 103
+verify:eslint-prebase: FAIL warnings increased 2168 → 5693 (ratchet)

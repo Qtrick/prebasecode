@@ -23,6 +23,7 @@ import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKe
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
+import { isCodeGraphCanvas, type PreBaseGraphType } from '../../common/types/graphProduct.js';
 
 interface IBridgeRequest {
 	requestId: string;
@@ -36,7 +37,7 @@ export class PreBaseGraphEditor extends EditorPane {
 	private _container: HTMLElement | undefined;
 	private _webview: IWebviewElement | undefined;
 	private readonly _webviewDisposables = this._register(new DisposableStore());
-	private _inputType: 'architecture' | 'network' = 'architecture';
+	private _inputType: PreBaseGraphType = 'code';
 	private _scanKickoff = false;
 	private _descriptionCts: CancellationTokenSource | undefined;
 
@@ -56,7 +57,12 @@ export class PreBaseGraphEditor extends EditorPane {
 		this._register(this.graphService.onDidChangeSnapshot(() => this._pushSnapshot()));
 		this._register(this.graphService.onDidChangeViewState(() => this._pushSnapshot()));
 		this._register(this.graphService.onDidChangeDiagnostics(() => this._pushSnapshot()));
+		this._register(this.graphService.onDidChangeHiddenCommunities(() => this._pushSnapshot()));
 		this._register(this.graphService.onDidRequestCameraAction(action => {
+			// Shared graph service — only the matching input may react (legacy dual-tab safety).
+			if (!this._ownsActiveGraphType()) {
+				return;
+			}
 			this._webview?.postMessage({ type: action === 'reset' ? 'resetView' : 'fitView' });
 		}));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
@@ -64,6 +70,16 @@ export class PreBaseGraphEditor extends EditorPane {
 				this._pushSnapshot();
 			}
 		}));
+	}
+
+	/** True when this editor input matches the singleton service graph type. */
+	private _ownsActiveGraphType(): boolean {
+		const serviceType = this.graphService.getViewState().graphType;
+		// Code and legacy network share the canvas path; treat them as matching for ownership.
+		if (isCodeGraphCanvas(this._inputType) && isCodeGraphCanvas(serviceType)) {
+			return true;
+		}
+		return this._inputType === serviceType;
 	}
 
 	protected createEditor(parent: HTMLElement): void {
@@ -159,7 +175,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		}
 		this._webviewDisposables.clear();
 		const webview = this._webviewDisposables.add(this.webviewService.createWebviewElement({
-			title: localize('prebase.graph.webviewTitle', "PreBase Graph"),
+			title: localize('prebase.graph.webviewTitle', "Code Graph"),
 			// Release GPU/CPU when the tab is hidden so the window stays closable.
 			options: { retainContextWhenHidden: false },
 			contentOptions: {
@@ -194,7 +210,7 @@ export class PreBaseGraphEditor extends EditorPane {
 	}
 
 	private _pushSnapshot(): void {
-		if (!this._webview) {
+		if (!this._webview || !this._ownsActiveGraphType()) {
 			return;
 		}
 		const snapshot = this.graphService.getSnapshot();
@@ -207,7 +223,8 @@ export class PreBaseGraphEditor extends EditorPane {
 				settings: this._graphSettings(),
 				graphType: this._inputType,
 				// Always send string|null (never undefined) so webview can clear selection.
-				selectedNodeId: this.graphService.getSelectedNodeId() ?? null
+				selectedNodeId: this.graphService.getSelectedNodeId() ?? null,
+				hiddenCommunityIds: this.graphService.getHiddenCommunityIds()
 			}
 		});
 	}
@@ -227,13 +244,26 @@ export class PreBaseGraphEditor extends EditorPane {
 					diagnostics: this.graphService.getDiagnostics(),
 					viewState: this.graphService.getViewState(),
 					selectedNodeId: this.graphService.getSelectedNodeId() ?? null,
+					hiddenCommunityIds: this.graphService.getHiddenCommunityIds(),
 					settings: this._graphSettings()
 				});
 				break;
 			case 'selectNode': {
-				const nodeId = (message.payload as { nodeId?: string | null } | undefined)?.nodeId;
-				this.graphService.setSelectedNodeId(nodeId || undefined);
-				await reply({ ok: true });
+				// Selection must never keep a prior AI describe in flight (privacy).
+				this._cancelDescription();
+				// Webview messages are untrusted — only accept ids present in the current snapshot.
+				const rawId = (message.payload as { nodeId?: string | null } | undefined)?.nodeId;
+				if (!rawId) {
+					this.graphService.setSelectedNodeId(undefined);
+					await reply({ ok: true });
+					break;
+				}
+				const snapshot = this.graphService.getSnapshot();
+				const node = snapshot?.nodes.find(n => n.id === rawId);
+				// setSelectedNodeId also rejects hidden-community nodes.
+				const ok = !!node;
+				this.graphService.setSelectedNodeId(ok ? rawId : undefined);
+				await reply({ ok: ok && this.graphService.getSelectedNodeId() === rawId });
 				break;
 			}
 			case 'describeNode': {
@@ -248,6 +278,25 @@ export class PreBaseGraphEditor extends EditorPane {
 				this._descriptionCts = new CancellationTokenSource();
 				const result = await this.descriptionService.describeNode(node, this._descriptionCts.token);
 				await reply(result);
+				break;
+			}
+			case 'explainNode': {
+				// Local deterministic explain — never triggers AI.
+				const nodeId = (message.payload as { nodeId?: string } | undefined)?.nodeId;
+				if (!nodeId) {
+					await reply({ found: false });
+					break;
+				}
+				const raw = this.graphService.explainNodeForMagnus(nodeId);
+				if (!raw) {
+					await reply({ found: false, nodeId });
+					break;
+				}
+				try {
+					await reply(JSON.parse(raw));
+				} catch {
+					await reply({ found: false, nodeId });
+				}
 				break;
 			}
 			case 'openFile':
@@ -295,19 +344,19 @@ export class PreBaseGraphEditor extends EditorPane {
 <html>
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style nonce="${nonce}">
 html, body { margin:0; height:100%; background:var(--vscode-editor-background, #1B1C1E); color:var(--vscode-foreground, #f4f4f5); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; overflow:hidden; }
 #stage { position:absolute; inset:0; }
-#archSvg, #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; }
-#archSvg { cursor:grab; }
-#archSvg.dragging, #archSvg.panning { cursor:grabbing; }
-#netCanvas { cursor:grab; }
+#netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; cursor:grab; }
 #netCanvas.dragging { cursor:grabbing; }
 #toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 88%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:4px; }
 #toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
 #toolbar button:hover { background:var(--vscode-toolbar-hoverBackground, #303030); }
-#toolbar label { display:flex; gap:4px; align-items:center; user-select:none; opacity:.9; }
+/* More specific than #toolbar label so Idle stays hidden before script runs. */
+#toolbar label { gap:4px; align-items:center; user-select:none; opacity:.9; }
+#toolbar label#idleToggleWrap { display:none; }
+#toolbar label#idleToggleWrap.is-visible { display:flex; }
 #status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
 #legend { position:absolute; left:12px; bottom:100px; z-index:4; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
 #legend .title { font-weight:700; margin-bottom:6px; letter-spacing:.02em; text-transform:uppercase; opacity:.75; font-size:10px; }
@@ -315,44 +364,38 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
 #legend .swatch.circle { border-radius:50%; }
 #legend .swatch.line { height:2px; width:16px; border-radius:1px; }
+#legend .swatch.line.dashed { background:transparent; height:0; border-radius:0; border-top:2px dashed var(--vscode-descriptionForeground, #a1a1aa); }
+#legend .swatch.line.dotted { background:transparent; height:0; border-radius:0; border-top:2px dotted var(--vscode-descriptionForeground, #a1a1aa); }
 #empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
 #popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #303030); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
 #popup h3 { margin:0 0 4px; font-size:13px; }
 #popup .meta { color:var(--vscode-descriptionForeground, #a1a1aa); font-size:11px; margin-bottom:8px; word-break:break-word; }
 #popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-disabledForeground, #71717a); margin:10px 0 4px; }
-#popup p { margin:0; font-size:12px; line-height:1.45; color:var(--vscode-foreground, #f4f4f5); }
+#popup p { margin:0; font-size:12px; line-height:1.45; color:var(--vscode-foreground, #f4f4f5); white-space:pre-wrap; }
 #popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
 #popup button { font-size:11px; border-radius:7px; border:1px solid var(--vscode-widget-border, #3C3C3C); background:var(--vscode-input-background, #303030); color:var(--vscode-foreground, #f4f4f5); padding:5px 8px; cursor:pointer; }
 #popup button.primary { border-color:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); background:var(--vscode-button-background, #2dd4bf); }
 #popup #popupClose { float:right; border:0; background:transparent; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:16px; }
-.ring, .pyramid-band, .edge { pointer-events:none; }
-.ring { fill:none; opacity:.55; }
-.node-label { fill:var(--vscode-foreground, #ecfeff); font-size:10px; pointer-events:none; }
-.edge { fill:none; opacity:.45; }
-.arch-node { cursor:pointer; }
-.arch-node.is-entry rect.node-face { stroke-width:2.4; }
-.arch-node.is-selected rect.node-face { stroke:#2dd4bf; stroke-width:2.6; filter:url(#glow); }
-.arch-node rect.node-face { fill:var(--vscode-editor-background, #1B1C1E); }
 </style>
 </head>
 <body>
 <div id="stage">
 	<div id="empty">Preparing graph…</div>
-	<svg id="archSvg"></svg>
-	<canvas id="netCanvas"></canvas>
+	<canvas id="netCanvas" role="img" aria-label="Code Graph canvas"></canvas>
 </div>
 <div id="legend" style="display:none"></div>
 <div id="popup" role="dialog" aria-modal="false" aria-label="Node details">
-	<button id="popupClose" type="button" title="Close">×</button>
+	<button id="popupClose" type="button" title="Close" aria-label="Close node details">×</button>
 	<h3 id="popupTitle"></h3>
 	<div class="meta" id="popupMeta"></div>
-	<div class="label">Overview</div>
-	<p id="popupOverview"></p>
-	<div class="label">AI Description</div>
+	<div class="label">Structure (local)</div>
+	<p id="popupOverview" style="white-space:pre-wrap"></p>
+	<div class="label">AI description (explicit only)</div>
 	<p id="popupAi"></p>
 	<div class="actions">
 		<button class="primary" id="popupOpen" type="button">Open File</button>
 		<button id="popupReveal" type="button">Reveal</button>
+		<button id="popupExplainAi" type="button">Request AI description</button>
 		<button id="popupMagnus" type="button">Attach to Agents</button>
 	</div>
 </div>
@@ -361,12 +404,11 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	<button id="zoomOut" title="Zoom out">−</button>
 	<button id="fit" title="Fit">⛶</button>
 	<button id="reset" title="Reset">↻</button>
-	<label id="idleToggleWrap" style="display:none"><input type="checkbox" id="idleToggle"> Idle</label>
+	<label id="idleToggleWrap"><input type="checkbox" id="idleToggle"> Idle</label>
 </div>
 <div id="status">Scanning…</div>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
-const archSvg = document.getElementById('archSvg');
 const netCanvas = document.getElementById('netCanvas');
 const ctx = netCanvas.getContext('2d', { alpha: true });
 const status = document.getElementById('status');
@@ -389,10 +431,6 @@ const NODE_SCALE = 1;
 const FOCAL = 640;
 const IDLE_YAW = 0.08;
 const IDLE_RESUME_MS = 1400;
-// Keep ARCH_* in sync with architecturePick.ts (screen-space hit testing).
-const ARCH_W = 28, ARCH_H = 28;
-/** Minimum Architecture node hit radius in CSS pixels (screen space), independent of zoom. */
-const ARCH_MIN_HIT_PX = 10;
 const ENTRY = '#e8b84a';
 const FILE_COLORS = {
 	typescript:'#3178c6', javascript:'#f1e05a', css:'#a371f7', html:'#e34c26',
@@ -404,8 +442,9 @@ let rotation = { yaw: 0.55, pitch: 0.28 };
 let snapshot = null;
 let diagnostics = null;
 let selectedNodeId = null;
+let hiddenCommunityLookup = Object.create(null);
 let settings = { showLegend:true, reduceMotion:false, networkIdleAutoRotate:false, networkDragDirection:'natural', maxRenderedEdges:420, maxRenderedNodes:280, quality:'auto' };
-let graphType = 'architecture';
+let graphType = 'code';
 let dragging = false, panning = false, rotating = false;
 let lastX = 0, lastY = 0, moved = false;
 let activePointerId = null, activePointerHost = null;
@@ -419,7 +458,162 @@ let lastRafTs = 0;
 let dirty = true;
 let rafScheduled = false;
 let dpr = Math.min(2, window.devicePixelRatio || 1);
+/** Per-node morph progress 0=dot … 1=Architecture-style card. Only selected + prior need entries. */
+const morphState = Object.create(null);
+const MORPH_EXPAND_MS = 200;
+const MORPH_CONTRACT_MS = 170;
+const CARD_W_CSS = 64;
+const CARD_H_CSS = 62;
+const CARD_ENTRY_H_CSS = 66;
+const CARD_RADIUS_CSS = 6;
 const pending = new Map();
+
+/** Mirrors presentation/selectedNodeCard.resolveSelectedNodeCardColors (webview cannot import TS). */
+function resolveCardThemeColors() {
+	let getProperty = null;
+	try {
+		if (document.documentElement && window.getComputedStyle) {
+			const style = window.getComputedStyle(document.documentElement);
+			getProperty = function (name) { return style.getPropertyValue(name); };
+		}
+	} catch (e) { /* ignore */ }
+	function read(name, fallback) {
+		if (!getProperty) return fallback;
+		const v = (getProperty(name) || '').trim();
+		return v || fallback;
+	}
+	return {
+		surface: read('--vscode-editor-background', '#1B1C1E'),
+		selectionRing: read('--vscode-focusBorder', '#2dd4bf'),
+		selectionGlow: 'rgba(45,212,191,0.35)',
+		label: read('--vscode-foreground', '#f4f4f5'),
+		iconTile: 'rgba(255,255,255,0.92)',
+		entryBadge: '#e8b84a'
+	};
+}
+let cardTheme = resolveCardThemeColors();
+
+function easeMorphExpand(t) {
+	const x = Math.max(0, Math.min(1, t));
+	return 1 - Math.pow(1 - x, 2.4);
+}
+function easeMorphContract(t) {
+	const x = Math.max(0, Math.min(1, t));
+	return 1 - Math.pow(1 - x, 2);
+}
+function clampMorphDt(dt) {
+	if (!isFinite(dt) || dt < 0) return 0;
+	return Math.min(0.05, dt);
+}
+function getMorphProgress(nodeId) {
+	const s = morphState[nodeId];
+	return s ? s.t : 0;
+}
+function setMorphTarget(nodeId, target, fromCurrent) {
+	if (!nodeId) return;
+	const cur = morphState[nodeId];
+	const startT = fromCurrent && cur ? cur.t : (target >= 1 ? 0 : (cur ? cur.t : 1));
+	const duration = target >= 1 ? MORPH_EXPAND_MS : MORPH_CONTRACT_MS;
+	if (settings.reduceMotion) {
+		morphState[nodeId] = { t: target, target: target, startT: target, startTs: performance.now(), duration: 0 };
+		dirty = true;
+		kickRaf();
+		return;
+	}
+	morphState[nodeId] = {
+		t: startT,
+		target: target,
+		startT: startT,
+		startTs: performance.now(),
+		duration: duration
+	};
+	dirty = true;
+	kickRaf();
+}
+function clearMorphState() {
+	for (const k of Object.keys(morphState)) delete morphState[k];
+}
+function advanceMorphAnimations(now) {
+	let any = false;
+	for (const id of Object.keys(morphState)) {
+		const s = morphState[id];
+		if (!s) continue;
+		const prevT = s.t;
+		if (s.duration <= 0 || settings.reduceMotion) {
+			s.t = s.target;
+		} else {
+			const elapsed = Math.max(0, now - s.startTs);
+			const u = Math.min(1, elapsed / s.duration);
+			const eased = s.target >= s.startT ? easeMorphExpand(u) : easeMorphContract(u);
+			s.t = s.startT + (s.target - s.startT) * eased;
+			if (u < 1) any = true;
+			else s.t = s.target;
+		}
+		// One more RAF frame when progress changes (including morph completion).
+		if (Math.abs(s.t - prevT) > 1e-4) any = true;
+		if (s.t <= 0.001 && s.target <= 0) {
+			delete morphState[id];
+		} else if (Math.abs(s.t - s.target) > 0.001 && s.duration > 0 && !settings.reduceMotion) {
+			any = true;
+		}
+	}
+	return any;
+}
+function interpolateCard(t, dotDiameterGraph, isEntry, k) {
+	const u = Math.max(0, Math.min(1, t));
+	const invK = 1 / Math.max(0.15, k);
+	const targetW = CARD_W_CSS * invK;
+	const targetH = (isEntry ? CARD_ENTRY_H_CSS : CARD_H_CSS) * invK;
+	const width = dotDiameterGraph + (targetW - dotDiameterGraph) * u;
+	const height = dotDiameterGraph + (targetH - dotDiameterGraph) * u;
+	const cornerCollapsed = Math.min(width, height) / 2;
+	const cornerTarget = CARD_RADIUS_CSS * invK;
+	const cornerRadius = cornerCollapsed + (cornerTarget - cornerCollapsed) * u;
+	return {
+		width: width,
+		height: height,
+		cornerRadius: Math.max(0, cornerRadius),
+		iconOpacity: Math.max(0, Math.min(1, (u - 0.25) / 0.3)),
+		labelOpacity: Math.max(0, Math.min(1, (u - 0.45) / 0.4)),
+		badgeOpacity: Math.max(0, Math.min(1, (u - 0.55) / 0.35)),
+		surfaceMix: u
+	};
+}
+function roundRectPath(c, x, y, w, h, r) {
+	const rr = Math.min(r, w / 2, h / 2);
+	c.beginPath();
+	if (typeof c.roundRect === 'function') {
+		c.roundRect(x, y, w, h, rr);
+		return;
+	}
+	c.moveTo(x + rr, y);
+	c.arcTo(x + w, y, x + w, y + h, rr);
+	c.arcTo(x + w, y + h, x, y + h, rr);
+	c.arcTo(x, y + h, x, y, rr);
+	c.arcTo(x, y, x + w, y, rr);
+	c.closePath();
+}
+function hitTestCard(px, py, cx, cy, pres) {
+	const hw = pres.width / 2 + 2;
+	const hh = pres.height / 2 + 2;
+	return px >= cx - hw && px <= cx + hw && py >= cy - hh && py <= cy + hh;
+}
+
+/** Select nodeId (expand) or null (contract current). Interruptible from current progress. */
+function applySelectionMorph(nextId) {
+	const prev = selectedNodeId;
+	if (prev && prev !== nextId) {
+		setMorphTarget(prev, 0, true);
+	}
+	if (nextId) {
+		setMorphTarget(nextId, 1, true);
+	} else if (prev) {
+		setMorphTarget(prev, 0, true);
+	}
+	selectedNodeId = nextId || null;
+	dirty = true;
+	kickRaf();
+}
 
 function request(type, payload) {
 	const requestId = Math.random().toString(36).slice(2);
@@ -429,7 +623,19 @@ function request(type, payload) {
 	});
 }
 
-function isNetwork() { return graphType === 'network' || (snapshot && snapshot.graphType === 'network'); }
+function setHiddenCommunityIds(ids) {
+	hiddenCommunityLookup = Object.create(null);
+	const list = Array.isArray(ids) ? ids : [];
+	for (let i = 0; i < list.length; i++) {
+		const id = list[i];
+		if (typeof id === 'number' && isFinite(id)) hiddenCommunityLookup[id] = true;
+	}
+}
+
+function isNodeHiddenByCommunity(node) {
+	if (!node || !node.meta || typeof node.meta.communityId !== 'number') return false;
+	return !!hiddenCommunityLookup[node.meta.communityId];
+}
 
 function thresholdForPointer(pointerType) {
 	if (pointerType === 'touch') return 8;
@@ -465,15 +671,25 @@ function fileType(path) {
 	return { id:'other', name: ext ? ext.toUpperCase() : 'Other', color:FILE_COLORS.other };
 }
 
+function communityColor(communityId) {
+	const hue = (Math.abs(communityId) * 47) % 360;
+	return 'hsl(' + hue + ' 62% 52%)';
+}
+
 function nodeColor(node, entryId) {
 	if (node.id === entryId || node.isEntry) return ENTRY;
+	// Default: community (Graphify-inspired clusters); fall back to file type.
+	const cid = node.meta && typeof node.meta.communityId === 'number' ? node.meta.communityId : null;
+	if (cid !== null && isFinite(cid)) {
+		return communityColor(cid);
+	}
 	return fileType(node.path || node.label).color;
 }
 
-function hash01(id, salt) {
-	let h = salt | 0;
-	for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-	return ((h >>> 0) % 1000) / 1000;
+function edgeDashForConfidence(confidence) {
+	if (confidence === 'INFERRED') return [6, 4];
+	if (confidence === 'AMBIGUOUS') return [2, 3];
+	return null; // EXTRACTED / unknown → solid
 }
 
 function projectPoint(x, y, z, yaw, pitch) {
@@ -493,7 +709,7 @@ function scheduleIdleResume() {
 	kickRaf();
 	if (idleResumeTimer) clearTimeout(idleResumeTimer);
 	idleResumeTimer = null;
-	if (!settings.networkIdleAutoRotate || settings.reduceMotion || !isNetwork()) return;
+	if (!settings.networkIdleAutoRotate || settings.reduceMotion) return;
 	idleResumeTimer = setTimeout(function () {
 		idleResumeTimer = null;
 		if (settings.networkIdleAutoRotate && !settings.reduceMotion && !dragging) {
@@ -533,15 +749,15 @@ function resizeCanvas() {
 }
 
 function rebuildBase3d(s) {
-	const key = [s.scannedAt, s.layoutMode, s.networkLayoutMode || '', s.graphType, (s.nodes || []).length, (s.edges || []).length].join('|');
+	// layoutMode is a legacy Arch field — networkLayoutMode drives Code Graph rebuilds.
+	const key = [s.scannedAt, s.networkLayoutMode || '', s.graphType, (s.nodes || []).length, (s.edges || []).length].join('|');
 	if (key === layoutKey && Object.keys(base3d).length) return false;
 	layoutKey = key;
 	base3d = Object.create(null);
 	const nodes = s.nodes || [];
 	const p3 = s.positions3d || null;
-	const network = s.graphType === 'network' || graphType === 'network';
 
-	// Prefer canonical 3D layout from the host (Network). Never invent depth by hashing 2D coords.
+	// Prefer canonical 3D layout from the host. Never invent depth by hashing 2D coords.
 	if (p3 && typeof p3 === 'object') {
 		let sx = 0, sy = 0, sz = 0, n = 0;
 		for (let i = 0; i < nodes.length; i++) {
@@ -556,42 +772,10 @@ function rebuildBase3d(s) {
 			if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) continue;
 			base3d[nodes[i].id] = { x: p.x - centroid.x, y: p.y - centroid.y, z: p.z - cz };
 		}
-		if (n > 0 || network) {
-			return true;
-		}
-	}
-
-	// Network must wait for positions3d — never synthesize Z via hash01.
-	if (network) {
-		centroid = { x: 0, y: 0 };
 		return true;
 	}
 
-	const positions = s.positions || {};
-	let sx = 0, sy = 0, n = 0, maxR = 1;
-	const centers = [];
-	for (let i = 0; i < nodes.length; i++) {
-		const p = positions[nodes[i].id];
-		if (!p) continue;
-		const cx = p.x + ARCH_W / 2;
-		const cy = p.y + ARCH_H / 2;
-		centers.push({ id: nodes[i].id, cx: cx, cy: cy });
-		sx += cx; sy += cy; n++;
-	}
-	centroid = n ? { x: sx / n, y: sy / n } : { x: 0, y: 0 };
-	for (let i = 0; i < centers.length; i++) {
-		maxR = Math.max(maxR, Math.hypot(centers[i].cx - centroid.x, centers[i].cy - centroid.y));
-	}
-	// Architecture fallback only: mild deterministic depth for SVG→canvas ports.
-	const zSpread = Math.max(80, maxR * 0.5);
-	for (let i = 0; i < centers.length; i++) {
-		const c = centers[i];
-		base3d[c.id] = {
-			x: c.cx - centroid.x,
-			y: c.cy - centroid.y,
-			z: (hash01(c.id, 5) - 0.5) * zSpread
-		};
-	}
+	centroid = { x: 0, y: 0 };
 	return true;
 }
 
@@ -611,9 +795,7 @@ function projectAll() {
 }
 
 function screenPos(id) {
-	if (isNetwork() && projected[id]) return projected[id];
-	const p = snapshot && snapshot.positions && snapshot.positions[id];
-	return p ? { x: p.x + ARCH_W / 2, y: p.y + ARCH_H / 2, depthScale: 1, z: 0 } : null;
+	return projected[id] || null;
 }
 
 function fitView() {
@@ -621,26 +803,19 @@ function fitView() {
 	const nodes = snapshot.nodes;
 	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 	for (let i = 0; i < nodes.length; i++) {
+		if (isNodeHiddenByCommunity(nodes[i])) continue;
 		const p = screenPos(nodes[i].id);
 		if (!p) continue;
-		const r = isNetwork() ? 16 : ARCH_W / 2;
+		const r = 16;
 		minX = Math.min(minX, p.x - r); minY = Math.min(minY, p.y - r);
 		maxX = Math.max(maxX, p.x + r); maxY = Math.max(maxY, p.y + r);
 	}
 	if (!isFinite(minX)) return;
 	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
-	const host = isNetwork() ? netCanvas : archSvg;
-	const vw = host.clientWidth || 800, vh = host.clientHeight || 600;
+	const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
 	const k = Math.min(vw / (bw + 120), vh / (bh + 120), 1.8) * (settings.initialZoom || 1);
 	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 	dirty = true;
-	if (!isNetwork()) applyArchTransform();
-	else kickRaf();
-}
-
-function applyArchTransform() {
-	const g = archSvg.querySelector('#world');
-	if (g) g.setAttribute('transform', 'translate(' + transform.x + ',' + transform.y + ') scale(' + transform.k + ')');
 }
 
 function updateLegend(s, network) {
@@ -653,178 +828,28 @@ function updateLegend(s, network) {
 		const t = fileType(s.nodes[i].path || s.nodes[i].label);
 		if (!types.has(t.id)) types.set(t.id, t);
 	}
-	let html = '<div class="title">File types</div>';
+	// Node fill is community-colored by default; file-type swatches are fallback only.
+	let html = '<div class="title">Node color</div>';
+	html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:hsl(94 62% 52%)"></span>Community (default)</div>';
+	html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:' + ENTRY + '"></span>Entry</div>';
+	html += '<div class="title" style="margin-top:8px">Visible edges</div>';
+	html += '<div class="row"><span class="swatch line" style="background:#94a3b8"></span>Import / dependency</div>';
+	html += '<div class="row"><span class="swatch line" style="background:#a78bfa"></span>Contains</div>';
+	html += '<div class="title" style="margin-top:8px">Confidence</div>';
+	html += '<div class="row"><span class="swatch line" style="background:#94a3b8"></span>EXTRACTED (solid)</div>';
+	html += '<div class="row"><span class="swatch line dashed"></span>INFERRED (dashed)</div>';
+	html += '<div class="row"><span class="swatch line dotted"></span>AMBIGUOUS (dotted)</div>';
+	html += '<div class="title" style="margin-top:8px">File type fallback</div>';
 	types.forEach(function (t) {
 		html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:' + t.color + '"></span>' + t.name + '</div>';
 	});
-	html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:' + ENTRY + '"></span>Entry</div>';
-	html += '<div class="title" style="margin-top:8px">' + (network ? 'Visible edges' : 'Edges') + '</div>';
-	html += '<div class="row"><span class="swatch line" style="background:#94a3b8"></span>Import</div>';
-	if (!network) html += '<div class="row"><span class="swatch line" style="background:' + ENTRY + ';border-top:1px dashed ' + ENTRY + '"></span>Root</div>';
-	else html += '<div class="row"><span class="swatch line" style="background:#a78bfa"></span>Composition</div>';
 	legend.innerHTML = html;
 	legend.style.display = 'block';
 }
 
-function architectureHitRadiusScreen() {
-	// Screen-space radius (CSS px): visual half-diagonal + pad, floored at ARCH_MIN_HIT_PX.
-	// Convert to world with (screen / zoom) in pickArchitectureNode — do not use a fixed world radius.
-	const visual = Math.hypot(ARCH_W / 2, ARCH_H / 2) * Math.max(0.001, transform.k);
-	return Math.max(ARCH_MIN_HIT_PX, visual + 4);
-}
-
-function pickArchitectureNode(clientX, clientY) {
-	// Mirrors pickArchitectureNodeAt in architecturePick.ts (closest center within screen-space halo).
-	if (!snapshot || isNetwork()) return null;
-	const rect = archSvg.getBoundingClientRect();
-	const sx = clientX - rect.left;
-	const sy = clientY - rect.top;
-	const k = Math.max(0.001, transform.k);
-	const wx = (sx - transform.x) / k;
-	const wy = (sy - transform.y) / k;
-	const hitWorld = architectureHitRadiusScreen() / k;
-	let best = null;
-	let bestDist = Infinity;
-	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
-	const nodes = (snapshot.nodes || []).slice(0, maxNodes);
-	for (let i = 0; i < nodes.length; i++) {
-		const node = nodes[i];
-		const p = snapshot.positions[node.id];
-		if (!p) continue;
-		const cx = p.x + ARCH_W / 2;
-		const cy = p.y + ARCH_H / 2;
-		const d = Math.hypot(wx - cx, wy - cy);
-		if (d <= hitWorld && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
-			bestDist = d;
-			best = node;
-		}
-	}
-	return best;
-}
-
-/** Toggle selection styling only — never rebuild SVG / positions on select. */
-function updateArchitectureSelection() {
-	if (isNetwork()) return;
-	const groups = archSvg.querySelectorAll('.arch-node');
-	for (let i = 0; i < groups.length; i++) {
-		const g = groups[i];
-		const id = g.getAttribute('data-node-id');
-		if (id && id === selectedNodeId) g.classList.add('is-selected');
-		else g.classList.remove('is-selected');
-	}
-}
-
-function renderArchitecture(s) {
-	archSvg.style.display = 'block';
-	netCanvas.style.display = 'none';
-	idleToggleWrap.style.display = 'none';
-	archSvg.innerHTML = '';
-	const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-	const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
-	filter.setAttribute('id', 'glow');
-	filter.setAttribute('x', '-50%'); filter.setAttribute('y', '-50%');
-	filter.setAttribute('width', '200%'); filter.setAttribute('height', '200%');
-	const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
-	blur.setAttribute('stdDeviation', '2.2'); blur.setAttribute('result', 'coloredBlur');
-	const merge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
-	const m1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
-	m1.setAttribute('in', 'coloredBlur');
-	const m2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
-	m2.setAttribute('in', 'SourceGraphic');
-	merge.appendChild(m1); merge.appendChild(m2);
-	filter.appendChild(blur); filter.appendChild(merge);
-	defs.appendChild(filter);
-	archSvg.appendChild(defs);
-
-	const world = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-	world.setAttribute('id', 'world');
-	archSvg.appendChild(world);
-
-	const entry = s.entryNodeId && s.positions[s.entryNodeId] ? s.positions[s.entryNodeId] : null;
-	const cx = entry ? entry.x + ARCH_W / 2 : 0;
-	const cy = entry ? entry.y + ARCH_H / 2 : 0;
-
-	if (s.layoutMode === 'hierarchy' && Array.isArray(s.ringBands)) {
-		for (let i = s.ringBands.length - 1; i >= 0; i--) {
-			const band = s.ringBands[i];
-			const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-			ring.setAttribute('class', 'ring');
-			ring.setAttribute('cx', String(cx));
-			ring.setAttribute('cy', String(cy));
-			ring.setAttribute('r', String((band.innerRadius + band.outerRadius) / 2));
-			ring.setAttribute('stroke', band.color || '#22d3ee');
-			ring.setAttribute('stroke-width', String(Math.max(10, band.outerRadius - band.innerRadius)));
-			world.appendChild(ring);
-		}
-	}
-	if (s.layoutMode === 'pyramid' && Array.isArray(s.pyramidBands)) {
-		for (let i = 0; i < s.pyramidBands.length; i++) {
-			const band = s.pyramidBands[i];
-			const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-			rect.setAttribute('class', 'pyramid-band');
-			rect.setAttribute('x', String(band.x));
-			rect.setAttribute('y', String(band.y));
-			rect.setAttribute('width', String(band.width));
-			rect.setAttribute('height', String(band.height));
-			rect.setAttribute('rx', '10');
-			rect.setAttribute('fill', band.color || '#38bdf8');
-			rect.setAttribute('opacity', '0.35');
-			world.appendChild(rect);
-		}
-	}
-
-	const maxEdges = Math.max(40, settings.maxRenderedEdges || 420);
-	const edges = (s.edges || []).slice(0, maxEdges);
-	for (let i = 0; i < edges.length; i++) {
-		const edge = edges[i];
-		const a = s.positions[edge.source], b = s.positions[edge.target];
-		if (!a || !b) continue;
-		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-		path.setAttribute('class', 'edge');
-		path.setAttribute('stroke', edge.kind === 'contains' ? ENTRY : '#64748b');
-		path.setAttribute('stroke-dasharray', edge.kind === 'contains' ? '4 3' : '0');
-		path.setAttribute('d', 'M' + (a.x + ARCH_W / 2) + ' ' + (a.y + ARCH_H / 2) + ' L' + (b.x + ARCH_W / 2) + ' ' + (b.y + ARCH_H / 2));
-		world.appendChild(path);
-	}
-
-	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
-	const nodes = (s.nodes || []).slice(0, maxNodes);
-	for (let i = 0; i < nodes.length; i++) {
-		const node = nodes[i];
-		const p = s.positions[node.id];
-		if (!p) continue;
-		const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-		let cls = 'arch-node';
-		if (node.id === s.entryNodeId) cls += ' is-entry';
-		if (node.id === selectedNodeId) cls += ' is-selected';
-		g.setAttribute('class', cls);
-		g.setAttribute('data-node-id', node.id);
-		g.setAttribute('transform', 'translate(' + p.x + ',' + p.y + ')');
-		const color = nodeColor(node, s.entryNodeId);
-		// Visual size stays ARCH_W×ARCH_H; hit testing is screen-space pickArchitectureNode (not DOM discs).
-		const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		rect.setAttribute('class', 'node-face');
-		rect.setAttribute('width', String(ARCH_W));
-		rect.setAttribute('height', String(ARCH_H));
-		rect.setAttribute('rx', '4');
-		rect.setAttribute('stroke', color);
-		rect.setAttribute('stroke-width', '1.4');
-		g.appendChild(rect);
-		const icon = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		icon.setAttribute('x', '7'); icon.setAttribute('y', '7');
-		icon.setAttribute('width', '14'); icon.setAttribute('height', '14');
-		icon.setAttribute('rx', '2');
-		icon.setAttribute('fill', color);
-		icon.setAttribute('opacity', '0.85');
-		icon.setAttribute('pointer-events', 'none');
-		g.appendChild(icon);
-		world.appendChild(g);
-	}
-	applyArchTransform();
-}
-
 function drawNetworkFrame() {
-	if (!snapshot || !isNetwork()) return;
+	if (!snapshot) return;
+	cardTheme = resolveCardThemeColors();
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
 	// Full-buffer clear with identity transform so frames never accumulate.
@@ -851,6 +876,11 @@ function drawNetworkFrame() {
 	projectAll();
 	const maxEdges = Math.max(40, settings.maxRenderedEdges || 420);
 	const edges = (snapshot.edges || []).slice(0, maxEdges);
+	const hiddenNodes = Object.create(null);
+	const allNodes = snapshot.nodes || [];
+	for (let i = 0; i < allNodes.length; i++) {
+		if (isNodeHiddenByCommunity(allNodes[i])) hiddenNodes[allNodes[i].id] = true;
+	}
 	ctx.save();
 	ctx.translate(transform.x, transform.y);
 	ctx.scale(transform.k, transform.k);
@@ -859,16 +889,26 @@ function drawNetworkFrame() {
 		const e = edges[i];
 		const a = projected[e.source], b = projected[e.target];
 		if (!a || !b) continue;
+		if (hiddenNodes[e.source] || hiddenNodes[e.target]) continue;
 		const avg = ((a.depthScale || 1) + (b.depthScale || 1)) / 2;
-		const edgeAlpha = Math.max(0.16, Math.min(0.78, 0.2 + 0.38 * avg));
+		const conf = e.meta && e.meta.confidence;
+		const confMul = conf === 'AMBIGUOUS' ? 0.55 : conf === 'INFERRED' ? 0.78 : 1;
+		const edgeAlpha = Math.max(0.14, Math.min(0.78, (0.2 + 0.38 * avg) * confMul));
 		ctx.beginPath();
 		ctx.strokeStyle = e.kind === 'contains'
 			? 'rgba(167,139,250,' + edgeAlpha + ')'
 			: 'rgba(125,170,220,' + edgeAlpha + ')';
-		ctx.lineWidth = 1 / transform.k;
+		ctx.lineWidth = (conf === 'EXTRACTED' || !conf ? 1.15 : 1) / transform.k;
+		const dash = edgeDashForConfidence(conf);
+		if (dash) {
+			ctx.setLineDash(dash.map(function (d) { return d / transform.k; }));
+		} else {
+			ctx.setLineDash([]);
+		}
 		ctx.moveTo(a.x, a.y);
 		ctx.lineTo(b.x, b.y);
 		ctx.stroke();
+		ctx.setLineDash([]);
 	}
 
 	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
@@ -878,20 +918,81 @@ function drawNetworkFrame() {
 	});
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
+		if (isNodeHiddenByCommunity(node)) continue;
 		const p = projected[node.id];
 		if (!p) continue;
 		const r = networkDrawRadius(node, p.depthScale || 1);
 		const color = nodeColor(node, snapshot.entryNodeId);
 		const isSelected = node.id === selectedNodeId;
-		const isEntry = node.id === snapshot.entryNodeId;
-		// Dim non-neighbors when a node is selected (easier reselection).
+		const isEntry = node.id === snapshot.entryNodeId || !!(node.meta && node.meta.isEntry) || !!node.isEntry;
+		const nodeMorphT = getMorphProgress(node.id);
+		// Dim non-selected nodes when a node is selected (readability for reselection).
 		let alpha = 0.42 + normalizeDepthScale(p.depthScale || 1) * 0.58;
 		if (selectedNodeId && !isSelected) {
 			alpha *= 0.35;
 		}
+		if (nodeMorphT > 0.001) {
+			const theme = cardTheme;
+			const pres = interpolateCard(nodeMorphT, r * 2, isEntry, transform.k);
+			const w = pres.width;
+			const h = pres.height;
+			const rad = pres.cornerRadius;
+			const x = p.x - w / 2;
+			const y = p.y - h / 2;
+			if (pres.surfaceMix < 0.98 && isSelected) {
+				ctx.beginPath();
+				ctx.fillStyle = theme.selectionGlow;
+				ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
+				ctx.fill();
+			}
+			roundRectPath(ctx, x, y, w, h, rad);
+			ctx.globalAlpha = alpha;
+			ctx.fillStyle = color;
+			ctx.fill();
+			if (pres.surfaceMix > 0.05) {
+				ctx.globalAlpha = alpha * (0.72 * pres.surfaceMix);
+				ctx.fillStyle = theme.surface;
+				ctx.fill();
+			}
+			ctx.globalAlpha = 1;
+			ctx.lineWidth = ((isSelected ? 2.2 : 1.25)) / transform.k;
+			ctx.strokeStyle = isSelected ? theme.selectionRing : color;
+			ctx.stroke();
+			if (pres.iconOpacity > 0.02) {
+				const icon = Math.min(w, h) * 0.32;
+				roundRectPath(ctx, p.x - icon / 2, p.y - h * 0.28 - icon / 2, icon, icon, icon * 0.18);
+				ctx.globalAlpha = alpha * pres.iconOpacity;
+				ctx.fillStyle = theme.iconTile;
+				ctx.fill();
+				ctx.globalAlpha = 1;
+			}
+			if (pres.labelOpacity > 0.02) {
+				const label = (node.label || node.id || '').split(/[/\\\\]/).pop() || node.id;
+				ctx.save();
+				ctx.globalAlpha = alpha * pres.labelOpacity;
+				ctx.fillStyle = theme.label;
+				ctx.font = (9 / transform.k) + 'px ui-sans-serif, system-ui, sans-serif';
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				const maxW = w - 6 / transform.k;
+				let text = label;
+				while (text.length > 2 && ctx.measureText(text).width > maxW) {
+					text = text.slice(0, -2);
+				}
+				if (text !== label && text.length > 0) text += '…';
+				ctx.fillText(text, p.x, p.y + h * 0.28);
+				if (isEntry && nodeMorphT > 0.6) {
+					ctx.font = (8 / transform.k) + 'px ui-sans-serif, system-ui, sans-serif';
+					ctx.fillStyle = theme.entryBadge;
+					ctx.fillText('Entry', p.x, p.y + h * 0.42);
+				}
+				ctx.restore();
+			}
+			continue;
+		}
 		if (isSelected || isEntry) {
 			ctx.beginPath();
-			ctx.fillStyle = isSelected ? 'rgba(45,212,191,0.35)' : 'rgba(232,184,74,0.28)';
+			ctx.fillStyle = isSelected ? cardTheme.selectionGlow : 'rgba(232,184,74,0.28)';
 			ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
 			ctx.fill();
 		}
@@ -902,7 +1003,7 @@ function drawNetworkFrame() {
 		ctx.fill();
 		ctx.globalAlpha = 1;
 		ctx.lineWidth = 1.25 / transform.k;
-		ctx.strokeStyle = isSelected ? '#2dd4bf' : 'rgba(255,255,255,0.22)';
+		ctx.strokeStyle = isSelected ? cardTheme.selectionRing : 'rgba(255,255,255,0.22)';
 		ctx.stroke();
 	}
 	ctx.restore();
@@ -937,27 +1038,62 @@ function pickNetworkNode(clientX, clientY) {
 	const y = (clientY - rect.top - transform.y) / transform.k;
 	let best = null, bestScore = -Infinity;
 	const nodes = snapshot.nodes || [];
-	for (let i = 0; i < nodes.length; i++) {
-		const p = projected[nodes[i].id];
-		if (!p) continue;
-		const d = Math.hypot(p.x - x, p.y - y);
-		const r = networkPickRadius(nodes[i]);
-		if (d <= r) {
-			// Frontmost: prefer smaller projected z (closer to camera), then nearer hit.
-			const score = -(typeof p.z === 'number' ? p.z : 0) * 1000 - d;
-			if (score > bestScore) { bestScore = score; best = nodes[i]; }
+	// Prefer morphing/expanded cards first (frontmost selection).
+	for (let pass = 0; pass < 2; pass++) {
+		for (let i = 0; i < nodes.length; i++) {
+			if (isNodeHiddenByCommunity(nodes[i])) continue;
+			const node = nodes[i];
+			const p = projected[node.id];
+			if (!p) continue;
+			const morphProg = getMorphProgress(node.id);
+			if (pass === 0 && morphProg <= 0.08) continue;
+			if (pass === 1 && morphProg > 0.08) continue;
+			let hit = false;
+			if (morphProg > 0.08) {
+				const isEntry = node.id === snapshot.entryNodeId || !!(node.meta && node.meta.isEntry) || !!node.isEntry;
+				const r = networkDrawRadius(node, p.depthScale || 1);
+				const pres = interpolateCard(morphProg, r * 2, isEntry, transform.k);
+				hit = hitTestCard(x, y, p.x, p.y, pres);
+			} else {
+				const d = Math.hypot(p.x - x, p.y - y);
+				hit = d <= networkPickRadius(node);
+			}
+			if (hit) {
+				const d = Math.hypot(p.x - x, p.y - y);
+				const score = (pass === 0 ? 1e9 : 0) - (typeof p.z === 'number' ? p.z : 0) * 1000 - d;
+				if (score > bestScore) { bestScore = score; best = node; }
+			}
 		}
+		if (best && pass === 0) return best;
 	}
 	return best;
 }
 
+function graphStatusLine() {
+	if (!snapshot) return 'Idle';
+	const totalNodes = (snapshot.nodes || []).length;
+	const totalEdges = (snapshot.edges || []).length;
+	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
+	const maxEdges = Math.max(40, settings.maxRenderedEdges || 420);
+	const renderedNodes = Math.min(totalNodes, maxNodes);
+	const renderedEdges = Math.min(totalEdges, maxEdges);
+	const omittedN = Math.max(0, totalNodes - renderedNodes);
+	const omittedE = Math.max(0, totalEdges - renderedEdges);
+	let base = (diagnostics && diagnostics.message)
+		|| (totalNodes + ' nodes · ' + totalEdges + ' links');
+	if (omittedN || omittedE) {
+		base += ' · showing ' + renderedNodes + '/' + totalNodes + ' nodes, '
+			+ renderedEdges + '/' + totalEdges + ' edges'
+			+ ' (omitted ' + omittedN + ' nodes, ' + omittedE + ' edges)';
+	}
+	return 'Code Graph · ' + base + ' · drag to rotate · scroll to zoom';
+}
+
 function render(full) {
-	const network = isNetwork();
-	idleToggleWrap.style.display = network ? 'flex' : 'none';
+	idleToggleWrap.classList.add('is-visible');
 	idleToggle.checked = !!settings.networkIdleAutoRotate;
 
 	if (!snapshot || !(snapshot.nodes || []).length) {
-		archSvg.style.display = 'none';
 		netCanvas.style.display = 'none';
 		legend.style.display = 'none';
 		empty.style.display = 'flex';
@@ -968,26 +1104,19 @@ function render(full) {
 	}
 
 	empty.style.display = 'none';
-	status.textContent = ((diagnostics && diagnostics.message) || (snapshot.nodes.length + ' nodes · ' + (snapshot.edges || []).length + ' links'))
-		+ (network ? ' · drag to rotate · scroll to zoom' : '');
-	updateLegend(snapshot, network);
+	status.textContent = graphStatusLine();
+	updateLegend(snapshot, true);
 
-	if (network) {
-		archSvg.style.display = 'none';
-		netCanvas.style.display = 'block';
-		rebuildBase3d(snapshot);
-		resizeCanvas();
-		projectAll();
-		dirty = true;
-		drawNetworkFrame();
-	} else {
-		renderArchitecture(snapshot);
-	}
+	netCanvas.style.display = 'block';
+	rebuildBase3d(snapshot);
+	resizeCanvas();
+	projectAll();
+	dirty = true;
+	drawNetworkFrame();
 }
 
 function onSnapshotMessage(payload) {
 	const prevScan = snapshot && snapshot.scannedAt;
-	const prevLayout = snapshot && snapshot.layoutMode;
 	const prevNetLayout = snapshot && snapshot.networkLayoutMode;
 	const prevType = snapshot && snapshot.graphType;
 	const prevMaxNodes = settings.maxRenderedNodes;
@@ -998,32 +1127,38 @@ function onSnapshotMessage(payload) {
 	if (payload && payload.graphType) graphType = payload.graphType;
 	else if (snapshot && snapshot.graphType) graphType = snapshot.graphType;
 	// Host clears with null; must apply even when falsy (old !== undefined missed undefined clears).
-	if (payload && 'selectedNodeId' in payload) selectedNodeId = payload.selectedNodeId || null;
+	if (payload && 'selectedNodeId' in payload) {
+		const nextSel = payload.selectedNodeId || null;
+		if (nextSel !== selectedNodeId) {
+			applySelectionMorph(nextSel);
+		}
+	}
+	if (payload && 'hiddenCommunityIds' in payload) setHiddenCommunityIds(payload.hiddenCommunityIds);
+	if (selectedNodeId && snapshot) {
+		const sel = (snapshot.nodes || []).find(function (n) { return n.id === selectedNodeId; });
+		if (!sel || isNodeHiddenByCommunity(sel)) {
+			applySelectionMorph(null);
+			clearMorphState();
+		}
+	}
 	idleToggle.checked = !!settings.networkIdleAutoRotate;
 	if (!settings.networkIdleAutoRotate || settings.reduceMotion) idlePaused = true;
-	else if (isNetwork()) scheduleIdleResume();
+	else scheduleIdleResume();
 
 	const nextScan = snapshot && snapshot.scannedAt;
-	const nextLayout = snapshot && snapshot.layoutMode;
 	const nextNetLayout = snapshot && snapshot.networkLayoutMode;
 	const nextType = snapshot && snapshot.graphType;
-	const layoutChanged = prevScan !== nextScan || prevLayout !== nextLayout || prevNetLayout !== nextNetLayout || prevType !== nextType || !prevScan;
+	const layoutChanged = prevScan !== nextScan || prevNetLayout !== nextNetLayout || prevType !== nextType || !prevScan;
 	const renderBudgetChanged = prevMaxNodes !== settings.maxRenderedNodes || prevMaxEdges !== settings.maxRenderedEdges;
-	// Selection / diagnostics-only pushes must not rebuild Architecture DOM (no relayout on select).
 	if (!layoutChanged && !renderBudgetChanged && snapshot && (snapshot.nodes || []).length) {
 		empty.style.display = 'none';
-		status.textContent = ((diagnostics && diagnostics.message) || (snapshot.nodes.length + ' nodes · ' + (snapshot.edges || []).length + ' links'))
-			+ (isNetwork() ? ' · drag to rotate · scroll to zoom' : '');
-		updateLegend(snapshot, isNetwork());
-		if (isNetwork()) {
-			dirty = true;
-			drawNetworkFrame();
-		} else {
-			updateArchitectureSelection();
-		}
+		status.textContent = graphStatusLine();
+		updateLegend(snapshot, true);
+		dirty = true;
+		drawNetworkFrame();
 		return;
 	}
-	if (layoutChanged && isNetwork()) resetCamera(false);
+	if (layoutChanged) resetCamera(false);
 	render(layoutChanged);
 	if (layoutChanged && snapshot && snapshot.nodes && snapshot.nodes.length) fitView();
 }
@@ -1037,24 +1172,18 @@ window.addEventListener('message', function (event) {
 		return;
 	}
 	if (msg.type === 'snapshot') { onSnapshotMessage(msg.payload); return; }
-	if (msg.type === 'resetView') {
-		resetCamera(false);
-		if (isNetwork()) { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
-		else fitView();
-		return;
-	}
-	if (msg.type === 'fitView') { if (isNetwork()) projectAll(); fitView(); if (isNetwork()) { dirty = true; drawNetworkFrame(); } }
+	if (msg.type === 'resetView') { resetCamera(false); projectAll(); dirty = true; drawNetworkFrame(); fitView(); return; }
+	if (msg.type === 'fitView') { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
 });
 
 function closePopup() {
 	popup.style.display = 'none';
 	popupNode = null;
-	if (isNetwork()) scheduleIdleResume();
+	scheduleIdleResume();
 }
 
 function placePopupNear(clientX, clientY) {
-	const host = isNetwork() ? netCanvas : archSvg;
-	const rect = host.getBoundingClientRect();
+	const rect = netCanvas.getBoundingClientRect();
 	const pw = Math.min(320, rect.width - 24);
 	let left = clientX - rect.left + 12;
 	let top = clientY - rect.top + 12;
@@ -1069,21 +1198,53 @@ async function openNodePopup(node, clientX, clientY) {
 	if (!node) return;
 	clearIdleTimers();
 	popupNode = node;
-	selectedNodeId = node.id;
+	applySelectionMorph(node.id);
 	popupTitle.textContent = node.label || node.id;
-	popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '');
-	popupOverview.textContent = 'Loading…';
-	popupAi.textContent = '…';
+	const community = node.meta && node.meta.communityLabel
+		? node.meta.communityLabel
+		: (node.meta && typeof node.meta.communityId === 'number' ? ('Community ' + node.meta.communityId) : '');
+	const kindBits = [node.kind, node.path, community, node.meta && node.meta.architectureLayer].filter(Boolean);
+	popupMeta.textContent = kindBits.join(' · ');
+	popupOverview.textContent = 'Loading structure…';
+	popupAi.textContent = 'Not requested. Use “Request AI description” for an optional model summary.';
 	placePopupNear(clientX, clientY);
+	// selectNode cancels any in-flight AI describe; explainNode is local-only.
 	request('selectNode', { nodeId: node.id });
-	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection();
-	const desc = await request('describeNode', { nodeId: node.id });
+	dirty = true; drawNetworkFrame();
+
+	const explained = await request('explainNode', { nodeId: node.id });
 	if (!popupNode || popupNode.id !== node.id) return;
-	popupOverview.textContent = (desc && desc.overview) || 'No overview.';
-	if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
-		popupAi.textContent = desc.aiDescription + (desc.cacheHit ? ' (cached)' : '');
+	if (explained && explained.found) {
+		const conf = explained.confidence || {};
+		const deg = explained.degrees || {};
+		const lines = [
+			'Kind: ' + (explained.kind || node.kind || '—'),
+			'Community: ' + (explained.communityLabel || community || '—'),
+			'Degree in/out/total: ' + [deg.inDegree, deg.outDegree, deg.degree].map(function (v) { return v == null ? '—' : v; }).join(' / '),
+			'Confidence: EXTRACTED ' + (conf.EXTRACTED || 0)
+				+ ' · INFERRED ' + (conf.INFERRED || 0)
+				+ ' · AMBIGUOUS ' + (conf.AMBIGUOUS || 0)
+				+ ' · unknown ' + (conf.unknown || 0)
+		];
+		if (explained.important) {
+			lines.push('Important: rank ' + explained.important.rank + ' · ' + (explained.important.reason || ''));
+		}
+		const outKinds = Object.keys(explained.outbound || {}).sort();
+		const inKinds = Object.keys(explained.inbound || {}).sort();
+		if (outKinds.length) {
+			lines.push('Outgoing: ' + outKinds.map(function (k) {
+				return k + '×' + ((explained.outbound[k] && explained.outbound[k].length) || 0);
+			}).join(', '));
+		}
+		if (inKinds.length) {
+			lines.push('Incoming: ' + inKinds.map(function (k) {
+				return k + '×' + ((explained.inbound[k] && explained.inbound[k].length) || 0);
+			}).join(', '));
+		}
+		// Outer TS template eats one backslash level; keep join newline as webview JS escape.
+		popupOverview.textContent = lines.join('\\n');
 	} else {
-		popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
+		popupOverview.textContent = 'No local structure explanation.';
 	}
 }
 
@@ -1099,14 +1260,9 @@ function onPointerDown(e, host) {
 	dragThreshold = thresholdForPointer(e.pointerType);
 	dragging = true; moved = false; lastX = e.clientX; lastY = e.clientY;
 	pointerDownX = e.clientX; pointerDownY = e.clientY;
-	pointerDownNode = isNetwork()
-		? pickNetworkNode(e.clientX, e.clientY)
-		: pickArchitectureNode(e.clientX, e.clientY);
-	// Architecture: pan only from background (or middle/shift). Node press must not pan,
-	// or tiny moves cancel selection.
-	const wantPan = e.button === 1 || e.shiftKey || (!isNetwork() && !pointerDownNode);
+	pointerDownNode = pickNetworkNode(e.clientX, e.clientY);
+	const wantPan = e.button === 1 || e.shiftKey;
 	panning = wantPan;
-	// Defer rotate until drag exceeds click threshold so node reselection works.
 	rotating = false;
 	host.classList.add('dragging');
 	if (panning) {
@@ -1124,63 +1280,45 @@ function onPointerUp(e, cancelled) {
 	dragging = false; panning = false; rotating = false;
 	interactionState = cancelled ? 'cancelled' : 'idle';
 	pointerDownNode = null;
-	archSvg.classList.remove('dragging'); archSvg.classList.remove('panning');
 	netCanvas.classList.remove('dragging');
+	netCanvas.classList.remove('panning');
 	const dist = e ? Math.hypot((e.clientX || 0) - pointerDownX, (e.clientY || 0) - pointerDownY) : 99;
 	if (e && !wasMoved && dist <= dragThreshold) {
-		if (isNetwork()) {
-			const node = pickNetworkNode(e.clientX, e.clientY);
-			if (node) {
-				openNodePopup(node, e.clientX, e.clientY);
-				return;
-			}
-			selectedNodeId = null;
-			request('selectNode', { nodeId: null });
-			closePopup();
-			dirty = true; drawNetworkFrame();
-		} else {
-			const node = pickArchitectureNode(e.clientX, e.clientY);
-			if (node) {
-				openNodePopup(node, e.clientX, e.clientY);
-				return;
-			}
-			selectedNodeId = null;
-			request('selectNode', { nodeId: null });
-			closePopup();
-			updateArchitectureSelection();
+		const node = pickNetworkNode(e.clientX, e.clientY);
+		if (node) {
+			openNodePopup(node, e.clientX, e.clientY);
+			return;
 		}
+		applySelectionMorph(null);
+		request('selectNode', { nodeId: null });
+		closePopup();
+		dirty = true; drawNetworkFrame();
 	}
-	if (isNetwork()) scheduleIdleResume();
+	scheduleIdleResume();
 }
 function onPointerMove(e) {
 	if (!dragging || e.pointerId !== activePointerId) return;
 	const dx = e.clientX - lastX, dy = e.clientY - lastY;
 	const total = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
 	if (total > dragThreshold) moved = true;
-	if (interactionState === 'pressed' && !panning && isNetwork() && moved) {
+	if (interactionState === 'pressed' && !panning && moved) {
 		rotating = true;
 		interactionState = 'rotating';
 		scheduleIdleResume();
 	}
 	lastX = e.clientX; lastY = e.clientY;
-	if (rotating && isNetwork()) {
+	if (rotating) {
 		const mapped = mapPointerDeltaToGraphRotation(dx, dy);
 		rotation.yaw = wrapRotationAngle(rotation.yaw + mapped.yaw);
 		rotation.pitch = wrapRotationAngle(rotation.pitch + mapped.pitch);
 		dirty = true;
-		kickRaf();
 		return;
 	}
 	if (!moved) return;
-	if (!panning && !isNetwork() && pointerDownNode) {
-		// Node gesture exceeded click threshold: treat as cancelled click, do not pan.
-		interactionState = 'cancelled';
-		return;
-	}
 	if (!panning) return;
 	interactionState = 'panning';
 	transform.x += dx; transform.y += dy;
-	if (isNetwork()) { dirty = true; kickRaf(); } else applyArchTransform();
+	dirty = true;
 }
 function onWheel(e) {
 	e.preventDefault();
@@ -1188,43 +1326,21 @@ function onWheel(e) {
 	const factor = e.deltaY < 0 ? 1.1 : 0.9;
 	const prev = transform.k;
 	transform.k = Math.min(3.5, Math.max(0.15, transform.k * factor));
-	const host = isNetwork() ? netCanvas : archSvg;
-	const rect = host.getBoundingClientRect();
+	const rect = netCanvas.getBoundingClientRect();
 	const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 	transform.x = mx - (mx - transform.x) * (transform.k / prev);
 	transform.y = my - (my - transform.y) * (transform.k / prev);
-	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else applyArchTransform();
+	dirty = true; drawNetworkFrame();
 }
 
-archSvg.addEventListener('pointerdown', function (e) { onPointerDown(e, archSvg); });
 netCanvas.addEventListener('pointerdown', function (e) { onPointerDown(e, netCanvas); });
-archSvg.addEventListener('pointermove', onPointerMove);
 netCanvas.addEventListener('pointermove', onPointerMove);
-archSvg.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
 netCanvas.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
-archSvg.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
 netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
-archSvg.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
 netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
-archSvg.addEventListener('dblclick', function (e) {
-	const node = pickArchitectureNode(e.clientX, e.clientY);
-	if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
-});
-archSvg.addEventListener('contextmenu', function (e) {
-	const node = pickArchitectureNode(e.clientX, e.clientY);
-	if (!node) return;
-	e.preventDefault();
-	openNodePopup(node, e.clientX, e.clientY);
-});
 netCanvas.addEventListener('dblclick', function (e) {
 	const node = pickNetworkNode(e.clientX, e.clientY);
 	if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
-});
-// Hover cursor for architecture without selecting
-archSvg.addEventListener('pointermove', function (e) {
-	if (dragging) return;
-	const node = pickArchitectureNode(e.clientX, e.clientY);
-	archSvg.style.cursor = node ? 'pointer' : 'grab';
 });
 document.getElementById('popupClose').onclick = function () { closePopup(); };
 document.getElementById('popupOpen').onclick = function () {
@@ -1234,27 +1350,34 @@ document.getElementById('popupReveal').onclick = function () {
 	if (popupNode) request('revealFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
 };
 document.getElementById('popupMagnus').onclick = function () { request('attachToMagnus', {}); };
+document.getElementById('popupExplainAi').onclick = async function () {
+	if (!popupNode) return;
+	const nodeId = popupNode.id;
+	popupAi.textContent = 'Requesting AI description…';
+	const desc = await request('describeNode', { nodeId: nodeId });
+	if (!popupNode || popupNode.id !== nodeId) return;
+	if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
+		popupAi.textContent = desc.aiDescription + (desc.cacheHit ? ' (cached)' : '');
+	} else {
+		popupAi.textContent = (desc && (desc.aiMessage || desc.overview)) || 'AI description unavailable.';
+	}
+};
 window.addEventListener('keydown', function (e) {
-	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection(); }
+	if (e.key === 'Escape') { closePopup(); applySelectionMorph(null); request('selectNode', { nodeId: null }); dirty = true; drawNetworkFrame(); }
 });
-archSvg.addEventListener('wheel', onWheel, { passive: false });
 netCanvas.addEventListener('wheel', onWheel, { passive: false });
-window.addEventListener('resize', function () { if (isNetwork()) { resizeCanvas(); dirty = true; drawNetworkFrame(); } });
+window.addEventListener('resize', function () { resizeCanvas(); dirty = true; drawNetworkFrame(); });
 
 document.getElementById('zoomIn').onclick = function () {
 	transform.k = Math.min(3.5, transform.k * 1.15); dirty = true;
-	if (isNetwork()) drawNetworkFrame(); else applyArchTransform();
+	drawNetworkFrame();
 };
 document.getElementById('zoomOut').onclick = function () {
 	transform.k = Math.max(0.15, transform.k / 1.15); dirty = true;
-	if (isNetwork()) drawNetworkFrame(); else applyArchTransform();
+	drawNetworkFrame();
 };
-document.getElementById('fit').onclick = function () { if (isNetwork()) projectAll(); fitView(); if (isNetwork()) { dirty = true; drawNetworkFrame(); } };
-document.getElementById('reset').onclick = function () {
-	resetCamera(false);
-	if (isNetwork()) { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
-	else fitView();
-};
+document.getElementById('fit').onclick = function () { projectAll(); fitView(); dirty = true; drawNetworkFrame(); };
+document.getElementById('reset').onclick = function () { resetCamera(false); projectAll(); dirty = true; drawNetworkFrame(); fitView(); };
 idleToggle.addEventListener('change', function () {
 	settings.networkIdleAutoRotate = !!idleToggle.checked;
 	request('setNetworkIdleAutoRotate', { enabled: settings.networkIdleAutoRotate });
@@ -1263,32 +1386,36 @@ idleToggle.addEventListener('change', function () {
 
 function rafLoop(ts) {
 	rafScheduled = false;
-	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
+	const dt = clampMorphDt((ts - (lastRafTs || ts)) / 1000);
 	lastRafTs = ts;
-	const animating = isNetwork() && settings.networkIdleAutoRotate && !settings.reduceMotion && !idlePaused && !dragging && !document.hidden && snapshot;
+	const morphing = advanceMorphAnimations(ts);
+	if (morphing) dirty = true;
+	const animating = settings.networkIdleAutoRotate && !settings.reduceMotion && !idlePaused && !dragging && !document.hidden && snapshot;
 	if (animating) {
 		rotation.yaw += IDLE_YAW * dt;
 		dirty = true;
 	}
-	if (dirty && isNetwork() && snapshot) drawNetworkFrame();
-	// Keep the loop alive only while idle rotation is actively advancing frames.
-	if (animating) kickRaf();
+	if (dirty && snapshot) drawNetworkFrame();
+	if (animating || morphing) kickRaf();
 }
 kickRaf();
 
-window.addEventListener('pagehide', clearIdleTimers);
+window.addEventListener('pagehide', function () { clearIdleTimers(); clearMorphState(); });
 document.addEventListener('visibilitychange', function () {
 	if (document.hidden) idlePaused = true;
-	else if (isNetwork()) scheduleIdleResume();
+	else scheduleIdleResume();
 });
 
 request('getSnapshot').then(function (res) {
 	snapshot = res && res.snapshot;
 	diagnostics = res && res.diagnostics;
-	selectedNodeId = (res && res.selectedNodeId) || null;
 	if (res && res.settings) settings = res.settings;
+	const initialSel = (res && res.selectedNodeId) || null;
+	if (initialSel) {
+		applySelectionMorph(initialSel);
+	}
 	if (snapshot && snapshot.graphType) graphType = snapshot.graphType;
-	if (isNetwork()) resetCamera(false);
+	resetCamera(false);
 	render(true);
 	if (snapshot && snapshot.nodes && snapshot.nodes.length) fitView();
 	scheduleIdleResume();

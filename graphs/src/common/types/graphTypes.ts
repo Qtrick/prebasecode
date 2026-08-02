@@ -6,6 +6,9 @@ export type NodeKind = 'folder' | 'file' | 'function' | 'component' | 'service' 
 
 export type EdgeKind = 'import' | 'export' | 'reference' | 'contains' | 'dependency'
 
+/** Edge provenance strength for Code Graph answers (optional; backward compatible). */
+export type EdgeConfidence = 'EXTRACTED' | 'INFERRED' | 'AMBIGUOUS'
+
 export interface GraphNode {
 	id: string
 	kind: NodeKind
@@ -24,6 +27,11 @@ export interface GraphNode {
 		architectureLayer?: string
 		importance?: number
 		isMetadata?: boolean
+		communityId?: number
+		communityLabel?: string
+		degree?: number
+		inDegree?: number
+		outDegree?: number
 	}
 }
 
@@ -37,7 +45,13 @@ export interface GraphEdge {
 		specifiers?: string[]
 		isDefault?: boolean
 		isDynamic?: boolean
+		/** @deprecated Prefer sourceLine; kept for older snapshots. */
 		line?: number
+		confidence?: EdgeConfidence
+		sourceFile?: string
+		/** 1-based call-site / import line when known. */
+		sourceLine?: number
+		reason?: string
 	}
 }
 
@@ -56,9 +70,11 @@ export interface GraphSnapshot {
 	nodes: GraphNode[]
 	edges: GraphEdge[]
 	positions: Record<string, LayoutPosition>
-	/** Canonical 3D base positions for Network Graph (never overwrite with projected coords). */
+	/** Canonical 3D base positions for the Code Graph canvas (never overwrite with projected coords). */
 	positions3d?: Record<string, LayoutPosition3D>
 	networkLayoutMode?: string
+	/** Optional schema marker; Code Graph enrichment uses 2. */
+	schemaVersion?: number
 	projectPath: string
 	projectName: string
 	entryNodeId: string | null
@@ -92,6 +108,8 @@ export interface ImportRef {
 	source: string
 	specifiers: string[]
 	isDefault?: boolean
+	/** True for `import()` / similar runtime loads (not static ImportDeclaration). */
+	isDynamic?: boolean
 	line?: number
 }
 

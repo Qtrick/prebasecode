@@ -22,9 +22,17 @@ function runMochaOnSource(testRelPath) {
 }
 
 const tests = [
-	'graphs/src/tests/unit/architecturePick.test.ts',
 	'graphs/src/tests/unit/networkLayout.test.ts',
 	'graphs/src/tests/unit/graphOwnershipBoundary.test.ts',
+	'graphs/src/tests/unit/graphProduct.test.ts',
+	'graphs/src/tests/unit/graphConfidence.test.ts',
+	'graphs/src/tests/unit/communities.test.ts',
+	'graphs/src/tests/unit/graphQuery.test.ts',
+	'graphs/src/tests/unit/bridgeNodes.test.ts',
+	'graphs/src/tests/unit/explainNode.test.ts',
+	'graphs/src/tests/unit/surprisingConnections.test.ts',
+	'graphs/src/tests/unit/selectedNodeCard.test.ts',
+	'graphs/src/tests/unit/graphWebviewHtml.test.ts',
 ];
 
 for (const test of tests) {

@@ -296,8 +296,18 @@ export class PreBaseSettingsEditor extends EditorPane {
 			accentCheckbox: () => this._accentCheckbox(),
 			range: (min, max, step, value) => this._range(min, max, step, value),
 			btn: (label, primary) => this._btn(label, primary),
-			sessionLayoutMode: () => this.graphService.getViewState().layoutMode,
-			setLayoutMode: (mode) => this.graphService.setLayoutMode(mode),
+			sessionLayoutMode: () => {
+				const networkMode = this.graphService.getSnapshot()?.networkLayoutMode;
+				if (typeof networkMode === 'string' && networkMode.length) {
+					return networkMode;
+				}
+				// Stable setting id — graph Settings UI owns the typed config enum.
+				return this._get('prebase.graph.networkLayoutMode', 'community');
+			},
+			setLayoutMode: async (mode: string) => {
+				await this._set('prebase.graph.networkLayoutMode', mode);
+				await this.graphService.relayout();
+			},
 			relayout: async () => { await this.graphService.relayout(); },
 		};
 	}

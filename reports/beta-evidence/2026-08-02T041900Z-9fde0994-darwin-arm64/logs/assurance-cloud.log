@@ -1,0 +1,31 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 assurance:cloud
+> npm run verify:supabase-migrations && npm run verify:supabase-rls-static && npm run verify:supabase-secrets
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:supabase-migrations
+> node scripts/supabase/verify-migrations.mjs
+
+verify:supabase-migrations: 5 migrations, 6 tables, RLS OK
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:supabase-rls-static
+> node scripts/supabase/verify-rls-static.mjs
+
+verify:supabase-rls-static: PASS (policy shape)
+Runtime adversarial checklist (manual / CI test project):
+ - Create User A and User B via Auth
+ - As A: insert profile, preferences, session, run, event
+ - As B: SELECT each table — expect 0 rows from A
+ - As B: UPDATE/DELETE A rows — expect deny
+ - As B: INSERT with user_id=A — expect deny
+ - Anonymous + publishable key only — expect deny on all user tables
+ - As A: INSERT into agent_usage — expect deny (server-only writes)
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:supabase-secrets
+> node scripts/supabase/verify-no-secrets-in-source.mjs
+
+verify-no-secrets-in-source: PASS

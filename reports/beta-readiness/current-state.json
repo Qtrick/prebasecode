@@ -1,0 +1,943 @@
+{
+  "runId": "2026-08-02T041900Z-9fde0994-darwin-arm64",
+  "branch": "main",
+  "commit": "9fde099426b124063653c99e4ab8e56278e9d803",
+  "generatedAt": "2026-08-02T04:23:29.221686+00:00",
+  "decision": "NO-GO",
+  "iconsMatch": true,
+  "commands": [
+    {
+      "name": "verify-icons",
+      "exitCode": 0,
+      "durationSec": 0.227,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-icons.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-graphs-boundary",
+      "exitCode": 0,
+      "durationSec": 1.443,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-graphs-boundary.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-typescript",
+      "exitCode": 0,
+      "durationSec": 0.393,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-typescript.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-privacy",
+      "exitCode": 0,
+      "durationSec": 0.145,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-privacy.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-config-uniqueness",
+      "exitCode": 0,
+      "durationSec": 0.142,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-config-uniqueness.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-supabase-migrations",
+      "exitCode": 0,
+      "durationSec": 0.143,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-supabase-migrations.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-supabase-rls-static",
+      "exitCode": 0,
+      "durationSec": 0.142,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-supabase-rls-static.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-supabase-secrets",
+      "exitCode": 0,
+      "durationSec": 1.056,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-supabase-secrets.log",
+      "result": "pass"
+    },
+    {
+      "name": "typecheck-graphs",
+      "exitCode": 0,
+      "durationSec": 0.29,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/typecheck-graphs.log",
+      "result": "pass"
+    },
+    {
+      "name": "test-graphs",
+      "exitCode": 0,
+      "durationSec": 1.688,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/test-graphs.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-startup",
+      "exitCode": 0,
+      "durationSec": 0.144,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-startup.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-graphs-out",
+      "exitCode": 0,
+      "durationSec": 0.143,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-graphs-out.log",
+      "result": "pass"
+    },
+    {
+      "name": "assurance-privacy",
+      "exitCode": 0,
+      "durationSec": 1.255,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/assurance-privacy.log",
+      "result": "pass"
+    },
+    {
+      "name": "assurance-cloud",
+      "exitCode": 0,
+      "durationSec": 1.033,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/assurance-cloud.log",
+      "result": "pass"
+    },
+    {
+      "name": "assurance-graphs",
+      "exitCode": 0,
+      "durationSec": 3.073,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/assurance-graphs.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-eslint-prebase",
+      "exitCode": 1,
+      "durationSec": 1.841,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-eslint-prebase.log",
+      "result": "fail"
+    },
+    {
+      "name": "assurance-package",
+      "exitCode": 0,
+      "durationSec": 2.165,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/assurance-package.log",
+      "result": "pass"
+    },
+    {
+      "name": "typecheck-client",
+      "exitCode": 1,
+      "durationSec": 6.497,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/typecheck-client.log",
+      "result": "fail"
+    },
+    {
+      "name": "npm-audit-omit-dev",
+      "exitCode": 1,
+      "durationSec": 1.267,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/npm-audit-omit-dev.log",
+      "result": "fail"
+    },
+    {
+      "name": "typecheck-client-rerun",
+      "exitCode": 1,
+      "durationSec": 5.703,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/typecheck-client-rerun.log",
+      "result": "fail"
+    },
+    {
+      "name": "typecheck-graphs-rerun",
+      "exitCode": 0,
+      "durationSec": 0.269,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/typecheck-graphs-rerun.log",
+      "result": "pass"
+    },
+    {
+      "name": "typecheck-graphs-preserved",
+      "exitCode": 0,
+      "durationSec": 0.178,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/typecheck-graphs-preserved.log",
+      "result": "pass"
+    },
+    {
+      "name": "test-graphs-rerun",
+      "exitCode": 0,
+      "durationSec": 1.603,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/test-graphs-rerun.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-icons-rerun",
+      "exitCode": 0,
+      "durationSec": 0.2,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-icons-rerun.log",
+      "result": "pass"
+    },
+    {
+      "name": "assurance-quick",
+      "exitCode": 1,
+      "durationSec": 7.672,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/assurance-quick.log",
+      "result": "fail"
+    },
+    {
+      "name": "typecheck-client-v3",
+      "exitCode": 0,
+      "durationSec": 5.916,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/typecheck-client-v3.log",
+      "result": "pass"
+    },
+    {
+      "name": "assurance-quick-v2",
+      "exitCode": 1,
+      "durationSec": 1.159,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/assurance-quick-v2.log",
+      "result": "fail"
+    },
+    {
+      "name": "verify-icons-final",
+      "exitCode": 0,
+      "durationSec": 0.167,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-icons-final.log",
+      "result": "pass"
+    },
+    {
+      "name": "assurance-quick-v3",
+      "exitCode": 1,
+      "durationSec": 0.865,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/assurance-quick-v3.log",
+      "result": "fail"
+    },
+    {
+      "name": "verify-icons-v3",
+      "exitCode": 0,
+      "durationSec": 0.151,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-icons-v3.log",
+      "result": "pass"
+    },
+    {
+      "name": "assurance-quick-v4",
+      "exitCode": 0,
+      "durationSec": 10.335,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/assurance-quick-v4.log",
+      "result": "pass"
+    },
+    {
+      "name": "verify-icons-v4",
+      "exitCode": 0,
+      "durationSec": 0.15,
+      "log": "reports/beta-evidence/2026-08-02T041900Z-9fde0994-darwin-arm64/logs/verify-icons-v4.log",
+      "result": "pass"
+    }
+  ],
+  "items": {
+    "BETA-001": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Locally verified (static+unit); GUI Settings smoke missing; CI remote missing",
+      "implementationFiles": [
+        "graphs/src/**",
+        "src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts"
+      ],
+      "existingEvidence": [
+        "verify-graphs-boundary",
+        "typecheck-graphs-rerun",
+        "typecheck-client-v3",
+        "test-graphs-rerun",
+        "assurance-quick-v4"
+      ],
+      "missingEvidence": [
+        "GUI Settings smoke",
+        "remote CI green"
+      ],
+      "dependencies": [
+        "BETA-002",
+        "BETA-004",
+        "BETA-027",
+        "BETA-037"
+      ],
+      "plannedActions": [
+        "GUI Settings smoke",
+        "CI evidence"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-002": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Statically verified only (local verifier pass; remote CI not re-proven this run)",
+      "implementationFiles": [
+        "graphs/scripts/verify-boundary/verify.mjs",
+        ".github/workflows/"
+      ],
+      "existingEvidence": [
+        "local verify-graphs-boundary pass"
+      ],
+      "missingEvidence": [
+        "actual GitHub Actions run ID"
+      ],
+      "dependencies": [
+        "BETA-027"
+      ],
+      "plannedActions": [
+        "obtain remote PR run"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-003": {
+      "trackerStatus": "Deferred After Beta",
+      "observedState": "Obsolete or superseded",
+      "implementationFiles": [
+        "graphs/src/preserved/architecture/**"
+      ],
+      "existingEvidence": [
+        "product UI absence (source)",
+        "ownership tests"
+      ],
+      "missingEvidence": [
+        "GUI absence screenshot"
+      ],
+      "dependencies": [
+        "BETA-037"
+      ],
+      "plannedActions": [
+        "GUI absence screenshot"
+      ],
+      "proposedStatus": "Deferred After Beta"
+    },
+    "BETA-004": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Implemented but untested (GUI)",
+      "implementationFiles": [
+        "graphs/src/host/workbench/graphEditor.ts",
+        "graphs/src/presentation/selectedNodeCard.ts"
+      ],
+      "existingEvidence": [
+        "unit morph tests",
+        "webview parse"
+      ],
+      "missingEvidence": [
+        "GUI morph matrix screenshots/recording"
+      ],
+      "dependencies": [
+        "BETA-037"
+      ],
+      "plannedActions": [
+        "execute GRAPH_ACCEPTANCE morph rows"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-005": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Locally verified",
+      "implementationFiles": [
+        "graphs/src/tests/unit/**",
+        "graphs/scripts/run-unit-tests.mjs"
+      ],
+      "existingEvidence": [
+        "test:graphs 54 pass local"
+      ],
+      "missingEvidence": [
+        "CI test job green"
+      ],
+      "dependencies": [
+        "BETA-027"
+      ],
+      "plannedActions": [
+        "CI evidence"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-006": {
+      "trackerStatus": "Complete",
+      "observedState": "Complete with current evidence (revalidated verify:typescript this run)",
+      "implementationFiles": [
+        "graphs/scripts/verify-typescript-lanes.mjs",
+        "package.json"
+      ],
+      "existingEvidence": [
+        "verify-typescript pass"
+      ],
+      "missingEvidence": [],
+      "dependencies": [],
+      "plannedActions": [],
+      "proposedStatus": "Complete"
+    },
+    "BETA-007": {
+      "trackerStatus": "Complete",
+      "observedState": "Complete with current evidence; TS 7.1 API still pending per official docs 2026-07-08",
+      "implementationFiles": [
+        "@typescript/typescript6"
+      ],
+      "existingEvidence": [
+        "verify-typescript"
+      ],
+      "missingEvidence": [],
+      "dependencies": [
+        "BETA-021"
+      ],
+      "plannedActions": [
+        "keep dual lane until 7.1 API"
+      ],
+      "proposedStatus": "Complete"
+    },
+    "BETA-008": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Partially implemented",
+      "implementationFiles": [
+        "build scripts"
+      ],
+      "existingEvidence": [
+        "spot compiles historically"
+      ],
+      "missingEvidence": [
+        "full extension compile matrix"
+      ],
+      "dependencies": [
+        "BETA-029"
+      ],
+      "plannedActions": [
+        "full compile-extensions"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-009": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Statically verified only / ratchet failed this run earlier",
+      "implementationFiles": [
+        "scripts/assurance/verify-eslint-prebase.mjs"
+      ],
+      "existingEvidence": [
+        "verify-eslint-prebase exit=1 this run \u2014 investigate"
+      ],
+      "missingEvidence": [
+        "green ratchet after dirty tree"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "inspect eslint-prebase log; fix or document"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-010": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Statically verified only (verify:startup launch skipped)",
+      "implementationFiles": [
+        "scripts/startup/**"
+      ],
+      "existingEvidence": [
+        "static startup PASS"
+      ],
+      "missingEvidence": [
+        "C1\u2013C5 GUI with screenshots"
+      ],
+      "dependencies": [
+        "BETA-032"
+      ],
+      "plannedActions": [
+        "PREBASE_STARTUP_LAUNCH=1 + CORE_IDE matrix"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-011": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Implemented but untested",
+      "implementationFiles": [
+        "CORE_IDE_ACCEPTANCE.md"
+      ],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "E1\u2013E6 GUI"
+      ],
+      "dependencies": [
+        "BETA-010"
+      ],
+      "plannedActions": [
+        "manual/automated smoke"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-012": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Partially implemented",
+      "implementationFiles": [
+        "extensions/prebase-magnus/**",
+        "graphs graph Magnus cmds"
+      ],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "session evidence"
+      ],
+      "dependencies": [
+        "BETA-037"
+      ],
+      "plannedActions": [
+        "Magnus mode matrix"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-013": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Partially implemented",
+      "implementationFiles": [
+        "runtime preview contrib"
+      ],
+      "existingEvidence": [
+        "privacy static CSP"
+      ],
+      "missingEvidence": [
+        "web/managed/external GUI"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "Runtime Preview acceptance"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-014": {
+      "trackerStatus": "In Progress",
+      "observedState": "Statically verified only",
+      "implementationFiles": [
+        "scripts/privacy/audit.mjs"
+      ],
+      "existingEvidence": [
+        "verify-privacy pass"
+      ],
+      "missingEvidence": [
+        "runtime network observation"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "build CDP/webRequest capture"
+      ],
+      "proposedStatus": "In Progress"
+    },
+    "BETA-015": {
+      "trackerStatus": "Blocked",
+      "observedState": "Externally blocked (signing) + package artifact missing",
+      "implementationFiles": [
+        "docs/PACKAGING.md",
+        "scripts/release/**"
+      ],
+      "existingEvidence": [
+        "assurance-package informational; signing vars missing"
+      ],
+      "missingEvidence": [
+        "unsigned full package artifact+hash+launch"
+      ],
+      "dependencies": [
+        "BETA-016"
+      ],
+      "plannedActions": [
+        "build unsigned package; signing remains Blocked"
+      ],
+      "proposedStatus": "Blocked"
+    },
+    "BETA-016": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Locally verified",
+      "implementationFiles": [
+        "build/icons/icon-integrity.sha256"
+      ],
+      "existingEvidence": [
+        "verify:icons 101/101; checksums match"
+      ],
+      "missingEvidence": [
+        "CI negative fixture; packaged icon path"
+      ],
+      "dependencies": [
+        "BETA-027",
+        "BETA-015"
+      ],
+      "plannedActions": [
+        "CI evidence"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-017": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Locally verified (quick/privacy/graphs/cloud/package)",
+      "implementationFiles": [
+        "package.json assurance:*"
+      ],
+      "existingEvidence": [
+        "assurance-quick-v4 pass"
+      ],
+      "missingEvidence": [
+        "intentional failure fixture; CI"
+      ],
+      "dependencies": [
+        "BETA-027"
+      ],
+      "plannedActions": [
+        "document skip honesty"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-018": {
+      "trackerStatus": "Not Started",
+      "observedState": "Missing",
+      "implementationFiles": [],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "a11y matrix"
+      ],
+      "dependencies": [
+        "BETA-004"
+      ],
+      "plannedActions": [
+        "execute a11y checklist"
+      ],
+      "proposedStatus": "Not Started"
+    },
+    "BETA-019": {
+      "trackerStatus": "Not Started",
+      "observedState": "Missing",
+      "implementationFiles": [],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "policy drafts+legal"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "engineering drafts"
+      ],
+      "proposedStatus": "Not Started"
+    },
+    "BETA-020": {
+      "trackerStatus": "Deferred After Beta",
+      "observedState": "Safely deferred",
+      "implementationFiles": [
+        "graph config showMinimap"
+      ],
+      "existingEvidence": [
+        "hidden setting historically"
+      ],
+      "missingEvidence": [
+        "Command Palette screenshot"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "GUI absence shot"
+      ],
+      "proposedStatus": "Deferred After Beta"
+    },
+    "BETA-021": {
+      "trackerStatus": "Deferred After Beta",
+      "observedState": "Safely deferred (research 2026-08-02: TS 7.1 API not GA)",
+      "implementationFiles": [
+        "@typescript/typescript6"
+      ],
+      "existingEvidence": [
+        "official TS 7.0 announcement"
+      ],
+      "missingEvidence": [
+        "7.1 API GA"
+      ],
+      "dependencies": [
+        "BETA-007"
+      ],
+      "plannedActions": [
+        "retain dual lane"
+      ],
+      "proposedStatus": "Deferred After Beta"
+    },
+    "BETA-022": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Implemented but untested",
+      "implementationFiles": [
+        "prebaseOnboardingEditor.ts"
+      ],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "first-run GUI"
+      ],
+      "dependencies": [
+        "BETA-033"
+      ],
+      "plannedActions": [
+        "fresh profile onboarding"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-023": {
+      "trackerStatus": "In Progress",
+      "observedState": "Partially implemented",
+      "implementationFiles": [
+        "docs/SECURITY_AND_SUPPLY_CHAIN.md"
+      ],
+      "existingEvidence": [
+        "npm-audit-omit-dev exit=1 findings"
+      ],
+      "missingEvidence": [
+        "reachability+remediation"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "explain shell-quote/tar; no blind fix"
+      ],
+      "proposedStatus": "In Progress"
+    },
+    "BETA-024": {
+      "trackerStatus": "In Progress",
+      "observedState": "Statically verified only (CPU layout bench)",
+      "implementationFiles": [
+        "docs/GRAPH_PERFORMANCE.md"
+      ],
+      "existingEvidence": [
+        "historical layout bench"
+      ],
+      "missingEvidence": [
+        "render/morph FPS"
+      ],
+      "dependencies": [
+        "BETA-004"
+      ],
+      "plannedActions": [
+        "profile renderer"
+      ],
+      "proposedStatus": "In Progress"
+    },
+    "BETA-025": {
+      "trackerStatus": "In Progress",
+      "observedState": "Partially implemented",
+      "implementationFiles": [
+        "PACKAGING.md"
+      ],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "notices inventory"
+      ],
+      "dependencies": [
+        "BETA-015",
+        "BETA-019"
+      ],
+      "plannedActions": [
+        "license inventory"
+      ],
+      "proposedStatus": "In Progress"
+    },
+    "BETA-026": {
+      "trackerStatus": "In Progress",
+      "observedState": "Partially implemented",
+      "implementationFiles": [
+        "docs/**",
+        "graphs/README.md"
+      ],
+      "existingEvidence": [
+        "one-graph docs updated"
+      ],
+      "missingEvidence": [
+        "full stale-string sweep"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "doc audit"
+      ],
+      "proposedStatus": "In Progress"
+    },
+    "BETA-027": {
+      "trackerStatus": "In Progress",
+      "observedState": "Statically verified only",
+      "implementationFiles": [
+        ".github/workflows/"
+      ],
+      "existingEvidence": [
+        "workflow exists historically"
+      ],
+      "missingEvidence": [
+        "remote run ID this HEAD"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "push/PR when instructed"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-028": {
+      "trackerStatus": "Not Started",
+      "observedState": "Missing",
+      "implementationFiles": [],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "NLS migration"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "scope English strings"
+      ],
+      "proposedStatus": "Not Started"
+    },
+    "BETA-029": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Partially implemented",
+      "implementationFiles": [
+        "extensions"
+      ],
+      "existingEvidence": [
+        "historical spot compiles"
+      ],
+      "missingEvidence": [
+        "full matrix"
+      ],
+      "dependencies": [
+        "BETA-008"
+      ],
+      "plannedActions": [
+        "compile-extensions"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-030": {
+      "trackerStatus": "Not Started",
+      "observedState": "Missing",
+      "implementationFiles": [],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "REH/web smoke"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "web compile smoke"
+      ],
+      "proposedStatus": "Not Started"
+    },
+    "BETA-031": {
+      "trackerStatus": "Deferred After Beta",
+      "observedState": "Externally blocked / deferred (npm 11 required)",
+      "implementationFiles": [
+        "preinstall"
+      ],
+      "existingEvidence": [
+        "npm 11.18.0"
+      ],
+      "missingEvidence": [
+        "isolated npm12 trial"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "retain npm11 for beta"
+      ],
+      "proposedStatus": "Deferred After Beta"
+    },
+    "BETA-032": {
+      "trackerStatus": "Needs Verification",
+      "observedState": "Statically verified only",
+      "implementationFiles": [
+        "scripts/startup"
+      ],
+      "existingEvidence": [
+        "verify-startup static; verify-graphs-out"
+      ],
+      "missingEvidence": [
+        "launch with fresh out"
+      ],
+      "dependencies": [
+        "BETA-010"
+      ],
+      "plannedActions": [
+        "launch smoke"
+      ],
+      "proposedStatus": "Needs Verification"
+    },
+    "BETA-033": {
+      "trackerStatus": "In Progress",
+      "observedState": "Partially implemented",
+      "implementationFiles": [
+        "PreBaseAccountService"
+      ],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "Auth lifecycle GUI"
+      ],
+      "dependencies": [
+        "BETA-034",
+        "BETA-014"
+      ],
+      "plannedActions": [
+        "test accounts"
+      ],
+      "proposedStatus": "In Progress"
+    },
+    "BETA-034": {
+      "trackerStatus": "In Progress",
+      "observedState": "Statically verified only",
+      "implementationFiles": [
+        "supabase migrations"
+      ],
+      "existingEvidence": [
+        "verify-supabase-migrations",
+        "verify-supabase-rls-static"
+      ],
+      "missingEvidence": [
+        "User A/B/anonymous adversarial"
+      ],
+      "dependencies": [
+        "BETA-033"
+      ],
+      "plannedActions": [
+        "runtime RLS harness"
+      ],
+      "proposedStatus": "In Progress"
+    },
+    "BETA-035": {
+      "trackerStatus": "Deferred After Beta",
+      "observedState": "Safely deferred",
+      "implementationFiles": [
+        "HOSTED_MAGNUS.md"
+      ],
+      "existingEvidence": [
+        "disabled docs"
+      ],
+      "missingEvidence": [
+        "UI absence screenshot"
+      ],
+      "dependencies": [],
+      "plannedActions": [
+        "confirm no picker"
+      ],
+      "proposedStatus": "Deferred After Beta"
+    },
+    "BETA-036": {
+      "trackerStatus": "Deferred After Beta",
+      "observedState": "Safely deferred",
+      "implementationFiles": [
+        "agent_events schema"
+      ],
+      "existingEvidence": [],
+      "missingEvidence": [
+        "no silent sync proof via privacy capture"
+      ],
+      "dependencies": [
+        "BETA-014"
+      ],
+      "plannedActions": [
+        "privacy scenario"
+      ],
+      "proposedStatus": "Deferred After Beta"
+    },
+    "BETA-037": {
+      "trackerStatus": "In Progress",
+      "observedState": "Locally verified (unit/static); GUI restore+morph missing",
+      "implementationFiles": [
+        "docs/MAIN_ONE_GRAPH_MIGRATION.md",
+        "graphs one-graph host"
+      ],
+      "existingEvidence": [
+        "assurance-quick-v4",
+        "test:graphs"
+      ],
+      "missingEvidence": [
+        "legacy tab restore GUI",
+        "morph GUI"
+      ],
+      "dependencies": [
+        "BETA-004",
+        "BETA-001"
+      ],
+      "plannedActions": [
+        "GUI acceptance"
+      ],
+      "proposedStatus": "In Progress"
+    }
+  }
+}

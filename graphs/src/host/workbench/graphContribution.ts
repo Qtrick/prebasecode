@@ -22,22 +22,39 @@ import { IWorkspaceContextService } from '../../../../../../platform/workspace/c
 import { IOutputService } from '../../../../../services/output/common/output.js';
 import { IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../../../services/output/common/output.js';
 import { prebaseMapsViewIcon } from '../../../browser/prebaseIcons.js';
-import type { LayoutMode } from '../../common/types/graphTypes.js';
 import { PREBASE_GRAPH_CHANNEL_ID, PREBASE_GRAPH_CHANNEL_LABEL, PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { PreBaseGraphCommandIds } from '../../commands/graphCommandIds.js';
 import { PreBaseGraphEditor } from './graphEditor.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
-import { IPreBaseGraphService, PreBaseGraphService, type PreBaseGraphType } from './prebaseGraphService.js';
+import { normalizeToCodeGraphType, type PreBaseGraphType } from '../../common/types/graphProduct.js';
+import { IPreBaseGraphService, PreBaseGraphService } from './prebaseGraphService.js';
 import { PreBaseMapsViewPane } from './prebaseMapsView.js';
+import { NETWORK_LAYOUT_OPTIONS, type NetworkLayoutMode } from '../../layouts/network/index.js';
 
 export const PREBASE_MAPS_VIEW_CONTAINER_ID = 'workbench.view.prebase.maps';
 
-async function openGraphEditor(accessor: ServicesAccessor, graphType: PreBaseGraphType): Promise<void> {
+/** Write analysis lines to the PreBase Graph output channel (channel must already be shown). */
+function appendGraphChannel(output: IOutputService, header: string, lines: string[]): void {
+	const channel = output.getChannel(PREBASE_GRAPH_CHANNEL_ID);
+	if (!channel) {
+		return;
+	}
+	channel.append(`[PreBase] ${header}\n`);
+	if (!lines.length) {
+		channel.append('  (none)\n');
+		return;
+	}
+	for (const line of lines) {
+		channel.append(`  ${line}\n`);
+	}
+}
+
+async function openGraphEditor(accessor: ServicesAccessor, _graphType?: PreBaseGraphType): Promise<void> {
 	const editorService = accessor.get(IEditorService);
 	const graphService = accessor.get(IPreBaseGraphService);
-	await graphService.setGraphType(graphType);
-	await editorService.openEditor(PreBaseGraphEditorInput.create(graphType), { pinned: true });
+	await graphService.setGraphType('code');
+	await editorService.openEditor(PreBaseGraphEditorInput.create('code'), { pinned: true });
 }
 
 class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
@@ -45,14 +62,16 @@ class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
 		return editor instanceof PreBaseGraphEditorInput;
 	}
 	serialize(editor: EditorInput): string {
-		return JSON.stringify({ graphType: (editor as PreBaseGraphEditorInput).graphType });
+		return JSON.stringify({ graphType: normalizeToCodeGraphType((editor as PreBaseGraphEditorInput).graphType) });
 	}
-	deserialize(instantiationService: IInstantiationService, raw: string): EditorInput | undefined {
+	deserialize(_instantiationService: IInstantiationService, raw: string): EditorInput | undefined {
 		try {
-			const data = JSON.parse(raw) as { graphType: PreBaseGraphType };
-			return PreBaseGraphEditorInput.create(data.graphType || 'architecture');
+			const data = JSON.parse(raw) as { graphType?: unknown };
+			// Legacy architecture|network|code|missing → Code Graph.
+			return PreBaseGraphEditorInput.create(normalizeToCodeGraphType(data.graphType));
 		} catch {
-			return undefined;
+			// Corrupt memento: still restore a Code Graph tab rather than dropping the editor.
+			return PreBaseGraphEditorInput.create('code');
 		}
 	}
 }
@@ -149,16 +168,24 @@ function registerGraphActions(): void {
 
 	registerAction2(class extends Action2 {
 		constructor() {
-			super({ id: PreBaseGraphCommandIds.openArchitecture, title: localize2('prebase.graph.openArchitecture', "Open Architecture Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
+			super({ id: PreBaseGraphCommandIds.open, title: localize2('prebase.graph.open', "Open Code Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
 		}
-		run(accessor: ServicesAccessor) { return openGraphEditor(accessor, 'architecture'); }
+		run(accessor: ServicesAccessor) { return openGraphEditor(accessor); }
+	});
+
+	// Legacy aliases — hidden from F1; both open Code Graph.
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.openArchitecture, title: localize2('prebase.graph.openArchitecture', "Open Code Graph"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor) { return openGraphEditor(accessor); }
 	});
 
 	registerAction2(class extends Action2 {
 		constructor() {
-			super({ id: PreBaseGraphCommandIds.openNetwork, title: localize2('prebase.graph.openNetwork', "Open Network Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
+			super({ id: PreBaseGraphCommandIds.openNetwork, title: localize2('prebase.graph.openNetwork', "Open Code Graph"), category: localize2('prebase.category', "PreBase"), f1: false });
 		}
-		run(accessor: ServicesAccessor) { return openGraphEditor(accessor, 'network'); }
+		run(accessor: ServicesAccessor) { return openGraphEditor(accessor); }
 	});
 
 	registerAction2(class extends Action2 {
@@ -184,29 +211,30 @@ function registerGraphActions(): void {
 
 	registerAction2(class extends Action2 {
 		constructor() {
-			super({ id: PreBaseGraphCommandIds.switchType, title: localize2('prebase.graph.switchType', "Switch Graph Type"), category: localize2('prebase.category', "PreBase"), f1: true });
+			super({ id: PreBaseGraphCommandIds.switchType, title: localize2('prebase.graph.switchType', "Open Code Graph"), category: localize2('prebase.category', "PreBase"), f1: false });
 		}
-		async run(accessor: ServicesAccessor, graphType?: PreBaseGraphType) {
-			const service = accessor.get(IPreBaseGraphService);
-			const next = graphType ?? (service.getViewState().graphType === 'architecture' ? 'network' : 'architecture');
-			await openGraphEditor(accessor, next);
+		async run(accessor: ServicesAccessor) {
+			// Deprecated: dual Architecture/Network product removed — open Code Graph.
+			await openGraphEditor(accessor);
 		}
 	});
 
 	registerAction2(class extends Action2 {
 		constructor() {
-			super({ id: PreBaseGraphCommandIds.switchLayout, title: localize2('prebase.graph.switchLayout', "Switch Architecture Layout"), category: localize2('prebase.category', "PreBase"), f1: true });
+			super({ id: PreBaseGraphCommandIds.switchLayout, title: localize2('prebase.graph.switchLayout', "Switch Graph Layout"), category: localize2('prebase.category', "PreBase"), f1: false });
 		}
-		async run(accessor: ServicesAccessor, layoutMode?: LayoutMode) {
-			const service = accessor.get(IPreBaseGraphService);
-			const current = service.getViewState().layoutMode;
-			const order: LayoutMode[] = ['hierarchy', 'pyramid', 'scattered'];
-			const next = layoutMode ?? order[(order.indexOf(current) + 1) % order.length];
-			await service.setLayoutMode(next);
-			await openGraphEditor(accessor, 'architecture');
+		async run(accessor: ServicesAccessor, layoutMode?: NetworkLayoutMode | string) {
+			const config = accessor.get(IConfigurationService);
+			const order = NETWORK_LAYOUT_OPTIONS.map(o => o.id);
+			const current = (config.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'community') as NetworkLayoutMode;
+			const asNetwork = typeof layoutMode === 'string' && order.includes(layoutMode as NetworkLayoutMode)
+				? layoutMode as NetworkLayoutMode
+				: undefined;
+			const next = asNetwork ?? order[(Math.max(0, order.indexOf(current)) + 1) % order.length];
+			await config.updateValue(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, next);
+			await openGraphEditor(accessor);
 		}
 	});
-
 	registerAction2(class extends Action2 {
 		constructor() {
 			super({ id: PreBaseGraphCommandIds.fitView, title: localize2('prebase.graph.fitView', "Fit Graph View"), category: localize2('prebase.category', "PreBase"), f1: true });
@@ -394,6 +422,243 @@ function registerGraphActions(): void {
 		}
 		run(accessor: ServicesAccessor) {
 			return accessor.get(IPreBaseGraphService).getOverviewForMagnus();
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.findPathForMagnus, title: localize2('prebase.graph.findPathForMagnus', "Find Graph Path for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor, fromIdOrPath: string, toIdOrPath: string) {
+			return accessor.get(IPreBaseGraphService).findPathForMagnus(fromIdOrPath, toIdOrPath);
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.getAffectedForMagnus, title: localize2('prebase.graph.getAffectedForMagnus', "Get Affected Graph Nodes for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor, nodeIdOrPath: string, maximumNodes?: number) {
+			return accessor.get(IPreBaseGraphService).getAffectedForMagnus(nodeIdOrPath, maximumNodes);
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.explainSelectedNode, title: localize2('prebase.graph.explainSelectedNode', "Explain Selected Graph Node"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		async run(accessor: ServicesAccessor) {
+			const graph = accessor.get(IPreBaseGraphService);
+			const notify = accessor.get(INotificationService);
+			const output = accessor.get(IOutputService);
+			const raw = graph.explainSelectedForMagnus();
+			if (!raw) {
+				notify.info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
+				return;
+			}
+			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
+			try {
+				const parsed = JSON.parse(raw) as {
+					label?: string;
+					communityLabel?: string;
+					degrees?: { degree?: number };
+					important?: { rank?: number };
+					confidence?: { EXTRACTED?: number; INFERRED?: number; AMBIGUOUS?: number; unknown?: number };
+				};
+				const conf = parsed.confidence;
+				const bits = [
+					parsed.label || 'node',
+					parsed.communityLabel ? `community ${parsed.communityLabel}` : undefined,
+					typeof parsed.degrees?.degree === 'number' ? `degree ${parsed.degrees.degree}` : undefined,
+					parsed.important?.rank ? `important #${parsed.important.rank}` : undefined,
+					conf
+						? `confidence EXTRACTED ${conf.EXTRACTED ?? 0} · INFERRED ${conf.INFERRED ?? 0} · AMBIGUOUS ${conf.AMBIGUOUS ?? 0} · unknown ${conf.unknown ?? 0}`
+						: undefined,
+				].filter(Boolean);
+				appendGraphChannel(output, `Explain ${parsed.label || 'node'}`, [
+					bits.join(' · '),
+					raw.length > 4_000 ? `${raw.slice(0, 4_000)}…` : raw,
+				]);
+				notify.info(localize('prebase.graph.explainSummary', "Explain: {0}", bits.join(' · ')));
+			} catch {
+				notify.info(localize('prebase.graph.explainReady', "Node explanation ready (see PreBase Graph output)."));
+			}
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.showImportantNodes, title: localize2('prebase.graph.showImportantNodes', "Show Important Graph Nodes"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		async run(accessor: ServicesAccessor) {
+			const output = accessor.get(IOutputService);
+			const raw = accessor.get(IPreBaseGraphService).getImportantNodesForMagnus(10);
+			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
+			try {
+				const parsed = JSON.parse(raw) as { nodes?: Array<{ label?: string; id?: string; degree?: number }>; notice?: string };
+				const nodeCount = parsed.nodes?.length ?? 0;
+				const lines = (parsed.nodes ?? []).slice(0, 10).map((n, i) => `${i + 1}. ${n.label || n.id} (degree ${n.degree ?? 0})`);
+				if (parsed.notice) {
+					lines.push(parsed.notice);
+				}
+				appendGraphChannel(output, `Important nodes (${nodeCount})`, lines);
+				accessor.get(INotificationService).info(
+					nodeCount
+						? localize('prebase.graph.importantSummary', "Important nodes:\n{0}", lines.join('\n'))
+						: localize('prebase.graph.importantEmpty', "No important nodes yet — scan the Code Graph first.")
+				);
+			} catch {
+				accessor.get(INotificationService).info(localize('prebase.graph.importantEmpty', "No important nodes yet — scan the Code Graph first."));
+			}
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.showBridgeNodes, title: localize2('prebase.graph.showBridgeNodes', "Show Bridge Graph Nodes"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		async run(accessor: ServicesAccessor) {
+			const output = accessor.get(IOutputService);
+			const raw = accessor.get(IPreBaseGraphService).getBridgeNodesForMagnus(10);
+			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
+			try {
+				const parsed = JSON.parse(raw) as { nodes?: Array<{ label?: string; id?: string; crossEdgeCount?: number; communities?: number[] }>; notice?: string };
+				const nodeCount = parsed.nodes?.length ?? 0;
+				const lines = (parsed.nodes ?? []).slice(0, 10).map((n, i) => {
+					const communities = (n.communities ?? []).join(',');
+					return `${i + 1}. ${n.label || n.id} (cross ${n.crossEdgeCount ?? 0}${communities ? `; communities ${communities}` : ''})`;
+				});
+				if (parsed.notice) {
+					lines.push(parsed.notice);
+				}
+				appendGraphChannel(output, `Bridge nodes (${nodeCount})`, lines);
+				accessor.get(INotificationService).info(
+					nodeCount
+						? localize('prebase.graph.bridgeSummary', "Bridge nodes:\n{0}", lines.join('\n'))
+						: localize('prebase.graph.bridgeEmpty', "No bridge nodes yet — scan the Code Graph first.")
+				);
+			} catch {
+				accessor.get(INotificationService).info(localize('prebase.graph.bridgeEmpty', "No bridge nodes yet — scan the Code Graph first."));
+			}
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.showCommunities, title: localize2('prebase.graph.showCommunities', "Show Graph Communities"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		async run(accessor: ServicesAccessor) {
+			const output = accessor.get(IOutputService);
+			const raw = accessor.get(IPreBaseGraphService).getCommunitiesForMagnus(20);
+			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
+			try {
+				const parsed = JSON.parse(raw) as { communityCount?: number; communities?: Array<{ id: number; label: string; count: number }>; notice?: string };
+				const communityCount = parsed.communityCount ?? parsed.communities?.length ?? 0;
+				const lines = (parsed.communities ?? []).slice(0, 12).map(c => `${c.label} (#${c.id}, ${c.count})`);
+				if (parsed.notice) {
+					lines.push(parsed.notice);
+				}
+				appendGraphChannel(output, `Communities (${communityCount})`, lines);
+				accessor.get(INotificationService).info(
+					(parsed.communities?.length ?? 0)
+						? localize('prebase.graph.communitiesSummary', "{0} communities:\n{1}", communityCount, lines.join('\n'))
+						: localize('prebase.graph.communitiesEmpty', "No communities yet — scan the Code Graph first.")
+				);
+			} catch {
+				accessor.get(INotificationService).info(localize('prebase.graph.communitiesEmpty', "No communities yet — scan the Code Graph first."));
+			}
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.explainForMagnus, title: localize2('prebase.graph.explainForMagnus', "Explain Graph Node for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor, nodeIdOrPath?: string) {
+			const graph = accessor.get(IPreBaseGraphService);
+			if (typeof nodeIdOrPath === 'string' && nodeIdOrPath.trim()) {
+				return graph.explainNodeForMagnus(nodeIdOrPath);
+			}
+			return graph.explainSelectedForMagnus();
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.getImportantForMagnus, title: localize2('prebase.graph.getImportantForMagnus', "Get Important Graph Nodes for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor, limit?: number) {
+			return accessor.get(IPreBaseGraphService).getImportantNodesForMagnus(limit);
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.getCommunitiesForMagnus, title: localize2('prebase.graph.getCommunitiesForMagnus', "Get Graph Communities for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor, limit?: number) {
+			return accessor.get(IPreBaseGraphService).getCommunitiesForMagnus(limit);
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.getBridgesForMagnus, title: localize2('prebase.graph.getBridgesForMagnus', "Get Bridge Graph Nodes for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor, limit?: number) {
+			return accessor.get(IPreBaseGraphService).getBridgeNodesForMagnus(limit);
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.getSurprisingForMagnus, title: localize2('prebase.graph.getSurprisingForMagnus', "Get Surprising Graph Connections for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor, limit?: number) {
+			return accessor.get(IPreBaseGraphService).getSurprisingConnectionsForMagnus(limit);
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.showSurprisingConnections, title: localize2('prebase.graph.showSurprisingConnections', "Show Surprising Graph Connections"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		async run(accessor: ServicesAccessor) {
+			const raw = accessor.get(IPreBaseGraphService).getSurprisingConnectionsForMagnus(10);
+			const output = accessor.get(IOutputService);
+			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
+			const channel = output.getChannel(PREBASE_GRAPH_CHANNEL_ID);
+			try {
+				const parsed = JSON.parse(raw) as {
+					edges?: Array<{
+						sourceLabel?: string;
+						targetLabel?: string;
+						sourceCommunity?: number;
+						targetCommunity?: number;
+						surprise?: number;
+						reason?: string;
+					}>;
+				};
+				const edges = parsed.edges ?? [];
+				channel?.append(`[PreBase] Cross-community surprising connections (${edges.length}):\n`);
+				for (const [i, e] of edges.entries()) {
+					channel?.append(
+						`  ${i + 1}. ${e.sourceLabel ?? '?'} → ${e.targetLabel ?? '?'} ` +
+						`(communities ${e.sourceCommunity}↔${e.targetCommunity}, surprise ${e.surprise ?? 0})\n` +
+						`     ${e.reason ?? ''}\n`
+					);
+				}
+				if (edges.length === 0) {
+					channel?.append('  (none — scan the Code Graph first, or no cross-community imports)\n');
+				}
+				accessor.get(INotificationService).info(
+					edges.length
+						? localize('prebase.graph.surprisingSummary', "Cross-community: {0} surprising connection(s) (see PreBase Graph output).", edges.length)
+						: localize('prebase.graph.surprisingEmpty', "No surprising cross-community connections yet — scan the Code Graph first.")
+				);
+			} catch {
+				accessor.get(INotificationService).info(localize('prebase.graph.surprisingEmpty', "No surprising cross-community connections yet — scan the Code Graph first."));
+			}
 		}
 	});
 

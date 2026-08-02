@@ -1,25 +1,27 @@
 # PreBase graphs package
 
-Architecture Graph and Network Graph implementation for PreBase. **All graph-owned code must live under this directory** (see [OWNERSHIP.md](./OWNERSHIP.md) and `.cursor/rules/graphs-ownership.mdc`).
+**Code Graph** (Network-based) is the sole active graph product. Architecture Graph implementation is **preserved dormant** under `graphs/src/preserved/architecture/` (not registered at runtime). **All graph-owned code must live under this directory** (see [OWNERSHIP.md](./OWNERSHIP.md) and `.cursor/rules/graphs-ownership.mdc`).
 
-## Current status (2026-07-21, Phase A Settings UI + shim removal)
-
-**Migration:** Core, layouts, host adapters, graph settings registration (`graphConfigurationContribution.ts`), graph Settings UI (`settings/graphSettingsUi.ts`), and graph commands (`graphContribution.ts`) live under `graphs/src/`. Workbench compiles them through a symlink bridge (see below). Legacy `common/graph/`, graph-only `browser/*`, and Phase D flat `core/*.ts` shims are **removed**.
+## Current status (2026-08-01 — one Code Graph on MAIN)
 
 | Role | Path |
 |---|---|
-| Shared types & constants | `graphs/src/common/types/`, `graphs/src/common/constants/`, `graphs/src/common/configuration/` |
-| Settings keys + `registerPreBaseGraphConfiguration` | `graphs/src/host/workbench/graphConfigurationContribution.ts` (re-exported from `graphs/src/settings/`) |
-| Settings UI panels | `graphs/src/host/workbench/settings/graphSettingsUi.ts` |
-| Command IDs + `registerPreBaseGraphContribution` | `graphs/src/commands/graphCommandIds.ts`, `graphs/src/host/workbench/graphContribution.ts` |
-| Scanning, parsing, resolution, generation, analysis | `graphs/src/core/{scanning,parsing,resolution,generation,analysis}/` |
-| Architecture & network layouts | `graphs/src/layouts/` (`shared/`, `architecture/`, `network/`) |
-| Architecture interaction (pick/hit-test) | `graphs/src/architecture/interaction/` |
-| Host (editors, webview, services) | `graphs/src/host/workbench/` |
-| Unit tests | `graphs/src/tests/unit/` (`architecturePick`, `networkLayout`, `graphOwnershipBoundary`) |
-| Boundary verifier | `graphs/scripts/verify-boundary/verify.mjs` → `npm run verify:graphs-boundary` |
+| Product type + normalize | `graphs/src/common/types/graphProduct.ts` |
+| Shared types & configuration | `graphs/src/common/types/`, `graphs/src/common/configuration/` |
+| Settings registration | `graphs/src/host/workbench/graphConfigurationContribution.ts` |
+| Settings UI | `graphs/src/host/workbench/settings/graphSettingsUi.ts` |
+| Commands | `graphs/src/commands/graphCommandIds.ts`, `graphs/src/host/workbench/graphContribution.ts` |
+| Scan / parse / generate / analysis / query | `graphs/src/core/` |
+| Active layouts | `graphs/src/layouts/network/` (Community Force default + Organic/Sphere/…) |
+| Selected-node card presentation | `graphs/src/presentation/selectedNodeCard.ts` |
+| Preserved Architecture + First Test refs | `graphs/src/preserved/architecture/` |
+| Host (editor, Maps sidebar, services) | `graphs/src/host/workbench/` |
+| Unit tests | `graphs/src/tests/unit/` |
+| Boundary verifier | `npm run verify:graphs-boundary` |
 
-**Still allowlisted outside `graphs/` (thin bootstrap only):** `prebase.contribution.ts` imports `registerPreBaseGraphContribution()`; `prebaseConfiguration.ts` imports `registerPreBaseGraphConfiguration()` and owns runtime/home/terminal-visibility keys; `prebaseSettingsEditor.ts` is the Settings **shell** (routes graph panels into `graphSettingsUi.ts`). See [docs/MIGRATION.md](./docs/MIGRATION.md).
+**Public command:** `prebase.graph.open` (Code Graph). Legacy `openArchitecture` / `openNetwork` redirect with `f1: false`.
+
+**Still allowlisted outside `graphs/` (thin bootstrap only):** `prebase.contribution.ts`, `prebaseConfiguration.ts`, Settings shell. See [docs/MIGRATION.md](./docs/MIGRATION.md) and [docs/MAIN_ONE_GRAPH_MIGRATION.md](../docs/MAIN_ONE_GRAPH_MIGRATION.md).
 
 ### Workbench integration
 

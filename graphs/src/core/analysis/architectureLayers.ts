@@ -183,7 +183,31 @@ export function computeNodeImportance(
 	return { inDegree, outDegree, score }
 }
 
-/** Sidebar Architecture mode ids (`prebase.graph.architectureMode`). */
+/** Single O(edges) pass — prefer this over per-node `computeNodeImportance` in layout/enrich loops. */
+export function buildImportanceByNode(
+	edges: GraphEdge[]
+): Map<string, { inDegree: number; outDegree: number; score: number }> {
+	const stats = new Map<string, { inDegree: number; outDegree: number; score: number }>()
+	const touch = (id: string) => {
+		let row = stats.get(id)
+		if (!row) {
+			row = { inDegree: 0, outDegree: 0, score: 0 }
+			stats.set(id, row)
+		}
+		return row
+	}
+	for (const e of edges) {
+		if (e.kind !== 'import') continue
+		touch(e.source).outDegree++
+		touch(e.target).inDegree++
+	}
+	for (const row of stats.values()) {
+		row.score = row.inDegree * 1.2 + row.outDegree * 0.8
+	}
+	return stats
+}
+
+/** Sidebar Architecture mode ids — deprecated; kept for settings migration keys. */
 export type ArchitectureModeId =
 	| 'product'
 	| 'file'
@@ -191,69 +215,3 @@ export type ArchitectureModeId =
 	| 'state'
 	| 'infrastructure'
 	| 'overview'
-
-/**
- * Layer / connectivity filter for an architecture mode.
- * `all` = no filter; `connected` = nodes on at least one import edge.
- */
-export function architectureModeFilter(
-	mode: string | undefined
-): Set<ArchitectureLayerId> | 'all' | 'connected' {
-	switch (mode) {
-		case 'product':
-			return new Set([
-				'entry', 'frontend', 'ui', 'components', 'api', 'auth',
-				'services', 'backend', 'database', 'utils'
-			])
-		case 'file':
-			// Source-focused: hide build/config/test noise.
-			return new Set([
-				'entry', 'frontend', 'ui', 'components', 'api', 'auth',
-				'services', 'backend', 'database', 'utils', 'other'
-			])
-		case 'dependency':
-			return 'connected'
-		case 'state':
-			return new Set(['frontend', 'api', 'auth', 'services', 'database'])
-		case 'infrastructure':
-			return new Set(['config', 'tests', 'other'])
-		case 'overview':
-		default:
-			return 'all'
-	}
-}
-
-/** Filter rendered nodes for the selected Architecture sidebar mode. Always keeps the entry. */
-export function filterNodesForArchitectureMode(
-	nodes: readonly GraphNode[],
-	edges: readonly GraphEdge[],
-	mode: string | undefined,
-	entryNodeId: string | null
-): GraphNode[] {
-	const filter = architectureModeFilter(mode)
-	if (filter === 'all') {
-		return [...nodes]
-	}
-
-	if (filter === 'connected') {
-		const connected = new Set<string>()
-		for (const e of edges) {
-			if (e.kind !== 'import') {
-				continue
-			}
-			connected.add(e.source)
-			connected.add(e.target)
-		}
-		return nodes.filter(n =>
-			n.id === entryNodeId || n.isEntry || connected.has(n.id)
-		)
-	}
-
-	return nodes.filter(n => {
-		if (n.id === entryNodeId || n.isEntry) {
-			return true
-		}
-		const layer = (n.meta?.architectureLayer as ArchitectureLayerId | undefined) ?? classifyNodeLayer(n.path, false)
-		return filter.has(layer)
-	})
-}

@@ -12,6 +12,80 @@ const GRAPHS_SRC = path.resolve(__dirname, '../..');
 const REPO_ROOT = path.resolve(GRAPHS_SRC, '../..');
 
 suite('Graph ownership boundary (Phase A)', () => {
+	test('Architecture Graph stays unavailable on active paths but preserved on disk (One-Graph-Type)', () => {
+		assert.ok(
+			!fs.existsSync(path.join(GRAPHS_SRC, 'layouts/architecture')),
+			'graphs/src/layouts/architecture must not return as an active product path'
+		);
+		assert.ok(
+			!fs.existsSync(path.join(GRAPHS_SRC, 'architecture')),
+			'graphs/src/architecture must not return as an active product path'
+		);
+		assert.ok(
+			!fs.existsSync(path.join(GRAPHS_SRC, 'layouts/shared')),
+			'graphs/src/layouts/shared must not return as an active product path'
+		);
+		assert.ok(
+			!fs.existsSync(path.join(GRAPHS_SRC, 'core/analysis/dependencyDepth.ts')),
+			'dependencyDepth.ts must not live under active core/analysis'
+		);
+		assert.ok(
+			!fs.existsSync(path.join(GRAPHS_SRC, 'tests/unit/architecturePick.test.ts')),
+			'architecturePick.test.ts must not run as an active unit test'
+		);
+
+		const preservedRoot = path.join(GRAPHS_SRC, 'preserved/architecture');
+		for (const rel of [
+			'README.md',
+			'ASSET_MANIFEST.md',
+			'LEGACY_SETTINGS.md',
+			'interaction/architecturePick.ts',
+			'analysis/dependencyDepth.ts',
+			'layouts/layoutEngine.ts',
+			'layouts/hierarchy/hierarchyLayout.ts',
+			'layouts/hierarchy/hierarchyDepthVisuals.ts',
+			'layouts/shared/layoutConfig.ts',
+			'layouts/shared/layoutConstraints.ts',
+			'layouts/shared/layoutDepthColors.ts',
+			'layouts/shared/layoutOrganization.ts',
+			'tests/architecturePick.test.ts',
+			'legacy-first-test/README.md',
+			'legacy-first-test/components/graph/PyramidLabels.tsx',
+			'legacy-first-test/components/nodes/ArchitectureNode.tsx',
+		]) {
+			assert.ok(
+				fs.existsSync(path.join(preservedRoot, rel)),
+				`missing preserved Architecture asset: preserved/architecture/${rel}`
+			);
+		}
+
+		// Active sources must not import the preserved archive.
+		const importRe = /(?:from\s+['"][^'"]*preserved\/architecture[^'"]*['"]|require\(\s*['"][^'"]*preserved\/architecture[^'"]*['"]\s*\))/;
+		const walk = (dir: string, acc: string[] = []): string[] => {
+			if (!fs.existsSync(dir)) {
+				return acc;
+			}
+			for (const ent of fs.readdirSync(dir, { withFileTypes: true })) {
+				const full = path.join(dir, ent.name);
+				if (ent.isDirectory()) {
+					walk(full, acc);
+				} else if (ent.isFile() && /\.(ts|tsx|js|mjs)$/.test(ent.name)) {
+					acc.push(full);
+				}
+			}
+			return acc;
+		};
+		for (const dir of ['common', 'core', 'layouts', 'host', 'commands', 'settings', 'presentation', 'tests']) {
+			for (const file of walk(path.join(GRAPHS_SRC, dir))) {
+				const text = fs.readFileSync(file, 'utf8');
+				assert.ok(
+					!importRe.test(text),
+					`active source imports preserved Architecture: ${path.relative(REPO_ROOT, file)}`
+				);
+			}
+		}
+	});
+
 	test('graphs/src/core has no flat shim .ts files', () => {
 		const coreDir = path.join(GRAPHS_SRC, 'core');
 		assert.ok(fs.existsSync(coreDir), 'graphs/src/core must exist');

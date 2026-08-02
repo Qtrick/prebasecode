@@ -69,7 +69,8 @@ export class GraphGenerator {
 					id: `contains:${folderIdForPath(parent)}->${id}`,
 					source: folderIdForPath(parent),
 					target: id,
-					kind: 'contains'
+					kind: 'contains',
+					meta: { confidence: 'EXTRACTED' }
 				})
 			}
 		}
@@ -118,7 +119,8 @@ export class GraphGenerator {
 						id: `contains:${folderIdForPath(parentFolder)}->${fileId}`,
 						source: folderIdForPath(parentFolder),
 						target: fileId,
-						kind: 'contains'
+						kind: 'contains',
+						meta: { confidence: 'EXTRACTED' }
 					})
 				}
 			}
@@ -143,7 +145,8 @@ export class GraphGenerator {
 						id: `contains:${fileId}->${fnId}`,
 						source: fileId,
 						target: fnId,
-						kind: 'contains'
+						kind: 'contains',
+						meta: { confidence: 'EXTRACTED' }
 					})
 				}
 			}
@@ -188,13 +191,18 @@ export class GraphGenerator {
 							id: `contains:${folderIdForPath(parentFolder)}->${targetId}`,
 							source: folderIdForPath(parentFolder),
 							target: targetId,
-							kind: 'contains'
+							kind: 'contains',
+							meta: { confidence: 'EXTRACTED' }
 						})
 					}
 				}
 				const edgeId = `import:${fileId}->${targetId}:${imp.source}`
+				// Dedup via nodeIds set (same set used for node ids — edge ids never collide with file: paths).
 				if (nodeIds.has(edgeId)) continue
-				const isDynamic = imp.source.includes('?') || imp.specifiers.includes('dynamic')
+				nodeIds.add(edgeId)
+				// ponytail: trust parser `isDynamic` (import()); `?` marks query-like module ids.
+				// Do not treat a local binding named "dynamic" as a dynamic import.
+				const isDynamic = !!imp.isDynamic || imp.source.includes('?')
 				edges.push({
 					id: edgeId,
 					source: fileId,
@@ -205,7 +213,11 @@ export class GraphGenerator {
 						specifiers: imp.specifiers,
 						isDefault: imp.isDefault,
 						isDynamic,
-						line: imp.line
+						line: imp.line,
+						confidence: isDynamic ? 'AMBIGUOUS' : 'EXTRACTED',
+						sourceFile: result.relativePath,
+						sourceLine: imp.line,
+						reason: isDynamic ? 'Dynamic or query-like import' : undefined,
 					}
 				})
 			}
@@ -220,6 +232,7 @@ export class GraphGenerator {
 		return {
 			nodes,
 			edges,
+			schemaVersion: 2,
 			projectPath,
 			projectName,
 			scannedAt: Date.now()
@@ -293,7 +306,11 @@ export class GraphGenerator {
 				id,
 				source: sourceFolder,
 				target: targetFolder,
-				kind: 'dependency'
+				kind: 'dependency',
+				meta: {
+					confidence: 'INFERRED',
+					reason: 'Aggregated from file-level import edges between folders',
+				}
 			})
 		}
 	}

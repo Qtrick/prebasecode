@@ -264,13 +264,12 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		const p = DOM.append(panel, DOM.$('p'));
 		p.style.color = MUTED;
 		p.style.fontSize = '12px';
-		p.textContent = localize('prebase.onboarding.graphBody', "Architecture uses Hierarchy, Pyramid, and Scattered. Network uses Organic, Sphere, Constellation, Clustered, and Radial. A project must be open before graph modes become available.");
+		p.textContent = localize('prebase.onboarding.graphBody', "Code Graph shows how files connect. Switch layouts — Community Force, Organic, Sphere, Constellation, Clustered, or Radial — as modes inside one graph. A project must be open before the graph becomes available.");
 		const row = DOM.append(panel, DOM.$('div'));
 		row.style.display = 'flex';
 		row.style.gap = '8px';
 		row.style.flexWrap = 'wrap';
-		this._btn(row, localize('prebase.onboarding.arch', "Architecture Graph"), () => void this.commandService.executeCommand('prebase.graph.openArchitecture'), true);
-		this._btn(row, localize('prebase.onboarding.net', "Network Graph"), () => void this.commandService.executeCommand('prebase.graph.openNetwork'));
+		this._btn(row, localize('prebase.onboarding.codeGraph', "Code Graph"), () => void this.commandService.executeCommand('prebase.graph.open'), true);
 	}
 
 	private _renderBuild(panel: HTMLElement): void {

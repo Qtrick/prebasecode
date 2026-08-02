@@ -1,0 +1,14 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:supabase-rls-static
+> node scripts/supabase/verify-rls-static.mjs
+
+verify:supabase-rls-static: PASS (policy shape)
+Runtime adversarial checklist (manual / CI test project):
+ - Create User A and User B via Auth
+ - As A: insert profile, preferences, session, run, event
+ - As B: SELECT each table — expect 0 rows from A
+ - As B: UPDATE/DELETE A rows — expect deny
+ - As B: INSERT with user_id=A — expect deny
+ - Anonymous + publishable key only — expect deny on all user tables
+ - As A: INSERT into agent_usage — expect deny (server-only writes)
