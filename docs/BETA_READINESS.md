@@ -2,7 +2,7 @@
 
 Canonical PreBase beta readiness tracker. Do not mark an item **Complete** without evidence.
 
-Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`  
+Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`
 Severities: `Blocker` | `Critical` | `High` | `Medium` | `Low`
 
 Last audit: **2026-08-02** (Checkpoint #13 — beta evidence honesty pass on `9fde0994`; decision **NO-GO**; beta candidate claim **forbidden**)
