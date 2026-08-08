@@ -1,7 +1,0 @@
-npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
-
-> code-oss-dev@1.128.0 verify:graphs-boundary
-> node graphs/scripts/verify-boundary/verify.mjs
-
-Graph boundary check OK
-Allowlist exceptions: 9

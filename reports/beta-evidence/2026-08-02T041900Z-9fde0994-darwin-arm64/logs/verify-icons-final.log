@@ -1,6 +1,0 @@
-npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
-
-> code-oss-dev@1.128.0 verify:icons
-> node scripts/icons/verify-icons.mjs
-
-verify:icons: 101/101 OK

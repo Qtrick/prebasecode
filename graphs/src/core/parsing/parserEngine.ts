@@ -167,31 +167,6 @@ export class ParserEngine {
 						specifiers: ['require'],
 						line: path.node.loc?.start.line
 					})
-					return
-				}
-				// Older babel: import('x') as CallExpression(callee=Import).
-				if (
-					t.isImport(path.node.callee) &&
-					path.node.arguments[0] &&
-					t.isStringLiteral(path.node.arguments[0])
-				) {
-					imports.push({
-						source: path.node.arguments[0].value,
-						specifiers: [],
-						isDynamic: true,
-						line: path.node.loc?.start.line
-					})
-				}
-			},
-			ImportExpression(path: NodePath<t.ImportExpression>) {
-				const src = path.node.source
-				if (t.isStringLiteral(src)) {
-					imports.push({
-						source: src.value,
-						specifiers: [],
-						isDynamic: true,
-						line: path.node.loc?.start.line
-					})
 				}
 			}
 		})

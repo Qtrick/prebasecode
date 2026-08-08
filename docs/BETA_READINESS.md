@@ -5,7 +5,7 @@ Canonical PreBase beta readiness tracker. Do not mark an item **Complete** witho
 Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`
 Severities: `Blocker` | `Critical` | `High` | `Medium` | `Low`
 
-Last audit: **2026-08-02** (Checkpoint #13 — beta evidence honesty pass on `9fde0994`; decision **NO-GO**; beta candidate claim **forbidden**)
+Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; beta candidate claim **forbidden**)
 
 ## Summary
 
@@ -38,13 +38,13 @@ Last audit: **2026-08-02** (Checkpoint #13 — beta evidence honesty pass on `9f
 
 | ID | Category | Description | Severity | Status | Owner | Blocker | Required validation | Evidence | Target | Added | Completed |
 |---|---|---|---|---|---|---|---|---|---|---|---|
-| BETA-001 | Graphs | Establish root `graphs/` as sole **Code Graph** subsystem (+ preserved dormant Architecture assets) | Blocker | Needs Verification | — | GUI Settings smoke; CI green | Boundary script pass; symlink compile; no duplicate core; stable setting/command IDs | 2026-08-01: active product is Code Graph only; Arch under `preserved/architecture/`; `verify:graphs-boundary` OK | Pre-beta | 2026-07-20 | — |
+| BETA-001 | Graphs | Establish root `graphs/` as sole Architecture/Network graph subsystem | Blocker | Needs Verification | — | GUI Settings smoke; CI green | Boundary script pass; symlink compile; no duplicate core; stable setting/command IDs | Phase A 2026-07-21: Settings UI in `graphSettingsUi.ts`; Phase D flat shims deleted; `verify:graphs-boundary` rejects flat `core/*.ts` + requires Settings UI route | Pre-beta | 2026-07-20 | — |
 | BETA-002 | Graphs | Graph boundary verifier in assurance/CI | Critical | Needs Verification | — | CI wiring (BETA-027) | `npm run verify:graphs-boundary` | `assurance:quick` + PR job `prebase-assurance` 2026-07-20 | Pre-beta | 2026-07-20 | — |
-| BETA-003 | Graphs | ~~Architecture Graph manual acceptance~~ — **superseded** by MAIN one-Code-Graph product direction (do not mark Complete as a tested Arch feature) | Critical | Deferred After Beta | — | Historical dual-graph UX removed | Preserve historical evidence only | 2026-08-01: product no longer exposes Architecture Graph; see BETA-004 / BETA-037 | Pre-beta | 2026-07-20 | — |
-| BETA-004 | Graphs | Code Graph visual/layout/interaction/**selected-node morph** acceptance (was Network Graph) | Critical | Needs Verification | — | GUI smoke | Manual smoke on Code Graph + morph matrix | Template: [GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md); morph research [GRAPH_NODE_MORPH_RESEARCH.md](GRAPH_NODE_MORPH_RESEARCH.md) | Pre-beta | 2026-07-20 | — |
-| BETA-005 | Graphs | Graph unit tests (product normalize, analysis, ownership, morph, network layouts) under `graphs/src/tests/unit` | High | Needs Verification | — | CI gate green on PR | Mocha/node harness green | 2026-08-01: `npm run test:graphs` green locally (product/analysis/morph/ownership); PR job not confirmed here | Pre-beta | 2026-07-20 | — |
-| BETA-006 | Toolchain | TypeScript 7.0.2 primary compiler lane | Blocker | Complete | — | — | `tsc`/`typecheck` invoke TS7 | 2026-08-02: `verify:typescript` pass (run `2026-08-02T041900Z-9fde0994-darwin-arm64`); `tsc` 7.0.2; prior `typecheck-client` + `assurance` 2026-07-20 | Pre-beta | 2026-07-20 | 2026-07-20 |
-| BETA-007 | Toolchain | TS6 compatibility lane for compiler API consumers | Critical | Complete | — | — | Inventory + compat resolve | 2026-08-02: `verify:typescript` pass; `@typescript/typescript6@6.0.2`, API 6.0.3, `tsc6` 6.0.3 | Pre-beta | 2026-07-20 | 2026-07-20 |
+| BETA-003 | Graphs | Architecture Graph manual acceptance (layouts, selection, minimap stub, settings) | Critical | Needs Verification | — | GUI smoke | Manual smoke on Architecture Graph | Template: [GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md) (all rows Needs Verification) | Pre-beta | 2026-07-20 | — |
+| BETA-004 | Graphs | Network Graph manual acceptance (layouts, rotation, drag, idle rotate) | Critical | Needs Verification | — | GUI smoke | Manual smoke on Network Graph | Template: [GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md) Network section | Pre-beta | 2026-07-20 | — |
+| BETA-005 | Graphs | Graph unit tests (`architecturePick`, `networkLayout`, ownership boundary) under `graphs/src/tests/unit` | High | Needs Verification | — | CI gate green on PR | Mocha/node harness green | `npm run test:graphs` includes ownership boundary checks (Phase A 2026-07-21); PR job green not confirmed here | Pre-beta | 2026-07-20 | — |
+| BETA-006 | Toolchain | TypeScript 7.0.2 primary compiler lane | Blocker | Complete | — | — | `tsc`/`typecheck` invoke TS7 | `tsc` 7.0.2; `verify:typescript`; `typecheck-client` + `assurance` 2026-07-20 | Pre-beta | 2026-07-20 | 2026-07-20 |
+| BETA-007 | Toolchain | TS6 compatibility lane for compiler API consumers | Critical | Complete | — | — | Inventory + compat resolve | `@typescript/typescript6@6.0.2`, import API 6.0.3, `tsc6` 6.0.3; `verify:typescript` | Pre-beta | 2026-07-20 | 2026-07-20 |
 | BETA-008 | Toolchain | Replace `@typescript/native-preview`/`tsgo` with stable TS7 entrypoints | High | Needs Verification | — | Extension compile matrix | Scripts use TS7 `tsc` | Phase F/K: `typescriptCompiler.ts`→`npx tsc`; no `build/lib/tsgo` refs; `assurance:quick` pass 2026-07-20; full `compile-extensions` not run | Pre-beta | 2026-07-20 | — |
 | BETA-009 | Toolchain | typescript-eslint typed lint on compat API | High | Needs Verification | — | Compat package | `npm run eslint` / `verify:eslint-prebase` | Compat lane OK; full `npm run eslint` still ~80k upstream warnings; `assurance:release` ratchets **PreBase paths only** (baseline debt allowed; not full-eslint clean) | Pre-beta | 2026-07-20 | — |
 | BETA-010 | Core | Clean startup / workspace open / crash recovery | Critical | Needs Verification | — | GUI launch | Fresh + existing profile launch | 2026-07-22: `PREBASE_STARTUP_LAUNCH=1` **passed outside sandbox** (extension host + `[PreBase] workbench restored`); **CORE_IDE C1–C5 matrix still Needs Verification — not Complete** | Pre-beta | 2026-07-20 | — |
@@ -57,13 +57,13 @@ Last audit: **2026-08-02** (Checkpoint #13 — beta evidence honesty pass on `9f
 | BETA-012 | Magnus | Ask/Plan/Edit/Agent + graph tools reliability | Critical | Needs Verification | — | GUI + Magnus ext | Tool smoke | Checklist: [CORE_IDE_ACCEPTANCE.md](CORE_IDE_ACCEPTANCE.md) P5; no agent session evidence yet | Pre-beta | 2026-07-20 | — |
 | BETA-013 | Runtime Preview | Web/Electron managed+external lifecycle cleanup | Critical | Needs Verification | — | GUI smoke | Manual + unit | Checklist: [CORE_IDE_ACCEPTANCE.md](CORE_IDE_ACCEPTANCE.md) P4; static CSP via `verify:privacy` only | Pre-beta | 2026-07-20 | — |
 | BETA-014 | Privacy | Telemetry/crash/surveys disabled; secrets storage; CSP | Blocker | In Progress | — | Runtime network observation (GUI) | Privacy checklist + `verify:privacy` | **Partial** 2026-07-22: static `verify:privacy` + secrets/CSP docs + `assurance:privacy`; runtime network observation **still Needs Verification** — [ASSURANCE.md](ASSURANCE.md#runtime-network-observation) — **not Complete** | Pre-beta | 2026-07-20 | — |
-| BETA-015 | Packaging | macOS/Windows/Linux builds, signing, notarization, updates | Blocker | Blocked | — | Platform access + signing credentials | CI/package smoke + signed release | 2026-08-02: `assurance:package` informational pass; **unsigned full package artifact not built**; signing **Blocked** (no `PREBASE_*` creds) — [PACKAGING.md](PACKAGING.md), [RELEASE_SIGNING.md](RELEASE_SIGNING.md) | Pre-beta | 2026-07-20 | — |
+| BETA-015 | Packaging | macOS/Windows/Linux builds, signing, notarization, updates | Blocker | Needs Verification | — | Platform access + signing credentials | CI/package smoke + signed release | Phase J: [PACKAGING.md](PACKAGING.md), [RELEASE_SIGNING.md](RELEASE_SIGNING.md), `assurance:package` + gulp task smoke on darwin arm64 2026-07-20; **unsigned full package not built**; signing **Blocked** (no `PREBASE_*` creds) | Pre-beta | 2026-07-20 | — |
 | BETA-016 | Packaging | Application icon preservation policy + checksum gate | High | Needs Verification | — | CI gate (BETA-027) | Checksums unchanged | `build/icons/icon-integrity.sha256` (101 paths); `npm run verify:icons` 101/101 OK 2026-07-20; Phase J re-verify via `assurance:package` | Pre-beta | 2026-07-20 | — |
 | BETA-017 | Quality | Repeatable `assurance` npm script | High | Needs Verification | — | CI wiring (BETA-027) | One command orchestrates checks | Tiers `assurance:quick|static|graphs|privacy|full|package`; `assurance` → quick; local `assurance:quick` + `assurance:package` pass Phase K 2026-07-20 — [ASSURANCE.md](ASSURANCE.md) | Pre-beta | 2026-07-20 | — |
 | BETA-018 | Quality | Accessibility (keyboard, HC, reduced motion) for graphs + IDE | High | Not Started | — | Assurance | A11y smoke | Minimap still stub | Pre-beta | 2026-07-20 | — |
 | BETA-019 | Release | Privacy policy, terms, support channel, known limitations | High | Not Started | — | Docs | Legal/support review | — | Pre-beta | 2026-07-20 | — |
 | BETA-020 | Graphs | Minimap implementation (setting exists, UI stub) | Medium | Deferred After Beta | — | Product decision | Feature or remove setting | **Option 2 locked** in [BETA_SCOPE.md](BETA_SCOPE.md): keep hidden; no fake UI; BETA-020 defer | After beta OK | 2026-07-20 | — |
-| BETA-021 | Toolchain | Remove TS6 compat after TS 7.1 API | Medium | Deferred After Beta | — | TS 7.1 API GA | Re-inventory API consumers | 2026-08-02: TS 7.0 GA lacks programmatic API; retain dual lane until TS 7.1 API GA — [Announcing TypeScript 7.0](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/) | Post TS 7.1 | 2026-07-20 | — |
+| BETA-021 | Toolchain | Remove TS6 compat after TS 7.1 API | Medium | Not Started | — | TS 7.1 GA | Re-inventory API consumers | — | Post TS 7.1 | 2026-07-20 | — |
 | BETA-022 | Core | Onboarding + account lifecycle | High | Needs Verification | — | Assurance | Sign-in/out smoke | 2026-07-22: versioned `prebase.onboarding.completedVersion`; editor + open/reset commands registered; first-run yield vs Home; **P2/P3 GUI smoke still Needs Verification — not Complete** | Pre-beta | 2026-07-20 | — |
 | BETA-023 | Security | Dependency audit + supply-chain review | Critical | In Progress | — | Lockfile review after TS7 | `npm audit` + review | 2026-07-22: [SECURITY_AND_SUPPLY_CHAIN.md](SECURITY_AND_SUPPLY_CHAIN.md) records `shell-quote` (high) + `tar` (critical) from `npm audit --omit=dev`; remediation not applied — **not Complete** | Pre-beta | 2026-07-20 | — |
 | BETA-024 | Graphs | Large-project graph performance/memory | High | In Progress | — | GUI FPS + memory | Perf sample | CPU layout micro-benchmark [GRAPH_PERFORMANCE.md](GRAPH_PERFORMANCE.md) 2026-07-20 (organic ~307 ms @ 500 synthetic nodes); no render/FPS evidence | Pre-beta | 2026-07-20 | — |
@@ -73,8 +73,7 @@ Last audit: **2026-08-02** (Checkpoint #13 — beta evidence honesty pass on `9f
 | BETA-028 | Localization | PreBase-specific UI strings / NLS for graphs, Magnus, onboarding | Medium | Not Started | — | Product copy | NLS export smoke | — | Pre-beta | 2026-07-20 | — |
 | BETA-029 | Extensions | Built-in extensions `typecheck-web` / gulp compile under dual TS lanes | High | Needs Verification | — | Full compile-extensions | `compile-extensions` + spot typecheck | Phase F: gulp `compile-extension:prebase-magnus` + `compile-extension:typescript-language-features` 0 errors; `typecheck-web` on TS ext pass; matrix incomplete | Pre-beta | 2026-07-20 | — |
 | BETA-030 | Infrastructure | Remote / web (REH) smoke: extension host, web client | High | Not Started | — | Platform matrix | REH manual or CI smoke | — | Pre-beta | 2026-07-20 | — |
-| BETA-031 | Toolchain | npm 12 migration: allowScripts allowlist + lift `preinstall` `<12` guard | High | Deferred After Beta | — | Native deps / postinstall | `npm install` on 12.x builds natives; document engines | Blocked 2026-07-20: npm 12.0.1 rejected by preinstall; rolled back to 11.18.0; retain npm 11 for beta | Pre-beta | 2026-07-20 | — |
-| BETA-037 | Graphs | MAIN migration to single Code Graph + legacy Arch/Net state/command compatibility + selected-node morph | Critical | In Progress | — | GUI acceptance (BETA-004); Magnus unify (BETA-012) | Migration matrix + unit tests + restore smoke | 2026-08-01: product/host/morph/analysis ported on MAIN; docs [MAIN_ONE_GRAPH_MIGRATION.md](MAIN_ONE_GRAPH_MIGRATION.md); GUI morph/restore **still Needs Verification** | Pre-beta | 2026-08-01 | — |
+| BETA-031 | Toolchain | npm 12 migration: allowScripts allowlist + lift `preinstall` `<12` guard | High | Not Started | — | Native deps / postinstall | `npm install` on 12.x builds natives; document engines | Blocked 2026-07-20: npm 12.0.1 rejected by preinstall; rolled back to 11.18.0 | Pre-beta | 2026-07-20 | — |
 
 ## Newly discovered during 2026-07-20 audit
 
@@ -85,8 +84,8 @@ Last audit: **2026-08-02** (Checkpoint #13 — beta evidence honesty pass on `9f
 - TS7 dual-lane install **complete** (BETA-006/007); `npm run verify:typescript` enforces primary `tsc` 7.x + compat packages.
 - Phase F toolchain verification (2026-07-20): spot extension compiles + `docs/TYPESCRIPT_EDITOR_VERIFICATION.md`; editor UI checklist still manual.
 - Phase J packaging prep (2026-07-20): [PACKAGING.md](PACKAGING.md), [RELEASE_SIGNING.md](RELEASE_SIGNING.md); Microsoft ESRP upstream-only; `assurance:package` gulp task smoke on darwin arm64; full unsigned package not built; signing blocked without `PREBASE_*` credentials.
-- Manual **Code Graph** acceptance (BETA-004) + morph, core IDE smoke (BETA-010/011), and Magnus (BETA-012) remain unverified; BETA-003 Architecture acceptance superseded (Deferred). Templates: [GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md), [CORE_IDE_ACCEPTANCE.md](CORE_IDE_ACCEPTANCE.md).
-- BETA-037: one-Code-Graph MAIN migration In Progress — unit/boundary green; GUI not claimed.
+- Manual graph acceptance (BETA-003/004), core IDE smoke (BETA-010/011), and Magnus (BETA-012) remain unverified; templates: [GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md), [CORE_IDE_ACCEPTANCE.md](CORE_IDE_ACCEPTANCE.md).
+- BETA-024: layout CPU benchmarks only — see [GRAPH_PERFORMANCE.md](GRAPH_PERFORMANCE.md).
 
 ### Checkpoint 9 / Phase K (final migration review, 2026-07-20)
 
@@ -151,27 +150,17 @@ Last audit: **2026-08-02** (Checkpoint #13 — beta evidence honesty pass on `9f
 - Docs: `DARK_UI_RESEARCH.md`, `DARK_SURFACE_AUDIT.md`, `DARK_SURFACE_TOKENS.md`, `DARK_UI_COMPARISON.md`, `CLEANUP_AUDIT.md`, `DARK_UI_PHASE_A_PLAN.md`.
 - **Honesty:** interactive screenshot matrix + CORE_IDE/GRAPH acceptance still open; BETA-018 a11y not Complete; **beta candidate claim still forbidden**. Icons 101/101 unchanged.
 
-### Checkpoint #13 / Beta evidence honesty pass (2026-08-02, `9fde0994`)
-
-- Evidence run `2026-08-02T041900Z-9fde0994-darwin-arm64`: [BETA_EVIDENCE_INDEX.md](BETA_EVIDENCE_INDEX.md), [BETA_ITEM_ASSESSMENTS.md](BETA_ITEM_ASSESSMENTS.md), [BETA_GO_NO_GO.md](BETA_GO_NO_GO.md), `reports/beta-readiness/current-state.json`.
-- Local static/unit: `assurance:quick-v4` pass; `verify:typescript`, `verify:graphs-boundary`, `typecheck:graphs`, `typecheck-client-v3`, `test:graphs` (54), `verify:privacy`, cloud/supabase static, `verify:icons` 101/101.
-- **Not collected:** GUI screenshots/videos; remote CI run ID; unsigned package artifact; privacy runtime capture; Auth/RLS adversarial.
-- **Honesty fixes:** BETA-015 → **Blocked** (package artifact + signing creds); BETA-021 → **Deferred After Beta** (TS 7.1 API not GA); BETA-006/007 remain **Complete** only with `verify:typescript` pass this run; BETA-004/037 remain **not Complete**.
-- **Decision: NO-GO.** Beta candidate claim **forbidden**.
-
 ## Completed this task
 
 | ID | Evidence |
 |---|---|
-| BETA-006 | 2026-08-02: `verify:typescript` pass (run `2026-08-02T041900Z-9fde0994-darwin-arm64`); `tsc` 7.0.2; prior `typecheck-client` + `assurance` 2026-07-20 |
-| BETA-007 | 2026-08-02: `verify:typescript` pass; `@typescript/typescript6@6.0.2`, API 6.0.3, `tsc6` |
+| BETA-006 | `tsc` 7.0.2; `npm run verify:typescript`; `typecheck-client`; `npm run assurance` 2026-07-20 |
+| BETA-007 | `@typescript/typescript6@6.0.2`, API 6.0.3, `tsc6`; `verify:typescript` |
 | BETA-026 (partial) | Phase F: `TYPESCRIPT_EDITOR_VERIFICATION.md`, fixture `test/fixtures/typescript-lanes/`, Phase F section in `TYPESCRIPT_7_MIGRATION.md` |
 | BETA-001 (partial) | Phase B settings + Phase C commands + Phase A Settings UI (`graphSettingsUi.ts`) + Phase D shim deletion; boundary verifier rejects flat `core/*.ts` |
 | BETA-002 (partial) | `graphs/scripts/verify-boundary/verify.mjs`; `npm run verify:graphs-boundary` OK locally |
 | BETA-016 (partial) | `build/icons/icon-integrity.sha256` + `verify:icons` 101/101 OK 2026-07-20; Phase J `assurance:package` |
-| BETA-015 (partial) | 2026-08-02: `assurance:package` informational; unsigned package artifact missing; signing blocked without creds — **Blocked, not Complete** |
-| BETA-021 (deferred) | 2026-08-02: TS 7.1 API not GA; retain TS6 compat lane until official API ships |
-| Checkpoint #13 (honesty) | Evidence index + assessments + GO/NO-GO + `current-state.json`; decision NO-GO |
+| BETA-015 (partial) | Phase J docs + `scripts/release/signing-preflight.mjs` + `package-smoke.mjs`; gulp tasks verified; signing blocked without creds |
 | BETA-025 (partial) | Packaging doc references upstream NOTICE flow; legal inventory still open |
 | BETA-014 (partial) | `scripts/privacy/audit.mjs` static PASS 2026-07-21 (adapter + cloud SecretStorage; Checkpoint #1 retarget); Checkpoint #5: privacy/CSP/secrets docs + `assurance:privacy`; runtime network observation still Needs Verification |
 | BETA-023 (partial) | Checkpoint #5–#12: [SECURITY_AND_SUPPLY_CHAIN.md](SECURITY_AND_SUPPLY_CHAIN.md) + `assurance:release` / PreBase eslint ratchet; `npm audit --omit=dev` findings recorded (`shell-quote` high, `tar` critical); reachability/remediation still open — **not Complete** |

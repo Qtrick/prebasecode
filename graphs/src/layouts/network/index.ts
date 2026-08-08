@@ -11,7 +11,6 @@ export type {
 
 import type { NetworkLayoutLink, NetworkLayoutMode, NetworkLayoutNode, Point3D } from './types.js'
 import { layoutClustered } from './clusteredLayout.js'
-import { layoutCommunityForce } from './communityForceLayout.js'
 import { layoutConstellation } from './constellationLayout.js'
 import { layoutOrganic } from './organicLayout.js'
 import { layoutRadial } from './radialLayout.js'
@@ -28,8 +27,6 @@ export function layoutNetworkGraph(
 	sphereRadius = 240
 ): Map<string, Point3D> {
 	switch (mode) {
-		case 'community':
-			return layoutCommunityForce(nodes, links, sphereRadius)
 		case 'sphere':
 			return layoutSphere(nodes, links, sphereRadius)
 		case 'constellation':
@@ -50,14 +47,9 @@ export const NETWORK_LAYOUT_OPTIONS: {
 	blurb: string
 }[] = [
 	{
-		id: 'community',
-		label: 'Community Force',
-		blurb: 'Groups detected communities into 3D clusters.'
-	},
-	{
 		id: 'organic',
 		label: 'Organic',
-		blurb: 'Balanced natural cloud.'
+		blurb: 'Balanced natural cloud — default startup arrangement.'
 	},
 	{
 		id: 'sphere',

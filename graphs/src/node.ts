@@ -7,3 +7,4 @@ export type * from './common/types/graphTypes.js';
 export { GraphGenerator } from './core/generation/graphGenerator.js';
 export { ParserEngine } from './core/parsing/parserEngine.js';
 export { layoutNetworkGraph } from './layouts/network/index.js';
+export { LayoutEngine } from './layouts/architecture/layoutEngine.js';

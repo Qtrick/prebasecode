@@ -14,23 +14,36 @@ import { IHoverService } from '../../../../../../platform/hover/browser/hover.js
 import { IInstantiationService } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { IKeybindingService } from '../../../../../../platform/keybinding/common/keybinding.js';
 import { IOpenerService } from '../../../../../../platform/opener/common/opener.js';
-import { INotificationService } from '../../../../../../platform/notification/common/notification.js';
 import { IThemeService } from '../../../../../../platform/theme/common/themeService.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 import { ViewPane } from '../../../../../browser/parts/views/viewPane.js';
 import { IViewletViewOptions } from '../../../../../browser/parts/views/viewsViewlet.js';
 import { IViewDescriptorService } from '../../../../../common/views.js';
 import { IEditorService } from '../../../../../services/editor/common/editorService.js';
-import { listCommunitySummaries, normalizeHiddenCommunityIds } from '../../core/analysis/communities.js';
 import { computeLanguageStats } from '../../core/analysis/languageStats.js';
-import type { GraphNode } from '../../common/types/graphTypes.js';
-import { PreBaseGraphCommandIds } from '../../commands/graphCommandIds.js';
+import type { GraphNode, LayoutMode } from '../../common/types/graphTypes.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
-import { isCodeGraphCanvas } from '../../common/types/graphProduct.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
 
+type ArchitectureModeId = 'product' | 'file' | 'dependency' | 'state' | 'infrastructure' | 'overview';
 type GraphFilterId = 'all' | 'files' | 'components' | 'dependencies';
 type ExplorerViewMode = 'flat' | 'tree';
+
+interface ArchitectureModeDef {
+	id: ArchitectureModeId;
+	label: string;
+	blurb: string;
+	question: string;
+}
+
+const ARCHITECTURE_MODES: ArchitectureModeDef[] = [
+	{ id: 'product', label: 'Product', blurb: 'Entry → routes → features → hooks → data', question: 'How is the product structured?' },
+	{ id: 'file', label: 'File', blurb: 'Important source files, primitives collapsed', question: 'What files make up this part of the project?' },
+	{ id: 'dependency', label: 'Dependency', blurb: 'Imports & exports, top connections only', question: 'What depends on what?' },
+	{ id: 'state', label: 'State / Data', blurb: 'Hooks, context, stores, APIs, data clients', question: 'Where does data come from and how does state flow?' },
+	{ id: 'infrastructure', label: 'Infrastructure', blurb: 'Configs, build tools, package & env files', question: 'How is this project built, configured, and run?' },
+	{ id: 'overview', label: 'Overview', blurb: 'How the architecture modes relate', question: 'How do the architecture layers connect?' },
+];
 
 const FILTERS: { id: GraphFilterId; label: string }[] = [
 	{ id: 'all', label: 'All' },
@@ -46,9 +59,6 @@ const MUTED = 'var(--vscode-descriptionForeground)';
 const SURFACE = 'var(--vscode-input-background)';
 const SURFACE_OVERLAY = 'var(--vscode-editorWidget-background)';
 const BORDER = 'var(--vscode-input-border, var(--vscode-widget-border))';
-const BORDER_SOFT = 'color-mix(in srgb, var(--vscode-input-border, var(--vscode-widget-border)) 40%, transparent)';
-const BORDER_FAINT = 'color-mix(in srgb, var(--vscode-input-border, var(--vscode-widget-border)) 60%, transparent)';
-const SURFACE_TRANSLUCENT = 'color-mix(in srgb, var(--vscode-input-background) 80%, transparent)';
 
 interface ExplorerDirNode {
 	type: 'dir';
@@ -70,15 +80,18 @@ export class PreBaseMapsViewPane extends ViewPane {
 	static readonly LABEL = localize2('prebase.maps.view', "Graph");
 
 	private _scroll: HTMLElement | undefined;
+	private _archModeSection: HTMLElement | undefined;
+	private _archBlurb: HTMLElement | undefined;
 	private _langSection: HTMLElement | undefined;
-	private _communitySection: HTMLElement | undefined;
 	private _filterSection: HTMLElement | undefined;
+	private _layoutSection: HTMLElement | undefined;
 	private _networkSection: HTMLElement | undefined;
 	private _displaySection: HTMLElement | undefined;
 	private _explorerList: HTMLElement | undefined;
 	private _diag: HTMLElement | undefined;
 
-	private _openCodeGraphBtn: HTMLButtonElement | undefined;
+	private _modeArchBtn: HTMLButtonElement | undefined;
+	private _modeNetBtn: HTMLButtonElement | undefined;
 	private _graphModeHelper: HTMLElement | undefined;
 	private _graphModeOpenBtn: HTMLButtonElement | undefined;
 	private _searchInput: HTMLInputElement | undefined;
@@ -86,16 +99,15 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _legendCheckbox: HTMLInputElement | undefined;
 	private _displayBody: HTMLElement | undefined;
 
+	private readonly _archModeButtons = new Map<ArchitectureModeId, HTMLButtonElement>();
 	private readonly _filterButtons = new Map<GraphFilterId, HTMLButtonElement>();
+	private readonly _layoutButtons = new Map<LayoutMode, HTMLButtonElement>();
 	private readonly _networkLayoutButtons = new Map<string, HTMLButtonElement>();
 	private readonly _explorerModeButtons = new Map<ExplorerViewMode, HTMLButtonElement>();
 	private readonly _expandedDirs = new Set<string>(['src']);
 	private readonly _explorerDisposables = this._register(new DisposableStore());
-	private readonly _communityDisposables = this._register(new DisposableStore());
 
 	private _searchQuery = '';
-	/** First endpoint for Maps Find Path (cleared after a successful path or cancel). */
-	private _pathFromId: string | undefined;
 
 	constructor(
 		options: IViewletViewOptions,
@@ -112,24 +124,21 @@ export class PreBaseMapsViewPane extends ViewPane {
 		@ICommandService private readonly commandService: ICommandService,
 		@IEditorService private readonly editorService: IEditorService,
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
-		@INotificationService private readonly notificationService: INotificationService,
 	) {
 		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
 		this._register(this.graphService.onDidChangeDiagnostics(() => this._refresh()));
 		this._register(this.graphService.onDidChangeViewState(() => this._refresh()));
 		this._register(this.graphService.onDidChangeSnapshot(() => this._refresh()));
-		this._register(this.graphService.onDidChangeHiddenCommunities(() => {
-			this._refreshCommunities();
-			this._refreshExplorerList();
-		}));
 		this._register(this.workspaceContextService.onDidChangeWorkbenchState(() => this._refresh()));
 		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => this._refresh()));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphShowLegend) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphArchitectureMode) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphFilter) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphExplorerViewMode) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode)
 			) {
 				this._refresh();
@@ -150,12 +159,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._scroll.style.boxSizing = 'border-box';
 
 		this._renderGraphMode();
-		// Architecture product chrome not rendered (sources preserved under graphs/src/preserved/architecture/).
+		this._renderArchitectureModes();
 		this._renderLanguages();
 		this._renderSearch();
-		this._renderAnalysis();
-		this._renderCommunities();
 		this._renderFilter();
+		this._renderArchitectureLayout();
 		this._renderNetwork();
 		this._renderDisplay();
 		this._renderExplorer();
@@ -183,27 +191,21 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 	private _renderGraphMode(): void {
 		const section = DOM.append(this._scroll!, DOM.$('div'));
-		this._sectionLabel(section, localize('prebase.maps.codeGraph', "Code Graph"));
-		const openBtn = DOM.append(section, DOM.$('button')) as HTMLButtonElement;
-		openBtn.type = 'button';
-		openBtn.textContent = localize('prebase.maps.openCodeGraph', "Open Code Graph");
-		openBtn.style.marginTop = '4px';
-		openBtn.style.padding = '6px 10px';
-		openBtn.style.fontSize = '11px';
-		openBtn.style.fontWeight = '600';
-		openBtn.style.borderRadius = '6px';
-		openBtn.style.cursor = 'pointer';
-		openBtn.style.border = `1px solid color-mix(in srgb, ${ACCENT} 40%, transparent)`;
-		openBtn.style.background = ACCENT_SOFT;
-		openBtn.style.color = ACCENT;
-		openBtn.style.width = '100%';
-		this._openCodeGraphBtn = openBtn;
-		this._register(DOM.addDisposableListener(openBtn, 'click', () => {
+		this._sectionLabel(section, localize('prebase.maps.graphMode', "Graph mode"));
+		const row = DOM.append(section, DOM.$('div'));
+		this._segmentTrack(row);
+		this._modeArchBtn = this._segmentBtn(row, localize('prebase.maps.architecture', "Architecture"), () => {
 			if (!this._hasOpenProject()) {
 				return;
 			}
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.open);
-		}));
+			this.commandService.executeCommand('prebase.graph.openArchitecture');
+		});
+		this._modeNetBtn = this._segmentBtn(row, localize('prebase.maps.network', "Network"), () => {
+			if (!this._hasOpenProject()) {
+				return;
+			}
+			this.commandService.executeCommand('prebase.graph.openNetwork');
+		});
 
 		this._graphModeHelper = DOM.append(section, DOM.$('p'));
 		this._graphModeHelper.style.fontSize = '10px';
@@ -212,7 +214,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._graphModeHelper.style.lineHeight = '1.4';
 		this._graphModeHelper.textContent = localize(
 			'prebase.maps.openProjectHint',
-			"Open a project to generate the Code Graph visualization."
+			"Open a project to choose a graph mode and generate its visualization."
 		);
 
 		this._graphModeOpenBtn = DOM.append(section, DOM.$('button')) as HTMLButtonElement;
@@ -223,12 +225,43 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._graphModeOpenBtn.style.fontSize = '10px';
 		this._graphModeOpenBtn.style.borderRadius = '6px';
 		this._graphModeOpenBtn.style.cursor = 'pointer';
-		this._graphModeOpenBtn.style.border = `1px solid color-mix(in srgb, ${ACCENT} 40%, transparent)`;
+		this._graphModeOpenBtn.style.border = `1px solid ${ACCENT}66`;
 		this._graphModeOpenBtn.style.background = ACCENT_SOFT;
 		this._graphModeOpenBtn.style.color = ACCENT;
 		this._register(DOM.addDisposableListener(this._graphModeOpenBtn, 'click', () => {
 			void this.commandService.executeCommand('workbench.action.files.openFolder');
 		}));
+	}
+
+	private _renderArchitectureModes(): void {
+		this._archModeSection = DOM.append(this._scroll!, DOM.$('div'));
+		this._sectionLabel(this._archModeSection, localize('prebase.maps.architectureMode', "Architecture mode"));
+		const grid = DOM.append(this._archModeSection, DOM.$('div'));
+		grid.style.display = 'grid';
+		grid.style.gridTemplateColumns = '1fr 1fr';
+		grid.style.gap = '4px';
+		for (const mode of ARCHITECTURE_MODES) {
+			const btn = DOM.append(grid, DOM.$('button')) as HTMLButtonElement;
+			btn.type = 'button';
+			btn.textContent = mode.label;
+			btn.title = mode.question;
+			btn.style.padding = '5px 8px';
+			btn.style.fontSize = '10px';
+			btn.style.fontWeight = '500';
+			btn.style.textAlign = 'left';
+			btn.style.borderRadius = '6px';
+			btn.style.cursor = 'pointer';
+			btn.style.border = 'none';
+			this._register(DOM.addDisposableListener(btn, 'click', () => {
+				void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphArchitectureMode, mode.id);
+			}));
+			this._archModeButtons.set(mode.id, btn);
+		}
+		this._archBlurb = DOM.append(this._archModeSection, DOM.$('p'));
+		this._archBlurb.style.fontSize = '10px';
+		this._archBlurb.style.color = MUTED;
+		this._archBlurb.style.margin = '4px 2px 0';
+		this._archBlurb.style.lineHeight = '1.35';
 	}
 
 	private _renderLanguages(): void {
@@ -240,7 +273,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._searchInput = DOM.append(section, DOM.$('input')) as HTMLInputElement;
 		this._searchInput.type = 'search';
 		this._searchInput.placeholder = localize('prebase.maps.searchFiles', "Search files…");
-		this._searchInput.setAttribute('aria-label', localize('prebase.maps.searchFilesAria', "Search Code Graph files"));
 		this._searchInput.style.width = '100%';
 		this._searchInput.style.boxSizing = 'border-box';
 		this._searchInput.style.padding = '6px 8px';
@@ -253,181 +285,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 			this._searchQuery = this._searchInput?.value.trim().toLowerCase() ?? '';
 			this._refreshExplorerList();
 		}));
-	}
-
-	/** Analysis shortcuts — inspired by Graphify MIT concepts, PreBase reimplementation */
-	private _renderAnalysis(): void {
-		const section = DOM.append(this._scroll!, DOM.$('div'));
-		this._sectionLabel(section, localize('prebase.maps.analysis', "Analysis"));
-		const row = DOM.append(section, DOM.$('div'));
-		row.style.display = 'flex';
-		row.style.flexWrap = 'wrap';
-		row.style.gap = '4px';
-
-		const mk = (label: string, onClick: () => void) => {
-			const btn = DOM.append(row, DOM.$('button')) as HTMLButtonElement;
-			btn.type = 'button';
-			btn.textContent = label;
-			btn.setAttribute('aria-label', label);
-			btn.style.padding = '4px 8px';
-			btn.style.fontSize = '10px';
-			btn.style.borderRadius = '6px';
-			btn.style.cursor = 'pointer';
-			btn.style.border = `1px solid ${BORDER}`;
-			btn.style.background = SURFACE;
-			btn.style.color = TEXT;
-			this._register(DOM.addDisposableListener(btn, 'click', onClick));
-			return btn;
-		};
-
-		mk(localize('prebase.maps.analysisImportant', "Important Nodes"), () => {
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.showImportantNodes);
-		});
-		mk(localize('prebase.maps.analysisBridge', "Bridge Nodes"), () => {
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.showBridgeNodes);
-		});
-		mk(localize('prebase.maps.analysisCommunities', "Communities"), () => {
-			if (this._communitySection) {
-				this._communitySection.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
-			}
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.showCommunities);
-		});
-		mk(localize('prebase.maps.analysisFindPath', "Find Path"), () => {
-			this._runFindPath();
-		});
-		mk(localize('prebase.maps.analysisAffected', "Potentially Affected"), () => {
-			const id = this.graphService.getSelectedNodeId();
-			if (!id) {
-				this.notificationService.info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
-				return;
-			}
-			const raw = this.graphService.getAffectedForMagnus(id, 30);
-			if (!raw) {
-				this.notificationService.info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
-				return;
-			}
-			try {
-				const parsed = JSON.parse(raw) as { nodeIds?: string[]; truncated?: boolean; notice?: string };
-				const count = parsed.nodeIds?.length ?? 0;
-				this.notificationService.info(localize(
-					'prebase.maps.affectedSummary',
-					"Potentially affected: {0} reverse dependent(s){1}",
-					count,
-					parsed.truncated ? ' (truncated)' : ''
-				));
-			} catch {
-				this.notificationService.info(localize('prebase.maps.affectedSummary', "Potentially affected: {0} reverse dependent(s){1}", 0, ''));
-			}
-		});
-		mk(localize('prebase.maps.analysisExplain', "Explain Selection"), () => {
-			const id = this.graphService.getSelectedNodeId();
-			if (!id) {
-				this.notificationService.info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
-				return;
-			}
-			const raw = this.graphService.explainNodeForMagnus(id);
-			if (!raw) {
-				this.notificationService.info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
-				return;
-			}
-			try {
-				const parsed = JSON.parse(raw) as {
-					label?: string;
-					communityLabel?: string;
-					degrees?: { degree?: number };
-					confidence?: { EXTRACTED?: number; INFERRED?: number; AMBIGUOUS?: number; unknown?: number };
-				};
-				const conf = parsed.confidence;
-				// Non-color text labels (not E/I/A abbreviations) for accessibility.
-				const confBit = conf
-					? localize(
-						'prebase.maps.explainConfidenceNamed',
-						"EXTRACTED {0} · INFERRED {1} · AMBIGUOUS {2} · unknown {3}",
-						conf.EXTRACTED ?? 0,
-						conf.INFERRED ?? 0,
-						conf.AMBIGUOUS ?? 0,
-						conf.unknown ?? 0
-					)
-					: '—';
-				this.notificationService.info(localize(
-					'prebase.maps.explainSummaryConfidence',
-					"Explain: {0} · community {1} · degree {2} · confidence {3}",
-					parsed.label || id,
-					parsed.communityLabel || '—',
-					parsed.degrees?.degree ?? 0,
-					confBit
-				));
-			} catch {
-				this.notificationService.info(localize('prebase.maps.explainSummaryConfidence', "Explain: {0} · community {1} · degree {2} · confidence {3}", id, '—', 0, '—'));
-			}
-		});
-		mk(localize('prebase.maps.analysisCrossCommunity', "Cross-community"), () => {
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.showSurprisingConnections);
-		});
-	}
-
-	/** Two-step Find Path: first click sets start from selection; second runs directed BFS with hop confidence. */
-	private _runFindPath(): void {
-		const selected = this.graphService.getSelectedNodeId();
-		if (!selected) {
-			this.notificationService.info(localize('prebase.graph.noSelectedNode', "No graph node selected."));
-			return;
-		}
-		if (!this._pathFromId || this._pathFromId === selected) {
-			this._pathFromId = selected;
-			const label = this.graphService.getSnapshot()?.nodes.find(n => n.id === selected)?.label || selected;
-			this.notificationService.info(localize(
-				'prebase.maps.findPathStart',
-				"Path start: {0}. Select a different node, then Find Path again.",
-				label
-			));
-			return;
-		}
-		const fromId = this._pathFromId;
-		this._pathFromId = undefined;
-		const raw = this.graphService.findPathForMagnus(fromId, selected);
-		if (!raw) {
-			this.notificationService.info(localize('prebase.maps.findPathMissing', "Could not resolve both path endpoints in the Code Graph."));
-			return;
-		}
-		try {
-			const parsed = JSON.parse(raw) as {
-				found?: boolean;
-				budgetExceeded?: boolean;
-				notice?: string;
-				nodeIds?: string[];
-				edges?: Array<{ from: string; to: string; kind: string; confidence?: string; sourceFile?: string; sourceLine?: number }>;
-			};
-			if (!parsed.found) {
-				this.notificationService.info(
-					parsed.budgetExceeded || parsed.notice
-						? localize('prebase.maps.findPathBudget', "No path found (visit budget). {0}", parsed.notice || '')
-						: localize('prebase.maps.findPathNone', "No directed import/dependency path between the selected nodes.")
-				);
-				return;
-			}
-			const hops = (parsed.edges ?? []).slice(0, 12).map((e, i) => {
-				const evidence = e.sourceFile
-					? `${e.sourceFile}${typeof e.sourceLine === 'number' ? `:${e.sourceLine}` : ''}`
-					: '';
-				return `${i + 1}. ${e.from} → ${e.to} (${e.kind}, ${e.confidence || 'unknown'}${evidence ? `; ${evidence}` : ''})`;
-			});
-			const via = (parsed.nodeIds ?? []).join(' → ');
-			this.notificationService.info(localize(
-				'prebase.maps.findPathResult',
-				"Path ({0} hop(s)): {1}\n{2}",
-				parsed.edges?.length ?? 0,
-				via,
-				hops.join('\n') || '(direct)'
-			));
-		} catch {
-			this.notificationService.info(localize('prebase.maps.findPathNone', "No directed import/dependency path between the selected nodes."));
-		}
-	}
-
-	private _renderCommunities(): void {
-		this._communitySection = DOM.append(this._scroll!, DOM.$('div'));
-		this._communitySection.style.display = 'none';
 	}
 
 	private _renderFilter(): void {
@@ -445,16 +302,38 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}
 	}
 
+	private _renderArchitectureLayout(): void {
+		this._layoutSection = DOM.append(this._scroll!, DOM.$('div'));
+		this._sectionLabel(this._layoutSection, localize('prebase.maps.layout', "Architecture Layout"));
+		const col = DOM.append(this._layoutSection, DOM.$('div'));
+		col.style.display = 'flex';
+		col.style.flexDirection = 'column';
+		col.style.gap = '2px';
+		for (const mode of ['hierarchy', 'pyramid', 'scattered'] as LayoutMode[]) {
+			const label = mode === 'hierarchy' ? localize('prebase.maps.hierarchy', "Hierarchy")
+				: mode === 'pyramid' ? localize('prebase.maps.pyramid', "Pyramid")
+					: localize('prebase.maps.scattered', "Scattered");
+			const btn = this._chipBtn(col, label, () => {
+				if (!this._hasOpenProject()) {
+					return;
+				}
+				this.commandService.executeCommand('prebase.graph.switchLayout', mode);
+			}, true, true);
+			this._layoutButtons.set(mode, btn);
+		}
+	}
+
 	private _renderNetwork(): void {
 		this._networkSection = DOM.append(this._scroll!, DOM.$('div'));
-		this._sectionLabel(this._networkSection, localize('prebase.maps.layoutSection', "Layout"));
+		this._sectionLabel(this._networkSection, localize('prebase.maps.networkSection', "Network"));
+
+		this._sectionLabel(this._networkSection, localize('prebase.maps.networkLayout', "Network Layout"));
 		const layoutCol = DOM.append(this._networkSection, DOM.$('div'));
 		layoutCol.style.display = 'flex';
 		layoutCol.style.flexDirection = 'column';
 		layoutCol.style.gap = '2px';
 		layoutCol.style.marginBottom = '8px';
 		const modes: { id: string; label: string }[] = [
-			{ id: 'community', label: localize('prebase.maps.net.community', "Community Force") },
 			{ id: 'organic', label: localize('prebase.maps.net.organic', "Organic") },
 			{ id: 'sphere', label: localize('prebase.maps.net.sphere', "Sphere") },
 			{ id: 'constellation', label: localize('prebase.maps.net.constellation', "Constellation") },
@@ -493,10 +372,10 @@ export class PreBaseMapsViewPane extends ViewPane {
 		netActions.style.gap = '6px';
 		netActions.style.flexWrap = 'wrap';
 		this._chipBtn(netActions, localize('prebase.maps.resetView', "Reset View"), () => {
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.resetView);
+			this.commandService.executeCommand('prebase.graph.resetView');
 		});
 		this._chipBtn(netActions, localize('prebase.maps.fitView', "Fit View"), () => {
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.fitView);
+			this.commandService.executeCommand('prebase.graph.fitView');
 		});
 	}
 
@@ -550,7 +429,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 	private _renderExplorer(): void {
 		const section = DOM.append(this._scroll!, DOM.$('div'));
-		section.style.borderTop = `1px solid ${BORDER_SOFT}`;
+		section.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
 		section.style.paddingTop = '8px';
 
 		const header = DOM.append(section, DOM.$('div'));
@@ -585,7 +464,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._explorerList = DOM.append(section, DOM.$('div'));
 		this._explorerList.style.maxHeight = '240px';
 		this._explorerList.style.overflowY = 'auto';
-		this._explorerList.style.border = `1px solid ${BORDER_FAINT}`;
+		this._explorerList.style.border = `1px solid color-mix(in srgb, ${BORDER} 40%, transparent)`;
 		this._explorerList.style.borderRadius = '6px';
 		this._explorerList.style.background = SURFACE_OVERLAY;
 		this._explorerList.style.padding = '4px';
@@ -597,13 +476,13 @@ export class PreBaseMapsViewPane extends ViewPane {
 		actions.style.gap = '6px';
 		actions.style.flexWrap = 'wrap';
 		this._chipBtn(actions, localize('prebase.maps.rescan', "Rescan"), () => {
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.rescanWorkspace);
+			this.commandService.executeCommand('prebase.graph.rescanWorkspace');
 		});
 		this._chipBtn(actions, localize('prebase.maps.cancel', "Cancel"), () => {
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.cancelScan);
+			this.commandService.executeCommand('prebase.graph.cancelScan');
 		});
 		this._chipBtn(actions, localize('prebase.maps.diagnostics', "Diagnostics"), () => {
-			void this.commandService.executeCommand(PreBaseGraphCommandIds.showDiagnostics);
+			this.commandService.executeCommand('prebase.graph.showDiagnostics');
 		});
 		this._chipBtn(actions, localize('prebase.maps.openSettings', "PreBase Settings"), () => {
 			if (CommandsRegistry.getCommand('prebase.settings.open')) {
@@ -626,18 +505,23 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _refresh(): void {
 		const state = this.graphService.getViewState();
 		const diag = this.graphService.getDiagnostics();
-		const isCodeCanvas = isCodeGraphCanvas(state.graphType);
+		const isNetwork = state.graphType === 'network';
+		const archMode = this._getArchitectureMode();
+		const isOverview = !isNetwork && archMode === 'overview';
 		const hasProject = this._hasOpenProject();
 		const scanStatus = diag.status;
 
-		this._setModeEnabled(this._openCodeGraphBtn, hasProject);
+		this._styleSegmentActive(this._modeArchBtn, state.graphType === 'architecture');
+		this._styleSegmentActive(this._modeNetBtn, isNetwork);
+		this._setModeEnabled(this._modeArchBtn, hasProject);
+		this._setModeEnabled(this._modeNetBtn, hasProject);
 
 		if (this._graphModeHelper) {
 			if (!hasProject) {
 				this._graphModeHelper.style.display = 'block';
 				this._graphModeHelper.textContent = localize(
 					'prebase.maps.openProjectHint',
-					"Open a project to generate the Code Graph visualization."
+					"Open a project to choose a graph mode and generate its visualization."
 				);
 			} else if (scanStatus === 'scanning') {
 				this._graphModeHelper.style.display = 'block';
@@ -660,19 +544,34 @@ export class PreBaseMapsViewPane extends ViewPane {
 			this._graphModeOpenBtn.style.display = hasProject ? 'none' : 'inline-block';
 		}
 
+		if (this._archModeSection) {
+			this._archModeSection.style.display = isNetwork || !hasProject ? 'none' : 'block';
+		}
+		for (const [id, btn] of this._archModeButtons) {
+			this._styleChipActive(btn, id === archMode);
+			btn.disabled = !hasProject;
+			btn.style.opacity = hasProject ? '1' : '0.45';
+			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';
+		}
+		if (this._archBlurb) {
+			this._archBlurb.textContent = ARCHITECTURE_MODES.find(m => m.id === archMode)?.blurb ?? '';
+		}
+
 		this._refreshLanguages();
-		this._refreshCommunities();
 
 		if (this._filterSection) {
-			this._filterSection.style.display = hasProject ? 'block' : 'none';
+			this._filterSection.style.display = isOverview || !hasProject ? 'none' : 'block';
 		}
 		const filter = this._getFilter();
 		for (const [id, btn] of this._filterButtons) {
 			this._styleChipActive(btn, id === filter);
 		}
 
+		if (this._layoutSection) {
+			this._layoutSection.style.display = isNetwork || isOverview || !hasProject ? 'none' : 'block';
+		}
 		if (this._networkSection) {
-			this._networkSection.style.display = isCodeCanvas && hasProject ? 'block' : 'none';
+			this._networkSection.style.display = isNetwork && hasProject ? 'block' : 'none';
 		}
 		if (this._displaySection) {
 			this._displaySection.style.display = hasProject ? 'block' : 'none';
@@ -685,7 +584,14 @@ export class PreBaseMapsViewPane extends ViewPane {
 			this._legendCheckbox.checked = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphShowLegend) !== false;
 		}
 
-		const networkLayout = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'community';
+		for (const [mode, btn] of this._layoutButtons) {
+			this._styleChipActive(btn, mode === state.layoutMode, true);
+			btn.disabled = !hasProject;
+			btn.style.opacity = hasProject ? '1' : '0.45';
+			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';
+		}
+
+		const networkLayout = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
 		for (const [mode, btn] of this._networkLayoutButtons) {
 			this._styleChipActive(btn, mode === networkLayout, true);
 			btn.disabled = !hasProject;
@@ -701,21 +607,10 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._refreshExplorerList();
 
 		if (this._diag) {
-			const snapshot = this.graphService.getSnapshot();
-			const communityCount = snapshot
-				? new Set(
-					snapshot.nodes
-						.map(n => n.meta?.communityId)
-						.filter((id): id is number => typeof id === 'number')
-				).size
-				: 0;
 			this._diag.textContent = [
 				localize('prebase.maps.status', "Status: {0}", diag.status),
 				diag.message || '',
-				localize('prebase.maps.counts', "Files {0} · Nodes {1} · Edges {2}", diag.fileCount, diag.nodeCount, diag.edgeCount),
-				communityCount > 0
-					? localize('prebase.maps.communities', "Communities {0}", communityCount)
-					: ''
+				localize('prebase.maps.counts', "Files {0} · Nodes {1} · Edges {2}", diag.fileCount, diag.nodeCount, diag.edgeCount)
 			].filter(Boolean).join('\n');
 		}
 	}
@@ -759,7 +654,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 				name: 'Other',
 				count: otherCount,
 				percent: Math.round((otherCount / totalFiles) * 1000) / 10,
-				color: MUTED,
+				color: '#52525b',
 			}]
 			: top;
 
@@ -776,8 +671,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 		bar.style.height = '10px';
 		bar.style.borderRadius = '999px';
 		bar.style.overflow = 'hidden';
-		bar.style.background = SURFACE_TRANSLUCENT;
-		bar.style.border = `1px solid ${BORDER_FAINT}`;
+		bar.style.background = `color-mix(in srgb, ${SURFACE} 80%, transparent)`;
+		bar.style.border = `1px solid color-mix(in srgb, ${BORDER} 40%, transparent)`;
 		for (const seg of display) {
 			const slice = DOM.append(bar, DOM.$('div'));
 			slice.style.width = `${Math.max(seg.percent, seg.count > 0 ? 2 : 0)}%`;
@@ -804,189 +699,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 			swatch.style.verticalAlign = 'middle';
 			DOM.append(item, DOM.$('span')).textContent = `${seg.name} ${seg.percent}%`;
 		}
-	}
-
-	private _hiddenCommunitySet(): Set<number> {
-		return new Set(this.graphService.getHiddenCommunityIds());
-	}
-
-	private _setHiddenCommunityIds(ids: Iterable<number>): void {
-		this.graphService.setHiddenCommunityIds(normalizeHiddenCommunityIds([...ids]));
-	}
-
-	private _refreshCommunities(): void {
-		if (!this._communitySection) {
-			return;
-		}
-		this._communityDisposables.clear();
-		DOM.clearNode(this._communitySection);
-		const snapshot = this.graphService.getSnapshot();
-		const summaries = listCommunitySummaries(snapshot?.nodes ?? []);
-		const known = new Set(summaries.map(s => s.id));
-		let hidden = this._hiddenCommunitySet();
-		if ([...hidden].some(id => !known.has(id))) {
-			hidden = new Set([...hidden].filter(id => known.has(id)));
-			this._setHiddenCommunityIds(hidden);
-		}
-		if (summaries.length === 0 || !this._hasOpenProject()) {
-			this._communitySection.style.display = 'none';
-			return;
-		}
-		this._communitySection.style.display = 'block';
-
-		const header = DOM.append(this._communitySection, DOM.$('div'));
-		header.style.display = 'flex';
-		header.style.alignItems = 'center';
-		header.style.gap = '6px';
-		header.style.marginBottom = '4px';
-
-		const allCb = DOM.append(header, DOM.$('input')) as HTMLInputElement;
-		allCb.type = 'checkbox';
-		allCb.style.accentColor = ACCENT;
-		allCb.title = localize('prebase.maps.communitiesSelectAll', "Show all communities on canvas and explorer");
-		allCb.setAttribute('aria-label', localize('prebase.maps.communitiesSelectAllAria', "Show all communities on canvas and explorer"));
-		const syncSelectAll = () => {
-			const hiddenNow = this._hiddenCommunitySet();
-			const hiddenCount = summaries.filter(s => hiddenNow.has(s.id)).length;
-			allCb.checked = hiddenCount === 0;
-			allCb.indeterminate = hiddenCount > 0 && hiddenCount < summaries.length;
-		};
-		syncSelectAll();
-		const rowCheckboxes: HTMLInputElement[] = [];
-		this._communityDisposables.add(DOM.addDisposableListener(allCb, 'change', () => {
-			if (allCb.checked) {
-				this._setHiddenCommunityIds([]);
-			} else {
-				this._setHiddenCommunityIds(summaries.map(s => s.id));
-			}
-			const hiddenNow = this._hiddenCommunitySet();
-			for (let i = 0; i < rowCheckboxes.length; i++) {
-				rowCheckboxes[i]!.checked = !hiddenNow.has(summaries[i]!.id);
-			}
-			syncSelectAll();
-			this._refreshExplorerList();
-		}));
-
-		const title = DOM.append(header, DOM.$('span'));
-		title.textContent = localize('prebase.maps.communitiesSection', "Communities");
-		title.style.fontSize = '10px';
-		title.style.fontWeight = '600';
-		title.style.letterSpacing = '0.06em';
-		title.style.textTransform = 'uppercase';
-		title.style.color = MUTED;
-
-		const hint = DOM.append(this._communitySection, DOM.$('div'));
-		hint.textContent = localize('prebase.maps.communitiesCanvasFilter', "Unchecked communities are hidden on the Code Graph canvas and in the explorer.");
-		hint.style.fontSize = '10px';
-		hint.style.color = MUTED;
-		hint.style.marginBottom = '6px';
-		hint.style.lineHeight = '1.3';
-
-		const list = DOM.append(this._communitySection, DOM.$('div'));
-		list.style.maxHeight = '140px';
-		list.style.overflowY = 'auto';
-		list.style.display = 'flex';
-		list.style.flexDirection = 'column';
-		list.style.gap = '2px';
-		list.setAttribute('role', 'group');
-		list.setAttribute('aria-label', localize('prebase.maps.communitiesListAria', "Code Graph communities"));
-
-		for (const summary of summaries) {
-			const row = DOM.append(list, DOM.$('div'));
-			row.style.display = 'flex';
-			row.style.alignItems = 'center';
-			row.style.gap = '6px';
-			row.style.padding = '2px 4px';
-			row.style.borderRadius = '4px';
-
-			const swatch = DOM.append(row, DOM.$('span'));
-			swatch.style.display = 'inline-block';
-			swatch.style.width = '8px';
-			swatch.style.height = '8px';
-			swatch.style.borderRadius = '2px';
-			swatch.style.flexShrink = '0';
-			swatch.style.backgroundColor = this._communityColor(summary.id);
-			swatch.setAttribute('aria-hidden', 'true');
-
-			const cb = DOM.append(row, DOM.$('input')) as HTMLInputElement;
-			cb.type = 'checkbox';
-			cb.style.accentColor = ACCENT;
-			cb.checked = !hidden.has(summary.id);
-			cb.title = localize('prebase.maps.communityToggle', "Show on canvas and explorer");
-			cb.setAttribute('aria-label', localize('prebase.maps.communityToggleAria', "Show community {0} on canvas and explorer", summary.label));
-			rowCheckboxes.push(cb);
-			this._communityDisposables.add(DOM.addDisposableListener(cb, 'change', () => {
-				const next = this._hiddenCommunitySet();
-				if (cb.checked) {
-					next.delete(summary.id);
-				} else {
-					next.add(summary.id);
-				}
-				this._setHiddenCommunityIds(next);
-				// ponytail: sync select-all in place — full rebuild steals checkbox focus.
-				syncSelectAll();
-				this._refreshExplorerList();
-			}));
-
-			const labelBtn = DOM.append(row, DOM.$('button')) as HTMLButtonElement;
-			labelBtn.type = 'button';
-			labelBtn.textContent = summary.label;
-			labelBtn.title = localize('prebase.maps.communityFocus', "Focus community hub on Code Graph");
-			labelBtn.setAttribute('aria-label', localize('prebase.maps.communityFocusAria', "Focus community {0} on Code Graph", summary.label));
-			labelBtn.style.all = 'unset';
-			labelBtn.style.flex = '1';
-			labelBtn.style.minWidth = '0';
-			labelBtn.style.fontSize = '11px';
-			labelBtn.style.color = TEXT;
-			labelBtn.style.cursor = 'pointer';
-			labelBtn.style.overflow = 'hidden';
-			labelBtn.style.textOverflow = 'ellipsis';
-			labelBtn.style.whiteSpace = 'nowrap';
-			this._communityDisposables.add(DOM.addDisposableListener(labelBtn, 'click', () => {
-				void this._focusCommunity(summary.id);
-			}));
-
-			const count = DOM.append(row, DOM.$('span'));
-			count.textContent = String(summary.count);
-			count.style.fontSize = '10px';
-			count.style.color = MUTED;
-			count.style.flexShrink = '0';
-			count.setAttribute('aria-label', localize('prebase.maps.communityCountAria', "{0} nodes", summary.count));
-		}
-	}
-
-	private _communityColor(id: number): string {
-		const hue = (Math.abs(id) * 47) % 360;
-		return `hsl(${hue} 62% 52%)`;
-	}
-
-	private async _focusCommunity(communityId: number): Promise<void> {
-		const hidden = this._hiddenCommunitySet();
-		if (hidden.has(communityId)) {
-			hidden.delete(communityId);
-			this._setHiddenCommunityIds(hidden);
-			this._refreshCommunities();
-		}
-		const nodes = this.graphService.getSnapshot()?.nodes ?? [];
-		const members = nodes.filter(n => n.meta?.communityId === communityId);
-		if (members.length === 0) {
-			return;
-		}
-		members.sort((a, b) => {
-			const degA = a.meta?.degree ?? 0;
-			const degB = b.meta?.degree ?? 0;
-			if (degB !== degA) {
-				return degB - degA;
-			}
-			return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
-		});
-		const hub = members[0]!;
-		if (this._hasOpenProject()) {
-			await this.commandService.executeCommand(PreBaseGraphCommandIds.open);
-		}
-		this.graphService.setSelectedNodeId(hub.id);
-		this.graphService.requestFitView();
-		this._refreshExplorerList();
 	}
 
 	private _refreshExplorerList(): void {
@@ -1028,10 +740,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 				if (!hay.includes(query)) {
 					return false;
 				}
-			}
-			const communityId = n.meta?.communityId;
-			if (typeof communityId === 'number' && this._hiddenCommunitySet().has(communityId)) {
-				return false;
 			}
 			return true;
 		});
@@ -1194,6 +902,12 @@ export class PreBaseMapsViewPane extends ViewPane {
 		} catch {
 			// ignore missing files
 		}
+	}
+
+	private _getArchitectureMode(): ArchitectureModeId {
+		const v = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphArchitectureMode);
+		const match = ARCHITECTURE_MODES.find(m => m.id === v);
+		return match?.id ?? 'product';
 	}
 
 	private _getFilter(): GraphFilterId {

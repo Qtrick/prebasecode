@@ -1,5 +1,0 @@
-npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
-
-> code-oss-dev@1.128.0 typecheck:graphs-preserved
-> tsc -p ./graphs/tsconfig.preserved-architecture.json --noEmit
-

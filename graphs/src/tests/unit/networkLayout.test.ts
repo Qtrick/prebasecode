@@ -55,15 +55,9 @@ suite('PreBase networkLayout', () => {
 		assert.ok(computeNetworkSphereRadius(100, 2) > computeNetworkSphereRadius(100, 1));
 	});
 
-	for (const mode of ['community', 'organic', 'sphere', 'constellation', 'clustered', 'radial'] as NetworkLayoutMode[]) {
+	for (const mode of ['organic', 'sphere', 'constellation', 'clustered', 'radial'] as NetworkLayoutMode[]) {
 		test(`${mode} is deterministic and 3D`, () => {
 			const g = makeGraph(48);
-			// Community Force needs community ids for meaningful clusters.
-			if (mode === 'community') {
-				for (let i = 0; i < g.nodes.length; i++) {
-					(g.nodes[i] as { communityId?: number }).communityId = i % 4;
-				}
-			}
 			const r = computeNetworkSphereRadius(g.nodes.length, 1);
 			const a = layoutNetworkGraph(mode, g.nodes, g.links, r);
 			const b = layoutNetworkGraph(mode, g.nodes, g.links, r);
@@ -82,63 +76,4 @@ suite('PreBase networkLayout', () => {
 			assert.ok(m.minNN > 0.5);
 		});
 	}
-
-	test('community empty and one-node graphs stay finite and deterministic', () => {
-		const empty = layoutNetworkGraph('community', [], [], 240)
-		assert.strictEqual(empty.size, 0)
-
-		const one = [{ id: 'solo', communityId: 0, fileTypeId: 'typescript', val: 2 }]
-		const a = layoutNetworkGraph('community', one, [], Number.NaN)
-		const b = layoutNetworkGraph('community', one, [], -10)
-		assert.strictEqual(a.size, 1)
-		assert.deepStrictEqual(a.get('solo'), b.get('solo'))
-		const p = a.get('solo')!
-		assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z))
-	})
-
-	test('community Force keeps members closer than random pairs', () => {
-		const nodes = Array.from({ length: 40 }, (_, i) => ({
-			id: `n${i}`,
-			communityId: i % 4,
-			fileTypeId: 'typescript',
-			val: 2,
-		}));
-		const links: { source: string; target: string }[] = [];
-		for (let i = 1; i < nodes.length; i++) {
-			links.push({ source: `n${i - 1}`, target: `n${i}` });
-		}
-		const r = computeNetworkSphereRadius(nodes.length, 1);
-		const layout = layoutNetworkGraph('community', nodes, links, r);
-		assert.strictEqual(layout.size, nodes.length);
-
-		function dist(a: string, b: string): number {
-			const p = layout.get(a)!;
-			const q = layout.get(b)!;
-			return Math.hypot(p.x - q.x, p.y - q.y, p.z - q.z);
-		}
-
-		let intraSum = 0;
-		let intraN = 0;
-		for (let c = 0; c < 4; c++) {
-			const members = nodes.filter(n => n.communityId === c).map(n => n.id);
-			for (let i = 0; i < members.length; i++) {
-				for (let j = i + 1; j < members.length; j++) {
-					intraSum += dist(members[i]!, members[j]!);
-					intraN++;
-				}
-			}
-		}
-		const intraMean = intraSum / Math.max(1, intraN);
-
-		let randomSum = 0;
-		let randomN = 0;
-		for (let i = 0; i < nodes.length; i++) {
-			for (let j = i + 1; j < nodes.length; j++) {
-				randomSum += dist(nodes[i]!.id, nodes[j]!.id);
-				randomN++;
-			}
-		}
-		const randomMean = randomSum / Math.max(1, randomN);
-		assert.ok(intraMean < randomMean * 0.85, `intra ${intraMean} vs all-pairs ${randomMean}`);
-	});
 });
