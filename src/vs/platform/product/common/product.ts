@@ -74,16 +74,16 @@ else {
 			defaultChatAgent: {
 				extensionId: 'prebase.magnus',
 				chatExtensionId: 'prebase.magnus',
-				chatExtensionOutputId: 'prebase.magnus.PreBase Magnus.log',
+				chatExtensionOutputId: 'prebase.magnus.PreBase Agent.log',
 				chatExtensionOutputExtensionStateCommand: 'prebase.magnus.debug.extensionState',
 				provider: {
 					default: {
 						id: 'magnus',
-						name: 'Magnus',
+						name: 'Agent',
 					},
 					enterprise: {
 						id: 'magnus',
-						name: 'Magnus',
+						name: 'Agent',
 					}
 				},
 				providerScopes: [],

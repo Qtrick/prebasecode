@@ -397,8 +397,10 @@ class LocalSession extends Disposable {
 export class LocalChatSessionsProvider extends Disposable implements ISessionsProvider {
 
 	readonly id = LOCAL_PROVIDER_ID;
-	readonly label = product.defaultChatAgent?.provider?.default?.name === 'Magnus'
-		? localize('localChatSessionsProviderMagnus', "Magnus")
+	readonly label = product.defaultChatAgent?.provider?.default?.name === 'Agent'
+		|| product.defaultChatAgent?.provider?.default?.name === 'Agents'
+		|| product.defaultChatAgent?.provider?.default?.name === 'Magnus'
+		? localize('localChatSessionsProviderAgent', "Agent")
 		: localize('localChatSessionsProvider', "Copilot Chat");
 	readonly icon = Codicon.vm;
 	readonly order = 0;

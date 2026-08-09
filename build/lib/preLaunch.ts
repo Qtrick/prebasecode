@@ -36,22 +36,20 @@ async function syncDarwinAppIcon() {
 	if (process.platform !== 'darwin') {
 		return;
 	}
-	const src = path.join(rootDir, 'resources', 'darwin', 'code.icns');
-	const appDir = path.join(rootDir, '.build', 'electron');
+	const { DarwinIconError, syncDevelopmentAdaptiveIcon } = await import('./prebaseDarwinIcon.ts');
 	try {
-		const entries = await fs.readdir(appDir);
-		const appName = entries.find(e => e.endsWith('.app'));
-		if (!appName) {
+		const result = await syncDevelopmentAdaptiveIcon(rootDir);
+		if (!result) {
+			// Electron not installed yet — distinct from adaptive failure.
 			return;
 		}
-		const dest = path.join(appDir, appName, 'Contents', 'Resources', 'PreBase.icns');
-		await fs.copyFile(src, dest);
-		// Bump mtime so macOS Dock / Finder refresh their icon cache.
-		const appPath = path.join(appDir, appName);
-		const now = new Date();
-		await fs.utimes(appPath, now, now);
-	} catch {
-		// Electron not installed yet, or non-PreBase bundle — ignore.
+		console.log(`[preLaunch] adaptive icon synced → ${result.appPath}`);
+	} catch (err) {
+		if (err instanceof DarwinIconError) {
+			console.error(`[preLaunch] adaptive icon sync failed (${err.code}):`, err.message);
+			throw err;
+		}
+		throw err;
 	}
 }
 
@@ -85,6 +83,15 @@ async function isExpectedElectronInstalled(): Promise<boolean> {
 async function ensureCompiled() {
 	if (!(await exists('out'))) {
 		await runProcess(npm, ['run', 'compile']);
+		return;
+	}
+	// Blank-workbench guard (BETA-032): `out/` can exist while the graphs
+	// package (src/.../prebase/graphs → graphs/src symlink) was never emitted
+	// or was wiped. Missing graphContribution.js aborts workbench restore.
+	const graphsContribution = 'out/vs/workbench/contrib/prebase/graphs/host/workbench/graphContribution.js';
+	if (!(await exists(graphsContribution))) {
+		console.log('[preLaunch] graphs out/ modules missing — running transpile-client');
+		await runProcess(npm, ['run', 'transpile-client']);
 	}
 }
 

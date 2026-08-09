@@ -15,6 +15,7 @@ import { IProductService } from '../../../../platform/product/common/productServ
 import { IStorageService } from '../../../../platform/storage/common/storage.js';
 import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
+import { ColorScheme } from '../../../../platform/theme/common/theme.js';
 import { EditorPane } from '../../../browser/parts/editor/editorPane.js';
 import { IEditorOpenContext } from '../../../common/editor.js';
 import { IEditorGroup } from '../../../services/editor/common/editorGroupsService.js';
@@ -31,32 +32,8 @@ import {
 	renderGraphPerformanceCategory,
 	renderGraphReduceMotionRow,
 } from '../graphs/host/workbench/settings/graphSettingsUi.js';
+import { classifyColorTheme, type ThemeGroup } from '../common/prebaseThemeClassify.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
-
-/** Popular built-in themes (PreBase + stock VS Code / Code - OSS classics). */
-const QUICK_THEMES: { id: string; label: string }[] = [
-	{ id: 'PreBase Dark', label: 'PreBase Night' },
-	{ id: 'PreBase Light', label: 'PreBase Dawn' },
-	{ id: 'Dark Modern', label: 'Dark Modern' },
-	{ id: 'Light Modern', label: 'Light Modern' },
-	{ id: 'Dark+', label: 'Dark+' },
-	{ id: 'Light+', label: 'Light+' },
-	{ id: 'Visual Studio Dark', label: 'VS Dark' },
-	{ id: 'Visual Studio Light', label: 'VS Light' },
-	{ id: 'Dark 2026', label: 'Dark 2026' },
-	{ id: 'Light 2026', label: 'Light 2026' },
-	{ id: 'Abyss', label: 'Abyss' },
-	{ id: 'Monokai', label: 'Monokai' },
-	{ id: 'Monokai Dimmed', label: 'Monokai Dimmed' },
-	{ id: 'Kimbie Dark', label: 'Kimbie Dark' },
-	{ id: 'Solarized Dark', label: 'Solarized Dark' },
-	{ id: 'Solarized Light', label: 'Solarized Light' },
-	{ id: 'Quiet Light', label: 'Quiet Light' },
-	{ id: 'Tomorrow Night Blue', label: 'Tomorrow Night Blue' },
-	{ id: 'Red', label: 'Red' },
-	{ id: 'Default High Contrast', label: 'HC Dark' },
-	{ id: 'Default High Contrast Light', label: 'HC Light' },
-];
 
 type SettingsCategory =
 	| 'appearance'
@@ -497,54 +474,132 @@ export class PreBaseSettingsEditor extends EditorPane {
 			localize('prebase.settings.appearance.desc', "Theme, density, and motion preferences.")
 		);
 
-		const currentThemeId = this.workbenchThemeService.getColorTheme().settingsId
-			|| this.workbenchThemeService.getColorTheme().id;
 		const themeCtrl = document.createElement('div');
 		Object.assign(themeCtrl.style, { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', maxWidth: '420px' });
 
-		const chips = DOM.append(themeCtrl, DOM.$('div'));
-		Object.assign(chips.style, { display: 'flex', flexWrap: 'wrap', gap: '6px', justifyContent: 'flex-end' });
-		for (const theme of QUICK_THEMES) {
-			const btn = DOM.append(chips, DOM.$('button')) as HTMLButtonElement;
-			btn.type = 'button';
-			btn.textContent = theme.label;
-			const active = currentThemeId === theme.id || currentThemeId.endsWith(theme.id);
-			Object.assign(btn.style, {
-				background: active ? 'color-mix(in srgb, #155e75 85%, var(--vscode-editor-background))' : COLORS.surface,
-				color: active ? '#ecfeff' : COLORS.text,
-				border: active ? '1px solid #22d3ee88' : `1px solid ${COLORS.border}`,
-				borderRadius: '999px',
-				padding: '4px 10px',
-				fontSize: '11px',
-				cursor: 'pointer',
-			});
-			this._renderDisposables.add(DOM.addDisposableListener(btn, 'click', () => {
-				void this.workbenchThemeService.setColorTheme(theme.id, 'auto').then(result => {
-					if (!result) {
-						this.notificationService.info(localize(
-							'prebase.settings.themeMissing',
-							"Theme “{0}” is not available yet. Use the full theme picker, or ensure built-in theme extensions are built.",
-							theme.label
-						));
-					}
-				});
-			}));
-		}
+		const themeSelect = document.createElement('select');
+		this._selectStyle(themeSelect);
+		themeSelect.style.minWidth = '280px';
+		themeSelect.setAttribute('aria-label', localize('prebase.settings.theme', "Color Theme"));
+		const loadingOpt = document.createElement('option');
+		loadingOpt.textContent = localize('prebase.settings.themeLoading', "Loading themes…");
+		loadingOpt.disabled = true;
+		themeSelect.appendChild(loadingOpt);
+		themeCtrl.appendChild(themeSelect);
 
-		const themeNote = DOM.append(themeCtrl, DOM.$('span'));
-		themeNote.textContent = localize(
-			'prebase.settings.themeUsesWorkbench',
-			"Includes PreBase + VS Code classics (Dark+, Light+, Abyss, Monokai, …)"
-		);
-		Object.assign(themeNote.style, { fontSize: '11px', color: COLORS.textMuted, textAlign: 'right' });
+		const themeMeta = DOM.append(themeCtrl, DOM.$('span'));
+		Object.assign(themeMeta.style, { fontSize: '11px', color: COLORS.textMuted, textAlign: 'right' });
+
+		const populateThemes = async () => {
+			const themes = await this.workbenchThemeService.getColorThemes();
+			const current = this.workbenchThemeService.getColorTheme();
+			const currentId = current.settingsId || current.id;
+			const groups: Record<ThemeGroup, typeof themes> = { prebase: [], builtin: [], extension: [] };
+			for (const theme of themes) {
+				const g = classifyColorTheme(theme);
+				if (g === 'skip') {
+					continue;
+				}
+				groups[g].push(theme);
+			}
+			const sortThemes = (a: (typeof themes)[number], b: (typeof themes)[number]) => a.label.localeCompare(b.label);
+			groups.prebase.sort(sortThemes);
+			groups.builtin.sort(sortThemes);
+			groups.extension.sort(sortThemes);
+
+			themeSelect.replaceChildren();
+			const addGroup = (label: string, list: typeof themes) => {
+				if (!list.length) {
+					return;
+				}
+				const og = document.createElement('optgroup');
+				og.label = label;
+				for (const theme of list) {
+					const opt = document.createElement('option');
+					opt.value = theme.settingsId;
+					const kind = theme.type === ColorScheme.HIGH_CONTRAST_DARK || theme.type === ColorScheme.HIGH_CONTRAST_LIGHT ? 'HC'
+						: theme.type === ColorScheme.LIGHT ? 'Light' : 'Dark';
+					opt.textContent = `${theme.label} (${kind})`;
+					og.appendChild(opt);
+				}
+				themeSelect.appendChild(og);
+			};
+			addGroup(localize('prebase.settings.themeGroupPrebase', "PreBase"), groups.prebase);
+			addGroup(localize('prebase.settings.themeGroupBuiltin', "VS Code Built-In"), groups.builtin);
+			addGroup(localize('prebase.settings.themeGroupExtensions', "Installed Extensions"), groups.extension);
+
+			const match = [...groups.prebase, ...groups.builtin, ...groups.extension]
+				.find(t => t.settingsId === currentId || t.id === currentId || currentId.endsWith(t.settingsId));
+			themeSelect.value = match?.settingsId ?? currentId;
+			themeMeta.textContent = localize(
+				'prebase.settings.themeDynamicCount',
+				"{0} themes available · changes apply live",
+				groups.prebase.length + groups.builtin.length + groups.extension.length
+			);
+		};
+
+		void populateThemes();
+		this._renderDisposables.add(this.workbenchThemeService.onDidColorThemeChange(() => {
+			void populateThemes();
+		}));
+		this._renderDisposables.add(DOM.addDisposableListener(themeSelect, 'change', () => {
+			const id = themeSelect.value;
+			void this.workbenchThemeService.setColorTheme(id, 'auto').then(result => {
+				if (!result) {
+					this.notificationService.info(localize(
+						'prebase.settings.themeMissing',
+						"Theme “{0}” is not available yet. Use the full theme picker, or ensure built-in theme extensions are built.",
+						id
+					));
+				}
+			});
+		}));
+
 		themeCtrl.appendChild(this._linkBtn(localize('prebase.settings.openTheme', "Browse all themes…"), () => {
 			void this.commandService.executeCommand('workbench.action.selectTheme');
 		}));
 		this._row(
 			card,
-			localize('prebase.settings.theme', "Theme"),
-			localize('prebase.settings.themeHint', "Pick a built-in theme or open the full Color Theme picker."),
+			localize('prebase.settings.theme', "Color Theme"),
+			localize('prebase.settings.themeHint', "Dynamically discovered PreBase, VS Code built-in, and extension themes."),
 			themeCtrl
+		);
+
+		const fileIconCtrl = document.createElement('div');
+		Object.assign(fileIconCtrl.style, { display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px', maxWidth: '420px' });
+		const fileIconSelect = document.createElement('select');
+		this._selectStyle(fileIconSelect);
+		fileIconSelect.style.minWidth = '280px';
+		fileIconCtrl.appendChild(fileIconSelect);
+		const populateFileIcons = async () => {
+			const themes = await this.workbenchThemeService.getFileIconThemes();
+			const current = this.workbenchThemeService.getFileIconTheme();
+			fileIconSelect.replaceChildren();
+			const none = document.createElement('option');
+			none.value = '';
+			none.textContent = localize('prebase.settings.fileIconNone', "None");
+			fileIconSelect.appendChild(none);
+			for (const theme of themes.filter(t => !!t.id).sort((a, b) => a.label.localeCompare(b.label))) {
+				const opt = document.createElement('option');
+				opt.value = theme.settingsId ?? theme.id;
+				opt.textContent = theme.label;
+				fileIconSelect.appendChild(opt);
+			}
+			fileIconSelect.value = current.settingsId ?? current.id ?? '';
+		};
+		void populateFileIcons();
+		this._renderDisposables.add(this.workbenchThemeService.onDidFileIconThemeChange(() => { void populateFileIcons(); }));
+		this._renderDisposables.add(DOM.addDisposableListener(fileIconSelect, 'change', () => {
+			void this.workbenchThemeService.setFileIconTheme(fileIconSelect.value || '', 'auto');
+		}));
+		fileIconCtrl.appendChild(this._linkBtn(localize('prebase.settings.openFileIconTheme', "Browse file icon themes…"), () => {
+			void this.commandService.executeCommand('workbench.action.selectIconTheme');
+		}));
+		this._row(
+			card,
+			localize('prebase.settings.fileIconTheme', "File Icon Theme"),
+			localize('prebase.settings.fileIconThemeHint', "Includes Minimal, Seti, and Modern Icons when available."),
+			fileIconCtrl
 		);
 
 		const density = document.createElement('select');

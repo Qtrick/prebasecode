@@ -48,10 +48,10 @@ if (npmVersionMatch) {
 	const npmMajor = parseInt(npmVersionMatch[1]);
 	if (npmMajor >= 12) {
 		// npm 12+ disables dependency install scripts by default (allowScripts).
-		// PreBase still relies on native postinstalls (node-gyp, etc.) and has not
-		// committed an allowScripts allowlist yet. Stay on npm 11 until that lands.
+		// Root package.json now has an allowScripts allowlist, but native rebuilds have
+		// not been fully retested under npm 12 yet. Stay on npm 11 until BETA-031.
 		console.error(`\x1b[1;31m*** Please use npm version < 12.0.0 (recommended: npm@11.18.0). Currently using ${npmUserAgent}.\x1b[0;0m`);
-		console.error('\x1b[1;31m*** npm 12 blocks dependency install scripts by default; PreBase is not migrated yet (see docs/TECHNOLOGY_VERSIONS.md / BETA backlog).\x1b[0;0m');
+		console.error('\x1b[1;31m*** npm 12 install-script defaults need a full native-module retest before PreBase migrates (see docs/TECHNOLOGY_VERSIONS.md / BETA-031).\x1b[0;0m');
 		console.error('\x1b[1;31m*** Fix: npm install -g npm@11.18.0\x1b[0;0m');
 		throw new Error();
 	}

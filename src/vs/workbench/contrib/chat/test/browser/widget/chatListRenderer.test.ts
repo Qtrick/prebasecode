@@ -6,7 +6,7 @@
 import assert from 'assert';
 import { URI } from '../../../../../../base/common/uri.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
-import { buildPlanReviewProgressContent, getWorkingProgressRelevantParts, shouldHideChatUserIdentity, shouldRenderInitialProgressiveContentImmediately, shouldScheduleInitialHeightChange } from '../../../browser/widget/chatListRenderer.js';
+import { buildPlanReviewProgressContent, getWorkingProgressRelevantParts, isAgentBrandUsername, shouldHideChatAvatar, shouldHideChatUserIdentity, shouldRenderInitialProgressiveContentImmediately, shouldScheduleInitialHeightChange } from '../../../browser/widget/chatListRenderer.js';
 import { IChatToolInvocationSerialized, ToolConfirmKind } from '../../../common/chatService/chatService.js';
 import { IChatRendererContent } from '../../../common/model/chatViewModel.js';
 import { ToolDataSource } from '../../../common/tools/languageModelToolsService.js';
@@ -49,10 +49,12 @@ suite('ChatListRenderer', () => {
 	});
 
 	suite('shouldHideChatUserIdentity', () => {
-		test('hides local Copilot, Agents, and Agent Host Copilot response identity', () => {
+		test('hides local Copilot and Agent Host Copilot response identity', () => {
 			assert.deepStrictEqual([
 				shouldHideChatUserIdentity('GitHub Copilot', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
+				shouldHideChatUserIdentity('Agent', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
 				shouldHideChatUserIdentity('Agents', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
+				shouldHideChatUserIdentity('Magnus', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
 				shouldHideChatUserIdentity('Agents', URI.from({ scheme: 'vscode-chat-editor' }), false, false, false),
 				shouldHideChatUserIdentity('Copilot', URI.from({ scheme: 'agent-host-copilotcli' }), true, false, false),
 				shouldHideChatUserIdentity('Copilot', URI.from({ scheme: 'agent-host-copilotcli' }), false, false, false),
@@ -64,15 +66,37 @@ suite('ChatListRenderer', () => {
 				shouldHideChatUserIdentity('User', URI.from({ scheme: 'vscode-chat-editor' }), false, false, true),
 			], [
 				true,
-				true,
-				true,
-				true,
 				false,
-				true,
 				false,
 				false,
 				false,
 				true,
+				false,
+				true,
+				false,
+				false,
+				false,
+				true,
+				true,
+			]);
+		});
+	});
+
+	suite('shouldHideChatAvatar', () => {
+		test('hides avatar for Agent brand names while keeping the label visible', () => {
+			assert.strictEqual(isAgentBrandUsername('Agent'), true);
+			assert.strictEqual(isAgentBrandUsername('Magnus'), true);
+			assert.deepStrictEqual([
+				shouldHideChatAvatar('Agent', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
+				shouldHideChatAvatar('Agents', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
+				shouldHideChatAvatar('Magnus', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
+				shouldHideChatAvatar('Claude', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
+				shouldHideChatAvatar('GitHub Copilot', URI.from({ scheme: 'vscode-chat-editor' }), true, false, false),
+			], [
+				true,
+				true,
+				true,
+				false,
 				true,
 			]);
 		});

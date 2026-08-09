@@ -643,9 +643,18 @@ BUILD_TARGETS.forEach(buildTarget => {
 		const packageTasks: task.Task[] = [
 			compileNativeExtensionsBuildTask,
 			util.rimraf(path.join(buildRoot, destinationFolderName)),
+		];
+		if (platform === 'darwin') {
+			packageTasks.push(task.define('compile-darwin-adaptive-icon', async () => {
+				const { ensureCompiledAssetsCarForPackaging } = await import('./lib/prebaseDarwinIcon.ts');
+				const car = await ensureCompiledAssetsCarForPackaging(path.join(import.meta.dirname, '..'));
+				console.log(`[package] darwin adaptive Assets.car ready: ${car}`);
+			}));
+		}
+		packageTasks.push(
 			packageTask(platform, arch, sourceFolderName, destinationFolderName, opts),
 			prepareCopilotRipgrepShimTask(platform, arch, destinationFolderName)
-		];
+		);
 
 		if (platform === 'win32') {
 			packageTasks.push(patchWin32DependenciesTask(destinationFolderName));

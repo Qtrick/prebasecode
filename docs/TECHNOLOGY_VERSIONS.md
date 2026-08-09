@@ -1,7 +1,7 @@
 # Technology Versions
 
-Research date: **2026-07-20**  
-Next review date: **2026-08-20**
+Research date: **2026-08-09** (Electron + supply-chain remediation)  
+Next review date: **2026-09-09**
 
 Canonical inventory of language runtimes and development tools used by PreBase. Update this document whenever a version research or upgrade occurs.
 
@@ -11,11 +11,11 @@ Canonical inventory of language runtimes and development tools used by PreBase. 
 | TypeScript compat API (`typescript` → `@typescript/typescript6`) | `npm:@typescript/typescript6@^6.0.2` → **6.0.2** (import API **6.0.3**; `tsc6`) | **6.0.2** | [Announcing TS 7.0](https://devblogs.microsoft.com/typescript/announcing-typescript-7-0/) | Required for `import 'typescript'` consumers | **Installed** — retain until TS 7.1 API | Installed 2026-07-20 dual-lane with primary | typescript-eslint + 20+ `build/lib/*` API imports |
 | `@typescript/native-preview` / `tsgo` CLI | **Removed** from root lockfile | Superseded by `typescript@7.0.2` | Same as above | Replaced by stable `@typescript/native` alias | Do not reintroduce | Removed during BETA-006 install | Build helper renamed to `typescriptCompiler.ts` (spawns `tsc`) |
 | Node.js | v24.17.0 (local) | Track LTS; research before bump | [nodejs.org](https://nodejs.org/) | OK for current Electron 42 | **Defer** unless TS7/Electron require | Deferred | Product/Electron matrix |
-| npm | **11.18.0** (required by `build/npm/preinstall.ts`) | 12.0.1 available | [npm v12.0.1](https://github.com/npm/cli/releases/tag/v12.0.1), [npm 12 allowScripts](https://github.blog/changelog/2026-06-09-upcoming-breaking-changes-for-npm-v12/) | **Blocked at ≥12** until allowScripts migration | Stay on **11.18.0** for installs | Rolled back from 12.0.1 on 2026-07-20 after preinstall guard | npm 12 defaults block dependency install scripts; need committed `allowScripts` + retest native modules |
+| npm | **11.18.0** (required by `build/npm/preinstall.ts`) | 12.0.1 available | [npm v12.0.1](https://github.com/npm/cli/releases/tag/v12.0.1), [npm 12 allowScripts](https://github.blog/changelog/2026-06-09-upcoming-breaking-changes-for-npm-v12/) | **Blocked at ≥12** until npm 12 + native rebuild retest | Stay on **11.18.0** for installs | Root `package.json` `allowScripts` committed 2026-08-09; still stay on npm 11 until full npm 12 retest | Native module rebuild under npm 12 not yet verified |
 | Bun | Not used | — | — | N/A | Skip | None | — |
 | pnpm | Not used | — | — | N/A | Skip | None | — |
 | Yarn | Not used | — | — | N/A | Skip | None | — |
-| Electron | 42.5.0 | Research before bump | Electron releases | OK | **Defer** | Deferred | Unrelated to this task |
+| Electron | **42.8.0** (`package.json` + `.npmrc-gyp` target / `ms_build_id=14845705`) | 42.8.1 available | [GHSA-r4w5-6pfg-jxp5](https://github.com/electron/electron/security/advisories/GHSA-r4w5-6pfg-jxp5) (patched ≥42.5.1), [Electron releases](https://releases.electronjs.org/), VS Code 1.133 packaging metadata | Aligns with VS Code 1.133 checksums; clears session-cache advisory | **Installed** 42.8.0 (not 42.8.1 — no matching MS build id/checksums yet) | Upgraded 2026-08-09; `build/checksums/electron.txt` from VS Code 1.133 | Full native-module + packaged-app smoke still needed before claiming ship-ready |
 | Rust | 1.96.1 (local `rustc`; used by TS7 native toolchain upstream, not PreBase app code) | Match platform | [rust-lang.org](https://www.rust-lang.org/) | Host toolchain only | **Defer** | Deferred | Not a PreBase dependency |
 | Cargo | Present with Rust | — | — | N/A for app | Defer | Deferred | — |
 | Go | Not found locally | TS7 compiler is Go-native upstream | — | N/A for PreBase source | Defer | Deferred | — |

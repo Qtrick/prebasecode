@@ -81,8 +81,8 @@ export function registerMagnusChatParticipants(
 		const participant = vscode.chat.createChatParticipant(id, async (request, _ctx, response, token) => {
 			return handleChatRequest(id, request, response, token, secrets, state);
 		});
-		// ThemeIcon — never a PNG <img> (avoids broken-image placeholder in Agents header).
-		participant.iconPath = new vscode.ThemeIcon('sparkle');
+		// No avatar image — workbench shows the "Agent" text label without an icon.
+		participant.iconPath = undefined;
 		context.subscriptions.push(participant);
 	}
 }

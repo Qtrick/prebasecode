@@ -146,6 +146,9 @@ export const config = {
 	copyright: 'Copyright (C) 2026 Microsoft. All rights reserved',
 	darwinExecutable: product.nameShort,
 	darwinIcon: 'resources/darwin/code.icns',
+	// Compiled at package/dev time by prebaseDarwinIcon.ts (actool → Assets.car).
+	// Path must exist before @vscode/gulp-electron runs; see ensureCompiledAssetsCarForPackaging().
+	darwinAssetsCar: path.join(root, '.build', 'darwin', 'adaptive', 'Assets.car'),
 	darwinBundleIdentifier: product.darwinBundleIdentifier,
 	darwinApplicationCategoryType: 'public.app-category.developer-tools',
 	darwinHelpBookFolder: 'VS Code HelpBook',
@@ -266,7 +269,15 @@ function getElectron(arch: string): () => NodeJS.ReadWriteStream {
 async function main(arch: string = process.arch): Promise<void> {
 	const electronPath = path.join(root, '.build', 'electron');
 	await util.rimraf(electronPath)();
+	if (process.platform === 'darwin') {
+		const { ensureCompiledAssetsCarForPackaging } = await import('./prebaseDarwinIcon.ts');
+		await ensureCompiledAssetsCarForPackaging(root);
+	}
 	await util.streamToPromise(getElectron(arch)());
+	if (process.platform === 'darwin') {
+		const { syncDevelopmentAdaptiveIcon } = await import('./prebaseDarwinIcon.ts');
+		await syncDevelopmentAdaptiveIcon(root);
+	}
 }
 
 if (import.meta.main) {

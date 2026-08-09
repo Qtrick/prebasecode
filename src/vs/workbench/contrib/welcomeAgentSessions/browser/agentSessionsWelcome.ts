@@ -732,8 +732,8 @@ export class AgentSessionsWelcomePage extends EditorPane {
 		// Content
 		const content = append(tosCard, $('.agentSessionsWelcome-walkthroughCard-content'));
 		const title = append(content, $('.agentSessionsWelcome-walkthroughCard-title'));
-		title.textContent = providers.default.name === 'Magnus'
-			? localize('tosTitleMagnus', "Try Magnus — add an API key to `.env` to get started")
+		title.textContent = providers.default.name === 'Agent' || providers.default.name === 'Agents' || providers.default.name === 'Magnus'
+			? localize('tosTitleAgent', "Try Agent — add an API key to `.env` to get started")
 			: localize('tosTitle', "Try GitHub Copilot for free, no sign-in required!");
 
 		const desc = append(content, $('.agentSessionsWelcome-walkthroughCard-description'));

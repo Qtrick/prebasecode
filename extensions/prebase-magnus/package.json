@@ -51,9 +51,9 @@
 		"chatParticipants": [
       {
         "id": "prebase.magnus.ask",
-        "name": "Agents",
-        "fullName": "Agents",
-        "description": "Ask Agents about your project (read-only)",
+        "name": "Agent",
+        "fullName": "Agent",
+        "description": "Ask Agent about your project (read-only)",
         "isDefault": true,
         "locations": [
           "panel"
@@ -64,9 +64,9 @@
       },
       {
         "id": "prebase.magnus.edit",
-        "name": "Agents",
-        "fullName": "Agents",
-        "description": "Edit code with Agents",
+        "name": "Agent",
+        "fullName": "Agent",
+        "description": "Edit code with Agent",
         "isDefault": true,
         "locations": [
           "panel"
@@ -78,8 +78,8 @@
       {
         "id": "prebase.magnus.agent",
         "name": "agent",
-        "fullName": "Agents",
-        "description": "Agent mode \u2014 plan, edit, and verify with Agents",
+        "fullName": "Agent",
+        "description": "Agent mode \u2014 plan, edit, and verify with Agent",
         "isDefault": true,
         "isAgent": true,
         "locations": [

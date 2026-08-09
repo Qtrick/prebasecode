@@ -40,8 +40,10 @@ export class SessionsWorkspaceContextService extends Disposable implements IWork
 	) {
 		super();
 		this.workspace = new Workspace(workspaceIdentifier.id, [], false, workspaceIdentifier.configPath, uri => uriIdentityService.extUri.ignorePathCasing(uri),
-			product.defaultChatAgent?.provider?.default?.name === 'Magnus'
-				? localize('agentsWindow.magnus', "Magnus Agents")
+			product.defaultChatAgent?.provider?.default?.name === 'Agent'
+				|| product.defaultChatAgent?.provider?.default?.name === 'Agents'
+				|| product.defaultChatAgent?.provider?.default?.name === 'Magnus'
+				? localize('agentsWindow.agent', "Agent")
 				: localize('agentsWindow', "Agents Window"));
 	}
 

@@ -1,0 +1,7 @@
+{
+  "CFBundleIdentifier": "com.prebase.ide",
+  "CFBundleExecutable": "PreBase",
+  "CFBundleName": "PreBase",
+  "CFBundleIconFile": "PreBase",
+  "ExtraKey": "keep-me"
+}

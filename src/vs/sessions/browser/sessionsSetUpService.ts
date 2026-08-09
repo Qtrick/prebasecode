@@ -346,12 +346,15 @@ class SessionsSetUpWidget extends Disposable {
 		this.logService.info('[sessions welcome] Showing welcome dialog');
 
 		const disposables = new DisposableStore();
-		const productName = this.productService.defaultChatAgent?.provider?.default?.name === 'Magnus'
-			? localize('walkthrough.productName.magnus', "{0} — Magnus Agents", this.productService.nameLong)
+		const isPreBaseAgent = this.productService.defaultChatAgent?.provider?.default?.name === 'Agent'
+			|| this.productService.defaultChatAgent?.provider?.default?.name === 'Agents'
+			|| this.productService.defaultChatAgent?.provider?.default?.name === 'Magnus';
+		const productName = isPreBaseAgent
+			? localize('walkthrough.productName.agent', "{0} — Agent", this.productService.nameLong)
 			: localize('walkthrough.productName', "{0} - Agents", this.productService.nameLong);
 
-		const detail = this.productService.defaultChatAgent?.provider?.default?.name === 'Magnus'
-			? localize('sessions.welcome.detail.magnus', "Plan, edit, and verify with Magnus — multi-session agents alongside your PreBase workspace.")
+		const detail = isPreBaseAgent
+			? localize('sessions.welcome.detail.agent', "Plan, edit, and verify with Agent — multi-session agents alongside your PreBase workspace.")
 			: localize('sessions.welcome.detail', "Your AI-powered coding experience where agents explore, build, and iterate with you.");
 
 		const dialog = disposables.add(new Dialog(

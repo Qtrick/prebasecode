@@ -1,0 +1,160 @@
+{
+  "source": "VS Code OSS archive 1.133.0",
+  "generated": "2026-08-09",
+  "colorThemes": [
+    {
+      "id": "Abyss",
+      "label": "%themeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/abyss-color-theme.json",
+      "extension": "theme-abyss"
+    },
+    {
+      "id": "Light 2026",
+      "label": "%light2026ThemeLabel%",
+      "uiTheme": "vs",
+      "path": "./themes/2026-light.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Dark 2026",
+      "label": "%dark2026ThemeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/2026-dark.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Dark+",
+      "label": "%darkPlusColorThemeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/dark_plus.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Dark Modern",
+      "label": "%darkModernThemeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/dark_modern.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Light+",
+      "label": "%lightPlusColorThemeLabel%",
+      "uiTheme": "vs",
+      "path": "./themes/light_plus.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Light Modern",
+      "label": "%lightModernThemeLabel%",
+      "uiTheme": "vs",
+      "path": "./themes/light_modern.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Visual Studio Dark",
+      "label": "%darkColorThemeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/dark_vs.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Visual Studio Light",
+      "label": "%lightColorThemeLabel%",
+      "uiTheme": "vs",
+      "path": "./themes/light_vs.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Default High Contrast",
+      "label": "%hcColorThemeLabel%",
+      "uiTheme": "hc-black",
+      "path": "./themes/hc_black.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Default High Contrast Light",
+      "label": "%lightHcColorThemeLabel%",
+      "uiTheme": "hc-light",
+      "path": "./themes/hc_light.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "Kimbie Dark",
+      "label": "%themeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/kimbie-dark-color-theme.json",
+      "extension": "theme-kimbie-dark"
+    },
+    {
+      "id": "Monokai",
+      "label": "%themeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/monokai-color-theme.json",
+      "extension": "theme-monokai"
+    },
+    {
+      "id": "Monokai Dimmed",
+      "label": "%themeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/dimmed-monokai-color-theme.json",
+      "extension": "theme-monokai-dimmed"
+    },
+    {
+      "id": "Quiet Light",
+      "label": "%themeLabel%",
+      "uiTheme": "vs",
+      "path": "./themes/quietlight-color-theme.json",
+      "extension": "theme-quietlight"
+    },
+    {
+      "id": "Red",
+      "label": "%themeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/Red-color-theme.json",
+      "extension": "theme-red"
+    },
+    {
+      "id": "Solarized Dark",
+      "label": "%themeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/solarized-dark-color-theme.json",
+      "extension": "theme-solarized-dark"
+    },
+    {
+      "id": "Solarized Light",
+      "label": "%themeLabel%",
+      "uiTheme": "vs",
+      "path": "./themes/solarized-light-color-theme.json",
+      "extension": "theme-solarized-light"
+    },
+    {
+      "id": "Tomorrow Night Blue",
+      "label": "%themeLabel%",
+      "uiTheme": "vs-dark",
+      "path": "./themes/tomorrow-night-blue-color-theme.json",
+      "extension": "theme-tomorrow-night-blue"
+    }
+  ],
+  "fileIconThemes": [
+    {
+      "id": "vs-minimal",
+      "label": "%minimalIconThemeLabel%",
+      "path": "./fileicons/vs_minimal-icon-theme.json",
+      "extension": "theme-defaults"
+    },
+    {
+      "id": "vscode-modern-icons",
+      "label": "%themeLabel%",
+      "path": "./fileicons/vscode-modern-icons-icon-theme.json",
+      "extension": "theme-modern-icons"
+    },
+    {
+      "id": "vs-seti",
+      "label": "%themeLabel%",
+      "path": "./icons/vs-seti-icon-theme.json",
+      "extension": "theme-seti"
+    }
+  ],
+  "notes": "PreBase-specific themes (PreBase Dark / PreBase Light) are allowed in addition and are not listed here."
+}

@@ -1,0 +1,643 @@
+{
+  "prebaseVersion": "1.128.0",
+  "vscodeReferenceVersion": "1.133.0",
+  "prebaseElectron": "42.5.0",
+  "vscodeElectron": "42.8.0",
+  "workingTreeSha": "ab379c6e05fcd688dcf2dee372434ff7510e5d9e",
+  "fileCounts": {
+    "pre": 15890,
+    "vs": 17036,
+    "common": 15473,
+    "onlyPre": 417,
+    "onlyVs": 1563,
+    "sizeChangedCommon": 2342
+  },
+  "themes": {
+    "pre": [
+      {
+        "ext": "theme-monokai",
+        "id": "Monokai",
+        "label": "%themeLabel%",
+        "path": "./themes/monokai-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-red",
+        "id": "Red",
+        "label": "%themeLabel%",
+        "path": "./themes/Red-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-abyss",
+        "id": "Abyss",
+        "label": "%themeLabel%",
+        "path": "./themes/abyss-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-quietlight",
+        "id": "Quiet Light",
+        "label": "%themeLabel%",
+        "path": "./themes/quietlight-color-theme.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-solarized-dark",
+        "id": "Solarized Dark",
+        "label": "%themeLabel%",
+        "path": "./themes/solarized-dark-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-tomorrow-night-blue",
+        "id": "Tomorrow Night Blue",
+        "label": "%themeLabel%",
+        "path": "./themes/tomorrow-night-blue-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-solarized-light",
+        "id": "Solarized Light",
+        "label": "%themeLabel%",
+        "path": "./themes/solarized-light-color-theme.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "PreBase Dark",
+        "label": "%prebaseDarkThemeLabel%",
+        "path": "./themes/prebase_dark.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "PreBase Light",
+        "label": "%prebaseLightThemeLabel%",
+        "path": "./themes/prebase_light.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Light 2026",
+        "label": "%light2026ThemeLabel%",
+        "path": "./themes/2026-light.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Dark 2026",
+        "label": "%dark2026ThemeLabel%",
+        "path": "./themes/2026-dark.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Dark+",
+        "label": "%darkPlusColorThemeLabel%",
+        "path": "./themes/dark_plus.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Dark Modern",
+        "label": "%darkModernThemeLabel%",
+        "path": "./themes/dark_modern.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Light+",
+        "label": "%lightPlusColorThemeLabel%",
+        "path": "./themes/light_plus.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Light Modern",
+        "label": "%lightModernThemeLabel%",
+        "path": "./themes/light_modern.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Visual Studio Dark",
+        "label": "%darkColorThemeLabel%",
+        "path": "./themes/dark_vs.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Visual Studio Light",
+        "label": "%lightColorThemeLabel%",
+        "path": "./themes/light_vs.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Default High Contrast",
+        "label": "%hcColorThemeLabel%",
+        "path": "./themes/hc_black.json",
+        "uiTheme": "hc-black"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Default High Contrast Light",
+        "label": "%lightHcColorThemeLabel%",
+        "path": "./themes/hc_light.json",
+        "uiTheme": "hc-light"
+      },
+      {
+        "ext": "theme-monokai-dimmed",
+        "id": "Monokai Dimmed",
+        "label": "%themeLabel%",
+        "path": "./themes/dimmed-monokai-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-kimbie-dark",
+        "id": "Kimbie Dark",
+        "label": "%themeLabel%",
+        "path": "./themes/kimbie-dark-color-theme.json",
+        "uiTheme": "vs-dark"
+      }
+    ],
+    "vs": [
+      {
+        "ext": "theme-monokai",
+        "id": "Monokai",
+        "label": "%themeLabel%",
+        "path": "./themes/monokai-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-red",
+        "id": "Red",
+        "label": "%themeLabel%",
+        "path": "./themes/Red-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-abyss",
+        "id": "Abyss",
+        "label": "%themeLabel%",
+        "path": "./themes/abyss-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-quietlight",
+        "id": "Quiet Light",
+        "label": "%themeLabel%",
+        "path": "./themes/quietlight-color-theme.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-solarized-dark",
+        "id": "Solarized Dark",
+        "label": "%themeLabel%",
+        "path": "./themes/solarized-dark-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-tomorrow-night-blue",
+        "id": "Tomorrow Night Blue",
+        "label": "%themeLabel%",
+        "path": "./themes/tomorrow-night-blue-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-solarized-light",
+        "id": "Solarized Light",
+        "label": "%themeLabel%",
+        "path": "./themes/solarized-light-color-theme.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Light 2026",
+        "label": "%light2026ThemeLabel%",
+        "path": "./themes/2026-light.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Dark 2026",
+        "label": "%dark2026ThemeLabel%",
+        "path": "./themes/2026-dark.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Dark+",
+        "label": "%darkPlusColorThemeLabel%",
+        "path": "./themes/dark_plus.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Dark Modern",
+        "label": "%darkModernThemeLabel%",
+        "path": "./themes/dark_modern.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Light+",
+        "label": "%lightPlusColorThemeLabel%",
+        "path": "./themes/light_plus.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Light Modern",
+        "label": "%lightModernThemeLabel%",
+        "path": "./themes/light_modern.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Visual Studio Dark",
+        "label": "%darkColorThemeLabel%",
+        "path": "./themes/dark_vs.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Visual Studio Light",
+        "label": "%lightColorThemeLabel%",
+        "path": "./themes/light_vs.json",
+        "uiTheme": "vs"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Default High Contrast",
+        "label": "%hcColorThemeLabel%",
+        "path": "./themes/hc_black.json",
+        "uiTheme": "hc-black"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "Default High Contrast Light",
+        "label": "%lightHcColorThemeLabel%",
+        "path": "./themes/hc_light.json",
+        "uiTheme": "hc-light"
+      },
+      {
+        "ext": "theme-monokai-dimmed",
+        "id": "Monokai Dimmed",
+        "label": "%themeLabel%",
+        "path": "./themes/dimmed-monokai-color-theme.json",
+        "uiTheme": "vs-dark"
+      },
+      {
+        "ext": "theme-kimbie-dark",
+        "id": "Kimbie Dark",
+        "label": "%themeLabel%",
+        "path": "./themes/kimbie-dark-color-theme.json",
+        "uiTheme": "vs-dark"
+      }
+    ],
+    "missingInPrebase": [],
+    "extraInPrebase": [
+      "PreBase Dark",
+      "PreBase Light"
+    ]
+  },
+  "iconThemes": {
+    "pre": [
+      {
+        "ext": "theme-seti",
+        "id": "vs-seti",
+        "label": "%themeLabel%",
+        "path": "./icons/vs-seti-icon-theme.json"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "vs-minimal",
+        "label": "%minimalIconThemeLabel%",
+        "path": "./fileicons/vs_minimal-icon-theme.json"
+      }
+    ],
+    "vs": [
+      {
+        "ext": "theme-seti",
+        "id": "vs-seti",
+        "label": "%themeLabel%",
+        "path": "./icons/vs-seti-icon-theme.json"
+      },
+      {
+        "ext": "theme-defaults",
+        "id": "vs-minimal",
+        "label": "%minimalIconThemeLabel%",
+        "path": "./fileicons/vs_minimal-icon-theme.json"
+      },
+      {
+        "ext": "theme-modern-icons",
+        "id": "vscode-modern-icons",
+        "label": "%themeLabel%",
+        "path": "./fileicons/vscode-modern-icons-icon-theme.json"
+      }
+    ],
+    "missingInPrebase": [
+      "vscode-modern-icons"
+    ],
+    "modernIconsInVs": true,
+    "modernIconsInPre": false
+  },
+  "prioritySubsystem": {
+    "identicalHashed": 5035,
+    "changedHashed": 1943,
+    "onlyVs": 1291,
+    "onlyPrebase": 100,
+    "changedSample": [
+      "build/darwin/create-dmg.ts",
+      "build/darwin/create-universal-app.ts",
+      "build/darwin/dmg-settings.py.template",
+      "build/darwin/sign.ts",
+      "build/darwin/verify-macho.ts",
+      "build/lib/builtInExtensions.ts",
+      "build/lib/compilation.ts",
+      "build/lib/copilot.ts",
+      "build/lib/extensions.ts",
+      "build/lib/fetch.ts",
+      "build/lib/i18n.resources.json",
+      "build/lib/node.ts",
+      "build/lib/policies/exportPolicyData.ts",
+      "build/lib/policies/policyData.jsonc",
+      "build/lib/preLaunch.ts",
+      "build/lib/stylelint/validateDesignTokens.ts",
+      "build/lib/stylelint/vscode-known-variables.json",
+      "build/lib/test/copilot.test.ts",
+      "build/lib/tsb/transpiler.ts",
+      "build/lib/util.ts",
+      "extensions/git/package.json",
+      "extensions/git/src/artifactProvider.ts",
+      "extensions/git/src/commands.ts",
+      "extensions/git/src/historyProvider.ts",
+      "extensions/git/src/repository.ts",
+      "extensions/git/src/test/smoke.test.ts",
+      "extensions/theme-defaults/package.json",
+      "extensions/theme-defaults/package.nls.json",
+      "extensions/theme-defaults/themes/2026-dark.json",
+      "extensions/theme-defaults/themes/2026-light.json",
+      "extensions/theme-defaults/themes/dark_vs.json",
+      "extensions/theme-defaults/themes/light_vs.json",
+      "extensions/typescript-language-features/package.json",
+      "extensions/typescript-language-features/src/languageFeatures/signatureHelp.ts",
+      "extensions/typescript-language-features/src/typescriptServiceClient.ts",
+      "src/vs/base/browser/animationSync.ts",
+      "src/vs/base/browser/contextmenu.ts",
+      "src/vs/base/browser/dom.ts",
+      "src/vs/base/browser/htmlToMarkdown.ts",
+      "src/vs/base/browser/indexedDB.ts",
+      "src/vs/base/browser/keyboardEvent.ts",
+      "src/vs/base/browser/markdownRenderer.ts",
+      "src/vs/base/browser/ui/actionbar/actionViewItems.ts",
+      "src/vs/base/browser/ui/contextview/contextview.ts",
+      "src/vs/base/browser/ui/dialog/dialog.css",
+      "src/vs/base/browser/ui/dialog/dialog.ts",
+      "src/vs/base/browser/ui/dropdown/dropdown.ts",
+      "src/vs/base/browser/ui/dropdown/dropdownActionViewItem.ts",
+      "src/vs/base/browser/ui/findinput/findInput.ts",
+      "src/vs/base/browser/ui/findinput/findInputToggles.ts",
+      "src/vs/base/browser/ui/findinput/replaceInput.ts",
+      "src/vs/base/browser/ui/grid/grid.ts",
+      "src/vs/base/browser/ui/hover/hover.ts",
+      "src/vs/base/browser/ui/hover/hoverDelegate.ts",
+      "src/vs/base/browser/ui/iconLabel/iconlabel.css",
+      "src/vs/base/browser/ui/inputbox/inputBox.ts",
+      "src/vs/base/browser/ui/list/listView.ts",
+      "src/vs/base/browser/ui/menu/menu.ts",
+      "src/vs/base/browser/ui/pixelSpinner/pixelSpinner.ts",
+      "src/vs/base/browser/ui/scrollbar/scrollableElement.ts",
+      "src/vs/base/browser/ui/splitview/paneview.css",
+      "src/vs/base/browser/ui/splitview/paneview.ts",
+      "src/vs/base/browser/ui/toggle/toggle.ts",
+      "src/vs/base/browser/ui/toolbar/toolbar.ts",
+      "src/vs/base/browser/ui/tree/abstractTree.ts",
+      "src/vs/base/common/arrays.ts",
+      "src/vs/base/common/codiconsLibrary.ts",
+      "src/vs/base/common/defaultAccount.ts",
+      "src/vs/base/common/errors.ts",
+      "src/vs/base/common/event.ts",
+      "src/vs/base/common/htmlContent.ts",
+      "src/vs/base/common/managedSettings.ts",
+      "src/vs/base/common/map.ts",
+      "src/vs/base/common/objects.ts",
+      "src/vs/base/common/observableInternal/base.ts",
+      "src/vs/base/common/platform.ts",
+      "src/vs/base/common/product.ts",
+      "src/vs/base/common/strings.ts",
+      "src/vs/base/node/zip.ts",
+      "src/vs/base/parts/ipc/common/ipc.mp.ts"
+    ],
+    "onlyVsSample": [
+      "build/lib/extensionTarget.ts",
+      "build/lib/npmPackage.ts",
+      "build/lib/osProxyResolver.ts",
+      "build/lib/policies/policyDataMerge.ts",
+      "build/lib/stylelint/validateHasSelectors.ts",
+      "build/lib/test/agentHostDependencies.test.ts",
+      "build/lib/test/eslint.test.ts",
+      "build/lib/test/extensionTarget.test.ts",
+      "build/lib/test/hygiene.test.ts",
+      "build/lib/test/layersChecker.test.ts",
+      "build/lib/test/osProxyResolver.test.ts",
+      "build/lib/test/policyDataMerge.test.ts",
+      "build/lib/test/rootAnchoredHas.test.ts",
+      "build/lib/test/stylelint.test.ts",
+      "build/lib/test/validatePackageLocks.test.ts",
+      "build/lib/tsgo.ts",
+      "extensions/git/src/icons.ts",
+      "extensions/theme-modern-icons/README.md",
+      "extensions/theme-modern-icons/fileicons/images/file.svg",
+      "extensions/theme-modern-icons/fileicons/images/folder-open.svg",
+      "extensions/theme-modern-icons/fileicons/images/folder.svg",
+      "extensions/theme-modern-icons/fileicons/images/frame.svg",
+      "extensions/theme-modern-icons/fileicons/images/fsharp.svg",
+      "extensions/theme-modern-icons/fileicons/images/git.svg",
+      "extensions/theme-modern-icons/fileicons/images/github.svg",
+      "extensions/theme-modern-icons/fileicons/images/gitignore.svg",
+      "extensions/theme-modern-icons/fileicons/images/gitlab.svg",
+      "extensions/theme-modern-icons/fileicons/images/go2.svg",
+      "extensions/theme-modern-icons/fileicons/images/go_3.svg",
+      "extensions/theme-modern-icons/fileicons/images/godot.svg",
+      "extensions/theme-modern-icons/fileicons/images/gradle.svg",
+      "extensions/theme-modern-icons/fileicons/images/grails.svg",
+      "extensions/theme-modern-icons/fileicons/images/graphql.svg",
+      "extensions/theme-modern-icons/fileicons/images/grunt.svg",
+      "extensions/theme-modern-icons/fileicons/images/gulp.svg",
+      "extensions/theme-modern-icons/fileicons/images/hacklang.svg",
+      "extensions/theme-modern-icons/fileicons/images/haml.svg",
+      "extensions/theme-modern-icons/fileicons/images/happenings.svg",
+      "extensions/theme-modern-icons/fileicons/images/haskell.svg",
+      "extensions/theme-modern-icons/fileicons/images/haxe.svg",
+      "extensions/theme-modern-icons/fileicons/images/heroku.svg",
+      "extensions/theme-modern-icons/fileicons/images/hex.svg",
+      "extensions/theme-modern-icons/fileicons/images/html.svg",
+      "extensions/theme-modern-icons/fileicons/images/htmlerb.svg",
+      "extensions/theme-modern-icons/fileicons/images/ignored.svg",
+      "extensions/theme-modern-icons/fileicons/images/illustrator.svg",
+      "extensions/theme-modern-icons/fileicons/images/image.svg",
+      "extensions/theme-modern-icons/fileicons/images/info.svg",
+      "extensions/theme-modern-icons/fileicons/images/ionic.svg",
+      "extensions/theme-modern-icons/fileicons/images/jade.svg",
+      "extensions/theme-modern-icons/fileicons/images/java.svg",
+      "extensions/theme-modern-icons/fileicons/images/javascript.svg",
+      "extensions/theme-modern-icons/fileicons/images/jenkins.svg",
+      "extensions/theme-modern-icons/fileicons/images/jinja.svg",
+      "extensions/theme-modern-icons/fileicons/images/jserb.svg",
+      "extensions/theme-modern-icons/fileicons/images/json.svg",
+      "extensions/theme-modern-icons/fileicons/images/julia.svg",
+      "extensions/theme-modern-icons/fileicons/images/karma.svg",
+      "extensions/theme-modern-icons/fileicons/images/kotlin.svg",
+      "extensions/theme-modern-icons/fileicons/images/less.svg",
+      "extensions/theme-modern-icons/fileicons/images/license.svg",
+      "extensions/theme-modern-icons/fileicons/images/liquid.svg",
+      "extensions/theme-modern-icons/fileicons/images/livescript.svg",
+      "extensions/theme-modern-icons/fileicons/images/lua.svg",
+      "extensions/theme-modern-icons/fileicons/images/makefile.svg",
+      "extensions/theme-modern-icons/fileicons/images/markdown.svg",
+      "extensions/theme-modern-icons/fileicons/images/maven.svg",
+      "extensions/theme-modern-icons/fileicons/images/mdo.svg",
+      "extensions/theme-modern-icons/fileicons/images/mustache.svg",
+      "extensions/theme-modern-icons/fileicons/images/nlm.svg",
+      "extensions/theme-modern-icons/fileicons/images/notebook.svg",
+      "extensions/theme-modern-icons/fileicons/images/npm.svg",
+      "extensions/theme-modern-icons/fileicons/images/npmignored.svg",
+      "extensions/theme-modern-icons/fileicons/images/nunjucks.svg",
+      "extensions/theme-modern-icons/fileicons/images/ocaml.svg",
+      "extensions/theme-modern-icons/fileicons/images/odata.svg",
+      "extensions/theme-modern-icons/fileicons/images/pddl.svg",
+      "extensions/theme-modern-icons/fileicons/images/pdf.svg",
+      "extensions/theme-modern-icons/fileicons/images/perl.svg",
+      "extensions/theme-modern-icons/fileicons/images/photoshop.svg"
+    ]
+  },
+  "securityCandidatePaths": [
+    "src/vs/base/parts/ipc/common/ipc.mp.ts",
+    "src/vs/base/parts/ipc/common/ipc.ts",
+    "src/vs/base/parts/ipc/test/common/ipc.test.ts",
+    "src/vs/code/electron-browser/workbench/workbench.ts",
+    "src/vs/code/electron-main/app.ts",
+    "src/vs/code/electron-main/main.ts",
+    "src/vs/platform/agentHost/browser/agentHostIpcChannelTransport.ts",
+    "src/vs/platform/agentHost/common/agentHostClientProxyChannel.ts",
+    "src/vs/platform/agentHost/electron-browser/localAgentHostService.ts",
+    "src/vs/platform/agentHost/electron-browser/sshRelayTransport.ts",
+    "src/vs/platform/agentHost/electron-browser/sshRemoteAgentHostServiceImpl.ts",
+    "src/vs/platform/agentHost/electron-browser/tunnelRelayTransport.ts",
+    "src/vs/platform/agentHost/electron-browser/wslRelayTransport.ts",
+    "src/vs/platform/agentHost/electron-browser/wslRemoteAgentHostServiceImpl.ts",
+    "src/vs/platform/agentHost/electron-main/electronAgentHostStarter.ts",
+    "src/vs/platform/agentHost/node/agentHostAuthenticationService.ts",
+    "src/vs/platform/agentHost/node/agentHostProxyResolver.ts",
+    "src/vs/platform/agentHost/node/codex/codexProxyService.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/AuthMode.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/GetAuthStatusParams.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/GetAuthStatusResponse.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/ChatgptAuthTokensRefreshParams.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/ChatgptAuthTokensRefreshReason.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/ChatgptAuthTokensRefreshResponse.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/FileSystemSandboxEntry.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/GuardianUserAuthorization.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/HookTrustStatus.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/McpAuthStatus.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/McpServerOauthLoginCompletedNotification.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/McpServerOauthLoginParams.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/McpServerOauthLoginResponse.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/PluginAuthPolicy.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/ProcessResizePtyParams.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/ProcessResizePtyResponse.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/SandboxMode.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/SandboxPolicy.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/SandboxWorkspaceWrite.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/WindowsSandboxReadiness.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/WindowsSandboxReadinessResponse.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/WindowsSandboxSetupCompletedNotification.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/WindowsSandboxSetupMode.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/WindowsSandboxSetupStartParams.ts",
+    "src/vs/platform/agentHost/node/codex/protocol/generated/v2/WindowsSandboxSetupStartResponse.ts",
+    "src/vs/platform/agentHost/node/copilot/agentHostSandboxEngine.ts",
+    "src/vs/platform/agentHost/node/copilot/byokLmProxyService.ts",
+    "src/vs/platform/agentHost/node/copilot/sandboxConfigForSdk.ts",
+    "src/vs/platform/agentHost/test/browser/agentHostIpcChannelTransport.test.ts",
+    "src/vs/platform/agentHost/test/electron-browser/localAgentHostService.test.ts",
+    "src/vs/platform/agentHost/test/electron-browser/remoteAgentHostProtocolClient.test.ts",
+    "src/vs/platform/agentHost/test/electron-browser/remoteAgentHostService.test.ts",
+    "src/vs/platform/agentHost/test/electron-browser/sshRemoteAgentHostService.test.ts",
+    "src/vs/platform/agentHost/test/node/byokLmProxyService.test.ts",
+    "src/vs/platform/agentHost/test/node/claudeProxyService.test.ts",
+    "src/vs/platform/agentHost/test/node/codex/codexProxyService.test.ts",
+    "src/vs/platform/agentHost/test/node/sandboxConfigForSdk.test.ts",
+    "src/vs/platform/auxiliaryWindow/electron-main/auxiliaryWindow.ts",
+    "src/vs/platform/browserView/electron-browser/preload-browserView.ts",
+    "src/vs/platform/browserView/electron-main/browserView.ts",
+    "src/vs/platform/browserView/electron-main/browserViewFrameInspector.ts",
+    "src/vs/platform/browserView/electron-main/browserViewInspector.ts",
+    "src/vs/platform/browserView/electron-main/browserViewMainService.ts",
+    "src/vs/platform/dialogs/electron-browser/dialog.ts",
+    "src/vs/platform/dialogs/electron-main/dialogMainService.ts",
+    "src/vs/platform/native/electron-main/auth.ts",
+    "src/vs/platform/native/electron-main/nativeHostMainService.ts",
+    "src/vs/platform/policy/common/fileManagedSettingsIpc.ts",
+    "src/vs/platform/policy/common/nativeManagedSettingsIpc.ts",
+    "src/vs/platform/sandbox/common/sandboxHelperService.ts",
+    "src/vs/platform/sandbox/common/settings.ts",
+    "src/vs/platform/sandbox/common/terminalSandboxEngine.ts",
+    "src/vs/platform/sandbox/common/terminalSandboxMxcRuntime.ts",
+    "src/vs/platform/sandbox/common/terminalSandboxReadAllowList.ts",
+    "src/vs/platform/sandbox/common/terminalSandboxRuntimeConfigurationPerOperation.ts",
+    "src/vs/platform/sandbox/common/terminalSandboxService.ts",
+    "src/vs/platform/sandbox/node/sandboxHelper.ts",
+    "src/vs/platform/sandbox/test/common/terminalSandboxEngine.test.ts",
+    "src/vs/platform/sandbox/test/node/sandboxHelper.test.ts",
+    "src/vs/platform/storage/common/storageIpc.ts",
+    "src/vs/platform/storage/electron-main/storageIpc.ts",
+    "src/vs/platform/storage/test/electron-main/storageMainService.test.ts",
+    "src/vs/platform/theme/electron-main/themeMainServiceImpl.ts",
+    "src/vs/platform/update/electron-main/updateService.win32.ts",
+    "src/vs/platform/utilityProcess/electron-main/utilityProcessWorkerMainService.ts",
+    "src/vs/platform/windows/electron-main/windowImpl.ts",
+    "src/vs/platform/windows/electron-main/windows.ts",
+    "src/vs/platform/windows/electron-main/windowsMainService.ts",
+    "src/vs/platform/workspaces/electron-main/workspacesHistoryMainService.ts",
+    "src/vs/workbench/api/browser/mainThreadAuthentication.ts",
+    "src/vs/workbench/api/common/extHostAuthentication.ts",
+    "src/vs/workbench/api/common/extHostXaaAuthProvider.ts",
+    "src/vs/workbench/api/node/proxyResolver.ts",
+    "src/vs/workbench/api/test/browser/extHostXaaAuthProvider.test.ts",
+    "src/vs/workbench/contrib/browserView/electron-browser/browserEditor.ts",
+    "src/vs/workbench/contrib/browserView/electron-browser/browserView.contribution.ts",
+    "src/vs/workbench/contrib/browserView/electron-browser/browserViewWorkbenchService.ts",
+    "src/vs/workbench/contrib/browserView/electron-browser/features/browserEditorChatFeatures.ts",
+    "src/vs/workbench/contrib/browserView/electron-browser/features/browserNavigationFeatures.ts",
+    "src/vs/workbench/contrib/browserView/electron-browser/features/webContentsViewRendererFeature.ts",
+    "src/vs/workbench/contrib/browserView/electron-browser/overlayManager.ts",
+    "src/vs/workbench/contrib/browserView/electron-browser/tools/browserToolHelpers.ts"
+  ],
+  "rejectedCategories": [
+    {
+      "category": "full src/vs rebase",
+      "reason": "Would erase PreBase product architecture"
+    },
+    {
+      "category": "Copilot product restore",
+      "reason": "Intentionally removed/disabled in PreBase"
+    },
+    {
+      "category": "Microsoft telemetry/services",
+      "reason": "Privacy policy / BETA-014"
+    },
+    {
+      "category": "VS Code branding/icons",
+      "reason": "PreBase product identity; icons frozen"
+    }
+  ],
+  "electronDecision": {
+    "from": "42.5.0",
+    "to": "42.8.0",
+    "notes": "42.8.0 release notes: memory info Linux, macOS window throttling fix, Windows ICO ASAR temp cleanup. No dedicated security advisories in 42.8.0 notes. Upgrade deferred pending native-module/assurance matrix; document for BETA-023.",
+    "status": "deferred"
+  }
+}

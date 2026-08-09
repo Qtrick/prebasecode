@@ -1,0 +1,7 @@
+{
+  "CFBundleIdentifier": "com.example.other",
+  "CFBundleExecutable": "Other",
+  "CFBundleName": "PreBase",
+  "CFBundleIconFile": "PreBase",
+  "ExtraKey": "keep-me"
+}

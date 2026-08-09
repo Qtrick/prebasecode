@@ -124,7 +124,10 @@ import { AgentSessionProviders, isAgentHostTarget } from '../agentSessions/agent
 const $ = dom.$;
 
 const COPILOT_USERNAME = 'GitHub Copilot';
-const AGENTS_USERNAME = 'Agents';
+/** Canonical response header label for PreBase Agents (never show an avatar). */
+const AGENT_USERNAME = 'Agent';
+/** Legacy labels that still map to the Agent brand header. */
+const AGENT_BRAND_USERNAMES = new Set(['Agent', 'Agents', 'Magnus']);
 const WORKING_CAUGHT_UP_DEBOUNCE_MS = 750;
 const DEFAULT_CHAT_ITEM_HORIZONTAL_PADDING = 40;
 
@@ -252,13 +255,26 @@ export interface IChatRendererDelegate {
 
 const mostRecentResponseClassName = 'chat-most-recent-response';
 
+export function isAgentBrandUsername(username: string): boolean {
+	return AGENT_BRAND_USERNAMES.has(username);
+}
+
+/**
+ * Hide both avatar and username (Copilot / sessions-window chrome).
+ * PreBase Agent brand keeps the "Agent" label visible — use {@link shouldHideChatAvatar}.
+ */
 export function shouldHideChatUserIdentity(username: string, sessionResource: URI, isResponse: boolean, isSessionsWindow: boolean, isSystemInitiatedRequest: boolean): boolean {
 	const sessionType = getChatSessionType(sessionResource);
 	return username === COPILOT_USERNAME ||
-		username === AGENTS_USERNAME ||
 		(isResponse && isAgentHostCopilotSessionType(sessionType)) ||
 		isSessionsWindow ||
 		isSystemInitiatedRequest;
+}
+
+/** Hide the circular agent avatar (including broken URI icons); Agent brand name stays visible. */
+export function shouldHideChatAvatar(username: string, sessionResource: URI, isResponse: boolean, isSessionsWindow: boolean, isSystemInitiatedRequest: boolean): boolean {
+	return shouldHideChatUserIdentity(username, sessionResource, isResponse, isSessionsWindow, isSystemInitiatedRequest)
+		|| isAgentBrandUsername(username);
 }
 
 function isAgentHostCopilotSessionType(sessionType: string): boolean {
@@ -915,19 +931,21 @@ export class ChatListItemRenderer extends Disposable implements ITreeRenderer<Ch
 
 		const isSystemInitiatedRequest = isRequestVM(element) && !!element.isSystemInitiated;
 		const hideChatUserIdentity = shouldHideChatUserIdentity(element.username, element.sessionResource, isResponseVM(element), this.environmentService.isSessionsWindow, isSystemInitiatedRequest);
+		const hideChatAvatar = shouldHideChatAvatar(element.username, element.sessionResource, isResponseVM(element), this.environmentService.isSessionsWindow, isSystemInitiatedRequest);
+		const displayUsername = isAgentBrandUsername(element.username) ? AGENT_USERNAME : element.username;
 
 		if (!this.rendererOptions.noHeader) {
-			if (!hideChatUserIdentity) {
+			if (!hideChatAvatar) {
 				this.renderAvatar(element, templateData);
 			} else {
 				templateData.avatarContainer.replaceChildren();
 			}
 		}
 
-		templateData.username.textContent = element.username;
+		templateData.username.textContent = displayUsername;
 		templateData.username.classList.toggle('hidden', hideChatUserIdentity);
-		templateData.avatarContainer.classList.toggle('hidden', hideChatUserIdentity);
-		templateData.header?.classList.toggle('header-identity-hidden', hideChatUserIdentity);
+		templateData.avatarContainer.classList.toggle('hidden', hideChatAvatar);
+		templateData.header?.classList.toggle('header-identity-hidden', hideChatUserIdentity && hideChatAvatar);
 
 		this.hoverHidden(templateData.requestHover);
 		dom.clearNode(templateData.detail);
