@@ -4,13 +4,15 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { BrowserWindow, WebContentsView } from 'electron';
-import { spawn, type ChildProcess } from 'child_process';
+import { execFile, spawn, type ChildProcess } from 'child_process';
 import * as http from 'http';
 import * as net from 'net';
 import { Emitter } from '../../../base/common/event.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
-import type { DesktopLaunchRequest, ManagedWindowState } from '../common/prebaseDesktopTypes.js';
+import type { DesktopLaunchRequest, ExternalLaunchRequest, ManagedWindowState } from '../common/prebaseDesktopTypes.js';
 import { IPreBaseDesktopMainService, type IPreBaseDesktopSpawnResult } from '../common/prebaseDesktop.js';
+import { CdpConnection, type MinimalWebSocket } from '../common/cdpConnection.js';
+import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.js';
 
 const STRIP_HEIGHT = 38;
 
@@ -56,12 +58,8 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 			this._destroyManagedSession(session, false);
 		}
 		this._managed.clear();
-		for (const child of this._externalChildren.values()) {
-			try {
-				child.kill('SIGTERM');
-			} catch {
-				// ignore
-			}
+		for (const pid of this._ownedPids) {
+			void this._killProcessTree(pid);
 		}
 		this._externalChildren.clear();
 		this._ownedPids.clear();
@@ -233,31 +231,46 @@ p{opacity:.75;margin:0;line-height:1.45}
 		return this._marshalForIpc(value);
 	}
 
-	async spawnExternal(command: string, cwd: string, debugPort: number, env: Record<string, string> = {}): Promise<IPreBaseDesktopSpawnResult> {
+	async spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env: Record<string, string> = {}): Promise<IPreBaseDesktopSpawnResult> {
 		const port = debugPort > 0 ? debugPort : await this._allocateDebugPort();
-		// Electron reads --remote-debugging-port from argv. npm scripts need `--` separator.
-		// ELECTRON_EXTRA_LAUNCH_ARGS is honored by many Electron templates as a secondary path.
-		const hasDebugFlag = /--remote-debugging-port\s*=?\s*\d+/.test(command);
-		const launchCommand = hasDebugFlag
-			? command
-			: /(?:^|\s)--(?:\s|$)/.test(command)
-				? `${command} --remote-debugging-port=${port}`
-				: `${command} -- --remote-debugging-port=${port}`;
+		if (!request.command.trim() || request.command.includes('\0') || request.args.some(arg => arg.includes('\0'))) {
+			throw new Error('Invalid external launch command.');
+		}
+		const args = [...request.args];
+		if (!args.some(arg => /^--remote-debugging-port(?:=|$)/.test(arg))) {
+			args.push(`--remote-debugging-port=${port}`);
+		}
+		const command = resolveExternalLaunchCommand(request, cwd);
 		const priorExtra = process.env.ELECTRON_EXTRA_LAUNCH_ARGS ?? '';
-		const child = spawn(launchCommand, {
+		const child = spawn(command, args, {
 			cwd,
-			shell: true,
 			env: {
 				...process.env,
 				...env,
 				ELECTRON_EXTRA_LAUNCH_ARGS: `${priorExtra} --remote-debugging-port=${port}`.trim(),
 			},
-			detached: false,
-			stdio: 'ignore',
+			detached: process.platform !== 'win32',
+			stdio: ['ignore', 'pipe', 'pipe'],
+			windowsHide: true,
 		});
 		if (!child.pid) {
 			throw new Error('Failed to spawn external Electron process.');
 		}
+		await new Promise<void>((resolve, reject) => {
+			const onError = (error: Error) => {
+				child.removeListener('spawn', onSpawn);
+				reject(error);
+			};
+			const onSpawn = () => {
+				child.removeListener('error', onError);
+				resolve();
+			};
+			child.once('error', onError);
+			child.once('spawn', onSpawn);
+		});
+		// Drain inherited app output so a verbose project cannot block on a full pipe.
+		child.stdout?.resume();
+		child.stderr?.resume();
 		this._ownedPids.add(child.pid);
 		this._ownedDebugPorts.add(port);
 		this._externalChildren.set(child.pid, child);
@@ -275,14 +288,7 @@ p{opacity:.75;margin:0;line-height:1.45}
 		if (!this._ownedPids.has(pid)) {
 			return;
 		}
-		const child = this._externalChildren.get(pid);
-		if (child) {
-			try {
-				child.kill('SIGTERM');
-			} catch {
-				// ignore
-			}
-		}
+		await this._killProcessTree(pid);
 		this._ownedPids.delete(pid);
 		this._externalChildren.delete(pid);
 	}
@@ -388,59 +394,81 @@ p{opacity:.75;margin:0;line-height:1.45}
 		if (!this._isLocalCdpWebSocketUrl(wsUrl)) {
 			throw new Error('CDP websocket must target localhost.');
 		}
-		const wsModule = await import('ws') as { default?: new (url: string) => MinimalWs; WebSocket?: new (url: string) => MinimalWs };
-		type MinimalWs = {
-			on(event: string, listener: (...args: any[]) => void): void;
-			send(data: string): void;
-			close(): void;
-		};
+		const wsModule = await import('ws') as { default?: new (url: string) => MinimalWebSocket; WebSocket?: new (url: string) => MinimalWebSocket };
 		const WebSocketCtor = wsModule.default ?? wsModule.WebSocket;
 		if (!WebSocketCtor) {
 			throw new Error('WebSocket implementation unavailable for CDP.');
 		}
 		return new Promise((resolve, reject) => {
 			const ws = new WebSocketCtor(wsUrl);
-			let id = 1;
-			const timer = setTimeout(() => {
+			const connection = new CdpConnection(ws);
+			let settled = false;
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			const finish = (error?: Error, value?: unknown) => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				if (timer) {
+					clearTimeout(timer);
+				}
 				ws.close();
-				reject(new Error('CDP evaluate timed out'));
+				if (error) {
+					reject(error);
+				} else {
+					resolve(value);
+				}
+			};
+			timer = setTimeout(() => {
+				connection.rejectAll(new Error('CDP evaluate timed out'));
+				finish(new Error('CDP evaluate timed out'));
 			}, 8000);
 			ws.on('open', () => {
-				ws.send(JSON.stringify({ id: id++, method: 'Runtime.enable' }));
-				ws.send(JSON.stringify({
-					id: id++,
-					method: 'Runtime.evaluate',
-					params: { expression, returnByValue: true, awaitPromise: true },
-				}));
-			});
-			ws.on('message', (raw: unknown) => {
-				try {
-					const msg = JSON.parse(String(raw)) as { id?: number; result?: { result?: { value?: unknown }; exceptionDetails?: unknown }; error?: { message?: string } };
-					if (msg.error) {
-						clearTimeout(timer);
-						ws.close();
-						reject(new Error(msg.error.message || 'CDP error'));
-						return;
-					}
-					if (msg.id && msg.result) {
-						clearTimeout(timer);
-						ws.close();
-						if (msg.result.exceptionDetails) {
-							reject(new Error('CDP expression threw'));
-							return;
+				void (async () => {
+					try {
+						await connection.request('Runtime.enable');
+						const result = await connection.request<{ result?: { value?: unknown }; exceptionDetails?: { text?: string } }>('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+						if (result.exceptionDetails) {
+							throw new Error(result.exceptionDetails.text || 'CDP expression threw');
 						}
-						resolve(msg.result.result?.value);
+						finish(undefined, result.result?.value);
+					} catch (error) {
+						finish(error instanceof Error ? error : new Error(String(error)));
 					}
-				} catch (err) {
-					clearTimeout(timer);
-					ws.close();
-					reject(err);
+				})();
+			});
+			ws.on('message', raw => connection.handleMessage(raw));
+			ws.on('error', error => {
+				connection.rejectAll(error);
+				finish(error);
+			});
+			ws.on('close', () => {
+				if (!settled) {
+					const error = new Error('CDP connection closed before the evaluation completed.');
+					connection.rejectAll(error);
+					finish(error);
 				}
 			});
-			ws.on('error', (err: Error) => {
-				clearTimeout(timer);
-				reject(err);
-			});
+		});
+	}
+
+	private _killProcessTree(pid: number): Promise<void> {
+		if (process.platform !== 'win32') {
+			try {
+				process.kill(-pid, 'SIGTERM');
+				return Promise.resolve();
+			} catch {
+				const child = this._externalChildren.get(pid);
+				try {
+					child?.kill('SIGTERM');
+				} catch {
+					// The child may have already exited.
+				}
+				return Promise.resolve();
+			}
+		}
+		return new Promise(resolve => {
+			execFile('taskkill', ['/pid', String(pid), '/t', '/f'], { windowsHide: true }, () => resolve());
 		});
 	}
 

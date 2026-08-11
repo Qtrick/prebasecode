@@ -5,11 +5,11 @@
 
 import { Event } from '../../../base/common/event.js';
 import { createDecorator } from '../../instantiation/common/instantiation.js';
-import type { DesktopLaunchRequest, IPreBaseDesktopSpawnResult, ManagedWindowState } from './prebaseDesktopTypes.js';
+import type { DesktopLaunchRequest, ExternalLaunchRequest, IPreBaseDesktopSpawnResult, ManagedWindowState } from './prebaseDesktopTypes.js';
 
 export const PREBASE_DESKTOP_CHANNEL_NAME = 'prebaseDesktop';
 
-export type { DesktopLaunchRequest, IPreBaseDesktopSpawnResult, ManagedWindowState };
+export type { DesktopLaunchRequest, ExternalLaunchRequest, IPreBaseDesktopSpawnResult, ManagedWindowState };
 
 export interface IPreBaseDesktopMainService {
 	readonly _serviceBrand: undefined;
@@ -26,7 +26,7 @@ export interface IPreBaseDesktopMainService {
 	/** PNG screenshot of app content only, base64-encoded. */
 	captureManagedScreenshot(sessionId: string): Promise<string>;
 
-	spawnExternal(command: string, cwd: string, debugPort: number, env?: Record<string, string>): Promise<IPreBaseDesktopSpawnResult>;
+	spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env?: Record<string, string>): Promise<IPreBaseDesktopSpawnResult>;
 	evaluateViaCdp(debugPort: number, expression: string): Promise<unknown>;
 	killOwnedProcess(pid: number): Promise<void>;
 	killAllOwned(): Promise<void>;

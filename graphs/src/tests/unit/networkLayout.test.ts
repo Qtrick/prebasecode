@@ -69,11 +69,48 @@ suite('PreBase networkLayout', () => {
 			}
 			const m = metrics(a);
 			assert.ok(Math.hypot(m.cx, m.cy, m.cz) < 1e-6);
-			// XY always spreads; Z is full-shell for most modes, mild depth for organic (V1.1).
+			// Every active layout must preserve meaningful depth; Organic is force-solved in XYZ.
 			assert.ok(m.vars[0] > 1);
 			assert.ok(m.vars[1] > 1);
 			assert.ok(m.vars[2] > (mode === 'organic' ? 0.5 : 1));
 			assert.ok(m.minNN > 0.5);
 		});
 	}
+
+	test('organic keeps a high-degree hub central in three dimensions', () => {
+		const nodes = [
+			{ id: 'hub', fileTypeId: 'typescript', val: 100, isEntry: true },
+			...Array.from({ length: 48 }, (_, i) => ({ id: `leaf${i}`, fileTypeId: 'typescript', val: 1, isEntry: false })),
+		];
+		const links = nodes.slice(1).map(node => ({ source: 'hub', target: node.id }));
+		const layout = layoutNetworkGraph('organic', nodes, links, 240);
+		const hub = layout.get('hub')!;
+		const hubDistanceFromCenter = Math.hypot(hub.x, hub.y, hub.z);
+		const nearestLeafDistanceFromCenter = Math.min(...nodes.slice(1).map(node => {
+			const position = layout.get(node.id)!;
+			return Math.hypot(position.x, position.y, position.z);
+		}));
+
+		assert.ok(hubDistanceFromCenter < nearestLeafDistanceFromCenter);
+	});
+
+	test('network layouts retain all nodes and finite volumetric positions with dangling links', () => {
+		const nodes = [
+			{ id: 'isolated', fileTypeId: 'typescript', val: 1, isEntry: true },
+			{ id: 'connected', fileTypeId: 'javascript', val: 2, isEntry: false },
+		];
+		const links = [
+			{ source: 'connected', target: 'missing' },
+			{ source: 'missing', target: 'isolated' },
+		];
+
+		for (const mode of ['organic', 'sphere', 'constellation', 'clustered', 'radial'] as NetworkLayoutMode[]) {
+			const layout = layoutNetworkGraph(mode, nodes, links, 240);
+			assert.strictEqual(layout.size, nodes.length, mode);
+			for (const node of nodes) {
+				const position = layout.get(node.id)!;
+				assert.ok(Number.isFinite(position.x) && Number.isFinite(position.y) && Number.isFinite(position.z), `${mode}:${node.id}`);
+			}
+		}
+	});
 });

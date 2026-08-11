@@ -5,7 +5,14 @@
 import type { NetworkLayoutLink, NetworkLayoutNode, Point3D } from './types.js'
 import { centerPositions, hash01 } from './networkNormalization.js'
 
-/** Balanced cloud — 2D force layout with mild depth (V1.1), distinct from fibonacci sphere. */
+/**
+ * Balanced, deterministic 3D force layout distinct from the fibonacci sphere.
+ *
+ * The solver intentionally remains small and synchronous for the graph sizes exposed by the
+ * workbench, but every geometric operation uses all three axes. Keeping Z in the initial seed
+ * only produces a rotating slab once XY forces settle, so collision, links and bounds must all
+ * participate in depth as well.
+ */
 export function layoutOrganic(
 	nodes: NetworkLayoutNode[],
 	links: NetworkLayoutLink[],
@@ -53,24 +60,30 @@ export function layoutOrganic(
 				const b = positions.get(ids[j])!
 				let dx = b.x - a.x
 				let dy = b.y - a.y
-				let dist = Math.hypot(dx, dy)
+				let dz = b.z - a.z
+				let dist = Math.hypot(dx, dy, dz)
 				if (dist < 0.001) {
 					dx = hash01(ids[i], j) - 0.5
 					dy = hash01(ids[j], i) - 0.5
-					dist = 0.15
+					dz = hash01(`${ids[i]}|${ids[j]}`, iter) - 0.5
+					dist = Math.hypot(dx, dy, dz) || 0.15
 				}
 				if (dist < minDist) {
 					const push = ((minDist - dist) / dist) * 0.6 * cooling
 					a.x -= dx * push
 					a.y -= dy * push
+					a.z -= dz * push
 					b.x += dx * push
 					b.y += dy * push
+					b.z += dz * push
 				} else if (dist < minDist * 2.5) {
 					const push = ((minDist * 2.5 - dist) / dist) * 0.12 * cooling
 					a.x -= dx * push
 					a.y -= dy * push
+					a.z -= dz * push
 					b.x += dx * push
 					b.y += dy * push
+					b.z += dz * push
 				}
 			}
 		}
@@ -81,29 +94,35 @@ export function layoutOrganic(
 			if (!s || !t) continue
 			const dx = t.x - s.x
 			const dy = t.y - s.y
-			const dist = Math.hypot(dx, dy) || 0.001
+			const dz = t.z - s.z
+			const dist = Math.hypot(dx, dy, dz) || 0.001
 			const pull = ((dist - linkIdeal) / dist) * 0.055 * cooling
 			s.x += dx * pull
 			s.y += dy * pull
+			s.z += dz * pull
 			t.x -= dx * pull
 			t.y -= dy * pull
+			t.z -= dz * pull
 		}
 
 		for (const p of positions.values()) {
-			const d = Math.hypot(p.x, p.y)
+			const d = Math.hypot(p.x, p.y, p.z)
 			if (d < minDist * 0.4) {
 				const k = (minDist * 0.4 - d) / (d || 0.1)
 				p.x -= p.x * k * 0.5
 				p.y -= p.y * k * 0.5
+				p.z -= p.z * k * 0.5
 			}
 			if (d > maxR) {
 				const k = (d - maxR) / d
 				p.x *= 1 - k * 0.9
 				p.y *= 1 - k * 0.9
+				p.z *= 1 - k * 0.9
 			} else if (d > maxR * 0.78) {
 				const k = ((d - maxR * 0.78) / (maxR * 0.22)) * 0.15 * cooling
 				p.x *= 1 - k
 				p.y *= 1 - k
+				p.z *= 1 - k
 			}
 		}
 	}
@@ -112,7 +131,7 @@ export function layoutOrganic(
 
 	let maxDist = 0
 	for (const p of positions.values()) {
-		maxDist = Math.max(maxDist, Math.hypot(p.x, p.y))
+		maxDist = Math.max(maxDist, Math.hypot(p.x, p.y, p.z))
 	}
 	if (maxDist > maxR && maxDist > 0) {
 		const scale = maxR / maxDist

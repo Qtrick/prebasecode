@@ -90,4 +90,71 @@ suite('electronDetector', () => {
 		assert.ok(profile.capabilities.limitations.some(l => l.includes('main-process code and preload are not executed')));
 		assert.strictEqual(profile.capabilities.requiresPreload, true);
 	});
+
+	test('blocks managed launch for a static renderer while retaining an honest external launch', () => {
+		const profile = detectElectronProject(probe({
+			packageJson: {
+				devDependencies: { electron: '^30.0.0' },
+				main: 'electron/main.js',
+				scripts: { start: 'electron .' },
+			},
+			exists: path => path === 'electron/main.js' || path === 'index.html',
+		}));
+
+		assert.deepStrictEqual({
+			isElectron: profile.isElectron,
+			confidence: profile.confidence,
+			renderer: profile.paths.renderer,
+			managed: profile.capabilities.supportsManagedLaunch,
+			external: profile.capabilities.supportsExternalLaunch,
+			mainProcess: profile.capabilities.requiresMainProcess,
+			screenshots: profile.capabilities.supportsScreenshots,
+			blockers: profile.capabilities.managedLaunchBlockers,
+		}, {
+			isElectron: true,
+			confidence: 'high',
+			renderer: 'index.html',
+			managed: false,
+			external: true,
+			mainProcess: true,
+			screenshots: false,
+			blockers: ['No renderer dev server was detected for managed launch.'],
+		});
+	});
+
+	test('infers Vite renderer and desktop inspection capabilities without claiming managed main-process execution', () => {
+		const profile = detectElectronProject(probe({
+			packageJson: {
+				devDependencies: { electron: '^30.0.0', vite: '^5.0.0' },
+				main: 'main.js',
+				scripts: { start: 'electron .' },
+			},
+			exists: path => path === 'main.js' || path === 'vite.config.ts',
+		}));
+
+		assert.deepStrictEqual({
+			rendererUrlHint: profile.rendererUrlHint,
+			likelyDevPort: profile.likelyDevPort,
+			managed: profile.capabilities.supportsManagedLaunch,
+			external: profile.capabilities.supportsExternalLaunch,
+			cdp: profile.capabilities.supportsCdpAttach,
+			inspection: profile.capabilities.supportsDOMInspection,
+			console: profile.capabilities.supportsConsoleCapture,
+			network: profile.capabilities.supportsNetworkCapture,
+			screenshots: profile.capabilities.supportsScreenshots,
+			input: profile.capabilities.supportsInputAutomation,
+		}, {
+			rendererUrlHint: 'http://localhost:5173',
+			likelyDevPort: 5173,
+			managed: true,
+			external: true,
+			cdp: true,
+			inspection: true,
+			console: false,
+			network: false,
+			screenshots: true,
+			input: false,
+		});
+		assert.ok(profile.capabilities.limitations.some(l => l.includes('main-process code and preload are not executed')));
+	});
 });

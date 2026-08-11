@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-export type { DesktopLaunchMode, DesktopLaunchRequest, ManagedWindowState } from '../../../../../platform/prebaseDesktop/common/prebaseDesktopTypes.js';
+export type { DesktopLaunchMode, DesktopLaunchRequest, ExternalLaunchRequest, ManagedWindowState } from '../../../../../platform/prebaseDesktop/common/prebaseDesktopTypes.js';
 import type { DesktopLaunchMode } from '../../../../../platform/prebaseDesktop/common/prebaseDesktopTypes.js';
 
 export type DesktopSessionState =

@@ -17,8 +17,9 @@ import { asJson, IRequestService } from '../../../../platform/request/common/req
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { PREBASE_DESKTOP_CHANNEL_NAME, type IPreBaseDesktopMainService } from '../../../../platform/prebaseDesktop/common/prebaseDesktop.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
-import type { CdpTarget, DesktopLaunchMode, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
+import type { CdpTarget, DesktopLaunchMode, ExternalLaunchRequest, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
+import { buildElectronExternalLaunchRequest, buildNpmExternalLaunchRequest } from '../common/runtime/externalLaunchCommand.js';
 import type { IPreBaseRuntimeAdapter, PreBaseDesktopLaunchOptions } from '../common/runtime/runtimeAdapter.js';
 import type { ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
 import type { ProjectProbe } from '../common/runtime/types.js';
@@ -50,7 +51,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 
 	private _profile: ElectronProjectProfile | undefined;
 	private _session: PreBaseDesktopSession | undefined;
-	private _lastRequest: { rendererUrl: string; command?: string; cwd: string; title: string } | undefined;
+	private _lastRequest: { rendererUrl: string; command?: ExternalLaunchRequest; cwd: string; title: string } | undefined;
 	private _launchModeOverride: DesktopLaunchMode | undefined;
 
 	constructor(
@@ -210,6 +211,9 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 					throw new Error('External Electron process did not receive a localhost debugging port.');
 				}
 				const targets = await this._discoverCdpTargets(debugPort);
+				if (!targets.length) {
+					throw new Error('External Electron application started without an inspectable CDP target. Verify that its launch script accepts --remote-debugging-port.');
+				}
 				this._updateSession({
 					state: 'running',
 					debugPort,
@@ -454,9 +458,14 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		super.dispose();
 	}
 
-	private _buildExternalCommand(profile: ElectronProjectProfile): string {
-		const script = profile.electronScriptName ?? 'start';
-		return `npm run ${script}`;
+	private _buildExternalCommand(profile: ElectronProjectProfile): ExternalLaunchRequest {
+		if (profile.electronScriptName) {
+			return buildNpmExternalLaunchRequest(profile.electronScriptName);
+		}
+		if (profile.paths.main) {
+			return buildElectronExternalLaunchRequest(profile.paths.main);
+		}
+		throw new Error('Electron project has no launch script or main entry.');
 	}
 
 	private async _resolveRendererUrl(candidate?: string): Promise<string | undefined> {

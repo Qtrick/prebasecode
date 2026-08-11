@@ -112,8 +112,8 @@ function buildCapabilities(
 	if (!isElectron) {
 		blockers.push('Project is not recognized as an Electron app.');
 	}
-	if (!hasRendererDevServer && !paths.renderer) {
-		blockers.push('No renderer dev server or static renderer entry was detected for managed launch.');
+	if (!hasRendererDevServer) {
+		blockers.push('No renderer dev server was detected for managed launch.');
 	}
 
 	const supportsManagedLaunch = isElectron && hasRendererDevServer;
@@ -136,10 +136,12 @@ function buildCapabilities(
 		supportsCdpAttach: supportsExternalLaunch || supportsManagedLaunch,
 		supportsDevServerAutostart,
 		supportsDOMInspection: supportsExternalLaunch || supportsManagedLaunch,
-		supportsConsoleCapture: supportsExternalLaunch,
-		supportsNetworkCapture: supportsExternalLaunch,
-		supportsScreenshots: supportsManagedLaunch || supportsExternalLaunch,
-		supportsInputAutomation: supportsExternalLaunch,
+		// External CDP evaluation is available, but event subscriptions and screenshot capture
+		// have not yet been implemented or surfaced by the desktop runtime.
+		supportsConsoleCapture: false,
+		supportsNetworkCapture: false,
+		supportsScreenshots: supportsManagedLaunch,
+		supportsInputAutomation: false,
 		supportsWindowManagement: supportsManagedLaunch,
 		requiresPreload: Boolean(paths.preload),
 		requiresMainProcess: Boolean(paths.main),

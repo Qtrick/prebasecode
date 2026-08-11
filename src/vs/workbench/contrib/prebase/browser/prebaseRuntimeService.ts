@@ -26,6 +26,7 @@ import { ITerminalInstance, ITerminalService } from '../../terminal/browser/term
 import { latestDevServerUrl } from '../common/runtime/devServerUrlParser.js';
 import { detectFramework } from '../common/runtime/frameworkDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
+import { buildNpmExternalLaunchRequest } from '../common/runtime/externalLaunchCommand.js';
 import type { ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
 import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { classifyNavigateUrl, classifyTerminalCommand, validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
@@ -653,12 +654,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 					return;
 				}
 				if (launchMode === 'external') {
-					const script = this._session.scripts.find(s => s.scriptName === this._session.selectedScriptName)
-						?? selectDefaultScript(this._session.scripts);
 					const session = await desktop.start({
 						launchMode: 'external',
 						rendererUrl: this._session.url,
-						command: script?.command,
+						command: electronProfile.electronScriptName ? buildNpmExternalLaunchRequest(electronProfile.electronScriptName) : undefined,
 					});
 					this._session = {
 						...this._session,

@@ -5,13 +5,19 @@
 
 export type DesktopLaunchMode = 'managed' | 'external';
 
+/** A shell-free command invocation owned by the desktop runtime. */
+export interface ExternalLaunchRequest {
+	command: string;
+	args: string[];
+}
+
 export interface DesktopLaunchRequest {
 	sessionId: string;
 	workspaceRoot: string;
 	launchMode: DesktopLaunchMode;
 	rendererUrl: string;
 	title: string;
-	command?: string;
+	command?: ExternalLaunchRequest;
 	cwd?: string;
 	debugPort?: number;
 	showManagementBar: boolean;
