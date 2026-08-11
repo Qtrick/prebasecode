@@ -3,7 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { resolvePreBaseCloudAuthConfig } from '../cloudConfiguration.js';
+import { isPreBaseCloudSyncAgentHistoryEnabled, resolvePreBaseCloudAuthConfig } from '../cloudConfiguration.js';
 import { buildSupabaseAuthUrl, redactSensitiveForLog } from '../supabaseAuthRest.js';
 
 suite('PreBase cloud configuration', () => {
@@ -42,6 +42,29 @@ suite('PreBase cloud configuration', () => {
 		});
 		assert.strictEqual(cfg.mode, 'legacy');
 		assert.strictEqual(cfg.legacyApiBaseUrl, 'https://legacy.example.com');
+	});
+
+	test('fails closed for insecure or incomplete Supabase configuration', () => {
+		const insecure = resolvePreBaseCloudAuthConfig(key => {
+			if (key === 'prebase.cloud.url') {
+				return 'http://localhost:54321';
+			}
+			if (key === 'prebase.cloud.publishableKey') {
+				return 'pk-test';
+			}
+			return undefined;
+		});
+		const incomplete = resolvePreBaseCloudAuthConfig(key => key === 'prebase.cloud.url' ? 'https://example.supabase.co' : undefined);
+
+		assert.deepStrictEqual(insecure, { mode: 'unconfigured' });
+		assert.deepStrictEqual(incomplete, { mode: 'unconfigured' });
+	});
+
+	test('keeps agent-history synchronization opt-in', () => {
+		assert.strictEqual(isPreBaseCloudSyncAgentHistoryEnabled(() => true), true);
+		assert.strictEqual(isPreBaseCloudSyncAgentHistoryEnabled(() => 'true'), false);
+		assert.strictEqual(isPreBaseCloudSyncAgentHistoryEnabled(() => 1), false);
+		assert.strictEqual(isPreBaseCloudSyncAgentHistoryEnabled(() => undefined), false);
 	});
 });
 

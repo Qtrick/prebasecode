@@ -20,7 +20,8 @@ supabase/
   migrations/          # Ordered SQL migrations (source of truth)
   seed.sql             # Empty by default
   functions/
-    agent-gateway/     # Deno edge skeleton
+    agent-gateway/     # Deno edge skeleton (intentionally 501)
+    web-search/        # Authenticated LinkUp gateway (provider secret server-only)
 scripts/supabase/
   verify-migrations.mjs
   gen-types.mjs
@@ -38,6 +39,7 @@ All application tables live in `public` with **RLS enabled**.
 | `agent_runs` | Runs within a session (status constrained) |
 | `agent_events` | Ordered event stream for opt-in sync |
 | `agent_usage` | Usage ledger rows (server-written only) |
+| `web_search_usage` | Metadata-only per-user search quota ledger (server-written only) |
 
 Shared trigger helper: `private.set_updated_at()` with `SECURITY DEFINER` and fixed `search_path`.
 
@@ -70,6 +72,8 @@ Shared trigger helper: `private.set_updated_at()` with `SECURITY DEFINER` and fi
 - `GET` health-style response includes `request_id`; never logs bearer tokens.
 
 CORS allowlist is tuned for local/desktop origins (`127.0.0.1`, `localhost`, `null`).
+
+`web-search` is separate from `agent-gateway`: it verifies a user JWT, validates bounded vendor-neutral search input, atomically reserves `web_search_usage` quota metadata, and calls LinkUp with `LINKUP_API_KEY` held only by Edge secrets. It returns bounded `{ title, url, excerpt }` sources, never raw provider responses. It does not persist or log queries/results. See [WEB_SEARCH_ARCHITECTURE.md](WEB_SEARCH_ARCHITECTURE.md).
 
 Function secrets (`SUPABASE_SERVICE_ROLE_KEY`, provider keys) are set with `supabase secrets set` or the Dashboard — not committed.
 

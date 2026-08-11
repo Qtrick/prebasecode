@@ -32,6 +32,7 @@ import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js
 import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IPreBaseCloudService, PreBaseCloudService } from './cloud/prebaseCloudService.js';
+import { IPreBaseWebSearchService, PreBaseWebSearchService, type IPreBaseWebSearchRequest } from './prebaseWebSearchService.js';
 import { IPreBaseAccountService, PreBaseAccountContext, PreBaseAccountService } from './prebaseAccountService.js';
 import { PreBaseCloudConfigKeys } from '../common/cloud/cloudConfiguration.js';
 import { prebaseRuntimeViewIcon } from './prebaseIcons.js';
@@ -56,6 +57,7 @@ registerPreBaseGraphContribution();
 
 registerSingleton(IPreBaseRuntimeService, PreBaseRuntimeService, InstantiationType.Delayed);
 registerSingleton(IPreBaseCloudService, PreBaseCloudService, InstantiationType.Delayed);
+registerSingleton(IPreBaseWebSearchService, PreBaseWebSearchService, InstantiationType.Delayed);
 registerSingleton(IPreBaseAccountService, PreBaseAccountService, InstantiationType.Delayed);
 
 // --- output channel
@@ -64,6 +66,15 @@ Registry.as<IOutputChannelRegistry>(OutputExtensions.OutputChannels).registerCha
 	id: PREBASE_RUNTIME_CHANNEL_ID,
 	label: PREBASE_RUNTIME_CHANNEL_LABEL,
 	log: false
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.webSearch.searchForMagnus', title: localize2('prebase.webSearch.searchForMagnus', "Search the Web for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, input: IPreBaseWebSearchRequest) {
+		return accessor.get(IPreBaseWebSearchService).searchForMagnus(input, CancellationToken.None);
+	}
 });
 
 registerAction2(class extends Action2 {

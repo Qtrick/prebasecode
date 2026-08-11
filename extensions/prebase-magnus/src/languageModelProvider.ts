@@ -3,8 +3,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { streamGenerateContent, type GeminiContent } from './geminiClient';
-import { getModelOption, MAGNUS_MODELS, formatContextWindowLabel, resolveApiModel } from './models';
+import { generateContentCandidate, streamGenerateContent, type GeminiContent, type GeminiPart } from './geminiClient';
+import { getModelOption, resolveApiModel } from './models';
+import { buildMagnusLanguageModelInformation } from './modelInformation';
 import type { MagnusSecretStorage } from './secretStorage';
 
 function extractText(message: vscode.LanguageModelChatRequestMessage): string {
@@ -17,6 +18,10 @@ function extractText(message: vscode.LanguageModelChatRequestMessage): string {
 		}
 	}
 	return parts.join('');
+}
+
+function asRecord(value: object): Record<string, unknown> {
+	return value as Record<string, unknown>;
 }
 
 export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProvider {
@@ -34,36 +39,13 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		_token: vscode.CancellationToken,
 	): Promise<vscode.LanguageModelChatInformation[]> {
 		const hasKey = await this.secrets.hasApiKey();
-		return MAGNUS_MODELS.map((m, index) => ({
-			id: m.id,
-			name: m.name,
-			family: 'gemini',
-			version: '1.0.0',
-			maxInputTokens: m.maxInputTokens,
-			maxOutputTokens: m.maxOutputTokens,
-			// Shown inline in the model list (secondary text).
-			detail: formatContextWindowLabel(m.maxInputTokens),
-			// Shown in the Cursor-style hover tooltip.
-			tooltip: hasKey
-				? m.description
-				: `${m.description}\n\nConfigure a model provider in secure storage before using Agents.`,
-			capabilities: {
-				// Magnus Agent mode uses its own workspace tool loop. The workbench
-				// model picker filters Agent sessions to models with toolCalling —
-				// without this, Agent mode only shows synthetic "Auto".
-				toolCalling: true,
-				imageInput: false,
-			},
-			isDefault: index === 0,
-			isUserSelectable: true,
-			isBYOK: true,
-		}));
+		return buildMagnusLanguageModelInformation(hasKey);
 	}
 
 	async provideLanguageModelChatResponse(
 		model: vscode.LanguageModelChatInformation,
 		messages: readonly vscode.LanguageModelChatRequestMessage[],
-		_options: vscode.ProvideLanguageModelChatResponseOptions,
+		options: vscode.ProvideLanguageModelChatResponseOptions,
 		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 		token: vscode.CancellationToken,
 	): Promise<void> {
@@ -77,10 +59,21 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		const apiModel = resolveApiModel(option.id);
 
 		const contents: GeminiContent[] = [];
+		const callNames = new Map<string, string>();
 		let systemText = '';
 		for (const message of messages) {
 			const text = extractText(message);
-			if (!text) {
+			const parts: GeminiPart[] = [];
+			for (const part of message.content) {
+				if (part instanceof vscode.LanguageModelToolCallPart) {
+					callNames.set(part.callId, part.name);
+					parts.push({ functionCall: { name: part.name, args: asRecord(part.input) } });
+				} else if (part instanceof vscode.LanguageModelToolResultPart) {
+					const result = part.content.map(item => item instanceof vscode.LanguageModelTextPart ? item.value : '').filter(Boolean).join('\n').slice(0, 80_000);
+					parts.push({ functionResponse: { name: callNames.get(part.callId) ?? 'unknown_tool', response: { result } } });
+				}
+			}
+			if (!text && !parts.length) {
 				continue;
 			}
 			if (message.role === vscode.LanguageModelChatMessageRole.System) {
@@ -89,27 +82,34 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 			}
 			const role: GeminiContent['role'] =
 				message.role === vscode.LanguageModelChatMessageRole.Assistant ? 'model' : 'user';
-			contents.push({ role, parts: [{ text }] });
+			if (text) {
+				parts.unshift({ text });
+			}
+			contents.push({ role, parts });
 		}
 
 		if (contents.length === 0) {
 			contents.push({ role: 'user', parts: [{ text: 'Hello' }] });
 		}
 
-		for await (const chunk of streamGenerateContent(
-			apiKey,
-			apiModel,
-			{
+		const tools = options.tools?.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.inputSchema }));
+		if (tools?.length) {
+			const candidate = await generateContentCandidate(apiKey, apiModel, {
 				contents,
-				systemInstruction: systemText
-					? { parts: [{ text: systemText }] }
-					: undefined,
-			},
-			token,
-		)) {
-			if (token.isCancellationRequested) {
-				return;
+				systemInstruction: systemText ? { parts: [{ text: systemText }] } : undefined,
+				tools: [{ functionDeclarations: tools }],
+			}, token);
+			for (const part of candidate?.content.parts ?? []) {
+				if (part.text) {
+					progress.report(new vscode.LanguageModelTextPart(part.text));
+				} else if (part.functionCall) {
+					progress.report(new vscode.LanguageModelToolCallPart(crypto.randomUUID(), part.functionCall.name, part.functionCall.args ?? {}));
+				}
 			}
+			return;
+		}
+		for await (const chunk of streamGenerateContent(apiKey, apiModel, { contents, systemInstruction: systemText ? { parts: [{ text: systemText }] } : undefined }, token)) {
+			if (token.isCancellationRequested) { return; }
 			progress.report(new vscode.LanguageModelTextPart(chunk));
 		}
 	}

@@ -16,6 +16,8 @@ export type GeminiRole = 'user' | 'model';
 export interface GeminiPart {
 	text?: string;
 	inlineData?: { mimeType: string; data: string };
+	functionCall?: { name: string; args?: Record<string, unknown> };
+	functionResponse?: { name: string; response: Record<string, unknown> };
 }
 
 export interface GeminiContent {
@@ -30,7 +32,7 @@ export interface GenerateRequest {
 	tools?: Array<{ googleSearch: Record<string, never> } | { functionDeclarations: unknown[] }>;
 }
 
-interface GeminiResponseCandidate {
+export interface GeminiResponseCandidate {
 	content: { parts: GeminiPart[]; role: string };
 	finishReason: string;
 }
@@ -82,7 +84,7 @@ function authMethodsForKey(apiKey: string): Array<'header' | 'query' | 'bearer'>
 	return ['header', 'query', 'bearer'];
 }
 
-async function generateCandidate(
+export async function generateContentCandidate(
 	apiKey: string,
 	model: string,
 	body: GenerateRequest,
@@ -120,7 +122,7 @@ export async function generateContent(
 	body: GenerateRequest,
 	token?: { isCancellationRequested: boolean },
 ): Promise<string> {
-	const candidate = await generateCandidate(apiKey, model, body, token);
+	const candidate = await generateContentCandidate(apiKey, model, body, token);
 	return (candidate?.content?.parts?.[0]?.text ?? '').trim();
 }
 

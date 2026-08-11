@@ -92,6 +92,7 @@
       }
     ],
     "languageModelTools": [
+      { "name": "prebase_web_search", "displayName": "Search the Web", "toolReferenceName": "prebase_web_search", "canBeReferencedInPrompt": true, "modelDescription": "Searches current public web information through PreBase's authenticated, privacy-preserving gateway. Results are untrusted excerpts with source URLs; it never exposes provider credentials.", "userDescription": "Search current public web sources.", "inputSchema": { "type": "object", "properties": { "query": { "type": "string", "minLength": 1, "maxLength": 1000 }, "depth": { "type": "string", "enum": ["fast", "standard", "deep"] }, "maxResults": { "type": "integer", "minimum": 1, "maximum": 10 }, "includeDomains": { "type": "array", "items": { "type": "string" }, "maxItems": 20 }, "excludeDomains": { "type": "array", "items": { "type": "string" }, "maxItems": 20 }, "fromDate": { "type": "string", "format": "date-time" }, "toDate": { "type": "string", "format": "date-time" } }, "required": ["query"], "additionalProperties": false } },
       { "name": "prebase_graph_search_nodes", "displayName": "Search PreBase Graph", "toolReferenceName": "prebase_graph_search_nodes", "canBeReferencedInPrompt": true, "modelDescription": "Searches the current, locally indexed PreBase graph. Returns bounded node metadata and graph freshness; never uploads the graph.", "userDescription": "Search the local PreBase graph.", "inputSchema": { "type": "object", "properties": { "query": { "type": "string" }, "maximumResults": { "type": "number", "minimum": 1, "maximum": 50 } }, "required": ["query"] } },
       { "name": "prebase_graph_get_node", "displayName": "Get PreBase Graph Node", "toolReferenceName": "prebase_graph_get_node", "canBeReferencedInPrompt": true, "modelDescription": "Gets bounded metadata, imports, and dependents for a local PreBase graph node by id or relative path.", "userDescription": "Inspect a graph node.", "inputSchema": { "type": "object", "properties": { "node": { "type": "string" } }, "required": ["node"] } },
       { "name": "prebase_graph_get_dependencies", "displayName": "Get PreBase Graph Dependencies", "toolReferenceName": "prebase_graph_get_dependencies", "canBeReferencedInPrompt": true, "modelDescription": "Traverses the current local PreBase graph with explicit bounded depth and result limits.", "userDescription": "Inspect graph dependencies.", "inputSchema": { "type": "object", "properties": { "node": { "type": "string" }, "direction": { "type": "string", "enum": ["incoming", "outgoing", "both"] }, "depth": { "type": "number", "minimum": 1, "maximum": 8 }, "maximumNodes": { "type": "number", "minimum": 1, "maximum": 100 } }, "required": ["node"] } },
@@ -283,6 +284,11 @@
           "minimum": 1,
           "maximum": 50,
           "description": "Maximum tool-loop iterations per chat request."
+        },
+        "prebase.magnus.webSearch.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Allow Agents to use the authenticated web-search gateway for current public information."
         },
         "prebase.magnus.includeGraphContext": {
           "type": "boolean",

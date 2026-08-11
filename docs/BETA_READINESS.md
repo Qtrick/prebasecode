@@ -75,6 +75,7 @@ Last audit: **2026-07-22** (Checkpoint #12 — final whole-diff honesty pass; be
 | BETA-030 | Infrastructure | Remote / web (REH) smoke: extension host, web client | High | Not Started | — | Platform matrix | REH manual or CI smoke | — | Pre-beta | 2026-07-20 | — |
 | BETA-038 | Packaging | macOS adaptive application icon packaging (Assets.car + CFBundleIconName + legacy icns; fail-closed) | Critical | Needs Verification | — | Packaged + Dock evidence | Dev+package `.app` verifier; Dock/Finder; signing order | 2026-08-09: `.icon` source + `prebaseDarwinIcon.ts`; dev `PreBase.app` `AdaptivePackage: PASS`; package gulp hook added; packaged release build evidence still open | Pre-beta | 2026-08-09 | — |
 | BETA-039 | Quality | VS Code stock color/file theme parity + PreBase Settings dynamic theme UI | Critical | Needs Verification | — | GUI theme smoke | `verify:theme-parity`; Settings selector; light/HC custom UI | 2026-08-09: 19/19 stock color IDs; Modern Icons ported; Settings dynamic discovery; light/HC GUI matrix still open | Pre-beta | 2026-08-09 | — |
+| BETA-040 | Magnus | Agent web search through authenticated LinkUp gateway | Critical | Needs Verification | — | Edge deployment + signed-in GUI tool loop | JWT/RLS/quota/security gates; source citations; cancellation/failure smoke | Dedicated gateway + metadata-only quota migration + native tool loop added 2026-08-11; live deploy and GUI evidence not yet recorded | Pre-beta | 2026-08-11 | — |
 
 ## Newly discovered during 2026-07-20 audit
 

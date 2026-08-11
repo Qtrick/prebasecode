@@ -582,9 +582,48 @@ class ProjectScriptTool implements vscode.LanguageModelTool<{ script: string }> 
 	}
 }
 
+interface WebSearchInput {
+	query: string;
+	depth?: 'fast' | 'standard' | 'deep';
+	maxResults?: number;
+	includeDomains?: string[];
+	excludeDomains?: string[];
+	fromDate?: string;
+	toDate?: string;
+}
+
+class WebSearchTool implements vscode.LanguageModelTool<WebSearchInput> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<WebSearchInput>): vscode.PreparedToolInvocation {
+		return { invocationMessage: `Searching the web for ${options.input.query?.trim().slice(0, 120) || 'current information'}` };
+	}
+
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<WebSearchInput>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const input = options.input;
+		if (typeof input.query !== 'string' || !input.query.trim() || input.query.length > 1_000) {
+			throw new Error('Web search requires a query of 1 to 1,000 characters.');
+		}
+		if (input.depth && !['fast', 'standard', 'deep'].includes(input.depth)) {
+			throw new Error('Web search depth must be fast, standard, or deep.');
+		}
+		if (input.maxResults !== undefined && (!Number.isInteger(input.maxResults) || input.maxResults < 1 || input.maxResults > 10)) {
+			throw new Error('Web search maximum results must be an integer from 1 to 10.');
+		}
+		for (const domains of [input.includeDomains, input.excludeDomains]) {
+			if (domains && (!Array.isArray(domains) || domains.length > 20 || domains.some(domain => typeof domain !== 'string' || domain.length > 253))) {
+				throw new Error('Web search domain filters must contain at most 20 host names.');
+			}
+		}
+		return commandResult(await vscode.commands.executeCommand('prebase.webSearch.searchForMagnus', input));
+	}
+}
+
 /** Registers structured native tools; no model output is interpreted as shell or edit directives. */
 export function registerMagnusLanguageModelTools(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
+		vscode.lm.registerTool('prebase_web_search', new WebSearchTool()),
 		vscode.lm.registerTool('prebase_graph_search_nodes', new GraphSearchTool()),
 		vscode.lm.registerTool('prebase_graph_get_node', new GraphNodeTool()),
 		vscode.lm.registerTool('prebase_graph_get_dependencies', new GraphDependenciesTool()),
