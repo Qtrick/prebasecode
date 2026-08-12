@@ -273,8 +273,6 @@ export class PreBaseSettingsEditor extends EditorPane {
 			accentCheckbox: () => this._accentCheckbox(),
 			range: (min, max, step, value) => this._range(min, max, step, value),
 			btn: (label, primary) => this._btn(label, primary),
-			sessionLayoutMode: () => this.graphService.getViewState().layoutMode,
-			setLayoutMode: (mode) => this.graphService.setLayoutMode(mode),
 			relayout: async () => { await this.graphService.relayout(); },
 		};
 	}

@@ -4,10 +4,7 @@
 
 import { localize } from '../../../../../../../nls.js';
 import type { IDisposable } from '../../../../../../../base/common/lifecycle.js';
-import type { LayoutMode } from '../../../common/types/graphTypes.js';
 import { PreBaseGraphConfigKeys } from '../../../common/configuration/graphConfigKeys.js';
-
-const LAYOUT_PRESETS: LayoutMode[] = ['hierarchy', 'pyramid', 'scattered'];
 
 /** Languages surfaced in PreBase Settings → About (graph analysis coverage). */
 export const GRAPH_SUPPORTED_LANGUAGES: ReadonlyArray<{ name: string; extensions: string }> = [
@@ -49,8 +46,6 @@ export interface IPreBaseGraphSettingsUiHost {
 	accentCheckbox(): HTMLInputElement;
 	range(min: number, max: number, step: number, value: number): HTMLInputElement;
 	btn(label: string, primary?: boolean): HTMLButtonElement;
-	sessionLayoutMode(): string;
-	setLayoutMode(mode: LayoutMode): Promise<void>;
 	relayout(): Promise<void>;
 }
 
@@ -65,31 +60,8 @@ export function renderGraphCategory(host: IPreBaseGraphSettingsUiHost): void {
 	const card = host.panel(
 		host.main,
 		localize('prebase.settings.graph.title', "Graph"),
-		localize('prebase.settings.graph.desc', "Default layout and architecture map display.")
+		localize('prebase.settings.graph.desc', "Code graph display and camera settings.")
 	);
-
-	const layout = document.createElement('select');
-	host.selectStyle(layout);
-	for (const m of LAYOUT_PRESETS) {
-		const opt = document.createElement('option');
-		opt.value = m;
-		opt.textContent = m;
-		layout.appendChild(opt);
-	}
-	layout.value = host.get(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout, 'hierarchy');
-	host.on(layout, 'change', () => {
-		void (async () => {
-			const mode = layout.value as LayoutMode;
-			await host.set(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout, mode);
-			await host.setLayoutMode(mode);
-		})();
-	});
-	host.row(card, localize('prebase.settings.defaultLayout', "Default layout"), undefined, layout);
-
-	const session = document.createElement('span');
-	session.textContent = host.sessionLayoutMode();
-	Object.assign(session.style, { fontSize: '12px', color: host.colors.accent, textTransform: 'capitalize' });
-	host.row(card, localize('prebase.settings.sessionLayout', "Session layout"), localize('prebase.settings.sessionLayoutHint', "Active layout for the current project."), session);
 
 	const zoom = host.range(0.5, 1.4, 0.02, host.get(PreBaseGraphConfigKeys.GraphInitialZoom, 0.92));
 	host.on(zoom, 'input', () => void host.set(PreBaseGraphConfigKeys.GraphInitialZoom, Number(zoom.value)));
@@ -100,24 +72,6 @@ export function renderGraphCategory(host: IPreBaseGraphSettingsUiHost): void {
 	host.on(edgeLabels, 'change', () => void host.set(PreBaseGraphConfigKeys.GraphShowEdgeLabels, edgeLabels.checked));
 	host.row(card, localize('prebase.settings.edgeLabels', "Edge import labels"), localize('prebase.settings.edgeLabelsHint', "Show import paths on dependency edges."), edgeLabels);
 
-	const dimWrap = document.createElement('div');
-	Object.assign(dimWrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-	const dimVal = host.get(PreBaseGraphConfigKeys.GraphLegendInteractionDim, 40);
-	const dim = host.range(0, 80, 5, dimVal);
-	const dimLabel = document.createElement('span');
-	dimLabel.textContent = `${dimVal}%`;
-	Object.assign(dimLabel.style, { fontSize: '10px', color: host.colors.textMuted, fontVariantNumeric: 'tabular-nums' });
-	host.on(dim, 'input', () => {
-		dimLabel.textContent = `${dim.value}%`;
-		void host.set(PreBaseGraphConfigKeys.GraphLegendInteractionDim, Number(dim.value));
-	});
-	dimWrap.append(dim, dimLabel);
-	host.row(
-		card,
-		localize('prebase.settings.legendDim', "Legend dim during interaction"),
-		localize('prebase.settings.legendDimHint', "How much the architecture legend fades while panning, zooming, or selecting."),
-		dimWrap
-	);
 }
 
 /** Graph canvas interaction controls (terminal visibility stays in the Settings shell). */

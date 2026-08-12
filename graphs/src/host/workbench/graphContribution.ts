@@ -22,22 +22,25 @@ import { IWorkspaceContextService } from '../../../../../../platform/workspace/c
 import { IOutputService } from '../../../../../services/output/common/output.js';
 import { IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../../../services/output/common/output.js';
 import { prebaseMapsViewIcon } from '../../../browser/prebaseIcons.js';
-import type { LayoutMode } from '../../common/types/graphTypes.js';
 import { PREBASE_GRAPH_CHANNEL_ID, PREBASE_GRAPH_CHANNEL_LABEL, PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { PreBaseGraphCommandIds } from '../../commands/graphCommandIds.js';
 import { PreBaseGraphEditor } from './graphEditor.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
-import { IPreBaseGraphService, PreBaseGraphService, type PreBaseGraphType } from './prebaseGraphService.js';
+import { IPreBaseGraphService, PreBaseGraphService } from './prebaseGraphService.js';
 import { PreBaseMapsViewPane } from './prebaseMapsView.js';
 
 export const PREBASE_MAPS_VIEW_CONTAINER_ID = 'workbench.view.prebase.maps';
 
-async function openGraphEditor(accessor: ServicesAccessor, graphType: PreBaseGraphType): Promise<void> {
+async function openGraphEditor(accessor: ServicesAccessor): Promise<void> {
 	const editorService = accessor.get(IEditorService);
 	const graphService = accessor.get(IPreBaseGraphService);
-	await graphService.setGraphType(graphType);
-	await editorService.openEditor(PreBaseGraphEditorInput.create(graphType), { pinned: true });
+	await graphService.setGraphType('network');
+	await editorService.openEditor(PreBaseGraphEditorInput.create('network'), { pinned: true });
+}
+
+function isNetworkGraphType(value: unknown): value is 'network' {
+	return value === 'network';
 }
 
 class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
@@ -49,8 +52,8 @@ class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
 	}
 	deserialize(instantiationService: IInstantiationService, raw: string): EditorInput | undefined {
 		try {
-			const data = JSON.parse(raw) as { graphType: PreBaseGraphType };
-			return PreBaseGraphEditorInput.create(data.graphType || 'architecture');
+			const data = JSON.parse(raw) as { graphType?: unknown };
+			return PreBaseGraphEditorInput.create(isNetworkGraphType(data.graphType) ? data.graphType : 'network');
 		} catch {
 			return undefined;
 		}
@@ -149,16 +152,9 @@ function registerGraphActions(): void {
 
 	registerAction2(class extends Action2 {
 		constructor() {
-			super({ id: PreBaseGraphCommandIds.openArchitecture, title: localize2('prebase.graph.openArchitecture', "Open Architecture Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
+			super({ id: PreBaseGraphCommandIds.openNetwork, title: localize2('prebase.graph.openNetwork', "Open Code Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
 		}
-		run(accessor: ServicesAccessor) { return openGraphEditor(accessor, 'architecture'); }
-	});
-
-	registerAction2(class extends Action2 {
-		constructor() {
-			super({ id: PreBaseGraphCommandIds.openNetwork, title: localize2('prebase.graph.openNetwork', "Open Network Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
-		}
-		run(accessor: ServicesAccessor) { return openGraphEditor(accessor, 'network'); }
+		run(accessor: ServicesAccessor) { return openGraphEditor(accessor); }
 	});
 
 	registerAction2(class extends Action2 {
@@ -180,31 +176,6 @@ function registerGraphActions(): void {
 			super({ id: PreBaseGraphCommandIds.cancelScan, title: localize2('prebase.graph.cancelScan', "Cancel Graph Scan"), category: localize2('prebase.category', "PreBase"), f1: true });
 		}
 		run(accessor: ServicesAccessor) { accessor.get(IPreBaseGraphService).cancelScan(); }
-	});
-
-	registerAction2(class extends Action2 {
-		constructor() {
-			super({ id: PreBaseGraphCommandIds.switchType, title: localize2('prebase.graph.switchType', "Switch Graph Type"), category: localize2('prebase.category', "PreBase"), f1: true });
-		}
-		async run(accessor: ServicesAccessor, graphType?: PreBaseGraphType) {
-			const service = accessor.get(IPreBaseGraphService);
-			const next = graphType ?? (service.getViewState().graphType === 'architecture' ? 'network' : 'architecture');
-			await openGraphEditor(accessor, next);
-		}
-	});
-
-	registerAction2(class extends Action2 {
-		constructor() {
-			super({ id: PreBaseGraphCommandIds.switchLayout, title: localize2('prebase.graph.switchLayout', "Switch Architecture Layout"), category: localize2('prebase.category', "PreBase"), f1: true });
-		}
-		async run(accessor: ServicesAccessor, layoutMode?: LayoutMode) {
-			const service = accessor.get(IPreBaseGraphService);
-			const current = service.getViewState().layoutMode;
-			const order: LayoutMode[] = ['hierarchy', 'pyramid', 'scattered'];
-			const next = layoutMode ?? order[(order.indexOf(current) + 1) % order.length];
-			await service.setLayoutMode(next);
-			await openGraphEditor(accessor, 'architecture');
-		}
 	});
 
 	registerAction2(class extends Action2 {

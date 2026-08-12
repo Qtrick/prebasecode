@@ -9,6 +9,7 @@ import {
 	allowsEdits,
 	getAgentModePromptBlock,
 	isMagnusAgentMode,
+	isMagnusToolAllowed,
 	modeFromChatParticipantId,
 	type MagnusAgentMode,
 } from './modes';
@@ -42,22 +43,7 @@ function buildSystemPrompt(mode: MagnusAgentMode, extras: string[]): string {
 }
 
 function toolDeclarations(mode: MagnusAgentMode): { functionDeclarations: Array<{ name: string; description: string; parameters?: object }> } {
-	const readOnlyRuntimeTools = new Set(['prebase_runtime_get_state', 'prebase_runtime_inspect_page', 'prebase_runtime_get_evidence']);
-	const allowed = vscode.lm.tools.filter(tool => {
-		if (!tool.name.startsWith('prebase_')) {
-			return false;
-		}
-		if (!allowsEdits(mode) && (tool.name.startsWith('prebase_edit_') || tool.name.startsWith('prebase_terminal_'))) {
-			return false;
-		}
-		if ((mode === 'ask' || mode === 'plan') && tool.name.startsWith('prebase_runtime_') && !readOnlyRuntimeTools.has(tool.name)) {
-			return false;
-		}
-		if (mode === 'runtime' && tool.name.startsWith('prebase_runtime_') && !readOnlyRuntimeTools.has(tool.name)) {
-			return false;
-		}
-		return true;
-	});
+	const allowed = vscode.lm.tools.filter(tool => isMagnusToolAllowed(mode, tool.name));
 	return {
 		functionDeclarations: allowed.map(tool => ({
 			name: tool.name,

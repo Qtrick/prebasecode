@@ -64,6 +64,58 @@ export function allowsEdits(mode: MagnusAgentMode): boolean {
 	return mode === 'patch' || mode === 'agent';
 }
 
+const ALL_MAGNUS_MODES: readonly MagnusAgentMode[] = ['ask', 'plan', 'runtime', 'patch', 'agent'];
+const WRITE_MAGNUS_MODES: readonly MagnusAgentMode[] = ['patch', 'agent'];
+
+/**
+ * The capability boundary for every Magnus tool exposed to the language model.
+ * Unknown tools are deliberately unavailable: new tools must opt in here rather than relying
+ * on a name prefix, which prevents accidental privilege expansion.
+ */
+const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgentMode[]>> = {
+	prebase_web_search: ALL_MAGNUS_MODES,
+	prebase_graph_search_nodes: ALL_MAGNUS_MODES,
+	prebase_graph_get_node: ALL_MAGNUS_MODES,
+	prebase_graph_get_dependencies: ALL_MAGNUS_MODES,
+	prebase_graph_get_overview: ALL_MAGNUS_MODES,
+	prebase_workspace_read_file: ALL_MAGNUS_MODES,
+	prebase_workspace_search_text: ALL_MAGNUS_MODES,
+	prebase_workspace_list_files: ALL_MAGNUS_MODES,
+	prebase_workspace_search_text_rich: ALL_MAGNUS_MODES,
+	prebase_workspace_read_file_range: ALL_MAGNUS_MODES,
+	prebase_workspace_search_symbols: ALL_MAGNUS_MODES,
+	prebase_workspace_get_definition: ALL_MAGNUS_MODES,
+	prebase_workspace_get_references: ALL_MAGNUS_MODES,
+	prebase_workspace_get_diagnostics: ALL_MAGNUS_MODES,
+	prebase_runtime_get_state: ALL_MAGNUS_MODES,
+	prebase_runtime_inspect_page: ALL_MAGNUS_MODES,
+	prebase_runtime_get_evidence: ALL_MAGNUS_MODES,
+	prebase_terminal_get_project_environment: ALL_MAGNUS_MODES,
+	prebase_desktop_list_sessions: ALL_MAGNUS_MODES,
+	prebase_desktop_get_session: ALL_MAGNUS_MODES,
+	prebase_desktop_inspect_window: ALL_MAGNUS_MODES,
+	prebase_edit_apply_file: WRITE_MAGNUS_MODES,
+	prebase_edit_apply: WRITE_MAGNUS_MODES,
+	prebase_edit_create_file: WRITE_MAGNUS_MODES,
+	prebase_edit_rename_file: WRITE_MAGNUS_MODES,
+	prebase_edit_delete_file: WRITE_MAGNUS_MODES,
+	prebase_runtime_navigate: WRITE_MAGNUS_MODES,
+	prebase_runtime_control_test: WRITE_MAGNUS_MODES,
+	prebase_runtime_server: WRITE_MAGNUS_MODES,
+	prebase_terminal_install_dependencies: WRITE_MAGNUS_MODES,
+	prebase_terminal_run_declared_node_version: WRITE_MAGNUS_MODES,
+	prebase_terminal_run_project_script: WRITE_MAGNUS_MODES,
+	prebase_desktop_reload_window: WRITE_MAGNUS_MODES,
+	prebase_desktop_restart_session: WRITE_MAGNUS_MODES,
+	prebase_desktop_stop_session: WRITE_MAGNUS_MODES,
+	prebase_desktop_cdp_evaluate: WRITE_MAGNUS_MODES,
+};
+
+/** Returns whether a registered tool is available in the selected Magnus agent mode. */
+export function isMagnusToolAllowed(mode: MagnusAgentMode, toolName: string): boolean {
+	return MAGNUS_TOOL_MODE_CAPABILITIES[toolName]?.includes(mode) ?? false;
+}
+
 export function getAgentModePromptBlock(mode: MagnusAgentMode): string {
 	switch (mode) {
 		case 'agent':

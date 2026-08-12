@@ -136,7 +136,7 @@ export function layoutOrganic(
 	if (maxDist > maxR && maxDist > 0) {
 		const scale = maxR / maxDist
 		for (const [id, p] of positions) {
-			positions.set(id, { x: p.x * scale, y: p.y * scale, z: p.z })
+			positions.set(id, { x: p.x * scale, y: p.y * scale, z: p.z * scale })
 		}
 	}
 

@@ -7,7 +7,7 @@ import { URI } from '../../../../../../base/common/uri.js';
 import { localize } from '../../../../../../nls.js';
 import { EditorInputCapabilities, IUntypedEditorInput } from '../../../../../common/editor.js';
 import { EditorInput } from '../../../../../common/editor/editorInput.js';
-import { prebaseArchitectureEditorIcon, prebaseNetworkEditorIcon } from '../../../browser/prebaseIcons.js';
+import { prebaseNetworkEditorIcon } from '../../../browser/prebaseIcons.js';
 import type { PreBaseGraphType } from './prebaseGraphService.js';
 
 export const PREBASE_GRAPH_SCHEME = 'prebase-graph';
@@ -15,8 +15,8 @@ export const PREBASE_GRAPH_SCHEME = 'prebase-graph';
 export class PreBaseGraphEditorInput extends EditorInput {
 	static readonly TypeID = 'workbench.input.prebaseGraph';
 
-	static create(graphType: PreBaseGraphType): PreBaseGraphEditorInput {
-		return new PreBaseGraphEditorInput(graphType);
+	static create(_graphType?: PreBaseGraphType): PreBaseGraphEditorInput {
+		return new PreBaseGraphEditorInput('network');
 	}
 
 	readonly resource: URI;
@@ -35,13 +35,11 @@ export class PreBaseGraphEditorInput extends EditorInput {
 	}
 
 	override getName(): string {
-		return this.graphType === 'architecture'
-			? localize('prebase.graph.architectureTitle', "Architecture Graph")
-			: localize('prebase.graph.networkTitle', "Network Graph");
+		return localize('prebase.graph.networkTitle', "Code Graph");
 	}
 
 	override getIcon(): ThemeIcon {
-		return this.graphType === 'architecture' ? prebaseArchitectureEditorIcon : prebaseNetworkEditorIcon;
+		return prebaseNetworkEditorIcon;
 	}
 
 	override matches(other: EditorInput | IUntypedEditorInput): boolean {

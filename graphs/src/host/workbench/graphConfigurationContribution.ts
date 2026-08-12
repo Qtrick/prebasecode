@@ -24,8 +24,8 @@ export function registerPreBaseGraphConfiguration(): void {
 			[PreBaseGraphConfigKeys.GraphDefaultType]: {
 				type: 'string',
 				enum: ['architecture', 'network'],
-				default: 'architecture',
-				description: localize('prebase.graph.defaultType', "Default PreBase graph type to open."),
+				default: 'network',
+				description: localize('prebase.graph.defaultType', "Default PreBase graph type to open. Network supports 3D drag rotation."),
 				scope: ConfigurationScope.RESOURCE
 			},
 			[PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout]: {

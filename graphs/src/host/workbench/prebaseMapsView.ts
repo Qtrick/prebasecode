@@ -21,29 +21,12 @@ import { IViewletViewOptions } from '../../../../../browser/parts/views/viewsVie
 import { IViewDescriptorService } from '../../../../../common/views.js';
 import { IEditorService } from '../../../../../services/editor/common/editorService.js';
 import { computeLanguageStats } from '../../core/analysis/languageStats.js';
-import type { GraphNode, LayoutMode } from '../../common/types/graphTypes.js';
+import type { GraphNode } from '../../common/types/graphTypes.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
 
-type ArchitectureModeId = 'product' | 'file' | 'dependency' | 'state' | 'infrastructure' | 'overview';
 type GraphFilterId = 'all' | 'files' | 'components' | 'dependencies';
 type ExplorerViewMode = 'flat' | 'tree';
-
-interface ArchitectureModeDef {
-	id: ArchitectureModeId;
-	label: string;
-	blurb: string;
-	question: string;
-}
-
-const ARCHITECTURE_MODES: ArchitectureModeDef[] = [
-	{ id: 'product', label: 'Product', blurb: 'Entry → routes → features → hooks → data', question: 'How is the product structured?' },
-	{ id: 'file', label: 'File', blurb: 'Important source files, primitives collapsed', question: 'What files make up this part of the project?' },
-	{ id: 'dependency', label: 'Dependency', blurb: 'Imports & exports, top connections only', question: 'What depends on what?' },
-	{ id: 'state', label: 'State / Data', blurb: 'Hooks, context, stores, APIs, data clients', question: 'Where does data come from and how does state flow?' },
-	{ id: 'infrastructure', label: 'Infrastructure', blurb: 'Configs, build tools, package & env files', question: 'How is this project built, configured, and run?' },
-	{ id: 'overview', label: 'Overview', blurb: 'How the architecture modes relate', question: 'How do the architecture layers connect?' },
-];
 
 const FILTERS: { id: GraphFilterId; label: string }[] = [
 	{ id: 'all', label: 'All' },
@@ -80,17 +63,13 @@ export class PreBaseMapsViewPane extends ViewPane {
 	static readonly LABEL = localize2('prebase.maps.view', "Graph");
 
 	private _scroll: HTMLElement | undefined;
-	private _archModeSection: HTMLElement | undefined;
-	private _archBlurb: HTMLElement | undefined;
 	private _langSection: HTMLElement | undefined;
 	private _filterSection: HTMLElement | undefined;
-	private _layoutSection: HTMLElement | undefined;
 	private _networkSection: HTMLElement | undefined;
 	private _displaySection: HTMLElement | undefined;
 	private _explorerList: HTMLElement | undefined;
 	private _diag: HTMLElement | undefined;
 
-	private _modeArchBtn: HTMLButtonElement | undefined;
 	private _modeNetBtn: HTMLButtonElement | undefined;
 	private _graphModeHelper: HTMLElement | undefined;
 	private _graphModeOpenBtn: HTMLButtonElement | undefined;
@@ -99,9 +78,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _legendCheckbox: HTMLInputElement | undefined;
 	private _displayBody: HTMLElement | undefined;
 
-	private readonly _archModeButtons = new Map<ArchitectureModeId, HTMLButtonElement>();
 	private readonly _filterButtons = new Map<GraphFilterId, HTMLButtonElement>();
-	private readonly _layoutButtons = new Map<LayoutMode, HTMLButtonElement>();
 	private readonly _networkLayoutButtons = new Map<string, HTMLButtonElement>();
 	private readonly _explorerModeButtons = new Map<ExplorerViewMode, HTMLButtonElement>();
 	private readonly _expandedDirs = new Set<string>(['src']);
@@ -135,10 +112,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			if (
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphShowLegend) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphArchitectureMode) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphFilter) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphExplorerViewMode) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode)
 			) {
 				this._refresh();
@@ -159,11 +133,9 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._scroll.style.boxSizing = 'border-box';
 
 		this._renderGraphMode();
-		this._renderArchitectureModes();
 		this._renderLanguages();
 		this._renderSearch();
 		this._renderFilter();
-		this._renderArchitectureLayout();
 		this._renderNetwork();
 		this._renderDisplay();
 		this._renderExplorer();
@@ -194,13 +166,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._sectionLabel(section, localize('prebase.maps.graphMode', "Graph mode"));
 		const row = DOM.append(section, DOM.$('div'));
 		this._segmentTrack(row);
-		this._modeArchBtn = this._segmentBtn(row, localize('prebase.maps.architecture', "Architecture"), () => {
-			if (!this._hasOpenProject()) {
-				return;
-			}
-			this.commandService.executeCommand('prebase.graph.openArchitecture');
-		});
-		this._modeNetBtn = this._segmentBtn(row, localize('prebase.maps.network', "Network"), () => {
+		this._modeNetBtn = this._segmentBtn(row, localize('prebase.maps.network', "Code Graph"), () => {
 			if (!this._hasOpenProject()) {
 				return;
 			}
@@ -231,37 +197,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._register(DOM.addDisposableListener(this._graphModeOpenBtn, 'click', () => {
 			void this.commandService.executeCommand('workbench.action.files.openFolder');
 		}));
-	}
-
-	private _renderArchitectureModes(): void {
-		this._archModeSection = DOM.append(this._scroll!, DOM.$('div'));
-		this._sectionLabel(this._archModeSection, localize('prebase.maps.architectureMode', "Architecture mode"));
-		const grid = DOM.append(this._archModeSection, DOM.$('div'));
-		grid.style.display = 'grid';
-		grid.style.gridTemplateColumns = '1fr 1fr';
-		grid.style.gap = '4px';
-		for (const mode of ARCHITECTURE_MODES) {
-			const btn = DOM.append(grid, DOM.$('button')) as HTMLButtonElement;
-			btn.type = 'button';
-			btn.textContent = mode.label;
-			btn.title = mode.question;
-			btn.style.padding = '5px 8px';
-			btn.style.fontSize = '10px';
-			btn.style.fontWeight = '500';
-			btn.style.textAlign = 'left';
-			btn.style.borderRadius = '6px';
-			btn.style.cursor = 'pointer';
-			btn.style.border = 'none';
-			this._register(DOM.addDisposableListener(btn, 'click', () => {
-				void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphArchitectureMode, mode.id);
-			}));
-			this._archModeButtons.set(mode.id, btn);
-		}
-		this._archBlurb = DOM.append(this._archModeSection, DOM.$('p'));
-		this._archBlurb.style.fontSize = '10px';
-		this._archBlurb.style.color = MUTED;
-		this._archBlurb.style.margin = '4px 2px 0';
-		this._archBlurb.style.lineHeight = '1.35';
 	}
 
 	private _renderLanguages(): void {
@@ -299,27 +234,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 				void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphFilter, f.id);
 			});
 			this._filterButtons.set(f.id, btn);
-		}
-	}
-
-	private _renderArchitectureLayout(): void {
-		this._layoutSection = DOM.append(this._scroll!, DOM.$('div'));
-		this._sectionLabel(this._layoutSection, localize('prebase.maps.layout', "Architecture Layout"));
-		const col = DOM.append(this._layoutSection, DOM.$('div'));
-		col.style.display = 'flex';
-		col.style.flexDirection = 'column';
-		col.style.gap = '2px';
-		for (const mode of ['hierarchy', 'pyramid', 'scattered'] as LayoutMode[]) {
-			const label = mode === 'hierarchy' ? localize('prebase.maps.hierarchy', "Hierarchy")
-				: mode === 'pyramid' ? localize('prebase.maps.pyramid', "Pyramid")
-					: localize('prebase.maps.scattered', "Scattered");
-			const btn = this._chipBtn(col, label, () => {
-				if (!this._hasOpenProject()) {
-					return;
-				}
-				this.commandService.executeCommand('prebase.graph.switchLayout', mode);
-			}, true, true);
-			this._layoutButtons.set(mode, btn);
 		}
 	}
 
@@ -503,17 +417,13 @@ export class PreBaseMapsViewPane extends ViewPane {
 	}
 
 	private _refresh(): void {
-		const state = this.graphService.getViewState();
 		const diag = this.graphService.getDiagnostics();
-		const isNetwork = state.graphType === 'network';
-		const archMode = this._getArchitectureMode();
-		const isOverview = !isNetwork && archMode === 'overview';
+		const isNetwork = true;
+		const isOverview = false;
 		const hasProject = this._hasOpenProject();
 		const scanStatus = diag.status;
 
-		this._styleSegmentActive(this._modeArchBtn, state.graphType === 'architecture');
 		this._styleSegmentActive(this._modeNetBtn, isNetwork);
-		this._setModeEnabled(this._modeArchBtn, hasProject);
 		this._setModeEnabled(this._modeNetBtn, hasProject);
 
 		if (this._graphModeHelper) {
@@ -544,19 +454,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 			this._graphModeOpenBtn.style.display = hasProject ? 'none' : 'inline-block';
 		}
 
-		if (this._archModeSection) {
-			this._archModeSection.style.display = isNetwork || !hasProject ? 'none' : 'block';
-		}
-		for (const [id, btn] of this._archModeButtons) {
-			this._styleChipActive(btn, id === archMode);
-			btn.disabled = !hasProject;
-			btn.style.opacity = hasProject ? '1' : '0.45';
-			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';
-		}
-		if (this._archBlurb) {
-			this._archBlurb.textContent = ARCHITECTURE_MODES.find(m => m.id === archMode)?.blurb ?? '';
-		}
-
 		this._refreshLanguages();
 
 		if (this._filterSection) {
@@ -567,9 +464,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 			this._styleChipActive(btn, id === filter);
 		}
 
-		if (this._layoutSection) {
-			this._layoutSection.style.display = isNetwork || isOverview || !hasProject ? 'none' : 'block';
-		}
 		if (this._networkSection) {
 			this._networkSection.style.display = isNetwork && hasProject ? 'block' : 'none';
 		}
@@ -582,13 +476,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}
 		if (this._legendCheckbox) {
 			this._legendCheckbox.checked = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphShowLegend) !== false;
-		}
-
-		for (const [mode, btn] of this._layoutButtons) {
-			this._styleChipActive(btn, mode === state.layoutMode, true);
-			btn.disabled = !hasProject;
-			btn.style.opacity = hasProject ? '1' : '0.45';
-			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';
 		}
 
 		const networkLayout = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
@@ -902,12 +789,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 		} catch {
 			// ignore missing files
 		}
-	}
-
-	private _getArchitectureMode(): ArchitectureModeId {
-		const v = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphArchitectureMode);
-		const match = ARCHITECTURE_MODES.find(m => m.id === v);
-		return match?.id ?? 'product';
 	}
 
 	private _getFilter(): GraphFilterId {

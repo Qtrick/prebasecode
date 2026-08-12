@@ -6,13 +6,10 @@
 export const PreBaseGraphCommandIds = {
 	clearDescriptionCache: 'prebase.graph.clearDescriptionCache',
 	regenerateDescription: 'prebase.graph.regenerateDescription',
-	openArchitecture: 'prebase.graph.openArchitecture',
 	openNetwork: 'prebase.graph.openNetwork',
 	scanWorkspace: 'prebase.graph.scanWorkspace',
 	rescanWorkspace: 'prebase.graph.rescanWorkspace',
 	cancelScan: 'prebase.graph.cancelScan',
-	switchType: 'prebase.graph.switchType',
-	switchLayout: 'prebase.graph.switchLayout',
 	fitView: 'prebase.graph.fitView',
 	resetView: 'prebase.graph.resetView',
 	toggleLegend: 'prebase.graph.toggleLegend',

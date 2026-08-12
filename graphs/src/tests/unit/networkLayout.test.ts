@@ -94,6 +94,15 @@ suite('PreBase networkLayout', () => {
 		assert.ok(hubDistanceFromCenter < nearestLeafDistanceFromCenter);
 	});
 
+	test('organic normalizes its final bounds uniformly across all axes', () => {
+		const graph = makeGraph(96);
+		const radius = 240;
+		const layout = layoutNetworkGraph('organic', graph.nodes, graph.links, radius);
+		for (const position of layout.values()) {
+			assert.ok(Math.hypot(position.x, position.y, position.z) <= radius * 0.88 + 1e-6);
+		}
+	});
+
 	test('network layouts retain all nodes and finite volumetric positions with dangling links', () => {
 		const nodes = [
 			{ id: 'isolated', fileTypeId: 'typescript', val: 1, isEntry: true },

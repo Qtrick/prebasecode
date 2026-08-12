@@ -142,7 +142,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	) {
 		super();
 		this._viewState = {
-			graphType: this.configurationService.getValue<PreBaseGraphType>(PreBaseGraphConfigKeys.GraphDefaultType) || 'architecture',
+			graphType: 'network',
 			layoutMode: this.configurationService.getValue<LayoutMode>(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout) || 'hierarchy'
 		};
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
@@ -388,24 +388,18 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async setGraphType(graphType: PreBaseGraphType): Promise<void> {
+		if (graphType !== 'network') {
+			return;
+		}
 		if (this._viewState.graphType === graphType) {
 			return;
 		}
-		const previous = this._viewState.graphType;
 		this._viewState = { ...this._viewState, graphType };
 		this._onDidChangeViewState.fire(this._viewState);
 		if (!this._rawSnapshot) {
 			return;
 		}
-		// Network uses a different layout; architecture can re-enrich in place.
-		if (previous === 'network' || graphType === 'network') {
-			void this.relayout();
-			return;
-		}
-		const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
-		this._snapshot = enriched;
-		this._onDidChangeSnapshot.fire(enriched);
-		this._setDiagnostics(enriched.diagnostics);
+		void this.relayout();
 	}
 
 	async setLayoutMode(layoutMode: LayoutMode): Promise<void> {

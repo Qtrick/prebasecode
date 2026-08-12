@@ -246,12 +246,9 @@ export class PreBaseHomeEditor extends EditorPane {
 			this._actionButton(row, localize('prebase.home.newFile', "New File"), () => {
 				void this.commandService.executeCommand('workbench.action.files.newUntitledFile');
 			});
-			this._actionButton(row, localize('prebase.home.architecture', "Architecture Graph"), () => {
-				void this.commandService.executeCommand('prebase.graph.openArchitecture');
-			});
-			this._actionButton(row, localize('prebase.home.network', "Network Graph"), () => {
+			this._actionButton(row, localize('prebase.home.network', "Code Graph"), () => {
 				void this.commandService.executeCommand('prebase.graph.openNetwork');
-			});
+			}, true);
 			this._actionButton(row, localize('prebase.home.runtime', "Runtime Preview"), () => {
 				void this.commandService.executeCommand('prebase.runtime.open');
 			});

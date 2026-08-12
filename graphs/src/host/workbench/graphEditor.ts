@@ -36,7 +36,7 @@ export class PreBaseGraphEditor extends EditorPane {
 	private _container: HTMLElement | undefined;
 	private _webview: IWebviewElement | undefined;
 	private readonly _webviewDisposables = this._register(new DisposableStore());
-	private _inputType: 'architecture' | 'network' = 'architecture';
+	private _inputType: 'architecture' | 'network' = 'network';
 	private _scanKickoff = false;
 	private _descriptionCts: CancellationTokenSource | undefined;
 
@@ -78,9 +78,9 @@ export class PreBaseGraphEditor extends EditorPane {
 		if (token.isCancellationRequested || !(input instanceof PreBaseGraphEditorInput) || !this._container) {
 			return;
 		}
-		this._inputType = input.graphType;
+		this._inputType = 'network';
 		// Never await scan/layout here — that freezes the workbench and prevents tab close.
-		void this.graphService.setGraphType(input.graphType);
+		void this.graphService.setGraphType('network');
 		this._ensureWebview();
 		this._pushSnapshot();
 
@@ -405,7 +405,7 @@ let snapshot = null;
 let diagnostics = null;
 let selectedNodeId = null;
 let settings = { showLegend:true, reduceMotion:false, networkIdleAutoRotate:false, networkDragDirection:'natural', maxRenderedEdges:420, maxRenderedNodes:280, quality:'auto' };
-let graphType = 'architecture';
+let graphType = 'network';
 let dragging = false, panning = false, rotating = false;
 let lastX = 0, lastY = 0, moved = false;
 let activePointerId = null, activePointerHost = null;
