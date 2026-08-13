@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as esbuild from 'esbuild';
+import { createHash } from 'crypto';
 import * as fs from 'fs';
 import * as path from 'path';
 import { promisify } from 'util';
@@ -58,6 +59,8 @@ type BuildTarget = 'desktop' | 'server' | 'server-web' | 'web';
 const SRC_DIR = 'src';
 const OUT_DIR = 'out';
 const OUT_VSCODE_DIR = 'out-vscode';
+const GRAPHS_SOURCE_DIR = path.join(REPO_ROOT, 'graphs', 'src');
+const GRAPHS_MANIFEST_RELATIVE_PATH = path.join('vs', 'workbench', 'contrib', 'prebase', 'graphs', '.prebase-source-manifest.json');
 
 // UTF-8 BOM - added to test files with 'utf8' in the path (matches gulp build behavior)
 const UTF8_BOM = Buffer.from([0xef, 0xbb, 0xbf]);
@@ -768,6 +771,34 @@ async function transpile(outDir: string, excludeTests: boolean): Promise<void> {
 		const destPath = path.join(REPO_ROOT, outDir, file.replace(/\.ts$/, '.js'));
 		return transpileFile(srcPath, destPath);
 	}));
+
+	await writeGraphsSourceManifest(outDir);
+}
+
+/**
+ * Records the exact authoritative graph sources used for a transpile build.
+ *
+ * The graph package is reached through a symlink below src/, so merely having
+ * a corresponding JavaScript file in out/ cannot prove it was emitted from
+ * today's graphs/src/. The startup verifier consumes this manifest before a
+ * development workbench launches.
+ */
+async function writeGraphsSourceManifest(outDir: string): Promise<void> {
+	const graphFiles = await globAsync('**/*', {
+		cwd: GRAPHS_SOURCE_DIR,
+		nodir: true,
+		ignore: ['**/*.d.ts'],
+	});
+	const files = await Promise.all(graphFiles.sort().map(async relativePath => {
+		const contents = await fs.promises.readFile(path.join(GRAPHS_SOURCE_DIR, relativePath));
+		return {
+			path: relativePath.split(path.sep).join('/'),
+			sha256: createHash('sha256').update(contents).digest('hex'),
+		};
+	}));
+	const manifestPath = path.join(REPO_ROOT, outDir, GRAPHS_MANIFEST_RELATIVE_PATH);
+	await fs.promises.mkdir(path.dirname(manifestPath), { recursive: true });
+	await fs.promises.writeFile(manifestPath, `${JSON.stringify({ version: 1, files }, undefined, '\t')}\n`, 'utf8');
 }
 
 // ============================================================================

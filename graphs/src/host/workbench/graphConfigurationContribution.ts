@@ -21,20 +21,6 @@ export function registerPreBaseGraphConfiguration(): void {
 				default: false,
 				description: localize('prebase.graph.reduceMotion', "Reduce motion in PreBase graph and UI animations."),
 			},
-			[PreBaseGraphConfigKeys.GraphDefaultType]: {
-				type: 'string',
-				enum: ['architecture', 'network'],
-				default: 'network',
-				description: localize('prebase.graph.defaultType', "Default PreBase graph type to open. Network supports 3D drag rotation."),
-				scope: ConfigurationScope.RESOURCE
-			},
-			[PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout]: {
-				type: 'string',
-				enum: ['hierarchy', 'pyramid', 'scattered'],
-				default: 'hierarchy',
-				description: localize('prebase.graph.defaultArchitectureLayout', "Default architecture graph layout."),
-				scope: ConfigurationScope.RESOURCE
-			},
 			[PreBaseGraphConfigKeys.GraphAutoScan]: {
 				type: 'boolean',
 				default: true,
@@ -69,54 +55,12 @@ export function registerPreBaseGraphConfiguration(): void {
 				maximum: 1.4,
 				description: localize('prebase.graph.initialZoom', "Camera zoom when a project first loads."),
 			},
-			[PreBaseGraphConfigKeys.GraphLegendInteractionDim]: {
-				type: 'number',
-				default: 40,
-				minimum: 0,
-				maximum: 80,
-				description: localize('prebase.graph.legendInteractionDim', "How much the architecture legend fades while panning, zooming, or selecting (0–80%)."),
-			},
 			[PreBaseGraphConfigKeys.GraphLayoutAnimationDuration]: {
 				type: 'number',
 				default: 750,
 				minimum: 0,
 				maximum: 2000,
 				description: localize('prebase.graph.layoutAnimationDuration', "Fit-view / layout animation duration in milliseconds."),
-			},
-			[PreBaseGraphConfigKeys.GraphLayerRadiusScale]: {
-				type: 'number',
-				default: 1,
-				minimum: 0.7,
-				maximum: 1.4,
-				description: localize('prebase.graph.layerRadiusScale', "Scales concentric ring radii for architecture layouts."),
-			},
-			[PreBaseGraphConfigKeys.GraphMaxNodesPerLayer]: {
-				type: 'number',
-				default: 24,
-				minimum: 8,
-				maximum: 48,
-				description: localize('prebase.graph.maxNodesPerLayer', "Maximum nodes per layer before an overflow sub-ring is added."),
-			},
-			[PreBaseGraphConfigKeys.GraphLayerGap]: {
-				type: 'number',
-				default: 96,
-				minimum: 80,
-				maximum: 200,
-				description: localize('prebase.graph.layerGap', "Distance between dependency rings."),
-			},
-			[PreBaseGraphConfigKeys.GraphCenterClearance]: {
-				type: 'number',
-				default: 80,
-				minimum: 64,
-				maximum: 160,
-				description: localize('prebase.graph.centerClearance', "Radius of the innermost ring."),
-			},
-			[PreBaseGraphConfigKeys.GraphScatterRelaxIterations]: {
-				type: 'number',
-				default: 10,
-				minimum: 4,
-				maximum: 24,
-				description: localize('prebase.graph.scatterRelaxIterations', "Spacing relaxation iterations for scattered layout."),
 			},
 			[PreBaseGraphConfigKeys.GraphFolderExpansionRadius]: {
 				type: 'number',
@@ -242,13 +186,6 @@ export function registerPreBaseGraphConfiguration(): void {
 				minimum: 0.4,
 				maximum: 2.5,
 				description: localize('prebase.graph.networkSpreadScale', "Overall spread scale for Network Graph layouts."),
-			},
-			[PreBaseGraphConfigKeys.GraphArchitectureMode]: {
-				type: 'string',
-				enum: ['product', 'file', 'dependency', 'state', 'infrastructure', 'overview'],
-				default: 'product',
-				description: localize('prebase.graph.architectureMode', "Architecture slice for the Architecture graph: filters rendered nodes by layer (product/state/infrastructure) or connectivity (dependency). Overview shows all layers. Does not recompute layout geometry."),
-				scope: ConfigurationScope.RESOURCE
 			},
 			[PreBaseGraphConfigKeys.GraphFilter]: {
 				type: 'string',

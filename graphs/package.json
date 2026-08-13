@@ -2,7 +2,7 @@
   "name": "@prebase/graphs",
   "version": "0.1.0",
   "private": true,
-  "description": "PreBase Architecture Graph and Network Graph subsystem",
+  "description": "PreBase Code Graph subsystem with preserved dormant Architecture Graph assets",
   "type": "module",
   "exports": {
     ".": "./src/index.ts",

@@ -89,8 +89,10 @@ async function ensureCompiled() {
 	// package (src/.../prebase/graphs → graphs/src symlink) was never emitted
 	// or was wiped. Missing graphContribution.js aborts workbench restore.
 	const graphsContribution = 'out/vs/workbench/contrib/prebase/graphs/host/workbench/graphContribution.js';
-	if (!(await exists(graphsContribution))) {
-		console.log('[preLaunch] graphs out/ modules missing — running transpile-client');
+	const { verifyGraphsOut } = await import('../../scripts/startup/verify-graphs-out.mjs');
+	const graphOutput = verifyGraphsOut();
+	if (!(await exists(graphsContribution)) || !graphOutput.ok) {
+		console.log(`[preLaunch] graphs out/ is missing or stale (${graphOutput.errors.join('; ') || 'missing graph contribution'}) — running transpile-client`);
 		await runProcess(npm, ['run', 'transpile-client']);
 	}
 }

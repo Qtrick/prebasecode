@@ -154,11 +154,6 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 
 	if (host.category === 'graph') {
 		advNumber(host, card, localize('prebase.settings.layoutAnim', "Layout animation"), localize('prebase.settings.layoutAnimHint', "Fit-view duration in milliseconds."), PreBaseGraphConfigKeys.GraphLayoutAnimationDuration, 750, 0, 2000, 50);
-		advRange(host, card, localize('prebase.settings.layerRadius', "Layer radius scale"), localize('prebase.settings.layerRadiusHint', "Scales concentric ring radii."), PreBaseGraphConfigKeys.GraphLayerRadiusScale, 1, 0.7, 1.4, 0.05);
-		advNumber(host, card, localize('prebase.settings.maxPerLayer', "Max nodes per layer"), localize('prebase.settings.maxPerLayerHint', "Before an overflow sub-ring is added."), PreBaseGraphConfigKeys.GraphMaxNodesPerLayer, 24, 8, 48, 1);
-		advNumber(host, card, localize('prebase.settings.layerGap', "Layer gap"), localize('prebase.settings.layerGapHint', "Distance between dependency rings."), PreBaseGraphConfigKeys.GraphLayerGap, 96, 80, 200, 4);
-		advNumber(host, card, localize('prebase.settings.centerClearance', "Center clearance"), localize('prebase.settings.centerClearanceHint', "Radius of the innermost ring."), PreBaseGraphConfigKeys.GraphCenterClearance, 80, 64, 160, 4);
-		advNumber(host, card, localize('prebase.settings.scatterPasses', "Scatter balance passes"), localize('prebase.settings.scatterPassesHint', "Spacing relaxation iterations."), PreBaseGraphConfigKeys.GraphScatterRelaxIterations, 10, 4, 24, 1);
 		advRange(host, card, localize('prebase.settings.folderRadius', "Folder expansion radius"), localize('prebase.settings.folderRadiusHint', "Tree mode radial child layout."), PreBaseGraphConfigKeys.GraphFolderExpansionRadius, 82, 48, 160, 4);
 		advRange(host, card, localize('prebase.settings.visibleRelated', "Visible related connections"), localize('prebase.settings.visibleRelatedHint', "Root link always shown; controls extra ranked links per file (0–2)."), PreBaseGraphConfigKeys.GraphVisibleRelatedConnections, 1, 0, 2, 1, true);
 

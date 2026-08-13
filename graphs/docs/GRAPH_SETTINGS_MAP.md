@@ -1,6 +1,6 @@
 # Graph settings map (beta audit)
 
-Last updated: **2026-07-21** (Phase A Settings UI extraction).
+Last updated: **2026-08-12** (single Code Graph cleanup).
 
 Registration: `graphs/src/host/workbench/graphConfigurationContribution.ts`  
 Keys: `graphs/src/common/configuration/graphConfigKeys.ts`  
@@ -10,18 +10,11 @@ Shell (nav only): `src/vs/workbench/contrib/prebase/browser/prebaseSettingsEdito
 
 | Setting ID | Default | UI | Runtime consumer | Status |
 |---|---|---|---|---|
-| `prebase.graph.defaultArchitectureLayout` | hierarchy | Graph | `prebaseGraphService` / layout | Wired |
 | `prebase.graph.initialZoom` | 0.92 | Graph | graph webview snapshot | Wired |
 | `prebase.graph.showEdgeLabels` | false | Graph | graph webview | Wired |
-| `prebase.graph.legendInteractionDim` | 40 | Graph | architecture legend | Wired |
 | `prebase.graph.reduceMotion` | false | Appearance | graph animations | Wired |
 | `prebase.graph.quality` | balanced | Performance | edge animation | Wired |
 | `prebase.graph.layoutAnimationDuration` | 750 | Advanced | fit-view | Wired |
-| `prebase.graph.layerRadiusScale` | 1 | Advanced | layout | Wired |
-| `prebase.graph.maxNodesPerLayer` | 24 | Advanced | layout | Wired |
-| `prebase.graph.layerGap` | 96 | Advanced | layout | Wired |
-| `prebase.graph.centerClearance` | 80 | Advanced | layout | Wired |
-| `prebase.graph.scatterRelaxIterations` | 10 | Advanced | layout | Wired |
 | `prebase.graph.folderExpansionRadius` | 82 | Advanced | layout | Wired |
 | `prebase.graph.visibleRelatedConnections` | 1 | Advanced | layout | Wired |
 | `prebase.graph.networkIdleAutoRotate` | false | Advanced | network webview | Wired |
@@ -38,3 +31,8 @@ Shell (nav only): `src/vs/workbench/contrib/prebase/browser/prebaseSettingsEdito
 | `prebase.graph.showMinimap` | (hidden) | — | stub | Deferred BETA-020 |
 
 Do not expose reserved settings as fully working. Prefer hide or wire before calling them production-ready.
+
+Architecture-only settings (`defaultType`, `defaultArchitectureLayout`,
+`architectureMode`, architecture legend/ring controls, and scatter controls)
+are intentionally not registered. Existing user values are inert compatibility
+data; the active product always opens the Code Graph.

@@ -6,6 +6,7 @@
  * locally (or watch-client-transpile) before relying on out/ being current.
  */
 import fs from 'node:fs';
+import crypto from 'node:crypto';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -44,6 +45,46 @@ const PREBASE_GRAPH_SERVICE_OUT = path.join(
 	REPO_ROOT,
 	'out/vs/workbench/contrib/prebase/graphs/host/workbench/prebaseGraphService.js',
 );
+const GRAPHS_SOURCE_DIR = path.join(REPO_ROOT, 'graphs', 'src');
+const GRAPHS_MANIFEST = path.join(REPO_ROOT, 'out/vs/workbench/contrib/prebase/graphs/.prebase-source-manifest.json');
+
+function collectGraphSourceFiles(directory, relative = '') {
+	const files = [];
+	for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+		const childRelative = path.posix.join(relative, entry.name);
+		const child = path.join(directory, entry.name);
+		if (entry.isDirectory()) {
+			files.push(...collectGraphSourceFiles(child, childRelative));
+		} else if (entry.isFile() && !entry.name.endsWith('.d.ts')) {
+			files.push({
+				path: childRelative,
+				sha256: crypto.createHash('sha256').update(fs.readFileSync(child)).digest('hex'),
+			});
+		}
+	}
+	// Match the deterministic lexical ordering used by the transpile manifest.
+	return files.sort((a, b) => a.path < b.path ? -1 : a.path > b.path ? 1 : 0);
+}
+
+function verifyGraphsFreshness(errors) {
+	if (!fs.existsSync(GRAPHS_MANIFEST)) {
+		errors.push('graphs source manifest missing; run npm run transpile-client');
+		return;
+	}
+	try {
+		const manifest = JSON.parse(fs.readFileSync(GRAPHS_MANIFEST, 'utf8'));
+		const actual = collectGraphSourceFiles(GRAPHS_SOURCE_DIR);
+		if (manifest.version !== 1 || !Array.isArray(manifest.files)) {
+			errors.push('graphs source manifest is malformed; run npm run transpile-client');
+			return;
+		}
+		if (JSON.stringify(manifest.files) !== JSON.stringify(actual)) {
+			errors.push('graphs out/ is stale relative to graphs/src (including deleted or renamed files); run npm run transpile-client');
+		}
+	} catch (error) {
+		errors.push(`graphs source manifest is unreadable: ${error instanceof Error ? error.message : String(error)}`);
+	}
+}
 
 /**
  * @returns {{ ok: boolean, errors: string[] }}
@@ -89,13 +130,15 @@ export function verifyGraphsOut() {
 		}
 	}
 
+	verifyGraphsFreshness(errors);
+
 	return { ok: errors.length === 0, errors };
 }
 
 function main() {
 	const { ok, errors } = verifyGraphsOut();
 	if (ok) {
-		console.log(`verify:graphs-out: PASS (${REQUIRED_OUT_MODULES.length} modules + symlink)`);
+		console.log(`verify:graphs-out: PASS (${REQUIRED_OUT_MODULES.length} modules + symlink + freshness manifest)`);
 		process.exit(0);
 	}
 	console.error('verify:graphs-out: FAIL');

@@ -8,21 +8,13 @@ export const PREBASE_GRAPH_CHANNEL_ID = 'prebaseGraph';
 export const PREBASE_GRAPH_CHANNEL_LABEL = localize('prebase.graph.channel', "PreBase Graph");
 
 export enum PreBaseGraphConfigKeys {
-	GraphDefaultType = 'prebase.graph.defaultType',
-	GraphDefaultArchitectureLayout = 'prebase.graph.defaultArchitectureLayout',
 	GraphAutoScan = 'prebase.graph.autoScan',
 	GraphShowLegend = 'prebase.graph.showLegend',
 	GraphShowMinimap = 'prebase.graph.showMinimap',
 	GraphHideLowImportance = 'prebase.graph.hideLowImportance',
 	GraphShowEdgeLabels = 'prebase.graph.showEdgeLabels',
 	GraphInitialZoom = 'prebase.graph.initialZoom',
-	GraphLegendInteractionDim = 'prebase.graph.legendInteractionDim',
 	GraphLayoutAnimationDuration = 'prebase.graph.layoutAnimationDuration',
-	GraphLayerRadiusScale = 'prebase.graph.layerRadiusScale',
-	GraphMaxNodesPerLayer = 'prebase.graph.maxNodesPerLayer',
-	GraphLayerGap = 'prebase.graph.layerGap',
-	GraphCenterClearance = 'prebase.graph.centerClearance',
-	GraphScatterRelaxIterations = 'prebase.graph.scatterRelaxIterations',
 	GraphFolderExpansionRadius = 'prebase.graph.folderExpansionRadius',
 	GraphVisibleRelatedConnections = 'prebase.graph.visibleRelatedConnections',
 	GraphMaxRenderedNodes = 'prebase.graph.maxRenderedNodes',
@@ -42,7 +34,6 @@ export enum PreBaseGraphConfigKeys {
 	GraphNetworkSimulationTicks = 'prebase.graph.networkSimulationTicks',
 	GraphNetworkLayoutMode = 'prebase.graph.networkLayoutMode',
 	GraphNetworkSpreadScale = 'prebase.graph.networkSpreadScale',
-	GraphArchitectureMode = 'prebase.graph.architectureMode',
 	GraphFilter = 'prebase.graph.filter',
 	GraphExplorerViewMode = 'prebase.graph.explorerViewMode',
 

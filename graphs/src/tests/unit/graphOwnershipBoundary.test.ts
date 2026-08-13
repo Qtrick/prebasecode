@@ -5,13 +5,33 @@
 import assert from 'assert';
 import fs from 'node:fs';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const GRAPHS_SRC = path.resolve(__dirname, '../..');
 const REPO_ROOT = path.resolve(GRAPHS_SRC, '../..');
 
 suite('Graph ownership boundary (Phase A)', () => {
+	test('compiled graph editor input normalizes a legacy Architecture restore to the Code Graph', async () => {
+		const compiledInput = path.join(
+			REPO_ROOT,
+			'out/vs/workbench/contrib/prebase/graphs/host/workbench/graphEditorInput.js'
+		);
+		assert.ok(fs.existsSync(compiledInput), 'compiled graph editor input missing; run npm run transpile-client');
+
+		const { PreBaseGraphEditorInput } = await import(pathToFileURL(compiledInput).href);
+		const restored = PreBaseGraphEditorInput.create('architecture');
+		assert.deepStrictEqual({
+			graphType: restored.graphType,
+			name: restored.getName(),
+			resource: restored.resource.path,
+		}, {
+			graphType: 'network',
+			name: 'Code Graph',
+			resource: '/network',
+		});
+	});
+
 	test('graphs/src/core has no flat shim .ts files', () => {
 		const coreDir = path.join(GRAPHS_SRC, 'core');
 		assert.ok(fs.existsSync(coreDir), 'graphs/src/core must exist');

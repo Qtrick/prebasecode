@@ -19,7 +19,6 @@ import { detectEntryNodeId } from '../../core/analysis/entryDetector.js';
 import { GraphGenerator } from '../../core/generation/graphGenerator.js';
 import { DEFAULT_IGNORE_PATTERNS } from '../../core/scanning/ignorePatterns.js';
 import { extractImportsForFile, extractPackageName } from '../../core/parsing/importExtractors.js';
-import { LayoutEngine } from '../../layouts/architecture/layoutEngine.js';
 import {
 	computeNetworkSphereRadius,
 	layoutNetworkGraph,
@@ -28,21 +27,13 @@ import {
 import { getFileTypeInfo } from '../../common/constants/fileTypeColors.js';
 import {
 	assignLayersToNodes,
-	computeNodeImportance,
-	filterNodesForArchitectureMode
+	computeNodeImportance
 } from '../../core/analysis/architectureLayers.js';
-import {
-	getHierarchyRingBandsForSnapshot,
-	getPyramidDepthBands,
-	type HierarchyRingBand,
-	type PyramidDepthBand
-} from '../../layouts/architecture/hierarchy/hierarchyLayout.js';
 import { isGraphRelevantFile } from '../../core/scanning/projectFiles.js';
 import { basename, normalizePath } from '../../core/resolution/paths.js';
 import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode, ParseResult, ScannedFile } from '../../common/types/graphTypes.js';
-import { depthLevelColor } from '../../layouts/shared/layoutDepthColors.js';
 
-export type PreBaseGraphType = 'architecture' | 'network';
+export type PreBaseGraphType = 'network';
 
 export interface PreBaseGraphViewState {
 	graphType: PreBaseGraphType;
@@ -53,8 +44,8 @@ export interface PreBaseEnrichedSnapshot extends GraphSnapshot {
 	graphType: PreBaseGraphType;
 	layoutMode: LayoutMode;
 	networkLayoutMode?: NetworkLayoutMode;
-	ringBands: Array<HierarchyRingBand & { color: string }>;
-	pyramidBands: Array<PyramidDepthBand & { color: string }>;
+	ringBands: readonly [];
+	pyramidBands: readonly [];
 	diagnostics: PreBaseGraphDiagnostics;
 }
 
@@ -143,14 +134,13 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		super();
 		this._viewState = {
 			graphType: 'network',
-			layoutMode: this.configurationService.getValue<LayoutMode>(PreBaseGraphConfigKeys.GraphDefaultArchitectureLayout) || 'hierarchy'
+			layoutMode: 'hierarchy'
 		};
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphHideLowImportance) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedNodes) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedEdges) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphArchitectureMode)
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedEdges)
 			) {
 				if (this._rawSnapshot) {
 					const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
@@ -387,19 +377,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		this._log(localize('prebase.graph.logCacheCleared', "Cleared graph cache."));
 	}
 
-	async setGraphType(graphType: PreBaseGraphType): Promise<void> {
-		if (graphType !== 'network') {
-			return;
-		}
-		if (this._viewState.graphType === graphType) {
-			return;
-		}
-		this._viewState = { ...this._viewState, graphType };
-		this._onDidChangeViewState.fire(this._viewState);
-		if (!this._rawSnapshot) {
-			return;
-		}
-		void this.relayout();
+	async setGraphType(_graphType: PreBaseGraphType): Promise<void> {
+		// The active product has one Code Graph. This method remains for callers
+		// and persisted editor restoration, but there is no alternate runtime path.
 	}
 
 	async setLayoutMode(layoutMode: LayoutMode): Promise<void> {
@@ -484,24 +464,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			});
 			await timeout(0);
 
-			const layoutMode = this._viewState.layoutMode;
 			let positions: GraphSnapshot['positions'];
-			let positions3d: GraphSnapshot['positions3d'] | undefined;
-			let networkLayoutMode: NetworkLayoutMode | undefined;
-
-			if (this._viewState.graphType === 'network') {
-				networkLayoutMode = this._getNetworkLayoutMode();
-				const computed = this._computeNetworkPositions(layoutNodes, layoutEdges, networkLayoutMode);
-				positions = computed.positions2d;
-				positions3d = computed.positions3d;
-			} else {
-				const layoutEngine = new LayoutEngine();
-				positions = await layoutEngine.layout(layoutNodes, layoutEdges, {
-					mode: layoutMode,
-					entryNodeId,
-					runtime: this._layoutRuntimeForMode(layoutMode)
-				});
-			}
+			const networkLayoutMode = this._getNetworkLayoutMode();
+			const computed = this._computeNetworkPositions(layoutNodes, layoutEdges, networkLayoutMode);
+			positions = computed.positions2d;
+			const positions3d = computed.positions3d;
 			await timeout(0);
 
 			// Reject stale completions that lost the scan slot to a newer run.
@@ -553,25 +520,14 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			message: localize('prebase.graph.relayout', "Updating layout…")
 		});
 		await timeout(0);
-		if (this._viewState.graphType === 'network') {
-			const networkLayoutMode = this._getNetworkLayoutMode();
-			const computed = this._computeNetworkPositions(this._rawSnapshot.nodes, this._rawSnapshot.edges, networkLayoutMode);
-			this._rawSnapshot = {
-				...this._rawSnapshot,
-				positions: computed.positions2d,
-				positions3d: computed.positions3d,
-				networkLayoutMode,
-			};
-		} else {
-			const layoutEngine = new LayoutEngine();
-			const mode = this._viewState.layoutMode;
-			const positions = await layoutEngine.layout(this._rawSnapshot.nodes, this._rawSnapshot.edges, {
-				mode,
-				entryNodeId: this._rawSnapshot.entryNodeId,
-				runtime: this._layoutRuntimeForMode(mode)
-			});
-			this._rawSnapshot = { ...this._rawSnapshot, positions, positions3d: undefined, networkLayoutMode: undefined };
-		}
+		const networkLayoutMode = this._getNetworkLayoutMode();
+		const computed = this._computeNetworkPositions(this._rawSnapshot.nodes, this._rawSnapshot.edges, networkLayoutMode);
+		this._rawSnapshot = {
+			...this._rawSnapshot,
+			positions: computed.positions2d,
+			positions3d: computed.positions3d,
+			networkLayoutMode,
+		};
 		await timeout(0);
 		const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
 		this._snapshot = enriched;
@@ -635,19 +591,6 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		return picked;
 	}
 
-	private _layoutRuntimeForMode(mode: LayoutMode) {
-		const quality = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphQuality) || 'auto';
-		const spacingScale = mode === 'scattered'
-			? Math.max(0.5, Math.min(2.5, (this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) || 80) / 80))
-			: 1;
-		const force = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkForceStrength) || 0.35;
-		const relaxBase = quality === 'performance' ? 4 : quality === 'quality' ? 14 : 8;
-		return {
-			spacingScale: mode === 'scattered' ? spacingScale * (0.7 + force) : spacingScale,
-			scatterRelaxIterations: relaxBase
-		};
-	}
-
 	private _isActiveScan(cts: CancellationTokenSource): boolean {
 		return this._scanCts === cts;
 	}
@@ -660,42 +603,20 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private _enrich(snapshot: GraphSnapshot, fileCount: number): PreBaseEnrichedSnapshot {
 		const layoutMode = this._viewState.layoutMode;
-		const networkLayoutMode = this._viewState.graphType === 'network'
-			? (snapshot.networkLayoutMode as NetworkLayoutMode | undefined) || this._getNetworkLayoutMode()
-			: undefined;
-		let ringBands: Array<HierarchyRingBand & { color: string }> = [];
-		let pyramidBands: Array<PyramidDepthBand & { color: string }> = [];
+		const networkLayoutMode = (snapshot.networkLayoutMode as NetworkLayoutMode | undefined) || this._getNetworkLayoutMode();
 
 		// Use file nodes only so folder stubs don't distort ring/pyramid geometry.
 		const layoutNodes = snapshot.nodes.filter(n => {
 			if (n.kind === 'folder') {
 				return false;
 			}
-			// Network layout drops function stubs; keep Architecture flexible.
-			if (this._viewState.graphType === 'network' && n.kind === 'function') {
+			if (n.kind === 'function') {
 				return false;
 			}
 			return true;
 		});
 		const layoutEdges = snapshot.edges.filter(e => e.kind === 'import');
 
-		if (snapshot.entryNodeId && this._viewState.graphType === 'architecture') {
-			if (layoutMode === 'hierarchy') {
-				ringBands = getHierarchyRingBandsForSnapshot(
-					layoutNodes,
-					layoutEdges,
-					snapshot.entryNodeId,
-					snapshot.positions
-				).map(band => ({ ...band, color: depthLevelColor(band.semanticDepth) }));
-			} else if (layoutMode === 'pyramid') {
-				pyramidBands = getPyramidDepthBands(
-					layoutNodes,
-					layoutEdges,
-					snapshot.entryNodeId,
-					snapshot.positions
-				).map(band => ({ ...band, color: depthLevelColor(band.depth) }));
-			}
-		}
 
 		const limits = this._scanLimits();
 		const maxNodes = limits.maxNodes;
@@ -711,11 +632,6 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				const imp = computeNodeImportance(n.id, layoutEdges);
 				return imp.score >= 1;
 			});
-		}
-		// Architecture sidebar mode: filter which layers/nodes are rendered (layout geometry unchanged).
-		if (this._viewState.graphType === 'architecture') {
-			const archMode = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphArchitectureMode);
-			nodes = filterNodesForArchitectureMode(nodes, layoutEdges, archMode, snapshot.entryNodeId);
 		}
 		if (nodes.length > maxNodes) {
 			nodes = this._pickLayoutNodes(nodes, layoutEdges, snapshot.entryNodeId, maxNodes);
@@ -750,9 +666,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			}
 		}
 		// Network always exposes positions3d (even empty) so the webview never hash01-synthesizes Z.
-		const resolvedPositions3d = this._viewState.graphType === 'network'
-			? positions3d
-			: (Object.keys(positions3d).length ? positions3d : undefined);
+		const resolvedPositions3d = positions3d;
 
 		return {
 			...snapshot,
@@ -763,8 +677,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			networkLayoutMode,
 			graphType: this._viewState.graphType,
 			layoutMode,
-			ringBands,
-			pyramidBands,
+			ringBands: [],
+			pyramidBands: [],
 			diagnostics
 		};
 	}
