@@ -19,10 +19,21 @@ export type NetworkLayoutMode =
 	| 'sphere'
 	| 'constellation'
 	| 'clustered'
-	| 'radial'
+	| 'radial';
 
 export interface Point3D {
-	x: number
-	y: number
-	z: number
+	x: number;
+	y: number;
+	z: number;
+}
+
+/** Runtime controls consumed by deterministic Network layout engines. */
+export interface NetworkLayoutRuntimeConfig {
+	sphereRadius: number;
+	/** Effective per-node radius; nodes are separated by roughly twice this value. */
+	collisionRadius: number;
+	/** Preferred center-to-center length for links when a layout applies link relaxation. */
+	linkDistance: number;
+	/** Scales bounded link relaxation without changing a layout's semantic structure. */
+	forceStrength: number;
 }

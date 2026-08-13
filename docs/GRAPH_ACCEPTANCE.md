@@ -41,6 +41,9 @@ Settings registration lives under `graphs/` (`registerPreBaseGraphConfiguration`
 | N5 | Idle auto-rotate | Wait with `networkIdleAutoRotate` enabled | Idle rotation when configured | Needs Verification | — |
 | N6 | Physics settings | Adjust force/link/charge in settings | Simulation behavior changes | Needs Verification | — |
 | N7 | Pick hit test | Click small node while zoomed out | Node picked (see unit tests `architecturePick`) | Needs Verification | — |
+| N8 | Sphere vs Radial semantics | Switch between Sphere and Radial at the same node/edge budget | Sphere is one even shell; Radial has an entry/central root and visible BFS radius layers | Needs Verification | Unit metrics cover semantic distinction; GUI front/side/oblique evidence still required |
+| N9 | Radial spacing and settings | Change Node spacing and preferred link length; rotate and zoom Radial | No obvious central pile; larger spacing increases center distance; larger link length changes layout | Needs Verification | Deterministic unit coverage; GUI screen-space inspection required |
+| N10 | Selected-node idle lock | Enable idle rotation, select node, close popup, drag, wait, then deselect | Camera stays fixed for the entire selection; manual drag works; only deselection resumes after idle delay | Needs Verification | Webview lifecycle tests; GUI timing evidence required |
 
 ## Automated coverage (2026-07-20)
 

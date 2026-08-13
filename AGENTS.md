@@ -17,7 +17,7 @@ This repository is the PreBase IDE product (VS Code–based). Treat it as a firs
 2. **Beta reminder** — Every final agent response must end with `Beta Readiness Reminder` sourced from `docs/BETA_READINESS.md`. See `.cursor/rules/beta-readiness-reminder.mdc`.
 3. **Graph ownership** — All Architecture/Network graph implementation lives under root `graphs/`. See `.cursor/rules/graphs-ownership.mdc` and `graphs/OWNERSHIP.md`.
 4. **Application icons (FROZEN)** — Never modify Dock/application/installer icons, icon sources, or `build/icons/icon-integrity.sha256` unless the user explicitly requests new icon artwork **and** authorizes a manifest update. Approved art is the sheened PreBase monogram. See `.cursor/rules/application-icons-frozen.mdc`. Dock cache mismatches are not a reason to edit sources.
-5. **Manual commit review** — Do not create Git commits, stage files, or run `git add` unless the user explicitly asks for a commit in that specific request. Complete implementation, review, and verification, then leave task-scoped changes uncommitted for manual review. Report the final worktree status and changed files; preserve unrelated pre-existing user changes. Never use `git reset --hard`, `git clean -fd`, or history rewriting.
+5. **Manual commit review** — Do not create Git commits, stage files, or run `git add` unless the user explicitly asks for a commit in that specific request. Complete implementation, review, and verification, then leave task-scoped changes uncommitted for manual review. Report the final worktree status, changed files, and a `Suggested Commit Title`; preserve unrelated pre-existing user changes. Never use `git reset --hard`, `git clean -fd`, or history rewriting.
 
 ## Graph subsystem
 

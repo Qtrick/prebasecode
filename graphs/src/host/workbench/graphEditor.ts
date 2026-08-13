@@ -308,13 +308,27 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
 #toolbar button:hover { background:var(--vscode-toolbar-hoverBackground, #303030); }
 #toolbar label { display:flex; gap:4px; align-items:center; user-select:none; opacity:.9; }
+#idleToggleWrap { display:none; }
 #status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
-#legend { position:absolute; left:12px; bottom:100px; z-index:4; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
+#legend { position:absolute; left:12px; bottom:100px; z-index:4; display:none; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
 #legend .title { font-weight:700; margin-bottom:6px; letter-spacing:.02em; text-transform:uppercase; opacity:.75; font-size:10px; }
 #legend .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
 #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
 #legend .swatch.circle { border-radius:50%; }
 #legend .swatch.line { height:2px; width:16px; border-radius:1px; }
+#legend .swatch.ft-typescript { background:#3178c6; }
+#legend .swatch.ft-javascript { background:#f1e05a; }
+#legend .swatch.ft-css { background:#a371f7; }
+#legend .swatch.ft-html { background:#e34c26; }
+#legend .swatch.ft-markdown { background:#519aba; }
+#legend .swatch.ft-image { background:#c678dd; }
+#legend .swatch.ft-config { background:#6b7280; }
+#legend .swatch.ft-other { background:#71717a; }
+#legend .swatch.entry { background:#e8b84a; }
+#legend .swatch.import { background:#94a3b8; }
+#legend .swatch.root { background:#e8b84a; border-top:1px dashed #e8b84a; }
+#legend .swatch.composition { background:#a78bfa; }
+#legend .title.spaced { margin-top:8px; }
 #empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
 #popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #303030); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
 #popup h3 { margin:0 0 4px; font-size:13px; }
@@ -341,7 +355,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	<svg id="archSvg"></svg>
 	<canvas id="netCanvas"></canvas>
 </div>
-<div id="legend" style="display:none"></div>
+<div id="legend"></div>
 <div id="popup" role="dialog" aria-modal="false" aria-label="Node details">
 	<button id="popupClose" type="button" title="Close">×</button>
 	<h3 id="popupTitle"></h3>
@@ -361,7 +375,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	<button id="zoomOut" title="Zoom out">−</button>
 	<button id="fit" title="Fit">⛶</button>
 	<button id="reset" title="Reset">↻</button>
-	<label id="idleToggleWrap" style="display:none"><input type="checkbox" id="idleToggle"> Idle</label>
+	<label id="idleToggleWrap"><input type="checkbox" id="idleToggle"> Idle</label>
 </div>
 <div id="status">Scanning…</div>
 <script nonce="${nonce}">
@@ -431,6 +445,19 @@ function request(type, payload) {
 
 function isNetwork() { return graphType === 'network' || (snapshot && snapshot.graphType === 'network'); }
 
+/** The single authority for automatic camera motion; manual camera controls remain available. */
+function canIdleRotate() {
+	return !!(isNetwork()
+		&& snapshot
+		&& settings.networkIdleAutoRotate
+		&& !settings.reduceMotion
+		&& !document.hidden
+		&& !dragging
+		&& !panning
+		&& !rotating
+		&& !selectedNodeId);
+}
+
 function thresholdForPointer(pointerType) {
 	if (pointerType === 'touch') return 8;
 	if (pointerType === 'pen') return 6;
@@ -493,10 +520,10 @@ function scheduleIdleResume() {
 	kickRaf();
 	if (idleResumeTimer) clearTimeout(idleResumeTimer);
 	idleResumeTimer = null;
-	if (!settings.networkIdleAutoRotate || settings.reduceMotion || !isNetwork()) return;
+	if (!canIdleRotate()) return;
 	idleResumeTimer = setTimeout(function () {
 		idleResumeTimer = null;
-		if (settings.networkIdleAutoRotate && !settings.reduceMotion && !dragging) {
+		if (canIdleRotate()) {
 			idlePaused = false;
 			kickRaf();
 		}
@@ -533,7 +560,7 @@ function resizeCanvas() {
 }
 
 function rebuildBase3d(s) {
-	const key = [s.scannedAt, s.layoutMode, s.networkLayoutMode || '', s.graphType, (s.nodes || []).length, (s.edges || []).length].join('|');
+	const key = [s.scannedAt, s.layoutRevision || 0, s.layoutMode, s.networkLayoutMode || '', s.graphType, (s.nodes || []).length, (s.edges || []).length].join('|');
 	if (key === layoutKey && Object.keys(base3d).length) return false;
 	layoutKey = key;
 	base3d = Object.create(null);
@@ -549,12 +576,15 @@ function rebuildBase3d(s) {
 			if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) continue;
 			sx += p.x; sy += p.y; sz += p.z; n++;
 		}
-		centroid = n ? { x: sx / n, y: sy / n } : { x: 0, y: 0 };
+		const preserveSemanticCenter = s.networkLayoutMode === 'radial';
+		centroid = preserveSemanticCenter ? { x: 0, y: 0 } : (n ? { x: sx / n, y: sy / n } : { x: 0, y: 0 });
 		const cz = n ? sz / n : 0;
 		for (let i = 0; i < nodes.length; i++) {
 			const p = p3[nodes[i].id];
 			if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) continue;
-			base3d[nodes[i].id] = { x: p.x - centroid.x, y: p.y - centroid.y, z: p.z - cz };
+			base3d[nodes[i].id] = preserveSemanticCenter
+				? { x: p.x, y: p.y, z: p.z }
+				: { x: p.x - centroid.x, y: p.y - centroid.y, z: p.z - cz };
 		}
 		if (n > 0 || network) {
 			return true;
@@ -654,14 +684,14 @@ function updateLegend(s, network) {
 		if (!types.has(t.id)) types.set(t.id, t);
 	}
 	let html = '<div class="title">File types</div>';
-	types.forEach(function (t) {
-		html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:' + t.color + '"></span>' + t.name + '</div>';
-	});
-	html += '<div class="row"><span class="swatch ' + (network ? 'circle' : '') + '" style="background:' + ENTRY + '"></span>Entry</div>';
-	html += '<div class="title" style="margin-top:8px">' + (network ? 'Visible edges' : 'Edges') + '</div>';
-	html += '<div class="row"><span class="swatch line" style="background:#94a3b8"></span>Import</div>';
-	if (!network) html += '<div class="row"><span class="swatch line" style="background:' + ENTRY + ';border-top:1px dashed ' + ENTRY + '"></span>Root</div>';
-	else html += '<div class="row"><span class="swatch line" style="background:#a78bfa"></span>Composition</div>';
+		types.forEach(function (t) {
+			html += '<div class="row"><span class="swatch ft-' + t.id + ' ' + (network ? 'circle' : '') + '"></span>' + t.name + '</div>';
+		});
+		html += '<div class="row"><span class="swatch entry ' + (network ? 'circle' : '') + '"></span>Entry</div>';
+		html += '<div class="title spaced">' + (network ? 'Visible edges' : 'Edges') + '</div>';
+		html += '<div class="row"><span class="swatch line import"></span>Import</div>';
+		if (!network) html += '<div class="row"><span class="swatch line root"></span>Root</div>';
+		else html += '<div class="row"><span class="swatch line composition"></span>Composition</div>';
 	legend.innerHTML = html;
 	legend.style.display = 'block';
 }
@@ -987,6 +1017,7 @@ function render(full) {
 
 function onSnapshotMessage(payload) {
 	const prevScan = snapshot && snapshot.scannedAt;
+	const prevLayoutRevision = snapshot && snapshot.layoutRevision;
 	const prevLayout = snapshot && snapshot.layoutMode;
 	const prevNetLayout = snapshot && snapshot.networkLayoutMode;
 	const prevType = snapshot && snapshot.graphType;
@@ -1000,14 +1031,15 @@ function onSnapshotMessage(payload) {
 	// Host clears with null; must apply even when falsy (old !== undefined missed undefined clears).
 	if (payload && 'selectedNodeId' in payload) selectedNodeId = payload.selectedNodeId || null;
 	idleToggle.checked = !!settings.networkIdleAutoRotate;
-	if (!settings.networkIdleAutoRotate || settings.reduceMotion) idlePaused = true;
-	else if (isNetwork()) scheduleIdleResume();
+	if (!canIdleRotate()) idlePaused = true;
+	else scheduleIdleResume();
 
 	const nextScan = snapshot && snapshot.scannedAt;
+	const nextLayoutRevision = snapshot && snapshot.layoutRevision;
 	const nextLayout = snapshot && snapshot.layoutMode;
 	const nextNetLayout = snapshot && snapshot.networkLayoutMode;
 	const nextType = snapshot && snapshot.graphType;
-	const layoutChanged = prevScan !== nextScan || prevLayout !== nextLayout || prevNetLayout !== nextNetLayout || prevType !== nextType || !prevScan;
+	const layoutChanged = prevScan !== nextScan || prevLayoutRevision !== nextLayoutRevision || prevLayout !== nextLayout || prevNetLayout !== nextNetLayout || prevType !== nextType || !prevScan;
 	const renderBudgetChanged = prevMaxNodes !== settings.maxRenderedNodes || prevMaxEdges !== settings.maxRenderedEdges;
 	// Selection / diagnostics-only pushes must not rebuild Architecture DOM (no relayout on select).
 	if (!layoutChanged && !renderBudgetChanged && snapshot && (snapshot.nodes || []).length) {
@@ -1265,7 +1297,7 @@ function rafLoop(ts) {
 	rafScheduled = false;
 	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
 	lastRafTs = ts;
-	const animating = isNetwork() && settings.networkIdleAutoRotate && !settings.reduceMotion && !idlePaused && !dragging && !document.hidden && snapshot;
+	const animating = canIdleRotate() && !idlePaused;
 	if (animating) {
 		rotation.yaw += IDLE_YAW * dt;
 		dirty = true;

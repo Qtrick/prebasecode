@@ -170,6 +170,9 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 		host.on(autoRotate, 'change', () => void host.set(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, autoRotate.checked));
 		host.row(card, localize('prebase.settings.autoRotate', "Auto-rotate when idle"), localize('prebase.settings.autoRotateHint', "Slowly rotates the network graph when you are not interacting."), autoRotate);
 
+		advRange(host, card, localize('prebase.settings.nodeSpacing', "Node spacing"), localize('prebase.settings.nodeSpacingHint', "Minimum 3D separation radius; nodes stay approximately twice this distance apart."), PreBaseGraphConfigKeys.GraphNetworkCollisionRadius, 24, 2, 120, 2, true);
+		advRange(host, card, localize('prebase.settings.linkDistance', "Preferred link length"), localize('prebase.settings.linkDistanceHint', "Target center-to-center length for bounded network link springs."), PreBaseGraphConfigKeys.GraphNetworkLinkDistance, 80, 4, 600, 4, true);
+		advRange(host, card, localize('prebase.settings.linkStrength', "Link spring strength"), localize('prebase.settings.linkStrengthHint', "Scales the bounded link-length correction without changing the selected layout semantics."), PreBaseGraphConfigKeys.GraphNetworkForceStrength, 0.35, 0, 2, 0.05, true);
 		advRange(host, card, localize('prebase.settings.physics', "Physics strength"), localize('prebase.settings.physicsHint', "Reserved — not applied yet (layout uses network force/link distance)."), PreBaseGraphConfigKeys.GraphNetworkPhysicsStrength, 1, 0.5, 2, 0.05, true);
 		advRange(host, card, localize('prebase.settings.edgeOpacity', "Edge opacity"), localize('prebase.settings.edgeOpacityHint', "Reserved — not applied by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity, 0.55, 0.2, 0.9, 0.05, true);
 

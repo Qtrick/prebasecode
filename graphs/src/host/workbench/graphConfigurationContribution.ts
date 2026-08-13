@@ -93,12 +93,16 @@ export function registerPreBaseGraphConfiguration(): void {
 			[PreBaseGraphConfigKeys.GraphNetworkForceStrength]: {
 				type: 'number',
 				default: 0.35,
-				description: localize('prebase.graph.networkForceStrength', "Force strength for network layout."),
+				minimum: 0,
+				maximum: 2,
+				description: localize('prebase.graph.networkForceStrength', "Strength of bounded link springs in Network Graph layouts."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkLinkDistance]: {
 				type: 'number',
 				default: 80,
-				description: localize('prebase.graph.networkLinkDistance', "Preferred link distance for network layout."),
+				minimum: 4,
+				maximum: 600,
+				description: localize('prebase.graph.networkLinkDistance', "Preferred center-to-center link length in Network Graph layouts."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkCharge]: {
 				type: 'number',
@@ -108,12 +112,14 @@ export function registerPreBaseGraphConfiguration(): void {
 			[PreBaseGraphConfigKeys.GraphNetworkCollisionRadius]: {
 				type: 'number',
 				default: 24,
-				description: localize('prebase.graph.networkCollisionRadius', "Collision radius for network layout. Reserved — not applied by the current layout engine."),
+				minimum: 2,
+				maximum: 120,
+				description: localize('prebase.graph.networkCollisionRadius', "Node spacing radius for Network Graph layouts. Nodes keep approximately twice this center-to-center distance."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkAlphaDecay]: {
 				type: 'number',
 				default: 0.02,
-				description: localize('prebase.graph.networkAlphaDecay', "Alpha decay for network layout simulation. Reserved — changing it retriggers layout but the value is not consumed yet."),
+				description: localize('prebase.graph.networkAlphaDecay', "Alpha decay for network layout simulation. Reserved — not applied by the current layout engine."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate]: {
 				type: 'boolean',
@@ -175,7 +181,7 @@ export function registerPreBaseGraphConfiguration(): void {
 					localize('prebase.graph.networkLayoutMode.sphere', "Even Fibonacci sphere shell."),
 					localize('prebase.graph.networkLayoutMode.constellation', "Connected files pull closer in 3D."),
 					localize('prebase.graph.networkLayoutMode.clustered', "Clusters by file type."),
-					localize('prebase.graph.networkLayoutMode.radial', "Important files nearer the center."),
+					localize('prebase.graph.networkLayoutMode.radial', "Entry-centered 3D layers by graph distance."),
 				],
 				default: 'organic',
 				description: localize('prebase.graph.networkLayoutMode', "Layout algorithm for the Network Graph."),

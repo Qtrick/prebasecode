@@ -59,6 +59,8 @@ export interface GraphSnapshot {
 	/** Canonical 3D base positions for Network Graph (never overwrite with projected coords). */
 	positions3d?: Record<string, LayoutPosition3D>
 	networkLayoutMode?: string
+	/** Advances whenever graph positions are recomputed without rescanning source files. */
+	layoutRevision?: number
 	projectPath: string
 	projectName: string
 	entryNodeId: string | null

@@ -50,6 +50,18 @@ suite('PreBase networkLayout', () => {
 		return { cx, cy, cz, vars, minNN };
 	}
 
+	function radius(position: Point3D): number {
+		return Math.hypot(position.x, position.y, position.z);
+	}
+
+	function totalLinkLength(layout: Map<string, Point3D>, links: Array<{ source: string; target: string }>): number {
+		return links.reduce((total, link) => total + Math.hypot(
+			layout.get(link.source)!.x - layout.get(link.target)!.x,
+			layout.get(link.source)!.y - layout.get(link.target)!.y,
+			layout.get(link.source)!.z - layout.get(link.target)!.z,
+		), 0);
+	}
+
 	test('sphere radius scales with node count and spread', () => {
 		assert.ok(computeNetworkSphereRadius(10, 1) < computeNetworkSphereRadius(400, 1));
 		assert.ok(computeNetworkSphereRadius(100, 2) > computeNetworkSphereRadius(100, 1));
@@ -68,7 +80,9 @@ suite('PreBase networkLayout', () => {
 				assert.deepStrictEqual(p1, p2);
 			}
 			const m = metrics(a);
-			assert.ok(Math.hypot(m.cx, m.cy, m.cz) < 1e-6);
+			if (mode !== 'radial') {
+				assert.ok(Math.hypot(m.cx, m.cy, m.cz) < 1e-6);
+			}
 			// Every active layout must preserve meaningful depth; Organic is force-solved in XYZ.
 			assert.ok(m.vars[0] > 1);
 			assert.ok(m.vars[1] > 1);
@@ -121,5 +135,70 @@ suite('PreBase networkLayout', () => {
 				assert.ok(Number.isFinite(position.x) && Number.isFinite(position.y) && Number.isFinite(position.z), `${mode}:${node.id}`);
 			}
 		}
+	});
+
+	test('radial pins the entry root and orders undirected BFS shells, unlike the even sphere shell', () => {
+		const nodes = [
+			{ id: 'entry', fileTypeId: 'typescript', val: 1, isEntry: true },
+			{ id: 'near-a', fileTypeId: 'typescript', val: 20, isEntry: false },
+			{ id: 'near-b', fileTypeId: 'typescript', val: 2, isEntry: false },
+			{ id: 'far-a', fileTypeId: 'typescript', val: 100, isEntry: false },
+			{ id: 'far-b', fileTypeId: 'typescript', val: 1, isEntry: false },
+		];
+		const links = [
+			{ source: 'entry', target: 'near-a' },
+			{ source: 'entry', target: 'near-b' },
+			{ source: 'near-a', target: 'far-a' },
+			{ source: 'near-b', target: 'far-b' },
+		];
+		const config = { sphereRadius: 240, collisionRadius: 16, linkDistance: 80, forceStrength: 0.35 };
+		const radial = layoutNetworkGraph('radial', nodes, links, config);
+		const sphere = layoutNetworkGraph('sphere', nodes, links, config);
+
+		assert.deepStrictEqual(radial.get('entry'), { x: 0, y: 0, z: 0 });
+		const nearRadius = Math.max(radius(radial.get('near-a')!), radius(radial.get('near-b')!));
+		const farRadius = Math.min(radius(radial.get('far-a')!), radius(radial.get('far-b')!));
+		assert.ok(nearRadius < farRadius, `BFS depth one (${nearRadius}) must precede depth two (${farRadius})`);
+		assert.ok(radius(sphere.get('entry')!) > 1, 'sphere must not adopt radial root-at-origin semantics');
+		assert.ok(Math.abs(radius(sphere.get('near-a')!) - radius(sphere.get('far-a')!)) < farRadius - nearRadius, 'sphere remains a tighter shell than BFS radial layers');
+	});
+
+	test('radial keeps disconnected components distinct on a bounded outer shell', () => {
+		const nodes = [
+			{ id: 'entry', isEntry: true },
+			{ id: 'main-leaf' },
+			{ id: 'a-root', val: 10 },
+			{ id: 'a-1' },
+			{ id: 'a-2' },
+			{ id: 'a-3' },
+			{ id: 'b-root', val: 1 },
+		];
+		const links = [
+			{ source: 'entry', target: 'main-leaf' },
+			{ source: 'a-root', target: 'a-1' },
+			{ source: 'a-1', target: 'a-2' },
+			{ source: 'a-2', target: 'a-3' },
+		];
+		const layout = layoutNetworkGraph('radial', nodes, links, { sphereRadius: 240, collisionRadius: 2, linkDistance: 50, forceStrength: 0 });
+		const mainRadius = radius(layout.get('main-leaf')!);
+		const aRoot = layout.get('a-root')!;
+		const bRoot = layout.get('b-root')!;
+		assert.ok(Math.min(radius(aRoot), radius(bRoot)) > mainRadius, 'disconnected components must remain outside the entry component');
+		assert.ok(Math.hypot(aRoot.x - bRoot.x, aRoot.y - bRoot.y, aRoot.z - bRoot.z) >= 4, 'disconnected component roots must not overlap');
+	});
+
+	test('network runtime collision, link-distance, and force controls materially change geometry without dropping nodes', () => {
+		const nodes = Array.from({ length: 12 }, (_, index) => ({ id: `n${index}`, fileTypeId: 'typescript', val: 1, isEntry: index === 0 }));
+		const links = nodes.slice(1).map(node => ({ source: 'n0', target: node.id }));
+		const closeRadial = layoutNetworkGraph('radial', nodes, links, { sphereRadius: 240, collisionRadius: 8, linkDistance: 24, forceStrength: 0 });
+		const spacedRadial = layoutNetworkGraph('radial', nodes, links, { sphereRadius: 240, collisionRadius: 40, linkDistance: 136, forceStrength: 0 });
+		assert.strictEqual(closeRadial.size, nodes.length);
+		assert.strictEqual(spacedRadial.size, nodes.length);
+		assert.ok(metrics(spacedRadial).minNN > metrics(closeRadial).minNN * 2, 'collision radius and link distance must expand radial spacing');
+		assert.ok(metrics(spacedRadial).minNN >= 79.9, 'radial collision pass must preserve approximately twice the configured radius');
+
+		const noForce = layoutNetworkGraph('constellation', nodes, links, { sphereRadius: 240, collisionRadius: 16, linkDistance: 24, forceStrength: 0 });
+		const strongForce = layoutNetworkGraph('constellation', nodes, links, { sphereRadius: 240, collisionRadius: 16, linkDistance: 24, forceStrength: 2 });
+		assert.ok(Math.abs(totalLinkLength(noForce, links) - totalLinkLength(strongForce, links)) > 1, 'force strength must affect link relaxation geometry');
 	});
 });

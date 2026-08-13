@@ -2,17 +2,18 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import type { NetworkLayoutLink, NetworkLayoutNode, Point3D } from './types.js'
-import { centerPositions, fibonacciShell, relaxLinks } from './networkNormalization.js'
+import type { NetworkLayoutLink, NetworkLayoutNode, NetworkLayoutRuntimeConfig, Point3D } from './types.js';
+import { centerPositions, fibonacciShell, minimumShellRadius, relaxLinksTowardDistance } from './networkNormalization.js';
 
 /** Tight geometric shell — minimal relaxation preserves the sphere silhouette. */
 export function layoutSphere(
 	nodes: NetworkLayoutNode[],
 	links: NetworkLayoutLink[],
-	sphereRadius: number
+	config: NetworkLayoutRuntimeConfig
 ): Map<string, Point3D> {
-	const positions = fibonacciShell(nodes, sphereRadius, () => 0.58)
-	relaxLinks(positions, links, sphereRadius * 0.94, 2, 0.008)
-	centerPositions(positions)
-	return positions
+	const shellRadius = Math.max(config.sphereRadius * 0.58, minimumShellRadius(nodes.length, config.collisionRadius * 2));
+	const positions = fibonacciShell(nodes, shellRadius, () => 1);
+	relaxLinksTowardDistance(positions, links, config.linkDistance, 2, config.forceStrength * 0.012);
+	centerPositions(positions);
+	return positions;
 }

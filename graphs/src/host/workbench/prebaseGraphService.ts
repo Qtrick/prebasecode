@@ -22,6 +22,7 @@ import { extractImportsForFile, extractPackageName } from '../../core/parsing/im
 import {
 	computeNetworkSphereRadius,
 	layoutNetworkGraph,
+	type NetworkLayoutRuntimeConfig,
 	type NetworkLayoutMode,
 } from '../../layouts/network/index.js';
 import { getFileTypeInfo } from '../../common/constants/fileTypeColors.js';
@@ -128,6 +129,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	private _rawSnapshot: GraphSnapshot | undefined;
 	private _scanCts: CancellationTokenSource | undefined;
 	private _relayoutGeneration = 0;
+	private _layoutRevision = 0;
 	private _selectedNodeId: string | undefined;
 	private _viewState: PreBaseGraphViewState;
 	private _diagnostics: PreBaseGraphDiagnostics = {
@@ -165,7 +167,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			} else if (
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkForceStrength) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) ||
-				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkAlphaDecay) ||
+				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkCollisionRadius) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkSpreadScale)
 			) {
@@ -502,6 +504,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				positions,
 				positions3d,
 				networkLayoutMode,
+				layoutRevision: ++this._layoutRevision,
 				entryNodeId,
 				scannedAt: Date.now()
 			};
@@ -550,6 +553,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			positions: computed.positions2d,
 			positions3d: computed.positions3d,
 			networkLayoutMode,
+			layoutRevision: ++this._layoutRevision,
 		};
 		await timeout(0);
 		if (!this._isCurrentRelayout(generation, rawSnapshot)) {
@@ -747,7 +751,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			.map(e => ({ source: e.source, target: e.target }));
 		const spread = Math.max(0.4, Math.min(2.5, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkSpreadScale) || 1));
 		const radius = computeNetworkSphereRadius(layoutNodes.length, spread);
-		const layout = layoutNetworkGraph(mode, layoutNodes, links, radius);
+		const layout = layoutNetworkGraph(mode, layoutNodes, links, this._getNetworkLayoutConfig(radius));
 		const positions2d: GraphSnapshot['positions'] = {};
 		const positions3d: NonNullable<GraphSnapshot['positions3d']> = {};
 		for (const [id, p] of layout) {
@@ -758,6 +762,15 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			positions2d[id] = { x: p.x - 14, y: p.y - 14 };
 		}
 		return { positions2d, positions3d };
+	}
+
+	private _getNetworkLayoutConfig(sphereRadius: number): NetworkLayoutRuntimeConfig {
+		return {
+			sphereRadius,
+			collisionRadius: Math.max(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkCollisionRadius) || 24),
+			linkDistance: Math.max(4, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) || 80),
+			forceStrength: Math.max(0, Math.min(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkForceStrength) ?? 0.35)),
+		};
 	}
 
 	private async _collectFiles(root: URI, token: CancellationToken, maxFiles: number): Promise<Array<ScannedFile & { resource: URI }>> {

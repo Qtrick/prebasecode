@@ -28,16 +28,16 @@ function makeGraph(n) {
 }
 
 const modes = ['organic', 'sphere', 'constellation', 'clustered', 'radial'];
-const sizes = [100, 500];
-const iterations = 5;
+const sizes = [100, 280, 500, 1000, 2000];
 
 console.log('network layout micro-benchmark (ms per run, median of iterations)');
-console.log(`node ${process.version}; iterations=${iterations}`);
+console.log(`node ${process.version}; 5 samples through 500 nodes, 3 samples above`);
 console.log('');
 
 for (const n of sizes) {
 	const { nodes, links } = makeGraph(n);
 	const radius = computeNetworkSphereRadius(n, 1);
+	const iterations = n > 500 ? 3 : 5;
 	console.log(`--- ${n} nodes ---`);
 	for (const mode of modes) {
 		const samples = [];

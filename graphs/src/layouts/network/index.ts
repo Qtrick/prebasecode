@@ -6,45 +6,64 @@ export type {
 	NetworkLayoutLink,
 	NetworkLayoutMode,
 	NetworkLayoutNode,
+	NetworkLayoutRuntimeConfig,
 	Point3D,
-} from './types.js'
+} from './types.js';
 
-import type { NetworkLayoutLink, NetworkLayoutMode, NetworkLayoutNode, Point3D } from './types.js'
-import { layoutClustered } from './clusteredLayout.js'
-import { layoutConstellation } from './constellationLayout.js'
-import { layoutOrganic } from './organicLayout.js'
-import { layoutRadial } from './radialLayout.js'
-import { layoutSphere } from './sphereLayout.js'
+import type { NetworkLayoutLink, NetworkLayoutMode, NetworkLayoutNode, NetworkLayoutRuntimeConfig, Point3D } from './types.js';
+import { layoutClustered } from './clusteredLayout.js';
+import { layoutConstellation } from './constellationLayout.js';
+import { layoutOrganic } from './organicLayout.js';
+import { layoutRadial } from './radialLayout.js';
+import { layoutSphere } from './sphereLayout.js';
 
 export function computeNetworkSphereRadius(nodeCount: number, spreadScale: number): number {
 	return Math.max(220, Math.min(420, Math.sqrt(Math.max(1, nodeCount)) * 26)) * spreadScale;
+}
+
+export const DEFAULT_NETWORK_LAYOUT_CONFIG: NetworkLayoutRuntimeConfig = {
+	sphereRadius: 240,
+	collisionRadius: 24,
+	linkDistance: 80,
+	forceStrength: 0.35,
+};
+
+function normalizeNetworkLayoutConfig(configOrRadius: NetworkLayoutRuntimeConfig | number | undefined): NetworkLayoutRuntimeConfig {
+	const supplied: Partial<NetworkLayoutRuntimeConfig> | undefined = typeof configOrRadius === 'number' ? { sphereRadius: configOrRadius } : configOrRadius;
+	return {
+		sphereRadius: Math.max(40, supplied?.sphereRadius ?? DEFAULT_NETWORK_LAYOUT_CONFIG.sphereRadius),
+		collisionRadius: Math.max(2, supplied?.collisionRadius ?? DEFAULT_NETWORK_LAYOUT_CONFIG.collisionRadius),
+		linkDistance: Math.max(4, supplied?.linkDistance ?? DEFAULT_NETWORK_LAYOUT_CONFIG.linkDistance),
+		forceStrength: Math.max(0, Math.min(2, supplied?.forceStrength ?? DEFAULT_NETWORK_LAYOUT_CONFIG.forceStrength)),
+	};
 }
 
 export function layoutNetworkGraph(
 	mode: NetworkLayoutMode,
 	nodes: NetworkLayoutNode[],
 	links: NetworkLayoutLink[],
-	sphereRadius = 240
+	configOrRadius: NetworkLayoutRuntimeConfig | number = DEFAULT_NETWORK_LAYOUT_CONFIG
 ): Map<string, Point3D> {
+	const config = normalizeNetworkLayoutConfig(configOrRadius);
 	switch (mode) {
 		case 'sphere':
-			return layoutSphere(nodes, links, sphereRadius)
+			return layoutSphere(nodes, links, config);
 		case 'constellation':
-			return layoutConstellation(nodes, links, sphereRadius)
+			return layoutConstellation(nodes, links, config);
 		case 'clustered':
-			return layoutClustered(nodes, links, sphereRadius)
+			return layoutClustered(nodes, links, config);
 		case 'radial':
-			return layoutRadial(nodes, links, sphereRadius)
+			return layoutRadial(nodes, links, config);
 		case 'organic':
 		default:
-			return layoutOrganic(nodes, links, sphereRadius)
+			return layoutOrganic(nodes, links, config);
 	}
 }
 
 export const NETWORK_LAYOUT_OPTIONS: {
-	id: NetworkLayoutMode
-	label: string
-	blurb: string
+	id: NetworkLayoutMode;
+	label: string;
+	blurb: string;
 }[] = [
 	{
 		id: 'organic',
@@ -69,6 +88,6 @@ export const NETWORK_LAYOUT_OPTIONS: {
 	{
 		id: 'radial',
 		label: 'Radial',
-		blurb: 'Important files near center, others outward.'
+		blurb: 'Graph-distance layers radiate from an entry or central file.'
 	}
-]
+];
