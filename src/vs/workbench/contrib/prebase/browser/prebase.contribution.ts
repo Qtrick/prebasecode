@@ -29,6 +29,7 @@ import { PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL } from '../co
 import type { PreBaseViewportPreset } from '../common/runtime/viewportPresets.js';
 import { IPreBaseRuntimeService, PreBaseRuntimeService } from './prebaseRuntimeService.js';
 import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
+import { stopDesktopSessionForMagnus } from '../common/runtime/desktopStopForMagnus.js';
 import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IPreBaseCloudService, PreBaseCloudService } from './cloud/prebaseCloudService.js';
@@ -952,16 +953,12 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({ id: 'prebase.runtime.desktopStopForMagnus', title: localize2('prebase.runtime.desktopStopForMagnus', "Stop Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
-	async run(accessor: ServicesAccessor, _sessionId?: string, force?: boolean) {
+	async run(accessor: ServicesAccessor, _sessionId?: string) {
 		const desktop = getDesktopRuntimeService(accessor);
 		if (!desktop) {
 			return { ok: false, reason: 'Desktop runtime unavailable.' };
 		}
-		if (force) {
-			await desktop.stop();
-		} else {
-			await desktop.kill();
-		}
+		await stopDesktopSessionForMagnus(desktop);
 		return { ok: true };
 	}
 });

@@ -26,8 +26,7 @@ import {
 } from '../../layouts/network/index.js';
 import { getFileTypeInfo } from '../../common/constants/fileTypeColors.js';
 import {
-	assignLayersToNodes,
-	computeNodeImportance
+	assignLayersToNodes
 } from '../../core/analysis/architectureLayers.js';
 import { isGraphRelevantFile } from '../../core/scanning/projectFiles.js';
 import { basename, normalizePath } from '../../core/resolution/paths.js';
@@ -58,6 +57,20 @@ export interface PreBaseGraphDiagnostics {
 	status: 'idle' | 'scanning' | 'ready' | 'error' | 'cancelled';
 	message?: string;
 }
+
+interface NodeImportance {
+	inDegree: number;
+	outDegree: number;
+	score: number;
+}
+
+interface AdjacentGraphEdge {
+	edge: GraphEdge;
+	isOutgoing: boolean;
+	isIncoming: boolean;
+}
+
+const EmptyNodeImportance: NodeImportance = { inDegree: 0, outDegree: 0, score: 0 };
 
 export const IPreBaseGraphService = createDecorator<IPreBaseGraphService>('prebaseGraphService');
 
@@ -114,6 +127,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	private _snapshot: PreBaseEnrichedSnapshot | undefined;
 	private _rawSnapshot: GraphSnapshot | undefined;
 	private _scanCts: CancellationTokenSource | undefined;
+	private _relayoutGeneration = 0;
 	private _selectedNodeId: string | undefined;
 	private _viewState: PreBaseGraphViewState;
 	private _diagnostics: PreBaseGraphDiagnostics = {
@@ -269,29 +283,33 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const visited = new Set<string>([root.id]);
 		const queue: Array<{ id: string; depth: number }> = [{ id: root.id, depth: 0 }];
 		const relationships: Array<{ from: string; to: string; kind: string }> = [];
-		while (queue.length && visited.size <= maximum) {
-			const current = queue.shift()!;
+		const adjacentEdges = new Map<string, AdjacentGraphEdge[]>();
+		const nodeById = new Map(snapshot.nodes.map(node => [node.id, node]));
+		for (const edge of snapshot.edges) {
+			this._addAdjacentEdge(adjacentEdges, edge.source, {
+				edge,
+				isOutgoing: true,
+				isIncoming: edge.source === edge.target,
+			});
+			if (edge.source !== edge.target) {
+				this._addAdjacentEdge(adjacentEdges, edge.target, { edge, isOutgoing: false, isIncoming: true });
+			}
+		}
+
+		for (let queueIndex = 0; queueIndex < queue.length && visited.size <= maximum; queueIndex++) {
+			const current = queue[queueIndex];
 			if (current.depth >= boundedDepth) {
 				continue;
 			}
-			for (const edge of snapshot.edges) {
-				const forward = edge.source === current.id;
-				const backward = edge.target === current.id;
-				if (!((boundedDirection !== 'incoming' && forward) || (boundedDirection !== 'outgoing' && backward))) {
-					continue;
-				}
-				const next = forward ? edge.target : edge.source;
-				relationships.push({ from: current.id, to: next, kind: edge.kind });
-				if (!visited.has(next) && visited.size < maximum) {
-					visited.add(next);
-					queue.push({ id: next, depth: current.depth + 1 });
-				}
-			}
+			this._visitDependencies(adjacentEdges.get(current.id), current, boundedDirection, visited, queue, relationships, maximum);
 		}
 		return JSON.stringify({
 			graph: this._freshness(),
 			root: root.id,
-			nodes: [...visited].map(id => snapshot.nodes.find(node => node.id === id)).filter(Boolean),
+			nodes: [...visited].flatMap(id => {
+				const node = nodeById.get(id);
+				return node ? [node] : [];
+			}),
 			relationships: relationships.slice(0, maximum * 3),
 		});
 	}
@@ -399,6 +417,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async scanWorkspace(token?: CancellationToken): Promise<PreBaseEnrichedSnapshot | undefined> {
+		this._relayoutGeneration++;
 		// Cancel any in-flight scan without marking the UI cancelled (a newer scan is starting).
 		if (this._scanCts) {
 			this._scanCts.cancel();
@@ -464,10 +483,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			});
 			await timeout(0);
 
-			let positions: GraphSnapshot['positions'];
 			const networkLayoutMode = this._getNetworkLayoutMode();
 			const computed = this._computeNetworkPositions(layoutNodes, layoutEdges, networkLayoutMode);
-			positions = computed.positions2d;
+			const positions = computed.positions2d;
 			const positions3d = computed.positions3d;
 			await timeout(0);
 
@@ -512,24 +530,33 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async relayout(): Promise<PreBaseEnrichedSnapshot | undefined> {
-		if (!this._rawSnapshot) {
+		const rawSnapshot = this._rawSnapshot;
+		if (!rawSnapshot) {
 			return this.scanWorkspace();
 		}
+		const generation = ++this._relayoutGeneration;
 		this._setDiagnostics({
 			status: 'scanning',
 			message: localize('prebase.graph.relayout', "Updating layout…")
 		});
 		await timeout(0);
+		if (!this._isCurrentRelayout(generation, rawSnapshot)) {
+			return undefined;
+		}
 		const networkLayoutMode = this._getNetworkLayoutMode();
-		const computed = this._computeNetworkPositions(this._rawSnapshot.nodes, this._rawSnapshot.edges, networkLayoutMode);
-		this._rawSnapshot = {
-			...this._rawSnapshot,
+		const computed = this._computeNetworkPositions(rawSnapshot.nodes, rawSnapshot.edges, networkLayoutMode);
+		const updatedSnapshot: GraphSnapshot = {
+			...rawSnapshot,
 			positions: computed.positions2d,
 			positions3d: computed.positions3d,
 			networkLayoutMode,
 		};
 		await timeout(0);
-		const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
+		if (!this._isCurrentRelayout(generation, rawSnapshot)) {
+			return undefined;
+		}
+		this._rawSnapshot = updatedSnapshot;
+		const enriched = this._enrich(updatedSnapshot, this._diagnostics.fileCount);
 		this._snapshot = enriched;
 		this._onDidChangeSnapshot.fire(enriched);
 		this._setDiagnostics(enriched.diagnostics);
@@ -569,14 +596,15 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		nodes: GraphNode[],
 		edges: GraphEdge[],
 		entryNodeId: string | null,
-		maxNodes: number
+		maxNodes: number,
+		importanceByNode = this._importanceByNode(edges)
 	): GraphNode[] {
 		const fileNodes = nodes.filter(n => n.kind !== 'folder');
 		if (fileNodes.length <= maxNodes) {
 			return fileNodes;
 		}
 		const scored = fileNodes.map(n => {
-			const imp = computeNodeImportance(n.id, edges);
+			const imp = importanceByNode.get(n.id) ?? EmptyNodeImportance;
 			const entryBoost = entryNodeId && (n.id === entryNodeId || n.isEntry) ? 1_000_000 : 0;
 			return { n, score: imp.score + entryBoost };
 		});
@@ -593,6 +621,10 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private _isActiveScan(cts: CancellationTokenSource): boolean {
 		return this._scanCts === cts;
+	}
+
+	private _isCurrentRelayout(generation: number, rawSnapshot: GraphSnapshot): boolean {
+		return this._relayoutGeneration === generation && this._rawSnapshot === rawSnapshot && !this._scanCts;
 	}
 
 	private _markCancelledIfActive(cts: CancellationTokenSource): void {
@@ -622,6 +654,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const maxNodes = limits.maxNodes;
 		const maxEdges = limits.maxEdges;
 		const hideLow = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphHideLowImportance) === true;
+		const importanceByNode = hideLow || layoutNodes.length > maxNodes ? this._importanceByNode(layoutEdges) : undefined;
 
 		let nodes = layoutNodes;
 		if (hideLow && snapshot.entryNodeId) {
@@ -629,12 +662,12 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				if (n.id === snapshot.entryNodeId || n.isEntry) {
 					return true;
 				}
-				const imp = computeNodeImportance(n.id, layoutEdges);
+				const imp = importanceByNode?.get(n.id) ?? EmptyNodeImportance;
 				return imp.score >= 1;
 			});
 		}
 		if (nodes.length > maxNodes) {
-			nodes = this._pickLayoutNodes(nodes, layoutEdges, snapshot.entryNodeId, maxNodes);
+			nodes = this._pickLayoutNodes(nodes, layoutEdges, snapshot.entryNodeId, maxNodes, importanceByNode);
 		}
 		const nodeIds = new Set(nodes.map(n => n.id));
 		const edges = snapshot.edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target)).slice(0, maxEdges);
@@ -694,11 +727,12 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		edges: GraphEdge[],
 		mode: NetworkLayoutMode
 	): { positions2d: GraphSnapshot['positions']; positions3d: NonNullable<GraphSnapshot['positions3d']> } {
+		const importanceByNode = this._importanceByNode(edges);
 		const layoutNodes = nodes
 			.filter(n => n.kind !== 'folder' && n.kind !== 'function')
 			.map(n => {
 				const ft = getFileTypeInfo(n.path);
-				const imp = computeNodeImportance(n.id, edges);
+				const imp = importanceByNode.get(n.id) ?? EmptyNodeImportance;
 				const degree = imp.inDegree + imp.outDegree;
 				return {
 					id: n.id,
@@ -732,11 +766,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const queue: URI[] = [root];
 		let visited = 0;
 
-		while (queue.length && files.length < maxFiles) {
+		for (let queueIndex = 0; queueIndex < queue.length && files.length < maxFiles; queueIndex++) {
 			if (token.isCancellationRequested) {
 				break;
 			}
-			const current = queue.shift()!;
+			const current = queue[queueIndex];
 			visited++;
 			if (visited % 12 === 0) {
 				this._setDiagnostics({
@@ -785,11 +819,12 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private async _parseFiles(files: Array<ScannedFile & { resource: URI }>, token: CancellationToken): Promise<ParseResult[]> {
 		const results: ParseResult[] = [];
-		for (let i = 0; i < files.length; i++) {
+		const batchSize = 8;
+		for (let i = 0; i < files.length; i += batchSize) {
 			if (token.isCancellationRequested) {
 				break;
 			}
-			if (i > 0 && i % 8 === 0) {
+			if (i > 0) {
 				this._setDiagnostics({
 					fileCount: files.length,
 					status: 'scanning',
@@ -797,37 +832,97 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				});
 				await timeout(0);
 			}
-			const file = files[i];
-			try {
-				const content = (await this.fileService.readFile(file.resource)).value.toString();
-				if (content.length > 200_000) {
-					continue;
+			const parsed = await Promise.all(files.slice(i, i + batchSize).map(file => this._parseFile(file)));
+			for (const result of parsed) {
+				if (result) {
+					results.push(result);
 				}
-				const imports = extractImportsForFile(file, content);
-				const packageName = extractPackageName(file, content);
-				const exports: ParseResult['exports'] = [];
-				const exportRe = /export\s+(?:default\s+)?(?:async\s+)?(?:function|class|const|let|var)\s+([A-Za-z0-9_]+)/g;
-				let m: RegExpExecArray | null;
-				let exportCount = 0;
-				while ((m = exportRe.exec(content)) !== null && exportCount < 40) {
-					exports.push({ name: m[1] });
-					exportCount++;
-				}
-				results.push({
-					filePath: file.absolutePath,
-					relativePath: file.relativePath,
-					imports,
-					exports,
-					functions: [],
-					components: [],
-					isComponentFile: file.extension === '.tsx' || file.extension === '.jsx',
-					packageName
-				});
-			} catch {
-				// skip unreadable files
 			}
 		}
 		return results;
+	}
+
+	private async _parseFile(file: ScannedFile & { resource: URI }): Promise<ParseResult | undefined> {
+		try {
+			const content = (await this.fileService.readFile(file.resource)).value.toString();
+			if (content.length > 200_000) {
+				return undefined;
+			}
+			const imports = extractImportsForFile(file, content);
+			const packageName = extractPackageName(file, content);
+			const exports: ParseResult['exports'] = [];
+			const exportRe = /export\s+(?:default\s+)?(?:async\s+)?(?:function|class|const|let|var)\s+([A-Za-z0-9_]+)/g;
+			let match: RegExpExecArray | null;
+			while ((match = exportRe.exec(content)) !== null && exports.length < 40) {
+				exports.push({ name: match[1] });
+			}
+			return {
+				filePath: file.absolutePath,
+				relativePath: file.relativePath,
+				imports,
+				exports,
+				functions: [],
+				components: [],
+				isComponentFile: file.extension === '.tsx' || file.extension === '.jsx',
+				packageName
+			};
+		} catch {
+			// Skip unreadable files.
+			return undefined;
+		}
+	}
+
+	private _importanceByNode(edges: readonly GraphEdge[]): Map<string, NodeImportance> {
+		const importanceByNode = new Map<string, NodeImportance>();
+		for (const edge of edges) {
+			if (edge.kind !== 'import') {
+				continue;
+			}
+			const source = importanceByNode.get(edge.source) ?? { inDegree: 0, outDegree: 0, score: 0 };
+			source.outDegree++;
+			importanceByNode.set(edge.source, source);
+			const target = importanceByNode.get(edge.target) ?? { inDegree: 0, outDegree: 0, score: 0 };
+			target.inDegree++;
+			importanceByNode.set(edge.target, target);
+		}
+		for (const importance of importanceByNode.values()) {
+			importance.score = importance.inDegree * 1.2 + importance.outDegree * 0.8;
+		}
+		return importanceByNode;
+	}
+
+	private _addAdjacentEdge(index: Map<string, AdjacentGraphEdge[]>, nodeId: string, edge: AdjacentGraphEdge): void {
+		const adjacent = index.get(nodeId);
+		if (adjacent) {
+			adjacent.push(edge);
+		} else {
+			index.set(nodeId, [edge]);
+		}
+	}
+
+	private _visitDependencies(
+		edges: readonly AdjacentGraphEdge[] | undefined,
+		current: { id: string; depth: number },
+		direction: 'incoming' | 'outgoing' | 'both',
+		visited: Set<string>,
+		queue: Array<{ id: string; depth: number }>,
+		relationships: Array<{ from: string; to: string; kind: string }>,
+		maximum: number
+	): void {
+		if (!edges) {
+			return;
+		}
+		for (const adjacent of edges) {
+			if ((direction === 'incoming' && !adjacent.isIncoming) || (direction === 'outgoing' && !adjacent.isOutgoing)) {
+				continue;
+			}
+			const next = adjacent.isOutgoing ? adjacent.edge.target : adjacent.edge.source;
+			relationships.push({ from: current.id, to: next, kind: adjacent.edge.kind });
+			if (!visited.has(next) && visited.size < maximum) {
+				visited.add(next);
+				queue.push({ id: next, depth: current.depth + 1 });
+			}
+		}
 	}
 
 	private async _readPackageMain(folder: URI): Promise<string | null> {

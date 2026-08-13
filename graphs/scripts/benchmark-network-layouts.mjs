@@ -2,7 +2,7 @@
 /**
  * Micro-benchmark for network layout algorithms (CPU only; not render FPS).
  * Usage (from repo root):
- *   node --experimental-strip-types --import=graphs/scripts/graphs-test-register.mjs graphs/scripts/benchmark-network-layouts.mjs
+ *   node --experimental-strip-types --import=./graphs/scripts/graphs-test-register.mjs graphs/scripts/benchmark-network-layouts.mjs
  */
 import { performance } from 'node:perf_hooks';
 import {

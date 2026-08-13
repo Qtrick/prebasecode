@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
@@ -57,12 +58,12 @@ class DesktopRestartTool implements vscode.LanguageModelTool<{ sessionId?: strin
 	}
 }
 
-class DesktopStopTool implements vscode.LanguageModelTool<{ sessionId?: string; force?: boolean }> {
-	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ sessionId?: string; force?: boolean }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+class DesktopStopTool implements vscode.LanguageModelTool<{ sessionId?: string }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ sessionId?: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-		return jsonResult(await vscode.commands.executeCommand('prebase.runtime.desktopStopForMagnus', options.input.sessionId, options.input.force === true));
+		return jsonResult(await vscode.commands.executeCommand('prebase.runtime.desktopStopForMagnus', options.input.sessionId));
 	}
 }
 

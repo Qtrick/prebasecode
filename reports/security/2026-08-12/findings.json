@@ -1,0 +1,30 @@
+[
+  {
+    "id": "SEC-001",
+    "severity": "Medium",
+    "cwe": "CWE-863",
+    "surface": "Magnus desktop-session termination tool",
+    "attackPreconditions": "A model can invoke the write-capability desktop stop tool while the user has confirmation enabled.",
+    "impact": "A model-controlled boolean could bypass the user's configured confirmation before stopping a PreBase-owned desktop app.",
+    "evidence": "desktopTools forwarded force=true; the command selected desktop.stop() rather than confirmation-aware desktop.kill().",
+    "rootCause": "A model-supplied flag was treated as authority to weaken a human-approval boundary.",
+    "remediation": "Removed force from the tool schema and invocation; the command delegates only to stopDesktopSessionForMagnus(), which calls kill().",
+    "test": "runtimeSafetyBoundaries.test.ts verifies the callable command boundary invokes kill even with a legacy force argument.",
+    "status": "Fixed",
+    "residualRisk": "Users may intentionally disable the confirmation setting; that remains an explicit local configuration decision."
+  },
+  {
+    "id": "SEC-002",
+    "severity": "Medium",
+    "cwe": "CWE-400",
+    "surface": "Runtime Preview console/network evidence",
+    "attackPreconditions": "A workspace process or preview supplies a sustained stream of diagnostic evidence.",
+    "impact": "Unbounded retained strings could consume renderer memory and enlarge agent context.",
+    "evidence": "Multiple session update paths appended evidence arrays without an entry or byte limit.",
+    "rootCause": "Evidence history had no retention policy.",
+    "remediation": "Bound retention to 200 entries, 4,000 characters per entry, and 64,000 total characters; reports droppedCount and truncated metadata.",
+    "test": "runtimeSafetyBoundaries.test.ts exercises count, character, per-entry, newest-tail, and drop behavior.",
+    "status": "Fixed",
+    "residualRisk": "Actual page/terminal capture sources need GUI lifecycle and sustained-load validation."
+  }
+]

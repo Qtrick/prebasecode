@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
@@ -14,8 +14,7 @@ import { ICommandService } from '../../../../platform/commands/common/commands.j
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
-import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
-import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
+import { createDecorator, IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { asTextOrError, IRequestService } from '../../../../platform/request/common/request.js';
@@ -24,11 +23,11 @@ import { IEditorService } from '../../../services/editor/common/editorService.js
 import { IOutputService } from '../../../services/output/common/output.js';
 import { ITerminalInstance, ITerminalService } from '../../terminal/browser/terminal.js';
 import { latestDevServerUrl } from '../common/runtime/devServerUrlParser.js';
+import { appendRuntimeEvidence } from '../common/runtime/evidenceBuffer.js';
 import { detectFramework } from '../common/runtime/frameworkDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
 import { buildNpmExternalLaunchRequest } from '../common/runtime/externalLaunchCommand.js';
-import type { ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
-import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
+import type { DesktopLaunchMode, ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
 import { classifyNavigateUrl, classifyTerminalCommand, validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
 import { detectDevScripts, selectDefaultScript } from '../common/runtime/scriptDetector.js';
 import { managedRendererDevCommand, scriptLaunchesElectronApp } from '../common/runtime/managedRendererCommand.js';
@@ -57,8 +56,10 @@ export interface PreBaseRuntimeSession {
 	consoleCapture: boolean;
 	networkCapture: boolean;
 	consoleEntries: string[];
+	consoleDroppedCount: number;
 	consoleErrorCount: number;
 	networkEntries: string[];
+	networkDroppedCount: number;
 	magnusAttached: boolean;
 	testSessionActive: boolean;
 	testSessionStartedAt: number | null;
@@ -230,8 +231,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			consoleCapture: this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeCaptureConsole) ?? true,
 			networkCapture: this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeCaptureNetwork) ?? true,
 			consoleEntries: [],
+			consoleDroppedCount: 0,
 			consoleErrorCount: 0,
 			networkEntries: [],
+			networkDroppedCount: 0,
 			magnusAttached: false,
 			testSessionActive: false,
 			testSessionStartedAt: null,
@@ -737,11 +740,11 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 				running: true,
 				selectedScriptName: script.scriptName,
 				packageManager: script.packageManager,
-				terminalInstanceId: instance.instanceId,
-				consoleEntries: this._session.consoleCapture
-					? [...this._session.consoleEntries, localize('prebase.runtime.consoleStarted', "Started `{0}`", script.command)]
-					: this._session.consoleEntries
+				terminalInstanceId: instance.instanceId
 			};
+			if (this._session.consoleCapture) {
+				this._pushConsole(localize('prebase.runtime.consoleStarted', "Started `{0}`", script.command));
+			}
 			this._log(localize('prebase.runtime.startedCmd', "Running {0}", script.command));
 			this._fire();
 			await this.openPreviewEditor();
@@ -840,8 +843,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		this._session = {
 			...this._session,
 			consoleEntries: [],
+			consoleDroppedCount: 0,
 			consoleErrorCount: 0,
-			networkEntries: []
+			networkEntries: [],
+			networkDroppedCount: 0
 		};
 		this._fire();
 	}
@@ -858,15 +863,8 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 
 	startTestSession(): void {
 		const startedAt = Date.now();
-		this._session = {
-			...this._session,
-			testSessionActive: true,
-			testSessionStartedAt: startedAt,
-			consoleEntries: [
-				...this._session.consoleEntries,
-				localize('prebase.runtime.testStart', "Test session started")
-			]
-		};
+		this._session = { ...this._session, testSessionActive: true, testSessionStartedAt: startedAt };
+		this._pushConsole(localize('prebase.runtime.testStart', "Test session started"));
 		this._log(localize('prebase.runtime.testStartLog', "Test session active."));
 		this._fire();
 	}
@@ -888,9 +886,9 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			...this._session,
 			testSessionActive: false,
 			testSessionStartedAt: null,
-			reports: [report, ...this._session.reports].slice(0, limit),
-			consoleEntries: [...this._session.consoleEntries, report]
+			reports: [report, ...this._session.reports].slice(0, limit)
 		};
+		this._pushConsole(report);
 		this._fire();
 	}
 
@@ -899,9 +897,9 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		const report = localize('prebase.runtime.testReplay', "Replay at {0} · {1}", new Date().toLocaleTimeString(), this._session.url);
 		this._session = {
 			...this._session,
-			reports: [report, ...this._session.reports].slice(0, limit),
-			consoleEntries: [...this._session.consoleEntries, report]
+			reports: [report, ...this._session.reports].slice(0, limit)
 		};
+		this._pushConsole(report);
 		this._fire();
 	}
 
@@ -911,14 +909,8 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 
 	attachToMagnus(): void {
 		const summary = this.getContextSummaryForMagnus();
-		this._session = {
-			...this._session,
-			magnusAttached: true,
-			consoleEntries: [
-				...this._session.consoleEntries,
-				localize('prebase.runtime.magnus', "Attached runtime context to Agents")
-			]
-		};
+		this._session = { ...this._session, magnusAttached: true };
+		this._pushConsole(localize('prebase.runtime.magnus', "Attached runtime context to Agents"));
 		this._fire();
 		void this.commandService.executeCommand('prebase.magnus.attachRuntimeContext', summary);
 		void this.commandService.executeCommand('prebase.magnus.open');
@@ -1084,7 +1076,8 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			kind,
 			entries: entries.slice(-maximum).map(redactRuntimeEvidence),
 			consoleErrorCount: this._session.consoleErrorCount,
-			truncated: entries.length > maximum,
+			truncated: entries.length > maximum || (kind === 'console' ? this._session.consoleDroppedCount : this._session.networkDroppedCount) > 0,
+			droppedCount: kind === 'console' ? this._session.consoleDroppedCount : this._session.networkDroppedCount,
 		};
 	}
 
@@ -1108,9 +1101,9 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	recordConsoleError(message: string): void {
 		this._session = {
 			...this._session,
-			consoleErrorCount: this._session.consoleErrorCount + 1,
-			consoleEntries: [...this._session.consoleEntries, `[error] ${message}`]
+			consoleErrorCount: this._session.consoleErrorCount + 1
 		};
+		this._pushConsole(`[error] ${message}`);
 		this._fire();
 	}
 
@@ -1289,16 +1282,20 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	private _pushConsole(line: string): void {
+		const evidence = appendRuntimeEvidence(this._session.consoleEntries, line);
 		this._session = {
 			...this._session,
-			consoleEntries: [...this._session.consoleEntries, line]
+			consoleEntries: evidence.entries,
+			consoleDroppedCount: this._session.consoleDroppedCount + evidence.droppedCount
 		};
 	}
 
 	private _pushNetwork(line: string): void {
+		const evidence = appendRuntimeEvidence(this._session.networkEntries, line);
 		this._session = {
 			...this._session,
-			networkEntries: [...this._session.networkEntries, line]
+			networkEntries: evidence.entries,
+			networkDroppedCount: this._session.networkDroppedCount + evidence.droppedCount
 		};
 	}
 
