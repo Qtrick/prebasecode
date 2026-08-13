@@ -82,7 +82,7 @@ suite('PreBase dependencyDepth', () => {
 	});
 
 	test('visits a wide cyclic import topology once and preserves its breadth-first depths', () => {
-		const width = 6_000;
+		const width = 12_000;
 		const nodes = [node('entry'), ...Array.from({ length: width }, (_, index) => node(`leaf-${index}`))];
 		const edges: GraphEdge[] = [];
 		for (let index = 0; index < width; index++) {

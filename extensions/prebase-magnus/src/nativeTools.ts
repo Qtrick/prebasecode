@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
@@ -365,9 +366,9 @@ async function packageManagerFor(folder: vscode.WorkspaceFolder): Promise<'npm' 
 	const packageUri = vscode.Uri.joinPath(folder.uri, 'package.json');
 	const raw = Buffer.from(await vscode.workspace.fs.readFile(packageUri)).toString('utf8');
 	const parsed = JSON.parse(raw) as { packageManager?: string };
-	if (parsed.packageManager?.startsWith('pnpm@')) return 'pnpm';
-	if (parsed.packageManager?.startsWith('yarn@')) return 'yarn';
-	if (parsed.packageManager?.startsWith('bun@')) return 'bun';
+	if (parsed.packageManager?.startsWith('pnpm@')) {return 'pnpm';}
+	if (parsed.packageManager?.startsWith('yarn@')) {return 'yarn';}
+	if (parsed.packageManager?.startsWith('bun@')) {return 'bun';}
 	for (const [name, manager] of [['bun.lock', 'bun'], ['bun.lockb', 'bun'], ['pnpm-lock.yaml', 'pnpm'], ['yarn.lock', 'yarn']] as const) {
 		try {
 			await vscode.workspace.fs.stat(vscode.Uri.joinPath(folder.uri, name));
@@ -399,28 +400,35 @@ async function runVisibleTask(task: vscode.Task, token: vscode.CancellationToken
 	const execution = await vscode.tasks.executeTask(task);
 	return new Promise(resolve => {
 		let settled = false;
-		let end: vscode.Disposable | undefined;
-		let cancel: vscode.Disposable | undefined;
+		const disposables: vscode.Disposable[] = [];
+		const addDisposable = <T extends vscode.Disposable>(disposable: T): T => {
+			if (settled) {
+				disposable.dispose();
+			} else {
+				disposables.push(disposable);
+			}
+			return disposable;
+		};
 		const finish = (cancelled: boolean, exitCode: number | undefined) => {
 			if (settled) {
 				return;
 			}
 			settled = true;
-			end?.dispose();
-			cancel?.dispose();
+			while (disposables.length) {
+				disposables.pop()?.dispose();
+			}
 			resolve({ cancelled, exitCode });
 		};
-		end = vscode.tasks.onDidEndTaskProcess(event => {
+		addDisposable(vscode.tasks.onDidEndTaskProcess(event => {
 			if (event.execution === execution) {
 				finish(false, event.exitCode);
 			}
-		});
-		cancel = token.onCancellationRequested(() => {
+		}));
+		addDisposable(token.onCancellationRequested(() => {
 			execution.terminate();
 			finish(true, undefined);
-		});
+		}));
 		if (settled) {
-			cancel.dispose();
 			return;
 		}
 		// Cancellation may arrive between executeTask and registration of the

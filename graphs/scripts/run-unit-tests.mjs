@@ -25,6 +25,7 @@ const tests = [
 	'graphs/src/tests/unit/architecturePick.test.ts',
 	'graphs/src/tests/unit/dependencyDepth.test.ts',
 	'graphs/src/tests/unit/graphEditor3dInteraction.test.ts',
+	'graphs/src/tests/unit/layoutOrganization.test.ts',
 	'graphs/src/tests/unit/networkLayout.test.ts',
 	'graphs/src/tests/unit/graphOwnershipBoundary.test.ts',
 ];

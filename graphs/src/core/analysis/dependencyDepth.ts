@@ -48,8 +48,8 @@ export function computeEntryPointDepthGroups(
 		queue.push(entryNodeId)
 	}
 
-	while (queue.length > 0) {
-		const current = queue.shift()!
+	for (let queueIndex = 0; queueIndex < queue.length; queueIndex++) {
+		const current = queue[queueIndex]
 		const d = depth.get(current)!
 		for (const next of adj.get(current) ?? []) {
 			if (!depth.has(next)) {

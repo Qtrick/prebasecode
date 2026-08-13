@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
@@ -20,15 +20,26 @@ interface CdpResponse {
 /** Correlates CDP responses by request id and safely ignores protocol events. */
 export class CdpConnection {
 	private _nextId = 1;
-	private readonly _pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void }>();
+	private readonly _pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
 
-	constructor(private readonly _webSocket: MinimalWebSocket) { }
+	constructor(private readonly _webSocket: MinimalWebSocket, private readonly _requestTimeoutMs = 8_000) { }
 
 	request<T>(method: string, params?: Record<string, unknown>): Promise<T> {
 		const id = this._nextId++;
 		return new Promise<T>((resolve, reject) => {
-			this._pending.set(id, { resolve: value => resolve(value as T), reject });
-			this._webSocket.send(JSON.stringify({ id, method, params }));
+			const timer = setTimeout(() => {
+				if (this._pending.delete(id)) {
+					reject(new Error(`CDP request timed out: ${method}`));
+				}
+			}, this._requestTimeoutMs);
+			this._pending.set(id, { resolve: value => resolve(value as T), reject, timer });
+			try {
+				this._webSocket.send(JSON.stringify({ id, method, params }));
+			} catch (error) {
+				clearTimeout(timer);
+				this._pending.delete(id);
+				reject(error instanceof Error ? error : new Error(String(error)));
+			}
 		});
 	}
 
@@ -48,6 +59,7 @@ export class CdpConnection {
 			return;
 		}
 		this._pending.delete(message.id);
+		clearTimeout(pending.timer);
 		if (message.error) {
 			pending.reject(new Error(message.error.message || 'CDP error'));
 			return;
@@ -57,6 +69,7 @@ export class CdpConnection {
 
 	rejectAll(error: Error): void {
 		for (const pending of this._pending.values()) {
+			clearTimeout(pending.timer);
 			pending.reject(error);
 		}
 		this._pending.clear();

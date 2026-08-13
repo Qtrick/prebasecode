@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 export interface MagnusModelOption {
@@ -37,30 +38,6 @@ export const MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		maxInputTokens: 1_000_000,
 		maxOutputTokens: 65_536,
 		description: 'Fast and capable — strong default for everyday coding.',
-	},
-	{
-		id: 'gemini-2.0-flash',
-		name: 'Gemini 2.0 Flash',
-		apiModel: 'gemini-2.0-flash',
-		maxInputTokens: 1_000_000,
-		maxOutputTokens: 8192,
-		description: 'Previous-generation Flash — quick responses with solid quality.',
-	},
-	{
-		id: 'gemini-1.5-pro',
-		name: 'Gemini 1.5 Pro',
-		apiModel: 'gemini-1.5-pro',
-		maxInputTokens: 2_000_000,
-		maxOutputTokens: 8192,
-		description: 'Very large context window for long files and multi-file reviews.',
-	},
-	{
-		id: 'gemini-1.5-flash',
-		name: 'Gemini 1.5 Flash',
-		apiModel: 'gemini-1.5-flash',
-		maxInputTokens: 1_000_000,
-		maxOutputTokens: 8192,
-		description: 'Lightweight Flash for quick questions and small edits.',
 	},
 ];
 

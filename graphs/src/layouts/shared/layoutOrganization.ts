@@ -3,7 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js'
-import { classifyNodeLayer, computeNodeImportance, type ArchitectureLayerId } from '../../core/analysis/architectureLayers.js'
+import { classifyNodeLayer, type ArchitectureLayerId } from '../../core/analysis/architectureLayers.js'
 import { computeEntryPointDepthGroups } from '../../core/analysis/dependencyDepth.js'
 
 export type LayoutOrganizationMethod =
@@ -99,9 +99,12 @@ export function computeOrganizationLayers(
 
 	if (method === 'import-importance') {
 		const importance = new Map<string, number>()
-		for (const id of nodeIds) {
-			const imp = computeNodeImportance(id, edges)
-			importance.set(id, imp.inDegree * 2 + imp.outDegree)
+		for (const edge of edges) {
+			if (edge.kind !== 'import') {
+				continue
+			}
+			importance.set(edge.source, (importance.get(edge.source) ?? 0) + 1)
+			importance.set(edge.target, (importance.get(edge.target) ?? 0) + 2)
 		}
 		const layers = bucketByRank(nodeIds, (id) => -(importance.get(id) ?? 0), entryNodeId)
 		const ranks = new Map<string, number>()
@@ -128,14 +131,12 @@ export function computeOrganizationLayers(
 	}
 
 	// directory-proximity
-	const entryNode = layoutNodes.find((n) => n.id === entryNodeId)
+	const nodeById = new Map(layoutNodes.map(node => [node.id, node]))
+	const entryNode = nodeById.get(entryNodeId)
 	const entryDepth = pathDepth(entryNode?.path)
 	const layers = bucketByRank(
 		nodeIds,
-		(id) => {
-			const node = layoutNodes.find((n) => n.id === id)
-			return pathDepth(node?.path) - entryDepth
-		},
+		id => pathDepth(nodeById.get(id)?.path) - entryDepth,
 		entryNodeId
 	)
 	const ranks = new Map<string, number>()

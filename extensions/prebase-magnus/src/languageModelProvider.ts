@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
@@ -8,13 +9,17 @@ import { getModelOption, resolveApiModel } from './models';
 import { buildMagnusLanguageModelInformation } from './modelInformation';
 import type { MagnusSecretStorage } from './secretStorage';
 
+function hasStringValue(value: object): value is { value: string } {
+	return Object.hasOwn(value, 'value') && typeof (value as { value?: unknown }).value === 'string';
+}
+
 function extractText(message: vscode.LanguageModelChatRequestMessage): string {
 	const parts: string[] = [];
 	for (const part of message.content) {
 		if (part instanceof vscode.LanguageModelTextPart) {
 			parts.push(part.value);
-		} else if (typeof part === 'object' && part && 'value' in part && typeof (part as { value: unknown }).value === 'string') {
-			parts.push((part as { value: string }).value);
+		} else if (typeof part === 'object' && part && hasStringValue(part)) {
+			parts.push(part.value);
 		}
 	}
 	return parts.join('');

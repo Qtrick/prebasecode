@@ -1,12 +1,13 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 /**
  * Direct HTTP client for the Gemini Generative Language API.
  *
- * Supports classic API keys (AIza…) via query/`x-goog-api-key`, and newer
- * "AQ." bearer credentials via Authorization header.
+ * Sends Google AI Studio credentials only in the documented x-goog-api-key
+ * header. In particular, credentials must never be placed in request URLs.
  */
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
@@ -42,87 +43,79 @@ interface GeminiResponse {
 	error?: { code: number; message: string; status: string };
 }
 
+export interface GeminiCancellationToken {
+	readonly isCancellationRequested: boolean;
+	readonly onCancellationRequested?: (listener: () => void) => { dispose(): void };
+}
+
+export interface GeminiTransport {
+	fetch(input: string | URL, init?: RequestInit): Promise<Response>;
+}
+
+interface CancellationBridge {
+	readonly signal: AbortSignal;
+	dispose(): void;
+}
+
+function bridgeCancellation(token: GeminiCancellationToken | undefined): CancellationBridge {
+	const controller = new AbortController();
+	if (token?.isCancellationRequested) {
+		controller.abort();
+	}
+	const subscription = token?.onCancellationRequested?.(() => controller.abort());
+	return {
+		signal: controller.signal,
+		dispose: () => subscription?.dispose(),
+	};
+}
+
 async function tryAuth(
 	apiKey: string,
 	model: string,
 	body: GenerateRequest,
-	method: 'query' | 'header' | 'bearer',
-	token?: { isCancellationRequested: boolean },
+	token?: GeminiCancellationToken,
+	transport: GeminiTransport = globalThis,
 ): Promise<GeminiResponseCandidate | undefined> {
 	if (token?.isCancellationRequested) {
 		throw new Error('Cancelled');
 	}
 
-	const baseUrl = `${BASE_URL}/models/${model}:generateContent`;
-	const url = method === 'query'
-		? `${baseUrl}?key=${encodeURIComponent(apiKey)}`
-		: baseUrl;
+	const url = `${BASE_URL}/models/${model}:generateContent`;
+	const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey };
 
-	const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-	if (method === 'header') {
-		headers['x-goog-api-key'] = apiKey;
+	const cancellation = bridgeCancellation(token);
+	try {
+		const res = await transport.fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: cancellation.signal });
+		const json = await res.json() as GeminiResponse;
+
+		if (!res.ok || json.error) {
+			throw new Error(JSON.stringify(json.error ?? { code: res.status, message: `HTTP ${res.status}` }));
+		}
+
+		return json.candidates?.[0];
+	} finally {
+		cancellation.dispose();
 	}
-	if (method === 'bearer') {
-		headers['Authorization'] = `Bearer ${apiKey}`;
-	}
-
-	const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-	const json = await res.json() as GeminiResponse;
-
-	if (!res.ok || json.error) {
-		throw new Error(JSON.stringify(json.error ?? { code: res.status, message: `HTTP ${res.status}` }));
-	}
-
-	return json.candidates?.[0];
-}
-
-function authMethodsForKey(apiKey: string): Array<'header' | 'query' | 'bearer'> {
-	// Newer Google AI Studio credentials often start with "AQ" / "AQ." and need Bearer.
-	if (/^AQ[.A-Za-z0-9_-]/i.test(apiKey.trim())) {
-		return ['bearer', 'header', 'query'];
-	}
-	return ['header', 'query', 'bearer'];
 }
 
 export async function generateContentCandidate(
 	apiKey: string,
 	model: string,
 	body: GenerateRequest,
-	token?: { isCancellationRequested: boolean },
+	token?: GeminiCancellationToken,
+	transport: GeminiTransport = globalThis,
 ): Promise<GeminiResponseCandidate | undefined> {
-	const methods = authMethodsForKey(apiKey);
-	let lastError: Error | undefined;
-
-	for (const method of methods) {
-		try {
-			return await tryAuth(apiKey, model, body, method, token);
-		} catch (err) {
-			lastError = err instanceof Error ? err : new Error(String(err));
-			const msg = lastError.message.toLowerCase();
-			const isAuthError =
-				msg.includes('api_key_invalid') ||
-				msg.includes('api_key_service_blocked') ||
-				msg.includes('unauthenticated') ||
-				msg.includes('invalid_argument') ||
-				msg.includes('"code":400') ||
-				msg.includes('"code":401') ||
-				msg.includes('"code":403');
-			if (!isAuthError) {
-				break;
-			}
-		}
-	}
-
-	throw lastError ?? new Error('All auth methods failed');
+	return tryAuth(apiKey, model, body, token, transport);
 }
 
 export async function generateContent(
 	apiKey: string,
 	model: string,
 	body: GenerateRequest,
-	token?: { isCancellationRequested: boolean },
+	token?: GeminiCancellationToken,
+	transport: GeminiTransport = globalThis,
 ): Promise<string> {
-	const candidate = await generateContentCandidate(apiKey, model, body, token);
+	const candidate = await generateContentCandidate(apiKey, model, body, token, transport);
 	return (candidate?.content?.parts?.[0]?.text ?? '').trim();
 }
 
@@ -134,35 +127,33 @@ export async function* streamGenerateContent(
 	apiKey: string,
 	model: string,
 	body: GenerateRequest,
-	token?: { isCancellationRequested: boolean },
+	token?: GeminiCancellationToken,
+	transport: GeminiTransport = globalThis,
 ): AsyncGenerator<string, void, unknown> {
-	const streamUrlBase = `${BASE_URL}/models/${model}:streamGenerateContent?alt=sse`;
+	const streamUrl = `${BASE_URL}/models/${model}:streamGenerateContent?alt=sse`;
+	const maxSseBufferBytes = 1 * 1024 * 1024;
 
-	const tryStream = async (method: 'header' | 'query' | 'bearer'): Promise<Response | undefined> => {
-		const url = method === 'query'
-			? `${streamUrlBase}&key=${encodeURIComponent(apiKey)}`
-			: streamUrlBase;
-		const headers: Record<string, string> = { 'Content-Type': 'application/json' };
-		if (method === 'header') {
-			headers['x-goog-api-key'] = apiKey;
+	const tryStream = async (): Promise<{ response: Response; cancellation: CancellationBridge } | undefined> => {
+		const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey };
+		const cancellation = bridgeCancellation(token);
+		try {
+			const response = await transport.fetch(streamUrl, { method: 'POST', headers, body: JSON.stringify(body), signal: cancellation.signal });
+			if (!response.ok) {
+				cancellation.dispose();
+				return undefined;
+			}
+			return { response, cancellation };
+		} catch (error) {
+			cancellation.dispose();
+			throw error;
 		}
-		if (method === 'bearer') {
-			headers['Authorization'] = `Bearer ${apiKey}`;
-		}
-		const res = await fetch(url, { method: 'POST', headers, body: JSON.stringify(body) });
-		if (!res.ok) {
-			return undefined;
-		}
-		return res;
 	};
 
-	for (const method of authMethodsForKey(apiKey)) {
-		try {
-			const res = await tryStream(method);
-			if (!res?.body) {
-				continue;
-			}
-			const reader = res.body.getReader();
+	let stream: { response: Response; cancellation: CancellationBridge } | undefined;
+	try {
+		stream = await tryStream();
+		if (stream?.response.body) {
+			const reader = stream.response.body.getReader();
 			const decoder = new TextDecoder();
 			let buffer = '';
 			while (true) {
@@ -175,6 +166,9 @@ export async function* streamGenerateContent(
 					return;
 				}
 				buffer += decoder.decode(value, { stream: true });
+				if (buffer.length > maxSseBufferBytes) {
+					throw new Error('Gemini SSE response exceeded the 1 MiB framing limit.');
+				}
 				const lines = buffer.split('\n');
 				buffer = lines.pop() ?? '';
 				for (const line of lines) {
@@ -199,12 +193,22 @@ export async function* streamGenerateContent(
 					}
 				}
 			}
-		} catch {
-			// try next auth method / fall through
 		}
+	} catch (error) {
+		if (token?.isCancellationRequested) {
+			return;
+		}
+		if (error instanceof Error && error.message.includes('SSE response exceeded')) {
+			throw error;
+		}
+	} finally {
+		stream?.cancellation.dispose();
 	}
 
-	const full = await generateContent(apiKey, model, body, token);
+	if (token?.isCancellationRequested) {
+		return;
+	}
+	const full = await generateContent(apiKey, model, body, token, transport);
 	// Match paced UI fallback (~3 chars / 22ms) when SSE is unavailable.
 	for (let i = 0; i < full.length; i += 3) {
 		if (token?.isCancellationRequested) {

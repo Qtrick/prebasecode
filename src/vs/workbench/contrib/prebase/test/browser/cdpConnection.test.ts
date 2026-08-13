@@ -63,4 +63,27 @@ suite('CdpConnection', () => {
 		connection.rejectAll(new Error('test cleanup'));
 		await assert.rejects(active, /test cleanup/);
 	});
+
+	test('times out an unanswered request, removes it, and ignores its late response', async () => {
+		const socket = new FakeWebSocket();
+		const connection = new CdpConnection(socket, 5);
+		const timedOut = connection.request('Runtime.evaluate');
+
+		await assert.rejects(timedOut, /CDP request timed out: Runtime\.evaluate/);
+		connection.handleMessage(JSON.stringify({ id: 1, result: { stale: true } }));
+
+		const current = connection.request<{ current: true }>('Runtime.enable');
+		connection.handleMessage(JSON.stringify({ id: 2, result: { current: true } }));
+		assert.deepStrictEqual(await current, { current: true });
+	});
+
+	test('clears request timers during rejectAll so cleanup is the only rejection cause', async () => {
+		const socket = new FakeWebSocket();
+		const connection = new CdpConnection(socket, 5);
+		const pending = connection.request('Runtime.enable');
+		connection.rejectAll(new Error('socket closed'));
+
+		await assert.rejects(pending, /socket closed/);
+		await new Promise(resolve => setTimeout(resolve, 10));
+	});
 });

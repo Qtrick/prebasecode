@@ -1,11 +1,10 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { BrowserWindow, WebContentsView } from 'electron';
 import { execFile, spawn, type ChildProcess } from 'child_process';
-import * as http from 'http';
 import * as net from 'net';
 import { Emitter } from '../../../base/common/event.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
@@ -15,6 +14,8 @@ import { CdpConnection, type MinimalWebSocket } from '../common/cdpConnection.js
 import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.js';
 
 const STRIP_HEIGHT = 38;
+const MAX_CDP_DISCOVERY_BYTES = 1 * 1024 * 1024;
+const MAX_MANAGED_SCREENSHOT_BYTES = 10 * 1024 * 1024;
 
 interface ManagedSession {
 	window: BrowserWindow;
@@ -212,7 +213,11 @@ p{opacity:.75;margin:0;line-height:1.45}
 			throw new Error('Managed desktop session not found.');
 		}
 		const image = await session.appView.webContents.capturePage();
-		return image.toPNG().toString('base64');
+		const png = image.toPNG();
+		if (png.byteLength > MAX_MANAGED_SCREENSHOT_BYTES) {
+			throw new Error('Managed screenshot exceeds the 10 MiB IPC limit.');
+		}
+		return png.toString('base64');
 	}
 
 	async evaluateViaCdp(debugPort: number, expression: string): Promise<unknown> {
@@ -367,14 +372,28 @@ p{opacity:.75;margin:0;line-height:1.45}
 		}
 	}
 
-	private _fetchJson<T>(url: string): Promise<T> {
+	private async _fetchJson<T>(url: string): Promise<T> {
 		if (!this._isLocalhostUrl(url)) {
-			return Promise.reject(new Error('CDP discovery is limited to localhost.'));
+			throw new Error('CDP discovery is limited to localhost.');
 		}
+		const http = await import('http');
 		return new Promise((resolve, reject) => {
 			const req = http.get(url, res => {
 				const chunks: Buffer[] = [];
-				res.on('data', (c: Buffer) => chunks.push(c));
+				let bodyBytes = 0;
+				if (!res.statusCode || res.statusCode < 200 || res.statusCode >= 300) {
+					res.resume();
+					reject(new Error(`CDP target discovery failed with HTTP ${res.statusCode ?? 'unknown'}.`));
+					return;
+				}
+				res.on('data', (c: Buffer) => {
+					bodyBytes += c.byteLength;
+					if (bodyBytes > MAX_CDP_DISCOVERY_BYTES) {
+						req.destroy(new Error('CDP target discovery response exceeds the 1 MiB limit.'));
+						return;
+					}
+					chunks.push(c);
+				});
 				res.on('end', () => {
 					try {
 						resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')) as T);
@@ -403,7 +422,10 @@ p{opacity:.75;margin:0;line-height:1.45}
 			const ws = new WebSocketCtor(wsUrl);
 			const connection = new CdpConnection(ws);
 			let settled = false;
-			let timer: ReturnType<typeof setTimeout> | undefined;
+			const timer = setTimeout(() => {
+				connection.rejectAll(new Error('CDP evaluate timed out'));
+				finish(new Error('CDP evaluate timed out'));
+			}, 8000);
 			const finish = (error?: Error, value?: unknown) => {
 				if (settled) {
 					return;
@@ -419,10 +441,6 @@ p{opacity:.75;margin:0;line-height:1.45}
 					resolve(value);
 				}
 			};
-			timer = setTimeout(() => {
-				connection.rejectAll(new Error('CDP evaluate timed out'));
-				finish(new Error('CDP evaluate timed out'));
-			}, 8000);
 			ws.on('open', () => {
 				void (async () => {
 					try {

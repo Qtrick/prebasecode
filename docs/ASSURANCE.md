@@ -13,7 +13,7 @@ Repeatable static checks for graph boundary, toolchain lanes, icons, privacy, an
 | `npm run assurance:privacy` | Static privacy audit (`verify:privacy` + `verify:supabase-secrets`) |
 | `npm run assurance:cloud` | Supabase migration + static RLS + secrets scan only (no Auth/RLS runtime) |
 | `npm run assurance:full` | `assurance:static` + `assurance:privacy` only — **does not run eslint** (exits 0 after a skip log). Not a release gate. |
-| `npm run assurance:release` | `assurance:static` + `assurance:privacy` + **PreBase-path** eslint ratchet (`verify:eslint-prebase`). Does **not** claim full-repo `npm run eslint` is clean. |
+| `npm run assurance:release` | `assurance:static` + `assurance:privacy` + strict privileged-code lint (`verify:eslint-prebase-security`) + **PreBase-path** eslint ratchet (`verify:eslint-prebase`). Does **not** claim full-repo `npm run eslint` is clean. |
 | `npm run assurance:package` | Icon manifest + signing preflight (informational) + gulp packaging task smoke — see [PACKAGING.md](PACKAGING.md) |
 | `npm run release:signing-preflight` | Enforces `PREBASE_*` signing env **names** for this OS (`--release`); does not sign |
 
@@ -23,6 +23,7 @@ Repeatable static checks for graph boundary, toolchain lanes, icons, privacy, an
 - `assurance:full` skips eslint on purpose; do **not** treat it as “eslint clean.”
 - `assurance:release` / `verify:eslint-prebase` lint **only** PreBase-owned globs (`graphs/`, `src/vs/workbench/contrib/prebase/`, selected `scripts/{privacy,startup,supabase,assurance}/`) and ratchet error/warning counts against [`docs/lint/eslint-prebase-baseline.json`](lint/eslint-prebase-baseline.json). Existing PreBase-path debt may remain until paid down; the gate fails on **increases** or a zero-file/no-op run.
 - Re-seed baseline (maintainers): `PREBASE_ESLINT_BASELINE=1 npm run verify:eslint-prebase`.
+- `verify:eslint-prebase-security` has **no baseline**: it requires zero errors and warnings in assurance scripts, `src/vs/platform/prebaseDesktop/`, and `extensions/prebase-magnus/src/`.
 
 Individual verifiers:
 
@@ -34,6 +35,7 @@ Individual verifiers:
 - `verify:privacy` — product telemetry flags, forbidden endpoints, secret-storage patterns, webview CSP
 - `verify:supabase-secrets` — no hardcoded Supabase service-role / JWT secrets in source
 - `verify:eslint-prebase` — PreBase-path eslint ratchet (see above); not full-repo eslint
+- `verify:eslint-prebase-security` — zero-debt lint gate for privileged assurance, desktop-runtime, and Magnus code
 - `verify:config-uniqueness` — duplicate `prebase.*` command IDs and configuration enum keys
 
 ## Icon integrity

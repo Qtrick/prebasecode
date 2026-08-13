@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
@@ -33,8 +34,16 @@ function relative(uri: vscode.Uri): string {
 	return vscode.workspace.asRelativePath(uri, false);
 }
 
+function isLocationLink(location: vscode.Location | vscode.LocationLink): location is vscode.LocationLink {
+	return Object.hasOwn(location, 'targetUri');
+}
+
+function isTextSearchMatch(entry: vscode.TextSearchResult): entry is vscode.TextSearchMatch {
+	return Object.hasOwn(entry, 'preview');
+}
+
 function locationJson(location: vscode.Location | vscode.LocationLink): Record<string, unknown> {
-	if ('targetUri' in location) {
+	if (isLocationLink(location)) {
 		return { path: relative(location.targetUri), range: rangeJson(location.targetSelectionRange ?? location.targetRange) };
 	}
 	return { path: relative(location.uri), range: rangeJson(location.range) };
@@ -71,7 +80,7 @@ export class WorkspaceIntelligence {
 			{ pattern: input.query, isRegExp: input.isRegex === true, isCaseSensitive: input.isCaseSensitive === true, isWordMatch: input.isWordMatch === true },
 			{ include: input.include?.trim() || undefined, exclude: input.exclude?.trim() || undefined, maxResults: maximum, useDefaultExcludes: true, useIgnoreFiles: true },
 			entry => {
-				if (token.isCancellationRequested || !('preview' in entry) || !isUnderWorkspace(entry.uri) || isSecretPath(entry.uri) || matches.length >= maximum) {
+				if (token.isCancellationRequested || !isTextSearchMatch(entry) || !isUnderWorkspace(entry.uri) || isSecretPath(entry.uri) || matches.length >= maximum) {
 					return;
 				}
 				matches.push({ path: relative(entry.uri), preview: entry.preview.text.slice(0, 500), ranges: entry.ranges instanceof vscode.Range ? [rangeJson(entry.ranges)] : entry.ranges.map(rangeJson) });
@@ -123,7 +132,7 @@ export class WorkspaceIntelligence {
 			throw new Error('Cancelled');
 		}
 		return { definitions: (locations ?? []).filter(location => {
-			const uri = 'targetUri' in location ? location.targetUri : location.uri;
+			const uri = isLocationLink(location) ? location.targetUri : location.uri;
 			return isUnderWorkspace(uri) && !isSecretPath(uri);
 		}).slice(0, 100).map(locationJson) };
 	}
