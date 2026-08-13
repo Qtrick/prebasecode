@@ -15,6 +15,12 @@ const TARGETS = [
 	'scripts/assurance/**/*.{ts,tsx,mts,cts}',
 	'src/vs/platform/prebaseDesktop/**/*.{ts,tsx,mts,cts}',
 	'extensions/prebase-magnus/src/**/*.{ts,tsx,mts,cts}',
+	// Workbench adapters that authorize/forward Agent desktop and preview operations.
+	'src/vs/workbench/contrib/prebase/common/runtime/desktopStopForMagnus.ts',
+	'src/vs/workbench/contrib/prebase/common/runtime/evidenceBuffer.ts',
+	'src/vs/workbench/contrib/prebase/common/runtime/permissionClassifier.ts',
+	'src/vs/workbench/contrib/prebase/common/runtime/runtimeResponseReader.ts',
+	'src/vs/workbench/contrib/prebase/common/runtime/runtimeWebviewProtocol.ts',
 ];
 
 async function main(): Promise<void> {

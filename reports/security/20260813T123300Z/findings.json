@@ -1,0 +1,32 @@
+[
+	{
+		"id": "PB-2026-08-13-RUNTIME-001",
+		"severity": "high",
+		"cwe": "CWE-345",
+		"surface": "Runtime Preview webview",
+		"attacker": "malicious preview iframe",
+		"preconditions": "User opens an attacker-controlled local preview page.",
+		"impact": "The iframe could forge parent control messages such as navigation, reload, or clear.",
+		"evidence": "The wrapper accepted window.message data by type without a host-only discriminator.",
+		"rootCause": "Missing message provenance boundary between the embedded page and the VS Code webview host.",
+		"patch": "Per-webview random control channel plus local HTTP(S) validation in the wrapper.",
+		"test": "runtimeWebviewProtocol.test.ts",
+		"status": "fixed",
+		"residualRisk": "A host-side message with the channel remains trusted by design; the channel is regenerated with the webview."
+	},
+	{
+		"id": "PB-2026-08-13-RUNTIME-002",
+		"severity": "medium",
+		"cwe": "CWE-770",
+		"surface": "Magnus Runtime page inspection",
+		"attacker": "malicious or pathological local preview server",
+		"preconditions": "Runtime Preview is connected and inspection is invoked.",
+		"impact": "The service could allocate the whole response before applying its output slice.",
+		"evidence": "asTextOrError consumed the response before `.slice(0, 200_000)`.",
+		"rootCause": "Output cap was applied after full stream materialization.",
+		"patch": "512 KiB Content-Length precheck and incremental cancellable bounded reader.",
+		"test": "runtimeResponseReader.test.ts",
+		"status": "fixed",
+		"residualRisk": "A single transport chunk can be larger than the retained bound; it is discarded and the stream is destroyed."
+	}
+]

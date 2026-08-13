@@ -17,13 +17,14 @@ import { IFileService } from '../../../../platform/files/common/files.js';
 import { createDecorator, IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IOpenerService } from '../../../../platform/opener/common/opener.js';
-import { asTextOrError, IRequestService } from '../../../../platform/request/common/request.js';
+import { readHeader, IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { IOutputService } from '../../../services/output/common/output.js';
 import { ITerminalInstance, ITerminalService } from '../../terminal/browser/terminal.js';
 import { latestDevServerUrl } from '../common/runtime/devServerUrlParser.js';
 import { appendRuntimeEvidence } from '../common/runtime/evidenceBuffer.js';
+import { MAX_RUNTIME_INSPECTION_RESPONSE_BYTES, readRuntimeResponseText } from '../common/runtime/runtimeResponseReader.js';
 import { detectFramework } from '../common/runtime/frameworkDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
 import { buildNpmExternalLaunchRequest } from '../common/runtime/externalLaunchCommand.js';
@@ -391,10 +392,12 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 				type: 'GET',
 				url,
 				timeout: 2500,
-				followRedirects: 3,
+				// Do not turn reachability polling into cross-origin/private-network probing.
+				followRedirects: 0,
 				callSite: 'PreBaseRuntimeService._probeUrl',
 			}, CancellationToken.None);
 			const status = context.res.statusCode ?? 0;
+			context.stream.destroy();
 			return status > 0 && status < 500;
 		} catch {
 			return false;
@@ -1041,13 +1044,22 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			const context = await this.requestService.request({ type: 'GET', url: validated.url, timeout: 5000, followRedirects: 0, callSite: 'PreBaseRuntimeService.inspectPageForMagnus' }, token);
 			const statusCode = context.res.statusCode ?? 0;
 			if (statusCode < 200 || statusCode >= 300) {
+				context.stream.destroy();
 				return { ok: false, reason: `Runtime Preview returned HTTP ${statusCode}; redirects and error responses are not inspected.`, state: this.getStateForMagnus() };
 			}
-			const response = (await asTextOrError(context) ?? '').slice(0, 200_000);
+			const contentLength = Number(readHeader(context.res.headers, 'content-length'));
+			if (Number.isFinite(contentLength) && contentLength > MAX_RUNTIME_INSPECTION_RESPONSE_BYTES) {
+				context.stream.destroy();
+				return { ok: false, reason: `Runtime Preview response exceeds the ${MAX_RUNTIME_INSPECTION_RESPONSE_BYTES / 1024} KiB inspection limit.`, state: this.getStateForMagnus() };
+			}
+			const response = await readRuntimeResponseText(context.stream, MAX_RUNTIME_INSPECTION_RESPONSE_BYTES, token);
+			if (response.tooLarge) {
+				return { ok: false, reason: `Runtime Preview response exceeds the ${MAX_RUNTIME_INSPECTION_RESPONSE_BYTES / 1024} KiB inspection limit.`, state: this.getStateForMagnus() };
+			}
 			if (token.isCancellationRequested) {
 				return { ok: false, reason: 'Cancelled', state: this.getStateForMagnus() };
 			}
-			const outline = pageOutline(response);
+			const outline = pageOutline(response.text);
 			return {
 				ok: true,
 				url: redactRuntimeEvidence(validated.url),
@@ -1155,10 +1167,11 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 					type: 'GET',
 					url,
 					timeout: 2000,
-					followRedirects: 3,
+				followRedirects: 0,
 					callSite: 'PreBaseRuntimeService._waitForUrl',
 				}, CancellationToken.None);
 				const status = context.res.statusCode ?? 0;
+				context.stream.destroy();
 				if (status > 0 && status < 500) {
 					return true;
 				}

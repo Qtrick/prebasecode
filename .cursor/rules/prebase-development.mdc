@@ -36,11 +36,13 @@ Definition of Done:
 11. Do not claim success unless verification was performed.
 12. Do not claim success if known issues remain.
 13. If uncertain, explicitly state uncertainty.
+14. After implementation, review, and relevant verification, commit only the task-scoped agent changes. Inspect the full diff and staged diff before committing. Preserve unrelated pre-existing user changes; never use blind `git add -A` on a dirty worktree, `git reset --hard`, `git clean -fd`, history rewriting, or `--no-verify` merely to bypass a hook.
 
 Final Output:
 
-14. Report:
+15. Report:
    - root cause
    - files changed
    - verification performed
    - remaining risks
+   - commit SHA and message

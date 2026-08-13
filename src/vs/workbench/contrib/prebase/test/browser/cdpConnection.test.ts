@@ -1,13 +1,17 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import { CdpConnection, type MinimalWebSocket } from '../../../../../platform/prebaseDesktop/common/cdpConnection.js';
 
 class FakeWebSocket implements MinimalWebSocket {
 	private messageListener: ((raw: unknown) => void) | undefined;
 	readonly sent: string[] = [];
+	throwOnSend: Error | undefined;
+	closed = false;
 
 	on(event: 'open' | 'close', listener: () => void): void;
 	on(event: 'message', listener: (raw: unknown) => void): void;
@@ -20,9 +24,12 @@ class FakeWebSocket implements MinimalWebSocket {
 
 	send(data: string): void {
 		this.sent.push(data);
+		if (this.throwOnSend) {
+			throw this.throwOnSend;
+		}
 	}
 
-	close(): void { }
+	close(): void { this.closed = true; }
 
 	emitMessage(message: unknown): void {
 		this.messageListener?.(JSON.stringify(message));
@@ -30,6 +37,7 @@ class FakeWebSocket implements MinimalWebSocket {
 }
 
 suite('CdpConnection', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('settles a request only from its matching response id', async () => {
 		const socket = new FakeWebSocket();
 		const connection = new CdpConnection(socket);
@@ -85,5 +93,70 @@ suite('CdpConnection', () => {
 
 		await assert.rejects(pending, /socket closed/);
 		await new Promise(resolve => setTimeout(resolve, 10));
+	});
+
+	test('enforces the pending request limit without sending an untracked request and releases a slot after settlement', async () => {
+		const socket = new FakeWebSocket();
+		const connection = new CdpConnection(socket, 100, 2);
+		const first = connection.request('Runtime.enable');
+		const second = connection.request('Runtime.evaluate');
+
+		await assert.rejects(connection.request('Runtime.getProperties'), /CDP pending request limit exceeded \(2\)/);
+		assert.strictEqual(socket.sent.length, 2);
+		connection.handleMessage(JSON.stringify({ id: 1, result: {} }));
+		await first;
+
+		const replacement = connection.request<{ active: true }>('Runtime.getProperties');
+		assert.strictEqual(socket.sent.length, 3);
+		connection.handleMessage(JSON.stringify({ id: 3, result: { active: true } }));
+		assert.deepStrictEqual(await replacement, { active: true });
+		connection.rejectAll(new Error('test cleanup'));
+		await assert.rejects(second, /test cleanup/);
+	});
+
+	test('rejects every pending request when an oversized UTF-8 inbound frame arrives and ignores its stale results', async () => {
+		const socket = new FakeWebSocket();
+		const connection = new CdpConnection(socket, 100, 4, 100);
+		const first = connection.request('Runtime.enable');
+		const second = connection.request('Runtime.evaluate');
+		// Attach handlers before the synchronous rejection so Node does not treat
+		// either pending protocol promise as an unhandled rejection.
+		void first.catch(() => undefined);
+		void second.catch(() => undefined);
+
+		connection.handleMessage('€'.repeat(34));
+		await assert.rejects(first, /CDP inbound message exceeds the 0\.09765625 KiB limit/);
+		await assert.rejects(second, /CDP inbound message exceeds the 0\.09765625 KiB limit/);
+		assert.strictEqual(socket.closed, true);
+		connection.handleMessage(JSON.stringify({ id: 1, result: { stale: true } }));
+
+		const current = connection.request<{ current: true }>('Runtime.enable');
+		connection.handleMessage(JSON.stringify({ id: 3, result: { current: true } }));
+		assert.deepStrictEqual(await current, { current: true });
+	});
+
+	test('rejects malformed protocol input and releases the request slot for a later request', async () => {
+		const socket = new FakeWebSocket();
+		const connection = new CdpConnection(socket, 100, 1);
+		const pending = connection.request('Runtime.enable');
+		const rejected = assert.rejects(pending, /JSON|Expected property/);
+		connection.handleMessage('{not json');
+		await rejected;
+
+		const current = connection.request<{ current: true }>('Runtime.evaluate');
+		connection.handleMessage(JSON.stringify({ id: 2, result: { current: true } }));
+		assert.deepStrictEqual(await current, { current: true });
+	});
+
+	test('cleans up a request whose websocket send throws so its pending slot is not retained', async () => {
+		const socket = new FakeWebSocket();
+		socket.throwOnSend = new Error('websocket send failed');
+		const connection = new CdpConnection(socket, 100, 1);
+		await assert.rejects(connection.request('Runtime.enable'), /websocket send failed/);
+
+		socket.throwOnSend = undefined;
+		const current = connection.request<{ current: true }>('Runtime.enable');
+		connection.handleMessage(JSON.stringify({ id: 2, result: { current: true } }));
+		assert.deepStrictEqual(await current, { current: true });
 	});
 });

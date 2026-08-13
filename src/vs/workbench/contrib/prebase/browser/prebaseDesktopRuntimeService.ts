@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
@@ -17,11 +17,10 @@ import { asJson, IRequestService } from '../../../../platform/request/common/req
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { PREBASE_DESKTOP_CHANNEL_NAME, type IPreBaseDesktopMainService } from '../../../../platform/prebaseDesktop/common/prebaseDesktop.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
-import type { CdpTarget, DesktopLaunchMode, ExternalLaunchRequest, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
+import type { CdpTarget, DesktopLaunchMode, ElectronProjectProfile, ExternalLaunchRequest, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
 import { buildElectronExternalLaunchRequest, buildNpmExternalLaunchRequest } from '../common/runtime/externalLaunchCommand.js';
 import type { IPreBaseRuntimeAdapter, PreBaseDesktopLaunchOptions } from '../common/runtime/runtimeAdapter.js';
-import type { ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
 import type { ProjectProbe } from '../common/runtime/types.js';
 import { validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
 

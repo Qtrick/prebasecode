@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
@@ -19,6 +19,7 @@ import { IEditorGroup } from '../../../services/editor/common/editorGroupsServic
 import { IWebviewElement, IWebviewService } from '../../webview/browser/webview.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import { validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
+import { createRuntimeWebviewControlMessage, type RuntimeWebviewControlType } from '../common/runtime/runtimeWebviewProtocol.js';
 import { PreBaseRuntimeEditorInput } from './runtimeEditorInput.js';
 import { IPreBaseRuntimeService } from './prebaseRuntimeService.js';
 
@@ -43,6 +44,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 	private _webviewReady = false;
 	private _hostResizeObserver: ResizeObserver | undefined;
 	private _responsiveSyncTimer: number | undefined;
+	private _webviewControlChannel: string | undefined;
 
 	constructor(
 		group: IEditorGroup,
@@ -65,7 +67,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 				}
 				return;
 			}
-			this._previewWebview.postMessage({ type: action });
+			this._postPreviewCommand(action);
 			if (action === 'reload') {
 				this._loadUrl(true);
 			}
@@ -196,6 +198,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 	override clearInput(): void {
 		this._sessionDisposables.clear();
 		this._previewWebview = undefined;
+		this._webviewControlChannel = undefined;
 		this._webviewReady = false;
 		this._loadedUrl = undefined;
 		super.clearInput();
@@ -314,9 +317,12 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		if (this._previewWebview || !this._frameShell) {
 			return;
 		}
+		const controlChannel = generateUuid();
 		const webview = this._sessionDisposables.add(this.webviewService.createWebviewElement({
 			title: localize('prebase.runtime.previewTitle', "PreBase Runtime Preview"),
-			options: { retainContextWhenHidden: true },
+			// Session state lives in PreBaseRuntimeService; releasing an inactive
+			// iframe prevents hidden project scripts, timers, and renderer memory.
+			options: { retainContextWhenHidden: false },
 			contentOptions: {
 				allowScripts: true,
 				localResourceRoots: []
@@ -324,7 +330,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			extension: undefined
 		}));
 		webview.mountTo(this._frameShell, this.window);
-		webview.setHtml(this._buildPreviewHtml());
+		webview.setHtml(this._buildPreviewHtml(controlChannel));
 		this._sessionDisposables.add(webview.onMessage(e => {
 			const msg = e.message as { type?: string; url?: string; detail?: string } | undefined;
 			if (!msg?.type) {
@@ -344,6 +350,14 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			}
 		}));
 		this._previewWebview = webview;
+		this._webviewControlChannel = controlChannel;
+	}
+
+	private _postPreviewCommand(type: RuntimeWebviewControlType, data: { url?: string; reason?: string } = {}): void {
+		if (!this._previewWebview || !this._webviewControlChannel) {
+			return;
+		}
+		this._previewWebview.postMessage(createRuntimeWebviewControlMessage(this._webviewControlChannel, type, data));
 	}
 
 	private _loadUrl(force: boolean): void {
@@ -352,7 +366,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			return;
 		}
 		if (!(session.running || session.previewConnected || session.serverRunning)) {
-			this._previewWebview.postMessage({ type: 'clear' });
+			this._postPreviewCommand('clear');
 			this._loadedUrl = undefined;
 			return;
 		}
@@ -366,16 +380,16 @@ export class PreBaseRuntimeEditor extends EditorPane {
 
 		const validated = validatePreviewUrl(session.url);
 		if (!validated.ok) {
-			this._previewWebview.postMessage({ type: 'clear', reason: validated.reason });
+			this._postPreviewCommand('clear', { reason: validated.reason });
 			this._loadedUrl = undefined;
 			return;
 		}
 
 		this._loadedUrl = validated.url;
-		this._previewWebview.postMessage({ type: 'setUrl', url: validated.url });
+		this._postPreviewCommand('setUrl', { url: validated.url });
 	}
 
-	private _buildPreviewHtml(): string {
+	private _buildPreviewHtml(controlChannel: string): string {
 		const nonce = generateUuid();
 		return `<!DOCTYPE html>
 <html>
@@ -400,6 +414,7 @@ html, body { margin:0; height:100%; width:100%; background:transparent; overflow
 const vscode = acquireVsCodeApi();
 const iframe = document.getElementById('frame');
 const overlay = document.getElementById('overlay');
+const controlChannel = '${controlChannel}';
 let currentUrl = '';
 
 function showOverlay(text) {
@@ -412,8 +427,17 @@ function hideOverlay() {
 
 window.addEventListener('message', function (event) {
 	const msg = event.data;
-	if (!msg || !msg.type) return;
-	if (msg.type === 'setUrl' && msg.url) {
+	// The iframe can postMessage to its parent. Only VS Code host commands have
+	// this per-webview channel, which never enters the untrusted iframe document.
+	if (!msg || msg.channel !== controlChannel || !msg.type) return;
+	if (msg.type === 'setUrl' && typeof msg.url === 'string') {
+		try {
+			const parsed = new URL(msg.url);
+			if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') throw new Error('Unsupported preview protocol');
+		} catch {
+			showOverlay('Blocked invalid preview URL');
+			return;
+		}
 		currentUrl = msg.url;
 		showOverlay('Loading ' + msg.url + '…');
 		iframe.onload = function () {

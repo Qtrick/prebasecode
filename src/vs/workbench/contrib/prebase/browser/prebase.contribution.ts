@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
@@ -19,11 +19,9 @@ import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/c
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
-import { IOutputService } from '../../../services/output/common/output.js';
-import { IOutputChannelRegistry, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
+import { IOutputChannelRegistry, IOutputService, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
-import '../common/prebaseConfiguration.js';
 import { registerPreBaseGraphContribution } from '../graphs/host/workbench/graphContribution.js';
 import { PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL } from '../common/prebaseConfiguration.js';
 import type { PreBaseViewportPreset } from '../common/runtime/viewportPresets.js';

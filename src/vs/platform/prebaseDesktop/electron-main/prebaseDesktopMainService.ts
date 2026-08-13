@@ -16,6 +16,8 @@ import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.j
 const STRIP_HEIGHT = 38;
 const MAX_CDP_DISCOVERY_BYTES = 1 * 1024 * 1024;
 const MAX_MANAGED_SCREENSHOT_BYTES = 10 * 1024 * 1024;
+const MAX_DESKTOP_EVALUATION_EXPRESSION_BYTES = 64 * 1024;
+const MAX_DESKTOP_EVALUATION_RESULT_BYTES = 1 * 1024 * 1024;
 
 interface ManagedSession {
 	window: BrowserWindow;
@@ -203,6 +205,7 @@ p{opacity:.75;margin:0;line-height:1.45}
 		if (!session) {
 			throw new Error('Managed desktop session not found.');
 		}
+		this._assertEvaluationExpression(expression);
 		const value = await session.appView.webContents.executeJavaScript(expression, true);
 		return this._marshalForIpc(value);
 	}
@@ -227,6 +230,7 @@ p{opacity:.75;margin:0;line-height:1.45}
 		if (!this._ownedDebugPorts.has(debugPort)) {
 			throw new Error('CDP evaluate is limited to PreBase-owned localhost debugging ports.');
 		}
+		this._assertEvaluationExpression(expression);
 		const targets = await this._fetchJson<Array<{ type?: string; webSocketDebuggerUrl?: string }>>(`http://127.0.0.1:${debugPort}/json`);
 		const page = targets.find(t => t.type === 'page' && t.webSocketDebuggerUrl) ?? targets.find(t => t.webSocketDebuggerUrl);
 		if (!page?.webSocketDebuggerUrl) {
@@ -365,10 +369,28 @@ p{opacity:.75;margin:0;line-height:1.45}
 		if (value === undefined) {
 			return undefined;
 		}
+		let serialized: string;
 		try {
-			return JSON.parse(JSON.stringify(value));
+			serialized = JSON.stringify(value) ?? String(value);
 		} catch {
-			return String(value);
+			serialized = String(value);
+		}
+		if (Buffer.byteLength(serialized, 'utf8') > MAX_DESKTOP_EVALUATION_RESULT_BYTES) {
+			throw new Error(`Desktop evaluation result exceeds the ${MAX_DESKTOP_EVALUATION_RESULT_BYTES / 1024} KiB IPC limit.`);
+		}
+		try {
+			return JSON.parse(serialized);
+		} catch {
+			return serialized;
+		}
+	}
+
+	private _assertEvaluationExpression(expression: string): void {
+		if (typeof expression !== 'string' || !expression.trim() || expression.includes('\0')) {
+			throw new Error('Desktop evaluation expression must be a non-empty string without NUL bytes.');
+		}
+		if (Buffer.byteLength(expression, 'utf8') > MAX_DESKTOP_EVALUATION_EXPRESSION_BYTES) {
+			throw new Error(`Desktop evaluation expression exceeds the ${MAX_DESKTOP_EVALUATION_EXPRESSION_BYTES / 1024} KiB limit.`);
 		}
 	}
 
