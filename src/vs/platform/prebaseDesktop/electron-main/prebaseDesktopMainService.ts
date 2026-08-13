@@ -12,12 +12,15 @@ import type { DesktopLaunchRequest, ExternalLaunchRequest, ManagedWindowState } 
 import { IPreBaseDesktopMainService, type IPreBaseDesktopSpawnResult } from '../common/prebaseDesktop.js';
 import { CdpConnection, type MinimalWebSocket } from '../common/cdpConnection.js';
 import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.js';
+import { ProcessOutputBuffer } from '../common/processOutputBuffer.js';
+import { terminateOwnedProcess, type ProcessTerminationSignal } from '../common/processTermination.js';
 
 const STRIP_HEIGHT = 38;
 const MAX_CDP_DISCOVERY_BYTES = 1 * 1024 * 1024;
 const MAX_MANAGED_SCREENSHOT_BYTES = 10 * 1024 * 1024;
 const MAX_DESKTOP_EVALUATION_EXPRESSION_BYTES = 64 * 1024;
 const MAX_DESKTOP_EVALUATION_RESULT_BYTES = 1 * 1024 * 1024;
+const MAX_RETAINED_EXTERNAL_OUTPUTS = 32;
 
 interface ManagedSession {
 	window: BrowserWindow;
@@ -49,6 +52,7 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 	private readonly _ownedPids = new Set<number>();
 	private readonly _ownedDebugPorts = new Set<number>();
 	private readonly _externalChildren = new Map<number, ChildProcess>();
+	private readonly _externalOutput = new Map<number, ProcessOutputBuffer>();
 
 	private readonly _onDidCloseManagedWindow = this._register(new Emitter<{ sessionId: string }>());
 	readonly onDidCloseManagedWindow = this._onDidCloseManagedWindow.event;
@@ -65,6 +69,7 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 			void this._killProcessTree(pid);
 		}
 		this._externalChildren.clear();
+		this._externalOutput.clear();
 		this._ownedPids.clear();
 		this._ownedDebugPorts.clear();
 		super.dispose();
@@ -277,9 +282,9 @@ p{opacity:.75;margin:0;line-height:1.45}
 			child.once('error', onError);
 			child.once('spawn', onSpawn);
 		});
-		// Drain inherited app output so a verbose project cannot block on a full pipe.
-		child.stdout?.resume();
-		child.stderr?.resume();
+		const output = new ProcessOutputBuffer();
+		child.stdout?.on('data', chunk => output.append('stdout', chunk));
+		child.stderr?.on('data', chunk => output.append('stderr', chunk));
 		this._ownedPids.add(child.pid);
 		this._ownedDebugPorts.add(port);
 		this._externalChildren.set(child.pid, child);
@@ -290,16 +295,37 @@ p{opacity:.75;margin:0;line-height:1.45}
 			}
 			this._ownedDebugPorts.delete(port);
 		});
+		// `close` follows closure of all stdio streams; `exit` alone can arrive
+		// before their final chunks have been delivered.
+		child.once('close', () => output.flush());
+		this._rememberProcessOutput(child.pid, output);
 		return { pid: child.pid, debugPort: port };
+	}
+
+	async getOwnedProcessOutput(pid: number, maximumEntries = 100): Promise<{ entries: ReturnType<ProcessOutputBuffer['getEntries']>['entries']; droppedCount: number; truncated: boolean }> {
+		return this._externalOutput.get(pid)?.getEntries(maximumEntries) ?? { entries: [], droppedCount: 0, truncated: false };
+	}
+
+	private _rememberProcessOutput(pid: number, output: ProcessOutputBuffer): void {
+		this._externalOutput.delete(pid);
+		this._externalOutput.set(pid, output);
+		while (this._externalOutput.size > MAX_RETAINED_EXTERNAL_OUTPUTS) {
+			const oldestPid = this._externalOutput.keys().next().value;
+			if (oldestPid === undefined) {
+				return;
+			}
+			this._externalOutput.delete(oldestPid);
+		}
 	}
 
 	async killOwnedProcess(pid: number): Promise<void> {
 		if (!this._ownedPids.has(pid)) {
 			return;
 		}
-		await this._killProcessTree(pid);
-		this._ownedPids.delete(pid);
-		this._externalChildren.delete(pid);
+		const stopped = await this._killProcessTree(pid);
+		if (!stopped) {
+			throw new Error(`PreBase could not confirm termination of owned process ${pid}.`);
+		}
 	}
 
 	async killAllOwned(): Promise<void> {
@@ -492,23 +518,50 @@ p{opacity:.75;margin:0;line-height:1.45}
 		});
 	}
 
-	private _killProcessTree(pid: number): Promise<void> {
+	private async _killProcessTree(pid: number): Promise<boolean> {
+		const child = this._externalChildren.get(pid);
+		if (!child || child.exitCode !== null || child.signalCode !== null) {
+			return true;
+		}
 		if (process.platform !== 'win32') {
+			return terminateOwnedProcess({
+				isExited: () => child.exitCode !== null || child.signalCode !== null,
+				sendSignal: signal => this._signalProcessTree(child, pid, signal),
+				waitForExit: timeoutMs => this._waitForChildExit(child, timeoutMs),
+			});
+		}
+		await new Promise<void>(resolve => {
+			execFile('taskkill', ['/pid', String(pid), '/t', '/f'], { windowsHide: true }, () => resolve());
+		});
+		return this._waitForChildExit(child, 3_000);
+	}
+
+	private _signalProcessTree(child: ChildProcess, pid: number, signal: ProcessTerminationSignal): boolean {
+		try {
+			process.kill(-pid, signal);
+			return true;
+		} catch {
 			try {
-				process.kill(-pid, 'SIGTERM');
-				return Promise.resolve();
+				return child.kill(signal);
 			} catch {
-				const child = this._externalChildren.get(pid);
-				try {
-					child?.kill('SIGTERM');
-				} catch {
-					// The child may have already exited.
-				}
-				return Promise.resolve();
+				return false;
 			}
 		}
+	}
+
+	private _waitForChildExit(child: ChildProcess, timeoutMs: number): Promise<boolean> {
+		if (child.exitCode !== null || child.signalCode !== null) {
+			return Promise.resolve(true);
+		}
 		return new Promise(resolve => {
-			execFile('taskkill', ['/pid', String(pid), '/t', '/f'], { windowsHide: true }, () => resolve());
+			const timer = setTimeout(() => finish(false), timeoutMs);
+			const onExit = () => finish(true);
+			const finish = (exited: boolean) => {
+				clearTimeout(timer);
+				child.removeListener('exit', onExit);
+				resolve(exited);
+			};
+			child.once('exit', onExit);
 		});
 	}
 

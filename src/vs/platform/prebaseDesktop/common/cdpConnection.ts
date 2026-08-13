@@ -3,6 +3,10 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { CancellationToken } from '../../../base/common/cancellation.js';
+import { CancellationError } from '../../../base/common/errors.js';
+import type { IDisposable } from '../../../base/common/lifecycle.js';
+
 export interface MinimalWebSocket {
 	on(event: 'open' | 'close', listener: () => void): void;
 	on(event: 'message', listener: (raw: unknown) => void): void;
@@ -44,7 +48,7 @@ function utf8ByteLength(value: string, stopAfter: number): number {
 /** Correlates CDP responses by request id and safely ignores protocol events. */
 export class CdpConnection {
 	private _nextId = 1;
-	private readonly _pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout> }>();
+	private readonly _pending = new Map<number, { resolve: (value: unknown) => void; reject: (error: Error) => void; timer: ReturnType<typeof setTimeout>; cancellation: IDisposable }>();
 
 	constructor(
 		private readonly _webSocket: MinimalWebSocket,
@@ -53,22 +57,39 @@ export class CdpConnection {
 		private readonly _maxInboundMessageBytes = MAX_CDP_INBOUND_MESSAGE_BYTES,
 	) { }
 
-	request<T>(method: string, params?: Record<string, unknown>): Promise<T> {
+	request<T>(method: string, params?: Record<string, unknown>, token: CancellationToken = CancellationToken.None): Promise<T> {
+		if (token.isCancellationRequested) {
+			return Promise.reject(new CancellationError());
+		}
 		if (this._pending.size >= this._maxPendingRequests) {
 			return Promise.reject(new Error(`CDP pending request limit exceeded (${this._maxPendingRequests}).`));
 		}
 		const id = this._nextId++;
 		return new Promise<T>((resolve, reject) => {
 			const timer = setTimeout(() => {
-				if (this._pending.delete(id)) {
+				const pending = this._pending.get(id);
+				if (pending) {
+					this._pending.delete(id);
+					pending.cancellation.dispose();
 					reject(new Error(`CDP request timed out: ${method}`));
 				}
 			}, this._requestTimeoutMs);
-			this._pending.set(id, { resolve: value => resolve(value as T), reject, timer });
+			const cancellation = token.onCancellationRequested(() => {
+				const pending = this._pending.get(id);
+				if (!pending) {
+					return;
+				}
+				this._pending.delete(id);
+				clearTimeout(pending.timer);
+				pending.cancellation.dispose();
+				reject(new CancellationError());
+			});
+			this._pending.set(id, { resolve: value => resolve(value as T), reject, timer, cancellation });
 			try {
 				this._webSocket.send(JSON.stringify({ id, method, params }));
 			} catch (error) {
 				clearTimeout(timer);
+				cancellation.dispose();
 				this._pending.delete(id);
 				reject(error instanceof Error ? error : new Error(String(error)));
 			}
@@ -102,6 +123,7 @@ export class CdpConnection {
 		}
 		this._pending.delete(message.id);
 		clearTimeout(pending.timer);
+		pending.cancellation.dispose();
 		if (message.error) {
 			pending.reject(new Error(message.error.message || 'CDP error'));
 			return;
@@ -112,6 +134,7 @@ export class CdpConnection {
 	rejectAll(error: Error): void {
 		for (const pending of this._pending.values()) {
 			clearTimeout(pending.timer);
+			pending.cancellation.dispose();
 			pending.reject(error);
 		}
 		this._pending.clear();

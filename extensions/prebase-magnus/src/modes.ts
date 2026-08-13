@@ -95,6 +95,7 @@ const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgen
 	prebase_desktop_list_sessions: ALL_MAGNUS_MODES,
 	prebase_desktop_get_session: ALL_MAGNUS_MODES,
 	prebase_desktop_inspect_window: ALL_MAGNUS_MODES,
+	prebase_desktop_get_process_output: ALL_MAGNUS_MODES,
 	prebase_edit_apply_file: WRITE_MAGNUS_MODES,
 	prebase_edit_apply: WRITE_MAGNUS_MODES,
 	prebase_edit_create_file: WRITE_MAGNUS_MODES,

@@ -4,13 +4,23 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
+import { formatProcessOutputForTool } from './processOutputFormatter';
+
+const MAX_TOOL_RESULT_CHARACTERS = 80_000;
 
 function result(value: string): vscode.LanguageModelToolResult {
-	return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(value.slice(0, 80_000))]);
+	return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(value.slice(0, MAX_TOOL_RESULT_CHARACTERS))]);
 }
 
 function jsonResult(value: unknown): vscode.LanguageModelToolResult {
-	return result(JSON.stringify(value ?? { ok: false }, null, 2));
+	const serialized = JSON.stringify(value ?? { ok: false }, null, 2);
+	return result(serialized.length <= MAX_TOOL_RESULT_CHARACTERS
+		? serialized
+		: JSON.stringify({ ok: false, truncated: true, reason: 'Tool result exceeds the response limit.' }));
+}
+
+function processOutputResult(value: unknown): vscode.LanguageModelToolResult {
+	return jsonResult(formatProcessOutputForTool(value));
 }
 
 class DesktopListSessionsTool implements vscode.LanguageModelTool<Record<string, never>> {
@@ -37,6 +47,15 @@ class DesktopInspectTool implements vscode.LanguageModelTool<{ sessionId?: strin
 			throw new Error('Cancelled');
 		}
 		return jsonResult(await vscode.commands.executeCommand('prebase.runtime.desktopInspectForMagnus', options.input.sessionId));
+	}
+}
+
+class DesktopProcessOutputTool implements vscode.LanguageModelTool<{ sessionId?: string }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ sessionId?: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		return processOutputResult(await vscode.commands.executeCommand('prebase.runtime.desktopGetProcessOutputForMagnus', options.input.sessionId));
 	}
 }
 
@@ -85,6 +104,7 @@ export function registerMagnusDesktopTools(context: vscode.ExtensionContext): vo
 		vscode.lm.registerTool('prebase_desktop_list_sessions', new DesktopListSessionsTool()),
 		vscode.lm.registerTool('prebase_desktop_get_session', new DesktopGetSessionTool()),
 		vscode.lm.registerTool('prebase_desktop_inspect_window', new DesktopInspectTool()),
+		vscode.lm.registerTool('prebase_desktop_get_process_output', new DesktopProcessOutputTool()),
 		vscode.lm.registerTool('prebase_desktop_reload_window', new DesktopReloadTool()),
 		vscode.lm.registerTool('prebase_desktop_restart_session', new DesktopRestartTool()),
 		vscode.lm.registerTool('prebase_desktop_stop_session', new DesktopStopTool()),

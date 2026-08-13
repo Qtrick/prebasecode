@@ -32,6 +32,7 @@ export interface IPreBaseDesktopRuntimeService extends IPreBaseRuntimeAdapter {
 	getSessions(): readonly PreBaseDesktopSession[];
 	getSessionSummaryForMagnus(sessionId?: string): Record<string, unknown>;
 	inspectForMagnus(sessionId?: string): Promise<Record<string, unknown>>;
+	getProcessOutputForMagnus(sessionId?: string): Promise<Record<string, unknown>>;
 	evaluateForMagnus(sessionId: string | undefined, expression: string): Promise<Record<string, unknown>>;
 	captureScreenshotForMagnus(sessionId?: string): Promise<Record<string, unknown>>;
 }
@@ -389,6 +390,25 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		} catch (err) {
 			return { ok: false, reason: err instanceof Error ? err.message : String(err) };
 		}
+	}
+
+	async getProcessOutputForMagnus(sessionId?: string): Promise<Record<string, unknown>> {
+		const session = this._resolveSession(sessionId);
+		if (!session) {
+			return { ok: false, reason: 'No owned desktop session.' };
+		}
+		if (session.launchMode !== 'external' || !session.pid) {
+			return { ok: false, reason: 'Process output is available only for PreBase-owned external desktop sessions.' };
+		}
+		const output = await this._main.getOwnedProcessOutput(session.pid, 10);
+		return {
+			ok: true,
+			pid: session.pid,
+			entries: output.entries,
+			truncated: output.truncated,
+			droppedCount: output.droppedCount,
+			limitation: 'Output is bounded and redacted in the Electron main process.',
+		};
 	}
 
 	async evaluateForMagnus(sessionId: string | undefined, expression: string): Promise<Record<string, unknown>> {

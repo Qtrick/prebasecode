@@ -4,6 +4,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import type { CancellationToken } from '../../../../../base/common/cancellation.js';
+import { CancellationError } from '../../../../../base/common/errors.js';
+import type { IDisposable } from '../../../../../base/common/lifecycle.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import { CdpConnection, type MinimalWebSocket } from '../../../../../platform/prebaseDesktop/common/cdpConnection.js';
 
@@ -33,6 +36,28 @@ class FakeWebSocket implements MinimalWebSocket {
 
 	emitMessage(message: unknown): void {
 		this.messageListener?.(JSON.stringify(message));
+	}
+}
+
+class TestCancellationToken implements CancellationToken {
+	private readonly _listeners = new Set<(event: void) => unknown>();
+	isCancellationRequested = false;
+
+	onCancellationRequested = (listener: (event: void) => unknown, thisArgs?: unknown): IDisposable => {
+		const callback = thisArgs === undefined ? listener : (event: void) => listener.call(thisArgs, event);
+		this._listeners.add(callback);
+		return { dispose: () => this._listeners.delete(callback) };
+	};
+
+	cancel(): void {
+		this.isCancellationRequested = true;
+		for (const listener of [...this._listeners]) {
+			listener(undefined);
+		}
+	}
+
+	get listenerCount(): number {
+		return this._listeners.size;
 	}
 }
 
@@ -158,5 +183,66 @@ suite('CdpConnection', () => {
 		const current = connection.request<{ current: true }>('Runtime.enable');
 		connection.handleMessage(JSON.stringify({ id: 2, result: { current: true } }));
 		assert.deepStrictEqual(await current, { current: true });
+	});
+
+	test('does not send or register an already-cancelled request', async () => {
+		const socket = new FakeWebSocket();
+		const connection = new CdpConnection(socket, 100, 1);
+		const token = new TestCancellationToken();
+		token.cancel();
+
+		await assert.rejects(connection.request('Runtime.enable', undefined, token), CancellationError);
+		assert.strictEqual(socket.sent.length, 0);
+		assert.strictEqual(token.listenerCount, 0);
+
+		const current = connection.request<{ current: true }>('Runtime.enable');
+		connection.handleMessage(JSON.stringify({ id: 1, result: { current: true } }));
+		assert.deepStrictEqual(await current, { current: true });
+	});
+
+	test('cancels only its own in-flight request, releases its slot, and ignores its late response', async () => {
+		const socket = new FakeWebSocket();
+		const connection = new CdpConnection(socket, 100, 2);
+		const cancelledToken = new TestCancellationToken();
+		const activeToken = new TestCancellationToken();
+		const cancelled = connection.request('Runtime.enable', undefined, cancelledToken);
+		const active = connection.request<{ active: true }>('Runtime.evaluate', undefined, activeToken);
+
+		assert.strictEqual(cancelledToken.listenerCount, 1);
+		assert.strictEqual(activeToken.listenerCount, 1);
+		cancelledToken.cancel();
+		await assert.rejects(cancelled, CancellationError);
+		assert.strictEqual(cancelledToken.listenerCount, 0);
+		connection.handleMessage(JSON.stringify({ id: 1, result: { stale: true } }));
+		connection.handleMessage(JSON.stringify({ id: 2, result: { active: true } }));
+		assert.deepStrictEqual(await active, { active: true });
+		assert.strictEqual(activeToken.listenerCount, 0);
+
+		const replacement = connection.request<{ replacement: true }>('Runtime.getProperties');
+		connection.handleMessage(JSON.stringify({ id: 3, result: { replacement: true } }));
+		assert.deepStrictEqual(await replacement, { replacement: true });
+	});
+
+	test('disposes cancellation registrations after timeout, rejectAll, and send failure', async () => {
+		const timedSocket = new FakeWebSocket();
+		const timedConnection = new CdpConnection(timedSocket, 5);
+		const timedToken = new TestCancellationToken();
+		await assert.rejects(timedConnection.request('Runtime.enable', undefined, timedToken), /CDP request timed out/);
+		assert.strictEqual(timedToken.listenerCount, 0);
+
+		const cleanupSocket = new FakeWebSocket();
+		const cleanupConnection = new CdpConnection(cleanupSocket);
+		const cleanupToken = new TestCancellationToken();
+		const pending = cleanupConnection.request('Runtime.enable', undefined, cleanupToken);
+		cleanupConnection.rejectAll(new Error('socket closed'));
+		await assert.rejects(pending, /socket closed/);
+		assert.strictEqual(cleanupToken.listenerCount, 0);
+
+		const failingSocket = new FakeWebSocket();
+		failingSocket.throwOnSend = new Error('send failed');
+		const failingConnection = new CdpConnection(failingSocket);
+		const failingToken = new TestCancellationToken();
+		await assert.rejects(failingConnection.request('Runtime.enable', undefined, failingToken), /send failed/);
+		assert.strictEqual(failingToken.listenerCount, 0);
 	});
 });

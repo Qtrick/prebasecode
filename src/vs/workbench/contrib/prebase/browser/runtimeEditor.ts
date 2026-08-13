@@ -44,6 +44,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 	private _webviewReady = false;
 	private _hostResizeObserver: ResizeObserver | undefined;
 	private _responsiveSyncTimer: number | undefined;
+	private _targetWindow: Window | undefined;
 	private _webviewControlChannel: string | undefined;
 
 	constructor(
@@ -76,6 +77,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 
 	protected createEditor(parent: HTMLElement): void {
 		this._root = DOM.append(parent, DOM.$('.prebase-runtime-editor'));
+		this._targetWindow = DOM.getWindow(this._root);
 		this._root.style.display = 'flex';
 		this._root.style.flexDirection = 'column';
 		this._root.style.height = '100%';
@@ -178,7 +180,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 				this._hostResizeObserver?.disconnect();
 				this._hostResizeObserver = undefined;
 				if (this._responsiveSyncTimer !== undefined) {
-					window.clearTimeout(this._responsiveSyncTimer);
+					this._targetWindow?.clearTimeout(this._responsiveSyncTimer);
 					this._responsiveSyncTimer = undefined;
 				}
 			}
@@ -215,9 +217,13 @@ export class PreBaseRuntimeEditor extends EditorPane {
 
 	private _scheduleResponsiveSync(): void {
 		if (this._responsiveSyncTimer !== undefined) {
-			window.clearTimeout(this._responsiveSyncTimer);
+			this._targetWindow?.clearTimeout(this._responsiveSyncTimer);
 		}
-		this._responsiveSyncTimer = window.setTimeout(() => {
+		const targetWindow = this._targetWindow;
+		if (!targetWindow) {
+			return;
+		}
+		this._responsiveSyncTimer = targetWindow.setTimeout(() => {
 			this._responsiveSyncTimer = undefined;
 			this._syncResponsiveViewportFromHost();
 			this._applyViewportChrome();
@@ -272,7 +278,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 
 	private _renderSession(): void {
 		const session = this.runtimeService.getSession();
-		if (this._urlInput && this._urlInput !== document.activeElement) {
+		if (this._urlInput && this._urlInput !== DOM.getWindow(this._urlInput).document.activeElement) {
 			this._urlInput.value = session.url;
 		}
 		if (this._statusBadge) {
@@ -427,9 +433,9 @@ function hideOverlay() {
 
 window.addEventListener('message', function (event) {
 	const msg = event.data;
-	// The iframe can postMessage to its parent. Only VS Code host commands have
-	// this per-webview channel, which never enters the untrusted iframe document.
-	if (!msg || msg.channel !== controlChannel || !msg.type) return;
+	// Host commands arrive through the webview wrapper at this document's origin.
+	// Reject messages from the untrusted preview iframe even if it learns a channel.
+	if (event.origin !== window.origin || !msg || msg.channel !== controlChannel || !msg.type) return;
 	if (msg.type === 'setUrl' && typeof msg.url === 'string') {
 		try {
 			const parsed = new URL(msg.url);

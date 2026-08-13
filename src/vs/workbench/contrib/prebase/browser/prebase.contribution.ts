@@ -22,7 +22,8 @@ import { INotificationService, Severity } from '../../../../platform/notificatio
 import { IOutputChannelRegistry, IOutputService, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
-import { registerPreBaseGraphContribution } from '../graphs/host/workbench/graphContribution.js';
+// eslint-disable-next-line local/code-import-patterns -- Graph sources are intentionally mounted here through the graphs ownership symlink.
+import { PREBASE_MAPS_VIEW_CONTAINER_ID, registerPreBaseGraphContribution } from '../graphs/host/workbench/graphContribution.js';
 import { PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL } from '../common/prebaseConfiguration.js';
 import type { PreBaseViewportPreset } from '../common/runtime/viewportPresets.js';
 import { IPreBaseRuntimeService, PreBaseRuntimeService } from './prebaseRuntimeService.js';
@@ -48,7 +49,7 @@ import { PreBaseOnboardingEditorInput } from './prebaseOnboardingEditorInput.js'
 import './prebaseRecentHistory.js';
 import { PreBaseWorkspaceOpeningEditor } from './prebaseWorkspaceOpeningEditor.js';
 import { PreBaseWorkspaceOpeningEditorInput } from './prebaseWorkspaceOpeningEditorInput.js';
-import type { PreBaseWorkspaceOpenPhase } from './prebaseWorkspaceOpening.js';
+import { PreBaseWorkspaceOpenPhase } from './prebaseWorkspaceOpening.js';
 
 registerPreBaseGraphContribution();
 
@@ -73,6 +74,16 @@ registerAction2(class extends Action2 {
 	}
 	run(accessor: ServicesAccessor, input: IPreBaseWebSearchRequest) {
 		return accessor.get(IPreBaseWebSearchService).searchForMagnus(input, CancellationToken.None);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopGetProcessOutputForMagnus', title: localize2('prebase.runtime.desktopGetProcessOutputForMagnus', "Get Desktop Process Output for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, sessionId?: string) {
+		const desktop = getDesktopRuntimeService(accessor);
+		return desktop?.getProcessOutputForMagnus(sessionId) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
 	}
 });
 
@@ -103,7 +114,7 @@ registerAction2(class extends Action2 {
 	}
 });
 
-export { PREBASE_MAPS_VIEW_CONTAINER_ID } from '../graphs/host/workbench/graphContribution.js';
+export { PREBASE_MAPS_VIEW_CONTAINER_ID };
 
 // --- view containers
 
@@ -180,7 +191,6 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 import './prebaseWorkbenchReadyContribution.js';
 import './prebaseOnboardingContribution.js';
 import './prebaseHomeEmptyEditors.js';
-import './prebaseWorkspaceOpening.js';
 
 class PreBaseRuntimeEditorInputSerializer implements IEditorSerializer {
 	canSerialize(editor: EditorInput): boolean {
@@ -411,16 +421,15 @@ async function promptCredentials(quickInput: IQuickInputService, includeDisplayN
 	return { email, password, displayName };
 }
 
-async function ensureAccountConfigured(accessor: ServicesAccessor): Promise<boolean> {
-	const accounts = accessor.get(IPreBaseAccountService);
+async function ensureAccountConfigured(accounts: IPreBaseAccountService, notificationService: INotificationService, commandService: ICommandService): Promise<boolean> {
 	if (accounts.apiConfigured) {
 		return true;
 	}
-	accessor.get(INotificationService).notify({
+	notificationService.notify({
 		severity: Severity.Info,
 		message: localize('prebase.account.unconfiguredMenu', "PreBase account service is not configured. Set prebase.cloud.url and prebase.cloud.publishableKey (Supabase) or the deprecated prebase.account.apiBaseUrl to enable sign-in."),
 	});
-	await accessor.get(ICommandService).executeCommand('workbench.action.openSettings', PreBaseCloudConfigKeys.Url);
+	await commandService.executeCommand('workbench.action.openSettings', PreBaseCloudConfigKeys.Url);
 	return false;
 }
 
@@ -440,19 +449,22 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		if (!(await ensureAccountConfigured(accessor))) {
+		const accountService = accessor.get(IPreBaseAccountService);
+		const notificationService = accessor.get(INotificationService);
+		const quickInputService = accessor.get(IQuickInputService);
+		const commandService = accessor.get(ICommandService);
+		if (!(await ensureAccountConfigured(accountService, notificationService, commandService))) {
 			return;
 		}
-		const notify = accessor.get(INotificationService);
-		const creds = await promptCredentials(accessor.get(IQuickInputService), false);
+		const creds = await promptCredentials(quickInputService, false);
 		if (!creds) {
 			return;
 		}
 		try {
-			await accessor.get(IPreBaseAccountService).signIn(creds.email, creds.password);
-			notify.info(localize('prebase.account.signedIn', "Signed in to PreBase."));
+			await accountService.signIn(creds.email, creds.password);
+			notificationService.info(localize('prebase.account.signedIn', "Signed in to PreBase."));
 		} catch (err) {
-			notify.error(err instanceof Error ? err.message : String(err));
+			notificationService.error(err instanceof Error ? err.message : String(err));
 		}
 	}
 });
@@ -473,19 +485,22 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		if (!(await ensureAccountConfigured(accessor))) {
+		const accountService = accessor.get(IPreBaseAccountService);
+		const notificationService = accessor.get(INotificationService);
+		const quickInputService = accessor.get(IQuickInputService);
+		const commandService = accessor.get(ICommandService);
+		if (!(await ensureAccountConfigured(accountService, notificationService, commandService))) {
 			return;
 		}
-		const notify = accessor.get(INotificationService);
-		const creds = await promptCredentials(accessor.get(IQuickInputService), true);
+		const creds = await promptCredentials(quickInputService, true);
 		if (!creds) {
 			return;
 		}
 		try {
-			await accessor.get(IPreBaseAccountService).signUp(creds.email, creds.password, creds.displayName);
-			notify.info(localize('prebase.account.created', "PreBase account created."));
+			await accountService.signUp(creds.email, creds.password, creds.displayName);
+			notificationService.info(localize('prebase.account.created', "PreBase account created."));
 		} catch (err) {
-			notify.error(err instanceof Error ? err.message : String(err));
+			notificationService.error(err instanceof Error ? err.message : String(err));
 		}
 	}
 });
@@ -532,8 +547,10 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		await accessor.get(IPreBaseAccountService).signOut();
-		accessor.get(INotificationService).info(localize('prebase.account.signedOut', "Signed out of PreBase."));
+		const accountService = accessor.get(IPreBaseAccountService);
+		const notificationService = accessor.get(INotificationService);
+		await accountService.signOut();
+		notificationService.info(localize('prebase.account.signedOut', "Signed out of PreBase."));
 	}
 });
 
@@ -553,7 +570,11 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run(accessor: ServicesAccessor) {
-		await ensureAccountConfigured(accessor);
+		await ensureAccountConfigured(
+			accessor.get(IPreBaseAccountService),
+			accessor.get(INotificationService),
+			accessor.get(ICommandService),
+		);
 	}
 });
 
@@ -614,10 +635,12 @@ registerAction2(class extends Action2 {
 		super({ id: 'prebase.runtime.detectConfigurations', title: localize2('prebase.runtime.detectConfigurations', "Detect Runtime Configurations"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	async run(accessor: ServicesAccessor) {
-		const urls = await accessor.get(IPreBaseRuntimeService).detectConfigurations();
+		const runtimeService = accessor.get(IPreBaseRuntimeService);
 		const output = accessor.get(IOutputService);
+		const notificationService = accessor.get(INotificationService);
+		const urls = await runtimeService.detectConfigurations();
 		await output.showChannel(PREBASE_RUNTIME_CHANNEL_ID);
-		accessor.get(INotificationService).info(localize('prebase.runtime.detectedNotify', "Detected: {0}", urls.join(', ')));
+		notificationService.info(localize('prebase.runtime.detectedNotify', "Detected: {0}", urls.join(', ')));
 	}
 });
 
@@ -770,9 +793,12 @@ registerAction2(class extends Action2 {
 		super({ id: 'prebase.runtime.showReports', title: localize2('prebase.runtime.showReportsCmd', "Show Runtime Reports"), category: localize2('prebase.category', "PreBase"), f1: true });
 	}
 	async run(accessor: ServicesAccessor) {
-		const reports = accessor.get(IPreBaseRuntimeService).showReports();
-		await accessor.get(IOutputService).showChannel(PREBASE_RUNTIME_CHANNEL_ID);
-		accessor.get(INotificationService).info(reports.length
+		const runtimeService = accessor.get(IPreBaseRuntimeService);
+		const output = accessor.get(IOutputService);
+		const notificationService = accessor.get(INotificationService);
+		const reports = runtimeService.showReports();
+		await output.showChannel(PREBASE_RUNTIME_CHANNEL_ID);
+		notificationService.info(reports.length
 			? reports.join('\n')
 			: localize('prebase.runtime.noReports', "No runtime reports yet."));
 	}
@@ -810,11 +836,11 @@ function getDesktopRuntimeService(accessor: ServicesAccessor): IPreBaseDesktopRu
 	}
 }
 
-async function ensureDesktopDetected(accessor: ServicesAccessor, desktop: IPreBaseDesktopRuntimeService): Promise<boolean> {
+async function ensureDesktopDetected(runtimeService: IPreBaseRuntimeService, desktop: IPreBaseDesktopRuntimeService): Promise<boolean> {
 	if (desktop.getProfile()?.isElectron) {
 		return true;
 	}
-	await accessor.get(IPreBaseRuntimeService).detectConfigurations();
+	await runtimeService.detectConfigurations();
 	return Boolean(desktop.getProfile()?.isElectron);
 }
 
@@ -824,13 +850,14 @@ registerAction2(class extends Action2 {
 	}
 	async run(accessor: ServicesAccessor) {
 		const desktop = getDesktopRuntimeService(accessor);
+		const runtimeService = accessor.get(IPreBaseRuntimeService);
 		if (desktop) {
-			if (!(await ensureDesktopDetected(accessor, desktop))) {
+			if (!(await ensureDesktopDetected(runtimeService, desktop))) {
 				return undefined;
 			}
 			return desktop.start();
 		}
-		return accessor.get(IPreBaseRuntimeService).start();
+		return runtimeService.start();
 	}
 });
 
@@ -853,13 +880,14 @@ registerAction2(class extends Action2 {
 	}
 	async run(accessor: ServicesAccessor) {
 		const desktop = getDesktopRuntimeService(accessor);
+		const runtimeService = accessor.get(IPreBaseRuntimeService);
 		if (desktop) {
-			if (!(await ensureDesktopDetected(accessor, desktop))) {
+			if (!(await ensureDesktopDetected(runtimeService, desktop))) {
 				return undefined;
 			}
 			return desktop.restart();
 		}
-		return accessor.get(IPreBaseRuntimeService).restart();
+		return runtimeService.restart();
 	}
 });
 

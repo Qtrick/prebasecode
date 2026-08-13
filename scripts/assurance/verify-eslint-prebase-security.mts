@@ -21,6 +21,9 @@ const TARGETS = [
 	'src/vs/workbench/contrib/prebase/common/runtime/permissionClassifier.ts',
 	'src/vs/workbench/contrib/prebase/common/runtime/runtimeResponseReader.ts',
 	'src/vs/workbench/contrib/prebase/common/runtime/runtimeWebviewProtocol.ts',
+	'src/vs/workbench/contrib/prebase/browser/prebaseDesktopRuntimeService.ts',
+	'src/vs/workbench/contrib/prebase/browser/prebaseRuntimeService.ts',
+	'src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts',
 ];
 
 async function main(): Promise<void> {
