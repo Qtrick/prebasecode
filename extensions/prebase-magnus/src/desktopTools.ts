@@ -23,6 +23,24 @@ function processOutputResult(value: unknown): vscode.LanguageModelToolResult {
 	return jsonResult(formatProcessOutputForTool(value));
 }
 
+function screenshotResult(value: unknown): vscode.LanguageModelToolResult {
+	if (!value || typeof value !== 'object' || (value as { ok?: unknown }).ok !== true || typeof (value as { pngBase64?: unknown }).pngBase64 !== 'string') {
+		return jsonResult(value);
+	}
+	const screenshot = value as { mimeType?: unknown; pngBase64: string; scope?: unknown; limitations?: unknown };
+	if (screenshot.mimeType !== 'image/png') {
+		return jsonResult({ ok: false, reason: 'Desktop screenshot did not return a PNG image.' });
+	}
+	const png = Buffer.from(screenshot.pngBase64, 'base64');
+	if (png.byteLength === 0 || png.byteLength > 10 * 1024 * 1024) {
+		return jsonResult({ ok: false, reason: 'Desktop screenshot exceeds the 10 MiB image limit.' });
+	}
+	return new vscode.LanguageModelToolResult([
+		new vscode.LanguageModelTextPart(JSON.stringify({ ok: true, mimeType: screenshot.mimeType, scope: screenshot.scope, limitations: screenshot.limitations, imageIncluded: true })),
+		vscode.LanguageModelDataPart.image(new Uint8Array(png), screenshot.mimeType),
+	]);
+}
+
 class DesktopListSessionsTool implements vscode.LanguageModelTool<Record<string, never>> {
 	async invoke(_options: vscode.LanguageModelToolInvocationOptions<Record<string, never>>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested) {
@@ -99,6 +117,19 @@ class DesktopCdpEvalTool implements vscode.LanguageModelTool<{ sessionId?: strin
 	}
 }
 
+class DesktopScreenshotTool implements vscode.LanguageModelTool<{ sessionId?: string }> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ sessionId?: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const screenshot = await vscode.commands.executeCommand('prebase.runtime.desktopCaptureScreenshotForMagnus', options.input.sessionId);
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		return screenshotResult(screenshot);
+	}
+}
+
 export function registerMagnusDesktopTools(context: vscode.ExtensionContext): void {
 	context.subscriptions.push(
 		vscode.lm.registerTool('prebase_desktop_list_sessions', new DesktopListSessionsTool()),
@@ -109,5 +140,6 @@ export function registerMagnusDesktopTools(context: vscode.ExtensionContext): vo
 		vscode.lm.registerTool('prebase_desktop_restart_session', new DesktopRestartTool()),
 		vscode.lm.registerTool('prebase_desktop_stop_session', new DesktopStopTool()),
 		vscode.lm.registerTool('prebase_desktop_cdp_evaluate', new DesktopCdpEvalTool()),
+		vscode.lm.registerTool('prebase_desktop_capture_screenshot', new DesktopScreenshotTool()),
 	);
 }

@@ -136,11 +136,9 @@ function buildCapabilities(
 		supportsCdpAttach: supportsExternalLaunch || supportsManagedLaunch,
 		supportsDevServerAutostart,
 		supportsDOMInspection: supportsExternalLaunch || supportsManagedLaunch,
-		// External CDP evaluation is available, but event subscriptions and screenshot capture
-		// have not yet been implemented or surfaced by the desktop runtime.
 		supportsConsoleCapture: false,
 		supportsNetworkCapture: false,
-		supportsScreenshots: supportsManagedLaunch,
+		supportsScreenshots: supportsExternalLaunch || supportsManagedLaunch,
 		supportsInputAutomation: false,
 		supportsWindowManagement: supportsManagedLaunch,
 		requiresPreload: Boolean(paths.preload),

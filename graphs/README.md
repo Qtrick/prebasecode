@@ -1,6 +1,6 @@
 # PreBase graphs package
 
-Architecture Graph and Network Graph implementation for PreBase. **All graph-owned code must live under this directory** (see [OWNERSHIP.md](./OWNERSHIP.md) and `.cursor/rules/graphs-ownership.mdc`).
+The active PreBase **Code Graph** implementation. **All graph-owned code must live under this directory** (see [OWNERSHIP.md](./OWNERSHIP.md) and `.cursor/rules/graphs-ownership.mdc`). The compatible internal identifier remains `network`; preserved Architecture assets are dormant reference material, not an active product surface (see [PRESERVED_ARCHITECTURE.md](./PRESERVED_ARCHITECTURE.md)).
 
 ## Current status (2026-07-21, Phase A Settings UI + shim removal)
 

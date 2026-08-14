@@ -439,15 +439,16 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		if (!session) {
 			return { ok: false, reason: 'No owned desktop session.' };
 		}
-		if (session.launchMode !== 'managed') {
-			return {
-				ok: false,
-				reason: 'Screenshot via PreBase is currently implemented for managed windows (application content only). Use external DevTools or CDP Page.captureScreenshot for external mode.',
-			};
-		}
 		try {
-			const pngBase64 = await this._main.captureManagedScreenshot(session.id);
-			return { ok: true, mimeType: 'image/png', pngBase64, scope: 'application-content-only' };
+			if (session.launchMode === 'managed') {
+				const pngBase64 = await this._main.captureManagedScreenshot(session.id);
+				return { ok: true, mimeType: 'image/png', pngBase64, scope: 'application-content-only' };
+			}
+			if (!session.debugPort) {
+				return { ok: false, reason: 'External session has no owned debugging endpoint.' };
+			}
+			const pngBase64 = await this._main.captureScreenshotViaCdp(session.debugPort);
+			return { ok: true, mimeType: 'image/png', pngBase64, scope: 'external-renderer-page-only', limitations: session.profile.capabilities.limitations };
 		} catch (err) {
 			return { ok: false, reason: err instanceof Error ? err.message : String(err) };
 		}

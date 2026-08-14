@@ -1,0 +1,69 @@
+{
+	"branch": "main",
+	"sha": "bd413b673cb9b609dbb4d286a889e130e977f812",
+	"platform": "darwin",
+	"architecture": "arm64",
+	"node": "v24.17.0",
+	"electron": "42.8.0",
+	"startedAt": "2026-08-14T17:47:21Z",
+	"finishedAt": null,
+	"scenarios": [
+		{
+			"scenario": "initial-icon-integrity",
+			"status": "PASS",
+			"commands": ["npm run verify:icons"],
+			"logs": [],
+			"screenshots": [],
+			"notes": "101/101 protected icon hashes matched."
+		},
+		{
+			"scenario": "core-ide-source-launch",
+			"status": "PASS",
+			"commands": [
+				"TMPDIR=/tmp .agents/skills/launch/scripts/launch.sh --repo /Users/qunyingfan/Prebasecode",
+				"TMPDIR=/tmp npx @playwright/cli -s=<unique> attach --cdp=http://127.0.0.1:<dynamic-port>",
+				"TMPDIR=/tmp npx @playwright/cli -s=<unique> snapshot"
+			],
+			"logs": [
+				".playwright-cli/console-2026-08-14T17-51-13-695Z.log",
+				".playwright-cli/page-2026-08-14T17-51-13-747Z.yml",
+				".playwright-cli/console-2026-08-14T17-57-14-229Z.log",
+				".playwright-cli/page-2026-08-14T17-57-14-359Z.yml",
+				".playwright-cli/console-2026-08-14T18-00-19-850Z.log",
+				".playwright-cli/page-2026-08-14T18-00-19-920Z.yml"
+			],
+			"screenshots": ["screenshots/fresh-profile-rerun.png", "screenshots/fresh-profile-final.png"],
+			"notes": "Final rerun showed only PreBase auth/Agents UI: no generic VS Code/Copilot modal, no Copilot status control, and no Magnus proposal warning."
+		},
+		{
+			"scenario": "fresh-profile-continue-offline",
+			"status": "PASS",
+			"commands": ["Playwright: click button named Continue Offline"],
+			"logs": [".playwright-cli/page-2026-08-14T18-00-41-455Z.yml"],
+			"screenshots": ["screenshots/fresh-profile-offline.png"],
+			"notes": "The auth overlay closed and the PreBase onboarding editor opened at step 1 without a crash."
+		},
+		{
+			"scenario": "prebase-auth-card-theme-inheritance",
+			"status": "PASS",
+			"commands": [
+				"TMPDIR=/tmp .agents/skills/launch/scripts/launch.sh --repo /Users/qunyingfan/Prebasecode",
+				"Playwright: inspect computed overlay/card styles and capture screenshot"
+			],
+			"logs": [".playwright-cli/page-2026-08-14T18-28-57-653Z.yml"],
+			"screenshots": ["screenshots/auth-card-final.png"],
+			"notes": "The modal is a child of .monaco-workbench, so scoped theme variables resolve to opaque rgb(27, 28, 30) backdrop and rgb(48, 48, 48) card."
+		},
+		{
+			"scenario": "prebase-auth-card-branded-backdrop",
+			"status": "PASS",
+			"commands": [
+				"TMPDIR=/tmp .agents/skills/launch/scripts/launch.sh --repo /Users/qunyingfan/Prebasecode -- /Users/qunyingfan/Prebasecode",
+				"Playwright: inspect provider asset URLs and overlay computed styles, click Continue Offline, wait 220 ms"
+			],
+			"logs": [".playwright-cli/page-2026-08-14T18-36-30-399Z.yml"],
+			"screenshots": ["screenshots/auth-card-branded-blur.png", "screenshots/auth-card-dismissed.png"],
+			"notes": "Existing GitHub and Google assets loaded at 18px. The IDE remains visible behind color-mix backdrop with blur(6px); after the 160ms close transition the overlay is absent."
+		}
+	]
+}

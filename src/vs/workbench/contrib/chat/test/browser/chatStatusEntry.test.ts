@@ -13,7 +13,7 @@ import { IStorageService, StorageScope, StorageTarget } from '../../../../../pla
 import { ChatEntitlement, IChatEntitlementService, IChatSentiment } from '../../../../services/chat/common/chatEntitlementService.js';
 import { IStatusbarEntry, IStatusbarEntryAccessor, IStatusbarService } from '../../../../services/statusbar/browser/statusbar.js';
 import { workbenchInstantiationService } from '../../../../test/browser/workbenchTestServices.js';
-import { ChatQuotaResumeState, ChatStatusBarEntry, computeQuotaResumeState } from '../../browser/chatStatus/chatStatusEntry.js';
+import { ChatQuotaResumeState, ChatStatusBarEntry, computeQuotaResumeState, isCopilotStatusBarEntryEnabled } from '../../browser/chatStatus/chatStatusEntry.js';
 import { IChatStatusItemService } from '../../browser/chatStatus/chatStatusItemService.js';
 
 type Quotas = IChatEntitlementService['quotas'];
@@ -24,6 +24,15 @@ const pooledDepleted = { percentRemaining: 0, unlimited: true, hasQuota: false }
 const pooledAvailable = { percentRemaining: 100, unlimited: true, hasQuota: true } as const;
 
 const RESUME_STATE_KEY = 'chat.quotaResumeState';
+
+suite('ChatStatusBarEntry - product registration', () => {
+
+	test('does not register the Copilot status control for PreBase Magnus', () => {
+		assert.strictEqual(isCopilotStatusBarEntryEnabled({ extensionId: 'prebase.magnus' }), false);
+		assert.strictEqual(isCopilotStatusBarEntryEnabled({ chatExtensionId: 'prebase.magnus' }), false);
+		assert.strictEqual(isCopilotStatusBarEntryEnabled({ extensionId: 'github.copilot', chatExtensionId: 'github.copilot.chat' }), true);
+	});
+});
 
 suite('ChatStatusBarEntry - computeQuotaResumeState', () => {
 

@@ -117,7 +117,7 @@ suite('electronDetector', () => {
 			managed: false,
 			external: true,
 			mainProcess: true,
-			screenshots: false,
+			screenshots: true,
 			blockers: ['No renderer dev server was detected for managed launch.'],
 		});
 	});

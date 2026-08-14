@@ -22,9 +22,12 @@ import { PREBASE_OAUTH_CALLBACK_AUTHORITY, PREBASE_OAUTH_CALLBACK_PATH, type Pre
 /** Product-owned startup gate, independent from the generic welcome/onboarding overlay. */
 export class PreBaseStartupAuthContribution extends Disposable implements IWorkbenchContribution, IURLHandler {
 	static readonly ID = 'workbench.contrib.prebase.startupAuth';
+	private static readonly AUTH_OVERLAY_CLOSE_DURATION = 160;
 
 	private _offlineDismissed = false;
 	private _overlay: HTMLElement | undefined;
+	private _closingOverlay: HTMLElement | undefined;
+	private _closeOverlayTimeout: number | undefined;
 
 	constructor(
 		@IPreBaseAccountService private readonly accountService: IPreBaseAccountService,
@@ -78,32 +81,63 @@ export class PreBaseStartupAuthContribution extends Disposable implements IWorkb
 		if (this._overlay) {
 			return;
 		}
-		const document = mainWindow.document;
-		const overlay = DOM.append(mainWindow.document.body, DOM.$('.prebase-startup-auth'));
+		if (this._closingOverlay) {
+			if (this._closeOverlayTimeout !== undefined) {
+				mainWindow.clearTimeout(this._closeOverlayTimeout);
+				this._closeOverlayTimeout = undefined;
+			}
+			this._closingOverlay.remove();
+			this._closingOverlay = undefined;
+		}
+		// Workbench color tokens are scoped to `.monaco-workbench`; append the modal there so
+		// its backdrop and card inherit the active theme instead of resolving transparent.
+		const workbench = Array.from(mainWindow.document.body.children).find(element => element.classList.contains('monaco-workbench'));
+		const overlayParent = DOM.isHTMLElement(workbench) ? workbench : mainWindow.document.body;
+		const overlay = DOM.append(overlayParent, DOM.$('.prebase-startup-auth'));
 		overlay.setAttribute('role', 'dialog');
 		overlay.setAttribute('aria-modal', 'true');
 		overlay.setAttribute('aria-label', localize('prebase.auth.ariaLabel', 'Sign in to PreBase'));
-		Object.assign(overlay.style, { position: 'fixed', inset: '0', zIndex: '100000', display: 'grid', placeItems: 'center', background: 'var(--vscode-editor-background)' });
+		Object.assign(overlay.style, {
+			position: 'fixed',
+			inset: '0',
+			zIndex: '100000',
+			display: 'grid',
+			placeItems: 'center',
+			background: 'color-mix(in srgb, var(--vscode-editor-background) 72%, transparent)',
+			backdropFilter: 'blur(6px)',
+			transition: `opacity ${PreBaseStartupAuthContribution.AUTH_OVERLAY_CLOSE_DURATION}ms ease-out, backdrop-filter ${PreBaseStartupAuthContribution.AUTH_OVERLAY_CLOSE_DURATION}ms ease-out`,
+		});
 		const card = DOM.append(overlay, DOM.$('.prebase-startup-auth-card'));
-		Object.assign(card.style, { width: 'min(440px, calc(100vw - 40px))', padding: '32px', boxSizing: 'border-box', border: '1px solid var(--vscode-widget-border)', borderRadius: '10px', background: 'var(--vscode-editorWidget-background)', color: 'var(--vscode-foreground)', boxShadow: '0 12px 36px var(--vscode-widget-shadow)' });
-		const logo = DOM.append(card, document.createElement('img'));
+		Object.assign(card.style, { width: 'min(440px, calc(100vw - 40px))', padding: '32px', boxSizing: 'border-box', border: '1px solid var(--vscode-widget-border)', borderRadius: '10px', background: 'color-mix(in srgb, var(--vscode-editorWidget-background) 96%, transparent)', color: 'var(--vscode-foreground)', boxShadow: '0 12px 36px var(--vscode-widget-shadow)' });
+		const logo = DOM.append(card, mainWindow.document.createElement('img'));
 		logo.src = FileAccess.asBrowserUri('vs/workbench/contrib/prebase/browser/media/prebase-logo.png').toString(true);
 		logo.alt = 'PreBase';
 		Object.assign(logo.style, { width: '44px', height: '44px', display: 'block', margin: '0 auto 16px' });
-		const title = DOM.append(card, document.createElement('h1'));
+		const title = DOM.append(card, mainWindow.document.createElement('h1'));
 		title.textContent = 'PreBase';
 		Object.assign(title.style, { textAlign: 'center', fontSize: '24px', margin: '0 0 8px' });
-		const copy = DOM.append(card, document.createElement('p'));
+		const copy = DOM.append(card, mainWindow.document.createElement('p'));
 		copy.textContent = this.accountService.apiConfigured ? localize('prebase.auth.copy', 'Sign in to sync your optional PreBase account.') : localize('prebase.auth.localCopy', 'Cloud sign-in is not configured. You can use PreBase locally.');
 		Object.assign(copy.style, { textAlign: 'center', color: 'var(--vscode-descriptionForeground)', margin: '0 0 20px' });
-		for (const provider of [{ id: 'github' as const, label: 'Continue with GitHub' }, { id: 'google' as const, label: 'Continue with Google' }]) {
-			const button = DOM.append(card, document.createElement('button'));
-			button.textContent = provider.label;
+		for (const provider of [
+			{ id: 'github' as const, label: localize('prebase.auth.github', 'Continue with GitHub'), logo: 'vs/workbench/contrib/chat/browser/chatSetup/media/github.svg' },
+			{ id: 'google' as const, label: localize('prebase.auth.google', 'Continue with Google'), logo: 'vs/workbench/contrib/chat/browser/chatSetup/media/google.svg' },
+		] as const) {
+			const button = DOM.append(card, mainWindow.document.createElement('button'));
 			button.disabled = !this.accountService.apiConfigured;
-			Object.assign(button.style, { width: '100%', minHeight: '42px', marginBottom: '10px', border: '1px solid var(--vscode-button-border, var(--vscode-widget-border))', borderRadius: '5px', background: 'var(--vscode-button-secondaryBackground)', color: 'var(--vscode-button-secondaryForeground)', cursor: 'pointer' });
+			Object.assign(button.style, { width: '100%', minHeight: '42px', marginBottom: '10px', border: '1px solid var(--vscode-button-border, var(--vscode-widget-border))', borderRadius: '5px', background: 'var(--vscode-button-secondaryBackground)', color: 'var(--vscode-button-secondaryForeground)', cursor: 'pointer', display: 'grid', gridTemplateColumns: '20px 1fr 20px', alignItems: 'center', columnGap: '8px' });
+			const providerLogo = DOM.append(button, mainWindow.document.createElement('img'));
+			providerLogo.src = FileAccess.asBrowserUri(provider.logo).toString(true);
+			providerLogo.alt = '';
+			providerLogo.setAttribute('aria-hidden', 'true');
+			Object.assign(providerLogo.style, { width: '18px', height: '18px', objectFit: 'contain' });
+			const providerLabel = DOM.append(button, mainWindow.document.createElement('span'));
+			providerLabel.textContent = provider.label;
+			const labelSpacer = DOM.append(button, mainWindow.document.createElement('span'));
+			labelSpacer.setAttribute('aria-hidden', 'true');
 			this._register(DOM.addDisposableListener(button, 'click', () => void this._signIn(provider.id)));
 		}
-		const offline = DOM.append(card, document.createElement('button'));
+		const offline = DOM.append(card, mainWindow.document.createElement('button'));
 		offline.textContent = localize('prebase.auth.continueOffline', 'Continue Offline');
 		Object.assign(offline.style, { width: '100%', minHeight: '38px', border: '0', background: 'transparent', color: 'var(--vscode-textLink-foreground)', cursor: 'pointer' });
 		this._register(DOM.addDisposableListener(offline, 'click', () => this._continueOffline()));
@@ -122,12 +156,33 @@ export class PreBaseStartupAuthContribution extends Disposable implements IWorkb
 	}
 
 	private _closeAuth(): void {
-		this._overlay?.remove();
+		const overlay = this._overlay;
+		if (!overlay) {
+			return;
+		}
 		this._overlay = undefined;
+		overlay.setAttribute('aria-hidden', 'true');
+		Object.assign(overlay.style, { opacity: '0', pointerEvents: 'none', backdropFilter: 'blur(0)' });
+		this._closingOverlay = overlay;
+		if (this._closeOverlayTimeout !== undefined) {
+			mainWindow.clearTimeout(this._closeOverlayTimeout);
+		}
+		this._closeOverlayTimeout = mainWindow.setTimeout(() => {
+			if (this._closingOverlay === overlay) {
+				this._closingOverlay = undefined;
+				this._closeOverlayTimeout = undefined;
+			}
+			overlay.remove();
+		}, PreBaseStartupAuthContribution.AUTH_OVERLAY_CLOSE_DURATION);
 	}
 
 	override dispose(): void {
 		this._closeAuth();
+		if (this._closeOverlayTimeout !== undefined) {
+			mainWindow.clearTimeout(this._closeOverlayTimeout);
+		}
+		this._closingOverlay?.remove();
+		this._closingOverlay = undefined;
 		super.dispose();
 	}
 }

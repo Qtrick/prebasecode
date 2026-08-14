@@ -10,6 +10,11 @@ fi
 
 cd $ROOT
 
+# The Electron unit runner needs the Electron main-process API. Codex/VS Code
+# extension hosts may inherit this for CLI work, which would otherwise make
+# `require('electron')` return the Node-mode path instead of `app`.
+unset ELECTRON_RUN_AS_NODE
+
 if [[ "$OSTYPE" == "darwin"* ]]; then
 	NAME=`node -p "require('./product.json').nameLong"`
 	EXE_NAME=`node -p "require('./product.json').nameShort"`

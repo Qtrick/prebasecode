@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Launch Code OSS (VS Code from sources) with:
-#   - a fresh, slimmed copy of the authenticated user-data-dir (so Copilot/GitHub auth works)
+#   - a fresh, slimmed copy of a source user-data-dir (so optional PreBase account
+#     and Magnus SecretStorage/provider state can be retained without requiring Copilot)
 #   - an isolated --shared-data-dir (otherwise two instances share ~/.vscode-oss-shared and crash each other)
 #   - unique debug ports for renderer (CDP), extension host, main process, and agent host
 #

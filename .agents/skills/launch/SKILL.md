@@ -7,12 +7,12 @@ description: "Launch Code OSS (VS Code from sources) into an isolated throwaway 
 
 You're working on VS Code itself and you want to:
 
-1. Launch a Code OSS build from sources that is **already signed in** (Copilot, GitHub, etc.) so chat / agent flows work end-to-end.
+1. Launch a PreBase build from sources with an isolated profile so normal workbench, Magnus, and optional PreBase-account flows can be exercised end-to-end.
 2. Drive it with `@playwright/cli` over CDP (UI automation).
 3. Optionally attach a debugger via **dap-cli** to set breakpoints in the renderer, extension host, or main process.
 4. Run multiple instances at once without port conflicts.
 
-This skill provides a launcher that clones an authenticated user-data-dir to a throwaway temp folder, picks free ports for every debug surface, and prints them as JSON so you can pick them up programmatically.
+This skill provides a launcher that clones a source user-data-dir to a throwaway temp folder, picks free ports for every debug surface, and prints them as JSON so you can pick them up programmatically. The source profile may preserve PreBase account state and Magnus SecretStorage/provider credentials, but authentication is optional for local workbench acceptance.
 
 The clone is **slim**: workspace storage, browser caches, file history, cached VSIX backups, and old logs are excluded by default. Auth tokens themselves live in the OS keychain (shared automatically) plus small files inside `User/globalStorage` - both of which *are* preserved.
 
@@ -21,8 +21,8 @@ The clone is **slim**: workspace storage, browser caches, file history, cached V
 - macOS or Linux. The launcher is a bash script and depends on `rsync`, `curl`, `nohup`, and Node on `PATH`. The example caller snippets below also use `jq` (parse the JSON output) and `lsof` (kill-by-port fallback) — install those if you plan to use them, but the launcher itself does not require them.
 - A VS Code checkout with `node_modules/` installed (`npm install` if missing — do **not** symlink from a sibling worktree; that breaks builds in subtle ways).
 - A VS Code checkout with sources built. Run `npm run compile` once (one-shot) or `npm run watch` for incremental rebuilds. Both build the full client **and** all built-in extensions under `extensions/`. You must build the full product to run successfully, building just the client is not enough.
-- An **authenticated** Code OSS profile to seed from. By default the launcher uses `~/.vscode-oss-dev`, which is the user-data-dir the repo's `launch.json` configs use - if the user has ever signed in to Copilot in a dev build, this should work. Only pass `--source-user-data-dir <path>` (or set `$CODE_OSS_DEV_AUTHED_USER_DATA_DIR`) when you specifically want to seed from a different profile (e.g. your regular `~/Library/Application Support/Code` install).
-  - If Code OSS launches and needs a sign-in, don't give up! Use the questions tool to ask the user to sign in.
+- A source Code OSS profile to seed from. By default the launcher uses `~/.vscode-oss-dev`, the user-data-dir used by the repository's `launch.json` configurations. Pass `--source-user-data-dir <path>` (or set `$CODE_OSS_DEV_AUTHED_USER_DATA_DIR`) to preserve a different PreBase account, theme, or Magnus-provider state. A fresh profile is valid for local workbench acceptance.
+  - PreBase intentionally does not require or restore Copilot. Only request user sign-in when the acceptance scenario explicitly needs a configured PreBase account or external model provider.
 - `@playwright/cli` available (it's a devDependency in the vscode repo - `npm install` then use `npx @playwright/cli`).
 - For debugger work: `dap-cli` on `PATH`. If debugger support would be useful but the `dap-cli` skill is not present, prompt the user to install it from https://github.com/roblourens/dap-cli.
 - CSS selectors are internal implementation details. If a selector-based `eval` stops working, take a fresh `snapshot`, inspect the current DOM, and update the selector rather than assuming an old one still applies.
@@ -48,7 +48,7 @@ The launcher script lives next to this SKILL.md at `scripts/launch.sh`. Resolve 
 
 ### What gets copied (slim mode, the default)
 
-The exclude list mirrors the one used by VS Code's own perf-test skill (`.github/skills/auto-perf-optimize`), which is known to keep Copilot auth and language-model availability working. Specifically `WebStorage/`, `Service Worker/`, `Local Storage/`, `Cookies`, `Network Persistent State`, `TransportSecurity`, `Trust Tokens`, `Preferences`, `machineid`, and the entire `User/globalStorage/` (which holds `state.vscdb` - where extension `SecretStorage` blobs live, encrypted with the OS keychain key) are all preserved. Auth tokens themselves stay in the OS keychain, which is per-user, so they follow automatically.
+The exclude list mirrors the one used by VS Code's own perf-test skill. Specifically `WebStorage/`, `Service Worker/`, `Local Storage/`, `Cookies`, `Network Persistent State`, `TransportSecurity`, `Trust Tokens`, `Preferences`, `machineid`, and the entire `User/globalStorage/` (which holds `state.vscdb` - where extension `SecretStorage` blobs live, encrypted with the OS keychain key) are preserved. This keeps optional PreBase-account and Magnus-provider state available without requiring Copilot.
 
 Excluded (transient, regenerable, or known-not-needed):
 - `User/workspaceStorage/` - per-workspace state, **including stored chat sessions** (often multi-GB)
@@ -63,7 +63,7 @@ Excluded (transient, regenerable, or known-not-needed):
 
 > **Why never share the source `extensions/` dir directly?** The extension management service writes a shared `.obsolete` file; two concurrent writers crash each other's shared background process. The launcher always uses an isolated extensions dir for the same reason it uses `--shared-data-dir` (see below).
 
-> If the launched window says "language model unavailable" or otherwise looks unauthed, ask the user to sign in.
+> If a scenario explicitly requires a configured PreBase account or model provider, confirm that the chosen source profile has the required user-owned credentials. Otherwise, continue offline; do not treat missing Copilot as a failure.
 
 The script runs pre-launch (electron download, compile-if-missing, built-in extensions) **in the foreground**, then starts Code OSS detached and **blocks until the renderer's CDP endpoint is responding** (up to ~90s) before printing the JSON line on stdout. If anything fails — preLaunch errors, code.sh exits early, CDP never opens — the script exits non-zero and dumps the relevant log tail to stderr.
 
@@ -276,9 +276,9 @@ To set breakpoints in VS Code source while the window is running, attach `dap-cl
 
 **Read the `dap-cli` skill for the full attach/breakpoint/inspect workflow when it is available** - this skill only tells you which port to point it at:
 
-- **Extension host** (most common - Copilot Chat extension, built-in extensions, your own extension under development) -> `extHostPort`
+- **Extension host** (most common - built-in extensions, the PreBase Magnus extension, or your own extension under development) -> `extHostPort`
 - **Main process** (Electron lifecycle, window/menu wiring, IPC) -> `mainPort`
-- **Local agent host** (`src/vs/platform/agentHost/node/...`, agent session lifecycle, AHP wiring, Claude/Copilot agent providers) -> `agentHostPort`
+- **Local agent host** (`src/vs/platform/agentHost/node/...`, agent session lifecycle, AHP wiring, and configured PreBase agent providers) -> `agentHostPort`
 - **Renderer** (the workbench itself, `src/vs/workbench/...`) -> `cdpPort`
 
 You can run `@playwright/cli` and `dap-cli` against the **same window simultaneously** - drive the UI with one terminal, hit a breakpoint and inspect state in another.

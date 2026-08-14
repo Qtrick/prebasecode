@@ -67,6 +67,9 @@ export function allowsEdits(mode: MagnusAgentMode): boolean {
 
 const ALL_MAGNUS_MODES: readonly MagnusAgentMode[] = ['ask', 'plan', 'runtime', 'patch', 'agent'];
 const WRITE_MAGNUS_MODES: readonly MagnusAgentMode[] = ['patch', 'agent'];
+// Test mode can operate only the explicitly selected Runtime Preview surface.
+// These tools retain their own Workspace Trust and confirmation checks.
+const RUNTIME_TEST_MAGNUS_MODES: readonly MagnusAgentMode[] = ['runtime', 'patch', 'agent'];
 
 /**
  * The capability boundary for every Magnus tool exposed to the language model.
@@ -96,14 +99,15 @@ const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgen
 	prebase_desktop_get_session: ALL_MAGNUS_MODES,
 	prebase_desktop_inspect_window: ALL_MAGNUS_MODES,
 	prebase_desktop_get_process_output: ALL_MAGNUS_MODES,
+	prebase_desktop_capture_screenshot: ALL_MAGNUS_MODES,
 	prebase_edit_apply_file: WRITE_MAGNUS_MODES,
 	prebase_edit_apply: WRITE_MAGNUS_MODES,
 	prebase_edit_create_file: WRITE_MAGNUS_MODES,
 	prebase_edit_rename_file: WRITE_MAGNUS_MODES,
 	prebase_edit_delete_file: WRITE_MAGNUS_MODES,
-	prebase_runtime_navigate: WRITE_MAGNUS_MODES,
-	prebase_runtime_control_test: WRITE_MAGNUS_MODES,
-	prebase_runtime_server: WRITE_MAGNUS_MODES,
+	prebase_runtime_navigate: RUNTIME_TEST_MAGNUS_MODES,
+	prebase_runtime_control_test: RUNTIME_TEST_MAGNUS_MODES,
+	prebase_runtime_server: RUNTIME_TEST_MAGNUS_MODES,
 	prebase_terminal_install_dependencies: WRITE_MAGNUS_MODES,
 	prebase_terminal_run_declared_node_version: WRITE_MAGNUS_MODES,
 	prebase_terminal_run_project_script: WRITE_MAGNUS_MODES,
@@ -116,6 +120,11 @@ const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgen
 /** Returns whether a registered tool is available in the selected Magnus agent mode. */
 export function isMagnusToolAllowed(mode: MagnusAgentMode, toolName: string): boolean {
 	return MAGNUS_TOOL_MODE_CAPABILITIES[toolName]?.includes(mode) ?? false;
+}
+
+/** Returns the complete, fail-closed capability registry for registration coverage tests. */
+export function getMagnusToolModeCapabilityNames(): readonly string[] {
+	return Object.freeze(Object.keys(MAGNUS_TOOL_MODE_CAPABILITIES));
 }
 
 export function getAgentModePromptBlock(mode: MagnusAgentMode): string {

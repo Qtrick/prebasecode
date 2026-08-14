@@ -10,7 +10,7 @@ Same as graph acceptance: date, build SHA/version, tester, pass/fail, notes. Att
 
 | # | Scenario | Steps | Expected | Status | Evidence |
 |---|---|---|---|---|---|
-| C1 | Fresh profile | New user data dir; launch PreBase | Window opens; no immediate crash | Needs Verification | — |
+| C1 | Fresh profile | New isolated user data dir; launch PreBase; choose Continue Offline | Window opens; no immediate crash | Pass | 2026-08-14 source launch, `bd413b67`, macOS arm64: PreBase auth gate and offline onboarding rendered; no VS Code/Copilot modal or status UI. [`fresh-profile.md`](../reports/beta-acceptance/2026-08-14T17-47-21Z-bd413b6-darwin-arm64/launch/fresh-profile.md) |
 | C2 | Existing profile | Reopen with prior `settings.json` | Settings migrate; no duplicate config errors | Needs Verification | — |
 | C3 | Folder workspace | File → Open Folder | Explorer + editor usable | Needs Verification | — |
 | C4 | Crash recovery | Kill process during edit; relaunch | Recovery prompt or restored buffers | Needs Verification | — |

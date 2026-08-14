@@ -40,6 +40,16 @@ export type ChatQuotaResumeState = 'none' | 'blocked' | 'resumed';
 type ChatQuotas = IChatEntitlementService['quotas'];
 
 /**
+ * The Copilot status dashboard is an upstream-only entry. PreBase uses Magnus
+ * as its product-owned chat agent, so registering this entry would expose a
+ * Copilot-branded control alongside the Agents UI.
+ */
+export function isCopilotStatusBarEntryEnabled(defaultChatAgent: { readonly extensionId?: string; readonly chatExtensionId?: string } | undefined): boolean {
+	return defaultChatAgent?.extensionId !== 'prebase.magnus'
+		&& defaultChatAgent?.chatExtensionId !== 'prebase.magnus';
+}
+
+/**
  * Whether this entry tracks quota for the given entitlement. All signed-up plans
  * are tracked via the unified premium chat quota. Transient states (signed out,
  * unresolved, not entitled) are not tracked.

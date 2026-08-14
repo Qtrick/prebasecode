@@ -935,3 +935,12 @@ registerAction2(class extends Action2 {
 		return getDesktopRuntimeService(accessor)?.evaluateForMagnus(sessionId, expression) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
 	}
 });
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopCaptureScreenshotForMagnus', title: localize2('prebase.runtime.desktopCaptureScreenshotForMagnus', "Capture Desktop Screenshot for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, sessionId?: string) {
+		return getDesktopRuntimeService(accessor)?.captureScreenshotForMagnus(sessionId) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
+	}
+});

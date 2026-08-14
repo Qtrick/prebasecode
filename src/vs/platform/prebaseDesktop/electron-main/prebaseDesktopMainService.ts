@@ -11,6 +11,7 @@ import { Disposable } from '../../../base/common/lifecycle.js';
 import type { DesktopLaunchRequest, ExternalLaunchRequest, ManagedWindowState } from '../common/prebaseDesktopTypes.js';
 import { IPreBaseDesktopMainService, type IPreBaseDesktopSpawnResult } from '../common/prebaseDesktop.js';
 import { CdpConnection, type MinimalWebSocket } from '../common/cdpConnection.js';
+import { MAX_EXTERNAL_SCREENSHOT_CDP_MESSAGE_BYTES, selectOwnedCdpPageWebSocketUrl, validateCdpPngScreenshotData, type CdpDiscoveryTarget } from '../common/cdpScreenshot.js';
 import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.js';
 import { ProcessOutputBuffer } from '../common/processOutputBuffer.js';
 import { terminateOwnedProcess, type ProcessTerminationSignal } from '../common/processTermination.js';
@@ -229,20 +230,18 @@ p{opacity:.75;margin:0;line-height:1.45}
 	}
 
 	async evaluateViaCdp(debugPort: number, expression: string): Promise<unknown> {
-		if (!Number.isInteger(debugPort) || debugPort <= 0 || debugPort > 65535) {
-			throw new Error('Invalid debug port.');
-		}
-		if (!this._ownedDebugPorts.has(debugPort)) {
-			throw new Error('CDP evaluate is limited to PreBase-owned localhost debugging ports.');
-		}
 		this._assertEvaluationExpression(expression);
-		const targets = await this._fetchJson<Array<{ type?: string; webSocketDebuggerUrl?: string }>>(`http://127.0.0.1:${debugPort}/json`);
-		const page = targets.find(t => t.type === 'page' && t.webSocketDebuggerUrl) ?? targets.find(t => t.webSocketDebuggerUrl);
-		if (!page?.webSocketDebuggerUrl) {
-			throw new Error('No CDP page target is available for this owned session.');
-		}
-		const value = await this._cdpEvaluate(page.webSocketDebuggerUrl, expression);
+		const value = await this._cdpEvaluate(await this._getOwnedCdpPageWebSocketUrl(debugPort), expression);
 		return this._marshalForIpc(value);
+	}
+
+	async captureScreenshotViaCdp(debugPort: number): Promise<string> {
+		const pngBase64 = await this._cdpCaptureScreenshot(await this._getOwnedCdpPageWebSocketUrl(debugPort));
+		const png = Buffer.from(pngBase64, 'base64');
+		if (png.byteLength < 8 || !png.subarray(0, 8).equals(Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]))) {
+			throw new Error('CDP screenshot did not return PNG data.');
+		}
+		return pngBase64;
 	}
 
 	async spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env: Record<string, string> = {}): Promise<IPreBaseDesktopSpawnResult> {
@@ -373,6 +372,21 @@ p{opacity:.75;margin:0;line-height:1.45}
 		}
 	}
 
+	private async _getOwnedCdpPageWebSocketUrl(debugPort: number): Promise<string> {
+		if (!Number.isInteger(debugPort) || debugPort <= 0 || debugPort > 65535) {
+			throw new Error('Invalid debug port.');
+		}
+		if (!this._ownedDebugPorts.has(debugPort)) {
+			throw new Error('CDP is limited to PreBase-owned localhost debugging ports.');
+		}
+		const targets = await this._fetchJson<CdpDiscoveryTarget[]>(`http://127.0.0.1:${debugPort}/json`);
+		const webSocketDebuggerUrl = selectOwnedCdpPageWebSocketUrl(targets, debugPort);
+		if (!webSocketDebuggerUrl) {
+			throw new Error('No renderer CDP page target is available for this owned session.');
+		}
+		return webSocketDebuggerUrl;
+	}
+
 	private _assertManagedRendererUrl(rendererUrl: string): void {
 		if (rendererUrl.startsWith('data:')) {
 			return;
@@ -458,6 +472,24 @@ p{opacity:.75;margin:0;line-height:1.45}
 	}
 
 	private async _cdpEvaluate(wsUrl: string, expression: string): Promise<unknown> {
+		return this._withCdpConnection(wsUrl, 'evaluate', 1 * 1024 * 1024, async connection => {
+			await connection.request('Runtime.enable');
+			const result = await connection.request<{ result?: { value?: unknown }; exceptionDetails?: { text?: string } }>('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
+			if (result.exceptionDetails) {
+				throw new Error(result.exceptionDetails.text || 'CDP expression threw');
+			}
+			return result.result?.value;
+		});
+	}
+
+	private async _cdpCaptureScreenshot(wsUrl: string): Promise<string> {
+		return this._withCdpConnection(wsUrl, 'screenshot capture', MAX_EXTERNAL_SCREENSHOT_CDP_MESSAGE_BYTES, async connection => {
+			const result = await connection.request<{ data?: unknown }>('Page.captureScreenshot', { format: 'png', fromSurface: true, captureBeyondViewport: false });
+			return validateCdpPngScreenshotData(result.data);
+		});
+	}
+
+	private async _withCdpConnection<T>(wsUrl: string, operation: string, maxInboundMessageBytes: number, run: (connection: CdpConnection) => Promise<T>): Promise<T> {
 		if (!this._isLocalCdpWebSocketUrl(wsUrl)) {
 			throw new Error('CDP websocket must target localhost.');
 		}
@@ -466,15 +498,16 @@ p{opacity:.75;margin:0;line-height:1.45}
 		if (!WebSocketCtor) {
 			throw new Error('WebSocket implementation unavailable for CDP.');
 		}
-		return new Promise((resolve, reject) => {
+		return new Promise<T>((resolve, reject) => {
 			const ws = new WebSocketCtor(wsUrl);
-			const connection = new CdpConnection(ws);
+			const connection = new CdpConnection(ws, 8_000, undefined, maxInboundMessageBytes);
 			let settled = false;
 			const timer = setTimeout(() => {
-				connection.rejectAll(new Error('CDP evaluate timed out'));
-				finish(new Error('CDP evaluate timed out'));
+				const error = new Error(`CDP ${operation} timed out`);
+				connection.rejectAll(error);
+				finish(error);
 			}, 8000);
-			const finish = (error?: Error, value?: unknown) => {
+			const finish = (error?: Error, value?: T) => {
 				if (settled) {
 					return;
 				}
@@ -486,18 +519,13 @@ p{opacity:.75;margin:0;line-height:1.45}
 				if (error) {
 					reject(error);
 				} else {
-					resolve(value);
+					resolve(value as T);
 				}
 			};
 			ws.on('open', () => {
 				void (async () => {
 					try {
-						await connection.request('Runtime.enable');
-						const result = await connection.request<{ result?: { value?: unknown }; exceptionDetails?: { text?: string } }>('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true });
-						if (result.exceptionDetails) {
-							throw new Error(result.exceptionDetails.text || 'CDP expression threw');
-						}
-						finish(undefined, result.result?.value);
+						finish(undefined, await run(connection));
 					} catch (error) {
 						finish(error instanceof Error ? error : new Error(String(error)));
 					}

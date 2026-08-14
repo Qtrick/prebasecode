@@ -139,6 +139,7 @@ Account deletion should go through Supabase Auth user deletion so FK `ON DELETE 
 ```bash
 npm run verify:supabase-migrations   # static SQL/RLS checks (no CLI)
 npm run verify:supabase-secrets      # scan src for committed service keys
+npm run test:supabase-rls-runtime    # explicit two-user non-production probe; skips without credentials
 npm run supabase:types               # optional; skips if CLI missing
 ```
 

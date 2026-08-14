@@ -339,7 +339,8 @@
 			"chatProvider",
 			"languageModelSystem",
 			"languageModelCapabilities",
-			"languageModelThinkingPart"
+			"languageModelThinkingPart",
+			"findTextInFiles"
 		]
 	},
 	"sessionsWindowAllowedExtensions": [],
