@@ -24,6 +24,21 @@ function redactProcessOutput(value: string): string {
 		.replace(/\beyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g, '[redacted-jwt]');
 }
 
+/** Truncates at a complete UTF-8 code-point boundary so the byte cap stays exact. */
+function truncateUtf8(value: string, maximumBytes: number): string {
+	const bytes = new TextEncoder().encode(value);
+	let end = Math.min(bytes.byteLength, maximumBytes);
+	const decoder = new TextDecoder('utf-8', { fatal: true });
+	while (end > 0) {
+		try {
+			return decoder.decode(bytes.slice(0, end));
+		} catch {
+			end--;
+		}
+	}
+	return '';
+}
+
 /** Bounded, redacted line buffer for PreBase-owned external process output. */
 export class ProcessOutputBuffer {
 	private readonly _decoders: Record<ProcessOutputStream, TextDecoder> = {
@@ -76,7 +91,7 @@ export class ProcessOutputBuffer {
 		let truncated = false;
 		const encoded = new TextEncoder().encode(redacted);
 		if (encoded.byteLength > MAX_PROCESS_OUTPUT_ENTRY_BYTES) {
-			redacted = new TextDecoder().decode(encoded.slice(0, MAX_PROCESS_OUTPUT_ENTRY_BYTES));
+			redacted = truncateUtf8(redacted, MAX_PROCESS_OUTPUT_ENTRY_BYTES);
 			truncated = true;
 		}
 		const bytes = new TextEncoder().encode(redacted).byteLength;

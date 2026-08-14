@@ -86,4 +86,14 @@ suite('ProcessOutputBuffer', () => {
 		assert.strictEqual(entry.truncated, true);
 		assert.strictEqual(new TextEncoder().encode(entry.text).byteLength, MAX_PROCESS_OUTPUT_ENTRY_BYTES);
 	});
+
+	test('never exceeds the byte cap when truncation falls inside a UTF-8 character', () => {
+		const output = new ProcessOutputBuffer();
+		output.append('stdout', encoder.encode('x'.repeat(MAX_PROCESS_OUTPUT_ENTRY_BYTES - 2) + '\u{1F680}'), 60);
+
+		const entry = output.getEntries().entries[0];
+		assert.strictEqual(entry.truncated, true);
+		assert.ok(encoder.encode(entry.text).byteLength <= MAX_PROCESS_OUTPUT_ENTRY_BYTES);
+		assert.ok(!entry.text.endsWith('\uFFFD'));
+	});
 });

@@ -22,7 +22,7 @@ import { PreBaseCloudConfigKeys } from '../common/cloud/cloudConfiguration.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import { IPreBaseCloudService } from './cloud/prebaseCloudService.js';
 import { redactSensitiveForLog } from '../common/cloud/supabaseAuthRest.js';
-import { consumePreBaseOAuthCallback, type IPreBaseOAuthAttempt, isPreBaseOAuthProvider, PREBASE_OAUTH_CALLBACK_AUTHORITY, PREBASE_OAUTH_CALLBACK_PATH, type PreBaseOAuthProvider, PREBASE_OAUTH_TIMEOUT_MS } from '../common/auth/prebaseOAuth.js';
+import { consumePreBaseOAuthCallback, consumePreBaseOAuthErrorCallback, type IPreBaseOAuthAttempt, isPreBaseOAuthProvider, PREBASE_OAUTH_CALLBACK_AUTHORITY, PREBASE_OAUTH_CALLBACK_PATH, type PreBaseOAuthProvider, PREBASE_OAUTH_TIMEOUT_MS } from '../common/auth/prebaseOAuth.js';
 
 export type PreBaseAccountState = 'initializing' | 'signedOut' | 'signingIn' | 'signedIn' | 'error' | 'unconfigured';
 
@@ -205,6 +205,11 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 		const attempt = this._oauthAttempt;
 		const callback = consumePreBaseOAuthCallback(uri, this.productService.urlProtocol, attempt, Date.now());
 		if (!callback || !attempt) {
+			if (consumePreBaseOAuthErrorCallback(uri, this.productService.urlProtocol, attempt, Date.now())) {
+				this._clearOAuthAttempt();
+				this._setState('signedOut', undefined, localize('prebase.account.oauthCancelled', 'Sign-in was cancelled or denied. Try again.'));
+				return true;
+			}
 			return false;
 		}
 		// Consume before the network exchange so deep-link replay cannot redeem the same code twice.

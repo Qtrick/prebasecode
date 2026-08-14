@@ -5,7 +5,7 @@
 
 import assert from 'assert';
 import { URI } from '../../../../../../base/common/uri.js';
-import { consumePreBaseOAuthCallback, isPreBaseOAuthProvider, parsePreBaseOAuthCallback, PREBASE_OAUTH_PROVIDERS } from '../prebaseOAuth.js';
+import { consumePreBaseOAuthCallback, consumePreBaseOAuthErrorCallback, isPreBaseOAuthProvider, parsePreBaseOAuthCallback, PREBASE_OAUTH_PROVIDERS } from '../prebaseOAuth.js';
 import { decidePreBaseStartup, type PreBaseStartupAccountState } from '../prebaseStartupAuth.js';
 
 suite('PreBase startup authentication decision', () => {
@@ -46,6 +46,7 @@ suite('PreBase OAuth callback parser', () => {
 			URI.parse('prebase://auth/callback?state=unpredictable-state'),
 			URI.parse('prebase://auth/callback?code=exchange-code&code=other-code&state=unpredictable-state'),
 			URI.parse('prebase://auth/callback?code=exchange-code&state=unpredictable-state&state=other-state'),
+			URI.parse('prebase://auth/callback?code=exchange-code&error=access_denied&state=unpredictable-state'),
 		]) {
 			assert.strictEqual(parsePreBaseOAuthCallback(uri, scheme, state), undefined, uri.toString());
 		}
@@ -83,6 +84,37 @@ suite('PreBase OAuth callback parser', () => {
 		const uri = URI.parse('prebase://auth/callback?code=exchange-code&state=timed-state');
 		assert.strictEqual(
 			consumePreBaseOAuthCallback(uri, scheme, { state: 'timed-state', expiresAt: 999, consumed: false }, 1_000),
+			undefined,
+		);
+	});
+
+	test('accepts a matching terminal OAuth error so the caller can restore an interactive signed-out state', () => {
+		const attempt = { state: 'one-time-state', expiresAt: 1_000, consumed: false };
+		assert.deepStrictEqual(
+			consumePreBaseOAuthErrorCallback(URI.parse('prebase://auth/callback?error=access_denied&state=one-time-state'), scheme, attempt, 1_000),
+			{ state: 'one-time-state' },
+		);
+		for (const uri of [
+			URI.parse('prebase://auth/callback?error=access_denied&state=wrong-state'),
+			URI.parse('prebase://auth/callback?error=access_denied'),
+			URI.parse('prebase://auth/callback?error=access_denied&error=other&state=one-time-state'),
+		]) {
+			assert.strictEqual(consumePreBaseOAuthErrorCallback(uri, scheme, attempt, 1_000), undefined, uri.toString());
+		}
+		assert.deepStrictEqual(
+			consumePreBaseOAuthErrorCallback(URI.parse('prebase://auth/callback?code=exchange-code&error=access_denied&state=one-time-state'), scheme, attempt, 1_000),
+			{ state: 'one-time-state' },
+		);
+	});
+
+	test('does not let a stale terminal OAuth error end an expired or consumed sign-in attempt', () => {
+		const uri = URI.parse('prebase://auth/callback?error=access_denied&state=one-time-state');
+		assert.strictEqual(
+			consumePreBaseOAuthErrorCallback(uri, scheme, { state: 'one-time-state', expiresAt: 999, consumed: false }, 1_000),
+			undefined,
+		);
+		assert.strictEqual(
+			consumePreBaseOAuthErrorCallback(uri, scheme, { state: 'one-time-state', expiresAt: 1_000, consumed: true }, 1_000),
 			undefined,
 		);
 	});

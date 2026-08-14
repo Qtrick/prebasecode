@@ -16,6 +16,10 @@ export interface IPreBaseOAuthCallback {
 	state: string;
 }
 
+export interface IPreBaseOAuthErrorCallback {
+	state: string;
+}
+
 export interface IPreBaseOAuthAttempt {
 	state: string;
 	expiresAt: number;
@@ -38,6 +42,34 @@ export function consumePreBaseOAuthCallback(
 	return parsePreBaseOAuthCallback(uri, expectedScheme, attempt.state);
 }
 
+/**
+ * Recognizes the terminal OAuth error response without exposing provider-supplied
+ * error values. The state check prevents an arbitrary protocol URL from ending
+ * an in-progress sign-in attempt.
+ */
+export function consumePreBaseOAuthErrorCallback(
+	uri: URI,
+	expectedScheme: string,
+	attempt: IPreBaseOAuthAttempt | undefined,
+	now: number,
+): IPreBaseOAuthErrorCallback | undefined {
+	if (!attempt || attempt.consumed || now > attempt.expiresAt) {
+		return undefined;
+	}
+	if (uri.scheme !== expectedScheme || uri.authority !== PREBASE_OAUTH_CALLBACK_AUTHORITY || uri.path !== PREBASE_OAUTH_CALLBACK_PATH) {
+		return undefined;
+	}
+	const values = new URLSearchParams(uri.query);
+	const states = values.getAll('state');
+	const errors = values.getAll('error');
+	// An OAuth error takes precedence if a malformed provider response includes
+	// both a code and an error. The caller must never redeem that code.
+	if (states.length !== 1 || errors.length !== 1 || !states[0] || !errors[0] || states[0] !== attempt.state) {
+		return undefined;
+	}
+	return { state: states[0] };
+}
+
 /** Strictly accepts the one registered product callback; never exposes callback values to logs. */
 export function parsePreBaseOAuthCallback(uri: URI, expectedScheme: string, expectedState: string): IPreBaseOAuthCallback | undefined {
 	if (uri.scheme !== expectedScheme || uri.authority !== PREBASE_OAUTH_CALLBACK_AUTHORITY || uri.path !== PREBASE_OAUTH_CALLBACK_PATH) {
@@ -46,7 +78,7 @@ export function parsePreBaseOAuthCallback(uri: URI, expectedScheme: string, expe
 	const values = new URLSearchParams(uri.query);
 	const codes = values.getAll('code');
 	const states = values.getAll('state');
-	if (codes.length !== 1 || states.length !== 1) {
+	if (values.has('error') || codes.length !== 1 || states.length !== 1) {
 		return undefined;
 	}
 	const [code] = codes;
