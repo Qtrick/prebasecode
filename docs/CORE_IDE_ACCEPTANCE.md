@@ -32,7 +32,7 @@ Same as graph acceptance: date, build SHA/version, tester, pass/fail, notes. Att
 | # | Scenario | Steps | Expected | Status | Evidence |
 |---|---|---|---|---|---|
 | P1 | PreBase Settings | Open PreBase Settings editor | Categories render; graph keys persist | Needs Verification | — |
-| P2 | Onboarding | First-run or reset onboarding | Flow completes without error | Needs Verification | — |
+| P2 | Onboarding | First-run or reset onboarding | Flow completes without error | Needs Verification | 2026-08-14 unsigned darwin-arm64 package smoke, fresh temporary profile: PreBase auth card rendered; Continue Offline opened "Welcome to PreBase" onboarding at step 1 without a crash. [`initial snapshot`](../.playwright-cli/page-2026-08-14T20-18-06-179Z.yml), [`offline snapshot`](../.playwright-cli/page-2026-08-14T20-18-16-920Z.yml). Complete/reset/return-session rows remain unverified. |
 | P3 | Account | Sign in / out (if API configured) | Tokens via secret storage; no plaintext in settings | Needs Verification | — |
 | P4 | Runtime preview | Open runtime preview | Strict CSP webview; lifecycle cleanup on close | Needs Verification | — |
 | P5 | Magnus / Agents | Open Agents; send prompt | Extension activates; no hard crash | Needs Verification | — |

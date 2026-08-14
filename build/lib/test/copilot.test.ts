@@ -9,9 +9,56 @@ import * as os from 'os';
 import * as path from 'path';
 import { suite, test } from 'node:test';
 import { create } from 'tar';
-import { copilotPlatforms, ensureCopilotPlatformPackage, getCopilotExcludeFilter, getCopilotRuntimePrebuildFiles, prepareBuiltInCopilotRipgrepShim } from '../copilot.ts';
+import { copilotPlatforms, ensureCopilotPlatformPackage, getCopilotExcludeFilter, getCopilotPackagingPlan, getCopilotRuntimePrebuildFiles, isBuiltInCopilotEnabled, prepareBuiltInCopilotRipgrepShim, verifyPreBaseDesktopPackage } from '../copilot.ts';
 
 suite('copilot', () => {
+	test('uses the enabled manifest and explicit product policy as the single Copilot packaging decision', () => {
+		const repoRoot = fs.mkdtempSync(path.join(os.tmpdir(), 'prebase-copilot-policy-test-'));
+		try {
+			fs.mkdirSync(path.join(repoRoot, 'extensions', 'copilot'), { recursive: true });
+			fs.writeFileSync(path.join(repoRoot, 'extensions', 'copilot', 'package.json'), '{}');
+			fs.writeFileSync(path.join(repoRoot, 'product.json'), JSON.stringify({ prebaseBuiltInCopilotEnabled: true }));
+			assert.strictEqual(isBuiltInCopilotEnabled(repoRoot), true);
+
+			fs.writeFileSync(path.join(repoRoot, 'product.json'), JSON.stringify({ prebaseBuiltInCopilotEnabled: false }));
+			assert.strictEqual(isBuiltInCopilotEnabled(repoRoot), false);
+
+			fs.rmSync(path.join(repoRoot, 'extensions', 'copilot', 'package.json'));
+			assert.strictEqual(isBuiltInCopilotEnabled(repoRoot), false);
+		} finally {
+			fs.rmSync(repoRoot, { recursive: true, force: true });
+		}
+	});
+
+	test('omits Copilot runtime prebuilds and excludes every Copilot dependency when disabled', () => {
+		assert.deepStrictEqual(getCopilotPackagingPlan(false, 'darwin', 'arm64'), {
+			runtimePrebuildFiles: [],
+			packageExcludeFilter: ['**', '!**/node_modules/@github/copilot/**', '!**/node_modules/@github/copilot-*/**'],
+			tgrepExcludeFilter: ['**'],
+		});
+
+		const enabledPlan = getCopilotPackagingPlan(true, 'darwin', 'arm64');
+		assert.ok(enabledPlan.runtimePrebuildFiles.includes('node_modules/@github/copilot-darwin-arm64/**'));
+		assert.ok(enabledPlan.packageExcludeFilter.includes('!**/node_modules/@github/copilot-darwin-x64/**'));
+	});
+
+	test('accepts a PreBase desktop package with Magnus and rejects a disabled Copilot manifest', () => {
+		const appBase = fs.mkdtempSync(path.join(os.tmpdir(), 'prebase-copilot-package-test-'));
+		try {
+			fs.mkdirSync(path.join(appBase, 'extensions', 'prebase-magnus'), { recursive: true });
+			fs.writeFileSync(path.join(appBase, 'product.json'), JSON.stringify({ nameShort: 'PreBase' }));
+			fs.writeFileSync(path.join(appBase, 'extensions', 'prebase-magnus', 'package.json'), '{}');
+
+			assert.doesNotThrow(() => verifyPreBaseDesktopPackage(appBase, false));
+
+			fs.mkdirSync(path.join(appBase, 'extensions', 'copilot'), { recursive: true });
+			fs.writeFileSync(path.join(appBase, 'extensions', 'copilot', 'package.json'), '{}');
+			assert.throws(() => verifyPreBaseDesktopPackage(appBase, false), /contains disabled Copilot manifest/);
+		} finally {
+			fs.rmSync(appBase, { recursive: true, force: true });
+		}
+	});
+
 	test('keeps the public copilot platform package include list scoped to the selected package', () => {
 		const files = getCopilotRuntimePrebuildFiles('linux', 'x64');
 

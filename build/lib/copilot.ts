@@ -10,6 +10,77 @@ import * as os from 'os';
 import * as path from 'path';
 import { extract } from 'tar';
 
+const COPILOT_EXTENSION_MANIFEST = path.join('extensions', 'copilot', 'package.json');
+
+interface PreBaseProductConfiguration {
+	prebaseBuiltInCopilotEnabled?: boolean;
+}
+
+/**
+ * Determines whether a product build may package the built-in Copilot extension.
+ *
+ * A checked-out manifest alone is not enough for PreBase: its product configuration
+ * explicitly disables Copilot. Conversely, an enabled product needs the real manifest,
+ * not the retained `package.json.disabled` reference file.
+ */
+export function isBuiltInCopilotEnabled(repoRoot: string): boolean {
+	const manifestPath = path.join(repoRoot, COPILOT_EXTENSION_MANIFEST);
+	if (!fs.existsSync(manifestPath)) {
+		return false;
+	}
+
+	try {
+		const productPath = path.join(repoRoot, 'product.json');
+		const product = JSON.parse(fs.readFileSync(productPath, 'utf8')) as PreBaseProductConfiguration;
+		return product.prebaseBuiltInCopilotEnabled !== false;
+	} catch (err) {
+		throw new Error(`[isBuiltInCopilotEnabled] Failed to read product configuration: ${err instanceof Error ? err.message : String(err)}`);
+	}
+}
+
+/** Returns package-stream inputs and filters for the selected product policy. */
+export function getCopilotPackagingPlan(enabled: boolean, platform: string, arch: string, nodeModulesRoot = 'node_modules'): { runtimePrebuildFiles: string[]; packageExcludeFilter: string[]; tgrepExcludeFilter: string[] } {
+	if (!enabled) {
+		return {
+			runtimePrebuildFiles: [],
+			packageExcludeFilter: ['**', '!**/node_modules/@github/copilot/**', '!**/node_modules/@github/copilot-*/**'],
+			tgrepExcludeFilter: ['**'],
+		};
+	}
+
+	return {
+		runtimePrebuildFiles: getCopilotRuntimePrebuildFiles(platform, arch, nodeModulesRoot),
+		packageExcludeFilter: getCopilotExcludeFilter(platform, arch),
+		tgrepExcludeFilter: getCopilotTgrepExcludeFilter(platform, arch),
+	};
+}
+
+/**
+ * Validates the packaged desktop app's extension policy after all package tasks run.
+ * The check deliberately accepts dormant Copilot source outside the app bundle.
+ */
+export function verifyPreBaseDesktopPackage(appBase: string, copilotEnabled: boolean): void {
+	const productPath = path.join(appBase, 'product.json');
+	if (!fs.existsSync(productPath)) {
+		throw new Error(`[verifyPreBaseDesktopPackage] Product metadata not found at ${productPath}`);
+	}
+	const product = JSON.parse(fs.readFileSync(productPath, 'utf8')) as { nameShort?: string };
+	if (product.nameShort !== 'PreBase') {
+		throw new Error(`[verifyPreBaseDesktopPackage] Expected PreBase product metadata in ${productPath}`);
+	}
+
+	const magnusManifestPath = path.join(appBase, 'extensions', 'prebase-magnus', 'package.json');
+	if (!fs.existsSync(magnusManifestPath)) {
+		throw new Error(`[verifyPreBaseDesktopPackage] PreBase Magnus extension not found at ${magnusManifestPath}`);
+	}
+
+	const copilotManifestPath = path.join(appBase, COPILOT_EXTENSION_MANIFEST);
+	if (copilotEnabled !== fs.existsSync(copilotManifestPath)) {
+		const expectation = copilotEnabled ? 'missing enabled' : 'contains disabled';
+		throw new Error(`[verifyPreBaseDesktopPackage] Package ${expectation} Copilot manifest at ${copilotManifestPath}`);
+	}
+}
+
 /**
  * The platforms that @github/copilot ships platform-specific packages for.
  * These are the `@github/copilot-{platform}` optional dependency packages.

@@ -70,6 +70,11 @@ const WRITE_MAGNUS_MODES: readonly MagnusAgentMode[] = ['patch', 'agent'];
 // Test mode can operate only the explicitly selected Runtime Preview surface.
 // These tools retain their own Workspace Trust and confirmation checks.
 const RUNTIME_TEST_MAGNUS_MODES: readonly MagnusAgentMode[] = ['runtime', 'patch', 'agent'];
+// These operations retain tool-level safety boundaries: project scripts must be
+// declared and safe, and desktop lifecycle operations target only PreBase-owned
+// sessions. They are therefore available while testing without expanding to
+// environment mutation or arbitrary runtime evaluation.
+const TEST_EXECUTION_SAFE_MAGNUS_MODES: readonly MagnusAgentMode[] = ['runtime', 'patch', 'agent'];
 
 /**
  * The capability boundary for every Magnus tool exposed to the language model.
@@ -110,10 +115,10 @@ const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgen
 	prebase_runtime_server: RUNTIME_TEST_MAGNUS_MODES,
 	prebase_terminal_install_dependencies: WRITE_MAGNUS_MODES,
 	prebase_terminal_run_declared_node_version: WRITE_MAGNUS_MODES,
-	prebase_terminal_run_project_script: WRITE_MAGNUS_MODES,
+	prebase_terminal_run_project_script: TEST_EXECUTION_SAFE_MAGNUS_MODES,
 	prebase_desktop_reload_window: WRITE_MAGNUS_MODES,
-	prebase_desktop_restart_session: WRITE_MAGNUS_MODES,
-	prebase_desktop_stop_session: WRITE_MAGNUS_MODES,
+	prebase_desktop_restart_session: TEST_EXECUTION_SAFE_MAGNUS_MODES,
+	prebase_desktop_stop_session: TEST_EXECUTION_SAFE_MAGNUS_MODES,
 	prebase_desktop_cdp_evaluate: WRITE_MAGNUS_MODES,
 };
 

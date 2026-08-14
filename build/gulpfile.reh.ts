@@ -31,7 +31,7 @@ import log from 'fancy-log';
 import buildfile from './buildfile.ts';
 import { fetchUrls } from './lib/fetch.ts';
 import { downloadFeedPackage } from './lib/azureFeed.ts';
-import { ensureCopilotPlatformPackage, getCopilotExcludeFilter, getCopilotRuntimePrebuildFiles, getCopilotTgrepExcludeFilter, getRipgrepExcludeFilter, prepareBuiltInCopilotRipgrepShim } from './lib/copilot.ts';
+import { ensureCopilotPlatformPackage, getCopilotPackagingPlan, getRipgrepExcludeFilter, isBuiltInCopilotEnabled, prepareBuiltInCopilotRipgrepShim } from './lib/copilot.ts';
 import { readAgentSdkResults } from './agent-sdk/common.ts';
 
 
@@ -41,6 +41,7 @@ const REPO_ROOT = path.dirname(import.meta.dirname);
 const commit = getVersion(REPO_ROOT);
 const BUILD_ROOT = path.dirname(REPO_ROOT);
 const REMOTE_FOLDER = path.join(REPO_ROOT, 'remote');
+const builtInCopilotEnabled = isBuiltInCopilotEnabled(REPO_ROOT);
 
 // Targets
 
@@ -445,11 +446,16 @@ function packageTask(type: string, platform: string, arch: string, sourceFolderN
 			.pipe(filter(['**', '!**/package-lock.json', '!**/*.{js,css}.map']))
 			.pipe(util.cleanNodeModules(path.join(import.meta.dirname, '.moduleignore')))
 			.pipe(util.cleanNodeModules(path.join(import.meta.dirname, `.moduleignore.${process.platform}`)));
-		ensureCopilotPlatformPackage(platform, arch, 'remote/node_modules');
-		const copilotRuntimePrebuilds = gulp.src(getCopilotRuntimePrebuildFiles(platform, arch, 'remote/node_modules'), { base: 'remote', dot: true, allowEmpty: true });
+		const copilotPackagingPlan = getCopilotPackagingPlan(builtInCopilotEnabled, platform, arch, 'remote/node_modules');
+		if (builtInCopilotEnabled) {
+			ensureCopilotPlatformPackage(platform, arch, 'remote/node_modules');
+		}
+		const copilotRuntimePrebuilds = builtInCopilotEnabled
+			? gulp.src(copilotPackagingPlan.runtimePrebuildFiles, { base: 'remote', dot: true, allowEmpty: true })
+			: es.readArray([]);
 		const deps = es.merge(cleanedDeps, copilotRuntimePrebuilds)
-			.pipe(filter(getCopilotExcludeFilter(platform, arch)))
-			.pipe(filter(getCopilotTgrepExcludeFilter(platform, arch)))
+			.pipe(filter(copilotPackagingPlan.packageExcludeFilter))
+			.pipe(filter(copilotPackagingPlan.tgrepExcludeFilter))
 			.pipe(filter(getRipgrepExcludeFilter(platform, arch)))
 			.pipe(jsFilter)
 			.pipe(util.stripSourceMappingURL())
@@ -663,7 +669,7 @@ function tweakProductForServerWeb(product: typeof import('../product.json')) {
 				task.task(`node-${platform}-${arch}`) as task.Task,
 				util.rimraf(path.join(BUILD_ROOT, destinationFolderName)),
 				packageTask(type, platform, arch, sourceFolderName, destinationFolderName),
-				prepareCopilotRipgrepShimTaskREH(platform, arch, destinationFolderName)
+				...(builtInCopilotEnabled ? [prepareCopilotRipgrepShimTaskREH(platform, arch, destinationFolderName)] : [])
 			];
 
 			if (platform === 'win32') {
@@ -677,7 +683,7 @@ function tweakProductForServerWeb(product: typeof import('../product.json')) {
 				compileBuildWithManglingTask,
 				cleanExtensionsBuildTask,
 				compileNonNativeExtensionsBuildTask,
-				compileCopilotExtensionBuildTask,
+				...(builtInCopilotEnabled ? [compileCopilotExtensionBuildTask] : []),
 				compileExtensionMediaBuildTask,
 				minified ? minifyTask : bundleTask,
 				serverTaskCI

@@ -30,7 +30,7 @@ suite('verify-macos-adaptive-icon', () => {
 	test('fails closed when adaptive source is missing under repo root', () => {
 		const result = verifyAdaptiveSources(FIXTURES);
 		assert.strictEqual(result.ok, false);
-		assert.ok(result.errors.some((e) => e.includes('MISSING adaptive source')));
+		assert.ok(result.errors.some((e: string) => e.includes('MISSING adaptive source')));
 	});
 
 	test('fixture adaptive + legacy paths validate when pointed at directly via custom layout', async () => {
@@ -51,7 +51,7 @@ suite('verify-macos-adaptive-icon', () => {
 	test('app verifier fails when Assets.car / CFBundleIconName absent', () => {
 		const result = verifyAppBundleIcons(path.join(FIXTURES, 'correct', 'PreBase.app'));
 		assert.strictEqual(result.ok, false);
-		assert.ok(result.errors.some((e) => e.includes('CFBundleIconName') || e.includes('Assets.car')));
+		assert.ok(result.errors.some((e: string) => e.includes('CFBundleIconName') || e.includes('Assets.car')));
 	});
 
 	test('canonical repo adaptive + legacy sources validate', () => {

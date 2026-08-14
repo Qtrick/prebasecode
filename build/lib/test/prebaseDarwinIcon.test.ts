@@ -8,6 +8,7 @@ import { suite, test, beforeEach, afterEach } from 'node:test';
 import fs from 'fs/promises';
 import os from 'os';
 import path from 'path';
+import { EventEmitter } from 'node:events';
 import {
 	DarwinIconError,
 	DarwinIconErrorCode,
@@ -138,10 +139,9 @@ suite('prebaseDarwinIcon', () => {
 	suite('createArgvRunner', () => {
 		test('never enables shell', async () => {
 			let sawShell: boolean | undefined;
-			const { EventEmitter } = await import('node:events');
-			const runner = createArgvRunner(((cmd, args, opts: { shell?: boolean }) => {
+			const runner = createArgvRunner(((_cmd, _args, opts: { shell?: boolean }) => {
 				sawShell = opts.shell;
-				const child = new EventEmitter() as NodeJS.EventEmitter & {
+				const child = new EventEmitter() as EventEmitter & {
 					stdout: EventEmitter;
 					stderr: EventEmitter;
 				};

@@ -37,6 +37,28 @@ export interface IPreBaseDesktopRuntimeService extends IPreBaseRuntimeAdapter {
 	captureScreenshotForMagnus(sessionId?: string): Promise<Record<string, unknown>>;
 }
 
+/**
+ * Checks that a renderer URL can be reached without allowing the initial URL to
+ * redirect the workbench to an unvalidated destination.
+ */
+export async function probeDesktopRendererUrl(requestService: IRequestService, url: string): Promise<boolean> {
+	try {
+		const context = await requestService.request({
+			type: 'GET',
+			url,
+			timeout: 2500,
+			// The candidate is validated before probing. Following redirects here would
+			// let an allowed URL make the workbench request an unvalidated target.
+			followRedirects: 0,
+			callSite: 'PreBaseDesktopRuntimeService._probeUrl',
+		}, CancellationToken.None);
+		const status = context.res.statusCode ?? 0;
+		return status > 0 && status < 500;
+	} catch {
+		return false;
+	}
+}
+
 export class PreBaseDesktopRuntimeService extends Disposable implements IPreBaseDesktopRuntimeService {
 	declare readonly _serviceBrand: undefined;
 
@@ -503,19 +525,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	}
 
 	private async _probeUrl(url: string): Promise<boolean> {
-		try {
-			const context = await this.requestService.request({
-				type: 'GET',
-				url,
-				timeout: 2500,
-				followRedirects: 3,
-				callSite: 'PreBaseDesktopRuntimeService._probeUrl',
-			}, CancellationToken.None);
-			const status = context.res.statusCode ?? 0;
-			return status > 0 && status < 500;
-		} catch {
-			return false;
-		}
+		return probeDesktopRendererUrl(this.requestService, url);
 	}
 
 	private async _discoverCdpTargets(port: number): Promise<CdpTarget[]> {

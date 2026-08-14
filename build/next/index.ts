@@ -290,6 +290,8 @@ const desktopResourcePatterns = [
 	'vs/workbench/contrib/welcomeGettingStarted/common/media/**/*.svg',
 	'vs/workbench/contrib/welcomeGettingStarted/common/media/**/*.png',
 	'vs/workbench/contrib/welcomeOnboarding/browser/media/*.svg',
+	'vs/workbench/contrib/chat/browser/chatSetup/media/{github,google}.svg',
+	'vs/workbench/contrib/prebase/browser/media/prebase-logo.png',
 	'vs/workbench/contrib/extensions/browser/media/{theme-icon.png,language-icon.svg}',
 	'vs/workbench/services/extensionManagement/common/media/*.svg',
 	'vs/workbench/services/extensionManagement/common/media/*.png',
@@ -889,6 +891,10 @@ ${tslib}`,
 				? { outdir: path.join(REPO_ROOT, outDir) }
 				: { outfile: outPath }),
 			bundle: true,
+			// Graph implementation is authored under graphs/src and intentionally
+			// imported through src/.../prebase/graphs. Preserve that path while
+			// resolving its workbench-relative imports during production bundling.
+			preserveSymlinks: true,
 			format: 'esm',
 			platform: 'neutral',
 			target: ['es2024'],

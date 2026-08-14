@@ -5,7 +5,7 @@
 
 import * as DOM from '../../../../base/browser/dom.js';
 import { mainWindow } from '../../../../base/browser/window.js';
-import { Disposable } from '../../../../base/common/lifecycle.js';
+import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
 import { URI } from '../../../../base/common/uri.js';
 import { FileAccess } from '../../../../base/common/network.js';
 import { localize } from '../../../../nls.js';
@@ -25,6 +25,8 @@ export class PreBaseStartupAuthContribution extends Disposable implements IWorkb
 	private static readonly AUTH_OVERLAY_CLOSE_DURATION = 160;
 
 	private _offlineDismissed = false;
+	/** Event handlers for the current auth overlay, not the contribution lifetime. */
+	private readonly _overlayDisposables = this._register(new DisposableStore());
 	private _overlay: HTMLElement | undefined;
 	private _closingOverlay: HTMLElement | undefined;
 	private _closeOverlayTimeout: number | undefined;
@@ -81,6 +83,7 @@ export class PreBaseStartupAuthContribution extends Disposable implements IWorkb
 		if (this._overlay) {
 			return;
 		}
+		this._overlayDisposables.clear();
 		if (this._closingOverlay) {
 			if (this._closeOverlayTimeout !== undefined) {
 				mainWindow.clearTimeout(this._closeOverlayTimeout);
@@ -135,13 +138,13 @@ export class PreBaseStartupAuthContribution extends Disposable implements IWorkb
 			providerLabel.textContent = provider.label;
 			const labelSpacer = DOM.append(button, mainWindow.document.createElement('span'));
 			labelSpacer.setAttribute('aria-hidden', 'true');
-			this._register(DOM.addDisposableListener(button, 'click', () => void this._signIn(provider.id)));
+			this._overlayDisposables.add(DOM.addDisposableListener(button, 'click', () => void this._signIn(provider.id)));
 		}
 		const offline = DOM.append(card, mainWindow.document.createElement('button'));
 		offline.textContent = localize('prebase.auth.continueOffline', 'Continue Offline');
 		Object.assign(offline.style, { width: '100%', minHeight: '38px', border: '0', background: 'transparent', color: 'var(--vscode-textLink-foreground)', cursor: 'pointer' });
-		this._register(DOM.addDisposableListener(offline, 'click', () => this._continueOffline()));
-		this._register(DOM.addDisposableListener(overlay, 'keydown', event => { if (event.key === 'Escape') { event.preventDefault(); this._continueOffline(); } }));
+		this._overlayDisposables.add(DOM.addDisposableListener(offline, 'click', () => this._continueOffline()));
+		this._overlayDisposables.add(DOM.addDisposableListener(overlay, 'keydown', event => { if (event.key === 'Escape') { event.preventDefault(); this._continueOffline(); } }));
 		this._overlay = overlay;
 		void offline.focus();
 	}
@@ -161,6 +164,9 @@ export class PreBaseStartupAuthContribution extends Disposable implements IWorkb
 			return;
 		}
 		this._overlay = undefined;
+		// The fade-out keeps the element visible, but it must stop accepting input and
+		// release button/overlay listener closures as soon as it starts closing.
+		this._overlayDisposables.clear();
 		overlay.setAttribute('aria-hidden', 'true');
 		Object.assign(overlay.style, { opacity: '0', pointerEvents: 'none', backdropFilter: 'blur(0)' });
 		this._closingOverlay = overlay;

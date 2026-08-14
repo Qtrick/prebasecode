@@ -22,6 +22,7 @@ import { type IExtensionDefinition, getExtensionStream } from './builtInExtensio
 import { fetchUrls, fetchGithub } from './fetch.ts';
 import { createTypeScriptCompilerStream, spawnTypeScriptCompiler } from './typescriptCompiler.ts';
 import watcher from './watch/index.ts';
+import { isBuiltInCopilotEnabled } from './copilot.ts';
 
 import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
@@ -469,7 +470,7 @@ function doPackageLocalExtensionsStream(forWeb: boolean, disableMangle: boolean,
  */
 export function packageCopilotExtensionStream(disableMangle: boolean): Stream {
 	const extensionPath = path.join(root, 'extensions', 'copilot');
-	if (!fs.existsSync(extensionPath)) {
+	if (!isBuiltInCopilotEnabled(root)) {
 		return es.readArray([]);
 	}
 

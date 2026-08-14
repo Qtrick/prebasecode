@@ -22,6 +22,7 @@ import * as tsb from './lib/tsb/index.ts';
 import { createTypeScriptCompilerStream, spawnTypeScriptCompiler } from './lib/typescriptCompiler.ts';
 import * as util from './lib/util.ts';
 import watcher from './lib/watch/index.ts';
+import { isBuiltInCopilotEnabled } from './lib/copilot.ts';
 
 const root = path.dirname(import.meta.dirname);
 const commit = getVersion(root);
@@ -294,7 +295,13 @@ task.task(compileNativeExtensionsBuildTask);
  * Compiles the built-in copilot extension for the build.
  * Used by non-CI local builds where copilot is not downloaded as a VSIX.
  */
-export const compileCopilotExtensionBuildTask = task.define('compile-copilot-extension-build', () => ext.packageCopilotExtensionStream(false).pipe(gulp.dest('.build')));
+export const compileCopilotExtensionBuildTask = task.define('compile-copilot-extension-build', () => {
+	if (!isBuiltInCopilotEnabled(root)) {
+		console.log('[compile-copilot-extension-build] Built-in Copilot is disabled by product policy.');
+		return Promise.resolve();
+	}
+	return ext.packageCopilotExtensionStream(false).pipe(gulp.dest('.build'));
+});
 task.task(compileCopilotExtensionBuildTask);
 
 /**

@@ -28,7 +28,7 @@ import minimist from 'minimist';
 import { compileBuildWithoutManglingTask, compileBuildWithManglingTask } from './gulpfile.compile.ts';
 import { compileNonNativeExtensionsBuildTask, compileNativeExtensionsBuildTask, compileAllExtensionsBuildTask, compileExtensionMediaBuildTask, cleanExtensionsBuildTask, compileCopilotExtensionBuildTask } from './gulpfile.extensions.ts';
 import { copyCodiconsTask } from './lib/compilation.ts';
-import { ensureCopilotPlatformPackage, getCopilotExcludeFilter, getCopilotRuntimePrebuildFiles, getCopilotTgrepExcludeFilter, getRipgrepExcludeFilter, prepareBuiltInCopilotRipgrepShim } from './lib/copilot.ts';
+import { ensureCopilotPlatformPackage, getCopilotPackagingPlan, getRipgrepExcludeFilter, isBuiltInCopilotEnabled, prepareBuiltInCopilotRipgrepShim, verifyPreBaseDesktopPackage } from './lib/copilot.ts';
 import { readAgentSdkResults } from './agent-sdk/common.ts';
 import { useEsbuildTranspile } from './buildConfig.ts';
 import { promisify } from 'util';
@@ -42,6 +42,7 @@ const glob = promisify(globCallback);
 const rcedit = promisify(rceditCallback);
 const root = path.dirname(import.meta.dirname);
 const commit = getVersion(root);
+const builtInCopilotEnabled = isBuiltInCopilotEnabled(root);
 
 // Build
 const vscodeEntryPoints = [
@@ -96,6 +97,8 @@ const vscodeResourceIncludes = [
 	// Welcome
 	'out-build/vs/workbench/contrib/welcomeGettingStarted/common/media/**/*.{svg,png}',
 	'out-build/vs/workbench/contrib/welcomeOnboarding/browser/media/*.svg',
+	'out-build/vs/workbench/contrib/chat/browser/chatSetup/media/{github,google}.svg',
+	'out-build/vs/workbench/contrib/prebase/browser/media/prebase-logo.png',
 
 	// Sessions
 	'out-build/vs/sessions/contrib/chat/browser/media/*.svg',
@@ -267,6 +270,11 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 			const set = new Set((ext as { platforms?: string[] }).platforms);
 			return !set.has(platform);
 		}).map(ext => `!.build/extensions/${ext.name}/**`);
+		if (!builtInCopilotEnabled) {
+			// CI package-only tasks may reuse a stale .build directory from an
+			// enabled checkout; never let that reactivate Copilot in PreBase.
+			platformSpecificBuiltInExtensionsExclusions.push('!.build/extensions/copilot/**');
+		}
 
 		const extensions = gulp.src(['.build/extensions/**', ...platformSpecificBuiltInExtensionsExclusions], { base: '.build', dot: true });
 
@@ -340,11 +348,16 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 			.pipe(filter(depFilterPattern))
 			.pipe(util.cleanNodeModules(path.join(import.meta.dirname, '.moduleignore')))
 			.pipe(util.cleanNodeModules(path.join(import.meta.dirname, `.moduleignore.${process.platform}`)));
-		ensureCopilotPlatformPackage(platform, arch);
-		const copilotRuntimePrebuilds = gulp.src(getCopilotRuntimePrebuildFiles(platform, arch), { base: '.', dot: true, allowEmpty: true });
+		const copilotPackagingPlan = getCopilotPackagingPlan(builtInCopilotEnabled, platform, arch);
+		if (builtInCopilotEnabled) {
+			ensureCopilotPlatformPackage(platform, arch);
+		}
+		const copilotRuntimePrebuilds = builtInCopilotEnabled
+			? gulp.src(copilotPackagingPlan.runtimePrebuildFiles, { base: '.', dot: true, allowEmpty: true })
+			: es.readArray([]);
 		const deps = es.merge(cleanedDeps, copilotRuntimePrebuilds)
-			.pipe(filter(getCopilotExcludeFilter(platform, arch)))
-			.pipe(filter(getCopilotTgrepExcludeFilter(platform, arch)))
+			.pipe(filter(copilotPackagingPlan.packageExcludeFilter))
+			.pipe(filter(copilotPackagingPlan.tgrepExcludeFilter))
 			.pipe(filter(getRipgrepExcludeFilter(platform, arch)))
 			.pipe(jsFilter)
 			.pipe(util.rewriteSourceMappingURL(sourceMappingURLBase))
@@ -619,6 +632,18 @@ function prepareCopilotRipgrepShimTask(platform: string, arch: string, destinati
 	};
 }
 
+function verifyPreBasePackageTask(platform: string, destinationFolderName: string) {
+	const outputDir = path.join(path.dirname(root), destinationFolderName);
+
+	return () => {
+		const versionedResourcesFolder = util.getVersionedResourcesFolder(platform, commit!);
+		const appBase = platform === 'darwin'
+			? path.join(outputDir, `${product.nameLong}.app`, 'Contents', 'Resources', 'app')
+			: path.join(outputDir, versionedResourcesFolder, 'resources', 'app');
+		verifyPreBaseDesktopPackage(appBase, builtInCopilotEnabled);
+	};
+}
+
 const buildRoot = path.dirname(root);
 
 const BUILD_TARGETS = [
@@ -651,10 +676,11 @@ BUILD_TARGETS.forEach(buildTarget => {
 				console.log(`[package] darwin adaptive Assets.car ready: ${car}`);
 			}));
 		}
-		packageTasks.push(
-			packageTask(platform, arch, sourceFolderName, destinationFolderName, opts),
-			prepareCopilotRipgrepShimTask(platform, arch, destinationFolderName)
-		);
+		packageTasks.push(packageTask(platform, arch, sourceFolderName, destinationFolderName, opts));
+		if (builtInCopilotEnabled) {
+			packageTasks.push(prepareCopilotRipgrepShimTask(platform, arch, destinationFolderName));
+		}
+		packageTasks.push(verifyPreBasePackageTask(platform, destinationFolderName));
 
 		if (platform === 'win32') {
 			packageTasks.push(patchWin32DependenciesTask(destinationFolderName));
@@ -679,7 +705,7 @@ BUILD_TARGETS.forEach(buildTarget => {
 				copyCodiconsTask,
 				cleanExtensionsBuildTask,
 				compileNonNativeExtensionsBuildTask,
-				compileCopilotExtensionBuildTask,
+				...(builtInCopilotEnabled ? [compileCopilotExtensionBuildTask] : []),
 				compileExtensionMediaBuildTask,
 				writeISODate('out-build'),
 				esbuildBundleTask,
@@ -690,7 +716,7 @@ BUILD_TARGETS.forEach(buildTarget => {
 				minified ? compileBuildWithManglingTask : compileBuildWithoutManglingTask,
 				cleanExtensionsBuildTask,
 				compileNonNativeExtensionsBuildTask,
-				compileCopilotExtensionBuildTask,
+				...(builtInCopilotEnabled ? [compileCopilotExtensionBuildTask] : []),
 				compileExtensionMediaBuildTask,
 				minified ? minifyVSCodeTask : bundleVSCodeTask,
 				vscodeTaskCI

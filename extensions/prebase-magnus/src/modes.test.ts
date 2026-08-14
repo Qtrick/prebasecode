@@ -16,6 +16,12 @@ import {
 } from './modes.js';
 
 const allModes = MAGNUS_AGENT_MODES.map(option => option.id);
+const testExecutionSafeTools = [
+	'prebase_terminal_run_project_script',
+	'prebase_desktop_restart_session',
+	'prebase_desktop_stop_session',
+];
+
 const privilegedWriteTools = [
 	'prebase_edit_apply_file',
 	'prebase_edit_apply',
@@ -24,10 +30,7 @@ const privilegedWriteTools = [
 	'prebase_edit_delete_file',
 	'prebase_terminal_install_dependencies',
 	'prebase_terminal_run_declared_node_version',
-	'prebase_terminal_run_project_script',
 	'prebase_desktop_reload_window',
-	'prebase_desktop_restart_session',
-	'prebase_desktop_stop_session',
 	'prebase_desktop_cdp_evaluate',
 ];
 
@@ -112,8 +115,11 @@ suite('Magnus mode capability boundary', () => {
 		}
 	});
 
-	test('allows Test mode only the dedicated Runtime Preview surface, whose tools retain their individual safeguards', () => {
+	test('allows Test mode the dedicated Runtime Preview and bounded test-execution surfaces', () => {
 		for (const tool of ['prebase_runtime_get_state', 'prebase_runtime_inspect_page', 'prebase_runtime_get_evidence', ...runtimeTestTools]) {
+			assert.strictEqual(isMagnusToolAllowed('runtime', tool), true, tool);
+		}
+		for (const tool of testExecutionSafeTools) {
 			assert.strictEqual(isMagnusToolAllowed('runtime', tool), true, tool);
 		}
 		for (const tool of privilegedWriteTools) {
@@ -121,10 +127,15 @@ suite('Magnus mode capability boundary', () => {
 		}
 	});
 
-	test('exposes workspace, terminal, and desktop writes only to Edit and Agent modes', () => {
+	test('keeps environment mutation and arbitrary runtime evaluation restricted to Edit and Agent modes', () => {
 		for (const tool of privilegedWriteTools) {
 			for (const mode of allModes) {
 				assert.strictEqual(isMagnusToolAllowed(mode, tool), mode === 'patch' || mode === 'agent', `${mode}:${tool}`);
+			}
+		}
+		for (const tool of testExecutionSafeTools) {
+			for (const mode of allModes) {
+				assert.strictEqual(isMagnusToolAllowed(mode, tool), mode === 'runtime' || mode === 'patch' || mode === 'agent', `${mode}:${tool}`);
 			}
 		}
 		for (const tool of runtimeTestTools) {
