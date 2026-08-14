@@ -5,6 +5,7 @@
 
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
+import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { IPreBaseAccountService } from './prebaseAccountService.js';
 import { PreBaseOnboardingEditorInput } from './prebaseOnboardingEditorInput.js';
@@ -26,9 +27,11 @@ export class PreBaseOnboardingContribution extends Disposable implements IWorkbe
 	constructor(
 		@IPreBaseAccountService private readonly accountService: IPreBaseAccountService,
 		@IEditorService private readonly editorService: IEditorService,
+		@IWorkbenchEnvironmentService private readonly environmentService: IWorkbenchEnvironmentService,
 	) {
 		super();
-		if (PreBaseOnboardingContribution._autoOpenAttempted) {
+		// Match the workbench startup runner: --skip-welcome must suppress all first-run welcome UI.
+		if (PreBaseOnboardingContribution._autoOpenAttempted || this.environmentService.skipWelcome) {
 			return;
 		}
 		PreBaseOnboardingContribution._autoOpenAttempted = true;

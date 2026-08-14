@@ -3,8 +3,11 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { newWriteableBufferStream, VSBuffer } from '../../../../../../base/common/buffer.js';
+import { CancellationToken } from '../../../../../../base/common/cancellation.js';
 import { isPreBaseCloudSyncAgentHistoryEnabled, resolvePreBaseCloudAuthConfig } from '../cloudConfiguration.js';
 import { buildSupabaseAuthUrl, redactSensitiveForLog } from '../supabaseAuthRest.js';
+import { PreBaseSupabaseAuthClient } from '../../../browser/cloud/prebaseSupabaseAuthClient.js';
 
 suite('PreBase cloud configuration', () => {
 	test('missing url and key yields unconfigured', () => {
@@ -79,5 +82,42 @@ suite('PreBase Supabase auth client helpers', () => {
 		const out = redactSensitiveForLog(`Authorization: Bearer ${jwt}`);
 		assert.ok(!out.includes(jwt));
 		assert.ok(out.includes('[redacted'));
+	});
+
+	test('builds a PKCE browser authorization URL with provider-specific, bounded scopes', () => {
+		const client = new PreBaseSupabaseAuthClient('https://ref.supabase.co/', 'pk-test', {} as never);
+		for (const [provider, expectedScopes] of [
+			['github', 'read:user user:email'],
+			['google', 'openid email profile'],
+		] as const) {
+			const url = new URL(client.createOAuthAuthorizationUrl(provider, 'prebase://auth/callback', 'challenge-value', 'state-value'));
+			assert.strictEqual(url.origin, 'https://ref.supabase.co');
+			assert.strictEqual(url.pathname, '/auth/v1/authorize');
+			assert.strictEqual(url.searchParams.get('provider'), provider);
+			assert.strictEqual(url.searchParams.get('redirect_to'), 'prebase://auth/callback');
+			assert.strictEqual(url.searchParams.get('flow_type'), 'pkce');
+			assert.strictEqual(url.searchParams.get('code_challenge'), 'challenge-value');
+			assert.strictEqual(url.searchParams.get('code_challenge_method'), 'S256');
+			assert.strictEqual(url.searchParams.get('state'), 'state-value');
+			assert.strictEqual(url.searchParams.get('scopes'), expectedScopes);
+		}
+	});
+
+	test('exchanges an OAuth code only through the PKCE token endpoint', async () => {
+		let options: { url: string; data?: string; headers?: Record<string, string> } | undefined;
+		const requestService = {
+			request: async (request: typeof options) => {
+				options = request;
+				const stream = newWriteableBufferStream();
+				stream.end(VSBuffer.fromString('{"access_token":"access"}'));
+				return { res: { statusCode: 200 }, stream };
+			},
+		};
+		const client = new PreBaseSupabaseAuthClient('https://ref.supabase.co', 'pk-test', requestService as never);
+		assert.deepStrictEqual(await client.exchangeCodeForSession('auth-code', 'verifier-value', CancellationToken.None), { access_token: 'access' });
+		assert.ok(options);
+		assert.strictEqual(options!.url, 'https://ref.supabase.co/auth/v1/token?grant_type=pkce');
+		assert.deepStrictEqual(JSON.parse(options!.data!), { auth_code: 'auth-code', code_verifier: 'verifier-value' });
+		assert.strictEqual(options!.headers!.apikey, 'pk-test');
 	});
 });

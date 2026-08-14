@@ -24,6 +24,11 @@ const TARGETS = [
 	'src/vs/workbench/contrib/prebase/browser/prebaseDesktopRuntimeService.ts',
 	'src/vs/workbench/contrib/prebase/browser/prebaseRuntimeService.ts',
 	'src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts',
+	'src/vs/workbench/contrib/prebase/browser/prebaseAccountService.ts',
+	'src/vs/workbench/contrib/prebase/browser/prebaseStartupAuthContribution.ts',
+	'src/vs/workbench/contrib/prebase/browser/cloud/prebaseSupabaseAuthClient.ts',
+	'src/vs/workbench/contrib/prebase/common/auth/prebaseOAuth.ts',
+	'src/vs/workbench/contrib/prebase/common/auth/prebaseStartupAuth.ts',
 ];
 
 async function main(): Promise<void> {

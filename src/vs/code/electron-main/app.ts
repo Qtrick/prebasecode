@@ -776,13 +776,13 @@ export class CodeApplication extends Disposable {
 		// Windows/Linux: protocol handler invokes CLI with --open-url
 		const protocolUrlsFromCommandLine = this.environmentMainService.args['open-url'] ? this.environmentMainService.args._urls || [] : [];
 		if (protocolUrlsFromCommandLine.length > 0) {
-			this.logService.trace('app#resolveInitialProtocolUrls() protocol urls from command line:', protocolUrlsFromCommandLine);
+			this.logService.trace('app#resolveInitialProtocolUrls() protocol urls from command line:', protocolUrlsFromCommandLine.map(url => this.protocolUrlForLog(url)));
 		}
 
 		// macOS: open-url events that were received before the app is ready
 		const protocolUrlsFromEvent = ((global as { getOpenUrls?: () => string[] }).getOpenUrls?.() || []);
 		if (protocolUrlsFromEvent.length > 0) {
-			this.logService.trace(`app#resolveInitialProtocolUrls() protocol urls from macOS 'open-url' event:`, protocolUrlsFromEvent);
+			this.logService.trace(`app#resolveInitialProtocolUrls() protocol urls from macOS 'open-url' event:`, protocolUrlsFromEvent.map(url => this.protocolUrlForLog(url)));
 		}
 
 		if (protocolUrlsFromCommandLine.length + protocolUrlsFromEvent.length === 0) {
@@ -796,7 +796,7 @@ export class CodeApplication extends Disposable {
 			try {
 				return { uri: URI.parse(url), originalUrl: url };
 			} catch {
-				this.logService.trace('app#resolveInitialProtocolUrls() protocol url failed to parse:', url);
+				this.logService.trace('app#resolveInitialProtocolUrls() protocol url failed to parse:', this.protocolUrlForLog(url));
 
 				return undefined;
 			}
@@ -813,16 +813,16 @@ export class CodeApplication extends Disposable {
 			const windowOpenable = this.getWindowOpenableFromProtocolUrl(protocolUrl.uri);
 			if (windowOpenable) {
 				if (await this.shouldBlockOpenable(windowOpenable, windowsMainService, dialogMainService)) {
-					this.logService.trace('app#resolveInitialProtocolUrls() protocol url was blocked:', protocolUrl.uri.toString(true));
+					this.logService.trace('app#resolveInitialProtocolUrls() protocol url was blocked:', this.protocolUrlForLog(protocolUrl.uri));
 
 					continue; // blocked
 				} else {
-					this.logService.trace('app#resolveInitialProtocolUrls() protocol url will be handled as window to open:', protocolUrl.uri.toString(true), windowOpenable);
+					this.logService.trace('app#resolveInitialProtocolUrls() protocol url will be handled as window to open:', this.protocolUrlForLog(protocolUrl.uri), windowOpenable);
 
 					openables.push(windowOpenable); // handled as window to open
 				}
 			} else {
-				this.logService.trace('app#resolveInitialProtocolUrls() protocol url will be passed to active window for handling:', protocolUrl.uri.toString(true));
+				this.logService.trace('app#resolveInitialProtocolUrls() protocol url will be passed to active window for handling:', this.protocolUrlForLog(protocolUrl.uri));
 
 				urls.push(protocolUrl); // handled within active window
 			}
@@ -955,7 +955,7 @@ export class CodeApplication extends Disposable {
 	}
 
 	private async handleProtocolUrl(windowsMainService: IWindowsMainService, dialogMainService: IDialogMainService, urlService: IURLService, uri: URI, options?: IOpenURLOptions): Promise<boolean> {
-		this.logService.trace('app#handleProtocolUrl():', uri.toString(true), options);
+		this.logService.trace('app#handleProtocolUrl():', this.protocolUrlForLog(uri), options);
 
 		// Support 'workspace' URLs (https://github.com/microsoft/vscode/issues/124263)
 		if (uri.scheme === this.productService.urlProtocol && uri.path === 'workspace') {
@@ -971,7 +971,7 @@ export class CodeApplication extends Disposable {
 		// We should handle the URI in a new window if the URL contains `windowId=_blank`
 		const params = new URLSearchParams(uri.query);
 		if (params.get('windowId') === '_blank') {
-			this.logService.trace(`app#handleProtocolUrl() found 'windowId=_blank' as parameter, setting shouldOpenInNewWindow=true:`, uri.toString(true));
+			this.logService.trace(`app#handleProtocolUrl() found 'windowId=_blank' as parameter, setting shouldOpenInNewWindow=true:`, this.protocolUrlForLog(uri));
 
 			params.delete('windowId');
 			uri = uri.with({ query: params.toString() });
@@ -981,7 +981,7 @@ export class CodeApplication extends Disposable {
 
 		// or if no window is open (macOS only)
 		else if (isMacintosh && windowsMainService.getWindowCount() === 0) {
-			this.logService.trace(`app#handleProtocolUrl() running on macOS with no window open, setting shouldOpenInNewWindow=true:`, uri.toString(true));
+			this.logService.trace(`app#handleProtocolUrl() running on macOS with no window open, setting shouldOpenInNewWindow=true:`, this.protocolUrlForLog(uri));
 
 			shouldOpenInNewWindow = true;
 		}
@@ -989,7 +989,7 @@ export class CodeApplication extends Disposable {
 		// Pass along whether the application is being opened via a Continue On flow
 		const continueOn = params.get('continueOn');
 		if (continueOn !== null) {
-			this.logService.trace(`app#handleProtocolUrl() found 'continueOn' as parameter:`, uri.toString(true));
+			this.logService.trace(`app#handleProtocolUrl() found 'continueOn' as parameter:`, this.protocolUrlForLog(uri));
 
 			params.delete('continueOn');
 			uri = uri.with({ query: params.toString() });
@@ -1000,7 +1000,7 @@ export class CodeApplication extends Disposable {
 		// Extract session parameter to open a specific chat session in the target window
 		const session = params.get('session');
 		if (session !== null) {
-			this.logService.trace(`app#handleProtocolUrl() found 'session' as parameter:`, uri.toString(true));
+			this.logService.trace(`app#handleProtocolUrl() found 'session' as parameter:`, this.protocolUrlForLog(uri));
 
 			params.delete('session');
 			uri = uri.with({ query: params.toString() });
@@ -1010,11 +1010,11 @@ export class CodeApplication extends Disposable {
 		const windowOpenableFromProtocolUrl = this.getWindowOpenableFromProtocolUrl(uri);
 		if (windowOpenableFromProtocolUrl) {
 			if (await this.shouldBlockOpenable(windowOpenableFromProtocolUrl, windowsMainService, dialogMainService)) {
-				this.logService.trace('app#handleProtocolUrl() protocol url was blocked:', uri.toString(true));
+				this.logService.trace('app#handleProtocolUrl() protocol url was blocked:', this.protocolUrlForLog(uri));
 
 				return true; // If openable should be blocked, behave as if it's handled
 			} else {
-				this.logService.trace('app#handleProtocolUrl() opening protocol url as window:', windowOpenableFromProtocolUrl, uri.toString(true));
+				this.logService.trace('app#handleProtocolUrl() opening protocol url as window:', windowOpenableFromProtocolUrl, this.protocolUrlForLog(uri));
 
 				const window = (await windowsMainService.open({
 					context: OpenContext.LINK,
@@ -1038,7 +1038,7 @@ export class CodeApplication extends Disposable {
 
 		// ...or if we should open in a new window and then handle it within that window
 		if (shouldOpenInNewWindow) {
-			this.logService.trace('app#handleProtocolUrl() opening empty window and passing in protocol url:', uri.toString(true));
+			this.logService.trace('app#handleProtocolUrl() opening empty window and passing in protocol url:', this.protocolUrlForLog(uri));
 
 			const window = (await windowsMainService.open({
 				context: OpenContext.LINK,
@@ -1054,9 +1054,22 @@ export class CodeApplication extends Disposable {
 			return urlService.open(uri, options);
 		}
 
-		this.logService.trace('app#handleProtocolUrl(): not handled', uri.toString(true), options);
+		this.logService.trace('app#handleProtocolUrl(): not handled', this.protocolUrlForLog(uri), options);
 
 		return false;
+	}
+
+	/** OAuth callback query values are credentials and must never be written to the main-process log. */
+	private protocolUrlForLog(value: URI | string): string {
+		try {
+			const uri = typeof value === 'string' ? URI.parse(value) : value;
+			if (uri.scheme === this.productService.urlProtocol && uri.authority === 'auth' && uri.path === '/callback') {
+				return `${uri.scheme}://auth/callback?[redacted]`;
+			}
+			return uri.toString(true);
+		} catch {
+			return '[unparseable protocol URL]';
+		}
 	}
 
 	private setupSharedProcess(machineId: string, sqmId: string, devDeviceId: string): { sharedProcessReady: Promise<MessagePortClient>; sharedProcessClient: Promise<MessagePortClient> } {

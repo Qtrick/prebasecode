@@ -234,6 +234,11 @@ export class StartupPageRunnerContribution extends Disposable implements IWorkbe
 	}
 
 	private tryShowOnboarding(): void {
+		// PreBase has a product-owned provider gate and versioned onboarding editor.
+		// Do not layer the generic VS Code/Copilot welcome overlay above it.
+		if (this.productService.nameShort === 'PreBase') {
+			return;
+		}
 		if (this.environmentService.skipWelcome) {
 			return; // skip welcome flag is set
 		}

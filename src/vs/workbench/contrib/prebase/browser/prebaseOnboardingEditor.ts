@@ -210,9 +210,6 @@ export class PreBaseOnboardingEditor extends EditorPane {
 			this._btn(actions, localize('prebase.onboarding.signIn', "Sign In"), () => {
 				void this.commandService.executeCommand('prebase.account.signIn');
 			}, true);
-			this._btn(actions, localize('prebase.onboarding.create', "Create Account"), () => {
-				void this.commandService.executeCommand('prebase.account.signUp');
-			});
 		}
 		this._btn(actions, localize('prebase.onboarding.continueWithout', "Continue without Signing In"), () => this._advance(true));
 

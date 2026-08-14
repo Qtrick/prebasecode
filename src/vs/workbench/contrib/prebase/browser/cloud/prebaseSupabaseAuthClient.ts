@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
@@ -8,6 +8,8 @@ import { asText, IRequestService } from '../../../../../platform/request/common/
 import { cloudErrorMessageFromBody, PreBaseCloudError } from '../../common/cloud/cloudErrors.js';
 import type { ISupabaseAuthTokenResponse, ISupabaseAuthUserResponse } from '../../common/cloud/cloudTypes.js';
 import { buildSupabaseAuthUrl } from '../../common/cloud/supabaseAuthRest.js';
+
+export type PreBaseSupabaseOAuthProvider = 'github' | 'google';
 
 export { buildSupabaseAuthUrl, buildSupabaseRestUrl, redactSensitiveForLog } from '../../common/cloud/supabaseAuthRest.js';
 
@@ -31,6 +33,27 @@ export class PreBaseSupabaseAuthClient {
 		return this._postJson(
 			buildSupabaseAuthUrl(this.supabaseUrl, '/token?grant_type=password'),
 			{ email, password },
+			{ apikey: this.publishableKey },
+			cancel,
+		);
+	}
+
+	createOAuthAuthorizationUrl(provider: PreBaseSupabaseOAuthProvider, redirectTo: string, codeChallenge: string, state: string): string {
+		const url = new URL(buildSupabaseAuthUrl(this.supabaseUrl, '/authorize'));
+		url.searchParams.set('provider', provider);
+		url.searchParams.set('redirect_to', redirectTo);
+		url.searchParams.set('flow_type', 'pkce');
+		url.searchParams.set('code_challenge', codeChallenge);
+		url.searchParams.set('code_challenge_method', 'S256');
+		url.searchParams.set('state', state);
+		url.searchParams.set('scopes', provider === 'github' ? 'read:user user:email' : 'openid email profile');
+		return url.toString();
+	}
+
+	async exchangeCodeForSession(code: string, codeVerifier: string, cancel: CancellationToken): Promise<ISupabaseAuthTokenResponse> {
+		return this._postJson(
+			buildSupabaseAuthUrl(this.supabaseUrl, '/token?grant_type=pkce'),
+			{ auth_code: code, code_verifier: codeVerifier },
 			{ apikey: this.publishableKey },
 			cancel,
 		);

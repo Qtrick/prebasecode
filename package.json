@@ -119,7 +119,8 @@
 		"typecheck:compat": "tsc6 -p ./src/tsconfig.json --noEmit --skipLibCheck",
 		"verify:eslint-prebase": "node --experimental-strip-types scripts/assurance/verify-eslint-prebase.mts",
 		"verify:eslint-prebase-security": "node --experimental-strip-types scripts/assurance/verify-eslint-prebase-security.mts",
-		"assurance:release": "npm run assurance:static && npm run assurance:privacy && npm run verify:eslint-prebase-security && npm run verify:eslint-prebase",
+		"verify:prebase-auth-ui": "node --experimental-strip-types scripts/assurance/verify-prebase-auth-ui.mts",
+		"assurance:release": "npm run assurance:static && npm run assurance:privacy && npm run verify:eslint-prebase-security && npm run verify:prebase-auth-ui && npm run verify:eslint-prebase",
 		"assurance:cloud": "npm run verify:supabase-migrations && npm run verify:supabase-rls-static && npm run verify:supabase-secrets"
 	},
 	"dependencies": {

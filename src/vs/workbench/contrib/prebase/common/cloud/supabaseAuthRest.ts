@@ -18,5 +18,7 @@ export function buildSupabaseRestUrl(supabaseUrl: string, table: string): string
 export function redactSensitiveForLog(text: string): string {
 	return text
 		.replace(/\beyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b/g, '[redacted-jwt]')
-		.replace(/\bBearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]');
+		.replace(/\bBearer\s+[A-Za-z0-9._-]+/gi, 'Bearer [redacted]')
+		.replace(/\b(auth_code|code_verifier|code_challenge|state)\b\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;&]+)/gi, '$1=[redacted]')
+		.replace(/([?&](?:token|access_token|id_token|refresh_token|key|code|password|secret|auth_code|code_verifier|code_challenge|state)=)[^&#\s]+/gi, '$1[redacted]');
 }

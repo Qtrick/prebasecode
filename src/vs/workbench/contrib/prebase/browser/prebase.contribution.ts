@@ -189,7 +189,7 @@ Registry.as<IEditorPaneRegistry>(EditorExtensions.EditorPane).registerEditorPane
 // Contributions that open editors / prove AfterRestored must load after pane registration above.
 // Onboarding before Home empty editors so first-run yield ordering is deterministic.
 import './prebaseWorkbenchReadyContribution.js';
-import './prebaseOnboardingContribution.js';
+import './prebaseStartupAuthContribution.js';
 import './prebaseHomeEmptyEditors.js';
 
 class PreBaseRuntimeEditorInputSerializer implements IEditorSerializer {
@@ -394,33 +394,6 @@ registerAction2(class extends Action2 {
 
 // --- account menu on the Activity Bar profile / Accounts button
 
-async function promptCredentials(quickInput: IQuickInputService, includeDisplayName: boolean): Promise<{ email: string; password: string; displayName?: string } | undefined> {
-	const email = await quickInput.input({
-		title: localize('prebase.account.emailTitle', "PreBase Account"),
-		prompt: localize('prebase.account.email', "Email"),
-		validateInput: async (v) => (!v.includes('@') ? localize('prebase.account.emailInvalid', "Enter a valid email") : undefined),
-	});
-	if (!email) {
-		return undefined;
-	}
-	let displayName: string | undefined;
-	if (includeDisplayName) {
-		displayName = await quickInput.input({
-			title: localize('prebase.account.displayTitle', "Display name"),
-			prompt: localize('prebase.account.display', "Display name (optional)"),
-		}) || undefined;
-	}
-	const password = await quickInput.input({
-		title: localize('prebase.account.passwordTitle', "Password"),
-		prompt: localize('prebase.account.password', "Password"),
-		password: true,
-	});
-	if (!password) {
-		return undefined;
-	}
-	return { email, password, displayName };
-}
-
 async function ensureAccountConfigured(accounts: IPreBaseAccountService, notificationService: INotificationService, commandService: ICommandService): Promise<boolean> {
 	if (accounts.apiConfigured) {
 		return true;
@@ -451,54 +424,19 @@ registerAction2(class extends Action2 {
 	async run(accessor: ServicesAccessor) {
 		const accountService = accessor.get(IPreBaseAccountService);
 		const notificationService = accessor.get(INotificationService);
-		const quickInputService = accessor.get(IQuickInputService);
 		const commandService = accessor.get(ICommandService);
 		if (!(await ensureAccountConfigured(accountService, notificationService, commandService))) {
 			return;
 		}
-		const creds = await promptCredentials(quickInputService, false);
-		if (!creds) {
+		const provider = await accessor.get(IQuickInputService).pick([
+			{ label: 'GitHub', id: 'github' },
+			{ label: 'Google', id: 'google' },
+		], { title: localize('prebase.account.providerTitle', 'Sign in to PreBase'), placeHolder: localize('prebase.account.providerPrompt', 'Choose a sign-in provider') });
+		if (!provider) {
 			return;
 		}
 		try {
-			await accountService.signIn(creds.email, creds.password);
-			notificationService.info(localize('prebase.account.signedIn', "Signed in to PreBase."));
-		} catch (err) {
-			notificationService.error(err instanceof Error ? err.message : String(err));
-		}
-	}
-});
-
-registerAction2(class extends Action2 {
-	constructor() {
-		super({
-			id: 'prebase.account.signUp',
-			title: localize2('prebase.account.signUp', "Create Account…"),
-			category: localize2('prebase.category', "PreBase"),
-			f1: true,
-			menu: {
-				id: MenuId.AccountsContext,
-				group: '0_prebase',
-				order: 2,
-				when: PreBaseAccountContext.notSignedIn,
-			}
-		});
-	}
-	async run(accessor: ServicesAccessor) {
-		const accountService = accessor.get(IPreBaseAccountService);
-		const notificationService = accessor.get(INotificationService);
-		const quickInputService = accessor.get(IQuickInputService);
-		const commandService = accessor.get(ICommandService);
-		if (!(await ensureAccountConfigured(accountService, notificationService, commandService))) {
-			return;
-		}
-		const creds = await promptCredentials(quickInputService, true);
-		if (!creds) {
-			return;
-		}
-		try {
-			await accountService.signUp(creds.email, creds.password, creds.displayName);
-			notificationService.info(localize('prebase.account.created', "PreBase account created."));
+			await accountService.signInWithProvider(provider.id as 'github' | 'google');
 		} catch (err) {
 			notificationService.error(err instanceof Error ? err.message : String(err));
 		}

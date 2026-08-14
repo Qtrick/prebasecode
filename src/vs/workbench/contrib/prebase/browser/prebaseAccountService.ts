@@ -1,25 +1,30 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { CancellationToken, CancellationTokenSource } from '../../../../base/common/cancellation.js';
+import { DeferredPromise } from '../../../../base/common/async.js';
+import { encodeBase64, VSBuffer } from '../../../../base/common/buffer.js';
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
+import { URI } from '../../../../base/common/uri.js';
 import { localize } from '../../../../nls.js';
 import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
 import { IContextKey, IContextKeyService, RawContextKey } from '../../../../platform/contextkey/common/contextkey.js';
 import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
 import { ILogService } from '../../../../platform/log/common/log.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
+import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { asText, IRequestService } from '../../../../platform/request/common/request.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../platform/storage/common/storage.js';
 import { PreBaseCloudConfigKeys } from '../common/cloud/cloudConfiguration.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import { IPreBaseCloudService } from './cloud/prebaseCloudService.js';
 import { redactSensitiveForLog } from '../common/cloud/supabaseAuthRest.js';
+import { consumePreBaseOAuthCallback, type IPreBaseOAuthAttempt, isPreBaseOAuthProvider, PREBASE_OAUTH_CALLBACK_AUTHORITY, PREBASE_OAUTH_CALLBACK_PATH, type PreBaseOAuthProvider, PREBASE_OAUTH_TIMEOUT_MS } from '../common/auth/prebaseOAuth.js';
 
-export type PreBaseAccountState = 'signedOut' | 'signingIn' | 'signedIn' | 'error' | 'unconfigured';
+export type PreBaseAccountState = 'initializing' | 'signedOut' | 'signingIn' | 'signedIn' | 'error' | 'unconfigured';
 
 export interface IPreBaseAccountInfo {
 	displayName: string;
@@ -30,7 +35,7 @@ export interface IPreBaseAccountInfo {
 export const IPreBaseAccountService = createDecorator<IPreBaseAccountService>('prebaseAccountService');
 
 /** Menu/when clauses — never reuse Copilot/GitHub account context keys. */
-export const PREBASE_ACCOUNT_STATE_CONTEXT_KEY = new RawContextKey<PreBaseAccountState>('prebaseAccountState', 'unconfigured');
+export const PREBASE_ACCOUNT_STATE_CONTEXT_KEY = new RawContextKey<PreBaseAccountState>('prebaseAccountState', 'initializing');
 export const PREBASE_ACCOUNT_CONFIGURED_CONTEXT_KEY = new RawContextKey<boolean>('prebaseAccountConfigured', false);
 
 export const PreBaseAccountContext = {
@@ -47,11 +52,14 @@ export interface IPreBaseAccountService {
 	readonly account: IPreBaseAccountInfo | undefined;
 	readonly lastError: string | undefined;
 	readonly apiConfigured: boolean;
+	whenInitialSessionResolved(): Promise<void>;
 	isOnboardingComplete(): boolean;
 	markOnboardingComplete(): void;
 	resetOnboarding(): void;
 	signIn(email: string, password: string): Promise<void>;
 	signUp(email: string, password: string, displayName?: string): Promise<void>;
+	signInWithProvider(provider: PreBaseOAuthProvider): Promise<void>;
+	handleOAuthCallback(uri: URI): Promise<boolean>;
 	signOut(): Promise<void>;
 	restoreSession(): Promise<void>;
 }
@@ -66,12 +74,15 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 	private readonly _onDidChangeState = this._register(new Emitter<void>());
 	readonly onDidChangeState = this._onDidChangeState.event;
 
-	private _state: PreBaseAccountState = 'unconfigured';
+	private _state: PreBaseAccountState = 'initializing';
 	private _account: IPreBaseAccountInfo | undefined;
 	private _lastError: string | undefined;
 	private _requestCts: CancellationTokenSource | undefined;
 	private readonly _stateKey: IContextKey<PreBaseAccountState>;
 	private readonly _configuredKey: IContextKey<boolean>;
+	private readonly _initialSessionResolved = new DeferredPromise<void>();
+	private _oauthAttempt: (IPreBaseOAuthAttempt & { codeVerifier: string }) | undefined;
+	private _oauthTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(
 		@IConfigurationService private readonly configurationService: IConfigurationService,
@@ -80,6 +91,7 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 		@IProductService private readonly productService: IProductService,
 		@ILogService private readonly logService: ILogService,
 		@IPreBaseCloudService private readonly cloudService: IPreBaseCloudService,
+		@IOpenerService private readonly openerService: IOpenerService,
 		@IContextKeyService contextKeyService: IContextKeyService,
 	) {
 		super();
@@ -100,6 +112,7 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 
 	override dispose(): void {
 		this._cancelRequests();
+		this._clearOAuthAttempt();
 		super.dispose();
 	}
 
@@ -107,6 +120,7 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 	get account(): IPreBaseAccountInfo | undefined { return this._account; }
 	get lastError(): string | undefined { return this._lastError; }
 	get apiConfigured(): boolean { return this.cloudService.isAuthConfigured(); }
+	whenInitialSessionResolved(): Promise<void> { return this._initialSessionResolved.p; }
 
 	isOnboardingComplete(): boolean {
 		const completed = this.storageService.getNumber(STORAGE_ONBOARDING, StorageScope.APPLICATION, 0);
@@ -142,6 +156,95 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 				this.logService.warn(`[PreBaseAccount] restoreSession: ${redactSensitiveForLog(message)}`);
 				this._setState('signedOut', undefined, undefined);
 			}
+		} finally {
+			this._initialSessionResolved.complete();
+		}
+	}
+
+	async signInWithProvider(provider: PreBaseOAuthProvider): Promise<void> {
+		if (!isPreBaseOAuthProvider(provider)) {
+			throw new Error(localize('prebase.account.invalidProvider', 'This sign-in provider is not available.'));
+		}
+		const client = this.cloudService.getAuthClient();
+		if (!client) {
+			const message = localize('prebase.account.oauthCloudUnconfigured', 'Cloud sign-in is not configured. You can continue locally.');
+			this._setState('unconfigured', undefined, message);
+			throw new Error(message);
+		}
+		if (this._oauthAttempt) {
+			throw new Error(localize('prebase.account.oauthActive', 'A PreBase sign-in is already in progress.'));
+		}
+		const codeVerifier = this._randomUrlSafe(48);
+		const state = this._randomUrlSafe(32);
+		const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
+		const challenge = encodeBase64(VSBuffer.wrap(new Uint8Array(digest)), false, true);
+		this._oauthAttempt = { state, codeVerifier, expiresAt: Date.now() + PREBASE_OAUTH_TIMEOUT_MS, consumed: false };
+		this._oauthTimer = setTimeout(() => {
+			this._clearOAuthAttempt();
+			if (this._state === 'signingIn') {
+				this._setState('signedOut', undefined, localize('prebase.account.oauthTimedOut', 'Sign-in timed out. Try again.'));
+			}
+		}, PREBASE_OAUTH_TIMEOUT_MS);
+		this._setState('signingIn', undefined, undefined);
+		const callback = URI.from({ scheme: this.productService.urlProtocol, authority: PREBASE_OAUTH_CALLBACK_AUTHORITY, path: PREBASE_OAUTH_CALLBACK_PATH }).toString();
+		try {
+			const opened = await this.openerService.open(client.createOAuthAuthorizationUrl(provider, callback, challenge, state), { openExternal: true });
+			if (opened) {
+				return;
+			}
+		} catch {
+			// Treat an opener failure exactly like a declined open; neither exposes OAuth values.
+		}
+		if (this._oauthAttempt) {
+			this._clearOAuthAttempt();
+			this._setState('signedOut', undefined, localize('prebase.account.browserFailed', 'Unable to open the system browser for sign-in.'));
+		}
+	}
+
+	async handleOAuthCallback(uri: URI): Promise<boolean> {
+		const attempt = this._oauthAttempt;
+		const callback = consumePreBaseOAuthCallback(uri, this.productService.urlProtocol, attempt, Date.now());
+		if (!callback || !attempt) {
+			return false;
+		}
+		// Consume before the network exchange so deep-link replay cannot redeem the same code twice.
+		this._clearOAuthAttempt();
+		const cancel = this._beginRequest();
+		try {
+			const client = this.cloudService.getAuthClient();
+			if (!client) {
+				throw new Error(localize('prebase.account.oauthCloudUnconfigured', 'Cloud sign-in is not configured. You can continue locally.'));
+			}
+			const response = await client.exchangeCodeForSession(callback.code, attempt.codeVerifier, cancel);
+			if (!response.access_token || cancel.isCancellationRequested) {
+				throw new Error(localize('prebase.account.oauthNoToken', 'Account service did not return a session token.'));
+			}
+			await this.cloudService.getSessionAdapter().write({ accessToken: response.access_token, refreshToken: response.refresh_token });
+			if (cancel.isCancellationRequested) {
+				// A sign-out may have raced an unabortable SecretStorage write. Clear only
+				// when no newer sign-in owns the session, matching the password flow.
+				if (!this._requestCts || this._requestCts.token === cancel) {
+					await this.cloudService.getSessionAdapter().clear();
+				}
+				this._abandonSigningInIfOwner(cancel);
+				return true;
+			}
+			const info = await this._buildAccountFromSupabase(response.access_token, cancel) ?? { displayName: response.user?.email || 'PreBase', email: response.user?.email };
+			if (cancel.isCancellationRequested) {
+				if (!this._requestCts || this._requestCts.token === cancel) {
+					await this.cloudService.getSessionAdapter().clear();
+				}
+				this._abandonSigningInIfOwner(cancel);
+				return true;
+			}
+			this.storageService.store(STORAGE_ACCOUNT, JSON.stringify(info), StorageScope.APPLICATION, StorageTarget.USER);
+			this._setState('signedIn', info, undefined);
+			return true;
+		} catch (err) {
+			if (!cancel.isCancellationRequested) {
+				this._setState('error', undefined, redactSensitiveForLog(err instanceof Error ? err.message : String(err)));
+			}
+			return true;
 		}
 	}
 
@@ -165,6 +268,7 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 
 	async signOut(): Promise<void> {
 		this._cancelRequests();
+		this._clearOAuthAttempt();
 		const auth = this.cloudService.getAuthConfig();
 		if (auth.mode === 'supabase') {
 			const session = await this.cloudService.getSessionAdapter().read();
@@ -270,6 +374,19 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 		this._requestCts = undefined;
 	}
 
+	private _clearOAuthAttempt(): void {
+		this._oauthAttempt = undefined;
+		if (this._oauthTimer !== undefined) {
+			clearTimeout(this._oauthTimer);
+			this._oauthTimer = undefined;
+		}
+	}
+
+	private _randomUrlSafe(bytes: number): string {
+		const value = crypto.getRandomValues(new Uint8Array(bytes));
+		return encodeBase64(VSBuffer.wrap(value), false, true);
+	}
+
 	private async _validateLegacySession(base: string, token: string, cancel: CancellationToken): Promise<IPreBaseAccountInfo | undefined> {
 		try {
 			const context = await this.requestService.request({
@@ -309,7 +426,7 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 			};
 		} catch (err) {
 			if (!cancel.isCancellationRequested) {
-				this.logService.warn(`[PreBaseAccount] session validation error: ${err instanceof Error ? err.message : String(err)}`);
+				this.logService.warn(`[PreBaseAccount] session validation error: ${redactSensitiveForLog(err instanceof Error ? err.message : String(err))}`);
 			}
 			return undefined;
 		}
