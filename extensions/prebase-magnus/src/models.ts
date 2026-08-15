@@ -3,6 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import type { DiscoveredGeminiModel } from './geminiClient';
+
 export type MagnusProviderId = 'gemini';
 
 export interface MagnusProviderCapabilities {
@@ -38,20 +40,20 @@ export const MAGNUS_PROVIDERS: readonly MagnusProviderDescriptor[] = [
 export interface MagnusModelOption {
 	readonly id: string;
 	readonly name: string;
-	/** Gemini API model id (empty for auto). */
+	/** Gemini API model id. */
 	readonly apiModel: string;
 	readonly maxInputTokens: number;
 	readonly maxOutputTokens: number;
-	/** Short picker / hover description (Cursor-style). */
+	/** Short picker / hover description. */
 	readonly description: string;
+	readonly isAuto?: boolean;
 }
 
 /**
- * Active supported models for PreBase beta.
- * Stale / shutdown models (Gemini 1.5 Pro/Flash, Gemini 2.0 Flash) have been retired.
+ * Default fallback models when live discovery is not yet available or offline.
  * Auto resolves to Gemini 2.5 Flash as the balanced, fast default.
  */
-export const MAGNUS_MODELS: readonly MagnusModelOption[] = [
+export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 	{
 		id: 'auto',
 		name: 'Auto',
@@ -59,6 +61,7 @@ export const MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		maxInputTokens: 1_000_000,
 		maxOutputTokens: 65_536,
 		description: 'Balanced quality and speed, recommended for most tasks (resolves to Gemini 2.5 Flash).',
+		isAuto: true,
 	},
 	{
 		id: 'gemini-2.5-pro',
@@ -77,6 +80,8 @@ export const MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		description: 'Fast and capable — strong default for everyday coding.',
 	},
 ];
+
+export const MAGNUS_MODELS: readonly MagnusModelOption[] = DEFAULT_MAGNUS_MODELS;
 
 export type MagnusDescriptionStatus =
 	| 'ready'
@@ -100,21 +105,94 @@ export interface MagnusDescriptionResult {
 	readonly retryable?: boolean;
 }
 
-export function resolveApiModel(modelId: string): string {
-	const found = MAGNUS_MODELS.find(m => m.id === modelId);
+/** In-memory short-lived cache for discovered models (TTL 5 minutes). */
+export class GeminiModelCache {
+	private _models: DiscoveredGeminiModel[] | undefined;
+	private _cachedAt: number = 0;
+	private readonly _ttlMs: number;
+
+	constructor(ttlMs: number = 5 * 60 * 1000) {
+		this._ttlMs = ttlMs;
+	}
+
+	get(): DiscoveredGeminiModel[] | undefined {
+		if (this._models && Date.now() - this._cachedAt < this._ttlMs) {
+			return this._models;
+		}
+		return undefined;
+	}
+
+	set(models: DiscoveredGeminiModel[]): void {
+		this._models = models;
+		this._cachedAt = Date.now();
+	}
+
+	invalidate(): void {
+		this._models = undefined;
+		this._cachedAt = 0;
+	}
+}
+
+export const globalGeminiModelCache = new GeminiModelCache();
+
+/**
+ * Builds list of user-selectable model options from discovered models or fallbacks.
+ */
+export function buildModelOptions(discovered?: DiscoveredGeminiModel[]): MagnusModelOption[] {
+	if (!discovered || discovered.length === 0) {
+		return [...DEFAULT_MAGNUS_MODELS];
+	}
+
+	const compatible = discovered.filter(m => m.agentCompatible);
+	if (compatible.length === 0) {
+		return [...DEFAULT_MAGNUS_MODELS];
+	}
+
+	// Determine best auto target: prefer gemini-2.5-flash, then 2.5-pro, then first compatible
+	let autoTarget = compatible.find(m => m.id === 'gemini-2.5-flash')
+		|| compatible.find(m => m.id === 'gemini-2.5-pro')
+		|| compatible[0];
+
+	const autoOption: MagnusModelOption = {
+		id: 'auto',
+		name: 'Auto',
+		apiModel: autoTarget.id,
+		maxInputTokens: autoTarget.inputTokenLimit,
+		maxOutputTokens: autoTarget.outputTokenLimit,
+		description: `Balanced quality and speed (resolves to ${autoTarget.displayName}).`,
+		isAuto: true,
+	};
+
+	const explicitOptions: MagnusModelOption[] = compatible.map(m => ({
+		id: m.id,
+		name: m.displayName || m.id,
+		apiModel: m.id,
+		maxInputTokens: m.inputTokenLimit,
+		maxOutputTokens: m.outputTokenLimit,
+		description: m.description || `Google Gemini model (${m.id}).`,
+	}));
+
+	return [autoOption, ...explicitOptions];
+}
+
+export function resolveApiModel(modelId: string, discovered?: DiscoveredGeminiModel[]): string {
+	const options = buildModelOptions(discovered ?? globalGeminiModelCache.get());
+	const found = options.find(m => m.id === modelId);
 	return found?.apiModel ?? 'gemini-2.5-flash';
 }
 
-export function resolveModelInfo(modelId: string): { apiModel: string; resolvedModelId: string } {
-	const found = MAGNUS_MODELS.find(m => m.id === modelId);
+export function resolveModelInfo(modelId: string, discovered?: DiscoveredGeminiModel[]): { apiModel: string; resolvedModelId: string } {
+	const options = buildModelOptions(discovered ?? globalGeminiModelCache.get());
+	const found = options.find(m => m.id === modelId);
 	if (found) {
 		return { apiModel: found.apiModel, resolvedModelId: found.id };
 	}
 	return { apiModel: 'gemini-2.5-flash', resolvedModelId: 'auto' };
 }
 
-export function getModelOption(modelId: string): MagnusModelOption {
-	return MAGNUS_MODELS.find(m => m.id === modelId) ?? MAGNUS_MODELS[0];
+export function getModelOption(modelId: string, discovered?: DiscoveredGeminiModel[]): MagnusModelOption {
+	const options = buildModelOptions(discovered ?? globalGeminiModelCache.get());
+	return options.find(m => m.id === modelId) ?? options[0];
 }
 
 /** Cursor-style context label, e.g. "1M context window". */
@@ -131,4 +209,3 @@ export function formatContextWindowLabel(maxInputTokens: number): string {
 	}
 	return `${n} context window`;
 }
-

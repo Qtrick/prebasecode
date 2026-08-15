@@ -3,7 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { formatContextWindowLabel, MAGNUS_MODELS } from './models';
+import { formatContextWindowLabel, buildModelOptions, globalGeminiModelCache, type MagnusModelOption } from './models';
+import type { DiscoveredGeminiModel } from './geminiClient';
 
 export interface MagnusLanguageModelInformation {
 	id: string;
@@ -21,11 +22,16 @@ export interface MagnusLanguageModelInformation {
 }
 
 /**
- * Produces the extension's advertised model metadata without claiming capabilities that the
- * Gemini transport does not currently implement.
+ * Produces the extension's advertised model metadata dynamically based on discovered
+ * models, without claiming capabilities that the transport does not currently implement.
  */
-export function buildMagnusLanguageModelInformation(hasKey: boolean): MagnusLanguageModelInformation[] {
-	return MAGNUS_MODELS.map((model, index) => ({
+export function buildMagnusLanguageModelInformation(
+	hasKey: boolean,
+	discovered?: DiscoveredGeminiModel[],
+): MagnusLanguageModelInformation[] {
+	const modelOptions = buildModelOptions(discovered ?? globalGeminiModelCache.get());
+
+	return modelOptions.map((model: MagnusModelOption, index: number) => ({
 		id: model.id,
 		name: model.name,
 		family: 'gemini',
@@ -35,9 +41,7 @@ export function buildMagnusLanguageModelInformation(hasKey: boolean): MagnusLang
 		detail: formatContextWindowLabel(model.maxInputTokens),
 		tooltip: hasKey
 			? model.description
-			: `${model.description}\n\nConfigure a model provider in secure storage before using Agents.`,
-		// The Gemini transport maps function parts to VS Code tool calls and accepts
-		// matching tool-result continuation messages.
+			: `${model.description}\n\nConfigure a Gemini credential before using Agents.`,
 		capabilities: { toolCalling: true, imageInput: false },
 		isDefault: index === 0,
 		isUserSelectable: true,

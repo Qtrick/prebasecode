@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'assert';
+import { suite, test } from 'node:test';
 import { formatProcessOutputForTool, MAX_PROCESS_OUTPUT_TOOL_ENTRIES, MAX_PROCESS_OUTPUT_TOOL_ENTRY_CHARACTERS } from './processOutputFormatter.js';
 
 suite('Magnus process output formatter', () => {

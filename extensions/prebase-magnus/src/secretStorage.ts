@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type * as vscode from 'vscode';
-import type { MagnusProviderId } from './models.ts';
+import { PreBaseSecretResolver, type ResolvedSecret, type SecretSourceType } from './secretResolver';
 
 const LEGACY_MODEL_PROVIDER_SECRET = 'prebase.magnus.modelProviderKey';
 const PROVIDER_KEY_PREFIX = 'prebase.magnus.provider';
@@ -15,35 +15,43 @@ export function getProviderSecretKey(providerId: string): string {
 
 export interface MagnusResolvedApiKey {
 	readonly provider: string;
-	readonly varName: 'stored';
+	readonly varName: string;
 	readonly apiKey: string;
-	readonly source: 'secret-storage';
+	readonly source: SecretSourceType;
 }
 
-/** Stores user credentials in the OS-backed secret vault, never workspace files. */
+/**
+ * Resolves credentials with strict precedence:
+ * In source development: PreBase root .env -> OS SecretStorage -> process.env fallback.
+ * In packaged application: OS SecretStorage only.
+ */
 export class MagnusSecretStorage {
 	private readonly secrets: vscode.SecretStorage;
+	private readonly resolver: PreBaseSecretResolver;
 
-	constructor(secrets: vscode.SecretStorage) {
+	constructor(secrets: vscode.SecretStorage, resolver?: PreBaseSecretResolver) {
 		this.secrets = secrets;
+		this.resolver = resolver ?? new PreBaseSecretResolver();
+	}
+
+	getResolver(): PreBaseSecretResolver {
+		return this.resolver;
 	}
 
 	/**
-	 * Resolves an API key for a specific provider.
-	 * Automatically and idempotently migrates legacy un-scoped keys to provider-scoped keys.
+	 * Resolves the stored SecretStorage key for a provider.
+	 * Migrates legacy un-scoped key to provider-scoped key if needed.
 	 */
-	async getProviderApiKey(providerId: string = 'gemini'): Promise<string | undefined> {
+	async getSecretStorageProviderApiKey(providerId: string = 'gemini'): Promise<string | undefined> {
 		const scopedSecretKey = getProviderSecretKey(providerId);
 		const existingScoped = (await this.secrets.get(scopedSecretKey))?.trim();
 		if (existingScoped) {
 			return existingScoped;
 		}
 
-		// Legacy migration: if reading default 'gemini' and no scoped key exists, check legacy key
 		if (providerId === 'gemini') {
 			const legacyKey = (await this.secrets.get(LEGACY_MODEL_PROVIDER_SECRET))?.trim();
 			if (legacyKey) {
-				// Migrate into scoped key and clean up legacy entry
 				await this.secrets.store(scopedSecretKey, legacyKey);
 				await this.secrets.delete(LEGACY_MODEL_PROVIDER_SECRET);
 				return legacyKey;
@@ -53,6 +61,33 @@ export class MagnusSecretStorage {
 		return undefined;
 	}
 
+	/**
+	 * Resolves active API key for a provider with deterministic precedence.
+	 */
+	async getProviderApiKey(providerId: string = 'gemini'): Promise<string | undefined> {
+		const storedKey = await this.getSecretStorageProviderApiKey(providerId);
+		if (providerId === 'gemini') {
+			const resolved = this.resolver.resolveGeminiKey(storedKey);
+			return resolved?.key;
+		}
+		if (providerId === 'linkup') {
+			const resolved = this.resolver.resolveLinkupKey(storedKey);
+			return resolved?.key;
+		}
+		return storedKey;
+	}
+
+	async getResolvedProviderApiKey(providerId: string = 'gemini'): Promise<ResolvedSecret | undefined> {
+		const storedKey = await this.getSecretStorageProviderApiKey(providerId);
+		if (providerId === 'gemini') {
+			return this.resolver.resolveGeminiKey(storedKey);
+		}
+		if (providerId === 'linkup') {
+			return this.resolver.resolveLinkupKey(storedKey);
+		}
+		return storedKey ? { key: storedKey, source: 'secret-storage', varName: 'stored' } : undefined;
+	}
+
 	async setProviderApiKey(providerId: string, apiKey: string): Promise<void> {
 		const trimmed = apiKey.trim();
 		if (!trimmed) {
@@ -60,7 +95,6 @@ export class MagnusSecretStorage {
 		}
 		const scopedKey = getProviderSecretKey(providerId);
 		await this.secrets.store(scopedKey, trimmed);
-		// Clean up legacy key if setting gemini key
 		if (providerId === 'gemini') {
 			await this.secrets.delete(LEGACY_MODEL_PROVIDER_SECRET);
 		}
@@ -75,21 +109,39 @@ export class MagnusSecretStorage {
 	}
 
 	async hasProviderApiKey(providerId: string = 'gemini'): Promise<boolean> {
-		return !!(await this.getProviderApiKey(providerId));
+		const key = await this.getProviderApiKey(providerId);
+		return !!key;
 	}
 
 	async getAnyKey(): Promise<MagnusResolvedApiKey | undefined> {
-		const apiKey = await this.getProviderApiKey('gemini');
-		return apiKey ? { provider: 'gemini', varName: 'stored', apiKey, source: 'secret-storage' } : undefined;
+		const resolved = await this.getResolvedProviderApiKey('gemini');
+		return resolved
+			? { provider: 'gemini', varName: resolved.varName, apiKey: resolved.key, source: resolved.source }
+			: undefined;
 	}
 
 	async getApiKey(): Promise<string | undefined> {
 		return this.getProviderApiKey('gemini');
 	}
 
-	async getGeminiKeyOrMessage(): Promise<{ key?: string; message?: string }> {
-		const key = await this.getApiKey();
-		return key ? { key } : { message: 'Agents has no configured Gemini credential. Use “Agents: Configure Model Provider” or “Agents: Import Provider Key from .env…”.' };
+	async getGeminiKeyOrMessage(): Promise<{ key?: string; message?: string; source?: SecretSourceType }> {
+		const resolved = await this.getResolvedProviderApiKey('gemini');
+		if (resolved) {
+			return { key: resolved.key, source: resolved.source };
+		}
+		return {
+			message: 'Agents has no configured Gemini credential. Configure a key in Agents Settings or provide GEMINI_API_KEY in PreBase root .env.',
+		};
+	}
+
+	async getLinkupKeyOrMessage(): Promise<{ key?: string; message?: string; source?: SecretSourceType }> {
+		const resolved = await this.getResolvedProviderApiKey('linkup');
+		if (resolved) {
+			return { key: resolved.key, source: resolved.source };
+		}
+		return {
+			message: 'LinkUp web search has no configured credential. Provide LINKUP_API_KEY in PreBase root .env or configure in settings.',
+		};
 	}
 
 	async hasApiKey(): Promise<boolean> {
@@ -103,5 +155,10 @@ export class MagnusSecretStorage {
 	async clearApiKey(): Promise<void> {
 		return this.clearProviderApiKey('gemini');
 	}
-}
 
+	async getDiagnostics() {
+		const storedGemini = await this.getSecretStorageProviderApiKey('gemini');
+		const storedLinkup = await this.getSecretStorageProviderApiKey('linkup');
+		return this.resolver.getDiagnostics(storedGemini, storedLinkup);
+	}
+}

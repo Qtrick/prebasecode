@@ -5,9 +5,9 @@
 
 import * as vscode from 'vscode';
 import { registerMagnusChatParticipants, type MagnusChatState } from './chatParticipant';
-import { generateContent } from './geminiClient';
+import { classifyGeminiError, generateContent } from './geminiClient';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
-import { MAGNUS_MODELS, resolveApiModel } from './models';
+import { buildModelOptions, globalGeminiModelCache, resolveModelInfo } from './models';
 import { DEFAULT_MAGNUS_AGENT_MODE, MAGNUS_AGENT_MODES, isMagnusAgentMode } from './modes';
 import { registerMagnusDesktopTools } from './desktopTools';
 import { registerMagnusLanguageModelTools } from './nativeTools';
@@ -46,7 +46,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	// Register chat participants first so Ask/Edit/Agent appear even if the LM
 	// provider proposal is unavailable or no API key is configured yet.
 	registerMagnusChatParticipants(context, secrets, state);
-	registerMagnusLanguageModelTools(context);
+	registerMagnusLanguageModelTools(context, secrets);
 	registerMagnusDesktopTools(context);
 
 	const lmProvider = new MagnusLanguageModelProvider(secrets);
@@ -89,7 +89,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		vscode.commands.registerCommand('prebase.magnus.setApiKey', async () => {
 			const value = await vscode.window.showInputBox({
 				title: 'Configure Agents Model Provider',
-				prompt: 'Enter the Gemini API key to store securely on this device.',
+				prompt: 'Enter the Gemini API key to store securely in OS SecretStorage.',
 				password: true,
 				ignoreFocusOut: true,
 			});
@@ -103,7 +103,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 		vscode.commands.registerCommand('prebase.magnus.clearApiKey', async () => {
 			await secrets.clearProviderApiKey('gemini');
-			void vscode.window.showInformationMessage('Cleared the configured Agents Gemini credential.');
+			void vscode.window.showInformationMessage('Cleared the configured Agents Gemini credential from secure storage.');
 			lmProvider.notifyChanged();
 		}),
 
@@ -112,32 +112,49 @@ export function activate(context: vscode.ExtensionContext): void {
 				void vscode.window.showWarningMessage('Importing environment credentials requires a trusted workspace.');
 				return;
 			}
+
+			// Check if already configured via PreBase root .env
+			const resolved = await secrets.getResolvedProviderApiKey('gemini');
+			if (resolved?.source === 'local-env') {
+				const answer = await vscode.window.showInformationMessage(
+					'PreBase is already using GEMINI_API_KEY from the PreBase repository root .env. Would you like to copy it into OS SecretStorage?',
+					'Copy to Secure Storage',
+					'Cancel',
+				);
+				if (answer === 'Copy to Secure Storage') {
+					await secrets.setProviderApiKey('gemini', resolved.key);
+					lmProvider.notifyChanged();
+					void vscode.window.showInformationMessage('Gemini key copied into PreBase OS SecretStorage.');
+				}
+				return;
+			}
+
 			const workspaceFolders = vscode.workspace.workspaceFolders;
 			if (!workspaceFolders || workspaceFolders.length === 0) {
-				void vscode.window.showWarningMessage('No open workspace folder to import from.');
+				void vscode.window.showWarningMessage('No open workspace folder to inspect.');
 				return;
 			}
 
 			let envContent: string | undefined;
-			let foundEnvName = '.env';
+			let foundFolder: string | undefined;
 			for (const folder of workspaceFolders) {
 				try {
 					const envUri = vscode.Uri.joinPath(folder.uri, '.env');
 					const bytes = await vscode.workspace.fs.readFile(envUri);
 					envContent = new TextDecoder().decode(bytes);
-					foundEnvName = `.env in ${folder.name}`;
+					foundFolder = folder.name;
 					break;
 				} catch {
 					// Try next folder
 				}
 			}
 
-			if (!envContent) {
+			if (!envContent || !foundFolder) {
 				void vscode.window.showInformationMessage('No .env file found in workspace root.');
 				return;
 			}
 
-			// Parse specifically for GEMINI_API_KEY without exposing or logging value
+			// Parse specifically for GEMINI_API_KEY
 			let candidateKey: string | undefined;
 			for (const line of envContent.split('\n')) {
 				const trimmed = line.trim();
@@ -148,10 +165,12 @@ export function activate(context: vscode.ExtensionContext): void {
 				const name = varName.trim();
 				if (name === 'GEMINI_API_KEY' || name === 'GOOGLE_API_KEY') {
 					let val = rest.join('=').trim();
-					const firstChar = val.charCodeAt(0);
-					const lastChar = val.charCodeAt(val.length - 1);
-					if ((firstChar === 34 && lastChar === 34) || (firstChar === 39 && lastChar === 39)) {
-						val = val.slice(1, -1);
+					if (val.length >= 2) {
+						const first = val[0];
+						const last = val[val.length - 1];
+						if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+							val = val.slice(1, -1);
+						}
 					}
 					if (val.trim()) {
 						candidateKey = val.trim();
@@ -161,12 +180,12 @@ export function activate(context: vscode.ExtensionContext): void {
 			}
 
 			if (!candidateKey) {
-				void vscode.window.showInformationMessage(`No GEMINI_API_KEY found in ${foundEnvName}.`);
+				void vscode.window.showInformationMessage(`No GEMINI_API_KEY found in ${foundFolder}/.env.`);
 				return;
 			}
 
-			const answer = await vscode.window.showInformationMessage(
-				`Found GEMINI_API_KEY in ${foundEnvName}. Import into PreBase secure OS storage?`,
+			const answer = await vscode.window.showWarningMessage(
+				`Import GEMINI_API_KEY from project "${foundFolder}" into PreBase secure OS storage?`,
 				{ modal: true },
 				'Import to Secure Storage',
 			);
@@ -178,30 +197,10 @@ export function activate(context: vscode.ExtensionContext): void {
 			}
 		}),
 
-		vscode.commands.registerCommand('prebase.magnus.importApiKeyFromProcessEnv', async () => {
-			const envKey = process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
-			if (!envKey) {
-				void vscode.window.showInformationMessage('No GEMINI_API_KEY found in the IDE runtime environment.');
-				return;
-			}
-
-			const answer = await vscode.window.showInformationMessage(
-				'Found GEMINI_API_KEY in environment variables. Import into PreBase secure OS storage?',
-				{ modal: true },
-				'Import to Secure Storage',
-			);
-
-			if (answer === 'Import to Secure Storage') {
-				await secrets.setProviderApiKey('gemini', envKey);
-				lmProvider.notifyChanged();
-				void vscode.window.showInformationMessage('Gemini API key successfully imported from environment into PreBase secure storage.');
-			}
-		}),
-
 		vscode.commands.registerCommand('prebase.magnus.testModelProvider', async () => {
 			const gemini = await secrets.getGeminiKeyOrMessage();
 			if (!gemini.key) {
-				void vscode.window.showErrorMessage('Agents has no configured Gemini credential. Use “Agents: Configure Model Provider” or “Agents: Import Provider Key from .env…”.');
+				void vscode.window.showErrorMessage('Agents has no configured Gemini credential. Configure a key in Agents Settings or provide GEMINI_API_KEY in PreBase root .env.');
 				return { ok: false, error: 'notConfigured' };
 			}
 			const modelInfo = resolveModelInfo(state.modelId);
@@ -220,25 +219,43 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.checkConfiguration', async () => {
-			const any = await secrets.getAnyKey();
-			const gemini = await secrets.getGeminiKeyOrMessage();
+			const resolvedGemini = await secrets.getResolvedProviderApiKey('gemini');
+			const resolvedLinkup = await secrets.getResolvedProviderApiKey('linkup');
 			const enabled = vscode.workspace.getConfiguration('prebase.magnus').get('enabled', true);
-			let keyStatus: string;
-			if (any) {
-				keyStatus = 'Model provider: Gemini configured in secure storage';
-			} else if (gemini.message) {
-				keyStatus = `Model provider: ${gemini.message}`;
+
+			let geminiStatus: string;
+			if (resolvedGemini) {
+				geminiStatus = `Gemini: Connected (${resolvedGemini.source === 'local-env' ? 'PreBase root .env' : 'Secure Storage'})`;
 			} else {
-				keyStatus = 'Model provider: not configured';
+				geminiStatus = 'Gemini: Not configured';
 			}
+
+			let linkupStatus: string;
+			if (resolvedLinkup) {
+				linkupStatus = `LinkUp: Connected (${resolvedLinkup.source === 'local-env' ? 'PreBase root .env' : 'Secure Storage'})`;
+			} else {
+				linkupStatus = 'LinkUp: Not configured (Local)';
+			}
+
 			const lines = [
 				`Enabled: ${enabled}`,
-				keyStatus,
+				geminiStatus,
+				linkupStatus,
 				`Default model: ${state.modelId}`,
 				`Default mode: ${state.mode}`,
-				'Model credentials are never read from workspace files.',
 			];
 			void vscode.window.showInformationMessage(lines.join(' · '));
+		}),
+
+		vscode.commands.registerCommand('prebase.magnus.diagnoseProviders', async () => {
+			const diag = await secrets.getDiagnostics();
+			const msg = [
+				`PreBase Environment: ${diag.isSourceDev ? 'Source Development' : 'Packaged Application'}`,
+				`Gemini: Local .env=${diag.gemini.localEnv}, SecretStorage=${diag.gemini.secretStorage} (Active: ${diag.gemini.activeSource ?? 'none'})`,
+				`LinkUp: Local .env=${diag.linkup.localEnv}, SecretStorage=${diag.linkup.secretStorage} (Active: ${diag.linkup.activeSource ?? 'none'})`,
+			].join('\n');
+			void vscode.window.showInformationMessage(msg, { modal: true });
+			return diag;
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.hasApiKey', async () => {
@@ -325,15 +342,30 @@ export function activate(context: vscode.ExtensionContext): void {
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.selectModel', async () => {
+			// Trigger fresh discovery if possible
+			await lmProvider.refreshDiscoveredModels();
+			const modelOptions = buildModelOptions(globalGeminiModelCache.get());
 			const picked = await vscode.window.showQuickPick(
-				MAGNUS_MODELS.map(m => ({ label: m.name, id: m.id })),
+				modelOptions.map(m => ({
+					label: m.name,
+					description: m.id === state.modelId ? '(Current)' : undefined,
+					detail: m.description,
+					id: m.id,
+				})),
 				{ title: 'Select Agents Model' },
 			);
 			if (picked) {
 				state.modelId = picked.id;
 				await vscode.workspace.getConfiguration('prebase.magnus').update('defaultModel', picked.id, vscode.ConfigurationTarget.Global);
+				lmProvider.notifyChanged();
 				void vscode.window.showInformationMessage(`Agents model: ${picked.label}`);
 			}
+		}),
+
+		vscode.commands.registerCommand('prebase.magnus.refreshModels', async () => {
+			const models = await lmProvider.refreshDiscoveredModels();
+			const count = models.filter(m => m.agentCompatible).length;
+			void vscode.window.showInformationMessage(`Refreshed Gemini models: ${count} compatible models available.`);
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.selectMode', async () => {

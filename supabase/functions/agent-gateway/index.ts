@@ -1,16 +1,18 @@
 /**
- * PreBase agent-gateway (skeleton).
- * Auth required; provider routing not wired. Never log Authorization or tokens.
+ * PreBase agent-gateway.
+ * Authenticated gateway for Gemini model discovery and generation.
+ * Provider credentials stay in Edge Function secrets.
+ * Prompts, response bodies, and API keys are never logged.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
-const MAX_BODY_BYTES = 32_768;
-const MODEL_ALLOWLIST = new Set([
-	"gpt-4.1-mini",
-	"gpt-4.1",
-	"claude-sonnet-4",
-	"gemini-2.0-flash",
+const MAX_BODY_BYTES = 65_536; // 64 KiB
+const MAX_OUTPUT_BYTES = 1_048_576; // 1 MiB
+
+const ALLOWED_MODELS = new Set([
+	"gemini-2.5-flash",
+	"gemini-2.5-pro",
 ]);
 
 const DESKTOP_ORIGIN_EXACT = new Set(["null"]);
@@ -34,7 +36,11 @@ function isAllowedOrigin(origin: string | null): boolean {
 type JsonRecord = Record<string, unknown>;
 
 function requestIdFrom(req: Request): string {
-	return req.headers.get("x-request-id") ?? crypto.randomUUID();
+	const headerId = req.headers.get("x-request-id");
+	if (headerId && /^[A-Za-z0-9-]{1,128}$/.test(headerId)) {
+		return headerId;
+	}
+	return crypto.randomUUID();
 }
 
 function corsHeaders(req: Request): HeadersInit {
@@ -115,11 +121,6 @@ async function requireUser(req: Request, requestId: string) {
 	return { user: data.user };
 }
 
-function parseModel(body: JsonRecord): string | null {
-	const model = body.model;
-	return typeof model === "string" && model.length > 0 ? model : null;
-}
-
 Deno.serve(async (req) => {
 	const requestId = requestIdFrom(req);
 
@@ -128,14 +129,84 @@ Deno.serve(async (req) => {
 	}
 
 	const url = new URL(req.url);
+	const geminiApiKey = Deno.env.get("GEMINI_API_KEY");
+
+	// Health and provider status endpoint
 	if (req.method === "GET") {
-		if (url.pathname.endsWith("/health")) {
+		if (url.pathname.endsWith("/health") || url.pathname.endsWith("/providers")) {
 			return json(req, requestId, 200, {
 				status: "ok",
 				service: "agent-gateway",
-				wired: false,
+				providers: [
+					{
+						id: "gemini",
+						displayName: "Google Gemini",
+						configured: !!geminiApiKey,
+						modelsAvailable: !!geminiApiKey,
+					},
+				],
 			});
 		}
+
+		// Authenticated models discovery endpoint
+		if (url.pathname.endsWith("/models")) {
+			const auth = await requireUser(req, requestId);
+			if ("error" in auth && auth.error) {
+				return auth.error;
+			}
+
+			if (!geminiApiKey) {
+				return json(req, requestId, 503, {
+					error: "not_configured",
+					message: "Gemini provider secret is not configured on the server.",
+				});
+			}
+
+			try {
+				const geminiRes = await fetch("https://generativelanguage.googleapis.com/v1beta/models?pageSize=50", {
+					method: "GET",
+					headers: {
+						"Content-Type": "application/json",
+						"x-goog-api-key": geminiApiKey,
+					},
+				});
+
+				if (!geminiRes.ok) {
+					return json(req, requestId, 502, {
+						error: "provider_error",
+						message: "Failed to discover models from Gemini API.",
+					});
+				}
+
+				const data = await geminiRes.json() as { models?: Array<{ name?: string; displayName?: string; description?: string; inputTokenLimit?: number; outputTokenLimit?: number; supportedGenerationMethods?: string[] }> };
+				const models = (data.models ?? [])
+					.map(m => {
+						const rawName = m.name ?? "";
+						const id = rawName.startsWith("models/") ? rawName.slice("models/".length) : rawName;
+						const methods = m.supportedGenerationMethods ?? [];
+						const supportsGenerate = methods.includes("generateContent");
+						const isDeprecated = id.includes("1.0") || id.includes("1.5") || id.includes("experimental");
+						return {
+							id,
+							displayName: m.displayName || id,
+							description: m.description || "",
+							inputTokenLimit: m.inputTokenLimit || 1_000_000,
+							outputTokenLimit: m.outputTokenLimit || 65_536,
+							agentCompatible: supportsGenerate && !isDeprecated,
+							descriptionCompatible: supportsGenerate,
+						};
+					})
+					.filter(m => m.id && (m.agentCompatible || m.descriptionCompatible));
+
+				return json(req, requestId, 200, { models });
+			} catch {
+				return json(req, requestId, 502, {
+					error: "provider_error",
+					message: "Error communicating with Gemini models API.",
+				});
+			}
+		}
+
 		return json(req, requestId, 405, { error: "method_not_allowed" });
 	}
 
@@ -144,11 +215,8 @@ Deno.serve(async (req) => {
 	}
 
 	const contentLength = req.headers.get("Content-Length");
-	if (contentLength) {
-		const n = Number(contentLength);
-		if (Number.isFinite(n) && n > MAX_BODY_BYTES) {
-			return json(req, requestId, 413, { error: "payload_too_large" });
-		}
+	if (contentLength && Number(contentLength) > MAX_BODY_BYTES) {
+		return json(req, requestId, 413, { error: "payload_too_large" });
 	}
 
 	const auth = await requireUser(req, requestId);
@@ -167,15 +235,22 @@ Deno.serve(async (req) => {
 		return json(req, requestId, 400, { error: "invalid_json" });
 	}
 
-	const model = parseModel(body);
-	if (!model || !MODEL_ALLOWLIST.has(model)) {
+	const model = typeof body.model === "string" ? body.model : "gemini-2.5-flash";
+	if (!ALLOWED_MODELS.has(model)) {
 		return json(req, requestId, 400, {
 			error: "model_not_allowed",
-			message: "Model is missing or not on the gateway allowlist.",
+			message: `Model ${model} is not allowed on the hosted gateway.`,
 		});
 	}
 
-	// Stub: fail closed if usage ledger cannot be queried (rate-limit hook point).
+	if (!geminiApiKey) {
+		return json(req, requestId, 503, {
+			error: "not_configured",
+			message: "Gemini provider is not configured on the hosted gateway.",
+		});
+	}
+
+	// Reserve quota atomically via admin client
 	const supabaseUrl = Deno.env.get("SUPABASE_URL");
 	const serviceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
 	if (!supabaseUrl || !serviceKey) {
@@ -188,20 +263,91 @@ Deno.serve(async (req) => {
 	const admin = createClient(supabaseUrl, serviceKey, {
 		auth: { persistSession: false, autoRefreshToken: false },
 	});
-	const { error: usageProbeError } = await admin
-		.from("agent_usage")
-		.select("id")
-		.limit(1);
-	if (usageProbeError) {
-		return json(req, requestId, 503, {
-			error: "usage_check_unavailable",
-			message: "Usage ledger unavailable; gateway is closed.",
+
+	const { error: quotaError } = await admin.rpc("reserve_agent_quota", {
+		p_user_id: auth.user.id,
+		p_request_id: requestId,
+		p_model: model,
+		p_estimated_units: 1000,
+	});
+
+	if (quotaError) {
+		return json(req, requestId, 429, {
+			error: "quota_exceeded",
+			message: "Usage rate limit or daily quota exceeded for hosted agents.",
 		});
 	}
 
-	return json(req, requestId, 501, {
-		error: "not_implemented",
-		message: "Agent gateway is authenticated but not fully wired to providers.",
-		model,
-	});
+	// Execute Gemini generation
+	try {
+		const geminiPayload = {
+			contents: body.contents ?? [{ role: "user", parts: [{ text: "Hello" }] }],
+			systemInstruction: body.systemInstruction,
+			generationConfig: body.generationConfig ?? { maxOutputTokens: 2048, temperature: 0.2 },
+			tools: body.tools,
+		};
+
+		const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+			method: "POST",
+			headers: {
+				"Content-Type": "application/json",
+				"x-goog-api-key": geminiApiKey,
+			},
+			body: JSON.stringify(geminiPayload),
+		});
+
+		if (!geminiRes.ok) {
+			const status = geminiRes.status;
+			await admin.from("agent_usage").update({ status: "voided" }).eq("request_id", requestId);
+			if (status === 400 || status === 401 || status === 403) {
+				return json(req, requestId, 502, {
+					error: "provider_auth_error",
+					message: "Hosted provider credential was rejected.",
+				});
+			}
+			if (status === 429) {
+				return json(req, requestId, 429, {
+					error: "provider_rate_limited",
+					message: "Hosted Gemini provider is rate limited. Please retry.",
+				});
+			}
+			return json(req, requestId, 502, {
+				error: "provider_error",
+				message: `Hosted Gemini returned HTTP ${status}.`,
+			});
+		}
+
+		const geminiData = await geminiRes.json() as JsonRecord;
+		const candidates = Array.isArray(geminiData.candidates) ? geminiData.candidates : [];
+		const firstCandidate = candidates[0] as JsonRecord | undefined;
+		const content = firstCandidate && typeof firstCandidate.content === "object" ? firstCandidate.content as JsonRecord : undefined;
+		const parts = content && Array.isArray(content.parts) ? content.parts : [];
+		const text = parts.map(p => (typeof p === "object" && p !== null && "text" in p ? String(p.text) : "")).join("");
+
+		if (text.length > MAX_OUTPUT_BYTES) {
+			await admin.from("agent_usage").update({ status: "voided" }).eq("request_id", requestId);
+			return json(req, requestId, 502, {
+				error: "response_too_large",
+				message: "Model response exceeded output limit.",
+			});
+		}
+
+		// Settle usage record
+		await admin.from("agent_usage").update({
+			output_units: Math.ceil(text.length / 4),
+			status: "recorded",
+		}).eq("request_id", requestId);
+
+		return json(req, requestId, 200, {
+			model,
+			text: text.slice(0, 16_000),
+			candidate: firstCandidate,
+		});
+	} catch {
+		await admin.from("agent_usage").update({ status: "voided" }).eq("request_id", requestId);
+		return json(req, requestId, 502, {
+			error: "provider_error",
+			message: "Error executing hosted agent generation.",
+		});
+	}
 });

@@ -10,7 +10,7 @@
  * header. In particular, credentials must never be placed in request URLs.
  */
 
-import type { MagnusDescriptionStatus } from './models.js';
+import type { MagnusDescriptionStatus } from './models';
 
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
 const MAX_NON_STREAM_RESPONSE_BYTES = 1 * 1024 * 1024; // 1 MiB max response size
@@ -47,6 +47,37 @@ export interface GeminiResponse {
 	error?: { code: number; message: string; status: string };
 }
 
+export interface GeminiRawModel {
+	name?: string;
+	version?: string;
+	displayName?: string;
+	description?: string;
+	inputTokenLimit?: number;
+	outputTokenLimit?: number;
+	supportedGenerationMethods?: string[];
+	temperature?: number;
+	topP?: number;
+	topK?: number;
+}
+
+export interface GeminiModelsListResponse {
+	models?: GeminiRawModel[];
+	nextPageToken?: string;
+	error?: { code: number; message: string; status: string };
+}
+
+export interface DiscoveredGeminiModel {
+	readonly id: string; // e.g. "gemini-2.5-flash"
+	readonly name: string; // e.g. "models/gemini-2.5-flash"
+	readonly displayName: string;
+	readonly description: string;
+	readonly inputTokenLimit: number;
+	readonly outputTokenLimit: number;
+	readonly supportedGenerationMethods: readonly string[];
+	readonly agentCompatible: boolean;
+	readonly descriptionCompatible: boolean;
+}
+
 export interface GeminiCancellationToken {
 	readonly isCancellationRequested: boolean;
 	readonly onCancellationRequested?: (listener: () => void) => { dispose(): void };
@@ -81,6 +112,10 @@ async function readBoundedResponseBody(res: Response, maxBytes: number = MAX_NON
 		if (typeof res.text === 'function') {
 			return res.text();
 		}
+		if (typeof (res as unknown as { json?: () => Promise<unknown> }).json === 'function') {
+			const j = await (res as unknown as { json: () => Promise<unknown> }).json();
+			return JSON.stringify(j);
+		}
 		return '';
 	}
 	const reader = res.body.getReader();
@@ -101,6 +136,97 @@ async function readBoundedResponseBody(res: Response, maxBytes: number = MAX_NON
 	}
 	text += decoder.decode();
 	return text;
+}
+
+/**
+ * Lists models available from the Gemini API using documented models.list endpoint.
+ * Paginates automatically and normalizes models with capability metadata.
+ */
+export async function listGeminiModels(
+	apiKey: string,
+	token?: GeminiCancellationToken,
+	transport: GeminiTransport = globalThis,
+): Promise<DiscoveredGeminiModel[]> {
+	if (token?.isCancellationRequested) {
+		throw new Error('Cancelled');
+	}
+
+	const discovered: DiscoveredGeminiModel[] = [];
+	let pageToken: string | undefined;
+
+	do {
+		const url = new URL(`${BASE_URL}/models`);
+		url.searchParams.set('pageSize', '50');
+		if (pageToken) {
+			url.searchParams.set('pageToken', pageToken);
+		}
+
+		const headers: Record<string, string> = {
+			'Content-Type': 'application/json',
+			'x-goog-api-key': apiKey,
+		};
+
+		const cancellation = bridgeCancellation(token);
+		try {
+			const res = await transport.fetch(url.toString(), {
+				method: 'GET',
+				headers,
+				signal: cancellation.signal,
+			});
+
+			const rawText = await readBoundedResponseBody(res, MAX_NON_STREAM_RESPONSE_BYTES);
+			let json: GeminiModelsListResponse;
+			try {
+				json = JSON.parse(rawText) as GeminiModelsListResponse;
+			} catch (err) {
+				throw new Error(JSON.stringify({
+					code: res.status,
+					message: `Failed to parse models response: ${err instanceof Error ? err.message : String(err)}`,
+				}));
+			}
+
+			if (!res.ok || json.error) {
+				throw new Error(JSON.stringify(json.error ?? { code: res.status, message: `HTTP ${res.status}` }));
+			}
+
+			for (const raw of json.models ?? []) {
+				const rawName = raw.name ?? '';
+				const id = rawName.startsWith('models/') ? rawName.slice('models/'.length) : rawName;
+				if (!id) {
+					continue;
+				}
+
+				const methods = raw.supportedGenerationMethods ?? [];
+				const supportsGenerate = methods.includes('generateContent');
+				// Text generation models are description compatible
+				const descriptionCompatible = supportsGenerate;
+				// Filter for agent compatibility: generateContent is required; exclude embedding/image/sound only
+				const isEmbeddingOnly = methods.length === 1 && (methods[0] === 'embedContent' || methods[0] === 'batchEmbedContents');
+				const isImageOnly = id.includes('imagen') || id.includes('image-generation');
+				const isAudioOnly = id.includes('chirp') || id.includes('native-audio');
+				const isDeprecated = id.includes('1.0') || id.includes('1.5') || id.includes('experimental');
+				const agentCompatible = supportsGenerate && !isEmbeddingOnly && !isImageOnly && !isAudioOnly && !isDeprecated;
+
+				discovered.push({
+					id,
+					name: rawName,
+					displayName: raw.displayName || id,
+					description: raw.description || '',
+					inputTokenLimit: raw.inputTokenLimit || 1_000_000,
+					outputTokenLimit: raw.outputTokenLimit || 65_536,
+					supportedGenerationMethods: methods,
+					agentCompatible,
+					descriptionCompatible,
+				});
+			}
+
+			pageToken = json.nextPageToken;
+		} finally {
+			cancellation.dispose();
+		}
+	} while (pageToken && discovered.length < 200);
+
+	return discovered;
 }
 
 async function tryAuth(
@@ -282,24 +408,32 @@ export function classifyGeminiError(error: unknown): {
 	const rawMsg = error instanceof Error ? error.message : String(error);
 
 	if (rawMsg.includes('Cancelled') || rawMsg.includes('AbortError') || rawMsg.includes('aborted')) {
-		return { status: 'cancelled', safeMessage: 'Description request was cancelled.', retryable: false };
+		return { status: 'cancelled', safeMessage: 'Request was cancelled.', retryable: false };
 	}
 
 	if (rawMsg.includes('size limit') || rawMsg.includes('exceeded the 1 MiB')) {
 		return { status: 'error', safeMessage: 'Gemini response exceeded size limit.', retryable: false };
 	}
 
-	// Try parsing JSON error structure from tryAuth
+	// Try parsing JSON error structure from tryAuth / listGeminiModels
 	try {
 		const parsed = JSON.parse(rawMsg) as { code?: number; message?: string; status?: string };
 		const code = parsed.code;
 		const statusStr = parsed.status ?? '';
 
-		if (code === 400 && (statusStr === 'INVALID_ARGUMENT' || parsed.message?.includes('API_KEY_INVALID'))) {
-			return { status: 'authError', safeMessage: 'Gemini rejected the configured credential. Update your key in Agents Provider Settings.', retryable: false };
+		if (code === 400 && (statusStr === 'INVALID_ARGUMENT' || parsed.message?.includes('API_KEY_INVALID') || parsed.message?.includes('API key not valid'))) {
+			return {
+				status: 'authError',
+				safeMessage: 'The configured Gemini credential was found but Google rejected it. Check the key\'s current Gemini API authorization/restriction status.',
+				retryable: false,
+			};
 		}
 		if (code === 401 || code === 403 || statusStr === 'PERMISSION_DENIED' || statusStr === 'UNAUTHENTICATED') {
-			return { status: 'authError', safeMessage: 'Gemini authentication failed. Please verify your API key.', retryable: false };
+			return {
+				status: 'authError',
+				safeMessage: 'Gemini authentication failed. Check the key\'s current Gemini API authorization/restriction status.',
+				retryable: false,
+			};
 		}
 		if (code === 429 || statusStr === 'RESOURCE_EXHAUSTED' || parsed.message?.includes('quota') || parsed.message?.includes('rate limit')) {
 			return { status: 'rateLimited', safeMessage: 'Gemini API is temporarily rate limited. Please retry in a moment.', retryable: true };
@@ -318,5 +452,5 @@ export function classifyGeminiError(error: unknown): {
 		return { status: 'networkError', safeMessage: 'Could not reach Gemini API. Please check your network connection.', retryable: true };
 	}
 
-	return { status: 'error', safeMessage: 'AI description generation encountered an error.', retryable: true };
+	return { status: 'error', safeMessage: 'Gemini request encountered an error.', retryable: true };
 }

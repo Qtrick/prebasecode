@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'assert';
+import { suite, test } from 'node:test';
 import {
 	formatWorkDuration,
 	MAGNUS_SESSION_SCHEMA_VERSION,

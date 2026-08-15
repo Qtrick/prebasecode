@@ -590,6 +590,9 @@ class ProjectScriptTool implements vscode.LanguageModelTool<{ script: string }> 
 	}
 }
 
+import { executeLocalLinkupSearch } from './localLinkupClient';
+import type { MagnusSecretStorage } from './secretStorage';
+
 interface WebSearchInput {
 	query: string;
 	depth?: 'fast' | 'standard' | 'deep';
@@ -601,6 +604,8 @@ interface WebSearchInput {
 }
 
 class WebSearchTool implements vscode.LanguageModelTool<WebSearchInput> {
+	constructor(private readonly secrets?: MagnusSecretStorage) { }
+
 	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<WebSearchInput>): vscode.PreparedToolInvocation {
 		return { invocationMessage: `Searching the web for ${options.input.query?.trim().slice(0, 120) || 'current information'}` };
 	}
@@ -624,14 +629,29 @@ class WebSearchTool implements vscode.LanguageModelTool<WebSearchInput> {
 				throw new Error('Web search domain filters must contain at most 20 host names.');
 			}
 		}
+
+		// Check local developer LinkUp key first (source-development)
+		if (this.secrets) {
+			const linkupKey = await this.secrets.getProviderApiKey('linkup');
+			if (linkupKey) {
+				try {
+					const localResult = await executeLocalLinkupSearch(linkupKey, input, token);
+					return commandResult(localResult);
+				} catch (err) {
+					console.warn('[Magnus WebSearch] Local LinkUp search failed:', err instanceof Error ? err.message : String(err));
+					throw err;
+				}
+			}
+		}
+
 		return commandResult(await vscode.commands.executeCommand('prebase.webSearch.searchForMagnus', input));
 	}
 }
 
 /** Registers structured native tools; no model output is interpreted as shell or edit directives. */
-export function registerMagnusLanguageModelTools(context: vscode.ExtensionContext): void {
+export function registerMagnusLanguageModelTools(context: vscode.ExtensionContext, secrets?: MagnusSecretStorage): void {
 	context.subscriptions.push(
-		vscode.lm.registerTool('prebase_web_search', new WebSearchTool()),
+		vscode.lm.registerTool('prebase_web_search', new WebSearchTool(secrets)),
 		vscode.lm.registerTool('prebase_graph_search_nodes', new GraphSearchTool()),
 		vscode.lm.registerTool('prebase_graph_get_node', new GraphNodeTool()),
 		vscode.lm.registerTool('prebase_graph_get_dependencies', new GraphDependenciesTool()),

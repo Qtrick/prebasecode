@@ -4,8 +4,15 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { generateContentCandidate, streamGenerateContent, type GeminiContent, type GeminiPart } from './geminiClient';
-import { getModelOption, resolveApiModel } from './models';
+import {
+	generateContentCandidate,
+	listGeminiModels,
+	streamGenerateContent,
+	type DiscoveredGeminiModel,
+	type GeminiContent,
+	type GeminiPart,
+} from './geminiClient';
+import { getModelOption, globalGeminiModelCache, resolveApiModel } from './models';
 import { buildMagnusLanguageModelInformation } from './modelInformation';
 import type { MagnusSecretStorage } from './secretStorage';
 
@@ -32,6 +39,7 @@ function asRecord(value: object): Record<string, unknown> {
 export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProvider {
 	private readonly _onDidChange = new vscode.EventEmitter<void>();
 	readonly onDidChangeLanguageModelChatInformation = this._onDidChange.event;
+	private _isDiscovering = false;
 
 	constructor(private readonly secrets: MagnusSecretStorage) { }
 
@@ -39,12 +47,46 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		this._onDidChange.fire();
 	}
 
+	async refreshDiscoveredModels(token?: vscode.CancellationToken): Promise<DiscoveredGeminiModel[]> {
+		const gemini = await this.secrets.getGeminiKeyOrMessage();
+		if (!gemini.key) {
+			globalGeminiModelCache.invalidate();
+			return [];
+		}
+
+		try {
+			const models = await listGeminiModels(gemini.key, token);
+			if (models && models.length > 0) {
+				globalGeminiModelCache.set(models);
+				this._onDidChange.fire();
+				return models;
+			}
+		} catch (err) {
+			// On discovery error, log warning and preserve cache / fallback
+			console.warn('[Magnus] Model discovery warning:', err instanceof Error ? err.message : String(err));
+		}
+		return globalGeminiModelCache.get() ?? [];
+	}
+
 	async provideLanguageModelChatInformation(
 		_options: vscode.PrepareLanguageModelChatModelOptions,
-		_token: vscode.CancellationToken,
+		token: vscode.CancellationToken,
 	): Promise<vscode.LanguageModelChatInformation[]> {
-		const hasKey = await this.secrets.hasApiKey();
-		return buildMagnusLanguageModelInformation(hasKey);
+		const gemini = await this.secrets.getGeminiKeyOrMessage();
+		const hasKey = !!gemini.key;
+
+		// Check cache first
+		let discovered = globalGeminiModelCache.get();
+
+		// If key exists and cache is empty and not already discovering, trigger discovery
+		if (hasKey && !discovered && !this._isDiscovering && !token.isCancellationRequested) {
+			this._isDiscovering = true;
+			this.refreshDiscoveredModels(token).finally(() => {
+				this._isDiscovering = false;
+			});
+		}
+
+		return buildMagnusLanguageModelInformation(hasKey, discovered);
 	}
 
 	async provideLanguageModelChatResponse(
