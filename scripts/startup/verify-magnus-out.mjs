@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Lightweight gate: verifies Magnus extension compiled output under extensions/prebase-magnus/out/.
+ * Dynamically derives expected output files from src/ (excluding test/declaration files).
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,22 +17,28 @@ const MAGNUS_SRC_DIR = path.join(MAGNUS_DIR, 'src');
 const MAGNUS_OUT_DIR = path.join(MAGNUS_DIR, 'out');
 const MAGNUS_EXTENSION_JS = path.join(MAGNUS_OUT_DIR, 'extension.js');
 
-const REQUIRED_MAGNUS_OUT_FILES = [
-	'extension.js',
-	'aiService.js',
-	'aiTypes.js',
-	'aiProviderRegistry.js',
-	'geminiAdapter.js',
-	'languageModelProvider.js',
-	'chatParticipant.js',
-	'secretStorage.js',
-	'secretResolver.js',
-	'secretCatalog.js',
-	'models.js',
-	'modes.js',
-	'transports/directGeminiTransport.js',
-	'transports/hostedGeminiTransport.js',
-];
+function getRuntimeSourceFiles(dir, base = '') {
+	const results = [];
+	if (!fs.existsSync(dir)) {
+		return results;
+	}
+	const entries = fs.readdirSync(dir, { withFileTypes: true });
+	for (const entry of entries) {
+		const full = path.join(dir, entry.name);
+		const rel = base ? `${base}/${entry.name}` : entry.name;
+		if (entry.isDirectory()) {
+			results.push(...getRuntimeSourceFiles(full, rel));
+		} else if (
+			entry.isFile() &&
+			entry.name.endsWith('.ts') &&
+			!entry.name.endsWith('.d.ts') &&
+			!entry.name.endsWith('.test.ts')
+		) {
+			results.push(rel.replace(/\.ts$/, '.js'));
+		}
+	}
+	return results;
+}
 
 function getLatestSourceMtime(dir) {
 	let maxMtime = 0;
@@ -77,10 +84,20 @@ export function verifyMagnusOut() {
 		errors.push(`compiled main is empty: ${path.relative(REPO_ROOT, MAGNUS_EXTENSION_JS)}`);
 	}
 
-	for (const file of REQUIRED_MAGNUS_OUT_FILES) {
+	const expectedOutputs = getRuntimeSourceFiles(MAGNUS_SRC_DIR);
+	if (expectedOutputs.length === 0) {
+		errors.push('no runtime source files detected under extensions/prebase-magnus/src');
+	}
+
+	for (const file of expectedOutputs) {
 		const fullPath = path.join(MAGNUS_OUT_DIR, file);
 		if (!fs.existsSync(fullPath)) {
 			errors.push(`missing compiled module: extensions/prebase-magnus/out/${file}`);
+		} else {
+			const stat = fs.statSync(fullPath);
+			if (stat.size === 0) {
+				errors.push(`empty compiled module: extensions/prebase-magnus/out/${file}`);
+			}
 		}
 	}
 
@@ -100,13 +117,14 @@ export function verifyMagnusOut() {
 	return {
 		ok: errors.length === 0,
 		errors,
+		derivedModulesCount: expectedOutputs.length,
 	};
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
 	const res = verifyMagnusOut();
 	if (res.ok) {
-		console.log('verify:magnus-out: PASS');
+		console.log(`verify:magnus-out: PASS (${res.derivedModulesCount} derived runtime modules verified)`);
 		process.exit(0);
 	} else {
 		console.error('verify:magnus-out: FAIL');

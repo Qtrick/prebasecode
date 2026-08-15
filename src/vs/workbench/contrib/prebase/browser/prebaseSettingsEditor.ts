@@ -711,8 +711,6 @@ export class PreBaseSettingsEditor extends EditorPane {
 			{ id: 'auto', label: 'Auto (Recommended - Gemini 2.5 Flash)' },
 			{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Complex Reasoning)' },
 			{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Fast & Capable)' },
-			{ id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Fast)' },
-			{ id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (Lightweight)' },
 		];
 		for (const m of models) {
 			const opt = document.createElement('option');

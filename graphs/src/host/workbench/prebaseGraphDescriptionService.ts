@@ -144,13 +144,15 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 				};
 
 				let raw: RawResult | undefined;
+				let execError: unknown = undefined;
 				try {
 					raw = await this.commandService.executeCommand<RawResult>(
 						'prebase.magnus.describeFile',
 						{ prompt, path: relative }
 					);
-				} catch {
+				} catch (err) {
 					raw = undefined;
+					execError = err;
 				}
 
 				if (cts.token.isCancellationRequested) {
@@ -158,10 +160,17 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 				}
 
 				if (!raw) {
+					const errMsg = execError instanceof Error ? execError.message : String(execError || '');
+					let aiMessage = localize('prebase.desc.configureMagnus', "Agents extension is not available.");
+					if (errMsg.includes('activation') || errMsg.includes('Activating extension')) {
+						aiMessage = localize('prebase.desc.activationFailed', "Agents runtime failed to activate.");
+					} else if (errMsg && !errMsg.includes('not found') && !errMsg.includes('command \'prebase.magnus.describeFile\'')) {
+						aiMessage = errMsg;
+					}
 					return {
 						overview,
 						aiStatus: 'unavailable',
-						aiMessage: localize('prebase.desc.configureMagnus', "Agents extension is not available."),
+						aiMessage,
 						cacheHit: false,
 					};
 				}

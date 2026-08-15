@@ -162,6 +162,11 @@ export function loadPreBaseRootEnv(explicitRoot?: string): Map<string, string> {
 		return new Map();
 	}
 }
+export interface RootEnvCacheState {
+	readonly mtime: number;
+	readonly size: number;
+	readonly values: Map<string, string>;
+}
 
 /**
  * Extension-side secret and execution mode resolver with deterministic precedence:
@@ -182,7 +187,7 @@ export function loadPreBaseRootEnv(explicitRoot?: string): Map<string, string> {
  * - Respects the explicit choice strictly.
  */
 export class PreBaseSecretResolver {
-	private _rootEnvCache: Map<string, string> | undefined;
+	private _rootEnvCache: RootEnvCacheState | null | undefined;
 	private _isSourceDev: boolean;
 	private _prebaseRoot: string | undefined;
 
@@ -209,10 +214,46 @@ export class PreBaseSecretResolver {
 	}
 
 	private getRootEnv(): Map<string, string> {
-		if (!this._rootEnvCache) {
-			this._rootEnvCache = this._isSourceDev ? loadPreBaseRootEnv(this._prebaseRoot) : new Map();
+		if (!this._isSourceDev || !this._prebaseRoot) {
+			return new Map();
 		}
-		return this._rootEnvCache;
+
+		const envPath = path.join(this._prebaseRoot, '.env');
+		try {
+			if (!fs.existsSync(envPath)) {
+				this._rootEnvCache = null;
+				return new Map();
+			}
+
+			const stat = fs.statSync(envPath);
+			if (stat.size > MAX_ENV_FILE_BYTES) {
+				console.warn('[PreBase SecretResolver] PreBase root .env exceeded size limit, ignoring.');
+				this._rootEnvCache = null;
+				return new Map();
+			}
+
+			if (this._rootEnvCache && this._rootEnvCache.mtime === stat.mtimeMs && this._rootEnvCache.size === stat.size) {
+				return this._rootEnvCache.values;
+			}
+
+			// On POSIX, check permissions and warn if group/world readable
+			if (process.platform !== 'win32' && (stat.mode & 0o077) !== 0) {
+				console.warn('[PreBase SecretResolver] Notice: PreBase root .env has group/world readable permissions.');
+			}
+
+			const content = fs.readFileSync(envPath, 'utf8');
+			const values = parseAllowlistedEnv(content);
+			this._rootEnvCache = {
+				mtime: stat.mtimeMs,
+				size: stat.size,
+				values,
+			};
+			return values;
+		} catch (err) {
+			console.warn('[PreBase SecretResolver] Failed to safely read PreBase root .env:', err instanceof Error ? err.message : String(err));
+			this._rootEnvCache = null;
+			return new Map();
+		}
 	}
 
 	/**
@@ -495,6 +536,9 @@ export class PreBaseSecretResolver {
 		requestedMode: PreBaseAIExecutionMode = 'auto',
 	): {
 		isSourceDev: boolean;
+		resolvedRootPresent: boolean;
+		resolvedRootPath?: string;
+		rootEnvPresent: boolean;
 		gemini: SecretDiagnosticStatus;
 		linkup: SecretDiagnosticStatus;
 	} {
@@ -512,8 +556,12 @@ export class PreBaseSecretResolver {
 			hostedAvailable: cloudHostedAvailable,
 		});
 
+		const hasEnvFile = this._isSourceDev && !!this._prebaseRoot && fs.existsSync(path.join(this._prebaseRoot, '.env'));
 		return {
 			isSourceDev: this._isSourceDev,
+			resolvedRootPresent: !!this._prebaseRoot,
+			resolvedRootPath: this._prebaseRoot,
+			rootEnvPresent: hasEnvFile,
 			gemini: {
 				id: 'gemini',
 				localEnv: env.has('GEMINI_API_KEY') || env.has('GOOGLE_API_KEY') ? 'present' : 'absent',

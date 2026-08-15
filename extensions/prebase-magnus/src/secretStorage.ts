@@ -45,6 +45,10 @@ export class MagnusSecretStorage {
 		return this.resolver;
 	}
 
+	refreshRootEnv(): void {
+		this.resolver.refreshRootEnv();
+	}
+
 	/**
 	 * Resolves the stored SecretStorage key for a provider.
 	 * Migrates legacy un-scoped key to provider-scoped key if needed.

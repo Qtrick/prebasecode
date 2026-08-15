@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 /**
  * Static workbench startup gates (+ optional launch when PREBASE_STARTUP_LAUNCH=1).
- * Includes verify:graphs-out checks.
+ * Includes verify:graphs-out and verify:magnus-out checks.
  */
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
@@ -26,48 +26,53 @@ const LAUNCH_TIMEOUT_MS = 60_000;
 const SUCCESS_MARKER = 'Started local extension host';
 /** Emitted by PreBaseWorkbenchReadyContribution after workbench AfterRestored. */
 const WORKBENCH_RESTORED_MARKER = '[PreBase] workbench restored';
+const MAGNUS_ACTIVATED_MARKER = '[Magnus] activation completed';
+const EXT_HOST_ACTIVATE_MARKER = 'ExtensionService#_doActivateExtension prebase.magnus';
+
 const FAIL_PATTERNS = [
 	/ERR_FILE_NOT_FOUND.*\/graphs\//i,
 	/ERR_FILE_NOT_FOUND.*(entryDetector|graphGenerator|ignorePatterns|importExtractors|layoutEngine|fileTypeColors|architectureLayers|layoutDepthColors|projectFiles|languageStats|hierarchyLayout|fileDescription)\.js/i,
 	/Failed to fetch dynamically imported module/i,
+	/\[Magnus\] activation failed/i,
+	/Tool ".*" was not contributed/i,
 ];
 
 /**
- * @param {string} userDataDir
- * @returns {string | undefined}
+ * @param {string} dir
+ * @returns {string}
  */
-function findLatestRendererLog(userDataDir) {
-	const logsRoot = path.join(userDataDir, 'logs');
-	if (!fs.existsSync(logsRoot)) {
-		return undefined;
+function readAllLogs(dir) {
+	let text = '';
+	if (!fs.existsSync(dir)) {
+		return text;
 	}
-	const sessions = fs
-		.readdirSync(logsRoot)
-		.map((name) => {
-			const full = path.join(logsRoot, name);
-			return { full, mtime: fs.statSync(full).mtimeMs };
-		})
-		.sort((a, b) => b.mtime - a.mtime);
-	for (const { full } of sessions) {
-		const rendererLog = path.join(full, 'window1', 'renderer.log');
-		if (fs.existsSync(rendererLog)) {
-			return rendererLog;
+	const entries = fs.readdirSync(dir, { withFileTypes: true });
+	for (const entry of entries) {
+		const full = path.join(dir, entry.name);
+		if (entry.isDirectory()) {
+			text += '\n' + readAllLogs(full);
+		} else if (entry.isFile() && (entry.name.endsWith('.log') || entry.name.endsWith('.txt'))) {
+			try {
+				text += '\n' + fs.readFileSync(full, 'utf8');
+			} catch {
+				// ignore read errors
+			}
 		}
 	}
-	return undefined;
+	return text;
 }
 
 /**
  * @param {import('node:child_process').ChildProcess} child
  * @param {string} userDataDir
+ * @param {() => string} getCapturedOutput
  * @returns {Promise<'ok' | 'fail' | 'timeout'>}
  */
-function waitForStartupSignals(child, userDataDir) {
+function waitForStartupSignals(child, userDataDir, getCapturedOutput) {
 	const deadline = Date.now() + LAUNCH_TIMEOUT_MS;
-	let lastSize = 0;
-	let accumulated = '';
 	let sawExtensionHost = false;
 	let sawWorkbenchRestored = false;
+	let sawMagnusActivated = false;
 
 	return new Promise((resolve) => {
 		const tick = () => {
@@ -75,30 +80,28 @@ function waitForStartupSignals(child, userDataDir) {
 				resolve('fail');
 				return;
 			}
-			const logPath = findLatestRendererLog(userDataDir);
-			if (logPath) {
-				const stat = fs.statSync(logPath);
-				if (stat.size > lastSize) {
-					const chunk = fs.readFileSync(logPath, 'utf8').slice(lastSize);
-					lastSize = stat.size;
-					accumulated += chunk;
-					if (accumulated.includes(SUCCESS_MARKER)) {
-						sawExtensionHost = true;
-					}
-					if (accumulated.includes(WORKBENCH_RESTORED_MARKER)) {
-						sawWorkbenchRestored = true;
-					}
-					if (sawExtensionHost && sawWorkbenchRestored) {
-						resolve('ok');
-						return;
-					}
-					for (const pattern of FAIL_PATTERNS) {
-						if (pattern.test(accumulated)) {
-							console.error(`verify:startup: launch failure matched ${pattern}`);
-							resolve('fail');
-							return;
-						}
-					}
+			const logsRoot = path.join(userDataDir, 'logs');
+			const logText = fs.existsSync(logsRoot) ? readAllLogs(logsRoot) : '';
+			const combined = getCapturedOutput() + '\n' + logText;
+
+			if (combined.includes(SUCCESS_MARKER)) {
+				sawExtensionHost = true;
+			}
+			if (combined.includes(WORKBENCH_RESTORED_MARKER)) {
+				sawWorkbenchRestored = true;
+			}
+			if (combined.includes(MAGNUS_ACTIVATED_MARKER) || (combined.includes(EXT_HOST_ACTIVATE_MARKER) && combined.includes('magnus/auto'))) {
+				sawMagnusActivated = true;
+			}
+			if (sawExtensionHost && sawWorkbenchRestored && sawMagnusActivated) {
+				resolve('ok');
+				return;
+			}
+			for (const pattern of FAIL_PATTERNS) {
+				if (pattern.test(combined)) {
+					console.error(`verify:startup: launch failure matched ${pattern}`);
+					resolve('fail');
+					return;
 				}
 			}
 			if (Date.now() >= deadline) {
@@ -107,6 +110,9 @@ function waitForStartupSignals(child, userDataDir) {
 				}
 				if (!sawWorkbenchRestored) {
 					console.error(`verify:startup: missing marker "${WORKBENCH_RESTORED_MARKER}" (workbench AfterRestored)`);
+				}
+				if (!sawMagnusActivated) {
+					console.error(`verify:startup: missing marker "${MAGNUS_ACTIVATED_MARKER}"`);
 				}
 				resolve('timeout');
 				return;
@@ -127,6 +133,7 @@ async function optionalLaunchCheck() {
 	fs.mkdirSync(userDataDir, { recursive: true });
 	fs.mkdirSync(extensionsDir, { recursive: true });
 
+	let capturedOutput = '';
 	const codeSh = path.join(REPO_ROOT, 'scripts/code.sh');
 	const child = spawn(
 		codeSh,
@@ -135,7 +142,8 @@ async function optionalLaunchCheck() {
 			userDataDir,
 			'--extensions-dir',
 			extensionsDir,
-			'--disable-extensions',
+			'--extensionDevelopmentPath=' + path.join(REPO_ROOT, 'extensions/prebase-magnus'),
+			'--enable-proposed-api=prebase.magnus',
 			'--disable-workspace-trust',
 			'.',
 		],
@@ -144,14 +152,18 @@ async function optionalLaunchCheck() {
 			env: {
 				...process.env,
 				VSCODE_SKIP_PRELAUNCH: '1',
+				PREBASE_MAGNUS_EXT_DEV: '1',
 			},
-			stdio: 'ignore',
+			stdio: ['ignore', 'pipe', 'pipe'],
 		},
 	);
 
+	child.stdout?.on('data', (c) => { capturedOutput += c.toString(); });
+	child.stderr?.on('data', (c) => { capturedOutput += c.toString(); });
+
 	let result;
 	try {
-		result = await waitForStartupSignals(child, userDataDir);
+		result = await waitForStartupSignals(child, userDataDir, () => capturedOutput);
 	} finally {
 		if (child.exitCode === null && child.pid) {
 			try {
@@ -174,11 +186,11 @@ async function optionalLaunchCheck() {
 	}
 
 	if (result === 'ok') {
-		console.log('verify:startup: launch check PASS (extension host + workbench restored marker)');
+		console.log('verify:startup: launch check PASS (extension host + workbench restored + Magnus activated)');
 		return true;
 	}
 	if (result === 'timeout') {
-		console.error(`verify:startup: launch timed out after ${LAUNCH_TIMEOUT_MS}ms (need "${SUCCESS_MARKER}" and "${WORKBENCH_RESTORED_MARKER}")`);
+		console.error(`verify:startup: launch timed out after ${LAUNCH_TIMEOUT_MS}ms (need "${SUCCESS_MARKER}", "${WORKBENCH_RESTORED_MARKER}", and "${MAGNUS_ACTIVATED_MARKER}")`);
 		console.error(`verify:startup: preserved profile for inspection: ${userDataDir}`);
 		return false;
 	}
