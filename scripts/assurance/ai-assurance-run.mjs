@@ -12,6 +12,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyMagnusOut } from '../startup/verify-magnus-out.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -106,7 +107,18 @@ async function runAssurance() {
 		details: 'Verified product.json, package.json, and AGENTS.md markers.',
 	});
 
-	// 2. Secret isolation test
+	// 2. Magnus compiled output verification
+	const magnusOutResult = verifyMagnusOut();
+	report.tests.push({
+		name: 'PreBase Magnus compiled runtime readiness',
+		status: magnusOutResult.ok ? 'PASS' : 'FAIL',
+		details: magnusOutResult.ok ? 'Verified out/extension.js and compiled runtime modules.' : magnusOutResult.errors.join('; '),
+	});
+	if (!magnusOutResult.ok) {
+		report.overallStatus = 'FAIL';
+	}
+
+	// 3. Secret isolation test
 	const arbitraryDirCheck = !isPreBaseRoot('/tmp');
 	report.tests.push({
 		name: 'Arbitrary workspace folder isolation',

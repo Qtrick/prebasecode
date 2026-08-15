@@ -1,0 +1,49 @@
+{
+  "runId": "ai-run-2026-08-15T06-55-01-389Z",
+  "timestamp": "2026-08-15T06:55:01.390Z",
+  "environment": {
+    "isSourceRoot": true,
+    "platform": "darwin",
+    "nodeVersion": "v24.17.0"
+  },
+  "secrets": {
+    "geminiConfigured": true,
+    "geminiSource": "root-env",
+    "linkupConfigured": true,
+    "linkupSource": "root-env"
+  },
+  "tests": [
+    {
+      "name": "PreBase root repository verification",
+      "status": "PASS",
+      "details": "Verified product.json, package.json, and AGENTS.md markers."
+    },
+    {
+      "name": "PreBase Magnus compiled runtime readiness",
+      "status": "PASS",
+      "details": "Verified out/extension.js and compiled runtime modules."
+    },
+    {
+      "name": "Arbitrary workspace folder isolation",
+      "status": "PASS",
+      "details": "Verified that non-PreBase folders cannot be scanned for .env credentials."
+    },
+    {
+      "name": "Gemini live model discovery",
+      "status": "FAIL",
+      "details": "fetch failed"
+    },
+    {
+      "name": "Gemini live content generation",
+      "status": "FAIL",
+      "details": "fetch failed"
+    },
+    {
+      "name": "LinkUp live search query execution",
+      "status": "FAIL",
+      "details": "fetch failed"
+    }
+  ],
+  "models": [],
+  "overallStatus": "FAIL"
+}

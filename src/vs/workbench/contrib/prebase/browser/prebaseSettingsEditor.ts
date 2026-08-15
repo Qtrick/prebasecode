@@ -663,7 +663,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		this._row(
 			card,
 			localize('prebase.settings.magnusModel', "Agents AI model"),
-			localize('prebase.settings.magnusModelHint', "Choose which model Agents uses. Managed by the Agents extension — not duplicated here. API keys belong in .env, never in this UI."),
+			localize('prebase.settings.magnusModelHint', "Choose which model Agents uses. Configure execution mode, providers, and secure BYOK keys in the Agents & AI section."),
 			modelCtrl
 		);
 	}

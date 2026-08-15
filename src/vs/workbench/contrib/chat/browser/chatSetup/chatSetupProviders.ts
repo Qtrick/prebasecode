@@ -180,7 +180,7 @@ export class SetupAgent extends Disposable implements IChatAgentImplementation {
 
 	private static readonly SETUP_NEEDED_MESSAGE = new MarkdownString(
 		isMagnusDefaultChatAgent()
-			? localize('settingUpMagnusNeeded', "Add at least one API key to the project `.env` file (Gemini, OpenAI, Claude, …) to use Chat.")
+			? localize('settingUpMagnusNeeded', "Configure a Gemini key in Agents Settings (or provide GEMINI_API_KEY in PreBase root .env) to use Chat.")
 			: localize('settingUpCopilotNeeded', "You need to set up GitHub Copilot and be signed in to use Chat.")
 	);
 	private static readonly TRUST_NEEDED_MESSAGE = new MarkdownString(localize('trustNeeded', "You need to trust this workspace to use Chat."));

@@ -74,6 +74,16 @@ export function verifyPreBaseDesktopPackage(appBase: string, copilotEnabled: boo
 		throw new Error(`[verifyPreBaseDesktopPackage] PreBase Magnus extension not found at ${magnusManifestPath}`);
 	}
 
+	const magnusExtensionJs = path.join(appBase, 'extensions', 'prebase-magnus', 'out', 'extension.js');
+	if (!fs.existsSync(magnusExtensionJs) || fs.statSync(magnusExtensionJs).size === 0) {
+		throw new Error(`[verifyPreBaseDesktopPackage] PreBase Magnus compiled entrypoint missing or empty at ${magnusExtensionJs}`);
+	}
+
+	const bundledRootEnv = path.join(appBase, '.env');
+	if (fs.existsSync(bundledRootEnv)) {
+		throw new Error(`[verifyPreBaseDesktopPackage] Dangerous secret leak: .env file found bundled in packaged application at ${bundledRootEnv}`);
+	}
+
 	const copilotManifestPath = path.join(appBase, COPILOT_EXTENSION_MANIFEST);
 	if (copilotEnabled !== fs.existsSync(copilotManifestPath)) {
 		const expectation = copilotEnabled ? 'missing enabled' : 'contains disabled';

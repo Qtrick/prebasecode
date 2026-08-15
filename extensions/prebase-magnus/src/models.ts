@@ -135,23 +135,41 @@ export class GeminiModelCache {
 
 export const globalGeminiModelCache = new GeminiModelCache();
 
+export type DiscoveredModelInput = DiscoveredGeminiModel | import('./aiTypes').NormalizedAIModel;
+
+function isCompatibleModel(m: DiscoveredModelInput): boolean {
+	if ('capabilities' in m && m.capabilities) {
+		return !!m.capabilities.agentCompatible;
+	}
+	if ('agentCompatible' in m) {
+		return !!m.agentCompatible;
+	}
+	return true;
+}
+
+function getModelDisplayName(m: DiscoveredModelInput): string {
+	return m.displayName || ('name' in m && m.name ? m.name : m.id);
+}
+
 /**
  * Builds list of user-selectable model options from discovered models or fallbacks.
  */
-export function buildModelOptions(discovered?: DiscoveredGeminiModel[]): MagnusModelOption[] {
+export function buildModelOptions(discovered?: DiscoveredModelInput[]): MagnusModelOption[] {
 	if (!discovered || discovered.length === 0) {
 		return [...DEFAULT_MAGNUS_MODELS];
 	}
 
-	const compatible = discovered.filter(m => m.agentCompatible);
+	const compatible = discovered.filter(isCompatibleModel);
 	if (compatible.length === 0) {
 		return [...DEFAULT_MAGNUS_MODELS];
 	}
 
 	// Determine best auto target: prefer gemini-2.5-flash, then 2.5-pro, then first compatible
-	let autoTarget = compatible.find(m => m.id === 'gemini-2.5-flash')
+	const autoTarget = compatible.find(m => m.id === 'gemini-2.5-flash')
 		|| compatible.find(m => m.id === 'gemini-2.5-pro')
 		|| compatible[0];
+
+	const targetDisplayName = getModelDisplayName(autoTarget);
 
 	const autoOption: MagnusModelOption = {
 		id: 'auto',
@@ -159,13 +177,13 @@ export function buildModelOptions(discovered?: DiscoveredGeminiModel[]): MagnusM
 		apiModel: autoTarget.id,
 		maxInputTokens: autoTarget.inputTokenLimit,
 		maxOutputTokens: autoTarget.outputTokenLimit,
-		description: `Balanced quality and speed (resolves to ${autoTarget.displayName}).`,
+		description: `Balanced quality and speed (resolves to ${targetDisplayName}).`,
 		isAuto: true,
 	};
 
 	const explicitOptions: MagnusModelOption[] = compatible.map(m => ({
 		id: m.id,
-		name: m.displayName || m.id,
+		name: getModelDisplayName(m),
 		apiModel: m.id,
 		maxInputTokens: m.inputTokenLimit,
 		maxOutputTokens: m.outputTokenLimit,
@@ -175,10 +193,10 @@ export function buildModelOptions(discovered?: DiscoveredGeminiModel[]): MagnusM
 	return [autoOption, ...explicitOptions];
 }
 
-export function resolveApiModel(modelId: string, discovered?: DiscoveredGeminiModel[]): string {
+export function resolveApiModel(modelId: string, discovered?: DiscoveredModelInput[]): string {
 	const options = buildModelOptions(discovered ?? globalGeminiModelCache.get());
 	const found = options.find(m => m.id === modelId);
-	return found?.apiModel ?? 'gemini-2.5-flash';
+	return found?.apiModel || 'gemini-2.5-flash';
 }
 
 export function resolveModelInfo(modelId: string, discovered?: DiscoveredGeminiModel[]): { apiModel: string; resolvedModelId: string } {

@@ -7,26 +7,19 @@ import * as vscode from 'vscode';
 import type { PreBaseAIService } from './aiService';
 import type { AIContentMessage, AIContentPart, NormalizedAIModel } from './aiTypes';
 import { buildMagnusLanguageModelInformation } from './modelInformation';
-import { globalGeminiModelCache } from './models';
 
-function hasStringValue(value: object): value is { value: string } {
-	return Object.hasOwn(value, 'value') && typeof (value as { value?: unknown }).value === 'string';
+function asRecord(value: unknown): Record<string, unknown> {
+	if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+		return value as Record<string, unknown>;
+	}
+	return {};
 }
 
 function extractText(message: vscode.LanguageModelChatRequestMessage): string {
-	const parts: string[] = [];
-	for (const part of message.content) {
-		if (part instanceof vscode.LanguageModelTextPart) {
-			parts.push(part.value);
-		} else if (typeof part === 'object' && part && hasStringValue(part)) {
-			parts.push(part.value);
-		}
-	}
-	return parts.join('');
-}
-
-function asRecord(value: object): Record<string, unknown> {
-	return value as Record<string, unknown>;
+	return message.content
+		.map(part => part instanceof vscode.LanguageModelTextPart ? part.value : '')
+		.filter(Boolean)
+		.join('\n');
 }
 
 export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProvider {
@@ -34,7 +27,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 	readonly onDidChangeLanguageModelChatInformation = this._onDidChange.event;
 	private _isDiscovering = false;
 
-	constructor(private readonly aiService: PreBaseAIService) { }
+	constructor(private readonly aiService: PreBaseAIService) {}
 
 	notifyChanged(): void {
 		this._onDidChange.fire();
@@ -50,7 +43,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		} catch (err) {
 			console.warn('[Magnus] Model discovery warning:', err instanceof Error ? err.message : String(err));
 		}
-		return globalGeminiModelCache.get() ?? [];
+		return [];
 	}
 
 	async provideLanguageModelChatInformation(
@@ -85,6 +78,14 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 		token: vscode.CancellationToken,
 	): Promise<void> {
+		const status = await this.aiService.getProviderStatus();
+		if (!status.configured) {
+			progress.report(new vscode.LanguageModelTextPart(
+				status.safeStatusMessage || 'Agents has no configured AI provider. Configure a Gemini key in Agents Settings or PreBase root .env.'
+			));
+			return;
+		}
+
 		const contents: AIContentMessage[] = [];
 		const callNames = new Map<string, string>();
 		let systemText = '';
@@ -120,51 +121,69 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		}
 
 		const tools = options.tools?.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.inputSchema }));
+		let partsReported = 0;
 
-		if (tools?.length) {
-			const result = await this.aiService.generateCandidate({
-				messages: contents,
-				systemInstruction: systemText || undefined,
-				tools,
-				modelId: model.id,
-			}, token);
-
-			for (const part of result.candidate?.content.parts ?? []) {
-				if (part.text) {
-					progress.report(new vscode.LanguageModelTextPart(part.text));
-				} else if (part.functionCall) {
-					progress.report(new vscode.LanguageModelToolCallPart(crypto.randomUUID(), part.functionCall.name, part.functionCall.args ?? {}));
-				}
-			}
-			return;
-		}
-
-		if (this.aiService.streamCandidate) {
-			await this.aiService.streamCandidate(
-				{
+		try {
+			if (tools?.length) {
+				const result = await this.aiService.generateCandidate({
 					messages: contents,
 					systemInstruction: systemText || undefined,
+					tools,
 					modelId: model.id,
-				},
-				chunk => {
-					if (token.isCancellationRequested) {
-						return;
+				}, token);
+
+				for (const part of result.candidate?.content.parts ?? []) {
+					if (part.text) {
+						progress.report(new vscode.LanguageModelTextPart(part.text));
+						partsReported++;
+					} else if (part.functionCall) {
+						progress.report(new vscode.LanguageModelToolCallPart(crypto.randomUUID(), part.functionCall.name, part.functionCall.args ?? {}));
+						partsReported++;
 					}
-					if (chunk.text) {
-						progress.report(new vscode.LanguageModelTextPart(chunk.text));
-					}
-				},
-				token,
-			);
-		} else {
-			const text = await this.aiService.generateText(
-				contents.map(c => c.parts.map(p => p.text ?? '').join('')).join('\n'),
-				{ modelId: model.id },
-				token,
-			);
-			if (!token.isCancellationRequested) {
-				progress.report(new vscode.LanguageModelTextPart(text));
+				}
+				if (partsReported === 0 && result.text) {
+					progress.report(new vscode.LanguageModelTextPart(result.text));
+					partsReported++;
+				}
+			} else if (this.aiService.streamCandidate) {
+				await this.aiService.streamCandidate(
+					{
+						messages: contents,
+						systemInstruction: systemText || undefined,
+						modelId: model.id,
+					},
+					chunk => {
+						if (token.isCancellationRequested) {
+							return;
+						}
+						if (chunk.text) {
+							progress.report(new vscode.LanguageModelTextPart(chunk.text));
+							partsReported++;
+						}
+					},
+					token,
+				);
+			} else {
+				const text = await this.aiService.generateText(
+					contents.map(c => c.parts.map(p => p.text ?? '').join('')).join('\n'),
+					{ modelId: model.id },
+					token,
+				);
+				if (!token.isCancellationRequested && text) {
+					progress.report(new vscode.LanguageModelTextPart(text));
+					partsReported++;
+				}
 			}
+
+			if (partsReported === 0 && !token.isCancellationRequested) {
+				progress.report(new vscode.LanguageModelTextPart('The AI model returned no content for this request.'));
+			}
+		} catch (err) {
+			if (token.isCancellationRequested) {
+				return;
+			}
+			const errorMsg = err instanceof Error ? err.message : String(err);
+			progress.report(new vscode.LanguageModelTextPart(`Agents generation failed: ${errorMsg}`));
 		}
 	}
 

@@ -6,18 +6,23 @@
 import * as vscode from 'vscode';
 import { registerMagnusChatParticipants, type MagnusChatState } from './chatParticipant';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
-import { buildModelOptions, globalGeminiModelCache } from './models';
+import { buildModelOptions } from './models';
 import { DEFAULT_MAGNUS_AGENT_MODE, MAGNUS_AGENT_MODES, isMagnusAgentMode } from './modes';
 import { registerMagnusDesktopTools } from './desktopTools';
 import { registerMagnusLanguageModelTools } from './nativeTools';
 import { MagnusSecretStorage } from './secretStorage';
-import { PreBaseAIService } from './aiService';
+import { PreBaseAIService, VsCodeWorkspaceConfigProvider } from './aiService';
 import { globalAIProviderRegistry } from './aiProviderRegistry';
 import type { PreBaseAIExecutionMode } from './secretCatalog';
 
 export function activate(context: vscode.ExtensionContext): void {
+	console.log('[Magnus] activation started');
+
 	const secrets = new MagnusSecretStorage(context.secrets);
-	const aiService = new PreBaseAIService(secrets, globalAIProviderRegistry);
+	const configProvider = new VsCodeWorkspaceConfigProvider(() => vscode.workspace.getConfiguration('prebase.magnus'));
+	const aiService = new PreBaseAIService(secrets, globalAIProviderRegistry, configProvider);
+	console.log('[Magnus] AI service initialized');
+
 	const config = vscode.workspace.getConfiguration('prebase.magnus');
 
 	const state: MagnusChatState = {
@@ -30,6 +35,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
 	// Register chat participants first so Ask/Edit/Agent appear
 	registerMagnusChatParticipants(context, aiService, state);
+	console.log('[Magnus] chat participants registered');
+
 	registerMagnusLanguageModelTools(context, secrets);
 	registerMagnusDesktopTools(context);
 
@@ -38,10 +45,11 @@ export function activate(context: vscode.ExtensionContext): void {
 		context.subscriptions.push(
 			vscode.lm.registerLanguageModelChatProvider('magnus', lmProvider),
 		);
+		console.log('[Magnus] language model provider registered');
 		// Kick an immediate model refresh so the workbench picker can list Magnus models.
 		lmProvider.notifyChanged();
 	} catch (err) {
-		console.error('[Agents] language model provider registration failed:', err);
+		console.error('[Magnus] language model provider registration failed:', err);
 	}
 
 	context.subscriptions.push(
@@ -72,6 +80,76 @@ export function activate(context: vscode.ExtensionContext): void {
 				query: '',
 				isPartialQuery: false,
 			});
+		}),
+
+		vscode.commands.registerCommand('prebase.magnus.open.walkthrough', async () => {
+			try {
+				await vscode.commands.executeCommand('workbench.action.openWalkthrough', 'prebase.magnus#magnusWalkthrough', false);
+			} catch {
+				await vscode.commands.executeCommand('prebase.magnus.open');
+			}
+		}),
+
+		vscode.commands.registerCommand('prebase.magnus.toggleStatusMenu', async () => {
+			await vscode.commands.executeCommand('prebase.magnus.checkConfiguration');
+		}),
+
+		vscode.commands.registerCommand('prebase.magnus.refreshToken', async () => {
+			aiService.invalidateModelCache();
+			lmProvider.notifyChanged();
+			await lmProvider.refreshDiscoveredModels();
+			const status = await aiService.getProviderStatus();
+			return {
+				ok: true,
+				configured: status.configured,
+				executionMode: status.executionMode,
+				effectiveSource: status.effectiveSource,
+			};
+		}),
+
+		vscode.commands.registerCommand('prebase.magnus.debug.extensionState', async () => {
+			const status = await aiService.getProviderStatus();
+			const diag = await secrets.getDiagnostics();
+			const models = await aiService.listModels(undefined, false);
+			return {
+				extensionId: 'prebase.magnus',
+				extensionVersion: context.extension.packageJSON?.version ?? '1.0.0',
+				activated: true,
+				commandsRegistered: true,
+				languageModelProviderRegistered: true,
+				providerId: status.providerId,
+				executionMode: status.executionMode,
+				effectiveSource: status.effectiveSource,
+				configured: status.configured,
+				modelCount: models.length,
+				selectedModel: state.modelId,
+				sourceDevelopmentDetected: diag.isSourceDev,
+				hostedAvailable: aiService.isCloudHostedAvailable(),
+				lastProviderErrorCategory: undefined,
+			};
+		}),
+
+		vscode.commands.registerCommand('prebase.magnus.git.generateCommitMessage', async () => {
+			const status = await aiService.getProviderStatus();
+			if (!status.configured) {
+				void vscode.window.showWarningMessage('Configure an AI model provider in Agents Settings to generate commit messages.');
+				return undefined;
+			}
+			try {
+				const result = await aiService.generateText(
+					'Generate a concise git commit message (under 72 chars, conventional commit format) for the current changes.',
+					{ modelId: state.modelId },
+				);
+				return result.trim();
+			} catch (err) {
+				void vscode.window.showErrorMessage(`Failed to generate commit message: ${err instanceof Error ? err.message : String(err)}`);
+				return undefined;
+			}
+		}),
+
+		vscode.commands.registerCommand('prebase.magnus.git.resolveMergeConflicts', async () => {
+			void vscode.window.showInformationMessage('Open the Agents chat panel and ask to resolve git merge conflicts.');
+			await vscode.commands.executeCommand('prebase.magnus.open');
 		}),
 
 		vscode.commands.registerCommand('prebase.magnus.setApiKey', async () => {
@@ -269,17 +347,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 		vscode.commands.registerCommand('prebase.magnus.selectModel', async () => {
 			const models = await aiService.listModels(undefined, true);
-			const modelOptions = buildModelOptions(models.length > 0 ? models.map(m => ({
-				id: m.id,
-				name: m.name,
-				displayName: m.displayName,
-				description: m.description,
-				inputTokenLimit: m.inputTokenLimit,
-				outputTokenLimit: m.outputTokenLimit,
-				supportedGenerationMethods: ['generateContent'],
-				agentCompatible: m.capabilities.agentCompatible,
-				descriptionCompatible: m.capabilities.descriptionCompatible,
-			})) : globalGeminiModelCache.get());
+			const modelOptions = buildModelOptions(models);
 
 			const picked = await vscode.window.showQuickPick(
 				modelOptions.map(m => ({
@@ -378,6 +446,9 @@ export function activate(context: vscode.ExtensionContext): void {
 			}
 		}),
 	);
+
+	console.log('[Magnus] commands registered');
+	console.log('[Magnus] activation completed');
 }
 
 export function deactivate(): void {

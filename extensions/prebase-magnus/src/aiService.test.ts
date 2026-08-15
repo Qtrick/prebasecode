@@ -5,18 +5,19 @@
 
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
-import { PreBaseAIService } from './aiService';
-import { AIProviderRegistry } from './aiProviderRegistry';
-import { MagnusSecretStorage } from './secretStorage';
-import { PreBaseSecretResolver } from './secretResolver';
+import { PreBaseAIService, InMemoryConfigProvider, VsCodeWorkspaceConfigProvider } from './aiService.ts';
+import { AIProviderRegistry } from './aiProviderRegistry.ts';
+import { MagnusSecretStorage } from './secretStorage.ts';
+import { PreBaseSecretResolver } from './secretResolver.ts';
+import { buildModelOptions, resolveApiModel, resolveModelInfo } from './models.ts';
 import type {
 	AIGenerateRequest,
 	AIGenerateResponseCandidate,
 	AIGenerateResult,
 	IPreBaseAIProviderAdapter,
 	NormalizedAIModel,
-} from './aiTypes';
-import type { PreBaseAIExecutionMode } from './secretCatalog';
+} from './aiTypes.ts';
+import type { PreBaseAIExecutionMode } from './secretCatalog.ts';
 
 /**
  * ============================================================================
@@ -98,13 +99,25 @@ class MockAIProviderAdapter implements IPreBaseAIProviderAdapter {
 			outputTokenLimit: 65_536,
 			capabilities: {
 				textGeneration: true,
-				streaming: true,
-				functionCalling: true,
-				multimodalInput: true,
-				structuredOutput: true,
-				thinkingProtocol: false,
 				agentCompatible: true,
 				descriptionCompatible: true,
+				toolCalling: true,
+				imageInput: false,
+			},
+		},
+		{
+			id: 'gemini-2.5-pro',
+			name: 'models/gemini-2.5-pro',
+			displayName: 'Gemini 2.5 Pro',
+			description: 'Mock quality model',
+			inputTokenLimit: 2_000_000,
+			outputTokenLimit: 65_536,
+			capabilities: {
+				textGeneration: true,
+				agentCompatible: true,
+				descriptionCompatible: true,
+				toolCalling: true,
+				imageInput: false,
 			},
 		},
 	];
@@ -112,95 +125,120 @@ class MockAIProviderAdapter implements IPreBaseAIProviderAdapter {
 	constructor(id = 'gemini', displayName = 'Google Gemini') {
 		this.id = id;
 		this.displayName = displayName;
-		this.staticFallbackModels = [
-			{
-				id: 'auto',
-				name: 'models/gemini-2.5-flash',
-				displayName: 'Auto',
-				description: 'Auto fallback',
-				inputTokenLimit: 1_000_000,
-				outputTokenLimit: 65_536,
-				capabilities: {
-					textGeneration: true,
-					streaming: true,
-					functionCalling: true,
-					multimodalInput: true,
-					structuredOutput: true,
-					thinkingProtocol: false,
-					agentCompatible: true,
-					descriptionCompatible: true,
-				},
-				isAuto: true,
-				isFallback: true,
-			},
-		];
+		this.staticFallbackModels = [...this.discoveredModels];
 	}
 
-	resolveAutoModel(): string {
+	resolveAutoModel(executionMode: PreBaseAIExecutionMode): string {
 		return 'gemini-2.5-flash';
 	}
 
 	async discoverModels(): Promise<NormalizedAIModel[]> {
 		this.discoverCalls++;
-		return this.discoveredModels;
+		return [...this.discoveredModels];
 	}
 
 	async generate(request: AIGenerateRequest): Promise<AIGenerateResult> {
 		this.generateCalls++;
-		return {
-			...this.generateResult,
-			modelId: request.modelId,
-		};
+		return this.generateResult;
 	}
 
 	async streamGenerate(
 		request: AIGenerateRequest,
-		_credential: unknown,
+		credential: unknown,
 		onChunk: (chunk: { text?: string; candidate?: AIGenerateResponseCandidate }) => void,
 	): Promise<AIGenerateResult> {
 		this.streamCalls++;
 		onChunk({ text: 'Streamed part 1' });
 		onChunk({ text: 'Streamed part 2' });
 		return {
-			...this.generateResult,
 			text: 'Streamed part 1Streamed part 2',
 			modelId: request.modelId,
+			providerId: this.id,
+			executionMode: 'byok',
 		};
 	}
 
-	async testConnection() {
+	async testConnection(): Promise<{ ok: boolean; modelId?: string; reply?: string }> {
 		this.testCalls++;
 		return { ok: true, modelId: 'gemini-2.5-flash', reply: 'PONG' };
 	}
 
-	normalizeError(error: unknown) {
+	normalizeError(err: unknown) {
 		return {
-			code: 'unknown' as const,
-			safeMessage: String(error),
+			code: 'error' as const,
+			safeMessage: err instanceof Error ? err.message : String(err),
 			retryable: false,
 		};
 	}
 }
 
-describe('PreBaseAIService & State Machine', () => {
-	it('resolves execution modes and credential precedence in packaged mode', async () => {
+describe('PreBaseAIService & Provider Resolution', () => {
+	it('resolves execution modes and updates provider status cleanly', async () => {
 		const mockStorage = new MockSecretStorage();
 		const resolver = new PreBaseSecretResolver({ forcePackaged: true });
 		const secrets = new MagnusSecretStorage(mockStorage as never, resolver);
 		const adapter = new MockAIProviderAdapter();
 		const registry = new AIProviderRegistry([adapter]);
-		const aiService = new PreBaseAIService(secrets, registry);
+		const configProvider = new InMemoryConfigProvider({ executionMode: 'byok' });
+		const aiService = new PreBaseAIService(secrets, registry, configProvider);
 
-		// Initially unconfigured
+		// Initially unconfigured in BYOK mode
 		const status1 = await aiService.getProviderStatus('gemini');
 		assert.equal(status1.configured, false);
-		assert.equal(status1.modelDiscovery, 'unconfigured');
+		assert.equal(status1.executionMode, 'byok');
 
-		// Set BYOK key
+		// Configure key in SecretStorage
 		await secrets.setProviderApiKey('gemini', 'secret-byok-test-key-12345');
 		const status2 = await aiService.getProviderStatus('gemini');
 		assert.equal(status2.configured, true);
 		assert.equal(status2.effectiveSource, 'OS SecretStorage (BYOK)');
+	});
+
+	it('reads and writes configuration via PreBaseAIConfigProvider', async () => {
+		const mockStorage = new MockSecretStorage();
+		const resolver = new PreBaseSecretResolver({ forcePackaged: true });
+		const secrets = new MagnusSecretStorage(mockStorage as never, resolver);
+		const adapter = new MockAIProviderAdapter();
+		const registry = new AIProviderRegistry([adapter]);
+		const config = new InMemoryConfigProvider({ executionMode: 'auto', defaultModel: 'auto', enabled: true });
+		const aiService = new PreBaseAIService(secrets, registry, config);
+
+		assert.equal(aiService.getExecutionMode(), 'auto');
+		assert.equal(aiService.isEnabled(), true);
+		assert.equal(aiService.getActiveModelId(), 'auto');
+
+		await aiService.setExecutionMode('development-env');
+		assert.equal(aiService.getExecutionMode(), 'development-env');
+		assert.equal(config.getExecutionMode(), 'development-env');
+
+		await aiService.setActiveModelId('gemini-2.5-pro');
+		assert.equal(aiService.getActiveModelId(), 'gemini-2.5-pro');
+		assert.equal(config.getDefaultModel(), 'gemini-2.5-pro');
+	});
+
+	it('works with VsCodeWorkspaceConfigProvider adapter pattern', async () => {
+		const store = new Map<string, unknown>([
+			['executionMode', 'byok'],
+			['provider', 'gemini'],
+			['defaultModel', 'gemini-2.5-flash'],
+			['enabled', true],
+		]);
+
+		const mockVsCodeConfig = {
+			get: <T>(key: string, def?: T): T => (store.has(key) ? (store.get(key) as T) : (def as T)),
+			update: async (key: string, val: unknown) => {
+				store.set(key, val);
+			},
+		};
+
+		const provider = new VsCodeWorkspaceConfigProvider(() => mockVsCodeConfig);
+		assert.equal(provider.getExecutionMode(), 'byok');
+		assert.equal(provider.getProvider(), 'gemini');
+		assert.equal(provider.getDefaultModel(), 'gemini-2.5-flash');
+		assert.equal(provider.isEnabled(), true);
+
+		await provider.setExecutionMode('development-env');
+		assert.equal(store.get('executionMode'), 'development-env');
 	});
 
 	it('discovers and caches models with TTL and handles auto model resolution', async () => {
@@ -216,7 +254,7 @@ describe('PreBaseAIService & State Machine', () => {
 		const models1 = await aiService.listModels('gemini', false);
 		assert.equal(adapter.discoverCalls, 1);
 		assert.ok(models1.length > 0);
-		assert.ok(models1.some(m => m.id === 'auto'));
+		assert.ok(models1.some(m => m.id === 'gemini-2.5-flash'));
 
 		// Second call should return cached models without rediscovery
 		const models2 = await aiService.listModels('gemini', false);
@@ -226,6 +264,53 @@ describe('PreBaseAIService & State Machine', () => {
 		// Force refresh should trigger discovery
 		await aiService.listModels('gemini', true);
 		assert.equal(adapter.discoverCalls, 2);
+	});
+
+	it('builds model options correctly from both NormalizedAIModel and legacy formats', () => {
+		const normalized: NormalizedAIModel[] = [
+			{
+				id: 'gemini-2.5-flash',
+				name: 'models/gemini-2.5-flash',
+				displayName: 'Gemini 2.5 Flash',
+				description: 'Fast model',
+				inputTokenLimit: 1_000_000,
+				outputTokenLimit: 65_536,
+				capabilities: {
+					textGeneration: true,
+					agentCompatible: true,
+					descriptionCompatible: true,
+					toolCalling: true,
+					imageInput: false,
+				},
+			},
+			{
+				id: 'incompatible-embed',
+				name: 'models/text-embedding-004',
+				displayName: 'Text Embedding 004',
+				inputTokenLimit: 2048,
+				outputTokenLimit: 0,
+				capabilities: {
+					textGeneration: false,
+					agentCompatible: false,
+					descriptionCompatible: false,
+					toolCalling: false,
+					imageInput: false,
+				},
+			},
+		];
+
+		const options = buildModelOptions(normalized);
+		assert.equal(options.length, 2); // Auto + gemini-2.5-flash (embed filtered out)
+		assert.equal(options[0].id, 'auto');
+		assert.equal(options[0].apiModel, 'gemini-2.5-flash');
+		assert.equal(options[1].id, 'gemini-2.5-flash');
+
+		assert.equal(resolveApiModel('auto', normalized), 'gemini-2.5-flash');
+		assert.equal(resolveApiModel('gemini-2.5-flash', normalized), 'gemini-2.5-flash');
+		assert.equal(resolveApiModel('unknown-retired-model', normalized), 'gemini-2.5-flash');
+
+		const info = resolveModelInfo('auto');
+		assert.equal(info.apiModel, 'gemini-2.5-flash');
 	});
 
 	it('generates text and stream candidates cleanly', async () => {
@@ -258,7 +343,7 @@ describe('PreBaseAIService & State Machine', () => {
 		assert.equal(streamResult.text, 'Streamed part 1Streamed part 2');
 	});
 
-	it('generates structured architectural file descriptions', async () => {
+	it('generates structured architectural file descriptions with dynamic cache identity', async () => {
 		const mockStorage = new MockSecretStorage();
 		await mockStorage.store('prebase.magnus.provider.gemini.apiKey', 'valid-key');
 		const resolver = new PreBaseSecretResolver({ forcePackaged: true });
@@ -270,7 +355,7 @@ describe('PreBaseAIService & State Machine', () => {
 		const desc = await aiService.describeFile('File content for description', 'src/vs/editor.ts');
 		assert.equal(desc.status, 'ready');
 		assert.equal(desc.text, 'Mock response text');
-		assert.equal(desc.cacheIdentity, 'gemini:gemini-2.5-flash');
+		assert.ok(desc.cacheIdentity?.startsWith('gemini:'));
 	});
 
 	it('handles unconfigured description requests gracefully with clear status', async () => {

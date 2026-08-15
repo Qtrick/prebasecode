@@ -95,6 +95,15 @@ async function ensureCompiled() {
 		console.log(`[preLaunch] graphs out/ is missing or stale (${graphOutput.errors.join('; ') || 'missing graph contribution'}) — running transpile-client`);
 		await runProcess(npm, ['run', 'transpile-client']);
 	}
+
+	// Magnus extension readiness guard: `out/` can exist while extensions/prebase-magnus/out/
+	// was never compiled or has fallen stale relative to its sources.
+	const { verifyMagnusOut } = await import('../../scripts/startup/verify-magnus-out.mjs');
+	const magnusOutput = verifyMagnusOut();
+	if (!magnusOutput.ok) {
+		console.log(`[preLaunch] Magnus extension out/ is missing or stale (${magnusOutput.errors.join('; ')}) — running compile-magnus`);
+		await runProcess(npm, ['run', 'compile-magnus']);
+	}
 }
 
 async function main() {

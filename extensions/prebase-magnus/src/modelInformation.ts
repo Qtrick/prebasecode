@@ -3,8 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { formatContextWindowLabel, buildModelOptions, globalGeminiModelCache, type MagnusModelOption } from './models';
-import type { DiscoveredGeminiModel } from './geminiClient';
+import { formatContextWindowLabel, buildModelOptions, globalGeminiModelCache, type MagnusModelOption, type DiscoveredModelInput } from './models';
 
 export interface MagnusLanguageModelInformation {
 	id: string;
@@ -27,7 +26,7 @@ export interface MagnusLanguageModelInformation {
  */
 export function buildMagnusLanguageModelInformation(
 	hasKey: boolean,
-	discovered?: DiscoveredGeminiModel[],
+	discovered?: DiscoveredModelInput[],
 ): MagnusLanguageModelInformation[] {
 	const modelOptions = buildModelOptions(discovered ?? globalGeminiModelCache.get());
 

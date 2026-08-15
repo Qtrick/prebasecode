@@ -530,13 +530,13 @@ export function buildModelPickerItems(
 		// entries can make `models` non-empty.
 		const magnus = isMagnusDefaultChatAgent();
 		const headerLabel = magnus
-			? localize('chat.modelPicker.setupRequiredMagnus', "Add an API key in `.env` to use models")
+			? localize('chat.modelPicker.setupRequiredMagnus', "Configure Agents to use models")
 			: localize('chat.modelPicker.setupRequired', "Sign in to use Copilot");
 		const actionLabel = magnus
-			? localize('chat.modelPicker.setupRequired.configureMagnus', "Open `.env`…")
+			? localize('chat.modelPicker.setupRequired.configureMagnus', "Configure Agents…")
 			: localize('chat.modelPicker.setupRequired.signIn', "Sign in to use Copilot...");
 		const actionTooltip = magnus
-			? localize('chat.modelPicker.setupRequired.configureMagnusTooltip', "Paste Gemini, OpenAI, Claude, or another provider key into `.env` (at least one).")
+			? localize('chat.modelPicker.setupRequired.configureMagnusTooltip', "Configure a Gemini key in Agents Settings (or provide GEMINI_API_KEY in PreBase root .env).")
 			: localize('chat.modelPicker.setupRequired.signInTooltip', "Sign in to GitHub Copilot to choose a model.");
 		items.push({
 			kind: ActionListItemKind.Header,

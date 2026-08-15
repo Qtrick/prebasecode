@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyGraphsOut } from './verify-graphs-out.mjs';
+import { verifyMagnusOut } from './verify-magnus-out.mjs';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
@@ -193,6 +194,11 @@ async function main() {
 	const graphs = verifyGraphsOut();
 	if (!graphs.ok) {
 		errors.push(...graphs.errors.map((e) => `graphs-out: ${e}`));
+	}
+
+	const magnus = verifyMagnusOut();
+	if (!magnus.ok) {
+		errors.push(...magnus.errors.map((e) => `magnus-out: ${e}`));
 	}
 
 	for (const [label, abs] of [

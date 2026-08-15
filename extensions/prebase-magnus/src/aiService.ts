@@ -35,84 +35,80 @@ export interface PreBaseAIConfigProvider {
 	isEnabled(): boolean;
 }
 
-class DefaultConfigProvider implements PreBaseAIConfigProvider {
-	private _executionMode: PreBaseAIExecutionMode = 'auto';
-	private _provider: string = 'gemini';
-	private _defaultModel: string = 'auto';
-	private _enabled: boolean = true;
+export class VsCodeWorkspaceConfigProvider implements PreBaseAIConfigProvider {
+	private readonly getConfiguration: () => { get<T>(section: string, defaultValue?: T): T; update?(section: string, value: unknown, target?: unknown): Thenable<void> };
 
-	private getVsCodeWorkspaceConfig() {
-		try {
-			// eslint-disable-next-line @typescript-eslint/no-explicit-any
-			const vscode = (globalThis as any).vscode;
-			if (vscode?.workspace?.getConfiguration) {
-				return vscode.workspace.getConfiguration('prebase.magnus');
-			}
-		} catch {
-			// ignore
-		}
-		return undefined;
+	constructor(getConfiguration: () => { get<T>(section: string, defaultValue?: T): T; update?(section: string, value: unknown, target?: unknown): Thenable<void> }) {
+		this.getConfiguration = getConfiguration;
 	}
 
 	getExecutionMode(): PreBaseAIExecutionMode {
-		const cfg = this.getVsCodeWorkspaceConfig();
-		if (cfg) {
-			const val = cfg.get('executionMode', 'auto');
-			if (val === 'development-env' || val === 'byok' || val === 'hosted') {
-				return val;
-			}
-			return 'auto';
+		const cfg = this.getConfiguration();
+		const val = cfg.get<string>('executionMode', 'auto');
+		if (val === 'development-env' || val === 'byok' || val === 'hosted') {
+			return val;
 		}
-		return this._executionMode;
+		return 'auto';
 	}
 
 	async setExecutionMode(mode: PreBaseAIExecutionMode): Promise<void> {
-		this._executionMode = mode;
-		const cfg = this.getVsCodeWorkspaceConfig();
-		if (cfg?.update) {
+		const cfg = this.getConfiguration();
+		if (cfg.update) {
 			await cfg.update('executionMode', mode, 1 /* ConfigurationTarget.Global */);
 		}
 	}
 
 	getProvider(): string {
-		const cfg = this.getVsCodeWorkspaceConfig();
-		if (cfg) {
-			return cfg.get('provider', 'gemini') || 'gemini';
-		}
-		return this._provider;
+		const cfg = this.getConfiguration();
+		return cfg.get<string>('provider', 'gemini') || 'gemini';
 	}
 
 	async setProvider(provider: string): Promise<void> {
-		this._provider = provider;
-		const cfg = this.getVsCodeWorkspaceConfig();
-		if (cfg?.update) {
+		const cfg = this.getConfiguration();
+		if (cfg.update) {
 			await cfg.update('provider', provider, 1 /* ConfigurationTarget.Global */);
 		}
 	}
 
 	getDefaultModel(): string {
-		const cfg = this.getVsCodeWorkspaceConfig();
-		if (cfg) {
-			return cfg.get('defaultModel', 'auto') || 'auto';
-		}
-		return this._defaultModel;
+		const cfg = this.getConfiguration();
+		return cfg.get<string>('defaultModel', 'auto') || 'auto';
 	}
 
 	async setDefaultModel(model: string): Promise<void> {
-		this._defaultModel = model;
-		const cfg = this.getVsCodeWorkspaceConfig();
-		if (cfg?.update) {
+		const cfg = this.getConfiguration();
+		if (cfg.update) {
 			await cfg.update('defaultModel', model, 1 /* ConfigurationTarget.Global */);
 		}
 	}
 
 	isEnabled(): boolean {
-		const cfg = this.getVsCodeWorkspaceConfig();
-		if (cfg) {
-			return cfg.get('enabled', true) !== false;
-		}
-		return this._enabled;
+		const cfg = this.getConfiguration();
+		return cfg.get<boolean>('enabled', true) !== false;
 	}
+}
+
+export class InMemoryConfigProvider implements PreBaseAIConfigProvider {
+	private _executionMode: PreBaseAIExecutionMode;
+	private _provider: string;
+	private _defaultModel: string;
+	private _enabled: boolean;
+
+	constructor(initial?: { executionMode?: PreBaseAIExecutionMode; provider?: string; defaultModel?: string; enabled?: boolean }) {
+		this._executionMode = initial?.executionMode ?? 'auto';
+		this._provider = initial?.provider ?? 'gemini';
+		this._defaultModel = initial?.defaultModel ?? 'auto';
+		this._enabled = initial?.enabled ?? true;
+	}
+
+	getExecutionMode(): PreBaseAIExecutionMode { return this._executionMode; }
+	async setExecutionMode(mode: PreBaseAIExecutionMode): Promise<void> { this._executionMode = mode; }
+	getProvider(): string { return this._provider; }
+	async setProvider(provider: string): Promise<void> { this._provider = provider; }
+	getDefaultModel(): string { return this._defaultModel; }
+	async setDefaultModel(model: string): Promise<void> { this._defaultModel = model; }
+	isEnabled(): boolean { return this._enabled; }
+	setEnabled(enabled: boolean): void { this._enabled = enabled; }
 }
 
 export class PreBaseAIService implements IPreBaseAIService {
@@ -129,12 +125,16 @@ export class PreBaseAIService implements IPreBaseAIService {
 	) {
 		this.secrets = secrets;
 		this.registry = registry;
-		this.config = config ?? new DefaultConfigProvider();
+		this.config = config ?? new InMemoryConfigProvider();
 	}
 
 	setCloudHostedAvailable(available: boolean): void {
 		this._cloudHostedAvailable = available;
 		this.invalidateModelCache();
+	}
+
+	isCloudHostedAvailable(): boolean {
+		return this._cloudHostedAvailable;
 	}
 
 	invalidateModelCache(providerId?: string): void {
@@ -178,6 +178,10 @@ export class PreBaseAIService implements IPreBaseAIService {
 		if (this.config.setDefaultModel) {
 			await this.config.setDefaultModel(modelId);
 		}
+	}
+
+	isEnabled(): boolean {
+		return this.config.isEnabled();
 	}
 
 	private async resolveCredential(providerId: string) {

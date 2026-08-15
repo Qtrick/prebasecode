@@ -171,7 +171,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 						return {
 							overview,
 							aiStatus: 'unavailable',
-							aiMessage: localize('prebase.desc.notConfigured', "AI description unavailable — no Gemini credential is configured. Use “Agents: Configure Model Provider” or “Agents: Import Provider Key from .env…”."),
+							aiMessage: raw.safeMessage || localize('prebase.desc.notConfigured', "AI description unavailable — no AI provider credential configured. Configure a key in Agents Settings (or provide GEMINI_API_KEY in PreBase root .env)."),
 							cacheHit: false,
 						};
 					}
@@ -179,7 +179,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 						return {
 							overview,
 							aiStatus: 'error',
-							aiMessage: localize('prebase.desc.authError', "Gemini rejected the configured credential. Update your key in Agents Provider Settings."),
+							aiMessage: raw.safeMessage || localize('prebase.desc.authError', "The AI provider rejected the configured credential. Update your key in Agents Settings."),
 							cacheHit: false,
 						};
 					}
@@ -187,7 +187,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 						return {
 							overview,
 							aiStatus: 'error',
-							aiMessage: localize('prebase.desc.rateLimited', "Gemini API is temporarily rate limited. Please retry in a moment."),
+							aiMessage: raw.safeMessage || localize('prebase.desc.rateLimited', "The AI provider is temporarily rate limited. Please retry in a moment."),
 							cacheHit: false,
 						};
 					}
@@ -195,7 +195,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 						return {
 							overview,
 							aiStatus: 'error',
-							aiMessage: localize('prebase.desc.modelUnavailable', "The selected model is unavailable."),
+							aiMessage: raw.safeMessage || localize('prebase.desc.modelUnavailable', "The selected AI model is unavailable."),
 							cacheHit: false,
 						};
 					}
