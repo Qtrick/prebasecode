@@ -33,6 +33,7 @@ import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IPreBaseCloudService, PreBaseCloudService } from './cloud/prebaseCloudService.js';
 import { IPreBaseWebSearchService, PreBaseWebSearchService, type IPreBaseWebSearchRequest } from './prebaseWebSearchService.js';
+import { IPreBaseAgentGatewayService, PreBaseAgentGatewayService } from './prebaseAgentGatewayService.js';
 import { IPreBaseAccountService, PreBaseAccountContext, PreBaseAccountService } from './prebaseAccountService.js';
 import { PreBaseCloudConfigKeys } from '../common/cloud/cloudConfiguration.js';
 import { prebaseRuntimeViewIcon } from './prebaseIcons.js';
@@ -58,6 +59,7 @@ registerPreBaseGraphContribution();
 registerSingleton(IPreBaseRuntimeService, PreBaseRuntimeService, InstantiationType.Delayed);
 registerSingleton(IPreBaseCloudService, PreBaseCloudService, InstantiationType.Delayed);
 registerSingleton(IPreBaseWebSearchService, PreBaseWebSearchService, InstantiationType.Delayed);
+registerSingleton(IPreBaseAgentGatewayService, PreBaseAgentGatewayService, InstantiationType.Delayed);
 registerSingleton(IPreBaseAccountService, PreBaseAccountService, InstantiationType.Delayed);
 
 // --- output channel
@@ -74,6 +76,24 @@ registerAction2(class extends Action2 {
 	}
 	run(accessor: ServicesAccessor, input: IPreBaseWebSearchRequest) {
 		return accessor.get(IPreBaseWebSearchService).searchForMagnus(input, CancellationToken.None);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.agentGateway.generate', title: localize2('prebase.agentGateway.generate', "Generate with PreBase Hosted Agent Gateway"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, payload: Record<string, unknown>) {
+		return accessor.get(IPreBaseAgentGatewayService).generate(payload, CancellationToken.None);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.agentGateway.discoverModels', title: localize2('prebase.agentGateway.discoverModels', "Discover Models from PreBase Hosted Agent Gateway"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor) {
+		return accessor.get(IPreBaseAgentGatewayService).discoverModels(CancellationToken.None);
 	}
 });
 

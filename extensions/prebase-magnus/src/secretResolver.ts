@@ -5,11 +5,11 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import { ALLOWLISTED_LOCAL_ENV_VARIABLES } from './secretCatalog';
+import { ALLOWLISTED_LOCAL_ENV_VARIABLES, type PreBaseAIExecutionMode } from './secretCatalog';
 
 const MAX_ENV_FILE_BYTES = 64 * 1024; // 64 KiB safety bound
 
-export type SecretSourceType = 'local-env' | 'secret-storage' | 'process-env';
+export type SecretSourceType = 'local-env' | 'secret-storage' | 'process-env' | 'hosted';
 
 export interface ResolvedSecret {
 	readonly key: string;
@@ -17,12 +17,24 @@ export interface ResolvedSecret {
 	readonly varName: string;
 }
 
+export interface ResolvedProviderExecution {
+	readonly providerId: string;
+	readonly executionMode: PreBaseAIExecutionMode;
+	readonly key?: string;
+	readonly source: SecretSourceType;
+	readonly varName?: string;
+	readonly configured: boolean;
+	readonly isHosted: boolean;
+}
+
 export interface SecretDiagnosticStatus {
 	readonly id: string;
 	readonly localEnv: 'present' | 'absent';
 	readonly secretStorage: 'present' | 'absent';
 	readonly processEnv: 'present' | 'absent';
+	readonly hosted: 'available' | 'unavailable';
 	readonly activeSource?: SecretSourceType;
+	readonly activeExecutionMode: PreBaseAIExecutionMode;
 }
 
 /**
@@ -140,7 +152,6 @@ export function loadPreBaseRootEnv(explicitRoot?: string): Map<string, string> {
 
 		// On POSIX, check permissions and warn if group/world readable
 		if (process.platform !== 'win32' && (stat.mode & 0o077) !== 0) {
-			// Permission warning without printing contents
 			console.warn('[PreBase SecretResolver] Notice: PreBase root .env has group/world readable permissions.');
 		}
 
@@ -153,13 +164,22 @@ export function loadPreBaseRootEnv(explicitRoot?: string): Map<string, string> {
 }
 
 /**
- * Extension-side secret resolver with strict deterministic precedence:
+ * Extension-side secret and execution mode resolver with deterministic precedence:
+ *
  * In Source-Development:
- * 1. Root .env allowlisted variable
- * 2. SecretStorage BYO credential
- * 3. Process environment allowlisted variable
+ * - 'auto' mode:
+ *   1. Root .env allowlisted variable (direct 'development-env')
+ *   2. SecretStorage BYOK credential (direct 'byok')
+ *   3. PreBase Hosted gateway if user is signed in ('hosted')
+ *   4. Process environment allowlisted variable fallback ('development-env')
+ *
  * In Packaged PreBase:
- * 1. SecretStorage BYO credential
+ * - 'auto' mode:
+ *   1. SecretStorage BYOK credential ('byok')
+ *   2. PreBase Hosted gateway if user is signed in ('hosted')
+ *
+ * In Explicit Modes ('development-env' | 'byok' | 'hosted'):
+ * - Respects the explicit choice strictly.
  */
 export class PreBaseSecretResolver {
 	private _rootEnvCache: Map<string, string> | undefined;
@@ -278,32 +298,239 @@ export class PreBaseSecretResolver {
 	}
 
 	/**
+	 * Resolves the effective execution mode and credential for a provider.
+	 */
+	resolveProviderExecution(options: {
+		providerId: string;
+		requestedMode: PreBaseAIExecutionMode;
+		secretStorageKey?: string;
+		hostedAvailable?: boolean;
+	}): ResolvedProviderExecution {
+		const { providerId, requestedMode, secretStorageKey, hostedAvailable } = options;
+		const normProvider = providerId.toLowerCase().replace(/-api$/, '');
+
+		// Explicit mode: development-env
+		if (requestedMode === 'development-env') {
+			if (this._isSourceDev) {
+				const env = this.getRootEnv();
+				if (normProvider === 'gemini') {
+					const rootKey = env.get('GEMINI_API_KEY') || env.get('GOOGLE_API_KEY');
+					if (rootKey) {
+						return {
+							providerId: 'gemini',
+							executionMode: 'development-env',
+							key: rootKey,
+							source: 'local-env',
+							varName: env.has('GEMINI_API_KEY') ? 'GEMINI_API_KEY' : 'GOOGLE_API_KEY',
+							configured: true,
+							isHosted: false,
+						};
+					}
+					const procKey = process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
+					if (procKey) {
+						return {
+							providerId: 'gemini',
+							executionMode: 'development-env',
+							key: procKey,
+							source: 'process-env',
+							varName: process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : 'GOOGLE_API_KEY',
+							configured: true,
+							isHosted: false,
+						};
+					}
+				} else if (normProvider === 'linkup') {
+					const rootKey = env.get('LINKUP_API_KEY');
+					if (rootKey) {
+						return {
+							providerId: 'linkup',
+							executionMode: 'development-env',
+							key: rootKey,
+							source: 'local-env',
+							varName: 'LINKUP_API_KEY',
+							configured: true,
+							isHosted: false,
+						};
+					}
+				}
+			}
+			return {
+				providerId: normProvider,
+				executionMode: 'development-env',
+				source: 'local-env',
+				configured: false,
+				isHosted: false,
+			};
+		}
+
+		// Explicit mode: byok
+		if (requestedMode === 'byok') {
+			const hasKey = !!(secretStorageKey && secretStorageKey.trim());
+			return {
+				providerId: normProvider,
+				executionMode: 'byok',
+				key: hasKey ? secretStorageKey!.trim() : undefined,
+				source: 'secret-storage',
+				varName: 'stored',
+				configured: hasKey,
+				isHosted: false,
+			};
+		}
+
+		// Explicit mode: hosted
+		if (requestedMode === 'hosted') {
+			return {
+				providerId: normProvider,
+				executionMode: 'hosted',
+				source: 'hosted',
+				configured: !!hostedAvailable,
+				isHosted: true,
+			};
+		}
+
+		// Auto mode resolution:
+		// 1. If in source development, prefer development root .env if key is present
+		if (this._isSourceDev) {
+			const env = this.getRootEnv();
+			if (normProvider === 'gemini') {
+				const rootKey = env.get('GEMINI_API_KEY') || env.get('GOOGLE_API_KEY');
+				if (rootKey) {
+					return {
+						providerId: 'gemini',
+						executionMode: 'development-env',
+						key: rootKey,
+						source: 'local-env',
+						varName: env.has('GEMINI_API_KEY') ? 'GEMINI_API_KEY' : 'GOOGLE_API_KEY',
+						configured: true,
+						isHosted: false,
+					};
+				}
+			} else if (normProvider === 'linkup') {
+				const rootKey = env.get('LINKUP_API_KEY');
+				if (rootKey) {
+					return {
+						providerId: 'linkup',
+						executionMode: 'development-env',
+						key: rootKey,
+						source: 'local-env',
+						varName: 'LINKUP_API_KEY',
+						configured: true,
+						isHosted: false,
+					};
+				}
+			}
+		}
+
+		// 2. SecretStorage BYOK key
+		if (secretStorageKey && secretStorageKey.trim()) {
+			return {
+				providerId: normProvider,
+				executionMode: 'byok',
+				key: secretStorageKey.trim(),
+				source: 'secret-storage',
+				varName: 'stored',
+				configured: true,
+				isHosted: false,
+			};
+		}
+
+		// 3. Hosted if available
+		if (hostedAvailable) {
+			return {
+				providerId: normProvider,
+				executionMode: 'hosted',
+				source: 'hosted',
+				configured: true,
+				isHosted: true,
+			};
+		}
+
+		// 4. Source dev process environment fallback
+		if (this._isSourceDev) {
+			if (normProvider === 'gemini') {
+				const procKey = process.env.GEMINI_API_KEY?.trim() || process.env.GOOGLE_API_KEY?.trim();
+				if (procKey) {
+					return {
+						providerId: 'gemini',
+						executionMode: 'development-env',
+						key: procKey,
+						source: 'process-env',
+						varName: process.env.GEMINI_API_KEY ? 'GEMINI_API_KEY' : 'GOOGLE_API_KEY',
+						configured: true,
+						isHosted: false,
+					};
+				}
+			} else if (normProvider === 'linkup') {
+				const procKey = process.env.LINKUP_API_KEY?.trim();
+				if (procKey) {
+					return {
+						providerId: 'linkup',
+						executionMode: 'development-env',
+						key: procKey,
+						source: 'process-env',
+						varName: 'LINKUP_API_KEY',
+						configured: true,
+						isHosted: false,
+					};
+				}
+			}
+		}
+
+		// Unconfigured
+		return {
+			providerId: normProvider,
+			executionMode: 'auto',
+			source: 'secret-storage',
+			configured: false,
+			isHosted: false,
+		};
+	}
+
+	/**
 	 * Returns non-secret diagnostic status for providers.
 	 */
-	getDiagnostics(secretStorageGemini?: string, secretStorageLinkup?: string): {
+	getDiagnostics(
+		secretStorageGemini?: string,
+		secretStorageLinkup?: string,
+		cloudHostedAvailable?: boolean,
+		requestedMode: PreBaseAIExecutionMode = 'auto',
+	): {
 		isSourceDev: boolean;
 		gemini: SecretDiagnosticStatus;
 		linkup: SecretDiagnosticStatus;
 	} {
 		const env = this.getRootEnv();
-		const resolvedGemini = this.resolveGeminiKey(secretStorageGemini);
-		const resolvedLinkup = this.resolveLinkupKey(secretStorageLinkup);
+		const resolvedGemini = this.resolveProviderExecution({
+			providerId: 'gemini',
+			requestedMode,
+			secretStorageKey: secretStorageGemini,
+			hostedAvailable: cloudHostedAvailable,
+		});
+		const resolvedLinkup = this.resolveProviderExecution({
+			providerId: 'linkup',
+			requestedMode,
+			secretStorageKey: secretStorageLinkup,
+			hostedAvailable: cloudHostedAvailable,
+		});
 
 		return {
 			isSourceDev: this._isSourceDev,
 			gemini: {
-				id: 'gemini-api',
+				id: 'gemini',
 				localEnv: env.has('GEMINI_API_KEY') || env.has('GOOGLE_API_KEY') ? 'present' : 'absent',
 				secretStorage: secretStorageGemini && secretStorageGemini.trim() ? 'present' : 'absent',
 				processEnv: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? 'present' : 'absent',
-				activeSource: resolvedGemini?.source,
+				hosted: cloudHostedAvailable ? 'available' : 'unavailable',
+				activeSource: resolvedGemini.source,
+				activeExecutionMode: resolvedGemini.executionMode,
 			},
 			linkup: {
-				id: 'linkup-api',
+				id: 'linkup',
 				localEnv: env.has('LINKUP_API_KEY') ? 'present' : 'absent',
 				secretStorage: secretStorageLinkup && secretStorageLinkup.trim() ? 'present' : 'absent',
 				processEnv: process.env.LINKUP_API_KEY ? 'present' : 'absent',
-				activeSource: resolvedLinkup?.source,
+				hosted: cloudHostedAvailable ? 'available' : 'unavailable',
+				activeSource: resolvedLinkup.source,
+				activeExecutionMode: resolvedLinkup.executionMode,
 			},
 		};
 	}

@@ -38,6 +38,7 @@ import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
 type SettingsCategory =
 	| 'appearance'
 	| 'graph'
+	| 'ai'
 	| 'sidebar'
 	| 'editor'
 	| 'extensions'
@@ -48,6 +49,7 @@ type SettingsCategory =
 const CATEGORIES: { id: SettingsCategory; label: string; icon: string }[] = [
 	{ id: 'appearance', label: localize('prebase.settings.cat.appearance', "Appearance"), icon: '$(symbol-color)' },
 	{ id: 'graph', label: localize('prebase.settings.cat.graph', "Graph"), icon: '$(type-hierarchy)' },
+	{ id: 'ai', label: localize('prebase.settings.cat.ai', "Agents & AI"), icon: '$(sparkle)' },
 	{ id: 'sidebar', label: localize('prebase.settings.cat.sidebar', "Sidebar"), icon: '$(layout-sidebar-left)' },
 	{ id: 'editor', label: localize('prebase.settings.cat.editor', "Editor"), icon: '$(edit)' },
 	{ id: 'extensions', label: localize('prebase.settings.cat.extensions', "Extensions"), icon: '$(extensions)' },
@@ -337,6 +339,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		switch (this._category) {
 			case 'appearance': this._renderAppearance(); break;
 			case 'graph': this._renderGraph(); break;
+			case 'ai': this._renderAI(); break;
 			case 'sidebar': this._renderSidebar(); break;
 			case 'editor': this._renderEditor(); break;
 			case 'extensions': this._renderExtensions(); break;
@@ -667,6 +670,117 @@ export class PreBaseSettingsEditor extends EditorPane {
 
 	private _renderGraph(): void {
 		renderGraphCategory(this._graphSettingsHost());
+	}
+
+	private _renderAI(): void {
+		const execCard = this._panel(
+			this._main!,
+			localize('prebase.settings.ai.execTitle', "Execution Mode & Provider"),
+			localize('prebase.settings.ai.execDesc', "Choose how PreBase connects to AI models (Gemini, etc.) and where credentials originate.")
+		);
+
+		const execSelect = document.createElement('select');
+		this._selectStyle(execSelect);
+		const modes = [
+			{ id: 'auto', label: 'Automatic (Recommended)' },
+			{ id: 'development-env', label: 'Development Environment (.env)' },
+			{ id: 'byok', label: 'Bring Your Own Key (BYOK)' },
+			{ id: 'hosted', label: 'PreBase Hosted (Cloud Gateway)' },
+		];
+		for (const m of modes) {
+			const opt = document.createElement('option');
+			opt.value = m.id;
+			opt.textContent = m.label;
+			execSelect.appendChild(opt);
+		}
+		const currentMode = this.configurationService.getValue<string>('prebase.magnus.executionMode') || 'auto';
+		execSelect.value = currentMode;
+		this._renderDisposables.add(DOM.addDisposableListener(execSelect, 'change', () => {
+			void this.configurationService.updateValue('prebase.magnus.executionMode', execSelect.value);
+		}));
+		this._row(
+			execCard,
+			localize('prebase.settings.ai.execMode', "Execution mode"),
+			localize('prebase.settings.ai.execModeHint', "Automatic uses PreBase root .env in source dev, BYOK key if configured, or PreBase Cloud when signed in."),
+			execSelect
+		);
+
+		const modelSelect = document.createElement('select');
+		this._selectStyle(modelSelect);
+		const models = [
+			{ id: 'auto', label: 'Auto (Recommended - Gemini 2.5 Flash)' },
+			{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Complex Reasoning)' },
+			{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Fast & Capable)' },
+			{ id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash (Fast)' },
+			{ id: 'gemini-2.0-flash-lite', label: 'Gemini 2.0 Flash Lite (Lightweight)' },
+		];
+		for (const m of models) {
+			const opt = document.createElement('option');
+			opt.value = m.id;
+			opt.textContent = m.label;
+			modelSelect.appendChild(opt);
+		}
+		modelSelect.value = this.configurationService.getValue<string>('prebase.magnus.defaultModel') || 'auto';
+		this._renderDisposables.add(DOM.addDisposableListener(modelSelect, 'change', () => {
+			void this.configurationService.updateValue('prebase.magnus.defaultModel', modelSelect.value);
+		}));
+		this._row(
+			execCard,
+			localize('prebase.settings.ai.defaultModel', "Default model"),
+			localize('prebase.settings.ai.defaultModelHint', "Selected model for Agents chat, code completion, and architectural graph descriptions."),
+			modelSelect
+		);
+
+		const actionsCard = this._panel(
+			this._main!,
+			localize('prebase.settings.ai.actionsTitle', "Credentials & Diagnostics"),
+			localize('prebase.settings.ai.actionsDesc', "Manage secure SecretStorage credentials and test provider connectivity.")
+		);
+
+		const testBtn = this._linkBtn(localize('prebase.settings.ai.testConn', "Test AI Connection…"), () => {
+			void this.commandService.executeCommand('prebase.magnus.testModelProvider');
+		});
+		this._row(
+			actionsCard,
+			localize('prebase.settings.ai.test', "Connectivity"),
+			localize('prebase.settings.ai.testHint', "Sends a non-streaming health ping to verify provider credentials and endpoint response."),
+			testBtn
+		);
+
+		const diagBtn = this._linkBtn(localize('prebase.settings.ai.diagnose', "Run Provider Diagnostics…"), () => {
+			void this.commandService.executeCommand('prebase.magnus.diagnoseProviders');
+		});
+		this._row(
+			actionsCard,
+			localize('prebase.settings.ai.diag', "Diagnostics"),
+			localize('prebase.settings.ai.diagHint', "Inspects credential sources across local .env, OS SecretStorage, and cloud availability without exposing secrets."),
+			diagBtn
+		);
+
+		const keyCtrl = document.createElement('div');
+		Object.assign(keyCtrl.style, { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' });
+		keyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.setKey', "Configure BYOK Key…"), () => {
+			void this.commandService.executeCommand('prebase.magnus.setApiKey');
+		}));
+		keyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.importEnv', "Import from .env…"), () => {
+			void this.commandService.executeCommand('prebase.magnus.importApiKeyFromEnv');
+		}));
+		keyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.clearKey', "Clear Key"), () => {
+			void this.commandService.executeCommand('prebase.magnus.clearApiKey');
+		}));
+		this._row(
+			actionsCard,
+			localize('prebase.settings.ai.keyManagement', "Secret Storage"),
+			localize('prebase.settings.ai.keyManagementHint', "Credentials are saved in OS-backed secure storage. Secret keys are never rendered in the UI."),
+			keyCtrl
+		);
+
+		const note = DOM.append(actionsCard, DOM.$('p'));
+		note.textContent = localize(
+			'prebase.settings.ai.privacyNotice',
+			"PreBase Privacy & Security: Model provider keys are never transmitted to third parties except the direct provider endpoint or authenticated PreBase agent gateway. Source files and telemetry are never uploaded."
+		);
+		Object.assign(note.style, { fontSize: '11px', color: COLORS.textMuted, padding: '8px 0 0', lineHeight: '1.45', margin: '0' });
 	}
 
 	private _renderSidebar(): void {

@@ -4,17 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import {
-	generateContentCandidate,
-	listGeminiModels,
-	streamGenerateContent,
-	type DiscoveredGeminiModel,
-	type GeminiContent,
-	type GeminiPart,
-} from './geminiClient';
-import { getModelOption, globalGeminiModelCache, resolveApiModel } from './models';
+import type { PreBaseAIService } from './aiService';
+import type { AIContentMessage, AIContentPart, NormalizedAIModel } from './aiTypes';
 import { buildMagnusLanguageModelInformation } from './modelInformation';
-import type { MagnusSecretStorage } from './secretStorage';
+import { globalGeminiModelCache } from './models';
 
 function hasStringValue(value: object): value is { value: string } {
 	return Object.hasOwn(value, 'value') && typeof (value as { value?: unknown }).value === 'string';
@@ -41,28 +34,20 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 	readonly onDidChangeLanguageModelChatInformation = this._onDidChange.event;
 	private _isDiscovering = false;
 
-	constructor(private readonly secrets: MagnusSecretStorage) { }
+	constructor(private readonly aiService: PreBaseAIService) { }
 
 	notifyChanged(): void {
 		this._onDidChange.fire();
 	}
 
-	async refreshDiscoveredModels(token?: vscode.CancellationToken): Promise<DiscoveredGeminiModel[]> {
-		const gemini = await this.secrets.getGeminiKeyOrMessage();
-		if (!gemini.key) {
-			globalGeminiModelCache.invalidate();
-			return [];
-		}
-
+	async refreshDiscoveredModels(token?: vscode.CancellationToken): Promise<NormalizedAIModel[]> {
 		try {
-			const models = await listGeminiModels(gemini.key, token);
+			const models = await this.aiService.listModels(undefined, true, token);
 			if (models && models.length > 0) {
-				globalGeminiModelCache.set(models);
 				this._onDidChange.fire();
 				return models;
 			}
 		} catch (err) {
-			// On discovery error, log warning and preserve cache / fallback
 			console.warn('[Magnus] Model discovery warning:', err instanceof Error ? err.message : String(err));
 		}
 		return globalGeminiModelCache.get() ?? [];
@@ -72,21 +57,25 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		_options: vscode.PrepareLanguageModelChatModelOptions,
 		token: vscode.CancellationToken,
 	): Promise<vscode.LanguageModelChatInformation[]> {
-		const gemini = await this.secrets.getGeminiKeyOrMessage();
-		const hasKey = !!gemini.key;
+		const status = await this.aiService.getProviderStatus();
+		const hasConfig = status.configured;
 
-		// Check cache first
-		let discovered = globalGeminiModelCache.get();
+		// Fetch models through AI service
+		let discovered: NormalizedAIModel[] = [];
+		try {
+			discovered = await this.aiService.listModels(undefined, false, token);
+		} catch {
+			// fallback
+		}
 
-		// If key exists and cache is empty and not already discovering, trigger discovery
-		if (hasKey && !discovered && !this._isDiscovering && !token.isCancellationRequested) {
+		if (hasConfig && discovered.length === 0 && !this._isDiscovering && !token.isCancellationRequested) {
 			this._isDiscovering = true;
 			this.refreshDiscoveredModels(token).finally(() => {
 				this._isDiscovering = false;
 			});
 		}
 
-		return buildMagnusLanguageModelInformation(hasKey, discovered);
+		return buildMagnusLanguageModelInformation(hasConfig, discovered);
 	}
 
 	async provideLanguageModelChatResponse(
@@ -96,21 +85,13 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		progress: vscode.Progress<vscode.LanguageModelResponsePart>,
 		token: vscode.CancellationToken,
 	): Promise<void> {
-		const gemini = await this.secrets.getGeminiKeyOrMessage();
-		if (!gemini.key) {
-			throw new Error(gemini.message || 'Agents: no model provider configured.');
-		}
-		const apiKey = gemini.key;
-
-		const option = getModelOption(model.id);
-		const apiModel = resolveApiModel(option.id);
-
-		const contents: GeminiContent[] = [];
+		const contents: AIContentMessage[] = [];
 		const callNames = new Map<string, string>();
 		let systemText = '';
+
 		for (const message of messages) {
 			const text = extractText(message);
-			const parts: GeminiPart[] = [];
+			const parts: AIContentPart[] = [];
 			for (const part of message.content) {
 				if (part instanceof vscode.LanguageModelToolCallPart) {
 					callNames.set(part.callId, part.name);
@@ -127,8 +108,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 				systemText += (systemText ? '\n' : '') + text;
 				continue;
 			}
-			const role: GeminiContent['role'] =
-				message.role === vscode.LanguageModelChatMessageRole.Assistant ? 'model' : 'user';
+			const role = message.role === vscode.LanguageModelChatMessageRole.Assistant ? 'model' : 'user';
 			if (text) {
 				parts.unshift({ text });
 			}
@@ -140,13 +120,16 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		}
 
 		const tools = options.tools?.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.inputSchema }));
+
 		if (tools?.length) {
-			const candidate = await generateContentCandidate(apiKey, apiModel, {
-				contents,
-				systemInstruction: systemText ? { parts: [{ text: systemText }] } : undefined,
-				tools: [{ functionDeclarations: tools }],
+			const result = await this.aiService.generateCandidate({
+				messages: contents,
+				systemInstruction: systemText || undefined,
+				tools,
+				modelId: model.id,
 			}, token);
-			for (const part of candidate?.content.parts ?? []) {
+
+			for (const part of result.candidate?.content.parts ?? []) {
 				if (part.text) {
 					progress.report(new vscode.LanguageModelTextPart(part.text));
 				} else if (part.functionCall) {
@@ -155,9 +138,33 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 			}
 			return;
 		}
-		for await (const chunk of streamGenerateContent(apiKey, apiModel, { contents, systemInstruction: systemText ? { parts: [{ text: systemText }] } : undefined }, token)) {
-			if (token.isCancellationRequested) { return; }
-			progress.report(new vscode.LanguageModelTextPart(chunk));
+
+		if (this.aiService.streamCandidate) {
+			await this.aiService.streamCandidate(
+				{
+					messages: contents,
+					systemInstruction: systemText || undefined,
+					modelId: model.id,
+				},
+				chunk => {
+					if (token.isCancellationRequested) {
+						return;
+					}
+					if (chunk.text) {
+						progress.report(new vscode.LanguageModelTextPart(chunk.text));
+					}
+				},
+				token,
+			);
+		} else {
+			const text = await this.aiService.generateText(
+				contents.map(c => c.parts.map(p => p.text ?? '').join('')).join('\n'),
+				{ modelId: model.id },
+				token,
+			);
+			if (!token.isCancellationRequested) {
+				progress.report(new vscode.LanguageModelTextPart(text));
+			}
 		}
 	}
 
@@ -167,7 +174,6 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 		_token: vscode.CancellationToken,
 	): Promise<number> {
 		const value = typeof text === 'string' ? text : extractText(text);
-		// Rough estimate: ~4 chars per token.
 		return Math.max(1, Math.ceil(value.length / 4));
 	}
 }

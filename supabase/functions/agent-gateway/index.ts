@@ -1,7 +1,7 @@
 /**
  * PreBase agent-gateway.
  * Authenticated gateway for Gemini model discovery and generation.
- * Provider credentials stay in Edge Function secrets.
+ * Provider credentials stay strictly in Edge Function secrets.
  * Prompts, response bodies, and API keys are never logged.
  */
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
@@ -13,6 +13,8 @@ const MAX_OUTPUT_BYTES = 1_048_576; // 1 MiB
 const ALLOWED_MODELS = new Set([
 	"gemini-2.5-flash",
 	"gemini-2.5-pro",
+	"gemini-2.0-flash",
+	"gemini-2.0-flash-lite",
 ]);
 
 const DESKTOP_ORIGIN_EXACT = new Set(["null"]);
@@ -50,7 +52,7 @@ function corsHeaders(req: Request): HeadersInit {
 	return {
 		"Access-Control-Allow-Origin": allowOrigin,
 		"Access-Control-Allow-Headers":
-			"authorization, apikey, content-type, x-client-info, x-request-id",
+			"authorization, apikey, content-type, x-client-info, x-request-id, accept",
 		"Access-Control-Allow-Methods": "GET, POST, OPTIONS",
 		"Vary": "Origin",
 	};
@@ -186,14 +188,15 @@ Deno.serve(async (req) => {
 						const methods = m.supportedGenerationMethods ?? [];
 						const supportsGenerate = methods.includes("generateContent");
 						const isDeprecated = id.includes("1.0") || id.includes("1.5") || id.includes("experimental");
+						const isAllowed = ALLOWED_MODELS.has(id);
 						return {
 							id,
 							displayName: m.displayName || id,
 							description: m.description || "",
 							inputTokenLimit: m.inputTokenLimit || 1_000_000,
 							outputTokenLimit: m.outputTokenLimit || 65_536,
-							agentCompatible: supportsGenerate && !isDeprecated,
-							descriptionCompatible: supportsGenerate,
+							agentCompatible: supportsGenerate && !isDeprecated && isAllowed,
+							descriptionCompatible: supportsGenerate && isAllowed,
 						};
 					})
 					.filter(m => m.id && (m.agentCompatible || m.descriptionCompatible));
@@ -278,6 +281,8 @@ Deno.serve(async (req) => {
 		});
 	}
 
+	const isStream = body.stream === true || req.headers.get("Accept") === "text/event-stream";
+
 	// Execute Gemini generation
 	try {
 		const geminiPayload = {
@@ -286,6 +291,42 @@ Deno.serve(async (req) => {
 			generationConfig: body.generationConfig ?? { maxOutputTokens: 2048, temperature: 0.2 },
 			tools: body.tools,
 		};
+
+		if (isStream) {
+			const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:streamGenerateContent?alt=sse`, {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+					"x-goog-api-key": geminiApiKey,
+					"Accept": "text/event-stream",
+				},
+				body: JSON.stringify(geminiPayload),
+			});
+
+			if (!geminiRes.ok || !geminiRes.body) {
+				await admin.from("agent_usage").update({ status: "voided" }).eq("request_id", requestId);
+				return json(req, requestId, 502, {
+					error: "provider_error",
+					message: `Hosted Gemini stream failed (HTTP ${geminiRes.status}).`,
+				});
+			}
+
+			// Settle usage record
+			await admin.from("agent_usage").update({
+				output_units: 500,
+				status: "recorded",
+			}).eq("request_id", requestId);
+
+			return new Response(geminiRes.body, {
+				status: 200,
+				headers: {
+					...corsHeaders(req),
+					"Content-Type": "text/event-stream",
+					"Cache-Control": "no-cache",
+					"x-request-id": requestId,
+				},
+			});
+		}
 
 		const geminiRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
 			method: "POST",

@@ -313,3 +313,40 @@ configurationRegistry.registerConfiguration({
 		},
 	}
 });
+
+configurationRegistry.registerConfiguration({
+	id: 'prebaseAgents',
+	order: 104,
+	title: localize('prebaseAgentsTitle', "PreBase Agents & AI"),
+	type: 'object',
+	properties: {
+		'prebase.magnus.enabled': {
+			type: 'boolean',
+			default: true,
+			description: localize('prebase.magnus.enabled', "Enable or disable PreBase Agents AI features."),
+		},
+		'prebase.magnus.executionMode': {
+			type: 'string',
+			enum: ['auto', 'development-env', 'byok', 'hosted'],
+			enumDescriptions: [
+				localize('prebase.magnus.executionMode.auto', "Automatic: Uses PreBase root .env in source dev, BYOK key if configured, or PreBase Cloud hosted gateway when signed in."),
+				localize('prebase.magnus.executionMode.developmentEnv', "Development Environment: Directly uses GEMINI_API_KEY from the authentic PreBase application root .env."),
+				localize('prebase.magnus.executionMode.byok', "Bring Your Own Key: Uses API key stored in secure OS SecretStorage."),
+				localize('prebase.magnus.executionMode.hosted', "PreBase Hosted: Routes model requests securely through PreBase Cloud authenticated agent-gateway."),
+			],
+			default: 'auto',
+			description: localize('prebase.magnus.executionMode', "Execution mode and credential source for PreBase AI services."),
+		},
+		'prebase.magnus.provider': {
+			type: 'string',
+			default: 'gemini',
+			description: localize('prebase.magnus.provider', "Active AI model provider for PreBase Agents."),
+		},
+		'prebase.magnus.defaultModel': {
+			type: 'string',
+			default: 'auto',
+			description: localize('prebase.magnus.defaultModel', "Default model for PreBase Agents chat and code descriptions."),
+		},
+	}
+});
+

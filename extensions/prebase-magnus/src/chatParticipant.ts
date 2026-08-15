@@ -4,8 +4,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { generateContentCandidate, type GeminiContent, type GeminiPart } from './geminiClient';
-import { getModelOption, resolveApiModel } from './models';
+import type { PreBaseAIService } from './aiService';
+import type { AIContentMessage, AIContentPart } from './aiTypes';
+import { getModelOption } from './models';
 import {
 	allowsEdits,
 	getAgentModePromptBlock,
@@ -14,7 +15,6 @@ import {
 	modeFromChatParticipantId,
 	type MagnusAgentMode,
 } from './modes';
-import type { MagnusSecretStorage } from './secretStorage';
 import { runHeaderLabel, type MagnusTaskRun } from './taskRunModel';
 
 export interface MagnusChatState {
@@ -43,15 +43,13 @@ function buildSystemPrompt(mode: MagnusAgentMode, extras: string[]): string {
 	return parts.join('\n');
 }
 
-function toolDeclarations(mode: MagnusAgentMode): { functionDeclarations: Array<{ name: string; description: string; parameters?: object }> } {
+function toolDeclarations(mode: MagnusAgentMode): Array<{ name: string; description: string; parameters?: object }> {
 	const allowed = vscode.lm.tools.filter(tool => isMagnusToolAllowed(mode, tool.name));
-	return {
-		functionDeclarations: allowed.map(tool => ({
-			name: tool.name,
-			description: tool.description,
-			parameters: tool.inputSchema,
-		})),
-	};
+	return allowed.map(tool => ({
+		name: tool.name,
+		description: tool.description,
+		parameters: tool.inputSchema,
+	}));
 }
 
 function toolResultText(result: vscode.LanguageModelToolResult): string {
@@ -66,7 +64,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function functionCalls(parts: GeminiPart[]): Array<{ name: string; args: Record<string, unknown> }> {
+function functionCalls(parts: AIContentPart[]): Array<{ name: string; args: Record<string, unknown> }> {
 	return parts.flatMap(part => {
 		const name = part.functionCall?.name?.trim();
 		return name ? [{ name, args: isRecord(part.functionCall?.args) ? part.functionCall.args : {} }] : [];
@@ -100,7 +98,7 @@ function finishThought(response: vscode.ChatResponseStream, id = 'magnus-thought
 
 export function registerMagnusChatParticipants(
 	context: vscode.ExtensionContext,
-	secrets: MagnusSecretStorage,
+	aiService: PreBaseAIService,
 	state: MagnusChatState,
 ): void {
 	const ids = [
@@ -111,9 +109,8 @@ export function registerMagnusChatParticipants(
 
 	for (const id of ids) {
 		const participant = vscode.chat.createChatParticipant(id, async (request, _ctx, response, token) => {
-			return handleChatRequest(id, request, response, token, secrets, state);
+			return handleChatRequest(id, request, response, token, aiService, state);
 		});
-		// No avatar image — workbench shows the "Agent" text label without an icon.
 		participant.iconPath = undefined;
 		context.subscriptions.push(participant);
 	}
@@ -124,7 +121,7 @@ async function handleChatRequest(
 	request: vscode.ChatRequest,
 	response: vscode.ChatResponseStream,
 	token: vscode.CancellationToken,
-	secrets: MagnusSecretStorage,
+	aiService: PreBaseAIService,
 	state: MagnusChatState,
 ): Promise<vscode.ChatResult | void> {
 	const enabled = vscode.workspace.getConfiguration('prebase.magnus').get<boolean>('enabled', true);
@@ -133,12 +130,11 @@ async function handleChatRequest(
 		return {};
 	}
 
-	const gemini = await secrets.getGeminiKeyOrMessage();
-	if (!gemini.key) {
-		response.markdown(gemini.message || 'No API key configured.');
+	const status = await aiService.getProviderStatus();
+	if (!status.configured) {
+		response.markdown(status.safeStatusMessage || 'No AI provider is configured. Configure a key in Agents Settings or provide GEMINI_API_KEY in PreBase root .env.');
 		return {};
 	}
-	const apiKey = gemini.key;
 
 	let mode = modeFromChatParticipantId(participantId);
 	const configured = vscode.workspace.getConfiguration('prebase.magnus').get<string>('defaultMode', state.mode);
@@ -151,7 +147,6 @@ async function handleChatRequest(
 	const modelId = state.modelId
 		|| vscode.workspace.getConfiguration('prebase.magnus').get<string>('defaultModel', 'auto')
 		|| 'auto';
-	const apiModel = resolveApiModel(modelId);
 	const modelLabel = getModelOption(modelId).name;
 
 	const extras: string[] = [];
@@ -165,7 +160,7 @@ async function handleChatRequest(
 		extras.push(`Runtime context:\n${state.runtimeContext}`);
 	}
 
-	const contents: GeminiContent[] = [
+	const contents: AIContentMessage[] = [
 		{ role: 'user', parts: [{ text: request.prompt }] },
 	];
 
@@ -187,11 +182,13 @@ async function handleChatRequest(
 		emitThought(response, `Planning with ${modelLabel}…`, 'magnus-planning');
 		let rawText = '';
 		let enteredRunning = false;
+
 		try {
 			const maxIterations = vscode.workspace.getConfiguration('prebase.magnus').get<number>('maxToolIterations', 12);
 			const tools = toolDeclarations(mode);
 			let webSearches = 0;
 			let deepWebSearches = 0;
+
 			for (let iteration = 0; iteration < maxIterations; iteration++) {
 				if (effectiveToken.isCancellationRequested) {
 					run.status = 'cancelled';
@@ -202,29 +199,35 @@ async function handleChatRequest(
 					response.markdown(`\n\n_${runHeaderLabel(run)}._`);
 					return {};
 				}
-				const candidate = await generateContentCandidate(apiKey, apiModel, {
-					contents,
-					systemInstruction: { parts: [{ text: buildSystemPrompt(mode, extras) }] },
-					tools: tools.functionDeclarations.length ? [tools] : undefined,
+
+				const result = await aiService.generateCandidate({
+					messages: contents,
+					systemInstruction: buildSystemPrompt(mode, extras),
+					tools: tools.length ? tools : undefined,
+					modelId,
 				}, effectiveToken);
-				const parts = candidate?.content?.parts ?? [];
+
+				const parts = result.candidate?.content?.parts ?? (result.text ? [{ text: result.text }] : []);
 				const calls = functionCalls(parts);
+
 				if (!calls.length) {
-					rawText = parts.map(part => part.text ?? '').join('');
+					rawText = result.text || parts.map(part => part.text ?? '').join('');
 					break;
 				}
+
 				enteredRunning = true;
 				run.status = 'running';
 				run.startedAt ??= Date.now();
 				finishThought(response, 'magnus-planning');
 				contents.push({ role: 'model', parts });
-				const responseParts: GeminiPart[] = [];
+
+				const responseParts: AIContentPart[] = [];
 				for (const [callIndex, call] of calls.entries()) {
 					if (callIndex >= 8) {
 						responseParts.push({ functionResponse: { name: call.name, response: { error: 'Tool-call batch limit reached; continue with results already collected.' } } });
 						continue;
 					}
-					if (!tools.functionDeclarations.some(tool => tool.name === call.name)) {
+					if (!tools.some(tool => tool.name === call.name)) {
 						responseParts.push({ functionResponse: { name: call.name, response: { error: 'Tool is not available in this agent mode.' } } });
 						continue;
 					}
@@ -238,8 +241,8 @@ async function handleChatRequest(
 						if (isDeep) { deepWebSearches++; }
 					}
 					try {
-						const result = await vscode.lm.invokeTool(call.name, { toolInvocationToken: request.toolInvocationToken, input: call.args }, effectiveToken);
-						responseParts.push({ functionResponse: { name: call.name, response: { result: toolResultText(result) } } });
+						const toolResult = await vscode.lm.invokeTool(call.name, { toolInvocationToken: request.toolInvocationToken, input: call.args }, effectiveToken);
+						responseParts.push({ functionResponse: { name: call.name, response: { result: toolResultText(toolResult) } } });
 					} catch (err) {
 						responseParts.push({ functionResponse: { name: call.name, response: { error: err instanceof Error ? err.message : 'Tool invocation failed.' } } });
 					}

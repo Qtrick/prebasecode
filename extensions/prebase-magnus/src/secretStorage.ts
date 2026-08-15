@@ -4,13 +4,20 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type * as vscode from 'vscode';
-import { PreBaseSecretResolver, type ResolvedSecret, type SecretSourceType } from './secretResolver';
+import {
+	PreBaseSecretResolver,
+	type ResolvedProviderExecution,
+	type ResolvedSecret,
+	type SecretSourceType,
+} from './secretResolver';
+import type { PreBaseAIExecutionMode } from './secretCatalog';
 
 const LEGACY_MODEL_PROVIDER_SECRET = 'prebase.magnus.modelProviderKey';
 const PROVIDER_KEY_PREFIX = 'prebase.magnus.provider';
 
 export function getProviderSecretKey(providerId: string): string {
-	return `${PROVIDER_KEY_PREFIX}.${providerId}.apiKey`;
+	const norm = providerId.toLowerCase().replace(/-api$/, '');
+	return `${PROVIDER_KEY_PREFIX}.${norm}.apiKey`;
 }
 
 export interface MagnusResolvedApiKey {
@@ -43,13 +50,14 @@ export class MagnusSecretStorage {
 	 * Migrates legacy un-scoped key to provider-scoped key if needed.
 	 */
 	async getSecretStorageProviderApiKey(providerId: string = 'gemini'): Promise<string | undefined> {
-		const scopedSecretKey = getProviderSecretKey(providerId);
+		const norm = providerId.toLowerCase().replace(/-api$/, '');
+		const scopedSecretKey = getProviderSecretKey(norm);
 		const existingScoped = (await this.secrets.get(scopedSecretKey))?.trim();
 		if (existingScoped) {
 			return existingScoped;
 		}
 
-		if (providerId === 'gemini') {
+		if (norm === 'gemini') {
 			const legacyKey = (await this.secrets.get(LEGACY_MODEL_PROVIDER_SECRET))?.trim();
 			if (legacyKey) {
 				await this.secrets.store(scopedSecretKey, legacyKey);
@@ -65,12 +73,13 @@ export class MagnusSecretStorage {
 	 * Resolves active API key for a provider with deterministic precedence.
 	 */
 	async getProviderApiKey(providerId: string = 'gemini'): Promise<string | undefined> {
-		const storedKey = await this.getSecretStorageProviderApiKey(providerId);
-		if (providerId === 'gemini') {
+		const norm = providerId.toLowerCase().replace(/-api$/, '');
+		const storedKey = await this.getSecretStorageProviderApiKey(norm);
+		if (norm === 'gemini') {
 			const resolved = this.resolver.resolveGeminiKey(storedKey);
 			return resolved?.key;
 		}
-		if (providerId === 'linkup') {
+		if (norm === 'linkup') {
 			const resolved = this.resolver.resolveLinkupKey(storedKey);
 			return resolved?.key;
 		}
@@ -78,14 +87,30 @@ export class MagnusSecretStorage {
 	}
 
 	async getResolvedProviderApiKey(providerId: string = 'gemini'): Promise<ResolvedSecret | undefined> {
-		const storedKey = await this.getSecretStorageProviderApiKey(providerId);
-		if (providerId === 'gemini') {
+		const norm = providerId.toLowerCase().replace(/-api$/, '');
+		const storedKey = await this.getSecretStorageProviderApiKey(norm);
+		if (norm === 'gemini') {
 			return this.resolver.resolveGeminiKey(storedKey);
 		}
-		if (providerId === 'linkup') {
+		if (norm === 'linkup') {
 			return this.resolver.resolveLinkupKey(storedKey);
 		}
 		return storedKey ? { key: storedKey, source: 'secret-storage', varName: 'stored' } : undefined;
+	}
+
+	async resolveProviderExecution(
+		providerId: string = 'gemini',
+		requestedMode: PreBaseAIExecutionMode = 'auto',
+		hostedAvailable?: boolean,
+	): Promise<ResolvedProviderExecution> {
+		const norm = providerId.toLowerCase().replace(/-api$/, '');
+		const storedKey = await this.getSecretStorageProviderApiKey(norm);
+		return this.resolver.resolveProviderExecution({
+			providerId: norm,
+			requestedMode,
+			secretStorageKey: storedKey,
+			hostedAvailable,
+		});
 	}
 
 	async setProviderApiKey(providerId: string, apiKey: string): Promise<void> {
@@ -93,17 +118,19 @@ export class MagnusSecretStorage {
 		if (!trimmed) {
 			throw new Error('The model-provider credential cannot be empty.');
 		}
-		const scopedKey = getProviderSecretKey(providerId);
+		const norm = providerId.toLowerCase().replace(/-api$/, '');
+		const scopedKey = getProviderSecretKey(norm);
 		await this.secrets.store(scopedKey, trimmed);
-		if (providerId === 'gemini') {
+		if (norm === 'gemini') {
 			await this.secrets.delete(LEGACY_MODEL_PROVIDER_SECRET);
 		}
 	}
 
 	async clearProviderApiKey(providerId: string): Promise<void> {
-		const scopedKey = getProviderSecretKey(providerId);
+		const norm = providerId.toLowerCase().replace(/-api$/, '');
+		const scopedKey = getProviderSecretKey(norm);
 		await this.secrets.delete(scopedKey);
-		if (providerId === 'gemini') {
+		if (norm === 'gemini') {
 			await this.secrets.delete(LEGACY_MODEL_PROVIDER_SECRET);
 		}
 	}
@@ -156,9 +183,9 @@ export class MagnusSecretStorage {
 		return this.clearProviderApiKey('gemini');
 	}
 
-	async getDiagnostics() {
+	async getDiagnostics(cloudHostedAvailable?: boolean, requestedMode: PreBaseAIExecutionMode = 'auto') {
 		const storedGemini = await this.getSecretStorageProviderApiKey('gemini');
 		const storedLinkup = await this.getSecretStorageProviderApiKey('linkup');
-		return this.resolver.getDiagnostics(storedGemini, storedLinkup);
+		return this.resolver.getDiagnostics(storedGemini, storedLinkup, cloudHostedAvailable, requestedMode);
 	}
 }
