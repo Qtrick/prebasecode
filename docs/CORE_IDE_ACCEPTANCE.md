@@ -37,13 +37,17 @@ Same as graph acceptance: date, build SHA/version, tester, pass/fail, notes. Att
 | P4 | Runtime preview | Open runtime preview | Strict CSP webview; lifecycle cleanup on close | Needs Verification | — |
 | P5 | Magnus / Agents | Open Agents; send prompt | Extension activates; no hard crash | Needs Verification | — |
 
-## Automated static gates (2026-07-20)
+## Automated static and unit gates (2026-08-14)
 
 | Check | Command | Result |
 |---|---|---|
 | Client typecheck | `npm run typecheck-client` | Pass |
 | Privacy static | `npm run verify:privacy` | Pass (runtime network observation still manual) |
 | Assurance quick | `npm run assurance:quick` | Pass |
+| PreBase pure tests | `npm run test:prebase-pure` | Pass (29 tests) |
+| Build test suite | `npm run test-build-scripts` | Pass (238 tests) |
+| Graph unit suite | `npm run test:graphs` | Pass (17 tests) |
+| Security lint ratchet | `npm run verify:eslint-prebase-security` | Pass (44 files, 0 errors, 0 warnings) |
 
 ## Related backlog
 

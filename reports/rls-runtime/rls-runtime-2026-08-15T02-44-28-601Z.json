@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "kind": "prebase-supabase-rls-runtime",
+  "startedAt": "2026-08-15T02:44:28.604Z",
+  "status": "skip",
+  "cases": [],
+  "reason": "Dedicated non-production RLS credentials are not configured.",
+  "completedAt": "2026-08-15T02:44:28.604Z"
+}

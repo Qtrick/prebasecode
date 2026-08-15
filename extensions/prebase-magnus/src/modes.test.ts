@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'assert';
+import { suite, test } from 'node:test';
 import {
 	allowsEdits,
 	DEFAULT_MAGNUS_AGENT_MODE,
@@ -13,7 +14,7 @@ import {
 	MAGNUS_AGENT_MODES,
 	modeFromChatParticipantId,
 	type MagnusAgentMode,
-} from './modes.js';
+} from './modes.ts';
 
 const allModes = MAGNUS_AGENT_MODES.map(option => option.id);
 const testExecutionSafeTools = [
