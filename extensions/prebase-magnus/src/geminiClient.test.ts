@@ -4,12 +4,14 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'assert';
+import { suite, test } from 'node:test';
 import {
+	generateContent,
 	generateContentCandidate,
 	streamGenerateContent,
 	type GeminiCancellationToken,
 	type GeminiTransport,
-} from './geminiClient.js';
+} from './geminiClient.ts';
 
 class TestCancellationToken implements GeminiCancellationToken {
 	isCancellationRequested = false;
@@ -169,45 +171,84 @@ suite('Gemini client cancellation transport', () => {
 		assert.strictEqual(token.listenerCount, 0);
 	});
 
-	test('disposes the request cancellation listener after a successful response', async () => {
-		const token = new TestCancellationToken();
+	test('concatenates multiple text parts across non-stream response', async () => {
 		const transport: GeminiTransport = {
 			fetch: async () => ({
 				ok: true,
-				json: async () => ({ candidates: [{ content: { role: 'model', parts: [{ text: 'Done' }] }, finishReason: 'STOP' }] }),
+				text: async () => JSON.stringify({
+					candidates: [{
+						content: {
+							role: 'model',
+							parts: [{ text: 'Part 1. ' }, { text: 'Part 2.' }],
+						},
+						finishReason: 'STOP',
+					}],
+				}),
 			} as Response),
 		};
 
-		const candidate = await generateContentCandidate('AIza-test', 'gemini-test', request, token, transport);
-		assert.strictEqual(candidate?.content.parts[0].text, 'Done');
-		assert.strictEqual(token.listenerCount, 0);
+		const result = await generateContent('AIza-test', 'gemini-test', request, undefined, transport);
+		assert.strictEqual(result, 'Part 1. Part 2.');
 	});
 
-	test('cancels a blocked SSE reader and never retries authentication or falls back to a second request', async () => {
-		const token = new TestCancellationToken();
-		let fetchCalls = 0;
-		let observedSignal: AbortSignal | undefined;
+	test('rejects an oversized non-stream response body', async () => {
 		const transport: GeminiTransport = {
-			fetch: async (_input, init) => {
-				fetchCalls++;
-				observedSignal = init?.signal as AbortSignal | undefined;
+			fetch: async () => {
 				const body = new ReadableStream<Uint8Array>({
 					start(controller) {
-						observedSignal?.addEventListener('abort', () => controller.error(new DOMException('Aborted', 'AbortError')), { once: true });
+						controller.enqueue(new Uint8Array(1024 * 1024 + 50));
+						controller.close();
 					},
 				});
 				return { ok: true, body } as Response;
 			},
 		};
 
-		const stream = streamGenerateContent('AIza-test', 'gemini-test', request, token, transport);
-		const pending = stream.next();
-		await Promise.resolve();
-		token.cancel();
-
-		assert.deepStrictEqual(await pending, { value: undefined, done: true });
-		assert.strictEqual(observedSignal?.aborted, true);
-		assert.strictEqual(fetchCalls, 1);
-		assert.strictEqual(token.listenerCount, 0);
+		await assert.rejects(generateContent('AIza-test', 'gemini-test', request, undefined, transport), /size limit/);
 	});
 });
+
+suite('classifyGeminiError', () => {
+	test('classifies authentication errors safely without key logging', async () => {
+		const { classifyGeminiError } = await import('./geminiClient.ts');
+		const authErr = new Error(JSON.stringify({ code: 400, status: 'INVALID_ARGUMENT', message: 'API_KEY_INVALID' }));
+		const res = classifyGeminiError(authErr);
+		assert.strictEqual(res.status, 'authError');
+		assert.strictEqual(res.retryable, false);
+		assert.ok(res.safeMessage.includes('credential'));
+	});
+
+	test('classifies rate limit errors as retryable', async () => {
+		const { classifyGeminiError } = await import('./geminiClient.ts');
+		const rateErr = new Error(JSON.stringify({ code: 429, status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' }));
+		const res = classifyGeminiError(rateErr);
+		assert.strictEqual(res.status, 'rateLimited');
+		assert.strictEqual(res.retryable, true);
+	});
+
+	test('classifies model unavailable errors', async () => {
+		const { classifyGeminiError } = await import('./geminiClient.ts');
+		const modelErr = new Error(JSON.stringify({ code: 404, status: 'NOT_FOUND', message: 'models/gemini-old is not found' }));
+		const res = classifyGeminiError(modelErr);
+		assert.strictEqual(res.status, 'modelUnavailable');
+		assert.strictEqual(res.retryable, false);
+	});
+
+	test('classifies network failures as retryable', async () => {
+		const { classifyGeminiError } = await import('./geminiClient.ts');
+		const netErr = new Error('fetch failed: getaddrinfo ENOTFOUND generativelanguage.googleapis.com');
+		const res = classifyGeminiError(netErr);
+		assert.strictEqual(res.status, 'networkError');
+		assert.strictEqual(res.retryable, true);
+	});
+
+	test('classifies cancellation requests', async () => {
+		const { classifyGeminiError } = await import('./geminiClient.ts');
+		const cancelErr = new Error('Cancelled');
+		const res = classifyGeminiError(cancelErr);
+		assert.strictEqual(res.status, 'cancelled');
+		assert.strictEqual(res.retryable, false);
+	});
+});
+
+

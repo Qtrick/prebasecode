@@ -10,7 +10,11 @@
  * header. In particular, credentials must never be placed in request URLs.
  */
 
+import type { MagnusDescriptionStatus } from './models.js';
+
 const BASE_URL = 'https://generativelanguage.googleapis.com/v1beta';
+const MAX_NON_STREAM_RESPONSE_BYTES = 1 * 1024 * 1024; // 1 MiB max response size
+const MAX_SSE_BUFFER_BYTES = 1 * 1024 * 1024; // 1 MiB max accumulated SSE buffer
 
 export type GeminiRole = 'user' | 'model';
 
@@ -38,7 +42,7 @@ export interface GeminiResponseCandidate {
 	finishReason: string;
 }
 
-interface GeminiResponse {
+export interface GeminiResponse {
 	candidates?: GeminiResponseCandidate[];
 	error?: { code: number; message: string; status: string };
 }
@@ -69,6 +73,36 @@ function bridgeCancellation(token: GeminiCancellationToken | undefined): Cancell
 	};
 }
 
+/**
+ * Reads a response body safely with an explicit byte bound.
+ */
+async function readBoundedResponseBody(res: Response, maxBytes: number = MAX_NON_STREAM_RESPONSE_BYTES): Promise<string> {
+	if (!res.body) {
+		if (typeof res.text === 'function') {
+			return res.text();
+		}
+		return '';
+	}
+	const reader = res.body.getReader();
+	const decoder = new TextDecoder();
+	let totalBytes = 0;
+	let text = '';
+	while (true) {
+		const { done, value } = await reader.read();
+		if (done) {
+			break;
+		}
+		totalBytes += value.byteLength;
+		if (totalBytes > maxBytes) {
+			await reader.cancel();
+			throw new Error(`Gemini response exceeded the ${Math.round(maxBytes / 1024)} KiB size limit.`);
+		}
+		text += decoder.decode(value, { stream: true });
+	}
+	text += decoder.decode();
+	return text;
+}
+
 async function tryAuth(
 	apiKey: string,
 	model: string,
@@ -86,7 +120,16 @@ async function tryAuth(
 	const cancellation = bridgeCancellation(token);
 	try {
 		const res = await transport.fetch(url, { method: 'POST', headers, body: JSON.stringify(body), signal: cancellation.signal });
-		const json = await res.json() as GeminiResponse;
+		let json: GeminiResponse;
+		try {
+			const rawText = await readBoundedResponseBody(res, MAX_NON_STREAM_RESPONSE_BYTES);
+			json = JSON.parse(rawText) as GeminiResponse;
+		} catch (err) {
+			if (err instanceof Error && err.message.includes('size limit')) {
+				throw err;
+			}
+			throw new Error(JSON.stringify({ code: res.status, message: `Failed to parse response: ${err instanceof Error ? err.message : String(err)}` }));
+		}
 
 		if (!res.ok || json.error) {
 			throw new Error(JSON.stringify(json.error ?? { code: res.status, message: `HTTP ${res.status}` }));
@@ -116,7 +159,10 @@ export async function generateContent(
 	transport: GeminiTransport = globalThis,
 ): Promise<string> {
 	const candidate = await generateContentCandidate(apiKey, model, body, token, transport);
-	return (candidate?.content?.parts?.[0]?.text ?? '').trim();
+	const textParts = (candidate?.content?.parts ?? [])
+		.map(p => p.text ?? '')
+		.join('');
+	return textParts.trim();
 }
 
 /**
@@ -131,7 +177,7 @@ export async function* streamGenerateContent(
 	transport: GeminiTransport = globalThis,
 ): AsyncGenerator<string, void, unknown> {
 	const streamUrl = `${BASE_URL}/models/${model}:streamGenerateContent?alt=sse`;
-	const maxSseBufferBytes = 1 * 1024 * 1024;
+	const maxSseBufferBytes = MAX_SSE_BUFFER_BYTES;
 
 	const tryStream = async (): Promise<{ response: Response; cancellation: CancellationBridge } | undefined> => {
 		const headers: Record<string, string> = { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey };
@@ -156,6 +202,7 @@ export async function* streamGenerateContent(
 			const reader = stream.response.body.getReader();
 			const decoder = new TextDecoder();
 			let buffer = '';
+			let accumulatedBytes = 0;
 			while (true) {
 				if (token?.isCancellationRequested) {
 					await reader.cancel();
@@ -165,10 +212,11 @@ export async function* streamGenerateContent(
 				if (done) {
 					return;
 				}
-				buffer += decoder.decode(value, { stream: true });
-				if (buffer.length > maxSseBufferBytes) {
+				accumulatedBytes += value.byteLength;
+				if (accumulatedBytes > maxSseBufferBytes) {
 					throw new Error('Gemini SSE response exceeded the 1 MiB framing limit.');
 				}
+				buffer += decoder.decode(value, { stream: true });
 				const lines = buffer.split('\n');
 				buffer = lines.pop() ?? '';
 				for (const line of lines) {
@@ -217,4 +265,58 @@ export async function* streamGenerateContent(
 		yield full.slice(i, i + 3);
 		await new Promise(resolve => setTimeout(resolve, 22));
 	}
+}
+
+/**
+ * Normalizes provider errors into structured, user-safe status objects without leaking secrets.
+ */
+export function classifyGeminiError(error: unknown): {
+	status: MagnusDescriptionStatus;
+	safeMessage: string;
+	retryable: boolean;
+} {
+	if (!error) {
+		return { status: 'error', safeMessage: 'Unknown provider error occurred.', retryable: true };
+	}
+
+	const rawMsg = error instanceof Error ? error.message : String(error);
+
+	if (rawMsg.includes('Cancelled') || rawMsg.includes('AbortError') || rawMsg.includes('aborted')) {
+		return { status: 'cancelled', safeMessage: 'Description request was cancelled.', retryable: false };
+	}
+
+	if (rawMsg.includes('size limit') || rawMsg.includes('exceeded the 1 MiB')) {
+		return { status: 'error', safeMessage: 'Gemini response exceeded size limit.', retryable: false };
+	}
+
+	// Try parsing JSON error structure from tryAuth
+	try {
+		const parsed = JSON.parse(rawMsg) as { code?: number; message?: string; status?: string };
+		const code = parsed.code;
+		const statusStr = parsed.status ?? '';
+
+		if (code === 400 && (statusStr === 'INVALID_ARGUMENT' || parsed.message?.includes('API_KEY_INVALID'))) {
+			return { status: 'authError', safeMessage: 'Gemini rejected the configured credential. Update your key in Agents Provider Settings.', retryable: false };
+		}
+		if (code === 401 || code === 403 || statusStr === 'PERMISSION_DENIED' || statusStr === 'UNAUTHENTICATED') {
+			return { status: 'authError', safeMessage: 'Gemini authentication failed. Please verify your API key.', retryable: false };
+		}
+		if (code === 429 || statusStr === 'RESOURCE_EXHAUSTED' || parsed.message?.includes('quota') || parsed.message?.includes('rate limit')) {
+			return { status: 'rateLimited', safeMessage: 'Gemini API is temporarily rate limited. Please retry in a moment.', retryable: true };
+		}
+		if (code === 404 || statusStr === 'NOT_FOUND' || parsed.message?.includes('models/')) {
+			return { status: 'modelUnavailable', safeMessage: 'The selected Gemini model is currently unavailable.', retryable: false };
+		}
+		if (code && code >= 500) {
+			return { status: 'error', safeMessage: `Gemini service error (${code}). Please retry.`, retryable: true };
+		}
+	} catch {
+		// Not JSON
+	}
+
+	if (rawMsg.includes('fetch failed') || rawMsg.includes('ENOTFOUND') || rawMsg.includes('ECONNREFUSED') || rawMsg.includes('network') || rawMsg.includes('ETIMEDOUT')) {
+		return { status: 'networkError', safeMessage: 'Could not reach Gemini API. Please check your network connection.', retryable: true };
+	}
+
+	return { status: 'error', safeMessage: 'AI description generation encountered an error.', retryable: true };
 }

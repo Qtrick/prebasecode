@@ -13,6 +13,16 @@ interface ProductManifest {
 
 interface ExtensionManifest {
 	enabledApiProposals?: string[];
+	contributes?: {
+		configuration?: {
+			properties?: {
+				'prebase.magnus.defaultModel'?: {
+					enum?: string[];
+					enumDescriptions?: string[];
+				};
+			};
+		};
+	};
 }
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../..');
@@ -45,4 +55,14 @@ if (missingFromProduct.length || missingFromExtension.length) {
 	throw new Error(`verify:prebase-magnus-manifest: proposal allowlists differ (missing from product: ${missingFromProduct.join(', ') || 'none'}; missing from extension: ${missingFromExtension.join(', ') || 'none'})`);
 }
 
-console.log(`verify:prebase-magnus-manifest: PASS (${extensionProposals.length} synchronized proposals)`);
+// Verify active models enum
+const modelEnum = magnusManifest.contributes?.configuration?.properties?.['prebase.magnus.defaultModel']?.enum;
+if (!Array.isArray(modelEnum) || !modelEnum.includes('auto') || !modelEnum.includes('gemini-2.5-pro') || !modelEnum.includes('gemini-2.5-flash')) {
+	throw new Error('verify:prebase-magnus-manifest: prebase.magnus.defaultModel enum must contain auto, gemini-2.5-pro, and gemini-2.5-flash');
+}
+if (modelEnum.some(m => m.includes('1.5') || m.includes('2.0'))) {
+	throw new Error('verify:prebase-magnus-manifest: prebase.magnus.defaultModel enum must not contain retired 1.5 or 2.0 models');
+}
+
+console.log(`verify:prebase-magnus-manifest: PASS (${extensionProposals.length} synchronized proposals, active models validated)`);
+

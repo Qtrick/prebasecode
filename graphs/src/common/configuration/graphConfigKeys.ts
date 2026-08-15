@@ -9,6 +9,7 @@ export const PREBASE_GRAPH_CHANNEL_LABEL = localize('prebase.graph.channel', "Pr
 
 export enum PreBaseGraphConfigKeys {
 	GraphAutoScan = 'prebase.graph.autoScan',
+	GraphRespectGitIgnore = 'prebase.graph.respectGitIgnore',
 	GraphShowLegend = 'prebase.graph.showLegend',
 	GraphShowMinimap = 'prebase.graph.showMinimap',
 	GraphHideLowImportance = 'prebase.graph.hideLowImportance',

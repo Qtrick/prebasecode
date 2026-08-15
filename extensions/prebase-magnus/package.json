@@ -197,6 +197,21 @@
         "category": "Agents"
       },
       {
+        "command": "prebase.magnus.importApiKeyFromEnv",
+        "title": "Import Provider Key from .env…",
+        "category": "Agents"
+      },
+      {
+        "command": "prebase.magnus.importApiKeyFromProcessEnv",
+        "title": "Import Provider Key from Environment",
+        "category": "Agents"
+      },
+      {
+        "command": "prebase.magnus.testModelProvider",
+        "title": "Test Model Provider",
+        "category": "Agents"
+      },
+      {
         "command": "prebase.magnus.open.walkthrough",
         "title": "Open Walkthrough",
         "category": "Agents"
@@ -226,18 +241,12 @@
           "enum": [
             "auto",
             "gemini-2.5-pro",
-            "gemini-2.5-flash",
-            "gemini-2.0-flash",
-            "gemini-1.5-pro",
-            "gemini-1.5-flash"
+            "gemini-2.5-flash"
           ],
           "enumDescriptions": [
-            "Auto",
+            "Auto (Gemini 2.5 Flash)",
             "Gemini 2.5 Pro",
-            "Gemini 2.5 Flash",
-            "Gemini 2.0 Flash",
-            "Gemini 1.5 Pro",
-            "Gemini 1.5 Flash"
+            "Gemini 2.5 Flash"
           ],
           "description": "Default Agents language model."
         },

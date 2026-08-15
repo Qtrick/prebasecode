@@ -5,7 +5,7 @@
 
 import { window, workspace, Uri, Disposable, Event, EventEmitter, FileDecoration, FileDecorationProvider, ThemeColor, l10n, SourceControlHistoryItemRef } from 'vscode';
 import * as path from 'path';
-import { Repository, GitResourceGroup } from './repository';
+import { Repository, GitResourceGroup, GitIgnoreMatchDetail } from './repository';
 import { Model } from './model';
 import { debounce } from './decorators';
 import { filterEvent, dispose, anyEvent, PromiseSource, combinedDisposable, runAndSubscribeEvent } from './util';
@@ -22,9 +22,39 @@ function equalSourceControlHistoryItemRefs(ref1?: SourceControlHistoryItemRef, r
 		ref1?.revision === ref2?.revision;
 }
 
-class GitIgnoreDecorationProvider implements FileDecorationProvider {
+export function formatIgnoreTooltip(match: GitIgnoreMatchDetail | undefined, repoRoot: string): string {
+	if (!match || !match.ignored) {
+		return l10n.t('Ignored by Git');
+	}
+	let sourceLabel = match.source;
+	if (path.isAbsolute(sourceLabel)) {
+		if (sourceLabel.startsWith(repoRoot)) {
+			sourceLabel = path.relative(repoRoot, sourceLabel);
+		} else {
+			return l10n.t('Ignored by global Git exclude rule');
+		}
+	}
+	if (match.pattern && match.line > 0) {
+		return l10n.t('Ignored by Git (pattern "{0}" in {1}:{2})', match.pattern, sourceLabel, match.line);
+	}
+	if (match.pattern) {
+		return l10n.t('Ignored by Git (pattern "{0}" in {1})', match.pattern, sourceLabel);
+	}
+	if (sourceLabel && match.line > 0) {
+		return l10n.t('Ignored by Git ({0}:{1})', sourceLabel, match.line);
+	}
+	return l10n.t('Ignored by Git');
+}
 
-	private static Decoration: FileDecoration = { color: new ThemeColor('gitDecoration.ignoredResourceForeground') };
+export function createIgnoreDecoration(match: GitIgnoreMatchDetail | undefined, repoRoot: string): FileDecoration {
+	return {
+		color: new ThemeColor('gitDecoration.ignoredResourceForeground'),
+		badge: 'I',
+		tooltip: formatIgnoreTooltip(match, repoRoot),
+	};
+}
+
+class GitIgnoreDecorationProvider implements FileDecorationProvider {
 
 	private readonly _onDidChangeDecorations = new EventEmitter<undefined | Uri | Uri[]>();
 	readonly onDidChangeFileDecorations: Event<undefined | Uri | Uri[]> = this._onDidChangeDecorations.event;
@@ -75,9 +105,10 @@ class GitIgnoreDecorationProvider implements FileDecorationProvider {
 		for (const [, item] of queue) {
 			const paths = [...item.queue.keys()];
 
-			item.repository.checkIgnore(paths).then(ignoreSet => {
+			item.repository.checkIgnoreDetails(paths).then(detailsMap => {
 				for (const [path, promiseSource] of item.queue.entries()) {
-					promiseSource.resolve(ignoreSet.has(path) ? GitIgnoreDecorationProvider.Decoration : undefined);
+					const match = detailsMap.get(path);
+					promiseSource.resolve(match?.ignored ? createIgnoreDecoration(match, item.repository.root) : undefined);
 				}
 			}, err => {
 				if (err.gitErrorCode !== GitErrorCodes.IsInSubmodule) {

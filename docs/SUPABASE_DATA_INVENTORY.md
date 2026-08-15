@@ -16,7 +16,7 @@ Short guide for what PreBase stores where. This is **not** a privacy policy; see
 | Data | Classification | Notes |
 | --- | --- | --- |
 | Source code & workspace files | **Local-only** | Normal IDE workspace; not uploaded by these migrations |
-| Magnus/API keys (Gemini, OpenAI, etc.) | **Local-only** | `.env` on device; not in Supabase schema |
+| Magnus/API keys (Gemini, etc.) | **Local-only** | OS-backed SecretStorage on device; not in Supabase schema |
 | Sign-in identity (email/OAuth subject) | **Cloud (account)** | Held by Supabase Auth when you use cloud sign-in |
 | Display name & avatar URL | **Cloud (account)** | `profiles` table |
 | UI/settings JSON | **Cloud (account)** | `user_preferences` |

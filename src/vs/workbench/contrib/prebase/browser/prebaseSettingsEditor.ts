@@ -827,7 +827,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const note = DOM.append(gallery, DOM.$('p'));
 		note.textContent = localize(
 			'prebase.settings.apiKeyNote',
-			"API keys and secrets are never shown in this UI. Configure Gemini and other keys in your project .env file."
+			"API keys and secrets are never shown in this UI. Configure Gemini credentials securely via Agents Provider Settings, or import from .env using “Agents: Import Provider Key from .env…”."
 		);
 		Object.assign(note.style, { fontSize: '11px', color: COLORS.textMuted, padding: '0 0 12px', lineHeight: '1.45', margin: '0' });
 

@@ -27,6 +27,12 @@ export function registerPreBaseGraphConfiguration(): void {
 				description: localize('prebase.graph.autoScan', "Automatically scan the workspace when opening PreBase Maps."),
 				scope: ConfigurationScope.RESOURCE
 			},
+			[PreBaseGraphConfigKeys.GraphRespectGitIgnore]: {
+				type: 'boolean',
+				default: true,
+				description: localize('prebase.graph.respectGitIgnore', "Exclude files ignored by Git from Code Graph scanning."),
+				scope: ConfigurationScope.RESOURCE
+			},
 			[PreBaseGraphConfigKeys.GraphShowLegend]: {
 				type: 'boolean',
 				default: true,

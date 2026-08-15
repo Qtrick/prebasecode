@@ -25,12 +25,13 @@ export interface IGraphNodeDescriptionResult {
 	cacheHit: boolean;
 }
 
-const PROMPT_VERSION = 'v2';
-const CACHE_KEY = 'prebase.graph.descriptionCache.v2';
+const PROMPT_VERSION = 'v3';
+const CACHE_KEY = 'prebase.graph.descriptionCache.v3';
 const MAX_CACHE = 200;
 const MAX_CONTENT = 6000;
 
-const SENSITIVE = /(^|\/)(\.env|\.env\..*|credentials|secrets?|id_rsa|\.pem|\.key)(\/|$)/i;
+const SENSITIVE = /(^|\/)(\.env|\.env\..*|credentials(\.json)?|secrets?(\.json)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|\.pem|\.key|\.p12|\.pfx)(\/|$)/i;
+const SENSITIVE_DIRS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(\/|$)/i;
 
 interface CacheEntry {
 	text: string;
@@ -75,8 +76,8 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		if (!relative) {
 			return { overview, aiStatus: 'skipped', aiMessage: localize('prebase.desc.badPath', "AI description skipped for an unsafe path."), cacheHit: false };
 		}
-		if (SENSITIVE.test(relative) || /\.(png|jpg|jpeg|gif|webp|ico|woff2?|ttf|eot|pdf|zip|gz)$/i.test(relative)) {
-			return { overview, aiStatus: 'skipped', aiMessage: localize('prebase.desc.skipped', "AI description skipped for this file type."), cacheHit: false };
+		if (SENSITIVE.test(relative) || SENSITIVE_DIRS.test(relative) || /\.(png|jpg|jpeg|gif|webp|ico|woff2?|ttf|eot|pdf|zip|gz|tar|tgz)$/i.test(relative)) {
+			return { overview, aiStatus: 'skipped', aiMessage: localize('prebase.desc.skipped', "AI description skipped for this sensitive or binary file."), cacheHit: false };
 		}
 
 		const folder = this.workspaceContextService.getWorkspace().folders[0];
@@ -89,7 +90,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		try {
 			const uri = this._resolveWorkspaceUri(folder.uri, relative);
 			if (uri) {
-				const file = await this.fileService.readFile(uri);
+				const file = await this.fileService.readFile(uri, { limits: { size: MAX_CONTENT } });
 				content = file.value.toString().slice(0, MAX_CONTENT);
 				contentHash = String(file.etag || content.length);
 			}
@@ -103,7 +104,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			relative,
 			contentHash,
 			PROMPT_VERSION,
-			'magnus-default',
+			'gemini',
 		].join('::');
 
 		const cached = options?.force ? undefined : this._readCache()[cacheKey];
@@ -133,33 +134,92 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					content || '(unavailable)',
 				].join('\n');
 
-				// Prefer Magnus extension command when present; ignore if unavailable.
-				let aiDescription: string | undefined;
+				// Invoke Magnus describeFile command
+				type RawResult = string | {
+					text?: string;
+					status?: 'ready' | 'notConfigured' | 'authError' | 'rateLimited' | 'networkError' | 'modelUnavailable' | 'cancelled' | 'disabled' | 'error' | 'skipped';
+					safeMessage?: string;
+					providerId?: string;
+					modelId?: string;
+				};
+
+				let raw: RawResult | undefined;
 				try {
-					const result = await this.commandService.executeCommand<string | { text?: string }>(
+					raw = await this.commandService.executeCommand<RawResult>(
 						'prebase.magnus.describeFile',
 						{ prompt, path: relative }
 					);
-					aiDescription = typeof result === 'string' ? result : result?.text;
 				} catch {
-					aiDescription = undefined;
+					raw = undefined;
 				}
 
 				if (cts.token.isCancellationRequested) {
 					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."), cacheHit: false };
 				}
 
-				if (!aiDescription?.trim()) {
+				if (!raw) {
 					return {
 						overview,
 						aiStatus: 'unavailable',
-						aiMessage: localize('prebase.desc.configureMagnus', "Configure Agents for an AI-generated description."),
+						aiMessage: localize('prebase.desc.configureMagnus', "Agents extension is not available."),
 						cacheHit: false,
 					};
 				}
 
-				this._writeCache(cacheKey, aiDescription.trim());
-				return { overview, aiDescription: aiDescription.trim(), aiStatus: 'ready', cacheHit: false };
+				if (typeof raw === 'object' && raw.status && raw.status !== 'ready') {
+					if (raw.status === 'notConfigured') {
+						return {
+							overview,
+							aiStatus: 'unavailable',
+							aiMessage: localize('prebase.desc.notConfigured', "AI description unavailable — no Gemini credential is configured. Use “Agents: Configure Model Provider” or “Agents: Import Provider Key from .env…”."),
+							cacheHit: false,
+						};
+					}
+					if (raw.status === 'authError') {
+						return {
+							overview,
+							aiStatus: 'error',
+							aiMessage: localize('prebase.desc.authError', "Gemini rejected the configured credential. Update your key in Agents Provider Settings."),
+							cacheHit: false,
+						};
+					}
+					if (raw.status === 'rateLimited') {
+						return {
+							overview,
+							aiStatus: 'error',
+							aiMessage: localize('prebase.desc.rateLimited', "Gemini API is temporarily rate limited. Please retry in a moment."),
+							cacheHit: false,
+						};
+					}
+					if (raw.status === 'modelUnavailable') {
+						return {
+							overview,
+							aiStatus: 'error',
+							aiMessage: localize('prebase.desc.modelUnavailable', "The selected model is unavailable."),
+							cacheHit: false,
+						};
+					}
+					return {
+						overview,
+						aiStatus: 'error',
+						aiMessage: raw.safeMessage || localize('prebase.desc.failed', "AI description generation failed."),
+						cacheHit: false,
+					};
+				}
+
+				const aiText = typeof raw === 'string' ? raw.trim() : raw.text?.trim();
+
+				if (!aiText) {
+					return {
+						overview,
+						aiStatus: 'unavailable',
+						aiMessage: localize('prebase.desc.emptyResult', "AI model returned an empty description."),
+						cacheHit: false,
+					};
+				}
+
+				this._writeCache(cacheKey, aiText);
+				return { overview, aiDescription: aiText, aiStatus: 'ready', cacheHit: false };
 			} catch (err) {
 				return {
 					overview,

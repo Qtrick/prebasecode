@@ -174,8 +174,28 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				if (this._viewState.graphType === 'network' && this._rawSnapshot) {
 					void this.relayout();
 				}
+			} else if (e.affectsConfiguration(PreBaseGraphConfigKeys.GraphRespectGitIgnore)) {
+				this._debounceRescan();
 			}
 		}));
+
+		this._register(this.fileService.onDidFilesChange(e => {
+			const isIgnore = (uri: URI) => uri.path.endsWith('.gitignore') || uri.path.endsWith('.git/info/exclude');
+			if (e.rawAdded.some(isIgnore) || e.rawUpdated.some(isIgnore) || e.rawDeleted.some(isIgnore)) {
+				this._debounceRescan();
+			}
+		}));
+	}
+
+	private _debounceRescanTimer: any;
+	private _debounceRescan(): void {
+		if (this._debounceRescanTimer) {
+			clearTimeout(this._debounceRescanTimer);
+		}
+		this._debounceRescanTimer = setTimeout(() => {
+			this._debounceRescanTimer = undefined;
+			void this.rescanWorkspace();
+		}, 500);
 	}
 
 	getSnapshot(): PreBaseEnrichedSnapshot | undefined {
@@ -775,7 +795,22 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private async _collectFiles(root: URI, token: CancellationToken, maxFiles: number): Promise<Array<ScannedFile & { resource: URI }>> {
 		const files: Array<ScannedFile & { resource: URI }> = [];
-		const ignorePatterns = DEFAULT_IGNORE_PATTERNS;
+		const respectGitIgnore = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphRespectGitIgnore) !== false;
+		let ignorePatterns = [...DEFAULT_IGNORE_PATTERNS];
+		if (respectGitIgnore) {
+			try {
+				const gitignoreUri = URI.joinPath(root, '.gitignore');
+				const stat = await this.fileService.readFile(gitignoreUri);
+				const content = stat.value.toString();
+				const extra = content.split('\n')
+					.map(l => l.trim())
+					.filter(l => l && !l.startsWith('#') && !l.startsWith('!'));
+				ignorePatterns = [...ignorePatterns, ...extra];
+			} catch {
+				// No root .gitignore file
+			}
+		}
+
 		const queue: URI[] = [root];
 		let visited = 0;
 
@@ -857,7 +892,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private async _parseFile(file: ScannedFile & { resource: URI }): Promise<ParseResult | undefined> {
 		try {
-			const content = (await this.fileService.readFile(file.resource)).value.toString();
+			const fileContent = await this.fileService.readFile(file.resource, { limits: { size: 200_000 } });
+			const content = fileContent.value.toString();
 			if (content.length > 200_000) {
 				return undefined;
 			}
@@ -964,15 +1000,19 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	private _isIgnored(relativePath: string, isDirectory: boolean, patterns: string[]): boolean {
 		const path = relativePath.replace(/^\/+/, '');
 		const candidates = isDirectory ? [path, `${path}/`, `**/${path}/**`] : [path, `**/${path}`];
-		for (const pattern of patterns) {
+		for (const rawPattern of patterns) {
+			const pattern = rawPattern.trim();
+			if (!pattern || pattern.startsWith('#')) {
+				continue;
+			}
 			for (const candidate of candidates) {
-				if (matchGlob(pattern, candidate) || matchGlob(pattern, `/${candidate}`)) {
+				if (matchGlob(pattern, candidate) || matchGlob(pattern, `/${candidate}`) || matchGlob(`**/${pattern}/**`, candidate) || matchGlob(`**/${pattern}`, candidate)) {
 					return true;
 				}
 			}
-			// Fast path for common folder ignores
-			const folder = pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, '').replace(/\*\*/g, '');
-			if (folder && (path === folder || path.startsWith(`${folder}/`) || path.includes(`/${folder}/`))) {
+			// Fast path for folder names (e.g. .reference, dist, target)
+			const cleanPattern = pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, '').replace(/^\//, '').replace(/\/$/, '').replace(/\*\*/g, '');
+			if (cleanPattern && (path === cleanPattern || path.startsWith(`${cleanPattern}/`) || path.includes(`/${cleanPattern}/`))) {
 				return true;
 			}
 		}
@@ -989,3 +1029,4 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		channel?.append(`[PreBase] ${message}\n`);
 	}
 }
+

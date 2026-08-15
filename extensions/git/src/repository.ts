@@ -53,6 +53,14 @@ export const enum ResourceGroupType {
 	Untracked
 }
 
+export interface GitIgnoreMatchDetail {
+	readonly path: string;
+	readonly source: string;
+	readonly line: number;
+	readonly pattern: string;
+	readonly ignored: boolean;
+}
+
 export class Resource implements SourceControlResourceState {
 
 	static getStatusLetter(type: Status): string {
@@ -2596,16 +2604,16 @@ export class Repository implements Disposable {
 		await this.run(Operation.RebaseAbort, async () => await this.repository.rebaseAbort());
 	}
 
-	checkIgnore(filePaths: string[]): Promise<Set<string>> {
+	checkIgnoreDetails(filePaths: string[]): Promise<Map<string, GitIgnoreMatchDetail>> {
 		return this.run(Operation.CheckIgnore, () => {
-			return new Promise<Set<string>>((resolve, reject) => {
+			return new Promise<Map<string, GitIgnoreMatchDetail>>((resolve, reject) => {
 
 				filePaths = filePaths
 					.filter(filePath => isDescendant(this.root, filePath));
 
 				if (filePaths.length === 0) {
 					// nothing left
-					return resolve(new Set<string>());
+					return resolve(new Map());
 				}
 
 				// https://git-scm.com/docs/git-check-ignore#git-check-ignore--z
@@ -2623,9 +2631,9 @@ export class Repository implements Disposable {
 				const onExit = (exitCode: number) => {
 					if (exitCode === 1) {
 						// nothing ignored
-						resolve(new Set<string>());
+						resolve(new Map());
 					} else if (exitCode === 0) {
-						resolve(new Set<string>(this.parseIgnoreCheck(data)));
+						resolve(this.parseIgnoreCheckDetails(data));
 					} else {
 						if (/ is in submodule /.test(stderr)) {
 							reject(new GitError({ stdout: data, stderr, exitCode, gitErrorCode: GitErrorCodes.IsInSubmodule }));
@@ -2657,10 +2665,46 @@ export class Repository implements Disposable {
 		});
 	}
 
-	// Parses output of `git check-ignore -v -z` and returns only those paths
-	// that are actually ignored by git.
-	// Matches to a negative pattern (starting with '!') are filtered out.
+	checkIgnore(filePaths: string[]): Promise<Set<string>> {
+		return this.checkIgnoreDetails(filePaths).then(details => {
+			const set = new Set<string>();
+			for (const [path, match] of details) {
+				if (match.ignored) {
+					set.add(path);
+				}
+			}
+			return set;
+		});
+	}
+
+	// Parses output of `git check-ignore -v -z` and returns detailed records
+	// per pathname with source, line, pattern, and ignore status.
+	// Matches to a negative pattern (starting with '!') are marked ignored = false.
 	// See also https://git-scm.com/docs/git-check-ignore#_output.
+	private parseIgnoreCheckDetails(raw: string): Map<string, GitIgnoreMatchDetail> {
+		const map = new Map<string, GitIgnoreMatchDetail>();
+		const elements = raw.split('\0');
+		for (let i = 0; i < elements.length; i += 4) {
+			const source = elements[i];
+			const lineStr = elements[i + 1];
+			const pattern = elements[i + 2];
+			const path = elements[i + 3];
+			if (!path) {
+				continue;
+			}
+			const line = parseInt(lineStr, 10) || 0;
+			const ignored = Boolean(pattern && !pattern.startsWith('!'));
+			map.set(path, {
+				path,
+				source: source || '',
+				line,
+				pattern: pattern || '',
+				ignored
+			});
+		}
+		return map;
+	}
+
 	private parseIgnoreCheck(raw: string): string[] {
 		const ignored = [];
 		const elements = raw.split('\0');

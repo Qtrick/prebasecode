@@ -717,4 +717,46 @@ suite('git', () => {
 			);
 		});
 	});
+
+	suite('GitIgnore Decorations & Details', () => {
+		test('formatIgnoreTooltip formats workspace rules with pattern and line', async () => {
+			const { formatIgnoreTooltip } = await import('../decorationProvider.js');
+			const tooltip = formatIgnoreTooltip({
+				path: '/repo/dist/bundle.js',
+				source: '.gitignore',
+				line: 12,
+				pattern: 'dist/',
+				ignored: true,
+			}, '/repo');
+
+			assert.strictEqual(tooltip, 'Ignored by Git (pattern "dist/" in .gitignore:12)');
+		});
+
+		test('formatIgnoreTooltip formats .git/info/exclude rules', async () => {
+			const { formatIgnoreTooltip } = await import('../decorationProvider.js');
+			const tooltip = formatIgnoreTooltip({
+				path: '/repo/.env.local',
+				source: '.git/info/exclude',
+				line: 3,
+				pattern: '.env.local',
+				ignored: true,
+			}, '/repo');
+
+			assert.strictEqual(tooltip, 'Ignored by Git (pattern ".env.local" in .git/info/exclude:3)');
+		});
+
+		test('formatIgnoreTooltip sanitizes global ignore paths for privacy', async () => {
+			const { formatIgnoreTooltip } = await import('../decorationProvider.js');
+			const tooltip = formatIgnoreTooltip({
+				path: '/repo/.DS_Store',
+				source: '/Users/alice/.config/git/ignore',
+				line: 5,
+				pattern: '.DS_Store',
+				ignored: true,
+			}, '/repo');
+
+			assert.strictEqual(tooltip, 'Ignored by global Git exclude rule');
+		});
+	});
 });
+
