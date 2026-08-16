@@ -130,4 +130,10 @@ suite('MagnusSecretStorage & Precedence', () => {
 		assert.strictEqual(isPreBaseSourceRoot('/tmp'), false);
 		assert.strictEqual(isPreBaseSourceRoot('/nonexistent/path'), false);
 	});
+
+	test('PreBaseSecretResolver respects allowAmbientRootDiscovery: false', () => {
+		const resolver = new PreBaseSecretResolver({ allowAmbientRootDiscovery: false });
+		assert.strictEqual(resolver.getPreBaseRoot(), undefined);
+		assert.strictEqual(resolver.isSourceDevelopment(), false);
+	});
 });

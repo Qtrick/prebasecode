@@ -66,10 +66,10 @@ function code() {
 	# recent projects would stay empty). Opt in with PREBASE_MAGNUS_EXT_DEV=1.
 	MAGNUS_DEV_PATH="$ROOT/extensions/prebase-magnus"
 	MAGNUS_DEV_ARG=()
-	if [[ -d "$MAGNUS_DEV_PATH" && "$@" != *"--enable-proposed-api"* ]]; then
+	if [[ -d "$MAGNUS_DEV_PATH" && "$*" != *"prebase.magnus"* ]]; then
 		MAGNUS_DEV_ARG=(--enable-proposed-api=prebase.magnus)
 	fi
-	if [[ "${PREBASE_MAGNUS_EXT_DEV:-}" == "1" && -d "$MAGNUS_DEV_PATH" && "$@" != *"--extensionDevelopmentPath"* ]]; then
+	if [[ "${PREBASE_MAGNUS_EXT_DEV:-}" == "1" && -d "$MAGNUS_DEV_PATH" && "$*" != *"--extensionDevelopmentPath"* ]]; then
 		MAGNUS_DEV_ARG+=(--extensionDevelopmentPath="$MAGNUS_DEV_PATH")
 	fi
 

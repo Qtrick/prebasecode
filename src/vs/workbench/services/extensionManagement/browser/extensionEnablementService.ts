@@ -87,7 +87,7 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
 		@IChatEntitlementService private readonly chatEntitlementService: IChatEntitlementService,
 		@IInstantiationService instantiationService: IInstantiationService,
 		@ILogService private readonly logService: ILogService,
-		@IProductService productService: IProductService
+		@IProductService private readonly productService: IProductService
 	) {
 		super();
 		this.storageManager = this._register(new StorageManager(storageService));
@@ -153,6 +153,14 @@ export class ExtensionEnablementService extends Disposable implements IWorkbench
 
 	private ensureChatExtensionInitialDisabledState(): void {
 		if (!this._chatExtensionId || this.environmentService.isSessionsWindow || this.environmentService.skipBuiltinExtensions?.some(id => id.toLowerCase() === this._chatExtensionId)) {
+			return;
+		}
+
+		// In PreBase, prebase.magnus is a first-party built-in extension that is never gated behind Copilot setup.
+		if (this.productService.prebaseBuiltInCopilotEnabled === false || this._chatExtensionId === 'prebase.magnus') {
+			if (this._isDisabledGlobally({ id: this._chatExtensionId })) {
+				this._enableExtension({ id: this._chatExtensionId });
+			}
 			return;
 		}
 

@@ -52,39 +52,48 @@ function readAllLogs(dir) {
 	return text;
 }
 
-async function runMagnusRuntimeSmoke() {
+async function runMagnusRuntimeSmoke(mode = 'normal') {
 	const stamp = Date.now();
-	const userDataDir = path.join(REPO_ROOT, `.tmp/magnus-verify-userdata-${stamp}`);
-	const extensionsDir = path.join(REPO_ROOT, `.tmp/magnus-verify-extensions-${stamp}`);
+	const baseTmp = path.join(REPO_ROOT, '.tmp/s');
+	const userDataDir = `${baseTmp}/u${stamp}-${mode.slice(0, 3)}`;
+	const extensionsDir = `${baseTmp}/e${stamp}-${mode.slice(0, 3)}`;
 	fs.mkdirSync(userDataDir, { recursive: true });
 	fs.mkdirSync(extensionsDir, { recursive: true });
 
 	const codeSh = path.join(REPO_ROOT, 'scripts/code.sh');
-	console.log('verify:magnus-runtime: launching PreBase with Magnus extension in clean profile...');
+	console.log(`verify:magnus-runtime: [Mode: ${mode.toUpperCase()}] launching PreBase in clean profile...`);
 
 	let processOutput = '';
-	const child = spawn(
-		codeSh,
-		[
-			'--user-data-dir',
-			userDataDir,
-			'--extensions-dir',
-			extensionsDir,
-			'--extensionDevelopmentPath=' + path.join(REPO_ROOT, 'extensions/prebase-magnus'),
-			'--enable-proposed-api=prebase.magnus',
-			'--disable-workspace-trust',
-			'.',
-		],
-		{
-			cwd: REPO_ROOT,
-			env: {
-				...process.env,
-				VSCODE_SKIP_PRELAUNCH: '1',
-				PREBASE_MAGNUS_EXT_DEV: '1',
-			},
-			stdio: ['ignore', 'pipe', 'pipe'],
-		},
-	);
+	const args = [
+		'--user-data-dir',
+		userDataDir,
+		'--extensions-dir',
+		extensionsDir,
+		'--disable-workspace-trust',
+		'--disable-telemetry',
+		'.',
+	];
+
+	const env = {
+		...process.env,
+		VSCODE_SKIP_PRELAUNCH: '1',
+	};
+	delete env.ELECTRON_RUN_AS_NODE;
+
+	if (mode === 'extension-dev') {
+		args.push('--extensionDevelopmentPath=' + path.join(REPO_ROOT, 'extensions/prebase-magnus'));
+		args.push('--enable-proposed-api=prebase.magnus');
+		env.PREBASE_MAGNUS_EXT_DEV = '1';
+	} else {
+		// Normal built-in launch: no extension-development args
+		delete env.PREBASE_MAGNUS_EXT_DEV;
+	}
+
+	const child = spawn(codeSh, args, {
+		cwd: REPO_ROOT,
+		env,
+		stdio: ['ignore', 'pipe', 'pipe'],
+	});
 
 	child.stdout?.on('data', (chunk) => {
 		processOutput += chunk.toString();
@@ -110,14 +119,16 @@ async function runMagnusRuntimeSmoke() {
 				const logText = fs.existsSync(logsRoot) ? readAllLogs(logsRoot) : '';
 				const combined = processOutput + '\n' + logText;
 
-				if (combined.includes('[Magnus] activation failed')) {
-					failureReason = 'Magnus activation failure logged';
-					resolve(false);
-					return;
+				if (combined.includes('[Magnus] activation failed') || combined.includes('[Magnus] core')) {
+					if (combined.includes('failed') || combined.includes('Error:')) {
+						failureReason = 'Magnus activation failure logged';
+						resolve(false);
+						return;
+					}
 				}
 
 				const hasMagnusActivated = combined.includes(MAGNUS_ACTIVATED_MARKER) ||
-					(combined.includes(EXT_HOST_ACTIVATE_MARKER) && combined.includes('magnus/auto'));
+					(combined.includes(EXT_HOST_ACTIVATE_MARKER) && (combined.includes('magnus/auto') || combined.includes('prebase.magnus')));
 				const hasWorkbenchRestored = combined.includes(WORKBENCH_RESTORED_MARKER);
 
 				if (hasMagnusActivated && hasWorkbenchRestored) {
@@ -158,16 +169,36 @@ async function runMagnusRuntimeSmoke() {
 	}
 
 	if (passed) {
-		console.log('verify:magnus-runtime: PASS (real PreBase application + Magnus activation verified in clean profile)');
-		process.exit(0);
+		console.log(`verify:magnus-runtime: PASS [Mode: ${mode.toUpperCase()}] (real PreBase application + Magnus verified in clean profile)`);
+		return true;
 	} else {
-		console.error(`verify:magnus-runtime: FAIL (${failureReason})`);
+		console.error(`verify:magnus-runtime: FAIL [Mode: ${mode.toUpperCase()}] (${failureReason})`);
+		if (processOutput) {
+			console.error(`verify:magnus-runtime: process output:\n${processOutput}`);
+		}
 		console.error(`verify:magnus-runtime: preserved logs for inspection at: ${userDataDir}`);
+		return false;
+	}
+}
+
+async function main() {
+	const isDevModeRequested = process.argv.includes('--dev') || process.argv.includes('--mode=extension-dev');
+	if (isDevModeRequested) {
+		const okDev = await runMagnusRuntimeSmoke('extension-dev');
+		if (!okDev) {
+			process.exit(1);
+		}
+		return;
+	}
+
+	// Normal launch verification (Mode B - Production-like built-in runtime)
+	const okNormal = await runMagnusRuntimeSmoke('normal');
+	if (!okNormal) {
 		process.exit(1);
 	}
 }
 
-runMagnusRuntimeSmoke().catch((err) => {
+main().catch((err) => {
 	console.error('verify:magnus-runtime: unexpected error', err);
 	process.exit(1);
 });

@@ -141,6 +141,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					safeMessage?: string;
 					providerId?: string;
 					modelId?: string;
+					cacheIdentity?: string;
 				};
 
 				let raw: RawResult | undefined;
@@ -227,7 +228,17 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					};
 				}
 
-				this._writeCache(cacheKey, aiText);
+				const cacheIdentity = (typeof raw === 'object' && raw.cacheIdentity) ? raw.cacheIdentity : 'gemini';
+				const effectiveCacheKey = [
+					folder.uri.toString(),
+					'file',
+					relative,
+					contentHash,
+					PROMPT_VERSION,
+					cacheIdentity,
+				].join('::');
+
+				this._writeCache(effectiveCacheKey, aiText);
 				return { overview, aiDescription: aiText, aiStatus: 'ready', cacheHit: false };
 			} catch (err) {
 				return {

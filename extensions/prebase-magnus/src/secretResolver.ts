@@ -5,6 +5,7 @@
 
 import * as fs from 'node:fs';
 import * as path from 'node:path';
+import * as crypto from 'node:crypto';
 import { ALLOWLISTED_LOCAL_ENV_VARIABLES, type PreBaseAIExecutionMode } from './secretCatalog';
 
 const MAX_ENV_FILE_BYTES = 64 * 1024; // 64 KiB safety bound
@@ -165,7 +166,14 @@ export function loadPreBaseRootEnv(explicitRoot?: string): Map<string, string> {
 export interface RootEnvCacheState {
 	readonly mtime: number;
 	readonly size: number;
+	readonly contentHash: string;
 	readonly values: Map<string, string>;
+}
+
+export interface PreBaseSecretResolverOptions {
+	explicitRoot?: string;
+	forcePackaged?: boolean;
+	allowAmbientRootDiscovery?: boolean;
 }
 
 /**
@@ -191,12 +199,18 @@ export class PreBaseSecretResolver {
 	private _isSourceDev: boolean;
 	private _prebaseRoot: string | undefined;
 
-	constructor(options?: { explicitRoot?: string; forcePackaged?: boolean }) {
+	constructor(options?: PreBaseSecretResolverOptions) {
 		if (options?.forcePackaged) {
 			this._isSourceDev = false;
 			this._prebaseRoot = undefined;
 		} else {
-			this._prebaseRoot = options?.explicitRoot ?? findPreBaseSourceRoot();
+			if (options?.explicitRoot) {
+				this._prebaseRoot = isPreBaseSourceRoot(options.explicitRoot) ? options.explicitRoot : findPreBaseSourceRoot(options.explicitRoot);
+			} else if (options?.allowAmbientRootDiscovery !== false) {
+				this._prebaseRoot = findPreBaseSourceRoot();
+			} else {
+				this._prebaseRoot = undefined;
+			}
 			this._isSourceDev = !!(this._prebaseRoot && isPreBaseSourceRoot(this._prebaseRoot));
 		}
 	}
@@ -232,7 +246,10 @@ export class PreBaseSecretResolver {
 				return new Map();
 			}
 
-			if (this._rootEnvCache && this._rootEnvCache.mtime === stat.mtimeMs && this._rootEnvCache.size === stat.size) {
+			const content = fs.readFileSync(envPath, 'utf8');
+			const contentHash = crypto.createHash('sha256').update(content).digest('hex');
+
+			if (this._rootEnvCache && this._rootEnvCache.contentHash === contentHash && this._rootEnvCache.size === stat.size) {
 				return this._rootEnvCache.values;
 			}
 
@@ -241,11 +258,11 @@ export class PreBaseSecretResolver {
 				console.warn('[PreBase SecretResolver] Notice: PreBase root .env has group/world readable permissions.');
 			}
 
-			const content = fs.readFileSync(envPath, 'utf8');
 			const values = parseAllowlistedEnv(content);
 			this._rootEnvCache = {
 				mtime: stat.mtimeMs,
 				size: stat.size,
+				contentHash,
 				values,
 			};
 			return values;

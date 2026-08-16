@@ -2705,19 +2705,6 @@ export class Repository implements Disposable {
 		return map;
 	}
 
-	private parseIgnoreCheck(raw: string): string[] {
-		const ignored = [];
-		const elements = raw.split('\0');
-		for (let i = 0; i < elements.length; i += 4) {
-			const pattern = elements[i + 2];
-			const path = elements[i + 3];
-			if (pattern && !pattern.startsWith('!')) {
-				ignored.push(path);
-			}
-		}
-		return ignored;
-	}
-
 	private async _push(remote?: string, refspec?: string, setUpstream = false, followTags = false, forcePushMode?: ForcePushMode, tags = false): Promise<void> {
 		try {
 			await this.repository.push(remote, refspec, setUpstream, followTags, forcePushMode, tags);

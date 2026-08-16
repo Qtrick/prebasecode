@@ -57,7 +57,7 @@ export function activate(context: vscode.ExtensionContext): void {
 	try {
 		// 1. Initialize secret resolver with deterministic root from extension path
 		const explicitRoot = findPreBaseSourceRoot(context.extensionPath);
-		const resolver = new PreBaseSecretResolver({ explicitRoot });
+		const resolver = new PreBaseSecretResolver({ explicitRoot, allowAmbientRootDiscovery: false });
 		const secrets = new MagnusSecretStorage(context.secrets, resolver);
 		console.log('[Magnus] secret resolver initialized');
 
@@ -87,7 +87,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		runtimeState.describeFileRegistered = true;
 		console.log('[Magnus] describeFile registered');
 
-		// 4. Register language model provider
+		// 4. Register language model provider (core subsystem)
 		const lmProvider = new MagnusLanguageModelProvider(aiService);
 		try {
 			context.subscriptions.push(
@@ -101,11 +101,12 @@ export function activate(context: vscode.ExtensionContext): void {
 				phase: 'languageModelProvider',
 				message: err instanceof Error ? err.message : String(err),
 			};
-			runtimeState.optionalSubsystemErrors.push(safeErr);
-			console.error('[Magnus] language model provider registration failed:', safeErr.message);
+			runtimeState.activationError = safeErr;
+			console.error('[Magnus] core language model provider registration failed:', safeErr.message);
+			throw err;
 		}
 
-		// 5. Register chat participants
+		// 5. Register chat participants (core subsystem)
 		try {
 			registerMagnusChatParticipants(context, aiService, state);
 			runtimeState.chatParticipantsRegistered = true;
@@ -115,11 +116,12 @@ export function activate(context: vscode.ExtensionContext): void {
 				phase: 'chatParticipants',
 				message: err instanceof Error ? err.message : String(err),
 			};
-			runtimeState.optionalSubsystemErrors.push(safeErr);
-			console.error('[Magnus] chat participants registration failed:', safeErr.message);
+			runtimeState.activationError = safeErr;
+			console.error('[Magnus] core chat participants registration failed:', safeErr.message);
+			throw err;
 		}
 
-		// 6. Register core native language-model tools
+		// 6. Register core native language-model tools (core subsystem)
 		try {
 			registerMagnusLanguageModelTools(context, secrets);
 			runtimeState.nativeToolsRegistered = true;
@@ -129,8 +131,9 @@ export function activate(context: vscode.ExtensionContext): void {
 				phase: 'nativeTools',
 				message: err instanceof Error ? err.message : String(err),
 			};
-			runtimeState.optionalSubsystemErrors.push(safeErr);
-			console.error('[Magnus] native tools registration failed:', safeErr.message);
+			runtimeState.activationError = safeErr;
+			console.error('[Magnus] core native tools registration failed:', safeErr.message);
+			throw err;
 		}
 
 		// 7. Register optional desktop language-model tools (isolated failure boundary)

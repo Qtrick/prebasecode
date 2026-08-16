@@ -78,7 +78,8 @@ MAIN_PORT=$(pick_port)
 AGENTHOST_PORT=$(pick_port)
 
 STAMP=$(date +%Y%m%d-%H%M%S)-$$
-RUN_DIR="${TMPDIR:-/tmp}/code-oss-dev/$STAMP"
+# Keep path short to stay safely under macOS 103-char UNIX socket path limit
+RUN_DIR="/tmp/pb/$STAMP"
 DEST_UDD="$RUN_DIR/user-data"
 SHARED_DATA_DIR="$RUN_DIR/shared-data"
 mkdir -p "$DEST_UDD" "$SHARED_DATA_DIR"
