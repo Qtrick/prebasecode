@@ -96,6 +96,56 @@ describe('DirectGeminiTransport', () => {
 		assert.equal(cancelErr.code, 'cancelled');
 		assert.equal(cancelErr.retryable, false);
 	});
+
+	it('discovers models across multiple pages and filters out specialized modalities', async () => {
+		const requestedUrls: string[] = [];
+
+		const mockFetch = async (input: string | URL): Promise<Response> => {
+			const url = String(input);
+			requestedUrls.push(url);
+
+			if (!url.includes('pageToken')) {
+				// Page 1
+				return new Response(JSON.stringify({
+					models: [
+						{ name: 'models/gemini-2.5-flash', displayName: 'Gemini 2.5 Flash', supportedGenerationMethods: ['generateContent'] },
+						{ name: 'models/gemini-2.5-pro', displayName: 'Gemini 2.5 Pro', supportedGenerationMethods: ['generateContent'] },
+						{ name: 'models/imagen-3.0-generate-002', displayName: 'Imagen 3', supportedGenerationMethods: ['generateContent'] },
+						{ name: 'models/gemini-robotics-er-2', displayName: 'Robotics ER 2', supportedGenerationMethods: ['generateContent'] },
+					],
+					nextPageToken: 'page2-token-abc',
+				}), { status: 200 });
+			} else {
+				// Page 2
+				return new Response(JSON.stringify({
+					models: [
+						{ name: 'models/gemini-3.7-flash', displayName: 'Gemini 3.7 Flash', supportedGenerationMethods: ['generateContent'] },
+						{ name: 'models/text-embedding-004', displayName: 'Text Embedding', supportedGenerationMethods: ['embedContent'] },
+						{ name: 'models/veo-3.1-generate', displayName: 'Veo 3.1', supportedGenerationMethods: ['generateContent'] },
+					],
+				}), { status: 200 });
+			}
+		};
+
+		const transport = new DirectGeminiTransport({ fetchImpl: mockFetch });
+		const discovered = await transport.discoverModels('test-key');
+
+		// Assert pagination occurred
+		assert.equal(requestedUrls.length, 2);
+		assert.ok(requestedUrls[1].includes('pageToken=page2-token-abc'));
+
+		// Assert models discovered
+		const ids = discovered.map(m => m.id);
+		assert.ok(ids.includes('gemini-2.5-flash'));
+		assert.ok(ids.includes('gemini-2.5-pro'));
+		assert.ok(ids.includes('gemini-3.7-flash'));
+
+		// Assert specialized non-coding models were excluded
+		assert.ok(!ids.includes('imagen-3.0-generate-002'));
+		assert.ok(!ids.includes('gemini-robotics-er-2'));
+		assert.ok(!ids.includes('text-embedding-004'));
+		assert.ok(!ids.includes('veo-3.1-generate'));
+	});
 });
 
 describe('HostedGeminiTransport', () => {

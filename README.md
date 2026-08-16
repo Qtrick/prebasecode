@@ -1,186 +1,197 @@
-# PreBase
+# PreBase — Internal Engineering Reference
 
-PreBase is an AI-assisted desktop IDE and code visualization platform. It combines a full VS Code workbench with interactive codebase maps, in-IDE runtime preview, and an Agents chat panel.
-
-PreBase is a fork of **Visual Studio Code / Code - OSS 1.128**. Upstream workbench, chat modes, and editor platform behavior come from that release (local source archive: `VSCode 1.128.0.zip`). PreBase-specific product code lives mainly under `src/vs/workbench/contrib/prebase/` and `extensions/prebase-magnus/`.
-
-## Naming: Agents vs Magnus
-
-In the **UI and docs**, the AI assistant is called **Agents**.
-
-In the **codebase**, many filenames, package names, setting identifiers, and command IDs still use **Magnus** (for example `extensions/prebase-magnus/`, `prebase.magnus.open`, `magnus.png`). That is intentional: rename the product label, not the file tree.
-
-| You see in the app | Lives in the repo as |
-|--------------------|----------------------|
-| Agents | `extensions/prebase-magnus/` |
-| Agents commands | `prebase.magnus.*` |
-| Agents settings | `prebase.magnus.*` |
+> **Audience:** Engineers, contractors, and approved AI agents working on the PreBase codebase.
+> This is not a public-facing README. External users and open-source contributors are not the target audience.
 
 ---
 
-## What PreBase adds
+## What PreBase is
 
-These layers are **not** stock Code - OSS:
+PreBase is an AI-assisted desktop IDE and code-visualization platform. It combines:
 
-| Feature | What it is |
-|--------|------------|
-| **Home** | Landing page with native recent projects |
-| **PreBase Maps** | Architecture & Network graphs of your workspace |
-| **Runtime Preview** | In-IDE localhost preview for Vite / Next / similar apps |
-| **Agents** | AI chat (Ask / Edit / Agent) wired through the VS Code 1.128 chat stack |
-| **Account** | Optional sign-in from the Activity Bar Accounts control |
-| **PreBase Settings** | Maps, runtime, themes, and graph interaction |
+- A full VS Code workbench (forked from **Code - OSS 1.128**, commit-locked in `product.json`)
+- **Architecture & Network Maps** — interactive codebase graphs rendered by the graph subsystem under `graphs/`
+- **Runtime Preview** — in-IDE localhost preview for front-end dev servers
+- **Agents** — AI chat participant backed by Google Gemini, wired through the VS Code 1.128 chat stack
+
+PreBase is **not** an open-source release of VS Code. It is a commercial product with its own build, release, signing, and deployment pipeline. Do not treat it as a disposable upstream fork.
 
 ---
 
-## Chat modes (use VS Code’s picker — not a separate “Intent”)
+## Naming conventions
 
-VS Code 1.128 exposes chat capability through the built-in mode / agent picker in the chat input (**Ask**, **Edit**, **Agent**). That is the product model PreBase should follow ([VS Code chat](https://code.visualstudio.com/docs/copilot/chat/chat-agent-mode), [agents overview](https://code.visualstudio.com/docs/agents/overview)).
+| You see in the UI | Lives in the codebase as |
+|-------------------|--------------------------|
+| **Agents** | `extensions/prebase-magnus/`, command prefix `prebase.magnus.*` |
+| **Architecture / Network / Maps** | `graphs/` |
+| **PreBase Settings** | `src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts` |
+| **PreBase (app name)** | `product.json` → `nameShort`, `nameLong`, `applicationName` |
 
-The original PreBase prototype used a custom five-way **Ask / Plan / Edit / Test / Agent** “intent-like” mode picker beside the model dropdown. That felt clunky next to the workbench: two vocabularies, two pickers, and Plan/Test sat outside VS Code’s `ChatModeKind`.
+The AI subsystem is called **Magnus** in the codebase (historical internal code name). The product label is **Agents**. File names and command IDs use `magnus`; UI copy uses `Agents`. Do not rename the file tree.
 
-**Recommendation for users and contributors:**
+---
 
-1. Pick mode in the **Agents / Chat** input toolbar (Ask / Edit / Agent).
-2. Prefer custom agents / prompts for specialized Plan or Test workflows later — same picker surface as VS Code, not a second QuickPick.
-3. In PreBase Settings, **Node drag hover delay** only controls graph node dragging, not chat mode. (Older builds labeled this “Intent.”)
+## Repository layout
 
-Legacy note: `Agents: Select Mode` and `prebase.magnus.defaultMode` still exist for compatibility with the prototype. Prefer the VS Code mode picker.
+```
+src/vs/workbench/contrib/prebase/   # Home, Maps, Runtime, Account, Settings, graph host
+extensions/prebase-magnus/          # Agents extension (AI chat + Code Graph descriptions)
+graphs/                             # Architecture & Network graph subsystem (authoritative)
+  src/                              # TypeScript source — single source of truth
+  src/host/workbench/               # VS Code host integration
+  scripts/                          # Boundary verifier, assurance helpers
+scripts/
+  code.sh                           # macOS / Linux launch from source
+  code.bat                          # Windows launch from source
+  startup/                          # verify-magnus-runtime.mjs and startup checks
+  assurance/                        # Static verifier scripts
+  privacy/                          # Privacy audit
+  supabase/                         # Supabase migration validation
+docs/
+  TECHNOLOGY_VERSIONS.md            # Canonical toolchain version inventory
+  BETA_READINESS.md                 # Canonical beta blocker backlog
+  ASSURANCE.md                      # Assurance tiers and per-script documentation
+  PACKAGING.md                      # gulp packaging tasks
+  RELEASE_SIGNING.md                # PreBase signing preflight
+  TYPESCRIPT_7_MIGRATION.md         # TS7 dual-lane architecture
+product.json                        # Branding, extension allowlists, feature flags
+build/icons/icon-integrity.sha256   # FROZEN — SHA-256 manifest for all platform icons
+.github/copilot-instructions.md     # Authoritative coding and architecture guidelines
+AGENTS.md                           # AI agent persistent policies
+CONTRIBUTING.md                     # Internal engineering workflow
+SECURITY.md                         # Security policy and vulnerability reporting
+```
+
+Upstream editor, terminal, git, and chat infrastructure come from Code - OSS 1.128 (`src/vs/`, `extensions/`). Source archive: `VSCode 1.128.0.zip`.
 
 ---
 
 ## Quick start (from source)
 
 ```bash
-# Install dependencies (first time)
+# Install dependencies — requires npm 11.x (see docs/TECHNOLOGY_VERSIONS.md)
 npm install
 
-# Fast build: transpile client + extensions + Agents extension
+# Fast build: transpile client + extensions
 npm run build-fast
 
 # Or full compile
 npm run compile
 
-# Launch PreBase with an isolated profile
+# Launch PreBase from source (macOS/Linux)
 ./scripts/code.sh
+
+# Launch PreBase from source (Windows)
+scripts\code.bat
+
+# Watch mode (incremental)
+npm run watch
+
+# Build only the Agents extension
+npm run compile-magnus
+npm run watch-magnus
 ```
 
-| Script | Purpose |
-|--------|---------|
-| `npm run watch` | Watch client, extensions, and Agents extension |
-| `npm run typecheck-client` | Typecheck the workbench |
-| `npm run compile-magnus` | Build the Agents (`prebase-magnus`) extension only |
-| `./scripts/code.sh` | Run the desktop app |
-
-User data for this build lives under `.prebase` / `.prebase-shared` (see `product.json`).
+User data lives under `.prebase` / `.prebase-shared` (configured in `product.json` → `dataFolderName`).
 
 ---
 
-## Feature guides
+## Chat mode (Agents)
 
-### 1. Home & recent projects
+Agents uses the VS Code 1.128 built-in chat stack (**Ask**, **Edit**, **Agent** modes in the chat input toolbar). These are the authoritative chat surfaces.
 
-1. Launch PreBase and open a folder once (`File → Open Folder…`).
-2. Command Palette → **PreBase: Open Home**.
-3. Click a recent project, or use **Open Folder** from Home.
-
-Recent lists use the **native** workbench history (same as File → Open Recent).
+Legacy: `Agents: Select Mode` and `prebase.magnus.defaultMode` exist for prototype compatibility (`ask`, `plan`, `patch`, `runtime`, `agent`). Prefer the VS Code mode picker for new work.
 
 ---
 
-### 2. PreBase Maps (Architecture & Network)
+## Feature list
 
-- **Architecture** — layers and file relationships (Hierarchy / Pyramid / Scattered).
-- **Network** — spatial 3D-ish view (Organic, Sphere, Constellation, Clustered, Radial) with drag-to-rotate, scroll-to-zoom, and optional idle spin (off by default).
-
-**Try it:**
-
-1. Open a folder with source files.
-2. Open **PreBase Maps** in the Activity Bar.
-3. Run **PreBase: Scan Workspace** (or open Architecture / Network from the palette).
-4. Switch layouts from Maps chips or PreBase Settings.
-5. Empty-space drag rotates the Network graph; adjust **Network drag direction** under PreBase Settings → Interaction if it feels reversed.
-6. **PreBase: Fit Graph View** / **Reset Graph View** if the camera drifts.
-
-Large repos: lower max rendered nodes/edges in PreBase Settings if the map feels heavy.
+| Feature | What it is |
+|---------|------------|
+| **Home** | Landing page with native recent projects |
+| **Architecture / Network Maps** | Architecture and network graphs of your workspace |
+| **Runtime Preview** | In-IDE localhost preview for Vite / Next.js / similar apps |
+| **Agents** | AI chat (Ask / Edit / Agent) wired through VS Code 1.128 chat stack |
+| **Account** | Optional sign-in from the Activity Bar Accounts control |
+| **PreBase Settings** | Maps, runtime, themes, and interaction settings |
 
 ---
 
-### 3. Node descriptions
+## AI credential modes
 
-Selecting a graph node shows a structural overview plus an optional AI description when a compatible Agents model is available.
+Magnus resolves credentials in priority order based on the configured execution mode:
 
----
+| Mode | Credential source |
+|------|-------------------|
+| `auto` (default) | PreBase repo root `.env` (source dev) → OS SecretStorage (BYOK) → Hosted (gated) |
+| `development-env` | `GEMINI_API_KEY` from PreBase root `.env` only |
+| `byok` | Gemini API key in OS SecretStorage via Agents Settings |
+| `hosted` | **GATED** — infrastructure present, production chain not wired. Do not enable without product authorization. |
 
-### 4. Runtime Preview
+The secret resolver finds the PreBase repository root deterministically from `extensionPath`. `GEMINI_API_KEY` must be in the **PreBase repository root** `.env`, not a project workspace `.env`.
 
-Detects common front-end stacks, starts `dev` / `start`, and loads localhost in an in-IDE preview. Prefer **Start** over Connect when nothing is listening yet. Vite projects typically use `http://localhost:5173`.
-
----
-
-### 5. Agents (AI)
-
-Agents is PreBase’s default frontier-model-backed chat participant on the VS Code 1.128 chat stack. Open it from the **Agents** view in the auxiliary bar, Home, or Command Palette → **Agents: Open**.
-
-#### Using Agents with Maps / Runtime
-
-- Attach graph selection or runtime context from Maps / Runtime actions.
-- Prefer Ask / Edit / Agent from the chat mode picker.
+LinkUp (web search): separate BYOK key — `LINKUP_API_KEY` in root `.env` or configured via `Agents: Configure LinkUp Key…` in Agents Settings.
 
 ---
 
-### 6. Account & settings
+## Assurance tiers
 
-- **Accounts / profile** at the bottom of the Activity Bar: Sign In / Create Account when `prebase.account.apiBaseUrl` is set.
-- Account sessions are independent from the Agents model service.
-- **PreBase: Open PreBase Settings** for themes, maps, runtime, and interaction.
+Run the smallest relevant check first. See [`docs/ASSURANCE.md`](docs/ASSURANCE.md) for the complete reference.
 
----
+| Command | What it proves |
+|---------|----------------|
+| `npm run verify:graphs-boundary` | Graph code stays under `graphs/` |
+| `npm run verify:icons` | Application icons not tampered (101-path SHA-256 manifest) |
+| `npm run verify:privacy` | Telemetry flags, forbidden endpoints, CSP, secret-storage patterns |
+| `npm run verify:config-uniqueness` | No duplicate command IDs or config keys; includes manifest↔workbench cross-check |
+| `npm run verify:prebase-magnus-manifest` | Magnus manifest ↔ product.json proposal allowlist parity |
+| `npm run test:prebase-magnus` | Magnus unit tests |
+| `npm run test:graphs` | Graph unit tests |
+| `npm run typecheck-client` | Workbench TypeScript (TS 7) |
+| `npm run assurance:quick` | Full quick static gate |
+| `npm run verify:magnus-runtime` | Normal built-in launch smoke — requires all 10 lifecycle markers + `coreReady` |
 
-## Repository layout (PreBase-focused)
-
-```
-src/vs/workbench/contrib/prebase/   # Home, Maps, Runtime, account, settings, graphs
-extensions/prebase-magnus/          # Agents extension (Magnus = historical code name)
-product.json                        # Branding, Agents default chat wiring
-scripts/code.sh                     # Launch desktop PreBase from source
-```
-
-Upstream editor, terminal, git, and chat shell still come from the Code - OSS 1.128 tree (`src/vs/`, `extensions/`). Local comparison archive: `VSCode 1.128.0.zip`.
-
----
-
-## Extension gallery (Open VSX only)
-
-PreBase **does not** use the Visual Studio Marketplace. Marketplace Terms of Use restrict that service to Microsoft’s binaries; OSS forks must not point `extensionsGallery` at `marketplace.visualstudio.com`.
-
-| Surface | Source |
-|---------|--------|
-| Extensions view (search / install / update) | [Open VSX Registry](https://open-vsx.org/) via `product.json` → `extensionsGallery` |
-| Built-in debug helpers (`js-debug`, …) | GitHub release VSIXes from each extension’s `repo` field |
-| Web workbench embeds (`build/vite`, `build/rspack`) | Same Open VSX endpoints |
-
-Verify locally:
-
-```bash
-node build/assert-open-vsx.mjs
-```
-
-Not every Marketplace extension is mirrored on Open VSX. Prefer Open VSX listings, publisher mirrors, or installing a VSIX from an open-source release. Do not re-point `product.json` at Microsoft’s gallery.
+> **Important:** `assurance:quick PASS` does **not** prove Agents works at runtime. Run `verify:magnus-runtime` separately.
 
 ---
 
-## Development notes
+## Application icons (FROZEN)
 
-- Prefer workbench services (configuration, editor panes, webview `postMessage`). Do not invent a second recents DB or fake signed-in state.
-- After editing `src/`, run `npm run transpile-client` or `npm run watch` so `out/` stays current.
-- Agents extension changes: `npm run compile-magnus` (or `watch-magnus`).
-- Coding expectations: `.cursor/rules/prebase-development.mdc` and `.github/copilot-instructions.md` when present.
+Do not modify icons, icon sources, or `build/icons/icon-integrity.sha256`. New icon artwork requires explicit product authorization and a separate manifest update PR.
+
+---
+
+## Graphs subsystem ownership
+
+All Architecture/Network graph implementation lives under `graphs/`. The workbench compiles graph code via symlink. Run `npm run verify:graphs-boundary` before merging any graph change.
+
+---
+
+## TypeScript dual lanes
+
+| Lane | Package | Binary | Used by |
+|------|---------|--------|---------|
+| Primary (TS 7) | `@typescript/native` → `typescript@7.0.2` | `tsc` | Typecheck, `typecheck-client`, `typecheck:graphs` |
+| Compat API (TS 6) | `typescript` → `@typescript/typescript6@6.0.2` | `tsc6` | ESLint, `build/lib/*` API imports, test harnesses |
+
+Run `npm run verify:typescript` to audit both lanes.
+
+---
+
+## Extension gallery
+
+PreBase uses [Open VSX Registry](https://open-vsx.org/). Do not re-point `product.json` at `marketplace.visualstudio.com` (restricted to Microsoft binaries by VS Marketplace Terms).
+
+---
+
+## Beta readiness
+
+Canonical beta blockers: [`docs/BETA_READINESS.md`](docs/BETA_READINESS.md).
+
+Hosted AI (BETA-035) is **GATED**: infrastructure present, production deployment and authentication not wired.
 
 ---
 
 ## License
 
-PreBase builds on [Code - OSS (microsoft/vscode)](https://github.com/microsoft/vscode) components licensed under the [MIT](LICENSE.txt) license. See `LICENSE.txt` and third-party notices in the repository.
-
-Copyright for PreBase-specific contributions: PreBase contributors. Upstream Code - OSS portions: copyright their respective authors (including Microsoft Corporation for the original Code - OSS project).
+PreBase builds on [Code - OSS (microsoft/vscode)](https://github.com/microsoft/vscode) components licensed under the MIT License (`LICENSE.txt`). PreBase-specific contributions: copyright PreBase contributors. Upstream Code - OSS portions: copyright their respective authors (including Microsoft Corporation for the original Code - OSS project).

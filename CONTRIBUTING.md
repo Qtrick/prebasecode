@@ -1,80 +1,71 @@
-# Contributing to PreBase
+# PreBase Internal Engineering & Contribution Guide
 
-Thanks for helping improve PreBase. PreBase is an AI-assisted desktop IDE and
-code-visualization product built on the Code - OSS workbench. Contributions
-should improve PreBase without reintroducing Microsoft-only services, telemetry,
-or branding.
+This guide describes the engineering workflow, repository boundaries, and quality requirements for engineers, contractors, and AI agents contributing to the PreBase codebase.
 
-## Questions and feedback
+---
 
-- Use [GitHub Discussions](https://github.com/Qtrick/prebasecode/discussions)
-  for questions, ideas, and design feedback.
-- Use [GitHub Issues](https://github.com/Qtrick/prebasecode/issues) for
-  reproducible bugs and scoped feature requests.
-- Do not use public issues for security vulnerabilities; follow
-  [SECURITY.md](SECURITY.md) instead.
+## 1. Engineering Workflow
 
-Before opening an issue, search existing issues and discussions. For a bug,
-include the PreBase version or commit, operating system and architecture,
-reproduction steps, expected and actual behavior, relevant logs, and screenshots
-or recordings when the problem is visual. Do not attach credentials, tokens,
-private source, or personally identifiable information.
+1. **Workspace setup:** Clone the authorized repository. Verify runtime tooling against [docs/TECHNOLOGY_VERSIONS.md](docs/TECHNOLOGY_VERSIONS.md).
+2. **Branching:** Create a focused feature/fix branch from `main`. Keep pull requests narrowly scoped.
+3. **Dependencies:** Use `npm install` (requires npm 11.x). Do not introduce unvetted third-party runtime dependencies.
+4. **Development loop:**
+   - **Terminal 1:** `npm run watch` (incremental build)
+   - **Terminal 2:** `./scripts/code.sh` (macOS/Linux) or `scripts\code.bat` (Windows)
+5. **AI Agents:** Follow [AGENTS.md](AGENTS.md) and [.github/copilot-instructions.md](.github/copilot-instructions.md). Do not automatically stage, commit, or rewrite git history.
 
-## Development setup
+---
 
-1. Fork and clone this repository, then create a focused branch.
-2. Install the repository's supported Node and npm versions described in
-   [TECHNOLOGY_VERSIONS.md](docs/TECHNOLOGY_VERSIONS.md).
-3. Install dependencies with `npm install`.
-4. Build or watch the workbench with `npm run watch`, then launch with
-   `./scripts/code.sh`.
+## 2. Core Repository Subsystems & Ownership
 
-PreBase-specific architecture and validation requirements are documented in
-[AGENTS.md](AGENTS.md), [the project instructions](.github/copilot-instructions.md),
-and [ASSURANCE.md](docs/ASSURANCE.md). In particular:
+- **Code Graph (`graphs/`):** All Architecture/Network graph implementations live under `graphs/`. The workbench compiles them via symlink `src/vs/workbench/contrib/prebase/graphs` → `graphs/src`. Never modify graph files under `src/vs/` directly; modify `graphs/src/`. Verify with `npm run verify:graphs-boundary`.
+- **Agents (`extensions/prebase-magnus/`):** First-party AI assistant. Command prefix `prebase.magnus.*`. Credential resolution uses OS SecretStorage and root `.env` for source dev.
+- **Application Icons (FROZEN):** Do not modify Dock/app/installer icons or `build/icons/icon-integrity.sha256` without explicit authorization. Verified with `npm run verify:icons`.
+- **Privacy & Telemetry:** Telemetry and crash reporting to third parties must remain disabled. Verified with `npm run verify:privacy`.
+- **Extension Registry:** Open VSX only. Do not point `product.json` at Visual Studio Marketplace.
 
-- Keep graph implementation under `graphs/`; run `npm run verify:graphs-boundary`
-  for graph work.
-- Do not modify application, Dock, or installer icons without explicit product
-  authorization; run `npm run verify:icons`.
-- Keep telemetry, crash reporting, surveys, and Microsoft Marketplace routing
-  disabled. PreBase uses Open VSX for extensions.
-- Preserve workspace trust, secret-storage, path-containment, confirmation, and
-  cancellation boundaries when working on Agents or Runtime Preview.
+---
 
-## Pull requests
+## 3. Pull Request Requirements
 
-Keep each pull request narrowly scoped and explain the user-visible outcome.
-Include:
+Every internal pull request must include:
+- A clear summary of the problem, root cause, and technical solution.
+- Exact commands executed and their verification status (PASS/FAIL).
+- For UI/visual changes: manual verification evidence or screenshots from normal launch.
+- Any impact on [docs/BETA_READINESS.md](docs/BETA_READINESS.md) or [docs/ASSURANCE.md](docs/ASSURANCE.md).
 
-- The problem and root cause.
-- The tests and validation commands you ran, including results.
-- Screenshots or manual acceptance evidence for visual work.
-- Any compatibility, security, performance, or accessibility implications.
+---
 
-Do not commit generated `out/` artifacts, credentials, personal profiles, or
-unrelated formatting changes. Do not replace PreBase configuration wholesale
-with upstream Code - OSS files. Upstream-derived code should retain applicable
-license and copyright notices.
+## 4. Verification & Quality Gates
 
-## Validation expectations
+Run the smallest relevant check first:
 
-Run the smallest relevant checks first. TypeScript changes under `src/` require
-`npm run typecheck-client`; graph changes normally require `npm run typecheck:graphs`
-and `npm run test:graphs`. Run `npm run assurance` when the changed surface is
-covered by the assurance suite. See [ASSURANCE.md](docs/ASSURANCE.md) for what
-each command does and does not prove.
+```bash
+# Typecheck
+npm run typecheck-client
+npm run typecheck:graphs
 
-## Product boundaries
+# Unit tests
+npm run test:prebase-magnus
+npm run test:graphs
 
-PreBase is a distinct product, not a Microsoft distribution. Contributions must
-not re-enable Microsoft telemetry, crash upload, surveys, Copilot dependencies,
-Hosted Magnus, or Visual Studio Marketplace endpoints. Where PreBase retains
-Code - OSS components, treat them as upstream implementation dependencies and
-keep PreBase product behavior, documentation, and release infrastructure under
-PreBase ownership.
+# Static & integrity assurance
+npm run verify:graphs-boundary
+npm run verify:icons
+npm run verify:privacy
+npm run verify:config-uniqueness
+npm run verify:prebase-magnus-manifest
+npm run assurance:quick
 
-## Thank you
+# Runtime verification (real PreBase launch in clean profile)
+npm run verify:magnus-runtime
+```
 
-Thoughtful reports, reviews, tests, documentation, and code all make PreBase
-more reliable and safer to use.
+---
+
+## 5. Security & Privacy Responsibilities
+
+- Never commit secrets, tokens, API keys, or private workspace data.
+- Maintain strict isolation between user project workspaces and PreBase application credentials.
+- Report any security vulnerability following the internal procedure in [SECURITY.md](SECURITY.md).
+

@@ -11,6 +11,12 @@
   "categories": [
     "Other"
   ],
+  "capabilities": {
+    "virtualWorkspaces": true,
+    "untrustedWorkspaces": {
+      "supported": true
+    }
+  },
   "activationEvents": [
     "onStartupFinished",
     "onLanguageModelChatProvider:magnus",
@@ -226,16 +232,31 @@
         "command": "prebase.magnus.toggleStatusMenu",
         "title": "Toggle Status Menu",
         "category": "Agents"
+      },
+      {
+        "command": "prebase.magnus.listModels",
+        "title": "List Models",
+        "category": "Agents"
+      },
+      {
+        "command": "prebase.magnus.setLinkupKey",
+        "title": "Configure LinkUp Key…",
+        "category": "Agents"
+      },
+      {
+        "command": "prebase.magnus.clearLinkupKey",
+        "title": "Clear LinkUp Key",
+        "category": "Agents"
+      },
+      {
+        "command": "prebase.magnus.testLinkupConnection",
+        "title": "Test LinkUp Connection",
+        "category": "Agents"
       }
     ],
     "configuration": {
       "title": "Agents",
       "properties": {
-        "prebase.magnus.enabled": {
-          "type": "boolean",
-          "default": true,
-          "description": "Enable Agents AI chat."
-        },
         "prebase.magnus.defaultModel": {
           "type": "string",
           "default": "auto",

@@ -10,9 +10,11 @@ import {
 	MAGNUS_PROVIDERS,
 	resolveApiModel,
 	resolveModelInfo,
+	resolveModelOrFallback,
 	getModelOption,
 	formatContextWindowLabel,
 } from './models.ts';
+import { resolveAutoModelFromDiscovered } from './geminiAdapter.ts';
 
 suite('Magnus Models & Providers', () => {
 	test('defines Gemini as the primary provider with standard capabilities', () => {
@@ -48,6 +50,40 @@ suite('Magnus Models & Providers', () => {
 	test('getModelOption falls back to auto option on unknown model id', () => {
 		const opt = getModelOption('unknown-model-xyz');
 		assert.strictEqual(opt.id, 'auto');
+	});
+
+	test('resolveModelOrFallback returns known model or falls back to auto', () => {
+		assert.strictEqual(resolveModelOrFallback('gemini-2.5-pro'), 'gemini-2.5-pro');
+		assert.strictEqual(resolveModelOrFallback('gemini-2.5-flash'), 'gemini-2.5-flash');
+		assert.strictEqual(resolveModelOrFallback('unknown-old-model'), 'auto');
+		assert.strictEqual(resolveModelOrFallback('auto'), 'auto');
+	});
+
+	test('resolveAutoModelFromDiscovered selects flash 3.x over 2.5 and 2.5 over pro', () => {
+		// Case 1: 3.x flash available
+		const with3x = [
+			{ id: 'gemini-3.7-flash', capabilities: { agentCompatible: true } },
+			{ id: 'gemini-2.5-flash', capabilities: { agentCompatible: true } },
+			{ id: 'gemini-2.5-pro', capabilities: { agentCompatible: true } },
+		];
+		assert.strictEqual(resolveAutoModelFromDiscovered(with3x), 'gemini-3.7-flash');
+
+		// Case 2: only 2.5 available
+		const with25 = [
+			{ id: 'gemini-2.5-pro', capabilities: { agentCompatible: true } },
+			{ id: 'gemini-2.5-flash', capabilities: { agentCompatible: true } },
+		];
+		assert.strictEqual(resolveAutoModelFromDiscovered(with25), 'gemini-2.5-flash');
+
+		// Case 3: only pro available
+		const withPro = [
+			{ id: 'gemini-2.5-pro', capabilities: { agentCompatible: true } },
+		];
+		assert.strictEqual(resolveAutoModelFromDiscovered(withPro), 'gemini-2.5-pro');
+
+		// Case 4: empty / offline fallback
+		assert.strictEqual(resolveAutoModelFromDiscovered([]), 'gemini-2.5-flash');
+		assert.strictEqual(resolveAutoModelFromDiscovered(undefined), 'gemini-2.5-flash');
 	});
 
 	test('formatContextWindowLabel formats token counts cleanly', () => {

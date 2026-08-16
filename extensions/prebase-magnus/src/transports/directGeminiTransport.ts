@@ -458,81 +458,121 @@ export class DirectGeminiTransport {
 		}
 
 		const { controller, cleanup } = this.createAbortController(token);
+		const MAX_PAGES = 10;
+		const PAGE_SIZE = 100;
+
+		/**
+		 * Exclude model families that are not appropriate for coding-agent workflows.
+		 * These may advertise generateContent but are specialised for other modalities.
+		 */
+		const EXCLUDED_PATTERNS = [
+			'embedding', 'aqa', 'imagen', 'veo', 'tts', 'live', 'robotics',
+			'bison', // legacy PaLM-era
+			'gemma',  // open weights, not Gemini API general chat
+		];
+
+		function isExcludedFamily(id: string): boolean {
+			const lower = id.toLowerCase();
+			return EXCLUDED_PATTERNS.some(pat => lower.includes(pat));
+		}
 
 		try {
-			const url = `${this.baseUrl}/models?pageSize=50`;
-			const res = await this.fetchImpl(url, {
-				method: 'GET',
-				headers: {
-					'Content-Type': 'application/json',
-					'x-goog-api-key': apiKey.trim(),
-				},
-				signal: controller.signal,
-			});
-
-			if (!res.ok) {
-				throw new Error(`Gemini model discovery failed (HTTP ${res.status})`);
-			}
-
-			const bodyText = await this.readBoundedText(res);
-			const data = JSON.parse(bodyText) as {
-				models?: Array<{
-					name?: string;
-					displayName?: string;
-					description?: string;
-					inputTokenLimit?: number;
-					outputTokenLimit?: number;
-					supportedGenerationMethods?: string[];
-				}>;
-			};
-
-			const rawModels = data.models ?? [];
 			const normalized: NormalizedAIModel[] = [];
+			let pageToken: string | undefined;
+			let pagesRead = 0;
 
-			for (const m of rawModels) {
-				const rawName = m.name ?? '';
-				const id = rawName.startsWith('models/') ? rawName.slice('models/'.length) : rawName;
-				if (!id) {
-					continue;
+			do {
+				if (token?.isCancellationRequested) {
+					throw new Error('Cancelled');
 				}
 
-				const methods = m.supportedGenerationMethods ?? [];
-				const supportsGenerate = methods.includes('generateContent');
-				const isDeprecated = id.includes('1.0') || id.includes('1.5') || id.includes('experimental');
-				const isEmbedding = id.includes('embedding') || id.includes('aqa') || id.includes('imagen');
-
-				if (isEmbedding) {
-					continue;
+				const params = new URLSearchParams({ pageSize: String(PAGE_SIZE) });
+				if (pageToken) {
+					params.set('pageToken', pageToken);
 				}
+				const url = `${this.baseUrl}/models?${params.toString()}`;
 
-				const agentCompatible = supportsGenerate && !isDeprecated;
-				const descriptionCompatible = supportsGenerate;
-
-				normalized.push({
-					id,
-					name: rawName || `models/${id}`,
-					displayName: m.displayName || id,
-					description: m.description || `Google Gemini ${id} model.`,
-					inputTokenLimit: m.inputTokenLimit || 1_000_000,
-					outputTokenLimit: m.outputTokenLimit || 65_536,
-					capabilities: {
-						textGeneration: supportsGenerate,
-						streaming: supportsGenerate,
-						functionCalling: agentCompatible,
-						multimodalInput: true,
-						structuredOutput: true,
-						thinkingProtocol: false,
-						agentCompatible,
-						descriptionCompatible,
+				const res = await this.fetchImpl(url, {
+					method: 'GET',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-goog-api-key': apiKey.trim(),
 					},
+					signal: controller.signal,
 				});
-			}
+
+				if (!res.ok) {
+					throw new Error(`Gemini model discovery failed (HTTP ${res.status})`);
+				}
+
+				const bodyText = await this.readBoundedText(res);
+				const data = JSON.parse(bodyText) as {
+					models?: Array<{
+						name?: string;
+						displayName?: string;
+						description?: string;
+						inputTokenLimit?: number;
+						outputTokenLimit?: number;
+						supportedGenerationMethods?: string[];
+					}>;
+					nextPageToken?: string;
+				};
+
+				pagesRead++;
+				pageToken = data.nextPageToken;
+
+				const rawModels = data.models ?? [];
+
+				for (const m of rawModels) {
+					const rawName = m.name ?? '';
+					const id = rawName.startsWith('models/') ? rawName.slice('models/'.length) : rawName;
+					if (!id) {
+						continue;
+					}
+
+					if (isExcludedFamily(id)) {
+						continue;
+					}
+
+					const methods = m.supportedGenerationMethods ?? [];
+					const supportsGenerate = methods.includes('generateContent');
+					if (!supportsGenerate) {
+						continue;
+					}
+
+					// Legacy generation suffix patterns that signal older / deprecated models
+					const isDeprecated = /-(1\.0|1\.5|exp\d|experimental|preview-\d{4})/i.test(id);
+
+					const agentCompatible = !isDeprecated;
+					const descriptionCompatible = true; // all generateContent models can describe files
+
+					normalized.push({
+						id,
+						name: rawName || `models/${id}`,
+						displayName: m.displayName || id,
+						description: m.description || `Google Gemini ${id} model.`,
+						inputTokenLimit: m.inputTokenLimit || 1_000_000,
+						outputTokenLimit: m.outputTokenLimit || 65_536,
+						capabilities: {
+							textGeneration: true,
+							streaming: true,
+							functionCalling: agentCompatible,
+							multimodalInput: true,
+							structuredOutput: agentCompatible,
+							thinkingProtocol: false,
+							agentCompatible,
+							descriptionCompatible,
+						},
+					});
+				}
+			} while (pageToken && pagesRead < MAX_PAGES);
 
 			return normalized.filter(m => m.capabilities.agentCompatible || m.capabilities.descriptionCompatible);
 		} finally {
 			cleanup();
 		}
 	}
+
 
 	async testConnection(
 		apiKey: string,

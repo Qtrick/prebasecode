@@ -25,6 +25,10 @@ import {
 	type HostedGeminiTransportOptions,
 } from './transports/hostedGeminiTransport';
 
+/**
+ * Static fallback model list used when live discovery is unavailable or offline.
+ * These should remain current general-purpose Gemini models.
+ */
 export const STATIC_FALLBACK_GEMINI_MODELS: readonly NormalizedAIModel[] = [
 	{
 		id: 'auto',
@@ -86,6 +90,41 @@ export const STATIC_FALLBACK_GEMINI_MODELS: readonly NormalizedAIModel[] = [
 	},
 ];
 
+/**
+ * Auto model policy: prefer the newest stable general-purpose flash model available.
+ * Priority: gemini-3.x-flash > gemini-2.5-flash > gemini-2.5-pro > first agentCompatible.
+ * Falls back to 'gemini-2.5-flash' when no discovery data is available.
+ */
+export function resolveAutoModelFromDiscovered(
+	models?: readonly { id: string; capabilities: { agentCompatible: boolean } }[],
+): string {
+	const agentModels = models?.filter(m => m.capabilities.agentCompatible) ?? [];
+	if (agentModels.length === 0) {
+		return 'gemini-2.5-flash'; // static fallback
+	}
+
+	// Prefer gemini-3.x-flash family (newest stable general-purpose flash)
+	const flash3x = agentModels.find(m => /^gemini-3\.\d+-flash/i.test(m.id));
+	if (flash3x) {
+		return flash3x.id;
+	}
+
+	// Then gemini-2.5-flash
+	const flash25 = agentModels.find(m => m.id === 'gemini-2.5-flash');
+	if (flash25) {
+		return flash25.id;
+	}
+
+	// Then gemini-2.5-pro
+	const pro25 = agentModels.find(m => m.id === 'gemini-2.5-pro');
+	if (pro25) {
+		return pro25.id;
+	}
+
+	// First compatible as last resort
+	return agentModels[0].id;
+}
+
 export class GeminiProviderAdapter implements IPreBaseAIProviderAdapter {
 	readonly id = 'gemini';
 	readonly displayName = 'Google Gemini';
@@ -109,8 +148,8 @@ export class GeminiProviderAdapter implements IPreBaseAIProviderAdapter {
 		this.hostedTransport = new HostedGeminiTransport(options?.hostedOptions);
 	}
 
-	resolveAutoModel(_executionMode: PreBaseAIExecutionMode): string {
-		return 'gemini-2.5-flash';
+	resolveAutoModel(_executionMode: PreBaseAIExecutionMode, discoveredModels?: readonly { id: string; capabilities: { agentCompatible: boolean } }[]): string {
+		return resolveAutoModelFromDiscovered(discoveredModels);
 	}
 
 	normalizeError(error: unknown): AIProviderErrorClassification {

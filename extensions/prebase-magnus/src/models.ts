@@ -208,6 +208,16 @@ export function resolveModelInfo(modelId: string, discovered?: DiscoveredGeminiM
 	return { apiModel: 'gemini-2.5-flash', resolvedModelId: 'auto' };
 }
 
+export function resolveModelOrFallback(modelId: string, discovered?: DiscoveredModelInput[]): string {
+	const options = buildModelOptions(discovered ?? globalGeminiModelCache.get());
+	const found = options.find(m => m.id === modelId);
+	if (found) {
+		return found.id;
+	}
+	// Fallback to auto
+	return 'auto';
+}
+
 export function getModelOption(modelId: string, discovered?: DiscoveredGeminiModel[]): MagnusModelOption {
 	const options = buildModelOptions(discovered ?? globalGeminiModelCache.get());
 	return options.find(m => m.id === modelId) ?? options[0];

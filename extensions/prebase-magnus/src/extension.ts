@@ -33,20 +33,44 @@ export interface MagnusRuntimeState {
 	desktopToolsRegistered: boolean;
 	activationError?: SafeMagnusError;
 	optionalSubsystemErrors: SafeMagnusError[];
+	/** True when ALL core subsystems completed registration with no activation error. */
+	get coreReady(): boolean;
+	/** True when optional subsystems degraded (desktop tools failed or optional errors present). */
+	get degraded(): boolean;
 }
 
-export const runtimeState: MagnusRuntimeState = {
-	activationStarted: false,
-	activationCompleted: false,
-	aiServiceInitialized: false,
-	coreCommandsRegistered: false,
-	describeFileRegistered: false,
-	languageModelProviderRegistered: false,
-	chatParticipantsRegistered: false,
-	nativeToolsRegistered: false,
-	desktopToolsRegistered: false,
-	optionalSubsystemErrors: [],
-};
+class MagnusRuntimeStateImpl implements MagnusRuntimeState {
+	activationStarted = false;
+	activationCompleted = false;
+	aiServiceInitialized = false;
+	coreCommandsRegistered = false;
+	describeFileRegistered = false;
+	languageModelProviderRegistered = false;
+	chatParticipantsRegistered = false;
+	nativeToolsRegistered = false;
+	desktopToolsRegistered = false;
+	activationError?: SafeMagnusError;
+	optionalSubsystemErrors: SafeMagnusError[] = [];
+
+	get coreReady(): boolean {
+		return (
+			this.activationCompleted &&
+			this.aiServiceInitialized &&
+			this.describeFileRegistered &&
+			this.coreCommandsRegistered &&
+			this.languageModelProviderRegistered &&
+			this.chatParticipantsRegistered &&
+			this.nativeToolsRegistered &&
+			!this.activationError
+		);
+	}
+
+	get degraded(): boolean {
+		return !this.desktopToolsRegistered || this.optionalSubsystemErrors.length > 0;
+	}
+}
+
+export const runtimeState: MagnusRuntimeState = new MagnusRuntimeStateImpl();
 
 export function activate(context: vscode.ExtensionContext): void {
 	runtimeState.activationStarted = true;
@@ -225,6 +249,10 @@ export function activate(context: vscode.ExtensionContext): void {
 					chatParticipantsRegistered: runtimeState.chatParticipantsRegistered,
 					nativeToolsRegistered: runtimeState.nativeToolsRegistered,
 					desktopToolsRegistered: runtimeState.desktopToolsRegistered,
+					/** All core subsystems ready with no activation error. */
+					coreReady: runtimeState.coreReady,
+					/** Optional subsystems degraded (desktop tools or optional errors). */
+					degraded: runtimeState.degraded,
 					activationError: runtimeState.activationError,
 					optionalSubsystemErrors: runtimeState.optionalSubsystemErrors,
 					providerId: status.providerId,
@@ -540,6 +568,62 @@ export function activate(context: vscode.ExtensionContext): void {
 					await aiService.setExecutionMode(picked.id);
 					lmProvider.notifyChanged();
 					void vscode.window.showInformationMessage(`Execution mode set to: ${picked.label}`);
+				}
+			}),
+
+			vscode.commands.registerCommand('prebase.magnus.listModels', async () => {
+				// Returns the current model list for Settings UI or diagnostics — no secrets.
+				const models = await aiService.listModels(undefined, false);
+				const options = buildModelOptions(models);
+				return options.map(m => ({ id: m.id, name: m.name, description: m.description, isAuto: !!m.isAuto }));
+			}),
+
+			vscode.commands.registerCommand('prebase.magnus.setLinkupKey', async () => {
+				const value = await vscode.window.showInputBox({
+					title: 'Configure Agents Web Search (LinkUp)',
+					prompt: 'Enter the LinkUp API key to store securely in OS SecretStorage. Get a key at linkup.so.',
+					password: true,
+					ignoreFocusOut: true,
+				});
+				if (!value) {
+					return;
+				}
+				await secrets.setProviderApiKey('linkup', value);
+				secrets.refreshRootEnv();
+				void vscode.window.showInformationMessage('LinkUp web search key configured in secure storage.');
+			}),
+
+			vscode.commands.registerCommand('prebase.magnus.clearLinkupKey', async () => {
+				await secrets.clearProviderApiKey('linkup');
+				secrets.refreshRootEnv();
+				void vscode.window.showInformationMessage('Cleared the configured LinkUp web search credential from secure storage.');
+			}),
+
+			vscode.commands.registerCommand('prebase.magnus.testLinkupConnection', async () => {
+				const resolved = await secrets.getResolvedProviderApiKey('linkup');
+				if (!resolved?.key) {
+					void vscode.window.showWarningMessage('LinkUp is not configured. Use "Configure LinkUp Key…" in Agents Settings.');
+					return { ok: false, error: 'notConfigured' };
+				}
+				try {
+					const res = await fetch('https://api.linkup.so/v1/search', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${resolved.key}` },
+						body: JSON.stringify({ q: 'ping', depth: 'fast', outputType: 'searchResults' }),
+						signal: AbortSignal.timeout(10_000),
+					});
+					if (res.ok || res.status === 422) {
+						// 422 = key valid but query malformed — still proves auth works
+						void vscode.window.showInformationMessage(`LinkUp connection test succeeded (HTTP ${res.status}).`);
+						return { ok: true, status: res.status };
+					}
+					const msg = `LinkUp connection test failed (HTTP ${res.status}).`;
+					void vscode.window.showErrorMessage(msg);
+					return { ok: false, error: String(res.status), message: msg };
+				} catch (err) {
+					const msg = err instanceof Error ? err.message : String(err);
+					void vscode.window.showErrorMessage(`LinkUp connection test failed: ${msg}`);
+					return { ok: false, error: 'network', message: msg };
 				}
 			}),
 

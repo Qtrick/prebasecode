@@ -1,14 +1,14 @@
 @echo off
-setlocal
+setlocal enabledelayedexpansion
 
-title VSCode Dev
+title PreBase Dev
 
 pushd %~dp0\..
 
 :: Get electron, compile, built-in extensions
 if "%VSCODE_SKIP_PRELAUNCH%"=="" (
 	node build/lib/preLaunch.ts || (
-		echo Failed to prepare VS Code for launch ^(build/lib/preLaunch.ts^). 1>&2
+		echo Failed to prepare PreBase for launch ^(build/lib/preLaunch.ts^). 1>&2
 		exit /b 1
 	)
 )
@@ -36,8 +36,30 @@ for %%A in (%*) do (
 	)
 )
 
-:: Launch Code
-%CODE% . %DISABLE_TEST_EXTENSION% %*
+:: Enable Magnus proposed APIs.
+:: Do NOT pass --extensionDevelopmentPath by default — opt in with PREBASE_MAGNUS_EXT_DEV=1.
+set MAGNUS_DEV_PATH=%~dp0..\extensions\prebase-magnus
+set MAGNUS_DEV_ARG=
+set INPUT_ARGS=%*
+if not "!INPUT_ARGS:prebase.magnus=!"=="!INPUT_ARGS!" goto skip_proposed
+	set MAGNUS_DEV_ARG=--enable-proposed-api=prebase.magnus
+:skip_proposed
+
+set MAGNUS_EXT_DEV_ARG=
+if "%PREBASE_MAGNUS_EXT_DEV%"=="1" (
+	if exist "%MAGNUS_DEV_PATH%" (
+		if "!INPUT_ARGS:--extensionDevelopmentPath=!"=="!INPUT_ARGS!" (
+			set "MAGNUS_EXT_DEV_ARG=--extensionDevelopmentPath=%MAGNUS_DEV_PATH%"
+		)
+	)
+)
+
+:: Never send usage/crash telemetry to Microsoft or third parties.
+set TELEMETRY_ARG=--disable-telemetry
+if not "!INPUT_ARGS:--disable-telemetry=!"=="!INPUT_ARGS!" set TELEMETRY_ARG=
+
+:: Launch PreBase
+%CODE% . %DISABLE_TEST_EXTENSION% %MAGNUS_DEV_ARG% %MAGNUS_EXT_DEV_ARG% %TELEMETRY_ARG% %*
 goto end
 
 :builtin

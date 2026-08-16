@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 /**
  * Ensure PreBase graph command IDs are unique and configuration enum keys do not collide.
+ * Also cross-checks extension manifest configuration keys against workbench-registered keys.
  */
 import fs from 'node:fs';
 import path from 'node:path';
@@ -45,4 +46,26 @@ if (keyDupes.length) {
 	process.exit(1);
 }
 
-console.log(`verify:config-uniqueness: ${declared.length} command IDs, ${configKeys.length} configuration keys — OK`);
+// Cross-check: extension manifest config keys must not duplicate workbench-registered keys.
+const workbenchKeys = new Set(configKeys);
+const magnusManifestPath = path.join(REPO_ROOT, 'extensions/prebase-magnus/package.json');
+let manifestKeys = [];
+try {
+	const manifest = JSON.parse(fs.readFileSync(magnusManifestPath, 'utf8'));
+	const props = manifest?.contributes?.configuration?.properties ?? {};
+	manifestKeys = Object.keys(props).filter(k => k.startsWith('prebase.'));
+} catch {
+	// If manifest is unparseable, skip cross-check (will fail manifest verifier separately)
+}
+const crossDupes = manifestKeys.filter(k => workbenchKeys.has(k));
+if (crossDupes.length) {
+	console.error(
+		'verify:config-uniqueness: extension manifest duplicates workbench configuration keys:',
+		crossDupes,
+		'— remove from extensions/prebase-magnus/package.json configuration.properties (owned by prebaseConfiguration.ts)',
+	);
+	process.exit(1);
+}
+
+console.log(`verify:config-uniqueness: ${declared.length} command IDs, ${configKeys.length} configuration keys, ${manifestKeys.length} manifest keys cross-checked — OK`);
+

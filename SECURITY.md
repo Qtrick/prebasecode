@@ -1,50 +1,37 @@
-# PreBase Security Policy
+# PreBase Security Policy & Incident Escalation
 
-## Reporting a vulnerability
+This document outlines security procedures, vulnerability handling, and internal incident response for PreBase engineers, contractors, and agents.
 
-Please do **not** report security vulnerabilities in public GitHub issues,
-discussions, pull requests, logs, screenshots, or chat transcripts.
+---
 
-Use [GitHub's private vulnerability reporting flow for
-PreBase](https://github.com/Qtrick/prebasecode/security/advisories/new). Include
-a concise description, affected commit or release, reproduction steps or proof
-of concept, impact, and any suggested mitigation. Do not include credentials,
-access tokens, private keys, or unnecessary user data.
+## 1. Internal Security Incident Response (Employees & Contractors)
 
-If private reporting is unavailable, do not disclose the vulnerability publicly;
-contact a repository maintainer through GitHub and ask for a private reporting
-channel.
+If you discover a security vulnerability, credential leak, tool boundary bypass, or potential supply-chain compromise:
 
-## Scope
+1. **Stop public disclosure:** Do not discuss the vulnerability or post reproduction steps, tokens, logs, or screenshots in public issues, pull requests, or unencrypted chat.
+2. **Immediate escalation:** Immediately escalate through the team's designated private security/engineering incident channel. If no dedicated channel is configured, create a private repository security advisory or contact the engineering lead through an approved private channel.
+3. **Credential containment:** If a credential (API key, Supabase service token, signing key) was exposed, immediately rotate or revoke it at the provider source.
+4. **Assessment & patching:**
+   - Establish affected versions, platforms, and commit ranges.
+   - Develop a minimal, focused patch and add regression verification (e.g. `npm run verify:privacy`, `npm run verify:supabase-secrets`).
+   - Coordinate release and disclosure strictly through authorized engineering leadership.
 
-This policy covers PreBase-owned code and configuration in this repository,
-including the desktop workbench, `graphs/`, `extensions/prebase-magnus/`, Runtime
-Preview, Agents tool boundaries, build and release scripts, and PreBase-operated
-cloud integrations.
+---
 
-Code inherited from Code - OSS may also be in scope when its behavior is exposed
-by PreBase. Please report it to PreBase first when you can reproduce it in a
-PreBase build; maintainers will coordinate any responsible upstream disclosure.
+## 2. Security Priorities & Critical Boundaries
 
-## What to expect
+High-priority incident categories:
+- **Sandbox & Electron Security:** Remote code execution, context isolation bypass, nodeIntegration misuse.
+- **Agents & Tool Boundaries:** File containment escapes, path traversal outside workspace, arbitrary command execution without required user approval.
+- **Credential Storage:** Secrets or session tokens leaked to disk, unencrypted storage, or transmitted to unauthorized endpoints.
+- **Supply-Chain & Extension Routing:** Unverified dependencies, non-allowlisted network endpoints, or routing extensions outside Open VSX.
+- **Workspace Privacy:** Telemetry/analytics leakage or automatic uploading of workspace files and secrets.
 
-Maintainers will assess reports, request only the information needed to
-reproduce them, and work toward a fix or mitigation. Do not assume a disclosure
-timeline until one is agreed with the maintainers. Please give maintainers a
-reasonable opportunity to investigate and release a fix before public
-disclosure.
+---
 
-## Security priorities
+## 3. External Vulnerability Reporting
 
-High-priority reports include:
+External researchers should report vulnerabilities via [GitHub's private vulnerability reporting flow for PreBase](https://github.com/Qtrick/prebasecode/security/advisories/new).
 
-- Remote code execution, sandbox escape, or unsafe Electron configuration.
-- Unauthorized workspace, filesystem, process, network, or credential access.
-- Agents or Runtime Preview permission bypasses, including workspace-trust,
-  path-containment, confirmation, or ownership failures.
-- Exposure of secrets, session tokens, source code, or personal data.
-- Supply-chain compromise, malicious extension routing, or update/signing flaws.
+Include affected version/commit, minimal reproduction steps, and impact assessment. Do not include sensitive user data or live credentials.
 
-The current security and supply-chain posture, known limitations, and validation
-work are documented in [docs/SECURITY_AND_SUPPLY_CHAIN.md](docs/SECURITY_AND_SUPPLY_CHAIN.md).
-That document is not a substitute for private vulnerability reporting.

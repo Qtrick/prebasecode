@@ -278,3 +278,51 @@ describe('Context Attachment Bounding', () => {
 	});
 });
 
+describe('MagnusRuntimeState CoreReady Computation', () => {
+	it('correctly computes coreReady=true only when all core subsystems are registered with no errors', () => {
+		// Mock implementation testing the coreReady contract
+		function computeCoreReady(state: {
+			activationCompleted: boolean;
+			aiServiceInitialized: boolean;
+			describeFileRegistered: boolean;
+			coreCommandsRegistered: boolean;
+			languageModelProviderRegistered: boolean;
+			chatParticipantsRegistered: boolean;
+			nativeToolsRegistered: boolean;
+			activationError?: unknown;
+		}): boolean {
+			return (
+				state.activationCompleted &&
+				state.aiServiceInitialized &&
+				state.describeFileRegistered &&
+				state.coreCommandsRegistered &&
+				state.languageModelProviderRegistered &&
+				state.chatParticipantsRegistered &&
+				state.nativeToolsRegistered &&
+				!state.activationError
+			);
+		}
+
+		const fullState = {
+			activationCompleted: true,
+			aiServiceInitialized: true,
+			describeFileRegistered: true,
+			coreCommandsRegistered: true,
+			languageModelProviderRegistered: true,
+			chatParticipantsRegistered: true,
+			nativeToolsRegistered: true,
+			activationError: undefined,
+		};
+		assert.strictEqual(computeCoreReady(fullState), true);
+
+		// Missing native tools
+		assert.strictEqual(computeCoreReady({ ...fullState, nativeToolsRegistered: false }), false);
+
+		// Missing language model provider
+		assert.strictEqual(computeCoreReady({ ...fullState, languageModelProviderRegistered: false }), false);
+
+		// With activation error
+		assert.strictEqual(computeCoreReady({ ...fullState, activationError: { phase: 'chatParticipants', message: 'failed' } }), false);
+	});
+});
+

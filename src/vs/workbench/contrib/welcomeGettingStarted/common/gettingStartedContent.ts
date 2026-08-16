@@ -227,7 +227,7 @@ const Button = (title: string, href: string) => `[${title}](${href})`;
 
 const MagnusStepTitle = localize('gettingStarted.copilotSetup.title', "Use AI features with PreBase Agents");
 const MagnusDescription = localize({ key: 'gettingStarted.copilotSetup.description', comment: ['{Locked="["}', '{Locked="]({0})"}'] }, "You can use PreBase Agents to generate code across multiple files, fix errors, ask questions about your code, and much more using natural language.");
-const MagnusConfigureButton = Button(localize('setupMagnusButton.configure', "Open API Keys (.env)"), `command:prebase.magnus.setApiKey`);
+const MagnusConfigureButton = Button(localize('setupMagnusButton.configure', "Open Agents Settings"), `command:prebase.settings.openAI`);
 const MagnusOpenButton = Button(localize('setupMagnusButton.open', "Open Agents"), `command:prebase.magnus.open`);
 const MagnusStartChatButton = Button(localize('setupMagnusButton.chat', "Start to Chat"), 'command:prebase.magnus.open');
 
@@ -294,7 +294,7 @@ export const walkthroughs: GettingStartedWalkthroughContent = [
 				{
 					id: 'prebaseConfigureMagnus',
 					title: localize('gettingStarted.prebaseConfigureMagnus.title', "Configure Agents"),
-					description: localize('gettingStarted.prebaseConfigureMagnus.description.interpolated', "Paste at least one provider API key into `.env` (Gemini, OpenAI, Claude, …).\n{0}", MagnusConfigureButton),
+					description: localize('gettingStarted.prebaseConfigureMagnus.description.interpolated', "Add a Gemini API key in Agents Settings to enable AI chat, code editing, and graph descriptions.\n{0}", MagnusConfigureButton),
 					completionEvents: ['onCommand:prebase.magnus.setApiKey'],
 					media: { type: 'svg', altText: 'Configure Agents', path: 'customize-ai.svg' },
 				},

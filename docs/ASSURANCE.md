@@ -36,7 +36,9 @@ Individual verifiers:
 - `verify:supabase-secrets` — no hardcoded Supabase service-role / JWT secrets in source
 - `verify:eslint-prebase` — PreBase-path eslint ratchet (see above); not full-repo eslint
 - `verify:eslint-prebase-security` — zero-debt lint gate for privileged assurance, desktop-runtime, and Magnus code
-- `verify:config-uniqueness` — duplicate `prebase.*` command IDs and configuration enum keys
+- `verify:config-uniqueness` — duplicate `prebase.*` command IDs and configuration enum keys (including manifest↔workbench cross-check)
+- `verify:prebase-magnus-manifest` — Magnus extension manifest ↔ product.json proposed API allowlist parity
+- `verify:magnus-runtime` — normal built-in launch verification in clean profile; strictly asserts all 10 lifecycle markers + workbench restored + `coreReady` state
 
 ## Icon integrity
 

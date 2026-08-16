@@ -683,9 +683,9 @@ export class PreBaseSettingsEditor extends EditorPane {
 		this._selectStyle(execSelect);
 		const modes = [
 			{ id: 'auto', label: 'Automatic (Recommended)' },
-			{ id: 'development-env', label: 'Development Environment (.env)' },
+			{ id: 'development-env', label: 'Development Environment (Root .env)' },
 			{ id: 'byok', label: 'Bring Your Own Key (BYOK)' },
-			{ id: 'hosted', label: 'PreBase Hosted (Cloud Gateway)' },
+			{ id: 'hosted', label: 'PreBase Hosted (Not available in this build)' },
 		];
 		for (const m of modes) {
 			const opt = document.createElement('option');
@@ -707,12 +707,12 @@ export class PreBaseSettingsEditor extends EditorPane {
 
 		const modelSelect = document.createElement('select');
 		this._selectStyle(modelSelect);
-		const models = [
+		const staticFallbackModels = [
 			{ id: 'auto', label: 'Auto (Recommended - Gemini 2.5 Flash)' },
 			{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Complex Reasoning)' },
 			{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Fast & Capable)' },
 		];
-		for (const m of models) {
+		for (const m of staticFallbackModels) {
 			const opt = document.createElement('option');
 			opt.value = m.id;
 			opt.textContent = m.label;
@@ -722,11 +722,52 @@ export class PreBaseSettingsEditor extends EditorPane {
 		this._renderDisposables.add(DOM.addDisposableListener(modelSelect, 'change', () => {
 			void this.configurationService.updateValue('prebase.magnus.defaultModel', modelSelect.value);
 		}));
+
+		// Populate dynamic models asynchronously if Magnus is available
+		void this.commandService.executeCommand<Array<{ id: string; name: string; description: string }>>('prebase.magnus.listModels')
+			.then(discovered => {
+				if (Array.isArray(discovered) && discovered.length > 0) {
+					DOM.clearNode(modelSelect);
+					for (const m of discovered) {
+						const opt = document.createElement('option');
+						opt.value = m.id;
+						opt.textContent = m.name;
+						modelSelect.appendChild(opt);
+					}
+					modelSelect.value = this.configurationService.getValue<string>('prebase.magnus.defaultModel') || 'auto';
+				}
+			})
+			.catch(() => { /* keep fallback options */ });
+
 		this._row(
 			execCard,
 			localize('prebase.settings.ai.defaultModel', "Default model"),
 			localize('prebase.settings.ai.defaultModelHint', "Selected model for Agents chat, code completion, and architectural graph descriptions."),
 			modelSelect
+		);
+
+		const webSearchCard = this._panel(
+			this._main!,
+			localize('prebase.settings.ai.webSearchTitle', "Web Search (LinkUp)"),
+			localize('prebase.settings.ai.webSearchDesc', "Configure LinkUp API credentials for live web search tools in Agents.")
+		);
+
+		const linkupKeyCtrl = document.createElement('div');
+		Object.assign(linkupKeyCtrl.style, { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' });
+		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.setLinkupKey', "Configure LinkUp Key…"), () => {
+			void this.commandService.executeCommand('prebase.magnus.setLinkupKey');
+		}));
+		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.testLinkupConn', "Test LinkUp…"), () => {
+			void this.commandService.executeCommand('prebase.magnus.testLinkupConnection');
+		}));
+		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.clearLinkupKey', "Clear LinkUp Key"), () => {
+			void this.commandService.executeCommand('prebase.magnus.clearLinkupKey');
+		}));
+		this._row(
+			webSearchCard,
+			localize('prebase.settings.ai.linkupKeyManagement', "LinkUp Credential"),
+			localize('prebase.settings.ai.linkupKeyHint', "Enables web grounding for agentic research. Key stored in OS SecretStorage."),
+			linkupKeyCtrl
 		);
 
 		const actionsCard = this._panel(
@@ -776,7 +817,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const note = DOM.append(actionsCard, DOM.$('p'));
 		note.textContent = localize(
 			'prebase.settings.ai.privacyNotice',
-			"PreBase Privacy & Security: Model provider keys are never transmitted to third parties except the direct provider endpoint or authenticated PreBase agent gateway. Source files and telemetry are never uploaded."
+			"PreBase Privacy & Security: PreBase telemetry and analytics are disabled by default. AI prompt content and file context are transmitted strictly to your configured model provider or PreBase gateway as needed to perform requested AI operations. Credentials and workspace secrets are never uploaded."
 		);
 		Object.assign(note.style, { fontSize: '11px', color: COLORS.textMuted, padding: '8px 0 0', lineHeight: '1.45', margin: '0' });
 	}

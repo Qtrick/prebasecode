@@ -342,11 +342,6 @@ configurationRegistry.registerConfiguration({
 			default: 'gemini',
 			description: localize('prebase.magnus.provider', "Active AI model provider for PreBase Agents."),
 		},
-		'prebase.magnus.defaultModel': {
-			type: 'string',
-			default: 'auto',
-			description: localize('prebase.magnus.defaultModel', "Default model for PreBase Agents chat and code descriptions."),
-		},
 	}
 });
 

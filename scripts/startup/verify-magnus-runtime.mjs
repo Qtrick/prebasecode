@@ -15,8 +15,6 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 
 const LAUNCH_TIMEOUT_MS = 60_000;
 const WORKBENCH_RESTORED_MARKER = '[PreBase] workbench restored';
-const MAGNUS_ACTIVATED_MARKER = '[Magnus] activation completed';
-const EXT_HOST_ACTIVATE_MARKER = 'ExtensionService#_doActivateExtension prebase.magnus';
 
 const REQUIRED_MAGNUS_LIFECYCLE_MARKERS = [
 	'[Magnus] activation started',
@@ -127,18 +125,28 @@ async function runMagnusRuntimeSmoke(mode = 'normal') {
 					}
 				}
 
-				const hasMagnusActivated = combined.includes(MAGNUS_ACTIVATED_MARKER) ||
-					(combined.includes(EXT_HOST_ACTIVATE_MARKER) && (combined.includes('magnus/auto') || combined.includes('prebase.magnus')));
 				const hasWorkbenchRestored = combined.includes(WORKBENCH_RESTORED_MARKER);
 
-				if (hasMagnusActivated && hasWorkbenchRestored) {
+				// STRICT: require ALL lifecycle markers — no weak OR fallback.
+				// EXT_HOST_ACTIVATE_MARKER is diagnostic evidence only, NOT a pass condition.
+				const missingMarkers = REQUIRED_MAGNUS_LIFECYCLE_MARKERS.filter(m => !combined.includes(m));
+				const allMarkersPresent = missingMarkers.length === 0;
+
+				// Additionally require coreReady signal: extension.ts logs this when
+				// all core subsystems registered without activationError.
+				const hasCoreReady = combined.includes('[Magnus] activation completed') && !combined.includes('[Magnus] activation failed');
+
+				if (allMarkersPresent && hasWorkbenchRestored && hasCoreReady) {
 					passed = true;
 					resolve(true);
 					return;
 				}
 
 				if (Date.now() >= deadline) {
-					failureReason = `Timed out after ${LAUNCH_TIMEOUT_MS}ms waiting for Magnus activation lifecycle (sawMagnusActivated=${hasMagnusActivated}, sawWorkbenchRestored=${hasWorkbenchRestored})`;
+					const missing = missingMarkers.length > 0
+						? `\n  Missing markers:\n${missingMarkers.map(m => `    - ${m}`).join('\n')}`
+						: '';
+					failureReason = `Timed out after ${LAUNCH_TIMEOUT_MS}ms. allMarkersPresent=${allMarkersPresent}, hasCoreReady=${hasCoreReady}, hasWorkbenchRestored=${hasWorkbenchRestored}${missing}`;
 					resolve(false);
 					return;
 				}
@@ -169,7 +177,7 @@ async function runMagnusRuntimeSmoke(mode = 'normal') {
 	}
 
 	if (passed) {
-		console.log(`verify:magnus-runtime: PASS [Mode: ${mode.toUpperCase()}] (real PreBase application + Magnus verified in clean profile)`);
+		console.log(`verify:magnus-runtime: PASS [Mode: ${mode.toUpperCase()}] (all ${REQUIRED_MAGNUS_LIFECYCLE_MARKERS.length} Magnus lifecycle markers + workbench restored; coreReady confirmed)`);
 		return true;
 	} else {
 		console.error(`verify:magnus-runtime: FAIL [Mode: ${mode.toUpperCase()}] (${failureReason})`);
@@ -182,7 +190,21 @@ async function runMagnusRuntimeSmoke(mode = 'normal') {
 }
 
 async function main() {
+	const isAll = process.argv.includes('--all');
 	const isDevModeRequested = process.argv.includes('--dev') || process.argv.includes('--mode=extension-dev');
+
+	if (isAll) {
+		const okNormal = await runMagnusRuntimeSmoke('normal');
+		if (!okNormal) {
+			process.exit(1);
+		}
+		const okDev = await runMagnusRuntimeSmoke('extension-dev');
+		if (!okDev) {
+			process.exit(1);
+		}
+		return;
+	}
+
 	if (isDevModeRequested) {
 		const okDev = await runMagnusRuntimeSmoke('extension-dev');
 		if (!okDev) {
