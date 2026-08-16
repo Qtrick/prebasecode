@@ -22,13 +22,15 @@ export interface IGraphNodeDescriptionResult {
 	aiDescription?: string;
 	aiStatus: 'skipped' | 'loading' | 'ready' | 'unavailable' | 'error';
 	aiMessage?: string;
+	aiProviderId?: string;
+	aiModelId?: string;
 	cacheHit: boolean;
 }
 
-const PROMPT_VERSION = 'v3';
-const CACHE_KEY = 'prebase.graph.descriptionCache.v3';
+const PROMPT_VERSION = 'v4';
+const CACHE_KEY = 'prebase.graph.descriptionCache.v4';
 const MAX_CACHE = 200;
-const MAX_CONTENT = 6000;
+const MAX_CONTENT = 12000;
 
 const SENSITIVE = /(^|\/)(\.env|\.env\..*|credentials(\.json)?|secrets?(\.json)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|\.pem|\.key|\.p12|\.pfx)(\/|$)/i;
 const SENSITIVE_DIRS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(\/|$)/i;
@@ -36,6 +38,9 @@ const SENSITIVE_DIRS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(\/
 interface CacheEntry {
 	text: string;
 	at: number;
+	providerId?: string;
+	modelId?: string;
+	cacheIdentity?: string;
 }
 
 export interface IPreBaseGraphDescriptionService {
@@ -50,13 +55,22 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 	private _active: CancellationTokenSource | undefined;
 	private _inflight = new Map<string, Promise<IGraphNodeDescriptionResult>>();
 
+	private readonly workspaceContextService: IWorkspaceContextService;
+	private readonly fileService: IFileService;
+	private readonly storageService: IStorageService;
+	private readonly commandService: ICommandService;
+
 	constructor(
-		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
-		@IFileService private readonly fileService: IFileService,
-		@IStorageService private readonly storageService: IStorageService,
-		@ICommandService private readonly commandService: ICommandService,
+		@IWorkspaceContextService workspaceContextService: IWorkspaceContextService,
+		@IFileService fileService: IFileService,
+		@IStorageService storageService: IStorageService,
+		@ICommandService commandService: ICommandService,
 	) {
 		super();
+		this.workspaceContextService = workspaceContextService;
+		this.fileService = fileService;
+		this.storageService = storageService;
+		this.commandService = commandService;
 	}
 
 	override dispose(): void {
@@ -104,12 +118,18 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			relative,
 			contentHash,
 			PROMPT_VERSION,
-			'gemini',
 		].join('::');
 
 		const cached = options?.force ? undefined : this._readCache()[cacheKey];
 		if (cached?.text) {
-			return { overview, aiDescription: cached.text, aiStatus: 'ready', cacheHit: true };
+			return {
+				overview,
+				aiDescription: cached.text,
+				aiStatus: 'ready',
+				aiProviderId: cached.providerId ?? 'gemini',
+				aiModelId: cached.modelId,
+				cacheHit: true,
+			};
 		}
 
 		const existing = this._inflight.get(cacheKey);
@@ -125,11 +145,13 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		const work = (async (): Promise<IGraphNodeDescriptionResult> => {
 			try {
 				const prompt = [
-					'Write a concise 1–3 sentence description of this source file’s likely role.',
-					'Be specific. Do not invent APIs. Plain text only.',
+					'Write a detailed, informative 3–5 sentence description (~80–160 words) of this source file’s role in the architecture.',
+					'Cover what this file is responsible for, its primary exports or classes, key dependencies or architectural relationships, and where it fits in the subsystem.',
+					'If this is a test file, state the specific behaviors, scenarios, or regressions it validates.',
+					'Rules: Use only evidence visible in the supplied path, layer, imports, and content. If evidence is insufficient, state so rather than inventing APIs. Output plain text only without markdown formatting.',
 					`Path: ${relative}`,
 					`Layer: ${node.meta?.architectureLayer ?? 'unknown'}`,
-					`Imports: ${(node.meta?.imports || []).slice(0, 12).join(', ') || 'none'}`,
+					`Imports: ${(node.meta?.imports || []).slice(0, 16).join(', ') || 'none'}`,
 					'Content:',
 					content || '(unavailable)',
 				].join('\n');
@@ -228,18 +250,26 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					};
 				}
 
-				const cacheIdentity = (typeof raw === 'object' && raw.cacheIdentity) ? raw.cacheIdentity : 'gemini';
-				const effectiveCacheKey = [
-					folder.uri.toString(),
-					'file',
-					relative,
-					contentHash,
-					PROMPT_VERSION,
-					cacheIdentity,
-				].join('::');
+				const providerId = (typeof raw === 'object' && raw.providerId) ? raw.providerId : 'gemini';
+				const modelId = (typeof raw === 'object' && raw.modelId) ? raw.modelId : undefined;
+				const cacheIdentity = (typeof raw === 'object' && raw.cacheIdentity) ? raw.cacheIdentity : `${providerId}:${modelId || 'auto'}:${PROMPT_VERSION}`;
 
-				this._writeCache(effectiveCacheKey, aiText);
-				return { overview, aiDescription: aiText, aiStatus: 'ready', cacheHit: false };
+				this._writeCache(cacheKey, {
+					text: aiText,
+					at: Date.now(),
+					providerId,
+					modelId,
+					cacheIdentity,
+				});
+
+				return {
+					overview,
+					aiDescription: aiText,
+					aiStatus: 'ready',
+					aiProviderId: providerId,
+					aiModelId: modelId,
+					cacheHit: false,
+				};
 			} catch (err) {
 				return {
 					overview,
@@ -289,9 +319,9 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		}
 	}
 
-	private _writeCache(key: string, text: string): void {
+	private _writeCache(key: string, entry: CacheEntry): void {
 		const cache = this._readCache();
-		cache[key] = { text, at: Date.now() };
+		cache[key] = entry;
 		const entries = Object.entries(cache).sort((a, b) => b[1].at - a[1].at).slice(0, MAX_CACHE);
 		const next: Record<string, CacheEntry> = {};
 		for (const [k, v] of entries) {

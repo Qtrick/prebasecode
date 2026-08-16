@@ -12,6 +12,11 @@ import type {
 	NormalizedAIModel,
 } from '../aiTypes';
 
+import {
+	serializeGeminiRequest,
+	parseGeminiResponsePart,
+} from './directGeminiTransport';
+
 export interface HostedGatewayClient {
 	generate(payload: Record<string, unknown>, token?: AICancellationToken): Promise<Record<string, unknown>>;
 	discoverModels(token?: AICancellationToken): Promise<NormalizedAIModel[]>;
@@ -98,7 +103,7 @@ export function classifyHostedGatewayError(err: unknown): AIProviderErrorClassif
 	return {
 		code: 'providerServerError',
 		safeMessage: message.length > 200 ? `${message.slice(0, 200)}…` : message,
-		retryable: false,
+		retryable: true,
 	};
 }
 
@@ -141,22 +146,34 @@ export class HostedGeminiTransport {
 			throw new Error('Cancelled');
 		}
 
+		const serialized = serializeGeminiRequest(request);
+		const model = request.modelId.replace(/^models\//, '');
+
 		// Use custom gateway client if provided (e.g. from workbench commands)
 		if (this.gatewayClient) {
-			const payload = {
-				model: request.modelId.replace(/^models\//, ''),
-				contents: request.contents,
-				systemInstruction: request.systemInstruction ? { parts: [{ text: request.systemInstruction }] } : undefined,
-				generationConfig: {
-					maxOutputTokens: request.maxOutputTokens ?? 4096,
-					temperature: request.temperature ?? 0.2,
-				},
-				tools: request.tools && request.tools.length > 0 ? [{ functionDeclarations: request.tools }] : undefined,
+			const payload: Record<string, unknown> = {
+				model,
+				contents: serialized.contents,
+				systemInstruction: serialized.systemInstruction,
+				generationConfig: serialized.generationConfig,
+				tools: serialized.tools,
 			};
 
 			const raw = await this.gatewayClient.generate(payload, token);
 			const text = typeof raw.text === 'string' ? raw.text : '';
-			const candidate = raw.candidate as AIGenerateResponseCandidate | undefined;
+			let candidate: AIGenerateResponseCandidate | undefined;
+			if (raw.candidate && typeof raw.candidate === 'object') {
+				const cand = raw.candidate as { content?: { parts?: Array<Record<string, unknown>>; role?: string }; finishReason?: string };
+				if (cand.content?.parts) {
+					candidate = {
+						content: {
+							role: cand.content.role ?? 'model',
+							parts: cand.content.parts.map(parseGeminiResponsePart),
+						},
+						finishReason: cand.finishReason,
+					};
+				}
+			}
 
 			return {
 				text,
@@ -179,51 +196,15 @@ export class HostedGeminiTransport {
 		const { controller, cleanup } = this.createAbortController(token);
 
 		try {
-			const model = request.modelId.replace(/^models\//, '');
 			const url = `${this.gatewayUrl}/functions/v1/agent-gateway`;
-
-			const contents = request.contents.map(msg => ({
-				role: msg.role === 'model' ? 'model' : 'user',
-				parts: msg.parts.map(p => {
-					if (p.functionCall) {
-						return { functionCall: p.functionCall };
-					}
-					if (p.functionResponse) {
-						return { functionResponse: p.functionResponse };
-					}
-					return { text: p.text ?? '' };
-				}),
-			}));
 
 			const payload: Record<string, unknown> = {
 				model,
-				contents,
+				contents: serialized.contents,
+				systemInstruction: serialized.systemInstruction,
+				generationConfig: serialized.generationConfig,
+				tools: serialized.tools,
 			};
-
-			if (request.systemInstruction) {
-				payload.systemInstruction = {
-					parts: [{ text: request.systemInstruction }],
-				};
-			}
-
-			if (request.maxOutputTokens || request.temperature !== undefined) {
-				payload.generationConfig = {
-					maxOutputTokens: request.maxOutputTokens ?? 4096,
-					temperature: request.temperature ?? 0.2,
-				};
-			}
-
-			if (request.tools && request.tools.length > 0) {
-				payload.tools = [
-					{
-						functionDeclarations: request.tools.map(t => ({
-							name: t.name,
-							description: t.description,
-							parameters: t.parameters,
-						})),
-					},
-				];
-			}
 
 			const res = await this.fetchImpl(url, {
 				method: 'POST',
@@ -257,12 +238,29 @@ export class HostedGeminiTransport {
 			const data = JSON.parse(rawBody) as {
 				model?: string;
 				text?: string;
-				candidate?: AIGenerateResponseCandidate;
+				candidate?: {
+					content?: {
+						parts?: Array<Record<string, unknown>>;
+						role?: string;
+					};
+					finishReason?: string;
+				};
 			};
+
+			let candidate: AIGenerateResponseCandidate | undefined;
+			if (data.candidate?.content?.parts) {
+				candidate = {
+					content: {
+						role: data.candidate.content.role ?? 'model',
+						parts: data.candidate.content.parts.map(parseGeminiResponsePart),
+					},
+					finishReason: data.candidate.finishReason,
+				};
+			}
 
 			return {
 				text: data.text ?? '',
-				candidate: data.candidate,
+				candidate,
 				modelId: model,
 				providerId: 'gemini',
 				executionMode: 'hosted',
@@ -278,21 +276,34 @@ export class HostedGeminiTransport {
 		token?: AICancellationToken,
 	): Promise<AIGenerateResult> {
 		if (this.gatewayClient?.streamGenerate) {
-			const payload = {
-				model: request.modelId.replace(/^models\//, ''),
-				contents: request.contents,
-				systemInstruction: request.systemInstruction ? { parts: [{ text: request.systemInstruction }] } : undefined,
-				generationConfig: {
-					maxOutputTokens: request.maxOutputTokens ?? 4096,
-					temperature: request.temperature ?? 0.2,
-				},
-				tools: request.tools && request.tools.length > 0 ? [{ functionDeclarations: request.tools }] : undefined,
+			const serialized = serializeGeminiRequest(request);
+			const model = request.modelId.replace(/^models\//, '');
+			const payload: Record<string, unknown> = {
+				model,
+				contents: serialized.contents,
+				systemInstruction: serialized.systemInstruction,
+				generationConfig: serialized.generationConfig,
+				tools: serialized.tools,
 			};
 
 			const raw = await this.gatewayClient.streamGenerate(payload, onChunk, token);
+			let candidate: AIGenerateResponseCandidate | undefined;
+			if (raw.candidate && typeof raw.candidate === 'object') {
+				const cand = raw.candidate as { content?: { parts?: Array<Record<string, unknown>>; role?: string }; finishReason?: string };
+				if (cand.content?.parts) {
+					candidate = {
+						content: {
+							role: cand.content.role ?? 'model',
+							parts: cand.content.parts.map(parseGeminiResponsePart),
+						},
+						finishReason: cand.finishReason,
+					};
+				}
+			}
+
 			return {
 				text: typeof raw.text === 'string' ? raw.text : '',
-				candidate: raw.candidate as AIGenerateResponseCandidate | undefined,
+				candidate,
 				modelId: request.modelId,
 				providerId: 'gemini',
 				executionMode: 'hosted',

@@ -29,6 +29,7 @@ const tests = [
 	'graphs/src/tests/unit/networkLayout.test.ts',
 	'graphs/src/tests/unit/graphOwnershipBoundary.test.ts',
 	'graphs/src/tests/unit/graphIgnoreScanning.test.ts',
+	'graphs/src/tests/unit/graphDescriptionService.test.ts',
 ];
 
 for (const test of tests) {

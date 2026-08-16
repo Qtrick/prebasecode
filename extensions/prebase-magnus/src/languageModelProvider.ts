@@ -120,7 +120,11 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 			contents.push({ role: 'user', parts: [{ text: 'Hello' }] });
 		}
 
-		const tools = options.tools?.map(tool => ({ name: tool.name, description: tool.description, parameters: tool.inputSchema }));
+		const tools = options.tools?.map(tool => ({
+			name: tool.name,
+			description: tool.description,
+			inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
+		}));
 		let partsReported = 0;
 
 		try {

@@ -102,7 +102,7 @@ function createWebviewHarness(): { canvas: FakeElement; context: vm.Context; run
 	assert.ok(script, 'webview script must be present');
 
 	const elements = new Map<string, FakeElement>();
-	for (const id of ['archSvg', 'netCanvas', 'status', 'legend', 'empty', 'idleToggle', 'idleToggleWrap', 'popup', 'popupTitle', 'popupMeta', 'popupOverview', 'popupAi', 'popupClose', 'popupOpen', 'popupReveal', 'popupMagnus', 'zoomIn', 'zoomOut', 'fit', 'reset']) {
+	for (const id of ['archSvg', 'netCanvas', 'status', 'legend', 'empty', 'idleToggle', 'idleToggleWrap', 'popup', 'popupTitle', 'popupMeta', 'popupOverview', 'popupAi', 'popupAiProvenance', 'popupClose', 'popupOpen', 'popupReveal', 'popupMagnus', 'zoomIn', 'zoomOut', 'fit', 'reset']) {
 		elements.set(id, new FakeElement());
 	}
 	const documentListeners = new Map<string, Listener[]>();

@@ -330,7 +330,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #legend .swatch.composition { background:#a78bfa; }
 #legend .title.spaced { margin-top:8px; }
 #empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
-#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(420px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #303030); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
+#popup { position:absolute; z-index:6; width:min(380px, calc(100% - 24px)); max-height:min(480px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #303030); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
 #popup h3 { margin:0 0 4px; font-size:13px; }
 #popup .meta { color:var(--vscode-descriptionForeground, #a1a1aa); font-size:11px; margin-bottom:8px; word-break:break-word; }
 #popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-disabledForeground, #71717a); margin:10px 0 4px; }
@@ -364,6 +364,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	<p id="popupOverview"></p>
 	<div class="label">AI Description</div>
 	<p id="popupAi"></p>
+	<div class="ai-provenance" id="popupAiProvenance" style="display:none; margin-top:4px; font-size:10px; color:var(--vscode-descriptionForeground, #a1a1aa);"></div>
 	<div class="actions">
 		<button class="primary" id="popupOpen" type="button">Open File</button>
 		<button id="popupReveal" type="button">Reveal</button>
@@ -393,6 +394,7 @@ const popupTitle = document.getElementById('popupTitle');
 const popupMeta = document.getElementById('popupMeta');
 const popupOverview = document.getElementById('popupOverview');
 const popupAi = document.getElementById('popupAi');
+const popupAiProvenance = document.getElementById('popupAiProvenance');
 let popupNode = null;
 let pointerDownNode = null;
 let pointerDownX = 0, pointerDownY = 0;
@@ -1106,6 +1108,7 @@ async function openNodePopup(node, clientX, clientY) {
 	popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '');
 	popupOverview.textContent = 'Loading…';
 	popupAi.textContent = '…';
+	if (popupAiProvenance) { popupAiProvenance.style.display = 'none'; popupAiProvenance.textContent = ''; }
 	placePopupNear(clientX, clientY);
 	request('selectNode', { nodeId: node.id });
 	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection();
@@ -1113,9 +1116,20 @@ async function openNodePopup(node, clientX, clientY) {
 	if (!popupNode || popupNode.id !== node.id) return;
 	popupOverview.textContent = (desc && desc.overview) || 'No overview.';
 	if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
-		popupAi.textContent = desc.aiDescription + (desc.cacheHit ? ' (cached)' : '');
+		popupAi.textContent = desc.aiDescription;
+		if (popupAiProvenance) {
+			const providerName = desc.aiProviderId === 'gemini' ? 'Gemini' : (desc.aiProviderId || 'AI');
+			const modelName = desc.aiModelId ? (' · ' + desc.aiModelId) : '';
+			const cacheLabel = desc.cacheHit ? ' · Cached' : '';
+			popupAiProvenance.textContent = providerName + modelName + cacheLabel;
+			popupAiProvenance.style.display = 'block';
+		}
 	} else {
 		popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
+		if (popupAiProvenance) {
+			popupAiProvenance.textContent = '';
+			popupAiProvenance.style.display = 'none';
+		}
 	}
 }
 

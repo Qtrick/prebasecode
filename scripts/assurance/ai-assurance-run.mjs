@@ -210,6 +210,118 @@ async function runAssurance() {
 			});
 			report.overallStatus = 'FAIL';
 		}
+
+		// 4b. Gemini Live Function-Calling Protocol with parametersJsonSchema (additionalProperties: false)
+		const fcStart = Date.now();
+		try {
+			const toolRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+				method: 'POST',
+				headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+				body: JSON.stringify({
+					contents: [{ role: 'user', parts: [{ text: 'What is the current time in Tokyo? Use tool get_current_time.' }] }],
+					tools: [{
+						functionDeclarations: [{
+							name: 'get_current_time',
+							description: 'Get current time for a given timezone',
+							parametersJsonSchema: {
+								type: 'object',
+								properties: {
+									timezone: { type: 'string', description: 'IANA timezone name, e.g. Asia/Tokyo' },
+								},
+								required: ['timezone'],
+								additionalProperties: false,
+							},
+						}],
+					}],
+					generationConfig: { maxOutputTokens: 256, temperature: 0.0 },
+				}),
+			});
+			const duration = Date.now() - fcStart;
+			if (toolRes.ok) {
+				const toolData = await toolRes.json();
+				const candidatePart = toolData.candidates?.[0]?.content?.parts?.[0];
+				const functionCall = candidatePart?.functionCall;
+				const thoughtSig = candidatePart?.thoughtSignature || candidatePart?.thought_signature;
+
+				if (functionCall && functionCall.name === 'get_current_time') {
+					report.tests.push({
+						name: 'Gemini function-calling protocol (parametersJsonSchema + additionalProperties)',
+						status: 'PASS',
+						durationMs: duration,
+						details: `Generated tool call '${functionCall.name}' (thoughtSignature present: ${Boolean(thoughtSig)}).`,
+					});
+
+					// 4c. Gemini Multi-Turn Tool Response Continuation with Preserved Thought Signature
+					const contStart = Date.now();
+					const contRes = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
+						body: JSON.stringify({
+							contents: [
+								{ role: 'user', parts: [{ text: 'What is the current time in Tokyo? Use tool get_current_time.' }] },
+								{
+									role: 'model',
+									parts: [candidatePart],
+								},
+								{
+									role: 'user',
+									parts: [{
+										functionResponse: {
+											name: 'get_current_time',
+											response: { currentTime: '2026-08-16T22:30:00+09:00' },
+											...(functionCall.id ? { id: functionCall.id } : {}),
+										},
+									}],
+								},
+							],
+							generationConfig: { maxOutputTokens: 256, temperature: 0.0 },
+						}),
+					});
+					const contDuration = Date.now() - contStart;
+					if (contRes.ok) {
+						const contData = await contRes.json();
+						const finalText = contData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+						report.tests.push({
+							name: 'Gemini multi-turn tool response continuation with thoughtSignature',
+							status: 'PASS',
+							durationMs: contDuration,
+							details: `Synthesized tool result into final response (${finalText.length} chars).`,
+						});
+					} else {
+						report.tests.push({
+							name: 'Gemini multi-turn tool response continuation with thoughtSignature',
+							status: 'FAIL',
+							durationMs: contDuration,
+							details: `HTTP ${contRes.status}`,
+						});
+						report.overallStatus = 'FAIL';
+					}
+				} else {
+					report.tests.push({
+						name: 'Gemini function-calling protocol (parametersJsonSchema + additionalProperties)',
+						status: 'FAIL',
+						durationMs: duration,
+						details: 'Model did not return expected functionCall part.',
+					});
+					report.overallStatus = 'FAIL';
+				}
+			} else {
+				report.tests.push({
+					name: 'Gemini function-calling protocol (parametersJsonSchema + additionalProperties)',
+					status: 'FAIL',
+					durationMs: duration,
+					details: `HTTP ${toolRes.status}`,
+				});
+				report.overallStatus = 'FAIL';
+			}
+		} catch (err) {
+			report.tests.push({
+				name: 'Gemini function-calling protocol (parametersJsonSchema + additionalProperties)',
+				status: 'FAIL',
+				details: err instanceof Error ? err.message : String(err),
+			});
+			report.overallStatus = 'FAIL';
+		}
 	} else {
 		report.tests.push({
 			name: 'Gemini live model discovery & generation',

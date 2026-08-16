@@ -164,8 +164,9 @@ export function buildModelOptions(discovered?: DiscoveredModelInput[]): MagnusMo
 		return [...DEFAULT_MAGNUS_MODELS];
 	}
 
-	// Determine best auto target: prefer gemini-2.5-flash, then 2.5-pro, then first compatible
-	const autoTarget = compatible.find(m => m.id === 'gemini-2.5-flash')
+	// Determine best auto target: prefer gemini-3.x-flash, then 2.5-flash, then 2.5-pro, then first compatible
+	const autoTarget = compatible.find(m => /^gemini-3\.\d+-flash/i.test(m.id))
+		|| compatible.find(m => m.id === 'gemini-2.5-flash')
 		|| compatible.find(m => m.id === 'gemini-2.5-pro')
 		|| compatible[0];
 

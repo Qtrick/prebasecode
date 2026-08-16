@@ -8,6 +8,7 @@ import type {
 	AIContentMessage,
 	AIGenerateResult,
 	AIProviderErrorClassification,
+	AIToolDeclaration,
 	IPreBaseAIService,
 	NormalizedAIModel,
 	ProviderStatusResult,
@@ -294,6 +295,37 @@ export class PreBaseAIService implements IPreBaseAIService {
 		return fallbackList;
 	}
 
+	async resolveModelForExecution(
+		providerId: string,
+		requestedModelId?: string,
+		credential?: import('./secretResolver').ResolvedProviderExecution,
+		token?: AICancellationToken,
+	): Promise<string> {
+		const targetId = providerId.toLowerCase().replace(/-api$/, '');
+		const modelId = requestedModelId ?? this.getActiveModelId();
+		if (modelId && modelId !== 'auto') {
+			return modelId.replace(/^models\//, '');
+		}
+
+		const adapter = this.registry.getAdapter(targetId);
+		if (!adapter) {
+			return 'gemini-2.5-flash';
+		}
+
+		const cred = credential ?? await this.resolveCredential(targetId);
+
+		let catalog = this.modelCache.get(targetId)?.models;
+		if (!catalog || catalog.length === 0) {
+			try {
+				catalog = await this.listModels(targetId, false, token);
+			} catch {
+				catalog = [...adapter.staticFallbackModels];
+			}
+		}
+
+		return adapter.resolveAutoModel(cred.executionMode, catalog);
+	}
+
 	async generateText(
 		prompt: string,
 		options?: { modelId?: string; maxTokens?: number; temperature?: number },
@@ -306,11 +338,11 @@ export class PreBaseAIService implements IPreBaseAIService {
 		}
 
 		const credential = await this.resolveCredential(providerId);
-		const modelId = options?.modelId ?? this.getActiveModelId();
+		const resolvedModel = await this.resolveModelForExecution(providerId, options?.modelId, credential, token);
 
 		const result = await adapter.generate(
 			{
-				modelId,
+				modelId: resolvedModel,
 				contents: [
 					{
 						role: 'user',
@@ -372,15 +404,14 @@ export class PreBaseAIService implements IPreBaseAIService {
 			};
 		}
 
-		const modelId = this.getActiveModelId();
-		const resolvedModel = modelId === 'auto' ? adapter.resolveAutoModel(credential.executionMode) : modelId;
+		const resolvedModel = await this.resolveModelForExecution(providerId, undefined, credential, token);
 
 		try {
 			const result = await adapter.generate(
 				{
 					modelId: resolvedModel,
 					contents: [{ role: 'user', parts: [{ text: trimmedPrompt }] }],
-					maxOutputTokens: 256,
+					maxOutputTokens: 512,
 					temperature: 0.2,
 				},
 				credential,
@@ -403,7 +434,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 				text,
 				providerId,
 				modelId: resolvedModel,
-				cacheIdentity: `${providerId}:${resolvedModel}`,
+				cacheIdentity: `${providerId}:${resolvedModel}:v4`,
 				retryable: false,
 			};
 		} catch (err) {
@@ -432,7 +463,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		request: {
 			messages: AIContentMessage[];
 			systemInstruction?: string;
-			tools?: Array<{ name: string; description: string; parameters?: object }>;
+			tools?: AIToolDeclaration[];
 			modelId?: string;
 		},
 		token?: AICancellationToken,
@@ -444,11 +475,11 @@ export class PreBaseAIService implements IPreBaseAIService {
 		}
 
 		const credential = await this.resolveCredential(providerId);
-		const modelId = request.modelId ?? this.getActiveModelId();
+		const resolvedModel = await this.resolveModelForExecution(providerId, request.modelId, credential, token);
 
 		return await adapter.generate(
 			{
-				modelId,
+				modelId: resolvedModel,
 				contents: request.messages,
 				systemInstruction: request.systemInstruction,
 				tools: request.tools,
@@ -462,7 +493,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		request: {
 			messages: AIContentMessage[];
 			systemInstruction?: string;
-			tools?: Array<{ name: string; description: string; parameters?: object }>;
+			tools?: AIToolDeclaration[];
 			modelId?: string;
 		},
 		onChunk: (chunk: { text?: string; candidate?: import('./aiTypes').AIGenerateResponseCandidate }) => void,
@@ -475,12 +506,12 @@ export class PreBaseAIService implements IPreBaseAIService {
 		}
 
 		const credential = await this.resolveCredential(providerId);
-		const modelId = request.modelId ?? this.getActiveModelId();
+		const resolvedModel = await this.resolveModelForExecution(providerId, request.modelId, credential, token);
 
 		if (adapter.streamGenerate) {
 			return await adapter.streamGenerate(
 				{
-					modelId,
+					modelId: resolvedModel,
 					contents: request.messages,
 					systemInstruction: request.systemInstruction,
 					tools: request.tools,
@@ -493,7 +524,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 		const result = await adapter.generate(
 			{
-				modelId,
+				modelId: resolvedModel,
 				contents: request.messages,
 				systemInstruction: request.systemInstruction,
 				tools: request.tools,
@@ -530,8 +561,8 @@ export class PreBaseAIService implements IPreBaseAIService {
 		}
 
 		const credential = await this.resolveCredential(targetId);
-		const targetModel = modelId ?? this.getActiveModelId();
+		const resolvedModel = await this.resolveModelForExecution(targetId, modelId, credential, token);
 
-		return await adapter.testConnection(credential, targetModel, token);
+		return await adapter.testConnection(credential, resolvedModel, token);
 	}
 }

@@ -35,13 +35,23 @@ export interface NormalizedAIModel {
 export interface AIContentPart {
 	readonly text?: string;
 	readonly inlineData?: { mimeType: string; data: string };
-	readonly functionCall?: { name: string; args?: Record<string, unknown> };
-	readonly functionResponse?: { name: string; response: Record<string, unknown> };
+	readonly functionCall?: { id?: string; name: string; args?: Record<string, unknown> };
+	readonly functionResponse?: { id?: string; name: string; response: Record<string, unknown> };
+	readonly thought?: boolean;
+	readonly thoughtSignature?: string;
+	readonly opaqueMetadata?: Record<string, unknown>;
 }
 
 export interface AIContentMessage {
 	readonly role: 'user' | 'model' | 'system';
 	readonly parts: AIContentPart[];
+}
+
+export interface AIToolDeclaration {
+	readonly name: string;
+	readonly description: string;
+	readonly inputSchema?: Record<string, unknown>;
+	readonly parameters?: Record<string, unknown>;
 }
 
 export interface AIGenerateRequest {
@@ -50,7 +60,7 @@ export interface AIGenerateRequest {
 	readonly systemInstruction?: string;
 	readonly maxOutputTokens?: number;
 	readonly temperature?: number;
-	readonly tools?: Array<{ name: string; description: string; parameters?: object }>;
+	readonly tools?: AIToolDeclaration[];
 	readonly stream?: boolean;
 }
 
@@ -105,7 +115,7 @@ export interface IPreBaseAIProviderAdapter {
 	readonly defaultModel: string;
 	readonly staticFallbackModels: readonly NormalizedAIModel[];
 
-	resolveAutoModel(executionMode: PreBaseAIExecutionMode): string;
+	resolveAutoModel(executionMode: PreBaseAIExecutionMode, discoveredModels?: readonly NormalizedAIModel[]): string;
 
 	discoverModels(
 		credential: ResolvedProviderExecution,
@@ -167,7 +177,7 @@ export interface IPreBaseAIService {
 		request: {
 			messages: AIContentMessage[];
 			systemInstruction?: string;
-			tools?: Array<{ name: string; description: string; parameters?: object }>;
+			tools?: AIToolDeclaration[];
 			modelId?: string;
 		},
 		token?: AICancellationToken,
@@ -177,7 +187,7 @@ export interface IPreBaseAIService {
 		request: {
 			messages: AIContentMessage[];
 			systemInstruction?: string;
-			tools?: Array<{ name: string; description: string; parameters?: object }>;
+			tools?: AIToolDeclaration[];
 			modelId?: string;
 		},
 		onChunk: (chunk: { text?: string; candidate?: AIGenerateResponseCandidate }) => void,

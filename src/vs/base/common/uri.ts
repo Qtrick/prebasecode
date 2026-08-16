@@ -108,14 +108,14 @@ export class URI implements UriComponents {
 		if (!thing || typeof thing !== 'object') {
 			return false;
 		}
-		return typeof (<URI>thing).authority === 'string'
-			&& typeof (<URI>thing).fragment === 'string'
-			&& typeof (<URI>thing).path === 'string'
-			&& typeof (<URI>thing).query === 'string'
-			&& typeof (<URI>thing).scheme === 'string'
-			&& typeof (<URI>thing).fsPath === 'string'
-			&& typeof (<URI>thing).with === 'function'
-			&& typeof (<URI>thing).toString === 'function';
+		return typeof (thing as URI).authority === 'string'
+			&& typeof (thing as URI).fragment === 'string'
+			&& typeof (thing as URI).path === 'string'
+			&& typeof (thing as URI).query === 'string'
+			&& typeof (thing as URI).scheme === 'string'
+			&& typeof (thing as URI).fsPath === 'string'
+			&& typeof (thing as URI).with === 'function'
+			&& typeof (thing as URI).toString === 'function';
 	}
 
 	/**

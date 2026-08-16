@@ -5,6 +5,7 @@
 
 import type {
 	AICancellationToken,
+	AIContentPart,
 	AIGenerateRequest,
 	AIGenerateResponseCandidate,
 	AIGenerateResult,
@@ -101,6 +102,150 @@ export function classifyGeminiHttpError(err: unknown): AIProviderErrorClassifica
  * Direct transport for Google Gemini Generative Language API.
  * Sends credentials strictly via x-goog-api-key header (never in URL or body).
  */
+/**
+ * Serializes a provider-neutral AIGenerateRequest to Gemini REST wire format.
+ * Uses parametersJsonSchema for function declarations to preserve JSON Schema fidelity.
+ * Preserves functionCall IDs, functionResponse IDs, and thought signatures.
+ */
+export function serializeGeminiRequest(request: AIGenerateRequest): Record<string, unknown> {
+	const contents = request.contents.map(msg => ({
+		role: msg.role === 'model' ? 'model' : 'user',
+		parts: msg.parts.map(p => {
+			if (p.functionCall) {
+				const fc: Record<string, unknown> = {
+					name: p.functionCall.name,
+					args: p.functionCall.args ?? {},
+				};
+				if (p.functionCall.id) {
+					fc.id = p.functionCall.id;
+				}
+				const partObj: Record<string, unknown> = { functionCall: fc };
+				if (p.thoughtSignature) {
+					partObj.thoughtSignature = p.thoughtSignature;
+				}
+				if (p.thought !== undefined) {
+					partObj.thought = p.thought;
+				}
+				return partObj;
+			}
+			if (p.functionResponse) {
+				const fr: Record<string, unknown> = {
+					name: p.functionResponse.name,
+					response: p.functionResponse.response ?? {},
+				};
+				if (p.functionResponse.id) {
+					fr.id = p.functionResponse.id;
+				}
+				return { functionResponse: fr };
+			}
+			if (p.inlineData) {
+				return { inlineData: p.inlineData };
+			}
+			const partObj: Record<string, unknown> = { text: p.text ?? '' };
+			if (p.thoughtSignature) {
+				partObj.thoughtSignature = p.thoughtSignature;
+			}
+			if (p.thought !== undefined) {
+				partObj.thought = p.thought;
+			}
+			return partObj;
+		}),
+	}));
+
+	const payload: Record<string, unknown> = {
+		contents,
+	};
+
+	if (request.systemInstruction) {
+		payload.systemInstruction = {
+			parts: [{ text: request.systemInstruction }],
+		};
+	}
+
+	if (request.maxOutputTokens || request.temperature !== undefined) {
+		payload.generationConfig = {
+			maxOutputTokens: request.maxOutputTokens ?? 4096,
+			temperature: request.temperature ?? 0.2,
+		};
+	}
+
+	if (request.tools && request.tools.length > 0) {
+		payload.tools = [
+			{
+				functionDeclarations: request.tools.map(t => {
+					const decl: Record<string, unknown> = {
+						name: t.name,
+						description: t.description,
+					};
+					const schema = t.inputSchema ?? t.parameters;
+					if (schema) {
+						decl.parametersJsonSchema = schema;
+					}
+					return decl;
+				}),
+			},
+		];
+	}
+
+	return payload;
+}
+
+export function parseGeminiResponsePart(rawPart: Record<string, unknown>): AIContentPart {
+	const part: {
+		text?: string;
+		inlineData?: { mimeType: string; data: string };
+		functionCall?: { id?: string; name: string; args?: Record<string, unknown> };
+		functionResponse?: { id?: string; name: string; response: Record<string, unknown> };
+		thought?: boolean;
+		thoughtSignature?: string;
+	} = {};
+
+	if (typeof rawPart.text === 'string') {
+		part.text = rawPart.text;
+	}
+	if (rawPart.thought === true) {
+		part.thought = true;
+	}
+	const sig = (typeof rawPart.thoughtSignature === 'string' && rawPart.thoughtSignature) ||
+		(typeof rawPart.thought_signature === 'string' && rawPart.thought_signature);
+	if (sig) {
+		part.thoughtSignature = sig;
+	}
+
+	if (rawPart.functionCall && typeof rawPart.functionCall === 'object') {
+		const fc = rawPart.functionCall as Record<string, unknown>;
+		const fcSig = (typeof fc.thoughtSignature === 'string' && fc.thoughtSignature) ||
+			(typeof fc.thought_signature === 'string' && fc.thought_signature);
+		if (fcSig && !part.thoughtSignature) {
+			part.thoughtSignature = fcSig;
+		}
+		part.functionCall = {
+			name: String(fc.name || ''),
+			id: typeof fc.id === 'string' ? fc.id : undefined,
+			args: (fc.args && typeof fc.args === 'object' && !Array.isArray(fc.args)) ? fc.args as Record<string, unknown> : {},
+		};
+	}
+
+	if (rawPart.functionResponse && typeof rawPart.functionResponse === 'object') {
+		const fr = rawPart.functionResponse as Record<string, unknown>;
+		part.functionResponse = {
+			name: String(fr.name || ''),
+			id: typeof fr.id === 'string' ? fr.id : undefined,
+			response: (fr.response && typeof fr.response === 'object' && !Array.isArray(fr.response)) ? fr.response as Record<string, unknown> : {},
+		};
+	}
+
+	if (rawPart.inlineData && typeof rawPart.inlineData === 'object') {
+		const id = rawPart.inlineData as Record<string, unknown>;
+		part.inlineData = {
+			mimeType: String(id.mimeType || ''),
+			data: String(id.data || ''),
+		};
+	}
+
+	return part;
+}
+
 export class DirectGeminiTransport {
 	private readonly baseUrl: string;
 	private readonly fetchImpl: (input: string | URL, init?: RequestInit) => Promise<Response>;
@@ -167,50 +312,7 @@ export class DirectGeminiTransport {
 			const model = request.modelId.replace(/^models\//, '');
 			const url = `${this.baseUrl}/models/${encodeURIComponent(model)}:generateContent`;
 
-			const contents = request.contents.map(msg => ({
-				role: msg.role === 'model' ? 'model' : 'user',
-				parts: msg.parts.map(p => {
-					if (p.functionCall) {
-						return { functionCall: p.functionCall };
-					}
-					if (p.functionResponse) {
-						return { functionResponse: p.functionResponse };
-					}
-					if (p.inlineData) {
-						return { inlineData: p.inlineData };
-					}
-					return { text: p.text ?? '' };
-				}),
-			}));
-
-			const payload: Record<string, unknown> = {
-				contents,
-			};
-
-			if (request.systemInstruction) {
-				payload.systemInstruction = {
-					parts: [{ text: request.systemInstruction }],
-				};
-			}
-
-			if (request.maxOutputTokens || request.temperature !== undefined) {
-				payload.generationConfig = {
-					maxOutputTokens: request.maxOutputTokens ?? 4096,
-					temperature: request.temperature ?? 0.2,
-				};
-			}
-
-			if (request.tools && request.tools.length > 0) {
-				payload.tools = [
-					{
-						functionDeclarations: request.tools.map(t => ({
-							name: t.name,
-							description: t.description,
-							parameters: t.parameters,
-						})),
-					},
-				];
-			}
+			const payload = serializeGeminiRequest(request);
 
 			const res = await this.fetchImpl(url, {
 				method: 'POST',
@@ -240,10 +342,7 @@ export class DirectGeminiTransport {
 			const data = JSON.parse(rawBody) as {
 				candidates?: Array<{
 					content?: {
-						parts?: Array<{
-							text?: string;
-							functionCall?: { name: string; args?: Record<string, unknown> };
-						}>;
+						parts?: Array<Record<string, unknown>>;
 						role?: string;
 					};
 					finishReason?: string;
@@ -251,7 +350,8 @@ export class DirectGeminiTransport {
 			};
 
 			const firstCandidate = data.candidates?.[0];
-			const parts = firstCandidate?.content?.parts ?? [];
+			const rawParts = firstCandidate?.content?.parts ?? [];
+			const parts = rawParts.map(parseGeminiResponsePart);
 			const textParts = parts.map(p => p.text ?? '').filter(Boolean);
 			const text = textParts.join('');
 
@@ -260,12 +360,7 @@ export class DirectGeminiTransport {
 				candidate = {
 					content: {
 						role: firstCandidate.content.role ?? 'model',
-						parts: parts.map(p => {
-							if (p.functionCall) {
-								return { functionCall: p.functionCall };
-							}
-							return { text: p.text ?? '' };
-						}),
+						parts,
 					},
 					finishReason: firstCandidate.finishReason,
 				};
@@ -299,47 +394,7 @@ export class DirectGeminiTransport {
 			const model = request.modelId.replace(/^models\//, '');
 			const url = `${this.baseUrl}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
 
-			const contents = request.contents.map(msg => ({
-				role: msg.role === 'model' ? 'model' : 'user',
-				parts: msg.parts.map(p => {
-					if (p.functionCall) {
-						return { functionCall: p.functionCall };
-					}
-					if (p.functionResponse) {
-						return { functionResponse: p.functionResponse };
-					}
-					return { text: p.text ?? '' };
-				}),
-			}));
-
-			const payload: Record<string, unknown> = {
-				contents,
-			};
-
-			if (request.systemInstruction) {
-				payload.systemInstruction = {
-					parts: [{ text: request.systemInstruction }],
-				};
-			}
-
-			if (request.maxOutputTokens || request.temperature !== undefined) {
-				payload.generationConfig = {
-					maxOutputTokens: request.maxOutputTokens ?? 4096,
-					temperature: request.temperature ?? 0.2,
-				};
-			}
-
-			if (request.tools && request.tools.length > 0) {
-				payload.tools = [
-					{
-						functionDeclarations: request.tools.map(t => ({
-							name: t.name,
-							description: t.description,
-							parameters: t.parameters,
-						})),
-					},
-				];
-			}
+			const payload = serializeGeminiRequest(request);
 
 			const res = await this.fetchImpl(url, {
 				method: 'POST',
@@ -394,10 +449,7 @@ export class DirectGeminiTransport {
 							const parsed = JSON.parse(jsonStr) as {
 								candidates?: Array<{
 									content?: {
-										parts?: Array<{
-											text?: string;
-											functionCall?: { name: string; args?: Record<string, unknown> };
-										}>;
+										parts?: Array<Record<string, unknown>>;
 										role?: string;
 									};
 									finishReason?: string;
@@ -405,7 +457,8 @@ export class DirectGeminiTransport {
 							};
 							const cand = parsed.candidates?.[0];
 							if (cand?.content?.parts) {
-								for (const p of cand.content.parts) {
+								const parsedParts = cand.content.parts.map(parseGeminiResponsePart);
+								for (const p of parsedParts) {
 									if (p.text) {
 										accumulatedText += p.text;
 										onChunk({ text: p.text });
@@ -415,7 +468,7 @@ export class DirectGeminiTransport {
 											candidate: {
 												content: {
 													role: 'model',
-													parts: [{ functionCall: p.functionCall }],
+													parts: [p],
 												},
 												finishReason: cand.finishReason,
 											},
@@ -425,7 +478,7 @@ export class DirectGeminiTransport {
 								lastCandidate = {
 									content: {
 										role: cand.content.role ?? 'model',
-										parts: cand.content.parts,
+										parts: parsedParts,
 									},
 									finishReason: cand.finishReason,
 								};

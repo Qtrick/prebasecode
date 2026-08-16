@@ -5,14 +5,175 @@
 
 import { describe, it } from 'node:test';
 import * as assert from 'node:assert/strict';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import {
 	DirectGeminiTransport,
 	classifyGeminiHttpError,
+	serializeGeminiRequest,
+	parseGeminiResponsePart,
 } from './transports/directGeminiTransport';
 import {
 	HostedGeminiTransport,
 	classifyHostedGatewayError,
 } from './transports/hostedGeminiTransport';
+import type { AIGenerateRequest, AIToolDeclaration } from './aiTypes';
+
+describe('Gemini Protocol & Schema Serialization', () => {
+	it('serializes function declarations using parametersJsonSchema without dropping additionalProperties', () => {
+		const request: AIGenerateRequest = {
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Search for TypeScript' }] }],
+			tools: [
+				{
+					name: 'prebase_web_search',
+					description: 'Search the web using LinkUp API',
+					inputSchema: {
+						type: 'object',
+						properties: {
+							query: { type: 'string', minLength: 1, maxLength: 1000 },
+							depth: { type: 'string', enum: ['fast', 'standard', 'deep'] },
+							maxResults: { type: 'integer', minimum: 1, maximum: 10 },
+						},
+						required: ['query'],
+						additionalProperties: false,
+					},
+				},
+			],
+		};
+
+		const payload = serializeGeminiRequest(request);
+		const tools = payload.tools as Array<{ functionDeclarations: Array<Record<string, unknown>> }>;
+		assert.ok(tools && tools.length === 1);
+		const decl = tools[0].functionDeclarations[0];
+		assert.equal(decl.name, 'prebase_web_search');
+		assert.equal(decl.description, 'Search the web using LinkUp API');
+		assert.equal(decl.parameters, undefined, 'parameters field should NOT be used');
+		assert.ok(decl.parametersJsonSchema, 'parametersJsonSchema field MUST be used');
+
+		const schema = decl.parametersJsonSchema as Record<string, unknown>;
+		assert.equal(schema.type, 'object');
+		assert.equal(schema.additionalProperties, false, 'additionalProperties: false MUST be preserved');
+		assert.deepEqual(schema.required, ['query']);
+	});
+
+	it('serializes multi-turn function calls and responses preserving IDs and thought signatures', () => {
+		const request: AIGenerateRequest = {
+			modelId: 'gemini-2.5-flash',
+			contents: [
+				{ role: 'user', parts: [{ text: 'Search' }] },
+				{
+					role: 'model',
+					parts: [
+						{
+							functionCall: { id: 'call_12345', name: 'prebase_web_search', args: { query: 'TypeScript 7' } },
+							thoughtSignature: 'opaque-signature-token-xyz',
+							thought: true,
+						},
+					],
+				},
+				{
+					role: 'user',
+					parts: [
+						{
+							functionResponse: {
+								id: 'call_12345',
+								name: 'prebase_web_search',
+								response: { result: 'TypeScript 7 released.' },
+							},
+						},
+					],
+				},
+			],
+		};
+
+		const payload = serializeGeminiRequest(request);
+		const contents = payload.contents as Array<{ role: string; parts: Array<Record<string, unknown>> }>;
+		assert.equal(contents.length, 3);
+
+		// Turn 2 (model): preserves functionCall with id and thoughtSignature
+		const modelPart = contents[1].parts[0];
+		const fc = modelPart.functionCall as Record<string, unknown>;
+		assert.equal(fc.id, 'call_12345');
+		assert.equal(fc.name, 'prebase_web_search');
+		assert.equal(modelPart.thoughtSignature, 'opaque-signature-token-xyz');
+		assert.equal(modelPart.thought, true);
+
+		// Turn 3 (user functionResponse): preserves matching id
+		const userPart = contents[2].parts[0];
+		const fr = userPart.functionResponse as Record<string, unknown>;
+		assert.equal(fr.id, 'call_12345');
+		assert.equal(fr.name, 'prebase_web_search');
+	});
+
+	it('parses raw Gemini candidates preserving functionCall IDs and thought signatures', () => {
+		const rawPart = {
+			functionCall: {
+				id: 'call_abc_999',
+				name: 'prebase_workspace_search',
+				args: { query: 'export function' },
+			},
+			thoughtSignature: 'base64-thought-signature-bytes',
+			thought: false,
+		};
+
+		const parsed = parseGeminiResponsePart(rawPart);
+		assert.equal(parsed.functionCall?.id, 'call_abc_999');
+		assert.equal(parsed.functionCall?.name, 'prebase_workspace_search');
+		assert.deepEqual(parsed.functionCall?.args, { query: 'export function' });
+		assert.equal(parsed.thoughtSignature, 'base64-thought-signature-bytes');
+	});
+
+	it('parses thought_signature snake_case variant from Gemini API', () => {
+		const rawPart = {
+			functionCall: {
+				name: 'prebase_read_file',
+				args: { path: 'src/vs/editor.ts' },
+			},
+			thought_signature: 'snake_case_signature_token',
+		};
+
+		const parsed = parseGeminiResponsePart(rawPart);
+		assert.equal(parsed.functionCall?.name, 'prebase_read_file');
+		assert.equal(parsed.thoughtSignature, 'snake_case_signature_token');
+	});
+
+	it('validates schema serialization matrix for all 38 contributing Magnus tools', () => {
+		const currentDir = path.dirname(fileURLToPath(import.meta.url));
+		const pkgPath = path.resolve(currentDir, '../package.json');
+		const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));
+		const tools: Array<{ name: string; description: string; inputSchema: Record<string, unknown> }> = pkg.contributes?.languageModelTools ?? [];
+		assert.ok(tools.length >= 35, `Expected at least 35 tools, found ${tools.length}`);
+
+		const declarations: AIToolDeclaration[] = tools.map(t => ({
+			name: t.name,
+			description: t.description,
+			inputSchema: t.inputSchema,
+		}));
+
+		const request: AIGenerateRequest = {
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Tool test' }] }],
+			tools: declarations,
+		};
+
+		const payload = serializeGeminiRequest(request);
+		const toolList = payload.tools as Array<{ functionDeclarations: Array<Record<string, unknown>> }>;
+		assert.equal(toolList.length, 1);
+		const decls = toolList[0].functionDeclarations;
+		assert.equal(decls.length, tools.length);
+
+		for (const [i, decl] of decls.entries()) {
+			const original = tools[i];
+			assert.equal(decl.name, original.name);
+			assert.equal(decl.description, original.description);
+			assert.equal(decl.parameters, undefined);
+			assert.ok(decl.parametersJsonSchema, `Tool ${original.name} missing parametersJsonSchema`);
+			assert.deepEqual(decl.parametersJsonSchema, original.inputSchema);
+		}
+	});
+});
 
 describe('DirectGeminiTransport', () => {
 	it('sends credentials strictly via x-goog-api-key header and never in URL', async () => {

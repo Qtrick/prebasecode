@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 import type { PreBaseAIService } from './aiService';
-import type { AIContentMessage, AIContentPart } from './aiTypes';
+import type { AIContentMessage, AIContentPart, AIToolDeclaration } from './aiTypes';
 import { getModelOption } from './models';
 import {
 	allowsEdits,
@@ -43,12 +43,12 @@ function buildSystemPrompt(mode: MagnusAgentMode, extras: string[]): string {
 	return parts.join('\n');
 }
 
-function toolDeclarations(mode: MagnusAgentMode): Array<{ name: string; description: string; parameters?: object }> {
+function toolDeclarations(mode: MagnusAgentMode): AIToolDeclaration[] {
 	const allowed = vscode.lm.tools.filter(tool => isMagnusToolAllowed(mode, tool.name));
 	return allowed.map(tool => ({
 		name: tool.name,
 		description: tool.description,
-		parameters: tool.inputSchema,
+		inputSchema: (tool.inputSchema && typeof tool.inputSchema === 'object') ? tool.inputSchema as Record<string, unknown> : undefined,
 	}));
 }
 
@@ -64,10 +64,11 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function functionCalls(parts: AIContentPart[]): Array<{ name: string; args: Record<string, unknown> }> {
+function functionCalls(parts: AIContentPart[]): Array<{ id?: string; name: string; args: Record<string, unknown> }> {
 	return parts.flatMap(part => {
 		const name = part.functionCall?.name?.trim();
-		return name ? [{ name, args: isRecord(part.functionCall?.args) ? part.functionCall.args : {} }] : [];
+		const id = part.functionCall?.id;
+		return name ? [{ id, name, args: isRecord(part.functionCall?.args) ? part.functionCall.args : {} }] : [];
 	});
 }
 
@@ -224,17 +225,17 @@ async function handleChatRequest(
 				const responseParts: AIContentPart[] = [];
 				for (const [callIndex, call] of calls.entries()) {
 					if (callIndex >= 8) {
-						responseParts.push({ functionResponse: { name: call.name, response: { error: 'Tool-call batch limit reached; continue with results already collected.' } } });
+						responseParts.push({ functionResponse: { id: call.id, name: call.name, response: { error: 'Tool-call batch limit reached; continue with results already collected.' } } });
 						continue;
 					}
 					if (!tools.some(tool => tool.name === call.name)) {
-						responseParts.push({ functionResponse: { name: call.name, response: { error: 'Tool is not available in this agent mode.' } } });
+						responseParts.push({ functionResponse: { id: call.id, name: call.name, response: { error: 'Tool is not available in this agent mode.' } } });
 						continue;
 					}
 					if (call.name === 'prebase_web_search') {
 						const isDeep = call.args.depth === 'deep';
 						if (webSearches >= 4 || (isDeep && deepWebSearches >= 1)) {
-							responseParts.push({ functionResponse: { name: call.name, response: { error: 'Web-search budget reached for this request; synthesize from existing sources.' } } });
+							responseParts.push({ functionResponse: { id: call.id, name: call.name, response: { error: 'Web-search budget reached for this request; synthesize from existing sources.' } } });
 							continue;
 						}
 						webSearches++;
@@ -242,9 +243,9 @@ async function handleChatRequest(
 					}
 					try {
 						const toolResult = await vscode.lm.invokeTool(call.name, { toolInvocationToken: request.toolInvocationToken, input: call.args }, effectiveToken);
-						responseParts.push({ functionResponse: { name: call.name, response: { result: toolResultText(toolResult) } } });
+						responseParts.push({ functionResponse: { id: call.id, name: call.name, response: { result: toolResultText(toolResult) } } });
 					} catch (err) {
-						responseParts.push({ functionResponse: { name: call.name, response: { error: err instanceof Error ? err.message : 'Tool invocation failed.' } } });
+						responseParts.push({ functionResponse: { id: call.id, name: call.name, response: { error: err instanceof Error ? err.message : 'Tool invocation failed.' } } });
 					}
 				}
 				contents.push({ role: 'user', parts: responseParts });
