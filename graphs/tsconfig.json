@@ -5,8 +5,7 @@
     "rootDir": ".",
     "types": ["mocha"],
     "skipLibCheck": true,
-    "preserveSymlinks": true,
-    "ignoreDeprecations": "6.0"
+    "preserveSymlinks": true
   },
   "include": [
     "src/common/types/**/*.ts",
