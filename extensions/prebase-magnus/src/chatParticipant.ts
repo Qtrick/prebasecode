@@ -124,9 +124,18 @@ async function handleChatRequest(
 		mode = state.mode === 'patch' || state.mode === 'agent' ? mode : state.mode;
 	}
 
-	const modelId = state.modelId
+	const requestModel = (request as unknown as { model?: { id?: string } }).model?.id;
+	const activeModelId = requestModel
+		|| state.modelId
 		|| vscode.workspace.getConfiguration('prebase.magnus').get<string>('defaultModel', 'auto')
 		|| 'auto';
+
+	const modelConfig = (request as unknown as { modelConfiguration?: Record<string, unknown> }).modelConfiguration;
+	const rawThinkingLevel = typeof modelConfig?.thinkingLevel === 'string' ? modelConfig.thinkingLevel : undefined;
+	const reasoningEffort: import('./aiTypes').AIReasoningEffort | undefined =
+		rawThinkingLevel === 'minimal' || rawThinkingLevel === 'low' || rawThinkingLevel === 'medium' || rawThinkingLevel === 'high' || rawThinkingLevel === 'default'
+			? rawThinkingLevel
+			: undefined;
 
 	const extras: string[] = [];
 	for (const file of state.attachedFiles) {
@@ -179,7 +188,8 @@ async function handleChatRequest(
 					messages: contents,
 					systemInstruction: buildSystemPrompt(mode, extras),
 					tools: tools.length ? tools : undefined,
-					modelId,
+					modelId: activeModelId,
+					reasoningEffort,
 				}, effectiveToken);
 
 				const parts = result.candidate?.content?.parts ?? (result.text ? [{ text: result.text }] : []);

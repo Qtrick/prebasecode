@@ -356,4 +356,122 @@ describe('HostedGeminiTransport', () => {
 		assert.equal(unavailErr.code, 'hostedUnavailable');
 		assert.equal(unavailErr.retryable, true);
 	});
+
+	it('serializes reasoning effort accurately for Gemini 3.x vs Gemini 2.5 vs default', () => {
+		// Gemini 3.x thinkingLevel
+		const g3Minimal = serializeGeminiRequest({
+			modelId: 'gemini-3.7-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			reasoningEffort: 'minimal',
+		});
+		assert.deepEqual(
+			(g3Minimal.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			{ thinkingLevel: 'MINIMAL' }
+		);
+
+		const g3High = serializeGeminiRequest({
+			modelId: 'gemini-3.7-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			reasoningEffort: 'high',
+		});
+		assert.deepEqual(
+			(g3High.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			{ thinkingLevel: 'HIGH' }
+		);
+
+		// Gemini 2.5 thinkingBudget
+		const g25Low = serializeGeminiRequest({
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			reasoningEffort: 'low',
+		});
+		assert.deepEqual(
+			(g25Low.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			{ thinkingBudget: 2048 }
+		);
+
+		// Default reasoning: thinkingConfig omitted
+		const g25Default = serializeGeminiRequest({
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			reasoningEffort: 'default',
+		});
+		assert.equal(
+			(g25Default.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			undefined
+		);
+	});
+
+	it('filters thought parts from visible answer text and captures usageMetadata in generate and streamGenerate', async () => {
+		const mockFetchGenerate = async (): Promise<Response> => {
+			return new Response(JSON.stringify({
+				candidates: [{
+					content: {
+						role: 'model',
+						parts: [
+							{ text: 'Thinking about the architecture...', thought: true },
+							{ text: 'Final concise summary of the module.' },
+						],
+					},
+					finishReason: 'STOP',
+				}],
+				usageMetadata: {
+					promptTokenCount: 120,
+					candidatesTokenCount: 15,
+					thoughtsTokenCount: 85,
+					totalTokenCount: 220,
+				},
+			}), { status: 200 });
+		};
+
+		const directTransport = new DirectGeminiTransport({ fetchImpl: mockFetchGenerate });
+		const result = await directTransport.generate('test-key', {
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Describe' }] }],
+		});
+
+		assert.equal(result.text, 'Final concise summary of the module.');
+		assert.ok(!result.text.includes('Thinking about'));
+		assert.deepEqual(result.usageMetadata, {
+			promptTokenCount: 120,
+			candidatesTokenCount: 15,
+			thoughtsTokenCount: 85,
+			totalTokenCount: 220,
+		});
+
+		// Streaming thought filter
+		const sseBody = [
+			'data: {"candidates":[{"content":{"parts":[{"text":"Thinking hidden step...","thought":true}],"role":"model"}}]}\n\n',
+			'data: {"candidates":[{"content":{"parts":[{"text":"Visible answer chunk."}],"role":"model"}}],"usageMetadata":{"promptTokenCount":100,"candidatesTokenCount":10,"thoughtsTokenCount":50,"totalTokenCount":160}}\n\n',
+			'data: [DONE]\n\n',
+		].join('');
+
+		const mockFetchStream = async (): Promise<Response> => {
+			return new Response(sseBody, {
+				status: 200,
+				headers: { 'Content-Type': 'text/event-stream' },
+			});
+		};
+
+		const directStreamTransport = new DirectGeminiTransport({ fetchImpl: mockFetchStream });
+		const streamedChunks: string[] = [];
+
+		const streamRes = await directStreamTransport.streamGenerate('test-key', {
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+		}, chunk => {
+			if (chunk.text) {
+				streamedChunks.push(chunk.text);
+			}
+		});
+
+		assert.equal(streamedChunks.join(''), 'Visible answer chunk.');
+		assert.equal(streamRes.text, 'Visible answer chunk.');
+		assert.deepEqual(streamRes.usageMetadata, {
+			promptTokenCount: 100,
+			candidatesTokenCount: 10,
+			thoughtsTokenCount: 50,
+			totalTokenCount: 160,
+		});
+	});
 });

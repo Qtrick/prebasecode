@@ -128,6 +128,28 @@ const chatParticipantExtensionPoint = extensionsRegistry.ExtensionsRegistry.regi
 					description: localize('chatParticipantWhen', "A condition which must be true to enable this participant."),
 					type: 'string'
 				},
+				isDefault: {
+					description: localize('chatParticipantIsDefault', "Whether this participant is a default participant."),
+					type: 'boolean'
+				},
+				isAgent: {
+					description: localize('chatParticipantIsAgent', "Whether this participant is an agent."),
+					type: 'boolean'
+				},
+				locations: {
+					description: localize('chatParticipantLocations', "The locations where this participant is available."),
+					type: 'array',
+					items: {
+						type: 'string'
+					}
+				},
+				modes: {
+					description: localize('chatParticipantModes', "The modes supported by this participant."),
+					type: 'array',
+					items: {
+						type: 'string'
+					}
+				},
 				disambiguation: {
 					description: localize('chatParticipantDisambiguation', "Metadata to help with automatically routing user questions to this chat participant."),
 					type: 'array',

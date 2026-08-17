@@ -96,10 +96,10 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 			for (const part of message.content) {
 				if (part instanceof vscode.LanguageModelToolCallPart) {
 					callNames.set(part.callId, part.name);
-					parts.push({ functionCall: { name: part.name, args: asRecord(part.input) } });
+					parts.push({ functionCall: { id: part.callId, name: part.name, args: asRecord(part.input) } });
 				} else if (part instanceof vscode.LanguageModelToolResultPart) {
 					const result = part.content.map(item => item instanceof vscode.LanguageModelTextPart ? item.value : '').filter(Boolean).join('\n').slice(0, 80_000);
-					parts.push({ functionResponse: { name: callNames.get(part.callId) ?? 'unknown_tool', response: { result } } });
+					parts.push({ functionResponse: { id: part.callId, name: callNames.get(part.callId) ?? 'unknown_tool', response: { result } } });
 				}
 			}
 			if (!text && !parts.length) {
@@ -125,6 +125,14 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 			description: tool.description,
 			inputSchema: tool.inputSchema as Record<string, unknown> | undefined,
 		}));
+
+		const modelConfig = (options as unknown as { modelConfiguration?: Record<string, unknown> }).modelConfiguration;
+		const rawThinkingLevel = typeof modelConfig?.thinkingLevel === 'string' ? modelConfig.thinkingLevel : undefined;
+		const reasoningEffort: import('./aiTypes').AIReasoningEffort | undefined =
+			rawThinkingLevel === 'minimal' || rawThinkingLevel === 'low' || rawThinkingLevel === 'medium' || rawThinkingLevel === 'high' || rawThinkingLevel === 'default'
+				? rawThinkingLevel
+				: undefined;
+
 		let partsReported = 0;
 
 		try {
@@ -134,6 +142,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 					systemInstruction: systemText || undefined,
 					tools,
 					modelId: model.id,
+					reasoningEffort,
 				}, token);
 
 				for (const part of result.candidate?.content.parts ?? []) {
@@ -141,7 +150,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 						progress.report(new vscode.LanguageModelTextPart(part.text));
 						partsReported++;
 					} else if (part.functionCall) {
-						progress.report(new vscode.LanguageModelToolCallPart(crypto.randomUUID(), part.functionCall.name, part.functionCall.args ?? {}));
+						progress.report(new vscode.LanguageModelToolCallPart(part.functionCall.id || crypto.randomUUID(), part.functionCall.name, part.functionCall.args ?? {}));
 						partsReported++;
 					}
 				}
@@ -155,6 +164,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 						messages: contents,
 						systemInstruction: systemText || undefined,
 						modelId: model.id,
+						reasoningEffort,
 					},
 					chunk => {
 						if (token.isCancellationRequested) {
@@ -170,7 +180,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 			} else {
 				const text = await this.aiService.generateText(
 					contents.map(c => c.parts.map(p => p.text ?? '').join('')).join('\n'),
-					{ modelId: model.id },
+					{ modelId: model.id, reasoningEffort },
 					token,
 				);
 				if (!token.isCancellationRequested && text) {

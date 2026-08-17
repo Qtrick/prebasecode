@@ -47,6 +47,7 @@ export interface MagnusModelOption {
 	/** Short picker / hover description. */
 	readonly description: string;
 	readonly isAuto?: boolean;
+	readonly reasoning?: import('./aiTypes').AIModelReasoningMetadata;
 }
 
 /**
@@ -64,6 +65,11 @@ export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		maxOutputTokens: 65_536,
 		description: 'Balanced quality and speed, recommended for most tasks.',
 		isAuto: true,
+		reasoning: {
+			supported: true,
+			supportedEfforts: ['default', 'low', 'medium', 'high'],
+			defaultEffort: 'default',
+		},
 	},
 	{
 		id: 'gemini-2.5-flash',
@@ -72,6 +78,11 @@ export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		maxInputTokens: 1_000_000,
 		maxOutputTokens: 65_536,
 		description: 'Fast and capable — strong default for everyday coding.',
+		reasoning: {
+			supported: true,
+			supportedEfforts: ['default', 'minimal', 'low', 'medium', 'high'],
+			defaultEffort: 'default',
+		},
 	},
 	{
 		id: 'gemini-2.5-pro',
@@ -80,6 +91,11 @@ export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		maxInputTokens: 1_000_000,
 		maxOutputTokens: 65_536,
 		description: 'Highest quality Gemini model — best for complex reasoning and large refactors.',
+		reasoning: {
+			supported: true,
+			supportedEfforts: ['default', 'low', 'medium', 'high'],
+			defaultEffort: 'default',
+		},
 	},
 ];
 
@@ -159,9 +175,14 @@ function toNormalizedModel(m: DiscoveredModelInput): import('./aiTypes').Normali
 			functionCalling: supportsGenerate,
 			multimodalInput: true,
 			structuredOutput: supportsGenerate,
-			thinkingProtocol: false,
+			thinkingProtocol: true,
 			agentCompatible: supportsGenerate,
 			descriptionCompatible: supportsGenerate,
+		},
+		reasoning: {
+			supported: true,
+			supportedEfforts: ['default', 'minimal', 'low', 'medium', 'high'],
+			defaultEffort: 'default',
 		},
 	};
 }
@@ -190,6 +211,7 @@ export function buildModelOptions(discovered?: DiscoveredModelInput[]): MagnusMo
 		maxOutputTokens: m.outputTokenLimit,
 		description: m.description || `Google Gemini model (${m.id}).`,
 		isAuto: m.isAuto,
+		reasoning: m.reasoning,
 	}));
 }
 

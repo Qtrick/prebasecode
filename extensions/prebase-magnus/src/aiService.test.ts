@@ -385,4 +385,66 @@ describe('PreBaseAIService & Provider Resolution', () => {
 		assert.equal(testRes.reply, 'PONG');
 		assert.equal(adapter.testCalls, 1);
 	});
+
+	it('retries describeFile automatically on token starvation / MAX_TOKENS', async () => {
+		const mockStorage = new MockSecretStorage();
+		await mockStorage.store('prebase.magnus.provider.gemini.apiKey', 'valid-key');
+		const resolver = new PreBaseSecretResolver({ forcePackaged: true });
+		const secrets = new MagnusSecretStorage(mockStorage as never, resolver);
+		const adapter = new MockAIProviderAdapter();
+		const registry = new AIProviderRegistry([adapter]);
+		const aiService = new PreBaseAIService(secrets, registry);
+
+		let callCount = 0;
+		adapter.generate = async (req: AIGenerateRequest) => {
+			callCount++;
+			if (callCount === 1) {
+				// Simulate token starvation: empty text + MAX_TOKENS finish reason
+				return {
+					text: '',
+					candidate: {
+						content: { role: 'model', parts: [{ text: '', thought: true }] },
+						finishReason: 'MAX_TOKENS',
+					},
+					usageMetadata: { promptTokenCount: 50, candidatesTokenCount: 0, thoughtsTokenCount: 256, totalTokenCount: 306 },
+					modelId: req.modelId,
+					providerId: 'gemini',
+					executionMode: 'byok',
+				};
+			}
+			// Attempt 2 succeeds with expanded headroom
+			assert.equal(req.maxOutputTokens, 2048);
+			assert.equal(req.reasoningEffort, 'minimal');
+			return {
+				text: 'Configuration entrypoint for Tauri host architecture.',
+				modelId: req.modelId,
+				providerId: 'gemini',
+				executionMode: 'byok',
+			};
+		};
+
+		const desc = await aiService.describeFile('File content', 'src-tauri/src/config/mod.rs');
+		assert.equal(desc.status, 'ready');
+		assert.equal(desc.text, 'Configuration entrypoint for Tauri host architecture.');
+		assert.equal(callCount, 2, 'Should have executed retry on MAX_TOKENS starvation');
+		assert.equal(desc.cacheIdentity, 'gemini:gemini-2.5-flash:description:low:v6');
+	});
+
+	it('resolves description context with low reasoning effort and v6 cache identity', async () => {
+		const mockStorage = new MockSecretStorage();
+		await mockStorage.store('prebase.magnus.provider.gemini.apiKey', 'valid-key');
+		const resolver = new PreBaseSecretResolver({ forcePackaged: true });
+		const secrets = new MagnusSecretStorage(mockStorage as never, resolver);
+		const adapter = new MockAIProviderAdapter();
+		const registry = new AIProviderRegistry([adapter]);
+		const aiService = new PreBaseAIService(secrets, registry);
+
+		const ctx = await aiService.getDescriptionContext('src/app.ts');
+		assert.equal(ctx.providerId, 'gemini');
+		assert.equal(ctx.modelId, 'gemini-2.5-flash');
+		assert.equal(ctx.executionMode, 'byok');
+		assert.equal(ctx.reasoningEffort, 'low');
+		assert.equal(ctx.policyVersion, 'v6');
+		assert.equal(ctx.cacheIdentity, 'gemini:gemini-2.5-flash:description:low:v6');
+	});
 });

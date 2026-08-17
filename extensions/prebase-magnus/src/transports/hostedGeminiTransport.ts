@@ -245,22 +245,43 @@ export class HostedGeminiTransport {
 					};
 					finishReason?: string;
 				};
+				usageMetadata?: Record<string, unknown>;
 			};
 
 			let candidate: AIGenerateResponseCandidate | undefined;
+			let text = data.text ?? '';
 			if (data.candidate?.content?.parts) {
+				const parsedParts = data.candidate.content.parts.map(parseGeminiResponsePart);
 				candidate = {
 					content: {
 						role: data.candidate.content.role ?? 'model',
-						parts: data.candidate.content.parts.map(parseGeminiResponsePart),
+						parts: parsedParts,
 					},
 					finishReason: data.candidate.finishReason,
+				};
+				const textParts = parsedParts.filter(p => !p.thought).map(p => p.text ?? '').filter(Boolean);
+				if (textParts.length > 0) {
+					text = textParts.join('');
+				}
+			}
+
+			let usageMetadata: import('../aiTypes').AIUsageMetadata | undefined;
+			if (data.usageMetadata && typeof data.usageMetadata === 'object') {
+				const rawUsage = data.usageMetadata;
+				usageMetadata = {
+					promptTokenCount: typeof rawUsage.promptTokenCount === 'number' ? rawUsage.promptTokenCount : undefined,
+					candidatesTokenCount: typeof rawUsage.candidatesTokenCount === 'number'
+						? rawUsage.candidatesTokenCount
+						: (typeof rawUsage.candidateTokenCount === 'number' ? rawUsage.candidateTokenCount : undefined),
+					thoughtsTokenCount: typeof rawUsage.thoughtsTokenCount === 'number' ? rawUsage.thoughtsTokenCount : undefined,
+					totalTokenCount: typeof rawUsage.totalTokenCount === 'number' ? rawUsage.totalTokenCount : undefined,
 				};
 			}
 
 			return {
-				text: data.text ?? '',
+				text,
 				candidate,
+				usageMetadata,
 				modelId: model,
 				providerId: 'gemini',
 				executionMode: 'hosted',

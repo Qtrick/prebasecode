@@ -59,25 +59,46 @@ suite('Magnus Models & Providers', () => {
 		assert.strictEqual(resolveModelOrFallback('auto'), 'auto');
 	});
 
+	function makeMockDiscoveredModel(id: string): any {
+		return {
+			id,
+			name: `models/${id}`,
+			displayName: id,
+			description: id,
+			inputTokenLimit: 1_000_000,
+			outputTokenLimit: 65_536,
+			capabilities: {
+				textGeneration: true,
+				streaming: true,
+				functionCalling: true,
+				multimodalInput: true,
+				structuredOutput: true,
+				thinkingProtocol: false,
+				agentCompatible: true,
+				descriptionCompatible: true,
+			},
+		};
+	}
+
 	test('resolveAutoModelFromDiscovered selects flash 3.x over 2.5 and 2.5 over pro', () => {
 		// Case 1: 3.x flash available
 		const with3x = [
-			{ id: 'gemini-3.7-flash', capabilities: { agentCompatible: true } },
-			{ id: 'gemini-2.5-flash', capabilities: { agentCompatible: true } },
-			{ id: 'gemini-2.5-pro', capabilities: { agentCompatible: true } },
+			makeMockDiscoveredModel('gemini-3.7-flash'),
+			makeMockDiscoveredModel('gemini-2.5-flash'),
+			makeMockDiscoveredModel('gemini-2.5-pro'),
 		];
 		assert.strictEqual(resolveAutoModelFromDiscovered(with3x), 'gemini-3.7-flash');
 
 		// Case 2: only 2.5 available
 		const with25 = [
-			{ id: 'gemini-2.5-pro', capabilities: { agentCompatible: true } },
-			{ id: 'gemini-2.5-flash', capabilities: { agentCompatible: true } },
+			makeMockDiscoveredModel('gemini-2.5-pro'),
+			makeMockDiscoveredModel('gemini-2.5-flash'),
 		];
 		assert.strictEqual(resolveAutoModelFromDiscovered(with25), 'gemini-2.5-flash');
 
 		// Case 3: only pro available
 		const withPro = [
-			{ id: 'gemini-2.5-pro', capabilities: { agentCompatible: true } },
+			makeMockDiscoveredModel('gemini-2.5-pro'),
 		];
 		assert.strictEqual(resolveAutoModelFromDiscovered(withPro), 'gemini-2.5-pro');
 

@@ -41,6 +41,19 @@ export type ModelTier =
 	| 'lite'
 	| 'custom';
 
+export type AIReasoningEffort =
+	| 'default'
+	| 'minimal'
+	| 'low'
+	| 'medium'
+	| 'high';
+
+export interface AIModelReasoningMetadata {
+	readonly supported: boolean;
+	readonly supportedEfforts: readonly AIReasoningEffort[];
+	readonly defaultEffort: AIReasoningEffort;
+}
+
 export interface ModelCapabilityFlags {
 	readonly textGeneration: boolean;
 	readonly streaming: boolean;
@@ -60,6 +73,7 @@ export interface NormalizedAIModel {
 	readonly inputTokenLimit: number;
 	readonly outputTokenLimit: number;
 	readonly capabilities: ModelCapabilityFlags;
+	readonly reasoning?: AIModelReasoningMetadata;
 	readonly providerId?: string;
 	readonly family?: string;
 	readonly releaseChannel?: ModelReleaseChannel;
@@ -103,6 +117,7 @@ export interface AIGenerateRequest {
 	readonly systemInstruction?: string;
 	readonly maxOutputTokens?: number;
 	readonly temperature?: number;
+	readonly reasoningEffort?: AIReasoningEffort;
 	readonly tools?: AIToolDeclaration[];
 	readonly stream?: boolean;
 }
@@ -112,12 +127,29 @@ export interface AIGenerateResponseCandidate {
 	readonly finishReason?: string;
 }
 
+export interface AIUsageMetadata {
+	readonly promptTokenCount?: number;
+	readonly candidatesTokenCount?: number;
+	readonly thoughtsTokenCount?: number;
+	readonly totalTokenCount?: number;
+}
+
 export interface AIGenerateResult {
 	readonly text: string;
 	readonly candidate?: AIGenerateResponseCandidate;
+	readonly usageMetadata?: AIUsageMetadata;
 	readonly modelId: string;
 	readonly providerId: string;
 	readonly executionMode: PreBaseAIExecutionMode;
+}
+
+export interface MagnusDescriptionContext {
+	readonly providerId: string;
+	readonly modelId: string;
+	readonly executionMode: PreBaseAIExecutionMode;
+	readonly reasoningEffort: AIReasoningEffort;
+	readonly policyVersion: string;
+	readonly cacheIdentity: string;
 }
 
 export type AIProviderErrorCode =
@@ -215,9 +247,10 @@ export interface IPreBaseAIService {
 	listModels(providerId?: string, forceRefresh?: boolean, token?: AICancellationToken): Promise<NormalizedAIModel[]>;
 	listRawModels?(providerId?: string, forceRefresh?: boolean, token?: AICancellationToken): Promise<NormalizedAIModel[]>;
 
-	generateText(prompt: string, options?: { modelId?: string; maxTokens?: number; temperature?: number; workload?: ModelWorkload }, token?: AICancellationToken): Promise<string>;
+	generateText(prompt: string, options?: { modelId?: string; maxTokens?: number; temperature?: number; reasoningEffort?: AIReasoningEffort; workload?: ModelWorkload }, token?: AICancellationToken): Promise<string>;
 
 	describeFile(prompt: string, filePath?: string, token?: AICancellationToken): Promise<MagnusDescriptionResult>;
+	getDescriptionContext?(filePath?: string): Promise<MagnusDescriptionContext>;
 
 	generateCandidate(
 		request: {
@@ -225,6 +258,7 @@ export interface IPreBaseAIService {
 			systemInstruction?: string;
 			tools?: AIToolDeclaration[];
 			modelId?: string;
+			reasoningEffort?: AIReasoningEffort;
 			workload?: ModelWorkload;
 		},
 		token?: AICancellationToken,
@@ -236,6 +270,7 @@ export interface IPreBaseAIService {
 			systemInstruction?: string;
 			tools?: AIToolDeclaration[];
 			modelId?: string;
+			reasoningEffort?: AIReasoningEffort;
 			workload?: ModelWorkload;
 		},
 		onChunk: (chunk: { text?: string; candidate?: AIGenerateResponseCandidate }) => void,

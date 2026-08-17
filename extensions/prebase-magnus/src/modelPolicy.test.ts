@@ -6,7 +6,14 @@
 import * as assert from 'assert';
 import { suite, test } from 'node:test';
 import type { NormalizedAIModel } from './aiTypes.ts';
-import { defaultGeminiModelPolicy, GeminiModelPolicy, type IModelPolicy } from './modelPolicy.ts';
+import {
+	defaultGeminiModelPolicy,
+	GeminiModelPolicy,
+	type IModelPolicy,
+	createThinkingLevelConfigSchema,
+	getReasoningEffortLabel,
+	getReasoningEffortDescription,
+} from './modelPolicy.ts';
 
 suite('GeminiModelPolicy & Model Curation Layer', () => {
 	const policy = new GeminiModelPolicy();
@@ -285,5 +292,62 @@ suite('GeminiModelPolicy & Model Curation Layer', () => {
 		assert.strictEqual(curated.length, 2);
 		assert.strictEqual(curated[0].id, 'auto');
 		assert.strictEqual(curated[1].id, 'claude-3-7-sonnet');
+	});
+
+	test('fails closed for unrecognized models with unknown release channel', () => {
+		const unknownModel = policy.classify(makeRawModel('unrecognized-test-model-xyz'));
+		assert.strictEqual(unknownModel.releaseChannel, 'unknown');
+		assert.strictEqual(unknownModel.consumerSelectable, false);
+		assert.strictEqual(unknownModel.autoEligible, false);
+		assert.strictEqual(unknownModel.descriptionEligible, false);
+		assert.strictEqual(unknownModel.visibility, 'hidden');
+		assert.strictEqual(unknownModel.hiddenReason, 'Unknown release channel (fail closed)');
+	});
+
+	test('synthesizes accurate reasoning metadata for Flash, Pro, and Auto models', () => {
+		const flash = policy.classify(makeRawModel('gemini-2.5-flash', 'Gemini 2.5 Flash'));
+		assert.strictEqual(flash.reasoning?.supported, true);
+		assert.deepStrictEqual(flash.reasoning?.supportedEfforts, ['default', 'minimal', 'low', 'medium', 'high']);
+		assert.strictEqual(flash.reasoning?.defaultEffort, 'default');
+
+		const pro = policy.classify(makeRawModel('gemini-2.5-pro', 'Gemini 2.5 Pro'));
+		assert.strictEqual(pro.reasoning?.supported, true);
+		assert.deepStrictEqual(pro.reasoning?.supportedEfforts, ['default', 'low', 'medium', 'high']);
+		assert.strictEqual(pro.reasoning?.defaultEffort, 'default');
+
+		const curated = policy.curateConsumerCatalog([
+			makeRawModel('gemini-2.5-flash', 'Gemini 2.5 Flash'),
+			makeRawModel('gemini-2.5-pro', 'Gemini 2.5 Pro'),
+		]);
+		const auto = curated.find(m => m.id === 'auto');
+		assert.ok(auto);
+		assert.strictEqual(auto.reasoning?.supported, true);
+		assert.deepStrictEqual(auto.reasoning?.supportedEfforts, ['default', 'low', 'medium', 'high']);
+		assert.strictEqual(auto.reasoning?.defaultEffort, 'default');
+	});
+
+	test('creates navigation configuration schema for models with thinking support', () => {
+		assert.strictEqual(getReasoningEffortLabel('default'), 'Default');
+		assert.strictEqual(getReasoningEffortLabel('minimal'), 'Minimal');
+		assert.strictEqual(getReasoningEffortLabel('low'), 'Low');
+		assert.strictEqual(getReasoningEffortLabel('medium'), 'Medium');
+		assert.strictEqual(getReasoningEffortLabel('high'), 'High');
+
+		const schema = createThinkingLevelConfigSchema({
+			supported: true,
+			supportedEfforts: ['default', 'minimal', 'low', 'medium', 'high'],
+			defaultEffort: 'default',
+		});
+
+		assert.ok(schema);
+		assert.strictEqual(schema.type, 'object');
+		const props = schema.properties as Record<string, any>;
+		assert.ok(props.thinkingLevel);
+		assert.strictEqual(props.thinkingLevel.title, 'Thinking Effort');
+		assert.strictEqual(props.thinkingLevel.group, 'navigation');
+		assert.strictEqual(props.thinkingLevel.default, 'default');
+		assert.deepStrictEqual(props.thinkingLevel.enum, ['default', 'minimal', 'low', 'medium', 'high']);
+		assert.deepStrictEqual(props.thinkingLevel.enumItemLabels, ['Default', 'Minimal', 'Low', 'Medium', 'High']);
+		assert.strictEqual(props.thinkingLevel.enumDescriptions.length, 5);
 	});
 });

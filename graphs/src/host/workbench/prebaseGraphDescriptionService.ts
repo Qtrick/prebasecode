@@ -27,10 +27,19 @@ export interface IGraphNodeDescriptionResult {
 	cacheHit: boolean;
 }
 
-const PROMPT_VERSION = 'v5';
-const CACHE_KEY = 'prebase.graph.descriptionCache.v5';
+const PROMPT_VERSION = 'v6';
+const CACHE_KEY = 'prebase.graph.descriptionCache.v6';
 const MAX_CACHE = 200;
 const MAX_CONTENT = 12000;
+
+function hashContent(str: string): string {
+	let h = 2166136261;
+	for (let i = 0; i < str.length; i++) {
+		h ^= str.charCodeAt(i);
+		h = Math.imul(h, 16777619);
+	}
+	return (h >>> 0).toString(16);
+}
 
 const SENSITIVE = /(^|\/)(\.env|\.env\..*|credentials(\.json)?|secrets?(\.json)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|\.pem|\.key|\.p12|\.pfx)(\/|$)/i;
 const SENSITIVE_DIRS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(\/|$)/i;
@@ -106,7 +115,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			if (uri) {
 				const file = await this.fileService.readFile(uri, { limits: { size: MAX_CONTENT } });
 				content = file.value.toString().slice(0, MAX_CONTENT);
-				contentHash = String(file.etag || content.length);
+				contentHash = String(file.etag || hashContent(content));
 			}
 		} catch {
 			content = '';

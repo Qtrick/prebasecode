@@ -162,11 +162,44 @@ export function serializeGeminiRequest(request: AIGenerateRequest): Record<strin
 		};
 	}
 
-	if (request.maxOutputTokens || request.temperature !== undefined) {
-		payload.generationConfig = {
-			maxOutputTokens: request.maxOutputTokens ?? 4096,
-			temperature: request.temperature ?? 0.2,
-		};
+	const genConfig: Record<string, unknown> = {};
+	if (request.maxOutputTokens !== undefined) {
+		genConfig.maxOutputTokens = request.maxOutputTokens;
+	}
+	if (request.temperature !== undefined) {
+		genConfig.temperature = request.temperature;
+	}
+
+	// Translate normalized reasoning effort to Gemini wire format
+	if (request.reasoningEffort && request.reasoningEffort !== 'default') {
+		const rawModel = (request.modelId || '').toLowerCase().replace(/^models\//, '');
+		const isGemini3 = /gemini-3/i.test(rawModel);
+
+		if (isGemini3) {
+			const levelMap: Record<string, string> = {
+				minimal: 'MINIMAL',
+				low: 'LOW',
+				medium: 'MEDIUM',
+				high: 'HIGH',
+			};
+			genConfig.thinkingConfig = {
+				thinkingLevel: levelMap[request.reasoningEffort] || 'LOW',
+			};
+		} else {
+			const budgetMap: Record<string, number> = {
+				minimal: 1024,
+				low: 2048,
+				medium: 8192,
+				high: 24576,
+			};
+			genConfig.thinkingConfig = {
+				thinkingBudget: budgetMap[request.reasoningEffort] ?? 2048,
+			};
+		}
+	}
+
+	if (Object.keys(genConfig).length > 0) {
+		payload.generationConfig = genConfig;
 	}
 
 	if (request.tools && request.tools.length > 0) {
@@ -347,12 +380,13 @@ export class DirectGeminiTransport {
 					};
 					finishReason?: string;
 				}>;
+				usageMetadata?: Record<string, unknown>;
 			};
 
 			const firstCandidate = data.candidates?.[0];
 			const rawParts = firstCandidate?.content?.parts ?? [];
 			const parts = rawParts.map(parseGeminiResponsePart);
-			const textParts = parts.map(p => p.text ?? '').filter(Boolean);
+			const textParts = parts.filter(p => !p.thought).map(p => p.text ?? '').filter(Boolean);
 			const text = textParts.join('');
 
 			let candidate: AIGenerateResponseCandidate | undefined;
@@ -366,9 +400,23 @@ export class DirectGeminiTransport {
 				};
 			}
 
+			let usageMetadata: import('../aiTypes').AIUsageMetadata | undefined;
+			if (data.usageMetadata && typeof data.usageMetadata === 'object') {
+				const rawUsage = data.usageMetadata;
+				usageMetadata = {
+					promptTokenCount: typeof rawUsage.promptTokenCount === 'number' ? rawUsage.promptTokenCount : undefined,
+					candidatesTokenCount: typeof rawUsage.candidatesTokenCount === 'number'
+						? rawUsage.candidatesTokenCount
+						: (typeof rawUsage.candidateTokenCount === 'number' ? rawUsage.candidateTokenCount : undefined),
+					thoughtsTokenCount: typeof rawUsage.thoughtsTokenCount === 'number' ? rawUsage.thoughtsTokenCount : undefined,
+					totalTokenCount: typeof rawUsage.totalTokenCount === 'number' ? rawUsage.totalTokenCount : undefined,
+				};
+			}
+
 			return {
 				text,
 				candidate,
+				usageMetadata,
 				modelId: model,
 				providerId: 'gemini',
 				executionMode: 'byok',
@@ -423,6 +471,7 @@ export class DirectGeminiTransport {
 			let buffer = '';
 			let totalBytes = 0;
 			let finishReason: string | undefined;
+			let latestUsage: import('../aiTypes').AIUsageMetadata | undefined;
 
 			while (true) {
 				const { done, value } = await reader.read();
@@ -455,7 +504,19 @@ export class DirectGeminiTransport {
 									};
 									finishReason?: string;
 								}>;
+								usageMetadata?: Record<string, unknown>;
 							};
+							if (parsed.usageMetadata && typeof parsed.usageMetadata === 'object') {
+								const rawUsage = parsed.usageMetadata;
+								latestUsage = {
+									promptTokenCount: typeof rawUsage.promptTokenCount === 'number' ? rawUsage.promptTokenCount : undefined,
+									candidatesTokenCount: typeof rawUsage.candidatesTokenCount === 'number'
+										? rawUsage.candidatesTokenCount
+										: (typeof rawUsage.candidateTokenCount === 'number' ? rawUsage.candidateTokenCount : undefined),
+									thoughtsTokenCount: typeof rawUsage.thoughtsTokenCount === 'number' ? rawUsage.thoughtsTokenCount : undefined,
+									totalTokenCount: typeof rawUsage.totalTokenCount === 'number' ? rawUsage.totalTokenCount : undefined,
+								};
+							}
 							const cand = parsed.candidates?.[0];
 							if (cand?.finishReason) {
 								finishReason = cand.finishReason;
@@ -464,7 +525,7 @@ export class DirectGeminiTransport {
 								const parsedParts = cand.content.parts.map(parseGeminiResponsePart);
 								for (const p of parsedParts) {
 									accumulatedParts.push(p);
-									if (p.text) {
+									if (p.text && !p.thought) {
 										accumulatedText += p.text;
 										onChunk({ text: p.text });
 									}
@@ -501,6 +562,7 @@ export class DirectGeminiTransport {
 			return {
 				text: accumulatedText,
 				candidate: finalCandidate,
+				usageMetadata: latestUsage,
 				modelId: model,
 				providerId: 'gemini',
 				executionMode: 'byok',

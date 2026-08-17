@@ -330,19 +330,32 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 		const cred = credential ?? await this.resolveCredential(targetId);
 
-		let catalog = this.modelCache.get(targetId)?.consumerModels;
-		if (!catalog || catalog.length === 0) {
-			try {
-				catalog = await this.listModels(targetId, false, token);
-			} catch {
-				catalog = [...adapter.staticFallbackModels];
+		const isInternalWorkload = workload && workload !== 'general-agent' && workload !== 'fast-agent';
+		let catalog: NormalizedAIModel[] | undefined;
+		if (isInternalWorkload) {
+			catalog = this.modelCache.get(targetId)?.rawModels;
+			if (!catalog || catalog.length === 0) {
+				try {
+					catalog = await this.listRawModels(targetId, false, token);
+				} catch {
+					catalog = [...adapter.staticFallbackModels];
+				}
+			}
+		} else {
+			catalog = this.modelCache.get(targetId)?.consumerModels;
+			if (!catalog || catalog.length === 0) {
+				try {
+					catalog = await this.listModels(targetId, false, token);
+				} catch {
+					catalog = [...adapter.staticFallbackModels];
+				}
 			}
 		}
 
 		const modelId = requestedModelId ?? this.getActiveModelId();
 
-		// If user explicitly requested Auto or no model specified, resolve via policy
-		if (!modelId || modelId === 'auto') {
+		// If user explicitly requested Auto, no model specified, or internal workload
+		if (!modelId || modelId === 'auto' || isInternalWorkload) {
 			return adapter.resolveAutoModel(cred.executionMode, catalog, workload);
 		}
 
@@ -360,7 +373,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 	async generateText(
 		prompt: string,
-		options?: { modelId?: string; maxTokens?: number; temperature?: number; workload?: import('./aiTypes').ModelWorkload },
+		options?: { modelId?: string; maxTokens?: number; temperature?: number; reasoningEffort?: import('./aiTypes').AIReasoningEffort; workload?: import('./aiTypes').ModelWorkload },
 		token?: AICancellationToken,
 	): Promise<string> {
 		const providerId = this.getActiveProviderId();
@@ -383,12 +396,33 @@ export class PreBaseAIService implements IPreBaseAIService {
 				],
 				maxOutputTokens: options?.maxTokens,
 				temperature: options?.temperature,
+				reasoningEffort: options?.reasoningEffort,
 			},
 			credential,
 			token,
 		);
 
 		return result.text;
+	}
+
+	async getDescriptionContext(
+		_filePath?: string,
+	): Promise<import('./aiTypes').MagnusDescriptionContext> {
+		const providerId = this.getActiveProviderId();
+		const credential = await this.resolveCredential(providerId);
+		const resolvedModel = await this.resolveModelForExecution(providerId, undefined, credential, undefined, 'description');
+		const policyVersion = 'v6';
+		const reasoningEffort: import('./aiTypes').AIReasoningEffort = 'low';
+		const cacheIdentity = `${providerId}:${resolvedModel}:description:${reasoningEffort}:${policyVersion}`;
+
+		return {
+			providerId,
+			modelId: resolvedModel,
+			executionMode: credential.executionMode,
+			reasoningEffort,
+			policyVersion,
+			cacheIdentity,
+		};
 	}
 
 	async describeFile(
@@ -438,37 +472,85 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 		// Use 'description' workload profile: routes to fast stable Flash model
 		const resolvedModel = await this.resolveModelForExecution(providerId, undefined, credential, token, 'description');
+		const cacheIdentity = `${providerId}:${resolvedModel}:description:low:v6`;
 
+		// Attempt 1: standard bounded description profile (1024 token headroom, low reasoning)
 		try {
 			const result = await adapter.generate(
 				{
 					modelId: resolvedModel,
 					contents: [{ role: 'user', parts: [{ text: trimmedPrompt }] }],
-					maxOutputTokens: 256,
+					maxOutputTokens: 1024,
 					temperature: 0.2,
+					reasoningEffort: 'low',
 				},
 				credential,
 				token,
 			);
 
 			const text = result.text.trim();
-			if (!text) {
+			if (text) {
 				return {
-					status: 'error',
+					status: 'ready',
+					text,
 					providerId,
 					modelId: resolvedModel,
-					safeMessage: 'AI model returned an empty description.',
-					retryable: true,
+					cacheIdentity,
+					retryable: false,
 				};
 			}
 
+			// Empty result check: inspect finish reason and usage metadata for token starvation
+			const finishReason = result.candidate?.finishReason;
+			const isStarvation = finishReason === 'MAX_TOKENS' ||
+				(result.usageMetadata?.thoughtsTokenCount && (!result.usageMetadata.candidatesTokenCount || result.usageMetadata.candidatesTokenCount <= 1));
+
+			// Attempt 2: Bounded retry with expanded headroom if starvation occurred
+			if (isStarvation && !token?.isCancellationRequested) {
+				try {
+					const retryResult = await adapter.generate(
+						{
+							modelId: resolvedModel,
+							contents: [{ role: 'user', parts: [{ text: trimmedPrompt }] }],
+							maxOutputTokens: 2048,
+							temperature: 0.2,
+							reasoningEffort: 'minimal',
+						},
+						credential,
+						token,
+					);
+
+					const retryText = retryResult.text.trim();
+					if (retryText) {
+						return {
+							status: 'ready',
+							text: retryText,
+							providerId,
+							modelId: resolvedModel,
+							cacheIdentity,
+							retryable: false,
+						};
+					}
+				} catch {
+					// Fall through to error reporting below
+				}
+			}
+
+			let safeMessage = 'AI model returned an empty description.';
+			let retryable = true;
+			if (finishReason === 'MAX_TOKENS') {
+				safeMessage = 'AI description generation exhausted its response budget.';
+			} else if (finishReason === 'SAFETY') {
+				safeMessage = 'AI description generation was blocked by provider safety policy.';
+				retryable = false;
+			}
+
 			return {
-				status: 'ready',
-				text,
+				status: 'error',
 				providerId,
 				modelId: resolvedModel,
-				cacheIdentity: `${providerId}:${resolvedModel}:v5`,
-				retryable: false,
+				safeMessage,
+				retryable,
 			};
 		} catch (err) {
 			const classification = adapter.normalizeError(err);
@@ -498,6 +580,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 			systemInstruction?: string;
 			tools?: AIToolDeclaration[];
 			modelId?: string;
+			reasoningEffort?: import('./aiTypes').AIReasoningEffort;
 			workload?: import('./aiTypes').ModelWorkload;
 		},
 		token?: AICancellationToken,
@@ -517,6 +600,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 				contents: request.messages,
 				systemInstruction: request.systemInstruction,
 				tools: request.tools,
+				reasoningEffort: request.reasoningEffort,
 			},
 			credential,
 			token,
@@ -529,6 +613,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 			systemInstruction?: string;
 			tools?: AIToolDeclaration[];
 			modelId?: string;
+			reasoningEffort?: import('./aiTypes').AIReasoningEffort;
 			workload?: import('./aiTypes').ModelWorkload;
 		},
 		onChunk: (chunk: { text?: string; candidate?: import('./aiTypes').AIGenerateResponseCandidate }) => void,
@@ -550,6 +635,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 					contents: request.messages,
 					systemInstruction: request.systemInstruction,
 					tools: request.tools,
+					reasoningEffort: request.reasoningEffort,
 				},
 				credential,
 				onChunk,
@@ -563,6 +649,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 				contents: request.messages,
 				systemInstruction: request.systemInstruction,
 				tools: request.tools,
+				reasoningEffort: request.reasoningEffort,
 			},
 			credential,
 			token,

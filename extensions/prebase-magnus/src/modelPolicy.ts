@@ -30,6 +30,52 @@ export interface IModelPolicy {
 	formatDiagnostics(rawCatalog: readonly NormalizedAIModel[]): Record<string, unknown>;
 }
 
+export function getReasoningEffortLabel(effort: import('./aiTypes').AIReasoningEffort): string {
+	switch (effort) {
+		case 'default': return 'Default';
+		case 'minimal': return 'Minimal';
+		case 'low': return 'Low';
+		case 'medium': return 'Medium';
+		case 'high': return 'High';
+		default: return 'Default';
+	}
+}
+
+export function getReasoningEffortDescription(effort: import('./aiTypes').AIReasoningEffort): string {
+	switch (effort) {
+		case 'default': return "Uses this model's recommended/provider-native reasoning behavior.";
+		case 'minimal': return 'Fastest response with very little reasoning.';
+		case 'low': return 'Prioritizes speed and lower cost for straightforward tasks.';
+		case 'medium': return 'Balanced reasoning for normal coding work.';
+		case 'high': return 'Uses more reasoning for difficult debugging, architecture, or multi-step work.';
+		default: return "Uses this model's recommended/provider-native reasoning behavior.";
+	}
+}
+
+export function createThinkingLevelConfigSchema(
+	reasoning?: import('./aiTypes').AIModelReasoningMetadata,
+): Record<string, unknown> | undefined {
+	if (!reasoning || !reasoning.supported || reasoning.supportedEfforts.length <= 1) {
+		return undefined;
+	}
+
+	return {
+		type: 'object',
+		properties: {
+			thinkingLevel: {
+				type: 'string',
+				title: 'Thinking Effort',
+				description: 'Controls how much reasoning effort the model uses.',
+				default: reasoning.defaultEffort,
+				enum: [...reasoning.supportedEfforts],
+				enumItemLabels: reasoning.supportedEfforts.map(getReasoningEffortLabel),
+				enumDescriptions: reasoning.supportedEfforts.map(getReasoningEffortDescription),
+				group: 'navigation',
+			},
+		},
+	};
+}
+
 /**
  * Policy for Google Gemini models.
  * Enforces consumer curation: hides preview, experimental, flash-lite, aliases, and specialized models.
@@ -60,18 +106,25 @@ export class GeminiModelPolicy implements IModelPolicy {
 		const rawId = model.id.toLowerCase().replace(/^models\//, '');
 		const displayName = model.displayName || model.id;
 
-		// Determine release channel
-		let releaseChannel: ModelReleaseChannel = 'stable';
-		if (/-(1\.0|1\.5)/i.test(rawId) || /deprecated/i.test(rawId)) {
-			releaseChannel = 'stable'; // legacy stable version
-		} else if (rawId.endsWith('-latest')) {
-			releaseChannel = 'latest-alias';
-		} else if (/-(exp\d*|experimental)/i.test(rawId) || /experimental/i.test(displayName)) {
+		// Fail-closed release channel detection
+		let releaseChannel: ModelReleaseChannel = 'unknown';
+		if (/-(exp\d*|experimental)/i.test(rawId) || /experimental/i.test(displayName)) {
 			releaseChannel = 'experimental';
 		} else if (/-(preview(-\d{4})?|_preview)/i.test(rawId) || /preview/i.test(displayName)) {
 			releaseChannel = 'preview';
 		} else if (/eap|early-access/i.test(rawId) || /eap/i.test(displayName)) {
 			releaseChannel = 'early-access';
+		} else if (rawId.endsWith('-latest')) {
+			releaseChannel = 'latest-alias';
+		} else if (
+			/gemini-(3\.[0-9]+|2\.5)-(flash|pro)/i.test(rawId) ||
+			/gemini-2\.5-flash-lite/i.test(rawId) ||
+			/-(1\.0|1\.5)/i.test(rawId) ||
+			/deprecated/i.test(rawId)
+		) {
+			releaseChannel = 'stable';
+		} else if (model.releaseChannel) {
+			releaseChannel = model.releaseChannel;
 		}
 
 		// Check for specialized patterns
@@ -119,6 +172,40 @@ export class GeminiModelPolicy implements IModelPolicy {
 			}
 		}
 
+		// Thinking & Reasoning capabilities
+		const isThinkingCapable = /gemini-(3\.[0-9]+|2\.5)-(flash|pro)/i.test(rawId) ||
+			rawId.includes('thinking') || rawId.includes('reasoning') ||
+			model.capabilities?.thinkingProtocol === true;
+
+		let reasoning: import('./aiTypes').AIModelReasoningMetadata | undefined;
+		if (isThinkingCapable) {
+			if (isFlash) {
+				reasoning = {
+					supported: true,
+					supportedEfforts: ['default', 'minimal', 'low', 'medium', 'high'],
+					defaultEffort: 'default',
+				};
+			} else if (isPro) {
+				reasoning = {
+					supported: true,
+					supportedEfforts: ['default', 'low', 'medium', 'high'],
+					defaultEffort: 'default',
+				};
+			} else {
+				reasoning = {
+					supported: true,
+					supportedEfforts: ['default', 'low', 'medium', 'high'],
+					defaultEffort: 'default',
+				};
+			}
+		} else {
+			reasoning = {
+				supported: false,
+				supportedEfforts: ['default'],
+				defaultEffort: 'default',
+			};
+		}
+
 		// Capabilities
 		const supportsGeneration = model.capabilities?.textGeneration ?? true;
 		const capabilities: ModelCapabilityFlags = {
@@ -127,7 +214,7 @@ export class GeminiModelPolicy implements IModelPolicy {
 			functionCalling: supportsGeneration && !isSpecialized && !isDeprecated,
 			multimodalInput: !rawId.includes('text-only'),
 			structuredOutput: supportsGeneration && !isSpecialized && !isDeprecated,
-			thinkingProtocol: rawId.includes('thinking') || rawId.includes('reasoning'),
+			thinkingProtocol: isThinkingCapable,
 			agentCompatible: supportsGeneration && !isSpecialized && !isDeprecated && releaseChannel === 'stable' && (isFlash || isPro),
 			descriptionCompatible: supportsGeneration && !isSpecialized && !isDeprecated && releaseChannel === 'stable',
 		};
@@ -151,6 +238,9 @@ export class GeminiModelPolicy implements IModelPolicy {
 		} else if (releaseChannel === 'latest-alias') {
 			visibility = 'hidden';
 			hiddenReason = 'Dynamic latest alias (pinned version required)';
+		} else if (releaseChannel === 'unknown') {
+			visibility = 'hidden';
+			hiddenReason = 'Unknown release channel (fail closed)';
 		} else if (isFlashLite) {
 			visibility = 'internal';
 			hiddenReason = 'Internal auxiliary model (Flash-Lite hidden from consumer reasoning selector)';
@@ -179,6 +269,7 @@ export class GeminiModelPolicy implements IModelPolicy {
 			deprecated: isDeprecated,
 			hiddenReason,
 			capabilities,
+			reasoning,
 		};
 	}
 
@@ -203,14 +294,15 @@ export class GeminiModelPolicy implements IModelPolicy {
 		unique.sort((a, b) => {
 			const score = (m: NormalizedAIModel) => {
 				let s = 0;
-				if (m.visibility === 'recommended') {s += 100;}
-				if (m.id.startsWith('gemini-3.7-flash')) {s += 90;}
-				else if (m.id.startsWith('gemini-3.6-flash')) {s += 80;}
-				else if (m.id.startsWith('gemini-3.5-flash')) {s += 70;}
-				else if (m.id.startsWith('gemini-2.5-pro')) {s += 60;}
-				else if (m.id.startsWith('gemini-2.5-flash')) {s += 50;}
-				else if (m.tier === 'flash') {s += 30;}
-				else if (m.tier === 'pro') {s += 20;}
+				if (m.visibility === 'recommended') { s += 100; }
+				if (m.id.startsWith('gemini-3.7-flash')) { s += 90; }
+				else if (m.id.startsWith('gemini-3.6-flash')) { s += 80; }
+				else if (m.id.startsWith('gemini-3.5-flash')) { s += 70; }
+				else if (m.id.startsWith('gemini-3.1-pro')) { s += 65; }
+				else if (m.id.startsWith('gemini-2.5-pro')) { s += 60; }
+				else if (m.id.startsWith('gemini-2.5-flash')) { s += 50; }
+				else if (m.tier === 'flash') { s += 30; }
+				else if (m.tier === 'pro') { s += 20; }
 				return s;
 			};
 			return score(b) - score(a);
@@ -237,9 +329,14 @@ export class GeminiModelPolicy implements IModelPolicy {
 				functionCalling: true,
 				multimodalInput: true,
 				structuredOutput: true,
-				thinkingProtocol: false,
+				thinkingProtocol: true,
 				agentCompatible: true,
 				descriptionCompatible: true,
+			},
+			reasoning: {
+				supported: true,
+				supportedEfforts: ['default', 'low', 'medium', 'high'],
+				defaultEffort: 'default',
 			},
 			providerId: this.providerId,
 			family: 'gemini',

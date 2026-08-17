@@ -10,7 +10,14 @@ import { existsSync } from 'node:fs';
 export async function resolve(specifier, context, nextResolve) {
 	if (specifier.endsWith('.js') && !specifier.includes('node_modules')) {
 		const parent = context.parentURL ? dirname(fileURLToPath(context.parentURL)) : process.cwd();
-		const resolvedTarget = resolvePath(parent, specifier);
+		let resolvedTarget = resolvePath(parent, specifier);
+
+		// When files under graphs/ reference VS Code core using the symlink depth (../../../../../../),
+		// map them directly to src/vs/
+		if (specifier.startsWith('../../../../../../')) {
+			const sub = specifier.replace(/^(\.\.\/)+/, '');
+			resolvedTarget = resolvePath(process.cwd(), 'src/vs', sub);
+		}
 
 		// If importing from core VS Code (src/vs/) or host/workbench/, prefer compiled out/ JavaScript if present
 		if (resolvedTarget.includes('/src/vs/')) {

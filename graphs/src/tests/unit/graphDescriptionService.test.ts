@@ -5,19 +5,16 @@
 
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
+import { URI } from '../../../../../../base/common/uri.js';
 import { PreBaseGraphDescriptionService } from '../../host/workbench/prebaseGraphDescriptionService.js';
 import type { GraphNode } from '../../common/types/graphTypes.js';
 
 suite('PreBaseGraphDescriptionService (Unit)', () => {
 	const workspaceFolder = {
-		uri: { toString: () => 'file:///mock/workspace', fsPath: '/mock/workspace' } as any,
+		uri: URI.file('/mock/workspace'),
 		name: 'mock-workspace',
 		index: 0,
-		toResource: (rel: string) => ({
-			toString: () => `file:///mock/workspace/${rel}`,
-			fsPath: `/mock/workspace/${rel}`,
-			path: `/mock/workspace/${rel}`,
-		}) as any,
+		toResource: (rel: string) => URI.file(`/mock/workspace/${rel}`),
 	};
 
 	const mockWorkspaceContextService = {
@@ -67,7 +64,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.ok(result.aiMessage?.includes('skipped'));
 	});
 
-	test('generates description with v5 prompt and returns AI provenance', async () => {
+	test('generates description with v6 prompt and returns AI provenance', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {
 			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
@@ -87,7 +84,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 					status: 'ready',
 					providerId: 'gemini',
 					modelId: 'gemini-2.5-flash',
-					cacheIdentity: 'gemini:gemini-2.5-flash:v5',
+					cacheIdentity: 'gemini:gemini-2.5-flash:description:low:v6',
 				};
 			},
 		} as any;
@@ -138,5 +135,88 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.equal(result2.aiProviderId, 'gemini');
 		assert.equal(result2.aiModelId, 'gemini-2.5-flash');
 		assert.equal(result2.aiDescription, result1.aiDescription);
+	});
+
+	test('computes deterministic content hash when file etag is absent', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		const noEtagFileService = {
+			readFile: async () => ({
+				value: Buffer.from('fn main() { println!("tauri config"); }'),
+			}),
+		} as any;
+
+		const mockCommandService = {
+			executeCommand: async () => ({
+				text: 'Configuration entrypoint for Tauri host.',
+				status: 'ready',
+				providerId: 'gemini',
+				modelId: 'gemini-2.5-flash',
+				cacheIdentity: 'gemini:gemini-2.5-flash:description:low:v6',
+			}),
+		} as any;
+
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			noEtagFileService,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const node: GraphNode = {
+			id: 'tauri-mod',
+			label: 'src-tauri/src/config/mod.rs',
+			path: 'src-tauri/src/config/mod.rs',
+			kind: 'file',
+		};
+
+		const result = await service.describeNode(node);
+		assert.equal(result.aiStatus, 'ready');
+		assert.equal(result.aiDescription, 'Configuration entrypoint for Tauri host.');
+
+		// Cache entry stored in v6 key
+		const storedRaw = storageMap.get('prebase.graph.descriptionCache.v6');
+		assert.ok(storedRaw, 'Should store in v6 cache key');
+		assert.ok(storedRaw.includes('Configuration entrypoint'));
+	});
+
+	test('handles empty responses and error states gracefully', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		const mockCommandService = {
+			executeCommand: async () => ({
+				status: 'error',
+				safeMessage: 'AI description generation exhausted its response budget.',
+			}),
+		} as any;
+
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			mockFileService,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const node: GraphNode = {
+			id: 'n-err',
+			label: 'src/heavy.ts',
+			path: 'src/heavy.ts',
+			kind: 'file',
+		};
+
+		const result = await service.describeNode(node);
+		assert.equal(result.aiStatus, 'error');
+		assert.equal(result.cacheHit, false);
+		assert.ok(result.aiMessage?.includes('budget'));
 	});
 });

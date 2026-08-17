@@ -19,7 +19,7 @@ import { ChatViewsWelcomeExtensions, IChatViewsWelcomeContributionRegistry, ICha
 const chatViewsWelcomeJsonSchema = {
 	type: 'object',
 	additionalProperties: false,
-	required: ['icon', 'title', 'contents', 'when'],
+	required: ['icon', 'title', 'when'],
 	properties: {
 		icon: {
 			type: 'string',
@@ -32,6 +32,10 @@ const chatViewsWelcomeJsonSchema = {
 		content: {
 			type: 'string',
 			description: localize('chatViewsWelcome.content', 'The content of the welcome message. The first command link will be rendered as a button.'),
+		},
+		contents: {
+			type: 'string',
+			description: localize('chatViewsWelcome.contents', 'The content of the welcome message.'),
 		},
 		when: {
 			type: 'string',
@@ -73,7 +77,7 @@ export class ChatViewsWelcomeHandler implements IWorkbenchContribution {
 						...providerDescriptor,
 						when,
 						icon: ThemeIcon.fromString(providerDescriptor.icon),
-						content: new MarkdownString(providerDescriptor.content, { isTrusted: true }), // private API with command links
+						content: new MarkdownString(providerDescriptor.content ?? providerDescriptor.contents ?? '', { isTrusted: true }), // private API with command links
 					};
 					Registry.as<IChatViewsWelcomeContributionRegistry>(ChatViewsWelcomeExtensions.ChatViewsWelcomeRegistry).register(descriptor);
 				}
