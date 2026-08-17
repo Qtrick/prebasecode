@@ -13,6 +13,7 @@ import {
 	createThinkingLevelConfigSchema,
 	getReasoningEffortLabel,
 	getReasoningEffortDescription,
+	resolveSupportedReasoningEffort,
 } from './modelPolicy.ts';
 
 suite('GeminiModelPolicy & Model Curation Layer', () => {
@@ -305,17 +306,34 @@ suite('GeminiModelPolicy & Model Curation Layer', () => {
 	});
 
 	test('synthesizes accurate reasoning metadata for Flash, Pro, and Auto models', () => {
-		const flash = policy.classify(makeRawModel('gemini-2.5-flash', 'Gemini 2.5 Flash'));
-		assert.strictEqual(flash.reasoning?.supported, true);
-		assert.deepStrictEqual(flash.reasoning?.supportedEfforts, ['default', 'minimal', 'low', 'medium', 'high']);
-		assert.strictEqual(flash.reasoning?.defaultEffort, 'default');
+		// Gemini 3.7 Flash: Minimal is unsupported -> default, low, medium, high
+		const flash37 = policy.classify(makeRawModel('gemini-3.7-flash', 'Gemini 3.7 Flash'));
+		assert.strictEqual(flash37.reasoning?.supported, true);
+		assert.deepStrictEqual(flash37.reasoning?.supportedEfforts, ['default', 'low', 'medium', 'high']);
+		assert.strictEqual(flash37.reasoning?.defaultEffort, 'default');
 
-		const pro = policy.classify(makeRawModel('gemini-2.5-pro', 'Gemini 2.5 Pro'));
-		assert.strictEqual(pro.reasoning?.supported, true);
-		assert.deepStrictEqual(pro.reasoning?.supportedEfforts, ['default', 'low', 'medium', 'high']);
-		assert.strictEqual(pro.reasoning?.defaultEffort, 'default');
+		// Gemini 3.6 Flash: Minimal is supported -> default, minimal, low, medium, high
+		const flash36 = policy.classify(makeRawModel('gemini-3.6-flash', 'Gemini 3.6 Flash'));
+		assert.strictEqual(flash36.reasoning?.supported, true);
+		assert.deepStrictEqual(flash36.reasoning?.supportedEfforts, ['default', 'minimal', 'low', 'medium', 'high']);
+		assert.strictEqual(flash36.reasoning?.defaultEffort, 'default');
 
+		// Gemini 2.5 Flash: consumer levels -> default, low, medium, high
+		const flash25 = policy.classify(makeRawModel('gemini-2.5-flash', 'Gemini 2.5 Flash'));
+		assert.strictEqual(flash25.reasoning?.supported, true);
+		assert.deepStrictEqual(flash25.reasoning?.supportedEfforts, ['default', 'low', 'medium', 'high']);
+		assert.strictEqual(flash25.reasoning?.defaultEffort, 'default');
+
+		// Gemini 2.5 Pro: default, low, medium, high
+		const pro25 = policy.classify(makeRawModel('gemini-2.5-pro', 'Gemini 2.5 Pro'));
+		assert.strictEqual(pro25.reasoning?.supported, true);
+		assert.deepStrictEqual(pro25.reasoning?.supportedEfforts, ['default', 'low', 'medium', 'high']);
+		assert.strictEqual(pro25.reasoning?.defaultEffort, 'default');
+
+		// Auto model: safe intersection across auto targets -> default, low, medium, high
 		const curated = policy.curateConsumerCatalog([
+			makeRawModel('gemini-3.7-flash', 'Gemini 3.7 Flash'),
+			makeRawModel('gemini-3.6-flash', 'Gemini 3.6 Flash'),
 			makeRawModel('gemini-2.5-flash', 'Gemini 2.5 Flash'),
 			makeRawModel('gemini-2.5-pro', 'Gemini 2.5 Pro'),
 		]);
@@ -324,6 +342,20 @@ suite('GeminiModelPolicy & Model Curation Layer', () => {
 		assert.strictEqual(auto.reasoning?.supported, true);
 		assert.deepStrictEqual(auto.reasoning?.supportedEfforts, ['default', 'low', 'medium', 'high']);
 		assert.strictEqual(auto.reasoning?.defaultEffort, 'default');
+	});
+
+	test('resolves supported reasoning effort safely defending against unsupported model efforts', () => {
+		// 3.6 Flash supports minimal
+		assert.strictEqual(resolveSupportedReasoningEffort('gemini-3.6-flash', 'minimal'), 'minimal');
+		assert.strictEqual(resolveSupportedReasoningEffort('gemini-3.6-flash', 'low'), 'low');
+
+		// 3.7 Flash normalizes minimal to low
+		assert.strictEqual(resolveSupportedReasoningEffort('gemini-3.7-flash', 'minimal'), 'low');
+		assert.strictEqual(resolveSupportedReasoningEffort('gemini-3.7-flash', 'medium'), 'medium');
+
+		// 2.5 Flash normalizes minimal to low
+		assert.strictEqual(resolveSupportedReasoningEffort('gemini-2.5-flash', 'minimal'), 'low');
+		assert.strictEqual(resolveSupportedReasoningEffort('gemini-2.5-flash', 'default'), 'default');
 	});
 
 	test('creates navigation configuration schema for models with thinking support', () => {

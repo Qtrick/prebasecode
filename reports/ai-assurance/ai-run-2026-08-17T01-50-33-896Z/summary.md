@@ -1,7 +1,7 @@
-# PreBase AI Assurance Report (ai-run-2026-08-16T23-42-47-057Z)
+# PreBase AI Assurance Report (ai-run-2026-08-17T01-50-33-896Z)
 
-**Timestamp**: 2026-08-16T23:42:47.063Z
-**Overall Status**: **FAIL**
+**Timestamp**: 2026-08-17T01:50:33.897Z
+**Overall Status**: **BLOCKED**
 **Source Root**: Verified PreBase Root
 
 ## Provider Status
@@ -16,12 +16,12 @@
 | Test Case | Status | Duration | Details |
 | --- | --- | --- | --- |
 | PreBase root repository verification | **PASS** | N/A | Verified product.json, package.json, and AGENTS.md markers. |
-| PreBase Magnus compiled runtime readiness | **FAIL** | N/A | compiled Magnus output is older than sources (stale by 32s) |
+| PreBase Magnus compiled runtime readiness | **PASS** | N/A | Verified out/extension.js and compiled runtime modules. |
 | Arbitrary workspace folder isolation | **PASS** | N/A | Verified that non-PreBase folders cannot be scanned for .env credentials. |
-| Gemini live model discovery & consumer curation | **FAIL** | N/A | fetch failed |
-| Gemini live content generation (gemini-2.5-flash) | **FAIL** | N/A | fetch failed |
-| Gemini function-calling protocol (parametersJsonSchema + additionalProperties) | **FAIL** | N/A | fetch failed |
-| LinkUp live search query execution | **FAIL** | N/A | fetch failed |
+| Gemini live model discovery & consumer curation | **BLOCKED** | N/A | Network unreachable (offline or sandbox): fetch failed |
+| Gemini live content generation (gemini-2.5-flash) | **BLOCKED** | N/A | Network unreachable (offline or sandbox): fetch failed |
+| Gemini function-calling protocol (parametersJsonSchema + additionalProperties) | **BLOCKED** | N/A | Network unreachable (offline or sandbox): fetch failed |
+| LinkUp live search query execution | **BLOCKED** | N/A | Network unreachable (offline or sandbox): fetch failed |
 
 ## Curated Gemini Models
 

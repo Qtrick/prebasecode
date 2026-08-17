@@ -1,6 +1,6 @@
 {
-  "runId": "ai-run-2026-08-16T23-42-28-505Z",
-  "timestamp": "2026-08-16T23:42:28.509Z",
+  "runId": "ai-run-2026-08-17T01-49-32-971Z",
+  "timestamp": "2026-08-17T01:49:32.972Z",
   "environment": {
     "isSourceRoot": true,
     "platform": "darwin",
@@ -20,8 +20,8 @@
     },
     {
       "name": "PreBase Magnus compiled runtime readiness",
-      "status": "FAIL",
-      "details": "compiled Magnus output is older than sources (stale by 32s)"
+      "status": "PASS",
+      "details": "Verified out/extension.js and compiled runtime modules."
     },
     {
       "name": "Arbitrary workspace folder isolation",

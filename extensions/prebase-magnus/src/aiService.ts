@@ -17,6 +17,7 @@ import { AIProviderRegistry, globalAIProviderRegistry } from './aiProviderRegist
 import type { PreBaseAIExecutionMode } from './secretCatalog';
 import type { MagnusSecretStorage } from './secretStorage';
 import type { MagnusDescriptionResult } from './models';
+import { resolveSupportedReasoningEffort } from './modelPolicy';
 
 interface CachedModelCatalog {
 	readonly rawModels: NormalizedAIModel[];
@@ -411,9 +412,9 @@ export class PreBaseAIService implements IPreBaseAIService {
 		const providerId = this.getActiveProviderId();
 		const credential = await this.resolveCredential(providerId);
 		const resolvedModel = await this.resolveModelForExecution(providerId, undefined, credential, undefined, 'description');
-		const policyVersion = 'v6';
+		const policyVersion = 'v7';
 		const reasoningEffort: import('./aiTypes').AIReasoningEffort = 'low';
-		const cacheIdentity = `${providerId}:${resolvedModel}:description:${reasoningEffort}:${policyVersion}`;
+		const cacheIdentity = `${providerId}:${resolvedModel}:description-policy-${policyVersion}`;
 
 		return {
 			providerId,
@@ -472,7 +473,8 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 		// Use 'description' workload profile: routes to fast stable Flash model
 		const resolvedModel = await this.resolveModelForExecution(providerId, undefined, credential, token, 'description');
-		const cacheIdentity = `${providerId}:${resolvedModel}:description:low:v6`;
+		const policyVersion = 'v7';
+		const cacheIdentity = `${providerId}:${resolvedModel}:description-policy-${policyVersion}`;
 
 		// Attempt 1: standard bounded description profile (1024 token headroom, low reasoning)
 		try {
@@ -505,16 +507,17 @@ export class PreBaseAIService implements IPreBaseAIService {
 			const isStarvation = finishReason === 'MAX_TOKENS' ||
 				(result.usageMetadata?.thoughtsTokenCount && (!result.usageMetadata.candidatesTokenCount || result.usageMetadata.candidatesTokenCount <= 1));
 
-			// Attempt 2: Bounded retry with expanded headroom if starvation occurred
+			// Attempt 2: Bounded retry with expanded headroom if starvation occurred (resolving supported reasoning effort)
 			if (isStarvation && !token?.isCancellationRequested) {
 				try {
+					const retryReasoning = resolveSupportedReasoningEffort(resolvedModel, 'minimal');
 					const retryResult = await adapter.generate(
 						{
 							modelId: resolvedModel,
 							contents: [{ role: 'user', parts: [{ text: trimmedPrompt }] }],
 							maxOutputTokens: 2048,
 							temperature: 0.2,
-							reasoningEffort: 'minimal',
+							reasoningEffort: retryReasoning,
 						},
 						credential,
 						token,

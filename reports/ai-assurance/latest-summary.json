@@ -1,7 +1,7 @@
 {
-  "runId": "ai-run-2026-08-17T01-25-00-920Z",
-  "timestamp": "2026-08-17T01:25:00.921Z",
-  "overallStatus": "FAIL",
+  "runId": "ai-run-2026-08-17T01-50-33-896Z",
+  "timestamp": "2026-08-17T01:50:33.897Z",
+  "overallStatus": "BLOCKED",
   "tests": [
     {
       "name": "PreBase root repository verification",
@@ -9,7 +9,7 @@
     },
     {
       "name": "PreBase Magnus compiled runtime readiness",
-      "status": "FAIL"
+      "status": "PASS"
     },
     {
       "name": "Arbitrary workspace folder isolation",
@@ -17,19 +17,19 @@
     },
     {
       "name": "Gemini live model discovery & consumer curation",
-      "status": "FAIL"
+      "status": "BLOCKED"
     },
     {
       "name": "Gemini live content generation (gemini-2.5-flash)",
-      "status": "FAIL"
+      "status": "BLOCKED"
     },
     {
       "name": "Gemini function-calling protocol (parametersJsonSchema + additionalProperties)",
-      "status": "FAIL"
+      "status": "BLOCKED"
     },
     {
       "name": "LinkUp live search query execution",
-      "status": "FAIL"
+      "status": "BLOCKED"
     }
   ],
   "modelCount": 0,

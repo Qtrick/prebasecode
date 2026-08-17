@@ -21,6 +21,7 @@ import { registerIcon } from '../../../../platform/theme/common/iconRegistry.js'
 import { ViewPaneContainer } from '../../../browser/parts/views/viewPaneContainer.js';
 import { IWorkbenchContribution } from '../../../common/contributions.js';
 import { IViewContainersRegistry, IViewDescriptor, IViewsRegistry, ViewContainer, ViewContainerLocation, Extensions as ViewExtensions } from '../../../common/views.js';
+import { EnablementState } from '../../../services/extensionManagement/common/extensionManagement.js';
 import { Extensions, IExtensionFeaturesRegistry, IExtensionFeatureTableRenderer, IRenderedData, IRowData, ITableData } from '../../../services/extensionManagement/common/extensionFeatures.js';
 import { isProposedApiEnabled } from '../../../services/extensions/common/extensions.js';
 import * as extensionsRegistry from '../../../services/extensions/common/extensionsRegistry.js';
@@ -362,21 +363,40 @@ export class ChatCompatibilityNotifier extends Disposable implements IWorkbenchC
 	) {
 		super();
 
-		// It may be better to have some generic UI for this, for any extension that is incompatible,
-		// but this is only enabled for Chat now and it needs to be obvious.
+		// Check whether the configured default chat extension is actually invalid/incompatible.
+		// Routine notifications (such as reload or restart required) must NOT set chatExtensionInvalid.
 		const isInvalid = ChatContextKeys.extensionInvalid.bindTo(contextKeyService);
-		this._register(Event.runAndSubscribe(
-			extensionsWorkbenchService.onDidChangeExtensionsNotification,
-			() => {
-				const notification = extensionsWorkbenchService.getExtensionsNotification();
-				const chatExtension = notification?.extensions.find(ext => ExtensionIdentifier.equals(ext.identifier.id, this.productService.defaultChatAgent?.chatExtensionId));
-				if (chatExtension) {
-					isInvalid.set(true);
-					this.registerWelcomeView(chatExtension);
-				} else {
-					isInvalid.set(false);
-				}
+
+		const checkCompatibility = () => {
+			const defaultChatExtensionId = this.productService.defaultChatAgent?.chatExtensionId;
+			if (!defaultChatExtensionId) {
+				isInvalid.set(false);
+				return;
 			}
+
+			const chatExtension = extensionsWorkbenchService.local.find(ext => ExtensionIdentifier.equals(ext.identifier.id, defaultChatExtensionId));
+			if (!chatExtension) {
+				isInvalid.set(false);
+				return;
+			}
+
+			const isExtensionInvalid = chatExtension.enablementState === EnablementState.DisabledByInvalidExtension ||
+				(chatExtension.local && !chatExtension.local.isValid);
+
+			if (isExtensionInvalid) {
+				isInvalid.set(true);
+				this.registerWelcomeView(chatExtension);
+			} else {
+				isInvalid.set(false);
+			}
+		};
+
+		this._register(Event.runAndSubscribe(
+			Event.any(
+				extensionsWorkbenchService.onChange,
+				extensionsWorkbenchService.onDidChangeExtensionsNotification
+			),
+			() => checkCompatibility()
 		));
 	}
 
@@ -386,10 +406,17 @@ export class ChatCompatibilityNotifier extends Disposable implements IWorkbenchC
 		}
 
 		this.registeredWelcomeView = true;
+		const defaultChatExtensionId = this.productService.defaultChatAgent?.chatExtensionId;
+		const isMagnus = isMagnusDefaultChatAgent();
+
 		const showExtensionLabel = localize('showExtension', "Show Extension");
-		const mainMessage = localize('chatFailErrorMessage', "Chat failed to load because the installed version of the Copilot Chat extension is not compatible with this version of {0}. Please ensure that the Copilot Chat extension is up to date.", this.productService.nameLong);
-		const commandButton = `[${showExtensionLabel}](${createCommandUri(showExtensionsWithIdsCommandId, [this.productService.defaultChatAgent?.chatExtensionId])})`;
-		const versionMessage = `Copilot Chat version: ${chatExtension.version}`;
+		const mainMessage = isMagnus
+			? localize('prebaseAgentsFailErrorMessage', "PreBase Agents could not load because the installed version of the Agents extension is not compatible with this version of {0}. Please ensure that the Agents extension is up to date.", this.productService.nameLong)
+			: localize('chatFailErrorMessage', "Chat failed to load because the installed version of the Copilot Chat extension is not compatible with this version of {0}. Please ensure that the Copilot Chat extension is up to date.", this.productService.nameLong);
+		const commandButton = `[${showExtensionLabel}](${createCommandUri(showExtensionsWithIdsCommandId, [defaultChatExtensionId])})`;
+		const versionMessage = isMagnus
+			? localize('prebaseAgentsVersion', "PreBase Agents version: {0}", chatExtension.version)
+			: `Copilot Chat version: ${chatExtension.version}`;
 		const viewsRegistry = Registry.as<IViewsRegistry>(ViewExtensions.ViewsRegistry);
 		this._register(viewsRegistry.registerViewWelcomeContent(ChatViewId, {
 			content: [mainMessage, commandButton, versionMessage].join('\n\n'),

@@ -176,18 +176,31 @@ export function serializeGeminiRequest(request: AIGenerateRequest): Record<strin
 		const isGemini3 = /gemini-3/i.test(rawModel);
 
 		if (isGemini3) {
-			const levelMap: Record<string, string> = {
-				minimal: 'MINIMAL',
-				low: 'LOW',
-				medium: 'MEDIUM',
-				high: 'HIGH',
-			};
-			genConfig.thinkingConfig = {
-				thinkingLevel: levelMap[request.reasoningEffort] || 'LOW',
-			};
+			if (rawModel.startsWith('gemini-3.6-flash')) {
+				const levelMap: Record<string, string> = {
+					minimal: 'MINIMAL',
+					low: 'LOW',
+					medium: 'MEDIUM',
+					high: 'HIGH',
+				};
+				genConfig.thinkingConfig = {
+					thinkingLevel: levelMap[request.reasoningEffort] || 'MEDIUM',
+				};
+			} else {
+				// Gemini 3.7 Flash and other 3.x models: minimal is unsupported -> normalize to LOW
+				const levelMap: Record<string, string> = {
+					minimal: 'LOW',
+					low: 'LOW',
+					medium: 'MEDIUM',
+					high: 'HIGH',
+				};
+				genConfig.thinkingConfig = {
+					thinkingLevel: levelMap[request.reasoningEffort] || 'MEDIUM',
+				};
+			}
 		} else {
 			const budgetMap: Record<string, number> = {
-				minimal: 1024,
+				minimal: 2048,
 				low: 2048,
 				medium: 8192,
 				high: 24576,

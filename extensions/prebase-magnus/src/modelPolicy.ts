@@ -76,6 +76,25 @@ export function createThinkingLevelConfigSchema(
 	};
 }
 
+export function resolveSupportedReasoningEffort(
+	modelId: string,
+	requestedEffort?: import('./aiTypes').AIReasoningEffort,
+): import('./aiTypes').AIReasoningEffort {
+	if (!requestedEffort || requestedEffort === 'default') {
+		return 'default';
+	}
+	const norm = (modelId || '').toLowerCase().replace(/^models\//, '');
+	// Gemini 3.6 Flash supports minimal
+	if (norm.startsWith('gemini-3.6-flash')) {
+		return requestedEffort;
+	}
+	// Gemini 3.7 Flash and 2.5 models do not support Minimal
+	if (requestedEffort === 'minimal') {
+		return 'low';
+	}
+	return requestedEffort;
+}
+
 /**
  * Policy for Google Gemini models.
  * Enforces consumer curation: hides preview, experimental, flash-lite, aliases, and specialized models.
@@ -172,20 +191,29 @@ export class GeminiModelPolicy implements IModelPolicy {
 			}
 		}
 
-		// Thinking & Reasoning capabilities
+		// Thinking & Reasoning capabilities (model-specific)
 		const isThinkingCapable = /gemini-(3\.[0-9]+|2\.5)-(flash|pro)/i.test(rawId) ||
 			rawId.includes('thinking') || rawId.includes('reasoning') ||
 			model.capabilities?.thinkingProtocol === true;
 
 		let reasoning: import('./aiTypes').AIModelReasoningMetadata | undefined;
 		if (isThinkingCapable) {
-			if (isFlash) {
+			if (rawId.startsWith('gemini-3.6-flash')) {
+				// Gemini 3.6 Flash supports minimal, low, medium, high
 				reasoning = {
 					supported: true,
 					supportedEfforts: ['default', 'minimal', 'low', 'medium', 'high'],
 					defaultEffort: 'default',
 				};
+			} else if (rawId.startsWith('gemini-3.7-flash') || isFlash) {
+				// Gemini 3.7 Flash and other consumer Flash models do not support Minimal
+				reasoning = {
+					supported: true,
+					supportedEfforts: ['default', 'low', 'medium', 'high'],
+					defaultEffort: 'default',
+				};
 			} else if (isPro) {
+				// Gemini Pro models support low, medium, high
 				reasoning = {
 					supported: true,
 					supportedEfforts: ['default', 'low', 'medium', 'high'],

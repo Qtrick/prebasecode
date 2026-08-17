@@ -1,6 +1,6 @@
 {
-  "runId": "ai-run-2026-08-16T23-42-47-057Z",
-  "timestamp": "2026-08-16T23:42:47.063Z",
+  "runId": "ai-run-2026-08-17T01-50-33-896Z",
+  "timestamp": "2026-08-17T01:50:33.897Z",
   "environment": {
     "isSourceRoot": true,
     "platform": "darwin",
@@ -20,8 +20,8 @@
     },
     {
       "name": "PreBase Magnus compiled runtime readiness",
-      "status": "FAIL",
-      "details": "compiled Magnus output is older than sources (stale by 32s)"
+      "status": "PASS",
+      "details": "Verified out/extension.js and compiled runtime modules."
     },
     {
       "name": "Arbitrary workspace folder isolation",
@@ -30,25 +30,25 @@
     },
     {
       "name": "Gemini live model discovery & consumer curation",
-      "status": "FAIL",
-      "details": "fetch failed"
+      "status": "BLOCKED",
+      "details": "Network unreachable (offline or sandbox): fetch failed"
     },
     {
       "name": "Gemini live content generation (gemini-2.5-flash)",
-      "status": "FAIL",
-      "details": "fetch failed"
+      "status": "BLOCKED",
+      "details": "Network unreachable (offline or sandbox): fetch failed"
     },
     {
       "name": "Gemini function-calling protocol (parametersJsonSchema + additionalProperties)",
-      "status": "FAIL",
-      "details": "fetch failed"
+      "status": "BLOCKED",
+      "details": "Network unreachable (offline or sandbox): fetch failed"
     },
     {
       "name": "LinkUp live search query execution",
-      "status": "FAIL",
-      "details": "fetch failed"
+      "status": "BLOCKED",
+      "details": "Network unreachable (offline or sandbox): fetch failed"
     }
   ],
   "models": [],
-  "overallStatus": "FAIL"
+  "overallStatus": "BLOCKED"
 }

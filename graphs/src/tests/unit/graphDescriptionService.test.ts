@@ -5,16 +5,15 @@
 
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
-import { URI } from '../../../../../../base/common/uri.js';
-import { PreBaseGraphDescriptionService } from '../../host/workbench/prebaseGraphDescriptionService.js';
+import { normalizeCompactDescription, PreBaseGraphDescriptionService } from '../../host/workbench/prebaseGraphDescriptionService.js';
 import type { GraphNode } from '../../common/types/graphTypes.js';
 
 suite('PreBaseGraphDescriptionService (Unit)', () => {
 	const workspaceFolder = {
-		uri: URI.file('/mock/workspace'),
+		uri: { toString: () => 'file:///mock/workspace' },
 		name: 'mock-workspace',
 		index: 0,
-		toResource: (rel: string) => URI.file(`/mock/workspace/${rel}`),
+		toResource: (rel: string) => ({ toString: () => `file:///mock/workspace/${rel}` }),
 	};
 
 	const mockWorkspaceContextService = {
@@ -31,6 +30,18 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 			};
 		},
 	} as any;
+
+	test('normalizes descriptions to concise 1-2 sentence forms and trims filler prefixes', () => {
+		const verbose = 'This file provides the primary editor container. It manages document models and coordinates workbench layout. In addition, it registers keybindings and handles viewport resizing.';
+		const normalized = normalizeCompactDescription(verbose);
+		assert.ok(normalized.startsWith('Provides the primary editor container.'));
+		assert.ok(normalized.includes('coordinates workbench layout.'));
+		assert.ok(!normalized.includes('viewport resizing.'));
+
+		const markdownSample = '**PreBaseEditor** manages the `monaco` editor instance and coordinates syntax decorations.';
+		const cleaned = normalizeCompactDescription(markdownSample);
+		assert.equal(cleaned, 'PreBaseEditor manages the monaco editor instance and coordinates syntax decorations.');
+	});
 
 	test('skips sensitive or credential files safely', async () => {
 		const storageMap = new Map<string, string>();
@@ -64,7 +75,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.ok(result.aiMessage?.includes('skipped'));
 	});
 
-	test('generates description with v6 prompt and returns AI provenance', async () => {
+	test('generates ultra-concise description with v7 prompt and returns AI provenance', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {
 			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
@@ -72,19 +83,29 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 			remove: (key: string) => storageMap.delete(key),
 		} as any;
 
-		let capturedCommand = '';
+		let capturedCommands: string[] = [];
 		let capturedArgs: any = undefined;
 
 		const mockCommandService = {
 			executeCommand: async (cmd: string, args: any) => {
-				capturedCommand = cmd;
+				capturedCommands.push(cmd);
+				if (cmd === 'prebase.magnus.getDescriptionContext') {
+					return {
+						providerId: 'gemini',
+						modelId: 'gemini-3.7-flash',
+						executionMode: 'byok',
+						reasoningEffort: 'low',
+						policyVersion: 'v7',
+						cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v7',
+					};
+				}
 				capturedArgs = args;
 				return {
-					text: 'PreBaseEditor is responsible for managing the primary editor surface. It coordinates rendering and user actions.',
+					text: 'Manages the primary editor surface. It coordinates rendering and user actions across active panes.',
 					status: 'ready',
 					providerId: 'gemini',
-					modelId: 'gemini-2.5-flash',
-					cacheIdentity: 'gemini:gemini-2.5-flash:description:low:v6',
+					modelId: 'gemini-3.7-flash',
+					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v7',
 				};
 			},
 		} as any;
@@ -110,8 +131,9 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		const result1 = await service.describeNode(node);
 
 		// Assert command and prompt details
-		assert.equal(capturedCommand, 'prebase.magnus.describeFile');
-		assert.ok(capturedArgs.prompt.includes('2–4 sentence description'));
+		assert.ok(capturedCommands.includes('prebase.magnus.getDescriptionContext'));
+		assert.ok(capturedCommands.includes('prebase.magnus.describeFile'));
+		assert.ok(capturedArgs.prompt.includes('1–2 sentence description (~30–55 words)'));
 		assert.ok(capturedArgs.prompt.includes('Path: src/editor.ts'));
 		assert.ok(capturedArgs.prompt.includes('Layer: workbench'));
 
@@ -119,22 +141,96 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.equal(result1.aiStatus, 'ready');
 		assert.equal(result1.cacheHit, false);
 		assert.equal(result1.aiProviderId, 'gemini');
-		assert.equal(result1.aiModelId, 'gemini-2.5-flash');
-		assert.ok(result1.aiDescription?.includes('PreBaseEditor is responsible'));
+		assert.equal(result1.aiModelId, 'gemini-3.7-flash');
+		assert.ok(result1.aiDescription?.includes('Manages the primary editor surface'));
 
 		// Assert cache key consistency: second call hits cache with same provenance
-		let commandExecutedAgain = false;
-		mockCommandService.executeCommand = async () => {
-			commandExecutedAgain = true;
+		let describeFileExecutedAgain = false;
+		mockCommandService.executeCommand = async (cmd: string) => {
+			if (cmd === 'prebase.magnus.getDescriptionContext') {
+				return {
+					providerId: 'gemini',
+					modelId: 'gemini-3.7-flash',
+					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v7',
+				};
+			}
+			if (cmd === 'prebase.magnus.describeFile') {
+				describeFileExecutedAgain = true;
+				return { text: 'test', status: 'ready' };
+			}
+			return undefined;
 		};
 
 		const result2 = await service.describeNode(node);
-		assert.equal(commandExecutedAgain, false, 'Should have hit cache instead of invoking command');
+		assert.equal(describeFileExecutedAgain, false, 'Should have hit cache instead of invoking describeFile');
 		assert.equal(result2.aiStatus, 'ready');
 		assert.equal(result2.cacheHit, true);
 		assert.equal(result2.aiProviderId, 'gemini');
-		assert.equal(result2.aiModelId, 'gemini-2.5-flash');
+		assert.equal(result2.aiModelId, 'gemini-3.7-flash');
 		assert.equal(result2.aiDescription, result1.aiDescription);
+	});
+
+	test('invalidates cache when model or policy cacheIdentity changes', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		let currentIdentity = 'gemini:gemini-2.5-flash:description-policy-v7';
+		let describeFileCount = 0;
+
+		const mockCommandService = {
+			executeCommand: async (cmd: string) => {
+				if (cmd === 'prebase.magnus.getDescriptionContext') {
+					return {
+						providerId: 'gemini',
+						modelId: currentIdentity.includes('3.7') ? 'gemini-3.7-flash' : 'gemini-2.5-flash',
+						cacheIdentity: currentIdentity,
+					};
+				}
+				if (cmd === 'prebase.magnus.describeFile') {
+					describeFileCount++;
+					return {
+						text: `Description under identity ${currentIdentity}`,
+						status: 'ready',
+						providerId: 'gemini',
+						modelId: currentIdentity.includes('3.7') ? 'gemini-3.7-flash' : 'gemini-2.5-flash',
+						cacheIdentity: currentIdentity,
+					};
+				}
+				return undefined;
+			},
+		} as any;
+
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			mockFileService,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const node: GraphNode = {
+			id: 'n1',
+			label: 'src/config.ts',
+			path: 'src/config.ts',
+			kind: 'file',
+		};
+
+		// First run: calls describeFile
+		await service.describeNode(node);
+		assert.equal(describeFileCount, 1);
+
+		// Second run with same identity: cache hit
+		await service.describeNode(node);
+		assert.equal(describeFileCount, 1);
+
+		// Third run after user switches to Gemini 3.7: identity changes -> cache miss
+		currentIdentity = 'gemini:gemini-3.7-flash:description-policy-v7';
+		const res3 = await service.describeNode(node);
+		assert.equal(describeFileCount, 2, 'Should have regenerated description for new model identity');
+		assert.ok(res3.aiDescription?.includes('gemini-3.7-flash'));
 	});
 
 	test('computes deterministic content hash when file etag is absent', async () => {
@@ -152,13 +248,18 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		} as any;
 
 		const mockCommandService = {
-			executeCommand: async () => ({
-				text: 'Configuration entrypoint for Tauri host.',
-				status: 'ready',
-				providerId: 'gemini',
-				modelId: 'gemini-2.5-flash',
-				cacheIdentity: 'gemini:gemini-2.5-flash:description:low:v6',
-			}),
+			executeCommand: async (cmd: string) => {
+				if (cmd === 'prebase.magnus.getDescriptionContext') {
+					return { cacheIdentity: 'gemini:gemini-2.5-flash:description-policy-v7' };
+				}
+				return {
+					text: 'Configuration entrypoint for Tauri host.',
+					status: 'ready',
+					providerId: 'gemini',
+					modelId: 'gemini-2.5-flash',
+					cacheIdentity: 'gemini:gemini-2.5-flash:description-policy-v7',
+				};
+			},
 		} as any;
 
 		const service = new PreBaseGraphDescriptionService(
@@ -179,9 +280,9 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.equal(result.aiStatus, 'ready');
 		assert.equal(result.aiDescription, 'Configuration entrypoint for Tauri host.');
 
-		// Cache entry stored in v6 key
-		const storedRaw = storageMap.get('prebase.graph.descriptionCache.v6');
-		assert.ok(storedRaw, 'Should store in v6 cache key');
+		// Cache entry stored in v7 key
+		const storedRaw = storageMap.get('prebase.graph.descriptionCache.v7');
+		assert.ok(storedRaw, 'Should store in v7 cache key');
 		assert.ok(storedRaw.includes('Configuration entrypoint'));
 	});
 

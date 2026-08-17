@@ -358,24 +358,45 @@ describe('HostedGeminiTransport', () => {
 	});
 
 	it('serializes reasoning effort accurately for Gemini 3.x vs Gemini 2.5 vs default', () => {
-		// Gemini 3.x thinkingLevel
-		const g3Minimal = serializeGeminiRequest({
+		// Gemini 3.6 Flash supports minimal
+		const g36Minimal = serializeGeminiRequest({
+			modelId: 'gemini-3.6-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			reasoningEffort: 'minimal',
+		});
+		assert.deepEqual(
+			(g36Minimal.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			{ thinkingLevel: 'MINIMAL' }
+		);
+
+		// Gemini 3.7 Flash: minimal normalized to LOW
+		const g37Minimal = serializeGeminiRequest({
 			modelId: 'gemini-3.7-flash',
 			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
 			reasoningEffort: 'minimal',
 		});
 		assert.deepEqual(
-			(g3Minimal.generationConfig as Record<string, unknown>)?.thinkingConfig,
-			{ thinkingLevel: 'MINIMAL' }
+			(g37Minimal.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			{ thinkingLevel: 'LOW' }
 		);
 
-		const g3High = serializeGeminiRequest({
+		const g37Low = serializeGeminiRequest({
+			modelId: 'gemini-3.7-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			reasoningEffort: 'low',
+		});
+		assert.deepEqual(
+			(g37Low.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			{ thinkingLevel: 'LOW' }
+		);
+
+		const g37High = serializeGeminiRequest({
 			modelId: 'gemini-3.7-flash',
 			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
 			reasoningEffort: 'high',
 		});
 		assert.deepEqual(
-			(g3High.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			(g37High.generationConfig as Record<string, unknown>)?.thinkingConfig,
 			{ thinkingLevel: 'HIGH' }
 		);
 
@@ -388,6 +409,26 @@ describe('HostedGeminiTransport', () => {
 		assert.deepEqual(
 			(g25Low.generationConfig as Record<string, unknown>)?.thinkingConfig,
 			{ thinkingBudget: 2048 }
+		);
+
+		const g25Medium = serializeGeminiRequest({
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			reasoningEffort: 'medium',
+		});
+		assert.deepEqual(
+			(g25Medium.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			{ thinkingBudget: 8192 }
+		);
+
+		const g25High = serializeGeminiRequest({
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			reasoningEffort: 'high',
+		});
+		assert.deepEqual(
+			(g25High.generationConfig as Record<string, unknown>)?.thinkingConfig,
+			{ thinkingBudget: 24576 }
 		);
 
 		// Default reasoning: thinkingConfig omitted

@@ -108,6 +108,11 @@ export function activate(context: vscode.ExtensionContext): void {
 				return await aiService.describeFile(prompt, filePath);
 			}),
 		);
+		context.subscriptions.push(
+			vscode.commands.registerCommand('prebase.magnus.getDescriptionContext', async (filePath?: string): Promise<import('./aiTypes').MagnusDescriptionContext> => {
+				return await aiService.getDescriptionContext(filePath);
+			}),
+		);
 		runtimeState.describeFileRegistered = true;
 		console.log('[Magnus] describeFile registered');
 

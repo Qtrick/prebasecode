@@ -89,6 +89,9 @@ class MockAIProviderAdapter implements IPreBaseAIProviderAdapter {
 		executionMode: 'byok',
 	};
 
+	readonly supportedExecutionModes: readonly PreBaseAIExecutionMode[] = ['byok', 'development-env'];
+	readonly defaultModel = 'gemini-2.5-flash';
+
 	discoveredModels: NormalizedAIModel[] = [
 		{
 			id: 'gemini-2.5-flash',
@@ -99,10 +102,11 @@ class MockAIProviderAdapter implements IPreBaseAIProviderAdapter {
 			outputTokenLimit: 65_536,
 			capabilities: {
 				textGeneration: true,
+				streaming: true,
+				functionCalling: true,
+				multimodalInput: false,
 				agentCompatible: true,
 				descriptionCompatible: true,
-				toolCalling: true,
-				imageInput: false,
 			},
 		},
 		{
@@ -114,10 +118,11 @@ class MockAIProviderAdapter implements IPreBaseAIProviderAdapter {
 			outputTokenLimit: 65_536,
 			capabilities: {
 				textGeneration: true,
+				streaming: true,
+				functionCalling: true,
+				multimodalInput: false,
 				agentCompatible: true,
 				descriptionCompatible: true,
-				toolCalling: true,
-				imageInput: false,
 			},
 		},
 	];
@@ -158,14 +163,18 @@ class MockAIProviderAdapter implements IPreBaseAIProviderAdapter {
 		};
 	}
 
-	async testConnection(): Promise<{ ok: boolean; modelId?: string; reply?: string }> {
+	async testConnection(
+		credential?: ResolvedProviderExecution,
+		modelId?: string,
+		token?: AICancellationToken,
+	): Promise<{ ok: boolean; modelId: string; reply?: string; error?: AIProviderErrorClassification }> {
 		this.testCalls++;
-		return { ok: true, modelId: 'gemini-2.5-flash', reply: 'PONG' };
+		return { ok: true, modelId: modelId || 'gemini-2.5-flash', reply: 'PONG' };
 	}
 
-	normalizeError(err: unknown) {
+	normalizeError(err: unknown): AIProviderErrorClassification {
 		return {
-			code: 'error' as const,
+			code: 'unknown',
 			safeMessage: err instanceof Error ? err.message : String(err),
 			retryable: false,
 		};
@@ -277,10 +286,11 @@ describe('PreBaseAIService & Provider Resolution', () => {
 				outputTokenLimit: 65_536,
 				capabilities: {
 					textGeneration: true,
+					streaming: true,
+					functionCalling: true,
+					multimodalInput: false,
 					agentCompatible: true,
 					descriptionCompatible: true,
-					toolCalling: true,
-					imageInput: false,
 				},
 			},
 			{
@@ -291,10 +301,11 @@ describe('PreBaseAIService & Provider Resolution', () => {
 				outputTokenLimit: 0,
 				capabilities: {
 					textGeneration: false,
+					streaming: false,
+					functionCalling: false,
+					multimodalInput: false,
 					agentCompatible: false,
 					descriptionCompatible: false,
-					toolCalling: false,
-					imageInput: false,
 				},
 			},
 		];
@@ -414,7 +425,7 @@ describe('PreBaseAIService & Provider Resolution', () => {
 			}
 			// Attempt 2 succeeds with expanded headroom
 			assert.equal(req.maxOutputTokens, 2048);
-			assert.equal(req.reasoningEffort, 'minimal');
+			assert.equal(req.reasoningEffort, 'low');
 			return {
 				text: 'Configuration entrypoint for Tauri host architecture.',
 				modelId: req.modelId,
@@ -427,10 +438,10 @@ describe('PreBaseAIService & Provider Resolution', () => {
 		assert.equal(desc.status, 'ready');
 		assert.equal(desc.text, 'Configuration entrypoint for Tauri host architecture.');
 		assert.equal(callCount, 2, 'Should have executed retry on MAX_TOKENS starvation');
-		assert.equal(desc.cacheIdentity, 'gemini:gemini-2.5-flash:description:low:v6');
+		assert.equal(desc.cacheIdentity, 'gemini:gemini-2.5-flash:description-policy-v7');
 	});
 
-	it('resolves description context with low reasoning effort and v6 cache identity', async () => {
+	it('resolves description context with low reasoning effort and v7 cache identity', async () => {
 		const mockStorage = new MockSecretStorage();
 		await mockStorage.store('prebase.magnus.provider.gemini.apiKey', 'valid-key');
 		const resolver = new PreBaseSecretResolver({ forcePackaged: true });
@@ -444,7 +455,7 @@ describe('PreBaseAIService & Provider Resolution', () => {
 		assert.equal(ctx.modelId, 'gemini-2.5-flash');
 		assert.equal(ctx.executionMode, 'byok');
 		assert.equal(ctx.reasoningEffort, 'low');
-		assert.equal(ctx.policyVersion, 'v6');
-		assert.equal(ctx.cacheIdentity, 'gemini:gemini-2.5-flash:description:low:v6');
+		assert.equal(ctx.policyVersion, 'v7');
+		assert.equal(ctx.cacheIdentity, 'gemini:gemini-2.5-flash:description-policy-v7');
 	});
 });

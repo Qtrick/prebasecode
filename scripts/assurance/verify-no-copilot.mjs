@@ -58,13 +58,37 @@ const lmApiDts = path.join(REPO_ROOT, 'src', 'vscode-dts', 'vscode.proposed.lang
 const chatApiDts = path.join(REPO_ROOT, 'src', 'vscode-dts', 'vscode.proposed.chatProvider.d.ts');
 check('VS Code Language Model API declarations preserved', fs.existsSync(lmApiDts) || fs.existsSync(path.join(REPO_ROOT, 'src', 'vscode-dts', 'vscode.d.ts')));
 
+// 6. product.json default chat agent is Magnus
+let defaultChatAgentIsMagnus = false;
+try {
+	const product = JSON.parse(fs.readFileSync(productJsonPath, 'utf8'));
+	defaultChatAgentIsMagnus = product.defaultChatAgent?.extensionId === 'prebase.magnus' && product.defaultChatAgent?.chatExtensionId === 'prebase.magnus';
+} catch (err) {
+	console.error('Failed checking defaultChatAgent in product.json:', err);
+}
+check('product.json configures Magnus as default chat agent', defaultChatAgentIsMagnus);
+
+// 7. First-party chat compatibility notifier uses PreBase Agents copy for Magnus
+const chatContribPath = path.join(REPO_ROOT, 'src', 'vs', 'workbench', 'contrib', 'chat', 'browser', 'chatParticipant.contribution.ts');
+let chatCompatFirstParty = false;
+try {
+	const chatContribContent = fs.readFileSync(chatContribPath, 'utf8');
+	chatCompatFirstParty = chatContribContent.includes('isMagnusDefaultChatAgent()') &&
+		chatContribContent.includes('prebaseAgentsFailErrorMessage') &&
+		chatContribContent.includes('prebaseAgentsVersion') &&
+		chatContribContent.includes('DisabledByInvalidExtension');
+} catch (err) {
+	console.error('Failed checking chatParticipant.contribution.ts:', err);
+}
+check('First-party chat compatibility notifier is Magnus-aware with PreBase branding', chatCompatFirstParty);
+
 console.log('\n================================================================');
 if (failures === 0) {
-	console.log(' NO-COPILOT VERIFICATION: PASS (All checks passed)');
+	console.log(' PREBASE COPILOT PRODUCT ISOLATION: PASS (All checks passed)');
 	console.log('================================================================');
 	process.exit(0);
 } else {
-	console.error(` NO-COPILOT VERIFICATION: FAIL (${failures} violations)`);
+	console.error(` PREBASE COPILOT PRODUCT ISOLATION: FAIL (${failures} violations)`);
 	console.log('================================================================');
 	process.exit(1);
 }

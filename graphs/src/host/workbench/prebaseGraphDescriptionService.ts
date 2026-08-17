@@ -27,8 +27,8 @@ export interface IGraphNodeDescriptionResult {
 	cacheHit: boolean;
 }
 
-const PROMPT_VERSION = 'v6';
-const CACHE_KEY = 'prebase.graph.descriptionCache.v6';
+const PROMPT_VERSION = 'v7';
+const CACHE_KEY = 'prebase.graph.descriptionCache.v7';
 const MAX_CACHE = 200;
 const MAX_CONTENT = 12000;
 
@@ -41,6 +41,51 @@ function hashContent(str: string): string {
 	return (h >>> 0).toString(16);
 }
 
+export function normalizeCompactDescription(rawText: string): string {
+	let text = rawText
+		.replace(/\*\*(.*?)\*\*/g, '$1')
+		.replace(/`(.*?)`/g, '$1')
+		.replace(/\s+/g, ' ')
+		.trim();
+
+	// Remove common verbose filler prefixes if present
+	text = text.replace(/^(This file\s+(is responsible for|provides|implements|contains|defines|serves as)\s+)/i, (match, p1, p2) => {
+		return p2.charAt(0).toUpperCase() + p2.slice(1) + ' ';
+	});
+
+	// Split into sentences
+	const sentences = text.match(/[^.!?]+[.!?]+(\s|$)/g) || [text];
+	const trimmedSentences = sentences.map(s => s.trim()).filter(Boolean);
+
+	if (trimmedSentences.length <= 2) {
+		const words = text.split(/\s+/);
+		if (words.length <= 65) {
+			return text;
+		}
+	}
+
+	// Prefer first 2 sentences if within bounded length
+	const firstTwo = trimmedSentences.slice(0, 2).join(' ');
+	const firstTwoWords = firstTwo.split(/\s+/);
+	if (firstTwoWords.length <= 65 && firstTwo.length > 0) {
+		return firstTwo;
+	}
+
+	// If first sentence alone is sufficient
+	const firstOne = trimmedSentences[0] || '';
+	if (firstOne.split(/\s+/).length <= 65 && firstOne.length > 0) {
+		return firstOne;
+	}
+
+	// Fallback bounding to 55 words cleanly
+	const words = text.split(/\s+/).slice(0, 55);
+	let result = words.join(' ');
+	if (!/[.!?]$/.test(result)) {
+		result += '.';
+	}
+	return result;
+}
+
 const SENSITIVE = /(^|\/)(\.env|\.env\..*|credentials(\.json)?|secrets?(\.json)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|\.pem|\.key|\.p12|\.pfx)(\/|$)/i;
 const SENSITIVE_DIRS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(\/|$)/i;
 
@@ -49,6 +94,15 @@ interface CacheEntry {
 	at: number;
 	providerId?: string;
 	modelId?: string;
+	cacheIdentity?: string;
+}
+
+interface DescriptionContextInfo {
+	providerId?: string;
+	modelId?: string;
+	executionMode?: string;
+	reasoningEffort?: string;
+	policyVersion?: string;
 	cacheIdentity?: string;
 }
 
@@ -121,6 +175,17 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			content = '';
 		}
 
+		// Retrieve active AI description context to validate cache identity
+		let activeContext: DescriptionContextInfo | undefined;
+		try {
+			activeContext = await this.commandService.executeCommand<DescriptionContextInfo>(
+				'prebase.magnus.getDescriptionContext',
+				relative
+			);
+		} catch {
+			activeContext = undefined;
+		}
+
 		const cacheKey = [
 			folder.uri.toString(),
 			'file',
@@ -131,14 +196,17 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 
 		const cached = options?.force ? undefined : this._readCache()[cacheKey];
 		if (cached?.text) {
-			return {
-				overview,
-				aiDescription: cached.text,
-				aiStatus: 'ready',
-				aiProviderId: cached.providerId ?? 'gemini',
-				aiModelId: cached.modelId,
-				cacheHit: true,
-			};
+			const matchesIdentity = !cached.cacheIdentity || !activeContext?.cacheIdentity || cached.cacheIdentity === activeContext.cacheIdentity;
+			if (matchesIdentity) {
+				return {
+					overview,
+					aiDescription: cached.text,
+					aiStatus: 'ready',
+					aiProviderId: cached.providerId ?? activeContext?.providerId ?? 'gemini',
+					aiModelId: cached.modelId ?? activeContext?.modelId,
+					cacheHit: true,
+				};
+			}
 		}
 
 		const existing = this._inflight.get(cacheKey);
@@ -154,10 +222,10 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		const work = (async (): Promise<IGraphNodeDescriptionResult> => {
 			try {
 				const prompt = [
-					'Write a compact, informative 2–4 sentence description (~45–90 words) of this source file’s role in the architecture.',
-					'Structure: 1. Core responsibility. 2. Important mechanics or primary exports/classes. 3. Architectural relationships or downstream dependencies.',
-					'If this is a test file, state the specific behaviors, scenarios, or regressions it validates.',
-					'Rules: Use only evidence visible in the supplied path, layer, imports, and content. Never invent unseen APIs. Output plain text only without markdown formatting.',
+					'Write an ultra-concise 1–2 sentence description (~30–55 words) of this source file.',
+					'Sentence 1: State its concrete responsibility in the codebase.',
+					'Sentence 2: State its most important mechanism, dependency, or architectural relationship (for test files, state what behavior or regression is validated).',
+					'Rules: Do NOT list exhaustive export identifiers or repeat generic category overviews. Use only evidence in the supplied path, layer, imports, and content. Output plain text only without markdown formatting.',
 					`Path: ${relative}`,
 					`Layer: ${node.meta?.architectureLayer ?? 'unknown'}`,
 					`Imports: ${(node.meta?.imports || []).slice(0, 16).join(', ') || 'none'}`,
@@ -248,9 +316,9 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					};
 				}
 
-				const aiText = typeof raw === 'string' ? raw.trim() : raw.text?.trim();
+				const rawAiText = typeof raw === 'string' ? raw.trim() : raw.text?.trim();
 
-				if (!aiText) {
+				if (!rawAiText) {
 					return {
 						overview,
 						aiStatus: 'unavailable',
@@ -259,9 +327,10 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					};
 				}
 
-				const providerId = (typeof raw === 'object' && raw.providerId) ? raw.providerId : 'gemini';
-				const modelId = (typeof raw === 'object' && raw.modelId) ? raw.modelId : undefined;
-				const cacheIdentity = (typeof raw === 'object' && raw.cacheIdentity) ? raw.cacheIdentity : `${providerId}:${modelId || 'auto'}:${PROMPT_VERSION}`;
+				const aiText = normalizeCompactDescription(rawAiText);
+				const providerId = (typeof raw === 'object' && raw.providerId) ? raw.providerId : (activeContext?.providerId ?? 'gemini');
+				const modelId = (typeof raw === 'object' && raw.modelId) ? raw.modelId : activeContext?.modelId;
+				const cacheIdentity = (typeof raw === 'object' && raw.cacheIdentity) ? raw.cacheIdentity : (activeContext?.cacheIdentity ?? `${providerId}:${modelId || 'auto'}:${PROMPT_VERSION}`);
 
 				this._writeCache(cacheKey, {
 					text: aiText,

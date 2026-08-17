@@ -60,6 +60,20 @@ function parseAllowlistedEnv(filePath) {
 	return map;
 }
 
+function isNetworkError(err) {
+	const msg = String(err?.message || err || '');
+	const code = err?.code || '';
+	return msg.includes('fetch failed') ||
+		msg.includes('ENOTFOUND') ||
+		msg.includes('EAI_AGAIN') ||
+		msg.includes('ECONNREFUSED') ||
+		msg.includes('ETIMEDOUT') ||
+		msg.includes('undici') ||
+		code === 'ENOTFOUND' ||
+		code === 'EAI_AGAIN' ||
+		code === 'ECONNREFUSED';
+}
+
 async function runAssurance() {
 	const runId = `ai-run-${new Date().toISOString().replace(/[:.]/g, '-')}`;
 	const reportsBaseDir = path.join(REPO_ROOT, 'reports/ai-assurance');
@@ -175,12 +189,23 @@ async function runAssurance() {
 				report.overallStatus = 'FAIL';
 			}
 		} catch (err) {
-			report.tests.push({
-				name: 'Gemini live model discovery & consumer curation',
-				status: 'FAIL',
-				details: err instanceof Error ? err.message : String(err),
-			});
-			report.overallStatus = 'FAIL';
+			if (isNetworkError(err)) {
+				report.tests.push({
+					name: 'Gemini live model discovery & consumer curation',
+					status: 'BLOCKED',
+					details: `Network unreachable (offline or sandbox): ${err.message}`,
+				});
+				if (report.overallStatus !== 'FAIL') {
+					report.overallStatus = 'BLOCKED';
+				}
+			} else {
+				report.tests.push({
+					name: 'Gemini live model discovery & consumer curation',
+					status: 'FAIL',
+					details: err instanceof Error ? err.message : String(err),
+				});
+				report.overallStatus = 'FAIL';
+			}
 		}
 
 		// 4. Gemini Live Generation
@@ -224,12 +249,23 @@ async function runAssurance() {
 				report.overallStatus = 'FAIL';
 			}
 		} catch (err) {
-			report.tests.push({
-				name: 'Gemini live content generation (gemini-2.5-flash)',
-				status: 'FAIL',
-				details: err instanceof Error ? err.message : String(err),
-			});
-			report.overallStatus = 'FAIL';
+			if (isNetworkError(err)) {
+				report.tests.push({
+					name: 'Gemini live content generation (gemini-2.5-flash)',
+					status: 'BLOCKED',
+					details: `Network unreachable (offline or sandbox): ${err.message}`,
+				});
+				if (report.overallStatus !== 'FAIL') {
+					report.overallStatus = 'BLOCKED';
+				}
+			} else {
+				report.tests.push({
+					name: 'Gemini live content generation (gemini-2.5-flash)',
+					status: 'FAIL',
+					details: err instanceof Error ? err.message : String(err),
+				});
+				report.overallStatus = 'FAIL';
+			}
 		}
 
 		// 4b. Gemini Live Function-Calling Protocol with parametersJsonSchema (additionalProperties: false)
@@ -346,12 +382,23 @@ async function runAssurance() {
 				report.overallStatus = 'FAIL';
 			}
 		} catch (err) {
-			report.tests.push({
-				name: 'Gemini function-calling protocol (parametersJsonSchema + additionalProperties)',
-				status: 'FAIL',
-				details: err instanceof Error ? err.message : String(err),
-			});
-			report.overallStatus = 'FAIL';
+			if (isNetworkError(err)) {
+				report.tests.push({
+					name: 'Gemini function-calling protocol (parametersJsonSchema + additionalProperties)',
+					status: 'BLOCKED',
+					details: `Network unreachable (offline or sandbox): ${err.message}`,
+				});
+				if (report.overallStatus !== 'FAIL') {
+					report.overallStatus = 'BLOCKED';
+				}
+			} else {
+				report.tests.push({
+					name: 'Gemini function-calling protocol (parametersJsonSchema + additionalProperties)',
+					status: 'FAIL',
+					details: err instanceof Error ? err.message : String(err),
+				});
+				report.overallStatus = 'FAIL';
+			}
 		}
 	} else {
 		report.tests.push({
@@ -412,12 +459,23 @@ async function runAssurance() {
 				report.overallStatus = 'FAIL';
 			}
 		} catch (err) {
-			report.tests.push({
-				name: 'LinkUp live search query execution',
-				status: 'FAIL',
-				details: err instanceof Error ? err.message : String(err),
-			});
-			report.overallStatus = 'FAIL';
+			if (isNetworkError(err)) {
+				report.tests.push({
+					name: 'LinkUp live search query execution',
+					status: 'BLOCKED',
+					details: `Network unreachable (offline or sandbox): ${err.message}`,
+				});
+				if (report.overallStatus !== 'FAIL') {
+					report.overallStatus = 'BLOCKED';
+				}
+			} else {
+				report.tests.push({
+					name: 'LinkUp live search query execution',
+					status: 'FAIL',
+					details: err instanceof Error ? err.message : String(err),
+				});
+				report.overallStatus = 'FAIL';
+			}
 		}
 	} else {
 		report.tests.push({
