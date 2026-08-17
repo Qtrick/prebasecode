@@ -252,6 +252,11 @@
         "command": "prebase.magnus.testLinkupConnection",
         "title": "Test LinkUp Connection",
         "category": "Agents"
+      },
+      {
+        "command": "prebase.magnus.diagnoseModelCatalog",
+        "title": "Diagnose Model Catalog",
+        "category": "Agents"
       }
     ],
     "configuration": {
@@ -266,7 +271,7 @@
             "gemini-2.5-flash"
           ],
           "enumDescriptions": [
-            "Auto (Gemini 2.5 Flash)",
+            "Auto (Recommended)",
             "Gemini 2.5 Pro",
             "Gemini 2.5 Flash"
           ],

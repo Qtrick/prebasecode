@@ -25,6 +25,8 @@ import {
 	type HostedGeminiTransportOptions,
 } from './transports/hostedGeminiTransport';
 
+import { defaultGeminiModelPolicy } from './modelPolicy';
+
 /**
  * Static fallback model list used when live discovery is unavailable or offline.
  * These should remain current general-purpose Gemini models.
@@ -34,7 +36,7 @@ export const STATIC_FALLBACK_GEMINI_MODELS: readonly NormalizedAIModel[] = [
 		id: 'auto',
 		name: 'models/gemini-2.5-flash',
 		displayName: 'Auto',
-		description: 'Balanced quality and speed, recommended for most tasks (resolves to Gemini 2.5 Flash).',
+		description: 'Balanced quality and speed, recommended for most tasks.',
 		inputTokenLimit: 1_000_000,
 		outputTokenLimit: 65_536,
 		capabilities: {
@@ -47,26 +49,16 @@ export const STATIC_FALLBACK_GEMINI_MODELS: readonly NormalizedAIModel[] = [
 			agentCompatible: true,
 			descriptionCompatible: true,
 		},
+		providerId: 'gemini',
+		family: 'gemini',
+		releaseChannel: 'stable',
+		workloads: ['general-agent', 'fast-agent'],
+		visibility: 'recommended',
+		tier: 'flash',
+		consumerSelectable: true,
+		autoEligible: true,
+		descriptionEligible: true,
 		isAuto: true,
-		isFallback: true,
-	},
-	{
-		id: 'gemini-2.5-pro',
-		name: 'models/gemini-2.5-pro',
-		displayName: 'Gemini 2.5 Pro',
-		description: 'Highest quality Gemini model — best for complex reasoning and large refactors.',
-		inputTokenLimit: 1_000_000,
-		outputTokenLimit: 65_536,
-		capabilities: {
-			textGeneration: true,
-			streaming: true,
-			functionCalling: true,
-			multimodalInput: true,
-			structuredOutput: true,
-			thinkingProtocol: false,
-			agentCompatible: true,
-			descriptionCompatible: true,
-		},
 		isFallback: true,
 	},
 	{
@@ -86,43 +78,55 @@ export const STATIC_FALLBACK_GEMINI_MODELS: readonly NormalizedAIModel[] = [
 			agentCompatible: true,
 			descriptionCompatible: true,
 		},
+		providerId: 'gemini',
+		family: 'gemini',
+		releaseChannel: 'stable',
+		workloads: ['general-agent', 'fast-agent', 'description'],
+		visibility: 'recommended',
+		tier: 'flash',
+		consumerSelectable: true,
+		autoEligible: true,
+		descriptionEligible: true,
+		isFallback: true,
+	},
+	{
+		id: 'gemini-2.5-pro',
+		name: 'models/gemini-2.5-pro',
+		displayName: 'Gemini 2.5 Pro',
+		description: 'Highest quality Gemini model — best for complex reasoning and large refactors.',
+		inputTokenLimit: 1_000_000,
+		outputTokenLimit: 65_536,
+		capabilities: {
+			textGeneration: true,
+			streaming: true,
+			functionCalling: true,
+			multimodalInput: true,
+			structuredOutput: true,
+			thinkingProtocol: false,
+			agentCompatible: true,
+			descriptionCompatible: true,
+		},
+		providerId: 'gemini',
+		family: 'gemini',
+		releaseChannel: 'stable',
+		workloads: ['general-agent', 'deep-reasoning'],
+		visibility: 'recommended',
+		tier: 'pro',
+		consumerSelectable: true,
+		autoEligible: true,
+		descriptionEligible: false,
 		isFallback: true,
 	},
 ];
 
 /**
- * Auto model policy: prefer the newest stable general-purpose flash model available.
- * Priority: gemini-3.x-flash > gemini-2.5-flash > gemini-2.5-pro > first agentCompatible.
- * Falls back to 'gemini-2.5-flash' when no discovery data is available.
+ * Auto model policy: delegates to default GeminiModelPolicy.
  */
 export function resolveAutoModelFromDiscovered(
-	models?: readonly { id: string; capabilities: { agentCompatible: boolean } }[],
+	models?: readonly NormalizedAIModel[],
+	workload?: import('./aiTypes').ModelWorkload,
 ): string {
-	const agentModels = models?.filter(m => m.capabilities.agentCompatible) ?? [];
-	if (agentModels.length === 0) {
-		return 'gemini-2.5-flash'; // static fallback
-	}
-
-	// Prefer gemini-3.x-flash family (newest stable general-purpose flash)
-	const flash3x = agentModels.find(m => /^gemini-3\.\d+-flash/i.test(m.id));
-	if (flash3x) {
-		return flash3x.id;
-	}
-
-	// Then gemini-2.5-flash
-	const flash25 = agentModels.find(m => m.id === 'gemini-2.5-flash');
-	if (flash25) {
-		return flash25.id;
-	}
-
-	// Then gemini-2.5-pro
-	const pro25 = agentModels.find(m => m.id === 'gemini-2.5-pro');
-	if (pro25) {
-		return pro25.id;
-	}
-
-	// First compatible as last resort
-	return agentModels[0].id;
+	return defaultGeminiModelPolicy.resolveAuto(models ?? STATIC_FALLBACK_GEMINI_MODELS, workload);
 }
 
 export class GeminiProviderAdapter implements IPreBaseAIProviderAdapter {
@@ -136,6 +140,7 @@ export class GeminiProviderAdapter implements IPreBaseAIProviderAdapter {
 	];
 	readonly defaultModel = 'auto';
 	readonly staticFallbackModels = STATIC_FALLBACK_GEMINI_MODELS;
+	readonly modelPolicy = defaultGeminiModelPolicy;
 
 	readonly directTransport: DirectGeminiTransport;
 	readonly hostedTransport: HostedGeminiTransport;
@@ -148,8 +153,12 @@ export class GeminiProviderAdapter implements IPreBaseAIProviderAdapter {
 		this.hostedTransport = new HostedGeminiTransport(options?.hostedOptions);
 	}
 
-	resolveAutoModel(_executionMode: PreBaseAIExecutionMode, discoveredModels?: readonly { id: string; capabilities: { agentCompatible: boolean } }[]): string {
-		return resolveAutoModelFromDiscovered(discoveredModels);
+	resolveAutoModel(_executionMode: PreBaseAIExecutionMode, discoveredModels?: readonly NormalizedAIModel[], workload?: import('./aiTypes').ModelWorkload): string {
+		return this.modelPolicy.resolveAuto(discoveredModels ?? this.staticFallbackModels, workload);
+	}
+
+	curateConsumerCatalog(models: readonly NormalizedAIModel[]): NormalizedAIModel[] {
+		return this.modelPolicy.curateConsumerCatalog(models);
 	}
 
 	normalizeError(error: unknown): AIProviderErrorClassification {

@@ -27,8 +27,8 @@ export interface IGraphNodeDescriptionResult {
 	cacheHit: boolean;
 }
 
-const PROMPT_VERSION = 'v4';
-const CACHE_KEY = 'prebase.graph.descriptionCache.v4';
+const PROMPT_VERSION = 'v5';
+const CACHE_KEY = 'prebase.graph.descriptionCache.v5';
 const MAX_CACHE = 200;
 const MAX_CONTENT = 12000;
 
@@ -145,10 +145,10 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		const work = (async (): Promise<IGraphNodeDescriptionResult> => {
 			try {
 				const prompt = [
-					'Write a detailed, informative 3–5 sentence description (~80–160 words) of this source file’s role in the architecture.',
-					'Cover what this file is responsible for, its primary exports or classes, key dependencies or architectural relationships, and where it fits in the subsystem.',
+					'Write a compact, informative 2–4 sentence description (~45–90 words) of this source file’s role in the architecture.',
+					'Structure: 1. Core responsibility. 2. Important mechanics or primary exports/classes. 3. Architectural relationships or downstream dependencies.',
 					'If this is a test file, state the specific behaviors, scenarios, or regressions it validates.',
-					'Rules: Use only evidence visible in the supplied path, layer, imports, and content. If evidence is insufficient, state so rather than inventing APIs. Output plain text only without markdown formatting.',
+					'Rules: Use only evidence visible in the supplied path, layer, imports, and content. Never invent unseen APIs. Output plain text only without markdown formatting.',
 					`Path: ${relative}`,
 					`Layer: ${node.meta?.architectureLayer ?? 'unknown'}`,
 					`Imports: ${(node.meta?.imports || []).slice(0, 16).join(', ') || 'none'}`,

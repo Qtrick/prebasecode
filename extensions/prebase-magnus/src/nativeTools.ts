@@ -1,11 +1,7 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
 import * as vscode from 'vscode';
 import { isSecretPath, isUnderWorkspace, MagnusWorkspaceTools, resolveWorkspaceUri } from './tools';
 import { WorkspaceIntelligence, type WorkspacePosition } from './workspaceIntelligence';
+import { MagnusToolActivityDescriptor } from './toolActivity';
 
 function result(value: string): vscode.LanguageModelToolResult {
 	return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(value.slice(0, 80_000))]);
@@ -16,6 +12,9 @@ function commandResult(value: unknown): vscode.LanguageModelToolResult {
 }
 
 class GraphSearchTool implements vscode.LanguageModelTool<{ query: string; maximumResults?: number }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ query: string; maximumResults?: number }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_graph_search', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ query: string; maximumResults?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
@@ -29,6 +28,9 @@ class GraphSearchTool implements vscode.LanguageModelTool<{ query: string; maxim
 }
 
 class GraphNodeTool implements vscode.LanguageModelTool<{ node: string }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ node: string }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_graph_node', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ node: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested || !options.input.node?.trim()) {
 			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'A graph node id or relative path is required.');
@@ -38,6 +40,9 @@ class GraphNodeTool implements vscode.LanguageModelTool<{ node: string }> {
 }
 
 class GraphDependenciesTool implements vscode.LanguageModelTool<{ node: string; direction?: 'incoming' | 'outgoing' | 'both'; depth?: number; maximumNodes?: number }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ node: string; direction?: 'incoming' | 'outgoing' | 'both'; depth?: number; maximumNodes?: number }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_graph_dependencies', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ node: string; direction?: 'incoming' | 'outgoing' | 'both'; depth?: number; maximumNodes?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested || !options.input.node?.trim()) {
 			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'A graph node id or relative path is required.');
@@ -47,6 +52,9 @@ class GraphDependenciesTool implements vscode.LanguageModelTool<{ node: string; 
 }
 
 class GraphOverviewTool implements vscode.LanguageModelTool<Record<string, never>> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<Record<string, never>>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_graph_overview', options.input as Record<string, unknown>);
+	}
 	async invoke(_options: vscode.LanguageModelToolInvocationOptions<Record<string, never>>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
@@ -57,6 +65,9 @@ class GraphOverviewTool implements vscode.LanguageModelTool<Record<string, never
 
 class WorkspaceReadTool implements vscode.LanguageModelTool<{ path: string }> {
 	private readonly workspace = new MagnusWorkspaceTools(1, false);
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ path: string }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_read', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		const response = await this.workspace.readFile(options.input.path, token);
 		if (!response.ok) {
@@ -68,6 +79,9 @@ class WorkspaceReadTool implements vscode.LanguageModelTool<{ path: string }> {
 
 class WorkspaceSearchTool implements vscode.LanguageModelTool<{ query: string }> {
 	private readonly workspace = new MagnusWorkspaceTools(1, false);
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ query: string }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_search', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ query: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		const response = await this.workspace.searchWorkspace(options.input.query, token);
 		if (!response.ok) {
@@ -80,24 +94,36 @@ class WorkspaceSearchTool implements vscode.LanguageModelTool<{ query: string }>
 const workspaceIntelligence = new WorkspaceIntelligence();
 
 class WorkspaceListFilesTool implements vscode.LanguageModelTool<{ include?: string; exclude?: string; maximumResults?: number }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ include?: string; exclude?: string; maximumResults?: number }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_list_files', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ include?: string; exclude?: string; maximumResults?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		return commandResult(await workspaceIntelligence.listFiles(options.input.include, options.input.exclude, options.input.maximumResults, token));
 	}
 }
 
 class WorkspaceTextSearchTool implements vscode.LanguageModelTool<{ query: string; isRegex?: boolean; isCaseSensitive?: boolean; isWordMatch?: boolean; include?: string; exclude?: string; maximumResults?: number }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ query: string; isRegex?: boolean; isCaseSensitive?: boolean; isWordMatch?: boolean; include?: string; exclude?: string; maximumResults?: number }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_text_search', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ query: string; isRegex?: boolean; isCaseSensitive?: boolean; isWordMatch?: boolean; include?: string; exclude?: string; maximumResults?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		return commandResult(await workspaceIntelligence.searchText(options.input, token));
 	}
 }
 
 class WorkspaceReadRangeTool implements vscode.LanguageModelTool<{ path: string; startLine?: number; endLine?: number; maximumCharacters?: number }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ path: string; startLine?: number; endLine?: number; maximumCharacters?: number }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_read_range', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string; startLine?: number; endLine?: number; maximumCharacters?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		return commandResult(await workspaceIntelligence.readFile(options.input.path, options.input.startLine, options.input.endLine, options.input.maximumCharacters, token));
 	}
 }
 
 class WorkspaceSymbolsTool implements vscode.LanguageModelTool<{ query?: string; path?: string; maximumResults?: number }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ query?: string; path?: string; maximumResults?: number }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_symbols', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ query?: string; path?: string; maximumResults?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (options.input.path) {
 			return commandResult(await workspaceIntelligence.documentSymbols(options.input.path, options.input.maximumResults, token));
@@ -107,18 +133,27 @@ class WorkspaceSymbolsTool implements vscode.LanguageModelTool<{ query?: string;
 }
 
 class WorkspaceDefinitionTool implements vscode.LanguageModelTool<{ path: string; position: WorkspacePosition }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ path: string; position: WorkspacePosition }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_definition', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string; position: WorkspacePosition }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		return commandResult(await workspaceIntelligence.getDefinitions(options.input.path, options.input.position, token));
 	}
 }
 
 class WorkspaceReferencesTool implements vscode.LanguageModelTool<{ path: string; position: WorkspacePosition }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ path: string; position: WorkspacePosition }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_references', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string; position: WorkspacePosition }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		return commandResult(await workspaceIntelligence.getReferences(options.input.path, options.input.position, token));
 	}
 }
 
 class WorkspaceDiagnosticsTool implements vscode.LanguageModelTool<{ path?: string }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ path?: string }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_workspace_diagnostics', options.input as Record<string, unknown>);
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path?: string }>, _token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		return commandResult(workspaceIntelligence.getDiagnostics(options.input.path));
 	}
@@ -280,6 +315,9 @@ class WorkspaceEditTool implements vscode.LanguageModelTool<{ path: string; cont
 }
 
 class RuntimeStateTool implements vscode.LanguageModelTool<Record<string, never>> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<Record<string, never>>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_runtime_status', options.input as Record<string, unknown>);
+	}
 	async invoke(_options: vscode.LanguageModelToolInvocationOptions<Record<string, never>>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
@@ -305,6 +343,9 @@ class RuntimeNavigateTool implements vscode.LanguageModelTool<{ url: string }> {
 }
 
 class RuntimeInspectPageTool implements vscode.LanguageModelTool<Record<string, never>> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<Record<string, never>>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_runtime_preview_diagnose', options.input as Record<string, unknown>);
+	}
 	async invoke(_options: vscode.LanguageModelToolInvocationOptions<Record<string, never>>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
@@ -314,6 +355,9 @@ class RuntimeInspectPageTool implements vscode.LanguageModelTool<Record<string, 
 }
 
 class RuntimeEvidenceTool implements vscode.LanguageModelTool<{ kind: 'console' | 'network'; maximumEntries?: number }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ kind: 'console' | 'network'; maximumEntries?: number }>): vscode.PreparedToolInvocation {
+		return { invocationMessage: `Collecting ${options.input.kind} evidence from Runtime Preview` };
+	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ kind: 'console' | 'network'; maximumEntries?: number }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		if (token.isCancellationRequested || (options.input.kind !== 'console' && options.input.kind !== 'network')) {
 			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Specify console or network evidence.');
@@ -441,6 +485,9 @@ async function runVisibleTask(task: vscode.Task, token: vscode.CancellationToken
 }
 
 class ProjectEnvironmentTool implements vscode.LanguageModelTool<Record<string, never>> {
+	prepareInvocation(_options: vscode.LanguageModelToolInvocationPrepareOptions<Record<string, never>>): vscode.PreparedToolInvocation {
+		return { invocationMessage: 'Inspecting project environment' };
+	}
 	async invoke(_options: vscode.LanguageModelToolInvocationOptions<Record<string, never>>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		const folder = await workspaceFolderForTerminal();
 		const raw = await textFile(folder, 'package.json');

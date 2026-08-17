@@ -708,9 +708,9 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const modelSelect = document.createElement('select');
 		this._selectStyle(modelSelect);
 		const staticFallbackModels = [
-			{ id: 'auto', label: 'Auto (Recommended - Gemini 2.5 Flash)' },
-			{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro (Complex Reasoning)' },
-			{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash (Fast & Capable)' },
+			{ id: 'auto', label: 'Auto (Recommended)' },
+			{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
+			{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
 		];
 		for (const m of staticFallbackModels) {
 			const opt = document.createElement('option');

@@ -9,6 +9,38 @@ import type { MagnusDescriptionResult } from './models';
 
 export type AIProviderId = 'gemini' | string;
 
+export type ModelReleaseChannel =
+	| 'stable'
+	| 'preview'
+	| 'experimental'
+	| 'latest-alias'
+	| 'early-access'
+	| 'unknown';
+
+export type ModelWorkload =
+	| 'general-agent'
+	| 'fast-agent'
+	| 'deep-reasoning'
+	| 'description'
+	| 'media'
+	| 'audio'
+	| 'research'
+	| 'computer-use'
+	| 'embedding'
+	| 'specialized';
+
+export type ModelVisibility =
+	| 'recommended'
+	| 'consumer'
+	| 'internal'
+	| 'hidden';
+
+export type ModelTier =
+	| 'flash'
+	| 'pro'
+	| 'lite'
+	| 'custom';
+
 export interface ModelCapabilityFlags {
 	readonly textGeneration: boolean;
 	readonly streaming: boolean;
@@ -28,6 +60,17 @@ export interface NormalizedAIModel {
 	readonly inputTokenLimit: number;
 	readonly outputTokenLimit: number;
 	readonly capabilities: ModelCapabilityFlags;
+	readonly providerId?: string;
+	readonly family?: string;
+	readonly releaseChannel?: ModelReleaseChannel;
+	readonly workloads?: readonly ModelWorkload[];
+	readonly visibility?: ModelVisibility;
+	readonly tier?: ModelTier;
+	readonly consumerSelectable?: boolean;
+	readonly autoEligible?: boolean;
+	readonly descriptionEligible?: boolean;
+	readonly deprecated?: boolean;
+	readonly hiddenReason?: string;
 	readonly isAuto?: boolean;
 	readonly isFallback?: boolean;
 }
@@ -115,12 +158,14 @@ export interface IPreBaseAIProviderAdapter {
 	readonly defaultModel: string;
 	readonly staticFallbackModels: readonly NormalizedAIModel[];
 
-	resolveAutoModel(executionMode: PreBaseAIExecutionMode, discoveredModels?: readonly NormalizedAIModel[]): string;
+	resolveAutoModel(executionMode: PreBaseAIExecutionMode, discoveredModels?: readonly NormalizedAIModel[], workload?: ModelWorkload): string;
 
 	discoverModels(
 		credential: ResolvedProviderExecution,
 		token?: AICancellationToken,
 	): Promise<NormalizedAIModel[]>;
+
+	curateConsumerCatalog?(models: readonly NormalizedAIModel[]): NormalizedAIModel[];
 
 	generate(
 		request: AIGenerateRequest,
@@ -168,8 +213,9 @@ export interface IPreBaseAIService {
 	getProviderStatus(providerId?: string): Promise<ProviderStatusResult>;
 
 	listModels(providerId?: string, forceRefresh?: boolean, token?: AICancellationToken): Promise<NormalizedAIModel[]>;
+	listRawModels?(providerId?: string, forceRefresh?: boolean, token?: AICancellationToken): Promise<NormalizedAIModel[]>;
 
-	generateText(prompt: string, options?: { modelId?: string; maxTokens?: number; temperature?: number }, token?: AICancellationToken): Promise<string>;
+	generateText(prompt: string, options?: { modelId?: string; maxTokens?: number; temperature?: number; workload?: ModelWorkload }, token?: AICancellationToken): Promise<string>;
 
 	describeFile(prompt: string, filePath?: string, token?: AICancellationToken): Promise<MagnusDescriptionResult>;
 
@@ -179,6 +225,7 @@ export interface IPreBaseAIService {
 			systemInstruction?: string;
 			tools?: AIToolDeclaration[];
 			modelId?: string;
+			workload?: ModelWorkload;
 		},
 		token?: AICancellationToken,
 	): Promise<AIGenerateResult>;
@@ -189,6 +236,7 @@ export interface IPreBaseAIService {
 			systemInstruction?: string;
 			tools?: AIToolDeclaration[];
 			modelId?: string;
+			workload?: ModelWorkload;
 		},
 		onChunk: (chunk: { text?: string; candidate?: AIGenerateResponseCandidate }) => void,
 		token?: AICancellationToken,

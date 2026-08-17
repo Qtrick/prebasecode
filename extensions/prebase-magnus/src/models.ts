@@ -53,6 +53,8 @@ export interface MagnusModelOption {
  * Default fallback models when live discovery is not yet available or offline.
  * Auto resolves to Gemini 2.5 Flash as the balanced, fast default.
  */
+import { defaultGeminiModelPolicy } from './modelPolicy';
+
 export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 	{
 		id: 'auto',
@@ -60,16 +62,8 @@ export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		apiModel: 'gemini-2.5-flash',
 		maxInputTokens: 1_000_000,
 		maxOutputTokens: 65_536,
-		description: 'Balanced quality and speed, recommended for most tasks (resolves to Gemini 2.5 Flash).',
+		description: 'Balanced quality and speed, recommended for most tasks.',
 		isAuto: true,
-	},
-	{
-		id: 'gemini-2.5-pro',
-		name: 'Gemini 2.5 Pro',
-		apiModel: 'gemini-2.5-pro',
-		maxInputTokens: 1_000_000,
-		maxOutputTokens: 65_536,
-		description: 'Highest quality Gemini model — best for complex reasoning and large refactors.',
 	},
 	{
 		id: 'gemini-2.5-flash',
@@ -78,6 +72,14 @@ export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		maxInputTokens: 1_000_000,
 		maxOutputTokens: 65_536,
 		description: 'Fast and capable — strong default for everyday coding.',
+	},
+	{
+		id: 'gemini-2.5-pro',
+		name: 'Gemini 2.5 Pro',
+		apiModel: 'gemini-2.5-pro',
+		maxInputTokens: 1_000_000,
+		maxOutputTokens: 65_536,
+		description: 'Highest quality Gemini model — best for complex reasoning and large refactors.',
 	},
 ];
 
@@ -137,14 +139,31 @@ export const globalGeminiModelCache = new GeminiModelCache();
 
 export type DiscoveredModelInput = DiscoveredGeminiModel | import('./aiTypes').NormalizedAIModel;
 
-function isCompatibleModel(m: DiscoveredModelInput): boolean {
-	if ('capabilities' in m && m.capabilities) {
-		return !!m.capabilities.agentCompatible;
+function toNormalizedModel(m: DiscoveredModelInput): import('./aiTypes').NormalizedAIModel {
+	if ('capabilities' in m && typeof m.capabilities === 'object') {
+		return m as import('./aiTypes').NormalizedAIModel;
 	}
-	if ('agentCompatible' in m) {
-		return !!m.agentCompatible;
-	}
-	return true;
+	const supportsGenerate = ('supportedGenerationMethods' in m && Array.isArray(m.supportedGenerationMethods))
+		? m.supportedGenerationMethods.includes('generateContent')
+		: true;
+	return {
+		id: m.id,
+		name: ('name' in m && m.name) ? m.name : `models/${m.id}`,
+		displayName: m.displayName || m.id,
+		description: m.description || `Google Gemini model (${m.id}).`,
+		inputTokenLimit: m.inputTokenLimit || 1_000_000,
+		outputTokenLimit: m.outputTokenLimit || 65_536,
+		capabilities: {
+			textGeneration: supportsGenerate,
+			streaming: true,
+			functionCalling: supportsGenerate,
+			multimodalInput: true,
+			structuredOutput: supportsGenerate,
+			thinkingProtocol: false,
+			agentCompatible: supportsGenerate,
+			descriptionCompatible: supportsGenerate,
+		},
+	};
 }
 
 function getModelDisplayName(m: DiscoveredModelInput): string {
@@ -153,45 +172,25 @@ function getModelDisplayName(m: DiscoveredModelInput): string {
 
 /**
  * Builds list of user-selectable model options from discovered models or fallbacks.
+ * Uses provider policy curation to ensure consumers see only curated stable models.
  */
 export function buildModelOptions(discovered?: DiscoveredModelInput[]): MagnusModelOption[] {
 	if (!discovered || discovered.length === 0) {
 		return [...DEFAULT_MAGNUS_MODELS];
 	}
 
-	const compatible = discovered.filter(isCompatibleModel);
-	if (compatible.length === 0) {
-		return [...DEFAULT_MAGNUS_MODELS];
-	}
+	const normalized = discovered.map(toNormalizedModel);
+	const curated = defaultGeminiModelPolicy.curateConsumerCatalog(normalized);
 
-	// Determine best auto target: prefer gemini-3.x-flash, then 2.5-flash, then 2.5-pro, then first compatible
-	const autoTarget = compatible.find(m => /^gemini-3\.\d+-flash/i.test(m.id))
-		|| compatible.find(m => m.id === 'gemini-2.5-flash')
-		|| compatible.find(m => m.id === 'gemini-2.5-pro')
-		|| compatible[0];
-
-	const targetDisplayName = getModelDisplayName(autoTarget);
-
-	const autoOption: MagnusModelOption = {
-		id: 'auto',
-		name: 'Auto',
-		apiModel: autoTarget.id,
-		maxInputTokens: autoTarget.inputTokenLimit,
-		maxOutputTokens: autoTarget.outputTokenLimit,
-		description: `Balanced quality and speed (resolves to ${targetDisplayName}).`,
-		isAuto: true,
-	};
-
-	const explicitOptions: MagnusModelOption[] = compatible.map(m => ({
+	return curated.map(m => ({
 		id: m.id,
-		name: getModelDisplayName(m),
-		apiModel: m.id,
+		name: m.isAuto ? 'Auto' : getModelDisplayName(m),
+		apiModel: m.isAuto ? defaultGeminiModelPolicy.resolveAuto(curated) : m.id,
 		maxInputTokens: m.inputTokenLimit,
 		maxOutputTokens: m.outputTokenLimit,
 		description: m.description || `Google Gemini model (${m.id}).`,
+		isAuto: m.isAuto,
 	}));
-
-	return [autoOption, ...explicitOptions];
 }
 
 export function resolveApiModel(modelId: string, discovered?: DiscoveredModelInput[]): string {

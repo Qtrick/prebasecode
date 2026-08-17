@@ -6,7 +6,6 @@
 import * as vscode from 'vscode';
 import type { PreBaseAIService } from './aiService';
 import type { AIContentMessage, AIContentPart, AIToolDeclaration } from './aiTypes';
-import { getModelOption } from './models';
 import {
 	allowsEdits,
 	getAgentModePromptBlock,
@@ -77,26 +76,6 @@ export function visibleAssistantText(raw: string): string {
 	return raw;
 }
 
-function emitThought(response: vscode.ChatResponseStream, text: string, id = 'magnus-thought'): void {
-	try {
-		response.thinkingProgress({ id, text });
-	} catch {
-		response.progress(text);
-	}
-}
-
-function finishThought(response: vscode.ChatResponseStream, id = 'magnus-thought'): void {
-	try {
-		response.thinkingProgress({
-			id,
-			text: '',
-			metadata: { vscodeReasoningDone: true, stopReason: 'text' },
-		});
-	} catch {
-		// Older hosts without thinkingProgress — ignore.
-	}
-}
-
 export function registerMagnusChatParticipants(
 	context: vscode.ExtensionContext,
 	aiService: PreBaseAIService,
@@ -148,7 +127,6 @@ async function handleChatRequest(
 	const modelId = state.modelId
 		|| vscode.workspace.getConfiguration('prebase.magnus').get<string>('defaultModel', 'auto')
 		|| 'auto';
-	const modelLabel = getModelOption(modelId).name;
 
 	const extras: string[] = [];
 	for (const file of state.attachedFiles) {
@@ -180,7 +158,6 @@ async function handleChatRequest(
 	};
 
 	try {
-		emitThought(response, `Planning with ${modelLabel}…`, 'magnus-planning');
 		let rawText = '';
 		let enteredRunning = false;
 
@@ -194,9 +171,6 @@ async function handleChatRequest(
 				if (effectiveToken.isCancellationRequested) {
 					run.status = 'cancelled';
 					run.completedAt = Date.now();
-					finishThought(response, 'magnus-planning');
-					emitThought(response, runHeaderLabel(run), 'magnus-run-header');
-					finishThought(response, 'magnus-run-header');
 					response.markdown(`\n\n_${runHeaderLabel(run)}._`);
 					return {};
 				}
@@ -219,7 +193,6 @@ async function handleChatRequest(
 				enteredRunning = true;
 				run.status = 'running';
 				run.startedAt ??= Date.now();
-				finishThought(response, 'magnus-planning');
 				contents.push({ role: 'model', parts });
 
 				const responseParts: AIContentPart[] = [];
@@ -243,7 +216,8 @@ async function handleChatRequest(
 					}
 					try {
 						const toolResult = await vscode.lm.invokeTool(call.name, { toolInvocationToken: request.toolInvocationToken, input: call.args }, effectiveToken);
-						responseParts.push({ functionResponse: { id: call.id, name: call.name, response: { result: toolResultText(toolResult) } } });
+						const resText = toolResultText(toolResult);
+						responseParts.push({ functionResponse: { id: call.id, name: call.name, response: { result: resText } } });
 					} catch (err) {
 						responseParts.push({ functionResponse: { id: call.id, name: call.name, response: { error: err instanceof Error ? err.message : 'Tool invocation failed.' } } });
 					}
@@ -254,18 +228,12 @@ async function handleChatRequest(
 			if (effectiveToken.isCancellationRequested) {
 				run.status = 'cancelled';
 				run.completedAt = Date.now();
-				finishThought(response, 'magnus-planning');
-				emitThought(response, runHeaderLabel(run), 'magnus-run-header');
-				finishThought(response, 'magnus-run-header');
 				response.markdown(`\n\n_${runHeaderLabel(run)}._`);
 				return {};
 			}
 			run.status = 'failed';
 			run.completedAt = Date.now();
 			run.error = err instanceof Error ? err.message : String(err);
-			finishThought(response, 'magnus-planning');
-			emitThought(response, runHeaderLabel(run), 'magnus-run-header');
-			finishThought(response, 'magnus-run-header');
 			response.markdown(`Agents request failed: ${run.error}`);
 			return {};
 		}
@@ -273,11 +241,7 @@ async function handleChatRequest(
 		run.status = 'completed';
 		run.completedAt = Date.now();
 		run.finalResponse = visibleAssistantText(rawText);
-		finishThought(response, 'magnus-planning');
-		emitThought(response, runHeaderLabel(run), 'magnus-run-header');
-		finishThought(response, 'magnus-run-header');
 		const finalVisible = run.finalResponse;
-		response.markdown('### Result\n\n');
 		response.markdown(finalVisible || (enteredRunning ? 'The tool loop reached its limit before the model returned a final response.' : 'The model returned no text.'));
 		return {};
 	} finally {

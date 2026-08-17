@@ -1,6 +1,6 @@
-# PreBase AI Assurance Report (ai-run-2026-08-15T06-55-01-389Z)
+# PreBase AI Assurance Report (ai-run-2026-08-16T23-42-47-057Z)
 
-**Timestamp**: 2026-08-15T06:55:01.390Z
+**Timestamp**: 2026-08-16T23:42:47.063Z
 **Overall Status**: **FAIL**
 **Source Root**: Verified PreBase Root
 
@@ -16,13 +16,14 @@
 | Test Case | Status | Duration | Details |
 | --- | --- | --- | --- |
 | PreBase root repository verification | **PASS** | N/A | Verified product.json, package.json, and AGENTS.md markers. |
-| PreBase Magnus compiled runtime readiness | **PASS** | N/A | Verified out/extension.js and compiled runtime modules. |
+| PreBase Magnus compiled runtime readiness | **FAIL** | N/A | compiled Magnus output is older than sources (stale by 32s) |
 | Arbitrary workspace folder isolation | **PASS** | N/A | Verified that non-PreBase folders cannot be scanned for .env credentials. |
-| Gemini live model discovery | **FAIL** | N/A | fetch failed |
-| Gemini live content generation | **FAIL** | N/A | fetch failed |
+| Gemini live model discovery & consumer curation | **FAIL** | N/A | fetch failed |
+| Gemini live content generation (gemini-2.5-flash) | **FAIL** | N/A | fetch failed |
+| Gemini function-calling protocol (parametersJsonSchema + additionalProperties) | **FAIL** | N/A | fetch failed |
 | LinkUp live search query execution | **FAIL** | N/A | fetch failed |
 
-## Discovered Compatible Gemini Models
+## Curated Gemini Models
 
 | Model ID | Display Name | Context Window (Input) | Output Tokens |
 | --- | --- | --- | --- |

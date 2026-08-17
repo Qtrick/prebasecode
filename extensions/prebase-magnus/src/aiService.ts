@@ -19,7 +19,8 @@ import type { MagnusSecretStorage } from './secretStorage';
 import type { MagnusDescriptionResult } from './models';
 
 interface CachedModelCatalog {
-	readonly models: NormalizedAIModel[];
+	readonly rawModels: NormalizedAIModel[];
+	readonly consumerModels: NormalizedAIModel[];
 	readonly cachedAt: number;
 	readonly source: 'live' | 'fallback';
 }
@@ -233,7 +234,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 					? 'fallback'
 					: 'cached';
 
-		const modelCount = cached?.models.length ?? (adapter?.staticFallbackModels.length ?? 0);
+		const modelCount = cached?.consumerModels.length ?? (adapter?.staticFallbackModels.length ?? 0);
 
 		return {
 			providerId: targetId,
@@ -245,6 +246,53 @@ export class PreBaseAIService implements IPreBaseAIService {
 			modelCount,
 			safeStatusMessage,
 		};
+	}
+
+	async listRawModels(
+		providerId?: string,
+		forceRefresh?: boolean,
+		token?: AICancellationToken,
+	): Promise<NormalizedAIModel[]> {
+		const targetId = (providerId ?? this.getActiveProviderId()).toLowerCase().replace(/-api$/, '');
+		const adapter = this.registry.getAdapter(targetId);
+		if (!adapter) {
+			return [];
+		}
+
+		const cached = this.modelCache.get(targetId);
+		if (!forceRefresh && cached && Date.now() - cached.cachedAt < MODEL_CACHE_TTL_MS) {
+			return cached.rawModels;
+		}
+
+		const credential = await this.resolveCredential(targetId);
+
+		try {
+			const discovered = await adapter.discoverModels(credential, token);
+			if (discovered && discovered.length > 0) {
+				const consumerList = adapter.curateConsumerCatalog
+					? adapter.curateConsumerCatalog(discovered)
+					: discovered;
+
+				this.modelCache.set(targetId, {
+					rawModels: discovered,
+					consumerModels: consumerList,
+					cachedAt: Date.now(),
+					source: 'live',
+				});
+				return discovered;
+			}
+		} catch (err) {
+			console.warn(`[PreBase AI Service] Raw model discovery warning for ${targetId}:`, err instanceof Error ? err.message : String(err));
+		}
+
+		const fallbackList = [...adapter.staticFallbackModels];
+		this.modelCache.set(targetId, {
+			rawModels: fallbackList,
+			consumerModels: fallbackList,
+			cachedAt: Date.now(),
+			source: 'fallback',
+		});
+		return fallbackList;
 	}
 
 	async listModels(
@@ -260,39 +308,11 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 		const cached = this.modelCache.get(targetId);
 		if (!forceRefresh && cached && Date.now() - cached.cachedAt < MODEL_CACHE_TTL_MS) {
-			return cached.models;
+			return cached.consumerModels;
 		}
 
-		const credential = await this.resolveCredential(targetId);
-
-		try {
-			const discovered = await adapter.discoverModels(credential, token);
-			if (discovered && discovered.length > 0) {
-				// Prepend auto option if not present
-				const hasAuto = discovered.some(m => m.id === 'auto');
-				const fullList = hasAuto
-					? discovered
-					: [adapter.staticFallbackModels.find(m => m.id === 'auto') ?? adapter.staticFallbackModels[0], ...discovered];
-
-				this.modelCache.set(targetId, {
-					models: fullList,
-					cachedAt: Date.now(),
-					source: 'live',
-				});
-				return fullList;
-			}
-		} catch (err) {
-			console.warn(`[PreBase AI Service] Model discovery warning for ${targetId}:`, err instanceof Error ? err.message : String(err));
-		}
-
-		// Return static fallback models on failure or unconfigured
-		const fallbackList = [...adapter.staticFallbackModels];
-		this.modelCache.set(targetId, {
-			models: fallbackList,
-			cachedAt: Date.now(),
-			source: 'fallback',
-		});
-		return fallbackList;
+		await this.listRawModels(targetId, forceRefresh, token);
+		return this.modelCache.get(targetId)?.consumerModels ?? [...adapter.staticFallbackModels];
 	}
 
 	async resolveModelForExecution(
@@ -300,13 +320,9 @@ export class PreBaseAIService implements IPreBaseAIService {
 		requestedModelId?: string,
 		credential?: import('./secretResolver').ResolvedProviderExecution,
 		token?: AICancellationToken,
+		workload?: import('./aiTypes').ModelWorkload,
 	): Promise<string> {
 		const targetId = providerId.toLowerCase().replace(/-api$/, '');
-		const modelId = requestedModelId ?? this.getActiveModelId();
-		if (modelId && modelId !== 'auto') {
-			return modelId.replace(/^models\//, '');
-		}
-
 		const adapter = this.registry.getAdapter(targetId);
 		if (!adapter) {
 			return 'gemini-2.5-flash';
@@ -314,7 +330,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 		const cred = credential ?? await this.resolveCredential(targetId);
 
-		let catalog = this.modelCache.get(targetId)?.models;
+		let catalog = this.modelCache.get(targetId)?.consumerModels;
 		if (!catalog || catalog.length === 0) {
 			try {
 				catalog = await this.listModels(targetId, false, token);
@@ -323,12 +339,28 @@ export class PreBaseAIService implements IPreBaseAIService {
 			}
 		}
 
-		return adapter.resolveAutoModel(cred.executionMode, catalog);
+		const modelId = requestedModelId ?? this.getActiveModelId();
+
+		// If user explicitly requested Auto or no model specified, resolve via policy
+		if (!modelId || modelId === 'auto') {
+			return adapter.resolveAutoModel(cred.executionMode, catalog, workload);
+		}
+
+		const cleanModelId = modelId.replace(/^models\//, '');
+
+		// If a specific model was requested, check if it is consumer-selectable in the active catalog
+		const isSelectable = catalog.some(m => m.id === cleanModelId && (m.consumerSelectable ?? true));
+		if (isSelectable) {
+			return cleanModelId;
+		}
+
+		// If saved model was deprecated / hidden, fallback to auto
+		return adapter.resolveAutoModel(cred.executionMode, catalog, workload);
 	}
 
 	async generateText(
 		prompt: string,
-		options?: { modelId?: string; maxTokens?: number; temperature?: number },
+		options?: { modelId?: string; maxTokens?: number; temperature?: number; workload?: import('./aiTypes').ModelWorkload },
 		token?: AICancellationToken,
 	): Promise<string> {
 		const providerId = this.getActiveProviderId();
@@ -338,7 +370,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		}
 
 		const credential = await this.resolveCredential(providerId);
-		const resolvedModel = await this.resolveModelForExecution(providerId, options?.modelId, credential, token);
+		const resolvedModel = await this.resolveModelForExecution(providerId, options?.modelId, credential, token, options?.workload);
 
 		const result = await adapter.generate(
 			{
@@ -404,14 +436,15 @@ export class PreBaseAIService implements IPreBaseAIService {
 			};
 		}
 
-		const resolvedModel = await this.resolveModelForExecution(providerId, undefined, credential, token);
+		// Use 'description' workload profile: routes to fast stable Flash model
+		const resolvedModel = await this.resolveModelForExecution(providerId, undefined, credential, token, 'description');
 
 		try {
 			const result = await adapter.generate(
 				{
 					modelId: resolvedModel,
 					contents: [{ role: 'user', parts: [{ text: trimmedPrompt }] }],
-					maxOutputTokens: 512,
+					maxOutputTokens: 256,
 					temperature: 0.2,
 				},
 				credential,
@@ -434,7 +467,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 				text,
 				providerId,
 				modelId: resolvedModel,
-				cacheIdentity: `${providerId}:${resolvedModel}:v4`,
+				cacheIdentity: `${providerId}:${resolvedModel}:v5`,
 				retryable: false,
 			};
 		} catch (err) {
@@ -465,6 +498,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 			systemInstruction?: string;
 			tools?: AIToolDeclaration[];
 			modelId?: string;
+			workload?: import('./aiTypes').ModelWorkload;
 		},
 		token?: AICancellationToken,
 	): Promise<AIGenerateResult> {
@@ -475,7 +509,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		}
 
 		const credential = await this.resolveCredential(providerId);
-		const resolvedModel = await this.resolveModelForExecution(providerId, request.modelId, credential, token);
+		const resolvedModel = await this.resolveModelForExecution(providerId, request.modelId, credential, token, request.workload);
 
 		return await adapter.generate(
 			{
@@ -495,6 +529,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 			systemInstruction?: string;
 			tools?: AIToolDeclaration[];
 			modelId?: string;
+			workload?: import('./aiTypes').ModelWorkload;
 		},
 		onChunk: (chunk: { text?: string; candidate?: import('./aiTypes').AIGenerateResponseCandidate }) => void,
 		token?: AICancellationToken,
@@ -506,7 +541,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		}
 
 		const credential = await this.resolveCredential(providerId);
-		const resolvedModel = await this.resolveModelForExecution(providerId, request.modelId, credential, token);
+		const resolvedModel = await this.resolveModelForExecution(providerId, request.modelId, credential, token, request.workload);
 
 		if (adapter.streamGenerate) {
 			return await adapter.streamGenerate(
@@ -540,6 +575,20 @@ export class PreBaseAIService implements IPreBaseAIService {
 			onChunk({ candidate: result.candidate });
 		}
 		return result;
+	}
+
+	async diagnoseModelCatalog(providerId?: string): Promise<Record<string, unknown>> {
+		const targetId = (providerId ?? this.getActiveProviderId()).toLowerCase().replace(/-api$/, '');
+		const raw = await this.listRawModels(targetId, true);
+		const adapter = this.registry.getAdapter(targetId);
+		if (adapter && 'modelPolicy' in adapter && typeof (adapter as { modelPolicy: { formatDiagnostics: (catalog: NormalizedAIModel[]) => Record<string, unknown> } }).modelPolicy?.formatDiagnostics === 'function') {
+			return (adapter as { modelPolicy: { formatDiagnostics: (catalog: NormalizedAIModel[]) => Record<string, unknown> } }).modelPolicy.formatDiagnostics(raw);
+		}
+		return {
+			providerId: targetId,
+			rawModelCount: raw.length,
+			models: raw.map(m => ({ id: m.id, displayName: m.displayName })),
+		};
 	}
 
 	async testConnection(

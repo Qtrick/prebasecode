@@ -67,7 +67,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.ok(result.aiMessage?.includes('skipped'));
 	});
 
-	test('generates description with v4 prompt and returns AI provenance', async () => {
+	test('generates description with v5 prompt and returns AI provenance', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {
 			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
@@ -87,7 +87,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 					status: 'ready',
 					providerId: 'gemini',
 					modelId: 'gemini-2.5-flash',
-					cacheIdentity: 'gemini:gemini-2.5-flash:v4',
+					cacheIdentity: 'gemini:gemini-2.5-flash:v5',
 				};
 			},
 		} as any;
@@ -114,7 +114,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 
 		// Assert command and prompt details
 		assert.equal(capturedCommand, 'prebase.magnus.describeFile');
-		assert.ok(capturedArgs.prompt.includes('3–5 sentence description'));
+		assert.ok(capturedArgs.prompt.includes('2–4 sentence description'));
 		assert.ok(capturedArgs.prompt.includes('Path: src/editor.ts'));
 		assert.ok(capturedArgs.prompt.includes('Layer: workbench'));
 

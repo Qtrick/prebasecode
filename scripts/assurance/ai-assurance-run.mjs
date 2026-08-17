@@ -62,7 +62,8 @@ function parseAllowlistedEnv(filePath) {
 
 async function runAssurance() {
 	const runId = `ai-run-${new Date().toISOString().replace(/[:.]/g, '-')}`;
-	const reportDir = path.join(REPO_ROOT, 'reports/ai-assurance', runId);
+	const reportsBaseDir = path.join(REPO_ROOT, 'reports/ai-assurance');
+	const reportDir = path.join(reportsBaseDir, runId);
 	fs.mkdirSync(reportDir, { recursive: true });
 
 	const report = {
@@ -137,26 +138,36 @@ async function runAssurance() {
 			if (res.ok) {
 				const data = await res.json();
 				const rawModels = data.models || [];
-				const compatible = rawModels.filter(m => {
+				const SPECIALIZED = ['embedding', 'aqa', 'imagen', 'veo', 'tts', 'live', 'robotics', 'bison', 'gemma', 'computer-use', 'deep-research', 'antigravity', 'custom-tools', 'audio', 'image'];
+				const curated = rawModels.filter(m => {
 					const methods = m.supportedGenerationMethods || [];
-					const name = m.name || '';
-					return methods.includes('generateContent') && !name.includes('1.0') && !name.includes('1.5') && !name.includes('experimental');
+					const rawId = ((m.name || '').replace(/^models\//, '')).toLowerCase();
+					const displayName = (m.displayName || '').toLowerCase();
+					const supportsGen = methods.includes('generateContent');
+					const isSpecialized = SPECIALIZED.some(p => rawId.includes(p) || displayName.includes(p));
+					const isPreview = rawId.includes('preview') || displayName.includes('preview');
+					const isExp = rawId.includes('exp') || displayName.includes('experimental');
+					const isAlias = rawId.endsWith('-latest');
+					const isLite = rawId.includes('flash-lite') || rawId.includes('flash_lite') || displayName.includes('flash-lite');
+					const isLegacy = rawId.includes('1.0') || rawId.includes('1.5');
+					return supportsGen && !isSpecialized && !isPreview && !isExp && !isAlias && !isLite && !isLegacy;
 				});
-				report.models = compatible.map(m => ({
+
+				report.models = curated.map(m => ({
 					id: (m.name || '').replace(/^models\//, ''),
 					displayName: m.displayName,
 					inputTokenLimit: m.inputTokenLimit,
 					outputTokenLimit: m.outputTokenLimit,
 				}));
 				report.tests.push({
-					name: 'Gemini live model discovery',
+					name: 'Gemini live model discovery & consumer curation',
 					status: 'PASS',
 					durationMs: duration,
-					details: `Discovered ${rawModels.length} models, ${compatible.length} compatible with Agents.`,
+					details: `Discovered ${rawModels.length} raw models; curated to ${curated.length} stable consumer models (0 preview, 0 experimental).`,
 				});
 			} else {
 				report.tests.push({
-					name: 'Gemini live model discovery',
+					name: 'Gemini live model discovery & consumer curation',
 					status: 'FAIL',
 					durationMs: duration,
 					details: `HTTP ${res.status}`,
@@ -165,7 +176,7 @@ async function runAssurance() {
 			}
 		} catch (err) {
 			report.tests.push({
-				name: 'Gemini live model discovery',
+				name: 'Gemini live model discovery & consumer curation',
 				status: 'FAIL',
 				details: err instanceof Error ? err.message : String(err),
 			});
@@ -180,22 +191,32 @@ async function runAssurance() {
 				headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
 				body: JSON.stringify({
 					contents: [{ role: 'user', parts: [{ text: 'Respond with exactly PONG in one word.' }] }],
-					generationConfig: { maxOutputTokens: 16, temperature: 0.0 },
+					generationConfig: { maxOutputTokens: 64, temperature: 0.0, thinkingConfig: { thinkingBudget: 0 } },
 				}),
 			});
 			const duration = Date.now() - genStart;
 			if (res.ok) {
 				const data = await res.json();
 				const text = data.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-				report.tests.push({
-					name: 'Gemini live content generation (gemini-2.5-flash)',
-					status: 'PASS',
-					durationMs: duration,
-					details: `Received response (${text.length} chars).`,
-				});
+				if (text.length > 0) {
+					report.tests.push({
+						name: 'Gemini live content generation (gemini-2.5-flash)',
+						status: 'PASS',
+						durationMs: duration,
+						details: `Received response (${text.length} chars): "${text.slice(0, 40)}"`,
+					});
+				} else {
+					report.tests.push({
+						name: 'Gemini live content generation (gemini-2.5-flash)',
+						status: 'FAIL',
+						durationMs: duration,
+						details: 'Model returned HTTP 200 but 0-length text content.',
+					});
+					report.overallStatus = 'FAIL';
+				}
 			} else {
 				report.tests.push({
-					name: 'Gemini live content generation',
+					name: 'Gemini live content generation (gemini-2.5-flash)',
 					status: 'FAIL',
 					durationMs: duration,
 					details: `HTTP ${res.status}`,
@@ -204,7 +225,7 @@ async function runAssurance() {
 			}
 		} catch (err) {
 			report.tests.push({
-				name: 'Gemini live content generation',
+				name: 'Gemini live content generation (gemini-2.5-flash)',
 				status: 'FAIL',
 				details: err instanceof Error ? err.message : String(err),
 			});
@@ -281,12 +302,22 @@ async function runAssurance() {
 					if (contRes.ok) {
 						const contData = await contRes.json();
 						const finalText = contData.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-						report.tests.push({
-							name: 'Gemini multi-turn tool response continuation with thoughtSignature',
-							status: 'PASS',
-							durationMs: contDuration,
-							details: `Synthesized tool result into final response (${finalText.length} chars).`,
-						});
+						if (finalText.length > 0) {
+							report.tests.push({
+								name: 'Gemini multi-turn tool response continuation with thoughtSignature',
+								status: 'PASS',
+								durationMs: contDuration,
+								details: `Synthesized tool result into final response (${finalText.length} chars).`,
+							});
+						} else {
+							report.tests.push({
+								name: 'Gemini multi-turn tool response continuation with thoughtSignature',
+								status: 'FAIL',
+								durationMs: contDuration,
+								details: 'Continuation returned HTTP 200 but 0-length text content.',
+							});
+							report.overallStatus = 'FAIL';
+						}
 					} else {
 						report.tests.push({
 							name: 'Gemini multi-turn tool response continuation with thoughtSignature',
@@ -324,27 +355,41 @@ async function runAssurance() {
 		}
 	} else {
 		report.tests.push({
-			name: 'Gemini live model discovery & generation',
+			name: 'Gemini live model discovery & consumer curation',
+			status: 'SKIPPED',
+			details: 'GEMINI_API_KEY is not configured.',
+		});
+		report.tests.push({
+			name: 'Gemini live content generation (gemini-2.5-flash)',
+			status: 'SKIPPED',
+			details: 'GEMINI_API_KEY is not configured.',
+		});
+		report.tests.push({
+			name: 'Gemini function-calling protocol (parametersJsonSchema + additionalProperties)',
+			status: 'SKIPPED',
+			details: 'GEMINI_API_KEY is not configured.',
+		});
+		report.tests.push({
+			name: 'Gemini multi-turn tool response continuation with thoughtSignature',
 			status: 'SKIPPED',
 			details: 'GEMINI_API_KEY is not configured.',
 		});
 	}
 
-	// 5. LinkUp Live Web Search
+	// 5. LinkUp Live Web Search Test
 	if (linkupKey) {
 		const searchStart = Date.now();
 		try {
 			const res = await fetch('https://api.linkup.so/v1/search', {
 				method: 'POST',
 				headers: {
-					Authorization: `Bearer ${linkupKey}`,
 					'Content-Type': 'application/json',
+					'Authorization': `Bearer ${linkupKey}`,
 				},
 				body: JSON.stringify({
-					q: 'PreBase AI development',
-					depth: 'fast',
+					q: 'VS Code Language Model Tool API 2026',
+					depth: 'standard',
 					outputType: 'searchResults',
-					maxResults: 3,
 				}),
 			});
 			const duration = Date.now() - searchStart;
@@ -409,7 +454,7 @@ async function runAssurance() {
 		'| --- | --- | --- | --- |',
 		...report.tests.map(t => `| ${t.name} | **${t.status}** | ${t.durationMs ? `${t.durationMs}ms` : 'N/A'} | ${t.details} |`),
 		'',
-		'## Discovered Compatible Gemini Models',
+		'## Curated Gemini Models',
 		'',
 		'| Model ID | Display Name | Context Window (Input) | Output Tokens |',
 		'| --- | --- | --- | --- |',
@@ -420,6 +465,34 @@ async function runAssurance() {
 	].join('\n');
 
 	fs.writeFileSync(path.join(reportDir, 'summary.md'), summaryMd, 'utf8');
+
+	// Write canonical latest-summary.json for persistent quick inspection
+	const canonicalSummary = {
+		runId: report.runId,
+		timestamp: report.timestamp,
+		overallStatus: report.overallStatus,
+		tests: report.tests.map(t => ({ name: t.name, status: t.status, durationMs: t.durationMs })),
+		modelCount: report.models.length,
+		curatedModels: report.models.map(m => m.id),
+	};
+	fs.writeFileSync(path.join(reportsBaseDir, 'latest-summary.json'), JSON.stringify(canonicalSummary, null, 2), 'utf8');
+
+	// Clean up old report directories, keeping last 5
+	try {
+		const entries = fs.readdirSync(reportsBaseDir, { withFileTypes: true })
+			.filter(e => e.isDirectory() && e.name.startsWith('ai-run-'))
+			.map(e => ({ name: e.name, time: fs.statSync(path.join(reportsBaseDir, e.name)).mtimeMs }))
+			.sort((a, b) => b.time - a.time);
+
+		if (entries.length > 5) {
+			for (const oldEntry of entries.slice(5)) {
+				fs.rmSync(path.join(reportsBaseDir, oldEntry.name), { recursive: true, force: true });
+			}
+		}
+	} catch {
+		// Ignore retention cleanup errors
+	}
+
 	console.log(`[AI Assurance] Report generated at: ${reportDir}`);
 	console.log(`[AI Assurance] Overall Result: ${report.overallStatus}`);
 

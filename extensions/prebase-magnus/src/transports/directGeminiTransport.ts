@@ -419,9 +419,10 @@ export class DirectGeminiTransport {
 			const reader = res.body.getReader();
 			const decoder = new TextDecoder();
 			let accumulatedText = '';
+			const accumulatedParts: AIContentPart[] = [];
 			let buffer = '';
 			let totalBytes = 0;
-			let lastCandidate: AIGenerateResponseCandidate | undefined;
+			let finishReason: string | undefined;
 
 			while (true) {
 				const { done, value } = await reader.read();
@@ -456,9 +457,13 @@ export class DirectGeminiTransport {
 								}>;
 							};
 							const cand = parsed.candidates?.[0];
+							if (cand?.finishReason) {
+								finishReason = cand.finishReason;
+							}
 							if (cand?.content?.parts) {
 								const parsedParts = cand.content.parts.map(parseGeminiResponsePart);
 								for (const p of parsedParts) {
+									accumulatedParts.push(p);
 									if (p.text) {
 										accumulatedText += p.text;
 										onChunk({ text: p.text });
@@ -475,13 +480,6 @@ export class DirectGeminiTransport {
 										});
 									}
 								}
-								lastCandidate = {
-									content: {
-										role: cand.content.role ?? 'model',
-										parts: parsedParts,
-									},
-									finishReason: cand.finishReason,
-								};
 							}
 						} catch {
 							// continue parsing subsequent chunks
@@ -490,9 +488,19 @@ export class DirectGeminiTransport {
 				}
 			}
 
+			const finalCandidate: AIGenerateResponseCandidate | undefined = accumulatedParts.length > 0
+				? {
+					content: {
+						role: 'model',
+						parts: accumulatedParts,
+					},
+					finishReason,
+				}
+				: undefined;
+
 			return {
 				text: accumulatedText,
-				candidate: lastCandidate,
+				candidate: finalCandidate,
 				modelId: model,
 				providerId: 'gemini',
 				executionMode: 'byok',
@@ -514,10 +522,6 @@ export class DirectGeminiTransport {
 		const MAX_PAGES = 10;
 		const PAGE_SIZE = 100;
 
-		/**
-		 * Exclude model families that are not appropriate for coding-agent workflows.
-		 * These may advertise generateContent but are specialised for other modalities.
-		 */
 		const EXCLUDED_PATTERNS = [
 			'embedding', 'aqa', 'imagen', 'veo', 'tts', 'live', 'robotics',
 			'bison', // legacy PaLM-era
@@ -593,13 +597,7 @@ export class DirectGeminiTransport {
 						continue;
 					}
 
-					// Legacy generation suffix patterns that signal older / deprecated models
-					const isDeprecated = /-(1\.0|1\.5|exp\d|experimental|preview-\d{4})/i.test(id);
-
-					const agentCompatible = !isDeprecated;
-					const descriptionCompatible = true; // all generateContent models can describe files
-
-					normalized.push({
+					const baseModel: NormalizedAIModel = {
 						id,
 						name: rawName || `models/${id}`,
 						displayName: m.displayName || id,
@@ -607,20 +605,22 @@ export class DirectGeminiTransport {
 						inputTokenLimit: m.inputTokenLimit || 1_000_000,
 						outputTokenLimit: m.outputTokenLimit || 65_536,
 						capabilities: {
-							textGeneration: true,
+							textGeneration: supportsGenerate,
 							streaming: true,
-							functionCalling: agentCompatible,
+							functionCalling: supportsGenerate,
 							multimodalInput: true,
-							structuredOutput: agentCompatible,
+							structuredOutput: supportsGenerate,
 							thinkingProtocol: false,
-							agentCompatible,
-							descriptionCompatible,
+							agentCompatible: supportsGenerate,
+							descriptionCompatible: supportsGenerate,
 						},
-					});
+					};
+
+					normalized.push(baseModel);
 				}
 			} while (pageToken && pagesRead < MAX_PAGES);
 
-			return normalized.filter(m => m.capabilities.agentCompatible || m.capabilities.descriptionCompatible);
+			return normalized;
 		} finally {
 			cleanup();
 		}

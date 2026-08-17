@@ -1,6 +1,6 @@
 {
-  "runId": "ai-run-2026-08-15T06-55-01-389Z",
-  "timestamp": "2026-08-15T06:55:01.390Z",
+  "runId": "ai-run-2026-08-16T23-42-28-505Z",
+  "timestamp": "2026-08-16T23:42:28.509Z",
   "environment": {
     "isSourceRoot": true,
     "platform": "darwin",
@@ -20,8 +20,8 @@
     },
     {
       "name": "PreBase Magnus compiled runtime readiness",
-      "status": "PASS",
-      "details": "Verified out/extension.js and compiled runtime modules."
+      "status": "FAIL",
+      "details": "compiled Magnus output is older than sources (stale by 32s)"
     },
     {
       "name": "Arbitrary workspace folder isolation",
@@ -29,12 +29,17 @@
       "details": "Verified that non-PreBase folders cannot be scanned for .env credentials."
     },
     {
-      "name": "Gemini live model discovery",
+      "name": "Gemini live model discovery & consumer curation",
       "status": "FAIL",
       "details": "fetch failed"
     },
     {
-      "name": "Gemini live content generation",
+      "name": "Gemini live content generation (gemini-2.5-flash)",
+      "status": "FAIL",
+      "details": "fetch failed"
+    },
+    {
+      "name": "Gemini function-calling protocol (parametersJsonSchema + additionalProperties)",
       "status": "FAIL",
       "details": "fetch failed"
     },

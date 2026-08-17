@@ -1,0 +1,32 @@
+[
+  {
+    "id": "gemini-2.5-flash",
+    "displayName": "Gemini 2.5 Flash",
+    "inputTokenLimit": 1048576,
+    "outputTokenLimit": 65536
+  },
+  {
+    "id": "gemini-2.5-pro",
+    "displayName": "Gemini 2.5 Pro",
+    "inputTokenLimit": 1048576,
+    "outputTokenLimit": 65536
+  },
+  {
+    "id": "gemini-3.5-flash",
+    "displayName": "Gemini 3.5 Flash",
+    "inputTokenLimit": 1048576,
+    "outputTokenLimit": 65536
+  },
+  {
+    "id": "gemini-3.6-flash",
+    "displayName": "Gemini 3.6 Flash",
+    "inputTokenLimit": 1048576,
+    "outputTokenLimit": 65536
+  },
+  {
+    "id": "gemini-3.7-flash",
+    "displayName": "Gemini 3.7 Flash",
+    "inputTokenLimit": 1048576,
+    "outputTokenLimit": 65536
+  }
+]

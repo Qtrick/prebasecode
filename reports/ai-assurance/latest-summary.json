@@ -1,0 +1,52 @@
+{
+  "runId": "ai-run-2026-08-16T23-43-54-895Z",
+  "timestamp": "2026-08-16T23:43:54.898Z",
+  "overallStatus": "PASS",
+  "tests": [
+    {
+      "name": "PreBase root repository verification",
+      "status": "PASS"
+    },
+    {
+      "name": "PreBase Magnus compiled runtime readiness",
+      "status": "PASS"
+    },
+    {
+      "name": "Arbitrary workspace folder isolation",
+      "status": "PASS"
+    },
+    {
+      "name": "Gemini live model discovery & consumer curation",
+      "status": "PASS",
+      "durationMs": 316
+    },
+    {
+      "name": "Gemini live content generation (gemini-2.5-flash)",
+      "status": "PASS",
+      "durationMs": 427
+    },
+    {
+      "name": "Gemini function-calling protocol (parametersJsonSchema + additionalProperties)",
+      "status": "PASS",
+      "durationMs": 728
+    },
+    {
+      "name": "Gemini multi-turn tool response continuation with thoughtSignature",
+      "status": "PASS",
+      "durationMs": 504
+    },
+    {
+      "name": "LinkUp live search query execution",
+      "status": "PASS",
+      "durationMs": 989
+    }
+  ],
+  "modelCount": 5,
+  "curatedModels": [
+    "gemini-2.5-flash",
+    "gemini-2.5-pro",
+    "gemini-3.5-flash",
+    "gemini-3.6-flash",
+    "gemini-3.7-flash"
+  ]
+}

@@ -492,6 +492,17 @@ export function activate(context: vscode.ExtensionContext): void {
 				return diag;
 			}),
 
+			vscode.commands.registerCommand('prebase.magnus.diagnoseModelCatalog', async () => {
+				const diag = await aiService.diagnoseModelCatalog();
+				const text = JSON.stringify(diag, null, 2);
+				const doc = await vscode.workspace.openTextDocument({
+					content: text,
+					language: 'json',
+				});
+				await vscode.window.showTextDocument(doc, { preview: true });
+				return diag;
+			}),
+
 			vscode.commands.registerCommand('prebase.magnus.hasApiKey', async () => {
 				const status = await aiService.getProviderStatus();
 				return status.configured;
