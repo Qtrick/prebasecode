@@ -408,7 +408,7 @@ describe('HostedGeminiTransport', () => {
 		});
 		assert.deepEqual(
 			(g25Low.generationConfig as Record<string, unknown>)?.thinkingConfig,
-			{ thinkingBudget: 2048 }
+			{ thinkingBudget: 1024 }
 		);
 
 		const g25Medium = serializeGeminiRequest({

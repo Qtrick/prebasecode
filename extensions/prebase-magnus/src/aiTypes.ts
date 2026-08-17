@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { PreBaseAIExecutionMode } from './secretCatalog';
+export type { PreBaseAIExecutionMode };
 import type { ResolvedProviderExecution } from './secretResolver';
 import type { MagnusDescriptionResult } from './models';
 

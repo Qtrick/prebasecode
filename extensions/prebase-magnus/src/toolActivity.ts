@@ -11,7 +11,7 @@ export function sanitizePath(rawPath: unknown): string {
 		return 'workspace';
 	}
 	const clean = rawPath.trim();
-	if (clean.includes('.env') || clean.includes('id_rsa') || clean.includes('.pem')) {
+	if (clean.includes('.env') || clean.includes('id_rsa') || clean.includes('.pem') || clean.includes('.key')) {
 		return clean.split(/[\/\\]/).pop() || clean;
 	}
 	// Normalize file schema and paths
@@ -53,27 +53,12 @@ export class MagnusToolActivityDescriptor {
 
 	static getInvocationMessage(toolName: string, input: Record<string, unknown>): string {
 		switch (toolName) {
-			case 'prebase_graph_search': {
-				const q = sanitizeQuery(input.query);
-				return q ? `Searching Code Graph for "${q}"` : 'Searching Code Graph';
-			}
-			case 'prebase_graph_node': {
-				const node = sanitizePath(input.node);
-				return `Inspecting Code Graph node "${node}"`;
-			}
-			case 'prebase_graph_dependencies': {
-				const node = sanitizePath(input.node);
-				const dir = typeof input.direction === 'string' ? input.direction : 'both';
-				return `Inspecting ${dir} dependencies for "${node}"`;
-			}
-			case 'prebase_graph_overview':
-				return 'Inspecting Code Graph architecture overview';
-
-			case 'prebase_workspace_read': {
+			// Workspace Tools
+			case 'prebase_workspace_read_file': {
 				const p = sanitizePath(input.path);
 				return `Reading ${p}`;
 			}
-			case 'prebase_workspace_read_range': {
+			case 'prebase_workspace_read_file_range': {
 				const p = sanitizePath(input.path);
 				const start = input.startLine;
 				const end = input.endLine;
@@ -84,19 +69,16 @@ export class MagnusToolActivityDescriptor {
 				}
 				return `Reading ${p}`;
 			}
-			case 'prebase_workspace_search': {
+			case 'prebase_workspace_search_text':
+			case 'prebase_workspace_search_text_rich': {
 				const q = sanitizeQuery(input.query);
-				return q ? `Searching workspace for "${q}"` : 'Searching workspace';
-			}
-			case 'prebase_workspace_text_search': {
-				const q = sanitizeQuery(input.query);
-				return q ? `Searching code for "${q}"` : 'Searching code';
+				return q ? `Searching code for "${q}"` : 'Searching workspace code';
 			}
 			case 'prebase_workspace_list_files': {
-				const inc = sanitizeQuery(input.include, 40);
-				return inc ? `Listing files in ${inc}` : 'Listing workspace files';
+				const inc = sanitizeQuery(input.include || input.pattern, 40);
+				return inc ? `Listing files matching ${inc}` : 'Listing workspace files';
 			}
-			case 'prebase_workspace_symbols': {
+			case 'prebase_workspace_search_symbols': {
 				if (input.path) {
 					const p = sanitizePath(input.path);
 					return `Finding symbols in ${p}`;
@@ -104,63 +86,122 @@ export class MagnusToolActivityDescriptor {
 				const q = sanitizeQuery(input.query);
 				return q ? `Finding symbols for "${q}"` : 'Finding workspace symbols';
 			}
-			case 'prebase_workspace_definition': {
+			case 'prebase_workspace_get_definition': {
 				const p = sanitizePath(input.path);
 				return `Finding definition in ${p}`;
 			}
-			case 'prebase_workspace_references': {
+			case 'prebase_workspace_get_references': {
 				const p = sanitizePath(input.path);
 				return `Finding references in ${p}`;
 			}
-			case 'prebase_workspace_diagnostics': {
+			case 'prebase_workspace_get_diagnostics': {
 				if (input.path) {
 					const p = sanitizePath(input.path);
 					return `Checking diagnostics for ${p}`;
 				}
 				return 'Checking workspace diagnostics';
 			}
-			case 'prebase_workspace_apply_edits': {
-				const edits = input.edits;
-				const count = Array.isArray(edits) ? edits.length : 1;
-				const firstPath = Array.isArray(edits) && edits[0]?.path ? sanitizePath(edits[0].path) : undefined;
-				if (count === 1 && firstPath) {
-					return `Applying edits to ${firstPath}`;
-				}
-				return `Applying edits across ${count} file${count === 1 ? '' : 's'}`;
+
+			// Edit Tools
+			case 'prebase_edit_apply_file':
+			case 'prebase_edit_apply': {
+				const p = sanitizePath(input.path);
+				return `Applying edits to ${p}`;
 			}
-			case 'prebase_workspace_create_file': {
+			case 'prebase_edit_create_file': {
 				const p = sanitizePath(input.path);
 				return `Creating ${p}`;
 			}
-			case 'prebase_workspace_delete_file': {
+			case 'prebase_edit_rename_file': {
+				const oldP = sanitizePath(input.oldPath);
+				const newP = sanitizePath(input.newPath);
+				return `Renaming ${oldP} to ${newP}`;
+			}
+			case 'prebase_edit_delete_file': {
 				const p = sanitizePath(input.path);
 				return `Deleting ${p}`;
 			}
-			case 'prebase_terminal_run_script': {
+
+			// Terminal Tools
+			case 'prebase_terminal_get_project_environment':
+				return 'Inspecting project environment';
+			case 'prebase_terminal_install_dependencies':
+				return 'Installing project dependencies';
+			case 'prebase_terminal_run_declared_node_version': {
+				const cmd = sanitizeQuery(input.command, 60);
+				return cmd ? `Running node command "${cmd}"` : 'Running declared node version';
+			}
+			case 'prebase_terminal_run_project_script': {
 				const s = sanitizeQuery(input.script, 50);
 				return s ? `Running project script "${s}"` : 'Running project script';
 			}
-			case 'prebase_terminal_run_command': {
-				const cmd = sanitizeQuery(input.command, 60);
-				return cmd ? `Running command "${cmd}"` : 'Running terminal command';
-			}
-			case 'prebase_terminal_read_output':
-				return 'Reading terminal output';
 
-			case 'prebase_runtime_status':
-				return 'Checking Runtime Preview status';
-			case 'prebase_runtime_preview_diagnose':
-				return 'Diagnosing Runtime Preview';
-			case 'prebase_runtime_preview_navigate': {
-				const p = sanitizeQuery(input.path ?? input.route, 50);
+			// Graph Tools
+			case 'prebase_graph_search_nodes': {
+				const q = sanitizeQuery(input.query);
+				return q ? `Searching Code Graph for "${q}"` : 'Searching Code Graph';
+			}
+			case 'prebase_graph_get_node': {
+				const node = sanitizePath(input.node);
+				return `Inspecting Code Graph node "${node}"`;
+			}
+			case 'prebase_graph_get_dependencies': {
+				const node = sanitizePath(input.node);
+				const dir = typeof input.direction === 'string' ? input.direction : 'both';
+				return `Inspecting ${dir} dependencies for "${node}"`;
+			}
+			case 'prebase_graph_get_overview':
+				return 'Inspecting Code Graph architecture overview';
+
+			// Runtime Tools
+			case 'prebase_runtime_get_state':
+				return 'Checking Runtime Preview state';
+			case 'prebase_runtime_navigate': {
+				const p = sanitizeQuery(input.path ?? input.route ?? input.url, 50);
 				return p ? `Navigating Runtime Preview to "${p}"` : 'Navigating Runtime Preview';
 			}
+			case 'prebase_runtime_inspect_page':
+				return 'Inspecting Runtime Preview page';
+			case 'prebase_runtime_get_evidence':
+				return 'Gathering Runtime Preview evidence';
+			case 'prebase_runtime_control_test': {
+				const act = sanitizeQuery(input.action, 40);
+				return act ? `Running test action "${act}"` : 'Controlling runtime test';
+			}
+			case 'prebase_runtime_server': {
+				const act = sanitizeQuery(input.action, 40);
+				return act ? `Managing runtime server (${act})` : 'Managing runtime server';
+			}
+
+			// Desktop Tools
+			case 'prebase_desktop_list_sessions':
+				return 'Listing active desktop sessions';
+			case 'prebase_desktop_get_session': {
+				const s = sanitizeQuery(input.sessionId, 40);
+				return s ? `Inspecting desktop session "${s}"` : 'Inspecting desktop session';
+			}
+			case 'prebase_desktop_inspect_window':
+				return 'Inspecting desktop window state';
+			case 'prebase_desktop_get_process_output':
+				return 'Reading desktop process output';
+			case 'prebase_desktop_reload_window':
+				return 'Reloading desktop window';
+			case 'prebase_desktop_restart_session':
+				return 'Restarting desktop session';
+			case 'prebase_desktop_stop_session':
+				return 'Stopping desktop session';
+			case 'prebase_desktop_cdp_evaluate': {
+				const expr = sanitizeQuery(input.expression, 50);
+				return expr ? `Evaluating CDP expression "${expr}"` : 'Evaluating CDP expression';
+			}
+			case 'prebase_desktop_capture_screenshot':
+				return 'Capturing desktop window screenshot';
+
+			// Web Search Tool
 			case 'prebase_web_search': {
 				const q = sanitizeQuery(input.query, 80);
 				return q ? `Searching the web for "${q}"` : 'Searching the web';
 			}
-			case 'prebase_model_diagnostics':
-				return 'Diagnosing AI model catalog';
 
 			default: {
 				const cleanName = toolName.replace(/^prebase_/, '').replace(/_/g, ' ');
@@ -171,40 +212,54 @@ export class MagnusToolActivityDescriptor {
 
 	static getConfirmationMessage(toolName: string, input: Record<string, unknown>): { title: string; message: string } | undefined {
 		switch (toolName) {
-			case 'prebase_workspace_apply_edits': {
-				const edits = input.edits;
-				const count = Array.isArray(edits) ? edits.length : 1;
+			case 'prebase_edit_apply_file':
+			case 'prebase_edit_apply': {
+				const p = sanitizePath(input.path);
 				return {
-					title: 'Apply Workspace Edits',
-					message: `Apply automated code edits across ${count} file(s)?`,
+					title: 'Apply File Edits',
+					message: `Apply automated code edits to "${p}"?`,
 				};
 			}
-			case 'prebase_workspace_create_file': {
+			case 'prebase_edit_create_file': {
 				const p = sanitizePath(input.path);
 				return {
 					title: 'Create Workspace File',
 					message: `Create new file at "${p}"?`,
 				};
 			}
-			case 'prebase_workspace_delete_file': {
+			case 'prebase_edit_rename_file': {
+				const oldP = sanitizePath(input.oldPath);
+				const newP = sanitizePath(input.newPath);
+				return {
+					title: 'Rename File',
+					message: `Rename "${oldP}" to "${newP}"?`,
+				};
+			}
+			case 'prebase_edit_delete_file': {
 				const p = sanitizePath(input.path);
 				return {
 					title: 'Delete Workspace File',
 					message: `Permanently delete file at "${p}"?`,
 				};
 			}
-			case 'prebase_terminal_run_command': {
-				const cmd = sanitizeQuery(input.command, 80);
-				return {
-					title: 'Run Terminal Command',
-					message: `Execute shell command "${cmd}"?`,
-				};
-			}
-			case 'prebase_terminal_run_script': {
+			case 'prebase_terminal_run_project_script': {
 				const s = sanitizeQuery(input.script, 50);
 				return {
 					title: 'Run Project Script',
 					message: `Execute project script "${s}"?`,
+				};
+			}
+			case 'prebase_terminal_run_declared_node_version': {
+				const cmd = sanitizeQuery(input.command, 60);
+				return {
+					title: 'Run Node Command',
+					message: `Execute command "${cmd}" in project runtime?`,
+				};
+			}
+			case 'prebase_terminal_install_dependencies': {
+				return {
+					title: 'Install Dependencies',
+					message: 'Install project dependencies using configured package manager?',
 				};
 			}
 			default:

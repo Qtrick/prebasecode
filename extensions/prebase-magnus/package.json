@@ -56,19 +56,31 @@
         "id": "prebase.magnus.ask",
         "name": "Agent",
         "fullName": "Agent",
-        "description": "Ask Agent about your project (read-only)"
+        "description": "Ask Agent about your project (read-only)",
+        "isDefault": true,
+        "modes": [
+          "ask"
+        ]
       },
       {
         "id": "prebase.magnus.edit",
         "name": "Agent",
         "fullName": "Agent",
-        "description": "Edit code with Agent"
+        "description": "Edit code with Agent",
+        "isDefault": true,
+        "modes": [
+          "edit"
+        ]
       },
       {
         "id": "prebase.magnus.agent",
         "name": "agent",
         "fullName": "Agent",
-        "description": "Agent mode \u2014 plan, edit, and verify with Agent",
+        "description": "Agent mode — plan, edit, and verify with Agent",
+        "isDefault": true,
+        "modes": [
+          "agent"
+        ],
         "when": "config.chat.agent.enabled"
       }
     ],

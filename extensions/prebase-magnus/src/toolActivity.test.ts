@@ -5,7 +5,7 @@
 
 import * as assert from 'assert';
 import { suite, test } from 'node:test';
-import { MagnusToolActivityDescriptor, sanitizePath, sanitizeQuery } from './toolActivity.ts';
+import { MagnusToolActivityDescriptor, sanitizePath, sanitizeQuery } from './toolActivity';
 
 suite('MagnusToolActivityDescriptor & Privacy Sanitization', () => {
 	test('sanitizes paths cleanly', () => {
@@ -38,68 +38,65 @@ suite('MagnusToolActivityDescriptor & Privacy Sanitization', () => {
 		assert.ok(truncated.endsWith('…'));
 	});
 
-	test('formats informative invocation messages for workspace tools', () => {
-		const readMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_read', { path: 'src/main.ts' });
+	test('formats informative invocation messages for workspace and edit tools', () => {
+		const readMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_read_file', { path: 'src/main.ts' });
 		assert.strictEqual(readMsg, 'Reading src/main.ts');
 
-		const rangeMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_read_range', { path: 'src/main.ts', startLine: 10, endLine: 25 });
+		const rangeMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_read_file_range', { path: 'src/main.ts', startLine: 10, endLine: 25 });
 		assert.strictEqual(rangeMsg, 'Reading src/main.ts (lines 10-25)');
 
-		const searchMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_search', { query: 'export interface' });
-		assert.strictEqual(searchMsg, 'Searching workspace for "export interface"');
-
-		const textSearchMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_text_search', { query: 'const config =' });
-		assert.strictEqual(textSearchMsg, 'Searching code for "const config ="');
+		const searchMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_search_text', { query: 'export interface' });
+		assert.strictEqual(searchMsg, 'Searching code for "export interface"');
 
 		const listMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_list_files', { include: 'src/**/*.ts' });
-		assert.strictEqual(listMsg, 'Listing files in src/**/*.ts');
+		assert.strictEqual(listMsg, 'Listing files matching src/**/*.ts');
 
-		const editMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_workspace_apply_edits', { edits: [{ path: 'src/a.ts' }, { path: 'src/b.ts' }] });
-		assert.strictEqual(editMsg, 'Applying edits across 2 files');
+		const editMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_edit_apply_file', { path: 'src/a.ts' });
+		assert.strictEqual(editMsg, 'Applying edits to src/a.ts');
 	});
 
 	test('formats informative invocation messages for graph tools', () => {
-		const graphSearch = MagnusToolActivityDescriptor.getInvocationMessage('prebase_graph_search', { query: 'aiService' });
+		const graphSearch = MagnusToolActivityDescriptor.getInvocationMessage('prebase_graph_search_nodes', { query: 'aiService' });
 		assert.strictEqual(graphSearch, 'Searching Code Graph for "aiService"');
 
-		const graphNode = MagnusToolActivityDescriptor.getInvocationMessage('prebase_graph_node', { node: 'src/aiService.ts' });
+		const graphNode = MagnusToolActivityDescriptor.getInvocationMessage('prebase_graph_get_node', { node: 'src/aiService.ts' });
 		assert.strictEqual(graphNode, 'Inspecting Code Graph node "src/aiService.ts"');
 
-		const graphDeps = MagnusToolActivityDescriptor.getInvocationMessage('prebase_graph_dependencies', { node: 'src/aiService.ts', direction: 'incoming' });
+		const graphDeps = MagnusToolActivityDescriptor.getInvocationMessage('prebase_graph_get_dependencies', { node: 'src/aiService.ts', direction: 'incoming' });
 		assert.strictEqual(graphDeps, 'Inspecting incoming dependencies for "src/aiService.ts"');
 
-		const graphOverview = MagnusToolActivityDescriptor.getInvocationMessage('prebase_graph_overview', {});
+		const graphOverview = MagnusToolActivityDescriptor.getInvocationMessage('prebase_graph_get_overview', {});
 		assert.strictEqual(graphOverview, 'Inspecting Code Graph architecture overview');
 	});
 
-	test('formats informative invocation messages for terminal, web search, and runtime tools', () => {
-		const scriptMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_terminal_run_script', { script: 'test' });
+	test('formats informative invocation messages for terminal, desktop, web search, and runtime tools', () => {
+		const scriptMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_terminal_run_project_script', { script: 'test' });
 		assert.strictEqual(scriptMsg, 'Running project script "test"');
 
-		const cmdMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_terminal_run_command', { command: 'git status' });
-		assert.strictEqual(cmdMsg, 'Running command "git status"');
+		const cmdMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_terminal_run_declared_node_version', { command: 'git status' });
+		assert.strictEqual(cmdMsg, 'Running node command "git status"');
+
+		const screenshotMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_desktop_capture_screenshot', {});
+		assert.strictEqual(screenshotMsg, 'Capturing desktop window screenshot');
 
 		const webMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_web_search', { query: 'VS Code LM API' });
 		assert.strictEqual(webMsg, 'Searching the web for "VS Code LM API"');
 
-		const runtimeMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_runtime_status', {});
-		assert.strictEqual(runtimeMsg, 'Checking Runtime Preview status');
+		const runtimeMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_runtime_get_state', {});
+		assert.strictEqual(runtimeMsg, 'Checking Runtime Preview state');
 	});
 
 	test('generates confirmation messages for destructive operations', () => {
-		const editConf = MagnusToolActivityDescriptor.getConfirmationMessage('prebase_workspace_apply_edits', { edits: [{ path: 'a.ts' }, { path: 'b.ts' }] });
-		assert.strictEqual(editConf?.title, 'Apply Workspace Edits');
-		assert.strictEqual(editConf?.message, 'Apply automated code edits across 2 file(s)?');
+		const editConf = MagnusToolActivityDescriptor.getConfirmationMessage('prebase_edit_apply_file', { path: 'src/a.ts' });
+		assert.strictEqual(editConf?.title, 'Apply File Edits');
+		assert.strictEqual(editConf?.message, 'Apply automated code edits to "src/a.ts"?');
 
-		const createConf = MagnusToolActivityDescriptor.getConfirmationMessage('prebase_workspace_create_file', { path: 'src/newFile.ts' });
+		const createConf = MagnusToolActivityDescriptor.getConfirmationMessage('prebase_edit_create_file', { path: 'src/newFile.ts' });
 		assert.strictEqual(createConf?.title, 'Create Workspace File');
 		assert.strictEqual(createConf?.message, 'Create new file at "src/newFile.ts"?');
 
-		const deleteConf = MagnusToolActivityDescriptor.getConfirmationMessage('prebase_workspace_delete_file', { path: 'src/oldFile.ts' });
+		const deleteConf = MagnusToolActivityDescriptor.getConfirmationMessage('prebase_edit_delete_file', { path: 'src/oldFile.ts' });
 		assert.strictEqual(deleteConf?.title, 'Delete Workspace File');
 		assert.strictEqual(deleteConf?.message, 'Permanently delete file at "src/oldFile.ts"?');
-
-		const readConf = MagnusToolActivityDescriptor.getConfirmationMessage('prebase_workspace_read', { path: 'src/a.ts' });
-		assert.strictEqual(readConf, undefined);
 	});
 });

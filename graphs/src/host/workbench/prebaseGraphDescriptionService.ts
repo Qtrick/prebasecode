@@ -167,9 +167,13 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		try {
 			const uri = this._resolveWorkspaceUri(folder.uri, relative);
 			if (uri) {
-				const file = await this.fileService.readFile(uri, { limits: { size: MAX_CONTENT } });
-				content = file.value.toString().slice(0, MAX_CONTENT);
-				contentHash = String(file.etag || hashContent(content));
+				try {
+					const file = await this.fileService.readFile(uri, { limits: { size: 2 * 1024 * 1024 } });
+					content = file.value.toString().slice(0, MAX_CONTENT);
+					contentHash = String(hashContent(content));
+				} catch {
+					content = '';
+				}
 			}
 		} catch {
 			content = '';
@@ -209,15 +213,15 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			}
 		}
 
-		const existing = this._inflight.get(cacheKey);
-		if (existing) {
-			return existing;
-		}
-
 		this._active?.cancel();
 		this._active?.dispose();
 		const cts = new CancellationTokenSource(token);
 		this._active = cts;
+
+		const existing = this._inflight.get(cacheKey);
+		if (existing && !cts.token.isCancellationRequested) {
+			return existing;
+		}
 
 		const work = (async (): Promise<IGraphNodeDescriptionResult> => {
 			try {

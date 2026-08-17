@@ -200,13 +200,13 @@ export function serializeGeminiRequest(request: AIGenerateRequest): Record<strin
 			}
 		} else {
 			const budgetMap: Record<string, number> = {
-				minimal: 2048,
-				low: 2048,
+				minimal: 1024,
+				low: 1024,
 				medium: 8192,
 				high: 24576,
 			};
 			genConfig.thinkingConfig = {
-				thinkingBudget: budgetMap[request.reasoningEffort] ?? 2048,
+				thinkingBudget: budgetMap[request.reasoningEffort] ?? 1024,
 			};
 		}
 	}
@@ -292,6 +292,68 @@ export function parseGeminiResponsePart(rawPart: Record<string, unknown>): AICon
 	return part;
 }
 
+export async function sleepWithCancellation(ms: number, token?: AICancellationToken): Promise<void> {
+	if (token?.isCancellationRequested) {
+		throw new Error('Cancelled');
+	}
+	return new Promise((resolve, reject) => {
+		let timer: ReturnType<typeof setTimeout> | undefined;
+		const sub = token?.onCancellationRequested?.(() => {
+			if (timer) {
+				clearTimeout(timer);
+			}
+			reject(new Error('Cancelled'));
+		});
+		timer = setTimeout(() => {
+			sub?.dispose();
+			resolve();
+		}, ms);
+	});
+}
+
+export interface RetryOptions {
+	maxAttempts?: number;
+	initialDelayMs?: number;
+	maxDelayMs?: number;
+}
+
+export async function executeWithRetry<T>(
+	operation: (attempt: number) => Promise<T>,
+	token?: AICancellationToken,
+	options?: RetryOptions,
+): Promise<T> {
+	const maxAttempts = options?.maxAttempts ?? 3;
+	const initialDelayMs = options?.initialDelayMs ?? 500;
+	const maxDelayMs = options?.maxDelayMs ?? 4000;
+
+	let attempt = 0;
+	while (attempt < maxAttempts) {
+		attempt++;
+		if (token?.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		try {
+			return await operation(attempt);
+		} catch (err) {
+			if (token?.isCancellationRequested || (err instanceof Error && err.message === 'Cancelled')) {
+				throw err;
+			}
+			const classification = classifyGeminiHttpError(err);
+			if (!classification.retryable || attempt >= maxAttempts) {
+				throw err;
+			}
+
+			// Bounded exponential backoff with jitter
+			const baseDelay = Math.min(initialDelayMs * Math.pow(2, attempt - 1), maxDelayMs);
+			const jitter = baseDelay * (0.8 + Math.random() * 0.4);
+			const delayMs = Math.round(jitter);
+
+			await sleepWithCancellation(delayMs, token);
+		}
+	}
+	throw new Error('Retry attempts exhausted.');
+}
+
 export class DirectGeminiTransport {
 	private readonly baseUrl: string;
 	private readonly fetchImpl: (input: string | URL, init?: RequestInit) => Promise<Response>;
@@ -352,91 +414,92 @@ export class DirectGeminiTransport {
 			throw new Error('Gemini API key is required for direct generation.');
 		}
 
-		const { controller, cleanup } = this.createAbortController(token);
+		return executeWithRetry(async () => {
+			const { controller, cleanup } = this.createAbortController(token);
+			try {
+				const model = request.modelId.replace(/^models\//, '');
+				const url = `${this.baseUrl}/models/${encodeURIComponent(model)}:generateContent`;
 
-		try {
-			const model = request.modelId.replace(/^models\//, '');
-			const url = `${this.baseUrl}/models/${encodeURIComponent(model)}:generateContent`;
+				const payload = serializeGeminiRequest(request);
 
-			const payload = serializeGeminiRequest(request);
-
-			const res = await this.fetchImpl(url, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'x-goog-api-key': apiKey.trim(),
-				},
-				body: JSON.stringify(payload),
-				signal: controller.signal,
-			});
-
-			if (!res.ok) {
-				const bodyText = await this.readBoundedText(res).catch(() => '');
-				let errMsg = `Gemini generation failed (HTTP ${res.status})`;
-				try {
-					const parsed = JSON.parse(bodyText) as { error?: { message?: string } };
-					if (parsed?.error?.message) {
-						errMsg = `${parsed.error.message} (HTTP ${res.status})`;
-					}
-				} catch {
-					// use default errMsg
-				}
-				throw new Error(errMsg);
-			}
-
-			const rawBody = await this.readBoundedText(res);
-			const data = JSON.parse(rawBody) as {
-				candidates?: Array<{
-					content?: {
-						parts?: Array<Record<string, unknown>>;
-						role?: string;
-					};
-					finishReason?: string;
-				}>;
-				usageMetadata?: Record<string, unknown>;
-			};
-
-			const firstCandidate = data.candidates?.[0];
-			const rawParts = firstCandidate?.content?.parts ?? [];
-			const parts = rawParts.map(parseGeminiResponsePart);
-			const textParts = parts.filter(p => !p.thought).map(p => p.text ?? '').filter(Boolean);
-			const text = textParts.join('');
-
-			let candidate: AIGenerateResponseCandidate | undefined;
-			if (firstCandidate?.content) {
-				candidate = {
-					content: {
-						role: firstCandidate.content.role ?? 'model',
-						parts,
+				const res = await this.fetchImpl(url, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-goog-api-key': apiKey.trim(),
 					},
-					finishReason: firstCandidate.finishReason,
-				};
-			}
+					body: JSON.stringify(payload),
+					signal: controller.signal,
+				});
 
-			let usageMetadata: import('../aiTypes').AIUsageMetadata | undefined;
-			if (data.usageMetadata && typeof data.usageMetadata === 'object') {
-				const rawUsage = data.usageMetadata;
-				usageMetadata = {
-					promptTokenCount: typeof rawUsage.promptTokenCount === 'number' ? rawUsage.promptTokenCount : undefined,
-					candidatesTokenCount: typeof rawUsage.candidatesTokenCount === 'number'
-						? rawUsage.candidatesTokenCount
-						: (typeof rawUsage.candidateTokenCount === 'number' ? rawUsage.candidateTokenCount : undefined),
-					thoughtsTokenCount: typeof rawUsage.thoughtsTokenCount === 'number' ? rawUsage.thoughtsTokenCount : undefined,
-					totalTokenCount: typeof rawUsage.totalTokenCount === 'number' ? rawUsage.totalTokenCount : undefined,
-				};
-			}
+				if (!res.ok) {
+					const bodyText = await this.readBoundedText(res).catch(() => '');
+					let errMsg = `Gemini generation failed (HTTP ${res.status})`;
+					try {
+						const parsed = JSON.parse(bodyText) as { error?: { message?: string } };
+						if (parsed?.error?.message) {
+							errMsg = `${parsed.error.message} (HTTP ${res.status})`;
+						}
+					} catch {
+						// use default errMsg
+					}
+					throw new Error(errMsg);
+				}
 
-			return {
-				text,
-				candidate,
-				usageMetadata,
-				modelId: model,
-				providerId: 'gemini',
-				executionMode: 'byok',
-			};
-		} finally {
-			cleanup();
-		}
+				const rawBody = await this.readBoundedText(res);
+				const data = JSON.parse(rawBody) as {
+					candidates?: Array<{
+						content?: {
+							parts?: Array<Record<string, unknown>>;
+							role?: string;
+						};
+						finishReason?: string;
+					}>;
+					usageMetadata?: Record<string, unknown>;
+				};
+
+				const firstCandidate = data.candidates?.[0];
+				const rawParts = firstCandidate?.content?.parts ?? [];
+				const parts = rawParts.map(parseGeminiResponsePart);
+				const textParts = parts.filter(p => !p.thought).map(p => p.text ?? '').filter(Boolean);
+				const text = textParts.join('');
+
+				let candidate: AIGenerateResponseCandidate | undefined;
+				if (firstCandidate?.content) {
+					candidate = {
+						content: {
+							role: firstCandidate.content.role ?? 'model',
+							parts,
+						},
+						finishReason: firstCandidate.finishReason,
+					};
+				}
+
+				let usageMetadata: import('../aiTypes').AIUsageMetadata | undefined;
+				if (data.usageMetadata && typeof data.usageMetadata === 'object') {
+					const rawUsage = data.usageMetadata;
+					usageMetadata = {
+						promptTokenCount: typeof rawUsage.promptTokenCount === 'number' ? rawUsage.promptTokenCount : undefined,
+						candidatesTokenCount: typeof rawUsage.candidatesTokenCount === 'number'
+							? rawUsage.candidatesTokenCount
+							: (typeof rawUsage.candidateTokenCount === 'number' ? rawUsage.candidateTokenCount : undefined),
+						thoughtsTokenCount: typeof rawUsage.thoughtsTokenCount === 'number' ? rawUsage.thoughtsTokenCount : undefined,
+						totalTokenCount: typeof rawUsage.totalTokenCount === 'number' ? rawUsage.totalTokenCount : undefined,
+					};
+				}
+
+				return {
+					text,
+					candidate,
+					usageMetadata,
+					modelId: model,
+					providerId: 'gemini',
+					executionMode: 'byok',
+				};
+			} finally {
+				cleanup();
+			}
+		}, token);
 	}
 
 	async streamGenerate(
@@ -448,65 +511,71 @@ export class DirectGeminiTransport {
 		if (token?.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
+		if (!apiKey.trim()) {
+			throw new Error('Gemini API key is required for direct streaming generation.');
+		}
 
-		const { controller, cleanup } = this.createAbortController(token);
+		let emittedChunk = false;
 
-		try {
-			const model = request.modelId.replace(/^models\//, '');
-			const url = `${this.baseUrl}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
+		const runStream = async (): Promise<AIGenerateResult> => {
+			const { controller, cleanup } = this.createAbortController(token);
 
-			const payload = serializeGeminiRequest(request);
+			try {
+				const model = request.modelId.replace(/^models\//, '');
+				const url = `${this.baseUrl}/models/${encodeURIComponent(model)}:streamGenerateContent?alt=sse`;
 
-			const res = await this.fetchImpl(url, {
-				method: 'POST',
-				headers: {
-					'Content-Type': 'application/json',
-					'x-goog-api-key': apiKey.trim(),
-					Accept: 'text/event-stream',
-				},
-				body: JSON.stringify(payload),
-				signal: controller.signal,
-			});
+				const payload = serializeGeminiRequest(request);
 
-			if (!res.ok) {
-				// Fallback to non-streaming if stream is unsupported
-				return await this.generate(apiKey, request, token);
-			}
+				const res = await this.fetchImpl(url, {
+					method: 'POST',
+					headers: {
+						'Content-Type': 'application/json',
+						'x-goog-api-key': apiKey.trim(),
+						Accept: 'text/event-stream',
+					},
+					body: JSON.stringify(payload),
+					signal: controller.signal,
+				});
 
-			if (!res.body) {
-				return await this.generate(apiKey, request, token);
-			}
+				if (!res.ok) {
+					const bodyText = await this.readBoundedText(res).catch(() => '');
+					let errMsg = `Gemini streaming failed (HTTP ${res.status})`;
+					try {
+						const parsed = JSON.parse(bodyText) as { error?: { message?: string } };
+						if (parsed?.error?.message) {
+							errMsg = `${parsed.error.message} (HTTP ${res.status})`;
+						}
+					} catch {
+						// use default errMsg
+					}
 
-			const reader = res.body.getReader();
-			const decoder = new TextDecoder();
-			let accumulatedText = '';
-			const accumulatedParts: AIContentPart[] = [];
-			let buffer = '';
-			let totalBytes = 0;
-			let finishReason: string | undefined;
-			let latestUsage: import('../aiTypes').AIUsageMetadata | undefined;
+					// If the endpoint explicitly indicates method not supported, fallback to non-streaming
+					if (res.status === 404 || res.status === 405) {
+						return await this.generate(apiKey, request, token);
+					}
 
-			while (true) {
-				const { done, value } = await reader.read();
-				if (done) {
-					break;
-				}
-				totalBytes += value.byteLength;
-				if (totalBytes > MAX_SSE_BUFFER_BYTES) {
-					await reader.cancel();
-					throw new Error('Gemini streaming response exceeded maximum stream buffer size.');
+					throw new Error(errMsg);
 				}
 
-				buffer += decoder.decode(value, { stream: true });
-				const lines = buffer.split(/\r?\n/);
-				buffer = lines.pop() ?? '';
+				if (!res.body) {
+					return await this.generate(apiKey, request, token);
+				}
 
-				for (const line of lines) {
+				const reader = res.body.getReader();
+				const decoder = new TextDecoder();
+				let accumulatedText = '';
+				const accumulatedParts: AIContentPart[] = [];
+				let buffer = '';
+				let totalBytes = 0;
+				let finishReason: string | undefined;
+				let latestUsage: import('../aiTypes').AIUsageMetadata | undefined;
+
+				const processLine = (line: string) => {
 					const trimmed = line.trim();
 					if (trimmed.startsWith('data: ')) {
 						const jsonStr = trimmed.slice(6).trim();
 						if (jsonStr === '[DONE]') {
-							continue;
+							return;
 						}
 						try {
 							const parsed = JSON.parse(jsonStr) as {
@@ -540,9 +609,11 @@ export class DirectGeminiTransport {
 									accumulatedParts.push(p);
 									if (p.text && !p.thought) {
 										accumulatedText += p.text;
+										emittedChunk = true;
 										onChunk({ text: p.text });
 									}
 									if (p.functionCall) {
+										emittedChunk = true;
 										onChunk({
 											candidate: {
 												content: {
@@ -559,30 +630,61 @@ export class DirectGeminiTransport {
 							// continue parsing subsequent chunks
 						}
 					}
+				};
+
+				while (true) {
+					const { done, value } = await reader.read();
+					if (done) {
+						if (buffer.trim()) {
+							processLine(buffer);
+						}
+						break;
+					}
+					totalBytes += value.byteLength;
+					if (totalBytes > MAX_SSE_BUFFER_BYTES) {
+						await reader.cancel();
+						throw new Error('Gemini streaming response exceeded maximum stream buffer size.');
+					}
+
+					buffer += decoder.decode(value, { stream: true });
+					const lines = buffer.split(/\r?\n/);
+					buffer = lines.pop() ?? '';
+
+					for (const line of lines) {
+						processLine(line);
+					}
 				}
+
+				const finalCandidate: AIGenerateResponseCandidate | undefined = accumulatedParts.length > 0
+					? {
+						content: {
+							role: 'model',
+							parts: accumulatedParts,
+						},
+						finishReason,
+					}
+					: undefined;
+
+				return {
+					text: accumulatedText,
+					candidate: finalCandidate,
+					usageMetadata: latestUsage,
+					modelId: model,
+					providerId: 'gemini',
+					executionMode: 'byok',
+				};
+			} finally {
+				cleanup();
 			}
+		};
 
-			const finalCandidate: AIGenerateResponseCandidate | undefined = accumulatedParts.length > 0
-				? {
-					content: {
-						role: 'model',
-						parts: accumulatedParts,
-					},
-					finishReason,
-				}
-				: undefined;
-
-			return {
-				text: accumulatedText,
-				candidate: finalCandidate,
-				usageMetadata: latestUsage,
-				modelId: model,
-				providerId: 'gemini',
-				executionMode: 'byok',
-			};
-		} finally {
-			cleanup();
-		}
+		// Only retry before any chunks have been emitted
+		return executeWithRetry(async () => {
+			if (emittedChunk) {
+				throw new Error('Stream interrupted after partial emission; replay prevented.');
+			}
+			return await runStream();
+		}, token);
 	}
 
 	async discoverModels(

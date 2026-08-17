@@ -25,6 +25,16 @@ interface CommandContribution {
 	category?: string;
 }
 
+interface ChatParticipantContribution {
+	id: string;
+	name: string;
+	fullName?: string;
+	description?: string;
+	isDefault?: boolean;
+	modes?: string[];
+	when?: string;
+}
+
 interface ExtensionManifest {
 	enabledApiProposals?: string[];
 	contributes?: {
@@ -36,6 +46,7 @@ interface ExtensionManifest {
 				};
 			};
 		};
+		chatParticipants?: ChatParticipantContribution[];
 		languageModelTools?: LanguageModelToolContribution[];
 		commands?: CommandContribution[];
 	};
@@ -81,7 +92,21 @@ if (modelEnum.some(m => m.includes('1.5') || m.includes('2.0'))) {
 	throw new Error('verify:prebase-magnus-manifest: prebase.magnus.defaultModel enum must not contain retired 1.5 or 2.0 models');
 }
 
-// 2. Verify Language Model Tools Parity
+// 2. Verify Chat Participants Default Routing
+const participants = magnusManifest.contributes?.chatParticipants;
+if (!Array.isArray(participants) || participants.length === 0) {
+	throw new Error('verify:prebase-magnus-manifest: chatParticipants must be contributed');
+}
+const defaultParticipants = participants.filter(p => p.isDefault === true);
+if (defaultParticipants.length === 0) {
+	throw new Error('verify:prebase-magnus-manifest: at least one chatParticipant must be declared with isDefault: true');
+}
+const supportedModes = new Set(defaultParticipants.flatMap(p => p.modes || []));
+if (!supportedModes.has('ask') || !supportedModes.has('edit')) {
+	throw new Error('verify:prebase-magnus-manifest: default chatParticipants must cover at least "ask" and "edit" modes');
+}
+
+// 3. Verify Language Model Tools Parity
 function extractRegisteredTools(srcDir: string): Set<string> {
 	const registeredTools = new Set<string>();
 	const files = fs.readdirSync(srcDir, { recursive: true }) as string[];

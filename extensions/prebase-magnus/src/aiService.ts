@@ -119,6 +119,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 	private readonly registry: AIProviderRegistry;
 	private readonly config: PreBaseAIConfigProvider;
 	private readonly modelCache = new Map<string, CachedModelCatalog>();
+	private readonly inFlightDiscovery = new Map<string, Promise<NormalizedAIModel[]>>();
 	private _cloudHostedAvailable: boolean = false;
 
 	constructor(
@@ -265,35 +266,55 @@ export class PreBaseAIService implements IPreBaseAIService {
 			return cached.rawModels;
 		}
 
-		const credential = await this.resolveCredential(targetId);
-
-		try {
-			const discovered = await adapter.discoverModels(credential, token);
-			if (discovered && discovered.length > 0) {
-				const consumerList = adapter.curateConsumerCatalog
-					? adapter.curateConsumerCatalog(discovered)
-					: discovered;
-
-				this.modelCache.set(targetId, {
-					rawModels: discovered,
-					consumerModels: consumerList,
-					cachedAt: Date.now(),
-					source: 'live',
-				});
-				return discovered;
-			}
-		} catch (err) {
-			console.warn(`[PreBase AI Service] Raw model discovery warning for ${targetId}:`, err instanceof Error ? err.message : String(err));
+		// Single-flight deduplication
+		const existingFlight = this.inFlightDiscovery.get(targetId);
+		if (existingFlight && !forceRefresh) {
+			return await existingFlight;
 		}
 
-		const fallbackList = [...adapter.staticFallbackModels];
-		this.modelCache.set(targetId, {
-			rawModels: fallbackList,
-			consumerModels: fallbackList,
-			cachedAt: Date.now(),
-			source: 'fallback',
-		});
-		return fallbackList;
+		const discoveryPromise = (async (): Promise<NormalizedAIModel[]> => {
+			const credential = await this.resolveCredential(targetId);
+
+			try {
+				const discovered = await adapter.discoverModels(credential, token);
+				if (discovered && discovered.length > 0) {
+					const consumerList = adapter.curateConsumerCatalog
+						? adapter.curateConsumerCatalog(discovered)
+						: discovered;
+
+					this.modelCache.set(targetId, {
+						rawModels: discovered,
+						consumerModels: consumerList,
+						cachedAt: Date.now(),
+						source: 'live',
+					});
+					return discovered;
+				}
+			} catch (err) {
+				console.warn(`[PreBase AI Service] Raw model discovery warning for ${targetId}:`, err instanceof Error ? err.message : String(err));
+			}
+
+			// Stale-while-revalidate: if live discovery transiently failed, keep previous cached catalog
+			if (cached && cached.rawModels.length > 0) {
+				return cached.rawModels;
+			}
+
+			const fallbackList = [...adapter.staticFallbackModels];
+			this.modelCache.set(targetId, {
+				rawModels: fallbackList,
+				consumerModels: fallbackList,
+				cachedAt: Date.now(),
+				source: 'fallback',
+			});
+			return fallbackList;
+		})();
+
+		this.inFlightDiscovery.set(targetId, discoveryPromise);
+		try {
+			return await discoveryPromise;
+		} finally {
+			this.inFlightDiscovery.delete(targetId);
+		}
 	}
 
 	async listModels(

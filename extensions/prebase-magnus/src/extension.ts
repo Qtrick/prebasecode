@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { registerMagnusChatParticipants, type MagnusChatState } from './chatParticipant';
+import { registerMagnusChatParticipants, type MagnusChatDefaults } from './chatParticipant';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
 import { buildModelOptions } from './models';
 import { DEFAULT_MAGNUS_AGENT_MODE, MAGNUS_AGENT_MODES, isMagnusAgentMode } from './modes';
@@ -92,7 +92,7 @@ export function activate(context: vscode.ExtensionContext): void {
 		console.log('[Magnus] AI service initialized');
 
 		const config = vscode.workspace.getConfiguration('prebase.magnus');
-		const state: MagnusChatState = {
+		const state: MagnusChatDefaults = {
 			mode: isMagnusAgentMode(config.get('defaultMode', DEFAULT_MAGNUS_AGENT_MODE) ?? DEFAULT_MAGNUS_AGENT_MODE)
 				? (config.get('defaultMode') as typeof DEFAULT_MAGNUS_AGENT_MODE)
 				: DEFAULT_MAGNUS_AGENT_MODE,
@@ -137,7 +137,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
 		// 5. Register chat participants (core subsystem)
 		try {
-			registerMagnusChatParticipants(context, aiService, state);
+			registerMagnusChatParticipants(context, aiService);
 			runtimeState.chatParticipantsRegistered = true;
 			console.log('[Magnus] chat participants registered');
 		} catch (err) {
@@ -517,9 +517,6 @@ export function activate(context: vscode.ExtensionContext): void {
 				state.attachedFiles = [];
 				state.graphSelection = undefined;
 				state.runtimeContext = undefined;
-				state.cancellation?.cancel();
-				state.cancellation?.dispose();
-				state.cancellation = undefined;
 				await vscode.commands.executeCommand('workbench.action.chat.newChat');
 				void vscode.window.showInformationMessage('Agents session cleared.');
 			}),
@@ -667,8 +664,12 @@ export function activate(context: vscode.ExtensionContext): void {
 				}
 			}),
 
-			vscode.commands.registerCommand('prebase.magnus.cancel', () => {
-				state.cancellation?.cancel();
+			vscode.commands.registerCommand('prebase.magnus.cancel', async () => {
+				try {
+					await vscode.commands.executeCommand('workbench.action.chat.cancel');
+				} catch {
+					// safe fallback
+				}
 				void vscode.window.showInformationMessage('Agents cancellation requested.');
 			}),
 
