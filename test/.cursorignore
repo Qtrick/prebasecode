@@ -1,5 +1,1 @@
 .env
-resources/darwin/code.icns
-resources/win32/code.ico
-resources/linux/code.png
-PreBase.icns
