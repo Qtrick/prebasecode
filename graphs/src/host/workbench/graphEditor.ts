@@ -1099,38 +1099,70 @@ function placePopupNear(clientX, clientY) {
 	popup.style.display = 'block';
 }
 
+function inferOverview(node) {
+	if (!node) return '';
+	const path = (node.path || node.label || '').toLowerCase();
+	const name = (node.label || '').replace(/\.(tsx?|jsx?|mjs|cjs)$/, '');
+	const layer = node.meta && node.meta.architectureLayer;
+	if (node.isEntry) return 'Application entry point — the root module where execution or rendering begins.';
+	if (layer === 'auth') return 'Authentication and session handling for user identity and access control.';
+	if (layer === 'api') return 'API route or endpoint layer — defines how external clients interact with backend logic.';
+	if (layer === 'database') return 'Data persistence layer — models, schemas, or database access utilities.';
+	if (layer === 'services') return 'Service module "' + name + '" — encapsulates business logic used across the application.';
+	if (layer === 'components' || node.kind === 'component') return 'UI component "' + name + '" — renders interface elements and composes the visual tree.';
+	if (layer === 'ui' || /page\.(tsx|jsx)$/.test(path)) return 'Page or screen module "' + name + '" — top-level route or view composition.';
+	if (/hook/i.test(name) || path.includes('/hooks/')) return 'React hook "' + name + '" — reusable stateful logic for components.';
+	if (/store|context|provider/i.test(name)) return 'State module "' + name + '" — manages shared application state or context.';
+	if (/util|helper|lib/i.test(path)) return 'Utility module "' + name + '" — shared helpers and low-level functions.';
+	if (/config|vite|webpack|eslint/.test(path)) return 'Project configuration — build, lint, or environment setup.';
+	if (/test|spec/.test(path)) return 'Test file for "' + name + '" — automated checks and specifications.';
+	if (/layout/i.test(name)) return 'Layout shell "' + name + '" — wraps pages with shared chrome and navigation.';
+	return 'Source file "' + (node.label || node.id) + '" — part of the ' + (layer || 'application') + ' architecture.';
+}
+
+let describeTimer = null;
+
 async function openNodePopup(node, clientX, clientY) {
 	if (!node) return;
 	clearIdleTimers();
+	if (describeTimer) {
+		clearTimeout(describeTimer);
+		describeTimer = null;
+	}
 	popupNode = node;
 	selectedNodeId = node.id;
 	popupTitle.textContent = node.label || node.id;
 	popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '');
-	popupOverview.textContent = 'Loading…';
-	popupAi.textContent = '…';
+	popupOverview.textContent = inferOverview(node);
+	popupAi.textContent = 'Generating AI description…';
 	if (popupAiProvenance) { popupAiProvenance.style.display = 'none'; popupAiProvenance.textContent = ''; }
 	placePopupNear(clientX, clientY);
 	request('selectNode', { nodeId: node.id });
 	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection();
-	const desc = await request('describeNode', { nodeId: node.id });
-	if (!popupNode || popupNode.id !== node.id) return;
-	popupOverview.textContent = (desc && desc.overview) || 'No overview.';
-	if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
-		popupAi.textContent = desc.aiDescription;
-		if (popupAiProvenance) {
-			const providerName = desc.aiProviderId === 'gemini' ? 'Gemini' : (desc.aiProviderId || 'AI');
-			const modelName = desc.aiModelId ? (' · ' + desc.aiModelId) : '';
-			const cacheLabel = desc.cacheHit ? ' · Cached' : '';
-			popupAiProvenance.textContent = providerName + modelName + cacheLabel;
-			popupAiProvenance.style.display = 'block';
+
+	describeTimer = setTimeout(async () => {
+		const desc = await request('describeNode', { nodeId: node.id });
+		if (!popupNode || popupNode.id !== node.id) return;
+		if (desc && desc.overview) {
+			popupOverview.textContent = desc.overview;
 		}
-	} else {
-		popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
-		if (popupAiProvenance) {
-			popupAiProvenance.textContent = '';
-			popupAiProvenance.style.display = 'none';
+		if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
+			popupAi.textContent = desc.aiDescription;
+			if (popupAiProvenance) {
+				const providerName = desc.aiProviderId === 'gemini' ? 'Gemini' : (desc.aiProviderId || 'AI');
+				const modelName = desc.aiModelId ? (' · ' + desc.aiModelId) : '';
+				const cacheLabel = desc.cacheHit ? ' · Cached' : '';
+				popupAiProvenance.textContent = providerName + modelName + cacheLabel;
+				popupAiProvenance.style.display = 'block';
+			}
+		} else {
+			popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
+			if (popupAiProvenance) {
+				popupAiProvenance.textContent = '';
+				popupAiProvenance.style.display = 'none';
+			}
 		}
-	}
+	}, 120);
 }
 
 function onPointerDown(e, host) {

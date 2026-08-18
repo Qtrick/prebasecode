@@ -123,9 +123,29 @@ export interface AIGenerateRequest {
 	readonly stream?: boolean;
 }
 
+export type AIResponseDisposition =
+	| 'text'
+	| 'toolCalls'
+	| 'thoughtOnly'
+	| 'maxTokens'
+	| 'promptBlocked'
+	| 'candidateBlocked'
+	| 'emptyStop'
+	| 'malformed'
+	| 'cancelled'
+	| 'providerError';
+
+export interface AIPromptFeedback {
+	readonly blockReason?: string;
+	readonly safetyRatings?: readonly unknown[];
+}
+
 export interface AIGenerateResponseCandidate {
 	readonly content: { parts: AIContentPart[]; role: string };
 	readonly finishReason?: string;
+	readonly finishMessage?: string;
+	readonly safetyRatings?: readonly unknown[];
+	readonly thoughtsTokenCount?: number;
 }
 
 export interface AIUsageMetadata {
@@ -138,6 +158,8 @@ export interface AIUsageMetadata {
 export interface AIGenerateResult {
 	readonly text: string;
 	readonly candidate?: AIGenerateResponseCandidate;
+	readonly disposition: AIResponseDisposition;
+	readonly promptFeedback?: AIPromptFeedback;
 	readonly usageMetadata?: AIUsageMetadata;
 	readonly modelId: string;
 	readonly providerId: string;

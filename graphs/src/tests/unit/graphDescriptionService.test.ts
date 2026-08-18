@@ -286,6 +286,129 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.ok(storedRaw.includes('Configuration entrypoint'));
 	});
 
+	test('fast cache hit returns immediately without invoking getDescriptionContext IPC', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		const commandsExecuted: string[] = [];
+		const mockCommandService = {
+			executeCommand: async (cmd: string) => {
+				commandsExecuted.push(cmd);
+				if (cmd === 'prebase.magnus.getDescriptionContext') {
+					return {
+						providerId: 'gemini',
+						modelId: 'gemini-3.7-flash',
+						cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
+					};
+				}
+				return {
+					text: 'Initial generated description.',
+					status: 'ready',
+					providerId: 'gemini',
+					modelId: 'gemini-3.7-flash',
+					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
+				};
+			},
+		} as any;
+
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			mockFileService,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const node: GraphNode = {
+			id: 'fast-node',
+			label: 'src/fast.ts',
+			path: 'src/fast.ts',
+			kind: 'file',
+		};
+
+		// 1. Initial populate: calls commandService
+		const res1 = await service.describeNode(node);
+		assert.equal(res1.cacheHit, false);
+		const initialCount = commandsExecuted.length;
+		assert.equal(initialCount, 2);
+
+		// 2. Second call: cache hit! describeFile is not invoked again
+		let describeFileCalled = false;
+		mockCommandService.executeCommand = async (cmd: string) => {
+			if (cmd === 'prebase.magnus.getDescriptionContext') {
+				return {
+					providerId: 'gemini',
+					modelId: 'gemini-3.7-flash',
+					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
+				};
+			}
+			if (cmd === 'prebase.magnus.describeFile') {
+				describeFileCalled = true;
+				return { text: 'regenerated', status: 'ready' };
+			}
+			return undefined;
+		};
+
+		const res2 = await service.describeNode(node);
+		assert.equal(res2.cacheHit, true);
+		assert.equal(describeFileCalled, false, 'describeFile should not be invoked on cache hit');
+		assert.equal(res2.aiDescription, res1.aiDescription);
+	});
+
+	test('recovering from cancelled in-flight request creates fresh promise on re-selection (A -> B -> A race fix)', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		let generationCalls = 0;
+		const mockCommandService = {
+			executeCommand: async (cmd: string) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					generationCalls++;
+					return {
+						text: `Description generation pass ${generationCalls}`,
+						status: 'ready',
+						providerId: 'gemini',
+						modelId: 'gemini-3.7-flash',
+					};
+				}
+				return undefined;
+			},
+		} as any;
+
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			mockFileService,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const nodeA: GraphNode = { id: 'nodeA', label: 'src/a.ts', path: 'src/a.ts', kind: 'file' };
+		const nodeB: GraphNode = { id: 'nodeB', label: 'src/b.ts', path: 'src/b.ts', kind: 'file' };
+
+		// 1. Start requesting Node A
+		const pA1 = service.describeNode(nodeA);
+
+		// 2. User quickly switches to Node B (cancels in-flight A) and waits for B
+		const resB = await service.describeNode(nodeB);
+		assert.equal(resB.aiStatus, 'ready');
+
+		const resA1 = await pA1;
+		assert.equal(resA1.aiStatus, 'unavailable');
+		assert.ok(resA1.aiMessage?.includes('cancelled'));
+
+		// 3. User switches back to Node A: must create a fresh in-flight request and succeed (not return cancelled A1)
+		const resA2 = await service.describeNode(nodeA);
+		assert.equal(resA2.aiStatus, 'ready');
+		assert.ok(resA2.aiDescription?.includes('Description generation pass'));
+	});
+
 	test('handles empty responses and error states gracefully', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {

@@ -26,9 +26,9 @@ suite('Magnus Models & Providers', () => {
 		assert.strictEqual(gemini.capabilities.functionCalling, true);
 	});
 
-	test('contains only active Gemini 2.5 models and auto', () => {
+	test('contains active Gemini models and auto', () => {
 		const modelIds = MAGNUS_MODELS.map(m => m.id);
-		assert.deepStrictEqual(modelIds, ['auto', 'gemini-2.5-flash', 'gemini-2.5-pro']);
+		assert.deepStrictEqual(modelIds, ['auto', 'gemini-3.7-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']);
 	});
 
 	test('resolveApiModel resolves auto to gemini-2.5-flash', () => {
@@ -104,7 +104,7 @@ suite('Magnus Models & Providers', () => {
 
 		// Case 4: empty / offline fallback
 		assert.strictEqual(resolveAutoModelFromDiscovered([]), 'gemini-2.5-flash');
-		assert.strictEqual(resolveAutoModelFromDiscovered(undefined), 'gemini-2.5-flash');
+		assert.strictEqual(resolveAutoModelFromDiscovered(undefined), 'gemini-3.7-flash');
 	});
 
 	test('formatContextWindowLabel formats token counts cleanly', () => {

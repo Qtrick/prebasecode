@@ -10,6 +10,7 @@ import type {
 	AIGenerateResponseCandidate,
 	AIGenerateResult,
 	AIProviderErrorClassification,
+	AIResponseDisposition,
 	NormalizedAIModel,
 } from '../aiTypes';
 
@@ -20,6 +21,54 @@ const MAX_SSE_BUFFER_BYTES = 1 * 1024 * 1024; // 1 MiB max accumulated SSE buffe
 export interface DirectGeminiTransportOptions {
 	baseUrl?: string;
 	fetchImpl?: (input: string | URL, init?: RequestInit) => Promise<Response>;
+}
+
+export function classifyGeminiResponseDisposition(
+	data: {
+		candidates?: Array<{
+			content?: { parts?: Array<Record<string, unknown> | AIContentPart>; role?: string };
+			finishReason?: string;
+			finishMessage?: string;
+			safetyRatings?: unknown[];
+		}>;
+		promptFeedback?: {
+			blockReason?: string;
+			safetyRatings?: unknown[];
+		};
+		usageMetadata?: Record<string, unknown>;
+	},
+	parts: AIContentPart[],
+	text: string,
+): AIResponseDisposition {
+	if (data.promptFeedback?.blockReason) {
+		return 'promptBlocked';
+	}
+	const firstCandidate = data.candidates?.[0];
+	if (!firstCandidate) {
+		return 'malformed';
+	}
+	const finishReason = (firstCandidate.finishReason || '').toUpperCase();
+	if (finishReason === 'SAFETY' || finishReason === 'BLOCKLIST' || finishReason === 'PROHIBITED_CONTENT') {
+		return 'candidateBlocked';
+	}
+	const hasFunctionCalls = parts.some(p => !!p.functionCall);
+	if (hasFunctionCalls) {
+		return 'toolCalls';
+	}
+	if (text.length > 0) {
+		return 'text';
+	}
+	const thoughtsTokenCount = typeof data.usageMetadata?.thoughtsTokenCount === 'number'
+		? data.usageMetadata.thoughtsTokenCount
+		: 0;
+	const hasThoughtParts = parts.some(p => p.thought === true);
+	if (finishReason === 'MAX_TOKENS') {
+		return (thoughtsTokenCount > 0 || hasThoughtParts) ? 'thoughtOnly' : 'maxTokens';
+	}
+	if (finishReason === 'STOP') {
+		return (thoughtsTokenCount > 0 || hasThoughtParts) ? 'thoughtOnly' : 'emptyStop';
+	}
+	return 'malformed';
 }
 
 export function classifyGeminiHttpError(err: unknown): AIProviderErrorClassification {
@@ -463,7 +512,13 @@ export class DirectGeminiTransport {
 							role?: string;
 						};
 						finishReason?: string;
+						finishMessage?: string;
+						safetyRatings?: unknown[];
 					}>;
+					promptFeedback?: {
+						blockReason?: string;
+						safetyRatings?: unknown[];
+					};
 					usageMetadata?: Record<string, unknown>;
 				};
 
@@ -481,6 +536,8 @@ export class DirectGeminiTransport {
 							parts,
 						},
 						finishReason: firstCandidate.finishReason,
+						finishMessage: firstCandidate.finishMessage,
+						safetyRatings: firstCandidate.safetyRatings,
 					};
 				}
 
@@ -497,9 +554,16 @@ export class DirectGeminiTransport {
 					};
 				}
 
+				const disposition = classifyGeminiResponseDisposition(data, parts, text);
+
 				return {
 					text,
 					candidate,
+					disposition,
+					promptFeedback: data.promptFeedback ? {
+						blockReason: data.promptFeedback.blockReason,
+						safetyRatings: data.promptFeedback.safetyRatings,
+					} : undefined,
 					usageMetadata,
 					modelId: model,
 					providerId: 'gemini',
@@ -644,6 +708,10 @@ export class DirectGeminiTransport {
 				while (true) {
 					const { done, value } = await reader.read();
 					if (done) {
+						const rest = decoder.decode();
+						if (rest) {
+							buffer += rest;
+						}
 						if (buffer.trim()) {
 							processLine(buffer);
 						}
@@ -674,9 +742,24 @@ export class DirectGeminiTransport {
 					}
 					: undefined;
 
+				const streamRawData = {
+					candidates: finalCandidate ? [{
+						content: finalCandidate.content,
+						finishReason,
+					}] : [],
+					usageMetadata: latestUsage ? {
+						promptTokenCount: latestUsage.promptTokenCount,
+						candidatesTokenCount: latestUsage.candidatesTokenCount,
+						thoughtsTokenCount: latestUsage.thoughtsTokenCount,
+						totalTokenCount: latestUsage.totalTokenCount,
+					} : undefined,
+				};
+				const disposition = classifyGeminiResponseDisposition(streamRawData, accumulatedParts, accumulatedText);
+
 				return {
 					text: accumulatedText,
 					candidate: finalCandidate,
+					disposition,
 					usageMetadata: latestUsage,
 					modelId: model,
 					providerId: 'gemini',
@@ -703,113 +786,118 @@ export class DirectGeminiTransport {
 		if (token?.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-
-		const { controller, cleanup } = this.createAbortController(token);
-		const MAX_PAGES = 10;
-		const PAGE_SIZE = 100;
-
-		const EXCLUDED_PATTERNS = [
-			'embedding', 'aqa', 'imagen', 'veo', 'tts', 'live', 'robotics',
-			'bison', // legacy PaLM-era
-			'gemma',  // open weights, not Gemini API general chat
-		];
-
-		function isExcludedFamily(id: string): boolean {
-			const lower = id.toLowerCase();
-			return EXCLUDED_PATTERNS.some(pat => lower.includes(pat));
+		if (!apiKey.trim()) {
+			return [];
 		}
 
-		try {
-			const normalized: NormalizedAIModel[] = [];
-			let pageToken: string | undefined;
-			let pagesRead = 0;
+		return executeWithRetry(async () => {
+			const { controller, cleanup } = this.createAbortController(token);
+			const MAX_PAGES = 10;
+			const PAGE_SIZE = 100;
 
-			do {
-				if (token?.isCancellationRequested) {
-					throw new Error('Cancelled');
-				}
+			const EXCLUDED_PATTERNS = [
+				'embedding', 'aqa', 'imagen', 'veo', 'tts', 'live', 'robotics',
+				'bison', // legacy PaLM-era
+				'gemma',  // open weights, not Gemini API general chat
+			];
 
-				const params = new URLSearchParams({ pageSize: String(PAGE_SIZE) });
-				if (pageToken) {
-					params.set('pageToken', pageToken);
-				}
-				const url = `${this.baseUrl}/models?${params.toString()}`;
+			function isExcludedFamily(id: string): boolean {
+				const lower = id.toLowerCase();
+				return EXCLUDED_PATTERNS.some(pat => lower.includes(pat));
+			}
 
-				const res = await this.fetchImpl(url, {
-					method: 'GET',
-					headers: {
-						'Content-Type': 'application/json',
-						'x-goog-api-key': apiKey.trim(),
-					},
-					signal: controller.signal,
-				});
+			try {
+				const normalized: NormalizedAIModel[] = [];
+				let pageToken: string | undefined;
+				let pagesRead = 0;
 
-				if (!res.ok) {
-					throw new Error(`Gemini model discovery failed (HTTP ${res.status})`);
-				}
-
-				const bodyText = await this.readBoundedText(res);
-				const data = JSON.parse(bodyText) as {
-					models?: Array<{
-						name?: string;
-						displayName?: string;
-						description?: string;
-						inputTokenLimit?: number;
-						outputTokenLimit?: number;
-						supportedGenerationMethods?: string[];
-					}>;
-					nextPageToken?: string;
-				};
-
-				pagesRead++;
-				pageToken = data.nextPageToken;
-
-				const rawModels = data.models ?? [];
-
-				for (const m of rawModels) {
-					const rawName = m.name ?? '';
-					const id = rawName.startsWith('models/') ? rawName.slice('models/'.length) : rawName;
-					if (!id) {
-						continue;
+				do {
+					if (token?.isCancellationRequested) {
+						throw new Error('Cancelled');
 					}
 
-					if (isExcludedFamily(id)) {
-						continue;
+					const params = new URLSearchParams({ pageSize: String(PAGE_SIZE) });
+					if (pageToken) {
+						params.set('pageToken', pageToken);
 					}
+					const url = `${this.baseUrl}/models?${params.toString()}`;
 
-					const methods = m.supportedGenerationMethods ?? [];
-					const supportsGenerate = methods.includes('generateContent');
-					if (!supportsGenerate) {
-						continue;
-					}
-
-					const baseModel: NormalizedAIModel = {
-						id,
-						name: rawName || `models/${id}`,
-						displayName: m.displayName || id,
-						description: m.description || `Google Gemini ${id} model.`,
-						inputTokenLimit: m.inputTokenLimit || 1_000_000,
-						outputTokenLimit: m.outputTokenLimit || 65_536,
-						capabilities: {
-							textGeneration: supportsGenerate,
-							streaming: true,
-							functionCalling: supportsGenerate,
-							multimodalInput: true,
-							structuredOutput: supportsGenerate,
-							thinkingProtocol: false,
-							agentCompatible: supportsGenerate,
-							descriptionCompatible: supportsGenerate,
+					const res = await this.fetchImpl(url, {
+						method: 'GET',
+						headers: {
+							'Content-Type': 'application/json',
+							'x-goog-api-key': apiKey.trim(),
 						},
+						signal: controller.signal,
+					});
+
+					if (!res.ok) {
+						throw new Error(`Gemini model discovery failed (HTTP ${res.status})`);
+					}
+
+					const bodyText = await this.readBoundedText(res);
+					const data = JSON.parse(bodyText) as {
+						models?: Array<{
+							name?: string;
+							displayName?: string;
+							description?: string;
+							inputTokenLimit?: number;
+							outputTokenLimit?: number;
+							supportedGenerationMethods?: string[];
+						}>;
+						nextPageToken?: string;
 					};
 
-					normalized.push(baseModel);
-				}
-			} while (pageToken && pagesRead < MAX_PAGES);
+					pagesRead++;
+					pageToken = data.nextPageToken;
 
-			return normalized;
-		} finally {
-			cleanup();
-		}
+					const rawModels = data.models ?? [];
+
+					for (const m of rawModels) {
+						const rawName = m.name ?? '';
+						const id = rawName.startsWith('models/') ? rawName.slice('models/'.length) : rawName;
+						if (!id) {
+							continue;
+						}
+
+						if (isExcludedFamily(id)) {
+							continue;
+						}
+
+						const methods = m.supportedGenerationMethods ?? [];
+						const supportsGenerate = methods.includes('generateContent');
+						if (!supportsGenerate) {
+							continue;
+						}
+
+						const baseModel: NormalizedAIModel = {
+							id,
+							name: rawName || `models/${id}`,
+							displayName: m.displayName || id,
+							description: m.description || `Google Gemini ${id} model.`,
+							inputTokenLimit: m.inputTokenLimit || 1_000_000,
+							outputTokenLimit: m.outputTokenLimit || 65_536,
+							capabilities: {
+								textGeneration: supportsGenerate,
+								streaming: true,
+								functionCalling: supportsGenerate,
+								multimodalInput: true,
+								structuredOutput: supportsGenerate,
+								thinkingProtocol: false,
+								agentCompatible: supportsGenerate,
+								descriptionCompatible: supportsGenerate,
+							},
+						};
+
+						normalized.push(baseModel);
+					}
+				} while (pageToken && pagesRead < MAX_PAGES);
+
+				return normalized;
+			} finally {
+				cleanup();
+			}
+		}, token);
 	}
 
 

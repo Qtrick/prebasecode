@@ -88,6 +88,7 @@ interface DescriptionContextInfo {
 	reasoningEffort?: string;
 	policyVersion?: string;
 	cacheIdentity?: string;
+	disabled?: boolean;
 }
 
 export interface IPreBaseGraphDescriptionService {
@@ -100,7 +101,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 	declare readonly _serviceBrand: undefined;
 
 	private _active: CancellationTokenSource | undefined;
-	private _inflight = new Map<string, Promise<IGraphNodeDescriptionResult>>();
+	private _inflight = new Map<string, { promise: Promise<IGraphNodeDescriptionResult>; cts: CancellationTokenSource }>();
 
 	private readonly workspaceContextService: IWorkspaceContextService;
 	private readonly fileService: IFileService;
@@ -124,6 +125,11 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		this._active?.cancel();
 		this._active?.dispose();
 		this._active = undefined;
+		for (const item of this._inflight.values()) {
+			item.cts.cancel();
+			item.cts.dispose();
+		}
+		this._inflight.clear();
 		super.dispose();
 	}
 
@@ -152,7 +158,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			const uri = this._resolveWorkspaceUri(folder.uri, relative);
 			if (uri) {
 				try {
-					const file = await this.fileService.readFile(uri, { limits: { size: 2 * 1024 * 1024 } });
+					const file = await this.fileService.readFile(uri, { position: 0, length: MAX_CONTENT });
 					content = file.value.toString().slice(0, MAX_CONTENT);
 					contentHash = String(hashContent(content));
 				} catch {
@@ -163,17 +169,6 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			content = '';
 		}
 
-		// Retrieve active AI description context to validate cache identity
-		let activeContext: DescriptionContextInfo | undefined;
-		try {
-			activeContext = await this.commandService.executeCommand<DescriptionContextInfo>(
-				'prebase.magnus.getDescriptionContext',
-				relative
-			);
-		} catch {
-			activeContext = undefined;
-		}
-
 		const cacheKey = [
 			folder.uri.toString(),
 			'file',
@@ -182,19 +177,12 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			PROMPT_VERSION,
 		].join('::');
 
-		const cached = options?.force ? undefined : this._readCache()[cacheKey];
-		if (cached?.text) {
-			const matchesIdentity = !cached.cacheIdentity || !activeContext?.cacheIdentity || cached.cacheIdentity === activeContext.cacheIdentity;
-			if (matchesIdentity) {
-				return {
-					overview,
-					aiDescription: cached.text,
-					aiStatus: 'ready',
-					aiProviderId: cached.providerId ?? activeContext?.providerId ?? 'gemini',
-					aiModelId: cached.modelId ?? activeContext?.modelId,
-					cacheHit: true,
-				};
-			}
+		const existing = this._inflight.get(cacheKey);
+		if (existing && !existing.cts.token.isCancellationRequested && (!token || !token.isCancellationRequested)) {
+			return existing.promise;
+		}
+		if (existing) {
+			this._inflight.delete(cacheKey);
 		}
 
 		this._active?.cancel();
@@ -202,13 +190,39 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		const cts = new CancellationTokenSource(token);
 		this._active = cts;
 
-		const existing = this._inflight.get(cacheKey);
-		if (existing && !cts.token.isCancellationRequested) {
-			return existing;
-		}
-
 		const work = (async (): Promise<IGraphNodeDescriptionResult> => {
 			try {
+				// Retrieve active AI description context
+				let activeContext: DescriptionContextInfo | undefined;
+				try {
+					activeContext = await this.commandService.executeCommand<DescriptionContextInfo>(
+						'prebase.magnus.getDescriptionContext',
+						relative
+					);
+				} catch {
+					activeContext = undefined;
+				}
+
+				if (cts.token.isCancellationRequested) {
+					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."), cacheHit: false };
+				}
+
+				if (activeContext?.disabled) {
+					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.disabled', "AI description is disabled in settings."), cacheHit: false };
+				}
+
+				const cached = options?.force ? undefined : this._readCache()[cacheKey];
+				if (cached?.text && (!activeContext?.cacheIdentity || cached.cacheIdentity === activeContext.cacheIdentity)) {
+					return {
+						overview,
+						aiDescription: cached.text,
+						aiStatus: 'ready',
+						aiProviderId: cached.providerId ?? activeContext?.providerId ?? 'gemini',
+						aiModelId: cached.modelId ?? activeContext?.modelId,
+						cacheHit: true,
+					};
+				}
+
 				const prompt = [
 					'Write an ultra-concise 1-sentence description (~18–32 words, max 38 words) of this source file.',
 					'State its concrete responsibility and key architectural mechanism in one clear, informative sentence with no filler.',
@@ -274,8 +288,8 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					if (raw.status === 'authError') {
 						return {
 							overview,
-							aiStatus: 'error',
-							aiMessage: raw.safeMessage || localize('prebase.desc.authError', "The AI provider rejected the configured credential. Update your key in Agents Settings."),
+							aiStatus: 'unavailable',
+							aiMessage: raw.safeMessage || localize('prebase.desc.authError', "AI description authentication failed. Check your API key in Agents Settings."),
 							cacheHit: false,
 						};
 					}
@@ -283,7 +297,31 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 						return {
 							overview,
 							aiStatus: 'error',
-							aiMessage: raw.safeMessage || localize('prebase.desc.rateLimited', "The AI provider is temporarily rate limited. Please retry in a moment."),
+							aiMessage: raw.safeMessage || localize('prebase.desc.rateLimited', "AI description rate limit reached. Please wait a moment before requesting another description."),
+							cacheHit: false,
+						};
+					}
+					if (raw.status === 'cancelled') {
+						return {
+							overview,
+							aiStatus: 'unavailable',
+							aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."),
+							cacheHit: false,
+						};
+					}
+					if (raw.status === 'disabled') {
+						return {
+							overview,
+							aiStatus: 'unavailable',
+							aiMessage: localize('prebase.desc.disabled', "AI description is disabled in settings."),
+							cacheHit: false,
+						};
+					}
+					if (raw.status === 'skipped') {
+						return {
+							overview,
+							aiStatus: 'skipped',
+							aiMessage: raw.safeMessage || localize('prebase.desc.skipped', "AI description skipped for this file."),
 							cacheHit: false,
 						};
 					}
@@ -343,7 +381,9 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					cacheHit: false,
 				};
 			} finally {
-				this._inflight.delete(cacheKey);
+				if (this._inflight.get(cacheKey)?.cts === cts) {
+					this._inflight.delete(cacheKey);
+				}
 				if (this._active === cts) {
 					this._active = undefined;
 				}
@@ -351,7 +391,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			}
 		})();
 
-		this._inflight.set(cacheKey, work);
+		this._inflight.set(cacheKey, { promise: work, cts });
 		return work;
 	}
 

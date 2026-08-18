@@ -892,11 +892,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private async _parseFile(file: ScannedFile & { resource: URI }): Promise<ParseResult | undefined> {
 		try {
-			const fileContent = await this.fileService.readFile(file.resource, { limits: { size: 200_000 } });
+			const fileContent = await this.fileService.readFile(file.resource, { position: 0, length: 120_000 });
 			const content = fileContent.value.toString();
-			if (content.length > 200_000) {
-				return undefined;
-			}
 			const imports = extractImportsForFile(file, content);
 			const packageName = extractPackageName(file, content);
 			const exports: ParseResult['exports'] = [];

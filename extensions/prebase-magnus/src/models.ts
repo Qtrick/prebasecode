@@ -72,6 +72,19 @@ export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		},
 	},
 	{
+		id: 'gemini-3.7-flash',
+		name: 'Gemini 3.7 Flash',
+		apiModel: 'gemini-3.7-flash',
+		maxInputTokens: 1_000_000,
+		maxOutputTokens: 65_536,
+		description: 'Next-generation hybrid reasoning model — fast with dynamic thinking capabilities.',
+		reasoning: {
+			supported: true,
+			supportedEfforts: ['default', 'low', 'medium', 'high'],
+			defaultEffort: 'default',
+		},
+	},
+	{
 		id: 'gemini-2.5-flash',
 		name: 'Gemini 2.5 Flash',
 		apiModel: 'gemini-2.5-flash',
@@ -80,7 +93,7 @@ export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 		description: 'Fast and capable — strong default for everyday coding.',
 		reasoning: {
 			supported: true,
-			supportedEfforts: ['default', 'minimal', 'low', 'medium', 'high'],
+			supportedEfforts: ['default', 'low', 'medium', 'high'],
 			defaultEffort: 'default',
 		},
 	},

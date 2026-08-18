@@ -7,6 +7,7 @@ import assert from 'node:assert';
 import { suite, test } from 'node:test';
 import {
 	classifyGeminiHttpError,
+	classifyGeminiResponseDisposition,
 	executeWithRetry,
 	sleepWithCancellation,
 } from './directGeminiTransport';
@@ -95,5 +96,86 @@ suite('Provider Resilience & Transient Retry', () => {
 		}, 20);
 
 		await assert.rejects(sleepPromise, /Cancelled/);
+	});
+
+	test('classifyGeminiResponseDisposition detects prompt safety block', () => {
+		const disposition = classifyGeminiResponseDisposition(
+			{ promptFeedback: { blockReason: 'SAFETY' } },
+			[],
+			'',
+		);
+		assert.strictEqual(disposition, 'promptBlocked');
+	});
+
+	test('classifyGeminiResponseDisposition detects candidate safety block', () => {
+		const disposition = classifyGeminiResponseDisposition(
+			{ candidates: [{ finishReason: 'SAFETY' }] },
+			[],
+			'',
+		);
+		assert.strictEqual(disposition, 'candidateBlocked');
+	});
+
+	test('classifyGeminiResponseDisposition detects function call tool parts', () => {
+		const disposition = classifyGeminiResponseDisposition(
+			{ candidates: [{ finishReason: 'STOP' }] },
+			[{ functionCall: { name: 'prebase_workspace_read_file', args: {} } }],
+			'',
+		);
+		assert.strictEqual(disposition, 'toolCalls');
+	});
+
+	test('classifyGeminiResponseDisposition detects visible text generation', () => {
+		const disposition = classifyGeminiResponseDisposition(
+			{ candidates: [{ finishReason: 'STOP' }] },
+			[{ text: 'Hello, world!' }],
+			'Hello, world!',
+		);
+		assert.strictEqual(disposition, 'text');
+	});
+
+	test('classifyGeminiResponseDisposition detects reasoning thought starvation', () => {
+		// MAX_TOKENS with thought parts and 0 text
+		const disposition1 = classifyGeminiResponseDisposition(
+			{ candidates: [{ finishReason: 'MAX_TOKENS' }], usageMetadata: { thoughtsTokenCount: 512 } },
+			[{ text: 'thinking...', thought: true }],
+			'',
+		);
+		assert.strictEqual(disposition1, 'thoughtOnly');
+
+		// STOP with thought parts and 0 text
+		const disposition2 = classifyGeminiResponseDisposition(
+			{ candidates: [{ finishReason: 'STOP' }], usageMetadata: { thoughtsTokenCount: 256 } },
+			[{ text: 'deep thoughts', thought: true }],
+			'',
+		);
+		assert.strictEqual(disposition2, 'thoughtOnly');
+	});
+
+	test('classifyGeminiResponseDisposition detects maxTokens output exhaustion', () => {
+		const disposition = classifyGeminiResponseDisposition(
+			{ candidates: [{ finishReason: 'MAX_TOKENS' }], usageMetadata: { thoughtsTokenCount: 0 } },
+			[],
+			'',
+		);
+		assert.strictEqual(disposition, 'maxTokens');
+	});
+
+	test('classifyGeminiResponseDisposition detects empty stop', () => {
+		const disposition = classifyGeminiResponseDisposition(
+			{ candidates: [{ finishReason: 'STOP' }] },
+			[],
+			'',
+		);
+		assert.strictEqual(disposition, 'emptyStop');
+	});
+
+	test('classifyGeminiResponseDisposition detects malformed candidate responses', () => {
+		const disposition = classifyGeminiResponseDisposition(
+			{ candidates: [] },
+			[],
+			'',
+		);
+		assert.strictEqual(disposition, 'malformed');
 	});
 });

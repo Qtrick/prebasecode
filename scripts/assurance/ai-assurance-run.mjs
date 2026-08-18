@@ -216,7 +216,7 @@ async function runAssurance() {
 				headers: { 'Content-Type': 'application/json', 'x-goog-api-key': geminiKey },
 				body: JSON.stringify({
 					contents: [{ role: 'user', parts: [{ text: 'Respond with exactly PONG in one word.' }] }],
-					generationConfig: { maxOutputTokens: 64, temperature: 0.0, thinkingConfig: { thinkingBudget: 0 } },
+					generationConfig: { maxOutputTokens: 64, temperature: 0.0 },
 				}),
 			});
 			const duration = Date.now() - genStart;

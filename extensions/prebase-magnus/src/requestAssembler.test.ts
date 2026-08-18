@@ -20,6 +20,12 @@ suite('Magnus Request Assembler & Context Budget', () => {
 		assert.strictEqual(isSensitiveFile('.env'), true);
 		assert.strictEqual(isSensitiveFile('.env.local'), true);
 		assert.strictEqual(isSensitiveFile('.env.production'), true);
+		assert.strictEqual(isSensitiveFile('.npmrc'), true);
+		assert.strictEqual(isSensitiveFile('.netrc'), true);
+		assert.strictEqual(isSensitiveFile('.pypirc'), true);
+		assert.strictEqual(isSensitiveFile('.git-credentials'), true);
+		assert.strictEqual(isSensitiveFile('.ssh/id_ed25519'), true);
+		assert.strictEqual(isSensitiveFile('.aws/credentials'), true);
 		assert.strictEqual(isSensitiveFile('secrets/id_rsa'), true);
 		assert.strictEqual(isSensitiveFile('certs/server.key'), true);
 		assert.strictEqual(isSensitiveFile('certs/cert.pem'), true);
@@ -27,6 +33,26 @@ suite('Magnus Request Assembler & Context Budget', () => {
 		assert.strictEqual(isSensitiveFile('token.json'), true);
 		assert.strictEqual(isSensitiveFile('src/app.ts'), false);
 		assert.strictEqual(isSensitiveFile('package.json'), false);
+	});
+
+	test('resolveNativeReferences skips sensitive files and reads bounded content via host', async () => {
+		const mockHost = {
+			readFile: async (uri: any) => Buffer.from(`content for ${uri.path}`),
+			asRelativePath: (uri: any) => uri.path,
+		};
+
+		const references = [
+			{ value: { fsPath: '.env', scheme: 'file', path: '.env' } },
+			{ value: { fsPath: 'src/main.ts', scheme: 'file', path: 'src/main.ts' } },
+		] as any;
+
+		const { resolveNativeReferences } = await import('./requestAssembler');
+		const resolved = await resolveNativeReferences(references, DEFAULT_CONTEXT_BUDGET, mockHost as any);
+
+		assert.strictEqual(resolved.length, 2);
+		assert.ok(resolved[0].includes('[SKIPPED - Sensitive]'));
+		assert.ok(resolved[1].includes('Attached file (src/main.ts)'));
+		assert.ok(resolved[1].includes('content for src/main.ts'));
 	});
 
 	test('buildSystemPrompt includes mode instructions and attached context', () => {

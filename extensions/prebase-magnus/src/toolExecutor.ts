@@ -133,6 +133,16 @@ async function executeSingleTool(
 		};
 	}
 
+	if (tracker.cumulativeResultChars >= budget.maxCumulativeToolResultChars) {
+		return {
+			functionResponse: {
+				id: call.id,
+				name: call.name,
+				response: { error: 'Cumulative tool result budget reached. Please synthesize your final response from collected evidence.' },
+			},
+		};
+	}
+
 	if (!availableTools.some(t => t.name === call.name)) {
 		return {
 			functionResponse: {
@@ -199,12 +209,19 @@ async function executeSingleTool(
 			},
 		};
 	} catch (err) {
-		const safeMsg = err instanceof Error ? err.message : String(err);
+		const raw = err instanceof Error ? err.message : String(err || 'Tool execution failed');
+		let safeMsg = raw
+			.replace(/(?:AIza|sk-|ghp_|gho_|xox[baprs]-)[A-Za-z0-9_-]{10,}/g, '***REDACTED***')
+			.replace(/(?:key|token|secret|password|bearer)[=:\s]+[A-Za-z0-9_\-.]{8,}/gi, '***REDACTED***');
+		const home = process.env.HOME || process.env.USERPROFILE;
+		if (home && safeMsg.includes(home)) {
+			safeMsg = safeMsg.split(home).join('~');
+		}
 		return {
 			functionResponse: {
 				id: call.id,
 				name: call.name,
-				response: { error: safeMsg },
+				response: { error: safeMsg.slice(0, 500) },
 			},
 		};
 	}

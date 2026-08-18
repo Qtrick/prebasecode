@@ -30,6 +30,7 @@ export interface ContextBudgetConfig {
 	readonly maxParallelReadTools: number;
 	readonly maxWebSearches: number;
 	readonly maxDeepWebSearches: number;
+	readonly maxWallClockMs: number;
 }
 
 export const DEFAULT_CONTEXT_BUDGET: ContextBudgetConfig = {
@@ -44,9 +45,11 @@ export const DEFAULT_CONTEXT_BUDGET: ContextBudgetConfig = {
 	maxParallelReadTools: 4,
 	maxWebSearches: 4,
 	maxDeepWebSearches: 1,
+	maxWallClockMs: 180_000, // 3 minutes wall-clock run ceiling
 };
 
-const SENSITIVE_FILE_PATTERN = /(?:^|[/\\])(\.env(?:\..*)?|id_rsa.*|.*\.pem|.*\.key|.*\.p12|.*\.pfx|credentials\.json|token\.json)$/i;
+const SENSITIVE_FILE_PATTERN = /(?:^|[/\\])(\.env(\..*)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa.*|id_ed25519.*|.*\.pem|.*\.key|.*\.p12|.*\.pfx|credentials\.json|token\.json)$/i;
+const SENSITIVE_DIR_PATTERN = /(?:^|[/\\])(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(?:[/\\]|$)/i;
 
 export interface AssembledChatRequest {
 	readonly mode: MagnusAgentMode;
@@ -59,8 +62,28 @@ export interface AssembledChatRequest {
 	readonly budget: ContextBudgetConfig;
 }
 
+export interface IRequestAssemblerHost {
+	readFile?(uri: vscode.Uri): Promise<Uint8Array>;
+	openTextDocument?(uri: vscode.Uri): Promise<{ getText(range?: vscode.Range): string }>;
+	asRelativePath?(uri: vscode.Uri, includeWorkspaceFolder?: boolean): string;
+	getLanguageModelTools?(): readonly vscode.LanguageModelToolInformation[];
+	getConfiguration?(section: string): { get<T>(key: string, defaultValue?: T): T };
+}
+
+const defaultVscodeHost: IRequestAssemblerHost = {
+	readFile: (uri) => (globalThis as any).vscode?.workspace?.fs?.readFile(uri),
+	openTextDocument: (uri) => (globalThis as any).vscode?.workspace?.openTextDocument(uri),
+	asRelativePath: (uri, inc) => (globalThis as any).vscode?.workspace?.asRelativePath(uri, inc),
+	getLanguageModelTools: () => (globalThis as any).vscode?.lm?.tools ?? [],
+	getConfiguration: (section) => (globalThis as any).vscode?.workspace?.getConfiguration(section),
+};
+
 export function isSensitiveFile(filePath: string): boolean {
-	return SENSITIVE_FILE_PATTERN.test(filePath);
+	if (!filePath || typeof filePath !== 'string') {
+		return false;
+	}
+	const normalized = filePath.replace(/\\/g, '/');
+	return SENSITIVE_FILE_PATTERN.test(normalized) || SENSITIVE_DIR_PATTERN.test(normalized);
 }
 
 export function buildSystemPrompt(
@@ -155,6 +178,7 @@ export function extractConversationHistory(
 export async function resolveNativeReferences(
 	references: readonly vscode.ChatPromptReference[] | undefined,
 	budget: ContextBudgetConfig = DEFAULT_CONTEXT_BUDGET,
+	host: IRequestAssemblerHost = defaultVscodeHost,
 ): Promise<string[]> {
 	if (!references || references.length === 0) {
 		return [];
@@ -182,13 +206,11 @@ export async function resolveNativeReferences(
 					continue;
 				}
 				try {
-					// @ts-ignore
-					const vscode = globalThis.vscode;
-					if (vscode?.workspace?.fs) {
-						const data = await vscode.workspace.fs.readFile(uri);
+					if (host.readFile) {
+						const data = await host.readFile(uri);
 						const text = Buffer.from(data).toString('utf8');
 						const boundedText = text.slice(0, budget.maxSingleAttachmentChars);
-						const rel = vscode.workspace.asRelativePath ? vscode.workspace.asRelativePath(uri, false) : fsPath;
+						const rel = host.asRelativePath ? host.asRelativePath(uri, false) : fsPath;
 						attached.push(`Attached file (${rel}):\n${boundedText}`);
 						cumulativeChars += boundedText.length;
 					}
@@ -205,14 +227,13 @@ export async function resolveNativeReferences(
 					continue;
 				}
 				try {
-					// @ts-ignore
-					const vscode = globalThis.vscode;
-					if (vscode?.workspace?.openTextDocument) {
-						const doc = await vscode.workspace.openTextDocument(uri);
+					if (host.openTextDocument) {
+						const doc = await host.openTextDocument(uri);
 						const selectedText = doc.getText(range);
 						const bounded = selectedText.slice(0, budget.maxSingleAttachmentChars);
-						const rel = vscode.workspace.asRelativePath ? vscode.workspace.asRelativePath(uri, false) : fsPath;
-						attached.push(`Attached selection (${rel}:${range.start.line + 1}-${range.end.line + 1}):\n${bounded}`);
+						const rel = host.asRelativePath ? host.asRelativePath(uri, false) : fsPath;
+						const lineInfo = range ? `:${range.start.line + 1}-${range.end.line + 1}` : '';
+						attached.push(`Attached selection (${rel}${lineInfo}):\n${bounded}`);
 						cumulativeChars += bounded.length;
 					}
 				} catch {
@@ -231,13 +252,12 @@ export function filterToolDeclarations(
 	mode: MagnusAgentMode,
 	toolReferences?: readonly vscode.ChatLanguageModelToolReference[],
 	availableTools?: readonly vscode.LanguageModelToolInformation[],
+	host: IRequestAssemblerHost = defaultVscodeHost,
 ): AIToolDeclaration[] {
 	let tools = availableTools;
 	if (!tools) {
 		try {
-			// @ts-ignore
-			const vscode = globalThis.vscode;
-			tools = vscode?.lm?.tools;
+			tools = host.getLanguageModelTools ? host.getLanguageModelTools() : [];
 		} catch {
 			tools = [];
 		}
@@ -263,10 +283,10 @@ export function filterToolDeclarations(
 }
 
 export function processToolResultData(
-	toolResult: vscode.LanguageModelToolResult,
+	toolResult: vscode.LanguageModelToolResult | undefined,
 	maxChars: number = DEFAULT_CONTEXT_BUDGET.maxSingleToolResultChars,
 ): { text: string; inlineImages: Array<{ mimeType: string; data: string }> } {
-	let textParts: string[] = [];
+	const textParts: string[] = [];
 	const inlineImages: Array<{ mimeType: string; data: string }> = [];
 
 	if (toolResult && Array.isArray(toolResult.content)) {
@@ -307,6 +327,7 @@ export function assembleChatRequest(
 	resolvedAttachments: string[],
 	budget: ContextBudgetConfig = DEFAULT_CONTEXT_BUDGET,
 	defaultModelConfig?: string,
+	host: IRequestAssemblerHost = defaultVscodeHost,
 ): AssembledChatRequest {
 	const requestModel = (request as unknown as { model?: { id?: string } }).model?.id;
 	let activeModelId = requestModel;
@@ -315,9 +336,7 @@ export function assembleChatRequest(
 			activeModelId = defaultModelConfig;
 		} else {
 			try {
-				// @ts-ignore
-				const vscode = globalThis.vscode;
-				activeModelId = vscode?.workspace?.getConfiguration?.('prebase.magnus')?.get?.('defaultModel', 'auto') || 'auto';
+				activeModelId = host.getConfiguration?.('prebase.magnus')?.get?.('defaultModel', 'auto') || 'auto';
 			} catch {
 				activeModelId = 'auto';
 			}
@@ -345,7 +364,7 @@ export function assembleChatRequest(
 		{ role: 'user', parts: [{ text: request.prompt }] },
 	];
 
-	const tools = filterToolDeclarations(mode, request.toolReferences);
+	const tools = filterToolDeclarations(mode, request.toolReferences, undefined, host);
 
 	return {
 		mode,

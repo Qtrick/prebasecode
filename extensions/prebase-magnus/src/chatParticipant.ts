@@ -136,6 +136,9 @@ async function handleChatRequest(
 	};
 
 	const messages: AIContentMessage[] = [...assembled.initialMessages];
+	const startTime = Date.now();
+	let recoveredStarvation = false;
+	let recoveredEmptyStop = false;
 
 	try {
 		let rawText = '';
@@ -150,6 +153,11 @@ async function handleChatRequest(
 					return {};
 				}
 
+				if (Date.now() - startTime > assembled.budget.maxWallClockMs) {
+					rawText = 'The task reached its maximum execution time limit before completing. Please review collected findings or retry.';
+					break;
+				}
+
 				const result = await aiService.generateCandidate({
 					messages,
 					systemInstruction: assembled.systemInstruction,
@@ -161,27 +169,123 @@ async function handleChatRequest(
 				const parts = result.candidate?.content?.parts ?? (result.text ? [{ text: result.text }] : []);
 				const calls = functionCalls(parts);
 
-				if (!calls.length) {
-					rawText = result.text || parts.map(part => part.text ?? '').join('');
+				if (calls.length > 0) {
+					enteredRunning = true;
+					run.status = 'running';
+					run.startedAt ??= Date.now();
+					messages.push({ role: 'model', parts });
+
+					const responseParts = await executeToolCallBatch(
+						calls,
+						assembled.tools,
+						request.toolInvocationToken,
+						effectiveToken,
+						assembled.budget,
+						tracker,
+						true,
+					);
+
+					messages.push({ role: 'user', parts: responseParts });
+					continue;
+				}
+
+				// No tool calls returned: inspect disposition and text content
+				const textParts = parts.filter(p => !p.thought).map(p => p.text ?? '').filter(Boolean).join('');
+				const candidateText = (result.text || textParts).trim();
+
+				if (candidateText.length > 0) {
+					rawText = candidateText;
 					break;
 				}
 
-				enteredRunning = true;
-				run.status = 'running';
-				run.startedAt ??= Date.now();
-				messages.push({ role: 'model', parts });
+				if (result.disposition === 'promptBlocked') {
+					const blockReason = result.promptFeedback?.blockReason ? ` (${result.promptFeedback.blockReason})` : '';
+					rawText = `The request was blocked by the AI provider's safety policy${blockReason}. Please adjust your prompt.`;
+					break;
+				}
 
-				const responseParts = await executeToolCallBatch(
-					calls,
-					assembled.tools,
-					request.toolInvocationToken,
-					effectiveToken,
-					assembled.budget,
-					tracker,
-					true,
-				);
+				if (result.disposition === 'candidateBlocked') {
+					rawText = 'The model response was blocked by safety policy. Please rephrase or narrow the request.';
+					break;
+				}
 
-				messages.push({ role: 'user', parts: responseParts });
+				if ((result.disposition === 'thoughtOnly' || result.disposition === 'maxTokens') && !recoveredStarvation) {
+					// Bounded recovery for reasoning token starvation: 1 synthesis request with low reasoning effort
+					recoveredStarvation = true;
+					try {
+						const recovery = await aiService.generateCandidate({
+							messages,
+							systemInstruction: `${assembled.systemInstruction}\nSynthesize and provide your final user-facing response now. Do not call additional tools.`,
+							modelId: assembled.modelId,
+							reasoningEffort: 'low',
+						}, effectiveToken);
+
+						const recoveryText = (recovery.text || recovery.candidate?.content?.parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') || '').trim();
+						if (recoveryText.length > 0) {
+							rawText = recoveryText;
+							break;
+						}
+					} catch {
+						// Fall through to actionable failure message
+					}
+
+					rawText = 'The model exhausted its output budget during reasoning. Please retry with a lower reasoning level or choose another model.';
+					break;
+				}
+
+				if (result.disposition === 'emptyStop' && !recoveredEmptyStop) {
+					recoveredEmptyStop = true;
+					if (enteredRunning) {
+						// Continue from preserved tool results to synthesize final answer
+						try {
+							const recovery = await aiService.generateCandidate({
+								messages,
+								systemInstruction: `${assembled.systemInstruction}\nProvide your final summary to the user based on the tool results collected above.`,
+								modelId: assembled.modelId,
+								reasoningEffort: 'low',
+							}, effectiveToken);
+
+							const recoveryText = (recovery.text || recovery.candidate?.content?.parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') || '').trim();
+							if (recoveryText.length > 0) {
+								rawText = recoveryText;
+								break;
+							}
+						} catch {
+							// Fall through
+						}
+
+						rawText = 'The model completed execution without returning visible text. Please retry or choose another model.';
+						break;
+					} else {
+						// Single bounded retry for clean prompt
+						try {
+							const retryResult = await aiService.generateCandidate({
+								messages,
+								systemInstruction: assembled.systemInstruction,
+								modelId: assembled.modelId,
+								reasoningEffort: assembled.reasoningEffort,
+							}, effectiveToken);
+							const retryText = (retryResult.text || retryResult.candidate?.content?.parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') || '').trim();
+							if (retryText.length > 0) {
+								rawText = retryText;
+								break;
+							}
+						} catch {
+							// Fall through
+						}
+
+						rawText = 'The model returned an empty response. Please retry or choose another model.';
+						break;
+					}
+				}
+
+				if (result.disposition === 'malformed') {
+					rawText = 'The model returned an unparseable or empty response. Please check your provider configuration or choose another model.';
+					break;
+				}
+
+				rawText = 'The model completed without returning visible text. Please retry or choose another model.';
+				break;
 			}
 		} catch (err) {
 			if (effectiveToken.isCancellationRequested) {
@@ -201,7 +305,7 @@ async function handleChatRequest(
 		run.completedAt = Date.now();
 		run.finalResponse = visibleAssistantText(rawText);
 		const finalVisible = run.finalResponse;
-		response.markdown(finalVisible || (enteredRunning ? 'The tool loop reached its limit before the model returned a final response.' : 'The model returned no text.'));
+		response.markdown(finalVisible || (enteredRunning ? 'The tool loop reached its limit before the model returned a final response.' : 'The model returned an empty response. Please retry or choose another model.'));
 		return {};
 	} finally {
 		cancelSub.dispose();

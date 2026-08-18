@@ -15,6 +15,7 @@ import type {
 import {
 	serializeGeminiRequest,
 	parseGeminiResponsePart,
+	classifyGeminiResponseDisposition,
 } from './directGeminiTransport';
 
 export interface HostedGatewayClient {
@@ -175,9 +176,15 @@ export class HostedGeminiTransport {
 				}
 			}
 
+			const parts = candidate?.content.parts ?? [];
+			const disposition = classifyGeminiResponseDisposition({
+				candidates: candidate ? [{ content: candidate.content, finishReason: candidate.finishReason }] : [],
+			}, parts, text);
+
 			return {
 				text,
 				candidate,
+				disposition,
 				modelId: request.modelId,
 				providerId: 'gemini',
 				executionMode: 'hosted',
@@ -278,9 +285,16 @@ export class HostedGeminiTransport {
 				};
 			}
 
+			const parts = candidate?.content.parts ?? [];
+			const disposition = classifyGeminiResponseDisposition({
+				candidates: candidate ? [{ content: candidate.content, finishReason: candidate.finishReason }] : [],
+				usageMetadata: data.usageMetadata,
+			}, parts, text);
+
 			return {
 				text,
 				candidate,
+				disposition,
 				usageMetadata,
 				modelId: model,
 				providerId: 'gemini',
@@ -322,9 +336,16 @@ export class HostedGeminiTransport {
 				}
 			}
 
+			const text = typeof raw.text === 'string' ? raw.text : '';
+			const parts = candidate?.content.parts ?? [];
+			const disposition = classifyGeminiResponseDisposition({
+				candidates: candidate ? [{ content: candidate.content, finishReason: candidate.finishReason }] : [],
+			}, parts, text);
+
 			return {
-				text: typeof raw.text === 'string' ? raw.text : '',
+				text,
 				candidate,
+				disposition,
 				modelId: request.modelId,
 				providerId: 'gemini',
 				executionMode: 'hosted',
