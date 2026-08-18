@@ -36,6 +36,7 @@ REPO=""
 EXTRA_ARGS=()
 CLONE_EXTENSIONS=0
 FULL=0
+NATIVE_DIALOGS=0
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -44,6 +45,7 @@ while [[ $# -gt 0 ]]; do
 		--repo) REPO="$2"; shift 2 ;;
 		--clone-extensions|--copy-extensions) CLONE_EXTENSIONS=1; shift ;;
 		--full) FULL=1; shift ;;
+		--native-dialogs) NATIVE_DIALOGS=1; shift ;;
 		--) shift; EXTRA_ARGS=("$@"); break ;;
 		*) echo "Unknown arg: $1" >&2; exit 2 ;;
 	esac
@@ -122,20 +124,23 @@ if [[ "$FULL" != "1" && "$CLONE_EXTENSIONS" == "1" ]]; then
 	rsync -a "$SOURCE_UDD/extensions/" "$EXT_DIR/"
 fi
 
-# Force the simple (quick-input) file dialog so automation can drive
-# "Open Folder" / workspace pickers. The native OS file dialog cannot be
-# controlled by @playwright/cli over CDP (and is completely unreachable
-# over SSH on headless macOS). The setting overlay is per-launch and
-# always applied because every launched instance under this skill is
-# a throwaway used for automation.
-SETTINGS_FILE="$DEST_UDD/User/settings.json"
-mkdir -p "$(dirname "$SETTINGS_FILE")"
-# Data-preserving text-based merge: insert/update `files.simpleDialog.enable`
-# without reparsing the whole file. Avoids dropping user comments and
-# string values containing `//` (e.g. URLs). Fails loudly if the file
-# exists but has no recognizable JSON object shape — never silently
-# overwrites with `{}`.
-if ! node - "$SETTINGS_FILE" <<'NODE'
+if [[ "$NATIVE_DIALOGS" == "1" ]]; then
+	echo "[launch.sh] native dialogs enabled (--native-dialogs): preserving standard OS native file dialogs (Playwright CDP cannot interact with native file dialogs)" >&2
+else
+	# Force the simple (quick-input) file dialog so automation can drive
+	# "Open Folder" / workspace pickers. The native OS file dialog cannot be
+	# controlled by @playwright/cli over CDP (and is completely unreachable
+	# over SSH on headless macOS). The setting overlay is per-launch and
+	# applied by default because launched instances under this skill are
+	# throwaways used for automation.
+	SETTINGS_FILE="$DEST_UDD/User/settings.json"
+	mkdir -p "$(dirname "$SETTINGS_FILE")"
+	# Data-preserving text-based merge: insert/update `files.simpleDialog.enable`
+	# without reparsing the whole file. Avoids dropping user comments and
+	# string values containing `//` (e.g. URLs). Fails loudly if the file
+	# exists but has no recognizable JSON object shape — never silently
+	# overwrites with `{}`.
+	if ! node - "$SETTINGS_FILE" <<'NODE'
 const fs = require('fs');
 const f = process.argv[2];
 const KEY = 'files.simpleDialog.enable';
@@ -189,11 +194,12 @@ const insertion = between.length === 0
 
 fs.writeFileSync(f, text.slice(0, lastBrace) + insertion + text.slice(lastBrace));
 NODE
-then
-	echo "[launch.sh] failed to ensure files.simpleDialog.enable=true in $SETTINGS_FILE — automation may need to fall back to per-key input" >&2
-	exit 1
+	then
+		echo "[launch.sh] failed to ensure files.simpleDialog.enable=true in $SETTINGS_FILE — automation may need to fall back to per-key input" >&2
+		exit 1
+	fi
+	echo "[launch.sh] automation mode: ensured files.simpleDialog.enable=true in $SETTINGS_FILE (use --native-dialogs to preserve OS dialogs for manual testing)" >&2
 fi
-echo "[launch.sh] ensured files.simpleDialog.enable=true in $SETTINGS_FILE" >&2
 
 # Strip ELECTRON_RUN_AS_NODE, commonly inherited from VS Code's integrated
 # terminal / agent runtimes; it breaks ./scripts/code.sh.

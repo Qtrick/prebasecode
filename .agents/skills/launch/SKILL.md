@@ -29,7 +29,7 @@ The clone is **slim**: workspace storage, browser caches, file history, cached V
 
 > The launcher **copies** the source profile to a temp dir and never mutates the original. Each launch gets its own isolated `--user-data-dir` and `--extensions-dir`.
 
-> The launcher always sets `files.simpleDialog.enable: true` in the launched profile's `User/settings.json`. This is required for automation: VS Code's native OS file dialogs cannot be driven via `@playwright/cli` over CDP and are completely unreachable over SSH on headless macOS. The simple (quick-input) dialog can be navigated with `press` and clipboard paste. The override is per-launch and only affects throwaway profiles.
+> **Automation-only File Dialog Override**: The launcher sets `files.simpleDialog.enable: true` by default in the throwaway profile's `User/settings.json`. This is an **automation-specific harness override** required for UI test automation: operating-system native file dialogs (such as macOS `NSOpenPanel`) cannot be driven via `@playwright/cli` over CDP and are unreachable on headless test runners. The standard PreBase desktop product and `./scripts/code.sh` use native OS dialogs by default (`files.simpleDialog.enable: false`). To launch an isolated profile with native dialogs preserved for manual testing, pass `--native-dialogs`.
 
 ## Launch
 
@@ -37,7 +37,8 @@ The launcher script lives next to this SKILL.md at `scripts/launch.sh`. Resolve 
 
 ```bash
 # LAUNCH=<dir-of-this-SKILL.md>/scripts/launch.sh
-"$LAUNCH"                                    # default: workbench
+"$LAUNCH"                                    # default: workbench (automation mode, simple dialogs)
+"$LAUNCH" --native-dialogs                   # manual inspection mode (preserves OS native dialogs)
 "$LAUNCH" --agents                           # Agents window
 "$LAUNCH" -- <workspace-path>                # forward extra args to code.sh
 "$LAUNCH" --source-user-data-dir <path>      # pick a specific authed profile

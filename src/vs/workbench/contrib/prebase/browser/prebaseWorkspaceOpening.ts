@@ -150,7 +150,7 @@ export class PreBaseWorkspaceOpeningContribution extends Disposable implements I
 		await this._closeLoadingEditors();
 
 		this._clearPending();
-		this._phase = hasFolder ? 'ready' : 'error';
+		this._phase = hasFolder ? 'ready' : 'idle';
 		void pending;
 	}
 
@@ -175,8 +175,13 @@ export class PreBaseWorkspaceOpeningContribution extends Disposable implements I
 	}
 
 	private _clearPending(): void {
-		this.storageService.remove(PREBASE_PENDING_WORKSPACE_KEY, StorageScope.APPLICATION);
+		clearPendingWorkspaceOpen(this.storageService);
 	}
+}
+
+/** Clear any stored pending workspace marker. */
+export function clearPendingWorkspaceOpen(storageService: IStorageService): void {
+	storageService.remove(PREBASE_PENDING_WORKSPACE_KEY, StorageScope.APPLICATION);
 }
 
 /** Call before hostService.openWindow / openFolder so reload shows a loading surface. */

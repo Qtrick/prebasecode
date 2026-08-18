@@ -22,7 +22,7 @@ import { ILabelService, Verbosity } from '../../../../platform/label/common/labe
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { IProductService } from '../../../../platform/product/common/productService.js';
 import { IStorageService } from '../../../../platform/storage/common/storage.js';
-import { storePendingWorkspaceOpen } from './prebaseWorkspaceOpening.js';
+import { clearPendingWorkspaceOpen, storePendingWorkspaceOpen } from './prebaseWorkspaceOpening.js';
 import { ITelemetryService } from '../../../../platform/telemetry/common/telemetry.js';
 import { IThemeService } from '../../../../platform/theme/common/themeService.js';
 import { asCssVariable } from '../../../../platform/theme/common/colorUtils.js';
@@ -219,19 +219,31 @@ export class PreBaseHomeEditor extends EditorPane {
 		row.style.gap = '8px';
 
 		if (emptyWorkbench) {
-			this._actionButton(row, localize('prebase.home.openFolder', "Open Folder"), () => {
+			this._actionButton(row, localize('prebase.home.openFolder', "Open Folder"), async () => {
 				storePendingWorkspaceOpen(this.appStorageService, {
 					label: localize('prebase.home.openFolderPending', "folder"),
 					action: 'openFolder',
 				});
-				void this.commandService.executeCommand('workbench.action.files.openFolder');
+				try {
+					await this.commandService.executeCommand('workbench.action.files.openFolder');
+				} finally {
+					if (this.workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY) {
+						clearPendingWorkspaceOpen(this.appStorageService);
+					}
+				}
 			}, true);
-			this._actionButton(row, localize('prebase.home.openWorkspace', "Open Workspace"), () => {
+			this._actionButton(row, localize('prebase.home.openWorkspace', "Open Workspace"), async () => {
 				storePendingWorkspaceOpen(this.appStorageService, {
 					label: localize('prebase.home.openWorkspacePending', "workspace"),
 					action: 'openWorkspace',
 				});
-				void this.commandService.executeCommand('workbench.action.openWorkspace');
+				try {
+					await this.commandService.executeCommand('workbench.action.openWorkspace');
+				} finally {
+					if (this.workspaceContextService.getWorkbenchState() === WorkbenchState.EMPTY) {
+						clearPendingWorkspaceOpen(this.appStorageService);
+					}
+				}
 			});
 			this._actionButton(row, localize('prebase.home.clone', "Clone Repository"), () => {
 				void this.commandService.executeCommand('git.clone');
