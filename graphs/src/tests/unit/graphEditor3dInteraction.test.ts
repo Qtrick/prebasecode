@@ -88,8 +88,23 @@ class FakeElement {
 		return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight };
 	}
 
-	getContext(): { setTransform(): void } {
-		return { setTransform() { } };
+	getContext(): any {
+		return {
+			setTransform() { },
+			save() { },
+			restore() { },
+			clearRect() { },
+			beginPath() { },
+			moveTo() { },
+			lineTo() { },
+			stroke() { },
+			fill() { },
+			arc() { },
+			fillText() { },
+			measureText() { return { width: 10 }; },
+			scale() { },
+			translate() { },
+		};
 	}
 }
 
@@ -278,5 +293,21 @@ suite('PreBase graph editor 3D interaction', () => {
 		runTimers();
 		assert.strictEqual(vm.runInContext('idlePaused', context), false);
 		assert.strictEqual(vm.runInContext('canIdleRotate()', context), true);
+	});
+
+	test('responsive stage resize shifts camera center by half delta while preserving zoom, pan, and rotation', () => {
+		const { context } = createWebviewHarness();
+		vm.runInContext("snapshot = { graphType: 'network', nodes: [{ id: 'n1' }] }; transform = { x: 100, y: 80, k: 1.5 }; rotation = { yaw: 0.4, pitch: 0.2 }; lastViewportW = 800; lastViewportH = 600;", context);
+		vm.runInContext('onStageResize(1000, 700);', context);
+
+		const t = vm.runInContext('transform', context);
+		const r = vm.runInContext('rotation', context);
+
+		// dx = (1000 - 800) / 2 = 100, dy = (700 - 600) / 2 = 50
+		assert.strictEqual(t.x, 200, 'transform.x shifted by dw/2');
+		assert.strictEqual(t.y, 130, 'transform.y shifted by dh/2');
+		assert.strictEqual(t.k, 1.5, 'zoom preserved');
+		assert.strictEqual(r.yaw, 0.4, 'yaw preserved');
+		assert.strictEqual(r.pitch, 0.2, 'pitch preserved');
 	});
 });

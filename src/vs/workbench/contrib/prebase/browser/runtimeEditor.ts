@@ -97,9 +97,9 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		const mkBtn = (label: string, onClick: () => void) => {
 			const btn = DOM.append(this._toolbar!, DOM.$('button')) as HTMLButtonElement;
 			btn.textContent = label;
-			btn.style.background = '#155e75';
-			btn.style.color = '#ecfeff';
-			btn.style.border = '1px solid #22d3ee55';
+			btn.style.background = 'var(--vscode-button-secondaryBackground, #242526)';
+			btn.style.color = 'var(--vscode-button-secondaryForeground, #f4f4f5)';
+			btn.style.border = '1px solid var(--vscode-button-border, #ffffff1a)';
 			btn.style.borderRadius = '6px';
 			btn.style.padding = '4px 10px';
 			btn.style.cursor = 'pointer';

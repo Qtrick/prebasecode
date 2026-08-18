@@ -1564,12 +1564,14 @@ export class ModelPickerWidget extends Disposable {
 			if (this._selectedModel && !noModelsAvailable && (effortConfig || tokensConfig)) {
 				const labelParts: string[] = [];
 				const ariaParts: string[] = [];
+				const isCompact = this._domNode.classList.contains('compact');
 				if (effortConfig) {
 					const enumIndex = effortConfig.schema.enum?.indexOf(effortConfig.value) ?? -1;
 					const effortLabel = enumIndex >= 0 && effortConfig.schema.enumItemLabels?.[enumIndex]
 						? effortConfig.schema.enumItemLabels[enumIndex]
 						: String(effortConfig.value);
-					labelParts.push(effortLabel);
+					const effortDisplay = (isCompact || tokensConfig) ? effortLabel : localize('chat.modelPicker.thinkingPrefix', "Thinking: {0}", effortLabel);
+					labelParts.push(effortDisplay);
 					ariaParts.push(localize('chat.modelPicker.effortAriaLabel', "Thinking Effort: {0}", effortLabel));
 				}
 				if (tokensConfig) {

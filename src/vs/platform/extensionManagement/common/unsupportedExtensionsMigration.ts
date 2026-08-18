@@ -31,7 +31,7 @@ export async function migrateUnsupportedExtensions(profile: IUserDataProfile | u
 				continue;
 			}
 			const { id: preReleaseExtensionId, autoMigrate, preRelease } = deprecated.extension;
-			if (!autoMigrate) {
+			if (!autoMigrate || areSameExtensions({ id: unsupportedExtensionId }, { id: preReleaseExtensionId })) {
 				continue;
 			}
 			const unsupportedExtension = installed.find(i => areSameExtensions(i.identifier, { id: unsupportedExtensionId }));

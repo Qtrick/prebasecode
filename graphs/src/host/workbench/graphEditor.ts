@@ -330,15 +330,16 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #legend .swatch.composition { background:#a78bfa; }
 #legend .title.spaced { margin-top:8px; }
 #empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
-#popup { position:absolute; z-index:6; width:min(380px, calc(100% - 24px)); max-height:min(480px, calc(100% - 48px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #303030); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:12px; padding:12px; box-shadow:0 16px 40px rgba(0,0,0,.45); }
-#popup h3 { margin:0 0 4px; font-size:13px; }
-#popup .meta { color:var(--vscode-descriptionForeground, #a1a1aa); font-size:11px; margin-bottom:8px; word-break:break-word; }
-#popup .label { font-size:10px; text-transform:uppercase; letter-spacing:.06em; color:var(--vscode-disabledForeground, #71717a); margin:10px 0 4px; }
-#popup p { margin:0; font-size:12px; line-height:1.45; color:var(--vscode-foreground, #f4f4f5); }
-#popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:10px; }
-#popup button { font-size:11px; border-radius:7px; border:1px solid var(--vscode-widget-border, #3C3C3C); background:var(--vscode-input-background, #303030); color:var(--vscode-foreground, #f4f4f5); padding:5px 8px; cursor:pointer; }
-#popup button.primary { border-color:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); background:var(--vscode-button-background, #2dd4bf); }
-#popup #popupClose { float:right; border:0; background:transparent; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:16px; }
+#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(340px, calc(100% - 32px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #202122); border:1px solid var(--vscode-widget-border, #2A2B2C); border-radius:9px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.28); }
+#popup h3 { margin:0 0 2px; font-size:12px; font-weight:600; }
+#popup .meta { color:var(--vscode-descriptionForeground, #a1a1aa); font-size:10.5px; margin-bottom:6px; word-break:break-word; }
+#popup .label { font-size:9.5px; font-weight:600; text-transform:none; letter-spacing:0; color:var(--vscode-descriptionForeground, #a1a1aa); margin:6px 0 2px; }
+#popup p { margin:0; font-size:11.5px; line-height:1.4; color:var(--vscode-foreground, #f4f4f5); }
+#popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+#popup button { font-size:11px; border-radius:6px; border:1px solid var(--vscode-widget-border, #2A2B2C); background:var(--vscode-input-background, #242526); color:var(--vscode-foreground, #f4f4f5); padding:4px 8px; cursor:pointer; }
+#popup button.primary { border-color:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); background:var(--vscode-button-background, #2dd4bf); font-weight:500; }
+#popup #popupClose { float:right; border:0; background:transparent; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:15px; line-height:1; cursor:pointer; padding:2px 4px; border-radius:4px; }
+#popup #popupClose:hover { color:var(--vscode-foreground, #f4f4f5); background:rgba(255,255,255,0.08); }
 .ring, .pyramid-band, .edge { pointer-events:none; }
 .ring { fill:none; opacity:.55; }
 .node-label { fill:var(--vscode-foreground, #ecfeff); font-size:10px; pointer-events:none; }
@@ -357,18 +358,17 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 </div>
 <div id="legend"></div>
 <div id="popup" role="dialog" aria-modal="false" aria-label="Node details">
-	<button id="popupClose" type="button" title="Close">×</button>
+	<button id="popupClose" type="button" title="Close" aria-label="Close details">×</button>
 	<h3 id="popupTitle"></h3>
 	<div class="meta" id="popupMeta"></div>
 	<div class="label">Overview</div>
 	<p id="popupOverview"></p>
-	<div class="label">AI Description</div>
+	<div class="label">AI Summary</div>
 	<p id="popupAi"></p>
-	<div class="ai-provenance" id="popupAiProvenance" style="display:none; margin-top:4px; font-size:10px; color:var(--vscode-descriptionForeground, #a1a1aa);"></div>
 	<div class="actions">
-		<button class="primary" id="popupOpen" type="button">Open File</button>
-		<button id="popupReveal" type="button">Reveal</button>
-		<button id="popupMagnus" type="button">Attach to Agents</button>
+		<button class="primary" id="popupOpen" type="button" title="Open File" aria-label="Open File">Open File</button>
+		<button id="popupReveal" type="button" title="Reveal in Explorer" aria-label="Reveal in Explorer">Reveal</button>
+		<button id="popupMagnus" type="button" title="Attach to Agents" aria-label="Attach to Agents">Attach to Agents</button>
 	</div>
 </div>
 <div id="toolbar">
@@ -1284,8 +1284,82 @@ window.addEventListener('keydown', function (e) {
 	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection(); }
 });
 archSvg.addEventListener('wheel', onWheel, { passive: false });
-netCanvas.addEventListener('wheel', onWheel, { passive: false });
-window.addEventListener('resize', function () { if (isNetwork()) { resizeCanvas(); dirty = true; drawNetworkFrame(); } });
+let lastViewportW = 0;
+let lastViewportH = 0;
+let resizeRafPending = false;
+
+function onStageResize(newW, newH) {
+	if (!newW || !newH) return;
+	if (lastViewportW === 0 || lastViewportH === 0) {
+		lastViewportW = newW;
+		lastViewportH = newH;
+		if (isNetwork()) resizeCanvas();
+		return;
+	}
+
+	const dw = newW - lastViewportW;
+	const dh = newH - lastViewportH;
+	lastViewportW = newW;
+	lastViewportH = newH;
+
+	if (Math.abs(dw) > 0.5 || Math.abs(dh) > 0.5) {
+		// Focal-point invariant: shift center translation by half delta to preserve centered content
+		transform.x += dw / 2;
+		transform.y += dh / 2;
+		dirty = true;
+	}
+
+	if (isNetwork()) {
+		resizeCanvas();
+	} else {
+		applyArchTransform();
+	}
+
+	// Clamp popup within new viewport bounds if open
+	if (popup && popup.style.display !== 'none') {
+		const pw = popup.offsetWidth || 320;
+		const ph = popup.offsetHeight || 220;
+		let left = parseFloat(popup.style.left) || 12;
+		let top = parseFloat(popup.style.top) || 12;
+		if (left + pw > newW - 8) left = Math.max(8, newW - pw - 8);
+		if (top + ph > newH - 8) top = Math.max(8, newH - ph - 8);
+		popup.style.left = left + 'px';
+		popup.style.top = top + 'px';
+	}
+
+	if (isNetwork() && dirty) {
+		drawNetworkFrame();
+	}
+}
+
+function scheduleResizeCheck() {
+	if (resizeRafPending) return;
+	resizeRafPending = true;
+	requestAnimationFrame(function () {
+		resizeRafPending = false;
+		const stageEl = document.getElementById('stage') || netCanvas || archSvg;
+		if (stageEl) {
+			const rect = stageEl.getBoundingClientRect();
+			onStageResize(rect.width, rect.height);
+		}
+	});
+}
+
+if (typeof ResizeObserver !== 'undefined') {
+	const stageEl = document.getElementById('stage') || document.body;
+	const observer = new ResizeObserver(function (entries) {
+		for (let i = 0; i < entries.length; i++) {
+			const entry = entries[i];
+			const cr = entry.contentRect;
+			if (cr && cr.width > 0 && cr.height > 0) {
+				scheduleResizeCheck();
+			}
+		}
+	});
+	observer.observe(stageEl);
+} else {
+	window.addEventListener('resize', scheduleResizeCheck);
+}
 
 document.getElementById('zoomIn').onclick = function () {
 	transform.k = Math.min(3.5, transform.k * 1.15); dirty = true;

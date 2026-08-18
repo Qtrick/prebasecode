@@ -27,8 +27,8 @@ export interface IGraphNodeDescriptionResult {
 	cacheHit: boolean;
 }
 
-const PROMPT_VERSION = 'v7';
-const CACHE_KEY = 'prebase.graph.descriptionCache.v7';
+const PROMPT_VERSION = 'v8';
+const CACHE_KEY = 'prebase.graph.descriptionCache.v8';
 const MAX_CACHE = 200;
 const MAX_CONTENT = 12000;
 
@@ -48,42 +48,26 @@ export function normalizeCompactDescription(rawText: string): string {
 		.replace(/\s+/g, ' ')
 		.trim();
 
-	// Remove common verbose filler prefixes if present
+	// Remove common verbose filler prefixes
 	text = text.replace(/^(This file\s+(is responsible for|provides|implements|contains|defines|serves as)\s+)/i, (match, p1, p2) => {
 		return p2.charAt(0).toUpperCase() + p2.slice(1) + ' ';
 	});
+	text = text.replace(/^(Defines TypeScript type definitions representing added|Defines TypeScript contracts for|Provides helper utilities for)\s+/i, 'Defines ');
 
 	// Split into sentences
 	const sentences = text.match(/[^.!?]+[.!?]+(\s|$)/g) || [text];
 	const trimmedSentences = sentences.map(s => s.trim()).filter(Boolean);
 
-	if (trimmedSentences.length <= 2) {
-		const words = text.split(/\s+/);
-		if (words.length <= 65) {
-			return text;
+	// Prefer first sentence
+	let first = trimmedSentences[0] || text;
+	const words = first.split(/\s+/);
+	if (words.length > 38) {
+		first = words.slice(0, 38).join(' ');
+		if (!/[.!?]$/.test(first)) {
+			first += '.';
 		}
 	}
-
-	// Prefer first 2 sentences if within bounded length
-	const firstTwo = trimmedSentences.slice(0, 2).join(' ');
-	const firstTwoWords = firstTwo.split(/\s+/);
-	if (firstTwoWords.length <= 65 && firstTwo.length > 0) {
-		return firstTwo;
-	}
-
-	// If first sentence alone is sufficient
-	const firstOne = trimmedSentences[0] || '';
-	if (firstOne.split(/\s+/).length <= 65 && firstOne.length > 0) {
-		return firstOne;
-	}
-
-	// Fallback bounding to 55 words cleanly
-	const words = text.split(/\s+/).slice(0, 55);
-	let result = words.join(' ');
-	if (!/[.!?]$/.test(result)) {
-		result += '.';
-	}
-	return result;
+	return first;
 }
 
 const SENSITIVE = /(^|\/)(\.env|\.env\..*|credentials(\.json)?|secrets?(\.json)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|\.pem|\.key|\.p12|\.pfx)(\/|$)/i;
@@ -226,9 +210,8 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		const work = (async (): Promise<IGraphNodeDescriptionResult> => {
 			try {
 				const prompt = [
-					'Write an ultra-concise 1–2 sentence description (~30–55 words) of this source file.',
-					'Sentence 1: State its concrete responsibility in the codebase.',
-					'Sentence 2: State its most important mechanism, dependency, or architectural relationship (for test files, state what behavior or regression is validated).',
+					'Write an ultra-concise 1-sentence description (~18–32 words, max 38 words) of this source file.',
+					'State its concrete responsibility and key architectural mechanism in one clear, informative sentence with no filler.',
 					'Rules: Do NOT list exhaustive export identifiers or repeat generic category overviews. Use only evidence in the supplied path, layer, imports, and content. Output plain text only without markdown formatting.',
 					`Path: ${relative}`,
 					`Layer: ${node.meta?.architectureLayer ?? 'unknown'}`,

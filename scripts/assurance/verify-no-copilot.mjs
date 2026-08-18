@@ -82,6 +82,20 @@ try {
 }
 check('First-party chat compatibility notifier is Magnus-aware with PreBase branding', chatCompatFirstParty);
 
+// 8. Extension gallery does not self-deprecate Magnus nor trigger false Copilot migration
+const galleryServicePath = path.join(REPO_ROOT, 'src', 'vs', 'platform', 'extensionManagement', 'common', 'extensionGalleryService.ts');
+const migrationPath = path.join(REPO_ROOT, 'src', 'vs', 'platform', 'extensionManagement', 'common', 'unsupportedExtensionsMigration.ts');
+let deprecationGuardsOk = false;
+try {
+	const galleryContent = fs.readFileSync(galleryServicePath, 'utf8');
+	const migrationContent = fs.readFileSync(migrationPath, 'utf8');
+	deprecationGuardsOk = galleryContent.includes('!areSameExtensions({ id: this.productService.defaultChatAgent.extensionId }, { id: this.productService.defaultChatAgent.chatExtensionId })') &&
+		migrationContent.includes('areSameExtensions({ id: unsupportedExtensionId }, { id: preReleaseExtensionId })');
+} catch (err) {
+	console.error('Failed checking extension gallery / migration guards:', err);
+}
+check('Extension Gallery and Migration services guard against self-deprecation of first-party Agent', deprecationGuardsOk);
+
 console.log('\n================================================================');
 if (failures === 0) {
 	console.log(' PREBASE COPILOT PRODUCT ISOLATION: PASS (All checks passed)');

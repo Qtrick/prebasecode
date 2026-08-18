@@ -112,4 +112,16 @@ suite('Magnus Models & Providers', () => {
 		assert.strictEqual(formatContextWindowLabel(2_000_000), '2M context window');
 		assert.strictEqual(formatContextWindowLabel(128_000), '128k context window');
 	});
+
+	test('buildMagnusLanguageModelInformation includes purpose descriptions and imageInput capability', async () => {
+		const { buildMagnusLanguageModelInformation } = await import('./modelInformation.ts');
+		const infos = buildMagnusLanguageModelInformation(true);
+		assert.ok(infos.length >= 3);
+		for (const info of infos) {
+			assert.ok(info.detail.length > 5, 'Must provide informative detail description');
+			assert.strictEqual(info.capabilities.imageInput, true, 'Must enable imageInput capability');
+			assert.strictEqual(info.capabilities.toolCalling, true, 'Must enable toolCalling capability');
+			assert.ok(info.tooltip.includes('context window'), 'Tooltip must include context window label');
+		}
+	});
 });

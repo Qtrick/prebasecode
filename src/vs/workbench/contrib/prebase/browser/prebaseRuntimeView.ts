@@ -262,9 +262,9 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		el.style.marginBottom = '6px';
 		el.style.padding = '6px 8px';
 		el.style.borderRadius = '6px';
-		el.style.border = '1px solid #334155';
-		el.style.background = '#020617';
-		el.style.color = '#e2e8f0';
+		el.style.border = '1px solid var(--vscode-sideBar-border, var(--vscode-panel-border, #2A2B2C))';
+		el.style.background = 'var(--vscode-input-background, #202122)';
+		el.style.color = 'var(--vscode-input-foreground, #f4f4f5)';
 	}
 
 	private _styleMeta(el: HTMLElement): void {
@@ -283,9 +283,9 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		btn.style.marginBottom = '4px';
 		btn.style.padding = '7px 8px';
 		btn.style.borderRadius = '6px';
-		btn.style.border = '1px solid #334155';
-		btn.style.background = '#155e75';
-		btn.style.color = '#ecfeff';
+		btn.style.border = '1px solid var(--vscode-button-border, transparent)';
+		btn.style.background = 'var(--vscode-button-background, #2dd4bf)';
+		btn.style.color = 'var(--vscode-button-foreground, #141516)';
 		btn.style.cursor = 'pointer';
 		btn.style.fontSize = '12px';
 		this._register(DOM.addDisposableListener(btn, 'click', onClick));
@@ -315,10 +315,10 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			].filter(Boolean).join('\n');
 		}
 		if (this._desktopManagedBtn) {
-			this._desktopManagedBtn.style.outline = session.desktopLaunchMode === 'managed' ? '2px solid #67e8f9' : '';
+			this._desktopManagedBtn.style.outline = session.desktopLaunchMode === 'managed' ? '2px solid var(--vscode-focusBorder, #2dd4bf)' : '';
 		}
 		if (this._desktopExternalBtn) {
-			this._desktopExternalBtn.style.outline = session.desktopLaunchMode === 'external' ? '2px solid #67e8f9' : '';
+			this._desktopExternalBtn.style.outline = session.desktopLaunchMode === 'external' ? '2px solid var(--vscode-focusBorder, #2dd4bf)' : '';
 		}
 
 		if (this._targetMeta) {

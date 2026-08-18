@@ -15,7 +15,7 @@ export interface MagnusLanguageModelInformation {
 	maxOutputTokens: number;
 	detail: string;
 	tooltip: string;
-	capabilities: { toolCalling: true; imageInput: false };
+	capabilities: { toolCalling: true; imageInput: true };
 	isDefault: boolean;
 	isUserSelectable: boolean;
 	isBYOK: boolean;
@@ -24,7 +24,7 @@ export interface MagnusLanguageModelInformation {
 
 /**
  * Produces the extension's advertised model metadata dynamically based on discovered
- * models, without claiming capabilities that the transport does not currently implement.
+ * models, with informative purpose descriptions and multimodal image input enabled.
  */
 export function buildMagnusLanguageModelInformation(
 	hasKey: boolean,
@@ -34,6 +34,7 @@ export function buildMagnusLanguageModelInformation(
 
 	return modelOptions.map((model: MagnusModelOption, index: number) => {
 		const configSchema = createThinkingLevelConfigSchema(model.reasoning);
+		const contextWindowStr = formatContextWindowLabel(model.maxInputTokens);
 		return {
 			id: model.id,
 			name: model.name,
@@ -41,11 +42,11 @@ export function buildMagnusLanguageModelInformation(
 			version: '1.0.0',
 			maxInputTokens: model.maxInputTokens,
 			maxOutputTokens: model.maxOutputTokens,
-			detail: formatContextWindowLabel(model.maxInputTokens),
+			detail: model.description || contextWindowStr,
 			tooltip: hasKey
-				? model.description
-				: `${model.description}\n\nConfigure a Gemini credential before using Agents.`,
-			capabilities: { toolCalling: true, imageInput: false },
+				? `${model.description} (${contextWindowStr})`
+				: `${model.description} (${contextWindowStr})\n\nConfigure a Gemini credential before using Agents.`,
+			capabilities: { toolCalling: true, imageInput: true },
 			isDefault: index === 0,
 			isUserSelectable: true,
 			isBYOK: true,

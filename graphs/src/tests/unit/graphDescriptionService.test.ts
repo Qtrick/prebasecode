@@ -31,11 +31,11 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		},
 	} as any;
 
-	test('normalizes descriptions to concise 1-2 sentence forms and trims filler prefixes', () => {
+	test('normalizes descriptions to concise 1-sentence forms and trims filler prefixes', () => {
 		const verbose = 'This file provides the primary editor container. It manages document models and coordinates workbench layout. In addition, it registers keybindings and handles viewport resizing.';
 		const normalized = normalizeCompactDescription(verbose);
 		assert.ok(normalized.startsWith('Provides the primary editor container.'));
-		assert.ok(normalized.includes('coordinates workbench layout.'));
+		assert.ok(!normalized.includes('coordinates workbench layout.'));
 		assert.ok(!normalized.includes('viewport resizing.'));
 
 		const markdownSample = '**PreBaseEditor** manages the `monaco` editor instance and coordinates syntax decorations.';
@@ -75,7 +75,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.ok(result.aiMessage?.includes('skipped'));
 	});
 
-	test('generates ultra-concise description with v7 prompt and returns AI provenance', async () => {
+	test('generates ultra-concise description with v8 prompt and returns AI provenance', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {
 			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
@@ -95,17 +95,17 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 						modelId: 'gemini-3.7-flash',
 						executionMode: 'byok',
 						reasoningEffort: 'low',
-						policyVersion: 'v7',
-						cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v7',
+						policyVersion: 'v8',
+						cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
 					};
 				}
 				capturedArgs = args;
 				return {
-					text: 'Manages the primary editor surface. It coordinates rendering and user actions across active panes.',
+					text: 'Manages the primary editor surface and coordinates rendering across active panes.',
 					status: 'ready',
 					providerId: 'gemini',
 					modelId: 'gemini-3.7-flash',
-					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v7',
+					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
 				};
 			},
 		} as any;
@@ -133,7 +133,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		// Assert command and prompt details
 		assert.ok(capturedCommands.includes('prebase.magnus.getDescriptionContext'));
 		assert.ok(capturedCommands.includes('prebase.magnus.describeFile'));
-		assert.ok(capturedArgs.prompt.includes('1–2 sentence description (~30–55 words)'));
+		assert.ok(capturedArgs.prompt.includes('1-sentence description'));
 		assert.ok(capturedArgs.prompt.includes('Path: src/editor.ts'));
 		assert.ok(capturedArgs.prompt.includes('Layer: workbench'));
 
@@ -151,7 +151,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 				return {
 					providerId: 'gemini',
 					modelId: 'gemini-3.7-flash',
-					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v7',
+					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
 				};
 			}
 			if (cmd === 'prebase.magnus.describeFile') {
@@ -178,7 +178,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 			remove: (key: string) => storageMap.delete(key),
 		} as any;
 
-		let currentIdentity = 'gemini:gemini-2.5-flash:description-policy-v7';
+		let currentIdentity = 'gemini:gemini-2.5-flash:description-policy-v8';
 		let describeFileCount = 0;
 
 		const mockCommandService = {
@@ -227,7 +227,7 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.equal(describeFileCount, 1);
 
 		// Third run after user switches to Gemini 3.7: identity changes -> cache miss
-		currentIdentity = 'gemini:gemini-3.7-flash:description-policy-v7';
+		currentIdentity = 'gemini:gemini-3.7-flash:description-policy-v8';
 		const res3 = await service.describeNode(node);
 		assert.equal(describeFileCount, 2, 'Should have regenerated description for new model identity');
 		assert.ok(res3.aiDescription?.includes('gemini-3.7-flash'));
@@ -250,14 +250,14 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		const mockCommandService = {
 			executeCommand: async (cmd: string) => {
 				if (cmd === 'prebase.magnus.getDescriptionContext') {
-					return { cacheIdentity: 'gemini:gemini-2.5-flash:description-policy-v7' };
+					return { cacheIdentity: 'gemini:gemini-2.5-flash:description-policy-v8' };
 				}
 				return {
 					text: 'Configuration entrypoint for Tauri host.',
 					status: 'ready',
 					providerId: 'gemini',
 					modelId: 'gemini-2.5-flash',
-					cacheIdentity: 'gemini:gemini-2.5-flash:description-policy-v7',
+					cacheIdentity: 'gemini:gemini-2.5-flash:description-policy-v8',
 				};
 			},
 		} as any;
@@ -280,9 +280,9 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.equal(result.aiStatus, 'ready');
 		assert.equal(result.aiDescription, 'Configuration entrypoint for Tauri host.');
 
-		// Cache entry stored in v7 key
-		const storedRaw = storageMap.get('prebase.graph.descriptionCache.v7');
-		assert.ok(storedRaw, 'Should store in v7 cache key');
+		// Cache entry stored in v8 key
+		const storedRaw = storageMap.get('prebase.graph.descriptionCache.v8');
+		assert.ok(storedRaw, 'Should store in v8 cache key');
 		assert.ok(storedRaw.includes('Configuration entrypoint'));
 	});
 

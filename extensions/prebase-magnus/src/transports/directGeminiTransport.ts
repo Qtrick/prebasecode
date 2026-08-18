@@ -73,10 +73,19 @@ export function classifyGeminiHttpError(err: unknown): AIProviderErrorClassifica
 		};
 	}
 
+	if (status === 503 || message.includes('503') || message.includes('high demand') || message.includes('UNAVAILABLE') || message.includes('Service Unavailable')) {
+		return {
+			code: 'providerServerError',
+			safeMessage: 'This model is currently experiencing high demand. Please retry in a moment.',
+			retryable: true,
+			httpStatus: status ?? 503,
+		};
+	}
+
 	if (status && status >= 500) {
 		return {
 			code: 'providerServerError',
-			safeMessage: `Gemini service is temporarily unavailable (HTTP ${status}).`,
+			safeMessage: 'Gemini service is temporarily unavailable. Please retry in a moment.',
 			retryable: true,
 			httpStatus: status,
 		};
