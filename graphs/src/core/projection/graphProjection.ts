@@ -32,6 +32,10 @@ export interface NodeImportance {
 
 const EmptyNodeImportance: NodeImportance = { inDegree: 0, outDegree: 0, score: 0 };
 
+function stableCompare(a: string, b: string): number {
+	return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export function projectNetworkGraph(
 	canonical: CanonicalGraphSnapshot,
 	options: NetworkProjectionOptions = {}
@@ -63,10 +67,9 @@ export function projectNetworkGraph(
 	}
 
 	const nodeIds = new Set(nodes.map(n => n.id));
-	const edges = canonical.edges
-		.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target))
-		.slice(0, maxEdges);
+	const eligibleEdges = canonical.edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target));
 
+	const edges = pickLayoutEdges(eligibleEdges, canonical.entryNodeId, maxEdges, importanceByNode);
 	const computed = computeNetworkPositions(nodes, edges, networkLayoutMode, options);
 
 	return {
@@ -119,7 +122,7 @@ export function pickLayoutNodes(
 		return { n, score: imp.score + entryBoost };
 	});
 
-	scored.sort((a, b) => b.score - a.score || a.n.id.localeCompare(b.n.id));
+	scored.sort((a, b) => b.score - a.score || stableCompare(a.n.id, b.n.id));
 	const picked = scored.slice(0, maxNodes).map(s => s.n);
 
 	if (entryNodeId && !picked.some(n => n.id === entryNodeId)) {
@@ -130,6 +133,28 @@ export function pickLayoutNodes(
 	}
 
 	return picked;
+}
+
+export function pickLayoutEdges(
+	edges: readonly GraphEdge[],
+	entryNodeId: string | null,
+	maxEdges: number,
+	importanceByNode: Map<string, NodeImportance>
+): GraphEdge[] {
+	if (edges.length <= maxEdges) {
+		return [...edges];
+	}
+
+	const scored = edges.map(e => {
+		const sourceImp = (importanceByNode.get(e.source) ?? EmptyNodeImportance).score;
+		const targetImp = (importanceByNode.get(e.target) ?? EmptyNodeImportance).score;
+		const isEntryConnection = entryNodeId && (e.source === entryNodeId || e.target === entryNodeId);
+		const score = (sourceImp + targetImp) + (isEntryConnection ? 10_000 : 0);
+		return { e, score };
+	});
+
+	scored.sort((a, b) => b.score - a.score || stableCompare(a.e.id, b.e.id));
+	return scored.slice(0, maxEdges).map(s => s.e);
 }
 
 function computeNetworkPositions(

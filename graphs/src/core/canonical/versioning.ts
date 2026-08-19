@@ -31,3 +31,17 @@ export function isAnalyzerCompatible(metadata: Partial<GraphVersionMetadata> | u
 	}
 	return metadata.analyzerVersion === GRAPH_ANALYZER_VERSION;
 }
+
+export function isComparableSnapshots(
+	a: { versions?: Partial<GraphVersionMetadata> },
+	b: { versions?: Partial<GraphVersionMetadata> }
+): boolean {
+	if (!a.versions || !b.versions) {
+		return true;
+	}
+	return (
+		a.versions.graphSchemaVersion === b.versions.graphSchemaVersion &&
+		a.versions.identityVersion === b.versions.identityVersion &&
+		a.versions.analyzerVersion === b.versions.analyzerVersion
+	);
+}

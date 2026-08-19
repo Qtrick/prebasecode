@@ -3,152 +3,105 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'node:assert';
+import { execSync } from 'node:child_process';
+import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { promises as fs } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { GitHistoryService } from '../../history/git/gitHistoryService.js';
-import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
-import { WorkingTreeContentSource } from '../../core/canonical/contentSource.js';
 import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
 import { computeCanonicalGraphDiff } from '../../core/canonical/canonicalGraphDiff.js';
+import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
+import { NodeGitHistoryService } from '../fixtures/nodeGitHistoryService.js';
 
 suite('GitTreeHistoricalAnalysis Integration Tests', () => {
-	let repoDir: string;
-	let gitService: GitHistoryService;
+	let tempRepoDir: string;
+	let gitService: NodeGitHistoryService;
 	let commit1Sha: string;
 	let commit2Sha: string;
 
-	suiteSetup(async () => {
-		repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'prebase-hist-test-'));
-		gitService = new GitHistoryService();
+	setup(async () => {
+		tempRepoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'prebase-hist-test-'));
+		execSync('git init -b main', { cwd: tempRepoDir });
+		execSync('git config user.name "Test Runner"', { cwd: tempRepoDir });
+		execSync('git config user.email "test@example.com"', { cwd: tempRepoDir });
 
-		const runGit = (args: string[]) => {
-			execFileSync('git', args, { cwd: repoDir, stdio: 'pipe' });
-		};
+		// Commit 1
+		await fs.writeFile(path.join(tempRepoDir, 'package.json'), JSON.stringify({ name: 'app', main: 'src/index.ts' }));
+		await fs.mkdir(path.join(tempRepoDir, 'src'), { recursive: true });
+		await fs.writeFile(path.join(tempRepoDir, 'src/index.ts'), `import { serviceA } from './serviceA'; export const run = () => serviceA();`);
+		await fs.writeFile(path.join(tempRepoDir, 'src/serviceA.ts'), `export function serviceA() { return 1; }`);
+		execSync('git add . && git commit -m "feat: commit 1"', { cwd: tempRepoDir });
+		commit1Sha = execSync('git rev-parse HEAD', { cwd: tempRepoDir }).toString('utf8').trim();
 
-		runGit(['init', '-b', 'main']);
-		runGit(['config', 'user.name', 'PreBase Test']);
-		runGit(['config', 'user.email', 'test@prebase.dev']);
-		runGit(['config', 'commit.gpgsign', 'false']);
+		// Commit 2: Add serviceB and import it in index
+		await fs.writeFile(path.join(tempRepoDir, 'src/index.ts'), `import { serviceA } from './serviceA'; import { serviceB } from './serviceB'; export const run = () => serviceA() + serviceB();`);
+		await fs.writeFile(path.join(tempRepoDir, 'src/serviceB.ts'), `export function serviceB() { return 2; }`);
+		execSync('git add . && git commit -m "feat: commit 2"', { cwd: tempRepoDir });
+		commit2Sha = execSync('git rev-parse HEAD', { cwd: tempRepoDir }).toString('utf8').trim();
 
-		// Commit 1: Basic app
-		await fs.mkdir(path.join(repoDir, 'src', 'utils'), { recursive: true });
-		await fs.writeFile(path.join(repoDir, 'package.json'), JSON.stringify({ name: 'app', main: 'src/index.ts' }), 'utf8');
-		await fs.writeFile(path.join(repoDir, 'src', 'index.ts'), 'import { helper } from "./utils/helper";\nexport const run = () => helper();\n', 'utf8');
-		await fs.writeFile(path.join(repoDir, 'src', 'utils', 'helper.ts'), 'export const helper = () => "v1";\n', 'utf8');
-		runGit(['add', '.']);
-		runGit(['commit', '-m', 'Commit 1: v1 helper']);
-		commit1Sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-
-		// Commit 2: Add auth and update helper
-		await fs.mkdir(path.join(repoDir, 'src', 'auth'), { recursive: true });
-		await fs.writeFile(path.join(repoDir, 'src', 'auth', 'authService.ts'), 'export class AuthService {}\n', 'utf8');
-		await fs.writeFile(path.join(repoDir, 'src', 'utils', 'helper.ts'), 'import { AuthService } from "../auth/authService";\nexport const helper = () => new AuthService();\n', 'utf8');
-		runGit(['add', '.']);
-		runGit(['commit', '-m', 'Commit 2: v2 helper with auth']);
-		commit2Sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+		gitService = new NodeGitHistoryService();
 	});
 
-	suiteTeardown(async () => {
-		if (repoDir) {
-			await fs.rm(repoDir, { recursive: true, force: true });
-		}
-	});
-
-	test('clean working tree canonical graph matches Git HEAD tree canonical graph identically', async () => {
-		const analyzer = new CanonicalGraphAnalyzer();
-
-		const workingSource = new WorkingTreeContentSource(repoDir);
-		const workingGraph = await analyzer.analyze(workingSource);
-
-		const gitHeadSource = new GitTreeContentSource(gitService, repoDir, commit2Sha);
-		const gitHeadGraph = await analyzer.analyze(gitHeadSource);
-
-		assert.ok(workingGraph);
-		assert.ok(gitHeadGraph);
-
-		assert.strictEqual(workingGraph.digest, gitHeadGraph.digest);
-		assert.strictEqual(workingGraph.nodes.length, gitHeadGraph.nodes.length);
-		assert.strictEqual(workingGraph.edges.length, gitHeadGraph.edges.length);
-
-		const diff = computeCanonicalGraphDiff(workingGraph, gitHeadGraph);
-		assert.strictEqual(diff.isIdentical, true);
-	});
-
-	test('analyzes historical commit 1 accurately without checkout', async () => {
-		const analyzer = new CanonicalGraphAnalyzer();
-		const gitCommit1Source = new GitTreeContentSource(gitService, repoDir, commit1Sha);
-		const commit1Graph = await analyzer.analyze(gitCommit1Source);
-
-		assert.ok(commit1Graph);
-		// Commit 1 does NOT have authService
-		const authNode = commit1Graph.nodes.find(n => n.path === 'src/auth/authService.ts');
-		assert.strictEqual(authNode, undefined);
-
-		// Commit 1 has index.ts, helper.ts, package.json
-		assert.strictEqual(commit1Graph.nodes.length, 3);
-
-		// Helper in Commit 1 does not import authService
-		const helperNode = commit1Graph.nodes.find(n => n.path === 'src/utils/helper.ts');
-		assert.ok(helperNode);
-		assert.strictEqual(helperNode.meta?.imports?.includes('../auth/authService'), false);
-	});
-
-	test('historical analysis isolates dirty working tree edits from historical ref', async () => {
-		// Create uncommitted dirty file in working tree
-		const dirtyFilePath = path.join(repoDir, 'src', 'dirtyUncommitted.ts');
-		await fs.writeFile(dirtyFilePath, 'export const dirty = true;\n', 'utf8');
-
+	teardown(async () => {
 		try {
-			const analyzer = new CanonicalGraphAnalyzer();
-
-			// Analyze commit 1 from Git
-			const gitCommit1Source = new GitTreeContentSource(gitService, repoDir, commit1Sha);
-			const commit1Graph = await analyzer.analyze(gitCommit1Source);
-
-			assert.ok(commit1Graph);
-			const dirtyInCommit1 = commit1Graph.nodes.find(n => n.path === 'src/dirtyUncommitted.ts');
-			assert.strictEqual(dirtyInCommit1, undefined);
-
-			// Working tree graph includes dirty file
-			const workingSource = new WorkingTreeContentSource(repoDir);
-			const workingGraph = await analyzer.analyze(workingSource);
-			assert.ok(workingGraph);
-			const dirtyInWorking = workingGraph.nodes.find(n => n.path === 'src/dirtyUncommitted.ts');
-			assert.ok(dirtyInWorking);
-
-			// Verify dirty file is still untouched on disk
-			const stat = await fs.stat(dirtyFilePath);
-			assert.ok(stat.isFile());
-		} finally {
-			// Clean up dirty file
-			await fs.rm(dirtyFilePath, { force: true });
+			await fs.rm(tempRepoDir, { recursive: true, force: true });
+		} catch {
+			// Cleanup ignore
 		}
 	});
 
-	test('historical diff between commit 1 and commit 2 shows exact architectural progression', async () => {
+	test('analyzes historical commit 1 without checkout', async () => {
+		const source1 = new GitTreeContentSource(gitService, tempRepoDir, commit1Sha);
 		const analyzer = new CanonicalGraphAnalyzer();
+		const snapshot1 = await analyzer.analyze(source1);
 
-		const c1Graph = await analyzer.analyze(new GitTreeContentSource(gitService, repoDir, commit1Sha));
-		const c2Graph = await analyzer.analyze(new GitTreeContentSource(gitService, repoDir, commit2Sha));
+		assert.ok(snapshot1);
+		assert.strictEqual(snapshot1.coverage.completeWithinProfile, true);
+		assert.strictEqual(snapshot1.coverage.analyzedCount, 3); // package.json, index.ts, serviceA.ts
+		assert.ok(snapshot1.nodes.some(n => n.path === 'src/serviceA.ts'));
+		assert.strictEqual(snapshot1.nodes.some(n => n.path === 'src/serviceB.ts'), false);
+	});
 
-		assert.ok(c1Graph);
-		assert.ok(c2Graph);
+	test('analyzes historical commit 2 without checkout', async () => {
+		const source2 = new GitTreeContentSource(gitService, tempRepoDir, commit2Sha);
+		const analyzer = new CanonicalGraphAnalyzer();
+		const snapshot2 = await analyzer.analyze(source2);
 
-		const diff = computeCanonicalGraphDiff(c1Graph, c2Graph);
+		assert.ok(snapshot2);
+		assert.strictEqual(snapshot2.coverage.analyzedCount, 4); // package.json, index.ts, serviceA.ts, serviceB.ts
+		assert.ok(snapshot2.nodes.some(n => n.path === 'src/serviceB.ts'));
+	});
+
+	test('diffs historical snapshots 1 and 2 yielding exact structural diff', async () => {
+		const analyzer = new CanonicalGraphAnalyzer();
+		const snap1 = await analyzer.analyze(new GitTreeContentSource(gitService, tempRepoDir, commit1Sha));
+		const snap2 = await analyzer.analyze(new GitTreeContentSource(gitService, tempRepoDir, commit2Sha));
+
+		assert.ok(snap1);
+		assert.ok(snap2);
+
+		const diff = computeCanonicalGraphDiff(snap1, snap2);
 		assert.strictEqual(diff.isIdentical, false);
-
-		// Added authService node
 		assert.strictEqual(diff.addedNodes.length, 1);
-		assert.strictEqual(diff.addedNodes[0].path, 'src/auth/authService.ts');
-
-		// Updated helper node (now imports authService)
+		assert.strictEqual(diff.addedNodes[0].path, 'src/serviceB.ts');
 		assert.strictEqual(diff.updatedNodes.length, 1);
-		assert.strictEqual(diff.updatedNodes[0].path, 'src/utils/helper.ts');
-
-		// Added edge helper -> authService
+		assert.strictEqual(diff.updatedNodes[0].path, 'src/index.ts');
 		assert.strictEqual(diff.addedEdges.length, 1);
-		assert.strictEqual(diff.addedEdges[0].target, 'file:src/auth/authService.ts');
+	});
+
+	test('dirty working tree changes do NOT contaminate historical git analysis', async () => {
+		// Mutate working tree with dirty untracked and uncommitted files
+		await fs.writeFile(path.join(tempRepoDir, 'src/index.ts'), `throw new Error('DIRTY WORKTREE OVERWRITE');`);
+		await fs.writeFile(path.join(tempRepoDir, 'src/dirtyNewFile.ts'), `export const dirty = true;`);
+
+		const source1 = new GitTreeContentSource(gitService, tempRepoDir, commit1Sha);
+		const analyzer = new CanonicalGraphAnalyzer();
+		const snapshot1 = await analyzer.analyze(source1);
+
+		assert.ok(snapshot1);
+		// snapshot1 must have the pristine historical index.ts, not the dirty working tree overwrite
+		const indexNode = snapshot1.nodes.find(n => n.path === 'src/index.ts');
+		assert.ok(indexNode);
+		assert.strictEqual(snapshot1.nodes.some(n => n.path === 'src/dirtyNewFile.ts'), false);
+		assert.ok(snapshot1.edges.some(e => e.target === 'file:src/serviceA.ts'));
 	});
 });

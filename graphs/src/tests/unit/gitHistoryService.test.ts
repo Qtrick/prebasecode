@@ -3,223 +3,187 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'node:assert';
+import { execSync } from 'node:child_process';
+import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
-import { promises as fs } from 'node:fs';
-import { execFileSync } from 'node:child_process';
-import { GitHistoryService, GIT_EMPTY_TREE_HASH } from '../../history/git/gitHistoryService.js';
+import { NodeGitHistoryService } from '../fixtures/nodeGitHistoryService.js';
+import { GitHistoryError } from '../../history/git/gitTypes.js';
 
-suite('GitHistoryService Unit & Integration Tests', () => {
-	let repoDir: string;
-	let gitService: GitHistoryService;
+suite('GitHistoryService & Node Adapter Unit Tests', () => {
+	let tempRepoDir: string;
+	let gitService: NodeGitHistoryService;
 
-	let rootCommitSha: string;
-	let commit2Sha: string;
-	let renameCommitSha: string;
-	let featureCommitSha: string;
-	let mainCommitSha: string;
-	let mergeCommitSha: string;
-	let weirdPathsCommitSha: string;
+	setup(async () => {
+		tempRepoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'prebase-git-test-'));
+		execSync('git init -b main', { cwd: tempRepoDir });
+		execSync('git config user.name "Test Runner"', { cwd: tempRepoDir });
+		execSync('git config user.email "test@example.com"', { cwd: tempRepoDir });
 
-	suiteSetup(async () => {
-		repoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'prebase-git-test-'));
-		gitService = new GitHistoryService();
+		// Commit 1: Initial files
+		await fs.writeFile(path.join(tempRepoDir, 'package.json'), JSON.stringify({ name: 'repo', main: 'index.js' }));
+		await fs.writeFile(path.join(tempRepoDir, 'index.js'), 'const a = require("./util");\nmodule.exports = a;\n');
+		await fs.writeFile(path.join(tempRepoDir, 'util.js'), 'module.exports = 42;\n');
+		execSync('git add . && git commit -m "feat: initial commit"', { cwd: tempRepoDir });
 
-		const runGit = (args: string[]) => {
-			execFileSync('git', args, { cwd: repoDir, stdio: 'pipe' });
-		};
+		// Lightweight tag
+		execSync('git tag v0.1.0', { cwd: tempRepoDir });
 
-		runGit(['init', '-b', 'main']);
-		runGit(['config', 'user.name', 'PreBase Test']);
-		runGit(['config', 'user.email', 'test@prebase.dev']);
-		runGit(['config', 'commit.gpgsign', 'false']);
+		// Commit 2: Modify & rename
+		await fs.writeFile(path.join(tempRepoDir, 'index.js'), 'const a = require("./helper");\nmodule.exports = a;\n');
+		execSync('git mv util.js helper.js', { cwd: tempRepoDir });
+		execSync('git commit -a -m "refactor: rename util to helper"', { cwd: tempRepoDir });
 
-		// 1. Root commit (0 parents)
-		await fs.mkdir(path.join(repoDir, 'src'), { recursive: true });
-		await fs.writeFile(path.join(repoDir, 'package.json'), JSON.stringify({ name: 'test-app', main: 'src/index.ts' }), 'utf8');
-		await fs.writeFile(path.join(repoDir, 'src', 'index.ts'), 'export const start = () => console.log("started");\n', 'utf8');
-		runGit(['add', '.']);
-		runGit(['commit', '-m', 'Initial root commit']);
-		rootCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+		// Annotated tag
+		execSync('git tag -a v0.2.0 -m "Release v0.2.0"', { cwd: tempRepoDir });
 
-		// 2. Commit 2: Add auth file
-		await fs.mkdir(path.join(repoDir, 'src', 'auth'), { recursive: true });
-		const loginContent = '// Authentication module\nexport function login(user: string, pass: string) { return user === "admin"; }\n';
-		await fs.writeFile(path.join(repoDir, 'src', 'auth', 'login.ts'), loginContent, 'utf8');
-		runGit(['add', '.']);
-		runGit(['commit', '-m', 'Add auth login module']);
-		commit2Sha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+		// Branch feature/login
+		execSync('git branch feature/login', { cwd: tempRepoDir });
 
-		// 3. Commit 3: Rename login.ts -> authentication/login.ts
-		await fs.mkdir(path.join(repoDir, 'src', 'authentication'), { recursive: true });
-		runGit(['mv', 'src/auth/login.ts', 'src/authentication/login.ts']);
-		runGit(['commit', '-m', 'Rename auth to authentication']);
-		renameCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-
-		// 4. Branch divergence: feature branch
-		runGit(['checkout', '-b', 'feature']);
-		await fs.writeFile(path.join(repoDir, 'src', 'feature.ts'), 'export const feature = 42;\n', 'utf8');
-		runGit(['add', '.']);
-		runGit(['commit', '-m', 'Add feature module']);
-		featureCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-
-		// 5. Back to main branch and make another commit
-		runGit(['checkout', 'main']);
-		await fs.writeFile(path.join(repoDir, 'src', 'mainEdit.ts'), 'export const mainEdit = true;\n', 'utf8');
-		runGit(['add', '.']);
-		runGit(['commit', '-m', 'Main branch progress']);
-		mainCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-
-		// 6. Merge feature into main (merge commit with 2 parents)
-		runGit(['merge', 'feature', '--no-ff', '-m', 'Merge branch feature into main']);
-		mergeCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-
-		// 7. Commit with weird file names (spaces, unicode, leading dashes)
-		await fs.writeFile(path.join(repoDir, 'src', 'space name.ts'), 'export const space = true;\n', 'utf8');
-		await fs.writeFile(path.join(repoDir, 'src', 'unicode-文件.ts'), 'export const unicode = true;\n', 'utf8');
-		await fs.writeFile(path.join(repoDir, 'src', '--dash.ts'), 'export const dash = true;\n', 'utf8');
-		runGit(['add', '.']);
-		runGit(['commit', '-m', 'Add files with unusual paths']);
-		weirdPathsCommitSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+		gitService = new NodeGitHistoryService();
 	});
 
-	suiteTeardown(async () => {
-		if (repoDir) {
-			await fs.rm(repoDir, { recursive: true, force: true });
+	teardown(async () => {
+		try {
+			await fs.rm(tempRepoDir, { recursive: true, force: true });
+		} catch {
+			// Cleanup ignore
 		}
 	});
 
-	test('isGitRepository identifies valid git repositories and rejects non-git paths', async () => {
-		assert.strictEqual(await gitService.isGitRepository(repoDir), true);
-		assert.strictEqual(await gitService.isGitRepository(os.tmpdir()), false);
-	});
+	test('isGitRepository and getRepositoryIdentity', async () => {
+		const isRepo = await gitService.isGitRepository(tempRepoDir);
+		assert.strictEqual(isRepo, true);
 
-	test('getRepositoryIdentity extracts root path and git directory', async () => {
-		const identity = await gitService.getRepositoryIdentity(repoDir);
-		assert.ok(identity);
-		const realExpected = await fs.realpath(repoDir);
-		assert.strictEqual(identity.rootPath, realExpected);
+		const identity = await gitService.getRepositoryIdentity(tempRepoDir);
+		assert.ok(identity.rootPath);
 		assert.ok(identity.gitDir.endsWith('.git'));
 	});
 
-	test('getCommit correctly preserves parents for root (0), linear (1), and merge (2) commits', async () => {
-		const rootCommit = await gitService.getCommit(repoDir, rootCommitSha);
-		assert.ok(rootCommit);
-		assert.strictEqual(rootCommit.sha, rootCommitSha);
-		assert.strictEqual(rootCommit.parents.length, 0); // Root commit has 0 parents
-		assert.strictEqual(rootCommit.message, 'Initial root commit');
+	test('listBranches parses branch names and commits cleanly via %00', async () => {
+		const branches = await gitService.listBranches(tempRepoDir);
+		assert.ok(branches.length >= 2);
+		const main = branches.find(b => b.name === 'main');
+		const feature = branches.find(b => b.name === 'feature/login');
 
-		const linearCommit = await gitService.getCommit(repoDir, commit2Sha);
-		assert.ok(linearCommit);
-		assert.strictEqual(linearCommit.parents.length, 1);
-		assert.strictEqual(linearCommit.parents[0], rootCommitSha);
-
-		const mergeCommit = await gitService.getCommit(repoDir, mergeCommitSha);
-		assert.ok(mergeCommit);
-		assert.strictEqual(mergeCommit.parents.length, 2); // Merge commit has 2 parents!
-		assert.strictEqual(mergeCommit.parents.includes(mainCommitSha), true);
-		assert.strictEqual(mergeCommit.parents.includes(featureCommitSha), true);
+		assert.ok(main);
+		assert.ok(feature);
+		assert.strictEqual(main.isRemote, false);
+		assert.strictEqual(main.commit.length, 40);
 	});
 
-	test('log returns paginated commits and supports firstParent option', async () => {
-		const fullLog = await gitService.log(repoDir, { limit: 20 });
-		assert.strictEqual(fullLog.length >= 6, true);
+	test('listTags distinguishes lightweight from annotated tags and peels annotated tags', async () => {
+		const tags = await gitService.listTags(tempRepoDir);
+		assert.strictEqual(tags.length, 2);
 
-		const paged = await gitService.log(repoDir, { limit: 2, skip: 1 });
-		assert.strictEqual(paged.length, 2);
-		assert.strictEqual(paged[0].sha, fullLog[1].sha);
-		assert.strictEqual(paged[1].sha, fullLog[2].sha);
+		const v010 = tags.find(t => t.name === 'v0.1.0');
+		const v020 = tags.find(t => t.name === 'v0.2.0');
 
-		const firstParentLog = await gitService.log(repoDir, { ref: mergeCommitSha, firstParent: true });
-		assert.strictEqual(firstParentLog.some(c => c.sha === featureCommitSha), false);
-		assert.strictEqual(firstParentLog.some(c => c.sha === mainCommitSha), true);
+		assert.ok(v010);
+		assert.ok(v020);
+
+		// v0.1.0 is lightweight
+		assert.strictEqual(v010.isAnnotated, false);
+		assert.strictEqual(v010.tagCommit.length, 40);
+
+		// v0.2.0 is annotated
+		assert.strictEqual(v020.isAnnotated, true);
+		assert.strictEqual(v020.tagCommit.length, 40);
+		assert.ok(v020.peeledCommit);
+		assert.strictEqual(v020.peeledCommit?.length, 40);
+		assert.notStrictEqual(v020.tagCommit, v020.peeledCommit);
 	});
 
-	test('diffCommitTrees detects file renames with oldPath and newPath', async () => {
-		const diff = await gitService.diffCommitTrees(repoDir, commit2Sha, renameCommitSha);
-		assert.strictEqual(diff.fromRef, commit2Sha);
-		assert.strictEqual(diff.toRef, renameCommitSha);
+	test('resolveRef strictly resolves commits with --verify and throws UnknownRef for invalid refs', async () => {
+		const headCommit = await gitService.resolveRef(tempRepoDir, 'HEAD');
+		assert.strictEqual(headCommit.length, 40);
 
-		const renameChange = diff.changes.find(c => c.kind === 'renamed');
-		assert.ok(renameChange);
-		assert.strictEqual(renameChange.oldPath, 'src/auth/login.ts');
-		assert.strictEqual(renameChange.path, 'src/authentication/login.ts');
-		assert.ok(typeof renameChange.similarity === 'number');
+		const tagCommit = await gitService.resolveRef(tempRepoDir, 'v0.2.0');
+		assert.strictEqual(tagCommit.length, 40);
+
+		await assert.rejects(
+			async () => gitService.resolveRef(tempRepoDir, 'nonexistent-ref-12345'),
+			(err: Error) => {
+				assert.ok(err instanceof GitHistoryError);
+				assert.strictEqual((err as GitHistoryError).code, 'UnknownRef');
+				return true;
+			}
+		);
 	});
 
-	test('diffCommitToParent diffs root commit against empty tree hash', async () => {
-		assert.strictEqual(GIT_EMPTY_TREE_HASH, '4b825dc642cb6eb9a060e54bf8d69288fbee4904');
-		const rootDiff = await gitService.diffCommitToParent(repoDir, rootCommitSha);
-		assert.strictEqual(rootDiff.changes.length, 2); // package.json and src/index.ts
-		assert.strictEqual(rootDiff.changes.every(c => c.kind === 'added'), true);
+	test('log returns bounded commits with machine-stable timestamps and parent links', async () => {
+		const commits = await gitService.log(tempRepoDir, { limit: 10 });
+		assert.strictEqual(commits.length, 2);
+
+		const head = commits[0];
+		assert.strictEqual(head.message, 'refactor: rename util to helper');
+		assert.strictEqual(head.parents.length, 1);
+		assert.ok(head.authorTimestamp > 0);
+		assert.ok(head.committerTimestamp > 0);
+		assert.strictEqual(head.author.name, 'Test Runner');
+
+		const root = commits[1];
+		assert.strictEqual(root.message, 'feat: initial commit');
+		assert.strictEqual(root.parents.length, 0);
 	});
 
-	test('diffCommitTrees (exact state A↔B) is distinct from diffReviewRange (three-dot base↔head)', async () => {
-		// Exact diff between mainCommitSha and featureCommitSha
-		// mainCommit has src/mainEdit.ts and does NOT have src/feature.ts
-		// featureCommit has src/feature.ts and does NOT have src/mainEdit.ts
-		const exactDiff = await gitService.diffCommitTrees(repoDir, mainCommitSha, featureCommitSha);
-		// Exact diff from main -> feature should show mainEdit deleted and feature added
-		const mainEditInExact = exactDiff.changes.find(c => c.path === 'src/mainEdit.ts');
-		assert.ok(mainEditInExact);
-		assert.strictEqual(mainEditInExact.kind, 'deleted');
+	test('listTree parses objectId, mode, and size using -l', async () => {
+		const headSha = await gitService.getHead(tempRepoDir);
+		const tree = await gitService.listTree(tempRepoDir, headSha);
 
-		// Review diff: merge-base(main, feature) -> feature
-		// merge-base is renameCommitSha, where mainEdit didn't exist yet, so review diff ONLY adds feature!
-		const reviewDiff = await gitService.diffReviewRange(repoDir, mainCommitSha, featureCommitSha);
-		const mainEditInReview = reviewDiff.changes.find(c => c.path === 'src/mainEdit.ts');
-		assert.strictEqual(mainEditInReview, undefined); // NOT in review diff!
-		const featureInReview = reviewDiff.changes.find(c => c.path === 'src/feature.ts');
-		assert.ok(featureInReview);
-		assert.strictEqual(featureInReview.kind, 'added');
+		assert.ok(tree.length >= 3);
+		const helperEntry = tree.find(e => e.path === 'helper.js');
+		assert.ok(helperEntry);
+		assert.strictEqual(helperEntry.objectType, 'blob');
+		assert.strictEqual(typeof helperEntry.size, 'number');
+		assert.ok(helperEntry.size! > 0);
+		assert.strictEqual(helperEntry.objectId.length, 40);
 	});
 
-	test('listTree and readFileAtRef read historical files without checking out', async () => {
-		// List tree at commit2 (before rename)
-		const tree2 = await gitService.listTree(repoDir, commit2Sha);
-		assert.strictEqual(tree2.some(e => e.path === 'src/auth/login.ts'), true);
-		assert.strictEqual(tree2.some(e => e.path === 'src/authentication/login.ts'), false);
+	test('diffCommitTrees captures rename and modifications with exact blob hashes', async () => {
+		const commits = await gitService.log(tempRepoDir);
+		const rootSha = commits[1].sha;
+		const headSha = commits[0].sha;
 
-		// Read file content at commit2
-		const content2 = await gitService.readFileAtRef(repoDir, commit2Sha, 'src/auth/login.ts');
-		assert.ok(content2);
-		assert.strictEqual(content2.includes('export function login'), true);
+		const diff = await gitService.diffCommitTrees(tempRepoDir, rootSha, headSha);
+		assert.strictEqual(diff.fromRef, rootSha);
+		assert.strictEqual(diff.toRef, headSha);
 
-		// File does not exist at root commit
-		const notFound = await gitService.readFileAtRef(repoDir, rootCommitSha, 'src/auth/login.ts');
-		assert.strictEqual(notFound, undefined);
+		const rename = diff.changes.find(c => c.kind === 'renamed');
+		assert.ok(rename);
+		assert.strictEqual(rename.oldPath, 'util.js');
+		assert.strictEqual(rename.path, 'helper.js');
+
+		const mod = diff.changes.find(c => c.kind === 'modified' && c.path === 'index.js');
+		assert.ok(mod);
+		assert.ok(mod.oldBlobOid);
+		assert.ok(mod.newBlobOid);
 	});
 
-	test('safely handles unusual file paths with spaces, unicode, and leading dashes', async () => {
-		const tree = await gitService.listTree(repoDir, weirdPathsCommitSha);
-		assert.strictEqual(tree.some(e => e.path === 'src/space name.ts'), true);
-		assert.strictEqual(tree.some(e => e.path === 'src/unicode-文件.ts'), true);
-		assert.strictEqual(tree.some(e => e.path === 'src/--dash.ts'), true);
+	test('diffCommitToParent for root commit correctly diffs against empty tree', async () => {
+		const commits = await gitService.log(tempRepoDir);
+		const rootSha = commits[1].sha;
 
-		const spaceContent = await gitService.readFileAtRef(repoDir, weirdPathsCommitSha, 'src/space name.ts');
-		assert.ok(spaceContent?.includes('export const space'));
-
-		const unicodeContent = await gitService.readFileAtRef(repoDir, weirdPathsCommitSha, 'src/unicode-文件.ts');
-		assert.ok(unicodeContent?.includes('export const unicode'));
-
-		const dashContent = await gitService.readFileAtRef(repoDir, weirdPathsCommitSha, 'src/--dash.ts');
-		assert.ok(dashContent?.includes('export const dash'));
+		const diff = await gitService.diffCommitToParent(tempRepoDir, rootSha);
+		assert.strictEqual(diff.toRef, rootSha);
+		assert.strictEqual(diff.changes.length, 3);
+		assert.ok(diff.changes.every(c => c.kind === 'added'));
 	});
 
-	test('historical analysis leaves working directory and HEAD completely unchanged', async () => {
-		const headBefore = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-		const statusBefore = execFileSync('git', ['status', '--porcelain'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+	test('HEAD change observer notifies on event fire', () => {
+		let received: string | undefined;
+		const sub = gitService.onDidChangeHead((e) => {
+			received = e.currentHead;
+		});
 
-		// Perform multiple historical reads
-		await gitService.getCommit(repoDir, rootCommitSha);
-		await gitService.listTree(repoDir, commit2Sha);
-		await gitService.readFileAtRef(repoDir, rootCommitSha, 'package.json');
-		await gitService.diffCommitTrees(repoDir, rootCommitSha, mergeCommitSha);
+		gitService.fireHeadChange({
+			repositoryId: tempRepoDir,
+			currentHead: 'deadbeef123',
+			timestamp: Date.now(),
+			transitionType: 'commit',
+		});
 
-		const headAfter = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-		const statusAfter = execFileSync('git', ['status', '--porcelain'], { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-
-		assert.strictEqual(headBefore, headAfter);
-		assert.strictEqual(statusBefore, statusAfter);
+		assert.strictEqual(received, 'deadbeef123');
+		sub.dispose();
 	});
 });

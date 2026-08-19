@@ -2,6 +2,32 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
+export type GitHistoryErrorCode =
+	| 'UnknownRef'
+	| 'Cancelled'
+	| 'Timeout'
+	| 'BufferLimit'
+	| 'RepositoryUnavailable'
+	| 'ObjectUnavailable'
+	| 'ProcessFailure'
+	| 'ParseFailure';
+
+export class GitHistoryError extends Error {
+	readonly code: GitHistoryErrorCode;
+	readonly details?: string;
+
+	constructor(
+		code: GitHistoryErrorCode,
+		message: string,
+		details?: string
+	) {
+		super(`[GitHistoryError:${code}] ${message}${details ? ` (${details})` : ''}`);
+		this.name = 'GitHistoryError';
+		this.code = code;
+		this.details = details;
+	}
+}
+
 export interface GitSignature {
 	readonly name: string;
 	readonly email: string;
@@ -13,8 +39,9 @@ export interface GitCommitMetadata {
 	readonly parents: readonly string[];
 	readonly author: GitSignature;
 	readonly committer: GitSignature;
+	readonly authorTimestamp: number;
+	readonly committerTimestamp: number;
 	readonly message: string;
-	readonly timestamp: number;
 }
 
 export interface GitRepositoryIdentity {
@@ -28,7 +55,8 @@ export type GitObjectType = 'blob' | 'tree' | 'commit' | 'tag';
 
 export interface GitTreeEntry {
 	readonly path: string;
-	readonly blobOid: string;
+	readonly objectId: string;
+	readonly blobOid?: string;
 	readonly mode: string;
 	readonly objectType: GitObjectType;
 	readonly size?: number;
@@ -51,11 +79,14 @@ export interface GitExactDiffResult {
 	readonly changes: readonly GitExactDiffChange[];
 }
 
+export type GitHeadTransitionType = 'commit' | 'checkout' | 'reset' | 'branch-switch' | 'external';
+
 export interface GitHeadChangeEvent {
 	readonly repositoryId: string;
 	readonly previousHead?: string;
 	readonly currentHead: string;
 	readonly timestamp: number;
+	readonly transitionType?: GitHeadTransitionType;
 }
 
 export interface GitLogOptions {
@@ -66,8 +97,17 @@ export interface GitLogOptions {
 	readonly path?: string;
 }
 
-export interface GitRefInfo {
+export interface GitBranchInfo {
 	readonly name: string;
 	readonly commit: string;
-	readonly type: 'branch' | 'tag' | 'head';
+	readonly isRemote: boolean;
 }
+
+export interface GitTagInfo {
+	readonly name: string;
+	readonly tagCommit: string;
+	readonly peeledCommit?: string;
+	readonly isAnnotated: boolean;
+}
+
+export type GitRefInfo = GitBranchInfo | GitTagInfo;

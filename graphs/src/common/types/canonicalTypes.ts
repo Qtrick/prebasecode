@@ -11,18 +11,51 @@ export interface GraphVersionMetadata {
 	readonly layoutVersion: number;
 }
 
+export type CanonicalExclusionCode =
+	| 'oversized-file'
+	| 'binary-file'
+	| 'unsupported-language'
+	| 'parse-error'
+	| 'permission-denied'
+	| 'ignored-pattern'
+	| 'policy-excluded'
+	| 'other';
+
 export interface CanonicalExclusionRecord {
 	readonly path: string;
-	readonly reason: 'unsupported-language' | 'oversized-file' | 'binary' | 'parse-error' | 'permission-denied' | 'ignored-pattern' | 'other';
+	readonly reason: CanonicalExclusionCode;
 	readonly message?: string;
 }
 
-export interface CanonicalCompleteness {
-	readonly isComplete: boolean;
-	readonly analyzedFileCount: number;
-	readonly excludedFileCount: number;
-	readonly exclusionReasons: Record<string, number>;
+export interface CanonicalCoverage {
+	readonly completeWithinProfile: boolean;
+	readonly isComplete: boolean; // Alias for backward compatibility
+	readonly discoveredCount: number;
+	readonly analyzedCount: number;
+	readonly analyzedFileCount: number; // Alias for backward compatibility
+	readonly excludedCount: number;
+	readonly excludedFileCount: number; // Alias for backward compatibility
+	readonly failedCount: number;
+	readonly truncated: boolean;
+	readonly truncationReason?: string;
+	readonly exclusionBreakdown: Record<CanonicalExclusionCode, number>;
+	readonly exclusionReasons: Record<string, number>; // Alias for backward compatibility
 	readonly skippedFiles?: readonly string[];
+}
+
+export type CanonicalCompleteness = CanonicalCoverage;
+
+export interface AnalysisManifestEntry {
+	readonly path: string;
+	readonly contentIdentity?: string;
+	readonly size?: number;
+	readonly analyzedAt: number;
+	readonly isComponent: boolean;
+	readonly architectureLayer?: string;
+}
+
+export interface AnalysisManifest {
+	readonly entries: readonly AnalysisManifestEntry[];
 }
 
 export interface CanonicalGraphSnapshot {
@@ -35,7 +68,9 @@ export interface CanonicalGraphSnapshot {
 	readonly sourceIdentity: string;
 	readonly digest: string;
 	readonly versions: GraphVersionMetadata;
-	readonly completeness: CanonicalCompleteness;
+	readonly coverage: CanonicalCoverage;
+	readonly completeness: CanonicalCoverage;
+	readonly manifest?: AnalysisManifest;
 }
 
 export interface CanonicalAnalysisOptions {

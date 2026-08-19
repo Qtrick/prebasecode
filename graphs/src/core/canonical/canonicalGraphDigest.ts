@@ -2,60 +2,44 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import { createHash } from 'node:crypto';
 import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js';
+import { computePureSha256 } from './pureSha256.js';
 
-export interface StructuralDigestPayload {
+export interface CanonicalGraphStructuralPayload {
 	readonly nodes: readonly GraphNode[];
 	readonly edges: readonly GraphEdge[];
 	readonly entryNodeId: string | null;
 }
 
-export function computeCanonicalGraphDigest(payload: StructuralDigestPayload): string {
-	const normalizedNodes = [...payload.nodes]
-		.sort((a, b) => a.id.localeCompare(b.id))
-		.map(node => ({
-			id: node.id,
-			kind: node.kind,
-			label: node.label,
-			path: node.path ? normalizeDigestPath(node.path) : undefined,
-			parentId: node.parentId,
-			isEntry: !!node.isEntry,
-			meta: node.meta ? {
-				architectureLayer: node.meta.architectureLayer,
-				language: node.meta.language,
-				isComponent: node.meta.isComponent,
-				isMetadata: node.meta.isMetadata,
-				imports: node.meta.imports ? [...node.meta.imports].sort() : undefined,
-				exports: node.meta.exports ? [...node.meta.exports].sort() : undefined,
-			} : undefined
-		}));
-
-	const normalizedEdges = [...payload.edges]
-		.sort((a, b) => a.id.localeCompare(b.id))
-		.map(edge => ({
-			id: edge.id,
-			source: edge.source,
-			target: edge.target,
-			kind: edge.kind,
-			meta: edge.meta ? {
-				importSource: edge.meta.importSource,
-				specifiers: edge.meta.specifiers ? [...edge.meta.specifiers].sort() : undefined,
-				isDefault: edge.meta.isDefault,
-				isDynamic: edge.meta.isDynamic,
-			} : undefined
-		}));
-
-	const normalizedData = {
-		entryNodeId: payload.entryNodeId,
-		nodes: normalizedNodes,
-		edges: normalizedEdges,
-	};
-
-	const json = JSON.stringify(normalizedData);
-	return createHash('sha256').update(json, 'utf8').digest('hex');
+function stableCompare(a: string, b: string): number {
+	return a < b ? -1 : a > b ? 1 : 0;
 }
 
-function normalizeDigestPath(rawPath: string): string {
-	return rawPath.replace(/\\/g, '/').replace(/^\/+/, '');
+export function computeCanonicalGraphDigest(payload: CanonicalGraphStructuralPayload): string {
+	const sortedNodes = [...payload.nodes].sort((a, b) => stableCompare(a.id, b.id));
+	const sortedEdges = [...payload.edges].sort((a, b) => stableCompare(a.id, b.id));
+
+	const normalized = {
+		entryNodeId: payload.entryNodeId,
+		nodes: sortedNodes.map(n => ({
+			id: n.id,
+			kind: n.kind,
+			path: n.path,
+			isEntry: !!n.isEntry,
+			architectureLayer: n.meta?.architectureLayer ?? null,
+			language: n.meta?.language ?? null,
+			exports: n.meta?.exports ? [...n.meta.exports].sort(stableCompare) : [],
+			imports: n.meta?.imports ? [...n.meta.imports].sort(stableCompare) : [],
+		})),
+		edges: sortedEdges.map(e => ({
+			id: e.id,
+			source: e.source,
+			target: e.target,
+			kind: e.kind,
+			specifiers: e.meta?.specifiers ? [...e.meta.specifiers].sort(stableCompare) : [],
+		})),
+	};
+
+	const serialized = JSON.stringify(normalized);
+	return computePureSha256(serialized);
 }

@@ -2,8 +2,9 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import type { CanonicalGraphSnapshot } from '../../common/types/canonicalTypes.js';
+import type { CanonicalGraphSnapshot, GraphVersionMetadata } from '../../common/types/canonicalTypes.js';
 import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js';
+import { isComparableSnapshots } from './versioning.js';
 
 export interface CanonicalGraphDiff {
 	readonly addedNodes: readonly GraphNode[];
@@ -15,12 +16,32 @@ export interface CanonicalGraphDiff {
 	readonly isIdentical: boolean;
 	readonly oldDigest: string;
 	readonly newDigest: string;
+	readonly isIncompatible?: boolean;
+}
+
+function stableCompare(a: string, b: string): number {
+	return a < b ? -1 : a > b ? 1 : 0;
 }
 
 export function computeCanonicalGraphDiff(
-	oldSnapshot: Pick<CanonicalGraphSnapshot, 'nodes' | 'edges' | 'digest'>,
-	newSnapshot: Pick<CanonicalGraphSnapshot, 'nodes' | 'edges' | 'digest'>
+	oldSnapshot: Pick<CanonicalGraphSnapshot, 'nodes' | 'edges' | 'digest'> & { versions?: Partial<GraphVersionMetadata> },
+	newSnapshot: Pick<CanonicalGraphSnapshot, 'nodes' | 'edges' | 'digest'> & { versions?: Partial<GraphVersionMetadata> }
 ): CanonicalGraphDiff {
+	if (!isComparableSnapshots(oldSnapshot, newSnapshot)) {
+		return {
+			addedNodes: [],
+			removedNodeIds: [],
+			updatedNodes: [],
+			addedEdges: [],
+			removedEdgeIds: [],
+			updatedEdges: [],
+			isIdentical: false,
+			oldDigest: oldSnapshot.digest,
+			newDigest: newSnapshot.digest,
+			isIncompatible: true,
+		};
+	}
+
 	const oldNodeMap = new Map<string, GraphNode>();
 	for (const node of oldSnapshot.nodes) {
 		oldNodeMap.set(node.id, node);
@@ -176,8 +197,8 @@ function areStringArraysEqual(a?: readonly string[], b?: readonly string[]): boo
 	if (a.length !== b.length) {
 		return false;
 	}
-	const sortedA = [...a].sort();
-	const sortedB = [...b].sort();
+	const sortedA = [...a].sort(stableCompare);
+	const sortedB = [...b].sort(stableCompare);
 	for (let i = 0; i < sortedA.length; i++) {
 		if (sortedA[i] !== sortedB[i]) {
 			return false;

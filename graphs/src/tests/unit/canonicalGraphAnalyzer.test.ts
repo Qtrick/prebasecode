@@ -48,7 +48,7 @@ class InMemoryContentSource implements IRepositoryContentSource {
 	}
 
 	async getContentIdentity(relativePath: string): Promise<string | undefined> {
-		return `hash:${relativePath}`;
+		return `oid:${relativePath}`;
 	}
 
 	async readPackageMain(): Promise<string | null> {
@@ -64,7 +64,7 @@ class InMemoryContentSource implements IRepositoryContentSource {
 }
 
 suite('CanonicalGraphAnalyzer Unit Tests', () => {
-	test('analyzes full repository into CanonicalGraphSnapshot with deterministic digest and versions', async () => {
+	test('analyzes full repository with ParserEngine AST parity, manifest, and deterministic digest', async () => {
 		const source = new InMemoryContentSource('/workspace', {
 			'package.json': JSON.stringify({ name: 'my-app', main: 'src/index.ts' }),
 			'src/index.ts': `import { helper } from './utils/helper'; export const main = () => helper();`,
@@ -82,10 +82,11 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		assert.strictEqual(snapshot.versions.graphSchemaVersion, 1);
 		assert.strictEqual(snapshot.versions.analyzerVersion, 1);
 
-		// Completeness check
-		assert.strictEqual(snapshot.completeness.isComplete, true);
-		assert.strictEqual(snapshot.completeness.analyzedFileCount, 5);
-		assert.strictEqual(snapshot.completeness.excludedFileCount, 0);
+		// Truthful coverage check
+		assert.strictEqual(snapshot.coverage.completeWithinProfile, true);
+		assert.strictEqual(snapshot.coverage.analyzedCount, 5);
+		assert.strictEqual(snapshot.coverage.excludedCount, 0);
+		assert.strictEqual(snapshot.coverage.truncated, false);
 
 		// Architecture layers
 		const headerNode = snapshot.nodes.find(n => n.path === 'src/components/Header.tsx');
@@ -100,6 +101,14 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		// Entry node detection
 		assert.strictEqual(snapshot.entryNodeId, 'file:src/index.ts');
 
+		// Analysis manifest
+		assert.ok(snapshot.manifest);
+		assert.strictEqual(snapshot.manifest.entries.length, 5);
+		const headerManifest = snapshot.manifest.entries.find(e => e.path === 'src/components/Header.tsx');
+		assert.ok(headerManifest);
+		assert.strictEqual(headerManifest.isComponent, true);
+		assert.strictEqual(headerManifest.contentIdentity, 'oid:src/components/Header.tsx');
+
 		// Digest determinism
 		const digest1 = snapshot.digest;
 		assert.strictEqual(typeof digest1, 'string');
@@ -109,28 +118,83 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		assert.strictEqual(snapshot2?.digest, digest1);
 	});
 
-	test('handles large synthetic repository (1,500 files) without truncation in canonical model', async () => {
-		const files: Record<string, string> = {
-			'package.json': JSON.stringify({ name: 'huge-app', main: 'src/file0.ts' }),
-		};
+	test('ParserEngine strips code-like comments and strings, preventing false structural history', async () => {
+		const source1 = new InMemoryContentSource('/workspace', {
+			'src/api.ts': `
+				// export const FakeDeprecatedExport = 42;
+				/* export function oldLegacyFunction() {} */
+				const message = "export const FakeInString = true";
+				export function realApi() { return message; }
+			`,
+		});
 
-		for (let i = 0; i < 1500; i++) {
-			const target = (i + 1) % 1500;
-			files[`src/file${i}.ts`] = `import { f${target} } from './file${target}'; export const f${i} = ${i};`;
-		}
+		const source2 = new InMemoryContentSource('/workspace', {
+			'src/api.ts': `
+				// modified comment that was changed in commit B
+				/* another comment */
+				const message = "export const FakeInString = true";
+				export function realApi() { return message; }
+			`,
+		});
 
-		const source = new InMemoryContentSource('/huge-workspace', files);
-		const analyzer = new CanonicalGraphAnalyzer({ maxCanonicalFiles: 5000 });
+		const analyzer = new CanonicalGraphAnalyzer();
+		const snap1 = await analyzer.analyze(source1);
+		const snap2 = await analyzer.analyze(source2);
+
+		assert.ok(snap1);
+		assert.ok(snap2);
+
+		const node1 = snap1.nodes.find(n => n.path === 'src/api.ts');
+		const node2 = snap2.nodes.find(n => n.path === 'src/api.ts');
+		assert.ok(node1);
+		assert.ok(node2);
+
+		// Only realApi should be an export; commented exports must NOT exist
+		assert.deepStrictEqual(node1.meta?.exports, ['realApi']);
+		assert.deepStrictEqual(node2.meta?.exports, ['realApi']);
+
+		// Digest must match identically because comment change is NOT a structural change!
+		assert.strictEqual(snap1.digest, snap2.digest);
+	});
+
+	test('classifies Vue and Svelte files as components via ParserEngine fallback', async () => {
+		const source = new InMemoryContentSource('/workspace', {
+			'src/App.vue': `<template><div>Vue</div></template><script>import Header from './Header.vue'; export default {};</script>`,
+			'src/Button.svelte': `<script>export let label = '';</script><button>{label}</button>`,
+		});
+
+		const analyzer = new CanonicalGraphAnalyzer();
 		const snapshot = await analyzer.analyze(source);
 
 		assert.ok(snapshot);
-		assert.strictEqual(snapshot.completeness.analyzedFileCount, 1501);
-		assert.strictEqual(snapshot.nodes.length >= 1500, true);
-		assert.strictEqual(snapshot.edges.length >= 1500, true);
-		assert.strictEqual(snapshot.completeness.isComplete, true);
+		const vueNode = snapshot.nodes.find(n => n.path === 'src/App.vue');
+		const svelteNode = snapshot.nodes.find(n => n.path === 'src/Button.svelte');
+
+		assert.ok(vueNode);
+		assert.ok(svelteNode);
+		assert.strictEqual(vueNode.kind, 'component');
+		assert.strictEqual(svelteNode.kind, 'component');
 	});
 
-	test('safely excludes oversized files, binary files, and parse errors with explicit completeness report', async () => {
+	test('explicitly marks truncation and incomplete coverage when exceeding maxCanonicalFiles', async () => {
+		const files: Record<string, string> = {};
+		for (let i = 0; i < 50; i++) {
+			files[`src/file${i}.ts`] = `export const f${i} = ${i};`;
+		}
+
+		const source = new InMemoryContentSource('/workspace', files);
+		const analyzer = new CanonicalGraphAnalyzer({ maxCanonicalFiles: 20 });
+		const snapshot = await analyzer.analyze(source);
+
+		assert.ok(snapshot);
+		assert.strictEqual(snapshot.coverage.discoveredCount, 50);
+		assert.strictEqual(snapshot.coverage.analyzedCount, 20);
+		assert.strictEqual(snapshot.coverage.truncated, true);
+		assert.strictEqual(snapshot.coverage.completeWithinProfile, false);
+		assert.ok(snapshot.coverage.truncationReason?.includes('20'));
+	});
+
+	test('safely excludes oversized and binary files with typed exclusion breakdown', async () => {
 		const binaryBuffer = String.fromCharCode(0, 1, 2, 3, 0, 4, 5);
 		const oversizedContent = 'export const big = 1;\n'.repeat(30_000); // > 500KB
 
@@ -144,16 +208,11 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		const snapshot = await analyzer.analyze(source);
 
 		assert.ok(snapshot);
-		assert.strictEqual(snapshot.completeness.isComplete, false);
-		assert.strictEqual(snapshot.completeness.analyzedFileCount, 1);
-		assert.strictEqual(snapshot.completeness.excludedFileCount, 2);
-		assert.ok(snapshot.completeness.exclusionReasons['oversized-file'] >= 1);
-		assert.ok(snapshot.completeness.exclusionReasons['binary-file'] >= 1);
-
-		const normalNode = snapshot.nodes.find(n => n.path === 'src/normal.ts');
-		assert.ok(normalNode);
-		const oversizedNode = snapshot.nodes.find(n => n.path === 'src/oversized.ts');
-		assert.strictEqual(oversizedNode, undefined);
+		assert.strictEqual(snapshot.coverage.completeWithinProfile, true);
+		assert.strictEqual(snapshot.coverage.analyzedCount, 1);
+		assert.strictEqual(snapshot.coverage.excludedCount, 2);
+		assert.strictEqual(snapshot.coverage.exclusionBreakdown['oversized-file'], 1);
+		assert.strictEqual(snapshot.coverage.exclusionBreakdown['binary-file'], 1);
 	});
 
 	test('respects cancellation cleanly without publishing corrupted partial graph', async () => {
@@ -172,13 +231,12 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 			}
 		};
 
-		// Cancel immediately
 		cancelRequested = true;
 		const result = await analyzer.analyze(source, token);
 		assert.strictEqual(result, undefined);
 	});
 
-	test('structural digest is invariant to node ordering in input', async () => {
+	test('structural digest is invariant to node and edge ordering in input', async () => {
 		const nodes1 = [
 			{ id: 'file:b.ts', kind: 'file' as const, label: 'b.ts', path: 'src/b.ts' },
 			{ id: 'file:a.ts', kind: 'file' as const, label: 'a.ts', path: 'src/a.ts' },

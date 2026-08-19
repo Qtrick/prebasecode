@@ -2,8 +2,6 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import { promises as fs } from 'node:fs';
-import * as path from 'node:path';
 import type { ScannedFile } from '../../common/types/graphTypes.js';
 import { DEFAULT_IGNORE_PATTERNS } from '../scanning/ignorePatterns.js';
 import { isGraphRelevantFile } from '../scanning/projectFiles.js';
@@ -28,13 +26,14 @@ export interface IRepositoryContentSource {
 export interface WorkingTreeFileOps {
 	readFile(filePath: string): Promise<string>;
 	readDirectory?(dirPath: string): Promise<Array<{ name: string; isDirectory: boolean }>>;
+	getFileSize?(filePath: string): Promise<number | undefined>;
 }
 
 export interface WorkingTreeContentSourceOptions {
 	readonly maxScanFiles?: number;
 	readonly respectGitIgnore?: boolean;
 	readonly customIgnorePatterns?: readonly string[];
-	readonly fileOps?: WorkingTreeFileOps;
+	readonly fileOps: WorkingTreeFileOps;
 	readonly projectName?: string;
 }
 
@@ -48,29 +47,27 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 	private readonly _customIgnorePatterns: readonly string[];
 	private readonly _fileOps: WorkingTreeFileOps;
 
-	constructor(rootPath: string, options: WorkingTreeContentSourceOptions = {}) {
+	constructor(rootPath: string, options: WorkingTreeContentSourceOptions) {
 		this.rootPath = normalizePath(rootPath).replace(/\/+$/, '');
 		this.projectName = options.projectName || basename(this.rootPath) || 'workspace';
 		this.identity = `working-tree:${this.rootPath}`;
 		this._maxScanFiles = options.maxScanFiles ?? 10_000;
 		this._respectGitIgnore = options.respectGitIgnore !== false;
 		this._customIgnorePatterns = options.customIgnorePatterns ?? [];
-		this._fileOps = options.fileOps ?? {
-			readFile: async (p: string) => fs.readFile(p, 'utf8'),
-			readDirectory: async (p: string) => {
-				const entries = await fs.readdir(p, { withFileTypes: true });
-				return entries.map((e: { name: string; isDirectory: () => boolean }) => ({ name: e.name, isDirectory: e.isDirectory() }));
-			}
-		};
+		this._fileOps = options.fileOps;
 	}
 
 	async listFiles(token?: CancellationTokenLike): Promise<ScannedFile[]> {
+		if (!this._fileOps.readDirectory) {
+			return [];
+		}
+
 		const files: ScannedFile[] = [];
 		let ignorePatterns = [...DEFAULT_IGNORE_PATTERNS, ...this._customIgnorePatterns];
 
 		if (this._respectGitIgnore) {
 			try {
-				const gitignorePath = path.join(this.rootPath, '.gitignore');
+				const gitignorePath = `${this.rootPath}/.gitignore`;
 				const content = await this._fileOps.readFile(gitignorePath);
 				const extra = content
 					.split('\n')
@@ -91,12 +88,7 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 			const currentDir = queue[queueIndex];
 			let entries: Array<{ name: string; isDirectory: boolean }>;
 			try {
-				if (this._fileOps.readDirectory) {
-					entries = await this._fileOps.readDirectory(currentDir);
-				} else {
-					const raw = await fs.readdir(currentDir, { withFileTypes: true });
-					entries = raw.map((e: { name: string; isDirectory: () => boolean }) => ({ name: e.name, isDirectory: e.isDirectory() }));
-				}
+				entries = await this._fileOps.readDirectory(currentDir);
 			} catch {
 				continue;
 			}
@@ -105,8 +97,8 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 				if (files.length >= this._maxScanFiles || token?.isCancellationRequested) {
 					break;
 				}
-				const fullPath = path.join(currentDir, entry.name);
-				const relPath = normalizePath(path.relative(this.rootPath, fullPath));
+				const fullPath = `${currentDir}/${entry.name}`;
+				const relPath = normalizePath(fullPath.slice(this.rootPath.length + 1));
 
 				if (this._isIgnored(relPath, entry.isDirectory, ignorePatterns)) {
 					continue;
@@ -136,9 +128,9 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 
 	async readFile(relativePath: string, _token?: CancellationTokenLike): Promise<string | undefined> {
 		try {
-			const fullPath = path.isAbsolute(relativePath)
+			const fullPath = relativePath.startsWith('/')
 				? relativePath
-				: path.join(this.rootPath, relativePath);
+				: `${this.rootPath}/${relativePath}`;
 			return await this._fileOps.readFile(fullPath);
 		} catch {
 			return undefined;
@@ -146,12 +138,14 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 	}
 
 	async getFileSize(relativePath: string): Promise<number | undefined> {
+		if (!this._fileOps.getFileSize) {
+			return undefined;
+		}
 		try {
-			const fullPath = path.isAbsolute(relativePath)
+			const fullPath = relativePath.startsWith('/')
 				? relativePath
-				: path.join(this.rootPath, relativePath);
-			const stat = await fs.stat(fullPath);
-			return stat.size;
+				: `${this.rootPath}/${relativePath}`;
+			return await this._fileOps.getFileSize(fullPath);
 		} catch {
 			return undefined;
 		}

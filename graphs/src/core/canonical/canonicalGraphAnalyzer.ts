@@ -3,15 +3,18 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type {
+	AnalysisManifest,
+	AnalysisManifestEntry,
 	CanonicalAnalysisOptions,
-	CanonicalCompleteness,
+	CanonicalCoverage,
+	CanonicalExclusionCode,
 	CanonicalGraphSnapshot,
 } from '../../common/types/canonicalTypes.js';
 import type { GraphEdge, GraphNode, ParseResult, ScannedFile } from '../../common/types/graphTypes.js';
 import { assignLayersToNodes } from '../analysis/architectureLayers.js';
 import { detectEntryNodeId } from '../analysis/entryDetector.js';
 import { GraphGenerator } from '../generation/graphGenerator.js';
-import { extractImportsForFile, extractPackageName } from '../parsing/importExtractors.js';
+import { ParserEngine } from '../parsing/parserEngine.js';
 import { computeCanonicalGraphDigest } from './canonicalGraphDigest.js';
 import type { CancellationTokenLike, IRepositoryContentSource } from './contentSource.js';
 import { createCurrentVersionMetadata } from './versioning.js';
@@ -19,17 +22,23 @@ import { createCurrentVersionMetadata } from './versioning.js';
 const DEFAULT_MAX_CANONICAL_FILES = 10_000;
 const DEFAULT_MAX_FILE_SIZE_BYTES = 500_000;
 
+function stableCompare(a: string, b: string): number {
+	return a < b ? -1 : a > b ? 1 : 0;
+}
+
 export class CanonicalGraphAnalyzer {
 	private readonly _maxCanonicalFiles: number;
 	private readonly _maxFileSizeBytes: number;
 	private readonly _includeFolders: boolean;
 	private readonly _includeFunctions: boolean;
+	private readonly _parserEngine: ParserEngine;
 
 	constructor(options: CanonicalAnalysisOptions = {}) {
 		this._maxCanonicalFiles = options.maxCanonicalFiles ?? DEFAULT_MAX_CANONICAL_FILES;
 		this._maxFileSizeBytes = options.maxFileSizeBytes ?? DEFAULT_MAX_FILE_SIZE_BYTES;
 		this._includeFolders = options.includeFolders ?? false;
 		this._includeFunctions = options.includeFunctions ?? false;
+		this._parserEngine = new ParserEngine();
 	}
 
 	async analyze(
@@ -45,19 +54,34 @@ export class CanonicalGraphAnalyzer {
 			return undefined;
 		}
 
+		const isTruncated = rawFiles.length > this._maxCanonicalFiles;
 		const files = rawFiles.slice(0, this._maxCanonicalFiles);
 
-		const exclusionReasons: Record<string, number> = {};
+		const exclusionBreakdown: Record<CanonicalExclusionCode, number> = {
+			'oversized-file': 0,
+			'binary-file': 0,
+			'unsupported-language': 0,
+			'parse-error': 0,
+			'permission-denied': 0,
+			'ignored-pattern': 0,
+			'policy-excluded': 0,
+			'other': 0,
+		};
 		const skippedFiles: string[] = [];
+		let failedCount = 0;
 
-		const recordExclusion = (path: string, reason: string) => {
-			exclusionReasons[reason] = (exclusionReasons[reason] ?? 0) + 1;
+		const recordExclusion = (path: string, code: CanonicalExclusionCode) => {
+			exclusionBreakdown[code] = (exclusionBreakdown[code] ?? 0) + 1;
+			if (code === 'parse-error') {
+				failedCount++;
+			}
 			if (skippedFiles.length < 50) {
 				skippedFiles.push(path);
 			}
 		};
 
 		const parseResults: ParseResult[] = [];
+		const manifestEntries: AnalysisManifestEntry[] = [];
 		const batchSize = 16;
 
 		for (let i = 0; i < files.length; i += batchSize) {
@@ -68,9 +92,10 @@ export class CanonicalGraphAnalyzer {
 			const parsedBatch = await Promise.all(
 				batch.map(file => this._parseSingleFile(contentSource, file, recordExclusion, token))
 			);
-			for (const result of parsedBatch) {
-				if (result) {
-					parseResults.push(result);
+			for (const item of parsedBatch) {
+				if (item) {
+					parseResults.push(item.parseResult);
+					manifestEntries.push(item.manifestEntry);
 				}
 			}
 		}
@@ -103,9 +128,9 @@ export class CanonicalGraphAnalyzer {
 		const entryNodeId = detectEntryNodeId(contentSource.rootPath, partial.nodes, partial.edges, packageMain);
 		const layeredNodes = assignLayersToNodes(partial.nodes, entryNodeId);
 
-		// Normalize node and edge ordering deterministically
-		const sortedNodes: GraphNode[] = [...layeredNodes].sort((a, b) => a.id.localeCompare(b.id));
-		const sortedEdges: GraphEdge[] = [...partial.edges].sort((a, b) => a.id.localeCompare(b.id));
+		// Normalize node and edge ordering deterministically using code-unit comparator
+		const sortedNodes: GraphNode[] = [...layeredNodes].sort((a, b) => stableCompare(a.id, b.id));
+		const sortedEdges: GraphEdge[] = [...partial.edges].sort((a, b) => stableCompare(a.id, b.id));
 
 		const digest = computeCanonicalGraphDigest({
 			nodes: sortedNodes,
@@ -113,12 +138,27 @@ export class CanonicalGraphAnalyzer {
 			entryNodeId,
 		});
 
-		const completeness: CanonicalCompleteness = {
-			isComplete: Object.keys(exclusionReasons).length === 0,
+		const totalExcluded = Object.values(exclusionBreakdown).reduce((a, b) => a + b, 0);
+		const completeWithinProfile = !isTruncated && failedCount === 0;
+
+		const coverage: CanonicalCoverage = {
+			completeWithinProfile,
+			isComplete: completeWithinProfile,
+			discoveredCount: rawFiles.length,
+			analyzedCount: parseResults.length,
 			analyzedFileCount: parseResults.length,
-			excludedFileCount: files.length - parseResults.length,
-			exclusionReasons,
+			excludedCount: totalExcluded,
+			excludedFileCount: totalExcluded,
+			failedCount,
+			truncated: isTruncated,
+			truncationReason: isTruncated ? `Exceeded maxCanonicalFiles budget of ${this._maxCanonicalFiles}` : undefined,
+			exclusionBreakdown,
+			exclusionReasons: exclusionBreakdown,
 			skippedFiles: skippedFiles.length > 0 ? skippedFiles : undefined,
+		};
+
+		const manifest: AnalysisManifest = {
+			entries: manifestEntries,
 		};
 
 		return {
@@ -131,24 +171,27 @@ export class CanonicalGraphAnalyzer {
 			sourceIdentity: contentSource.identity,
 			digest,
 			versions: createCurrentVersionMetadata(),
-			completeness,
+			coverage,
+			completeness: coverage,
+			manifest,
 		};
 	}
 
 	private async _parseSingleFile(
 		contentSource: IRepositoryContentSource,
 		file: ScannedFile,
-		recordExclusion: (path: string, reason: string) => void,
+		recordExclusion: (path: string, code: CanonicalExclusionCode) => void,
 		token?: CancellationTokenLike
-	): Promise<ParseResult | undefined> {
+	): Promise<{ parseResult: ParseResult; manifestEntry: AnalysisManifestEntry } | undefined> {
 		if (token?.isCancellationRequested) {
 			return undefined;
 		}
 
 		try {
+			let fileSize: number | undefined;
 			if (contentSource.getFileSize) {
-				const size = await contentSource.getFileSize(file.relativePath);
-				if (typeof size === 'number' && size > this._maxFileSizeBytes) {
+				fileSize = await contentSource.getFileSize(file.relativePath);
+				if (typeof fileSize === 'number' && fileSize > this._maxFileSizeBytes) {
 					recordExclusion(file.relativePath, 'oversized-file');
 					return undefined;
 				}
@@ -156,10 +199,11 @@ export class CanonicalGraphAnalyzer {
 
 			const content = await contentSource.readFile(file.relativePath, token);
 			if (content === undefined) {
-				recordExclusion(file.relativePath, 'file-read-error');
+				recordExclusion(file.relativePath, 'parse-error');
 				return undefined;
 			}
 
+			const actualSize = fileSize ?? content.length;
 			if (content.length > this._maxFileSizeBytes) {
 				recordExclusion(file.relativePath, 'oversized-file');
 				return undefined;
@@ -171,26 +215,31 @@ export class CanonicalGraphAnalyzer {
 				return undefined;
 			}
 
-			const imports = extractImportsForFile(file, content);
-			const packageName = extractPackageName(file, content);
-			const exports: ParseResult['exports'] = [];
-
-			const exportRe = /export\s+(?:default\s+)?(?:async\s+)?(?:function|class|const|let|var|type|interface|enum)\s+([A-Za-z0-9_]+)/g;
-			let match: RegExpExecArray | null;
-			while ((match = exportRe.exec(content)) !== null && exports.length < 50) {
-				exports.push({ name: match[1] });
+			// Use ParserEngine with content override for full Babel AST / fallback / Vue / Svelte parity
+			const parseResult = await this._parserEngine.parseFile(file, content);
+			if (!parseResult) {
+				recordExclusion(file.relativePath, 'parse-error');
+				return undefined;
 			}
 
-			return {
-				filePath: file.absolutePath,
-				relativePath: file.relativePath,
-				imports,
-				exports,
-				functions: [],
-				components: [],
-				isComponentFile: file.extension === '.tsx' || file.extension === '.jsx',
-				packageName,
+			let contentIdentity: string | undefined;
+			if (contentSource.getContentIdentity) {
+				try {
+					contentIdentity = await contentSource.getContentIdentity(file.relativePath);
+				} catch {
+					contentIdentity = undefined;
+				}
+			}
+
+			const manifestEntry: AnalysisManifestEntry = {
+				path: file.relativePath,
+				contentIdentity,
+				size: actualSize,
+				analyzedAt: Date.now(),
+				isComponent: !!parseResult.isComponentFile,
 			};
+
+			return { parseResult, manifestEntry };
 		} catch {
 			recordExclusion(file.relativePath, 'parse-error');
 			return undefined;

@@ -2,7 +2,6 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import * as path from 'node:path';
 import type { ScannedFile } from '../../common/types/graphTypes.js';
 import type { CancellationTokenLike, IRepositoryContentSource } from '../../core/canonical/contentSource.js';
 import { DEFAULT_IGNORE_PATTERNS } from '../../core/scanning/ignorePatterns.js';
@@ -13,6 +12,7 @@ import type { GitTreeEntry } from './gitTypes.js';
 
 export interface GitTreeContentSourceOptions {
 	readonly maxScanFiles?: number;
+	readonly maxFileSizeBytes?: number;
 	readonly projectName?: string;
 }
 
@@ -24,6 +24,7 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 	readonly projectName: string;
 	private readonly _gitService: IGitHistoryService;
 	private readonly _maxScanFiles: number;
+	private readonly _maxFileSizeBytes: number;
 	private _treeEntriesMap: Map<string, GitTreeEntry> | undefined;
 
 	constructor(
@@ -38,6 +39,7 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 		this.projectName = options.projectName || basename(this.rootPath) || 'workspace';
 		this.identity = `git-tree:${this.rootPath}:${this.commitSha}`;
 		this._maxScanFiles = options.maxScanFiles ?? 10_000;
+		this._maxFileSizeBytes = options.maxFileSizeBytes ?? 500_000;
 	}
 
 	async listFiles(token?: CancellationTokenLike): Promise<ScannedFile[]> {
@@ -67,7 +69,7 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 			const name = basename(relPath);
 			const ext = name.includes('.') ? `.${name.split('.').pop()!.toLowerCase()}` : '';
 			files.push({
-				absolutePath: path.join(this.rootPath, relPath),
+				absolutePath: `${this.rootPath}/${relPath}`,
 				relativePath: relPath,
 				extension: ext,
 			});
@@ -79,7 +81,17 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 
 	async readFile(relativePath: string, token?: CancellationTokenLike): Promise<string | undefined> {
 		const normalized = normalizePath(relativePath).replace(/^\/+/, '');
-		return this._gitService.readFileAtRef(this.rootPath, this.commitSha, normalized, token);
+		const entry = this._treeEntriesMap?.get(normalized);
+		// Pre-filter oversized blobs before fetching content
+		if (entry && typeof entry.size === 'number' && entry.size > this._maxFileSizeBytes) {
+			return undefined;
+		}
+
+		try {
+			return await this._gitService.readFileAtRef(this.rootPath, this.commitSha, normalized, token);
+		} catch {
+			return undefined;
+		}
 	}
 
 	async getFileSize(relativePath: string): Promise<number | undefined> {
@@ -91,7 +103,7 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 	async getContentIdentity(relativePath: string): Promise<string | undefined> {
 		const normalized = normalizePath(relativePath).replace(/^\/+/, '');
 		const entry = this._treeEntriesMap?.get(normalized);
-		return entry?.blobOid;
+		return entry?.blobOid ?? entry?.objectId;
 	}
 
 	async readPackageMain(token?: CancellationTokenLike): Promise<string | null> {

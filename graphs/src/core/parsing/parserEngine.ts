@@ -31,7 +31,11 @@ const PARSER_PLUGINS: ParserOptions['plugins'] = [
 ]
 
 export class ParserEngine {
-	constructor(private readonly readFile: ParserFileReader = async () => undefined) { }
+	private readonly readFile: ParserFileReader;
+
+	constructor(readFile: ParserFileReader = async () => undefined) {
+		this.readFile = readFile;
+	}
 
 	async parseFile(file: ScannedFile, contentOverride?: string): Promise<ParseResult | null> {
 		let content: string

@@ -19,11 +19,10 @@ import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnaly
 import { WorkingTreeContentSource } from '../../core/canonical/contentSource.js';
 import { computeCanonicalGraphDiff, type CanonicalGraphDiff } from '../../core/canonical/canonicalGraphDiff.js';
 import { projectNetworkGraph } from '../../core/projection/graphProjection.js';
-import { GitHistoryService } from '../../history/git/gitHistoryService.js';
-import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
+import { CanonicalQueryIndex, type AdjacentEdgeInfo } from '../../core/query/canonicalQueryIndex.js';
 import type { NetworkLayoutMode } from '../../layouts/network/index.js';
 import { basename } from '../../core/resolution/paths.js';
-import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode } from '../../common/types/graphTypes.js';
+import type { GraphNode, GraphSnapshot, LayoutMode } from '../../common/types/graphTypes.js';
 
 export type PreBaseGraphType = 'network';
 
@@ -52,12 +51,6 @@ export interface PreBaseGraphDiagnostics {
 	status: 'idle' | 'scanning' | 'ready' | 'error' | 'cancelled';
 	message?: string;
 	digest?: string;
-}
-
-interface AdjacentGraphEdge {
-	edge: GraphEdge;
-	isOutgoing: boolean;
-	isIncoming: boolean;
 }
 
 export const IPreBaseGraphService = createDecorator<IPreBaseGraphService>('prebaseGraphService');
@@ -118,6 +111,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private _snapshot: PreBaseEnrichedSnapshot | undefined;
 	private _canonicalSnapshot: CanonicalGraphSnapshot | undefined;
+	private _canonicalIndex: CanonicalQueryIndex | undefined;
 	private _scanCts: CancellationTokenSource | undefined;
 	private _relayoutGeneration = 0;
 	private _layoutRevision = 0;
@@ -225,27 +219,24 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	getSelectionSummaryForMagnus(): string | undefined {
-		const source = this._canonicalSnapshot ?? this._snapshot;
-		if (!source || !this._selectedNodeId) {
-			return undefined;
-		}
-		const node = source.nodes.find(n => n.id === this._selectedNodeId);
+		const node = this._selectedNodeId ? this._canonicalIndex?.findNode(this._selectedNodeId) : undefined;
 		if (!node) {
 			return undefined;
 		}
-		const edges = source.edges.filter(e => e.source === node.id || e.target === node.id);
+		const incoming = this._canonicalIndex?.incomingEdges.get(node.id)?.length ?? 0;
+		const outgoing = this._canonicalIndex?.outgoingEdges.get(node.id)?.length ?? 0;
 		return [
 			`Graph type: ${this._viewState.graphType}`,
 			`Layout: ${this._viewState.layoutMode}`,
 			`Selected node: ${node.label || node.id}`,
 			`Path: ${node.path || node.id}`,
 			`Kind: ${node.kind}`,
-			`Connected edges: ${edges.length}`,
+			`Connected edges: ${incoming + outgoing}`,
 		].join('\n');
 	}
 
 	searchForMagnus(query: string, maximumResults = 20): string {
-		const source = this._canonicalSnapshot ?? this._snapshot;
+		const source = this._canonicalSnapshot;
 		const normalized = typeof query === 'string' && query.length <= 512 ? query.trim().toLowerCase() : '';
 		if (!source || !normalized) {
 			return JSON.stringify({ graph: this._freshness(), nodes: [] });
@@ -253,76 +244,102 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const boundedMaximum = typeof maximumResults === 'number' && Number.isFinite(maximumResults)
 			? Math.max(1, Math.min(Math.floor(maximumResults), 50))
 			: 20;
-		const degree = this._degrees(source);
-		const nodes = source.nodes
-			.filter(node => [node.id, node.label, node.path, node.kind, node.meta?.language, node.meta?.architectureLayer]
-				.some(value => value?.toLowerCase().includes(normalized)))
-			.slice(0, boundedMaximum)
-			.map(node => ({
+
+		const matchingNodes: Array<{
+			id: string;
+			label: string;
+			path?: string;
+			kind: string;
+			language?: string;
+			layer?: string;
+			isEntry: boolean;
+			degree: number;
+		}> = [];
+
+		for (const node of source.nodes) {
+			if (matchingNodes.length >= boundedMaximum) {
+				break;
+			}
+			const matches = [node.id, node.label, node.path, node.kind, node.meta?.language, node.meta?.architectureLayer]
+				.some(value => value?.toLowerCase().includes(normalized));
+
+			if (matches) {
+				matchingNodes.push({
+					id: node.id,
+					label: node.label,
+					path: node.path,
+					kind: node.kind,
+					language: node.meta?.language,
+					layer: node.meta?.architectureLayer,
+					isEntry: !!node.isEntry,
+					degree: this._canonicalIndex?.nodeDegree.get(node.id) ?? 0,
+				});
+			}
+		}
+
+		return JSON.stringify({ graph: this._freshness(), nodes: matchingNodes });
+	}
+
+	getNodeDetailsForMagnus(nodeIdOrPath: string): string | undefined {
+		const node = this._findNode(nodeIdOrPath);
+		if (!node || !this._canonicalIndex) {
+			return undefined;
+		}
+
+		const incoming = this._canonicalIndex.incomingEdges.get(node.id) ?? [];
+		const outgoing = this._canonicalIndex.outgoingEdges.get(node.id) ?? [];
+
+		// Bounded details to avoid sending massive payloads to the AI model
+		const boundedImports = outgoing.slice(0, 50).map(edge => ({ kind: edge.kind, target: edge.target }));
+		const boundedDependents = incoming.slice(0, 50).map(edge => ({ kind: edge.kind, source: edge.source }));
+
+		return JSON.stringify({
+			graph: this._freshness(),
+			node: {
 				id: node.id,
 				label: node.label,
 				path: node.path,
 				kind: node.kind,
-				language: node.meta?.language,
-				layer: node.meta?.architectureLayer,
-				isEntry: !!node.isEntry,
-				degree: degree.get(node.id) ?? 0,
-			}));
-		return JSON.stringify({ graph: this._freshness(), nodes });
-	}
-
-	getNodeDetailsForMagnus(nodeIdOrPath: string): string | undefined {
-		const source = this._canonicalSnapshot ?? this._snapshot;
-		const node = this._findNode(nodeIdOrPath);
-		if (!source || !node) {
-			return undefined;
-		}
-		const edges = source.edges.filter(edge => edge.source === node.id || edge.target === node.id);
-		return JSON.stringify({
-			graph: this._freshness(),
-			node,
-			imports: edges.filter(edge => edge.source === node.id).map(edge => ({ kind: edge.kind, target: edge.target })),
-			dependents: edges.filter(edge => edge.target === node.id).map(edge => ({ kind: edge.kind, source: edge.source })),
+				isEntry: node.isEntry,
+				meta: {
+					architectureLayer: node.meta?.architectureLayer,
+					language: node.meta?.language,
+					imports: node.meta?.imports?.slice(0, 50),
+					exports: node.meta?.exports?.slice(0, 50),
+				}
+			},
+			imports: boundedImports,
+			dependents: boundedDependents,
 		});
 	}
 
 	getDependenciesForMagnus(nodeIdOrPath: string, direction: 'incoming' | 'outgoing' | 'both' = 'both', depth = 1, maximumNodes = 50): string | undefined {
-		const source = this._canonicalSnapshot ?? this._snapshot;
 		const root = this._findNode(nodeIdOrPath);
-		if (!source || !root) {
+		if (!root || !this._canonicalIndex) {
 			return undefined;
 		}
 		const boundedDirection = direction === 'incoming' || direction === 'outgoing' || direction === 'both' ? direction : 'both';
 		const boundedDepth = typeof depth === 'number' && Number.isFinite(depth) ? Math.max(1, Math.min(Math.floor(depth), 8)) : 1;
 		const maximum = typeof maximumNodes === 'number' && Number.isFinite(maximumNodes) ? Math.max(1, Math.min(Math.floor(maximumNodes), 100)) : 50;
+
 		const visited = new Set<string>([root.id]);
 		const queue: Array<{ id: string; depth: number }> = [{ id: root.id, depth: 0 }];
 		const relationships: Array<{ from: string; to: string; kind: string }> = [];
-		const adjacentEdges = new Map<string, AdjacentGraphEdge[]>();
-		const nodeById = new Map(source.nodes.map(node => [node.id, node]));
-		for (const edge of source.edges) {
-			this._addAdjacentEdge(adjacentEdges, edge.source, {
-				edge,
-				isOutgoing: true,
-				isIncoming: edge.source === edge.target,
-			});
-			if (edge.source !== edge.target) {
-				this._addAdjacentEdge(adjacentEdges, edge.target, { edge, isOutgoing: false, isIncoming: true });
-			}
-		}
 
 		for (let queueIndex = 0; queueIndex < queue.length && visited.size <= maximum; queueIndex++) {
 			const current = queue[queueIndex];
 			if (current.depth >= boundedDepth) {
 				continue;
 			}
-			this._visitDependencies(adjacentEdges.get(current.id), current, boundedDirection, visited, queue, relationships, maximum);
+			const adjacent = this._canonicalIndex.adjacentEdges.get(current.id);
+			this._visitDependencies(adjacent, current, boundedDirection, visited, queue, relationships, maximum);
 		}
+
 		return JSON.stringify({
 			graph: this._freshness(),
 			root: root.id,
 			nodes: [...visited].flatMap(id => {
-				const node = nodeById.get(id);
+				const node = this._canonicalIndex?.nodeById.get(id);
 				return node ? [node] : [];
 			}),
 			relationships: relationships.slice(0, maximum * 3),
@@ -330,19 +347,23 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	getOverviewForMagnus(): string {
-		const source = this._canonicalSnapshot ?? this._snapshot;
-		if (!source) {
+		const source = this._canonicalSnapshot;
+		if (!source || !this._canonicalIndex) {
 			return JSON.stringify({ graph: this._freshness(), available: false });
 		}
-		const degree = this._degrees(source);
-		const languages = [...new Set(source.nodes.map(node => node.meta?.language).filter((value): value is string => !!value))];
-		const highDegree = [...degree.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)
-			.map(([id, count]) => ({ id, degree: count, path: source.nodes.find(node => node.id === id)?.path }));
+		const degree = this._canonicalIndex.nodeDegree;
+		const languages = this._canonicalIndex.languages;
+		const highDegree = [...degree.entries()]
+			.sort((a, b) => b[1] - a[1])
+			.slice(0, 10)
+			.map(([id, count]) => ({ id, degree: count, path: this._canonicalIndex?.nodeById.get(id)?.path }));
+
 		return JSON.stringify({
 			graph: this._freshness(),
 			available: true,
 			totalCanonicalNodes: source.nodes.length,
 			totalCanonicalEdges: source.edges.length,
+			coverage: source.coverage,
 			languages,
 			highDegree,
 		});
@@ -353,8 +374,16 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		if (!node) {
 			return false;
 		}
-		this.setSelectedNodeId(node.id);
-		return true;
+
+		// Check if node is rendered in current 280-node projection
+		const isRendered = this._snapshot?.nodes.some(n => n.id === node.id);
+		if (isRendered) {
+			this.setSelectedNodeId(node.id);
+			return true;
+		}
+
+		// Node exists in canonical graph but is not in render projection
+		return false;
 	}
 
 	private _findNode(nodeIdOrPath: string): GraphNode | undefined {
@@ -365,17 +394,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		if (!value || value.length > 4096) {
 			return undefined;
 		}
-		const source = this._canonicalSnapshot ?? this._snapshot;
-		return source?.nodes.find(node => node.id === value || node.path === value || `file:${node.path}` === value);
-	}
-
-	private _degrees(source: { edges: readonly GraphEdge[] }): Map<string, number> {
-		const degree = new Map<string, number>();
-		for (const edge of source.edges) {
-			degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
-			degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
-		}
-		return degree;
+		return this._canonicalIndex?.findNode(value) ?? this._snapshot?.nodes.find(n => n.id === value || n.path === value);
 	}
 
 	private _freshness(): { scannedAt: number | null; status: PreBaseGraphDiagnostics['status']; projectPath: string | undefined; digest?: string } {
@@ -406,6 +425,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	clearCache(): void {
 		this._snapshot = undefined;
 		this._canonicalSnapshot = undefined;
+		this._canonicalIndex = undefined;
 		this._onDidChangeSnapshot.fire(undefined);
 		this._setDiagnostics({
 			fileCount: 0,
@@ -420,7 +440,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async setGraphType(_graphType: PreBaseGraphType): Promise<void> {
-		// The active product has one Code Graph.
+		// PreBase has one active Code Graph mode.
 	}
 
 	async setLayoutMode(layoutMode: LayoutMode): Promise<void> {
@@ -472,6 +492,21 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 						const uri = URI.file(p);
 						const fileContent = await this.fileService.readFile(uri, { position: 0, length: 500_000 });
 						return fileContent.value.toString();
+					},
+					readDirectory: async (p: string) => {
+						const uri = URI.file(p);
+						const stat = await this.fileService.resolve(uri);
+						if (!stat.children) return [];
+						return stat.children.map(c => ({ name: c.name, isDirectory: c.isDirectory }));
+					},
+					getFileSize: async (p: string) => {
+						try {
+							const uri = URI.file(p);
+							const stat = await this.fileService.stat(uri);
+							return stat.size;
+						} catch {
+							return undefined;
+						}
 					}
 				}
 			});
@@ -529,20 +564,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		return enriched;
 	}
 
-	async buildCanonicalGraphAtRef(ref: string, token?: CancellationToken): Promise<CanonicalGraphSnapshot | undefined> {
-		const folder = this.workspaceService.getWorkspace().folders[0];
-		if (!folder) {
-			return undefined;
-		}
-		const rootPath = folder.uri.fsPath || folder.uri.path;
-		const gitService = new GitHistoryService();
-		const resolvedSha = await gitService.resolveRef(rootPath, ref, token);
-		if (!resolvedSha) {
-			return undefined;
-		}
-		const gitSource = new GitTreeContentSource(gitService, rootPath, resolvedSha);
-		const analyzer = new CanonicalGraphAnalyzer();
-		return analyzer.analyze(gitSource, token);
+	async buildCanonicalGraphAtRef(_ref: string, _token?: CancellationToken): Promise<CanonicalGraphSnapshot | undefined> {
+		// Historical Git graph analysis in workbench delegates to Git extension host in Phase 2
+		return undefined;
 	}
 
 	async compareCanonicalGraphRefs(refA: string, refB: string, token?: CancellationToken): Promise<{ diff: CanonicalGraphDiff; snapshotA: CanonicalGraphSnapshot; snapshotB: CanonicalGraphSnapshot } | undefined> {
@@ -556,6 +580,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	private _projectAndPublish(canonical: CanonicalGraphSnapshot): PreBaseEnrichedSnapshot {
+		this._canonicalIndex = new CanonicalQueryIndex(canonical);
+
 		const limits = this._scanLimits();
 		const networkLayoutMode = this._getNetworkLayoutMode();
 		const spread = Math.max(0.4, Math.min(2.5, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkSpreadScale) || 1));
@@ -575,7 +601,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 		const isCapped = canonical.nodes.length > projection.nodes.length;
 		const diagnostics: PreBaseGraphDiagnostics = {
-			fileCount: canonical.completeness.analyzedFileCount,
+			fileCount: canonical.coverage.analyzedCount,
 			nodeCount: projection.nodes.length,
 			edgeCount: projection.edges.length,
 			canonicalNodeCount: canonical.nodes.length,
@@ -586,7 +612,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			digest: canonical.digest,
 			message: isCapped
 				? localize('prebase.graph.readyCapped', "{0} canonical nodes ({1} rendered) · {2} edges", canonical.nodes.length, projection.nodes.length, projection.edges.length)
-				: localize('prebase.graph.ready', "{0} files · {1} nodes · {2} edges", canonical.completeness.analyzedFileCount, projection.nodes.length, projection.edges.length)
+				: localize('prebase.graph.ready', "{0} files · {1} nodes · {2} edges", canonical.coverage.analyzedCount, projection.nodes.length, projection.edges.length)
 		};
 
 		const enriched: PreBaseEnrichedSnapshot = {
@@ -644,17 +670,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		}
 	}
 
-	private _addAdjacentEdge(index: Map<string, AdjacentGraphEdge[]>, nodeId: string, edge: AdjacentGraphEdge): void {
-		const adjacent = index.get(nodeId);
-		if (adjacent) {
-			adjacent.push(edge);
-		} else {
-			index.set(nodeId, [edge]);
-		}
-	}
-
 	private _visitDependencies(
-		edges: readonly AdjacentGraphEdge[] | undefined,
+		edges: readonly AdjacentEdgeInfo[] | undefined,
 		current: { id: string; depth: number },
 		direction: 'incoming' | 'outgoing' | 'both',
 		visited: Set<string>,

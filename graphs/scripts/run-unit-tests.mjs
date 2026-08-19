@@ -33,6 +33,7 @@ const tests = [
 	'graphs/src/tests/unit/canonicalGraphAnalyzer.test.ts',
 	'graphs/src/tests/unit/canonicalProjection.test.ts',
 	'graphs/src/tests/unit/canonicalGraphDiff.test.ts',
+	'graphs/src/tests/unit/canonicalQueryIndex.test.ts',
 	'graphs/src/tests/unit/gitHistoryService.test.ts',
 	'graphs/src/tests/unit/gitTreeHistoricalAnalysis.test.ts',
 ];
