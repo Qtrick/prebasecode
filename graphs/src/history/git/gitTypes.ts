@@ -42,6 +42,7 @@ export interface GitSignature {
 export interface GitCommitMetadata {
 	readonly sha: string;
 	readonly parents: readonly string[];
+	readonly treeSha?: string;
 	readonly author: GitSignature;
 	readonly committer: GitSignature;
 	readonly authorTimestamp: number;
@@ -71,12 +72,18 @@ export interface GitTreeEntry {
 	readonly size?: number;
 }
 
+export interface GitTreeListOptions {
+	readonly maxEntries?: number;
+	readonly scope?: string;
+}
+
 export interface GitTreeInventory {
 	readonly entries: readonly GitTreeEntry[];
 	readonly isTruncated: boolean;
 	readonly returnedCount: number;
 	readonly discoveredAtLeast: number;
 	readonly scope?: string;
+	readonly truncationReason?: string;
 }
 
 export type GitChangeKind = 'added' | 'deleted' | 'modified' | 'renamed' | 'copied';

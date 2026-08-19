@@ -134,7 +134,7 @@ export interface IGitRepository {
 	resolveCommitRef?(ref: string, token?: CancellationToken): Promise<string>;
 	getCommitDetails?(ref: string, token?: CancellationToken): Promise<GitCommitMetadata>;
 	getCommitLog?(options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]>;
-	listTreeEntries?(ref: string, token?: CancellationToken): Promise<GitTreeEntry[]>;
+	listTreeEntries?(ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeEntry[]>;
 	readBlobContent?(ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string>;
 	diffExactTrees?(refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult>;
 	diffCommitToParent?(commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult>;
@@ -154,7 +154,7 @@ export interface IGitExtensionDelegate {
 	resolveCommitRef?(root: URI, ref: string, token?: CancellationToken): Promise<string>;
 	getCommitDetails?(root: URI, ref: string, token?: CancellationToken): Promise<GitCommitMetadata>;
 	getCommitLog?(root: URI, options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]>;
-	listTreeEntries?(root: URI, ref: string, token?: CancellationToken): Promise<GitTreeEntry[]>;
+	listTreeEntries?(root: URI, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeEntry[]>;
 	readBlobContent?(root: URI, ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string>;
 	diffExactTrees?(root: URI, refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult>;
 	diffCommitToParent?(root: URI, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult>;

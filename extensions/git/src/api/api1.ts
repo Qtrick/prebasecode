@@ -132,7 +132,7 @@ export class ApiRepository implements Repository {
 		return this.#repository.getObjectDetails(treeish, path);
 	}
 
-	getObjectFiles(ref: string, options?: { recursive?: boolean; path?: string }): Promise<{ mode: string; type: string; object: string; size: string; file: string }[]> {
+	getObjectFiles(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }): Promise<{ mode: string; type: string; object: string; size: string; file: string }[]> {
 		return this.#repository.getObjectFiles(ref, options);
 	}
 

@@ -14,6 +14,7 @@ import {
 	type GitRepositoryIdentity,
 	type GitTagInfo,
 	type GitTreeEntry,
+	type GitTreeListOptions,
 } from '../../history/git/gitTypes.js';
 
 export interface WorkbenchGitServiceLike {
@@ -28,7 +29,7 @@ export interface WorkbenchGitRepositoryLike {
 	resolveCommitRef?(ref: string, token?: any): Promise<string>;
 	getCommitDetails?(ref: string, token?: any): Promise<any>;
 	getCommitLog?(options: any, token?: any): Promise<any[]>;
-	listTreeEntries?(ref: string, token?: any): Promise<any[]>;
+	listTreeEntries?(ref: string, options?: any, token?: any): Promise<any[]>;
 	readBlobContent?(ref: string, path: string, maxBytes?: number, token?: any): Promise<string>;
 	diffExactTrees?(refA: string, refB: string, token?: any): Promise<any>;
 	diffCommitToParent?(commitRef: string, parentIndex?: number, token?: any): Promise<any>;
@@ -37,7 +38,7 @@ export interface WorkbenchGitRepositoryLike {
 }
 
 function normalizePath(p: string): string {
-	return p.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+	return p.replace(/\\/g, '/').replace(/\/+$/, '');
 }
 
 export class WorkbenchGitHistoryService implements IGitHistoryService {
@@ -237,13 +238,15 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 		}
 	}
 
-	async listTree(rootPath: string, ref: string, token?: CancellationTokenLike): Promise<GitTreeEntry[]> {
+	async listTree(rootPath: string, ref: string, options?: GitTreeListOptions | CancellationTokenLike, token?: CancellationTokenLike): Promise<GitTreeEntry[]> {
 		const repo = await this._ensureRepository(rootPath);
 		if (!repo.listTreeEntries) {
 			throw new GitHistoryError('ProcessFailure', 'listTreeEntries is not available on workbench Git repository');
 		}
+		const opts = (options && 'maxEntries' in options) ? options : undefined;
+		const actualToken = (options && 'isCancellationRequested' in options) ? options : token;
 		try {
-			const entries = await repo.listTreeEntries(ref, token);
+			const entries = await repo.listTreeEntries(ref, opts, actualToken);
 			return (entries || []).map(e => ({
 				path: e.path,
 				objectId: e.objectId,
@@ -288,7 +291,8 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 				changes: res.changes || [],
 			};
 		} catch (err: any) {
-			throw new GitHistoryError('ProcessFailure', err?.message || `Failed to diff ${refA}..${refB}`);
+			const code = err?.code || 'ProcessFailure';
+			throw new GitHistoryError(code, err?.message || `Failed to diff ${refA}..${refB}`);
 		}
 	}
 
@@ -305,7 +309,8 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 				changes: res.changes || [],
 			};
 		} catch (err: any) {
-			throw new GitHistoryError('ProcessFailure', err?.message || `Failed to diff commit '${commitRef}' to parent`);
+			const code = err?.code || 'ProcessFailure';
+			throw new GitHistoryError(code, err?.message || `Failed to diff commit '${commitRef}' to parent`);
 		}
 	}
 

@@ -130,7 +130,7 @@ interface Repository {
 	getCommit?(ref: string): Promise<Commit>;
 	resolveCommitRef?(ref: string): Promise<string>;
 	log?(options?: LogOptions): Promise<Commit[]>;
-	getObjectFiles?(ref: string, options?: { recursive?: boolean; path?: string }): Promise<LsTreeItem[]>;
+	getObjectFiles?(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }): Promise<LsTreeItem[]>;
 	getObjectDetails?(treeish: string, path: string): Promise<{ mode: string; object: string; size: number }>;
 	show?(ref: string, path: string): Promise<string>;
 	buffer?(ref: string, path: string): Promise<Buffer>;
@@ -211,6 +211,37 @@ interface GitExtensionAPI {
 
 interface GitExtension {
 	getAPI(version: 1): GitExtensionAPI;
+}
+
+function mapGitErrorToCode(err: any, defaultCode: string = 'ProcessFailure'): string {
+	if (!err) return defaultCode;
+	if (err.code && typeof err.code === 'string') return err.code;
+	const msg = String(err.message || err.stderr || err).toLowerCase();
+	if (msg.includes('unknown revision') || msg.includes('bad object') || msg.includes('not a valid object name') || msg.includes('ambiguous argument') || msg.includes('path not known by git')) {
+		return 'UnknownRef';
+	}
+	if (msg.includes('exceeds') || msg.includes('oversized')) {
+		return 'OversizedBlob';
+	}
+	if (msg.includes('cancel') || err.name === 'CancellationError') {
+		return 'Cancelled';
+	}
+	if (msg.includes('timeout')) {
+		return 'Timeout';
+	}
+	if (msg.includes('buffer') || msg.includes('out of memory')) {
+		return 'BufferLimit';
+	}
+	if (msg.includes('not a git repository') || (msg.includes('repository') && msg.includes('not found'))) {
+		return 'RepositoryNotFound';
+	}
+	if (msg.includes('does not exist in') || msg.includes('could not show object')) {
+		return 'ObjectUnavailable';
+	}
+	if (msg.includes('not supported') || msg.includes('unknown option')) {
+		return 'NotSupported';
+	}
+	return defaultCode;
 }
 
 export interface IExtHostGitExtensionService extends ExtHostGitExtensionShape {
@@ -498,7 +529,7 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 	}
 
-	async $listTreeEntries(handle: number, ref: string, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>> {
+	async $listTreeEntries(handle: number, ref: string, options?: { maxEntries?: number; scope?: string }, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
@@ -508,7 +539,7 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 		try {
 			if (typeof repository.getObjectFiles === 'function') {
-				const items = await repository.getObjectFiles(ref, { recursive: true });
+				const items = await repository.getObjectFiles(ref, { recursive: true, path: options?.scope, maxEntries: options?.maxEntries, scope: options?.scope });
 				const entries: GitTreeEntryDto[] = (items || []).map(item => ({
 					path: item.file,
 					objectId: item.object,
@@ -520,7 +551,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'getObjectFiles is not available on repository' } };
 		} catch (err: any) {
-			return { success: false, error: { code: 'ProcessFailure', message: err?.message || `Failed to list tree for '${ref}'` } };
+			const code = mapGitErrorToCode(err, 'ProcessFailure');
+			return { success: false, error: { code, message: err?.message || `Failed to list tree for '${ref}'` } };
 		}
 	}
 
@@ -533,13 +565,17 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
 		}
 		try {
-			if (maxBytes !== undefined && path && typeof repository.getObjectDetails === 'function') {
+			if (maxBytes !== undefined && typeof repository.getObjectDetails === 'function') {
 				try {
 					const details = await repository.getObjectDetails(ref, path);
 					if (details && details.size > maxBytes) {
 						return { success: false, error: { code: 'OversizedBlob', message: `Blob size ${details.size} exceeds maximum limit of ${maxBytes} bytes` } };
 					}
-				} catch {
+				} catch (detailErr: any) {
+					const detailCode = mapGitErrorToCode(detailErr);
+					if (detailCode === 'OversizedBlob') {
+						return { success: false, error: { code: 'OversizedBlob', message: detailErr?.message || `Blob exceeds maximum limit of ${maxBytes} bytes` } };
+					}
 					// Fall through to buffer
 				}
 			}
@@ -556,7 +592,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'show is not supported on repository' } };
 		} catch (err: any) {
-			return { success: false, error: { code: 'ObjectUnavailable', message: err?.message || `Failed to read blob at '${ref}:${path}'` } };
+			const code = mapGitErrorToCode(err, 'ObjectUnavailable');
+			return { success: false, error: { code, message: err?.message || `Failed to read blob at '${ref}:${path}'` } };
 		}
 	}
 
@@ -602,7 +639,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			});
 			return { success: true, data: { fromRef: refA, toRef: refB, changes } };
 		} catch (err: any) {
-			return { success: false, error: { code: 'ProcessFailure', message: err?.message || `Failed to diff ${refA}..${refB}` } };
+			const code = mapGitErrorToCode(err, 'ProcessFailure');
+			return { success: false, error: { code, message: err?.message || `Failed to diff ${refA}..${refB}` } };
 		}
 	}
 
@@ -651,7 +689,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'getCommit is not supported on repository' } };
 		} catch (err: any) {
-			return { success: false, error: { code: 'ProcessFailure', message: err?.message || `Failed to diff commit '${commitRef}' to parent` } };
+			const code = mapGitErrorToCode(err, 'ProcessFailure');
+			return { success: false, error: { code, message: err?.message || `Failed to diff commit '${commitRef}' to parent` } };
 		}
 	}
 
@@ -670,7 +709,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			}
 			return this.$diffExactTrees(handle, fromRef, headRef, token);
 		} catch (err: any) {
-			return { success: false, error: { code: 'ProcessFailure', message: err?.message || `Failed to diff review range ${baseRef}...${headRef}` } };
+			const code = mapGitErrorToCode(err, 'ProcessFailure');
+			return { success: false, error: { code, message: err?.message || `Failed to diff review range ${baseRef}...${headRef}` } };
 		}
 	}
 

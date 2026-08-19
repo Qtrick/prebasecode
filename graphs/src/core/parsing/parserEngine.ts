@@ -32,9 +32,11 @@ const PARSER_PLUGINS: ParserOptions['plugins'] = [
 
 export class ParserEngine {
 	private readonly readFile: ParserFileReader;
+	private readonly maxFileSizeBytes: number;
 
-	constructor(readFile: ParserFileReader = async () => undefined) {
+	constructor(readFile: ParserFileReader = async () => undefined, maxFileSizeBytes: number = 1_000_000) {
 		this.readFile = readFile;
+		this.maxFileSizeBytes = maxFileSizeBytes;
 	}
 
 	async parseFile(file: ScannedFile, contentOverride?: string): Promise<ParseResult | null> {
@@ -49,7 +51,7 @@ export class ParserEngine {
 			content = loaded
 		}
 
-		if (content.length > 500_000) return null
+		if (content.length > this.maxFileSizeBytes) return null
 
 		if (isMetadataFile(file.relativePath)) {
 			return this.parseMetadataFile(file)

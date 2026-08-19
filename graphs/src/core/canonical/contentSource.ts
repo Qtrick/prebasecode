@@ -107,6 +107,7 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 			}
 
 			const candidatePaths: Array<{ fullPath: string; relPath: string; name: string; ext: string }> = [];
+			const candidateDirs: Array<{ fullPath: string; relPath: string }> = [];
 
 			for (const entry of entries) {
 				if (token?.isCancellationRequested) {
@@ -120,7 +121,7 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 				}
 
 				if (entry.isDirectory) {
-					queue.push(fullPath);
+					candidateDirs.push({ fullPath, relPath });
 					continue;
 				}
 
@@ -140,13 +141,24 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 				candidatePaths.push({ fullPath, relPath, name, ext });
 			}
 
-			if (this._checkIgnore && candidatePaths.length > 0) {
+			if (this._checkIgnore && (candidatePaths.length > 0 || candidateDirs.length > 0)) {
+				const pathsToCheck = [
+					...candidateDirs.map(d => d.fullPath),
+					...candidatePaths.map(c => c.fullPath),
+				];
 				let ignoredSet: Set<string>;
 				try {
-					ignoredSet = await this._checkIgnore(candidatePaths.map(c => c.fullPath));
+					ignoredSet = await this._checkIgnore(pathsToCheck);
 				} catch {
 					ignoredSet = new Set();
 				}
+
+				for (const dir of candidateDirs) {
+					if (!ignoredSet.has(dir.fullPath) && !ignoredSet.has(dir.relPath) && !ignoredSet.has(`${dir.fullPath}/`) && !ignoredSet.has(`${dir.relPath}/`)) {
+						queue.push(dir.fullPath);
+					}
+				}
+
 				for (const cand of candidatePaths) {
 					if (ignoredSet.has(cand.fullPath) || ignoredSet.has(cand.relPath)) {
 						continue;
@@ -162,6 +174,9 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 					}
 				}
 			} else {
+				for (const dir of candidateDirs) {
+					queue.push(dir.fullPath);
+				}
 				for (const cand of candidatePaths) {
 					if (files.length < this._maxScanFiles) {
 						files.push({

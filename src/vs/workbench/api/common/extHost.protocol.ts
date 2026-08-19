@@ -4092,7 +4092,7 @@ export interface ExtHostGitExtensionShape {
 	$resolveCommitRef(handle: number, ref: string, token?: CancellationToken): Promise<GitHistoryResultDto<string>>;
 	$getCommitDetails(handle: number, ref: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto>>;
 	$getCommitLog(handle: number, options: GitLogOptionsDto, token?: CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto[]>>;
-	$listTreeEntries(handle: number, ref: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>>;
+	$listTreeEntries(handle: number, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>>;
 	$readBlobContent(handle: number, ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<GitHistoryResultDto<string>>;
 	$diffExactTrees(handle: number, refA: string, refB: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;
 	$diffCommitToParent(handle: number, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;

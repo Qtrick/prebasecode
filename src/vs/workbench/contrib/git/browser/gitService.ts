@@ -111,9 +111,9 @@ export class GitRepository extends Disposable implements IGitRepository {
 		throw new Error('getCommitLog is not supported by delegate');
 	}
 
-	async listTreeEntries(ref: string, token?: CancellationToken): Promise<GitTreeEntry[]> {
+	async listTreeEntries(ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeEntry[]> {
 		if (this.delegate.listTreeEntries) {
-			return this.delegate.listTreeEntries(this.rootUri, ref, token);
+			return this.delegate.listTreeEntries(this.rootUri, ref, options, token);
 		}
 		throw new Error('listTreeEntries is not supported by delegate');
 	}

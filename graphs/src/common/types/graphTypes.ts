@@ -109,6 +109,7 @@ export interface ScannedFile {
 	absolutePath: string
 	relativePath: string
 	extension: string
+	blobOid?: string
 }
 
 export type LayoutMode = 'hierarchy' | 'pyramid' | 'scattered'

@@ -43,7 +43,7 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 	}
 
 	async listFiles(token?: CancellationTokenLike): Promise<ScannedFileInventory> {
-		const treeEntries = await this._gitService.listTree(this.rootPath, this.commitSha, token);
+		const treeEntries = await this._gitService.listTree(this.rootPath, this.commitSha, { maxEntries: this._maxScanFiles * 2 }, token);
 		const files: ScannedFile[] = [];
 		const entriesMap = new Map<string, GitTreeEntry>();
 		let isTruncated = false;

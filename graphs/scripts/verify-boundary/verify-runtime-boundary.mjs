@@ -37,6 +37,12 @@ const SCAN_DIRS = [
 	'host',
 	'layouts',
 	'commands',
+	'temporal/common',
+	'temporal/core',
+	'temporal/analysis',
+	'temporal/ingestion',
+	'temporal/host',
+	'temporal/persistence/common',
 ];
 
 async function collectTsFiles(dir) {

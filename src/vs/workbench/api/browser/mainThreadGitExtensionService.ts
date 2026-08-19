@@ -215,12 +215,12 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 		return result.data;
 	}
 
-	async listTreeEntries(root: URI, ref: string, token?: CancellationToken): Promise<GitTreeEntry[]> {
+	async listTreeEntries(root: URI, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeEntry[]> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
 			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
-		const result = await this._proxy.$listTreeEntries(handle, ref, token);
+		const result = await this._proxy.$listTreeEntries(handle, ref, options, token);
 		if (!result.success || !result.data) {
 			throwGitError(result.error, `Failed to list tree entries for '${ref}'`);
 		}

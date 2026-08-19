@@ -529,7 +529,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				fileOps: {
 					readFile: async (p: string) => {
 						const uri = URI.file(p);
-						const fileContent = await this.fileService.readFile(uri, { position: 0, length: 500_000 });
+						const fileContent = await this.fileService.readFile(uri, { position: 0, length: 1_000_000 });
 						return fileContent.value.toString();
 					},
 					readDirectory: async (p: string) => {

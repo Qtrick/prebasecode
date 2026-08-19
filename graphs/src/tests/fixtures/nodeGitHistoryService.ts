@@ -21,6 +21,7 @@ import {
 	type GitRepositoryIdentity,
 	type GitTagInfo,
 	type GitTreeEntry,
+	type GitTreeListOptions,
 	GitHistoryError,
 } from '../../history/git/gitTypes.js';
 
@@ -358,12 +359,20 @@ export class NodeGitHistoryService implements IGitHistoryService {
 		});
 	}
 
-	async listTree(rootPath: string, ref: string, token?: CancellationTokenLike): Promise<GitTreeEntry[]> {
+	async listTree(rootPath: string, ref: string, options?: GitTreeListOptions | CancellationTokenLike, token?: CancellationTokenLike): Promise<GitTreeEntry[]> {
 		const resolvedSha = await this.resolveRef(rootPath, ref, token);
+		const opts = (options && 'maxEntries' in options) ? options : undefined;
+		const actualToken = (options && 'isCancellationRequested' in options) ? options : token;
+
+		const args = ['ls-tree', '-r', '-z', '-l', '--full-name', '--end-of-options', resolvedSha];
+		if (opts?.scope) {
+			args.push('--', opts.scope);
+		}
+
 		const res = await this._exec({
 			cwd: rootPath,
-			args: ['ls-tree', '-r', '-z', '-l', '--full-name', '--end-of-options', resolvedSha],
-			token,
+			args,
+			token: actualToken,
 		});
 		if (res.exitCode !== 0) {
 			throw new GitHistoryError('ObjectUnavailable', `Failed to list tree for ref: ${ref}`, res.stderr);
@@ -396,6 +405,10 @@ export class NodeGitHistoryService implements IGitHistoryService {
 				objectType,
 				size: isNaN(size as number) ? undefined : size,
 			});
+
+			if (typeof opts?.maxEntries === 'number' && opts.maxEntries > 0 && entries.length >= opts.maxEntries) {
+				break;
+			}
 		}
 
 		return entries;

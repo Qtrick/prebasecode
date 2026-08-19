@@ -1035,7 +1035,7 @@ export function parseLsFiles(raw: string): LsFilesElement[] {
 		.map(([, mode, object, stage, file]) => ({ mode, object, stage, file }));
 }
 
-const stashRegex = /([0-9a-f]{40})\n(.*)\nstash@{(\d+)}\n(WIP\s)?on\s([^:]+):\s(.*)\n(\d+)\n(\d+)(?:\x00)/gmi;
+const stashRegex = /([0-9a-f]{40,64})\n(.*)\nstash@{(\d+)}\n(WIP\s)?on\s([^:]+):\s(.*)\n(\d+)\n(\d+)(?:\x00)/gmi;
 
 function parseGitStashes(raw: string): Stash[] {
 	const result: Stash[] = [];
@@ -1627,6 +1627,17 @@ export class Repository {
 	}
 
 	async getObjectDetails(treeish: string, path: string): Promise<{ mode: string; object: string; size: number }> {
+		if (!path && /^[0-9a-fA-F]{40,64}$/.test(treeish)) {
+			const typeRes = await this.exec(['cat-file', '-t', treeish]);
+			const objectType = typeRes.stdout.trim();
+			if (objectType !== 'blob') {
+				throw new GitError({ message: `Object '${treeish}' is a ${objectType}, not a blob`, gitErrorCode: GitErrorCodes.UnknownPath });
+			}
+			const sizeRes = await this.exec(['cat-file', '-s', treeish]);
+			const size = parseInt(sizeRes.stdout.trim(), 10) || 0;
+			return { mode: '100644', object: treeish, size };
+		}
+
 		if (!treeish || treeish === ':1' || treeish === ':2' || treeish === ':3') { // index
 			const elements = await this.lsfiles(path);
 
@@ -1654,7 +1665,7 @@ export class Repository {
 		return { mode, object, size: parseInt(size) || 0 };
 	}
 
-	async lstree(treeish: string, path?: string, options?: { recursive?: boolean }): Promise<LsTreeElement[]> {
+	async lstree(treeish: string, path?: string, options?: { recursive?: boolean; maxEntries?: number; scope?: string }): Promise<LsTreeElement[]> {
 		const args = ['ls-tree', '-l'];
 
 		if (options?.recursive) {
@@ -1663,12 +1674,17 @@ export class Repository {
 
 		args.push(treeish);
 
-		if (path) {
-			args.push('--', this.sanitizeRelativePath(path));
+		const targetPath = options?.scope || path;
+		if (targetPath) {
+			args.push('--', this.sanitizeRelativePath(targetPath));
 		}
 
 		const { stdout } = await this.exec(args);
-		return parseLsTree(stdout);
+		const parsed = parseLsTree(stdout);
+		if (typeof options?.maxEntries === 'number' && options.maxEntries > 0 && parsed.length > options.maxEntries) {
+			return parsed.slice(0, options.maxEntries);
+		}
+		return parsed;
 	}
 
 	async lsfiles(path: string): Promise<LsFilesElement[]> {
