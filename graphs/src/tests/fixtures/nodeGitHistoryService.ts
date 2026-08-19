@@ -200,6 +200,7 @@ export class NodeGitHistoryService implements IGitHistoryService {
 		}
 
 		return {
+			repositoryId: topLevel,
 			rootPath: topLevel,
 			gitDir,
 			commonGitDir,

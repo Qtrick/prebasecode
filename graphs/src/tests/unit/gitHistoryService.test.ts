@@ -57,7 +57,7 @@ suite('GitHistoryService & Node Adapter Unit Tests', () => {
 
 		const identity = await gitService.getRepositoryIdentity(tempRepoDir);
 		assert.ok(identity.rootPath);
-		assert.ok(identity.gitDir.endsWith('.git'));
+		assert.ok(identity.gitDir?.endsWith('.git'));
 	});
 
 	test('listBranches parses branch names and commits cleanly via %00', async () => {

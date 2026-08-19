@@ -50,13 +50,18 @@ export interface AnalysisManifestEntry {
 	readonly path: string;
 	readonly contentIdentity?: string;
 	readonly size?: number;
-	readonly analyzedAt: number;
 	readonly isComponent: boolean;
 	readonly architectureLayer?: string;
+	readonly language?: string;
+	readonly analyzedAt?: number;
 }
 
 export interface AnalysisManifest {
 	readonly entries: readonly AnalysisManifestEntry[];
+	readonly runMetadata?: {
+		readonly analyzedAt: number;
+		readonly durationMs?: number;
+	};
 }
 
 export interface CanonicalGraphSnapshot {

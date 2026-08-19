@@ -92,6 +92,10 @@ export interface IPreBaseGraphService {
 	getDependenciesForMagnus(nodeIdOrPath: string, direction?: 'incoming' | 'outgoing' | 'both', depth?: number, maximumNodes?: number): string | undefined;
 	getOverviewForMagnus(): string;
 	focusNodeForMagnus(nodeIdOrPath: string): boolean;
+	resolveNodeFocusForMagnus(nodeIdOrPath: string): {
+		status: 'not-found' | 'found-rendered-focused' | 'found-canonical-not-rendered';
+		node?: GraphNode;
+	};
 
 	requestResetView(): void;
 	requestFitView(): void;
@@ -383,20 +387,28 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	focusNodeForMagnus(nodeIdOrPath: string): boolean {
+		const result = this.resolveNodeFocusForMagnus(nodeIdOrPath);
+		return result.status === 'found-rendered-focused';
+	}
+
+	resolveNodeFocusForMagnus(nodeIdOrPath: string): {
+		status: 'not-found' | 'found-rendered-focused' | 'found-canonical-not-rendered';
+		node?: GraphNode;
+	} {
 		const node = this._findNode(nodeIdOrPath);
 		if (!node) {
-			return false;
+			return { status: 'not-found' };
 		}
 
-		// Check if node is rendered in current 280-node projection
+		// Check if node is rendered in current projection
 		const isRendered = this._snapshot?.nodes.some(n => n.id === node.id);
 		if (isRendered) {
 			this.setSelectedNodeId(node.id);
-			return true;
+			return { status: 'found-rendered-focused', node };
 		}
 
 		// Node exists in canonical graph but is not in render projection
-		return false;
+		return { status: 'found-canonical-not-rendered', node };
 	}
 
 	private _findNode(nodeIdOrPath: string): GraphNode | undefined {
@@ -500,11 +512,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			const projectName = basename(projectPath) || folder.name;
 			const respectGitIgnore = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphRespectGitIgnore) !== false;
 
-			// Wire HEAD observers for any newly-opened repositories before scanning.
+			// Ensure repository is opened/known before wiring ignore or HEAD
+			const repoForIgnore = await this._ensureGitRepositoryForPath(projectPath);
 			this._checkAndWireHeadObservers();
 
 			// Wire git-native checkIgnore when available for the workspace folder.
-			const repoForIgnore = this._findGitRepositoryForPath(projectPath);
 			const checkIgnoreFn: ((paths: string[]) => Promise<Set<string>>) | undefined =
 				(respectGitIgnore && repoForIgnore?.checkIgnore)
 					? async (paths) => new Set(await repoForIgnore.checkIgnore!(paths))
@@ -632,7 +644,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	private _projectAndPublish(canonical: CanonicalGraphSnapshot): PreBaseEnrichedSnapshot {
-		this._canonicalIndex = new CanonicalQueryIndex(canonical);
+		if (this._canonicalSnapshot !== canonical || !this._canonicalIndex) {
+			this._canonicalIndex = new CanonicalQueryIndex(canonical);
+		}
 
 		const limits = this._scanLimits();
 		const networkLayoutMode = this._getNetworkLayoutMode();
@@ -729,6 +743,29 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		}
 		const all = Array.from(this.gitService.repositories);
 		return all.length === 1 ? all[0] : undefined;
+	}
+
+	/** Ensures the repository for the given path is opened and tracked by git service. */
+	private async _ensureGitRepositoryForPath(fsPath: string): Promise<IGitRepository | undefined> {
+		let repo = this._findGitRepositoryForPath(fsPath);
+		if (repo) {
+			return repo;
+		}
+		if (this.gitService && typeof this.gitService.openRepository === 'function') {
+			try {
+				const uri = URI.file(fsPath);
+				repo = await Promise.race([
+					this.gitService.openRepository(uri),
+					new Promise<undefined>((resolve) => setTimeout(() => resolve(undefined), 1500))
+				]);
+				if (repo) {
+					this._wireRepositoryHeadObserver(repo);
+				}
+			} catch {
+				// Non-git folder or open failed
+			}
+		}
+		return repo || this._findGitRepositoryForPath(fsPath);
 	}
 
 	/**

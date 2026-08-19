@@ -1252,11 +1252,11 @@ export class Repository implements Disposable {
 			this.repository.diffBetweenWithStats(ref, { path, similarityThreshold }));
 	}
 
-	diffTrees(treeish1: string, treeish2?: string): Promise<DiffChange[]> {
+	diffTrees(treeish1: string, treeish2?: string, options?: { root?: boolean; similarityThreshold?: number }): Promise<DiffChange[]> {
 		const scopedConfig = workspace.getConfiguration('git', Uri.file(this.root));
-		const similarityThreshold = scopedConfig.get<number>('similarityThreshold', 50);
+		const similarityThreshold = options?.similarityThreshold ?? scopedConfig.get<number>('similarityThreshold', 50);
 
-		return this.run(Operation.Diff, () => this.repository.diffTrees(treeish1, treeish2, { similarityThreshold }));
+		return this.run(Operation.Diff, () => this.repository.diffTrees(treeish1, treeish2, { similarityThreshold, root: options?.root }));
 	}
 
 	resolveCommitRef(ref: string): Promise<string> {

@@ -13,6 +13,7 @@ import { IExtHostExtensionService } from './extHostExtensionService.js';
 import { IExtHostRpcService } from './extHostRpcService.js';
 import { ExtHostGitExtensionShape, GitBranchDto, GitChangeDto, GitCommitMetadataDto, GitDiffChangeDto, GitExactDiffChangeDto, GitExactDiffResultDto, GitHistoryResultDto, GitLogOptionsDto, GitRefDto, GitRefQueryDto, GitRefTypeDto, GitRepositoryStateDto, GitTreeEntryDto, GitUpstreamRefDto, MainContext, MainThreadGitExtensionShape } from './extHost.protocol.js';
 import { ResourceMap } from '../../../base/common/map.js';
+import * as path from '../../../base/common/path.js';
 
 const GIT_EXTENSION_ID = 'vscode.git';
 
@@ -136,7 +137,7 @@ interface Repository {
 	diffBetween?(ref1: string, ref2: string, path?: string): Promise<Change[]>;
 	diffBetweenWithStats(ref1: string, ref2: string, path?: string): Promise<DiffChange[]>;
 	diffBetweenWithStats2(ref: string, path?: string): Promise<DiffChange[]>;
-	diffTrees?(treeish1: string, treeish2?: string): Promise<DiffChange[]>;
+	diffTrees?(treeish1: string, treeish2?: string, options?: { root?: boolean; similarityThreshold?: number }): Promise<DiffChange[]>;
 	getMergeBase?(ref1: string, ref2: string): Promise<string | undefined>;
 	checkIgnore?(paths: string[]): Promise<Set<string>>;
 	isBranchProtected(branch?: Branch): boolean;
@@ -610,6 +611,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
 		}
+		if (token?.isCancellationRequested) {
+			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
+		}
 		try {
 			if (typeof repository.getCommit === 'function') {
 				const commit = await repository.getCommit(commitRef);
@@ -618,7 +622,31 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				}
 				const parents = commit.parents || [];
 				const pIndex = parentIndex ?? 0;
-				const parentRef = parents[pIndex] || '4b825dc642cb6eb9a060e54bf8d69288fbee4904'; // Empty tree SHA for root commit
+				if (parents.length === 0 || pIndex >= parents.length) {
+					// Root commit: diff directly against null tree using --root semantics (object-format independent)
+					if (typeof repository.diffTrees === 'function') {
+						const diffs = await repository.diffTrees(commitRef, undefined, { root: true });
+						const rootPath = repository.rootUri.path;
+						const changes: GitExactDiffChangeDto[] = (diffs || []).map(d => {
+							const changeDto = toGitChangeDto(d);
+							const modifiedUri = changeDto.modifiedUri ? URI.revive(changeDto.modifiedUri) : undefined;
+							const originalUri = changeDto.originalUri ? URI.revive(changeDto.originalUri) : undefined;
+							const uri = changeDto.uri ? URI.revive(changeDto.uri) : undefined;
+							const relPath = modifiedUri ? modifiedUri.path.slice(rootPath.length + 1) : (uri ? uri.path.slice(rootPath.length + 1) : '');
+							const oldRelPath = originalUri ? originalUri.path.slice(rootPath.length + 1) : undefined;
+							return {
+								kind: 'added',
+								path: relPath,
+								oldPath: oldRelPath,
+								similarity: d.similarity,
+								oldBlobOid: d.oldBlobOid,
+								newBlobOid: d.newBlobOid,
+							};
+						});
+						return { success: true, data: { fromRef: '', toRef: commitRef, changes } };
+					}
+				}
+				const parentRef = parents[pIndex];
 				return this.$diffExactTrees(handle, parentRef, commitRef, token);
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'getCommit is not supported on repository' } };
@@ -648,13 +676,26 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 
 	async $checkIgnore(handle: number, paths: string[]): Promise<string[]> {
 		const repository = this._repositories.get(handle);
-		if (!repository) {
+		if (!repository || !paths || paths.length === 0) {
 			return [];
 		}
 		try {
 			if (typeof repository.checkIgnore === 'function') {
-				const set = await repository.checkIgnore(paths);
-				return Array.from(set || []);
+				const rootPath = repository.rootUri.fsPath;
+				const absPaths = paths.map(p => path.isAbsolute(p) ? p : path.join(rootPath, p));
+				const set = await repository.checkIgnore(absPaths);
+				if (!set || set.size === 0) {
+					return [];
+				}
+				const result = new Set<string>();
+				for (const p of paths) {
+					const abs = path.isAbsolute(p) ? p : path.join(rootPath, p);
+					if (set.has(abs) || set.has(p)) {
+						result.add(p);
+						result.add(abs);
+					}
+				}
+				return Array.from(result);
 			}
 			return [];
 		} catch {

@@ -291,7 +291,7 @@ export interface Repository {
 	diffBetweenPatch(ref1: string, ref2: string, path?: string): Promise<string>;
 	diffBetweenWithStats(ref1: string, ref2: string, path?: string): Promise<DiffChange[]>;
 	diffBetweenWithStats2(ref: string, path?: string): Promise<DiffChange[]>;
-	diffTrees(treeish1: string, treeish2?: string): Promise<DiffChange[]>;
+	diffTrees(treeish1: string, treeish2?: string, options?: { root?: boolean; similarityThreshold?: number }): Promise<DiffChange[]>;
 	resolveCommitRef(ref: string): Promise<string>;
 
 	hashObject(data: string): Promise<string>;

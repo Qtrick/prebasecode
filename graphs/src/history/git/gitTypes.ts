@@ -8,9 +8,13 @@ export type GitHistoryErrorCode =
 	| 'Timeout'
 	| 'BufferLimit'
 	| 'RepositoryUnavailable'
+	| 'RepositoryNotFound'
 	| 'ObjectUnavailable'
+	| 'OversizedBlob'
+	| 'NotSupported'
 	| 'ProcessFailure'
-	| 'ParseFailure';
+	| 'ParseFailure'
+	| 'HistoryIncomplete';
 
 export class GitHistoryError extends Error {
 	readonly code: GitHistoryErrorCode;
@@ -46,10 +50,14 @@ export interface GitCommitMetadata {
 }
 
 export interface GitRepositoryIdentity {
+	readonly repositoryId: string;
 	readonly rootPath: string;
-	readonly gitDir: string;
+	readonly rootUri?: string;
+	readonly gitDir?: string;
 	readonly commonGitDir?: string;
 	readonly remoteUrl?: string;
+	readonly headBranch?: string;
+	readonly isUnborn?: boolean;
 }
 
 export type GitObjectType = 'blob' | 'tree' | 'commit' | 'tag';
@@ -61,6 +69,14 @@ export interface GitTreeEntry {
 	readonly mode: string;
 	readonly objectType: GitObjectType;
 	readonly size?: number;
+}
+
+export interface GitTreeInventory {
+	readonly entries: readonly GitTreeEntry[];
+	readonly isTruncated: boolean;
+	readonly returnedCount: number;
+	readonly discoveredAtLeast: number;
+	readonly scope?: string;
 }
 
 export type GitChangeKind = 'added' | 'deleted' | 'modified' | 'renamed' | 'copied';

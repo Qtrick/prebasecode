@@ -143,12 +143,12 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 			if (this._checkIgnore && candidatePaths.length > 0) {
 				let ignoredSet: Set<string>;
 				try {
-					ignoredSet = await this._checkIgnore(candidatePaths.map(c => c.relPath));
+					ignoredSet = await this._checkIgnore(candidatePaths.map(c => c.fullPath));
 				} catch {
 					ignoredSet = new Set();
 				}
 				for (const cand of candidatePaths) {
-					if (ignoredSet.has(cand.relPath)) {
+					if (ignoredSet.has(cand.fullPath) || ignoredSet.has(cand.relPath)) {
 						continue;
 					}
 					if (files.length < this._maxScanFiles) {

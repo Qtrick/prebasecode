@@ -39,6 +39,7 @@ const tests = [
 	'graphs/src/tests/unit/workbenchGitHistoryService.test.ts',
 	'graphs/src/tests/unit/productionGitBridgeContract.test.ts',
 	'graphs/src/tests/unit/gitTreeHistoricalAnalysis.test.ts',
+	'graphs/src/tests/unit/gitBridgeE2E.test.ts',
 ];
 
 for (const test of tests) {

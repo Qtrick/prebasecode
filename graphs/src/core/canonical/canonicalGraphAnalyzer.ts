@@ -49,6 +49,7 @@ export class CanonicalGraphAnalyzer {
 			return undefined;
 		}
 
+		const startTime = Date.now();
 		const inventory = await contentSource.listFiles(token);
 		if (token?.isCancellationRequested) {
 			return undefined;
@@ -129,17 +130,24 @@ export class CanonicalGraphAnalyzer {
 		const entryNodeId = detectEntryNodeId(contentSource.rootPath, partial.nodes, partial.edges, packageMain);
 		const layeredNodes = assignLayersToNodes(partial.nodes, entryNodeId);
 
-		// Populate architectureLayer in analysis manifest entries
-		const nodeLayerMap = new Map<string, string>();
+		// Populate architectureLayer and language in analysis manifest entries
+		const nodeMetaMap = new Map<string, { layer?: string; language?: string }>();
 		for (const node of layeredNodes) {
-			if (node.path && node.meta?.architectureLayer) {
-				nodeLayerMap.set(node.path, node.meta.architectureLayer);
+			if (node.path) {
+				nodeMetaMap.set(node.path, {
+					layer: node.meta?.architectureLayer,
+					language: node.meta?.language,
+				});
 			}
 		}
-		const enrichedManifestEntries: AnalysisManifestEntry[] = manifestEntries.map(entry => ({
-			...entry,
-			architectureLayer: nodeLayerMap.get(entry.path),
-		}));
+		const enrichedManifestEntries: AnalysisManifestEntry[] = manifestEntries.map(entry => {
+			const meta = nodeMetaMap.get(entry.path);
+			return {
+				...entry,
+				architectureLayer: meta?.layer,
+				language: meta?.language,
+			};
+		});
 
 		// Normalize node and edge ordering deterministically using code-unit comparator
 		const sortedNodes: GraphNode[] = [...layeredNodes].sort((a, b) => stableCompare(a.id, b.id));
@@ -159,22 +167,27 @@ export class CanonicalGraphAnalyzer {
 			completeWithinProfile,
 			isComplete: completeWithinProfile,
 			discoveredCount,
-			analyzedCount: parseResults.length,
-			analyzedFileCount: parseResults.length,
+			analyzedCount: manifestEntries.length,
+			analyzedFileCount: manifestEntries.length,
 			excludedCount: totalExcluded,
 			excludedFileCount: totalExcluded,
 			failedCount,
 			truncated: isTruncated,
 			truncationReason: isTruncated
-				? (inventory.truncationReason ?? `Exceeded maxCanonicalFiles budget of ${this._maxCanonicalFiles}`)
+				? (inventory.truncationReason ?? `Exceeded max canonical file budget of ${this._maxCanonicalFiles}`)
 				: undefined,
 			exclusionBreakdown,
 			exclusionReasons: exclusionBreakdown,
 			skippedFiles: skippedFiles.length > 0 ? skippedFiles : undefined,
 		};
 
+		const durationMs = Date.now() - startTime;
 		const manifest: AnalysisManifest = {
 			entries: enrichedManifestEntries,
+			runMetadata: {
+				analyzedAt: startTime,
+				durationMs,
+			},
 		};
 
 		return {
@@ -213,14 +226,16 @@ export class CanonicalGraphAnalyzer {
 				}
 			}
 
-			const content = await contentSource.readFile(file.relativePath, token);
-			if (content === undefined) {
-				recordExclusion(file.relativePath, 'parse-error');
+			const content = await contentSource.readFile(file.relativePath);
+			if (content === undefined || token?.isCancellationRequested) {
+				if (content === undefined) {
+					recordExclusion(file.relativePath, 'parse-error');
+				}
 				return undefined;
 			}
 
-			const actualSize = fileSize ?? content.length;
-			if (content.length > this._maxFileSizeBytes) {
+			const actualSize = fileSize ?? Buffer.byteLength(content, 'utf8');
+			if (actualSize > this._maxFileSizeBytes) {
 				recordExclusion(file.relativePath, 'oversized-file');
 				return undefined;
 			}
@@ -251,7 +266,6 @@ export class CanonicalGraphAnalyzer {
 				path: file.relativePath,
 				contentIdentity,
 				size: actualSize,
-				analyzedAt: Date.now(),
 				isComponent: !!parseResult.isComponentFile,
 			};
 

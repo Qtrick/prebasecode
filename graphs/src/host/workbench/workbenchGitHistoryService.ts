@@ -120,10 +120,18 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 	}
 
 	async getRepositoryIdentity(rootPath: string, _token?: CancellationTokenLike): Promise<GitRepositoryIdentity> {
-		await this._ensureRepository(rootPath);
+		const repo = await this._ensureRepository(rootPath);
+		const repoRootPath = repo.rootUri.fsPath || repo.rootUri.path;
+		const rootUriStr = repo.rootUri.toString();
+		const state = repo.state?.current || (repo.state?.get ? repo.state.get() : undefined);
+		const headBranch = state?.HEAD?.name;
+		const isUnborn = !state?.HEAD?.commit;
 		return {
-			rootPath,
-			gitDir: `${rootPath}/.git`,
+			repositoryId: rootUriStr,
+			rootPath: repoRootPath,
+			rootUri: rootUriStr,
+			headBranch,
+			isUnborn,
 		};
 	}
 

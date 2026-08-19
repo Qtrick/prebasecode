@@ -1290,7 +1290,7 @@ const REFS_FORMAT = '%(refname)%00%(objectname)%00%(*objectname)';
 const REFS_WITH_DETAILS_FORMAT = `${REFS_FORMAT}%00%(parent)%00%(*parent)%00%(authorname)%00%(*authorname)%00%(committerdate:unix)%00%(*committerdate:unix)%00%(subject)%00%(*subject)`;
 
 function parseRefs(data: string): (Ref | Branch)[] {
-	const refRegex = /^(refs\/[^\0]+)\0([0-9a-f]{40})\0([0-9a-f]{40})?(?:\0(.*))?$/gm;
+	const refRegex = /^(refs\/[^\0]+)\0([0-9a-f]{40,64})\0([0-9a-f]{40,64})?(?:\0(.*))?$/gm;
 
 	const headRegex = /^refs\/heads\/([^ ]+)$/;
 	const remoteHeadRegex = /^refs\/remotes\/([^/]+)\/([^ ]+)$/;
@@ -1940,8 +1940,12 @@ export class Repository {
 	}
 
 
-	async diffTrees(treeish1: string, treeish2?: string, options?: { similarityThreshold?: number }): Promise<DiffChange[]> {
-		const args = ['diff-tree', '-r', '--raw', '--numstat', '--diff-filter=ADMR', '-z'];
+	async diffTrees(treeish1: string, treeish2?: string, options?: { similarityThreshold?: number; root?: boolean }): Promise<DiffChange[]> {
+		const args = ['diff-tree', '-r', '--raw', '--no-abbrev', '--numstat', '--diff-filter=ADMR', '-z'];
+
+		if (options?.root || !treeish2) {
+			args.push('--root');
+		}
 
 		if (options?.similarityThreshold) {
 			args.push(`--find-renames=${options.similarityThreshold}%`);

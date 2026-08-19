@@ -45,8 +45,14 @@ export function isComparableSnapshots(
 		typeof a.versions.graphSchemaVersion === 'number' &&
 		typeof b.versions.graphSchemaVersion === 'number' &&
 		a.versions.graphSchemaVersion === b.versions.graphSchemaVersion &&
+		typeof a.versions.identityVersion === 'number' &&
+		typeof b.versions.identityVersion === 'number' &&
 		a.versions.identityVersion === b.versions.identityVersion &&
+		typeof a.versions.analyzerVersion === 'number' &&
+		typeof b.versions.analyzerVersion === 'number' &&
 		a.versions.analyzerVersion === b.versions.analyzerVersion &&
-		(a.versions.analysisProfileVersion ?? 1) === (b.versions.analysisProfileVersion ?? 1)
+		typeof a.versions.analysisProfileVersion === 'number' &&
+		typeof b.versions.analysisProfileVersion === 'number' &&
+		a.versions.analysisProfileVersion === b.versions.analysisProfileVersion
 	);
 }

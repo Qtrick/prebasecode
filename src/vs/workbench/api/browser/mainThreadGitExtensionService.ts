@@ -125,8 +125,17 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 			this._repositories.set(result.handle, repository);
 			this._repositoryHandles.set(repositoryRootUri, result.handle);
 
-			// Wait for the repository to be fully initialized before returning it
-			await waitForState(repository.state, state => state.HEAD !== undefined);
+			// Wait for the repository to be initialized (or timeout quickly for unborn repos)
+			if (state.HEAD === undefined) {
+				try {
+					await Promise.race([
+						waitForState(repository.state, s => s.HEAD !== undefined),
+						new Promise<void>(resolve => setTimeout(resolve, 500))
+					]);
+				} catch {
+					// Continue with current state
+				}
+			}
 
 			return repository;
 		});
