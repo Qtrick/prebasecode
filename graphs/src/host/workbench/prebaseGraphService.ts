@@ -9,29 +9,21 @@ import { Disposable } from '../../../../../../base/common/lifecycle.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { localize } from '../../../../../../nls.js';
 import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
-import { IFileService, IFileStat } from '../../../../../../platform/files/common/files.js';
+import { IFileService } from '../../../../../../platform/files/common/files.js';
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 import { IOutputService } from '../../../../../services/output/common/output.js';
-import { match as matchGlob } from '../../../../../../base/common/glob.js';
 import { PreBaseGraphConfigKeys, PREBASE_GRAPH_CHANNEL_ID } from '../../common/configuration/graphConfigKeys.js';
-import { detectEntryNodeId } from '../../core/analysis/entryDetector.js';
-import { GraphGenerator } from '../../core/generation/graphGenerator.js';
-import { DEFAULT_IGNORE_PATTERNS } from '../../core/scanning/ignorePatterns.js';
-import { extractImportsForFile, extractPackageName } from '../../core/parsing/importExtractors.js';
-import {
-	computeNetworkSphereRadius,
-	layoutNetworkGraph,
-	type NetworkLayoutRuntimeConfig,
-	type NetworkLayoutMode,
-} from '../../layouts/network/index.js';
-import { getFileTypeInfo } from '../../common/constants/fileTypeColors.js';
-import {
-	assignLayersToNodes
-} from '../../core/analysis/architectureLayers.js';
-import { isGraphRelevantFile } from '../../core/scanning/projectFiles.js';
-import { basename, normalizePath } from '../../core/resolution/paths.js';
-import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode, ParseResult, ScannedFile } from '../../common/types/graphTypes.js';
+import type { CanonicalGraphSnapshot } from '../../common/types/canonicalTypes.js';
+import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
+import { WorkingTreeContentSource } from '../../core/canonical/contentSource.js';
+import { computeCanonicalGraphDiff, type CanonicalGraphDiff } from '../../core/canonical/canonicalGraphDiff.js';
+import { projectNetworkGraph } from '../../core/projection/graphProjection.js';
+import { GitHistoryService } from '../../history/git/gitHistoryService.js';
+import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
+import type { NetworkLayoutMode } from '../../layouts/network/index.js';
+import { basename } from '../../core/resolution/paths.js';
+import type { GraphEdge, GraphNode, GraphSnapshot, LayoutMode } from '../../common/types/graphTypes.js';
 
 export type PreBaseGraphType = 'network';
 
@@ -53,16 +45,13 @@ export interface PreBaseGraphDiagnostics {
 	fileCount: number;
 	nodeCount: number;
 	edgeCount: number;
+	canonicalNodeCount?: number;
+	canonicalEdgeCount?: number;
 	entryNodeId: string | null;
 	scannedAt: number | null;
 	status: 'idle' | 'scanning' | 'ready' | 'error' | 'cancelled';
 	message?: string;
-}
-
-interface NodeImportance {
-	inDegree: number;
-	outDegree: number;
-	score: number;
+	digest?: string;
 }
 
 interface AdjacentGraphEdge {
@@ -70,8 +59,6 @@ interface AdjacentGraphEdge {
 	isOutgoing: boolean;
 	isIncoming: boolean;
 }
-
-const EmptyNodeImportance: NodeImportance = { inDegree: 0, outDegree: 0, score: 0 };
 
 export const IPreBaseGraphService = createDecorator<IPreBaseGraphService>('prebaseGraphService');
 
@@ -85,6 +72,7 @@ export interface IPreBaseGraphService {
 	readonly onDidRequestCameraAction: Event<PreBaseGraphCameraAction>;
 
 	getSnapshot(): PreBaseEnrichedSnapshot | undefined;
+	getCanonicalSnapshot(): CanonicalGraphSnapshot | undefined;
 	getViewState(): PreBaseGraphViewState;
 	getDiagnostics(): PreBaseGraphDiagnostics;
 
@@ -96,6 +84,9 @@ export interface IPreBaseGraphService {
 	setGraphType(graphType: PreBaseGraphType): Promise<void>;
 	setLayoutMode(layoutMode: LayoutMode): Promise<void>;
 	relayout(): Promise<PreBaseEnrichedSnapshot | undefined>;
+
+	buildCanonicalGraphAtRef(ref: string, token?: CancellationToken): Promise<CanonicalGraphSnapshot | undefined>;
+	compareCanonicalGraphRefs(refA: string, refB: string, token?: CancellationToken): Promise<{ diff: CanonicalGraphDiff; snapshotA: CanonicalGraphSnapshot; snapshotB: CanonicalGraphSnapshot } | undefined>;
 
 	getSelectedNodeId(): string | undefined;
 	setSelectedNodeId(nodeId: string | undefined): void;
@@ -126,7 +117,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	readonly onDidRequestCameraAction = this._onDidRequestCameraAction.event;
 
 	private _snapshot: PreBaseEnrichedSnapshot | undefined;
-	private _rawSnapshot: GraphSnapshot | undefined;
+	private _canonicalSnapshot: CanonicalGraphSnapshot | undefined;
 	private _scanCts: CancellationTokenSource | undefined;
 	private _relayoutGeneration = 0;
 	private _layoutRevision = 0;
@@ -158,11 +149,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedNodes) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphMaxRenderedEdges)
 			) {
-				if (this._rawSnapshot) {
-					const enriched = this._enrich(this._rawSnapshot, this._diagnostics.fileCount);
-					this._snapshot = enriched;
-					this._onDidChangeSnapshot.fire(enriched);
-					this._setDiagnostics(enriched.diagnostics);
+				if (this._canonicalSnapshot) {
+					this._projectAndPublish(this._canonicalSnapshot);
 				}
 			} else if (
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkForceStrength) ||
@@ -171,7 +159,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkSpreadScale)
 			) {
-				if (this._viewState.graphType === 'network' && this._rawSnapshot) {
+				if (this._viewState.graphType === 'network' && this._canonicalSnapshot) {
 					void this.relayout();
 				}
 			} else if (e.affectsConfiguration(PreBaseGraphConfigKeys.GraphRespectGitIgnore)) {
@@ -200,6 +188,10 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	getSnapshot(): PreBaseEnrichedSnapshot | undefined {
 		return this._snapshot;
+	}
+
+	getCanonicalSnapshot(): CanonicalGraphSnapshot | undefined {
+		return this._canonicalSnapshot;
 	}
 
 	getViewState(): PreBaseGraphViewState {
@@ -233,17 +225,18 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	getSelectionSummaryForMagnus(): string | undefined {
-		if (!this._snapshot || !this._selectedNodeId) {
+		const source = this._canonicalSnapshot ?? this._snapshot;
+		if (!source || !this._selectedNodeId) {
 			return undefined;
 		}
-		const node = this._snapshot.nodes.find(n => n.id === this._selectedNodeId);
+		const node = source.nodes.find(n => n.id === this._selectedNodeId);
 		if (!node) {
 			return undefined;
 		}
-		const edges = this._snapshot.edges.filter(e => e.source === node.id || e.target === node.id);
+		const edges = source.edges.filter(e => e.source === node.id || e.target === node.id);
 		return [
-			`Graph type: ${this._snapshot.graphType}`,
-			`Layout: ${this._snapshot.layoutMode}`,
+			`Graph type: ${this._viewState.graphType}`,
+			`Layout: ${this._viewState.layoutMode}`,
 			`Selected node: ${node.label || node.id}`,
 			`Path: ${node.path || node.id}`,
 			`Kind: ${node.kind}`,
@@ -252,16 +245,16 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	searchForMagnus(query: string, maximumResults = 20): string {
-		const snapshot = this._snapshot;
+		const source = this._canonicalSnapshot ?? this._snapshot;
 		const normalized = typeof query === 'string' && query.length <= 512 ? query.trim().toLowerCase() : '';
-		if (!snapshot || !normalized) {
+		if (!source || !normalized) {
 			return JSON.stringify({ graph: this._freshness(), nodes: [] });
 		}
 		const boundedMaximum = typeof maximumResults === 'number' && Number.isFinite(maximumResults)
 			? Math.max(1, Math.min(Math.floor(maximumResults), 50))
 			: 20;
-		const degree = this._degrees(snapshot);
-		const nodes = snapshot.nodes
+		const degree = this._degrees(source);
+		const nodes = source.nodes
 			.filter(node => [node.id, node.label, node.path, node.kind, node.meta?.language, node.meta?.architectureLayer]
 				.some(value => value?.toLowerCase().includes(normalized)))
 			.slice(0, boundedMaximum)
@@ -279,12 +272,12 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	getNodeDetailsForMagnus(nodeIdOrPath: string): string | undefined {
-		const snapshot = this._snapshot;
+		const source = this._canonicalSnapshot ?? this._snapshot;
 		const node = this._findNode(nodeIdOrPath);
-		if (!snapshot || !node) {
+		if (!source || !node) {
 			return undefined;
 		}
-		const edges = snapshot.edges.filter(edge => edge.source === node.id || edge.target === node.id);
+		const edges = source.edges.filter(edge => edge.source === node.id || edge.target === node.id);
 		return JSON.stringify({
 			graph: this._freshness(),
 			node,
@@ -294,9 +287,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	getDependenciesForMagnus(nodeIdOrPath: string, direction: 'incoming' | 'outgoing' | 'both' = 'both', depth = 1, maximumNodes = 50): string | undefined {
-		const snapshot = this._snapshot;
+		const source = this._canonicalSnapshot ?? this._snapshot;
 		const root = this._findNode(nodeIdOrPath);
-		if (!snapshot || !root) {
+		if (!source || !root) {
 			return undefined;
 		}
 		const boundedDirection = direction === 'incoming' || direction === 'outgoing' || direction === 'both' ? direction : 'both';
@@ -306,8 +299,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const queue: Array<{ id: string; depth: number }> = [{ id: root.id, depth: 0 }];
 		const relationships: Array<{ from: string; to: string; kind: string }> = [];
 		const adjacentEdges = new Map<string, AdjacentGraphEdge[]>();
-		const nodeById = new Map(snapshot.nodes.map(node => [node.id, node]));
-		for (const edge of snapshot.edges) {
+		const nodeById = new Map(source.nodes.map(node => [node.id, node]));
+		for (const edge of source.edges) {
 			this._addAdjacentEdge(adjacentEdges, edge.source, {
 				edge,
 				isOutgoing: true,
@@ -337,15 +330,22 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	getOverviewForMagnus(): string {
-		const snapshot = this._snapshot;
-		if (!snapshot) {
+		const source = this._canonicalSnapshot ?? this._snapshot;
+		if (!source) {
 			return JSON.stringify({ graph: this._freshness(), available: false });
 		}
-		const degree = this._degrees(snapshot);
-		const languages = [...new Set(snapshot.nodes.map(node => node.meta?.language).filter((value): value is string => !!value))];
+		const degree = this._degrees(source);
+		const languages = [...new Set(source.nodes.map(node => node.meta?.language).filter((value): value is string => !!value))];
 		const highDegree = [...degree.entries()].sort((a, b) => b[1] - a[1]).slice(0, 10)
-			.map(([id, count]) => ({ id, degree: count, path: snapshot.nodes.find(node => node.id === id)?.path }));
-		return JSON.stringify({ graph: this._freshness(), available: true, languages, highDegree });
+			.map(([id, count]) => ({ id, degree: count, path: source.nodes.find(node => node.id === id)?.path }));
+		return JSON.stringify({
+			graph: this._freshness(),
+			available: true,
+			totalCanonicalNodes: source.nodes.length,
+			totalCanonicalEdges: source.edges.length,
+			languages,
+			highDegree,
+		});
 	}
 
 	focusNodeForMagnus(nodeIdOrPath: string): boolean {
@@ -365,23 +365,25 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		if (!value || value.length > 4096) {
 			return undefined;
 		}
-		return this._snapshot?.nodes.find(node => node.id === value || node.path === value || `file:${node.path}` === value);
+		const source = this._canonicalSnapshot ?? this._snapshot;
+		return source?.nodes.find(node => node.id === value || node.path === value || `file:${node.path}` === value);
 	}
 
-	private _degrees(snapshot: PreBaseEnrichedSnapshot): Map<string, number> {
+	private _degrees(source: { edges: readonly GraphEdge[] }): Map<string, number> {
 		const degree = new Map<string, number>();
-		for (const edge of snapshot.edges) {
+		for (const edge of source.edges) {
 			degree.set(edge.source, (degree.get(edge.source) ?? 0) + 1);
 			degree.set(edge.target, (degree.get(edge.target) ?? 0) + 1);
 		}
 		return degree;
 	}
 
-	private _freshness(): { scannedAt: number | null; status: PreBaseGraphDiagnostics['status']; projectPath: string | undefined } {
+	private _freshness(): { scannedAt: number | null; status: PreBaseGraphDiagnostics['status']; projectPath: string | undefined; digest?: string } {
 		return {
 			scannedAt: this._diagnostics.scannedAt,
 			status: this._diagnostics.status,
-			projectPath: this._snapshot?.projectPath,
+			projectPath: this._snapshot?.projectPath ?? this._canonicalSnapshot?.projectPath,
+			digest: this._canonicalSnapshot?.digest,
 		};
 	}
 
@@ -403,7 +405,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	clearCache(): void {
 		this._snapshot = undefined;
-		this._rawSnapshot = undefined;
+		this._canonicalSnapshot = undefined;
 		this._onDidChangeSnapshot.fire(undefined);
 		this._setDiagnostics({
 			fileCount: 0,
@@ -418,8 +420,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async setGraphType(_graphType: PreBaseGraphType): Promise<void> {
-		// The active product has one Code Graph. This method remains for callers
-		// and persisted editor restoration, but there is no alternate runtime path.
+		// The active product has one Code Graph.
 	}
 
 	async setLayoutMode(layoutMode: LayoutMode): Promise<void> {
@@ -428,7 +429,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		}
 		this._viewState = { ...this._viewState, layoutMode };
 		this._onDidChangeViewState.fire(this._viewState);
-		if (this._rawSnapshot) {
+		if (this._canonicalSnapshot) {
 			void this.relayout();
 		}
 	}
@@ -440,7 +441,6 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	async scanWorkspace(token?: CancellationToken): Promise<PreBaseEnrichedSnapshot | undefined> {
 		this._relayoutGeneration++;
-		// Cancel any in-flight scan without marking the UI cancelled (a newer scan is starting).
 		if (this._scanCts) {
 			this._scanCts.cancel();
 			this._scanCts.dispose();
@@ -462,78 +462,36 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 			const projectPath = folder.uri.fsPath || folder.uri.path;
 			const projectName = basename(projectPath) || folder.name;
-			const limits = this._scanLimits();
-			const files = await this._collectFiles(folder.uri, cts.token, limits.maxScanFiles);
-			if (cts.token.isCancellationRequested) {
-				this._markCancelledIfActive(cts);
-				return undefined;
-			}
+			const respectGitIgnore = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphRespectGitIgnore) !== false;
 
-			this._setDiagnostics({
-				fileCount: files.length,
-				status: 'scanning',
-				message: localize('prebase.graph.parsing', "Parsing {0} files…", files.length)
+			const contentSource = new WorkingTreeContentSource(projectPath, {
+				projectName,
+				respectGitIgnore,
+				fileOps: {
+					readFile: async (p: string) => {
+						const uri = URI.file(p);
+						const fileContent = await this.fileService.readFile(uri, { position: 0, length: 500_000 });
+						return fileContent.value.toString();
+					}
+				}
 			});
-			this._log(localize('prebase.graph.logFiles', "Found {0} relevant files (cap {1}).", files.length, limits.maxScanFiles));
-			const results = await this._parseFiles(files, cts.token);
-			if (cts.token.isCancellationRequested) {
+
+			const analyzer = new CanonicalGraphAnalyzer();
+			const canonical = await analyzer.analyze(contentSource, cts.token);
+			if (!canonical || cts.token.isCancellationRequested) {
 				this._markCancelledIfActive(cts);
 				return undefined;
 			}
 
 			await timeout(0);
-			const generator = new GraphGenerator({ includeFolders: false, includeFunctions: false });
-			const partial = generator.buildFromParseResults(projectPath, projectName, results);
-			const packageMain = await this._readPackageMain(folder.uri);
-			if (cts.token.isCancellationRequested) {
-				this._markCancelledIfActive(cts);
-				return undefined;
-			}
-
-			const entryNodeId = detectEntryNodeId(projectPath, partial.nodes, partial.edges, packageMain);
-			const layeredNodes = assignLayersToNodes(partial.nodes, entryNodeId);
-			const layoutNodes = this._pickLayoutNodes(layeredNodes, partial.edges, entryNodeId, limits.maxLayoutNodes);
-			const layoutNodeIds = new Set(layoutNodes.map(n => n.id));
-			const layoutEdges = partial.edges.filter(e => layoutNodeIds.has(e.source) && layoutNodeIds.has(e.target));
-
-			this._setDiagnostics({
-				fileCount: files.length,
-				nodeCount: layoutNodes.length,
-				edgeCount: layoutEdges.length,
-				status: 'scanning',
-				message: localize('prebase.graph.layingOut', "Computing layout for {0} nodes…", layoutNodes.length)
-			});
-			await timeout(0);
-
-			const networkLayoutMode = this._getNetworkLayoutMode();
-			const computed = this._computeNetworkPositions(layoutNodes, layoutEdges, networkLayoutMode);
-			const positions = computed.positions2d;
-			const positions3d = computed.positions3d;
-			await timeout(0);
-
-			// Reject stale completions that lost the scan slot to a newer run.
 			if (!this._isActiveScan(cts) || cts.token.isCancellationRequested) {
 				this._markCancelledIfActive(cts);
 				return undefined;
 			}
 
-			this._rawSnapshot = {
-				...partial,
-				nodes: layoutNodes,
-				edges: layoutEdges,
-				positions,
-				positions3d,
-				networkLayoutMode,
-				layoutRevision: ++this._layoutRevision,
-				entryNodeId,
-				scannedAt: Date.now()
-			};
-
-			const enriched = this._enrich(this._rawSnapshot, files.length);
-			this._snapshot = enriched;
-			this._onDidChangeSnapshot.fire(enriched);
-			this._setDiagnostics(enriched.diagnostics);
-			this._log(localize('prebase.graph.logReady', "Graph ready: {0} nodes, {1} edges.", enriched.nodes.length, enriched.edges.length));
+			this._canonicalSnapshot = canonical;
+			const enriched = this._projectAndPublish(canonical);
+			this._log(localize('prebase.graph.logReady', "Graph ready: {0} canonical nodes ({1} rendered), {2} edges.", canonical.nodes.length, enriched.nodes.length, enriched.edges.length));
 			return enriched;
 		} catch (err) {
 			if (!this._isActiveScan(cts) || cts.token.isCancellationRequested) {
@@ -553,8 +511,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async relayout(): Promise<PreBaseEnrichedSnapshot | undefined> {
-		const rawSnapshot = this._rawSnapshot;
-		if (!rawSnapshot) {
+		const canonical = this._canonicalSnapshot;
+		if (!canonical) {
 			return this.scanWorkspace();
 		}
 		const generation = ++this._relayoutGeneration;
@@ -563,180 +521,110 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			message: localize('prebase.graph.relayout', "Updating layout…")
 		});
 		await timeout(0);
-		if (!this._isCurrentRelayout(generation, rawSnapshot)) {
+		if (generation !== this._relayoutGeneration) {
 			return undefined;
 		}
-		const networkLayoutMode = this._getNetworkLayoutMode();
-		const computed = this._computeNetworkPositions(rawSnapshot.nodes, rawSnapshot.edges, networkLayoutMode);
-		const updatedSnapshot: GraphSnapshot = {
-			...rawSnapshot,
-			positions: computed.positions2d,
-			positions3d: computed.positions3d,
-			networkLayoutMode,
-			layoutRevision: ++this._layoutRevision,
-		};
-		await timeout(0);
-		if (!this._isCurrentRelayout(generation, rawSnapshot)) {
-			return undefined;
-		}
-		this._rawSnapshot = updatedSnapshot;
-		const enriched = this._enrich(updatedSnapshot, this._diagnostics.fileCount);
-		this._snapshot = enriched;
-		this._onDidChangeSnapshot.fire(enriched);
-		this._setDiagnostics(enriched.diagnostics);
+
+		const enriched = this._projectAndPublish(canonical);
 		return enriched;
 	}
 
-	private _scanLimits(): { maxScanFiles: number; maxLayoutNodes: number; maxNodes: number; maxEdges: number } {
+	async buildCanonicalGraphAtRef(ref: string, token?: CancellationToken): Promise<CanonicalGraphSnapshot | undefined> {
+		const folder = this.workspaceService.getWorkspace().folders[0];
+		if (!folder) {
+			return undefined;
+		}
+		const rootPath = folder.uri.fsPath || folder.uri.path;
+		const gitService = new GitHistoryService();
+		const resolvedSha = await gitService.resolveRef(rootPath, ref, token);
+		if (!resolvedSha) {
+			return undefined;
+		}
+		const gitSource = new GitTreeContentSource(gitService, rootPath, resolvedSha);
+		const analyzer = new CanonicalGraphAnalyzer();
+		return analyzer.analyze(gitSource, token);
+	}
+
+	async compareCanonicalGraphRefs(refA: string, refB: string, token?: CancellationToken): Promise<{ diff: CanonicalGraphDiff; snapshotA: CanonicalGraphSnapshot; snapshotB: CanonicalGraphSnapshot } | undefined> {
+		const snapshotA = await this.buildCanonicalGraphAtRef(refA, token);
+		const snapshotB = await this.buildCanonicalGraphAtRef(refB, token);
+		if (!snapshotA || !snapshotB) {
+			return undefined;
+		}
+		const diff = computeCanonicalGraphDiff(snapshotA, snapshotB);
+		return { diff, snapshotA, snapshotB };
+	}
+
+	private _projectAndPublish(canonical: CanonicalGraphSnapshot): PreBaseEnrichedSnapshot {
+		const limits = this._scanLimits();
+		const networkLayoutMode = this._getNetworkLayoutMode();
+		const spread = Math.max(0.4, Math.min(2.5, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkSpreadScale) || 1));
+		const hideLow = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphHideLowImportance) === true;
+
+		const projection = projectNetworkGraph(canonical, {
+			maxRenderedNodes: limits.maxNodes,
+			maxRenderedEdges: limits.maxEdges,
+			hideLowImportance: hideLow,
+			networkLayoutMode,
+			spreadScale: spread,
+			collisionRadius: Math.max(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkCollisionRadius) || 24),
+			linkDistance: Math.max(4, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) || 80),
+			forceStrength: Math.max(0, Math.min(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkForceStrength) ?? 0.35)),
+			layoutRevision: ++this._layoutRevision,
+		});
+
+		const isCapped = canonical.nodes.length > projection.nodes.length;
+		const diagnostics: PreBaseGraphDiagnostics = {
+			fileCount: canonical.completeness.analyzedFileCount,
+			nodeCount: projection.nodes.length,
+			edgeCount: projection.edges.length,
+			canonicalNodeCount: canonical.nodes.length,
+			canonicalEdgeCount: canonical.edges.length,
+			entryNodeId: canonical.entryNodeId,
+			scannedAt: canonical.analyzedAt,
+			status: 'ready',
+			digest: canonical.digest,
+			message: isCapped
+				? localize('prebase.graph.readyCapped', "{0} canonical nodes ({1} rendered) · {2} edges", canonical.nodes.length, projection.nodes.length, projection.edges.length)
+				: localize('prebase.graph.ready', "{0} files · {1} nodes · {2} edges", canonical.completeness.analyzedFileCount, projection.nodes.length, projection.edges.length)
+		};
+
+		const enriched: PreBaseEnrichedSnapshot = {
+			...projection,
+			positions3d: projection.positions3d ?? {},
+			networkLayoutMode,
+			graphType: this._viewState.graphType,
+			layoutMode: this._viewState.layoutMode,
+			ringBands: [],
+			pyramidBands: [],
+			diagnostics
+		};
+
+		this._snapshot = enriched;
+		this._onDidChangeSnapshot.fire(enriched);
+		this._setDiagnostics(diagnostics);
+		return enriched;
+	}
+
+	private _scanLimits(): { maxNodes: number; maxEdges: number } {
 		const quality = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphQuality) || 'auto';
 		const configuredNodes = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphMaxRenderedNodes) || 280;
 		const configuredEdges = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphMaxRenderedEdges) || 420;
 		if (quality === 'performance') {
 			return {
-				maxScanFiles: Math.min(220, configuredNodes + 40),
-				maxLayoutNodes: Math.min(180, configuredNodes),
 				maxNodes: Math.min(180, configuredNodes),
 				maxEdges: Math.min(280, configuredEdges)
 			};
 		}
 		if (quality === 'quality') {
 			return {
-				maxScanFiles: Math.min(900, Math.max(configuredNodes * 2, 500)),
-				maxLayoutNodes: Math.min(600, configuredNodes),
 				maxNodes: configuredNodes,
 				maxEdges: configuredEdges
 			};
 		}
-		// auto — keep the workbench responsive even on huge repos (e.g. VS Code itself)
 		return {
-			maxScanFiles: Math.min(420, configuredNodes + 80),
-			maxLayoutNodes: Math.min(320, configuredNodes),
 			maxNodes: Math.min(280, configuredNodes),
 			maxEdges: Math.min(420, configuredEdges)
-		};
-	}
-
-	private _pickLayoutNodes(
-		nodes: GraphNode[],
-		edges: GraphEdge[],
-		entryNodeId: string | null,
-		maxNodes: number,
-		importanceByNode = this._importanceByNode(edges)
-	): GraphNode[] {
-		const fileNodes = nodes.filter(n => n.kind !== 'folder');
-		if (fileNodes.length <= maxNodes) {
-			return fileNodes;
-		}
-		const scored = fileNodes.map(n => {
-			const imp = importanceByNode.get(n.id) ?? EmptyNodeImportance;
-			const entryBoost = entryNodeId && (n.id === entryNodeId || n.isEntry) ? 1_000_000 : 0;
-			return { n, score: imp.score + entryBoost };
-		});
-		scored.sort((a, b) => b.score - a.score || a.n.id.localeCompare(b.n.id));
-		const picked = scored.slice(0, maxNodes).map(s => s.n);
-		if (entryNodeId && !picked.some(n => n.id === entryNodeId)) {
-			const entry = fileNodes.find(n => n.id === entryNodeId);
-			if (entry) {
-				picked[picked.length - 1] = entry;
-			}
-		}
-		return picked;
-	}
-
-	private _isActiveScan(cts: CancellationTokenSource): boolean {
-		return this._scanCts === cts;
-	}
-
-	private _isCurrentRelayout(generation: number, rawSnapshot: GraphSnapshot): boolean {
-		return this._relayoutGeneration === generation && this._rawSnapshot === rawSnapshot && !this._scanCts;
-	}
-
-	private _markCancelledIfActive(cts: CancellationTokenSource): void {
-		if (this._isActiveScan(cts)) {
-			this._setDiagnostics({ status: 'cancelled', message: localize('prebase.graph.scanCancelled', "Scan cancelled.") });
-		}
-	}
-
-	private _enrich(snapshot: GraphSnapshot, fileCount: number): PreBaseEnrichedSnapshot {
-		const layoutMode = this._viewState.layoutMode;
-		const networkLayoutMode = (snapshot.networkLayoutMode as NetworkLayoutMode | undefined) || this._getNetworkLayoutMode();
-
-		// Use file nodes only so folder stubs don't distort ring/pyramid geometry.
-		const layoutNodes = snapshot.nodes.filter(n => {
-			if (n.kind === 'folder') {
-				return false;
-			}
-			if (n.kind === 'function') {
-				return false;
-			}
-			return true;
-		});
-		const layoutEdges = snapshot.edges.filter(e => e.kind === 'import');
-
-
-		const limits = this._scanLimits();
-		const maxNodes = limits.maxNodes;
-		const maxEdges = limits.maxEdges;
-		const hideLow = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphHideLowImportance) === true;
-		const importanceByNode = hideLow || layoutNodes.length > maxNodes ? this._importanceByNode(layoutEdges) : undefined;
-
-		let nodes = layoutNodes;
-		if (hideLow && snapshot.entryNodeId) {
-			nodes = layoutNodes.filter(n => {
-				if (n.id === snapshot.entryNodeId || n.isEntry) {
-					return true;
-				}
-				const imp = importanceByNode?.get(n.id) ?? EmptyNodeImportance;
-				return imp.score >= 1;
-			});
-		}
-		if (nodes.length > maxNodes) {
-			nodes = this._pickLayoutNodes(nodes, layoutEdges, snapshot.entryNodeId, maxNodes, importanceByNode);
-		}
-		const nodeIds = new Set(nodes.map(n => n.id));
-		const edges = snapshot.edges.filter(e => nodeIds.has(e.source) && nodeIds.has(e.target)).slice(0, maxEdges);
-		const positions: GraphSnapshot['positions'] = {};
-		for (const node of nodes) {
-			if (snapshot.positions[node.id]) {
-				positions[node.id] = snapshot.positions[node.id];
-			}
-		}
-
-		const truncated = fileCount >= limits.maxScanFiles || layoutNodes.length >= limits.maxLayoutNodes;
-		const diagnostics: PreBaseGraphDiagnostics = {
-			fileCount,
-			nodeCount: nodes.length,
-			edgeCount: edges.length,
-			entryNodeId: snapshot.entryNodeId,
-			scannedAt: snapshot.scannedAt,
-			status: 'ready',
-			message: truncated
-				? localize('prebase.graph.readyCapped', "{0} files · {1} nodes · {2} edges (capped for performance)", fileCount, nodes.length, edges.length)
-				: localize('prebase.graph.ready', "{0} files · {1} nodes · {2} edges", fileCount, nodes.length, edges.length)
-		};
-
-		const positions3d: NonNullable<GraphSnapshot['positions3d']> = {};
-		for (const node of nodes) {
-			const p = snapshot.positions3d?.[node.id];
-			if (p && Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z)) {
-				positions3d[node.id] = p;
-			}
-		}
-		// Network always exposes positions3d (even empty) so the webview never hash01-synthesizes Z.
-		const resolvedPositions3d = positions3d;
-
-		return {
-			...snapshot,
-			nodes,
-			edges,
-			positions,
-			positions3d: resolvedPositions3d,
-			networkLayoutMode,
-			graphType: this._viewState.graphType,
-			layoutMode,
-			ringBands: [],
-			pyramidBands: [],
-			diagnostics
 		};
 	}
 
@@ -746,195 +634,14 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		return (valid.includes(mode as NetworkLayoutMode) ? mode : 'organic') as NetworkLayoutMode;
 	}
 
-	private _computeNetworkPositions(
-		nodes: GraphNode[],
-		edges: GraphEdge[],
-		mode: NetworkLayoutMode
-	): { positions2d: GraphSnapshot['positions']; positions3d: NonNullable<GraphSnapshot['positions3d']> } {
-		const importanceByNode = this._importanceByNode(edges);
-		const layoutNodes = nodes
-			.filter(n => n.kind !== 'folder' && n.kind !== 'function')
-			.map(n => {
-				const ft = getFileTypeInfo(n.path);
-				const imp = importanceByNode.get(n.id) ?? EmptyNodeImportance;
-				const degree = imp.inDegree + imp.outDegree;
-				return {
-					id: n.id,
-					fileTypeId: ft.id,
-					isEntry: !!n.isEntry,
-					val: n.isEntry ? 10 : Math.max(1.5, 1.2 + Math.sqrt(degree) * 1.4),
-				};
-			});
-		const nodeIds = new Set(layoutNodes.map(n => n.id));
-		const links = edges
-			.filter(e => (e.kind === 'import' || e.kind === 'dependency') && nodeIds.has(e.source) && nodeIds.has(e.target))
-			.map(e => ({ source: e.source, target: e.target }));
-		const spread = Math.max(0.4, Math.min(2.5, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkSpreadScale) || 1));
-		const radius = computeNetworkSphereRadius(layoutNodes.length, spread);
-		const layout = layoutNetworkGraph(mode, layoutNodes, links, this._getNetworkLayoutConfig(radius));
-		const positions2d: GraphSnapshot['positions'] = {};
-		const positions3d: NonNullable<GraphSnapshot['positions3d']> = {};
-		for (const [id, p] of layout) {
-			if (!Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) {
-				continue;
-			}
-			positions3d[id] = { x: p.x, y: p.y, z: p.z };
-			positions2d[id] = { x: p.x - 14, y: p.y - 14 };
-		}
-		return { positions2d, positions3d };
+	private _isActiveScan(cts: CancellationTokenSource): boolean {
+		return this._scanCts === cts;
 	}
 
-	private _getNetworkLayoutConfig(sphereRadius: number): NetworkLayoutRuntimeConfig {
-		return {
-			sphereRadius,
-			collisionRadius: Math.max(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkCollisionRadius) || 24),
-			linkDistance: Math.max(4, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) || 80),
-			forceStrength: Math.max(0, Math.min(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkForceStrength) ?? 0.35)),
-		};
-	}
-
-	private async _collectFiles(root: URI, token: CancellationToken, maxFiles: number): Promise<Array<ScannedFile & { resource: URI }>> {
-		const files: Array<ScannedFile & { resource: URI }> = [];
-		const respectGitIgnore = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphRespectGitIgnore) !== false;
-		let ignorePatterns = [...DEFAULT_IGNORE_PATTERNS];
-		if (respectGitIgnore) {
-			try {
-				const gitignoreUri = URI.joinPath(root, '.gitignore');
-				const stat = await this.fileService.readFile(gitignoreUri);
-				const content = stat.value.toString();
-				const extra = content.split('\n')
-					.map(l => l.trim())
-					.filter(l => l && !l.startsWith('#') && !l.startsWith('!'));
-				ignorePatterns = [...ignorePatterns, ...extra];
-			} catch {
-				// No root .gitignore file
-			}
+	private _markCancelledIfActive(cts: CancellationTokenSource): void {
+		if (this._isActiveScan(cts)) {
+			this._setDiagnostics({ status: 'cancelled', message: localize('prebase.graph.scanCancelled', "Scan cancelled.") });
 		}
-
-		const queue: URI[] = [root];
-		let visited = 0;
-
-		for (let queueIndex = 0; queueIndex < queue.length && files.length < maxFiles; queueIndex++) {
-			if (token.isCancellationRequested) {
-				break;
-			}
-			const current = queue[queueIndex];
-			visited++;
-			if (visited % 12 === 0) {
-				this._setDiagnostics({
-					fileCount: files.length,
-					status: 'scanning',
-					message: localize('prebase.graph.scanningProgress', "Scanning workspace… {0} files", files.length)
-				});
-				await timeout(0);
-			}
-			let stat: IFileStat;
-			try {
-				stat = await this.fileService.resolve(current, { resolveMetadata: false });
-			} catch {
-				continue;
-			}
-			if (!stat.isDirectory || !stat.children) {
-				continue;
-			}
-			for (const child of stat.children) {
-				if (files.length >= maxFiles) {
-					break;
-				}
-				const relative = normalizePath(this._toRelative(root, child.resource));
-				if (this._isIgnored(relative, child.isDirectory, ignorePatterns)) {
-					continue;
-				}
-				if (child.isDirectory) {
-					queue.push(child.resource);
-					continue;
-				}
-				if (!isGraphRelevantFile(relative)) {
-					continue;
-				}
-				const name = basename(relative);
-				const ext = name.includes('.') ? `.${name.split('.').pop()!.toLowerCase()}` : '';
-				files.push({
-					absolutePath: child.resource.fsPath || child.resource.path,
-					relativePath: relative,
-					extension: ext,
-					resource: child.resource
-				});
-			}
-		}
-		return files;
-	}
-
-	private async _parseFiles(files: Array<ScannedFile & { resource: URI }>, token: CancellationToken): Promise<ParseResult[]> {
-		const results: ParseResult[] = [];
-		const batchSize = 8;
-		for (let i = 0; i < files.length; i += batchSize) {
-			if (token.isCancellationRequested) {
-				break;
-			}
-			if (i > 0) {
-				this._setDiagnostics({
-					fileCount: files.length,
-					status: 'scanning',
-					message: localize('prebase.graph.parseProgress', "Parsing files… {0}/{1}", i, files.length)
-				});
-				await timeout(0);
-			}
-			const parsed = await Promise.all(files.slice(i, i + batchSize).map(file => this._parseFile(file)));
-			for (const result of parsed) {
-				if (result) {
-					results.push(result);
-				}
-			}
-		}
-		return results;
-	}
-
-	private async _parseFile(file: ScannedFile & { resource: URI }): Promise<ParseResult | undefined> {
-		try {
-			const fileContent = await this.fileService.readFile(file.resource, { position: 0, length: 120_000 });
-			const content = fileContent.value.toString();
-			const imports = extractImportsForFile(file, content);
-			const packageName = extractPackageName(file, content);
-			const exports: ParseResult['exports'] = [];
-			const exportRe = /export\s+(?:default\s+)?(?:async\s+)?(?:function|class|const|let|var)\s+([A-Za-z0-9_]+)/g;
-			let match: RegExpExecArray | null;
-			while ((match = exportRe.exec(content)) !== null && exports.length < 40) {
-				exports.push({ name: match[1] });
-			}
-			return {
-				filePath: file.absolutePath,
-				relativePath: file.relativePath,
-				imports,
-				exports,
-				functions: [],
-				components: [],
-				isComponentFile: file.extension === '.tsx' || file.extension === '.jsx',
-				packageName
-			};
-		} catch {
-			// Skip unreadable files.
-			return undefined;
-		}
-	}
-
-	private _importanceByNode(edges: readonly GraphEdge[]): Map<string, NodeImportance> {
-		const importanceByNode = new Map<string, NodeImportance>();
-		for (const edge of edges) {
-			if (edge.kind !== 'import') {
-				continue;
-			}
-			const source = importanceByNode.get(edge.source) ?? { inDegree: 0, outDegree: 0, score: 0 };
-			source.outDegree++;
-			importanceByNode.set(edge.source, source);
-			const target = importanceByNode.get(edge.target) ?? { inDegree: 0, outDegree: 0, score: 0 };
-			target.inDegree++;
-			importanceByNode.set(edge.target, target);
-		}
-		for (const importance of importanceByNode.values()) {
-			importance.score = importance.inDegree * 1.2 + importance.outDegree * 0.8;
-		}
-		return importanceByNode;
 	}
 
 	private _addAdjacentEdge(index: Map<string, AdjacentGraphEdge[]>, nodeId: string, edge: AdjacentGraphEdge): void {
@@ -971,51 +678,6 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		}
 	}
 
-	private async _readPackageMain(folder: URI): Promise<string | null> {
-		try {
-			const pkgUri = URI.joinPath(folder, 'package.json');
-			const raw = (await this.fileService.readFile(pkgUri)).value.toString();
-			const pkg = JSON.parse(raw) as { main?: string; module?: string };
-			return pkg.module ?? pkg.main ?? null;
-		} catch {
-			return null;
-		}
-	}
-
-	private _toRelative(root: URI, resource: URI): string {
-		const rootPath = normalizePath(root.fsPath || root.path).replace(/\/$/, '');
-		const full = normalizePath(resource.fsPath || resource.path);
-		if (full.startsWith(rootPath + '/')) {
-			return full.slice(rootPath.length + 1);
-		}
-		if (full === rootPath) {
-			return '';
-		}
-		return basename(full);
-	}
-
-	private _isIgnored(relativePath: string, isDirectory: boolean, patterns: string[]): boolean {
-		const path = relativePath.replace(/^\/+/, '');
-		const candidates = isDirectory ? [path, `${path}/`, `**/${path}/**`] : [path, `**/${path}`];
-		for (const rawPattern of patterns) {
-			const pattern = rawPattern.trim();
-			if (!pattern || pattern.startsWith('#')) {
-				continue;
-			}
-			for (const candidate of candidates) {
-				if (matchGlob(pattern, candidate) || matchGlob(pattern, `/${candidate}`) || matchGlob(`**/${pattern}/**`, candidate) || matchGlob(`**/${pattern}`, candidate)) {
-					return true;
-				}
-			}
-			// Fast path for folder names (e.g. .reference, dist, target)
-			const cleanPattern = pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, '').replace(/^\//, '').replace(/\/$/, '').replace(/\*\*/g, '');
-			if (cleanPattern && (path === cleanPattern || path.startsWith(`${cleanPattern}/`) || path.includes(`/${cleanPattern}/`))) {
-				return true;
-			}
-		}
-		return false;
-	}
-
 	private _setDiagnostics(partial: Partial<PreBaseGraphDiagnostics>): void {
 		this._diagnostics = { ...this._diagnostics, ...partial };
 		this._onDidChangeDiagnostics.fire(this._diagnostics);
@@ -1026,4 +688,3 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		channel?.append(`[PreBase] ${message}\n`);
 	}
 }
-

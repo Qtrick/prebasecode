@@ -3,7 +3,7 @@
   "compilerOptions": {
     "noEmit": true,
     "rootDir": ".",
-    "types": ["mocha"],
+    "types": ["node", "mocha"],
     "skipLibCheck": true,
     "preserveSymlinks": true
   },
@@ -11,6 +11,7 @@
     "src/common/types/**/*.ts",
     "src/common/constants/**/*.ts",
     "src/core/**/*.ts",
+    "src/history/**/*.ts",
     "src/layouts/**/*.ts",
     "src/architecture/**/*.ts",
     "src/index.ts",

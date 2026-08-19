@@ -1,0 +1,33 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) PreBase. All rights reserved.
+ *--------------------------------------------------------------------------------------------*/
+
+import type { GraphVersionMetadata } from '../../common/types/canonicalTypes.js';
+
+export const GRAPH_SCHEMA_VERSION = 1;
+export const GRAPH_ANALYZER_VERSION = 1;
+export const GRAPH_IDENTITY_VERSION = 1;
+export const GRAPH_LAYOUT_VERSION = 1;
+
+export function createCurrentVersionMetadata(): GraphVersionMetadata {
+	return {
+		graphSchemaVersion: GRAPH_SCHEMA_VERSION,
+		analyzerVersion: GRAPH_ANALYZER_VERSION,
+		identityVersion: GRAPH_IDENTITY_VERSION,
+		layoutVersion: GRAPH_LAYOUT_VERSION,
+	};
+}
+
+export function isGraphSchemaCompatible(metadata: Partial<GraphVersionMetadata> | undefined): boolean {
+	if (!metadata || typeof metadata.graphSchemaVersion !== 'number') {
+		return false;
+	}
+	return metadata.graphSchemaVersion === GRAPH_SCHEMA_VERSION;
+}
+
+export function isAnalyzerCompatible(metadata: Partial<GraphVersionMetadata> | undefined): boolean {
+	if (!metadata || typeof metadata.analyzerVersion !== 'number') {
+		return false;
+	}
+	return metadata.analyzerVersion === GRAPH_ANALYZER_VERSION;
+}

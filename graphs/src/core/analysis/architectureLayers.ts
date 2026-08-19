@@ -132,8 +132,8 @@ export function classifyNodeLayer(path: string | undefined, isEntry?: boolean): 
 		return 'components'
 	}
 	if (/pages\/|app\/|views\/|screens\/|layouts\//.test(p)) return 'ui'
-	if (/src\/renderer|src\/ui|styles\/|\.css$|frontend/.test(p)) return 'frontend'
 	if (/\/(utils?|helpers?|lib|common|shared)\//.test(p)) return 'utils'
+	if (/\/(config|configuration|settings)\//.test(p) || /\.config\./.test(p)) return 'config'
 	if (/hooks\/|store\/|state\//.test(p)) return 'frontend'
 
 	return 'other'

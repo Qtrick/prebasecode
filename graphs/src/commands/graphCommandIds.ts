@@ -27,4 +27,7 @@ export const PreBaseGraphCommandIds = {
 	getOverviewForMagnus: 'prebase.graph.getOverviewForMagnus',
 	focusForMagnus: 'prebase.graph.focusForMagnus',
 	attachSelectionToMagnus: 'prebase.graph.attachSelectionToMagnus',
+	diagnoseCanonicalGraph: 'prebase.graph.diagnoseCanonicalGraph',
+	buildCanonicalGraphAtRef: 'prebase.graph.buildCanonicalGraphAtRef',
+	compareCanonicalGraphRefs: 'prebase.graph.compareCanonicalGraphRefs',
 } as const;

@@ -226,6 +226,101 @@ function registerGraphActions(): void {
 
 	registerAction2(class extends Action2 {
 		constructor() {
+			super({ id: PreBaseGraphCommandIds.diagnoseCanonicalGraph, title: localize2('prebase.graph.diagnoseCanonicalGraph', "Diagnose Canonical Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		async run(accessor: ServicesAccessor) {
+			const graphService = accessor.get(IPreBaseGraphService);
+			const canonical = graphService.getCanonicalSnapshot();
+			const output = accessor.get(IOutputService);
+			const channel = output.getChannel(PREBASE_GRAPH_CHANNEL_ID);
+			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
+
+			if (!canonical) {
+				accessor.get(INotificationService).info(localize('prebase.graph.canonicalNotAnalyzed', "Canonical graph has not been analyzed yet. Run a workspace scan first."));
+				return;
+			}
+
+			const summary = [
+				`[Canonical Graph Diagnostics]`,
+				`Project: ${canonical.projectName} (${canonical.projectPath})`,
+				`Source Identity: ${canonical.sourceIdentity}`,
+				`Structural Digest: ${canonical.digest}`,
+				`Schema Version: ${canonical.versions.graphSchemaVersion}`,
+				`Analyzer Version: ${canonical.versions.analyzerVersion}`,
+				`Canonical Nodes: ${canonical.nodes.length}`,
+				`Canonical Edges: ${canonical.edges.length}`,
+				`Analyzed Files: ${canonical.completeness.analyzedFileCount}`,
+				`Excluded Files: ${canonical.completeness.excludedFileCount}`,
+				`Complete: ${canonical.completeness.isComplete}`,
+			].join('\n');
+
+			channel?.append(`${summary}\n`);
+			accessor.get(INotificationService).info(localize('prebase.graph.canonicalSummary', "Canonical graph: {0} nodes, {1} edges (digest: {2})", canonical.nodes.length, canonical.edges.length, canonical.digest.slice(0, 8)));
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.buildCanonicalGraphAtRef, title: localize2('prebase.graph.buildCanonicalGraphAtRef', "Build Canonical Graph at Git Ref"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		async run(accessor: ServicesAccessor, ref = 'HEAD') {
+			const graphService = accessor.get(IPreBaseGraphService);
+			const notify = accessor.get(INotificationService);
+			const output = accessor.get(IOutputService);
+			const channel = output.getChannel(PREBASE_GRAPH_CHANNEL_ID);
+
+			notify.info(localize('prebase.graph.buildingAtRef', "Building canonical graph at ref: {0}…", ref));
+			const snapshot = await graphService.buildCanonicalGraphAtRef(ref);
+			if (!snapshot) {
+				notify.error(localize('prebase.graph.buildAtRefFailed', "Failed to build canonical graph at ref: {0}", ref));
+				return;
+			}
+
+			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
+			channel?.append(`[Canonical Graph at ${ref}]\nNodes: ${snapshot.nodes.length}, Edges: ${snapshot.edges.length}, Digest: ${snapshot.digest}\n`);
+			notify.info(localize('prebase.graph.buildAtRefSuccess', "Canonical graph at {0}: {1} nodes, {2} edges", ref, snapshot.nodes.length, snapshot.edges.length));
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.compareCanonicalGraphRefs, title: localize2('prebase.graph.compareCanonicalGraphRefs', "Compare Canonical Graph Refs"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		async run(accessor: ServicesAccessor, refA = 'HEAD~1', refB = 'HEAD') {
+			const graphService = accessor.get(IPreBaseGraphService);
+			const notify = accessor.get(INotificationService);
+			const output = accessor.get(IOutputService);
+			const channel = output.getChannel(PREBASE_GRAPH_CHANNEL_ID);
+
+			notify.info(localize('prebase.graph.comparingRefs', "Comparing canonical graph {0} ↔ {1}…", refA, refB));
+			const result = await graphService.compareCanonicalGraphRefs(refA, refB);
+			if (!result) {
+				notify.error(localize('prebase.graph.compareRefsFailed', "Failed to compare canonical graphs for {0} and {1}", refA, refB));
+				return;
+			}
+
+			const { diff, snapshotA, snapshotB } = result;
+			await output.showChannel(PREBASE_GRAPH_CHANNEL_ID);
+			const summary = [
+				`[Canonical Graph Comparison: ${refA} ↔ ${refB}]`,
+				`Snapshot A (${refA}): ${snapshotA.nodes.length} nodes, ${snapshotA.edges.length} edges (digest: ${snapshotA.digest.slice(0, 8)})`,
+				`Snapshot B (${refB}): ${snapshotB.nodes.length} nodes, ${snapshotB.edges.length} edges (digest: ${snapshotB.digest.slice(0, 8)})`,
+				`Identical: ${diff.isIdentical}`,
+				`Added Nodes: ${diff.addedNodes.length}`,
+				`Removed Nodes: ${diff.removedNodeIds.length}`,
+				`Updated Nodes: ${diff.updatedNodes.length}`,
+				`Added Edges: ${diff.addedEdges.length}`,
+				`Removed Edges: ${diff.removedEdgeIds.length}`,
+				`Updated Edges: ${diff.updatedEdges.length}`,
+			].join('\n');
+
+			channel?.append(`${summary}\n`);
+			notify.info(localize('prebase.graph.compareSuccess', "Comparison: +{0}/-{1} nodes, +{2}/-{3} edges", diff.addedNodes.length, diff.removedNodeIds.length, diff.addedEdges.length, diff.removedEdgeIds.length));
+		}
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
 			super({ id: PreBaseGraphCommandIds.clearCache, title: localize2('prebase.graph.clearCache', "Clear Graph Cache"), category: localize2('prebase.category', "PreBase"), f1: true });
 		}
 		run(accessor: ServicesAccessor) { accessor.get(IPreBaseGraphService).clearCache(); }
