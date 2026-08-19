@@ -91,7 +91,9 @@ export interface TemporalEdgeSnapshot {
 
 export interface TemporalStructuralDelta {
 	readonly commitSha: string;
+	readonly baseCommitSha: string;
 	readonly parentCommitSha: string;
+	readonly targetCanonicalDigest?: string;
 	readonly deltaVersion: number;
 	readonly entitiesAdded: readonly TemporalEntitySnapshot[];
 	readonly entitiesModified: readonly TemporalEntitySnapshot[];
@@ -104,6 +106,7 @@ export interface TemporalStructuralDelta {
 
 export interface TemporalCommitRecord {
 	readonly commitSha: string;
+	readonly canonicalDigest?: string;
 	readonly parentShas: readonly string[];
 	readonly treeSha: string;
 	readonly authorName: string;
@@ -114,6 +117,8 @@ export interface TemporalCommitRecord {
 	readonly ingestedAt: number;
 	readonly isCheckpoint: boolean;
 	readonly checkpointInterval: number;
+	readonly deltaDepth?: number;
+	readonly baseCommitSha?: string;
 	readonly schemaVersion: number;
 	readonly analyzerVersion: number;
 	readonly profileVersion: number;

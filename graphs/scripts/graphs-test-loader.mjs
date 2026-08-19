@@ -28,12 +28,6 @@ export async function resolve(specifier, context, nextResolve) {
 		}
 
 		if (resolvedTarget.includes('/graphs/src/host/workbench/')) {
-			if (resolvedTarget.includes('workbenchGitHistoryService')) {
-				const tsPath = resolvedTarget.replace(/\.js$/, '.ts');
-				if (existsSync(tsPath)) {
-					return nextResolve(pathToFileURL(tsPath).href, context);
-				}
-			}
 			const rel = resolvedTarget.slice(resolvedTarget.indexOf('/graphs/src/host/workbench/') + '/graphs/src/host/workbench/'.length);
 			const outTarget = resolvePath(process.cwd(), 'out/vs/workbench/contrib/prebase/graphs/host/workbench', rel.replace(/\.ts$/, '.js'));
 			if (existsSync(outTarget)) {

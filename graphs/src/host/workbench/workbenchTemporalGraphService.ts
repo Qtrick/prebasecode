@@ -6,13 +6,13 @@ import { Disposable, DisposableStore } from '../../../../../../base/common/lifec
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 import { IEnvironmentService } from '../../../../../../platform/environment/common/environment.js';
-import { IGitService } from '../../../../git/common/gitService.js';
-import { WorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
+import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import { TemporalGraphService, type ITemporalGraphService, type TemporalIndexStatus } from '../../temporal/host/temporalGraphService.js';
 import { TemporalCommitIngestionService } from '../../temporal/ingestion/temporalCommitIngestionService.js';
 import { TemporalRepositoryRegistry, type TemporalStoreFactory } from '../../temporal/ingestion/temporalRepositoryRegistry.js';
 import { IncrementalGraphAnalyzer } from '../../temporal/analysis/incrementalGraphAnalyzer.js';
 import { SqliteTemporalStore } from '../../temporal/persistence/node/sqliteTemporalStore.js';
+import { computePureSha256 } from '../../core/canonical/pureSha256.js';
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type {
 	TemporalEntityLineageEvent,
@@ -29,10 +29,18 @@ export interface IPreBaseTemporalGraphService extends ITemporalGraphService {
 	readonly _serviceBrand: undefined;
 }
 
+export function computeSafeStorePath(storageHome: URI, repoId: string, rootPath: string): string {
+	const hash = computePureSha256(repoId || rootPath).slice(0, 16);
+	const base = (rootPath ? rootPath.split(/[/\\]/).filter(Boolean).pop() : 'repo') || 'repo';
+	const safeName = base.replace(/[^a-zA-Z0-9_-]/g, '_');
+	const filename = `${safeName}_${hash}.db`;
+	const dbUri = URI.joinPath(storageHome, 'prebase-temporal', filename);
+	return dbUri.fsPath || dbUri.path;
+}
+
 export class WorkbenchTemporalGraphService extends Disposable implements IPreBaseTemporalGraphService {
 	declare readonly _serviceBrand: undefined;
 
-	private readonly _gitHistoryService: WorkbenchGitHistoryService;
 	private readonly _registry: TemporalRepositoryRegistry;
 	private readonly _ingestionService: TemporalCommitIngestionService;
 	private readonly _temporalService: TemporalGraphService;
@@ -41,15 +49,13 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 	constructor(
 		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 		@IEnvironmentService private readonly environmentService: IEnvironmentService,
-		@IGitService private readonly gitService: IGitService,
+		@IWorkbenchGitHistoryService private readonly _gitHistoryService: IWorkbenchGitHistoryService,
 	) {
 		super();
-		this._gitHistoryService = new WorkbenchGitHistoryService(this.gitService as any);
 
-		const storeFactory: TemporalStoreFactory = async (repoId: string) => {
+		const storeFactory: TemporalStoreFactory = async (repoId: string, rootPath: string) => {
 			const storageHome = this.environmentService.userRoamingDataHome || this.environmentService.workspaceStorageHome;
-			const dbUri = URI.joinPath(storageHome, 'prebase-temporal', `${repoId}.db`);
-			const dbPath = dbUri.fsPath || dbUri.path;
+			const dbPath = computeSafeStorePath(storageHome, repoId, rootPath);
 			return new SqliteTemporalStore({ dbPath });
 		};
 
@@ -60,19 +66,30 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 
 		this._checkAndWireHeadObservers();
 		this._register(this.workspaceService.onDidChangeWorkspaceFolders(() => this._checkAndWireHeadObservers()));
+		if (typeof this._gitHistoryService.onDidChangeHead === 'function') {
+			const sub = this._gitHistoryService.onDidChangeHead((event: GitHeadChangeEvent) => {
+				this._routeHeadChanged(event);
+			});
+			this._register(sub);
+		}
 	}
 
 	private _checkAndWireHeadObservers(): void {
 		const folders = this.workspaceService.getWorkspace().folders;
 		for (const folder of folders) {
 			const rootPath = folder.uri.fsPath || folder.uri.path;
-			if (!this._repositoryHeadObservers.has(rootPath)) {
-				const store = new DisposableStore();
-				store.add(this._gitHistoryService.onDidChangeHead((event: GitHeadChangeEvent) => {
-					this._temporalService.handleHeadChanged(event, rootPath).catch(() => {});
-				}));
-				this._repositoryHeadObservers.set(rootPath, store);
-			}
+			// Ensure store is initialized for open workspace folders
+			this._gitHistoryService.getRepositoryIdentity(rootPath).then(identity => {
+				this._registry.getStore(identity.repositoryId, rootPath).catch(() => {});
+			}).catch(() => {});
+		}
+	}
+
+	private _routeHeadChanged(event: GitHeadChangeEvent): void {
+		const folders = this.workspaceService.getWorkspace().folders;
+		for (const folder of folders) {
+			const rootPath = folder.uri.fsPath || folder.uri.path;
+			this._temporalService.handleHeadChanged(event, rootPath).catch(() => {});
 		}
 	}
 

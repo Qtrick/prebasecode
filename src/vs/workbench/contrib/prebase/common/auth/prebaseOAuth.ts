@@ -59,8 +59,7 @@ export function consumePreBaseOAuthErrorCallback(
 	if (uri.scheme !== expectedScheme || uri.authority !== PREBASE_OAUTH_CALLBACK_AUTHORITY || uri.path !== PREBASE_OAUTH_CALLBACK_PATH) {
 		return undefined;
 	}
-	const queryOrFragment = uri.query || (uri.fragment.startsWith('?') ? uri.fragment.slice(1) : uri.fragment);
-	const values = new URLSearchParams(queryOrFragment);
+	const values = new URLSearchParams(uri.query || '');
 	const states = values.getAll('state');
 	const errors = values.getAll('error');
 	// An OAuth error takes precedence if a malformed provider response includes
@@ -71,13 +70,21 @@ export function consumePreBaseOAuthErrorCallback(
 	return { state: states[0] };
 }
 
-/** Strictly accepts the one registered product callback; never exposes callback values to logs. */
+/** Strictly accepts the registered product callback via PKCE query; rejects implicit fragment tokens. */
 export function parsePreBaseOAuthCallback(uri: URI, expectedScheme: string, expectedState: string): IPreBaseOAuthCallback | undefined {
 	if (uri.scheme !== expectedScheme || uri.authority !== PREBASE_OAUTH_CALLBACK_AUTHORITY || uri.path !== PREBASE_OAUTH_CALLBACK_PATH) {
 		return undefined;
 	}
-	const queryOrFragment = uri.query || (uri.fragment.startsWith('?') ? uri.fragment.slice(1) : uri.fragment);
-	const values = new URLSearchParams(queryOrFragment);
+
+	// Strictly reject implicit grant tokens in URI fragment
+	if (uri.fragment) {
+		const fragmentParams = new URLSearchParams(uri.fragment.startsWith('?') ? uri.fragment.slice(1) : uri.fragment);
+		if (fragmentParams.has('access_token') || fragmentParams.has('id_token') || fragmentParams.has('refresh_token')) {
+			return undefined;
+		}
+	}
+
+	const values = new URLSearchParams(uri.query || '');
 	const codes = values.getAll('code');
 	const states = values.getAll('state');
 	if (values.has('error') || codes.length !== 1 || states.length !== 1) {

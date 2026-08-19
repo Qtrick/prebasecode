@@ -455,13 +455,14 @@ export class NodeGitHistoryService implements IGitHistoryService {
 	}
 
 	async diffCommitTrees(rootPath: string, refA: string, refB: string, token?: CancellationTokenLike): Promise<GitExactDiffResult> {
-		const resolvedA = refA === GIT_EMPTY_TREE_HASH ? GIT_EMPTY_TREE_HASH : await this.resolveRef(rootPath, refA, token);
+		const isRootDiff = !refA || refA === 'ROOT' || refA === GIT_EMPTY_TREE_HASH || refA === '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 		const resolvedB = await this.resolveRef(rootPath, refB, token);
 
 		const args = ['diff-tree', '-r', '-z', '-M', '--no-commit-id'];
-		if (resolvedA === GIT_EMPTY_TREE_HASH) {
+		if (isRootDiff) {
 			args.push('--root', '--end-of-options', resolvedB);
 		} else {
+			const resolvedA = await this.resolveRef(rootPath, refA, token);
 			args.push('--end-of-options', resolvedA, resolvedB);
 		}
 
@@ -481,7 +482,7 @@ export class NodeGitHistoryService implements IGitHistoryService {
 		const commit = await this.getCommit(rootPath, commitRef, token);
 		if (commit.parents.length === 0) {
 			// Root commit
-			return this.diffCommitTrees(rootPath, GIT_EMPTY_TREE_HASH, commit.sha, token);
+			return this.diffCommitTrees(rootPath, 'ROOT', commit.sha, token);
 		}
 		const parentRef = commit.parents[parentIndex] ?? commit.parents[0];
 		return this.diffCommitTrees(rootPath, parentRef, commit.sha, token);

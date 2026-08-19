@@ -101,14 +101,22 @@ export class TemporalCommitIngestionService {
 		let diffChanges: any[] = [];
 		if (commitMeta.parents.length > 0) {
 			const primaryParentSha = commitMeta.parents[0];
-			try {
+			if (!commitsBySha.has(primaryParentSha)) {
+				// Prerequisite parent is not yet indexed -> index prerequisite along lineage
+				parentSnapshot = await this.ingestCommit(rootPath, primaryParentSha, {}, token);
+			} else {
 				parentSnapshot = await this.reconstructGraphAtCommit(rootPath, primaryParentSha, token);
-				const diffRes = await this._gitService.diffCommitToParent(rootPath, commitSha, 0, token);
-				diffChanges = diffRes.changes as any[];
-			} catch {
-				// Fallback to direct parse if parent reconstruction fails
-				parentSnapshot = undefined;
 			}
+
+			if (!parentSnapshot) {
+				throw new TemporalError(
+					'DeltaReconstructionFailed',
+					`Failed to obtain parent snapshot for ${commitSha} (parent: ${primaryParentSha})`
+				);
+			}
+
+			const diffRes = await this._gitService.diffCommitToParent(rootPath, commitSha, 0, token);
+			diffChanges = diffRes.changes as any[];
 		}
 
 		// Read prior deleted paths in history for robust CASE 8 fresh recreation
@@ -126,8 +134,11 @@ export class TemporalCommitIngestionService {
 			deletedPathsInHistory,
 		});
 
+		const canonicalDigest = analysisOutput.snapshot.digest || analysisOutput.snapshot.canonicalSnapshot?.digest;
+
 		const commitRecord: TemporalCommitRecord = {
 			commitSha,
+			canonicalDigest,
 			parentShas: commitMeta.parents,
 			treeSha: commitMeta.treeSha || '',
 			authorName: commitMeta.author?.name || '',
@@ -138,6 +149,8 @@ export class TemporalCommitIngestionService {
 			ingestedAt: Date.now(),
 			isCheckpoint,
 			checkpointInterval: DEFAULT_CHECKPOINT_INTERVAL,
+			deltaDepth,
+			baseCommitSha: commitMeta.parents[0] || undefined,
 			schemaVersion: CURRENT_SCHEMA_VERSION,
 			analyzerVersion: CURRENT_ANALYZER_VERSION,
 			profileVersion: CURRENT_PROFILE_VERSION,
@@ -205,8 +218,17 @@ export class TemporalCommitIngestionService {
 			deltas.push(delta);
 		}
 
-		// 4. Reconstruct snapshot
-		return this._reconstructionEngine.reconstruct(baseCheckpoint, deltas, commitSha);
+		// 4. Reconstruct snapshot and verify digest
+		const targetCommit = commitsBySha.get(commitSha);
+		const reconstructed = this._reconstructionEngine.reconstruct(baseCheckpoint, deltas, commitSha);
+		if (targetCommit?.canonicalDigest && reconstructed.digest && reconstructed.digest !== targetCommit.canonicalDigest) {
+			throw new TemporalError(
+				'DatabaseCorrupted',
+				`Reconstructed snapshot digest mismatch for ${commitSha}: expected ${targetCommit.canonicalDigest}, got ${reconstructed.digest}`
+			);
+		}
+
+		return reconstructed;
 	}
 
 	async ingestCommitRange(

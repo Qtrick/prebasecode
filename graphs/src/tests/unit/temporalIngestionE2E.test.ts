@@ -237,4 +237,135 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			}
 		}
 	});
+
+	test('Two-tier parse cache persists across store restarts and serves L2 parse artifacts', async () => {
+		const { repoDir, tempBase, dbPath } = createE2ERepo('sha1');
+
+		try {
+			const gitService = new NodeGitHistoryService();
+
+			// Session 1: Create and ingest Commit 1
+			{
+				const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
+				const analyzer = new IncrementalGraphAnalyzer();
+				const reconstructionEngine = new TemporalReconstructionEngine();
+				const indexPlanner = new TemporalIndexPlanner();
+				const ingestionService = new TemporalCommitIngestionService(gitService, registry, analyzer, reconstructionEngine, indexPlanner);
+				const temporalService = new TemporalGraphService(gitService, registry, ingestionService);
+
+				fs.mkdirSync(path.join(repoDir, 'src'), { recursive: true });
+				fs.writeFileSync(path.join(repoDir, 'src/a.ts'), 'export const a = 1;', 'utf8');
+				fs.writeFileSync(path.join(repoDir, 'src/b.ts'), 'export const b = 2;', 'utf8');
+				execSync('git add . && git commit -m "feat: initial"', { cwd: repoDir, stdio: 'pipe' });
+				const c1 = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+
+				await temporalService.ingestCommit(repoDir, c1);
+				await registry.closeAll();
+			}
+
+			// Session 2: Fresh registry and store restart against same database
+			{
+				const freshRegistry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
+				const freshAnalyzer = new IncrementalGraphAnalyzer();
+				const freshReconstructionEngine = new TemporalReconstructionEngine();
+				const freshIndexPlanner = new TemporalIndexPlanner();
+				const freshIngestionService = new TemporalCommitIngestionService(
+					gitService,
+					freshRegistry,
+					freshAnalyzer,
+					freshReconstructionEngine,
+					freshIndexPlanner
+				);
+				const freshTemporalService = new TemporalGraphService(gitService, freshRegistry, freshIngestionService);
+
+				// Modify only a.ts -> b.ts is unchanged and should load from persistent L2 SQLite store
+				fs.writeFileSync(path.join(repoDir, 'src/a.ts'), 'export const a = 100;', 'utf8');
+				execSync('git add . && git commit -m "feat: update a"', { cwd: repoDir, stdio: 'pipe' });
+				const c2 = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+
+				const snap2 = await freshTemporalService.ingestCommit(repoDir, c2);
+				assert.strictEqual(snap2.commitSha, c2);
+				assert.strictEqual(snap2.entityMap.size, 2);
+
+				// Reconstruct C1 from the restarted store
+				const c1 = execSync('git rev-parse HEAD~1', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+				const snap1 = await freshTemporalService.getGraphAtCommit(repoDir, c1);
+				assert.strictEqual(snap1.commitSha, c1);
+				assert.strictEqual(snap1.entityMap.size, 2);
+
+				await freshRegistry.closeAll();
+			}
+		} finally {
+			try {
+				fs.rmSync(tempBase, { recursive: true, force: true });
+			} catch {
+				// ignore
+			}
+		}
+	});
+
+	test('Multi-root concurrent event routing and FIFO ingestion queue', async () => {
+		const repoA = createE2ERepo('sha1');
+		const repoB = createE2ERepo('sha1');
+
+		try {
+			const gitService = new NodeGitHistoryService();
+			const registry = new TemporalRepositoryRegistry(async (repoId: string, rootPath: string) => {
+				const db = rootPath === repoA.repoDir ? repoA.dbPath : repoB.dbPath;
+				return new SqliteTemporalStore({ dbPath: db });
+			});
+			const analyzer = new IncrementalGraphAnalyzer();
+			const reconstructionEngine = new TemporalReconstructionEngine();
+			const indexPlanner = new TemporalIndexPlanner();
+			const ingestionService = new TemporalCommitIngestionService(gitService, registry, analyzer, reconstructionEngine, indexPlanner);
+			const temporalService = new TemporalGraphService(gitService, registry, ingestionService);
+
+			// Populate Repo A
+			fs.mkdirSync(path.join(repoA.repoDir, 'src'), { recursive: true });
+			fs.writeFileSync(path.join(repoA.repoDir, 'src/repoA.ts'), 'export const repoA = true;', 'utf8');
+			execSync('git add . && git commit -m "feat: repo A init"', { cwd: repoA.repoDir, stdio: 'pipe' });
+			const cA = execSync('git rev-parse HEAD', { cwd: repoA.repoDir, stdio: 'pipe' }).toString().trim();
+
+			// Populate Repo B
+			fs.mkdirSync(path.join(repoB.repoDir, 'src'), { recursive: true });
+			fs.writeFileSync(path.join(repoB.repoDir, 'src/repoB.ts'), 'export const repoB = true;', 'utf8');
+			execSync('git add . && git commit -m "feat: repo B init"', { cwd: repoB.repoDir, stdio: 'pipe' });
+			const cB = execSync('git rev-parse HEAD', { cwd: repoB.repoDir, stdio: 'pipe' }).toString().trim();
+
+			// Concurrently ingest both repositories
+			const [snapA, snapB] = await Promise.all([
+				temporalService.ensureCommitIndexed(repoA.repoDir, cA),
+				temporalService.ensureCommitIndexed(repoB.repoDir, cB),
+			]);
+
+			assert.strictEqual(snapA.commitSha, cA);
+			assert.ok(snapA.pathToEntityId.has('src/repoA.ts'));
+			assert.strictEqual(snapA.pathToEntityId.has('src/repoB.ts'), false);
+
+			assert.strictEqual(snapB.commitSha, cB);
+			assert.ok(snapB.pathToEntityId.has('src/repoB.ts'));
+			assert.strictEqual(snapB.pathToEntityId.has('src/repoA.ts'), false);
+
+			// Test handleHeadChanged routing
+			const idA = await gitService.getRepositoryIdentity(repoA.repoDir);
+			await temporalService.handleHeadChanged({
+				repositoryId: idA.repositoryId,
+				currentHead: cA,
+				timestamp: Date.now(),
+				transitionType: 'commit',
+			}, repoA.repoDir);
+
+			const statusA = await temporalService.getCommitIndexStatus(repoA.repoDir, cA);
+			assert.strictEqual(statusA, 'ready');
+
+			await registry.closeAll();
+		} finally {
+			try {
+				fs.rmSync(repoA.tempBase, { recursive: true, force: true });
+				fs.rmSync(repoB.tempBase, { recursive: true, force: true });
+			} catch {
+				// ignore
+			}
+		}
+	});
 });

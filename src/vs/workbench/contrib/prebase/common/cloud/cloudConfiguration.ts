@@ -29,6 +29,24 @@ function nonEmpty(raw: unknown): string {
 	return typeof raw === 'string' ? raw.trim() : '';
 }
 
+function safeDecodeBase64Url(base64Url: string): string | undefined {
+	try {
+		let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+		while (base64.length % 4 !== 0) {
+			base64 += '=';
+		}
+		if (typeof atob === 'function') {
+			return atob(base64);
+		}
+		if (typeof Buffer !== 'undefined') {
+			return Buffer.from(base64, 'base64').toString('utf8');
+		}
+	} catch {
+		// Base64 decode failure
+	}
+	return undefined;
+}
+
 function isForbiddenSecretKey(key: string): boolean {
 	const trimmed = key.trim();
 	if (trimmed.startsWith('sb_secret_') || trimmed.startsWith('secret_')) {
@@ -40,10 +58,12 @@ function isForbiddenSecretKey(key: string): boolean {
 	try {
 		const parts = trimmed.split('.');
 		if (parts.length === 3) {
-			const decoded = typeof atob === 'function' ? atob(parts[1]) : Buffer.from(parts[1], 'base64').toString('utf8');
-			const payload = JSON.parse(decoded);
-			if (payload && (payload.role === 'service_role' || payload.role === 'supabase_admin')) {
-				return true;
+			const decoded = safeDecodeBase64Url(parts[1]);
+			if (decoded) {
+				const payload = JSON.parse(decoded);
+				if (payload && (payload.role === 'service_role' || payload.role === 'supabase_admin')) {
+					return true;
+				}
 			}
 		}
 	} catch {

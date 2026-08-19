@@ -64,38 +64,39 @@ export class TemporalIndexPlanner {
 			};
 		}
 
-		// BFS backwards along first-parent/parent ancestry to find the nearest checkpoint
-		const queue: Array<{ sha: string; path: string[] }> = [{ sha: targetCommitSha, path: [targetCommitSha] }];
-		const visited = new Set<string>([targetCommitSha]);
+		// Traverse backwards along the exact delta base lineage to find the base checkpoint
+		let currentSha: string | undefined = targetCommitSha;
+		const chain: string[] = [];
+		const visited = new Set<string>();
 
-		while (queue.length > 0) {
-			const { sha, path } = queue.shift()!;
-			const record = commitsBySha.get(sha);
-			if (!record) continue;
+		while (currentSha && !visited.has(currentSha)) {
+			visited.add(currentSha);
+			const record = commitsBySha.get(currentSha);
+			if (!record) {
+				break;
+			}
 
 			if (record.isCheckpoint) {
-				// Found nearest ancestor checkpoint!
-				// Path from base (exclusive) to target (inclusive):
-				const deltaShas = path.slice(0, path.length - 1).reverse();
 				return {
 					targetCommitSha,
-					baseCheckpointSha: sha,
-					deltaShas,
-					totalDeltas: deltaShas.length,
-					isDirectCheckpoint: false,
+					baseCheckpointSha: currentSha,
+					deltaShas: chain.reverse(),
+					totalDeltas: chain.length,
+					isDirectCheckpoint: chain.length === 0,
 				};
 			}
 
-			for (const parentSha of record.parentShas) {
-				if (parentSha && !visited.has(parentSha) && commitsBySha.has(parentSha)) {
-					visited.add(parentSha);
-					queue.push({ sha: parentSha, path: [...path, parentSha] });
-				}
-			}
+			chain.push(currentSha);
+			currentSha = record.baseCommitSha || (record.parentShas && record.parentShas[0]) || undefined;
 		}
 
-		// If no ancestor checkpoint found, return linear fallback
-		return this.planReconstruction(targetCommitSha, Array.from(commitsBySha.values()));
+		// Fallback if disconnected
+		return {
+			targetCommitSha,
+			deltaShas: [],
+			totalDeltas: 0,
+			isDirectCheckpoint: false,
+		};
 	}
 
 	/**

@@ -149,7 +149,24 @@ export class PreBaseCloudService extends Disposable implements IPreBaseCloudServ
 		}
 	}
 
+	private _inFlightRefresh?: Promise<string | undefined>;
+
 	async refreshAccessTokenIfNeeded(cancel: CancellationToken): Promise<string | undefined> {
+		if (this._inFlightRefresh) {
+			return this._inFlightRefresh;
+		}
+
+		const promise = this._doRefreshAccessTokenIfNeeded(cancel);
+		this._inFlightRefresh = promise;
+		promise.finally(() => {
+			if (this._inFlightRefresh === promise) {
+				this._inFlightRefresh = undefined;
+			}
+		});
+		return promise;
+	}
+
+	private async _doRefreshAccessTokenIfNeeded(cancel: CancellationToken): Promise<string | undefined> {
 		const client = this.getAuthClient();
 		if (!client) {
 			return undefined;

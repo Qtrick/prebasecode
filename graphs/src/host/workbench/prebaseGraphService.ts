@@ -24,7 +24,7 @@ import type { NetworkLayoutMode } from '../../layouts/network/index.js';
 import { basename } from '../../core/resolution/paths.js';
 import type { GraphNode, GraphSnapshot, LayoutMode } from '../../common/types/graphTypes.js';
 import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
-import { WorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
+import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import { IGitService, IGitRepository } from '../../../../git/common/gitService.js';
 
 export type PreBaseGraphType = 'network';
@@ -133,7 +133,6 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		status: 'idle'
 	};
 
-	private _gitHistoryService: WorkbenchGitHistoryService | undefined;
 	/** Per-repository HEAD-state observers, keyed by repository root URI. */
 	private readonly _repositoryHeadObservers = new Map<string, DisposableStore>();
 
@@ -143,6 +142,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IOutputService private readonly outputService: IOutputService,
 		@IGitService private readonly gitService: IGitService,
+		@IWorkbenchGitHistoryService private readonly _gitHistoryService: IWorkbenchGitHistoryService,
 	) {
 		super();
 		this._viewState = {
@@ -150,8 +150,6 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			layoutMode: 'hierarchy'
 		};
 		if (this.gitService) {
-			this._gitHistoryService = new WorkbenchGitHistoryService(this.gitService as any);
-			// Eagerly subscribe to any repositories that are already open at construction time.
 			this._checkAndWireHeadObservers();
 		}
 		this._register(this.configurationService.onDidChangeConfiguration(e => {

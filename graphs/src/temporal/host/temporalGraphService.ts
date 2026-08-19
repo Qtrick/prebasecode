@@ -119,31 +119,43 @@ export class TemporalGraphService implements ITemporalGraphService {
 	}
 
 	async ingestCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
-		const key = `${rootPath}:${commitSha}`;
-		const inFlight = this._inFlightIngestions.get(key);
-		if (inFlight) {
-			return inFlight;
-		}
+		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
 
-		const promise = (async () => {
-			try {
-				return await this._ingestionService.ingestCommit(rootPath, commitSha, {}, token);
-			} finally {
-				this._inFlightIngestions.delete(key);
-			}
-		})();
-
-		this._inFlightIngestions.set(key, promise);
-		return promise;
+		return runtime.queueIngestion(commitSha, async () => {
+			return runtime.ingestionService.ingestCommit(rootPath, commitSha, {}, token);
+		});
 	}
 
 	async ingestCommitRange(rootPath: string, commitShas: string[], token?: CancellationTokenLike): Promise<void> {
-		return this._ingestionService.ingestCommitRange(rootPath, commitShas, token);
+		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
+
+		for (const sha of commitShas) {
+			if (token?.isCancellationRequested) break;
+			await runtime.queueIngestion(sha, async () => {
+				return runtime.ingestionService.ingestCommit(rootPath, sha, {}, token);
+			});
+		}
 	}
 
 	async handleHeadChanged(event: GitHeadChangeEvent, rootPath: string): Promise<void> {
-		if (event.currentHead) {
-			await this._ingestionService.ingestCommit(rootPath, event.currentHead, { isExplicitHead: true });
+		if (!event.currentHead) {
+			return;
+		}
+
+		try {
+			const identity = await this._gitService.getRepositoryIdentity(rootPath);
+			// Match event repositoryId to target repository
+			if (event.repositoryId && event.repositoryId !== identity.repositoryId && event.repositoryId !== rootPath) {
+				return;
+			}
+			const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
+			await runtime.queueIngestion(event.currentHead, async () => {
+				return runtime.ingestionService.ingestCommit(rootPath, event.currentHead, { isExplicitHead: true });
+			});
+		} catch {
+			// Ignore background ingestion failure on head change
 		}
 	}
 

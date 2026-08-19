@@ -3,6 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { CURRENT_DELTA_VERSION } from '../common/temporalVersioning.js';
+import { computeCanonicalGraphDigest } from '../../core/canonical/canonicalGraphDigest.js';
 import type {
 	ArchitectureGraphData,
 	TemporalEdgeSnapshot,
@@ -80,9 +81,14 @@ export class TemporalDeltaEngine {
 			}
 		}
 
+		const baseCommitSha = parentSnap?.commitSha ?? '';
+		const targetCanonicalDigest = currentSnap.digest || currentSnap.canonicalSnapshot?.digest;
+
 		return {
 			commitSha: currentSnap.commitSha,
-			parentCommitSha: parentSnap?.commitSha ?? '',
+			baseCommitSha,
+			parentCommitSha: baseCommitSha,
+			targetCanonicalDigest,
 			deltaVersion: CURRENT_DELTA_VERSION,
 			entitiesAdded,
 			entitiesModified,
@@ -162,6 +168,12 @@ export class TemporalDeltaEngine {
 			timestamp: baseSnap.timestamp,
 		};
 
+		const derivedDigest = delta.targetCanonicalDigest || computeCanonicalGraphDigest({
+			nodes: sortedNodes,
+			edges: sortedEdges,
+			entryNodeId: baseSnap.canonicalSnapshot?.entryNodeId ?? null,
+		});
+
 		return {
 			schemaVersion: baseSnap.schemaVersion,
 			analyzerVersion: baseSnap.analyzerVersion,
@@ -169,6 +181,13 @@ export class TemporalDeltaEngine {
 			commitSha: delta.commitSha,
 			timestamp: baseSnap.timestamp,
 			isCheckpoint,
+			digest: derivedDigest,
+			canonicalSnapshot: baseSnap.canonicalSnapshot ? {
+				...baseSnap.canonicalSnapshot,
+				nodes: sortedNodes,
+				edges: sortedEdges,
+				digest: derivedDigest,
+			} : undefined,
 			graphData,
 			entityMap: newEntityMap,
 			edgeMap: newEdgeMap,

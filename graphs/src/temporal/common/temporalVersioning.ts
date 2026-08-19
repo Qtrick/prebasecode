@@ -3,10 +3,11 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { TemporalError } from './temporalErrors.js';
+import { GRAPH_ANALYZER_VERSION, GRAPH_ANALYSIS_PROFILE_VERSION } from '../../core/canonical/versioning.js';
 
-export const CURRENT_SCHEMA_VERSION = 2;
-export const CURRENT_ANALYZER_VERSION = 1;
-export const CURRENT_PROFILE_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_ANALYZER_VERSION = GRAPH_ANALYZER_VERSION;
+export const CURRENT_PROFILE_VERSION = GRAPH_ANALYSIS_PROFILE_VERSION;
 export const CURRENT_DELTA_VERSION = 1;
 
 /** Default interval between full checkpoints (e.g. Every 10 commits) */

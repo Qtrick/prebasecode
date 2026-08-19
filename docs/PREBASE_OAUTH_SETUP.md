@@ -88,9 +88,13 @@ The PreBase desktop application uses a standard PKCE authorization code exchange
    - The SHA-256 base64url challenge is sent in `/authorize`.
    - The plain verifier is held strictly in memory, never persisted to disk, and consumed immediately upon exchange.
 3. **Strict Callback Validation**:
-   - The protocol handler accepts only URLs matching `prebase://auth/callback`.
+   - The protocol handler accepts only URLs matching `prebase://auth/callback` via query parameters (`?code=...&state=...`).
+   - Implicit grant tokens in URL fragments (`#access_token=...`, `#id_token=...`) are strictly rejected.
    - The returned `state` parameter must match the in-flight attempt's `state` exactly.
    - Expired attempts (> 5 minutes) and replayed URLs are immediately rejected.
-4. **OS Keychain Secret Storage**:
+4. **OS Keychain Secret Storage & Concurrency Serialization**:
    - Tokens (`access_token`, `refresh_token`) are stored in OS-backed `SecretStorage` (macOS Keychain, Windows Credential Manager, Linux Secret Service).
+   - Concurrent token refreshes are serialized behind an in-flight promise mutex to prevent single-use refresh token burn races.
    - Sessions are refreshed atomically and cleared securely on sign-out.
+5. **Elevated Key Diagnostics**:
+   - Client-side configuration parsing strictly forbids secret/service-role keys (`sb_secret_*`, `service_role`, `supabase_admin`) using browser-safe base64url payload inspection.

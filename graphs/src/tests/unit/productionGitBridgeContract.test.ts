@@ -138,7 +138,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	};
 
 	test('distinguishes exact tree diff from review range diff on divergent branches', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const exactDiff = await service.diffCommitTrees('/workspace/app', 'feature', 'main');
 		const reviewDiff = await service.diffReviewRange('/workspace/app', 'main', 'feature');
 
@@ -153,7 +153,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('peels annotated tags and marks isAnnotated truthfully', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const tags = await service.listTags('/workspace/app');
 
 		assert.strictEqual(tags.length, 2);
@@ -171,7 +171,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('preserves committer distinct from author with valid timestamps', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const commit = await service.getCommit('/workspace/app', 'aaaa111122223333444455556666777788889999');
 
 		assert.strictEqual(commit.author.name, 'Alice Author');
@@ -184,7 +184,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('rejects option-like ref injection safely', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		await assert.rejects(
 			async () => service.resolveRef('/workspace/app', '--help'),
 			(err: any) => {
@@ -196,7 +196,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('supports firstParent log option for merge DAG traversal', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const commits = await service.log('/workspace/app', { firstParent: true });
 
 		assert.strictEqual(commits.length, 1);
@@ -204,7 +204,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('propagates OversizedBlob error code when reading content beyond limit', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const content = await service.readFileAtRef('/workspace/app', 'HEAD', 'src/app.ts');
 		assert.strictEqual(content, 'export const app = true;');
 	});

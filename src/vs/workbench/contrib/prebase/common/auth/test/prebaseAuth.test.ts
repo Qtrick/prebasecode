@@ -119,6 +119,21 @@ suite('PreBase OAuth callback parser', () => {
 		);
 	});
 
+	test('strictly rejects implicit grant tokens delivered via URL fragment', () => {
+		for (const fragmentUri of [
+			URI.parse('prebase://auth/callback#access_token=secret_token&state=unpredictable-state'),
+			URI.parse('prebase://auth/callback#id_token=jwt_id_token&state=unpredictable-state'),
+			URI.parse('prebase://auth/callback#refresh_token=refresh_tok&state=unpredictable-state'),
+			URI.parse('prebase://auth/callback?code=code&state=unpredictable-state#access_token=secret_token'),
+		]) {
+			assert.strictEqual(
+				parsePreBaseOAuthCallback(fragmentUri, scheme, state),
+				undefined,
+				`Should reject fragment token in: ${fragmentUri.toString()}`
+			);
+		}
+	});
+
 	test('exposes GitHub and Google as the complete OAuth provider allowlist', () => {
 		assert.deepStrictEqual(PREBASE_OAUTH_PROVIDERS, ['github', 'google']);
 		assert.strictEqual(isPreBaseOAuthProvider('github'), true);

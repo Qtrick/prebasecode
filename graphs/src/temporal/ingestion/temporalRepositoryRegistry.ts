@@ -3,12 +3,15 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { ITemporalStore } from '../persistence/common/temporalStore.js';
+import type { IGitHistoryService } from '../../history/git/gitHistoryService.js';
+import { TemporalRepositoryRuntime } from './temporalRepositoryRuntime.js';
 import { TemporalError } from '../common/temporalErrors.js';
 
 export type TemporalStoreFactory = (repositoryId: string, rootPath: string) => Promise<ITemporalStore>;
 
 export class TemporalRepositoryRegistry {
 	private readonly _stores = new Map<string, ITemporalStore>();
+	private readonly _runtimes = new Map<string, TemporalRepositoryRuntime>();
 	private readonly _storeFactory: TemporalStoreFactory;
 
 	constructor(storeFactory: TemporalStoreFactory) {
@@ -40,11 +43,32 @@ export class TemporalRepositoryRegistry {
 		}
 	}
 
+	async getRuntime(repositoryId: string, rootPath: string, gitService: IGitHistoryService): Promise<TemporalRepositoryRuntime> {
+		const existing = this._runtimes.get(repositoryId);
+		if (existing) {
+			return existing;
+		}
+
+		const store = await this.getStore(repositoryId, rootPath);
+		const runtime = new TemporalRepositoryRuntime(repositoryId, rootPath, store, gitService);
+		this._runtimes.set(repositoryId, runtime);
+		return runtime;
+	}
+
 	hasStore(repositoryId: string): boolean {
 		return this._stores.has(repositoryId);
 	}
 
+	hasRuntime(repositoryId: string): boolean {
+		return this._runtimes.has(repositoryId);
+	}
+
 	async closeStore(repositoryId: string): Promise<void> {
+		const runtime = this._runtimes.get(repositoryId);
+		if (runtime) {
+			await runtime.dispose();
+			this._runtimes.delete(repositoryId);
+		}
 		const store = this._stores.get(repositoryId);
 		if (store) {
 			await store.close();
@@ -53,6 +77,11 @@ export class TemporalRepositoryRegistry {
 	}
 
 	async closeAll(): Promise<void> {
+		for (const runtime of this._runtimes.values()) {
+			await runtime.dispose();
+		}
+		this._runtimes.clear();
+
 		for (const store of this._stores.values()) {
 			await store.close();
 		}

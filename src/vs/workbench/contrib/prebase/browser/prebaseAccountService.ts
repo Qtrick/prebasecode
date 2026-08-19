@@ -358,12 +358,26 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 		this.cloudService.markOnline();
 		const profileRepo = this.cloudService.getProfileRepository();
 		const profile = profileRepo ? await profileRepo.fetchProfile(user.id, accessToken, cancel) : undefined;
-		const metaName = typeof user.user_metadata?.display_name === 'string' ? user.user_metadata.display_name : undefined;
+		const metaName = typeof user.user_metadata?.display_name === 'string' && user.user_metadata.display_name.trim()
+			? user.user_metadata.display_name.trim()
+			: typeof user.user_metadata?.full_name === 'string' && user.user_metadata.full_name.trim()
+			? user.user_metadata.full_name.trim()
+			: typeof user.user_metadata?.name === 'string' && user.user_metadata.name.trim()
+			? user.user_metadata.name.trim()
+			: typeof user.user_metadata?.user_name === 'string' && user.user_metadata.user_name.trim()
+			? user.user_metadata.user_name.trim()
+			: undefined;
+		const metaAvatar = typeof user.user_metadata?.avatar_url === 'string' && user.user_metadata.avatar_url.trim()
+			? user.user_metadata.avatar_url.trim()
+			: typeof user.user_metadata?.picture === 'string' && user.user_metadata.picture.trim()
+			? user.user_metadata.picture.trim()
+			: undefined;
 		const displayName = profile?.display_name || metaName || user.email || 'PreBase';
+		const avatarUrl = profile?.avatar_url || metaAvatar || undefined;
 		return {
 			displayName,
 			email: user.email,
-			avatarUrl: profile?.avatar_url ?? undefined,
+			avatarUrl,
 		};
 	}
 

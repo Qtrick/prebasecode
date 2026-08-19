@@ -3,6 +3,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as sqlite3 from '@vscode/sqlite3';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { TemporalError } from '../../common/temporalErrors.js';
 import { computeAnalysisCacheKey, validateVersion } from '../../common/temporalVersioning.js';
 import { runMigrations } from './temporalMigrations.js';
@@ -60,6 +62,16 @@ export class SqliteTemporalStore implements ITemporalStore {
 	async open(): Promise<void> {
 		if (this.isOpen()) {
 			return;
+		}
+
+		// Ensure parent directory exists
+		try {
+			const dir = path.dirname(this._dbPath);
+			if (dir && !fs.existsSync(dir)) {
+				fs.mkdirSync(dir, { recursive: true });
+			}
+		} catch {
+			// Directory may already exist or be created concurrently
 		}
 
 		await new Promise<void>((resolve, reject) => {
@@ -194,18 +206,24 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 		return this.runInTransaction(async () => {
 			// 1. Insert Commit
+			const canonicalDigest = commit.canonicalDigest || snapshot.digest || snapshot.canonicalSnapshot?.digest || '';
+			const baseCommitSha = commit.baseCommitSha || delta?.baseCommitSha || delta?.parentCommitSha || '';
+			const deltaDepth = commit.deltaDepth ?? (commit.isCheckpoint ? 0 : 1);
+
 			await new Promise<void>((resolve, reject) => {
 				const stmt = `
 					INSERT OR REPLACE INTO commits (
-						commit_sha, parent_shas, tree_sha, author_name, author_email,
+						commit_sha, canonical_digest, parent_shas, tree_sha, author_name, author_email,
 						author_timestamp, committer_timestamp, message, ingested_at,
-						is_checkpoint, checkpoint_interval, schema_version, analyzer_version, profile_version
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+						is_checkpoint, checkpoint_interval, delta_depth, base_commit_sha,
+						schema_version, analyzer_version, profile_version
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 				`;
 				db.run(
 					stmt,
 					[
 						commit.commitSha,
+						canonicalDigest,
 						JSON.stringify(commit.parentShas),
 						commit.treeSha,
 						commit.authorName,
@@ -216,6 +234,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 						commit.ingestedAt,
 						commit.isCheckpoint ? 1 : 0,
 						commit.checkpointInterval,
+						deltaDepth,
+						baseCommitSha,
 						commit.schemaVersion,
 						commit.analyzerVersion,
 						commit.profileVersion,
@@ -239,7 +259,6 @@ export class SqliteTemporalStore implements ITemporalStore {
 			}
 
 			// 3. Insert or update immutable Graph State (Deduplication via canonical digest)
-			const digest = snapshot.digest || snapshot.canonicalSnapshot?.digest;
 			const serializedSnapshot = JSON.stringify({
 				schemaVersion: snapshot.schemaVersion,
 				analyzerVersion: snapshot.analyzerVersion,
@@ -247,26 +266,24 @@ export class SqliteTemporalStore implements ITemporalStore {
 				commitSha: snapshot.commitSha,
 				timestamp: snapshot.timestamp,
 				isCheckpoint: snapshot.isCheckpoint,
-				digest,
+				digest: canonicalDigest,
 				graphData: snapshot.graphData,
 				entities: Array.from(snapshot.entityMap.values()),
 				edges: Array.from(snapshot.edgeMap.values()),
 			});
 
-			if (digest) {
+			if (canonicalDigest) {
 				await new Promise<void>((resolve, reject) => {
-					const stateId = `state_${digest.slice(0, 16)}`;
 					const stmt = `
 						INSERT OR IGNORE INTO graph_states (
-							state_id, canonical_digest, snapshot_json, created_at,
+							canonical_digest, snapshot_json, created_at,
 							schema_version, analyzer_version, profile_version
-						) VALUES (?, ?, ?, ?, ?, ?, ?);
+						) VALUES (?, ?, ?, ?, ?, ?);
 					`;
 					db.run(
 						stmt,
 						[
-							stateId,
-							digest,
+							canonicalDigest,
 							serializedSnapshot,
 							Date.now(),
 							snapshot.schemaVersion,
@@ -283,13 +300,14 @@ export class SqliteTemporalStore implements ITemporalStore {
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
 						INSERT OR REPLACE INTO checkpoints (
-							commit_sha, snapshot_json, created_at, schema_version, analyzer_version, profile_version
-						) VALUES (?, ?, ?, ?, ?, ?);
+							commit_sha, canonical_digest, snapshot_json, created_at, schema_version, analyzer_version, profile_version
+						) VALUES (?, ?, ?, ?, ?, ?, ?);
 					`;
 					db.run(
 						stmt,
 						[
 							commit.commitSha,
+							canonicalDigest,
 							serializedSnapshot,
 							Date.now(),
 							snapshot.schemaVersion,
@@ -306,14 +324,15 @@ export class SqliteTemporalStore implements ITemporalStore {
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
 						INSERT OR REPLACE INTO deltas (
-							commit_sha, parent_commit_sha, delta_json, delta_version, created_at
-						) VALUES (?, ?, ?, ?, ?);
+							commit_sha, base_commit_sha, target_canonical_digest, delta_json, delta_version, created_at
+						) VALUES (?, ?, ?, ?, ?, ?);
 					`;
 					db.run(
 						stmt,
 						[
 							delta.commitSha,
-							delta.parentCommitSha,
+							delta.baseCommitSha || delta.parentCommitSha,
+							delta.targetCanonicalDigest || canonicalDigest,
 							JSON.stringify(delta),
 							delta.deltaVersion,
 							Date.now(),
@@ -590,7 +609,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				if (err) return reject(err);
 				if (!row) return resolve(undefined);
 				resolve({
-					stateId: row.state_id,
+					stateId: row.canonical_digest,
 					canonicalDigest: row.canonical_digest,
 					snapshotJson: row.snapshot_json,
 				});
@@ -880,6 +899,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 	private _mapCommitRecord(row: any): TemporalCommitRecord {
 		return {
 			commitSha: row.commit_sha,
+			canonicalDigest: row.canonical_digest || undefined,
 			parentShas: JSON.parse(row.parent_shas || '[]'),
 			treeSha: row.tree_sha,
 			authorName: row.author_name,
@@ -890,6 +910,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 			ingestedAt: row.ingested_at,
 			isCheckpoint: Boolean(row.is_checkpoint),
 			checkpointInterval: row.checkpoint_interval,
+			deltaDepth: typeof row.delta_depth === 'number' ? row.delta_depth : (row.is_checkpoint ? 0 : 1),
+			baseCommitSha: row.base_commit_sha || undefined,
 			schemaVersion: row.schema_version,
 			analyzerVersion: row.analyzer_version,
 			profileVersion: row.profile_version,

@@ -23,7 +23,6 @@ export interface BlobParseArtifact {
 	readonly language?: string;
 	readonly functionCount?: number;
 	readonly componentCount?: number;
-	readonly analyzedAt?: number;
 }
 
 export interface ICanonicalParseArtifactCache {
@@ -42,7 +41,6 @@ export function extractBlobParseArtifact(result: ParseResult, language?: string)
 		language,
 		functionCount: result.functions?.length ?? 0,
 		componentCount: result.components?.length ?? 0,
-		analyzedAt: Date.now(),
 	};
 }
 

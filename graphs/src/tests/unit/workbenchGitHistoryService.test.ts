@@ -104,7 +104,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	};
 
 	test('resolves references and fetches commit details accurately', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const sha = await service.resolveRef('/workspace/test-repo', 'main');
 		assert.strictEqual(sha, '1111111111111111111111111111111111111111');
 
@@ -115,7 +115,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('lists tree entries, reads blobs, and diffs trees via bridge', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const entries = await service.listTree('/workspace/test-repo', 'HEAD');
 		assert.strictEqual(entries.length, 2);
 		assert.strictEqual(entries[0].path, 'src/index.ts');
@@ -130,7 +130,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('emits deduplicated onDidChangeHead events', () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const events: any[] = [];
 		const disposable = service.onDidChangeHead?.((e) => {
 			events.push(e);
@@ -151,7 +151,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('wraps failures into typed GitHistoryError without silent swallowing', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		await assert.rejects(
 			async () => service.resolveRef('/workspace/test-repo', 'invalid-ref-12345'),
 			(err: any) => {
@@ -163,7 +163,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('tracks HEAD changes per repository — events from different repos are independent', () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const events: any[] = [];
 		const disposable = service.onDidChangeHead?.((e) => events.push(e));
 
@@ -199,7 +199,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('per-repo deduplication: identical SHA on one repo does not suppress the same SHA on another', () => {
-		const service = new WorkbenchGitHistoryService(mockGitService);
+		const service = new WorkbenchGitHistoryService(mockGitService as any);
 		const events: any[] = [];
 		const disposable = service.onDidChangeHead?.((e) => events.push(e));
 

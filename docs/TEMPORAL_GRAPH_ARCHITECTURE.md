@@ -22,17 +22,21 @@ PreBase has **one active user-facing Code Graph mode**:
   - Separation of stable content records in `AnalysisManifest` from run diagnostics.
   - Query index lifecycle optimization (reused on view relayouts).
   - Magnus hidden canonical node query resolution (`resolveNodeFocusForMagnus`).
-- **Phase 2 (Planned Next)**:
+- **Phase 2 (Complete — Phase 2.2 Production Activation)**:
   - Temporal entity lineage (cross-commit node and edge stability).
-  - SQLite persistence layer and incremental cache indexing.
-  - Workspace repository identity registry.
-- **Phase 3 (Planned)**:
+  - Schema v3 SQLite persistence layer (`SCHEMA_V3_DDL`) with `commits`, `checkpoints`, `deltas`, `graph_states`, `blob_parse_artifacts`, `refs`, and `commit_parents`.
+  - Exact delta-base DAG reconstruction along the `baseCommitSha` ancestry chain with canonical digest verification.
+  - Fail-closed parent lineage reconstruction with prerequisite recursive indexing.
+  - Incremental AST analysis backed by persistent two-tier parse artifact caching (`TwoTierParseArtifactCache`).
+  - Shared workbench Git history service (`IWorkbenchGitHistoryService`) with automatic repository observation and multi-root event routing.
+  - Per-repository isolated runtime (`TemporalRepositoryRuntime`) with sequential FIFO ingestion queue and in-flight request deduplication.
+- **Phase 3 (Planned Next)**:
   - Temporal UI timeline, commit scrubber, and graph diff overlays.
 - **Phase 4 (Planned)**:
   - Graph Blame & Magnus Temporal conversational query tools.
 
 > [!NOTE]
-> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 1.4 completes and freezes the foundational non-UI engine, exact Git history interfaces, canonical data models, and Magnus structural query endpoints before Phase 2 temporal persistence begins.
+> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 2 completes and operationalizes the durable temporal persistence engine, DAG delta reconstruction, incremental analysis, and workbench Git event streaming before Phase 3 timeline UI development begins.
 
 ---
 

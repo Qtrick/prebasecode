@@ -2,6 +2,8 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
+import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
+import { IGitService } from '../../../../git/common/gitService.js';
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type { EventLike, IGitHistoryService } from '../../history/git/gitHistoryService.js';
 import {
@@ -10,6 +12,7 @@ import {
 	type GitCommitMetadata,
 	type GitExactDiffResult,
 	type GitHeadChangeEvent,
+	type GitHeadTransitionType,
 	type GitLogOptions,
 	type GitRepositoryIdentity,
 	type GitTagInfo,
@@ -17,9 +20,19 @@ import {
 	type GitTreeListOptions,
 } from '../../history/git/gitTypes.js';
 
+export const IWorkbenchGitHistoryService = createDecorator<IWorkbenchGitHistoryService>('workbenchGitHistoryService');
+
+export interface IWorkbenchGitHistoryService extends IGitHistoryService {
+	readonly _serviceBrand: undefined;
+	notifyHeadChanged(repositoryId: string, newHead: string, transitionType?: GitHeadTransitionType): void;
+	observeRepository(repo: WorkbenchGitRepositoryLike): void;
+	dispose(): void;
+}
+
 export interface WorkbenchGitServiceLike {
+	readonly _serviceBrand?: undefined;
 	readonly repositories: Iterable<WorkbenchGitRepositoryLike>;
-	openRepository(uri: any): Promise<WorkbenchGitRepositoryLike | undefined>;
+	openRepository?(uri: any): Promise<WorkbenchGitRepositoryLike | undefined>;
 }
 
 export interface WorkbenchGitRepositoryLike {
@@ -41,11 +54,15 @@ function normalizePath(p: string): string {
 	return p.replace(/\\/g, '/').replace(/\/+$/, '');
 }
 
-export class WorkbenchGitHistoryService implements IGitHistoryService {
+export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
+	declare readonly _serviceBrand: undefined;
+
 	private readonly _gitService: WorkbenchGitServiceLike;
 	private readonly _headListeners = new Set<(e: GitHeadChangeEvent) => void>();
 	/** Per-repository last-known HEAD SHA for deduplication. */
 	private readonly _lastHeadShaByRepo = new Map<string, string>();
+	private readonly _observedRepos = new Set<string>();
+	private readonly _disposables: Array<{ dispose(): void }> = [];
 
 	readonly onDidChangeHead: EventLike<GitHeadChangeEvent> = (listener) => {
 		this._headListeners.add(listener);
@@ -56,21 +73,54 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 		};
 	};
 
-	constructor(gitService: WorkbenchGitServiceLike) {
-		this._gitService = gitService;
+	constructor(@IGitService gitService: IGitService) {
+		this._gitService = gitService as any;
+		this._wireExistingRepositories();
+	}
+
+	private _wireExistingRepositories(): void {
+		if (this._gitService && this._gitService.repositories) {
+			for (const repo of this._gitService.repositories) {
+				this.observeRepository(repo);
+			}
+		}
+	}
+
+	observeRepository(repo: WorkbenchGitRepositoryLike): void {
+		const repoId = repo.rootUri.toString();
+		if (this._observedRepos.has(repoId)) {
+			return;
+		}
+		this._observedRepos.add(repoId);
+
+		const repoState = (repo as any).state;
+		if (repoState && typeof repoState.recomputeInitiallyAndOnChange === 'function') {
+			let lastHead: string | undefined;
+			const sub = repoState.recomputeInitiallyAndOnChange({ add: (d: any) => this._disposables.push(d) }, (state: any) => {
+				const headCommit = state?.HEAD?.commit;
+				if (headCommit && headCommit !== lastHead) {
+					lastHead = headCommit;
+					this.notifyHeadChanged(repoId, headCommit, 'external');
+				}
+			});
+			if (sub && typeof sub.dispose === 'function') {
+				this._disposables.push(sub);
+			}
+		}
 	}
 
 	private _findRepository(rootPath: string): WorkbenchGitRepositoryLike | undefined {
-		const target = normalizePath(rootPath);
+		const target = normalizePath(rootPath).toLowerCase();
 		let bestMatch: WorkbenchGitRepositoryLike | undefined;
 		let bestMatchLen = 0;
 
 		for (const repo of this._gitService.repositories) {
-			const repoFsPath = repo.rootUri.fsPath ? normalizePath(repo.rootUri.fsPath) : '';
-			const repoPath = normalizePath(repo.rootUri.path);
+			const repoFsPath = repo.rootUri.fsPath ? normalizePath(repo.rootUri.fsPath).toLowerCase() : '';
+			const repoPath = normalizePath(repo.rootUri.path).toLowerCase();
 
 			// Exact match
 			if (repoFsPath === target || repoPath === target) {
+				this.observeRepository(repo);
 				return repo;
 			}
 
@@ -85,20 +135,16 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 		}
 
 		if (bestMatch) {
+			this.observeRepository(bestMatch);
 			return bestMatch;
 		}
 
-		// Fallback: if only one repository is open, return it
-		const allRepos = Array.from(this._gitService.repositories);
-		if (allRepos.length === 1) {
-			return allRepos[0];
-		}
 		return undefined;
 	}
 
 	private async _ensureRepository(rootPath: string): Promise<WorkbenchGitRepositoryLike> {
 		let repo = this._findRepository(rootPath);
-		if (!repo) {
+		if (!repo && typeof this._gitService.openRepository === 'function') {
 			try {
 				repo = await this._gitService.openRepository({ path: rootPath, scheme: 'file' });
 			} catch {
@@ -353,5 +399,13 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 				// Listener error
 			}
 		}
+	}
+
+	dispose(): void {
+		for (const d of this._disposables) {
+			d.dispose();
+		}
+		this._disposables.length = 0;
+		this._headListeners.clear();
 	}
 }
