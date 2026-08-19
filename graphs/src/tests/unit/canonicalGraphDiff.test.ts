@@ -4,6 +4,7 @@
 
 import assert from 'node:assert';
 import { computeCanonicalGraphDiff } from '../../core/canonical/canonicalGraphDiff.js';
+import { createCurrentVersionMetadata } from '../../core/canonical/versioning.js';
 import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js';
 
 suite('CanonicalGraphDiff Unit Tests', () => {
@@ -24,12 +25,15 @@ suite('CanonicalGraphDiff Unit Tests', () => {
 			{ id: 'e2', source: 'file:src/index.ts', target: 'file:src/added.ts', kind: 'import' },
 		];
 
+		const versions = createCurrentVersionMetadata();
 		const diff = computeCanonicalGraphDiff(
-			{ nodes: oldNodes, edges: oldEdges, digest: 'digest1' },
-			{ nodes: newNodes, edges: newEdges, digest: 'digest2' }
+			{ nodes: oldNodes, edges: oldEdges, digest: 'digest1', versions },
+			{ nodes: newNodes, edges: newEdges, digest: 'digest2', versions }
 		);
 
+		assert.strictEqual(diff.kind, 'diff');
 		assert.strictEqual(diff.isIdentical, false);
+		assert.strictEqual(diff.isIncompatible, false);
 		assert.strictEqual(diff.addedNodes.length, 1);
 		assert.strictEqual(diff.addedNodes[0].id, 'file:src/added.ts');
 		assert.strictEqual(diff.removedNodeIds.length, 1);
@@ -49,12 +53,15 @@ suite('CanonicalGraphDiff Unit Tests', () => {
 		];
 		const edges: GraphEdge[] = [];
 
+		const versions = createCurrentVersionMetadata();
 		const diff = computeCanonicalGraphDiff(
-			{ nodes, edges, digest: 'digest_same' },
-			{ nodes, edges, digest: 'digest_same' }
+			{ nodes, edges, digest: 'digest_same', versions },
+			{ nodes, edges, digest: 'digest_same', versions }
 		);
 
+		assert.strictEqual(diff.kind, 'identical');
 		assert.strictEqual(diff.isIdentical, true);
+		assert.strictEqual(diff.isIncompatible, false);
 		assert.strictEqual(diff.addedNodes.length, 0);
 		assert.strictEqual(diff.removedNodeIds.length, 0);
 	});
@@ -66,10 +73,28 @@ suite('CanonicalGraphDiff Unit Tests', () => {
 		const edges: GraphEdge[] = [];
 
 		const diff = computeCanonicalGraphDiff(
-			{ nodes, edges, digest: 'd1', versions: { graphSchemaVersion: 1, analyzerVersion: 1, identityVersion: 1, layoutVersion: 1 } },
-			{ nodes, edges, digest: 'd2', versions: { graphSchemaVersion: 999, analyzerVersion: 1, identityVersion: 1, layoutVersion: 1 } }
+			{ nodes, edges, digest: 'd1', versions: { graphSchemaVersion: 1, analyzerVersion: 1, identityVersion: 1, layoutVersion: 1, analysisProfileVersion: 1 } },
+			{ nodes, edges, digest: 'd2', versions: { graphSchemaVersion: 999, analyzerVersion: 1, identityVersion: 1, layoutVersion: 1, analysisProfileVersion: 1 } }
 		);
 
+		assert.strictEqual(diff.kind, 'incompatible');
+		assert.strictEqual(diff.isIdentical, false);
+		assert.strictEqual(diff.isIncompatible, true);
+		assert.ok(diff.incompatibilityReason);
+	});
+
+	test('fails closed when version metadata is missing', () => {
+		const nodes: GraphNode[] = [
+			{ id: 'file:src/index.ts', kind: 'file', label: 'index.ts', path: 'src/index.ts' },
+		];
+		const edges: GraphEdge[] = [];
+
+		const diff = computeCanonicalGraphDiff(
+			{ nodes, edges, digest: 'd1' },
+			{ nodes, edges, digest: 'd2' }
+		);
+
+		assert.strictEqual(diff.kind, 'incompatible');
 		assert.strictEqual(diff.isIdentical, false);
 		assert.strictEqual(diff.isIncompatible, true);
 	});

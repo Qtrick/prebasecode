@@ -32,6 +32,9 @@ export interface Ref {
 	readonly commit?: string;
 	readonly commitDetails?: Commit;
 	readonly remote?: string;
+	readonly tagCommit?: string;
+	readonly peeledCommit?: string;
+	readonly isAnnotated?: boolean;
 }
 
 export interface UpstreamRef {
@@ -60,6 +63,8 @@ export interface Commit {
 	readonly authorName?: string;
 	readonly authorEmail?: string;
 	readonly commitDate?: Date;
+	readonly committerName?: string;
+	readonly committerEmail?: string;
 	readonly shortStat?: CommitShortStat;
 }
 
@@ -124,6 +129,9 @@ export interface Change {
 export interface DiffChange extends Change {
 	readonly insertions: number;
 	readonly deletions: number;
+	readonly oldBlobOid?: string;
+	readonly newBlobOid?: string;
+	readonly similarity?: number;
 }
 
 export type RepositoryKind = 'repository' | 'submodule' | 'worktree';
@@ -170,6 +178,7 @@ export interface LogOptions {
 	readonly grep?: string;
 	readonly refNames?: string[];
 	readonly maxParents?: number;
+	readonly firstParent?: boolean;
 	readonly skip?: number;
 }
 
@@ -282,6 +291,8 @@ export interface Repository {
 	diffBetweenPatch(ref1: string, ref2: string, path?: string): Promise<string>;
 	diffBetweenWithStats(ref1: string, ref2: string, path?: string): Promise<DiffChange[]>;
 	diffBetweenWithStats2(ref: string, path?: string): Promise<DiffChange[]>;
+	diffTrees(treeish1: string, treeish2?: string): Promise<DiffChange[]>;
+	resolveCommitRef(ref: string): Promise<string>;
 
 	hashObject(data: string): Promise<string>;
 

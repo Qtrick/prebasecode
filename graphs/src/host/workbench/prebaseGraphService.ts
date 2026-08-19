@@ -5,7 +5,7 @@
 import { timeout } from '../../../../../../base/common/async.js';
 import { CancellationToken, CancellationTokenSource } from '../../../../../../base/common/cancellation.js';
 import { Emitter, Event } from '../../../../../../base/common/event.js';
-import { Disposable } from '../../../../../../base/common/lifecycle.js';
+import { Disposable, DisposableStore } from '../../../../../../base/common/lifecycle.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { localize } from '../../../../../../nls.js';
 import { IConfigurationService } from '../../../../../../platform/configuration/common/configuration.js';
@@ -25,7 +25,7 @@ import { basename } from '../../core/resolution/paths.js';
 import type { GraphNode, GraphSnapshot, LayoutMode } from '../../common/types/graphTypes.js';
 import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
 import { WorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
-import { IGitService } from '../../../../git/common/gitService.js';
+import { IGitService, IGitRepository } from '../../../../git/common/gitService.js';
 
 export type PreBaseGraphType = 'network';
 
@@ -130,6 +130,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	};
 
 	private _gitHistoryService: WorkbenchGitHistoryService | undefined;
+	/** Per-repository HEAD-state observers, keyed by repository root URI. */
+	private readonly _repositoryHeadObservers = new Map<string, DisposableStore>();
 
 	constructor(
 		@IFileService private readonly fileService: IFileService,
@@ -145,6 +147,8 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		};
 		if (this.gitService) {
 			this._gitHistoryService = new WorkbenchGitHistoryService(this.gitService as any);
+			// Eagerly subscribe to any repositories that are already open at construction time.
+			this._checkAndWireHeadObservers();
 		}
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (
@@ -417,6 +421,9 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	override dispose(): void {
 		this.cancelScan();
+		for (const store of this._repositoryHeadObservers.values()) {
+			store.dispose();
+		}
 		super.dispose();
 	}
 
@@ -493,9 +500,20 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			const projectName = basename(projectPath) || folder.name;
 			const respectGitIgnore = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphRespectGitIgnore) !== false;
 
+			// Wire HEAD observers for any newly-opened repositories before scanning.
+			this._checkAndWireHeadObservers();
+
+			// Wire git-native checkIgnore when available for the workspace folder.
+			const repoForIgnore = this._findGitRepositoryForPath(projectPath);
+			const checkIgnoreFn: ((paths: string[]) => Promise<Set<string>>) | undefined =
+				(respectGitIgnore && repoForIgnore?.checkIgnore)
+					? async (paths) => new Set(await repoForIgnore.checkIgnore!(paths))
+					: undefined;
+
 			const contentSource = new WorkingTreeContentSource(projectPath, {
 				projectName,
 				respectGitIgnore,
+				checkIgnore: checkIgnoreFn,
 				fileOps: {
 					readFile: async (p: string) => {
 						const uri = URI.file(p);
@@ -698,6 +716,52 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const mode = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
 		const valid: NetworkLayoutMode[] = ['organic', 'sphere', 'constellation', 'clustered', 'radial'];
 		return (valid.includes(mode as NetworkLayoutMode) ? mode : 'organic') as NetworkLayoutMode;
+	}
+
+	/** Returns the IGitRepository for the given filesystem path, if open and known. */
+	private _findGitRepositoryForPath(fsPath: string): IGitRepository | undefined {
+		const normalizedTarget = fsPath.replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+		for (const repo of this.gitService.repositories) {
+			const repoFsPath = (repo.rootUri.fsPath || repo.rootUri.path).replace(/\\/g, '/').replace(/\/+$/, '').toLowerCase();
+			if (repoFsPath === normalizedTarget) {
+				return repo;
+			}
+		}
+		const all = Array.from(this.gitService.repositories);
+		return all.length === 1 ? all[0] : undefined;
+	}
+
+	/**
+	 * Subscribes to HEAD state changes on any IGitRepository that is currently
+	 * open in the git service but not yet observed. Safe to call repeatedly.
+	 */
+	private _checkAndWireHeadObservers(): void {
+		for (const repo of this.gitService.repositories) {
+			this._wireRepositoryHeadObserver(repo);
+		}
+	}
+
+	/**
+	 * Attaches an observable subscription to `repo.state` so that whenever
+	 * HEAD.commit changes we forward it to `_gitHistoryService.notifyHeadChanged()`.
+	 * Idempotent — calling it twice for the same repository is a no-op.
+	 */
+	private _wireRepositoryHeadObserver(repo: IGitRepository): void {
+		const repoId = repo.rootUri.toString();
+		if (this._repositoryHeadObservers.has(repoId)) {
+			return; // Already observing this repository.
+		}
+		let lastHeadCommit: string | undefined;
+		const store = new DisposableStore();
+		repo.state.recomputeInitiallyAndOnChange(store, (state) => {
+			const headCommit = state.HEAD?.commit;
+			if (headCommit && headCommit !== lastHeadCommit) {
+				lastHeadCommit = headCommit;
+				this._gitHistoryService?.notifyHeadChanged(repoId, headCommit, 'external');
+			}
+		});
+		this._repositoryHeadObservers.set(repoId, store);
+		this._register(store);
 	}
 
 	private _isActiveScan(cts: CancellationTokenSource): boolean {

@@ -43,7 +43,8 @@ function normalizePath(p: string): string {
 export class WorkbenchGitHistoryService implements IGitHistoryService {
 	private readonly _gitService: WorkbenchGitServiceLike;
 	private readonly _headListeners = new Set<(e: GitHeadChangeEvent) => void>();
-	private _lastHeadSha: string | undefined;
+	/** Per-repository last-known HEAD SHA for deduplication. */
+	private readonly _lastHeadShaByRepo = new Map<string, string>();
 
 	readonly onDidChangeHead: EventLike<GitHeadChangeEvent> = (listener) => {
 		this._headListeners.add(listener);
@@ -60,13 +61,32 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 
 	private _findRepository(rootPath: string): WorkbenchGitRepositoryLike | undefined {
 		const target = normalizePath(rootPath);
+		let bestMatch: WorkbenchGitRepositoryLike | undefined;
+		let bestMatchLen = 0;
+
 		for (const repo of this._gitService.repositories) {
 			const repoFsPath = repo.rootUri.fsPath ? normalizePath(repo.rootUri.fsPath) : '';
 			const repoPath = normalizePath(repo.rootUri.path);
-			if (repoFsPath === target || repoPath === target || target.endsWith(repoPath)) {
+
+			// Exact match
+			if (repoFsPath === target || repoPath === target) {
 				return repo;
 			}
+
+			// Subdirectory match (e.g. /repo/packages/frontend inside /repo)
+			if (repoFsPath && target.startsWith(repoFsPath + '/') && repoFsPath.length > bestMatchLen) {
+				bestMatch = repo;
+				bestMatchLen = repoFsPath.length;
+			} else if (repoPath && target.startsWith(repoPath + '/') && repoPath.length > bestMatchLen) {
+				bestMatch = repo;
+				bestMatchLen = repoPath.length;
+			}
 		}
+
+		if (bestMatch) {
+			return bestMatch;
+		}
+
 		// Fallback: if only one repository is open, return it
 		const allRepos = Array.from(this._gitService.repositories);
 		if (allRepos.length === 1) {
@@ -128,7 +148,8 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 				message: dto.message,
 			};
 		} catch (err: any) {
-			throw new GitHistoryError('UnknownRef', err?.message || `Failed to get commit details for '${ref}'`);
+			const code = err?.code || 'UnknownRef';
+			throw new GitHistoryError(code, err?.message || `Failed to get commit details for '${ref}'`);
 		}
 	}
 
@@ -149,7 +170,8 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 				message: dto.message,
 			}));
 		} catch (err: any) {
-			throw new GitHistoryError('ProcessFailure', err?.message || 'Failed to get commit log');
+			const code = err?.code || 'ProcessFailure';
+			throw new GitHistoryError(code, err?.message || 'Failed to get commit log');
 		}
 	}
 
@@ -161,14 +183,15 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 		try {
 			return await repo.resolveCommitRef(ref, token);
 		} catch (err: any) {
-			throw new GitHistoryError('UnknownRef', err?.message || `Failed to resolve ref '${ref}'`);
+			const code = err?.code || 'UnknownRef';
+			throw new GitHistoryError(code, err?.message || `Failed to resolve ref '${ref}'`);
 		}
 	}
 
 	async listBranches(rootPath: string, token?: CancellationTokenLike): Promise<GitBranchInfo[]> {
 		const repo = await this._ensureRepository(rootPath);
 		if (!repo.getRefs) {
-			return [];
+			throw new GitHistoryError('ProcessFailure', 'getRefs is not available on workbench Git repository');
 		}
 		try {
 			const refs = await repo.getRefs({}, token);
@@ -179,15 +202,16 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 					commit: r.commit,
 					isRemote: r.type === 1,
 				}));
-		} catch {
-			return [];
+		} catch (err: any) {
+			const code = err?.code || 'ProcessFailure';
+			throw new GitHistoryError(code, err?.message || 'Failed to list branches');
 		}
 	}
 
 	async listTags(rootPath: string, token?: CancellationTokenLike): Promise<GitTagInfo[]> {
 		const repo = await this._ensureRepository(rootPath);
 		if (!repo.getRefs) {
-			return [];
+			throw new GitHistoryError('ProcessFailure', 'getRefs is not available on workbench Git repository');
 		}
 		try {
 			const refs = await repo.getRefs({ pattern: 'refs/tags/*' }, token);
@@ -195,12 +219,13 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 				.filter(r => r.name && r.commit)
 				.map(r => ({
 					name: r.name,
-					tagCommit: r.commit,
-					peeledCommit: r.commit,
-					isAnnotated: false,
+					tagCommit: r.tagCommit || r.commit,
+					peeledCommit: r.peeledCommit || r.commit,
+					isAnnotated: r.isAnnotated ?? false,
 				}));
-		} catch {
-			return [];
+		} catch (err: any) {
+			const code = err?.code || 'ProcessFailure';
+			throw new GitHistoryError(code, err?.message || 'Failed to list tags');
 		}
 	}
 
@@ -220,7 +245,8 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 				size: e.size,
 			}));
 		} catch (err: any) {
-			throw new GitHistoryError('ProcessFailure', err?.message || `Failed to list tree for '${ref}'`);
+			const code = err?.code || 'ProcessFailure';
+			throw new GitHistoryError(code, err?.message || `Failed to list tree for '${ref}'`);
 		}
 	}
 
@@ -232,7 +258,8 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 		try {
 			return await repo.readBlobContent(ref, relativePath, undefined, token);
 		} catch (err: any) {
-			throw new GitHistoryError('ObjectUnavailable', err?.message || `Failed to read blob at '${ref}:${relativePath}'`);
+			const code = err?.code || 'ObjectUnavailable';
+			throw new GitHistoryError(code, err?.message || `Failed to read blob at '${ref}:${relativePath}'`);
 		}
 	}
 
@@ -287,16 +314,18 @@ export class WorkbenchGitHistoryService implements IGitHistoryService {
 				changes: res.changes || [],
 			};
 		} catch (err: any) {
-			throw new GitHistoryError('ProcessFailure', err?.message || `Failed to diff review range ${baseRef}...${headRef}`);
+			const code = err?.code || 'ProcessFailure';
+			throw new GitHistoryError(code, err?.message || `Failed to diff review range ${baseRef}...${headRef}`);
 		}
 	}
 
 	notifyHeadChanged(repositoryId: string, newHead: string, transitionType: 'commit' | 'checkout' | 'reset' | 'branch-switch' | 'external' = 'external'): void {
-		if (newHead === this._lastHeadSha) {
+		const previousHead = this._lastHeadShaByRepo.get(repositoryId);
+		if (newHead === previousHead) {
+			// Deduplicate per-repository only; different repos may share identical SHAs.
 			return;
 		}
-		const previousHead = this._lastHeadSha;
-		this._lastHeadSha = newHead;
+		this._lastHeadShaByRepo.set(repositoryId, newHead);
 		const event: GitHeadChangeEvent = {
 			repositoryId,
 			previousHead,

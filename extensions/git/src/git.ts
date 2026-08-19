@@ -373,7 +373,7 @@ function sanitizeRelativePath(path: string): string {
 	return path.replace(/\\/g, '/');
 }
 
-const COMMIT_FORMAT = '%H%n%aN%n%aE%n%at%n%ct%n%P%n%D%n%B';
+const COMMIT_FORMAT = '%H%n%aN%n%aE%n%at%n%cN%n%cE%n%ct%n%P%n%D%n%B';
 const STASH_FORMAT = '%H%n%P%n%gd%n%gs%n%at%n%ct';
 
 export interface ICloneOptions {
@@ -923,7 +923,7 @@ export function parseGitRemotes(raw: string): MutableRemote[] {
 	return remotes;
 }
 
-const commitRegex = /([0-9a-f]{40})\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)(?:\n([^]*?))?(?:\x00)(?:\n((?:.*)files? changed(?:.*))$)?/gm;
+const commitRegex = /([0-9a-f]{40,64})\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)(?:\n([^]*?))?(?:\x00)(?:\n((?:.*)files? changed(?:.*))$)?/gm;
 
 export function parseGitCommits(data: string): Commit[] {
 	const commits: Commit[] = [];
@@ -932,6 +932,8 @@ export function parseGitCommits(data: string): Commit[] {
 	let authorName;
 	let authorEmail;
 	let authorDate;
+	let committerName;
+	let committerEmail;
 	let commitDate;
 	let parents;
 	let refNames;
@@ -945,7 +947,7 @@ export function parseGitCommits(data: string): Commit[] {
 			break;
 		}
 
-		[, ref, authorName, authorEmail, authorDate, commitDate, parents, refNames, message, shortStat] = match;
+		[, ref, authorName, authorEmail, authorDate, committerName, committerEmail, commitDate, parents, refNames, message, shortStat] = match;
 
 		if (message[message.length - 1] === '\n') {
 			message = message.substr(0, message.length - 1);
@@ -956,11 +958,13 @@ export function parseGitCommits(data: string): Commit[] {
 			hash: ` ${ref}`.substr(1),
 			message: ` ${message}`.substr(1),
 			parents: parents ? parents.split(' ') : [],
-			authorDate: new Date(Number(authorDate) * 1000),
-			authorName: ` ${authorName}`.substr(1),
-			authorEmail: ` ${authorEmail}`.substr(1),
-			commitDate: new Date(Number(commitDate) * 1000),
-			refNames: refNames.split(',').map(s => s.trim()),
+			authorDate: authorDate ? new Date(Number(authorDate) * 1000) : undefined,
+			authorName: authorName ? ` ${authorName}`.substr(1) : undefined,
+			authorEmail: authorEmail ? ` ${authorEmail}`.substr(1) : undefined,
+			committerName: committerName ? ` ${committerName}`.substr(1) : undefined,
+			committerEmail: committerEmail ? ` ${committerEmail}`.substr(1) : undefined,
+			commitDate: commitDate ? new Date(Number(commitDate) * 1000) : undefined,
+			refNames: refNames ? refNames.split(',').map(s => s.trim()) : [],
 			shortStat: shortStat ? parseGitDiffShortStat(shortStat) : undefined,
 			coAuthors: parseCoAuthors(message)
 		});
@@ -1136,13 +1140,20 @@ function parseGitChangesRaw(repositoryRoot: string, raw: string): DiffChange[] {
 
 		if (segment.startsWith(':')) {
 			// Parse --raw output
-			const [, , , , change] = segment.split(' ');
+			const parts = segment.split(' ');
+			const srcSha = parts[2];
+			const dstSha = parts[3];
+			const change = parts[4] || '';
 			const filePath = segments[index++];
 			const originalUri = Uri.file(path.isAbsolute(filePath) ? filePath : path.join(repositoryRoot, filePath));
 
 			let uri = originalUri;
 			let renameUri = originalUri;
 			let status: Status = Status.UNTRACKED;
+			let similarity: number | undefined;
+
+			const oldBlobOid = srcSha && !/^0+$/.test(srcSha) ? srcSha : undefined;
+			const newBlobOid = dstSha && !/^0+$/.test(dstSha) ? dstSha : undefined;
 
 			switch (change[0]) {
 				case 'A':
@@ -1164,6 +1175,7 @@ function parseGitChangesRaw(repositoryRoot: string, raw: string): DiffChange[] {
 					}
 
 					status = Status.INDEX_RENAMED;
+					similarity = parseInt(change.slice(1), 10) || undefined;
 					uri = renameUri = Uri.file(path.isAbsolute(newPath) ? newPath : path.join(repositoryRoot, newPath));
 					break;
 				}
@@ -1172,7 +1184,7 @@ function parseGitChangesRaw(repositoryRoot: string, raw: string): DiffChange[] {
 					break segmentsLoop;
 			}
 
-			changes.push({ status, uri, originalUri, renameUri });
+			changes.push({ status, uri, originalUri, renameUri, oldBlobOid, newBlobOid, similarity });
 		} else {
 			// Parse --numstat output
 			const [insertions, deletions, filePath] = segment.split('\t');
@@ -1336,7 +1348,16 @@ function parseRefs(data: string): (Ref | Branch)[] {
 			const name = `${refMatch[1]}/${refMatch[2]}`;
 			refs.push({ name, remote: refMatch[1], commit: commitHash, commitDetails, type: RefType.RemoteHead });
 		} else if (refMatch = tagRegex.exec(ref)) {
-			refs.push({ name: refMatch[1], commit: tagCommitHash ?? commitHash, commitDetails, type: RefType.Tag });
+			const isAnnotated = !!tagCommitHash && tagCommitHash !== commitHash;
+			refs.push({
+				name: refMatch[1],
+				commit: tagCommitHash ?? commitHash,
+				tagCommit: commitHash,
+				peeledCommit: tagCommitHash ?? commitHash,
+				isAnnotated,
+				commitDetails,
+				type: RefType.Tag
+			});
 		}
 	} while (true);
 
@@ -1453,6 +1474,10 @@ export class Repository {
 			}
 		}
 
+		if (options?.firstParent) {
+			args.push('--first-parent');
+		}
+
 		if (options?.reverse) {
 			args.push('--reverse', '--ancestry-path');
 		}
@@ -1461,10 +1486,14 @@ export class Repository {
 			args.push('--author-date-order');
 		}
 
+		if (typeof options?.maxEntries === 'number') {
+			args.push(`-n${options.maxEntries}`);
+		} else if (!options?.range) {
+			args.push(`-n32`);
+		}
+
 		if (options?.range) {
 			args.push(options.range);
-		} else {
-			args.push(`-n${options?.maxEntries ?? 32}`);
 		}
 
 		if (options?.author) {
@@ -1569,8 +1598,11 @@ export class Repository {
 	}
 
 	async buffer(ref: string, filePath: string): Promise<Buffer> {
-		const relativePath = this.sanitizeRelativePath(filePath);
-		const child = this.stream(['show', '--textconv', `${ref}:${relativePath}`]);
+		const relativePath = filePath ? this.sanitizeRelativePath(filePath) : '';
+		const args = relativePath
+			? ['show', '--textconv', `${ref}:${relativePath}`]
+			: ['cat-file', '-p', ref];
+		const child = this.stream(args);
 
 		if (!child.stdout) {
 			return Promise.reject<Buffer>('Can\'t open file from git');
@@ -3368,6 +3400,15 @@ export class Repository {
 		} catch (err) {
 			return undefined;
 		}
+	}
+
+	async resolveCommitRef(ref: string): Promise<string> {
+		const args = ['rev-parse', '--verify', '--end-of-options', `${ref}^{commit}`];
+		const result = await this.exec(args);
+		if (result.exitCode || !result.stdout.trim()) {
+			throw new GitError({ message: `Ref '${ref}' could not be resolved to a commit`, gitErrorCode: GitErrorCodes.UnknownPath });
+		}
+		return result.stdout.trim();
 	}
 
 	async updateSubmodules(paths: string[]): Promise<void> {

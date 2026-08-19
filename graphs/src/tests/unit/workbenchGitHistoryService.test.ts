@@ -161,4 +161,63 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 			}
 		);
 	});
+
+	test('tracks HEAD changes per repository — events from different repos are independent', () => {
+		const service = new WorkbenchGitHistoryService(mockGitService);
+		const events: any[] = [];
+		const disposable = service.onDidChangeHead?.((e) => events.push(e));
+
+		// Both repos advance independently
+		service.notifyHeadChanged('repo1', 'sha_A', 'commit');
+		service.notifyHeadChanged('repo2', 'sha_X', 'commit');
+		service.notifyHeadChanged('repo1', 'sha_B', 'checkout');
+		service.notifyHeadChanged('repo2', 'sha_Y', 'branch-switch');
+
+		assert.strictEqual(events.length, 4, 'all 4 events must be emitted');
+
+		// repo1 event 1
+		assert.strictEqual(events[0].repositoryId, 'repo1');
+		assert.strictEqual(events[0].previousHead, undefined);
+		assert.strictEqual(events[0].currentHead, 'sha_A');
+
+		// repo2 event 1
+		assert.strictEqual(events[1].repositoryId, 'repo2');
+		assert.strictEqual(events[1].previousHead, undefined);
+		assert.strictEqual(events[1].currentHead, 'sha_X');
+
+		// repo1 event 2 — previousHead is repo1's last, not repo2's
+		assert.strictEqual(events[2].repositoryId, 'repo1');
+		assert.strictEqual(events[2].previousHead, 'sha_A');
+		assert.strictEqual(events[2].currentHead, 'sha_B');
+
+		// repo2 event 2 — previousHead is repo2's last
+		assert.strictEqual(events[3].repositoryId, 'repo2');
+		assert.strictEqual(events[3].previousHead, 'sha_X');
+		assert.strictEqual(events[3].currentHead, 'sha_Y');
+
+		disposable?.dispose();
+	});
+
+	test('per-repo deduplication: identical SHA on one repo does not suppress the same SHA on another', () => {
+		const service = new WorkbenchGitHistoryService(mockGitService);
+		const events: any[] = [];
+		const disposable = service.onDidChangeHead?.((e) => events.push(e));
+
+		// Simulate two repos landing on the same SHA (e.g. both branch from the same upstream tag)
+		const SHARED_SHA = 'deadbeef00000000000000000000000000000000';
+		service.notifyHeadChanged('repo1', SHARED_SHA, 'commit');
+		service.notifyHeadChanged('repo2', SHARED_SHA, 'commit'); // must NOT be swallowed
+		// Within the same repo, a duplicate should be swallowed
+		service.notifyHeadChanged('repo1', SHARED_SHA, 'commit'); // swallowed
+		service.notifyHeadChanged('repo2', SHARED_SHA, 'checkout'); // swallowed
+
+		// Only 2 events emitted (one per repo); the within-repo duplicates are suppressed
+		assert.strictEqual(events.length, 2);
+		assert.strictEqual(events[0].repositoryId, 'repo1');
+		assert.strictEqual(events[0].currentHead, SHARED_SHA);
+		assert.strictEqual(events[1].repositoryId, 'repo2');
+		assert.strictEqual(events[1].currentHead, SHARED_SHA);
+
+		disposable?.dispose();
+	});
 });

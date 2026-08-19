@@ -9,6 +9,7 @@ export interface GraphVersionMetadata {
 	readonly analyzerVersion: number;
 	readonly identityVersion: number;
 	readonly layoutVersion: number;
+	readonly analysisProfileVersion?: number;
 }
 
 export type CanonicalExclusionCode =

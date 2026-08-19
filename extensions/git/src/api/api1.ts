@@ -226,6 +226,14 @@ export class ApiRepository implements Repository {
 		return this.#repository.diffBetweenWithStats2(ref, path);
 	}
 
+	diffTrees(treeish1: string, treeish2?: string): Promise<DiffChange[]> {
+		return this.#repository.diffTrees(treeish1, treeish2);
+	}
+
+	resolveCommitRef(ref: string): Promise<string> {
+		return this.#repository.resolveCommitRef(ref);
+	}
+
 	hashObject(data: string): Promise<string> {
 		return this.#repository.hashObject(data);
 	}

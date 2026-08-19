@@ -1259,6 +1259,10 @@ export class Repository implements Disposable {
 		return this.run(Operation.Diff, () => this.repository.diffTrees(treeish1, treeish2, { similarityThreshold }));
 	}
 
+	resolveCommitRef(ref: string): Promise<string> {
+		return this.run(Operation.Show, () => this.repository.resolveCommitRef(ref));
+	}
+
 	getMergeBase(ref1: string, ref2: string, ...refs: string[]): Promise<string | undefined> {
 		return this.run(Operation.MergeBase, () => this.repository.getMergeBase(ref1, ref2, ...refs));
 	}

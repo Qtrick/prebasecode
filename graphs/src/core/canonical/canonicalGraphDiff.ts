@@ -7,6 +7,8 @@ import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js';
 import { isComparableSnapshots } from './versioning.js';
 
 export interface CanonicalGraphDiff {
+	readonly kind?: 'diff' | 'identical' | 'incompatible';
+	readonly incompatibilityReason?: string;
 	readonly addedNodes: readonly GraphNode[];
 	readonly removedNodeIds: readonly string[];
 	readonly updatedNodes: readonly GraphNode[];
@@ -29,6 +31,8 @@ export function computeCanonicalGraphDiff(
 ): CanonicalGraphDiff {
 	if (!isComparableSnapshots(oldSnapshot, newSnapshot)) {
 		return {
+			kind: 'incompatible',
+			incompatibilityReason: 'Snapshots have incompatible schema, analyzer, identity, or profile versions',
 			addedNodes: [],
 			removedNodeIds: [],
 			updatedNodes: [],
@@ -109,6 +113,7 @@ export function computeCanonicalGraphDiff(
 		updatedEdges.length === 0;
 
 	return {
+		kind: isIdentical ? 'identical' : 'diff',
 		addedNodes,
 		removedNodeIds,
 		updatedNodes,
@@ -118,6 +123,7 @@ export function computeCanonicalGraphDiff(
 		isIdentical,
 		oldDigest: oldSnapshot.digest,
 		newDigest: newSnapshot.digest,
+		isIncompatible: false,
 	};
 }
 

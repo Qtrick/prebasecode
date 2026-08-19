@@ -20,6 +20,9 @@ export interface GitRef {
 	readonly name?: string;
 	readonly commit?: string;
 	readonly remote?: string;
+	readonly tagCommit?: string;
+	readonly peeledCommit?: string;
+	readonly isAnnotated?: boolean;
 }
 
 export interface GitRefQuery {
@@ -38,6 +41,9 @@ export interface GitChange {
 export interface GitDiffChange extends GitChange {
 	readonly insertions: number;
 	readonly deletions: number;
+	readonly oldBlobOid?: string;
+	readonly newBlobOid?: string;
+	readonly similarity?: number;
 }
 
 export interface GitRemote {

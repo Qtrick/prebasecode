@@ -3965,6 +3965,9 @@ export interface GitRefDto {
 	readonly name: string;
 	readonly type: GitRefTypeDto;
 	readonly revision: string;
+	readonly tagCommit?: string;
+	readonly peeledCommit?: string;
+	readonly isAnnotated?: boolean;
 }
 
 export interface GitChangeDto {
@@ -3976,6 +3979,9 @@ export interface GitChangeDto {
 export interface GitDiffChangeDto extends GitChangeDto {
 	readonly insertions: number;
 	readonly deletions: number;
+	readonly oldBlobOid?: string;
+	readonly newBlobOid?: string;
+	readonly similarity?: number;
 }
 
 export interface GitRemoteDto {

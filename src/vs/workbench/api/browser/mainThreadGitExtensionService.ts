@@ -67,6 +67,14 @@ function toGitRepositoryState(dto: GitRepositoryStateDto | undefined): GitReposi
 	};
 }
 
+function throwGitError(error?: { code?: string; message?: string; details?: string }, fallbackMessage?: string): never {
+	const err = new Error(error?.message || fallbackMessage || 'Git operation failed');
+	if (error?.code) {
+		(err as any).code = error.code;
+	}
+	throw err;
+}
+
 @extHostNamedCustomer(MainContext.MainThreadGitExtension)
 export class MainThreadGitExtensionService extends Disposable implements MainThreadGitExtensionShape, IGitExtensionDelegate {
 	private readonly _proxy: ExtHostGitExtensionShape;
@@ -165,11 +173,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async resolveCommitRef(root: URI, ref: string, token?: CancellationToken): Promise<string> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			throw new Error(`Repository not found for root: ${root.toString()}`);
+			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
 		const result = await this._proxy.$resolveCommitRef(handle, ref, token);
 		if (!result.success || !result.data) {
-			throw new Error(result.error?.message || `Failed to resolve commit ref '${ref}'`);
+			throwGitError(result.error, `Failed to resolve commit ref '${ref}'`);
 		}
 		return result.data;
 	}
@@ -177,11 +185,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async getCommitDetails(root: URI, ref: string, token?: CancellationToken): Promise<GitCommitMetadata> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			throw new Error(`Repository not found for root: ${root.toString()}`);
+			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
 		const result = await this._proxy.$getCommitDetails(handle, ref, token);
 		if (!result.success || !result.data) {
-			throw new Error(result.error?.message || `Failed to get commit details for '${ref}'`);
+			throwGitError(result.error, `Failed to get commit details for '${ref}'`);
 		}
 		return result.data;
 	}
@@ -189,11 +197,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async getCommitLog(root: URI, options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			return [];
+			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
 		const result = await this._proxy.$getCommitLog(handle, options, token);
 		if (!result.success || !result.data) {
-			throw new Error(result.error?.message || 'Failed to get commit log');
+			throwGitError(result.error, 'Failed to get commit log');
 		}
 		return result.data;
 	}
@@ -201,11 +209,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async listTreeEntries(root: URI, ref: string, token?: CancellationToken): Promise<GitTreeEntry[]> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			return [];
+			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
 		const result = await this._proxy.$listTreeEntries(handle, ref, token);
 		if (!result.success || !result.data) {
-			throw new Error(result.error?.message || `Failed to list tree entries for '${ref}'`);
+			throwGitError(result.error, `Failed to list tree entries for '${ref}'`);
 		}
 		return result.data;
 	}
@@ -213,11 +221,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async readBlobContent(root: URI, ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			throw new Error(`Repository not found for root: ${root.toString()}`);
+			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
 		const result = await this._proxy.$readBlobContent(handle, ref, path, maxBytes, token);
 		if (!result.success || result.data === undefined) {
-			throw new Error(result.error?.message || `Failed to read blob at '${ref}:${path}'`);
+			throwGitError(result.error, `Failed to read blob at '${ref}:${path}'`);
 		}
 		return result.data;
 	}
@@ -225,11 +233,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async diffExactTrees(root: URI, refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			throw new Error(`Repository not found for root: ${root.toString()}`);
+			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
 		const result = await this._proxy.$diffExactTrees(handle, refA, refB, token);
 		if (!result.success || !result.data) {
-			throw new Error(result.error?.message || `Failed to diff ${refA}..${refB}`);
+			throwGitError(result.error, `Failed to diff ${refA}..${refB}`);
 		}
 		return result.data;
 	}
@@ -237,11 +245,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async diffCommitToParent(root: URI, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			throw new Error(`Repository not found for root: ${root.toString()}`);
+			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
 		const result = await this._proxy.$diffCommitToParent(handle, commitRef, parentIndex, token);
 		if (!result.success || !result.data) {
-			throw new Error(result.error?.message || `Failed to diff commit '${commitRef}' to parent`);
+			throwGitError(result.error, `Failed to diff commit '${commitRef}' to parent`);
 		}
 		return result.data;
 	}
@@ -249,11 +257,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async diffReviewRange(root: URI, baseRef: string, headRef: string, token?: CancellationToken): Promise<GitExactDiffResult> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			throw new Error(`Repository not found for root: ${root.toString()}`);
+			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });
 		}
 		const result = await this._proxy.$diffReviewRange(handle, baseRef, headRef, token);
 		if (!result.success || !result.data) {
-			throw new Error(result.error?.message || `Failed to diff review range ${baseRef}...${headRef}`);
+			throwGitError(result.error, `Failed to diff review range ${baseRef}...${headRef}`);
 		}
 		return result.data;
 	}

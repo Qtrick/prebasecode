@@ -84,6 +84,9 @@ function toGitChangeDto(change: Change): GitChangeDto {
 interface DiffChange extends Change {
 	readonly insertions: number;
 	readonly deletions: number;
+	readonly oldBlobOid?: string;
+	readonly newBlobOid?: string;
+	readonly similarity?: number;
 }
 
 interface Commit {
@@ -93,6 +96,8 @@ interface Commit {
 	readonly authorDate?: Date;
 	readonly authorName?: string;
 	readonly authorEmail?: string;
+	readonly committerName?: string;
+	readonly committerEmail?: string;
 	readonly commitDate?: Date;
 }
 
@@ -101,6 +106,8 @@ interface LogOptions {
 	readonly range?: string;
 	readonly path?: string;
 	readonly sortByAuthorDate?: boolean;
+	readonly firstParent?: boolean;
+	readonly skip?: number;
 }
 
 interface LsTreeItem {
@@ -120,13 +127,16 @@ interface Repository {
 	getRefs(query: GitRefQuery, token?: vscode.CancellationToken): Promise<GitRef[]>;
 	getBranches?(query: { remote?: boolean }, token?: vscode.CancellationToken): Promise<GitRef[]>;
 	getCommit?(ref: string): Promise<Commit>;
+	resolveCommitRef?(ref: string): Promise<string>;
 	log?(options?: LogOptions): Promise<Commit[]>;
 	getObjectFiles?(ref: string, options?: { recursive?: boolean; path?: string }): Promise<LsTreeItem[]>;
+	getObjectDetails?(treeish: string, path: string): Promise<{ mode: string; object: string; size: number }>;
 	show?(ref: string, path: string): Promise<string>;
 	buffer?(ref: string, path: string): Promise<Buffer>;
 	diffBetween?(ref1: string, ref2: string, path?: string): Promise<Change[]>;
 	diffBetweenWithStats(ref1: string, ref2: string, path?: string): Promise<DiffChange[]>;
 	diffBetweenWithStats2(ref: string, path?: string): Promise<DiffChange[]>;
+	diffTrees?(treeish1: string, treeish2?: string): Promise<DiffChange[]>;
 	getMergeBase?(ref1: string, ref2: string): Promise<string | undefined>;
 	checkIgnore?(paths: string[]): Promise<Set<string>>;
 	isBranchProtected(branch?: Branch): boolean;
@@ -294,7 +304,10 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 					id,
 					name: ref.name,
 					type: toGitRefTypeDto(ref.type),
-					revision: ref.commit
+					revision: ref.commit,
+					tagCommit: (ref as any).tagCommit,
+					peeledCommit: (ref as any).peeledCommit,
+					isAnnotated: (ref as any).isAnnotated,
 				} satisfies GitRefDto;
 			});
 
@@ -368,12 +381,19 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 	}
 
-	async $resolveCommitRef(handle: number, ref: string, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<string>> {
+	async $resolveCommitRef(handle: number, ref: string, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<string>> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
 		}
+		if (token?.isCancellationRequested) {
+			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
+		}
 		try {
+			if (typeof repository.resolveCommitRef === 'function') {
+				const sha = await repository.resolveCommitRef(ref);
+				return { success: true, data: sha };
+			}
 			if (typeof repository.getCommit === 'function') {
 				const commit = await repository.getCommit(ref);
 				if (!commit?.hash) {
@@ -381,16 +401,19 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				}
 				return { success: true, data: commit.hash };
 			}
-			return { success: false, error: { code: 'NotSupported', message: 'getCommit is not supported on repository' } };
+			return { success: false, error: { code: 'NotSupported', message: 'resolveCommitRef is not supported on repository' } };
 		} catch (err: any) {
 			return { success: false, error: { code: 'UnknownRef', message: err?.message || `Failed to resolve ref '${ref}'` } };
 		}
 	}
 
-	async $getCommitDetails(handle: number, ref: string, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto>> {
+	async $getCommitDetails(handle: number, ref: string, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto>> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		if (token?.isCancellationRequested) {
+			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
 		}
 		try {
 			if (typeof repository.getCommit === 'function') {
@@ -398,8 +421,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				if (!commit) {
 					return { success: false, error: { code: 'UnknownRef', message: `Commit '${ref}' not found` } };
 				}
-				const authorDateStr = commit.authorDate ? new Date(commit.authorDate).toISOString() : new Date().toISOString();
-				const commitDateStr = commit.commitDate ? new Date(commit.commitDate).toISOString() : authorDateStr;
+				const authorDateStr = commit.authorDate ? new Date(commit.authorDate).toISOString() : '';
+				const commitDateStr = commit.commitDate ? new Date(commit.commitDate).toISOString() : '';
 				return {
 					success: true,
 					data: {
@@ -411,12 +434,12 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 							date: authorDateStr,
 						},
 						committer: {
-							name: commit.authorName || '',
-							email: commit.authorEmail || '',
-							date: commitDateStr,
+							name: commit.committerName || commit.authorName || '',
+							email: commit.committerEmail || commit.authorEmail || '',
+							date: commitDateStr || authorDateStr,
 						},
-						authorTimestamp: commit.authorDate ? new Date(commit.authorDate).getTime() : Date.now(),
-						committerTimestamp: commit.commitDate ? new Date(commit.commitDate).getTime() : Date.now(),
+						authorTimestamp: commit.authorDate ? new Date(commit.authorDate).getTime() : 0,
+						committerTimestamp: commit.commitDate ? new Date(commit.commitDate).getTime() : 0,
 						message: commit.message || '',
 					}
 				};
@@ -427,10 +450,13 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 	}
 
-	async $getCommitLog(handle: number, options: GitLogOptionsDto, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto[]>> {
+	async $getCommitLog(handle: number, options: GitLogOptionsDto, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto[]>> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		if (token?.isCancellationRequested) {
+			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
 		}
 		try {
 			if (typeof repository.log === 'function') {
@@ -438,11 +464,13 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 					maxEntries: options.limit,
 					range: options.ref,
 					path: options.path,
+					firstParent: options.firstParent,
+					skip: options.skip,
 				};
 				const commits = await repository.log(logOptions);
 				const mapped: GitCommitMetadataDto[] = (commits || []).map(commit => {
-					const authorDateStr = commit.authorDate ? new Date(commit.authorDate).toISOString() : new Date().toISOString();
-					const commitDateStr = commit.commitDate ? new Date(commit.commitDate).toISOString() : authorDateStr;
+					const authorDateStr = commit.authorDate ? new Date(commit.authorDate).toISOString() : '';
+					const commitDateStr = commit.commitDate ? new Date(commit.commitDate).toISOString() : '';
 					return {
 						sha: commit.hash,
 						parents: commit.parents || [],
@@ -452,9 +480,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 							date: authorDateStr,
 						},
 						committer: {
-							name: commit.authorName || '',
-							email: commit.authorEmail || '',
-							date: commitDateStr,
+							name: commit.committerName || commit.authorName || '',
+							email: commit.committerEmail || commit.authorEmail || '',
+							date: commitDateStr || authorDateStr,
 						},
 						authorTimestamp: commit.authorDate ? new Date(commit.authorDate).getTime() : 0,
 						committerTimestamp: commit.commitDate ? new Date(commit.commitDate).getTime() : 0,
@@ -469,10 +497,13 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 	}
 
-	async $listTreeEntries(handle: number, ref: string, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>> {
+	async $listTreeEntries(handle: number, ref: string, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		if (token?.isCancellationRequested) {
+			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
 		}
 		try {
 			if (typeof repository.getObjectFiles === 'function') {
@@ -492,15 +523,28 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 	}
 
-	async $readBlobContent(handle: number, ref: string, path: string, maxBytes?: number, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<string>> {
+	async $readBlobContent(handle: number, ref: string, path: string, maxBytes?: number, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<string>> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
 		}
+		if (token?.isCancellationRequested) {
+			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
+		}
 		try {
-			if (maxBytes && typeof repository.buffer === 'function') {
+			if (maxBytes !== undefined && path && typeof repository.getObjectDetails === 'function') {
+				try {
+					const details = await repository.getObjectDetails(ref, path);
+					if (details && details.size > maxBytes) {
+						return { success: false, error: { code: 'OversizedBlob', message: `Blob size ${details.size} exceeds maximum limit of ${maxBytes} bytes` } };
+					}
+				} catch {
+					// Fall through to buffer
+				}
+			}
+			if (typeof repository.buffer === 'function') {
 				const buf = await repository.buffer(ref, path);
-				if (buf.length > maxBytes) {
+				if (maxBytes !== undefined && buf.length > maxBytes) {
 					return { success: false, error: { code: 'OversizedBlob', message: `Blob size ${buf.length} exceeds limit ${maxBytes}` } };
 				}
 				return { success: true, data: buf.toString('utf8') };
@@ -515,13 +559,21 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 	}
 
-	async $diffExactTrees(handle: number, refA: string, refB: string, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>> {
+	async $diffExactTrees(handle: number, refA: string, refB: string, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
 		}
+		if (token?.isCancellationRequested) {
+			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
+		}
 		try {
-			const diffs = await repository.diffBetweenWithStats(refA, refB);
+			let diffs: DiffChange[];
+			if (typeof repository.diffTrees === 'function') {
+				diffs = await repository.diffTrees(refA, refB);
+			} else {
+				diffs = await repository.diffBetweenWithStats(refA, refB);
+			}
 			const rootPath = repository.rootUri.path;
 			const changes: GitExactDiffChangeDto[] = (diffs || []).map(d => {
 				let kind: 'added' | 'deleted' | 'modified' | 'renamed' | 'copied' = 'modified';
@@ -542,6 +594,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 					kind,
 					path: relPath,
 					oldPath: oldRelPath,
+					similarity: d.similarity,
+					oldBlobOid: d.oldBlobOid,
+					newBlobOid: d.newBlobOid,
 				};
 			});
 			return { success: true, data: { fromRef: refA, toRef: refB, changes } };
