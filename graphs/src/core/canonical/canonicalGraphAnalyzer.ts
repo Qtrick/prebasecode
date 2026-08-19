@@ -19,6 +19,12 @@ import { computeCanonicalGraphDigest } from './canonicalGraphDigest.js';
 import type { CancellationTokenLike, IRepositoryContentSource } from './contentSource.js';
 import { createCurrentVersionMetadata } from './versioning.js';
 
+import {
+	type ICanonicalParseArtifactCache,
+	extractBlobParseArtifact,
+	materializeParseResult,
+} from './parseArtifactCache.js';
+
 const DEFAULT_MAX_CANONICAL_FILES = 10_000;
 const DEFAULT_MAX_FILE_SIZE_BYTES = 500_000;
 
@@ -32,6 +38,7 @@ export class CanonicalGraphAnalyzer {
 	private readonly _includeFolders: boolean;
 	private readonly _includeFunctions: boolean;
 	private readonly _parserEngine: ParserEngine;
+	private readonly _parseArtifactCache?: ICanonicalParseArtifactCache;
 
 	constructor(options: CanonicalAnalysisOptions = {}) {
 		this._maxCanonicalFiles = options.maxCanonicalFiles ?? DEFAULT_MAX_CANONICAL_FILES;
@@ -39,6 +46,7 @@ export class CanonicalGraphAnalyzer {
 		this._includeFolders = options.includeFolders ?? false;
 		this._includeFunctions = options.includeFunctions ?? false;
 		this._parserEngine = new ParserEngine();
+		this._parseArtifactCache = options.parseArtifactCache;
 	}
 
 	async analyze(
@@ -226,6 +234,35 @@ export class CanonicalGraphAnalyzer {
 				}
 			}
 
+			let contentIdentity: string | undefined = file.blobOid;
+			if (!contentIdentity && contentSource.getContentIdentity) {
+				try {
+					contentIdentity = await contentSource.getContentIdentity(file.relativePath);
+				} catch {
+					contentIdentity = undefined;
+				}
+			}
+
+			// 1. Check path-independent parse artifact cache
+			if (contentIdentity && this._parseArtifactCache) {
+				try {
+					const cachedArtifact = await this._parseArtifactCache.get(contentIdentity, file.extension);
+					if (cachedArtifact) {
+						const parseResult = materializeParseResult(file, cachedArtifact);
+						const manifestEntry: AnalysisManifestEntry = {
+							path: file.relativePath,
+							contentIdentity,
+							size: fileSize ?? 0,
+							isComponent: Boolean(parseResult.isComponentFile),
+							language: cachedArtifact.language,
+						};
+						return { parseResult, manifestEntry };
+					}
+				} catch {
+					// Cache miss -> fallback to full parse
+				}
+			}
+
 			const content = await contentSource.readFile(file.relativePath);
 			if (content === undefined || token?.isCancellationRequested) {
 				if (content === undefined) {
@@ -253,12 +290,13 @@ export class CanonicalGraphAnalyzer {
 				return undefined;
 			}
 
-			let contentIdentity: string | undefined;
-			if (contentSource.getContentIdentity) {
+			// 2. Store extracted path-independent parse artifact in cache
+			if (contentIdentity && this._parseArtifactCache) {
 				try {
-					contentIdentity = await contentSource.getContentIdentity(file.relativePath);
+					const artifact = extractBlobParseArtifact(parseResult);
+					await this._parseArtifactCache.set(contentIdentity, file.extension, artifact);
 				} catch {
-					contentIdentity = undefined;
+					// Non-fatal cache store failure
 				}
 			}
 

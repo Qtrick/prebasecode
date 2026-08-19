@@ -3,9 +3,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { CancellationTokenLike, IRepositoryContentSource } from '../../core/canonical/contentSource.js';
-import type { ParseResult } from '../../common/types/graphTypes.js';
 import type { GitExactDiffChange } from '../../history/git/gitTypes.js';
-import { ParserEngine } from '../../core/parsing/parserEngine.js';
+import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
+import { type ICanonicalParseArtifactCache } from '../../core/canonical/parseArtifactCache.js';
 import { normalizePath } from '../../core/resolution/paths.js';
 import {
 	CURRENT_ANALYZER_VERSION,
@@ -16,11 +16,9 @@ import { BlobAnalysisCache } from './blobAnalysisCache.js';
 import { TemporalLineageResolver, type FileToResolve } from '../core/temporalLineageResolver.js';
 import { TemporalEdgeLineageResolver, type RawEdgeInfo } from '../core/temporalEdgeLineage.js';
 import { TemporalDeltaEngine } from '../core/temporalDelta.js';
+import { TemporalError } from '../common/temporalErrors.js';
 import type {
 	ArchitectureGraphData,
-	BlobAnalysisRecord,
-	GraphNodeData,
-	TemporalEdgeKind,
 	TemporalEntityLineageEvent,
 	TemporalGraphSnapshot,
 	TemporalStructuralDelta,
@@ -32,6 +30,7 @@ export interface IncrementalAnalysisOptions {
 	readonly schemaVersion?: number;
 	readonly analyzerVersion?: number;
 	readonly profileVersion?: number;
+	readonly parseArtifactCache?: ICanonicalParseArtifactCache;
 }
 
 export interface IncrementalAnalysisInput {
@@ -41,12 +40,14 @@ export interface IncrementalAnalysisInput {
 	readonly parentSnapshot?: TemporalGraphSnapshot;
 	readonly isCheckpoint?: boolean;
 	readonly token?: CancellationTokenLike;
+	readonly deletedPathsInHistory?: ReadonlyMap<string, string>;
 }
 
 export interface IncrementalAnalysisOutput {
 	readonly snapshot: TemporalGraphSnapshot;
 	readonly delta?: TemporalStructuralDelta;
 	readonly lineageEvents: readonly TemporalEntityLineageEvent[];
+	readonly isIdenticalToParent?: boolean;
 }
 
 export class IncrementalGraphAnalyzer {
@@ -55,15 +56,14 @@ export class IncrementalGraphAnalyzer {
 	private readonly _schemaVersion: number;
 	private readonly _analyzerVersion: number;
 	private readonly _profileVersion: number;
-	private readonly _parserEngine: ParserEngine;
-	private readonly _blobCache: BlobAnalysisCache;
+	private readonly _parseCache?: ICanonicalParseArtifactCache;
 	private readonly _lineageResolver: TemporalLineageResolver;
 	private readonly _edgeLineageResolver: TemporalEdgeLineageResolver;
 	private readonly _deltaEngine: TemporalDeltaEngine;
 
 	constructor(
 		options: IncrementalAnalysisOptions = {},
-		blobCache: BlobAnalysisCache = new BlobAnalysisCache(),
+		parseCache?: ICanonicalParseArtifactCache,
 		lineageResolver: TemporalLineageResolver = new TemporalLineageResolver(),
 		edgeLineageResolver: TemporalEdgeLineageResolver = new TemporalEdgeLineageResolver(),
 		deltaEngine: TemporalDeltaEngine = new TemporalDeltaEngine()
@@ -74,11 +74,10 @@ export class IncrementalGraphAnalyzer {
 		this._analyzerVersion = options.analyzerVersion ?? CURRENT_ANALYZER_VERSION;
 		this._profileVersion = options.profileVersion ?? CURRENT_PROFILE_VERSION;
 
-		this._blobCache = blobCache;
+		this._parseCache = parseCache ?? options.parseArtifactCache ?? new BlobAnalysisCache(10_000, this._analyzerVersion, this._profileVersion);
 		this._lineageResolver = lineageResolver;
 		this._edgeLineageResolver = edgeLineageResolver;
 		this._deltaEngine = deltaEngine;
-		this._parserEngine = new ParserEngine(async (p: string) => undefined, this._maxFileSizeBytes);
 	}
 
 	async analyzeCommit(input: IncrementalAnalysisInput): Promise<IncrementalAnalysisOutput> {
@@ -89,95 +88,68 @@ export class IncrementalGraphAnalyzer {
 			parentSnapshot,
 			isCheckpoint = false,
 			token,
+			deletedPathsInHistory,
 		} = input;
 
-		const inventory = await contentSource.listFiles(token);
-		const rawFiles = inventory.files.slice(0, this._maxCanonicalFiles);
+		if (token?.isCancellationRequested) {
+			throw new TemporalError('Cancelled', `Analysis cancelled for commit ${commitSha}`);
+		}
 
-		const filesToResolve: FileToResolve[] = [];
-		const allRawEdges: RawEdgeInfo[] = [];
+		// 1. Run Canonical Analysis with shared path-independent parse cache
+		const canonicalAnalyzer = new CanonicalGraphAnalyzer({
+			maxCanonicalFiles: this._maxCanonicalFiles,
+			maxFileSizeBytes: this._maxFileSizeBytes,
+			parseArtifactCache: this._parseCache,
+		});
 
-		for (const file of rawFiles) {
+		const canonicalSnapshot = await canonicalAnalyzer.analyze(contentSource, token);
+		if (!canonicalSnapshot) {
 			if (token?.isCancellationRequested) {
-				break;
+				throw new TemporalError('Cancelled', `Analysis cancelled for commit ${commitSha}`);
 			}
+			throw new TemporalError('BlobAnalysisFailed', `Failed to produce canonical graph snapshot for commit ${commitSha}`);
+		}
 
-			const relPath = normalizePath(file.relativePath);
-			const blobOid = file.blobOid ?? '';
-			const language = file.extension ? file.extension.replace(/^\./, '') : 'text';
+		// Check if structurally identical to parent snapshot
+		const isIdenticalToParent = Boolean(
+			parentSnapshot &&
+			parentSnapshot.digest &&
+			canonicalSnapshot.digest &&
+			parentSnapshot.digest === canonicalSnapshot.digest
+		);
 
-			// 1. Check BlobAnalysisCache
-			let record: BlobAnalysisRecord | undefined;
-			if (blobOid) {
-				record = this._blobCache.get(blobOid, this._analyzerVersion, this._profileVersion, language);
-			}
-
-			// 2. Parse if cache miss
-			if (!record) {
-				const content = await contentSource.readFile(file.relativePath, token);
-				let parseResult: ParseResult | null = null;
-				if (content !== undefined) {
-					parseResult = await this._parserEngine.parseFile(file, content);
-				}
-
-				const nodeData: GraphNodeData = {
-					id: relPath,
-					kind: 'file',
-					label: file.relativePath.split('/').pop() || relPath,
-					path: relPath,
-					meta: {
-						language,
-						architectureLayer: 'domain',
-						exports: parseResult?.exports?.map(e => e.name) ?? [],
-						imports: parseResult?.imports?.map(i => i.source) ?? [],
-					},
-				};
-
-				const outgoingEdges: Array<{ targetPath: string; kind: TemporalEdgeKind; weight?: number }> = [];
-				if (parseResult && parseResult.imports) {
-					for (const imp of parseResult.imports) {
-						if (imp.source && typeof imp.source === 'string') {
-							const targetRel = this._resolveImportPath(relPath, imp.source);
-							outgoingEdges.push({
-								targetPath: targetRel,
-								kind: 'imports',
-								weight: 1,
-							});
-						}
-					}
-				}
-
-				record = {
-					blobOid: blobOid || `hash_${relPath}`,
-					analyzerVersion: this._analyzerVersion,
-					profileVersion: this._profileVersion,
-					language,
-					nodeData,
-					outgoingEdges,
-					analyzedAt: Date.now(),
-				};
-
-				if (blobOid) {
-					this._blobCache.set(record);
+		// 2. Prepare files and edges for lineage resolution
+		const filesToResolve: FileToResolve[] = [];
+		const manifestMap = new Map<string, string>();
+		if (canonicalSnapshot.manifest?.entries) {
+			for (const entry of canonicalSnapshot.manifest.entries) {
+				if (entry.contentIdentity) {
+					manifestMap.set(normalizePath(entry.path), entry.contentIdentity);
 				}
 			}
+		}
 
-			// Add to resolution inputs
+		const cleanPath = (p: string) => normalizePath(p).replace(/^file:/, '').replace(/^\/+/, '');
+
+		for (const node of canonicalSnapshot.nodes) {
+			const relPath = cleanPath(node.path || node.id);
+			const blobOid = manifestMap.get(relPath);
 			filesToResolve.push({
 				path: relPath,
-				blobOid: file.blobOid,
-				contentHash: record.blobOid,
-				nodeData: record.nodeData,
+				blobOid,
+				contentHash: blobOid,
+				nodeData: node,
 			});
+		}
 
-			for (const edge of record.outgoingEdges) {
-				allRawEdges.push({
-					sourcePath: relPath,
-					targetPath: edge.targetPath,
-					kind: edge.kind,
-					weight: edge.weight,
-				});
-			}
+		const allRawEdges: RawEdgeInfo[] = [];
+		for (const edge of canonicalSnapshot.edges) {
+			allRawEdges.push({
+				sourcePath: cleanPath(edge.source),
+				targetPath: cleanPath(edge.target),
+				kind: 'imports',
+				weight: (edge as any).weight ?? 1,
+			});
 		}
 
 		// 3. Resolve Entity Lineage
@@ -191,6 +163,7 @@ export class IncrementalGraphAnalyzer {
 			parentPathToEntityId,
 			currentFiles: filesToResolve,
 			diffChanges,
+			deletedPathsInHistory,
 		});
 
 		// 4. Resolve Edge Lineage
@@ -201,13 +174,11 @@ export class IncrementalGraphAnalyzer {
 			rawEdges: allRawEdges,
 		});
 
-		// 5. Construct Graph Data
-		const nodes = Array.from(lineageResult.entitySnapshots.values()).map(e => e.nodeData);
-		const edges = Array.from(edgeMap.values()).map(e => e.edgeData);
+		// 5. Construct TemporalGraphSnapshot
 		const graphData: ArchitectureGraphData = {
-			nodes,
-			edges,
-			timestamp: Date.now(),
+			nodes: canonicalSnapshot.nodes,
+			edges: canonicalSnapshot.edges,
+			timestamp: canonicalSnapshot.analyzedAt,
 		};
 
 		const currentSnapshot: TemporalGraphSnapshot = {
@@ -215,12 +186,14 @@ export class IncrementalGraphAnalyzer {
 			analyzerVersion: this._analyzerVersion,
 			profileVersion: this._profileVersion,
 			commitSha,
-			timestamp: Date.now(),
+			timestamp: canonicalSnapshot.analyzedAt,
 			isCheckpoint,
+			canonicalSnapshot,
 			graphData,
 			entityMap: lineageResult.entitySnapshots,
 			edgeMap,
 			pathToEntityId: lineageResult.pathToEntityId,
+			digest: canonicalSnapshot.digest,
 		};
 
 		// 6. Compute structural delta if parent exists
@@ -233,20 +206,7 @@ export class IncrementalGraphAnalyzer {
 			snapshot: currentSnapshot,
 			delta,
 			lineageEvents: lineageResult.lineageEvents,
+			isIdenticalToParent,
 		};
-	}
-
-	private _resolveImportPath(sourceFilePath: string, importSpecifier: string): string {
-		if (!importSpecifier.startsWith('.')) {
-			// External package
-			return importSpecifier;
-		}
-
-		const sourceDir = sourceFilePath.includes('/')
-			? sourceFilePath.slice(0, sourceFilePath.lastIndexOf('/'))
-			: '';
-
-		const combined = sourceDir ? `${sourceDir}/${importSpecifier}` : importSpecifier;
-		return normalizePath(combined);
 	}
 }

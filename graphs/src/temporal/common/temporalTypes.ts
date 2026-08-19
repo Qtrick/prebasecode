@@ -119,6 +119,9 @@ export interface TemporalCommitRecord {
 	readonly profileVersion: number;
 }
 
+import type { CanonicalGraphSnapshot } from '../../common/types/canonicalTypes.js';
+import type { BlobParseArtifact } from '../../core/canonical/parseArtifactCache.js';
+
 export interface TemporalGraphSnapshot {
 	readonly schemaVersion: number;
 	readonly analyzerVersion: number;
@@ -126,10 +129,12 @@ export interface TemporalGraphSnapshot {
 	readonly commitSha: string;
 	readonly timestamp: number;
 	readonly isCheckpoint: boolean;
+	readonly canonicalSnapshot?: CanonicalGraphSnapshot;
 	readonly graphData: ArchitectureGraphData;
 	readonly entityMap: ReadonlyMap<string, TemporalEntitySnapshot>; // entityId -> snapshot
 	readonly edgeMap: ReadonlyMap<string, TemporalEdgeSnapshot>;     // edgeId -> snapshot
 	readonly pathToEntityId: ReadonlyMap<string, string>;            // path -> entityId
+	readonly digest?: string;
 }
 
 export interface TemporalReconstructionPlan {
@@ -154,7 +159,7 @@ export interface BlobAnalysisRecord {
 	readonly analyzerVersion: number;
 	readonly profileVersion: number;
 	readonly language: string;
-	readonly nodeData: GraphNodeData;
-	readonly outgoingEdges: readonly { readonly targetPath: string; readonly kind: TemporalEdgeKind; readonly weight?: number }[];
+	readonly artifact: BlobParseArtifact;
 	readonly analyzedAt: number;
 }
+

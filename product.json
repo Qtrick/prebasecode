@@ -36,6 +36,8 @@
 	"urlProtocol": "prebase",
 	"enableTelemetry": false,
 	"prebaseBuiltInCopilotEnabled": false,
+	"prebaseCloudUrl": "https://mvfopbkhftgmcwdpqrww.supabase.co",
+	"prebaseCloudPublishableKey": "sb_publishable_P3F3RJiePsPe3pz3s72S9A_rCiV8Edx",
 	"webviewContentExternalBaseUrlTemplate": "https://{{uuid}}.vscode-cdn.net/insider/ef65ac1ba57f57f2a3961bfe94aa20481caca4c6/out/vs/workbench/contrib/webview/browser/pre/",
 	"extensionsGallery": {
 		"serviceUrl": "https://open-vsx.org/vscode/gallery",

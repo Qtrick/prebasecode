@@ -60,9 +60,12 @@ class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
 	}
 }
 
+import { IPreBaseTemporalGraphService, WorkbenchTemporalGraphService } from './workbenchTemporalGraphService.js';
+
 function registerGraphSingletons(): void {
 	registerSingleton(IPreBaseGraphService, PreBaseGraphService, InstantiationType.Delayed);
 	registerSingleton(IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService, InstantiationType.Delayed);
+	registerSingleton(IPreBaseTemporalGraphService, WorkbenchTemporalGraphService, InstantiationType.Delayed);
 }
 
 function registerGraphOutputChannel(): void {

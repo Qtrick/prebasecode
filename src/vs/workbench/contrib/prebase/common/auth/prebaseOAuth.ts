@@ -59,7 +59,8 @@ export function consumePreBaseOAuthErrorCallback(
 	if (uri.scheme !== expectedScheme || uri.authority !== PREBASE_OAUTH_CALLBACK_AUTHORITY || uri.path !== PREBASE_OAUTH_CALLBACK_PATH) {
 		return undefined;
 	}
-	const values = new URLSearchParams(uri.query);
+	const queryOrFragment = uri.query || (uri.fragment.startsWith('?') ? uri.fragment.slice(1) : uri.fragment);
+	const values = new URLSearchParams(queryOrFragment);
 	const states = values.getAll('state');
 	const errors = values.getAll('error');
 	// An OAuth error takes precedence if a malformed provider response includes
@@ -75,7 +76,8 @@ export function parsePreBaseOAuthCallback(uri: URI, expectedScheme: string, expe
 	if (uri.scheme !== expectedScheme || uri.authority !== PREBASE_OAUTH_CALLBACK_AUTHORITY || uri.path !== PREBASE_OAUTH_CALLBACK_PATH) {
 		return undefined;
 	}
-	const values = new URLSearchParams(uri.query);
+	const queryOrFragment = uri.query || (uri.fragment.startsWith('?') ? uri.fragment.slice(1) : uri.fragment);
+	const values = new URLSearchParams(queryOrFragment);
 	const codes = values.getAll('code');
 	const states = values.getAll('state');
 	if (values.has('error') || codes.length !== 1 || states.length !== 1) {

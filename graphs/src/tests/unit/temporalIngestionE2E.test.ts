@@ -62,11 +62,19 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			execSync('git add . && git commit -m "feat: initial commit"', { cwd: repoDir, stdio: 'pipe' });
 			const c1 = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
 
-			// Ingest Commit 1
-			const snap1 = await temporalService.ingestCommit(repoDir, c1);
+			// Check status before ingestion
+			const statusBefore = await temporalService.getCommitIndexStatus(repoDir, c1);
+			assert.strictEqual(statusBefore, 'not-indexed');
+
+			// Ingest Commit 1 via ensureCommitIndexed
+			const snap1 = await temporalService.ensureCommitIndexed(repoDir, c1);
 			assert.strictEqual(snap1.commitSha, c1);
 			assert.strictEqual(snap1.entityMap.size, 2);
 			assert.strictEqual(snap1.edgeMap.size, 1);
+
+			// Check status after ingestion
+			const statusAfter = await temporalService.getCommitIndexStatus(repoDir, c1);
+			assert.strictEqual(statusAfter, 'ready');
 
 			// 2. Commit 2: Modify src/util.ts and add src/config.ts
 			fs.writeFileSync(path.join(repoDir, 'src/util.ts'), 'export const helper = () => "hello world!";\nexport const version = 2;', 'utf8');
@@ -116,6 +124,72 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			assert.ok(renameEvent);
 			assert.strictEqual(renameEvent.evidence.oldPath, 'src/util.ts');
 			assert.strictEqual(renameEvent.evidence.newPath, 'src/utils.ts');
+
+			await registry.closeAll();
+
+			// 4. Test Persistence Restart: open new registry on same dbPath and verify instant reconstruction without re-ingesting
+			const restartRegistry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const restartIngestion = new TemporalCommitIngestionService(gitService, restartRegistry);
+			const restartTemporalService = new TemporalGraphService(gitService, restartRegistry, restartIngestion);
+
+			const restartedSnap3 = await restartTemporalService.getGraphAtCommit(repoDir, c3);
+			assert.strictEqual(restartedSnap3.commitSha, c3);
+			assert.strictEqual(restartedSnap3.entityMap.size, 3);
+
+			await restartRegistry.closeAll();
+		} finally {
+			try {
+				fs.rmSync(tempBase, { recursive: true, force: true });
+			} catch {
+				// ignore
+			}
+		}
+	});
+
+	test('Handles branch merge commits and preserves multi-parent DAG relations', async () => {
+		const { repoDir, tempBase, dbPath } = createE2ERepo('sha1');
+
+		try {
+			const gitService = new NodeGitHistoryService();
+			const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const analyzer = new IncrementalGraphAnalyzer();
+			const ingestionService = new TemporalCommitIngestionService(gitService, registry, analyzer);
+			const temporalService = new TemporalGraphService(gitService, registry, ingestionService);
+
+			// Root commit on main
+			fs.mkdirSync(path.join(repoDir, 'src'), { recursive: true });
+			fs.writeFileSync(path.join(repoDir, 'src/base.ts'), 'export const base = 1;', 'utf8');
+			execSync('git add . && git commit -m "feat: root"', { cwd: repoDir, stdio: 'pipe' });
+			const cRoot = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+			await temporalService.ingestCommit(repoDir, cRoot);
+
+			// Create feature branch
+			execSync('git checkout -b feature', { cwd: repoDir, stdio: 'pipe' });
+			fs.writeFileSync(path.join(repoDir, 'src/feature.ts'), 'export const feature = 2;', 'utf8');
+			execSync('git add . && git commit -m "feat: add feature"', { cwd: repoDir, stdio: 'pipe' });
+			const cFeature = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+			await temporalService.ingestCommit(repoDir, cFeature);
+
+			// Back to main, commit a change
+			execSync('git checkout main', { cwd: repoDir, stdio: 'pipe' });
+			fs.writeFileSync(path.join(repoDir, 'src/mainExtra.ts'), 'export const mainExtra = 3;', 'utf8');
+			execSync('git add . && git commit -m "feat: main extra"', { cwd: repoDir, stdio: 'pipe' });
+			const cMain = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+			await temporalService.ingestCommit(repoDir, cMain);
+
+			// Merge feature branch into main
+			execSync('git merge feature -m "merge: feature into main"', { cwd: repoDir, stdio: 'pipe' });
+			const cMerge = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+			const mergeSnap = await temporalService.ingestCommit(repoDir, cMerge);
+
+			assert.strictEqual(mergeSnap.commitSha, cMerge);
+			assert.strictEqual(mergeSnap.entityMap.size, 3); // base.ts, feature.ts, mainExtra.ts
+
+			const store = await registry.getStore('repo', repoDir);
+			const parents = await store.getCommitParents(cMerge);
+			assert.strictEqual(parents.length, 2);
+			assert.strictEqual(parents[0], cMain);
+			assert.strictEqual(parents[1], cFeature);
 
 			await registry.closeAll();
 		} finally {

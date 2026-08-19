@@ -59,6 +59,7 @@ export interface GitRepositoryIdentity {
 	readonly remoteUrl?: string;
 	readonly headBranch?: string;
 	readonly isUnborn?: boolean;
+	readonly objectFormat?: 'sha1' | 'sha256';
 }
 
 export type GitObjectType = 'blob' | 'tree' | 'commit' | 'tag';

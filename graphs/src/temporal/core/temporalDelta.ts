@@ -148,14 +148,18 @@ export class TemporalDeltaEngine {
 			newEdgeMap.set(added.edgeId, added);
 		}
 
-		// 8. Reconstruct ArchitectureGraphData
+		// 8. Reconstruct ArchitectureGraphData with deterministic sorting
 		const nodes = Array.from(newEntityMap.values()).map(e => e.nodeData);
 		const edges = Array.from(newEdgeMap.values()).map(e => e.edgeData);
 
+		const stableCompare = (a: string, b: string) => (a < b ? -1 : a > b ? 1 : 0);
+		const sortedNodes = [...nodes].sort((a, b) => stableCompare(a.id, b.id));
+		const sortedEdges = [...edges].sort((a, b) => stableCompare(a.id, b.id));
+
 		const graphData: ArchitectureGraphData = {
-			nodes,
-			edges,
-			timestamp: Date.now(),
+			nodes: sortedNodes,
+			edges: sortedEdges,
+			timestamp: baseSnap.timestamp,
 		};
 
 		return {
@@ -163,7 +167,7 @@ export class TemporalDeltaEngine {
 			analyzerVersion: baseSnap.analyzerVersion,
 			profileVersion: baseSnap.profileVersion,
 			commitSha: delta.commitSha,
-			timestamp: Date.now(),
+			timestamp: baseSnap.timestamp,
 			isCheckpoint,
 			graphData,
 			entityMap: newEntityMap,

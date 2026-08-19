@@ -81,6 +81,7 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 				absolutePath: `${this.rootPath}/${relPath}`,
 				relativePath: relPath,
 				extension: ext,
+				blobOid: entry.blobOid || entry.objectId,
 			});
 		}
 

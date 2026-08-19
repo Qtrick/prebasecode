@@ -13,7 +13,19 @@ import type {
 	TemporalQueryOptions,
 } from '../common/temporalTypes.js';
 
+export type TemporalIndexStatus =
+	| 'unregistered'
+	| 'not-indexed'
+	| 'queued'
+	| 'indexing'
+	| 'ready'
+	| 'incomplete'
+	| 'failed'
+	| 'cancelled';
+
 export interface ITemporalGraphService {
+	getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalIndexStatus>;
+	ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	getGraphAtCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	getEntityHistory(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]>;
 	getEntityLineageEvents(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]>;
@@ -21,12 +33,14 @@ export interface ITemporalGraphService {
 	ingestCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	ingestCommitRange(rootPath: string, commitShas: string[], token?: CancellationTokenLike): Promise<void>;
 	handleHeadChanged(event: GitHeadChangeEvent, rootPath: string): Promise<void>;
+	dispose(): Promise<void>;
 }
 
 export class TemporalGraphService implements ITemporalGraphService {
 	private readonly _gitService: IGitHistoryService;
 	private readonly _registry: TemporalRepositoryRegistry;
 	private readonly _ingestionService: TemporalCommitIngestionService;
+	private readonly _inFlightIngestions = new Map<string, Promise<TemporalGraphSnapshot>>();
 
 	constructor(
 		gitService: IGitHistoryService,
@@ -36,6 +50,28 @@ export class TemporalGraphService implements ITemporalGraphService {
 		this._gitService = gitService;
 		this._registry = registry;
 		this._ingestionService = ingestionService;
+	}
+
+	async getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalIndexStatus> {
+		if (this._inFlightIngestions.has(`${rootPath}:${commitSha}`)) {
+			return 'indexing';
+		}
+		try {
+			const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+			const store = await this._registry.getStore(identity.repositoryId, rootPath);
+			const commit = await store.getCommit(commitSha);
+			return commit ? 'ready' : 'not-indexed';
+		} catch {
+			return 'unregistered';
+		}
+	}
+
+	async ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
+		const status = await this.getCommitIndexStatus(rootPath, commitSha, token);
+		if (status === 'ready') {
+			return this.getGraphAtCommit(rootPath, commitSha, token);
+		}
+		return this.ingestCommit(rootPath, commitSha, token);
 	}
 
 	async getGraphAtCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
@@ -83,7 +119,22 @@ export class TemporalGraphService implements ITemporalGraphService {
 	}
 
 	async ingestCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
-		return this._ingestionService.ingestCommit(rootPath, commitSha, {}, token);
+		const key = `${rootPath}:${commitSha}`;
+		const inFlight = this._inFlightIngestions.get(key);
+		if (inFlight) {
+			return inFlight;
+		}
+
+		const promise = (async () => {
+			try {
+				return await this._ingestionService.ingestCommit(rootPath, commitSha, {}, token);
+			} finally {
+				this._inFlightIngestions.delete(key);
+			}
+		})();
+
+		this._inFlightIngestions.set(key, promise);
+		return promise;
 	}
 
 	async ingestCommitRange(rootPath: string, commitShas: string[], token?: CancellationTokenLike): Promise<void> {
@@ -94,5 +145,9 @@ export class TemporalGraphService implements ITemporalGraphService {
 		if (event.currentHead) {
 			await this._ingestionService.ingestCommit(rootPath, event.currentHead, { isExplicitHead: true });
 		}
+	}
+
+	async dispose(): Promise<void> {
+		await this._registry.dispose();
 	}
 }

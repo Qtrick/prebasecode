@@ -45,20 +45,36 @@ suite('SqliteTemporalStore', () => {
 		assert.strictEqual(store.isOpen(), true);
 	});
 
-	test('saveCommitIngestion saves commit, checkpoint, delta, entities, and edges atomically', async () => {
+	test('repository identity record persistence', async () => {
+		await store.setRepositoryIdentity({
+			repoId: 'repo_123',
+			rootPath: '/workspaces/repo',
+			commonGitDir: '/workspaces/repo/.git',
+			objectFormat: 'sha1',
+			createdAt: 1000,
+		});
+
+		const retrieved = await store.getRepositoryIdentity();
+		assert.ok(retrieved);
+		assert.strictEqual(retrieved.repoId, 'repo_123');
+		assert.strictEqual(retrieved.rootPath, '/workspaces/repo');
+		assert.strictEqual(retrieved.objectFormat, 'sha1');
+	});
+
+	test('saveCommitIngestion saves commit, commit_parents, checkpoint, delta, entities, and edges atomically', async () => {
 		const commitRecord: TemporalCommitRecord = {
 			commitSha: 'commit1',
-			parentShas: [],
+			parentShas: ['parent_a', 'parent_b'],
 			treeSha: 'tree1',
 			authorName: 'Developer',
 			authorEmail: 'dev@prebase.io',
 			authorTimestamp: 1000,
 			committerTimestamp: 1000,
-			message: 'Initial commit',
+			message: 'Merge commit',
 			ingestedAt: 1001,
 			isCheckpoint: true,
 			checkpointInterval: 10,
-			schemaVersion: 1,
+			schemaVersion: 2,
 			analyzerVersion: 1,
 			profileVersion: 1,
 		};
@@ -95,12 +111,13 @@ suite('SqliteTemporalStore', () => {
 		};
 
 		const snapshot: TemporalGraphSnapshot = {
-			schemaVersion: 1,
+			schemaVersion: 2,
 			analyzerVersion: 1,
 			profileVersion: 1,
 			commitSha: 'commit1',
 			timestamp: 1001,
 			isCheckpoint: true,
+			digest: 'digest_commit1',
 			graphData: {
 				nodes: [nodeData],
 				edges: [edgeData],
@@ -114,7 +131,7 @@ suite('SqliteTemporalStore', () => {
 		const lineageEvents: TemporalEntityLineageEvent[] = [{
 			entityId: 'ent_main',
 			commitSha: 'commit1',
-			parentCommitSha: '',
+			parentCommitSha: 'parent_a',
 			lineageCase: 'same-canonical-id',
 			evidence: { confidence: 1.0, details: 'Root entity' },
 		}];
@@ -126,6 +143,18 @@ suite('SqliteTemporalStore', () => {
 		assert.ok(retrievedCommit);
 		assert.strictEqual(retrievedCommit.commitSha, 'commit1');
 		assert.strictEqual(retrievedCommit.isCheckpoint, true);
+
+		// Verify relational parents
+		const parents = await store.getCommitParents('commit1');
+		assert.deepStrictEqual(parents, ['parent_a', 'parent_b']);
+
+		const childrenA = await store.getCommitChildren('parent_a');
+		assert.deepStrictEqual(childrenA, ['commit1']);
+
+		// Verify state deduplication record
+		const state = await store.getGraphStateByDigest('digest_commit1');
+		assert.ok(state);
+		assert.strictEqual(state.canonicalDigest, 'digest_commit1');
 
 		// Verify checkpoint retrieval
 		const retrievedSnapshot = await store.getCheckpointSnapshot('commit1');
@@ -150,6 +179,20 @@ suite('SqliteTemporalStore', () => {
 		assert.strictEqual(edge.sourceEntityId, 'ent_main');
 	});
 
+	test('refs persistence and retrieval', async () => {
+		await store.saveRef({
+			refName: 'refs/heads/main',
+			targetSha: 'commit_head',
+			refType: 'branch',
+			lastObserved: 2000,
+		});
+
+		const ref = await store.getRef('refs/heads/main');
+		assert.ok(ref);
+		assert.strictEqual(ref.targetSha, 'commit_head');
+		assert.strictEqual(ref.refType, 'branch');
+	});
+
 	test('runInTransaction rolls back modifications on error', async () => {
 		try {
 			await store.runInTransaction(async () => {
@@ -158,8 +201,13 @@ suite('SqliteTemporalStore', () => {
 					analyzerVersion: 1,
 					profileVersion: 1,
 					language: 'ts',
-					nodeData: { id: 'x', kind: 'file' as const, label: 'x', path: 'x.ts' },
-					outgoingEdges: [],
+					artifact: {
+						imports: [],
+						exports: [],
+						functions: [],
+						components: [],
+						isComponentFile: false,
+					},
 					analyzedAt: Date.now(),
 				});
 
@@ -179,8 +227,13 @@ suite('SqliteTemporalStore', () => {
 			analyzerVersion: 1,
 			profileVersion: 1,
 			language: 'typescript',
-			nodeData: { id: 'src/p.ts', kind: 'file' as const, label: 'p.ts', path: 'src/p.ts' },
-			outgoingEdges: [{ targetPath: 'src/q.ts', kind: 'imports' as const, weight: 1 }],
+			artifact: {
+				imports: [{ source: 'src/q.ts', specifiers: [] }],
+				exports: [{ name: 'myExport' }],
+				functions: [],
+				components: [],
+				isComponentFile: false,
+			},
 			analyzedAt: 5000,
 		};
 
@@ -189,7 +242,7 @@ suite('SqliteTemporalStore', () => {
 		const retrieved = await store.getBlobAnalysis('blob_persist_1', 1, 1, 'typescript');
 		assert.ok(retrieved);
 		assert.strictEqual(retrieved.blobOid, 'blob_persist_1');
-		assert.strictEqual(retrieved.outgoingEdges.length, 1);
-		assert.strictEqual(retrieved.outgoingEdges[0].targetPath, 'src/q.ts');
+		assert.strictEqual(retrieved.artifact.exports.length, 1);
+		assert.strictEqual(retrieved.artifact.exports[0].name, 'myExport');
 	});
 });

@@ -29,6 +29,29 @@ function nonEmpty(raw: unknown): string {
 	return typeof raw === 'string' ? raw.trim() : '';
 }
 
+function isForbiddenSecretKey(key: string): boolean {
+	const trimmed = key.trim();
+	if (trimmed.startsWith('sb_secret_') || trimmed.startsWith('secret_')) {
+		return true;
+	}
+	if (trimmed.toLowerCase().includes('service_role')) {
+		return true;
+	}
+	try {
+		const parts = trimmed.split('.');
+		if (parts.length === 3) {
+			const decoded = typeof atob === 'function' ? atob(parts[1]) : Buffer.from(parts[1], 'base64').toString('utf8');
+			const payload = JSON.parse(decoded);
+			if (payload && (payload.role === 'service_role' || payload.role === 'supabase_admin')) {
+				return true;
+			}
+		}
+	} catch {
+		// Not a decodeable JWT payload
+	}
+	return false;
+}
+
 export function resolvePreBaseCloudAuthConfig(
 	getConfigValue: (key: string) => unknown,
 	product?: IPreBaseProductCloudFields,
@@ -37,9 +60,11 @@ export function resolvePreBaseCloudAuthConfig(
 		nonEmpty(getConfigValue(PreBaseCloudConfigKeys.Url)) ||
 		nonEmpty(product?.prebaseCloudUrl),
 	);
-	const publishableKey =
+	const rawPublishableKey =
 		nonEmpty(getConfigValue(PreBaseCloudConfigKeys.PublishableKey)) ||
 		nonEmpty(product?.prebaseCloudPublishableKey);
+
+	const publishableKey = isForbiddenSecretKey(rawPublishableKey) ? '' : rawPublishableKey;
 
 	if (cloudUrl && publishableKey) {
 		return { mode: 'supabase', supabaseUrl: cloudUrl, publishableKey };

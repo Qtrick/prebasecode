@@ -4,7 +4,7 @@
 
 import { TemporalError } from './temporalErrors.js';
 
-export const CURRENT_SCHEMA_VERSION = 1;
+export const CURRENT_SCHEMA_VERSION = 2;
 export const CURRENT_ANALYZER_VERSION = 1;
 export const CURRENT_PROFILE_VERSION = 1;
 export const CURRENT_DELTA_VERSION = 1;

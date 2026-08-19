@@ -21,5 +21,6 @@ export { IncrementalGraphAnalyzer } from './temporal/analysis/incrementalGraphAn
 export type { ITemporalStore } from './temporal/persistence/common/temporalStore.js';
 export { TemporalRepositoryRegistry } from './temporal/ingestion/temporalRepositoryRegistry.js';
 export { TemporalCommitIngestionService } from './temporal/ingestion/temporalCommitIngestionService.js';
-export { TemporalGraphService, type ITemporalGraphService } from './temporal/host/temporalGraphService.js';
+export type { BlobParseArtifact, ICanonicalParseArtifactCache } from './core/canonical/parseArtifactCache.js';
+export { TwoTierParseArtifactCache } from './temporal/analysis/blobAnalysisCache.js';
 

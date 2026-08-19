@@ -6,7 +6,11 @@ import * as sqlite3 from '@vscode/sqlite3';
 import { TemporalError } from '../../common/temporalErrors.js';
 import { computeAnalysisCacheKey, validateVersion } from '../../common/temporalVersioning.js';
 import { runMigrations } from './temporalMigrations.js';
-import type { ITemporalStore } from '../common/temporalStore.js';
+import type {
+	ITemporalStore,
+	RefRecord,
+	RepositoryIdentityRecord,
+} from '../common/temporalStore.js';
 import type {
 	BlobAnalysisRecord,
 	TemporalCommitRecord,
@@ -67,7 +71,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 				this._db = db;
 
-				// Configure PRAGMAs
+				// Configure PRAGMAs for durability, concurrency, and integrity
 				db.serialize(() => {
 					db.run('PRAGMA journal_mode = WAL;');
 					db.run(`PRAGMA busy_timeout = ${this._busyTimeoutMs};`);
@@ -118,6 +122,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 	async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
 		const db = this._getDb();
+
 		await new Promise<void>((resolve, reject) => {
 			db.run('BEGIN IMMEDIATE;', (err) => (err ? reject(err) : resolve()));
 		});
@@ -134,6 +139,45 @@ export class SqliteTemporalStore implements ITemporalStore {
 			});
 			throw error;
 		}
+	}
+
+	async setRepositoryIdentity(identity: RepositoryIdentityRecord): Promise<void> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			const stmt = `
+				INSERT OR REPLACE INTO repository_identity (
+					repo_id, root_path, common_git_dir, object_format, created_at
+				) VALUES (?, ?, ?, ?, ?);
+			`;
+			db.run(
+				stmt,
+				[
+					identity.repoId,
+					identity.rootPath,
+					identity.commonGitDir ?? null,
+					identity.objectFormat,
+					identity.createdAt,
+				],
+				(err) => (err ? reject(err) : resolve())
+			);
+		});
+	}
+
+	async getRepositoryIdentity(): Promise<RepositoryIdentityRecord | undefined> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.get('SELECT * FROM repository_identity LIMIT 1;', (err, row: any) => {
+				if (err) return reject(err);
+				if (!row) return resolve(undefined);
+				resolve({
+					repoId: row.repo_id,
+					rootPath: row.root_path,
+					commonGitDir: row.common_git_dir || undefined,
+					objectFormat: row.object_format,
+					createdAt: row.created_at,
+				});
+			});
+		});
 	}
 
 	async saveCommitIngestion(
@@ -180,20 +224,62 @@ export class SqliteTemporalStore implements ITemporalStore {
 				);
 			});
 
-			// 2. Insert Checkpoint if applicable
-			if (commit.isCheckpoint) {
-				const serializedSnapshot = JSON.stringify({
-					schemaVersion: snapshot.schemaVersion,
-					analyzerVersion: snapshot.analyzerVersion,
-					profileVersion: snapshot.profileVersion,
-					commitSha: snapshot.commitSha,
-					timestamp: snapshot.timestamp,
-					isCheckpoint: snapshot.isCheckpoint,
-					graphData: snapshot.graphData,
-					entities: Array.from(snapshot.entityMap.values()),
-					edges: Array.from(snapshot.edgeMap.values()),
-				});
+			// 2. Insert Relational Commit Parents
+			if (commit.parentShas && commit.parentShas.length > 0) {
+				for (let idx = 0; idx < commit.parentShas.length; idx++) {
+					const parentSha = commit.parentShas[idx];
+					await new Promise<void>((resolve, reject) => {
+						const stmt = `
+							INSERT OR REPLACE INTO commit_parents (commit_sha, parent_index, parent_sha)
+							VALUES (?, ?, ?);
+						`;
+						db.run(stmt, [commit.commitSha, idx, parentSha], (err) => (err ? reject(err) : resolve()));
+					});
+				}
+			}
 
+			// 3. Insert or update immutable Graph State (Deduplication via canonical digest)
+			const digest = snapshot.digest || snapshot.canonicalSnapshot?.digest;
+			const serializedSnapshot = JSON.stringify({
+				schemaVersion: snapshot.schemaVersion,
+				analyzerVersion: snapshot.analyzerVersion,
+				profileVersion: snapshot.profileVersion,
+				commitSha: snapshot.commitSha,
+				timestamp: snapshot.timestamp,
+				isCheckpoint: snapshot.isCheckpoint,
+				digest,
+				graphData: snapshot.graphData,
+				entities: Array.from(snapshot.entityMap.values()),
+				edges: Array.from(snapshot.edgeMap.values()),
+			});
+
+			if (digest) {
+				await new Promise<void>((resolve, reject) => {
+					const stateId = `state_${digest.slice(0, 16)}`;
+					const stmt = `
+						INSERT OR IGNORE INTO graph_states (
+							state_id, canonical_digest, snapshot_json, created_at,
+							schema_version, analyzer_version, profile_version
+						) VALUES (?, ?, ?, ?, ?, ?, ?);
+					`;
+					db.run(
+						stmt,
+						[
+							stateId,
+							digest,
+							serializedSnapshot,
+							Date.now(),
+							snapshot.schemaVersion,
+							snapshot.analyzerVersion,
+							snapshot.profileVersion,
+						],
+						(err) => (err ? reject(err) : resolve())
+					);
+				});
+			}
+
+			// 4. Insert Checkpoint if applicable
+			if (commit.isCheckpoint) {
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
 						INSERT OR REPLACE INTO checkpoints (
@@ -215,7 +301,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				});
 			}
 
-			// 3. Insert Delta if provided
+			// 5. Insert Delta if provided
 			if (delta) {
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
@@ -237,7 +323,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				});
 			}
 
-			// 4. Save entities and snapshots
+			// 6. Save entities and snapshots
 			for (const [entityId, entitySnap] of snapshot.entityMap) {
 				// Upsert Entity
 				await new Promise<void>((resolve, reject) => {
@@ -278,7 +364,20 @@ export class SqliteTemporalStore implements ITemporalStore {
 				});
 			}
 
-			// 5. Save lineage events
+			// Mark deleted entities in this delta as inactive in entities table
+			if (delta && delta.entitiesDeleted && delta.entitiesDeleted.length > 0) {
+				for (const deletedId of delta.entitiesDeleted) {
+					await new Promise<void>((resolve, reject) => {
+						db.run(
+							'UPDATE entities SET is_active = 0, last_seen_commit = ? WHERE entity_id = ?;',
+							[commit.commitSha, deletedId],
+							(err) => (err ? reject(err) : resolve())
+						);
+					});
+				}
+			}
+
+			// 7. Save lineage events
 			for (const event of lineageEvents) {
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
@@ -301,7 +400,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				});
 			}
 
-			// 6. Save edges and snapshots
+			// 8. Save edges and snapshots
 			for (const [edgeId, edgeSnap] of snapshot.edgeMap) {
 				// Upsert Edge
 				await new Promise<void>((resolve, reject) => {
@@ -382,6 +481,45 @@ export class SqliteTemporalStore implements ITemporalStore {
 		});
 	}
 
+	async getCommitParents(commitSha: string): Promise<string[]> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all(
+				'SELECT parent_sha FROM commit_parents WHERE commit_sha = ? ORDER BY parent_index ASC;',
+				[commitSha],
+				(err, rows: any[]) => {
+					if (err) return reject(err);
+					if (rows && rows.length > 0) {
+						return resolve(rows.map(r => r.parent_sha));
+					}
+					// Fallback to commits.parent_shas JSON if commit_parents is empty
+					db.get('SELECT parent_shas FROM commits WHERE commit_sha = ?;', [commitSha], (cErr, cRow: any) => {
+						if (cErr || !cRow) return resolve([]);
+						try {
+							resolve(JSON.parse(cRow.parent_shas || '[]'));
+						} catch {
+							resolve([]);
+						}
+					});
+				}
+			);
+		});
+	}
+
+	async getCommitChildren(commitSha: string): Promise<string[]> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all(
+				'SELECT commit_sha FROM commit_parents WHERE parent_sha = ?;',
+				[commitSha],
+				(err, rows: any[]) => {
+					if (err) return reject(err);
+					resolve((rows || []).map(r => r.commit_sha));
+				}
+			);
+		});
+	}
+
 	async getCheckpointSnapshot(commitSha: string): Promise<TemporalGraphSnapshot | undefined> {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
@@ -418,6 +556,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 						entityMap,
 						edgeMap,
 						pathToEntityId,
+						digest: parsed.digest,
 					};
 					resolve(snapshot);
 				} catch (parseErr) {
@@ -440,6 +579,21 @@ export class SqliteTemporalStore implements ITemporalStore {
 				} catch (parseErr) {
 					reject(new TemporalError('DatabaseCorrupted', `Failed to parse delta JSON for ${commitSha}`, parseErr));
 				}
+			});
+		});
+	}
+
+	async getGraphStateByDigest(digest: string): Promise<{ stateId: string; canonicalDigest: string; snapshotJson: string } | undefined> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.get('SELECT * FROM graph_states WHERE canonical_digest = ?;', [digest], (err, row: any) => {
+				if (err) return reject(err);
+				if (!row) return resolve(undefined);
+				resolve({
+					stateId: row.state_id,
+					canonicalDigest: row.canonical_digest,
+					snapshotJson: row.snapshot_json,
+				});
 			});
 		});
 	}
@@ -528,6 +682,25 @@ export class SqliteTemporalStore implements ITemporalStore {
 		});
 	}
 
+	async getDeletedPathsInHistory(): Promise<Map<string, string>> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all(
+				"SELECT entity_id, canonical_path FROM entities WHERE is_active = 0;",
+				(err, rows: any[]) => {
+					if (err) return reject(err);
+					const map = new Map<string, string>();
+					for (const r of rows || []) {
+						if (r.canonical_path && r.entity_id) {
+							map.set(r.canonical_path, r.entity_id);
+						}
+					}
+					resolve(map);
+				}
+			);
+		});
+	}
+
 	async getEdge(edgeId: string): Promise<TemporalEdgeRecord | undefined> {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
@@ -547,6 +720,70 @@ export class SqliteTemporalStore implements ITemporalStore {
 		});
 	}
 
+	async getEdgeHistory(edgeId: string): Promise<TemporalEdgeSnapshot[]> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all(
+				'SELECT es.* FROM edge_snapshots es LEFT JOIN commits c ON es.commit_sha = c.commit_sha WHERE es.edge_id = ? ORDER BY c.ingested_at ASC;',
+				[edgeId],
+				(err, rows: any[]) => {
+					if (err) return reject(err);
+					const snapshots: TemporalEdgeSnapshot[] = (rows || []).map(r => ({
+						edgeId: r.edge_id,
+						commitSha: r.commit_sha,
+						sourceEntityId: r.source_entity_id,
+						targetEntityId: r.target_entity_id,
+						kind: r.kind,
+						edgeData: JSON.parse(r.edge_data_json),
+					}));
+					resolve(snapshots);
+				}
+			);
+		});
+	}
+
+	async saveRef(ref: RefRecord): Promise<void> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			const stmt = `
+				INSERT OR REPLACE INTO refs (ref_name, target_sha, ref_type, last_observed)
+				VALUES (?, ?, ?, ?);
+			`;
+			db.run(stmt, [ref.refName, ref.targetSha, ref.refType ?? null, ref.lastObserved], (err) => (err ? reject(err) : resolve()));
+		});
+	}
+
+	async getRef(refName: string): Promise<RefRecord | undefined> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.get('SELECT * FROM refs WHERE ref_name = ?;', [refName], (err, row: any) => {
+				if (err) return reject(err);
+				if (!row) return resolve(undefined);
+				resolve({
+					refName: row.ref_name,
+					targetSha: row.target_sha,
+					refType: row.ref_type || undefined,
+					lastObserved: row.last_observed,
+				});
+			});
+		});
+	}
+
+	async getAllRefs(): Promise<RefRecord[]> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all('SELECT * FROM refs ORDER BY last_observed DESC;', (err, rows: any[]) => {
+				if (err) return reject(err);
+				resolve((rows || []).map(r => ({
+					refName: r.ref_name,
+					targetSha: r.target_sha,
+					refType: r.ref_type || undefined,
+					lastObserved: r.last_observed,
+				})));
+			});
+		});
+	}
+
 	async getBlobAnalysis(
 		blobOid: string,
 		analyzerVersion: number,
@@ -557,7 +794,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 
 		return new Promise((resolve, reject) => {
-			db.get('SELECT * FROM blob_cache WHERE cache_key = ?;', [key], (err, row: any) => {
+			db.get('SELECT * FROM blob_parse_artifacts WHERE cache_key = ?;', [key], (err, row: any) => {
 				if (err) return reject(err);
 				if (!row) return resolve(undefined);
 				try {
@@ -566,12 +803,11 @@ export class SqliteTemporalStore implements ITemporalStore {
 						analyzerVersion: row.analyzer_version,
 						profileVersion: row.profile_version,
 						language: row.language,
-						nodeData: JSON.parse(row.node_data_json),
-						outgoingEdges: JSON.parse(row.outgoing_edges_json),
+						artifact: JSON.parse(row.artifact_json),
 						analyzedAt: row.analyzed_at,
 					});
 				} catch (parseErr) {
-					reject(new TemporalError('DatabaseCorrupted', `Failed to parse blob cache record for ${key}`, parseErr));
+					reject(new TemporalError('DatabaseCorrupted', `Failed to parse blob parse artifact for ${key}`, parseErr));
 				}
 			});
 		});
@@ -588,10 +824,10 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 		return new Promise((resolve, reject) => {
 			const stmt = `
-				INSERT OR REPLACE INTO blob_cache (
+				INSERT OR REPLACE INTO blob_parse_artifacts (
 					cache_key, blob_oid, analyzer_version, profile_version, language,
-					node_data_json, outgoing_edges_json, analyzed_at
-				) VALUES (?, ?, ?, ?, ?, ?, ?, ?);
+					artifact_json, analyzed_at
+				) VALUES (?, ?, ?, ?, ?, ?, ?);
 			`;
 			db.run(
 				stmt,
@@ -601,8 +837,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 					record.analyzerVersion,
 					record.profileVersion,
 					record.language,
-					JSON.stringify(record.nodeData),
-					JSON.stringify(record.outgoingEdges),
+					JSON.stringify(record.artifact),
 					record.analyzedAt,
 				],
 				(err) => (err ? reject(err) : resolve())
@@ -622,6 +857,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 		return this.runInTransaction(async () => {
 			await new Promise<void>((resolve, reject) => {
 				db.exec(`
+					DELETE FROM blob_parse_artifacts;
 					DELETE FROM blob_cache;
 					DELETE FROM edge_snapshots;
 					DELETE FROM edges;
@@ -630,7 +866,11 @@ export class SqliteTemporalStore implements ITemporalStore {
 					DELETE FROM entities;
 					DELETE FROM deltas;
 					DELETE FROM checkpoints;
+					DELETE FROM graph_states;
+					DELETE FROM refs;
+					DELETE FROM commit_parents;
 					DELETE FROM commits;
+					DELETE FROM repository_identity;
 					DELETE FROM meta;
 				`, (err) => (err ? reject(err) : resolve()));
 			});

@@ -61,6 +61,15 @@ export class TemporalCommitIngestionService {
 		const repoId = identity.repositoryId;
 		const store = await this._registry.getStore(repoId, rootPath);
 
+		// Record repository identity
+		await store.setRepositoryIdentity({
+			repoId,
+			rootPath,
+			commonGitDir: identity.commonGitDir,
+			objectFormat: identity.objectFormat || (commitSha.length === 64 ? 'sha256' : 'sha1'),
+			createdAt: Date.now(),
+		});
+
 		// Check if already ingested
 		const existingRecord = await store.getCommit(commitSha);
 		if (existingRecord) {
@@ -70,11 +79,21 @@ export class TemporalCommitIngestionService {
 		// Read commit metadata from Git
 		const commitMeta = await this._gitService.getCommit(rootPath, commitSha, token);
 		const allCommits = await store.getAllCommits();
-		const commitIndex = allCommits.length;
+		const commitsBySha = new Map(allCommits.map(c => [c.commitSha, c]));
+
 		const isRoot = commitMeta.parents.length === 0;
+
+		// Calculate current delta depth from primary parent
+		let deltaDepth = 0;
+		if (commitMeta.parents.length > 0) {
+			const parentSha = commitMeta.parents[0];
+			const plan = this._indexPlanner.planDagReconstruction(parentSha, commitsBySha);
+			deltaDepth = plan.totalDeltas + 1;
+		}
+
 		const isCheckpoint = Boolean(
 			options.forceCheckpoint ||
-			this._indexPlanner.shouldCreateCheckpoint(commitIndex, isRoot, Boolean(options.isExplicitHead))
+			this._indexPlanner.shouldCreateCheckpoint(deltaDepth, isRoot, Boolean(options.isExplicitHead))
 		);
 
 		// Get parent snapshot if exists
@@ -87,12 +106,15 @@ export class TemporalCommitIngestionService {
 				const diffRes = await this._gitService.diffCommitToParent(rootPath, commitSha, 0, token);
 				diffChanges = diffRes.changes as any[];
 			} catch {
-				// Fallback to full parse if parent cannot be reconstructed
+				// Fallback to direct parse if parent reconstruction fails
 				parentSnapshot = undefined;
 			}
 		}
 
-		// Run Incremental Analysis
+		// Read prior deleted paths in history for robust CASE 8 fresh recreation
+		const deletedPathsInHistory = await store.getDeletedPathsInHistory();
+
+		// Run Incremental Analysis backed by persistent L2 store
 		const contentSource = new GitTreeContentSource(this._gitService, rootPath, commitSha);
 		const analysisOutput = await this._analyzer.analyzeCommit({
 			commitSha,
@@ -101,6 +123,7 @@ export class TemporalCommitIngestionService {
 			parentSnapshot,
 			isCheckpoint,
 			token,
+			deletedPathsInHistory,
 		});
 
 		const commitRecord: TemporalCommitRecord = {
@@ -149,9 +172,10 @@ export class TemporalCommitIngestionService {
 			return directCheckpoint;
 		}
 
-		// 2. Plan reconstruction traversal
+		// 2. Plan DAG-aware reconstruction traversal
 		const allCommits = await store.getAllCommits();
-		const plan = this._indexPlanner.planReconstruction(commitSha, allCommits);
+		const commitsBySha = new Map(allCommits.map(c => [c.commitSha, c]));
+		const plan = this._indexPlanner.planDagReconstruction(commitSha, commitsBySha);
 
 		if (!plan.baseCheckpointSha) {
 			throw new TemporalError(

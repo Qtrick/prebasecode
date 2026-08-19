@@ -1,7 +1,4 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
- *--------------------------------------------------------------------------------------------*/
-
+import { computePureSha256 } from '../../core/canonical/pureSha256.js';
 import type { GitExactDiffChange } from '../../history/git/gitTypes.js';
 import type {
 	GraphNodeData,
@@ -25,6 +22,7 @@ export interface LineageResolutionInput {
 	readonly currentFiles: readonly FileToResolve[];
 	readonly diffChanges: readonly GitExactDiffChange[];
 	readonly deletedEntityIdsInHistory?: ReadonlySet<string>;
+	readonly deletedPathsInHistory?: ReadonlyMap<string, string>; // path -> prior deleted entityId
 }
 
 export interface LineageResolutionResult {
@@ -34,10 +32,12 @@ export interface LineageResolutionResult {
 	readonly terminatedEntityIds: string[];
 }
 
-function generateEntityId(path: string, commitSha: string, disambiguator?: string): string {
+export function generateEntityId(path: string, commitSha: string, disambiguator?: string): string {
 	const cleanPath = path.replace(/\\/g, '/');
+	const baseName = cleanPath.replace(/[^a-zA-Z0-9_.-]/g, '_').slice(0, 32);
+	const hash = computePureSha256(`${commitSha}:${cleanPath}:${disambiguator ?? ''}`).slice(0, 16);
 	const suffix = disambiguator ? `_${disambiguator}` : '';
-	return `ent_${cleanPath.replace(/[^a-zA-Z0-9_.-]/g, '_')}_${commitSha.slice(0, 8)}${suffix}`;
+	return `ent_${baseName}_${hash}${suffix}`;
 }
 
 export class TemporalLineageResolver {
@@ -249,10 +249,12 @@ export class TemporalLineageResolver {
 			}
 
 			// CASE 8: Recreated fresh after prior delete
-			const priorDeletedEntityId = Array.from(deletedEntityIdsInHistory).find(id => {
-				const snap = parentEntityMap.get(id);
-				return snap && snap.path === currentPath;
-			});
+			const priorDeletedEntityId =
+				input.deletedPathsInHistory?.get(currentPath) ??
+				Array.from(deletedEntityIdsInHistory).find(id => {
+					const snap = parentEntityMap.get(id);
+					return snap && snap.path === currentPath;
+				});
 
 			if (priorDeletedEntityId) {
 				const freshEntityId = generateEntityId(currentPath, commitSha, 'recreated');

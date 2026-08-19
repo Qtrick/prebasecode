@@ -58,4 +58,8 @@ export class TemporalRepositoryRegistry {
 		}
 		this._stores.clear();
 	}
+
+	async dispose(): Promise<void> {
+		await this.closeAll();
+	}
 }

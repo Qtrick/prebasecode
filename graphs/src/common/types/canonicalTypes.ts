@@ -85,4 +85,5 @@ export interface CanonicalAnalysisOptions {
 	readonly includeFolders?: boolean;
 	readonly includeFunctions?: boolean;
 	readonly respectGitIgnore?: boolean;
+	readonly parseArtifactCache?: import('../../core/canonical/parseArtifactCache.js').ICanonicalParseArtifactCache;
 }

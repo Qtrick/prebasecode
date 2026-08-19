@@ -200,12 +200,27 @@ export class NodeGitHistoryService implements IGitHistoryService {
 			// No remote configured
 		}
 
+		let objectFormat: 'sha1' | 'sha256' = 'sha1';
+		try {
+			const formatRes = await this._exec({
+				cwd: rootPath,
+				args: ['rev-parse', '--show-object-format'],
+				token,
+			});
+			if (formatRes.exitCode === 0 && formatRes.stdout.trim() === 'sha256') {
+				objectFormat = 'sha256';
+			}
+		} catch {
+			objectFormat = 'sha1';
+		}
+
 		return {
 			repositoryId: topLevel,
 			rootPath: topLevel,
 			gitDir,
 			commonGitDir,
 			remoteUrl,
+			objectFormat,
 		};
 	}
 

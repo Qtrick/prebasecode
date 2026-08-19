@@ -6,6 +6,7 @@ import assert from 'node:assert';
 import { suite, test } from 'mocha';
 import { BlobAnalysisCache } from '../../temporal/analysis/blobAnalysisCache.js';
 import { IncrementalGraphAnalyzer } from '../../temporal/analysis/incrementalGraphAnalyzer.js';
+import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
 import type { IRepositoryContentSource, ScannedFileInventory } from '../../core/canonical/contentSource.js';
 import { isTemporalError } from '../../temporal/common/temporalErrors.js';
 import { computeAnalysisCacheKey } from '../../temporal/common/temporalVersioning.js';
@@ -44,45 +45,39 @@ class MockContentSource implements IRepositoryContentSource {
 
 suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
 	test('BlobAnalysisCache tracks hits, misses, and enforces capacity eviction', () => {
-		const cache = new BlobAnalysisCache(2);
+		const cache = new BlobAnalysisCache(2, 1, 1);
 
-		cache.set({
-			blobOid: 'blob1',
-			analyzerVersion: 1,
-			profileVersion: 1,
-			language: 'ts',
-			nodeData: { id: '1', kind: 'file', label: '1', path: '1.ts' },
-			outgoingEdges: [],
-			analyzedAt: 1,
+		cache.set('blob1', '.ts', {
+			imports: [],
+			exports: [{ name: 'a' }],
+			functions: [],
+			components: [],
+			isComponentFile: false,
 		});
 
-		cache.set({
-			blobOid: 'blob2',
-			analyzerVersion: 1,
-			profileVersion: 1,
-			language: 'ts',
-			nodeData: { id: '2', kind: 'file', label: '2', path: '2.ts' },
-			outgoingEdges: [],
-			analyzedAt: 2,
+		cache.set('blob2', '.ts', {
+			imports: [],
+			exports: [{ name: 'b' }],
+			functions: [],
+			components: [],
+			isComponentFile: false,
 		});
 
-		assert.ok(cache.get('blob1', 1, 1, 'ts'));
+		assert.ok(cache.get('blob1', '.ts'));
 		assert.strictEqual(cache.getStats().hits, 1);
 
-		// Insert 3rd entry -> evicts blob2 because blob1 was recently read
-		cache.set({
-			blobOid: 'blob3',
-			analyzerVersion: 1,
-			profileVersion: 1,
-			language: 'ts',
-			nodeData: { id: '3', kind: 'file', label: '3', path: '3.ts' },
-			outgoingEdges: [],
-			analyzedAt: 3,
+		// Insert 3rd entry -> evicts blob2 because blob1 was recently accessed
+		cache.set('blob3', '.ts', {
+			imports: [],
+			exports: [{ name: 'c' }],
+			functions: [],
+			components: [],
+			isComponentFile: false,
 		});
 
-		assert.ok(cache.get('blob1', 1, 1, 'ts')); // Still present
-		assert.strictEqual(cache.get('blob2', 1, 1, 'ts'), undefined); // Evicted
-		assert.ok(cache.get('blob3', 1, 1, 'ts'));
+		assert.ok(cache.get('blob1', '.ts')); // Still present
+		assert.strictEqual(cache.get('blob2', '.ts'), undefined); // Evicted
+		assert.ok(cache.get('blob3', '.ts'));
 	});
 
 	test('computeAnalysisCacheKey fails closed on invalid versions', () => {
@@ -95,14 +90,43 @@ suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
 		}, (err: any) => isTemporalError(err) && err.code === 'InvalidVersion');
 	});
 
-	test('IncrementalGraphAnalyzer reuses blob cache on commit transitions', async () => {
+	test('IncrementalGraphAnalyzer produces identical structural truth to CanonicalGraphAnalyzer', async () => {
 		const cache = new BlobAnalysisCache();
 		const analyzer = new IncrementalGraphAnalyzer({}, cache);
 
-		// Commit 1: files A and B
+		const source = new MockContentSource({
+			'src/presentation/app.tsx': {
+				content: 'import { UserService } from "../services/userService"; export function App() { return <div />; }',
+				blobOid: 'blob_app',
+			},
+			'src/services/userService.ts': {
+				content: 'export class UserService { getUser() { return { id: 1 }; } }',
+				blobOid: 'blob_service',
+			},
+		});
+
+		const directCanonicalAnalyzer = new CanonicalGraphAnalyzer();
+		const directCanonicalSnapshot = await directCanonicalAnalyzer.analyze(source);
+		assert.ok(directCanonicalSnapshot);
+
+		const incrementalOutput = await analyzer.analyzeCommit({
+			commitSha: 'commit_1',
+			contentSource: source,
+		});
+
+		assert.strictEqual(incrementalOutput.snapshot.graphData.nodes.length, directCanonicalSnapshot.nodes.length);
+		assert.strictEqual(incrementalOutput.snapshot.graphData.edges.length, directCanonicalSnapshot.edges.length);
+		assert.strictEqual(incrementalOutput.snapshot.digest, directCanonicalSnapshot.digest);
+	});
+
+	test('IncrementalGraphAnalyzer reuses blob cache and handles path-independent renames', async () => {
+		const cache = new BlobAnalysisCache();
+		const analyzer = new IncrementalGraphAnalyzer({}, cache);
+
+		// Commit 1
 		const source1 = new MockContentSource({
-			'src/a.ts': { content: 'import { b } from "./b"; export const a = 1;', blobOid: 'oid_a1' },
-			'src/b.ts': { content: 'export const b = 2;', blobOid: 'oid_b1' },
+			'src/shared.ts': { content: 'export const shared = 42;', blobOid: 'blob_shared' },
+			'src/main.ts': { content: 'import { shared } from "./shared"; export const main = 1;', blobOid: 'blob_main1' },
 		});
 
 		const out1 = await analyzer.analyzeCommit({
@@ -111,15 +135,12 @@ suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
 		});
 
 		assert.strictEqual(out1.snapshot.entityMap.size, 2);
-		assert.strictEqual(out1.snapshot.edgeMap.size, 1);
 		assert.strictEqual(cache.getStats().hits, 0);
-		assert.strictEqual(cache.getStats().misses, 2);
 
-		// Commit 2: file A unchanged (oid_a1), file B modified (oid_b2), file C added (oid_c1)
+		// Commit 2: shared.ts copied/renamed to util.ts with identical blob_shared
 		const source2 = new MockContentSource({
-			'src/a.ts': { content: 'import { b } from "./b"; export const a = 1;', blobOid: 'oid_a1' },
-			'src/b.ts': { content: 'export const b = 3; export const bExtra = 4;', blobOid: 'oid_b2' },
-			'src/c.ts': { content: 'export const c = 5;', blobOid: 'oid_c1' },
+			'src/util.ts': { content: 'export const shared = 42;', blobOid: 'blob_shared' },
+			'src/main.ts': { content: 'import { shared } from "./util"; export const main = 2;', blobOid: 'blob_main2' },
 		});
 
 		const out2 = await analyzer.analyzeCommit({
@@ -128,11 +149,38 @@ suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
 			parentSnapshot: out1.snapshot,
 		});
 
-		assert.strictEqual(out2.snapshot.entityMap.size, 3);
-		// File A was a cache hit!
+		// Blob shared was a cache hit, and materialized with path src/util.ts!
 		assert.ok(cache.getStats().hits >= 1);
-		assert.ok(out2.delta);
-		assert.strictEqual(out2.delta!.entitiesAdded.length, 1);
-		assert.strictEqual(out2.delta!.entitiesModified.length, 1);
+		const utilNode = out2.snapshot.graphData.nodes.find(n => n.path === 'src/util.ts');
+		assert.ok(utilNode);
+		assert.strictEqual(utilNode.path, 'src/util.ts');
+	});
+
+	test('Identical structural state detection on comment-only change', async () => {
+		const cache = new BlobAnalysisCache();
+		const analyzer = new IncrementalGraphAnalyzer({}, cache);
+
+		const source1 = new MockContentSource({
+			'src/a.ts': { content: 'export const a = 1;', blobOid: 'blob_a1' },
+		});
+
+		const out1 = await analyzer.analyzeCommit({
+			commitSha: 'c1',
+			contentSource: source1,
+		});
+
+		// Commit 2: only comments added, AST is structurally equivalent
+		const source2 = new MockContentSource({
+			'src/a.ts': { content: '// Documentation comment\nexport const a = 1;', blobOid: 'blob_a2' },
+		});
+
+		const out2 = await analyzer.analyzeCommit({
+			commitSha: 'c2',
+			contentSource: source2,
+			parentSnapshot: out1.snapshot,
+		});
+
+		assert.strictEqual(out2.isIdenticalToParent, true);
+		assert.strictEqual(out1.snapshot.digest, out2.snapshot.digest);
 	});
 });
