@@ -23,6 +23,9 @@ import { CanonicalQueryIndex, type AdjacentEdgeInfo } from '../../core/query/can
 import type { NetworkLayoutMode } from '../../layouts/network/index.js';
 import { basename } from '../../core/resolution/paths.js';
 import type { GraphNode, GraphSnapshot, LayoutMode } from '../../common/types/graphTypes.js';
+import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
+import { WorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
+import { IGitService } from '../../../../git/common/gitService.js';
 
 export type PreBaseGraphType = 'network';
 
@@ -126,17 +129,23 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		status: 'idle'
 	};
 
+	private _gitHistoryService: WorkbenchGitHistoryService | undefined;
+
 	constructor(
 		@IFileService private readonly fileService: IFileService,
 		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@IOutputService private readonly outputService: IOutputService,
+		@IGitService private readonly gitService: IGitService,
 	) {
 		super();
 		this._viewState = {
 			graphType: 'network',
 			layoutMode: 'hierarchy'
 		};
+		if (this.gitService) {
+			this._gitHistoryService = new WorkbenchGitHistoryService(this.gitService as any);
+		}
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphHideLowImportance) ||
@@ -564,9 +573,34 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		return enriched;
 	}
 
-	async buildCanonicalGraphAtRef(_ref: string, _token?: CancellationToken): Promise<CanonicalGraphSnapshot | undefined> {
-		// Historical Git graph analysis in workbench delegates to Git extension host in Phase 2
-		return undefined;
+	async buildCanonicalGraphAtRef(ref: string, token?: CancellationToken): Promise<CanonicalGraphSnapshot | undefined> {
+		if (!this._gitHistoryService) {
+			this._log(localize('prebase.graph.noGit', "Git history service is not available."));
+			return undefined;
+		}
+		const folder = this.workspaceService.getWorkspace().folders[0];
+		if (!folder) {
+			return undefined;
+		}
+		const rootPath = folder.uri.fsPath || folder.uri.path;
+		const limits = this._scanLimits();
+		const analyzer = new CanonicalGraphAnalyzer({
+			maxCanonicalFiles: limits.maxCanonicalFiles,
+			maxFileSizeBytes: limits.maxFileSizeBytes,
+		});
+
+		try {
+			const commitSha = await this._gitHistoryService.resolveRef(rootPath, ref, token);
+			const source = new GitTreeContentSource(this._gitHistoryService, rootPath, commitSha, {
+				maxScanFiles: limits.maxCanonicalFiles,
+				maxFileSizeBytes: limits.maxFileSizeBytes,
+				projectName: folder.name,
+			});
+			return await analyzer.analyze(source, token);
+		} catch (err: any) {
+			this._log(localize('prebase.graph.historicalAnalysisFailed', "Historical graph analysis failed for ref {0}: {1}", ref, err?.message || String(err)));
+			return undefined;
+		}
 	}
 
 	async compareCanonicalGraphRefs(refA: string, refB: string, token?: CancellationToken): Promise<{ diff: CanonicalGraphDiff; snapshotA: CanonicalGraphSnapshot; snapshotB: CanonicalGraphSnapshot } | undefined> {
@@ -632,25 +666,31 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		return enriched;
 	}
 
-	private _scanLimits(): { maxNodes: number; maxEdges: number } {
+	private _scanLimits(): { maxNodes: number; maxEdges: number; maxCanonicalFiles: number; maxFileSizeBytes: number } {
 		const quality = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphQuality) || 'auto';
 		const configuredNodes = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphMaxRenderedNodes) || 280;
 		const configuredEdges = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphMaxRenderedEdges) || 420;
 		if (quality === 'performance') {
 			return {
 				maxNodes: Math.min(180, configuredNodes),
-				maxEdges: Math.min(280, configuredEdges)
+				maxEdges: Math.min(280, configuredEdges),
+				maxCanonicalFiles: 5_000,
+				maxFileSizeBytes: 300_000,
 			};
 		}
 		if (quality === 'quality') {
 			return {
 				maxNodes: configuredNodes,
-				maxEdges: configuredEdges
+				maxEdges: configuredEdges,
+				maxCanonicalFiles: 20_000,
+				maxFileSizeBytes: 1_000_000,
 			};
 		}
 		return {
 			maxNodes: Math.min(280, configuredNodes),
-			maxEdges: Math.min(420, configuredEdges)
+			maxEdges: Math.min(420, configuredEdges),
+			maxCanonicalFiles: 10_000,
+			maxFileSizeBytes: 500_000,
 		};
 	}
 

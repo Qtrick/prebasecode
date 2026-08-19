@@ -3,8 +3,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 /**
- * Pure TypeScript SHA-256 implementation.
- * Zero external dependencies. Works identically across Browser, Node, and Web Workers.
+ * Pure TypeScript SHA-256 implementation conforming to FIPS 180-4.
+ * Zero external dependencies. Operates identically across Browser, Node, and Web Workers.
  */
 
 const K = new Uint32Array([
@@ -53,7 +53,7 @@ export function computePureSha256(input: string): string {
 	const bytes = encodeUtf8(input);
 	const bitLength = bytes.length * 8;
 
-	// Length with padding: 1 byte (0x80) + padding bytes + 8 bytes length
+	// Length with padding: 1 byte (0x80) + k zero bytes + 8 bytes length = multiple of 64 bytes
 	const paddedLength = (((bytes.length + 8) >> 6) + 1) << 6;
 	const buffer = new Uint8Array(paddedLength);
 	buffer.set(bytes);
@@ -84,7 +84,7 @@ export function computePureSha256(input: string): string {
 		for (let t = 16; t < 64; t++) {
 			const s0 = rotr(7, w[t - 15]) ^ rotr(18, w[t - 15]) ^ (w[t - 15] >>> 3);
 			const s1 = rotr(17, w[t - 2]) ^ rotr(19, w[t - 2]) ^ (w[t - 2] >>> 10);
-			w[t] = (((w[t - 16] + s0) | 0) + ((w[t - 7] + s1) | 0)) | 0;
+			w[t] = (w[t - 16] + s0 + w[t - 7] + s1) | 0;
 		}
 
 		let a = h0;
@@ -99,7 +99,7 @@ export function computePureSha256(input: string): string {
 		for (let t = 0; t < 64; t++) {
 			const s1 = rotr(6, e) ^ rotr(11, e) ^ rotr(25, e);
 			const ch = (e & f) ^ (~e & g);
-			const temp1 = ((((h + s1) | 0) + ((ch + K[t]) | 0)) | 0 + w[t]) | 0;
+			const temp1 = (h + s1 + ch + K[t] + w[t]) | 0;
 			const s0 = rotr(2, a) ^ rotr(13, a) ^ rotr(22, a);
 			const maj = (a & b) ^ (a & c) ^ (b & c);
 			const temp2 = (s0 + maj) | 0;

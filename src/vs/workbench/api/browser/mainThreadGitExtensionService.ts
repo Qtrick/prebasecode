@@ -9,7 +9,7 @@ import { ResourceMap } from '../../../base/common/map.js';
 import { waitForState } from '../../../base/common/observable.js';
 import { URI } from '../../../base/common/uri.js';
 import { GitRepository } from '../../contrib/git/browser/gitService.js';
-import { IGitExtensionDelegate, IGitService, GitRef, GitRefQuery, GitRefType, GitRepositoryState, GitBranch, GitChange, GitDiffChange, IGitRepository } from '../../contrib/git/common/gitService.js';
+import { IGitExtensionDelegate, IGitService, GitRef, GitRefQuery, GitRefType, GitRepositoryState, GitBranch, GitChange, GitDiffChange, IGitRepository, GitCommitMetadata, GitTreeEntry, GitExactDiffResult, GitLogOptions } from '../../contrib/git/common/gitService.js';
 import { extHostNamedCustomer, IExtHostContext } from '../../services/extensions/common/extHostCustomers.js';
 import { ExtHostContext, ExtHostGitExtensionShape, GitDiffChangeDto, GitRefTypeDto, GitRepositoryStateDto, MainContext, MainThreadGitExtensionShape } from '../common/extHost.protocol.js';
 
@@ -160,6 +160,110 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 
 		const result = await this._proxy.$diffBetweenWithStats2(handle, ref, path);
 		return result.map(toGitDiffChange);
+	}
+
+	async resolveCommitRef(root: URI, ref: string, token?: CancellationToken): Promise<string> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			throw new Error(`Repository not found for root: ${root.toString()}`);
+		}
+		const result = await this._proxy.$resolveCommitRef(handle, ref, token);
+		if (!result.success || !result.data) {
+			throw new Error(result.error?.message || `Failed to resolve commit ref '${ref}'`);
+		}
+		return result.data;
+	}
+
+	async getCommitDetails(root: URI, ref: string, token?: CancellationToken): Promise<GitCommitMetadata> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			throw new Error(`Repository not found for root: ${root.toString()}`);
+		}
+		const result = await this._proxy.$getCommitDetails(handle, ref, token);
+		if (!result.success || !result.data) {
+			throw new Error(result.error?.message || `Failed to get commit details for '${ref}'`);
+		}
+		return result.data;
+	}
+
+	async getCommitLog(root: URI, options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			return [];
+		}
+		const result = await this._proxy.$getCommitLog(handle, options, token);
+		if (!result.success || !result.data) {
+			throw new Error(result.error?.message || 'Failed to get commit log');
+		}
+		return result.data;
+	}
+
+	async listTreeEntries(root: URI, ref: string, token?: CancellationToken): Promise<GitTreeEntry[]> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			return [];
+		}
+		const result = await this._proxy.$listTreeEntries(handle, ref, token);
+		if (!result.success || !result.data) {
+			throw new Error(result.error?.message || `Failed to list tree entries for '${ref}'`);
+		}
+		return result.data;
+	}
+
+	async readBlobContent(root: URI, ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			throw new Error(`Repository not found for root: ${root.toString()}`);
+		}
+		const result = await this._proxy.$readBlobContent(handle, ref, path, maxBytes, token);
+		if (!result.success || result.data === undefined) {
+			throw new Error(result.error?.message || `Failed to read blob at '${ref}:${path}'`);
+		}
+		return result.data;
+	}
+
+	async diffExactTrees(root: URI, refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			throw new Error(`Repository not found for root: ${root.toString()}`);
+		}
+		const result = await this._proxy.$diffExactTrees(handle, refA, refB, token);
+		if (!result.success || !result.data) {
+			throw new Error(result.error?.message || `Failed to diff ${refA}..${refB}`);
+		}
+		return result.data;
+	}
+
+	async diffCommitToParent(root: URI, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			throw new Error(`Repository not found for root: ${root.toString()}`);
+		}
+		const result = await this._proxy.$diffCommitToParent(handle, commitRef, parentIndex, token);
+		if (!result.success || !result.data) {
+			throw new Error(result.error?.message || `Failed to diff commit '${commitRef}' to parent`);
+		}
+		return result.data;
+	}
+
+	async diffReviewRange(root: URI, baseRef: string, headRef: string, token?: CancellationToken): Promise<GitExactDiffResult> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			throw new Error(`Repository not found for root: ${root.toString()}`);
+		}
+		const result = await this._proxy.$diffReviewRange(handle, baseRef, headRef, token);
+		if (!result.success || !result.data) {
+			throw new Error(result.error?.message || `Failed to diff review range ${baseRef}...${headRef}`);
+		}
+		return result.data;
+	}
+
+	async checkIgnore(root: URI, paths: string[]): Promise<string[]> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			return [];
+		}
+		return this._proxy.$checkIgnore(handle, paths);
 	}
 
 	async $onDidChangeRepository(handle: number): Promise<void> {

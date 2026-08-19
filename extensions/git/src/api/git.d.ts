@@ -252,6 +252,7 @@ export interface Repository {
 	getGlobalConfig(key: string): Promise<string>;
 
 	getObjectDetails(treeish: string, path: string): Promise<{ mode: string, object: string, size: number }>;
+	getObjectFiles(ref: string, options?: { recursive?: boolean; path?: string }): Promise<{ mode: string; type: string; object: string; size: string; file: string }[]>;
 	detectObjectType(object: string): Promise<{ mimetype: string, encoding?: string }>;
 	buffer(ref: string, path: string): Promise<Buffer>;
 	show(ref: string, path: string): Promise<string>;

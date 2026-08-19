@@ -11,12 +11,20 @@ export interface CancellationTokenLike {
 	readonly isCancellationRequested: boolean;
 }
 
+export interface ScannedFileInventory {
+	readonly files: readonly ScannedFile[];
+	readonly isTruncated: boolean;
+	readonly discoveredCount: number;
+	readonly eligibleCount: number;
+	readonly truncationReason?: string;
+}
+
 export interface IRepositoryContentSource {
 	readonly kind: 'working-tree' | 'git-tree';
 	readonly identity: string;
 	readonly rootPath: string;
 	readonly projectName?: string;
-	listFiles(token?: CancellationTokenLike): Promise<ScannedFile[]>;
+	listFiles(token?: CancellationTokenLike): Promise<ScannedFileInventory>;
 	readFile(relativePath: string, token?: CancellationTokenLike): Promise<string | undefined>;
 	getFileSize?(relativePath: string): Promise<number | undefined>;
 	getContentIdentity?(relativePath: string): Promise<string | undefined>;
@@ -33,6 +41,7 @@ export interface WorkingTreeContentSourceOptions {
 	readonly maxScanFiles?: number;
 	readonly respectGitIgnore?: boolean;
 	readonly customIgnorePatterns?: readonly string[];
+	readonly checkIgnore?: (paths: string[]) => Promise<Set<string>>;
 	readonly fileOps: WorkingTreeFileOps;
 	readonly projectName?: string;
 }
@@ -45,6 +54,7 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 	private readonly _maxScanFiles: number;
 	private readonly _respectGitIgnore: boolean;
 	private readonly _customIgnorePatterns: readonly string[];
+	private readonly _checkIgnore?: (paths: string[]) => Promise<Set<string>>;
 	private readonly _fileOps: WorkingTreeFileOps;
 
 	constructor(rootPath: string, options: WorkingTreeContentSourceOptions) {
@@ -54,18 +64,19 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 		this._maxScanFiles = options.maxScanFiles ?? 10_000;
 		this._respectGitIgnore = options.respectGitIgnore !== false;
 		this._customIgnorePatterns = options.customIgnorePatterns ?? [];
+		this._checkIgnore = options.checkIgnore;
 		this._fileOps = options.fileOps;
 	}
 
-	async listFiles(token?: CancellationTokenLike): Promise<ScannedFile[]> {
+	async listFiles(token?: CancellationTokenLike): Promise<ScannedFileInventory> {
 		if (!this._fileOps.readDirectory) {
-			return [];
+			return { files: [], isTruncated: false, discoveredCount: 0, eligibleCount: 0 };
 		}
 
 		const files: ScannedFile[] = [];
 		let ignorePatterns = [...DEFAULT_IGNORE_PATTERNS, ...this._customIgnorePatterns];
 
-		if (this._respectGitIgnore) {
+		if (this._respectGitIgnore && !this._checkIgnore) {
 			try {
 				const gitignorePath = `${this.rootPath}/.gitignore`;
 				const content = await this._fileOps.readFile(gitignorePath);
@@ -80,8 +91,10 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 		}
 
 		const queue: string[] = [this.rootPath];
+		let isTruncated = false;
+		let discoveredCount = 0;
 
-		for (let queueIndex = 0; queueIndex < queue.length && files.length < this._maxScanFiles; queueIndex++) {
+		for (let queueIndex = 0; queueIndex < queue.length; queueIndex++) {
 			if (token?.isCancellationRequested) {
 				break;
 			}
@@ -93,14 +106,16 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 				continue;
 			}
 
+			const candidatePaths: Array<{ fullPath: string; relPath: string; name: string; ext: string }> = [];
+
 			for (const entry of entries) {
-				if (files.length >= this._maxScanFiles || token?.isCancellationRequested) {
+				if (token?.isCancellationRequested) {
 					break;
 				}
 				const fullPath = `${currentDir}/${entry.name}`;
 				const relPath = normalizePath(fullPath.slice(this.rootPath.length + 1));
 
-				if (this._isIgnored(relPath, entry.isDirectory, ignorePatterns)) {
+				if (this._isPatternIgnored(relPath, entry.isDirectory, ignorePatterns)) {
 					continue;
 				}
 
@@ -113,17 +128,61 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 					continue;
 				}
 
+				discoveredCount++;
+
+				if (files.length >= this._maxScanFiles) {
+					isTruncated = true;
+					continue;
+				}
+
 				const name = basename(relPath);
 				const ext = name.includes('.') ? `.${name.split('.').pop()!.toLowerCase()}` : '';
-				files.push({
-					absolutePath: fullPath,
-					relativePath: relPath,
-					extension: ext
-				});
+				candidatePaths.push({ fullPath, relPath, name, ext });
+			}
+
+			if (this._checkIgnore && candidatePaths.length > 0) {
+				let ignoredSet: Set<string>;
+				try {
+					ignoredSet = await this._checkIgnore(candidatePaths.map(c => c.relPath));
+				} catch {
+					ignoredSet = new Set();
+				}
+				for (const cand of candidatePaths) {
+					if (ignoredSet.has(cand.relPath)) {
+						continue;
+					}
+					if (files.length < this._maxScanFiles) {
+						files.push({
+							absolutePath: cand.fullPath,
+							relativePath: cand.relPath,
+							extension: cand.ext,
+						});
+					} else {
+						isTruncated = true;
+					}
+				}
+			} else {
+				for (const cand of candidatePaths) {
+					if (files.length < this._maxScanFiles) {
+						files.push({
+							absolutePath: cand.fullPath,
+							relativePath: cand.relPath,
+							extension: cand.ext,
+						});
+					} else {
+						isTruncated = true;
+					}
+				}
 			}
 		}
 
-		return files;
+		return {
+			files,
+			isTruncated,
+			discoveredCount,
+			eligibleCount: files.length,
+			truncationReason: isTruncated ? `Exceeded maxScanFiles limit of ${this._maxScanFiles}` : undefined,
+		};
 	}
 
 	async readFile(relativePath: string, _token?: CancellationTokenLike): Promise<string | undefined> {
@@ -162,7 +221,7 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 		}
 	}
 
-	private _isIgnored(relativePath: string, isDirectory: boolean, patterns: string[]): boolean {
+	private _isPatternIgnored(relativePath: string, isDirectory: boolean, patterns: string[]): boolean {
 		const clean = relativePath.replace(/^\/+/, '');
 		const segments = clean.split('/');
 		for (const rawPattern of patterns) {

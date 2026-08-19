@@ -49,12 +49,13 @@ export class CanonicalGraphAnalyzer {
 			return undefined;
 		}
 
-		const rawFiles = await contentSource.listFiles(token);
+		const inventory = await contentSource.listFiles(token);
 		if (token?.isCancellationRequested) {
 			return undefined;
 		}
 
-		const isTruncated = rawFiles.length > this._maxCanonicalFiles;
+		const rawFiles = inventory.files;
+		const isTruncated = inventory.isTruncated || rawFiles.length > this._maxCanonicalFiles;
 		const files = rawFiles.slice(0, this._maxCanonicalFiles);
 
 		const exclusionBreakdown: Record<CanonicalExclusionCode, number> = {
@@ -128,6 +129,18 @@ export class CanonicalGraphAnalyzer {
 		const entryNodeId = detectEntryNodeId(contentSource.rootPath, partial.nodes, partial.edges, packageMain);
 		const layeredNodes = assignLayersToNodes(partial.nodes, entryNodeId);
 
+		// Populate architectureLayer in analysis manifest entries
+		const nodeLayerMap = new Map<string, string>();
+		for (const node of layeredNodes) {
+			if (node.path && node.meta?.architectureLayer) {
+				nodeLayerMap.set(node.path, node.meta.architectureLayer);
+			}
+		}
+		const enrichedManifestEntries: AnalysisManifestEntry[] = manifestEntries.map(entry => ({
+			...entry,
+			architectureLayer: nodeLayerMap.get(entry.path),
+		}));
+
 		// Normalize node and edge ordering deterministically using code-unit comparator
 		const sortedNodes: GraphNode[] = [...layeredNodes].sort((a, b) => stableCompare(a.id, b.id));
 		const sortedEdges: GraphEdge[] = [...partial.edges].sort((a, b) => stableCompare(a.id, b.id));
@@ -140,25 +153,28 @@ export class CanonicalGraphAnalyzer {
 
 		const totalExcluded = Object.values(exclusionBreakdown).reduce((a, b) => a + b, 0);
 		const completeWithinProfile = !isTruncated && failedCount === 0;
+		const discoveredCount = Math.max(inventory.discoveredCount, rawFiles.length);
 
 		const coverage: CanonicalCoverage = {
 			completeWithinProfile,
 			isComplete: completeWithinProfile,
-			discoveredCount: rawFiles.length,
+			discoveredCount,
 			analyzedCount: parseResults.length,
 			analyzedFileCount: parseResults.length,
 			excludedCount: totalExcluded,
 			excludedFileCount: totalExcluded,
 			failedCount,
 			truncated: isTruncated,
-			truncationReason: isTruncated ? `Exceeded maxCanonicalFiles budget of ${this._maxCanonicalFiles}` : undefined,
+			truncationReason: isTruncated
+				? (inventory.truncationReason ?? `Exceeded maxCanonicalFiles budget of ${this._maxCanonicalFiles}`)
+				: undefined,
 			exclusionBreakdown,
 			exclusionReasons: exclusionBreakdown,
 			skippedFiles: skippedFiles.length > 0 ? skippedFiles : undefined,
 		};
 
 		const manifest: AnalysisManifest = {
-			entries: manifestEntries,
+			entries: enrichedManifestEntries,
 		};
 
 		return {

@@ -11,7 +11,7 @@ import { ExtensionIdentifier } from '../../../platform/extensions/common/extensi
 import { createDecorator } from '../../../platform/instantiation/common/instantiation.js';
 import { IExtHostExtensionService } from './extHostExtensionService.js';
 import { IExtHostRpcService } from './extHostRpcService.js';
-import { ExtHostGitExtensionShape, GitBranchDto, GitChangeDto, GitDiffChangeDto, GitRefDto, GitRefQueryDto, GitRefTypeDto, GitRepositoryStateDto, GitUpstreamRefDto, MainContext, MainThreadGitExtensionShape } from './extHost.protocol.js';
+import { ExtHostGitExtensionShape, GitBranchDto, GitChangeDto, GitCommitMetadataDto, GitDiffChangeDto, GitExactDiffChangeDto, GitExactDiffResultDto, GitHistoryResultDto, GitLogOptionsDto, GitRefDto, GitRefQueryDto, GitRefTypeDto, GitRepositoryStateDto, GitTreeEntryDto, GitUpstreamRefDto, MainContext, MainThreadGitExtensionShape } from './extHost.protocol.js';
 import { ResourceMap } from '../../../base/common/map.js';
 
 const GIT_EXTENSION_ID = 'vscode.git';
@@ -86,6 +86,31 @@ interface DiffChange extends Change {
 	readonly deletions: number;
 }
 
+interface Commit {
+	readonly hash: string;
+	readonly message: string;
+	readonly parents: string[];
+	readonly authorDate?: Date;
+	readonly authorName?: string;
+	readonly authorEmail?: string;
+	readonly commitDate?: Date;
+}
+
+interface LogOptions {
+	readonly maxEntries?: number;
+	readonly range?: string;
+	readonly path?: string;
+	readonly sortByAuthorDate?: boolean;
+}
+
+interface LsTreeItem {
+	readonly mode: string;
+	readonly type: string;
+	readonly object: string;
+	readonly size: string;
+	readonly file: string;
+}
+
 interface Repository {
 	readonly rootUri: vscode.Uri;
 	readonly state: RepositoryState;
@@ -93,8 +118,17 @@ interface Repository {
 	status(): Promise<void>;
 	getBranchBase(name: string): Promise<Branch | undefined>;
 	getRefs(query: GitRefQuery, token?: vscode.CancellationToken): Promise<GitRef[]>;
+	getBranches?(query: { remote?: boolean }, token?: vscode.CancellationToken): Promise<GitRef[]>;
+	getCommit?(ref: string): Promise<Commit>;
+	log?(options?: LogOptions): Promise<Commit[]>;
+	getObjectFiles?(ref: string, options?: { recursive?: boolean; path?: string }): Promise<LsTreeItem[]>;
+	show?(ref: string, path: string): Promise<string>;
+	buffer?(ref: string, path: string): Promise<Buffer>;
+	diffBetween?(ref1: string, ref2: string, path?: string): Promise<Change[]>;
 	diffBetweenWithStats(ref1: string, ref2: string, path?: string): Promise<DiffChange[]>;
 	diffBetweenWithStats2(ref: string, path?: string): Promise<DiffChange[]>;
+	getMergeBase?(ref1: string, ref2: string): Promise<string | undefined>;
+	checkIgnore?(paths: string[]): Promise<Set<string>>;
 	isBranchProtected(branch?: Branch): boolean;
 }
 
@@ -329,6 +363,245 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				insertions: c.insertions,
 				deletions: c.deletions,
 			}));
+		} catch {
+			return [];
+		}
+	}
+
+	async $resolveCommitRef(handle: number, ref: string, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<string>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		try {
+			if (typeof repository.getCommit === 'function') {
+				const commit = await repository.getCommit(ref);
+				if (!commit?.hash) {
+					return { success: false, error: { code: 'UnknownRef', message: `Ref '${ref}' could not be resolved to a commit` } };
+				}
+				return { success: true, data: commit.hash };
+			}
+			return { success: false, error: { code: 'NotSupported', message: 'getCommit is not supported on repository' } };
+		} catch (err: any) {
+			return { success: false, error: { code: 'UnknownRef', message: err?.message || `Failed to resolve ref '${ref}'` } };
+		}
+	}
+
+	async $getCommitDetails(handle: number, ref: string, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		try {
+			if (typeof repository.getCommit === 'function') {
+				const commit = await repository.getCommit(ref);
+				if (!commit) {
+					return { success: false, error: { code: 'UnknownRef', message: `Commit '${ref}' not found` } };
+				}
+				const authorDateStr = commit.authorDate ? new Date(commit.authorDate).toISOString() : new Date().toISOString();
+				const commitDateStr = commit.commitDate ? new Date(commit.commitDate).toISOString() : authorDateStr;
+				return {
+					success: true,
+					data: {
+						sha: commit.hash,
+						parents: commit.parents || [],
+						author: {
+							name: commit.authorName || '',
+							email: commit.authorEmail || '',
+							date: authorDateStr,
+						},
+						committer: {
+							name: commit.authorName || '',
+							email: commit.authorEmail || '',
+							date: commitDateStr,
+						},
+						authorTimestamp: commit.authorDate ? new Date(commit.authorDate).getTime() : Date.now(),
+						committerTimestamp: commit.commitDate ? new Date(commit.commitDate).getTime() : Date.now(),
+						message: commit.message || '',
+					}
+				};
+			}
+			return { success: false, error: { code: 'NotSupported', message: 'getCommit is not supported on repository' } };
+		} catch (err: any) {
+			return { success: false, error: { code: 'UnknownRef', message: err?.message || `Failed to get commit '${ref}'` } };
+		}
+	}
+
+	async $getCommitLog(handle: number, options: GitLogOptionsDto, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto[]>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		try {
+			if (typeof repository.log === 'function') {
+				const logOptions: LogOptions = {
+					maxEntries: options.limit,
+					range: options.ref,
+					path: options.path,
+				};
+				const commits = await repository.log(logOptions);
+				const mapped: GitCommitMetadataDto[] = (commits || []).map(commit => {
+					const authorDateStr = commit.authorDate ? new Date(commit.authorDate).toISOString() : new Date().toISOString();
+					const commitDateStr = commit.commitDate ? new Date(commit.commitDate).toISOString() : authorDateStr;
+					return {
+						sha: commit.hash,
+						parents: commit.parents || [],
+						author: {
+							name: commit.authorName || '',
+							email: commit.authorEmail || '',
+							date: authorDateStr,
+						},
+						committer: {
+							name: commit.authorName || '',
+							email: commit.authorEmail || '',
+							date: commitDateStr,
+						},
+						authorTimestamp: commit.authorDate ? new Date(commit.authorDate).getTime() : 0,
+						committerTimestamp: commit.commitDate ? new Date(commit.commitDate).getTime() : 0,
+						message: commit.message || '',
+					};
+				});
+				return { success: true, data: mapped };
+			}
+			return { success: false, error: { code: 'NotSupported', message: 'log is not supported on repository' } };
+		} catch (err: any) {
+			return { success: false, error: { code: 'ProcessFailure', message: err?.message || 'Failed to get commit log' } };
+		}
+	}
+
+	async $listTreeEntries(handle: number, ref: string, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		try {
+			if (typeof repository.getObjectFiles === 'function') {
+				const items = await repository.getObjectFiles(ref, { recursive: true });
+				const entries: GitTreeEntryDto[] = (items || []).map(item => ({
+					path: item.file,
+					objectId: item.object,
+					mode: item.mode,
+					objectType: item.type === 'blob' ? 'blob' : item.type === 'tree' ? 'tree' : item.type === 'commit' ? 'commit' : 'tag',
+					size: parseInt(item.size, 10) || undefined,
+				}));
+				return { success: true, data: entries };
+			}
+			return { success: false, error: { code: 'NotSupported', message: 'getObjectFiles is not available on repository' } };
+		} catch (err: any) {
+			return { success: false, error: { code: 'ProcessFailure', message: err?.message || `Failed to list tree for '${ref}'` } };
+		}
+	}
+
+	async $readBlobContent(handle: number, ref: string, path: string, maxBytes?: number, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<string>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		try {
+			if (maxBytes && typeof repository.buffer === 'function') {
+				const buf = await repository.buffer(ref, path);
+				if (buf.length > maxBytes) {
+					return { success: false, error: { code: 'OversizedBlob', message: `Blob size ${buf.length} exceeds limit ${maxBytes}` } };
+				}
+				return { success: true, data: buf.toString('utf8') };
+			}
+			if (typeof repository.show === 'function') {
+				const content = await repository.show(ref, path);
+				return { success: true, data: content };
+			}
+			return { success: false, error: { code: 'NotSupported', message: 'show is not supported on repository' } };
+		} catch (err: any) {
+			return { success: false, error: { code: 'ObjectUnavailable', message: err?.message || `Failed to read blob at '${ref}:${path}'` } };
+		}
+	}
+
+	async $diffExactTrees(handle: number, refA: string, refB: string, _token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		try {
+			const diffs = await repository.diffBetweenWithStats(refA, refB);
+			const rootPath = repository.rootUri.path;
+			const changes: GitExactDiffChangeDto[] = (diffs || []).map(d => {
+				let kind: 'added' | 'deleted' | 'modified' | 'renamed' | 'copied' = 'modified';
+				if (d.status === GitStatus.INDEX_ADDED || d.status === GitStatus.UNTRACKED || d.status === GitStatus.INTENT_TO_ADD) {
+					kind = 'added';
+				} else if (d.status === GitStatus.INDEX_DELETED || d.status === GitStatus.DELETED) {
+					kind = 'deleted';
+				} else if (d.status === GitStatus.INDEX_RENAMED || d.status === GitStatus.INTENT_TO_RENAME) {
+					kind = 'renamed';
+				}
+				const changeDto = toGitChangeDto(d);
+				const modifiedUri = changeDto.modifiedUri ? URI.revive(changeDto.modifiedUri) : undefined;
+				const originalUri = changeDto.originalUri ? URI.revive(changeDto.originalUri) : undefined;
+				const uri = changeDto.uri ? URI.revive(changeDto.uri) : undefined;
+				const relPath = modifiedUri ? modifiedUri.path.slice(rootPath.length + 1) : (uri ? uri.path.slice(rootPath.length + 1) : '');
+				const oldRelPath = originalUri ? originalUri.path.slice(rootPath.length + 1) : undefined;
+				return {
+					kind,
+					path: relPath,
+					oldPath: oldRelPath,
+				};
+			});
+			return { success: true, data: { fromRef: refA, toRef: refB, changes } };
+		} catch (err: any) {
+			return { success: false, error: { code: 'ProcessFailure', message: err?.message || `Failed to diff ${refA}..${refB}` } };
+		}
+	}
+
+	async $diffCommitToParent(handle: number, commitRef: string, parentIndex?: number, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		try {
+			if (typeof repository.getCommit === 'function') {
+				const commit = await repository.getCommit(commitRef);
+				if (!commit) {
+					return { success: false, error: { code: 'UnknownRef', message: `Commit '${commitRef}' not found` } };
+				}
+				const parents = commit.parents || [];
+				const pIndex = parentIndex ?? 0;
+				const parentRef = parents[pIndex] || '4b825dc642cb6eb9a060e54bf8d69288fbee4904'; // Empty tree SHA for root commit
+				return this.$diffExactTrees(handle, parentRef, commitRef, token);
+			}
+			return { success: false, error: { code: 'NotSupported', message: 'getCommit is not supported on repository' } };
+		} catch (err: any) {
+			return { success: false, error: { code: 'ProcessFailure', message: err?.message || `Failed to diff commit '${commitRef}' to parent` } };
+		}
+	}
+
+	async $diffReviewRange(handle: number, baseRef: string, headRef: string, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		try {
+			let fromRef = baseRef;
+			if (typeof repository.getMergeBase === 'function') {
+				const mergeBase = await repository.getMergeBase(baseRef, headRef);
+				if (mergeBase) {
+					fromRef = mergeBase;
+				}
+			}
+			return this.$diffExactTrees(handle, fromRef, headRef, token);
+		} catch (err: any) {
+			return { success: false, error: { code: 'ProcessFailure', message: err?.message || `Failed to diff review range ${baseRef}...${headRef}` } };
+		}
+	}
+
+	async $checkIgnore(handle: number, paths: string[]): Promise<string[]> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return [];
+		}
+		try {
+			if (typeof repository.checkIgnore === 'function') {
+				const set = await repository.checkIgnore(paths);
+				return Array.from(set || []);
+			}
+			return [];
 		} catch {
 			return [];
 		}

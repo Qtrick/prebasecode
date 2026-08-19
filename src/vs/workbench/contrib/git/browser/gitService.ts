@@ -7,7 +7,7 @@ import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { BugIndicatingError } from '../../../../base/common/errors.js';
 import { Disposable, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { URI } from '../../../../base/common/uri.js';
-import { IGitService, IGitExtensionDelegate, GitRef, GitRefQuery, IGitRepository, GitRepositoryState, GitDiffChange } from '../common/gitService.js';
+import { IGitService, IGitExtensionDelegate, GitRef, GitRefQuery, IGitRepository, GitRepositoryState, GitDiffChange, GitCommitMetadata, GitTreeEntry, GitExactDiffResult, GitLogOptions } from '../common/gitService.js';
 import { ISettableObservable, observableValueOpts } from '../../../../base/common/observable.js';
 import { structuralEquals } from '../../../../base/common/equals.js';
 import { AutoOpenBarrier } from '../../../../base/common/async.js';
@@ -88,5 +88,68 @@ export class GitRepository extends Disposable implements IGitRepository {
 
 	async diffBetweenWithStats2(ref: string, path?: string): Promise<GitDiffChange[]> {
 		return this.delegate.diffBetweenWithStats2(this.rootUri, ref, path);
+	}
+
+	async resolveCommitRef(ref: string, token?: CancellationToken): Promise<string> {
+		if (this.delegate.resolveCommitRef) {
+			return this.delegate.resolveCommitRef(this.rootUri, ref, token);
+		}
+		throw new Error('resolveCommitRef is not supported by delegate');
+	}
+
+	async getCommitDetails(ref: string, token?: CancellationToken): Promise<GitCommitMetadata> {
+		if (this.delegate.getCommitDetails) {
+			return this.delegate.getCommitDetails(this.rootUri, ref, token);
+		}
+		throw new Error('getCommitDetails is not supported by delegate');
+	}
+
+	async getCommitLog(options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]> {
+		if (this.delegate.getCommitLog) {
+			return this.delegate.getCommitLog(this.rootUri, options, token);
+		}
+		throw new Error('getCommitLog is not supported by delegate');
+	}
+
+	async listTreeEntries(ref: string, token?: CancellationToken): Promise<GitTreeEntry[]> {
+		if (this.delegate.listTreeEntries) {
+			return this.delegate.listTreeEntries(this.rootUri, ref, token);
+		}
+		throw new Error('listTreeEntries is not supported by delegate');
+	}
+
+	async readBlobContent(ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string> {
+		if (this.delegate.readBlobContent) {
+			return this.delegate.readBlobContent(this.rootUri, ref, path, maxBytes, token);
+		}
+		throw new Error('readBlobContent is not supported by delegate');
+	}
+
+	async diffExactTrees(refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult> {
+		if (this.delegate.diffExactTrees) {
+			return this.delegate.diffExactTrees(this.rootUri, refA, refB, token);
+		}
+		throw new Error('diffExactTrees is not supported by delegate');
+	}
+
+	async diffCommitToParent(commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult> {
+		if (this.delegate.diffCommitToParent) {
+			return this.delegate.diffCommitToParent(this.rootUri, commitRef, parentIndex, token);
+		}
+		throw new Error('diffCommitToParent is not supported by delegate');
+	}
+
+	async diffReviewRange(baseRef: string, headRef: string, token?: CancellationToken): Promise<GitExactDiffResult> {
+		if (this.delegate.diffReviewRange) {
+			return this.delegate.diffReviewRange(this.rootUri, baseRef, headRef, token);
+		}
+		throw new Error('diffReviewRange is not supported by delegate');
+	}
+
+	async checkIgnore(paths: string[]): Promise<string[]> {
+		if (this.delegate.checkIgnore) {
+			return this.delegate.checkIgnore(this.rootUri, paths);
+		}
+		return [];
 	}
 }

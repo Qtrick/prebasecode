@@ -3,7 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { ScannedFile } from '../../common/types/graphTypes.js';
-import type { CancellationTokenLike, IRepositoryContentSource } from '../../core/canonical/contentSource.js';
+import type { CancellationTokenLike, IRepositoryContentSource, ScannedFileInventory } from '../../core/canonical/contentSource.js';
 import { DEFAULT_IGNORE_PATTERNS } from '../../core/scanning/ignorePatterns.js';
 import { isGraphRelevantFile } from '../../core/scanning/projectFiles.js';
 import { basename, normalizePath } from '../../core/resolution/paths.js';
@@ -42,13 +42,15 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 		this._maxFileSizeBytes = options.maxFileSizeBytes ?? 500_000;
 	}
 
-	async listFiles(token?: CancellationTokenLike): Promise<ScannedFile[]> {
+	async listFiles(token?: CancellationTokenLike): Promise<ScannedFileInventory> {
 		const treeEntries = await this._gitService.listTree(this.rootPath, this.commitSha, token);
 		const files: ScannedFile[] = [];
 		const entriesMap = new Map<string, GitTreeEntry>();
+		let isTruncated = false;
+		let discoveredCount = 0;
 
 		for (const entry of treeEntries) {
-			if (files.length >= this._maxScanFiles || token?.isCancellationRequested) {
+			if (token?.isCancellationRequested) {
 				break;
 			}
 			if (entry.objectType !== 'blob') {
@@ -66,6 +68,13 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 				continue;
 			}
 
+			discoveredCount++;
+
+			if (files.length >= this._maxScanFiles) {
+				isTruncated = true;
+				continue;
+			}
+
 			const name = basename(relPath);
 			const ext = name.includes('.') ? `.${name.split('.').pop()!.toLowerCase()}` : '';
 			files.push({
@@ -76,7 +85,13 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 		}
 
 		this._treeEntriesMap = entriesMap;
-		return files;
+		return {
+			files,
+			isTruncated,
+			discoveredCount,
+			eligibleCount: files.length,
+			truncationReason: isTruncated ? `Exceeded maxScanFiles limit of ${this._maxScanFiles}` : undefined,
+		};
 	}
 
 	async readFile(relativePath: string, token?: CancellationTokenLike): Promise<string | undefined> {

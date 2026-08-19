@@ -104,4 +104,32 @@ export class CanonicalQueryIndex {
 		const trimmed = idOrPath.trim();
 		return this.nodeById.get(trimmed) ?? this.nodeByPath.get(trimmed);
 	}
+
+	searchNodes(query: string, limit: number = 20): Array<{ node: GraphNode; score: number }> {
+		if (!query) return [];
+		const lowerQuery = query.toLowerCase().trim();
+		const results: Array<{ node: GraphNode; score: number }> = [];
+
+		for (const node of this.snapshot.nodes) {
+			const label = (node.label || '').toLowerCase();
+			const path = (node.path || '').toLowerCase();
+			const id = (node.id || '').toLowerCase();
+
+			let score = 0;
+			if (label === lowerQuery || path === lowerQuery || id === lowerQuery) {
+				score = 100;
+			} else if (label.startsWith(lowerQuery) || path.startsWith(lowerQuery)) {
+				score = 80;
+			} else if (label.includes(lowerQuery) || path.includes(lowerQuery) || id.includes(lowerQuery)) {
+				score = 50;
+			}
+
+			if (score > 0) {
+				results.push({ node, score });
+			}
+		}
+
+		results.sort((a, b) => b.score - a.score || (a.node.id < b.node.id ? -1 : a.node.id > b.node.id ? 1 : 0));
+		return results.slice(0, limit);
+	}
 }

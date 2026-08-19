@@ -30,11 +30,13 @@ const tests = [
 	'graphs/src/tests/unit/graphOwnershipBoundary.test.ts',
 	'graphs/src/tests/unit/graphIgnoreScanning.test.ts',
 	'graphs/src/tests/unit/graphDescriptionService.test.ts',
+	'graphs/src/tests/unit/pureSha256.test.ts',
 	'graphs/src/tests/unit/canonicalGraphAnalyzer.test.ts',
 	'graphs/src/tests/unit/canonicalProjection.test.ts',
 	'graphs/src/tests/unit/canonicalGraphDiff.test.ts',
 	'graphs/src/tests/unit/canonicalQueryIndex.test.ts',
 	'graphs/src/tests/unit/gitHistoryService.test.ts',
+	'graphs/src/tests/unit/workbenchGitHistoryService.test.ts',
 	'graphs/src/tests/unit/gitTreeHistoricalAnalysis.test.ts',
 ];
 

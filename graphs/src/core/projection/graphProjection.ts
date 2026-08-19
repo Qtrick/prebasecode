@@ -118,8 +118,9 @@ export function pickLayoutNodes(
 
 	const scored = fileNodes.map(n => {
 		const imp = importanceByNode.get(n.id) ?? EmptyNodeImportance;
+		const explicitImp = typeof n.meta?.importance === 'number' ? n.meta.importance * 10 : 0;
 		const entryBoost = entryNodeId && (n.id === entryNodeId || n.isEntry) ? 1_000_000 : 0;
-		return { n, score: imp.score + entryBoost };
+		return { n, score: imp.score + explicitImp + entryBoost };
 	});
 
 	scored.sort((a, b) => b.score - a.score || stableCompare(a.n.id, b.n.id));

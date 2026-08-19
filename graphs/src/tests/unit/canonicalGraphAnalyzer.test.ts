@@ -4,7 +4,7 @@
 
 import assert from 'node:assert';
 import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
-import type { IRepositoryContentSource, CancellationTokenLike } from '../../core/canonical/contentSource.js';
+import type { IRepositoryContentSource, CancellationTokenLike, ScannedFileInventory } from '../../core/canonical/contentSource.js';
 import type { ScannedFile } from '../../common/types/graphTypes.js';
 import { computeCanonicalGraphDigest } from '../../core/canonical/canonicalGraphDigest.js';
 
@@ -14,15 +14,25 @@ class InMemoryContentSource implements IRepositoryContentSource {
 	readonly rootPath: string;
 	readonly projectName: string;
 	private readonly _files: Map<string, string>;
+	private readonly _forceTruncated: boolean;
+	private readonly _forceDiscoveredCount?: number;
 
-	constructor(rootPath: string, files: Record<string, string>, projectName = 'test-project') {
+	constructor(
+		rootPath: string,
+		files: Record<string, string>,
+		projectName = 'test-project',
+		forceTruncated = false,
+		forceDiscoveredCount?: number
+	) {
 		this.rootPath = rootPath;
 		this.projectName = projectName;
 		this.identity = `test-source:${rootPath}`;
 		this._files = new Map(Object.entries(files));
+		this._forceTruncated = forceTruncated;
+		this._forceDiscoveredCount = forceDiscoveredCount;
 	}
 
-	async listFiles(token?: CancellationTokenLike): Promise<ScannedFile[]> {
+	async listFiles(token?: CancellationTokenLike): Promise<ScannedFileInventory> {
 		const result: ScannedFile[] = [];
 		for (const relativePath of this._files.keys()) {
 			if (token?.isCancellationRequested) break;
@@ -34,7 +44,13 @@ class InMemoryContentSource implements IRepositoryContentSource {
 				extension: ext,
 			});
 		}
-		return result;
+		return {
+			files: result,
+			isTruncated: this._forceTruncated,
+			discoveredCount: this._forceDiscoveredCount ?? result.length,
+			eligibleCount: result.length,
+			truncationReason: this._forceTruncated ? 'Content source reached limit' : undefined,
+		};
 	}
 
 	async readFile(relativePath: string, token?: CancellationTokenLike): Promise<string | undefined> {
@@ -108,6 +124,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		assert.ok(headerManifest);
 		assert.strictEqual(headerManifest.isComponent, true);
 		assert.strictEqual(headerManifest.contentIdentity, 'oid:src/components/Header.tsx');
+		assert.strictEqual(headerManifest.architectureLayer, 'components');
 
 		// Digest determinism
 		const digest1 = snapshot.digest;
@@ -192,6 +209,25 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		assert.strictEqual(snapshot.coverage.truncated, true);
 		assert.strictEqual(snapshot.coverage.completeWithinProfile, false);
 		assert.ok(snapshot.coverage.truncationReason?.includes('20'));
+	});
+
+	test('truthfully propagates truncation when content source pre-truncates inventory', async () => {
+		const files: Record<string, string> = {};
+		for (let i = 0; i < 10; i++) {
+			files[`src/file${i}.ts`] = `export const f${i} = ${i};`;
+		}
+
+		// Content source returns 10 files but reports discoveredCount=15000 and isTruncated=true
+		const source = new InMemoryContentSource('/workspace', files, 'test-project', true, 15_000);
+		const analyzer = new CanonicalGraphAnalyzer({ maxCanonicalFiles: 10_000 });
+		const snapshot = await analyzer.analyze(source);
+
+		assert.ok(snapshot);
+		assert.strictEqual(snapshot.coverage.discoveredCount, 15_000);
+		assert.strictEqual(snapshot.coverage.analyzedCount, 10);
+		assert.strictEqual(snapshot.coverage.truncated, true, 'Must reflect source inventory truncation');
+		assert.strictEqual(snapshot.coverage.completeWithinProfile, false, 'Pre-truncated source cannot be completeWithinProfile');
+		assert.ok(snapshot.coverage.truncationReason?.includes('Content source reached limit'));
 	});
 
 	test('safely excludes oversized and binary files with typed exclusion breakdown', async () => {

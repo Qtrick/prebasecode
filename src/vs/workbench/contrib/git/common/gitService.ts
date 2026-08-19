@@ -73,6 +73,47 @@ export interface GitUpstreamRef {
 	readonly commit?: string;
 }
 
+export interface GitCommitMetadata {
+	readonly sha: string;
+	readonly parents: string[];
+	readonly author: { readonly name: string; readonly email: string; readonly date: string };
+	readonly committer: { readonly name: string; readonly email: string; readonly date: string };
+	readonly authorTimestamp: number;
+	readonly committerTimestamp: number;
+	readonly message: string;
+}
+
+export interface GitTreeEntry {
+	readonly path: string;
+	readonly objectId: string;
+	readonly mode: string;
+	readonly objectType: 'blob' | 'tree' | 'commit' | 'tag';
+	readonly size?: number;
+}
+
+export interface GitExactDiffChange {
+	readonly kind: 'added' | 'deleted' | 'modified' | 'renamed' | 'copied';
+	readonly path: string;
+	readonly oldPath?: string;
+	readonly similarity?: number;
+	readonly oldBlobOid?: string;
+	readonly newBlobOid?: string;
+}
+
+export interface GitExactDiffResult {
+	readonly fromRef: string;
+	readonly toRef: string;
+	readonly changes: GitExactDiffChange[];
+}
+
+export interface GitLogOptions {
+	readonly ref?: string;
+	readonly limit?: number;
+	readonly skip?: number;
+	readonly firstParent?: boolean;
+	readonly path?: string;
+}
+
 export interface IGitRepository {
 	readonly rootUri: URI;
 
@@ -82,6 +123,17 @@ export interface IGitRepository {
 	getRefs(query: GitRefQuery, token?: CancellationToken): Promise<GitRef[]>;
 	diffBetweenWithStats(ref1: string, ref2: string, path?: string): Promise<GitDiffChange[]>;
 	diffBetweenWithStats2(ref: string, path?: string): Promise<GitDiffChange[]>;
+
+	// Historical Git Bridge
+	resolveCommitRef?(ref: string, token?: CancellationToken): Promise<string>;
+	getCommitDetails?(ref: string, token?: CancellationToken): Promise<GitCommitMetadata>;
+	getCommitLog?(options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]>;
+	listTreeEntries?(ref: string, token?: CancellationToken): Promise<GitTreeEntry[]>;
+	readBlobContent?(ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string>;
+	diffExactTrees?(refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult>;
+	diffCommitToParent?(commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult>;
+	diffReviewRange?(baseRef: string, headRef: string, token?: CancellationToken): Promise<GitExactDiffResult>;
+	checkIgnore?(paths: string[]): Promise<string[]>;
 }
 
 export interface IGitExtensionDelegate {
@@ -91,6 +143,17 @@ export interface IGitExtensionDelegate {
 	getRefs(root: URI, query?: GitRefQuery, token?: CancellationToken): Promise<GitRef[]>;
 	diffBetweenWithStats(root: URI, ref1: string, ref2: string, path?: string): Promise<GitDiffChange[]>;
 	diffBetweenWithStats2(root: URI, ref: string, path?: string): Promise<GitDiffChange[]>;
+
+	// Historical Git Bridge
+	resolveCommitRef?(root: URI, ref: string, token?: CancellationToken): Promise<string>;
+	getCommitDetails?(root: URI, ref: string, token?: CancellationToken): Promise<GitCommitMetadata>;
+	getCommitLog?(root: URI, options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]>;
+	listTreeEntries?(root: URI, ref: string, token?: CancellationToken): Promise<GitTreeEntry[]>;
+	readBlobContent?(root: URI, ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string>;
+	diffExactTrees?(root: URI, refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult>;
+	diffCommitToParent?(root: URI, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult>;
+	diffReviewRange?(root: URI, baseRef: string, headRef: string, token?: CancellationToken): Promise<GitExactDiffResult>;
+	checkIgnore?(root: URI, paths: string[]): Promise<string[]>;
 }
 
 export const IGitService = createDecorator<IGitService>('gitService');

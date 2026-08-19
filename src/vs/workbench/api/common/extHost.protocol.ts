@@ -4015,6 +4015,65 @@ export interface GitUpstreamRefDto {
 	readonly commit?: string;
 }
 
+export interface GitCommitAuthorDto {
+	readonly name: string;
+	readonly email: string;
+	readonly date: string;
+}
+
+export interface GitCommitMetadataDto {
+	readonly sha: string;
+	readonly parents: string[];
+	readonly author: GitCommitAuthorDto;
+	readonly committer: GitCommitAuthorDto;
+	readonly authorTimestamp: number;
+	readonly committerTimestamp: number;
+	readonly message: string;
+}
+
+export interface GitTreeEntryDto {
+	readonly path: string;
+	readonly objectId: string;
+	readonly mode: string;
+	readonly objectType: 'blob' | 'tree' | 'commit' | 'tag';
+	readonly size?: number;
+}
+
+export interface GitExactDiffChangeDto {
+	readonly kind: 'added' | 'deleted' | 'modified' | 'renamed' | 'copied';
+	readonly path: string;
+	readonly oldPath?: string;
+	readonly similarity?: number;
+	readonly oldBlobOid?: string;
+	readonly newBlobOid?: string;
+}
+
+export interface GitExactDiffResultDto {
+	readonly fromRef: string;
+	readonly toRef: string;
+	readonly changes: GitExactDiffChangeDto[];
+}
+
+export interface GitHistoryErrorDto {
+	readonly code: string;
+	readonly message: string;
+	readonly details?: string;
+}
+
+export interface GitHistoryResultDto<T> {
+	readonly success: boolean;
+	readonly data?: T;
+	readonly error?: GitHistoryErrorDto;
+}
+
+export interface GitLogOptionsDto {
+	readonly ref?: string;
+	readonly limit?: number;
+	readonly skip?: number;
+	readonly firstParent?: boolean;
+	readonly path?: string;
+}
+
 export interface ExtHostGitExtensionShape {
 	$isGitExtensionAvailable(): Promise<boolean>;
 	$openRepository(root: UriComponents): Promise<{ handle: number; rootUri: UriComponents; state: GitRepositoryStateDto } | undefined>;
@@ -4022,6 +4081,17 @@ export interface ExtHostGitExtensionShape {
 	$getRepositoryState(handle: number): Promise<GitRepositoryStateDto | undefined>;
 	$diffBetweenWithStats(handle: number, ref1: string, ref2: string, path?: string): Promise<GitDiffChangeDto[]>;
 	$diffBetweenWithStats2(handle: number, ref: string, path?: string): Promise<GitDiffChangeDto[]>;
+
+	// Historical Git Bridge
+	$resolveCommitRef(handle: number, ref: string, token?: CancellationToken): Promise<GitHistoryResultDto<string>>;
+	$getCommitDetails(handle: number, ref: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto>>;
+	$getCommitLog(handle: number, options: GitLogOptionsDto, token?: CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto[]>>;
+	$listTreeEntries(handle: number, ref: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>>;
+	$readBlobContent(handle: number, ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<GitHistoryResultDto<string>>;
+	$diffExactTrees(handle: number, refA: string, refB: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;
+	$diffCommitToParent(handle: number, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;
+	$diffReviewRange(handle: number, baseRef: string, headRef: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;
+	$checkIgnore(handle: number, paths: string[]): Promise<string[]>;
 }
 
 // --- proxy identifiers

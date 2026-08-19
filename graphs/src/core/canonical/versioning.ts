@@ -36,10 +36,15 @@ export function isComparableSnapshots(
 	a: { versions?: Partial<GraphVersionMetadata> },
 	b: { versions?: Partial<GraphVersionMetadata> }
 ): boolean {
-	if (!a.versions || !b.versions) {
+	if (!a.versions && !b.versions) {
 		return true;
 	}
+	if (!a.versions || !b.versions) {
+		return false;
+	}
 	return (
+		typeof a.versions.graphSchemaVersion === 'number' &&
+		typeof b.versions.graphSchemaVersion === 'number' &&
 		a.versions.graphSchemaVersion === b.versions.graphSchemaVersion &&
 		a.versions.identityVersion === b.versions.identityVersion &&
 		a.versions.analyzerVersion === b.versions.analyzerVersion

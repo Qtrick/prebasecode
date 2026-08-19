@@ -22,6 +22,7 @@ export class GitHistoryError extends Error {
 		details?: string
 	) {
 		super(`[GitHistoryError:${code}] ${message}${details ? ` (${details})` : ''}`);
+		Object.setPrototypeOf(this, GitHistoryError.prototype);
 		this.name = 'GitHistoryError';
 		this.code = code;
 		this.details = details;
