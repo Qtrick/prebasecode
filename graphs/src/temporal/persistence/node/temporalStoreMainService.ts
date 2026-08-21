@@ -96,6 +96,7 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 			case 'getCommit': return store.getCommit(args[0] as string);
 			case 'getAllCommits': return store.getAllCommits();
 			case 'getLatestCommit': return store.getLatestCommit();
+			case 'getCommitCoverage': return store.getCommitCoverage(args[0] as string);
 			case 'getCommitParents': return store.getCommitParents(args[0] as string);
 			case 'getCommitChildren': return store.getCommitChildren(args[0] as string);
 			case 'getCheckpointSnapshot': return store.getCheckpointSnapshot(args[0] as string);

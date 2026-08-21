@@ -109,19 +109,42 @@ export class TemporalRepositoryRegistry {
 		}
 		const store = this._stores.get(repositoryId);
 		if (store) {
-			await store.close();
+			// Runtime disposal owns its store close. Closing it again can race native
+			// SQLite teardown and violates the store lifecycle contract.
+			if (!runtime || runtime.store !== store) {
+				await store.close();
+			}
 			this._stores.delete(repositoryId);
 		}
 	}
 
+	/**
+	 * Closes the runtime and store associated with a repository root. Workbench
+	 * close events identify repositories by root URI while this registry owns
+	 * entries by stable Git repository ID, so callers must not use a URI string
+	 * as a repository ID.
+	 */
+	async closeStoreByRootPath(rootPath: string): Promise<void> {
+		for (const [repositoryId, runtime] of this._runtimes) {
+			if (runtime.rootPath === rootPath) {
+				await this.closeStore(repositoryId);
+				return;
+			}
+		}
+	}
+
 	async closeAll(): Promise<void> {
+		const closedByRuntime = new Set<ITemporalStore>();
 		for (const runtime of this._runtimes.values()) {
 			await runtime.dispose();
+			closedByRuntime.add(runtime.store);
 		}
 		this._runtimes.clear();
 
 		for (const store of this._stores.values()) {
-			await store.close();
+			if (!closedByRuntime.has(store)) {
+				await store.close();
+			}
 		}
 		this._stores.clear();
 	}

@@ -4,8 +4,11 @@
 
 import assert from 'node:assert';
 import { suite, test } from 'mocha';
+import { GitHistoryError } from '../../history/git/gitTypes.js';
+import { TemporalError } from '../../temporal/common/temporalErrors.js';
+import { TemporalGraphService } from '../../temporal/host/temporalGraphService.js';
 import type { IGitHistoryService } from '../../history/git/gitHistoryService.js';
-import type { TemporalGraphSnapshot } from '../../temporal/common/temporalTypes.js';
+import type { TemporalCommitRecord, TemporalGraphSnapshot } from '../../temporal/common/temporalTypes.js';
 import { TemporalRepositoryRegistry } from '../../temporal/ingestion/temporalRepositoryRegistry.js';
 import { TemporalRepositoryRuntime } from '../../temporal/ingestion/temporalRepositoryRuntime.js';
 import type { ITemporalStore } from '../../temporal/persistence/common/temporalStore.js';
@@ -66,6 +69,24 @@ suite('TemporalRepositoryRuntime', () => {
 			sameRuntime: true,
 		});
 		await registry.closeAll();
+	});
+
+	test('closes a repository runtime by root path instead of treating a URI as its Git identity', async () => {
+		let closeCalls = 0;
+		const store = Object.assign(Object.create(null), {
+			isOpen: () => true,
+			close: async () => { closeCalls++; },
+		}) as ITemporalStore;
+		const registry = new TemporalRepositoryRegistry(async () => store);
+		const gitService = Object.create(null) as IGitHistoryService;
+
+		await registry.getRuntime('stable-git-id', '/repo-a', gitService);
+		await registry.closeStoreByRootPath('/repo-a');
+
+		assert.deepStrictEqual({ closeCalls, hasRuntime: registry.hasRuntime('stable-git-id') }, {
+			closeCalls: 1,
+			hasRuntime: false,
+		});
 	});
 
 	test('deduplicates simultaneous work for one commit SHA', async () => {
@@ -190,5 +211,128 @@ suite('TemporalRepositoryRuntime', () => {
 			/disposed/
 		);
 		assert.strictEqual(closeCalls, 1);
+	});
+
+	test('reports repository failures as structured diagnostics instead of unregistered without context', async () => {
+		const gitService = Object.assign(Object.create(null), {
+			getRepositoryIdentity: async () => {
+				throw new GitHistoryError('RepositoryUnavailable', 'repository is closed');
+			},
+		}) as IGitHistoryService;
+		const registry = new TemporalRepositoryRegistry(async () => Object.create(null) as ITemporalStore);
+		const service = new TemporalGraphService(gitService, registry);
+
+		assert.deepStrictEqual(await service.getCommitIndexStatus('/repo-a', 'commit-a'), {
+			status: 'unregistered',
+			diagnosticCode: 'repository-unavailable',
+		});
+	});
+
+	test('reports persisted cache corruption as failed instead of masking it as an unregistered repository', async () => {
+		const store = Object.assign(Object.create(null), {
+			isOpen: () => true,
+			open: async () => {},
+			close: async () => {},
+			getCommit: async () => {
+				throw new TemporalError('DatabaseCorrupted', 'checkpoint digest does not match');
+			},
+		}) as ITemporalStore;
+		const gitService = Object.assign(Object.create(null), {
+			getRepositoryIdentity: async () => ({ repositoryId: 'repo-a', rootPath: '/repo-a', objectFormat: 'sha1' as const }),
+		}) as IGitHistoryService;
+		const service = new TemporalGraphService(gitService, new TemporalRepositoryRegistry(async () => store));
+
+		assert.deepStrictEqual(await service.getCommitIndexStatus('/repo-a', 'commit-a'), {
+			status: 'failed',
+			diagnosticCode: 'database-corrupted',
+		});
+	});
+
+	test('derives incomplete status from persisted canonical coverage after runtime restart', async () => {
+		const commit: TemporalCommitRecord = {
+			commitSha: 'commit-a',
+			canonicalDigest: 'digest-a',
+			parentShas: [],
+			treeSha: 'tree-a',
+			authorName: 'Tester',
+			authorEmail: 'tester@prebase.invalid',
+			authorTimestamp: 1,
+			committerTimestamp: 1,
+			message: 'incomplete graph',
+			ingestedAt: 1,
+			isCheckpoint: true,
+			checkpointInterval: 10,
+			deltaDepth: 0,
+			schemaVersion: 4,
+			analyzerVersion: 1,
+			profileVersion: 1,
+		};
+		const coverage = {
+			completeWithinProfile: false,
+			isComplete: false,
+			discoveredCount: 2,
+			analyzedCount: 1,
+			analyzedFileCount: 1,
+			excludedCount: 1,
+			excludedFileCount: 1,
+			failedCount: 0,
+			truncated: true,
+			truncationReason: 'producer limit',
+			exclusionBreakdown: {
+				'oversized-file': 0,
+				'binary-file': 0,
+				'unsupported-language': 0,
+				'parse-error': 0,
+				'permission-denied': 0,
+				'ignored-pattern': 0,
+				'policy-excluded': 0,
+				other: 0,
+			},
+			exclusionReasons: {},
+		};
+		const snapshot: TemporalGraphSnapshot = {
+			schemaVersion: 4,
+			analyzerVersion: 1,
+			profileVersion: 1,
+			commitSha: commit.commitSha,
+			timestamp: 1,
+			isCheckpoint: true,
+			digest: 'digest-a',
+			canonicalSnapshot: {
+				nodes: [],
+				edges: [],
+				projectPath: '/repo-a',
+				projectName: 'repo-a',
+				entryNodeId: null,
+				analyzedAt: 1,
+				sourceIdentity: 'git:commit-a',
+				digest: 'digest-a',
+				versions: { graphSchemaVersion: 1, analyzerVersion: 1, identityVersion: 1, layoutVersion: 1 },
+				coverage,
+				completeness: coverage,
+			},
+			graphData: { nodes: [], edges: [], timestamp: 1 },
+			entityMap: new Map(),
+			edgeMap: new Map(),
+			pathToEntityId: new Map(),
+		};
+		const store = Object.assign(Object.create(null), {
+			isOpen: () => true,
+			open: async () => {},
+			close: async () => {},
+			getCommit: async () => commit,
+			getCommitCoverage: async () => snapshot.canonicalSnapshot!.coverage,
+		}) as ITemporalStore;
+		const gitService = Object.assign(Object.create(null), {
+			getRepositoryIdentity: async () => ({ repositoryId: 'repo-a', rootPath: '/repo-a', objectFormat: 'sha1' as const }),
+		}) as IGitHistoryService;
+
+		// A new registry has no in-memory ingestion state, which models a restart.
+		const restartedRegistry = new TemporalRepositoryRegistry(async () => store);
+		const restartedService = new TemporalGraphService(gitService, restartedRegistry);
+		assert.deepStrictEqual(await restartedService.getCommitIndexStatus('/repo-a', commit.commitSha), {
+			status: 'incomplete',
+		});
+		await restartedRegistry.closeAll();
 	});
 });

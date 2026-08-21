@@ -9,7 +9,7 @@ import { IEnvironmentService } from '../../../../../../platform/environment/comm
 import { IMainProcessService } from '../../../../../../platform/ipc/common/mainProcessService.js';
 import { ILogService } from '../../../../../../platform/log/common/log.js';
 import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
-import { TemporalGraphService, type ITemporalGraphService, type TemporalIndexStatus } from '../../temporal/host/temporalGraphService.js';
+import { TemporalGraphService, type ITemporalGraphService, type TemporalCommitIndexStatus } from '../../temporal/host/temporalGraphService.js';
 import { TemporalRepositoryRegistry, type TemporalStoreFactory } from '../../temporal/ingestion/temporalRepositoryRegistry.js';
 import { TEMPORAL_STORE_CHANNEL_NAME } from '../../temporal/persistence/common/temporalStoreChannel.js';
 import { WorkbenchTemporalStore } from './workbenchTemporalStore.js';
@@ -75,7 +75,7 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 			void this._activateRepository(repository.rootUri.fsPath || repository.rootUri.path);
 		}));
 		this._register(this._gitHistoryService.onDidCloseRepository(repository => {
-			void this._registry.closeStore(repository.rootUri.toString());
+			void this._registry.closeStoreByRootPath(repository.rootUri.fsPath || repository.rootUri.path);
 		}));
 		if (typeof this._gitHistoryService.onDidChangeHead === 'function') {
 			const sub = this._gitHistoryService.onDidChangeHead((event: GitHeadChangeEvent) => {
@@ -111,7 +111,7 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 		}
 	}
 
-	getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalIndexStatus> {
+	getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalCommitIndexStatus> {
 		return this._temporalService.getCommitIndexStatus(rootPath, commitSha, token);
 	}
 

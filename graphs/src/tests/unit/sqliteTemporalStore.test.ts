@@ -443,6 +443,13 @@ suite('SqliteTemporalStore', () => {
 			dbPath,
 			`SELECT COUNT(*) AS value FROM graph_states WHERE canonical_digest = '${digest}';`,
 		), 2);
+		assert.deepStrictEqual({
+			complete: (await store.getCommitCoverage('complete'))?.completeWithinProfile,
+			incomplete: (await store.getCommitCoverage('incomplete'))?.completeWithinProfile,
+		}, {
+			complete: true,
+			incomplete: false,
+		});
 	});
 
 	test('saveCommitIngestion saves commit, commit_parents, checkpoint, delta, entities, and edges atomically', async () => {

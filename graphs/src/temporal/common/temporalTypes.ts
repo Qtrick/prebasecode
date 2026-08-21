@@ -15,8 +15,32 @@ export type TemporalIndexStatus =
 	| 'indexing'
 	| 'ready'
 	| 'incomplete'
+	| 'rebuilding'
 	| 'failed'
 	| 'cancelled';
+
+/**
+ * Machine-readable reason that an index status could not be determined or
+ * completed. These values deliberately avoid surfacing raw Git, SQLite, or
+ * source-content error messages to consumers.
+ */
+export type TemporalIndexDiagnosticCode =
+	| 'repository-unavailable'
+	| 'database-corrupted'
+	| 'schema-migration-failed'
+	| 'history-unavailable'
+	| 'git-error'
+	| 'runtime-failure';
+
+/**
+ * The Phase-3-facing commit index state. A failed status always carries a
+ * diagnostic code so callers never have to infer an operational failure from
+ * an unrelated lifecycle state such as `unregistered`.
+ */
+export interface TemporalCommitIndexStatus {
+	readonly status: TemporalIndexStatus;
+	readonly diagnosticCode?: TemporalIndexDiagnosticCode;
+}
 
 export interface ArchitectureGraphData {
 	readonly nodes: readonly GraphNode[];

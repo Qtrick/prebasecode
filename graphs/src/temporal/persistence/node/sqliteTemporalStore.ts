@@ -26,6 +26,7 @@ import type {
 	TemporalGraphSnapshot,
 	TemporalStructuralDelta,
 } from '../../common/temporalTypes.js';
+import type { CanonicalCoverage } from '../../../common/types/canonicalTypes.js';
 
 export interface SqliteStoreOptions {
 	readonly dbPath: string;
@@ -645,6 +646,41 @@ export class SqliteTemporalStore implements ITemporalStore {
 				if (!row) return resolve(undefined);
 				resolve(this._mapCommitRecord(row));
 			});
+		});
+	}
+
+	async getCommitCoverage(commitSha: string): Promise<CanonicalCoverage | undefined> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.get(
+				`SELECT graph_states.snapshot_json
+				 FROM commits
+				 INNER JOIN graph_states ON graph_states.state_id = commits.canonical_state_id
+				 WHERE commits.commit_sha = ?;`,
+				[commitSha],
+				(error, row: { snapshot_json?: string } | undefined) => {
+					if (error) {
+						reject(error);
+						return;
+					}
+					if (!row?.snapshot_json) {
+						resolve(undefined);
+						return;
+					}
+					try {
+						const parsed = JSON.parse(row.snapshot_json) as { coverage?: CanonicalCoverage; completeness?: CanonicalCoverage };
+						const coverage = parsed.coverage ?? parsed.completeness;
+						if (!coverage || typeof coverage.completeWithinProfile !== 'boolean') {
+							throw new TemporalError('DatabaseCorrupted', `Canonical state coverage is missing for ${commitSha}`);
+						}
+						resolve(coverage);
+					} catch (parseError) {
+						reject(parseError instanceof TemporalError
+							? parseError
+							: new TemporalError('DatabaseCorrupted', `Failed to parse canonical state coverage for ${commitSha}`, parseError));
+					}
+				}
+			);
 		});
 	}
 

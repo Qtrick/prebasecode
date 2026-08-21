@@ -4,6 +4,8 @@
 
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type { GitHeadChangeEvent, IGitHistoryService } from '../../history/git/gitHistoryService.js';
+import { GitHistoryError } from '../../history/git/gitTypes.js';
+import { isTemporalError } from '../common/temporalErrors.js';
 import type { TemporalCommitIngestionService } from '../ingestion/temporalCommitIngestionService.js';
 import type { TemporalRepositoryRegistry } from '../ingestion/temporalRepositoryRegistry.js';
 import type {
@@ -12,13 +14,13 @@ import type {
 	TemporalEntitySnapshot,
 	TemporalGraphSnapshot,
 	TemporalQueryOptions,
-	TemporalIndexStatus,
+	TemporalCommitIndexStatus,
 } from '../common/temporalTypes.js';
 
-export type { TemporalIndexStatus } from '../common/temporalTypes.js';
+export type { TemporalCommitIndexStatus, TemporalIndexStatus } from '../common/temporalTypes.js';
 
 export interface ITemporalGraphService {
-	getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalIndexStatus>;
+	getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalCommitIndexStatus>;
 	ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	getGraphAtCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	getEntityHistory(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]>;
@@ -49,25 +51,38 @@ export class TemporalGraphService implements ITemporalGraphService {
 		this._registry = registry;
 	}
 
-	async getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalIndexStatus> {
+	async getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalCommitIndexStatus> {
 		try {
 			const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 			const store = await this._registry.getStore(identity.repositoryId, rootPath);
 			const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
 			const runtimeStatus = runtime.getIndexStatus(commitSha);
 			if (runtimeStatus) {
-				return runtimeStatus;
+				return { status: runtimeStatus };
 			}
 			const commit = await store.getCommit(commitSha);
-			return commit ? 'ready' : 'not-indexed';
-		} catch {
-			return 'unregistered';
+			if (!commit) {
+				return { status: 'not-indexed' };
+			}
+
+			// Runtime status is intentionally ephemeral. Read the coverage attached to
+			// this commit's canonical state without reconstructing graph payloads for
+			// every timeline status row after a workbench restart.
+			const coverage = await store.getCommitCoverage(commitSha);
+			if (!coverage) {
+				return { status: 'failed', diagnosticCode: 'database-corrupted' };
+			}
+			return {
+				status: coverage.completeWithinProfile ? 'ready' : 'incomplete',
+			};
+		} catch (error) {
+			return this._toFailedIndexStatus(error);
 		}
 	}
 
 	async ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
 		const status = await this.getCommitIndexStatus(rootPath, commitSha, token);
-		if (status === 'ready') {
+		if (status.status === 'ready' || status.status === 'incomplete') {
 			return this.getGraphAtCommit(rootPath, commitSha, token);
 		}
 		return this.ingestCommit(rootPath, commitSha, token);
@@ -119,6 +134,40 @@ export class TemporalGraphService implements ITemporalGraphService {
 		return records
 			.filter(record => order.has(record.commitSha))
 			.sort((first, second) => order.get(first.commitSha)! - order.get(second.commitSha)!);
+	}
+
+	private _toFailedIndexStatus(error: unknown): TemporalCommitIndexStatus {
+		if (isTemporalError(error)) {
+			switch (error.code) {
+				case 'Cancelled':
+					return { status: 'cancelled' };
+				case 'RepositoryNotFound':
+					return { status: 'unregistered', diagnosticCode: 'repository-unavailable' };
+				case 'DatabaseCorrupted':
+				case 'DeltaReconstructionFailed':
+				case 'CheckpointNotFound':
+					return { status: 'failed', diagnosticCode: 'database-corrupted' };
+				case 'SchemaMigrationFailed':
+					return { status: 'failed', diagnosticCode: 'schema-migration-failed' };
+				default:
+					return { status: 'failed', diagnosticCode: 'runtime-failure' };
+			}
+		}
+		if (error instanceof GitHistoryError) {
+			switch (error.code) {
+				case 'Cancelled':
+					return { status: 'cancelled' };
+				case 'RepositoryUnavailable':
+				case 'RepositoryNotFound':
+					return { status: 'unregistered', diagnosticCode: 'repository-unavailable' };
+				case 'Timeout':
+				case 'HistoryIncomplete':
+					return { status: 'failed', diagnosticCode: 'history-unavailable' };
+				default:
+					return { status: 'failed', diagnosticCode: 'git-error' };
+			}
+		}
+		return { status: 'failed', diagnosticCode: 'runtime-failure' };
 	}
 
 	async queryTemporalGraph(rootPath: string, options: TemporalQueryOptions, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot[]> {

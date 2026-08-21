@@ -27,6 +27,7 @@ import {
 
 const DEFAULT_MAX_CANONICAL_FILES = 10_000;
 const DEFAULT_MAX_FILE_SIZE_BYTES = 500_000;
+const utf8Encoder = new TextEncoder();
 
 function stableCompare(a: string, b: string): number {
 	return a < b ? -1 : a > b ? 1 : 0;
@@ -167,7 +168,10 @@ export class CanonicalGraphAnalyzer {
 		});
 
 		const totalExcluded = Object.values(exclusionBreakdown).reduce((a, b) => a + b, 0);
-		const completeWithinProfile = !isTruncated && failedCount === 0;
+		// Files inside the supported profile that exceed the source-size budget leave
+		// the canonical state partial just like parser failures. Treating such a commit
+		// as complete would make persisted Temporal status falsely become `ready`.
+		const completeWithinProfile = !isTruncated && failedCount === 0 && exclusionBreakdown['oversized-file'] === 0;
 		const discoveredCount = Math.max(inventory.discoveredCount, rawFiles.length);
 
 		const coverage: CanonicalCoverage = {
@@ -270,7 +274,7 @@ export class CanonicalGraphAnalyzer {
 				return undefined;
 			}
 
-			const actualSize = fileSize ?? Buffer.byteLength(content, 'utf8');
+			const actualSize = fileSize ?? utf8Encoder.encode(content).byteLength;
 			if (actualSize > this._maxFileSizeBytes) {
 				recordExclusion(file.relativePath, 'oversized-file');
 				return undefined;

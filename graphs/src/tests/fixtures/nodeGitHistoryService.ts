@@ -7,7 +7,6 @@ import * as path from 'node:path';
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import {
 	type IGitHistoryService,
-	GIT_EMPTY_TREE_HASH,
 } from '../../history/git/gitHistoryService.js';
 import {
 	type GitBranchInfo,
@@ -25,6 +24,8 @@ import {
 	type GitTreeListOptions,
 	GitHistoryError,
 } from '../../history/git/gitTypes.js';
+
+const SHA1_EMPTY_TREE_HASH_FIXTURE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
 interface ExecGitOptions {
 	cwd: string;
@@ -465,7 +466,7 @@ export class NodeGitHistoryService implements IGitHistoryService {
 	}
 
 	async diffCommitTrees(rootPath: string, refA: string, refB: string, token?: CancellationTokenLike): Promise<GitExactDiffResult> {
-		const isRootDiff = !refA || refA === 'ROOT' || refA === GIT_EMPTY_TREE_HASH || refA === '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+		const isRootDiff = !refA || refA === 'ROOT' || refA === SHA1_EMPTY_TREE_HASH_FIXTURE;
 		const resolvedB = await this.resolveRef(rootPath, refB, token);
 
 		const args = ['diff-tree', '-r', '-z', '-M', '--no-commit-id'];

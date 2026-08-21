@@ -18,8 +18,6 @@ import type {
 
 export type { GitHeadChangeEvent, GitBranchInfo, GitCommitMetadata, GitExactDiffResult, GitLogOptions, GitRepositoryIdentity, GitTagInfo, GitTreeEntry, GitTreeInventory, GitTreeListOptions };
 
-export const GIT_EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
-
 export type EventLike<T> = (listener: (e: T) => void) => { dispose(): void };
 
 export interface IGitHistoryService {

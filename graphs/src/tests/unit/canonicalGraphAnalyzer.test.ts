@@ -244,11 +244,50 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		const snapshot = await analyzer.analyze(source);
 
 		assert.ok(snapshot);
-		assert.strictEqual(snapshot.coverage.completeWithinProfile, true);
+		assert.strictEqual(snapshot.coverage.completeWithinProfile, false);
 		assert.strictEqual(snapshot.coverage.analyzedCount, 1);
 		assert.strictEqual(snapshot.coverage.excludedCount, 2);
 		assert.strictEqual(snapshot.coverage.exclusionBreakdown['oversized-file'], 1);
 		assert.strictEqual(snapshot.coverage.exclusionBreakdown['binary-file'], 1);
+	});
+
+	test('measures uncached Unicode source by UTF-8 bytes rather than UTF-16 code units', async () => {
+		const content = 'export const emoji = "😀";';
+		const file: ScannedFile = {
+			absolutePath: '/unicode-workspace/src/emoji.ts',
+			relativePath: 'src/emoji.ts',
+			extension: '.ts',
+		};
+		const source: IRepositoryContentSource = {
+			kind: 'working-tree',
+			rootPath: '/unicode-workspace',
+			identity: 'unicode-size-fixture',
+			async listFiles(): Promise<ScannedFileInventory> {
+				return {
+					files: [file],
+					isTruncated: false,
+					discoveredCount: 1,
+					eligibleCount: 1,
+				};
+			},
+			async readFile(): Promise<string> {
+				return content;
+			},
+		};
+
+		const snapshot = await new CanonicalGraphAnalyzer({ maxFileSizeBytes: content.length }).analyze(source);
+
+		assert.ok(snapshot);
+		assert.ok(new TextEncoder().encode(content).byteLength > content.length);
+		assert.deepStrictEqual({
+			analyzed: snapshot.coverage.analyzedCount,
+			excluded: snapshot.coverage.exclusionBreakdown['oversized-file'],
+			complete: snapshot.coverage.completeWithinProfile,
+		}, {
+			analyzed: 0,
+			excluded: 1,
+			complete: false,
+		});
 	});
 
 	test('respects cancellation cleanly without publishing corrupted partial graph', async () => {

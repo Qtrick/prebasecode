@@ -140,7 +140,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 			// Check status before ingestion
 			const statusBefore = await temporalService.getCommitIndexStatus(repoDir, c1);
-			assert.strictEqual(statusBefore, 'not-indexed');
+			assert.deepStrictEqual(statusBefore, { status: 'not-indexed' });
 
 			// Ingest Commit 1 via ensureCommitIndexed
 			const snap1 = await temporalService.ensureCommitIndexed(repoDir, c1);
@@ -150,7 +150,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 			// Check status after ingestion
 			const statusAfter = await temporalService.getCommitIndexStatus(repoDir, c1);
-			assert.strictEqual(statusAfter, 'ready');
+			assert.deepStrictEqual(statusAfter, { status: 'ready' });
 
 			// 2. Commit 2: Modify src/util.ts and add src/config.ts
 			fs.writeFileSync(path.join(repoDir, 'src/util.ts'), 'export const helper = () => "hello world!";\nexport const version = 2;', 'utf8');
@@ -493,7 +493,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			}, repoA.repoDir);
 
 			const statusA = await temporalService.getCommitIndexStatus(repoA.repoDir, cA);
-			assert.strictEqual(statusA, 'ready');
+			assert.deepStrictEqual(statusA, { status: 'ready' });
 
 			await registry.closeAll();
 		} finally {

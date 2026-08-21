@@ -13,6 +13,7 @@ import type {
 	TemporalGraphSnapshot,
 	TemporalStructuralDelta,
 } from '../../common/temporalTypes.js';
+import type { CanonicalCoverage } from '../../../common/types/canonicalTypes.js';
 
 export interface RepositoryIdentityRecord {
 	readonly repoId: string;
@@ -50,6 +51,8 @@ export interface ITemporalStore {
 	getCommit(commitSha: string): Promise<TemporalCommitRecord | undefined>;
 	getAllCommits(): Promise<TemporalCommitRecord[]>;
 	getLatestCommit(): Promise<TemporalCommitRecord | undefined>;
+	/** Returns persisted canonical coverage without reconstructing a graph state. */
+	getCommitCoverage(commitSha: string): Promise<CanonicalCoverage | undefined>;
 	getCommitParents(commitSha: string): Promise<string[]>;
 	getCommitChildren(commitSha: string): Promise<string[]>;
 

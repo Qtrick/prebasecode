@@ -5,6 +5,7 @@
 import type { IChannel } from '../../../../../../base/parts/ipc/common/ipc.js';
 import { ProxyChannel } from '../../../../../../base/parts/ipc/common/ipc.js';
 import type { ITemporalStore } from '../../temporal/persistence/common/temporalStore.js';
+import type { CanonicalCoverage } from '../../common/types/canonicalTypes.js';
 import { deserializeTemporalStoreValue, serializeTemporalStoreValue, type ITemporalStoreMainService } from '../../temporal/persistence/common/temporalStoreChannel.js';
 import type {
 	BlobAnalysisRecord,
@@ -42,6 +43,7 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 	getCommit(commitSha: string): Promise<TemporalCommitRecord | undefined> { return this._call('getCommit', commitSha); }
 	getAllCommits(): Promise<TemporalCommitRecord[]> { return this._call('getAllCommits'); }
 	getLatestCommit(): Promise<TemporalCommitRecord | undefined> { return this._call('getLatestCommit'); }
+	getCommitCoverage(commitSha: string): Promise<CanonicalCoverage | undefined> { return this._call('getCommitCoverage', commitSha); }
 	getCommitParents(commitSha: string): Promise<string[]> { return this._call('getCommitParents', commitSha); }
 	getCommitChildren(commitSha: string): Promise<string[]> { return this._call('getCommitChildren', commitSha); }
 	getCheckpointSnapshot(commitSha: string): Promise<TemporalGraphSnapshot | undefined> { return this._call('getCheckpointSnapshot', commitSha); }
