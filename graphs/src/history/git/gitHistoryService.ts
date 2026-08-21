@@ -12,10 +12,11 @@ import type {
 	GitRepositoryIdentity,
 	GitTagInfo,
 	GitTreeEntry,
+	GitTreeInventory,
 	GitTreeListOptions,
 } from './gitTypes.js';
 
-export type { GitHeadChangeEvent, GitBranchInfo, GitCommitMetadata, GitExactDiffResult, GitLogOptions, GitRepositoryIdentity, GitTagInfo, GitTreeEntry, GitTreeListOptions };
+export type { GitHeadChangeEvent, GitBranchInfo, GitCommitMetadata, GitExactDiffResult, GitLogOptions, GitRepositoryIdentity, GitTagInfo, GitTreeEntry, GitTreeInventory, GitTreeListOptions };
 
 export const GIT_EMPTY_TREE_HASH = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 
@@ -31,7 +32,7 @@ export interface IGitHistoryService {
 	resolveRef(rootPath: string, ref: string, token?: CancellationTokenLike): Promise<string>;
 	listBranches(rootPath: string, token?: CancellationTokenLike): Promise<GitBranchInfo[]>;
 	listTags(rootPath: string, token?: CancellationTokenLike): Promise<GitTagInfo[]>;
-	listTree(rootPath: string, ref: string, options?: GitTreeListOptions | CancellationTokenLike, token?: CancellationTokenLike): Promise<GitTreeEntry[]>;
+	listTree(rootPath: string, ref: string, options?: GitTreeListOptions | CancellationTokenLike, token?: CancellationTokenLike): Promise<GitTreeInventory>;
 	readFileAtRef(rootPath: string, ref: string, relativePath: string, token?: CancellationTokenLike): Promise<string>;
 	readBlob(rootPath: string, objectId: string, token?: CancellationTokenLike): Promise<string>;
 	diffCommitTrees(rootPath: string, refA: string, refB: string, token?: CancellationTokenLike): Promise<GitExactDiffResult>;

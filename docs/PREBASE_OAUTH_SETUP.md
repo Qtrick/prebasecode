@@ -10,11 +10,9 @@ The PreBase desktop application uses a standard PKCE authorization code exchange
         | 1. Opens system browser:
         |    https://<project-ref>.supabase.co/auth/v1/authorize
         |      ?provider=google
-        |      &redirect_to=prebase://auth/callback
-        |      &flow_type=pkce
-        |      &code_challenge=<S256_challenge>
-        |      &code_challenge_method=S256
-        |      &state=<random_state>
+        |      &redirect_to=prebase://auth/callback?sb_flow_id=<app_flow_id>
+        |      &code_challenge=<sha256_challenge>
+        |      &code_challenge_method=s256
         |      &scopes=openid+email+profile
         v
 [ Supabase Auth Server ]
@@ -24,17 +22,17 @@ The PreBase desktop application uses a standard PKCE authorization code exchange
 [ Google OAuth 2.0 Consent ]
         |
         | 3. User approves -> Google redirects back to:
-        |    https://<project-ref>.supabase.co/auth/v1/callback?code=...&state=...
+        |    https://<project-ref>.supabase.co/auth/v1/callback?code=...&state=<supabase_flow_state>
         v
 [ Supabase Auth Server ]
         |
         | 4. Validates Google token exchange, provisions/links user account,
         |    generates PKCE authorization code, and redirects browser to:
-        |    prebase://auth/callback?code=<pkce_auth_code>&state=<random_state>
+        |    prebase://auth/callback?sb_flow_id=<app_flow_id>&code=<pkce_auth_code>
         v
 [ PreBase Custom Protocol Handler (prebase://auth/callback) ]
         |
-        | 5. Validates matching state, live attempt (<5 min), and one-time use;
+        | 5. Validates the matching application flow ID, live attempt (<5 min), and one-time use;
         |    POSTs to Supabase token endpoint:
         |    https://<project-ref>.supabase.co/auth/v1/token?grant_type=pkce
         |    Body: { "auth_code": "...", "code_verifier": "..." }
@@ -70,7 +68,7 @@ The PreBase desktop application uses a standard PKCE authorization code exchange
      - Enable Google Provider.
      - Enter Google Client ID and Google Client Secret.
    - In Supabase Auth -> URL Configuration:
-     - **Redirect URLs**: Must allowlist `prebase://auth/callback`.
+     - **Redirect URLs**: Must allowlist the `prebase://auth/callback` query variant used for `sb_flow_id` (for example an appropriate wildcard rule). Supabase matches the full redirect URL, including its query.
 
 4. **Minimal Scopes**:
    - Google: `openid`, `email`, `profile`.
@@ -88,9 +86,10 @@ The PreBase desktop application uses a standard PKCE authorization code exchange
    - The SHA-256 base64url challenge is sent in `/authorize`.
    - The plain verifier is held strictly in memory, never persisted to disk, and consumed immediately upon exchange.
 3. **Strict Callback Validation**:
-   - The protocol handler accepts only URLs matching `prebase://auth/callback` via query parameters (`?code=...&state=...`).
+   - Supabase creates and validates the provider OAuth `state` used between Google and Supabase. PreBase does not send an application-owned top-level `state` to `/authorize`.
+   - The protocol handler accepts only URLs matching `prebase://auth/callback` with one `sb_flow_id` and one `code` query parameter.
    - Implicit grant tokens in URL fragments (`#access_token=...`, `#id_token=...`) are strictly rejected.
-   - The returned `state` parameter must match the in-flight attempt's `state` exactly.
+   - The returned `sb_flow_id` must match the in-memory attempt exactly. It is correlation data, not the PKCE verifier and not a provider OAuth state.
    - Expired attempts (> 5 minutes) and replayed URLs are immediately rejected.
 4. **OS Keychain Secret Storage & Concurrency Serialization**:
    - Tokens (`access_token`, `refresh_token`) are stored in OS-backed `SecretStorage` (macOS Keychain, Windows Credential Manager, Linux Secret Service).
@@ -98,3 +97,14 @@ The PreBase desktop application uses a standard PKCE authorization code exchange
    - Sessions are refreshed atomically and cleared securely on sign-out.
 5. **Elevated Key Diagnostics**:
    - Client-side configuration parsing strictly forbids secret/service-role keys (`sb_secret_*`, `service_role`, `supabase_admin`) using browser-safe base64url payload inspection.
+
+## 4. Protocol Sources and Acceptance Boundary
+
+The implementation is checked against current primary sources rather than assuming SDK behavior:
+
+- Supabase Auth's external authorization handler owns the provider `state` and creates the server-side flow state: <https://github.com/supabase/auth/blob/master/internal/api/external.go>
+- Supabase Auth JS documents the `sb_flow_id` redirect correlation mechanism for PKCE flows: <https://github.com/supabase/supabase-js/blob/master/packages/core/auth-js/src/lib/types.ts>
+- Supabase local sign-out scope is documented at <https://supabase.com/docs/guides/auth/signout>.
+- Electron's custom-protocol lifecycle, including macOS `open-url` and Windows/Linux second-instance delivery, is documented at <https://www.electronjs.org/docs/latest/tutorial/launch-app-from-url-in-another-app>.
+
+Unit and integration tests can prove URL construction, callback strictness, replay rejection, token storage, and refresh serialization. They cannot prove Google console configuration, Supabase redirect allowlisting, provider consent, or OS protocol registration in a packaged application. Those remain manual/operator acceptance and must be reported as `BLOCKED` until exercised live.

@@ -2,20 +2,22 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import { Disposable, DisposableStore } from '../../../../../../base/common/lifecycle.js';
+import { Disposable } from '../../../../../../base/common/lifecycle.js';
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
 import { IEnvironmentService } from '../../../../../../platform/environment/common/environment.js';
+import { IMainProcessService } from '../../../../../../platform/ipc/common/mainProcessService.js';
+import { ILogService } from '../../../../../../platform/log/common/log.js';
 import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import { TemporalGraphService, type ITemporalGraphService, type TemporalIndexStatus } from '../../temporal/host/temporalGraphService.js';
-import { TemporalCommitIngestionService } from '../../temporal/ingestion/temporalCommitIngestionService.js';
 import { TemporalRepositoryRegistry, type TemporalStoreFactory } from '../../temporal/ingestion/temporalRepositoryRegistry.js';
-import { IncrementalGraphAnalyzer } from '../../temporal/analysis/incrementalGraphAnalyzer.js';
-import { SqliteTemporalStore } from '../../temporal/persistence/node/sqliteTemporalStore.js';
+import { TEMPORAL_STORE_CHANNEL_NAME } from '../../temporal/persistence/common/temporalStoreChannel.js';
+import { WorkbenchTemporalStore } from './workbenchTemporalStore.js';
 import { computePureSha256 } from '../../core/canonical/pureSha256.js';
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type {
 	TemporalEntityLineageEvent,
+	TemporalEdgeSnapshot,
 	TemporalEntitySnapshot,
 	TemporalGraphSnapshot,
 	TemporalQueryOptions,
@@ -42,33 +44,42 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 	declare readonly _serviceBrand: undefined;
 
 	private readonly _registry: TemporalRepositoryRegistry;
-	private readonly _ingestionService: TemporalCommitIngestionService;
 	private readonly _temporalService: TemporalGraphService;
-	private readonly _repositoryHeadObservers = new Map<string, DisposableStore>();
 
 	constructor(
 		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 		@IEnvironmentService private readonly environmentService: IEnvironmentService,
 		@IWorkbenchGitHistoryService private readonly _gitHistoryService: IWorkbenchGitHistoryService,
+		@IMainProcessService mainProcessService: IMainProcessService,
+		@ILogService private readonly _logService: ILogService,
 	) {
 		super();
 
 		const storeFactory: TemporalStoreFactory = async (repoId: string, rootPath: string) => {
-			const storageHome = this.environmentService.userRoamingDataHome || this.environmentService.workspaceStorageHome;
+			// Temporal databases are large, repository-derived, and reconstructable.
+			// Keep them in the device-local cache rather than roaming user data.
+			const storageHome = this.environmentService.cacheHome;
 			const dbPath = computeSafeStorePath(storageHome, repoId, rootPath);
-			return new SqliteTemporalStore({ dbPath });
+			return new WorkbenchTemporalStore(mainProcessService.getChannel(TEMPORAL_STORE_CHANNEL_NAME), dbPath);
 		};
 
 		this._registry = new TemporalRepositoryRegistry(storeFactory);
-		const analyzer = new IncrementalGraphAnalyzer();
-		this._ingestionService = new TemporalCommitIngestionService(this._gitHistoryService, this._registry, analyzer);
-		this._temporalService = new TemporalGraphService(this._gitHistoryService, this._registry, this._ingestionService);
+		this._temporalService = new TemporalGraphService(this._gitHistoryService, this._registry);
 
 		this._checkAndWireHeadObservers();
+		for (const repository of this._gitHistoryService.getRepositories()) {
+			void this._activateRepository(repository.rootUri.fsPath || repository.rootUri.path);
+		}
 		this._register(this.workspaceService.onDidChangeWorkspaceFolders(() => this._checkAndWireHeadObservers()));
+		this._register(this._gitHistoryService.onDidOpenRepository(repository => {
+			void this._activateRepository(repository.rootUri.fsPath || repository.rootUri.path);
+		}));
+		this._register(this._gitHistoryService.onDidCloseRepository(repository => {
+			void this._registry.closeStore(repository.rootUri.toString());
+		}));
 		if (typeof this._gitHistoryService.onDidChangeHead === 'function') {
 			const sub = this._gitHistoryService.onDidChangeHead((event: GitHeadChangeEvent) => {
-				this._routeHeadChanged(event);
+				void this._routeHeadChanged(event);
 			});
 			this._register(sub);
 		}
@@ -78,18 +89,25 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 		const folders = this.workspaceService.getWorkspace().folders;
 		for (const folder of folders) {
 			const rootPath = folder.uri.fsPath || folder.uri.path;
-			// Ensure store is initialized for open workspace folders
-			this._gitHistoryService.getRepositoryIdentity(rootPath).then(identity => {
-				this._registry.getStore(identity.repositoryId, rootPath).catch(() => {});
-			}).catch(() => {});
+			void this._activateRepository(rootPath);
 		}
 	}
 
-	private _routeHeadChanged(event: GitHeadChangeEvent): void {
-		const folders = this.workspaceService.getWorkspace().folders;
-		for (const folder of folders) {
-			const rootPath = folder.uri.fsPath || folder.uri.path;
-			this._temporalService.handleHeadChanged(event, rootPath).catch(() => {});
+	private async _activateRepository(rootPath: string): Promise<void> {
+		try {
+			const identity = await this._gitHistoryService.getRepositoryIdentity(rootPath);
+			const runtime = await this._registry.getRuntime(identity.repositoryId, identity.rootPath, this._gitHistoryService);
+			await runtime.refreshRefs();
+		} catch (error) {
+			this._logService.error('[PreBase][Temporal] Failed to activate repository runtime', error);
+		}
+	}
+
+	private async _routeHeadChanged(event: GitHeadChangeEvent): Promise<void> {
+		try {
+			await this._temporalService.handleRegisteredRepositoryHeadChanged(event);
+		} catch (error) {
+			this._logService.error(`[PreBase][Temporal] History indexing failed for repository ${computePureSha256(event.repositoryId).slice(0, 12)}`, error);
 		}
 	}
 
@@ -109,8 +127,24 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 		return this._temporalService.getEntityHistory(rootPath, entityId, token);
 	}
 
+	getEntityHistoryAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]> {
+		return this._temporalService.getEntityHistoryAtRef(rootPath, entityId, targetRef, token);
+	}
+
 	getEntityLineageEvents(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]> {
 		return this._temporalService.getEntityLineageEvents(rootPath, entityId, token);
+	}
+
+	getEntityLineageEventsAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]> {
+		return this._temporalService.getEntityLineageEventsAtRef(rootPath, entityId, targetRef, token);
+	}
+
+	getEdgeHistory(rootPath: string, edgeId: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]> {
+		return this._temporalService.getEdgeHistory(rootPath, edgeId, token);
+	}
+
+	getEdgeHistoryAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]> {
+		return this._temporalService.getEdgeHistoryAtRef(rootPath, edgeId, targetRef, token);
 	}
 
 	queryTemporalGraph(rootPath: string, options: TemporalQueryOptions, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot[]> {
@@ -130,10 +164,6 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 	}
 
 	override async dispose(): Promise<void> {
-		for (const store of this._repositoryHeadObservers.values()) {
-			store.dispose();
-		}
-		this._repositoryHeadObservers.clear();
 		await this._temporalService.dispose();
 		super.dispose();
 	}

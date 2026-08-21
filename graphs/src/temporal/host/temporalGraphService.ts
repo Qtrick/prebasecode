@@ -8,27 +8,25 @@ import type { TemporalCommitIngestionService } from '../ingestion/temporalCommit
 import type { TemporalRepositoryRegistry } from '../ingestion/temporalRepositoryRegistry.js';
 import type {
 	TemporalEntityLineageEvent,
+	TemporalEdgeSnapshot,
 	TemporalEntitySnapshot,
 	TemporalGraphSnapshot,
 	TemporalQueryOptions,
+	TemporalIndexStatus,
 } from '../common/temporalTypes.js';
 
-export type TemporalIndexStatus =
-	| 'unregistered'
-	| 'not-indexed'
-	| 'queued'
-	| 'indexing'
-	| 'ready'
-	| 'incomplete'
-	| 'failed'
-	| 'cancelled';
+export type { TemporalIndexStatus } from '../common/temporalTypes.js';
 
 export interface ITemporalGraphService {
 	getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalIndexStatus>;
 	ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	getGraphAtCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	getEntityHistory(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]>;
+	getEntityHistoryAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]>;
 	getEntityLineageEvents(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]>;
+	getEntityLineageEventsAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]>;
+	getEdgeHistory(rootPath: string, edgeId: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]>;
+	getEdgeHistoryAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]>;
 	queryTemporalGraph(rootPath: string, options: TemporalQueryOptions, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot[]>;
 	ingestCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	ingestCommitRange(rootPath: string, commitShas: string[], token?: CancellationTokenLike): Promise<void>;
@@ -39,26 +37,27 @@ export interface ITemporalGraphService {
 export class TemporalGraphService implements ITemporalGraphService {
 	private readonly _gitService: IGitHistoryService;
 	private readonly _registry: TemporalRepositoryRegistry;
-	private readonly _ingestionService: TemporalCommitIngestionService;
-	private readonly _inFlightIngestions = new Map<string, Promise<TemporalGraphSnapshot>>();
 
 	constructor(
 		gitService: IGitHistoryService,
 		registry: TemporalRepositoryRegistry,
-		ingestionService: TemporalCommitIngestionService
+		// Retained temporarily for source compatibility with Phase 2 callers.
+		// Runtime-owned ingestion is the sole production authority.
+		_ingestionService?: TemporalCommitIngestionService
 	) {
 		this._gitService = gitService;
 		this._registry = registry;
-		this._ingestionService = ingestionService;
 	}
 
 	async getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalIndexStatus> {
-		if (this._inFlightIngestions.has(`${rootPath}:${commitSha}`)) {
-			return 'indexing';
-		}
 		try {
 			const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 			const store = await this._registry.getStore(identity.repositoryId, rootPath);
+			const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
+			const runtimeStatus = runtime.getIndexStatus(commitSha);
+			if (runtimeStatus) {
+				return runtimeStatus;
+			}
 			const commit = await store.getCommit(commitSha);
 			return commit ? 'ready' : 'not-indexed';
 		} catch {
@@ -75,43 +74,80 @@ export class TemporalGraphService implements ITemporalGraphService {
 	}
 
 	async getGraphAtCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
-		return this._ingestionService.reconstructGraphAtCommit(rootPath, commitSha, token);
+		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
+		return runtime.ingestionService.reconstructGraphAtCommit(rootPath, commitSha, token);
 	}
 
 	async getEntityHistory(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]> {
+		const head = await this._gitService.getHead(rootPath, token);
+		return this.getEntityHistoryAtRef(rootPath, entityId, head, token);
+	}
+
+	async getEntityHistoryAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]> {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const store = await this._registry.getStore(identity.repositoryId, rootPath);
-		return store.getEntityHistory(entityId);
+		return this._scopeHistoryToRef(rootPath, targetRef, await store.getEntityHistory(entityId), token);
 	}
 
 	async getEntityLineageEvents(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]> {
+		const head = await this._gitService.getHead(rootPath, token);
+		return this.getEntityLineageEventsAtRef(rootPath, entityId, head, token);
+	}
+
+	async getEntityLineageEventsAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]> {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const store = await this._registry.getStore(identity.repositoryId, rootPath);
-		return store.getEntityLineageEvents(entityId);
+		return this._scopeHistoryToRef(rootPath, targetRef, await store.getEntityLineageEvents(entityId), token);
+	}
+
+	async getEdgeHistory(rootPath: string, edgeId: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]> {
+		const head = await this._gitService.getHead(rootPath, token);
+		return this.getEdgeHistoryAtRef(rootPath, edgeId, head, token);
+	}
+
+	async getEdgeHistoryAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]> {
+		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+		const store = await this._registry.getStore(identity.repositoryId, rootPath);
+		return this._scopeHistoryToRef(rootPath, targetRef, await store.getEdgeHistory(edgeId), token);
+	}
+
+	private async _scopeHistoryToRef<T extends { readonly commitSha: string }>(rootPath: string, targetRef: string, records: readonly T[], token?: CancellationTokenLike): Promise<T[]> {
+		const targetSha = await this._gitService.resolveRef(rootPath, targetRef, token);
+		const history = await this._gitService.log(rootPath, { ref: targetSha }, token);
+		const order = new Map(history.slice().reverse().map((commit, index) => [commit.sha, index]));
+		return records
+			.filter(record => order.has(record.commitSha))
+			.sort((first, second) => order.get(first.commitSha)! - order.get(second.commitSha)!);
 	}
 
 	async queryTemporalGraph(rootPath: string, options: TemporalQueryOptions, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot[]> {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const store = await this._registry.getStore(identity.repositoryId, rootPath);
-		const allCommits = await store.getAllCommits();
-
-		let filtered = allCommits;
+		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
+		const toCommitSha = options.toCommitSha ?? await this._gitService.getHead(rootPath, token);
+		const history = await this._gitService.log(rootPath, {
+			ref: toCommitSha,
+			firstParent: true,
+			limit: Math.max(options.limit ?? 0, 10_000),
+		}, token);
+		const commitsBySha = new Map((await store.getAllCommits()).map(commit => [commit.commitSha, commit]));
+		let filtered = history
+			.map(commit => commitsBySha.get(commit.sha))
+			.filter((commit): commit is NonNullable<typeof commit> => Boolean(commit))
+			.reverse();
 		if (options.fromCommitSha) {
 			const idx = filtered.findIndex(c => c.commitSha === options.fromCommitSha);
-			if (idx >= 0) filtered = filtered.slice(idx);
-		}
-		if (options.toCommitSha) {
-			const idx = filtered.findIndex(c => c.commitSha === options.toCommitSha);
-			if (idx >= 0) filtered = filtered.slice(0, idx + 1);
+			filtered = idx >= 0 ? filtered.slice(idx) : [];
 		}
 		if (options.limit && options.limit > 0) {
-			filtered = filtered.slice(0, options.limit);
+			filtered = filtered.slice(Math.max(0, filtered.length - options.limit));
 		}
 
 		const results: TemporalGraphSnapshot[] = [];
 		for (const commit of filtered) {
 			if (token?.isCancellationRequested) break;
-			const snap = await this._ingestionService.reconstructGraphAtCommit(rootPath, commit.commitSha, token);
+			const snap = await runtime.ingestionService.reconstructGraphAtCommit(rootPath, commit.commitSha, token);
 			results.push(snap);
 		}
 
@@ -144,19 +180,29 @@ export class TemporalGraphService implements ITemporalGraphService {
 			return;
 		}
 
-		try {
-			const identity = await this._gitService.getRepositoryIdentity(rootPath);
-			// Match event repositoryId to target repository
-			if (event.repositoryId && event.repositoryId !== identity.repositoryId && event.repositoryId !== rootPath) {
-				return;
-			}
-			const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
-			await runtime.queueIngestion(event.currentHead, async () => {
-				return runtime.ingestionService.ingestCommit(rootPath, event.currentHead, { isExplicitHead: true });
-			});
-		} catch {
-			// Ignore background ingestion failure on head change
+		const identity = await this._gitService.getRepositoryIdentity(rootPath);
+		// Match event repositoryId to target repository
+		if (event.repositoryId && event.repositoryId !== identity.repositoryId && event.repositoryId !== rootPath) {
+			return;
 		}
+		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
+		await runtime.queueIngestion(event.currentHead, async () => {
+			return runtime.ingestionService.ingestCommit(rootPath, event.currentHead!, { isExplicitHead: true });
+		});
+	}
+
+	async handleRegisteredRepositoryHeadChanged(event: GitHeadChangeEvent): Promise<void> {
+		if (!event.currentHead) {
+			return;
+		}
+		const runtime = this._registry.getExistingRuntime(event.repositoryId);
+		if (!runtime) {
+			return;
+		}
+		await runtime.queueIngestion(event.currentHead, async () => {
+			return runtime.ingestionService.ingestCommit(runtime.rootPath, event.currentHead!, { isExplicitHead: true });
+		});
+		await runtime.refreshRefs(event.currentHead);
 	}
 
 	async dispose(): Promise<void> {

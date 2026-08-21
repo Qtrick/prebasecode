@@ -42,6 +42,7 @@ const tests = [
 	'graphs/src/tests/unit/gitBridgeE2E.test.ts',
 	'graphs/src/tests/unit/temporalLineage.test.ts',
 	'graphs/src/tests/unit/temporalDelta.test.ts',
+	'graphs/src/tests/unit/temporalRepositoryRuntime.test.ts',
 	'graphs/src/tests/unit/incrementalAnalysis.test.ts',
 	'graphs/src/tests/unit/sqliteTemporalStore.test.ts',
 	'graphs/src/tests/unit/temporalIngestionE2E.test.ts',

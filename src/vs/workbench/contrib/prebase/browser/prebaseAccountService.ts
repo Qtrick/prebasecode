@@ -167,7 +167,10 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 		}
 		const client = this.cloudService.getAuthClient();
 		if (!client) {
-			const message = localize('prebase.account.oauthCloudUnconfigured', 'Cloud sign-in is not configured. You can continue locally.');
+			const config = this.cloudService.getAuthConfig();
+			const message = config.configurationError === 'invalid-client-key'
+				? localize('prebase.account.oauthInvalidClientKey', 'The configured Supabase credential is not a client publishable key. Remove the secret or service-role key and configure a publishable key.')
+				: localize('prebase.account.oauthCloudUnconfigured', 'Cloud sign-in is not configured. You can continue locally.');
 			this._setState('unconfigured', undefined, message);
 			throw new Error(message);
 		}
@@ -175,10 +178,10 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 			throw new Error(localize('prebase.account.oauthActive', 'A PreBase sign-in is already in progress.'));
 		}
 		const codeVerifier = this._randomUrlSafe(48);
-		const state = this._randomUrlSafe(32);
+		const flowId = this._randomUrlSafe(32);
 		const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(codeVerifier));
 		const challenge = encodeBase64(VSBuffer.wrap(new Uint8Array(digest)), false, true);
-		this._oauthAttempt = { state, codeVerifier, expiresAt: Date.now() + PREBASE_OAUTH_TIMEOUT_MS, consumed: false };
+		this._oauthAttempt = { flowId, codeVerifier, expiresAt: Date.now() + PREBASE_OAUTH_TIMEOUT_MS, consumed: false };
 		this._oauthTimer = setTimeout(() => {
 			this._clearOAuthAttempt();
 			if (this._state === 'signingIn') {
@@ -186,9 +189,14 @@ export class PreBaseAccountService extends Disposable implements IPreBaseAccount
 			}
 		}, PREBASE_OAUTH_TIMEOUT_MS);
 		this._setState('signingIn', undefined, undefined);
-		const callback = URI.from({ scheme: this.productService.urlProtocol, authority: PREBASE_OAUTH_CALLBACK_AUTHORITY, path: PREBASE_OAUTH_CALLBACK_PATH }).toString();
+		const callback = URI.from({
+			scheme: this.productService.urlProtocol,
+			authority: PREBASE_OAUTH_CALLBACK_AUTHORITY,
+			path: PREBASE_OAUTH_CALLBACK_PATH,
+			query: `sb_flow_id=${flowId}`,
+		}).toString();
 		try {
-			const opened = await this.openerService.open(client.createOAuthAuthorizationUrl(provider, callback, challenge, state), { openExternal: true });
+			const opened = await this.openerService.open(client.createOAuthAuthorizationUrl(provider, callback, challenge), { openExternal: true });
 			if (opened) {
 				return;
 			}

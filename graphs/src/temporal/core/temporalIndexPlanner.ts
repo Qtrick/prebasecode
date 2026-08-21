@@ -23,15 +23,11 @@ export class TemporalIndexPlanner {
 	 * Determines whether a commit should be indexed as a full checkpoint.
 	 * Bounded delta depth policy: root commits are always checkpoints; commits exceeding delta depth are checkpoints.
 	 */
-	shouldCreateCheckpoint(currentDeltaDepth: number, isRoot: boolean, isExplicitHead: boolean): boolean {
+	shouldCreateCheckpoint(currentDeltaDepth: number, isRoot: boolean, _isExplicitHead: boolean): boolean {
 		if (isRoot) {
 			return true;
 		}
 		if (currentDeltaDepth >= this._checkpointInterval || currentDeltaDepth >= this._maxDeltaDepth) {
-			return true;
-		}
-		// If explicit head and delta depth is significant (e.g. >= 5), take a checkpoint for snappy HEAD queries
-		if (isExplicitHead && currentDeltaDepth >= 5) {
 			return true;
 		}
 		return false;

@@ -1,6 +1,6 @@
-# PreBase Temporal Graph Architecture — Phase 1.4 / Final Foundation Freeze
+# PreBase Temporal Graph Architecture — Phase 2.3 Integrity Gate
 
-This document defines the architecture, data models, Git history interfaces, and structural intelligence contracts established for **PreBase Temporal Graph (Phase 1.4 / Final Production Acceptance and Persistence-Readiness Freeze)**.
+This document defines the current architecture, verified repairs, and remaining blockers for **PreBase Temporal Graph Phase 2.3**. Phase 2 remains **In Progress** and Phase 3 UI work is not yet authorized.
 
 ---
 
@@ -22,21 +22,46 @@ PreBase has **one active user-facing Code Graph mode**:
   - Separation of stable content records in `AnalysisManifest` from run diagnostics.
   - Query index lifecycle optimization (reused on view relayouts).
   - Magnus hidden canonical node query resolution (`resolveNodeFocusForMagnus`).
-- **Phase 2 (Complete — Phase 2.2 Production Activation)**:
+- **Phase 2 (In Progress — Phase 2.3 Integrity Gate)**:
   - Temporal entity lineage (cross-commit node and edge stability).
-  - Schema v3 SQLite persistence layer (`SCHEMA_V3_DDL`) with `commits`, `checkpoints`, `deltas`, `graph_states`, `blob_parse_artifacts`, `refs`, and `commit_parents`.
-  - Exact delta-base DAG reconstruction along the `baseCommitSha` ancestry chain with canonical digest verification.
+  - Schema v4 SQLite persistence with immutable canonical states, commit occurrences, entity deletions, edge events, parse artifacts, refs, and the full parent DAG.
+  - Exact delta-base DAG reconstruction along the `baseCommitSha` ancestry chain with recomputed canonical digest verification.
   - Fail-closed parent lineage reconstruction with prerequisite recursive indexing.
   - Incremental AST analysis backed by persistent two-tier parse artifact caching (`TwoTierParseArtifactCache`).
-  - Shared workbench Git history service (`IWorkbenchGitHistoryService`) with automatic repository observation and multi-root event routing.
+  - Shared workbench Git history service (`IWorkbenchGitHistoryService`) with exact repository open/close/HEAD routing.
   - Per-repository isolated runtime (`TemporalRepositoryRuntime`) with sequential FIFO ingestion queue and in-flight request deduplication.
+  - Browser-safe workbench proxy to a validated Electron-main SQLite owner; native bindings are not renderer-reachable.
 - **Phase 3 (Planned Next)**:
   - Temporal UI timeline, commit scrubber, and graph diff overlays.
 - **Phase 4 (Planned)**:
   - Graph Blame & Magnus Temporal conversational query tools.
 
-> [!NOTE]
-> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 2 completes and operationalizes the durable temporal persistence engine, DAG delta reconstruction, incremental analysis, and workbench Git event streaming before Phase 3 timeline UI development begins.
+> [!WARNING]
+> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 3 remains blocked until the remaining ancestry/ref query, migration-fixture, runtime smoke, and operator OAuth acceptance gates below are green.
+
+### Phase 2.3 verified repairs and open gate
+
+Verified in this pass:
+
+- Checkpoint restart restores complete deterministic canonical metadata, including versions, project/source identity, entry node, coverage, manifest, and digest.
+- Immutable `graph_states` use a coverage-aware state identity while retaining the structural digest separately; commit-specific Temporal occurrences stay outside the state payload.
+- Delta replay restores target metadata and recomputes the canonical digest from reconstructed content.
+- One runtime-owned analyzer/ingestion composition coordinates FIFO work, failure recovery, deduplication, and idempotent drain-before-close disposal.
+- Git tree listing now crosses the extension-host/main-thread/workbench bridge as a structured inventory and the production Git process stops after observing `maxEntries + 1` or cancellation.
+- First-parent temporal queries derive ordering from Git topology rather than `ingested_at`.
+- SQLite opens and migrations are serialized, migrations run transactionally, current-schema columns and foreign keys are validated, malformed topology fails closed, and direct checkpoint loads recompute their digest.
+- Native SQLite ownership is behind a main-process channel with cache-root and `.db` path validation; the transitive runtime-boundary verifier includes a deliberately invalid fixture.
+- Repository discovery, late open, close, HEAD changes, and cold-start runtime creation route through exact per-repository ownership without broadcast fan-out.
+- HEAD, local/remote branches, and tags are observed into the shared immutable commit/state model.
+
+Still required before Phase 3:
+
+- Move canonical Babel parsing behind a browser-resolvable execution boundary (or ship an explicitly bundled browser parser). The desktop smoke proved that raw `@babel/*` package imports are not resolvable by the workbench ESM loader; they are now lazy so startup survives, but Temporal analysis is not release-ready until parsing itself executes successfully.
+- Expose ancestry-scoped edge removal events through the public history API; present-edge snapshots alone cannot describe deletion.
+- Execute the compiled producer truncation/cancellation tests inside the Git extension-host harness (plain Mocha cannot load the `vscode` host module).
+- Define and verify repository-local corruption recovery and bounded retention policy (retention must never mutate reachable immutable history incorrectly).
+- Complete restart/runtime desktop smoke with measured checkpoint/delta depth, database size, and persistent L2 reuse.
+- Complete live warm/cold Google OAuth and Supabase operator acceptance; repository tests cannot substitute for provider-console evidence.
 
 ---
 

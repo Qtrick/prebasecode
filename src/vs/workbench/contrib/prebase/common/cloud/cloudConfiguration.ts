@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { localize } from '../../../../../nls.js';
+import { decodeBase64 } from '../../../../../base/common/buffer.js';
 import { Extensions as ConfigurationExtensions, IConfigurationRegistry } from '../../../../../platform/configuration/common/configurationRegistry.js';
 import { Registry } from '../../../../../platform/registry/common/platform.js';
 import type { IPreBaseCloudAuthConfig, IPreBaseProductCloudFields } from './cloudTypes.js';
@@ -15,14 +16,21 @@ export enum PreBaseCloudConfigKeys {
 	SyncPreferences = 'prebase.cloud.sync.preferences',
 }
 
-const HTTPS_URL_RE = /^https:\/\//i;
-
-function normalizeHttpsUrl(raw: string): string {
+function normalizeCloudUrl(raw: string): string {
 	const trimmed = raw.trim();
-	if (!trimmed || !HTTPS_URL_RE.test(trimmed)) {
+	if (!trimmed) {
 		return '';
 	}
-	return trimmed.replace(/\/$/, '');
+	try {
+		const url = new URL(trimmed);
+		const isLoopbackHttp = url.protocol === 'http:' && (url.hostname === '127.0.0.1' || url.hostname === 'localhost' || url.hostname === '::1');
+		if (url.protocol !== 'https:' && !isLoopbackHttp) {
+			return '';
+		}
+		return trimmed.replace(/\/$/, '');
+	} catch {
+		return '';
+	}
 }
 
 function nonEmpty(raw: unknown): string {
@@ -31,16 +39,7 @@ function nonEmpty(raw: unknown): string {
 
 function safeDecodeBase64Url(base64Url: string): string | undefined {
 	try {
-		let base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
-		while (base64.length % 4 !== 0) {
-			base64 += '=';
-		}
-		if (typeof atob === 'function') {
-			return atob(base64);
-		}
-		if (typeof Buffer !== 'undefined') {
-			return Buffer.from(base64, 'base64').toString('utf8');
-		}
+		return decodeBase64(base64Url).toString();
 	} catch {
 		// Base64 decode failure
 	}
@@ -76,21 +75,22 @@ export function resolvePreBaseCloudAuthConfig(
 	getConfigValue: (key: string) => unknown,
 	product?: IPreBaseProductCloudFields,
 ): IPreBaseCloudAuthConfig {
-	const cloudUrl = normalizeHttpsUrl(
-		nonEmpty(getConfigValue(PreBaseCloudConfigKeys.Url)) ||
-		nonEmpty(product?.prebaseCloudUrl),
+	const rawCloudUrl = nonEmpty(getConfigValue(PreBaseCloudConfigKeys.Url)) || nonEmpty(product?.prebaseCloudUrl);
+	const cloudUrl = normalizeCloudUrl(
+		rawCloudUrl,
 	);
 	const rawPublishableKey =
 		nonEmpty(getConfigValue(PreBaseCloudConfigKeys.PublishableKey)) ||
 		nonEmpty(product?.prebaseCloudPublishableKey);
 
-	const publishableKey = isForbiddenSecretKey(rawPublishableKey) ? '' : rawPublishableKey;
+	const forbiddenClientKey = isForbiddenSecretKey(rawPublishableKey);
+	const publishableKey = forbiddenClientKey ? '' : rawPublishableKey;
 
 	if (cloudUrl && publishableKey) {
 		return { mode: 'supabase', supabaseUrl: cloudUrl, publishableKey };
 	}
 
-	const legacy = normalizeHttpsUrl(
+	const legacy = normalizeCloudUrl(
 		nonEmpty(getConfigValue('prebase.account.apiBaseUrl')) ||
 		nonEmpty(product?.prebaseAccountApiBaseUrl),
 	);
@@ -98,6 +98,15 @@ export function resolvePreBaseCloudAuthConfig(
 		return { mode: 'legacy', legacyApiBaseUrl: legacy };
 	}
 
+	if (forbiddenClientKey) {
+		return { mode: 'unconfigured', configurationError: 'invalid-client-key' };
+	}
+	if (rawCloudUrl && !cloudUrl) {
+		return { mode: 'unconfigured', configurationError: 'invalid-url' };
+	}
+	if (rawCloudUrl || rawPublishableKey) {
+		return { mode: 'unconfigured', configurationError: 'incomplete' };
+	}
 	return { mode: 'unconfigured' };
 }
 
@@ -130,7 +139,7 @@ export function registerPreBaseCloudConfiguration(): void {
 				default: '',
 				description: localize(
 					'prebase.cloud.publishableKey',
-					"Supabase publishable (anon) key. Store in user settings or OS secret storage — never commit this value. Required together with prebase.cloud.url for cloud sign-in.",
+					"Supabase public client publishable (or legacy anon) key. This value is safe to embed in a public client; never use a secret or service-role key. Required together with prebase.cloud.url for cloud sign-in.",
 				),
 			},
 			[PreBaseCloudConfigKeys.SyncAgentHistory]: {

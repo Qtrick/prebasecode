@@ -15,7 +15,7 @@ import {
 import { IncrementalGraphAnalyzer } from '../analysis/incrementalGraphAnalyzer.js';
 import { TemporalReconstructionEngine } from '../core/temporalReconstruction.js';
 import { TemporalIndexPlanner } from '../core/temporalIndexPlanner.js';
-import { TemporalRepositoryRegistry } from './temporalRepositoryRegistry.js';
+import type { ITemporalStore } from '../persistence/common/temporalStore.js';
 import type {
 	TemporalCommitRecord,
 	TemporalGraphSnapshot,
@@ -26,16 +26,20 @@ export interface IngestCommitOptions {
 	readonly forceCheckpoint?: boolean;
 }
 
+export interface ITemporalStoreProvider {
+	getStore(repositoryId: string, rootPath: string): Promise<ITemporalStore>;
+}
+
 export class TemporalCommitIngestionService {
 	private readonly _gitService: IGitHistoryService;
-	private readonly _registry: TemporalRepositoryRegistry;
+	private readonly _registry: ITemporalStoreProvider;
 	private readonly _analyzer: IncrementalGraphAnalyzer;
 	private readonly _reconstructionEngine: TemporalReconstructionEngine;
 	private readonly _indexPlanner: TemporalIndexPlanner;
 
 	constructor(
 		gitService: IGitHistoryService,
-		registry: TemporalRepositoryRegistry,
+		registry: ITemporalStoreProvider,
 		analyzer: IncrementalGraphAnalyzer = new IncrementalGraphAnalyzer(),
 		reconstructionEngine: TemporalReconstructionEngine = new TemporalReconstructionEngine(),
 		indexPlanner: TemporalIndexPlanner = new TemporalIndexPlanner()
@@ -120,7 +124,9 @@ export class TemporalCommitIngestionService {
 		}
 
 		// Read prior deleted paths in history for robust CASE 8 fresh recreation
-		const deletedPathsInHistory = await store.getDeletedPathsInHistory();
+		const deletedPathsInHistory = commitMeta.parents.length > 0
+			? await store.getDeletedPathsInHistory(commitMeta.parents[0])
+			: new Map<string, string>();
 
 		// Run Incremental Analysis backed by persistent L2 store
 		const contentSource = new GitTreeContentSource(this._gitService, rootPath, commitSha);
@@ -149,8 +155,8 @@ export class TemporalCommitIngestionService {
 			ingestedAt: Date.now(),
 			isCheckpoint,
 			checkpointInterval: DEFAULT_CHECKPOINT_INTERVAL,
-			deltaDepth,
-			baseCommitSha: commitMeta.parents[0] || undefined,
+			deltaDepth: isCheckpoint ? 0 : deltaDepth,
+			baseCommitSha: isCheckpoint ? undefined : commitMeta.parents[0] || undefined,
 			schemaVersion: CURRENT_SCHEMA_VERSION,
 			analyzerVersion: CURRENT_ANALYZER_VERSION,
 			profileVersion: CURRENT_PROFILE_VERSION,
@@ -160,7 +166,7 @@ export class TemporalCommitIngestionService {
 		await store.saveCommitIngestion(
 			commitRecord,
 			analysisOutput.snapshot,
-			analysisOutput.delta,
+			isCheckpoint ? undefined : analysisOutput.delta,
 			analysisOutput.lineageEvents
 		);
 

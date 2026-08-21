@@ -42,6 +42,8 @@ import { BrowserViewMainService, IBrowserViewMainService } from '../../platform/
 import { BrowserViewGroupMainService, IBrowserViewGroupMainService } from '../../platform/browserView/electron-main/browserViewGroupMainService.js';
 import { PREBASE_DESKTOP_CHANNEL_NAME, IPreBaseDesktopMainService } from '../../platform/prebaseDesktop/common/prebaseDesktop.js';
 import { PreBaseDesktopMainService } from '../../platform/prebaseDesktop/electron-main/prebaseDesktopMainService.js';
+import { TEMPORAL_STORE_CHANNEL_NAME } from '../../workbench/contrib/prebase/graphs/temporal/persistence/common/temporalStoreChannel.js';
+import { TemporalStoreMainService } from '../../workbench/contrib/prebase/graphs/temporal/persistence/node/temporalStoreMainService.js';
 import { NativeParsedArgs } from '../../platform/environment/common/argv.js';
 import { IEnvironmentMainService } from '../../platform/environment/electron-main/environmentMainService.js';
 import { isLaunchedFromCli } from '../../platform/environment/node/argvHelper.js';
@@ -1334,6 +1336,12 @@ export class CodeApplication extends Disposable {
 		// PreBase Desktop Runtime
 		const prebaseDesktopChannel = ProxyChannel.fromService(accessor.get(IPreBaseDesktopMainService), disposables);
 		mainProcessElectronServer.registerChannel(PREBASE_DESKTOP_CHANNEL_NAME, prebaseDesktopChannel);
+
+		// PreBase Temporal persistence stays in the Electron main process. The
+		// sandboxed workbench reaches it only through this typed IPC channel.
+		const temporalStoreRoot = URI.joinPath(this.environmentMainService.cacheHome, 'prebase-temporal').fsPath;
+		const temporalStoreService = disposables.add(new TemporalStoreMainService(temporalStoreRoot));
+		mainProcessElectronServer.registerChannel(TEMPORAL_STORE_CHANNEL_NAME, ProxyChannel.fromService(temporalStoreService, disposables));
 
 		// Signing
 		const signChannel = ProxyChannel.fromService(accessor.get(ISignService), disposables);

@@ -50,7 +50,7 @@ suite('PreBase cloud configuration', () => {
 	test('fails closed for insecure or incomplete Supabase configuration', () => {
 		const insecure = resolvePreBaseCloudAuthConfig(key => {
 			if (key === 'prebase.cloud.url') {
-				return 'http://localhost:54321';
+				return 'http://192.168.1.50:54321';
 			}
 			if (key === 'prebase.cloud.publishableKey') {
 				return 'pk-test';
@@ -59,8 +59,20 @@ suite('PreBase cloud configuration', () => {
 		});
 		const incomplete = resolvePreBaseCloudAuthConfig(key => key === 'prebase.cloud.url' ? 'https://example.supabase.co' : undefined);
 
-		assert.deepStrictEqual(insecure, { mode: 'unconfigured' });
-		assert.deepStrictEqual(incomplete, { mode: 'unconfigured' });
+		assert.deepStrictEqual(insecure, { mode: 'unconfigured', configurationError: 'invalid-url' });
+		assert.deepStrictEqual(incomplete, { mode: 'unconfigured', configurationError: 'incomplete' });
+	});
+
+	test('allows local Supabase loopback HTTP while rejecting elevated client credentials explicitly', () => {
+		const local = resolvePreBaseCloudAuthConfig(key => key === 'prebase.cloud.url'
+			? 'http://127.0.0.1:54321/'
+			: key === 'prebase.cloud.publishableKey' ? 'sb_publishable_local' : undefined);
+		const secret = resolvePreBaseCloudAuthConfig(key => key === 'prebase.cloud.url'
+			? 'https://example.supabase.co'
+			: key === 'prebase.cloud.publishableKey' ? ['sb', 'secret', 'do-not-use'].join('_') : undefined);
+
+		assert.deepStrictEqual(local, { mode: 'supabase', supabaseUrl: 'http://127.0.0.1:54321', publishableKey: 'sb_publishable_local' });
+		assert.deepStrictEqual(secret, { mode: 'unconfigured', configurationError: 'invalid-client-key' });
 	});
 
 	test('keeps agent-history synchronization opt-in', () => {
@@ -90,15 +102,15 @@ suite('PreBase Supabase auth client helpers', () => {
 			['github', 'read:user user:email'],
 			['google', 'openid email profile'],
 		] as const) {
-			const url = new URL(client.createOAuthAuthorizationUrl(provider, 'prebase://auth/callback', 'challenge-value', 'state-value'));
+			const url = new URL(client.createOAuthAuthorizationUrl(provider, 'prebase://auth/callback?sb_flow_id=flow-value', 'challenge-value'));
 			assert.strictEqual(url.origin, 'https://ref.supabase.co');
 			assert.strictEqual(url.pathname, '/auth/v1/authorize');
 			assert.strictEqual(url.searchParams.get('provider'), provider);
-			assert.strictEqual(url.searchParams.get('redirect_to'), 'prebase://auth/callback');
-			assert.strictEqual(url.searchParams.get('flow_type'), 'pkce');
+			assert.strictEqual(url.searchParams.get('redirect_to'), 'prebase://auth/callback?sb_flow_id=flow-value');
+			assert.strictEqual(url.searchParams.has('flow_type'), false);
 			assert.strictEqual(url.searchParams.get('code_challenge'), 'challenge-value');
-			assert.strictEqual(url.searchParams.get('code_challenge_method'), 'S256');
-			assert.strictEqual(url.searchParams.get('state'), 'state-value');
+			assert.strictEqual(url.searchParams.get('code_challenge_method'), 's256');
+			assert.strictEqual(url.searchParams.has('state'), false);
 			assert.strictEqual(url.searchParams.get('scopes'), expectedScopes);
 		}
 	});

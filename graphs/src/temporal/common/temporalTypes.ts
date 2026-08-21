@@ -3,9 +3,20 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js';
+import type { CanonicalGraphSnapshot } from '../../common/types/canonicalTypes.js';
 
 export type GraphNodeData = GraphNode;
 export type GraphEdgeData = GraphEdge;
+
+export type TemporalIndexStatus =
+	| 'unregistered'
+	| 'not-indexed'
+	| 'queued'
+	| 'indexing'
+	| 'ready'
+	| 'incomplete'
+	| 'failed'
+	| 'cancelled';
 
 export interface ArchitectureGraphData {
 	readonly nodes: readonly GraphNode[];
@@ -94,6 +105,8 @@ export interface TemporalStructuralDelta {
 	readonly baseCommitSha: string;
 	readonly parentCommitSha: string;
 	readonly targetCanonicalDigest?: string;
+	readonly targetTimestamp?: number;
+	readonly targetCanonicalMetadata?: TemporalCanonicalSnapshotMetadata;
 	readonly deltaVersion: number;
 	readonly entitiesAdded: readonly TemporalEntitySnapshot[];
 	readonly entitiesModified: readonly TemporalEntitySnapshot[];
@@ -124,7 +137,7 @@ export interface TemporalCommitRecord {
 	readonly profileVersion: number;
 }
 
-import type { CanonicalGraphSnapshot } from '../../common/types/canonicalTypes.js';
+export type TemporalCanonicalSnapshotMetadata = Omit<CanonicalGraphSnapshot, 'nodes' | 'edges' | 'digest'>;
 import type { BlobParseArtifact } from '../../core/canonical/parseArtifactCache.js';
 
 export interface TemporalGraphSnapshot {
@@ -153,9 +166,6 @@ export interface TemporalReconstructionPlan {
 export interface TemporalQueryOptions {
 	readonly fromCommitSha?: string;
 	readonly toCommitSha?: string;
-	readonly pathScope?: string;
-	readonly entityIds?: readonly string[];
-	readonly maxDepth?: number;
 	readonly limit?: number;
 }
 
@@ -167,4 +177,3 @@ export interface BlobAnalysisRecord {
 	readonly artifact: BlobParseArtifact;
 	readonly analyzedAt: number;
 }
-

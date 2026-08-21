@@ -63,12 +63,13 @@ export interface ITemporalStore {
 	getEntityHistory(entityId: string): Promise<TemporalEntitySnapshot[]>;
 	getEntityLineageEvents(entityId: string): Promise<TemporalEntityLineageEvent[]>;
 	getActiveEntitiesAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]>;
-	getDeletedPathsInHistory(): Promise<Map<string, string>>;
+	getDeletedPathsInHistory(baseCommitSha: string): Promise<Map<string, string>>;
 	getEdge(edgeId: string): Promise<TemporalEdgeRecord | undefined>;
 	getEdgeHistory(edgeId: string): Promise<TemporalEdgeSnapshot[]>;
 
 	// Refs
 	saveRef(ref: RefRecord): Promise<void>;
+	replaceRefs(refs: readonly RefRecord[]): Promise<void>;
 	getRef(refName: string): Promise<RefRecord | undefined>;
 	getAllRefs(): Promise<RefRecord[]>;
 
@@ -80,9 +81,6 @@ export interface ITemporalStore {
 		language: string
 	): Promise<BlobAnalysisRecord | undefined>;
 	saveBlobAnalysis(record: BlobAnalysisRecord): Promise<void>;
-
-	// Transaction support
-	runInTransaction<T>(operation: () => Promise<T>): Promise<T>;
 
 	// Maintenance
 	vacuum(): Promise<void>;

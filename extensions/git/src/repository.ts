@@ -2532,6 +2532,10 @@ export class Repository implements Disposable {
 		return this.run(Operation.GetObjectFiles, () => this.repository.lstree(ref, options?.path, options));
 	}
 
+	getObjectFilesInventory(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<{ entries: LsTreeElement[]; isTruncated: boolean; returnedCount: number; discoveredAtLeast: number }> {
+		return this.run(Operation.GetObjectFiles, () => this.repository.lstreeInventory(ref, options?.path, { ...options, cancellationToken: token }));
+	}
+
 	getObjectDetails(ref: string, path: string): Promise<{ mode: string; object: string; size: number }> {
 		return this.run(Operation.GetObjectDetails, () => this.repository.getObjectDetails(ref, path));
 	}

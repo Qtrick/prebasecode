@@ -21,6 +21,7 @@ import {
 	type GitRepositoryIdentity,
 	type GitTagInfo,
 	type GitTreeEntry,
+	type GitTreeInventory,
 	type GitTreeListOptions,
 	GitHistoryError,
 } from '../../history/git/gitTypes.js';
@@ -374,7 +375,7 @@ export class NodeGitHistoryService implements IGitHistoryService {
 		});
 	}
 
-	async listTree(rootPath: string, ref: string, options?: GitTreeListOptions | CancellationTokenLike, token?: CancellationTokenLike): Promise<GitTreeEntry[]> {
+	async listTree(rootPath: string, ref: string, options?: GitTreeListOptions | CancellationTokenLike, token?: CancellationTokenLike): Promise<GitTreeInventory> {
 		const resolvedSha = await this.resolveRef(rootPath, ref, token);
 		const opts = (options && 'maxEntries' in options) ? options : undefined;
 		const actualToken = (options && 'isCancellationRequested' in options) ? options : token;
@@ -396,6 +397,7 @@ export class NodeGitHistoryService implements IGitHistoryService {
 		const entries: GitTreeEntry[] = [];
 		const parts = res.stdout.split('\0').filter(Boolean);
 
+		let isTruncated = false;
 		for (const part of parts) {
 			// Format with -l: "<mode> <type> <object> <size>\t<file>"
 			const tabIndex = part.indexOf('\t');
@@ -422,11 +424,19 @@ export class NodeGitHistoryService implements IGitHistoryService {
 			});
 
 			if (typeof opts?.maxEntries === 'number' && opts.maxEntries > 0 && entries.length >= opts.maxEntries) {
+				isTruncated = parts.length > entries.length;
 				break;
 			}
 		}
 
-		return entries;
+		return {
+			entries,
+			isTruncated,
+			returnedCount: entries.length,
+			discoveredAtLeast: isTruncated ? entries.length + 1 : entries.length,
+			scope: opts?.scope,
+			truncationReason: isTruncated ? 'Git tree producer entry limit reached' : undefined,
+		};
 	}
 
 	async readFileAtRef(rootPath: string, ref: string, relativePath: string, token?: CancellationTokenLike): Promise<string> {

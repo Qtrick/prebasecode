@@ -123,6 +123,8 @@ export interface IMainContext extends IRPCProtocol {
 
 export interface MainThreadGitExtensionShape extends IDisposable {
 	$onDidChangeRepository(handle: number): Promise<void>;
+	$onDidOpenRepository(repository: { handle: number; rootUri: UriComponents; state: GitRepositoryStateDto }): Promise<void>;
+	$onDidCloseRepository(handle: number): Promise<void>;
 }
 
 export interface MainThreadClipboardShape extends IDisposable {
@@ -4045,6 +4047,13 @@ export interface GitTreeEntryDto {
 	readonly size?: number;
 }
 
+export interface GitTreeInventoryDto {
+	readonly entries: GitTreeEntryDto[];
+	readonly isTruncated: boolean;
+	readonly returnedCount: number;
+	readonly discoveredAtLeast: number;
+}
+
 export interface GitExactDiffChangeDto {
 	readonly kind: 'added' | 'deleted' | 'modified' | 'renamed' | 'copied';
 	readonly path: string;
@@ -4092,7 +4101,7 @@ export interface ExtHostGitExtensionShape {
 	$resolveCommitRef(handle: number, ref: string, token?: CancellationToken): Promise<GitHistoryResultDto<string>>;
 	$getCommitDetails(handle: number, ref: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto>>;
 	$getCommitLog(handle: number, options: GitLogOptionsDto, token?: CancellationToken): Promise<GitHistoryResultDto<GitCommitMetadataDto[]>>;
-	$listTreeEntries(handle: number, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>>;
+	$listTreeEntries(handle: number, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitHistoryResultDto<GitTreeInventoryDto>>;
 	$readBlobContent(handle: number, ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<GitHistoryResultDto<string>>;
 	$diffExactTrees(handle: number, refA: string, refB: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;
 	$diffCommitToParent(handle: number, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;

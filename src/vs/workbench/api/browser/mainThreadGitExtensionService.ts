@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { Sequencer } from '../../../base/common/async.js'; import { CancellationToken } from '../../../base/common/cancellation.js';
+import { Emitter } from '../../../base/common/event.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
 import { ResourceMap } from '../../../base/common/map.js';
 import { waitForState } from '../../../base/common/observable.js';
@@ -81,7 +82,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	private readonly _openRepositorySequencer = new Sequencer();
 
 	private _repositoryHandles = new ResourceMap<number>();
-	private _repositories = new Map<number, IGitRepository>();
+	private _repositories = new Map<number, GitRepository>();
+	private readonly _onDidOpenRepository = this._register(new Emitter<IGitRepository>());
+	readonly onDidOpenRepository = this._onDidOpenRepository.event;
+	private readonly _onDidCloseRepository = this._register(new Emitter<IGitRepository>());
+	readonly onDidCloseRepository = this._onDidCloseRepository.event;
 
 	get repositories(): Iterable<IGitRepository> {
 		return this._repositories.values();
@@ -118,12 +123,8 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 
 			const repositoryRootUri = URI.revive(result.rootUri);
 
-			// Create a new repository and store it in the maps
-			const state = toGitRepositoryState(result.state);
-			const repository = new GitRepository(repositoryRootUri, state, this);
-
-			this._repositories.set(result.handle, repository);
-			this._repositoryHandles.set(repositoryRootUri, result.handle);
+			const repository = this._upsertRepository(result.handle, repositoryRootUri, result.state);
+			const state = repository.state.get();
 
 			// Wait for the repository to be initialized (or timeout quickly for unborn repos)
 			if (state.HEAD === undefined) {
@@ -139,6 +140,37 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 
 			return repository;
 		});
+	}
+
+	async $onDidOpenRepository(result: { handle: number; rootUri: import('../../../base/common/uri.js').UriComponents; state: GitRepositoryStateDto }): Promise<void> {
+		const isNewRepository = !this._repositories.has(result.handle);
+		const repository = this._upsertRepository(result.handle, URI.revive(result.rootUri), result.state);
+		if (isNewRepository) {
+			this._onDidOpenRepository.fire(repository);
+		}
+	}
+
+	async $onDidCloseRepository(handle: number): Promise<void> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return;
+		}
+		this._repositories.delete(handle);
+		this._repositoryHandles.delete(repository.rootUri);
+		this._onDidCloseRepository.fire(repository);
+		repository.dispose();
+	}
+
+	private _upsertRepository(handle: number, rootUri: URI, stateDto: GitRepositoryStateDto): GitRepository {
+		const existing = this._repositories.get(handle);
+		if (existing) {
+			existing.updateState(toGitRepositoryState(stateDto));
+			return existing as GitRepository;
+		}
+		const repository = new GitRepository(rootUri, toGitRepositoryState(stateDto), this);
+		this._repositories.set(handle, repository);
+		this._repositoryHandles.set(rootUri, handle);
+		return repository;
 	}
 
 	async getRefs(root: URI, query: GitRefQuery, token?: CancellationToken): Promise<GitRef[]> {
@@ -215,7 +247,7 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 		return result.data;
 	}
 
-	async listTreeEntries(root: URI, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeEntry[]> {
+	async listTreeEntries(root: URI, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<{ entries: GitTreeEntry[]; isTruncated: boolean; returnedCount: number; discoveredAtLeast: number }> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
 			throwGitError({ code: 'RepositoryUnavailable', message: `Repository not found for root: ${root.toString()}` });

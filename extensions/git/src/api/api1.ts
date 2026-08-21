@@ -136,6 +136,10 @@ export class ApiRepository implements Repository {
 		return this.#repository.getObjectFiles(ref, options);
 	}
 
+	getObjectFilesInventory(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<{ entries: { mode: string; type: string; object: string; size: string; file: string }[]; isTruncated: boolean; returnedCount: number; discoveredAtLeast: number }> {
+		return this.#repository.getObjectFilesInventory(ref, options, token);
+	}
+
 	detectObjectType(object: string): Promise<{ mimetype: string; encoding?: string }> {
 		return this.#repository.detectObjectType(object);
 	}

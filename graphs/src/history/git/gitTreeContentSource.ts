@@ -43,9 +43,9 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 	}
 
 	async listFiles(token?: CancellationTokenLike): Promise<ScannedFileInventory> {
-		const rawTree: any = await this._gitService.listTree(this.rootPath, this.commitSha, { maxEntries: this._maxScanFiles * 2 }, token);
-		const treeEntries: GitTreeEntry[] = Array.isArray(rawTree) ? rawTree : rawTree?.entries || [];
-		const isProducerTruncated = !Array.isArray(rawTree) && Boolean(rawTree?.isTruncated);
+		const rawTree = await this._gitService.listTree(this.rootPath, this.commitSha, { maxEntries: this._maxScanFiles * 2 }, token);
+		const treeEntries = rawTree.entries;
+		const isProducerTruncated = rawTree.isTruncated;
 		const files: ScannedFile[] = [];
 		const entriesMap = new Map<string, GitTreeEntry>();
 		let isTruncated = isProducerTruncated;
@@ -93,7 +93,7 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 			isTruncated,
 			discoveredCount,
 			eligibleCount: files.length,
-			truncationReason: isTruncated ? (isProducerTruncated ? ((rawTree as any).truncationReason || 'Tree enumeration truncated by producer limit') : `Exceeded maxScanFiles limit of ${this._maxScanFiles}`) : undefined,
+			truncationReason: isTruncated ? (isProducerTruncated ? (rawTree.truncationReason || 'Tree enumeration truncated by producer limit') : `Exceeded maxScanFiles limit of ${this._maxScanFiles}`) : undefined,
 		};
 	}
 

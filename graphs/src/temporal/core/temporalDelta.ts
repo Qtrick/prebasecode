@@ -4,6 +4,7 @@
 
 import { CURRENT_DELTA_VERSION } from '../common/temporalVersioning.js';
 import { computeCanonicalGraphDigest } from '../../core/canonical/canonicalGraphDigest.js';
+import { TemporalError } from '../common/temporalErrors.js';
 import type {
 	ArchitectureGraphData,
 	TemporalEdgeSnapshot,
@@ -83,12 +84,25 @@ export class TemporalDeltaEngine {
 
 		const baseCommitSha = parentSnap?.commitSha ?? '';
 		const targetCanonicalDigest = currentSnap.digest || currentSnap.canonicalSnapshot?.digest;
+		const targetCanonicalMetadata = currentSnap.canonicalSnapshot ? {
+			projectPath: currentSnap.canonicalSnapshot.projectPath,
+			projectName: currentSnap.canonicalSnapshot.projectName,
+			entryNodeId: currentSnap.canonicalSnapshot.entryNodeId,
+			analyzedAt: currentSnap.canonicalSnapshot.analyzedAt,
+			sourceIdentity: currentSnap.canonicalSnapshot.sourceIdentity,
+			versions: currentSnap.canonicalSnapshot.versions,
+			coverage: currentSnap.canonicalSnapshot.coverage,
+			completeness: currentSnap.canonicalSnapshot.completeness,
+			manifest: currentSnap.canonicalSnapshot.manifest,
+		} : undefined;
 
 		return {
 			commitSha: currentSnap.commitSha,
 			baseCommitSha,
 			parentCommitSha: baseCommitSha,
 			targetCanonicalDigest,
+			targetTimestamp: currentSnap.timestamp,
+			targetCanonicalMetadata,
 			deltaVersion: CURRENT_DELTA_VERSION,
 			entitiesAdded,
 			entitiesModified,
@@ -154,6 +168,19 @@ export class TemporalDeltaEngine {
 			newEdgeMap.set(added.edgeId, added);
 		}
 
+		// A reconstructed target is an occurrence at the target commit even when
+		// its structural content was preserved from the base state.
+		for (const [entityId, entity] of newEntityMap) {
+			if (entity.commitSha !== delta.commitSha) {
+				newEntityMap.set(entityId, { ...entity, commitSha: delta.commitSha });
+			}
+		}
+		for (const [edgeId, edge] of newEdgeMap) {
+			if (edge.commitSha !== delta.commitSha) {
+				newEdgeMap.set(edgeId, { ...edge, commitSha: delta.commitSha });
+			}
+		}
+
 		// 8. Reconstruct ArchitectureGraphData with deterministic sorting
 		const nodes = Array.from(newEntityMap.values()).map(e => e.nodeData);
 		const edges = Array.from(newEdgeMap.values()).map(e => e.edgeData);
@@ -162,28 +189,48 @@ export class TemporalDeltaEngine {
 		const sortedNodes = [...nodes].sort((a, b) => stableCompare(a.id, b.id));
 		const sortedEdges = [...edges].sort((a, b) => stableCompare(a.id, b.id));
 
+		const targetTimestamp = delta.targetTimestamp ?? delta.targetCanonicalMetadata?.analyzedAt ?? baseSnap.timestamp;
 		const graphData: ArchitectureGraphData = {
 			nodes: sortedNodes,
 			edges: sortedEdges,
-			timestamp: baseSnap.timestamp,
+			timestamp: targetTimestamp,
 		};
 
-		const derivedDigest = delta.targetCanonicalDigest || computeCanonicalGraphDigest({
+		const entryNodeId = delta.targetCanonicalMetadata?.entryNodeId ?? baseSnap.canonicalSnapshot?.entryNodeId ?? null;
+		const derivedDigest = computeCanonicalGraphDigest({
 			nodes: sortedNodes,
 			edges: sortedEdges,
-			entryNodeId: baseSnap.canonicalSnapshot?.entryNodeId ?? null,
+			entryNodeId,
 		});
+		if (delta.targetCanonicalDigest && derivedDigest !== delta.targetCanonicalDigest) {
+			throw new TemporalError(
+				'DatabaseCorrupted',
+				`Reconstructed canonical content for '${delta.commitSha}' does not match its stored digest`
+			);
+		}
+
+		const canonicalMetadata = delta.targetCanonicalMetadata ?? (baseSnap.canonicalSnapshot ? {
+			projectPath: baseSnap.canonicalSnapshot.projectPath,
+			projectName: baseSnap.canonicalSnapshot.projectName,
+			entryNodeId: baseSnap.canonicalSnapshot.entryNodeId,
+			analyzedAt: targetTimestamp,
+			sourceIdentity: baseSnap.canonicalSnapshot.sourceIdentity,
+			versions: baseSnap.canonicalSnapshot.versions,
+			coverage: baseSnap.canonicalSnapshot.coverage,
+			completeness: baseSnap.canonicalSnapshot.completeness,
+			manifest: baseSnap.canonicalSnapshot.manifest,
+		} : undefined);
 
 		return {
 			schemaVersion: baseSnap.schemaVersion,
 			analyzerVersion: baseSnap.analyzerVersion,
 			profileVersion: baseSnap.profileVersion,
 			commitSha: delta.commitSha,
-			timestamp: baseSnap.timestamp,
+			timestamp: targetTimestamp,
 			isCheckpoint,
 			digest: derivedDigest,
-			canonicalSnapshot: baseSnap.canonicalSnapshot ? {
-				...baseSnap.canonicalSnapshot,
+			canonicalSnapshot: canonicalMetadata ? {
+				...canonicalMetadata,
 				nodes: sortedNodes,
 				edges: sortedEdges,
 				digest: derivedDigest,

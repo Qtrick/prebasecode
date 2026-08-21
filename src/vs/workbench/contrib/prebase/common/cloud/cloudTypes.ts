@@ -24,6 +24,8 @@ export interface IPreBaseSupabaseSession {
 
 export interface IPreBaseCloudAuthConfig {
 	readonly mode: PreBaseCloudAuthMode;
+	/** Safe configuration diagnostic; never contains credential material. */
+	readonly configurationError?: 'invalid-url' | 'invalid-client-key' | 'incomplete';
 	/** Normalized `https://…supabase.co` when mode is `supabase`. */
 	readonly supabaseUrl?: string;
 	readonly publishableKey?: string;
@@ -31,7 +33,7 @@ export interface IPreBaseCloudAuthConfig {
 	readonly legacyApiBaseUrl?: string;
 }
 
-/** Optional `product.json` fields (never commit secret keys). */
+/** Optional `product.json` fields (publishable keys are public; never commit secret keys). */
 export interface IPreBaseProductCloudFields {
 	prebaseCloudUrl?: string;
 	prebaseCloudPublishableKey?: string;

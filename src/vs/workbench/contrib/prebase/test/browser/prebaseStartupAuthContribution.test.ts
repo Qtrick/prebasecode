@@ -7,6 +7,7 @@ import assert from 'assert';
 import { mainWindow } from '../../../../../base/browser/window.js';
 import { Emitter, type Event } from '../../../../../base/common/event.js';
 import { toDisposable } from '../../../../../base/common/lifecycle.js';
+import { URI } from '../../../../../base/common/uri.js';
 import { upcastPartial } from '../../../../../base/test/common/mock.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import type { IProductService } from '../../../../../platform/product/common/productService.js';
@@ -26,6 +27,7 @@ class TestAccountService implements IPreBaseAccountService {
 	lastError = undefined;
 	apiConfigured = true;
 	signInCalls = 0;
+	oauthCallbacks: string[] = [];
 
 	whenInitialSessionResolved(): Promise<void> { return Promise.resolve(); }
 	isOnboardingComplete(): boolean { return true; }
@@ -34,7 +36,7 @@ class TestAccountService implements IPreBaseAccountService {
 	async signIn(): Promise<void> { }
 	async signUp(): Promise<void> { }
 	async signInWithProvider(_provider: PreBaseOAuthProvider): Promise<void> { this.signInCalls++; }
-	async handleOAuthCallback(): Promise<boolean> { return true; }
+	async handleOAuthCallback(uri: URI): Promise<boolean> { this.oauthCallbacks.push(uri.toString()); return true; }
 	async signOut(): Promise<void> { }
 	async restoreSession(): Promise<void> { }
 
@@ -110,6 +112,33 @@ suite('PreBase startup auth overlay lifecycle', () => {
 		githubButton(await waitForAuthOverlay()).click();
 		assert.strictEqual(accountService.signInCalls, 1, 'the current overlay must retain its live sign-in listener');
 		assert.strictEqual(urlHandlers.length, 1);
+		contribution.dispose();
+	});
+
+	test('routes buffered cold-start and subsequent warm OAuth deep links through the same strict handler', async () => {
+		const accountService = disposables.add(new TestAccountService());
+		const coldUri = URI.parse('prebase://auth/callback?sb_flow_id=cold&code=cold-code');
+		let registeredHandler: IURLHandler | undefined;
+		const contribution = disposables.add(new PreBaseStartupAuthContribution(
+			accountService,
+			upcastPartial<IEditorService>({ editors: [] }),
+			upcastPartial<IWorkbenchEnvironmentService>({ skipWelcome: true }),
+			upcastPartial<IProductService>({ urlProtocol: 'prebase' }),
+			upcastPartial<IURLService>({
+				registerHandler: handler => {
+					registeredHandler = handler;
+					queueMicrotask(() => { void handler.handleURL(coldUri); });
+					return toDisposable(() => { registeredHandler = undefined; });
+				},
+			}),
+		));
+		await Promise.resolve();
+		await Promise.resolve();
+
+		const warmUri = URI.parse('prebase://auth/callback?sb_flow_id=warm&code=warm-code');
+		assert.strictEqual(await registeredHandler?.handleURL(warmUri), true);
+		assert.strictEqual(await registeredHandler?.handleURL(URI.parse('prebase://other/callback?code=ignored')), false);
+		assert.deepStrictEqual(accountService.oauthCallbacks, [coldUri.toString(), warmUri.toString()]);
 		contribution.dispose();
 	});
 });

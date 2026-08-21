@@ -124,6 +124,9 @@ export interface Change {
 	readonly originalUri: Uri;
 	readonly renameUri: Uri | undefined;
 	readonly status: Status;
+	readonly oldBlobOid?: string;
+	readonly newBlobOid?: string;
+	readonly similarity?: number;
 }
 
 export interface DiffChange extends Change {
@@ -262,6 +265,7 @@ export interface Repository {
 
 	getObjectDetails(treeish: string, path: string): Promise<{ mode: string, object: string, size: number }>;
 	getObjectFiles(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }): Promise<{ mode: string; type: string; object: string; size: string; file: string }[]>;
+	getObjectFilesInventory(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<{ entries: { mode: string; type: string; object: string; size: string; file: string }[]; isTruncated: boolean; returnedCount: number; discoveredAtLeast: number }>;
 	detectObjectType(object: string): Promise<{ mimetype: string, encoding?: string }>;
 	buffer(ref: string, path: string): Promise<Buffer>;
 	show(ref: string, path: string): Promise<string>;

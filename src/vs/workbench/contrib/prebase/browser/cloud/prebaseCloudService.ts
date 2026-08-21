@@ -152,18 +152,18 @@ export class PreBaseCloudService extends Disposable implements IPreBaseCloudServ
 	private _inFlightRefresh?: Promise<string | undefined>;
 
 	async refreshAccessTokenIfNeeded(cancel: CancellationToken): Promise<string | undefined> {
-		if (this._inFlightRefresh) {
-			return this._inFlightRefresh;
+		if (!this._inFlightRefresh) {
+			const promise = this._doRefreshAccessTokenIfNeeded(CancellationToken.None);
+			this._inFlightRefresh = promise;
+			const clearIfCurrent = () => {
+				if (this._inFlightRefresh === promise) {
+					this._inFlightRefresh = undefined;
+				}
+			};
+			void promise.then(clearIfCurrent, clearIfCurrent);
 		}
-
-		const promise = this._doRefreshAccessTokenIfNeeded(cancel);
-		this._inFlightRefresh = promise;
-		promise.finally(() => {
-			if (this._inFlightRefresh === promise) {
-				this._inFlightRefresh = undefined;
-			}
-		});
-		return promise;
+		const accessToken = await this._inFlightRefresh;
+		return cancel.isCancellationRequested ? undefined : accessToken;
 	}
 
 	private async _doRefreshAccessTokenIfNeeded(cancel: CancellationToken): Promise<string | undefined> {
@@ -197,6 +197,10 @@ export class PreBaseCloudService extends Disposable implements IPreBaseCloudServ
 			if (cancel.isCancellationRequested || !refreshed.access_token) {
 				return undefined;
 			}
+			const currentSession = await this._sessionAdapter.read();
+			if (currentSession?.refreshToken !== session.refreshToken) {
+				return undefined;
+			}
 			await this._sessionAdapter.write({
 				accessToken: refreshed.access_token,
 				refreshToken: refreshed.refresh_token ?? session.refreshToken,
@@ -206,7 +210,10 @@ export class PreBaseCloudService extends Disposable implements IPreBaseCloudServ
 		} catch (err) {
 			const msg = err instanceof Error ? err.message : String(err);
 			this.logService.warn(`[PreBaseCloud] token refresh failed: ${redactSensitiveForLog(msg)}`);
-			await this._sessionAdapter.clear();
+			const currentSession = await this._sessionAdapter.read();
+			if (currentSession?.refreshToken === session.refreshToken) {
+				await this._sessionAdapter.clear();
+			}
 			this.markOffline();
 			return undefined;
 		}

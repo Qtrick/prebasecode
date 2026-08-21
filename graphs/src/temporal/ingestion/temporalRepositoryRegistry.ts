@@ -12,6 +12,8 @@ export type TemporalStoreFactory = (repositoryId: string, rootPath: string) => P
 export class TemporalRepositoryRegistry {
 	private readonly _stores = new Map<string, ITemporalStore>();
 	private readonly _runtimes = new Map<string, TemporalRepositoryRuntime>();
+	private readonly _storeCreations = new Map<string, Promise<ITemporalStore>>();
+	private readonly _runtimeCreations = new Map<string, Promise<TemporalRepositoryRuntime>>();
 	private readonly _storeFactory: TemporalStoreFactory;
 
 	constructor(storeFactory: TemporalStoreFactory) {
@@ -26,7 +28,44 @@ export class TemporalRepositoryRegistry {
 			}
 			return existing;
 		}
+		const pending = this._storeCreations.get(repositoryId);
+		if (pending) {
+			return pending;
+		}
 
+		const creation = this._createStore(repositoryId, rootPath);
+		this._storeCreations.set(repositoryId, creation);
+		try {
+			return await creation;
+		} finally {
+			if (this._storeCreations.get(repositoryId) === creation) {
+				this._storeCreations.delete(repositoryId);
+			}
+		}
+	}
+
+	async getRuntime(repositoryId: string, rootPath: string, gitService: IGitHistoryService): Promise<TemporalRepositoryRuntime> {
+		const existing = this._runtimes.get(repositoryId);
+		if (existing) {
+			return existing;
+		}
+		const pending = this._runtimeCreations.get(repositoryId);
+		if (pending) {
+			return pending;
+		}
+
+		const creation = this._createRuntime(repositoryId, rootPath, gitService);
+		this._runtimeCreations.set(repositoryId, creation);
+		try {
+			return await creation;
+		} finally {
+			if (this._runtimeCreations.get(repositoryId) === creation) {
+				this._runtimeCreations.delete(repositoryId);
+			}
+		}
+	}
+
+	private async _createStore(repositoryId: string, rootPath: string): Promise<ITemporalStore> {
 		try {
 			const store = await this._storeFactory(repositoryId, rootPath);
 			if (!store.isOpen()) {
@@ -43,12 +82,7 @@ export class TemporalRepositoryRegistry {
 		}
 	}
 
-	async getRuntime(repositoryId: string, rootPath: string, gitService: IGitHistoryService): Promise<TemporalRepositoryRuntime> {
-		const existing = this._runtimes.get(repositoryId);
-		if (existing) {
-			return existing;
-		}
-
+	private async _createRuntime(repositoryId: string, rootPath: string, gitService: IGitHistoryService): Promise<TemporalRepositoryRuntime> {
 		const store = await this.getStore(repositoryId, rootPath);
 		const runtime = new TemporalRepositoryRuntime(repositoryId, rootPath, store, gitService);
 		this._runtimes.set(repositoryId, runtime);
@@ -61,6 +95,10 @@ export class TemporalRepositoryRegistry {
 
 	hasRuntime(repositoryId: string): boolean {
 		return this._runtimes.has(repositoryId);
+	}
+
+	getExistingRuntime(repositoryId: string): TemporalRepositoryRuntime | undefined {
+		return this._runtimes.get(repositoryId);
 	}
 
 	async closeStore(repositoryId: string): Promise<void> {

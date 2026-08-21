@@ -764,6 +764,8 @@ export interface Commit {
 	authorDate?: Date;
 	authorName?: string;
 	authorEmail?: string;
+	committerName?: string;
+	committerEmail?: string;
 	commitDate?: Date;
 	refNames: string[];
 	shortStat?: CommitShortStat;
@@ -1010,6 +1012,13 @@ export interface LsTreeElement {
 	object: string;
 	size: string;
 	file: string;
+}
+
+export interface LsTreeInventory {
+	readonly entries: LsTreeElement[];
+	readonly isTruncated: boolean;
+	readonly returnedCount: number;
+	readonly discoveredAtLeast: number;
 }
 
 export function parseLsTree(raw: string): LsTreeElement[] {
@@ -1666,25 +1675,87 @@ export class Repository {
 	}
 
 	async lstree(treeish: string, path?: string, options?: { recursive?: boolean; maxEntries?: number; scope?: string }): Promise<LsTreeElement[]> {
+		return (await this.lstreeInventory(treeish, path, options)).entries;
+	}
+
+	async lstreeInventory(treeish: string, path?: string, options?: { recursive?: boolean; maxEntries?: number; scope?: string; cancellationToken?: CancellationToken }): Promise<LsTreeInventory> {
 		const args = ['ls-tree', '-l'];
 
 		if (options?.recursive) {
 			args.push('-r');
 		}
 
-		args.push(treeish);
+		args.push('-z', '--full-name', '--end-of-options', treeish);
 
 		const targetPath = options?.scope || path;
 		if (targetPath) {
 			args.push('--', this.sanitizeRelativePath(targetPath));
 		}
 
-		const { stdout } = await this.exec(args);
-		const parsed = parseLsTree(stdout);
-		if (typeof options?.maxEntries === 'number' && options.maxEntries > 0 && parsed.length > options.maxEntries) {
-			return parsed.slice(0, options.maxEntries);
-		}
-		return parsed;
+		const maxEntries = typeof options?.maxEntries === 'number' && options.maxEntries > 0 ? options.maxEntries : undefined;
+		const child = this.stream(args);
+		return await new Promise<LsTreeInventory>((resolve, reject) => {
+			const entries: LsTreeElement[] = [];
+			const stderr: Buffer[] = [];
+			let pending = Buffer.alloc(0);
+			let intentionalStop = false;
+			let cancelled = false;
+			let settled = false;
+			const cancellation = options?.cancellationToken?.onCancellationRequested(() => {
+				cancelled = true;
+				child.kill();
+			});
+
+			const finish = (callback: () => void) => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				cancellation?.dispose();
+				callback();
+			};
+			const parseRecord = (record: string): LsTreeElement | undefined => {
+				const match = /^(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\t([\s\S]*)$/.exec(record);
+				return match ? { mode: match[1], type: match[2], object: match[3], size: match[4], file: match[5] } : undefined;
+			};
+
+			child.stdout?.on('data', (chunk: Buffer) => {
+				pending = Buffer.concat([pending, chunk]);
+				let separator = pending.indexOf(0);
+				while (separator >= 0) {
+					const record = pending.subarray(0, separator).toString('utf8');
+					pending = pending.subarray(separator + 1);
+					const parsed = parseRecord(record);
+					if (parsed) {
+						if (maxEntries !== undefined && entries.length >= maxEntries) {
+							intentionalStop = true;
+							child.kill();
+							return;
+						}
+						entries.push(parsed);
+					}
+					separator = pending.indexOf(0);
+				}
+			});
+			child.stderr?.on('data', (chunk: Buffer) => stderr.push(chunk));
+			child.on('error', err => finish(() => reject(err)));
+			child.on('close', code => finish(() => {
+				if (cancelled) {
+					reject(new CancellationError());
+					return;
+				}
+				if (!intentionalStop && code !== 0) {
+					reject(new GitError({ message: 'Failed to enumerate Git tree', stderr: Buffer.concat(stderr).toString('utf8'), exitCode: code ?? undefined }));
+					return;
+				}
+				resolve({
+					entries,
+					isTruncated: intentionalStop,
+					returnedCount: entries.length,
+					discoveredAtLeast: intentionalStop ? entries.length + 1 : entries.length,
+				});
+			}));
+		});
 	}
 
 	async lsfiles(path: string): Promise<LsFilesElement[]> {

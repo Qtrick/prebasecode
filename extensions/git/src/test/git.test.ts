@@ -4,11 +4,78 @@
  *--------------------------------------------------------------------------------------------*/
 
 import 'mocha';
-import { GitStatusParser, parseGitCommits, parseGitmodules, parseLsTree, parseLsFiles, parseGitRemotes, parseCoAuthors } from '../git';
+import { GitStatusParser, Repository, parseGitCommits, parseGitmodules, parseLsTree, parseLsFiles, parseGitRemotes, parseCoAuthors } from '../git';
 import * as assert from 'assert';
 import { splitInChunks } from '../util';
+import { EventEmitter } from 'node:events';
+import { PassThrough } from 'node:stream';
+import type { ChildProcess } from 'node:child_process';
 
 suite('git', () => {
+	suite('bounded tree inventory producer', () => {
+		function createRepositoryWithChild(): { repository: Repository; child: ChildProcess; stdout: PassThrough; getKillCalls: () => number } {
+			const stdout = new PassThrough();
+			const stderr = new PassThrough();
+			const emitter = new EventEmitter();
+			let killCalls = 0;
+			const child = Object.assign(emitter, {
+				stdout,
+				stderr,
+				kill: () => {
+					killCalls++;
+					queueMicrotask(() => emitter.emit('close', null));
+					return true;
+				},
+			}) as unknown as ChildProcess;
+			const git = { stream: () => child } as any;
+			const repository = new Repository(git, '/repo', undefined, {} as any, { warn: () => {} } as any);
+			return { repository, child, stdout, getKillCalls: () => killCalls };
+		}
+
+		test('kills ls-tree after observing maxEntries + 1 and reports truthful truncation', async () => {
+			const { repository, stdout, getKillCalls } = createRepositoryWithChild();
+			const inventoryPromise = repository.lstreeInventory('HEAD', undefined, { recursive: true, maxEntries: 2 });
+			stdout.write(Buffer.from(
+				'100644 blob aaaa 1\tfirst.ts\0' +
+				'100644 blob bbbb 1\tsecond.ts\0' +
+				'100644 blob cccc 1\tthird.ts\0' +
+				'100644 blob dddd 1\tfourth.ts\0',
+			));
+
+			const inventory = await inventoryPromise;
+			assert.deepStrictEqual({
+				files: inventory.entries.map(entry => entry.file),
+				isTruncated: inventory.isTruncated,
+				returnedCount: inventory.returnedCount,
+				discoveredAtLeast: inventory.discoveredAtLeast,
+				killCalls: getKillCalls(),
+			}, {
+				files: ['first.ts', 'second.ts'],
+				isTruncated: true,
+				returnedCount: 2,
+				discoveredAtLeast: 3,
+				killCalls: 1,
+			});
+		});
+
+		test('cancellation kills the active ls-tree process and rejects instead of publishing partial inventory', async () => {
+			const { repository, getKillCalls } = createRepositoryWithChild();
+			let cancellationListener: (() => void) | undefined;
+			const token = {
+				isCancellationRequested: false,
+				onCancellationRequested: (listener: () => void) => {
+					cancellationListener = listener;
+					return { dispose: () => { cancellationListener = undefined; } };
+				},
+			} as any;
+			const inventoryPromise = repository.lstreeInventory('HEAD', undefined, { recursive: true, cancellationToken: token });
+			cancellationListener?.();
+
+			await assert.rejects(inventoryPromise, error => error instanceof Error && error.name === 'Canceled');
+			assert.strictEqual(getKillCalls(), 1);
+		});
+	});
+
 	suite('GitStatusParser', () => {
 		test('empty parser', () => {
 			const parser = new GitStatusParser();
@@ -759,4 +826,3 @@ suite('git', () => {
 		});
 	});
 });
-

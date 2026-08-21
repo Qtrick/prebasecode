@@ -5,6 +5,12 @@
 import assert from 'node:assert';
 import { WorkbenchGitHistoryService, type WorkbenchGitServiceLike } from '../../host/workbench/workbenchGitHistoryService.js';
 import { GitHistoryError } from '../../history/git/gitTypes.js';
+const uriIdentityService = {
+	extUri: {
+		isEqual: (first: { fsPath: string }, second: { fsPath: string }) => first.fsPath === second.fsPath,
+		isEqualOrParent: (resource: { fsPath: string }, candidate: { fsPath: string }) => resource.fsPath === candidate.fsPath || resource.fsPath.startsWith(`${candidate.fsPath}/`),
+	},
+} as any;
 
 suite('Production Git Bridge Contract Unit Tests', () => {
 	const mockRepo = {
@@ -111,9 +117,10 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 			};
 		},
 		async listTreeEntries(_ref: string) {
-			return [
+			const entries = [
 				{ path: 'src/app.ts', objectId: 'blobA1', mode: '100644', objectType: 'blob', size: 500 },
 			];
+			return { entries, isTruncated: false, discoveredAtLeast: entries.length };
 		},
 		async readBlobContent(_ref: string, path: string, maxBytes?: number) {
 			if (path === 'src/app.ts') {
@@ -138,7 +145,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	};
 
 	test('distinguishes exact tree diff from review range diff on divergent branches', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const exactDiff = await service.diffCommitTrees('/workspace/app', 'feature', 'main');
 		const reviewDiff = await service.diffReviewRange('/workspace/app', 'main', 'feature');
 
@@ -153,7 +160,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('peels annotated tags and marks isAnnotated truthfully', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const tags = await service.listTags('/workspace/app');
 
 		assert.strictEqual(tags.length, 2);
@@ -171,7 +178,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('preserves committer distinct from author with valid timestamps', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const commit = await service.getCommit('/workspace/app', 'aaaa111122223333444455556666777788889999');
 
 		assert.strictEqual(commit.author.name, 'Alice Author');
@@ -184,7 +191,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('rejects option-like ref injection safely', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		await assert.rejects(
 			async () => service.resolveRef('/workspace/app', '--help'),
 			(err: any) => {
@@ -196,7 +203,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('supports firstParent log option for merge DAG traversal', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const commits = await service.log('/workspace/app', { firstParent: true });
 
 		assert.strictEqual(commits.length, 1);
@@ -204,7 +211,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('propagates OversizedBlob error code when reading content beyond limit', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const content = await service.readFileAtRef('/workspace/app', 'HEAD', 'src/app.ts');
 		assert.strictEqual(content, 'export const app = true;');
 	});

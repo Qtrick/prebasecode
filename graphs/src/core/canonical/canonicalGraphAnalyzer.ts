@@ -14,7 +14,7 @@ import type { GraphEdge, GraphNode, ParseResult, ScannedFile } from '../../commo
 import { assignLayersToNodes } from '../analysis/architectureLayers.js';
 import { detectEntryNodeId } from '../analysis/entryDetector.js';
 import { GraphGenerator } from '../generation/graphGenerator.js';
-import { ParserEngine } from '../parsing/parserEngine.js';
+import type { ParserEngine } from '../parsing/parserEngine.js';
 import { computeCanonicalGraphDigest } from './canonicalGraphDigest.js';
 import type { CancellationTokenLike, IRepositoryContentSource } from './contentSource.js';
 import { createCurrentVersionMetadata } from './versioning.js';
@@ -37,7 +37,7 @@ export class CanonicalGraphAnalyzer {
 	private readonly _maxFileSizeBytes: number;
 	private readonly _includeFolders: boolean;
 	private readonly _includeFunctions: boolean;
-	private readonly _parserEngine: ParserEngine;
+	private _parserEnginePromise: Promise<ParserEngine> | undefined;
 	private readonly _parseArtifactCache?: ICanonicalParseArtifactCache;
 
 	constructor(options: CanonicalAnalysisOptions = {}) {
@@ -45,7 +45,6 @@ export class CanonicalGraphAnalyzer {
 		this._maxFileSizeBytes = options.maxFileSizeBytes ?? DEFAULT_MAX_FILE_SIZE_BYTES;
 		this._includeFolders = options.includeFolders ?? false;
 		this._includeFunctions = options.includeFunctions ?? false;
-		this._parserEngine = new ParserEngine();
 		this._parseArtifactCache = options.parseArtifactCache;
 	}
 
@@ -284,7 +283,8 @@ export class CanonicalGraphAnalyzer {
 			}
 
 			// Use ParserEngine with content override for full Babel AST / fallback / Vue / Svelte parity
-			const parseResult = await this._parserEngine.parseFile(file, content);
+			const parserEngine = await this._getParserEngine();
+			const parseResult = await parserEngine.parseFile(file, content);
 			if (!parseResult) {
 				recordExclusion(file.relativePath, 'parse-error');
 				return undefined;
@@ -312,6 +312,14 @@ export class CanonicalGraphAnalyzer {
 			recordExclusion(file.relativePath, 'parse-error');
 			return undefined;
 		}
+	}
+
+	private _getParserEngine(): Promise<ParserEngine> {
+		// ParserEngine carries Babel's Node-style package imports. Loading it lazily keeps
+		// those imports out of the Electron renderer's startup module graph; analysis
+		// failures remain contained in the typed indexing path instead of crashing the
+		// entire workbench before a repository has requested parsing.
+		return this._parserEnginePromise ??= import('../parsing/parserEngine.js').then(module => new module.ParserEngine());
 	}
 
 	private _isLikelyBinary(content: string): boolean {

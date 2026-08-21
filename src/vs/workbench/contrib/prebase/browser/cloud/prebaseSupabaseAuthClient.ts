@@ -38,14 +38,12 @@ export class PreBaseSupabaseAuthClient {
 		);
 	}
 
-	createOAuthAuthorizationUrl(provider: PreBaseSupabaseOAuthProvider, redirectTo: string, codeChallenge: string, state: string): string {
+	createOAuthAuthorizationUrl(provider: PreBaseSupabaseOAuthProvider, redirectTo: string, codeChallenge: string): string {
 		const url = new URL(buildSupabaseAuthUrl(this.supabaseUrl, '/authorize'));
 		url.searchParams.set('provider', provider);
 		url.searchParams.set('redirect_to', redirectTo);
-		url.searchParams.set('flow_type', 'pkce');
 		url.searchParams.set('code_challenge', codeChallenge);
-		url.searchParams.set('code_challenge_method', 'S256');
-		url.searchParams.set('state', state);
+		url.searchParams.set('code_challenge_method', 's256');
 		url.searchParams.set('scopes', provider === 'github' ? 'read:user user:email' : 'openid email profile');
 		return url.toString();
 	}
@@ -101,7 +99,7 @@ export class PreBaseSupabaseAuthClient {
 		try {
 			await this.requestService.request({
 				type: 'POST',
-				url: buildSupabaseAuthUrl(this.supabaseUrl, '/logout'),
+				url: buildSupabaseAuthUrl(this.supabaseUrl, '/logout?scope=local'),
 				headers: {
 					apikey: this.publishableKey,
 					Authorization: `Bearer ${accessToken}`,

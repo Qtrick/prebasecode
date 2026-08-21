@@ -119,6 +119,13 @@ interface LsTreeItem {
 	readonly file: string;
 }
 
+interface LsTreeInventory {
+	readonly entries: LsTreeItem[];
+	readonly isTruncated: boolean;
+	readonly returnedCount: number;
+	readonly discoveredAtLeast: number;
+}
+
 interface Repository {
 	readonly rootUri: vscode.Uri;
 	readonly state: RepositoryState;
@@ -131,6 +138,7 @@ interface Repository {
 	resolveCommitRef?(ref: string): Promise<string>;
 	log?(options?: LogOptions): Promise<Commit[]>;
 	getObjectFiles?(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }): Promise<LsTreeItem[]>;
+	getObjectFilesInventory?(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }, token?: vscode.CancellationToken): Promise<LsTreeInventory>;
 	getObjectDetails?(treeish: string, path: string): Promise<{ mode: string; object: string; size: number }>;
 	show?(ref: string, path: string): Promise<string>;
 	buffer?(ref: string, path: string): Promise<Buffer>;
@@ -206,6 +214,9 @@ interface GitRefQuery {
 }
 
 interface GitExtensionAPI {
+	readonly repositories: readonly Repository[];
+	readonly onDidOpenRepository: Event<Repository>;
+	readonly onDidCloseRepository: Event<Repository>;
 	openRepository(root: vscode.Uri): Promise<Repository | null>;
 }
 
@@ -256,6 +267,7 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 	private static _handlePool: number = 0;
 
 	private _gitApi: GitExtensionAPI | undefined;
+	private _gitApiListenersInstalled = false;
 
 	private readonly _proxy: MainThreadGitExtensionShape;
 
@@ -288,6 +300,10 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			return undefined;
 		}
 
+		return this._registerRepository(repository);
+	}
+
+	private _registerRepository(repository: Repository): { handle: number; rootUri: UriComponents; state: GitRepositoryStateDto } {
 		const existingHandle = this._repositoryByUri.get(repository.rootUri);
 		if (existingHandle !== undefined) {
 			if (this._repositories.get(existingHandle) !== repository) {
@@ -311,6 +327,17 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 
 		const state = this._getRepositoryState(repository);
 		return { handle, rootUri: repository.rootUri, state };
+	}
+
+	private _unregisterRepository(repository: Repository): number | undefined {
+		const handle = this._repositoryByUri.get(repository.rootUri);
+		if (handle === undefined) {
+			return undefined;
+		}
+		this._repositoryStateChangeListeners.deleteAndDispose(handle);
+		this._repositoryByUri.delete(repository.rootUri);
+		this._repositories.delete(handle);
+		return handle;
 	}
 
 	async $getRefs(handle: number, query: GitRefQueryDto, token?: vscode.CancellationToken): Promise<GitRefDto[]> {
@@ -529,7 +556,7 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 	}
 
-	async $listTreeEntries(handle: number, ref: string, options?: { maxEntries?: number; scope?: string }, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<GitTreeEntryDto[]>> {
+	async $listTreeEntries(handle: number, ref: string, options?: { maxEntries?: number; scope?: string }, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<{ entries: GitTreeEntryDto[]; isTruncated: boolean; returnedCount: number; discoveredAtLeast: number }>> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {
 			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
@@ -538,18 +565,23 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
 		}
 		try {
-			if (typeof repository.getObjectFiles === 'function') {
-				const items = await repository.getObjectFiles(ref, { recursive: true, path: options?.scope, maxEntries: options?.maxEntries, scope: options?.scope });
-				const entries: GitTreeEntryDto[] = (items || []).map(item => ({
+			if (typeof repository.getObjectFilesInventory === 'function') {
+				const inventory = await repository.getObjectFilesInventory(ref, { recursive: true, path: options?.scope, maxEntries: options?.maxEntries, scope: options?.scope }, token);
+				const entries: GitTreeEntryDto[] = (inventory.entries || []).map(item => ({
 					path: item.file,
 					objectId: item.object,
 					mode: item.mode,
 					objectType: item.type === 'blob' ? 'blob' : item.type === 'tree' ? 'tree' : item.type === 'commit' ? 'commit' : 'tag',
 					size: parseInt(item.size, 10) || undefined,
 				}));
-				return { success: true, data: entries };
+				return { success: true, data: {
+					entries,
+					isTruncated: inventory.isTruncated,
+					returnedCount: entries.length,
+					discoveredAtLeast: Math.max(entries.length, inventory.discoveredAtLeast || entries.length),
+				} };
 			}
-			return { success: false, error: { code: 'NotSupported', message: 'getObjectFiles is not available on repository' } };
+			return { success: false, error: { code: 'NotSupported', message: 'Producer-bounded tree inventory is not available on repository' } };
 		} catch (err: any) {
 			const code = mapGitErrorToCode(err, 'ProcessFailure');
 			return { success: false, error: { code, message: err?.message || `Failed to list tree for '${ref}'` } };
@@ -757,6 +789,22 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			const exports = this._extHostExtensionService.getExtensionExports(new ExtensionIdentifier(GIT_EXTENSION_ID));
 			if (!!exports && typeof (exports as GitExtension).getAPI === 'function') {
 				this._gitApi = (exports as GitExtension).getAPI(1);
+				if (!this._gitApiListenersInstalled) {
+					this._gitApiListenersInstalled = true;
+					for (const repository of this._gitApi.repositories) {
+						const dto = this._registerRepository(repository);
+						await this._proxy.$onDidOpenRepository(dto);
+					}
+					this._register(this._gitApi.onDidOpenRepository(repository => {
+						void this._proxy.$onDidOpenRepository(this._registerRepository(repository));
+					}));
+					this._register(this._gitApi.onDidCloseRepository(repository => {
+						const handle = this._unregisterRepository(repository);
+						if (handle !== undefined) {
+							void this._proxy.$onDidCloseRepository(handle);
+						}
+					}));
+				}
 			}
 		} catch {
 			// Git extension not available

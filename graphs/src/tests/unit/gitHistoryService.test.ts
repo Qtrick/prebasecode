@@ -131,8 +131,9 @@ suite('GitHistoryService & Node Adapter Unit Tests', () => {
 		const headSha = await gitService.getHead(tempRepoDir);
 		const tree = await gitService.listTree(tempRepoDir, headSha);
 
-		assert.ok(tree.length >= 3);
-		const helperEntry = tree.find(e => e.path === 'helper.js');
+		assert.ok(tree.entries.length >= 3);
+		assert.strictEqual(tree.isTruncated, false);
+		const helperEntry = tree.entries.find(e => e.path === 'helper.js');
 		assert.ok(helperEntry);
 		assert.strictEqual(helperEntry.objectType, 'blob');
 		assert.strictEqual(typeof helperEntry.size, 'number');

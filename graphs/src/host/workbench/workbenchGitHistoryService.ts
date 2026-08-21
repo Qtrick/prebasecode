@@ -3,7 +3,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
+import { URI } from '../../../../../../base/common/uri.js';
 import { IGitService } from '../../../../git/common/gitService.js';
+import { IUriIdentityService } from '../../../../../../platform/uriIdentity/common/uriIdentity.js';
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type { EventLike, IGitHistoryService } from '../../history/git/gitHistoryService.js';
 import {
@@ -16,7 +18,7 @@ import {
 	type GitLogOptions,
 	type GitRepositoryIdentity,
 	type GitTagInfo,
-	type GitTreeEntry,
+	type GitTreeInventory,
 	type GitTreeListOptions,
 } from '../../history/git/gitTypes.js';
 
@@ -24,6 +26,9 @@ export const IWorkbenchGitHistoryService = createDecorator<IWorkbenchGitHistoryS
 
 export interface IWorkbenchGitHistoryService extends IGitHistoryService {
 	readonly _serviceBrand: undefined;
+	readonly onDidOpenRepository: EventLike<WorkbenchGitRepositoryLike>;
+	readonly onDidCloseRepository: EventLike<WorkbenchGitRepositoryLike>;
+	getRepositories(): readonly WorkbenchGitRepositoryLike[];
 	notifyHeadChanged(repositoryId: string, newHead: string, transitionType?: GitHeadTransitionType): void;
 	observeRepository(repo: WorkbenchGitRepositoryLike): void;
 	dispose(): void;
@@ -32,6 +37,8 @@ export interface IWorkbenchGitHistoryService extends IGitHistoryService {
 export interface WorkbenchGitServiceLike {
 	readonly _serviceBrand?: undefined;
 	readonly repositories: Iterable<WorkbenchGitRepositoryLike>;
+	readonly onDidOpenRepository?: EventLike<WorkbenchGitRepositoryLike>;
+	readonly onDidCloseRepository?: EventLike<WorkbenchGitRepositoryLike>;
 	openRepository?(uri: any): Promise<WorkbenchGitRepositoryLike | undefined>;
 }
 
@@ -42,7 +49,7 @@ export interface WorkbenchGitRepositoryLike {
 	resolveCommitRef?(ref: string, token?: any): Promise<string>;
 	getCommitDetails?(ref: string, token?: any): Promise<any>;
 	getCommitLog?(options: any, token?: any): Promise<any[]>;
-	listTreeEntries?(ref: string, options?: any, token?: any): Promise<any[]>;
+	listTreeEntries?(ref: string, options?: any, token?: any): Promise<{ entries: any[]; isTruncated: boolean; discoveredAtLeast: number }>;
 	readBlobContent?(ref: string, path: string, maxBytes?: number, token?: any): Promise<string>;
 	diffExactTrees?(refA: string, refB: string, token?: any): Promise<any>;
 	diffCommitToParent?(commitRef: string, parentIndex?: number, token?: any): Promise<any>;
@@ -50,15 +57,13 @@ export interface WorkbenchGitRepositoryLike {
 	checkIgnore?(paths: string[]): Promise<string[]>;
 }
 
-function normalizePath(p: string): string {
-	return p.replace(/\\/g, '/').replace(/\/+$/, '');
-}
-
 export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 	declare readonly _serviceBrand: undefined;
 
 	private readonly _gitService: WorkbenchGitServiceLike;
 	private readonly _headListeners = new Set<(e: GitHeadChangeEvent) => void>();
+	private readonly _repositoryOpenListeners = new Set<(repository: WorkbenchGitRepositoryLike) => void>();
+	private readonly _repositoryCloseListeners = new Set<(repository: WorkbenchGitRepositoryLike) => void>();
 	/** Per-repository last-known HEAD SHA for deduplication. */
 	private readonly _lastHeadShaByRepo = new Map<string, string>();
 	private readonly _observedRepos = new Set<string>();
@@ -72,10 +77,39 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 			},
 		};
 	};
+	readonly onDidOpenRepository: EventLike<WorkbenchGitRepositoryLike> = listener => {
+		this._repositoryOpenListeners.add(listener);
+		return { dispose: () => this._repositoryOpenListeners.delete(listener) };
+	};
+	readonly onDidCloseRepository: EventLike<WorkbenchGitRepositoryLike> = listener => {
+		this._repositoryCloseListeners.add(listener);
+		return { dispose: () => this._repositoryCloseListeners.delete(listener) };
+	};
 
-	constructor(@IGitService gitService: IGitService) {
+	constructor(
+		@IGitService gitService: IGitService,
+		@IUriIdentityService private readonly _uriIdentityService: IUriIdentityService,
+	) {
 		this._gitService = gitService as any;
 		this._wireExistingRepositories();
+		if (this._gitService.onDidOpenRepository) {
+			this._disposables.push(this._gitService.onDidOpenRepository(repository => {
+				this.observeRepository(repository);
+				for (const listener of this._repositoryOpenListeners) {
+					listener(repository);
+				}
+			}));
+		}
+		if (this._gitService.onDidCloseRepository) {
+			this._disposables.push(this._gitService.onDidCloseRepository(repository => {
+				const repositoryId = repository.rootUri.toString();
+				this._observedRepos.delete(repositoryId);
+				this._lastHeadShaByRepo.delete(repositoryId);
+				for (const listener of this._repositoryCloseListeners) {
+					listener(repository);
+				}
+			}));
+		}
 	}
 
 	private _wireExistingRepositories(): void {
@@ -84,6 +118,10 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 				this.observeRepository(repo);
 			}
 		}
+	}
+
+	getRepositories(): readonly WorkbenchGitRepositoryLike[] {
+		return Array.from(this._gitService.repositories);
 	}
 
 	observeRepository(repo: WorkbenchGitRepositoryLike): void {
@@ -110,27 +148,25 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 	}
 
 	private _findRepository(rootPath: string): WorkbenchGitRepositoryLike | undefined {
-		const target = normalizePath(rootPath).toLowerCase();
+		const target = URI.file(rootPath);
 		let bestMatch: WorkbenchGitRepositoryLike | undefined;
 		let bestMatchLen = 0;
 
 		for (const repo of this._gitService.repositories) {
-			const repoFsPath = repo.rootUri.fsPath ? normalizePath(repo.rootUri.fsPath).toLowerCase() : '';
-			const repoPath = normalizePath(repo.rootUri.path).toLowerCase();
+			const repositoryResource = URI.isUri(repo.rootUri) ? repo.rootUri : URI.parse(repo.rootUri.toString());
 
-			// Exact match
-			if (repoFsPath === target || repoPath === target) {
+			if (this._uriIdentityService.extUri.isEqual(repositoryResource, target)) {
 				this.observeRepository(repo);
 				return repo;
 			}
 
-			// Subdirectory match (e.g. /repo/packages/frontend inside /repo)
-			if (repoFsPath && target.startsWith(repoFsPath + '/') && repoFsPath.length > bestMatchLen) {
+			if (this._uriIdentityService.extUri.isEqualOrParent(target, repositoryResource)) {
+				const repoFsPath = repositoryResource.fsPath || repositoryResource.path;
+				if (repoFsPath.length <= bestMatchLen) {
+					continue;
+				}
 				bestMatch = repo;
 				bestMatchLen = repoFsPath.length;
-			} else if (repoPath && target.startsWith(repoPath + '/') && repoPath.length > bestMatchLen) {
-				bestMatch = repo;
-				bestMatchLen = repoPath.length;
 			}
 		}
 
@@ -284,7 +320,7 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 		}
 	}
 
-	async listTree(rootPath: string, ref: string, options?: GitTreeListOptions | CancellationTokenLike, token?: CancellationTokenLike): Promise<GitTreeEntry[]> {
+	async listTree(rootPath: string, ref: string, options?: GitTreeListOptions | CancellationTokenLike, token?: CancellationTokenLike): Promise<GitTreeInventory> {
 		const repo = await this._ensureRepository(rootPath);
 		if (!repo.listTreeEntries) {
 			throw new GitHistoryError('ProcessFailure', 'listTreeEntries is not available on workbench Git repository');
@@ -292,8 +328,8 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 		const opts = (options && 'maxEntries' in options) ? options : undefined;
 		const actualToken = (options && 'isCancellationRequested' in options) ? options : token;
 		try {
-			const entries = await repo.listTreeEntries(ref, opts, actualToken);
-			return (entries || []).map(e => ({
+			const inventory = await repo.listTreeEntries(ref, opts, actualToken);
+			const entries = (inventory?.entries || []).map((e: any) => ({
 				path: e.path,
 				objectId: e.objectId,
 				blobOid: e.objectId,
@@ -301,6 +337,14 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 				objectType: e.objectType,
 				size: e.size,
 			}));
+			return {
+				entries,
+				isTruncated: Boolean(inventory?.isTruncated),
+				returnedCount: entries.length,
+				discoveredAtLeast: Math.max(entries.length, Number(inventory?.discoveredAtLeast) || entries.length),
+				scope: opts?.scope,
+				truncationReason: inventory?.isTruncated ? 'Git tree producer entry limit reached' : undefined,
+			};
 		} catch (err: any) {
 			const code = err?.code || 'ProcessFailure';
 			throw new GitHistoryError(code, err?.message || `Failed to list tree for '${ref}'`);
@@ -407,5 +451,7 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 		}
 		this._disposables.length = 0;
 		this._headListeners.clear();
+		this._repositoryOpenListeners.clear();
+		this._repositoryCloseListeners.clear();
 	}
 }

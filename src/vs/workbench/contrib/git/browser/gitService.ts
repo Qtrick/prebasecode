@@ -5,9 +5,10 @@
 
 import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { BugIndicatingError } from '../../../../base/common/errors.js';
-import { Disposable, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
+import { Emitter } from '../../../../base/common/event.js';
+import { Disposable, DisposableStore, IDisposable, toDisposable } from '../../../../base/common/lifecycle.js';
 import { URI } from '../../../../base/common/uri.js';
-import { IGitService, IGitExtensionDelegate, GitRef, GitRefQuery, IGitRepository, GitRepositoryState, GitDiffChange, GitCommitMetadata, GitTreeEntry, GitExactDiffResult, GitLogOptions } from '../common/gitService.js';
+import { IGitService, IGitExtensionDelegate, GitRef, GitRefQuery, IGitRepository, GitRepositoryState, GitDiffChange, GitCommitMetadata, GitTreeInventory, GitExactDiffResult, GitLogOptions } from '../common/gitService.js';
 import { ISettableObservable, observableValueOpts } from '../../../../base/common/observable.js';
 import { structuralEquals } from '../../../../base/common/equals.js';
 import { AutoOpenBarrier } from '../../../../base/common/async.js';
@@ -18,6 +19,11 @@ export class GitService extends Disposable implements IGitService {
 
 	private _delegate: IGitExtensionDelegate | undefined;
 	private _delegateBarrier = new AutoOpenBarrier(10_000);
+	private readonly _delegateListeners = this._register(new DisposableStore());
+	private readonly _onDidOpenRepository = this._register(new Emitter<IGitRepository>());
+	readonly onDidOpenRepository = this._onDidOpenRepository.event;
+	private readonly _onDidCloseRepository = this._register(new Emitter<IGitRepository>());
+	readonly onDidCloseRepository = this._onDidCloseRepository.event;
 
 	get repositories(): Iterable<IGitRepository> {
 		return this._delegate?.repositories ?? [];
@@ -37,9 +43,12 @@ export class GitService extends Disposable implements IGitService {
 		}
 
 		this._delegate = delegate;
+		this._delegateListeners.add(delegate.onDidOpenRepository(repository => this._onDidOpenRepository.fire(repository)));
+		this._delegateListeners.add(delegate.onDidCloseRepository(repository => this._onDidCloseRepository.fire(repository)));
 		this._delegateBarrier.open();
 
 		return toDisposable(() => {
+			this._delegateListeners.clear();
 			this._delegate = undefined;
 		});
 	}
@@ -111,7 +120,7 @@ export class GitRepository extends Disposable implements IGitRepository {
 		throw new Error('getCommitLog is not supported by delegate');
 	}
 
-	async listTreeEntries(ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeEntry[]> {
+	async listTreeEntries(ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeInventory> {
 		if (this.delegate.listTreeEntries) {
 			return this.delegate.listTreeEntries(this.rootUri, ref, options, token);
 		}

@@ -5,7 +5,7 @@
 import { TemporalError } from './temporalErrors.js';
 import { GRAPH_ANALYZER_VERSION, GRAPH_ANALYSIS_PROFILE_VERSION } from '../../core/canonical/versioning.js';
 
-export const CURRENT_SCHEMA_VERSION = 3;
+export const CURRENT_SCHEMA_VERSION = 4;
 export const CURRENT_ANALYZER_VERSION = GRAPH_ANALYZER_VERSION;
 export const CURRENT_PROFILE_VERSION = GRAPH_ANALYSIS_PROFILE_VERSION;
 export const CURRENT_DELTA_VERSION = 1;

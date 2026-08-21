@@ -15,6 +15,7 @@ export interface RawEdgeInfo {
 	readonly kind: TemporalEdgeKind;
 	readonly weight?: number;
 	readonly metadata?: Record<string, unknown>;
+	readonly edgeData?: GraphEdgeData;
 }
 
 export interface EdgeResolutionInput {
@@ -62,7 +63,7 @@ export class TemporalEdgeLineageResolver {
 			const sourceSnap = entitySnapshots.get(sourceEntityId);
 			const targetSnap = entitySnapshots.get(targetEntityId);
 
-			const edgeData: GraphEdgeData = {
+			const edgeData: GraphEdgeData = raw.edgeData ?? {
 				id: edgeId,
 				source: sourceSnap ? sourceSnap.nodeData.id : sourceEntityId,
 				target: targetSnap ? targetSnap.nodeData.id : targetEntityId,

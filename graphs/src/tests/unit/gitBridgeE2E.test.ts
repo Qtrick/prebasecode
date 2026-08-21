@@ -284,7 +284,7 @@ suite('Production Git Bridge & Real Git Fixture E2E Tests', () => {
 			assert.ok(snap);
 
 			const tree = await gitService.listTree(tempRepoDir, sha);
-			for (const entry of tree) {
+			for (const entry of tree.entries) {
 				if (entry.blobOid) {
 					seenBlobOids.add(entry.blobOid);
 					totalBlobReferences++;
@@ -294,7 +294,7 @@ suite('Production Git Bridge & Real Git Fixture E2E Tests', () => {
 			timings.push({
 				commit: sha.slice(0, 7),
 				durationMs: dt,
-				blobCount: tree.length,
+				blobCount: tree.entries.length,
 			});
 		}
 		const totalDuration = Date.now() - startOverall;

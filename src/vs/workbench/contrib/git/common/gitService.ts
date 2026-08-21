@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { CancellationToken } from '../../../../base/common/cancellation.js';
+import { Event } from '../../../../base/common/event.js';
 import { IDisposable } from '../../../../base/common/lifecycle.js';
 import { IObservable } from '../../../../base/common/observable.js';
 import { URI } from '../../../../base/common/uri.js';
@@ -97,6 +98,13 @@ export interface GitTreeEntry {
 	readonly size?: number;
 }
 
+export interface GitTreeInventory {
+	readonly entries: GitTreeEntry[];
+	readonly isTruncated: boolean;
+	readonly returnedCount: number;
+	readonly discoveredAtLeast: number;
+}
+
 export interface GitExactDiffChange {
 	readonly kind: 'added' | 'deleted' | 'modified' | 'renamed' | 'copied';
 	readonly path: string;
@@ -134,7 +142,7 @@ export interface IGitRepository {
 	resolveCommitRef?(ref: string, token?: CancellationToken): Promise<string>;
 	getCommitDetails?(ref: string, token?: CancellationToken): Promise<GitCommitMetadata>;
 	getCommitLog?(options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]>;
-	listTreeEntries?(ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeEntry[]>;
+	listTreeEntries?(ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeInventory>;
 	readBlobContent?(ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string>;
 	diffExactTrees?(refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult>;
 	diffCommitToParent?(commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult>;
@@ -144,6 +152,8 @@ export interface IGitRepository {
 
 export interface IGitExtensionDelegate {
 	readonly repositories: Iterable<IGitRepository>;
+	readonly onDidOpenRepository: Event<IGitRepository>;
+	readonly onDidCloseRepository: Event<IGitRepository>;
 	openRepository(uri: URI): Promise<IGitRepository | undefined>;
 
 	getRefs(root: URI, query?: GitRefQuery, token?: CancellationToken): Promise<GitRef[]>;
@@ -154,7 +164,7 @@ export interface IGitExtensionDelegate {
 	resolveCommitRef?(root: URI, ref: string, token?: CancellationToken): Promise<string>;
 	getCommitDetails?(root: URI, ref: string, token?: CancellationToken): Promise<GitCommitMetadata>;
 	getCommitLog?(root: URI, options: GitLogOptions, token?: CancellationToken): Promise<GitCommitMetadata[]>;
-	listTreeEntries?(root: URI, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeEntry[]>;
+	listTreeEntries?(root: URI, ref: string, options?: { maxEntries?: number; scope?: string }, token?: CancellationToken): Promise<GitTreeInventory>;
 	readBlobContent?(root: URI, ref: string, path: string, maxBytes?: number, token?: CancellationToken): Promise<string>;
 	diffExactTrees?(root: URI, refA: string, refB: string, token?: CancellationToken): Promise<GitExactDiffResult>;
 	diffCommitToParent?(root: URI, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult>;
@@ -168,6 +178,8 @@ export interface IGitService {
 	readonly _serviceBrand: undefined;
 
 	readonly repositories: Iterable<IGitRepository>;
+	readonly onDidOpenRepository: Event<IGitRepository>;
+	readonly onDidCloseRepository: Event<IGitRepository>;
 
 	setDelegate(delegate: IGitExtensionDelegate): IDisposable;
 

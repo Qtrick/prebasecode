@@ -7,6 +7,7 @@ import { suite, test } from 'mocha';
 import { TemporalDeltaEngine } from '../../temporal/core/temporalDelta.js';
 import { TemporalReconstructionEngine } from '../../temporal/core/temporalReconstruction.js';
 import { isTemporalError } from '../../temporal/common/temporalErrors.js';
+import { computeCanonicalGraphDigest } from '../../core/canonical/canonicalGraphDigest.js';
 import type {
 	TemporalEdgeSnapshot,
 	TemporalEntitySnapshot,
@@ -57,6 +58,64 @@ function createDummySnapshot(commitSha: string, entities: TemporalEntitySnapshot
 		entityMap,
 		edgeMap,
 		pathToEntityId,
+	};
+}
+
+function createCanonicalSnapshot(commitSha: string, timestamp: number, entities: TemporalEntitySnapshot[]): TemporalGraphSnapshot {
+	const base = createDummySnapshot(commitSha, entities);
+	const nodes = base.graphData.nodes;
+	const edges = base.graphData.edges;
+	const digest = computeCanonicalGraphDigest({ nodes, edges, entryNodeId: nodes[0]?.id ?? null });
+	const coverage = {
+		completeWithinProfile: true,
+		isComplete: true,
+		discoveredCount: nodes.length,
+		analyzedCount: nodes.length,
+		analyzedFileCount: nodes.length,
+		excludedCount: 0,
+		excludedFileCount: 0,
+		failedCount: 0,
+		truncated: false,
+		exclusionBreakdown: {
+			'oversized-file': 0,
+			'binary-file': 0,
+			'unsupported-language': 0,
+			'parse-error': 0,
+			'permission-denied': 0,
+			'ignored-pattern': 0,
+			'policy-excluded': 0,
+			other: 0,
+		},
+		exclusionReasons: {},
+	};
+	return {
+		...base,
+		timestamp,
+		digest,
+		graphData: { nodes, edges, timestamp },
+		canonicalSnapshot: {
+			nodes,
+			edges,
+			projectPath: `/repo/${commitSha}`,
+			projectName: `repo-${commitSha}`,
+			entryNodeId: nodes[0]?.id ?? null,
+			analyzedAt: timestamp,
+			sourceIdentity: `git:${commitSha}`,
+			digest,
+			versions: {
+				graphSchemaVersion: 1,
+				analyzerVersion: 1,
+				identityVersion: 1,
+				layoutVersion: 1,
+				analysisProfileVersion: 1,
+			},
+			coverage,
+			completeness: coverage,
+			manifest: {
+				entries: nodes.map(node => ({ path: node.path ?? node.id, isComponent: false, contentIdentity: `${commitSha}:${node.path ?? node.id}` })),
+				runMetadata: { analyzedAt: timestamp },
+			},
+		},
 	};
 }
 
@@ -119,6 +178,10 @@ suite('TemporalDeltaEngine & TemporalReconstructionEngine', () => {
 		assert.ok(!reconstructed.entityMap.has('ent2'));
 		assert.strictEqual(reconstructed.pathToEntityId.get('src/c.ts'), 'ent3');
 		assert.strictEqual(reconstructed.graphData.nodes.length, 2);
+		assert.deepStrictEqual(
+			Array.from(reconstructed.entityMap.values(), entity => entity.commitSha),
+			['commit2', 'commit2']
+		);
 	});
 
 	test('reconstruct sequentially applies multi-step delta chain', () => {
@@ -165,6 +228,51 @@ suite('TemporalDeltaEngine & TemporalReconstructionEngine', () => {
 			reconstructionEngine.reconstruct(snap1, [brokenDelta], 'c2');
 		}, (err: any) => {
 			return isTemporalError(err) && err.code === 'DeltaReconstructionFailed';
+		});
+	});
+
+	test('delta replay restores target canonical metadata instead of inheriting checkpoint metadata', () => {
+		const base = createCanonicalSnapshot('c1', 100, [
+			{ entityId: 'ent1', commitSha: 'c1', path: 'a.ts', blobOid: 'b1', nodeData: createDummyNode('a.ts') },
+		]);
+		const target = createCanonicalSnapshot('c2', 200, [
+			{ entityId: 'ent1', commitSha: 'c2', path: 'a.ts', blobOid: 'b2', nodeData: createDummyNode('a.ts', 20) },
+		]);
+
+		const reconstructed = deltaEngine.applyDelta(base, deltaEngine.computeDelta(target, base));
+
+		assert.deepStrictEqual({
+			timestamp: reconstructed.timestamp,
+			graphTimestamp: reconstructed.graphData.timestamp,
+			projectPath: reconstructed.canonicalSnapshot?.projectPath,
+			sourceIdentity: reconstructed.canonicalSnapshot?.sourceIdentity,
+			analyzedAt: reconstructed.canonicalSnapshot?.analyzedAt,
+			coverage: reconstructed.canonicalSnapshot?.coverage,
+			manifest: reconstructed.canonicalSnapshot?.manifest,
+		}, {
+			timestamp: target.timestamp,
+			graphTimestamp: target.graphData.timestamp,
+			projectPath: target.canonicalSnapshot?.projectPath,
+			sourceIdentity: target.canonicalSnapshot?.sourceIdentity,
+			analyzedAt: target.canonicalSnapshot?.analyzedAt,
+			coverage: target.canonicalSnapshot?.coverage,
+			manifest: target.canonicalSnapshot?.manifest,
+		});
+	});
+
+	test('delta replay recomputes canonical digest and rejects tampered content', () => {
+		const base = createCanonicalSnapshot('c1', 100, []);
+		const target = createCanonicalSnapshot('c2', 200, [
+			{ entityId: 'ent1', commitSha: 'c2', path: 'a.ts', blobOid: 'b1', nodeData: createDummyNode('a.ts') },
+		]);
+		const delta = deltaEngine.computeDelta(target, base);
+		const tampered = {
+			...delta,
+			entitiesAdded: [{ ...delta.entitiesAdded[0], nodeData: createDummyNode('tampered.ts') }],
+		};
+
+		assert.throws(() => deltaEngine.applyDelta(base, tampered), error => {
+			return isTemporalError(error) && error.code === 'DatabaseCorrupted';
 		});
 	});
 });

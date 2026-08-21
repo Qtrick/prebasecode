@@ -63,9 +63,40 @@ async function collectTsFiles(dir) {
 	return results;
 }
 
+function importedModules(content) {
+	const modules = [];
+	const pattern = /(?:from\s+|import\s*\(\s*)['"]([^'"]+)['"]/g;
+	let match;
+	while ((match = pattern.exec(content)) !== null) {
+		modules.push(match[1]);
+	}
+	return modules;
+}
+
+async function resolveRelativeImport(fromFile, moduleName) {
+	if (!moduleName.startsWith('.')) {
+		return undefined;
+	}
+	const base = path.resolve(path.dirname(fromFile), moduleName);
+	const candidates = moduleName.endsWith('.js')
+		? [`${base.slice(0, -3)}.ts`, `${base.slice(0, -3)}.tsx`]
+		: [`${base}.ts`, `${base}.tsx`, path.join(base, 'index.ts')];
+	for (const candidate of candidates) {
+		try {
+			if ((await fs.stat(candidate)).isFile()) {
+				return candidate;
+			}
+		} catch {
+			// Try the next TypeScript resolution candidate.
+		}
+	}
+	return undefined;
+}
+
 async function verifyRuntimeBoundary() {
 	const errors = [];
 	let scannedCount = 0;
+	const sandboxEntries = [];
 
 	for (const subDir of SCAN_DIRS) {
 		const targetDir = path.join(GRAPHS_SRC, subDir);
@@ -73,6 +104,7 @@ async function verifyRuntimeBoundary() {
 
 		for (const file of files) {
 			scannedCount++;
+			sandboxEntries.push(file);
 			const content = await fs.readFile(file, 'utf8');
 			const lines = content.split('\n');
 
@@ -89,6 +121,41 @@ async function verifyRuntimeBoundary() {
 				}
 			}
 		}
+	}
+
+	const contentCache = new Map();
+	const readImports = async file => {
+		if (!contentCache.has(file)) {
+			contentCache.set(file, importedModules(await fs.readFile(file, 'utf8')));
+		}
+		return contentCache.get(file);
+	};
+	const visit = async (file, chain, visited, targetErrors = errors) => {
+		if (visited.has(file)) {
+			return;
+		}
+		visited.add(file);
+		for (const moduleName of await readImports(file)) {
+			if (FORBIDDEN_MODULES.includes(moduleName) || moduleName === '@vscode/sqlite3') {
+				const rendered = [...chain, file].map(item => path.relative(REPO_ROOT, item)).join(' -> ');
+				targetErrors.push(`${rendered} -> ${moduleName}: forbidden transitive runtime dependency.`);
+				continue;
+			}
+			const target = await resolveRelativeImport(file, moduleName);
+			if (target && target.startsWith(GRAPHS_SRC + path.sep)) {
+				await visit(target, [...chain, file], new Set(visited), targetErrors);
+			}
+		}
+	};
+	for (const entry of sandboxEntries) {
+		await visit(entry, [], new Set());
+	}
+
+	const invalidFixture = path.join(GRAPHS_SRC, 'tests/fixtures/runtime-boundary-invalid/entry.ts');
+	const fixtureErrors = [];
+	await visit(invalidFixture, [], new Set(), fixtureErrors);
+	if (!fixtureErrors.some(error => error.includes('@vscode/sqlite3') && error.includes('intermediate.ts'))) {
+		errors.push('Transitive runtime-boundary self-test failed to detect the invalid entry -> intermediate -> @vscode/sqlite3 fixture.');
 	}
 
 	if (errors.length > 0) {

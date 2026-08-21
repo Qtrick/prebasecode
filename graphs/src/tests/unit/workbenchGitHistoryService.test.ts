@@ -5,6 +5,12 @@
 import assert from 'node:assert';
 import { WorkbenchGitHistoryService, type WorkbenchGitServiceLike } from '../../host/workbench/workbenchGitHistoryService.js';
 import { GitHistoryError } from '../../history/git/gitTypes.js';
+const uriIdentityService = {
+	extUri: {
+		isEqual: (first: { fsPath: string }, second: { fsPath: string }) => first.fsPath === second.fsPath,
+		isEqualOrParent: (resource: { fsPath: string }, candidate: { fsPath: string }) => resource.fsPath === candidate.fsPath || resource.fsPath.startsWith(`${candidate.fsPath}/`),
+	},
+} as any;
 
 suite('WorkbenchGitHistoryService Unit Tests', () => {
 	const mockRepo = {
@@ -43,10 +49,11 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 			];
 		},
 		async listTreeEntries(_ref: string) {
-			return [
+			const entries = [
 				{ path: 'src/index.ts', objectId: 'blob1', mode: '100644', objectType: 'blob', size: 120 },
 				{ path: 'src/components/App.tsx', objectId: 'blob2', mode: '100644', objectType: 'blob', size: 240 },
 			];
+			return { entries, isTruncated: false, discoveredAtLeast: entries.length };
 		},
 		async readBlobContent(_ref: string, path: string) {
 			if (path === 'src/index.ts') {
@@ -104,7 +111,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	};
 
 	test('resolves references and fetches commit details accurately', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const sha = await service.resolveRef('/workspace/test-repo', 'main');
 		assert.strictEqual(sha, '1111111111111111111111111111111111111111');
 
@@ -115,11 +122,12 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('lists tree entries, reads blobs, and diffs trees via bridge', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
-		const entries = await service.listTree('/workspace/test-repo', 'HEAD');
-		assert.strictEqual(entries.length, 2);
-		assert.strictEqual(entries[0].path, 'src/index.ts');
-		assert.strictEqual(entries[0].objectType, 'blob');
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
+		const inventory = await service.listTree('/workspace/test-repo', 'HEAD');
+		assert.strictEqual(inventory.entries.length, 2);
+		assert.strictEqual(inventory.isTruncated, false);
+		assert.strictEqual(inventory.entries[0].path, 'src/index.ts');
+		assert.strictEqual(inventory.entries[0].objectType, 'blob');
 
 		const content = await service.readFileAtRef('/workspace/test-repo', 'HEAD', 'src/index.ts');
 		assert.strictEqual(content, 'export const index = true;');
@@ -129,8 +137,34 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 		assert.strictEqual(diff.changes[0].kind, 'modified');
 	});
 
+	test('preserves producer truncation metadata across the workbench bridge', async () => {
+		const truncatedRepo = {
+			...mockRepo,
+			async listTreeEntries() {
+				return {
+					entries: [{ path: 'src/index.ts', objectId: 'blob1', mode: '100644', objectType: 'blob', size: 120 }],
+					isTruncated: true,
+					discoveredAtLeast: 2,
+				};
+			},
+		};
+		const service = new WorkbenchGitHistoryService({ repositories: [truncatedRepo] } as any, uriIdentityService);
+		const inventory = await service.listTree('/workspace/test-repo', 'HEAD', { maxEntries: 1 });
+		assert.deepStrictEqual({
+			paths: inventory.entries.map(entry => entry.path),
+			isTruncated: inventory.isTruncated,
+			returnedCount: inventory.returnedCount,
+			discoveredAtLeast: inventory.discoveredAtLeast,
+		}, {
+			paths: ['src/index.ts'],
+			isTruncated: true,
+			returnedCount: 1,
+			discoveredAtLeast: 2,
+		});
+	});
+
 	test('emits deduplicated onDidChangeHead events', () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const events: any[] = [];
 		const disposable = service.onDidChangeHead?.((e) => {
 			events.push(e);
@@ -151,7 +185,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('wraps failures into typed GitHistoryError without silent swallowing', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		await assert.rejects(
 			async () => service.resolveRef('/workspace/test-repo', 'invalid-ref-12345'),
 			(err: any) => {
@@ -163,7 +197,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('tracks HEAD changes per repository — events from different repos are independent', () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const events: any[] = [];
 		const disposable = service.onDidChangeHead?.((e) => events.push(e));
 
@@ -199,7 +233,7 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 	});
 
 	test('per-repo deduplication: identical SHA on one repo does not suppress the same SHA on another', () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any);
+		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const events: any[] = [];
 		const disposable = service.onDidChangeHead?.((e) => events.push(e));
 

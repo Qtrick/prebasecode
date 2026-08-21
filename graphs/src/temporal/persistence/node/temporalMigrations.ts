@@ -466,9 +466,32 @@ CREATE TABLE IF NOT EXISTS blob_parse_artifacts (
 CREATE INDEX IF NOT EXISTS idx_blob_parse_artifacts_oid ON blob_parse_artifacts(blob_oid);
 `;
 
+export const SCHEMA_V4_ADDITIONS_DDL = `
+CREATE TABLE IF NOT EXISTS entity_deletions (
+	entity_id TEXT NOT NULL,
+	commit_sha TEXT NOT NULL,
+	canonical_path TEXT NOT NULL,
+	PRIMARY KEY (entity_id, commit_sha),
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_deletions_commit ON entity_deletions(commit_sha);
+CREATE INDEX IF NOT EXISTS idx_entity_deletions_path ON entity_deletions(canonical_path);
+
+CREATE TABLE IF NOT EXISTS edge_events (
+	edge_id TEXT NOT NULL,
+	commit_sha TEXT NOT NULL,
+	event_kind TEXT NOT NULL,
+	PRIMARY KEY (edge_id, commit_sha, event_kind),
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_edge_events_commit ON edge_events(commit_sha);
+`;
+
 export async function runMigrations(db: sqlite3.Database): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
-		db.get('PRAGMA user_version;', async (err, row: any) => {
+			db.get('PRAGMA user_version;', async (err, row: any) => {
 			if (err) {
 				return reject(new TemporalError('SchemaMigrationFailed', 'Failed to read PRAGMA user_version', err));
 			}
@@ -485,11 +508,12 @@ export async function runMigrations(db: sqlite3.Database): Promise<void> {
 			}
 
 			try {
+				await execSql(db, 'BEGIN IMMEDIATE;');
 				if (currentVersion === 0) {
-					// Fresh database -> initialize directly to Schema V3
+					// Establish the v3 baseline, then use the same v3 -> v4 path as
+					// existing caches so fresh and migrated schemas are identical.
 					await execSql(db, SCHEMA_V3_DDL);
-					await execSql(db, `PRAGMA user_version = ${CURRENT_SCHEMA_VERSION};`);
-					return resolve();
+					currentVersion = 3;
 				}
 
 				if (currentVersion === 1) {
@@ -547,20 +571,23 @@ export async function runMigrations(db: sqlite3.Database): Promise<void> {
 
 					// Backfill commit_parents from commits.parent_shas
 					const rows: any[] = await allSql(db, 'SELECT commit_sha, parent_shas FROM commits;');
-					const insertStmt = db.prepare('INSERT OR IGNORE INTO commit_parents (commit_sha, parent_index, parent_sha) VALUES (?, ?, ?);');
 					for (const r of rows || []) {
+						let parents: string[];
 						try {
-							const parents: string[] = JSON.parse(r.parent_shas || '[]');
-							parents.forEach((psha, idx) => {
-								if (psha) {
-									insertStmt.run(r.commit_sha, idx, psha);
-								}
-							});
-						} catch {
-							// Ignore malformed JSON in legacy row
+							const parsed = JSON.parse(r.parent_shas || '[]');
+							if (!Array.isArray(parsed) || parsed.some(parent => typeof parent !== 'string')) {
+								throw new Error('parent_shas is not a string array');
+							}
+							parents = parsed;
+						} catch (error) {
+							throw new TemporalError('DatabaseCorrupted', `Malformed parent topology for legacy commit '${r.commit_sha}'`, error);
+						}
+						for (let index = 0; index < parents.length; index++) {
+							if (parents[index]) {
+								await runSql(db, 'INSERT OR IGNORE INTO commit_parents (commit_sha, parent_index, parent_sha) VALUES (?, ?, ?);', [r.commit_sha, index, parents[index]]);
+							}
 						}
 					}
-					insertStmt.finalize();
 					currentVersion = 2;
 				}
 
@@ -578,40 +605,96 @@ export async function runMigrations(db: sqlite3.Database): Promise<void> {
 					`);
 
 					// Ensure commits table has v3 columns
-					try {
+					if (!(await columnExists(db, 'commits', 'canonical_digest'))) {
 						await execSql(db, 'ALTER TABLE commits ADD COLUMN canonical_digest TEXT NOT NULL DEFAULT "";');
-					} catch { /* column might already exist */ }
-					try {
+					}
+					if (!(await columnExists(db, 'commits', 'delta_depth'))) {
 						await execSql(db, 'ALTER TABLE commits ADD COLUMN delta_depth INTEGER NOT NULL DEFAULT 0;');
-					} catch { /* column might already exist */ }
-					try {
+					}
+					if (!(await columnExists(db, 'commits', 'base_commit_sha'))) {
 						await execSql(db, 'ALTER TABLE commits ADD COLUMN base_commit_sha TEXT;');
-					} catch { /* column might already exist */ }
+					}
 
 					// Ensure deltas table has v3 columns
-					try {
+					if (!(await columnExists(db, 'deltas', 'base_commit_sha'))) {
 						await execSql(db, 'ALTER TABLE deltas ADD COLUMN base_commit_sha TEXT NOT NULL DEFAULT "";');
-					} catch { /* column might already exist */ }
-					try {
+					}
+					if (!(await columnExists(db, 'deltas', 'target_canonical_digest'))) {
 						await execSql(db, 'ALTER TABLE deltas ADD COLUMN target_canonical_digest TEXT NOT NULL DEFAULT "";');
-					} catch { /* column might already exist */ }
+					}
 
 					// Ensure checkpoints table has v3 columns
-					try {
+					if (!(await columnExists(db, 'checkpoints', 'canonical_digest'))) {
 						await execSql(db, 'ALTER TABLE checkpoints ADD COLUMN canonical_digest TEXT NOT NULL DEFAULT "";');
-					} catch { /* column might already exist */ }
+					}
 
 					// Ensure blob_parse_artifacts table has extension column
-					try {
+					if (!(await columnExists(db, 'blob_parse_artifacts', 'extension'))) {
 						await execSql(db, 'ALTER TABLE blob_parse_artifacts ADD COLUMN extension TEXT NOT NULL DEFAULT "";');
-					} catch { /* column might already exist */ }
-
-					await execSql(db, `PRAGMA user_version = ${CURRENT_SCHEMA_VERSION};`);
+					}
 					currentVersion = 3;
 				}
 
+				if (currentVersion === 3) {
+					await execSql(db, 'ALTER TABLE graph_states RENAME TO graph_states_v3;');
+					await execSql(db, `
+						CREATE TABLE graph_states (
+							state_id TEXT PRIMARY KEY,
+							canonical_digest TEXT NOT NULL,
+							schema_version INTEGER NOT NULL,
+							analyzer_version INTEGER NOT NULL,
+							profile_version INTEGER NOT NULL,
+							snapshot_json TEXT NOT NULL,
+							created_at INTEGER NOT NULL
+						);
+						INSERT INTO graph_states (state_id, canonical_digest, schema_version, analyzer_version, profile_version, snapshot_json, created_at)
+						SELECT canonical_digest, canonical_digest, schema_version, analyzer_version, profile_version, snapshot_json, created_at
+						FROM graph_states_v3;
+						DROP TABLE graph_states_v3;
+						CREATE INDEX idx_graph_states_digest ON graph_states(canonical_digest);
+					`);
+					if (!(await columnExists(db, 'commits', 'canonical_state_id'))) {
+						await execSql(db, 'ALTER TABLE commits ADD COLUMN canonical_state_id TEXT;');
+					}
+					await execSql(db, 'UPDATE commits SET canonical_state_id = canonical_digest WHERE canonical_state_id IS NULL;');
+					await execSql(db, SCHEMA_V4_ADDITIONS_DDL);
+					const lineageRows = await allSql(db, "SELECT entity_id, commit_sha, evidence_json FROM lineage_events WHERE lineage_case = 'terminated';");
+					for (const lineage of lineageRows) {
+						let evidence: { oldPath?: string };
+						try {
+							evidence = JSON.parse(lineage.evidence_json || '{}');
+						} catch (error) {
+							throw new TemporalError('DatabaseCorrupted', `Malformed lineage evidence for '${lineage.commit_sha}'`, error);
+						}
+						if (evidence.oldPath) {
+							await runSql(db, 'INSERT OR IGNORE INTO entity_deletions (entity_id, commit_sha, canonical_path) VALUES (?, ?, ?);', [lineage.entity_id, lineage.commit_sha, evidence.oldPath]);
+						}
+					}
+					const deltaRows = await allSql(db, 'SELECT commit_sha, delta_json FROM deltas;');
+					for (const deltaRow of deltaRows) {
+						let delta: { edgesDeleted?: string[] };
+						try {
+							delta = JSON.parse(deltaRow.delta_json || '{}');
+						} catch (error) {
+							throw new TemporalError('DatabaseCorrupted', `Malformed delta payload for '${deltaRow.commit_sha}'`, error);
+						}
+						for (const edgeId of delta.edgesDeleted ?? []) {
+							await runSql(db, 'INSERT OR IGNORE INTO edge_events (edge_id, commit_sha, event_kind) VALUES (?, ?, ?);', [edgeId, deltaRow.commit_sha, 'removed']);
+						}
+					}
+					currentVersion = 4;
+				}
+
+				await validateCurrentSchema(db);
+				await execSql(db, `PRAGMA user_version = ${currentVersion};`);
+				await execSql(db, 'COMMIT;');
 				resolve();
 			} catch (migrationErr: any) {
+				try {
+					await execSql(db, 'ROLLBACK;');
+				} catch {
+					// Preserve the original migration failure.
+				}
 				reject(new TemporalError('SchemaMigrationFailed', migrationErr?.message || String(migrationErr), migrationErr));
 			}
 		});
@@ -634,4 +717,50 @@ function allSql(db: sqlite3.Database, sql: string): Promise<any[]> {
 			else resolve(rows || []);
 		});
 	});
+}
+
+function runSql(db: sqlite3.Database, sql: string, parameters: readonly unknown[]): Promise<void> {
+	return new Promise((resolve, reject) => {
+		db.run(sql, parameters, error => error ? reject(error) : resolve());
+	});
+}
+
+async function columnExists(db: sqlite3.Database, table: string, column: string): Promise<boolean> {
+	const columns = await allSql(db, `PRAGMA table_info(${table});`);
+	return columns.some(candidate => candidate.name === column);
+}
+
+async function validateCurrentSchema(db: sqlite3.Database): Promise<void> {
+	const requiredColumns: Readonly<Record<string, readonly string[]>> = {
+		meta: ['key', 'value'],
+		repository_identity: ['repo_id', 'root_path', 'object_format'],
+		commits: ['commit_sha', 'canonical_digest', 'canonical_state_id', 'parent_shas', 'is_checkpoint', 'delta_depth', 'base_commit_sha', 'schema_version', 'analyzer_version', 'profile_version'],
+		commit_parents: ['commit_sha', 'parent_index', 'parent_sha'],
+		refs: ['ref_name', 'target_sha', 'last_observed'],
+		graph_states: ['state_id', 'canonical_digest', 'snapshot_json', 'schema_version', 'analyzer_version', 'profile_version'],
+		checkpoints: ['commit_sha', 'canonical_digest', 'snapshot_json'],
+		deltas: ['commit_sha', 'base_commit_sha', 'target_canonical_digest', 'delta_json', 'delta_version'],
+		entities: ['entity_id', 'canonical_path'],
+		entity_snapshots: ['entity_id', 'commit_sha', 'path', 'node_data_json'],
+		entity_deletions: ['entity_id', 'commit_sha', 'canonical_path'],
+		lineage_events: ['entity_id', 'commit_sha', 'parent_commit_sha', 'lineage_case', 'evidence_json'],
+		edges: ['edge_id', 'source_entity_id', 'target_entity_id', 'kind'],
+		edge_snapshots: ['edge_id', 'commit_sha', 'source_entity_id', 'target_entity_id', 'edge_data_json'],
+		edge_events: ['edge_id', 'commit_sha', 'event_kind'],
+		blob_parse_artifacts: ['cache_key', 'blob_oid', 'extension', 'analyzer_version', 'profile_version', 'language', 'artifact_json'],
+	};
+
+	for (const [table, expectedColumns] of Object.entries(requiredColumns)) {
+		const columns = await allSql(db, `PRAGMA table_info(${table});`);
+		const actualColumns = new Set(columns.map(column => column.name));
+		const missingColumns = expectedColumns.filter(column => !actualColumns.has(column));
+		if (missingColumns.length > 0) {
+			throw new TemporalError('DatabaseCorrupted', `Temporal schema table '${table}' is missing required columns: ${missingColumns.join(', ')}`);
+		}
+	}
+
+	const foreignKeyFailures = await allSql(db, 'PRAGMA foreign_key_check;');
+	if (foreignKeyFailures.length > 0) {
+		throw new TemporalError('DatabaseCorrupted', 'Temporal schema contains invalid foreign-key relationships');
+	}
 }
