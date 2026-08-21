@@ -196,6 +196,24 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 		);
 	});
 
+	test('preserves extension-host log cancellation as typed Git control flow', async () => {
+		const cancelledRepo = {
+			...mockRepo,
+			async getCommitLog() {
+				const error = new Error('Cancelled by caller');
+				error.name = 'CancellationError';
+				throw error;
+			},
+		};
+		const service = new WorkbenchGitHistoryService({ repositories: [cancelledRepo] } as any, uriIdentityService);
+		await assert.rejects(
+			() => service.log('/workspace/test-repo'),
+			// The graph runner loads workbench code from `out/`, so `instanceof`
+			// can cross two copies of this class. Verify the stable boundary shape.
+			(error: unknown) => (error as { name?: string; code?: string }).name === GitHistoryError.name && (error as { code?: string }).code === 'Cancelled',
+		);
+	});
+
 	test('tracks HEAD changes per repository — events from different repos are independent', () => {
 		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
 		const events: any[] = [];

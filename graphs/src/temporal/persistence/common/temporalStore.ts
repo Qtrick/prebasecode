@@ -36,6 +36,11 @@ export interface TemporalStoreMaintenanceResult {
 	readonly withinBudget: boolean;
 }
 
+export interface TemporalCommitIndexMetadata {
+	readonly commitSha: string;
+	readonly coverage?: CanonicalCoverage;
+}
+
 export interface ITemporalStore {
 	isOpen(): boolean;
 	open(): Promise<void>;
@@ -59,6 +64,8 @@ export interface ITemporalStore {
 	getLatestCommit(): Promise<TemporalCommitRecord | undefined>;
 	/** Returns persisted canonical coverage without reconstructing a graph state. */
 	getCommitCoverage(commitSha: string): Promise<CanonicalCoverage | undefined>;
+	/** Batched metadata-only lookup for timeline rows; never reconstructs graph payloads. */
+	getCommitIndexMetadata(commitShas: readonly string[]): Promise<TemporalCommitIndexMetadata[]>;
 	getCommitParents(commitSha: string): Promise<string[]>;
 	getCommitChildren(commitSha: string): Promise<string[]>;
 

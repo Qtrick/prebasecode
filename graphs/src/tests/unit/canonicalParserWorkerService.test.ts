@@ -3,6 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'node:assert';
+import { CanonicalParserWorkerChannel } from '../../host/node/canonicalParserWorkerChannel.js';
 import { CanonicalParserWorkerService } from '../../host/node/canonicalParserWorkerService.js';
 
 function request(relativePath: string, content: string) {
@@ -41,6 +42,15 @@ suite('CanonicalParserWorkerService', () => {
 		const results = await worker.parseBatch([
 			request('stale.ts', 'export const stale = true;'),
 		], { isCancellationRequested: true } as Parameters<CanonicalParserWorkerService['parseBatch']>[1]);
+
+		assert.deepStrictEqual(results, []);
+	});
+
+	test('accepts cancellation through the narrow IPC channel rather than a ProxyChannel method argument', async () => {
+		const channel = new CanonicalParserWorkerChannel(new CanonicalParserWorkerService());
+		const results = await channel.call<readonly unknown[]>('test', 'parseBatch', [request('cancelled.ts', 'export const stale = true;')], {
+			isCancellationRequested: true,
+		} as Parameters<CanonicalParserWorkerChannel['call']>[3]);
 
 		assert.deepStrictEqual(results, []);
 	});

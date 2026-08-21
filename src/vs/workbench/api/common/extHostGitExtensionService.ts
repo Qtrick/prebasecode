@@ -552,7 +552,7 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'log is not supported on repository' } };
 		} catch (err: any) {
-			return { success: false, error: { code: 'ProcessFailure', message: err?.message || 'Failed to get commit log' } };
+			return { success: false, error: { code: mapGitErrorToCode(err, 'ProcessFailure'), message: err?.message || 'Failed to get commit log' } };
 		}
 	}
 

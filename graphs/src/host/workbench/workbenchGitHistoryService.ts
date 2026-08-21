@@ -261,7 +261,12 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 				message: dto.message,
 			}));
 		} catch (err: any) {
-			const code = err?.code || 'ProcessFailure';
+			// Extension-host cancellation may cross the generic proxy as a plain
+			// serialized Error.  Preserve it as control flow rather than reporting a
+			// failed Git process to Temporal callers.
+			const code = token?.isCancellationRequested || err?.code === 'Cancelled' || err?.name === 'CancellationError' || /cancelled/i.test(err?.message ?? '')
+				? 'Cancelled'
+				: err?.code || 'ProcessFailure';
 			throw new GitHistoryError(code, err?.message || 'Failed to get commit log');
 		}
 	}

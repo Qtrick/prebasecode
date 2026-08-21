@@ -12,7 +12,7 @@ import { SqliteTemporalStore } from '../../temporal/persistence/node/sqliteTempo
 import { TemporalStoreMainService } from '../../temporal/persistence/node/temporalStoreMainService.js';
 import { SCHEMA_V1_DDL, SCHEMA_V2_DDL, SCHEMA_V3_DDL } from '../../temporal/persistence/node/temporalMigrations.js';
 import { CURRENT_SCHEMA_VERSION } from '../../temporal/common/temporalVersioning.js';
-import { isTemporalError } from '../../temporal/common/temporalErrors.js';
+import { isTemporalError, TemporalError } from '../../temporal/common/temporalErrors.js';
 import { computeCanonicalGraphDigest } from '../../core/canonical/canonicalGraphDigest.js';
 import type {
 	TemporalCommitRecord,
@@ -167,7 +167,9 @@ suite('SqliteTemporalStore', () => {
 		const mainService = new TemporalStoreMainService(storageRoot);
 		const authorizedPath = path.join(storageRoot, 'authorized.db');
 		await mainService.open(authorizedPath);
-		await assert.rejects(mainService.open(path.join(storageRoot, '..', 'escaped.db')), /outside the authorized cache directory/);
+		const escaped = JSON.parse(await mainService.open(path.join(storageRoot, '..', 'escaped.db'))) as { ok: boolean; error?: { code: string } };
+		assert.strictEqual(escaped.ok, false);
+		assert.strictEqual(escaped.error?.code, 'StoreNotOpen');
 		await mainService.close(authorizedPath);
 		mainService.dispose();
 	});
@@ -178,9 +180,56 @@ suite('SqliteTemporalStore', () => {
 		const ipcPath = path.join(storageRoot, 'concurrent.db');
 
 		await Promise.all([mainService.open(ipcPath), mainService.open(ipcPath), mainService.open(ipcPath)]);
-		assert.deepStrictEqual(JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')), []);
+		assert.deepStrictEqual(JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')), { ok: true, value: '[]' });
 		await Promise.all([mainService.close(ipcPath), mainService.close(ipcPath)]);
 		mainService.dispose();
+	});
+
+	test('Electron-main store owner preserves typed operational failures in its IPC response envelope', async () => {
+		const storageRoot = path.dirname(dbPath);
+		const mainService = new TemporalStoreMainService(storageRoot);
+		const ipcPath = path.join(storageRoot, 'typed-error.db');
+
+		try {
+			const unopened = JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')) as { ok: boolean; error?: { code: string; message: string } };
+			assert.strictEqual(unopened.ok, false);
+			assert.strictEqual(unopened.error?.code, 'StoreNotOpen');
+			assert.match(unopened.error?.message ?? '', /Temporal store is not open/);
+
+			await mainService.open(ipcPath);
+			const invalidBudget = JSON.parse(await mainService.invoke(ipcPath, 'runMaintenance', '[0]')) as { ok: boolean; error?: { code: string; message: string } };
+			assert.strictEqual(invalidBudget.ok, false);
+			assert.strictEqual(invalidBudget.error?.code, 'StorageLimitExceeded');
+			assert.match(invalidBudget.error?.message ?? '', /positive database budget/);
+		} finally {
+			await mainService.close(ipcPath);
+			mainService.dispose();
+		}
+	});
+
+	test('Electron-main store owner recovers corruption detected after open and retries the safe read', async () => {
+		const storageRoot = path.dirname(dbPath);
+		const mainService = new TemporalStoreMainService(storageRoot);
+		const ipcPath = path.join(storageRoot, 'late-corruption.db');
+		let poisonedStoreClosed = false;
+
+		try {
+			await mainService.open(ipcPath);
+			const internals = mainService as unknown as { _stores: Map<string, SqliteTemporalStore>; _validateDbPath(path: string): string };
+			const canonicalPath = internals._validateDbPath(ipcPath);
+			internals._stores.set(canonicalPath, {
+				isOpen: () => true,
+				close: async () => { poisonedStoreClosed = true; },
+				getAllRefs: async () => { throw new TemporalError('DatabaseCorrupted', 'Synthetic post-open payload corruption'); },
+			} as unknown as SqliteTemporalStore);
+
+			assert.deepStrictEqual(JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')), { ok: true, value: '[]' });
+			assert.strictEqual(poisonedStoreClosed, true);
+			assert.strictEqual(fs.readdirSync(storageRoot).some(name => /^late-corruption\.db\.corrupt-\d+$/.test(name)), true);
+		} finally {
+			await mainService.close(ipcPath);
+			mainService.dispose();
+		}
 	});
 
 	test('Electron-main store owner quarantines one corrupt derived cache and recreates it without touching siblings', async () => {
@@ -193,8 +242,8 @@ suite('SqliteTemporalStore', () => {
 		try {
 			await mainService.open(siblingPath);
 			await mainService.open(corruptPath);
-			assert.deepStrictEqual(JSON.parse(await mainService.invoke(corruptPath, 'getAllRefs', '[]')), []);
-			assert.deepStrictEqual(JSON.parse(await mainService.invoke(siblingPath, 'getAllRefs', '[]')), []);
+			assert.deepStrictEqual(JSON.parse(await mainService.invoke(corruptPath, 'getAllRefs', '[]')), { ok: true, value: '[]' });
+			assert.deepStrictEqual(JSON.parse(await mainService.invoke(siblingPath, 'getAllRefs', '[]')), { ok: true, value: '[]' });
 			assert.strictEqual(fs.readdirSync(storageRoot).some(name => /^corrupt\.db\.corrupt-\d+$/.test(name)), true);
 		} finally {
 			await mainService.close(corruptPath);
@@ -206,7 +255,9 @@ suite('SqliteTemporalStore', () => {
 	test('Electron-main store owner rejects nested and symlink database escapes', async function () {
 		const storageRoot = path.dirname(dbPath);
 		const mainService = new TemporalStoreMainService(storageRoot);
-		await assert.rejects(mainService.open(path.join(storageRoot, 'nested', 'store.db')), /outside the authorized cache directory/);
+		const nested = JSON.parse(await mainService.open(path.join(storageRoot, 'nested', 'store.db'))) as { ok: boolean; error?: { code: string } };
+		assert.strictEqual(nested.ok, false);
+		assert.strictEqual(nested.error?.code, 'StoreNotOpen');
 
 		const outsidePath = path.join(os.tmpdir(), `prebase-temporal-outside-${Date.now()}.db`);
 		const symlinkPath = path.join(storageRoot, 'linked.db');
@@ -216,7 +267,9 @@ suite('SqliteTemporalStore', () => {
 			mainService.dispose();
 			this.skip();
 		}
-		await assert.rejects(mainService.open(symlinkPath), /outside the authorized cache directory/);
+		const symlink = JSON.parse(await mainService.open(symlinkPath)) as { ok: boolean; error?: { code: string } };
+		assert.strictEqual(symlink.ok, false);
+		assert.strictEqual(symlink.error?.code, 'StoreNotOpen');
 		fs.rmSync(symlinkPath, { force: true });
 		fs.rmSync(outsidePath, { force: true });
 		mainService.dispose();
@@ -742,10 +795,15 @@ suite('SqliteTemporalStore', () => {
 		await store.saveRef({ refName: 'refs/tags/keep', targetSha: commit.commitSha, refType: 'tag', lastObserved: 1000 });
 		await store.saveBlobAnalysis({
 			blobOid: 'regenerable-artifact', analyzerVersion: 1, profileVersion: 1, language: 'ts', analyzedAt: 1,
-			artifact: { imports: [], exports: [], functions: [], components: [], isComponentFile: false },
+			artifact: { imports: [{ source: 'x'.repeat(256_000), specifiers: [] }], exports: [], functions: [], components: [], isComponentFile: false },
 		});
 
+		const physicalBytes = (): number => [dbPath, `${dbPath}-wal`]
+			.filter(candidate => fs.existsSync(candidate))
+			.reduce((total, candidate) => total + fs.statSync(candidate).size, 0);
+		const physicalBefore = physicalBytes();
 		const result = await store.runMaintenance(1);
+		const physicalAfter = physicalBytes();
 		assert.deepStrictEqual({
 			evicted: result.parseArtifactsEvicted,
 			artifact: await store.getBlobAnalysis('regenerable-artifact', 1, 1, 'ts'),
@@ -758,6 +816,7 @@ suite('SqliteTemporalStore', () => {
 			checkpoint: commit.commitSha,
 		});
 		assert.strictEqual(result.withinBudget, false, 'The result must be truthful when preserved graph state alone exceeds the budget.');
+		assert.ok(physicalAfter < physicalBefore, `Maintenance must reduce the operational SQLite footprint (${physicalBefore} -> ${physicalAfter}).`);
 	});
 
 	test('blob analysis cache persists and retrieves entries', async () => {

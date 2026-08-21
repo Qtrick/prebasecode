@@ -48,6 +48,7 @@ export interface ITemporalGraphService {
 }
 
 export class TemporalGraphService implements ITemporalGraphService {
+	private static readonly REF_REFRESH_MAX_AGE_MS = 30_000;
 	private readonly _gitService: IGitHistoryService;
 	private readonly _registry: TemporalRepositoryRegistry;
 
@@ -105,8 +106,13 @@ export class TemporalGraphService implements ITemporalGraphService {
 		if (token?.isCancellationRequested) {
 			throw new GitHistoryError('Cancelled', 'Repository ref request was cancelled');
 		}
-		await runtime.refreshRefs();
-		return (await runtime.store.getAllRefs()).map(ref => ({
+		let refs = await runtime.store.getAllRefs();
+		const newestObservation = refs.reduce((newest, ref) => Math.max(newest, ref.lastObserved), 0);
+		if (refs.length === 0 || Date.now() - newestObservation > TemporalGraphService.REF_REFRESH_MAX_AGE_MS) {
+			await runtime.refreshRefs();
+			refs = await runtime.store.getAllRefs();
+		}
+		return refs.map(ref => ({
 			name: ref.refName,
 			targetSha: ref.targetSha,
 			kind: ref.refType === 'symbolic-head' || ref.refType === 'detached-head'
@@ -131,10 +137,13 @@ export class TemporalGraphService implements ITemporalGraphService {
 		}
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const store = await this._registry.getStore(identity.repositoryId, rootPath);
+		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
 		const page = history.slice(0, pageSize);
-		const commits: TemporalCommitSummary[] = await Promise.all(page.map(async commit => {
-			const record = await store.getCommit(commit.sha);
-			const coverage = record ? await store.getCommitCoverage(commit.sha) : undefined;
+		const metadataBySha = new Map((await store.getCommitIndexMetadata(page.map(commit => commit.sha))).map(metadata => [metadata.commitSha, metadata]));
+		const commits: TemporalCommitSummary[] = page.map(commit => {
+			const runtimeStatus = runtime.getIndexStatus(commit.sha);
+			const metadata = metadataBySha.get(commit.sha);
+			const coverage = metadata?.coverage;
 			return {
 				sha: commit.sha,
 				parents: commit.parents,
@@ -143,9 +152,9 @@ export class TemporalGraphService implements ITemporalGraphService {
 				authorTimestamp: commit.authorTimestamp,
 				committerTimestamp: commit.committerTimestamp,
 				message: commit.message,
-				indexStatus: !record ? { status: 'not-indexed' } : !coverage ? { status: 'failed', diagnosticCode: 'database-corrupted' } : { status: coverage.completeWithinProfile ? 'ready' : 'incomplete' },
+				indexStatus: runtimeStatus ? { status: runtimeStatus } : !metadata ? { status: 'not-indexed' } : !coverage ? { status: 'failed', diagnosticCode: 'database-corrupted' } : { status: coverage.completeWithinProfile ? 'ready' : 'incomplete' },
 			};
-		}));
+		});
 		const hasMore = history.length > pageSize;
 		return { commits, hasMore, nextCursor: hasMore ? this._makeHistoryCursor(ref, skip + pageSize) : undefined };
 	}

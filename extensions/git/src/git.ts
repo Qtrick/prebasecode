@@ -926,6 +926,10 @@ export function parseGitRemotes(raw: string): MutableRemote[] {
 }
 
 const commitRegex = /([0-9a-f]{40,64})\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)(?:\n([^]*?))?(?:\x00)(?:\n((?:.*)files? changed(?:.*))$)?/gm;
+// Older extension hosts emitted the same record without the committer name and
+// email fields. Retain decode compatibility for buffered/logged output from
+// those hosts while using the richer format for new Git operations.
+const legacyCommitRegex = /([0-9a-f]{40,64})\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)\n(.*)(?:\n([^]*?))?(?:\x00)(?:\n((?:.*)files? changed(?:.*))$)?/gm;
 
 export function parseGitCommits(data: string): Commit[] {
 	const commits: Commit[] = [];
@@ -942,14 +946,29 @@ export function parseGitCommits(data: string): Commit[] {
 	let message;
 	let shortStat;
 	let match;
+	// Detect only the first NUL-delimited record. Testing the entire legacy
+	// stream lets the richer expression consume into a following commit and
+	// misclassify a multi-commit legacy response.
+	const firstRecordEnd = data.indexOf('\x00');
+	const firstRecord = firstRecordEnd === -1 ? data : data.slice(0, firstRecordEnd + 1);
+	commitRegex.lastIndex = 0;
+	const usesLegacyFormat = !commitRegex.test(firstRecord);
+	const parser = usesLegacyFormat ? legacyCommitRegex : commitRegex;
+	parser.lastIndex = 0;
 
 	do {
-		match = commitRegex.exec(data);
+		match = parser.exec(data);
 		if (match === null) {
 			break;
 		}
 
-		[, ref, authorName, authorEmail, authorDate, committerName, committerEmail, commitDate, parents, refNames, message, shortStat] = match;
+		if (usesLegacyFormat) {
+			[, ref, authorName, authorEmail, authorDate, commitDate, parents, refNames, message, shortStat] = match;
+			committerName = undefined;
+			committerEmail = undefined;
+		} else {
+			[, ref, authorName, authorEmail, authorDate, committerName, committerEmail, commitDate, parents, refNames, message, shortStat] = match;
+		}
 
 		if (message[message.length - 1] === '\n') {
 			message = message.substr(0, message.length - 1);
@@ -963,8 +982,8 @@ export function parseGitCommits(data: string): Commit[] {
 			authorDate: authorDate ? new Date(Number(authorDate) * 1000) : undefined,
 			authorName: authorName ? ` ${authorName}`.substr(1) : undefined,
 			authorEmail: authorEmail ? ` ${authorEmail}`.substr(1) : undefined,
-			committerName: committerName ? ` ${committerName}`.substr(1) : undefined,
-			committerEmail: committerEmail ? ` ${committerEmail}`.substr(1) : undefined,
+			...(committerName ? { committerName: ` ${committerName}`.substr(1) } : {}),
+			...(committerEmail ? { committerEmail: ` ${committerEmail}`.substr(1) } : {}),
 			commitDate: commitDate ? new Date(Number(commitDate) * 1000) : undefined,
 			refNames: refNames ? refNames.split(',').map(s => s.trim()) : [],
 			shortStat: shortStat ? parseGitDiffShortStat(shortStat) : undefined,

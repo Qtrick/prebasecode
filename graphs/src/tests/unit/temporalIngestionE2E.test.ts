@@ -365,7 +365,25 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 		try {
 			const gitService = new NodeGitHistoryService();
-			const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const storeCalls = { commit: 0, coverage: 0, metadata: 0, replaceRefs: 0 };
+			const registry = createRegistry(async () => {
+				const store = new SqliteTemporalStore({ dbPath });
+				return new Proxy(store, {
+					get(target, property, receiver) {
+						const value = Reflect.get(target, property, receiver);
+						if (typeof value !== 'function') {
+							return value;
+						}
+						return (...args: unknown[]) => {
+							if (property === 'getCommit') storeCalls.commit++;
+							if (property === 'getCommitCoverage') storeCalls.coverage++;
+							if (property === 'getCommitIndexMetadata') storeCalls.metadata++;
+							if (property === 'replaceRefs') storeCalls.replaceRefs++;
+							return value.apply(target, args);
+						};
+					},
+				});
+			});
 			const temporalService = new TemporalGraphService(gitService, registry);
 			fs.mkdirSync(path.join(repoDir, 'src'), { recursive: true });
 			fs.writeFileSync(path.join(repoDir, 'src/main.ts'), 'export const revision = 0;', 'utf8');
@@ -381,8 +399,12 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			const thirdSha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
 
 			const refs = await temporalService.getRepositoryRefs(repoDir);
+			const cachedRefs = await temporalService.getRepositoryRefs(repoDir);
+			assert.deepStrictEqual(cachedRefs, refs);
+			assert.strictEqual(storeCalls.replaceRefs, 1, 'Fresh ref reads must reuse the persisted snapshot instead of writing SQLite again.');
 			const firstPage = await temporalService.getHistoryPage(repoDir, { pageSize: 2 });
 			assert.ok(firstPage.nextCursor);
+			assert.deepStrictEqual(storeCalls, { commit: 0, coverage: 0, metadata: 1, replaceRefs: 1 }, 'A page must batch persisted index metadata instead of issuing N+1 row lookups.');
 			fs.writeFileSync(path.join(repoDir, 'src/main.ts'), 'export const revision = 3;', 'utf8');
 			execSync('git add . && git commit -m "feat: fourth after first page"', { cwd: repoDir, stdio: 'pipe' });
 			const fourthSha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();

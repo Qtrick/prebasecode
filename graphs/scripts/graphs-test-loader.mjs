@@ -14,7 +14,12 @@ export async function resolve(specifier, context, nextResolve) {
 
 		// When files under graphs/ reference VS Code core using the symlink depth (../../../../../../),
 		// map them directly to src/vs/
-		if (specifier.startsWith('../../../../../../')) {
+		if (parent.includes('/out/vs/workbench/contrib/prebase/graphs/') && specifier.startsWith('../../../../../../')) {
+			const sub = specifier.replace(/^(\.\.\/)+/, '');
+			return nextResolve(pathToFileURL(resolvePath(process.cwd(), 'out/vs', sub)).href, context);
+		}
+
+		if (parent.includes('/graphs/src/') && specifier.startsWith('../../../../../../')) {
 			const sub = specifier.replace(/^(\.\.\/)+/, '');
 			resolvedTarget = resolvePath(process.cwd(), 'src/vs', sub);
 		}

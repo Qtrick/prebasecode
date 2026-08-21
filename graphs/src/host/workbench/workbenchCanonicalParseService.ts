@@ -4,14 +4,13 @@
 
 import { CancellationTokenSource } from '../../../../../../base/common/cancellation.js';
 import { Disposable, DisposableStore, MutableDisposable } from '../../../../../../base/common/lifecycle.js';
-import { ProxyChannel } from '../../../../../../base/parts/ipc/common/ipc.js';
+import type { IChannel } from '../../../../../../base/parts/ipc/common/ipc.js';
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { IUtilityProcessWorker, IUtilityProcessWorkerWorkbenchService } from '../../../../../../workbench/services/utilityProcess/electron-browser/utilityProcessWorkerWorkbenchService.js';
 import { CanonicalParseServiceError, type CanonicalParseRequest, type ICanonicalParseService } from '../../core/canonical/canonicalParseService.js';
 import { CANONICAL_PARSER_WORKER_CHANNEL } from '../../core/canonical/canonicalParseWorkerProtocol.js';
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type { BlobParseArtifact } from '../../core/canonical/parseArtifactCache.js';
-import type { ICanonicalParserWorkerService } from '../node/canonicalParserWorkerService.js';
 
 const WORKER_MODULE_ID = 'vs/workbench/contrib/prebase/graphs/host/node/canonicalParserWorkerMain';
 
@@ -19,17 +18,22 @@ const WORKER_MODULE_ID = 'vs/workbench/contrib/prebase/graphs/host/node/canonica
 export class WorkbenchCanonicalParseService extends Disposable implements ICanonicalParseService {
 	declare readonly _serviceBrand: undefined;
 	private readonly _worker = this._register(new MutableDisposable<IUtilityProcessWorker>());
-	private _workerPromise: Promise<ICanonicalParserWorkerService> | undefined;
+	private readonly _workers: IUtilityProcessWorkerWorkbenchService;
+	private _workerPromise: Promise<IChannel> | undefined;
 	private readonly _pending: Array<{ request: CanonicalParseRequest; token?: CancellationTokenLike; resolve: (artifact: BlobParseArtifact | undefined) => void; reject: (error: Error) => void }> = [];
 	private _flushScheduled = false;
 	private _isFlushing = false;
+	private _activeBatchCancellation: CancellationTokenSource | undefined;
+	private _workerTerminated = false;
+	private _isDisposed = false;
 
-	constructor(@IUtilityProcessWorkerWorkbenchService private readonly _workers: IUtilityProcessWorkerWorkbenchService) {
+	constructor(@IUtilityProcessWorkerWorkbenchService workers: IUtilityProcessWorkerWorkbenchService) {
 		super();
+		this._workers = workers;
 	}
 
 	parse(request: CanonicalParseRequest, token?: CancellationTokenLike): Promise<BlobParseArtifact | undefined> {
-		if (token?.isCancellationRequested) {
+		if (this._isDisposed || token?.isCancellationRequested) {
 			return Promise.resolve(undefined);
 		}
 		return new Promise((resolve, reject) => {
@@ -61,6 +65,7 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 					continue;
 				}
 				const batchCancellation = new CancellationTokenSource();
+				this._activeBatchCancellation = batchCancellation;
 				const cancellationListeners = new DisposableStore();
 				try {
 					const worker = await this._getWorker();
@@ -75,7 +80,7 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 							}));
 						}
 					}
-					const results = await worker.parseBatch(active.map(item => item.request), batchCancellation.token);
+					const results = await worker.call<readonly (BlobParseArtifact | undefined)[]>('parseBatch', active.map(item => item.request), batchCancellation.token);
 					const wasCancelled = batchCancellation.token.isCancellationRequested;
 					if (wasCancelled) {
 						for (const item of active) {
@@ -91,13 +96,24 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 					}
 				} catch (error) {
 					this._invalidateWorker();
+					if (this._isDisposed || batchCancellation.token.isCancellationRequested) {
+						for (const item of active) {
+							item.resolve(undefined);
+						}
+						continue;
+					}
 					const parseError = error instanceof CanonicalParseServiceError
 						? error
-						: new CanonicalParseServiceError('service-unavailable', 'Canonical parser worker is unavailable.', error);
+						: this._workerTerminated
+							? new CanonicalParseServiceError('worker-terminated', 'Canonical parser worker terminated while parsing.', error)
+							: new CanonicalParseServiceError('service-unavailable', 'Canonical parser worker is unavailable.', error);
 					for (const item of active) {
 						item.reject(parseError);
 					}
 				} finally {
+					if (this._activeBatchCancellation === batchCancellation) {
+						this._activeBatchCancellation = undefined;
+					}
 					cancellationListeners.dispose();
 					batchCancellation.dispose();
 				}
@@ -107,22 +123,37 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 		}
 	}
 
-	private async _getWorker(): Promise<ICanonicalParserWorkerService> {
+	private async _getWorker(): Promise<IChannel> {
+		if (this._isDisposed) {
+			throw new CanonicalParseServiceError('worker-terminated', 'Canonical parser service is disposed.');
+		}
 		return this._workerPromise ??= this._createWorker();
 	}
 
-	private async _createWorker(): Promise<ICanonicalParserWorkerService> {
+	private async _createWorker(): Promise<IChannel> {
 		try {
 			const worker = await this._workers.createWorker({ moduleId: WORKER_MODULE_ID, type: 'prebaseCanonicalParser', name: 'PreBase Canonical Parser' });
+			// Disposal can race worker startup. MutableDisposable intentionally ignores
+			// assignments after it is disposed, so dispose this just-created process
+			// explicitly instead of leaking it past the workbench lifecycle.
+			if (this._isDisposed) {
+				worker.dispose();
+				throw new CanonicalParseServiceError('worker-terminated', 'Canonical parser service was disposed during worker startup.');
+			}
+			this._workerTerminated = false;
 			this._worker.value = worker;
 			void worker.onDidTerminate.then(() => {
 				if (this._worker.value === worker) {
+					this._workerTerminated = true;
 					this._invalidateWorker();
 				}
 			});
-			return ProxyChannel.toService<ICanonicalParserWorkerService>(worker.client.getChannel(CANONICAL_PARSER_WORKER_CHANNEL));
+			return worker.client.getChannel(CANONICAL_PARSER_WORKER_CHANNEL);
 		} catch (error) {
 			this._workerPromise = undefined;
+			if (error instanceof CanonicalParseServiceError) {
+				throw error;
+			}
 			throw new CanonicalParseServiceError('service-unavailable', 'Unable to start the canonical parser worker.', error);
 		}
 	}
@@ -130,6 +161,19 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 	private _invalidateWorker(): void {
 		this._worker.clear();
 		this._workerPromise = undefined;
+	}
+
+	override dispose(): void {
+		if (this._isDisposed) {
+			return;
+		}
+		this._isDisposed = true;
+		this._activeBatchCancellation?.cancel();
+		for (const item of this._pending.splice(0)) {
+			item.resolve(undefined);
+		}
+		this._invalidateWorker();
+		super.dispose();
 	}
 }
 

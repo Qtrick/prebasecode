@@ -21,6 +21,8 @@ import type {
 	TemporalGraphSnapshot,
 } from '../common/temporalTypes.js';
 
+const MAX_RECONSTRUCTION_DEPTH = DEFAULT_CHECKPOINT_INTERVAL * 2;
+
 export interface IngestCommitOptions {
 	readonly isExplicitHead?: boolean;
 	readonly forceCheckpoint?: boolean;
@@ -82,17 +84,14 @@ export class TemporalCommitIngestionService {
 
 		// Read commit metadata from Git
 		const commitMeta = await this._gitService.getCommit(rootPath, commitSha, token);
-		const allCommits = await store.getAllCommits();
-		const commitsBySha = new Map(allCommits.map(c => [c.commitSha, c]));
-
 		const isRoot = commitMeta.parents.length === 0;
 
 		// Calculate current delta depth from primary parent
 		let deltaDepth = 0;
 		if (commitMeta.parents.length > 0) {
 			const parentSha = commitMeta.parents[0];
-			const plan = this._indexPlanner.planDagReconstruction(parentSha, commitsBySha);
-			deltaDepth = plan.totalDeltas + 1;
+			const parent = await store.getCommit(parentSha);
+			deltaDepth = parent?.isCheckpoint ? 1 : (parent?.deltaDepth ?? 0) + 1;
 		}
 
 		const isCheckpoint = Boolean(
@@ -105,7 +104,7 @@ export class TemporalCommitIngestionService {
 		let diffChanges: any[] = [];
 		if (commitMeta.parents.length > 0) {
 			const primaryParentSha = commitMeta.parents[0];
-			if (!commitsBySha.has(primaryParentSha)) {
+			if (!(await store.getCommit(primaryParentSha))) {
 				// Prerequisite parent is not yet indexed -> index prerequisite along lineage
 				parentSnapshot = await this.ingestCommit(rootPath, primaryParentSha, {}, token);
 			} else {
@@ -191,10 +190,27 @@ export class TemporalCommitIngestionService {
 			return directCheckpoint;
 		}
 
-		// 2. Plan DAG-aware reconstruction traversal
-		const allCommits = await store.getAllCommits();
-		const commitsBySha = new Map(allCommits.map(c => [c.commitSha, c]));
-		const plan = this._indexPlanner.planDagReconstruction(commitSha, commitsBySha);
+		// 2. Follow the persisted delta-base chain. This bounded lookup avoids an
+		// O(repository history) commit-table scan for every reconstruction.
+		const targetCommit = await store.getCommit(commitSha);
+		let current = targetCommit;
+		const backwardsDeltas: string[] = [];
+		const visited = new Set<string>();
+		let baseCheckpointSha: string | undefined;
+		while (current && !visited.has(current.commitSha) && backwardsDeltas.length <= MAX_RECONSTRUCTION_DEPTH) {
+			visited.add(current.commitSha);
+			if (current.isCheckpoint) {
+				baseCheckpointSha = current.commitSha;
+				break;
+			}
+			backwardsDeltas.push(current.commitSha);
+			const base = current.baseCommitSha ?? current.parentShas[0];
+			current = base ? await store.getCommit(base) : undefined;
+		}
+		if (backwardsDeltas.length > MAX_RECONSTRUCTION_DEPTH || (current && visited.has(current.commitSha) && !current.isCheckpoint)) {
+			throw new TemporalError('DatabaseCorrupted', `Temporal reconstruction chain for '${commitSha}' is cyclic or exceeds its policy bound`);
+		}
+		const plan = { baseCheckpointSha, deltaShas: backwardsDeltas.reverse() };
 
 		if (!plan.baseCheckpointSha) {
 			throw new TemporalError(
@@ -225,7 +241,6 @@ export class TemporalCommitIngestionService {
 		}
 
 		// 4. Reconstruct snapshot and verify digest
-		const targetCommit = commitsBySha.get(commitSha);
 		const reconstructed = this._reconstructionEngine.reconstruct(baseCheckpoint, deltas, commitSha);
 		if (targetCommit?.canonicalDigest && reconstructed.digest && reconstructed.digest !== targetCommit.canonicalDigest) {
 			throw new TemporalError(

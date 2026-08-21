@@ -1,6 +1,6 @@
-# PreBase Temporal Graph Architecture — Phase 2.3 Integrity Gate
+# PreBase Temporal Graph Architecture — Phase 2.6 Runtime Gate
 
-This document defines the current architecture, verified repairs, and remaining blockers for **PreBase Temporal Graph Phase 2.3**. Phase 2 remains **In Progress** and Phase 3 UI work is not yet authorized.
+This document defines the current architecture, verified repairs, and remaining blockers for **PreBase Temporal Graph Phase 2.6**. Phase 2 remains **In Progress** and Phase 3 UI work is not yet authorized.
 
 ---
 
@@ -22,7 +22,7 @@ PreBase has **one active user-facing Code Graph mode**:
   - Separation of stable content records in `AnalysisManifest` from run diagnostics.
   - Query index lifecycle optimization (reused on view relayouts).
   - Magnus hidden canonical node query resolution (`resolveNodeFocusForMagnus`).
-- **Phase 2 (In Progress — Phase 2.3 Integrity Gate)**:
+- **Phase 2 (In Progress — Phase 2.6 Runtime Gate)**:
   - Temporal entity lineage (cross-commit node and edge stability).
   - Schema v4 SQLite persistence with immutable canonical states, commit occurrences, entity deletions, edge events, parse artifacts, refs, and the full parent DAG.
   - Exact delta-base DAG reconstruction along the `baseCommitSha` ancestry chain with recomputed canonical digest verification.
@@ -31,6 +31,10 @@ PreBase has **one active user-facing Code Graph mode**:
   - Shared workbench Git history service (`IWorkbenchGitHistoryService`) with exact repository open/close/HEAD routing.
   - Per-repository isolated runtime (`TemporalRepositoryRuntime`) with sequential FIFO ingestion queue and in-flight request deduplication.
   - Browser-safe workbench proxy to a validated Electron-main SQLite owner; native bindings are not renderer-reachable.
+  - Canonical parsing runs in a per-window utility process behind a cancellable, non-ProxyChannel RPC boundary; Babel remains outside the sandboxed renderer.
+  - Temporal store operations carry explicit typed error envelopes over IPC, so cache corruption and cancellation are not downgraded to generic errors.
+  - Metadata-only paged history and bounded reconstruction avoid whole-history scans on hot paths; refs are refresh-cached rather than rewritten on every read.
+  - Derived parse artifacts are the only retention-eviction target. Explicit maintenance checkpoints/compacts SQLite after eviction and truthfully reports when immutable state exceeds budget.
 - **Phase 3 (Planned Next)**:
   - Temporal UI timeline, commit scrubber, and graph diff overlays.
 - **Phase 4 (Planned)**:
@@ -39,7 +43,7 @@ PreBase has **one active user-facing Code Graph mode**:
 > [!WARNING]
 > In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 3 remains blocked until the remaining ancestry/ref query, migration-fixture, runtime smoke, and operator OAuth acceptance gates below are green.
 
-### Phase 2.3 verified repairs and open gate
+### Phase 2.6 verified repairs and open gate
 
 Verified in this pass:
 
@@ -53,14 +57,15 @@ Verified in this pass:
 - Native SQLite ownership is behind a main-process channel with cache-root and `.db` path validation; the transitive runtime-boundary verifier includes a deliberately invalid fixture.
 - Repository discovery, late open, close, HEAD changes, and cold-start runtime creation route through exact per-repository ownership without broadcast fan-out.
 - HEAD, local/remote branches, and tags are observed into the shared immutable commit/state model.
+- Parser batches use a narrow `IChannel.call(..., cancellationToken)` server channel, carry cancellation into the utility process, and enforce item/source/batch limits without logging source text.
+- Parser worker disposal cancels active work, settles queued callers, and prevents worker recreation after disposal; unexpected termination is classified separately from launch failure.
+- Temporal IPC returns safe typed error DTOs, and a corruption discovered after open is quarantined/rebuilt once before a safe retry. Quarantine generation cleanup includes DB, WAL, and SHM companions.
+- Timeline status reads request one batch of persisted commit metadata instead of reconstructing graphs or issuing per-row store reads.
 
 Still required before Phase 3:
 
-- Move canonical Babel parsing behind a browser-resolvable execution boundary (or ship an explicitly bundled browser parser). The desktop smoke proved that raw `@babel/*` package imports are not resolvable by the workbench ESM loader; they are now lazy so startup survives, but Temporal analysis is not release-ready until parsing itself executes successfully.
-- Expose ancestry-scoped edge removal events through the public history API; present-edge snapshots alone cannot describe deletion.
-- Execute the compiled producer truncation/cancellation tests inside the Git extension-host harness (plain Mocha cannot load the `vscode` host module).
-- Define and verify repository-local corruption recovery and bounded retention policy (retention must never mutate reachable immutable history incorrectly).
-- Complete restart/runtime desktop smoke with measured checkpoint/delta depth, database size, and persistent L2 reuse.
+- Complete real desktop Network and Temporal acceptance with utility-process metrics (L1/L2 hits, worker parses, indexed commits, checkpoints, deltas, max delta depth, and database footprint).
+- Complete broader scale validation for sparse transition storage and long-history ingestion; Phase 2.6 removes `getAllCommits()` from the ingestion/reconstruction hot paths but does not make a Phase-3 UI claim.
 - Complete live warm/cold Google OAuth and Supabase operator acceptance; repository tests cannot substitute for provider-console evidence.
 
 ---

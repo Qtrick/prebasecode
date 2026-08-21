@@ -6,7 +6,8 @@ import type { IChannel } from '../../../../../../base/parts/ipc/common/ipc.js';
 import { ProxyChannel } from '../../../../../../base/parts/ipc/common/ipc.js';
 import type { ITemporalStore } from '../../temporal/persistence/common/temporalStore.js';
 import type { CanonicalCoverage } from '../../common/types/canonicalTypes.js';
-import { deserializeTemporalStoreValue, serializeTemporalStoreValue, type ITemporalStoreMainService } from '../../temporal/persistence/common/temporalStoreChannel.js';
+import { deserializeTemporalStoreValue, serializeTemporalStoreValue, type ITemporalStoreMainService, type TemporalStoreIpcResponse } from '../../temporal/persistence/common/temporalStoreChannel.js';
+import { TemporalError } from '../../temporal/common/temporalErrors.js';
 import type {
 	BlobAnalysisRecord,
 	TemporalCommitRecord,
@@ -18,7 +19,7 @@ import type {
 	TemporalGraphSnapshot,
 	TemporalStructuralDelta,
 } from '../../temporal/common/temporalTypes.js';
-import type { RefRecord, RepositoryIdentityRecord, TemporalStoreMaintenanceResult } from '../../temporal/persistence/common/temporalStore.js';
+import type { RefRecord, RepositoryIdentityRecord, TemporalCommitIndexMetadata, TemporalStoreMaintenanceResult } from '../../temporal/persistence/common/temporalStore.js';
 
 export class WorkbenchTemporalStore implements ITemporalStore {
 	private readonly _main: ITemporalStoreMainService;
@@ -29,12 +30,20 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 	}
 
 	isOpen(): boolean { return this._isOpen; }
-	async open(): Promise<void> { await this._main.open(this._dbPath); this._isOpen = true; }
-	async close(): Promise<void> { if (this._isOpen) { await this._main.close(this._dbPath); this._isOpen = false; } }
+	async open(): Promise<void> { await this._unwrap(this._main.open(this._dbPath)); this._isOpen = true; }
+	async close(): Promise<void> { if (this._isOpen) { await this._unwrap(this._main.close(this._dbPath)); this._isOpen = false; } }
 
-	private async _call<T>(method: keyof ITemporalStore, ...args: readonly unknown[]): Promise<T> {
-		const result = await this._main.invoke(this._dbPath, method, serializeTemporalStoreValue(args));
-		return deserializeTemporalStoreValue<T>(result);
+	private async _unwrap<T>(responsePromise: Promise<string>): Promise<T> {
+		const response = deserializeTemporalStoreValue<TemporalStoreIpcResponse>(await responsePromise);
+		if (!response.ok) {
+			throw new TemporalError(response.error.code, response.error.message);
+		}
+		const value = deserializeTemporalStoreValue<T | null>(response.value);
+		return (value === null ? undefined : value) as T;
+	}
+
+	private _call<T>(method: keyof ITemporalStore, ...args: readonly unknown[]): Promise<T> {
+		return this._unwrap<T>(this._main.invoke(this._dbPath, method, serializeTemporalStoreValue(args)));
 	}
 
 	setRepositoryIdentity(identity: RepositoryIdentityRecord): Promise<void> { return this._call('setRepositoryIdentity', identity); }
@@ -44,6 +53,7 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 	getAllCommits(): Promise<TemporalCommitRecord[]> { return this._call('getAllCommits'); }
 	getLatestCommit(): Promise<TemporalCommitRecord | undefined> { return this._call('getLatestCommit'); }
 	getCommitCoverage(commitSha: string): Promise<CanonicalCoverage | undefined> { return this._call('getCommitCoverage', commitSha); }
+	getCommitIndexMetadata(commitShas: readonly string[]): Promise<TemporalCommitIndexMetadata[]> { return this._call('getCommitIndexMetadata', commitShas); }
 	getCommitParents(commitSha: string): Promise<string[]> { return this._call('getCommitParents', commitSha); }
 	getCommitChildren(commitSha: string): Promise<string[]> { return this._call('getCommitChildren', commitSha); }
 	getCheckpointSnapshot(commitSha: string): Promise<TemporalGraphSnapshot | undefined> { return this._call('getCheckpointSnapshot', commitSha); }

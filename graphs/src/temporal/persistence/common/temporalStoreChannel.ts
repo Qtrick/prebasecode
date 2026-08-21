@@ -5,17 +5,25 @@
 export const TEMPORAL_STORE_CHANNEL_NAME = 'prebaseTemporalStore';
 
 export interface ITemporalStoreMainService {
-	open(dbPath: string): Promise<void>;
-	close(dbPath: string): Promise<void>;
+	/** Every main-process operation uses the same typed result envelope. */
+	open(dbPath: string): Promise<string>;
+	close(dbPath: string): Promise<string>;
 	invoke(dbPath: string, method: string, argumentsJson: string): Promise<string>;
 }
+
+export type TemporalStoreIpcResponse =
+	| { readonly ok: true; readonly value: string }
+	| { readonly ok: false; readonly error: { readonly code: import('../../common/temporalErrors.js').TemporalErrorCode; readonly message: string } };
 
 const MAP_MARKER = '$prebaseMap';
 
 export function serializeTemporalStoreValue(value: unknown): string {
+	// JSON.stringify(undefined) returns undefined rather than a transport value.
+	// Store methods legitimately use undefined for a cache miss or void result, so
+	// preserve it as the JSON null sentinel at this process boundary.
 	return JSON.stringify(value, (_key, candidate) => candidate instanceof Map
 		? { [MAP_MARKER]: Array.from(candidate.entries()) }
-		: candidate);
+		: candidate) ?? 'null';
 }
 
 export function deserializeTemporalStoreValue<T>(value: string): T {

@@ -21,6 +21,9 @@ const GRAPHS_SYMLINK = path.join(
 /** @type {string[]} */
 const REQUIRED_OUT_MODULES = [
 	'out/vs/workbench/contrib/prebase/graphs/host/workbench/prebaseGraphService.js',
+	'out/vs/workbench/contrib/prebase/graphs/host/node/canonicalParserWorkerMain.js',
+	'out/vs/workbench/contrib/prebase/graphs/host/node/canonicalParserWorkerChannel.js',
+	'out/vs/workbench/contrib/prebase/graphs/host/node/canonicalParserWorkerService.js',
 	'out/vs/workbench/contrib/prebase/graphs/host/workbench/graphContribution.js',
 	'out/vs/workbench/contrib/prebase/graphs/core/analysis/entryDetector.js',
 	'out/vs/workbench/contrib/prebase/graphs/core/generation/graphGenerator.js',

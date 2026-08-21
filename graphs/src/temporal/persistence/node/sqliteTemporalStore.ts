@@ -14,6 +14,7 @@ import type {
 	ITemporalStore,
 	RefRecord,
 	RepositoryIdentityRecord,
+	TemporalCommitIndexMetadata,
 	TemporalStoreMaintenanceResult,
 } from '../common/temporalStore.js';
 import type {
@@ -705,6 +706,38 @@ export class SqliteTemporalStore implements ITemporalStore {
 		});
 	}
 
+	async getCommitIndexMetadata(commitShas: readonly string[]): Promise<TemporalCommitIndexMetadata[]> {
+		if (commitShas.length === 0) {
+			return [];
+		}
+		const db = this._getDb();
+		const placeholders = commitShas.map(() => '?').join(', ');
+		return new Promise((resolve, reject) => {
+			db.all(
+				`SELECT commits.commit_sha, graph_states.snapshot_json
+				 FROM commits LEFT JOIN graph_states ON graph_states.state_id = commits.canonical_state_id
+				 WHERE commits.commit_sha IN (${placeholders});`,
+				commitShas,
+				(error, rows: Array<{ commit_sha: string; snapshot_json?: string }>) => {
+					if (error) return reject(error);
+					try {
+						resolve(rows.map(row => {
+							if (!row.snapshot_json) return { commitSha: row.commit_sha };
+							const snapshot = JSON.parse(row.snapshot_json) as { coverage?: CanonicalCoverage; completeness?: CanonicalCoverage };
+							const coverage = snapshot.coverage ?? snapshot.completeness;
+							if (!coverage || typeof coverage.completeWithinProfile !== 'boolean') {
+								throw new TemporalError('DatabaseCorrupted', `Canonical state coverage is missing for ${row.commit_sha}`);
+							}
+							return { commitSha: row.commit_sha, coverage };
+						}));
+					} catch (parseError) {
+						reject(parseError instanceof TemporalError ? parseError : new TemporalError('DatabaseCorrupted', 'Failed to parse timeline index metadata', parseError));
+					}
+				}
+			);
+		});
+	}
+
 	async getCommitParents(commitSha: string): Promise<string[]> {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
@@ -1261,6 +1294,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 		}
 		const db = this._getDb();
 		const databaseBytes = async (): Promise<number> => Number(await readPragma(db, 'page_count')) * Number(await readPragma(db, 'page_size'));
+		const compactedDatabaseBytes = async (): Promise<number> => (Number(await readPragma(db, 'page_count')) - Number(await readPragma(db, 'freelist_count'))) * Number(await readPragma(db, 'page_size'));
 		let size = await databaseBytes();
 		let evicted = 0;
 		while (size > maxDatabaseBytes) {
@@ -1274,7 +1308,22 @@ export class SqliteTemporalStore implements ITemporalStore {
 				break;
 			}
 			evicted += removed;
-			await runStatement(db, 'PRAGMA incremental_vacuum;');
+			// Deletions only populate SQLite's freelist. Avoid vacuuming for every
+			// 256-row batch: each VACUUM rewrites the whole cache and made a large
+			// artifact cache scale quadratically. The freelist gives the post-VACUUM
+			// lower bound, so stop deleting once one final compaction can meet budget.
+			if (await compactedDatabaseBytes() <= maxDatabaseBytes) {
+				break;
+			}
+		}
+		if (evicted > 0) {
+			// This is an explicit maintenance operation. A regular DELETE does not
+			// shrink the file, particularly for caches predating incremental vacuum.
+			await runStatement(db, 'PRAGMA wal_checkpoint(TRUNCATE);');
+			await runStatement(db, 'VACUUM;');
+			// VACUUM itself can produce WAL frames, so truncate once more before
+			// reporting the physical cache footprint to the maintenance caller.
+			await runStatement(db, 'PRAGMA wal_checkpoint(TRUNCATE);');
 			size = await databaseBytes();
 		}
 		return { databaseBytes: size, parseArtifactsEvicted: evicted, withinBudget: size <= maxDatabaseBytes };
