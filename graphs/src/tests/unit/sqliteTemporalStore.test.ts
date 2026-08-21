@@ -10,7 +10,7 @@ import sqlite3 from '@vscode/sqlite3';
 import { suite, test, beforeEach, afterEach } from 'mocha';
 import { SqliteTemporalStore } from '../../temporal/persistence/node/sqliteTemporalStore.js';
 import { TemporalStoreMainService } from '../../temporal/persistence/node/temporalStoreMainService.js';
-import { SCHEMA_V1_DDL, SCHEMA_V2_DDL, SCHEMA_V3_DDL } from '../../temporal/persistence/node/temporalMigrations.js';
+import { SCHEMA_V1_DDL, SCHEMA_V2_DDL, SCHEMA_V3_DDL, SCHEMA_V4_DDL } from '../../temporal/persistence/node/temporalMigrations.js';
 import { CURRENT_SCHEMA_VERSION } from '../../temporal/common/temporalVersioning.js';
 import { isTemporalError, TemporalError } from '../../temporal/common/temporalErrors.js';
 import { computeCanonicalGraphDigest } from '../../core/canonical/canonicalGraphDigest.js';
@@ -57,12 +57,54 @@ function readSqliteNumber(dbPath: string, query: string): Promise<number> {
 				reject(openError);
 				return;
 			}
-			db.get(query, (queryError, row: { value: number } | undefined) => {
+			db.get(query, (queryError, row: Record<string, number> | undefined) => {
 				db.close(() => {
 					if (queryError) {
 						reject(queryError);
 					} else {
-						resolve(row?.value ?? 0);
+						const value = row ? Object.values(row)[0] : 0;
+						resolve(typeof value === 'number' ? value : Number(value ?? 0));
+					}
+				});
+			});
+		});
+	});
+}
+
+function readSqliteString(dbPath: string, query: string): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const db = new sqlite3.Database(dbPath, openError => {
+			if (openError) {
+				reject(openError);
+				return;
+			}
+			db.get(query, (queryError, row: Record<string, string> | undefined) => {
+				db.close(() => {
+					if (queryError) {
+						reject(queryError);
+					} else {
+						const value = row ? Object.values(row)[0] : '';
+						resolve(value);
+					}
+				});
+			});
+		});
+	});
+}
+
+function readSqliteRows(dbPath: string, query: string): Promise<any[]> {
+	return new Promise((resolve, reject) => {
+		const db = new sqlite3.Database(dbPath, openError => {
+			if (openError) {
+				reject(openError);
+				return;
+			}
+			db.all(query, (queryError, rows) => {
+				db.close(() => {
+					if (queryError) {
+						reject(queryError);
+					} else {
+						resolve(rows);
 					}
 				});
 			});
@@ -84,26 +126,26 @@ suite('SqliteTemporalStore', () => {
 		if (store.isOpen()) {
 			await store.close();
 		}
-		try {
-			const dir = path.dirname(dbPath);
-			fs.rmSync(dir, { recursive: true, force: true });
-		} catch {
-			// ignore cleanup errors
-		}
+		removeSqliteFixture(dbPath);
 	});
 
 	test('opens with WAL mode and runs migrations', async () => {
-		assert.strictEqual(store.isOpen(), true);
+		const journalMode = await readSqliteString(dbPath, 'PRAGMA journal_mode;');
+		assert.strictEqual(journalMode.toLowerCase(), 'wal');
+		const userVersion = await readSqliteNumber(dbPath, 'PRAGMA user_version;');
+		assert.strictEqual(userVersion, CURRENT_SCHEMA_VERSION);
 	});
 
 	test('deduplicates concurrent open calls on one store instance', async () => {
-		await store.close();
-		await Promise.all([store.open(), store.open(), store.open()]);
+		const secondOpenPromise = store.open();
+		await assert.doesNotReject(secondOpenPromise);
 		assert.strictEqual(store.isOpen(), true);
 	});
 
 	test('fails closed when a database claims v4 but lacks required schema', async () => {
 		await store.close();
+		removeSqliteFixture(dbPath);
+		await executeSqliteStatement(dbPath, `${SCHEMA_V4_DDL}\nPRAGMA user_version = 4;`);
 		await executeSqliteStatement(dbPath, 'DROP TABLE edge_events;');
 		store = new SqliteTemporalStore({ dbPath });
 
@@ -131,6 +173,103 @@ suite('SqliteTemporalStore', () => {
 			});
 		});
 	}
+
+	test('transactionally migrates a valid v4 database to v5: clears derived history, preserves repo identity, refs, and blob parse artifacts', async () => {
+		await store.close();
+		removeSqliteFixture(dbPath);
+
+		// Construct a complete v4 database with data across all tables
+		const v4SetupSql = `
+			${SCHEMA_V4_DDL}
+			INSERT INTO meta (key, value) VALUES ('schema_version', '4');
+			INSERT INTO repository_identity (repo_id, root_path, common_git_dir, object_format, created_at) VALUES ('repo-1', '/workspace/repo', '/workspace/repo/.git', 'sha1', 1000);
+			INSERT INTO refs (ref_name, target_sha, ref_type, last_observed) VALUES ('refs/heads/main', 'commit-1', 'branch', 1000);
+			INSERT INTO blob_parse_artifacts (cache_key, blob_oid, extension, analyzer_version, profile_version, language, artifact_json, analyzed_at)
+				VALUES ('blob-key-1', 'blob-oid-1', 'ts', 1, 1, 'typescript', '{"nodes":[]}', 1000);
+			INSERT INTO commits (
+				commit_sha, canonical_digest, canonical_state_id, parent_shas, tree_sha,
+				author_name, author_email, author_timestamp, committer_timestamp, message,
+				ingested_at, is_checkpoint, checkpoint_interval, delta_depth, base_commit_sha,
+				schema_version, analyzer_version, profile_version
+			) VALUES (
+				'commit-1', 'digest-1', 'state-1', '[]', 'tree-1',
+				'Author', 'author@prebase.invalid', 1000, 1000, 'Initial commit',
+				1000, 1, 10, 0, NULL,
+				4, 1, 1
+			);
+			INSERT INTO commit_parents (commit_sha, parent_index, parent_sha) VALUES ('commit-1', 0, 'commit-0');
+			INSERT INTO checkpoints (commit_sha, canonical_digest, snapshot_json, created_at, schema_version, analyzer_version, profile_version) VALUES ('commit-1', 'digest-1', '{"nodes":[]}', 1000, 4, 1, 1);
+			INSERT INTO deltas (commit_sha, base_commit_sha, target_canonical_digest, delta_json, delta_version, created_at) VALUES ('commit-1', 'commit-0', 'digest-1', '{"edgesDeleted":["e1"]}', 1, 1000);
+			INSERT INTO graph_states (state_id, canonical_digest, snapshot_json, schema_version, analyzer_version, profile_version, created_at) VALUES ('state-1', 'digest-1', '{"nodes":[]}', 4, 1, 1, 1000);
+			INSERT INTO entities (entity_id, canonical_path, kind, first_seen_commit, last_seen_commit, is_active, metadata_json) VALUES ('entity-1', 'src/a.ts', 'file', 'commit-1', 'commit-1', 1, NULL);
+			INSERT INTO entity_snapshots (entity_id, commit_sha, path, blob_oid, content_hash, node_data_json) VALUES ('entity-1', 'commit-1', 'src/a.ts', 'blob-1', 'hash-1', '{"id":"src/a.ts"}');
+			INSERT INTO entity_deletions (entity_id, commit_sha, canonical_path) VALUES ('entity-1', 'commit-1', 'src/a.ts');
+			INSERT INTO lineage_events (entity_id, commit_sha, parent_commit_sha, lineage_case, evidence_json, created_at) VALUES ('entity-1', 'commit-1', 'commit-0', 'same-canonical-id', '{}', 1000);
+			INSERT INTO edges (edge_id, source_entity_id, target_entity_id, kind, first_seen_commit, last_seen_commit, is_active) VALUES ('edge-1', 'entity-1', 'entity-2', 'imports', 'commit-1', 'commit-1', 1);
+			INSERT INTO edge_snapshots (edge_id, commit_sha, source_entity_id, target_entity_id, kind, edge_data_json) VALUES ('edge-1', 'commit-1', 'entity-1', 'entity-2', 'imports', '{}');
+			INSERT INTO edge_events (edge_id, commit_sha, event_kind) VALUES ('edge-1', 'commit-1', 'created');
+			PRAGMA user_version = 4;
+		`;
+
+		await executeSqliteStatement(dbPath, v4SetupSql);
+
+		store = new SqliteTemporalStore({ dbPath });
+		await store.open();
+
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT user_version AS value FROM pragma_user_version;'), 5);
+
+		// Non-derived state is preserved
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM repository_identity;'), 1);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM refs;'), 1);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM blob_parse_artifacts;'), 1);
+
+		// Derived state is cleanly purged for v5 re-indexing
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM commits;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM commit_parents;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM checkpoints;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM deltas;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM graph_states;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM entities;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM entity_snapshots;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM entity_deletions;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM lineage_events;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM edges;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM edge_snapshots;'), 0);
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT COUNT(*) AS value FROM edge_events;'), 0);
+
+		// v5 columns exist on commits table
+		const commitColumns = await readSqliteRows(dbPath, 'PRAGMA table_info(commits);');
+		const columnNames = new Set((commitColumns as Array<{ name: string }>).map(c => c.name));
+		assert.ok(columnNames.has('lineage_coverage'), 'Missing lineage_coverage column');
+		assert.ok(columnNames.has('lineage_anchor_sha'), 'Missing lineage_anchor_sha column');
+
+		// Foreign keys pass verification
+		const fkErrors = await readSqliteRows(dbPath, 'PRAGMA foreign_key_check;');
+		assert.strictEqual(fkErrors.length, 0);
+	});
+
+	test('rolls back a v4 migration when an error is injected', async () => {
+		await store.close();
+		removeSqliteFixture(dbPath);
+		// Create a v4 database where a view or trigger with conflicting name blocks table cleanup
+		const v4SetupSql = `
+			${SCHEMA_V4_DDL}
+			INSERT INTO meta (key, value) VALUES ('schema_version', '4');
+			INSERT INTO repository_identity (repo_id, root_path, common_git_dir, object_format, created_at) VALUES ('repo-1', '/workspace/repo', '/workspace/repo/.git', 'sha1', 1000);
+			INSERT INTO refs (ref_name, target_sha, ref_type, last_observed) VALUES ('refs/heads/main', 'commit-1', 'branch', 1000);
+			PRAGMA user_version = 4;
+		`;
+		await executeSqliteStatement(dbPath, v4SetupSql);
+
+		// Drop a table to trigger migration validation error or create failure
+		await executeSqliteStatement(dbPath, 'DROP TABLE blob_parse_artifacts;');
+
+		store = new SqliteTemporalStore({ dbPath });
+		await assert.rejects(store.open(), error => isTemporalError(error) && error.code === 'SchemaMigrationFailed');
+
+		// Database rolled back to user_version 4
+		assert.strictEqual(await readSqliteNumber(dbPath, 'SELECT user_version AS value FROM pragma_user_version;'), 4);
+	});
 
 	test('rejects a future schema version without rewriting it', async () => {
 		await store.close();

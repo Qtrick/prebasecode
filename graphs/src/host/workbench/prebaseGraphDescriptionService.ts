@@ -8,7 +8,7 @@ import { isEqualOrParent } from '../../../../../../base/common/resources.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { localize } from '../../../../../../nls.js';
 import { ICommandService } from '../../../../../../platform/commands/common/commands.js';
-import { IFileService } from '../../../../../../platform/files/common/files.js';
+import { IFileService, FileOperation } from '../../../../../../platform/files/common/files.js';
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../../../platform/storage/common/storage.js';
 import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
@@ -27,9 +27,17 @@ export interface IGraphNodeDescriptionResult {
 	cacheHit: boolean;
 }
 
-const PROMPT_VERSION = 'v8';
-const CACHE_KEY = 'prebase.graph.descriptionCache.v8';
-const MAX_CACHE = 200;
+export interface IPeekGraphNodeDescriptionResult {
+	cached: boolean;
+	description?: string;
+	providerId?: string;
+	modelId?: string;
+}
+
+const PROMPT_VERSION = 'v9';
+const CACHE_KEY = 'prebase.graph.descriptionCache.v9';
+const MAX_CACHE_ENTRIES = 2000;
+const MAX_CACHE_BYTES = 1024 * 1024; // 1 MB byte budget
 const MAX_CONTENT = 12000;
 
 function hashContent(str: string): string {
@@ -73,12 +81,13 @@ export function normalizeCompactDescription(rawText: string): string {
 const SENSITIVE = /(^|\/)(\.env|\.env\..*|credentials(\.json)?|secrets?(\.json)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|\.pem|\.key|\.p12|\.pfx)(\/|$)/i;
 const SENSITIVE_DIRS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(\/|$)/i;
 
-interface CacheEntry {
-	text: string;
-	at: number;
+interface CacheEntryV9 {
+	description: string;
+	sourceFingerprint: string;
+	generatedAt: number;
+	promptVersion: string;
 	providerId?: string;
 	modelId?: string;
-	cacheIdentity?: string;
 }
 
 interface DescriptionContextInfo {
@@ -94,6 +103,7 @@ interface DescriptionContextInfo {
 export interface IPreBaseGraphDescriptionService {
 	readonly _serviceBrand: undefined;
 	describeNode(node: GraphNode, token?: CancellationToken, options?: { force?: boolean }): Promise<IGraphNodeDescriptionResult>;
+	peekCachedDescription(node: GraphNode): IPeekGraphNodeDescriptionResult;
 	clearCache(): void;
 }
 
@@ -102,6 +112,10 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 
 	private _active: CancellationTokenSource | undefined;
 	private _inflight = new Map<string, { promise: Promise<IGraphNodeDescriptionResult>; cts: CancellationTokenSource }>();
+
+	private readonly _dirtyFiles = new Set<string>();
+	private readonly _cleanVerifiedFiles = new Set<string>();
+	private readonly _fileGeneration = new Map<string, number>();
 
 	private readonly workspaceContextService: IWorkspaceContextService;
 	private readonly fileService: IFileService;
@@ -119,6 +133,50 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		this.fileService = fileService;
 		this.storageService = storageService;
 		this.commandService = commandService;
+
+		// Track file modifications lazily in-memory. Zero network/AI calls on file events.
+		if (this.fileService.onDidFilesChange) {
+			this._register(this.fileService.onDidFilesChange(e => {
+				const folder = this.workspaceContextService.getWorkspace().folders[0];
+				if (!folder) {
+					return;
+				}
+				for (const uri of e.rawAdded) {
+					this._handleFileChange(folder.uri, uri, false);
+				}
+				for (const uri of e.rawUpdated) {
+					this._handleFileChange(folder.uri, uri, false);
+				}
+				for (const uri of e.rawDeleted) {
+					this._handleFileChange(folder.uri, uri, true);
+				}
+			}));
+		}
+
+		if (this.fileService.onDidRunOperation) {
+			this._register(this.fileService.onDidRunOperation(e => {
+				const folder = this.workspaceContextService.getWorkspace().folders[0];
+				if (!folder) {
+					return;
+				}
+				this._handleFileChange(folder.uri, e.resource, e.operation === FileOperation.DELETE);
+			}));
+		}
+	}
+
+	private _handleFileChange(folderUri: URI, uri: URI, isDelete: boolean): void {
+		if (isEqualOrParent(uri, folderUri)) {
+			const rel = this._safeRelativePath(uri.path.replace(folderUri.path, '').replace(/^\//, ''));
+			if (rel) {
+				const cacheKey = this._makeLogicalKey(folderUri, rel);
+				this._fileGeneration.set(cacheKey, (this._fileGeneration.get(cacheKey) || 0) + 1);
+				this._dirtyFiles.add(cacheKey);
+				this._cleanVerifiedFiles.delete(cacheKey);
+				if (isDelete) {
+					this._deleteCacheKey(cacheKey);
+				}
+			}
+		}
 	}
 
 	override dispose(): void {
@@ -130,11 +188,41 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			item.cts.dispose();
 		}
 		this._inflight.clear();
+		this._dirtyFiles.clear();
+		this._cleanVerifiedFiles.clear();
 		super.dispose();
 	}
 
 	clearCache(): void {
 		this.storageService.remove(CACHE_KEY, StorageScope.APPLICATION);
+		this._dirtyFiles.clear();
+		this._cleanVerifiedFiles.clear();
+	}
+
+	peekCachedDescription(node: GraphNode): IPeekGraphNodeDescriptionResult {
+		const relative = this._safeRelativePath(node.path || node.label);
+		if (!relative || SENSITIVE.test(relative) || SENSITIVE_DIRS.test(relative)) {
+			return { cached: false };
+		}
+		const folder = this.workspaceContextService.getWorkspace().folders[0];
+		if (!folder) {
+			return { cached: false };
+		}
+		const cacheKey = this._makeLogicalKey(folder.uri, relative);
+		if (this._dirtyFiles.has(cacheKey)) {
+			return { cached: false };
+		}
+		const cache = this._readCache();
+		const entry = cache[cacheKey];
+		if (entry?.description && entry.promptVersion === PROMPT_VERSION) {
+			return {
+				cached: true,
+				description: entry.description,
+				providerId: entry.providerId,
+				modelId: entry.modelId,
+			};
+		}
+		return { cached: false };
 	}
 
 	async describeNode(node: GraphNode, token?: CancellationToken, options?: { force?: boolean }): Promise<IGraphNodeDescriptionResult> {
@@ -152,31 +240,24 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.noWorkspace', "Open a project to generate AI descriptions."), cacheHit: false };
 		}
 
-		let content = '';
-		let contentHash = '0';
-		try {
-			const uri = this._resolveWorkspaceUri(folder.uri, relative);
-			if (uri) {
-				try {
-					const file = await this.fileService.readFile(uri, { position: 0, length: MAX_CONTENT });
-					content = file.value.toString().slice(0, MAX_CONTENT);
-					contentHash = String(hashContent(content));
-				} catch {
-					content = '';
-				}
+		const cacheKey = this._makeLogicalKey(folder.uri, relative);
+
+		// Fast clean-path cache hit: if verified clean and not forced, return cached description without reading file or calling AI
+		if (!options?.force && this._cleanVerifiedFiles.has(cacheKey)) {
+			const cached = this._readCache()[cacheKey];
+			if (cached?.description && cached.promptVersion === PROMPT_VERSION) {
+				return {
+					overview,
+					aiDescription: cached.description,
+					aiStatus: 'ready',
+					aiProviderId: cached.providerId ?? 'gemini',
+					aiModelId: cached.modelId,
+					cacheHit: true,
+				};
 			}
-		} catch {
-			content = '';
 		}
 
-		const cacheKey = [
-			folder.uri.toString(),
-			'file',
-			relative,
-			contentHash,
-			PROMPT_VERSION,
-		].join('::');
-
+		// Deduplicate simultaneous requests for same node
 		const existing = this._inflight.get(cacheKey);
 		if (existing && !existing.cts.token.isCancellationRequested && (!token || !token.isCancellationRequested)) {
 			return existing.promise;
@@ -191,7 +272,42 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		this._active = cts;
 
 		const work = (async (): Promise<IGraphNodeDescriptionResult> => {
+			const fileGenAtStart = this._fileGeneration.get(cacheKey) || 0;
 			try {
+				let content = '';
+				let contentHash = '0';
+				const uri = this._resolveWorkspaceUri(folder.uri, relative);
+				if (uri) {
+					try {
+						const file = await this.fileService.readFile(uri, { position: 0, length: MAX_CONTENT });
+						content = file.value.toString().slice(0, MAX_CONTENT);
+						contentHash = String(hashContent(content));
+					} catch {
+						content = '';
+					}
+				}
+
+				if (cts.token.isCancellationRequested) {
+					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."), cacheHit: false };
+				}
+
+				// Check fingerprint match if not forced
+				if (!options?.force) {
+					const cached = this._readCache()[cacheKey];
+					if (cached?.description && cached.promptVersion === PROMPT_VERSION && cached.sourceFingerprint === contentHash) {
+						this._cleanVerifiedFiles.add(cacheKey);
+						this._dirtyFiles.delete(cacheKey);
+						return {
+							overview,
+							aiDescription: cached.description,
+							aiStatus: 'ready',
+							aiProviderId: cached.providerId ?? 'gemini',
+							aiModelId: cached.modelId,
+							cacheHit: true,
+						};
+					}
+				}
+
 				// Retrieve active AI description context
 				let activeContext: DescriptionContextInfo | undefined;
 				try {
@@ -211,18 +327,6 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.disabled', "AI description is disabled in settings."), cacheHit: false };
 				}
 
-				const cached = options?.force ? undefined : this._readCache()[cacheKey];
-				if (cached?.text && (!activeContext?.cacheIdentity || cached.cacheIdentity === activeContext.cacheIdentity)) {
-					return {
-						overview,
-						aiDescription: cached.text,
-						aiStatus: 'ready',
-						aiProviderId: cached.providerId ?? activeContext?.providerId ?? 'gemini',
-						aiModelId: cached.modelId ?? activeContext?.modelId,
-						cacheHit: true,
-					};
-				}
-
 				const prompt = [
 					'Write an ultra-concise 1-sentence description (~18–32 words, max 38 words) of this source file.',
 					'State its concrete responsibility and key architectural mechanism in one clear, informative sentence with no filler.',
@@ -234,7 +338,6 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					content || '(unavailable)',
 				].join('\n');
 
-				// Invoke Magnus describeFile command
 				type RawResult = string | {
 					text?: string;
 					status?: 'ready' | 'notConfigured' | 'authError' | 'rateLimited' | 'networkError' | 'modelUnavailable' | 'cancelled' | 'disabled' | 'error' | 'skipped';
@@ -355,15 +458,21 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 				const aiText = normalizeCompactDescription(rawAiText);
 				const providerId = (typeof raw === 'object' && raw.providerId) ? raw.providerId : (activeContext?.providerId ?? 'gemini');
 				const modelId = (typeof raw === 'object' && raw.modelId) ? raw.modelId : activeContext?.modelId;
-				const cacheIdentity = (typeof raw === 'object' && raw.cacheIdentity) ? raw.cacheIdentity : (activeContext?.cacheIdentity ?? `${providerId}:${modelId || 'auto'}:${PROMPT_VERSION}`);
 
-				this._writeCache(cacheKey, {
-					text: aiText,
-					at: Date.now(),
-					providerId,
-					modelId,
-					cacheIdentity,
-				});
+				// Stale in-flight race protection: discard result if file was modified again during AI request
+				const currentFileGen = this._fileGeneration.get(cacheKey) || 0;
+				if (fileGenAtStart === currentFileGen) {
+					this._writeCache(cacheKey, {
+						description: aiText,
+						sourceFingerprint: contentHash,
+						generatedAt: Date.now(),
+						promptVersion: PROMPT_VERSION,
+						providerId,
+						modelId,
+					});
+					this._cleanVerifiedFiles.add(cacheKey);
+					this._dirtyFiles.delete(cacheKey);
+				}
 
 				return {
 					overview,
@@ -395,8 +504,11 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		return work;
 	}
 
-	private _safeRelativePath(raw: string): string | undefined {
-		const relative = raw.replace(/^file:/, '').replace(/\\/g, '/');
+	private _safeRelativePath(candidate: string | undefined): string | undefined {
+		if (!candidate) {
+			return undefined;
+		}
+		const relative = candidate.replace(/\\/g, '/').replace(/^\.\//, '').trim();
 		if (!relative || relative.startsWith('/') || /^[A-Za-z]:/.test(relative)) {
 			return undefined;
 		}
@@ -407,30 +519,53 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		return parts.join('/');
 	}
 
-	private _resolveWorkspaceUri(folder: URI, relative: string): URI | undefined {
-		const uri = URI.joinPath(folder, relative);
-		// Require a path separator after the folder prefix — string startsWith alone allows /workspace-evil escapes.
-		if (!isEqualOrParent(uri, folder)) {
-			return undefined;
-		}
-		return uri;
+	private _makeLogicalKey(folderUri: URI, relative: string): string {
+		const folderStr = URI.isUri(folderUri) ? folderUri.toString() : String(folderUri);
+		return `${folderStr}::${relative}`;
 	}
 
-	private _readCache(): Record<string, CacheEntry> {
+	private _resolveWorkspaceUri(folder: URI, relative: string): URI | undefined {
 		try {
-			return JSON.parse(this.storageService.get(CACHE_KEY, StorageScope.APPLICATION, '{}') || '{}') as Record<string, CacheEntry>;
+			const folderUri = URI.isUri(folder) ? folder : URI.parse(String(folder));
+			const uri = URI.joinPath(folderUri, relative);
+			if (!isEqualOrParent(uri, folderUri)) {
+				return undefined;
+			}
+			return uri;
+		} catch {
+			return undefined;
+		}
+	}
+
+	private _readCache(): Record<string, CacheEntryV9> {
+		try {
+			return JSON.parse(this.storageService.get(CACHE_KEY, StorageScope.APPLICATION, '{}') || '{}') as Record<string, CacheEntryV9>;
 		} catch {
 			return {};
 		}
 	}
 
-	private _writeCache(key: string, entry: CacheEntry): void {
+	private _deleteCacheKey(key: string): void {
+		const cache = this._readCache();
+		if (cache[key]) {
+			delete cache[key];
+			this.storageService.store(CACHE_KEY, JSON.stringify(cache), StorageScope.APPLICATION, StorageTarget.MACHINE);
+		}
+	}
+
+	private _writeCache(key: string, entry: CacheEntryV9): void {
 		const cache = this._readCache();
 		cache[key] = entry;
-		const entries = Object.entries(cache).sort((a, b) => b[1].at - a[1].at).slice(0, MAX_CACHE);
-		const next: Record<string, CacheEntry> = {};
+		const entries = Object.entries(cache).sort((a, b) => b[1].generatedAt - a[1].generatedAt).slice(0, MAX_CACHE_ENTRIES);
+		const next: Record<string, CacheEntryV9> = {};
+		let totalBytes = 0;
 		for (const [k, v] of entries) {
+			const entryBytes = k.length + (v.description?.length ?? 0) + 128;
+			if (totalBytes + entryBytes > MAX_CACHE_BYTES) {
+				break;
+			}
 			next[k] = v;
+			totalBytes += entryBytes;
 		}
 		this.storageService.store(CACHE_KEY, JSON.stringify(next), StorageScope.APPLICATION, StorageTarget.MACHINE);
 	}

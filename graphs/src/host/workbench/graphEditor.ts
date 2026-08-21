@@ -236,6 +236,18 @@ export class PreBaseGraphEditor extends EditorPane {
 				await reply({ ok: true });
 				break;
 			}
+			case 'peekNodeDescription': {
+				const nodeId = (message.payload as { nodeId?: string } | undefined)?.nodeId;
+				const snapshot = this.graphService.getSnapshot();
+				const node = snapshot?.nodes.find(n => n.id === nodeId);
+				if (!node) {
+					await reply({ cached: false });
+					break;
+				}
+				const peek = this.descriptionService.peekCachedDescription(node);
+				await reply(peek);
+				break;
+			}
 			case 'describeNode': {
 				const nodeId = (message.payload as { nodeId?: string } | undefined)?.nodeId;
 				const snapshot = this.graphService.getSnapshot();
@@ -1138,6 +1150,18 @@ async function openNodePopup(node, clientX, clientY) {
 	if (popupAiProvenance) { popupAiProvenance.style.display = 'none'; popupAiProvenance.textContent = ''; }
 	placePopupNear(clientX, clientY);
 	request('selectNode', { nodeId: node.id });
+	request('peekNodeDescription', { nodeId: node.id }).then(peek => {
+		if (!popupNode || popupNode.id !== node.id) return;
+		if (peek && peek.cached && peek.description) {
+			popupAi.textContent = peek.description;
+			if (popupAiProvenance) {
+				const providerName = peek.providerId === 'gemini' ? 'Gemini' : (peek.providerId || 'AI');
+				const modelName = peek.modelId ? (' · ' + peek.modelId) : '';
+				popupAiProvenance.textContent = providerName + modelName + ' · Cached';
+				popupAiProvenance.style.display = 'block';
+			}
+		}
+	});
 	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection();
 
 	describeTimer = setTimeout(async () => {

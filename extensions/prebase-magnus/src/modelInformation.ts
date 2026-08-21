@@ -35,6 +35,10 @@ export function buildMagnusLanguageModelInformation(
 	return modelOptions.map((model: MagnusModelOption, index: number) => {
 		const configSchema = createThinkingLevelConfigSchema(model.reasoning);
 		const contextWindowStr = formatContextWindowLabel(model.maxInputTokens);
+		const hasContextInDesc = model.description ? model.description.includes(contextWindowStr) : false;
+		const baseTooltip = model.description
+			? (hasContextInDesc ? model.description : `${model.description} (${contextWindowStr})`)
+			: contextWindowStr;
 		return {
 			id: model.id,
 			name: model.name,
@@ -44,8 +48,8 @@ export function buildMagnusLanguageModelInformation(
 			maxOutputTokens: model.maxOutputTokens,
 			detail: model.description || contextWindowStr,
 			tooltip: hasKey
-				? `${model.description} (${contextWindowStr})`
-				: `${model.description} (${contextWindowStr})\n\nConfigure a Gemini credential before using Agents.`,
+				? baseTooltip
+				: `${baseTooltip}\n\nConfigure a Gemini credential before using Agents.`,
 			capabilities: { toolCalling: true, imageInput: true },
 			isDefault: index === 0,
 			isUserSelectable: true,

@@ -140,7 +140,7 @@ export interface TemporalEdgeSnapshot {
 export interface TemporalEdgeLifecycleEvent {
 	readonly edgeId: string;
 	readonly commitSha: string;
-	readonly eventKind: 'created' | 'changed' | 'removed';
+	readonly eventKind: 'created' | 'changed' | 'removed' | 'observed-at-anchor';
 	readonly sourceEntityId?: string;
 	readonly targetEntityId?: string;
 	readonly kind?: TemporalEdgeKind;

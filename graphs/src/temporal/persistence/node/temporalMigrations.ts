@@ -489,6 +489,201 @@ CREATE TABLE IF NOT EXISTS edge_events (
 CREATE INDEX IF NOT EXISTS idx_edge_events_commit ON edge_events(commit_sha);
 `;
 
+export const SCHEMA_V4_DDL = `
+CREATE TABLE IF NOT EXISTS meta (
+	key TEXT PRIMARY KEY,
+	value TEXT NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS repository_identity (
+	repo_id TEXT PRIMARY KEY,
+	root_path TEXT NOT NULL,
+	common_git_dir TEXT,
+	object_format TEXT NOT NULL,
+	created_at INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS graph_states (
+	state_id TEXT PRIMARY KEY,
+	canonical_digest TEXT NOT NULL,
+	schema_version INTEGER NOT NULL,
+	analyzer_version INTEGER NOT NULL,
+	profile_version INTEGER NOT NULL,
+	snapshot_json TEXT NOT NULL,
+	created_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_graph_states_digest ON graph_states(canonical_digest);
+
+CREATE TABLE IF NOT EXISTS commits (
+	commit_sha TEXT PRIMARY KEY,
+	canonical_digest TEXT NOT NULL DEFAULT '',
+	canonical_state_id TEXT,
+	parent_shas TEXT NOT NULL,
+	tree_sha TEXT NOT NULL,
+	author_name TEXT NOT NULL,
+	author_email TEXT NOT NULL,
+	author_timestamp INTEGER NOT NULL,
+	committer_timestamp INTEGER NOT NULL,
+	message TEXT NOT NULL,
+	ingested_at INTEGER NOT NULL,
+	is_checkpoint INTEGER NOT NULL,
+	checkpoint_interval INTEGER NOT NULL,
+	delta_depth INTEGER NOT NULL DEFAULT 0,
+	base_commit_sha TEXT,
+	schema_version INTEGER NOT NULL,
+	analyzer_version INTEGER NOT NULL,
+	profile_version INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_commits_ingested ON commits(ingested_at);
+CREATE INDEX IF NOT EXISTS idx_commits_digest ON commits(canonical_digest);
+CREATE INDEX IF NOT EXISTS idx_commits_base ON commits(base_commit_sha);
+
+CREATE TABLE IF NOT EXISTS commit_parents (
+	commit_sha TEXT NOT NULL,
+	parent_index INTEGER NOT NULL,
+	parent_sha TEXT NOT NULL,
+	PRIMARY KEY (commit_sha, parent_index),
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_commit_parents_parent ON commit_parents(parent_sha);
+
+CREATE TABLE IF NOT EXISTS refs (
+	ref_name TEXT PRIMARY KEY,
+	target_sha TEXT NOT NULL,
+	ref_type TEXT,
+	last_observed INTEGER NOT NULL
+);
+
+CREATE TABLE IF NOT EXISTS checkpoints (
+	commit_sha TEXT PRIMARY KEY,
+	canonical_digest TEXT NOT NULL DEFAULT '',
+	snapshot_json TEXT NOT NULL,
+	created_at INTEGER NOT NULL,
+	schema_version INTEGER NOT NULL,
+	analyzer_version INTEGER NOT NULL,
+	profile_version INTEGER NOT NULL,
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS deltas (
+	commit_sha TEXT PRIMARY KEY,
+	base_commit_sha TEXT NOT NULL,
+	target_canonical_digest TEXT NOT NULL DEFAULT '',
+	delta_json TEXT NOT NULL,
+	delta_version INTEGER NOT NULL,
+	created_at INTEGER NOT NULL,
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_deltas_base ON deltas(base_commit_sha);
+
+CREATE TABLE IF NOT EXISTS entities (
+	entity_id TEXT PRIMARY KEY,
+	canonical_path TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	first_seen_commit TEXT NOT NULL,
+	last_seen_commit TEXT NOT NULL,
+	is_active INTEGER NOT NULL,
+	metadata_json TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_entities_path ON entities(canonical_path);
+
+CREATE TABLE IF NOT EXISTS entity_snapshots (
+	entity_id TEXT NOT NULL,
+	commit_sha TEXT NOT NULL,
+	path TEXT NOT NULL,
+	blob_oid TEXT,
+	content_hash TEXT,
+	node_data_json TEXT NOT NULL,
+	PRIMARY KEY (entity_id, commit_sha),
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_snapshots_commit ON entity_snapshots(commit_sha);
+CREATE INDEX IF NOT EXISTS idx_entity_snapshots_path ON entity_snapshots(path);
+CREATE INDEX IF NOT EXISTS idx_entity_snapshots_blob ON entity_snapshots(blob_oid);
+
+CREATE TABLE IF NOT EXISTS entity_deletions (
+	entity_id TEXT NOT NULL,
+	commit_sha TEXT NOT NULL,
+	canonical_path TEXT NOT NULL,
+	PRIMARY KEY (entity_id, commit_sha),
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_entity_deletions_commit ON entity_deletions(commit_sha);
+CREATE INDEX IF NOT EXISTS idx_entity_deletions_path ON entity_deletions(canonical_path);
+
+CREATE TABLE IF NOT EXISTS lineage_events (
+	id INTEGER PRIMARY KEY AUTOINCREMENT,
+	entity_id TEXT NOT NULL,
+	commit_sha TEXT NOT NULL,
+	parent_commit_sha TEXT NOT NULL,
+	lineage_case TEXT NOT NULL,
+	evidence_json TEXT NOT NULL,
+	created_at INTEGER NOT NULL,
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_lineage_entity ON lineage_events(entity_id);
+CREATE INDEX IF NOT EXISTS idx_lineage_commit ON lineage_events(commit_sha);
+
+CREATE TABLE IF NOT EXISTS edges (
+	edge_id TEXT PRIMARY KEY,
+	source_entity_id TEXT NOT NULL,
+	target_entity_id TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	first_seen_commit TEXT NOT NULL,
+	last_seen_commit TEXT NOT NULL,
+	is_active INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_edges_source ON edges(source_entity_id);
+CREATE INDEX IF NOT EXISTS idx_edges_target ON edges(target_entity_id);
+
+CREATE TABLE IF NOT EXISTS edge_snapshots (
+	edge_id TEXT NOT NULL,
+	commit_sha TEXT NOT NULL,
+	source_entity_id TEXT NOT NULL,
+	target_entity_id TEXT NOT NULL,
+	kind TEXT NOT NULL,
+	edge_data_json TEXT NOT NULL,
+	PRIMARY KEY (edge_id, commit_sha),
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_edge_snapshots_commit ON edge_snapshots(commit_sha);
+CREATE INDEX IF NOT EXISTS idx_edge_snapshots_source ON edge_snapshots(source_entity_id);
+CREATE INDEX IF NOT EXISTS idx_edge_snapshots_target ON edge_snapshots(target_entity_id);
+
+CREATE TABLE IF NOT EXISTS edge_events (
+	edge_id TEXT NOT NULL,
+	commit_sha TEXT NOT NULL,
+	event_kind TEXT NOT NULL,
+	PRIMARY KEY (edge_id, commit_sha, event_kind),
+	FOREIGN KEY (commit_sha) REFERENCES commits(commit_sha) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_edge_events_commit ON edge_events(commit_sha);
+
+CREATE TABLE IF NOT EXISTS blob_parse_artifacts (
+	cache_key TEXT PRIMARY KEY,
+	blob_oid TEXT NOT NULL,
+	extension TEXT NOT NULL DEFAULT '',
+	analyzer_version INTEGER NOT NULL,
+	profile_version INTEGER NOT NULL,
+	language TEXT NOT NULL,
+	artifact_json TEXT NOT NULL,
+	analyzed_at INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_blob_parse_artifacts_oid ON blob_parse_artifacts(blob_oid);
+`;
+
 /**
  * v5 changes history-table semantics from full observations to structural
  * transitions. Temporal stores are derived caches, so rebuilding graph state

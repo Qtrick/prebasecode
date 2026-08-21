@@ -215,4 +215,77 @@ suite('Temporal bounded cold-history indexing', () => {
 			await registry.closeAll();
 		}
 	});
+
+	test('multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D)', async () => {
+		const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prebase-bounded-multi-reconcile-'));
+		tempDirs.push(tempDir);
+		const git = new LongHistoryGitService();
+		const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath: path.join(tempDir, 'temporal.db') }), new NodeCanonicalParseService());
+		const temporal = new TemporalGraphService(git, registry);
+		const shaA = commitSha(0);
+		const shaB = commitSha(1);
+		const shaC = commitSha(2);
+		const shaD = commitSha(3);
+
+		try {
+			// 1. Index D (isolated checkpoint)
+			await temporal.ensureCommitIndexed(ROOT_PATH, shaD);
+			assert.deepStrictEqual(await temporal.getCommitIndexStatus(ROOT_PATH, shaD), {
+				status: 'ready',
+				lineageCoverage: { kind: 'partial', unknownBeforeCommitSha: shaD },
+			});
+
+			// 2. Index C (isolated checkpoint)
+			await temporal.ensureCommitIndexed(ROOT_PATH, shaC);
+			assert.deepStrictEqual(await temporal.getCommitIndexStatus(ROOT_PATH, shaC), {
+				status: 'ready',
+				lineageCoverage: { kind: 'partial', unknownBeforeCommitSha: shaC },
+			});
+
+			// 3. Index A (root checkpoint, complete)
+			await temporal.ensureCommitIndexed(ROOT_PATH, shaA);
+			assert.deepStrictEqual(await temporal.getCommitIndexStatus(ROOT_PATH, shaA), {
+				status: 'ready',
+				lineageCoverage: { kind: 'complete' },
+			});
+
+			// 4. Index B (delta from A, complete)
+			await temporal.ensureCommitIndexed(ROOT_PATH, shaB);
+			assert.deepStrictEqual(await temporal.getCommitIndexStatus(ROOT_PATH, shaB), {
+				status: 'ready',
+				lineageCoverage: { kind: 'complete' },
+			});
+
+			// 5. Re-request C: reconciles against B -> becomes delta from B, complete
+			const reconciledC = await temporal.ensureCommitIndexed(ROOT_PATH, shaC);
+			assert.strictEqual(reconciledC.isCheckpoint, false);
+			assert.deepStrictEqual(await temporal.getCommitIndexStatus(ROOT_PATH, shaC), {
+				status: 'ready',
+				lineageCoverage: { kind: 'complete' },
+			});
+
+			// 6. Re-request D: reconciles against C -> becomes delta from C, complete
+			const reconciledD = await temporal.ensureCommitIndexed(ROOT_PATH, shaD);
+			assert.strictEqual(reconciledD.isCheckpoint, false);
+			assert.deepStrictEqual(await temporal.getCommitIndexStatus(ROOT_PATH, shaD), {
+				status: 'ready',
+				lineageCoverage: { kind: 'complete' },
+			});
+
+			const store = await registry.getStore('synthetic-history', ROOT_PATH);
+			const allCommits = await store.getAllCommits();
+			const sorted = allCommits.slice().sort((a, b) => a.commitSha.localeCompare(b.commitSha));
+			assert.deepStrictEqual(
+				sorted.map(c => [c.commitSha, c.isCheckpoint, c.baseCommitSha, c.lineageCoverage?.kind]),
+				[
+					[shaA, true, undefined, 'complete'],
+					[shaB, false, shaA, 'complete'],
+					[shaC, false, shaB, 'complete'],
+					[shaD, false, shaC, 'complete'],
+				]
+			);
+		} finally {
+			await registry.closeAll();
+		}
+	});
 });

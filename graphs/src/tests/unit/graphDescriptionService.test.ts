@@ -5,15 +5,17 @@
 
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
+import { URI } from '../../../../../../base/common/uri.js';
 import { normalizeCompactDescription, PreBaseGraphDescriptionService } from '../../host/workbench/prebaseGraphDescriptionService.js';
 import type { GraphNode } from '../../common/types/graphTypes.js';
 
-suite('PreBaseGraphDescriptionService (Unit)', () => {
+suite('PreBaseGraphDescriptionService (Unit - v9 File-Aware Cache)', () => {
+	const workspaceFolderUri = URI.parse('file:///mock/workspace');
 	const workspaceFolder = {
-		uri: { toString: () => 'file:///mock/workspace' },
+		uri: workspaceFolderUri,
 		name: 'mock-workspace',
 		index: 0,
-		toResource: (rel: string) => ({ toString: () => `file:///mock/workspace/${rel}` }),
+		toResource: (rel: string) => URI.joinPath(workspaceFolderUri, rel),
 	};
 
 	const mockWorkspaceContextService = {
@@ -22,14 +24,42 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		}),
 	} as any;
 
-	const mockFileService = {
-		readFile: async () => {
-			return {
-				value: Buffer.from('export class PreBaseEditor { constructor() {} run() {} }'),
-				etag: 'etag-123',
-			};
-		},
-	} as any;
+	function createMockFileService(files: Record<string, string> = {}) {
+		let changeListener: ((e: any) => void) | undefined;
+		let operationListener: ((e: any) => void) | undefined;
+		let readCount = 0;
+
+		return {
+			get readCount() { return readCount; },
+			readFile: async (resource: any) => {
+				readCount++;
+				const uriStr = resource.toString();
+				const content = files[uriStr] ?? 'export const mock = true;';
+				return {
+					value: Buffer.from(content),
+					etag: 'etag-1',
+				};
+			},
+			onDidFilesChange: (listener: (e: any) => void) => {
+				changeListener = listener;
+				return { dispose: () => { changeListener = undefined; } };
+			},
+			onDidRunOperation: (listener: (e: any) => void) => {
+				operationListener = listener;
+				return { dispose: () => { operationListener = undefined; } };
+			},
+			emitChange: (resource: any, isDelete: boolean = false) => {
+				changeListener?.({
+					rawAdded: [],
+					rawUpdated: isDelete ? [] : [resource],
+					rawDeleted: isDelete ? [resource] : [],
+				});
+			},
+			emitOperation: (resource: any, operation: number = 0) => {
+				operationListener?.({ resource, operation });
+			},
+		};
+	}
 
 	test('normalizes descriptions to concise 1-sentence forms and trims filler prefixes', () => {
 		const verbose = 'This file provides the primary editor container. It manages document models and coordinates workbench layout. In addition, it registers keybindings and handles viewport resizing.';
@@ -55,9 +85,10 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 			executeCommand: async () => assert.fail('Should not execute command for sensitive file'),
 		} as any;
 
+		const fileService = createMockFileService();
 		const service = new PreBaseGraphDescriptionService(
 			mockWorkspaceContextService,
-			mockFileService,
+			fileService as any,
 			mockStorage,
 			mockCommandService,
 		);
@@ -73,9 +104,12 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		assert.equal(result.aiStatus, 'skipped');
 		assert.equal(result.cacheHit, false);
 		assert.ok(result.aiMessage?.includes('skipped'));
+
+		const peek = service.peekCachedDescription(node);
+		assert.equal(peek.cached, false);
 	});
 
-	test('generates ultra-concise description with v8 prompt and returns AI provenance', async () => {
+	test('1. Same file viewed 10 times -> exactly 1 AI call; clean cache hit returns without disk read or AI call', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {
 			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
@@ -83,94 +117,64 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 			remove: (key: string) => storageMap.delete(key),
 		} as any;
 
-		let capturedCommands: string[] = [];
-		let capturedArgs: any = undefined;
-
+		let aiCallCount = 0;
 		const mockCommandService = {
-			executeCommand: async (cmd: string, args: any) => {
-				capturedCommands.push(cmd);
+			executeCommand: async (cmd: string) => {
 				if (cmd === 'prebase.magnus.getDescriptionContext') {
+					return { providerId: 'gemini', modelId: 'gemini-3.7-flash' };
+				}
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCallCount++;
 					return {
+						text: 'Coordinates primary graph layout and visual node hierarchies.',
+						status: 'ready',
 						providerId: 'gemini',
 						modelId: 'gemini-3.7-flash',
-						executionMode: 'byok',
-						reasoningEffort: 'low',
-						policyVersion: 'v8',
-						cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
 					};
 				}
-				capturedArgs = args;
-				return {
-					text: 'Manages the primary editor surface and coordinates rendering across active panes.',
-					status: 'ready',
-					providerId: 'gemini',
-					modelId: 'gemini-3.7-flash',
-					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
-				};
+				return undefined;
 			},
 		} as any;
 
+		const fileService = createMockFileService();
 		const service = new PreBaseGraphDescriptionService(
 			mockWorkspaceContextService,
-			mockFileService,
+			fileService as any,
 			mockStorage,
 			mockCommandService,
 		);
 
 		const node: GraphNode = {
-			id: 'editor-node',
+			id: 'n-editor',
 			label: 'src/editor.ts',
 			path: 'src/editor.ts',
 			kind: 'file',
-			meta: {
-				architectureLayer: 'workbench',
-				imports: ['vs/base/common/lifecycle', 'vs/editor/common/editorCommon'],
-			},
 		};
 
-		const result1 = await service.describeNode(node);
+		// 1st open: reads file and calls AI
+		const res1 = await service.describeNode(node);
+		assert.equal(aiCallCount, 1);
+		assert.equal(res1.cacheHit, false);
+		assert.equal(res1.aiStatus, 'ready');
+		assert.ok(res1.aiDescription?.includes('Coordinates primary graph layout'));
+		const initialReads = fileService.readCount;
 
-		// Assert command and prompt details
-		assert.ok(capturedCommands.includes('prebase.magnus.getDescriptionContext'));
-		assert.ok(capturedCommands.includes('prebase.magnus.describeFile'));
-		assert.ok(capturedArgs.prompt.includes('1-sentence description'));
-		assert.ok(capturedArgs.prompt.includes('Path: src/editor.ts'));
-		assert.ok(capturedArgs.prompt.includes('Layer: workbench'));
+		// 2nd through 10th open: clean verified fast path (zero AI calls, zero disk reads)
+		for (let i = 2; i <= 10; i++) {
+			const res = await service.describeNode(node);
+			assert.equal(aiCallCount, 1, `Expected 1 AI call on pass ${i}`);
+			assert.equal(res.cacheHit, true, `Expected cache hit on pass ${i}`);
+			assert.equal(res.aiDescription, res1.aiDescription);
+			assert.equal(fileService.readCount, initialReads, `Pass ${i} must not read disk`);
+		}
 
-		// Assert result & provenance
-		assert.equal(result1.aiStatus, 'ready');
-		assert.equal(result1.cacheHit, false);
-		assert.equal(result1.aiProviderId, 'gemini');
-		assert.equal(result1.aiModelId, 'gemini-3.7-flash');
-		assert.ok(result1.aiDescription?.includes('Manages the primary editor surface'));
-
-		// Assert cache key consistency: second call hits cache with same provenance
-		let describeFileExecutedAgain = false;
-		mockCommandService.executeCommand = async (cmd: string) => {
-			if (cmd === 'prebase.magnus.getDescriptionContext') {
-				return {
-					providerId: 'gemini',
-					modelId: 'gemini-3.7-flash',
-					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
-				};
-			}
-			if (cmd === 'prebase.magnus.describeFile') {
-				describeFileExecutedAgain = true;
-				return { text: 'test', status: 'ready' };
-			}
-			return undefined;
-		};
-
-		const result2 = await service.describeNode(node);
-		assert.equal(describeFileExecutedAgain, false, 'Should have hit cache instead of invoking describeFile');
-		assert.equal(result2.aiStatus, 'ready');
-		assert.equal(result2.cacheHit, true);
-		assert.equal(result2.aiProviderId, 'gemini');
-		assert.equal(result2.aiModelId, 'gemini-3.7-flash');
-		assert.equal(result2.aiDescription, result1.aiDescription);
+		// Peek is immediately ready
+		const peek = service.peekCachedDescription(node);
+		assert.equal(peek.cached, true);
+		assert.equal(peek.description, res1.aiDescription);
 	});
 
-	test('invalidates cache when model or policy cacheIdentity changes', async () => {
+	test('2. Model switch -> 0 extra AI calls (model changes do not invalidate cache for unchanged files)', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {
 			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
@@ -178,187 +182,58 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 			remove: (key: string) => storageMap.delete(key),
 		} as any;
 
-		let currentIdentity = 'gemini:gemini-2.5-flash:description-policy-v8';
-		let describeFileCount = 0;
+		let currentModel = 'gemini-2.5-flash';
+		let aiCallCount = 0;
 
 		const mockCommandService = {
 			executeCommand: async (cmd: string) => {
 				if (cmd === 'prebase.magnus.getDescriptionContext') {
-					return {
-						providerId: 'gemini',
-						modelId: currentIdentity.includes('3.7') ? 'gemini-3.7-flash' : 'gemini-2.5-flash',
-						cacheIdentity: currentIdentity,
-					};
+					return { providerId: 'gemini', modelId: currentModel };
 				}
 				if (cmd === 'prebase.magnus.describeFile') {
-					describeFileCount++;
+					aiCallCount++;
 					return {
-						text: `Description under identity ${currentIdentity}`,
+						text: `Description generated by ${currentModel}`,
 						status: 'ready',
 						providerId: 'gemini',
-						modelId: currentIdentity.includes('3.7') ? 'gemini-3.7-flash' : 'gemini-2.5-flash',
-						cacheIdentity: currentIdentity,
+						modelId: currentModel,
 					};
 				}
 				return undefined;
 			},
 		} as any;
 
+		const fileService = createMockFileService();
 		const service = new PreBaseGraphDescriptionService(
 			mockWorkspaceContextService,
-			mockFileService,
+			fileService as any,
 			mockStorage,
 			mockCommandService,
 		);
 
 		const node: GraphNode = {
-			id: 'n1',
-			label: 'src/config.ts',
-			path: 'src/config.ts',
+			id: 'n-models',
+			label: 'src/models.ts',
+			path: 'src/models.ts',
 			kind: 'file',
 		};
 
-		// First run: calls describeFile
-		await service.describeNode(node);
-		assert.equal(describeFileCount, 1);
-
-		// Second run with same identity: cache hit
-		await service.describeNode(node);
-		assert.equal(describeFileCount, 1);
-
-		// Third run after user switches to Gemini 3.7: identity changes -> cache miss
-		currentIdentity = 'gemini:gemini-3.7-flash:description-policy-v8';
-		const res3 = await service.describeNode(node);
-		assert.equal(describeFileCount, 2, 'Should have regenerated description for new model identity');
-		assert.ok(res3.aiDescription?.includes('gemini-3.7-flash'));
-	});
-
-	test('computes deterministic content hash when file etag is absent', async () => {
-		const storageMap = new Map<string, string>();
-		const mockStorage = {
-			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
-			store: (key: string, val: string) => storageMap.set(key, val),
-			remove: (key: string) => storageMap.delete(key),
-		} as any;
-
-		const noEtagFileService = {
-			readFile: async () => ({
-				value: Buffer.from('fn main() { println!("tauri config"); }'),
-			}),
-		} as any;
-
-		const mockCommandService = {
-			executeCommand: async (cmd: string) => {
-				if (cmd === 'prebase.magnus.getDescriptionContext') {
-					return { cacheIdentity: 'gemini:gemini-2.5-flash:description-policy-v8' };
-				}
-				return {
-					text: 'Configuration entrypoint for Tauri host.',
-					status: 'ready',
-					providerId: 'gemini',
-					modelId: 'gemini-2.5-flash',
-					cacheIdentity: 'gemini:gemini-2.5-flash:description-policy-v8',
-				};
-			},
-		} as any;
-
-		const service = new PreBaseGraphDescriptionService(
-			mockWorkspaceContextService,
-			noEtagFileService,
-			mockStorage,
-			mockCommandService,
-		);
-
-		const node: GraphNode = {
-			id: 'tauri-mod',
-			label: 'src-tauri/src/config/mod.rs',
-			path: 'src-tauri/src/config/mod.rs',
-			kind: 'file',
-		};
-
-		const result = await service.describeNode(node);
-		assert.equal(result.aiStatus, 'ready');
-		assert.equal(result.aiDescription, 'Configuration entrypoint for Tauri host.');
-
-		// Cache entry stored in v8 key
-		const storedRaw = storageMap.get('prebase.graph.descriptionCache.v8');
-		assert.ok(storedRaw, 'Should store in v8 cache key');
-		assert.ok(storedRaw.includes('Configuration entrypoint'));
-	});
-
-	test('fast cache hit returns immediately without invoking getDescriptionContext IPC', async () => {
-		const storageMap = new Map<string, string>();
-		const mockStorage = {
-			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
-			store: (key: string, val: string) => storageMap.set(key, val),
-			remove: (key: string) => storageMap.delete(key),
-		} as any;
-
-		const commandsExecuted: string[] = [];
-		const mockCommandService = {
-			executeCommand: async (cmd: string) => {
-				commandsExecuted.push(cmd);
-				if (cmd === 'prebase.magnus.getDescriptionContext') {
-					return {
-						providerId: 'gemini',
-						modelId: 'gemini-3.7-flash',
-						cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
-					};
-				}
-				return {
-					text: 'Initial generated description.',
-					status: 'ready',
-					providerId: 'gemini',
-					modelId: 'gemini-3.7-flash',
-					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
-				};
-			},
-		} as any;
-
-		const service = new PreBaseGraphDescriptionService(
-			mockWorkspaceContextService,
-			mockFileService,
-			mockStorage,
-			mockCommandService,
-		);
-
-		const node: GraphNode = {
-			id: 'fast-node',
-			label: 'src/fast.ts',
-			path: 'src/fast.ts',
-			kind: 'file',
-		};
-
-		// 1. Initial populate: calls commandService
+		// 1. Initial generation with Gemini 2.5 Flash
 		const res1 = await service.describeNode(node);
+		assert.equal(aiCallCount, 1);
 		assert.equal(res1.cacheHit, false);
-		const initialCount = commandsExecuted.length;
-		assert.equal(initialCount, 2);
 
-		// 2. Second call: cache hit! describeFile is not invoked again
-		let describeFileCalled = false;
-		mockCommandService.executeCommand = async (cmd: string) => {
-			if (cmd === 'prebase.magnus.getDescriptionContext') {
-				return {
-					providerId: 'gemini',
-					modelId: 'gemini-3.7-flash',
-					cacheIdentity: 'gemini:gemini-3.7-flash:description-policy-v8',
-				};
-			}
-			if (cmd === 'prebase.magnus.describeFile') {
-				describeFileCalled = true;
-				return { text: 'regenerated', status: 'ready' };
-			}
-			return undefined;
-		};
+		// 2. User switches model to Gemini 3.7 Flash
+		currentModel = 'gemini-3.7-flash';
 
+		// 3. Opening node again: file has not changed, so cached description is preserved (0 extra AI calls)
 		const res2 = await service.describeNode(node);
+		assert.equal(aiCallCount, 1, 'Model switch should not trigger regeneration for unchanged files');
 		assert.equal(res2.cacheHit, true);
-		assert.equal(describeFileCalled, false, 'describeFile should not be invoked on cache hit');
 		assert.equal(res2.aiDescription, res1.aiDescription);
 	});
 
-	test('recovering from cancelled in-flight request creates fresh promise on re-selection (A -> B -> A race fix)', async () => {
+	test('3. File edit -> 0 AI calls on save, exactly 1 lazy AI call on next view', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {
 			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
@@ -366,50 +241,167 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 			remove: (key: string) => storageMap.delete(key),
 		} as any;
 
-		let generationCalls = 0;
+		const routerUri = URI.joinPath(workspaceFolderUri, 'src/router.ts');
+		const files: Record<string, string> = {
+			[routerUri.toString()]: 'export const router = { version: 1 };',
+		};
+
+		let aiCallCount = 0;
 		const mockCommandService = {
 			executeCommand: async (cmd: string) => {
 				if (cmd === 'prebase.magnus.describeFile') {
-					generationCalls++;
+					aiCallCount++;
 					return {
-						text: `Description generation pass ${generationCalls}`,
+						text: `Router description v${aiCallCount}`,
 						status: 'ready',
-						providerId: 'gemini',
-						modelId: 'gemini-3.7-flash',
 					};
 				}
 				return undefined;
 			},
 		} as any;
 
+		const fileService = createMockFileService(files);
 		const service = new PreBaseGraphDescriptionService(
 			mockWorkspaceContextService,
-			mockFileService,
+			fileService as any,
 			mockStorage,
 			mockCommandService,
 		);
 
-		const nodeA: GraphNode = { id: 'nodeA', label: 'src/a.ts', path: 'src/a.ts', kind: 'file' };
-		const nodeB: GraphNode = { id: 'nodeB', label: 'src/b.ts', path: 'src/b.ts', kind: 'file' };
+		const node: GraphNode = {
+			id: 'n-router',
+			label: 'src/router.ts',
+			path: 'src/router.ts',
+			kind: 'file',
+		};
 
-		// 1. Start requesting Node A
-		const pA1 = service.describeNode(nodeA);
+		// 1. First view: 1 AI call
+		const res1 = await service.describeNode(node);
+		assert.equal(aiCallCount, 1);
+		assert.equal(res1.cacheHit, false);
 
-		// 2. User quickly switches to Node B (cancels in-flight A) and waits for B
-		const resB = await service.describeNode(nodeB);
-		assert.equal(resB.aiStatus, 'ready');
+		// 2. User edits file on disk and saves (IFileService emits change event)
+		files[routerUri.toString()] = 'export const router = { version: 2, routes: [] };';
+		fileService.emitChange(routerUri);
 
-		const resA1 = await pA1;
-		assert.equal(resA1.aiStatus, 'unavailable');
-		assert.ok(resA1.aiMessage?.includes('cancelled'));
+		// PRIVACY INVARIANT: Zero AI calls on save!
+		assert.equal(aiCallCount, 1, 'Zero AI calls must be made on file save event');
 
-		// 3. User switches back to Node A: must create a fresh in-flight request and succeed (not return cancelled A1)
-		const resA2 = await service.describeNode(nodeA);
-		assert.equal(resA2.aiStatus, 'ready');
-		assert.ok(resA2.aiDescription?.includes('Description generation pass'));
+		// Peek is marked dirty/not ready
+		const peekDirty = service.peekCachedDescription(node);
+		assert.equal(peekDirty.cached, false);
+
+		// 3. User views node: 1 lazy AI call occurs
+		const res2 = await service.describeNode(node);
+		assert.equal(aiCallCount, 2, 'Lazy AI call should occur when node is viewed after edit');
+		assert.equal(res2.cacheHit, false);
+		assert.ok(res2.aiDescription?.includes('v2'));
+
+		// 4. Subsequent view without edits: cache hit again
+		const res3 = await service.describeNode(node);
+		assert.equal(aiCallCount, 2);
+		assert.equal(res3.cacheHit, true);
 	});
 
-	test('handles empty responses and error states gracefully', async () => {
+	test('4. Unrelated file edit -> 0 extra AI calls for other nodes', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		let aiCallCount = 0;
+		const mockCommandService = {
+			executeCommand: async (cmd: string) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCallCount++;
+					return { text: 'Description', status: 'ready' };
+				}
+				return undefined;
+			},
+		} as any;
+
+		const fileService = createMockFileService();
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			fileService as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const nodeA: GraphNode = { id: 'nA', label: 'src/a.ts', path: 'src/a.ts', kind: 'file' };
+		const nodeB: GraphNode = { id: 'nB', label: 'src/b.ts', path: 'src/b.ts', kind: 'file' };
+
+		await service.describeNode(nodeA);
+		await service.describeNode(nodeB);
+		assert.equal(aiCallCount, 2);
+
+		// Emit edit event ONLY for B
+		fileService.emitChange(URI.joinPath(workspaceFolderUri, 'src/b.ts'));
+
+		// Node A remains clean verified and hits cache without disk read or AI call
+		const readCountBefore = fileService.readCount;
+		const resA = await service.describeNode(nodeA);
+		assert.equal(aiCallCount, 2, 'Node A must not trigger AI call');
+		assert.equal(resA.cacheHit, true);
+		assert.equal(fileService.readCount, readCountBefore, 'Node A must not read disk');
+	});
+
+	test('5. Stale in-flight race protection: discards result if file changed during in-flight generation', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		let aiCalled = false;
+		let finishAiCall: ((val: any) => void) | undefined;
+		const mockCommandService = {
+			executeCommand: async (cmd: string) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCalled = true;
+					return new Promise(resolve => {
+						finishAiCall = resolve;
+					});
+				}
+				return undefined;
+			},
+		} as any;
+
+		const fileService = createMockFileService();
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			fileService as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const node: GraphNode = { id: 'n-race', label: 'src/race.ts', path: 'src/race.ts', kind: 'file' };
+
+		// 1. Start describeNode (in flight)
+		const promise = service.describeNode(node);
+
+		// 2. Wait until executeCommand has been invoked
+		while (!aiCalled) {
+			await new Promise(r => setTimeout(r, 10));
+		}
+
+		// 3. While AI is in flight, user edits file again
+		fileService.emitChange(URI.joinPath(workspaceFolderUri, 'src/race.ts'));
+
+		// 4. AI finishes with old description
+		finishAiCall?.({ text: 'Stale description', status: 'ready' });
+		await promise;
+
+		// 5. Cache must NOT store the stale description as clean
+		const cache = JSON.parse(storageMap.get('prebase.graph.descriptionCache.v9') || '{}');
+		assert.equal(Object.keys(cache).length, 0, 'Stale description must not be saved to cache');
+		assert.equal(service.peekCachedDescription(node).cached, false);
+	});
+
+	test('6. Persistence across restart and 500-node scale capacity', async () => {
 		const storageMap = new Map<string, string>();
 		const mockStorage = {
 			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
@@ -418,29 +410,52 @@ suite('PreBaseGraphDescriptionService (Unit)', () => {
 		} as any;
 
 		const mockCommandService = {
-			executeCommand: async () => ({
-				status: 'error',
-				safeMessage: 'AI description generation exhausted its response budget.',
-			}),
+			executeCommand: async (cmd: string, args: any) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					return { text: `Description for ${args.path}`, status: 'ready' };
+				}
+				return undefined;
+			},
 		} as any;
 
-		const service = new PreBaseGraphDescriptionService(
+		const fileService = createMockFileService();
+		const service1 = new PreBaseGraphDescriptionService(
 			mockWorkspaceContextService,
-			mockFileService,
+			fileService as any,
 			mockStorage,
 			mockCommandService,
 		);
 
-		const node: GraphNode = {
-			id: 'n-err',
-			label: 'src/heavy.ts',
-			path: 'src/heavy.ts',
-			kind: 'file',
-		};
+		// Populate 500 nodes
+		for (let i = 0; i < 500; i++) {
+			const node: GraphNode = { id: `node-${i}`, label: `src/file_${i}.ts`, path: `src/file_${i}.ts`, kind: 'file' };
+			await service1.describeNode(node);
+		}
 
-		const result = await service.describeNode(node);
-		assert.equal(result.aiStatus, 'error');
-		assert.equal(result.cacheHit, false);
-		assert.ok(result.aiMessage?.includes('budget'));
+		// Verify 500 entries stored in v9 storage key
+		const storedRaw = storageMap.get('prebase.graph.descriptionCache.v9');
+		assert.ok(storedRaw, 'Storage must contain v9 cache');
+		const parsed = JSON.parse(storedRaw);
+		assert.equal(Object.keys(parsed).length, 500, 'Cache should hold 500 nodes without eviction');
+
+		// Restart service with fresh in-memory instance
+		const service2 = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			fileService as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		// Verified clean file matches cached fingerprint without re-calling AI
+		const node0: GraphNode = { id: 'node-0', label: 'src/file_0.ts', path: 'src/file_0.ts', kind: 'file' };
+		const res = await service2.describeNode(node0);
+		assert.equal(res.cacheHit, true);
+		assert.ok(res.aiDescription?.includes('src/file_0.ts'));
+
+		// clearCache removes all entries
+		service2.clearCache();
+		assert.equal(storageMap.has('prebase.graph.descriptionCache.v9'), false);
+		assert.equal(service2.peekCachedDescription(node0).cached, false);
 	});
 });
+

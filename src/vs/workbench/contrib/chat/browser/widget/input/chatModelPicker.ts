@@ -389,11 +389,11 @@ function createModelAction(
 	// Detailed AIC/token pricing is shown in the hover instead.
 	const pricingForDescription = isMultiplierPricing(model) ? model.metadata.pricing : undefined;
 	const priceCategoryLabel = getPriceCategoryLabel(model.metadata.priceCategory);
-	// Strip the detail when suppressVendorInDetail is set — the vendor is
-	// shown either inline (promoted) or in a section header (Other Models).
-	// For PreBase Agents, keep context-window detail even when vendor is suppressed.
-	const keepMagnusDetail = isMagnusDefaultChatAgent() && !!model.metadata.detail;
-	const detail = (suppressVendorInDetail && !keepMagnusDetail) ? undefined : model.metadata.detail;
+	// For PreBase Agents, strip inline prose description from action.description to prevent
+	// ActionList.computeMaxWidth from bloating the popup dropdown width. Full metadata remains
+	// accessible via ariaDescription and rich hover cards.
+	const isMagnus = isMagnusDefaultChatAgent();
+	const detail = (suppressVendorInDetail || isMagnus) ? undefined : model.metadata.detail;
 	const textParts = [detail, pricingForDescription].filter(Boolean);
 	const textDescription = textParts.length > 0 ? textParts.join(' · ') : undefined;
 
@@ -409,7 +409,7 @@ function createModelAction(
 		section,
 		run: () => onSelect(model),
 	};
-	const ariaDescription = [textDescription, priceCategoryLabel, model.metadata.tooltip]
+	const ariaDescription = [model.metadata.detail || textDescription, priceCategoryLabel, model.metadata.tooltip]
 		.filter((part): part is string => !!part)
 		.join(' · ') || undefined;
 	return { action, ariaDescription };
@@ -1458,6 +1458,7 @@ export class ModelPickerWidget extends Disposable {
 				void this._openerService.open(uri, { allowCommands: true });
 			},
 			minWidth: 200,
+			maxWidth: isMagnusDefaultChatAgent() ? 360 : undefined,
 		};
 		const previouslyFocusedElement = dom.getActiveElement();
 

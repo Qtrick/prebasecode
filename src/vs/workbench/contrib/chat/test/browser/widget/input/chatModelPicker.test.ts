@@ -234,6 +234,30 @@ suite('buildModelPickerItems', () => {
 		} as IActionListItem<IActionWidgetDropdownAction>), 'Claude Sonnet 4.6, Medium cost');
 	});
 
+	test('PreBase Magnus models maintain compact action descriptions while preserving ariaDescription', () => {
+		const geminiFlash: ILanguageModelChatMetadataAndIdentifier = {
+			identifier: 'prebase-magnus:gemini-2.5-flash',
+			metadata: {
+				id: 'gemini-2.5-flash',
+				name: 'Gemini 2.5 Flash',
+				vendor: 'prebase-magnus',
+				version: '1.0.0',
+				family: 'gemini',
+				maxInputTokens: 1048576,
+				maxOutputTokens: 8192,
+				detail: 'Fast, highly capable model for general tasks (1M context window)',
+				tooltip: 'Fast, highly capable model for general tasks (1M context window)',
+				isDefaultForLocation: {},
+			} as ILanguageModelChatMetadata,
+		};
+		const items = callBuild([geminiFlash]);
+		const actions = getActionItems(items);
+		const flashAction = actions.find(a => a.item?.id === 'prebase-magnus:gemini-2.5-flash');
+		assert.ok(flashAction, 'expected flash action');
+		assert.strictEqual(flashAction.item?.description, undefined, 'Inline description must be stripped for PreBase models to prevent bloated popup width');
+		assert.strictEqual(flashAction.ariaDescription?.includes('Fast, highly capable model for general tasks'), true, 'ariaDescription must preserve full description for screen readers');
+	});
+
 	test('auto model always appears first', () => {
 		const auto = createAutoModel();
 		const modelA = createModel('gpt-4o', 'GPT-4o');

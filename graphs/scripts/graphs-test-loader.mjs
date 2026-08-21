@@ -23,7 +23,7 @@ export async function resolve(specifier, context, nextResolve) {
 			resolvedTarget = resolvePath(process.cwd(), 'src/vs', sub);
 		}
 
-		// If importing from core VS Code (src/vs/) or host/workbench/, prefer compiled out/ JavaScript if present
+		// If importing from core VS Code (src/vs/), prefer compiled out/ JavaScript if present
 		if (resolvedTarget.includes('/src/vs/')) {
 			const outTarget = resolvedTarget.replace('/src/vs/', '/out/vs/');
 			if (existsSync(outTarget)) {

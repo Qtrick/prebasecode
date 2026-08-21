@@ -647,9 +647,11 @@ export class SqliteTemporalStore implements ITemporalStore {
 				});
 			}
 			if (!delta) {
+				const isRoot = commit.parentShas.length === 0;
+				const eventKind = isRoot ? 'created' : 'observed-at-anchor';
 				for (const edge of snapshot.edgeMap.values()) {
 					await new Promise<void>((resolve, reject) => {
-						db.run('INSERT OR IGNORE INTO edge_events (edge_id, commit_sha, event_kind) VALUES (?, ?, ?);', [edge.edgeId, commit.commitSha, 'created'], error => error ? reject(error) : resolve());
+						db.run('INSERT OR IGNORE INTO edge_events (edge_id, commit_sha, event_kind) VALUES (?, ?, ?);', [edge.edgeId, commit.commitSha, eventKind], error => error ? reject(error) : resolve());
 					});
 				}
 			}
