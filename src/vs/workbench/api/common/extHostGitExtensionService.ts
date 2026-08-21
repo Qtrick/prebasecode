@@ -224,17 +224,32 @@ interface GitExtension {
 	getAPI(version: 1): GitExtensionAPI;
 }
 
-function mapGitErrorToCode(err: any, defaultCode: string = 'ProcessFailure'): string {
-	if (!err) return defaultCode;
-	if (err.code && typeof err.code === 'string') return err.code;
-	const msg = String(err.message || err.stderr || err).toLowerCase();
+function getErrorMessage(err: unknown): string | undefined {
+	if (err instanceof Error && err.message) {
+		return err.message;
+	}
+	if (typeof err === 'object' && err !== null && typeof (err as { message?: unknown }).message === 'string') {
+		return (err as { message: string }).message;
+	}
+	return undefined;
+}
+
+function mapGitErrorToCode(err: unknown, defaultCode: string = 'ProcessFailure'): string {
+	if (!err) {
+		return defaultCode;
+	}
+	const errObj = typeof err === 'object' && err !== null ? (err as { code?: unknown; message?: unknown; stderr?: unknown; name?: unknown }) : undefined;
+	if (errObj && typeof errObj.code === 'string') {
+		return errObj.code;
+	}
+	const msg = String(errObj?.message || errObj?.stderr || err).toLowerCase();
 	if (msg.includes('unknown revision') || msg.includes('bad object') || msg.includes('not a valid object name') || msg.includes('ambiguous argument') || msg.includes('path not known by git')) {
 		return 'UnknownRef';
 	}
 	if (msg.includes('exceeds') || msg.includes('oversized')) {
 		return 'OversizedBlob';
 	}
-	if (msg.includes('cancel') || err.name === 'CancellationError') {
+	if (msg.includes('cancel') || (errObj && errObj.name === 'CancellationError')) {
 		return 'Cancelled';
 	}
 	if (msg.includes('timeout')) {
@@ -364,9 +379,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 					name: ref.name,
 					type: toGitRefTypeDto(ref.type),
 					revision: ref.commit,
-					tagCommit: (ref as any).tagCommit,
-					peeledCommit: (ref as any).peeledCommit,
-					isAnnotated: (ref as any).isAnnotated,
+					tagCommit: (ref as { readonly tagCommit?: string }).tagCommit,
+					peeledCommit: (ref as { readonly peeledCommit?: string }).peeledCommit,
+					isAnnotated: (ref as { readonly isAnnotated?: boolean }).isAnnotated,
 				} satisfies GitRefDto;
 			});
 
@@ -461,8 +476,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				return { success: true, data: commit.hash };
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'resolveCommitRef is not supported on repository' } };
-		} catch (err: any) {
-			return { success: false, error: { code: 'UnknownRef', message: err?.message || `Failed to resolve ref '${ref}'` } };
+		} catch (err) {
+			return { success: false, error: { code: 'UnknownRef', message: getErrorMessage(err) || `Failed to resolve ref '${ref}'` } };
 		}
 	}
 
@@ -504,8 +519,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				};
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'getCommit is not supported on repository' } };
-		} catch (err: any) {
-			return { success: false, error: { code: 'UnknownRef', message: err?.message || `Failed to get commit '${ref}'` } };
+		} catch (err) {
+			return { success: false, error: { code: 'UnknownRef', message: getErrorMessage(err) || `Failed to get commit '${ref}'` } };
 		}
 	}
 
@@ -551,8 +566,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				return { success: true, data: mapped };
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'log is not supported on repository' } };
-		} catch (err: any) {
-			return { success: false, error: { code: mapGitErrorToCode(err, 'ProcessFailure'), message: err?.message || 'Failed to get commit log' } };
+		} catch (err) {
+			return { success: false, error: { code: mapGitErrorToCode(err, 'ProcessFailure'), message: getErrorMessage(err) || 'Failed to get commit log' } };
 		}
 	}
 
@@ -582,9 +597,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				} };
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'Producer-bounded tree inventory is not available on repository' } };
-		} catch (err: any) {
+		} catch (err) {
 			const code = mapGitErrorToCode(err, 'ProcessFailure');
-			return { success: false, error: { code, message: err?.message || `Failed to list tree for '${ref}'` } };
+			return { success: false, error: { code, message: getErrorMessage(err) || `Failed to list tree for '${ref}'` } };
 		}
 	}
 
@@ -603,10 +618,10 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 					if (details && details.size > maxBytes) {
 						return { success: false, error: { code: 'OversizedBlob', message: `Blob size ${details.size} exceeds maximum limit of ${maxBytes} bytes` } };
 					}
-				} catch (detailErr: any) {
+				} catch (detailErr) {
 					const detailCode = mapGitErrorToCode(detailErr);
 					if (detailCode === 'OversizedBlob') {
-						return { success: false, error: { code: 'OversizedBlob', message: detailErr?.message || `Blob exceeds maximum limit of ${maxBytes} bytes` } };
+						return { success: false, error: { code: 'OversizedBlob', message: getErrorMessage(detailErr) || `Blob exceeds maximum limit of ${maxBytes} bytes` } };
 					}
 					// Fall through to buffer
 				}
@@ -623,9 +638,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				return { success: true, data: content };
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'show is not supported on repository' } };
-		} catch (err: any) {
+		} catch (err) {
 			const code = mapGitErrorToCode(err, 'ObjectUnavailable');
-			return { success: false, error: { code, message: err?.message || `Failed to read blob at '${ref}:${path}'` } };
+			return { success: false, error: { code, message: getErrorMessage(err) || `Failed to read blob at '${ref}:${path}'` } };
 		}
 	}
 
@@ -670,9 +685,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				};
 			});
 			return { success: true, data: { fromRef: refA, toRef: refB, changes } };
-		} catch (err: any) {
+		} catch (err) {
 			const code = mapGitErrorToCode(err, 'ProcessFailure');
-			return { success: false, error: { code, message: err?.message || `Failed to diff ${refA}..${refB}` } };
+			return { success: false, error: { code, message: getErrorMessage(err) || `Failed to diff ${refA}..${refB}` } };
 		}
 	}
 
@@ -720,9 +735,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				return this.$diffExactTrees(handle, parentRef, commitRef, token);
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'getCommit is not supported on repository' } };
-		} catch (err: any) {
+		} catch (err) {
 			const code = mapGitErrorToCode(err, 'ProcessFailure');
-			return { success: false, error: { code, message: err?.message || `Failed to diff commit '${commitRef}' to parent` } };
+			return { success: false, error: { code, message: getErrorMessage(err) || `Failed to diff commit '${commitRef}' to parent` } };
 		}
 	}
 
@@ -740,9 +755,9 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 				}
 			}
 			return this.$diffExactTrees(handle, fromRef, headRef, token);
-		} catch (err: any) {
+		} catch (err) {
 			const code = mapGitErrorToCode(err, 'ProcessFailure');
-			return { success: false, error: { code, message: err?.message || `Failed to diff review range ${baseRef}...${headRef}` } };
+			return { success: false, error: { code, message: getErrorMessage(err) || `Failed to diff review range ${baseRef}...${headRef}` } };
 		}
 	}
 

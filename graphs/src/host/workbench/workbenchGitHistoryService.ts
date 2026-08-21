@@ -90,7 +90,7 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 		@IGitService gitService: IGitService,
 		@IUriIdentityService private readonly _uriIdentityService: IUriIdentityService,
 	) {
-		this._gitService = gitService as any;
+		this._gitService = gitService as unknown as WorkbenchGitServiceLike;
 		this._wireExistingRepositories();
 		if (this._gitService.onDidOpenRepository) {
 			this._disposables.push(this._gitService.onDidOpenRepository(repository => {
@@ -131,10 +131,10 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 		}
 		this._observedRepos.add(repoId);
 
-		const repoState = (repo as any).state;
+		const repoState = repo.state as { readonly recomputeInitiallyAndOnChange?: (store: { add: (d: { dispose(): void }) => void }, callback: (state: { readonly HEAD?: { readonly commit?: string } }) => void) => { dispose(): void } } | undefined;
 		if (repoState && typeof repoState.recomputeInitiallyAndOnChange === 'function') {
 			let lastHead: string | undefined;
-			const sub = repoState.recomputeInitiallyAndOnChange({ add: (d: any) => this._disposables.push(d) }, (state: any) => {
+			const sub = repoState.recomputeInitiallyAndOnChange({ add: (d: { dispose(): void }) => this._disposables.push(d) }, (state) => {
 				const headCommit = state?.HEAD?.commit;
 				if (headCommit && headCommit !== lastHead) {
 					lastHead = headCommit;
@@ -330,8 +330,9 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 		if (!repo.listTreeEntries) {
 			throw new GitHistoryError('ProcessFailure', 'listTreeEntries is not available on workbench Git repository');
 		}
-		const opts = (options && 'maxEntries' in options) ? options : undefined;
-		const actualToken = (options && 'isCancellationRequested' in options) ? options : token;
+		const isToken = Boolean(options && (options as CancellationTokenLike).isCancellationRequested !== undefined);
+		const opts = (options && !isToken) ? (options as GitTreeListOptions) : undefined;
+		const actualToken = isToken ? (options as CancellationTokenLike) : token;
 		try {
 			const inventory = await repo.listTreeEntries(ref, opts, actualToken);
 			const entries = (inventory?.entries || []).map((e: any) => ({

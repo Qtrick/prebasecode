@@ -54,7 +54,9 @@ class InMemoryContentSource implements IRepositoryContentSource {
 	async listFiles(token?: CancellationTokenLike): Promise<ScannedFileInventory> {
 		const result: ScannedFile[] = [];
 		for (const relativePath of this._files.keys()) {
-			if (token?.isCancellationRequested) break;
+			if (token?.isCancellationRequested) {
+				break;
+			}
 			const name = relativePath.split('/').pop() || relativePath;
 			const ext = name.includes('.') ? `.${name.split('.').pop()!.toLowerCase()}` : '';
 			result.push({
@@ -73,7 +75,9 @@ class InMemoryContentSource implements IRepositoryContentSource {
 	}
 
 	async readFile(relativePath: string, token?: CancellationTokenLike): Promise<string | undefined> {
-		if (token?.isCancellationRequested) return undefined;
+		if (token?.isCancellationRequested) {
+			return undefined;
+		}
 		return this._files.get(relativePath);
 	}
 
@@ -88,7 +92,9 @@ class InMemoryContentSource implements IRepositoryContentSource {
 
 	async readPackageMain(): Promise<string | null> {
 		const pkg = this._files.get('package.json');
-		if (!pkg) return null;
+		if (!pkg) {
+			return null;
+		}
 		try {
 			const parsed = JSON.parse(pkg);
 			return parsed.main || parsed.module || null;

@@ -69,9 +69,9 @@ function toGitRepositoryState(dto: GitRepositoryStateDto | undefined): GitReposi
 }
 
 function throwGitError(error?: { code?: string; message?: string; details?: string }, fallbackMessage?: string): never {
-	const err = new Error(error?.message || fallbackMessage || 'Git operation failed');
+	const err: Error & { code?: string } = new Error(error?.message || fallbackMessage || 'Git operation failed');
 	if (error?.code) {
-		(err as any).code = error.code;
+		err.code = error.code;
 	}
 	throw err;
 }

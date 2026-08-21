@@ -154,7 +154,7 @@ export class IncrementalGraphAnalyzer {
 				sourcePath: cleanPath(edge.source),
 				targetPath: cleanPath(edge.target),
 				kind: 'imports',
-				weight: (edge as any).weight ?? 1,
+				weight: (edge as { readonly weight?: number }).weight ?? 1,
 				edgeData: edge,
 			});
 		}

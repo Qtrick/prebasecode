@@ -1,14 +1,17 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import assert from 'assert';
-import { URI } from '../../../../../../base/common/uri.js';
-import { consumePreBaseOAuthCallback, consumePreBaseOAuthErrorCallback, isPreBaseOAuthProvider, parsePreBaseOAuthCallback, PREBASE_OAUTH_PROVIDERS } from '../prebaseOAuth.js';
-import { decidePreBaseStartup, type PreBaseStartupAccountState } from '../prebaseStartupAuth.js';
+import * as assert from 'assert';
+import { URI } from '../../../../../base/common/uri.js';
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
+import { consumePreBaseOAuthCallback, consumePreBaseOAuthErrorCallback, isPreBaseOAuthProvider, parsePreBaseOAuthCallback, PREBASE_OAUTH_PROVIDERS } from '../../common/auth/prebaseOAuth.js';
+import { decidePreBaseStartup, type PreBaseStartupAccountState } from '../../common/auth/prebaseStartupAuth.js';
 
 suite('PreBase startup authentication decision', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+
 	test('waits through initialization and signing-in, avoiding an auth-screen flash for an eventual signed-in session', () => {
 		for (const state of ['initializing', 'signingIn'] as PreBaseStartupAccountState[]) {
 			assert.strictEqual(decidePreBaseStartup(state, false, false), 'wait', state);
@@ -29,6 +32,8 @@ suite('PreBase startup authentication decision', () => {
 });
 
 suite('PreBase OAuth callback parser', () => {
+	ensureNoDisposablesAreLeakedInTestSuite();
+
 	const scheme = 'prebase';
 	const flowId = 'unpredictable-flow';
 

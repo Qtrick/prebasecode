@@ -229,7 +229,9 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 	async readPackageMain(_token?: CancellationTokenLike): Promise<string | null> {
 		try {
 			const raw = await this.readFile('package.json');
-			if (!raw) return null;
+			if (!raw) {
+				return null;
+			}
 			const pkg = JSON.parse(raw) as { main?: string; module?: string };
 			return pkg.module ?? pkg.main ?? null;
 		} catch {
@@ -242,7 +244,9 @@ export class WorkingTreeContentSource implements IRepositoryContentSource {
 		const segments = clean.split('/');
 		for (const rawPattern of patterns) {
 			const pattern = rawPattern.trim();
-			if (!pattern || pattern.startsWith('#')) continue;
+			if (!pattern || pattern.startsWith('#')) {
+				continue;
+			}
 
 			// Direct segment match (e.g. "node_modules", ".git", "dist")
 			const exact = pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, '').replace(/^\//, '').replace(/\/$/, '').replace(/\*\*/g, '');

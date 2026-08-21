@@ -127,7 +127,9 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 	async readPackageMain(token?: CancellationTokenLike): Promise<string | null> {
 		try {
 			const raw = await this.readFile('package.json', token);
-			if (!raw) return null;
+			if (!raw) {
+				return null;
+			}
 			const pkg = JSON.parse(raw) as { main?: string; module?: string };
 			return pkg.module ?? pkg.main ?? null;
 		} catch {
@@ -140,7 +142,9 @@ export class GitTreeContentSource implements IRepositoryContentSource {
 		const segments = clean.split('/');
 		for (const rawPattern of DEFAULT_IGNORE_PATTERNS) {
 			const pattern = rawPattern.trim();
-			if (!pattern || pattern.startsWith('#')) continue;
+			if (!pattern || pattern.startsWith('#')) {
+				continue;
+			}
 
 			const exact = pattern.replace(/^\*\*\//, '').replace(/\/\*\*$/, '').replace(/^\//, '').replace(/\/$/, '').replace(/\*\*/g, '');
 			if (exact && (segments.includes(exact) || clean === exact || clean.startsWith(`${exact}/`))) {

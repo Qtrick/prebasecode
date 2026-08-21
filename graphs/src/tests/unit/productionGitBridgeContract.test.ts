@@ -5,12 +5,13 @@
 import assert from 'node:assert';
 import { WorkbenchGitHistoryService, type WorkbenchGitServiceLike } from '../../host/workbench/workbenchGitHistoryService.js';
 import { GitHistoryError } from '../../history/git/gitTypes.js';
+
 const uriIdentityService = {
 	extUri: {
 		isEqual: (first: { fsPath: string }, second: { fsPath: string }) => first.fsPath === second.fsPath,
 		isEqualOrParent: (resource: { fsPath: string }, candidate: { fsPath: string }) => resource.fsPath === candidate.fsPath || resource.fsPath.startsWith(`${candidate.fsPath}/`),
 	},
-} as any;
+} as unknown as ConstructorParameters<typeof WorkbenchGitHistoryService>[1];
 
 suite('Production Git Bridge Contract Unit Tests', () => {
 	const mockRepo = {
@@ -18,14 +19,20 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 		state: { current: {} },
 		async resolveCommitRef(ref: string) {
 			if (ref.startsWith('-')) {
-				const err: any = new Error(`fatal: ambiguous argument '${ref}': unknown revision or path`);
+				const err: Error & { code?: string } = new Error(`fatal: ambiguous argument '${ref}': unknown revision or path`);
 				err.code = 'UnknownRef';
 				throw err;
 			}
-			if (ref === 'HEAD' || ref === 'main') return 'aaaa111122223333444455556666777788889999';
-			if (ref === 'feature') return 'bbbb111122223333444455556666777788889999';
-			if (ref === 'v1.0.0') return 'cccc111122223333444455556666777788889999';
-			const err: any = new Error(`Ref '${ref}' not found`);
+			if (ref === 'HEAD' || ref === 'main') {
+				return 'aaaa111122223333444455556666777788889999';
+			}
+			if (ref === 'feature') {
+				return 'bbbb111122223333444455556666777788889999';
+			}
+			if (ref === 'v1.0.0') {
+				return 'cccc111122223333444455556666777788889999';
+			}
+			const err: Error & { code?: string } = new Error(`Ref '${ref}' not found`);
 			err.code = 'UnknownRef';
 			throw err;
 		},
@@ -41,11 +48,11 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 					message: 'feat: add temporal bridge',
 				};
 			}
-			const err: any = new Error(`Commit '${ref}' not found`);
+			const err: Error & { code?: string } = new Error(`Commit '${ref}' not found`);
 			err.code = 'UnknownRef';
 			throw err;
 		},
-		async getCommitLog(options: any) {
+		async getCommitLog(options: { firstParent?: boolean }) {
 			if (options.firstParent) {
 				return [
 					{
@@ -61,7 +68,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 			}
 			return [];
 		},
-		async getRefs(query: any) {
+		async getRefs(query?: { pattern?: string }) {
 			if (query?.pattern === 'refs/tags/*') {
 				return [
 					{
@@ -125,13 +132,13 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 		async readBlobContent(_ref: string, path: string, maxBytes?: number) {
 			if (path === 'src/app.ts') {
 				if (maxBytes !== undefined && maxBytes < 500) {
-					const err: any = new Error('Blob exceeds limit');
+					const err: Error & { code?: string } = new Error('Blob exceeds limit');
 					err.code = 'OversizedBlob';
 					throw err;
 				}
 				return 'export const app = true;';
 			}
-			const err: any = new Error('Object not found');
+			const err: Error & { code?: string } = new Error('Object not found');
 			err.code = 'ObjectUnavailable';
 			throw err;
 		}
@@ -144,8 +151,10 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 		}
 	};
 
+	const gitServiceParam = mockGitService as unknown as ConstructorParameters<typeof WorkbenchGitHistoryService>[0];
+
 	test('distinguishes exact tree diff from review range diff on divergent branches', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
+		const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
 		const exactDiff = await service.diffCommitTrees('/workspace/app', 'feature', 'main');
 		const reviewDiff = await service.diffReviewRange('/workspace/app', 'main', 'feature');
 
@@ -160,7 +169,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('peels annotated tags and marks isAnnotated truthfully', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
+		const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
 		const tags = await service.listTags('/workspace/app');
 
 		assert.strictEqual(tags.length, 2);
@@ -178,7 +187,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('preserves committer distinct from author with valid timestamps', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
+		const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
 		const commit = await service.getCommit('/workspace/app', 'aaaa111122223333444455556666777788889999');
 
 		assert.strictEqual(commit.author.name, 'Alice Author');
@@ -191,19 +200,20 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('rejects option-like ref injection safely', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
+		const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
 		await assert.rejects(
 			async () => service.resolveRef('/workspace/app', '--help'),
-			(err: any) => {
-				assert.strictEqual(err.name, GitHistoryError.name);
-				assert.strictEqual(err.code, 'UnknownRef');
+			(err: unknown) => {
+				const e = err as GitHistoryError;
+				assert.strictEqual(e.name, GitHistoryError.name);
+				assert.strictEqual(e.code, 'UnknownRef');
 				return true;
 			}
 		);
 	});
 
 	test('supports firstParent log option for merge DAG traversal', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
+		const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
 		const commits = await service.log('/workspace/app', { firstParent: true });
 
 		assert.strictEqual(commits.length, 1);
@@ -211,7 +221,7 @@ suite('Production Git Bridge Contract Unit Tests', () => {
 	});
 
 	test('propagates OversizedBlob error code when reading content beyond limit', async () => {
-		const service = new WorkbenchGitHistoryService(mockGitService as any, uriIdentityService);
+		const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
 		const content = await service.readFileAtRef('/workspace/app', 'HEAD', 'src/app.ts');
 		assert.strictEqual(content, 'export const app = true;');
 	});

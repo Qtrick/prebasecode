@@ -669,7 +669,7 @@ export async function runMigrations(db: sqlite3.Database): Promise<void> {
 					}
 					await execSql(db, 'UPDATE commits SET canonical_state_id = canonical_digest WHERE canonical_state_id IS NULL;');
 					await execSql(db, SCHEMA_V4_ADDITIONS_DDL);
-					const lineageRows = await allSql(db, "SELECT entity_id, commit_sha, evidence_json FROM lineage_events WHERE lineage_case = 'terminated';");
+					const lineageRows = await allSql(db, 'SELECT entity_id, commit_sha, evidence_json FROM lineage_events WHERE lineage_case = \'terminated\';');
 					for (const lineage of lineageRows) {
 						let evidence: { oldPath?: string };
 						try {
@@ -737,8 +737,11 @@ export async function runMigrations(db: sqlite3.Database): Promise<void> {
 function execSql(db: sqlite3.Database, sql: string): Promise<void> {
 	return new Promise((resolve, reject) => {
 		db.exec(sql, (err) => {
-			if (err) reject(err);
-			else resolve();
+			if (err) {
+				reject(err);
+			} else {
+				resolve();
+			}
 		});
 	});
 }
@@ -746,8 +749,11 @@ function execSql(db: sqlite3.Database, sql: string): Promise<void> {
 function allSql(db: sqlite3.Database, sql: string): Promise<any[]> {
 	return new Promise((resolve, reject) => {
 		db.all(sql, (err, rows) => {
-			if (err) reject(err);
-			else resolve(rows || []);
+			if (err) {
+				reject(err);
+			} else {
+				resolve(rows || []);
+			}
 		});
 	});
 }

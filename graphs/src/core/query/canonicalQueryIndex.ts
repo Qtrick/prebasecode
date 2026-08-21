@@ -100,13 +100,17 @@ export class CanonicalQueryIndex {
 	}
 
 	findNode(idOrPath: string): GraphNode | undefined {
-		if (!idOrPath) return undefined;
+		if (!idOrPath) {
+			return undefined;
+		}
 		const trimmed = idOrPath.trim();
 		return this.nodeById.get(trimmed) ?? this.nodeByPath.get(trimmed);
 	}
 
 	searchNodes(query: string, limit: number = 20): Array<{ node: GraphNode; score: number }> {
-		if (!query) return [];
+		if (!query) {
+			return [];
+		}
 		const lowerQuery = query.toLowerCase().trim();
 		const results: Array<{ node: GraphNode; score: number }> = [];
 

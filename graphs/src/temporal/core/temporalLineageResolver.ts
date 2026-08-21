@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) PreBase. All rights reserved.
+ *--------------------------------------------------------------------------------------------*/
+
 import { computePureSha256 } from '../../core/canonical/pureSha256.js';
 import type { GitExactDiffChange } from '../../history/git/gitTypes.js';
 import type {
@@ -288,7 +292,9 @@ export class TemporalLineageResolver {
 			// CASE 5: Directory Move fallback heuristic
 			let directoryMoveFound = false;
 			for (const [parentPath, parentId] of parentPathToEntityId) {
-				if (claimedParentEntityIds.has(parentId)) continue;
+				if (claimedParentEntityIds.has(parentId)) {
+					continue;
+				}
 				const parentSlashIndex = parentPath.lastIndexOf('/');
 				const currentSlashIndex = currentPath.lastIndexOf('/');
 				if (parentSlashIndex > 0 && currentSlashIndex > 0) {
