@@ -8,6 +8,7 @@ import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
+import { NodeCanonicalParseService } from '../../node/canonicalParseService.js';
 import { computeCanonicalGraphDiff } from '../../core/canonical/canonicalGraphDiff.js';
 import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
 import { NodeGitHistoryService } from '../fixtures/nodeGitHistoryService.js';
@@ -17,6 +18,8 @@ suite('GitTreeHistoricalAnalysis Integration Tests', () => {
 	let gitService: NodeGitHistoryService;
 	let commit1Sha: string;
 	let commit2Sha: string;
+
+	const createAnalyzer = (): CanonicalGraphAnalyzer => new CanonicalGraphAnalyzer({ parseService: new NodeCanonicalParseService() });
 
 	setup(async () => {
 		tempRepoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'prebase-hist-test-'));
@@ -51,7 +54,7 @@ suite('GitTreeHistoricalAnalysis Integration Tests', () => {
 
 	test('analyzes historical commit 1 without checkout', async () => {
 		const source1 = new GitTreeContentSource(gitService, tempRepoDir, commit1Sha);
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createAnalyzer();
 		const snapshot1 = await analyzer.analyze(source1);
 
 		assert.ok(snapshot1);
@@ -63,7 +66,7 @@ suite('GitTreeHistoricalAnalysis Integration Tests', () => {
 
 	test('analyzes historical commit 2 without checkout', async () => {
 		const source2 = new GitTreeContentSource(gitService, tempRepoDir, commit2Sha);
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createAnalyzer();
 		const snapshot2 = await analyzer.analyze(source2);
 
 		assert.ok(snapshot2);
@@ -72,7 +75,7 @@ suite('GitTreeHistoricalAnalysis Integration Tests', () => {
 	});
 
 	test('diffs historical snapshots 1 and 2 yielding exact structural diff', async () => {
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createAnalyzer();
 		const snap1 = await analyzer.analyze(new GitTreeContentSource(gitService, tempRepoDir, commit1Sha));
 		const snap2 = await analyzer.analyze(new GitTreeContentSource(gitService, tempRepoDir, commit2Sha));
 
@@ -94,7 +97,7 @@ suite('GitTreeHistoricalAnalysis Integration Tests', () => {
 		await fs.writeFile(path.join(tempRepoDir, 'src/dirtyNewFile.ts'), `export const dirty = true;`);
 
 		const source1 = new GitTreeContentSource(gitService, tempRepoDir, commit1Sha);
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createAnalyzer();
 		const snapshot1 = await analyzer.analyze(source1);
 
 		assert.ok(snapshot1);

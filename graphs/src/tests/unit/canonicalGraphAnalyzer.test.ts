@@ -6,7 +6,26 @@ import assert from 'node:assert';
 import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
 import type { IRepositoryContentSource, CancellationTokenLike, ScannedFileInventory } from '../../core/canonical/contentSource.js';
 import type { ScannedFile } from '../../common/types/graphTypes.js';
+import type { CanonicalAnalysisOptions } from '../../common/types/canonicalTypes.js';
 import { computeCanonicalGraphDigest } from '../../core/canonical/canonicalGraphDigest.js';
+import { CanonicalParseServiceError, type CanonicalParseRequest, type ICanonicalParseService } from '../../core/canonical/canonicalParseService.js';
+import { extractBlobParseArtifact, type BlobParseArtifact } from '../../core/canonical/parseArtifactCache.js';
+import { ParserEngine } from '../../core/parsing/parserEngine.js';
+import { NodeCanonicalParseService } from '../../node/canonicalParseService.js';
+
+function createCanonicalAnalyzer(options: CanonicalAnalysisOptions = {}): CanonicalGraphAnalyzer {
+	return new CanonicalGraphAnalyzer({ ...options, parseService: new NodeCanonicalParseService() });
+}
+
+class CountingNodeParseService implements ICanonicalParseService {
+	private readonly _nodeService = new NodeCanonicalParseService();
+	parseCalls = 0;
+
+	async parse(request: CanonicalParseRequest, token?: CancellationTokenLike): Promise<BlobParseArtifact | undefined> {
+		this.parseCalls++;
+		return this._nodeService.parse(request, token);
+	}
+}
 
 class InMemoryContentSource implements IRepositoryContentSource {
 	readonly kind = 'working-tree';
@@ -89,7 +108,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 			'src/components/Header.tsx': `import React from 'react'; export function Header() { return <div>Header</div>; }`,
 		});
 
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createCanonicalAnalyzer();
 		const snapshot = await analyzer.analyze(source);
 
 		assert.ok(snapshot);
@@ -154,7 +173,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 			`,
 		});
 
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createCanonicalAnalyzer();
 		const snap1 = await analyzer.analyze(source1);
 		const snap2 = await analyzer.analyze(source2);
 
@@ -180,7 +199,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 			'src/Button.svelte': `<script>export let label = '';</script><button>{label}</button>`,
 		});
 
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createCanonicalAnalyzer();
 		const snapshot = await analyzer.analyze(source);
 
 		assert.ok(snapshot);
@@ -193,6 +212,34 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		assert.strictEqual(svelteNode.kind, 'component');
 	});
 
+	test('preserves direct ParserEngine artifact parity across supported source formats', async () => {
+		const parserEngine = new ParserEngine();
+		const parseService = new NodeCanonicalParseService();
+		const cases = [
+			['src/module.ts', 'export const typed: number = 1;'],
+			['src/View.tsx', 'export const View = () => <main />;'],
+			['src/module.js', 'export async function load() { return import("./lazy.js"); }'],
+			['src/View.jsx', 'export const View = () => <main />;'],
+			['src/App.vue', '<script>import View from "./View.vue"; export default View;</script>'],
+			['src/App.svelte', '<script>export let label = "";</script><button>{label}</button>'],
+			['package.json', '{"name":"fixture","main":"src/module.ts"}'],
+			['src/commonjs.cjs', 'const value = require("./value"); module.exports = value;'],
+		] as const;
+
+		for (const [relativePath, content] of cases) {
+			const file: ScannedFile = {
+				absolutePath: `/parser-parity/${relativePath}`,
+				relativePath,
+				extension: relativePath.includes('.') ? `.${relativePath.split('.').pop()!}` : '',
+			};
+			const direct = await parserEngine.parseFile(file, content);
+			const throughService = await parseService.parse({ file, content });
+
+			assert.ok(direct, relativePath);
+			assert.deepStrictEqual(throughService, extractBlobParseArtifact(direct), relativePath);
+		}
+	});
+
 	test('explicitly marks truncation and incomplete coverage when exceeding maxCanonicalFiles', async () => {
 		const files: Record<string, string> = {};
 		for (let i = 0; i < 50; i++) {
@@ -200,7 +247,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		}
 
 		const source = new InMemoryContentSource('/workspace', files);
-		const analyzer = new CanonicalGraphAnalyzer({ maxCanonicalFiles: 20 });
+		const analyzer = createCanonicalAnalyzer({ maxCanonicalFiles: 20 });
 		const snapshot = await analyzer.analyze(source);
 
 		assert.ok(snapshot);
@@ -219,7 +266,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 
 		// Content source returns 10 files but reports discoveredCount=15000 and isTruncated=true
 		const source = new InMemoryContentSource('/workspace', files, 'test-project', true, 15_000);
-		const analyzer = new CanonicalGraphAnalyzer({ maxCanonicalFiles: 10_000 });
+		const analyzer = createCanonicalAnalyzer({ maxCanonicalFiles: 10_000 });
 		const snapshot = await analyzer.analyze(source);
 
 		assert.ok(snapshot);
@@ -240,7 +287,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 			'src/oversized.ts': oversizedContent,
 		});
 
-		const analyzer = new CanonicalGraphAnalyzer({ maxFileSizeBytes: 100_000 });
+		const analyzer = createCanonicalAnalyzer({ maxFileSizeBytes: 100_000 });
 		const snapshot = await analyzer.analyze(source);
 
 		assert.ok(snapshot);
@@ -275,7 +322,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 			},
 		};
 
-		const snapshot = await new CanonicalGraphAnalyzer({ maxFileSizeBytes: content.length }).analyze(source);
+		const snapshot = await createCanonicalAnalyzer({ maxFileSizeBytes: content.length }).analyze(source);
 
 		assert.ok(snapshot);
 		assert.ok(new TextEncoder().encode(content).byteLength > content.length);
@@ -290,6 +337,47 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		});
 	});
 
+	test('reuses a cached parse artifact without invoking the parser service again', async () => {
+		const source = new InMemoryContentSource('/cache-workspace', {
+			'src/shared.ts': 'export const shared = 42;',
+		});
+		const parseService = new CountingNodeParseService();
+		const artifacts = new Map<string, BlobParseArtifact>();
+		const parseArtifactCache = {
+			get(blobOid: string): BlobParseArtifact | undefined {
+				return artifacts.get(blobOid);
+			},
+			set(blobOid: string, _extension: string, artifact: BlobParseArtifact): void {
+				artifacts.set(blobOid, artifact);
+			},
+		};
+		const analyzer = new CanonicalGraphAnalyzer({ parseService, parseArtifactCache });
+
+		const [first, second] = [await analyzer.analyze(source), await analyzer.analyze(source)];
+
+		assert.ok(first);
+		assert.ok(second);
+		assert.deepStrictEqual({
+			parseCalls: parseService.parseCalls,
+			cachedArtifacts: artifacts.size,
+			digestMatches: first.digest === second.digest,
+		}, {
+			parseCalls: 1,
+			cachedArtifacts: 1,
+			digestMatches: true,
+		});
+	});
+
+	test('propagates a systemic parser-service failure instead of publishing a fake partial graph', async () => {
+		const source = new InMemoryContentSource('/unavailable-parser', {
+			'src/main.ts': 'export const main = true;',
+		});
+
+		await assert.rejects(new CanonicalGraphAnalyzer().analyze(source), error => {
+			return error instanceof CanonicalParseServiceError && error.code === 'service-unavailable';
+		});
+	});
+
 	test('respects cancellation cleanly without publishing corrupted partial graph', async () => {
 		const files: Record<string, string> = {};
 		for (let i = 0; i < 200; i++) {
@@ -297,7 +385,7 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		}
 
 		const source = new InMemoryContentSource('/workspace', files);
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createCanonicalAnalyzer();
 
 		let cancelRequested = false;
 		const token: CancellationTokenLike = {

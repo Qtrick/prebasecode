@@ -17,13 +17,19 @@ import { computePureSha256 } from '../../core/canonical/pureSha256.js';
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type {
 	TemporalEntityLineageEvent,
+	TemporalEdgeLifecycleEvent,
 	TemporalEdgeSnapshot,
 	TemporalEntitySnapshot,
 	TemporalGraphSnapshot,
+	TemporalHistoryPage,
+	TemporalHistoryPageOptions,
+	TemporalMaintenanceResult,
 	TemporalQueryOptions,
+	TemporalRepositoryRef,
 } from '../../temporal/common/temporalTypes.js';
 import type { GitHeadChangeEvent } from '../../history/git/gitHistoryService.js';
 import { URI } from '../../../../../../base/common/uri.js';
+import { IPreBaseCanonicalParseService } from './workbenchCanonicalParseService.js';
 
 export const IPreBaseTemporalGraphService = createDecorator<IPreBaseTemporalGraphService>('prebaseTemporalGraphService');
 
@@ -52,6 +58,7 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 		@IWorkbenchGitHistoryService private readonly _gitHistoryService: IWorkbenchGitHistoryService,
 		@IMainProcessService mainProcessService: IMainProcessService,
 		@ILogService private readonly _logService: ILogService,
+		@IPreBaseCanonicalParseService parseService: IPreBaseCanonicalParseService,
 	) {
 		super();
 
@@ -63,7 +70,7 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 			return new WorkbenchTemporalStore(mainProcessService.getChannel(TEMPORAL_STORE_CHANNEL_NAME), dbPath);
 		};
 
-		this._registry = new TemporalRepositoryRegistry(storeFactory);
+		this._registry = new TemporalRepositoryRegistry(storeFactory, parseService);
 		this._temporalService = new TemporalGraphService(this._gitHistoryService, this._registry);
 
 		this._checkAndWireHeadObservers();
@@ -115,6 +122,18 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 		return this._temporalService.getCommitIndexStatus(rootPath, commitSha, token);
 	}
 
+	getRepositoryRefs(rootPath: string, token?: CancellationTokenLike): Promise<TemporalRepositoryRef[]> {
+		return this._temporalService.getRepositoryRefs(rootPath, token);
+	}
+
+	getHistoryPage(rootPath: string, options?: TemporalHistoryPageOptions, token?: CancellationTokenLike): Promise<TemporalHistoryPage> {
+		return this._temporalService.getHistoryPage(rootPath, options, token);
+	}
+
+	runMaintenance(rootPath: string, maxDatabaseBytes: number, token?: CancellationTokenLike): Promise<TemporalMaintenanceResult> {
+		return this._temporalService.runMaintenance(rootPath, maxDatabaseBytes, token);
+	}
+
 	ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
 		return this._temporalService.ensureCommitIndexed(rootPath, commitSha, token);
 	}
@@ -145,6 +164,14 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 
 	getEdgeHistoryAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]> {
 		return this._temporalService.getEdgeHistoryAtRef(rootPath, edgeId, targetRef, token);
+	}
+
+	getEdgeLifecycleEvents(rootPath: string, edgeId: string, token?: CancellationTokenLike): Promise<TemporalEdgeLifecycleEvent[]> {
+		return this._temporalService.getEdgeLifecycleEvents(rootPath, edgeId, token);
+	}
+
+	getEdgeLifecycleEventsAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeLifecycleEvent[]> {
+		return this._temporalService.getEdgeLifecycleEventsAtRef(rootPath, edgeId, targetRef, token);
 	}
 
 	queryTemporalGraph(rootPath: string, options: TemporalQueryOptions, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot[]> {

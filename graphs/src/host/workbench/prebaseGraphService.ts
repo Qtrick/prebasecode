@@ -25,6 +25,7 @@ import { basename } from '../../core/resolution/paths.js';
 import type { GraphNode, GraphSnapshot, LayoutMode } from '../../common/types/graphTypes.js';
 import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
 import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
+import { IPreBaseCanonicalParseService } from './workbenchCanonicalParseService.js';
 import { IGitService, IGitRepository } from '../../../../git/common/gitService.js';
 
 export type PreBaseGraphType = 'network';
@@ -143,6 +144,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		@IOutputService private readonly outputService: IOutputService,
 		@IGitService private readonly gitService: IGitService,
 		@IWorkbenchGitHistoryService private readonly _gitHistoryService: IWorkbenchGitHistoryService,
+		@IPreBaseCanonicalParseService private readonly _parseService: IPreBaseCanonicalParseService,
 	) {
 		super();
 		this._viewState = {
@@ -548,7 +550,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 				}
 			});
 
-			const analyzer = new CanonicalGraphAnalyzer();
+			const analyzer = new CanonicalGraphAnalyzer({ parseService: this._parseService });
 			const canonical = await analyzer.analyze(contentSource, cts.token);
 			if (!canonical || cts.token.isCancellationRequested) {
 				this._markCancelledIfActive(cts);
@@ -615,6 +617,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		const analyzer = new CanonicalGraphAnalyzer({
 			maxCanonicalFiles: limits.maxCanonicalFiles,
 			maxFileSizeBytes: limits.maxFileSizeBytes,
+			parseService: this._parseService,
 		});
 
 		try {

@@ -86,4 +86,5 @@ export interface CanonicalAnalysisOptions {
 	readonly includeFunctions?: boolean;
 	readonly respectGitIgnore?: boolean;
 	readonly parseArtifactCache?: import('../../core/canonical/parseArtifactCache.js').ICanonicalParseArtifactCache;
+	readonly parseService?: import('../../core/canonical/canonicalParseService.js').ICanonicalParseService;
 }

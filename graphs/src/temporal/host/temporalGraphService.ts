@@ -9,18 +9,27 @@ import { isTemporalError } from '../common/temporalErrors.js';
 import type { TemporalCommitIngestionService } from '../ingestion/temporalCommitIngestionService.js';
 import type { TemporalRepositoryRegistry } from '../ingestion/temporalRepositoryRegistry.js';
 import type {
+	TemporalCommitIndexStatus,
+	TemporalCommitSummary,
+	TemporalEdgeLifecycleEvent,
 	TemporalEntityLineageEvent,
 	TemporalEdgeSnapshot,
 	TemporalEntitySnapshot,
 	TemporalGraphSnapshot,
+	TemporalHistoryPage,
+	TemporalHistoryPageOptions,
+	TemporalMaintenanceResult,
 	TemporalQueryOptions,
-	TemporalCommitIndexStatus,
+	TemporalRepositoryRef,
 } from '../common/temporalTypes.js';
 
 export type { TemporalCommitIndexStatus, TemporalIndexStatus } from '../common/temporalTypes.js';
 
 export interface ITemporalGraphService {
 	getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalCommitIndexStatus>;
+	getRepositoryRefs(rootPath: string, token?: CancellationTokenLike): Promise<TemporalRepositoryRef[]>;
+	getHistoryPage(rootPath: string, options?: TemporalHistoryPageOptions, token?: CancellationTokenLike): Promise<TemporalHistoryPage>;
+	runMaintenance(rootPath: string, maxDatabaseBytes: number, token?: CancellationTokenLike): Promise<TemporalMaintenanceResult>;
 	ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	getGraphAtCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	getEntityHistory(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]>;
@@ -29,6 +38,8 @@ export interface ITemporalGraphService {
 	getEntityLineageEventsAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]>;
 	getEdgeHistory(rootPath: string, edgeId: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]>;
 	getEdgeHistoryAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]>;
+	getEdgeLifecycleEvents(rootPath: string, edgeId: string, token?: CancellationTokenLike): Promise<TemporalEdgeLifecycleEvent[]>;
+	getEdgeLifecycleEventsAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeLifecycleEvent[]>;
 	queryTemporalGraph(rootPath: string, options: TemporalQueryOptions, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot[]>;
 	ingestCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot>;
 	ingestCommitRange(rootPath: string, commitShas: string[], token?: CancellationTokenLike): Promise<void>;
@@ -88,6 +99,66 @@ export class TemporalGraphService implements ITemporalGraphService {
 		return this.ingestCommit(rootPath, commitSha, token);
 	}
 
+	async getRepositoryRefs(rootPath: string, token?: CancellationTokenLike): Promise<TemporalRepositoryRef[]> {
+		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
+		if (token?.isCancellationRequested) {
+			throw new GitHistoryError('Cancelled', 'Repository ref request was cancelled');
+		}
+		await runtime.refreshRefs();
+		return (await runtime.store.getAllRefs()).map(ref => ({
+			name: ref.refName,
+			targetSha: ref.targetSha,
+			kind: ref.refType === 'symbolic-head' || ref.refType === 'detached-head'
+				? 'head'
+				: ref.refType === 'remote-branch'
+					? 'remote-branch'
+					: ref.refType === 'annotated-tag'
+						? 'annotated-tag'
+						: ref.refType === 'tag' ? 'tag' : 'branch',
+			isDetached: ref.refType === 'detached-head' ? true : undefined,
+		}));
+	}
+
+	async getHistoryPage(rootPath: string, options: TemporalHistoryPageOptions = {}, token?: CancellationTokenLike): Promise<TemporalHistoryPage> {
+		const pageSize = Math.min(250, Math.max(1, options.pageSize ?? 50));
+		const cursor = options.cursor ? this._parseHistoryCursor(options.cursor) : undefined;
+		const ref = cursor?.refSha ?? await this._gitService.resolveRef(rootPath, options.ref ?? 'HEAD', token);
+		const skip = cursor?.skip ?? 0;
+		const history = await this._gitService.log(rootPath, { ref, firstParent: true, skip, limit: pageSize + 1 }, token);
+		if (token?.isCancellationRequested) {
+			throw new GitHistoryError('Cancelled', 'Temporal history request was cancelled');
+		}
+		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+		const store = await this._registry.getStore(identity.repositoryId, rootPath);
+		const page = history.slice(0, pageSize);
+		const commits: TemporalCommitSummary[] = await Promise.all(page.map(async commit => {
+			const record = await store.getCommit(commit.sha);
+			const coverage = record ? await store.getCommitCoverage(commit.sha) : undefined;
+			return {
+				sha: commit.sha,
+				parents: commit.parents,
+				authorName: commit.author.name,
+				authorEmail: commit.author.email,
+				authorTimestamp: commit.authorTimestamp,
+				committerTimestamp: commit.committerTimestamp,
+				message: commit.message,
+				indexStatus: !record ? { status: 'not-indexed' } : !coverage ? { status: 'failed', diagnosticCode: 'database-corrupted' } : { status: coverage.completeWithinProfile ? 'ready' : 'incomplete' },
+			};
+		}));
+		const hasMore = history.length > pageSize;
+		return { commits, hasMore, nextCursor: hasMore ? this._makeHistoryCursor(ref, skip + pageSize) : undefined };
+	}
+
+	async runMaintenance(rootPath: string, maxDatabaseBytes: number, token?: CancellationTokenLike): Promise<TemporalMaintenanceResult> {
+		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+		if (token?.isCancellationRequested) {
+			throw new GitHistoryError('Cancelled', 'Temporal maintenance was cancelled');
+		}
+		const store = await this._registry.getStore(identity.repositoryId, rootPath);
+		return store.runMaintenance(maxDatabaseBytes);
+	}
+
 	async getGraphAtCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
@@ -102,7 +173,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 	async getEntityHistoryAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]> {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const store = await this._registry.getStore(identity.repositoryId, rootPath);
-		return this._scopeHistoryToRef(rootPath, targetRef, await store.getEntityHistory(entityId), token);
+		return store.getEntityHistoryReachableFrom(entityId, await this._gitService.resolveRef(rootPath, targetRef, token));
 	}
 
 	async getEntityLineageEvents(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]> {
@@ -113,7 +184,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 	async getEntityLineageEventsAtRef(rootPath: string, entityId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEntityLineageEvent[]> {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const store = await this._registry.getStore(identity.repositoryId, rootPath);
-		return this._scopeHistoryToRef(rootPath, targetRef, await store.getEntityLineageEvents(entityId), token);
+		return store.getEntityLineageEventsReachableFrom(entityId, await this._gitService.resolveRef(rootPath, targetRef, token));
 	}
 
 	async getEdgeHistory(rootPath: string, edgeId: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]> {
@@ -124,16 +195,31 @@ export class TemporalGraphService implements ITemporalGraphService {
 	async getEdgeHistoryAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeSnapshot[]> {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const store = await this._registry.getStore(identity.repositoryId, rootPath);
-		return this._scopeHistoryToRef(rootPath, targetRef, await store.getEdgeHistory(edgeId), token);
+		return store.getEdgeHistoryReachableFrom(edgeId, await this._gitService.resolveRef(rootPath, targetRef, token));
 	}
 
-	private async _scopeHistoryToRef<T extends { readonly commitSha: string }>(rootPath: string, targetRef: string, records: readonly T[], token?: CancellationTokenLike): Promise<T[]> {
-		const targetSha = await this._gitService.resolveRef(rootPath, targetRef, token);
-		const history = await this._gitService.log(rootPath, { ref: targetSha }, token);
-		const order = new Map(history.slice().reverse().map((commit, index) => [commit.sha, index]));
-		return records
-			.filter(record => order.has(record.commitSha))
-			.sort((first, second) => order.get(first.commitSha)! - order.get(second.commitSha)!);
+	async getEdgeLifecycleEvents(rootPath: string, edgeId: string, token?: CancellationTokenLike): Promise<TemporalEdgeLifecycleEvent[]> {
+		return this.getEdgeLifecycleEventsAtRef(rootPath, edgeId, await this._gitService.getHead(rootPath, token), token);
+	}
+
+	async getEdgeLifecycleEventsAtRef(rootPath: string, edgeId: string, targetRef: string, token?: CancellationTokenLike): Promise<TemporalEdgeLifecycleEvent[]> {
+		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
+		const store = await this._registry.getStore(identity.repositoryId, rootPath);
+		return store.getEdgeLifecycleEventsReachableFrom(edgeId, await this._gitService.resolveRef(rootPath, targetRef, token));
+	}
+
+	private _makeHistoryCursor(refSha: string, skip: number): string {
+		return `${refSha}:${skip}`;
+	}
+
+	private _parseHistoryCursor(cursor: string): { refSha: string; skip: number } {
+		const separator = cursor.lastIndexOf(':');
+		const refSha = separator > 0 ? cursor.slice(0, separator) : '';
+		const skip = Number.parseInt(separator > 0 ? cursor.slice(separator + 1) : '', 10);
+		if (!/^[0-9a-f]{40}(?:[0-9a-f]{24})?$/i.test(refSha) || !Number.isSafeInteger(skip) || skip < 0) {
+			throw new GitHistoryError('ParseFailure', 'Invalid Temporal history cursor');
+		}
+		return { refSha, skip };
 	}
 
 	private _toFailedIndexStatus(error: unknown): TemporalCommitIndexStatus {
@@ -178,11 +264,11 @@ export class TemporalGraphService implements ITemporalGraphService {
 		const history = await this._gitService.log(rootPath, {
 			ref: toCommitSha,
 			firstParent: true,
-			limit: Math.max(options.limit ?? 0, 10_000),
+			// This legacy graph-materializing API is intentionally bounded. Phase-3
+			// timeline consumers use getHistoryPage() and reconstruct only selection.
+			limit: Math.max(1, options.limit ?? 50),
 		}, token);
-		const commitsBySha = new Map((await store.getAllCommits()).map(commit => [commit.commitSha, commit]));
-		let filtered = history
-			.map(commit => commitsBySha.get(commit.sha))
+		let filtered = (await Promise.all(history.map(commit => store.getCommit(commit.sha))))
 			.filter((commit): commit is NonNullable<typeof commit> => Boolean(commit))
 			.reverse();
 		if (options.fromCommitSha) {

@@ -5,6 +5,7 @@
 import type { CancellationTokenLike, IRepositoryContentSource } from '../../core/canonical/contentSource.js';
 import type { GitExactDiffChange } from '../../history/git/gitTypes.js';
 import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
+import type { ICanonicalParseService } from '../../core/canonical/canonicalParseService.js';
 import { type ICanonicalParseArtifactCache } from '../../core/canonical/parseArtifactCache.js';
 import { normalizePath } from '../../core/resolution/paths.js';
 import {
@@ -31,6 +32,8 @@ export interface IncrementalAnalysisOptions {
 	readonly analyzerVersion?: number;
 	readonly profileVersion?: number;
 	readonly parseArtifactCache?: ICanonicalParseArtifactCache;
+	/** Runtime-owned parser adapter. Browser callers must use the utility-process service. */
+	readonly parseService?: ICanonicalParseService;
 }
 
 export interface IncrementalAnalysisInput {
@@ -57,6 +60,7 @@ export class IncrementalGraphAnalyzer {
 	private readonly _analyzerVersion: number;
 	private readonly _profileVersion: number;
 	private readonly _parseCache?: ICanonicalParseArtifactCache;
+	private readonly _parseService?: ICanonicalParseService;
 	private readonly _lineageResolver: TemporalLineageResolver;
 	private readonly _edgeLineageResolver: TemporalEdgeLineageResolver;
 	private readonly _deltaEngine: TemporalDeltaEngine;
@@ -75,6 +79,7 @@ export class IncrementalGraphAnalyzer {
 		this._profileVersion = options.profileVersion ?? CURRENT_PROFILE_VERSION;
 
 		this._parseCache = parseCache ?? options.parseArtifactCache ?? new BlobAnalysisCache(10_000, this._analyzerVersion, this._profileVersion);
+		this._parseService = options.parseService;
 		this._lineageResolver = lineageResolver;
 		this._edgeLineageResolver = edgeLineageResolver;
 		this._deltaEngine = deltaEngine;
@@ -100,6 +105,7 @@ export class IncrementalGraphAnalyzer {
 			maxCanonicalFiles: this._maxCanonicalFiles,
 			maxFileSizeBytes: this._maxFileSizeBytes,
 			parseArtifactCache: this._parseCache,
+			parseService: this._parseService,
 		});
 
 		const canonicalSnapshot = await canonicalAnalyzer.analyze(contentSource, token);

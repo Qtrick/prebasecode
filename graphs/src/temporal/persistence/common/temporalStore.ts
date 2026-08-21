@@ -30,6 +30,12 @@ export interface RefRecord {
 	readonly lastObserved: number;
 }
 
+export interface TemporalStoreMaintenanceResult {
+	readonly databaseBytes: number;
+	readonly parseArtifactsEvicted: number;
+	readonly withinBudget: boolean;
+}
+
 export interface ITemporalStore {
 	isOpen(): boolean;
 	open(): Promise<void>;
@@ -64,11 +70,16 @@ export interface ITemporalStore {
 	// Entity and Edge queries
 	getEntity(entityId: string): Promise<TemporalEntity | undefined>;
 	getEntityHistory(entityId: string): Promise<TemporalEntitySnapshot[]>;
+	/** All-parent DAG-reachable records, ordered by persisted commit time. */
+	getEntityHistoryReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntitySnapshot[]>;
 	getEntityLineageEvents(entityId: string): Promise<TemporalEntityLineageEvent[]>;
+	getEntityLineageEventsReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntityLineageEvent[]>;
 	getActiveEntitiesAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]>;
 	getDeletedPathsInHistory(baseCommitSha: string): Promise<Map<string, string>>;
 	getEdge(edgeId: string): Promise<TemporalEdgeRecord | undefined>;
 	getEdgeHistory(edgeId: string): Promise<TemporalEdgeSnapshot[]>;
+	getEdgeHistoryReachableFrom(edgeId: string, targetCommitSha: string): Promise<TemporalEdgeSnapshot[]>;
+	getEdgeLifecycleEventsReachableFrom(edgeId: string, targetCommitSha: string): Promise<import('../../common/temporalTypes.js').TemporalEdgeLifecycleEvent[]>;
 
 	// Refs
 	saveRef(ref: RefRecord): Promise<void>;
@@ -84,6 +95,8 @@ export interface ITemporalStore {
 		language: string
 	): Promise<BlobAnalysisRecord | undefined>;
 	saveBlobAnalysis(record: BlobAnalysisRecord): Promise<void>;
+	/** Evicts only regenerable parse artifacts; canonical states and reconstruction chains are never deleted. */
+	runMaintenance(maxDatabaseBytes: number): Promise<TemporalStoreMaintenanceResult>;
 
 	// Maintenance
 	vacuum(): Promise<void>;

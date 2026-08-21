@@ -9,6 +9,7 @@ import { basename, normalizePath } from '../resolution/paths.js';
 
 export interface CancellationTokenLike {
 	readonly isCancellationRequested: boolean;
+	readonly onCancellationRequested?: (listener: () => void) => { dispose(): void };
 }
 
 export interface ScannedFileInventory {

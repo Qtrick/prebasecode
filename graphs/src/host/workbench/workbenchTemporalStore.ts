@@ -18,7 +18,7 @@ import type {
 	TemporalGraphSnapshot,
 	TemporalStructuralDelta,
 } from '../../temporal/common/temporalTypes.js';
-import type { RefRecord, RepositoryIdentityRecord } from '../../temporal/persistence/common/temporalStore.js';
+import type { RefRecord, RepositoryIdentityRecord, TemporalStoreMaintenanceResult } from '../../temporal/persistence/common/temporalStore.js';
 
 export class WorkbenchTemporalStore implements ITemporalStore {
 	private readonly _main: ITemporalStoreMainService;
@@ -51,17 +51,22 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 	getGraphStateByDigest(digest: string): Promise<{ stateId: string; canonicalDigest: string; snapshotJson: string } | undefined> { return this._call('getGraphStateByDigest', digest); }
 	getEntity(entityId: string): Promise<TemporalEntity | undefined> { return this._call('getEntity', entityId); }
 	getEntityHistory(entityId: string): Promise<TemporalEntitySnapshot[]> { return this._call('getEntityHistory', entityId); }
+	getEntityHistoryReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntitySnapshot[]> { return this._call('getEntityHistoryReachableFrom', entityId, targetCommitSha); }
 	getEntityLineageEvents(entityId: string): Promise<TemporalEntityLineageEvent[]> { return this._call('getEntityLineageEvents', entityId); }
+	getEntityLineageEventsReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntityLineageEvent[]> { return this._call('getEntityLineageEventsReachableFrom', entityId, targetCommitSha); }
 	getActiveEntitiesAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]> { return this._call('getActiveEntitiesAtCommit', commitSha); }
 	getDeletedPathsInHistory(baseCommitSha: string): Promise<Map<string, string>> { return this._call('getDeletedPathsInHistory', baseCommitSha); }
 	getEdge(edgeId: string): Promise<TemporalEdgeRecord | undefined> { return this._call('getEdge', edgeId); }
 	getEdgeHistory(edgeId: string): Promise<TemporalEdgeSnapshot[]> { return this._call('getEdgeHistory', edgeId); }
+	getEdgeHistoryReachableFrom(edgeId: string, targetCommitSha: string): Promise<TemporalEdgeSnapshot[]> { return this._call('getEdgeHistoryReachableFrom', edgeId, targetCommitSha); }
+	getEdgeLifecycleEventsReachableFrom(edgeId: string, targetCommitSha: string): Promise<import('../../temporal/common/temporalTypes.js').TemporalEdgeLifecycleEvent[]> { return this._call('getEdgeLifecycleEventsReachableFrom', edgeId, targetCommitSha); }
 	saveRef(ref: RefRecord): Promise<void> { return this._call('saveRef', ref); }
 	replaceRefs(refs: readonly RefRecord[]): Promise<void> { return this._call('replaceRefs', refs); }
 	getRef(refName: string): Promise<RefRecord | undefined> { return this._call('getRef', refName); }
 	getAllRefs(): Promise<RefRecord[]> { return this._call('getAllRefs'); }
 	getBlobAnalysis(blobOid: string, analyzerVersion: number, profileVersion: number, language: string): Promise<BlobAnalysisRecord | undefined> { return this._call('getBlobAnalysis', blobOid, analyzerVersion, profileVersion, language); }
 	saveBlobAnalysis(record: BlobAnalysisRecord): Promise<void> { return this._call('saveBlobAnalysis', record); }
+	runMaintenance(maxDatabaseBytes: number): Promise<TemporalStoreMaintenanceResult> { return this._call('runMaintenance', maxDatabaseBytes); }
 	vacuum(): Promise<void> { return this._call('vacuum'); }
 	clear(): Promise<void> { return this._call('clear'); }
 }

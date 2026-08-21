@@ -8,6 +8,7 @@ import * as path from 'node:path';
 import type { ITemporalStore } from '../common/temporalStore.js';
 import { deserializeTemporalStoreValue, serializeTemporalStoreValue, type ITemporalStoreMainService } from '../common/temporalStoreChannel.js';
 import { SqliteTemporalStore } from './sqliteTemporalStore.js';
+import { isTemporalError } from '../../common/temporalErrors.js';
 
 type StoreArguments = readonly unknown[];
 
@@ -21,6 +22,7 @@ function isSymbolicLink(candidate: string): boolean {
 
 export class TemporalStoreMainService extends Disposable implements ITemporalStoreMainService {
 	private readonly _stores = new Map<string, SqliteTemporalStore>();
+	private readonly _recoveryAttempted = new Set<string>();
 	private readonly _storageRoot: string;
 
 	constructor(storageRoot: string) {
@@ -57,8 +59,45 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 				await store.open();
 			} catch (error) {
 				this._stores.delete(dbPath);
-				throw error;
+				if (!this._isRecoverableCorruption(error) || this._recoveryAttempted.has(dbPath)) {
+					throw error;
+				}
+				this._recoveryAttempted.add(dbPath);
+				await store.close().catch(() => undefined);
+				this._quarantineDatabase(dbPath);
+				store = new SqliteTemporalStore({ dbPath });
+				try {
+					await store.open();
+					this._stores.set(dbPath, store);
+					this._recoveryAttempted.delete(dbPath);
+				} catch (freshError) {
+					this._stores.delete(dbPath);
+					throw freshError;
+				}
 			}
+		}
+	}
+
+	private _isRecoverableCorruption(error: unknown): boolean {
+		return isTemporalError(error) && error.code === 'DatabaseCorrupted';
+	}
+
+	/** Quarantines only this derived-cache database and its SQLite companions. */
+	private _quarantineDatabase(dbPath: string): void {
+		const stamp = `${Date.now()}`;
+		for (const suffix of ['', '-wal', '-shm']) {
+			const source = `${dbPath}${suffix}`;
+			if (fs.existsSync(source)) {
+				fs.renameSync(source, `${source}.corrupt-${stamp}`);
+			}
+		}
+		const directory = path.dirname(dbPath);
+		const baseName = `${path.basename(dbPath)}.corrupt-`;
+		const quarantined = fs.readdirSync(directory)
+			.filter(name => name.startsWith(baseName))
+			.sort();
+		for (const name of quarantined.slice(0, Math.max(0, quarantined.length - 9))) {
+			fs.unlinkSync(path.join(directory, name));
 		}
 	}
 
@@ -104,17 +143,22 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 			case 'getGraphStateByDigest': return store.getGraphStateByDigest(args[0] as string);
 			case 'getEntity': return store.getEntity(args[0] as string);
 			case 'getEntityHistory': return store.getEntityHistory(args[0] as string);
+			case 'getEntityHistoryReachableFrom': return store.getEntityHistoryReachableFrom(args[0] as string, args[1] as string);
 			case 'getEntityLineageEvents': return store.getEntityLineageEvents(args[0] as string);
+			case 'getEntityLineageEventsReachableFrom': return store.getEntityLineageEventsReachableFrom(args[0] as string, args[1] as string);
 			case 'getActiveEntitiesAtCommit': return store.getActiveEntitiesAtCommit(args[0] as string);
 			case 'getDeletedPathsInHistory': return store.getDeletedPathsInHistory(args[0] as string);
 			case 'getEdge': return store.getEdge(args[0] as string);
 			case 'getEdgeHistory': return store.getEdgeHistory(args[0] as string);
+			case 'getEdgeHistoryReachableFrom': return store.getEdgeHistoryReachableFrom(args[0] as string, args[1] as string);
+			case 'getEdgeLifecycleEventsReachableFrom': return store.getEdgeLifecycleEventsReachableFrom(args[0] as string, args[1] as string);
 			case 'saveRef': return store.saveRef(args[0] as Parameters<ITemporalStore['saveRef']>[0]);
 			case 'replaceRefs': return store.replaceRefs(args[0] as Parameters<ITemporalStore['replaceRefs']>[0]);
 			case 'getRef': return store.getRef(args[0] as string);
 			case 'getAllRefs': return store.getAllRefs();
 			case 'getBlobAnalysis': return store.getBlobAnalysis(args[0] as string, args[1] as number, args[2] as number, args[3] as string);
 			case 'saveBlobAnalysis': return store.saveBlobAnalysis(args[0] as Parameters<ITemporalStore['saveBlobAnalysis']>[0]);
+			case 'runMaintenance': return store.runMaintenance(args[0] as number);
 			case 'vacuum': return store.vacuum();
 			case 'clear': return store.clear();
 			default: throw new Error(`Unsupported Temporal store method '${String(method)}'`);

@@ -10,6 +10,7 @@ import { TemporalCommitIngestionService, type ITemporalStoreProvider } from './t
 import { TemporalReconstructionEngine } from '../core/temporalReconstruction.js';
 import { TemporalIndexPlanner } from '../core/temporalIndexPlanner.js';
 import { TemporalError } from '../common/temporalErrors.js';
+import type { ICanonicalParseService } from '../../core/canonical/canonicalParseService.js';
 import {
 	CURRENT_ANALYZER_VERSION,
 	CURRENT_PROFILE_VERSION,
@@ -58,6 +59,7 @@ export class TemporalRepositoryRuntime {
 		rootPath: string,
 		store: ITemporalStore,
 		gitService: IGitHistoryService,
+		parseService?: ICanonicalParseService,
 		reconstructionEngine?: TemporalReconstructionEngine,
 		indexPlanner?: TemporalIndexPlanner
 	) {
@@ -68,7 +70,7 @@ export class TemporalRepositoryRuntime {
 
 		const l1 = new BlobAnalysisCache(10_000, CURRENT_ANALYZER_VERSION, CURRENT_PROFILE_VERSION);
 		this.parseCache = new TwoTierParseArtifactCache(l1, store, CURRENT_ANALYZER_VERSION, CURRENT_PROFILE_VERSION);
-		this.analyzer = new IncrementalGraphAnalyzer({ parseArtifactCache: this.parseCache });
+		this.analyzer = new IncrementalGraphAnalyzer({ parseArtifactCache: this.parseCache, parseService });
 
 		const storeProvider: ITemporalStoreProvider = {
 			getStore: async () => this.store,

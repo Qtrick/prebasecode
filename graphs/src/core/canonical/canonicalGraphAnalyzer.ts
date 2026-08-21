@@ -14,14 +14,13 @@ import type { GraphEdge, GraphNode, ParseResult, ScannedFile } from '../../commo
 import { assignLayersToNodes } from '../analysis/architectureLayers.js';
 import { detectEntryNodeId } from '../analysis/entryDetector.js';
 import { GraphGenerator } from '../generation/graphGenerator.js';
-import type { ParserEngine } from '../parsing/parserEngine.js';
 import { computeCanonicalGraphDigest } from './canonicalGraphDigest.js';
 import type { CancellationTokenLike, IRepositoryContentSource } from './contentSource.js';
 import { createCurrentVersionMetadata } from './versioning.js';
+import { CanonicalParseServiceError, type ICanonicalParseService, UnavailableCanonicalParseService } from './canonicalParseService.js';
 
 import {
 	type ICanonicalParseArtifactCache,
-	extractBlobParseArtifact,
 	materializeParseResult,
 } from './parseArtifactCache.js';
 
@@ -38,7 +37,7 @@ export class CanonicalGraphAnalyzer {
 	private readonly _maxFileSizeBytes: number;
 	private readonly _includeFolders: boolean;
 	private readonly _includeFunctions: boolean;
-	private _parserEnginePromise: Promise<ParserEngine> | undefined;
+	private readonly _parseService: ICanonicalParseService;
 	private readonly _parseArtifactCache?: ICanonicalParseArtifactCache;
 
 	constructor(options: CanonicalAnalysisOptions = {}) {
@@ -47,6 +46,7 @@ export class CanonicalGraphAnalyzer {
 		this._includeFolders = options.includeFolders ?? false;
 		this._includeFunctions = options.includeFunctions ?? false;
 		this._parseArtifactCache = options.parseArtifactCache;
+		this._parseService = options.parseService ?? new UnavailableCanonicalParseService();
 	}
 
 	async analyze(
@@ -286,19 +286,17 @@ export class CanonicalGraphAnalyzer {
 				return undefined;
 			}
 
-			// Use ParserEngine with content override for full Babel AST / fallback / Vue / Svelte parity
-			const parserEngine = await this._getParserEngine();
-			const parseResult = await parserEngine.parseFile(file, content);
-			if (!parseResult) {
+			const artifact = await this._parseService.parse({ file, content }, token);
+			if (!artifact) {
 				recordExclusion(file.relativePath, 'parse-error');
 				return undefined;
 			}
+			const parseResult = materializeParseResult(file, artifact);
 
 			// 2. Store extracted path-independent parse artifact in cache
 			if (contentIdentity && this._parseArtifactCache) {
 				try {
-					const artifact = extractBlobParseArtifact(parseResult);
-					await this._parseArtifactCache.set(contentIdentity, file.extension, artifact);
+				await this._parseArtifactCache.set(contentIdentity, file.extension, artifact);
 				} catch {
 					// Non-fatal cache store failure
 				}
@@ -312,18 +310,16 @@ export class CanonicalGraphAnalyzer {
 			};
 
 			return { parseResult, manifestEntry };
-		} catch {
+		} catch (error) {
+			if (error instanceof CanonicalParseServiceError) {
+				if (error.code === 'cancelled') {
+					return undefined;
+				}
+				throw error;
+			}
 			recordExclusion(file.relativePath, 'parse-error');
 			return undefined;
 		}
-	}
-
-	private _getParserEngine(): Promise<ParserEngine> {
-		// ParserEngine carries Babel's Node-style package imports. Loading it lazily keeps
-		// those imports out of the Electron renderer's startup module graph; analysis
-		// failures remain contained in the typed indexing path instead of crashing the
-		// entire workbench before a repository has requested parsing.
-		return this._parserEnginePromise ??= import('../parsing/parserEngine.js').then(module => new module.ParserEngine());
 	}
 
 	private _isLikelyBinary(content: string): boolean {

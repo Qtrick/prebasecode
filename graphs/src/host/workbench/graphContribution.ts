@@ -28,6 +28,7 @@ import { PreBaseGraphEditor } from './graphEditor.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
 import { IPreBaseGraphService, PreBaseGraphService } from './prebaseGraphService.js';
+import { IPreBaseCanonicalParseService, WorkbenchCanonicalParseService } from './workbenchCanonicalParseService.js';
 import { PreBaseMapsViewPane } from './prebaseMapsView.js';
 
 export const PREBASE_MAPS_VIEW_CONTAINER_ID = 'workbench.view.prebase.maps';
@@ -65,6 +66,7 @@ import { IPreBaseTemporalGraphService, WorkbenchTemporalGraphService } from './w
 
 function registerGraphSingletons(): void {
 	registerSingleton(IWorkbenchGitHistoryService, WorkbenchGitHistoryService, InstantiationType.Delayed);
+	registerSingleton(IPreBaseCanonicalParseService, WorkbenchCanonicalParseService, InstantiationType.Delayed);
 	registerSingleton(IPreBaseGraphService, PreBaseGraphService, InstantiationType.Delayed);
 	registerSingleton(IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService, InstantiationType.Delayed);
 	registerSingleton(IPreBaseTemporalGraphService, WorkbenchTemporalGraphService, InstantiationType.Eager);

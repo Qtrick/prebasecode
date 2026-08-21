@@ -32,6 +32,7 @@ const tests = [
 	'graphs/src/tests/unit/graphDescriptionService.test.ts',
 	'graphs/src/tests/unit/pureSha256.test.ts',
 	'graphs/src/tests/unit/canonicalGraphAnalyzer.test.ts',
+	'graphs/src/tests/unit/canonicalParserWorkerService.test.ts',
 	'graphs/src/tests/unit/canonicalProjection.test.ts',
 	'graphs/src/tests/unit/canonicalGraphDiff.test.ts',
 	'graphs/src/tests/unit/canonicalQueryIndex.test.ts',

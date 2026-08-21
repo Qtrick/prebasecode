@@ -136,7 +136,7 @@ interface Repository {
 	getBranches?(query: { remote?: boolean }, token?: vscode.CancellationToken): Promise<GitRef[]>;
 	getCommit?(ref: string): Promise<Commit>;
 	resolveCommitRef?(ref: string): Promise<string>;
-	log?(options?: LogOptions): Promise<Commit[]>;
+	log?(options?: LogOptions, token?: vscode.CancellationToken): Promise<Commit[]>;
 	getObjectFiles?(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }): Promise<LsTreeItem[]>;
 	getObjectFilesInventory?(ref: string, options?: { recursive?: boolean; path?: string; maxEntries?: number; scope?: string }, token?: vscode.CancellationToken): Promise<LsTreeInventory>;
 	getObjectDetails?(treeish: string, path: string): Promise<{ mode: string; object: string; size: number }>;
@@ -526,7 +526,7 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 					firstParent: options.firstParent,
 					skip: options.skip,
 				};
-				const commits = await repository.log(logOptions);
+				const commits = await repository.log(logOptions, token);
 				const mapped: GitCommitMetadataDto[] = (commits || []).map(commit => {
 					const authorDateStr = commit.authorDate ? new Date(commit.authorDate).toISOString() : '';
 					const commitDateStr = commit.commitDate ? new Date(commit.commitDate).toISOString() : '';

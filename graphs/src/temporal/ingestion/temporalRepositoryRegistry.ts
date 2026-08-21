@@ -6,6 +6,7 @@ import type { ITemporalStore } from '../persistence/common/temporalStore.js';
 import type { IGitHistoryService } from '../../history/git/gitHistoryService.js';
 import { TemporalRepositoryRuntime } from './temporalRepositoryRuntime.js';
 import { TemporalError } from '../common/temporalErrors.js';
+import type { ICanonicalParseService } from '../../core/canonical/canonicalParseService.js';
 
 export type TemporalStoreFactory = (repositoryId: string, rootPath: string) => Promise<ITemporalStore>;
 
@@ -15,9 +16,11 @@ export class TemporalRepositoryRegistry {
 	private readonly _storeCreations = new Map<string, Promise<ITemporalStore>>();
 	private readonly _runtimeCreations = new Map<string, Promise<TemporalRepositoryRuntime>>();
 	private readonly _storeFactory: TemporalStoreFactory;
+	private readonly _parseService?: ICanonicalParseService;
 
-	constructor(storeFactory: TemporalStoreFactory) {
+	constructor(storeFactory: TemporalStoreFactory, parseService?: ICanonicalParseService) {
 		this._storeFactory = storeFactory;
+		this._parseService = parseService;
 	}
 
 	async getStore(repositoryId: string, rootPath: string): Promise<ITemporalStore> {
@@ -84,7 +87,7 @@ export class TemporalRepositoryRegistry {
 
 	private async _createRuntime(repositoryId: string, rootPath: string, gitService: IGitHistoryService): Promise<TemporalRepositoryRuntime> {
 		const store = await this.getStore(repositoryId, rootPath);
-		const runtime = new TemporalRepositoryRuntime(repositoryId, rootPath, store, gitService);
+		const runtime = new TemporalRepositoryRuntime(repositoryId, rootPath, store, gitService, this._parseService);
 		this._runtimes.set(repositoryId, runtime);
 		return runtime;
 	}

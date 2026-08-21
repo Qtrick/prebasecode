@@ -183,6 +183,26 @@ suite('SqliteTemporalStore', () => {
 		mainService.dispose();
 	});
 
+	test('Electron-main store owner quarantines one corrupt derived cache and recreates it without touching siblings', async () => {
+		const storageRoot = path.dirname(dbPath);
+		const mainService = new TemporalStoreMainService(storageRoot);
+		const corruptPath = path.join(storageRoot, 'corrupt.db');
+		const siblingPath = path.join(storageRoot, 'sibling.db');
+		fs.writeFileSync(corruptPath, 'this is not a SQLite database', 'utf8');
+
+		try {
+			await mainService.open(siblingPath);
+			await mainService.open(corruptPath);
+			assert.deepStrictEqual(JSON.parse(await mainService.invoke(corruptPath, 'getAllRefs', '[]')), []);
+			assert.deepStrictEqual(JSON.parse(await mainService.invoke(siblingPath, 'getAllRefs', '[]')), []);
+			assert.strictEqual(fs.readdirSync(storageRoot).some(name => /^corrupt\.db\.corrupt-\d+$/.test(name)), true);
+		} finally {
+			await mainService.close(corruptPath);
+			await mainService.close(siblingPath);
+			mainService.dispose();
+		}
+	});
+
 	test('Electron-main store owner rejects nested and symlink database escapes', async function () {
 		const storageRoot = path.dirname(dbPath);
 		const mainService = new TemporalStoreMainService(storageRoot);
@@ -703,6 +723,41 @@ suite('SqliteTemporalStore', () => {
 
 		const blob = await store.getBlobAnalysis('blob_tx_test', 1, 1, 'ts');
 		assert.strictEqual(blob, undefined); // Rolled back!
+	});
+
+	test('maintenance evicts only regenerable parse artifacts and preserves reachable checkpoint and refs', async () => {
+		const digest = computeCanonicalGraphDigest({ nodes: [], edges: [], entryNodeId: null });
+		const commit: TemporalCommitRecord = {
+			commitSha: 'maintenance-checkpoint', canonicalDigest: digest, parentShas: [], treeSha: 'maintenance-tree',
+			authorName: 'Tester', authorEmail: 'tester@prebase.invalid', authorTimestamp: 1000, committerTimestamp: 1000,
+			message: 'maintenance checkpoint', ingestedAt: 1000, isCheckpoint: true, checkpointInterval: 10,
+			deltaDepth: 0, schemaVersion: 2, analyzerVersion: 1, profileVersion: 1,
+		};
+		const snapshot: TemporalGraphSnapshot = {
+			schemaVersion: 2, analyzerVersion: 1, profileVersion: 1, commitSha: commit.commitSha, timestamp: 1000,
+			isCheckpoint: true, digest, graphData: { nodes: [], edges: [], timestamp: 1000 },
+			entityMap: new Map(), edgeMap: new Map(), pathToEntityId: new Map(),
+		};
+		await store.saveCommitIngestion(commit, snapshot);
+		await store.saveRef({ refName: 'refs/tags/keep', targetSha: commit.commitSha, refType: 'tag', lastObserved: 1000 });
+		await store.saveBlobAnalysis({
+			blobOid: 'regenerable-artifact', analyzerVersion: 1, profileVersion: 1, language: 'ts', analyzedAt: 1,
+			artifact: { imports: [], exports: [], functions: [], components: [], isComponentFile: false },
+		});
+
+		const result = await store.runMaintenance(1);
+		assert.deepStrictEqual({
+			evicted: result.parseArtifactsEvicted,
+			artifact: await store.getBlobAnalysis('regenerable-artifact', 1, 1, 'ts'),
+			ref: (await store.getRef('refs/tags/keep'))?.targetSha,
+			checkpoint: (await store.getCheckpointSnapshot(commit.commitSha))?.commitSha,
+		}, {
+			evicted: 1,
+			artifact: undefined,
+			ref: commit.commitSha,
+			checkpoint: commit.commitSha,
+		});
+		assert.strictEqual(result.withinBudget, false, 'The result must be truthful when preserved graph state alone exceeds the budget.');
 	});
 
 	test('blob analysis cache persists and retrieves entries', async () => {

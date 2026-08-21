@@ -14,6 +14,7 @@ import type {
 	ITemporalStore,
 	RefRecord,
 	RepositoryIdentityRecord,
+	TemporalStoreMaintenanceResult,
 } from '../common/temporalStore.js';
 import type {
 	BlobAnalysisRecord,
@@ -68,6 +69,18 @@ function readPragma(db: sqlite3.Database, name: string): Promise<string | number
 			resolve(value);
 		});
 	});
+}
+
+function isSqliteCorruption(error: unknown): boolean {
+	if (error instanceof TemporalError) {
+		return error.code === 'DatabaseCorrupted' || isSqliteCorruption(error.cause);
+	}
+	if (!(error instanceof Error)) {
+		return false;
+	}
+	const errorWithCode = error as Error & { code?: unknown };
+	const code = typeof errorWithCode.code === 'string' ? errorWithCode.code : '';
+	return /SQLITE_(?:CORRUPT|NOTADB)/.test(code) || /(?:malformed|not a database|database disk image is malformed)/i.test(error.message);
 }
 
 function stableSerialize(value: unknown): string {
@@ -154,6 +167,10 @@ export class SqliteTemporalStore implements ITemporalStore {
 					try {
 						await this._configureDatabase(db);
 						await runMigrations(db);
+						const integrity = await readPragma(db, 'integrity_check');
+						if (String(integrity).toLowerCase() !== 'ok') {
+							throw new TemporalError('DatabaseCorrupted', 'SQLite integrity check failed for the derived Temporal cache');
+						}
 						this._isOpen = true;
 						resolve();
 					} catch (error) {
@@ -182,7 +199,11 @@ export class SqliteTemporalStore implements ITemporalStore {
 				throw new Error('SQLite returned an unsupported Temporal cache configuration');
 			}
 		} catch (error) {
-			throw new TemporalError('StoreNotOpen', 'Failed to configure or verify SQLite PRAGMAs', error);
+			throw new TemporalError(
+				isSqliteCorruption(error) ? 'DatabaseCorrupted' : 'StoreNotOpen',
+				'Failed to configure or verify SQLite PRAGMAs',
+				error
+			);
 		}
 	}
 
@@ -867,6 +888,40 @@ export class SqliteTemporalStore implements ITemporalStore {
 		});
 	}
 
+	async getEntityHistoryReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntitySnapshot[]> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all(
+				`WITH RECURSIVE ancestry(commit_sha) AS (
+					SELECT ?
+					UNION
+					SELECT parent_sha FROM commit_parents JOIN ancestry ON commit_parents.commit_sha = ancestry.commit_sha
+				)
+				SELECT snapshots.* FROM entity_snapshots snapshots
+				JOIN ancestry ON ancestry.commit_sha = snapshots.commit_sha
+				JOIN commits ON commits.commit_sha = snapshots.commit_sha
+				WHERE snapshots.entity_id = ?
+				ORDER BY commits.committer_timestamp ASC, commits.ingested_at ASC;`,
+				[targetCommitSha, entityId],
+				(err, rows: any[]) => {
+					if (err) return reject(err);
+					try {
+						resolve((rows || []).map(row => ({
+							entityId: row.entity_id,
+							commitSha: row.commit_sha,
+							path: row.path,
+							blobOid: row.blob_oid || undefined,
+							contentHash: row.content_hash || undefined,
+							nodeData: JSON.parse(row.node_data_json),
+						})));
+					} catch (parseError) {
+						reject(new TemporalError('DatabaseCorrupted', `Failed to parse entity history for ${entityId}`, parseError));
+					}
+				}
+			);
+		});
+	}
+
 	async getEntityLineageEvents(entityId: string): Promise<TemporalEntityLineageEvent[]> {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
@@ -883,6 +938,39 @@ export class SqliteTemporalStore implements ITemporalStore {
 						evidence: JSON.parse(r.evidence_json),
 					}));
 					resolve(events);
+				}
+			);
+		});
+	}
+
+	async getEntityLineageEventsReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntityLineageEvent[]> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all(
+				`WITH RECURSIVE ancestry(commit_sha) AS (
+					SELECT ?
+					UNION
+					SELECT parent_sha FROM commit_parents JOIN ancestry ON commit_parents.commit_sha = ancestry.commit_sha
+				)
+				SELECT events.* FROM lineage_events events
+				JOIN ancestry ON ancestry.commit_sha = events.commit_sha
+				JOIN commits ON commits.commit_sha = events.commit_sha
+				WHERE events.entity_id = ?
+				ORDER BY commits.committer_timestamp ASC, commits.ingested_at ASC;`,
+				[targetCommitSha, entityId],
+				(err, rows: any[]) => {
+					if (err) return reject(err);
+					try {
+						resolve((rows || []).map(row => ({
+							entityId: row.entity_id,
+							commitSha: row.commit_sha,
+							parentCommitSha: row.parent_commit_sha,
+							lineageCase: row.lineage_case,
+							evidence: JSON.parse(row.evidence_json),
+						})));
+					} catch (parseError) {
+						reject(new TemporalError('DatabaseCorrupted', `Failed to parse entity lineage history for ${entityId}`, parseError));
+					}
 				}
 			);
 		});
@@ -975,6 +1063,72 @@ export class SqliteTemporalStore implements ITemporalStore {
 						edgeData: JSON.parse(r.edge_data_json),
 					}));
 					resolve(snapshots);
+				}
+			);
+		});
+	}
+
+	async getEdgeHistoryReachableFrom(edgeId: string, targetCommitSha: string): Promise<TemporalEdgeSnapshot[]> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all(
+				`WITH RECURSIVE ancestry(commit_sha) AS (
+					SELECT ?
+					UNION
+					SELECT parent_sha FROM commit_parents JOIN ancestry ON commit_parents.commit_sha = ancestry.commit_sha
+				)
+				SELECT snapshots.* FROM edge_snapshots snapshots
+				JOIN ancestry ON ancestry.commit_sha = snapshots.commit_sha
+				JOIN commits ON commits.commit_sha = snapshots.commit_sha
+				WHERE snapshots.edge_id = ?
+				ORDER BY commits.committer_timestamp ASC, commits.ingested_at ASC;`,
+				[targetCommitSha, edgeId],
+				(err, rows: any[]) => {
+					if (err) return reject(err);
+					try {
+						resolve((rows || []).map(row => ({
+							edgeId: row.edge_id,
+							commitSha: row.commit_sha,
+							sourceEntityId: row.source_entity_id,
+							targetEntityId: row.target_entity_id,
+							kind: row.kind,
+							edgeData: JSON.parse(row.edge_data_json),
+						})));
+					} catch (parseError) {
+						reject(new TemporalError('DatabaseCorrupted', `Failed to parse edge history for ${edgeId}`, parseError));
+					}
+				}
+			);
+		});
+	}
+
+	async getEdgeLifecycleEventsReachableFrom(edgeId: string, targetCommitSha: string): Promise<import('../../common/temporalTypes.js').TemporalEdgeLifecycleEvent[]> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.all(
+				`WITH RECURSIVE ancestry(commit_sha) AS (
+					SELECT ?
+					UNION
+					SELECT parent_sha FROM commit_parents JOIN ancestry ON commit_parents.commit_sha = ancestry.commit_sha
+				)
+				SELECT events.edge_id, events.commit_sha, events.event_kind, edges.source_entity_id, edges.target_entity_id, edges.kind
+				FROM edge_events events
+				JOIN ancestry ON ancestry.commit_sha = events.commit_sha
+				LEFT JOIN edges ON edges.edge_id = events.edge_id
+				JOIN commits ON commits.commit_sha = events.commit_sha
+				WHERE events.edge_id = ?
+				ORDER BY commits.committer_timestamp ASC, commits.ingested_at ASC;`,
+				[targetCommitSha, edgeId],
+				(err, rows: any[]) => {
+					if (err) return reject(err);
+					resolve((rows || []).map(row => ({
+						edgeId: row.edge_id,
+						commitSha: row.commit_sha,
+						eventKind: row.event_kind,
+						sourceEntityId: row.source_entity_id || undefined,
+						targetEntityId: row.target_entity_id || undefined,
+						kind: row.kind || undefined,
+					})));
 				}
 			);
 		});
@@ -1099,6 +1253,31 @@ export class SqliteTemporalStore implements ITemporalStore {
 				(err) => (err ? reject(err) : resolve())
 			);
 		});
+	}
+
+	async runMaintenance(maxDatabaseBytes: number): Promise<TemporalStoreMaintenanceResult> {
+		if (!Number.isSafeInteger(maxDatabaseBytes) || maxDatabaseBytes <= 0) {
+			throw new TemporalError('StorageLimitExceeded', 'Temporal maintenance requires a positive database budget');
+		}
+		const db = this._getDb();
+		const databaseBytes = async (): Promise<number> => Number(await readPragma(db, 'page_count')) * Number(await readPragma(db, 'page_size'));
+		let size = await databaseBytes();
+		let evicted = 0;
+		while (size > maxDatabaseBytes) {
+			const removed = await new Promise<number>((resolve, reject) => {
+				db.run('DELETE FROM blob_parse_artifacts WHERE cache_key IN (SELECT cache_key FROM blob_parse_artifacts ORDER BY analyzed_at ASC LIMIT 256);', function(error) {
+					if (error) return reject(error);
+					resolve(this.changes ?? 0);
+				});
+			});
+			if (removed === 0) {
+				break;
+			}
+			evicted += removed;
+			await runStatement(db, 'PRAGMA incremental_vacuum;');
+			size = await databaseBytes();
+		}
+		return { databaseBytes: size, parseArtifactsEvicted: evicted, withinBudget: size <= maxDatabaseBytes };
 	}
 
 	async vacuum(): Promise<void> {

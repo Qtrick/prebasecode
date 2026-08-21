@@ -8,6 +8,7 @@ import { promises as fs } from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
 import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
+import { NodeCanonicalParseService } from '../../node/canonicalParseService.js';
 import { computeCanonicalGraphDiff } from '../../core/canonical/canonicalGraphDiff.js';
 import { CanonicalQueryIndex } from '../../core/query/canonicalQueryIndex.js';
 import { projectNetworkGraph } from '../../core/projection/graphProjection.js';
@@ -23,6 +24,7 @@ suite('Production Git Bridge & Real Git Fixture E2E Tests', () => {
 	let mainCommitSha: string;
 	let renameCommitSha: string;
 	let commentOnlyCommitSha: string;
+	const createAnalyzer = (): CanonicalGraphAnalyzer => new CanonicalGraphAnalyzer({ parseService: new NodeCanonicalParseService() });
 
 	setup(async () => {
 		tempRepoDir = await fs.mkdtemp(path.join(os.tmpdir(), 'prebase-bridge-e2e-'));
@@ -123,7 +125,7 @@ suite('Production Git Bridge & Real Git Fixture E2E Tests', () => {
 		assert.notStrictEqual(diff.changes[0].oldBlobOid, diff.changes[0].newBlobOid);
 
 		// Canonical graph analysis on both commits
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createAnalyzer();
 		const prevSnapshot = await analyzer.analyze(new GitTreeContentSource(gitService, tempRepoDir, renameCommitSha));
 		const currentSnapshot = await analyzer.analyze(new GitTreeContentSource(gitService, tempRepoDir, commentOnlyCommitSha));
 
@@ -270,7 +272,7 @@ suite('Production Git Bridge & Real Git Fixture E2E Tests', () => {
 			commitShas.push(execSync('git rev-parse HEAD', { cwd: tempRepoDir }).toString('utf8').trim());
 		}
 
-		const analyzer = new CanonicalGraphAnalyzer();
+		const analyzer = createAnalyzer();
 		const timings: { commit: string; durationMs: number; blobCount: number }[] = [];
 		const seenBlobOids = new Set<string>();
 		let totalBlobReferences = 0;

@@ -124,6 +124,57 @@ export interface TemporalEdgeSnapshot {
 	readonly edgeData: GraphEdgeData;
 }
 
+/** A persisted edge observation scoped to all-parent ancestry; `present` is emitted per indexed commit and `removed` records deletion. */
+export interface TemporalEdgeLifecycleEvent {
+	readonly edgeId: string;
+	readonly commitSha: string;
+	readonly eventKind: 'present' | 'removed';
+	readonly sourceEntityId?: string;
+	readonly targetEntityId?: string;
+	readonly kind?: TemporalEdgeKind;
+}
+
+/** Repository ref metadata for the Phase-3 ref picker. */
+export interface TemporalRepositoryRef {
+	readonly name: string;
+	readonly targetSha: string;
+	readonly kind: 'head' | 'branch' | 'remote-branch' | 'tag' | 'annotated-tag';
+	/** Present only for the current HEAD ref when it is not attached to a branch. */
+	readonly isDetached?: boolean;
+}
+
+/** Metadata-only primary-timeline row. Selecting a row is the only operation that reconstructs its graph. */
+export interface TemporalCommitSummary {
+	readonly sha: string;
+	readonly parents: readonly string[];
+	readonly authorName: string;
+	readonly authorEmail: string;
+	readonly authorTimestamp: number;
+	readonly committerTimestamp: number;
+	readonly message: string;
+	readonly indexStatus: TemporalCommitIndexStatus;
+}
+
+export interface TemporalHistoryPage {
+	readonly commits: readonly TemporalCommitSummary[];
+	readonly hasMore: boolean;
+	/** Opaque cursor pinned to the ref SHA from the first request. */
+	readonly nextCursor?: string;
+}
+
+export interface TemporalHistoryPageOptions {
+	readonly ref?: string;
+	readonly cursor?: string;
+	readonly pageSize?: number;
+}
+
+/** Repository-local maintenance result. Retention only evicts regenerable parse artifacts, never graph-state chains. */
+export interface TemporalMaintenanceResult {
+	readonly databaseBytes: number;
+	readonly parseArtifactsEvicted: number;
+	readonly withinBudget: boolean;
+}
+
 export interface TemporalStructuralDelta {
 	readonly commitSha: string;
 	readonly baseCommitSha: string;

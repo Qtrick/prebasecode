@@ -7,6 +7,7 @@ import { suite, test } from 'mocha';
 import { BlobAnalysisCache } from '../../temporal/analysis/blobAnalysisCache.js';
 import { IncrementalGraphAnalyzer } from '../../temporal/analysis/incrementalGraphAnalyzer.js';
 import { CanonicalGraphAnalyzer } from '../../core/canonical/canonicalGraphAnalyzer.js';
+import { NodeCanonicalParseService } from '../../node/canonicalParseService.js';
 import type { IRepositoryContentSource, ScannedFileInventory } from '../../core/canonical/contentSource.js';
 import { isTemporalError } from '../../temporal/common/temporalErrors.js';
 import { computeAnalysisCacheKey } from '../../temporal/common/temporalVersioning.js';
@@ -41,6 +42,10 @@ class MockContentSource implements IRepositoryContentSource {
 		const rel = relativePath.replace(/^\/+/, '').replace(/^repo\//, '');
 		return this._files.get(rel)?.content;
 	}
+}
+
+function createIncrementalAnalyzer(cache: BlobAnalysisCache): IncrementalGraphAnalyzer {
+	return new IncrementalGraphAnalyzer({ parseService: new NodeCanonicalParseService() }, cache);
 }
 
 suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
@@ -92,7 +97,7 @@ suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
 
 	test('IncrementalGraphAnalyzer produces identical structural truth to CanonicalGraphAnalyzer', async () => {
 		const cache = new BlobAnalysisCache();
-		const analyzer = new IncrementalGraphAnalyzer({}, cache);
+		const analyzer = createIncrementalAnalyzer(cache);
 
 		const source = new MockContentSource({
 			'src/presentation/app.tsx': {
@@ -105,7 +110,7 @@ suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
 			},
 		});
 
-		const directCanonicalAnalyzer = new CanonicalGraphAnalyzer();
+		const directCanonicalAnalyzer = new CanonicalGraphAnalyzer({ parseService: new NodeCanonicalParseService() });
 		const directCanonicalSnapshot = await directCanonicalAnalyzer.analyze(source);
 		assert.ok(directCanonicalSnapshot);
 
@@ -121,7 +126,7 @@ suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
 
 	test('IncrementalGraphAnalyzer reuses blob cache and handles path-independent renames', async () => {
 		const cache = new BlobAnalysisCache();
-		const analyzer = new IncrementalGraphAnalyzer({}, cache);
+		const analyzer = createIncrementalAnalyzer(cache);
 
 		// Commit 1
 		const source1 = new MockContentSource({
@@ -158,7 +163,7 @@ suite('BlobAnalysisCache & IncrementalGraphAnalyzer', () => {
 
 	test('Identical structural state detection on comment-only change', async () => {
 		const cache = new BlobAnalysisCache();
-		const analyzer = new IncrementalGraphAnalyzer({}, cache);
+		const analyzer = createIncrementalAnalyzer(cache);
 
 		const source1 = new MockContentSource({
 			'src/a.ts': { content: 'export const a = 1;', blobOid: 'blob_a1' },

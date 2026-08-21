@@ -10,10 +10,11 @@ import * as path from 'node:path';
 import { suite, test } from 'mocha';
 import { NodeGitHistoryService } from '../fixtures/nodeGitHistoryService.js';
 import { SqliteTemporalStore } from '../../temporal/persistence/node/sqliteTemporalStore.js';
-import { TemporalRepositoryRegistry } from '../../temporal/ingestion/temporalRepositoryRegistry.js';
+import { TemporalRepositoryRegistry, type TemporalStoreFactory } from '../../temporal/ingestion/temporalRepositoryRegistry.js';
 import { TemporalCommitIngestionService } from '../../temporal/ingestion/temporalCommitIngestionService.js';
 import { TemporalGraphService } from '../../temporal/host/temporalGraphService.js';
 import { IncrementalGraphAnalyzer } from '../../temporal/analysis/incrementalGraphAnalyzer.js';
+import { NodeCanonicalParseService } from '../../node/canonicalParseService.js';
 import { TemporalReconstructionEngine } from '../../temporal/core/temporalReconstruction.js';
 import { TemporalIndexPlanner } from '../../temporal/core/temporalIndexPlanner.js';
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
@@ -42,6 +43,14 @@ function createE2ERepo(objectFormat: 'sha1' | 'sha256' = 'sha1'): { repoDir: str
 	execSync('git config user.email "tester@prebase.io"', { cwd: repoDir, stdio: 'pipe' });
 
 	return { repoDir, tempBase, dbPath };
+}
+
+function createIncrementalAnalyzer(): IncrementalGraphAnalyzer {
+	return new IncrementalGraphAnalyzer({ parseService: new NodeCanonicalParseService() });
+}
+
+function createRegistry(storeFactory: TemporalStoreFactory): TemporalRepositoryRegistry {
+	return new TemporalRepositoryRegistry(storeFactory, new NodeCanonicalParseService());
 }
 
 class CoordinatedGitHistoryService extends NodeGitHistoryService {
@@ -90,7 +99,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 			const gitService = new CoordinatedGitHistoryService();
 			gitService.blockParent(parentSha);
-			const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
 			const temporalService = new TemporalGraphService(gitService, registry);
 
 			const childRequest = temporalService.ensureCommitIndexed(repoDir, childSha);
@@ -124,8 +133,8 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 		try {
 			const gitService = new NodeGitHistoryService();
-			const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
-			const analyzer = new IncrementalGraphAnalyzer();
+			const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const analyzer = createIncrementalAnalyzer();
 			const reconstructionEngine = new TemporalReconstructionEngine();
 			const indexPlanner = new TemporalIndexPlanner({ checkpointInterval: 2 });
 			const ingestionService = new TemporalCommitIngestionService(gitService, registry, analyzer, reconstructionEngine, indexPlanner);
@@ -204,7 +213,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			await registry.closeAll();
 
 			// 4. Test Persistence Restart: open new registry on same dbPath and verify instant reconstruction without re-ingesting
-			const restartRegistry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const restartRegistry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
 			const restartIngestion = new TemporalCommitIngestionService(gitService, restartRegistry);
 			const restartTemporalService = new TemporalGraphService(gitService, restartRegistry, restartIngestion);
 
@@ -227,8 +236,8 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 		try {
 			const gitService = new NodeGitHistoryService();
-			const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
-			const analyzer = new IncrementalGraphAnalyzer();
+			const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const analyzer = createIncrementalAnalyzer();
 			const ingestionService = new TemporalCommitIngestionService(gitService, registry, analyzer);
 			const temporalService = new TemporalGraphService(gitService, registry, ingestionService);
 
@@ -241,10 +250,12 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 			// Create feature branch
 			execSync('git checkout -b feature', { cwd: repoDir, stdio: 'pipe' });
-			fs.writeFileSync(path.join(repoDir, 'src/feature.ts'), 'export const feature = 2;', 'utf8');
+			fs.writeFileSync(path.join(repoDir, 'src/feature.ts'), 'import { base } from "./base"; export const feature = base + 1;', 'utf8');
 			execSync('git add . && git commit -m "feat: add feature"', { cwd: repoDir, stdio: 'pipe' });
 			const cFeature = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
-			await temporalService.ingestCommit(repoDir, cFeature);
+			const featureSnap = await temporalService.ingestCommit(repoDir, cFeature);
+			const featureEdgeId = Array.from(featureSnap.edgeMap.keys())[0];
+			assert.ok(featureEdgeId);
 
 			// Back to main, commit a change
 			execSync('git checkout main', { cwd: repoDir, stdio: 'pipe' });
@@ -266,6 +277,11 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			assert.strictEqual(parents.length, 2);
 			assert.strictEqual(parents[0], cMain);
 			assert.strictEqual(parents[1], cFeature);
+			assert.deepStrictEqual(
+				(await temporalService.getEdgeLifecycleEventsAtRef(repoDir, featureEdgeId, cMerge)).map(event => [event.commitSha, event.eventKind]),
+				[[cFeature, 'present']],
+				'An edge introduced on a non-first merge parent must remain visible through all-parent ancestry even when merge lineage assigns the reintroduced relation a new edge ID.',
+			);
 
 			await registry.closeAll();
 		} finally {
@@ -282,7 +298,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 		try {
 			const gitService = new NodeGitHistoryService();
-			const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
 			const temporalService = new TemporalGraphService(gitService, registry);
 			fs.mkdirSync(path.join(repoDir, 'src'), { recursive: true });
 			fs.writeFileSync(path.join(repoDir, 'src/a.ts'), 'export const a = 1;', 'utf8');
@@ -308,13 +324,15 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			const mainSha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
 			await temporalService.ingestCommit(repoDir, mainSha);
 
-			const [mainEntities, featureEntities, mainLineage, featureLineage, mainEdges, featureEdges] = await Promise.all([
+			const [mainEntities, featureEntities, mainLineage, featureLineage, mainEdges, featureEdges, mainLifecycle, featureLifecycle] = await Promise.all([
 				temporalService.getEntityHistoryAtRef(repoDir, entityId, mainSha),
 				temporalService.getEntityHistoryAtRef(repoDir, entityId, featureSha),
 				temporalService.getEntityLineageEventsAtRef(repoDir, entityId, mainSha),
 				temporalService.getEntityLineageEventsAtRef(repoDir, entityId, featureSha),
 				temporalService.getEdgeHistoryAtRef(repoDir, edgeId, mainSha),
 				temporalService.getEdgeHistoryAtRef(repoDir, edgeId, featureSha),
+				temporalService.getEdgeLifecycleEventsAtRef(repoDir, edgeId, mainSha),
+				temporalService.getEdgeLifecycleEventsAtRef(repoDir, edgeId, featureSha),
 			]);
 
 			assert.deepStrictEqual({
@@ -324,6 +342,8 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 				featureLineage: featureLineage.map(event => event.commitSha),
 				mainEdges: mainEdges.map(snapshot => snapshot.commitSha),
 				featureEdges: featureEdges.map(snapshot => snapshot.commitSha),
+				mainLifecycle: mainLifecycle.map(event => [event.commitSha, event.eventKind]),
+				featureLifecycle: featureLifecycle.map(event => [event.commitSha, event.eventKind]),
 			}, {
 				mainEntities: [rootSha, mainSha],
 				featureEntities: [rootSha, featureSha],
@@ -331,7 +351,79 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 				featureLineage: [featureSha],
 				mainEdges: [rootSha, mainSha],
 				featureEdges: [rootSha],
+				mainLifecycle: [[rootSha, 'present'], [mainSha, 'present']],
+				featureLifecycle: [[rootSha, 'present'], [featureSha, 'removed']],
 			});
+			await registry.closeAll();
+		} finally {
+			fs.rmSync(tempBase, { recursive: true, force: true });
+		}
+	});
+
+	test('exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs', async () => {
+		const { repoDir, tempBase, dbPath } = createE2ERepo('sha1');
+
+		try {
+			const gitService = new NodeGitHistoryService();
+			const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const temporalService = new TemporalGraphService(gitService, registry);
+			fs.mkdirSync(path.join(repoDir, 'src'), { recursive: true });
+			fs.writeFileSync(path.join(repoDir, 'src/main.ts'), 'export const revision = 0;', 'utf8');
+			execSync('git add . && git commit -m "feat: root"', { cwd: repoDir, stdio: 'pipe' });
+			const rootSha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+			fs.writeFileSync(path.join(repoDir, 'src/main.ts'), 'export const revision = 1;', 'utf8');
+			execSync('git add . && git commit -m "feat: second"', { cwd: repoDir, stdio: 'pipe' });
+			const secondSha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+			execSync('git branch feature', { cwd: repoDir, stdio: 'pipe' });
+			execSync('git tag v1', { cwd: repoDir, stdio: 'pipe' });
+			fs.writeFileSync(path.join(repoDir, 'src/main.ts'), 'export const revision = 2;', 'utf8');
+			execSync('git add . && git commit -m "feat: third"', { cwd: repoDir, stdio: 'pipe' });
+			const thirdSha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+
+			const refs = await temporalService.getRepositoryRefs(repoDir);
+			const firstPage = await temporalService.getHistoryPage(repoDir, { pageSize: 2 });
+			assert.ok(firstPage.nextCursor);
+			fs.writeFileSync(path.join(repoDir, 'src/main.ts'), 'export const revision = 3;', 'utf8');
+			execSync('git add . && git commit -m "feat: fourth after first page"', { cwd: repoDir, stdio: 'pipe' });
+			const fourthSha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
+			const cancelledToken: CancellationTokenLike = { isCancellationRequested: true };
+			await assert.rejects(
+				temporalService.getHistoryPage(repoDir, { cursor: firstPage.nextCursor, pageSize: 2 }, cancelledToken),
+				error => error instanceof Error && error.name === 'GitHistoryError' && 'code' in error && error.code === 'Cancelled',
+			);
+			const secondPage = await temporalService.getHistoryPage(repoDir, { cursor: firstPage.nextCursor, pageSize: 2 });
+			const featurePage = await temporalService.getHistoryPage(repoDir, { ref: 'feature', pageSize: 1 });
+
+			assert.deepStrictEqual({
+				refs: refs.map(ref => [ref.name, ref.targetSha, ref.kind]).sort((a, b) => a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0),
+				pageOne: firstPage.commits.map(commit => [commit.sha, commit.indexStatus.status]),
+				pageTwo: secondPage.commits.map(commit => [commit.sha, commit.indexStatus.status]),
+				featurePage: featurePage.commits.map(commit => commit.sha),
+				headAfterPaging: (await temporalService.getHistoryPage(repoDir, { pageSize: 1 })).commits.map(commit => commit.sha),
+				hasMore: [firstPage.hasMore, secondPage.hasMore],
+			}, {
+				refs: [
+					['HEAD', thirdSha, 'head'],
+					['refs/heads/feature', secondSha, 'branch'],
+					['refs/heads/main', thirdSha, 'branch'],
+					['refs/tags/v1', secondSha, 'tag'],
+				],
+				pageOne: [[thirdSha, 'not-indexed'], [secondSha, 'not-indexed']],
+				pageTwo: [[rootSha, 'not-indexed']],
+				featurePage: [secondSha],
+				headAfterPaging: [fourthSha],
+				hasMore: [true, false],
+			});
+
+			execSync(`git checkout --detach ${thirdSha}`, { cwd: repoDir, stdio: 'pipe' });
+			const detachedHead = (await temporalService.getRepositoryRefs(repoDir)).find(ref => ref.name === 'HEAD');
+			assert.deepStrictEqual(detachedHead, {
+				name: 'HEAD',
+				targetSha: thirdSha,
+				kind: 'head',
+				isDetached: true,
+			});
+			execSync('git checkout main', { cwd: repoDir, stdio: 'pipe' });
 			await registry.closeAll();
 		} finally {
 			fs.rmSync(tempBase, { recursive: true, force: true });
@@ -347,8 +439,8 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 		try {
 			const gitService = new NodeGitHistoryService();
-			const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
-			const analyzer = new IncrementalGraphAnalyzer();
+			const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
+			const analyzer = createIncrementalAnalyzer();
 			const reconstructionEngine = new TemporalReconstructionEngine();
 			const indexPlanner = new TemporalIndexPlanner();
 			const ingestionService = new TemporalCommitIngestionService(gitService, registry, analyzer, reconstructionEngine, indexPlanner);
@@ -383,8 +475,8 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 			// Session 1: Create and ingest Commit 1
 			{
-				const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
-				const analyzer = new IncrementalGraphAnalyzer();
+				const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
+				const analyzer = createIncrementalAnalyzer();
 				const reconstructionEngine = new TemporalReconstructionEngine();
 				const indexPlanner = new TemporalIndexPlanner();
 				const ingestionService = new TemporalCommitIngestionService(gitService, registry, analyzer, reconstructionEngine, indexPlanner);
@@ -402,8 +494,8 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 			// Session 2: Fresh registry and store restart against same database
 			{
-				const freshRegistry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }));
-				const freshAnalyzer = new IncrementalGraphAnalyzer();
+				const freshRegistry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
+				const freshAnalyzer = createIncrementalAnalyzer();
 				const freshReconstructionEngine = new TemporalReconstructionEngine();
 				const freshIndexPlanner = new TemporalIndexPlanner();
 				const freshIngestionService = new TemporalCommitIngestionService(
@@ -447,11 +539,11 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 		try {
 			const gitService = new NodeGitHistoryService();
-			const registry = new TemporalRepositoryRegistry(async (repoId: string, rootPath: string) => {
+			const registry = createRegistry(async (_repoId: string, rootPath: string) => {
 				const db = rootPath === repoA.repoDir ? repoA.dbPath : repoB.dbPath;
 				return new SqliteTemporalStore({ dbPath: db });
 			});
-			const analyzer = new IncrementalGraphAnalyzer();
+			const analyzer = createIncrementalAnalyzer();
 			const reconstructionEngine = new TemporalReconstructionEngine();
 			const indexPlanner = new TemporalIndexPlanner();
 			const ingestionService = new TemporalCommitIngestionService(gitService, registry, analyzer, reconstructionEngine, indexPlanner);
