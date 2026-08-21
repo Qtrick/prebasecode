@@ -12,6 +12,7 @@ import type {
 	TemporalEntitySnapshot,
 	TemporalGraphSnapshot,
 	TemporalStructuralDelta,
+	TemporalLineageCoverage,
 } from '../../common/temporalTypes.js';
 import type { CanonicalCoverage } from '../../../common/types/canonicalTypes.js';
 
@@ -39,6 +40,7 @@ export interface TemporalStoreMaintenanceResult {
 export interface TemporalCommitIndexMetadata {
 	readonly commitSha: string;
 	readonly coverage?: CanonicalCoverage;
+	readonly lineageCoverage?: TemporalLineageCoverage;
 }
 
 export interface ITemporalStore {
@@ -64,6 +66,7 @@ export interface ITemporalStore {
 	getLatestCommit(): Promise<TemporalCommitRecord | undefined>;
 	/** Returns persisted canonical coverage without reconstructing a graph state. */
 	getCommitCoverage(commitSha: string): Promise<CanonicalCoverage | undefined>;
+	getCommitLineageCoverage(commitSha: string): Promise<TemporalLineageCoverage | undefined>;
 	/** Batched metadata-only lookup for timeline rows; never reconstructs graph payloads. */
 	getCommitIndexMetadata(commitShas: readonly string[]): Promise<TemporalCommitIndexMetadata[]>;
 	getCommitParents(commitSha: string): Promise<string[]>;

@@ -40,6 +40,18 @@ export type TemporalIndexDiagnosticCode =
 export interface TemporalCommitIndexStatus {
 	readonly status: TemporalIndexStatus;
 	readonly diagnosticCode?: TemporalIndexDiagnosticCode;
+	/** Canonical graph completeness and historical lineage completeness are distinct. */
+	readonly lineageCoverage?: TemporalLineageCoverage;
+}
+
+/**
+ * Describes whether entity identity is connected to the repository root for
+ * this indexed state. A partial state remains structurally complete; only
+ * identity before its anchor is intentionally unknown.
+ */
+export interface TemporalLineageCoverage {
+	readonly kind: 'complete' | 'partial';
+	readonly unknownBeforeCommitSha?: string;
 }
 
 export interface ArchitectureGraphData {
@@ -124,11 +136,11 @@ export interface TemporalEdgeSnapshot {
 	readonly edgeData: GraphEdgeData;
 }
 
-/** A persisted edge observation scoped to all-parent ancestry; `present` is emitted per indexed commit and `removed` records deletion. */
+/** A sparse edge transition scoped to all-parent ancestry. */
 export interface TemporalEdgeLifecycleEvent {
 	readonly edgeId: string;
 	readonly commitSha: string;
-	readonly eventKind: 'present' | 'removed';
+	readonly eventKind: 'created' | 'changed' | 'removed';
 	readonly sourceEntityId?: string;
 	readonly targetEntityId?: string;
 	readonly kind?: TemporalEdgeKind;
@@ -207,6 +219,7 @@ export interface TemporalCommitRecord {
 	readonly checkpointInterval: number;
 	readonly deltaDepth?: number;
 	readonly baseCommitSha?: string;
+	readonly lineageCoverage?: TemporalLineageCoverage;
 	readonly schemaVersion: number;
 	readonly analyzerVersion: number;
 	readonly profileVersion: number;

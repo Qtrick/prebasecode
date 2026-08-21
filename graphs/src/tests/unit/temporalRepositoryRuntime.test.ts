@@ -248,6 +248,39 @@ suite('TemporalRepositoryRuntime', () => {
 		});
 	});
 
+	test('reindexes a requested graph after recovery leaves the derived cache empty', async () => {
+		const commitSha = 'commit-a';
+		const snapshot = createSnapshot(commitSha);
+		let reconstructionCalls = 0;
+		let ingestionCalls = 0;
+		const store = Object.assign(Object.create(null), {
+			isOpen: () => true,
+			open: async () => {},
+			close: async () => {},
+			getCommit: async () => undefined,
+		}) as ITemporalStore;
+		const gitService = Object.assign(Object.create(null), {
+			getRepositoryIdentity: async () => ({ repositoryId: 'repo-a', rootPath: '/repo-a', objectFormat: 'sha1' as const }),
+		}) as IGitHistoryService;
+		const registry = new TemporalRepositoryRegistry(async () => store);
+		const runtime = await registry.getRuntime('repo-a', '/repo-a', gitService);
+		(runtime as unknown as { ingestionService: { reconstructGraphAtCommit(): Promise<TemporalGraphSnapshot>; ingestCommit(): Promise<TemporalGraphSnapshot> } }).ingestionService = {
+			reconstructGraphAtCommit: async () => {
+				reconstructionCalls++;
+				throw new TemporalError('CheckpointNotFound', 'The recovered cache has no checkpoint');
+			},
+			ingestCommit: async () => {
+				ingestionCalls++;
+				return snapshot;
+			},
+		};
+		const service = new TemporalGraphService(gitService, registry);
+
+		assert.strictEqual(await service.getGraphAtCommit('/repo-a', commitSha), snapshot);
+		assert.deepStrictEqual({ reconstructionCalls, ingestionCalls }, { reconstructionCalls: 1, ingestionCalls: 1 });
+		await registry.closeAll();
+	});
+
 	test('derives incomplete status from persisted canonical coverage after runtime restart', async () => {
 		const commit: TemporalCommitRecord = {
 			commitSha: 'commit-a',
@@ -332,6 +365,7 @@ suite('TemporalRepositoryRuntime', () => {
 		const restartedService = new TemporalGraphService(gitService, restartedRegistry);
 		assert.deepStrictEqual(await restartedService.getCommitIndexStatus('/repo-a', commit.commitSha), {
 			status: 'incomplete',
+			lineageCoverage: { kind: 'complete' },
 		});
 		await restartedRegistry.closeAll();
 	});

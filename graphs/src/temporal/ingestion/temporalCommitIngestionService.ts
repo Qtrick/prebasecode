@@ -4,6 +4,7 @@
 
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type { IGitHistoryService } from '../../history/git/gitHistoryService.js';
+import type { GitExactDiffChange } from '../../history/git/gitTypes.js';
 import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
 import { TemporalError } from '../common/temporalErrors.js';
 import {
@@ -26,6 +27,8 @@ const MAX_RECONSTRUCTION_DEPTH = DEFAULT_CHECKPOINT_INTERVAL * 2;
 export interface IngestCommitOptions {
 	readonly isExplicitHead?: boolean;
 	readonly forceCheckpoint?: boolean;
+	/** Internal: replace an isolated checkpoint once its parent segment is available. */
+	readonly reconcileExisting?: boolean;
 }
 
 export interface ITemporalStoreProvider {
@@ -78,7 +81,11 @@ export class TemporalCommitIngestionService {
 
 		// Check if already ingested
 		const existingRecord = await store.getCommit(commitSha);
-		if (existingRecord) {
+		if (existingRecord && !options.reconcileExisting) {
+			const parentSha = existingRecord.parentShas[0];
+			if (existingRecord.lineageCoverage?.kind === 'partial' && parentSha && await store.getCommit(parentSha)) {
+				return this.ingestCommit(rootPath, commitSha, { ...options, reconcileExisting: true }, token);
+			}
 			return this.reconstructGraphAtCommit(rootPath, commitSha, token);
 		}
 
@@ -86,44 +93,37 @@ export class TemporalCommitIngestionService {
 		const commitMeta = await this._gitService.getCommit(rootPath, commitSha, token);
 		const isRoot = commitMeta.parents.length === 0;
 
-		// Calculate current delta depth from primary parent
+		// Calculate depth only from an already-indexed parent. A selection must
+		// never recursively analyze history back to the repository root.
 		let deltaDepth = 0;
+		let parentSnapshot: TemporalGraphSnapshot | undefined;
+		let lineageCoverage: TemporalCommitRecord['lineageCoverage'] = { kind: 'complete' };
 		if (commitMeta.parents.length > 0) {
 			const parentSha = commitMeta.parents[0];
 			const parent = await store.getCommit(parentSha);
 			deltaDepth = parent?.isCheckpoint ? 1 : (parent?.deltaDepth ?? 0) + 1;
+			if (parent) {
+				parentSnapshot = await this.reconstructGraphAtCommit(rootPath, parentSha, token);
+				lineageCoverage = parent.lineageCoverage ?? { kind: 'complete' };
+			} else {
+				lineageCoverage = { kind: 'partial', unknownBeforeCommitSha: commitSha };
+			}
 		}
 
 		const isCheckpoint = Boolean(
 			options.forceCheckpoint ||
+			!parentSnapshot ||
 			this._indexPlanner.shouldCreateCheckpoint(deltaDepth, isRoot, Boolean(options.isExplicitHead))
 		);
 
-		// Get parent snapshot if exists
-		let parentSnapshot: TemporalGraphSnapshot | undefined;
-		let diffChanges: any[] = [];
-		if (commitMeta.parents.length > 0) {
-			const primaryParentSha = commitMeta.parents[0];
-			if (!(await store.getCommit(primaryParentSha))) {
-				// Prerequisite parent is not yet indexed -> index prerequisite along lineage
-				parentSnapshot = await this.ingestCommit(rootPath, primaryParentSha, {}, token);
-			} else {
-				parentSnapshot = await this.reconstructGraphAtCommit(rootPath, primaryParentSha, token);
-			}
-
-			if (!parentSnapshot) {
-				throw new TemporalError(
-					'DeltaReconstructionFailed',
-					`Failed to obtain parent snapshot for ${commitSha} (parent: ${primaryParentSha})`
-				);
-			}
-
+		let diffChanges: readonly GitExactDiffChange[] = [];
+		if (parentSnapshot) {
 			const diffRes = await this._gitService.diffCommitToParent(rootPath, commitSha, 0, token);
-			diffChanges = diffRes.changes as any[];
+			diffChanges = diffRes.changes;
 		}
 
 		// Read prior deleted paths in history for robust CASE 8 fresh recreation
-		const deletedPathsInHistory = commitMeta.parents.length > 0
+		const deletedPathsInHistory = parentSnapshot
 			? await store.getDeletedPathsInHistory(commitMeta.parents[0])
 			: new Map<string, string>();
 
@@ -156,6 +156,7 @@ export class TemporalCommitIngestionService {
 			checkpointInterval: DEFAULT_CHECKPOINT_INTERVAL,
 			deltaDepth: isCheckpoint ? 0 : deltaDepth,
 			baseCommitSha: isCheckpoint ? undefined : commitMeta.parents[0] || undefined,
+			lineageCoverage,
 			schemaVersion: CURRENT_SCHEMA_VERSION,
 			analyzerVersion: CURRENT_ANALYZER_VERSION,
 			profileVersion: CURRENT_PROFILE_VERSION,
@@ -165,7 +166,7 @@ export class TemporalCommitIngestionService {
 		await store.saveCommitIngestion(
 			commitRecord,
 			analysisOutput.snapshot,
-			isCheckpoint ? undefined : analysisOutput.delta,
+			analysisOutput.delta,
 			analysisOutput.lineageEvents
 		);
 

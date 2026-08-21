@@ -311,7 +311,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 		validateVersion(commit.analyzerVersion, 'analyzerVersion');
 		validateVersion(commit.profileVersion, 'profileVersion');
 		if (commit.isCheckpoint) {
-			if (delta || commit.baseCommitSha || (commit.deltaDepth ?? 0) !== 0) {
+			if (commit.baseCommitSha || (commit.deltaDepth ?? 0) !== 0) {
 				throw new TemporalError('DatabaseCorrupted', `Checkpoint '${commit.commitSha}' has an invalid reconstruction base or delta`);
 			}
 		} else {
@@ -328,6 +328,14 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 
 		return this.runInTransaction(async () => {
+			// A bounded segment may first have been stored as an isolated checkpoint
+			// and later be reconciled with an indexed parent. Remove its old derived
+			// occurrence before replacing it so no stale anchor survives replay.
+			if (await this.getCommit(commit.commitSha)) {
+				for (const table of ['entity_deletions', 'edge_events', 'lineage_events', 'entity_snapshots', 'edge_snapshots', 'checkpoints', 'deltas', 'commit_parents']) {
+					await new Promise<void>((resolve, reject) => db.run(`DELETE FROM ${table} WHERE commit_sha = ?;`, [commit.commitSha], error => error ? reject(error) : resolve()));
+				}
+			}
 			// 1. Insert Commit
 			const canonicalDigest = commit.canonicalDigest || snapshot.digest || snapshot.canonicalSnapshot?.digest || '';
 			const canonicalStateId = computeCanonicalStateId(snapshot, canonicalDigest);
@@ -339,9 +347,9 @@ export class SqliteTemporalStore implements ITemporalStore {
 					INSERT OR REPLACE INTO commits (
 						commit_sha, canonical_digest, canonical_state_id, parent_shas, tree_sha, author_name, author_email,
 						author_timestamp, committer_timestamp, message, ingested_at,
-						is_checkpoint, checkpoint_interval, delta_depth, base_commit_sha,
+						is_checkpoint, checkpoint_interval, delta_depth, base_commit_sha, lineage_coverage, lineage_anchor_sha,
 						schema_version, analyzer_version, profile_version
-					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
+					) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);
 				`;
 				db.run(
 					stmt,
@@ -361,6 +369,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 						commit.checkpointInterval,
 						deltaDepth,
 						baseCommitSha,
+						commit.lineageCoverage?.kind ?? 'complete',
+						commit.lineageCoverage?.unknownBeforeCommitSha ?? null,
 						commit.schemaVersion,
 						commit.analyzerVersion,
 						commit.profileVersion,
@@ -457,7 +467,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 			}
 
 			// 5. Insert Delta if provided
-			if (delta) {
+			if (delta && !commit.isCheckpoint) {
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
 						INSERT OR REPLACE INTO deltas (
@@ -479,8 +489,13 @@ export class SqliteTemporalStore implements ITemporalStore {
 				});
 			}
 
-			// 6. Save entities and snapshots
-			for (const [entityId, entitySnap] of snapshot.entityMap) {
+			// 6. Persist full entity state at a checkpoint and only actual transitions
+			// otherwise. Graph reconstruction remains the authority for unchanged state.
+			const entityTransitions = !delta
+				? snapshot.entityMap.values()
+				: new Map([...(delta?.entitiesAdded ?? []), ...(delta?.entitiesModified ?? [])].map(value => [value.entityId, value])).values();
+			for (const entitySnap of entityTransitions) {
+				const entityId = entitySnap.entityId;
 				// Upsert Entity
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
@@ -551,8 +566,9 @@ export class SqliteTemporalStore implements ITemporalStore {
 				}
 			}
 
-			// 7. Save lineage events
-			for (const event of lineageEvents) {
+			// Unchanged continuity is implied by the reconstruction chain, so omit its
+			// per-commit marker. Every persisted lineage row now describes a change.
+			for (const event of lineageEvents.filter(event => event.lineageCase !== 'same-canonical-id')) {
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
 						INSERT INTO lineage_events (
@@ -574,8 +590,13 @@ export class SqliteTemporalStore implements ITemporalStore {
 				});
 			}
 
-			// 8. Save edges and snapshots
-			for (const [edgeId, edgeSnap] of snapshot.edgeMap) {
+			// 8. Checkpoints retain a full recoverable state; delta commits record only
+			// additions or changes instead of an observation for every present edge.
+			const edgeTransitions = !delta
+				? snapshot.edgeMap.values()
+				: new Map([...(delta?.edgesAdded ?? []), ...(delta?.edgesModified ?? [])].map(value => [value.edgeId, value])).values();
+			for (const edgeSnap of edgeTransitions) {
+				const edgeId = edgeSnap.edgeId;
 				// Upsert Edge
 				await new Promise<void>((resolve, reject) => {
 					const stmt = `
@@ -619,12 +640,22 @@ export class SqliteTemporalStore implements ITemporalStore {
 						(err) => (err ? reject(err) : resolve())
 					);
 				});
+			}
+			for (const edge of delta?.edgesAdded ?? []) {
 				await new Promise<void>((resolve, reject) => {
-					db.run(
-						'INSERT OR IGNORE INTO edge_events (edge_id, commit_sha, event_kind) VALUES (?, ?, ?);',
-						[edgeId, commit.commitSha, 'present'],
-						error => error ? reject(error) : resolve(),
-					);
+					db.run('INSERT OR IGNORE INTO edge_events (edge_id, commit_sha, event_kind) VALUES (?, ?, ?);', [edge.edgeId, commit.commitSha, 'created'], error => error ? reject(error) : resolve());
+				});
+			}
+			if (!delta) {
+				for (const edge of snapshot.edgeMap.values()) {
+					await new Promise<void>((resolve, reject) => {
+						db.run('INSERT OR IGNORE INTO edge_events (edge_id, commit_sha, event_kind) VALUES (?, ?, ?);', [edge.edgeId, commit.commitSha, 'created'], error => error ? reject(error) : resolve());
+					});
+				}
+			}
+			for (const edge of delta?.edgesModified ?? []) {
+				await new Promise<void>((resolve, reject) => {
+					db.run('INSERT OR IGNORE INTO edge_events (edge_id, commit_sha, event_kind) VALUES (?, ?, ?);', [edge.edgeId, commit.commitSha, 'changed'], error => error ? reject(error) : resolve());
 				});
 			}
 			for (const deletedEdgeId of delta?.edgesDeleted ?? []) {
@@ -706,6 +737,31 @@ export class SqliteTemporalStore implements ITemporalStore {
 		});
 	}
 
+	async getCommitLineageCoverage(commitSha: string): Promise<import('../../common/temporalTypes.js').TemporalLineageCoverage | undefined> {
+		const db = this._getDb();
+		return new Promise((resolve, reject) => {
+			db.get('SELECT lineage_coverage, lineage_anchor_sha FROM commits WHERE commit_sha = ?;', [commitSha], (error, row: { lineage_coverage?: string; lineage_anchor_sha?: string } | undefined) => {
+				if (error) {
+					reject(error);
+					return;
+				}
+				if (!row) {
+					resolve(undefined);
+					return;
+				}
+				if (row.lineage_coverage === 'complete') {
+					resolve({ kind: 'complete' });
+					return;
+				}
+				if (row.lineage_coverage === 'partial' && row.lineage_anchor_sha) {
+					resolve({ kind: 'partial', unknownBeforeCommitSha: row.lineage_anchor_sha });
+					return;
+				}
+				reject(new TemporalError('DatabaseCorrupted', `Invalid lineage coverage for ${commitSha}`));
+			});
+		});
+	}
+
 	async getCommitIndexMetadata(commitShas: readonly string[]): Promise<TemporalCommitIndexMetadata[]> {
 		if (commitShas.length === 0) {
 			return [];
@@ -714,21 +770,27 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const placeholders = commitShas.map(() => '?').join(', ');
 		return new Promise((resolve, reject) => {
 			db.all(
-				`SELECT commits.commit_sha, graph_states.snapshot_json
+				`SELECT commits.commit_sha, commits.lineage_coverage, commits.lineage_anchor_sha, graph_states.snapshot_json
 				 FROM commits LEFT JOIN graph_states ON graph_states.state_id = commits.canonical_state_id
 				 WHERE commits.commit_sha IN (${placeholders});`,
 				commitShas,
-				(error, rows: Array<{ commit_sha: string; snapshot_json?: string }>) => {
+				(error, rows: Array<{ commit_sha: string; lineage_coverage?: string; lineage_anchor_sha?: string; snapshot_json?: string }>) => {
 					if (error) return reject(error);
 					try {
 						resolve(rows.map(row => {
-							if (!row.snapshot_json) return { commitSha: row.commit_sha };
+							const lineageCoverage = row.lineage_coverage === 'partial'
+								? row.lineage_anchor_sha ? { kind: 'partial' as const, unknownBeforeCommitSha: row.lineage_anchor_sha } : undefined
+								: row.lineage_coverage === 'complete' ? { kind: 'complete' as const } : undefined;
+							if (!lineageCoverage) {
+								throw new TemporalError('DatabaseCorrupted', `Invalid lineage coverage for ${row.commit_sha}`);
+							}
+							if (!row.snapshot_json) return { commitSha: row.commit_sha, lineageCoverage };
 							const snapshot = JSON.parse(row.snapshot_json) as { coverage?: CanonicalCoverage; completeness?: CanonicalCoverage };
 							const coverage = snapshot.coverage ?? snapshot.completeness;
 							if (!coverage || typeof coverage.completeWithinProfile !== 'boolean') {
 								throw new TemporalError('DatabaseCorrupted', `Canonical state coverage is missing for ${row.commit_sha}`);
 							}
-							return { commitSha: row.commit_sha, coverage };
+							return { commitSha: row.commit_sha, coverage, lineageCoverage };
 						}));
 					} catch (parseError) {
 						reject(parseError instanceof TemporalError ? parseError : new TemporalError('DatabaseCorrupted', 'Failed to parse timeline index metadata', parseError));
@@ -1377,6 +1439,9 @@ export class SqliteTemporalStore implements ITemporalStore {
 			checkpointInterval: row.checkpoint_interval,
 			deltaDepth: typeof row.delta_depth === 'number' ? row.delta_depth : (row.is_checkpoint ? 0 : 1),
 			baseCommitSha: row.base_commit_sha || undefined,
+			lineageCoverage: row.lineage_coverage === 'partial'
+				? { kind: 'partial', unknownBeforeCommitSha: row.lineage_anchor_sha }
+				: { kind: 'complete' },
 			schemaVersion: row.schema_version,
 			analyzerVersion: row.analyzer_version,
 			profileVersion: row.profile_version,

@@ -17,6 +17,7 @@ import type {
 	TemporalEntityLineageEvent,
 	TemporalEntitySnapshot,
 	TemporalGraphSnapshot,
+	TemporalLineageCoverage,
 	TemporalStructuralDelta,
 } from '../../temporal/common/temporalTypes.js';
 import type { RefRecord, RepositoryIdentityRecord, TemporalCommitIndexMetadata, TemporalStoreMaintenanceResult } from '../../temporal/persistence/common/temporalStore.js';
@@ -53,6 +54,7 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 	getAllCommits(): Promise<TemporalCommitRecord[]> { return this._call('getAllCommits'); }
 	getLatestCommit(): Promise<TemporalCommitRecord | undefined> { return this._call('getLatestCommit'); }
 	getCommitCoverage(commitSha: string): Promise<CanonicalCoverage | undefined> { return this._call('getCommitCoverage', commitSha); }
+	getCommitLineageCoverage(commitSha: string): Promise<TemporalLineageCoverage | undefined> { return this._call('getCommitLineageCoverage', commitSha); }
 	getCommitIndexMetadata(commitShas: readonly string[]): Promise<TemporalCommitIndexMetadata[]> { return this._call('getCommitIndexMetadata', commitShas); }
 	getCommitParents(commitSha: string): Promise<string[]> { return this._call('getCommitParents', commitSha); }
 	getCommitChildren(commitSha: string): Promise<string[]> { return this._call('getCommitChildren', commitSha); }

@@ -489,6 +489,17 @@ CREATE TABLE IF NOT EXISTS edge_events (
 CREATE INDEX IF NOT EXISTS idx_edge_events_commit ON edge_events(commit_sha);
 `;
 
+/**
+ * v5 changes history-table semantics from full observations to structural
+ * transitions. Temporal stores are derived caches, so rebuilding graph state
+ * is safer than attempting to reinterpret dense v4 observations as events.
+ */
+export const SCHEMA_V5_ADDITIONS_DDL = `
+ALTER TABLE commits ADD COLUMN lineage_coverage TEXT NOT NULL DEFAULT 'complete';
+ALTER TABLE commits ADD COLUMN lineage_anchor_sha TEXT;
+CREATE INDEX IF NOT EXISTS idx_commits_lineage_anchor ON commits(lineage_anchor_sha);
+`;
+
 export async function runMigrations(db: sqlite3.Database): Promise<void> {
 	return new Promise<void>((resolve, reject) => {
 			db.get('PRAGMA user_version;', async (err, row: any) => {
@@ -685,6 +696,28 @@ export async function runMigrations(db: sqlite3.Database): Promise<void> {
 					currentVersion = 4;
 				}
 
+				if (currentVersion === 4) {
+					// v4 persisted an observation for every entity and edge at every
+					// commit. v5 persists only checkpoints and structural transitions.
+					// Discard only derived graph state; refs and blob artifacts stay warm.
+					await execSql(db, `
+						DELETE FROM entity_deletions;
+						DELETE FROM edge_events;
+						DELETE FROM lineage_events;
+						DELETE FROM entity_snapshots;
+						DELETE FROM edge_snapshots;
+						DELETE FROM checkpoints;
+						DELETE FROM deltas;
+						DELETE FROM commit_parents;
+						DELETE FROM commits;
+						DELETE FROM graph_states;
+						DELETE FROM entities;
+						DELETE FROM edges;
+					`);
+					await execSql(db, SCHEMA_V5_ADDITIONS_DDL);
+					currentVersion = 5;
+				}
+
 				await validateCurrentSchema(db);
 				await execSql(db, `PRAGMA user_version = ${currentVersion};`);
 				await execSql(db, 'COMMIT;');
@@ -734,7 +767,7 @@ async function validateCurrentSchema(db: sqlite3.Database): Promise<void> {
 	const requiredColumns: Readonly<Record<string, readonly string[]>> = {
 		meta: ['key', 'value'],
 		repository_identity: ['repo_id', 'root_path', 'object_format'],
-		commits: ['commit_sha', 'canonical_digest', 'canonical_state_id', 'parent_shas', 'is_checkpoint', 'delta_depth', 'base_commit_sha', 'schema_version', 'analyzer_version', 'profile_version'],
+		commits: ['commit_sha', 'canonical_digest', 'canonical_state_id', 'parent_shas', 'is_checkpoint', 'delta_depth', 'base_commit_sha', 'lineage_coverage', 'lineage_anchor_sha', 'schema_version', 'analyzer_version', 'profile_version'],
 		commit_parents: ['commit_sha', 'parent_index', 'parent_sha'],
 		refs: ['ref_name', 'target_sha', 'last_observed'],
 		graph_states: ['state_id', 'canonical_digest', 'snapshot_json', 'schema_version', 'analyzer_version', 'profile_version'],

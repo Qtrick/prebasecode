@@ -5,7 +5,7 @@
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 import type { GitHeadChangeEvent, IGitHistoryService } from '../../history/git/gitHistoryService.js';
 import { GitHistoryError } from '../../history/git/gitTypes.js';
-import { isTemporalError } from '../common/temporalErrors.js';
+import { isTemporalError, TemporalError } from '../common/temporalErrors.js';
 import type { TemporalCommitIngestionService } from '../ingestion/temporalCommitIngestionService.js';
 import type { TemporalRepositoryRegistry } from '../ingestion/temporalRepositoryRegistry.js';
 import type {
@@ -69,7 +69,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 			const store = await this._registry.getStore(identity.repositoryId, rootPath);
 			const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
 			const runtimeStatus = runtime.getIndexStatus(commitSha);
-			if (runtimeStatus) {
+			if (runtimeStatus && runtimeStatus !== 'ready' && runtimeStatus !== 'incomplete') {
 				return { status: runtimeStatus };
 			}
 			const commit = await store.getCommit(commitSha);
@@ -81,11 +81,18 @@ export class TemporalGraphService implements ITemporalGraphService {
 			// this commit's canonical state without reconstructing graph payloads for
 			// every timeline status row after a workbench restart.
 			const coverage = await store.getCommitCoverage(commitSha);
+			const lineageCoverage = typeof store.getCommitLineageCoverage === 'function'
+				? await store.getCommitLineageCoverage(commitSha)
+				: commit.lineageCoverage ?? { kind: 'complete' as const };
 			if (!coverage) {
+				return { status: 'failed', diagnosticCode: 'database-corrupted' };
+			}
+			if (!lineageCoverage) {
 				return { status: 'failed', diagnosticCode: 'database-corrupted' };
 			}
 			return {
 				status: coverage.completeWithinProfile ? 'ready' : 'incomplete',
+				lineageCoverage,
 			};
 		} catch (error) {
 			return this._toFailedIndexStatus(error);
@@ -94,7 +101,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 
 	async ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
 		const status = await this.getCommitIndexStatus(rootPath, commitSha, token);
-		if (status.status === 'ready' || status.status === 'incomplete') {
+		if ((status.status === 'ready' || status.status === 'incomplete') && status.lineageCoverage?.kind !== 'partial') {
 			return this.getGraphAtCommit(rootPath, commitSha, token);
 		}
 		return this.ingestCommit(rootPath, commitSha, token);
@@ -144,6 +151,16 @@ export class TemporalGraphService implements ITemporalGraphService {
 			const runtimeStatus = runtime.getIndexStatus(commit.sha);
 			const metadata = metadataBySha.get(commit.sha);
 			const coverage = metadata?.coverage;
+			const indexStatus: TemporalCommitIndexStatus = runtimeStatus && runtimeStatus !== 'ready' && runtimeStatus !== 'incomplete'
+				? { status: runtimeStatus }
+				: !metadata
+					? { status: 'not-indexed' }
+					: !coverage || !metadata.lineageCoverage
+						? { status: 'failed', diagnosticCode: 'database-corrupted' as const }
+						: {
+							status: coverage.completeWithinProfile ? 'ready' as const : 'incomplete' as const,
+							lineageCoverage: metadata.lineageCoverage,
+						};
 			return {
 				sha: commit.sha,
 				parents: commit.parents,
@@ -152,7 +169,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 				authorTimestamp: commit.authorTimestamp,
 				committerTimestamp: commit.committerTimestamp,
 				message: commit.message,
-				indexStatus: runtimeStatus ? { status: runtimeStatus } : !metadata ? { status: 'not-indexed' } : !coverage ? { status: 'failed', diagnosticCode: 'database-corrupted' } : { status: coverage.completeWithinProfile ? 'ready' : 'incomplete' },
+				indexStatus,
 			};
 		});
 		const hasMore = history.length > pageSize;
@@ -171,7 +188,18 @@ export class TemporalGraphService implements ITemporalGraphService {
 	async getGraphAtCommit(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
-		return runtime.ingestionService.reconstructGraphAtCommit(rootPath, commitSha, token);
+		try {
+			return await runtime.ingestionService.reconstructGraphAtCommit(rootPath, commitSha, token);
+		} catch (error) {
+			// A corruption recovery replaces the derived database with an empty store.
+			// Retry the user request through bounded ingestion rather than leaking a
+			// misleading missing-checkpoint error. If the commit row still exists, the
+			// reconstruction chain itself is malformed and must continue to fail closed.
+			if (error instanceof TemporalError && error.code === 'CheckpointNotFound' && !(await runtime.store.getCommit(commitSha))) {
+				return runtime.queueIngestion(commitSha, () => runtime.ingestionService.ingestCommit(rootPath, commitSha, {}, token));
+			}
+			throw error;
+		}
 	}
 
 	async getEntityHistory(rootPath: string, entityId: string, token?: CancellationTokenLike): Promise<TemporalEntitySnapshot[]> {

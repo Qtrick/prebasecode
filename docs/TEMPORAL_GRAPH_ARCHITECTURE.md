@@ -1,6 +1,6 @@
-# PreBase Temporal Graph Architecture — Phase 2.6 Runtime Gate
+# PreBase Temporal Graph Architecture — Phase 2.7 Final Engine Gate
 
-This document defines the current architecture, verified repairs, and remaining blockers for **PreBase Temporal Graph Phase 2.6**. Phase 2 remains **In Progress** and Phase 3 UI work is not yet authorized.
+This document defines the current architecture, verified repairs, and remaining **Temporal-engine** blockers for **PreBase Temporal Graph Phase 2.7**. Phase 3 authorization depends on the Temporal engine gates in this document, not on unrelated PreBase beta or release acceptance work.
 
 ---
 
@@ -22,11 +22,11 @@ PreBase has **one active user-facing Code Graph mode**:
   - Separation of stable content records in `AnalysisManifest` from run diagnostics.
   - Query index lifecycle optimization (reused on view relayouts).
   - Magnus hidden canonical node query resolution (`resolveNodeFocusForMagnus`).
-- **Phase 2 (In Progress — Phase 2.6 Runtime Gate)**:
+- **Phase 2 (In Progress — Phase 2.7 Final Engine Gate)**:
   - Temporal entity lineage (cross-commit node and edge stability).
-  - Schema v4 SQLite persistence with immutable canonical states, commit occurrences, entity deletions, edge events, parse artifacts, refs, and the full parent DAG.
+  - Schema v5 SQLite persistence with immutable canonical states, sparse entity/edge transitions, parse artifacts, refs, and the full parent DAG.
   - Exact delta-base DAG reconstruction along the `baseCommitSha` ancestry chain with recomputed canonical digest verification.
-  - Fail-closed parent lineage reconstruction with prerequisite recursive indexing.
+  - Bounded on-demand indexing with explicit lineage coverage when an isolated checkpoint has no indexed parent.
   - Incremental AST analysis backed by persistent two-tier parse artifact caching (`TwoTierParseArtifactCache`).
   - Shared workbench Git history service (`IWorkbenchGitHistoryService`) with exact repository open/close/HEAD routing.
   - Per-repository isolated runtime (`TemporalRepositoryRuntime`) with sequential FIFO ingestion queue and in-flight request deduplication.
@@ -41,9 +41,9 @@ PreBase has **one active user-facing Code Graph mode**:
   - Graph Blame & Magnus Temporal conversational query tools.
 
 > [!WARNING]
-> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 3 remains blocked until the remaining ancestry/ref query, migration-fixture, runtime smoke, and operator OAuth acceptance gates below are green.
+> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 3 remains blocked only by remaining Temporal-engine work: bounded on-demand indexing, truthful segment lineage coverage, sparse persistence/scaling evidence, corruption recovery, and real desktop parser/runtime proof. OAuth, signing, general beta acceptance, and other operator-owned work remain valid PreBase beta/release gates but do not block the Temporal Phase 3 UI.
 
-### Phase 2.6 verified repairs and open gate
+### Phase 2.7 verified repairs and open gate
 
 Verified in this pass:
 
@@ -59,14 +59,14 @@ Verified in this pass:
 - HEAD, local/remote branches, and tags are observed into the shared immutable commit/state model.
 - Parser batches use a narrow `IChannel.call(..., cancellationToken)` server channel, carry cancellation into the utility process, and enforce item/source/batch limits without logging source text.
 - Parser worker disposal cancels active work, settles queued callers, and prevents worker recreation after disposal; unexpected termination is classified separately from launch failure.
-- Temporal IPC returns safe typed error DTOs, and a corruption discovered after open is quarantined/rebuilt once before a safe retry. Quarantine generation cleanup includes DB, WAL, and SHM companions.
+- Temporal IPC returns safe typed error DTOs, and a corruption discovered after open is quarantined/rebuilt once before a safe retry. Quarantine generation cleanup retains a bounded set of DB, WAL, and SHM generations together.
 - Timeline status reads request one batch of persisted commit metadata instead of reconstructing graphs or issuing per-row store reads.
 
 Still required before Phase 3:
 
 - Complete real desktop Network and Temporal acceptance with utility-process metrics (L1/L2 hits, worker parses, indexed commits, checkpoints, deltas, max delta depth, and database footprint).
-- Complete broader scale validation for sparse transition storage and long-history ingestion; Phase 2.6 removes `getAllCommits()` from the ingestion/reconstruction hot paths but does not make a Phase-3 UI claim.
-- Complete live warm/cold Google OAuth and Supabase operator acceptance; repository tests cannot substitute for provider-console evidence.
+- Complete broader scale validation for sparse transition storage and long-history ingestion; bounded on-demand indexing removes recursive root-history analysis but does not by itself make a Phase-3 UI claim.
+- Live Google OAuth and Supabase operator acceptance remain tracked in the PreBase beta backlog; they are not Temporal Phase 3 dependencies.
 
 ---
 

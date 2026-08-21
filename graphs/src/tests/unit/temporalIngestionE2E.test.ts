@@ -98,14 +98,11 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			const childSha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
 
 			const gitService = new CoordinatedGitHistoryService();
-			gitService.blockParent(parentSha);
 			const registry = createRegistry(async () => new SqliteTemporalStore({ dbPath }));
 			const temporalService = new TemporalGraphService(gitService, registry);
 
 			const childRequest = temporalService.ensureCommitIndexed(repoDir, childSha);
-			await gitService.parentReached;
 			const parentRequest = temporalService.ensureCommitIndexed(repoDir, parentSha);
-			gitService.releaseParent();
 
 			const [child, parent] = await Promise.all([childRequest, parentRequest]);
 			const store = await registry.getStore(repoDir, repoDir);
@@ -159,7 +156,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 
 			// Check status after ingestion
 			const statusAfter = await temporalService.getCommitIndexStatus(repoDir, c1);
-			assert.deepStrictEqual(statusAfter, { status: 'ready' });
+			assert.deepStrictEqual(statusAfter, { status: 'ready', lineageCoverage: { kind: 'complete' } });
 
 			// 2. Commit 2: Modify src/util.ts and add src/config.ts
 			fs.writeFileSync(path.join(repoDir, 'src/util.ts'), 'export const helper = () => "hello world!";\nexport const version = 2;', 'utf8');
@@ -279,7 +276,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			assert.strictEqual(parents[1], cFeature);
 			assert.deepStrictEqual(
 				(await temporalService.getEdgeLifecycleEventsAtRef(repoDir, featureEdgeId, cMerge)).map(event => [event.commitSha, event.eventKind]),
-				[[cFeature, 'present']],
+				[[cFeature, 'created']],
 				'An edge introduced on a non-first merge parent must remain visible through all-parent ancestry even when merge lineage assigns the reintroduced relation a new edge ID.',
 			);
 
@@ -349,10 +346,10 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 				featureEntities: [rootSha, featureSha],
 				mainLineage: [mainSha],
 				featureLineage: [featureSha],
-				mainEdges: [rootSha, mainSha],
+				mainEdges: [rootSha],
 				featureEdges: [rootSha],
-				mainLifecycle: [[rootSha, 'present'], [mainSha, 'present']],
-				featureLifecycle: [[rootSha, 'present'], [featureSha, 'removed']],
+				mainLifecycle: [[rootSha, 'created']],
+				featureLifecycle: [[rootSha, 'created'], [featureSha, 'removed']],
 			});
 			await registry.closeAll();
 		} finally {
@@ -607,7 +604,7 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 			}, repoA.repoDir);
 
 			const statusA = await temporalService.getCommitIndexStatus(repoA.repoDir, cA);
-			assert.deepStrictEqual(statusA, { status: 'ready' });
+			assert.deepStrictEqual(statusA, { status: 'ready', lineageCoverage: { kind: 'complete' } });
 
 			await registry.closeAll();
 		} finally {

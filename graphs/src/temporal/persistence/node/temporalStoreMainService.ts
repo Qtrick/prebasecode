@@ -21,6 +21,7 @@ function isSymbolicLink(candidate: string): boolean {
 }
 
 export class TemporalStoreMainService extends Disposable implements ITemporalStoreMainService {
+	private static readonly MAX_QUARANTINE_GENERATIONS = 3;
 	private readonly _stores = new Map<string, SqliteTemporalStore>();
 	private readonly _recoveryAttempted = new Set<string>();
 	private readonly _storageRoot: string;
@@ -106,12 +107,29 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 			}
 		}
 		const directory = path.dirname(dbPath);
-		const baseName = `${path.basename(dbPath)}.corrupt-`;
-		const quarantined = fs.readdirSync(directory)
-			.filter(name => name.startsWith(baseName))
-			.sort();
-		for (const name of quarantined.slice(0, Math.max(0, quarantined.length - 9))) {
-			fs.unlinkSync(path.join(directory, name));
+		const baseName = path.basename(dbPath);
+		const companionPrefixes = [`${baseName}.corrupt-`, `${baseName}-wal.corrupt-`, `${baseName}-shm.corrupt-`];
+		const quarantineGenerations = new Map<string, string[]>();
+		for (const name of fs.readdirSync(directory)) {
+			const prefix = companionPrefixes.find(candidate => name.startsWith(candidate));
+			if (!prefix) {
+				continue;
+			}
+			const generation = name.slice(prefix.length);
+			if (!generation || !/^\d+$/.test(generation)) {
+				continue;
+			}
+			const files = quarantineGenerations.get(generation) ?? [];
+			files.push(name);
+			quarantineGenerations.set(generation, files);
+		}
+		const staleGenerations = Array.from(quarantineGenerations.keys())
+			.sort((left, right) => left.length === right.length ? (left < right ? -1 : left > right ? 1 : 0) : left.length - right.length)
+			.slice(0, Math.max(0, quarantineGenerations.size - TemporalStoreMainService.MAX_QUARANTINE_GENERATIONS));
+		for (const generation of staleGenerations) {
+			for (const name of quarantineGenerations.get(generation) ?? []) {
+				fs.unlinkSync(path.join(directory, name));
+			}
 		}
 	}
 
@@ -204,6 +222,7 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 			case 'getAllCommits': return store.getAllCommits();
 			case 'getLatestCommit': return store.getLatestCommit();
 			case 'getCommitCoverage': return store.getCommitCoverage(args[0] as string);
+			case 'getCommitLineageCoverage': return store.getCommitLineageCoverage(args[0] as string);
 			case 'getCommitIndexMetadata': return store.getCommitIndexMetadata(args[0] as string[]);
 			case 'getCommitParents': return store.getCommitParents(args[0] as string);
 			case 'getCommitChildren': return store.getCommitChildren(args[0] as string);

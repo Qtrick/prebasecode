@@ -252,6 +252,48 @@ suite('SqliteTemporalStore', () => {
 		}
 	});
 
+	test('Electron-main store owner bounds DB, WAL, and SHM quarantine companions by generation', async () => {
+		const storageRoot = path.dirname(dbPath);
+		const mainService = new TemporalStoreMainService(storageRoot);
+		const ipcPath = path.join(storageRoot, 'generation-cleanup.db');
+		const baseName = path.basename(ipcPath);
+		const priorGenerations = ['1', '2', '3'];
+
+		try {
+			for (const generation of priorGenerations) {
+				for (const suffix of ['', '-wal', '-shm']) {
+					fs.writeFileSync(path.join(storageRoot, `${baseName}${suffix}.corrupt-${generation}`), generation, 'utf8');
+				}
+			}
+			fs.writeFileSync(ipcPath, 'derived cache', 'utf8');
+			fs.writeFileSync(`${ipcPath}-wal`, 'wal', 'utf8');
+			fs.writeFileSync(`${ipcPath}-shm`, 'shm', 'utf8');
+
+			const internals = mainService as unknown as { _quarantineDatabase(path: string): void };
+			internals._quarantineDatabase(ipcPath);
+
+			const quarantined = fs.readdirSync(storageRoot)
+				.filter(name => name.startsWith(`${baseName}.corrupt-`) || name.startsWith(`${baseName}-wal.corrupt-`) || name.startsWith(`${baseName}-shm.corrupt-`));
+			const generations = new Map<string, string[]>();
+			for (const name of quarantined) {
+				const generation = name.slice(name.lastIndexOf('.corrupt-') + '.corrupt-'.length);
+				const files = generations.get(generation) ?? [];
+				files.push(name);
+				generations.set(generation, files);
+			}
+
+			assert.strictEqual(generations.size, 3);
+			assert.strictEqual(generations.has('1'), false);
+			assert.strictEqual(generations.get('2')?.length, 3);
+			assert.strictEqual(generations.get('3')?.length, 3);
+			const newGenerations = Array.from(generations.entries()).filter(([generation]) => generation !== '2' && generation !== '3');
+			assert.strictEqual(newGenerations.length, 1);
+			assert.strictEqual(newGenerations[0][1].length, 3);
+		} finally {
+			mainService.dispose();
+		}
+	});
+
 	test('Electron-main store owner rejects nested and symlink database escapes', async function () {
 		const storageRoot = path.dirname(dbPath);
 		const mainService = new TemporalStoreMainService(storageRoot);
@@ -671,8 +713,7 @@ suite('SqliteTemporalStore', () => {
 		assert.strictEqual(history[0].path, 'src/main.ts');
 
 		const events = await store.getEntityLineageEvents('ent_main');
-		assert.strictEqual(events.length, 1);
-		assert.strictEqual(events[0].lineageCase, 'same-canonical-id');
+		assert.strictEqual(events.length, 0, 'Unchanged identity continuity is implicit and must not create a dense lineage event.');
 
 		// Verify edge retrieval
 		const edge = await store.getEdge('ent_main->ext_lib:imports');
