@@ -137,6 +137,7 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.1 & 3.2)', () => {
 		return {
 			getRepositories: () => [{ rootUri: workspaceFolderUri }],
 			getRepositoryIdentity: async () => ({ repositoryId: 'repo-mock-123' }),
+			getEmptyTree: async () => '4b825dc642cb6eb9a060e54bf8d69288fbee4904',
 			onDidChangeHead: onDidChangeHeadEmitter.event,
 			emitHeadChanged: (currentHead: string) => onDidChangeHeadEmitter.fire({ currentHead, repositoryId: 'repo-mock-123', timestamp: Date.now() }),
 		};
@@ -175,74 +176,20 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.1 & 3.2)', () => {
 	test('1. selectRef loads paged commit timeline, positions nodes, and selects HEAD', async () => {
 		const history: TemporalHistoryPage = {
 			commits: [
-				makeCommitSummary('commit-3', 'feat: add service', 3000, ['commit-2']),
-				makeCommitSummary('commit-2', 'fix: utils', 2000, ['commit-1']),
-				makeCommitSummary('commit-1', 'initial', 1000, [], true),
+				makeCommitSummary('commit-3', 'third', 3000, ['commit-2']),
+				makeCommitSummary('commit-2', 'second', 2000, ['commit-1']),
+				makeCommitSummary('commit-1', 'initial', 1000, []),
 			],
 			hasMore: false,
 		};
 
 		const entities: Record<string, TemporalEntitySnapshot[]> = {
-			'commit-3': [makeEntity('e1', 'src/a.ts', 'can-1')],
-			'commit-2': [makeEntity('e1', 'src/a.ts', 'can-1')],
+			'commit-3': [makeEntity('ent-1', 'src/a.ts', 'can-1'), makeEntity('ent-2', 'src/b.ts', 'can-2')],
+			'commit-2': [makeEntity('ent-1', 'src/a.ts', 'can-1')],
+			'commit-1': [makeEntity('ent-1', 'src/a.ts', 'can-1')],
 		};
 
-		const temporalGraphService = createMockTemporalGraphService({ HEAD: history, main: history }, entities);
-		const gitHistoryService = createMockGitHistoryService();
-		const commandService = createMockCommandService();
-		const editorService = createMockEditorService();
-
-		const service = new WorkbenchTemporalViewService(
-			mockWorkspaceService,
-			gitHistoryService as any,
-			temporalGraphService as any,
-			commandService as any,
-			editorService as any,
-			mockLogService,
-		);
-
-		await service.selectRef('main');
-
-		const state = service.getState();
-		assert.equal(state.selectedRef, 'main');
-		assert.equal(state.selectedCommitSha, 'commit-3');
-		assert.equal(state.compareBaseSha, 'commit-2', 'Default compare base for commit-3 must be first parent (commit-2)');
-		assert.equal(state.pagedTimeline.length, 3);
-		assert.equal(state.totalAvailableCommits, 3);
-		assert.equal(state.isSettled, true);
-		assert.ok(state.diff);
-		assert.equal(state.diff?.targetCommitSha, 'commit-3');
-		assert.equal(state.diff?.nodes.length, 1);
-		assert.ok(typeof state.diff?.nodes[0].x === 'number');
-		assert.ok(typeof state.diff?.nodes[0].y === 'number');
-	});
-
-	test('2. Multi-page cursor pagination loads > 50 commits without duplication or premature cutoff', async () => {
-		const page1Commits: TemporalCommitSummary[] = [];
-		for (let i = 120; i > 70; i--) {
-			page1Commits.push(makeCommitSummary(`sha-${i}`, `commit ${i}`, i * 1000, [`sha-${i - 1}`]));
-		}
-		const page2Commits: TemporalCommitSummary[] = [];
-		for (let i = 70; i > 20; i--) {
-			page2Commits.push(makeCommitSummary(`sha-${i}`, `commit ${i}`, i * 1000, [`sha-${i - 1}`]));
-		}
-		const page3Commits: TemporalCommitSummary[] = [];
-		for (let i = 20; i >= 1; i--) {
-			page3Commits.push(makeCommitSummary(`sha-${i}`, `commit ${i}`, i * 1000, i > 1 ? [`sha-${i - 1}`] : []));
-		}
-
-		const historyPages: Record<string, TemporalHistoryPage> = {
-			HEAD: { commits: page1Commits, hasMore: true, nextCursor: 'cursor-page-2' },
-			'cursor-page-2': { commits: page2Commits, hasMore: true, nextCursor: 'cursor-page-3' },
-			'cursor-page-3': { commits: page3Commits, hasMore: false },
-		};
-
-		const entities: Record<string, TemporalEntitySnapshot[]> = {
-			'sha-120': [makeEntity('e1', 'src/a.ts', 'can-1')],
-			'sha-119': [makeEntity('e1', 'src/a.ts', 'can-1')],
-		};
-
-		const temporalGraphService = createMockTemporalGraphService(historyPages, entities);
+		const temporalGraphService = createMockTemporalGraphService({ HEAD: history }, entities);
 		const gitHistoryService = createMockGitHistoryService();
 		const commandService = createMockCommandService();
 		const editorService = createMockEditorService();
@@ -258,42 +205,33 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.1 & 3.2)', () => {
 
 		await service.initialize();
 
-		// Page 1
-		let state = service.getState();
-		assert.equal(state.pagedTimeline.length, 50);
-		assert.equal(state.historyHasMore, true);
-		assert.equal(state.historyNextCursor, 'cursor-page-2');
+		const state = service.getState();
+		assert.equal(state.selectedRef, 'HEAD');
+		assert.equal(state.selectedCommitSha, 'commit-3');
+		assert.equal(state.renderedCommitSha, 'commit-3');
+		assert.equal(state.isLoadingSelection, false);
+		assert.equal(state.compareBaseSha, 'commit-2');
+		assert.equal(state.pagedTimeline.length, 3);
+		assert.equal(state.diff?.nodes.length, 2);
+		assert.equal(state.diff?.summary.addedCount, 1);
 
-		// Load Page 2
-		await service.loadMoreHistory();
-		state = service.getState();
-		assert.equal(state.pagedTimeline.length, 100);
-		assert.equal(state.historyHasMore, true);
-		assert.equal(state.historyNextCursor, 'cursor-page-3');
-
-		// Load Page 3
-		await service.loadMoreHistory();
-		state = service.getState();
-		assert.equal(state.pagedTimeline.length, 120);
-		assert.equal(state.historyHasMore, false);
-
-		// Deduplication check: all 120 SHAs must be unique
-		const shas = new Set(state.pagedTimeline.map(c => c.sha));
-		assert.equal(shas.size, 120);
+		service.dispose();
 	});
 
-	test('3. Base-Before-Target Indexing Order: base is indexed before target commit', async () => {
+	test('2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state', async () => {
 		const history: TemporalHistoryPage = {
 			commits: [
-				makeCommitSummary('target-sha', 'target', 2000, ['base-sha']),
-				makeCommitSummary('base-sha', 'base', 1000, []),
+				makeCommitSummary('commit-3', 'third', 3000, ['commit-2']),
+				makeCommitSummary('commit-2', 'second', 2000, ['commit-1']),
+				makeCommitSummary('commit-1', 'initial', 1000, []),
 			],
 			hasMore: false,
 		};
 
 		const entities: Record<string, TemporalEntitySnapshot[]> = {
-			'target-sha': [makeEntity('e1', 'src/a.ts', 'can-2')],
-			'base-sha': [makeEntity('e1', 'src/a.ts', 'can-1')],
+			'commit-3': [makeEntity('ent-1', 'src/a.ts', 'can-1')],
+			'commit-2': [makeEntity('ent-1', 'src/a.ts', 'can-1')],
+			'commit-1': [makeEntity('ent-1', 'src/a.ts', 'can-1')],
 		};
 
 		const temporalGraphService = createMockTemporalGraphService({ HEAD: history }, entities);
@@ -310,34 +248,89 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.1 & 3.2)', () => {
 			mockLogService,
 		);
 
-		await service.selectRef('HEAD');
+		await service.initialize();
 
-		// Check sequence of index/get calls
-		const baseIndex = temporalGraphService.indexingSequence.findIndex(s => s.includes('base-sha'));
-		const targetIndex = temporalGraphService.indexingSequence.findIndex(s => s.includes('target-sha'));
-		assert.ok(baseIndex >= 0, 'Base commit must be indexed');
-		assert.ok(targetIndex >= 0, 'Target commit must be indexed');
-		assert.ok(baseIndex < targetIndex, 'Base commit must be indexed BEFORE target commit');
+		// Rapid scrubs without immediate flag
+		service.selectCommit('commit-2');
+		assert.equal(service.getState().selectedCommitSha, 'commit-2');
+		assert.equal(service.getState().isLoadingSelection, true);
+
+		service.selectCommit('commit-1');
+		assert.equal(service.getState().selectedCommitSha, 'commit-1');
+		assert.equal(service.getState().isLoadingSelection, true);
+
+		// Wait for scrub debounce timer to fire
+		await new Promise(r => setTimeout(r, 160));
+
+		assert.equal(service.getState().selectedCommitSha, 'commit-1');
+		assert.equal(service.getState().renderedCommitSha, 'commit-1');
+		assert.equal(service.getState().isLoadingSelection, false);
+
+		service.dispose();
 	});
 
-	test('4. openSourceDiff invokes vscode.diff with exact Git extension URI contract', async () => {
+	test('3. Base-before-target indexing ordering & LRU diff cache', async () => {
 		const history: TemporalHistoryPage = {
 			commits: [
-				makeCommitSummary('target-sha-1234567890', 'mod file', 2000, ['base-sha-1234567890']),
+				makeCommitSummary('commit-target', 'feature', 2000, ['commit-base']),
+				makeCommitSummary('commit-base', 'base', 1000, []),
+			],
+			hasMore: false,
+		};
+
+		const entities: Record<string, TemporalEntitySnapshot[]> = {
+			'commit-target': [makeEntity('ent-1', 'src/a.ts', 'can-1'), makeEntity('ent-2', 'src/b.ts', 'can-2')],
+			'commit-base': [makeEntity('ent-1', 'src/a.ts', 'can-1')],
+		};
+
+		const temporalGraphService = createMockTemporalGraphService({ HEAD: history }, entities);
+		const gitHistoryService = createMockGitHistoryService();
+		const commandService = createMockCommandService();
+		const editorService = createMockEditorService();
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			gitHistoryService as any,
+			temporalGraphService as any,
+			commandService as any,
+			editorService as any,
+			mockLogService,
+		);
+
+		await service.initialize();
+
+		// Check indexing order: base was queried before target!
+		const seq = temporalGraphService.indexingSequence;
+		const baseIdx = seq.indexOf('get:commit-base');
+		const targetIdx = seq.indexOf('get:commit-target');
+		assert.ok(baseIdx !== -1 && targetIdx !== -1);
+		assert.ok(baseIdx < targetIdx, `Base commit must be indexed before target commit (base=${baseIdx}, target=${targetIdx})`);
+
+		// Selecting same commit again should hit LRU cache without re-indexing
+		const initialCount = temporalGraphService.entityQueryCount;
+		await service.selectCommit('commit-target', { immediate: true });
+		assert.equal(temporalGraphService.entityQueryCount, initialCount, 'Cache hit should not re-query entity graphs');
+
+		service.dispose();
+	});
+
+	test('4. openSourceDiff constructs valid Git resource URIs for added, removed, and modified files with getEmptyTree', async () => {
+		const history: TemporalHistoryPage = {
+			commits: [
+				makeCommitSummary('target-sha-1234567890', 'target', 2000, ['base-sha-1234567890']),
+				makeCommitSummary('base-sha-1234567890', 'base', 1000, []),
 			],
 			hasMore: false,
 		};
 
 		const entities: Record<string, TemporalEntitySnapshot[]> = {
 			'target-sha-1234567890': [
-				makeEntity('ent-mod', 'src/modified.ts', 'can-v2'),
 				makeEntity('ent-added', 'src/added.ts', 'can-add'),
-				makeEntity('ent-renamed', 'src/newPath.ts', 'can-v2'),
+				makeEntity('ent-modified', 'src/mod.ts', 'can-mod-v2'),
 			],
 			'base-sha-1234567890': [
-				makeEntity('ent-mod', 'src/modified.ts', 'can-v1'),
-				makeEntity('ent-removed', 'src/deleted.ts', 'can-del'),
-				makeEntity('ent-renamed', 'src/oldPath.ts', 'can-v1'),
+				makeEntity('ent-removed', 'src/removed.ts', 'can-rem'),
+				makeEntity('ent-modified', 'src/mod.ts', 'can-mod-v1'),
 			],
 		};
 
@@ -355,27 +348,25 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.1 & 3.2)', () => {
 			mockLogService,
 		);
 
-		await service.selectRef('HEAD');
-
-		// Test modified file diff
-		await service.openSourceDiff('ent-mod');
-		assert.equal(commandService.executedCommands.length, 1);
-		let diffCall = commandService.executedCommands[0];
-		assert.equal(diffCall.command, 'vscode.diff');
-		let [baseUri, targetUri, title] = diffCall.args;
-
-		assert.equal(baseUri.scheme, 'git');
-		assert.equal(JSON.parse(baseUri.query).ref, 'base-sha-1234567890');
-		assert.equal(targetUri.scheme, 'git');
-		assert.equal(JSON.parse(targetUri.query).ref, 'target-sha-1234567890');
-		assert.ok(title.includes('modified.ts'));
+		await service.initialize();
 
 		// Test added file diff (empty left)
 		await service.openSourceDiff('ent-added');
+		assert.equal(commandService.executedCommands.length, 1);
+		let diffCall = commandService.executedCommands[0];
+		assert.equal(diffCall.command, 'vscode.diff');
+		let [baseUri, targetUri] = diffCall.args;
+		assert.equal(baseUri.scheme, 'git');
+		assert.equal(JSON.parse(baseUri.query).ref, '4b825dc642cb6eb9a060e54bf8d69288fbee4904', 'Added file left side must be empty tree git ref');
+		assert.equal(targetUri.scheme, 'git');
+		assert.equal(JSON.parse(targetUri.query).ref, 'target-sha-1234567890');
+
+		// Test modified file diff
+		await service.openSourceDiff('ent-modified');
 		diffCall = commandService.executedCommands[1];
 		[baseUri, targetUri] = diffCall.args;
 		assert.equal(baseUri.scheme, 'git');
-		assert.equal(JSON.parse(baseUri.query).ref, '~', 'Added file left side must be empty git ref');
+		assert.equal(JSON.parse(baseUri.query).ref, 'base-sha-1234567890');
 		assert.equal(targetUri.scheme, 'git');
 		assert.equal(JSON.parse(targetUri.query).ref, 'target-sha-1234567890');
 
@@ -386,7 +377,9 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.1 & 3.2)', () => {
 		assert.equal(baseUri.scheme, 'git');
 		assert.equal(JSON.parse(baseUri.query).ref, 'base-sha-1234567890');
 		assert.equal(targetUri.scheme, 'git');
-		assert.equal(JSON.parse(targetUri.query).ref, '~', 'Removed file right side must be empty git ref');
+		assert.equal(JSON.parse(targetUri.query).ref, '4b825dc642cb6eb9a060e54bf8d69288fbee4904', 'Removed file right side must be empty tree git ref');
+
+		service.dispose();
 	});
 
 	test('5. openHistoricalFile opens revision at selected commit via EditorService', async () => {
@@ -422,6 +415,8 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.1 & 3.2)', () => {
 		const opened = editorService.openedEditors[0];
 		assert.equal(opened.resource.scheme, 'git');
 		assert.equal(JSON.parse(opened.resource.query).ref, 'commit-historical');
+
+		service.dispose();
 	});
 
 	test('6. Display mode and entity selection isolation', async () => {
@@ -460,6 +455,119 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.1 & 3.2)', () => {
 		assert.equal(service.getState().selectedEntityId, 'ent-1');
 		service.selectEntity(undefined);
 		assert.equal(service.getState().selectedEntityId, undefined);
+
+		service.dispose();
+	});
+
+	test('7. Multi-repository ownership and switchRepository', async () => {
+		const historyRepoA: TemporalHistoryPage = {
+			commits: [makeCommitSummary('commit-a1', 'repo a commit', 1000, [])],
+			hasMore: false,
+		};
+		const historyRepoB: TemporalHistoryPage = {
+			commits: [makeCommitSummary('commit-b1', 'repo b commit', 2000, [])],
+			hasMore: false,
+		};
+
+		const entities: Record<string, TemporalEntitySnapshot[]> = {
+			'commit-a1': [makeEntity('ent-a', 'src/a.ts', 'can-a')],
+			'commit-b1': [makeEntity('ent-b', 'src/b.ts', 'can-b')],
+		};
+
+		const temporalGraphService = {
+			getRepositoryRefs: async () => [],
+			getHistoryPage: async (root: string) => {
+				return root.includes('repoB') ? historyRepoB : historyRepoA;
+			},
+			getCommitIndexStatus: async () => ({ status: 'ready' as const }),
+			getGraphAtCommit: async (_root: string, sha: string) => ({
+				commitSha: sha,
+				timestamp: Date.now(),
+				isCheckpoint: false,
+				entityMap: new Map((entities[sha] || []).map(e => [e.entityId, e])),
+				edgeMap: new Map(),
+				pathToEntityId: new Map(),
+				graphData: { nodes: [], edges: [], timestamp: Date.now() },
+				schemaVersion: 1,
+				analyzerVersion: 1,
+				profileVersion: 1,
+			}),
+		};
+
+		const gitHistoryService = {
+			getRepositories: () => [
+				{ rootUri: URI.file('/mock/repoA') },
+				{ rootUri: URI.file('/mock/repoB') },
+			],
+			getRepositoryIdentity: async (root: string) => ({ repositoryId: root }),
+			getEmptyTree: async () => '4b825dc642cb6eb9a060e54bf8d69288fbee4904',
+			onDidChangeHead: new Emitter<any>().event,
+		};
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			gitHistoryService as any,
+			temporalGraphService as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+		);
+
+		await service.initialize();
+
+		assert.equal(service.getState().availableRepositories.length, 2);
+		assert.equal(service.getState().selectedCommitSha, 'commit-a1');
+
+		await service.switchRepository('/mock/repoB');
+		assert.equal(service.getState().activeRepositoryRoot, '/mock/repoB');
+		assert.equal(service.getState().selectedCommitSha, 'commit-b1');
+
+		service.dispose();
+	});
+
+	test('8. Arbitrary comparison base: setCompareBase triggers diff against custom base', async () => {
+		const history: TemporalHistoryPage = {
+			commits: [
+				makeCommitSummary('commit-head', 'head', 3000, ['commit-p1', 'commit-p2']),
+				makeCommitSummary('commit-p1', 'parent 1', 2000, []),
+				makeCommitSummary('commit-p2', 'parent 2', 2000, []),
+				makeCommitSummary('commit-old', 'old branch', 1000, []),
+			],
+			hasMore: false,
+		};
+
+		const entities: Record<string, TemporalEntitySnapshot[]> = {
+			'commit-head': [makeEntity('ent-1', 'src/a.ts', 'can-1'), makeEntity('ent-2', 'src/b.ts', 'can-2')],
+			'commit-p1': [makeEntity('ent-1', 'src/a.ts', 'can-1')],
+			'commit-p2': [makeEntity('ent-2', 'src/b.ts', 'can-2')],
+			'commit-old': [],
+		};
+
+		const temporalGraphService = createMockTemporalGraphService({ HEAD: history }, entities);
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			temporalGraphService as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+		);
+
+		await service.initialize();
+		assert.equal(service.getState().comparisonMode, 'first-parent');
+		assert.equal(service.getState().compareBaseSha, 'commit-p1');
+
+		// Switch to explicit second parent
+		await service.setCompareBase('commit-p2');
+		assert.equal(service.getState().comparisonMode, 'explicit-parent');
+		assert.equal(service.getState().compareBaseSha, 'commit-p2');
+		assert.equal(service.getState().diff?.summary.addedCount, 1); // ent-1 was added relative to p2
+
+		// Switch to arbitrary old commit
+		await service.setCompareBase('commit-old');
+		assert.equal(service.getState().comparisonMode, 'arbitrary');
+		assert.equal(service.getState().compareBaseSha, 'commit-old');
+		assert.equal(service.getState().diff?.summary.addedCount, 2); // both ent-1 and ent-2 are added relative to old
 
 		service.dispose();
 	});

@@ -38,8 +38,8 @@ export interface IPeekGraphNodeDescriptionResult {
 
 export interface IPreBaseGraphDescriptionService {
 	readonly _serviceBrand: undefined;
-	peekCachedDescription(node: GraphNode): IPeekGraphNodeDescriptionResult;
-	describeNode(node: GraphNode, token?: CancellationToken, options?: { force?: boolean }): Promise<IGraphNodeDescriptionResult>;
+	peekCachedDescription(node: GraphNode, context?: { projectRoot?: string; contentIdentity?: string }): IPeekGraphNodeDescriptionResult;
+	describeNode(node: GraphNode, token?: CancellationToken, options?: { force?: boolean; projectRoot?: string; contentIdentity?: string }): Promise<IGraphNodeDescriptionResult>;
 	clearCache(): void;
 }
 
@@ -261,11 +261,21 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		}
 	}
 
-	private _getFolderForNode(node: GraphNode): IWorkspaceFolder | undefined {
+	private _getFolderForNode(node: GraphNode, projectRoot?: string): IWorkspaceFolder | undefined {
 		const workspace = this.workspaceContextService?.getWorkspace?.();
 		const folders = workspace?.folders || [];
 		if (!folders.length) {
 			return undefined;
+		}
+		if (projectRoot) {
+			const normalizedProjectRoot = projectRoot.replace(/\\/g, '/').replace(/\/$/, '');
+			const rootMatch = folders.find(f => {
+				const fPath = (f.uri.fsPath || f.uri.path).replace(/\\/g, '/').replace(/\/$/, '');
+				return fPath === normalizedProjectRoot;
+			});
+			if (rootMatch) {
+				return rootMatch;
+			}
 		}
 		if (folders.length === 1 || !node.path) {
 			return folders[0];
@@ -329,12 +339,12 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		this._inflight.clear();
 	}
 
-	peekCachedDescription(node: GraphNode): IPeekGraphNodeDescriptionResult {
+	peekCachedDescription(node: GraphNode, context?: { projectRoot?: string; contentIdentity?: string }): IPeekGraphNodeDescriptionResult {
 		const relative = this._safeRelativePath(node.path || node.label);
 		if (!relative || SENSITIVE.test(relative) || SENSITIVE_DIRS.test(relative)) {
 			return { cached: false };
 		}
-		const folder = this._getFolderForNode(node);
+		const folder = this._getFolderForNode(node, context?.projectRoot);
 		if (!folder) {
 			return { cached: false };
 		}
@@ -359,8 +369,9 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					};
 				}
 			}
-			const nodeContentHash = (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentHash
+			const nodeContentHash = context?.contentIdentity
 				|| (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentIdentity
+				|| (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentHash
 				|| (node as any).contentHash;
 			if (nodeContentHash && entry.sourceFingerprint === String(nodeContentHash)) {
 				const expectedFingerprint = computePromptSemanticFingerprint(relative, nodeLayer, nodeImports, String(nodeContentHash));
@@ -379,7 +390,19 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		return { cached: false };
 	}
 
-	async describeNode(node: GraphNode, token?: CancellationToken, options?: { force?: boolean }): Promise<IGraphNodeDescriptionResult> {
+	async describeNode(
+		node: GraphNode,
+		tokenOrOptions?: CancellationToken | { force?: boolean; projectRoot?: string; contentIdentity?: string },
+		maybeOptions?: { force?: boolean; projectRoot?: string; contentIdentity?: string }
+	): Promise<IGraphNodeDescriptionResult> {
+		let token: CancellationToken | undefined;
+		let options: { force?: boolean; projectRoot?: string; contentIdentity?: string } | undefined;
+		if (tokenOrOptions && typeof (tokenOrOptions as any).onCancellationRequested === 'function') {
+			token = tokenOrOptions as CancellationToken;
+			options = maybeOptions;
+		} else {
+			options = (tokenOrOptions as { force?: boolean; projectRoot?: string; contentIdentity?: string }) || maybeOptions;
+		}
 		const overview = inferFileDescription(node);
 		const relative = this._safeRelativePath(node.path || node.label);
 		if (!relative) {
@@ -389,7 +412,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			return { overview, aiStatus: 'skipped', aiMessage: localize('prebase.desc.skipped', "AI description skipped for this sensitive or binary file."), cacheHit: false };
 		}
 
-		const folder = this._getFolderForNode(node);
+		const folder = this._getFolderForNode(node, options?.projectRoot);
 		if (!folder) {
 			return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.noWorkspace', "Open a project to generate AI descriptions."), cacheHit: false };
 		}
@@ -435,8 +458,9 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			const fileGenAtStart = this._fileGeneration.get(cacheKey) || 0;
 			try {
 				let content = '';
-				const nodeContentHash = (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentHash
+				const nodeContentHash = options?.contentIdentity
 					|| (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentIdentity
+					|| (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentHash
 					|| (node as any).contentHash;
 
 				let contentHash = nodeContentHash ? String(nodeContentHash) : '0';

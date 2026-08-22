@@ -315,6 +315,18 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 		return this._proxy.$checkIgnore(handle, paths);
 	}
 
+	async getEmptyTree(root: URI, token?: CancellationToken): Promise<string> {
+		const handle = this._repositoryHandles.get(root);
+		if (handle === undefined) {
+			return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+		}
+		const result = await this._proxy.$getEmptyTree(handle, token);
+		if (!result.success || !result.data) {
+			return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+		}
+		return result.data;
+	}
+
 	async $onDidChangeRepository(handle: number): Promise<void> {
 		const repository = this._repositories.get(handle);
 		if (!repository) {

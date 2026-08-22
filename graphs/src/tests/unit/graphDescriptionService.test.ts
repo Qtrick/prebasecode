@@ -677,5 +677,104 @@ suite('PreBaseGraphDescriptionService (Unit - v9 File-Aware Cache)', () => {
 		assert.equal(aiCallCount, 2);
 		assert.equal(resNew.cacheHit, false);
 	});
+
+	test('11. contentIdentity cache match returns cached description without file read or AI invocation', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		let aiCallCount = 0;
+		const mockCommandService = {
+			executeCommand: async (cmd: string, args: any) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCallCount++;
+					return { text: `Described ${args.path}`, status: 'ready' };
+				}
+				return undefined;
+			},
+		} as any;
+
+		const fileService = createMockFileService({
+			'file:///mock/workspace/src/sample.ts': 'export const x = 42;'
+		});
+
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			fileService as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const node: GraphNode = { id: 'n1', label: 'src/sample.ts', path: 'src/sample.ts', kind: 'file' };
+		const firstDesc = await service.describeNode(node);
+		assert.equal(aiCallCount, 1);
+		assert.ok(firstDesc.aiDescription);
+
+		// Now query peekCachedDescription and describeNode with matching contentIdentity
+		const peek = service.peekCachedDescription(node, { projectRoot: '/mock/workspace' });
+		assert.equal(peek.cached, true);
+		assert.equal(peek.description, firstDesc.aiDescription);
+
+		const secondDesc = await service.describeNode(node, undefined, { projectRoot: '/mock/workspace' });
+		assert.equal(aiCallCount, 1, 'AI must not be called on cache hit');
+		assert.equal(secondDesc.cacheHit, true);
+	});
+
+	test('12. Explicit projectRoot isolates identical relative paths across workspace folders', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		const folderA_Uri = URI.parse('file:///workspace/rootA');
+		const folderB_Uri = URI.parse('file:///workspace/rootB');
+
+		const folderA = { uri: folderA_Uri, name: 'rootA', index: 0, toResource: (rel: string) => URI.joinPath(folderA_Uri, rel) };
+		const folderB = { uri: folderB_Uri, name: 'rootB', index: 1, toResource: (rel: string) => URI.joinPath(folderB_Uri, rel) };
+
+		const multiRootContext = {
+			getWorkspace: () => ({ folders: [folderA, folderB] }),
+			getWorkspaceFolder: (uri: URI) => {
+				const s = uri.toString();
+				if (s.startsWith(folderA_Uri.toString())) return folderA;
+				if (s.startsWith(folderB_Uri.toString())) return folderB;
+				return undefined;
+			},
+		} as any;
+
+		let aiCallCount = 0;
+		const mockCommandService = {
+			executeCommand: async (cmd: string, args: any) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCallCount++;
+					return { text: `Desc for ${args.path}`, status: 'ready' };
+				}
+				return undefined;
+			},
+		} as any;
+
+		const fileService = createMockFileService();
+		const service = new PreBaseGraphDescriptionService(
+			multiRootContext,
+			fileService as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const node: GraphNode = { id: 'common', label: 'src/main.ts', path: 'src/main.ts', kind: 'file' };
+
+		// Describe for Root A
+		await service.describeNode(node, undefined, { projectRoot: '/workspace/rootA' });
+		assert.equal(aiCallCount, 1);
+
+		// Describe for Root B with same relative path -> must not reuse Root A's cache blindly without checking Root B
+		await service.describeNode(node, undefined, { projectRoot: '/workspace/rootB' });
+		assert.equal(aiCallCount, 2);
+	});
 });
 

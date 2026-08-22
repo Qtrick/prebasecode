@@ -53,6 +53,8 @@ const tests = [
 	'graphs/src/tests/unit/temporalStructuralDiff.test.ts',
 	'graphs/src/tests/unit/temporalLayoutEngine.test.ts',
 	'graphs/src/tests/unit/workbenchTemporalViewService.test.ts',
+	'graphs/src/tests/unit/graphEditorTemporalWebview.test.ts',
+	'graphs/src/tests/unit/temporalDesktopAcceptance.test.ts',
 ];
 
 for (const test of tests) {

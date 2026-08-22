@@ -19,6 +19,7 @@ import {
 	type TemporalCommitSummary,
 	type TemporalStructuralDiff,
 	type TemporalDisplayMode,
+	type TemporalRepositoryDescriptor,
 } from '../../../temporal/view/temporalViewTypes.js';
 import { computeTemporalStructuralDiff } from '../../../temporal/view/temporalStructuralDiff.js';
 import { layoutTemporalGraph } from '../../../temporal/view/temporalLayoutEngine.js';
@@ -46,12 +47,17 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private readonly _onDidChangeDiff = this._register(new Emitter<TemporalStructuralDiff>());
 	readonly onDidChangeDiff: Event<TemporalStructuralDiff> = this._onDidChangeDiff.event;
 
+	private _availableRepositories: TemporalRepositoryDescriptor[] = [];
 	private _activeRepositoryId?: string;
 	private _activeRepositoryRoot?: string;
 	private _repositoryRefs: TemporalRepositoryRef[] = [];
 	private _selectedRef: string = 'HEAD';
 	private _selectedCommitSha: string = '';
+	private _renderedCommitSha?: string;
+	private _isLoadingSelection: boolean = false;
+	private _selectionError?: string;
 	private _compareBaseSha?: string;
+	private _customCompareBase?: string;
 	private _comparisonMode: 'first-parent' | 'explicit-parent' | 'arbitrary' = 'first-parent';
 	private _followHead: boolean = true;
 	private _displayMode: TemporalDisplayMode = 'changes';
@@ -62,6 +68,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private _loadedCommitCount: number = 0;
 	private _historyHasMore: boolean = false;
 	private _historyNextCursor?: string;
+	private _isLoadingMoreHistory: boolean = false;
 	private _isSettled: boolean = false;
 	private _isPartialLineage: boolean = false;
 	private _currentDiff?: TemporalStructuralDiff;
@@ -69,8 +76,10 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private readonly _positions = new Map<string, { x: number; y: number }>();
 	private readonly _diffCache = new Map<string, TemporalStructuralDiff>();
 	private _scrubTimer: any = undefined;
-	private _activeCts?: CancellationTokenSource;
+	private _historyGenerationToken: number = 0;
+	private _historyCts?: CancellationTokenSource;
 	private _generationToken: number = 0;
+	private _activeCts?: CancellationTokenSource;
 	private _initPromise?: Promise<void>;
 
 	constructor(
@@ -93,6 +102,10 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 		if (this._workspaceContextService?.onDidChangeWorkspaceFolders) {
 			this._register(this._workspaceContextService.onDidChangeWorkspaceFolders(() => {
+				this._activeRepositoryRoot = undefined;
+				this._activeRepositoryId = undefined;
+				this._diffCache.clear();
+				this._positions.clear();
 				void this.refresh();
 			}));
 		}
@@ -100,12 +113,17 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 	getState(): ITemporalViewState {
 		return {
+			availableRepositories: this._availableRepositories,
 			activeRepositoryId: this._activeRepositoryId,
 			activeRepositoryRoot: this._activeRepositoryRoot,
 			repositoryRefs: this._repositoryRefs,
 			selectedRef: this._selectedRef,
 			selectedCommitSha: this._selectedCommitSha,
+			renderedCommitSha: this._renderedCommitSha,
+			isLoadingSelection: this._isLoadingSelection,
+			selectionError: this._selectionError,
 			compareBaseSha: this._compareBaseSha,
+			customCompareBase: this._customCompareBase,
 			comparisonMode: this._comparisonMode,
 			followHead: this._followHead,
 			displayMode: this._displayMode,
@@ -122,18 +140,53 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		};
 	}
 
+	private _updateAvailableRepositories(): void {
+		const repos: TemporalRepositoryDescriptor[] = [];
+		try {
+			if (this._gitHistoryService?.getRepositories) {
+				const gitRepos = this._gitHistoryService.getRepositories();
+				for (const r of gitRepos) {
+					const rootPath = r.rootUri.fsPath || r.rootUri.path;
+					const label = getBaseName(rootPath);
+					repos.push({
+						id: r.rootUri.toString(),
+						rootUri: rootPath,
+						label,
+					});
+				}
+			}
+		} catch {
+			// ignore git history service query failure
+		}
+
+		if (repos.length === 0) {
+			const workspace = this._workspaceContextService.getWorkspace();
+			const folders = workspace?.folders || [];
+			for (const f of folders) {
+				const rootPath = f.uri.fsPath || f.uri.path;
+				repos.push({
+					id: f.uri.toString(),
+					rootUri: rootPath,
+					label: f.name || getBaseName(rootPath),
+				});
+			}
+		}
+
+		this._availableRepositories = repos;
+	}
+
 	private _getActiveRepoRoot(): string | undefined {
 		if (this._activeRepositoryRoot) {
 			return this._activeRepositoryRoot;
 		}
-		const workspace = this._workspaceContextService.getWorkspace();
-		const firstFolder = workspace?.folders?.[0];
-		if (!firstFolder) {
-			return undefined;
+		this._updateAvailableRepositories();
+		if (this._availableRepositories.length > 0) {
+			const first = this._availableRepositories[0];
+			this._activeRepositoryRoot = first.rootUri;
+			this._activeRepositoryId = first.id;
+			return first.rootUri;
 		}
-		const root = firstFolder.uri.fsPath || firstFolder.uri.path;
-		this._activeRepositoryRoot = root;
-		return root;
+		return undefined;
 	}
 
 	async initialize(): Promise<void> {
@@ -148,9 +201,48 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 	}
 
+	async switchRepository(repoRoot: string): Promise<void> {
+		if (!repoRoot || repoRoot === this._activeRepositoryRoot) {
+			return;
+		}
+
+		if (this._scrubTimer) {
+			clearTimeout(this._scrubTimer);
+			this._scrubTimer = undefined;
+		}
+		this._historyCts?.cancel();
+		this._historyCts?.dispose();
+		this._historyCts = undefined;
+		this._activeCts?.cancel();
+		this._activeCts?.dispose();
+		this._activeCts = undefined;
+
+		this._historyGenerationToken++;
+		this._generationToken++;
+
+		this._activeRepositoryRoot = repoRoot;
+		this._diffCache.clear();
+		this._positions.clear();
+		this._pagedTimeline = [];
+		this._loadedCommitCount = 0;
+		this._historyNextCursor = undefined;
+		this._historyHasMore = false;
+		this._selectedCommitSha = '';
+		this._renderedCommitSha = undefined;
+		this._isLoadingSelection = false;
+		this._selectionError = undefined;
+		this._currentDiff = undefined;
+		this._compareBaseSha = undefined;
+		this._customCompareBase = undefined;
+
+		await this.initialize();
+	}
+
 	private async _doInitialize(): Promise<void> {
+		this._updateAvailableRepositories();
 		const root = this._getActiveRepoRoot();
 		if (!root) {
+			this._notifyStateChanged();
 			return;
 		}
 
@@ -177,7 +269,6 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	async selectRef(refName: string): Promise<void> {
 		this._selectedRef = refName;
 		if (refName !== 'HEAD' && refName !== '') {
-			// If browsing a specific branch or tag, do not automatically jump with live HEAD changes
 			this._followHead = false;
 		}
 
@@ -185,6 +276,12 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		if (!root) {
 			return;
 		}
+
+		const currentGen = ++this._historyGenerationToken;
+		this._historyCts?.cancel();
+		this._historyCts?.dispose();
+		const cts = new CancellationTokenSource();
+		this._historyCts = cts;
 
 		try {
 			// Refresh refs in background
@@ -197,12 +294,20 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				// retain existing refs
 			}
 
+			if (cts.token.isCancellationRequested || this._historyGenerationToken !== currentGen) {
+				return;
+			}
+
 			// Reset pagination state for new ref
 			this._historyNextCursor = undefined;
 			const historyPage = await this._temporalGraphService.getHistoryPage(root, {
 				ref: refName,
 				pageSize: PAGE_SIZE,
 			});
+
+			if (cts.token.isCancellationRequested || this._historyGenerationToken !== currentGen) {
+				return;
+			}
 
 			this._historyHasMore = Boolean(historyPage.hasMore);
 			this._historyNextCursor = historyPage.nextCursor;
@@ -227,25 +332,41 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				await this.selectCommit(headSha, { immediate: true });
 			} else {
 				this._selectedCommitSha = '';
+				this._renderedCommitSha = undefined;
+				this._isLoadingSelection = false;
 				this._currentDiff = undefined;
 				this._notifyStateChanged();
 			}
 		} catch (err) {
-			this._logService.error('[WorkbenchTemporalViewService] Failed to load commit history for ref:', refName, err);
+			if (!cts.token.isCancellationRequested && this._historyGenerationToken === currentGen) {
+				this._logService.error('[WorkbenchTemporalViewService] Failed to load commit history for ref:', refName, err);
+			}
+		} finally {
+			if (this._historyCts === cts) {
+				this._historyCts = undefined;
+			}
+			cts.dispose();
 		}
 	}
 
 	async loadMoreHistory(): Promise<void> {
 		const root = this._getActiveRepoRoot();
-		if (!root || !this._historyHasMore || !this._historyNextCursor) {
+		if (!root || !this._historyHasMore || !this._historyNextCursor || this._isLoadingMoreHistory) {
 			return;
 		}
+
+		this._isLoadingMoreHistory = true;
+		const currentGen = this._historyGenerationToken;
 
 		try {
 			const historyPage = await this._temporalGraphService.getHistoryPage(root, {
 				cursor: this._historyNextCursor,
 				pageSize: PAGE_SIZE,
 			});
+
+			if (this._historyGenerationToken !== currentGen) {
+				return;
+			}
 
 			const existingShas = new Set(this._pagedTimeline.map(c => c.sha));
 			const newItems = historyPage.commits
@@ -271,6 +392,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			this._notifyStateChanged();
 		} catch (err) {
 			this._logService.error('[WorkbenchTemporalViewService] Failed to load more history:', err);
+		} finally {
+			this._isLoadingMoreHistory = false;
 		}
 	}
 
@@ -280,11 +403,17 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 
 		this._selectedCommitSha = commitSha;
+		this._isLoadingSelection = true;
+		this._selectionError = undefined;
+
 		if (options?.compareBaseSha !== undefined) {
 			this._compareBaseSha = options.compareBaseSha;
+			this._customCompareBase = options.compareBaseSha;
+			this._comparisonMode = 'arbitrary';
+		} else if (this._customCompareBase) {
+			this._compareBaseSha = this._customCompareBase;
 			this._comparisonMode = 'arbitrary';
 		} else {
-			// Default compare base to first parent of the selected commit
 			const commit = this._pagedTimeline.find(c => c.sha === commitSha);
 			this._compareBaseSha = commit?.parents?.[0];
 			this._comparisonMode = 'first-parent';
@@ -297,7 +426,6 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			}
 			await this._reconstructDiffForSelection(commitSha, this._compareBaseSha);
 		} else {
-			// Rapid scrub debouncing
 			if (this._scrubTimer) {
 				clearTimeout(this._scrubTimer);
 			}
@@ -311,6 +439,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 	async setCompareBase(compareBaseSha: string | undefined): Promise<void> {
 		this._compareBaseSha = compareBaseSha;
+		this._customCompareBase = compareBaseSha;
 		const commit = this._pagedTimeline.find(c => c.sha === this._selectedCommitSha);
 		if (compareBaseSha === commit?.parents?.[0]) {
 			this._comparisonMode = 'first-parent';
@@ -334,6 +463,10 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 	setFollowHead(follow: boolean): void {
 		this._followHead = follow;
+		if (follow && this._selectedRef !== 'HEAD') {
+			void this.selectRef('HEAD');
+			return;
+		}
 		this._notifyStateChanged();
 	}
 
@@ -350,16 +483,20 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private async _reconstructDiffForSelection(targetSha: string, baseSha?: string): Promise<void> {
 		const root = this._getActiveRepoRoot();
 		if (!root) {
+			this._isLoadingSelection = false;
+			this._notifyStateChanged();
 			return;
 		}
 
-		const cachePrefix = `${targetSha}..${baseSha || 'root'}`;
+		const cachePrefix = `${this._activeRepositoryId || root}::${targetSha}..${baseSha || 'root'}`;
 		const cached = this._diffCache.get(cachePrefix);
 		if (cached) {
-			// Move to most recently used in LRU
 			this._diffCache.delete(cachePrefix);
 			this._diffCache.set(cachePrefix, cached);
 
+			this._renderedCommitSha = targetSha;
+			this._isLoadingSelection = false;
+			this._selectionError = undefined;
 			this._currentDiff = cached;
 			this._isSettled = true;
 			this._isPartialLineage = cached.isPartialLineage;
@@ -375,8 +512,6 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		this._activeCts = cts;
 
 		try {
-			// Step 1: Base-Before-Target Indexing Ordering (Part VI)
-			// Ensure base commit is indexed first if specified, so target can establish full parent lineage
 			let baseEntities: readonly TemporalEntitySnapshot[] | undefined;
 			let baseEdges: readonly TemporalEdgeSnapshot[] | undefined;
 
@@ -395,7 +530,6 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				return;
 			}
 
-			// Step 2: Ensure target commit is indexed against the now-present base
 			const targetPreStatus = await this._temporalGraphService.getCommitIndexStatus(root, targetSha, cts.token);
 			const isTargetReady = targetPreStatus.status === 'ready' || targetPreStatus.status === 'incomplete';
 
@@ -410,14 +544,10 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				return;
 			}
 
-			// Step 3: Refresh index status after indexing to reflect final reconciled status
 			const finalTargetStatus = await this._temporalGraphService.getCommitIndexStatus(root, targetSha, cts.token);
 			const isFinalReady = finalTargetStatus.status === 'ready' || finalTargetStatus.status === 'incomplete';
-			this._isSettled = isFinalReady;
 			const isPartial = finalTargetStatus.lineageCoverage?.kind === 'partial';
-			this._isPartialLineage = isPartial;
 
-			// Step 4: Pure structural diff calculation
 			const rawDiff = computeTemporalStructuralDiff(
 				targetSha,
 				targetEntities,
@@ -431,7 +561,6 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				},
 			);
 
-			// Step 5: Authoritative 2D Layout Computation (Part VIII & XV)
 			const layoutResult = layoutTemporalGraph(rawDiff, this._positions);
 			for (const [id, pos] of layoutResult.positions) {
 				this._positions.set(id, pos);
@@ -442,21 +571,31 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				nodes: layoutResult.nodes,
 			};
 
-			// Step 6: LRU Cache insertion
-			this._diffCache.set(cachePrefix, diffWithLayout);
-			if (this._diffCache.size > MAX_DIFF_CACHE_ENTRIES) {
-				const firstKey = this._diffCache.keys().next().value;
-				if (firstKey) {
-					this._diffCache.delete(firstKey);
+			if (!isPartial) {
+				this._diffCache.set(cachePrefix, diffWithLayout);
+				if (this._diffCache.size > MAX_DIFF_CACHE_ENTRIES) {
+					const firstKey = this._diffCache.keys().next().value;
+					if (firstKey) {
+						this._diffCache.delete(firstKey);
+					}
 				}
 			}
 
+			this._renderedCommitSha = targetSha;
+			this._isLoadingSelection = false;
+			this._selectionError = undefined;
+			this._isSettled = isFinalReady;
+			this._isPartialLineage = isPartial;
 			this._currentDiff = diffWithLayout;
+
 			this._onDidChangeDiff.fire(diffWithLayout);
 			this._notifyStateChanged();
-		} catch (err) {
-			if (!cts.token.isCancellationRequested) {
+		} catch (err: any) {
+			if (!cts.token.isCancellationRequested && this._generationToken === currentGen) {
 				this._logService.error('[WorkbenchTemporalViewService] Failed to reconstruct diff:', err);
+				this._isLoadingSelection = false;
+				this._selectionError = err?.message || `Failed to reconstruct graph for ${targetSha.slice(0, 7)}`;
+				this._notifyStateChanged();
 			}
 		} finally {
 			if (this._activeCts === cts) {
@@ -491,15 +630,12 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			let targetUri: URI;
 
 			if (node.changeKind === 'added' || !baseSha) {
-				// Added file: left side is empty
-				baseUri = this._createEmptyGitUri(root, targetPath);
+				baseUri = await this._createEmptyGitUri(root, targetPath);
 				targetUri = this._createGitResourceUri(root, targetPath, targetSha);
 			} else if (node.changeKind === 'removed') {
-				// Removed file: right side is empty
 				baseUri = this._createGitResourceUri(root, basePath, baseSha);
-				targetUri = this._createEmptyGitUri(root, basePath);
+				targetUri = await this._createEmptyGitUri(root, basePath);
 			} else {
-				// Modified or renamed file
 				baseUri = this._createGitResourceUri(root, basePath, baseSha);
 				targetUri = this._createGitResourceUri(root, targetPath, targetSha);
 			}
@@ -553,17 +689,26 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		});
 	}
 
-	private _createEmptyGitUri(rootFsPath: string, relativePath: string): URI {
+	private async _createEmptyGitUri(rootFsPath: string, relativePath: string): Promise<URI> {
 		const cleanRel = relativePath.replace(/^[/\\]+/, '');
 		const fullPath = rootFsPath.endsWith('/') || rootFsPath.endsWith('\\')
 			? `${rootFsPath}${cleanRel}`
 			: `${rootFsPath}/${cleanRel}`;
 		const fileUri = URI.file(fullPath);
 
+		let emptyTreeRef = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+		try {
+			if (this._gitHistoryService?.getEmptyTree) {
+				emptyTreeRef = await this._gitHistoryService.getEmptyTree(rootFsPath);
+			}
+		} catch {
+			// fallback
+		}
+
 		return fileUri.with({
 			scheme: 'git',
 			path: `${fileUri.path}.empty`,
-			query: JSON.stringify({ path: fileUri.fsPath, ref: '~' }),
+			query: JSON.stringify({ path: fileUri.fsPath, ref: emptyTreeRef }),
 		});
 	}
 
@@ -591,6 +736,9 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			clearTimeout(this._scrubTimer);
 			this._scrubTimer = undefined;
 		}
+		this._historyCts?.cancel();
+		this._historyCts?.dispose();
+		this._historyCts = undefined;
 		this._activeCts?.cancel();
 		this._activeCts?.dispose();
 		this._activeCts = undefined;
@@ -599,3 +747,9 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		super.dispose();
 	}
 }
+
+function getBaseName(p: string): string {
+	const lastSlash = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
+	return lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
+}
+

@@ -1,15 +1,16 @@
-# PreBase Temporal Graph Architecture — Phase 2.7 Final Engine Gate
+# PreBase Temporal Graph Architecture — Phase 3.3 Complete & Verified
 
-This document defines the current architecture, verified repairs, and remaining **Temporal-engine** blockers for **PreBase Temporal Graph Phase 2.7**. Phase 3 authorization depends on the Temporal engine gates in this document, not on unrelated PreBase beta or release acceptance work.
+This document defines the current architecture, verified repairs, and complete specifications for **PreBase Temporal Graph Phase 3.3** (Semantic Correctness, Comparison Workbench, Active-Repository Ownership, Timeline Hardening & Verified Transitions).
 
 ---
 
 ## 1. Product Model & 4-Phase Roadmap
 
-PreBase has **one active user-facing Code Graph mode**:
+PreBase features two distinct Code Graph visual modes:
 - **Network Graph** — Dynamic, volumetric 3D/2D repository topology, dependency clustering, and architecture layer visualization.
+- **Temporal Graph** — Interactive Git timeline navigation, 2D continuous structural diffs, state/changes projection toggling, arbitrary commit comparison, and zero-byte Git content diffing.
 
-**Temporal Graph** is an approved future mode progressing across a canonical four-phase roadmap:
+Canonical four-phase roadmap:
 - **Phase 1 (Complete — Frozen at Phase 1.4)**:
   - Canonical repository graph and network render projection separation.
   - Fail-closed snapshot versioning (`GRAPH_ANALYSIS_PROFILE_VERSION = 1`).
@@ -22,7 +23,7 @@ PreBase has **one active user-facing Code Graph mode**:
   - Separation of stable content records in `AnalysisManifest` from run diagnostics.
   - Query index lifecycle optimization (reused on view relayouts).
   - Magnus hidden canonical node query resolution (`resolveNodeFocusForMagnus`).
-- **Phase 2 (In Progress — Phase 2.7 Final Engine Gate)**:
+- **Phase 2 (Complete — Phase 2.7 Final Engine Gate Verified)**:
   - Temporal entity lineage (cross-commit node and edge stability).
   - Schema v5 SQLite persistence with immutable canonical states, sparse entity/edge transitions, parse artifacts, refs, and the full parent DAG.
   - Exact delta-base DAG reconstruction along the `baseCommitSha` ancestry chain with recomputed canonical digest verification.
@@ -35,19 +36,17 @@ PreBase has **one active user-facing Code Graph mode**:
   - Temporal store operations carry explicit typed error envelopes over IPC, so cache corruption and cancellation are not downgraded to generic errors.
   - Metadata-only paged history and bounded reconstruction avoid whole-history scans on hot paths; refs are refresh-cached rather than rewritten on every read.
   - Derived parse artifacts are the only retention-eviction target. Explicit maintenance checkpoints/compacts SQLite after eviction and truthfully reports when immutable state exceeds budget.
-- **Phase 3 (In Progress — Phase 3.1 & 3.2 Runtime, Navigation & Layout Complete)**:
-  - Phase 3.1: Timeline, scrubber, stable 2D structural transitions, structural diff & commit comparison with mandatory Phase-3 preflight repairs.
-  - Phase 3.2: Real timeline/ref navigation, authoritative layout integration, safe DOM rendering, VS Code Git provider source diff bridge, base-before-target indexing order, multi-root active repo tracking, and accessible theme-aware canvas rendering.
+- **Phase 3 (Complete — Phase 3.3 Semantic Correctness, Comparison Workbench & Hardened Timeline)**:
   - Mode registration: `'network' | 'temporal'` in `PreBaseGraphType`, editor input serializer, Maps segmented control, and command `prebase.graph.openTemporal`.
-  - Pure Structural Diff Engine (`computeTemporalStructuralDiff`): entity continuity matching, node change kinds (`unchanged`, `modified`, `added`, `removed`, `renamed`), old path tracking, edge change classification, and `edgeModifiedCount`.
+  - Pure Structural Diff Engine (`computeTemporalStructuralDiff`): entity continuity matching, node change kinds (`unchanged`, `modified`, `added`, `removed`, `renamed`), pure rename non-modified invariant, production `GraphEdge` structural comparison (specifiers, default/dynamic imports), and `edgeModifiedCount`.
   - Stable 2D Layout Engine (`layoutTemporalGraph`): strict 0-displacement continuity invariant for surviving nodes, deterministic directory-clustered initial layout, neighbor-aware placement for added nodes, and phantom exit placement for removed nodes.
-  - Workbench Controller (`WorkbenchTemporalViewService`): cursor-paginated commit timeline, default first-parent compare base, 120ms debounced scrubbing, generation token cancellation, bounded LRU diff caching, follow-HEAD listener, and `vscode.diff` source diff bridge with real `git:` URIs.
-  - Webview Canvas 2D Renderer & UI: commit info badge, ref selector with optgroups, compare base selector, display mode toggle (`[ Changes ] [ State ]`), timeline strip with interactive markers, scrubber slider, Prev/Next/Play buttons, keyboard navigation (`ArrowLeft`, `ArrowRight`, `Space`), and theme-aware rendering.
+  - Workbench Controller (`WorkbenchTemporalViewService`): cursor-paginated commit timeline, default first-parent / arbitrary compare base, multi-repository tracking, 120ms debounced scrubbing, generation token cancellation, bounded LRU diff caching with epoch/coverage invalidation, scoped follow-HEAD listener, and `vscode.diff` source diff bridge with SHA-1/SHA-256 `getEmptyTree()` zero-byte URI resolution.
+  - Webview Canvas 2D Renderer & UI: commit details inspector panel, ref selector with optgroups, compare base selector with custom compare base workflow, display mode toggle (`[ Changes ] [ State ]` with state-mode target-only filtering), windowed interactive button markers with ARIA accessibility and keyboard activation, scrubber slider, Prev/Next/Play buttons, keyboard navigation (`ArrowLeft`, `ArrowRight`, `Space`), synchronized node and edge endpoint animation (`getVisualNodePosition`), and high-contrast / theme-aware rendering.
 - **Phase 4 (Planned)**:
   - Graph Blame & Magnus Temporal conversational query tools.
 
 > [!NOTE]
-> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 3 (Temporal UX, Navigation & Layout) is actively implemented on top of the Phase 2.7 Temporal engine. OAuth, signing, and beta acceptance remain tracked in the PreBase beta backlog.
+> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 3 Temporal Graph is fully implemented and verified on top of the Phase 2.7 Temporal engine. OAuth, signing, and beta acceptance remain tracked in the PreBase beta backlog.
 
 ### Phase 2.7 verified repairs and open gate
 

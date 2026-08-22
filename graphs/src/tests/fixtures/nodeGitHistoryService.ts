@@ -606,4 +606,21 @@ export class NodeGitHistoryService implements IGitHistoryService {
 
 		return changes;
 	}
+
+	async getEmptyTree(rootPath: string, token?: CancellationTokenLike): Promise<string> {
+		try {
+			const res = await this._exec({
+				cwd: rootPath,
+				args: ['hash-object', '-t', 'tree', '/dev/null'],
+				token,
+			});
+			const tree = res.stdout.trim();
+			if (tree) {
+				return tree;
+			}
+		} catch {
+			// fallback
+		}
+		return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+	}
 }

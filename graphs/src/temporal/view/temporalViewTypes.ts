@@ -81,13 +81,24 @@ export interface TemporalCommitSummary {
 	readonly isSettled: boolean;
 }
 
+export interface TemporalRepositoryDescriptor {
+	readonly id: string;
+	readonly rootUri: string;
+	readonly label: string;
+}
+
 export interface ITemporalViewState {
+	readonly availableRepositories: readonly TemporalRepositoryDescriptor[];
 	readonly activeRepositoryId?: string;
 	readonly activeRepositoryRoot?: string;
 	readonly repositoryRefs: readonly TemporalRepositoryRef[];
 	readonly selectedRef: string;
 	readonly selectedCommitSha: string;
+	readonly renderedCommitSha?: string;
+	readonly isLoadingSelection: boolean;
+	readonly selectionError?: string;
 	readonly compareBaseSha?: string;
+	readonly customCompareBase?: string;
 	readonly comparisonMode: 'first-parent' | 'explicit-parent' | 'arbitrary';
 	readonly followHead: boolean;
 	readonly displayMode: TemporalDisplayMode;
@@ -101,6 +112,7 @@ export interface ITemporalViewState {
 	readonly diff?: TemporalStructuralDiff;
 	readonly selectedEntityId?: string;
 	readonly filterQuery?: string;
+	readonly timelineWindow?: { readonly start: number; readonly count: number };
 }
 
 export interface TemporalLayoutResult {
@@ -118,6 +130,7 @@ export interface IPreBaseTemporalViewService {
 
 	getState(): ITemporalViewState;
 	initialize(): Promise<void>;
+	switchRepository(repoRoot: string): Promise<void>;
 	selectRef(refName: string): Promise<void>;
 	selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean }): Promise<void>;
 	setCompareBase(compareBaseSha: string | undefined): Promise<void>;
@@ -130,3 +143,4 @@ export interface IPreBaseTemporalViewService {
 	openHistoricalFile(entityId: string): Promise<void>;
 	refresh(): Promise<void>;
 }
+

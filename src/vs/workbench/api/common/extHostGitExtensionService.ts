@@ -790,6 +790,26 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		}
 	}
 
+	async $getEmptyTree(handle: number, token?: vscode.CancellationToken): Promise<GitHistoryResultDto<string>> {
+		const repository = this._repositories.get(handle);
+		if (!repository) {
+			return { success: false, error: { code: 'RepositoryNotFound', message: `Repository with handle ${handle} not found` } };
+		}
+		if (token?.isCancellationRequested) {
+			return { success: false, error: { code: 'Cancelled', message: 'Operation cancelled' } };
+		}
+		try {
+			if (typeof (repository as any).getEmptyTree === 'function') {
+				const emptyTree = await (repository as any).getEmptyTree();
+				return { success: true, data: emptyTree };
+			}
+			return { success: true, data: '4b825dc642cb6eb9a060e54bf8d69288fbee4904' };
+		} catch (err) {
+			const code = mapGitErrorToCode(err, 'ProcessFailure');
+			return { success: false, error: { code, message: getErrorMessage(err) || 'Failed to get empty tree' } };
+		}
+	}
+
 	private async _ensureGitApi(): Promise<GitExtensionAPI | undefined> {
 		if (this._gitApi) {
 			return this._gitApi;

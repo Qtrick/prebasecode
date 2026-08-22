@@ -148,6 +148,7 @@ export interface IGitRepository {
 	diffCommitToParent?(commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult>;
 	diffReviewRange?(baseRef: string, headRef: string, token?: CancellationToken): Promise<GitExactDiffResult>;
 	checkIgnore?(paths: string[]): Promise<string[]>;
+	getEmptyTree?(token?: CancellationToken): Promise<string>;
 }
 
 export interface IGitExtensionDelegate {
@@ -170,6 +171,7 @@ export interface IGitExtensionDelegate {
 	diffCommitToParent?(root: URI, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitExactDiffResult>;
 	diffReviewRange?(root: URI, baseRef: string, headRef: string, token?: CancellationToken): Promise<GitExactDiffResult>;
 	checkIgnore?(root: URI, paths: string[]): Promise<string[]>;
+	getEmptyTree?(root: URI, token?: CancellationToken): Promise<string>;
 }
 
 export const IGitService = createDecorator<IGitService>('gitService');

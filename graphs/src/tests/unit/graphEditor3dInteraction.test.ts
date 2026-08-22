@@ -133,13 +133,14 @@ function createWebviewHarness(): { canvas: FakeElement; context: vm.Context; run
 	const elements = new Map<string, FakeElement>();
 	for (const id of [
 		'archSvg', 'netCanvas', 'status', 'legend', 'empty', 'idleToggle', 'idleToggleWrap',
-		'toolbar', 'temporalToolbar', 'temporalScrubberBar', 'temporalRefSelect', 'temporalCompareSelect',
+		'toolbar', 'temporalToolbar', 'temporalRepoWrap', 'temporalRepoSelect', 'temporalScrubberBar', 'temporalRefSelect', 'temporalCompareSelect',
 		'temporalFollowHead', 'temporalFilterInput', 'temporalScrubber', 'temporalPrevBtn', 'temporalNextBtn',
 		'temporalPlayBtn', 'temporalCommitSha', 'temporalCommitMessage', 'temporalCommitAuthor', 'temporalCommitStatus',
 		'temporalPartialWarning', 'badgeAdded', 'badgeRemoved', 'badgeModified', 'badgeRenamed',
-		'temporalModeChangesBtn', 'temporalModeStateBtn', 'temporalTimelineStrip', 'temporalLoadMoreBtn',
+		'temporalModeChangesBtn', 'temporalModeStateBtn', 'temporalToggleDetailsBtn', 'temporalTimelineStrip', 'temporalLoadMoreBtn',
+		'temporalDetailsPanel', 'temporalDetailsClose', 'temporalDetailsList', 'temporalDetailsSha', 'temporalDetailsAuthor', 'temporalDetailsParents', 'temporalDetailsSummary',
 		'popup', 'popupTitle', 'popupMeta', 'popupOverview', 'popupAi', 'popupAiProvenance',
-		'popupClose', 'popupOpen', 'popupHistoricalView', 'popupSourceDiff', 'popupReveal', 'popupMagnus', 'zoomIn', 'zoomOut', 'fit', 'reset'
+		'popupClose', 'popupOpen', 'popupHistoricalView', 'popupSourceDiff', 'popupSetBase', 'popupReveal', 'popupMagnus', 'zoomIn', 'zoomOut', 'fit', 'reset'
 	]) {
 		elements.set(id, new FakeElement());
 	}

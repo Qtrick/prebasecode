@@ -83,13 +83,7 @@ export function computeTemporalStructuralDiff(
 			let isModified = false;
 
 			const teCanonicalId = (te as any).canonicalNodeId || te.nodeData?.id || te.path;
-			const beCanonicalId = be ? ((be as any).canonicalNodeId || be.nodeData?.id || be.path) : undefined;
-
-			const contentChanged = Boolean(
-				(te.blobOid && be?.blobOid && te.blobOid !== be.blobOid)
-				|| (te.contentHash && be?.contentHash && te.contentHash !== be.contentHash)
-				|| (be && teCanonicalId !== beCanonicalId)
-			);
+			const contentChanged = hasNodeContentChanged(te, be);
 
 			if (!be) {
 				changeKind = 'added';
@@ -240,6 +234,60 @@ function makeEdgeKey(sourceEntityId: string, targetEntityId: string, kind: strin
 	return `${sourceEntityId}-->${targetEntityId}::${kind}`;
 }
 
+function hasNodeContentChanged(te: TemporalEntitySnapshot, be?: TemporalEntitySnapshot): boolean {
+	if (!be) {
+		return false;
+	}
+	// 1. Direct blob OID / contentIdentity comparison
+	const teBlob = te.blobOid || (te as any).contentIdentity;
+	const beBlob = be.blobOid || (be as any).contentIdentity;
+	if (teBlob && beBlob) {
+		return teBlob !== beBlob;
+	}
+
+	// 2. Direct content hash comparison
+	if (te.contentHash && be.contentHash) {
+		return te.contentHash !== be.contentHash;
+	}
+
+	// 3. For in-place files (same path), if canonicalNodeId changed, content is modified
+	if (te.path === be.path) {
+		const teCanonical = (te as any).canonicalNodeId || te.nodeData?.id;
+		const beCanonical = (be as any).canonicalNodeId || be.nodeData?.id;
+		if (teCanonical && beCanonical && teCanonical !== beCanonical) {
+			return true;
+		}
+	}
+
+	// 4. Fallback: semantic comparison of nodeData excluding identity/path/layout fields
+	if (te.nodeData && be.nodeData) {
+		return hasNodeDataChanged(te.nodeData, be.nodeData);
+	}
+
+	return false;
+}
+
+function hasNodeDataChanged(a: any, b: any): boolean {
+	if (!a && !b) return false;
+	if (!a || !b) return true;
+
+	if (a.kind && b.kind && a.kind !== b.kind) return true;
+
+	const aMeta = a.meta || {};
+	const bMeta = b.meta || {};
+
+	if (aMeta.architectureLayer !== bMeta.architectureLayer) return true;
+	if (aMeta.language !== bMeta.language) return true;
+	if (aMeta.isComponent !== bMeta.isComponent) return true;
+	if (aMeta.functionCount !== bMeta.functionCount) return true;
+	if (aMeta.componentCount !== bMeta.componentCount) return true;
+
+	if (!areStringArraysEquivalent(aMeta.exports, bMeta.exports)) return true;
+	if (!areStringArraysEquivalent(aMeta.imports, bMeta.imports)) return true;
+
+	return false;
+}
+
 function hasEdgeDataChanged(a: any, b: any): boolean {
 	if (!a && !b) {
 		return false;
@@ -247,20 +295,62 @@ function hasEdgeDataChanged(a: any, b: any): boolean {
 	if (!a || !b) {
 		return true;
 	}
-	if (a.weight !== b.weight || a.importType !== b.importType) {
+
+	if (a.kind && b.kind && a.kind !== b.kind) {
 		return true;
 	}
-	if (a.meta && b.meta) {
-		const aKeys = Object.keys(a.meta);
-		const bKeys = Object.keys(b.meta);
-		if (aKeys.length !== bKeys.length) {
+
+	if (a.weight !== undefined && b.weight !== undefined && a.weight !== b.weight) {
+		return true;
+	}
+	if (a.importType !== undefined && b.importType !== undefined && a.importType !== b.importType) {
+		return true;
+	}
+
+	const aMeta = a.meta;
+	const bMeta = b.meta;
+	const aHasMeta = aMeta && Object.keys(aMeta).length > 0;
+	const bHasMeta = bMeta && Object.keys(bMeta).length > 0;
+
+	if (!aHasMeta && !bHasMeta) {
+		return false;
+	}
+	if (!aHasMeta || !bHasMeta) {
+		return true;
+	}
+
+	if (aMeta.importSource !== bMeta.importSource) return true;
+	if (Boolean(aMeta.isDefault) !== Boolean(bMeta.isDefault)) return true;
+	if (Boolean(aMeta.isDynamic) !== Boolean(bMeta.isDynamic)) return true;
+
+	if (!areStringArraysEquivalent(aMeta.specifiers, bMeta.specifiers)) {
+		return true;
+	}
+
+	const aKeys = Object.keys(aMeta).filter(k => k !== 'line' && k !== 'importSource' && k !== 'isDefault' && k !== 'isDynamic' && k !== 'specifiers');
+	const bKeys = Object.keys(bMeta).filter(k => k !== 'line' && k !== 'importSource' && k !== 'isDefault' && k !== 'isDynamic' && k !== 'specifiers');
+
+	if (aKeys.length !== bKeys.length) return true;
+	for (const k of aKeys) {
+		if (Array.isArray(aMeta[k]) && Array.isArray(bMeta[k])) {
+			if (!areStringArraysEquivalent(aMeta[k], bMeta[k])) return true;
+		} else if (aMeta[k] !== bMeta[k]) {
 			return true;
 		}
-		for (const k of aKeys) {
-			if (a.meta[k] !== b.meta[k]) {
-				return true;
-			}
-		}
 	}
+
 	return false;
 }
+
+function areStringArraysEquivalent(a?: readonly string[], b?: readonly string[]): boolean {
+	if (!a && !b) return true;
+	if (!a || !b) return false;
+	if (a.length !== b.length) return false;
+	const sortedA = [...a].sort();
+	const sortedB = [...b].sort();
+	for (let i = 0; i < sortedA.length; i++) {
+		if (sortedA[i] !== sortedB[i]) return false;
+	}
+	return true;
+}
+

@@ -4107,6 +4107,7 @@ export interface ExtHostGitExtensionShape {
 	$diffCommitToParent(handle: number, commitRef: string, parentIndex?: number, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;
 	$diffReviewRange(handle: number, baseRef: string, headRef: string, token?: CancellationToken): Promise<GitHistoryResultDto<GitExactDiffResultDto>>;
 	$checkIgnore(handle: number, paths: string[]): Promise<string[]>;
+	$getEmptyTree(handle: number, token?: CancellationToken): Promise<GitHistoryResultDto<string>>;
 }
 
 // --- proxy identifiers

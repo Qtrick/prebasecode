@@ -36,4 +36,5 @@ export interface IGitHistoryService {
 	diffCommitTrees(rootPath: string, refA: string, refB: string, token?: CancellationTokenLike): Promise<GitExactDiffResult>;
 	diffCommitToParent(rootPath: string, commitRef: string, parentIndex?: number, token?: CancellationTokenLike): Promise<GitExactDiffResult>;
 	diffReviewRange(rootPath: string, baseRef: string, headRef: string, token?: CancellationTokenLike): Promise<GitExactDiffResult>;
+	getEmptyTree(rootPath: string, token?: CancellationTokenLike): Promise<string>;
 }

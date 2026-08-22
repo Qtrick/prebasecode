@@ -74,6 +74,7 @@ class LongHistoryGitService implements IGitHistoryService {
 		return { fromRef: '', toRef: '', changes: [] };
 	}
 	async diffReviewRange(): Promise<GitExactDiffResult> { return { fromRef: '', toRef: '', changes: [] }; }
+	async getEmptyTree(): Promise<string> { return '4b825dc642cb6eb9a060e54bf8d69288fbee4904'; }
 
 	private _commit(index: number): GitCommitMetadata {
 		const sha = commitSha(index);

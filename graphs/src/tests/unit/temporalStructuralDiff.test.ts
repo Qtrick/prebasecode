@@ -234,4 +234,70 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1 & 3.2)', () => {
 		assert.equal(diff.isPartialLineage, true);
 		assert.equal(diff.partialLineageReason, 'Indexing in progress');
 	});
+
+	test('9. Pure rename: path and canonicalNodeId change, but blobOid/contentIdentity unchanged -> isModified is FALSE', () => {
+		const baseEntities = [
+			makeEntity('ent-1', 'src/oldPath.ts', 'file:src/oldPath.ts', { exports: ['foo'] }, 'blob-same-sha'),
+		];
+		const targetEntities = [
+			makeEntity('ent-1', 'src/newPath.ts', 'file:src/newPath.ts', { exports: ['foo'] }, 'blob-same-sha'),
+		];
+
+		const diff = computeTemporalStructuralDiff('commit-2', targetEntities, [], 'commit-1', baseEntities, []);
+
+		assert.equal(diff.summary.renamedCount, 1);
+		assert.equal(diff.summary.modifiedCount, 0);
+		assert.equal(diff.nodes[0].changeKind, 'renamed');
+		assert.equal(diff.nodes[0].isModified, false);
+		assert.equal(diff.nodes[0].meta?.isRenamedAndModified, false);
+	});
+
+	test('10. GraphEdge production comparison: specifier order independence and meta fields', () => {
+		const baseEntities = [
+			makeEntity('ent-1', 'src/a.ts', 'can-1'),
+			makeEntity('ent-2', 'src/b.ts', 'can-2'),
+		];
+		const targetEntities = [
+			makeEntity('ent-1', 'src/a.ts', 'can-1'),
+			makeEntity('ent-2', 'src/b.ts', 'can-2'),
+		];
+
+		// Case A: reordered specifiers ['alpha', 'beta'] vs ['beta', 'alpha'] -> unchanged
+		const baseEdgesReorder = [
+			makeEdge('edge-1', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', {
+				meta: { specifiers: ['alpha', 'beta'], isDefault: false, isDynamic: false }
+			}),
+		];
+		const targetEdgesReorder = [
+			makeEdge('edge-1', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', {
+				meta: { specifiers: ['beta', 'alpha'], isDefault: false, isDynamic: false }
+			}),
+		];
+
+		const diffReorder = computeTemporalStructuralDiff('c2', targetEntities, targetEdgesReorder, 'c1', baseEntities, baseEdgesReorder);
+		assert.equal(diffReorder.summary.edgeModifiedCount, 0);
+		assert.equal(diffReorder.edges[0].changeKind, 'unchanged');
+
+		// Case B: added specifier ['alpha'] -> ['alpha', 'gamma'] -> modified
+		const targetEdgesModified = [
+			makeEdge('edge-1', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', {
+				meta: { specifiers: ['alpha', 'gamma'], isDefault: false, isDynamic: false }
+			}),
+		];
+
+		const diffModified = computeTemporalStructuralDiff('c2', targetEntities, targetEdgesModified, 'c1', baseEntities, baseEdgesReorder);
+		assert.equal(diffModified.summary.edgeModifiedCount, 1);
+		assert.equal(diffModified.edges[0].changeKind, 'modified');
+
+		// Case C: isDynamic flag changed from false to true -> modified
+		const targetEdgesDynamic = [
+			makeEdge('edge-1', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', {
+				meta: { specifiers: ['alpha', 'beta'], isDefault: false, isDynamic: true }
+			}),
+		];
+
+		const diffDynamic = computeTemporalStructuralDiff('c2', targetEntities, targetEdgesDynamic, 'c1', baseEntities, baseEdgesReorder);
+		assert.equal(diffDynamic.summary.edgeModifiedCount, 1);
+		assert.equal(diffDynamic.edges[0].changeKind, 'modified');
+	});
 });

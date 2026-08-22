@@ -55,6 +55,7 @@ export interface WorkbenchGitRepositoryLike {
 	diffCommitToParent?(commitRef: string, parentIndex?: number, token?: any): Promise<any>;
 	diffReviewRange?(baseRef: string, headRef: string, token?: any): Promise<any>;
 	checkIgnore?(paths: string[]): Promise<string[]>;
+	getEmptyTree?(token?: any): Promise<string>;
 }
 
 export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
@@ -426,6 +427,21 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 			const code = err?.code || 'ProcessFailure';
 			throw new GitHistoryError(code, err?.message || `Failed to diff review range ${baseRef}...${headRef}`);
 		}
+	}
+
+	async getEmptyTree(rootPath: string, token?: CancellationTokenLike): Promise<string> {
+		try {
+			const repo = await this._ensureRepository(rootPath);
+			if (repo.getEmptyTree) {
+				const res = await repo.getEmptyTree(token);
+				if (res) {
+					return res;
+				}
+			}
+		} catch {
+			// Fallback to SHA-1 empty tree
+		}
+		return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 	}
 
 	notifyHeadChanged(repositoryId: string, newHead: string, transitionType: 'commit' | 'checkout' | 'reset' | 'branch-switch' | 'external' = 'external'): void {

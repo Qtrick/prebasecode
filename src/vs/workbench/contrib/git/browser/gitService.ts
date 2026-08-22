@@ -161,4 +161,11 @@ export class GitRepository extends Disposable implements IGitRepository {
 		}
 		return [];
 	}
+
+	async getEmptyTree(token?: CancellationToken): Promise<string> {
+		if (this.delegate.getEmptyTree) {
+			return this.delegate.getEmptyTree(this.rootUri, token);
+		}
+		return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+	}
 }
