@@ -3,19 +3,21 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
-import type {
-	GitBranchInfo,
-	GitCommitMetadata,
-	GitExactDiffResult,
-	GitHeadChangeEvent,
-	GitLogOptions,
-	GitRepositoryIdentity,
-	GitTagInfo,
-	GitTreeEntry,
-	GitTreeInventory,
-	GitTreeListOptions,
+import {
+	GitHistoryError,
+	type GitBranchInfo,
+	type GitCommitMetadata,
+	type GitExactDiffResult,
+	type GitHeadChangeEvent,
+	type GitLogOptions,
+	type GitRepositoryIdentity,
+	type GitTagInfo,
+	type GitTreeEntry,
+	type GitTreeInventory,
+	type GitTreeListOptions,
 } from './gitTypes.js';
 
+export { GitHistoryError };
 export type { GitHeadChangeEvent, GitBranchInfo, GitCommitMetadata, GitExactDiffResult, GitLogOptions, GitRepositoryIdentity, GitTagInfo, GitTreeEntry, GitTreeInventory, GitTreeListOptions };
 
 export type EventLike<T> = (listener: (e: T) => void) => { dispose(): void };

@@ -36,12 +36,18 @@ Canonical four-phase roadmap:
   - Temporal store operations carry explicit typed error envelopes over IPC, so cache corruption and cancellation are not downgraded to generic errors.
   - Metadata-only paged history and bounded reconstruction avoid whole-history scans on hot paths; refs are refresh-cached rather than rewritten on every read.
   - Derived parse artifacts are the only retention-eviction target. Explicit maintenance checkpoints/compacts SQLite after eviction and truthfully reports when immutable state exceeds budget.
-- **Phase 3 (Complete — Phase 3.3 Semantic Correctness, Comparison Workbench & Hardened Timeline)**:
+- **Phase 3 (Complete — Phase 3.4 Final Core Production Hardening Verified)**:
   - Mode registration: `'network' | 'temporal'` in `PreBaseGraphType`, editor input serializer, Maps segmented control, and command `prebase.graph.openTemporal`.
+  - Comparison State Machine (`TemporalComparisonMode`): explicit `first-parent` (dynamic first-parent derivation across scrubber navigation), `explicit-parent` (Parent 2 on merge commit; resets to first-parent when target changes), and `pinned` (base remains fixed as target changes $C \to D \to E$). `setCompareBase(undefined)` resets cleanly to dynamic `first-parent`.
+  - Elimination of all SHA-1 empty-tree fallbacks: fail closed with typed `GitHistoryError` (`RepositoryUnavailable`, `NotSupported`, `ProcessFailure`) across Extension Host, MainThread, Workbench Git, and Temporal view service.
+  - Host-side QuickInput Base Picker: `pickTemporalCompareBase` using `IQuickInputService` to resolve symbolic refs (branches, tags, custom text) to immutable commit SHAs before pinning.
+  - Action Binding Truthfulness: `openSourceDiff` and `openHistoricalFile` bind strictly to rendered state (`_currentDiff.targetCommitSha` and `_currentDiff.baseCommitSha`) rather than in-flight `_selectedCommitSha`.
+  - Cancellation & Coalescing: Cancellation tokens propagated into history operations (`selectRef`, `loadMoreHistory`), coalescing in-flight requests for identical cursors.
+  - Security & Webview DOM Safety: Elimination of repository-controlled `innerHTML` in details inspector and dropdowns, using safe DOM APIs (`textContent`, `createElement`, `appendChild`).
+  - Description Service Capacity & Freshness: Expanded LRU cache to 2,000 entries (2MB), canonical `contentIdentity` hashing, and stale in-flight generation discard.
+  - Accessibility & Interaction: Space key event ownership guarded on interactive buttons; bounded windowed timeline DOM strip.
   - Pure Structural Diff Engine (`computeTemporalStructuralDiff`): entity continuity matching, node change kinds (`unchanged`, `modified`, `added`, `removed`, `renamed`), pure rename non-modified invariant, production `GraphEdge` structural comparison (specifiers, default/dynamic imports), and `edgeModifiedCount`.
   - Stable 2D Layout Engine (`layoutTemporalGraph`): strict 0-displacement continuity invariant for surviving nodes, deterministic directory-clustered initial layout, neighbor-aware placement for added nodes, and phantom exit placement for removed nodes.
-  - Workbench Controller (`WorkbenchTemporalViewService`): cursor-paginated commit timeline, default first-parent / arbitrary compare base, multi-repository tracking, 120ms debounced scrubbing, generation token cancellation, bounded LRU diff caching with epoch/coverage invalidation, scoped follow-HEAD listener, and `vscode.diff` source diff bridge with SHA-1/SHA-256 `getEmptyTree()` zero-byte URI resolution.
-  - Webview Canvas 2D Renderer & UI: commit details inspector panel, ref selector with optgroups, compare base selector with custom compare base workflow, display mode toggle (`[ Changes ] [ State ]` with state-mode target-only filtering), windowed interactive button markers with ARIA accessibility and keyboard activation, scrubber slider, Prev/Next/Play buttons, keyboard navigation (`ArrowLeft`, `ArrowRight`, `Space`), synchronized node and edge endpoint animation (`getVisualNodePosition`), and high-contrast / theme-aware rendering.
 - **Phase 4 (Planned)**:
   - Graph Blame & Magnus Temporal conversational query tools.
 

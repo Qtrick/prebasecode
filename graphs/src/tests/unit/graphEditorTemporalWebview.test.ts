@@ -4,12 +4,175 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
+import vm from 'node:vm';
 import { suite, test } from 'mocha';
 import { PreBaseGraphEditorInput } from '../../host/workbench/graphEditorInput.js';
 
-suite('GraphEditorTemporalWebview (Unit - Phase 3.3)', () => {
-	test('1. Webview HTML structure includes all Phase 3.3 UI components with secure CSP and nonces', () => {
-		// Instantiate editor input to get generated HTML or verify editor structure
+type Listener = (event: any) => void;
+
+class FakeClassList {
+	private readonly values = new Set<string>();
+	add(...names: string[]): void { for (const n of names) this.values.add(n); }
+	remove(...names: string[]): void { for (const n of names) this.values.delete(n); }
+	contains(name: string): boolean { return this.values.has(name); }
+}
+
+class FakeElement {
+	readonly style: Record<string, string> = { display: 'none' };
+	readonly classList = new FakeClassList();
+	readonly listeners = new Map<string, Listener[]>();
+	readonly clientWidth = 800;
+	readonly clientHeight = 600;
+	checked = false;
+	onclick: (() => void) | null = null;
+	innerHTML = '';
+	textContent = '';
+	value = '';
+	max = '0';
+	disabled = false;
+	title = '';
+	firstChild: FakeElement | null = null;
+	children: FakeElement[] = [];
+
+	addEventListener(type: string, listener: Listener): void {
+		const list = this.listeners.get(type) ?? [];
+		list.push(listener);
+		this.listeners.set(type, list);
+	}
+
+	dispatch(type: string, event: any): void {
+		for (const listener of this.listeners.get(type) ?? []) {
+			listener(event);
+		}
+	}
+
+	setPointerCapture(): void {}
+	hasPointerCapture(): boolean { return false; }
+	releasePointerCapture(): void {}
+	getBoundingClientRect(): { left: number; top: number; width: number; height: number } {
+		return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight };
+	}
+	setAttribute(_name: string, _value: string): void {}
+	appendChild(child: FakeElement): FakeElement {
+		this.children.push(child);
+		if (!this.firstChild) this.firstChild = child;
+		return child;
+	}
+	removeChild(child: FakeElement): FakeElement {
+		this.children = this.children.filter(c => c !== child);
+		this.firstChild = this.children[0] || null;
+		return child;
+	}
+	getContext(): any {
+		return {
+			resetTransform() {}, setTransform() {}, save() {}, restore() {}, clearRect() {},
+			beginPath() {}, moveTo() {}, lineTo() {}, stroke() {}, fill() {}, arc() {},
+			fillText() {}, measureText() { return { width: 10 }; }, scale() {}, translate() {}, setLineDash() {}
+		};
+	}
+}
+
+function createTemporalWebviewHarness() {
+	const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
+	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
+	const script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
+	assert.ok(script, 'webview script must be present');
+
+	const elements = new Map<string, FakeElement>();
+	for (const id of [
+		'archSvg', 'netCanvas', 'status', 'legend', 'empty', 'idleToggle', 'idleToggleWrap',
+		'toolbar', 'temporalToolbar', 'temporalRepoWrap', 'temporalRepoSelect', 'temporalScrubberBar', 'temporalRefSelect', 'temporalCompareSelect',
+		'temporalFollowHead', 'temporalFilterInput', 'temporalScrubber', 'temporalPrevBtn', 'temporalNextBtn',
+		'temporalPlayBtn', 'temporalCommitSha', 'temporalCommitMessage', 'temporalCommitAuthor', 'temporalCommitStatus',
+		'temporalPartialWarning', 'badgeAdded', 'badgeRemoved', 'badgeModified', 'badgeRenamed',
+		'temporalModeChangesBtn', 'temporalModeStateBtn', 'temporalToggleDetailsBtn', 'temporalTimelineStrip', 'temporalLoadMoreBtn',
+		'temporalDetailsPanel', 'temporalDetailsClose', 'temporalDetailsList', 'temporalDetailsSha', 'temporalDetailsAuthor', 'temporalDetailsParents', 'temporalDetailsSummary',
+		'detailsCommitSha', 'detailsCommitMsg', 'detailsCommitAuthor', 'detailsCommitParents', 'detailsDeltaSummary', 'detailsEntityList',
+		'popup', 'popupTitle', 'popupMeta', 'popupOverview', 'popupAi', 'popupAiProvenance',
+		'popupClose', 'popupOpen', 'popupHistoricalView', 'popupSourceDiff', 'popupSetBase', 'popupReveal', 'popupMagnus', 'zoomIn', 'zoomOut', 'fit', 'reset'
+	]) {
+		elements.set(id, new FakeElement());
+	}
+
+	const postedMessages: any[] = [];
+	const windowListeners = new Map<string, Listener[]>();
+	const document = {
+		body: new FakeElement(),
+		documentElement: new FakeElement(),
+		getElementById(id: string): FakeElement {
+			let el = elements.get(id);
+			if (!el) {
+				el = new FakeElement();
+				elements.set(id, el);
+			}
+			return el;
+		},
+		createElement(_tag: string): FakeElement {
+			return new FakeElement();
+		},
+		addEventListener(type: string, listener: Listener): void {
+			const list = windowListeners.get(type) ?? [];
+			list.push(listener);
+			windowListeners.set(type, list);
+		},
+		get hidden(): boolean { return false; },
+	};
+
+	const context = vm.createContext({
+		acquireVsCodeApi: () => ({
+			postMessage: (msg: any) => { postedMessages.push(msg); }
+		}),
+		document,
+		window: {
+			devicePixelRatio: 1,
+			innerWidth: 800,
+			innerHeight: 600,
+			addEventListener(type: string, listener: Listener): void {
+				const list = windowListeners.get(type) ?? [];
+				list.push(listener);
+				windowListeners.set(type, list);
+			},
+			matchMedia: () => ({ matches: false }),
+		},
+		getComputedStyle: () => ({ getPropertyValue: () => '' }),
+		performance: { now: () => 1000 },
+		Map,
+		Set,
+		Math,
+		Number,
+		Object,
+		Array,
+		String,
+		Promise,
+		setTimeout: () => 1,
+		clearTimeout: () => {},
+		setInterval: () => 1,
+		clearInterval: () => {},
+		requestAnimationFrame: () => 1,
+	});
+
+	vm.runInContext(script, context, { timeout: 1000 });
+
+	return {
+		context,
+		elements,
+		postedMessages,
+		postMessageToWebview: (data: any) => {
+			for (const listener of windowListeners.get('message') ?? []) {
+				listener({ data });
+			}
+		},
+		dispatchWindowKeydown: (event: any) => {
+			for (const listener of windowListeners.get('keydown') ?? []) {
+				listener(event);
+			}
+		}
+	};
+}
+
+suite('GraphEditorTemporalWebview (Unit - Phase 3.4 VM & Webview)', () => {
+	test('1. Webview HTML structure includes all Phase 3.4 UI components with secure CSP and nonces', () => {
 		const input = new PreBaseGraphEditorInput('temporal');
 		assert.equal(input.graphType, 'temporal');
 		assert.equal(input.typeId, PreBaseGraphEditorInput.TypeID);
@@ -17,7 +180,6 @@ suite('GraphEditorTemporalWebview (Unit - Phase 3.3)', () => {
 	});
 
 	test('2. Visual position interpolation function computes synchronized node & edge positions', () => {
-		// Test interpolation helper algorithm as implemented in webview drawTemporalFrame
 		function getVisualNodePosition(
 			node: { entityId: string; x: number; y: number },
 			animState: { prevPositions: Map<string, { x: number; y: number }>; progress: number }
@@ -40,7 +202,6 @@ suite('GraphEditorTemporalWebview (Unit - Phase 3.3)', () => {
 		const targetNode1 = { entityId: 'node-1', x: 200, y: 300 };
 		const targetNode2 = { entityId: 'node-2', x: 600, y: 700 };
 
-		// At progress = 0.5 (halfway)
 		const pos1_half = getVisualNodePosition(targetNode1, { prevPositions: prevPos, progress: 0.5 });
 		const pos2_half = getVisualNodePosition(targetNode2, { prevPositions: prevPos, progress: 0.5 });
 
@@ -48,12 +209,6 @@ suite('GraphEditorTemporalWebview (Unit - Phase 3.3)', () => {
 		assert.equal(pos1_half.y, 200);
 		assert.equal(pos2_half.x, 550);
 		assert.equal(pos2_half.y, 600);
-
-		// Edge endpoint calculation using the same visual position
-		const edgeSource = pos1_half;
-		const edgeTarget = pos2_half;
-		assert.equal(edgeSource.x, 150);
-		assert.equal(edgeTarget.x, 550);
 	});
 
 	test('3. State Mode Invariant: removed nodes and removed edges are strictly excluded from state projection', () => {
@@ -95,12 +250,10 @@ suite('GraphEditorTemporalWebview (Unit - Phase 3.3)', () => {
 			return { nodes: visibleNodes, edges: visibleEdges };
 		}
 
-		// Changes mode contains all nodes and edges
 		const changesResult = filterForMode('changes', allNodes, allEdges);
 		assert.equal(changesResult.nodes.length, 4);
 		assert.equal(changesResult.edges.length, 3);
 
-		// State mode filters out removed nodes and any edge connected to a removed node
 		const stateResult = filterForMode('state', allNodes, allEdges);
 		assert.equal(stateResult.nodes.length, 3);
 		assert.ok(!stateResult.nodes.some(n => n.entityId === 'n3'));
@@ -108,44 +261,70 @@ suite('GraphEditorTemporalWebview (Unit - Phase 3.3)', () => {
 		assert.ok(!stateResult.edges.some(e => e.edgeId === 'e2'));
 	});
 
-	test('4. Windowed timeline algorithm bounds DOM markers for large histories (e.g. 50,000 commits)', () => {
-		const MAX_WINDOW_MARKERS = 80;
+	test('4. Production Webview VM: Receives temporalState and updates DOM safely without innerHTML injection', () => {
+		const harness = createTemporalWebviewHarness();
 
-		function computeTimelineWindow(totalCommits: number, selectedIndex: number) {
-			if (totalCommits <= MAX_WINDOW_MARKERS) {
-				return { start: 0, end: totalCommits };
+		// Post temporal state with repository-controlled strings
+		harness.postMessageToWebview({
+			type: 'temporalState',
+			payload: {
+				mode: 'temporal',
+				activeRepositoryRoot: '/workspace/project',
+				availableRepositories: [{ rootPath: '/workspace/project', name: 'project' }],
+				selectedRef: 'main',
+				availableRefs: [{ name: 'main', kind: 'branch', isHead: true, targetCommitSha: 'sha1234567' }],
+				selectedCommitSha: 'sha1234567890abcdef',
+				renderedCommitSha: 'sha1234567890abcdef',
+				compareBaseSha: 'base0987654321fedcba',
+				renderedCompareBaseSha: 'base0987654321fedcba',
+				comparisonMode: 'first-parent',
+				displayMode: 'changes',
+				followHead: true,
+				filterQuery: '',
+				isIndexed: true,
+				loadedCommitCount: 1,
+				pagedTimeline: [{
+					sha: 'sha1234567890abcdef',
+					shortSha: 'sha1234',
+					message: '<script>alert("xss")</script> feat: add security',
+					author: 'Security Dev <dev@prebase.io>',
+					timestamp: Date.now(),
+					parents: ['base0987654321fedcba'],
+					isCheckpoint: true,
+				}],
 			}
-			const half = Math.floor(MAX_WINDOW_MARKERS / 2);
-			let start = selectedIndex - half;
-			let end = selectedIndex + half;
-			if (start < 0) {
-				start = 0;
-				end = MAX_WINDOW_MARKERS;
-			} else if (end > totalCommits) {
-				end = totalCommits;
-				start = Math.max(0, totalCommits - MAX_WINDOW_MARKERS);
+		});
+
+		// Post structural diff
+		harness.postMessageToWebview({
+			type: 'temporalDiff',
+			payload: {
+				targetCommitSha: 'sha1234567890abcdef',
+				baseCommitSha: 'base0987654321fedcba',
+				summary: { addedCount: 2, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 5, edgeAddedCount: 1, edgeRemovedCount: 0, edgeModifiedCount: 0 },
+				nodes: [
+					{ entityId: 'e1', path: 'src/secure.ts', label: 'secure.ts', kind: 'file', x: 10, y: 10, changeKind: 'added' },
+					{ entityId: 'e2', path: 'src/app.ts', label: 'app.ts', kind: 'file', x: 20, y: 20, changeKind: 'modified' },
+				],
+				edges: [
+					{ edgeId: 'ed1', sourceEntityId: 'e2', targetEntityId: 'e1', kind: 'imports', changeKind: 'added', edgeData: { id: 'ed1', source: 'src/app.ts', target: 'src/secure.ts' } }
+				]
 			}
-			return { start, end };
-		}
+		});
 
-		// Test small history
-		const wSmall = computeTimelineWindow(20, 5);
-		assert.equal(wSmall.start, 0);
-		assert.equal(wSmall.end, 20);
+		const commitMsgEl = harness.elements.get('temporalCommitMessage')!;
+		assert.ok(commitMsgEl.textContent.includes('feat: add security'));
+		// Verify details panel DOM elements were created safely
+		const detailsShaEl = harness.elements.get('detailsCommitSha')!;
+		assert.ok(detailsShaEl.textContent.includes('sha1234'));
 
-		// Test 50,000 commits with selected commit near middle (index 25,000)
-		const wLargeMid = computeTimelineWindow(50000, 25000);
-		assert.equal(wLargeMid.end - wLargeMid.start, MAX_WINDOW_MARKERS);
-		assert.ok(wLargeMid.start <= 25000 && 25000 < wLargeMid.end);
-
-		// Test 50,000 commits with selected commit at head (index 0)
-		const wLargeHead = computeTimelineWindow(50000, 0);
-		assert.equal(wLargeHead.start, 0);
-		assert.equal(wLargeHead.end, 80);
-
-		// Test 50,000 commits with selected commit at tail (index 49,999)
-		const wLargeTail = computeTimelineWindow(50000, 49999);
-		assert.equal(wLargeTail.end, 50000);
-		assert.equal(wLargeTail.start, 50000 - 80);
+		// Test keyboard interaction: Space key on a BUTTON element must NOT trigger play
+		let prevented = false;
+		harness.dispatchWindowKeydown({
+			key: ' ',
+			target: { tagName: 'BUTTON' },
+			preventDefault: () => { prevented = true; }
+		});
+		assert.equal(prevented, false, 'Space key on button must NOT be captured as global play shortcut');
 	});
 });

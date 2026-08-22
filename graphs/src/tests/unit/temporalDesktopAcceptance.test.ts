@@ -122,6 +122,12 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 			trace: () => {},
 		};
 
+		const mockStorageService = {
+			get: () => undefined,
+			store: () => {},
+			remove: () => {},
+		};
+
 		const viewService = new WorkbenchTemporalViewService(
 			mockWorkspaceService as any,
 			gitHistoryService as any,
@@ -129,6 +135,7 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 			mockCommandService as any,
 			mockEditorService as any,
 			mockLogService as any,
+			mockStorageService as any,
 		);
 
 		await viewService.initialize();
@@ -177,11 +184,11 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 		// Relative to c3 (feature-service), c5 added multiply to calc.ts and imported it
 		assert.ok(stateAtC5VsP2.diff);
 
-		// Verification Step 5: Arbitrary comparison (c6 against root c1)
+		// Verification Step 5: Arbitrary pinned comparison (c6 against root c1)
 		await viewService.selectCommit(c6Sha, { immediate: true });
 		await viewService.setCompareBase(c1Sha);
 		const stateArbitrary = viewService.getState();
-		assert.equal(stateArbitrary.comparisonMode, 'arbitrary');
+		assert.equal(stateArbitrary.comparisonMode, 'pinned');
 		assert.equal(stateArbitrary.compareBaseSha, c1Sha);
 		assert.ok(stateArbitrary.diff);
 

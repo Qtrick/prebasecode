@@ -430,18 +430,17 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 	}
 
 	async getEmptyTree(rootPath: string, token?: CancellationTokenLike): Promise<string> {
-		try {
-			const repo = await this._ensureRepository(rootPath);
-			if (repo.getEmptyTree) {
-				const res = await repo.getEmptyTree(token);
-				if (res) {
-					return res;
-				}
-			}
-		} catch {
-			// Fallback to SHA-1 empty tree
+		const repo = await this._ensureRepository(rootPath);
+		if (!repo) {
+			throw new GitHistoryError('RepositoryUnavailable', `Git repository not found for path ${rootPath}`);
 		}
-		return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+		if (repo.getEmptyTree) {
+			const res = await repo.getEmptyTree(token);
+			if (res) {
+				return res;
+			}
+		}
+		throw new GitHistoryError('NotSupported', `getEmptyTree not available on repository for path ${rootPath}`);
 	}
 
 	notifyHeadChanged(repositoryId: string, newHead: string, transitionType: 'commit' | 'checkout' | 'reset' | 'branch-switch' | 'external' = 'external'): void {

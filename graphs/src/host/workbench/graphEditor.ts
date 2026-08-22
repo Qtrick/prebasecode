@@ -20,6 +20,9 @@ import { IEditorOpenContext } from '../../../../../common/editor.js';
 import { IEditorGroup } from '../../../../../services/editor/common/editorGroupsService.js';
 import { IEditorService } from '../../../../../services/editor/common/editorService.js';
 import { IWebviewElement, IWebviewService } from '../../../../webview/browser/webview.js';
+import { IQuickInputService, type IQuickPickItem } from '../../../../../../platform/quickinput/common/quickInput.js';
+import { INotificationService } from '../../../../../../platform/notification/common/notification.js';
+import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
@@ -60,6 +63,9 @@ export class PreBaseGraphEditor extends EditorPane {
 		@IEditorService private readonly editorService: IEditorService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@ICommandService private readonly commandService: ICommandService,
+		@IQuickInputService private readonly quickInputService: IQuickInputService,
+		@INotificationService private readonly notificationService: INotificationService,
+		@IWorkbenchGitHistoryService private readonly gitHistoryService: IWorkbenchGitHistoryService,
 	) {
 		super(PreBaseGraphEditor.ID, group, telemetryService, themeService, storageService);
 		this._register(this.graphService.onDidChangeSnapshot(() => this._pushSnapshot()));
@@ -286,7 +292,8 @@ export class PreBaseGraphEditor extends EditorPane {
 					await reply({ cached: false });
 					break;
 				}
-				const peek = this.descriptionService.peekCachedDescription(node, { projectRoot: snapshot?.projectPath });
+				const contentIdentity = this._getContentIdentityForNode(node.path);
+				const peek = this.descriptionService.peekCachedDescription(node, { projectRoot: snapshot?.projectPath, contentIdentity });
 				await reply(peek);
 				break;
 			}
@@ -300,7 +307,8 @@ export class PreBaseGraphEditor extends EditorPane {
 				}
 				this._cancelDescription();
 				this._descriptionCts = new CancellationTokenSource();
-				const result = await this.descriptionService.describeNode(node, this._descriptionCts.token, { projectRoot: snapshot?.projectPath });
+				const contentIdentity = this._getContentIdentityForNode(node.path);
+				const result = await this.descriptionService.describeNode(node, this._descriptionCts.token, { projectRoot: snapshot?.projectPath, contentIdentity });
 				await reply(result);
 				break;
 			}
@@ -320,18 +328,26 @@ export class PreBaseGraphEditor extends EditorPane {
 			}
 			case 'openTemporalHistoricalFile': {
 				const p = message.payload as { entityId?: string } | undefined;
+				let result: { ok: boolean; message?: string } = { ok: false, message: 'Missing entityId' };
 				if (p?.entityId) {
-					await this.temporalViewService.openHistoricalFile(p.entityId);
+					result = await this.temporalViewService.openHistoricalFile(p.entityId);
 				}
-				await reply({ ok: true });
+				if (!result.ok && result.message) {
+					this.notificationService?.warn(result.message);
+				}
+				await reply(result);
 				break;
 			}
 			case 'openTemporalSourceDiff': {
 				const p = message.payload as { entityId?: string } | undefined;
+				let result: { ok: boolean; message?: string } = { ok: false, message: 'Missing entityId' };
 				if (p?.entityId) {
-					await this.temporalViewService.openSourceDiff(p.entityId);
+					result = await this.temporalViewService.openSourceDiff(p.entityId);
 				}
-				await reply({ ok: true });
+				if (!result.ok && result.message) {
+					this.notificationService?.warn(result.message);
+				}
+				await reply(result);
 				break;
 			}
 			case 'setNetworkIdleAutoRotate': {
@@ -386,6 +402,11 @@ export class PreBaseGraphEditor extends EditorPane {
 				await reply({ ok: true });
 				break;
 			}
+			case 'pickTemporalCompareBase': {
+				await this._pickTemporalCompareBase();
+				await reply({ ok: true });
+				break;
+			}
 			case 'setTemporalDisplayMode': {
 				const p = message.payload as { mode?: TemporalDisplayMode } | undefined;
 				if (p?.mode) {
@@ -424,6 +445,107 @@ export class PreBaseGraphEditor extends EditorPane {
 			default:
 				await reply({ ok: false });
 				break;
+		}
+	}
+
+	private _getContentIdentityForNode(filePath?: string): string | undefined {
+		const snapshot = this.graphService.getSnapshot();
+		if (!snapshot || !filePath) {
+			return undefined;
+		}
+		const entries = (snapshot as any)?.manifest?.entries;
+		if (Array.isArray(entries)) {
+			const entry = entries.find((e: any) => e.path === filePath || e.relativePath === filePath);
+			if (entry?.contentIdentity) {
+				return entry.contentIdentity;
+			}
+		}
+		return undefined;
+	}
+
+	private async _pickTemporalCompareBase(): Promise<void> {
+		if (!this.quickInputService) {
+			return;
+		}
+		const state = this.temporalViewService.getState();
+		const curSha = state.selectedCommitSha;
+		const curCommit = state.selectedCommitSummary;
+		const timeline = state.pagedTimeline || [];
+
+		interface IComparePickItem extends IQuickPickItem {
+			action: 'first-parent' | 'parent-2' | 'pinned-sha' | 'custom-ref';
+			sha?: string;
+		}
+
+		const items: IComparePickItem[] = [];
+
+		const p1Sha = curCommit?.parents?.[0];
+		items.push({
+			label: '$(git-commit) First Parent' + (p1Sha ? ` (${p1Sha.slice(0, 7)})` : ''),
+			description: 'Dynamic comparison against immediate previous commit',
+			action: 'first-parent',
+		});
+
+		if (curCommit?.parents && curCommit.parents.length > 1) {
+			const p2Sha = curCommit.parents[1];
+			items.push({
+				label: `$(git-merge) Second Parent (${p2Sha.slice(0, 7)})`,
+				description: 'Explicit comparison against merge parent branch',
+				action: 'parent-2',
+			});
+		}
+
+		items.push({ type: 'separator', label: 'Recent Commits' } as any);
+		for (const c of timeline.slice(0, 15)) {
+			if (c.sha !== curSha) {
+				items.push({
+					label: `$(git-commit) ${c.shortSha || c.sha.slice(0, 7)}: ${c.message}`,
+					description: c.author ? `by ${c.author}` : '',
+					action: 'pinned-sha',
+					sha: c.sha,
+				});
+			}
+		}
+
+		items.push({ type: 'separator', label: 'Custom' } as any);
+		items.push({
+			label: '$(search) Enter custom branch, tag, or SHA…',
+			description: 'Resolve symbolic ref or specific commit SHA',
+			action: 'custom-ref',
+		});
+
+		const selected = await this.quickInputService.pick(items, {
+			placeHolder: 'Select commit or ref to compare against',
+		});
+
+		if (!selected) {
+			return;
+		}
+
+		if (selected.action === 'first-parent') {
+			await this.temporalViewService.setCompareBase({ mode: 'first-parent' });
+		} else if (selected.action === 'parent-2') {
+			await this.temporalViewService.setCompareBase({ mode: 'parent', parentIndex: 1 });
+		} else if (selected.action === 'pinned-sha' && selected.sha) {
+			await this.temporalViewService.setCompareBase({ mode: 'pinned', baseSha: selected.sha });
+		} else if (selected.action === 'custom-ref') {
+			const input = await this.quickInputService.input({
+				prompt: 'Enter Git branch, tag, or commit SHA to compare against',
+				placeHolder: 'e.g. main, v1.0.0, 3a9f1c2',
+			});
+			if (input && input.trim()) {
+				const trimmed = input.trim();
+				const root = state.activeRepositoryRoot;
+				let resolvedSha = trimmed;
+				if (root && this.gitHistoryService) {
+					try {
+						resolvedSha = await this.gitHistoryService.resolveRef(root, trimmed);
+					} catch {
+						// Fallback to literal if resolve fails
+					}
+				}
+				await this.temporalViewService.setCompareBase({ mode: 'pinned', baseSha: resolvedSha });
+			}
 		}
 	}
 
@@ -1047,29 +1169,29 @@ function updateTemporalUI(state, diff) {
 	}
 
 	// Safe Arbitrary Compare Base Selector
-	temporalCompareSelect.innerHTML = '';
+	while (temporalCompareSelect.firstChild) temporalCompareSelect.removeChild(temporalCompareSelect.firstChild);
 	const timeline = state.pagedTimeline || [];
-	const curCommit = timeline.find(c => c.sha === state.selectedCommitSha);
+	const curCommit = state.selectedCommitSummary || timeline.find(c => c.sha === state.selectedCommitSha);
 	const curBase = state.compareBaseSha || '';
 
 	const p1Opt = document.createElement('option');
 	p1Opt.value = curCommit?.parents?.[0] || '';
-	p1Opt.textContent = curCommit?.parents?.[0] ? 'Parent (' + curCommit.parents[0].slice(0, 7) + ')' : 'Initial Commit (No Parent)';
-	if (state.comparisonMode === 'first-parent' || (curBase && curBase === curCommit?.parents?.[0])) p1Opt.selected = true;
+	p1Opt.textContent = curCommit?.parents?.[0] ? 'First Parent (' + curCommit.parents[0].slice(0, 7) + ')' : 'Initial Commit (No Parent)';
+	if (state.comparisonMode === 'first-parent') p1Opt.selected = true;
 	temporalCompareSelect.appendChild(p1Opt);
 
 	if (curCommit?.parents && curCommit.parents.length > 1) {
 		const p2Opt = document.createElement('option');
 		p2Opt.value = curCommit.parents[1];
 		p2Opt.textContent = 'Parent 2 (' + curCommit.parents[1].slice(0, 7) + ')';
-		if (state.comparisonMode === 'explicit-parent' || curBase === curCommit.parents[1]) p2Opt.selected = true;
+		if (state.comparisonMode === 'explicit-parent') p2Opt.selected = true;
 		temporalCompareSelect.appendChild(p2Opt);
 	}
 
-	if (curBase && curBase !== curCommit?.parents?.[0] && curBase !== curCommit?.parents?.[1]) {
+	if (state.comparisonMode === 'pinned' && curBase) {
 		const customOpt = document.createElement('option');
 		customOpt.value = curBase;
-		customOpt.textContent = 'Custom (' + curBase.slice(0, 7) + ')';
+		customOpt.textContent = 'Pinned · ' + curBase.slice(0, 7);
 		customOpt.selected = true;
 		temporalCompareSelect.appendChild(customOpt);
 
@@ -1098,43 +1220,51 @@ function updateTemporalUI(state, diff) {
 	temporalFollowHead.checked = !!state.followHead;
 
 	// Scrubber slider & Timeline Strip
-	const total = timeline.length;
+	const total = state.loadedCommitCount || timeline.length;
 	temporalScrubber.max = String(Math.max(0, total - 1));
-	const currentIdx = timeline.findIndex(c => c.sha === state.selectedCommitSha);
+	const currentIdx = typeof state.selectedCommitIndex === 'number'
+		? state.selectedCommitIndex
+		: timeline.findIndex(c => c.sha === state.selectedCommitSha);
+
 	if (currentIdx >= 0) {
 		const sliderVal = (total - 1) - currentIdx;
 		temporalScrubber.value = String(sliderVal);
-		const commit = timeline[currentIdx];
-		temporalCommitSha.textContent = commit.shortSha || commit.sha.slice(0, 7);
-		temporalCommitMessage.textContent = commit.message || '';
-		temporalCommitAuthor.textContent = commit.author ? 'by ' + commit.author : '';
-		
-		if (state.isLoadingSelection) {
-			temporalCommitStatus.textContent = 'Loading ' + (state.selectedCommitSha ? state.selectedCommitSha.slice(0, 7) : '') + '…';
-			temporalCommitStatus.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
-		} else if (state.selectionError) {
-			temporalCommitStatus.textContent = 'Error';
-			temporalCommitStatus.title = state.selectionError;
-			temporalCommitStatus.style.color = 'var(--vscode-errorForeground, #f85149)';
-		} else if (state.isSettled) {
-			temporalCommitStatus.textContent = 'Settled';
-			temporalCommitStatus.title = 'Graph fully indexed and reconciled';
-			temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
-		} else {
-			temporalCommitStatus.textContent = 'Indexing…';
-			temporalCommitStatus.title = 'Lineage indexing in progress';
-			temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)';
+		const commit = curCommit || timeline[currentIdx];
+		if (commit) {
+			temporalCommitSha.textContent = commit.shortSha || commit.sha.slice(0, 7);
+			temporalCommitMessage.textContent = commit.message || '';
+			temporalCommitAuthor.textContent = commit.author ? 'by ' + commit.author : '';
+
+			const isRendered = state.renderedCommitSha === state.selectedCommitSha;
+			if (state.isLoadingSelection || !isRendered) {
+				temporalCommitStatus.textContent = 'Loading ' + (commit.shortSha || commit.sha.slice(0, 7)) + '…';
+				temporalCommitStatus.title = 'Reconstructing graph for target commit';
+				temporalCommitStatus.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
+			} else if (state.selectionError) {
+				temporalCommitStatus.textContent = 'Error';
+				temporalCommitStatus.title = state.selectionError;
+				temporalCommitStatus.style.color = 'var(--vscode-errorForeground, #f85149)';
+			} else if (state.isSettled) {
+				temporalCommitStatus.textContent = 'Settled';
+				temporalCommitStatus.title = 'Graph fully indexed and reconciled';
+				temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+			} else {
+				temporalCommitStatus.textContent = 'Indexing…';
+				temporalCommitStatus.title = 'Lineage indexing in progress';
+				temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)';
+			}
+			temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
 		}
-		temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
 	}
 
 	// Render windowed interactive timeline button markers
-	temporalTimelineStrip.innerHTML = '';
+	while (temporalTimelineStrip.firstChild) temporalTimelineStrip.removeChild(temporalTimelineStrip.firstChild);
 	const windowSize = 80;
 	let startIdx = 0;
 	let endIdx = timeline.length;
-	if (timeline.length > windowSize && currentIdx >= 0) {
-		startIdx = Math.max(0, currentIdx - Math.floor(windowSize / 2));
+	const localIdx = timeline.findIndex(c => c.sha === state.selectedCommitSha);
+	if (timeline.length > windowSize && localIdx >= 0) {
+		startIdx = Math.max(0, localIdx - Math.floor(windowSize / 2));
 		endIdx = Math.min(timeline.length, startIdx + windowSize);
 		if (endIdx - startIdx < windowSize) {
 			startIdx = Math.max(0, endIdx - windowSize);
@@ -1155,7 +1285,8 @@ function updateTemporalUI(state, diff) {
 		btn.title = markerLabel;
 		btn.setAttribute('aria-label', markerLabel);
 		btn.onclick = (function (sha) {
-			return function () {
+			return function (e) {
+				if (e) { e.stopPropagation(); }
 				request('selectTemporalCommit', { commitSha: sha, immediate: true });
 			};
 		})(c.sha);
@@ -1163,6 +1294,7 @@ function updateTemporalUI(state, diff) {
 			return function (e) {
 				if (e.key === 'Enter' || e.key === ' ') {
 					e.preventDefault();
+					e.stopPropagation();
 					request('selectTemporalCommit', { commitSha: sha, immediate: true });
 				}
 			};
@@ -1185,27 +1317,49 @@ function updateTemporalUI(state, diff) {
 		detailsParents.textContent = (curCommit.parents && curCommit.parents.length > 0) ? curCommit.parents.join(', ') : 'None (Root commit)';
 	}
 	if (diff && diff.summary && detailsSummary) {
-		detailsSummary.innerHTML =
-			'<span class="badge-added">+' + diff.summary.addedCount + ' nodes</span>' +
-			'<span class="badge-removed">-' + diff.summary.removedCount + ' nodes</span>' +
-			'<span class="badge-modified">~' + diff.summary.modifiedCount + ' modified</span>' +
-			'<span class="badge-renamed">⇄' + diff.summary.renamedCount + ' renamed</span>' +
-			'<span style="font-size:10px; opacity:0.75; margin-left:auto;">' + diff.nodes.length + ' total nodes</span>';
+		while (detailsSummary.firstChild) detailsSummary.removeChild(detailsSummary.firstChild);
+		const bAdded = document.createElement('span'); bAdded.className = 'badge-added'; bAdded.textContent = '+' + diff.summary.addedCount + ' nodes'; detailsSummary.appendChild(bAdded);
+		const bRemoved = document.createElement('span'); bRemoved.className = 'badge-removed'; bRemoved.textContent = '-' + diff.summary.removedCount + ' nodes'; detailsSummary.appendChild(bRemoved);
+		const bMod = document.createElement('span'); bMod.className = 'badge-modified'; bMod.textContent = '~' + diff.summary.modifiedCount + ' modified'; detailsSummary.appendChild(bMod);
+		const bRen = document.createElement('span'); bRen.className = 'badge-renamed'; bRen.textContent = '⇄' + diff.summary.renamedCount + ' renamed'; detailsSummary.appendChild(bRen);
+		if (diff.summary.edgeAddedCount || diff.summary.edgeRemovedCount || diff.summary.edgeModifiedCount) {
+			const bEdges = document.createElement('span'); bEdges.style.fontSize = '10px'; bEdges.style.opacity = '0.75';
+			bEdges.textContent = 'Edges: +' + diff.summary.edgeAddedCount + ' -' + diff.summary.edgeRemovedCount + ' ~' + diff.summary.edgeModifiedCount;
+			detailsSummary.appendChild(bEdges);
+		}
+		const bTotal = document.createElement('span'); bTotal.style.fontSize = '10px'; bTotal.style.opacity = '0.75'; bTotal.style.marginLeft = 'auto';
+		bTotal.textContent = (diff.nodes ? diff.nodes.length : 0) + ' total nodes';
+		detailsSummary.appendChild(bTotal);
 	}
 	if (diff && detailsEntities) {
-		detailsEntities.innerHTML = '';
+		while (detailsEntities.firstChild) detailsEntities.removeChild(detailsEntities.firstChild);
 		const changedNodes = (diff.nodes || []).filter(n => n.changeKind !== 'unchanged');
 		if (changedNodes.length === 0) {
-			detailsEntities.innerHTML = '<div style="opacity:0.6; padding:4px;">No structural changes against compare base.</div>';
+			const emptyDiv = document.createElement('div');
+			emptyDiv.style.opacity = '0.6';
+			emptyDiv.style.padding = '4px';
+			emptyDiv.textContent = 'No structural changes against compare base.';
+			detailsEntities.appendChild(emptyDiv);
 		} else {
 			for (let i = 0; i < changedNodes.length; i++) {
 				const n = changedNodes[i];
 				const item = document.createElement('div');
 				item.className = 'entity-item';
-				const kindBadgeClass = 'badge-' + n.changeKind;
-				item.innerHTML =
-					'<span style="font-family:monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:210px;" title="' + (n.path || '') + '">' + (n.label || n.id) + '</span>' +
-					'<span class="' + kindBadgeClass + '">' + n.changeKind + '</span>';
+				const labelSpan = document.createElement('span');
+				labelSpan.style.fontFamily = 'monospace';
+				labelSpan.style.overflow = 'hidden';
+				labelSpan.style.textOverflow = 'ellipsis';
+				labelSpan.style.whiteSpace = 'nowrap';
+				labelSpan.style.maxWidth = '210px';
+				labelSpan.title = n.path || '';
+				labelSpan.textContent = n.label || n.path || n.entityId;
+				item.appendChild(labelSpan);
+
+				const badgeSpan = document.createElement('span');
+				badgeSpan.className = 'badge-' + n.changeKind;
+				badgeSpan.textContent = n.changeKind;
+				item.appendChild(badgeSpan);
+
 				item.onclick = (function (node) {
 					return function () {
 						selectedNodeId = node.entityId;
@@ -1499,14 +1653,24 @@ function toggleTemporalPlay() {
 		isPlayingHistory = false;
 		temporalPlayBtn.textContent = '▶';
 	} else {
+		const timeline = (temporalState && temporalState.pagedTimeline) || [];
+		if (timeline.length <= 1) return;
+		const curIdx = timeline.findIndex(c => c.sha === temporalState.selectedCommitSha);
+		if (curIdx === 0) {
+			// At HEAD, rewind to oldest loaded commit and play forward
+			const oldestIdx = timeline.length - 1;
+			request('selectTemporalCommit', { commitSha: timeline[oldestIdx].sha, immediate: true });
+		}
 		isPlayingHistory = true;
 		temporalPlayBtn.textContent = '❚❚';
 		playIntervalTimer = setInterval(function () {
-			stepTemporalCommit(1);
-			const timeline = temporalState.pagedTimeline || [];
-			if (timeline[0] && timeline[0].sha === temporalState.selectedCommitSha) {
+			const curTl = (temporalState && temporalState.pagedTimeline) || [];
+			const currentIdx = curTl.findIndex(c => c.sha === temporalState.selectedCommitSha);
+			if (currentIdx <= 0) {
 				toggleTemporalPlay();
+				return;
 			}
+			stepTemporalCommit(1);
 		}, 900);
 	}
 }
@@ -1896,12 +2060,8 @@ temporalRefSelect.addEventListener('change', function () {
 temporalCompareSelect.addEventListener('change', function () {
 	const base = temporalCompareSelect.value;
 	if (base === '__prompt_custom__') {
-		const entered = prompt('Enter Git commit SHA, branch, or tag to compare against:');
-		if (entered && entered.trim()) {
-			request('setTemporalCompareBase', { compareBaseSha: entered.trim() });
-		} else {
-			updateTemporalUI(temporalState, temporalDiff);
-		}
+		request('pickTemporalCompareBase', {});
+		updateTemporalUI(temporalState, temporalDiff);
 	} else if (base === '__clear_custom__') {
 		request('setTemporalCompareBase', { compareBaseSha: undefined });
 	} else {
@@ -1936,7 +2096,7 @@ temporalDetailsClose.addEventListener('click', function () {
 temporalScrubber.addEventListener('input', function () {
 	const val = parseInt(temporalScrubber.value, 10);
 	const timeline = (temporalState && temporalState.pagedTimeline) || [];
-	const total = timeline.length;
+	const total = (temporalState && temporalState.loadedCommitCount) || timeline.length;
 	const targetIdx = (total - 1) - val;
 	if (timeline[targetIdx]) {
 		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: false });
@@ -1946,7 +2106,7 @@ temporalScrubber.addEventListener('input', function () {
 temporalScrubber.addEventListener('change', function () {
 	const val = parseInt(temporalScrubber.value, 10);
 	const timeline = (temporalState && temporalState.pagedTimeline) || [];
-	const total = timeline.length;
+	const total = (temporalState && temporalState.loadedCommitCount) || timeline.length;
 	const targetIdx = (total - 1) - val;
 	if (timeline[targetIdx]) {
 		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: true });
@@ -1968,7 +2128,8 @@ temporalFollowHead.addEventListener('change', function () {
 });
 
 window.addEventListener('keydown', function (e) {
-	if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return;
+	const targetTag = (e.target && e.target.tagName) || '';
+	if (targetTag === 'INPUT' || targetTag === 'SELECT' || targetTag === 'TEXTAREA' || targetTag === 'BUTTON' || (e.target && e.target.isContentEditable)) return;
 	if (e.key === 'Escape') {
 		closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); dirty = true; kickRaf();
 	} else if (isTemporal()) {

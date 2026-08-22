@@ -318,11 +318,11 @@ export class MainThreadGitExtensionService extends Disposable implements MainThr
 	async getEmptyTree(root: URI, token?: CancellationToken): Promise<string> {
 		const handle = this._repositoryHandles.get(root);
 		if (handle === undefined) {
-			return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+			throw new Error(`Git repository handle not found for ${root.toString()}`);
 		}
 		const result = await this._proxy.$getEmptyTree(handle, token);
 		if (!result.success || !result.data) {
-			return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+			throw new Error(result.error?.message || `Failed to get empty tree for repository ${root.toString()}`);
 		}
 		return result.data;
 	}

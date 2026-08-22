@@ -166,6 +166,6 @@ export class GitRepository extends Disposable implements IGitRepository {
 		if (this.delegate.getEmptyTree) {
 			return this.delegate.getEmptyTree(this.rootUri, token);
 		}
-		return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+		throw new Error(`getEmptyTree is not implemented on Git delegate for ${this.rootUri.toString()}`);
 	}
 }

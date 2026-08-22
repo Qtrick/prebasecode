@@ -801,9 +801,11 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 		try {
 			if (typeof (repository as any).getEmptyTree === 'function') {
 				const emptyTree = await (repository as any).getEmptyTree();
-				return { success: true, data: emptyTree };
+				if (emptyTree) {
+					return { success: true, data: emptyTree };
+				}
 			}
-			return { success: true, data: '4b825dc642cb6eb9a060e54bf8d69288fbee4904' };
+			return { success: false, error: { code: 'NotSupported', message: 'getEmptyTree is not supported on the active git repository' } };
 		} catch (err) {
 			const code = mapGitErrorToCode(err, 'ProcessFailure');
 			return { success: false, error: { code, message: getErrorMessage(err) || 'Failed to get empty tree' } };

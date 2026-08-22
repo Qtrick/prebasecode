@@ -56,8 +56,8 @@ interface CacheEntryV9 {
 
 const CACHE_KEY = 'prebase.graph.descriptionCache.v9';
 const PROMPT_VERSION = 9;
-const MAX_CACHE_ENTRIES = 500;
-const MAX_CACHE_BYTES = 512 * 1024; // 512 KB
+const MAX_CACHE_ENTRIES = 2000;
+const MAX_CACHE_BYTES = 2 * 1024 * 1024; // 2 MB
 const MAX_CONTENT = 12000;
 const SENSITIVE = /(secret|token|password|credential|apiKey|privateKey|\.env|\.pem|\.key)/i;
 const SENSITIVE_DIRS = /(^|\/)(\.git|\.agents|\.cursor|node_modules|out|dist|build|\.vscode|\.idea)(\/|$)/;
@@ -539,7 +539,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.empty', "Empty response from language model."), cacheHit: false };
 				}
 
-				// If file was mutated during generation, do not cache stale result
+				// If file was mutated during generation, do not cache and discard stale result
 				const currentFileGen = this._fileGeneration.get(cacheKey) || 0;
 				if (currentFileGen === fileGenAtStart) {
 					this._writeCache(cacheKey, {
@@ -554,14 +554,21 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					});
 					this._cleanVerifiedFiles.add(cacheKey);
 					this._dirtyFiles.delete(cacheKey);
+
+					return {
+						overview,
+						aiDescription: description,
+						aiStatus: 'ready',
+						aiProviderId,
+						aiModelId,
+						cacheHit: false
+					};
 				}
 
 				return {
 					overview,
-					aiDescription: description,
-					aiStatus: 'ready',
-					aiProviderId,
-					aiModelId,
+					aiStatus: 'unavailable',
+					aiMessage: localize('prebase.desc.stale', "File was modified while generating description."),
 					cacheHit: false
 				};
 			} catch (err: any) {

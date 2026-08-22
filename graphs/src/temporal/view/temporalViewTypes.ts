@@ -11,6 +11,13 @@ export type TemporalNodeChangeKind = 'unchanged' | 'modified' | 'added' | 'remov
 export type TemporalEdgeChangeKind = 'unchanged' | 'modified' | 'added' | 'removed';
 export type TemporalDisplayMode = 'changes' | 'state';
 
+export type TemporalComparisonMode = 'first-parent' | 'explicit-parent' | 'pinned';
+
+export type TemporalComparisonSelection =
+	| { readonly mode: 'first-parent' }
+	| { readonly mode: 'parent'; readonly parentIndex: number }
+	| { readonly mode: 'pinned'; readonly baseSha: string };
+
 export interface TemporalRenderNode {
 	readonly entityId: string;
 	readonly canonicalNodeId: string;
@@ -42,8 +49,18 @@ export interface TemporalRenderEdge {
 	readonly kind: string;
 	readonly changeKind: TemporalEdgeChangeKind;
 	readonly edgeData?: {
-		readonly importType?: string;
-		readonly weight?: number;
+		readonly id?: string;
+		readonly source?: string;
+		readonly target?: string;
+		readonly kind?: string;
+		readonly meta?: {
+			readonly importSource?: string;
+			readonly specifiers?: readonly string[];
+			readonly isDefault?: boolean;
+			readonly isDynamic?: boolean;
+			readonly line?: number;
+			readonly [key: string]: unknown;
+		};
 		readonly [key: string]: unknown;
 	};
 }
@@ -97,14 +114,18 @@ export interface ITemporalViewState {
 	readonly renderedCommitSha?: string;
 	readonly isLoadingSelection: boolean;
 	readonly selectionError?: string;
+	readonly isLoadingHistory?: boolean;
+	readonly historyError?: string;
 	readonly compareBaseSha?: string;
-	readonly customCompareBase?: string;
-	readonly comparisonMode: 'first-parent' | 'explicit-parent' | 'arbitrary';
+	readonly renderedCompareBaseSha?: string;
+	readonly comparisonSelection?: TemporalComparisonSelection;
+	readonly comparisonMode: TemporalComparisonMode;
 	readonly followHead: boolean;
 	readonly displayMode: TemporalDisplayMode;
 	readonly pagedTimeline: readonly TemporalCommitSummary[];
 	readonly loadedCommitCount: number;
-	readonly totalAvailableCommits?: number;
+	readonly selectedCommitIndex?: number;
+	readonly selectedCommitSummary?: TemporalCommitSummary;
 	readonly historyHasMore: boolean;
 	readonly historyNextCursor?: string;
 	readonly isSettled: boolean;
@@ -133,14 +154,14 @@ export interface IPreBaseTemporalViewService {
 	switchRepository(repoRoot: string): Promise<void>;
 	selectRef(refName: string): Promise<void>;
 	selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean }): Promise<void>;
-	setCompareBase(compareBaseSha: string | undefined): Promise<void>;
+	setCompareBase(compareBaseShaOrSelection: string | TemporalComparisonSelection | undefined): Promise<void>;
 	setDisplayMode(mode: TemporalDisplayMode): void;
 	setFollowHead(follow: boolean): void;
 	setFilterQuery(query: string): void;
 	selectEntity(entityId: string | undefined): void;
 	loadMoreHistory(): Promise<void>;
-	openSourceDiff(entityId: string): Promise<void>;
-	openHistoricalFile(entityId: string): Promise<void>;
+	openSourceDiff(entityId: string): Promise<{ ok: boolean; message?: string }>;
+	openHistoricalFile(entityId: string): Promise<{ ok: boolean; message?: string }>;
 	refresh(): Promise<void>;
 }
 
