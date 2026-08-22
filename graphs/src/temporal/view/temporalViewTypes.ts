@@ -5,9 +5,11 @@
 
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
 import type { Event } from '../../../../../../base/common/event.js';
+import type { TemporalRepositoryRef } from '../common/temporalTypes.js';
 
 export type TemporalNodeChangeKind = 'unchanged' | 'modified' | 'added' | 'removed' | 'renamed';
 export type TemporalEdgeChangeKind = 'unchanged' | 'modified' | 'added' | 'removed';
+export type TemporalDisplayMode = 'changes' | 'state';
 
 export interface TemporalRenderNode {
 	readonly entityId: string;
@@ -20,11 +22,13 @@ export interface TemporalRenderNode {
 	readonly z?: number;
 	readonly changeKind: TemporalNodeChangeKind;
 	readonly oldPath?: string;
+	readonly isModified?: boolean;
 	readonly meta?: {
 		readonly architectureLayer?: string;
 		readonly fileType?: string;
 		readonly linesOfCode?: number;
 		readonly language?: string;
+		readonly isRenamedAndModified?: boolean;
 		readonly [key: string]: unknown;
 	};
 }
@@ -52,6 +56,7 @@ export interface TemporalStructuralDiffSummary {
 	readonly unchangedCount: number;
 	readonly edgeAddedCount: number;
 	readonly edgeRemovedCount: number;
+	readonly edgeModifiedCount: number;
 }
 
 export interface TemporalStructuralDiff {
@@ -77,12 +82,20 @@ export interface TemporalCommitSummary {
 }
 
 export interface ITemporalViewState {
+	readonly activeRepositoryId?: string;
+	readonly activeRepositoryRoot?: string;
+	readonly repositoryRefs: readonly TemporalRepositoryRef[];
 	readonly selectedRef: string;
 	readonly selectedCommitSha: string;
 	readonly compareBaseSha?: string;
+	readonly comparisonMode: 'first-parent' | 'explicit-parent' | 'arbitrary';
 	readonly followHead: boolean;
+	readonly displayMode: TemporalDisplayMode;
 	readonly pagedTimeline: readonly TemporalCommitSummary[];
-	readonly totalAvailableCommits: number;
+	readonly loadedCommitCount: number;
+	readonly totalAvailableCommits?: number;
+	readonly historyHasMore: boolean;
+	readonly historyNextCursor?: string;
 	readonly isSettled: boolean;
 	readonly isPartialLineage: boolean;
 	readonly diff?: TemporalStructuralDiff;
@@ -104,12 +117,16 @@ export interface IPreBaseTemporalViewService {
 	readonly onDidChangeDiff: Event<TemporalStructuralDiff>;
 
 	getState(): ITemporalViewState;
+	initialize(): Promise<void>;
 	selectRef(refName: string): Promise<void>;
 	selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean }): Promise<void>;
 	setCompareBase(compareBaseSha: string | undefined): Promise<void>;
+	setDisplayMode(mode: TemporalDisplayMode): void;
 	setFollowHead(follow: boolean): void;
 	setFilterQuery(query: string): void;
+	selectEntity(entityId: string | undefined): void;
 	loadMoreHistory(): Promise<void>;
 	openSourceDiff(entityId: string): Promise<void>;
+	openHistoricalFile(entityId: string): Promise<void>;
 	refresh(): Promise<void>;
 }

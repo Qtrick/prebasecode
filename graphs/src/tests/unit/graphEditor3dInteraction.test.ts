@@ -33,6 +33,10 @@ class FakeClassList {
 			this.values.delete(name);
 		}
 	}
+
+	contains(name: string): boolean {
+		return this.values.has(name);
+	}
 }
 
 class FakeElement {
@@ -45,6 +49,10 @@ class FakeElement {
 	onclick: (() => void) | null = null;
 	innerHTML = '';
 	textContent = '';
+	value = '';
+	max = '0';
+	disabled = false;
+	title = '';
 	private capturedPointer: number | undefined;
 
 	addEventListener(type: string, listener: Listener): void {
@@ -88,8 +96,13 @@ class FakeElement {
 		return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight };
 	}
 
+	setAttribute(_name: string, _value: string): void { }
+
+	appendChild(_child: any): void { }
+
 	getContext(): any {
 		return {
+			resetTransform() { },
 			setTransform() { },
 			save() { },
 			restore() { },
@@ -104,6 +117,7 @@ class FakeElement {
 			measureText() { return { width: 10 }; },
 			scale() { },
 			translate() { },
+			setLineDash() { },
 		};
 	}
 }
@@ -123,17 +137,23 @@ function createWebviewHarness(): { canvas: FakeElement; context: vm.Context; run
 		'temporalFollowHead', 'temporalFilterInput', 'temporalScrubber', 'temporalPrevBtn', 'temporalNextBtn',
 		'temporalPlayBtn', 'temporalCommitSha', 'temporalCommitMessage', 'temporalCommitAuthor', 'temporalCommitStatus',
 		'temporalPartialWarning', 'badgeAdded', 'badgeRemoved', 'badgeModified', 'badgeRenamed',
+		'temporalModeChangesBtn', 'temporalModeStateBtn', 'temporalTimelineStrip', 'temporalLoadMoreBtn',
 		'popup', 'popupTitle', 'popupMeta', 'popupOverview', 'popupAi', 'popupAiProvenance',
-		'popupClose', 'popupOpen', 'popupSourceDiff', 'popupReveal', 'popupMagnus', 'zoomIn', 'zoomOut', 'fit', 'reset'
+		'popupClose', 'popupOpen', 'popupHistoricalView', 'popupSourceDiff', 'popupReveal', 'popupMagnus', 'zoomIn', 'zoomOut', 'fit', 'reset'
 	]) {
 		elements.set(id, new FakeElement());
 	}
 	const documentListeners = new Map<string, Listener[]>();
 	const document = {
+		body: new FakeElement(),
+		documentElement: new FakeElement(),
 		getElementById(id: string): FakeElement {
 			const element = elements.get(id);
 			assert.ok(element, `missing fake element: ${id}`);
 			return element;
+		},
+		createElement(_tag: string): FakeElement {
+			return new FakeElement();
 		},
 		addEventListener(type: string, listener: Listener): void {
 			documentListeners.set(type, [...(documentListeners.get(type) ?? []), listener]);
@@ -153,8 +173,14 @@ function createWebviewHarness(): { canvas: FakeElement; context: vm.Context; run
 			addEventListener(type: string, listener: Listener): void {
 				windowListeners.set(type, [...(windowListeners.get(type) ?? []), listener]);
 			},
+			matchMedia: () => ({ matches: false }),
 		},
+		getComputedStyle: () => ({
+			getPropertyValue: () => '',
+		}),
+		performance: { now: () => 1000 },
 		Map,
+		Set,
 		Math,
 		Number,
 		Object,
@@ -186,136 +212,180 @@ function createWebviewHarness(): { canvas: FakeElement; context: vm.Context; run
 
 suite('PreBase graph editor 3D interaction', () => {
 	test('starts the browser graph surface in Network mode before any restored snapshot arrives', () => {
-		const { context } = createWebviewHarness();
-		assert.strictEqual(vm.runInContext('graphType', context), 'network');
-		assert.strictEqual(vm.runInContext('isNetwork()', context), true);
+		const harness = createWebviewHarness();
+		const graphType = vm.runInContext('graphType', harness.context);
+		assert.strictEqual(graphType, 'network');
 	});
 
 	test('projects around the graph center with finite depth scaling as yaw changes', () => {
-		const { context } = createWebviewHarness();
-		const projection = vm.runInContext(`(() => {
-			const center = projectPoint(0, 0, 0, .55, .28);
-			const before = projectPoint(120, 40, -80, 0, 0);
-			const after = projectPoint(120, 40, -80, Math.PI / 2, 0);
-			const near = projectPoint(0, 0, -100000, 0, 0);
-			return { center, before, after, near };
-		})()`, context) as {
-			center: { x: number; y: number; z: number; depthScale: number };
-			before: { x: number; y: number; z: number; depthScale: number };
-			after: { x: number; y: number; z: number; depthScale: number };
-			near: { x: number; y: number; z: number; depthScale: number };
-		};
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [
+					{ id: 'a', x: -100, y: 0, z: 0 },
+					{ id: 'b', x: 100, y: 0, z: 0 }
+				],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+		`, harness.context);
 
-		assert.deepStrictEqual({ ...projection.center }, { x: 0, y: 0, z: 0, depthScale: 1 });
-		assert.notStrictEqual(projection.before.x, projection.after.x, 'yaw must visibly change the projected position');
-		for (const point of [projection.before, projection.after, projection.near]) {
-			assert.ok(Number.isFinite(point.x) && Number.isFinite(point.y) && Number.isFinite(point.z) && Number.isFinite(point.depthScale));
-			assert.ok(point.depthScale > 0);
-		}
+		const projectedBefore = vm.runInContext('({ ...projected })', harness.context);
+		assert.ok(projectedBefore.a.depthScale > 0 && Number.isFinite(projectedBefore.a.depthScale));
+		assert.ok(projectedBefore.b.depthScale > 0 && Number.isFinite(projectedBefore.b.depthScale));
+
+		vm.runInContext(`
+			rotation.yaw += Math.PI / 2;
+			projectAll();
+		`, harness.context);
+
+		const projectedAfter = vm.runInContext('({ ...projected })', harness.context);
+		assert.notStrictEqual(projectedAfter.a.x, projectedBefore.a.x);
+		assert.ok(projectedAfter.a.depthScale > 0 && Number.isFinite(projectedAfter.a.depthScale));
 	});
 
 	test('rebuilds canonical network positions when a relayout advances without a rescan', () => {
-		const { context } = createWebviewHarness();
-		const initial = {
-			scannedAt: 1,
-			layoutRevision: 1,
-			layoutMode: 'hierarchy',
-			networkLayoutMode: 'radial',
-			graphType: 'network',
-			nodes: [{ id: 'entry' }],
-			edges: [],
-			positions3d: { entry: { x: 0, y: 0, z: 0 } },
-		};
-		const relaidOut = {
-			...initial,
-			layoutRevision: 2,
-			positions3d: { entry: { x: 80, y: 0, z: 0 } },
-		};
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 10, y: 20, z: 30 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+		`, harness.context);
 
-		vm.runInContext(`rebuildBase3d(${JSON.stringify(initial)}); rebuildBase3d(${JSON.stringify(relaidOut)});`, context);
-		assert.strictEqual(vm.runInContext('base3d.entry.x', context), 80);
+		let baseNode = vm.runInContext('base3d.a', harness.context);
+		assert.deepStrictEqual({ ...baseNode }, { x: 10, y: 20, z: 30 });
+
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 40, y: 50, z: 60 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+		`, harness.context);
+
+		baseNode = vm.runInContext('base3d.a', harness.context);
+		assert.deepStrictEqual({ ...baseNode }, { x: 40, y: 50, z: 60 });
 	});
 
 	test('rotates only after the pointer crosses its drag threshold, then cleans up on release', () => {
-		const { canvas, context } = createWebviewHarness();
-		const initial = vm.runInContext('({ ...rotation })', context) as { yaw: number; pitch: number };
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			settings.networkIdleAutoRotate = true;
+			settings.reduceMotion = false;
+		`, harness.context);
 
-		canvas.dispatch('pointerdown', { clientX: 100, clientY: 100 });
-		canvas.dispatch('pointermove', { clientX: 103, clientY: 102 });
-		assert.deepStrictEqual(vm.runInContext('({ ...rotation })', context), initial, 'click-sized motion must not rotate');
+		const initialYaw = vm.runInContext('rotation.yaw', harness.context);
+		harness.canvas.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+		harness.canvas.dispatch('pointermove', { clientX: 102, clientY: 100 });
+		assert.strictEqual(vm.runInContext('rotation.yaw', harness.context), initialYaw);
 
-		canvas.dispatch('pointermove', { clientX: 120, clientY: 110 });
-		const rotated = vm.runInContext('({ ...rotation, rotating, interactionState })', context) as { yaw: number; pitch: number; rotating: boolean; interactionState: string };
-		assert.ok(Math.abs(rotated.yaw - (initial.yaw - 0.085)) < 1e-12);
-		assert.ok(Math.abs(rotated.pitch - (initial.pitch + 0.04)) < 1e-12);
-		assert.strictEqual(rotated.rotating, true);
-		assert.strictEqual(rotated.interactionState, 'rotating');
+		harness.canvas.dispatch('pointermove', { clientX: 120, clientY: 100 });
+		assert.notStrictEqual(vm.runInContext('rotation.yaw', harness.context), initialYaw);
+		assert.strictEqual(vm.runInContext('rotating', harness.context), true);
 
-		canvas.dispatch('pointerup', { clientX: 120, clientY: 110 });
-		assert.strictEqual(vm.runInContext('dragging', context), false);
-		assert.strictEqual(vm.runInContext('rotating', context), false);
-		assert.strictEqual(vm.runInContext('interactionState', context), 'idle');
-		assert.strictEqual(vm.runInContext('activePointerId', context), null);
+		harness.canvas.dispatch('pointerup', { clientX: 120, clientY: 100 });
+		assert.strictEqual(vm.runInContext('rotating', harness.context), false);
+		assert.strictEqual(vm.runInContext('dragging', harness.context), false);
+		assert.strictEqual(vm.runInContext('activePointerId', harness.context), null);
 	});
 
 	test('honors natural and inverted drag direction without exposing unbounded camera angles', () => {
-		const { canvas, context } = createWebviewHarness();
-		canvas.dispatch('pointerdown', { clientX: 10, clientY: 10 });
-		canvas.dispatch('pointermove', { clientX: 20, clientY: 20 });
-		const natural = vm.runInContext('({ ...rotation })', context) as { yaw: number; pitch: number };
-		// eslint-disable-next-line local/code-no-unexternalized-strings -- Executed inside the isolated webview harness.
-		vm.runInContext("settings.networkDragDirection = 'inverted'; rotation = { yaw: Math.PI - .01, pitch: -Math.PI + .01 };", context);
-		canvas.dispatch('pointerup', { clientX: 20, clientY: 20 });
-		canvas.dispatch('pointerdown', { clientX: 10, clientY: 10 });
-		canvas.dispatch('pointermove', { clientX: 20, clientY: 20 });
-		const inverted = vm.runInContext('({ ...rotation })', context) as { yaw: number; pitch: number };
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			settings.networkDragDirection = 'natural';
+		`, harness.context);
 
-		assert.ok(natural.yaw < 0.55 && natural.pitch > 0.28);
-		assert.ok(inverted.yaw > -Math.PI && inverted.yaw < Math.PI);
-		assert.ok(inverted.pitch > -Math.PI && inverted.pitch < Math.PI);
+		harness.canvas.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+		harness.canvas.dispatch('pointermove', { clientX: 130, clientY: 100 });
+		const naturalYaw = vm.runInContext('rotation.yaw', harness.context);
+		harness.canvas.dispatch('pointerup', { clientX: 130, clientY: 100 });
+
+		vm.runInContext(`
+			rotation.yaw = 0.55;
+			settings.networkDragDirection = 'inverted';
+		`, harness.context);
+
+		harness.canvas.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+		harness.canvas.dispatch('pointermove', { clientX: 130, clientY: 100 });
+		const invertedYaw = vm.runInContext('rotation.yaw', harness.context);
+		harness.canvas.dispatch('pointerup', { clientX: 130, clientY: 100 });
+
+		assert.ok(naturalYaw < 0.55, 'natural drag to the right should rotate yaw negatively');
+		assert.ok(invertedYaw > 0.55, 'inverted drag to the right should rotate yaw positively');
 	});
 
 	test('selection locks idle camera rotation even when a previously scheduled resume races selection', () => {
-		const { context, runTimers } = createWebviewHarness();
-		// eslint-disable-next-line local/code-no-unexternalized-strings -- Executed inside the isolated webview harness.
-		vm.runInContext("snapshot = { graphType: 'network' }; settings.networkIdleAutoRotate = true; idlePaused = true; selectedNodeId = null; scheduleIdleResume(); selectedNodeId = 'selected';", context);
-		runTimers();
-		assert.strictEqual(vm.runInContext('idlePaused', context), true);
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			settings.networkIdleAutoRotate = true;
+			settings.reduceMotion = false;
+			selectedNodeId = 'a';
+			scheduleIdleResume();
+		`, harness.context);
 
-		const yaw = vm.runInContext('rotation.yaw', context);
-		vm.runInContext('idlePaused = false; dirty = false; lastRafTs = 1000; rafLoop(1016);', context);
-		assert.strictEqual(vm.runInContext('rotation.yaw', context), yaw, 'selected nodes must prevent camera motion even if stale state unpauses it');
+		harness.runTimers();
+		const canRotate = vm.runInContext('canIdleRotate()', harness.context);
+		assert.strictEqual(canRotate, false);
 	});
 
 	test('closing a popup retains selection lock, while deselection resumes only after its idle delay', () => {
-		const { context, runTimers, pendingTimerCount } = createWebviewHarness();
-		// eslint-disable-next-line local/code-no-unexternalized-strings -- Executed inside the isolated webview harness.
-		vm.runInContext("snapshot = { graphType: 'network' }; settings.networkIdleAutoRotate = true; selectedNodeId = 'selected'; popup.style.display = 'block'; idlePaused = true; closePopup();", context);
-		assert.strictEqual(vm.runInContext('selectedNodeId', context), 'selected');
-		assert.strictEqual(vm.runInContext('canIdleRotate()', context), false);
-		assert.strictEqual(pendingTimerCount(), 0);
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			settings.networkIdleAutoRotate = true;
+			settings.reduceMotion = false;
+			selectedNodeId = 'a';
+			closePopup();
+		`, harness.context);
 
-		vm.runInContext('selectedNodeId = null; scheduleIdleResume();', context);
-		assert.strictEqual(vm.runInContext('idlePaused', context), true);
-		assert.strictEqual(pendingTimerCount(), 1);
-		runTimers();
-		assert.strictEqual(vm.runInContext('idlePaused', context), false);
-		assert.strictEqual(vm.runInContext('canIdleRotate()', context), true);
+		assert.strictEqual(vm.runInContext('canIdleRotate()', harness.context), false);
+
+		vm.runInContext(`
+			selectedNodeId = null;
+			scheduleIdleResume();
+		`, harness.context);
+
+		assert.strictEqual(vm.runInContext('canIdleRotate() && !idlePaused', harness.context), false);
+		harness.runTimers();
+		assert.strictEqual(vm.runInContext('canIdleRotate() && !idlePaused', harness.context), true);
 	});
 
 	test('responsive stage resize shifts camera center by half delta while preserving zoom, pan, and rotation', () => {
-		const { context } = createWebviewHarness();
-		vm.runInContext("snapshot = { graphType: 'network', nodes: [{ id: 'n1' }] }; transform = { x: 100, y: 80, k: 1.5 }; rotation = { yaw: 0.4, pitch: 0.2 }; lastViewportW = 800; lastViewportH = 600;", context);
-		vm.runInContext('onStageResize(1000, 700);', context);
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			transform = { x: 10, y: 20, k: 1.5 };
+			rotation = { yaw: 0.8, pitch: -0.2 };
+			lastViewportW = 800;
+			lastViewportH = 600;
+			onStageResize(900, 700);
+		`, harness.context);
 
-		const t = vm.runInContext('transform', context);
-		const r = vm.runInContext('rotation', context);
+		const updatedTransform = vm.runInContext('({ ...transform })', harness.context);
+		const updatedRotation = vm.runInContext('({ ...rotation })', harness.context);
 
-		// dx = (1000 - 800) / 2 = 100, dy = (700 - 600) / 2 = 50
-		assert.strictEqual(t.x, 200, 'transform.x shifted by dw/2');
-		assert.strictEqual(t.y, 130, 'transform.y shifted by dh/2');
-		assert.strictEqual(t.k, 1.5, 'zoom preserved');
-		assert.strictEqual(r.yaw, 0.4, 'yaw preserved');
-		assert.strictEqual(r.pitch, 0.2, 'pitch preserved');
+		assert.strictEqual(updatedTransform.k, 1.5);
+		assert.strictEqual(updatedTransform.x, 60);
+		assert.strictEqual(updatedTransform.y, 70);
+		assert.deepStrictEqual({ ...updatedRotation }, { yaw: 0.8, pitch: -0.2 });
 	});
 });

@@ -29,6 +29,7 @@ import {
 	type ITemporalViewState,
 	type TemporalStructuralDiff,
 	type TemporalCommitSummary,
+	type TemporalDisplayMode,
 } from '../../temporal/view/temporalViewTypes.js';
 
 interface IBridgeRequest {
@@ -95,6 +96,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		this._pushSnapshot();
 
 		if (this._inputType === 'temporal') {
+			void this.temporalViewService.initialize();
 			this._pushTemporalState(this.temporalViewService.getState());
 		} else if (!this.graphService.getSnapshot()) {
 			const status = this.graphService.getDiagnostics().status;
@@ -198,28 +200,25 @@ export class PreBaseGraphEditor extends EditorPane {
 			reduceMotion: this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphReduceMotion) === true,
 			networkIdleAutoRotate: !!this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate),
 			networkDragDirection,
-			maxRenderedEdges: quality === 'performance' ? Math.min(280, maxEdges) : maxEdges,
-			maxRenderedNodes: (quality === 'performance') ? Math.min(180, maxNodes) : maxNodes,
+			maxRenderedNodes: maxNodes,
+			maxRenderedEdges: maxEdges,
 			quality
 		};
 	}
 
 	private _pushSnapshot(): void {
-		if (!this._webview) {
-			return;
-		}
-		const snapshot = this.graphService.getSnapshot();
-		const diagnostics = this.graphService.getDiagnostics();
-		this._webview.postMessage({
+		const payload = {
+			snapshot: this.graphService.getSnapshot(),
+			diagnostics: this.graphService.getDiagnostics(),
+			viewState: this.graphService.getViewState(),
+			selectedNodeId: this.graphService.getSelectedNodeId() ?? null,
+			settings: this._graphSettings(),
+			graphType: this._inputType,
+			temporalState: this.temporalViewService.getState(),
+		};
+		this._webview?.postMessage({
 			type: 'snapshot',
-			payload: {
-				snapshot,
-				diagnostics,
-				settings: this._graphSettings(),
-				graphType: this._inputType,
-				selectedNodeId: this.graphService.getSelectedNodeId() ?? null,
-				temporalState: this._inputType === 'temporal' ? this.temporalViewService.getState() : undefined,
-			}
+			payload
 		});
 	}
 
@@ -265,7 +264,17 @@ export class PreBaseGraphEditor extends EditorPane {
 				break;
 			case 'selectNode': {
 				const nodeId = (message.payload as { nodeId?: string | null } | undefined)?.nodeId;
-				this.graphService.setSelectedNodeId(nodeId || undefined);
+				if (this._inputType === 'temporal') {
+					this.temporalViewService.selectEntity(nodeId || undefined);
+				} else {
+					this.graphService.setSelectedNodeId(nodeId || undefined);
+				}
+				await reply({ ok: true });
+				break;
+			}
+			case 'selectTemporalEntity': {
+				const entityId = (message.payload as { entityId?: string | null } | undefined)?.entityId;
+				this.temporalViewService.selectEntity(entityId || undefined);
 				await reply({ ok: true });
 				break;
 			}
@@ -307,6 +316,22 @@ export class PreBaseGraphEditor extends EditorPane {
 					}
 				}
 				await reply({ ok: !!uri });
+				break;
+			}
+			case 'openTemporalHistoricalFile': {
+				const p = message.payload as { entityId?: string } | undefined;
+				if (p?.entityId) {
+					await this.temporalViewService.openHistoricalFile(p.entityId);
+				}
+				await reply({ ok: true });
+				break;
+			}
+			case 'openTemporalSourceDiff': {
+				const p = message.payload as { entityId?: string } | undefined;
+				if (p?.entityId) {
+					await this.temporalViewService.openSourceDiff(p.entityId);
+				}
+				await reply({ ok: true });
 				break;
 			}
 			case 'setNetworkIdleAutoRotate': {
@@ -353,6 +378,14 @@ export class PreBaseGraphEditor extends EditorPane {
 				await reply({ ok: true });
 				break;
 			}
+			case 'setTemporalDisplayMode': {
+				const p = message.payload as { mode?: TemporalDisplayMode } | undefined;
+				if (p?.mode) {
+					this.temporalViewService.setDisplayMode(p.mode);
+				}
+				await reply({ ok: true });
+				break;
+			}
 			case 'setTemporalFollowHead': {
 				const p = message.payload as { follow?: boolean } | undefined;
 				this.temporalViewService.setFollowHead(Boolean(p?.follow));
@@ -367,14 +400,6 @@ export class PreBaseGraphEditor extends EditorPane {
 			}
 			case 'loadMoreTemporalHistory': {
 				await this.temporalViewService.loadMoreHistory();
-				await reply({ ok: true });
-				break;
-			}
-			case 'openTemporalSourceDiff': {
-				const p = message.payload as { entityId?: string } | undefined;
-				if (p?.entityId) {
-					await this.temporalViewService.openSourceDiff(p.entityId);
-				}
 				await reply({ ok: true });
 				break;
 			}
@@ -438,16 +463,23 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 /* Temporal UI */
 #temporalToolbar { position:absolute; top:12px; left:12px; right:12px; z-index:5; display:none; gap:10px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:6px 12px; font-size:12px; backdrop-filter:blur(8px); }
 #temporalToolbar select, #temporalToolbar input { background:var(--vscode-dropdown-background, #252526); color:var(--vscode-dropdown-foreground, #cccccc); border:1px solid var(--vscode-dropdown-border, #3c3c3c); border-radius:4px; padding:3px 6px; font-size:11px; }
+#temporalDisplayModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
+#temporalDisplayModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
 #temporalScrubberBar { position:absolute; left:12px; right:12px; bottom:12px; z-index:5; display:none; flex-direction:column; gap:6px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:8px 12px; font-size:12px; backdrop-filter:blur(8px); }
 #temporalScrubberBar .row { display:flex; align-items:center; gap:8px; width:100%; }
 #temporalScrubberBar button { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
 #temporalScrubberBar button:hover { background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.08)); }
+#temporalTimelineStrip { display:flex; align-items:center; gap:4px; height:18px; overflow-x:auto; width:100%; padding:2px 0; }
+.commit-marker { width:8px; height:8px; border-radius:50%; background:var(--vscode-descriptionForeground, #71717a); flex:0 0 auto; cursor:pointer; transition:transform 0.1s ease; border:1px solid transparent; }
+.commit-marker:hover { transform:scale(1.4); }
+.commit-marker.active { background:#2dd4bf; transform:scale(1.5); border-color:#fff; }
+.commit-marker.is-merge { border-radius:2px; background:#a371f7; }
 #temporalScrubber { flex:1; width:100%; height:4px; accent-color:var(--vscode-button-background, #2dd4bf); cursor:pointer; }
-.badge-added { color:#3fb950; background:rgba(63,185,80,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
-.badge-removed { color:#f85149; background:rgba(248,81,73,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
-.badge-modified { color:#d29922; background:rgba(210,153,34,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
-.badge-renamed { color:#58a6ff; background:rgba(88,166,255,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
-.badge-warning { color:#e3b341; background:rgba(227,179,65,0.15); padding:1px 6px; border-radius:4px; font-weight:600; display:none; }
+.badge-added { color:var(--vscode-gitDecoration-addedResourceForeground, #3fb950); background:rgba(63,185,80,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
+.badge-removed { color:var(--vscode-gitDecoration-deletedResourceForeground, #f85149); background:rgba(248,81,73,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
+.badge-modified { color:var(--vscode-gitDecoration-modifiedResourceForeground, #d29922); background:rgba(210,153,34,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
+.badge-renamed { color:var(--vscode-gitDecoration-renamedResourceForeground, #58a6ff); background:rgba(88,166,255,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
+.badge-warning { color:var(--vscode-editorWarning-foreground, #e3b341); background:rgba(227,179,65,0.15); padding:1px 6px; border-radius:4px; font-weight:600; display:none; }
 
 #empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
 #popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(340px, calc(100% - 32px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #202122); border:1px solid var(--vscode-widget-border, #2A2B2C); border-radius:9px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.28); }
@@ -458,6 +490,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
 #popup button { font-size:11px; border-radius:6px; border:1px solid var(--vscode-widget-border, #2A2B2C); background:var(--vscode-input-background, #242526); color:var(--vscode-foreground, #f4f4f5); padding:4px 8px; cursor:pointer; }
 #popup button.primary { border-color:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); background:var(--vscode-button-background, #2dd4bf); font-weight:500; }
+#popup button:disabled { opacity:0.4; cursor:not-allowed; }
 #popup #popupClose { float:right; border:0; background:transparent; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:15px; line-height:1; cursor:pointer; padding:2px 4px; border-radius:4px; }
 #popup #popupClose:hover { color:var(--vscode-foreground, #f4f4f5); background:rgba(255,255,255,0.08); }
 .ring, .pyramid-band, .edge { pointer-events:none; }
@@ -484,43 +517,45 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		Temporal Graph
 	</span>
 	<label style="display:flex; align-items:center; gap:4px; font-size:11px;">
-		Branch:
-		<select id="temporalRefSelect">
-			<option value="HEAD">HEAD</option>
-		</select>
+		Branch / Ref:
+		<select id="temporalRefSelect" title="Select Git branch, tag, or HEAD"></select>
 	</label>
 	<label style="display:flex; align-items:center; gap:4px; font-size:11px;">
-		Compare:
-		<select id="temporalCompareSelect">
-			<option value="">Parent (1st parent)</option>
-		</select>
+		Compare Base:
+		<select id="temporalCompareSelect" title="Select comparison base commit"></select>
 	</label>
+	<div id="temporalDisplayModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; overflow:hidden;">
+		<button id="temporalModeChangesBtn" type="button" class="active" title="Highlight structural differences against comparison base">Changes</button>
+		<button id="temporalModeStateBtn" type="button" title="View complete codebase state at selected commit">State</button>
+	</div>
 	<label style="display:flex; align-items:center; gap:4px; font-size:11px; margin-left:4px;">
 		<input type="checkbox" id="temporalFollowHead" checked> Follow HEAD
 	</label>
 	<div id="temporalDiffBadges" style="display:flex; gap:6px; font-size:11px; margin-left:auto; align-items:center;">
-		<span id="badgeAdded" class="badge-added">+0</span>
-		<span id="badgeRemoved" class="badge-removed">-0</span>
-		<span id="badgeModified" class="badge-modified">~0</span>
-		<span id="badgeRenamed" class="badge-renamed">⇄0</span>
+		<span id="badgeAdded" class="badge-added" title="Added nodes">+0</span>
+		<span id="badgeRemoved" class="badge-removed" title="Removed nodes">-0</span>
+		<span id="badgeModified" class="badge-modified" title="Modified nodes">~0</span>
+		<span id="badgeRenamed" class="badge-renamed" title="Renamed nodes">⇄0</span>
 		<span id="temporalPartialWarning" class="badge-warning" title="Partial lineage indexing in progress">Partial</span>
 	</div>
-	<input id="temporalFilterInput" type="search" placeholder="Filter entities…" style="width:130px;">
+	<input id="temporalFilterInput" type="search" placeholder="Filter entities…" style="width:130px;" aria-label="Filter temporal entities">
 </div>
 
 <!-- Temporal Scrubber Bar -->
 <div id="temporalScrubberBar">
+	<div id="temporalTimelineStrip" aria-label="Loaded commit history timeline"></div>
 	<div class="row">
-		<button id="temporalPrevBtn" title="Previous commit (Left arrow)">◀</button>
-		<button id="temporalPlayBtn" title="Play timeline (Space)">▶</button>
-		<button id="temporalNextBtn" title="Next commit (Right arrow)">▶</button>
-		<span id="temporalCommitSha" style="font-family:monospace; font-weight:600; color:#58a6ff; font-size:11.5px;"></span>
+		<button id="temporalPrevBtn" title="Previous older commit (Left arrow)" aria-label="Previous commit">◀</button>
+		<button id="temporalPlayBtn" title="Play timeline (Space)" aria-label="Play timeline">▶</button>
+		<button id="temporalNextBtn" title="Next newer commit (Right arrow)" aria-label="Next commit">▶</button>
+		<button id="temporalLoadMoreBtn" title="Load more historical commits" aria-label="Load more history" style="display:none;">+More</button>
+		<span id="temporalCommitSha" style="font-family:monospace; font-weight:600; color:var(--vscode-textLink-foreground, #58a6ff); font-size:11.5px;"></span>
 		<span id="temporalCommitMessage" style="font-size:11px; max-width:440px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
 		<span id="temporalCommitAuthor" style="font-size:10.5px; opacity:0.75;"></span>
 		<span id="temporalCommitStatus" style="font-size:10px; border-radius:4px; padding:1px 5px; background:rgba(255,255,255,0.08);"></span>
 	</div>
 	<div class="row">
-		<input id="temporalScrubber" type="range" min="0" max="0" value="0">
+		<input id="temporalScrubber" type="range" min="0" max="0" value="0" aria-label="Temporal commit history scrubber">
 	</div>
 </div>
 
@@ -535,7 +570,8 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	<p id="popupAi"></p>
 	<div class="actions">
 		<button class="primary" id="popupOpen" type="button" title="Open File" aria-label="Open File">Open File</button>
-		<button id="popupSourceDiff" type="button" class="primary" title="View Source Diff" aria-label="View Source Diff" style="display:none;">View Source Diff</button>
+		<button id="popupHistoricalView" type="button" title="View historical revision at this commit" aria-label="View at Commit" style="display:none;">View at Commit</button>
+		<button id="popupSourceDiff" type="button" class="primary" title="View Source Diff against base" aria-label="View Source Diff" style="display:none;">View Source Diff</button>
 		<button id="popupReveal" type="button" title="Reveal in Explorer" aria-label="Reveal in Explorer">Reveal</button>
 		<button id="popupMagnus" type="button" title="Attach to Agents" aria-label="Attach to Agents">Attach to Agents</button>
 	</div>
@@ -565,10 +601,14 @@ const temporalRefSelect = document.getElementById('temporalRefSelect');
 const temporalCompareSelect = document.getElementById('temporalCompareSelect');
 const temporalFollowHead = document.getElementById('temporalFollowHead');
 const temporalFilterInput = document.getElementById('temporalFilterInput');
+const temporalModeChangesBtn = document.getElementById('temporalModeChangesBtn');
+const temporalModeStateBtn = document.getElementById('temporalModeStateBtn');
+const temporalTimelineStrip = document.getElementById('temporalTimelineStrip');
 const temporalScrubber = document.getElementById('temporalScrubber');
 const temporalPrevBtn = document.getElementById('temporalPrevBtn');
 const temporalNextBtn = document.getElementById('temporalNextBtn');
 const temporalPlayBtn = document.getElementById('temporalPlayBtn');
+const temporalLoadMoreBtn = document.getElementById('temporalLoadMoreBtn');
 const temporalCommitSha = document.getElementById('temporalCommitSha');
 const temporalCommitMessage = document.getElementById('temporalCommitMessage');
 const temporalCommitAuthor = document.getElementById('temporalCommitAuthor');
@@ -586,7 +626,10 @@ const popupOverview = document.getElementById('popupOverview');
 const popupAi = document.getElementById('popupAi');
 const popupAiProvenance = document.getElementById('popupAiProvenance');
 const popupOpen = document.getElementById('popupOpen');
+const popupHistoricalView = document.getElementById('popupHistoricalView');
 const popupSourceDiff = document.getElementById('popupSourceDiff');
+const popupReveal = document.getElementById('popupReveal');
+const popupMagnus = document.getElementById('popupMagnus');
 
 let popupNode = null;
 let pointerDownNode = null;
@@ -631,7 +674,6 @@ const pending = new Map();
 // Temporal State & 2D Transition Engine
 let temporalState = null;
 let temporalDiff = null;
-let temporalPositions = new Map(); // entityId -> { x, y }
 let previousTemporalRenderNodes = new Map();
 let currentTemporalRenderNodes = new Map();
 let animStartTime = 0;
@@ -639,6 +681,7 @@ let animDuration = 220;
 let isAnimatingTemporal = false;
 let isPlayingHistory = false;
 let playIntervalTimer = null;
+let displayMode = 'changes';
 
 function request(type, payload) {
 	const requestId = Math.random().toString(36).slice(2);
@@ -650,6 +693,21 @@ function request(type, payload) {
 
 function isNetwork() { return graphType === 'network'; }
 function isTemporal() { return graphType === 'temporal'; }
+
+function getComputedThemeColors() {
+	const s = getComputedStyle(document.documentElement);
+	return {
+		bg: s.getPropertyValue('--vscode-editor-background').trim() || '#1B1C1E',
+		fg: s.getPropertyValue('--vscode-foreground').trim() || '#f4f4f5',
+		border: s.getPropertyValue('--vscode-widget-border').trim() || '#3C3C3C',
+		added: s.getPropertyValue('--vscode-gitDecoration-addedResourceForeground').trim() || '#3fb950',
+		deleted: s.getPropertyValue('--vscode-gitDecoration-deletedResourceForeground').trim() || '#f85149',
+		modified: s.getPropertyValue('--vscode-gitDecoration-modifiedResourceForeground').trim() || '#d29922',
+		renamed: s.getPropertyValue('--vscode-gitDecoration-renamedResourceForeground').trim() || '#58a6ff',
+		accent: s.getPropertyValue('--vscode-button-background').trim() || '#2dd4bf',
+		isHighContrast: document.body.classList.contains('vscode-high-contrast') || s.getPropertyValue('--vscode-contrastBorder').trim() !== '',
+	};
+}
 
 function canIdleRotate() {
 	return !!(isNetwork()
@@ -698,27 +756,27 @@ function projectPoint(x, y, z, yaw, pitch) {
 	const cp = Math.cos(pitch), sp = Math.sin(pitch);
 	const y1 = y * cp - z * sp;
 	const z1 = y * sp + z * cp;
+
 	const cy = Math.cos(yaw), sy = Math.sin(yaw);
 	const x2 = x * cy + z1 * sy;
 	const z2 = -x * sy + z1 * cy;
-	const depthScale = FOCAL / Math.max(FOCAL * 0.42, FOCAL + z2);
+
+	const distance = FOCAL + z2;
+	const depthScale = distance > 40 ? FOCAL / distance : 0.05;
 	return { x: x2 * depthScale, y: y1 * depthScale, z: z2, depthScale: depthScale };
 }
 
-function scheduleIdleResume() {
-	idlePaused = true;
-	dirty = true;
-	kickRaf();
-	if (idleResumeTimer) clearTimeout(idleResumeTimer);
-	idleResumeTimer = null;
-	if (!canIdleRotate()) return;
-	idleResumeTimer = setTimeout(function () {
-		idleResumeTimer = null;
-		if (canIdleRotate()) {
-			idlePaused = false;
-			kickRaf();
-		}
-	}, IDLE_RESUME_MS);
+function resizeCanvas() {
+	if (!netCanvas) return;
+	const w = netCanvas.clientWidth || 800;
+	const h = netCanvas.clientHeight || 600;
+	if (netCanvas.width !== Math.floor(w * dpr) || netCanvas.height !== Math.floor(h * dpr)) {
+		netCanvas.width = Math.floor(w * dpr);
+		netCanvas.height = Math.floor(h * dpr);
+		ctx.resetTransform();
+		ctx.scale(dpr, dpr);
+		dirty = true;
+	}
 }
 
 function kickRaf() {
@@ -727,76 +785,49 @@ function kickRaf() {
 	requestAnimationFrame(rafLoop);
 }
 
-function clearIdleTimers() {
+function scheduleIdleResume() {
+	if (!settings.networkIdleAutoRotate || settings.reduceMotion) return;
 	idlePaused = true;
 	if (idleResumeTimer) clearTimeout(idleResumeTimer);
-	idleResumeTimer = null;
+	idleResumeTimer = setTimeout(function () {
+		idlePaused = false;
+		kickRaf();
+	}, IDLE_RESUME_MS);
 }
 
-function resetCamera(preserveZoom) {
-	rotation = { yaw: 0.55, pitch: 0.28 };
-	if (!preserveZoom) transform = { x: 0, y: 0, k: settings.initialZoom || 1 };
-	scheduleIdleResume();
+function resetCamera(force) {
+	rotation.yaw = 0.55;
+	rotation.pitch = 0.28;
+	transform = { x: 0, y: 0, k: 1 };
 	dirty = true;
-}
-
-function resizeCanvas() {
-	const w = netCanvas.clientWidth || window.innerWidth || 800;
-	const h = netCanvas.clientHeight || window.innerHeight || 600;
-	dpr = Math.min(settings.quality === 'performance' ? 1.25 : 2, window.devicePixelRatio || 1);
-	netCanvas.width = Math.max(1, Math.floor(w * dpr));
-	netCanvas.height = Math.max(1, Math.floor(h * dpr));
-	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-	dirty = true;
+	kickRaf();
 }
 
 function rebuildBase3d(s) {
-	const key = [s.scannedAt, s.layoutRevision || 0, s.layoutMode, s.networkLayoutMode || '', s.graphType, (s.nodes || []).length, (s.edges || []).length].join('|');
-	if (key === layoutKey && Object.keys(base3d).length) return false;
-	layoutKey = key;
+	if (!s || !s.nodes) return;
 	base3d = Object.create(null);
-	const nodes = s.nodes || [];
-	const p3 = s.positions3d || null;
-	const network = s.graphType === 'network' || graphType === 'network';
-
-	if (p3 && typeof p3 === 'object') {
-		let sx = 0, sy = 0, sz = 0, n = 0;
-		for (let i = 0; i < nodes.length; i++) {
-			const p = p3[nodes[i].id];
-			if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) continue;
-			sx += p.x; sy += p.y; sz += p.z; n++;
-		}
-		const preserveSemanticCenter = s.networkLayoutMode === 'radial';
-		centroid = preserveSemanticCenter ? { x: 0, y: 0 } : (n ? { x: sx / n, y: sy / n } : { x: 0, y: 0 });
-		const cz = n ? sz / n : 0;
-		for (let i = 0; i < nodes.length; i++) {
-			const p = p3[nodes[i].id];
-			if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y) || !Number.isFinite(p.z)) continue;
-			base3d[nodes[i].id] = preserveSemanticCenter
-				? { x: p.x, y: p.y, z: p.z }
-				: { x: p.x - centroid.x, y: p.y - centroid.y, z: p.z - cz };
-		}
-		if (n > 0 || network) {
-			return true;
-		}
+	const nodes = s.nodes;
+	let sumX = 0, sumY = 0;
+	for (let i = 0; i < nodes.length; i++) {
+		const n = nodes[i];
+		const nx = n.x || 0, ny = n.y || 0, nz = n.z || 0;
+		base3d[n.id] = { x: nx, y: ny, z: nz };
+		sumX += nx; sumY += ny;
 	}
-
-	if (network) {
-		centroid = { x: 0, y: 0 };
-		return true;
-	}
-	return true;
+	centroid = { x: sumX / (nodes.length || 1), y: sumY / (nodes.length || 1) };
 }
 
 function projectAll() {
+	if (!snapshot || !isNetwork()) return;
+	const nodes = snapshot.nodes || [];
 	projected = Object.create(null);
-	const ids = Object.keys(base3d);
-	for (let i = 0; i < ids.length; i++) {
-		const b = base3d[ids[i]];
-		const pr = projectPoint(b.x, b.y, b.z, rotation.yaw, rotation.pitch);
-		projected[ids[i]] = {
-			x: centroid.x + pr.x,
-			y: centroid.y + pr.y,
+	for (let i = 0; i < nodes.length; i++) {
+		const node = nodes[i];
+		const p = base3d[node.id] || { x: node.x || 0, y: node.y || 0, z: node.z || 0 };
+		const pr = projectPoint(p.x - centroid.x, p.y - centroid.y, p.z, rotation.yaw, rotation.pitch);
+		projected[node.id] = {
+			x: pr.x,
+			y: pr.y,
 			depthScale: pr.depthScale,
 			z: pr.z
 		};
@@ -814,9 +845,8 @@ function fitView() {
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 		for (let i = 0; i < temporalDiff.nodes.length; i++) {
 			const n = temporalDiff.nodes[i];
-			const pos = temporalPositions.get(n.entityId) || { x: n.x, y: n.y };
-			minX = Math.min(minX, pos.x - 20); minY = Math.min(minY, pos.y - 20);
-			maxX = Math.max(maxX, pos.x + 20); maxY = Math.max(maxY, pos.y + 20);
+			minX = Math.min(minX, n.x - 20); minY = Math.min(minY, n.y - 20);
+			maxX = Math.max(maxX, n.x + 20); maxY = Math.max(maxY, n.y + 20);
 		}
 		if (!isFinite(minX)) return;
 		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
@@ -848,11 +878,11 @@ function fitView() {
 function updateLegend(s, network) {
 	if (isTemporal()) {
 		let html = '<div class="title">Temporal Transitions</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#3fb950"></span>Added (+)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#f85149"></span>Removed (-)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#d29922"></span>Modified (~)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#58a6ff"></span>Renamed (⇄)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#8b949e"></span>Unchanged</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-addedResourceForeground, #3fb950)"></span>Added (+)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-deletedResourceForeground, #f85149)"></span>Removed (-)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)"></span>Modified (~)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-renamedResourceForeground, #58a6ff)"></span>Renamed (⇄)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-descriptionForeground, #8b949e)"></span>Unchanged</div>';
 		legend.innerHTML = html;
 		legend.style.display = 'block';
 		return;
@@ -885,25 +915,111 @@ function updateTemporalUI(state, diff) {
 	toolbar.style.display = 'none';
 	status.style.display = 'none';
 
-	// Ref selector
-	if (temporalRefSelect.value !== state.selectedRef) {
-		temporalRefSelect.innerHTML = '<option value="' + state.selectedRef + '">' + state.selectedRef + '</option>';
+	// Safe DOM Ref Selector population
+	const currentRef = state.selectedRef || 'HEAD';
+	const refs = state.repositoryRefs || [];
+	temporalRefSelect.innerHTML = '';
+
+	const headGroup = document.createElement('optgroup');
+	headGroup.label = 'Current / HEAD';
+	const headOpt = document.createElement('option');
+	headOpt.value = 'HEAD';
+	headOpt.textContent = 'HEAD';
+	if (currentRef === 'HEAD') headOpt.selected = true;
+	headGroup.appendChild(headOpt);
+	temporalRefSelect.appendChild(headGroup);
+
+	const localBranches = refs.filter(r => r.kind === 'branch');
+	if (localBranches.length > 0) {
+		const grp = document.createElement('optgroup');
+		grp.label = 'Local Branches';
+		for (let i = 0; i < localBranches.length; i++) {
+			const b = localBranches[i];
+			const opt = document.createElement('option');
+			opt.value = b.name;
+			opt.textContent = b.name;
+			if (b.name === currentRef) opt.selected = true;
+			grp.appendChild(opt);
+		}
+		temporalRefSelect.appendChild(grp);
 	}
 
-	// Compare Base
-	const compareBase = state.compareBaseSha || '';
-	temporalCompareSelect.innerHTML = '<option value="">Parent (1st parent)</option>' + (compareBase ? '<option value="' + compareBase + '" selected>' + compareBase.slice(0, 7) + '</option>' : '');
+	const remoteBranches = refs.filter(r => r.kind === 'remote-branch');
+	if (remoteBranches.length > 0) {
+		const grp = document.createElement('optgroup');
+		grp.label = 'Remote Branches';
+		for (let i = 0; i < remoteBranches.length; i++) {
+			const b = remoteBranches[i];
+			const opt = document.createElement('option');
+			opt.value = b.name;
+			opt.textContent = b.name;
+			if (b.name === currentRef) opt.selected = true;
+			grp.appendChild(opt);
+		}
+		temporalRefSelect.appendChild(grp);
+	}
+
+	const tags = refs.filter(r => r.kind === 'tag' || r.kind === 'annotated-tag');
+	if (tags.length > 0) {
+		const grp = document.createElement('optgroup');
+		grp.label = 'Tags';
+		for (let i = 0; i < tags.length; i++) {
+			const t = tags[i];
+			const opt = document.createElement('option');
+			opt.value = t.name;
+			opt.textContent = t.name;
+			if (t.name === currentRef) opt.selected = true;
+			grp.appendChild(opt);
+		}
+		temporalRefSelect.appendChild(grp);
+	}
+
+	// Safe DOM Compare Base Selector
+	temporalCompareSelect.innerHTML = '';
+	const timeline = state.pagedTimeline || [];
+	const curCommit = timeline.find(c => c.sha === state.selectedCommitSha);
+	const curBase = state.compareBaseSha || '';
+
+	const p1Opt = document.createElement('option');
+	p1Opt.value = curCommit?.parents?.[0] || '';
+	p1Opt.textContent = curCommit?.parents?.[0] ? 'Parent (' + curCommit.parents[0].slice(0, 7) + ')' : 'Initial Commit (No Parent)';
+	if (state.comparisonMode === 'first-parent' || curBase === curCommit?.parents?.[0]) p1Opt.selected = true;
+	temporalCompareSelect.appendChild(p1Opt);
+
+	if (curCommit?.parents && curCommit.parents.length > 1) {
+		const p2Opt = document.createElement('option');
+		p2Opt.value = curCommit.parents[1];
+		p2Opt.textContent = 'Parent 2 (' + curCommit.parents[1].slice(0, 7) + ')';
+		if (curBase === curCommit.parents[1]) p2Opt.selected = true;
+		temporalCompareSelect.appendChild(p2Opt);
+	}
+
+	if (curBase && curBase !== curCommit?.parents?.[0] && curBase !== curCommit?.parents?.[1]) {
+		const customOpt = document.createElement('option');
+		customOpt.value = curBase;
+		customOpt.textContent = 'Custom (' + curBase.slice(0, 7) + ')';
+		customOpt.selected = true;
+		temporalCompareSelect.appendChild(customOpt);
+	}
+
+	// Display Mode Buttons
+	displayMode = state.displayMode || 'changes';
+	if (displayMode === 'changes') {
+		temporalModeChangesBtn.classList.add('active');
+		temporalModeStateBtn.classList.remove('active');
+	} else {
+		temporalModeChangesBtn.classList.remove('active');
+		temporalModeStateBtn.classList.add('active');
+	}
 
 	// Follow HEAD
 	temporalFollowHead.checked = !!state.followHead;
 
-	// Commit summary & Scrubber
-	const timeline = state.pagedTimeline || [];
+	// Scrubber slider & Timeline Strip
 	const total = timeline.length;
 	temporalScrubber.max = String(Math.max(0, total - 1));
 	const currentIdx = timeline.findIndex(c => c.sha === state.selectedCommitSha);
 	if (currentIdx >= 0) {
-		// Scrubber slider: left (0) is oldest, right (total-1) is HEAD
 		const sliderVal = (total - 1) - currentIdx;
 		temporalScrubber.value = String(sliderVal);
 		const commit = timeline[currentIdx];
@@ -911,13 +1027,32 @@ function updateTemporalUI(state, diff) {
 		temporalCommitMessage.textContent = commit.message || '';
 		temporalCommitAuthor.textContent = commit.author ? 'by ' + commit.author : '';
 		temporalCommitStatus.textContent = state.isSettled ? 'Settled' : 'Indexing…';
-		temporalCommitStatus.style.color = state.isSettled ? '#3fb950' : '#d29922';
+		temporalCommitStatus.style.color = state.isSettled ? 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)' : 'var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)';
+		temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
 	}
+
+	// Render interactive timeline markers
+	temporalTimelineStrip.innerHTML = '';
+	for (let i = timeline.length - 1; i >= 0; i--) {
+		const c = timeline[i];
+		const dot = document.createElement('div');
+		dot.className = 'commit-marker' + (c.sha === state.selectedCommitSha ? ' active' : '') + (c.isMerge ? ' is-merge' : '');
+		dot.title = (c.shortSha || c.sha.slice(0, 7)) + ' - ' + c.message + (c.author ? ' (' + c.author + ')' : '');
+		dot.onclick = (function (sha) {
+			return function () {
+				request('selectTemporalCommit', { commitSha: sha, immediate: true });
+			};
+		})(c.sha);
+		temporalTimelineStrip.appendChild(dot);
+	}
+
+	// Load more history button
+	temporalLoadMoreBtn.style.display = state.historyHasMore ? 'inline-block' : 'none';
 
 	// Partial warning
 	temporalPartialWarning.style.display = state.isPartialLineage ? 'inline-block' : 'none';
 
-	// Badges
+	// Diff Badges
 	if (diff && diff.summary) {
 		badgeAdded.textContent = '+' + diff.summary.addedCount;
 		badgeRemoved.textContent = '-' + diff.summary.removedCount;
@@ -931,36 +1066,30 @@ function updateTemporalDiffTransition(diff) {
 	previousTemporalRenderNodes = new Map(currentTemporalRenderNodes);
 	const nextMap = new Map();
 
-	// Stable Layout computation
+	// Production Layout: coordinates are authoritatively computed by host TemporalLayoutEngine!
 	const nodes = diff.nodes || [];
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
-		let pos = temporalPositions.get(node.entityId);
-		if (!pos) {
-			// Deterministic placement for new node
-			let angle = (hashString(node.entityId) % 360) * (Math.PI / 180);
-			let dist = 120 + (hashString(node.entityId) % 180);
-			pos = { x: Math.round(Math.cos(angle) * dist), y: Math.round(Math.sin(angle) * dist) };
-			temporalPositions.set(node.entityId, pos);
-		}
 		nextMap.set(node.entityId, {
 			entityId: node.entityId,
 			canonicalNodeId: node.canonicalNodeId,
 			path: node.path,
 			label: node.label,
 			kind: node.kind,
-			x: pos.x,
-			y: pos.y,
+			x: node.x,
+			y: node.y,
 			changeKind: node.changeKind,
 			oldPath: node.oldPath,
+			isModified: node.isModified,
 			meta: node.meta,
 		});
 	}
 
 	currentTemporalRenderNodes = nextMap;
 	animStartTime = performance.now();
-	animDuration = settings.reduceMotion ? 0 : 220;
-	isAnimatingTemporal = !settings.reduceMotion;
+	const prefersReduced = settings.reduceMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	animDuration = prefersReduced ? 0 : 220;
+	isAnimatingTemporal = !prefersReduced;
 	dirty = true;
 	kickRaf();
 }
@@ -980,6 +1109,7 @@ function drawTemporalFrame(now) {
 	if (t >= 1) isAnimatingTemporal = false;
 
 	const filterQuery = (temporalFilterInput.value || '').trim().toLowerCase();
+	const theme = getComputedThemeColors();
 
 	// Draw edges
 	const edges = (temporalDiff && temporalDiff.edges) || [];
@@ -992,16 +1122,28 @@ function drawTemporalFrame(now) {
 		ctx.beginPath();
 		ctx.moveTo(srcNode.x, srcNode.y);
 		ctx.lineTo(tgtNode.x, tgtNode.y);
-		if (edge.changeKind === 'added') {
-			ctx.strokeStyle = 'rgba(63, 185, 80, 0.7)';
-			ctx.lineWidth = 2;
-			ctx.setLineDash([]);
-		} else if (edge.changeKind === 'removed') {
-			ctx.strokeStyle = 'rgba(248, 81, 73, 0.6)';
-			ctx.lineWidth = 1.5;
-			ctx.setLineDash([4, 4]);
+
+		if (displayMode === 'changes') {
+			if (edge.changeKind === 'added') {
+				ctx.strokeStyle = theme.added;
+				ctx.lineWidth = theme.isHighContrast ? 3 : 2;
+				ctx.setLineDash([]);
+			} else if (edge.changeKind === 'removed') {
+				ctx.strokeStyle = theme.deleted;
+				ctx.lineWidth = theme.isHighContrast ? 2.5 : 1.5;
+				ctx.setLineDash([4, 4]);
+			} else if (edge.changeKind === 'modified') {
+				ctx.strokeStyle = theme.modified;
+				ctx.lineWidth = theme.isHighContrast ? 2.5 : 1.5;
+				ctx.setLineDash([2, 2]);
+			} else {
+				ctx.strokeStyle = 'rgba(139, 148, 158, 0.35)';
+				ctx.lineWidth = 1;
+				ctx.setLineDash([]);
+			}
 		} else {
-			ctx.strokeStyle = 'rgba(139, 148, 158, 0.35)';
+			// State mode: natural edges
+			ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
 			ctx.lineWidth = 1;
 			ctx.setLineDash([]);
 		}
@@ -1030,7 +1172,7 @@ function drawTemporalFrame(now) {
 			curAlpha = ease;
 			curScale = 0.5 + 0.5 * ease;
 		} else if (node.changeKind === 'removed') {
-			curAlpha = isAnimatingTemporal ? 1 - 0.7 * ease : 0.3;
+			curAlpha = isAnimatingTemporal ? 1 - 0.7 * ease : 0.35;
 		}
 
 		ctx.save();
@@ -1044,58 +1186,67 @@ function drawTemporalFrame(now) {
 		if (selectedNodeId === node.entityId || selectedNodeId === node.canonicalNodeId) {
 			ctx.beginPath();
 			ctx.arc(0, 0, radius + 5, 0, 2 * Math.PI);
-			ctx.strokeStyle = '#2dd4bf';
-			ctx.lineWidth = 3;
+			ctx.strokeStyle = theme.accent;
+			ctx.lineWidth = theme.isHighContrast ? 4 : 3;
 			ctx.stroke();
 		}
 
 		// Node Body
 		ctx.beginPath();
 		ctx.arc(0, 0, radius, 0, 2 * Math.PI);
-		let fillColor = '#30363d';
-		let strokeColor = '#8b949e';
+		let fillColor = theme.bg;
+		let strokeColor = theme.border;
 
-		if (node.changeKind === 'added') {
-			fillColor = '#1f4828';
-			strokeColor = '#3fb950';
-		} else if (node.changeKind === 'removed') {
-			fillColor = '#4e1c1b';
-			strokeColor = '#f85149';
-		} else if (node.changeKind === 'modified') {
-			fillColor = '#4a3712';
-			strokeColor = '#d29922';
-		} else if (node.changeKind === 'renamed') {
-			fillColor = '#1f3552';
-			strokeColor = '#58a6ff';
+		if (displayMode === 'changes') {
+			if (node.changeKind === 'added') {
+				fillColor = 'color-mix(in srgb, ' + theme.added + ' 25%, ' + theme.bg + ')';
+				strokeColor = theme.added;
+			} else if (node.changeKind === 'removed') {
+				fillColor = 'color-mix(in srgb, ' + theme.deleted + ' 25%, ' + theme.bg + ')';
+				strokeColor = theme.deleted;
+			} else if (node.changeKind === 'modified') {
+				fillColor = 'color-mix(in srgb, ' + theme.modified + ' 25%, ' + theme.bg + ')';
+				strokeColor = theme.modified;
+			} else if (node.changeKind === 'renamed') {
+				fillColor = 'color-mix(in srgb, ' + theme.renamed + ' 25%, ' + theme.bg + ')';
+				strokeColor = theme.renamed;
+			}
+		} else {
+			// State mode: use file type color
+			const ft = fileType(node.path || node.label);
+			fillColor = ft.color;
+			strokeColor = theme.border;
 		}
 
 		ctx.fillStyle = fillColor;
 		ctx.fill();
-		ctx.lineWidth = node.changeKind === 'unchanged' ? 1.5 : 2.5;
+		ctx.lineWidth = (node.changeKind === 'unchanged' || displayMode === 'state') ? 1.5 : (theme.isHighContrast ? 3.5 : 2.5);
 		ctx.strokeStyle = strokeColor;
 		ctx.stroke();
 
-		// Change Symbol / Badge
-		let badgeSymbol = '';
-		if (node.changeKind === 'added') badgeSymbol = '+';
-		else if (node.changeKind === 'removed') badgeSymbol = '−';
-		else if (node.changeKind === 'modified') badgeSymbol = '~';
-		else if (node.changeKind === 'renamed') badgeSymbol = '⇄';
+		// Change Symbol / Badge (only in changes mode)
+		if (displayMode === 'changes') {
+			let badgeSymbol = '';
+			if (node.changeKind === 'added') badgeSymbol = '+';
+			else if (node.changeKind === 'removed') badgeSymbol = '−';
+			else if (node.changeKind === 'modified') badgeSymbol = '~';
+			else if (node.changeKind === 'renamed') badgeSymbol = node.isModified ? '⇄*' : '⇄';
 
-		if (badgeSymbol) {
-			ctx.fillStyle = strokeColor;
-			ctx.font = 'bold 11px sans-serif';
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'middle';
-			ctx.fillText(badgeSymbol, 0, 0);
+			if (badgeSymbol) {
+				ctx.fillStyle = strokeColor;
+				ctx.font = 'bold 11px sans-serif';
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'middle';
+				ctx.fillText(badgeSymbol, 0, 0);
+			}
 		}
 
 		// Label
-		ctx.fillStyle = '#f4f4f5';
+		ctx.fillStyle = theme.fg;
 		ctx.font = '10.5px sans-serif';
 		ctx.textAlign = 'center';
 		ctx.textBaseline = 'top';
-		const labelText = node.oldPath ? node.label + ' (was ' + getBaseName(node.oldPath) + ')' : node.label;
+		const labelText = node.oldPath && displayMode === 'changes' ? node.label + ' (was ' + getBaseName(node.oldPath) + ')' : node.label;
 		ctx.fillText(labelText, 0, radius + 3);
 
 		ctx.restore();
@@ -1142,7 +1293,6 @@ function stepTemporalCommit(delta) {
 	if (targetIdx >= 0 && targetIdx < timeline.length) {
 		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: true });
 	} else if (delta < 0 && targetIdx >= timeline.length) {
-		// Load more history on older edge
 		request('loadMoreTemporalHistory', {});
 	}
 }
@@ -1345,16 +1495,25 @@ function openNodePopup(node, clientX, clientY) {
 
 	if (isTemporal()) {
 		popupSourceDiff.style.display = 'inline-block';
-		popupOpen.style.display = node.changeKind === 'removed' ? 'none' : 'inline-block';
+		popupHistoricalView.style.display = 'inline-block';
+		popupOpen.style.display = 'none';
+		popupMagnus.disabled = true;
+		popupMagnus.title = 'Attach to Agents is available on the live codebase.';
 	} else {
 		popupSourceDiff.style.display = 'none';
+		popupHistoricalView.style.display = 'none';
 		popupOpen.style.display = 'inline-block';
+		popupMagnus.disabled = false;
+		popupMagnus.title = 'Attach to Agents';
 	}
 
 	placePopupNear(clientX, clientY);
-	request('selectNode', { nodeId: selectedNodeId });
 
-	if (isNetwork()) {
+	if (isTemporal()) {
+		request('selectTemporalEntity', { entityId: node.entityId });
+		dirty = true; drawTemporalFrame(performance.now());
+	} else {
+		request('selectNode', { nodeId: selectedNodeId });
 		request('peekNodeDescription', { nodeId: node.id }).then(peek => {
 			if (!popupNode || popupNode.id !== node.id) return;
 			if (peek && peek.cached && peek.description) {
@@ -1373,8 +1532,6 @@ function openNodePopup(node, clientX, clientY) {
 			}
 		});
 		dirty = true; drawNetworkFrame();
-	} else {
-		dirty = true; drawTemporalFrame(performance.now());
 	}
 }
 
@@ -1424,6 +1581,7 @@ function onPointerUp(e, cancelled) {
 				return;
 			}
 			selectedNodeId = null;
+			request('selectTemporalEntity', { entityId: null });
 			closePopup();
 			dirty = true; drawTemporalFrame(performance.now());
 		} else {
@@ -1504,6 +1662,9 @@ document.getElementById('popupClose').onclick = function () { closePopup(); };
 document.getElementById('popupOpen').onclick = function () {
 	if (popupNode) request('openFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
 };
+document.getElementById('popupHistoricalView').onclick = function () {
+	if (popupNode && popupNode.entityId) request('openTemporalHistoricalFile', { entityId: popupNode.entityId });
+};
 document.getElementById('popupSourceDiff').onclick = function () {
 	if (popupNode && popupNode.entityId) request('openTemporalSourceDiff', { entityId: popupNode.entityId });
 };
@@ -1511,6 +1672,26 @@ document.getElementById('popupReveal').onclick = function () {
 	if (popupNode) request('revealFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
 };
 document.getElementById('popupMagnus').onclick = function () { request('attachToMagnus', {}); };
+
+temporalRefSelect.addEventListener('change', function () {
+	const ref = temporalRefSelect.value;
+	if (ref) {
+		request('selectTemporalRef', { ref: ref });
+	}
+});
+
+temporalCompareSelect.addEventListener('change', function () {
+	const base = temporalCompareSelect.value || undefined;
+	request('setTemporalCompareBase', { compareBaseSha: base });
+});
+
+temporalModeChangesBtn.addEventListener('click', function () {
+	request('setTemporalDisplayMode', { mode: 'changes' });
+});
+
+temporalModeStateBtn.addEventListener('click', function () {
+	request('setTemporalDisplayMode', { mode: 'state' });
+});
 
 temporalScrubber.addEventListener('input', function () {
 	const val = parseInt(temporalScrubber.value, 10);
@@ -1522,9 +1703,20 @@ temporalScrubber.addEventListener('input', function () {
 	}
 });
 
+temporalScrubber.addEventListener('change', function () {
+	const val = parseInt(temporalScrubber.value, 10);
+	const timeline = (temporalState && temporalState.pagedTimeline) || [];
+	const total = timeline.length;
+	const targetIdx = (total - 1) - val;
+	if (timeline[targetIdx]) {
+		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: true });
+	}
+});
+
 temporalPrevBtn.addEventListener('click', function () { stepTemporalCommit(-1); });
 temporalNextBtn.addEventListener('click', function () { stepTemporalCommit(1); });
 temporalPlayBtn.addEventListener('click', toggleTemporalPlay);
+temporalLoadMoreBtn.addEventListener('click', function () { request('loadMoreTemporalHistory', {}); });
 
 temporalFilterInput.addEventListener('input', function () {
 	dirty = true;

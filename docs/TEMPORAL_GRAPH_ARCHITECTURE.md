@@ -35,18 +35,19 @@ PreBase has **one active user-facing Code Graph mode**:
   - Temporal store operations carry explicit typed error envelopes over IPC, so cache corruption and cancellation are not downgraded to generic errors.
   - Metadata-only paged history and bounded reconstruction avoid whole-history scans on hot paths; refs are refresh-cached rather than rewritten on every read.
   - Derived parse artifacts are the only retention-eviction target. Explicit maintenance checkpoints/compacts SQLite after eviction and truthfully reports when immutable state exceeds budget.
-- **Phase 3 (In Progress — Phase 3.1 Complete)**:
+- **Phase 3 (In Progress — Phase 3.1 & 3.2 Runtime, Navigation & Layout Complete)**:
   - Phase 3.1: Timeline, scrubber, stable 2D structural transitions, structural diff & commit comparison with mandatory Phase-3 preflight repairs.
+  - Phase 3.2: Real timeline/ref navigation, authoritative layout integration, safe DOM rendering, VS Code Git provider source diff bridge, base-before-target indexing order, multi-root active repo tracking, and accessible theme-aware canvas rendering.
   - Mode registration: `'network' | 'temporal'` in `PreBaseGraphType`, editor input serializer, Maps segmented control, and command `prebase.graph.openTemporal`.
-  - Pure Structural Diff Engine (`computeTemporalStructuralDiff`): entity continuity matching, node change kinds (`unchanged`, `modified`, `added`, `removed`, `renamed`), old path tracking, and edge change classification.
+  - Pure Structural Diff Engine (`computeTemporalStructuralDiff`): entity continuity matching, node change kinds (`unchanged`, `modified`, `added`, `removed`, `renamed`), old path tracking, edge change classification, and `edgeModifiedCount`.
   - Stable 2D Layout Engine (`layoutTemporalGraph`): strict 0-displacement continuity invariant for surviving nodes, deterministic directory-clustered initial layout, neighbor-aware placement for added nodes, and phantom exit placement for removed nodes.
-  - Workbench Controller (`WorkbenchTemporalViewService`): paged commit timeline (~50), default first-parent compare base, 120ms debounced scrubbing, generation token cancellation, bounded diff caching, follow-HEAD listener, and `vscode.diff` source diff bridge.
-  - Webview Canvas 2D Renderer & UI: commit info badge, ref selector, compare base selector, scrubber slider track, Prev/Next/Play buttons, keyboard navigation (`ArrowLeft`, `ArrowRight`, `Space`), structural diff badges (`+A`, `-R`, `~M`, `⇄R`), and smooth 220ms node/edge transitions.
+  - Workbench Controller (`WorkbenchTemporalViewService`): cursor-paginated commit timeline, default first-parent compare base, 120ms debounced scrubbing, generation token cancellation, bounded LRU diff caching, follow-HEAD listener, and `vscode.diff` source diff bridge with real `git:` URIs.
+  - Webview Canvas 2D Renderer & UI: commit info badge, ref selector with optgroups, compare base selector, display mode toggle (`[ Changes ] [ State ]`), timeline strip with interactive markers, scrubber slider, Prev/Next/Play buttons, keyboard navigation (`ArrowLeft`, `ArrowRight`, `Space`), and theme-aware rendering.
 - **Phase 4 (Planned)**:
   - Graph Blame & Magnus Temporal conversational query tools.
 
-> [!WARNING]
-> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 3 remains blocked only by remaining Temporal-engine work: bounded on-demand indexing, truthful segment lineage coverage, sparse persistence/scaling evidence, corruption recovery, and real desktop parser/runtime proof. OAuth, signing, general beta acceptance, and other operator-owned work remain valid PreBase beta/release gates but do not block the Temporal Phase 3 UI.
+> [!NOTE]
+> In accordance with repository policy, **Architecture Graph** remains dormant and preserved. Phase 3 (Temporal UX, Navigation & Layout) is actively implemented on top of the Phase 2.7 Temporal engine. OAuth, signing, and beta acceptance remain tracked in the PreBase beta backlog.
 
 ### Phase 2.7 verified repairs and open gate
 

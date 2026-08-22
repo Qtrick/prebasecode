@@ -32,6 +32,7 @@ export function computeTemporalStructuralDiff(
 	let unchangedCount = 0;
 	let edgeAddedCount = 0;
 	let edgeRemovedCount = 0;
+	let edgeModifiedCount = 0;
 
 	if (!baseCommitSha || !baseEntities) {
 		// Root commit or no base: all nodes and edges are added
@@ -79,9 +80,16 @@ export function computeTemporalStructuralDiff(
 			const be = baseEntityMap.get(te.entityId);
 			let changeKind: TemporalNodeChangeKind;
 			let oldPath: string | undefined;
+			let isModified = false;
 
 			const teCanonicalId = (te as any).canonicalNodeId || te.nodeData?.id || te.path;
 			const beCanonicalId = be ? ((be as any).canonicalNodeId || be.nodeData?.id || be.path) : undefined;
+
+			const contentChanged = Boolean(
+				(te.blobOid && be?.blobOid && te.blobOid !== be.blobOid)
+				|| (te.contentHash && be?.contentHash && te.contentHash !== be.contentHash)
+				|| (be && teCanonicalId !== beCanonicalId)
+			);
 
 			if (!be) {
 				changeKind = 'added';
@@ -90,17 +98,20 @@ export function computeTemporalStructuralDiff(
 				changeKind = 'renamed';
 				oldPath = be.path;
 				renamedCount++;
-			} else if (
-				(te.blobOid && be.blobOid && te.blobOid !== be.blobOid)
-				|| (te.contentHash && be.contentHash && te.contentHash !== be.contentHash)
-				|| (teCanonicalId !== beCanonicalId)
-			) {
+				isModified = contentChanged;
+			} else if (contentChanged) {
 				changeKind = 'modified';
 				modifiedCount++;
+				isModified = true;
 			} else {
 				changeKind = 'unchanged';
 				unchangedCount++;
 			}
+
+			const metaObj = {
+				...(te.nodeData as any),
+				isRenamedAndModified: changeKind === 'renamed' && isModified,
+			};
 
 			nodes.push({
 				entityId: te.entityId,
@@ -112,7 +123,8 @@ export function computeTemporalStructuralDiff(
 				y: 0,
 				changeKind,
 				oldPath,
-				meta: te.nodeData as any,
+				isModified,
+				meta: metaObj,
 			});
 		}
 
@@ -148,11 +160,19 @@ export function computeTemporalStructuralDiff(
 		for (const tEdge of targetEdges) {
 			const key = makeEdgeKey(tEdge.sourceEntityId, tEdge.targetEntityId, tEdge.kind);
 			targetEdgeMap.set(key, tEdge);
-			const inBase = baseEdgeMap.has(key);
-			const changeKind: TemporalEdgeChangeKind = inBase ? 'unchanged' : 'added';
-			if (!inBase) {
+			const bEdge = baseEdgeMap.get(key);
+			let changeKind: TemporalEdgeChangeKind;
+
+			if (!bEdge) {
+				changeKind = 'added';
 				edgeAddedCount++;
+			} else if (hasEdgeDataChanged(tEdge.edgeData, bEdge.edgeData)) {
+				changeKind = 'modified';
+				edgeModifiedCount++;
+			} else {
+				changeKind = 'unchanged';
 			}
+
 			const srcPath = (tEdge as any).sourcePath || targetEntityMap.get(tEdge.sourceEntityId)?.path || '';
 			const tgtPath = (tEdge as any).targetPath || targetEntityMap.get(tEdge.targetEntityId)?.path || '';
 			edges.push({
@@ -197,6 +217,7 @@ export function computeTemporalStructuralDiff(
 		unchangedCount,
 		edgeAddedCount,
 		edgeRemovedCount,
+		edgeModifiedCount,
 	};
 
 	return {
@@ -217,4 +238,29 @@ function getLabelFromPath(p: string): string {
 
 function makeEdgeKey(sourceEntityId: string, targetEntityId: string, kind: string): string {
 	return `${sourceEntityId}-->${targetEntityId}::${kind}`;
+}
+
+function hasEdgeDataChanged(a: any, b: any): boolean {
+	if (!a && !b) {
+		return false;
+	}
+	if (!a || !b) {
+		return true;
+	}
+	if (a.weight !== b.weight || a.importType !== b.importType) {
+		return true;
+	}
+	if (a.meta && b.meta) {
+		const aKeys = Object.keys(a.meta);
+		const bKeys = Object.keys(b.meta);
+		if (aKeys.length !== bKeys.length) {
+			return true;
+		}
+		for (const k of aKeys) {
+			if (a.meta[k] !== b.meta[k]) {
+				return true;
+			}
+		}
+	}
+	return false;
 }

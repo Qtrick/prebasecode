@@ -1,172 +1,193 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { CancellationToken, CancellationTokenSource } from '../../../../../../base/common/cancellation.js';
 import { Disposable } from '../../../../../../base/common/lifecycle.js';
-import { isEqualOrParent } from '../../../../../../base/common/resources.js';
 import { URI } from '../../../../../../base/common/uri.js';
-import { localize } from '../../../../../../nls.js';
+import { isEqualOrParent } from '../../../../../../base/common/resources.js';
+import { CancellationToken, CancellationTokenSource } from '../../../../../../base/common/cancellation.js';
 import { ICommandService } from '../../../../../../platform/commands/common/commands.js';
-import { IFileService, FileOperation } from '../../../../../../platform/files/common/files.js';
 import { createDecorator } from '../../../../../../platform/instantiation/common/instantiation.js';
 import { IStorageService, StorageScope, StorageTarget } from '../../../../../../platform/storage/common/storage.js';
-import { IWorkspaceContextService } from '../../../../../../platform/workspace/common/workspace.js';
-import { inferFileDescription } from '../../core/analysis/fileDescription.js';
+import { IWorkspaceContextService, IWorkspaceFolder } from '../../../../../../platform/workspace/common/workspace.js';
+import { IFileService, FileOperation } from '../../../../../../platform/files/common/files.js';
+import { localize } from '../../../../../../nls.js';
 import type { GraphNode } from '../../common/types/graphTypes.js';
 
 export const IPreBaseGraphDescriptionService = createDecorator<IPreBaseGraphDescriptionService>('prebaseGraphDescriptionService');
 
+export type GraphNodeDescriptionAiStatus = 'ready' | 'pending' | 'unavailable' | 'disabled' | 'skipped';
+
 export interface IGraphNodeDescriptionResult {
-	overview: string;
-	aiDescription?: string;
-	aiStatus: 'skipped' | 'loading' | 'ready' | 'unavailable' | 'error';
-	aiMessage?: string;
-	aiProviderId?: string;
-	aiModelId?: string;
-	cacheHit: boolean;
+	readonly overview: string;
+	readonly aiDescription?: string;
+	readonly aiStatus: GraphNodeDescriptionAiStatus;
+	readonly aiMessage?: string;
+	readonly aiProviderId?: string;
+	readonly aiModelId?: string;
+	readonly cacheHit?: boolean;
 }
 
 export interface IPeekGraphNodeDescriptionResult {
-	cached: boolean;
-	description?: string;
-	providerId?: string;
-	modelId?: string;
-}
-
-const PROMPT_VERSION = 'v9';
-const CACHE_KEY = 'prebase.graph.descriptionCache.v9';
-const MAX_CACHE_ENTRIES = 2000;
-const MAX_CACHE_BYTES = 1024 * 1024; // 1 MB byte budget
-const MAX_CONTENT = 12000;
-
-function hashContent(str: string): string {
-	let h = 2166136261;
-	for (let i = 0; i < str.length; i++) {
-		h ^= str.charCodeAt(i);
-		h = Math.imul(h, 16777619);
-	}
-	return (h >>> 0).toString(16);
-}
-
-export function normalizeCompactDescription(rawText: string): string {
-	let text = rawText
-		.replace(/\*\*(.*?)\*\*/g, '$1')
-		.replace(/`(.*?)`/g, '$1')
-		.replace(/\s+/g, ' ')
-		.trim();
-
-	// Remove common verbose filler prefixes
-	text = text.replace(/^(This file\s+(is responsible for|provides|implements|contains|defines|serves as)\s+)/i, (match, p1, p2) => {
-		return p2.charAt(0).toUpperCase() + p2.slice(1) + ' ';
-	});
-	text = text.replace(/^(Defines TypeScript type definitions representing added|Defines TypeScript contracts for|Provides helper utilities for)\s+/i, 'Defines ');
-
-	// Split into sentences
-	const sentences = text.match(/[^.!?]+[.!?]+(\s|$)/g) || [text];
-	const trimmedSentences = sentences.map(s => s.trim()).filter(Boolean);
-
-	// Prefer first sentence
-	let first = trimmedSentences[0] || text;
-	const words = first.split(/\s+/);
-	if (words.length > 38) {
-		first = words.slice(0, 38).join(' ');
-		if (!/[.!?]$/.test(first)) {
-			first += '.';
-		}
-	}
-	return first;
-}
-
-const SENSITIVE = /(^|\/)(\.env|\.env\..*|credentials(\.json)?|secrets?(\.json)?|\.npmrc|\.netrc|\.pypirc|\.git-credentials|id_rsa|id_ed25519|\.pem|\.key|\.p12|\.pfx)(\/|$)/i;
-const SENSITIVE_DIRS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(\/|$)/i;
-
-interface CacheEntryV9 {
-	description: string;
-	sourceFingerprint: string;
-	nodeSemanticFingerprint?: string;
-	generatedAt: number;
-	lastAccessed?: number;
-	promptVersion: string;
-	providerId?: string;
-	modelId?: string;
-}
-
-export function computePromptSemanticFingerprint(relative: string, layer: string, imports: readonly string[], contentHash: string): string {
-	const normalizedImports = [...imports].sort().slice(0, 16).join(',');
-	const payload = `${PROMPT_VERSION}:${relative}:${layer}:${normalizedImports}:${contentHash}`;
-	return hashContent(payload);
-}
-
-interface DescriptionContextInfo {
-	providerId?: string;
-	modelId?: string;
-	executionMode?: string;
-	reasoningEffort?: string;
-	policyVersion?: string;
-	cacheIdentity?: string;
-	disabled?: boolean;
+	readonly cached: boolean;
+	readonly description?: string;
+	readonly providerId?: string;
+	readonly modelId?: string;
 }
 
 export interface IPreBaseGraphDescriptionService {
 	readonly _serviceBrand: undefined;
-	describeNode(node: GraphNode, token?: CancellationToken, options?: { force?: boolean }): Promise<IGraphNodeDescriptionResult>;
 	peekCachedDescription(node: GraphNode): IPeekGraphNodeDescriptionResult;
+	describeNode(node: GraphNode, token?: CancellationToken, options?: { force?: boolean }): Promise<IGraphNodeDescriptionResult>;
 	clearCache(): void;
+}
+
+interface CacheEntryV9 {
+	readonly description: string;
+	readonly sourceFingerprint: string;
+	readonly nodeSemanticFingerprint?: string;
+	readonly generatedAt: number;
+	lastAccessed?: number;
+	readonly promptVersion: number;
+	readonly providerId?: string;
+	readonly modelId?: string;
+}
+
+const CACHE_KEY = 'prebase.graph.descriptionCache.v9';
+const PROMPT_VERSION = 9;
+const MAX_CACHE_ENTRIES = 500;
+const MAX_CACHE_BYTES = 512 * 1024; // 512 KB
+const MAX_CONTENT = 12000;
+const SENSITIVE = /(secret|token|password|credential|apiKey|privateKey|\.env|\.pem|\.key)/i;
+const SENSITIVE_DIRS = /(^|\/)(\.git|\.agents|\.cursor|node_modules|out|dist|build|\.vscode|\.idea)(\/|$)/;
+
+export function computePromptSemanticFingerprint(
+	path: string,
+	layer: string,
+	imports: readonly string[] = [],
+	sourceFingerprint: string = '0'
+): string {
+	const sortedImports = [...imports].sort().join(',');
+	const payload = `${path}::${layer}::${sortedImports}::${sourceFingerprint}`;
+	let hash = 5381;
+	for (let i = 0; i < payload.length; i++) {
+		hash = ((hash << 5) + hash) + payload.charCodeAt(i);
+		hash |= 0;
+	}
+	return String(Math.abs(hash));
+}
+
+export function normalizeCompactDescription(raw: string): string {
+	if (!raw) {
+		return '';
+	}
+	let text = raw.replace(/\r?\n/g, ' ').trim();
+	text = text.replace(/\*\*([^*]+)\*\*/g, '$1')
+		.replace(/\*([^*]+)\*/g, '$1')
+		.replace(/`([^`]+)`/g, '$1')
+		.replace(/^#+\s+/g, '');
+	text = text.replace(/^(this\s+(file|module|component|class|service)\s+(is|provides|manages|handles|implements|defines|contains)\s+)/i, (_, _prefix, _type, verb) => {
+		return verb.charAt(0).toUpperCase() + verb.slice(1) + ' ';
+	});
+	text = text.replace(/^(this\s+(file|module|component|class|service)\s+)/i, '');
+	const sentenceMatch = text.match(/^(.+?[.!?])(?:\s+|$)/);
+	if (sentenceMatch) {
+		text = sentenceMatch[1].trim();
+	}
+	if (text && !/[.!?]$/.test(text)) {
+		text += '.';
+	}
+	if (text.length > 0) {
+		text = text.charAt(0).toUpperCase() + text.slice(1);
+	}
+	return text;
+}
+
+function hashContent(content: string): number {
+	let hash = 5381;
+	for (let i = 0; i < content.length; i++) {
+		hash = ((hash << 5) + hash) + content.charCodeAt(i);
+		hash |= 0;
+	}
+	return Math.abs(hash);
+}
+
+function inferFileDescription(node: GraphNode): string {
+	const p = (node.path || node.label || node.id || '').toLowerCase();
+	const base = p.split(/[/\\\\]/).pop() || p;
+	const ext = base.includes('.') ? base.split('.').pop() : '';
+	const layer = (node.meta && node.meta.architectureLayer) ? String(node.meta.architectureLayer) : '';
+	const layerInfo = layer && layer !== 'unknown' ? ` (${layer} layer)` : '';
+
+	if (ext === 'ts' || ext === 'tsx' || ext === 'js' || ext === 'jsx' || ext === 'mts' || ext === 'cts') {
+		if (base.includes('.test.') || base.includes('.spec.') || base.startsWith('test')) {
+			return `Test suite covering components or business logic${layerInfo}.`;
+		}
+		if (base.includes('types') || base.includes('interface')) {
+			return `Type definitions and interface contracts${layerInfo}.`;
+		}
+		if (base.includes('service') || base.includes('client')) {
+			return `Service client handling operations and side-effects${layerInfo}.`;
+		}
+		if (base.includes('controller') || base.includes('handler')) {
+			return `Request/action controller dispatching user or system workflows${layerInfo}.`;
+		}
+		if (base.includes('component') || base.includes('view') || ext === 'tsx' || ext === 'jsx') {
+			return `UI component rendering layout and interactive elements${layerInfo}.`;
+		}
+		return `Source code module defining application behavior${layerInfo}.`;
+	}
+	if (ext === 'css' || ext === 'scss' || ext === 'sass' || ext === 'less') {
+		return `Style sheet defining visual appearance and layout themes.`;
+	}
+	if (ext === 'html' || ext === 'htm') {
+		return `HTML markup defining document structure.`;
+	}
+	if (ext === 'json' || ext === 'yaml' || ext === 'yml' || ext === 'toml' || ext === 'env') {
+		return `Configuration settings or structured data file.`;
+	}
+	if (ext === 'md' || ext === 'markdown' || ext === 'txt') {
+		return `Documentation or notes providing context and guidance.`;
+	}
+	if (ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif' || ext === 'svg' || ext === 'webp' || ext === 'ico') {
+		return `Static graphical asset.`;
+	}
+	return `Workspace asset or document${layerInfo}.`;
 }
 
 export class PreBaseGraphDescriptionService extends Disposable implements IPreBaseGraphDescriptionService {
 	declare readonly _serviceBrand: undefined;
 
-	private _active: CancellationTokenSource | undefined;
+	private _active?: CancellationTokenSource;
 	private readonly _inflight = new Map<string, { promise: Promise<IGraphNodeDescriptionResult>; cts: CancellationTokenSource }>();
-
 	private readonly _dirtyFiles = new Set<string>();
 	private readonly _cleanVerifiedFiles = new Set<string>();
 	private readonly _fileGeneration = new Map<string, number>();
-
-	private readonly workspaceContextService: IWorkspaceContextService;
-	private readonly fileService: IFileService;
-	private readonly storageService: IStorageService;
-	private readonly commandService: ICommandService;
+	private _cachedRecord?: Record<string, CacheEntryV9>;
+	private _touchDebounceTimer?: any;
 
 	constructor(
-		@IWorkspaceContextService workspaceContextService: IWorkspaceContextService,
-		@IFileService fileService: IFileService,
-		@IStorageService storageService: IStorageService,
-		@ICommandService commandService: ICommandService,
+		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
+		@IFileService private readonly fileService: IFileService,
+		@IStorageService private readonly storageService: IStorageService,
+		@ICommandService private readonly commandService: ICommandService,
 	) {
 		super();
-		this.workspaceContextService = workspaceContextService;
-		this.fileService = fileService;
-		this.storageService = storageService;
-		this.commandService = commandService;
 
-		// Track file modifications lazily in-memory. Zero network/AI calls on file events.
-		if (this.fileService.onDidFilesChange) {
+		if (this.fileService?.onDidFilesChange) {
 			this._register(this.fileService.onDidFilesChange(e => {
-				for (const uri of e.rawAdded) {
-					const match = this._getFolderForUri(uri);
+				const list = (e as any).raw || (e as any).rawUpdated || [];
+				for (const change of list) {
+					const match = this._getFolderForUri((change as any).resource || change);
 					if (match) {
 						this._handleFileChange(match.folderUri, match.relative, false);
-					}
-				}
-				for (const uri of e.rawUpdated) {
-					const match = this._getFolderForUri(uri);
-					if (match) {
-						this._handleFileChange(match.folderUri, match.relative, false);
-					}
-				}
-				for (const uri of e.rawDeleted) {
-					const match = this._getFolderForUri(uri);
-					if (match) {
-						this._handleFileChange(match.folderUri, match.relative, true);
 					}
 				}
 			}));
 		}
 
-		if (this.fileService.onDidRunOperation) {
+		if (this.fileService?.onDidRunOperation) {
 			this._register(this.fileService.onDidRunOperation(e => {
 				if (e.operation === FileOperation.DELETE) {
 					const match = this._getFolderForUri(e.resource);
@@ -215,7 +236,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			if (!uri || !uri.path) {
 				return undefined;
 			}
-			if (typeof this.workspaceContextService.getWorkspaceFolder === 'function') {
+			if (typeof this.workspaceContextService?.getWorkspaceFolder === 'function') {
 				const folder = this.workspaceContextService.getWorkspaceFolder(uri);
 				if (folder && isEqualOrParent(uri, folder.uri)) {
 					const rel = this._safeRelativePath(uri.path.replace(folder.uri.path, '').replace(/^\//, ''));
@@ -224,7 +245,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					}
 				}
 			}
-			const workspace = this.workspaceContextService.getWorkspace?.();
+			const workspace = this.workspaceContextService?.getWorkspace?.();
 			const folders = workspace?.folders || [];
 			for (const f of folders) {
 				if (isEqualOrParent(uri, f.uri)) {
@@ -238,6 +259,23 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		} catch {
 			return undefined;
 		}
+	}
+
+	private _getFolderForNode(node: GraphNode): IWorkspaceFolder | undefined {
+		const workspace = this.workspaceContextService?.getWorkspace?.();
+		const folders = workspace?.folders || [];
+		if (!folders.length) {
+			return undefined;
+		}
+		if (folders.length === 1 || !node.path) {
+			return folders[0];
+		}
+		const nodePath = (node.path || '').replace(/\\/g, '/');
+		const match = folders.find(f => {
+			const fPath = f.uri.fsPath.replace(/\\/g, '/') || f.uri.path;
+			return nodePath.startsWith(fPath);
+		});
+		return match || folders[0];
 	}
 
 	private _handleFileChange(folderUri: URI, relative: string, isDelete: boolean): void {
@@ -256,6 +294,11 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 	}
 
 	override dispose(): void {
+		if (this._touchDebounceTimer) {
+			clearTimeout(this._touchDebounceTimer);
+			this._touchDebounceTimer = undefined;
+		}
+		this._flushCache();
 		this._active?.cancel();
 		this._active?.dispose();
 		this._active = undefined;
@@ -272,6 +315,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 
 	clearCache(): void {
 		this.storageService.remove(CACHE_KEY, StorageScope.APPLICATION);
+		this._cachedRecord = {};
 		this._dirtyFiles.clear();
 		this._cleanVerifiedFiles.clear();
 		this._fileGeneration.clear();
@@ -290,7 +334,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		if (!relative || SENSITIVE.test(relative) || SENSITIVE_DIRS.test(relative)) {
 			return { cached: false };
 		}
-		const folder = this.workspaceContextService.getWorkspace().folders[0];
+		const folder = this._getFolderForNode(node);
 		if (!folder) {
 			return { cached: false };
 		}
@@ -315,9 +359,11 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					};
 				}
 			}
-			const nodeContentHash = (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentHash || (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentIdentity;
-			if (nodeContentHash && entry.sourceFingerprint === nodeContentHash) {
-				const expectedFingerprint = computePromptSemanticFingerprint(relative, nodeLayer, nodeImports, nodeContentHash);
+			const nodeContentHash = (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentHash
+				|| (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentIdentity
+				|| (node as any).contentHash;
+			if (nodeContentHash && entry.sourceFingerprint === String(nodeContentHash)) {
+				const expectedFingerprint = computePromptSemanticFingerprint(relative, nodeLayer, nodeImports, String(nodeContentHash));
 				if (!entry.nodeSemanticFingerprint || entry.nodeSemanticFingerprint === expectedFingerprint) {
 					this._cleanVerifiedFiles.add(cacheKey);
 					this._touchCacheEntry(cacheKey);
@@ -343,7 +389,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			return { overview, aiStatus: 'skipped', aiMessage: localize('prebase.desc.skipped', "AI description skipped for this sensitive or binary file."), cacheHit: false };
 		}
 
-		const folder = this.workspaceContextService.getWorkspace().folders[0];
+		const folder = this._getFolderForNode(node);
 		if (!folder) {
 			return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.noWorkspace', "Open a project to generate AI descriptions."), cacheHit: false };
 		}
@@ -389,13 +435,19 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			const fileGenAtStart = this._fileGeneration.get(cacheKey) || 0;
 			try {
 				let content = '';
-				let contentHash = '0';
+				const nodeContentHash = (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentHash
+					|| (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentIdentity
+					|| (node as any).contentHash;
+
+				let contentHash = nodeContentHash ? String(nodeContentHash) : '0';
 				const uri = this._resolveWorkspaceUri(folder.uri, relative);
 				if (uri) {
 					try {
 						const file = await this.fileService.readFile(uri, { position: 0, length: MAX_CONTENT });
 						content = file.value.toString().slice(0, MAX_CONTENT);
-						contentHash = String(hashContent(content));
+						if (!nodeContentHash) {
+							contentHash = String(hashContent(content));
+						}
 					} catch {
 						content = '';
 					}
@@ -427,169 +479,54 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					}
 				}
 
-				// Retrieve active AI description context
-				let activeContext: DescriptionContextInfo | undefined;
+				let context: any;
 				try {
-					activeContext = await this.commandService.executeCommand<DescriptionContextInfo>(
-						'prebase.magnus.getDescriptionContext',
-						relative
-					);
+					context = await this.commandService?.executeCommand?.('prebase.magnus.getDescriptionContext');
 				} catch {
-					activeContext = undefined;
+					context = undefined;
 				}
 
-				if (cts.token.isCancellationRequested) {
-					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."), cacheHit: false };
-				}
+				let rawDescription = '';
+				let aiProviderId = context?.providerId || 'gemini';
+				let aiModelId = context?.modelId;
 
-				if (activeContext?.disabled) {
-					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.disabled', "AI description is disabled in settings."), cacheHit: false };
-				}
-
-				const prompt = [
-					'Write an ultra-concise 1-sentence description (~18–32 words, max 38 words) of this source file.',
-					'State its concrete responsibility and key architectural mechanism in one clear, informative sentence with no filler.',
-					'Rules: Do NOT list exhaustive export identifiers or repeat generic category overviews. Use only evidence in the supplied path, layer, imports, and content. Output plain text only without markdown formatting.',
-					`Path: ${relative}`,
-					`Layer: ${nodeLayer}`,
-					`Imports: ${nodeImports.slice(0, 16).join(', ') || 'none'}`,
-					'Content:',
-					content || '(unavailable)',
-				].join('\n');
-
-				type RawResult = string | {
-					text?: string;
-					status?: 'ready' | 'notConfigured' | 'authError' | 'rateLimited' | 'networkError' | 'modelUnavailable' | 'cancelled' | 'disabled' | 'error' | 'skipped';
-					safeMessage?: string;
-					providerId?: string;
-					modelId?: string;
-					cacheIdentity?: string;
-				};
-
-				let raw: RawResult | undefined;
-				let execError: unknown = undefined;
+				const prompt = this._buildPrompt(relative, content, nodeLayer, nodeImports);
+				let aiResult: any;
 				try {
-					raw = await this.commandService.executeCommand<RawResult>(
-						'prebase.magnus.describeFile',
-						{ prompt, path: relative }
-					);
-				} catch (err) {
-					raw = undefined;
-					execError = err;
+					aiResult = await this.commandService?.executeCommand?.('prebase.magnus.describeFile', {
+						path: relative,
+						content,
+						layer: nodeLayer,
+						imports: nodeImports,
+						prompt,
+					});
+				} catch {
+					aiResult = undefined;
 				}
 
-				if (cts.token.isCancellationRequested) {
-					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."), cacheHit: false };
+				if (aiResult && aiResult.text) {
+					rawDescription = aiResult.text;
+					if (aiResult.providerId) { aiProviderId = aiResult.providerId; }
+					if (aiResult.modelId) { aiModelId = aiResult.modelId; }
 				}
 
-				if (!raw) {
-					const errMsg = execError instanceof Error ? execError.message : String(execError || '');
-					let aiMessage = localize('prebase.desc.configureMagnus', "Agents extension is not available.");
-					if (errMsg.includes('activation') || errMsg.includes('Activating extension')) {
-						aiMessage = localize('prebase.desc.activationFailed', "Agents runtime failed to activate.");
-					} else if (errMsg && !errMsg.includes('not found') && !errMsg.includes('command \'prebase.magnus.describeFile\'')) {
-						aiMessage = errMsg;
-					}
-					return {
-						overview,
-						aiStatus: 'unavailable',
-						aiMessage,
-						cacheHit: false,
-					};
+				const description = normalizeCompactDescription(rawDescription);
+				if (!description) {
+					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.empty', "Empty response from language model."), cacheHit: false };
 				}
 
-				if (typeof raw === 'object' && raw.status && raw.status !== 'ready') {
-					if (raw.status === 'notConfigured') {
-						return {
-							overview,
-							aiStatus: 'unavailable',
-							aiMessage: raw.safeMessage || localize('prebase.desc.notConfigured', "AI description unavailable — no AI provider credential configured. Configure a key in Agents Settings (or provide GEMINI_API_KEY in PreBase root .env)."),
-							cacheHit: false,
-						};
-					}
-					if (raw.status === 'authError') {
-						return {
-							overview,
-							aiStatus: 'unavailable',
-							aiMessage: raw.safeMessage || localize('prebase.desc.authError', "AI description authentication failed. Check your API key in Agents Settings."),
-							cacheHit: false,
-						};
-					}
-					if (raw.status === 'rateLimited') {
-						return {
-							overview,
-							aiStatus: 'error',
-							aiMessage: raw.safeMessage || localize('prebase.desc.rateLimited', "AI description rate limit reached. Please wait a moment before requesting another description."),
-							cacheHit: false,
-						};
-					}
-					if (raw.status === 'cancelled') {
-						return {
-							overview,
-							aiStatus: 'unavailable',
-							aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."),
-							cacheHit: false,
-						};
-					}
-					if (raw.status === 'disabled') {
-						return {
-							overview,
-							aiStatus: 'unavailable',
-							aiMessage: localize('prebase.desc.disabled', "AI description is disabled in settings."),
-							cacheHit: false,
-						};
-					}
-					if (raw.status === 'skipped') {
-						return {
-							overview,
-							aiStatus: 'skipped',
-							aiMessage: raw.safeMessage || localize('prebase.desc.skipped', "AI description skipped for this file."),
-							cacheHit: false,
-						};
-					}
-					if (raw.status === 'modelUnavailable') {
-						return {
-							overview,
-							aiStatus: 'error',
-							aiMessage: raw.safeMessage || localize('prebase.desc.modelUnavailable', "The selected AI model is unavailable."),
-							cacheHit: false,
-						};
-					}
-					return {
-						overview,
-						aiStatus: 'error',
-						aiMessage: raw.safeMessage || localize('prebase.desc.failed', "AI description generation failed."),
-						cacheHit: false,
-					};
-				}
-
-				const rawAiText = typeof raw === 'string' ? raw.trim() : raw.text?.trim();
-
-				if (!rawAiText) {
-					return {
-						overview,
-						aiStatus: 'unavailable',
-						aiMessage: localize('prebase.desc.emptyResult', "AI model returned an empty description."),
-						cacheHit: false,
-					};
-				}
-
-				const aiText = normalizeCompactDescription(rawAiText);
-				const providerId = (typeof raw === 'object' && raw.providerId) ? raw.providerId : (activeContext?.providerId ?? 'gemini');
-				const modelId = (typeof raw === 'object' && raw.modelId) ? raw.modelId : activeContext?.modelId;
-
-				// Stale in-flight race protection: discard result if file was modified again during AI request
+				// If file was mutated during generation, do not cache stale result
 				const currentFileGen = this._fileGeneration.get(cacheKey) || 0;
-				if (fileGenAtStart === currentFileGen) {
+				if (currentFileGen === fileGenAtStart) {
 					this._writeCache(cacheKey, {
-						description: aiText,
+						description,
 						sourceFingerprint: contentHash,
 						nodeSemanticFingerprint: semanticFingerprint,
 						generatedAt: Date.now(),
 						lastAccessed: Date.now(),
 						promptVersion: PROMPT_VERSION,
-						providerId,
-						modelId,
+						providerId: aiProviderId,
+						modelId: aiModelId
 					});
 					this._cleanVerifiedFiles.add(cacheKey);
 					this._dirtyFiles.delete(cacheKey);
@@ -597,32 +534,41 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 
 				return {
 					overview,
-					aiDescription: aiText,
+					aiDescription: description,
 					aiStatus: 'ready',
-					aiProviderId: providerId,
-					aiModelId: modelId,
-					cacheHit: false,
+					aiProviderId,
+					aiModelId,
+					cacheHit: false
 				};
-			} catch (err) {
-				return {
-					overview,
-					aiStatus: 'error',
-					aiMessage: err instanceof Error ? err.message : String(err),
-					cacheHit: false,
-				};
+			} catch (err: any) {
+				if (cts.token.isCancellationRequested) {
+					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."), cacheHit: false };
+				}
+				return { overview, aiStatus: 'unavailable', aiMessage: err?.message || String(err), cacheHit: false };
 			} finally {
-				if (this._inflight.get(cacheKey)?.cts === cts) {
-					this._inflight.delete(cacheKey);
-				}
-				if (this._active === cts) {
-					this._active = undefined;
-				}
-				cts.dispose();
+				this._inflight.delete(cacheKey);
 			}
 		})();
 
 		this._inflight.set(cacheKey, { promise: work, cts });
 		return work;
+	}
+
+	private _buildPrompt(path: string, content: string, layer: string, imports: readonly string[]): string {
+		const importList = imports.length ? imports.slice(0, 15).join(', ') : 'None';
+		return `You are analyzing a codebase file for an architectural code graph.
+Provide a concise, highly accurate description of the file's primary responsibility in 2-3 sentences.
+Focus on its role, exported capabilities, and how other parts of the system interact with it.
+
+File path: ${path}
+Architectural layer: ${layer}
+Direct imports/dependencies: ${importList}
+
+File content excerpt:
+\`\`\`
+${content}
+\`\`\`
+`;
 	}
 
 	private _safeRelativePath(candidate: string | undefined): string | undefined {
@@ -659,10 +605,15 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 	}
 
 	private _readCache(): Record<string, CacheEntryV9> {
+		if (this._cachedRecord) {
+			return this._cachedRecord;
+		}
 		try {
-			return JSON.parse(this.storageService.get(CACHE_KEY, StorageScope.APPLICATION, '{}') || '{}') as Record<string, CacheEntryV9>;
+			this._cachedRecord = JSON.parse(this.storageService.get(CACHE_KEY, StorageScope.APPLICATION, '{}') || '{}') as Record<string, CacheEntryV9>;
+			return this._cachedRecord;
 		} catch {
-			return {};
+			this._cachedRecord = {};
+			return this._cachedRecord;
 		}
 	}
 
@@ -670,7 +621,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		const cache = this._readCache();
 		if (cache[key]) {
 			delete cache[key];
-			this.storageService.store(CACHE_KEY, JSON.stringify(cache), StorageScope.APPLICATION, StorageTarget.MACHINE);
+			this._flushCache();
 		}
 	}
 
@@ -678,15 +629,22 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		const cache = this._readCache();
 		if (cache[key]) {
 			cache[key].lastAccessed = Date.now();
-			this.storageService.store(CACHE_KEY, JSON.stringify(cache), StorageScope.APPLICATION, StorageTarget.MACHINE);
+			// Debounce storage writes for hover touches
+			if (this._touchDebounceTimer) {
+				clearTimeout(this._touchDebounceTimer);
+			}
+			this._touchDebounceTimer = setTimeout(() => {
+				this._touchDebounceTimer = undefined;
+				this._flushCache();
+			}, 2000);
 		}
 	}
 
-	private _writeCache(key: string, entry: CacheEntryV9): void {
-		const cache = this._readCache();
-		entry.lastAccessed = entry.lastAccessed ?? Date.now();
-		cache[key] = entry;
-		const entries = Object.entries(cache).sort((a, b) => (b[1].lastAccessed ?? b[1].generatedAt) - (a[1].lastAccessed ?? a[1].generatedAt)).slice(0, MAX_CACHE_ENTRIES);
+	private _flushCache(): void {
+		if (!this._cachedRecord) {
+			return;
+		}
+		const entries = Object.entries(this._cachedRecord).sort((a, b) => (b[1].lastAccessed ?? b[1].generatedAt) - (a[1].lastAccessed ?? a[1].generatedAt)).slice(0, MAX_CACHE_ENTRIES);
 		const next: Record<string, CacheEntryV9> = {};
 		let totalBytes = 0;
 		for (const [k, v] of entries) {
@@ -697,6 +655,14 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 			next[k] = v;
 			totalBytes += entryBytes;
 		}
+		this._cachedRecord = next;
 		this.storageService.store(CACHE_KEY, JSON.stringify(next), StorageScope.APPLICATION, StorageTarget.MACHINE);
+	}
+
+	private _writeCache(key: string, entry: CacheEntryV9): void {
+		const cache = this._readCache();
+		entry.lastAccessed = entry.lastAccessed ?? Date.now();
+		cache[key] = entry;
+		this._flushCache();
 	}
 }

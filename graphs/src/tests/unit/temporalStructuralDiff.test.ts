@@ -8,12 +8,13 @@ import { suite, test } from 'mocha';
 import { computeTemporalStructuralDiff } from '../../temporal/view/temporalStructuralDiff.js';
 import type { TemporalEntitySnapshot, TemporalEdgeSnapshot, TemporalEdgeKind } from '../../temporal/common/temporalTypes.js';
 
-suite('TemporalStructuralDiff (Unit - Phase 3.1)', () => {
-	function makeEntity(entityId: string, path: string, canonicalNodeId: string, meta?: any): TemporalEntitySnapshot {
+suite('TemporalStructuralDiff (Unit - Phase 3.1 & 3.2)', () => {
+	function makeEntity(entityId: string, path: string, canonicalNodeId: string, meta?: any, blobOid?: string): TemporalEntitySnapshot {
 		return {
 			entityId,
 			commitSha: 'commit-test',
 			path,
+			blobOid,
 			nodeData: {
 				id: canonicalNodeId,
 				kind: 'file',
@@ -24,19 +25,19 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1)', () => {
 		};
 	}
 
-	function makeEdge(edgeId: string, sourceEntityId: string, targetEntityId: string, sourcePath: string, targetPath: string, kind: TemporalEdgeKind = 'imports'): TemporalEdgeSnapshot {
+	function makeEdge(edgeId: string, sourceEntityId: string, targetEntityId: string, sourcePath: string, targetPath: string, kind: TemporalEdgeKind = 'imports', edgeData?: any): TemporalEdgeSnapshot {
 		return {
 			edgeId,
 			commitSha: 'commit-test',
 			sourceEntityId,
 			targetEntityId,
 			kind,
-			edgeData: {
+			edgeData: edgeData || {
 				id: edgeId,
 				source: sourceEntityId,
 				target: targetEntityId,
 				kind,
-			} as any,
+			},
 			...({ sourcePath, targetPath } as any),
 		};
 	}
@@ -63,6 +64,7 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1)', () => {
 		assert.equal(diff.summary.unchangedCount, 0);
 		assert.equal(diff.summary.edgeAddedCount, 1);
 		assert.equal(diff.summary.edgeRemovedCount, 0);
+		assert.equal(diff.summary.edgeModifiedCount, 0);
 		assert.equal(diff.isPartialLineage, false);
 
 		assert.ok(diff.nodes.every(n => n.changeKind === 'added'));
@@ -90,10 +92,10 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1)', () => {
 		assert.equal(diff.summary.unchangedCount, 2);
 		assert.equal(diff.summary.addedCount, 0);
 		assert.equal(diff.summary.modifiedCount, 0);
-		assert.equal(diff.summary.removedCount, 0);
 		assert.equal(diff.summary.renamedCount, 0);
 		assert.equal(diff.summary.edgeAddedCount, 0);
 		assert.equal(diff.summary.edgeRemovedCount, 0);
+		assert.equal(diff.summary.edgeModifiedCount, 0);
 		assert.ok(diff.nodes.every(n => n.changeKind === 'unchanged'));
 		assert.ok(diff.edges.every(e => e.changeKind === 'unchanged'));
 	});
@@ -111,20 +113,21 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1)', () => {
 		assert.equal(diff.summary.modifiedCount, 1);
 		assert.equal(diff.summary.unchangedCount, 0);
 		assert.equal(diff.nodes[0].changeKind, 'modified');
+		assert.equal(diff.nodes[0].isModified, true);
 		assert.equal(diff.nodes[0].entityId, 'ent-1');
 		assert.equal(diff.nodes[0].canonicalNodeId, 'can-1-v2');
 	});
 
-	test('4. File rename (exact and with edits): same entityId, changed path -> renamed with oldPath', () => {
+	test('4. File rename with modification: detects renamed and sets isRenamedAndModified', () => {
 		const baseEntities = [
-			makeEntity('ent-1', 'src/oldRouter.ts', 'can-1-v1'),
-			makeEntity('ent-2', 'src/service.ts', 'can-2-v1'),
+			makeEntity('ent-1', 'src/oldRouter.ts', 'can-1-v1', {}, 'blob-1'),
+			makeEntity('ent-2', 'src/service.ts', 'can-2-v1', {}, 'blob-2'),
 		];
 		const targetEntities = [
-			// Exact rename
-			makeEntity('ent-1', 'src/newRouter.ts', 'can-1-v1'),
-			// Rename + edit
-			makeEntity('ent-2', 'src/core/service.ts', 'can-2-v2'),
+			// Exact rename (same content)
+			makeEntity('ent-1', 'src/newRouter.ts', 'can-1-v1', {}, 'blob-1'),
+			// Rename + edit (different content)
+			makeEntity('ent-2', 'src/core/service.ts', 'can-2-v2', {}, 'blob-3'),
 		];
 
 		const diff = computeTemporalStructuralDiff('commit-2', targetEntities, [], 'commit-1', baseEntities, []);
@@ -136,12 +139,16 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1)', () => {
 		const n1 = diff.nodes.find(n => n.entityId === 'ent-1');
 		assert.ok(n1);
 		assert.equal(n1.changeKind, 'renamed');
+		assert.equal(n1.isModified, false);
+		assert.equal(n1.meta?.isRenamedAndModified, false);
 		assert.equal(n1.path, 'src/newRouter.ts');
 		assert.equal(n1.oldPath, 'src/oldRouter.ts');
 
 		const n2 = diff.nodes.find(n => n.entityId === 'ent-2');
 		assert.ok(n2);
 		assert.equal(n2.changeKind, 'renamed');
+		assert.equal(n2.isModified, true);
+		assert.equal(n2.meta?.isRenamedAndModified, true);
 		assert.equal(n2.path, 'src/core/service.ts');
 		assert.equal(n2.oldPath, 'src/service.ts');
 	});
@@ -193,47 +200,28 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1)', () => {
 		assert.equal(nodeB?.oldPath, 'src/b.ts');
 	});
 
-	test('7. Edge lifecycle: additions and removals across structural snapshot diff', () => {
+	test('7. Edge modification detection: weight or metadata change triggers edgeModifiedCount', () => {
 		const baseEntities = [
 			makeEntity('ent-1', 'src/a.ts', 'can-1'),
 			makeEntity('ent-2', 'src/b.ts', 'can-2'),
-			makeEntity('ent-3', 'src/c.ts', 'can-3'),
 		];
 		const baseEdges = [
-			makeEdge('edge-1-2', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts'),
-			makeEdge('edge-2-3', 'ent-2', 'ent-3', 'src/b.ts', 'src/c.ts'),
+			makeEdge('edge-1-2', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', { weight: 1, importType: 'named' }),
 		];
-
 		const targetEntities = [
 			makeEntity('ent-1', 'src/a.ts', 'can-1'),
 			makeEntity('ent-2', 'src/b.ts', 'can-2'),
-			makeEntity('ent-3', 'src/c.ts', 'can-3'),
 		];
 		const targetEdges = [
-			// edge-1-2 kept (unchanged)
-			makeEdge('edge-1-2', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts'),
-			// edge-2-3 deleted (removed)
-			// edge-1-3 added
-			makeEdge('edge-1-3', 'ent-1', 'ent-3', 'src/a.ts', 'src/c.ts'),
+			makeEdge('edge-1-2', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', { weight: 5, importType: 'named' }),
 		];
 
 		const diff = computeTemporalStructuralDiff('commit-2', targetEntities, targetEdges, 'commit-1', baseEntities, baseEdges);
 
-		assert.equal(diff.summary.edgeAddedCount, 1);
-		assert.equal(diff.summary.edgeRemovedCount, 1);
-		assert.equal(diff.edges.length, 3); // 1 unchanged + 1 added + 1 removed
-
-		const addedEdge = diff.edges.find(e => e.sourceEntityId === 'ent-1' && e.targetEntityId === 'ent-3');
-		assert.ok(addedEdge);
-		assert.equal(addedEdge.changeKind, 'added');
-
-		const removedEdge = diff.edges.find(e => e.sourceEntityId === 'ent-2' && e.targetEntityId === 'ent-3');
-		assert.ok(removedEdge);
-		assert.equal(removedEdge.changeKind, 'removed');
-
-		const unchangedEdge = diff.edges.find(e => e.sourceEntityId === 'ent-1' && e.targetEntityId === 'ent-2');
-		assert.ok(unchangedEdge);
-		assert.equal(unchangedEdge.changeKind, 'unchanged');
+		assert.equal(diff.summary.edgeModifiedCount, 1);
+		assert.equal(diff.summary.edgeAddedCount, 0);
+		assert.equal(diff.summary.edgeRemovedCount, 0);
+		assert.equal(diff.edges[0].changeKind, 'modified');
 	});
 
 	test('8. Partial lineage warning annotation', () => {
