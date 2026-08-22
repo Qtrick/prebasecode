@@ -84,7 +84,8 @@ export interface ITemporalStore {
 	getEntityHistoryReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntitySnapshot[]>;
 	getEntityLineageEvents(entityId: string): Promise<TemporalEntityLineageEvent[]>;
 	getEntityLineageEventsReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntityLineageEvent[]>;
-	getActiveEntitiesAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]>;
+	/** Returns entity snapshots persisted at this commit (transitions or full checkpoint). Reconstruct canonical state for full active entity query. */
+	getEntitySnapshotsAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]>;
 	getDeletedPathsInHistory(baseCommitSha: string): Promise<Map<string, string>>;
 	getEdge(edgeId: string): Promise<TemporalEdgeRecord | undefined>;
 	getEdgeHistory(edgeId: string): Promise<TemporalEdgeSnapshot[]>;

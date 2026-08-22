@@ -22,6 +22,12 @@ suite('PreBaseGraphDescriptionService (Unit - v9 File-Aware Cache)', () => {
 		getWorkspace: () => ({
 			folders: [workspaceFolder],
 		}),
+		getWorkspaceFolder: (uri: URI) => {
+			if (uri.toString().startsWith(workspaceFolderUri.toString())) {
+				return workspaceFolder;
+			}
+			return undefined;
+		},
 	} as any;
 
 	function createMockFileService(files: Record<string, string> = {}) {
@@ -55,8 +61,8 @@ suite('PreBaseGraphDescriptionService (Unit - v9 File-Aware Cache)', () => {
 					rawDeleted: isDelete ? [resource] : [],
 				});
 			},
-			emitOperation: (resource: any, operation: number = 0) => {
-				operationListener?.({ resource, operation });
+			emitOperation: (resource: any, operation: number = 0, target?: any) => {
+				operationListener?.({ resource, operation, target });
 			},
 		};
 	}
@@ -456,6 +462,220 @@ suite('PreBaseGraphDescriptionService (Unit - v9 File-Aware Cache)', () => {
 		service2.clearCache();
 		assert.equal(storageMap.has('prebase.graph.descriptionCache.v9'), false);
 		assert.equal(service2.peekCachedDescription(node0).cached, false);
+	});
+
+	test('7. Restart freshness: external edit while closed prevents stale peek and updates on view', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		let aiCallCount = 0;
+		const mockCommandService = {
+			executeCommand: async (cmd: string, args: any) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCallCount++;
+					return { text: `Description v${aiCallCount} for ${args.path}`, status: 'ready' };
+				}
+				return undefined;
+			},
+		} as any;
+
+		const fileUri = URI.joinPath(workspaceFolderUri, 'src/service.ts');
+		const files: Record<string, string> = {
+			[fileUri.toString()]: 'export class Service { version = 1; }',
+		};
+		const fileService1 = createMockFileService(files);
+		const service1 = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			fileService1 as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const node: GraphNode = { id: 'n-svc', label: 'src/service.ts', path: 'src/service.ts', kind: 'file' };
+		await service1.describeNode(node);
+		assert.equal(aiCallCount, 1);
+
+		// Simulate app close & external file modification
+		files[fileUri.toString()] = 'export class Service { version = 2; newMethod() {} }';
+
+		// Restart app / new service instance
+		const fileService2 = createMockFileService(files);
+		const service2 = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			fileService2 as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		// Synchronous peek on unverified node must NOT return stale cached description
+		const peekResult = service2.peekCachedDescription(node);
+		assert.equal(peekResult.cached, false, 'Unverified node after restart must return cached: false');
+
+		// View node: detects changed content hash / fingerprint and triggers fresh AI description
+		const describeResult = await service2.describeNode(node);
+		assert.equal(aiCallCount, 2, 'External change must trigger fresh AI generation');
+		assert.equal(describeResult.cacheHit, false);
+		assert.ok(describeResult.aiDescription?.includes('v2'));
+	});
+
+	test('8. Prompt semantic fingerprint: layer or imports change invalidates cache', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		let aiCallCount = 0;
+		const mockCommandService = {
+			executeCommand: async (cmd: string, args: any) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCallCount++;
+					return { text: `Layered desc ${aiCallCount}`, status: 'ready' };
+				}
+				return undefined;
+			},
+		} as any;
+
+		const fileService = createMockFileService();
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			fileService as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const nodeV1: GraphNode = {
+			id: 'n-arch',
+			label: 'src/arch.ts',
+			path: 'src/arch.ts',
+			kind: 'file',
+			meta: { architectureLayer: 'presentation', imports: ['react', 'monaco'] },
+		};
+
+		await service.describeNode(nodeV1);
+		assert.equal(aiCallCount, 1);
+
+		// Same content, but architecture layer changed to 'data-access' and imports changed
+		const nodeV2: GraphNode = {
+			id: 'n-arch',
+			label: 'src/arch.ts',
+			path: 'src/arch.ts',
+			kind: 'file',
+			meta: { architectureLayer: 'data-access', imports: ['sqlite3', 'knex'] },
+		};
+
+		// Invalidate memory verified state by marking dirty or simulating semantic node change
+		const res2 = await service.describeNode(nodeV2, undefined, { force: false });
+		assert.equal(aiCallCount, 2, 'Changed architecture layer / imports must produce fresh description');
+		assert.equal(res2.cacheHit, false);
+	});
+
+	test('9. Multi-root workspace: events in Folder B do not invalidate Folder A', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		const folderA_Uri = URI.parse('file:///workspace/rootA');
+		const folderB_Uri = URI.parse('file:///workspace/rootB');
+
+		const folderA = { uri: folderA_Uri, name: 'rootA', index: 0, toResource: (rel: string) => URI.joinPath(folderA_Uri, rel) };
+		const folderB = { uri: folderB_Uri, name: 'rootB', index: 1, toResource: (rel: string) => URI.joinPath(folderB_Uri, rel) };
+
+		const multiRootContext = {
+			getWorkspace: () => ({ folders: [folderA, folderB] }),
+			getWorkspaceFolder: (uri: URI) => {
+				const s = uri.toString();
+				if (s.startsWith(folderA_Uri.toString())) return folderA;
+				if (s.startsWith(folderB_Uri.toString())) return folderB;
+				return undefined;
+			},
+		} as any;
+
+		let aiCallCount = 0;
+		const mockCommandService = {
+			executeCommand: async (cmd: string) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCallCount++;
+					return { text: `Desc ${aiCallCount}`, status: 'ready' };
+				}
+				return undefined;
+			},
+		} as any;
+
+		const fileService = createMockFileService();
+		const service = new PreBaseGraphDescriptionService(
+			multiRootContext,
+			fileService as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const nodeA: GraphNode = { id: 'nA', label: 'src/index.ts', path: 'src/index.ts', kind: 'file' };
+		await service.describeNode(nodeA);
+		assert.equal(aiCallCount, 1);
+
+		// Emit change in folder B
+		const bFileUri = URI.joinPath(folderB_Uri, 'src/index.ts');
+		fileService.emitChange(bFileUri);
+
+		// Node in folder A remains clean verified
+		const resA = await service.describeNode(nodeA);
+		assert.equal(aiCallCount, 1, 'Folder A node must remain cached when folder B file changes');
+		assert.equal(resA.cacheHit, true);
+	});
+
+	test('10. File MOVE / COPY operations update cache accordingly', async () => {
+		const storageMap = new Map<string, string>();
+		const mockStorage = {
+			get: (key: string, _scope: any, def: string) => storageMap.get(key) ?? def,
+			store: (key: string, val: string) => storageMap.set(key, val),
+			remove: (key: string) => storageMap.delete(key),
+		} as any;
+
+		let aiCallCount = 0;
+		const mockCommandService = {
+			executeCommand: async (cmd: string, args: any) => {
+				if (cmd === 'prebase.magnus.describeFile') {
+					aiCallCount++;
+					return { text: `Desc for ${args.path}`, status: 'ready' };
+				}
+				return undefined;
+			},
+		} as any;
+
+		const fileService = createMockFileService();
+		const service = new PreBaseGraphDescriptionService(
+			mockWorkspaceContextService,
+			fileService as any,
+			mockStorage,
+			mockCommandService,
+		);
+
+		const oldNode: GraphNode = { id: 'n-old', label: 'src/old.ts', path: 'src/old.ts', kind: 'file' };
+		await service.describeNode(oldNode);
+		assert.equal(aiCallCount, 1);
+
+		// Emit MOVE operation: src/old.ts -> src/new.ts
+		const srcUri = URI.joinPath(workspaceFolderUri, 'src/old.ts');
+		const dstUri = URI.joinPath(workspaceFolderUri, 'src/new.ts');
+		(fileService as any).emitOperation(srcUri, 2 /* FileOperation.MOVE */, { resource: dstUri });
+
+		// Old node cache is deleted
+		assert.equal(service.peekCachedDescription(oldNode).cached, false);
+
+		// New node at new path triggers fresh description
+		const newNode: GraphNode = { id: 'n-new', label: 'src/new.ts', path: 'src/new.ts', kind: 'file' };
+		const resNew = await service.describeNode(newNode);
+		assert.equal(aiCallCount, 2);
+		assert.equal(resNew.cacheHit, false);
 	});
 });
 

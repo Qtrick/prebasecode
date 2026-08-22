@@ -669,6 +669,35 @@ export class SqliteTemporalStore implements ITemporalStore {
 					);
 				});
 			}
+
+			// 9. Master-record GC: prune orphaned provisional entities and edges no longer referenced anywhere
+			await new Promise<void>((resolve, reject) => {
+				db.run(`
+					DELETE FROM edges
+					WHERE edge_id NOT IN (
+						SELECT edge_id FROM edge_snapshots
+						UNION
+						SELECT edge_id FROM edge_events
+					);
+				`, error => error ? reject(error) : resolve());
+			});
+
+			await new Promise<void>((resolve, reject) => {
+				db.run(`
+					DELETE FROM entities
+					WHERE entity_id NOT IN (
+						SELECT entity_id FROM entity_snapshots
+						UNION
+						SELECT entity_id FROM entity_deletions
+						UNION
+						SELECT entity_id FROM lineage_events
+						UNION
+						SELECT source_entity_id FROM edges
+						UNION
+						SELECT target_entity_id FROM edges
+					);
+				`, error => error ? reject(error) : resolve());
+			});
 		});
 	}
 
@@ -1073,7 +1102,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 		});
 	}
 
-	async getActiveEntitiesAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]> {
+	async getEntitySnapshotsAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]> {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.all(

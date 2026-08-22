@@ -409,9 +409,18 @@ function createModelAction(
 		section,
 		run: () => onSelect(model),
 	};
-	const ariaDescription = [model.metadata.detail || textDescription, priceCategoryLabel, model.metadata.tooltip]
-		.filter((part): part is string => !!part)
-		.join(' · ') || undefined;
+	const uniqueParts: string[] = [];
+	const seen = new Set<string>();
+	for (const candidate of [model.metadata.detail || textDescription, priceCategoryLabel, model.metadata.tooltip]) {
+		if (candidate) {
+			const norm = candidate.trim().toLowerCase();
+			if (!seen.has(norm) && candidate !== model.metadata.name) {
+				uniqueParts.push(candidate.trim());
+				seen.add(norm);
+			}
+		}
+	}
+	const ariaDescription = uniqueParts.length > 0 ? uniqueParts.join(' · ') : undefined;
 	return { action, ariaDescription };
 }
 

@@ -7,6 +7,7 @@ export const PreBaseGraphCommandIds = {
 	clearDescriptionCache: 'prebase.graph.clearDescriptionCache',
 	regenerateDescription: 'prebase.graph.regenerateDescription',
 	openNetwork: 'prebase.graph.openNetwork',
+	openTemporal: 'prebase.graph.openTemporal',
 	scanWorkspace: 'prebase.graph.scanWorkspace',
 	rescanWorkspace: 'prebase.graph.rescanWorkspace',
 	cancelScan: 'prebase.graph.cancelScan',

@@ -234,7 +234,7 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 			case 'getEntityHistoryReachableFrom': return store.getEntityHistoryReachableFrom(args[0] as string, args[1] as string);
 			case 'getEntityLineageEvents': return store.getEntityLineageEvents(args[0] as string);
 			case 'getEntityLineageEventsReachableFrom': return store.getEntityLineageEventsReachableFrom(args[0] as string, args[1] as string);
-			case 'getActiveEntitiesAtCommit': return store.getActiveEntitiesAtCommit(args[0] as string);
+			case 'getEntitySnapshotsAtCommit': return store.getEntitySnapshotsAtCommit(args[0] as string);
 			case 'getDeletedPathsInHistory': return store.getDeletedPathsInHistory(args[0] as string);
 			case 'getEdge': return store.getEdge(args[0] as string);
 			case 'getEdgeHistory': return store.getEdgeHistory(args[0] as string);

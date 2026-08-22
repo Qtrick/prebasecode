@@ -300,6 +300,137 @@ suite('Temporal sparse persistence', () => {
 		assert.strictEqual(reconciledEvents[0].eventKind, 'created');
 	});
 
+	test('garbage collects obsolete provisional master entity and edge records upon reconciliation', async () => {
+		const node = { id: 'src/app.ts', kind: 'file' as const, label: 'app.ts', path: 'src/app.ts' };
+		const edge = { id: 'provisional-edge', source: 'src/app.ts', target: 'src/lib.ts', kind: 'import' as const };
+		const digest = computeCanonicalGraphDigest({ nodes: [node], edges: [edge], entryNodeId: null });
+
+		// 1. Ingest commit C as an isolated provisional checkpoint with provisional entity ID 'entity-provisional-c'
+		const provisionalEntity: TemporalEntitySnapshot = { entityId: 'entity-provisional-c', commitSha: 'commit-c', path: node.path, nodeData: node };
+		const provisionalEdgeSnap = { edgeId: 'edge-provisional-c', commitSha: 'commit-c', sourceEntityId: 'entity-provisional-c', targetEntityId: 'entity-lib', kind: 'imports' as const, edgeData: edge };
+		const provisionalSnap: TemporalGraphSnapshot = {
+			schemaVersion: 5,
+			analyzerVersion: 1,
+			profileVersion: 1,
+			commitSha: 'commit-c',
+			timestamp: 100,
+			isCheckpoint: true,
+			digest,
+			graphData: { nodes: [node], edges: [edge], timestamp: 100 },
+			entityMap: new Map([['entity-provisional-c', provisionalEntity]]),
+			edgeMap: new Map([[provisionalEdgeSnap.edgeId, provisionalEdgeSnap]]),
+			pathToEntityId: new Map([[node.path, 'entity-provisional-c']]),
+		};
+		const provisionalCommit: TemporalCommitRecord = {
+			commitSha: 'commit-c',
+			canonicalDigest: digest,
+			parentShas: ['commit-b'],
+			treeSha: 'tree-c',
+			authorName: 'Tester',
+			authorEmail: 'tester@prebase.invalid',
+			authorTimestamp: 100,
+			committerTimestamp: 100,
+			message: 'provisional anchor',
+			ingestedAt: 100,
+			isCheckpoint: true,
+			checkpointInterval: 10,
+			deltaDepth: 0,
+			lineageCoverage: { kind: 'partial', unknownBeforeCommitSha: 'commit-c' },
+			schemaVersion: 5,
+			analyzerVersion: 1,
+			profileVersion: 1,
+		};
+		await store.saveCommitIngestion(provisionalCommit, provisionalSnap, undefined, []);
+
+		// Verify provisional master entity & edge exist
+		assert.ok(await store.getEntity('entity-provisional-c'), 'provisional entity should exist in master table');
+		assert.ok(await store.getEdge('edge-provisional-c'), 'provisional edge should exist in master table');
+
+		// 2. Parent commit-b is ingested
+		const parentEntity: TemporalEntitySnapshot = { entityId: 'entity-canonical-c', commitSha: 'commit-b', path: node.path, nodeData: node };
+		const parentEdgeSnap = { edgeId: 'edge-canonical-c', commitSha: 'commit-b', sourceEntityId: 'entity-canonical-c', targetEntityId: 'entity-lib', kind: 'imports' as const, edgeData: edge };
+		const parentSnap: TemporalGraphSnapshot = {
+			schemaVersion: 5,
+			analyzerVersion: 1,
+			profileVersion: 1,
+			commitSha: 'commit-b',
+			timestamp: 90,
+			isCheckpoint: true,
+			digest,
+			graphData: { nodes: [node], edges: [edge], timestamp: 90 },
+			entityMap: new Map([['entity-canonical-c', parentEntity]]),
+			edgeMap: new Map([[parentEdgeSnap.edgeId, parentEdgeSnap]]),
+			pathToEntityId: new Map([[node.path, 'entity-canonical-c']]),
+		};
+		const parentCommit: TemporalCommitRecord = {
+			commitSha: 'commit-b',
+			canonicalDigest: digest,
+			parentShas: [],
+			treeSha: 'tree-b',
+			authorName: 'Tester',
+			authorEmail: 'tester@prebase.invalid',
+			authorTimestamp: 90,
+			committerTimestamp: 90,
+			message: 'root parent',
+			ingestedAt: 90,
+			isCheckpoint: true,
+			checkpointInterval: 10,
+			deltaDepth: 0,
+			lineageCoverage: { kind: 'complete' },
+			schemaVersion: 5,
+			analyzerVersion: 1,
+			profileVersion: 1,
+		};
+		await store.saveCommitIngestion(parentCommit, parentSnap, undefined, []);
+
+		// 3. Reconcile commit C with resolved historical entity 'entity-canonical-c' and edge 'edge-canonical-c'
+		const finalEntity: TemporalEntitySnapshot = { entityId: 'entity-canonical-c', commitSha: 'commit-c', path: node.path, nodeData: node };
+		const finalEdgeSnap = { edgeId: 'edge-canonical-c', commitSha: 'commit-c', sourceEntityId: 'entity-canonical-c', targetEntityId: 'entity-lib', kind: 'imports' as const, edgeData: edge };
+		const finalSnap: TemporalGraphSnapshot = {
+			...provisionalSnap,
+			entityMap: new Map([['entity-canonical-c', finalEntity]]),
+			edgeMap: new Map([[finalEdgeSnap.edgeId, finalEdgeSnap]]),
+			pathToEntityId: new Map([[node.path, 'entity-canonical-c']]),
+		};
+		const finalDelta: TemporalStructuralDelta = {
+			commitSha: 'commit-c',
+			baseCommitSha: 'commit-b',
+			parentCommitSha: 'commit-b',
+			targetCanonicalDigest: digest,
+			deltaVersion: 1,
+			entitiesAdded: [],
+			entitiesModified: [],
+			entitiesDeleted: [],
+			entitiesRenamed: [],
+			edgesAdded: [],
+			edgesModified: [],
+			edgesDeleted: [],
+		};
+		const finalCommit: TemporalCommitRecord = {
+			...provisionalCommit,
+			isCheckpoint: false,
+			deltaDepth: 1,
+			baseCommitSha: 'commit-b',
+			lineageCoverage: { kind: 'complete' },
+		};
+
+		await store.saveCommitIngestion(finalCommit, finalSnap, finalDelta, [{
+			entityId: 'entity-canonical-c',
+			commitSha: 'commit-c',
+			parentCommitSha: 'commit-b',
+			lineageCase: 'same-canonical-id',
+			evidence: { confidence: 1 },
+		}]);
+
+		// Obsolete provisional master records MUST be garbage collected
+		assert.strictEqual(await store.getEntity('entity-provisional-c'), undefined, 'obsolete provisional master entity must be GCed');
+		assert.strictEqual(await store.getEdge('edge-provisional-c'), undefined, 'obsolete provisional master edge must be GCed');
+
+		// Final master records must be present
+		assert.ok(await store.getEntity('entity-canonical-c'), 'final entity must exist in master table');
+		assert.ok(await store.getEdge('edge-canonical-c'), 'final edge must exist in master table');
+	});
+
 	test('proves sparse order-of-growth across 100 commits with 500 entities and 500 edges', async () => {
 		const ENTITY_COUNT = 500;
 		const COMMIT_COUNT = 100;
@@ -409,7 +540,8 @@ suite('Temporal sparse persistence', () => {
 				lineageCoverage: { kind: 'complete' },
 			};
 
-			const delta: TemporalStructuralDelta | undefined = (isCheckpoint || !parentSha) ? undefined : {
+			// Model production correctly: whenever parent snapshot is known, compute parent->target structural delta, even if isCheckpoint === true
+			const delta: TemporalStructuralDelta | undefined = !parentSha ? undefined : {
 				commitSha,
 				baseCommitSha: parentSha,
 				parentCommitSha: parentSha,
@@ -443,16 +575,16 @@ suite('Temporal sparse persistence', () => {
 		const checkpoints = await readCount(dbPath, 'checkpoints');
 		const deltas = await readCount(dbPath, 'deltas');
 
-		// 10 checkpoints * 500 = 5000 from checkpoints + 90 deltas * 10 modifications = 5900
-		// In dense v4 storage, this would be 500 * 100 = 50,000 entity snapshots!
+		// 1 root checkpoint * 500 = 500 + 99 delta transitions * 10 modifications = 1490
+		// In dense v4 storage, this was 500 * 100 = 50,000 entity snapshots!
 		assert.strictEqual(checkpoints, 10);
 		assert.strictEqual(deltas, 90);
-		assert.strictEqual(entitySnapshots, (10 * ENTITY_COUNT) + (90 * 10));
+		assert.strictEqual(entitySnapshots, ENTITY_COUNT + (99 * 10));
 		assert.strictEqual(lineageEvents, totalModifiedEntities);
 
-		// Unchanged edges emit zero delta events: only the 10 checkpoints record edge events (500 created + 4500 observed-at-anchor)
-		assert.strictEqual(edgeEvents, 10 * ENTITY_COUNT);
-		assert.strictEqual(edgeSnapshots, 10 * ENTITY_COUNT);
+		// Unchanged edges emit zero delta events: only the root checkpoint records edge events (500 created, zero false observed-at-anchor on periodic checkpoints)
+		assert.strictEqual(edgeEvents, ENTITY_COUNT);
+		assert.strictEqual(edgeSnapshots, ENTITY_COUNT);
 
 		// Total DB file size should remain bounded (under 10MB for 100 full commits, vs ~75MB in dense v4 storage)
 		const stat = fs.statSync(dbPath);

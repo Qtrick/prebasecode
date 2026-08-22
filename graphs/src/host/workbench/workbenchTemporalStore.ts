@@ -66,7 +66,7 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 	getEntityHistoryReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntitySnapshot[]> { return this._call('getEntityHistoryReachableFrom', entityId, targetCommitSha); }
 	getEntityLineageEvents(entityId: string): Promise<TemporalEntityLineageEvent[]> { return this._call('getEntityLineageEvents', entityId); }
 	getEntityLineageEventsReachableFrom(entityId: string, targetCommitSha: string): Promise<TemporalEntityLineageEvent[]> { return this._call('getEntityLineageEventsReachableFrom', entityId, targetCommitSha); }
-	getActiveEntitiesAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]> { return this._call('getActiveEntitiesAtCommit', commitSha); }
+	getEntitySnapshotsAtCommit(commitSha: string): Promise<TemporalEntitySnapshot[]> { return this._call('getEntitySnapshotsAtCommit', commitSha); }
 	getDeletedPathsInHistory(baseCommitSha: string): Promise<Map<string, string>> { return this._call('getDeletedPathsInHistory', baseCommitSha); }
 	getEdge(edgeId: string): Promise<TemporalEdgeRecord | undefined> { return this._call('getEdge', edgeId); }
 	getEdgeHistory(edgeId: string): Promise<TemporalEdgeSnapshot[]> { return this._call('getEdgeHistory', edgeId); }

@@ -11,12 +11,13 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, '../..');
 const MOCHA = path.join(REPO_ROOT, 'node_modules/mocha/bin/mocha.js');
 const REGISTER = path.join(__dirname, 'graphs-test-register.mjs');
+const SETUP = path.join(__dirname, 'graphs-test-setup.mjs');
 
 function runMochaOnSource(testRelPath) {
 	const testAbs = path.join(REPO_ROOT, testRelPath);
 	return spawnSync(
 		process.execPath,
-		['--experimental-strip-types', `--import=${REGISTER}`, MOCHA, testAbs, '--ui', 'tdd', '--timeout', '5000'],
+		['--experimental-strip-types', `--import=${SETUP}`, `--import=${REGISTER}`, MOCHA, testAbs, '--ui', 'tdd', '--timeout', '5000'],
 		{ cwd: REPO_ROOT, stdio: 'inherit' }
 	).status ?? 1;
 }
@@ -49,6 +50,9 @@ const tests = [
 	'graphs/src/tests/unit/temporalSparsePersistence.test.ts',
 	'graphs/src/tests/unit/temporalBoundedIngestion.test.ts',
 	'graphs/src/tests/unit/temporalIngestionE2E.test.ts',
+	'graphs/src/tests/unit/temporalStructuralDiff.test.ts',
+	'graphs/src/tests/unit/temporalLayoutEngine.test.ts',
+	'graphs/src/tests/unit/workbenchTemporalViewService.test.ts',
 ];
 
 for (const test of tests) {

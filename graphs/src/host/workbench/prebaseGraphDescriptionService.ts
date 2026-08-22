@@ -84,10 +84,18 @@ const SENSITIVE_DIRS = /(^|\/)(\.ssh|\.aws|\.gnupg|\.config\/gcloud|secrets?)(\/
 interface CacheEntryV9 {
 	description: string;
 	sourceFingerprint: string;
+	nodeSemanticFingerprint?: string;
 	generatedAt: number;
+	lastAccessed?: number;
 	promptVersion: string;
 	providerId?: string;
 	modelId?: string;
+}
+
+export function computePromptSemanticFingerprint(relative: string, layer: string, imports: readonly string[], contentHash: string): string {
+	const normalizedImports = [...imports].sort().slice(0, 16).join(',');
+	const payload = `${PROMPT_VERSION}:${relative}:${layer}:${normalizedImports}:${contentHash}`;
+	return hashContent(payload);
 }
 
 interface DescriptionContextInfo {
@@ -111,7 +119,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 	declare readonly _serviceBrand: undefined;
 
 	private _active: CancellationTokenSource | undefined;
-	private _inflight = new Map<string, { promise: Promise<IGraphNodeDescriptionResult>; cts: CancellationTokenSource }>();
+	private readonly _inflight = new Map<string, { promise: Promise<IGraphNodeDescriptionResult>; cts: CancellationTokenSource }>();
 
 	private readonly _dirtyFiles = new Set<string>();
 	private readonly _cleanVerifiedFiles = new Set<string>();
@@ -137,44 +145,112 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		// Track file modifications lazily in-memory. Zero network/AI calls on file events.
 		if (this.fileService.onDidFilesChange) {
 			this._register(this.fileService.onDidFilesChange(e => {
-				const folder = this.workspaceContextService.getWorkspace().folders[0];
-				if (!folder) {
-					return;
-				}
 				for (const uri of e.rawAdded) {
-					this._handleFileChange(folder.uri, uri, false);
+					const match = this._getFolderForUri(uri);
+					if (match) {
+						this._handleFileChange(match.folderUri, match.relative, false);
+					}
 				}
 				for (const uri of e.rawUpdated) {
-					this._handleFileChange(folder.uri, uri, false);
+					const match = this._getFolderForUri(uri);
+					if (match) {
+						this._handleFileChange(match.folderUri, match.relative, false);
+					}
 				}
 				for (const uri of e.rawDeleted) {
-					this._handleFileChange(folder.uri, uri, true);
+					const match = this._getFolderForUri(uri);
+					if (match) {
+						this._handleFileChange(match.folderUri, match.relative, true);
+					}
 				}
 			}));
 		}
 
 		if (this.fileService.onDidRunOperation) {
 			this._register(this.fileService.onDidRunOperation(e => {
-				const folder = this.workspaceContextService.getWorkspace().folders[0];
-				if (!folder) {
-					return;
+				if (e.operation === FileOperation.DELETE) {
+					const match = this._getFolderForUri(e.resource);
+					if (match) {
+						this._handleFileChange(match.folderUri, match.relative, true);
+					}
+				} else if (e.operation === FileOperation.MOVE) {
+					const srcMatch = this._getFolderForUri(e.resource);
+					if (srcMatch) {
+						this._handleFileChange(srcMatch.folderUri, srcMatch.relative, true);
+					}
+					const targetRes = e.target?.resource || e.target;
+					if (targetRes) {
+						const targetMatch = this._getFolderForUri(targetRes);
+						if (targetMatch) {
+							this._handleFileChange(targetMatch.folderUri, targetMatch.relative, false);
+						}
+					}
+				} else if (e.operation === FileOperation.COPY) {
+					const targetRes = e.target?.resource || e.target;
+					if (targetRes) {
+						const targetMatch = this._getFolderForUri(targetRes);
+						if (targetMatch) {
+							this._handleFileChange(targetMatch.folderUri, targetMatch.relative, false);
+						}
+					}
+				} else if (e.operation === FileOperation.CREATE || e.operation === FileOperation.WRITE) {
+					const res = e.target?.resource || e.target || e.resource;
+					if (res) {
+						const match = this._getFolderForUri(res);
+						if (match) {
+							this._handleFileChange(match.folderUri, match.relative, false);
+						}
+					}
 				}
-				this._handleFileChange(folder.uri, e.resource, e.operation === FileOperation.DELETE);
 			}));
 		}
 	}
 
-	private _handleFileChange(folderUri: URI, uri: URI, isDelete: boolean): void {
-		if (isEqualOrParent(uri, folderUri)) {
-			const rel = this._safeRelativePath(uri.path.replace(folderUri.path, '').replace(/^\//, ''));
-			if (rel) {
-				const cacheKey = this._makeLogicalKey(folderUri, rel);
-				this._fileGeneration.set(cacheKey, (this._fileGeneration.get(cacheKey) || 0) + 1);
-				this._dirtyFiles.add(cacheKey);
-				this._cleanVerifiedFiles.delete(cacheKey);
-				if (isDelete) {
-					this._deleteCacheKey(cacheKey);
+	private _getFolderForUri(candidate: URI | { resource: URI } | undefined): { folderUri: URI; relative: string } | undefined {
+		try {
+			if (!candidate) {
+				return undefined;
+			}
+			const uri = (candidate as any).resource || candidate;
+			if (!uri || !uri.path) {
+				return undefined;
+			}
+			if (typeof this.workspaceContextService.getWorkspaceFolder === 'function') {
+				const folder = this.workspaceContextService.getWorkspaceFolder(uri);
+				if (folder && isEqualOrParent(uri, folder.uri)) {
+					const rel = this._safeRelativePath(uri.path.replace(folder.uri.path, '').replace(/^\//, ''));
+					if (rel) {
+						return { folderUri: folder.uri, relative: rel };
+					}
 				}
+			}
+			const workspace = this.workspaceContextService.getWorkspace?.();
+			const folders = workspace?.folders || [];
+			for (const f of folders) {
+				if (isEqualOrParent(uri, f.uri)) {
+					const rel = this._safeRelativePath(uri.path.replace(f.uri.path, '').replace(/^\//, ''));
+					if (rel) {
+						return { folderUri: f.uri, relative: rel };
+					}
+				}
+			}
+			return undefined;
+		} catch {
+			return undefined;
+		}
+	}
+
+	private _handleFileChange(folderUri: URI, relative: string, isDelete: boolean): void {
+		const cacheKey = this._makeLogicalKey(folderUri, relative);
+		this._fileGeneration.set(cacheKey, (this._fileGeneration.get(cacheKey) || 0) + 1);
+		this._dirtyFiles.add(cacheKey);
+		this._cleanVerifiedFiles.delete(cacheKey);
+		if (isDelete) {
+			this._deleteCacheKey(cacheKey);
+			const inflight = this._inflight.get(cacheKey);
+			if (inflight) {
+				inflight.cts.cancel();
+				this._inflight.delete(cacheKey);
 			}
 		}
 	}
@@ -190,6 +266,7 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		this._inflight.clear();
 		this._dirtyFiles.clear();
 		this._cleanVerifiedFiles.clear();
+		this._fileGeneration.clear();
 		super.dispose();
 	}
 
@@ -197,6 +274,15 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		this.storageService.remove(CACHE_KEY, StorageScope.APPLICATION);
 		this._dirtyFiles.clear();
 		this._cleanVerifiedFiles.clear();
+		this._fileGeneration.clear();
+		this._active?.cancel();
+		this._active?.dispose();
+		this._active = undefined;
+		for (const item of this._inflight.values()) {
+			item.cts.cancel();
+			item.cts.dispose();
+		}
+		this._inflight.clear();
 	}
 
 	peekCachedDescription(node: GraphNode): IPeekGraphNodeDescriptionResult {
@@ -215,12 +301,34 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		const cache = this._readCache();
 		const entry = cache[cacheKey];
 		if (entry?.description && entry.promptVersion === PROMPT_VERSION) {
-			return {
-				cached: true,
-				description: entry.description,
-				providerId: entry.providerId,
-				modelId: entry.modelId,
-			};
+			const nodeLayer = node.meta?.architectureLayer ?? 'unknown';
+			const nodeImports = node.meta?.imports || [];
+			if (this._cleanVerifiedFiles.has(cacheKey)) {
+				const expectedFingerprint = computePromptSemanticFingerprint(relative, nodeLayer, nodeImports, entry.sourceFingerprint);
+				if (!entry.nodeSemanticFingerprint || entry.nodeSemanticFingerprint === expectedFingerprint) {
+					this._touchCacheEntry(cacheKey);
+					return {
+						cached: true,
+						description: entry.description,
+						providerId: entry.providerId,
+						modelId: entry.modelId,
+					};
+				}
+			}
+			const nodeContentHash = (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentHash || (node.meta as { contentHash?: string; contentIdentity?: string } | undefined)?.contentIdentity;
+			if (nodeContentHash && entry.sourceFingerprint === nodeContentHash) {
+				const expectedFingerprint = computePromptSemanticFingerprint(relative, nodeLayer, nodeImports, nodeContentHash);
+				if (!entry.nodeSemanticFingerprint || entry.nodeSemanticFingerprint === expectedFingerprint) {
+					this._cleanVerifiedFiles.add(cacheKey);
+					this._touchCacheEntry(cacheKey);
+					return {
+						cached: true,
+						description: entry.description,
+						providerId: entry.providerId,
+						modelId: entry.modelId,
+					};
+				}
+			}
 		}
 		return { cached: false };
 	}
@@ -241,19 +349,25 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		}
 
 		const cacheKey = this._makeLogicalKey(folder.uri, relative);
+		const nodeLayer = node.meta?.architectureLayer ?? 'unknown';
+		const nodeImports = node.meta?.imports || [];
 
 		// Fast clean-path cache hit: if verified clean and not forced, return cached description without reading file or calling AI
 		if (!options?.force && this._cleanVerifiedFiles.has(cacheKey)) {
 			const cached = this._readCache()[cacheKey];
 			if (cached?.description && cached.promptVersion === PROMPT_VERSION) {
-				return {
-					overview,
-					aiDescription: cached.description,
-					aiStatus: 'ready',
-					aiProviderId: cached.providerId ?? 'gemini',
-					aiModelId: cached.modelId,
-					cacheHit: true,
-				};
+				const expectedFingerprint = computePromptSemanticFingerprint(relative, nodeLayer, nodeImports, cached.sourceFingerprint);
+				if (!cached.nodeSemanticFingerprint || cached.nodeSemanticFingerprint === expectedFingerprint) {
+					this._touchCacheEntry(cacheKey);
+					return {
+						overview,
+						aiDescription: cached.description,
+						aiStatus: 'ready',
+						aiProviderId: cached.providerId ?? 'gemini',
+						aiModelId: cached.modelId,
+						cacheHit: true,
+					};
+				}
 			}
 		}
 
@@ -291,20 +405,25 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					return { overview, aiStatus: 'unavailable', aiMessage: localize('prebase.desc.cancelled', "Description request cancelled."), cacheHit: false };
 				}
 
+				const semanticFingerprint = computePromptSemanticFingerprint(relative, nodeLayer, nodeImports, contentHash);
+
 				// Check fingerprint match if not forced
 				if (!options?.force) {
 					const cached = this._readCache()[cacheKey];
 					if (cached?.description && cached.promptVersion === PROMPT_VERSION && cached.sourceFingerprint === contentHash) {
-						this._cleanVerifiedFiles.add(cacheKey);
-						this._dirtyFiles.delete(cacheKey);
-						return {
-							overview,
-							aiDescription: cached.description,
-							aiStatus: 'ready',
-							aiProviderId: cached.providerId ?? 'gemini',
-							aiModelId: cached.modelId,
-							cacheHit: true,
-						};
+						if (!cached.nodeSemanticFingerprint || cached.nodeSemanticFingerprint === semanticFingerprint) {
+							this._cleanVerifiedFiles.add(cacheKey);
+							this._dirtyFiles.delete(cacheKey);
+							this._touchCacheEntry(cacheKey);
+							return {
+								overview,
+								aiDescription: cached.description,
+								aiStatus: 'ready',
+								aiProviderId: cached.providerId ?? 'gemini',
+								aiModelId: cached.modelId,
+								cacheHit: true,
+							};
+						}
 					}
 				}
 
@@ -332,8 +451,8 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					'State its concrete responsibility and key architectural mechanism in one clear, informative sentence with no filler.',
 					'Rules: Do NOT list exhaustive export identifiers or repeat generic category overviews. Use only evidence in the supplied path, layer, imports, and content. Output plain text only without markdown formatting.',
 					`Path: ${relative}`,
-					`Layer: ${node.meta?.architectureLayer ?? 'unknown'}`,
-					`Imports: ${(node.meta?.imports || []).slice(0, 16).join(', ') || 'none'}`,
+					`Layer: ${nodeLayer}`,
+					`Imports: ${nodeImports.slice(0, 16).join(', ') || 'none'}`,
 					'Content:',
 					content || '(unavailable)',
 				].join('\n');
@@ -465,7 +584,9 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 					this._writeCache(cacheKey, {
 						description: aiText,
 						sourceFingerprint: contentHash,
+						nodeSemanticFingerprint: semanticFingerprint,
 						generatedAt: Date.now(),
+						lastAccessed: Date.now(),
 						promptVersion: PROMPT_VERSION,
 						providerId,
 						modelId,
@@ -553,14 +674,23 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 		}
 	}
 
+	private _touchCacheEntry(key: string): void {
+		const cache = this._readCache();
+		if (cache[key]) {
+			cache[key].lastAccessed = Date.now();
+			this.storageService.store(CACHE_KEY, JSON.stringify(cache), StorageScope.APPLICATION, StorageTarget.MACHINE);
+		}
+	}
+
 	private _writeCache(key: string, entry: CacheEntryV9): void {
 		const cache = this._readCache();
+		entry.lastAccessed = entry.lastAccessed ?? Date.now();
 		cache[key] = entry;
-		const entries = Object.entries(cache).sort((a, b) => b[1].generatedAt - a[1].generatedAt).slice(0, MAX_CACHE_ENTRIES);
+		const entries = Object.entries(cache).sort((a, b) => (b[1].lastAccessed ?? b[1].generatedAt) - (a[1].lastAccessed ?? a[1].generatedAt)).slice(0, MAX_CACHE_ENTRIES);
 		const next: Record<string, CacheEntryV9> = {};
 		let totalBytes = 0;
 		for (const [k, v] of entries) {
-			const entryBytes = k.length + (v.description?.length ?? 0) + 128;
+			const entryBytes = k.length + (v.description?.length ?? 0) + 160;
 			if (totalBytes + entryBytes > MAX_CACHE_BYTES) {
 				break;
 			}

@@ -71,6 +71,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _diag: HTMLElement | undefined;
 
 	private _modeNetBtn: HTMLButtonElement | undefined;
+	private _modeTemporalBtn: HTMLButtonElement | undefined;
 	private _graphModeHelper: HTMLElement | undefined;
 	private _graphModeOpenBtn: HTMLButtonElement | undefined;
 	private _searchInput: HTMLInputElement | undefined;
@@ -171,6 +172,12 @@ export class PreBaseMapsViewPane extends ViewPane {
 				return;
 			}
 			this.commandService.executeCommand('prebase.graph.openNetwork');
+		});
+		this._modeTemporalBtn = this._segmentBtn(row, localize('prebase.maps.temporal', "Temporal"), () => {
+			if (!this._hasOpenProject()) {
+				return;
+			}
+			this.commandService.executeCommand('prebase.graph.openTemporal');
 		});
 
 		this._graphModeHelper = DOM.append(section, DOM.$('p'));
@@ -418,13 +425,16 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 	private _refresh(): void {
 		const diag = this.graphService.getDiagnostics();
-		const isNetwork = true;
+		const isTemporal = this.graphService.getViewState().graphType === 'temporal';
+		const isNetwork = !isTemporal;
 		const isOverview = false;
 		const hasProject = this._hasOpenProject();
 		const scanStatus = diag.status;
 
 		this._styleSegmentActive(this._modeNetBtn, isNetwork);
+		this._styleSegmentActive(this._modeTemporalBtn, isTemporal);
 		this._setModeEnabled(this._modeNetBtn, hasProject);
+		this._setModeEnabled(this._modeTemporalBtn, hasProject);
 
 		if (this._graphModeHelper) {
 			if (!hasProject) {

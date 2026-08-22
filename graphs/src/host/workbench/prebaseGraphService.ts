@@ -28,7 +28,7 @@ import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import { IPreBaseCanonicalParseService } from './workbenchCanonicalParseService.js';
 import { IGitService, IGitRepository } from '../../../../git/common/gitService.js';
 
-export type PreBaseGraphType = 'network';
+export type PreBaseGraphType = 'network' | 'temporal';
 
 export interface PreBaseGraphViewState {
 	graphType: PreBaseGraphType;
@@ -467,8 +467,12 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		this._log(localize('prebase.graph.logCacheCleared', "Cleared graph cache."));
 	}
 
-	async setGraphType(_graphType: PreBaseGraphType): Promise<void> {
-		// PreBase has one active Code Graph mode.
+	async setGraphType(graphType: PreBaseGraphType): Promise<void> {
+		if (this._viewState.graphType === graphType) {
+			return;
+		}
+		this._viewState = { ...this._viewState, graphType };
+		this._onDidChangeViewState.fire(this._viewState);
 	}
 
 	async setLayoutMode(layoutMode: LayoutMode): Promise<void> {

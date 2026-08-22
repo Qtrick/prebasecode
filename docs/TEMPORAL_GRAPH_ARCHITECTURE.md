@@ -35,8 +35,13 @@ PreBase has **one active user-facing Code Graph mode**:
   - Temporal store operations carry explicit typed error envelopes over IPC, so cache corruption and cancellation are not downgraded to generic errors.
   - Metadata-only paged history and bounded reconstruction avoid whole-history scans on hot paths; refs are refresh-cached rather than rewritten on every read.
   - Derived parse artifacts are the only retention-eviction target. Explicit maintenance checkpoints/compacts SQLite after eviction and truthfully reports when immutable state exceeds budget.
-- **Phase 3 (Planned Next)**:
-  - Temporal UI timeline, commit scrubber, and graph diff overlays.
+- **Phase 3 (In Progress — Phase 3.1 Complete)**:
+  - Phase 3.1: Timeline, scrubber, stable 2D structural transitions, structural diff & commit comparison with mandatory Phase-3 preflight repairs.
+  - Mode registration: `'network' | 'temporal'` in `PreBaseGraphType`, editor input serializer, Maps segmented control, and command `prebase.graph.openTemporal`.
+  - Pure Structural Diff Engine (`computeTemporalStructuralDiff`): entity continuity matching, node change kinds (`unchanged`, `modified`, `added`, `removed`, `renamed`), old path tracking, and edge change classification.
+  - Stable 2D Layout Engine (`layoutTemporalGraph`): strict 0-displacement continuity invariant for surviving nodes, deterministic directory-clustered initial layout, neighbor-aware placement for added nodes, and phantom exit placement for removed nodes.
+  - Workbench Controller (`WorkbenchTemporalViewService`): paged commit timeline (~50), default first-parent compare base, 120ms debounced scrubbing, generation token cancellation, bounded diff caching, follow-HEAD listener, and `vscode.diff` source diff bridge.
+  - Webview Canvas 2D Renderer & UI: commit info badge, ref selector, compare base selector, scrubber slider track, Prev/Next/Play buttons, keyboard navigation (`ArrowLeft`, `ArrowRight`, `Space`), structural diff badges (`+A`, `-R`, `~M`, `⇄R`), and smooth 220ms node/edge transitions.
 - **Phase 4 (Planned)**:
   - Graph Blame & Magnus Temporal conversational query tools.
 

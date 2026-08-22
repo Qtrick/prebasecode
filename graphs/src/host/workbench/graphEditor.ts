@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as DOM from '../../../../../../base/browser/dom.js';
@@ -22,7 +23,13 @@ import { IWebviewElement, IWebviewService } from '../../../../webview/browser/we
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
-import { IPreBaseGraphService } from './prebaseGraphService.js';
+import { IPreBaseGraphService, type PreBaseGraphType } from './prebaseGraphService.js';
+import {
+	IPreBaseTemporalViewService,
+	type ITemporalViewState,
+	type TemporalStructuralDiff,
+	type TemporalCommitSummary,
+} from '../../temporal/view/temporalViewTypes.js';
 
 interface IBridgeRequest {
 	requestId: string;
@@ -36,7 +43,7 @@ export class PreBaseGraphEditor extends EditorPane {
 	private _container: HTMLElement | undefined;
 	private _webview: IWebviewElement | undefined;
 	private readonly _webviewDisposables = this._register(new DisposableStore());
-	private _inputType: 'architecture' | 'network' = 'network';
+	private _inputType: PreBaseGraphType = 'network';
 	private _scanKickoff = false;
 	private _descriptionCts: CancellationTokenSource | undefined;
 
@@ -48,6 +55,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		@IWebviewService private readonly webviewService: IWebviewService,
 		@IPreBaseGraphService private readonly graphService: IPreBaseGraphService,
 		@IPreBaseGraphDescriptionService private readonly descriptionService: IPreBaseGraphDescriptionService,
+		@IPreBaseTemporalViewService private readonly temporalViewService: IPreBaseTemporalViewService,
 		@IEditorService private readonly editorService: IEditorService,
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@ICommandService private readonly commandService: ICommandService,
@@ -59,6 +67,9 @@ export class PreBaseGraphEditor extends EditorPane {
 		this._register(this.graphService.onDidRequestCameraAction(action => {
 			this._webview?.postMessage({ type: action === 'reset' ? 'resetView' : 'fitView' });
 		}));
+		this._register(this.temporalViewService.onDidChangeState(state => this._pushTemporalState(state)));
+		this._register(this.temporalViewService.onDidChangeDiff(diff => this._pushTemporalDiff(diff)));
+		this._register(this.temporalViewService.onDidChangeTimeline(timeline => this._pushTemporalTimeline(timeline)));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (e.affectsConfiguration('prebase.graph') || e.affectsConfiguration('prebase.interaction')) {
 				this._pushSnapshot();
@@ -78,13 +89,14 @@ export class PreBaseGraphEditor extends EditorPane {
 		if (token.isCancellationRequested || !(input instanceof PreBaseGraphEditorInput) || !this._container) {
 			return;
 		}
-		this._inputType = 'network';
-		// Never await scan/layout here — that freezes the workbench and prevents tab close.
-		void this.graphService.setGraphType('network');
+		this._inputType = input.graphType === 'temporal' ? 'temporal' : 'network';
+		void this.graphService.setGraphType(this._inputType);
 		this._ensureWebview();
 		this._pushSnapshot();
 
-		if (!this.graphService.getSnapshot()) {
+		if (this._inputType === 'temporal') {
+			this._pushTemporalState(this.temporalViewService.getState());
+		} else if (!this.graphService.getSnapshot()) {
 			const status = this.graphService.getDiagnostics().status;
 			if (status !== 'scanning' && !this._scanKickoff) {
 				this._scanKickoff = true;
@@ -160,7 +172,6 @@ export class PreBaseGraphEditor extends EditorPane {
 		this._webviewDisposables.clear();
 		const webview = this._webviewDisposables.add(this.webviewService.createWebviewElement({
 			title: localize('prebase.graph.webviewTitle', "PreBase Graph"),
-			// Release GPU/CPU when the tab is hidden so the window stays closable.
 			options: { retainContextWhenHidden: false },
 			contentOptions: {
 				allowScripts: true,
@@ -206,9 +217,30 @@ export class PreBaseGraphEditor extends EditorPane {
 				diagnostics,
 				settings: this._graphSettings(),
 				graphType: this._inputType,
-				// Always send string|null (never undefined) so webview can clear selection.
-				selectedNodeId: this.graphService.getSelectedNodeId() ?? null
+				selectedNodeId: this.graphService.getSelectedNodeId() ?? null,
+				temporalState: this._inputType === 'temporal' ? this.temporalViewService.getState() : undefined,
 			}
+		});
+	}
+
+	private _pushTemporalState(state: ITemporalViewState): void {
+		this._webview?.postMessage({
+			type: 'temporalState',
+			payload: state
+		});
+	}
+
+	private _pushTemporalDiff(diff: TemporalStructuralDiff): void {
+		this._webview?.postMessage({
+			type: 'temporalDiff',
+			payload: diff
+		});
+	}
+
+	private _pushTemporalTimeline(timeline: readonly TemporalCommitSummary[]): void {
+		this._webview?.postMessage({
+			type: 'temporalTimeline',
+			payload: timeline
 		});
 	}
 
@@ -227,7 +259,8 @@ export class PreBaseGraphEditor extends EditorPane {
 					diagnostics: this.graphService.getDiagnostics(),
 					viewState: this.graphService.getViewState(),
 					selectedNodeId: this.graphService.getSelectedNodeId() ?? null,
-					settings: this._graphSettings()
+					settings: this._graphSettings(),
+					temporalState: this.temporalViewService.getState(),
 				});
 				break;
 			case 'selectNode': {
@@ -295,6 +328,66 @@ export class PreBaseGraphEditor extends EditorPane {
 				});
 				break;
 			}
+			case 'getTemporalState':
+				await reply(this.temporalViewService.getState());
+				break;
+			case 'selectTemporalRef': {
+				const ref = (message.payload as { ref?: string } | undefined)?.ref;
+				if (ref) {
+					await this.temporalViewService.selectRef(ref);
+				}
+				await reply({ ok: true });
+				break;
+			}
+			case 'selectTemporalCommit': {
+				const p = message.payload as { commitSha?: string; compareBaseSha?: string; immediate?: boolean } | undefined;
+				if (p?.commitSha) {
+					await this.temporalViewService.selectCommit(p.commitSha, { compareBaseSha: p.compareBaseSha, immediate: p.immediate });
+				}
+				await reply({ ok: true });
+				break;
+			}
+			case 'setTemporalCompareBase': {
+				const p = message.payload as { compareBaseSha?: string } | undefined;
+				await this.temporalViewService.setCompareBase(p?.compareBaseSha);
+				await reply({ ok: true });
+				break;
+			}
+			case 'setTemporalFollowHead': {
+				const p = message.payload as { follow?: boolean } | undefined;
+				this.temporalViewService.setFollowHead(Boolean(p?.follow));
+				await reply({ ok: true });
+				break;
+			}
+			case 'setTemporalFilter': {
+				const p = message.payload as { filter?: string } | undefined;
+				this.temporalViewService.setFilterQuery(p?.filter || '');
+				await reply({ ok: true });
+				break;
+			}
+			case 'loadMoreTemporalHistory': {
+				await this.temporalViewService.loadMoreHistory();
+				await reply({ ok: true });
+				break;
+			}
+			case 'openTemporalSourceDiff': {
+				const p = message.payload as { entityId?: string } | undefined;
+				if (p?.entityId) {
+					await this.temporalViewService.openSourceDiff(p.entityId);
+				}
+				await reply({ ok: true });
+				break;
+			}
+			case 'switchGraphMode': {
+				const mode = (message.payload as { mode?: PreBaseGraphType } | undefined)?.mode;
+				if (mode) {
+					this._inputType = mode;
+					await this.graphService.setGraphType(mode);
+					this._pushSnapshot();
+				}
+				await reply({ ok: true });
+				break;
+			}
 			default:
 				await reply({ ok: false });
 				break;
@@ -341,6 +434,21 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #legend .swatch.root { background:#e8b84a; border-top:1px dashed #e8b84a; }
 #legend .swatch.composition { background:#a78bfa; }
 #legend .title.spaced { margin-top:8px; }
+
+/* Temporal UI */
+#temporalToolbar { position:absolute; top:12px; left:12px; right:12px; z-index:5; display:none; gap:10px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:6px 12px; font-size:12px; backdrop-filter:blur(8px); }
+#temporalToolbar select, #temporalToolbar input { background:var(--vscode-dropdown-background, #252526); color:var(--vscode-dropdown-foreground, #cccccc); border:1px solid var(--vscode-dropdown-border, #3c3c3c); border-radius:4px; padding:3px 6px; font-size:11px; }
+#temporalScrubberBar { position:absolute; left:12px; right:12px; bottom:12px; z-index:5; display:none; flex-direction:column; gap:6px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:8px 12px; font-size:12px; backdrop-filter:blur(8px); }
+#temporalScrubberBar .row { display:flex; align-items:center; gap:8px; width:100%; }
+#temporalScrubberBar button { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
+#temporalScrubberBar button:hover { background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.08)); }
+#temporalScrubber { flex:1; width:100%; height:4px; accent-color:var(--vscode-button-background, #2dd4bf); cursor:pointer; }
+.badge-added { color:#3fb950; background:rgba(63,185,80,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
+.badge-removed { color:#f85149; background:rgba(248,81,73,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
+.badge-modified { color:#d29922; background:rgba(210,153,34,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
+.badge-renamed { color:#58a6ff; background:rgba(88,166,255,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
+.badge-warning { color:#e3b341; background:rgba(227,179,65,0.15); padding:1px 6px; border-radius:4px; font-weight:600; display:none; }
+
 #empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
 #popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(340px, calc(100% - 32px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #202122); border:1px solid var(--vscode-widget-border, #2A2B2C); border-radius:9px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.28); }
 #popup h3 { margin:0 0 2px; font-size:12px; font-weight:600; }
@@ -368,6 +476,54 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	<svg id="archSvg"></svg>
 	<canvas id="netCanvas"></canvas>
 </div>
+
+<!-- Temporal Toolbar -->
+<div id="temporalToolbar">
+	<span style="font-weight:600; font-size:12px; color:var(--vscode-foreground, #f4f4f5); display:flex; align-items:center; gap:6px;">
+		<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#2dd4bf;"></span>
+		Temporal Graph
+	</span>
+	<label style="display:flex; align-items:center; gap:4px; font-size:11px;">
+		Branch:
+		<select id="temporalRefSelect">
+			<option value="HEAD">HEAD</option>
+		</select>
+	</label>
+	<label style="display:flex; align-items:center; gap:4px; font-size:11px;">
+		Compare:
+		<select id="temporalCompareSelect">
+			<option value="">Parent (1st parent)</option>
+		</select>
+	</label>
+	<label style="display:flex; align-items:center; gap:4px; font-size:11px; margin-left:4px;">
+		<input type="checkbox" id="temporalFollowHead" checked> Follow HEAD
+	</label>
+	<div id="temporalDiffBadges" style="display:flex; gap:6px; font-size:11px; margin-left:auto; align-items:center;">
+		<span id="badgeAdded" class="badge-added">+0</span>
+		<span id="badgeRemoved" class="badge-removed">-0</span>
+		<span id="badgeModified" class="badge-modified">~0</span>
+		<span id="badgeRenamed" class="badge-renamed">⇄0</span>
+		<span id="temporalPartialWarning" class="badge-warning" title="Partial lineage indexing in progress">Partial</span>
+	</div>
+	<input id="temporalFilterInput" type="search" placeholder="Filter entities…" style="width:130px;">
+</div>
+
+<!-- Temporal Scrubber Bar -->
+<div id="temporalScrubberBar">
+	<div class="row">
+		<button id="temporalPrevBtn" title="Previous commit (Left arrow)">◀</button>
+		<button id="temporalPlayBtn" title="Play timeline (Space)">▶</button>
+		<button id="temporalNextBtn" title="Next commit (Right arrow)">▶</button>
+		<span id="temporalCommitSha" style="font-family:monospace; font-weight:600; color:#58a6ff; font-size:11.5px;"></span>
+		<span id="temporalCommitMessage" style="font-size:11px; max-width:440px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+		<span id="temporalCommitAuthor" style="font-size:10.5px; opacity:0.75;"></span>
+		<span id="temporalCommitStatus" style="font-size:10px; border-radius:4px; padding:1px 5px; background:rgba(255,255,255,0.08);"></span>
+	</div>
+	<div class="row">
+		<input id="temporalScrubber" type="range" min="0" max="0" value="0">
+	</div>
+</div>
+
 <div id="legend"></div>
 <div id="popup" role="dialog" aria-modal="false" aria-label="Node details">
 	<button id="popupClose" type="button" title="Close" aria-label="Close details">×</button>
@@ -379,6 +535,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	<p id="popupAi"></p>
 	<div class="actions">
 		<button class="primary" id="popupOpen" type="button" title="Open File" aria-label="Open File">Open File</button>
+		<button id="popupSourceDiff" type="button" class="primary" title="View Source Diff" aria-label="View Source Diff" style="display:none;">View Source Diff</button>
 		<button id="popupReveal" type="button" title="Reveal in Explorer" aria-label="Reveal in Explorer">Reveal</button>
 		<button id="popupMagnus" type="button" title="Attach to Agents" aria-label="Attach to Agents">Attach to Agents</button>
 	</div>
@@ -401,12 +558,36 @@ const legend = document.getElementById('legend');
 const empty = document.getElementById('empty');
 const idleToggle = document.getElementById('idleToggle');
 const idleToggleWrap = document.getElementById('idleToggleWrap');
+const toolbar = document.getElementById('toolbar');
+const temporalToolbar = document.getElementById('temporalToolbar');
+const temporalScrubberBar = document.getElementById('temporalScrubberBar');
+const temporalRefSelect = document.getElementById('temporalRefSelect');
+const temporalCompareSelect = document.getElementById('temporalCompareSelect');
+const temporalFollowHead = document.getElementById('temporalFollowHead');
+const temporalFilterInput = document.getElementById('temporalFilterInput');
+const temporalScrubber = document.getElementById('temporalScrubber');
+const temporalPrevBtn = document.getElementById('temporalPrevBtn');
+const temporalNextBtn = document.getElementById('temporalNextBtn');
+const temporalPlayBtn = document.getElementById('temporalPlayBtn');
+const temporalCommitSha = document.getElementById('temporalCommitSha');
+const temporalCommitMessage = document.getElementById('temporalCommitMessage');
+const temporalCommitAuthor = document.getElementById('temporalCommitAuthor');
+const temporalCommitStatus = document.getElementById('temporalCommitStatus');
+const temporalPartialWarning = document.getElementById('temporalPartialWarning');
+const badgeAdded = document.getElementById('badgeAdded');
+const badgeRemoved = document.getElementById('badgeRemoved');
+const badgeModified = document.getElementById('badgeModified');
+const badgeRenamed = document.getElementById('badgeRenamed');
+
 const popup = document.getElementById('popup');
 const popupTitle = document.getElementById('popupTitle');
 const popupMeta = document.getElementById('popupMeta');
 const popupOverview = document.getElementById('popupOverview');
 const popupAi = document.getElementById('popupAi');
 const popupAiProvenance = document.getElementById('popupAiProvenance');
+const popupOpen = document.getElementById('popupOpen');
+const popupSourceDiff = document.getElementById('popupSourceDiff');
+
 let popupNode = null;
 let pointerDownNode = null;
 let pointerDownX = 0, pointerDownY = 0;
@@ -417,9 +598,7 @@ const NODE_SCALE = 1;
 const FOCAL = 640;
 const IDLE_YAW = 0.08;
 const IDLE_RESUME_MS = 1400;
-// Keep ARCH_* in sync with architecturePick.ts (screen-space hit testing).
 const ARCH_W = 28, ARCH_H = 28;
-/** Minimum Architecture node hit radius in CSS pixels (screen space), independent of zoom. */
 const ARCH_MIN_HIT_PX = 10;
 const ENTRY = '#e8b84a';
 const FILE_COLORS = {
@@ -449,6 +628,18 @@ let rafScheduled = false;
 let dpr = Math.min(2, window.devicePixelRatio || 1);
 const pending = new Map();
 
+// Temporal State & 2D Transition Engine
+let temporalState = null;
+let temporalDiff = null;
+let temporalPositions = new Map(); // entityId -> { x, y }
+let previousTemporalRenderNodes = new Map();
+let currentTemporalRenderNodes = new Map();
+let animStartTime = 0;
+let animDuration = 220;
+let isAnimatingTemporal = false;
+let isPlayingHistory = false;
+let playIntervalTimer = null;
+
 function request(type, payload) {
 	const requestId = Math.random().toString(36).slice(2);
 	return new Promise(function (resolve) {
@@ -457,9 +648,9 @@ function request(type, payload) {
 	});
 }
 
-function isNetwork() { return graphType === 'network' || (snapshot && snapshot.graphType === 'network'); }
+function isNetwork() { return graphType === 'network'; }
+function isTemporal() { return graphType === 'temporal'; }
 
-/** The single authority for automatic camera motion; manual camera controls remain available. */
 function canIdleRotate() {
 	return !!(isNetwork()
 		&& snapshot
@@ -478,9 +669,6 @@ function thresholdForPointer(pointerType) {
 	return 4;
 }
 
-// Screen Y increases downward. The graph is grabbed directly: dragging right
-// brings its left side forward, while dragging down rolls the graph upward.
-// The inverted setting flips this single mapping for both axes.
 function mapPointerDeltaToGraphRotation(dx, dy) {
 	const direction = settings.networkDragDirection === 'inverted' ? -1 : 1;
 	const sensitivity = 0.005 * direction;
@@ -504,17 +692,6 @@ function fileType(path) {
 	if (ext === 'png' || ext === 'jpg' || ext === 'jpeg' || ext === 'gif' || ext === 'webp' || ext === 'svg' || ext === 'ico') return { id:'image', name:'Image', color:FILE_COLORS.image };
 	if (ext === 'json' || ext === 'yaml' || ext === 'yml' || ext === 'toml' || ext === 'env' || ext === 'ini' || base.startsWith('.')) return { id:'config', name:'Config', color:FILE_COLORS.config };
 	return { id:'other', name: ext ? ext.toUpperCase() : 'Other', color:FILE_COLORS.other };
-}
-
-function nodeColor(node, entryId) {
-	if (node.id === entryId || node.isEntry) return ENTRY;
-	return fileType(node.path || node.label).color;
-}
-
-function hash01(id, salt) {
-	let h = salt | 0;
-	for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-	return ((h >>> 0) % 1000) / 1000;
 }
 
 function projectPoint(x, y, z, yaw, pitch) {
@@ -582,7 +759,6 @@ function rebuildBase3d(s) {
 	const p3 = s.positions3d || null;
 	const network = s.graphType === 'network' || graphType === 'network';
 
-	// Prefer canonical 3D layout from the host (Network). Never invent depth by hashing 2D coords.
 	if (p3 && typeof p3 === 'object') {
 		let sx = 0, sy = 0, sz = 0, n = 0;
 		for (let i = 0; i < nodes.length; i++) {
@@ -605,36 +781,9 @@ function rebuildBase3d(s) {
 		}
 	}
 
-	// Network must wait for positions3d — never synthesize Z via hash01.
 	if (network) {
 		centroid = { x: 0, y: 0 };
 		return true;
-	}
-
-	const positions = s.positions || {};
-	let sx = 0, sy = 0, n = 0, maxR = 1;
-	const centers = [];
-	for (let i = 0; i < nodes.length; i++) {
-		const p = positions[nodes[i].id];
-		if (!p) continue;
-		const cx = p.x + ARCH_W / 2;
-		const cy = p.y + ARCH_H / 2;
-		centers.push({ id: nodes[i].id, cx: cx, cy: cy });
-		sx += cx; sy += cy; n++;
-	}
-	centroid = n ? { x: sx / n, y: sy / n } : { x: 0, y: 0 };
-	for (let i = 0; i < centers.length; i++) {
-		maxR = Math.max(maxR, Math.hypot(centers[i].cx - centroid.x, centers[i].cy - centroid.y));
-	}
-	// Architecture fallback only: mild deterministic depth for SVG→canvas ports.
-	const zSpread = Math.max(80, maxR * 0.5);
-	for (let i = 0; i < centers.length; i++) {
-		const c = centers[i];
-		base3d[c.id] = {
-			x: c.cx - centroid.x,
-			y: c.cy - centroid.y,
-			z: (hash01(c.id, 5) - 0.5) * zSpread
-		};
 	}
 	return true;
 }
@@ -656,38 +805,58 @@ function projectAll() {
 
 function screenPos(id) {
 	if (isNetwork() && projected[id]) return projected[id];
-	const p = snapshot && snapshot.positions && snapshot.positions[id];
-	return p ? { x: p.x + ARCH_W / 2, y: p.y + ARCH_H / 2, depthScale: 1, z: 0 } : null;
+	return null;
 }
 
 function fitView() {
+	if (isTemporal()) {
+		if (!temporalDiff || !temporalDiff.nodes || !temporalDiff.nodes.length) return;
+		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+		for (let i = 0; i < temporalDiff.nodes.length; i++) {
+			const n = temporalDiff.nodes[i];
+			const pos = temporalPositions.get(n.entityId) || { x: n.x, y: n.y };
+			minX = Math.min(minX, pos.x - 20); minY = Math.min(minY, pos.y - 20);
+			maxX = Math.max(maxX, pos.x + 20); maxY = Math.max(maxY, pos.y + 20);
+		}
+		if (!isFinite(minX)) return;
+		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
+		const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
+		const k = Math.min(vw / (bw + 160), vh / (bh + 160), 2.0);
+		transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
+		dirty = true; kickRaf();
+		return;
+	}
+
 	if (!snapshot || !(snapshot.nodes || []).length) return;
 	const nodes = snapshot.nodes;
 	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 	for (let i = 0; i < nodes.length; i++) {
 		const p = screenPos(nodes[i].id);
 		if (!p) continue;
-		const r = isNetwork() ? 16 : ARCH_W / 2;
+		const r = 16;
 		minX = Math.min(minX, p.x - r); minY = Math.min(minY, p.y - r);
 		maxX = Math.max(maxX, p.x + r); maxY = Math.max(maxY, p.y + r);
 	}
 	if (!isFinite(minX)) return;
 	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
-	const host = isNetwork() ? netCanvas : archSvg;
-	const vw = host.clientWidth || 800, vh = host.clientHeight || 600;
+	const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
 	const k = Math.min(vw / (bw + 120), vh / (bh + 120), 1.8) * (settings.initialZoom || 1);
 	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
-	dirty = true;
-	if (!isNetwork()) applyArchTransform();
-	else kickRaf();
-}
-
-function applyArchTransform() {
-	const g = archSvg.querySelector('#world');
-	if (g) g.setAttribute('transform', 'translate(' + transform.x + ',' + transform.y + ') scale(' + transform.k + ')');
+	dirty = true; kickRaf();
 }
 
 function updateLegend(s, network) {
+	if (isTemporal()) {
+		let html = '<div class="title">Temporal Transitions</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#3fb950"></span>Added (+)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#f85149"></span>Removed (-)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#d29922"></span>Modified (~)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#58a6ff"></span>Renamed (⇄)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#8b949e"></span>Unchanged</div>';
+		legend.innerHTML = html;
+		legend.style.display = 'block';
+		return;
+	}
 	if (!settings.showLegend || !s || !(s.nodes || []).length) {
 		legend.style.display = 'none';
 		return;
@@ -698,47 +867,335 @@ function updateLegend(s, network) {
 		if (!types.has(t.id)) types.set(t.id, t);
 	}
 	let html = '<div class="title">File types</div>';
-		types.forEach(function (t) {
-			html += '<div class="row"><span class="swatch ft-' + t.id + ' ' + (network ? 'circle' : '') + '"></span>' + t.name + '</div>';
-		});
-		html += '<div class="row"><span class="swatch entry ' + (network ? 'circle' : '') + '"></span>Entry</div>';
-		html += '<div class="title spaced">' + (network ? 'Visible edges' : 'Edges') + '</div>';
-		html += '<div class="row"><span class="swatch line import"></span>Import</div>';
-		if (!network) html += '<div class="row"><span class="swatch line root"></span>Root</div>';
-		else html += '<div class="row"><span class="swatch line composition"></span>Composition</div>';
+	types.forEach(function (t) {
+		html += '<div class="row"><span class="swatch ft-' + t.id + ' circle"></span>' + t.name + '</div>';
+	});
+	html += '<div class="row"><span class="swatch entry circle"></span>Entry</div>';
+	html += '<div class="title spaced">Visible edges</div>';
+	html += '<div class="row"><span class="swatch line import"></span>Import</div>';
+	html += '<div class="row"><span class="swatch line composition"></span>Composition</div>';
 	legend.innerHTML = html;
 	legend.style.display = 'block';
 }
 
-function architectureHitRadiusScreen() {
-	// Screen-space radius (CSS px): visual half-diagonal + pad, floored at ARCH_MIN_HIT_PX.
-	// Convert to world with (screen / zoom) in pickArchitectureNode — do not use a fixed world radius.
-	const visual = Math.hypot(ARCH_W / 2, ARCH_H / 2) * Math.max(0.001, transform.k);
-	return Math.max(ARCH_MIN_HIT_PX, visual + 4);
+function updateTemporalUI(state, diff) {
+	if (!state) return;
+	temporalToolbar.style.display = 'flex';
+	temporalScrubberBar.style.display = 'flex';
+	toolbar.style.display = 'none';
+	status.style.display = 'none';
+
+	// Ref selector
+	if (temporalRefSelect.value !== state.selectedRef) {
+		temporalRefSelect.innerHTML = '<option value="' + state.selectedRef + '">' + state.selectedRef + '</option>';
+	}
+
+	// Compare Base
+	const compareBase = state.compareBaseSha || '';
+	temporalCompareSelect.innerHTML = '<option value="">Parent (1st parent)</option>' + (compareBase ? '<option value="' + compareBase + '" selected>' + compareBase.slice(0, 7) + '</option>' : '');
+
+	// Follow HEAD
+	temporalFollowHead.checked = !!state.followHead;
+
+	// Commit summary & Scrubber
+	const timeline = state.pagedTimeline || [];
+	const total = timeline.length;
+	temporalScrubber.max = String(Math.max(0, total - 1));
+	const currentIdx = timeline.findIndex(c => c.sha === state.selectedCommitSha);
+	if (currentIdx >= 0) {
+		// Scrubber slider: left (0) is oldest, right (total-1) is HEAD
+		const sliderVal = (total - 1) - currentIdx;
+		temporalScrubber.value = String(sliderVal);
+		const commit = timeline[currentIdx];
+		temporalCommitSha.textContent = commit.shortSha || commit.sha.slice(0, 7);
+		temporalCommitMessage.textContent = commit.message || '';
+		temporalCommitAuthor.textContent = commit.author ? 'by ' + commit.author : '';
+		temporalCommitStatus.textContent = state.isSettled ? 'Settled' : 'Indexing…';
+		temporalCommitStatus.style.color = state.isSettled ? '#3fb950' : '#d29922';
+	}
+
+	// Partial warning
+	temporalPartialWarning.style.display = state.isPartialLineage ? 'inline-block' : 'none';
+
+	// Badges
+	if (diff && diff.summary) {
+		badgeAdded.textContent = '+' + diff.summary.addedCount;
+		badgeRemoved.textContent = '-' + diff.summary.removedCount;
+		badgeModified.textContent = '~' + diff.summary.modifiedCount;
+		badgeRenamed.textContent = '⇄' + diff.summary.renamedCount;
+	}
 }
 
-function pickArchitectureNode(clientX, clientY) {
-	// Mirrors pickArchitectureNodeAt in architecturePick.ts (closest center within screen-space halo).
-	if (!snapshot || isNetwork()) return null;
-	const rect = archSvg.getBoundingClientRect();
+function updateTemporalDiffTransition(diff) {
+	if (!diff) return;
+	previousTemporalRenderNodes = new Map(currentTemporalRenderNodes);
+	const nextMap = new Map();
+
+	// Stable Layout computation
+	const nodes = diff.nodes || [];
+	for (let i = 0; i < nodes.length; i++) {
+		const node = nodes[i];
+		let pos = temporalPositions.get(node.entityId);
+		if (!pos) {
+			// Deterministic placement for new node
+			let angle = (hashString(node.entityId) % 360) * (Math.PI / 180);
+			let dist = 120 + (hashString(node.entityId) % 180);
+			pos = { x: Math.round(Math.cos(angle) * dist), y: Math.round(Math.sin(angle) * dist) };
+			temporalPositions.set(node.entityId, pos);
+		}
+		nextMap.set(node.entityId, {
+			entityId: node.entityId,
+			canonicalNodeId: node.canonicalNodeId,
+			path: node.path,
+			label: node.label,
+			kind: node.kind,
+			x: pos.x,
+			y: pos.y,
+			changeKind: node.changeKind,
+			oldPath: node.oldPath,
+			meta: node.meta,
+		});
+	}
+
+	currentTemporalRenderNodes = nextMap;
+	animStartTime = performance.now();
+	animDuration = settings.reduceMotion ? 0 : 220;
+	isAnimatingTemporal = !settings.reduceMotion;
+	dirty = true;
+	kickRaf();
+}
+
+function drawTemporalFrame(now) {
+	if (!netCanvas) return;
+	const w = netCanvas.clientWidth || 800;
+	const h = netCanvas.clientHeight || 600;
+	ctx.clearRect(0, 0, w, h);
+
+	ctx.save();
+	ctx.translate(w / 2 + transform.x, h / 2 + transform.y);
+	ctx.scale(transform.k, transform.k);
+
+	const t = animDuration > 0 ? Math.min(1, (now - animStartTime) / animDuration) : 1;
+	const ease = 1 - Math.pow(1 - t, 3);
+	if (t >= 1) isAnimatingTemporal = false;
+
+	const filterQuery = (temporalFilterInput.value || '').trim().toLowerCase();
+
+	// Draw edges
+	const edges = (temporalDiff && temporalDiff.edges) || [];
+	for (let i = 0; i < edges.length; i++) {
+		const edge = edges[i];
+		const srcNode = currentTemporalRenderNodes.get(edge.sourceEntityId);
+		const tgtNode = currentTemporalRenderNodes.get(edge.targetEntityId);
+		if (!srcNode || !tgtNode) continue;
+
+		ctx.beginPath();
+		ctx.moveTo(srcNode.x, srcNode.y);
+		ctx.lineTo(tgtNode.x, tgtNode.y);
+		if (edge.changeKind === 'added') {
+			ctx.strokeStyle = 'rgba(63, 185, 80, 0.7)';
+			ctx.lineWidth = 2;
+			ctx.setLineDash([]);
+		} else if (edge.changeKind === 'removed') {
+			ctx.strokeStyle = 'rgba(248, 81, 73, 0.6)';
+			ctx.lineWidth = 1.5;
+			ctx.setLineDash([4, 4]);
+		} else {
+			ctx.strokeStyle = 'rgba(139, 148, 158, 0.35)';
+			ctx.lineWidth = 1;
+			ctx.setLineDash([]);
+		}
+		ctx.stroke();
+	}
+	ctx.setLineDash([]);
+
+	// Draw nodes
+	currentTemporalRenderNodes.forEach(function (node) {
+		if (filterQuery && !node.path.toLowerCase().includes(filterQuery) && !node.label.toLowerCase().includes(filterQuery)) {
+			return;
+		}
+
+		let curX = node.x;
+		let curY = node.y;
+		let curAlpha = 1;
+		let curScale = 1;
+
+		const prev = previousTemporalRenderNodes.get(node.entityId);
+		if (isAnimatingTemporal && prev) {
+			curX = prev.x + (node.x - prev.x) * ease;
+			curY = prev.y + (node.y - prev.y) * ease;
+		}
+
+		if (node.changeKind === 'added' && isAnimatingTemporal) {
+			curAlpha = ease;
+			curScale = 0.5 + 0.5 * ease;
+		} else if (node.changeKind === 'removed') {
+			curAlpha = isAnimatingTemporal ? 1 - 0.7 * ease : 0.3;
+		}
+
+		ctx.save();
+		ctx.globalAlpha = curAlpha;
+		ctx.translate(curX, curY);
+		ctx.scale(curScale, curScale);
+
+		const radius = 14;
+
+		// Selection highlight ring
+		if (selectedNodeId === node.entityId || selectedNodeId === node.canonicalNodeId) {
+			ctx.beginPath();
+			ctx.arc(0, 0, radius + 5, 0, 2 * Math.PI);
+			ctx.strokeStyle = '#2dd4bf';
+			ctx.lineWidth = 3;
+			ctx.stroke();
+		}
+
+		// Node Body
+		ctx.beginPath();
+		ctx.arc(0, 0, radius, 0, 2 * Math.PI);
+		let fillColor = '#30363d';
+		let strokeColor = '#8b949e';
+
+		if (node.changeKind === 'added') {
+			fillColor = '#1f4828';
+			strokeColor = '#3fb950';
+		} else if (node.changeKind === 'removed') {
+			fillColor = '#4e1c1b';
+			strokeColor = '#f85149';
+		} else if (node.changeKind === 'modified') {
+			fillColor = '#4a3712';
+			strokeColor = '#d29922';
+		} else if (node.changeKind === 'renamed') {
+			fillColor = '#1f3552';
+			strokeColor = '#58a6ff';
+		}
+
+		ctx.fillStyle = fillColor;
+		ctx.fill();
+		ctx.lineWidth = node.changeKind === 'unchanged' ? 1.5 : 2.5;
+		ctx.strokeStyle = strokeColor;
+		ctx.stroke();
+
+		// Change Symbol / Badge
+		let badgeSymbol = '';
+		if (node.changeKind === 'added') badgeSymbol = '+';
+		else if (node.changeKind === 'removed') badgeSymbol = '−';
+		else if (node.changeKind === 'modified') badgeSymbol = '~';
+		else if (node.changeKind === 'renamed') badgeSymbol = '⇄';
+
+		if (badgeSymbol) {
+			ctx.fillStyle = strokeColor;
+			ctx.font = 'bold 11px sans-serif';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'middle';
+			ctx.fillText(badgeSymbol, 0, 0);
+		}
+
+		// Label
+		ctx.fillStyle = '#f4f4f5';
+		ctx.font = '10.5px sans-serif';
+		ctx.textAlign = 'center';
+		ctx.textBaseline = 'top';
+		const labelText = node.oldPath ? node.label + ' (was ' + getBaseName(node.oldPath) + ')' : node.label;
+		ctx.fillText(labelText, 0, radius + 3);
+
+		ctx.restore();
+	});
+
+	ctx.restore();
+
+	if (isAnimatingTemporal) {
+		dirty = true;
+		kickRaf();
+	}
+}
+
+function pickTemporalNode(clientX, clientY) {
+	if (!netCanvas) return null;
+	const rect = netCanvas.getBoundingClientRect();
+	const sx = clientX - rect.left;
+	const sy = clientY - rect.top;
+	const w = netCanvas.clientWidth || 800;
+	const h = netCanvas.clientHeight || 600;
+	const wx = (sx - (w / 2 + transform.x)) / transform.k;
+	const wy = (sy - (h / 2 + transform.y)) / transform.k;
+
+	let best = null;
+	let bestDist = 24 / transform.k;
+
+	currentTemporalRenderNodes.forEach(function (node) {
+		const d = Math.hypot(wx - node.x, wy - node.y);
+		if (d <= bestDist) {
+			bestDist = d;
+			best = node;
+		}
+	});
+
+	return best;
+}
+
+function stepTemporalCommit(delta) {
+	if (!temporalState || !temporalState.pagedTimeline || !temporalState.pagedTimeline.length) return;
+	const timeline = temporalState.pagedTimeline;
+	const curIdx = timeline.findIndex(c => c.sha === temporalState.selectedCommitSha);
+	if (curIdx < 0) return;
+	const targetIdx = curIdx - delta; // delta +1 means newer (towards HEAD / index 0), -1 means older
+	if (targetIdx >= 0 && targetIdx < timeline.length) {
+		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: true });
+	} else if (delta < 0 && targetIdx >= timeline.length) {
+		// Load more history on older edge
+		request('loadMoreTemporalHistory', {});
+	}
+}
+
+function toggleTemporalPlay() {
+	if (isPlayingHistory) {
+		clearInterval(playIntervalTimer);
+		playIntervalTimer = null;
+		isPlayingHistory = false;
+		temporalPlayBtn.textContent = '▶';
+	} else {
+		isPlayingHistory = true;
+		temporalPlayBtn.textContent = '❚❚';
+		playIntervalTimer = setInterval(function () {
+			stepTemporalCommit(1);
+			const timeline = temporalState.pagedTimeline || [];
+			if (timeline[0] && timeline[0].sha === temporalState.selectedCommitSha) {
+				toggleTemporalPlay();
+			}
+		}, 900);
+	}
+}
+
+function hashString(str) {
+	let hash = 5381;
+	for (let i = 0; i < str.length; i++) hash = ((hash << 5) + hash) + str.charCodeAt(i);
+	return Math.abs(hash | 0);
+}
+
+function getBaseName(p) {
+	const lastSlash = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\\\'));
+	return lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
+}
+
+function pickNetworkNode(clientX, clientY) {
+	if (!snapshot || !isNetwork()) return null;
+	const rect = netCanvas.getBoundingClientRect();
 	const sx = clientX - rect.left;
 	const sy = clientY - rect.top;
 	const k = Math.max(0.001, transform.k);
 	const wx = (sx - transform.x) / k;
 	const wy = (sy - transform.y) / k;
-	const hitWorld = architectureHitRadiusScreen() / k;
 	let best = null;
 	let bestDist = Infinity;
 	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
 	const nodes = (snapshot.nodes || []).slice(0, maxNodes);
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
-		const p = snapshot.positions[node.id];
+		const p = screenPos(node.id);
 		if (!p) continue;
-		const cx = p.x + ARCH_W / 2;
-		const cy = p.y + ARCH_H / 2;
-		const d = Math.hypot(wx - cx, wy - cy);
-		if (d <= hitWorld && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
+		const r = 16 * (p.depthScale || 1);
+		const d = Math.hypot(wx - p.x, wy - p.y);
+		if (d <= r + 8 && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
 			bestDist = d;
 			best = node;
 		}
@@ -746,447 +1203,179 @@ function pickArchitectureNode(clientX, clientY) {
 	return best;
 }
 
-/** Toggle selection styling only — never rebuild SVG / positions on select. */
-function updateArchitectureSelection() {
-	if (isNetwork()) return;
-	const groups = archSvg.querySelectorAll('.arch-node');
-	for (let i = 0; i < groups.length; i++) {
-		const g = groups[i];
-		const id = g.getAttribute('data-node-id');
-		if (id && id === selectedNodeId) g.classList.add('is-selected');
-		else g.classList.remove('is-selected');
-	}
-}
-
-function renderArchitecture(s) {
-	archSvg.style.display = 'block';
-	netCanvas.style.display = 'none';
-	idleToggleWrap.style.display = 'none';
-	archSvg.innerHTML = '';
-	const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
-	const filter = document.createElementNS('http://www.w3.org/2000/svg', 'filter');
-	filter.setAttribute('id', 'glow');
-	filter.setAttribute('x', '-50%'); filter.setAttribute('y', '-50%');
-	filter.setAttribute('width', '200%'); filter.setAttribute('height', '200%');
-	const blur = document.createElementNS('http://www.w3.org/2000/svg', 'feGaussianBlur');
-	blur.setAttribute('stdDeviation', '2.2'); blur.setAttribute('result', 'coloredBlur');
-	const merge = document.createElementNS('http://www.w3.org/2000/svg', 'feMerge');
-	const m1 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
-	m1.setAttribute('in', 'coloredBlur');
-	const m2 = document.createElementNS('http://www.w3.org/2000/svg', 'feMergeNode');
-	m2.setAttribute('in', 'SourceGraphic');
-	merge.appendChild(m1); merge.appendChild(m2);
-	filter.appendChild(blur); filter.appendChild(merge);
-	defs.appendChild(filter);
-	archSvg.appendChild(defs);
-
-	const world = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-	world.setAttribute('id', 'world');
-	archSvg.appendChild(world);
-
-	const entry = s.entryNodeId && s.positions[s.entryNodeId] ? s.positions[s.entryNodeId] : null;
-	const cx = entry ? entry.x + ARCH_W / 2 : 0;
-	const cy = entry ? entry.y + ARCH_H / 2 : 0;
-
-	if (s.layoutMode === 'hierarchy' && Array.isArray(s.ringBands)) {
-		for (let i = s.ringBands.length - 1; i >= 0; i--) {
-			const band = s.ringBands[i];
-			const ring = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
-			ring.setAttribute('class', 'ring');
-			ring.setAttribute('cx', String(cx));
-			ring.setAttribute('cy', String(cy));
-			ring.setAttribute('r', String((band.innerRadius + band.outerRadius) / 2));
-			ring.setAttribute('stroke', band.color || '#22d3ee');
-			ring.setAttribute('stroke-width', String(Math.max(10, band.outerRadius - band.innerRadius)));
-			world.appendChild(ring);
-		}
-	}
-	if (s.layoutMode === 'pyramid' && Array.isArray(s.pyramidBands)) {
-		for (let i = 0; i < s.pyramidBands.length; i++) {
-			const band = s.pyramidBands[i];
-			const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-			rect.setAttribute('class', 'pyramid-band');
-			rect.setAttribute('x', String(band.x));
-			rect.setAttribute('y', String(band.y));
-			rect.setAttribute('width', String(band.width));
-			rect.setAttribute('height', String(band.height));
-			rect.setAttribute('rx', '10');
-			rect.setAttribute('fill', band.color || '#38bdf8');
-			rect.setAttribute('opacity', '0.35');
-			world.appendChild(rect);
-		}
-	}
-
-	const maxEdges = Math.max(40, settings.maxRenderedEdges || 420);
-	const edges = (s.edges || []).slice(0, maxEdges);
-	for (let i = 0; i < edges.length; i++) {
-		const edge = edges[i];
-		const a = s.positions[edge.source], b = s.positions[edge.target];
-		if (!a || !b) continue;
-		const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-		path.setAttribute('class', 'edge');
-		path.setAttribute('stroke', edge.kind === 'contains' ? ENTRY : '#64748b');
-		path.setAttribute('stroke-dasharray', edge.kind === 'contains' ? '4 3' : '0');
-		path.setAttribute('d', 'M' + (a.x + ARCH_W / 2) + ' ' + (a.y + ARCH_H / 2) + ' L' + (b.x + ARCH_W / 2) + ' ' + (b.y + ARCH_H / 2));
-		world.appendChild(path);
-	}
-
-	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
-	const nodes = (s.nodes || []).slice(0, maxNodes);
-	for (let i = 0; i < nodes.length; i++) {
-		const node = nodes[i];
-		const p = s.positions[node.id];
-		if (!p) continue;
-		const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
-		let cls = 'arch-node';
-		if (node.id === s.entryNodeId) cls += ' is-entry';
-		if (node.id === selectedNodeId) cls += ' is-selected';
-		g.setAttribute('class', cls);
-		g.setAttribute('data-node-id', node.id);
-		g.setAttribute('transform', 'translate(' + p.x + ',' + p.y + ')');
-		const color = nodeColor(node, s.entryNodeId);
-		// Visual size stays ARCH_W×ARCH_H; hit testing is screen-space pickArchitectureNode (not DOM discs).
-		const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		rect.setAttribute('class', 'node-face');
-		rect.setAttribute('width', String(ARCH_W));
-		rect.setAttribute('height', String(ARCH_H));
-		rect.setAttribute('rx', '4');
-		rect.setAttribute('stroke', color);
-		rect.setAttribute('stroke-width', '1.4');
-		g.appendChild(rect);
-		const icon = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		icon.setAttribute('x', '7'); icon.setAttribute('y', '7');
-		icon.setAttribute('width', '14'); icon.setAttribute('height', '14');
-		icon.setAttribute('rx', '2');
-		icon.setAttribute('fill', color);
-		icon.setAttribute('opacity', '0.85');
-		icon.setAttribute('pointer-events', 'none');
-		g.appendChild(icon);
-		world.appendChild(g);
-	}
-	applyArchTransform();
-}
-
 function drawNetworkFrame() {
-	if (!snapshot || !isNetwork()) return;
+	if (!netCanvas) return;
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
-	// Full-buffer clear with identity transform so frames never accumulate.
-	ctx.save();
-	ctx.setTransform(1, 0, 0, 1, 0, 0);
-	ctx.globalAlpha = 1;
-	ctx.globalCompositeOperation = 'source-over';
-	ctx.clearRect(0, 0, netCanvas.width, netCanvas.height);
-	ctx.restore();
-	ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
 	ctx.clearRect(0, 0, w, h);
-
-	// Subtle grid
-	ctx.save();
-	ctx.strokeStyle = 'rgba(148,163,184,0.08)';
-	ctx.lineWidth = 1;
-	const grid = 48;
-	const ox = ((transform.x % grid) + grid) % grid;
-	const oy = ((transform.y % grid) + grid) % grid;
-	for (let x = ox; x < w; x += grid) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, h); ctx.stroke(); }
-	for (let y = oy; y < h; y += grid) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(w, y); ctx.stroke(); }
-	ctx.restore();
-
 	projectAll();
-	const maxEdges = Math.max(40, settings.maxRenderedEdges || 420);
-	const edges = (snapshot.edges || []).slice(0, maxEdges);
+
 	ctx.save();
 	ctx.translate(transform.x, transform.y);
 	ctx.scale(transform.k, transform.k);
 
+	const nodes = (snapshot && snapshot.nodes) || [];
+	const edges = (snapshot && snapshot.edges) || [];
+	const entryId = snapshot && snapshot.entryNodeId;
+
+	// Draw Network Edges
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
-		const a = projected[e.source], b = projected[e.target];
-		if (!a || !b) continue;
-		const avg = ((a.depthScale || 1) + (b.depthScale || 1)) / 2;
-		const edgeAlpha = Math.max(0.16, Math.min(0.78, 0.2 + 0.38 * avg));
+		const p1 = screenPos(e.source);
+		const p2 = screenPos(e.target);
+		if (!p1 || !p2) continue;
 		ctx.beginPath();
-		ctx.strokeStyle = e.kind === 'contains'
-			? 'rgba(167,139,250,' + edgeAlpha + ')'
-			: 'rgba(125,170,220,' + edgeAlpha + ')';
-		ctx.lineWidth = 1 / transform.k;
-		ctx.moveTo(a.x, a.y);
-		ctx.lineTo(b.x, b.y);
+		ctx.moveTo(p1.x, p1.y);
+		ctx.lineTo(p2.x, p2.y);
+		ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
+		ctx.lineWidth = 1;
 		ctx.stroke();
 	}
 
-	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
-	const nodes = (snapshot.nodes || []).slice(0, maxNodes).slice().sort(function (a, b) {
-		// Far nodes first, then nearer nodes on top for visible occlusion.
-		return ((projected[b.id] && projected[b.id].z) || 0) - ((projected[a.id] && projected[a.id].z) || 0);
-	});
+	// Draw Network Nodes
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
-		const p = projected[node.id];
+		const p = screenPos(node.id);
 		if (!p) continue;
-		const r = networkDrawRadius(node, p.depthScale || 1);
-		const color = nodeColor(node, snapshot.entryNodeId);
-		const isSelected = node.id === selectedNodeId;
-		const isEntry = node.id === snapshot.entryNodeId;
-		// Dim non-neighbors when a node is selected (easier reselection).
-		let alpha = 0.42 + normalizeDepthScale(p.depthScale || 1) * 0.58;
-		if (selectedNodeId && !isSelected) {
-			alpha *= 0.35;
-		}
-		if (isSelected || isEntry) {
+		const r = 14 * (p.depthScale || 1);
+
+		if (selectedNodeId === node.id) {
 			ctx.beginPath();
-			ctx.fillStyle = isSelected ? 'rgba(45,212,191,0.35)' : 'rgba(232,184,74,0.28)';
-			ctx.arc(p.x, p.y, r + 3, 0, Math.PI * 2);
-			ctx.fill();
+			ctx.arc(p.x, p.y, r + 4, 0, 2 * Math.PI);
+			ctx.strokeStyle = '#2dd4bf';
+			ctx.lineWidth = 2.5;
+			ctx.stroke();
 		}
+
 		ctx.beginPath();
-		ctx.fillStyle = color;
-		ctx.globalAlpha = alpha;
-		ctx.arc(p.x, p.y, r, 0, Math.PI * 2);
+		ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
+		ctx.fillStyle = nodeColor(node, entryId);
 		ctx.fill();
-		ctx.globalAlpha = 1;
-		ctx.lineWidth = 1.25 / transform.k;
-		ctx.strokeStyle = isSelected ? '#2dd4bf' : 'rgba(255,255,255,0.22)';
+		ctx.strokeStyle = '#1B1C1E';
+		ctx.lineWidth = 1.5;
 		ctx.stroke();
+
+		ctx.fillStyle = '#f4f4f5';
+		ctx.font = '10px sans-serif';
+		ctx.textAlign = 'center';
+		ctx.fillText(node.label || node.id, p.x, p.y + r + 2);
 	}
+
 	ctx.restore();
 	dirty = false;
 }
 
-function normalizeDepthScale(depthScale) {
-	return Math.max(0, Math.min(1, (depthScale - 0.62) / 1.15));
+function nodeColor(node, entryId) {
+	if (node.id === entryId || node.isEntry) return ENTRY;
+	return fileType(node.path || node.label).color;
 }
 
-function networkNodeVal(node) {
-	if (typeof node.val === 'number' && node.val > 0) return node.val;
-	const imp = node.meta && typeof node.meta.importance === 'number' ? node.meta.importance : 0;
-	if (imp > 0) return Math.max(1.5, 1.2 + Math.sqrt(imp) * 1.4);
-	if (node.isEntry) return 10;
-	return 1.5;
-}
-
-function networkDrawRadius(node, depthScale) {
-	const scaleMul = Math.max(0.76, Math.min(1.38, 0.76 + normalizeDepthScale(depthScale) * 0.62));
-	return (Math.sqrt(networkNodeVal(node)) * NODE_SCALE * 1.7 + 1.6) * scaleMul;
-}
-
-function networkPickRadius(node) {
-	return Math.max(18, Math.sqrt(networkNodeVal(node)) * NODE_SCALE * 3.2 + 10);
-}
-
-function pickNetworkNode(clientX, clientY) {
-	if (!snapshot) return null;
-	const rect = netCanvas.getBoundingClientRect();
-	const x = (clientX - rect.left - transform.x) / transform.k;
-	const y = (clientY - rect.top - transform.y) / transform.k;
-	let best = null, bestScore = -Infinity;
-	const nodes = snapshot.nodes || [];
-	for (let i = 0; i < nodes.length; i++) {
-		const p = projected[nodes[i].id];
-		if (!p) continue;
-		const d = Math.hypot(p.x - x, p.y - y);
-		const r = networkPickRadius(nodes[i]);
-		if (d <= r) {
-			// Frontmost: prefer smaller projected z (closer to camera), then nearer hit.
-			const score = -(typeof p.z === 'number' ? p.z : 0) * 1000 - d;
-			if (score > bestScore) { bestScore = score; best = nodes[i]; }
-		}
+function render(first) {
+	if (isTemporal()) {
+		archSvg.style.display = 'none';
+		netCanvas.style.display = 'block';
+		empty.style.display = 'none';
+		resizeCanvas();
+		updateLegend(null, false);
+		updateTemporalUI(temporalState, temporalDiff);
+		dirty = true;
+		kickRaf();
+		return;
 	}
-	return best;
-}
 
-function render(full) {
-	const network = isNetwork();
-	idleToggleWrap.style.display = network ? 'flex' : 'none';
-	idleToggle.checked = !!settings.networkIdleAutoRotate;
+	temporalToolbar.style.display = 'none';
+	temporalScrubberBar.style.display = 'none';
+	toolbar.style.display = 'flex';
 
-	if (!snapshot || !(snapshot.nodes || []).length) {
+	if (!snapshot || !snapshot.nodes || !snapshot.nodes.length) {
 		archSvg.style.display = 'none';
 		netCanvas.style.display = 'none';
-		legend.style.display = 'none';
 		empty.style.display = 'flex';
-		const msg = (diagnostics && diagnostics.message) || (diagnostics && diagnostics.status === 'scanning' ? 'Scanning workspace…' : 'No graph data yet. Open a folder and Rescan.');
-		empty.textContent = msg;
-		status.textContent = (diagnostics && diagnostics.status) ? (diagnostics.status + (diagnostics.message ? ' · ' + diagnostics.message : '')) : 'Idle';
+		empty.textContent = (diagnostics && diagnostics.message) || 'Preparing Code Graph…';
+		status.textContent = (diagnostics && diagnostics.status) === 'scanning' ? 'Scanning workspace…' : 'Idle';
 		return;
 	}
 
 	empty.style.display = 'none';
-	status.textContent = ((diagnostics && diagnostics.message) || (snapshot.nodes.length + ' nodes · ' + (snapshot.edges || []).length + ' links'))
-		+ (network ? ' · drag to rotate · scroll to zoom' : '');
-	updateLegend(snapshot, network);
-
-	if (network) {
-		archSvg.style.display = 'none';
-		netCanvas.style.display = 'block';
-		rebuildBase3d(snapshot);
-		resizeCanvas();
-		projectAll();
-		dirty = true;
-		drawNetworkFrame();
-	} else {
-		renderArchitecture(snapshot);
-	}
+	archSvg.style.display = 'none';
+	netCanvas.style.display = 'block';
+	resizeCanvas();
+	rebuildBase3d(snapshot);
+	updateLegend(snapshot, true);
+	status.textContent = snapshot.nodes.length + ' files · ' + (snapshot.edges || []).length + ' edges';
+	dirty = true;
+	kickRaf();
 }
-
-function onSnapshotMessage(payload) {
-	const prevScan = snapshot && snapshot.scannedAt;
-	const prevLayoutRevision = snapshot && snapshot.layoutRevision;
-	const prevLayout = snapshot && snapshot.layoutMode;
-	const prevNetLayout = snapshot && snapshot.networkLayoutMode;
-	const prevType = snapshot && snapshot.graphType;
-	const prevMaxNodes = settings.maxRenderedNodes;
-	const prevMaxEdges = settings.maxRenderedEdges;
-	snapshot = payload && payload.snapshot;
-	diagnostics = payload && payload.diagnostics;
-	settings = (payload && payload.settings) || settings;
-	if (payload && payload.graphType) graphType = payload.graphType;
-	else if (snapshot && snapshot.graphType) graphType = snapshot.graphType;
-	// Host clears with null; must apply even when falsy (old !== undefined missed undefined clears).
-	if (payload && 'selectedNodeId' in payload) selectedNodeId = payload.selectedNodeId || null;
-	idleToggle.checked = !!settings.networkIdleAutoRotate;
-	if (!canIdleRotate()) idlePaused = true;
-	else scheduleIdleResume();
-
-	const nextScan = snapshot && snapshot.scannedAt;
-	const nextLayoutRevision = snapshot && snapshot.layoutRevision;
-	const nextLayout = snapshot && snapshot.layoutMode;
-	const nextNetLayout = snapshot && snapshot.networkLayoutMode;
-	const nextType = snapshot && snapshot.graphType;
-	const layoutChanged = prevScan !== nextScan || prevLayoutRevision !== nextLayoutRevision || prevLayout !== nextLayout || prevNetLayout !== nextNetLayout || prevType !== nextType || !prevScan;
-	const renderBudgetChanged = prevMaxNodes !== settings.maxRenderedNodes || prevMaxEdges !== settings.maxRenderedEdges;
-	// Selection / diagnostics-only pushes must not rebuild Architecture DOM (no relayout on select).
-	if (!layoutChanged && !renderBudgetChanged && snapshot && (snapshot.nodes || []).length) {
-		empty.style.display = 'none';
-		status.textContent = ((diagnostics && diagnostics.message) || (snapshot.nodes.length + ' nodes · ' + (snapshot.edges || []).length + ' links'))
-			+ (isNetwork() ? ' · drag to rotate · scroll to zoom' : '');
-		updateLegend(snapshot, isNetwork());
-		if (isNetwork()) {
-			dirty = true;
-			drawNetworkFrame();
-		} else {
-			updateArchitectureSelection();
-		}
-		return;
-	}
-	if (layoutChanged && isNetwork()) resetCamera(false);
-	render(layoutChanged);
-	if (layoutChanged && snapshot && snapshot.nodes && snapshot.nodes.length) fitView();
-}
-
-window.addEventListener('message', function (event) {
-	const msg = event.data;
-	if (!msg) return;
-	if (msg.type === 'response' && pending.has(msg.requestId)) {
-		pending.get(msg.requestId)(msg.payload);
-		pending.delete(msg.requestId);
-		return;
-	}
-	if (msg.type === 'snapshot') { onSnapshotMessage(msg.payload); return; }
-	if (msg.type === 'resetView') {
-		resetCamera(false);
-		if (isNetwork()) { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
-		else fitView();
-		return;
-	}
-	if (msg.type === 'fitView') { if (isNetwork()) projectAll(); fitView(); if (isNetwork()) { dirty = true; drawNetworkFrame(); } }
-});
 
 function closePopup() {
 	popup.style.display = 'none';
 	popupNode = null;
-	if (isNetwork()) scheduleIdleResume();
-}
-
-function placePopupNear(clientX, clientY) {
-	const host = isNetwork() ? netCanvas : archSvg;
-	const rect = host.getBoundingClientRect();
-	const pw = Math.min(320, rect.width - 24);
-	let left = clientX - rect.left + 12;
-	let top = clientY - rect.top + 12;
-	if (left + pw > rect.width - 8) left = Math.max(8, rect.width - pw - 8);
-	if (top + 220 > rect.height - 8) top = Math.max(8, clientY - rect.top - 230);
-	popup.style.left = left + 'px';
-	popup.style.top = top + 'px';
-	popup.style.display = 'block';
 }
 
 function inferOverview(node) {
-	if (!node) return '';
-	const path = (node.path || node.label || '').toLowerCase();
-	const name = (node.label || '').replace(/\.(tsx?|jsx?|mjs|cjs)$/, '');
-	const layer = node.meta && node.meta.architectureLayer;
-	if (node.isEntry) return 'Application entry point — the root module where execution or rendering begins.';
-	if (layer === 'auth') return 'Authentication and session handling for user identity and access control.';
-	if (layer === 'api') return 'API route or endpoint layer — defines how external clients interact with backend logic.';
-	if (layer === 'database') return 'Data persistence layer — models, schemas, or database access utilities.';
-	if (layer === 'services') return 'Service module "' + name + '" — encapsulates business logic used across the application.';
-	if (layer === 'components' || node.kind === 'component') return 'UI component "' + name + '" — renders interface elements and composes the visual tree.';
-	if (layer === 'ui' || /page\.(tsx|jsx)$/.test(path)) return 'Page or screen module "' + name + '" — top-level route or view composition.';
-	if (/hook/i.test(name) || path.includes('/hooks/')) return 'React hook "' + name + '" — reusable stateful logic for components.';
-	if (/store|context|provider/i.test(name)) return 'State module "' + name + '" — manages shared application state or context.';
-	if (/util|helper|lib/i.test(path)) return 'Utility module "' + name + '" — shared helpers and low-level functions.';
-	if (/config|vite|webpack|eslint/.test(path)) return 'Project configuration — build, lint, or environment setup.';
-	if (/test|spec/.test(path)) return 'Test file for "' + name + '" — automated checks and specifications.';
-	if (/layout/i.test(name)) return 'Layout shell "' + name + '" — wraps pages with shared chrome and navigation.';
-	return 'Source file "' + (node.label || node.id) + '" — part of the ' + (layer || 'application') + ' architecture.';
+	if (!node) return 'No file details.';
+	if (node.meta && node.meta.overview) return node.meta.overview;
+	return 'Source file (' + fileType(node.path || node.label).name + ').';
+}
+
+function placePopupNear(clientX, clientY) {
+	const pw = 300, ph = 200;
+	let left = clientX + 12;
+	let top = clientY + 12;
+	if (left + pw > window.innerWidth - 12) left = clientX - pw - 12;
+	if (top + ph > window.innerHeight - 12) top = clientY - ph - 12;
+	popup.style.left = Math.max(12, left) + 'px';
+	popup.style.top = Math.max(12, top) + 'px';
+	popup.style.display = 'block';
 }
 
 let describeTimer = null;
-
-async function openNodePopup(node, clientX, clientY) {
-	if (!node) return;
-	clearIdleTimers();
+function openNodePopup(node, clientX, clientY) {
 	if (describeTimer) {
 		clearTimeout(describeTimer);
 		describeTimer = null;
 	}
 	popupNode = node;
-	selectedNodeId = node.id;
+	selectedNodeId = node.entityId || node.id;
 	popupTitle.textContent = node.label || node.id;
-	popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '');
+	popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '') + (node.changeKind ? ' · ' + node.changeKind.toUpperCase() : '');
 	popupOverview.textContent = inferOverview(node);
-	popupAi.textContent = 'Generating AI description…';
+	popupAi.textContent = '';
 	if (popupAiProvenance) { popupAiProvenance.style.display = 'none'; popupAiProvenance.textContent = ''; }
-	placePopupNear(clientX, clientY);
-	request('selectNode', { nodeId: node.id });
-	request('peekNodeDescription', { nodeId: node.id }).then(peek => {
-		if (!popupNode || popupNode.id !== node.id) return;
-		if (peek && peek.cached && peek.description) {
-			popupAi.textContent = peek.description;
-			if (popupAiProvenance) {
-				const providerName = peek.providerId === 'gemini' ? 'Gemini' : (peek.providerId || 'AI');
-				const modelName = peek.modelId ? (' · ' + peek.modelId) : '';
-				popupAiProvenance.textContent = providerName + modelName + ' · Cached';
-				popupAiProvenance.style.display = 'block';
-			}
-		}
-	});
-	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection();
 
-	describeTimer = setTimeout(async () => {
-		const desc = await request('describeNode', { nodeId: node.id });
-		if (!popupNode || popupNode.id !== node.id) return;
-		if (desc && desc.overview) {
-			popupOverview.textContent = desc.overview;
-		}
-		if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
-			popupAi.textContent = desc.aiDescription;
-			if (popupAiProvenance) {
-				const providerName = desc.aiProviderId === 'gemini' ? 'Gemini' : (desc.aiProviderId || 'AI');
-				const modelName = desc.aiModelId ? (' · ' + desc.aiModelId) : '';
-				const cacheLabel = desc.cacheHit ? ' · Cached' : '';
-				popupAiProvenance.textContent = providerName + modelName + cacheLabel;
-				popupAiProvenance.style.display = 'block';
+	if (isTemporal()) {
+		popupSourceDiff.style.display = 'inline-block';
+		popupOpen.style.display = node.changeKind === 'removed' ? 'none' : 'inline-block';
+	} else {
+		popupSourceDiff.style.display = 'none';
+		popupOpen.style.display = 'inline-block';
+	}
+
+	placePopupNear(clientX, clientY);
+	request('selectNode', { nodeId: selectedNodeId });
+
+	if (isNetwork()) {
+		request('peekNodeDescription', { nodeId: node.id }).then(peek => {
+			if (!popupNode || popupNode.id !== node.id) return;
+			if (peek && peek.cached && peek.description) {
+				popupAi.textContent = peek.description;
+			} else {
+				popupAi.textContent = 'Generating AI description…';
+				describeTimer = setTimeout(async () => {
+					const desc = await request('describeNode', { nodeId: node.id });
+					if (!popupNode || popupNode.id !== node.id) return;
+					if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
+						popupAi.textContent = desc.aiDescription;
+					} else {
+						popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
+					}
+				}, 60);
 			}
-		} else {
-			popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
-			if (popupAiProvenance) {
-				popupAiProvenance.textContent = '';
-				popupAiProvenance.style.display = 'none';
-			}
-		}
-	}, 120);
+		});
+		dirty = true; drawNetworkFrame();
+	} else {
+		dirty = true; drawTemporalFrame(performance.now());
+	}
 }
 
 function onPointerDown(e, host) {
@@ -1194,21 +1383,18 @@ function onPointerDown(e, host) {
 	if (popup.style.display !== 'none') {
 		closePopup();
 	}
-	host.setPointerCapture(e.pointerId);
 	activePointerId = e.pointerId;
 	activePointerHost = host;
 	interactionState = 'pressed';
 	dragThreshold = thresholdForPointer(e.pointerType);
 	dragging = true; moved = false; lastX = e.clientX; lastY = e.clientY;
 	pointerDownX = e.clientX; pointerDownY = e.clientY;
-	pointerDownNode = isNetwork()
-		? pickNetworkNode(e.clientX, e.clientY)
-		: pickArchitectureNode(e.clientX, e.clientY);
-	// Architecture: pan only from background (or middle/shift). Node press must not pan,
-	// or tiny moves cancel selection.
-	const wantPan = e.button === 1 || e.shiftKey || (!isNetwork() && !pointerDownNode);
+	pointerDownNode = isTemporal()
+		? pickTemporalNode(e.clientX, e.clientY)
+		: pickNetworkNode(e.clientX, e.clientY);
+
+	const wantPan = e.button === 1 || e.shiftKey || isTemporal();
 	panning = wantPan;
-	// Defer rotate until drag exceeds click threshold so node reselection works.
 	rotating = false;
 	host.classList.add('dragging');
 	if (panning) {
@@ -1216,6 +1402,7 @@ function onPointerDown(e, host) {
 		scheduleIdleResume();
 	}
 }
+
 function onPointerUp(e, cancelled) {
 	if (e.pointerId !== activePointerId) return;
 	const pointerHost = activePointerHost;
@@ -1226,11 +1413,20 @@ function onPointerUp(e, cancelled) {
 	dragging = false; panning = false; rotating = false;
 	interactionState = cancelled ? 'cancelled' : 'idle';
 	pointerDownNode = null;
-	archSvg.classList.remove('dragging'); archSvg.classList.remove('panning');
 	netCanvas.classList.remove('dragging');
+
 	const dist = e ? Math.hypot((e.clientX || 0) - pointerDownX, (e.clientY || 0) - pointerDownY) : 99;
 	if (e && !wasMoved && dist <= dragThreshold) {
-		if (isNetwork()) {
+		if (isTemporal()) {
+			const node = pickTemporalNode(e.clientX, e.clientY);
+			if (node) {
+				openNodePopup(node, e.clientX, e.clientY);
+				return;
+			}
+			selectedNodeId = null;
+			closePopup();
+			dirty = true; drawTemporalFrame(performance.now());
+		} else {
 			const node = pickNetworkNode(e.clientX, e.clientY);
 			if (node) {
 				openNodePopup(node, e.clientX, e.clientY);
@@ -1240,31 +1436,24 @@ function onPointerUp(e, cancelled) {
 			request('selectNode', { nodeId: null });
 			closePopup();
 			dirty = true; drawNetworkFrame();
-		} else {
-			const node = pickArchitectureNode(e.clientX, e.clientY);
-			if (node) {
-				openNodePopup(node, e.clientX, e.clientY);
-				return;
-			}
-			selectedNodeId = null;
-			request('selectNode', { nodeId: null });
-			closePopup();
-			updateArchitectureSelection();
 		}
 	}
 	if (isNetwork()) scheduleIdleResume();
 }
+
 function onPointerMove(e) {
 	if (!dragging || e.pointerId !== activePointerId) return;
 	const dx = e.clientX - lastX, dy = e.clientY - lastY;
 	const total = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
 	if (total > dragThreshold) moved = true;
+
 	if (interactionState === 'pressed' && !panning && isNetwork() && moved) {
 		rotating = true;
 		interactionState = 'rotating';
 		scheduleIdleResume();
 	}
 	lastX = e.clientX; lastY = e.clientY;
+
 	if (rotating && isNetwork()) {
 		const mapped = mapPointerDeltaToGraphRotation(dx, dy);
 		rotation.yaw = wrapRotationAngle(rotation.yaw + mapped.yaw);
@@ -1273,73 +1462,98 @@ function onPointerMove(e) {
 		kickRaf();
 		return;
 	}
+
 	if (!moved) return;
-	if (!panning && !isNetwork() && pointerDownNode) {
-		// Node gesture exceeded click threshold: treat as cancelled click, do not pan.
-		interactionState = 'cancelled';
-		return;
-	}
 	if (!panning) return;
 	interactionState = 'panning';
 	transform.x += dx; transform.y += dy;
-	if (isNetwork()) { dirty = true; kickRaf(); } else applyArchTransform();
+	dirty = true; kickRaf();
 }
+
 function onWheel(e) {
 	e.preventDefault();
 	scheduleIdleResume();
 	const factor = e.deltaY < 0 ? 1.1 : 0.9;
 	const prev = transform.k;
 	transform.k = Math.min(3.5, Math.max(0.15, transform.k * factor));
-	const host = isNetwork() ? netCanvas : archSvg;
-	const rect = host.getBoundingClientRect();
+	const rect = netCanvas.getBoundingClientRect();
 	const mx = e.clientX - rect.left, my = e.clientY - rect.top;
 	transform.x = mx - (mx - transform.x) * (transform.k / prev);
 	transform.y = my - (my - transform.y) * (transform.k / prev);
-	if (isNetwork()) { dirty = true; drawNetworkFrame(); } else applyArchTransform();
+	dirty = true; kickRaf();
 }
 
-archSvg.addEventListener('pointerdown', function (e) { onPointerDown(e, archSvg); });
 netCanvas.addEventListener('pointerdown', function (e) { onPointerDown(e, netCanvas); });
-archSvg.addEventListener('pointermove', onPointerMove);
 netCanvas.addEventListener('pointermove', onPointerMove);
-archSvg.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
 netCanvas.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
-archSvg.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
 netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
-archSvg.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
 netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
-archSvg.addEventListener('dblclick', function (e) {
-	const node = pickArchitectureNode(e.clientX, e.clientY);
-	if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
-});
-archSvg.addEventListener('contextmenu', function (e) {
-	const node = pickArchitectureNode(e.clientX, e.clientY);
-	if (!node) return;
-	e.preventDefault();
-	openNodePopup(node, e.clientX, e.clientY);
-});
+netCanvas.addEventListener('wheel', onWheel, { passive: false });
+
 netCanvas.addEventListener('dblclick', function (e) {
-	const node = pickNetworkNode(e.clientX, e.clientY);
-	if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
+	if (isTemporal()) {
+		const node = pickTemporalNode(e.clientX, e.clientY);
+		if (node) request('openTemporalSourceDiff', { entityId: node.entityId });
+	} else {
+		const node = pickNetworkNode(e.clientX, e.clientY);
+		if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
+	}
 });
-// Hover cursor for architecture without selecting
-archSvg.addEventListener('pointermove', function (e) {
-	if (dragging) return;
-	const node = pickArchitectureNode(e.clientX, e.clientY);
-	archSvg.style.cursor = node ? 'pointer' : 'grab';
-});
+
 document.getElementById('popupClose').onclick = function () { closePopup(); };
 document.getElementById('popupOpen').onclick = function () {
 	if (popupNode) request('openFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
+};
+document.getElementById('popupSourceDiff').onclick = function () {
+	if (popupNode && popupNode.entityId) request('openTemporalSourceDiff', { entityId: popupNode.entityId });
 };
 document.getElementById('popupReveal').onclick = function () {
 	if (popupNode) request('revealFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
 };
 document.getElementById('popupMagnus').onclick = function () { request('attachToMagnus', {}); };
-window.addEventListener('keydown', function (e) {
-	if (e.key === 'Escape') { closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); if (isNetwork()) { dirty = true; drawNetworkFrame(); } else updateArchitectureSelection(); }
+
+temporalScrubber.addEventListener('input', function () {
+	const val = parseInt(temporalScrubber.value, 10);
+	const timeline = (temporalState && temporalState.pagedTimeline) || [];
+	const total = timeline.length;
+	const targetIdx = (total - 1) - val;
+	if (timeline[targetIdx]) {
+		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: false });
+	}
 });
-archSvg.addEventListener('wheel', onWheel, { passive: false });
+
+temporalPrevBtn.addEventListener('click', function () { stepTemporalCommit(-1); });
+temporalNextBtn.addEventListener('click', function () { stepTemporalCommit(1); });
+temporalPlayBtn.addEventListener('click', toggleTemporalPlay);
+
+temporalFilterInput.addEventListener('input', function () {
+	dirty = true;
+	kickRaf();
+});
+
+temporalFollowHead.addEventListener('change', function () {
+	request('setTemporalFollowHead', { follow: temporalFollowHead.checked });
+});
+
+window.addEventListener('keydown', function (e) {
+	if (e.target && (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.target.tagName === 'TEXTAREA')) return;
+	if (e.key === 'Escape') {
+		closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); dirty = true; kickRaf();
+	} else if (isTemporal()) {
+		if (e.key === 'ArrowLeft') { e.preventDefault(); stepTemporalCommit(-1); }
+		else if (e.key === 'ArrowRight') { e.preventDefault(); stepTemporalCommit(1); }
+		else if (e.key === ' ') { e.preventDefault(); toggleTemporalPlay(); }
+	}
+});
+
+document.getElementById('zoomIn').onclick = function () { transform.k = Math.min(3.5, transform.k * 1.15); dirty = true; kickRaf(); };
+document.getElementById('zoomOut').onclick = function () { transform.k = Math.max(0.15, transform.k / 1.15); dirty = true; kickRaf(); };
+document.getElementById('fit').onclick = function () { fitView(); };
+document.getElementById('reset').onclick = function () {
+	resetCamera(false);
+	fitView();
+};
+
 let lastViewportW = 0;
 let lastViewportH = 0;
 let resizeRafPending = false;
@@ -1349,7 +1563,7 @@ function onStageResize(newW, newH) {
 	if (lastViewportW === 0 || lastViewportH === 0) {
 		lastViewportW = newW;
 		lastViewportH = newH;
-		if (isNetwork()) resizeCanvas();
+		resizeCanvas();
 		return;
 	}
 
@@ -1359,19 +1573,13 @@ function onStageResize(newW, newH) {
 	lastViewportH = newH;
 
 	if (Math.abs(dw) > 0.5 || Math.abs(dh) > 0.5) {
-		// Focal-point invariant: shift center translation by half delta to preserve centered content
 		transform.x += dw / 2;
 		transform.y += dh / 2;
 		dirty = true;
 	}
 
-	if (isNetwork()) {
-		resizeCanvas();
-	} else {
-		applyArchTransform();
-	}
+	resizeCanvas();
 
-	// Clamp popup within new viewport bounds if open
 	if (popup && popup.style.display !== 'none') {
 		const pw = popup.offsetWidth || 320;
 		const ph = popup.offsetHeight || 220;
@@ -1383,8 +1591,8 @@ function onStageResize(newW, newH) {
 		popup.style.top = top + 'px';
 	}
 
-	if (isNetwork() && dirty) {
-		drawNetworkFrame();
+	if (dirty) {
+		kickRaf();
 	}
 }
 
@@ -1417,57 +1625,88 @@ if (typeof ResizeObserver !== 'undefined') {
 	window.addEventListener('resize', scheduleResizeCheck);
 }
 
-document.getElementById('zoomIn').onclick = function () {
-	transform.k = Math.min(3.5, transform.k * 1.15); dirty = true;
-	if (isNetwork()) drawNetworkFrame(); else applyArchTransform();
-};
-document.getElementById('zoomOut').onclick = function () {
-	transform.k = Math.max(0.15, transform.k / 1.15); dirty = true;
-	if (isNetwork()) drawNetworkFrame(); else applyArchTransform();
-};
-document.getElementById('fit').onclick = function () { if (isNetwork()) projectAll(); fitView(); if (isNetwork()) { dirty = true; drawNetworkFrame(); } };
-document.getElementById('reset').onclick = function () {
-	resetCamera(false);
-	if (isNetwork()) { projectAll(); fitView(); dirty = true; drawNetworkFrame(); }
-	else fitView();
-};
-idleToggle.addEventListener('change', function () {
-	settings.networkIdleAutoRotate = !!idleToggle.checked;
-	request('setNetworkIdleAutoRotate', { enabled: settings.networkIdleAutoRotate });
-	scheduleIdleResume();
+window.addEventListener('message', function (e) {
+	const msg = e.data;
+	if (!msg) return;
+	if (msg.type === 'response' && pending.has(msg.requestId)) {
+		const resolve = pending.get(msg.requestId);
+		pending.delete(msg.requestId);
+		resolve(msg.payload);
+	} else if (msg.type === 'snapshot') {
+		snapshot = msg.payload.snapshot;
+		diagnostics = msg.payload.diagnostics;
+		if (msg.payload.settings) settings = msg.payload.settings;
+		if (msg.payload.graphType) graphType = msg.payload.graphType;
+		if (msg.payload.temporalState) {
+			temporalState = msg.payload.temporalState;
+			temporalDiff = temporalState.diff || null;
+			updateTemporalDiffTransition(temporalDiff);
+		}
+		render(false);
+	} else if (msg.type === 'temporalState') {
+		temporalState = msg.payload;
+		if (temporalState.diff) {
+			temporalDiff = temporalState.diff;
+			updateTemporalDiffTransition(temporalDiff);
+		}
+		updateTemporalUI(temporalState, temporalDiff);
+		render(false);
+	} else if (msg.type === 'temporalDiff') {
+		temporalDiff = msg.payload;
+		updateTemporalDiffTransition(temporalDiff);
+		updateTemporalUI(temporalState, temporalDiff);
+	} else if (msg.type === 'temporalTimeline') {
+		if (temporalState) temporalState = Object.assign({}, temporalState, { pagedTimeline: msg.payload });
+		updateTemporalUI(temporalState, temporalDiff);
+	} else if (msg.type === 'fitView') {
+		fitView();
+	} else if (msg.type === 'resetView') {
+		resetCamera(false);
+		fitView();
+	}
 });
 
 function rafLoop(ts) {
 	rafScheduled = false;
 	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
 	lastRafTs = ts;
-	const animating = canIdleRotate() && !idlePaused;
-	if (animating) {
-		rotation.yaw += IDLE_YAW * dt;
-		dirty = true;
+
+	if (isTemporal()) {
+		if (dirty || isAnimatingTemporal) {
+			drawTemporalFrame(ts);
+			dirty = false;
+		}
+	} else {
+		const animating = canIdleRotate() && !idlePaused;
+		if (animating) {
+			rotation.yaw += IDLE_YAW * dt;
+			dirty = true;
+		}
+		if (dirty && isNetwork() && snapshot) drawNetworkFrame();
+		if (animating) kickRaf();
 	}
-	if (dirty && isNetwork() && snapshot) drawNetworkFrame();
-	// Keep the loop alive only while idle rotation is actively advancing frames.
-	if (animating) kickRaf();
 }
 kickRaf();
-
-window.addEventListener('pagehide', clearIdleTimers);
-document.addEventListener('visibilitychange', function () {
-	if (document.hidden) idlePaused = true;
-	else if (isNetwork()) scheduleIdleResume();
-});
 
 request('getSnapshot').then(function (res) {
 	snapshot = res && res.snapshot;
 	diagnostics = res && res.diagnostics;
 	selectedNodeId = (res && res.selectedNodeId) || null;
 	if (res && res.settings) settings = res.settings;
-	if (snapshot && snapshot.graphType) graphType = snapshot.graphType;
-	if (isNetwork()) resetCamera(false);
+	if (res && res.viewState && res.viewState.graphType) graphType = res.viewState.graphType;
+	if (res && res.temporalState) {
+		temporalState = res.temporalState;
+		temporalDiff = temporalState.diff || null;
+		if (temporalDiff) updateTemporalDiffTransition(temporalDiff);
+	}
 	render(true);
-	if (snapshot && snapshot.nodes && snapshot.nodes.length) fitView();
-	scheduleIdleResume();
+	if (isTemporal()) {
+		fitView();
+	} else {
+		resetCamera(false);
+		fitView();
+		scheduleIdleResume();
+	}
 });
 </script>
 </body>

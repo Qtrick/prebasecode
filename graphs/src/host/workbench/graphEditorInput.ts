@@ -15,8 +15,8 @@ export const PREBASE_GRAPH_SCHEME = 'prebase-graph';
 export class PreBaseGraphEditorInput extends EditorInput {
 	static readonly TypeID = 'workbench.input.prebaseGraph';
 
-	static create(_graphType?: PreBaseGraphType): PreBaseGraphEditorInput {
-		return new PreBaseGraphEditorInput('network');
+	static create(graphType: PreBaseGraphType = 'network'): PreBaseGraphEditorInput {
+		return new PreBaseGraphEditorInput(graphType === 'temporal' ? 'temporal' : 'network');
 	}
 
 	readonly resource: URI;
@@ -35,10 +35,16 @@ export class PreBaseGraphEditorInput extends EditorInput {
 	}
 
 	override getName(): string {
+		if (this.graphType === 'temporal') {
+			return localize('prebase.graph.temporalTitle', "Temporal Graph");
+		}
 		return localize('prebase.graph.networkTitle', "Code Graph");
 	}
 
 	override getIcon(): ThemeIcon {
+		if (this.graphType === 'temporal') {
+			return ThemeIcon.fromId('history');
+		}
 		return prebaseNetworkEditorIcon;
 	}
 

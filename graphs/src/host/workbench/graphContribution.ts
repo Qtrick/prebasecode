@@ -31,6 +31,11 @@ import { IPreBaseGraphService, PreBaseGraphService } from './prebaseGraphService
 import { IPreBaseCanonicalParseService, WorkbenchCanonicalParseService } from './workbenchCanonicalParseService.js';
 import { PreBaseMapsViewPane } from './prebaseMapsView.js';
 
+import { IWorkbenchGitHistoryService, WorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
+import { IPreBaseTemporalGraphService, WorkbenchTemporalGraphService } from './workbenchTemporalGraphService.js';
+import { IPreBaseTemporalViewService } from '../../temporal/view/temporalViewTypes.js';
+import { WorkbenchTemporalViewService } from './temporal/workbenchTemporalViewService.js';
+
 export const PREBASE_MAPS_VIEW_CONTAINER_ID = 'workbench.view.prebase.maps';
 
 async function openGraphEditor(accessor: ServicesAccessor): Promise<void> {
@@ -40,8 +45,15 @@ async function openGraphEditor(accessor: ServicesAccessor): Promise<void> {
 	await editorService.openEditor(PreBaseGraphEditorInput.create('network'), { pinned: true });
 }
 
-function isNetworkGraphType(value: unknown): value is 'network' {
-	return value === 'network';
+async function openTemporalGraphEditor(accessor: ServicesAccessor): Promise<void> {
+	const editorService = accessor.get(IEditorService);
+	const graphService = accessor.get(IPreBaseGraphService);
+	await graphService.setGraphType('temporal');
+	await editorService.openEditor(PreBaseGraphEditorInput.create('temporal'), { pinned: true });
+}
+
+function isSupportedGraphType(value: unknown): value is 'network' | 'temporal' {
+	return value === 'network' || value === 'temporal';
 }
 
 class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
@@ -54,15 +66,12 @@ class PreBaseGraphEditorInputSerializer implements IEditorSerializer {
 	deserialize(instantiationService: IInstantiationService, raw: string): EditorInput | undefined {
 		try {
 			const data = JSON.parse(raw) as { graphType?: unknown };
-			return PreBaseGraphEditorInput.create(isNetworkGraphType(data.graphType) ? data.graphType : 'network');
+			return PreBaseGraphEditorInput.create(isSupportedGraphType(data.graphType) ? data.graphType : 'network');
 		} catch {
 			return undefined;
 		}
 	}
 }
-
-import { IWorkbenchGitHistoryService, WorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
-import { IPreBaseTemporalGraphService, WorkbenchTemporalGraphService } from './workbenchTemporalGraphService.js';
 
 function registerGraphSingletons(): void {
 	registerSingleton(IWorkbenchGitHistoryService, WorkbenchGitHistoryService, InstantiationType.Delayed);
@@ -70,6 +79,7 @@ function registerGraphSingletons(): void {
 	registerSingleton(IPreBaseGraphService, PreBaseGraphService, InstantiationType.Delayed);
 	registerSingleton(IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService, InstantiationType.Delayed);
 	registerSingleton(IPreBaseTemporalGraphService, WorkbenchTemporalGraphService, InstantiationType.Eager);
+	registerSingleton(IPreBaseTemporalViewService, WorkbenchTemporalViewService, InstantiationType.Eager);
 }
 
 function registerGraphOutputChannel(): void {
@@ -162,6 +172,13 @@ function registerGraphActions(): void {
 			super({ id: PreBaseGraphCommandIds.openNetwork, title: localize2('prebase.graph.openNetwork', "Open Code Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
 		}
 		run(accessor: ServicesAccessor) { return openGraphEditor(accessor); }
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: PreBaseGraphCommandIds.openTemporal, title: localize2('prebase.graph.openTemporal', "Open Temporal Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		run(accessor: ServicesAccessor) { return openTemporalGraphEditor(accessor); }
 	});
 
 	registerAction2(class extends Action2 {

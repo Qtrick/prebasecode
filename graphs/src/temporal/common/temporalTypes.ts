@@ -85,6 +85,7 @@ export interface TemporalEntity {
 	readonly entityId: string;
 	readonly canonicalPath: string;
 	readonly kind: TemporalEntityKind;
+	/** First commit at which this PreBase cache observed the entity (cache provenance, not Git historical creation origin). */
 	readonly firstSeenCommit: string;
 	readonly lastSeenCommit: string;
 	readonly isActive: boolean;
@@ -122,6 +123,7 @@ export interface TemporalEdgeRecord {
 	readonly sourceEntityId: string;
 	readonly targetEntityId: string;
 	readonly kind: TemporalEdgeKind;
+	/** First commit at which this PreBase cache observed the edge (cache provenance, not Git historical creation origin). */
 	readonly firstSeenCommit: string;
 	readonly lastSeenCommit: string;
 	readonly isActive: boolean;
