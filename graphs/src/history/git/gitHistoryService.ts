@@ -10,6 +10,8 @@ import {
 	type GitExactDiffResult,
 	type GitHeadChangeEvent,
 	type GitLogOptions,
+	type GitRemoteRefUpdate,
+	type GitRemoteSyncResult,
 	type GitRepositoryIdentity,
 	type GitTagInfo,
 	type GitTreeEntry,
@@ -18,7 +20,20 @@ import {
 } from './gitTypes.js';
 
 export { GitHistoryError };
-export type { GitHeadChangeEvent, GitBranchInfo, GitCommitMetadata, GitExactDiffResult, GitLogOptions, GitRepositoryIdentity, GitTagInfo, GitTreeEntry, GitTreeInventory, GitTreeListOptions };
+export type {
+	GitBranchInfo,
+	GitCommitMetadata,
+	GitExactDiffResult,
+	GitHeadChangeEvent,
+	GitLogOptions,
+	GitRemoteRefUpdate,
+	GitRemoteSyncResult,
+	GitRepositoryIdentity,
+	GitTagInfo,
+	GitTreeEntry,
+	GitTreeInventory,
+	GitTreeListOptions,
+};
 
 export type EventLike<T> = (listener: (e: T) => void) => { dispose(): void };
 
@@ -39,4 +54,5 @@ export interface IGitHistoryService {
 	diffCommitToParent(rootPath: string, commitRef: string, parentIndex?: number, token?: CancellationTokenLike): Promise<GitExactDiffResult>;
 	diffReviewRange(rootPath: string, baseRef: string, headRef: string, token?: CancellationTokenLike): Promise<GitExactDiffResult>;
 	getEmptyTree(rootPath: string, token?: CancellationTokenLike): Promise<string>;
+	fetchRemoteRefs?(rootPath: string, remoteName?: string, token?: CancellationTokenLike): Promise<GitRemoteSyncResult>;
 }

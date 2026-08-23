@@ -1,10 +1,6 @@
-/*---------------------------------------------------------------------------------------------
- *  Copyright (c) Microsoft Corporation. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
- *--------------------------------------------------------------------------------------------*/
-
 import * as path from 'path';
 import * as vscode from 'vscode';
+import { ProjectSafetyService } from './projectSafetyService';
 
 const SECRET_BASENAMES = new Set([
 	'.env',
@@ -180,20 +176,24 @@ export class MagnusWorkspaceTools {
 		if (token.isCancellationRequested) {
 			return { ok: false, output: 'Cancelled' };
 		}
-		if (!vscode.workspace.isTrusted) {
-			return { ok: false, output: 'Workspace Trust is required before Agents can edit files.' };
-		}
-		if (typeof newContent !== 'string' || newContent.length > 1_000_000) {
-			return { ok: false, output: 'Edit content must be text no larger than 1 MB.' };
-		}
 		const uri = resolveWorkspaceUri(relativePath);
 		if (!uri || !isUnderWorkspace(uri)) {
 			return { ok: false, output: 'Path is outside the workspace.' };
 		}
-		if (isSecretPath(uri)) {
+		if (isSecretPath(uri) || ProjectSafetyService.instance.isSensitivePath(uri)) {
 			return { ok: false, output: 'Refusing to edit secret/credential files.' };
 		}
-
+		if (typeof newContent !== 'string' || newContent.length > 1_000_000) {
+			return { ok: false, output: 'Edit content must be text no larger than 1 MB.' };
+		}
+		const perm = await ProjectSafetyService.instance.checkPermission({
+			category: 'write',
+			targetPath: uri,
+			description: `Write ${vscode.workspace.asRelativePath(uri)}`,
+		});
+		if (!perm.allowed) {
+			return { ok: false, output: perm.reason || 'File edit denied by Project Safety.' };
+		}
 		if (this.requireEditApproval) {
 			const choice = await vscode.window.showWarningMessage(
 				`Agents wants to write ${vscode.workspace.asRelativePath(uri)}. Allow?`,

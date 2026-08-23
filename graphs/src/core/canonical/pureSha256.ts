@@ -3,8 +3,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 /**
- * Pure TypeScript SHA-256 implementation conforming to FIPS 180-4.
- * Zero external dependencies. Operates identically across Browser, Node, and Web Workers.
+ * Pure TypeScript SHA-256 and HMAC-SHA256 implementation conforming to FIPS 180-4 / RFC 2104.
+ * Zero external dependencies. Operates identically across Browser, Node, Electron, and Web Workers.
  */
 
 const K = new Uint32Array([
@@ -49,8 +49,7 @@ function encodeUtf8(str: string): Uint8Array {
 	return new Uint8Array(utf8);
 }
 
-export function computePureSha256(input: string): string {
-	const bytes = encodeUtf8(input);
+export function computePureSha256Raw(bytes: Uint8Array): Uint8Array {
 	const bitLength = bytes.length * 8;
 
 	// Length with padding: 1 byte (0x80) + k zero bytes + 8 bytes length = multiple of 64 bytes
@@ -60,7 +59,7 @@ export function computePureSha256(input: string): string {
 	buffer[bytes.length] = 0x80;
 
 	// Append original length in bits (big-endian 64-bit uint)
-	const view = new DataView(buffer.buffer);
+	const view = new DataView(buffer.buffer, buffer.byteOffset, buffer.byteLength);
 	const highBits = Math.floor(bitLength / 0x100000000);
 	const lowBits = bitLength >>> 0;
 	view.setUint32(paddedLength - 8, highBits, false);
@@ -124,6 +123,78 @@ export function computePureSha256(input: string): string {
 		h7 = (h7 + h) | 0;
 	}
 
-	const hexParts = [h0, h1, h2, h3, h4, h5, h6, h7].map(n => (n >>> 0).toString(16).padStart(8, '0'));
-	return hexParts.join('');
+	const result = new Uint8Array(32);
+	const resView = new DataView(result.buffer, result.byteOffset, result.byteLength);
+	resView.setUint32(0, h0, false);
+	resView.setUint32(4, h1, false);
+	resView.setUint32(8, h2, false);
+	resView.setUint32(12, h3, false);
+	resView.setUint32(16, h4, false);
+	resView.setUint32(20, h5, false);
+	resView.setUint32(24, h6, false);
+	resView.setUint32(28, h7, false);
+	return result;
+}
+
+export function computePureSha256(input: string): string {
+	const raw = computePureSha256Raw(encodeUtf8(input));
+	let hex = '';
+	for (let i = 0; i < raw.length; i++) {
+		hex += raw[i].toString(16).padStart(2, '0');
+	}
+	return hex;
+}
+
+export function computePureHmacSha256(key: string, message: string): string {
+	let keyBytes = encodeUtf8(key);
+	const blockSize = 64;
+
+	if (keyBytes.length > blockSize) {
+		keyBytes = computePureSha256Raw(keyBytes);
+	}
+
+	const paddedKey = new Uint8Array(blockSize);
+	paddedKey.set(keyBytes);
+
+	const oKeyPad = new Uint8Array(blockSize);
+	const iKeyPad = new Uint8Array(blockSize);
+
+	for (let i = 0; i < blockSize; i++) {
+		oKeyPad[i] = paddedKey[i] ^ 0x5c;
+		iKeyPad[i] = paddedKey[i] ^ 0x36;
+	}
+
+	const msgBytes = encodeUtf8(message);
+	const innerMsg = new Uint8Array(blockSize + msgBytes.length);
+	innerMsg.set(iKeyPad, 0);
+	innerMsg.set(msgBytes, blockSize);
+	const innerHash = computePureSha256Raw(innerMsg);
+
+	const outerMsg = new Uint8Array(blockSize + innerHash.length);
+	outerMsg.set(oKeyPad, 0);
+	outerMsg.set(innerHash, blockSize);
+	const outerHash = computePureSha256Raw(outerMsg);
+
+	let hex = '';
+	for (let i = 0; i < outerHash.length; i++) {
+		hex += outerHash[i].toString(16).padStart(2, '0');
+	}
+	return hex;
+}
+
+export function timingSafeEqualStrings(a: string, b: string): boolean {
+	if (typeof a !== 'string' || typeof b !== 'string') {
+		return false;
+	}
+	const aBytes = encodeUtf8(a);
+	const bBytes = encodeUtf8(b);
+
+	let mismatch = aBytes.length === bBytes.length ? 0 : 1;
+	const len = Math.min(aBytes.length, bBytes.length);
+
+	for (let i = 0; i < len; i++) {
+		mismatch |= (aBytes[i] ^ bBytes[i]);
+	}
+
+	return mismatch === 0 && aBytes.length === bBytes.length;
 }

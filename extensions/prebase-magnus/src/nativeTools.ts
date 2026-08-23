@@ -6,6 +6,7 @@ import * as vscode from 'vscode';
 import { isSecretPath, isUnderWorkspace, MagnusWorkspaceTools, resolveWorkspaceUri } from './tools';
 import { WorkspaceIntelligence, type WorkspacePosition } from './workspaceIntelligence';
 import { MagnusToolActivityDescriptor } from './toolActivity';
+import { ProjectSafetyService } from './projectSafetyService';
 
 function result(value: string): vscode.LanguageModelToolResult {
 	return new vscode.LanguageModelToolResult([new vscode.LanguageModelTextPart(value.slice(0, 80_000))]);
@@ -195,8 +196,12 @@ class WorkspaceApplyEditsTool implements vscode.LanguageModelTool<{ files: Versi
 		return { invocationMessage: `Applying edits to ${options.input.files?.length ?? 0} file(s)`, confirmationMessages: { title: 'Allow Agents to apply these workspace edits?', message: 'Agents will apply the reviewed, version-checked text edits as one workspace operation.' } };
 	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ files: VersionedFileEdits[]; label?: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		if (!vscode.workspace.isTrusted) {
-			throw new Error('Workspace Trust is required before Agents can edit files.');
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', description: 'Apply workspace edits' });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'Workspace edit denied by Project Safety.');
 		}
 		if (!Array.isArray(options.input.files) || options.input.files.length === 0 || options.input.files.length > 50) {
 			throw new Error('Provide between 1 and 50 version-checked files.');
@@ -245,8 +250,12 @@ class WorkspaceCreateFileTool implements vscode.LanguageModelTool<{ path: string
 		return { invocationMessage: `Creating ${options.input.path}`, confirmationMessages: { title: 'Allow Agents to create this file?', message: `Agents will create \`${options.input.path}\` without overwriting an existing file.` } };
 	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string; content: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		if (!vscode.workspace.isTrusted || token.isCancellationRequested || typeof options.input.content !== 'string' || options.input.content.length > 1_000_000) {
-			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Workspace Trust and content no larger than 1 MB are required.');
+		if (token.isCancellationRequested || typeof options.input.content !== 'string' || options.input.content.length > 1_000_000) {
+			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Content no larger than 1 MB is required.');
+		}
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', targetPath: options.input.path, description: 'Create file' });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'File creation denied by Project Safety.');
 		}
 		const uri = checkedWorkspaceUri(options.input.path);
 		const edit = new vscode.WorkspaceEdit();
@@ -263,8 +272,12 @@ class WorkspaceRenameFileTool implements vscode.LanguageModelTool<{ from: string
 		return { invocationMessage: `Renaming ${options.input.from}`, confirmationMessages: { title: 'Allow Agents to rename this file?', message: `Agents will rename \`${options.input.from}\` to \`${options.input.to}\` without overwriting a destination.` } };
 	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ from: string; to: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		if (!vscode.workspace.isTrusted || token.isCancellationRequested) {
-			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Workspace Trust is required before Agents can rename files.');
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', targetPath: options.input.from, description: 'Rename file' });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'File rename denied by Project Safety.');
 		}
 		const source = checkedWorkspaceUri(options.input.from);
 		const destination = checkedWorkspaceUri(options.input.to);
@@ -282,8 +295,12 @@ class WorkspaceDeleteFileTool implements vscode.LanguageModelTool<{ path: string
 		return { invocationMessage: `Deleting ${options.input.path}`, confirmationMessages: { title: 'Allow Agents to delete this file?', message: `Agents will permanently delete \`${options.input.path}\`. Review this destructive change carefully.` } };
 	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		if (!vscode.workspace.isTrusted || token.isCancellationRequested) {
-			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Workspace Trust is required before Agents can delete files.');
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', targetPath: options.input.path, description: 'Delete file' });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'File deletion denied by Project Safety.');
 		}
 		const uri = checkedWorkspaceUri(options.input.path);
 		const edit = new vscode.WorkspaceEdit();
@@ -307,8 +324,9 @@ class WorkspaceEditTool implements vscode.LanguageModelTool<{ path: string; cont
 		};
 	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string; content: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		if (!vscode.workspace.isTrusted) {
-			throw new Error('Workspace Trust is required before Agents can edit files.');
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', targetPath: options.input.path, description: 'Edit file' });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'File edit denied by Project Safety.');
 		}
 		const response = await this.workspace.applyEdit(options.input.path, options.input.content, token);
 		if (!response.ok) {
@@ -396,8 +414,9 @@ class RuntimeServerTool implements vscode.LanguageModelTool<{ action: 'start' | 
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-		if (!vscode.workspace.isTrusted) {
-			throw new Error('Workspace Trust is required before Agents can control Runtime Preview.');
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'runtime', description: 'Control Runtime Preview server' });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'Runtime Preview server control denied by Project Safety.');
 		}
 		const action = options.input.action;
 		if (action !== 'start' && action !== 'stop' && action !== 'restart') {
@@ -522,8 +541,12 @@ class InstallDependenciesTool implements vscode.LanguageModelTool<{ operation: '
 		};
 	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ operation: 'install' | 'update' }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		if (!vscode.workspace.isTrusted || token.isCancellationRequested) {
-			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Workspace Trust is required before Agents can change dependencies.');
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'terminal', command: `${options.input.operation} dependencies`, description: 'Modify dependencies' });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'Dependency modification denied by Project Safety.');
 		}
 		if (options.input.operation !== 'install' && options.input.operation !== 'update') {
 			throw new Error('Unsupported dependency operation.');
@@ -562,8 +585,12 @@ class DeclaredNodeVersionTool implements vscode.LanguageModelTool<{ action: 'use
 		};
 	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ action: 'use' | 'install'; version: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		if (!vscode.workspace.isTrusted || token.isCancellationRequested) {
-			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Workspace Trust is required before Agents can manage Node versions.');
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'terminal', command: `nvm ${options.input.action} ${options.input.version}`, description: 'Manage Node version' });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'Node version management denied by Project Safety.');
 		}
 		if ((options.input.action !== 'use' && options.input.action !== 'install') || typeof options.input.version !== 'string' || options.input.version.length > 40 || !/^(?:v?\d+(?:\.\d+){0,2}|lts\/[A-Za-z0-9*_-]+)$/.test(options.input.version)) {
 			throw new Error('Use a declared numeric or lts Node version only.');
@@ -601,12 +628,13 @@ class ProjectScriptTool implements vscode.LanguageModelTool<{ script: string }> 
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-		if (!vscode.workspace.isTrusted) {
-			throw new Error('Workspace Trust is required before Agents can run project scripts.');
-		}
 		const script = typeof options.input.script === 'string' ? options.input.script.trim() : undefined;
 		if (!script || !SAFE_SCRIPT_NAME.test(script)) {
 			throw new Error('Only declared validation, test, build, or check scripts are allowed.');
+		}
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'terminal', command: `npm run ${script}`, description: `Run script ${script}` });
+		if (!perm.allowed) {
+			throw new Error(perm.reason || 'Project script execution denied by Project Safety.');
 		}
 		const folder = await workspaceFolderForTerminal();
 		const raw = Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.joinPath(folder.uri, 'package.json'))).toString('utf8');

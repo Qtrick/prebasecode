@@ -120,7 +120,7 @@ export class NodeGitHistoryService implements IGitHistoryService {
 				}, 50);
 			}
 
-			child.stdout.on('data', (chunk: Buffer) => {
+			child.stdout?.on('data', (chunk: Buffer) => {
 				totalStdoutBytes += chunk.length;
 				if (totalStdoutBytes > maxBuffer) {
 					if (!isResolved) {
@@ -134,7 +134,7 @@ export class NodeGitHistoryService implements IGitHistoryService {
 				stdoutChunks.push(chunk);
 			});
 
-			child.stderr.on('data', (chunk: Buffer) => {
+			child.stderr?.on('data', (chunk: Buffer) => {
 				totalStderrBytes += chunk.length;
 				if (totalStderrBytes > 5 * 1024 * 1024) {
 					return; // Bound stderr accumulation

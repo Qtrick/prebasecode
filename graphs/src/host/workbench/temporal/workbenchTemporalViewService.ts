@@ -89,7 +89,6 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private _loadedCommitCount: number = 0;
 	private _historyHasMore: boolean = false;
 	private _historyNextCursor?: string;
-	private _isLoadingMoreHistory: boolean = false;
 	private _isSettled: boolean = false;
 	private _isPartialLineage: boolean = false;
 	private _currentDiff?: TemporalStructuralDiff;
@@ -971,8 +970,15 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		if (this._activeRepositoryId && e.repositoryId && e.repositoryId !== this._activeRepositoryId) {
 			return;
 		}
-		if (e.currentHead && e.currentHead !== this._selectedCommitSha) {
-			await this.selectRef(this._selectedRef);
+		if (this._followHead) {
+			if (e.currentHead && e.currentHead !== this._selectedCommitSha) {
+				await this.selectRef(this._selectedRef);
+			}
+		} else {
+			// When followHead is disabled, refresh timeline metadata so new commits appear in the history list,
+			// while retaining the current historical commit selection without view jumps.
+			const currentSelectedSha = this._selectedCommitSha;
+			await this.selectRef(this._selectedRef, currentSelectedSha);
 		}
 	}
 

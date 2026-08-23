@@ -24,6 +24,8 @@ import { computeLanguageStats } from '../../core/analysis/languageStats.js';
 import type { GraphNode } from '../../common/types/graphTypes.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
+import { IPreBaseTemporalViewService } from '../../temporal/view/temporalViewTypes.js';
+import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 
 type GraphFilterId = 'all' | 'files' | 'components' | 'dependencies';
 type ExplorerViewMode = 'flat' | 'tree';
@@ -67,6 +69,9 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _filterSection: HTMLElement | undefined;
 	private _networkSection: HTMLElement | undefined;
 	private _displaySection: HTMLElement | undefined;
+	private _historySection: HTMLElement | undefined;
+	private _historyBody: HTMLElement | undefined;
+	private _historyList: HTMLElement | undefined;
 	private _explorerList: HTMLElement | undefined;
 	private _diag: HTMLElement | undefined;
 
@@ -84,8 +89,10 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private readonly _explorerModeButtons = new Map<ExplorerViewMode, HTMLButtonElement>();
 	private readonly _expandedDirs = new Set<string>(['src']);
 	private readonly _explorerDisposables = this._register(new DisposableStore());
+	private readonly _historyDisposables = this._register(new DisposableStore());
 
 	private _searchQuery = '';
+	private _historyExpanded = true;
 
 	constructor(
 		options: IViewletViewOptions,
@@ -99,6 +106,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		@IThemeService themeService: IThemeService,
 		@IHoverService hoverService: IHoverService,
 		@IPreBaseGraphService private readonly graphService: IPreBaseGraphService,
+		@IPreBaseTemporalViewService private readonly temporalViewService: IPreBaseTemporalViewService,
 		@ICommandService private readonly commandService: ICommandService,
 		@IEditorService private readonly editorService: IEditorService,
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
@@ -107,6 +115,9 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._register(this.graphService.onDidChangeDiagnostics(() => this._refresh()));
 		this._register(this.graphService.onDidChangeViewState(() => this._refresh()));
 		this._register(this.graphService.onDidChangeSnapshot(() => this._refresh()));
+		this._register(this.temporalViewService.onDidChangeState(() => this._refreshHistory()));
+		this._register(this.temporalViewService.onDidChangeTimeline(() => this._refreshHistory()));
+		this._register(this.editorService.onDidActiveEditorChange(() => this._refresh()));
 		this._register(this.workspaceContextService.onDidChangeWorkbenchState(() => this._refresh()));
 		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => this._refresh()));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
@@ -139,6 +150,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._renderFilter();
 		this._renderNetwork();
 		this._renderDisplay();
+		this._renderHistory();
 		this._renderExplorer();
 		this._renderActions();
 		this._renderDiagnostics();
@@ -348,6 +360,205 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}));
 	}
 
+	private _renderHistory(): void {
+		this._historySection = DOM.append(this._scroll!, DOM.$('div'));
+		this._historySection.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
+		this._historySection.style.paddingTop = '8px';
+
+		const header = DOM.append(this._historySection, DOM.$('button')) as HTMLButtonElement;
+		header.type = 'button';
+		header.textContent = this._historyExpanded
+			? localize('prebase.maps.historyOpen', "▾ History")
+			: localize('prebase.maps.historyClosed', "▸ History");
+		header.style.all = 'unset';
+		header.style.fontSize = '10px';
+		header.style.fontWeight = '600';
+		header.style.letterSpacing = '0.06em';
+		header.style.textTransform = 'uppercase';
+		header.style.color = MUTED;
+		header.style.cursor = 'pointer';
+		header.style.marginBottom = '6px';
+		header.style.display = 'block';
+
+		this._historyBody = DOM.append(this._historySection, DOM.$('div'));
+		this._historyBody.style.display = this._historyExpanded ? 'block' : 'none';
+		this._historyBody.style.width = 'calc(100% - 8px)';
+		this._historyBody.style.marginInline = '4px';
+		this._historyBody.style.boxSizing = 'border-box';
+		this._historyBody.style.maxHeight = '280px';
+		this._historyBody.style.overflowY = 'auto';
+		this._historyBody.style.border = `1px solid color-mix(in srgb, ${BORDER} 40%, transparent)`;
+		this._historyBody.style.borderRadius = '6px';
+		this._historyBody.style.background = SURFACE_OVERLAY;
+		this._historyBody.style.padding = '4px';
+
+		this._historyList = DOM.append(this._historyBody, DOM.$('div'));
+		this._historyList.setAttribute('role', 'listbox');
+		this._historyList.setAttribute('aria-label', localize('prebase.maps.historyListAria', "Commit History"));
+
+		this._register(DOM.addDisposableListener(header, 'click', () => {
+			this._historyExpanded = !this._historyExpanded;
+			if (this._historyBody) {
+				this._historyBody.style.display = this._historyExpanded ? 'block' : 'none';
+			}
+			header.textContent = this._historyExpanded
+				? localize('prebase.maps.historyOpen', "▾ History")
+				: localize('prebase.maps.historyClosed', "▸ History");
+		}));
+	}
+
+	private _refreshHistory(): void {
+		if (!this._historyList) {
+			return;
+		}
+		this._historyDisposables.clear();
+		DOM.clearNode(this._historyList);
+
+		const state = this.temporalViewService.getState();
+		const timeline = state.pagedTimeline || [];
+		if (timeline.length === 0) {
+			const empty = DOM.append(this._historyList, DOM.$('div'));
+			empty.textContent = localize('prebase.maps.historyEmpty', "No commit history loaded.");
+			empty.style.fontSize = '11px';
+			empty.style.color = MUTED;
+			empty.style.padding = '8px';
+			return;
+		}
+
+		const selectedSha = state.selectedCommitSha;
+		const windowStart = state.timelineWindow ? state.timelineWindow.start : 0;
+
+		for (let i = 0; i < timeline.length; i++) {
+			const commit = timeline[i];
+			const globalIndex = windowStart + i;
+			const isSelected = commit.sha === selectedSha;
+
+			const row = DOM.append(this._historyList, DOM.$('div'));
+			row.tabIndex = 0;
+			row.setAttribute('role', 'option');
+			row.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+			row.style.display = 'flex';
+			row.style.flexDirection = 'column';
+			row.style.gap = '2px';
+			row.style.padding = '4px 6px';
+			row.style.marginBottom = '2px';
+			row.style.borderRadius = '4px';
+			row.style.cursor = 'pointer';
+			row.style.boxSizing = 'border-box';
+			row.style.width = '100%';
+			row.style.background = isSelected ? ACCENT_SOFT : 'transparent';
+			row.style.border = isSelected ? `1px solid ${ACCENT}88` : '1px solid transparent';
+			row.style.outline = 'none';
+
+			// Line 1: short SHA + message + isMerge badge
+			const line1 = DOM.append(row, DOM.$('div'));
+			line1.style.display = 'flex';
+			line1.style.alignItems = 'center';
+			line1.style.gap = '6px';
+			line1.style.overflow = 'hidden';
+
+			const shaBadge = DOM.append(line1, DOM.$('span'));
+			shaBadge.textContent = commit.shortSha || commit.sha.slice(0, 7);
+			shaBadge.style.fontFamily = 'monospace';
+			shaBadge.style.fontSize = '10px';
+			shaBadge.style.fontWeight = '600';
+			shaBadge.style.color = isSelected ? ACCENT : 'var(--vscode-textLink-foreground, #58a6ff)';
+			shaBadge.style.flexShrink = '0';
+
+			if (commit.isMerge) {
+				const mergeBadge = DOM.append(line1, DOM.$('span'));
+				mergeBadge.textContent = 'M';
+				mergeBadge.title = localize('prebase.maps.mergeCommit', "Merge Commit");
+				mergeBadge.style.fontSize = '9px';
+				mergeBadge.style.fontWeight = '700';
+				mergeBadge.style.padding = '0 3px';
+				mergeBadge.style.borderRadius = '2px';
+				mergeBadge.style.background = 'rgba(163, 113, 247, 0.25)';
+				mergeBadge.style.color = '#a371f7';
+				mergeBadge.style.flexShrink = '0';
+			}
+
+			const msgSpan = DOM.append(line1, DOM.$('span'));
+			msgSpan.textContent = commit.message || '(no message)';
+			msgSpan.style.fontSize = '11px';
+			msgSpan.style.color = TEXT;
+			msgSpan.style.overflow = 'hidden';
+			msgSpan.style.textOverflow = 'ellipsis';
+			msgSpan.style.whiteSpace = 'nowrap';
+			msgSpan.style.flex = '1';
+
+			// Line 2: timestamp + author
+			const line2 = DOM.append(row, DOM.$('div'));
+			line2.style.display = 'flex';
+			line2.style.alignItems = 'center';
+			line2.style.justifyContent = 'space-between';
+			line2.style.fontSize = '9.5px';
+			line2.style.color = MUTED;
+
+			const dateSpan = DOM.append(line2, DOM.$('span'));
+			dateSpan.textContent = commit.timestamp ? new Date(commit.timestamp).toLocaleString() : '';
+
+			const authorSpan = DOM.append(line2, DOM.$('span'));
+			authorSpan.textContent = commit.author || '';
+			authorSpan.style.overflow = 'hidden';
+			authorSpan.style.textOverflow = 'ellipsis';
+			authorSpan.style.whiteSpace = 'nowrap';
+			authorSpan.style.maxWidth = '100px';
+
+			const onSelect = () => {
+				void this.temporalViewService.selectCommitIndex(globalIndex, { immediate: true });
+				const activeType = this._getActiveGraphType();
+				if (activeType !== 'temporal') {
+					void this.commandService.executeCommand('prebase.graph.openTemporal');
+				}
+			};
+
+			this._historyDisposables.add(DOM.addDisposableListener(row, 'click', (e) => {
+				e.stopPropagation();
+				onSelect();
+			}));
+
+			this._historyDisposables.add(DOM.addDisposableListener(row, 'keydown', (e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					e.stopPropagation();
+					onSelect();
+				}
+			}));
+		}
+
+		if (state.historyHasMore) {
+			const loadMoreBtn = DOM.append(this._historyList, DOM.$('button')) as HTMLButtonElement;
+			loadMoreBtn.type = 'button';
+			loadMoreBtn.textContent = state.isLoadingMoreHistory
+				? localize('prebase.maps.historyLoading', "Loading older commits…")
+				: localize('prebase.maps.historyLoadMore', "Load older commits…");
+			loadMoreBtn.disabled = !!state.isLoadingMoreHistory;
+			loadMoreBtn.style.display = 'block';
+			loadMoreBtn.style.width = '100%';
+			loadMoreBtn.style.padding = '6px';
+			loadMoreBtn.style.marginTop = '4px';
+			loadMoreBtn.style.fontSize = '10.5px';
+			loadMoreBtn.style.borderRadius = '4px';
+			loadMoreBtn.style.border = `1px solid ${BORDER}`;
+			loadMoreBtn.style.background = SURFACE;
+			loadMoreBtn.style.color = TEXT;
+			loadMoreBtn.style.cursor = state.isLoadingMoreHistory ? 'not-allowed' : 'pointer';
+
+			this._historyDisposables.add(DOM.addDisposableListener(loadMoreBtn, 'click', () => {
+				void this.temporalViewService.loadMoreHistory();
+			}));
+		}
+	}
+
+	private _getActiveGraphType(): 'network' | 'temporal' {
+		const activeEditor = this.editorService.activeEditor;
+		if (activeEditor instanceof PreBaseGraphEditorInput) {
+			return activeEditor.graphType;
+		}
+		return this.graphService.getViewState().graphType === 'temporal' ? 'temporal' : 'network';
+	}
+
 	private _renderExplorer(): void {
 		const section = DOM.append(this._scroll!, DOM.$('div'));
 		section.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
@@ -425,7 +636,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 	private _refresh(): void {
 		const diag = this.graphService.getDiagnostics();
-		const isTemporal = this.graphService.getViewState().graphType === 'temporal';
+		const activeGraphType = this._getActiveGraphType();
+		const isTemporal = activeGraphType === 'temporal';
 		const isNetwork = !isTemporal;
 		const isOverview = false;
 		const hasProject = this._hasOpenProject();
@@ -480,6 +692,9 @@ export class PreBaseMapsViewPane extends ViewPane {
 		if (this._displaySection) {
 			this._displaySection.style.display = hasProject ? 'block' : 'none';
 		}
+		if (this._historySection) {
+			this._historySection.style.display = hasProject ? 'block' : 'none';
+		}
 
 		if (this._idleRotateCheckbox) {
 			this._idleRotateCheckbox.checked = !!this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate);
@@ -502,6 +717,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}
 
 		this._refreshExplorerList();
+		this._refreshHistory();
 
 		if (this._diag) {
 			this._diag.textContent = [

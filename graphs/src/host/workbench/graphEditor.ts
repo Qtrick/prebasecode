@@ -31,7 +31,6 @@ import {
 	IPreBaseTemporalViewService,
 	type ITemporalViewState,
 	type TemporalStructuralDiff,
-	type TemporalCommitSummary,
 	type TemporalDisplayMode,
 } from '../../temporal/view/temporalViewTypes.js';
 
@@ -50,6 +49,7 @@ export class PreBaseGraphEditor extends EditorPane {
 	private _inputType: PreBaseGraphType = 'network';
 	private _scanKickoff = false;
 	private _descriptionCts: CancellationTokenSource | undefined;
+	private _webviewGeneration = 0;
 
 	constructor(
 		group: IEditorGroup,
@@ -96,13 +96,16 @@ export class PreBaseGraphEditor extends EditorPane {
 			return;
 		}
 		this._inputType = input.graphType === 'temporal' ? 'temporal' : 'network';
-		void this.graphService.setGraphType(this._inputType);
 		this._ensureWebview();
 		this._pushSnapshot();
 
 		if (this._inputType === 'temporal') {
 			void this.temporalViewService.initialize();
 			this._pushTemporalState(this.temporalViewService.getState());
+			const diff = this.temporalViewService.getState().diff;
+			if (diff) {
+				this._pushTemporalDiff(diff);
+			}
 		} else if (!this.graphService.getSnapshot()) {
 			const status = this.graphService.getDiagnostics().status;
 			if (status !== 'scanning' && !this._scanKickoff) {
@@ -177,6 +180,7 @@ export class PreBaseGraphEditor extends EditorPane {
 			return;
 		}
 		this._webviewDisposables.clear();
+		const generation = ++this._webviewGeneration;
 		const webview = this._webviewDisposables.add(this.webviewService.createWebviewElement({
 			title: localize('prebase.graph.webviewTitle', "PreBase Graph"),
 			options: { retainContextWhenHidden: false },
@@ -186,10 +190,10 @@ export class PreBaseGraphEditor extends EditorPane {
 			},
 			extension: undefined
 		}));
-		webview.mountTo(this._container, this.window);
-		webview.setHtml(this._buildHtml());
-		this._webviewDisposables.add(webview.onMessage(e => this._onMessage(e.message as IBridgeRequest)));
 		this._webview = webview;
+		this._webviewDisposables.add(webview.onMessage(e => this._onMessage(e.message as IBridgeRequest, generation)));
+		webview.mountTo(this._container, this.window);
+		webview.setHtml(this._buildHtml(generation));
 	}
 
 	private _graphSettings() {
@@ -241,15 +245,32 @@ export class PreBaseGraphEditor extends EditorPane {
 		});
 	}
 
-	private async _onMessage(message: IBridgeRequest): Promise<void> {
+	private async _onMessage(message: IBridgeRequest, generation?: number): Promise<void> {
+		if (generation !== undefined && generation !== this._webviewGeneration) {
+			return;
+		}
 		if (!message || !message.type) {
 			return;
 		}
 		const reply = async (payload: unknown) => {
-			this._webview?.postMessage({ type: 'response', requestId: message.requestId, payload });
+			if (generation === undefined || generation === this._webviewGeneration) {
+				this._webview?.postMessage({ type: 'response', requestId: message.requestId, payload });
+			}
 		};
 
 		switch (message.type) {
+			case 'ready': {
+				this._pushSnapshot();
+				if (this._inputType === 'temporal') {
+					this._pushTemporalState(this.temporalViewService.getState());
+					const diff = this.temporalViewService.getState().diff;
+					if (diff) {
+						this._pushTemporalDiff(diff);
+					}
+				}
+				await reply({ ok: true, graphType: this._inputType });
+				break;
+			}
 			case 'getSnapshot':
 				await reply({
 					snapshot: this.graphService.getSnapshot(),
@@ -257,6 +278,7 @@ export class PreBaseGraphEditor extends EditorPane {
 					viewState: this.graphService.getViewState(),
 					selectedNodeId: this.graphService.getSelectedNodeId() ?? null,
 					settings: this._graphSettings(),
+					graphType: this._inputType,
 					temporalState: this.temporalViewService.getState(),
 				});
 				break;
@@ -517,7 +539,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		}
 
 		// Local branches
-		const localBranches = refs.filter(r => r.kind === 'branch' && !r.isRemote);
+		const localBranches = refs.filter(r => r.kind === 'branch');
 		if (localBranches.length > 0) {
 			items.push({ type: 'separator', label: 'Local Branches' } as any);
 			for (const b of localBranches) {
@@ -531,7 +553,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		}
 
 		// Remote branches
-		const remoteBranches = refs.filter(r => r.kind === 'branch' && r.isRemote);
+		const remoteBranches = refs.filter(r => r.kind === 'remote-branch');
 		if (remoteBranches.length > 0) {
 			items.push({ type: 'separator', label: 'Remote Branches' } as any);
 			for (const b of remoteBranches) {
@@ -617,8 +639,9 @@ export class PreBaseGraphEditor extends EditorPane {
 		}
 	}
 
-	private _buildHtml(): string {
+	private _buildHtml(generation: number): string {
 		const nonce = generateUuid();
+		const initialGraphType = this._inputType;
 		return `<!DOCTYPE html>
 <html>
 <head>
@@ -812,6 +835,10 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 <div id="status">Scanning…</div>
 <script nonce="${nonce}">
 const vscode = acquireVsCodeApi();
+const currentGeneration = Number('${generation}') || 0;
+let initialGraphType = '${initialGraphType}' === 'temporal' ? 'temporal' : 'network';
+let graphType = initialGraphType;
+
 const archSvg = document.getElementById('archSvg');
 const netCanvas = document.getElementById('netCanvas');
 const ctx = netCanvas.getContext('2d', { alpha: true });
@@ -887,7 +914,6 @@ let snapshot = null;
 let diagnostics = null;
 let selectedNodeId = null;
 let settings = { showLegend:true, reduceMotion:false, networkIdleAutoRotate:false, networkDragDirection:'natural', maxRenderedEdges:420, maxRenderedNodes:280, quality:'auto' };
-let graphType = 'network';
 let dragging = false, panning = false, rotating = false;
 let lastX = 0, lastY = 0, moved = false;
 let activePointerId = null, activePointerHost = null;
@@ -915,11 +941,20 @@ let isPlayingHistory = false;
 let playIntervalTimer = null;
 let displayMode = 'changes';
 
-function request(type, payload) {
+function request(type, payload, timeoutMs = 5000) {
 	const requestId = Math.random().toString(36).slice(2);
-	return new Promise(function (resolve) {
-		pending.set(requestId, resolve);
-		vscode.postMessage({ requestId: requestId, type: type, payload: payload });
+	return new Promise(function (resolve, reject) {
+		const timer = setTimeout(function () {
+			if (pending.has(requestId)) {
+				pending.delete(requestId);
+				reject(new Error('Request timed out: ' + type));
+			}
+		}, timeoutMs);
+		pending.set(requestId, function (val) {
+			clearTimeout(timer);
+			resolve(val);
+		});
+		vscode.postMessage({ requestId: requestId, type: type, payload: payload, generation: currentGeneration });
 	});
 }
 
@@ -1073,15 +1108,15 @@ function screenPos(id) {
 
 function getVisualNodePosition(node, ease) {
 	if (!node) return { x: 0, y: 0 };
-	if (!isAnimatingTemporal) return { x: node.x, y: node.y };
+	if (!isAnimatingTemporal) return { x: node.x || 0, y: node.y || 0 };
 	const prev = previousTemporalRenderNodes.get(node.entityId);
 	if (prev) {
 		return {
-			x: prev.x + (node.x - prev.x) * ease,
-			y: prev.y + (node.y - prev.y) * ease
+			x: prev.x + ((node.x || 0) - prev.x) * ease,
+			y: prev.y + ((node.y || 0) - prev.y) * ease
 		};
 	}
-	return { x: node.x, y: node.y };
+	return { x: node.x || 0, y: node.y || 0 };
 }
 
 function fitView() {
@@ -1091,8 +1126,8 @@ function fitView() {
 		for (let i = 0; i < temporalDiff.nodes.length; i++) {
 			const n = temporalDiff.nodes[i];
 			if (displayMode === 'state' && n.changeKind === 'removed') continue;
-			minX = Math.min(minX, n.x - 20); minY = Math.min(minY, n.y - 20);
-			maxX = Math.max(maxX, n.x + 20); maxY = Math.max(maxY, n.y + 20);
+			minX = Math.min(minX, (n.x || 0) - 20); minY = Math.min(minY, (n.y || 0) - 20);
+			maxX = Math.max(maxX, (n.x || 0) + 20); maxY = Math.max(maxY, (n.y || 0) + 20);
 		}
 		if (!isFinite(minX)) return;
 		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
@@ -1483,8 +1518,14 @@ function updateTemporalUI(state, diff) {
 function updateTemporalDiffTransition(diff) {
 	if (!diff) return;
 	const nextPrevMap = new Map();
+	const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const isReduced = settings.reduceMotion || prefersReduced;
+	const currentEase = (isAnimatingTemporal && animDuration > 0 && !isReduced)
+		? 1 - Math.pow(1 - Math.min(1, (performance.now() - animStartTime) / animDuration), 3)
+		: 1;
+
 	currentTemporalRenderNodes.forEach(function (n) {
-		nextPrevMap.set(n.entityId, { x: n.x || 0, y: n.y || 0 });
+		nextPrevMap.set(n.entityId, getVisualNodePosition(n, currentEase));
 	});
 	previousTemporalRenderNodes = nextPrevMap;
 
@@ -1509,37 +1550,30 @@ function updateTemporalDiffTransition(diff) {
 		});
 	}
 	currentTemporalRenderNodes = nextMap;
+	animDuration = isReduced ? 0 : 220;
 	animStartTime = performance.now();
-	isAnimatingTemporal = true;
+	isAnimatingTemporal = !isReduced;
 	dirty = true;
 	kickRaf();
 }
 
-function getVisualNodePosition(node, ease) {
-	const prev = previousTemporalRenderNodes.get(node.entityId);
-	if (!prev) {
-		return { x: node.x, y: node.y };
-	}
-	return {
-		x: prev.x + (node.x - prev.x) * ease,
-		y: prev.y + (node.y - prev.y) * ease,
-	};
-}
-
 function drawTemporalFrame(ts) {
-	if (!netCanvas || !netCtx) return;
-	const w = netCanvas.width = netCanvas.clientWidth || 800;
-	const h = netCanvas.height = netCanvas.clientHeight || 600;
-	const ctx = netCtx;
+	if (!netCanvas || !ctx) return;
+	const w = netCanvas.clientWidth || 800;
+	const h = netCanvas.clientHeight || 600;
+	const theme = getComputedThemeColors();
 
 	ctx.clearRect(0, 0, w, h);
 	ctx.save();
 	ctx.translate(w / 2 + transform.x, h / 2 + transform.y);
 	ctx.scale(transform.k, transform.k);
 
+	const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+	const isReduced = settings.reduceMotion || prefersReduced;
+
 	const elapsed = ts - animStartTime;
-	const progress = animDuration > 0 ? Math.min(1, elapsed / animDuration) : 1;
-	const ease = 1 - Math.pow(1 - progress, 3);
+	const progress = (animDuration > 0 && !isReduced) ? Math.min(1, elapsed / animDuration) : 1;
+	const ease = isReduced ? 1 : 1 - Math.pow(1 - progress, 3);
 	if (progress >= 1) {
 		isAnimatingTemporal = false;
 	}
@@ -1550,8 +1584,10 @@ function drawTemporalFrame(ts) {
 	if (temporalDiff && temporalDiff.edges) {
 		for (let i = 0; i < temporalDiff.edges.length; i++) {
 			const edge = temporalDiff.edges[i];
-			const sourceNode = currentTemporalRenderNodes.get(edge.sourceId);
-			const targetNode = currentTemporalRenderNodes.get(edge.targetId);
+			const sourceEntityId = edge.sourceEntityId || edge.sourceId;
+			const targetEntityId = edge.targetEntityId || edge.targetId;
+			const sourceNode = currentTemporalRenderNodes.get(sourceEntityId);
+			const targetNode = currentTemporalRenderNodes.get(targetEntityId);
 			if (!sourceNode || !targetNode) continue;
 			if (displayMode === 'state' && (sourceNode.changeKind === 'removed' || targetNode.changeKind === 'removed' || edge.changeKind === 'removed')) continue;
 
@@ -1563,17 +1599,19 @@ function drawTemporalFrame(ts) {
 			ctx.lineTo(tp.x, tp.y);
 
 			if (edge.changeKind === 'added') {
-				ctx.strokeStyle = 'rgba(63, 185, 80, 0.6)';
+				ctx.strokeStyle = theme.added;
 				ctx.lineWidth = 2;
+				ctx.setLineDash([]);
 			} else if (edge.changeKind === 'removed') {
-				ctx.strokeStyle = 'rgba(248, 81, 73, 0.4)';
+				ctx.strokeStyle = theme.deleted;
 				ctx.lineWidth = 1.5;
 				ctx.setLineDash([4, 4]);
 			} else if (edge.changeKind === 'modified') {
-				ctx.strokeStyle = 'rgba(210, 153, 34, 0.6)';
+				ctx.strokeStyle = theme.modified;
 				ctx.lineWidth = 2;
+				ctx.setLineDash([]);
 			} else {
-				ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
+				ctx.strokeStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(148, 163, 184, 0.25)';
 				ctx.lineWidth = 1;
 				ctx.setLineDash([]);
 			}
@@ -1591,21 +1629,21 @@ function drawTemporalFrame(ts) {
 		const isSelected = selectedNodeId === node.entityId;
 
 		let r = 16;
-		let fillColor = 'rgba(110, 118, 129, 0.3)';
-		let strokeColor = '#6e7681';
+		let fillColor = theme.isHighContrast ? '#000000' : 'rgba(110, 118, 129, 0.3)';
+		let strokeColor = theme.isHighContrast ? '#ffffff' : '#6e7681';
 
 		if (node.changeKind === 'added') {
 			fillColor = 'rgba(63, 185, 80, 0.25)';
-			strokeColor = '#3fb950';
+			strokeColor = theme.added;
 		} else if (node.changeKind === 'removed') {
 			fillColor = 'rgba(248, 81, 73, 0.2)';
-			strokeColor = '#f85149';
+			strokeColor = theme.deleted;
 		} else if (node.changeKind === 'modified') {
 			fillColor = 'rgba(210, 153, 34, 0.25)';
-			strokeColor = '#d29922';
+			strokeColor = theme.modified;
 		} else if (node.changeKind === 'renamed') {
 			fillColor = 'rgba(163, 113, 247, 0.25)';
-			strokeColor = '#a371f7';
+			strokeColor = theme.renamed;
 		}
 
 		if (!isMatch) {
@@ -1618,11 +1656,11 @@ function drawTemporalFrame(ts) {
 		ctx.fillStyle = fillColor;
 		ctx.fill();
 		ctx.lineWidth = isSelected ? 3 : 1.5;
-		ctx.strokeStyle = isSelected ? '#ffffff' : strokeColor;
+		ctx.strokeStyle = isSelected ? (theme.isHighContrast ? '#ffff00' : '#ffffff') : strokeColor;
 		ctx.stroke();
 
 		// Node Label
-		ctx.fillStyle = isMatch ? (isSelected ? '#ffffff' : 'var(--vscode-foreground, #f4f4f5)') : 'rgba(150,150,150,0.3)';
+		ctx.fillStyle = isMatch ? (isSelected ? (theme.isHighContrast ? '#ffff00' : '#ffffff') : theme.fg) : 'rgba(150, 150, 150, 0.3)';
 		ctx.font = isSelected ? 'bold 12px ui-sans-serif, system-ui, sans-serif' : '11px ui-sans-serif, system-ui, sans-serif';
 		ctx.textAlign = 'center';
 		ctx.fillText(node.label || node.path || '', pos.x, pos.y + r + 14);
@@ -1651,7 +1689,7 @@ function pickTemporalNode(clientX, clientY) {
 
 	currentTemporalRenderNodes.forEach(function (node) {
 		if (displayMode === 'state' && node.changeKind === 'removed') return;
-		const d = Math.hypot(wx - node.x, wy - node.y);
+		const d = Math.hypot(wx - (node.x || 0), wy - (node.y || 0));
 		if (d <= bestDist) {
 			bestDist = d;
 			best = node;
@@ -2310,13 +2348,24 @@ function rafLoop(ts) {
 }
 kickRaf();
 
+// Ready handshake: notify host immediately so host pushes current snapshot & state
+request('ready', { generation: currentGeneration, graphType: initialGraphType }).catch(function (err) {
+	console.warn('[PreBase Graph] Ready handshake request error:', err);
+});
+
+// Primary snapshot request
 request('getSnapshot').then(function (res) {
-	snapshot = res && res.snapshot;
-	diagnostics = res && res.diagnostics;
-	selectedNodeId = (res && res.selectedNodeId) || null;
-	if (res && res.settings) settings = res.settings;
-	if (res && res.viewState && res.viewState.graphType) graphType = res.viewState.graphType;
-	if (res && res.temporalState) {
+	if (!res) return;
+	snapshot = res.snapshot;
+	diagnostics = res.diagnostics;
+	selectedNodeId = res.selectedNodeId || null;
+	if (res.settings) settings = res.settings;
+	if (res.graphType) {
+		graphType = res.graphType;
+	} else if (initialGraphType) {
+		graphType = initialGraphType;
+	}
+	if (res.temporalState) {
 		temporalState = res.temporalState;
 		temporalDiff = temporalState.diff || null;
 		if (temporalDiff) updateTemporalDiffTransition(temporalDiff);
@@ -2328,6 +2377,26 @@ request('getSnapshot').then(function (res) {
 		resetCamera(false);
 		fitView();
 		scheduleIdleResume();
+	}
+}).catch(function (err) {
+	console.warn('[PreBase Graph] Initial getSnapshot failed:', err);
+	if (!snapshot && (!temporalState || !temporalDiff)) {
+		if (empty) {
+			empty.innerHTML = '<div>Graph UI initialized.<br><a id="retryLoadBtn" style="color:var(--vscode-textLink-foreground, #58a6ff); cursor:pointer; text-decoration:underline; font-size:12px; margin-top:8px; display:inline-block;">Click to retry loading</a></div>';
+			const retryBtn = document.getElementById('retryLoadBtn');
+			if (retryBtn) {
+				retryBtn.onclick = function () {
+					empty.textContent = 'Preparing graph…';
+					request('getSnapshot').then(function (res) {
+						if (!res) return;
+						snapshot = res.snapshot;
+						diagnostics = res.diagnostics;
+						if (res.graphType) graphType = res.graphType;
+						render(true);
+					});
+				};
+			}
+		}
 	}
 });
 </script>

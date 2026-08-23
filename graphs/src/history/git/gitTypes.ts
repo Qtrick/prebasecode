@@ -136,3 +136,19 @@ export interface GitTagInfo {
 }
 
 export type GitRefInfo = GitBranchInfo | GitTagInfo;
+
+export interface GitRemoteRefUpdate {
+	readonly refName: string;
+	readonly previousSha?: string;
+	readonly currentSha: string;
+	readonly isNew: boolean;
+	readonly isDeleted: boolean;
+}
+
+export interface GitRemoteSyncResult {
+	readonly ok: boolean;
+	readonly remoteName: string;
+	readonly updatedRefs: readonly GitRemoteRefUpdate[];
+	readonly newCommitsDiscovered: number;
+	readonly error?: string;
+}
