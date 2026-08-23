@@ -161,11 +161,14 @@ suite('NetworkRenderMath (Unit - Visual Fidelity & Radius Invariants)', () => {
 		assert.ok(isNetworkLabelEligible(entryNode, 0.5, false, { isEntry: true }), 'Entry node should be labeled at k=0.5');
 		assert.ok(!isNetworkLabelEligible(smallNode, 0.5, false, {}), 'Leaf node should NOT be labeled at k=0.5');
 
-		// At medium zoom (zoom k = 0.8):
-		assert.ok(isNetworkLabelEligible(hubNode, 0.8, false, {}), 'Hub node should be labeled at k=0.8');
+		// At medium zoom (zoom k = 0.9):
+		assert.ok(isNetworkLabelEligible(hubNode, 0.9, false, {}), 'Hub node should be labeled at k=0.9');
 
-		// At deep zoom (zoom k = 1.3):
-		assert.ok(isNetworkLabelEligible(smallNode, 1.3, false, {}), 'Leaf node should be labeled at k=1.3');
+		// At overview / normal zoom (zoom k = 1.2):
+		assert.ok(!isNetworkLabelEligible(smallNode, 1.2, false, {}), 'Leaf node should NOT be labeled at overview zoom k=1.2');
+
+		// At deep zoom (zoom k = 1.7):
+		assert.ok(isNetworkLabelEligible(smallNode, 1.7, false, {}), 'Leaf node should be labeled at deep zoom k=1.7');
 
 		// Hovered and selected are always labeled:
 		assert.ok(isNetworkLabelEligible(smallNode, 0.2, false, { isSelected: true }), 'Selected node is always labeled');

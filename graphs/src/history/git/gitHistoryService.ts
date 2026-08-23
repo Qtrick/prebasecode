@@ -9,6 +9,7 @@ import {
 	type GitCommitMetadata,
 	type GitExactDiffResult,
 	type GitHeadChangeEvent,
+	type GitHistorySearchOptions,
 	type GitLogOptions,
 	type GitRemoteRefUpdate,
 	type GitRemoteSyncResult,
@@ -25,6 +26,7 @@ export type {
 	GitCommitMetadata,
 	GitExactDiffResult,
 	GitHeadChangeEvent,
+	GitHistorySearchOptions,
 	GitLogOptions,
 	GitRemoteRefUpdate,
 	GitRemoteSyncResult,
@@ -44,6 +46,7 @@ export interface IGitHistoryService {
 	getHead(rootPath: string, token?: CancellationTokenLike): Promise<string>;
 	getCommit(rootPath: string, ref: string, token?: CancellationTokenLike): Promise<GitCommitMetadata>;
 	log(rootPath: string, options?: GitLogOptions, token?: CancellationTokenLike): Promise<GitCommitMetadata[]>;
+	searchHistory?(rootPath: string, options: GitHistorySearchOptions, token?: CancellationTokenLike): Promise<GitCommitMetadata[]>;
 	resolveRef(rootPath: string, ref: string, token?: CancellationTokenLike): Promise<string>;
 	listBranches(rootPath: string, token?: CancellationTokenLike): Promise<GitBranchInfo[]>;
 	listTags(rootPath: string, token?: CancellationTokenLike): Promise<GitTagInfo[]>;

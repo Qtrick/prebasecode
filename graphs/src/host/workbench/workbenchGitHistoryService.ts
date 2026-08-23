@@ -15,6 +15,7 @@ import {
 	type GitExactDiffResult,
 	type GitHeadChangeEvent,
 	type GitHeadTransitionType,
+	type GitHistorySearchOptions,
 	type GitLogOptions,
 	type GitRemoteRefUpdate,
 	type GitRemoteSyncResult,
@@ -33,6 +34,7 @@ export interface IWorkbenchGitHistoryService extends IGitHistoryService {
 	getRepositories(): readonly WorkbenchGitRepositoryLike[];
 	notifyHeadChanged(repositoryId: string, newHead: string, transitionType?: GitHeadTransitionType): void;
 	observeRepository(repo: WorkbenchGitRepositoryLike): void;
+	searchHistory(rootPath: string, options: GitHistorySearchOptions, token?: CancellationTokenLike): Promise<GitCommitMetadata[]>;
 	dispose(): void;
 }
 
@@ -292,6 +294,64 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 				: err?.code || 'ProcessFailure';
 			throw new GitHistoryError(code, err?.message || 'Failed to get commit log');
 		}
+	}
+
+	async searchHistory(rootPath: string, options: GitHistorySearchOptions, token?: CancellationTokenLike): Promise<GitCommitMetadata[]> {
+		const rawQuery = (options.query || '').trim();
+		let messageFilter = options.message;
+		let authorFilter = options.author;
+		let pathFilter = options.file;
+		let shaFilter = options.sha;
+		const limit = Math.min(100, options.limit ?? 50);
+
+		// Parse tokenized prefixes from query string if present
+		if (rawQuery) {
+			const tokens = rawQuery.match(/(?:[^\s"]+|"[^"]*")+/g) || [rawQuery];
+			const plainTerms: string[] = [];
+
+			for (const tokenStr of tokens) {
+				const unquoted = tokenStr.replace(/^"(.*)"$/, '$1');
+				if (/^(?:message|msg|m):/i.test(unquoted)) {
+					messageFilter = unquoted.replace(/^(?:message|msg|m):/i, '');
+				} else if (/^(?:author|by|a):/i.test(unquoted)) {
+					authorFilter = unquoted.replace(/^(?:author|by|a):/i, '');
+				} else if (/^(?:file|path|f):/i.test(unquoted)) {
+					pathFilter = unquoted.replace(/^(?:file|path|f):/i, '');
+				} else if (/^(?:sha|commit|c):/i.test(unquoted)) {
+					shaFilter = unquoted.replace(/^(?:sha|commit|c):/i, '');
+				} else {
+					plainTerms.push(unquoted);
+				}
+			}
+
+			if (plainTerms.length > 0 && !messageFilter && !authorFilter && !shaFilter) {
+				messageFilter = plainTerms.join(' ');
+			}
+		}
+
+		// If a SHA prefix was explicitly targeted:
+		if (shaFilter) {
+			try {
+				const directCommit = await this.getCommit(rootPath, shaFilter, token);
+				if (directCommit) {
+					return [directCommit];
+				}
+			} catch {
+				// Continue to log search if SHA not resolved directly
+			}
+		}
+
+		const logOptions: GitLogOptions = {
+			ref: options.ref,
+			limit,
+			skip: options.skip,
+			firstParent: options.firstParent,
+			path: pathFilter,
+			grep: messageFilter,
+			author: authorFilter,
+		};
+
+		return this.log(rootPath, logOptions, token);
 	}
 
 	async resolveRef(rootPath: string, ref: string, token?: CancellationTokenLike): Promise<string> {

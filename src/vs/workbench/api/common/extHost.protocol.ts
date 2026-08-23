@@ -4087,6 +4087,8 @@ export interface GitLogOptionsDto {
 	readonly skip?: number;
 	readonly firstParent?: boolean;
 	readonly path?: string;
+	readonly author?: string;
+	readonly grep?: string;
 }
 
 export interface ExtHostGitExtensionShape {

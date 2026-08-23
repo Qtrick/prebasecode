@@ -30,10 +30,10 @@ export function layoutOrganic(
 		degree.set(link.target, (degree.get(link.target) ?? 0) + 1);
 	}
 	const maxDeg = Math.max(1, ...degree.values());
-	const maxR = sphereRadius * 0.88;
-	const minDist = Math.max(config.collisionRadius * 2, sphereRadius / Math.max(6, Math.sqrt(n) * 1.05));
-	const linkIdeal = Math.max(config.linkDistance, minDist * 1.4);
-	const zSpread = sphereRadius * 0.9;
+	const maxR = sphereRadius * 0.82;
+	const minDist = Math.max(14, sphereRadius / Math.max(8, Math.sqrt(n) * 1.25));
+	const linkIdeal = minDist * 2.1;
+	const zSpread = sphereRadius * 0.14;
 
 	for (const node of nodes) {
 		const d = degree.get(node.id) ?? 0;

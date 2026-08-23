@@ -39,6 +39,7 @@ export async function resolve(specifier, context, nextResolve) {
 			}
 		}
 
+		// For all graphs/ sources, prefer live TypeScript files on disk
 		const tsPath = resolvedTarget.replace(/\.js$/, '.ts');
 		if (existsSync(tsPath)) {
 			return nextResolve(pathToFileURL(tsPath).href, context);

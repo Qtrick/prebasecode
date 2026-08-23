@@ -32,7 +32,7 @@ export interface NetworkNodeLike {
 	};
 }
 
-export const NETWORK_FOCAL_LENGTH = 850;
+export const NETWORK_FOCAL_LENGTH = 1100;
 
 /**
  * Clamp a number to a bounded [min, max] range.
@@ -46,17 +46,17 @@ export function clamp(val: number, min: number, max: number): number {
  * Near nodes approach 1.0, far nodes approach 0.0.
  */
 export function normalizeDepthScale(depthScale: number): number {
-	return clamp((depthScale - 0.65) / 0.85, 0, 1);
+	return clamp((depthScale - 0.75) / 0.5, 0, 1);
 }
 
 /**
  * Computes depth factor for node sizing.
  * Perspective influences node glyphs sublinearly so nodes do not balloon into giant circles.
- * Output is strictly bounded between [0.78, 1.28].
+ * Output is strictly bounded between [0.82, 1.22].
  */
 export function computeNetworkDepthSizeFactor(depthScale: number): number {
 	const norm = normalizeDepthScale(depthScale);
-	return clamp(0.78 + norm * 0.46, 0.78, 1.28);
+	return clamp(0.82 + norm * 0.38, 0.82, 1.22);
 }
 
 /**
@@ -228,7 +228,7 @@ export function computeNetworkFitTransform(
 	const usableH = Math.max(100, viewportHeight - pad * 2);
 
 	const scale = Math.min(usableW / boxW, usableH / boxH, 2.0) * initialZoom;
-	const k = clamp(scale, 0.2, 2.5);
+	const k = clamp(scale, 0.6, 1.4);
 
 	const centerX = (minX + maxX) / 2;
 	const centerY = (minY + maxY) / 2;
@@ -262,7 +262,7 @@ export function isNetworkLabelEligible(
 		return false;
 	}
 
-	if (options.isEntry && transformK >= 0.35) {
+	if (options.isEntry && transformK >= 0.5) {
 		return true;
 	}
 
@@ -270,10 +270,10 @@ export function isNetworkLabelEligible(
 	const degree = node.degree ?? 0;
 	const isHub = importance >= 0.6 || degree >= 5;
 
-	if (isHub && transformK >= 0.65) {
+	if (isHub && transformK >= 0.85) {
 		return true;
 	}
 
-	// General node labels only visible at deeper zoom
-	return transformK >= 1.2;
+	// General node labels only visible at deeper zoom (hover-first at overview)
+	return transformK >= 1.6;
 }

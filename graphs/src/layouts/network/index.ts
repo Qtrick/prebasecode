@@ -18,7 +18,7 @@ import { layoutRadial } from './radialLayout.js';
 import { layoutSphere } from './sphereLayout.js';
 
 export function computeNetworkSphereRadius(nodeCount: number, spreadScale: number): number {
-	return Math.max(220, Math.min(420, Math.sqrt(Math.max(1, nodeCount)) * 26)) * spreadScale;
+	return Math.max(190, Math.min(310, Math.sqrt(Math.max(1, nodeCount)) * 22)) * spreadScale;
 }
 
 export const DEFAULT_NETWORK_LAYOUT_CONFIG: NetworkLayoutRuntimeConfig = {

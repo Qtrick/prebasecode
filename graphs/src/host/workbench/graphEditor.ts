@@ -689,7 +689,9 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #temporalContextModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
 #temporalContextModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
 #temporalScrubberBar { position:absolute; left:12px; right:12px; bottom:12px; z-index:5; display:none; flex-direction:column; gap:6px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:8px 12px; font-size:12px; backdrop-filter:blur(8px); }
-#temporalScrubberBar .row { display:flex; align-items:center; gap:8px; width:100%; }
+#temporalScrubberBar .row { display:flex; align-items:center; width:100%; box-sizing:border-box; }
+#temporalScrubberBar .controls-row { display:flex; align-items:center; gap:8px; width:100%; }
+#temporalScrubberBar .track-row { display:flex; align-items:center; width:100%; margin-top:2px; }
 #temporalScrubberBar button { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
 #temporalScrubberBar button:hover { background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.08)); }
 #temporalTimelineStrip { display:flex; align-items:center; gap:4px; height:20px; overflow-x:auto; width:100%; padding:2px 0; }
@@ -698,7 +700,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 .commit-marker:focus-visible { outline:2px solid var(--vscode-focusBorder, #007fd4); outline-offset:2px; }
 .commit-marker.active { background:var(--vscode-button-background, #2dd4bf); transform:scale(1.4); border-color:#fff; }
 .commit-marker.is-merge { border-radius:2px; background:#a371f7; }
-#temporalScrubber { flex:1; width:100%; height:4px; accent-color:var(--vscode-button-background, #2dd4bf); cursor:pointer; }
+#temporalScrubber { width:100%; height:5px; accent-color:var(--vscode-button-background, #2dd4bf); cursor:pointer; }
 .badge-added { color:var(--vscode-gitDecoration-addedResourceForeground, #3fb950); background:rgba(63,185,80,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
 .badge-removed { color:var(--vscode-gitDecoration-deletedResourceForeground, #f85149); background:rgba(248,81,73,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
 .badge-modified { color:var(--vscode-gitDecoration-modifiedResourceForeground, #d29922); background:rgba(210,153,34,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
@@ -819,16 +821,22 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 <!-- Temporal Scrubber Bar -->
 <div id="temporalScrubberBar">
 	<div id="temporalTimelineStrip" style="display:none;" aria-label="Loaded commit history timeline"></div>
-	<div class="row" style="display:flex; align-items:center; gap:8px;">
-		<button id="temporalPrevBtn" title="Previous older commit (Left arrow)" aria-label="Previous commit">◀</button>
-		<button id="temporalPlayBtn" title="Play timeline (Space)" aria-label="Play timeline">▶</button>
-		<button id="temporalNextBtn" title="Next newer commit (Right arrow)" aria-label="Next commit">▶</button>
-		<button id="temporalLoadMoreBtn" title="Load more historical commits" aria-label="Load more history" style="display:none;">+More</button>
-		<input id="temporalScrubber" type="range" min="0" max="0" value="0" aria-label="Temporal commit history scrubber" style="flex:1;">
-		<span id="temporalCommitSha" style="font-family:monospace; font-weight:600; color:var(--vscode-textLink-foreground, #58a6ff); font-size:11.5px;"></span>
-		<span id="temporalCommitMessage" style="font-size:11px; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
-		<span id="temporalCommitAuthor" style="font-size:10.5px; opacity:0.75;"></span>
-		<button id="temporalToggleDetailsBtn" type="button" title="Toggle commit details & structural diff inspector" aria-label="Toggle Details" style="margin-left:auto;">Details ▾</button>
+	<div class="row controls-row" style="display:flex; align-items:center; gap:8px; width:100%;">
+		<div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
+			<button id="temporalPrevBtn" title="Previous older commit (Left arrow)" aria-label="Previous commit">◀</button>
+			<button id="temporalPlayBtn" title="Play timeline (Space)" aria-label="Play timeline">▶</button>
+			<button id="temporalNextBtn" title="Next newer commit (Right arrow)" aria-label="Next commit">▶</button>
+			<button id="temporalLoadMoreBtn" title="Load more historical commits" aria-label="Load more history" style="display:none;">+More</button>
+		</div>
+		<div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; overflow:hidden;">
+			<span id="temporalCommitSha" style="font-family:monospace; font-weight:600; color:var(--vscode-textLink-foreground, #58a6ff); font-size:11.5px; flex-shrink:0;"></span>
+			<span id="temporalCommitMessage" style="font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;"></span>
+			<span id="temporalCommitAuthor" style="font-size:10.5px; opacity:0.75; flex-shrink:0;"></span>
+		</div>
+		<button id="temporalToggleDetailsBtn" type="button" title="Toggle commit details & structural diff inspector" aria-label="Toggle Details" style="flex-shrink:0; margin-left:auto;">Details ▾</button>
+	</div>
+	<div class="row track-row" style="display:flex; align-items:center; width:100%; padding-top:2px;">
+		<input id="temporalScrubber" type="range" min="0" max="0" value="0" aria-label="Temporal commit history scrubber" style="width:100%; display:block;">
 	</div>
 </div>
 
@@ -1328,91 +1336,11 @@ function screenPos(id) {
 	return null;
 }
 
-let focusPositions = new Map();
-
-function computeFocusIslandPositions(nodes, edges) {
-	const positions = new Map();
-	if (!nodes || nodes.length === 0) return positions;
-
-	const changedNodes = nodes.filter(n => n.changeKind && n.changeKind !== 'unchanged');
-	const contextNodes = nodes.filter(n => !n.changeKind || n.changeKind === 'unchanged');
-
-	if (changedNodes.length === 0) {
-		const GOLDEN = 2.399963229728653;
-		for (let i = 0; i < nodes.length; i++) {
-			const r = i === 0 ? 0 : Math.sqrt(i) * 36;
-			const a = i * GOLDEN;
-			positions.set(nodes[i].entityId, { x: Math.round(Math.cos(a) * r), y: Math.round(Math.sin(a) * r) });
-		}
-		return positions;
-	}
-
-	const changedCount = changedNodes.length;
-	const centerSpread = changedCount === 1 ? 0 : Math.min(180, Math.sqrt(changedCount) * 44);
-	for (let i = 0; i < changedCount; i++) {
-		if (changedCount === 1) {
-			positions.set(changedNodes[0].entityId, { x: 0, y: 0 });
-		} else if (changedCount === 2) {
-			positions.set(changedNodes[0].entityId, { x: -48, y: 0 });
-			positions.set(changedNodes[1].entityId, { x: 48, y: 0 });
-		} else {
-			const a = (i / changedCount) * 2 * Math.PI;
-			positions.set(changedNodes[i].entityId, {
-				x: Math.round(Math.cos(a) * centerSpread),
-				y: Math.round(Math.sin(a) * centerSpread * 0.8),
-			});
-		}
-	}
-
-	const adjacency = new Map();
-	for (let i = 0; i < edges.length; i++) {
-		const e = edges[i];
-		const s = e.sourceEntityId || e.sourceId;
-		const t = e.targetEntityId || e.targetId;
-		if (!s || !t) continue;
-		if (!adjacency.has(s)) adjacency.set(s, []);
-		if (!adjacency.has(t)) adjacency.set(t, []);
-		adjacency.get(s).push(t);
-		adjacency.get(t).push(s);
-	}
-
-	const contextByAnchor = new Map();
-	for (let i = 0; i < contextNodes.length; i++) {
-		const cn = contextNodes[i];
-		const neighbors = adjacency.get(cn.entityId) || [];
-		let anchor = changedNodes[0].entityId;
-		for (let j = 0; j < neighbors.length; j++) {
-			if (positions.has(neighbors[j])) {
-				anchor = neighbors[j];
-				break;
-			}
-		}
-		if (!contextByAnchor.has(anchor)) contextByAnchor.set(anchor, []);
-		contextByAnchor.get(anchor).push(cn);
-	}
-
-	for (const [anchorId, cList] of contextByAnchor) {
-		const anchorPos = positions.get(anchorId) || { x: 0, y: 0 };
-		const cCount = cList.length;
-		for (let i = 0; i < cCount; i++) {
-			const angle = (i / Math.max(1, cCount)) * 2 * Math.PI + 0.35;
-			const dist = Math.min(140, 64 + Math.sqrt(i) * 26);
-			positions.set(cList[i].entityId, {
-				x: Math.round(anchorPos.x + Math.cos(angle) * dist),
-				y: Math.round(anchorPos.y + Math.sin(angle) * dist * 0.85),
-			});
-		}
-	}
-
-	return positions;
-}
 
 function getVisualNodePosition(node, ease) {
 	if (!node) return { x: 0, y: 0 };
-	const isFocusMode = (displayMode === 'changes' || displayMode === 'focus');
-	const fp = isFocusMode ? focusPositions.get(node.entityId) : null;
-	const targetX = fp ? fp.x : (node.x || 0);
-	const targetY = fp ? fp.y : (node.y || 0);
+	const targetX = node.x || 0;
+	const targetY = node.y || 0;
 
 	if (!isAnimatingTemporal) return { x: targetX, y: targetY };
 	const prev = previousTemporalRenderNodes.get(node.entityId);
@@ -1435,13 +1363,10 @@ function fitView() {
 		const targetNodes = fc.nodes;
 		if (!targetNodes || targetNodes.length === 0) return;
 		const isFocusMode = (displayMode === 'changes' || displayMode === 'focus');
-		if (isFocusMode) {
-			focusPositions = computeFocusIslandPositions(targetNodes, fc.edges);
-		}
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 		for (let i = 0; i < targetNodes.length; i++) {
 			const n = targetNodes[i];
-			const pos = isFocusMode && focusPositions.get(n.entityId) ? focusPositions.get(n.entityId) : { x: n.x || 0, y: n.y || 0 };
+			const pos = { x: n.x || 0, y: n.y || 0 };
 			const r = (n.changeKind && n.changeKind !== 'unchanged' ? 8 : 4.5) + 6;
 			minX = Math.min(minX, pos.x - r); minY = Math.min(minY, pos.y - r);
 			maxX = Math.max(maxX, pos.x + r); maxY = Math.max(maxY, pos.y + r);
@@ -1449,8 +1374,8 @@ function fitView() {
 		if (!isFinite(minX)) return;
 		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 		const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
-		const padding = isFocusMode ? 100 : 72;
-		const k = Math.max(0.18, Math.min(2.5, Math.min((vw - padding * 2) / bw, (vh - padding * 2) / bh)));
+		const padding = isFocusMode ? 80 : 64;
+		const k = Math.max(0.4, Math.min(1.8, Math.min((vw - padding * 2) / bw, (vh - padding * 2) / bh)));
 		transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 		dirty = true; kickRaf();
 		return;
@@ -1473,7 +1398,7 @@ function fitView() {
 	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 	const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
 	const initialZoom = settings.initialZoom || 1;
-	const k = Math.max(0.2, Math.min(2.5, Math.min((vw - 96) / bw, (vh - 96) / bh) * initialZoom));
+	const k = Math.max(0.6, Math.min(1.4, Math.min((vw - 96) / bw, (vh - 96) / bh) * initialZoom));
 	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 	dirty = true; kickRaf();
 }
@@ -1994,16 +1919,38 @@ function drawTemporalFrame(ts) {
 	const focusSet = visibleData.focusSet;
 	const directContextSet = visibleData.directContextSet;
 
-	// 3. Render Edges (Curved Bezier with Dark Contrast Halo)
+	// 3. Render Edges (Curved Bezier with Dark Contrast Halo & LOD)
 	if (visibleData.edges) {
-		for (let i = 0; i < visibleData.edges.length; i++) {
-			const edge = visibleData.edges[i];
+		const isEdgeConnectedToActive = function (edge) {
+			const s = edge.sourceEntityId || edge.sourceId;
+			const t = edge.targetEntityId || edge.targetId;
+			const activeId = selectedNodeId || hoveredNodeId;
+			return Boolean(activeId && (s === activeId || t === activeId));
+		};
+
+		// Sort edges: background unchanged edges first, changed focus edges next, active highlighted edges on top
+		const edgesToDraw = visibleData.edges.slice().sort(function (a, b) {
+			const aActive = isEdgeConnectedToActive(a) ? 2 : (a.changeKind && a.changeKind !== 'unchanged' ? 1 : 0);
+			const bActive = isEdgeConnectedToActive(b) ? 2 : (b.changeKind && b.changeKind !== 'unchanged' ? 1 : 0);
+			return aActive - bActive;
+		});
+
+		for (let i = 0; i < edgesToDraw.length; i++) {
+			const edge = edgesToDraw[i];
 			const sourceEntityId = edge.sourceEntityId || edge.sourceId;
 			const targetEntityId = edge.targetEntityId || edge.targetId;
 			const sourceNode = currentTemporalRenderNodes.get(sourceEntityId);
 			const targetNode = currentTemporalRenderNodes.get(targetEntityId);
 			if (!sourceNode || !targetNode) continue;
 			if (!visibleNodeSet.has(sourceEntityId) || !visibleNodeSet.has(targetEntityId)) continue;
+
+			const isEdgeActive = isEdgeConnectedToActive(edge);
+			const isEdgeChanged = Boolean(edge.changeKind && edge.changeKind !== 'unchanged');
+
+			// Edge LOD: at low zoom (transform.k < 0.65) in full state mode, suppress unchanged distant edges unless active
+			if (displayMode === 'state' && transform.k < 0.65 && !isEdgeActive && !isEdgeChanged) {
+				continue;
+			}
 
 			const sp = getVisualNodePosition(sourceNode, ease);
 			const tp = getVisualNodePosition(targetNode, ease);
@@ -2021,7 +1968,10 @@ function drawTemporalFrame(ts) {
 			let edgeWidth = 1.0;
 			let edgeDash = [];
 
-			if (edge.changeKind === 'added') {
+			if (isEdgeActive) {
+				edgeColor = '#2dd4bf';
+				edgeWidth = 2.4;
+			} else if (edge.changeKind === 'added') {
 				edgeColor = theme.added;
 				edgeWidth = 1.8;
 			} else if (edge.changeKind === 'removed') {
@@ -2043,7 +1993,7 @@ function drawTemporalFrame(ts) {
 				ctx.lineTo(tp.x, tp.y);
 			}
 			ctx.strokeStyle = theme.isHighContrast ? 'rgba(0, 0, 0, 0.95)' : 'rgba(15, 23, 42, 0.65)';
-			ctx.lineWidth = edgeWidth + 2.2;
+			ctx.lineWidth = edgeWidth + (isEdgeActive ? 3.0 : 2.0);
 			ctx.stroke();
 
 			// Colored stroke
@@ -2063,12 +2013,14 @@ function drawTemporalFrame(ts) {
 	}
 
 	// 4. Render Nodes (Distant Context -> Direct Context -> Changed Focus Nodes)
-	const nodesToRender = visibleData.nodes;
-	nodesToRender.sort((a, b) => {
+	const nodesToRender = visibleData.nodes.slice();
+	nodesToRender.sort(function (a, b) {
 		const aRank = a.changeKind && a.changeKind !== 'unchanged' ? 2 : (directContextSet.has(a.entityId) ? 1 : 0);
 		const bRank = b.changeKind && b.changeKind !== 'unchanged' ? 2 : (directContextSet.has(b.entityId) ? 1 : 0);
 		return aRank - bRank;
 	});
+
+	const isChangesMode = displayMode === 'changes';
 
 	for (let i = 0; i < nodesToRender.length; i++) {
 		const node = nodesToRender[i];
@@ -2080,18 +2032,36 @@ function drawTemporalFrame(ts) {
 		const isDirectContext = directContextSet.has(node.entityId);
 
 		const layerColor = getArchitectureLayerColor(node.meta?.architectureLayer);
-		let r = isFocus ? 6.5 : (isDirectContext ? 4.2 : 3.4);
+		let r = isFocus ? 7.0 : (isDirectContext ? 4.5 : 3.5);
+		let fillColor = layerColor;
 		let strokeColor = theme.isHighContrast ? '#ffffff' : '#6e7681';
 		let alpha = isFocus ? 1.0 : (isDirectContext ? 0.85 : 0.45);
+		let haloColor = null;
 
 		if (node.changeKind === 'added') {
 			strokeColor = theme.added;
+			if (isChangesMode) {
+				fillColor = '#2ea043';
+				haloColor = 'rgba(63, 185, 80, 0.28)';
+			}
 		} else if (node.changeKind === 'removed') {
 			strokeColor = theme.deleted;
+			if (isChangesMode) {
+				fillColor = 'rgba(248, 81, 73, 0.25)';
+				haloColor = 'rgba(248, 81, 73, 0.28)';
+			}
 		} else if (node.changeKind === 'modified') {
 			strokeColor = theme.modified;
+			if (isChangesMode) {
+				fillColor = '#d29922';
+				haloColor = 'rgba(210, 153, 34, 0.28)';
+			}
 		} else if (node.changeKind === 'renamed') {
 			strokeColor = theme.renamed;
+			if (isChangesMode) {
+				fillColor = '#1f6feb';
+				haloColor = 'rgba(88, 166, 255, 0.28)';
+			}
 		}
 
 		if (!isMatch) {
@@ -2104,47 +2074,51 @@ function drawTemporalFrame(ts) {
 		// Selection / Hover highlights
 		if (isSelected) {
 			ctx.beginPath();
-			ctx.arc(pos.x, pos.y, r + 4, 0, Math.PI * 2);
+			ctx.arc(pos.x, pos.y, r + 4.5, 0, Math.PI * 2);
 			ctx.strokeStyle = '#2dd4bf';
 			ctx.lineWidth = 2.5;
 			ctx.stroke();
 		} else if (isHovered) {
 			ctx.beginPath();
-			ctx.arc(pos.x, pos.y, r + 3, 0, Math.PI * 2);
+			ctx.arc(pos.x, pos.y, r + 3.5, 0, Math.PI * 2);
 			ctx.strokeStyle = '#58a6ff';
-			ctx.lineWidth = 1.8;
+			ctx.lineWidth = 2.0;
 			ctx.stroke();
 		}
 
 		// Entry indicator
 		if (node.meta?.isEntry) {
 			ctx.beginPath();
-			ctx.arc(pos.x, pos.y, r + 2.5, 0, Math.PI * 2);
+			ctx.arc(pos.x, pos.y, r + 2.8, 0, Math.PI * 2);
 			ctx.strokeStyle = '#f59e0b';
-			ctx.lineWidth = 1.2;
+			ctx.lineWidth = 1.4;
 			ctx.stroke();
 		}
 
 		// Glowing accent halo for changed nodes
-		if (isFocus) {
+		if (isFocus && haloColor) {
 			ctx.beginPath();
 			ctx.arc(pos.x, pos.y, r + 4.5, 0, Math.PI * 2);
-			if (node.changeKind === 'added') ctx.fillStyle = 'rgba(63, 185, 80, 0.22)';
-			else if (node.changeKind === 'removed') ctx.fillStyle = 'rgba(248, 81, 73, 0.22)';
-			else if (node.changeKind === 'modified') ctx.fillStyle = 'rgba(210, 153, 34, 0.24)';
-			else if (node.changeKind === 'renamed') ctx.fillStyle = 'rgba(88, 166, 255, 0.22)';
-			else ctx.fillStyle = 'rgba(45, 212, 191, 0.22)';
+			ctx.fillStyle = haloColor;
 			ctx.fill();
 		}
 
-		// Node Interior: Architecture Layer Color
+		// Node Main Body
 		ctx.beginPath();
 		ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
-		ctx.fillStyle = layerColor;
+		ctx.fillStyle = fillColor;
 		ctx.fill();
 
-		// Node Outer Ring: Change Status
-		ctx.lineWidth = isFocus ? 2.0 : 1.2;
+		// Inner Architecture Pip in Changes Mode for changed nodes
+		if (isChangesMode && isFocus) {
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, 2.5, 0, Math.PI * 2);
+			ctx.fillStyle = layerColor;
+			ctx.fill();
+		}
+
+		// Node Outer Stroke
+		ctx.lineWidth = isFocus ? 2.2 : 1.2;
 		if (node.changeKind === 'removed' && typeof ctx.setLineDash === 'function') {
 			ctx.setLineDash([2, 2]);
 		}

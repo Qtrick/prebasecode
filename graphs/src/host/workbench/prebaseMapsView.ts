@@ -4,6 +4,7 @@
 
 import * as DOM from '../../../../../../base/browser/dom.js';
 import { DisposableStore } from '../../../../../../base/common/lifecycle.js';
+import { CancellationTokenSource } from '../../../../../../base/common/cancellation.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { localize, localize2 } from '../../../../../../nls.js';
 import { CommandsRegistry, ICommandService } from '../../../../../../platform/commands/common/commands.js';
@@ -25,6 +26,8 @@ import type { GraphNode } from '../../common/types/graphTypes.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { IPreBaseGraphService } from './prebaseGraphService.js';
 import { IPreBaseTemporalViewService } from '../../temporal/view/temporalViewTypes.js';
+import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
+import type { GitCommitMetadata } from '../../history/git/gitTypes.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 
 type GraphFilterId = 'all' | 'files' | 'components' | 'dependencies';
@@ -80,9 +83,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _graphModeHelper: HTMLElement | undefined;
 	private _graphModeOpenBtn: HTMLButtonElement | undefined;
 	private _searchInput: HTMLInputElement | undefined;
+	private _commitSearchInput: HTMLInputElement | undefined;
 	private _idleRotateCheckbox: HTMLInputElement | undefined;
 	private _legendCheckbox: HTMLInputElement | undefined;
 	private _displayBody: HTMLElement | undefined;
+	private _legendContainer: HTMLElement | undefined;
 
 	private readonly _filterButtons = new Map<GraphFilterId, HTMLButtonElement>();
 	private readonly _networkLayoutButtons = new Map<string, HTMLButtonElement>();
@@ -92,6 +97,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private readonly _historyDisposables = this._register(new DisposableStore());
 
 	private _searchQuery = '';
+	private _commitSearchQuery = '';
+	private _remoteSearchResults: GitCommitMetadata[] | null = null;
+	private _isSearchingHistory = false;
+	private _searchCts: CancellationTokenSource | null = null;
+	private _searchDebounceTimer: any = null;
 	private _historyExpanded = true;
 
 	constructor(
@@ -107,6 +117,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		@IHoverService hoverService: IHoverService,
 		@IPreBaseGraphService private readonly graphService: IPreBaseGraphService,
 		@IPreBaseTemporalViewService private readonly temporalViewService: IPreBaseTemporalViewService,
+		@IWorkbenchGitHistoryService private readonly gitHistoryService: IWorkbenchGitHistoryService,
 		@ICommandService private readonly commandService: ICommandService,
 		@IEditorService private readonly editorService: IEditorService,
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
@@ -349,6 +360,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 			);
 		}));
 
+		this._legendContainer = DOM.append(this._displayBody, DOM.$('div'));
+		this._legendContainer.style.marginTop = '8px';
+		this._legendContainer.style.paddingTop = '6px';
+		this._legendContainer.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 40%, transparent)`;
+
 		this._register(DOM.addDisposableListener(header, 'click', () => {
 			const open = this._displayBody?.style.display !== 'none';
 			if (this._displayBody) {
@@ -392,6 +408,32 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._historyBody.style.background = SURFACE_OVERLAY;
 		this._historyBody.style.padding = '4px';
 
+		// Dedicated Commit Search Input (smart prefixes: author:, msg:, sha:, file:)
+		const searchWrap = DOM.append(this._historyBody, DOM.$('div'));
+		searchWrap.style.display = 'flex';
+		searchWrap.style.alignItems = 'center';
+		searchWrap.style.marginBottom = '6px';
+		searchWrap.style.position = 'relative';
+
+		this._commitSearchInput = DOM.append(searchWrap, DOM.$('input')) as HTMLInputElement;
+		this._commitSearchInput.type = 'search';
+		this._commitSearchInput.placeholder = localize('prebase.maps.searchCommits', "Search commits… (author:, msg:)");
+		this._commitSearchInput.setAttribute('aria-label', localize('prebase.maps.searchCommitsAria', "Search commit history"));
+		this._commitSearchInput.style.width = '100%';
+		this._commitSearchInput.style.fontSize = '11px';
+		this._commitSearchInput.style.padding = '4px 6px';
+		this._commitSearchInput.style.borderRadius = '4px';
+		this._commitSearchInput.style.border = `1px solid ${BORDER}`;
+		this._commitSearchInput.style.background = SURFACE;
+		this._commitSearchInput.style.color = TEXT;
+		this._commitSearchInput.style.outline = 'none';
+		this._commitSearchInput.style.boxSizing = 'border-box';
+
+		this._register(DOM.addDisposableListener(this._commitSearchInput, 'input', () => {
+			this._commitSearchQuery = this._commitSearchInput?.value || '';
+			this._onCommitSearchInputChanged();
+		}));
+
 		this._historyList = DOM.append(this._historyBody, DOM.$('div'));
 		this._historyList.setAttribute('role', 'listbox');
 		this._historyList.setAttribute('aria-label', localize('prebase.maps.historyListAria', "Commit History"));
@@ -407,6 +449,60 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}));
 	}
 
+	private _onCommitSearchInputChanged(): void {
+		if (this._searchDebounceTimer) {
+			clearTimeout(this._searchDebounceTimer);
+			this._searchDebounceTimer = null;
+		}
+		if (this._searchCts) {
+			this._searchCts.cancel();
+			this._searchCts.dispose();
+			this._searchCts = null;
+		}
+
+		const query = (this._commitSearchQuery || '').trim();
+		if (!query) {
+			this._remoteSearchResults = null;
+			this._isSearchingHistory = false;
+			this._refreshHistory();
+			return;
+		}
+
+		// Phase 1: Filter currently loaded commits immediately
+		this._refreshHistory();
+
+		// Phase 2: Debounced full repository history search across git
+		this._searchDebounceTimer = setTimeout(() => {
+			void this._performBackendCommitSearch(query);
+		}, 250);
+	}
+
+	private async _performBackendCommitSearch(query: string): Promise<void> {
+		const state = this.temporalViewService.getState();
+		const rootPath = state.activeRepositoryRoot;
+		if (!rootPath) {
+			return;
+		}
+
+		this._searchCts = new CancellationTokenSource();
+		this._isSearchingHistory = true;
+		this._refreshHistory();
+
+		try {
+			const results = await this.gitHistoryService.searchHistory(rootPath, { query, limit: 50 }, this._searchCts.token);
+			if (!this._searchCts.token.isCancellationRequested) {
+				this._remoteSearchResults = results;
+				this._isSearchingHistory = false;
+				this._refreshHistory();
+			}
+		} catch (err: any) {
+			if (!this._searchCts?.token.isCancellationRequested) {
+				this._isSearchingHistory = false;
+				this._refreshHistory();
+			}
+		}
+	}
+
 	private _refreshHistory(): void {
 		if (!this._historyList) {
 			return;
@@ -415,27 +511,72 @@ export class PreBaseMapsViewPane extends ViewPane {
 		DOM.clearNode(this._historyList);
 
 		const state = this.temporalViewService.getState();
-		const timeline = state.pagedTimeline || [];
-		if (timeline.length === 0) {
-			const empty = DOM.append(this._historyList, DOM.$('div'));
-			empty.textContent = localize('prebase.maps.historyEmpty', "No commit history loaded.");
-			empty.style.fontSize = '11px';
-			empty.style.color = MUTED;
-			empty.style.padding = '8px';
-			return;
-		}
-
+		const loadedTimeline = state.pagedTimeline || [];
 		const activeGraphType = this._getActiveGraphType();
 		const isNetwork = activeGraphType === 'network';
 		const historicalSha = this.graphService.getSelectedHistoricalCommitSha();
 		const windowStart = state.timelineWindow ? state.timelineWindow.start : 0;
+		const query = (this._commitSearchQuery || '').trim().toLowerCase();
 
 		// Derive actual repository HEAD commit sha if known
 		const headRef = state.repositoryRefs?.find(r => r.kind === 'head' || r.name === 'HEAD');
-		const headSha = headRef?.targetSha || (state.selectedRef === 'HEAD' && timeline[0] ? timeline[0].sha : undefined);
+		const headSha = headRef?.targetSha || (state.selectedRef === 'HEAD' && loadedTimeline[0] ? loadedTimeline[0].sha : undefined);
 
-		// 1. Mode-Adaptive Special Top Row (Code Graph only: Live Working Tree)
-		if (isNetwork) {
+		// Determine list of commits to display (either remote search results, locally filtered loaded timeline, or full timeline)
+		interface CommitDisplayItem {
+			readonly sha: string;
+			readonly shortSha?: string;
+			readonly message: string;
+			readonly author: string;
+			readonly timestamp?: number;
+			readonly isMerge?: boolean;
+			readonly originalIndex?: number;
+		}
+
+		let itemsToRender: CommitDisplayItem[] = [];
+
+		if (query) {
+			if (this._remoteSearchResults) {
+				itemsToRender = this._remoteSearchResults.map(c => ({
+					sha: c.sha,
+					shortSha: c.sha.slice(0, 7),
+					message: c.message,
+					author: c.author?.name || '',
+					timestamp: c.authorTimestamp,
+					isMerge: c.parents && c.parents.length > 1,
+				}));
+			} else {
+				// Instant Phase 1 filter on loaded timeline
+				itemsToRender = loadedTimeline
+					.map((c, i) => ({
+						sha: c.sha,
+						shortSha: c.shortSha || c.sha.slice(0, 7),
+						message: c.message,
+						author: c.author,
+						timestamp: c.timestamp,
+						isMerge: c.isMerge,
+						originalIndex: windowStart + i,
+					}))
+					.filter(c =>
+						c.message.toLowerCase().includes(query) ||
+						c.sha.toLowerCase().includes(query) ||
+						c.author.toLowerCase().includes(query)
+					);
+			}
+		} else {
+			itemsToRender = loadedTimeline.map((c, i) => ({
+				sha: c.sha,
+				shortSha: c.shortSha || c.sha.slice(0, 7),
+				message: c.message,
+				author: c.author,
+				timestamp: c.timestamp,
+				isMerge: c.isMerge,
+				originalIndex: windowStart + i,
+			}));
+		}
+
+		// 1. Mode-Adaptive Special Top Row (Code Graph only: Live Working Tree, shown when not searching)
+		if (isNetwork && !query) {
 			const isWtSelected = !historicalSha;
 			const wtRow = DOM.append(this._historyList, DOM.$('div'));
 			wtRow.tabIndex = 0;
@@ -496,15 +637,35 @@ export class PreBaseMapsViewPane extends ViewPane {
 			}));
 		}
 
-		// 2. Commit History Rows
-		for (let i = 0; i < timeline.length; i++) {
-			const commit = timeline[i];
-			const globalIndex = windowStart + i;
+		// Searching Status Indicator
+		if (this._isSearchingHistory) {
+			const searchStatus = DOM.append(this._historyList, DOM.$('div'));
+			searchStatus.textContent = localize('prebase.maps.searchingHistory', "Searching full Git history…");
+			searchStatus.style.fontSize = '10.5px';
+			searchStatus.style.color = ACCENT;
+			searchStatus.style.padding = '4px 6px';
+			searchStatus.style.fontStyle = 'italic';
+		}
+
+		if (itemsToRender.length === 0 && !this._isSearchingHistory) {
+			const empty = DOM.append(this._historyList, DOM.$('div'));
+			empty.textContent = query
+				? localize('prebase.maps.noCommitMatches', "No commits match \"{0}\".", query)
+				: localize('prebase.maps.historyEmpty', "No commit history loaded.");
+			empty.style.fontSize = '11px';
+			empty.style.color = MUTED;
+			empty.style.padding = '8px';
+			return;
+		}
+
+		// 2. Commit Rows
+		for (let i = 0; i < itemsToRender.length; i++) {
+			const commit = itemsToRender[i];
 			const isSelected = isNetwork
 				? Boolean(historicalSha && commit.sha === historicalSha)
-				: Boolean(commit.sha === state.selectedCommitSha || (!state.selectedCommitSha && i === 0));
+				: Boolean(commit.sha === state.selectedCommitSha || (!state.selectedCommitSha && !query && i === 0));
 
-			const isHeadCommit = headSha ? commit.sha === headSha : (state.selectedRef === 'HEAD' && i === 0);
+			const isHeadCommit = headSha ? commit.sha === headSha : (!query && state.selectedRef === 'HEAD' && i === 0);
 
 			const row = DOM.append(this._historyList, DOM.$('div'));
 			row.tabIndex = 0;
@@ -602,7 +763,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 				if (activeType === 'network') {
 					void this.graphService.loadHistoricalCommit(commit.sha);
 				} else {
-					void this.temporalViewService.selectCommitIndex(globalIndex, { immediate: true });
+					if (typeof commit.originalIndex === 'number') {
+						void this.temporalViewService.selectCommitIndex(commit.originalIndex, { immediate: true });
+					} else {
+						void this.temporalViewService.selectCommit(commit.sha);
+					}
 				}
 				this._refreshHistorySelection();
 			};
@@ -621,7 +786,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			}));
 		}
 
-		if (state.historyHasMore) {
+		if (!query && state.historyHasMore) {
 			const loadMoreBtn = DOM.append(this._historyList, DOM.$('button')) as HTMLButtonElement;
 			loadMoreBtn.type = 'button';
 			loadMoreBtn.textContent = state.isLoadingMoreHistory
@@ -846,6 +1011,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		this._refreshExplorerList();
 		this._refreshHistory();
+		this._refreshLegend();
 
 		if (this._diag) {
 			this._diag.textContent = [
@@ -853,6 +1019,70 @@ export class PreBaseMapsViewPane extends ViewPane {
 				diag.message || '',
 				localize('prebase.maps.counts', "Files {0} · Nodes {1} · Edges {2}", diag.fileCount, diag.nodeCount, diag.edgeCount)
 			].filter(Boolean).join('\n');
+		}
+	}
+
+	private _refreshLegend(): void {
+		if (!this._legendContainer) {
+			return;
+		}
+		DOM.clearNode(this._legendContainer);
+
+		const activeType = this._getActiveGraphType();
+		const isTemporal = activeType === 'temporal';
+
+		const title = DOM.append(this._legendContainer, DOM.$('div'));
+		title.textContent = isTemporal
+			? localize('prebase.maps.temporalLegendTitle', "Change Semantics")
+			: localize('prebase.maps.networkLegendTitle', "Node Types");
+		title.style.fontSize = '9.5px';
+		title.style.fontWeight = '600';
+		title.style.textTransform = 'uppercase';
+		title.style.letterSpacing = '0.05em';
+		title.style.color = MUTED;
+		title.style.marginBottom = '4px';
+
+		const itemsGrid = DOM.append(this._legendContainer, DOM.$('div'));
+		itemsGrid.style.display = 'grid';
+		itemsGrid.style.gridTemplateColumns = '1fr 1fr';
+		itemsGrid.style.gap = '4px 8px';
+		itemsGrid.style.fontSize = '10px';
+
+		const legendItems = isTemporal
+			? [
+				{ label: localize('prebase.maps.added', "Added"), color: '#2ea043' },
+				{ label: localize('prebase.maps.removed', "Removed"), color: '#f85149' },
+				{ label: localize('prebase.maps.modified', "Modified"), color: '#d29922' },
+				{ label: localize('prebase.maps.renamed', "Renamed"), color: '#1f6feb' },
+				{ label: localize('prebase.maps.surviving', "Unchanged"), color: '#6e7681' },
+			]
+			: [
+				{ label: localize('prebase.maps.components', "Components"), color: '#38bdf8' },
+				{ label: localize('prebase.maps.files', "Files"), color: '#818cf8' },
+				{ label: localize('prebase.maps.dependencies', "Dependencies"), color: '#fb923c' },
+				{ label: localize('prebase.maps.other', "Other"), color: '#94a3b8' },
+			];
+
+		for (const item of legendItems) {
+			const row = DOM.append(itemsGrid, DOM.$('div'));
+			row.style.display = 'flex';
+			row.style.alignItems = 'center';
+			row.style.gap = '5px';
+
+			const dot = DOM.append(row, DOM.$('span'));
+			dot.style.width = '7px';
+			dot.style.height = '7px';
+			dot.style.borderRadius = '50%';
+			dot.style.background = item.color;
+			dot.style.display = 'inline-block';
+			dot.style.flexShrink = '0';
+
+			const label = DOM.append(row, DOM.$('span'));
+			label.textContent = item.label;
+			label.style.color = TEXT;
+			label.style.overflow = 'hidden';
+			label.style.textOverflow = 'ellipsis';
+			label.style.whiteSpace = 'nowrap';
 		}
 	}
 

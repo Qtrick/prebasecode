@@ -20,6 +20,7 @@ import { createCurrentVersionMetadata } from './versioning.js';
 import { CanonicalParseServiceError, type ICanonicalParseService, UnavailableCanonicalParseService } from './canonicalParseService.js';
 
 import {
+	type BlobParseArtifact,
 	type ICanonicalParseArtifactCache,
 	materializeParseResult,
 } from './parseArtifactCache.js';

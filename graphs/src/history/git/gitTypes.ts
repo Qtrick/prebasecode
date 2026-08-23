@@ -120,6 +120,23 @@ export interface GitLogOptions {
 	readonly skip?: number;
 	readonly firstParent?: boolean;
 	readonly path?: string;
+	readonly author?: string;
+	readonly grep?: string;
+}
+
+export interface GitHistorySearchOptions {
+	readonly ref?: string;
+	readonly query?: string;
+	readonly message?: string;
+	readonly author?: string;
+	readonly sha?: string;
+	readonly file?: string;
+	readonly after?: string;
+	readonly before?: string;
+	readonly change?: string;
+	readonly limit?: number;
+	readonly skip?: number;
+	readonly firstParent?: boolean;
 }
 
 export interface GitBranchInfo {

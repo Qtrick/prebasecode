@@ -40,8 +40,8 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 			}
 			throw new Error(`Commit '${ref}' not found`);
 		},
-		async getCommitLog() {
-			return [
+		async getCommitLog(options?: any) {
+			const all = [
 				{
 					sha: '1111111111111111111111111111111111111111',
 					parents: [],
@@ -50,8 +50,22 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 					authorTimestamp: 1771286400000,
 					committerTimestamp: 1771286400000,
 					message: 'initial commit',
+				},
+				{
+					sha: '2222222222222222222222222222222222222222',
+					parents: ['1111111111111111111111111111111111111111'],
+					author: { name: 'Alice', email: 'alice@prebase.io', date: '2026-08-19T00:00:00Z' },
+					committer: { name: 'Alice', email: 'alice@prebase.io', date: '2026-08-19T00:00:00Z' },
+					authorTimestamp: 1771372800000,
+					committerTimestamp: 1771372800000,
+					message: 'feat(graph): add 3d camera perspective',
 				}
 			];
+			return all.filter(c => {
+				if (options?.grep && !c.message.toLowerCase().includes(options.grep.toLowerCase())) return false;
+				if (options?.author && !c.author.name.toLowerCase().includes(options.author.toLowerCase())) return false;
+				return true;
+			});
 		},
 		async listTreeEntries(_ref: string) {
 			const entries = [
@@ -281,5 +295,36 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 		assert.strictEqual(events[1].currentHead, SHARED_SHA);
 
 		disposable?.dispose();
+	});
+
+	suite('searchHistory Intelligent Search', () => {
+		test('searches commits by plain text query matching message', async () => {
+			const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
+			const results = await service.searchHistory('/workspace/test-repo', { query: 'camera' });
+			assert.strictEqual(results.length, 1);
+			assert.strictEqual(results[0].sha, '2222222222222222222222222222222222222222');
+			assert.strictEqual(results[0].message, 'feat(graph): add 3d camera perspective');
+		});
+
+		test('parses author: prefix filter', async () => {
+			const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
+			const results = await service.searchHistory('/workspace/test-repo', { query: 'author:Alice' });
+			assert.strictEqual(results.length, 1);
+			assert.strictEqual(results[0].author.name, 'Alice');
+		});
+
+		test('parses msg: prefix filter', async () => {
+			const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
+			const results = await service.searchHistory('/workspace/test-repo', { query: 'msg:initial' });
+			assert.strictEqual(results.length, 1);
+			assert.strictEqual(results[0].sha, '1111111111111111111111111111111111111111');
+		});
+
+		test('direct SHA lookup resolves exact commit', async () => {
+			const service = new WorkbenchGitHistoryService(gitServiceParam, uriIdentityService);
+			const results = await service.searchHistory('/workspace/test-repo', { sha: '1111111111111111111111111111111111111111' });
+			assert.strictEqual(results.length, 1);
+			assert.strictEqual(results[0].sha, '1111111111111111111111111111111111111111');
+		});
 	});
 });

@@ -4,11 +4,38 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { TemporalStructuralDiff, TemporalRenderNode, TemporalLayoutResult } from './temporalViewTypes.js';
+import { classifyNodeLayer, ARCHITECTURE_LAYERS, type ArchitectureLayerId } from '../../core/analysis/architectureLayers.js';
 
 export interface TemporalLayoutOptions {
 	readonly width?: number;
 	readonly height?: number;
 	readonly nodeSpacing?: number;
+}
+
+const LAYER_COLOR_MAP = new Map<ArchitectureLayerId, string>(
+	ARCHITECTURE_LAYERS.map(l => [l.id, l.color])
+);
+
+export function getArchitectureLayerColor(layerId?: ArchitectureLayerId): string {
+	return (layerId && LAYER_COLOR_MAP.get(layerId)) || '#6366f1';
+}
+
+export function getNodeLayer(node: TemporalRenderNode): ArchitectureLayerId {
+	if (node.meta?.architectureLayer) {
+		return node.meta.architectureLayer as ArchitectureLayerId;
+	}
+	return classifyNodeLayer(node.path || node.label, Boolean(node.meta?.isEntry));
+}
+
+function enrichNodeWithLayer(node: TemporalRenderNode): TemporalRenderNode {
+	const layer = getNodeLayer(node);
+	return {
+		...node,
+		meta: {
+			...(node.meta || {}),
+			architectureLayer: layer,
+		},
+	};
 }
 
 export function layoutTemporalGraph(
@@ -51,11 +78,11 @@ export function layoutTemporalGraph(
 		const prev = previousPositions.get(node.entityId);
 		if (prev) {
 			nextPositions.set(node.entityId, { x: prev.x, y: prev.y });
-			positionedNodes.push({
+			positionedNodes.push(enrichNodeWithLayer({
 				...node,
 				x: prev.x,
 				y: prev.y,
-			});
+			}));
 		} else {
 			unpositionedNodes.push(node);
 		}
@@ -64,7 +91,10 @@ export function layoutTemporalGraph(
 	// 2. If no previous positions exist (initial render), lay out all nodes deterministically via topology-informed anchors
 	if (previousPositions.size === 0) {
 		const initialResult = computeTopologyInformedInitialLayout(diff.nodes, diff.edges, nodeSpacing);
-		return initialResult;
+		return {
+			nodes: initialResult.nodes.map(enrichNodeWithLayer),
+			positions: initialResult.positions,
+		};
 	}
 
 	// 3. For newly added nodes without prior position, place near connected neighbors with collision resolution
@@ -150,11 +180,11 @@ export function layoutTemporalGraph(
 		nextPositions.set(node.entityId, slot);
 		occupiedCoords.push(slot);
 
-		positionedNodes.push({
+		positionedNodes.push(enrichNodeWithLayer({
 			...node,
 			x: slot.x,
 			y: slot.y,
-		});
+		}));
 	}
 
 	return {

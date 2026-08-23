@@ -109,6 +109,8 @@ interface LogOptions {
 	readonly sortByAuthorDate?: boolean;
 	readonly firstParent?: boolean;
 	readonly skip?: number;
+	readonly author?: string;
+	readonly grep?: string;
 }
 
 interface LsTreeItem {
@@ -540,6 +542,8 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 					path: options.path,
 					firstParent: options.firstParent,
 					skip: options.skip,
+					author: options.author,
+					grep: options.grep,
 				};
 				const commits = await repository.log(logOptions, token);
 				const mapped: GitCommitMetadataDto[] = (commits || []).map(commit => {
