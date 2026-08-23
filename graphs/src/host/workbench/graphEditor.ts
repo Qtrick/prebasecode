@@ -715,15 +715,39 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #temporalDetailsPanel .entity-item:hover { background:var(--vscode-list-hoverBackground, rgba(255,255,255,0.06)); }
 
 #empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
-#popup { position:absolute; z-index:6; width:min(320px, calc(100% - 24px)); max-height:min(340px, calc(100% - 32px)); overflow:auto; display:none; background:var(--vscode-editorWidget-background, #202122); border:1px solid var(--vscode-widget-border, #2A2B2C); border-radius:9px; padding:10px 12px; box-shadow:0 8px 24px rgba(0,0,0,.28); }
-#popup h3 { margin:0 0 2px; font-size:12px; font-weight:600; }
-#popup .meta { color:var(--vscode-descriptionForeground, #a1a1aa); font-size:10.5px; margin-bottom:6px; word-break:break-word; }
-#popup .label { font-size:9.5px; font-weight:600; text-transform:none; letter-spacing:0; color:var(--vscode-descriptionForeground, #a1a1aa); margin:6px 0 2px; }
+#popup { position:absolute; z-index:10; width:min(340px, calc(100% - 24px)); max-height:min(420px, calc(100% - 32px)); overflow:auto; display:none; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 96%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.35); backdrop-filter:blur(10px); font-size:11.5px; color:var(--vscode-foreground, #f4f4f5); }
+#popup .popup-header { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; border-bottom:1px solid var(--vscode-widget-border, rgba(255,255,255,0.08)); padding-bottom:8px; }
+#popup .popup-header-main { flex:1; min-width:0; }
+#popup .popup-badges { display:flex; gap:4px; align-items:center; margin-bottom:4px; }
+#popup .layer-badge { font-size:9.5px; font-weight:600; padding:1px 6px; border-radius:4px; text-transform:uppercase; color:#ffffff; background:#6366f1; }
+#popup .change-badge { font-size:9.5px; font-weight:600; padding:1px 6px; border-radius:4px; text-transform:uppercase; }
+#popup h3 { margin:0 0 2px; font-size:13px; font-weight:600; color:var(--vscode-editor-foreground, #f4f4f5); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+#popup .meta { color:var(--vscode-descriptionForeground, #a1a1aa); font-size:10.5px; word-break:break-all; }
+#popup #popupClose { border:0; background:transparent; color:var(--vscode-descriptionForeground, #a1a1aa); border-radius:4px; width:22px; height:22px; display:flex; align-items:center; justify-content:center; cursor:pointer; font-size:11px; flex-shrink:0; }
+#popup #popupClose:hover { background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.08)); color:var(--vscode-foreground, #f4f4f5); }
+#popup .popup-details-list { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+#popup .detail-row { display:flex; justify-content:space-between; align-items:center; font-size:11px; padding:2px 0; }
+#popup .detail-label { color:var(--vscode-descriptionForeground, #a1a1aa); }
+#popup .detail-value { font-weight:500; }
+#popup .actions { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; border-top:1px solid var(--vscode-widget-border, rgba(255,255,255,0.08)); padding-top:8px; }
+#popup .actions button { background:var(--vscode-button-secondaryBackground, #3a3d41); color:var(--vscode-button-secondaryForeground, #ffffff); border:1px solid transparent; border-radius:4px; padding:4px 10px; font-size:11px; cursor:pointer; font-weight:500; transition:background 0.1s ease; }
+#popup .actions button:hover { background:var(--vscode-button-secondaryHoverBackground, #45494e); }
+#popup .actions button.primary { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
+#popup .actions button.primary:hover { background:var(--vscode-button-hoverBackground, #14b8a6); }
+.no-changes-card { position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); z-index:4; display:none; flex-direction:column; align-items:center; gap:8px; text-align:center; padding:20px 24px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; backdrop-filter:blur(8px); box-shadow:0 8px 24px rgba(0,0,0,0.25); max-width:380px; }
+.no-changes-card .title { font-size:13px; font-weight:600; color:var(--vscode-foreground, #f4f4f5); }
+.no-changes-card .desc { font-size:11.5px; color:var(--vscode-descriptionForeground, #a1a1aa); line-height:1.4; }
+.no-changes-card button { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); border:0; border-radius:4px; padding:6px 14px; font-weight:600; font-size:11.5px; cursor:pointer; margin-top:4px; }
 </style>
 </head>
 <body>
 <div id="stage">
 	<div id="empty">Preparing graph…</div>
+	<div id="noChangesCard" class="no-changes-card">
+		<div class="title">No structural graph changes in this commit</div>
+		<div class="desc">Only non-graph modifications (comments, text, or documentation) occurred in this revision.</div>
+		<button id="noChangesViewSource" type="button">View Source Changes</button>
+	</div>
 	<svg id="archSvg"></svg>
 	<canvas id="netCanvas"></canvas>
 	<div id="temporalDetailsPanel" role="region" aria-label="Commit details and structural delta">
@@ -775,11 +799,11 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	</label>
 	<div id="temporalDisplayModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; overflow:hidden;">
 		<button id="temporalModeChangesBtn" type="button" class="active" title="Highlight structural differences against comparison base">Changes</button>
-		<button id="temporalModeStateBtn" type="button" title="View complete codebase state at selected commit">State</button>
+		<button id="temporalModeStateBtn" type="button" title="View complete codebase architecture at selected commit">Full Codebase</button>
 	</div>
 	<div id="temporalContextModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; overflow:hidden; margin-left:2px;">
-		<button id="temporalContextFocusedBtn" type="button" class="active" title="Show only changed files and 1-hop connected context">Focused</button>
-		<button id="temporalContextFullBtn" type="button" title="Show full repository context">Full Context</button>
+		<button id="temporalContextFocusedBtn" type="button" class="active" title="Show only changed files and 1-hop connected context">Changed Only</button>
+		<button id="temporalContextFullBtn" type="button" title="Show 1-hop neighbor context">Nearby Context</button>
 	</div>
 	<label style="display:flex; align-items:center; gap:4px; font-size:11px; margin-left:4px;">
 		<input type="checkbox" id="temporalFollowHead" checked> Follow HEAD
@@ -789,7 +813,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<span id="badgeRemoved" class="badge-removed" title="Removed nodes">-0</span>
 		<span id="badgeModified" class="badge-modified" title="Modified nodes">~0</span>
 		<span id="badgeRenamed" class="badge-renamed" title="Renamed nodes">⇄0</span>
-		<span id="temporalPartialWarning" class="badge-warning" title="Some historical lineage is still being indexed. Structural identity may be incomplete for this comparison.">Partial</span>
+		<span id="temporalPartialWarning" class="badge-warning" title="Lineage indexing is in progress.">Reconciling…</span>
 	</div>
 	<input id="temporalFilterInput" type="search" placeholder="Filter entities…" style="width:130px;" aria-label="Filter temporal entities">
 </div>
@@ -815,17 +839,26 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 
 <div id="legend"></div>
 <div id="popup" role="dialog" aria-modal="false" aria-label="Node details">
-	<button id="popupClose" type="button" title="Close" aria-label="Close details">×</button>
-	<h3 id="popupTitle"></h3>
-	<div class="meta" id="popupMeta"></div>
-	<div class="label">Overview</div>
-	<p id="popupOverview"></p>
-	<div class="label">AI Summary</div>
-	<p id="popupAi"></p>
+	<div class="popup-header">
+		<div class="popup-header-main">
+			<div class="popup-badges">
+				<span id="popupLayerBadge" class="layer-badge" style="display:none;"></span>
+				<span id="popupChangeBadge" class="change-badge" style="display:none;"></span>
+			</div>
+			<h3 id="popupTitle"></h3>
+			<div class="meta" id="popupMeta"></div>
+		</div>
+		<button id="popupClose" type="button" title="Close (Esc)" aria-label="Close details">✕</button>
+	</div>
+	<div id="popupDetailsList" class="popup-details-list"></div>
+	<div id="popupAiWrap" style="display:none;">
+		<div class="label" style="font-size:9.5px; font-weight:600; color:var(--vscode-descriptionForeground, #a1a1aa); margin:4px 0 2px;">AI Description</div>
+		<p id="popupAi" style="margin:0 0 6px; font-size:11px; line-height:1.4; color:var(--vscode-foreground, #f4f4f5);"></p>
+	</div>
 	<div class="actions">
-		<button class="primary" id="popupOpen" type="button" title="Open File" aria-label="Open File">Open File</button>
-		<button id="popupHistoricalView" type="button" title="View historical revision at this commit" aria-label="View at Commit" style="display:none;">View at Commit</button>
 		<button id="popupSourceDiff" type="button" class="primary" title="View Source Diff against base" aria-label="View Source Diff" style="display:none;">View Source Diff</button>
+		<button id="popupHistoricalView" type="button" class="primary" title="View historical revision at this commit" aria-label="View at Commit" style="display:none;">View at Commit</button>
+		<button class="primary" id="popupOpen" type="button" title="Open File" aria-label="Open File">Open File</button>
 		<button id="popupSetBase" type="button" title="Set this commit as comparison base" aria-label="Set as Base" style="display:none;">Set as Base</button>
 		<button id="popupReveal" type="button" title="Reveal in Explorer" aria-label="Reveal in Explorer">Reveal</button>
 		<button id="popupMagnus" type="button" title="Attach to Agents" aria-label="Attach to Agents">Attach to Agents</button>
@@ -913,7 +946,10 @@ const badgeRenamed = document.getElementById('badgeRenamed');
 const popup = document.getElementById('popup');
 const popupTitle = document.getElementById('popupTitle');
 const popupMeta = document.getElementById('popupMeta');
-const popupOverview = document.getElementById('popupOverview');
+const popupLayerBadge = document.getElementById('popupLayerBadge');
+const popupChangeBadge = document.getElementById('popupChangeBadge');
+const popupDetailsList = document.getElementById('popupDetailsList');
+const popupAiWrap = document.getElementById('popupAiWrap');
 const popupAi = document.getElementById('popupAi');
 const popupOpen = document.getElementById('popupOpen');
 const popupHistoricalView = document.getElementById('popupHistoricalView');
@@ -921,6 +957,8 @@ const popupSourceDiff = document.getElementById('popupSourceDiff');
 const popupSetBase = document.getElementById('popupSetBase');
 const popupReveal = document.getElementById('popupReveal');
 const popupMagnus = document.getElementById('popupMagnus');
+const noChangesCard = document.getElementById('noChangesCard');
+const noChangesViewSource = document.getElementById('noChangesViewSource');
 
 let popupNode = null;
 let pointerDownNode = null;
@@ -939,6 +977,40 @@ const FILE_COLORS = {
 	typescript:'#3178c6', javascript:'#f1e05a', css:'#a371f7', html:'#e34c26',
 	markdown:'#519aba', image:'#c678dd', config:'#6b7280', other:'#71717a'
 };
+
+const ARCHITECTURE_LAYER_COLORS = {
+	'entry': '#f59e0b',
+	'frontend': '#818cf8',
+	'ui': '#a78bfa',
+	'components': '#c084fc',
+	'api': '#38bdf8',
+	'auth': '#f472b6',
+	'services': '#34d399',
+	'backend': '#2dd4bf',
+	'database': '#fb923c',
+	'utils': '#71717a',
+	'config': '#52525b',
+	'tests': '#52525b',
+	'other': '#6366f1'
+};
+
+function getArchitectureLayerColor(layer) {
+	if (!layer) return '#6366f1';
+	return ARCHITECTURE_LAYER_COLORS[layer.toLowerCase()] || '#6366f1';
+}
+
+const textWidthCache = new Map();
+function measureTextWidth(text, font) {
+	const key = font + '::' + text;
+	let w = textWidthCache.get(key);
+	if (w === undefined) {
+		ctx.font = font;
+		w = Math.ceil(ctx.measureText(text).width);
+		if (textWidthCache.size > 2000) textWidthCache.clear();
+		textWidthCache.set(key, w);
+	}
+	return w;
+}
 
 let transform = { x: 0, y: 0, k: 1 };
 let rotation = { yaw: 0.55, pitch: 0.28 };
@@ -1083,7 +1155,7 @@ function computeNetworkPickRadius(node, depthScale, entryId) {
 
 function computeTemporalVisibleElements(diff, mode, contextMode) {
 	if (!diff || !diff.nodes || !diff.nodes.length) {
-		return { nodes: [], edges: [], focusSet: new Set(), directContextSet: new Set() };
+		return { nodes: [], edges: [], focusSet: new Set(), directContextSet: new Set(), hasZeroChanges: true };
 	}
 	const allNodes = diff.nodes;
 	const allEdges = diff.edges || [];
@@ -1095,7 +1167,7 @@ function computeTemporalVisibleElements(diff, mode, contextMode) {
 			const t = e.targetEntityId || e.targetId;
 			return stateIdSet.has(s) && stateIdSet.has(t) && e.changeKind !== 'removed';
 		});
-		return { nodes: stateNodes, edges: stateEdges, focusSet: stateIdSet, directContextSet: new Set() };
+		return { nodes: stateNodes, edges: stateEdges, focusSet: stateIdSet, directContextSet: new Set(), hasZeroChanges: false };
 	}
 
 	// Changes mode
@@ -1104,8 +1176,7 @@ function computeTemporalVisibleElements(diff, mode, contextMode) {
 	const directContextSet = new Set();
 
 	if (focusSet.size === 0) {
-		const visibleSet = new Set(allNodes.map(n => n.entityId));
-		return { nodes: allNodes, edges: allEdges, focusSet: visibleSet, directContextSet: new Set() };
+		return { nodes: [], edges: [], focusSet: new Set(), directContextSet: new Set(), hasZeroChanges: true };
 	}
 
 	for (let i = 0; i < allEdges.length; i++) {
@@ -1124,9 +1195,9 @@ function computeTemporalVisibleElements(diff, mode, contextMode) {
 			const t = e.targetEntityId || e.targetId;
 			return visibleIdSet.has(s) && visibleIdSet.has(t);
 		});
-		return { nodes: visibleNodes, edges: visibleEdges, focusSet: focusSet, directContextSet: directContextSet };
+		return { nodes: visibleNodes, edges: visibleEdges, focusSet: focusSet, directContextSet: directContextSet, hasZeroChanges: false };
 	} else {
-		return { nodes: allNodes, edges: allEdges, focusSet: focusSet, directContextSet: directContextSet };
+		return { nodes: allNodes, edges: allEdges, focusSet: focusSet, directContextSet: directContextSet, hasZeroChanges: false };
 	}
 }
 
@@ -1763,9 +1834,6 @@ function drawTemporalFrame(ts) {
 	const theme = getComputedThemeColors();
 
 	ctx.clearRect(0, 0, w, h);
-	ctx.save();
-	ctx.translate(transform.x, transform.y);
-	ctx.scale(transform.k, transform.k);
 
 	const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const isReduced = settings.reduceMotion || prefersReduced;
@@ -1781,11 +1849,46 @@ function drawTemporalFrame(ts) {
 
 	// 1. Calculate Focus+Context visible elements
 	const visibleData = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
+
+	if (visibleData.hasZeroChanges && displayMode === 'changes') {
+		if (noChangesCard) noChangesCard.style.display = 'flex';
+		return;
+	} else {
+		if (noChangesCard) noChangesCard.style.display = 'none';
+	}
+
+	ctx.save();
+	ctx.translate(transform.x, transform.y);
+	ctx.scale(transform.k, transform.k);
+
+	// 2. Render Architecture Hierarchy Guides in Full Codebase Mode
+	if (displayMode === 'state' && temporalDiff && Array.isArray(temporalDiff.guides)) {
+		for (let g = 0; g < temporalDiff.guides.length; g++) {
+			const guide = temporalDiff.guides[g];
+			if (guide && guide.radius > 0) {
+				ctx.save();
+				ctx.beginPath();
+				ctx.arc(0, 0, guide.radius, 0, Math.PI * 2);
+				ctx.strokeStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.16)' : 'rgba(148, 163, 184, 0.10)';
+				ctx.lineWidth = 1.0;
+				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 6]);
+				ctx.stroke();
+				if (guide.label && transform.k >= 0.45) {
+					ctx.font = '9.5px ui-sans-serif, system-ui, sans-serif';
+					ctx.fillStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.35)' : 'rgba(148, 163, 184, 0.4)';
+					ctx.textAlign = 'left';
+					ctx.fillText(guide.label.toUpperCase(), 12, -guide.radius + 12);
+				}
+				ctx.restore();
+			}
+		}
+	}
+
 	const visibleNodeSet = new Set(visibleData.nodes.map(n => n.entityId));
 	const focusSet = visibleData.focusSet;
 	const directContextSet = visibleData.directContextSet;
 
-	// 2. Render Edges
+	// 3. Render Edges (Curved Bezier with Dark Contrast Halo)
 	if (visibleData.edges) {
 		for (let i = 0; i < visibleData.edges.length; i++) {
 			const edge = visibleData.edges[i];
@@ -1799,35 +1902,62 @@ function drawTemporalFrame(ts) {
 			const sp = getVisualNodePosition(sourceNode, ease);
 			const tp = getVisualNodePosition(targetNode, ease);
 
-			ctx.beginPath();
-			ctx.moveTo(sp.x, sp.y);
-			ctx.lineTo(tp.x, tp.y);
+			const dx = tp.x - sp.x;
+			const dy = tp.y - sp.y;
+			const dist = Math.hypot(dx, dy);
+			const curvature = Math.min(0.24, Math.max(0.08, 30 / (dist + 1)));
+			const midX = (sp.x + tp.x) / 2;
+			const midY = (sp.y + tp.y) / 2;
+			const cpX = midX - dy * curvature * 0.35;
+			const cpY = midY + dx * curvature * 0.35;
+
+			let edgeColor = theme.isHighContrast ? 'rgba(255, 255, 255, 0.35)' : 'rgba(148, 163, 184, 0.2)';
+			let edgeWidth = 1.0;
+			let edgeDash = [];
 
 			if (edge.changeKind === 'added') {
-				ctx.strokeStyle = theme.added;
-				ctx.lineWidth = 1.8;
-				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+				edgeColor = theme.added;
+				edgeWidth = 1.8;
 			} else if (edge.changeKind === 'removed') {
-				ctx.strokeStyle = theme.deleted;
-				ctx.lineWidth = 1.4;
-				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 4]);
+				edgeColor = theme.deleted;
+				edgeWidth = 1.4;
+				edgeDash = [4, 4];
 			} else if (edge.changeKind === 'modified') {
-				ctx.strokeStyle = theme.modified;
-				ctx.lineWidth = 1.8;
-				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
-			} else {
-				ctx.strokeStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.35)' : 'rgba(148, 163, 184, 0.2)';
-				ctx.lineWidth = 1.0;
-				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+				edgeColor = theme.modified;
+				edgeWidth = 1.8;
 			}
+
+			ctx.save();
+			// Dark contrast halo beneath edge
+			ctx.beginPath();
+			ctx.moveTo(sp.x, sp.y);
+			if (typeof ctx.quadraticCurveTo === 'function') {
+				ctx.quadraticCurveTo(cpX, cpY, tp.x, tp.y);
+			} else {
+				ctx.lineTo(tp.x, tp.y);
+			}
+			ctx.strokeStyle = theme.isHighContrast ? 'rgba(0, 0, 0, 0.95)' : 'rgba(15, 23, 42, 0.65)';
+			ctx.lineWidth = edgeWidth + 2.2;
 			ctx.stroke();
-			if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+
+			// Colored stroke
+			ctx.beginPath();
+			ctx.moveTo(sp.x, sp.y);
+			if (typeof ctx.quadraticCurveTo === 'function') {
+				ctx.quadraticCurveTo(cpX, cpY, tp.x, tp.y);
+			} else {
+				ctx.lineTo(tp.x, tp.y);
+			}
+			ctx.strokeStyle = edgeColor;
+			ctx.lineWidth = edgeWidth;
+			if (edgeDash.length && typeof ctx.setLineDash === 'function') ctx.setLineDash(edgeDash);
+			ctx.stroke();
+			ctx.restore();
 		}
 	}
 
-	// 3. Render Nodes (Distant Context -> Direct Context -> Changed Focus Nodes)
+	// 4. Render Nodes (Distant Context -> Direct Context -> Changed Focus Nodes)
 	const nodesToRender = visibleData.nodes;
-	// Sort by focus priority so changed nodes draw on top
 	nodesToRender.sort((a, b) => {
 		const aRank = a.changeKind && a.changeKind !== 'unchanged' ? 2 : (directContextSet.has(a.entityId) ? 1 : 0);
 		const bRank = b.changeKind && b.changeKind !== 'unchanged' ? 2 : (directContextSet.has(b.entityId) ? 1 : 0);
@@ -1843,32 +1973,29 @@ function drawTemporalFrame(ts) {
 		const isFocus = Boolean(node.changeKind && node.changeKind !== 'unchanged');
 		const isDirectContext = directContextSet.has(node.entityId);
 
-		let r = isFocus ? 6.5 : (isDirectContext ? 3.8 : 3.0);
-		let fillColor = theme.isHighContrast ? '#000000' : 'rgba(110, 118, 129, 0.25)';
+		const layerColor = getArchitectureLayerColor(node.meta?.architectureLayer);
+		let r = isFocus ? 6.5 : (isDirectContext ? 4.2 : 3.4);
 		let strokeColor = theme.isHighContrast ? '#ffffff' : '#6e7681';
-		let alpha = isFocus ? 1.0 : (isDirectContext ? 0.85 : 0.4);
+		let alpha = isFocus ? 1.0 : (isDirectContext ? 0.85 : 0.45);
 
 		if (node.changeKind === 'added') {
-			fillColor = 'rgba(63, 185, 80, 0.3)';
 			strokeColor = theme.added;
 		} else if (node.changeKind === 'removed') {
-			fillColor = 'rgba(248, 81, 73, 0.25)';
 			strokeColor = theme.deleted;
 		} else if (node.changeKind === 'modified') {
-			fillColor = 'rgba(210, 153, 34, 0.3)';
 			strokeColor = theme.modified;
 		} else if (node.changeKind === 'renamed') {
-			fillColor = 'rgba(163, 113, 247, 0.3)';
 			strokeColor = theme.renamed;
 		}
 
 		if (!isMatch) {
-			alpha *= 0.3;
+			alpha *= 0.25;
 		}
 
 		ctx.save();
 		ctx.globalAlpha = alpha;
 
+		// Selection / Hover highlights
 		if (isSelected) {
 			ctx.beginPath();
 			ctx.arc(pos.x, pos.y, r + 4, 0, Math.PI * 2);
@@ -1883,10 +2010,22 @@ function drawTemporalFrame(ts) {
 			ctx.stroke();
 		}
 
+		// Entry indicator
+		if (node.meta?.isEntry) {
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, r + 2.5, 0, Math.PI * 2);
+			ctx.strokeStyle = '#f59e0b';
+			ctx.lineWidth = 1.2;
+			ctx.stroke();
+		}
+
+		// Node Interior: Architecture Layer Color
 		ctx.beginPath();
 		ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
-		ctx.fillStyle = fillColor;
+		ctx.fillStyle = layerColor;
 		ctx.fill();
+
+		// Node Outer Ring: Change Status
 		ctx.lineWidth = isFocus ? 2.0 : 1.2;
 		if (node.changeKind === 'removed' && typeof ctx.setLineDash === 'function') {
 			ctx.setLineDash([2, 2]);
@@ -1897,7 +2036,7 @@ function drawTemporalFrame(ts) {
 		ctx.restore();
 	}
 
-	// 4. Labels with Level of Detail
+	// 5. Labels with Level of Detail & Screen-Space Collision Culling
 	const placedLabels = [];
 	for (let i = 0; i < nodesToRender.length; i++) {
 		const node = nodesToRender[i];
@@ -1909,14 +2048,15 @@ function drawTemporalFrame(ts) {
 
 		const pos = getVisualNodePosition(node, ease);
 		const labelText = node.label || node.path || '';
-		const r = isFocus ? 6.5 : 3.8;
+		const r = isFocus ? 6.5 : 4.0;
 		const labelY = pos.y + r + 10;
+		const font = (isSelected || isHovered) ? 'bold 11px ui-sans-serif, system-ui, sans-serif' : '10px ui-sans-serif, system-ui, sans-serif';
 
-		const estW = Math.max(16, labelText.length * 6.2);
-		const boxLeft = pos.x - estW / 2 - 2;
+		const estW = measureTextWidth(labelText, font);
+		const boxLeft = pos.x - estW / 2 - 3;
 		const boxTop = labelY - 7;
-		const boxW = estW + 4;
-		const boxH = 13;
+		const boxW = estW + 6;
+		const boxH = 14;
 
 		if (!isSelected && !isHovered) {
 			let collision = false;
@@ -1932,9 +2072,9 @@ function drawTemporalFrame(ts) {
 		placedLabels.push({ x: boxLeft, y: boxTop, w: boxW, h: boxH });
 
 		ctx.save();
-		ctx.font = (isSelected || isHovered) ? 'bold 11px ui-sans-serif, system-ui, sans-serif' : '10px ui-sans-serif, system-ui, sans-serif';
+		ctx.font = font;
 		ctx.textAlign = 'center';
-		ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+		ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
 		ctx.fillRect(boxLeft, boxTop, boxW, boxH);
 		ctx.fillStyle = isSelected ? '#2dd4bf' : (isHovered ? '#58a6ff' : (isFocus ? '#f4f4f5' : 'rgba(244, 244, 245, 0.75)'));
 		ctx.fillText(labelText, pos.x, labelY + 3);
@@ -2270,22 +2410,15 @@ function closePopup() {
 	popupNode = null;
 }
 
-function inferOverview(node) {
-	if (node.overview) return node.overview;
-	if (node.description) return node.description;
-	if (node.path) return 'File: ' + node.path;
-	return 'Entity: ' + (node.label || node.id);
-}
-
 function placePopupNear(clientX, clientY) {
 	if (!popup) return;
-	const pw = 300, ph = 200;
-	let left = clientX + 12;
-	let top = clientY + 12;
-	if (left + pw > window.innerWidth - 12) left = clientX - pw - 12;
-	if (top + ph > window.innerHeight - 12) top = clientY - ph - 12;
-	popup.style.left = Math.max(12, left) + 'px';
-	popup.style.top = Math.max(12, top) + 'px';
+	const pw = 340, ph = 260;
+	let left = clientX + 14;
+	let top = clientY + 14;
+	if (left + pw > window.innerWidth - 14) left = clientX - pw - 14;
+	if (top + ph > window.innerHeight - 64) top = clientY - ph - 14;
+	popup.style.left = Math.max(14, Math.min(window.innerWidth - pw - 14, left)) + 'px';
+	popup.style.top = Math.max(52, Math.min(window.innerHeight - ph - 64, top)) + 'px';
 	popup.style.display = 'block';
 }
 
@@ -2300,13 +2433,93 @@ function openNodePopup(node, clientX, clientY) {
 
 	selectedNodeId = node.entityId || node.id;
 	if (popupTitle) popupTitle.textContent = node.label || node.id;
-	if (popupMeta) popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '') + (node.changeKind ? ' · ' + node.changeKind.toUpperCase() : '');
-	if (popupOverview) popupOverview.textContent = inferOverview(node);
+	if (popupMeta) popupMeta.textContent = node.path || '';
+
+	const layer = (node.meta && node.meta.architectureLayer) ? node.meta.architectureLayer : 'other';
+	if (popupLayerBadge) {
+		popupLayerBadge.style.display = 'inline-block';
+		popupLayerBadge.textContent = layer;
+		popupLayerBadge.style.backgroundColor = getArchitectureLayerColor(layer);
+	}
+
+	if (popupChangeBadge) {
+		if (node.changeKind) {
+			popupChangeBadge.style.display = 'inline-block';
+			popupChangeBadge.textContent = node.changeKind.toUpperCase();
+			if (node.changeKind === 'added') {
+				popupChangeBadge.style.background = 'rgba(63, 185, 80, 0.2)';
+				popupChangeBadge.style.color = '#3fb950';
+			} else if (node.changeKind === 'removed') {
+				popupChangeBadge.style.background = 'rgba(248, 81, 73, 0.2)';
+				popupChangeBadge.style.color = '#f85149';
+			} else if (node.changeKind === 'modified') {
+				popupChangeBadge.style.background = 'rgba(210, 153, 34, 0.2)';
+				popupChangeBadge.style.color = '#d29922';
+			} else if (node.changeKind === 'renamed') {
+				popupChangeBadge.style.background = 'rgba(163, 113, 247, 0.2)';
+				popupChangeBadge.style.color = '#a371f7';
+			} else {
+				popupChangeBadge.style.background = 'rgba(255, 255, 255, 0.08)';
+				popupChangeBadge.style.color = '#a1a1aa';
+			}
+		} else {
+			popupChangeBadge.style.display = 'none';
+		}
+	}
+
+	if (popupDetailsList) {
+		popupDetailsList.innerHTML = '';
+		const rows = [
+			{ label: 'Layer', value: layer.charAt(0).toUpperCase() + layer.slice(1) },
+			{ label: 'Language', value: (node.meta && node.meta.language) ? node.meta.language : fileType(node.path || node.label).label },
+			{ label: 'Exports', value: (node.meta && Array.isArray(node.meta.exports)) ? (node.meta.exports.length + ' symbols') : '0 symbols' },
+			{ label: 'Imports', value: (node.meta && Array.isArray(node.meta.imports)) ? (node.meta.imports.length + ' dependencies') : '0 dependencies' }
+		];
+		if (node.meta && typeof node.meta.linesOfCode === 'number' && node.meta.linesOfCode > 0) {
+			rows.push({ label: 'Lines of Code', value: node.meta.linesOfCode + ' lines' });
+		}
+		if (node.oldPath) {
+			rows.push({ label: 'Old Path', value: node.oldPath });
+		}
+
+		for (let i = 0; i < rows.length; i++) {
+			const r = rows[i];
+			const div = document.createElement('div');
+			div.className = 'detail-row';
+			const lbl = document.createElement('span');
+			lbl.className = 'detail-label';
+			lbl.textContent = r.label;
+			const val = document.createElement('span');
+			val.className = 'detail-value';
+			val.textContent = r.value;
+			div.appendChild(lbl);
+			div.appendChild(val);
+			popupDetailsList.appendChild(div);
+		}
+	}
+
 	if (popupAi) popupAi.textContent = '';
+	if (popupAiWrap) {
+		if (isTemporal()) {
+			popupAiWrap.style.display = 'none';
+		} else {
+			popupAiWrap.style.display = 'block';
+		}
+	}
 
 	if (isTemporal()) {
-		if (popupSourceDiff) popupSourceDiff.style.display = 'inline-block';
-		if (popupHistoricalView) popupHistoricalView.style.display = 'inline-block';
+		const isChanged = Boolean(node.changeKind && node.changeKind !== 'unchanged');
+		if (popupSourceDiff) {
+			popupSourceDiff.style.display = isChanged ? 'inline-block' : 'none';
+		}
+		if (popupHistoricalView) {
+			popupHistoricalView.style.display = 'inline-block';
+			if (isChanged) {
+				popupHistoricalView.classList.remove('primary');
+			} else {
+				popupHistoricalView.classList.add('primary');
+			}
+		}
 		if (popupSetBase) popupSetBase.style.display = 'inline-block';
 		if (popupOpen) popupOpen.style.display = 'none';
 		if (popupMagnus) {
@@ -2653,6 +2866,14 @@ if (temporalDetailsClose && temporalDetailsPanel) {
 	temporalDetailsClose.addEventListener('click', function () {
 		temporalDetailsPanel.style.display = 'none';
 		if (temporalToggleDetailsBtn) temporalToggleDetailsBtn.textContent = 'Details ▾';
+	});
+}
+if (noChangesViewSource) {
+	noChangesViewSource.addEventListener('click', function () {
+		const targetSha = (temporalDiff && temporalDiff.targetCommitSha) || (temporalState && temporalState.renderedCommitSha);
+		if (targetSha) {
+			request('openCommitChanges', { commitSha: targetSha });
+		}
 	});
 }
 if (temporalScrubber) {

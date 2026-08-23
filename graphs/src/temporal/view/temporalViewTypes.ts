@@ -85,6 +85,9 @@ export interface TemporalStructuralDiff {
 	readonly summary: TemporalStructuralDiffSummary;
 	readonly isPartialLineage: boolean;
 	readonly partialLineageReason?: string;
+	readonly bands?: readonly any[];
+	readonly guides?: readonly any[];
+	readonly entryEntityId?: string;
 }
 
 export interface TemporalCommitSummary {

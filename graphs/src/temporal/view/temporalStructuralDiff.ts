@@ -78,7 +78,16 @@ export function computeTemporalStructuralDiff(
 		const targetEntityMap = new Map<string, TemporalEntitySnapshot>();
 		for (const te of targetEntities) {
 			targetEntityMap.set(te.entityId, te);
+		}
+
+		const matchedBaseEntityIds = new Set<string>();
+
+		for (const te of targetEntities) {
 			const be = baseEntityMap.get(te.entityId);
+			if (be) {
+				matchedBaseEntityIds.add(be.entityId);
+			}
+
 			let changeKind: TemporalNodeChangeKind;
 			let oldPath: string | undefined;
 			let isModified = false;
@@ -128,7 +137,7 @@ export function computeTemporalStructuralDiff(
 
 		// Check for removed entities present in base but absent in target
 		for (const be of baseEntities) {
-			if (!targetEntityMap.has(be.entityId)) {
+			if (!matchedBaseEntityIds.has(be.entityId)) {
 				const beCanonicalId = (be as any).canonicalNodeId || be.nodeData?.id || be.path;
 				nodes.push({
 					entityId: be.entityId,
@@ -148,31 +157,33 @@ export function computeTemporalStructuralDiff(
 		// Edge diffing
 		const baseEdgeMap = new Map<string, TemporalEdgeSnapshot>();
 		if (baseEdges) {
-			for (const bEdge of baseEdges) {
-				const key = makeEdgeKey(bEdge.sourceEntityId, bEdge.targetEntityId, bEdge.kind);
-				baseEdgeMap.set(key, bEdge);
+			for (const be of baseEdges) {
+				baseEdgeMap.set(be.edgeId, be);
 			}
 		}
 
-		const targetEdgeMap = new Map<string, TemporalEdgeSnapshot>();
+		const matchedBaseEdgeIds = new Set<string>();
+
 		for (const tEdge of targetEdges) {
-			const key = makeEdgeKey(tEdge.sourceEntityId, tEdge.targetEntityId, tEdge.kind);
-			targetEdgeMap.set(key, tEdge);
-			const bEdge = baseEdgeMap.get(key);
-			let changeKind: TemporalEdgeChangeKind;
-
-			if (!bEdge) {
-				changeKind = 'added';
-				edgeAddedCount++;
-			} else if (hasEdgeDataChanged(tEdge.edgeData, bEdge.edgeData)) {
-				changeKind = 'modified';
-				edgeModifiedCount++;
-			} else {
-				changeKind = 'unchanged';
-			}
-
 			const srcPath = (tEdge as any).sourcePath || targetEntityMap.get(tEdge.sourceEntityId)?.path || '';
 			const tgtPath = (tEdge as any).targetPath || targetEntityMap.get(tEdge.targetEntityId)?.path || '';
+
+			const bEdge = baseEdgeMap.get(tEdge.edgeId);
+			if (bEdge) {
+				matchedBaseEdgeIds.add(bEdge.edgeId);
+			}
+
+			let edgeChangeKind: TemporalEdgeChangeKind;
+			if (!bEdge) {
+				edgeChangeKind = 'added';
+				edgeAddedCount++;
+			} else if (hasEdgeDataChanged(tEdge.edgeData, bEdge.edgeData)) {
+				edgeChangeKind = 'modified';
+				edgeModifiedCount++;
+			} else {
+				edgeChangeKind = 'unchanged';
+			}
+
 			edges.push({
 				edgeId: tEdge.edgeId,
 				sourceEntityId: tEdge.sourceEntityId,
@@ -180,17 +191,18 @@ export function computeTemporalStructuralDiff(
 				sourcePath: srcPath,
 				targetPath: tgtPath,
 				kind: tEdge.kind,
-				changeKind,
+				changeKind: edgeChangeKind,
 				edgeData: tEdge.edgeData as any,
 			});
 		}
 
+		// Check for removed edges
 		if (baseEdges) {
 			for (const bEdge of baseEdges) {
-				const key = makeEdgeKey(bEdge.sourceEntityId, bEdge.targetEntityId, bEdge.kind);
-				if (!targetEdgeMap.has(key)) {
+				if (!matchedBaseEdgeIds.has(bEdge.edgeId)) {
 					const srcPath = (bEdge as any).sourcePath || baseEntityMap.get(bEdge.sourceEntityId)?.path || '';
 					const tgtPath = (bEdge as any).targetPath || baseEntityMap.get(bEdge.targetEntityId)?.path || '';
+
 					edges.push({
 						edgeId: bEdge.edgeId,
 						sourceEntityId: bEdge.sourceEntityId,
@@ -233,10 +245,6 @@ export function computeTemporalStructuralDiff(
 function getLabelFromPath(p: string): string {
 	const lastSlash = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\'));
 	return lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
-}
-
-function makeEdgeKey(sourceEntityId: string, targetEntityId: string, kind: string): string {
-	return `${sourceEntityId}-->${targetEntityId}::${kind}`;
 }
 
 function hasNodeContentChanged(te: TemporalEntitySnapshot, be?: TemporalEntitySnapshot): boolean {

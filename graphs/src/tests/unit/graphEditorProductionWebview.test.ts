@@ -123,6 +123,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 		beginPath() { drawCalls.push({ type: 'beginPath', args: [] }); },
 		moveTo(...args: any[]) { drawCalls.push({ type: 'moveTo', args }); },
 		lineTo(...args: any[]) { drawCalls.push({ type: 'lineTo', args }); },
+		quadraticCurveTo(...args: any[]) { drawCalls.push({ type: 'quadraticCurveTo', args }); },
 		stroke() { drawCalls.push({ type: 'stroke', args: [] }); },
 		fill() { drawCalls.push({ type: 'fill', args: [] }); },
 		fillRect(...args: any[]) { drawCalls.push({ type: 'fillRect', args }); },
@@ -445,11 +446,11 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		const commitMsgEl = harness.elements.get('temporalCommitMessage')!;
 		assert.strictEqual(commitMsgEl.textContent, 'Fix temporal transitions');
 
-		// Verify draw calls for temporal nodes
+		// Verify draw calls for temporal nodes and edges
 		const arcCalls = harness.drawCalls.filter(c => c.type === 'arc');
-		const lineToCalls = harness.drawCalls.filter(c => c.type === 'lineTo');
+		const edgeDrawCalls = harness.drawCalls.filter(c => c.type === 'quadraticCurveTo' || c.type === 'lineTo');
 		assert.ok(arcCalls.length >= 2, `Expected at least 2 temporal node arcs, got ${arcCalls.length}`);
-		assert.ok(lineToCalls.length >= 1, `Expected at least 1 temporal edge line, got ${lineToCalls.length}`);
+		assert.ok(edgeDrawCalls.length >= 1, `Expected at least 1 temporal edge draw call, got ${edgeDrawCalls.length}`);
 
 		// Verify translates do not double-count (w/2, h/2)
 		const translateCalls = harness.drawCalls.filter(c => c.type === 'translate');

@@ -25,7 +25,7 @@ import {
 	type TemporalComparisonMode,
 } from '../../../temporal/view/temporalViewTypes.js';
 import { computeTemporalStructuralDiff } from '../../../temporal/view/temporalStructuralDiff.js';
-import { layoutTemporalGraph } from '../../../temporal/view/temporalLayoutEngine.js';
+import { computeArchitectureTemporalLayout } from '../../../view/temporal/temporalArchitectureAdapter.js';
 import { GitHistoryError, type GitHeadChangeEvent } from '../../../history/git/gitHistoryService.js';
 import type {
 	TemporalCommitSummary as ITemporalStoreCommitSummary,
@@ -761,11 +761,14 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			}
 
 			const targetPreStatus = await this._temporalGraphService.getCommitIndexStatus(root, targetSha, cts.token);
-			const isTargetReady = targetPreStatus.status === 'ready' || targetPreStatus.status === 'incomplete';
+			const isTargetPartialInitial = targetPreStatus.lineageCoverage?.kind === 'partial';
 
-			const targetGraph = isTargetReady
-				? await this._temporalGraphService.getGraphAtCommit(root, targetSha, cts.token)
-				: await this._temporalGraphService.ensureCommitIndexed(root, targetSha, cts.token);
+			// If target was previously stored as a partial anchor and base is now ready, reconcile target
+			const targetGraph = (isTargetPartialInitial && baseSha)
+				? await this._temporalGraphService.ensureCommitIndexed(root, targetSha, cts.token)
+				: (targetPreStatus.status === 'ready' || targetPreStatus.status === 'incomplete')
+					? await this._temporalGraphService.getGraphAtCommit(root, targetSha, cts.token)
+					: await this._temporalGraphService.ensureCommitIndexed(root, targetSha, cts.token);
 
 			const targetEntities: TemporalEntitySnapshot[] = targetGraph?.entityMap ? Array.from(targetGraph.entityMap.values()) : [];
 			const targetEdges: TemporalEdgeSnapshot[] = targetGraph?.edgeMap ? Array.from(targetGraph.edgeMap.values()) : [];
@@ -792,7 +795,11 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				},
 			);
 
-			const layoutResult = layoutTemporalGraph(rawDiff, this._positions);
+			const layoutResult = computeArchitectureTemporalLayout(rawDiff, {
+				mode: this._displayMode,
+				previousPositions: this._positions,
+			});
+
 			for (const [id, pos] of layoutResult.positions) {
 				this._positions.delete(id);
 				this._positions.set(id, pos);
@@ -807,6 +814,9 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			const diffWithLayout: TemporalStructuralDiff = {
 				...rawDiff,
 				nodes: layoutResult.nodes,
+				bands: layoutResult.bands,
+				guides: layoutResult.guides,
+				entryEntityId: layoutResult.entryEntityId,
 			};
 
 			if (!isPartial) {
