@@ -44,6 +44,7 @@ const STORAGE_KEY_TEMPORAL_VIEW = 'prebase.temporal.viewState.v1';
 interface IPersistedTemporalViewState {
 	readonly activeRepositoryRoot?: string;
 	readonly selectedRef?: string;
+	readonly selectedCommitSha?: string;
 	readonly displayMode?: TemporalDisplayMode;
 	readonly followHead?: boolean;
 	readonly comparisonSelection?: TemporalComparisonSelection;
@@ -72,6 +73,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private _selectionError?: string;
 	private _isLoadingHistory: boolean = false;
 	private _historyError?: string;
+	private _isLoadingMoreHistory: boolean = false;
+	private _historyLoadMoreError?: string;
 
 	private _comparisonSelection: TemporalComparisonSelection = { mode: 'first-parent' };
 	private _compareBaseSha?: string;
@@ -122,6 +125,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 		if (this._workspaceContextService?.onDidChangeWorkspaceFolders) {
 			this._register(this._workspaceContextService.onDidChangeWorkspaceFolders(() => {
+				this._cancelActiveRequests();
 				this._activeRepositoryRoot = undefined;
 				this._activeRepositoryId = undefined;
 				this._diffCache.clear();
@@ -131,13 +135,38 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 	}
 
+	private _cancelActiveRequests(): void {
+		if (this._scrubTimer) {
+			clearTimeout(this._scrubTimer);
+			this._scrubTimer = undefined;
+		}
+		this._historyGenerationToken++;
+		this._generationToken++;
+		this._historyCts?.cancel();
+		this._historyCts?.dispose();
+		this._historyCts = undefined;
+		this._loadMoreCts?.cancel();
+		this._loadMoreCts?.dispose();
+		this._loadMoreCts = undefined;
+		this._activeCts?.cancel();
+		this._activeCts?.dispose();
+		this._activeCts = undefined;
+	}
+
 	getState(): ITemporalViewState {
 		const total = this._loadedCommitCount || this._pagedTimeline.length;
 		const currentIdx = this._pagedTimeline.findIndex(c => c.sha === this._selectedCommitSha);
 		const curCommit = currentIdx >= 0 ? this._pagedTimeline[currentIdx] : undefined;
 
+		const renderedIdx = this._renderedCommitSha ? this._pagedTimeline.findIndex(c => c.sha === this._renderedCommitSha) : -1;
+		const renderedCommit = renderedIdx >= 0 ? this._pagedTimeline[renderedIdx] : undefined;
+
+		const renderedBaseIdx = this._renderedCompareBaseSha ? this._pagedTimeline.findIndex(c => c.sha === this._renderedCompareBaseSha) : -1;
+		const renderedBaseCommit = renderedBaseIdx >= 0 ? this._pagedTimeline[renderedBaseIdx] : undefined;
+
 		// Bounded timeline window (up to TIMELINE_WINDOW_SIZE around selection)
 		let windowedTimeline: TemporalCommitSummary[] = this._pagedTimeline;
+		let windowStart = 0;
 		if (total > TIMELINE_WINDOW_SIZE && currentIdx >= 0) {
 			const half = Math.floor(TIMELINE_WINDOW_SIZE / 2);
 			let start = Math.max(0, currentIdx - half);
@@ -145,6 +174,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			if (end - start < TIMELINE_WINDOW_SIZE) {
 				start = Math.max(0, end - TIMELINE_WINDOW_SIZE);
 			}
+			windowStart = start;
 			windowedTimeline = this._pagedTimeline.slice(start, end);
 		}
 
@@ -167,6 +197,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			selectionError: this._selectionError,
 			isLoadingHistory: this._isLoadingHistory,
 			historyError: this._historyError,
+			isLoadingMoreHistory: this._isLoadingMoreHistory,
+			historyLoadMoreError: this._historyLoadMoreError,
 			compareBaseSha: this._compareBaseSha,
 			renderedCompareBaseSha: this._renderedCompareBaseSha,
 			comparisonSelection: this._comparisonSelection,
@@ -177,6 +209,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			loadedCommitCount: total,
 			selectedCommitIndex: currentIdx >= 0 ? currentIdx : undefined,
 			selectedCommitSummary: curCommit,
+			renderedCommitSummary: renderedCommit,
+			renderedCompareBaseSummary: renderedBaseCommit,
 			historyHasMore: this._historyHasMore,
 			historyNextCursor: this._historyNextCursor,
 			isSettled: this._isSettled,
@@ -184,6 +218,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			diff: this._currentDiff,
 			selectedEntityId: this._selectedEntityId,
 			filterQuery: this._filterQuery,
+			timelineWindow: { start: windowStart, count: windowedTimeline.length },
 		};
 	}
 
@@ -206,19 +241,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			// ignore git history service query failure
 		}
 
-		if (repos.length === 0) {
-			const workspace = this._workspaceContextService.getWorkspace();
-			const folders = workspace?.folders || [];
-			for (const f of folders) {
-				const rootPath = f.uri.fsPath || f.uri.path;
-				repos.push({
-					id: f.uri.toString(),
-					rootUri: rootPath,
-					label: f.name || getBaseName(rootPath),
-				});
-			}
-		}
-
+		// Strictly only real Git repositories are supported for Temporal history.
 		this._availableRepositories = repos;
 	}
 
@@ -261,22 +284,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			return;
 		}
 
-		if (this._scrubTimer) {
-			clearTimeout(this._scrubTimer);
-			this._scrubTimer = undefined;
-		}
-
-		this._historyGenerationToken++;
-		this._generationToken++;
-		this._historyCts?.cancel();
-		this._historyCts?.dispose();
-		this._historyCts = undefined;
-		this._loadMoreCts?.cancel();
-		this._loadMoreCts?.dispose();
-		this._loadMoreCts = undefined;
-		this._activeCts?.cancel();
-		this._activeCts?.dispose();
-		this._activeCts = undefined;
+		this._cancelActiveRequests();
 
 		this._activeRepositoryRoot = repoRoot;
 		this._activeRepositoryId = matched.id;
@@ -298,6 +306,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		this._selectionError = undefined;
 		this._isLoadingHistory = false;
 		this._historyError = undefined;
+		this._isLoadingMoreHistory = false;
+		this._historyLoadMoreError = undefined;
 		this._currentDiff = undefined;
 
 		await this.initialize();
@@ -305,26 +315,58 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 	private async _doInitialize(): Promise<void> {
 		this._updateAvailableRepositories();
-		const root = this._getActiveRepoRoot();
-		if (!root) {
+		if (this._availableRepositories.length === 0) {
 			this._isLoadingHistory = false;
 			this._historyError = 'No Git repository available in workspace';
 			this._notifyStateChanged();
 			return;
 		}
 
-		// Restore persisted state if available
-		this._restorePersistedState();
+		// 1. Read persisted candidate state first
+		const persisted = this._readPersistedState();
 
+		// 2. Validate repository: if active root was explicitly set, preserve it if valid, else use persisted or first discovered
+		let activeRepo = this._activeRepositoryRoot
+			? this._availableRepositories.find(r => r.rootUri === this._activeRepositoryRoot)
+			: undefined;
+		if (!activeRepo) {
+			activeRepo = persisted?.activeRepositoryRoot
+				? this._availableRepositories.find(r => r.rootUri === persisted.activeRepositoryRoot)
+				: undefined;
+		}
+		if (!activeRepo) {
+			activeRepo = this._availableRepositories[0];
+		}
+
+		// 3. Set active repo and root BEFORE any root-dependent operations
+		this._activeRepositoryRoot = activeRepo.rootUri;
+		this._activeRepositoryId = activeRepo.id;
+		const root = this._activeRepositoryRoot;
+
+		// 4. Apply display / comparison modes
+		if (persisted?.displayMode === 'changes' || persisted?.displayMode === 'state') {
+			this._displayMode = persisted.displayMode;
+		}
+		if (typeof persisted?.followHead === 'boolean') {
+			this._followHead = persisted.followHead;
+		}
+		if (persisted?.comparisonSelection) {
+			this._comparisonSelection = persisted.comparisonSelection;
+		}
+
+		// 5. Load identity for that exact root
 		try {
 			if (this._gitHistoryService?.getRepositoryIdentity) {
 				const identity = await this._gitHistoryService.getRepositoryIdentity(root);
-				this._activeRepositoryId = identity?.repositoryId;
+				if (identity?.repositoryId) {
+					this._activeRepositoryId = identity.repositoryId;
+				}
 			}
 		} catch {
-			// ignore identity lookup failure on non-git
+			// ignore identity lookup failure
 		}
 
+		// 6. Load refs for that exact root
 		try {
 			const refs = await this._temporalGraphService.getRepositoryRefs(root);
 			this._repositoryRefs = refs || [];
@@ -333,10 +375,33 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			this._repositoryRefs = [];
 		}
 
-		await this.selectRef(this._selectedRef || 'HEAD');
+		// 7. Validate persisted ref against available refs; fallback to HEAD if stale/missing
+		let refToSelect = persisted?.selectedRef || 'HEAD';
+		if (refToSelect !== 'HEAD' && this._repositoryRefs.length > 0) {
+			const refExists = this._repositoryRefs.some(r => r.name === refToSelect);
+			if (!refExists) {
+				this._logService.info(`[WorkbenchTemporalViewService] Persisted ref '${refToSelect}' no longer exists, falling back to HEAD.`);
+				refToSelect = 'HEAD';
+			}
+		}
+
+		// 8. Validate persisted pinned base if present
+		if (this._comparisonSelection.mode === 'pinned' && this._comparisonSelection.baseSha) {
+			try {
+				const resolved = await this._gitHistoryService.resolveRef(root, this._comparisonSelection.baseSha);
+				if (!resolved) {
+					this._comparisonSelection = { mode: 'first-parent' };
+				}
+			} catch {
+				this._comparisonSelection = { mode: 'first-parent' };
+			}
+		}
+
+		// 9. Load history for selected ref (with optional persisted commit restoration)
+		await this.selectRef(refToSelect, persisted?.selectedCommitSha);
 	}
 
-	async selectRef(refName: string): Promise<void> {
+	async selectRef(refName: string, targetCommitSha?: string): Promise<void> {
 		const root = this._getActiveRepoRoot();
 		if (!root) {
 			this._isLoadingHistory = false;
@@ -413,11 +478,11 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			}));
 			this._loadedCommitCount = this._pagedTimeline.length;
 
-			this._onDidChangeTimeline.fire(this._pagedTimeline);
-
 			if (this._pagedTimeline.length > 0) {
-				const headCommit = this._pagedTimeline[0];
-				await this.selectCommit(headCommit.sha, { immediate: true });
+				const commitToSelect = targetCommitSha && this._pagedTimeline.some(c => c.sha === targetCommitSha)
+					? targetCommitSha
+					: this._pagedTimeline[0].sha;
+				await this.selectCommit(commitToSelect, { immediate: true });
 			} else {
 				this._selectedCommitSha = '';
 				this._renderedCommitSha = undefined;
@@ -443,6 +508,37 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 	}
 
+	async selectCommitIndex(globalIndex: number, options?: { immediate?: boolean }): Promise<void> {
+		if (globalIndex < 0 || globalIndex >= this._pagedTimeline.length) {
+			return;
+		}
+		const commit = this._pagedTimeline[globalIndex];
+		if (commit) {
+			await this.selectCommit(commit.sha, options);
+		}
+	}
+
+	async stepCommit(delta: number): Promise<void> {
+		if (this._pagedTimeline.length === 0) {
+			return;
+		}
+		const curIdx = this._pagedTimeline.findIndex(c => c.sha === this._selectedCommitSha);
+		const currentIdx = curIdx >= 0 ? curIdx : 0;
+		const targetIdx = currentIdx - delta; // delta +1: newer (towards HEAD index 0), delta -1: older (towards higher index)
+
+		if (targetIdx >= 0 && targetIdx < this._pagedTimeline.length) {
+			await this.selectCommit(this._pagedTimeline[targetIdx].sha, { immediate: true });
+		} else if (delta < 0 && targetIdx >= this._pagedTimeline.length) {
+			// At loaded boundary and stepping older: load next page if available, then step
+			if (this._historyHasMore && this._historyNextCursor) {
+				await this.loadMoreHistory();
+				if (targetIdx < this._pagedTimeline.length) {
+					await this.selectCommit(this._pagedTimeline[targetIdx].sha, { immediate: true });
+				}
+			}
+		}
+	}
+
 	async loadMoreHistory(): Promise<void> {
 		const root = this._getActiveRepoRoot();
 		if (!root || !this._historyHasMore || !this._historyNextCursor || this._isLoadingMoreHistory) {
@@ -450,6 +546,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 
 		this._isLoadingMoreHistory = true;
+		this._historyLoadMoreError = undefined;
+		this._notifyStateChanged();
 		const currentGen = this._historyGenerationToken;
 		const cursorToFetch = this._historyNextCursor;
 
@@ -487,12 +585,14 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			this._loadedCommitCount = this._pagedTimeline.length;
 			this._historyHasMore = Boolean(historyPage.hasMore);
 			this._historyNextCursor = historyPage.nextCursor;
+			this._historyLoadMoreError = undefined;
 
-			this._onDidChangeTimeline.fire(this._pagedTimeline);
 			this._notifyStateChanged();
 		} catch (err: any) {
 			if (!cts.token.isCancellationRequested && this._historyGenerationToken === currentGen) {
 				this._logService.error('[WorkbenchTemporalViewService] Failed to load more history:', err);
+				this._historyLoadMoreError = err?.message || 'Could not load older history.';
+				this._notifyStateChanged();
 			}
 		} finally {
 			if (this._loadMoreCts === cts) {
@@ -500,6 +600,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			}
 			cts.dispose();
 			this._isLoadingMoreHistory = false;
+			this._notifyStateChanged();
 		}
 	}
 
@@ -642,10 +743,12 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		try {
 			let baseEntities: readonly TemporalEntitySnapshot[] | undefined;
 			let baseEdges: readonly TemporalEdgeSnapshot[] | undefined;
+			let isBasePartial = false;
 
 			if (baseSha) {
 				const baseStatus = await this._temporalGraphService.getCommitIndexStatus(root, baseSha, cts.token);
 				const isBaseReady = baseStatus.status === 'ready' || baseStatus.status === 'incomplete';
+				isBasePartial = baseStatus.lineageCoverage?.kind === 'partial';
 				const baseGraph = isBaseReady
 					? await this._temporalGraphService.getGraphAtCommit(root, baseSha, cts.token)
 					: await this._temporalGraphService.ensureCommitIndexed(root, baseSha, cts.token);
@@ -674,7 +777,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 			const finalTargetStatus = await this._temporalGraphService.getCommitIndexStatus(root, targetSha, cts.token);
 			const isFinalReady = finalTargetStatus.status === 'ready' || finalTargetStatus.status === 'incomplete';
-			const isPartial = finalTargetStatus.lineageCoverage?.kind === 'partial';
+			const isTargetPartial = finalTargetStatus.lineageCoverage?.kind === 'partial';
+			const isPartial = isTargetPartial || isBasePartial;
 
 			const rawDiff = computeTemporalStructuralDiff(
 				targetSha,
@@ -691,6 +795,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 			const layoutResult = layoutTemporalGraph(rawDiff, this._positions);
 			for (const [id, pos] of layoutResult.positions) {
+				this._positions.delete(id);
 				this._positions.set(id, pos);
 				if (this._positions.size > MAX_POSITIONS_CACHE_ENTRIES) {
 					const firstKey = this._positions.keys().next().value;
@@ -706,6 +811,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			};
 
 			if (!isPartial) {
+				this._diffCache.delete(cachePrefix);
 				this._diffCache.set(cachePrefix, diffWithLayout);
 				if (this._diffCache.size > MAX_DIFF_CACHE_ENTRIES) {
 					const firstKey = this._diffCache.keys().next().value;
@@ -882,6 +988,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			const persisted: IPersistedTemporalViewState = {
 				activeRepositoryRoot: this._activeRepositoryRoot,
 				selectedRef: this._selectedRef,
+				selectedCommitSha: this._selectedCommitSha,
 				displayMode: this._displayMode,
 				followHead: this._followHead,
 				comparisonSelection: this._comparisonSelection,
@@ -892,52 +999,23 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 	}
 
-	private _restorePersistedState(): void {
+	private _readPersistedState(): IPersistedTemporalViewState | undefined {
 		if (!this._storageService) {
-			return;
+			return undefined;
 		}
 		try {
 			const raw = this._storageService.get(STORAGE_KEY_TEMPORAL_VIEW, StorageScope.WORKSPACE);
 			if (!raw) {
-				return;
+				return undefined;
 			}
-			const parsed = JSON.parse(raw) as IPersistedTemporalViewState;
-			if (parsed.activeRepositoryRoot && this._availableRepositories.some(r => r.rootUri === parsed.activeRepositoryRoot)) {
-				this._activeRepositoryRoot = parsed.activeRepositoryRoot;
-				const matched = this._availableRepositories.find(r => r.rootUri === parsed.activeRepositoryRoot);
-				this._activeRepositoryId = matched?.id;
-			}
-			if (parsed.selectedRef) {
-				this._selectedRef = parsed.selectedRef;
-			}
-			if (parsed.displayMode === 'changes' || parsed.displayMode === 'state') {
-				this._displayMode = parsed.displayMode;
-			}
-			if (typeof parsed.followHead === 'boolean') {
-				this._followHead = parsed.followHead;
-			}
-			if (parsed.comparisonSelection) {
-				this._comparisonSelection = parsed.comparisonSelection;
-			}
+			return JSON.parse(raw) as IPersistedTemporalViewState;
 		} catch {
-			// ignore corrupted storage read
+			return undefined;
 		}
 	}
 
 	override dispose(): void {
-		if (this._scrubTimer) {
-			clearTimeout(this._scrubTimer);
-			this._scrubTimer = undefined;
-		}
-		this._historyCts?.cancel();
-		this._historyCts?.dispose();
-		this._historyCts = undefined;
-		this._loadMoreCts?.cancel();
-		this._loadMoreCts?.dispose();
-		this._loadMoreCts = undefined;
-		this._activeCts?.cancel();
-		this._activeCts?.dispose();
-		this._activeCts = undefined;
+		this._cancelActiveRequests();
 		this._diffCache.clear();
 		this._positions.clear();
 		super.dispose();

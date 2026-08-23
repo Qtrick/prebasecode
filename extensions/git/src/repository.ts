@@ -2214,7 +2214,7 @@ export class Repository implements Disposable {
 
 	async getEmptyTree(): Promise<string> {
 		if (!this._EMPTY_TREE) {
-			const result = await this.repository.exec(['hash-object', '-t', 'tree', '/dev/null']);
+			const result = await this.repository.exec(['hash-object', '-t', 'tree', '--stdin'], { input: '' });
 			this._EMPTY_TREE = result.stdout.trim();
 		}
 

@@ -29,6 +29,7 @@ export function computeTemporalStructuralDiff(
 	let removedCount = 0;
 	let modifiedCount = 0;
 	let renamedCount = 0;
+	let renamedModifiedCount = 0;
 	let unchangedCount = 0;
 	let edgeAddedCount = 0;
 	let edgeRemovedCount = 0;
@@ -93,6 +94,9 @@ export function computeTemporalStructuralDiff(
 				oldPath = be.path;
 				renamedCount++;
 				isModified = contentChanged;
+				if (isModified) {
+					renamedModifiedCount++;
+				}
 			} else if (contentChanged) {
 				changeKind = 'modified';
 				modifiedCount++;
@@ -208,6 +212,7 @@ export function computeTemporalStructuralDiff(
 		removedCount,
 		modifiedCount,
 		renamedCount,
+		renamedModifiedCount,
 		unchangedCount,
 		edgeAddedCount,
 		edgeRemovedCount,
@@ -297,13 +302,6 @@ function hasEdgeDataChanged(a: any, b: any): boolean {
 	}
 
 	if (a.kind && b.kind && a.kind !== b.kind) {
-		return true;
-	}
-
-	if (a.weight !== undefined && b.weight !== undefined && a.weight !== b.weight) {
-		return true;
-	}
-	if (a.importType !== undefined && b.importType !== undefined && a.importType !== b.importType) {
 		return true;
 	}
 

@@ -76,7 +76,6 @@ export class PreBaseGraphEditor extends EditorPane {
 		}));
 		this._register(this.temporalViewService.onDidChangeState(state => this._pushTemporalState(state)));
 		this._register(this.temporalViewService.onDidChangeDiff(diff => this._pushTemporalDiff(diff)));
-		this._register(this.temporalViewService.onDidChangeTimeline(timeline => this._pushTemporalTimeline(timeline)));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (e.affectsConfiguration('prebase.graph') || e.affectsConfiguration('prebase.interaction')) {
 				this._pushSnapshot();
@@ -242,13 +241,6 @@ export class PreBaseGraphEditor extends EditorPane {
 		});
 	}
 
-	private _pushTemporalTimeline(timeline: readonly TemporalCommitSummary[]): void {
-		this._webview?.postMessage({
-			type: 'temporalTimeline',
-			payload: timeline
-		});
-	}
-
 	private async _onMessage(message: IBridgeRequest): Promise<void> {
 		if (!message || !message.type) {
 			return;
@@ -396,6 +388,22 @@ export class PreBaseGraphEditor extends EditorPane {
 				await reply({ ok: true });
 				break;
 			}
+			case 'selectTemporalCommitIndex': {
+				const p = message.payload as { index?: number; immediate?: boolean } | undefined;
+				if (typeof p?.index === 'number') {
+					await this.temporalViewService.selectCommitIndex(p.index, { immediate: p.immediate });
+				}
+				await reply({ ok: true });
+				break;
+			}
+			case 'stepTemporalCommit': {
+				const p = message.payload as { delta?: number } | undefined;
+				if (typeof p?.delta === 'number') {
+					await this.temporalViewService.stepCommit(p.delta);
+				}
+				await reply({ ok: true });
+				break;
+			}
 			case 'setTemporalCompareBase': {
 				const p = message.payload as { compareBaseSha?: string } | undefined;
 				await this.temporalViewService.setCompareBase(p?.compareBaseSha);
@@ -449,13 +457,17 @@ export class PreBaseGraphEditor extends EditorPane {
 	}
 
 	private _getContentIdentityForNode(filePath?: string): string | undefined {
-		const snapshot = this.graphService.getSnapshot();
-		if (!snapshot || !filePath) {
+		const canonical = this.graphService.getCanonicalSnapshot();
+		if (!canonical || !filePath) {
 			return undefined;
 		}
-		const entries = (snapshot as any)?.manifest?.entries;
+		const normalized = filePath.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\//, '');
+		const entries = canonical.manifest?.entries;
 		if (Array.isArray(entries)) {
-			const entry = entries.find((e: any) => e.path === filePath || e.relativePath === filePath);
+			const entry = entries.find((e: any) => {
+				const entryPath = (e.path || e.relativePath || '').replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\//, '');
+				return entryPath === normalized;
+			});
 			if (entry?.contentIdentity) {
 				return entry.contentIdentity;
 			}
@@ -471,9 +483,10 @@ export class PreBaseGraphEditor extends EditorPane {
 		const curSha = state.selectedCommitSha;
 		const curCommit = state.selectedCommitSummary;
 		const timeline = state.pagedTimeline || [];
+		const refs = state.repositoryRefs || [];
 
 		interface IComparePickItem extends IQuickPickItem {
-			action: 'first-parent' | 'parent-2' | 'pinned-sha' | 'custom-ref';
+			action: 'first-parent' | 'parent-2' | 'reset-parent' | 'pinned-sha' | 'custom-ref';
 			sha?: string;
 		}
 
@@ -493,6 +506,56 @@ export class PreBaseGraphEditor extends EditorPane {
 				description: 'Explicit comparison against merge parent branch',
 				action: 'parent-2',
 			});
+		}
+
+		if (state.comparisonSelection?.mode === 'pinned') {
+			items.push({
+				label: `$(debug-restart) Reset to First Parent`,
+				description: `Currently pinned to ${state.compareBaseSha?.slice(0, 7) || 'custom commit'}`,
+				action: 'reset-parent',
+			});
+		}
+
+		// Local branches
+		const localBranches = refs.filter(r => r.kind === 'branch' && !r.isRemote);
+		if (localBranches.length > 0) {
+			items.push({ type: 'separator', label: 'Local Branches' } as any);
+			for (const b of localBranches) {
+				items.push({
+					label: `$(git-branch) ${b.name}`,
+					description: b.targetSha ? b.targetSha.slice(0, 7) : '',
+					action: 'pinned-sha',
+					sha: b.targetSha,
+				});
+			}
+		}
+
+		// Remote branches
+		const remoteBranches = refs.filter(r => r.kind === 'branch' && r.isRemote);
+		if (remoteBranches.length > 0) {
+			items.push({ type: 'separator', label: 'Remote Branches' } as any);
+			for (const b of remoteBranches) {
+				items.push({
+					label: `$(cloud) ${b.name}`,
+					description: b.targetSha ? b.targetSha.slice(0, 7) : '',
+					action: 'pinned-sha',
+					sha: b.targetSha,
+				});
+			}
+		}
+
+		// Tags
+		const tags = refs.filter(r => r.kind === 'tag');
+		if (tags.length > 0) {
+			items.push({ type: 'separator', label: 'Tags' } as any);
+			for (const t of tags) {
+				items.push({
+					label: `$(tag) ${t.name}`,
+					description: t.targetSha ? t.targetSha.slice(0, 7) : '',
+					action: 'pinned-sha',
+					sha: t.targetSha,
+				});
+			}
 		}
 
 		items.push({ type: 'separator', label: 'Recent Commits' } as any);
@@ -522,7 +585,7 @@ export class PreBaseGraphEditor extends EditorPane {
 			return;
 		}
 
-		if (selected.action === 'first-parent') {
+		if (selected.action === 'first-parent' || selected.action === 'reset-parent') {
 			await this.temporalViewService.setCompareBase({ mode: 'first-parent' });
 		} else if (selected.action === 'parent-2') {
 			await this.temporalViewService.setCompareBase({ mode: 'parent', parentIndex: 1 });
@@ -536,15 +599,20 @@ export class PreBaseGraphEditor extends EditorPane {
 			if (input && input.trim()) {
 				const trimmed = input.trim();
 				const root = state.activeRepositoryRoot;
-				let resolvedSha = trimmed;
-				if (root && this.gitHistoryService) {
-					try {
-						resolvedSha = await this.gitHistoryService.resolveRef(root, trimmed);
-					} catch {
-						// Fallback to literal if resolve fails
-					}
+				if (!root || !this.gitHistoryService) {
+					this.notificationService.warn(localize('prebase.temporal.noRepo', "No active repository to resolve ref."));
+					return;
 				}
-				await this.temporalViewService.setCompareBase({ mode: 'pinned', baseSha: resolvedSha });
+				try {
+					const resolvedSha = await this.gitHistoryService.resolveRef(root, trimmed);
+					if (resolvedSha && /^[0-9a-fA-F]{40,64}$/.test(resolvedSha.trim())) {
+						await this.temporalViewService.setCompareBase({ mode: 'pinned', baseSha: resolvedSha.trim() });
+					} else {
+						this.notificationService.error(localize('prebase.temporal.resolveFailed', 'Could not resolve "{0}" to a commit.', trimmed));
+					}
+				} catch (err: any) {
+					this.notificationService.error(localize('prebase.temporal.resolveFailed', 'Could not resolve "{0}" to a commit.', trimmed));
+				}
 			}
 		}
 	}
@@ -1259,20 +1327,10 @@ function updateTemporalUI(state, diff) {
 
 	// Render windowed interactive timeline button markers
 	while (temporalTimelineStrip.firstChild) temporalTimelineStrip.removeChild(temporalTimelineStrip.firstChild);
-	const windowSize = 80;
-	let startIdx = 0;
-	let endIdx = timeline.length;
-	const localIdx = timeline.findIndex(c => c.sha === state.selectedCommitSha);
-	if (timeline.length > windowSize && localIdx >= 0) {
-		startIdx = Math.max(0, localIdx - Math.floor(windowSize / 2));
-		endIdx = Math.min(timeline.length, startIdx + windowSize);
-		if (endIdx - startIdx < windowSize) {
-			startIdx = Math.max(0, endIdx - windowSize);
-		}
-	}
-
-	for (let i = endIdx - 1; i >= startIdx; i--) {
+	const windowStart = state.timelineWindow ? state.timelineWindow.start : 0;
+	for (let i = timeline.length - 1; i >= 0; i--) {
 		const c = timeline[i];
+		const globalIndex = windowStart + i;
 		const btn = document.createElement('button');
 		btn.type = 'button';
 		btn.className = 'commit-marker' + (c.sha === state.selectedCommitSha ? ' active' : '') + (c.isMerge ? ' is-merge' : '');
@@ -1284,21 +1342,21 @@ function updateTemporalUI(state, diff) {
 		const markerLabel = 'Commit ' + (c.shortSha || c.sha.slice(0, 7)) + ': ' + c.message + (c.author ? ', by ' + c.author : '') + (c.isMerge ? ' [Merge]' : '');
 		btn.title = markerLabel;
 		btn.setAttribute('aria-label', markerLabel);
-		btn.onclick = (function (sha) {
+		btn.onclick = (function (sha, idx) {
 			return function (e) {
 				if (e) { e.stopPropagation(); }
-				request('selectTemporalCommit', { commitSha: sha, immediate: true });
+				request('selectTemporalCommitIndex', { index: idx, immediate: true });
 			};
-		})(c.sha);
-		btn.onkeydown = (function (sha) {
+		})(c.sha, globalIndex);
+		btn.onkeydown = (function (sha, idx) {
 			return function (e) {
 				if (e.key === 'Enter' || e.key === ' ') {
 					e.preventDefault();
 					e.stopPropagation();
-					request('selectTemporalCommit', { commitSha: sha, immediate: true });
+					request('selectTemporalCommitIndex', { index: idx, immediate: true });
 				}
 			};
-		})(c.sha);
+		})(c.sha, globalIndex);
 		temporalTimelineStrip.appendChild(btn);
 	}
 
@@ -1310,18 +1368,35 @@ function updateTemporalUI(state, diff) {
 	const detailsSummary = document.getElementById('detailsDeltaSummary');
 	const detailsEntities = document.getElementById('detailsEntityList');
 
-	if (curCommit && detailsSha) {
-		detailsSha.textContent = curCommit.sha;
-		detailsMsg.textContent = curCommit.message || '(no message)';
-		detailsAuthor.textContent = (curCommit.author || 'Unknown') + ' · ' + (curCommit.timestamp ? new Date(curCommit.timestamp).toLocaleString() : '');
-		detailsParents.textContent = (curCommit.parents && curCommit.parents.length > 0) ? curCommit.parents.join(', ') : 'None (Root commit)';
+	const renderedCommit = state.renderedCommitSummary;
+	const isCurrentlyLoading = Boolean(state.isLoadingSelection || (state.renderedCommitSha && state.renderedCommitSha !== state.selectedCommitSha));
+
+	if (detailsSha) {
+		if (isCurrentlyLoading && curCommit && renderedCommit) {
+			detailsSha.textContent = (renderedCommit.sha || '') + ' (Displaying)\n' + (curCommit.sha || '') + ' (Selected - Loading…)';
+		} else {
+			detailsSha.textContent = (renderedCommit ? renderedCommit.sha : (curCommit ? curCommit.sha : ''));
+		}
 	}
+	if (detailsMsg) {
+		const target = renderedCommit || curCommit;
+		detailsMsg.textContent = target?.message || '(no message)';
+	}
+	if (detailsAuthor) {
+		const target = renderedCommit || curCommit;
+		detailsAuthor.textContent = (target?.author || 'Unknown') + ' · ' + (target?.timestamp ? new Date(target.timestamp).toLocaleString() : '');
+	}
+	if (detailsParents) {
+		const target = renderedCommit || curCommit;
+		detailsParents.textContent = (target?.parents && target.parents.length > 0) ? target.parents.join(', ') : 'None (Root commit)';
+	}
+
 	if (diff && diff.summary && detailsSummary) {
 		while (detailsSummary.firstChild) detailsSummary.removeChild(detailsSummary.firstChild);
 		const bAdded = document.createElement('span'); bAdded.className = 'badge-added'; bAdded.textContent = '+' + diff.summary.addedCount + ' nodes'; detailsSummary.appendChild(bAdded);
 		const bRemoved = document.createElement('span'); bRemoved.className = 'badge-removed'; bRemoved.textContent = '-' + diff.summary.removedCount + ' nodes'; detailsSummary.appendChild(bRemoved);
 		const bMod = document.createElement('span'); bMod.className = 'badge-modified'; bMod.textContent = '~' + diff.summary.modifiedCount + ' modified'; detailsSummary.appendChild(bMod);
-		const bRen = document.createElement('span'); bRen.className = 'badge-renamed'; bRen.textContent = '⇄' + diff.summary.renamedCount + ' renamed'; detailsSummary.appendChild(bRen);
+		const bRen = document.createElement('span'); bRen.className = 'badge-renamed'; bRen.textContent = '⇄' + diff.summary.renamedCount + ' renamed' + (diff.summary.renamedModifiedCount ? ' (~' + diff.summary.renamedModifiedCount + ' also modified)' : ''); detailsSummary.appendChild(bRen);
 		if (diff.summary.edgeAddedCount || diff.summary.edgeRemovedCount || diff.summary.edgeModifiedCount) {
 			const bEdges = document.createElement('span'); bEdges.style.fontSize = '10px'; bEdges.style.opacity = '0.75';
 			bEdges.textContent = 'Edges: +' + diff.summary.edgeAddedCount + ' -' + diff.summary.edgeRemovedCount + ' ~' + diff.summary.edgeModifiedCount;
@@ -1380,6 +1455,18 @@ function updateTemporalUI(state, diff) {
 
 	// Load more history button
 	temporalLoadMoreBtn.style.display = state.historyHasMore ? 'inline-block' : 'none';
+	if (state.isLoadingMoreHistory) {
+		temporalLoadMoreBtn.textContent = 'Loading…';
+		temporalLoadMoreBtn.disabled = true;
+	} else if (state.historyLoadMoreError) {
+		temporalLoadMoreBtn.textContent = 'Retry loading older';
+		temporalLoadMoreBtn.disabled = false;
+		temporalLoadMoreBtn.title = state.historyLoadMoreError;
+	} else {
+		temporalLoadMoreBtn.textContent = 'Load older…';
+		temporalLoadMoreBtn.disabled = false;
+		temporalLoadMoreBtn.title = 'Load older commit history';
+	}
 
 	// Partial warning
 	temporalPartialWarning.style.display = state.isPartialLineage ? 'inline-block' : 'none';
@@ -1395,11 +1482,9 @@ function updateTemporalUI(state, diff) {
 
 function updateTemporalDiffTransition(diff) {
 	if (!diff) return;
-	const ease = animDuration > 0 ? (1 - Math.pow(1 - Math.min(1, (performance.now() - animStartTime) / animDuration), 3)) : 1;
 	const nextPrevMap = new Map();
 	currentTemporalRenderNodes.forEach(function (n) {
-		const pos = getVisualNodePosition(n, ease);
-		nextPrevMap.set(n.entityId, { x: pos.x, y: pos.y });
+		nextPrevMap.set(n.entityId, { x: n.x || 0, y: n.y || 0 });
 	});
 	previousTemporalRenderNodes = nextPrevMap;
 
@@ -1410,194 +1495,137 @@ function updateTemporalDiffTransition(diff) {
 		nextMap.set(node.entityId, {
 			entityId: node.entityId,
 			canonicalNodeId: node.canonicalNodeId,
-			path: node.path,
 			label: node.label,
-			kind: node.kind,
-			x: node.x,
-			y: node.y,
-			changeKind: node.changeKind,
+			path: node.path,
 			oldPath: node.oldPath,
-			isModified: node.isModified,
-			meta: node.meta,
+			changeKind: node.changeKind,
+			architectureLayer: node.architectureLayer,
+			isMergeArtifact: node.isMergeArtifact,
+			isStructuralAnomaly: node.isStructuralAnomaly,
+			fileType: node.fileType,
+			confidence: node.confidence,
+			x: node.x || 0,
+			y: node.y || 0,
 		});
 	}
-
 	currentTemporalRenderNodes = nextMap;
 	animStartTime = performance.now();
-	const prefersReduced = settings.reduceMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-	animDuration = prefersReduced ? 0 : 220;
-	isAnimatingTemporal = !prefersReduced;
+	isAnimatingTemporal = true;
 	dirty = true;
 	kickRaf();
 }
 
-function drawTemporalFrame(now) {
-	if (!netCanvas) return;
-	const w = netCanvas.clientWidth || 800;
-	const h = netCanvas.clientHeight || 600;
-	ctx.clearRect(0, 0, w, h);
+function getVisualNodePosition(node, ease) {
+	const prev = previousTemporalRenderNodes.get(node.entityId);
+	if (!prev) {
+		return { x: node.x, y: node.y };
+	}
+	return {
+		x: prev.x + (node.x - prev.x) * ease,
+		y: prev.y + (node.y - prev.y) * ease,
+	};
+}
 
+function drawTemporalFrame(ts) {
+	if (!netCanvas || !netCtx) return;
+	const w = netCanvas.width = netCanvas.clientWidth || 800;
+	const h = netCanvas.height = netCanvas.clientHeight || 600;
+	const ctx = netCtx;
+
+	ctx.clearRect(0, 0, w, h);
 	ctx.save();
 	ctx.translate(w / 2 + transform.x, h / 2 + transform.y);
 	ctx.scale(transform.k, transform.k);
 
-	const t = animDuration > 0 ? Math.min(1, (now - animStartTime) / animDuration) : 1;
-	const ease = 1 - Math.pow(1 - t, 3);
-	if (t >= 1) isAnimatingTemporal = false;
+	const elapsed = ts - animStartTime;
+	const progress = animDuration > 0 ? Math.min(1, elapsed / animDuration) : 1;
+	const ease = 1 - Math.pow(1 - progress, 3);
+	if (progress >= 1) {
+		isAnimatingTemporal = false;
+	}
 
-	const filterQuery = (temporalFilterInput.value || '').trim().toLowerCase();
-	const theme = getComputedThemeColors();
+	const filterVal = (temporalFilterInput && temporalFilterInput.value) ? temporalFilterInput.value.toLowerCase().trim() : '';
 
-	// Draw edges with synchronized visual endpoints
-	const edges = (temporalDiff && temporalDiff.edges) || [];
-	for (let i = 0; i < edges.length; i++) {
-		const edge = edges[i];
-		if (displayMode === 'state' && edge.changeKind === 'removed') continue;
-		const srcNode = currentTemporalRenderNodes.get(edge.sourceEntityId);
-		const tgtNode = currentTemporalRenderNodes.get(edge.targetEntityId);
-		if (!srcNode || !tgtNode) continue;
-		if (displayMode === 'state' && (srcNode.changeKind === 'removed' || tgtNode.changeKind === 'removed')) continue;
+	// Render Edges
+	if (temporalDiff && temporalDiff.edges) {
+		for (let i = 0; i < temporalDiff.edges.length; i++) {
+			const edge = temporalDiff.edges[i];
+			const sourceNode = currentTemporalRenderNodes.get(edge.sourceId);
+			const targetNode = currentTemporalRenderNodes.get(edge.targetId);
+			if (!sourceNode || !targetNode) continue;
+			if (displayMode === 'state' && (sourceNode.changeKind === 'removed' || targetNode.changeKind === 'removed' || edge.changeKind === 'removed')) continue;
 
-		const srcPos = getVisualNodePosition(srcNode, ease);
-		const tgtPos = getVisualNodePosition(tgtNode, ease);
+			const sp = getVisualNodePosition(sourceNode, ease);
+			const tp = getVisualNodePosition(targetNode, ease);
 
-		ctx.beginPath();
-		ctx.moveTo(srcPos.x, srcPos.y);
-		ctx.lineTo(tgtPos.x, tgtPos.y);
+			ctx.beginPath();
+			ctx.moveTo(sp.x, sp.y);
+			ctx.lineTo(tp.x, tp.y);
 
-		if (displayMode === 'changes') {
 			if (edge.changeKind === 'added') {
-				ctx.save();
-				if (isAnimatingTemporal) ctx.globalAlpha = ease;
-				ctx.strokeStyle = theme.added;
-				ctx.lineWidth = theme.isHighContrast ? 3 : 2;
-				ctx.setLineDash([]);
-				ctx.stroke();
-				ctx.restore();
+				ctx.strokeStyle = 'rgba(63, 185, 80, 0.6)';
+				ctx.lineWidth = 2;
 			} else if (edge.changeKind === 'removed') {
-				ctx.save();
-				if (isAnimatingTemporal) ctx.globalAlpha = 1 - 0.7 * ease;
-				ctx.strokeStyle = theme.deleted;
-				ctx.lineWidth = theme.isHighContrast ? 2.5 : 1.5;
+				ctx.strokeStyle = 'rgba(248, 81, 73, 0.4)';
+				ctx.lineWidth = 1.5;
 				ctx.setLineDash([4, 4]);
-				ctx.stroke();
-				ctx.restore();
 			} else if (edge.changeKind === 'modified') {
-				ctx.strokeStyle = theme.modified;
-				ctx.lineWidth = theme.isHighContrast ? 2.5 : 1.5;
-				ctx.setLineDash([2, 2]);
-				ctx.stroke();
+				ctx.strokeStyle = 'rgba(210, 153, 34, 0.6)';
+				ctx.lineWidth = 2;
 			} else {
-				ctx.strokeStyle = 'rgba(139, 148, 158, 0.35)';
+				ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)';
 				ctx.lineWidth = 1;
 				ctx.setLineDash([]);
-				ctx.stroke();
 			}
-		} else {
-			// State mode: natural edges
-			ctx.strokeStyle = 'rgba(148, 163, 184, 0.45)';
-			ctx.lineWidth = 1;
-			ctx.setLineDash([]);
 			ctx.stroke();
+			ctx.setLineDash([]);
 		}
 	}
-	ctx.setLineDash([]);
 
-	// Draw nodes with synchronized visual positions
+	// Render Nodes
 	currentTemporalRenderNodes.forEach(function (node) {
-		if (displayMode === 'state' && node.changeKind === 'removed') {
-			return;
-		}
-		if (filterQuery && !node.path.toLowerCase().includes(filterQuery) && !node.label.toLowerCase().includes(filterQuery)) {
-			return;
-		}
+		if (displayMode === 'state' && node.changeKind === 'removed') return;
 
 		const pos = getVisualNodePosition(node, ease);
-		let curAlpha = 1;
-		let curScale = 1;
+		const isMatch = !filterVal || (node.label && node.label.toLowerCase().includes(filterVal)) || (node.path && node.path.toLowerCase().includes(filterVal));
+		const isSelected = selectedNodeId === node.entityId;
 
-		if (node.changeKind === 'added' && isAnimatingTemporal) {
-			curAlpha = ease;
-			curScale = 0.5 + 0.5 * ease;
+		let r = 16;
+		let fillColor = 'rgba(110, 118, 129, 0.3)';
+		let strokeColor = '#6e7681';
+
+		if (node.changeKind === 'added') {
+			fillColor = 'rgba(63, 185, 80, 0.25)';
+			strokeColor = '#3fb950';
 		} else if (node.changeKind === 'removed') {
-			curAlpha = isAnimatingTemporal ? 1 - 0.7 * ease : 0.35;
+			fillColor = 'rgba(248, 81, 73, 0.2)';
+			strokeColor = '#f85149';
+		} else if (node.changeKind === 'modified') {
+			fillColor = 'rgba(210, 153, 34, 0.25)';
+			strokeColor = '#d29922';
+		} else if (node.changeKind === 'renamed') {
+			fillColor = 'rgba(163, 113, 247, 0.25)';
+			strokeColor = '#a371f7';
 		}
 
-		ctx.save();
-		ctx.globalAlpha = curAlpha;
-		ctx.translate(pos.x, pos.y);
-		ctx.scale(curScale, curScale);
-
-		const radius = 14;
-
-		// Selection highlight ring
-		if (selectedNodeId === node.entityId || selectedNodeId === node.canonicalNodeId) {
-			ctx.beginPath();
-			ctx.arc(0, 0, radius + 5, 0, 2 * Math.PI);
-			ctx.strokeStyle = theme.accent;
-			ctx.lineWidth = theme.isHighContrast ? 4 : 3;
-			ctx.stroke();
+		if (!isMatch) {
+			fillColor = 'rgba(50, 50, 50, 0.1)';
+			strokeColor = 'rgba(100, 100, 100, 0.2)';
 		}
 
-		// Node Body
 		ctx.beginPath();
-		ctx.arc(0, 0, radius, 0, 2 * Math.PI);
-		let fillColor = theme.bg;
-		let strokeColor = theme.border;
-
-		if (displayMode === 'changes') {
-			if (node.changeKind === 'added') {
-				fillColor = 'color-mix(in srgb, ' + theme.added + ' 25%, ' + theme.bg + ')';
-				strokeColor = theme.added;
-			} else if (node.changeKind === 'removed') {
-				fillColor = 'color-mix(in srgb, ' + theme.deleted + ' 25%, ' + theme.bg + ')';
-				strokeColor = theme.deleted;
-			} else if (node.changeKind === 'modified') {
-				fillColor = 'color-mix(in srgb, ' + theme.modified + ' 25%, ' + theme.bg + ')';
-				strokeColor = theme.modified;
-			} else if (node.changeKind === 'renamed') {
-				fillColor = 'color-mix(in srgb, ' + theme.renamed + ' 25%, ' + theme.bg + ')';
-				strokeColor = theme.renamed;
-			}
-		} else {
-			// State mode: use file type color
-			const ft = fileType(node.path || node.label);
-			fillColor = ft.color;
-			strokeColor = theme.border;
-		}
-
+		ctx.arc(pos.x, pos.y, isSelected ? r + 4 : r, 0, Math.PI * 2);
 		ctx.fillStyle = fillColor;
 		ctx.fill();
-		ctx.lineWidth = (node.changeKind === 'unchanged' || displayMode === 'state') ? 1.5 : (theme.isHighContrast ? 3.5 : 2.5);
-		ctx.strokeStyle = strokeColor;
+		ctx.lineWidth = isSelected ? 3 : 1.5;
+		ctx.strokeStyle = isSelected ? '#ffffff' : strokeColor;
 		ctx.stroke();
 
-		// Change Symbol / Badge (only in changes mode)
-		if (displayMode === 'changes') {
-			let badgeSymbol = '';
-			if (node.changeKind === 'added') badgeSymbol = '+';
-			else if (node.changeKind === 'removed') badgeSymbol = '−';
-			else if (node.changeKind === 'modified') badgeSymbol = '~';
-			else if (node.changeKind === 'renamed') badgeSymbol = node.isModified ? '⇄*' : '⇄';
-
-			if (badgeSymbol) {
-				ctx.fillStyle = strokeColor;
-				ctx.font = 'bold 11px sans-serif';
-				ctx.textAlign = 'center';
-				ctx.textBaseline = 'middle';
-				ctx.fillText(badgeSymbol, 0, 0);
-			}
-		}
-
-		// Label
-		ctx.fillStyle = theme.fg;
-		ctx.font = '10.5px sans-serif';
+		// Node Label
+		ctx.fillStyle = isMatch ? (isSelected ? '#ffffff' : 'var(--vscode-foreground, #f4f4f5)') : 'rgba(150,150,150,0.3)';
+		ctx.font = isSelected ? 'bold 12px ui-sans-serif, system-ui, sans-serif' : '11px ui-sans-serif, system-ui, sans-serif';
 		ctx.textAlign = 'center';
-		ctx.textBaseline = 'top';
-		const labelText = node.oldPath && displayMode === 'changes' ? node.label + ' (was ' + getBaseName(node.oldPath) + ')' : node.label;
-		ctx.fillText(labelText, 0, radius + 3);
-
-		ctx.restore();
+		ctx.fillText(node.label || node.path || '', pos.x, pos.y + r + 14);
 	});
 
 	ctx.restore();
@@ -1634,16 +1662,7 @@ function pickTemporalNode(clientX, clientY) {
 }
 
 function stepTemporalCommit(delta) {
-	if (!temporalState || !temporalState.pagedTimeline || !temporalState.pagedTimeline.length) return;
-	const timeline = temporalState.pagedTimeline;
-	const curIdx = timeline.findIndex(c => c.sha === temporalState.selectedCommitSha);
-	if (curIdx < 0) return;
-	const targetIdx = curIdx - delta; // delta +1 means newer (towards HEAD / index 0), -1 means older
-	if (targetIdx >= 0 && targetIdx < timeline.length) {
-		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: true });
-	} else if (delta < 0 && targetIdx >= timeline.length) {
-		request('loadMoreTemporalHistory', {});
-	}
+	request('stepTemporalCommit', { delta: delta });
 }
 
 function toggleTemporalPlay() {
@@ -1653,19 +1672,17 @@ function toggleTemporalPlay() {
 		isPlayingHistory = false;
 		temporalPlayBtn.textContent = '▶';
 	} else {
-		const timeline = (temporalState && temporalState.pagedTimeline) || [];
-		if (timeline.length <= 1) return;
-		const curIdx = timeline.findIndex(c => c.sha === temporalState.selectedCommitSha);
-		if (curIdx === 0) {
+		if (!temporalState) return;
+		const curIdx = typeof temporalState.selectedCommitIndex === 'number' ? temporalState.selectedCommitIndex : 0;
+		if (curIdx === 0 && temporalState.loadedCommitCount > 1) {
 			// At HEAD, rewind to oldest loaded commit and play forward
-			const oldestIdx = timeline.length - 1;
-			request('selectTemporalCommit', { commitSha: timeline[oldestIdx].sha, immediate: true });
+			const oldestIdx = temporalState.loadedCommitCount - 1;
+			request('selectTemporalCommitIndex', { index: oldestIdx, immediate: true });
 		}
 		isPlayingHistory = true;
 		temporalPlayBtn.textContent = '❚❚';
 		playIntervalTimer = setInterval(function () {
-			const curTl = (temporalState && temporalState.pagedTimeline) || [];
-			const currentIdx = curTl.findIndex(c => c.sha === temporalState.selectedCommitSha);
+			const currentIdx = (temporalState && typeof temporalState.selectedCommitIndex === 'number') ? temporalState.selectedCommitIndex : 0;
 			if (currentIdx <= 0) {
 				toggleTemporalPlay();
 				return;
@@ -1823,9 +1840,10 @@ function closePopup() {
 }
 
 function inferOverview(node) {
-	if (!node) return 'No file details.';
-	if (node.meta && node.meta.overview) return node.meta.overview;
-	return 'Source file (' + fileType(node.path || node.label).name + ').';
+	if (node.overview) return node.overview;
+	if (node.description) return node.description;
+	if (node.path) return 'File: ' + node.path;
+	return 'Entity: ' + (node.label || node.id);
 }
 
 function placePopupNear(clientX, clientY) {
@@ -1841,14 +1859,12 @@ function placePopupNear(clientX, clientY) {
 
 let describeTimer = null;
 function openNodePopup(node, clientX, clientY) {
+	popupNode = node;
 	if (describeTimer) {
 		clearTimeout(describeTimer);
 		describeTimer = null;
 	}
-	if (displayMode === 'state' && node.changeKind === 'removed') {
-		return;
-	}
-	popupNode = node;
+
 	selectedNodeId = node.entityId || node.id;
 	popupTitle.textContent = node.label || node.id;
 	popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '') + (node.changeKind ? ' · ' + node.changeKind.toUpperCase() : '');
@@ -1863,11 +1879,22 @@ function openNodePopup(node, clientX, clientY) {
 		popupOpen.style.display = 'none';
 		popupMagnus.disabled = true;
 		popupMagnus.title = 'Attach to Agents is available on the live codebase.';
+
+		// Historical reveal policy: Reveal in Explorer only if rendered commit is HEAD and node is not removed
+		const isHead = Boolean(temporalState && temporalState.renderedCommitSha && temporalState.pagedTimeline && temporalState.pagedTimeline[0] && temporalState.renderedCommitSha === temporalState.pagedTimeline[0].sha);
+		if (isHead && node.changeKind !== 'removed') {
+			popupReveal.style.display = 'inline-block';
+			popupReveal.textContent = 'Reveal Current File';
+		} else {
+			popupReveal.style.display = 'none';
+		}
 	} else {
 		popupSourceDiff.style.display = 'none';
 		popupHistoricalView.style.display = 'none';
 		popupSetBase.style.display = 'none';
 		popupOpen.style.display = 'inline-block';
+		popupReveal.style.display = 'inline-block';
+		popupReveal.textContent = 'Reveal in Explorer';
 		popupMagnus.disabled = false;
 		popupMagnus.title = 'Attach to Agents';
 	}
@@ -2034,8 +2061,9 @@ document.getElementById('popupSourceDiff').onclick = function () {
 	if (popupNode && popupNode.entityId) request('openTemporalSourceDiff', { entityId: popupNode.entityId });
 };
 popupSetBase.onclick = function () {
-	if (temporalState && temporalState.selectedCommitSha) {
-		request('setTemporalCompareBase', { compareBaseSha: temporalState.selectedCommitSha });
+	const baseSha = (temporalDiff && temporalDiff.targetCommitSha) || (temporalState && temporalState.renderedCommitSha);
+	if (baseSha) {
+		request('setTemporalCompareBase', { compareBaseSha: baseSha });
 	}
 };
 document.getElementById('popupReveal').onclick = function () {
@@ -2095,21 +2123,19 @@ temporalDetailsClose.addEventListener('click', function () {
 
 temporalScrubber.addEventListener('input', function () {
 	const val = parseInt(temporalScrubber.value, 10);
-	const timeline = (temporalState && temporalState.pagedTimeline) || [];
-	const total = (temporalState && temporalState.loadedCommitCount) || timeline.length;
-	const targetIdx = (total - 1) - val;
-	if (timeline[targetIdx]) {
-		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: false });
+	const total = (temporalState && temporalState.loadedCommitCount) || 0;
+	if (total > 0) {
+		const targetGlobalIdx = (total - 1) - val;
+		request('selectTemporalCommitIndex', { index: targetGlobalIdx, immediate: false });
 	}
 });
 
 temporalScrubber.addEventListener('change', function () {
 	const val = parseInt(temporalScrubber.value, 10);
-	const timeline = (temporalState && temporalState.pagedTimeline) || [];
-	const total = (temporalState && temporalState.loadedCommitCount) || timeline.length;
-	const targetIdx = (total - 1) - val;
-	if (timeline[targetIdx]) {
-		request('selectTemporalCommit', { commitSha: timeline[targetIdx].sha, immediate: true });
+	const total = (temporalState && temporalState.loadedCommitCount) || 0;
+	if (total > 0) {
+		const targetGlobalIdx = (total - 1) - val;
+		request('selectTemporalCommitIndex', { index: targetGlobalIdx, immediate: true });
 	}
 });
 
@@ -2118,9 +2144,14 @@ temporalNextBtn.addEventListener('click', function () { stepTemporalCommit(1); }
 temporalPlayBtn.addEventListener('click', toggleTemporalPlay);
 temporalLoadMoreBtn.addEventListener('click', function () { request('loadMoreTemporalHistory', {}); });
 
+let filterDebounceTimer = null;
 temporalFilterInput.addEventListener('input', function () {
 	dirty = true;
 	kickRaf();
+	if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+	filterDebounceTimer = setTimeout(function () {
+		request('setTemporalFilter', { filter: temporalFilterInput.value || '' });
+	}, 200);
 });
 
 temporalFollowHead.addEventListener('change', function () {
@@ -2237,6 +2268,7 @@ window.addEventListener('message', function (e) {
 		}
 		render(false);
 	} else if (msg.type === 'temporalState') {
+		graphType = 'temporal';
 		temporalState = msg.payload;
 		if (temporalState.diff) {
 			temporalDiff = temporalState.diff;
@@ -2247,9 +2279,6 @@ window.addEventListener('message', function (e) {
 	} else if (msg.type === 'temporalDiff') {
 		temporalDiff = msg.payload;
 		updateTemporalDiffTransition(temporalDiff);
-		updateTemporalUI(temporalState, temporalDiff);
-	} else if (msg.type === 'temporalTimeline') {
-		if (temporalState) temporalState = Object.assign({}, temporalState, { pagedTimeline: msg.payload });
 		updateTemporalUI(temporalState, temporalDiff);
 	} else if (msg.type === 'fitView') {
 		fitView();

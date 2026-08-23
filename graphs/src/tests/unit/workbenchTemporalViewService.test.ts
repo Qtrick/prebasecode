@@ -661,4 +661,75 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)', () => {
 
 		service.dispose();
 	});
+
+	test('selectCommitIndex and stepCommit: host-owned bounded navigation', async () => {
+		const history: TemporalHistoryPage = {
+			commits: [
+				makeCommitSummary('c-3', 'third', 300, ['c-2']),
+				makeCommitSummary('c-2', 'second', 200, ['c-1']),
+				makeCommitSummary('c-1', 'initial', 100, []),
+			],
+			hasMore: false,
+		};
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			createMockTemporalGraphService({ HEAD: history }, {}, {}) as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+			mockStorageService,
+		);
+
+		await service.initialize();
+		assert.equal(service.getState().selectedCommitSha, 'c-3');
+		assert.equal(service.getState().selectedCommitIndex, 0);
+
+		// Step older (+1 delta in stepCommit moves newer towards HEAD index 0, -1 moves older towards higher index)
+		await service.stepCommit(-1);
+		assert.equal(service.getState().selectedCommitSha, 'c-2');
+		assert.equal(service.getState().selectedCommitIndex, 1);
+
+		await service.stepCommit(-1);
+		assert.equal(service.getState().selectedCommitSha, 'c-1');
+		assert.equal(service.getState().selectedCommitIndex, 2);
+
+		// Step newer
+		await service.stepCommit(1);
+		assert.equal(service.getState().selectedCommitSha, 'c-2');
+		assert.equal(service.getState().selectedCommitIndex, 1);
+
+		// Direct index jump
+		await service.selectCommitIndex(0, { immediate: true });
+		assert.equal(service.getState().selectedCommitSha, 'c-3');
+		assert.equal(service.getState().selectedCommitIndex, 0);
+
+		service.dispose();
+	});
+
+	test('Non-Git workspace: availableRepositories only discovers genuine Git repositories', async () => {
+		const nonGitGitHistoryService = {
+			getRepositories: () => [],
+			getRepositoryIdentity: async () => undefined,
+			getEmptyTree: async () => '4b825dc642cb6eb9a060e54bf8d69288fbee4904',
+			onDidChangeHead: new Emitter<any>().event,
+		};
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			nonGitGitHistoryService as any,
+			createMockTemporalGraphService({}, {}, {}) as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+			mockStorageService,
+		);
+
+		await service.initialize();
+		assert.equal(service.getState().availableRepositories.length, 0);
+		assert.equal(service.getState().historyError, 'No Git repository available in workspace');
+
+		service.dispose();
+	});
 });

@@ -620,7 +620,7 @@ export class Git {
 
 		options.onSpawn?.(child);
 
-		if (options.input) {
+		if (options.input !== undefined) {
 			child.stdin!.end(options.input, 'utf8');
 		}
 

@@ -588,8 +588,8 @@ export class PreBaseGraphDescriptionService extends Disposable implements IPreBa
 	private _buildPrompt(path: string, content: string, layer: string, imports: readonly string[]): string {
 		const importList = imports.length ? imports.slice(0, 15).join(', ') : 'None';
 		return `You are analyzing a codebase file for an architectural code graph.
-Provide a concise, highly accurate description of the file's primary responsibility in 2-3 sentences.
-Focus on its role, exported capabilities, and how other parts of the system interact with it.
+Provide a concise, single-sentence (18-38 words) description of the file's primary role and responsibilities.
+Focus on its purpose, exported capabilities, and key dependencies. Do not wrap in quotes or add conversational preamble.
 
 File path: ${path}
 Architectural layer: ${layer}
@@ -679,7 +679,7 @@ ${content}
 		const next: Record<string, CacheEntryV9> = {};
 		let totalBytes = 0;
 		for (const [k, v] of entries) {
-			const entryBytes = k.length + (v.description?.length ?? 0) + 160;
+			const entryBytes = Buffer.byteLength(k, 'utf8') + Buffer.byteLength(v.description || '', 'utf8') + 160;
 			if (totalBytes + entryBytes > MAX_CACHE_BYTES) {
 				break;
 			}

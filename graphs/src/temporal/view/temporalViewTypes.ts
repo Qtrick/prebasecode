@@ -70,6 +70,7 @@ export interface TemporalStructuralDiffSummary {
 	readonly removedCount: number;
 	readonly modifiedCount: number;
 	readonly renamedCount: number;
+	readonly renamedModifiedCount?: number;
 	readonly unchangedCount: number;
 	readonly edgeAddedCount: number;
 	readonly edgeRemovedCount: number;
@@ -116,6 +117,8 @@ export interface ITemporalViewState {
 	readonly selectionError?: string;
 	readonly isLoadingHistory?: boolean;
 	readonly historyError?: string;
+	readonly isLoadingMoreHistory?: boolean;
+	readonly historyLoadMoreError?: string;
 	readonly compareBaseSha?: string;
 	readonly renderedCompareBaseSha?: string;
 	readonly comparisonSelection?: TemporalComparisonSelection;
@@ -126,6 +129,8 @@ export interface ITemporalViewState {
 	readonly loadedCommitCount: number;
 	readonly selectedCommitIndex?: number;
 	readonly selectedCommitSummary?: TemporalCommitSummary;
+	readonly renderedCommitSummary?: TemporalCommitSummary;
+	readonly renderedCompareBaseSummary?: TemporalCommitSummary;
 	readonly historyHasMore: boolean;
 	readonly historyNextCursor?: string;
 	readonly isSettled: boolean;
@@ -154,6 +159,8 @@ export interface IPreBaseTemporalViewService {
 	switchRepository(repoRoot: string): Promise<void>;
 	selectRef(refName: string): Promise<void>;
 	selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean }): Promise<void>;
+	selectCommitIndex(globalIndex: number, options?: { immediate?: boolean }): Promise<void>;
+	stepCommit(delta: number): Promise<void>;
 	setCompareBase(compareBaseShaOrSelection: string | TemporalComparisonSelection | undefined): Promise<void>;
 	setDisplayMode(mode: TemporalDisplayMode): void;
 	setFollowHead(follow: boolean): void;
@@ -164,4 +171,5 @@ export interface IPreBaseTemporalViewService {
 	openHistoricalFile(entityId: string): Promise<{ ok: boolean; message?: string }>;
 	refresh(): Promise<void>;
 }
+
 

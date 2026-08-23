@@ -25,18 +25,20 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1 & 3.2)', () => {
 		};
 	}
 
-	function makeEdge(edgeId: string, sourceEntityId: string, targetEntityId: string, sourcePath: string, targetPath: string, kind: TemporalEdgeKind = 'imports', edgeData?: any): TemporalEdgeSnapshot {
+	function makeEdge(edgeId: string, sourceEntityId: string, targetEntityId: string, sourcePath: string, targetPath: string, kind: TemporalEdgeKind = 'imports', metaOrData?: any): TemporalEdgeSnapshot {
+		const meta = metaOrData && typeof metaOrData === 'object' && 'meta' in metaOrData ? metaOrData.meta : metaOrData;
 		return {
 			edgeId,
 			commitSha: 'commit-test',
 			sourceEntityId,
 			targetEntityId,
 			kind,
-			edgeData: edgeData || {
+			edgeData: {
 				id: edgeId,
 				source: sourceEntityId,
 				target: targetEntityId,
 				kind,
+				meta: meta || {},
 			},
 			...({ sourcePath, targetPath } as any),
 		};
@@ -200,20 +202,20 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1 & 3.2)', () => {
 		assert.equal(nodeB?.oldPath, 'src/b.ts');
 	});
 
-	test('7. Edge modification detection: weight or metadata change triggers edgeModifiedCount', () => {
+	test('7. Edge modification detection: metadata change triggers edgeModifiedCount', () => {
 		const baseEntities = [
 			makeEntity('ent-1', 'src/a.ts', 'can-1'),
 			makeEntity('ent-2', 'src/b.ts', 'can-2'),
 		];
 		const baseEdges = [
-			makeEdge('edge-1-2', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', { weight: 1, importType: 'named' }),
+			makeEdge('edge-1-2', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', { specifiers: ['foo'] }),
 		];
 		const targetEntities = [
 			makeEntity('ent-1', 'src/a.ts', 'can-1'),
 			makeEntity('ent-2', 'src/b.ts', 'can-2'),
 		];
 		const targetEdges = [
-			makeEdge('edge-1-2', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', { weight: 5, importType: 'named' }),
+			makeEdge('edge-1-2', 'ent-1', 'ent-2', 'src/a.ts', 'src/b.ts', 'imports', { specifiers: ['foo', 'bar'] }),
 		];
 
 		const diff = computeTemporalStructuralDiff('commit-2', targetEntities, targetEdges, 'commit-1', baseEntities, baseEdges);

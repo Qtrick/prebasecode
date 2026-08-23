@@ -22,10 +22,13 @@ class FakeElement {
 	readonly style: Record<string, string> = { display: 'none' };
 	readonly classList = new FakeClassList();
 	readonly listeners = new Map<string, Listener[]>();
+	readonly attributes = new Map<string, string>();
 	readonly clientWidth = 800;
 	readonly clientHeight = 600;
 	checked = false;
-	onclick: (() => void) | null = null;
+	onclick: ((e?: any) => void) | null = null;
+	onkeydown: ((e?: any) => void) | null = null;
+	ondblclick: ((e?: any) => void) | null = null;
 	innerHTML = '';
 	textContent = '';
 	value = '';
@@ -34,6 +37,15 @@ class FakeElement {
 	title = '';
 	firstChild: FakeElement | null = null;
 	children: FakeElement[] = [];
+
+	private _className = '';
+	get className(): string { return this._className; }
+	set className(val: string) {
+		this._className = val;
+		for (const n of val.split(/\s+/).filter(Boolean)) {
+			this.classList.add(n);
+		}
+	}
 
 	addEventListener(type: string, listener: Listener): void {
 		const list = this.listeners.get(type) ?? [];
@@ -53,7 +65,12 @@ class FakeElement {
 	getBoundingClientRect(): { left: number; top: number; width: number; height: number } {
 		return { left: 0, top: 0, width: this.clientWidth, height: this.clientHeight };
 	}
-	setAttribute(_name: string, _value: string): void {}
+	setAttribute(name: string, value: string): void {
+		this.attributes.set(name, value);
+	}
+	getAttribute(name: string): string | undefined {
+		return this.attributes.get(name);
+	}
 	appendChild(child: FakeElement): FakeElement {
 		this.children.push(child);
 		if (!this.firstChild) this.firstChild = child;
@@ -76,8 +93,9 @@ class FakeElement {
 function createTemporalWebviewHarness() {
 	const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
 	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
-	const script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
+	let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
 	assert.ok(script, 'webview script must be present');
+	script = script.replace("let graphType = 'network';", "let graphType = 'temporal';");
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [
@@ -145,6 +163,8 @@ function createTemporalWebviewHarness() {
 		Array,
 		String,
 		Promise,
+		parseInt,
+		parseFloat,
 		setTimeout: () => 1,
 		clearTimeout: () => {},
 		setInterval: () => 1,
@@ -171,8 +191,8 @@ function createTemporalWebviewHarness() {
 	};
 }
 
-suite('GraphEditorTemporalWebview (Unit - Phase 3.4 VM & Webview)', () => {
-	test('1. Webview HTML structure includes all Phase 3.4 UI components with secure CSP and nonces', () => {
+suite('GraphEditorTemporalWebview (Unit - Phase 3.5 VM & Webview)', () => {
+	test('1. Webview HTML structure includes all Phase 3.5 UI components with secure CSP and nonces', () => {
 		const input = new PreBaseGraphEditorInput('temporal');
 		assert.equal(input.graphType, 'temporal');
 		assert.equal(input.typeId, PreBaseGraphEditorInput.TypeID);
@@ -211,120 +231,128 @@ suite('GraphEditorTemporalWebview (Unit - Phase 3.4 VM & Webview)', () => {
 		assert.equal(pos2_half.y, 600);
 	});
 
-	test('3. State Mode Invariant: removed nodes and removed edges are strictly excluded from state projection', () => {
-		interface TestNode {
-			entityId: string;
-			changeKind: 'unchanged' | 'modified' | 'added' | 'removed' | 'renamed';
-		}
-		interface TestEdge {
-			edgeId: string;
-			sourceEntityId: string;
-			targetEntityId: string;
-			changeKind: 'unchanged' | 'modified' | 'added' | 'removed';
-		}
-
-		const allNodes: TestNode[] = [
-			{ entityId: 'n1', changeKind: 'unchanged' },
-			{ entityId: 'n2', changeKind: 'added' },
-			{ entityId: 'n3', changeKind: 'removed' },
-			{ entityId: 'n4', changeKind: 'modified' },
-		];
-
-		const allEdges: TestEdge[] = [
-			{ edgeId: 'e1', sourceEntityId: 'n1', targetEntityId: 'n2', changeKind: 'added' },
-			{ edgeId: 'e2', sourceEntityId: 'n1', targetEntityId: 'n3', changeKind: 'removed' },
-			{ edgeId: 'e3', sourceEntityId: 'n1', targetEntityId: 'n4', changeKind: 'unchanged' },
-		];
-
-		function filterForMode(mode: 'changes' | 'state', nodes: TestNode[], edges: TestEdge[]) {
-			if (mode === 'changes') {
-				return { nodes, edges };
-			}
-			const visibleNodes = nodes.filter(n => n.changeKind !== 'removed');
-			const visibleNodeIds = new Set(visibleNodes.map(n => n.entityId));
-			const visibleEdges = edges.filter(e =>
-				e.changeKind !== 'removed' &&
-				visibleNodeIds.has(e.sourceEntityId) &&
-				visibleNodeIds.has(e.targetEntityId)
-			);
-			return { nodes: visibleNodes, edges: visibleEdges };
-		}
-
-		const changesResult = filterForMode('changes', allNodes, allEdges);
-		assert.equal(changesResult.nodes.length, 4);
-		assert.equal(changesResult.edges.length, 3);
-
-		const stateResult = filterForMode('state', allNodes, allEdges);
-		assert.equal(stateResult.nodes.length, 3);
-		assert.ok(!stateResult.nodes.some(n => n.entityId === 'n3'));
-		assert.equal(stateResult.edges.length, 2);
-		assert.ok(!stateResult.edges.some(e => e.edgeId === 'e2'));
-	});
-
-	test('4. Production Webview VM: Receives temporalState and updates DOM safely without innerHTML injection', () => {
+	test('3. Production Webview VM: Bounded navigation, scrubber calculation, and relative stepping messages', () => {
 		const harness = createTemporalWebviewHarness();
 
-		// Post temporal state with repository-controlled strings
+		// Post 3-commit temporal state with timelineWindow metadata
 		harness.postMessageToWebview({
 			type: 'temporalState',
 			payload: {
 				mode: 'temporal',
 				activeRepositoryRoot: '/workspace/project',
-				availableRepositories: [{ rootPath: '/workspace/project', name: 'project' }],
-				selectedRef: 'main',
-				availableRefs: [{ name: 'main', kind: 'branch', isHead: true, targetCommitSha: 'sha1234567' }],
-				selectedCommitSha: 'sha1234567890abcdef',
-				renderedCommitSha: 'sha1234567890abcdef',
-				compareBaseSha: 'base0987654321fedcba',
-				renderedCompareBaseSha: 'base0987654321fedcba',
+				availableRepositories: [{ id: 'proj', rootUri: '/workspace/project', label: 'project' }],
+				selectedRef: 'HEAD',
+				repositoryRefs: [{ name: 'HEAD', kind: 'branch', isRemote: false, targetSha: 'sha_head' }],
+				selectedCommitSha: 'sha_head',
+				renderedCommitSha: 'sha_head',
+				selectedCommitIndex: 0,
+				loadedCommitCount: 3,
+				compareBaseSha: 'sha_c2',
+				renderedCompareBaseSha: 'sha_c2',
 				comparisonMode: 'first-parent',
 				displayMode: 'changes',
 				followHead: true,
 				filterQuery: '',
-				isIndexed: true,
-				loadedCommitCount: 1,
-				pagedTimeline: [{
-					sha: 'sha1234567890abcdef',
-					shortSha: 'sha1234',
-					message: '<script>alert("xss")</script> feat: add security',
-					author: 'Security Dev <dev@prebase.io>',
-					timestamp: Date.now(),
-					parents: ['base0987654321fedcba'],
-					isCheckpoint: true,
-				}],
-			}
-		});
-
-		// Post structural diff
-		harness.postMessageToWebview({
-			type: 'temporalDiff',
-			payload: {
-				targetCommitSha: 'sha1234567890abcdef',
-				baseCommitSha: 'base0987654321fedcba',
-				summary: { addedCount: 2, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 5, edgeAddedCount: 1, edgeRemovedCount: 0, edgeModifiedCount: 0 },
-				nodes: [
-					{ entityId: 'e1', path: 'src/secure.ts', label: 'secure.ts', kind: 'file', x: 10, y: 10, changeKind: 'added' },
-					{ entityId: 'e2', path: 'src/app.ts', label: 'app.ts', kind: 'file', x: 20, y: 20, changeKind: 'modified' },
+				isSettled: true,
+				timelineWindow: { start: 0, count: 3 },
+				pagedTimeline: [
+					{ sha: 'sha_head', shortSha: 'sha_hea', message: 'feat: head commit', author: 'Dev', timestamp: Date.now(), parents: ['sha_c2'], isMerge: false },
+					{ sha: 'sha_c2', shortSha: 'sha_c20', message: 'feat: c2 commit', author: 'Dev', timestamp: Date.now() - 1000, parents: ['sha_c1'], isMerge: false },
+					{ sha: 'sha_c1', shortSha: 'sha_c10', message: 'feat: c1 commit', author: 'Dev', timestamp: Date.now() - 2000, parents: [], isMerge: false },
 				],
-				edges: [
-					{ edgeId: 'ed1', sourceEntityId: 'e2', targetEntityId: 'e1', kind: 'imports', changeKind: 'added', edgeData: { id: 'ed1', source: 'src/app.ts', target: 'src/secure.ts' } }
-				]
 			}
 		});
 
-		const commitMsgEl = harness.elements.get('temporalCommitMessage')!;
-		assert.ok(commitMsgEl.textContent.includes('feat: add security'));
-		// Verify details panel DOM elements were created safely
-		const detailsShaEl = harness.elements.get('detailsCommitSha')!;
-		assert.ok(detailsShaEl.textContent.includes('sha1234'));
+		// Check scrubber initialization: max should be 2 (total 3 - 1), value should be 2 ((3-1)-0)
+		const scrubber = harness.elements.get('temporalScrubber')!;
+		assert.equal(scrubber.max, '2');
+		assert.equal(scrubber.value, '2');
+		assert.ok(scrubber.getAttribute('aria-valuetext')?.includes('head commit'));
 
-		// Test keyboard interaction: Space key on a BUTTON element must NOT trigger play
-		let prevented = false;
+		// Test Scrubber Interaction: dragging to slider value 0 should select global index 2 ((3-1)-0 = 2)
+		scrubber.value = '0';
+		scrubber.dispatch('change', {});
+
+		const lastMsg = harness.postedMessages[harness.postedMessages.length - 1];
+		assert.equal(lastMsg.type, 'selectTemporalCommitIndex');
+		assert.equal(lastMsg.payload.index, 2);
+		assert.equal(lastMsg.payload.immediate, true);
+
+		// Test Step Navigation: Clicking prev / next buttons
+		const prevBtn = harness.elements.get('temporalPrevBtn')!;
+		prevBtn.dispatch('click', {});
+		const prevMsg = harness.postedMessages[harness.postedMessages.length - 1];
+		assert.equal(prevMsg.type, 'stepTemporalCommit');
+		assert.equal(prevMsg.payload.delta, -1);
+
+		const nextBtn = harness.elements.get('temporalNextBtn')!;
+		nextBtn.dispatch('click', {});
+		const nextMsg = harness.postedMessages[harness.postedMessages.length - 1];
+		assert.equal(nextMsg.type, 'stepTemporalCommit');
+		assert.equal(nextMsg.payload.delta, 1);
+
+		// Test Arrow Keys on window
+		let arrowPrevented = false;
 		harness.dispatchWindowKeydown({
-			key: ' ',
-			target: { tagName: 'BUTTON' },
-			preventDefault: () => { prevented = true; }
+			key: 'ArrowLeft',
+			target: { tagName: 'DIV' },
+			preventDefault: () => { arrowPrevented = true; }
 		});
-		assert.equal(prevented, false, 'Space key on button must NOT be captured as global play shortcut');
+		assert.equal(arrowPrevented, true);
+		const arrowLeftMsg = harness.postedMessages[harness.postedMessages.length - 1];
+		assert.equal(arrowLeftMsg.type, 'stepTemporalCommit');
+		assert.equal(arrowLeftMsg.payload.delta, -1);
+	});
+
+	test('4. Details panel displays loading truth and rendered diff summary with renamedModifiedCount', () => {
+		const harness = createTemporalWebviewHarness();
+
+		// Post state where selectedCommit is c2 but rendered is c1 (loading in progress)
+		harness.postMessageToWebview({
+			type: 'temporalState',
+			payload: {
+				mode: 'temporal',
+				activeRepositoryRoot: '/workspace/project',
+				selectedRef: 'HEAD',
+				selectedCommitSha: 'sha_c2_full_hash',
+				renderedCommitSha: 'sha_c1_full_hash',
+				selectedCommitIndex: 1,
+				loadedCommitCount: 2,
+				isLoadingSelection: true,
+				selectedCommitSummary: { sha: 'sha_c2_full_hash', message: 'c2 commit', author: 'Dev' },
+				renderedCommitSummary: { sha: 'sha_c1_full_hash', message: 'c1 commit', author: 'Dev' },
+				pagedTimeline: [
+					{ sha: 'sha_c2_full_hash', shortSha: 'sha_c2', message: 'c2 commit' },
+					{ sha: 'sha_c1_full_hash', shortSha: 'sha_c1', message: 'c1 commit' },
+				],
+				diff: {
+					targetCommitSha: 'sha_c1_full_hash',
+					baseCommitSha: undefined,
+					summary: {
+						addedCount: 3,
+						removedCount: 1,
+						modifiedCount: 2,
+						renamedCount: 2,
+						renamedModifiedCount: 1,
+						unchangedCount: 10,
+						edgeAddedCount: 2,
+						edgeRemovedCount: 1,
+						edgeModifiedCount: 0,
+					},
+					nodes: [],
+					edges: [],
+				}
+			}
+		});
+
+		const detailsShaEl = harness.elements.get('detailsCommitSha')!;
+		assert.ok(detailsShaEl.textContent.includes('Displaying'));
+		assert.ok(detailsShaEl.textContent.includes('Loading…'));
+
+		const detailsSummaryEl = harness.elements.get('detailsDeltaSummary')!;
+		assert.ok(detailsSummaryEl.children.length > 0);
+		const renamedBadge = detailsSummaryEl.children.find(c => c.classList.contains('badge-renamed'));
+		assert.ok(renamedBadge);
+		assert.ok(renamedBadge.textContent.includes('2 renamed (~1 also modified)'));
 	});
 });

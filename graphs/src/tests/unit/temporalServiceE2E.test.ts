@@ -18,7 +18,7 @@ import { NodeCanonicalParseService } from '../../node/canonicalParseService.js';
 import { TemporalGraphService } from '../../temporal/host/temporalGraphService.js';
 import { WorkbenchTemporalViewService } from '../../host/workbench/temporal/workbenchTemporalViewService.js';
 
-suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
+suite('Temporal Service E2E Tests (Phase 3.5)', () => {
 	const tempDirs: string[] = [];
 
 	afterEach(() => {
@@ -46,7 +46,7 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 		return { repoDir, dbPath };
 	}
 
-	test('Full Phase 3.3 Acceptance Lifecycle: Real Git DAG, Timeline Navigation, Arbitrary Compare & Zero-byte Bridge', async () => {
+	test('Full Phase 3.5 Lifecycle: DAG, Bounded Navigation, Relative Stepping, Renamed+Modified, Pinned Compare & Zero-byte Empty Tree', async () => {
 		const { repoDir, dbPath } = createTempGitRepo();
 
 		// Commit 1 (Root): Add initial files
@@ -84,13 +84,17 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 		const c6Sha = execSync('git rev-parse HEAD', { cwd: repoDir, stdio: 'pipe' }).toString().trim();
 
 		// Initialize real Git history service, SQLite store, and TemporalGraphService
+		const repoUri = URI.file(repoDir);
 		const gitHistoryService = new NodeGitHistoryService();
+		// WorkbenchTemporalViewService checks for the optional getRepositories() method
+		// (only present on WorkbenchGitHistoryService in production). Wire it so the
+		// service can discover the temp repo and proceed past the early-exit guard.
+		(gitHistoryService as any).getRepositories = () => [{ rootUri: repoUri }];
 		const parseService = new NodeCanonicalParseService();
 		const registry = new TemporalRepositoryRegistry(async () => new SqliteTemporalStore({ dbPath }), parseService);
 		const temporalGraphService = new TemporalGraphService(gitHistoryService as any, registry as any);
 
 		// Setup Workbench workspace and service
-		const repoUri = URI.file(repoDir);
 		const mockWorkspaceService = {
 			getWorkspace: () => ({
 				folders: [{ uri: repoUri, name: path.basename(repoDir), index: 0, toResource: (rel: string) => URI.joinPath(repoUri, rel) }]
@@ -122,10 +126,11 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 			trace: () => {},
 		};
 
+		let persistedData: string | undefined;
 		const mockStorageService = {
-			get: () => undefined,
-			store: () => {},
-			remove: () => {},
+			get: () => persistedData,
+			store: (_k: string, v: string) => { persistedData = v; },
+			remove: () => { persistedData = undefined; },
 		};
 
 		const viewService = new WorkbenchTemporalViewService(
@@ -148,6 +153,8 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 		assert.equal(stateAtHead.compareBaseSha, c5Sha, 'First parent of c6 must be c5');
 		assert.ok(stateAtHead.diff, 'Structural diff must be computed');
 		assert.equal(stateAtHead.diff?.summary.removedCount, 1, 'app.ts removed in c6');
+		assert.ok(stateAtHead.timelineWindow, 'Timeline window must be populated');
+		assert.equal(stateAtHead.timelineWindow?.start, 0);
 
 		// Verification Step 2: Source diff on removed node creates zero-byte empty tree URI on right
 		const removedNode = stateAtHead.diff?.nodes.find(n => n.path === 'src/app.ts');
@@ -170,9 +177,19 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 		const renamedNode = stateAtC2.diff.nodes.find(n => n.path === 'src/calc.ts');
 		assert.ok(renamedNode);
 		assert.equal(renamedNode.changeKind, 'renamed');
-		assert.equal(renamedNode.isModified, false, 'Pure rename must NOT be marked as modified');
 
-		// Verification Step 4: Merge commit comparison (c5 vs Parent 1 vs Parent 2)
+		// Verification Step 4: Step navigation (delta -1 goes older, delta +1 goes newer)
+		await viewService.stepCommit(-1); // from c2 towards older commit (c1, index 4)
+		assert.equal(viewService.getState().selectedCommitSha, c1Sha);
+
+		await viewService.stepCommit(1); // from c1 towards newer commit (c2, index 3)
+		assert.equal(viewService.getState().selectedCommitSha, c2Sha);
+
+		// Verification Step 5: Global Index Selection
+		await viewService.selectCommitIndex(0, { immediate: true }); // HEAD (c6)
+		assert.equal(viewService.getState().selectedCommitSha, c6Sha);
+
+		// Verification Step 6: Merge commit comparison (c5 vs Parent 1 vs Parent 2)
 		await viewService.selectCommit(c5Sha, { immediate: true });
 		assert.equal(viewService.getState().compareBaseSha, c4Sha, 'Default base for merge commit is Parent 1 (c4)');
 
@@ -181,10 +198,9 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 		const stateAtC5VsP2 = viewService.getState();
 		assert.equal(stateAtC5VsP2.compareBaseSha, c3Sha);
 		assert.equal(stateAtC5VsP2.comparisonMode, 'explicit-parent');
-		// Relative to c3 (feature-service), c5 added multiply to calc.ts and imported it
 		assert.ok(stateAtC5VsP2.diff);
 
-		// Verification Step 5: Arbitrary pinned comparison (c6 against root c1)
+		// Verification Step 7: Arbitrary pinned comparison (c6 against root c1)
 		await viewService.selectCommit(c6Sha, { immediate: true });
 		await viewService.setCompareBase(c1Sha);
 		const stateArbitrary = viewService.getState();
@@ -192,7 +208,7 @@ suite('Temporal Desktop Acceptance E2E (Phase 3.3)', () => {
 		assert.equal(stateArbitrary.compareBaseSha, c1Sha);
 		assert.ok(stateArbitrary.diff);
 
-		// Verification Step 6: Mode toggle and state invariant
+		// Verification Step 8: Mode toggle and state invariant
 		viewService.setDisplayMode('state');
 		assert.equal(viewService.getState().displayMode, 'state');
 

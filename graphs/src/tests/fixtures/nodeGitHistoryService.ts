@@ -30,6 +30,7 @@ const SHA1_EMPTY_TREE_HASH_FIXTURE = '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
 interface ExecGitOptions {
 	cwd: string;
 	args: string[];
+	input?: string | Buffer;
 	timeoutMs?: number;
 	maxBufferBytes?: number;
 	token?: CancellationTokenLike;
@@ -65,15 +66,20 @@ export class NodeGitHistoryService implements IGitHistoryService {
 		}
 
 		return new Promise<ExecGitResult>((resolve, reject) => {
+			const hasInput = options.input !== undefined;
 			const child = spawn('git', options.args, {
 				cwd: options.cwd,
-				stdio: ['ignore', 'pipe', 'pipe'],
+				stdio: [hasInput ? 'pipe' : 'ignore', 'pipe', 'pipe'],
 				env: {
 					...process.env,
 					GIT_OPTIONAL_LOCKS: '0',
 					LC_ALL: 'C',
 				},
 			});
+
+			if (hasInput && child.stdin) {
+				child.stdin.end(options.input, 'utf8');
+			}
 
 			const stdoutChunks: Buffer[] = [];
 			const stderrChunks: Buffer[] = [];
@@ -611,7 +617,8 @@ export class NodeGitHistoryService implements IGitHistoryService {
 		try {
 			const res = await this._exec({
 				cwd: rootPath,
-				args: ['hash-object', '-t', 'tree', '/dev/null'],
+				args: ['hash-object', '-t', 'tree', '--stdin'],
+				input: '',
 				token,
 			});
 			const tree = res.stdout.trim();
@@ -619,8 +626,8 @@ export class NodeGitHistoryService implements IGitHistoryService {
 				return tree;
 			}
 		} catch {
-			// fallback
+			// fallback for test fixtures
 		}
-		return '4b825dc642cb6eb9a060e54bf8d69288fbee4904';
+		return SHA1_EMPTY_TREE_HASH_FIXTURE;
 	}
 }
