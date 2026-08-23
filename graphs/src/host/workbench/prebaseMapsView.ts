@@ -425,18 +425,87 @@ export class PreBaseMapsViewPane extends ViewPane {
 			return;
 		}
 
-		const selectedSha = state.selectedCommitSha;
+		const historicalSha = this.graphService.getSelectedHistoricalCommitSha();
+		const selectedSha = historicalSha || state.selectedCommitSha;
 		const windowStart = state.timelineWindow ? state.timelineWindow.start : 0;
 
+		// 1. Working Tree Row
+		const wtRow = DOM.append(this._historyList, DOM.$('div'));
+		const isWtSelected = !historicalSha && (this._getActiveGraphType() === 'network');
+		wtRow.tabIndex = 0;
+		wtRow.setAttribute('role', 'option');
+		wtRow.setAttribute('aria-selected', isWtSelected ? 'true' : 'false');
+		wtRow.className = 'history-item history-working-tree' + (isWtSelected ? ' selected' : '');
+		wtRow.dataset.commitSha = '__working_tree__';
+		wtRow.style.display = 'flex';
+		wtRow.style.flexDirection = 'column';
+		wtRow.style.gap = '2px';
+		wtRow.style.padding = '4px 6px';
+		wtRow.style.marginBottom = '2px';
+		wtRow.style.borderRadius = '4px';
+		wtRow.style.cursor = 'pointer';
+		wtRow.style.boxSizing = 'border-box';
+		wtRow.style.width = '100%';
+		wtRow.style.background = isWtSelected ? ACCENT_SOFT : 'transparent';
+		wtRow.style.border = isWtSelected ? `1px solid ${ACCENT}88` : '1px solid transparent';
+		wtRow.style.outline = 'none';
+
+		const wtLine1 = DOM.append(wtRow, DOM.$('div'));
+		wtLine1.style.display = 'flex';
+		wtLine1.style.alignItems = 'center';
+		wtLine1.style.gap = '6px';
+
+		const wtBadge = DOM.append(wtLine1, DOM.$('span'));
+		wtBadge.textContent = '● Live';
+		wtBadge.style.fontSize = '10px';
+		wtBadge.style.fontWeight = '600';
+		wtBadge.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+		wtBadge.style.flexShrink = '0';
+
+		const wtMsg = DOM.append(wtLine1, DOM.$('span'));
+		wtMsg.textContent = localize('prebase.maps.workingTree', "Working Tree · Live Codebase");
+		wtMsg.style.fontSize = '11px';
+		wtMsg.style.fontWeight = '600';
+		wtMsg.style.color = TEXT;
+		wtMsg.style.overflow = 'hidden';
+		wtMsg.style.textOverflow = 'ellipsis';
+		wtMsg.style.whiteSpace = 'nowrap';
+		wtMsg.style.flex = '1';
+
+		const onSelectWt = () => {
+			const activeType = this._getActiveGraphType();
+			if (activeType === 'network') {
+				void this.graphService.loadHistoricalCommit(undefined);
+			} else {
+				void this.temporalViewService.selectCommitIndex(0, { immediate: true });
+			}
+			this._refreshHistorySelection();
+		};
+
+		this._historyDisposables.add(DOM.addDisposableListener(wtRow, 'click', (e) => {
+			e.stopPropagation();
+			onSelectWt();
+		}));
+		this._historyDisposables.add(DOM.addDisposableListener(wtRow, 'keydown', (e) => {
+			if (e.key === 'Enter' || e.key === ' ') {
+				e.preventDefault();
+				e.stopPropagation();
+				onSelectWt();
+			}
+		}));
+
+		// 2. Commit History Rows
 		for (let i = 0; i < timeline.length; i++) {
 			const commit = timeline[i];
 			const globalIndex = windowStart + i;
-			const isSelected = commit.sha === selectedSha;
+			const isSelected = (!isWtSelected) && (commit.sha === selectedSha);
 
 			const row = DOM.append(this._historyList, DOM.$('div'));
 			row.tabIndex = 0;
 			row.setAttribute('role', 'option');
 			row.setAttribute('aria-selected', isSelected ? 'true' : 'false');
+			row.className = 'history-item' + (isSelected ? ' selected' : '');
+			row.dataset.commitSha = commit.sha;
 			row.style.display = 'flex';
 			row.style.flexDirection = 'column';
 			row.style.gap = '2px';
@@ -450,20 +519,24 @@ export class PreBaseMapsViewPane extends ViewPane {
 			row.style.border = isSelected ? `1px solid ${ACCENT}88` : '1px solid transparent';
 			row.style.outline = 'none';
 
-			// Line 1: short SHA + message + isMerge badge
+			// Line 1: message (prominent) + HEAD badge + isMerge badge
 			const line1 = DOM.append(row, DOM.$('div'));
 			line1.style.display = 'flex';
 			line1.style.alignItems = 'center';
 			line1.style.gap = '6px';
 			line1.style.overflow = 'hidden';
 
-			const shaBadge = DOM.append(line1, DOM.$('span'));
-			shaBadge.textContent = commit.shortSha || commit.sha.slice(0, 7);
-			shaBadge.style.fontFamily = 'monospace';
-			shaBadge.style.fontSize = '10px';
-			shaBadge.style.fontWeight = '600';
-			shaBadge.style.color = isSelected ? ACCENT : 'var(--vscode-textLink-foreground, #58a6ff)';
-			shaBadge.style.flexShrink = '0';
+			if (i === 0) {
+				const headBadge = DOM.append(line1, DOM.$('span'));
+				headBadge.textContent = 'HEAD';
+				headBadge.style.fontSize = '9px';
+				headBadge.style.fontWeight = '700';
+				headBadge.style.padding = '0 4px';
+				headBadge.style.borderRadius = '3px';
+				headBadge.style.background = 'rgba(45, 212, 191, 0.2)';
+				headBadge.style.color = '#2dd4bf';
+				headBadge.style.flexShrink = '0';
+			}
 
 			if (commit.isMerge) {
 				const mergeBadge = DOM.append(line1, DOM.$('span'));
@@ -481,13 +554,14 @@ export class PreBaseMapsViewPane extends ViewPane {
 			const msgSpan = DOM.append(line1, DOM.$('span'));
 			msgSpan.textContent = commit.message || '(no message)';
 			msgSpan.style.fontSize = '11px';
+			msgSpan.style.fontWeight = '600';
 			msgSpan.style.color = TEXT;
 			msgSpan.style.overflow = 'hidden';
 			msgSpan.style.textOverflow = 'ellipsis';
 			msgSpan.style.whiteSpace = 'nowrap';
 			msgSpan.style.flex = '1';
 
-			// Line 2: timestamp + author
+			// Line 2: short SHA + localized date + author
 			const line2 = DOM.append(row, DOM.$('div'));
 			line2.style.display = 'flex';
 			line2.style.alignItems = 'center';
@@ -495,22 +569,35 @@ export class PreBaseMapsViewPane extends ViewPane {
 			line2.style.fontSize = '9.5px';
 			line2.style.color = MUTED;
 
-			const dateSpan = DOM.append(line2, DOM.$('span'));
-			dateSpan.textContent = commit.timestamp ? new Date(commit.timestamp).toLocaleString() : '';
+			const leftMeta = DOM.append(line2, DOM.$('span'));
+			leftMeta.style.display = 'flex';
+			leftMeta.style.alignItems = 'center';
+			leftMeta.style.gap = '6px';
+
+			const shaBadge = DOM.append(leftMeta, DOM.$('span'));
+			shaBadge.textContent = commit.shortSha || commit.sha.slice(0, 7);
+			shaBadge.style.fontFamily = 'monospace';
+			shaBadge.style.fontSize = '10px';
+			shaBadge.style.color = isSelected ? ACCENT : 'var(--vscode-textLink-foreground, #58a6ff)';
+			shaBadge.style.flexShrink = '0';
+
+			const dateSpan = DOM.append(leftMeta, DOM.$('span'));
+			dateSpan.textContent = commit.timestamp ? new Date(commit.timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
 
 			const authorSpan = DOM.append(line2, DOM.$('span'));
 			authorSpan.textContent = commit.author || '';
 			authorSpan.style.overflow = 'hidden';
 			authorSpan.style.textOverflow = 'ellipsis';
 			authorSpan.style.whiteSpace = 'nowrap';
-			authorSpan.style.maxWidth = '100px';
+			authorSpan.style.maxWidth = '90px';
 
 			const onSelect = () => {
 				void this.temporalViewService.selectCommitIndex(globalIndex, { immediate: true });
 				const activeType = this._getActiveGraphType();
-				if (activeType !== 'temporal') {
-					void this.commandService.executeCommand('prebase.graph.openTemporal');
+				if (activeType === 'network') {
+					void this.graphService.loadHistoricalCommit(commit.sha);
 				}
+				this._refreshHistorySelection();
 			};
 
 			this._historyDisposables.add(DOM.addDisposableListener(row, 'click', (e) => {
@@ -549,6 +636,27 @@ export class PreBaseMapsViewPane extends ViewPane {
 				void this.temporalViewService.loadMoreHistory();
 			}));
 		}
+	}
+
+	private _refreshHistorySelection(): void {
+		if (!this._historyList) return;
+		const historicalSha = this.graphService.getSelectedHistoricalCommitSha();
+		const state = this.temporalViewService.getState();
+		const isNetwork = this._getActiveGraphType() === 'network';
+		const activeSha = isNetwork ? (historicalSha || '__working_tree__') : state.selectedCommitSha;
+
+		const rows = this._historyList.querySelectorAll<HTMLElement>('.history-item');
+		rows.forEach(r => {
+			const rowSha = r.dataset.commitSha;
+			const isSel = rowSha === activeSha;
+			r.setAttribute('aria-selected', isSel ? 'true' : 'false');
+			r.style.background = isSel ? ACCENT_SOFT : 'transparent';
+			r.style.border = isSel ? `1px solid ${ACCENT}88` : '1px solid transparent';
+			const shaEl = r.querySelector('span[style*="monospace"]');
+			if (shaEl) {
+				(shaEl as HTMLElement).style.color = isSel ? ACCENT : 'var(--vscode-textLink-foreground, #58a6ff)';
+			}
+		});
 	}
 
 	private _getActiveGraphType(): 'network' | 'temporal' {

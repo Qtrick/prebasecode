@@ -646,7 +646,7 @@ export class PreBaseGraphEditor extends EditorPane {
 <html>
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}';">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}' 'unsafe-inline'; style-src-elem 'nonce-${nonce}'; style-src-attr 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style nonce="${nonce}">
 html, body { margin:0; height:100%; background:var(--vscode-editor-background, #1B1C1E); color:var(--vscode-foreground, #f4f4f5); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; overflow:hidden; }
 #stage { position:absolute; inset:0; }
@@ -731,7 +731,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		</div>
 		<div class="meta-row">
 			<label>Commit</label>
-			<span id="detailsCommitSha" style="font-family:monospace; color:var(--vscode-textLink-foreground, #58a6ff);"></span>
+			<span id="detailsCommitSha" style="font-family:monospace; color:var(--vscode-textLink-foreground, #58a6ff); white-space:pre-line;"></span>
 		</div>
 		<div class="meta-row">
 			<label>Message</label>
@@ -834,14 +834,38 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 </div>
 <div id="status">Scanning…</div>
 <script nonce="${nonce}">
+// 1. VS Code API and Initial Constants
 const vscode = acquireVsCodeApi();
 const currentGeneration = Number('${generation}') || 0;
 let initialGraphType = '${initialGraphType}' === 'temporal' ? 'temporal' : 'network';
 let graphType = initialGraphType;
 
+// 2. Fast request dispatcher & pending map
+const pending = new Map();
+function request(type, payload, timeoutMs = 5000) {
+	const requestId = Math.random().toString(36).slice(2);
+	return new Promise(function (resolve, reject) {
+		const timer = setTimeout(function () {
+			if (pending.has(requestId)) {
+				pending.delete(requestId);
+				reject(new Error('Request timed out: ' + type));
+			}
+		}, timeoutMs);
+		pending.set(requestId, function (val) {
+			clearTimeout(timer);
+			resolve(val);
+		});
+		vscode.postMessage({ requestId: requestId, type: type, payload: payload, generation: currentGeneration });
+	});
+}
+
+// 3. Immediate Bootstrap Ready Handshake (fires before any other logic)
+vscode.postMessage({ requestId: 'bootstrap', type: 'ready', payload: { generation: currentGeneration, graphType: initialGraphType }, generation: currentGeneration });
+
+// 4. Core DOM Element References
 const archSvg = document.getElementById('archSvg');
 const netCanvas = document.getElementById('netCanvas');
-const ctx = netCanvas.getContext('2d', { alpha: true });
+const ctx = netCanvas ? netCanvas.getContext('2d', { alpha: true }) : null;
 const status = document.getElementById('status');
 const legend = document.getElementById('legend');
 const empty = document.getElementById('empty');
@@ -882,7 +906,6 @@ const popupTitle = document.getElementById('popupTitle');
 const popupMeta = document.getElementById('popupMeta');
 const popupOverview = document.getElementById('popupOverview');
 const popupAi = document.getElementById('popupAi');
-const popupAiProvenance = document.getElementById('popupAiProvenance');
 const popupOpen = document.getElementById('popupOpen');
 const popupHistoricalView = document.getElementById('popupHistoricalView');
 const popupSourceDiff = document.getElementById('popupSourceDiff');
@@ -927,7 +950,6 @@ let lastRafTs = 0;
 let dirty = true;
 let rafScheduled = false;
 let dpr = Math.min(2, window.devicePixelRatio || 1);
-const pending = new Map();
 
 // Temporal State & 2D Transition Engine
 let temporalState = null;
@@ -940,23 +962,6 @@ let isAnimatingTemporal = false;
 let isPlayingHistory = false;
 let playIntervalTimer = null;
 let displayMode = 'changes';
-
-function request(type, payload, timeoutMs = 5000) {
-	const requestId = Math.random().toString(36).slice(2);
-	return new Promise(function (resolve, reject) {
-		const timer = setTimeout(function () {
-			if (pending.has(requestId)) {
-				pending.delete(requestId);
-				reject(new Error('Request timed out: ' + type));
-			}
-		}, timeoutMs);
-		pending.set(requestId, function (val) {
-			clearTimeout(timer);
-			resolve(val);
-		});
-		vscode.postMessage({ requestId: requestId, type: type, payload: payload, generation: currentGeneration });
-	});
-}
 
 function isNetwork() { return graphType === 'network'; }
 function isTemporal() { return graphType === 'temporal'; }
@@ -1007,7 +1012,8 @@ function wrapRotationAngle(angle) {
 
 function fileType(path) {
 	if (!path) return { id:'other', name:'Other', color:FILE_COLORS.other };
-	const base = String(path).split(/[/\\\\]/).pop() || path;
+	const normalized = String(path).replace(/\\\\/g, '/');
+	const base = normalized.split('/').pop() || path;
 	const ext = base.includes('.') ? base.split('.').pop().toLowerCase() : '';
 	if (ext === 'ts' || ext === 'tsx' || ext === 'mts' || ext === 'cts') return { id:'typescript', name:'TypeScript', color:FILE_COLORS.typescript };
 	if (ext === 'js' || ext === 'jsx' || ext === 'mjs' || ext === 'cjs') return { id:'javascript', name:'JavaScript', color:FILE_COLORS.javascript };
@@ -1034,13 +1040,15 @@ function projectPoint(x, y, z, yaw, pitch) {
 }
 
 function resizeCanvas() {
-	if (!netCanvas) return;
+	if (!netCanvas || !ctx) return;
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
 	if (netCanvas.width !== Math.floor(w * dpr) || netCanvas.height !== Math.floor(h * dpr)) {
 		netCanvas.width = Math.floor(w * dpr);
 		netCanvas.height = Math.floor(h * dpr);
-		ctx.resetTransform();
+		if (typeof ctx.resetTransform === 'function') {
+			ctx.resetTransform();
+		}
 		ctx.scale(dpr, dpr);
 		dirty = true;
 	}
@@ -1120,6 +1128,7 @@ function getVisualNodePosition(node, ease) {
 }
 
 function fitView() {
+	if (!netCanvas) return;
 	if (isTemporal()) {
 		if (!temporalDiff || !temporalDiff.nodes || !temporalDiff.nodes.length) return;
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
@@ -1157,6 +1166,7 @@ function fitView() {
 }
 
 function updateLegend(s, network) {
+	if (!legend) return;
 	if (isTemporal()) {
 		let html = '<div class="title">Temporal Transitions</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-addedResourceForeground, #3fb950)"></span>Added (+)</div>';
@@ -1191,208 +1201,226 @@ function updateLegend(s, network) {
 
 function updateTemporalUI(state, diff) {
 	if (!state) return;
-	temporalToolbar.style.display = 'flex';
-	temporalScrubberBar.style.display = 'flex';
-	toolbar.style.display = 'none';
-	status.style.display = 'none';
+	if (temporalToolbar) temporalToolbar.style.display = 'flex';
+	if (temporalScrubberBar) temporalScrubberBar.style.display = 'flex';
+	if (toolbar) toolbar.style.display = 'none';
+	if (status) status.style.display = 'none';
 
 	// Safe Multi-Repository Selector population
-	if (state.availableRepositories && state.availableRepositories.length > 1) {
-		temporalRepoWrap.style.display = 'flex';
-		temporalRepoSelect.innerHTML = '';
-		for (let i = 0; i < state.availableRepositories.length; i++) {
-			const r = state.availableRepositories[i];
-			const opt = document.createElement('option');
-			opt.value = r.rootUri;
-			opt.textContent = r.label;
-			if (r.rootUri === state.activeRepositoryRoot) opt.selected = true;
-			temporalRepoSelect.appendChild(opt);
+	if (temporalRepoSelect && temporalRepoWrap) {
+		if (state.availableRepositories && state.availableRepositories.length > 1) {
+			temporalRepoWrap.style.display = 'flex';
+			temporalRepoSelect.innerHTML = '';
+			for (let i = 0; i < state.availableRepositories.length; i++) {
+				const r = state.availableRepositories[i];
+				const opt = document.createElement('option');
+				opt.value = r.rootUri;
+				opt.textContent = r.label;
+				if (r.rootUri === state.activeRepositoryRoot) opt.selected = true;
+				temporalRepoSelect.appendChild(opt);
+			}
+		} else {
+			temporalRepoWrap.style.display = 'none';
 		}
-	} else {
-		temporalRepoWrap.style.display = 'none';
 	}
 
 	// Safe DOM Ref Selector population
-	const currentRef = state.selectedRef || 'HEAD';
-	const refs = state.repositoryRefs || [];
-	temporalRefSelect.innerHTML = '';
+	if (temporalRefSelect) {
+		const currentRef = state.selectedRef || 'HEAD';
+		const refs = state.repositoryRefs || [];
+		temporalRefSelect.innerHTML = '';
 
-	const headGroup = document.createElement('optgroup');
-	headGroup.label = 'Current / HEAD';
-	const headOpt = document.createElement('option');
-	headOpt.value = 'HEAD';
-	headOpt.textContent = 'HEAD';
-	if (currentRef === 'HEAD') headOpt.selected = true;
-	headGroup.appendChild(headOpt);
-	temporalRefSelect.appendChild(headGroup);
+		const headGroup = document.createElement('optgroup');
+		headGroup.label = 'Current / HEAD';
+		const headOpt = document.createElement('option');
+		headOpt.value = 'HEAD';
+		headOpt.textContent = 'HEAD';
+		if (currentRef === 'HEAD') headOpt.selected = true;
+		headGroup.appendChild(headOpt);
+		temporalRefSelect.appendChild(headGroup);
 
-	const localBranches = refs.filter(r => r.kind === 'branch');
-	if (localBranches.length > 0) {
-		const grp = document.createElement('optgroup');
-		grp.label = 'Local Branches';
-		for (let i = 0; i < localBranches.length; i++) {
-			const b = localBranches[i];
-			const opt = document.createElement('option');
-			opt.value = b.name;
-			opt.textContent = b.name;
-			if (b.name === currentRef) opt.selected = true;
-			grp.appendChild(opt);
+		const localBranches = refs.filter(r => r.kind === 'branch');
+		if (localBranches.length > 0) {
+			const grp = document.createElement('optgroup');
+			grp.label = 'Local Branches';
+			for (let i = 0; i < localBranches.length; i++) {
+				const b = localBranches[i];
+				const opt = document.createElement('option');
+				opt.value = b.name;
+				opt.textContent = b.name;
+				if (b.name === currentRef) opt.selected = true;
+				grp.appendChild(opt);
+			}
+			temporalRefSelect.appendChild(grp);
 		}
-		temporalRefSelect.appendChild(grp);
-	}
 
-	const remoteBranches = refs.filter(r => r.kind === 'remote-branch');
-	if (remoteBranches.length > 0) {
-		const grp = document.createElement('optgroup');
-		grp.label = 'Remote Branches';
-		for (let i = 0; i < remoteBranches.length; i++) {
-			const b = remoteBranches[i];
-			const opt = document.createElement('option');
-			opt.value = b.name;
-			opt.textContent = b.name;
-			if (b.name === currentRef) opt.selected = true;
-			grp.appendChild(opt);
+		const remoteBranches = refs.filter(r => r.kind === 'remote-branch');
+		if (remoteBranches.length > 0) {
+			const grp = document.createElement('optgroup');
+			grp.label = 'Remote Branches';
+			for (let i = 0; i < remoteBranches.length; i++) {
+				const b = remoteBranches[i];
+				const opt = document.createElement('option');
+				opt.value = b.name;
+				opt.textContent = b.name;
+				if (b.name === currentRef) opt.selected = true;
+				grp.appendChild(opt);
+			}
+			temporalRefSelect.appendChild(grp);
 		}
-		temporalRefSelect.appendChild(grp);
-	}
 
-	const tags = refs.filter(r => r.kind === 'tag' || r.kind === 'annotated-tag');
-	if (tags.length > 0) {
-		const grp = document.createElement('optgroup');
-		grp.label = 'Tags';
-		for (let i = 0; i < tags.length; i++) {
-			const t = tags[i];
-			const opt = document.createElement('option');
-			opt.value = t.name;
-			opt.textContent = t.name;
-			if (t.name === currentRef) opt.selected = true;
-			grp.appendChild(opt);
+		const tags = refs.filter(r => r.kind === 'tag' || r.kind === 'annotated-tag');
+		if (tags.length > 0) {
+			const grp = document.createElement('optgroup');
+			grp.label = 'Tags';
+			for (let i = 0; i < tags.length; i++) {
+				const t = tags[i];
+				const opt = document.createElement('option');
+				opt.value = t.name;
+				opt.textContent = t.name;
+				if (t.name === currentRef) opt.selected = true;
+				grp.appendChild(opt);
+			}
+			temporalRefSelect.appendChild(grp);
 		}
-		temporalRefSelect.appendChild(grp);
 	}
 
 	// Safe Arbitrary Compare Base Selector
-	while (temporalCompareSelect.firstChild) temporalCompareSelect.removeChild(temporalCompareSelect.firstChild);
-	const timeline = state.pagedTimeline || [];
-	const curCommit = state.selectedCommitSummary || timeline.find(c => c.sha === state.selectedCommitSha);
-	const curBase = state.compareBaseSha || '';
+	if (temporalCompareSelect) {
+		while (temporalCompareSelect.firstChild) temporalCompareSelect.removeChild(temporalCompareSelect.firstChild);
+		const timeline = state.pagedTimeline || [];
+		const curCommit = state.selectedCommitSummary || timeline.find(c => c.sha === state.selectedCommitSha);
+		const curBase = state.compareBaseSha || '';
 
-	const p1Opt = document.createElement('option');
-	p1Opt.value = curCommit?.parents?.[0] || '';
-	p1Opt.textContent = curCommit?.parents?.[0] ? 'First Parent (' + curCommit.parents[0].slice(0, 7) + ')' : 'Initial Commit (No Parent)';
-	if (state.comparisonMode === 'first-parent') p1Opt.selected = true;
-	temporalCompareSelect.appendChild(p1Opt);
+		const p1Opt = document.createElement('option');
+		p1Opt.value = curCommit?.parents?.[0] || '';
+		p1Opt.textContent = curCommit?.parents?.[0] ? 'First Parent (' + curCommit.parents[0].slice(0, 7) + ')' : 'Initial Commit (No Parent)';
+		if (state.comparisonMode === 'first-parent') p1Opt.selected = true;
+		temporalCompareSelect.appendChild(p1Opt);
 
-	if (curCommit?.parents && curCommit.parents.length > 1) {
-		const p2Opt = document.createElement('option');
-		p2Opt.value = curCommit.parents[1];
-		p2Opt.textContent = 'Parent 2 (' + curCommit.parents[1].slice(0, 7) + ')';
-		if (state.comparisonMode === 'explicit-parent') p2Opt.selected = true;
-		temporalCompareSelect.appendChild(p2Opt);
+		if (curCommit?.parents && curCommit.parents.length > 1) {
+			const p2Opt = document.createElement('option');
+			p2Opt.value = curCommit.parents[1];
+			p2Opt.textContent = 'Parent 2 (' + curCommit.parents[1].slice(0, 7) + ')';
+			if (state.comparisonMode === 'explicit-parent') p2Opt.selected = true;
+			temporalCompareSelect.appendChild(p2Opt);
+		}
+
+		if (state.comparisonMode === 'pinned' && curBase) {
+			const customOpt = document.createElement('option');
+			customOpt.value = curBase;
+			customOpt.textContent = 'Pinned · ' + curBase.slice(0, 7);
+			customOpt.selected = true;
+			temporalCompareSelect.appendChild(customOpt);
+
+			const clearOpt = document.createElement('option');
+			clearOpt.value = '__clear_custom__';
+			clearOpt.textContent = '↺ Reset to First Parent';
+			temporalCompareSelect.appendChild(clearOpt);
+		}
+
+		const promptOpt = document.createElement('option');
+		promptOpt.value = '__prompt_custom__';
+		promptOpt.textContent = 'Set comparison base…';
+		temporalCompareSelect.appendChild(promptOpt);
 	}
-
-	if (state.comparisonMode === 'pinned' && curBase) {
-		const customOpt = document.createElement('option');
-		customOpt.value = curBase;
-		customOpt.textContent = 'Pinned · ' + curBase.slice(0, 7);
-		customOpt.selected = true;
-		temporalCompareSelect.appendChild(customOpt);
-
-		const clearOpt = document.createElement('option');
-		clearOpt.value = '__clear_custom__';
-		clearOpt.textContent = '↺ Reset to First Parent';
-		temporalCompareSelect.appendChild(clearOpt);
-	}
-
-	const promptOpt = document.createElement('option');
-	promptOpt.value = '__prompt_custom__';
-	promptOpt.textContent = 'Set comparison base…';
-	temporalCompareSelect.appendChild(promptOpt);
 
 	// Display Mode Buttons
 	displayMode = state.displayMode || 'changes';
-	if (displayMode === 'changes') {
-		temporalModeChangesBtn.classList.add('active');
-		temporalModeStateBtn.classList.remove('active');
-	} else {
-		temporalModeChangesBtn.classList.remove('active');
-		temporalModeStateBtn.classList.add('active');
+	if (temporalModeChangesBtn && temporalModeStateBtn) {
+		if (displayMode === 'changes') {
+			temporalModeChangesBtn.classList.add('active');
+			temporalModeStateBtn.classList.remove('active');
+		} else {
+			temporalModeChangesBtn.classList.remove('active');
+			temporalModeStateBtn.classList.add('active');
+		}
 	}
 
 	// Follow HEAD
-	temporalFollowHead.checked = !!state.followHead;
+	if (temporalFollowHead) {
+		temporalFollowHead.checked = !!state.followHead;
+	}
 
 	// Scrubber slider & Timeline Strip
+	const timeline = state.pagedTimeline || [];
 	const total = state.loadedCommitCount || timeline.length;
-	temporalScrubber.max = String(Math.max(0, total - 1));
+	if (temporalScrubber) {
+		temporalScrubber.max = String(Math.max(0, total - 1));
+	}
 	const currentIdx = typeof state.selectedCommitIndex === 'number'
 		? state.selectedCommitIndex
 		: timeline.findIndex(c => c.sha === state.selectedCommitSha);
+	const curCommit = state.selectedCommitSummary || (currentIdx >= 0 ? timeline[currentIdx] : undefined);
 
 	if (currentIdx >= 0) {
 		const sliderVal = (total - 1) - currentIdx;
-		temporalScrubber.value = String(sliderVal);
+		if (temporalScrubber) temporalScrubber.value = String(sliderVal);
 		const commit = curCommit || timeline[currentIdx];
 		if (commit) {
-			temporalCommitSha.textContent = commit.shortSha || commit.sha.slice(0, 7);
-			temporalCommitMessage.textContent = commit.message || '';
-			temporalCommitAuthor.textContent = commit.author ? 'by ' + commit.author : '';
+			if (temporalCommitSha) temporalCommitSha.textContent = commit.shortSha || commit.sha.slice(0, 7);
+			if (temporalCommitMessage) temporalCommitMessage.textContent = commit.message || '';
+			if (temporalCommitAuthor) temporalCommitAuthor.textContent = commit.author ? 'by ' + commit.author : '';
 
 			const isRendered = state.renderedCommitSha === state.selectedCommitSha;
-			if (state.isLoadingSelection || !isRendered) {
-				temporalCommitStatus.textContent = 'Loading ' + (commit.shortSha || commit.sha.slice(0, 7)) + '…';
-				temporalCommitStatus.title = 'Reconstructing graph for target commit';
-				temporalCommitStatus.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
-			} else if (state.selectionError) {
-				temporalCommitStatus.textContent = 'Error';
-				temporalCommitStatus.title = state.selectionError;
-				temporalCommitStatus.style.color = 'var(--vscode-errorForeground, #f85149)';
-			} else if (state.isSettled) {
-				temporalCommitStatus.textContent = 'Settled';
-				temporalCommitStatus.title = 'Graph fully indexed and reconciled';
-				temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
-			} else {
-				temporalCommitStatus.textContent = 'Indexing…';
-				temporalCommitStatus.title = 'Lineage indexing in progress';
-				temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)';
+			if (temporalCommitStatus) {
+				if (state.isLoadingSelection || !isRendered) {
+					temporalCommitStatus.textContent = 'Loading ' + (commit.shortSha || commit.sha.slice(0, 7)) + '…';
+					temporalCommitStatus.title = 'Reconstructing graph for target commit';
+					temporalCommitStatus.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
+				} else if (state.selectionError) {
+					temporalCommitStatus.textContent = 'Error';
+					temporalCommitStatus.title = state.selectionError;
+					temporalCommitStatus.style.color = 'var(--vscode-errorForeground, #f85149)';
+				} else if (state.isSettled) {
+					temporalCommitStatus.textContent = 'Settled';
+					temporalCommitStatus.title = 'Graph fully indexed and reconciled';
+					temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+				} else {
+					temporalCommitStatus.textContent = 'Indexing…';
+					temporalCommitStatus.title = 'Lineage indexing in progress';
+					temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)';
+				}
 			}
-			temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
+			if (temporalScrubber) temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
 		}
 	}
 
 	// Render windowed interactive timeline button markers
-	while (temporalTimelineStrip.firstChild) temporalTimelineStrip.removeChild(temporalTimelineStrip.firstChild);
-	const windowStart = state.timelineWindow ? state.timelineWindow.start : 0;
-	for (let i = timeline.length - 1; i >= 0; i--) {
-		const c = timeline[i];
-		const globalIndex = windowStart + i;
-		const btn = document.createElement('button');
-		btn.type = 'button';
-		btn.className = 'commit-marker' + (c.sha === state.selectedCommitSha ? ' active' : '') + (c.isMerge ? ' is-merge' : '');
-		btn.setAttribute('role', 'button');
-		btn.setAttribute('tabindex', '0');
-		if (c.sha === state.selectedCommitSha) {
-			btn.setAttribute('aria-current', 'true');
-		}
-		const markerLabel = 'Commit ' + (c.shortSha || c.sha.slice(0, 7)) + ': ' + c.message + (c.author ? ', by ' + c.author : '') + (c.isMerge ? ' [Merge]' : '');
-		btn.title = markerLabel;
-		btn.setAttribute('aria-label', markerLabel);
-		btn.onclick = (function (sha, idx) {
-			return function (e) {
-				if (e) { e.stopPropagation(); }
-				request('selectTemporalCommitIndex', { index: idx, immediate: true });
-			};
-		})(c.sha, globalIndex);
-		btn.onkeydown = (function (sha, idx) {
-			return function (e) {
-				if (e.key === 'Enter' || e.key === ' ') {
-					e.preventDefault();
-					e.stopPropagation();
+	if (temporalTimelineStrip) {
+		while (temporalTimelineStrip.firstChild) temporalTimelineStrip.removeChild(temporalTimelineStrip.firstChild);
+		const windowStart = state.timelineWindow ? state.timelineWindow.start : 0;
+		for (let i = timeline.length - 1; i >= 0; i--) {
+			const c = timeline[i];
+			const globalIndex = windowStart + i;
+			const btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'commit-marker' + (c.sha === state.selectedCommitSha ? ' active' : '') + (c.isMerge ? ' is-merge' : '');
+			btn.setAttribute('role', 'button');
+			btn.setAttribute('tabindex', '0');
+			if (c.sha === state.selectedCommitSha) {
+				btn.setAttribute('aria-current', 'true');
+			}
+			const markerLabel = 'Commit ' + (c.shortSha || c.sha.slice(0, 7)) + ': ' + c.message + (c.author ? ', by ' + c.author : '') + (c.isMerge ? ' [Merge]' : '');
+			btn.title = markerLabel;
+			btn.setAttribute('aria-label', markerLabel);
+			btn.onclick = (function (sha, idx) {
+				return function (e) {
+					if (e) { e.stopPropagation(); }
 					request('selectTemporalCommitIndex', { index: idx, immediate: true });
-				}
-			};
-		})(c.sha, globalIndex);
-		temporalTimelineStrip.appendChild(btn);
+				};
+			})(c.sha, globalIndex);
+			btn.onkeydown = (function (sha, idx) {
+				return function (e) {
+					if (e.key === 'Enter' || e.key === ' ') {
+						e.preventDefault();
+						e.stopPropagation();
+						request('selectTemporalCommitIndex', { index: idx, immediate: true });
+					}
+				};
+			})(c.sha, globalIndex);
+			temporalTimelineStrip.appendChild(btn);
+		}
 	}
 
 	// Details Inspector Panel Update
@@ -1408,7 +1436,7 @@ function updateTemporalUI(state, diff) {
 
 	if (detailsSha) {
 		if (isCurrentlyLoading && curCommit && renderedCommit) {
-			detailsSha.textContent = (renderedCommit.sha || '') + ' (Displaying)\n' + (curCommit.sha || '') + ' (Selected - Loading…)';
+			detailsSha.textContent = (renderedCommit.sha || '') + ' (Displaying)' + String.fromCharCode(10) + (curCommit.sha || '') + ' (Selected - Loading…)';
 		} else {
 			detailsSha.textContent = (renderedCommit ? renderedCommit.sha : (curCommit ? curCommit.sha : ''));
 		}
@@ -1489,29 +1517,33 @@ function updateTemporalUI(state, diff) {
 	}
 
 	// Load more history button
-	temporalLoadMoreBtn.style.display = state.historyHasMore ? 'inline-block' : 'none';
-	if (state.isLoadingMoreHistory) {
-		temporalLoadMoreBtn.textContent = 'Loading…';
-		temporalLoadMoreBtn.disabled = true;
-	} else if (state.historyLoadMoreError) {
-		temporalLoadMoreBtn.textContent = 'Retry loading older';
-		temporalLoadMoreBtn.disabled = false;
-		temporalLoadMoreBtn.title = state.historyLoadMoreError;
-	} else {
-		temporalLoadMoreBtn.textContent = 'Load older…';
-		temporalLoadMoreBtn.disabled = false;
-		temporalLoadMoreBtn.title = 'Load older commit history';
+	if (temporalLoadMoreBtn) {
+		temporalLoadMoreBtn.style.display = state.historyHasMore ? 'inline-block' : 'none';
+		if (state.isLoadingMoreHistory) {
+			temporalLoadMoreBtn.textContent = 'Loading…';
+			temporalLoadMoreBtn.disabled = true;
+		} else if (state.historyLoadMoreError) {
+			temporalLoadMoreBtn.textContent = 'Retry loading older';
+			temporalLoadMoreBtn.disabled = false;
+			temporalLoadMoreBtn.title = state.historyLoadMoreError;
+		} else {
+			temporalLoadMoreBtn.textContent = 'Load older…';
+			temporalLoadMoreBtn.disabled = false;
+			temporalLoadMoreBtn.title = 'Load older commit history';
+		}
 	}
 
 	// Partial warning
-	temporalPartialWarning.style.display = state.isPartialLineage ? 'inline-block' : 'none';
+	if (temporalPartialWarning) {
+		temporalPartialWarning.style.display = state.isPartialLineage ? 'inline-block' : 'none';
+	}
 
 	// Diff Badges
 	if (diff && diff.summary) {
-		badgeAdded.textContent = '+' + diff.summary.addedCount;
-		badgeRemoved.textContent = '-' + diff.summary.removedCount;
-		badgeModified.textContent = '~' + diff.summary.modifiedCount;
-		badgeRenamed.textContent = '⇄' + diff.summary.renamedCount;
+		if (badgeAdded) badgeAdded.textContent = '+' + diff.summary.addedCount;
+		if (badgeRemoved) badgeRemoved.textContent = '-' + diff.summary.removedCount;
+		if (badgeModified) badgeModified.textContent = '~' + diff.summary.modifiedCount;
+		if (badgeRenamed) badgeRenamed.textContent = '⇄' + diff.summary.renamedCount;
 	}
 }
 
@@ -1601,22 +1633,22 @@ function drawTemporalFrame(ts) {
 			if (edge.changeKind === 'added') {
 				ctx.strokeStyle = theme.added;
 				ctx.lineWidth = 2;
-				ctx.setLineDash([]);
+				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
 			} else if (edge.changeKind === 'removed') {
 				ctx.strokeStyle = theme.deleted;
 				ctx.lineWidth = 1.5;
-				ctx.setLineDash([4, 4]);
+				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 4]);
 			} else if (edge.changeKind === 'modified') {
 				ctx.strokeStyle = theme.modified;
 				ctx.lineWidth = 2;
-				ctx.setLineDash([]);
+				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
 			} else {
 				ctx.strokeStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(148, 163, 184, 0.25)';
 				ctx.lineWidth = 1;
-				ctx.setLineDash([]);
+				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
 			}
 			ctx.stroke();
-			ctx.setLineDash([]);
+			if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
 		}
 	}
 
@@ -1708,17 +1740,16 @@ function toggleTemporalPlay() {
 		clearInterval(playIntervalTimer);
 		playIntervalTimer = null;
 		isPlayingHistory = false;
-		temporalPlayBtn.textContent = '▶';
+		if (temporalPlayBtn) temporalPlayBtn.textContent = '▶';
 	} else {
 		if (!temporalState) return;
 		const curIdx = typeof temporalState.selectedCommitIndex === 'number' ? temporalState.selectedCommitIndex : 0;
 		if (curIdx === 0 && temporalState.loadedCommitCount > 1) {
-			// At HEAD, rewind to oldest loaded commit and play forward
 			const oldestIdx = temporalState.loadedCommitCount - 1;
 			request('selectTemporalCommitIndex', { index: oldestIdx, immediate: true });
 		}
 		isPlayingHistory = true;
-		temporalPlayBtn.textContent = '❚❚';
+		if (temporalPlayBtn) temporalPlayBtn.textContent = '❚❚';
 		playIntervalTimer = setInterval(function () {
 			const currentIdx = (temporalState && typeof temporalState.selectedCommitIndex === 'number') ? temporalState.selectedCommitIndex : 0;
 			if (currentIdx <= 0) {
@@ -1730,19 +1761,8 @@ function toggleTemporalPlay() {
 	}
 }
 
-function hashString(str) {
-	let hash = 5381;
-	for (let i = 0; i < str.length; i++) hash = ((hash << 5) + hash) + str.charCodeAt(i);
-	return Math.abs(hash | 0);
-}
-
-function getBaseName(p) {
-	const lastSlash = Math.max(p.lastIndexOf('/'), p.lastIndexOf('\\\\'));
-	return lastSlash >= 0 ? p.slice(lastSlash + 1) : p;
-}
-
 function pickNetworkNode(clientX, clientY) {
-	if (!snapshot || !isNetwork()) return null;
+	if (!snapshot || !isNetwork() || !netCanvas) return null;
 	const rect = netCanvas.getBoundingClientRect();
 	const sx = clientX - rect.left;
 	const sy = clientY - rect.top;
@@ -1768,7 +1788,7 @@ function pickNetworkNode(clientX, clientY) {
 }
 
 function drawNetworkFrame() {
-	if (!netCanvas) return;
+	if (!netCanvas || !ctx) return;
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
 	ctx.clearRect(0, 0, w, h);
@@ -1836,9 +1856,9 @@ function nodeColor(node, entryId) {
 
 function render(first) {
 	if (isTemporal()) {
-		archSvg.style.display = 'none';
-		netCanvas.style.display = 'block';
-		empty.style.display = 'none';
+		if (archSvg) archSvg.style.display = 'none';
+		if (netCanvas) netCanvas.style.display = 'block';
+		if (empty) empty.style.display = 'none';
 		resizeCanvas();
 		updateLegend(null, false);
 		updateTemporalUI(temporalState, temporalDiff);
@@ -1847,33 +1867,41 @@ function render(first) {
 		return;
 	}
 
-	temporalToolbar.style.display = 'none';
-	temporalScrubberBar.style.display = 'none';
-	temporalDetailsPanel.style.display = 'none';
-	toolbar.style.display = 'flex';
+	if (temporalToolbar) temporalToolbar.style.display = 'none';
+	if (temporalScrubberBar) temporalScrubberBar.style.display = 'none';
+	if (temporalDetailsPanel) temporalDetailsPanel.style.display = 'none';
+	if (toolbar) toolbar.style.display = 'flex';
 
 	if (!snapshot || !snapshot.nodes || !snapshot.nodes.length) {
-		archSvg.style.display = 'none';
-		netCanvas.style.display = 'none';
-		empty.style.display = 'flex';
-		empty.textContent = (diagnostics && diagnostics.message) || 'Preparing Code Graph…';
-		status.textContent = (diagnostics && diagnostics.status) === 'scanning' ? 'Scanning workspace…' : 'Idle';
+		if (archSvg) archSvg.style.display = 'none';
+		if (netCanvas) netCanvas.style.display = 'none';
+		if (empty) {
+			empty.style.display = 'flex';
+			empty.textContent = (diagnostics && diagnostics.message) || 'Preparing Code Graph…';
+		}
+		if (status) {
+			status.style.display = 'block';
+			status.textContent = (diagnostics && diagnostics.status) === 'scanning' ? 'Scanning workspace…' : 'Idle';
+		}
 		return;
 	}
 
-	empty.style.display = 'none';
-	archSvg.style.display = 'none';
-	netCanvas.style.display = 'block';
+	if (empty) empty.style.display = 'none';
+	if (archSvg) archSvg.style.display = 'none';
+	if (netCanvas) netCanvas.style.display = 'block';
 	resizeCanvas();
 	rebuildBase3d(snapshot);
 	updateLegend(snapshot, true);
-	status.textContent = snapshot.nodes.length + ' files · ' + (snapshot.edges || []).length + ' edges';
+	if (status) {
+		status.style.display = 'block';
+		status.textContent = snapshot.nodes.length + ' files · ' + (snapshot.edges || []).length + ' edges';
+	}
 	dirty = true;
 	kickRaf();
 }
 
 function closePopup() {
-	popup.style.display = 'none';
+	if (popup) popup.style.display = 'none';
 	popupNode = null;
 }
 
@@ -1885,6 +1913,7 @@ function inferOverview(node) {
 }
 
 function placePopupNear(clientX, clientY) {
+	if (!popup) return;
 	const pw = 300, ph = 200;
 	let left = clientX + 12;
 	let top = clientY + 12;
@@ -1897,6 +1926,7 @@ function placePopupNear(clientX, clientY) {
 
 let describeTimer = null;
 function openNodePopup(node, clientX, clientY) {
+	if (!popup) return;
 	popupNode = node;
 	if (describeTimer) {
 		clearTimeout(describeTimer);
@@ -1904,37 +1934,43 @@ function openNodePopup(node, clientX, clientY) {
 	}
 
 	selectedNodeId = node.entityId || node.id;
-	popupTitle.textContent = node.label || node.id;
-	popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '') + (node.changeKind ? ' · ' + node.changeKind.toUpperCase() : '');
-	popupOverview.textContent = inferOverview(node);
-	popupAi.textContent = '';
-	if (popupAiProvenance) { popupAiProvenance.style.display = 'none'; popupAiProvenance.textContent = ''; }
+	if (popupTitle) popupTitle.textContent = node.label || node.id;
+	if (popupMeta) popupMeta.textContent = (node.path || '') + (node.meta && node.meta.architectureLayer ? ' · ' + node.meta.architectureLayer : '') + (node.changeKind ? ' · ' + node.changeKind.toUpperCase() : '');
+	if (popupOverview) popupOverview.textContent = inferOverview(node);
+	if (popupAi) popupAi.textContent = '';
 
 	if (isTemporal()) {
-		popupSourceDiff.style.display = 'inline-block';
-		popupHistoricalView.style.display = 'inline-block';
-		popupSetBase.style.display = 'inline-block';
-		popupOpen.style.display = 'none';
-		popupMagnus.disabled = true;
-		popupMagnus.title = 'Attach to Agents is available on the live codebase.';
+		if (popupSourceDiff) popupSourceDiff.style.display = 'inline-block';
+		if (popupHistoricalView) popupHistoricalView.style.display = 'inline-block';
+		if (popupSetBase) popupSetBase.style.display = 'inline-block';
+		if (popupOpen) popupOpen.style.display = 'none';
+		if (popupMagnus) {
+			popupMagnus.disabled = true;
+			popupMagnus.title = 'Attach to Agents is available on the live codebase.';
+		}
 
-		// Historical reveal policy: Reveal in Explorer only if rendered commit is HEAD and node is not removed
 		const isHead = Boolean(temporalState && temporalState.renderedCommitSha && temporalState.pagedTimeline && temporalState.pagedTimeline[0] && temporalState.renderedCommitSha === temporalState.pagedTimeline[0].sha);
 		if (isHead && node.changeKind !== 'removed') {
-			popupReveal.style.display = 'inline-block';
-			popupReveal.textContent = 'Reveal Current File';
+			if (popupReveal) {
+				popupReveal.style.display = 'inline-block';
+				popupReveal.textContent = 'Reveal Current File';
+			}
 		} else {
-			popupReveal.style.display = 'none';
+			if (popupReveal) popupReveal.style.display = 'none';
 		}
 	} else {
-		popupSourceDiff.style.display = 'none';
-		popupHistoricalView.style.display = 'none';
-		popupSetBase.style.display = 'none';
-		popupOpen.style.display = 'inline-block';
-		popupReveal.style.display = 'inline-block';
-		popupReveal.textContent = 'Reveal in Explorer';
-		popupMagnus.disabled = false;
-		popupMagnus.title = 'Attach to Agents';
+		if (popupSourceDiff) popupSourceDiff.style.display = 'none';
+		if (popupHistoricalView) popupHistoricalView.style.display = 'none';
+		if (popupSetBase) popupSetBase.style.display = 'none';
+		if (popupOpen) popupOpen.style.display = 'inline-block';
+		if (popupReveal) {
+			popupReveal.style.display = 'inline-block';
+			popupReveal.textContent = 'Reveal in Explorer';
+		}
+		if (popupMagnus) {
+			popupMagnus.disabled = false;
+			popupMagnus.title = 'Attach to Agents';
+		}
 	}
 
 	placePopupNear(clientX, clientY);
@@ -1947,16 +1983,16 @@ function openNodePopup(node, clientX, clientY) {
 		request('peekNodeDescription', { nodeId: node.id }).then(peek => {
 			if (!popupNode || popupNode.id !== node.id) return;
 			if (peek && peek.cached && peek.description) {
-				popupAi.textContent = peek.description;
+				if (popupAi) popupAi.textContent = peek.description;
 			} else {
-				popupAi.textContent = 'Generating AI description…';
+				if (popupAi) popupAi.textContent = 'Generating AI description…';
 				describeTimer = setTimeout(async () => {
 					const desc = await request('describeNode', { nodeId: node.id });
 					if (!popupNode || popupNode.id !== node.id) return;
 					if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
-						popupAi.textContent = desc.aiDescription;
+						if (popupAi) popupAi.textContent = desc.aiDescription;
 					} else {
-						popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
+						if (popupAi) popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
 					}
 				}, 60);
 			}
@@ -1967,7 +2003,7 @@ function openNodePopup(node, clientX, clientY) {
 
 function onPointerDown(e, host) {
 	if (!e.isPrimary || (e.button !== 0 && e.button !== 1)) return;
-	if (popup.style.display !== 'none') {
+	if (popup && popup.style.display !== 'none') {
 		closePopup();
 	}
 	activePointerId = e.pointerId;
@@ -1983,9 +2019,9 @@ function onPointerDown(e, host) {
 	const wantPan = e.button === 1 || e.shiftKey || isTemporal();
 	panning = wantPan;
 	rotating = false;
-	host.classList.add('dragging');
+	if (host) host.classList.add('dragging');
 	if (panning) {
-		host.classList.add('panning');
+		if (host) host.classList.add('panning');
 		scheduleIdleResume();
 	}
 }
@@ -1995,12 +2031,14 @@ function onPointerUp(e, cancelled) {
 	const pointerHost = activePointerHost;
 	activePointerId = null;
 	activePointerHost = null;
-	if (pointerHost && pointerHost.hasPointerCapture(e.pointerId)) pointerHost.releasePointerCapture(e.pointerId);
+	if (pointerHost && typeof pointerHost.hasPointerCapture === 'function' && pointerHost.hasPointerCapture(e.pointerId)) {
+		pointerHost.releasePointerCapture(e.pointerId);
+	}
 	const wasMoved = moved || cancelled;
 	dragging = false; panning = false; rotating = false;
 	interactionState = cancelled ? 'cancelled' : 'idle';
 	pointerDownNode = null;
-	netCanvas.classList.remove('dragging');
+	if (netCanvas) netCanvas.classList.remove('dragging');
 
 	const dist = e ? Math.hypot((e.clientX || 0) - pointerDownX, (e.clientY || 0) - pointerDownY) : 99;
 	if (e && !wasMoved && dist <= dragThreshold) {
@@ -2059,6 +2097,7 @@ function onPointerMove(e) {
 }
 
 function onWheel(e) {
+	if (!netCanvas) return;
 	e.preventDefault();
 	scheduleIdleResume();
 	const factor = e.deltaY < 0 ? 1.1 : 0.9;
@@ -2071,130 +2110,195 @@ function onWheel(e) {
 	dirty = true; kickRaf();
 }
 
-netCanvas.addEventListener('pointerdown', function (e) { onPointerDown(e, netCanvas); });
-netCanvas.addEventListener('pointermove', onPointerMove);
-netCanvas.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
-netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
-netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
-netCanvas.addEventListener('wheel', onWheel, { passive: false });
-
-netCanvas.addEventListener('dblclick', function (e) {
-	if (isTemporal()) {
-		const node = pickTemporalNode(e.clientX, e.clientY);
-		if (node) request('openTemporalSourceDiff', { entityId: node.entityId });
-	} else {
-		const node = pickNetworkNode(e.clientX, e.clientY);
-		if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
-	}
-});
-
-document.getElementById('popupClose').onclick = function () { closePopup(); };
-document.getElementById('popupOpen').onclick = function () {
-	if (popupNode) request('openFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
-};
-document.getElementById('popupHistoricalView').onclick = function () {
-	if (popupNode && popupNode.entityId) request('openTemporalHistoricalFile', { entityId: popupNode.entityId });
-};
-document.getElementById('popupSourceDiff').onclick = function () {
-	if (popupNode && popupNode.entityId) request('openTemporalSourceDiff', { entityId: popupNode.entityId });
-};
-popupSetBase.onclick = function () {
-	const baseSha = (temporalDiff && temporalDiff.targetCommitSha) || (temporalState && temporalState.renderedCommitSha);
-	if (baseSha) {
-		request('setTemporalCompareBase', { compareBaseSha: baseSha });
-	}
-};
-document.getElementById('popupReveal').onclick = function () {
-	if (popupNode) request('revealFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
-};
-document.getElementById('popupMagnus').onclick = function () { request('attachToMagnus', {}); };
-
-temporalRepoSelect.addEventListener('change', function () {
-	const repoRoot = temporalRepoSelect.value;
-	if (repoRoot) {
-		request('switchTemporalRepository', { repoRoot: repoRoot });
-	}
-});
-
-temporalRefSelect.addEventListener('change', function () {
-	const ref = temporalRefSelect.value;
-	if (ref) {
-		request('selectTemporalRef', { ref: ref });
-	}
-});
-
-temporalCompareSelect.addEventListener('change', function () {
-	const base = temporalCompareSelect.value;
-	if (base === '__prompt_custom__') {
-		request('pickTemporalCompareBase', {});
+// 5. Message Dispatcher
+window.addEventListener('message', function (e) {
+	const msg = e.data;
+	if (!msg) return;
+	if (msg.type === 'response' && pending.has(msg.requestId)) {
+		const resolve = pending.get(msg.requestId);
+		pending.delete(msg.requestId);
+		resolve(msg.payload);
+	} else if (msg.type === 'snapshot') {
+		snapshot = msg.payload.snapshot;
+		diagnostics = msg.payload.diagnostics;
+		if (msg.payload.settings) settings = msg.payload.settings;
+		if (msg.payload.graphType) graphType = msg.payload.graphType;
+		if (msg.payload.temporalState) {
+			temporalState = msg.payload.temporalState;
+			temporalDiff = temporalState.diff || null;
+			updateTemporalDiffTransition(temporalDiff);
+		}
+		render(false);
+	} else if (msg.type === 'temporalState') {
+		graphType = 'temporal';
+		temporalState = msg.payload;
+		if (temporalState.diff) {
+			temporalDiff = temporalState.diff;
+			updateTemporalDiffTransition(temporalDiff);
+		}
 		updateTemporalUI(temporalState, temporalDiff);
-	} else if (base === '__clear_custom__') {
-		request('setTemporalCompareBase', { compareBaseSha: undefined });
-	} else {
-		request('setTemporalCompareBase', { compareBaseSha: base || undefined });
+		render(false);
+	} else if (msg.type === 'temporalDiff') {
+		temporalDiff = msg.payload;
+		updateTemporalDiffTransition(temporalDiff);
+		updateTemporalUI(temporalState, temporalDiff);
+	} else if (msg.type === 'fitView') {
+		fitView();
+	} else if (msg.type === 'resetView') {
+		resetCamera(false);
+		fitView();
 	}
 });
 
-temporalModeChangesBtn.addEventListener('click', function () {
-	request('setTemporalDisplayMode', { mode: 'changes' });
-});
+// 6. Attach Event Handlers Guarded
+if (netCanvas) {
+	netCanvas.addEventListener('pointerdown', function (e) { onPointerDown(e, netCanvas); });
+	netCanvas.addEventListener('pointermove', onPointerMove);
+	netCanvas.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
+	netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
+	netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
+	netCanvas.addEventListener('wheel', onWheel, { passive: false });
 
-temporalModeStateBtn.addEventListener('click', function () {
-	if (popupNode && popupNode.changeKind === 'removed') {
-		closePopup();
-		selectedNodeId = null;
-		request('selectTemporalEntity', { entityId: null });
-	}
-	request('setTemporalDisplayMode', { mode: 'state' });
-});
+	netCanvas.addEventListener('dblclick', function (e) {
+		if (isTemporal()) {
+			const node = pickTemporalNode(e.clientX, e.clientY);
+			if (node) request('openTemporalSourceDiff', { entityId: node.entityId });
+		} else {
+			const node = pickNetworkNode(e.clientX, e.clientY);
+			if (node) request('openFile', { path: node.path || node.id.replace(/^file:/, '') });
+		}
+	});
+}
 
-temporalToggleDetailsBtn.addEventListener('click', function () {
-	const isVisible = temporalDetailsPanel.style.display === 'flex';
-	temporalDetailsPanel.style.display = isVisible ? 'none' : 'flex';
-	temporalToggleDetailsBtn.textContent = isVisible ? 'Details ▾' : 'Details ▴';
-});
+const popupCloseBtn = document.getElementById('popupClose');
+if (popupCloseBtn) popupCloseBtn.onclick = function () { closePopup(); };
 
-temporalDetailsClose.addEventListener('click', function () {
-	temporalDetailsPanel.style.display = 'none';
-	temporalToggleDetailsBtn.textContent = 'Details ▾';
-});
+if (popupOpen) {
+	popupOpen.onclick = function () {
+		if (popupNode) request('openFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
+	};
+}
+if (popupHistoricalView) {
+	popupHistoricalView.onclick = function () {
+		if (popupNode && popupNode.entityId) request('openTemporalHistoricalFile', { entityId: popupNode.entityId });
+	};
+}
+if (popupSourceDiff) {
+	popupSourceDiff.onclick = function () {
+		if (popupNode && popupNode.entityId) request('openTemporalSourceDiff', { entityId: popupNode.entityId });
+	};
+}
+if (popupSetBase) {
+	popupSetBase.onclick = function () {
+		const baseSha = (temporalDiff && temporalDiff.targetCommitSha) || (temporalState && temporalState.renderedCommitSha);
+		if (baseSha) {
+			request('setTemporalCompareBase', { compareBaseSha: baseSha });
+		}
+	};
+}
+if (popupReveal) {
+	popupReveal.onclick = function () {
+		if (popupNode) request('revealFile', { path: popupNode.path || popupNode.id.replace(/^file:/, '') });
+	};
+}
+if (popupMagnus) {
+	popupMagnus.onclick = function () { request('attachToMagnus', {}); };
+}
 
-temporalScrubber.addEventListener('input', function () {
-	const val = parseInt(temporalScrubber.value, 10);
-	const total = (temporalState && temporalState.loadedCommitCount) || 0;
-	if (total > 0) {
-		const targetGlobalIdx = (total - 1) - val;
-		request('selectTemporalCommitIndex', { index: targetGlobalIdx, immediate: false });
-	}
-});
-
-temporalScrubber.addEventListener('change', function () {
-	const val = parseInt(temporalScrubber.value, 10);
-	const total = (temporalState && temporalState.loadedCommitCount) || 0;
-	if (total > 0) {
-		const targetGlobalIdx = (total - 1) - val;
-		request('selectTemporalCommitIndex', { index: targetGlobalIdx, immediate: true });
-	}
-});
-
-temporalPrevBtn.addEventListener('click', function () { stepTemporalCommit(-1); });
-temporalNextBtn.addEventListener('click', function () { stepTemporalCommit(1); });
-temporalPlayBtn.addEventListener('click', toggleTemporalPlay);
-temporalLoadMoreBtn.addEventListener('click', function () { request('loadMoreTemporalHistory', {}); });
+if (temporalRepoSelect) {
+	temporalRepoSelect.addEventListener('change', function () {
+		const repoRoot = temporalRepoSelect.value;
+		if (repoRoot) request('switchTemporalRepository', { repoRoot: repoRoot });
+	});
+}
+if (temporalRefSelect) {
+	temporalRefSelect.addEventListener('change', function () {
+		const ref = temporalRefSelect.value;
+		if (ref) request('selectTemporalRef', { ref: ref });
+	});
+}
+if (temporalCompareSelect) {
+	temporalCompareSelect.addEventListener('change', function () {
+		const base = temporalCompareSelect.value;
+		if (base === '__prompt_custom__') {
+			request('pickTemporalCompareBase', {});
+			updateTemporalUI(temporalState, temporalDiff);
+		} else if (base === '__clear_custom__') {
+			request('setTemporalCompareBase', { compareBaseSha: undefined });
+		} else {
+			request('setTemporalCompareBase', { compareBaseSha: base || undefined });
+		}
+	});
+}
+if (temporalModeChangesBtn) {
+	temporalModeChangesBtn.addEventListener('click', function () {
+		request('setTemporalDisplayMode', { mode: 'changes' });
+	});
+}
+if (temporalModeStateBtn) {
+	temporalModeStateBtn.addEventListener('click', function () {
+		if (popupNode && popupNode.changeKind === 'removed') {
+			closePopup();
+			selectedNodeId = null;
+			request('selectTemporalEntity', { entityId: null });
+		}
+		request('setTemporalDisplayMode', { mode: 'state' });
+	});
+}
+if (temporalToggleDetailsBtn) {
+	temporalToggleDetailsBtn.addEventListener('click', function () {
+		if (temporalDetailsPanel) {
+			const isVisible = temporalDetailsPanel.style.display === 'flex';
+			temporalDetailsPanel.style.display = isVisible ? 'none' : 'flex';
+			temporalToggleDetailsBtn.textContent = isVisible ? 'Details ▾' : 'Details ▴';
+		}
+	});
+}
+if (temporalDetailsClose && temporalDetailsPanel) {
+	temporalDetailsClose.addEventListener('click', function () {
+		temporalDetailsPanel.style.display = 'none';
+		if (temporalToggleDetailsBtn) temporalToggleDetailsBtn.textContent = 'Details ▾';
+	});
+}
+if (temporalScrubber) {
+	temporalScrubber.addEventListener('input', function () {
+		const val = parseInt(temporalScrubber.value, 10);
+		const total = (temporalState && temporalState.loadedCommitCount) || 0;
+		if (total > 0) {
+			const targetGlobalIdx = (total - 1) - val;
+			request('selectTemporalCommitIndex', { index: targetGlobalIdx, immediate: false });
+		}
+	});
+	temporalScrubber.addEventListener('change', function () {
+		const val = parseInt(temporalScrubber.value, 10);
+		const total = (temporalState && temporalState.loadedCommitCount) || 0;
+		if (total > 0) {
+			const targetGlobalIdx = (total - 1) - val;
+			request('selectTemporalCommitIndex', { index: targetGlobalIdx, immediate: true });
+		}
+	});
+}
+if (temporalPrevBtn) temporalPrevBtn.addEventListener('click', function () { stepTemporalCommit(-1); });
+if (temporalNextBtn) temporalNextBtn.addEventListener('click', function () { stepTemporalCommit(1); });
+if (temporalPlayBtn) temporalPlayBtn.addEventListener('click', toggleTemporalPlay);
+if (temporalLoadMoreBtn) temporalLoadMoreBtn.addEventListener('click', function () { request('loadMoreTemporalHistory', {}); });
 
 let filterDebounceTimer = null;
-temporalFilterInput.addEventListener('input', function () {
-	dirty = true;
-	kickRaf();
-	if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
-	filterDebounceTimer = setTimeout(function () {
-		request('setTemporalFilter', { filter: temporalFilterInput.value || '' });
-	}, 200);
-});
-
-temporalFollowHead.addEventListener('change', function () {
-	request('setTemporalFollowHead', { follow: temporalFollowHead.checked });
-});
+if (temporalFilterInput) {
+	temporalFilterInput.addEventListener('input', function () {
+		dirty = true;
+		kickRaf();
+		if (filterDebounceTimer) clearTimeout(filterDebounceTimer);
+		filterDebounceTimer = setTimeout(function () {
+			request('setTemporalFilter', { filter: temporalFilterInput.value || '' });
+		}, 200);
+	});
+}
+if (temporalFollowHead) {
+	temporalFollowHead.addEventListener('change', function () {
+		request('setTemporalFollowHead', { follow: temporalFollowHead.checked });
+	});
+}
 
 window.addEventListener('keydown', function (e) {
 	const targetTag = (e.target && e.target.tagName) || '';
@@ -2208,13 +2312,14 @@ window.addEventListener('keydown', function (e) {
 	}
 });
 
-document.getElementById('zoomIn').onclick = function () { transform.k = Math.min(3.5, transform.k * 1.15); dirty = true; kickRaf(); };
-document.getElementById('zoomOut').onclick = function () { transform.k = Math.max(0.15, transform.k / 1.15); dirty = true; kickRaf(); };
-document.getElementById('fit').onclick = function () { fitView(); };
-document.getElementById('reset').onclick = function () {
-	resetCamera(false);
-	fitView();
-};
+const zoomInBtn = document.getElementById('zoomIn');
+if (zoomInBtn) zoomInBtn.onclick = function () { transform.k = Math.min(3.5, transform.k * 1.15); dirty = true; kickRaf(); };
+const zoomOutBtn = document.getElementById('zoomOut');
+if (zoomOutBtn) zoomOutBtn.onclick = function () { transform.k = Math.max(0.15, transform.k / 1.15); dirty = true; kickRaf(); };
+const fitBtn = document.getElementById('fit');
+if (fitBtn) fitBtn.onclick = function () { fitView(); };
+const resetBtn = document.getElementById('reset');
+if (resetBtn) resetBtn.onclick = function () { resetCamera(false); fitView(); };
 
 let lastViewportW = 0;
 let lastViewportH = 0;
@@ -2287,45 +2392,6 @@ if (typeof ResizeObserver !== 'undefined') {
 	window.addEventListener('resize', scheduleResizeCheck);
 }
 
-window.addEventListener('message', function (e) {
-	const msg = e.data;
-	if (!msg) return;
-	if (msg.type === 'response' && pending.has(msg.requestId)) {
-		const resolve = pending.get(msg.requestId);
-		pending.delete(msg.requestId);
-		resolve(msg.payload);
-	} else if (msg.type === 'snapshot') {
-		snapshot = msg.payload.snapshot;
-		diagnostics = msg.payload.diagnostics;
-		if (msg.payload.settings) settings = msg.payload.settings;
-		if (msg.payload.graphType) graphType = msg.payload.graphType;
-		if (msg.payload.temporalState) {
-			temporalState = msg.payload.temporalState;
-			temporalDiff = temporalState.diff || null;
-			updateTemporalDiffTransition(temporalDiff);
-		}
-		render(false);
-	} else if (msg.type === 'temporalState') {
-		graphType = 'temporal';
-		temporalState = msg.payload;
-		if (temporalState.diff) {
-			temporalDiff = temporalState.diff;
-			updateTemporalDiffTransition(temporalDiff);
-		}
-		updateTemporalUI(temporalState, temporalDiff);
-		render(false);
-	} else if (msg.type === 'temporalDiff') {
-		temporalDiff = msg.payload;
-		updateTemporalDiffTransition(temporalDiff);
-		updateTemporalUI(temporalState, temporalDiff);
-	} else if (msg.type === 'fitView') {
-		fitView();
-	} else if (msg.type === 'resetView') {
-		resetCamera(false);
-		fitView();
-	}
-});
-
 function rafLoop(ts) {
 	rafScheduled = false;
 	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
@@ -2348,12 +2414,7 @@ function rafLoop(ts) {
 }
 kickRaf();
 
-// Ready handshake: notify host immediately so host pushes current snapshot & state
-request('ready', { generation: currentGeneration, graphType: initialGraphType }).catch(function (err) {
-	console.warn('[PreBase Graph] Ready handshake request error:', err);
-});
-
-// Primary snapshot request
+// 7. Initial State Fetch
 request('getSnapshot').then(function (res) {
 	if (!res) return;
 	snapshot = res.snapshot;
@@ -2380,13 +2441,18 @@ request('getSnapshot').then(function (res) {
 	}
 }).catch(function (err) {
 	console.warn('[PreBase Graph] Initial getSnapshot failed:', err);
+});
+
+// 8. Startup Watchdog: If renderer remains uninitialized after 4s, provide interactive diagnostic/retry
+setTimeout(function () {
 	if (!snapshot && (!temporalState || !temporalDiff)) {
-		if (empty) {
-			empty.innerHTML = '<div>Graph UI initialized.<br><a id="retryLoadBtn" style="color:var(--vscode-textLink-foreground, #58a6ff); cursor:pointer; text-decoration:underline; font-size:12px; margin-top:8px; display:inline-block;">Click to retry loading</a></div>';
-			const retryBtn = document.getElementById('retryLoadBtn');
-			if (retryBtn) {
-				retryBtn.onclick = function () {
+		if (empty && empty.textContent === 'Preparing graph…') {
+			empty.innerHTML = '<div style="padding:16px;"><div>Graph renderer failed to initialize.</div><button id="retryWatchdogBtn" style="margin-top:10px; padding:4px 12px; border-radius:4px; background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); border:none; cursor:pointer; font-weight:600;">Retry</button></div>';
+			const btn = document.getElementById('retryWatchdogBtn');
+			if (btn) {
+				btn.onclick = function () {
 					empty.textContent = 'Preparing graph…';
+					request('ready', { generation: currentGeneration, graphType: initialGraphType });
 					request('getSnapshot').then(function (res) {
 						if (!res) return;
 						snapshot = res.snapshot;
@@ -2398,9 +2464,10 @@ request('getSnapshot').then(function (res) {
 			}
 		}
 	}
-});
+}, 4000);
 </script>
 </body>
 </html>`;
 	}
 }
+

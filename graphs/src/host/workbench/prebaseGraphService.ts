@@ -84,6 +84,8 @@ export interface IPreBaseGraphService {
 
 	buildCanonicalGraphAtRef(ref: string, token?: CancellationToken): Promise<CanonicalGraphSnapshot | undefined>;
 	compareCanonicalGraphRefs(refA: string, refB: string, token?: CancellationToken): Promise<{ diff: CanonicalGraphDiff; snapshotA: CanonicalGraphSnapshot; snapshotB: CanonicalGraphSnapshot } | undefined>;
+	loadHistoricalCommit(commitSha?: string, token?: CancellationToken): Promise<PreBaseEnrichedSnapshot | undefined>;
+	getSelectedHistoricalCommitSha(): string | undefined;
 
 	getSelectedNodeId(): string | undefined;
 	setSelectedNodeId(nodeId: string | undefined): void;
@@ -646,6 +648,45 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 		}
 		const diff = computeCanonicalGraphDiff(snapshotA, snapshotB);
 		return { diff, snapshotA, snapshotB };
+	}
+
+	private _selectedHistoricalCommitSha?: string;
+
+	getSelectedHistoricalCommitSha(): string | undefined {
+		return this._selectedHistoricalCommitSha;
+	}
+
+	async loadHistoricalCommit(commitSha?: string, token?: CancellationToken): Promise<PreBaseEnrichedSnapshot | undefined> {
+		if (!commitSha || commitSha === 'HEAD' || commitSha === 'working-tree') {
+			this._selectedHistoricalCommitSha = undefined;
+			if (this._canonicalSnapshot) {
+				return this._projectAndPublish(this._canonicalSnapshot);
+			}
+			return this.scanWorkspace(token);
+		}
+
+		this._selectedHistoricalCommitSha = commitSha;
+		this._setDiagnostics({
+			status: 'scanning',
+			message: localize('prebase.graph.loadingHistorical', "Loading historical graph at {0}…", commitSha.slice(0, 7))
+		});
+
+		try {
+			const canonical = await this.buildCanonicalGraphAtRef(commitSha, token);
+			if (!canonical || token?.isCancellationRequested) {
+				return undefined;
+			}
+			const enriched = this._projectAndPublish(canonical);
+			this._setDiagnostics({
+				status: 'ready',
+				message: localize('prebase.graph.historicalReady', "Commit {0} · {1} files · {2} nodes", commitSha.slice(0, 7), canonical.coverage.analyzedCount, enriched.nodes.length)
+			});
+			return enriched;
+		} catch (err: any) {
+			const message = err instanceof Error ? err.message : String(err);
+			this._setDiagnostics({ status: 'error', message: localize('prebase.graph.historicalFailed', "Failed to load historical commit {0}: {1}", commitSha.slice(0, 7), message) });
+			return undefined;
+		}
 	}
 
 	private _projectAndPublish(canonical: CanonicalGraphSnapshot): PreBaseEnrichedSnapshot {

@@ -4,7 +4,7 @@
 
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { ProjectSafetyService } from './projectSafetyService';
+import { ProjectSafetyService } from './projectSafetyService.ts';
 
 describe('ProjectSafetyService Unit Tests', () => {
 	const safety = ProjectSafetyService.instance;
@@ -54,5 +54,41 @@ describe('ProjectSafetyService Unit Tests', () => {
 			targetPath: '/workspace/src/main.ts',
 		});
 		assert.strictEqual(readPerm.allowed, true);
+	});
+
+	it('rejects explicit sensitiveFileRead and sensitiveFileWrite categories', async () => {
+		const r = await safety.checkPermission({
+			category: 'sensitiveFileRead',
+			targetPath: '/workspace/keys/app.key',
+		});
+		assert.strictEqual(r.allowed, false);
+
+		const w = await safety.checkPermission({
+			category: 'sensitiveFileWrite',
+			targetPath: '/workspace/.env',
+		});
+		assert.strictEqual(w.allowed, false);
+	});
+
+	it('validates workspaceRead and workspaceWrite categories', async () => {
+		const wsRead = await safety.checkPermission({
+			category: 'workspaceRead',
+			targetPath: '/workspace/src/App.vue',
+		});
+		assert.strictEqual(wsRead.allowed, true);
+
+		const wsWrite = await safety.checkPermission({
+			category: 'workspaceWrite',
+			targetPath: '/workspace/src/App.vue',
+		});
+		assert.strictEqual(wsWrite.allowed, true);
+	});
+
+	it('handles trusted network URLs without prompt', async () => {
+		const netPerm = await safety.checkPermission({
+			category: 'network',
+			url: 'https://api.github.com/repos/prebase/prebase',
+		});
+		assert.strictEqual(netPerm.allowed, true);
 	});
 });

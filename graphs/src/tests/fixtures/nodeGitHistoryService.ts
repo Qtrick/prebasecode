@@ -17,6 +17,8 @@ import {
 	type GitHeadChangeEvent,
 	type GitLogOptions,
 	type GitObjectType,
+	type GitRemoteRefUpdate,
+	type GitRemoteSyncResult,
 	type GitRepositoryIdentity,
 	type GitTagInfo,
 	type GitTreeEntry,
@@ -629,5 +631,63 @@ export class NodeGitHistoryService implements IGitHistoryService {
 			// fallback for test fixtures
 		}
 		return SHA1_EMPTY_TREE_HASH_FIXTURE;
+	}
+
+	async fetchRemoteRefs(rootPath: string, remoteName: string = 'origin', token?: CancellationTokenLike): Promise<GitRemoteSyncResult> {
+		const preBranches = await this.listBranches(rootPath, token);
+		const preRemoteMap = new Map<string, string>();
+		for (const b of preBranches) {
+			if (b.isRemote && (b.name.startsWith(`${remoteName}/`) || b.name.startsWith(`remotes/${remoteName}/`))) {
+				preRemoteMap.set(b.name, b.commit);
+			}
+		}
+
+		const res = await this._exec({
+			cwd: rootPath,
+			args: ['fetch', remoteName, '--prune'],
+			token,
+		});
+		if (res.exitCode !== 0) {
+			return {
+				ok: false,
+				remoteName,
+				updatedRefs: [],
+				newCommitsDiscovered: 0,
+				error: res.stderr || 'Git fetch failed',
+			};
+		}
+
+		const postBranches = await this.listBranches(rootPath, token);
+		const postRemoteMap = new Map<string, string>();
+		for (const b of postBranches) {
+			if (b.isRemote && (b.name.startsWith(`${remoteName}/`) || b.name.startsWith(`remotes/${remoteName}/`))) {
+				postRemoteMap.set(b.name, b.commit);
+			}
+		}
+
+		const updatedRefs: GitRemoteRefUpdate[] = [];
+		let newCommitsDiscovered = 0;
+		for (const [refName, newSha] of postRemoteMap) {
+			const prevSha = preRemoteMap.get(refName);
+			if (!prevSha) {
+				updatedRefs.push({ refName, currentSha: newSha, isNew: true, isDeleted: false });
+				newCommitsDiscovered++;
+			} else if (prevSha !== newSha) {
+				updatedRefs.push({ refName, previousSha: prevSha, currentSha: newSha, isNew: false, isDeleted: false });
+				newCommitsDiscovered++;
+			}
+		}
+		for (const [refName, oldSha] of preRemoteMap) {
+			if (!postRemoteMap.has(refName)) {
+				updatedRefs.push({ refName, previousSha: oldSha, currentSha: '', isNew: false, isDeleted: true });
+			}
+		}
+
+		return {
+			ok: true,
+			remoteName,
+			updatedRefs,
+			newCommitsDiscovered,
+		};
 	}
 }

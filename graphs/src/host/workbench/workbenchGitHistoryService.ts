@@ -16,6 +16,8 @@ import {
 	type GitHeadChangeEvent,
 	type GitHeadTransitionType,
 	type GitLogOptions,
+	type GitRemoteRefUpdate,
+	type GitRemoteSyncResult,
 	type GitRepositoryIdentity,
 	type GitTagInfo,
 	type GitTreeInventory,
@@ -186,6 +188,26 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 				repo = await this._gitService.openRepository({ path: rootPath, scheme: 'file' });
 			} catch {
 				// Failed to open
+			}
+		}
+		if (!repo && this._gitService.repositories.length === 0) {
+			// Extension host git may still be activating; wait for repository
+			for (let i = 0; i < 10; i++) {
+				await new Promise(r => setTimeout(r, 500));
+				repo = this._findRepository(rootPath);
+				if (repo) {
+					break;
+				}
+				if (typeof this._gitService.openRepository === 'function') {
+					try {
+						repo = await this._gitService.openRepository({ path: rootPath, scheme: 'file' });
+						if (repo) {
+							break;
+						}
+					} catch {
+						// retry
+					}
+				}
 			}
 		}
 		if (!repo) {
@@ -441,6 +463,65 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 			}
 		}
 		throw new GitHistoryError('NotSupported', `getEmptyTree not available on repository for path ${rootPath}`);
+	}
+
+	async fetchRemoteRefs(rootPath: string, remoteName: string = 'origin', token?: CancellationTokenLike): Promise<GitRemoteSyncResult> {
+		const repo = await this._ensureRepository(rootPath);
+		const preBranches = await this.listBranches(rootPath, token);
+		const preRemoteMap = new Map<string, string>();
+		for (const b of preBranches) {
+			if (b.isRemote && (b.name.startsWith(`${remoteName}/`) || b.name.startsWith(`remotes/${remoteName}/`))) {
+				preRemoteMap.set(b.name, b.commit);
+			}
+		}
+
+		const fetchFn = (repo as any).fetchRemote || (repo as any).fetch;
+		if (typeof fetchFn === 'function') {
+			try {
+				await fetchFn.call(repo, { remote: remoteName, prune: true });
+			} catch (err: any) {
+				return {
+					ok: false,
+					remoteName,
+					updatedRefs: [],
+					newCommitsDiscovered: 0,
+					error: err?.message || 'Fetch failed',
+				};
+			}
+		}
+
+		const postBranches = await this.listBranches(rootPath, token);
+		const postRemoteMap = new Map<string, string>();
+		for (const b of postBranches) {
+			if (b.isRemote && (b.name.startsWith(`${remoteName}/`) || b.name.startsWith(`remotes/${remoteName}/`))) {
+				postRemoteMap.set(b.name, b.commit);
+			}
+		}
+
+		const updatedRefs: GitRemoteRefUpdate[] = [];
+		let newCommitsDiscovered = 0;
+		for (const [refName, newSha] of postRemoteMap) {
+			const prevSha = preRemoteMap.get(refName);
+			if (!prevSha) {
+				updatedRefs.push({ refName, currentSha: newSha, isNew: true, isDeleted: false });
+				newCommitsDiscovered++;
+			} else if (prevSha !== newSha) {
+				updatedRefs.push({ refName, previousSha: prevSha, currentSha: newSha, isNew: false, isDeleted: false });
+				newCommitsDiscovered++;
+			}
+		}
+		for (const [refName, oldSha] of preRemoteMap) {
+			if (!postRemoteMap.has(refName)) {
+				updatedRefs.push({ refName, previousSha: oldSha, currentSha: '', isNew: false, isDeleted: true });
+			}
+		}
+
+		return {
+			ok: true,
+			remoteName,
+			updatedRefs,
+			newCommitsDiscovered,
+		};
 	}
 
 	notifyHeadChanged(repositoryId: string, newHead: string, transitionType: 'commit' | 'checkout' | 'reset' | 'branch-switch' | 'external' = 'external'): void {

@@ -88,7 +88,7 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 						}
 						continue;
 					}
-					if (results.length !== active.length) {
+					if (!results || results.length !== active.length) {
 						throw new CanonicalParseServiceError('protocol-error', 'Canonical parser worker returned an incomplete batch.');
 					}
 					for (let index = 0; index < active.length; index++) {
