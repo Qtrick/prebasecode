@@ -49,11 +49,16 @@ export interface IWebhookProcessResult {
 export class GitHubAppWebhookReceiver {
 	private readonly _processedDeliveries = new Set<string>();
 	private readonly _maxDeliveryHistory = 1000;
+	private readonly _webhookSecret: string;
+	private readonly _onPushReceived?: (payload: IGitHubPushEventPayload) => void | Promise<void>;
 
 	constructor(
-		private readonly _webhookSecret: string,
-		private readonly _onPushReceived?: (payload: IGitHubPushEventPayload) => void | Promise<void>
-	) {}
+		webhookSecret: string,
+		onPushReceived?: (payload: IGitHubPushEventPayload) => void | Promise<void>
+	) {
+		this._webhookSecret = webhookSecret;
+		this._onPushReceived = onPushReceived;
+	}
 
 	/**
 	 * Timing-safe HMAC-SHA256 signature verification.

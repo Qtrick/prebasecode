@@ -56,3 +56,7 @@ dist
 
 # Task baseline snapshots (local)
 .tmp-task-snapshots/
+
+# TEMPORARY FFATU — LOCAL TRANSFER ONLY
+# REMOVE WHEN USER SAYS FFATU IS NO LONGER NEEDED
+FFATU/

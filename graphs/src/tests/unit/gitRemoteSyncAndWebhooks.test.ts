@@ -11,9 +11,16 @@ import type { GitBranchInfo } from '../../history/git/gitTypes.js';
 
 class MockGitHistoryForSync implements Partial<IGitHistoryService> {
 	branches: GitBranchInfo[] = [];
+	onFetch?: () => void;
 
 	async listBranches(): Promise<GitBranchInfo[]> {
 		return this.branches;
+	}
+
+	async fetch(): Promise<void> {
+		if (this.onFetch) {
+			this.onFetch();
+		}
 	}
 }
 
@@ -25,16 +32,15 @@ suite('GitRemoteSyncService & GitHubAppWebhookReceiver', () => {
 				{ name: 'main', commit: 'c1', isRemote: false },
 				{ name: 'origin/main', commit: 'c1', isRemote: true },
 			];
+			mockGit.onFetch = () => {
+				mockGit.branches = [
+					{ name: 'main', commit: 'c1', isRemote: false },
+					{ name: 'origin/main', commit: 'c1', isRemote: true },
+					{ name: 'origin/feature', commit: 'c2', isRemote: true },
+				];
+			};
 
 			const syncService = new GitRemoteSyncService(mockGit as unknown as IGitHistoryService);
-
-			// Simulate remote fetch discovering origin/feature
-			mockGit.branches = [
-				{ name: 'main', commit: 'c1', isRemote: false },
-				{ name: 'origin/main', commit: 'c1', isRemote: true },
-				{ name: 'origin/feature', commit: 'c2', isRemote: true },
-			];
-
 			const res = await syncService.syncRemote('/repo', { remoteName: 'origin' });
 			assert.strictEqual(res.ok, true);
 			assert.strictEqual(res.newCommitsDiscovered, 1);
@@ -49,14 +55,13 @@ suite('GitRemoteSyncService & GitHubAppWebhookReceiver', () => {
 			mockGit.branches = [
 				{ name: 'origin/main', commit: 'sha_old', isRemote: true },
 			];
+			mockGit.onFetch = () => {
+				mockGit.branches = [
+					{ name: 'origin/main', commit: 'sha_new', isRemote: true },
+				];
+			};
 
 			const syncService = new GitRemoteSyncService(mockGit as unknown as IGitHistoryService);
-
-			// Tip advances to sha_new
-			mockGit.branches = [
-				{ name: 'origin/main', commit: 'sha_new', isRemote: true },
-			];
-
 			const res = await syncService.syncRemote('/repo', { remoteName: 'origin' });
 			assert.strictEqual(res.ok, true);
 			assert.strictEqual(res.newCommitsDiscovered, 1);
@@ -74,14 +79,13 @@ suite('GitRemoteSyncService & GitHubAppWebhookReceiver', () => {
 				{ name: 'origin/main', commit: 'c1', isRemote: true },
 				{ name: 'origin/stale', commit: 'c2', isRemote: true },
 			];
+			mockGit.onFetch = () => {
+				mockGit.branches = [
+					{ name: 'origin/main', commit: 'c1', isRemote: true },
+				];
+			};
 
 			const syncService = new GitRemoteSyncService(mockGit as unknown as IGitHistoryService);
-
-			// origin/stale was pruned
-			mockGit.branches = [
-				{ name: 'origin/main', commit: 'c1', isRemote: true },
-			];
-
 			const res = await syncService.syncRemote('/repo', { remoteName: 'origin' });
 			assert.strictEqual(res.ok, true);
 			const deleted = res.updatedRefs.find(r => r.refName === 'origin/stale');

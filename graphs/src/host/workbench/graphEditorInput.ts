@@ -20,9 +20,11 @@ export class PreBaseGraphEditorInput extends EditorInput {
 	}
 
 	readonly resource: URI;
+	readonly graphType: PreBaseGraphType;
 
-	constructor(readonly graphType: PreBaseGraphType) {
+	constructor(graphType: PreBaseGraphType) {
 		super();
+		this.graphType = graphType;
 		this.resource = URI.from({ scheme: PREBASE_GRAPH_SCHEME, path: `/${graphType}` });
 	}
 

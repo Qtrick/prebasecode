@@ -190,7 +190,7 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 				// Failed to open
 			}
 		}
-		if (!repo && this._gitService.repositories.length === 0) {
+		if (!repo && Array.from(this._gitService.repositories).length === 0) {
 			// Extension host git may still be activating; wait for repository
 			for (let i = 0; i < 10; i++) {
 				await new Promise(r => setTimeout(r, 500));

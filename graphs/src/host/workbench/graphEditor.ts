@@ -936,6 +936,7 @@ let rotation = { yaw: 0.55, pitch: 0.28 };
 let snapshot = null;
 let diagnostics = null;
 let selectedNodeId = null;
+let hoveredNodeId = null;
 let settings = { showLegend:true, reduceMotion:false, networkIdleAutoRotate:false, networkDragDirection:'natural', maxRenderedEdges:420, maxRenderedNodes:280, quality:'auto' };
 let dragging = false, panning = false, rotating = false;
 let lastX = 0, lastY = 0, moved = false;
@@ -1034,8 +1035,8 @@ function projectPoint(x, y, z, yaw, pitch) {
 	const x2 = x * cy + z1 * sy;
 	const z2 = -x * sy + z1 * cy;
 
-	const distance = FOCAL + z2;
-	const depthScale = distance > 40 ? FOCAL / distance : 0.05;
+	const distance = Math.max(FOCAL * 0.2, FOCAL + z2);
+	const depthScale = FOCAL / distance;
 	return { x: x2 * depthScale, y: y1 * depthScale, z: z2, depthScale: depthScale };
 }
 
@@ -1079,17 +1080,59 @@ function resetCamera(force) {
 }
 
 function rebuildBase3d(s) {
-	if (!s || !s.nodes) return;
+	if (!s || !s.nodes) return false;
+	const key = [s.scannedAt || '', s.layoutMode || '', s.networkLayoutMode || '', s.graphType || '', (s.nodes || []).length, (s.edges || []).length, s.projectUri || ''].join('|');
+	if (s.scannedAt && key === layoutKey && Object.keys(base3d).length) return false;
+	layoutKey = key;
 	base3d = Object.create(null);
-	const nodes = s.nodes;
-	let sumX = 0, sumY = 0;
-	for (let i = 0; i < nodes.length; i++) {
-		const n = nodes[i];
-		const nx = n.x || 0, ny = n.y || 0, nz = n.z || 0;
-		base3d[n.id] = { x: nx, y: ny, z: nz };
-		sumX += nx; sumY += ny;
+	const nodes = s.nodes || [];
+	const p3 = s.positions3d || null;
+
+	let validCount = 0;
+	let sx = 0, sy = 0;
+
+	// 1. Production contract: s.positions3d
+	if (p3 && typeof p3 === 'object') {
+		for (let i = 0; i < nodes.length; i++) {
+			const n = nodes[i];
+			const p = p3[n.id];
+			if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+			const pz = Number.isFinite(p.z) ? p.z : 0;
+			base3d[n.id] = { x: p.x, y: p.y, z: pz };
+			sx += p.x; sy += p.y;
+			validCount++;
+		}
 	}
-	centroid = { x: sumX / (nodes.length || 1), y: sumY / (nodes.length || 1) };
+
+	// 2. Fallback to node.x, node.y, node.z if present
+	if (validCount === 0) {
+		for (let i = 0; i < nodes.length; i++) {
+			const n = nodes[i];
+			if (n && Number.isFinite(n.x) && Number.isFinite(n.y)) {
+				const nz = Number.isFinite(n.z) ? n.z : 0;
+				base3d[n.id] = { x: n.x, y: n.y, z: nz };
+				sx += n.x; sy += n.y;
+				validCount++;
+			}
+		}
+	}
+
+	// 3. Fallback to s.positions
+	if (validCount === 0 && s.positions && typeof s.positions === 'object') {
+		for (let i = 0; i < nodes.length; i++) {
+			const n = nodes[i];
+			const p = s.positions[n.id];
+			if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+			base3d[n.id] = { x: p.x, y: p.y, z: 0 };
+			sx += p.x; sy += p.y;
+			validCount++;
+		}
+	}
+
+	const preserveSemanticCenter = s.networkLayoutMode === 'radial';
+	centroid = preserveSemanticCenter ? { x: 0, y: 0 } : (validCount > 1 ? { x: sx / validCount, y: sy / validCount } : { x: 0, y: 0 });
+
+	return validCount > 0;
 }
 
 function projectAll() {
@@ -1098,7 +1141,8 @@ function projectAll() {
 	projected = Object.create(null);
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
-		const p = base3d[node.id] || { x: node.x || 0, y: node.y || 0, z: node.z || 0 };
+		const p = base3d[node.id];
+		if (!p) continue;
 		const pr = projectPoint(p.x - centroid.x, p.y - centroid.y, p.z, rotation.yaw, rotation.pitch);
 		projected[node.id] = {
 			x: pr.x,
@@ -1135,32 +1179,33 @@ function fitView() {
 		for (let i = 0; i < temporalDiff.nodes.length; i++) {
 			const n = temporalDiff.nodes[i];
 			if (displayMode === 'state' && n.changeKind === 'removed') continue;
-			minX = Math.min(minX, (n.x || 0) - 20); minY = Math.min(minY, (n.y || 0) - 20);
-			maxX = Math.max(maxX, (n.x || 0) + 20); maxY = Math.max(maxY, (n.y || 0) + 20);
+			minX = Math.min(minX, (n.x || 0) - 24); minY = Math.min(minY, (n.y || 0) - 24);
+			maxX = Math.max(maxX, (n.x || 0) + 24); maxY = Math.max(maxY, (n.y || 0) + 24);
 		}
 		if (!isFinite(minX)) return;
 		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 		const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
-		const k = Math.min(vw / (bw + 160), vh / (bh + 160), 2.0);
+		const k = Math.min(vw / (bw + 120), vh / (bh + 120), 2.0);
 		transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 		dirty = true; kickRaf();
 		return;
 	}
 
 	if (!snapshot || !(snapshot.nodes || []).length) return;
+	projectAll();
 	const nodes = snapshot.nodes;
 	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 	for (let i = 0; i < nodes.length; i++) {
 		const p = screenPos(nodes[i].id);
 		if (!p) continue;
-		const r = 16;
+		const r = 20 * (p.depthScale || 1);
 		minX = Math.min(minX, p.x - r); minY = Math.min(minY, p.y - r);
 		maxX = Math.max(maxX, p.x + r); maxY = Math.max(maxY, p.y + r);
 	}
 	if (!isFinite(minX)) return;
 	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 	const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
-	const k = Math.min(vw / (bw + 120), vh / (bh + 120), 1.8) * (settings.initialZoom || 1);
+	const k = Math.min(vw / (bw + 120), vh / (bh + 120), 2.0) * (settings.initialZoom || 1);
 	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 	dirty = true; kickRaf();
 }
@@ -1597,7 +1642,7 @@ function drawTemporalFrame(ts) {
 
 	ctx.clearRect(0, 0, w, h);
 	ctx.save();
-	ctx.translate(w / 2 + transform.x, h / 2 + transform.y);
+	ctx.translate(transform.x, transform.y);
 	ctx.scale(transform.k, transform.k);
 
 	const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -1711,13 +1756,12 @@ function pickTemporalNode(clientX, clientY) {
 	const rect = netCanvas.getBoundingClientRect();
 	const sx = clientX - rect.left;
 	const sy = clientY - rect.top;
-	const w = netCanvas.clientWidth || 800;
-	const h = netCanvas.clientHeight || 600;
-	const wx = (sx - (w / 2 + transform.x)) / transform.k;
-	const wy = (sy - (h / 2 + transform.y)) / transform.k;
+	const k = Math.max(0.001, transform.k);
+	const wx = (sx - transform.x) / k;
+	const wy = (sy - transform.y) / k;
 
 	let best = null;
-	let bestDist = 24 / transform.k;
+	let bestDist = 24 / k;
 
 	currentTemporalRenderNodes.forEach(function (node) {
 		if (displayMode === 'state' && node.changeKind === 'removed') return;
@@ -1771,15 +1815,15 @@ function pickNetworkNode(clientX, clientY) {
 	const wy = (sy - transform.y) / k;
 	let best = null;
 	let bestDist = Infinity;
-	const maxNodes = Math.max(40, settings.maxRenderedNodes || 280);
-	const nodes = (snapshot.nodes || []).slice(0, maxNodes);
+	const nodes = snapshot.nodes || [];
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
 		const p = screenPos(node.id);
 		if (!p) continue;
-		const r = 16 * (p.depthScale || 1);
+		const baseR = Math.max(6, Math.min(22, 8 + Math.sqrt(node.importance || node.degree || 1) * 1.8));
+		const r = baseR * (p.depthScale || 1);
 		const d = Math.hypot(wx - p.x, wy - p.y);
-		if (d <= r + 8 && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
+		if (d <= r + 10 && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
 			bestDist = d;
 			best = node;
 		}
@@ -1801,33 +1845,72 @@ function drawNetworkFrame() {
 	const nodes = (snapshot && snapshot.nodes) || [];
 	const edges = (snapshot && snapshot.edges) || [];
 	const entryId = snapshot && snapshot.entryNodeId;
+	const activeHighlightId = selectedNodeId || hoveredNodeId;
 
-	// Draw Network Edges
+	// Build connected node lookup for focus / neighborhood highlighting
+	const connectedNodeIds = new Set();
+	if (activeHighlightId) {
+		connectedNodeIds.add(activeHighlightId);
+		for (let i = 0; i < edges.length; i++) {
+			const e = edges[i];
+			if (e.source === activeHighlightId) connectedNodeIds.add(e.target);
+			if (e.target === activeHighlightId) connectedNodeIds.add(e.source);
+		}
+	}
+
+	// 1. Draw Network Edges
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
 		const p1 = screenPos(e.source);
 		const p2 = screenPos(e.target);
 		if (!p1 || !p2) continue;
+
+		const isConnectedToHighlight = activeHighlightId && (e.source === activeHighlightId || e.target === activeHighlightId);
 		ctx.beginPath();
 		ctx.moveTo(p1.x, p1.y);
 		ctx.lineTo(p2.x, p2.y);
-		ctx.strokeStyle = 'rgba(148, 163, 184, 0.35)';
-		ctx.lineWidth = 1;
+
+		if (isConnectedToHighlight) {
+			ctx.strokeStyle = '#2dd4bf';
+			ctx.lineWidth = 2.0;
+		} else if (activeHighlightId) {
+			ctx.strokeStyle = 'rgba(148, 163, 184, 0.06)';
+			ctx.lineWidth = 0.8;
+		} else {
+			ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
+			ctx.lineWidth = 1.0;
+		}
 		ctx.stroke();
 	}
 
-	// Draw Network Nodes
+	// 2. Draw Network Nodes
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
 		const p = screenPos(node.id);
 		if (!p) continue;
-		const r = 14 * (p.depthScale || 1);
 
-		if (selectedNodeId === node.id) {
+		const baseR = Math.max(6, Math.min(22, 8 + Math.sqrt(node.importance || node.degree || 1) * 1.8));
+		const r = baseR * (p.depthScale || 1);
+		const isSelected = selectedNodeId === node.id;
+		const isHovered = hoveredNodeId === node.id;
+		const isDimmed = Boolean(activeHighlightId && !connectedNodeIds.has(node.id));
+
+		ctx.save();
+		if (isDimmed) {
+			ctx.globalAlpha = 0.35;
+		}
+
+		if (isSelected) {
+			ctx.beginPath();
+			ctx.arc(p.x, p.y, r + 5, 0, 2 * Math.PI);
+			ctx.strokeStyle = '#2dd4bf';
+			ctx.lineWidth = 3.0;
+			ctx.stroke();
+		} else if (isHovered) {
 			ctx.beginPath();
 			ctx.arc(p.x, p.y, r + 4, 0, 2 * Math.PI);
-			ctx.strokeStyle = '#2dd4bf';
-			ctx.lineWidth = 2.5;
+			ctx.strokeStyle = '#58a6ff';
+			ctx.lineWidth = 2.0;
 			ctx.stroke();
 		}
 
@@ -1835,14 +1918,83 @@ function drawNetworkFrame() {
 		ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
 		ctx.fillStyle = nodeColor(node, entryId);
 		ctx.fill();
-		ctx.strokeStyle = '#1B1C1E';
-		ctx.lineWidth = 1.5;
+		ctx.strokeStyle = isSelected ? '#2dd4bf' : (isHovered ? '#58a6ff' : '#1B1C1E');
+		ctx.lineWidth = isSelected || isHovered ? 2.0 : 1.2;
 		ctx.stroke();
+		ctx.restore();
+	}
 
-		ctx.fillStyle = '#f4f4f5';
-		ctx.font = '10px sans-serif';
+	// 3. Draw Network Labels with Level of Detail & Screen-Space Collision Culling
+	const placedLabelBoxes = [];
+	const isMoving = rotating || (dragging && panning);
+
+	for (let i = 0; i < nodes.length; i++) {
+		const node = nodes[i];
+		const p = screenPos(node.id);
+		if (!p) continue;
+
+		const isSelected = selectedNodeId === node.id;
+		const isHovered = hoveredNodeId === node.id;
+		const isEntry = (node.id === entryId || node.isEntry);
+		const isImportant = (node.importance && node.importance >= 0.7) || (node.degree && node.degree >= 6);
+
+		let shouldShowLabel = false;
+		if (isSelected || isHovered) {
+			shouldShowLabel = true;
+		} else if (!isMoving) {
+			if (isEntry && transform.k >= 0.4) {
+				shouldShowLabel = true;
+			} else if (isImportant && transform.k >= 0.7) {
+				shouldShowLabel = true;
+			} else if (transform.k >= 1.25) {
+				shouldShowLabel = true;
+			}
+		}
+
+		if (!shouldShowLabel) continue;
+
+		const baseR = Math.max(6, Math.min(22, 8 + Math.sqrt(node.importance || node.degree || 1) * 1.8));
+		const r = baseR * (p.depthScale || 1);
+		const labelText = node.label || node.id;
+		const labelY = p.y + r + 12;
+
+		// Text collision box in world coords (approximate text width based on length)
+		const estWidth = Math.max(20, labelText.length * 6.5);
+		const boxLeft = p.x - estWidth / 2 - 2;
+		const boxTop = labelY - 8;
+		const boxWidth = estWidth + 4;
+		const boxHeight = 14;
+
+		if (!isSelected && !isHovered) {
+			let collides = false;
+			for (let b = 0; b < placedLabelBoxes.length; b++) {
+				const pb = placedLabelBoxes[b];
+				if (
+					boxLeft < pb.x + pb.w &&
+					boxLeft + boxWidth > pb.x &&
+					boxTop < pb.y + pb.h &&
+					boxTop + boxHeight > pb.y
+				) {
+					collides = true;
+					break;
+				}
+			}
+			if (collides) continue;
+		}
+
+		placedLabelBoxes.push({ x: boxLeft, y: boxTop, w: boxWidth, h: boxHeight });
+
+		ctx.save();
+		ctx.font = (isSelected || isHovered) ? 'bold 11px ui-sans-serif, system-ui, sans-serif' : '10px ui-sans-serif, system-ui, sans-serif';
 		ctx.textAlign = 'center';
-		ctx.fillText(node.label || node.id, p.x, p.y + r + 2);
+
+		// Subtle backdrop for readability
+		ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+		ctx.fillRect(boxLeft, boxTop, boxWidth, boxHeight);
+
+		ctx.fillStyle = (isSelected || isHovered) ? '#2dd4bf' : '#f4f4f5';
+		ctx.fillText(labelText, p.x, labelY + 2);
+		ctx.restore();
 	}
 
 	ctx.restore();
@@ -1862,6 +2014,9 @@ function render(first) {
 		resizeCanvas();
 		updateLegend(null, false);
 		updateTemporalUI(temporalState, temporalDiff);
+		if (first && temporalDiff && temporalDiff.nodes && temporalDiff.nodes.length) {
+			fitView();
+		}
 		dirty = true;
 		kickRaf();
 		return;
@@ -1890,11 +2045,15 @@ function render(first) {
 	if (archSvg) archSvg.style.display = 'none';
 	if (netCanvas) netCanvas.style.display = 'block';
 	resizeCanvas();
-	rebuildBase3d(snapshot);
+	const layoutChanged = rebuildBase3d(snapshot);
 	updateLegend(snapshot, true);
 	if (status) {
 		status.style.display = 'block';
 		status.textContent = snapshot.nodes.length + ' files · ' + (snapshot.edges || []).length + ' edges';
+	}
+	if (first || layoutChanged) {
+		projectAll();
+		fitView();
 	}
 	dirty = true;
 	kickRaf();
@@ -2068,7 +2227,19 @@ function onPointerUp(e, cancelled) {
 }
 
 function onPointerMove(e) {
-	if (!dragging || e.pointerId !== activePointerId) return;
+	if (!dragging) {
+		const node = isTemporal() ? pickTemporalNode(e.clientX, e.clientY) : pickNetworkNode(e.clientX, e.clientY);
+		const newHoverId = node ? (node.entityId || node.id) : null;
+		if (newHoverId !== hoveredNodeId) {
+			hoveredNodeId = newHoverId;
+			if (netCanvas) netCanvas.style.cursor = hoveredNodeId ? 'pointer' : 'default';
+			dirty = true;
+			kickRaf();
+		}
+		return;
+	}
+
+	if (e.pointerId !== activePointerId) return;
 	const dx = e.clientX - lastX, dy = e.clientY - lastY;
 	const total = Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY);
 	if (total > dragThreshold) moved = true;

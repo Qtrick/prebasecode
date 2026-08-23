@@ -425,18 +425,26 @@ export class PreBaseMapsViewPane extends ViewPane {
 			return;
 		}
 
+		const activeGraphType = this._getActiveGraphType();
+		const isNetwork = activeGraphType === 'network';
 		const historicalSha = this.graphService.getSelectedHistoricalCommitSha();
-		const selectedSha = historicalSha || state.selectedCommitSha;
 		const windowStart = state.timelineWindow ? state.timelineWindow.start : 0;
 
-		// 1. Working Tree Row
+		// Derive actual repository HEAD commit sha if known
+		const headRef = state.repositoryRefs?.find(r => r.kind === 'head' || r.name === 'HEAD');
+		const headSha = headRef?.targetSha || (state.selectedRef === 'HEAD' && timeline[0] ? timeline[0].sha : undefined);
+
+		// 1. Mode-Adaptive Special Top Row
+		const isWtSelected = isNetwork
+			? !historicalSha
+			: (Boolean(state.selectedCommitSha && timeline[0] && state.selectedCommitSha === timeline[0].sha));
+
 		const wtRow = DOM.append(this._historyList, DOM.$('div'));
-		const isWtSelected = !historicalSha && (this._getActiveGraphType() === 'network');
 		wtRow.tabIndex = 0;
 		wtRow.setAttribute('role', 'option');
 		wtRow.setAttribute('aria-selected', isWtSelected ? 'true' : 'false');
 		wtRow.className = 'history-item history-working-tree' + (isWtSelected ? ' selected' : '');
-		wtRow.dataset.commitSha = '__working_tree__';
+		wtRow.dataset.commitSha = '__special_top_row__';
 		wtRow.style.display = 'flex';
 		wtRow.style.flexDirection = 'column';
 		wtRow.style.gap = '2px';
@@ -456,14 +464,26 @@ export class PreBaseMapsViewPane extends ViewPane {
 		wtLine1.style.gap = '6px';
 
 		const wtBadge = DOM.append(wtLine1, DOM.$('span'));
-		wtBadge.textContent = '● Live';
-		wtBadge.style.fontSize = '10px';
-		wtBadge.style.fontWeight = '600';
-		wtBadge.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+		if (isNetwork) {
+			wtBadge.textContent = '● Live';
+			wtBadge.style.fontSize = '10px';
+			wtBadge.style.fontWeight = '600';
+			wtBadge.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+		} else {
+			wtBadge.textContent = 'HEAD';
+			wtBadge.style.fontSize = '9px';
+			wtBadge.style.fontWeight = '700';
+			wtBadge.style.padding = '0 4px';
+			wtBadge.style.borderRadius = '3px';
+			wtBadge.style.background = 'rgba(45, 212, 191, 0.2)';
+			wtBadge.style.color = '#2dd4bf';
+		}
 		wtBadge.style.flexShrink = '0';
 
 		const wtMsg = DOM.append(wtLine1, DOM.$('span'));
-		wtMsg.textContent = localize('prebase.maps.workingTree', "Working Tree · Live Codebase");
+		wtMsg.textContent = isNetwork
+			? localize('prebase.maps.workingTree', "Working Tree · Live Codebase")
+			: localize('prebase.maps.temporalCurrentCommit', "Current Commit / HEAD");
 		wtMsg.style.fontSize = '11px';
 		wtMsg.style.fontWeight = '600';
 		wtMsg.style.color = TEXT;
@@ -472,9 +492,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 		wtMsg.style.whiteSpace = 'nowrap';
 		wtMsg.style.flex = '1';
 
-		const onSelectWt = () => {
-			const activeType = this._getActiveGraphType();
-			if (activeType === 'network') {
+		const onSelectSpecialRow = () => {
+			if (this._getActiveGraphType() === 'network') {
 				void this.graphService.loadHistoricalCommit(undefined);
 			} else {
 				void this.temporalViewService.selectCommitIndex(0, { immediate: true });
@@ -484,13 +503,13 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		this._historyDisposables.add(DOM.addDisposableListener(wtRow, 'click', (e) => {
 			e.stopPropagation();
-			onSelectWt();
+			onSelectSpecialRow();
 		}));
 		this._historyDisposables.add(DOM.addDisposableListener(wtRow, 'keydown', (e) => {
 			if (e.key === 'Enter' || e.key === ' ') {
 				e.preventDefault();
 				e.stopPropagation();
-				onSelectWt();
+				onSelectSpecialRow();
 			}
 		}));
 
@@ -498,7 +517,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 		for (let i = 0; i < timeline.length; i++) {
 			const commit = timeline[i];
 			const globalIndex = windowStart + i;
-			const isSelected = (!isWtSelected) && (commit.sha === selectedSha);
+			const isSelected = isNetwork
+				? Boolean(historicalSha && commit.sha === historicalSha)
+				: Boolean(!isWtSelected && commit.sha === state.selectedCommitSha);
+
+			const isHeadCommit = headSha ? commit.sha === headSha : (state.selectedRef === 'HEAD' && i === 0);
 
 			const row = DOM.append(this._historyList, DOM.$('div'));
 			row.tabIndex = 0;
@@ -526,7 +549,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			line1.style.gap = '6px';
 			line1.style.overflow = 'hidden';
 
-			if (i === 0) {
+			if (isHeadCommit) {
 				const headBadge = DOM.append(line1, DOM.$('span'));
 				headBadge.textContent = 'HEAD';
 				headBadge.style.fontSize = '9px';
@@ -592,10 +615,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 			authorSpan.style.maxWidth = '90px';
 
 			const onSelect = () => {
-				void this.temporalViewService.selectCommitIndex(globalIndex, { immediate: true });
 				const activeType = this._getActiveGraphType();
 				if (activeType === 'network') {
 					void this.graphService.loadHistoricalCommit(commit.sha);
+				} else {
+					void this.temporalViewService.selectCommitIndex(globalIndex, { immediate: true });
 				}
 				this._refreshHistorySelection();
 			};
@@ -640,15 +664,28 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 	private _refreshHistorySelection(): void {
 		if (!this._historyList) return;
+		const isNetwork = this._getActiveGraphType() === 'network';
 		const historicalSha = this.graphService.getSelectedHistoricalCommitSha();
 		const state = this.temporalViewService.getState();
-		const isNetwork = this._getActiveGraphType() === 'network';
-		const activeSha = isNetwork ? (historicalSha || '__working_tree__') : state.selectedCommitSha;
+		const timeline = state.pagedTimeline || [];
+
+		const targetSha = isNetwork
+			? (historicalSha || '__special_top_row__')
+			: state.selectedCommitSha;
+
+		const isSpecialTopSelected = isNetwork
+			? !historicalSha
+			: (Boolean(state.selectedCommitSha && timeline[0] && state.selectedCommitSha === timeline[0].sha));
 
 		const rows = this._historyList.querySelectorAll<HTMLElement>('.history-item');
 		rows.forEach(r => {
 			const rowSha = r.dataset.commitSha;
-			const isSel = rowSha === activeSha;
+			let isSel = false;
+			if (rowSha === '__special_top_row__') {
+				isSel = isSpecialTopSelected;
+			} else {
+				isSel = !isSpecialTopSelected && (rowSha === targetSha);
+			}
 			r.setAttribute('aria-selected', isSel ? 'true' : 'false');
 			r.style.background = isSel ? ACCENT_SOFT : 'transparent';
 			r.style.border = isSel ? `1px solid ${ACCENT}88` : '1px solid transparent';

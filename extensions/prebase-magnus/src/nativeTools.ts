@@ -199,7 +199,7 @@ class WorkspaceApplyEditsTool implements vscode.LanguageModelTool<{ files: Versi
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', description: 'Apply workspace edits' });
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'workspaceWrite', description: 'Apply workspace edits' });
 		if (!perm.allowed) {
 			throw new Error(perm.reason || 'Workspace edit denied by Project Safety.');
 		}
@@ -253,7 +253,7 @@ class WorkspaceCreateFileTool implements vscode.LanguageModelTool<{ path: string
 		if (token.isCancellationRequested || typeof options.input.content !== 'string' || options.input.content.length > 1_000_000) {
 			throw new Error(token.isCancellationRequested ? 'Cancelled' : 'Content no larger than 1 MB is required.');
 		}
-		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', targetPath: options.input.path, description: 'Create file' });
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'workspaceWrite', targetPath: options.input.path, description: 'Create file' });
 		if (!perm.allowed) {
 			throw new Error(perm.reason || 'File creation denied by Project Safety.');
 		}
@@ -275,7 +275,7 @@ class WorkspaceRenameFileTool implements vscode.LanguageModelTool<{ from: string
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', targetPath: options.input.from, description: 'Rename file' });
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'fileMove', sourcePath: options.input.from, targetPath: options.input.to, description: 'Rename file' });
 		if (!perm.allowed) {
 			throw new Error(perm.reason || 'File rename denied by Project Safety.');
 		}
@@ -298,7 +298,7 @@ class WorkspaceDeleteFileTool implements vscode.LanguageModelTool<{ path: string
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', targetPath: options.input.path, description: 'Delete file' });
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'fileDelete', targetPath: options.input.path, description: 'Delete file' });
 		if (!perm.allowed) {
 			throw new Error(perm.reason || 'File deletion denied by Project Safety.');
 		}
@@ -324,7 +324,7 @@ class WorkspaceEditTool implements vscode.LanguageModelTool<{ path: string; cont
 		};
 	}
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ path: string; content: string }>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
-		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'write', targetPath: options.input.path, description: 'Edit file' });
+		const perm = await ProjectSafetyService.instance.checkPermission({ category: 'workspaceWrite', targetPath: options.input.path, description: 'Edit file' });
 		if (!perm.allowed) {
 			throw new Error(perm.reason || 'File edit denied by Project Safety.');
 		}

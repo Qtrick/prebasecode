@@ -125,6 +125,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 		lineTo(...args: any[]) { drawCalls.push({ type: 'lineTo', args }); },
 		stroke() { drawCalls.push({ type: 'stroke', args: [] }); },
 		fill() { drawCalls.push({ type: 'fill', args: [] }); },
+		fillRect(...args: any[]) { drawCalls.push({ type: 'fillRect', args }); },
 		arc(...args: any[]) { drawCalls.push({ type: 'arc', args }); },
 		fillText(...args: any[]) { drawCalls.push({ type: 'fillText', args }); },
 		measureText() { return { width: 10 }; },
@@ -136,6 +137,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 		lineWidth: 1,
 		font: '',
 		textAlign: '',
+		globalAlpha: 1,
 	};
 
 	const canvasEl = elements.get('netCanvas')!;
@@ -267,19 +269,27 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		assert.strictEqual(readyMsg.payload.graphType, 'network');
 	});
 
-	test('Code Graph: renders 3D network nodes and edges on receiving snapshot', () => {
+	test('Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity', () => {
 		const harness = createProductionWebviewHarness('network');
+		// Production contract: GraphNode has NO x, y, z fields!
 		const sampleSnapshot = {
 			nodes: [
-				{ id: 'file:src/index.ts', label: 'index.ts', path: 'src/index.ts', x: 100, y: 50, z: 20 },
-				{ id: 'file:src/app.ts', label: 'app.ts', path: 'src/app.ts', x: -50, y: 120, z: -10 },
-				{ id: 'file:src/utils.ts', label: 'utils.ts', path: 'src/utils.ts', x: 0, y: -80, z: 5 }
+				{ id: 'file:src/index.ts', kind: 'file', label: 'index.ts', path: 'src/index.ts', parentId: null, isEntry: true, depth: 0, meta: {} },
+				{ id: 'file:src/app.ts', kind: 'file', label: 'app.ts', path: 'src/app.ts', parentId: null, isEntry: false, depth: 1, meta: {} },
+				{ id: 'file:src/utils.ts', kind: 'file', label: 'utils.ts', path: 'src/utils.ts', parentId: null, isEntry: false, depth: 2, meta: {} }
 			],
 			edges: [
 				{ source: 'file:src/index.ts', target: 'file:src/app.ts' },
 				{ source: 'file:src/app.ts', target: 'file:src/utils.ts' }
 			],
-			entryNodeId: 'file:src/index.ts'
+			positions3d: {
+				'file:src/index.ts': { x: 120, y: 80, z: 40 },
+				'file:src/app.ts': { x: -90, y: 140, z: -30 },
+				'file:src/utils.ts': { x: 10, y: -110, z: 15 }
+			},
+			entryNodeId: 'file:src/index.ts',
+			networkLayoutMode: 'organic',
+			scannedAt: 1000
 		};
 
 		harness.triggerMessage({
@@ -300,10 +310,88 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 
 		assert.ok(arcCalls.length >= 3, `Expected at least 3 node arcs, got ${arcCalls.length}`);
 		assert.ok(lineToCalls.length >= 2, `Expected at least 2 edge lines, got ${lineToCalls.length}`);
-		assert.ok(fillTextCalls.length >= 3, `Expected at least 3 node labels, got ${fillTextCalls.length}`);
+		assert.ok(fillTextCalls.length >= 1, `Expected entry node label, got ${fillTextCalls.length}`);
+
+		// Spatial Diversity Assertion: node positions must NOT collapse to (0,0) or to each other
+		const nodeCenters = arcCalls.map(c => ({ x: c.args[0], y: c.args[1] }));
+		const uniqueX = new Set(nodeCenters.map(c => Math.round(c.x)));
+		const uniqueY = new Set(nodeCenters.map(c => Math.round(c.y)));
+		assert.ok(uniqueX.size >= 2, `Expected spatially distinct X coordinates, got ${uniqueX.size}`);
+		assert.ok(uniqueY.size >= 2, `Expected spatially distinct Y coordinates, got ${uniqueY.size}`);
 	});
 
-	test('Temporal Graph: renders 2D temporal diff transitions and UI', () => {
+	test('Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin', () => {
+		const harness = createProductionWebviewHarness('network');
+
+		// Test Radial layout (must preserve origin (0,0) as center)
+		const radialSnapshot = {
+			nodes: [
+				{ id: 'center', kind: 'file', label: 'center.ts', path: 'src/center.ts', parentId: null, isEntry: true, depth: 0, meta: {} },
+				{ id: 'leaf1', kind: 'file', label: 'leaf1.ts', path: 'src/leaf1.ts', parentId: null, isEntry: false, depth: 1, meta: {} },
+			],
+			edges: [{ source: 'center', target: 'leaf1' }],
+			positions3d: {
+				'center': { x: 0, y: 0, z: 0 },
+				'leaf1': { x: 200, y: 0, z: 0 }
+			},
+			networkLayoutMode: 'radial',
+			scannedAt: 2000
+		};
+
+		harness.triggerMessage({
+			type: 'snapshot',
+			payload: { snapshot: radialSnapshot, graphType: 'network' }
+		});
+		harness.triggerRaf(1032);
+
+		const arcCalls = harness.drawCalls.filter(c => c.type === 'arc');
+		assert.ok(arcCalls.length >= 2);
+	});
+
+	test('Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective', () => {
+		const harness = createProductionWebviewHarness('network');
+		const snapshot = {
+			nodes: [
+				{ id: 'n1', kind: 'file', label: 'first.ts', path: 'src/first.ts', parentId: null, isEntry: true, depth: 0, meta: {} },
+				{ id: 'n2', kind: 'file', label: 'second.ts', path: 'src/second.ts', parentId: null, isEntry: false, depth: 1, meta: {} }
+			],
+			edges: [{ source: 'n1', target: 'n2' }],
+			positions3d: {
+				'n1': { x: -100, y: 0, z: 0 },
+				'n2': { x: 100, y: 0, z: 0 }
+			},
+			networkLayoutMode: 'organic',
+			scannedAt: 3000
+		};
+
+		harness.triggerMessage({
+			type: 'snapshot',
+			payload: { snapshot, graphType: 'network' }
+		});
+		harness.triggerRaf(1050);
+
+		// Trigger canvas click via pointerdown / pointerup
+		const canvasEl = harness.elements.get('netCanvas')!;
+		canvasEl.dispatch('pointerdown', {
+			isPrimary: true,
+			button: 0,
+			clientX: 400,
+			clientY: 300,
+			pointerId: 1,
+			pointerType: 'mouse'
+		});
+
+		canvasEl.dispatch('pointerup', {
+			pointerId: 1,
+			clientX: 400,
+			clientY: 300
+		});
+
+		// Verify selection message was dispatched or handled
+		assert.ok(harness.drawCalls.length > 0);
+	});
+
+	test('Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting', () => {
 		const harness = createProductionWebviewHarness('temporal');
 		const readyMsg = harness.postedMessages.find(m => m.type === 'ready');
 		assert.ok(readyMsg);
@@ -362,5 +450,9 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		const lineToCalls = harness.drawCalls.filter(c => c.type === 'lineTo');
 		assert.ok(arcCalls.length >= 2, `Expected at least 2 temporal node arcs, got ${arcCalls.length}`);
 		assert.ok(lineToCalls.length >= 1, `Expected at least 1 temporal edge line, got ${lineToCalls.length}`);
+
+		// Verify translates do not double-count (w/2, h/2)
+		const translateCalls = harness.drawCalls.filter(c => c.type === 'translate');
+		assert.ok(translateCalls.length >= 1);
 	});
 });

@@ -54,6 +54,8 @@ const tests = [
 	'graphs/src/tests/unit/temporalLayoutEngine.test.ts',
 	'graphs/src/tests/unit/workbenchTemporalViewService.test.ts',
 	'graphs/src/tests/unit/graphEditorTemporalWebview.test.ts',
+	'graphs/src/tests/unit/graphEditorProductionWebview.test.ts',
+	'graphs/src/tests/unit/gitRemoteSyncAndWebhooks.test.ts',
 	'graphs/src/tests/unit/temporalServiceE2E.test.ts',
 ];
 

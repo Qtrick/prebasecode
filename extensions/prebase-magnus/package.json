@@ -342,10 +342,12 @@
           "default": "prompt",
           "enum": [
             "prompt",
+            "auto-safe",
             "deny"
           ],
           "enumDescriptions": [
             "Prompt user before executing terminal commands.",
+            "Automatically allow safe read-only/inspection terminal commands while prompting for mutations.",
             "Deny all terminal execution requests."
           ],
           "description": "PreBase Project Safety terminal execution policy."

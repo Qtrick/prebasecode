@@ -12,9 +12,11 @@ export interface IGitRemoteSyncOptions {
 }
 
 export class GitRemoteSyncService {
-	constructor(
-		private readonly _gitHistoryService: IGitHistoryService,
-	) {}
+	private readonly _gitHistoryService: IGitHistoryService;
+
+	constructor(gitHistoryService: IGitHistoryService) {
+		this._gitHistoryService = gitHistoryService;
+	}
 
 	async syncRemote(
 		rootPath: string,
@@ -33,10 +35,14 @@ export class GitRemoteSyncService {
 				}
 			}
 
-			// 2. Perform remote fetch if history service implements it directly
+			// 2. Perform remote fetch if history service implements it
 			if (this._gitHistoryService.fetchRemoteRefs) {
 				const directResult = await this._gitHistoryService.fetchRemoteRefs(rootPath, remoteName, token);
-				return directResult;
+				if (directResult) {
+					return directResult;
+				}
+			} else if (typeof (this._gitHistoryService as any).fetch === 'function') {
+				await (this._gitHistoryService as any).fetch(rootPath, remoteName, token);
 			}
 
 			// 3. Query updated branch state
