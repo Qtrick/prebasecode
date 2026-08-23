@@ -35,14 +35,24 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 	private _validateDbPath(dbPath: string): string {
 		const storageRoot = path.resolve(this._storageRoot);
 		const resolvedPath = path.resolve(dbPath);
+		const parentDir = path.dirname(resolvedPath);
+		if (!fs.existsSync(parentDir)) {
+			try {
+				fs.mkdirSync(parentDir, { recursive: true });
+			} catch {
+				// Ignore
+			}
+		}
 		let resolvedParent: string;
 		try {
-			resolvedParent = fs.realpathSync(path.dirname(resolvedPath));
-		} catch {
+			resolvedParent = fs.realpathSync(parentDir);
+		} catch (e: any) {
+			console.error('[TemporalStoreMainService] realpath failed:', parentDir, e?.message);
 			throw new Error('Temporal store path is outside the authorized cache directory');
 		}
 		const canonicalPath = path.join(resolvedParent, path.basename(resolvedPath));
 		if (resolvedParent !== storageRoot || path.extname(canonicalPath) !== '.db' || isSymbolicLink(resolvedPath)) {
+			console.error('[TemporalStoreMainService] validation mismatch:', { storageRoot, resolvedParent, ext: path.extname(canonicalPath), isSymlink: isSymbolicLink(resolvedPath), dbPath });
 			throw new Error('Temporal store path is outside the authorized cache directory');
 		}
 		return canonicalPath;
@@ -180,6 +190,7 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 			const response: TemporalStoreIpcResponse = { ok: true, value: serializeTemporalStoreValue(await operation()) };
 			return serializeTemporalStoreValue(response);
 		} catch (error) {
+			console.error('[TemporalStoreMainService] IPC operation failed:', error instanceof Error ? error.message : String(error), error instanceof Error && error.stack ? error.stack : '');
 			const temporalError = isTemporalError(error)
 				? error
 				: new TemporalError('StoreNotOpen', 'Temporal store operation failed');

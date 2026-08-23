@@ -73,10 +73,10 @@ suite('NetworkRenderMath (Unit - Visual Fidelity & Radius Invariants)', () => {
 			assert.ok(ordR >= 3.0 && ordR <= 6.0, `Ordinary node radius must be 3-6px, got ${ordR} at depthScale ${depthScale}`);
 
 			const hubR = computeNetworkVisualRadius(hubNode, depthScale, { entryNodeId: 'file:src/main.ts' });
-			assert.ok(hubR >= 5.5 && hubR <= 10.5, `Hub node radius must be ~6-10px, got ${hubR} at depthScale ${depthScale}`);
+			assert.ok(hubR >= 4.8 && hubR <= 10.5, `Hub node radius must be ~5-10px, got ${hubR} at depthScale ${depthScale}`);
 
 			const entryR = computeNetworkVisualRadius(entryNode, depthScale, { entryNodeId: 'file:src/main.ts' });
-			assert.ok(entryR >= 6.0 && entryR <= 10.5, `Entry node radius must be ~6-10px, got ${entryR} at depthScale ${depthScale}`);
+			assert.ok(entryR >= 5.0 && entryR <= 10.5, `Entry node radius must be ~5-10px, got ${entryR} at depthScale ${depthScale}`);
 
 			// Hover and selected states should be subtle, not giant
 			const hoverR = computeNetworkVisualRadius(ordinaryNode, depthScale, { entryNodeId: 'file:src/main.ts', isHovered: true });

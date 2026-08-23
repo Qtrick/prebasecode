@@ -1339,7 +1339,10 @@ export class CodeApplication extends Disposable {
 
 		// PreBase Temporal persistence stays in the Electron main process. The
 		// sandboxed workbench reaches it only through this typed IPC channel.
-		const temporalStoreRoot = URI.joinPath(this.environmentMainService.cacheHome, 'prebase-temporal').fsPath;
+		// The renderer computes dbPath using environmentService.cacheHome which
+		// resolves to URI.file(userDataPath), then appends 'prebase-temporal'.
+		// storageRoot must match that directory exactly.
+		const temporalStoreRoot = join(this.environmentMainService.userDataPath, 'prebase-temporal');
 		const temporalStoreService = disposables.add(new TemporalStoreMainService(temporalStoreRoot));
 		mainProcessElectronServer.registerChannel(TEMPORAL_STORE_CHANNEL_NAME, ProxyChannel.fromService(temporalStoreService, disposables));
 

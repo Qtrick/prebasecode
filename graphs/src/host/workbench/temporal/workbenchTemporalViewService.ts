@@ -81,7 +81,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private _renderedCompareBaseSha?: string;
 
 	private _followHead: boolean = true;
-	private _displayMode: TemporalDisplayMode = 'changes';
+	private _displayMode: TemporalDisplayMode = 'state';
 	private _filterQuery: string = '';
 	private _selectedEntityId?: string;
 

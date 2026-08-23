@@ -116,13 +116,14 @@ export function computeNetworkSemanticWeight(node: NetworkNodeLike, entryNodeId?
 	}
 
 	const importance = node.importance ?? node.meta?.importance ?? 0;
-	if (importance > 0) {
-		return Math.max(1.5, 1.2 + Math.sqrt(importance) * 1.8);
-	}
-
 	const degree = node.degree ?? 0;
-	if (degree > 0) {
-		return Math.max(1.5, 1.2 + Math.sqrt(degree) * 1.4);
+
+	if (importance > 0 || degree > 0) {
+		const impWeight = importance > 0
+			? (importance <= 1.0 ? 1.2 + Math.sqrt(importance * 10) * 1.8 : 1.2 + Math.sqrt(importance) * 1.8)
+			: 0;
+		const degWeight = degree > 0 ? 1.2 + Math.sqrt(degree) * 1.4 : 0;
+		return Math.max(1.5, impWeight, degWeight);
 	}
 
 	return 1.5;

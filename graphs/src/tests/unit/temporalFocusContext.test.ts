@@ -93,6 +93,8 @@ suite('TemporalFocusContext (Unit - Focus+Context & Spatial Quality)', () => {
 			if (e.entityId === 'ent-10' || e.entityId === 'ent-20') {
 				return {
 					...e,
+					canonicalNodeId: 'can-' + e.entityId + '-v2',
+					blobOid: 'blob-' + e.entityId + '-v2',
 					nodeData: { ...e.nodeData, label: 'modified_' + e.entityId },
 				};
 			}

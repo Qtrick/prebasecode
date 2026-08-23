@@ -53,7 +53,7 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 		this._isFlushing = true;
 		try {
 			while (this._pending.length > 0) {
-				const pending = this._pending.splice(0);
+				const pending = this._pending.splice(0, 32);
 				const active = pending.filter(item => {
 					if (!item.token?.isCancellationRequested) {
 						return true;
@@ -95,7 +95,10 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 						active[index].resolve(active[index].token?.isCancellationRequested ? undefined : results[index]);
 					}
 				} catch (error) {
-					this._invalidateWorker();
+					console.error('[WorkbenchCanonicalParseService] parseBatch failed:', error);
+					if (this._workerTerminated) {
+						this._invalidateWorker();
+					}
 					if (this._isDisposed || batchCancellation.token.isCancellationRequested) {
 						for (const item of active) {
 							item.resolve(undefined);
@@ -127,7 +130,13 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 		if (this._isDisposed) {
 			throw new CanonicalParseServiceError('worker-terminated', 'Canonical parser service is disposed.');
 		}
-		return this._workerPromise ??= this._createWorker();
+		if (!this._workerPromise) {
+			this._workerPromise = this._createWorker().catch(err => {
+				this._workerPromise = undefined;
+				throw err;
+			});
+		}
+		return this._workerPromise;
 	}
 
 	private async _createWorker(): Promise<IChannel> {

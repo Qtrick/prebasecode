@@ -219,10 +219,21 @@ export function computeTopologyInformedInitialLayout(
 		list.push(node);
 	}
 
-	// Sort directories by total degrees (most central/important directories first)
+	// Sort directories: directory with the entry/root node comes first (center), then highest individual hub, then total degrees
+	const rootNodeId = nodes[0]?.entityId;
 	const sortedDirs = Array.from(dirGroups.keys()).sort((a, b) => {
 		const aNodes = dirGroups.get(a) || [];
 		const bNodes = dirGroups.get(b) || [];
+
+		const aHasRoot = aNodes.some(n => n.entityId === rootNodeId || Boolean(n.meta?.isEntry));
+		const bHasRoot = bNodes.some(n => n.entityId === rootNodeId || Boolean(n.meta?.isEntry));
+		if (aHasRoot && !bHasRoot) return -1;
+		if (bHasRoot && !aHasRoot) return 1;
+
+		const aMaxDeg = aNodes.reduce((max, n) => Math.max(max, degreeByNode.get(n.entityId) || 0), 0);
+		const bMaxDeg = bNodes.reduce((max, n) => Math.max(max, degreeByNode.get(n.entityId) || 0), 0);
+		if (bMaxDeg !== aMaxDeg) return bMaxDeg - aMaxDeg;
+
 		const aDeg = aNodes.reduce((sum, n) => sum + (degreeByNode.get(n.entityId) || 0), 0);
 		const bDeg = bNodes.reduce((sum, n) => sum + (degreeByNode.get(n.entityId) || 0), 0);
 		if (bDeg !== aDeg) return bDeg - aDeg;

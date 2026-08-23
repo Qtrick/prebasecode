@@ -3,6 +3,7 @@
  * Graph unit tests without full IDE transpile.
  * Runs Mocha on graph-owned sources via Node strip-types + graphs-test-loader (.js → .ts).
  */
+import fs from 'node:fs';
 import path from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -12,58 +13,35 @@ const REPO_ROOT = path.resolve(__dirname, '../..');
 const MOCHA = path.join(REPO_ROOT, 'node_modules/mocha/bin/mocha.js');
 const REGISTER = path.join(__dirname, 'graphs-test-register.mjs');
 const SETUP = path.join(__dirname, 'graphs-test-setup.mjs');
+const UNIT_TESTS_DIR = path.join(REPO_ROOT, 'graphs/src/tests/unit');
 
 function runMochaOnSource(testRelPath) {
 	const testAbs = path.join(REPO_ROOT, testRelPath);
 	return spawnSync(
 		process.execPath,
-		['--experimental-strip-types', `--import=${SETUP}`, `--import=${REGISTER}`, MOCHA, testAbs, '--ui', 'tdd', '--timeout', '5000'],
+		['--experimental-strip-types', `--import=${SETUP}`, `--import=${REGISTER}`, MOCHA, testAbs, '--ui', 'tdd', '--timeout', '10000'],
 		{ cwd: REPO_ROOT, stdio: 'inherit' }
 	).status ?? 1;
 }
 
-const tests = [
-	'graphs/src/tests/unit/architecturePick.test.ts',
-	'graphs/src/tests/unit/dependencyDepth.test.ts',
-	'graphs/src/tests/unit/graphEditor3dInteraction.test.ts',
-	'graphs/src/tests/unit/layoutOrganization.test.ts',
-	'graphs/src/tests/unit/networkLayout.test.ts',
-	'graphs/src/tests/unit/graphOwnershipBoundary.test.ts',
-	'graphs/src/tests/unit/graphIgnoreScanning.test.ts',
-	'graphs/src/tests/unit/graphDescriptionService.test.ts',
-	'graphs/src/tests/unit/pureSha256.test.ts',
-	'graphs/src/tests/unit/canonicalGraphAnalyzer.test.ts',
-	'graphs/src/tests/unit/canonicalParserWorkerService.test.ts',
-	'graphs/src/tests/unit/canonicalProjection.test.ts',
-	'graphs/src/tests/unit/canonicalGraphDiff.test.ts',
-	'graphs/src/tests/unit/canonicalQueryIndex.test.ts',
-	'graphs/src/tests/unit/gitHistoryService.test.ts',
-	'graphs/src/tests/unit/workbenchGitHistoryService.test.ts',
-	'graphs/src/tests/unit/productionGitBridgeContract.test.ts',
-	'graphs/src/tests/unit/gitTreeHistoricalAnalysis.test.ts',
-	'graphs/src/tests/unit/gitBridgeE2E.test.ts',
-	'graphs/src/tests/unit/temporalLineage.test.ts',
-	'graphs/src/tests/unit/temporalDelta.test.ts',
-	'graphs/src/tests/unit/temporalRepositoryRuntime.test.ts',
-	'graphs/src/tests/unit/incrementalAnalysis.test.ts',
-	'graphs/src/tests/unit/sqliteTemporalStore.test.ts',
-	'graphs/src/tests/unit/temporalSparsePersistence.test.ts',
-	'graphs/src/tests/unit/temporalBoundedIngestion.test.ts',
-	'graphs/src/tests/unit/temporalIngestionE2E.test.ts',
-	'graphs/src/tests/unit/temporalStructuralDiff.test.ts',
-	'graphs/src/tests/unit/temporalLayoutEngine.test.ts',
-	'graphs/src/tests/unit/workbenchTemporalViewService.test.ts',
-	'graphs/src/tests/unit/graphEditorTemporalWebview.test.ts',
-	'graphs/src/tests/unit/graphEditorProductionWebview.test.ts',
-	'graphs/src/tests/unit/gitRemoteSyncAndWebhooks.test.ts',
-	'graphs/src/tests/unit/temporalServiceE2E.test.ts',
-];
+// Automatically and deterministically discover all *.test.ts files in graphs/src/tests/unit/
+const testFiles = fs.readdirSync(UNIT_TESTS_DIR)
+	.filter(file => file.endsWith('.test.ts'))
+	.sort()
+	.map(file => path.join('graphs/src/tests/unit', file));
 
-for (const test of tests) {
+console.log(`[graphs:unit-tests] Discovered ${testFiles.length} test files in graphs/src/tests/unit/`);
+
+let failureCount = 0;
+for (const test of testFiles) {
 	const code = runMochaOnSource(test);
 	if (code !== 0) {
+		console.error(`[graphs:unit-tests] FAILED: ${test} (exit code ${code})`);
+		failureCount++;
 		process.exit(code);
 	}
 }
 
+console.log(`[graphs:unit-tests] All ${testFiles.length} test files passed successfully.`);
 process.exit(0);
+

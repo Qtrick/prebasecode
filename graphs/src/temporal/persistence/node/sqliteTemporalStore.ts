@@ -241,25 +241,33 @@ export class SqliteTemporalStore implements ITemporalStore {
 		return this._db;
 	}
 
+	private _transactionQueue: Promise<unknown> = Promise.resolve();
+
 	async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
-		const db = this._getDb();
+		const run = async () => {
+			const db = this._getDb();
 
-		await new Promise<void>((resolve, reject) => {
-			db.run('BEGIN IMMEDIATE;', (err) => (err ? reject(err) : resolve()));
-		});
-
-		try {
-			const result = await operation();
 			await new Promise<void>((resolve, reject) => {
-				db.run('COMMIT;', (err) => (err ? reject(err) : resolve()));
+				db.run('BEGIN IMMEDIATE;', (err) => (err ? reject(err) : resolve()));
 			});
-			return result;
-		} catch (error) {
-			await new Promise<void>((resolve) => {
-				db.run('ROLLBACK;', () => resolve());
-			});
-			throw error;
-		}
+
+			try {
+				const result = await operation();
+				await new Promise<void>((resolve, reject) => {
+					db.run('COMMIT;', (err) => (err ? reject(err) : resolve()));
+				});
+				return result;
+			} catch (error) {
+				await new Promise<void>((resolve) => {
+					db.run('ROLLBACK;', () => resolve());
+				});
+				throw error;
+			}
+		};
+
+		const next = this._transactionQueue.then(run, run);
+		this._transactionQueue = next.catch(() => {});
+		return next;
 	}
 
 	async setRepositoryIdentity(identity: RepositoryIdentityRecord): Promise<void> {

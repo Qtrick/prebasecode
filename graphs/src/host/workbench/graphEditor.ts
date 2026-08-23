@@ -781,59 +781,54 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 
 <!-- Temporal Toolbar -->
 <div id="temporalToolbar">
-	<span style="font-weight:600; font-size:12px; color:var(--vscode-foreground, #f4f4f5); display:flex; align-items:center; gap:6px;">
-		<span style="display:inline-block; width:8px; height:8px; border-radius:50%; background:#2dd4bf;"></span>
-		Temporal Graph
-	</span>
+	<div id="temporalDisplayModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:6px; overflow:hidden; background:rgba(0,0,0,0.25);">
+		<button id="temporalModeStateBtn" type="button" class="active" title="Full Codebase Architecture Map">Full Map</button>
+		<button id="temporalModeChangesBtn" type="button" title="Focus on Changed Files & Direct Dependencies">Focus Changes</button>
+	</div>
+	<div id="temporalContextModeWrap" style="display:none; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; overflow:hidden; margin-left:2px;">
+		<button id="temporalContextFocusedBtn" type="button" class="active" title="Show only changed files and 1-hop connected context">Changed Only</button>
+		<button id="temporalContextFullBtn" type="button" title="Show nearby context">Nearby Context</button>
+	</div>
 	<label id="temporalRepoWrap" style="display:none; align-items:center; gap:4px; font-size:11px;">
 		Repo:
 		<select id="temporalRepoSelect" title="Select active repository"></select>
 	</label>
 	<label style="display:flex; align-items:center; gap:4px; font-size:11px;">
-		Branch / Ref:
+		Branch:
 		<select id="temporalRefSelect" title="Select Git branch, tag, or HEAD"></select>
 	</label>
 	<label style="display:flex; align-items:center; gap:4px; font-size:11px;">
-		Compare Base:
+		Compare:
 		<select id="temporalCompareSelect" title="Select comparison base commit"></select>
 	</label>
-	<div id="temporalDisplayModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; overflow:hidden;">
-		<button id="temporalModeChangesBtn" type="button" class="active" title="Highlight structural differences against comparison base">Changes</button>
-		<button id="temporalModeStateBtn" type="button" title="View complete codebase architecture at selected commit">Full Codebase</button>
-	</div>
-	<div id="temporalContextModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; overflow:hidden; margin-left:2px;">
-		<button id="temporalContextFocusedBtn" type="button" class="active" title="Show only changed files and 1-hop connected context">Changed Only</button>
-		<button id="temporalContextFullBtn" type="button" title="Show 1-hop neighbor context">Nearby Context</button>
-	</div>
-	<label style="display:flex; align-items:center; gap:4px; font-size:11px; margin-left:4px;">
+	<label style="display:flex; align-items:center; gap:4px; font-size:11px; margin-left:2px;">
 		<input type="checkbox" id="temporalFollowHead" checked> Follow HEAD
 	</label>
-	<div id="temporalDiffBadges" style="display:flex; gap:6px; font-size:11px; margin-left:auto; align-items:center;">
+	<div id="temporalDiffBadges" style="display:flex; gap:5px; font-size:11px; margin-left:auto; align-items:center;">
 		<span id="badgeAdded" class="badge-added" title="Added nodes">+0</span>
 		<span id="badgeRemoved" class="badge-removed" title="Removed nodes">-0</span>
 		<span id="badgeModified" class="badge-modified" title="Modified nodes">~0</span>
 		<span id="badgeRenamed" class="badge-renamed" title="Renamed nodes">⇄0</span>
-		<span id="temporalPartialWarning" class="badge-warning" title="Lineage indexing is in progress.">Reconciling…</span>
+		<span id="temporalPartialWarning" class="badge-warning" style="display:none;"></span>
+		<span id="temporalCommitStatus" class="status-pill" style="display:inline-flex; align-items:center; gap:4px; font-size:10.5px; border-radius:12px; padding:2px 8px; font-weight:600;"></span>
 	</div>
 	<input id="temporalFilterInput" type="search" placeholder="Filter entities…" style="width:130px;" aria-label="Filter temporal entities">
+	<button id="temporalLegendBtn" type="button" style="background:transparent; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; padding:2px 8px; color:var(--vscode-foreground, #f4f4f5); cursor:pointer; font-size:11px;" title="Toggle Legend">ⓘ Legend</button>
 </div>
 
 <!-- Temporal Scrubber Bar -->
 <div id="temporalScrubberBar">
-	<div id="temporalTimelineStrip" aria-label="Loaded commit history timeline"></div>
-	<div class="row">
+	<div id="temporalTimelineStrip" style="display:none;" aria-label="Loaded commit history timeline"></div>
+	<div class="row" style="display:flex; align-items:center; gap:8px;">
 		<button id="temporalPrevBtn" title="Previous older commit (Left arrow)" aria-label="Previous commit">◀</button>
 		<button id="temporalPlayBtn" title="Play timeline (Space)" aria-label="Play timeline">▶</button>
 		<button id="temporalNextBtn" title="Next newer commit (Right arrow)" aria-label="Next commit">▶</button>
 		<button id="temporalLoadMoreBtn" title="Load more historical commits" aria-label="Load more history" style="display:none;">+More</button>
+		<input id="temporalScrubber" type="range" min="0" max="0" value="0" aria-label="Temporal commit history scrubber" style="flex:1;">
 		<span id="temporalCommitSha" style="font-family:monospace; font-weight:600; color:var(--vscode-textLink-foreground, #58a6ff); font-size:11.5px;"></span>
-		<span id="temporalCommitMessage" style="font-size:11px; max-width:380px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
+		<span id="temporalCommitMessage" style="font-size:11px; max-width:340px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;"></span>
 		<span id="temporalCommitAuthor" style="font-size:10.5px; opacity:0.75;"></span>
-		<span id="temporalCommitStatus" style="font-size:10px; border-radius:4px; padding:1px 5px; background:rgba(255,255,255,0.08);"></span>
 		<button id="temporalToggleDetailsBtn" type="button" title="Toggle commit details & structural diff inspector" aria-label="Toggle Details" style="margin-left:auto;">Details ▾</button>
-	</div>
-	<div class="row">
-		<input id="temporalScrubber" type="range" min="0" max="0" value="0" aria-label="Temporal commit history scrubber">
 	</div>
 </div>
 
@@ -1333,17 +1328,103 @@ function screenPos(id) {
 	return null;
 }
 
+let focusPositions = new Map();
+
+function computeFocusIslandPositions(nodes, edges) {
+	const positions = new Map();
+	if (!nodes || nodes.length === 0) return positions;
+
+	const changedNodes = nodes.filter(n => n.changeKind && n.changeKind !== 'unchanged');
+	const contextNodes = nodes.filter(n => !n.changeKind || n.changeKind === 'unchanged');
+
+	if (changedNodes.length === 0) {
+		const GOLDEN = 2.399963229728653;
+		for (let i = 0; i < nodes.length; i++) {
+			const r = i === 0 ? 0 : Math.sqrt(i) * 36;
+			const a = i * GOLDEN;
+			positions.set(nodes[i].entityId, { x: Math.round(Math.cos(a) * r), y: Math.round(Math.sin(a) * r) });
+		}
+		return positions;
+	}
+
+	const changedCount = changedNodes.length;
+	const centerSpread = changedCount === 1 ? 0 : Math.min(180, Math.sqrt(changedCount) * 44);
+	for (let i = 0; i < changedCount; i++) {
+		if (changedCount === 1) {
+			positions.set(changedNodes[0].entityId, { x: 0, y: 0 });
+		} else if (changedCount === 2) {
+			positions.set(changedNodes[0].entityId, { x: -48, y: 0 });
+			positions.set(changedNodes[1].entityId, { x: 48, y: 0 });
+		} else {
+			const a = (i / changedCount) * 2 * Math.PI;
+			positions.set(changedNodes[i].entityId, {
+				x: Math.round(Math.cos(a) * centerSpread),
+				y: Math.round(Math.sin(a) * centerSpread * 0.8),
+			});
+		}
+	}
+
+	const adjacency = new Map();
+	for (let i = 0; i < edges.length; i++) {
+		const e = edges[i];
+		const s = e.sourceEntityId || e.sourceId;
+		const t = e.targetEntityId || e.targetId;
+		if (!s || !t) continue;
+		if (!adjacency.has(s)) adjacency.set(s, []);
+		if (!adjacency.has(t)) adjacency.set(t, []);
+		adjacency.get(s).push(t);
+		adjacency.get(t).push(s);
+	}
+
+	const contextByAnchor = new Map();
+	for (let i = 0; i < contextNodes.length; i++) {
+		const cn = contextNodes[i];
+		const neighbors = adjacency.get(cn.entityId) || [];
+		let anchor = changedNodes[0].entityId;
+		for (let j = 0; j < neighbors.length; j++) {
+			if (positions.has(neighbors[j])) {
+				anchor = neighbors[j];
+				break;
+			}
+		}
+		if (!contextByAnchor.has(anchor)) contextByAnchor.set(anchor, []);
+		contextByAnchor.get(anchor).push(cn);
+	}
+
+	for (const [anchorId, cList] of contextByAnchor) {
+		const anchorPos = positions.get(anchorId) || { x: 0, y: 0 };
+		const cCount = cList.length;
+		for (let i = 0; i < cCount; i++) {
+			const angle = (i / Math.max(1, cCount)) * 2 * Math.PI + 0.35;
+			const dist = Math.min(140, 64 + Math.sqrt(i) * 26);
+			positions.set(cList[i].entityId, {
+				x: Math.round(anchorPos.x + Math.cos(angle) * dist),
+				y: Math.round(anchorPos.y + Math.sin(angle) * dist * 0.85),
+			});
+		}
+	}
+
+	return positions;
+}
+
 function getVisualNodePosition(node, ease) {
 	if (!node) return { x: 0, y: 0 };
-	if (!isAnimatingTemporal) return { x: node.x || 0, y: node.y || 0 };
+	const isFocusMode = (displayMode === 'changes' || displayMode === 'focus');
+	const fp = isFocusMode ? focusPositions.get(node.entityId) : null;
+	const targetX = fp ? fp.x : (node.x || 0);
+	const targetY = fp ? fp.y : (node.y || 0);
+
+	if (!isAnimatingTemporal) return { x: targetX, y: targetY };
 	const prev = previousTemporalRenderNodes.get(node.entityId);
 	if (prev) {
+		const prevX = prev.x || 0;
+		const prevY = prev.y || 0;
 		return {
-			x: prev.x + ((node.x || 0) - prev.x) * ease,
-			y: prev.y + ((node.y || 0) - prev.y) * ease
+			x: prevX + (targetX - prevX) * ease,
+			y: prevY + (targetY - prevY) * ease
 		};
 	}
-	return { x: node.x || 0, y: node.y || 0 };
+	return { x: targetX, y: targetY };
 }
 
 function fitView() {
@@ -1353,17 +1434,23 @@ function fitView() {
 		const fc = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
 		const targetNodes = fc.nodes;
 		if (!targetNodes || targetNodes.length === 0) return;
+		const isFocusMode = (displayMode === 'changes' || displayMode === 'focus');
+		if (isFocusMode) {
+			focusPositions = computeFocusIslandPositions(targetNodes, fc.edges);
+		}
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 		for (let i = 0; i < targetNodes.length; i++) {
 			const n = targetNodes[i];
-			const r = (n.changeKind && n.changeKind !== 'unchanged' ? 7.5 : 4.0) + 4;
-			minX = Math.min(minX, (n.x || 0) - r); minY = Math.min(minY, (n.y || 0) - r);
-			maxX = Math.max(maxX, (n.x || 0) + r); maxY = Math.max(maxY, (n.y || 0) + r);
+			const pos = isFocusMode && focusPositions.get(n.entityId) ? focusPositions.get(n.entityId) : { x: n.x || 0, y: n.y || 0 };
+			const r = (n.changeKind && n.changeKind !== 'unchanged' ? 8 : 4.5) + 6;
+			minX = Math.min(minX, pos.x - r); minY = Math.min(minY, pos.y - r);
+			maxX = Math.max(maxX, pos.x + r); maxY = Math.max(maxY, pos.y + r);
 		}
 		if (!isFinite(minX)) return;
 		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 		const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
-		const k = Math.max(0.15, Math.min(2.5, Math.min((vw - 96) / bw, (vh - 96) / bh)));
+		const padding = isFocusMode ? 100 : 72;
+		const k = Math.max(0.18, Math.min(2.5, Math.min((vw - padding * 2) / bw, (vh - padding * 2) / bh)));
 		transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 		dirty = true; kickRaf();
 		return;
@@ -1394,14 +1481,24 @@ function fitView() {
 function updateLegend(s, network) {
 	if (!legend) return;
 	if (isTemporal()) {
-		let html = '<div class="title">Temporal Transitions</div>';
+		let html = '<div class="header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--vscode-widget-border, #3c3c3c); padding-bottom:4px;">';
+		html += '<span class="title" style="margin:0; font-weight:700;">Temporal Legend</span>';
+		html += '<button id="legendCloseBtn" style="border:0; background:transparent; color:var(--vscode-foreground, #ccc); cursor:pointer; font-size:12px;">✕</button></div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-addedResourceForeground, #3fb950)"></span>Added (+)</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-deletedResourceForeground, #f85149)"></span>Removed (-)</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)"></span>Modified (~)</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-renamedResourceForeground, #58a6ff)"></span>Renamed (⇄)</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-descriptionForeground, #8b949e)"></span>Unchanged</div>';
+		html += '<div class="title spaced" style="margin-top:8px; font-weight:700; text-transform:uppercase; font-size:10px; opacity:0.75;">Architecture Layers</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#f59e0b"></span>Entry Root</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#818cf8"></span>Frontend / UI</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#38bdf8"></span>API / Backend</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#34d399"></span>Services / Logic</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#fb923c"></span>Database / Data</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:#71717a"></span>Utils / Config</div>';
 		legend.innerHTML = html;
-		legend.style.display = 'block';
+		const closeBtn = document.getElementById('legendCloseBtn');
+		if (closeBtn) closeBtn.onclick = function() { legend.style.display = 'none'; };
 		return;
 	}
 	if (!settings.showLegend || !s || !(s.nodes || []).length) {
@@ -1552,12 +1649,12 @@ function updateTemporalUI(state, diff) {
 	}
 
 	// Display Mode Buttons & Context Filter Toggle
-	displayMode = state.displayMode || 'changes';
+	displayMode = state.displayMode || 'state';
 	if (temporalModeChangesBtn && temporalModeStateBtn) {
-		if (displayMode === 'changes') {
+		if (displayMode === 'changes' || displayMode === 'focus') {
 			temporalModeChangesBtn.classList.add('active');
 			temporalModeStateBtn.classList.remove('active');
-			if (temporalContextModeWrap) temporalContextModeWrap.style.display = 'flex';
+			if (temporalContextModeWrap) temporalContextModeWrap.style.display = 'none';
 		} else {
 			temporalModeChangesBtn.classList.remove('active');
 			temporalModeStateBtn.classList.add('active');
@@ -1603,21 +1700,30 @@ function updateTemporalUI(state, diff) {
 			const isRendered = state.renderedCommitSha === state.selectedCommitSha;
 			if (temporalCommitStatus) {
 				if (state.isLoadingSelection || !isRendered) {
-					temporalCommitStatus.textContent = 'Loading ' + (commit.shortSha || commit.sha.slice(0, 7)) + '…';
+					temporalCommitStatus.textContent = 'Indexing…';
 					temporalCommitStatus.title = 'Reconstructing graph for target commit';
 					temporalCommitStatus.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
+					temporalCommitStatus.style.background = 'rgba(210, 153, 34, 0.15)';
 				} else if (state.selectionError) {
 					temporalCommitStatus.textContent = 'Error';
 					temporalCommitStatus.title = state.selectionError;
 					temporalCommitStatus.style.color = 'var(--vscode-errorForeground, #f85149)';
+					temporalCommitStatus.style.background = 'rgba(248, 81, 73, 0.15)';
+				} else if (state.isPartialLineage) {
+					temporalCommitStatus.textContent = 'Reconciling…';
+					temporalCommitStatus.title = 'History lineage reconciliation in progress';
+					temporalCommitStatus.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
+					temporalCommitStatus.style.background = 'rgba(210, 153, 34, 0.15)';
 				} else if (state.isSettled) {
-					temporalCommitStatus.textContent = 'Settled';
+					temporalCommitStatus.textContent = 'Ready';
 					temporalCommitStatus.title = 'Graph fully indexed and reconciled';
 					temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+					temporalCommitStatus.style.background = 'rgba(63, 185, 80, 0.15)';
 				} else {
 					temporalCommitStatus.textContent = 'Indexing…';
 					temporalCommitStatus.title = 'Lineage indexing in progress';
 					temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)';
+					temporalCommitStatus.style.background = 'rgba(210, 153, 34, 0.15)';
 				}
 			}
 			if (temporalScrubber) temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
@@ -2017,6 +2123,18 @@ function drawTemporalFrame(ts) {
 			ctx.strokeStyle = '#f59e0b';
 			ctx.lineWidth = 1.2;
 			ctx.stroke();
+		}
+
+		// Glowing accent halo for changed nodes
+		if (isFocus) {
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, r + 4.5, 0, Math.PI * 2);
+			if (node.changeKind === 'added') ctx.fillStyle = 'rgba(63, 185, 80, 0.22)';
+			else if (node.changeKind === 'removed') ctx.fillStyle = 'rgba(248, 81, 73, 0.22)';
+			else if (node.changeKind === 'modified') ctx.fillStyle = 'rgba(210, 153, 34, 0.24)';
+			else if (node.changeKind === 'renamed') ctx.fillStyle = 'rgba(88, 166, 255, 0.22)';
+			else ctx.fillStyle = 'rgba(45, 212, 191, 0.22)';
+			ctx.fill();
 		}
 
 		// Node Interior: Architecture Layer Color
@@ -2913,6 +3031,15 @@ if (temporalFilterInput) {
 if (temporalFollowHead) {
 	temporalFollowHead.addEventListener('change', function () {
 		request('setTemporalFollowHead', { follow: temporalFollowHead.checked });
+	});
+}
+const temporalLegendBtn = document.getElementById('temporalLegendBtn');
+if (temporalLegendBtn) {
+	temporalLegendBtn.addEventListener('click', function () {
+		if (legend) {
+			const isVis = legend.style.display === 'block';
+			legend.style.display = isVis ? 'none' : 'block';
+		}
 	});
 }
 

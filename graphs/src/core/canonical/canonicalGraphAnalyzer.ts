@@ -286,7 +286,16 @@ export class CanonicalGraphAnalyzer {
 				return undefined;
 			}
 
-			const artifact = await this._parseService.parse({ file, content }, token);
+			let artifact: BlobParseArtifact | undefined;
+			try {
+				artifact = await this._parseService.parse({ file, content }, token);
+			} catch (err) {
+				if (err instanceof CanonicalParseServiceError && (err.code === 'service-unavailable' || err.code === 'worker-terminated')) {
+					throw err;
+				}
+				recordExclusion(file.relativePath, 'parse-error');
+				return undefined;
+			}
 			if (!artifact) {
 				recordExclusion(file.relativePath, 'parse-error');
 				return undefined;
