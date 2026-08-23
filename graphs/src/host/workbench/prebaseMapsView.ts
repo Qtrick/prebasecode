@@ -434,84 +434,67 @@ export class PreBaseMapsViewPane extends ViewPane {
 		const headRef = state.repositoryRefs?.find(r => r.kind === 'head' || r.name === 'HEAD');
 		const headSha = headRef?.targetSha || (state.selectedRef === 'HEAD' && timeline[0] ? timeline[0].sha : undefined);
 
-		// 1. Mode-Adaptive Special Top Row
-		const isWtSelected = isNetwork
-			? !historicalSha
-			: (Boolean(state.selectedCommitSha && timeline[0] && state.selectedCommitSha === timeline[0].sha));
-
-		const wtRow = DOM.append(this._historyList, DOM.$('div'));
-		wtRow.tabIndex = 0;
-		wtRow.setAttribute('role', 'option');
-		wtRow.setAttribute('aria-selected', isWtSelected ? 'true' : 'false');
-		wtRow.className = 'history-item history-working-tree' + (isWtSelected ? ' selected' : '');
-		wtRow.dataset.commitSha = '__special_top_row__';
-		wtRow.style.display = 'flex';
-		wtRow.style.flexDirection = 'column';
-		wtRow.style.gap = '2px';
-		wtRow.style.padding = '4px 6px';
-		wtRow.style.marginBottom = '2px';
-		wtRow.style.borderRadius = '4px';
-		wtRow.style.cursor = 'pointer';
-		wtRow.style.boxSizing = 'border-box';
-		wtRow.style.width = '100%';
-		wtRow.style.background = isWtSelected ? ACCENT_SOFT : 'transparent';
-		wtRow.style.border = isWtSelected ? `1px solid ${ACCENT}88` : '1px solid transparent';
-		wtRow.style.outline = 'none';
-
-		const wtLine1 = DOM.append(wtRow, DOM.$('div'));
-		wtLine1.style.display = 'flex';
-		wtLine1.style.alignItems = 'center';
-		wtLine1.style.gap = '6px';
-
-		const wtBadge = DOM.append(wtLine1, DOM.$('span'));
+		// 1. Mode-Adaptive Special Top Row (Code Graph only: Live Working Tree)
 		if (isNetwork) {
+			const isWtSelected = !historicalSha;
+			const wtRow = DOM.append(this._historyList, DOM.$('div'));
+			wtRow.tabIndex = 0;
+			wtRow.setAttribute('role', 'option');
+			wtRow.setAttribute('aria-selected', isWtSelected ? 'true' : 'false');
+			wtRow.className = 'history-item history-working-tree' + (isWtSelected ? ' selected' : '');
+			wtRow.dataset.commitSha = '__special_top_row__';
+			wtRow.style.display = 'flex';
+			wtRow.style.flexDirection = 'column';
+			wtRow.style.gap = '2px';
+			wtRow.style.padding = '4px 6px';
+			wtRow.style.marginBottom = '2px';
+			wtRow.style.borderRadius = '4px';
+			wtRow.style.cursor = 'pointer';
+			wtRow.style.boxSizing = 'border-box';
+			wtRow.style.width = '100%';
+			wtRow.style.background = isWtSelected ? ACCENT_SOFT : 'transparent';
+			wtRow.style.border = isWtSelected ? `1px solid ${ACCENT}88` : '1px solid transparent';
+			wtRow.style.outline = 'none';
+
+			const wtLine1 = DOM.append(wtRow, DOM.$('div'));
+			wtLine1.style.display = 'flex';
+			wtLine1.style.alignItems = 'center';
+			wtLine1.style.gap = '6px';
+
+			const wtBadge = DOM.append(wtLine1, DOM.$('span'));
 			wtBadge.textContent = '● Live';
 			wtBadge.style.fontSize = '10px';
 			wtBadge.style.fontWeight = '600';
 			wtBadge.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
-		} else {
-			wtBadge.textContent = 'HEAD';
-			wtBadge.style.fontSize = '9px';
-			wtBadge.style.fontWeight = '700';
-			wtBadge.style.padding = '0 4px';
-			wtBadge.style.borderRadius = '3px';
-			wtBadge.style.background = 'rgba(45, 212, 191, 0.2)';
-			wtBadge.style.color = '#2dd4bf';
-		}
-		wtBadge.style.flexShrink = '0';
+			wtBadge.style.flexShrink = '0';
 
-		const wtMsg = DOM.append(wtLine1, DOM.$('span'));
-		wtMsg.textContent = isNetwork
-			? localize('prebase.maps.workingTree', "Working Tree · Live Codebase")
-			: localize('prebase.maps.temporalCurrentCommit', "Current Commit / HEAD");
-		wtMsg.style.fontSize = '11px';
-		wtMsg.style.fontWeight = '600';
-		wtMsg.style.color = TEXT;
-		wtMsg.style.overflow = 'hidden';
-		wtMsg.style.textOverflow = 'ellipsis';
-		wtMsg.style.whiteSpace = 'nowrap';
-		wtMsg.style.flex = '1';
+			const wtMsg = DOM.append(wtLine1, DOM.$('span'));
+			wtMsg.textContent = localize('prebase.maps.workingTree', "Working Tree · Live Codebase");
+			wtMsg.style.fontSize = '11px';
+			wtMsg.style.fontWeight = '600';
+			wtMsg.style.color = TEXT;
+			wtMsg.style.overflow = 'hidden';
+			wtMsg.style.textOverflow = 'ellipsis';
+			wtMsg.style.whiteSpace = 'nowrap';
+			wtMsg.style.flex = '1';
 
-		const onSelectSpecialRow = () => {
-			if (this._getActiveGraphType() === 'network') {
+			const onSelectSpecialRow = () => {
 				void this.graphService.loadHistoricalCommit(undefined);
-			} else {
-				void this.temporalViewService.selectCommitIndex(0, { immediate: true });
-			}
-			this._refreshHistorySelection();
-		};
+				this._refreshHistorySelection();
+			};
 
-		this._historyDisposables.add(DOM.addDisposableListener(wtRow, 'click', (e) => {
-			e.stopPropagation();
-			onSelectSpecialRow();
-		}));
-		this._historyDisposables.add(DOM.addDisposableListener(wtRow, 'keydown', (e) => {
-			if (e.key === 'Enter' || e.key === ' ') {
-				e.preventDefault();
+			this._historyDisposables.add(DOM.addDisposableListener(wtRow, 'click', (e) => {
 				e.stopPropagation();
 				onSelectSpecialRow();
-			}
-		}));
+			}));
+			this._historyDisposables.add(DOM.addDisposableListener(wtRow, 'keydown', (e) => {
+				if (e.key === 'Enter' || e.key === ' ') {
+					e.preventDefault();
+					e.stopPropagation();
+					onSelectSpecialRow();
+				}
+			}));
+		}
 
 		// 2. Commit History Rows
 		for (let i = 0; i < timeline.length; i++) {
@@ -519,7 +502,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			const globalIndex = windowStart + i;
 			const isSelected = isNetwork
 				? Boolean(historicalSha && commit.sha === historicalSha)
-				: Boolean(!isWtSelected && commit.sha === state.selectedCommitSha);
+				: Boolean(commit.sha === state.selectedCommitSha || (!state.selectedCommitSha && i === 0));
 
 			const isHeadCommit = headSha ? commit.sha === headSha : (state.selectedRef === 'HEAD' && i === 0);
 
@@ -673,9 +656,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			? (historicalSha || '__special_top_row__')
 			: state.selectedCommitSha;
 
-		const isSpecialTopSelected = isNetwork
-			? !historicalSha
-			: (Boolean(state.selectedCommitSha && timeline[0] && state.selectedCommitSha === timeline[0].sha));
+		const isSpecialTopSelected = isNetwork ? !historicalSha : false;
 
 		const rows = this._historyList.querySelectorAll<HTMLElement>('.history-item');
 		rows.forEach(r => {
@@ -684,7 +665,9 @@ export class PreBaseMapsViewPane extends ViewPane {
 			if (rowSha === '__special_top_row__') {
 				isSel = isSpecialTopSelected;
 			} else {
-				isSel = !isSpecialTopSelected && (rowSha === targetSha);
+				isSel = isNetwork
+					? (Boolean(historicalSha && rowSha === historicalSha))
+					: (Boolean(rowSha === targetSha || (!targetSha && rowSha === timeline[0]?.sha)));
 			}
 			r.setAttribute('aria-selected', isSel ? 'true' : 'false');
 			r.style.background = isSel ? ACCENT_SOFT : 'transparent';

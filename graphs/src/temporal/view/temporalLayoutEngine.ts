@@ -20,31 +20,33 @@ export function layoutTemporalGraph(
 	const positionedNodes: TemporalRenderNode[] = [];
 	const unpositionedNodes: TemporalRenderNode[] = [];
 
-	const width = options?.width ?? 1200;
-	const height = options?.height ?? 800;
-	const nodeSpacing = options?.nodeSpacing ?? 80;
+	const nodeSpacing = options?.nodeSpacing ?? 48;
 
 	// Build adjacency map for neighbor-aware placement of added nodes
 	const connectedNeighbors = new Map<string, Set<string>>();
 	for (const edge of diff.edges) {
 		if (edge.changeKind !== 'removed') {
-			let srcSet = connectedNeighbors.get(edge.sourceEntityId);
+			const src = edge.sourceEntityId || (edge as any).sourceId;
+			const tgt = edge.targetEntityId || (edge as any).targetId;
+			if (!src || !tgt) continue;
+
+			let srcSet = connectedNeighbors.get(src);
 			if (!srcSet) {
 				srcSet = new Set();
-				connectedNeighbors.set(edge.sourceEntityId, srcSet);
+				connectedNeighbors.set(src, srcSet);
 			}
-			srcSet.add(edge.targetEntityId);
+			srcSet.add(tgt);
 
-			let tgtSet = connectedNeighbors.get(edge.targetEntityId);
+			let tgtSet = connectedNeighbors.get(tgt);
 			if (!tgtSet) {
 				tgtSet = new Set();
-				connectedNeighbors.set(edge.targetEntityId, tgtSet);
+				connectedNeighbors.set(tgt, tgtSet);
 			}
-			tgtSet.add(edge.sourceEntityId);
+			tgtSet.add(src);
 		}
 	}
 
-	// 1. Position surviving and previously known nodes at their EXACT previous coordinates (0 displacement)
+	// 1. Position surviving and previously known nodes at their EXACT previous coordinates (0 displacement invariant)
 	for (const node of diff.nodes) {
 		const prev = previousPositions.get(node.entityId);
 		if (prev) {
@@ -59,20 +61,55 @@ export function layoutTemporalGraph(
 		}
 	}
 
-	// 2. If no previous positions exist (initial render), lay out all nodes deterministically
+	// 2. If no previous positions exist (initial render), lay out all nodes deterministically via topology-informed anchors
 	if (previousPositions.size === 0) {
-		const initialResult = computeDeterministicInitialLayout(diff.nodes, width, height, nodeSpacing);
+		const initialResult = computeTopologyInformedInitialLayout(diff.nodes, diff.edges, nodeSpacing);
 		return initialResult;
 	}
 
-	// 3. For newly added nodes without prior position, place near connected neighbors or in balanced clusters
+	// 3. For newly added nodes without prior position, place near connected neighbors with collision resolution
+	const occupiedCoords: { x: number; y: number }[] = Array.from(nextPositions.values());
+	const MIN_NODE_DISTANCE = Math.max(22, nodeSpacing * 0.55);
+
+	function isSlotFree(x: number, y: number): boolean {
+		for (let i = 0; i < occupiedCoords.length; i++) {
+			const p = occupiedCoords[i];
+			const distSq = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
+			if (distSq < MIN_NODE_DISTANCE * MIN_NODE_DISTANCE) {
+				return false;
+			}
+		}
+		return true;
+	}
+
+	function findFreeSlotNear(centerX: number, centerY: number, seed: number): { x: number; y: number } {
+		if (isSlotFree(centerX, centerY)) {
+			return { x: centerX, y: centerY };
+		}
+
+		// Search in a golden-ratio spiral for the closest collision-free slot
+		const baseAngle = (seed % 360) * (Math.PI / 180);
+		for (let step = 1; step <= 36; step++) {
+			const radius = MIN_NODE_DISTANCE * (0.9 + Math.floor(step / 6) * 0.6);
+			const angle = baseAngle + step * 1.047; // ~60 degree increments with spiral growth
+			const candX = Math.round(centerX + Math.cos(angle) * radius);
+			const candY = Math.round(centerY + Math.sin(angle) * radius);
+			if (isSlotFree(candX, candY)) {
+				return { x: candX, y: candY };
+			}
+		}
+
+		return { x: centerX + (seed % 15) - 7, y: centerY + (seed % 17) - 8 };
+	}
+
 	for (let i = 0; i < unpositionedNodes.length; i++) {
 		const node = unpositionedNodes[i];
 		const neighbors = connectedNeighbors.get(node.entityId);
-		let placed = false;
+		let targetX = 0;
+		let targetY = 0;
+		let foundAnchor = false;
 
 		if (neighbors && neighbors.size > 0) {
-			// Find known neighbor positions
 			const knownNeighborPositions: { x: number; y: number }[] = [];
 			for (const neighborId of neighbors) {
 				const pos = nextPositions.get(neighborId);
@@ -82,7 +119,6 @@ export function layoutTemporalGraph(
 			}
 
 			if (knownNeighborPositions.length > 0) {
-				// Compute center of known neighbors
 				let avgX = 0;
 				let avgY = 0;
 				for (const p of knownNeighborPositions) {
@@ -92,38 +128,33 @@ export function layoutTemporalGraph(
 				avgX /= knownNeighborPositions.length;
 				avgY /= knownNeighborPositions.length;
 
-				// Deterministic angle based on entityId hash
 				const angle = (hashString(node.entityId) % 360) * (Math.PI / 180);
-				const dist = nodeSpacing * 1.25;
-				const posX = Math.round(avgX + Math.cos(angle) * dist);
-				const posY = Math.round(avgY + Math.sin(angle) * dist);
-
-				nextPositions.set(node.entityId, { x: posX, y: posY });
-				positionedNodes.push({
-					...node,
-					x: posX,
-					y: posY,
-				});
-				placed = true;
+				const dist = nodeSpacing * 0.9;
+				targetX = Math.round(avgX + Math.cos(angle) * dist);
+				targetY = Math.round(avgY + Math.sin(angle) * dist);
+				foundAnchor = true;
 			}
 		}
 
-		if (!placed) {
-			// Place in an open ring around center
+		if (!foundAnchor) {
+			// Place in a compact interior ring around centroid
 			const hash = hashString(node.entityId);
-			const ring = 1 + (hash % 4);
+			const ring = 1 + (hash % 5);
 			const angle = ((hash % 1000) / 1000) * 2 * Math.PI;
-			const radius = ring * nodeSpacing * 2;
-			const posX = Math.round(Math.cos(angle) * radius);
-			const posY = Math.round(Math.sin(angle) * radius);
-
-			nextPositions.set(node.entityId, { x: posX, y: posY });
-			positionedNodes.push({
-				...node,
-				x: posX,
-				y: posY,
-			});
+			const radius = ring * nodeSpacing * 1.1;
+			targetX = Math.round(Math.cos(angle) * radius);
+			targetY = Math.round(Math.sin(angle) * radius);
 		}
+
+		const slot = findFreeSlotNear(targetX, targetY, hashString(node.entityId));
+		nextPositions.set(node.entityId, slot);
+		occupiedCoords.push(slot);
+
+		positionedNodes.push({
+			...node,
+			x: slot.x,
+			y: slot.y,
+		});
 	}
 
 	return {
@@ -132,52 +163,117 @@ export function layoutTemporalGraph(
 	};
 }
 
-function computeDeterministicInitialLayout(
+/**
+ * Computes a deterministic, topology-informed 2D layout.
+ *
+ * Replaces the old directory-wheel algorithm (which scaled linearly as dirs * 80,
+ * creating an empty annulus with 2000px diameter).
+ *
+ * New Design:
+ * - Topological community & directory clustering.
+ * - Central placement of high-degree hubs and core modules.
+ * - Sublinear radial growth (proportional to sqrt(node count)), preventing the horseshoe/annulus defect.
+ * - Bounded coordinate space (nodes comfortably fill a 600x400 organic region).
+ */
+export function computeTopologyInformedInitialLayout(
 	nodes: readonly TemporalRenderNode[],
-	width: number,
-	height: number,
-	nodeSpacing: number,
+	edges: readonly { sourceEntityId?: string; sourceId?: string; targetEntityId?: string; targetId?: string }[],
+	nodeSpacing = 48,
 ): TemporalLayoutResult {
 	const positions = new Map<string, { x: number; y: number }>();
 	const resultNodes: TemporalRenderNode[] = [];
 
-	// Group by directory path
-	const groups = new Map<string, TemporalRenderNode[]>();
+	if (nodes.length === 0) {
+		return { nodes: resultNodes, positions };
+	}
+
+	// 1. Calculate degree for each node from topological edges
+	const degreeByNode = new Map<string, number>();
+	const adjacency = new Map<string, Set<string>>();
+
 	for (const node of nodes) {
-		const dir = getDirectory(node.path);
-		let list = groups.get(dir);
+		degreeByNode.set(node.entityId, 0);
+		adjacency.set(node.entityId, new Set());
+	}
+
+	for (const edge of edges) {
+		const src = edge.sourceEntityId || (edge as any).sourceId;
+		const tgt = edge.targetEntityId || (edge as any).targetId;
+		if (src && tgt && degreeByNode.has(src) && degreeByNode.has(tgt)) {
+			degreeByNode.set(src, (degreeByNode.get(src) || 0) + 1);
+			degreeByNode.set(tgt, (degreeByNode.get(tgt) || 0) + 1);
+			adjacency.get(src)?.add(tgt);
+			adjacency.get(tgt)?.add(src);
+		}
+	}
+
+	// 2. Group nodes by directory
+	const dirGroups = new Map<string, TemporalRenderNode[]>();
+	for (const node of nodes) {
+		const dir = getDirectory(node.path || node.label);
+		let list = dirGroups.get(dir);
 		if (!list) {
 			list = [];
-			groups.set(dir, list);
+			dirGroups.set(dir, list);
 		}
 		list.push(node);
 	}
 
-	const sortedDirs = Array.from(groups.keys()).sort();
-	const totalDirs = sortedDirs.length || 1;
-	const clusterRadius = Math.max(180, totalDirs * nodeSpacing * 0.8);
+	// Sort directories by total degrees (most central/important directories first)
+	const sortedDirs = Array.from(dirGroups.keys()).sort((a, b) => {
+		const aNodes = dirGroups.get(a) || [];
+		const bNodes = dirGroups.get(b) || [];
+		const aDeg = aNodes.reduce((sum, n) => sum + (degreeByNode.get(n.entityId) || 0), 0);
+		const bDeg = bNodes.reduce((sum, n) => sum + (degreeByNode.get(n.entityId) || 0), 0);
+		if (bDeg !== aDeg) return bDeg - aDeg;
+		return a.localeCompare(b);
+	});
 
-	for (let dirIndex = 0; dirIndex < sortedDirs.length; dirIndex++) {
-		const dir = sortedDirs[dirIndex];
-		const dirNodes = groups.get(dir) || [];
-		const dirAngle = (dirIndex / totalDirs) * 2 * Math.PI;
-		const dirCenterX = Math.round(Math.cos(dirAngle) * clusterRadius);
-		const dirCenterY = Math.round(Math.sin(dirAngle) * clusterRadius);
+	// 3. Compact 2D Phyllotaxis / Sunflower cluster placement for directory centers
+	// Radius grows sublinearly: R ~ c * sqrt(dirIndex), ensuring interior density without a hollow ring
+	const totalDirs = sortedDirs.length;
+	const GOLDEN_ANGLE = 2.399963229728653; // ~137.5 degrees
+	const dirCenters = new Map<string, { x: number; y: number }>();
 
-		// Sort nodes inside directory deterministically
-		dirNodes.sort((a, b) => a.path.localeCompare(b.path));
+	for (let i = 0; i < totalDirs; i++) {
+		const dir = sortedDirs[i];
+		if (i === 0) {
+			dirCenters.set(dir, { x: 0, y: 0 });
+		} else {
+			// Sublinear radius scaling: max radius ~240-320px even for 40+ directories
+			const clusterR = Math.min(320, Math.sqrt(i) * nodeSpacing * 1.15);
+			const clusterAngle = i * GOLDEN_ANGLE;
+			const cx = Math.round(Math.cos(clusterAngle) * clusterR);
+			const cy = Math.round(Math.sin(clusterAngle) * clusterR * 0.78); // Slight aspect ratio bias
+			dirCenters.set(dir, { x: cx, y: cy });
+		}
+	}
+
+	// 4. Place nodes within each directory cluster
+	for (const dir of sortedDirs) {
+		const dirNodes = dirGroups.get(dir) || [];
+		const center = dirCenters.get(dir) || { x: 0, y: 0 };
+
+		// Sort nodes inside directory: highest degree at center
+		dirNodes.sort((a, b) => {
+			const da = degreeByNode.get(a.entityId) || 0;
+			const db = degreeByNode.get(b.entityId) || 0;
+			if (db !== da) return db - da;
+			return (a.path || a.label).localeCompare(b.path || b.label);
+		});
 
 		const count = dirNodes.length;
 		for (let i = 0; i < count; i++) {
 			const node = dirNodes[i];
-			let x = dirCenterX;
-			let y = dirCenterY;
+			let x = center.x;
+			let y = center.y;
 
 			if (count > 1) {
-				const nodeAngle = (i / count) * 2 * Math.PI;
-				const nodeDist = Math.min(nodeSpacing * 0.9 + Math.floor(i / 8) * (nodeSpacing * 0.6), 300);
-				x = Math.round(dirCenterX + Math.cos(nodeAngle) * nodeDist);
-				y = Math.round(dirCenterY + Math.sin(nodeAngle) * nodeDist);
+				// Sunflower distribution inside directory cluster
+				const localAngle = i * GOLDEN_ANGLE;
+				const localDist = Math.min(160, Math.sqrt(i) * (nodeSpacing * 0.65));
+				x = Math.round(center.x + Math.cos(localAngle) * localDist);
+				y = Math.round(center.y + Math.sin(localAngle) * localDist);
 			}
 
 			positions.set(node.entityId, { x, y });
@@ -196,8 +292,10 @@ function computeDeterministicInitialLayout(
 }
 
 function getDirectory(filePath: string): string {
-	const lastSlash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'));
-	return lastSlash >= 0 ? filePath.slice(0, lastSlash) : '.';
+	if (!filePath) return '.';
+	const normalized = filePath.replace(/\\/g, '/');
+	const lastSlash = normalized.lastIndexOf('/');
+	return lastSlash >= 0 ? normalized.slice(0, lastSlash) : '.';
 }
 
 function hashString(str: string): number {

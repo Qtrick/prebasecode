@@ -686,6 +686,8 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #temporalToolbar select, #temporalToolbar input { background:var(--vscode-dropdown-background, #252526); color:var(--vscode-dropdown-foreground, #cccccc); border:1px solid var(--vscode-dropdown-border, #3c3c3c); border-radius:4px; padding:3px 6px; font-size:11px; }
 #temporalDisplayModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
 #temporalDisplayModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
+#temporalContextModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
+#temporalContextModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
 #temporalScrubberBar { position:absolute; left:12px; right:12px; bottom:12px; z-index:5; display:none; flex-direction:column; gap:6px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:8px 12px; font-size:12px; backdrop-filter:blur(8px); }
 #temporalScrubberBar .row { display:flex; align-items:center; gap:8px; width:100%; }
 #temporalScrubberBar button { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
@@ -775,6 +777,10 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<button id="temporalModeChangesBtn" type="button" class="active" title="Highlight structural differences against comparison base">Changes</button>
 		<button id="temporalModeStateBtn" type="button" title="View complete codebase state at selected commit">State</button>
 	</div>
+	<div id="temporalContextModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; overflow:hidden; margin-left:2px;">
+		<button id="temporalContextFocusedBtn" type="button" class="active" title="Show only changed files and 1-hop connected context">Focused</button>
+		<button id="temporalContextFullBtn" type="button" title="Show full repository context">Full Context</button>
+	</div>
 	<label style="display:flex; align-items:center; gap:4px; font-size:11px; margin-left:4px;">
 		<input type="checkbox" id="temporalFollowHead" checked> Follow HEAD
 	</label>
@@ -783,7 +789,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<span id="badgeRemoved" class="badge-removed" title="Removed nodes">-0</span>
 		<span id="badgeModified" class="badge-modified" title="Modified nodes">~0</span>
 		<span id="badgeRenamed" class="badge-renamed" title="Renamed nodes">⇄0</span>
-		<span id="temporalPartialWarning" class="badge-warning" title="Partial lineage indexing in progress">Partial</span>
+		<span id="temporalPartialWarning" class="badge-warning" title="Some historical lineage is still being indexed. Structural identity may be incomplete for this comparison.">Partial</span>
 	</div>
 	<input id="temporalFilterInput" type="search" placeholder="Filter entities…" style="width:130px;" aria-label="Filter temporal entities">
 </div>
@@ -882,6 +888,9 @@ const temporalFollowHead = document.getElementById('temporalFollowHead');
 const temporalFilterInput = document.getElementById('temporalFilterInput');
 const temporalModeChangesBtn = document.getElementById('temporalModeChangesBtn');
 const temporalModeStateBtn = document.getElementById('temporalModeStateBtn');
+const temporalContextModeWrap = document.getElementById('temporalContextModeWrap');
+const temporalContextFocusedBtn = document.getElementById('temporalContextFocusedBtn');
+const temporalContextFullBtn = document.getElementById('temporalContextFullBtn');
 const temporalTimelineStrip = document.getElementById('temporalTimelineStrip');
 const temporalScrubber = document.getElementById('temporalScrubber');
 const temporalPrevBtn = document.getElementById('temporalPrevBtn');
@@ -920,7 +929,7 @@ let interactionState = 'idle';
 let dragThreshold = 4;
 const NODE_SCALE = 1;
 
-const FOCAL = 640;
+const FOCAL = 850;
 const IDLE_YAW = 0.08;
 const IDLE_RESUME_MS = 1400;
 const ARCH_W = 28, ARCH_H = 28;
@@ -963,6 +972,7 @@ let isAnimatingTemporal = false;
 let isPlayingHistory = false;
 let playIntervalTimer = null;
 let displayMode = 'changes';
+let temporalContextFilterMode = 'focused';
 
 function isNetwork() { return graphType === 'network'; }
 function isTemporal() { return graphType === 'temporal'; }
@@ -1026,6 +1036,100 @@ function fileType(path) {
 	return { id:'other', name: ext ? ext.toUpperCase() : 'Other', color:FILE_COLORS.other };
 }
 
+function normalizeDepthScale(depthScale) {
+	if (!Number.isFinite(depthScale)) return 0.5;
+	return Math.max(0, Math.min(1, (depthScale - 0.65) / 0.85));
+}
+
+function computeNetworkDepthFactor(depthScale) {
+	const norm = normalizeDepthScale(depthScale);
+	return Math.max(0.78, Math.min(1.28, 0.78 + norm * 0.46));
+}
+
+function computeDepthAlpha(depthScale) {
+	const norm = normalizeDepthScale(depthScale);
+	return Math.max(0.45, Math.min(1.0, 0.45 + norm * 0.55));
+}
+
+function computeSemanticWeight(node, entryId) {
+	if (!node) return 1.5;
+	if (typeof node.val === 'number' && Number.isFinite(node.val) && node.val > 0) return node.val;
+	if (node.id === entryId || node.isEntry) return 10;
+	const imp = (typeof node.importance === 'number' && Number.isFinite(node.importance))
+		? node.importance
+		: (node.meta && typeof node.meta.importance === 'number' ? node.meta.importance : 0);
+	if (imp > 0) return Math.max(1.5, 1.2 + Math.sqrt(imp) * 1.8);
+	const deg = (typeof node.degree === 'number' && Number.isFinite(node.degree)) ? node.degree : 0;
+	if (deg > 0) return Math.max(1.5, 1.2 + Math.sqrt(deg) * 1.4);
+	return 1.5;
+}
+
+function computeNetworkVisualRadius(node, depthScale, entryId, isSelected, isHovered) {
+	const weight = computeSemanticWeight(node, entryId);
+	const depthFactor = computeNetworkDepthFactor(depthScale);
+	const nodeScale = (typeof settings.nodeScale === 'number' && Number.isFinite(settings.nodeScale))
+		? Math.max(0.5, Math.min(2.0, settings.nodeScale))
+		: 1.0;
+	let r = (Math.sqrt(weight) * nodeScale * 1.6 + 1.6) * depthFactor;
+	if (isHovered) r *= 1.15;
+	if (isSelected) r *= 1.25;
+	return Math.max(2.5, Math.min(20, r));
+}
+
+function computeNetworkPickRadius(node, depthScale, entryId) {
+	const vr = computeNetworkVisualRadius(node, depthScale, entryId, false, false);
+	return Math.max(18, vr * 2.2 + 8);
+}
+
+function computeTemporalVisibleElements(diff, mode, contextMode) {
+	if (!diff || !diff.nodes || !diff.nodes.length) {
+		return { nodes: [], edges: [], focusSet: new Set(), directContextSet: new Set() };
+	}
+	const allNodes = diff.nodes;
+	const allEdges = diff.edges || [];
+	if (mode === 'state') {
+		const stateNodes = allNodes.filter(n => n.changeKind !== 'removed');
+		const stateIdSet = new Set(stateNodes.map(n => n.entityId));
+		const stateEdges = allEdges.filter(e => {
+			const s = e.sourceEntityId || e.sourceId;
+			const t = e.targetEntityId || e.targetId;
+			return stateIdSet.has(s) && stateIdSet.has(t) && e.changeKind !== 'removed';
+		});
+		return { nodes: stateNodes, edges: stateEdges, focusSet: stateIdSet, directContextSet: new Set() };
+	}
+
+	// Changes mode
+	const focusNodes = allNodes.filter(n => n.changeKind && n.changeKind !== 'unchanged');
+	const focusSet = new Set(focusNodes.map(n => n.entityId));
+	const directContextSet = new Set();
+
+	if (focusSet.size === 0) {
+		const visibleSet = new Set(allNodes.map(n => n.entityId));
+		return { nodes: allNodes, edges: allEdges, focusSet: visibleSet, directContextSet: new Set() };
+	}
+
+	for (let i = 0; i < allEdges.length; i++) {
+		const e = allEdges[i];
+		const s = e.sourceEntityId || e.sourceId;
+		const t = e.targetEntityId || e.targetId;
+		if (focusSet.has(s) && !focusSet.has(t)) directContextSet.add(t);
+		if (focusSet.has(t) && !focusSet.has(s)) directContextSet.add(s);
+	}
+
+	if (contextMode === 'focused') {
+		const visibleIdSet = new Set([...focusSet, ...directContextSet]);
+		const visibleNodes = allNodes.filter(n => visibleIdSet.has(n.entityId));
+		const visibleEdges = allEdges.filter(e => {
+			const s = e.sourceEntityId || e.sourceId;
+			const t = e.targetEntityId || e.targetId;
+			return visibleIdSet.has(s) && visibleIdSet.has(t);
+		});
+		return { nodes: visibleNodes, edges: visibleEdges, focusSet: focusSet, directContextSet: directContextSet };
+	} else {
+		return { nodes: allNodes, edges: allEdges, focusSet: focusSet, directContextSet: directContextSet };
+	}
+}
+
 function projectPoint(x, y, z, yaw, pitch) {
 	const cp = Math.cos(pitch), sp = Math.sin(pitch);
 	const y1 = y * cp - z * sp;
@@ -1035,7 +1139,7 @@ function projectPoint(x, y, z, yaw, pitch) {
 	const x2 = x * cy + z1 * sy;
 	const z2 = -x * sy + z1 * cy;
 
-	const distance = Math.max(FOCAL * 0.2, FOCAL + z2);
+	const distance = Math.max(FOCAL * 0.25, FOCAL + z2);
 	const depthScale = FOCAL / distance;
 	return { x: x2 * depthScale, y: y1 * depthScale, z: z2, depthScale: depthScale };
 }
@@ -1175,17 +1279,20 @@ function fitView() {
 	if (!netCanvas) return;
 	if (isTemporal()) {
 		if (!temporalDiff || !temporalDiff.nodes || !temporalDiff.nodes.length) return;
+		const fc = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
+		const targetNodes = fc.nodes;
+		if (!targetNodes || targetNodes.length === 0) return;
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-		for (let i = 0; i < temporalDiff.nodes.length; i++) {
-			const n = temporalDiff.nodes[i];
-			if (displayMode === 'state' && n.changeKind === 'removed') continue;
-			minX = Math.min(minX, (n.x || 0) - 24); minY = Math.min(minY, (n.y || 0) - 24);
-			maxX = Math.max(maxX, (n.x || 0) + 24); maxY = Math.max(maxY, (n.y || 0) + 24);
+		for (let i = 0; i < targetNodes.length; i++) {
+			const n = targetNodes[i];
+			const r = (n.changeKind && n.changeKind !== 'unchanged' ? 7.5 : 4.0) + 4;
+			minX = Math.min(minX, (n.x || 0) - r); minY = Math.min(minY, (n.y || 0) - r);
+			maxX = Math.max(maxX, (n.x || 0) + r); maxY = Math.max(maxY, (n.y || 0) + r);
 		}
 		if (!isFinite(minX)) return;
 		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 		const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
-		const k = Math.min(vw / (bw + 120), vh / (bh + 120), 2.0);
+		const k = Math.max(0.15, Math.min(2.5, Math.min((vw - 96) / bw, (vh - 96) / bh)));
 		transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 		dirty = true; kickRaf();
 		return;
@@ -1194,18 +1301,21 @@ function fitView() {
 	if (!snapshot || !(snapshot.nodes || []).length) return;
 	projectAll();
 	const nodes = snapshot.nodes;
+	const entryId = snapshot.entryNodeId;
 	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 	for (let i = 0; i < nodes.length; i++) {
-		const p = screenPos(nodes[i].id);
+		const node = nodes[i];
+		const p = screenPos(node.id);
 		if (!p) continue;
-		const r = 20 * (p.depthScale || 1);
+		const r = computeNetworkVisualRadius(node, p.depthScale || 1, entryId, false, false);
 		minX = Math.min(minX, p.x - r); minY = Math.min(minY, p.y - r);
 		maxX = Math.max(maxX, p.x + r); maxY = Math.max(maxY, p.y + r);
 	}
 	if (!isFinite(minX)) return;
 	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 	const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
-	const k = Math.min(vw / (bw + 120), vh / (bh + 120), 2.0) * (settings.initialZoom || 1);
+	const initialZoom = settings.initialZoom || 1;
+	const k = Math.max(0.2, Math.min(2.5, Math.min((vw - 96) / bw, (vh - 96) / bh) * initialZoom));
 	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
 	dirty = true; kickRaf();
 }
@@ -1370,15 +1480,27 @@ function updateTemporalUI(state, diff) {
 		temporalCompareSelect.appendChild(promptOpt);
 	}
 
-	// Display Mode Buttons
+	// Display Mode Buttons & Context Filter Toggle
 	displayMode = state.displayMode || 'changes';
 	if (temporalModeChangesBtn && temporalModeStateBtn) {
 		if (displayMode === 'changes') {
 			temporalModeChangesBtn.classList.add('active');
 			temporalModeStateBtn.classList.remove('active');
+			if (temporalContextModeWrap) temporalContextModeWrap.style.display = 'flex';
 		} else {
 			temporalModeChangesBtn.classList.remove('active');
 			temporalModeStateBtn.classList.add('active');
+			if (temporalContextModeWrap) temporalContextModeWrap.style.display = 'none';
+		}
+	}
+
+	if (temporalContextFocusedBtn && temporalContextFullBtn) {
+		if (temporalContextFilterMode === 'focused') {
+			temporalContextFocusedBtn.classList.add('active');
+			temporalContextFullBtn.classList.remove('active');
+		} else {
+			temporalContextFocusedBtn.classList.remove('active');
+			temporalContextFullBtn.classList.add('active');
 		}
 	}
 
@@ -1657,16 +1779,22 @@ function drawTemporalFrame(ts) {
 
 	const filterVal = (temporalFilterInput && temporalFilterInput.value) ? temporalFilterInput.value.toLowerCase().trim() : '';
 
-	// Render Edges
-	if (temporalDiff && temporalDiff.edges) {
-		for (let i = 0; i < temporalDiff.edges.length; i++) {
-			const edge = temporalDiff.edges[i];
+	// 1. Calculate Focus+Context visible elements
+	const visibleData = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
+	const visibleNodeSet = new Set(visibleData.nodes.map(n => n.entityId));
+	const focusSet = visibleData.focusSet;
+	const directContextSet = visibleData.directContextSet;
+
+	// 2. Render Edges
+	if (visibleData.edges) {
+		for (let i = 0; i < visibleData.edges.length; i++) {
+			const edge = visibleData.edges[i];
 			const sourceEntityId = edge.sourceEntityId || edge.sourceId;
 			const targetEntityId = edge.targetEntityId || edge.targetId;
 			const sourceNode = currentTemporalRenderNodes.get(sourceEntityId);
 			const targetNode = currentTemporalRenderNodes.get(targetEntityId);
 			if (!sourceNode || !targetNode) continue;
-			if (displayMode === 'state' && (sourceNode.changeKind === 'removed' || targetNode.changeKind === 'removed' || edge.changeKind === 'removed')) continue;
+			if (!visibleNodeSet.has(sourceEntityId) || !visibleNodeSet.has(targetEntityId)) continue;
 
 			const sp = getVisualNodePosition(sourceNode, ease);
 			const tp = getVisualNodePosition(targetNode, ease);
@@ -1677,19 +1805,19 @@ function drawTemporalFrame(ts) {
 
 			if (edge.changeKind === 'added') {
 				ctx.strokeStyle = theme.added;
-				ctx.lineWidth = 2;
+				ctx.lineWidth = 1.8;
 				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
 			} else if (edge.changeKind === 'removed') {
 				ctx.strokeStyle = theme.deleted;
-				ctx.lineWidth = 1.5;
+				ctx.lineWidth = 1.4;
 				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 4]);
 			} else if (edge.changeKind === 'modified') {
 				ctx.strokeStyle = theme.modified;
-				ctx.lineWidth = 2;
+				ctx.lineWidth = 1.8;
 				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
 			} else {
-				ctx.strokeStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.4)' : 'rgba(148, 163, 184, 0.25)';
-				ctx.lineWidth = 1;
+				ctx.strokeStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.35)' : 'rgba(148, 163, 184, 0.2)';
+				ctx.lineWidth = 1.0;
 				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
 			}
 			ctx.stroke();
@@ -1697,51 +1825,121 @@ function drawTemporalFrame(ts) {
 		}
 	}
 
-	// Render Nodes
-	currentTemporalRenderNodes.forEach(function (node) {
-		if (displayMode === 'state' && node.changeKind === 'removed') return;
+	// 3. Render Nodes (Distant Context -> Direct Context -> Changed Focus Nodes)
+	const nodesToRender = visibleData.nodes;
+	// Sort by focus priority so changed nodes draw on top
+	nodesToRender.sort((a, b) => {
+		const aRank = a.changeKind && a.changeKind !== 'unchanged' ? 2 : (directContextSet.has(a.entityId) ? 1 : 0);
+		const bRank = b.changeKind && b.changeKind !== 'unchanged' ? 2 : (directContextSet.has(b.entityId) ? 1 : 0);
+		return aRank - bRank;
+	});
 
+	for (let i = 0; i < nodesToRender.length; i++) {
+		const node = nodesToRender[i];
 		const pos = getVisualNodePosition(node, ease);
 		const isMatch = !filterVal || (node.label && node.label.toLowerCase().includes(filterVal)) || (node.path && node.path.toLowerCase().includes(filterVal));
 		const isSelected = selectedNodeId === node.entityId;
+		const isHovered = hoveredNodeId === node.entityId;
+		const isFocus = Boolean(node.changeKind && node.changeKind !== 'unchanged');
+		const isDirectContext = directContextSet.has(node.entityId);
 
-		let r = 16;
-		let fillColor = theme.isHighContrast ? '#000000' : 'rgba(110, 118, 129, 0.3)';
+		let r = isFocus ? 6.5 : (isDirectContext ? 3.8 : 3.0);
+		let fillColor = theme.isHighContrast ? '#000000' : 'rgba(110, 118, 129, 0.25)';
 		let strokeColor = theme.isHighContrast ? '#ffffff' : '#6e7681';
+		let alpha = isFocus ? 1.0 : (isDirectContext ? 0.85 : 0.4);
 
 		if (node.changeKind === 'added') {
-			fillColor = 'rgba(63, 185, 80, 0.25)';
+			fillColor = 'rgba(63, 185, 80, 0.3)';
 			strokeColor = theme.added;
 		} else if (node.changeKind === 'removed') {
-			fillColor = 'rgba(248, 81, 73, 0.2)';
+			fillColor = 'rgba(248, 81, 73, 0.25)';
 			strokeColor = theme.deleted;
 		} else if (node.changeKind === 'modified') {
-			fillColor = 'rgba(210, 153, 34, 0.25)';
+			fillColor = 'rgba(210, 153, 34, 0.3)';
 			strokeColor = theme.modified;
 		} else if (node.changeKind === 'renamed') {
-			fillColor = 'rgba(163, 113, 247, 0.25)';
+			fillColor = 'rgba(163, 113, 247, 0.3)';
 			strokeColor = theme.renamed;
 		}
 
 		if (!isMatch) {
-			fillColor = 'rgba(50, 50, 50, 0.1)';
-			strokeColor = 'rgba(100, 100, 100, 0.2)';
+			alpha *= 0.3;
+		}
+
+		ctx.save();
+		ctx.globalAlpha = alpha;
+
+		if (isSelected) {
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, r + 4, 0, Math.PI * 2);
+			ctx.strokeStyle = '#2dd4bf';
+			ctx.lineWidth = 2.5;
+			ctx.stroke();
+		} else if (isHovered) {
+			ctx.beginPath();
+			ctx.arc(pos.x, pos.y, r + 3, 0, Math.PI * 2);
+			ctx.strokeStyle = '#58a6ff';
+			ctx.lineWidth = 1.8;
+			ctx.stroke();
 		}
 
 		ctx.beginPath();
-		ctx.arc(pos.x, pos.y, isSelected ? r + 4 : r, 0, Math.PI * 2);
+		ctx.arc(pos.x, pos.y, r, 0, Math.PI * 2);
 		ctx.fillStyle = fillColor;
 		ctx.fill();
-		ctx.lineWidth = isSelected ? 3 : 1.5;
-		ctx.strokeStyle = isSelected ? (theme.isHighContrast ? '#ffff00' : '#ffffff') : strokeColor;
+		ctx.lineWidth = isFocus ? 2.0 : 1.2;
+		if (node.changeKind === 'removed' && typeof ctx.setLineDash === 'function') {
+			ctx.setLineDash([2, 2]);
+		}
+		ctx.strokeStyle = strokeColor;
 		ctx.stroke();
+		if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+		ctx.restore();
+	}
 
-		// Node Label
-		ctx.fillStyle = isMatch ? (isSelected ? (theme.isHighContrast ? '#ffff00' : '#ffffff') : theme.fg) : 'rgba(150, 150, 150, 0.3)';
-		ctx.font = isSelected ? 'bold 12px ui-sans-serif, system-ui, sans-serif' : '11px ui-sans-serif, system-ui, sans-serif';
+	// 4. Labels with Level of Detail
+	const placedLabels = [];
+	for (let i = 0; i < nodesToRender.length; i++) {
+		const node = nodesToRender[i];
+		const isSelected = selectedNodeId === node.entityId;
+		const isHovered = hoveredNodeId === node.entityId;
+		const isFocus = Boolean(node.changeKind && node.changeKind !== 'unchanged');
+		const shouldLabel = isSelected || isHovered || isFocus || (transform.k >= 1.25);
+		if (!shouldLabel) continue;
+
+		const pos = getVisualNodePosition(node, ease);
+		const labelText = node.label || node.path || '';
+		const r = isFocus ? 6.5 : 3.8;
+		const labelY = pos.y + r + 10;
+
+		const estW = Math.max(16, labelText.length * 6.2);
+		const boxLeft = pos.x - estW / 2 - 2;
+		const boxTop = labelY - 7;
+		const boxW = estW + 4;
+		const boxH = 13;
+
+		if (!isSelected && !isHovered) {
+			let collision = false;
+			for (let b = 0; b < placedLabels.length; b++) {
+				const pb = placedLabels[b];
+				if (boxLeft < pb.x + pb.w && boxLeft + boxW > pb.x && boxTop < pb.y + pb.h && boxTop + boxH > pb.y) {
+					collision = true;
+					break;
+				}
+			}
+			if (collision) continue;
+		}
+		placedLabels.push({ x: boxLeft, y: boxTop, w: boxW, h: boxH });
+
+		ctx.save();
+		ctx.font = (isSelected || isHovered) ? 'bold 11px ui-sans-serif, system-ui, sans-serif' : '10px ui-sans-serif, system-ui, sans-serif';
 		ctx.textAlign = 'center';
-		ctx.fillText(node.label || node.path || '', pos.x, pos.y + r + 14);
-	});
+		ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
+		ctx.fillRect(boxLeft, boxTop, boxW, boxH);
+		ctx.fillStyle = isSelected ? '#2dd4bf' : (isHovered ? '#58a6ff' : (isFocus ? '#f4f4f5' : 'rgba(244, 244, 245, 0.75)'));
+		ctx.fillText(labelText, pos.x, labelY + 3);
+		ctx.restore();
+	}
 
 	ctx.restore();
 
@@ -1760,13 +1958,19 @@ function pickTemporalNode(clientX, clientY) {
 	const wx = (sx - transform.x) / k;
 	const wy = (sy - transform.y) / k;
 
+	const visibleData = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
+	const visibleNodeSet = new Set(visibleData.nodes.map(n => n.entityId));
+
 	let best = null;
-	let bestDist = 24 / k;
+	let bestDist = Infinity;
+	const minPickR = Math.max(18, 22 / k);
 
 	currentTemporalRenderNodes.forEach(function (node) {
-		if (displayMode === 'state' && node.changeKind === 'removed') return;
+		if (!visibleNodeSet.has(node.entityId)) return;
+		const isFocus = Boolean(node.changeKind && node.changeKind !== 'unchanged');
+		const pickR = isFocus ? Math.max(20, 24 / k) : minPickR;
 		const d = Math.hypot(wx - (node.x || 0), wy - (node.y || 0));
-		if (d <= bestDist) {
+		if (d <= pickR && d < bestDist) {
 			bestDist = d;
 			best = node;
 		}
@@ -1816,14 +2020,14 @@ function pickNetworkNode(clientX, clientY) {
 	let best = null;
 	let bestDist = Infinity;
 	const nodes = snapshot.nodes || [];
+	const entryId = snapshot.entryNodeId;
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
 		const p = screenPos(node.id);
 		if (!p) continue;
-		const baseR = Math.max(6, Math.min(22, 8 + Math.sqrt(node.importance || node.degree || 1) * 1.8));
-		const r = baseR * (p.depthScale || 1);
+		const pickR = computeNetworkPickRadius(node, p.depthScale || 1, entryId);
 		const d = Math.hypot(wx - p.x, wy - p.y);
-		if (d <= r + 10 && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
+		if (d <= pickR && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
 			bestDist = d;
 			best = node;
 		}
@@ -1858,7 +2062,7 @@ function drawNetworkFrame() {
 		}
 	}
 
-	// 1. Draw Network Edges
+	// 1. Draw Network Edges (Thin screen-space stroke)
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
 		const p1 = screenPos(e.source);
@@ -1872,45 +2076,49 @@ function drawNetworkFrame() {
 
 		if (isConnectedToHighlight) {
 			ctx.strokeStyle = '#2dd4bf';
-			ctx.lineWidth = 2.0;
+			ctx.lineWidth = 1.8 / transform.k;
 		} else if (activeHighlightId) {
-			ctx.strokeStyle = 'rgba(148, 163, 184, 0.06)';
-			ctx.lineWidth = 0.8;
+			ctx.strokeStyle = 'rgba(148, 163, 184, 0.05)';
+			ctx.lineWidth = 0.7 / transform.k;
 		} else {
-			ctx.strokeStyle = 'rgba(148, 163, 184, 0.22)';
-			ctx.lineWidth = 1.0;
+			ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
+			ctx.lineWidth = 0.85 / transform.k;
 		}
 		ctx.stroke();
 	}
 
-	// 2. Draw Network Nodes
-	for (let i = 0; i < nodes.length; i++) {
-		const node = nodes[i];
+	// 2. Draw Network Nodes Sorted by Projected Z (Far-to-Near)
+	const sortedNodes = nodes.slice().sort(function (a, b) {
+		const pA = screenPos(a.id);
+		const pB = screenPos(b.id);
+		return (pA ? pA.z : 0) - (pB ? pB.z : 0);
+	});
+
+	for (let i = 0; i < sortedNodes.length; i++) {
+		const node = sortedNodes[i];
 		const p = screenPos(node.id);
 		if (!p) continue;
 
-		const baseR = Math.max(6, Math.min(22, 8 + Math.sqrt(node.importance || node.degree || 1) * 1.8));
-		const r = baseR * (p.depthScale || 1);
 		const isSelected = selectedNodeId === node.id;
 		const isHovered = hoveredNodeId === node.id;
+		const r = computeNetworkVisualRadius(node, p.depthScale || 1, entryId, isSelected, isHovered);
+		const depthAlpha = computeDepthAlpha(p.depthScale || 1);
 		const isDimmed = Boolean(activeHighlightId && !connectedNodeIds.has(node.id));
 
 		ctx.save();
-		if (isDimmed) {
-			ctx.globalAlpha = 0.35;
-		}
+		ctx.globalAlpha = isDimmed ? 0.25 : depthAlpha;
 
 		if (isSelected) {
 			ctx.beginPath();
-			ctx.arc(p.x, p.y, r + 5, 0, 2 * Math.PI);
+			ctx.arc(p.x, p.y, r + 4, 0, 2 * Math.PI);
 			ctx.strokeStyle = '#2dd4bf';
-			ctx.lineWidth = 3.0;
+			ctx.lineWidth = 2.5;
 			ctx.stroke();
 		} else if (isHovered) {
 			ctx.beginPath();
-			ctx.arc(p.x, p.y, r + 4, 0, 2 * Math.PI);
+			ctx.arc(p.x, p.y, r + 3, 0, 2 * Math.PI);
 			ctx.strokeStyle = '#58a6ff';
-			ctx.lineWidth = 2.0;
+			ctx.lineWidth = 1.8;
 			ctx.stroke();
 		}
 
@@ -1918,8 +2126,8 @@ function drawNetworkFrame() {
 		ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
 		ctx.fillStyle = nodeColor(node, entryId);
 		ctx.fill();
-		ctx.strokeStyle = isSelected ? '#2dd4bf' : (isHovered ? '#58a6ff' : '#1B1C1E');
-		ctx.lineWidth = isSelected || isHovered ? 2.0 : 1.2;
+		ctx.strokeStyle = isSelected ? '#2dd4bf' : (isHovered ? '#58a6ff' : 'rgba(27, 28, 30, 0.85)');
+		ctx.lineWidth = isSelected || isHovered ? 1.8 : 1.0;
 		ctx.stroke();
 		ctx.restore();
 	}
@@ -1928,8 +2136,8 @@ function drawNetworkFrame() {
 	const placedLabelBoxes = [];
 	const isMoving = rotating || (dragging && panning);
 
-	for (let i = 0; i < nodes.length; i++) {
-		const node = nodes[i];
+	for (let i = 0; i < sortedNodes.length; i++) {
+		const node = sortedNodes[i];
 		const p = screenPos(node.id);
 		if (!p) continue;
 
@@ -1942,28 +2150,26 @@ function drawNetworkFrame() {
 		if (isSelected || isHovered) {
 			shouldShowLabel = true;
 		} else if (!isMoving) {
-			if (isEntry && transform.k >= 0.4) {
+			if (isEntry && transform.k >= 0.35) {
 				shouldShowLabel = true;
-			} else if (isImportant && transform.k >= 0.7) {
+			} else if (isImportant && transform.k >= 0.65) {
 				shouldShowLabel = true;
-			} else if (transform.k >= 1.25) {
+			} else if (transform.k >= 1.2) {
 				shouldShowLabel = true;
 			}
 		}
 
 		if (!shouldShowLabel) continue;
 
-		const baseR = Math.max(6, Math.min(22, 8 + Math.sqrt(node.importance || node.degree || 1) * 1.8));
-		const r = baseR * (p.depthScale || 1);
+		const r = computeNetworkVisualRadius(node, p.depthScale || 1, entryId, isSelected, isHovered);
 		const labelText = node.label || node.id;
-		const labelY = p.y + r + 12;
+		const labelY = p.y + r + 10;
 
-		// Text collision box in world coords (approximate text width based on length)
-		const estWidth = Math.max(20, labelText.length * 6.5);
+		const estWidth = Math.max(18, labelText.length * 6.2);
 		const boxLeft = p.x - estWidth / 2 - 2;
-		const boxTop = labelY - 8;
+		const boxTop = labelY - 7;
 		const boxWidth = estWidth + 4;
-		const boxHeight = 14;
+		const boxHeight = 13;
 
 		if (!isSelected && !isHovered) {
 			let collides = false;
@@ -1988,12 +2194,12 @@ function drawNetworkFrame() {
 		ctx.font = (isSelected || isHovered) ? 'bold 11px ui-sans-serif, system-ui, sans-serif' : '10px ui-sans-serif, system-ui, sans-serif';
 		ctx.textAlign = 'center';
 
-		// Subtle backdrop for readability
+		// Backdrop for contrast
 		ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
 		ctx.fillRect(boxLeft, boxTop, boxWidth, boxHeight);
 
 		ctx.fillStyle = (isSelected || isHovered) ? '#2dd4bf' : '#f4f4f5';
-		ctx.fillText(labelText, p.x, labelY + 2);
+		ctx.fillText(labelText, p.x, labelY + 3);
 		ctx.restore();
 	}
 
@@ -2414,6 +2620,24 @@ if (temporalModeStateBtn) {
 			request('selectTemporalEntity', { entityId: null });
 		}
 		request('setTemporalDisplayMode', { mode: 'state' });
+	});
+}
+if (temporalContextFocusedBtn) {
+	temporalContextFocusedBtn.addEventListener('click', function () {
+		temporalContextFilterMode = 'focused';
+		if (temporalState) updateTemporalUI(temporalState, temporalDiff);
+		fitView();
+		dirty = true;
+		kickRaf();
+	});
+}
+if (temporalContextFullBtn) {
+	temporalContextFullBtn.addEventListener('click', function () {
+		temporalContextFilterMode = 'full';
+		if (temporalState) updateTemporalUI(temporalState, temporalDiff);
+		fitView();
+		dirty = true;
+		kickRaf();
 	});
 }
 if (temporalToggleDetailsBtn) {
