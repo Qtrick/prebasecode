@@ -144,7 +144,7 @@ export function registerPreBaseGraphConfiguration(): void {
 				default: 0.55,
 				minimum: 0.2,
 				maximum: 0.9,
-				description: localize('prebase.graph.networkEdgeOpacity', "Network link visibility. Reserved — not applied by the graph webview yet."),
+				description: localize('prebase.graph.networkEdgeOpacity', "Network link opacity scale multiplier."),
 			},
 			[PreBaseGraphConfigKeys.GraphQuality]: {
 				type: 'string',
@@ -186,7 +186,7 @@ export function registerPreBaseGraphConfiguration(): void {
 					localize('prebase.graph.networkLayoutMode.organic', "Balanced 3D cloud."),
 					localize('prebase.graph.networkLayoutMode.sphere', "Even Fibonacci sphere shell."),
 					localize('prebase.graph.networkLayoutMode.constellation', "Connected files pull closer in 3D."),
-					localize('prebase.graph.networkLayoutMode.clustered', "Clusters by file type."),
+					localize('prebase.graph.networkLayoutMode.clustered', "Groups files by architectural role and module."),
 					localize('prebase.graph.networkLayoutMode.radial', "Entry-centered 3D layers by graph distance."),
 				],
 				default: 'organic',
@@ -218,14 +218,14 @@ export function registerPreBaseGraphConfiguration(): void {
 				default: 1,
 				minimum: 0.5,
 				maximum: 2,
-				description: localize('prebase.interaction.panSensitivity', "Pan sensitivity for PreBase graphs. Reserved — not read by the graph webview yet."),
+				description: localize('prebase.interaction.panSensitivity', "Pan sensitivity for PreBase graphs."),
 			},
 			[PreBaseGraphConfigKeys.InteractionZoomSensitivity]: {
 				type: 'number',
 				default: 1,
 				minimum: 0.5,
 				maximum: 2,
-				description: localize('prebase.interaction.zoomSensitivity', "Zoom sensitivity for PreBase graphs. Reserved — not read by the graph webview yet."),
+				description: localize('prebase.interaction.zoomSensitivity', "Zoom sensitivity for PreBase graphs (smooth wheel, trackpad, and gestures)."),
 			},
 			[PreBaseGraphConfigKeys.InteractionNetworkDragDirection]: {
 				type: 'string',
@@ -243,6 +243,11 @@ export function registerPreBaseGraphConfiguration(): void {
 				minimum: 80,
 				maximum: 400,
 				description: localize('prebase.interaction.nodeDragDelayMs', "Hover delay (ms) before a graph node becomes draggable. Reserved — not read by the graph webview yet. Unrelated to Agents chat modes."),
+			},
+			[PreBaseGraphConfigKeys.InteractionKeepGraphCentered]: {
+				type: 'boolean',
+				default: false,
+				description: localize('prebase.interaction.keepGraphCentered', "Keep the visible graph centered in the viewport during interaction and rotation."),
 			},
 		}
 	});

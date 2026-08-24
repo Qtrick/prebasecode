@@ -79,7 +79,17 @@ export function renderGraphInteractionControls(host: IPreBaseGraphSettingsUiHost
 	const card = host.panel(
 		host.main,
 		localize('prebase.settings.interaction.title', "Interaction"),
-		localize('prebase.settings.interaction.desc', "Pan and zoom behavior. Pan/zoom sliders are reserved until the graph webview reads them.")
+		localize('prebase.settings.interaction.desc', "Pan, zoom, and graph centering behavior.")
+	);
+
+	const keepCentered = host.accentCheckbox();
+	keepCentered.checked = host.get(PreBaseGraphConfigKeys.InteractionKeepGraphCentered, false);
+	host.on(keepCentered, 'change', () => void host.set(PreBaseGraphConfigKeys.InteractionKeepGraphCentered, keepCentered.checked));
+	host.row(
+		card,
+		localize('prebase.settings.keepCentered', "Keep graph centered"),
+		localize('prebase.settings.keepCenteredHint', "Keeps the visible graph centered in the viewport during interaction and rotation."),
+		keepCentered
 	);
 
 	const pan = host.range(0.5, 2, 0.1, host.get(PreBaseGraphConfigKeys.InteractionPanSensitivity, 1));
@@ -88,7 +98,7 @@ export function renderGraphInteractionControls(host: IPreBaseGraphSettingsUiHost
 
 	const zoom = host.range(0.5, 2, 0.1, host.get(PreBaseGraphConfigKeys.InteractionZoomSensitivity, 1));
 	host.on(zoom, 'input', () => void host.set(PreBaseGraphConfigKeys.InteractionZoomSensitivity, Number(zoom.value)));
-	host.row(card, localize('prebase.settings.zoomSensitivity', "Zoom sensitivity"), undefined, zoom);
+	host.row(card, localize('prebase.settings.zoomSensitivity', "Zoom sensitivity"), localize('prebase.settings.zoomSensitivityHint', "Smooth wheel and trackpad zoom multiplier."), zoom);
 
 	const drag = document.createElement('select');
 	host.selectStyle(drag);

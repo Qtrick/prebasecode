@@ -42,6 +42,7 @@ export enum PreBaseGraphConfigKeys {
 	InteractionZoomSensitivity = 'prebase.interaction.zoomSensitivity',
 	InteractionNetworkDragDirection = 'prebase.interaction.networkDragDirection',
 	InteractionNodeDragDelayMs = 'prebase.interaction.nodeDragDelayMs',
+	InteractionKeepGraphCentered = 'prebase.interaction.keepGraphCentered',
 }
 
 /** Graph-owned `prebase.graph.*` and graph interaction keys (for Reset all). */

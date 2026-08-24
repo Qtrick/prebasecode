@@ -203,6 +203,10 @@ export class PreBaseGraphEditor extends EditorPane {
 		const networkDragDirection = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.InteractionNetworkDragDirection) === 'inverted'
 			? 'inverted'
 			: 'natural';
+		const zoomSensitivity = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.InteractionZoomSensitivity) ?? 1.0;
+		const panSensitivity = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.InteractionPanSensitivity) ?? 1.0;
+		const keepGraphCentered = Boolean(this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.InteractionKeepGraphCentered));
+		const networkEdgeOpacity = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity) ?? 0.55;
 		return {
 			showLegend: this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphShowLegend) !== false,
 			initialZoom: this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphInitialZoom) || 1,
@@ -211,7 +215,11 @@ export class PreBaseGraphEditor extends EditorPane {
 			networkDragDirection,
 			maxRenderedNodes: maxNodes,
 			maxRenderedEdges: maxEdges,
-			quality
+			quality,
+			zoomSensitivity,
+			panSensitivity,
+			keepGraphCentered,
+			networkEdgeOpacity
 		};
 	}
 
@@ -367,6 +375,14 @@ export class PreBaseGraphEditor extends EditorPane {
 			case 'setNetworkIdleAutoRotate': {
 				const enabled = !!(message.payload as { enabled?: boolean } | undefined)?.enabled;
 				await this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate, enabled);
+				await reply({ ok: true });
+				break;
+			}
+			case 'updateSetting': {
+				const p = message.payload as { key?: string; value?: unknown } | undefined;
+				if (p?.key && (p.key.startsWith('prebase.graph.') || p.key.startsWith('prebase.interaction.'))) {
+					await this.configurationService.updateValue(p.key, p.value);
+				}
 				await reply({ ok: true });
 				break;
 			}
@@ -656,8 +672,9 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #netCanvas { cursor:grab; }
 #netCanvas.dragging { cursor:grabbing; }
 #toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 88%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:4px; }
-#toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:0; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
+#toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid transparent; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
 #toolbar button:hover { background:var(--vscode-toolbar-hoverBackground, #303030); }
+#toolbar button.active, #toolbar button[aria-pressed="true"] { background:rgba(45, 212, 191, 0.18); color:var(--vscode-button-background, #2dd4bf); border-color:var(--vscode-button-background, #2dd4bf); font-weight:600; }
 #toolbar label { display:flex; gap:4px; align-items:center; user-select:none; opacity:.9; }
 #idleToggleWrap { display:none; }
 #status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
@@ -851,12 +868,13 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<button id="popupMagnus" type="button" title="Attach to Agents" aria-label="Attach to Agents">Attach to Agents</button>
 	</div>
 </div>
-<div id="toolbar">
-	<button id="zoomIn" title="Zoom in">+</button>
-	<button id="zoomOut" title="Zoom out">−</button>
-	<button id="fit" title="Fit">⛶</button>
-	<button id="reset" title="Reset">↻</button>
-	<label id="idleToggleWrap"><input type="checkbox" id="idleToggle"> Idle</label>
+<div id="toolbar" role="toolbar" aria-label="Graph Viewport Controls">
+	<button id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
+	<button id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out">−</button>
+	<button id="fit" type="button" title="Fit View" aria-label="Fit View">⛶</button>
+	<button id="centerLock" type="button" title="Keep graph centered" aria-label="Keep graph centered" aria-pressed="false">🎯</button>
+	<button id="reset" type="button" title="Reset View" aria-label="Reset View">↻</button>
+	<label id="idleToggleWrap"><input type="checkbox" id="idleToggle" aria-label="Auto-rotate when idle"> Idle</label>
 </div>
 <div id="status">Scanning…</div>
 <script nonce="${nonce}">
@@ -1007,13 +1025,34 @@ let snapshot = null;
 let diagnostics = null;
 let selectedNodeId = null;
 let hoveredNodeId = null;
-let settings = { showLegend:true, reduceMotion:false, networkIdleAutoRotate:false, networkDragDirection:'natural', maxRenderedEdges:420, maxRenderedNodes:280, quality:'auto' };
+let settings = {
+	showLegend: true,
+	reduceMotion: false,
+	networkIdleAutoRotate: false,
+	networkDragDirection: 'natural',
+	maxRenderedEdges: 420,
+	maxRenderedNodes: 280,
+	quality: 'auto',
+	zoomSensitivity: 1.0,
+	panSensitivity: 1.0,
+	keepGraphCentered: false,
+	networkEdgeOpacity: 0.55,
+};
+const centerLockBtn = document.getElementById('centerLock');
+let keepGraphCentered = false;
+let activeCameraAnim = null;
+
+// Graph Adjacency and Static Descriptor Maps
+let nodeIncidentEdgesMap = new Map();
+let nodeNeighborsMap = new Map();
+let staticEdgeDescriptorCache = new Map();
+
 let dragging = false, panning = false, rotating = false;
 let lastX = 0, lastY = 0, moved = false;
 let activePointerId = null, activePointerHost = null;
 let layoutKey = '';
 let base3d = Object.create(null);
-let centroid = { x:0, y:0 };
+let centroid = { x: 0, y: 0 };
 let projected = Object.create(null);
 let idlePaused = true;
 let idleResumeTimer = null;
@@ -1021,6 +1060,239 @@ let lastRafTs = 0;
 let dirty = true;
 let rafScheduled = false;
 let dpr = Math.min(2, window.devicePixelRatio || 1);
+
+// Pure Viewport Mathematics & Helpers
+const MIN_ZOOM = 0.15;
+const MAX_ZOOM = 3.5;
+const DOM_DELTA_PIXEL = 0;
+const DOM_DELTA_LINE = 1;
+const DOM_DELTA_PAGE = 2;
+
+function clamp(val, min, max) {
+	return Math.max(min, Math.min(max, val));
+}
+
+function normalizeWheelZoomDelta(options) {
+	const deltaY = options.deltaY || 0;
+	const deltaMode = options.deltaMode !== undefined ? options.deltaMode : DOM_DELTA_PIXEL;
+	const ctrlKey = Boolean(options.ctrlKey);
+	const sensitivity = (typeof options.sensitivity === 'number' && Number.isFinite(options.sensitivity) && options.sensitivity > 0)
+		? options.sensitivity
+		: 1.0;
+
+	if (deltaY === 0) return 0;
+
+	let pixelDelta = deltaY;
+	if (deltaMode === DOM_DELTA_LINE) {
+		pixelDelta = deltaY * 24;
+	} else if (deltaMode === DOM_DELTA_PAGE) {
+		pixelDelta = deltaY * 400;
+	}
+
+	if (ctrlKey) {
+		pixelDelta *= 2.0;
+	}
+
+	const clampedDelta = clamp(pixelDelta, -320, 320);
+	return clampedDelta * sensitivity;
+}
+
+function computeContinuousZoomFactor(normalizedDelta) {
+	if (normalizedDelta === 0) return 1.0;
+	return Math.pow(2, -normalizedDelta * 0.0025);
+}
+
+function applyZoomAroundCursor(t, factor, cursorX, cursorY, minZoom, maxZoom) {
+	const minZ = minZoom !== undefined ? minZoom : MIN_ZOOM;
+	const maxZ = maxZoom !== undefined ? maxZoom : MAX_ZOOM;
+	const prevK = t.k;
+	const targetK = clamp(prevK * factor, minZ, maxZ);
+	if (targetK === prevK) return { x: t.x, y: t.y, k: t.k };
+
+	const ratio = targetK / prevK;
+	const targetX = cursorX - (cursorX - t.x) * ratio;
+	const targetY = cursorY - (cursorY - t.y) * ratio;
+
+	return { x: targetX, y: targetY, k: targetK };
+}
+
+function applyZoomAroundCenter(t, factor, width, height, minZoom, maxZoom, insets) {
+	const top = (insets && insets.top) || 0;
+	const bottom = (insets && insets.bottom) || 0;
+	const left = (insets && insets.left) || 0;
+	const right = (insets && insets.right) || 0;
+
+	const usableWidth = Math.max(1, width - left - right);
+	const usableHeight = Math.max(1, height - top - bottom);
+	const centerX = left + usableWidth / 2;
+	const centerY = top + usableHeight / 2;
+
+	return applyZoomAroundCursor(t, factor, centerX, centerY, minZoom, maxZoom);
+}
+
+function computeGraphBounds(nodes) {
+	if (!nodes || nodes.length === 0) return null;
+	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	for (let i = 0; i < nodes.length; i++) {
+		const n = nodes[i];
+		const r = (typeof n.radius === 'number' && Number.isFinite(n.radius)) ? n.radius : 10;
+		minX = Math.min(minX, n.x - r);
+		minY = Math.min(minY, n.y - r);
+		maxX = Math.max(maxX, n.x + r);
+		maxY = Math.max(maxY, n.y + r);
+	}
+	if (!Number.isFinite(minX) || !Number.isFinite(minY) || !Number.isFinite(maxX) || !Number.isFinite(maxY)) {
+		return null;
+	}
+	return { minX: minX, minY: minY, maxX: maxX, maxY: maxY };
+}
+
+function computeCenterLockedTransform(bounds, width, height, currentK, insets) {
+	if (!bounds) return { x: width / 2, y: height / 2, k: currentK };
+	const top = (insets && insets.top) || 0;
+	const bottom = (insets && insets.bottom) || 0;
+	const left = (insets && insets.left) || 0;
+	const right = (insets && insets.right) || 0;
+
+	const usableWidth = Math.max(1, width - left - right);
+	const usableHeight = Math.max(1, height - top - bottom);
+	const viewportCenterX = left + usableWidth / 2;
+	const viewportCenterY = top + usableHeight / 2;
+
+	const graphCenterX = (bounds.minX + bounds.maxX) / 2;
+	const graphCenterY = (bounds.minY + bounds.maxY) / 2;
+
+	const targetX = viewportCenterX - graphCenterX * currentK;
+	const targetY = viewportCenterY - graphCenterY * currentK;
+
+	return { x: targetX, y: targetY, k: currentK };
+}
+
+function isCenterDeadZone(current, target, thresholdPx) {
+	const thresh = thresholdPx !== undefined ? thresholdPx : 0.5;
+	const dx = Math.abs(current.x - target.x);
+	const dy = Math.abs(current.y - target.y);
+	return dx < thresh && dy < thresh;
+}
+
+function easeOutCubic(t) {
+	const clamped = clamp(t, 0, 1);
+	return 1 - Math.pow(1 - clamped, 3);
+}
+
+function interpolateViewport(from, to, t) {
+	const ease = easeOutCubic(t);
+	return {
+		x: from.x + (to.x - from.x) * ease,
+		y: from.y + (to.y - from.y) * ease,
+		k: from.k + (to.k - from.k) * ease,
+	};
+}
+
+function getUsableInsets() {
+	if (isTemporal()) {
+		return { top: 48, bottom: 68, left: 12, right: 12 };
+	}
+	return { top: 12, bottom: 56, left: 12, right: 12 };
+}
+
+function syncCenterLockUI() {
+	if (!centerLockBtn) return;
+	centerLockBtn.setAttribute('aria-pressed', keepGraphCentered ? 'true' : 'false');
+	centerLockBtn.classList.toggle('active', keepGraphCentered);
+	centerLockBtn.title = keepGraphCentered ? 'Keep graph centered (Active)' : 'Keep graph centered';
+}
+
+function applyCenterLock(immediate) {
+	if (!keepGraphCentered || !netCanvas) return;
+	const w = netCanvas.clientWidth || 800;
+	const h = netCanvas.clientHeight || 600;
+	let bounds = null;
+
+	if (isTemporal()) {
+		if (!currentTemporalRenderNodes || currentTemporalRenderNodes.size === 0) return;
+		const nodesList = [];
+		currentTemporalRenderNodes.forEach(function (n) {
+			nodesList.push({ x: n.x || 0, y: n.y || 0, radius: 10 });
+		});
+		bounds = computeGraphBounds(nodesList);
+	} else if (isNetwork() && snapshot) {
+		const nodes = snapshot.nodes || [];
+		const projectedList = [];
+		for (let i = 0; i < nodes.length; i++) {
+			const p = projected[nodes[i].id];
+			if (p) projectedList.push({ x: p.x, y: p.y, radius: 8 });
+		}
+		bounds = computeGraphBounds(projectedList);
+	}
+
+	if (!bounds) return;
+	const target = computeCenterLockedTransform(bounds, w, h, transform.k, getUsableInsets());
+	if (!isCenterDeadZone(transform, target, 0.5)) {
+		transform.x = target.x;
+		transform.y = target.y;
+		dirty = true;
+		kickRaf();
+	}
+}
+
+function cancelCameraAnimation() {
+	activeCameraAnim = null;
+}
+
+function animateViewportTo(targetTransform, durationMs) {
+	const dur = durationMs !== undefined ? durationMs : 240;
+	if (settings.reduceMotion || dur <= 0) {
+		transform = { x: targetTransform.x, y: targetTransform.y, k: targetTransform.k };
+		dirty = true;
+		kickRaf();
+		return;
+	}
+	activeCameraAnim = {
+		from: { x: transform.x, y: transform.y, k: transform.k },
+		to: { x: targetTransform.x, y: targetTransform.y, k: targetTransform.k },
+		startTs: performance.now(),
+		duration: dur
+	};
+	dirty = true;
+	kickRaf();
+}
+
+function rebuildAdjacencyAndStaticDescriptors() {
+	nodeIncidentEdgesMap.clear();
+	nodeNeighborsMap.clear();
+	staticEdgeDescriptorCache.clear();
+
+	if (!snapshot) return;
+	const nodes = snapshot.nodes || [];
+	const edges = snapshot.edges || [];
+	for (let i = 0; i < nodes.length; i++) {
+		nodeIncidentEdgesMap.set(nodes[i].id, []);
+		nodeNeighborsMap.set(nodes[i].id, new Set());
+	}
+
+	for (let i = 0; i < edges.length; i++) {
+		const e = edges[i];
+		if (!nodeIncidentEdgesMap.has(e.source)) nodeIncidentEdgesMap.set(e.source, []);
+		if (!nodeIncidentEdgesMap.has(e.target)) nodeIncidentEdgesMap.set(e.target, []);
+		if (!nodeNeighborsMap.has(e.source)) nodeNeighborsMap.set(e.source, new Set());
+		if (!nodeNeighborsMap.has(e.target)) nodeNeighborsMap.set(e.target, new Set());
+
+		nodeIncidentEdgesMap.get(e.source).push(e);
+		nodeIncidentEdgesMap.get(e.target).push(e);
+		nodeNeighborsMap.get(e.source).add(e.target);
+		nodeNeighborsMap.get(e.target).add(e.source);
+
+		const kind = e.kind || 'import';
+		const meta = e.meta || {};
+		const key = (e.id || (e.source + '->' + e.target)) + '::' + kind;
+		staticEdgeDescriptorCache.set(key, {
+			kind: kind,
+			isDynamic: Boolean(meta.isDynamic),
+			isEntryRelated: Boolean(meta.isEntryRelated || meta.isEntry),
+		});
+	}
+}
 
 // Temporal State & 2D Transition Engine
 let temporalState = null;
@@ -1341,8 +1613,17 @@ function getVisualNodePosition(node, ease) {
 	return { x: targetX, y: targetY };
 }
 
-function fitView() {
+function fitView(animate) {
 	if (!netCanvas) return;
+	const shouldAnimate = animate === true && !settings.reduceMotion;
+	const insets = getUsableInsets();
+	const vw = netCanvas.clientWidth || 800;
+	const vh = netCanvas.clientHeight || 600;
+	const usableW = Math.max(1, vw - insets.left - insets.right);
+	const usableH = Math.max(1, vh - insets.top - insets.bottom);
+	const centerX = insets.left + usableW / 2;
+	const centerY = insets.top + usableH / 2;
+
 	if (isTemporal()) {
 		if (!temporalDiff || !temporalDiff.nodes || !temporalDiff.nodes.length) return;
 		const fc = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
@@ -1359,11 +1640,18 @@ function fitView() {
 		}
 		if (!isFinite(minX)) return;
 		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
-		const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
 		const padding = isFocusMode ? 80 : 64;
-		const k = Math.max(0.4, Math.min(1.8, Math.min((vw - padding * 2) / bw, (vh - padding * 2) / bh)));
-		transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
-		dirty = true; kickRaf();
+		const k = Math.max(MIN_ZOOM, Math.min(1.8, Math.min((usableW - padding * 2) / bw, (usableH - padding * 2) / bh)));
+		const graphCenterX = (minX + maxX) / 2;
+		const graphCenterY = (minY + maxY) / 2;
+		const targetTransform = { k: k, x: centerX - graphCenterX * k, y: centerY - graphCenterY * k };
+		if (shouldAnimate) {
+			animateViewportTo(targetTransform, 320);
+		} else {
+			transform = targetTransform;
+			dirty = true;
+			kickRaf();
+		}
 		return;
 	}
 
@@ -1382,11 +1670,18 @@ function fitView() {
 	}
 	if (!isFinite(minX)) return;
 	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
-	const vw = netCanvas.clientWidth || 800, vh = netCanvas.clientHeight || 600;
 	const initialZoom = settings.initialZoom || 1;
-	const k = Math.max(0.6, Math.min(1.4, Math.min((vw - 96) / bw, (vh - 96) / bh) * initialZoom));
-	transform = { k: k, x: (vw - bw * k) / 2 - minX * k, y: (vh - bh * k) / 2 - minY * k };
-	dirty = true; kickRaf();
+	const k = Math.max(MIN_ZOOM, Math.min(1.6, Math.min((usableW - 96) / bw, (usableH - 96) / bh) * initialZoom));
+	const graphCenterX = (minX + maxX) / 2;
+	const graphCenterY = (minY + maxY) / 2;
+	const targetTransform = { k: k, x: centerX - graphCenterX * k, y: centerY - graphCenterY * k };
+	if (shouldAnimate) {
+		animateViewportTo(targetTransform, 320);
+	} else {
+		transform = targetTransform;
+		dirty = true;
+		kickRaf();
+	}
 }
 
 function updateLegend(s, network) {
@@ -2258,7 +2553,11 @@ function pickNetworkNode(clientX, clientY) {
 	return best;
 }
 
-function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zoom) {
+function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zoom, opacitySetting) {
+	const opacityScale = (typeof opacitySetting === 'number' && Number.isFinite(opacitySetting))
+		? (opacitySetting / 0.55)
+		: 1.0;
+
 	if (isConnectedToHighlight) {
 		return {
 			color: '#2dd4bf',
@@ -2274,7 +2573,7 @@ function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zo
 		return {
 			color: 'rgba(148, 163, 184, 0.05)',
 			width: 0.6 / zoom,
-			alpha: 0.05,
+			alpha: Math.min(1.0, 0.05 * opacityScale),
 			dash: [],
 			priority: 0,
 			showArrow: false,
@@ -2289,7 +2588,7 @@ function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zo
 		return {
 			color: 'rgba(100, 116, 139, 0.25)',
 			width: 0.75 / zoom,
-			alpha: 0.35,
+			alpha: Math.min(1.0, 0.35 * opacityScale),
 			dash: [2, 3],
 			priority: 1,
 			showArrow: false,
@@ -2300,7 +2599,7 @@ function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zo
 		return {
 			color: 'rgba(167, 139, 250, 0.55)',
 			width: 1.35 / zoom,
-			alpha: 0.6,
+			alpha: Math.min(1.0, 0.6 * opacityScale),
 			dash: [],
 			priority: 10,
 			showArrow: zoom >= 1.2,
@@ -2312,7 +2611,7 @@ function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zo
 		return {
 			color: 'rgba(244, 114, 182, 0.6)',
 			width: 1.1 / zoom,
-			alpha: 0.65,
+			alpha: Math.min(1.0, 0.65 * opacityScale),
 			dash: [4, 4],
 			priority: 8,
 			showArrow: zoom >= 0.9,
@@ -2323,7 +2622,7 @@ function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zo
 		return {
 			color: 'rgba(245, 158, 11, 0.65)',
 			width: 1.3 / zoom,
-			alpha: 0.75,
+			alpha: Math.min(1.0, 0.75 * opacityScale),
 			dash: [],
 			priority: 9,
 			showArrow: zoom >= 0.9,
@@ -2335,7 +2634,7 @@ function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zo
 		return {
 			color: 'rgba(148, 163, 184, 0.32)',
 			width: 0.8 / zoom,
-			alpha: 0.4,
+			alpha: Math.min(1.0, 0.4 * opacityScale),
 			dash: [],
 			priority: 2,
 			showArrow: false,
@@ -2347,7 +2646,7 @@ function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zo
 	return {
 		color: 'rgba(148, 163, 184, 0.22)',
 		width: 0.85 / zoom,
-		alpha: 0.35,
+		alpha: Math.min(1.0, 0.35 * opacityScale),
 		dash: [],
 		priority: 3,
 		showArrow: zoom >= 1.3,
@@ -2389,19 +2688,17 @@ function drawNetworkFrame() {
 	const entryId = snapshot && snapshot.entryNodeId;
 	const activeHighlightId = selectedNodeId || hoveredNodeId;
 
-	// Build connected node lookup for focus / neighborhood highlighting
-	const connectedNodeIds = new Set();
+	// Build connected node lookup using pre-indexed neighbor map
+	let connectedNodeIds = null;
 	if (activeHighlightId) {
+		const cachedNeighbors = nodeNeighborsMap.get(activeHighlightId);
+		connectedNodeIds = cachedNeighbors ? new Set(cachedNeighbors) : new Set();
 		connectedNodeIds.add(activeHighlightId);
-		for (let i = 0; i < edges.length; i++) {
-			const e = edges[i];
-			if (e.source === activeHighlightId) connectedNodeIds.add(e.target);
-			if (e.target === activeHighlightId) connectedNodeIds.add(e.source);
-		}
 	}
 
 	// 1. Draw Network Edges (Z-bucketed semantic rendering with LOD culling)
 	const edgesToDraw = [];
+	const opacityVal = settings.networkEdgeOpacity;
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
 		const p1 = screenPos(e.source);
@@ -2409,7 +2706,7 @@ function drawNetworkFrame() {
 		if (!p1 || !p2) continue;
 
 		const isConnectedToHighlight = activeHighlightId && (e.source === activeHighlightId || e.target === activeHighlightId);
-		const desc = evaluateNetworkEdge(e, isConnectedToHighlight, activeHighlightId, transform.k);
+		const desc = evaluateNetworkEdge(e, isConnectedToHighlight, activeHighlightId, transform.k, opacityVal);
 		if (!desc) continue;
 
 		edgesToDraw.push({ p1: p1, p2: p2, desc: desc });
@@ -2429,6 +2726,7 @@ function drawNetworkFrame() {
 		ctx.lineTo(p2.x, p2.y);
 		ctx.strokeStyle = desc.color;
 		ctx.lineWidth = desc.width;
+		ctx.globalAlpha = desc.alpha;
 		if (desc.dash && desc.dash.length > 0) {
 			ctx.setLineDash(desc.dash);
 		}
@@ -2456,7 +2754,7 @@ function drawNetworkFrame() {
 		const isHovered = hoveredNodeId === node.id;
 		const r = computeNetworkVisualRadius(node, p.depthScale || 1, entryId, isSelected, isHovered);
 		const depthAlpha = computeDepthAlpha(p.depthScale || 1);
-		const isDimmed = Boolean(activeHighlightId && !connectedNodeIds.has(node.id));
+		const isDimmed = Boolean(activeHighlightId && connectedNodeIds && !connectedNodeIds.has(node.id));
 
 		ctx.save();
 		ctx.globalAlpha = isDimmed ? 0.25 : depthAlpha;
@@ -2574,7 +2872,9 @@ function render(first) {
 		updateLegend(null, false);
 		updateTemporalUI(temporalState, temporalDiff);
 		if (first && temporalDiff && temporalDiff.nodes && temporalDiff.nodes.length) {
-			fitView();
+			fitView(false);
+		} else if (keepGraphCentered) {
+			applyCenterLock(true);
 		}
 		dirty = true;
 		kickRaf();
@@ -2605,6 +2905,7 @@ function render(first) {
 	if (netCanvas) netCanvas.style.display = 'block';
 	resizeCanvas();
 	const layoutChanged = rebuildBase3d(snapshot);
+	rebuildAdjacencyAndStaticDescriptors();
 	updateLegend(snapshot, true);
 	if (status) {
 		status.style.display = 'block';
@@ -2612,7 +2913,10 @@ function render(first) {
 	}
 	if (first || layoutChanged) {
 		projectAll();
-		fitView();
+		fitView(false);
+	} else if (keepGraphCentered) {
+		projectAll();
+		applyCenterLock(true);
 	}
 	dirty = true;
 	kickRaf();
@@ -2887,6 +3191,10 @@ function onPointerMove(e) {
 		const mapped = mapPointerDeltaToGraphRotation(dx, dy);
 		rotation.yaw = wrapRotationAngle(rotation.yaw + mapped.yaw);
 		rotation.pitch = wrapRotationAngle(rotation.pitch + mapped.pitch);
+		projectAll();
+		if (keepGraphCentered) {
+			applyCenterLock(true);
+		}
 		dirty = true;
 		kickRaf();
 		return;
@@ -2894,23 +3202,49 @@ function onPointerMove(e) {
 
 	if (!moved) return;
 	if (!panning) return;
+	if (keepGraphCentered) {
+		// Panning is disabled while Keep Graph Centered is active
+		return;
+	}
 	interactionState = 'panning';
-	transform.x += dx; transform.y += dy;
-	dirty = true; kickRaf();
+	const panSens = (typeof settings.panSensitivity === 'number' && Number.isFinite(settings.panSensitivity) && settings.panSensitivity > 0)
+		? settings.panSensitivity
+		: 1.0;
+	transform.x += dx * panSens;
+	transform.y += dy * panSens;
+	dirty = true;
+	kickRaf();
 }
 
 function onWheel(e) {
 	if (!netCanvas) return;
 	e.preventDefault();
 	scheduleIdleResume();
-	const factor = e.deltaY < 0 ? 1.1 : 0.9;
-	const prev = transform.k;
-	transform.k = Math.min(3.5, Math.max(0.15, transform.k * factor));
+	cancelCameraAnimation();
+
+	const normalizedDelta = normalizeWheelZoomDelta({
+		deltaY: e.deltaY,
+		deltaMode: e.deltaMode,
+		ctrlKey: e.ctrlKey,
+		sensitivity: settings.zoomSensitivity ?? 1.0
+	});
+	if (normalizedDelta === 0) return;
+
+	const factor = computeContinuousZoomFactor(normalizedDelta);
 	const rect = netCanvas.getBoundingClientRect();
-	const mx = e.clientX - rect.left, my = e.clientY - rect.top;
-	transform.x = mx - (mx - transform.x) * (transform.k / prev);
-	transform.y = my - (my - transform.y) * (transform.k / prev);
-	dirty = true; kickRaf();
+	const mx = e.clientX - rect.left;
+	const my = e.clientY - rect.top;
+
+	if (keepGraphCentered) {
+		const insets = getUsableInsets();
+		transform = applyZoomAroundCenter(transform, factor, rect.width, rect.height, MIN_ZOOM, MAX_ZOOM, insets);
+		applyCenterLock(true);
+	} else {
+		transform = applyZoomAroundCursor(transform, factor, mx, my, MIN_ZOOM, MAX_ZOOM);
+	}
+
+	dirty = true;
+	kickRaf();
 }
 
 // 5. Message Dispatcher
@@ -2924,7 +3258,13 @@ window.addEventListener('message', function (e) {
 	} else if (msg.type === 'snapshot') {
 		snapshot = msg.payload.snapshot;
 		diagnostics = msg.payload.diagnostics;
-		if (msg.payload.settings) settings = msg.payload.settings;
+		if (msg.payload.settings) {
+			settings = msg.payload.settings;
+			if (typeof settings.keepGraphCentered === 'boolean') {
+				keepGraphCentered = settings.keepGraphCentered;
+				syncCenterLockUI();
+			}
+		}
 		if (msg.payload.graphType) graphType = msg.payload.graphType;
 		if (msg.payload.temporalState) {
 			temporalState = msg.payload.temporalState;
@@ -2932,6 +3272,15 @@ window.addEventListener('message', function (e) {
 			updateTemporalDiffTransition(temporalDiff);
 		}
 		render(false);
+	} else if (msg.type === 'settings') {
+		settings = msg.payload;
+		if (typeof settings.keepGraphCentered === 'boolean') {
+			keepGraphCentered = settings.keepGraphCentered;
+			syncCenterLockUI();
+			if (keepGraphCentered) applyCenterLock(true);
+		}
+		dirty = true;
+		kickRaf();
 	} else if (msg.type === 'temporalState') {
 		graphType = 'temporal';
 		temporalState = msg.payload;
@@ -2946,10 +3295,10 @@ window.addEventListener('message', function (e) {
 		updateTemporalDiffTransition(temporalDiff);
 		updateTemporalUI(temporalState, temporalDiff);
 	} else if (msg.type === 'fitView') {
-		fitView();
+		fitView(true);
 	} else if (msg.type === 'resetView') {
 		resetCamera(false);
-		fitView();
+		fitView(true);
 	}
 });
 
@@ -3150,14 +3499,63 @@ window.addEventListener('keydown', function (e) {
 	}
 });
 
+if (centerLockBtn) {
+	centerLockBtn.onclick = function () {
+		cancelCameraAnimation();
+		keepGraphCentered = !keepGraphCentered;
+		settings.keepGraphCentered = keepGraphCentered;
+		syncCenterLockUI();
+		request('updateSetting', { key: 'prebase.interaction.keepGraphCentered', value: keepGraphCentered });
+		if (keepGraphCentered) {
+			applyCenterLock(true);
+		}
+	};
+}
+
 const zoomInBtn = document.getElementById('zoomIn');
-if (zoomInBtn) zoomInBtn.onclick = function () { transform.k = Math.min(3.5, transform.k * 1.15); dirty = true; kickRaf(); };
+if (zoomInBtn) {
+	zoomInBtn.onclick = function () {
+		cancelCameraAnimation();
+		const w = netCanvas ? netCanvas.clientWidth : 800;
+		const h = netCanvas ? netCanvas.clientHeight : 600;
+		const insets = getUsableInsets();
+		const target = keepGraphCentered
+			? applyZoomAroundCenter(transform, 1.25, w, h, MIN_ZOOM, MAX_ZOOM, insets)
+			: applyZoomAroundCenter(transform, 1.25, w, h, MIN_ZOOM, MAX_ZOOM);
+		animateViewportTo(target, 180);
+	};
+}
+
 const zoomOutBtn = document.getElementById('zoomOut');
-if (zoomOutBtn) zoomOutBtn.onclick = function () { transform.k = Math.max(0.15, transform.k / 1.15); dirty = true; kickRaf(); };
+if (zoomOutBtn) {
+	zoomOutBtn.onclick = function () {
+		cancelCameraAnimation();
+		const w = netCanvas ? netCanvas.clientWidth : 800;
+		const h = netCanvas ? netCanvas.clientHeight : 600;
+		const insets = getUsableInsets();
+		const target = keepGraphCentered
+			? applyZoomAroundCenter(transform, 0.8, w, h, MIN_ZOOM, MAX_ZOOM, insets)
+			: applyZoomAroundCenter(transform, 0.8, w, h, MIN_ZOOM, MAX_ZOOM);
+		animateViewportTo(target, 180);
+	};
+}
+
 const fitBtn = document.getElementById('fit');
-if (fitBtn) fitBtn.onclick = function () { fitView(); };
+if (fitBtn) {
+	fitBtn.onclick = function () {
+		cancelCameraAnimation();
+		fitView(true);
+	};
+}
+
 const resetBtn = document.getElementById('reset');
-if (resetBtn) resetBtn.onclick = function () { resetCamera(false); fitView(); };
+if (resetBtn) {
+	resetBtn.onclick = function () {
+		cancelCameraAnimation();
+		resetCamera(false);
+		fitView(true);
+	};
+}
 
 let lastViewportW = 0;
 let lastViewportH = 0;
@@ -3184,6 +3582,10 @@ function onStageResize(newW, newH) {
 	}
 
 	resizeCanvas();
+
+	if (keepGraphCentered) {
+		applyCenterLock(true);
+	}
 
 	if (popup && popup.style.display !== 'none') {
 		const pw = popup.offsetWidth || 320;
@@ -3235,6 +3637,16 @@ function rafLoop(ts) {
 	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
 	lastRafTs = ts;
 
+	if (activeCameraAnim) {
+		const elapsed = ts - activeCameraAnim.startTs;
+		const progress = Math.min(1.0, elapsed / activeCameraAnim.duration);
+		transform = interpolateViewport(activeCameraAnim.from, activeCameraAnim.to, progress);
+		if (elapsed >= activeCameraAnim.duration) {
+			activeCameraAnim = null;
+		}
+		dirty = true;
+	}
+
 	if (isTemporal()) {
 		if (dirty || isAnimatingTemporal) {
 			drawTemporalFrame(ts);
@@ -3244,10 +3656,14 @@ function rafLoop(ts) {
 		const animating = canIdleRotate() && !idlePaused;
 		if (animating) {
 			rotation.yaw += IDLE_YAW * dt;
+			if (keepGraphCentered) {
+				projectAll();
+				applyCenterLock(true);
+			}
 			dirty = true;
 		}
 		if (dirty && isNetwork() && snapshot) drawNetworkFrame();
-		if (animating) kickRaf();
+		if (animating || activeCameraAnim) kickRaf();
 	}
 }
 kickRaf();
@@ -3258,7 +3674,13 @@ request('getSnapshot').then(function (res) {
 	snapshot = res.snapshot;
 	diagnostics = res.diagnostics;
 	selectedNodeId = res.selectedNodeId || null;
-	if (res.settings) settings = res.settings;
+	if (res.settings) {
+		settings = res.settings;
+		if (typeof settings.keepGraphCentered === 'boolean') {
+			keepGraphCentered = settings.keepGraphCentered;
+			syncCenterLockUI();
+		}
+	}
 	if (res.graphType) {
 		graphType = res.graphType;
 	} else if (initialGraphType) {
@@ -3271,10 +3693,10 @@ request('getSnapshot').then(function (res) {
 	}
 	render(true);
 	if (isTemporal()) {
-		fitView();
+		fitView(false);
 	} else {
 		resetCamera(false);
-		fitView();
+		fitView(false);
 		scheduleIdleResume();
 	}
 }).catch(function (err) {

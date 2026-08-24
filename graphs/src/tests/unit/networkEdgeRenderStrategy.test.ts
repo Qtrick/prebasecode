@@ -6,10 +6,10 @@
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
 import { NetworkEdgeRenderStrategy } from '../../view/network/networkEdgeRenderStrategy.js';
-import type { GraphEdge } from '../../common/types/graphTypes.js';
+import type { GraphEdge, EdgeKind } from '../../common/types/graphTypes.js';
 
 suite('NetworkEdgeRenderStrategy (Unit - Semantic Edge Variants & LOD)', () => {
-	function makeEdge(kind: string, source = 'n1', target = 'n2', meta?: any): GraphEdge {
+	function makeEdge(kind: EdgeKind, source = 'n1', target = 'n2', meta?: any): GraphEdge {
 		return {
 			id: `${source}-${target}`,
 			source,

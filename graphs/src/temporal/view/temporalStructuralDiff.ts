@@ -28,7 +28,6 @@ export interface ComparisonMatchEvidence {
 
 const EMPTY_BLOB_HASHES = new Set([
 	'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', // SHA-1 empty blob
-	'4b825dc642cb6eb9a060e54bf8d69288fbee4904', // SHA-1 empty tree
 	'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', // SHA-256 empty blob
 ]);
 
