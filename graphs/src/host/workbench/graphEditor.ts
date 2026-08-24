@@ -429,6 +429,11 @@ export class PreBaseGraphEditor extends EditorPane {
 				await reply({ ok: true });
 				break;
 			}
+			case 'retryTemporalSelection': {
+				await this.temporalViewService.retrySelection();
+				await reply({ ok: true });
+				break;
+			}
 			case 'selectTemporalCommitIndex': {
 				const p = message.payload as { index?: number; immediate?: boolean } | undefined;
 				if (typeof p?.index === 'number') {
@@ -719,6 +724,14 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #temporalDisplayModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
 #temporalContextModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
 #temporalContextModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
+#temporalViewportControls button:hover { background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1)); }
+#temporalViewportControls button:focus-visible { outline:1px solid var(--vscode-focusBorder, #007fd4); outline-offset:1px; }
+#temporalCenterLockBtn[aria-pressed="true"] { color:var(--vscode-button-background, #2dd4bf) !important; border-color:var(--vscode-button-background, #2dd4bf) !important; background:rgba(45, 212, 191, 0.16) !important; }
+#temporalCenterLockBtn .icon-pressed { display:none; }
+#temporalCenterLockBtn[aria-pressed="true"] .icon-unpressed { display:none; }
+#temporalCenterLockBtn[aria-pressed="true"] .icon-pressed { display:block !important; }
+#temporalRetryBtn:hover { background:var(--vscode-button-secondaryHoverBackground, #45494e); }
+
 #temporalScrubberBar { position:absolute; left:12px; right:12px; bottom:12px; z-index:5; display:none; flex-direction:column; gap:6px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:8px 12px; font-size:12px; backdrop-filter:blur(8px); }
 #temporalScrubberBar .row { display:flex; align-items:center; width:100%; box-sizing:border-box; }
 #temporalScrubberBar .controls-row { display:flex; align-items:center; gap:8px; width:100%; }
@@ -831,16 +844,25 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	</div>
 </div>
 
-<!-- Temporal Minimal Canvas Breadcrumb -->
+<!-- Temporal Minimal Canvas Breadcrumb & Viewport Toolbar -->
 <div id="temporalToolbar">
 	<div id="temporalDisplayModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:6px; overflow:hidden; background:rgba(0,0,0,0.25); flex-shrink:0;">
-		<button id="temporalModeStateBtn" type="button" class="active" title="Full Codebase Architecture Map" style="padding:2px 8px; font-size:10.5px;">Full Map</button>
-		<button id="temporalModeChangesBtn" type="button" title="Focus on Changed Files & Direct Dependencies" style="padding:2px 8px; font-size:10.5px;">Focus Changes</button>
+		<button id="temporalModeStateBtn" type="button" class="active" title="Full Codebase Architecture Map (1)" style="padding:2px 8px; font-size:10.5px;">Full Map</button>
+		<button id="temporalModeChangesBtn" type="button" title="Focus on Changed Files & Direct Dependencies (2)" style="padding:2px 8px; font-size:10.5px;">Focus Changes</button>
 	</div>
 	<div id="temporalBreadcrumbWrap" style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1;">
 		<span id="temporalBreadcrumbTarget" style="font-family:monospace; font-weight:600; color:var(--vscode-textLink-foreground, #58a6ff);"></span>
 		<span id="temporalBreadcrumbVs" style="opacity:0.5; font-size:10px;">vs</span>
 		<span id="temporalBreadcrumbBase" style="font-family:monospace; color:var(--vscode-descriptionForeground, #a1a1aa);"></span>
+	</div>
+	<!-- Temporal Viewport Controls -->
+	<div id="temporalViewportControls" style="display:flex; align-items:center; gap:2px; background:rgba(0,0,0,0.2); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:6px; padding:2px; flex-shrink:0;">
+		<button id="temporalFitBtn" type="button" title="Fit to screen / Recenter graph (F or 0)" aria-label="Fit to screen" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M2 2L6.5 2 6.5 3 3.707 3 7.354 6.646 6.646 7.354 3 3.707 3 6.5 2 6.5z M14 14L9.5 14 9.5 13 12.293 13 8.646 9.354 9.354 8.646 13 12.293 13 9.5 14 9.5z"/></svg></button>
+		<button id="temporalCenterLockBtn" type="button" title="Keep graph centered during timeline changes (C)" aria-label="Keep graph centered" aria-pressed="false" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:1px solid transparent; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg class="icon-unpressed" viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M8 1a6 6 0 0 1 6 6c0 2.3-1.5 4.05-3.15 5.07A11 11 0 0 1 8 13.44a11 11 0 0 1-2.85-1.37C3.5 11.05 2 9.3 2 7a6 6 0 0 1 6-6zm0 1a5 5 0 0 0-5 5c0 .34.03.66.1.96C3.53 9.86 5.63 10.94 8 12.4c2.37-1.46 4.47-2.54 4.9-4.44.07-.3.1-.62.1-.96a5 5 0 0 0-5-5zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg><svg class="icon-pressed" viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none; display:none;"><path d="M8 1a6 6 0 0 1 6 6c0 2.3-1.5 4.05-3.15 5.07A11 11 0 0 1 8 13.44a11 11 0 0 1-2.85-1.37C3.5 11.05 2 9.3 2 7a6 6 0 0 1 6-6zm0 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg></button>
+		<button id="temporalZoomInBtn" type="button" title="Zoom in (+)" aria-label="Zoom in" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M7.5 2a5.5 5.5 0 0 1 4.383 8.838l4.471 4.47-.707.707-4.47-4.47A5.5 5.5 0 1 1 7.5 2zm0 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM8 5v2h2v1H8v2H7V8H5V7h2V5h1z"/></svg></button>
+		<button id="temporalZoomOutBtn" type="button" title="Zoom out (-)" aria-label="Zoom out" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M7.5 2a5.5 5.5 0 0 1 4.383 8.838l4.471 4.47-.707.707-4.47-4.47A5.5 5.5 0 1 1 7.5 2zm0 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM5 7h5v1H5V7z"/></svg></button>
+		<button id="temporalResetBtn" type="button" title="Reset View (R)" aria-label="Reset View" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M13.45 8.17c-.44 2.61-2.72 4.58-5.45 4.58A5.5 5.5 0 0 1 2.5 7.25h1.01a4.5 4.5 0 0 0 4.49 4.5c2.17 0 3.98-1.55 4.42-3.6l-1.71.57-.32-.95 3.12-1.04.95 3.12-.95.32-.06-.99zM2.55 6.83C2.99 4.22 5.27 2.25 8 2.25a5.5 5.5 0 0 1 5.5 5.5h-1.01a4.5 4.5 0 0 0-4.49-4.5c-2.17 0-3.98 1.55-4.42 3.6l1.71-.57.32.95-3.12 1.04L1.54 5.15l.95-.32.06.99z"/></svg></button>
+		<button id="temporalHelpBtn" type="button" title="Keyboard Shortcuts (Alt+F1 or ?)" aria-label="Keyboard Shortcuts" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6zm-.1 2.5a2.2 2.2 0 0 0-2.2 2.2.6.6 0 0 0 1.2 0 .99.99 0 1 1 1.69.7.6.6 0 0 0-.15.42v1a.6.6 0 0 0 1.2 0v-.66a2.2 2.2 0 0 0-.74-1.66 1 1 0 0 0-.1-.08A1 1 0 0 1 7.9 4.7zm.1 6.3a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z"/></svg></button>
 	</div>
 	<div id="temporalDiffBadges" style="display:flex; gap:4px; font-size:10.5px; margin-left:auto; flex-shrink:0; align-items:center;">
 		<span id="badgeAdded" class="badge-added" title="Added nodes">+0</span>
@@ -849,7 +871,9 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<span id="badgeRenamed" class="badge-renamed" title="Renamed nodes">⇄0</span>
 		<span id="temporalPartialWarning" class="badge-warning" style="display:none;"></span>
 		<span id="temporalCommitStatus" class="status-pill" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; border-radius:10px; padding:2px 7px; font-weight:600;"></span>
-	</div></div>
+		<button id="temporalRetryBtn" type="button" title="Retry loading target commit" aria-label="Retry" style="display:none; font-size:10px; font-weight:600; padding:2px 8px; border-radius:4px; border:1px solid var(--vscode-widget-border, #3C3C3C); background:var(--vscode-button-secondaryBackground, #3a3d41); color:var(--vscode-button-secondaryForeground, #ffffff); cursor:pointer;">Retry</button>
+	</div>
+</div>
 
 <!-- Temporal Scrubber Bar -->
 <div id="temporalScrubberBar">
@@ -981,6 +1005,13 @@ const temporalPartialWarning = document.getElementById('temporalPartialWarning')
 const temporalToggleDetailsBtn = document.getElementById('temporalToggleDetailsBtn');
 const temporalDetailsPanel = document.getElementById('temporalDetailsPanel');
 const temporalDetailsClose = document.getElementById('temporalDetailsClose');
+const temporalFitBtn = document.getElementById('temporalFitBtn');
+const temporalCenterLockBtn = document.getElementById('temporalCenterLockBtn');
+const temporalZoomInBtn = document.getElementById('temporalZoomInBtn');
+const temporalZoomOutBtn = document.getElementById('temporalZoomOutBtn');
+const temporalResetBtn = document.getElementById('temporalResetBtn');
+const temporalHelpBtn = document.getElementById('temporalHelpBtn');
+const temporalRetryBtn = document.getElementById('temporalRetryBtn');
 const badgeAdded = document.getElementById('badgeAdded');
 const badgeRemoved = document.getElementById('badgeRemoved');
 const badgeModified = document.getElementById('badgeModified');
@@ -1250,10 +1281,16 @@ function getUsableInsets() {
 }
 
 function syncCenterLockUI() {
-	if (!centerLockBtn) return;
-	centerLockBtn.setAttribute('aria-pressed', keepGraphCentered ? 'true' : 'false');
-	centerLockBtn.classList.toggle('active', keepGraphCentered);
-	centerLockBtn.title = keepGraphCentered ? 'Keep graph centered (Active)' : 'Keep graph centered';
+	if (centerLockBtn) {
+		centerLockBtn.setAttribute('aria-pressed', keepGraphCentered ? 'true' : 'false');
+		centerLockBtn.classList.toggle('active', keepGraphCentered);
+		centerLockBtn.title = keepGraphCentered ? 'Keep graph centered (Active)' : 'Keep graph centered';
+	}
+	if (temporalCenterLockBtn) {
+		temporalCenterLockBtn.setAttribute('aria-pressed', keepGraphCentered ? 'true' : 'false');
+		temporalCenterLockBtn.classList.toggle('active', keepGraphCentered);
+		temporalCenterLockBtn.title = keepGraphCentered ? 'Keep graph centered during timeline changes (Active)' : 'Keep graph centered during timeline changes (C)';
+	}
 }
 
 // Reusable scratch list so per-frame center-lock recomputation does not allocate.
@@ -1467,6 +1504,125 @@ function computeNetworkVisualRadius(node, depthScale, entryId, isSelected, isHov
 function computeNetworkPickRadius(node, depthScale, entryId) {
 	const vr = computeNetworkVisualRadius(node, depthScale, entryId, false, false);
 	return Math.max(18, vr * 2.2 + 8);
+}
+
+function computeTemporalUnifiedStatusInWebview(state) {
+	const selectedSha = (state && state.selectedCommitSha) || '';
+	const selectedShort = selectedSha ? ((state.selectedCommitSummary && state.selectedCommitSummary.shortSha) || selectedSha.slice(0, 7)) : '';
+	const renderedSha = (state && state.renderedCommitSha) || '';
+	const renderedShort = renderedSha ? ((state.renderedCommitSummary && state.renderedCommitSummary.shortSha) || renderedSha.slice(0, 7)) : '';
+
+	if (state && state.isLoadingHistory) {
+		return {
+			kind: 'loading-history',
+			label: 'Loading History…',
+			title: 'Reading commit timeline from Git repository',
+			isJobActive: true,
+			isError: false,
+			canRetry: false,
+			colorVar: 'var(--vscode-editorWarning-foreground, #d29922)',
+			bgVar: 'rgba(210, 153, 34, 0.15)'
+		};
+	}
+
+	if (state && state.isLoadingSelection) {
+		return {
+			kind: 'reconstructing',
+			label: 'Indexing…',
+			title: selectedShort ? ('Reconstructing graph for ' + selectedShort + '…') : 'Reconstructing graph for target commit…',
+			isJobActive: true,
+			isError: false,
+			canRetry: false,
+			colorVar: 'var(--vscode-editorWarning-foreground, #d29922)',
+			bgVar: 'rgba(210, 153, 34, 0.15)'
+		};
+	}
+
+	if (state && state.selectionError) {
+		const isStaleRender = Boolean(renderedSha && renderedSha !== selectedSha);
+		const errorMsg = state.selectionError;
+		const title = isStaleRender
+			? ('Could not load ' + (selectedShort || selectedSha) + '. Showing previous graph ' + (renderedShort || renderedSha) + '. ' + errorMsg)
+			: ('Failed to load graph for ' + (selectedShort || selectedSha || 'target commit') + ': ' + errorMsg);
+
+		return {
+			kind: 'error',
+			label: 'Error',
+			title: title,
+			isJobActive: false,
+			isError: true,
+			error: errorMsg,
+			staleRenderedSha: isStaleRender ? renderedSha : undefined,
+			canRetry: true,
+			colorVar: 'var(--vscode-errorForeground, #f85149)',
+			bgVar: 'rgba(248, 81, 73, 0.15)'
+		};
+	}
+
+	if (state && state.historyError) {
+		return {
+			kind: 'error',
+			label: 'Error',
+			title: 'History error: ' + state.historyError,
+			isJobActive: false,
+			isError: true,
+			error: state.historyError,
+			canRetry: true,
+			colorVar: 'var(--vscode-errorForeground, #f85149)',
+			bgVar: 'rgba(248, 81, 73, 0.15)'
+		};
+	}
+
+	if (selectedSha && renderedSha && selectedSha !== renderedSha) {
+		return {
+			kind: 'stale',
+			label: 'Stale View',
+			title: 'Showing graph for ' + (renderedShort || renderedSha) + ' (selected: ' + (selectedShort || selectedSha) + '). Click to reconcile.',
+			isJobActive: false,
+			isError: false,
+			staleRenderedSha: renderedSha,
+			canRetry: true,
+			colorVar: 'var(--vscode-descriptionForeground, #a1a1aa)',
+			bgVar: 'rgba(161, 161, 170, 0.15)'
+		};
+	}
+
+	if (state && state.isPartialLineage) {
+		return {
+			kind: 'partial',
+			label: 'Partial History',
+			title: 'Lineage coverage is partial; structural comparison is truthful.',
+			isJobActive: false,
+			isError: false,
+			canRetry: false,
+			colorVar: 'var(--vscode-descriptionForeground, #a1a1aa)',
+			bgVar: 'rgba(161, 161, 170, 0.15)'
+		};
+	}
+
+	if (!state || !state.pagedTimeline || state.pagedTimeline.length === 0) {
+		return {
+			kind: 'idle',
+			label: 'No History',
+			title: 'No commit history available for active ref',
+			isJobActive: false,
+			isError: false,
+			canRetry: false,
+			colorVar: 'var(--vscode-descriptionForeground, #a1a1aa)',
+			bgVar: 'rgba(161, 161, 170, 0.12)'
+		};
+	}
+
+	return {
+		kind: 'ready',
+		label: 'Ready',
+		title: 'Graph fully indexed and reconciled',
+		isJobActive: false,
+		isError: false,
+		canRetry: false,
+		colorVar: 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)',
+		bgVar: 'rgba(63, 185, 80, 0.15)'
+	};
 }
 
 // Cached Focus+Context derivation: recomputed only when the diff, display mode or
@@ -1985,29 +2141,16 @@ function updateTemporalUI(state, diff) {
 			if (temporalCommitMessage) temporalCommitMessage.textContent = commit.message || '';
 			if (temporalCommitAuthor) temporalCommitAuthor.textContent = commit.author ? 'by ' + commit.author : '';
 
-			const isRendered = state.renderedCommitSha === state.selectedCommitSha;
 			if (temporalCommitStatus) {
-				if (state.isLoadingSelection || !isRendered) {
-					temporalCommitStatus.textContent = 'Indexing…';
-					temporalCommitStatus.title = 'Reconstructing graph for target commit';
-					temporalCommitStatus.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
-					temporalCommitStatus.style.background = 'rgba(210, 153, 34, 0.15)';
-				} else if (state.selectionError) {
-					temporalCommitStatus.textContent = 'Error';
-					temporalCommitStatus.title = state.selectionError;
-					temporalCommitStatus.style.color = 'var(--vscode-errorForeground, #f85149)';
-					temporalCommitStatus.style.background = 'rgba(248, 81, 73, 0.15)';
-				} else if (state.isPartialLineage) {
-					temporalCommitStatus.textContent = 'Partial History';
-					temporalCommitStatus.title = 'Lineage coverage is partial; structural comparison is truthful.';
-					temporalCommitStatus.style.color = 'var(--vscode-descriptionForeground, #a1a1aa)';
-					temporalCommitStatus.style.background = 'rgba(161, 161, 170, 0.15)';
-				} else {
-					temporalCommitStatus.textContent = 'Ready';
-					temporalCommitStatus.title = 'Graph fully indexed and reconciled';
-					temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
-					temporalCommitStatus.style.background = 'rgba(63, 185, 80, 0.15)';
-				}
+				const unifiedStatus = computeTemporalUnifiedStatusInWebview(state);
+				temporalCommitStatus.textContent = unifiedStatus.label;
+				temporalCommitStatus.title = unifiedStatus.title;
+				temporalCommitStatus.style.color = unifiedStatus.colorVar;
+				temporalCommitStatus.style.background = unifiedStatus.bgVar;
+			}
+			if (temporalRetryBtn) {
+				const unifiedStatus = computeTemporalUnifiedStatusInWebview(state);
+				temporalRetryBtn.style.display = unifiedStatus.canRetry ? 'inline-block' : 'none';
 			}
 			if (temporalScrubber) temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
 		}
@@ -2255,23 +2398,37 @@ function drawTemporalFrame(ts) {
 	ctx.translate(transform.x, transform.y);
 	ctx.scale(transform.k, transform.k);
 
-	// 2. Render Architecture Hierarchy Guides in Full Codebase Mode
+	// 2. Render Architecture Hierarchy / Community Region Boundaries in Full Codebase Mode
 	if (displayMode === 'state' && temporalDiff && Array.isArray(temporalDiff.guides)) {
 		for (let g = 0; g < temporalDiff.guides.length; g++) {
 			const guide = temporalDiff.guides[g];
 			if (guide && guide.radius > 0) {
 				ctx.save();
+				const gRadius = guide.radius || 70;
+				const gx = guide.x || 0;
+				const gy = guide.y || 0;
 				ctx.beginPath();
-				ctx.arc(0, 0, guide.radius, 0, Math.PI * 2);
-				ctx.strokeStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.16)' : 'rgba(148, 163, 184, 0.10)';
-				ctx.lineWidth = 1.0;
+				ctx.arc(gx, gy, gRadius, 0, Math.PI * 2);
+				ctx.fillStyle = theme.isHighContrast
+					? 'rgba(255, 255, 255, 0.03)'
+					: (guide.color ? (guide.color + '0c') : 'rgba(99, 102, 241, 0.04)');
+				ctx.fill();
+				ctx.strokeStyle = theme.isHighContrast
+					? 'rgba(255, 255, 255, 0.18)'
+					: (guide.color ? (guide.color + '38') : 'rgba(99, 102, 241, 0.18)');
+				ctx.lineWidth = 1.2;
 				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 6]);
 				ctx.stroke();
-				if (guide.label && transform.k >= 0.45) {
-					ctx.font = '9.5px ui-sans-serif, system-ui, sans-serif';
-					ctx.fillStyle = theme.isHighContrast ? 'rgba(255, 255, 255, 0.35)' : 'rgba(148, 163, 184, 0.4)';
-					ctx.textAlign = 'left';
-					ctx.fillText(guide.label.toUpperCase(), 12, -guide.radius + 12);
+
+				// Region Header Label (Upper edge of cluster hull)
+				if (guide.label && transform.k >= 0.35) {
+					ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
+					ctx.fillStyle = theme.isHighContrast
+						? 'rgba(255, 255, 255, 0.65)'
+						: (guide.color || 'var(--vscode-descriptionForeground, #a1a1aa)');
+					ctx.textAlign = 'center';
+					ctx.textBaseline = 'bottom';
+					ctx.fillText(guide.label.toUpperCase(), gx, gy - gRadius - 6);
 				}
 				ctx.restore();
 			}
@@ -2310,9 +2467,14 @@ function drawTemporalFrame(ts) {
 			const isEdgeActive = isEdgeConnectedToActive(edge);
 			const isEdgeChanged = Boolean(edge.changeKind && edge.changeKind !== 'unchanged');
 
-			// Edge LOD: at low zoom (transform.k < 0.65) in full state mode, suppress unchanged distant edges unless active
-			if (displayMode === 'state' && transform.k < 0.65 && !isEdgeActive && !isEdgeChanged) {
-				continue;
+			// Semantic Edge LOD:
+			// - Changed edges and active (selected/hovered) edges are ALWAYS rendered at any zoom.
+			// - In Full Map mode at far zoom (k < 0.65), suppress unchanged low-priority edges to prevent blob clutter.
+			// - During active drag/pan interaction, drop low-priority unchanged edges for 60fps responsiveness.
+			if (displayMode === 'state' && !isEdgeActive && !isEdgeChanged) {
+				if (transform.k < 0.65 || interactionState === 'drag' || interactionState === 'pan') {
+					continue;
+				}
 			}
 
 			const sp = getVisualNodePosition(sourceNode, ease);
@@ -3642,7 +3804,7 @@ window.addEventListener('keydown', function (e) {
 
 	// Escape works everywhere except while typing in inputs (first Escape exits the field).
 	if (e.key === 'Escape') {
-		if (popup && popup.style.display !== 'none') {
+		if (popup && popup.style && popup.style.display && popup.style.display !== 'none') {
 			clearGraphSelection(true);
 			e.preventDefault();
 			return;
@@ -3655,7 +3817,7 @@ window.addEventListener('keydown', function (e) {
 	if (isTextInput) return;
 
 	const canvasFocused = document.activeElement === netCanvas;
-	if ((e.key === 'F1' || (e.key === '/' && e.shiftKey)) && canvasFocused) {
+	if (((e.key === 'F1' && (e.altKey || e.metaKey)) || (e.key === '/' && e.shiftKey) || e.key === '?') && canvasFocused) {
 		const helpEl = document.getElementById('graphKbdHelp');
 		if (helpEl) helpEl.hidden = !helpEl.hidden;
 		e.preventDefault();
@@ -3699,6 +3861,7 @@ window.addEventListener('keydown', function (e) {
 		case 'C':
 			e.preventDefault();
 			if (centerLockBtn) centerLockBtn.click();
+			else if (temporalCenterLockBtn) temporalCenterLockBtn.click();
 			announceGraph(keepGraphCentered ? 'Keep centered on' : 'Keep centered off');
 			break;
 		default:
@@ -3740,6 +3903,75 @@ if (centerLockBtn) {
 		if (keepGraphCentered) {
 			applyCenterLock(true);
 		}
+	};
+}
+
+if (temporalCenterLockBtn) {
+	temporalCenterLockBtn.onclick = function () {
+		cancelCameraAnimation();
+		keepGraphCentered = !keepGraphCentered;
+		settings.keepGraphCentered = keepGraphCentered;
+		syncCenterLockUI();
+		request('updateSetting', { key: 'prebase.interaction.keepGraphCentered', value: keepGraphCentered });
+		if (keepGraphCentered) {
+			applyCenterLock(true);
+		}
+	};
+}
+
+if (temporalFitBtn) {
+	temporalFitBtn.onclick = function () {
+		cancelCameraAnimation();
+		fitView(true);
+		announceGraph('Fit view');
+	};
+}
+
+if (temporalZoomInBtn) {
+	temporalZoomInBtn.onclick = function () {
+		cancelCameraAnimation();
+		const w = netCanvas ? netCanvas.clientWidth : 800;
+		const h = netCanvas ? netCanvas.clientHeight : 600;
+		const insets = getUsableInsets();
+		const target = keepGraphCentered
+			? applyZoomAroundCenter(transform, 1.25, w, h, MIN_ZOOM, MAX_ZOOM, insets)
+			: applyZoomAroundCenter(transform, 1.25, w, h, MIN_ZOOM, MAX_ZOOM);
+		animateViewportTo(target, 180);
+	};
+}
+
+if (temporalZoomOutBtn) {
+	temporalZoomOutBtn.onclick = function () {
+		cancelCameraAnimation();
+		const w = netCanvas ? netCanvas.clientWidth : 800;
+		const h = netCanvas ? netCanvas.clientHeight : 600;
+		const insets = getUsableInsets();
+		const target = keepGraphCentered
+			? applyZoomAroundCenter(transform, 0.8, w, h, MIN_ZOOM, MAX_ZOOM, insets)
+			: applyZoomAroundCenter(transform, 0.8, w, h, MIN_ZOOM, MAX_ZOOM);
+		animateViewportTo(target, 180);
+	};
+}
+
+if (temporalResetBtn) {
+	temporalResetBtn.onclick = function () {
+		cancelCameraAnimation();
+		resetCamera(false);
+		fitView(true);
+		announceGraph('View reset');
+	};
+}
+
+if (temporalHelpBtn) {
+	temporalHelpBtn.onclick = function () {
+		const helpEl = document.getElementById('graphKbdHelp');
+		if (helpEl) helpEl.hidden = !helpEl.hidden;
+	};
+}
+
+if (temporalRetryBtn) {
+	temporalRetryBtn.onclick = function () {
+		request('retryTemporalSelection');
 	};
 }
 

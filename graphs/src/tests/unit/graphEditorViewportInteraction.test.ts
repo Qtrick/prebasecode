@@ -188,6 +188,7 @@ function createHarness(): Harness {
 		'temporalPlayBtn', 'temporalCommitSha', 'temporalCommitMessage', 'temporalCommitAuthor', 'temporalCommitStatus',
 		'temporalPartialWarning', 'badgeAdded', 'badgeRemoved', 'badgeModified', 'badgeRenamed',
 		'temporalModeChangesBtn', 'temporalModeStateBtn', 'temporalContextModeWrap', 'temporalContextFocusedBtn', 'temporalContextFullBtn', 'temporalToggleDetailsBtn', 'temporalTimelineStrip', 'temporalLoadMoreBtn',
+		'temporalFitBtn', 'temporalCenterLockBtn', 'temporalZoomInBtn', 'temporalZoomOutBtn', 'temporalResetBtn', 'temporalHelpBtn', 'temporalRetryBtn',
 		'temporalDetailsPanel', 'temporalDetailsClose', 'temporalDetailsList', 'temporalDetailsSha', 'temporalDetailsAuthor', 'temporalDetailsParents', 'temporalDetailsSummary',
 		'detailsCommitSha', 'detailsCommitMsg', 'detailsCommitAuthor', 'detailsCommitParents', 'detailsDeltaSummary', 'detailsEntityList',
 		'popup', 'popupTitle', 'popupMeta', 'popupLayerBadge', 'popupChangeBadge', 'popupDetailsList', 'popupAiWrap', 'popupAi', 'popupAiProvenance',
@@ -985,9 +986,21 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		const helpEl = harness.elements.get('graphKbdHelp')!;
 		helpEl.hidden = true;
 
-		// F1 opens help
+		// Plain F1 must NOT open help (preserves VS Code command palette)
 		harness.dispatchKey('F1');
-		assert.strictEqual(helpEl.hidden, false, 'F1 toggles help overlay on');
+		assert.strictEqual(helpEl.hidden, true, 'Plain F1 does not hijack command palette');
+
+		// Alt+F1 opens help
+		harness.dispatchKey('F1', { altKey: true });
+		assert.strictEqual(helpEl.hidden, false, 'Alt+F1 toggles help overlay on');
+
+		// Escape closes help
+		harness.dispatchKey('Escape');
+		assert.strictEqual(helpEl.hidden, true, 'Escape closes help overlay');
+
+		// '?' opens help
+		harness.dispatchKey('?');
+		assert.strictEqual(helpEl.hidden, false, "'?' toggles help overlay on");
 
 		// Escape closes help
 		harness.dispatchKey('Escape');

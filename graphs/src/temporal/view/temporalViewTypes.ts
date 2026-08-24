@@ -147,6 +147,7 @@ export interface ITemporalViewState {
 export interface TemporalLayoutResult {
 	readonly nodes: readonly TemporalRenderNode[];
 	readonly positions: Map<string, { x: number; y: number }>;
+	readonly guides?: readonly any[];
 }
 
 export const IPreBaseTemporalViewService = createDecorator<IPreBaseTemporalViewService>('prebaseTemporalViewService');
@@ -172,7 +173,10 @@ export interface IPreBaseTemporalViewService {
 	loadMoreHistory(): Promise<void>;
 	openSourceDiff(entityId: string): Promise<{ ok: boolean; message?: string }>;
 	openHistoricalFile(entityId: string): Promise<{ ok: boolean; message?: string }>;
+	retrySelection(): Promise<void>;
 	refresh(): Promise<void>;
 }
+
+export * from './temporalStatusModel.js';
 
 

@@ -21,6 +21,14 @@ export interface TemporalFocusContextResult {
 	readonly directContextNodeIds: ReadonlySet<string>;
 	readonly totalNodeCount: number;
 	readonly totalEdgeCount: number;
+	readonly hasZeroChanges: boolean;
+}
+
+export interface ViewportInsets {
+	readonly top?: number;
+	readonly bottom?: number;
+	readonly left?: number;
+	readonly right?: number;
 }
 
 /**
@@ -38,11 +46,25 @@ export interface TemporalFocusContextResult {
  * - Returns the complete target commit topology (excluding removed comparison ghosts).
  */
 export function computeTemporalFocusContext(
-	diff: TemporalStructuralDiff,
+	diff: TemporalStructuralDiff | null | undefined,
 	displayMode: TemporalDisplayMode = 'changes',
 	contextFilterMode: TemporalContextFilterMode = 'focused',
 ): TemporalFocusContextResult {
-	const allNodes = diff.nodes || [];
+	if (!diff || !diff.nodes || diff.nodes.length === 0) {
+		return {
+			displayMode,
+			contextFilterMode,
+			visibleNodes: [],
+			visibleEdges: [],
+			changedNodeIds: new Set(),
+			directContextNodeIds: new Set(),
+			totalNodeCount: 0,
+			totalEdgeCount: 0,
+			hasZeroChanges: true,
+		};
+	}
+
+	const allNodes = diff.nodes;
 	const allEdges = diff.edges || [];
 
 	if (displayMode === 'state') {
@@ -65,6 +87,7 @@ export function computeTemporalFocusContext(
 			directContextNodeIds: visibleNodeIdSet,
 			totalNodeCount: visibleNodes.length,
 			totalEdgeCount: visibleEdges.length,
+			hasZeroChanges: false,
 		};
 	}
 
@@ -72,7 +95,7 @@ export function computeTemporalFocusContext(
 	const changedNodeIds = new Set<string>();
 	for (let i = 0; i < allNodes.length; i++) {
 		const node = allNodes[i];
-		if (node.changeKind !== 'unchanged') {
+		if (node.changeKind && node.changeKind !== 'unchanged') {
 			changedNodeIds.add(node.entityId);
 		}
 	}
@@ -113,26 +136,18 @@ export function computeTemporalFocusContext(
 		}
 	}
 
-	// Handle edge case: commit with 0 changes (e.g. root/clean or unchanged)
+	// Handle edge case: commit with 0 structural graph changes
 	if (changedNodeIds.size === 0) {
-		// In focused mode with 0 changes, display top 20 hub nodes or all nodes if small
-		const visibleNodes = allNodes.slice(0, Math.min(allNodes.length, 30));
-		const visibleNodeIdSet = new Set(visibleNodes.map(n => n.entityId));
-		const visibleEdges = allEdges.filter(e => {
-			const src = e.sourceEntityId || (e as any).sourceId;
-			const tgt = e.targetEntityId || (e as any).targetId;
-			return visibleNodeIdSet.has(src) && visibleNodeIdSet.has(tgt);
-		});
-
 		return {
 			displayMode: 'changes',
 			contextFilterMode,
-			visibleNodes,
-			visibleEdges,
+			visibleNodes: [],
+			visibleEdges: [],
 			changedNodeIds,
-			directContextNodeIds: visibleNodeIdSet,
+			directContextNodeIds,
 			totalNodeCount: allNodes.length,
 			totalEdgeCount: allEdges.length,
+			hasZeroChanges: true,
 		};
 	}
 
@@ -154,6 +169,7 @@ export function computeTemporalFocusContext(
 			directContextNodeIds,
 			totalNodeCount: allNodes.length,
 			totalEdgeCount: allEdges.length,
+			hasZeroChanges: false,
 		};
 	}
 
@@ -167,13 +183,14 @@ export function computeTemporalFocusContext(
 		directContextNodeIds,
 		totalNodeCount: allNodes.length,
 		totalEdgeCount: allEdges.length,
+		hasZeroChanges: false,
 	};
 }
 
 /**
  * Computes visual radius for Temporal nodes.
- * Changed nodes are large and eye-catching (5.5 - 7.5px).
- * Unchanged context nodes are modest and quiet (3.0 - 4.0px).
+ * Changed nodes are prominent (6.0 - 8.0px).
+ * Unchanged context nodes are quiet (3.0 - 4.5px).
  */
 export function computeTemporalVisualRadius(
 	node: TemporalRenderNode,
@@ -183,11 +200,11 @@ export function computeTemporalVisualRadius(
 		readonly isChanged?: boolean;
 	},
 ): number {
-	const isChanged = options?.isChanged ?? (node.changeKind !== 'unchanged');
-	let r = isChanged ? 6.5 : 3.5;
+	const isChanged = options?.isChanged ?? (node.changeKind && node.changeKind !== 'unchanged');
+	let r = isChanged ? 7.0 : 3.8;
 
 	if (options?.isHovered) {
-		r *= 1.2;
+		r *= 1.25;
 	}
 	if (options?.isSelected) {
 		r *= 1.35;
@@ -197,17 +214,38 @@ export function computeTemporalVisualRadius(
 }
 
 /**
- * Computes mode-aware Fit View camera transform for Temporal Graph.
+ * Computes mode-aware, overlay-aware Fit View camera transform for Temporal Graph.
  */
 export function computeTemporalFitTransform(
 	visibleNodes: readonly TemporalRenderNode[],
 	viewportWidth: number,
 	viewportHeight: number,
-	padding = 72,
+	options?: {
+		readonly padding?: number;
+		readonly insets?: ViewportInsets;
+		readonly minZoom?: number;
+		readonly maxZoom?: number;
+	},
 ): { readonly x: number; readonly y: number; readonly k: number } {
-	if (visibleNodes.length === 0) {
+	if (!visibleNodes || visibleNodes.length === 0) {
 		return { x: 0, y: 0, k: 1 };
 	}
+
+	const padding = options?.padding ?? 64;
+	const minZoom = options?.minZoom ?? 0.15;
+	const maxZoom = options?.maxZoom ?? 2.0;
+
+	const insets = {
+		top: options?.insets?.top ?? 0,
+		bottom: options?.insets?.bottom ?? 0,
+		left: options?.insets?.left ?? 0,
+		right: options?.insets?.right ?? 0,
+	};
+
+	const usableW = Math.max(100, viewportWidth - insets.left - insets.right);
+	const usableH = Math.max(100, viewportHeight - insets.top - insets.bottom);
+	const centerX = insets.left + usableW / 2;
+	const centerY = insets.top + usableH / 2;
 
 	let minX = Infinity;
 	let minY = Infinity;
@@ -216,7 +254,7 @@ export function computeTemporalFitTransform(
 
 	for (let i = 0; i < visibleNodes.length; i++) {
 		const node = visibleNodes[i];
-		const r = computeTemporalVisualRadius(node) + 4;
+		const r = computeTemporalVisualRadius(node) + 6;
 		const nx = node.x || 0;
 		const ny = node.y || 0;
 		minX = Math.min(minX, nx - r);
@@ -226,19 +264,23 @@ export function computeTemporalFitTransform(
 	}
 
 	if (!Number.isFinite(minX)) {
-		return { x: 0, y: 0, k: 1 };
+		return { x: centerX, y: centerY, k: 1 };
 	}
 
 	const bw = Math.max(1, maxX - minX);
 	const bh = Math.max(1, maxY - minY);
-	const usableW = Math.max(100, viewportWidth - padding * 2);
-	const usableH = Math.max(100, viewportHeight - padding * 2);
 
-	const k = Math.min(usableW / (bw + 60), usableH / (bh + 60), 2.0);
-	const clampedK = Math.max(0.15, Math.min(2.5, k));
+	const fitW = Math.max(50, usableW - padding * 2);
+	const fitH = Math.max(50, usableH - padding * 2);
 
-	const x = (viewportWidth - bw * clampedK) / 2 - minX * clampedK;
-	const y = (viewportHeight - bh * clampedK) / 2 - minY * clampedK;
+	const rawK = Math.min(fitW / bw, fitH / bh);
+	const clampedK = Math.max(minZoom, Math.min(maxZoom, rawK));
+
+	const graphCenterX = (minX + maxX) / 2;
+	const graphCenterY = (minY + maxY) / 2;
+
+	const x = centerX - graphCenterX * clampedK;
+	const y = centerY - graphCenterY * clampedK;
 
 	return { x, y, k: clampedK };
 }

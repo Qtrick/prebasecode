@@ -396,8 +396,9 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			}
 		}
 
-		// 9. Load history for selected ref (with optional persisted commit restoration)
-		await this.selectRef(refToSelect, persisted?.selectedCommitSha);
+		// 9. Load history for selected ref (with optional persisted commit restoration only if followHead is false or ref is not HEAD)
+		const commitToRestore = (this._followHead && refToSelect === 'HEAD') ? undefined : persisted?.selectedCommitSha;
+		await this.selectRef(refToSelect, commitToRestore);
 	}
 
 	async selectRef(refName: string, targetCommitSha?: string): Promise<void> {
@@ -824,6 +825,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			const diffWithLayout: TemporalStructuralDiff = {
 				...rawDiff,
 				nodes: layoutResult.nodes,
+				guides: layoutResult.guides || rawDiff.guides,
 			};
 
 			if (!isPartial) {
@@ -977,6 +979,16 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		});
 	}
 
+	async retrySelection(): Promise<void> {
+		this._selectionError = undefined;
+		this._historyError = undefined;
+		if (this._selectedCommitSha) {
+			await this.selectCommit(this._selectedCommitSha, { immediate: true });
+		} else if (this._selectedRef) {
+			await this.selectRef(this._selectedRef);
+		}
+	}
+
 	async refresh(): Promise<void> {
 		this._diffCache.clear();
 		this._positions.clear();
@@ -988,9 +1000,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			return;
 		}
 		if (this._followHead) {
-			if (e.currentHead && e.currentHead !== this._selectedCommitSha) {
-				await this.selectRef(this._selectedRef);
-			}
+			await this.selectRef('HEAD');
 		} else {
 			// When followHead is disabled, refresh timeline metadata so new commits appear in the history list,
 			// while retaining the current historical commit selection without view jumps.

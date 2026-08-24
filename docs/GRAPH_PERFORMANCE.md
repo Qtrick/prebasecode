@@ -72,6 +72,15 @@ Structural performance work landed ahead of GUI measurement (BETA-024 evidence s
 | Center-lock bounds reuse a scratch array | Removes per-frame allocations while Keep Graph Centered is active |
 | Dead caches removed (`nodeIncidentEdgesMap`, `staticEdgeDescriptorCache`) | Eliminates snapshot-time ingestion cost and memory for structures no render path ever read |
 
+## Temporal Graph & Layout Engine Optimizations (2026-08-24, Phase 3.11)
+
+| Change | Intent |
+|---|---|
+| Semantic Architectural Community Layout Engine | Replaced sunflower spiral with macro community partitioning (Entry, UI, Services, Data, Utils, Config) with collision avoidance, macro spacing (`>= 280px`), and cluster hull guides |
+| Dynamic Semantic Zoom & Edge LOD | Low-priority intra-cluster edges suppressed at far zoom (`k < 0.65`) to eliminate edge hairballs; active/changed edges rendered with high-contrast halos |
+| Pure Authoritative Status Model | Unified state precedence (`computeTemporalUnifiedStatus`) prevents conflicting status states (e.g., Error vs Indexing) and stale UI locks |
+| Bidirectional Viewport Synchronization | Synchronized Fit, Recenter, Center Lock, and Zoom controls across toolbar, sidebar, and webview |
+
 Frame-time/FPS/memory measurements in the running product remain **not yet recorded**; this table documents code-level changes only.
 
 ## Related backlog

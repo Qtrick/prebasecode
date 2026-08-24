@@ -5,7 +5,7 @@
 import { ThemeIcon } from '../../../../../../base/common/themables.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { localize } from '../../../../../../nls.js';
-import { EditorInputCapabilities, IUntypedEditorInput } from '../../../../../common/editor.js';
+import { EditorInputCapabilities, type IUntypedEditorInput } from '../../../../../common/editor.js';
 import { EditorInput } from '../../../../../common/editor/editorInput.js';
 import { prebaseNetworkEditorIcon } from '../../../browser/prebaseIcons.js';
 import type { PreBaseGraphType } from './prebaseGraphService.js';

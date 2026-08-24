@@ -24,11 +24,11 @@ import { IEditorService } from '../../../../../services/editor/common/editorServ
 import { computeLanguageStats } from '../../core/analysis/languageStats.js';
 import type { GraphNode } from '../../common/types/graphTypes.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
-import { IPreBaseGraphService } from './prebaseGraphService.js';
-import { IPreBaseTemporalViewService } from '../../temporal/view/temporalViewTypes.js';
+import { IPreBaseTemporalViewService, computeTemporalUnifiedStatus } from '../../temporal/view/temporalViewTypes.js';
 import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import type { GitCommitMetadata } from '../../history/git/gitTypes.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
+import { IPreBaseGraphService } from './prebaseGraphService.js';
 
 type GraphFilterId = 'all' | 'files' | 'components' | 'dependencies';
 type ExplorerViewMode = 'flat' | 'tree';
@@ -86,7 +86,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _temporalFilterInput: HTMLInputElement | undefined;
 	private _temporalStatusBadge: HTMLElement | undefined;
 	private _temporalChangeBadgesWrap: HTMLElement | undefined;
-	private _temporalSyncBtn: HTMLButtonElement | undefined;
+	private _temporalRetryBtn: HTMLButtonElement | undefined;
+	private _temporalRefreshBtn: HTMLButtonElement | undefined;
 	private _explorerList: HTMLElement | undefined;
 	private _diag: HTMLElement | undefined;
 
@@ -539,25 +540,50 @@ export class PreBaseMapsViewPane extends ViewPane {
 		statusRow.style.display = 'flex';
 		statusRow.style.alignItems = 'center';
 		statusRow.style.justifyContent = 'space-between';
-		statusRow.style.marginTop = '2px';
+		statusRow.style.gap = '8px';
+		statusRow.style.marginTop = '4px';
 
-		this._temporalStatusBadge = DOM.append(statusRow, DOM.$('span'));
+		const statusLeft = DOM.append(statusRow, DOM.$('div'));
+		statusLeft.style.display = 'flex';
+		statusLeft.style.alignItems = 'center';
+		statusLeft.style.gap = '6px';
+		statusLeft.style.minWidth = '0';
+
+		this._temporalStatusBadge = DOM.append(statusLeft, DOM.$('span'));
 		this._temporalStatusBadge.style.fontSize = '10px';
 		this._temporalStatusBadge.style.fontWeight = '600';
-		this._temporalStatusBadge.style.padding = '2px 6px';
-		this._temporalStatusBadge.style.borderRadius = '4px';
+		this._temporalStatusBadge.style.padding = '2px 7px';
+		this._temporalStatusBadge.style.borderRadius = '10px';
 
-		this._temporalSyncBtn = DOM.append(statusRow, DOM.$('button')) as HTMLButtonElement;
-		this._temporalSyncBtn.type = 'button';
-		this._temporalSyncBtn.textContent = localize('prebase.maps.syncRemote', "Sync Remote");
-		this._temporalSyncBtn.style.fontSize = '10px';
-		this._temporalSyncBtn.style.padding = '2px 6px';
-		this._temporalSyncBtn.style.borderRadius = '4px';
-		this._temporalSyncBtn.style.border = `1px solid ${BORDER}`;
-		this._temporalSyncBtn.style.background = SURFACE_OVERLAY;
-		this._temporalSyncBtn.style.color = TEXT;
-		this._temporalSyncBtn.style.cursor = 'pointer';
-		this._register(DOM.addDisposableListener(this._temporalSyncBtn, 'click', () => {
+		this._temporalRetryBtn = DOM.append(statusLeft, DOM.$('button')) as HTMLButtonElement;
+		this._temporalRetryBtn.type = 'button';
+		this._temporalRetryBtn.textContent = localize('prebase.maps.retry', "Retry");
+		this._temporalRetryBtn.title = localize('prebase.maps.retryTitle', "Retry loading the selected commit");
+		this._temporalRetryBtn.style.display = 'none';
+		this._temporalRetryBtn.style.fontSize = '10px';
+		this._temporalRetryBtn.style.fontWeight = '500';
+		this._temporalRetryBtn.style.padding = '2px 8px';
+		this._temporalRetryBtn.style.borderRadius = '4px';
+		this._temporalRetryBtn.style.border = `1px solid ${BORDER}`;
+		this._temporalRetryBtn.style.background = 'var(--vscode-button-secondaryBackground, #3a3d41)';
+		this._temporalRetryBtn.style.color = 'var(--vscode-button-secondaryForeground, #ffffff)';
+		this._temporalRetryBtn.style.cursor = 'pointer';
+		this._register(DOM.addDisposableListener(this._temporalRetryBtn, 'click', () => {
+			void this.temporalViewService.retrySelection();
+		}));
+
+		this._temporalRefreshBtn = DOM.append(statusRow, DOM.$('button')) as HTMLButtonElement;
+		this._temporalRefreshBtn.type = 'button';
+		this._temporalRefreshBtn.textContent = localize('prebase.maps.refreshHistory', "Refresh");
+		this._temporalRefreshBtn.title = localize('prebase.maps.refreshHistoryTitle', "Refresh Git history and branches");
+		this._temporalRefreshBtn.style.fontSize = '10px';
+		this._temporalRefreshBtn.style.padding = '2px 7px';
+		this._temporalRefreshBtn.style.borderRadius = '4px';
+		this._temporalRefreshBtn.style.border = `1px solid ${BORDER}`;
+		this._temporalRefreshBtn.style.background = SURFACE_OVERLAY;
+		this._temporalRefreshBtn.style.color = MUTED;
+		this._temporalRefreshBtn.style.cursor = 'pointer';
+		this._register(DOM.addDisposableListener(this._temporalRefreshBtn, 'click', () => {
 			void this.temporalViewService.refresh();
 		}));
 
@@ -1344,26 +1370,16 @@ export class PreBaseMapsViewPane extends ViewPane {
 			addBadge(`⇄${renamed}`, '#1f6feb', 'rgba(31, 111, 235, 0.15)', 'Renamed nodes (click to filter)', 'renamed');
 		}
 
-		// 6. Truthful Status Badge
+		// 6. Authoritative Unified Status Badge & Recovery Action
 		if (this._temporalStatusBadge) {
-			if (state.isLoadingSelection) {
-				this._temporalStatusBadge.textContent = localize('prebase.maps.indexing', "Indexing…");
-				this._temporalStatusBadge.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
-				this._temporalStatusBadge.style.background = 'rgba(210, 153, 34, 0.15)';
-			} else if (state.selectionError) {
-				this._temporalStatusBadge.textContent = localize('prebase.maps.error', "Error");
-				this._temporalStatusBadge.style.color = 'var(--vscode-errorForeground, #f85149)';
-				this._temporalStatusBadge.style.background = 'rgba(248, 81, 73, 0.15)';
-			} else if (state.isPartialLineage) {
-				this._temporalStatusBadge.textContent = localize('prebase.maps.partialHistory', "Partial History");
-				this._temporalStatusBadge.title = localize('prebase.maps.partialHistoryTitle', "Lineage coverage is partial; structural comparison is truthful.");
-				this._temporalStatusBadge.style.color = 'var(--vscode-descriptionForeground, #a1a1aa)';
-				this._temporalStatusBadge.style.background = 'rgba(161, 161, 170, 0.15)';
-			} else {
-				this._temporalStatusBadge.textContent = localize('prebase.maps.ready', "Ready");
-				this._temporalStatusBadge.title = localize('prebase.maps.readyTitle', "Comparison fully indexed and reconciled");
-				this._temporalStatusBadge.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
-				this._temporalStatusBadge.style.background = 'rgba(63, 185, 80, 0.15)';
+			const unifiedStatus = computeTemporalUnifiedStatus(state);
+			this._temporalStatusBadge.textContent = unifiedStatus.label;
+			this._temporalStatusBadge.title = unifiedStatus.title;
+			this._temporalStatusBadge.style.color = unifiedStatus.colorVar;
+			this._temporalStatusBadge.style.background = unifiedStatus.bgVar;
+
+			if (this._temporalRetryBtn) {
+				this._temporalRetryBtn.style.display = unifiedStatus.canRetry ? 'inline-flex' : 'none';
 			}
 		}
 	}
@@ -1536,7 +1552,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		const filter = this._getFilter();
 		const query = this._searchQuery;
-		const nodes = (snapshot.nodes ?? []).filter(n => {
+		const nodes = (snapshot.nodes ?? []).filter((n: GraphNode) => {
 			if (!n || n.kind === 'folder') {
 				return false;
 			}
@@ -1565,8 +1581,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 		if (mode === 'flat') {
 			nodes
 				.slice()
-				.sort((a, b) => (a.path || a.label).localeCompare(b.path || b.label))
-				.forEach(node => this._appendFileRow(this._explorerList!, node, 0));
+				.sort((a: GraphNode, b: GraphNode) => (a.path || a.label).localeCompare(b.path || b.label))
+				.forEach((node: GraphNode) => this._appendFileRow(this._explorerList!, node, 0));
 			if (nodes.length === 0) {
 				this._appendEmptyExplorer();
 			}
