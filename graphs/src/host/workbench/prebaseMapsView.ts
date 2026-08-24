@@ -75,6 +75,18 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _historySection: HTMLElement | undefined;
 	private _historyBody: HTMLElement | undefined;
 	private _historyList: HTMLElement | undefined;
+	private _temporalSection: HTMLElement | undefined;
+	private _temporalBody: HTMLElement | undefined;
+	private _temporalExpanded = true;
+	private _temporalRefSelect: HTMLSelectElement | undefined;
+	private _temporalCompareSelect: HTMLSelectElement | undefined;
+	private _temporalFollowHeadCheckbox: HTMLInputElement | undefined;
+	private _temporalModeStateBtn: HTMLButtonElement | undefined;
+	private _temporalModeChangesBtn: HTMLButtonElement | undefined;
+	private _temporalFilterInput: HTMLInputElement | undefined;
+	private _temporalStatusBadge: HTMLElement | undefined;
+	private _temporalChangeBadgesWrap: HTMLElement | undefined;
+	private _temporalSyncBtn: HTMLButtonElement | undefined;
 	private _explorerList: HTMLElement | undefined;
 	private _diag: HTMLElement | undefined;
 
@@ -126,8 +138,17 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._register(this.graphService.onDidChangeDiagnostics(() => this._refresh()));
 		this._register(this.graphService.onDidChangeViewState(() => this._refresh()));
 		this._register(this.graphService.onDidChangeSnapshot(() => this._refresh()));
-		this._register(this.temporalViewService.onDidChangeState(() => this._refreshHistory()));
-		this._register(this.temporalViewService.onDidChangeTimeline(() => this._refreshHistory()));
+		this._register(this.temporalViewService.onDidChangeState(() => {
+			this._refreshTemporal();
+			this._refreshHistory();
+		}));
+		this._register(this.temporalViewService.onDidChangeTimeline(() => {
+			this._refreshTemporal();
+			this._refreshHistory();
+		}));
+		this._register(this.temporalViewService.onDidChangeDiff(() => {
+			this._refreshTemporal();
+		}));
 		this._register(this.editorService.onDidActiveEditorChange(() => this._refresh()));
 		this._register(this.workspaceContextService.onDidChangeWorkbenchState(() => this._refresh()));
 		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => this._refresh()));
@@ -160,6 +181,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._renderSearch();
 		this._renderFilter();
 		this._renderNetwork();
+		this._renderTemporal();
 		this._renderDisplay();
 		this._renderHistory();
 		this._renderExplorer();
@@ -376,6 +398,180 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}));
 	}
 
+	private _renderTemporal(): void {
+		this._temporalSection = DOM.append(this._scroll!, DOM.$('div'));
+		this._temporalSection.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
+		this._temporalSection.style.paddingTop = '8px';
+
+		const header = DOM.append(this._temporalSection, DOM.$('button')) as HTMLButtonElement;
+		header.type = 'button';
+		header.textContent = this._temporalExpanded
+			? localize('prebase.maps.temporalOpen', "▾ Temporal & Compare")
+			: localize('prebase.maps.temporalClosed', "▸ Temporal & Compare");
+		header.style.all = 'unset';
+		header.style.fontSize = '10px';
+		header.style.fontWeight = '600';
+		header.style.letterSpacing = '0.06em';
+		header.style.textTransform = 'uppercase';
+		header.style.color = MUTED;
+		header.style.cursor = 'pointer';
+		header.style.marginBottom = '6px';
+		header.style.display = 'block';
+
+		this._temporalBody = DOM.append(this._temporalSection, DOM.$('div'));
+		this._temporalBody.style.display = this._temporalExpanded ? 'flex' : 'none';
+		this._temporalBody.style.flexDirection = 'column';
+		this._temporalBody.style.gap = '8px';
+		this._temporalBody.style.paddingInline = '2px';
+
+		// 1. Mode Toggles: Full Map vs Focus Changes
+		const modeRow = DOM.append(this._temporalBody, DOM.$('div'));
+		this._segmentTrack(modeRow);
+		this._temporalModeStateBtn = this._segmentBtn(modeRow, localize('prebase.maps.fullMap', "Full Map"), () => {
+			this.temporalViewService.setDisplayMode('state');
+		});
+		this._temporalModeChangesBtn = this._segmentBtn(modeRow, localize('prebase.maps.focusChanges', "Focus Changes"), () => {
+			this.temporalViewService.setDisplayMode('changes');
+		});
+
+		// 2. Branch & Compare Selectors
+		const selCol = DOM.append(this._temporalBody, DOM.$('div'));
+		selCol.style.display = 'flex';
+		selCol.style.flexDirection = 'column';
+		selCol.style.gap = '6px';
+
+		// Branch row
+		const branchRow = DOM.append(selCol, DOM.$('div'));
+		branchRow.style.display = 'flex';
+		branchRow.style.alignItems = 'center';
+		branchRow.style.justifyContent = 'space-between';
+		branchRow.style.gap = '6px';
+
+		const branchLbl = DOM.append(branchRow, DOM.$('span'));
+		branchLbl.textContent = localize('prebase.maps.branch', "Branch:");
+		branchLbl.style.fontSize = '11px';
+		branchLbl.style.color = MUTED;
+
+		this._temporalRefSelect = DOM.append(branchRow, DOM.$('select')) as HTMLSelectElement;
+		this._temporalRefSelect.style.flex = '1';
+		this._temporalRefSelect.style.fontSize = '11px';
+		this._temporalRefSelect.style.padding = '3px 4px';
+		this._temporalRefSelect.style.borderRadius = '4px';
+		this._temporalRefSelect.style.border = `1px solid ${BORDER}`;
+		this._temporalRefSelect.style.background = SURFACE;
+		this._temporalRefSelect.style.color = TEXT;
+		this._register(DOM.addDisposableListener(this._temporalRefSelect, 'change', () => {
+			if (this._temporalRefSelect?.value) {
+				void this.temporalViewService.selectRef(this._temporalRefSelect.value);
+			}
+		}));
+
+		// Compare row
+		const compRow = DOM.append(selCol, DOM.$('div'));
+		compRow.style.display = 'flex';
+		compRow.style.alignItems = 'center';
+		compRow.style.justifyContent = 'space-between';
+		compRow.style.gap = '6px';
+
+		const compLbl = DOM.append(compRow, DOM.$('span'));
+		compLbl.textContent = localize('prebase.maps.compare', "Compare:");
+		compLbl.style.fontSize = '11px';
+		compLbl.style.color = MUTED;
+
+		this._temporalCompareSelect = DOM.append(compRow, DOM.$('select')) as HTMLSelectElement;
+		this._temporalCompareSelect.style.flex = '1';
+		this._temporalCompareSelect.style.fontSize = '11px';
+		this._temporalCompareSelect.style.padding = '3px 4px';
+		this._temporalCompareSelect.style.borderRadius = '4px';
+		this._temporalCompareSelect.style.border = `1px solid ${BORDER}`;
+		this._temporalCompareSelect.style.background = SURFACE;
+		this._temporalCompareSelect.style.color = TEXT;
+		this._register(DOM.addDisposableListener(this._temporalCompareSelect, 'change', () => {
+			if (this._temporalCompareSelect) {
+				void this.temporalViewService.setCompareBase(this._temporalCompareSelect.value);
+			}
+		}));
+
+		// Follow HEAD checkbox row
+		const followRow = DOM.append(this._temporalBody, DOM.$('label'));
+		followRow.style.display = 'flex';
+		followRow.style.alignItems = 'center';
+		followRow.style.gap = '6px';
+		followRow.style.fontSize = '11px';
+		followRow.style.color = TEXT;
+		followRow.style.cursor = 'pointer';
+
+		this._temporalFollowHeadCheckbox = DOM.append(followRow, DOM.$('input')) as HTMLInputElement;
+		this._temporalFollowHeadCheckbox.type = 'checkbox';
+		this._temporalFollowHeadCheckbox.checked = true;
+		this._register(DOM.addDisposableListener(this._temporalFollowHeadCheckbox, 'change', () => {
+			this.temporalViewService.setFollowHead(this._temporalFollowHeadCheckbox?.checked ?? true);
+		}));
+		const followText = DOM.append(followRow, DOM.$('span'));
+		followText.textContent = localize('prebase.maps.followHead', "Follow HEAD");
+
+		// Entity Filter Input
+		this._temporalFilterInput = DOM.append(this._temporalBody, DOM.$('input')) as HTMLInputElement;
+		this._temporalFilterInput.type = 'search';
+		this._temporalFilterInput.placeholder = localize('prebase.maps.filterEntities', "Filter entities…");
+		this._temporalFilterInput.style.width = '100%';
+		this._temporalFilterInput.style.boxSizing = 'border-box';
+		this._temporalFilterInput.style.padding = '4px 6px';
+		this._temporalFilterInput.style.fontSize = '11px';
+		this._temporalFilterInput.style.borderRadius = '4px';
+		this._temporalFilterInput.style.border = `1px solid ${BORDER}`;
+		this._temporalFilterInput.style.background = SURFACE;
+		this._temporalFilterInput.style.color = TEXT;
+		this._temporalFilterInput.style.outline = 'none';
+		this._register(DOM.addDisposableListener(this._temporalFilterInput, 'input', () => {
+			this.temporalViewService.setFilterQuery(this._temporalFilterInput?.value || '');
+		}));
+
+		// Change Breakdown Badges Summary
+		this._temporalChangeBadgesWrap = DOM.append(this._temporalBody, DOM.$('div'));
+		this._temporalChangeBadgesWrap.style.display = 'flex';
+		this._temporalChangeBadgesWrap.style.alignItems = 'center';
+		this._temporalChangeBadgesWrap.style.gap = '4px';
+		this._temporalChangeBadgesWrap.style.flexWrap = 'wrap';
+
+		// Status Badge Row
+		const statusRow = DOM.append(this._temporalBody, DOM.$('div'));
+		statusRow.style.display = 'flex';
+		statusRow.style.alignItems = 'center';
+		statusRow.style.justifyContent = 'space-between';
+		statusRow.style.marginTop = '2px';
+
+		this._temporalStatusBadge = DOM.append(statusRow, DOM.$('span'));
+		this._temporalStatusBadge.style.fontSize = '10px';
+		this._temporalStatusBadge.style.fontWeight = '600';
+		this._temporalStatusBadge.style.padding = '2px 6px';
+		this._temporalStatusBadge.style.borderRadius = '4px';
+
+		this._temporalSyncBtn = DOM.append(statusRow, DOM.$('button')) as HTMLButtonElement;
+		this._temporalSyncBtn.type = 'button';
+		this._temporalSyncBtn.textContent = localize('prebase.maps.syncRemote', "Sync Remote");
+		this._temporalSyncBtn.style.fontSize = '10px';
+		this._temporalSyncBtn.style.padding = '2px 6px';
+		this._temporalSyncBtn.style.borderRadius = '4px';
+		this._temporalSyncBtn.style.border = `1px solid ${BORDER}`;
+		this._temporalSyncBtn.style.background = SURFACE_OVERLAY;
+		this._temporalSyncBtn.style.color = TEXT;
+		this._temporalSyncBtn.style.cursor = 'pointer';
+		this._register(DOM.addDisposableListener(this._temporalSyncBtn, 'click', () => {
+			void this.temporalViewService.refresh();
+		}));
+
+		this._register(DOM.addDisposableListener(header, 'click', () => {
+			this._temporalExpanded = !this._temporalExpanded;
+			if (this._temporalBody) {
+				this._temporalBody.style.display = this._temporalExpanded ? 'flex' : 'none';
+			}
+			header.textContent = this._temporalExpanded
+				? localize('prebase.maps.temporalOpen', "▾ Temporal & Compare")
+				: localize('prebase.maps.temporalClosed', "▸ Temporal & Compare");
+		}));
+	}
+
 	private _renderHistory(): void {
 		this._historySection = DOM.append(this._scroll!, DOM.$('div'));
 		this._historySection.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
@@ -397,23 +593,23 @@ export class PreBaseMapsViewPane extends ViewPane {
 		header.style.display = 'block';
 
 		this._historyBody = DOM.append(this._historySection, DOM.$('div'));
-		this._historyBody.style.display = this._historyExpanded ? 'block' : 'none';
+		this._historyBody.style.display = this._historyExpanded ? 'flex' : 'none';
+		this._historyBody.style.flexDirection = 'column';
 		this._historyBody.style.width = 'calc(100% - 8px)';
 		this._historyBody.style.marginInline = '4px';
 		this._historyBody.style.boxSizing = 'border-box';
-		this._historyBody.style.maxHeight = '280px';
-		this._historyBody.style.overflowY = 'auto';
 		this._historyBody.style.border = `1px solid color-mix(in srgb, ${BORDER} 40%, transparent)`;
 		this._historyBody.style.borderRadius = '6px';
 		this._historyBody.style.background = SURFACE_OVERLAY;
 		this._historyBody.style.padding = '4px';
 
-		// Dedicated Commit Search Input (smart prefixes: author:, msg:, sha:, file:)
+		// Dedicated Commit Search Container (NEVER SCROLLS)
 		const searchWrap = DOM.append(this._historyBody, DOM.$('div'));
 		searchWrap.style.display = 'flex';
 		searchWrap.style.alignItems = 'center';
 		searchWrap.style.marginBottom = '6px';
 		searchWrap.style.position = 'relative';
+		searchWrap.style.flexShrink = '0';
 
 		this._commitSearchInput = DOM.append(searchWrap, DOM.$('input')) as HTMLInputElement;
 		this._commitSearchInput.type = 'search';
@@ -434,14 +630,38 @@ export class PreBaseMapsViewPane extends ViewPane {
 			this._onCommitSearchInputChanged();
 		}));
 
-		this._historyList = DOM.append(this._historyBody, DOM.$('div'));
+		this._register(DOM.addDisposableListener(this._commitSearchInput, 'keydown', (e: KeyboardEvent) => {
+			if (e.key === 'Escape') {
+				if (this._commitSearchInput) {
+					this._commitSearchInput.value = '';
+					this._commitSearchQuery = '';
+					this._onCommitSearchInputChanged();
+					this._commitSearchInput.blur();
+				}
+			} else if (e.key === 'ArrowDown') {
+				const firstRow = this._historyList?.querySelector<HTMLElement>('.history-item');
+				if (firstRow) {
+					firstRow.focus();
+					e.preventDefault();
+				}
+			}
+		}));
+
+		// Scrolling List Viewport (ONLY THIS SCROLLS)
+		const listViewport = DOM.append(this._historyBody, DOM.$('div'));
+		listViewport.style.maxHeight = '280px';
+		listViewport.style.overflowY = 'auto';
+		listViewport.style.boxSizing = 'border-box';
+		listViewport.style.width = '100%';
+
+		this._historyList = DOM.append(listViewport, DOM.$('div'));
 		this._historyList.setAttribute('role', 'listbox');
 		this._historyList.setAttribute('aria-label', localize('prebase.maps.historyListAria', "Commit History"));
 
 		this._register(DOM.addDisposableListener(header, 'click', () => {
 			this._historyExpanded = !this._historyExpanded;
 			if (this._historyBody) {
-				this._historyBody.style.display = this._historyExpanded ? 'block' : 'none';
+				this._historyBody.style.display = this._historyExpanded ? 'flex' : 'none';
 			}
 			header.textContent = this._historyExpanded
 				? localize('prebase.maps.historyOpen', "▾ History")
@@ -1011,6 +1231,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		this._refreshExplorerList();
 		this._refreshHistory();
+		this._refreshTemporal();
 		this._refreshLegend();
 
 		if (this._diag) {
@@ -1019,6 +1240,131 @@ export class PreBaseMapsViewPane extends ViewPane {
 				diag.message || '',
 				localize('prebase.maps.counts', "Files {0} · Nodes {1} · Edges {2}", diag.fileCount, diag.nodeCount, diag.edgeCount)
 			].filter(Boolean).join('\n');
+		}
+	}
+
+	private _refreshTemporal(): void {
+		if (!this._temporalSection) return;
+		const activeGraphType = this._getActiveGraphType();
+		const isTemporal = activeGraphType === 'temporal';
+		const hasProject = this._hasOpenProject();
+
+		this._temporalSection.style.display = isTemporal && hasProject ? 'block' : 'none';
+		if (!isTemporal || !hasProject) return;
+
+		const state = this.temporalViewService.getState();
+		const diff = state.diff;
+		const summary = diff?.summary;
+
+		// 1. Mode Buttons
+		const isChanges = state.displayMode === 'changes';
+		this._styleSegmentActive(this._temporalModeStateBtn, !isChanges);
+		this._styleSegmentActive(this._temporalModeChangesBtn, isChanges);
+
+		// 2. Ref Select
+		if (this._temporalRefSelect) {
+			DOM.clearNode(this._temporalRefSelect);
+			const refs = state.repositoryRefs || [];
+			const optHead = DOM.append(this._temporalRefSelect, DOM.$('option')) as HTMLOptionElement;
+			optHead.value = 'HEAD';
+			optHead.textContent = 'HEAD';
+			optHead.selected = state.selectedRef === 'HEAD';
+
+			for (const r of refs) {
+				if (r.name === 'HEAD') continue;
+				const opt = DOM.append(this._temporalRefSelect, DOM.$('option')) as HTMLOptionElement;
+				opt.value = r.name;
+				opt.textContent = `${r.kind === 'branch' ? '⑂ ' : '🏷 '}${r.name}`;
+				opt.selected = state.selectedRef === r.name;
+			}
+		}
+
+		// 3. Compare Select
+		if (this._temporalCompareSelect) {
+			DOM.clearNode(this._temporalCompareSelect);
+			const curCommit = state.pagedTimeline?.find(c => c.sha === state.selectedCommitSha);
+			const parents = curCommit?.parents || [];
+
+			const optFirst = DOM.append(this._temporalCompareSelect, DOM.$('option')) as HTMLOptionElement;
+			optFirst.value = '__first_parent__';
+			const firstParentShort = parents[0] ? ` (${parents[0].slice(0, 7)})` : '';
+			optFirst.textContent = `First Parent${firstParentShort}`;
+			optFirst.selected = state.comparisonSelection?.mode === 'first-parent';
+
+			if (parents.length > 1) {
+				const optSecond = DOM.append(this._temporalCompareSelect, DOM.$('option')) as HTMLOptionElement;
+				optSecond.value = parents[1];
+				optSecond.textContent = `Merge Parent (${parents[1].slice(0, 7)})`;
+				optSecond.selected = state.comparisonSelection?.mode === 'parent';
+			}
+
+			if (state.comparisonSelection?.mode === 'pinned' && state.comparisonSelection.baseSha) {
+				const optPinned = DOM.append(this._temporalCompareSelect, DOM.$('option')) as HTMLOptionElement;
+				optPinned.value = state.comparisonSelection.baseSha;
+				optPinned.textContent = `Pinned · ${state.comparisonSelection.baseSha.slice(0, 7)}`;
+				optPinned.selected = true;
+			}
+		}
+
+		// 4. Follow HEAD Checkbox
+		if (this._temporalFollowHeadCheckbox) {
+			this._temporalFollowHeadCheckbox.checked = state.followHead;
+		}
+
+		// 5. Change Badges Summary
+		if (this._temporalChangeBadgesWrap) {
+			DOM.clearNode(this._temporalChangeBadgesWrap);
+			const addBadge = (text: string, color: string, bg: string, title: string, queryFilter: string) => {
+				const badge = DOM.append(this._temporalChangeBadgesWrap!, DOM.$('span'));
+				badge.textContent = text;
+				badge.title = title;
+				badge.style.fontSize = '10.5px';
+				badge.style.fontWeight = '600';
+				badge.style.padding = '2px 6px';
+				badge.style.borderRadius = '4px';
+				badge.style.color = color;
+				badge.style.background = bg;
+				badge.style.cursor = 'pointer';
+				this._register(DOM.addDisposableListener(badge, 'click', () => {
+					const cur = this._temporalFilterInput?.value || '';
+					const next = cur === queryFilter ? '' : queryFilter;
+					if (this._temporalFilterInput) this._temporalFilterInput.value = next;
+					this.temporalViewService.setFilterQuery(next);
+				}));
+			};
+
+			const added = summary?.addedCount ?? 0;
+			const removed = summary?.removedCount ?? 0;
+			const modified = summary?.modifiedCount ?? 0;
+			const renamed = summary?.renamedCount ?? 0;
+
+			addBadge(`+${added}`, '#2ea043', 'rgba(46, 160, 67, 0.15)', 'Added nodes (click to filter)', 'added');
+			addBadge(`-${removed}`, '#f85149', 'rgba(248, 81, 73, 0.15)', 'Removed nodes (click to filter)', 'removed');
+			addBadge(`~${modified}`, '#d29922', 'rgba(210, 153, 34, 0.15)', 'Modified nodes (click to filter)', 'modified');
+			addBadge(`⇄${renamed}`, '#1f6feb', 'rgba(31, 111, 235, 0.15)', 'Renamed nodes (click to filter)', 'renamed');
+		}
+
+		// 6. Truthful Status Badge
+		if (this._temporalStatusBadge) {
+			if (state.isLoadingSelection) {
+				this._temporalStatusBadge.textContent = localize('prebase.maps.indexing', "Indexing…");
+				this._temporalStatusBadge.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
+				this._temporalStatusBadge.style.background = 'rgba(210, 153, 34, 0.15)';
+			} else if (state.selectionError) {
+				this._temporalStatusBadge.textContent = localize('prebase.maps.error', "Error");
+				this._temporalStatusBadge.style.color = 'var(--vscode-errorForeground, #f85149)';
+				this._temporalStatusBadge.style.background = 'rgba(248, 81, 73, 0.15)';
+			} else if (state.isPartialLineage) {
+				this._temporalStatusBadge.textContent = localize('prebase.maps.partialHistory', "Partial History");
+				this._temporalStatusBadge.title = localize('prebase.maps.partialHistoryTitle', "Lineage coverage is partial; structural comparison is truthful.");
+				this._temporalStatusBadge.style.color = 'var(--vscode-descriptionForeground, #a1a1aa)';
+				this._temporalStatusBadge.style.background = 'rgba(161, 161, 170, 0.15)';
+			} else {
+				this._temporalStatusBadge.textContent = localize('prebase.maps.ready', "Ready");
+				this._temporalStatusBadge.title = localize('prebase.maps.readyTitle', "Comparison fully indexed and reconciled");
+				this._temporalStatusBadge.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+				this._temporalStatusBadge.style.background = 'rgba(63, 185, 80, 0.15)';
+			}
 		}
 	}
 

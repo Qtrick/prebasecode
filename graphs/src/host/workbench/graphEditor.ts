@@ -682,7 +682,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #legend .title.spaced { margin-top:8px; }
 
 /* Temporal UI */
-#temporalToolbar { position:absolute; top:12px; left:12px; right:12px; z-index:5; display:none; gap:10px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:6px 12px; font-size:12px; backdrop-filter:blur(8px); }
+#temporalToolbar { position:absolute; top:12px; left:12px; z-index:5; display:none; gap:10px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:5px 10px; font-size:12px; backdrop-filter:blur(8px); max-width:calc(100% - 24px); box-sizing:border-box; }
 #temporalToolbar select, #temporalToolbar input { background:var(--vscode-dropdown-background, #252526); color:var(--vscode-dropdown-foreground, #cccccc); border:1px solid var(--vscode-dropdown-border, #3c3c3c); border-radius:4px; padding:3px 6px; font-size:11px; }
 #temporalDisplayModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
 #temporalDisplayModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
@@ -781,41 +781,25 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	</div>
 </div>
 
-<!-- Temporal Toolbar -->
+<!-- Temporal Minimal Canvas Breadcrumb -->
 <div id="temporalToolbar">
-	<div id="temporalDisplayModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:6px; overflow:hidden; background:rgba(0,0,0,0.25);">
-		<button id="temporalModeStateBtn" type="button" class="active" title="Full Codebase Architecture Map">Full Map</button>
-		<button id="temporalModeChangesBtn" type="button" title="Focus on Changed Files & Direct Dependencies">Focus Changes</button>
+	<div id="temporalDisplayModeWrap" style="display:flex; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:6px; overflow:hidden; background:rgba(0,0,0,0.25); flex-shrink:0;">
+		<button id="temporalModeStateBtn" type="button" class="active" title="Full Codebase Architecture Map" style="padding:2px 8px; font-size:10.5px;">Full Map</button>
+		<button id="temporalModeChangesBtn" type="button" title="Focus on Changed Files & Direct Dependencies" style="padding:2px 8px; font-size:10.5px;">Focus Changes</button>
 	</div>
-	<div id="temporalContextModeWrap" style="display:none; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; overflow:hidden; margin-left:2px;">
-		<button id="temporalContextFocusedBtn" type="button" class="active" title="Show only changed files and 1-hop connected context">Changed Only</button>
-		<button id="temporalContextFullBtn" type="button" title="Show nearby context">Nearby Context</button>
+	<div id="temporalBreadcrumbWrap" style="display:flex; align-items:center; gap:6px; font-size:11px; font-weight:500; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1;">
+		<span id="temporalBreadcrumbTarget" style="font-family:monospace; font-weight:600; color:var(--vscode-textLink-foreground, #58a6ff);"></span>
+		<span id="temporalBreadcrumbVs" style="opacity:0.5; font-size:10px;">vs</span>
+		<span id="temporalBreadcrumbBase" style="font-family:monospace; color:var(--vscode-descriptionForeground, #a1a1aa);"></span>
 	</div>
-	<label id="temporalRepoWrap" style="display:none; align-items:center; gap:4px; font-size:11px;">
-		Repo:
-		<select id="temporalRepoSelect" title="Select active repository"></select>
-	</label>
-	<label style="display:flex; align-items:center; gap:4px; font-size:11px;">
-		Branch:
-		<select id="temporalRefSelect" title="Select Git branch, tag, or HEAD"></select>
-	</label>
-	<label style="display:flex; align-items:center; gap:4px; font-size:11px;">
-		Compare:
-		<select id="temporalCompareSelect" title="Select comparison base commit"></select>
-	</label>
-	<label style="display:flex; align-items:center; gap:4px; font-size:11px; margin-left:2px;">
-		<input type="checkbox" id="temporalFollowHead" checked> Follow HEAD
-	</label>
-	<div id="temporalDiffBadges" style="display:flex; gap:5px; font-size:11px; margin-left:auto; align-items:center;">
+	<div id="temporalDiffBadges" style="display:flex; gap:4px; font-size:10.5px; margin-left:auto; flex-shrink:0; align-items:center;">
 		<span id="badgeAdded" class="badge-added" title="Added nodes">+0</span>
 		<span id="badgeRemoved" class="badge-removed" title="Removed nodes">-0</span>
 		<span id="badgeModified" class="badge-modified" title="Modified nodes">~0</span>
 		<span id="badgeRenamed" class="badge-renamed" title="Renamed nodes">⇄0</span>
 		<span id="temporalPartialWarning" class="badge-warning" style="display:none;"></span>
-		<span id="temporalCommitStatus" class="status-pill" style="display:inline-flex; align-items:center; gap:4px; font-size:10.5px; border-radius:12px; padding:2px 8px; font-weight:600;"></span>
+		<span id="temporalCommitStatus" class="status-pill" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; border-radius:10px; padding:2px 7px; font-weight:600;"></span>
 	</div>
-	<input id="temporalFilterInput" type="search" placeholder="Filter entities…" style="width:130px;" aria-label="Filter temporal entities">
-	<button id="temporalLegendBtn" type="button" style="background:transparent; border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; padding:2px 8px; color:var(--vscode-foreground, #f4f4f5); cursor:pointer; font-size:11px;" title="Toggle Legend">ⓘ Legend</button>
 </div>
 
 <!-- Temporal Scrubber Bar -->
@@ -915,6 +899,8 @@ const idleToggle = document.getElementById('idleToggle');
 const idleToggleWrap = document.getElementById('idleToggleWrap');
 const toolbar = document.getElementById('toolbar');
 const temporalToolbar = document.getElementById('temporalToolbar');
+const temporalBreadcrumbTarget = document.getElementById('temporalBreadcrumbTarget');
+const temporalBreadcrumbBase = document.getElementById('temporalBreadcrumbBase');
 const temporalScrubberBar = document.getElementById('temporalScrubberBar');
 const temporalRepoWrap = document.getElementById('temporalRepoWrap');
 const temporalRepoSelect = document.getElementById('temporalRepoSelect');
@@ -1613,6 +1599,16 @@ function updateTemporalUI(state, diff) {
 		: timeline.findIndex(c => c.sha === state.selectedCommitSha);
 	const curCommit = state.selectedCommitSummary || (currentIdx >= 0 ? timeline[currentIdx] : undefined);
 
+	// Top Breadcrumb Update
+	if (temporalBreadcrumbTarget) {
+		const targetShort = curCommit ? (curCommit.shortSha || curCommit.sha.slice(0, 7)) : (state.selectedCommitSha ? state.selectedCommitSha.slice(0, 7) : 'HEAD');
+		temporalBreadcrumbTarget.textContent = (state.selectedRef || 'HEAD') + ' · ' + targetShort;
+	}
+	if (temporalBreadcrumbBase) {
+		const curBase = state.compareBaseSha || curCommit?.parents?.[0] || '';
+		temporalBreadcrumbBase.textContent = curBase ? curBase.slice(0, 7) : 'root';
+	}
+
 	if (currentIdx >= 0) {
 		const sliderVal = (total - 1) - currentIdx;
 		if (temporalScrubber) temporalScrubber.value = String(sliderVal);
@@ -1635,20 +1631,15 @@ function updateTemporalUI(state, diff) {
 					temporalCommitStatus.style.color = 'var(--vscode-errorForeground, #f85149)';
 					temporalCommitStatus.style.background = 'rgba(248, 81, 73, 0.15)';
 				} else if (state.isPartialLineage) {
-					temporalCommitStatus.textContent = 'Reconciling…';
-					temporalCommitStatus.title = 'History lineage reconciliation in progress';
-					temporalCommitStatus.style.color = 'var(--vscode-editorWarning-foreground, #d29922)';
-					temporalCommitStatus.style.background = 'rgba(210, 153, 34, 0.15)';
-				} else if (state.isSettled) {
+					temporalCommitStatus.textContent = 'Partial History';
+					temporalCommitStatus.title = 'Lineage coverage is partial; structural comparison is truthful.';
+					temporalCommitStatus.style.color = 'var(--vscode-descriptionForeground, #a1a1aa)';
+					temporalCommitStatus.style.background = 'rgba(161, 161, 170, 0.15)';
+				} else {
 					temporalCommitStatus.textContent = 'Ready';
 					temporalCommitStatus.title = 'Graph fully indexed and reconciled';
 					temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
 					temporalCommitStatus.style.background = 'rgba(63, 185, 80, 0.15)';
-				} else {
-					temporalCommitStatus.textContent = 'Indexing…';
-					temporalCommitStatus.title = 'Lineage indexing in progress';
-					temporalCommitStatus.style.color = 'var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)';
-					temporalCommitStatus.style.background = 'rgba(210, 153, 34, 0.15)';
 				}
 			}
 			if (temporalScrubber) temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
@@ -2267,6 +2258,121 @@ function pickNetworkNode(clientX, clientY) {
 	return best;
 }
 
+function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zoom) {
+	if (isConnectedToHighlight) {
+		return {
+			color: '#2dd4bf',
+			width: Math.max(1.8, 2.2 / zoom),
+			alpha: 1.0,
+			dash: (edge.meta && edge.meta.isDynamic) ? [4, 4] : [],
+			priority: 100,
+			showArrow: zoom >= 0.7,
+		};
+	}
+
+	if (activeHighlightId) {
+		return {
+			color: 'rgba(148, 163, 184, 0.05)',
+			width: 0.6 / zoom,
+			alpha: 0.05,
+			dash: [],
+			priority: 0,
+			showArrow: false,
+		};
+	}
+
+	const kind = edge.kind || 'import';
+	const meta = edge.meta || {};
+
+	if (kind === 'contains') {
+		if (zoom < 0.8) return null;
+		return {
+			color: 'rgba(100, 116, 139, 0.25)',
+			width: 0.75 / zoom,
+			alpha: 0.35,
+			dash: [2, 3],
+			priority: 1,
+			showArrow: false,
+		};
+	}
+
+	if (kind === 'dependency') {
+		return {
+			color: 'rgba(167, 139, 250, 0.55)',
+			width: 1.35 / zoom,
+			alpha: 0.6,
+			dash: [],
+			priority: 10,
+			showArrow: zoom >= 1.2,
+		};
+	}
+
+	if (meta.isDynamic) {
+		if (zoom < 0.45) return null;
+		return {
+			color: 'rgba(244, 114, 182, 0.6)',
+			width: 1.1 / zoom,
+			alpha: 0.65,
+			dash: [4, 4],
+			priority: 8,
+			showArrow: zoom >= 0.9,
+		};
+	}
+
+	if (meta.isEntryRelated || meta.isEntry) {
+		return {
+			color: 'rgba(245, 158, 11, 0.65)',
+			width: 1.3 / zoom,
+			alpha: 0.75,
+			dash: [],
+			priority: 9,
+			showArrow: zoom >= 0.9,
+		};
+	}
+
+	if (kind === 'reference' || kind === 'export') {
+		if (zoom < 0.6) return null;
+		return {
+			color: 'rgba(148, 163, 184, 0.32)',
+			width: 0.8 / zoom,
+			alpha: 0.4,
+			dash: [],
+			priority: 2,
+			showArrow: false,
+		};
+	}
+
+	// Default standard import
+	if (zoom < 0.38) return null;
+	return {
+		color: 'rgba(148, 163, 184, 0.22)',
+		width: 0.85 / zoom,
+		alpha: 0.35,
+		dash: [],
+		priority: 3,
+		showArrow: zoom >= 1.3,
+	};
+}
+
+function drawNetworkEdgeArrow(p1, p2, color, arrowSize) {
+	const dx = p2.x - p1.x;
+	const dy = p2.y - p1.y;
+	const len = Math.hypot(dx, dy);
+	if (len < 16) return;
+	const midX = p1.x + dx * 0.62;
+	const midY = p1.y + dy * 0.62;
+	const angle = Math.atan2(dy, dx);
+	ctx.save();
+	ctx.fillStyle = color;
+	ctx.beginPath();
+	ctx.moveTo(midX, midY);
+	ctx.lineTo(midX - arrowSize * Math.cos(angle - Math.PI / 6), midY - arrowSize * Math.sin(angle - Math.PI / 6));
+	ctx.lineTo(midX - arrowSize * Math.cos(angle + Math.PI / 6), midY - arrowSize * Math.sin(angle + Math.PI / 6));
+	if (ctx.closePath) ctx.closePath();
+	ctx.fill();
+	ctx.restore();
+}
+
 function drawNetworkFrame() {
 	if (!netCanvas || !ctx) return;
 	const w = netCanvas.clientWidth || 800;
@@ -2294,7 +2400,8 @@ function drawNetworkFrame() {
 		}
 	}
 
-	// 1. Draw Network Edges (Thin screen-space stroke)
+	// 1. Draw Network Edges (Z-bucketed semantic rendering with LOD culling)
+	const edgesToDraw = [];
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
 		const p1 = screenPos(e.source);
@@ -2302,21 +2409,35 @@ function drawNetworkFrame() {
 		if (!p1 || !p2) continue;
 
 		const isConnectedToHighlight = activeHighlightId && (e.source === activeHighlightId || e.target === activeHighlightId);
+		const desc = evaluateNetworkEdge(e, isConnectedToHighlight, activeHighlightId, transform.k);
+		if (!desc) continue;
+
+		edgesToDraw.push({ p1: p1, p2: p2, desc: desc });
+	}
+
+	edgesToDraw.sort(function (a, b) { return a.desc.priority - b.desc.priority; });
+
+	for (let i = 0; i < edgesToDraw.length; i++) {
+		const item = edgesToDraw[i];
+		const p1 = item.p1;
+		const p2 = item.p2;
+		const desc = item.desc;
+
+		ctx.save();
 		ctx.beginPath();
 		ctx.moveTo(p1.x, p1.y);
 		ctx.lineTo(p2.x, p2.y);
-
-		if (isConnectedToHighlight) {
-			ctx.strokeStyle = '#2dd4bf';
-			ctx.lineWidth = 1.8 / transform.k;
-		} else if (activeHighlightId) {
-			ctx.strokeStyle = 'rgba(148, 163, 184, 0.05)';
-			ctx.lineWidth = 0.7 / transform.k;
-		} else {
-			ctx.strokeStyle = 'rgba(148, 163, 184, 0.2)';
-			ctx.lineWidth = 0.85 / transform.k;
+		ctx.strokeStyle = desc.color;
+		ctx.lineWidth = desc.width;
+		if (desc.dash && desc.dash.length > 0) {
+			ctx.setLineDash(desc.dash);
 		}
 		ctx.stroke();
+
+		if (desc.showArrow) {
+			drawNetworkEdgeArrow(p1, p2, desc.color, Math.max(3, 4 / transform.k));
+		}
+		ctx.restore();
 	}
 
 	// 2. Draw Network Nodes Sorted by Projected Z (Far-to-Near)

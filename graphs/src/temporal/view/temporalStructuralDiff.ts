@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { TemporalEntitySnapshot, TemporalEdgeSnapshot } from '../common/temporalTypes.js';
+import type { GitExactDiffChange } from '../../history/git/gitTypes.js';
 import type {
 	TemporalStructuralDiff,
 	TemporalRenderNode,
@@ -13,6 +14,29 @@ import type {
 	TemporalEdgeChangeKind,
 } from './temporalViewTypes.js';
 
+export interface TemporalStructuralDiffOptions {
+	readonly isPartialLineage?: boolean;
+	readonly partialLineageReason?: string;
+	readonly gitDiffChanges?: readonly GitExactDiffChange[];
+}
+
+export interface ComparisonMatchEvidence {
+	readonly matchKind: 'persisted-lineage' | 'git-rename' | 'same-path' | 'exact-content' | 'unmatched';
+	readonly oldPath?: string;
+	readonly similarity?: number;
+}
+
+const EMPTY_BLOB_HASHES = new Set([
+	'e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', // SHA-1 empty blob
+	'4b825dc642cb6eb9a060e54bf8d69288fbee4904', // SHA-1 empty tree
+	'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', // SHA-256 empty blob
+]);
+
+function normalizePath(p: string | undefined): string {
+	if (!p) return '';
+	return p.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\//, '');
+}
+
 export function computeTemporalStructuralDiff(
 	targetCommitSha: string,
 	targetEntities: readonly TemporalEntitySnapshot[],
@@ -20,7 +44,7 @@ export function computeTemporalStructuralDiff(
 	baseCommitSha?: string,
 	baseEntities?: readonly TemporalEntitySnapshot[],
 	baseEdges?: readonly TemporalEdgeSnapshot[],
-	lineageOptions?: { isPartialLineage?: boolean; partialLineageReason?: string },
+	lineageOptions?: TemporalStructuralDiffOptions,
 ): TemporalStructuralDiff {
 	const nodes: TemporalRenderNode[] = [];
 	const edges: TemporalRenderEdge[] = [];
@@ -71,23 +95,125 @@ export function computeTemporalStructuralDiff(
 		}
 	} else {
 		const baseEntityMap = new Map<string, TemporalEntitySnapshot>();
+		const baseBlobCounts = new Map<string, number>();
 		for (const be of baseEntities) {
 			baseEntityMap.set(be.entityId, be);
+			const blob = be.blobOid || (be as any).contentIdentity || be.contentHash;
+			if (blob) {
+				baseBlobCounts.set(blob, (baseBlobCounts.get(blob) ?? 0) + 1);
+			}
 		}
 
 		const targetEntityMap = new Map<string, TemporalEntitySnapshot>();
+		const targetBlobCounts = new Map<string, number>();
 		for (const te of targetEntities) {
 			targetEntityMap.set(te.entityId, te);
+			const blob = te.blobOid || (te as any).contentIdentity || te.contentHash;
+			if (blob) {
+				targetBlobCounts.set(blob, (targetBlobCounts.get(blob) ?? 0) + 1);
+			}
 		}
 
+		// Cross-Commit Comparison Identity Resolution
+		const matchedTargetEntityToBase = new Map<string, TemporalEntitySnapshot>();
 		const matchedBaseEntityIds = new Set<string>();
+		const targetMatchEvidence = new Map<string, ComparisonMatchEvidence>();
 
+		// STEP 1 — SAME PERSISTED ENTITY ID (Highest-confidence persisted lineage)
 		for (const te of targetEntities) {
 			const be = baseEntityMap.get(te.entityId);
-			if (be) {
+			if (be && !matchedBaseEntityIds.has(be.entityId)) {
+				matchedTargetEntityToBase.set(te.entityId, be);
 				matchedBaseEntityIds.add(be.entityId);
+				targetMatchEvidence.set(te.entityId, { matchKind: 'persisted-lineage', oldPath: be.path });
 			}
+		}
 
+		// STEP 2 — EXPLICIT GIT RENAME EVIDENCE (diff-tree -M rename detection)
+		const gitDiffs = lineageOptions?.gitDiffChanges;
+		if (gitDiffs && gitDiffs.length > 0) {
+			for (const diff of gitDiffs) {
+				if (diff.kind === 'renamed' && diff.oldPath && diff.path) {
+					const normNew = normalizePath(diff.path);
+					const normOld = normalizePath(diff.oldPath);
+
+					const te = targetEntities.find(n => !matchedTargetEntityToBase.has(n.entityId) && normalizePath(n.path) === normNew);
+					const be = baseEntities.find(n => !matchedBaseEntityIds.has(n.entityId) && normalizePath(n.path) === normOld);
+
+					if (te && be) {
+						matchedTargetEntityToBase.set(te.entityId, be);
+						matchedBaseEntityIds.add(be.entityId);
+						targetMatchEvidence.set(te.entityId, {
+							matchKind: 'git-rename',
+							oldPath: be.path,
+							similarity: diff.similarity,
+						});
+					}
+				}
+			}
+		}
+
+		// STEP 3 — SAME NORMALIZED PATH (Same logical file across independently indexed cold anchors)
+		for (const te of targetEntities) {
+			if (matchedTargetEntityToBase.has(te.entityId)) {
+				continue;
+			}
+			const normPath = normalizePath(te.path);
+			const be = baseEntities.find(n => !matchedBaseEntityIds.has(n.entityId) && normalizePath(n.path) === normPath);
+			if (be) {
+				matchedTargetEntityToBase.set(te.entityId, be);
+				matchedBaseEntityIds.add(be.entityId);
+				targetMatchEvidence.set(te.entityId, { matchKind: 'same-path', oldPath: be.path });
+			}
+		}
+
+		// STEP 4 — UNIQUE FULL BLOB / CONTENT IDENTITY MATCH (Unambiguous 1-to-1 exact moves/renames)
+		const unmatchedBaseByBlob = new Map<string, TemporalEntitySnapshot[]>();
+		for (const be of baseEntities) {
+			if (matchedBaseEntityIds.has(be.entityId)) continue;
+			const blob = be.blobOid || (be as any).contentIdentity || be.contentHash;
+			if (blob && blob.length >= 7) {
+				const list = unmatchedBaseByBlob.get(blob) ?? [];
+				list.push(be);
+				unmatchedBaseByBlob.set(blob, list);
+			}
+		}
+
+		const unmatchedTargetByBlob = new Map<string, TemporalEntitySnapshot[]>();
+		for (const te of targetEntities) {
+			if (matchedTargetEntityToBase.has(te.entityId)) continue;
+			const blob = te.blobOid || (te as any).contentIdentity || te.contentHash;
+			if (blob && blob.length >= 7) {
+				const list = unmatchedTargetByBlob.get(blob) ?? [];
+				list.push(te);
+				unmatchedTargetByBlob.set(blob, list);
+			}
+		}
+
+		for (const [blob, targetList] of unmatchedTargetByBlob) {
+			// Never pair empty files across different paths without explicit Git rename
+			if (EMPTY_BLOB_HASHES.has(blob.toLowerCase())) {
+				continue;
+			}
+			const baseList = unmatchedBaseByBlob.get(blob);
+			const totalInBase = baseBlobCounts.get(blob) ?? 0;
+			const totalInTarget = targetBlobCounts.get(blob) ?? 0;
+
+			// Only pair if the blob is strictly unique (frequency == 1) in BOTH entire trees
+			if (totalInBase === 1 && totalInTarget === 1 && targetList.length === 1 && baseList && baseList.length === 1) {
+				const te = targetList[0];
+				const be = baseList[0];
+				if (!matchedTargetEntityToBase.has(te.entityId) && !matchedBaseEntityIds.has(be.entityId)) {
+					matchedTargetEntityToBase.set(te.entityId, be);
+					matchedBaseEntityIds.add(be.entityId);
+					targetMatchEvidence.set(te.entityId, { matchKind: 'exact-content', oldPath: be.path });
+				}
+			}
+		}
+
+		// STEP 5 — CLASSIFY TARGET NODES (Matched vs Added)
+		for (const te of targetEntities) {
+			const be = matchedTargetEntityToBase.get(te.entityId);
 			let changeKind: TemporalNodeChangeKind;
 			let oldPath: string | undefined;
 			let isModified = false;
@@ -98,7 +224,7 @@ export function computeTemporalStructuralDiff(
 			if (!be) {
 				changeKind = 'added';
 				addedCount++;
-			} else if (te.path !== be.path) {
+			} else if (normalizePath(te.path) !== normalizePath(be.path)) {
 				changeKind = 'renamed';
 				oldPath = be.path;
 				renamedCount++;
@@ -115,9 +241,11 @@ export function computeTemporalStructuralDiff(
 				unchangedCount++;
 			}
 
+			const evidence = targetMatchEvidence.get(te.entityId);
 			const metaObj = {
 				...(te.nodeData as any),
 				isRenamedAndModified: changeKind === 'renamed' && isModified,
+				comparisonMatchKind: evidence?.matchKind || (changeKind === 'added' ? 'unmatched' : undefined),
 			};
 
 			nodes.push({
@@ -154,11 +282,25 @@ export function computeTemporalStructuralDiff(
 			}
 		}
 
-		// Edge diffing
-		const baseEdgeMap = new Map<string, TemporalEdgeSnapshot>();
+		// Edge diffing with comparison identity mapping
+		const targetEntityIdToBaseId = new Map<string, string>();
+		for (const [tId, be] of matchedTargetEntityToBase) {
+			targetEntityIdToBaseId.set(tId, be.entityId);
+		}
+
+		const baseEdgeById = new Map<string, TemporalEdgeSnapshot>();
+		const baseEdgeByEndpoints = new Map<string, TemporalEdgeSnapshot>();
+		const baseEdgeByPaths = new Map<string, TemporalEdgeSnapshot>();
+
 		if (baseEdges) {
 			for (const be of baseEdges) {
-				baseEdgeMap.set(be.edgeId, be);
+				baseEdgeById.set(be.edgeId, be);
+				const bSrcPath = (be as any).sourcePath || baseEntityMap.get(be.sourceEntityId)?.path || '';
+				const bTgtPath = (be as any).targetPath || baseEntityMap.get(be.targetEntityId)?.path || '';
+				baseEdgeByEndpoints.set(`${be.sourceEntityId}:::${be.targetEntityId}:::${be.kind}`, be);
+				if (bSrcPath && bTgtPath) {
+					baseEdgeByPaths.set(`${normalizePath(bSrcPath)}:::${normalizePath(bTgtPath)}:::${be.kind}`, be);
+				}
 			}
 		}
 
@@ -168,7 +310,18 @@ export function computeTemporalStructuralDiff(
 			const srcPath = (tEdge as any).sourcePath || targetEntityMap.get(tEdge.sourceEntityId)?.path || '';
 			const tgtPath = (tEdge as any).targetPath || targetEntityMap.get(tEdge.targetEntityId)?.path || '';
 
-			const bEdge = baseEdgeMap.get(tEdge.edgeId);
+			let bEdge = baseEdgeById.get(tEdge.edgeId);
+			if (!bEdge) {
+				const mappedSrcBaseId = targetEntityIdToBaseId.get(tEdge.sourceEntityId);
+				const mappedTgtBaseId = targetEntityIdToBaseId.get(tEdge.targetEntityId);
+				if (mappedSrcBaseId && mappedTgtBaseId) {
+					bEdge = baseEdgeByEndpoints.get(`${mappedSrcBaseId}:::${mappedTgtBaseId}:::${tEdge.kind}`);
+				}
+			}
+			if (!bEdge && srcPath && tgtPath) {
+				bEdge = baseEdgeByPaths.get(`${normalizePath(srcPath)}:::${normalizePath(tgtPath)}:::${tEdge.kind}`);
+			}
+
 			if (bEdge) {
 				matchedBaseEdgeIds.add(bEdge.edgeId);
 			}
@@ -359,4 +512,3 @@ function areStringArraysEquivalent(a?: readonly string[], b?: readonly string[])
 	}
 	return true;
 }
-

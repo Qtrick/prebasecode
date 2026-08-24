@@ -100,7 +100,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 	const elements = new Map<string, FakeElement>();
 	for (const id of [
 		'archSvg', 'netCanvas', 'status', 'legend', 'empty', 'idleToggle', 'idleToggleWrap',
-		'toolbar', 'temporalToolbar', 'temporalRepoWrap', 'temporalRepoSelect', 'temporalScrubberBar', 'temporalRefSelect', 'temporalCompareSelect',
+		'toolbar', 'temporalToolbar', 'temporalBreadcrumbTarget', 'temporalBreadcrumbBase', 'temporalRepoWrap', 'temporalRepoSelect', 'temporalScrubberBar', 'temporalRefSelect', 'temporalCompareSelect',
 		'temporalFollowHead', 'temporalFilterInput', 'temporalScrubber', 'temporalPrevBtn', 'temporalNextBtn',
 		'temporalPlayBtn', 'temporalCommitSha', 'temporalCommitMessage', 'temporalCommitAuthor', 'temporalCommitStatus',
 		'temporalPartialWarning', 'badgeAdded', 'badgeRemoved', 'badgeModified', 'badgeRenamed',
@@ -121,6 +121,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 		restore() { drawCalls.push({ type: 'restore', args: [] }); },
 		clearRect(...args: any[]) { drawCalls.push({ type: 'clearRect', args }); },
 		beginPath() { drawCalls.push({ type: 'beginPath', args: [] }); },
+		closePath() { drawCalls.push({ type: 'closePath', args: [] }); },
 		moveTo(...args: any[]) { drawCalls.push({ type: 'moveTo', args }); },
 		lineTo(...args: any[]) { drawCalls.push({ type: 'lineTo', args }); },
 		quadraticCurveTo(...args: any[]) { drawCalls.push({ type: 'quadraticCurveTo', args }); },

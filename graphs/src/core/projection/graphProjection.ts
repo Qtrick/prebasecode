@@ -173,6 +173,8 @@ function computeNetworkPositions(
 			const degree = imp.inDegree + imp.outDegree;
 			return {
 				id: n.id,
+				path: n.path,
+				architectureLayer: (n.meta?.architectureLayer as string | undefined),
 				fileTypeId: ft.id,
 				isEntry: !!n.isEntry,
 				val: n.isEntry ? 10 : Math.max(1.5, 1.2 + Math.sqrt(degree) * 1.4),

@@ -155,7 +155,7 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1 & 3.2)', () => {
 		assert.equal(n2.oldPath, 'src/service.ts');
 	});
 
-	test('5. File deletion and recreation at same path: old entity removed, new entity added', () => {
+	test('5. Cross-anchor entity ID difference at same path: reconciled as modified without false add/remove', () => {
 		const baseEntities = [
 			makeEntity('ent-old', 'src/feature.ts', 'can-old'),
 		];
@@ -165,16 +165,14 @@ suite('TemporalStructuralDiff (Unit - Phase 3.1 & 3.2)', () => {
 
 		const diff = computeTemporalStructuralDiff('commit-2', targetEntities, [], 'commit-1', baseEntities, []);
 
-		assert.equal(diff.summary.addedCount, 1);
-		assert.equal(diff.summary.removedCount, 1);
+		assert.equal(diff.summary.addedCount, 0);
+		assert.equal(diff.summary.removedCount, 0);
+		assert.equal(diff.summary.modifiedCount, 1);
 
-		const removedNode = diff.nodes.find(n => n.entityId === 'ent-old');
-		assert.ok(removedNode);
-		assert.equal(removedNode.changeKind, 'removed');
-
-		const addedNode = diff.nodes.find(n => n.entityId === 'ent-new');
-		assert.ok(addedNode);
-		assert.equal(addedNode.changeKind, 'added');
+		const node = diff.nodes.find(n => n.path === 'src/feature.ts');
+		assert.ok(node);
+		assert.equal(node.changeKind, 'modified');
+		assert.equal(node.isModified, true);
 	});
 
 	test('6. Path swapping (A -> B, B -> A): correctly follows entity continuity', () => {

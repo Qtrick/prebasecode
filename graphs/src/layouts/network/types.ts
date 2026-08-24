@@ -1,10 +1,13 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 export interface NetworkLayoutNode {
 	id: string;
 	fileTypeId?: string;
+	architectureLayer?: string;
+	path?: string;
 	val?: number;
 	isEntry?: boolean;
 }

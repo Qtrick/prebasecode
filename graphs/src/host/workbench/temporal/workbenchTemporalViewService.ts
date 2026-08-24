@@ -782,6 +782,16 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			const isTargetPartial = finalTargetStatus.lineageCoverage?.kind === 'partial';
 			const isPartial = isTargetPartial || isBasePartial;
 
+			let gitDiffChanges: import('../../../history/git/gitTypes.js').GitExactDiffChange[] | undefined;
+			if (baseSha && this._gitHistoryService?.diffCommitTrees) {
+				try {
+					const diffResult = await this._gitHistoryService.diffCommitTrees(root, baseSha, targetSha, cts.token);
+					gitDiffChanges = (diffResult.changes || []) as import('../../../history/git/gitTypes.js').GitExactDiffChange[];
+				} catch {
+					// Fall back cleanly to path and blob identity matching
+				}
+			}
+
 			const rawDiff = computeTemporalStructuralDiff(
 				targetSha,
 				targetEntities,
@@ -791,7 +801,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				baseEdges,
 				{
 					isPartialLineage: isPartial,
-					partialLineageReason: isPartial ? 'Background lineage indexing in progress' : undefined,
+					partialLineageReason: isPartial ? 'Historical lineage coverage is partial' : undefined,
+					gitDiffChanges,
 				},
 			);
 
