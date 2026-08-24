@@ -704,7 +704,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 			maxRenderedEdges: limits.maxEdges,
 			hideLowImportance: hideLow,
 			networkLayoutMode,
-			spreadScale: spread,
+			spreadScale: spread * Math.max(0.5, Math.min(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkPhysicsStrength) || 1)),
 			collisionRadius: Math.max(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkCollisionRadius) || 24),
 			linkDistance: Math.max(4, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkLinkDistance) || 80),
 			forceStrength: Math.max(0, Math.min(2, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkForceStrength) ?? 0.35)),

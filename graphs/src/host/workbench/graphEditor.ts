@@ -24,6 +24,7 @@ import { IQuickInputService, type IQuickPickItem } from '../../../../../../platf
 import { INotificationService } from '../../../../../../platform/notification/common/notification.js';
 import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
+import { serializeNetworkEdgeVisualSource } from './networkEdgeVisualRuntime.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
 import { IPreBaseGraphService, type PreBaseGraphType } from './prebaseGraphService.js';
@@ -207,6 +208,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		const panSensitivity = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.InteractionPanSensitivity) ?? 1.0;
 		const keepGraphCentered = Boolean(this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.InteractionKeepGraphCentered));
 		const networkEdgeOpacity = this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity) ?? 0.55;
+		const layoutAnimationDuration = Math.max(0, Math.min(2000, this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphLayoutAnimationDuration) ?? 320));
 		return {
 			showLegend: this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphShowLegend) !== false,
 			initialZoom: this.configurationService.getValue<number>(PreBaseGraphConfigKeys.GraphInitialZoom) || 1,
@@ -219,7 +221,8 @@ export class PreBaseGraphEditor extends EditorPane {
 			zoomSensitivity,
 			panSensitivity,
 			keepGraphCentered,
-			networkEdgeOpacity
+			networkEdgeOpacity,
+			layoutAnimationDuration
 		};
 	}
 
@@ -668,13 +671,24 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #stage { position:absolute; inset:0; }
 #archSvg, #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; }
 #archSvg { cursor:grab; }
-#archSvg.dragging, #archSvg.panning { cursor:grabbing; }
+#archSvg.dragging { cursor:grabbing; }
+/* Base cursor is managed by updateCanvasCursor() (state-driven); CSS provides the
+   manipulation fallback for the brief moment before JS state settles. */
 #netCanvas { cursor:grab; }
-#netCanvas.dragging { cursor:grabbing; }
-#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:4px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 88%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:4px; }
-#toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid transparent; border-radius:6px; padding:6px 8px; cursor:pointer; font-size:12px; }
+#toolbar { position:absolute; left:12px; bottom:56px; z-index:4; display:flex; gap:2px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 88%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:3px; }
+#toolbar button, #toolbar label { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid transparent; border-radius:6px; padding:0; cursor:pointer; font-size:12px; }
+#toolbar button { width:26px; height:26px; display:flex; align-items:center; justify-content:center; }
+#toolbar button svg { width:16px; height:16px; fill:currentColor; display:block; pointer-events:none; }
 #toolbar button:hover { background:var(--vscode-toolbar-hoverBackground, #303030); }
-#toolbar button.active, #toolbar button[aria-pressed="true"] { background:rgba(45, 212, 191, 0.18); color:var(--vscode-button-background, #2dd4bf); border-color:var(--vscode-button-background, #2dd4bf); font-weight:600; }
+#toolbar button:focus-visible, .commit-marker:focus-visible, #temporalToolbar button:focus-visible,
+#temporalScrubberBar button:focus-visible, #popup button:focus-visible, #temporalDetailsClose:focus-visible {
+	outline:1px solid var(--vscode-focusBorder, #007fd4); outline-offset:1px;
+}
+/* Center Lock active state: shape change + outline + accent, never color alone. */
+#toolbar button[aria-pressed="true"] { color:var(--vscode-button-background, #2dd4bf); border-color:var(--vscode-button-background, #2dd4bf); background:rgba(45, 212, 191, 0.14); }
+#toolbar button .icon-pressed { display:none; }
+#toolbar button[aria-pressed="true"] .icon-unpressed { display:none; }
+#toolbar button[aria-pressed="true"] .icon-pressed { display:block; }
 #toolbar label { display:flex; gap:4px; align-items:center; user-select:none; opacity:.9; }
 #idleToggleWrap { display:none; }
 #status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
@@ -699,7 +713,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #legend .title.spaced { margin-top:8px; }
 
 /* Temporal UI */
-#temporalToolbar { position:absolute; top:12px; left:12px; z-index:5; display:none; gap:10px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:5px 10px; font-size:12px; backdrop-filter:blur(8px); max-width:calc(100% - 24px); box-sizing:border-box; }
+#temporalToolbar { position:absolute; top:12px; left:12px; right:12px; z-index:5; display:none; gap:10px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:5px 10px; font-size:12px; backdrop-filter:blur(8px); max-width:calc(100% - 24px); box-sizing:border-box; flex-wrap:wrap; }
 #temporalToolbar select, #temporalToolbar input { background:var(--vscode-dropdown-background, #252526); color:var(--vscode-dropdown-foreground, #cccccc); border:1px solid var(--vscode-dropdown-border, #3c3c3c); border-radius:4px; padding:3px 6px; font-size:11px; }
 #temporalDisplayModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
 #temporalDisplayModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
@@ -709,7 +723,8 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #temporalScrubberBar .row { display:flex; align-items:center; width:100%; box-sizing:border-box; }
 #temporalScrubberBar .controls-row { display:flex; align-items:center; gap:8px; width:100%; }
 #temporalScrubberBar .track-row { display:flex; align-items:center; width:100%; margin-top:2px; }
-#temporalScrubberBar button { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; padding:3px 8px; cursor:pointer; font-size:11px; }
+#temporalScrubberBar button { background:transparent; color:var(--vscode-foreground, #f4f4f5); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:4px; padding:3px 6px; cursor:pointer; font-size:11px; display:inline-flex; align-items:center; justify-content:center; min-width:24px; height:22px; box-sizing:border-box; }
+#temporalScrubberBar button svg { width:12px; height:12px; fill:currentColor; display:block; pointer-events:none; }
 #temporalScrubberBar button:hover { background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.08)); }
 #temporalTimelineStrip { display:flex; align-items:center; gap:4px; height:20px; overflow-x:auto; width:100%; padding:2px 0; }
 .commit-marker { width:10px; height:10px; border-radius:50%; background:var(--vscode-descriptionForeground, #71717a); flex:0 0 auto; cursor:pointer; transition:transform 0.1s ease; border:1px solid transparent; padding:0; }
@@ -724,7 +739,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 .badge-renamed { color:var(--vscode-gitDecoration-renamedResourceForeground, #58a6ff); background:rgba(88,166,255,0.15); padding:1px 6px; border-radius:4px; font-weight:600; }
 .badge-warning { color:var(--vscode-editorWarning-foreground, #e3b341); background:rgba(227,179,65,0.15); padding:1px 6px; border-radius:4px; font-weight:600; display:none; }
 
-#temporalDetailsPanel { position:absolute; right:12px; top:52px; bottom:84px; width:340px; z-index:5; display:none; flex-direction:column; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 96%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:12px; backdrop-filter:blur(8px); box-shadow:0 8px 24px rgba(0,0,0,0.3); font-size:11.5px; }
+#temporalDetailsPanel { position:absolute; right:12px; top:52px; bottom:84px; width:min(340px, calc(100vw - 24px)); z-index:5; display:none; flex-direction:column; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 96%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:12px; backdrop-filter:blur(8px); box-shadow:0 8px 24px rgba(0,0,0,0.3); font-size:11.5px; box-sizing:border-box; }
 #temporalDetailsPanel .header { display:flex; align-items:center; justify-content:space-between; font-weight:600; font-size:12px; margin-bottom:8px; border-bottom:1px solid var(--vscode-widget-border, #3C3C3C); padding-bottom:6px; }
 #temporalDetailsPanel .meta-row { display:flex; flex-direction:column; gap:2px; margin-bottom:6px; }
 #temporalDetailsPanel .meta-row label { font-size:10px; text-transform:uppercase; opacity:0.65; font-weight:600; }
@@ -757,6 +772,13 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 .no-changes-card .title { font-size:13px; font-weight:600; color:var(--vscode-foreground, #f4f4f5); }
 .no-changes-card .desc { font-size:11.5px; color:var(--vscode-descriptionForeground, #a1a1aa); line-height:1.4; }
 .no-changes-card button { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); border:0; border-radius:4px; padding:6px 14px; font-weight:600; font-size:11.5px; cursor:pointer; margin-top:4px; }
+#netCanvas:focus-visible { outline:2px solid var(--vscode-focusBorder, #007fd4); outline-offset:-2px; }
+.kbd-help { position:absolute; left:50%; top:50%; transform:translate(-50%, -50%); z-index:9; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 97%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:14px 18px; font-size:12px; line-height:1.7; box-shadow:0 10px 30px rgba(0,0,0,0.35); pointer-events:none; }
+.kbd-help .title { font-weight:700; margin-bottom:6px; }
+@media (prefers-reduced-motion: reduce) {
+	.commit-marker { transition:none; }
+	#popup, .no-changes-card { transition:none; }
+}
 </style>
 </head>
 <body>
@@ -768,7 +790,18 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<button id="noChangesViewSource" type="button">View Source Changes</button>
 	</div>
 	<svg id="archSvg"></svg>
-	<canvas id="netCanvas"></canvas>
+	<canvas id="netCanvas" tabindex="0" role="application" aria-roledescription="interactive graph"
+		aria-label="Code Graph. Use arrow keys to move between nodes; Enter opens details; press F1 for help."
+		aria-describedby="graphKbdHelp"></canvas>
+	<div id="graphLiveRegion" role="status" aria-live="polite" style="position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;"></div>
+	<div id="graphKbdHelp" class="kbd-help" hidden>
+		<div class="title">Graph keyboard shortcuts</div>
+		<div>Arrow keys — move between nodes</div>
+		<div>Enter / Space — open node details</div>
+		<div>Escape — clear selection / close panels</div>
+		<div>+ / − (or =) — zoom in / out · 0 or F — fit view · R — reset view · C — keep centered</div>
+		<div>Tab — leave the canvas to the toolbar and page controls</div>
+	</div>
 	<div id="temporalDetailsPanel" role="region" aria-label="Commit details and structural delta">
 		<div class="header">
 			<span>Commit Details & Structural Delta</span>
@@ -816,17 +849,16 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<span id="badgeRenamed" class="badge-renamed" title="Renamed nodes">⇄0</span>
 		<span id="temporalPartialWarning" class="badge-warning" style="display:none;"></span>
 		<span id="temporalCommitStatus" class="status-pill" style="display:inline-flex; align-items:center; gap:4px; font-size:10px; border-radius:10px; padding:2px 7px; font-weight:600;"></span>
-	</div>
-</div>
+	</div></div>
 
 <!-- Temporal Scrubber Bar -->
 <div id="temporalScrubberBar">
 	<div id="temporalTimelineStrip" style="display:none;" aria-label="Loaded commit history timeline"></div>
 	<div class="row controls-row" style="display:flex; align-items:center; gap:8px; width:100%;">
 		<div style="display:flex; align-items:center; gap:4px; flex-shrink:0;">
-			<button id="temporalPrevBtn" title="Previous older commit (Left arrow)" aria-label="Previous commit">◀</button>
-			<button id="temporalPlayBtn" title="Play timeline (Space)" aria-label="Play timeline">▶</button>
-			<button id="temporalNextBtn" title="Next newer commit (Right arrow)" aria-label="Next commit">▶</button>
+			<button id="temporalPrevBtn" title="Previous older commit (Left arrow)" aria-label="Previous commit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M10.5 3.5v9L4.5 8z"/></svg></button>
+			<button id="temporalPlayBtn" title="Play timeline (Space)" aria-label="Play timeline"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.5l9 5.5-9 5.5z"/></svg></button>
+			<button id="temporalNextBtn" title="Next newer commit (Right arrow)" aria-label="Next commit"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 12.5v-9l6 4.5z"/></svg></button>
 			<button id="temporalLoadMoreBtn" title="Load more historical commits" aria-label="Load more history" style="display:none;">+More</button>
 		</div>
 		<div style="display:flex; align-items:center; gap:6px; flex:1; min-width:0; overflow:hidden;">
@@ -834,7 +866,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 			<span id="temporalCommitMessage" style="font-size:11px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; flex:1; min-width:0;"></span>
 			<span id="temporalCommitAuthor" style="font-size:10.5px; opacity:0.75; flex-shrink:0;"></span>
 		</div>
-		<button id="temporalToggleDetailsBtn" type="button" title="Toggle commit details & structural diff inspector" aria-label="Toggle Details" style="flex-shrink:0; margin-left:auto;">Details ▾</button>
+		<button id="temporalToggleDetailsBtn" type="button" title="Toggle commit details & structural diff inspector" aria-label="Toggle Details" aria-expanded="false" aria-controls="temporalDetailsPanel" style="flex-shrink:0; margin-left:auto;">Details</button>
 	</div>
 	<div class="row track-row" style="display:flex; align-items:center; width:100%; padding-top:2px;">
 		<input id="temporalScrubber" type="range" min="0" max="0" value="0" aria-label="Temporal commit history scrubber" style="width:100%; display:block;">
@@ -869,11 +901,11 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	</div>
 </div>
 <div id="toolbar" role="toolbar" aria-label="Graph Viewport Controls">
-	<button id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in">+</button>
-	<button id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out">−</button>
-	<button id="fit" type="button" title="Fit View" aria-label="Fit View">⛶</button>
-	<button id="centerLock" type="button" title="Keep graph centered" aria-label="Keep graph centered" aria-pressed="false">🎯</button>
-	<button id="reset" type="button" title="Reset View" aria-label="Reset View">↻</button>
+	<button id="zoomIn" type="button" title="Zoom in" aria-label="Zoom in"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.5 2a5.5 5.5 0 0 1 4.383 8.838l4.471 4.47-.707.707-4.47-4.47A5.5 5.5 0 1 1 7.5 2zm0 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM8 5v2h2v1H8v2H7V8H5V7h2V5h1z"/></svg></button>
+	<button id="zoomOut" type="button" title="Zoom out" aria-label="Zoom out"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M7.5 2a5.5 5.5 0 0 1 4.383 8.838l4.471 4.47-.707.707-4.47-4.47A5.5 5.5 0 1 1 7.5 2zm0 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM5 7h5v1H5V7z"/></svg></button>
+	<button id="fit" type="button" title="Fit View" aria-label="Fit View"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2L6.5 2 6.5 3 3.707 3 7.354 6.646 6.646 7.354 3 3.707 3 6.5 2 6.5z M14 14L9.5 14 9.5 13 12.293 13 8.646 9.354 9.354 8.646 13 12.293 13 9.5 14 9.5z"/></svg></button>
+	<button id="centerLock" type="button" title="Keep graph centered" aria-label="Keep graph centered" aria-pressed="false"><svg class="icon-unpressed" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a6 6 0 0 1 6 6c0 2.3-1.5 4.05-3.15 5.07A11 11 0 0 1 8 13.44a11 11 0 0 1-2.85-1.37C3.5 11.05 2 9.3 2 7a6 6 0 0 1 6-6zm0 1a5 5 0 0 0-5 5c0 .34.03.66.1.96C3.53 9.86 5.63 10.94 8 12.4c2.37-1.46 4.47-2.54 4.9-4.44.07-.3.1-.62.1-.96a5 5 0 0 0-5-5zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg><svg class="icon-pressed" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a6 6 0 0 1 6 6c0 2.3-1.5 4.05-3.15 5.07A11 11 0 0 1 8 13.44a11 11 0 0 1-2.85-1.37C3.5 11.05 2 9.3 2 7a6 6 0 0 1 6-6zm0 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg></button>
+	<button id="reset" type="button" title="Reset View" aria-label="Reset View"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.45 8.17c-.44 2.61-2.72 4.58-5.45 4.58A5.5 5.5 0 0 1 2.5 7.25h1.01a4.5 4.5 0 0 0 4.49 4.5c2.17 0 3.98-1.55 4.42-3.6l-1.71.57-.32-.95 3.12-1.04.95 3.12-.95.32-.06-.99zM2.55 6.83C2.99 4.22 5.27 2.25 8 2.25a5.5 5.5 0 0 1 5.5 5.5h-1.01a4.5 4.5 0 0 0-4.49-4.5c-2.17 0-3.98 1.55-4.42 3.6l1.71-.57.32.95-3.12 1.04L1.54 5.15l.95-.32.06.99z"/></svg></button>
 	<label id="idleToggleWrap"><input type="checkbox" id="idleToggle" aria-label="Auto-rotate when idle"> Idle</label>
 </div>
 <div id="status">Scanning…</div>
@@ -883,6 +915,10 @@ const vscode = acquireVsCodeApi();
 const currentGeneration = Number('${generation}') || 0;
 let initialGraphType = '${initialGraphType}' === 'temporal' ? 'temporal' : 'network';
 let graphType = initialGraphType;
+
+// Authoritative Network edge visual resolver, injected from
+// graphs/src/view/network/networkEdgeVisual.ts (single source of truth; parity-tested).
+const resolveNetworkEdgeVisual = ${serializeNetworkEdgeVisualSource()};
 
 // 2. Fast request dispatcher & pending map
 const pending = new Map();
@@ -1042,10 +1078,10 @@ const centerLockBtn = document.getElementById('centerLock');
 let keepGraphCentered = false;
 let activeCameraAnim = null;
 
-// Graph Adjacency and Static Descriptor Maps
-let nodeIncidentEdgesMap = new Map();
+// Graph adjacency index: consumed by the highlight path in drawNetworkFrame.
+// (A former incident-edges map and static edge descriptor cache were removed:
+// they were built on every snapshot but never read by any render path.)
 let nodeNeighborsMap = new Map();
-let staticEdgeDescriptorCache = new Map();
 
 let dragging = false, panning = false, rotating = false;
 let lastX = 0, lastY = 0, moved = false;
@@ -1190,10 +1226,27 @@ function interpolateViewport(from, to, t) {
 }
 
 function getUsableInsets() {
+	let top = 12, bottom = 56, left = 12, right = 12;
 	if (isTemporal()) {
-		return { top: 48, bottom: 68, left: 12, right: 12 };
+		top = 48;
+		bottom = 68;
+		// Commit-details inspector occupies the right side when visible
+		// (~340px panel + 12px offsets); Fit View / Center Lock / zoom-around-center
+		// must not center content underneath it.
+		if (temporalDetailsPanel && temporalDetailsPanel.style.display !== 'none' && temporalDetailsPanel.offsetWidth > 0) {
+			right += temporalDetailsPanel.offsetWidth + 24;
+			bottom = Math.max(bottom, 84);
+		}
 	}
-	return { top: 12, bottom: 56, left: 12, right: 12 };
+	// Defensive clamps: never let insets consume the whole (possibly tiny) viewport.
+	const w = netCanvas ? (netCanvas.clientWidth || 800) : 800;
+	const h = netCanvas ? (netCanvas.clientHeight || 600) : 600;
+	return {
+		top: Math.min(top, Math.floor(h * 0.4)),
+		bottom: Math.min(bottom, Math.floor(h * 0.55)),
+		left: Math.min(left, Math.floor(w * 0.4)),
+		right: Math.min(right, Math.floor(w * 0.6)),
+	};
 }
 
 function syncCenterLockUI() {
@@ -1203,31 +1256,41 @@ function syncCenterLockUI() {
 	centerLockBtn.title = keepGraphCentered ? 'Keep graph centered (Active)' : 'Keep graph centered';
 }
 
-function applyCenterLock(immediate) {
-	if (!keepGraphCentered || !netCanvas) return;
-	const w = netCanvas.clientWidth || 800;
-	const h = netCanvas.clientHeight || 600;
-	let bounds = null;
+// Reusable scratch list so per-frame center-lock recomputation does not allocate.
+let _centerLockScratch = [];
 
+function collectCenterLockBounds() {
+	_centerLockScratch.length = 0;
 	if (isTemporal()) {
-		if (!currentTemporalRenderNodes || currentTemporalRenderNodes.size === 0) return;
-		const nodesList = [];
+		if (!currentTemporalRenderNodes || currentTemporalRenderNodes.size === 0) return null;
 		currentTemporalRenderNodes.forEach(function (n) {
-			nodesList.push({ x: n.x || 0, y: n.y || 0, radius: 10 });
+			_centerLockScratch.push({ x: n.x || 0, y: n.y || 0, radius: 10 });
 		});
-		bounds = computeGraphBounds(nodesList);
 	} else if (isNetwork() && snapshot) {
 		const nodes = snapshot.nodes || [];
-		const projectedList = [];
 		for (let i = 0; i < nodes.length; i++) {
 			const p = projected[nodes[i].id];
-			if (p) projectedList.push({ x: p.x, y: p.y, radius: 8 });
+			if (p) _centerLockScratch.push({ x: p.x, y: p.y, radius: 8 });
 		}
-		bounds = computeGraphBounds(projectedList);
+	} else {
+		return null;
 	}
+	return computeGraphBounds(_centerLockScratch);
+}
 
+function applyCenterLock(immediate) {
+	if (!keepGraphCentered || !netCanvas) return;
+	// Never fight an in-flight programmatic camera animation; rafLoop re-applies
+	// lock after the animation completes.
+	if (activeCameraAnim && !immediate) return;
+	const w = netCanvas.clientWidth || 800;
+	const h = netCanvas.clientHeight || 600;
+
+	const bounds = collectCenterLockBounds();
 	if (!bounds) return;
 	const target = computeCenterLockedTransform(bounds, w, h, transform.k, getUsableInsets());
+	// Sub-half-pixel residual is invisible at any DPR and re-locking every frame
+	// against float drift would keep a repaint loop alive for nothing.
 	if (!isCenterDeadZone(transform, target, 0.5)) {
 		transform.x = target.x;
 		transform.y = target.y;
@@ -1258,39 +1321,22 @@ function animateViewportTo(targetTransform, durationMs) {
 	kickRaf();
 }
 
-function rebuildAdjacencyAndStaticDescriptors() {
-	nodeIncidentEdgesMap.clear();
+function rebuildAdjacency() {
 	nodeNeighborsMap.clear();
-	staticEdgeDescriptorCache.clear();
 
 	if (!snapshot) return;
 	const nodes = snapshot.nodes || [];
 	const edges = snapshot.edges || [];
 	for (let i = 0; i < nodes.length; i++) {
-		nodeIncidentEdgesMap.set(nodes[i].id, []);
 		nodeNeighborsMap.set(nodes[i].id, new Set());
 	}
 
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
-		if (!nodeIncidentEdgesMap.has(e.source)) nodeIncidentEdgesMap.set(e.source, []);
-		if (!nodeIncidentEdgesMap.has(e.target)) nodeIncidentEdgesMap.set(e.target, []);
 		if (!nodeNeighborsMap.has(e.source)) nodeNeighborsMap.set(e.source, new Set());
 		if (!nodeNeighborsMap.has(e.target)) nodeNeighborsMap.set(e.target, new Set());
-
-		nodeIncidentEdgesMap.get(e.source).push(e);
-		nodeIncidentEdgesMap.get(e.target).push(e);
 		nodeNeighborsMap.get(e.source).add(e.target);
 		nodeNeighborsMap.get(e.target).add(e.source);
-
-		const kind = e.kind || 'import';
-		const meta = e.meta || {};
-		const key = (e.id || (e.source + '->' + e.target)) + '::' + kind;
-		staticEdgeDescriptorCache.set(key, {
-			kind: kind,
-			isDynamic: Boolean(meta.isDynamic),
-			isEntryRelated: Boolean(meta.isEntryRelated || meta.isEntry),
-		});
 	}
 }
 
@@ -1310,9 +1356,14 @@ let temporalContextFilterMode = 'focused';
 function isNetwork() { return graphType === 'network'; }
 function isTemporal() { return graphType === 'temporal'; }
 
+// Theme tokens cached between invalidations: getComputedStyle on every frame is a
+// measurable hot-path cost (measured in Phase 3.10 profiling). Invalidate via
+// invalidateThemeColors() when a message may follow a theme change.
+let _themeColors = null;
 function getComputedThemeColors() {
+	if (_themeColors) return _themeColors;
 	const s = getComputedStyle(document.documentElement);
-	return {
+	_themeColors = {
 		bg: s.getPropertyValue('--vscode-editor-background').trim() || '#1B1C1E',
 		fg: s.getPropertyValue('--vscode-foreground').trim() || '#f4f4f5',
 		border: s.getPropertyValue('--vscode-widget-border').trim() || '#3C3C3C',
@@ -1323,6 +1374,10 @@ function getComputedThemeColors() {
 		accent: s.getPropertyValue('--vscode-button-background').trim() || '#2dd4bf',
 		isHighContrast: document.body.classList.contains('vscode-high-contrast') || s.getPropertyValue('--vscode-contrastBorder').trim() !== '',
 	};
+	return _themeColors;
+}
+function invalidateThemeColors() {
+	_themeColors = null;
 }
 
 function canIdleRotate() {
@@ -1414,7 +1469,23 @@ function computeNetworkPickRadius(node, depthScale, entryId) {
 	return Math.max(18, vr * 2.2 + 8);
 }
 
+// Cached Focus+Context derivation: recomputed only when the diff, display mode or
+// context filter actually changes (all three are immutable between updates).
+let _temporalVisibleCache = null;
+let _temporalVisibleCacheKey = '';
+
 function computeTemporalVisibleElements(diff, mode, contextMode) {
+	const cacheKey = (diff ? 1 : 0) + '|' + mode + '|' + contextMode;
+	if (_temporalVisibleCache && _temporalVisibleCacheKey === cacheKey && _temporalVisibleCache._diff === diff) {
+		return _temporalVisibleCache;
+	}
+	_temporalVisibleCache = _computeTemporalVisibleElementsUncached(diff, mode, contextMode);
+	_temporalVisibleCache._diff = diff;
+	_temporalVisibleCacheKey = cacheKey;
+	return _temporalVisibleCache;
+}
+
+function _computeTemporalVisibleElementsUncached(diff, mode, contextMode) {
 	if (!diff || !diff.nodes || !diff.nodes.length) {
 		return { nodes: [], edges: [], focusSet: new Set(), directContextSet: new Set(), hasZeroChanges: true };
 	}
@@ -1616,6 +1687,7 @@ function getVisualNodePosition(node, ease) {
 function fitView(animate) {
 	if (!netCanvas) return;
 	const shouldAnimate = animate === true && !settings.reduceMotion;
+	const animMs = Math.max(0, settings.layoutAnimationDuration !== undefined ? Number(settings.layoutAnimationDuration) : 320);
 	const insets = getUsableInsets();
 	const vw = netCanvas.clientWidth || 800;
 	const vh = netCanvas.clientHeight || 600;
@@ -1645,8 +1717,8 @@ function fitView(animate) {
 		const graphCenterX = (minX + maxX) / 2;
 		const graphCenterY = (minY + maxY) / 2;
 		const targetTransform = { k: k, x: centerX - graphCenterX * k, y: centerY - graphCenterY * k };
-		if (shouldAnimate) {
-			animateViewportTo(targetTransform, 320);
+		if (shouldAnimate && animMs > 0) {
+			animateViewportTo(targetTransform, animMs);
 		} else {
 			transform = targetTransform;
 			dirty = true;
@@ -1675,8 +1747,8 @@ function fitView(animate) {
 	const graphCenterX = (minX + maxX) / 2;
 	const graphCenterY = (minY + maxY) / 2;
 	const targetTransform = { k: k, x: centerX - graphCenterX * k, y: centerY - graphCenterY * k };
-	if (shouldAnimate) {
-		animateViewportTo(targetTransform, 320);
+	if (shouldAnimate && animMs > 0) {
+		animateViewportTo(targetTransform, animMs);
 	} else {
 		transform = targetTransform;
 		dirty = true;
@@ -2139,7 +2211,12 @@ function updateTemporalDiffTransition(diff) {
 	currentTemporalRenderNodes = nextMap;
 	animDuration = isReduced ? 0 : 220;
 	animStartTime = performance.now();
-	isAnimatingTemporal = !isReduced;
+	isAnimatingTemporal = !isReduced && animDuration > 0;
+	// Reduced motion must never leave a lingering animation flag that keeps the
+	// RAF loop repainting.
+	if (!isAnimatingTemporal) {
+		previousTemporalRenderNodes = new Map();
+	}
 	dirty = true;
 	kickRaf();
 }
@@ -2501,12 +2578,18 @@ function stepTemporalCommit(delta) {
 	request('stepTemporalCommit', { delta: delta });
 }
 
+const PLAY_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4.5 2.5l9 5.5-9 5.5z"/></svg>';
+const PAUSE_ICON = '<svg viewBox="0 0 16 16" aria-hidden="true"><path d="M4 2.5h3v11H4zM9 2.5h3v11H9z"/></svg>';
+
 function toggleTemporalPlay() {
 	if (isPlayingHistory) {
 		clearInterval(playIntervalTimer);
 		playIntervalTimer = null;
 		isPlayingHistory = false;
-		if (temporalPlayBtn) temporalPlayBtn.textContent = '▶';
+		if (temporalPlayBtn) {
+			temporalPlayBtn.innerHTML = PLAY_ICON;
+			temporalPlayBtn.title = 'Play timeline (Space)';
+		}
 	} else {
 		if (!temporalState) return;
 		const curIdx = typeof temporalState.selectedCommitIndex === 'number' ? temporalState.selectedCommitIndex : 0;
@@ -2515,7 +2598,10 @@ function toggleTemporalPlay() {
 			request('selectTemporalCommitIndex', { index: oldestIdx, immediate: true });
 		}
 		isPlayingHistory = true;
-		if (temporalPlayBtn) temporalPlayBtn.textContent = '❚❚';
+		if (temporalPlayBtn) {
+			temporalPlayBtn.innerHTML = PAUSE_ICON;
+			temporalPlayBtn.title = 'Pause timeline (Space)';
+		}
 		playIntervalTimer = setInterval(function () {
 			const currentIdx = (temporalState && typeof temporalState.selectedCommitIndex === 'number') ? temporalState.selectedCommitIndex : 0;
 			if (currentIdx <= 0) {
@@ -2551,106 +2637,6 @@ function pickNetworkNode(clientX, clientY) {
 		}
 	}
 	return best;
-}
-
-function evaluateNetworkEdge(edge, isConnectedToHighlight, activeHighlightId, zoom, opacitySetting) {
-	const opacityScale = (typeof opacitySetting === 'number' && Number.isFinite(opacitySetting))
-		? (opacitySetting / 0.55)
-		: 1.0;
-
-	if (isConnectedToHighlight) {
-		return {
-			color: '#2dd4bf',
-			width: Math.max(1.8, 2.2 / zoom),
-			alpha: 1.0,
-			dash: (edge.meta && edge.meta.isDynamic) ? [4, 4] : [],
-			priority: 100,
-			showArrow: zoom >= 0.7,
-		};
-	}
-
-	if (activeHighlightId) {
-		return {
-			color: 'rgba(148, 163, 184, 0.05)',
-			width: 0.6 / zoom,
-			alpha: Math.min(1.0, 0.05 * opacityScale),
-			dash: [],
-			priority: 0,
-			showArrow: false,
-		};
-	}
-
-	const kind = edge.kind || 'import';
-	const meta = edge.meta || {};
-
-	if (kind === 'contains') {
-		if (zoom < 0.8) return null;
-		return {
-			color: 'rgba(100, 116, 139, 0.25)',
-			width: 0.75 / zoom,
-			alpha: Math.min(1.0, 0.35 * opacityScale),
-			dash: [2, 3],
-			priority: 1,
-			showArrow: false,
-		};
-	}
-
-	if (kind === 'dependency') {
-		return {
-			color: 'rgba(167, 139, 250, 0.55)',
-			width: 1.35 / zoom,
-			alpha: Math.min(1.0, 0.6 * opacityScale),
-			dash: [],
-			priority: 10,
-			showArrow: zoom >= 1.2,
-		};
-	}
-
-	if (meta.isDynamic) {
-		if (zoom < 0.45) return null;
-		return {
-			color: 'rgba(244, 114, 182, 0.6)',
-			width: 1.1 / zoom,
-			alpha: Math.min(1.0, 0.65 * opacityScale),
-			dash: [4, 4],
-			priority: 8,
-			showArrow: zoom >= 0.9,
-		};
-	}
-
-	if (meta.isEntryRelated || meta.isEntry) {
-		return {
-			color: 'rgba(245, 158, 11, 0.65)',
-			width: 1.3 / zoom,
-			alpha: Math.min(1.0, 0.75 * opacityScale),
-			dash: [],
-			priority: 9,
-			showArrow: zoom >= 0.9,
-		};
-	}
-
-	if (kind === 'reference' || kind === 'export') {
-		if (zoom < 0.6) return null;
-		return {
-			color: 'rgba(148, 163, 184, 0.32)',
-			width: 0.8 / zoom,
-			alpha: Math.min(1.0, 0.4 * opacityScale),
-			dash: [],
-			priority: 2,
-			showArrow: false,
-		};
-	}
-
-	// Default standard import
-	if (zoom < 0.38) return null;
-	return {
-		color: 'rgba(148, 163, 184, 0.22)',
-		width: 0.85 / zoom,
-		alpha: Math.min(1.0, 0.35 * opacityScale),
-		dash: [],
-		priority: 3,
-		showArrow: zoom >= 1.3,
-	};
 }
 
 function drawNetworkEdgeArrow(p1, p2, color, arrowSize) {
@@ -2705,8 +2691,8 @@ function drawNetworkFrame() {
 		const p2 = screenPos(e.target);
 		if (!p1 || !p2) continue;
 
-		const isConnectedToHighlight = activeHighlightId && (e.source === activeHighlightId || e.target === activeHighlightId);
-		const desc = evaluateNetworkEdge(e, isConnectedToHighlight, activeHighlightId, transform.k, opacityVal);
+		const isConnectedToHighlight = Boolean(activeHighlightId && (e.source === activeHighlightId || e.target === activeHighlightId));
+		const desc = resolveNetworkEdgeVisual(e, isConnectedToHighlight, activeHighlightId, transform.k, opacityVal);
 		if (!desc) continue;
 
 		edgesToDraw.push({ p1: p1, p2: p2, desc: desc });
@@ -2738,17 +2724,19 @@ function drawNetworkFrame() {
 		ctx.restore();
 	}
 
-	// 2. Draw Network Nodes Sorted by Projected Z (Far-to-Near)
-	const sortedNodes = nodes.slice().sort(function (a, b) {
-		const pA = screenPos(a.id);
-		const pB = screenPos(b.id);
-		return (pA ? pA.z : 0) - (pB ? pB.z : 0);
-	});
+	// 2. Draw Network Nodes Sorted by Projected Z (Far-to-Near).
+	// Pair (node, projected) up front: the comparator runs O(n log n) times and
+	// must not perform two map lookups per comparison.
+	const sortedPairs = [];
+	for (let i = 0; i < nodes.length; i++) {
+		const p = screenPos(nodes[i].id);
+		if (p) sortedPairs.push({ node: nodes[i], p: p });
+	}
+	sortedPairs.sort(function (a, b) { return a.p.z - b.p.z; });
 
-	for (let i = 0; i < sortedNodes.length; i++) {
-		const node = sortedNodes[i];
-		const p = screenPos(node.id);
-		if (!p) continue;
+	for (let i = 0; i < sortedPairs.length; i++) {
+		const node = sortedPairs[i].node;
+		const p = sortedPairs[i].p;
 
 		const isSelected = selectedNodeId === node.id;
 		const isHovered = hoveredNodeId === node.id;
@@ -2787,10 +2775,9 @@ function drawNetworkFrame() {
 	const placedLabelBoxes = [];
 	const isMoving = rotating || (dragging && panning);
 
-	for (let i = 0; i < sortedNodes.length; i++) {
-		const node = sortedNodes[i];
-		const p = screenPos(node.id);
-		if (!p) continue;
+	for (let i = 0; i < sortedPairs.length; i++) {
+		const node = sortedPairs[i].node;
+		const p = sortedPairs[i].p;
 
 		const isSelected = selectedNodeId === node.id;
 		const isHovered = hoveredNodeId === node.id;
@@ -2905,7 +2892,7 @@ function render(first) {
 	if (netCanvas) netCanvas.style.display = 'block';
 	resizeCanvas();
 	const layoutChanged = rebuildBase3d(snapshot);
-	rebuildAdjacencyAndStaticDescriptors();
+	rebuildAdjacency();
 	updateLegend(snapshot, true);
 	if (status) {
 		status.style.display = 'block';
@@ -2925,6 +2912,11 @@ function render(first) {
 function closePopup() {
 	if (popup) popup.style.display = 'none';
 	popupNode = null;
+	// Focus return target when the popup was opened via keyboard.
+	if (document.activeElement && document.activeElement !== document.body
+		&& popup && popup.contains && popup.contains(document.activeElement)) {
+		if (netCanvas) netCanvas.focus();
+	}
 }
 
 function placePopupNear(clientX, clientY) {
@@ -2949,8 +2941,10 @@ function openNodePopup(node, clientX, clientY) {
 	}
 
 	selectedNodeId = node.entityId || node.id;
+	kbdFocusIndex = -1;
 	if (popupTitle) popupTitle.textContent = node.label || node.id;
 	if (popupMeta) popupMeta.textContent = node.path || '';
+	announceGraph(describeNodeForAnnouncement(node));
 
 	const layer = (node.meta && node.meta.architectureLayer) ? node.meta.architectureLayer : 'other';
 	if (popupLayerBadge) {
@@ -3114,11 +3108,31 @@ function onPointerDown(e, host) {
 	const wantPan = e.button === 1 || e.shiftKey || isTemporal();
 	panning = wantPan;
 	rotating = false;
-	if (host) host.classList.add('dragging');
-	if (panning) {
-		if (host) host.classList.add('panning');
+	if (host) {
+		// Acquire capture so drags continue when the pointer leaves the canvas
+		// (window edges, overlays, other editors); released in onPointerUp.
+		if (typeof host.setPointerCapture === 'function') {
+			try { host.setPointerCapture(e.pointerId); } catch (err) { /* stale/invalid pointer id */ }
+		}
+		host.classList.add('dragging');
+	}
+	updateCanvasCursor();
+	if (panning || (isNetwork() && keepGraphCentered)) {
 		scheduleIdleResume();
 	}
+}
+
+/**
+ * Single source of truth for the canvas cursor, derived from the live interaction state.
+ * Order: active manipulation > selectable node hover > background affordance.
+ */
+function updateCanvasCursor() {
+	if (!netCanvas) return;
+	if (dragging) {
+		netCanvas.style.cursor = 'grabbing';
+		return;
+	}
+	netCanvas.style.cursor = hoveredNodeId ? 'pointer' : (isNetwork() && !keepGraphCentered ? 'grab' : 'default');
 }
 
 function onPointerUp(e, cancelled) {
@@ -3133,7 +3147,11 @@ function onPointerUp(e, cancelled) {
 	dragging = false; panning = false; rotating = false;
 	interactionState = cancelled ? 'cancelled' : 'idle';
 	pointerDownNode = null;
-	if (netCanvas) netCanvas.classList.remove('dragging');
+	if (netCanvas) {
+		netCanvas.classList.remove('dragging');
+		netCanvas.classList.remove('panning');
+		updateCanvasCursor();
+	}
 
 	const dist = e ? Math.hypot((e.clientX || 0) - pointerDownX, (e.clientY || 0) - pointerDownY) : 99;
 	if (e && !wasMoved && dist <= dragThreshold) {
@@ -3168,7 +3186,7 @@ function onPointerMove(e) {
 		const newHoverId = node ? (node.entityId || node.id) : null;
 		if (newHoverId !== hoveredNodeId) {
 			hoveredNodeId = newHoverId;
-			if (netCanvas) netCanvas.style.cursor = hoveredNodeId ? 'pointer' : 'default';
+			updateCanvasCursor();
 			dirty = true;
 			kickRaf();
 		}
@@ -3260,6 +3278,7 @@ window.addEventListener('message', function (e) {
 		diagnostics = msg.payload.diagnostics;
 		if (msg.payload.settings) {
 			settings = msg.payload.settings;
+			invalidateThemeColors();
 			if (typeof settings.keepGraphCentered === 'boolean') {
 				keepGraphCentered = settings.keepGraphCentered;
 				syncCenterLockUI();
@@ -3272,8 +3291,10 @@ window.addEventListener('message', function (e) {
 			updateTemporalDiffTransition(temporalDiff);
 		}
 		render(false);
+		announceSnapshotSummary();
 	} else if (msg.type === 'settings') {
 		settings = msg.payload;
+		invalidateThemeColors();
 		if (typeof settings.keepGraphCentered === 'boolean') {
 			keepGraphCentered = settings.keepGraphCentered;
 			syncCenterLockUI();
@@ -3310,6 +3331,13 @@ if (netCanvas) {
 	netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
 	netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
 	netCanvas.addEventListener('wheel', onWheel, { passive: false });
+
+	// Editor/window losing focus mid-drag must not leave a stuck grabbing state.
+	window.addEventListener('blur', function () {
+		if (activePointerId !== null) {
+			onPointerUp({ pointerId: activePointerId }, true);
+		}
+	});
 
 	netCanvas.addEventListener('dblclick', function (e) {
 		if (isTemporal()) {
@@ -3415,19 +3443,24 @@ if (temporalContextFullBtn) {
 		kickRaf();
 	});
 }
+function syncDetailsToggleLabel(isVisible) {
+	if (!temporalToggleDetailsBtn) return;
+	temporalToggleDetailsBtn.setAttribute('aria-expanded', isVisible ? 'true' : 'false');
+}
 if (temporalToggleDetailsBtn) {
+	syncDetailsToggleLabel(false);
 	temporalToggleDetailsBtn.addEventListener('click', function () {
 		if (temporalDetailsPanel) {
 			const isVisible = temporalDetailsPanel.style.display === 'flex';
 			temporalDetailsPanel.style.display = isVisible ? 'none' : 'flex';
-			temporalToggleDetailsBtn.textContent = isVisible ? 'Details ▾' : 'Details ▴';
+			syncDetailsToggleLabel(!isVisible);
 		}
 	});
 }
 if (temporalDetailsClose && temporalDetailsPanel) {
 	temporalDetailsClose.addEventListener('click', function () {
 		temporalDetailsPanel.style.display = 'none';
-		if (temporalToggleDetailsBtn) temporalToggleDetailsBtn.textContent = 'Details ▾';
+		syncDetailsToggleLabel(false);
 	});
 }
 if (noChangesViewSource) {
@@ -3487,17 +3520,215 @@ if (temporalLegendBtn) {
 	});
 }
 
+// ── Accessibility: live announcements, keyboard graph navigation, help toggle ──
+const graphLiveRegion = document.getElementById('graphLiveRegion');
+let announceTimer = null;
+function announceGraph(text) {
+	if (!graphLiveRegion) return;
+	// Clear-then-set forces screen readers to re-announce identical strings.
+	graphLiveRegion.textContent = '';
+	if (announceTimer) clearTimeout(announceTimer);
+	announceTimer = setTimeout(function () {
+		if (graphLiveRegion) graphLiveRegion.textContent = text;
+	}, 60);
+}
+
+function describeNodeForAnnouncement(node) {
+	if (!node) return 'No node selected';
+	const id = node.entityId || node.id;
+	const label = node.label || id;
+	const path = node.path ? (', path ' + node.path) : '';
+	let change = '';
+	if (node.changeKind && node.changeKind !== 'unchanged') change = ', ' + node.changeKind;
+	return label + path + change;
+}
+
+// Keyboard focus order over the currently visible nodes.
+let kbdFocusIndex = -1;
+
+function visibleNodesForNavigation() {
+	if (isTemporal()) {
+		const visible = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
+		return visible.nodes || [];
+	}
+	return (snapshot && snapshot.nodes) || [];
+}
+
+function centerOnNode(nodeId) {
+	if (!netCanvas || !nodeId) return;
+	const w = netCanvas.clientWidth || 800;
+	const h = netCanvas.clientHeight || 600;
+	const insets = getUsableInsets();
+	let wx = null, wy = null;
+	if (isTemporal()) {
+		const n = currentTemporalRenderNodes.get(nodeId);
+		if (n) { wx = n.x || 0; wy = n.y || 0; }
+	} else {
+		const p = projected[nodeId];
+		if (p) { wx = p.x; wy = p.y; }
+	}
+	if (wx === null) return;
+	const target = { x: w / 2 - wx * transform.k + (insets.left - insets.right) / 2, y: h / 2 - wy * transform.k + (insets.top - insets.bottom) / 2, k: transform.k };
+	cancelCameraAnimation();
+	transform = target;
+	dirty = true;
+	kickRaf();
+}
+
+function moveKbdFocus(delta) {
+	const nodes = visibleNodesForNavigation();
+	if (!nodes.length) {
+		announceGraph(isTemporal() ? 'No temporal changes to navigate' : 'Graph is empty');
+		return;
+	}
+	kbdFocusIndex = Math.max(0, Math.min(nodes.length - 1, (kbdFocusIndex < 0 ? (delta > 0 ? 0 : nodes.length - 1) : kbdFocusIndex + delta)));
+	const node = nodes[kbdFocusIndex];
+	if (!node) return;
+	hoveredNodeId = node.entityId || node.id;
+	centerOnNode(hoveredNodeId);
+	dirty = true;
+	kickRaf();
+	announceGraph(describeNodeForAnnouncement(node) + (kbdFocusIndex + 1) + ' of ' + nodes.length);
+}
+
+function activateKbdFocus() {
+	if (kbdFocusIndex < 0) return;
+	const nodes = visibleNodesForNavigation();
+	const node = nodes[kbdFocusIndex];
+	if (!node) return;
+	openNodePopup(node, window.innerWidth / 2, window.innerHeight / 2);
+	dirty = true;
+	kickRaf();
+	if (netCanvas) netCanvas.focus();
+	announceGraph('Opened details for ' + describeNodeForAnnouncement(node));
+}
+
+function clearGraphSelection(fromKey) {
+	closePopup();
+	selectedNodeId = null;
+	hoveredNodeId = null;
+	kbdFocusIndex = -1;
+	if (isTemporal()) {
+		request('selectTemporalEntity', { entityId: null });
+	} else {
+		request('selectNode', { nodeId: null });
+	}
+	dirty = true;
+	kickRaf();
+	if (fromKey && netCanvas) netCanvas.focus();
+}
+
+function zoomByFactor(factor) {
+	if (!netCanvas) return;
+	cancelCameraAnimation();
+	const w = netCanvas.clientWidth || 800;
+	const h = netCanvas.clientHeight || 600;
+	const insets = getUsableInsets();
+	const target = keepGraphCentered
+		? applyZoomAroundCenter(transform, factor, w, h, MIN_ZOOM, MAX_ZOOM, insets)
+		: applyZoomAroundCenter(transform, factor, w, h, MIN_ZOOM, MAX_ZOOM);
+	if (settings.reduceMotion) {
+		transform = target;
+		dirty = true;
+		kickRaf();
+	} else {
+		animateViewportTo(target, 160);
+	}
+}
+
 window.addEventListener('keydown', function (e) {
 	const targetTag = (e.target && e.target.tagName) || '';
-	if (targetTag === 'INPUT' || targetTag === 'SELECT' || targetTag === 'TEXTAREA' || targetTag === 'BUTTON' || (e.target && e.target.isContentEditable)) return;
+	const isTextInput = targetTag === 'INPUT' || targetTag === 'SELECT' || targetTag === 'TEXTAREA' || targetTag === 'BUTTON' || (e.target && e.target.isContentEditable);
+
+	// Escape works everywhere except while typing in inputs (first Escape exits the field).
 	if (e.key === 'Escape') {
-		closePopup(); selectedNodeId = null; request('selectNode', { nodeId: null }); dirty = true; kickRaf();
-	} else if (isTemporal()) {
-		if (e.key === 'ArrowLeft') { e.preventDefault(); stepTemporalCommit(-1); }
-		else if (e.key === 'ArrowRight') { e.preventDefault(); stepTemporalCommit(1); }
-		else if (e.key === ' ') { e.preventDefault(); toggleTemporalPlay(); }
+		if (popup && popup.style.display !== 'none') {
+			clearGraphSelection(true);
+			e.preventDefault();
+			return;
+		}
+		const helpEl = document.getElementById('graphKbdHelp');
+		if (helpEl && !helpEl.hidden) { helpEl.hidden = true; e.preventDefault(); return; }
+		if (!isTextInput) clearGraphSelection(true);
+		return;
+	}
+	if (isTextInput) return;
+
+	const canvasFocused = document.activeElement === netCanvas;
+	if ((e.key === 'F1' || (e.key === '/' && e.shiftKey)) && canvasFocused) {
+		const helpEl = document.getElementById('graphKbdHelp');
+		if (helpEl) helpEl.hidden = !helpEl.hidden;
+		e.preventDefault();
+		return;
+	}
+	if (!canvasFocused) {
+		// Temporal commit navigation stays available globally (no canvas focus
+		// required); node traversal below applies once the canvas is focused.
+		if (isTemporal()) {
+			if (e.key === 'ArrowLeft') { e.preventDefault(); stepTemporalCommit(-1); }
+			else if (e.key === 'ArrowRight') { e.preventDefault(); stepTemporalCommit(1); }
+			else if (e.key === ' ') { e.preventDefault(); toggleTemporalPlay(); }
+		}
+		return;
+	}
+
+	switch (e.key) {
+		case 'ArrowRight':
+		case 'ArrowDown':
+			e.preventDefault(); moveKbdFocus(1); break;
+		case 'ArrowLeft':
+		case 'ArrowUp':
+			e.preventDefault(); moveKbdFocus(-1); break;
+		case 'Enter':
+		case ' ':
+			e.preventDefault(); activateKbdFocus(); break;
+		case '+':
+		case '=':
+			e.preventDefault(); zoomByFactor(1.25); break;
+		case '-':
+		case '_':
+			e.preventDefault(); zoomByFactor(0.8); break;
+		case '0':
+		case 'f':
+		case 'F':
+			e.preventDefault(); fitView(!settings.reduceMotion); announceGraph('Fit view'); break;
+		case 'r':
+		case 'R':
+			e.preventDefault(); resetCamera(false); fitView(true); announceGraph('View reset'); break;
+		case 'c':
+		case 'C':
+			e.preventDefault();
+			if (centerLockBtn) centerLockBtn.click();
+			announceGraph(keepGraphCentered ? 'Keep centered on' : 'Keep centered off');
+			break;
+		default:
+			break;
 	}
 });
+
+// System reduced-motion changes take effect without a reload.
+if (window.matchMedia) {
+	try {
+		const motionQuery = window.matchMedia('(prefers-reduced-motion: reduce)');
+		const motionListener = function () { dirty = true; kickRaf(); };
+		if (typeof motionQuery.addEventListener === 'function') {
+			motionQuery.addEventListener('change', motionListener);
+		} else if (typeof motionQuery.addListener === 'function') {
+			motionQuery.addListener(motionListener);
+		}
+	} catch (err) { /* older matchMedia implementations */ }
+}
+
+// Announce snapshot arrival so screen readers describe what was loaded.
+function announceSnapshotSummary() {
+	if (isTemporal()) {
+		const count = temporalDiff && temporalDiff.nodes ? temporalDiff.nodes.length : 0;
+		const changed = temporalDiff && temporalDiff.summary ? (temporalDiff.summary.addedCount + temporalDiff.summary.removedCount + temporalDiff.summary.modifiedCount + temporalDiff.summary.renamedCount) : 0;
+		announceGraph('Temporal graph: ' + count + ' entities, ' + changed + ' changed.');
+	} else if (snapshot) {
+		announceGraph('Code graph: ' + snapshot.nodes.length + ' files, ' + ((snapshot.edges || []).length) + ' connections.');
+	}
+}
 
 if (centerLockBtn) {
 	centerLockBtn.onclick = function () {
@@ -3643,6 +3874,10 @@ function rafLoop(ts) {
 		transform = interpolateViewport(activeCameraAnim.from, activeCameraAnim.to, progress);
 		if (elapsed >= activeCameraAnim.duration) {
 			activeCameraAnim = null;
+			// Snap to exact final transform so easing residual never leaves the
+			// camera a fraction of a pixel off target.
+			dirty = true;
+			if (keepGraphCentered && !isTemporal()) applyCenterLock(true);
 		}
 		dirty = true;
 	}
@@ -3663,7 +3898,7 @@ function rafLoop(ts) {
 			dirty = true;
 		}
 		if (dirty && isNetwork() && snapshot) drawNetworkFrame();
-		if (animating || activeCameraAnim) kickRaf();
+		if (animating || activeCameraAnim || isAnimatingTemporal) kickRaf();
 	}
 }
 kickRaf();
@@ -3699,6 +3934,7 @@ request('getSnapshot').then(function (res) {
 		fitView(false);
 		scheduleIdleResume();
 	}
+	announceSnapshotSummary();
 }).catch(function (err) {
 	console.warn('[PreBase Graph] Initial getSnapshot failed:', err);
 });

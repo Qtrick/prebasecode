@@ -5,6 +5,7 @@
 import assert from 'assert';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { serializeNetworkEdgeVisualSource } from '../../host/workbench/networkEdgeVisualRuntime.js';
 
 type Listener = (event: PointerEventLike) => void;
 
@@ -127,8 +128,13 @@ function createWebviewHarness(): { canvas: FakeElement; context: vm.Context; run
 	// production script in a DOM-shaped harness instead of maintaining a copy.
 	const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
 	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
-	const script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
+	let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
 	assert.ok(script, 'webview script must be present');
+	// Interpolate host-side template substitutions exactly like _buildHtml does,
+	// including the injected authoritative edge resolver (Fix B parity path).
+	script = script.replace('${generation}', '7')
+		.replace('${initialGraphType}', 'network')
+		.replace('${serializeNetworkEdgeVisualSource()}', serializeNetworkEdgeVisualSource());
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [
@@ -140,7 +146,8 @@ function createWebviewHarness(): { canvas: FakeElement; context: vm.Context; run
 		'temporalModeChangesBtn', 'temporalModeStateBtn', 'temporalContextModeWrap', 'temporalContextFocusedBtn', 'temporalContextFullBtn', 'temporalToggleDetailsBtn', 'temporalTimelineStrip', 'temporalLoadMoreBtn',
 		'temporalDetailsPanel', 'temporalDetailsClose', 'temporalDetailsList', 'temporalDetailsSha', 'temporalDetailsAuthor', 'temporalDetailsParents', 'temporalDetailsSummary',
 		'popup', 'popupTitle', 'popupMeta', 'popupLayerBadge', 'popupChangeBadge', 'popupDetailsList', 'popupAiWrap', 'popupAi', 'popupAiProvenance',
-		'popupClose', 'popupOpen', 'popupHistoricalView', 'popupSourceDiff', 'popupSetBase', 'popupReveal', 'popupMagnus', 'noChangesCard', 'noChangesViewSource', 'zoomIn', 'zoomOut', 'fit', 'centerLock', 'reset', 'temporalLegendBtn'
+		'popupClose', 'popupOpen', 'popupHistoricalView', 'popupSourceDiff', 'popupSetBase', 'popupReveal', 'popupMagnus', 'noChangesCard', 'noChangesViewSource',
+		'graphLiveRegion', 'graphKbdHelp', 'zoomIn', 'zoomOut', 'fit', 'centerLock', 'reset', 'temporalLegendBtn'
 	]) {
 		elements.set(id, new FakeElement());
 	}

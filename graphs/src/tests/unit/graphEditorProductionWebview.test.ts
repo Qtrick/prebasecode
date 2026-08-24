@@ -7,6 +7,7 @@ import * as assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { suite, test } from 'mocha';
+import { serializeNetworkEdgeVisualSource } from '../../host/workbench/networkEdgeVisualRuntime.js';
 
 type Listener = (event: any) => void;
 
@@ -94,8 +95,9 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 	assert.ok(rawScriptMatch, 'webview script must be present in graphEditor.ts');
 
 	let script = rawScriptMatch[1];
-	script = script.replace('${generation}', '42');
-	script = script.replace('${initialGraphType}', initialType);
+	script = script.replace('${generation}', '42')
+		.replace('${initialGraphType}', initialType)
+		.replace('${serializeNetworkEdgeVisualSource()}', serializeNetworkEdgeVisualSource());
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [

@@ -5,6 +5,7 @@
 import assert from 'assert';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
+import { serializeNetworkEdgeVisualSource } from '../../host/workbench/networkEdgeVisualRuntime.js';
 
 type Listener = (event: any) => void;
 
@@ -49,7 +50,10 @@ class FakeElement {
 	readonly attributes = new Map<string, string>();
 	readonly clientWidth = 800;
 	readonly clientHeight = 600;
+	offsetWidth = 0;
+	offsetHeight = 0;
 	checked = false;
+	hidden = false;
 	onclick: (() => void) | null = null;
 	innerHTML = '';
 	textContent = '';
@@ -58,6 +62,16 @@ class FakeElement {
 	disabled = false;
 	title = '';
 	private capturedPointer: number | undefined;
+
+	click(): void {
+		if (typeof this.onclick === 'function') {
+			this.onclick();
+		}
+	}
+
+	focus(): void {
+		// Sets this as active element in the owning harness sandbox if hooked
+	}
 
 	addEventListener(type: string, listener: Listener): void {
 		const listeners = this.listeners.get(type) ?? [];
@@ -148,17 +162,27 @@ interface Harness {
 	getActiveCameraAnim(): any;
 	getNodeNeighborsMap(): Map<string, Set<string>>;
 	evaluateNetworkEdge(edge: any, isSelected: boolean, activeHighlightNodeId: string | null, zoom: number, edgeOpacityMultiplier?: number): any;
+	getUsableInsets(): Record<string, number>;
+	callUpdateCanvasCursor(): void;
+	focusCanvas(): void;
+	dispatchKey(key: string, extra?: Record<string, any>): void;
 }
 
 function createHarness(): Harness {
 	const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
 	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
-	const script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
+	let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
 	assert.ok(script, 'webview script must be present in graphEditor.ts');
+	// Interpolate host-side template substitutions exactly like _buildHtml does,
+	// including the injected authoritative edge resolver (Fix B parity path).
+	script = script.replace('${generation}', '7')
+		.replace('${initialGraphType}', 'network')
+		.replace('${serializeNetworkEdgeVisualSource()}', serializeNetworkEdgeVisualSource());
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [
 		'archSvg', 'netCanvas', 'status', 'legend', 'empty', 'idleToggle', 'idleToggleWrap',
+		'graphLiveRegion', 'graphKbdHelp',
 		'toolbar', 'temporalToolbar', 'temporalBreadcrumbTarget', 'temporalBreadcrumbBase', 'temporalRepoWrap', 'temporalRepoSelect', 'temporalScrubberBar', 'temporalRefSelect', 'temporalCompareSelect',
 		'temporalFollowHead', 'temporalFilterInput', 'temporalScrubber', 'temporalPrevBtn', 'temporalNextBtn',
 		'temporalPlayBtn', 'temporalCommitSha', 'temporalCommitMessage', 'temporalCommitAuthor', 'temporalCommitStatus',
@@ -185,6 +209,7 @@ function createHarness(): Harness {
 		document: {
 			body: new FakeElement(),
 			documentElement: new FakeElement(),
+			activeElement: null as FakeElement | null,
 			getElementById(id: string): FakeElement {
 				let el = elements.get(id);
 				if (!el) {
@@ -208,6 +233,11 @@ function createHarness(): Harness {
 				windowListeners.set(type, list);
 			},
 			removeEventListener() { },
+			dispatchWindowEvent(type: string, event: Record<string, any> = {}): void {
+				for (const listener of windowListeners.get(type) ?? []) {
+					listener(event);
+				}
+			},
 		},
 		getComputedStyle: () => ({
 			getPropertyValue: (prop: string) => {
@@ -225,6 +255,7 @@ function createHarness(): Harness {
 			rafCallback = null;
 		},
 		setTimeout: (fn: Function, _ms: number) => {
+			try { fn(); } catch (_) { }
 			return 1;
 		},
 		clearTimeout: () => { },
@@ -270,7 +301,10 @@ function createHarness(): Harness {
 			}
 		},
 		getTransform(): { x: number; y: number; k: number } {
-			return vm.runInContext('({ ...transform })', context);
+			// Copy into a host-realm plain object so deepStrictEqual does not
+			// reject the vm realm's Object prototype.
+			const t = vm.runInContext('({ ...transform })', context) as any;
+			return { x: t.x, y: t.y, k: t.k };
 		},
 		getKeepGraphCentered(): boolean {
 			return vm.runInContext('keepGraphCentered', context);
@@ -285,7 +319,29 @@ function createHarness(): Harness {
 			return vm.runInContext('nodeNeighborsMap', context);
 		},
 		evaluateNetworkEdge(edge: any, isSelected: boolean, activeHighlightNodeId: string | null, zoom: number, edgeOpacityMultiplier?: number): any {
-			return vm.runInContext(`evaluateNetworkEdge(${JSON.stringify(edge)}, ${isSelected}, ${JSON.stringify(activeHighlightNodeId)}, ${zoom}, ${edgeOpacityMultiplier})`, context);
+			return vm.runInContext(`resolveNetworkEdgeVisual(${JSON.stringify(edge)}, ${isSelected}, ${JSON.stringify(activeHighlightNodeId)}, ${zoom}, ${edgeOpacityMultiplier})`, context);
+		},
+		getUsableInsets(): Record<string, number> {
+			// Spread into a host-realm plain object so deepStrictEqual does not
+			// reject the vm realm's Object prototype.
+			return { ...vm.runInContext('getUsableInsets()', context) } as Record<string, number>;
+		},
+		callUpdateCanvasCursor(): void {
+			vm.runInContext('updateCanvasCursor()', context);
+		},
+		focusCanvas(): void {
+			sandbox.document.activeElement = elements.get('netCanvas')!;
+		},
+		dispatchKey(key: string, extra: Record<string, any> = {}): void {
+			const event = {
+				key,
+				target: sandbox.document.activeElement || sandbox.document.body,
+				preventDefault() { },
+				...extra,
+			};
+			for (const listener of windowListeners.get('keydown') ?? []) {
+				listener(event);
+			}
 		},
 	};
 }
@@ -567,4 +623,392 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		assert.ok(desc.alpha > 0.45 && desc.alpha < 0.65, `scaled edge alpha was ${desc.alpha}`);
 	});
 
+	test('9. Pointer capture lifecycle: pointerdown acquires capture, pointerup releases it and clears drag state', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 }],
+					positions3d: { 'a': { x: 0, y: 0, z: 0 } },
+				},
+				settings: { keepGraphCentered: false },
+			},
+		});
+
+		harness.canvas.dispatch('pointerdown', { button: 1, clientX: 200, clientY: 200 });
+		assert.strictEqual(harness.canvas.hasPointerCapture(1), true, 'canvas captured the active pointer on pointerdown');
+		assert.strictEqual(harness.canvas.classList.contains('dragging'), true, '.dragging class applied during drag');
+		assert.strictEqual(vm.runInContext('dragging', harness.context), true);
+
+		harness.canvas.dispatch('pointerup', { clientX: 200, clientY: 200 });
+		assert.strictEqual(harness.canvas.hasPointerCapture(1), false, 'capture released on pointerup');
+		assert.strictEqual(harness.canvas.classList.contains('dragging'), false, '.dragging class removed after pointerup');
+		assert.strictEqual(vm.runInContext('activePointerId', harness.context), null);
+	});
+
+	test('10. Pointercancel mid-drag cancels cleanly without leaving stuck dragging state or stale capture', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 }],
+					positions3d: { 'a': { x: 0, y: 0, z: 0 } },
+				},
+				settings: { keepGraphCentered: false },
+			},
+		});
+
+		harness.canvas.dispatch('pointerdown', { button: 1, clientX: 200, clientY: 200 });
+		harness.canvas.dispatch('pointermove', { clientX: 320, clientY: 320 });
+
+		harness.canvas.dispatch('pointercancel', { clientX: 320, clientY: 320 });
+		assert.strictEqual(vm.runInContext('dragging', harness.context), false, 'cancelled drag resets dragging flag');
+		assert.strictEqual(harness.canvas.hasPointerCapture(1), false, 'capture released after pointercancel');
+		assert.strictEqual(harness.canvas.classList.contains('dragging'), false, '.dragging class removed after cancel');
+		assert.strictEqual(harness.canvas.style.cursor !== 'grabbing', true, `cursor not left grabbing after cancel (was ${harness.canvas.style.cursor})`);
+	});
+
+	test('11. Window blur mid-drag force-releases the drag so no grabbing cursor or dragging class survives', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 }],
+					positions3d: { 'a': { x: 0, y: 0, z: 0 } },
+				},
+				settings: { keepGraphCentered: false },
+			},
+		});
+
+		harness.canvas.dispatch('pointerdown', { button: 1, clientX: 200, clientY: 200 });
+		assert.strictEqual(vm.runInContext('dragging', harness.context), true);
+		assert.strictEqual(harness.canvas.style.cursor, 'grabbing');
+
+		harness.context.window.dispatchWindowEvent('blur');
+		assert.strictEqual(vm.runInContext('dragging', harness.context), false, 'blur mid-drag clears dragging flag');
+		assert.strictEqual(vm.runInContext('activePointerId', harness.context), null, 'blur mid-drag clears active pointer');
+		assert.strictEqual(harness.canvas.classList.contains('dragging'), false, '.dragging class removed by blur handler');
+		assert.notStrictEqual(harness.canvas.style.cursor, 'grabbing', 'grabbing cursor cleared by blur handler');
+
+		// A late pointerup for the already-released id must be a no-op (guarded by pointerId check)
+		harness.canvas.dispatch('pointerup', { clientX: 500, clientY: 500 });
+		assert.strictEqual(harness.postedMessages.filter(m => m.type === 'selectNode').length, 0,
+			'stale pointerup after blur does not open a node popup / select');
+	});
+
+	test('12. updateCanvasCursor truth table: dragging > hover > network grab > default (center lock & temporal)', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 }],
+					positions3d: { 'a': { x: 0, y: 0, z: 0 } },
+				},
+				settings: { keepGraphCentered: false },
+			},
+		});
+
+		// Idle, no hover, no center lock → grab affordance
+		vm.runInContext('dragging = false; hoveredNodeId = null;', harness.context);
+		harness.callUpdateCanvasCursor();
+		assert.strictEqual(harness.canvas.style.cursor, 'grab', 'idle network background uses grab');
+
+		// keepGraphCentered removes the grab affordance (panning is suppressed there)
+		vm.runInContext('keepGraphCentered = true;', harness.context);
+		harness.callUpdateCanvasCursor();
+		assert.strictEqual(harness.canvas.style.cursor, 'default', 'center-locked background uses default cursor');
+		vm.runInContext('keepGraphCentered = false;', harness.context);
+
+		// Hovering a selectable node beats the background affordance
+		vm.runInContext("hoveredNodeId = 'a';", harness.context);
+		harness.callUpdateCanvasCursor();
+		assert.strictEqual(harness.canvas.style.cursor, 'pointer', 'hover over node uses pointer');
+
+		// Active manipulation dominates hover
+		vm.runInContext('dragging = true;', harness.context);
+		harness.callUpdateCanvasCursor();
+		assert.strictEqual(harness.canvas.style.cursor, 'grabbing', 'dragging always shows grabbing regardless of hover');
+		vm.runInContext('dragging = false; hoveredNodeId = null;', harness.context);
+
+		// Temporal mode never advertises a pan/rotate grab affordance
+		vm.runInContext("graphType = 'temporal';", harness.context);
+		harness.callUpdateCanvasCursor();
+		assert.strictEqual(harness.canvas.style.cursor, 'default', 'temporal mode uses default cursor');
+	});
+
+	test('13. getUsableInsets grows with the temporal details panel and clamps at tiny viewports', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 }],
+					positions3d: { 'a': { x: 0, y: 0, z: 0 } },
+				},
+				settings: { keepGraphCentered: false },
+			},
+		});
+
+		// Network baseline insets
+		let insets = harness.getUsableInsets();
+		assert.deepStrictEqual(insets, { top: 12, bottom: 56, left: 12, right: 12 }, 'network baseline insets are the toolbar margins only');
+
+		// Switch to temporal mode: taller toolbar/scrubber chrome
+		vm.runInContext("graphType = 'temporal';", harness.context);
+		insets = harness.getUsableInsets();
+		assert.deepStrictEqual(insets, { top: 48, bottom: 68, left: 12, right: 12 }, 'temporal baseline insets reserve toolbar + scrubber space');
+
+		// Visible details panel (display:flex + measured width) widens the right inset
+		const panel = harness.elements.get('temporalDetailsPanel')!;
+		panel.style.display = 'flex';
+		panel.offsetWidth = 340;
+		insets = harness.getUsableInsets();
+		assert.strictEqual(insets.right, 376, 'right inset grows by panel width + 24px gutter');
+		assert.strictEqual(insets.bottom, 84, 'bottom inset honors scrubber bar below the panel');
+		panel.style.display = 'none';
+
+		// Hidden-but-measured panel must NOT widen the inset (display gate)
+		panel.offsetWidth = 340;
+		insets = harness.getUsableInsets();
+		assert.strictEqual(insets.right, 12, 'hidden details panel does not consume usable area');
+
+		// Tiny viewport clamps: insets can never consume the whole canvas.
+		// Expected exact values: top=min(48, floor(80*0.4))=32, bottom=min(84, floor(80*0.55))=44,
+		// right=min(376, floor(100*0.6))=60, left=min(12, 40)=12.
+		panel.style.display = 'flex';
+		Object.defineProperty(panel, 'offsetWidth', { value: 340 });
+		Object.defineProperty(harness.canvas, 'clientWidth', { value: 100 });
+		Object.defineProperty(harness.canvas, 'clientHeight', { value: 80 });
+		insets = harness.getUsableInsets();
+		assert.deepStrictEqual(insets, { top: 32, bottom: 44, left: 12, right: 60 },
+			'tiny-viewport insets engage every defensive clamp');
+	});
+
+	test('14. applyCenterLock yields to an in-flight camera animation and rafLoop re-locks after it completes', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [
+						{ id: 'a', path: 'a.ts', x: -100, y: -80, z: 0 },
+						{ id: 'b', path: 'b.ts', x: 20, y: 10, z: 0 },
+					],
+					positions3d: {
+						'a': { x: -100, y: -80, z: 0 },
+						'b': { x: 20, y: 10, z: 0 },
+					},
+				},
+				settings: { keepGraphCentered: false, reduceMotion: false },
+			},
+		});
+		vm.runInContext('projectAll(); keepGraphCentered = true;', harness.context);
+
+		// Yield half: while an animation is in flight, a passive lock attempt must
+		// not touch the transform even though the current pan is far off-center.
+		vm.runInContext(`
+			transform = { x: 500, y: -300, k: 1 };
+			activeCameraAnim = { from: { x: 500, y: -300, k: 1 }, to: { x: -999, y: -999, k: 1 }, startTs: 1000, duration: 180 };
+			applyCenterLock(false);
+		`, harness.context);
+		const untouched = harness.getTransform();
+		assert.deepStrictEqual(untouched, { x: 500, y: -300, k: 1 },
+			'center lock defers to the running camera animation');
+
+		// Re-lock half: when the animation finishes, rafLoop must restore the lock,
+		// pulling the deliberately off-center animation endpoint back to center.
+		vm.runInContext(`
+			projectAll();
+			applyCenterLock(true);
+		`, harness.context);
+		const lockRef = harness.getTransform();
+		assert.ok(Math.abs(lockRef.x) < 400 && Math.abs(lockRef.y) < 400, 'sanity: lock target is viewport-centered, not off-graph');
+
+		vm.runInContext(`
+			activeCameraAnim = { from: { x: ${lockRef.x}, y: ${lockRef.y}, k: ${lockRef.k} }, to: { x: -999, y: -999, k: ${lockRef.k} }, startTs: 1000, duration: 180 };
+		`, harness.context);
+		harness.runAnimationFrame(1300);
+
+		assert.strictEqual(harness.getActiveCameraAnim(), null, 'animation finished and cleaned up');
+		const finalT = harness.getTransform();
+		assert.strictEqual(finalT.k, lockRef.k, 'zoom preserved through the re-lock');
+		assert.ok(Math.abs(finalT.x - lockRef.x) < 1 && Math.abs(finalT.y - lockRef.y) < 1,
+			`pan re-centered after the animation completed (got ${finalT.x},${finalT.y}, want ${lockRef.x},${lockRef.y})`);
+	});
+
+	test('15. Temporal visible-elements memoization: same diff/mode/context returns the cached object identity', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'temporal',
+				temporalState: {
+					displayMode: 'changes',
+					diff: {
+						sourceCommitSha: 'c0', targetCommitSha: 'c1',
+						nodes: [
+							{ entityId: 'e1', label: 'a.ts', path: 'src/a.ts', changeKind: 'added', x: 10, y: 20 },
+							{ entityId: 'e2', label: 'b.ts', path: 'src/b.ts', changeKind: 'modified', x: 30, y: 40 },
+							{ entityId: 'far1', label: 'c.ts', path: 'src/c.ts', changeKind: 'unchanged', x: 500, y: 600 },
+						],
+						edges: [],
+						summary: { addedCount: 1, removedCount: 0, modifiedCount: 1, renamedCount: 0 }
+					},
+				},
+				settings: {},
+			},
+		});
+
+		// Same inputs → identical object identity (cache hit; drawNetworkFrame calls
+		// this on every frame, so a broken cache would allocate per frame).
+		const first = vm.runInContext('computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode)', harness.context);
+		const second = vm.runInContext('computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode)', harness.context);
+		assert.strictEqual(first, second, 'repeat computation with same diff+mode+context returns cached result');
+		assert.strictEqual(first.nodes.length, 2, 'focused changes-mode shows only changed nodes (far unchanged node is unrelated, not 1-hop context)');
+
+		// Different context mode → cache miss with different content
+		const fullMode = vm.runInContext(
+			"computeTemporalVisibleElements(temporalDiff, displayMode, 'full')", harness.context);
+		assert.notStrictEqual(fullMode, first, 'changing context filter mode invalidates the cache key');
+		assert.strictEqual(fullMode.nodes.length, 3, 'full mode exposes all nodes including unrelated ones');
+
+		// A different diff object bypasses the cache even when mode/key match
+		const mutated = vm.runInContext(`
+			(() => {
+				const d2 = Object.assign({}, temporalDiff);
+				d2.nodes = [...temporalDiff.nodes];
+				return computeTemporalVisibleElements(d2, displayMode, temporalContextFilterMode);
+			})()
+		`, harness.context) as any;
+		assert.notStrictEqual(mutated, second, 'a different diff object invalidates by identity');
+	});
+
+	test('16. Keyboard Accessibility: Arrow keys traverse nodes, live region announces focus, Enter opens popup, Escape clears selection', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [
+						{ id: 'nodeA', label: 'entry.ts', path: 'src/entry.ts', x: 0, y: 0, z: 0 },
+						{ id: 'nodeB', label: 'utils.ts', path: 'src/utils.ts', x: 50, y: 50, z: 0 },
+						{ id: 'nodeC', label: 'types.ts', path: 'src/types.ts', x: 100, y: 100, z: 0 },
+					],
+					edges: [
+						{ source: 'nodeA', target: 'nodeB' },
+						{ source: 'nodeA', target: 'nodeC' },
+					],
+					positions3d: {
+						'nodeA': { x: 0, y: 0, z: 0 },
+						'nodeB': { x: 50, y: 50, z: 0 },
+						'nodeC': { x: 100, y: 100, z: 0 },
+					},
+				},
+				settings: { reduceMotion: false, keepGraphCentered: false },
+			},
+		});
+
+		harness.focusCanvas();
+		const liveRegion = harness.elements.get('graphLiveRegion')!;
+		const popup = harness.elements.get('popup')!;
+
+		// First ArrowRight sets focus to first node (index 0) and announces it
+		harness.dispatchKey('ArrowRight');
+		let kbdIndex = vm.runInContext('kbdFocusIndex', harness.context);
+		let hovered = vm.runInContext('hoveredNodeId', harness.context);
+		assert.strictEqual(kbdIndex, 0, 'first ArrowRight focuses node 0');
+		assert.strictEqual(hovered, 'nodeA', 'hovered node reflects node 0 ID');
+		assert.ok(liveRegion.textContent.includes('entry.ts') && liveRegion.textContent.includes('1 of 3'),
+			`live region announces node 1 of 3 (got "${liveRegion.textContent}")`);
+
+		// Next ArrowRight advances to node 1
+		harness.dispatchKey('ArrowRight');
+		kbdIndex = vm.runInContext('kbdFocusIndex', harness.context);
+		hovered = vm.runInContext('hoveredNodeId', harness.context);
+		assert.strictEqual(kbdIndex, 1, 'second ArrowRight advances to node 1');
+		assert.strictEqual(hovered, 'nodeB', 'hovered node reflects node 1 ID');
+		assert.ok(liveRegion.textContent.includes('utils.ts') && liveRegion.textContent.includes('2 of 3'),
+			`live region announces node 2 of 3 (got "${liveRegion.textContent}")`);
+
+		// ArrowLeft goes back to node 0
+		harness.dispatchKey('ArrowLeft');
+		kbdIndex = vm.runInContext('kbdFocusIndex', harness.context);
+		assert.strictEqual(kbdIndex, 0, 'ArrowLeft steps back to node 0');
+
+		// Enter activates node popup
+		harness.dispatchKey('Enter');
+		assert.strictEqual(popup.style.display, 'block', 'Enter opens node details popup');
+		assert.ok(liveRegion.textContent.includes('Opened details for entry.ts'),
+			`live region announces popup open (got "${liveRegion.textContent}")`);
+
+		// Escape closes popup and clears selection
+		harness.dispatchKey('Escape');
+		assert.strictEqual(popup.style.display, 'none', 'Escape closes popup');
+		kbdIndex = vm.runInContext('kbdFocusIndex', harness.context);
+		hovered = vm.runInContext('hoveredNodeId', harness.context);
+		assert.strictEqual(kbdIndex, -1, 'selection index reset on Escape');
+		assert.strictEqual(hovered, null, 'hovered node cleared on Escape');
+	});
+
+	test('17. Keyboard Shortcuts: F1 toggles help overlay, + / - zoom, 0/f fit, r resets, and c toggles center-lock', () => {
+		const harness = createHarness();
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [
+						{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 },
+						{ id: 'b', path: 'b.ts', x: 100, y: 100, z: 0 },
+					],
+					positions3d: {
+						'a': { x: 0, y: 0, z: 0 },
+						'b': { x: 100, y: 100, z: 0 },
+					},
+				},
+				settings: { reduceMotion: true, keepGraphCentered: false },
+			},
+		});
+
+		harness.focusCanvas();
+		const helpEl = harness.elements.get('graphKbdHelp')!;
+		helpEl.hidden = true;
+
+		// F1 opens help
+		harness.dispatchKey('F1');
+		assert.strictEqual(helpEl.hidden, false, 'F1 toggles help overlay on');
+
+		// Escape closes help
+		harness.dispatchKey('Escape');
+		assert.strictEqual(helpEl.hidden, true, 'Escape closes help overlay');
+
+		// '+' zooms in (with reduceMotion: true, transform updates immediately)
+		const startZoom = harness.getTransform().k;
+		harness.dispatchKey('+');
+		const zoomedIn = harness.getTransform().k;
+		assert.ok(zoomedIn > startZoom, `'+' zooms in: ${zoomedIn} > ${startZoom}`);
+
+		// '-' zooms out
+		harness.dispatchKey('-');
+		const zoomedOut = harness.getTransform().k;
+		assert.ok(zoomedOut < zoomedIn, `'-' zooms out: ${zoomedOut} < ${zoomedIn}`);
+
+		// 'c' toggles center-lock mode
+		assert.strictEqual(harness.getKeepGraphCentered(), false, 'starts unlocked');
+		harness.dispatchKey('c');
+		assert.strictEqual(harness.getKeepGraphCentered(), true, "'c' key enables keepGraphCentered");
+		harness.dispatchKey('c');
+		assert.strictEqual(harness.getKeepGraphCentered(), false, "subsequent 'c' key disables keepGraphCentered");
+	});
 });

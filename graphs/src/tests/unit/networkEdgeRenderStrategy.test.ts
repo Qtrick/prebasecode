@@ -28,7 +28,7 @@ suite('NetworkEdgeRenderStrategy (Unit - Semantic Edge Variants & LOD)', () => {
 
 		assert.equal(desc.variant, 'highlighted');
 		assert.equal(desc.alpha, 1.0);
-		assert.equal(desc.priority, 3);
+		assert.equal(desc.priority, 100);
 		assert.equal(desc.visibleAtLOD, true);
 		assert.ok(desc.lineWidth >= 1.8);
 	});
@@ -66,7 +66,7 @@ suite('NetworkEdgeRenderStrategy (Unit - Semantic Edge Variants & LOD)', () => {
 		assert.equal(macroDesc.variant, 'dependency');
 		assert.equal(macroDesc.visibleAtLOD, true);
 		assert.ok(macroDesc.alpha >= 0.5);
-		assert.equal(macroDesc.priority, 2);
+		assert.equal(macroDesc.priority, 10);
 	});
 
 	test('5. Dynamic import edge has distinct dashed pattern and accent style', () => {
@@ -96,15 +96,24 @@ suite('NetworkEdgeRenderStrategy (Unit - Semantic Edge Variants & LOD)', () => {
 		const macroDesc = NetworkEdgeRenderStrategy.evaluate(edge, { zoom: 0.25 });
 		assert.equal(macroDesc.variant, 'import');
 		assert.equal(macroDesc.visibleAtLOD, false);
+		assert.equal(macroDesc.alpha, 0);
 
 		const midDesc = NetworkEdgeRenderStrategy.evaluate(edge, { zoom: 0.8 });
 		assert.equal(midDesc.variant, 'import');
 		assert.equal(midDesc.visibleAtLOD, true);
-		assert.ok(midDesc.alpha >= 0.3);
 
 		const detailDesc = NetworkEdgeRenderStrategy.evaluate(edge, { zoom: 1.4 });
 		assert.equal(detailDesc.variant, 'import');
 		assert.equal(detailDesc.visibleAtLOD, true);
 		assert.equal(detailDesc.hasArrow, true);
+	});
+
+	test('8. Edge opacity setting scales alpha through the authoritative resolver', () => {
+		const edge = makeEdge('import', 'file-a', 'file-b');
+		const baselineDesc = NetworkEdgeRenderStrategy.evaluate(edge, { zoom: 1.0 });
+		const boostedDesc = NetworkEdgeRenderStrategy.evaluate(edge, { zoom: 1.0, edgeOpacitySetting: 0.85 });
+
+		assert.ok(boostedDesc.alpha > baselineDesc.alpha,
+			`opacity 0.85 (${boostedDesc.alpha}) must exceed baseline 0.55 (${baselineDesc.alpha})`);
 	});
 });

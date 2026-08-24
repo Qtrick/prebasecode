@@ -58,7 +58,21 @@ evidence before BETA-024 can close.
 
 ## Product limits (configuration)
 
-Review caps in `PreBaseGraphConfigKeys` (`maxRenderedNodes`, `maxRenderedEdges`, etc.) during manual large-repo smoke ([GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md) A9). Keys marked **Reserved** in settings schema (e.g. `networkSimulationTicks`, `renderThrottleMs`) are not consumed by the webview yet.
+Review caps in `PreBaseGraphConfigKeys` (`maxRenderedNodes`, `maxRenderedEdges`, etc.) during manual large-repo smoke ([GRAPH_ACCEPTANCE.md](GRAPH_ACCEPTANCE.md) N9). Keys that are not consumed by the webview (e.g. `networkSimulationTicks`, `renderThrottleMs`, `networkLodNodeThreshold`, `networkCharge`, `networkAlphaDecay`) carry explicit `deprecationMessage`s in the settings registry as of 2026-08-23 so they no longer appear as live knobs.
+
+## Render-path changes (2026-08-23, Phase 3.10)
+
+Structural performance work landed ahead of GUI measurement (BETA-024 evidence still open):
+
+| Change | Intent |
+|---|---|
+| Z-sort pairs nodes with projections once; label loop reuses the sorted pairs | Removes 2 map lookups per comparator call + 1 lookup per labeled node per frame |
+| `computeTemporalVisibleElements` memoized on immutable (diff, mode, contextMode) | Stops per-frame O(n) visible-set derivation during temporal scrubbing/animation |
+| Theme token cache (`getComputedThemeColors`) invalidated on settings/snapshot messages | Removes per-frame `getComputedStyle` reads |
+| Center-lock bounds reuse a scratch array | Removes per-frame allocations while Keep Graph Centered is active |
+| Dead caches removed (`nodeIncidentEdgesMap`, `staticEdgeDescriptorCache`) | Eliminates snapshot-time ingestion cost and memory for structures no render path ever read |
+
+Frame-time/FPS/memory measurements in the running product remain **not yet recorded**; this table documents code-level changes only.
 
 ## Related backlog
 

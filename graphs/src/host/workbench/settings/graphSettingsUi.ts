@@ -164,8 +164,6 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 
 	if (host.category === 'graph') {
 		advNumber(host, card, localize('prebase.settings.layoutAnim', "Layout animation"), localize('prebase.settings.layoutAnimHint', "Fit-view duration in milliseconds."), PreBaseGraphConfigKeys.GraphLayoutAnimationDuration, 750, 0, 2000, 50);
-		advRange(host, card, localize('prebase.settings.folderRadius', "Folder expansion radius"), localize('prebase.settings.folderRadiusHint', "Tree mode radial child layout."), PreBaseGraphConfigKeys.GraphFolderExpansionRadius, 82, 48, 160, 4);
-		advRange(host, card, localize('prebase.settings.visibleRelated', "Visible related connections"), localize('prebase.settings.visibleRelatedHint', "Root link always shown; controls extra ranked links per file (0–2)."), PreBaseGraphConfigKeys.GraphVisibleRelatedConnections, 1, 0, 2, 1, true);
 
 		const netHead = document.createElement('div');
 		card.appendChild(netHead);
@@ -183,8 +181,7 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 		advRange(host, card, localize('prebase.settings.nodeSpacing', "Node spacing"), localize('prebase.settings.nodeSpacingHint', "Minimum 3D separation radius; nodes stay approximately twice this distance apart."), PreBaseGraphConfigKeys.GraphNetworkCollisionRadius, 24, 2, 120, 2, true);
 		advRange(host, card, localize('prebase.settings.linkDistance', "Preferred link length"), localize('prebase.settings.linkDistanceHint', "Target center-to-center length for bounded network link springs."), PreBaseGraphConfigKeys.GraphNetworkLinkDistance, 80, 4, 600, 4, true);
 		advRange(host, card, localize('prebase.settings.linkStrength', "Link spring strength"), localize('prebase.settings.linkStrengthHint', "Scales the bounded link-length correction without changing the selected layout semantics."), PreBaseGraphConfigKeys.GraphNetworkForceStrength, 0.35, 0, 2, 0.05, true);
-		advRange(host, card, localize('prebase.settings.physics', "Physics strength"), localize('prebase.settings.physicsHint', "Reserved — not applied yet (layout uses network force/link distance)."), PreBaseGraphConfigKeys.GraphNetworkPhysicsStrength, 1, 0.5, 2, 0.05, true);
-		advRange(host, card, localize('prebase.settings.edgeOpacity', "Edge opacity"), localize('prebase.settings.edgeOpacityHint', "Reserved — not applied by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity, 0.55, 0.2, 0.9, 0.05, true);
+		advRange(host, card, localize('prebase.settings.edgeOpacity', "Edge opacity"), localize('prebase.settings.edgeOpacityHint', "Opacity of non-highlighted network edges; 0.55 is the default."), PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity, 0.55, 0.2, 0.9, 0.05, true);
 
 		const applyRow = document.createElement('div');
 		card.appendChild(applyRow);
@@ -195,31 +192,12 @@ export function renderGraphAdvanced(host: IPreBaseGraphSettingsUiHost): void {
 	}
 
 	if (host.category === 'interaction') {
-		const wrap = document.createElement('div');
-		Object.assign(wrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-		const delay = host.get(PreBaseGraphConfigKeys.InteractionNodeDragDelayMs, 200);
-		const range = host.range(80, 400, 10, delay);
-		const label = document.createElement('span');
-		label.textContent = `${delay}ms`;
-		Object.assign(label.style, { fontSize: '10px', color: host.colors.textMuted, width: '40px', textAlign: 'right' });
-		host.on(range, 'input', () => {
-			label.textContent = `${range.value}ms`;
-			void host.set(PreBaseGraphConfigKeys.InteractionNodeDragDelayMs, Number(range.value) || 200);
-		});
-		wrap.append(range, label);
-		host.row(
-			card,
-			localize('prebase.settings.nodeDragHover', "Node drag hover delay"),
-			localize('prebase.settings.nodeDragHoverHint', "Hover delay (ms) before a graph node becomes draggable. Reserved — not read by the graph webview yet. Unrelated to Agents chat modes."),
-			wrap
-		);
+		// No advanced rows: node dragging uses a fixed movement threshold in the
+		// webview; the legacy hover-delay key is deprecated and intentionally absent.
 	}
 
 	if (host.category === 'performance') {
 		advNumber(host, card, localize('prebase.settings.maxNodes', "Max rendered nodes"), localize('prebase.settings.maxNodesHint', "Caps visible nodes by importance."), PreBaseGraphConfigKeys.GraphMaxRenderedNodes, 280, 50, 2000, 50);
-		advNumber(host, card, localize('prebase.settings.renderThrottle', "Render throttle"), localize('prebase.settings.renderThrottleHint', "Reserved — not read by the graph webview yet."), PreBaseGraphConfigKeys.GraphRenderThrottleMs, 0, 0, 100, 1);
-		advNumber(host, card, localize('prebase.settings.networkLod', "Network LOD threshold"), localize('prebase.settings.networkLodHint', "Reserved — not read by the graph webview yet."), PreBaseGraphConfigKeys.GraphNetworkLodNodeThreshold, 900, 400, 3000, 100);
-		advNumber(host, card, localize('prebase.settings.simTicks', "Network simulation ticks"), localize('prebase.settings.simTicksHint', "Reserved — not applied by the current layout engine."), PreBaseGraphConfigKeys.GraphNetworkSimulationTicks, 80, 20, 200, 1);
 	}
 }
 

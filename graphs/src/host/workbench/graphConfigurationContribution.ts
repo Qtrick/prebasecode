@@ -52,7 +52,8 @@ export function registerPreBaseGraphConfiguration(): void {
 			[PreBaseGraphConfigKeys.GraphShowEdgeLabels]: {
 				type: 'boolean',
 				default: false,
-				description: localize('prebase.graph.showEdgeLabels', "Show import paths on dependency edges."),
+				deprecationMessage: localize('prebase.graph.showEdgeLabels.deprecated', "Edge import labels are not rendered by the current Code Graph. This setting is ignored."),
+				description: localize('prebase.graph.showEdgeLabels', "Reserved for future edge label rendering. Currently ignored."),
 			},
 			[PreBaseGraphConfigKeys.GraphInitialZoom]: {
 				type: 'number',
@@ -73,14 +74,16 @@ export function registerPreBaseGraphConfiguration(): void {
 				default: 82,
 				minimum: 48,
 				maximum: 160,
-				description: localize('prebase.graph.folderExpansionRadius', "Tree mode radial child layout radius."),
+				deprecationMessage: localize('prebase.graph.folderExpansionRadius.deprecated', "Folder expansion radius belongs to the dormant Architecture Graph and is not applied by the active Code Graph."),
+				description: localize('prebase.graph.folderExpansionRadius', "Reserved for the dormant Architecture Graph. Currently ignored."),
 			},
 			[PreBaseGraphConfigKeys.GraphVisibleRelatedConnections]: {
 				type: 'number',
 				default: 1,
 				minimum: 0,
 				maximum: 2,
-				description: localize('prebase.graph.visibleRelatedConnections', "Extra ranked related links per file beyond the root link (0–2)."),
+				deprecationMessage: localize('prebase.graph.visibleRelatedConnections.deprecated', "Extra related links belong to the dormant Architecture Graph and are not applied by the active Code Graph."),
+				description: localize('prebase.graph.visibleRelatedConnections', "Reserved for the dormant Architecture Graph. Currently ignored."),
 			},
 			[PreBaseGraphConfigKeys.GraphMaxRenderedNodes]: {
 				type: 'number',
@@ -113,7 +116,8 @@ export function registerPreBaseGraphConfiguration(): void {
 			[PreBaseGraphConfigKeys.GraphNetworkCharge]: {
 				type: 'number',
 				default: -120,
-				description: localize('prebase.graph.networkCharge', "Charge strength for network layout. Reserved — not applied by the current layout engine (use networkForceStrength / networkLinkDistance)."),
+				deprecationMessage: localize('prebase.graph.networkCharge.deprecated', "Classic force charge belongs to the dormant Architecture Graph. The active Code Graph uses bounded link relaxation (networkForceStrength / networkLinkDistance)."),
+				description: localize('prebase.graph.networkCharge', "Reserved — not applied by the current layout engine (use networkForceStrength / networkLinkDistance)."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkCollisionRadius]: {
 				type: 'number',
@@ -125,7 +129,8 @@ export function registerPreBaseGraphConfiguration(): void {
 			[PreBaseGraphConfigKeys.GraphNetworkAlphaDecay]: {
 				type: 'number',
 				default: 0.02,
-				description: localize('prebase.graph.networkAlphaDecay', "Alpha decay for network layout simulation. Reserved — not applied by the current layout engine."),
+				deprecationMessage: localize('prebase.graph.networkAlphaDecay.deprecated', "Simulated-annealing alpha decay is not used by the deterministic layout engines. This setting is ignored."),
+				description: localize('prebase.graph.networkAlphaDecay', "Reserved — not applied by the current layout engine."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate]: {
 				type: 'boolean',
@@ -137,7 +142,7 @@ export function registerPreBaseGraphConfiguration(): void {
 				default: 1,
 				minimum: 0.5,
 				maximum: 2,
-				description: localize('prebase.graph.networkPhysicsStrength', "Scales repulsion and centering forces in the network view. Reserved — not applied by the current layout engine (use networkForceStrength / networkLinkDistance)."),
+				description: localize('prebase.graph.networkPhysicsStrength', "Scales the overall layout spread of the Network Graph together with node spacing."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkEdgeOpacity]: {
 				type: 'number',
@@ -163,21 +168,24 @@ export function registerPreBaseGraphConfiguration(): void {
 				default: 0,
 				minimum: 0,
 				maximum: 100,
-				description: localize('prebase.graph.renderThrottleMs', "Delays graph node/edge sync (milliseconds). Reserved — not read by the graph webview yet."),
+				deprecationMessage: localize('prebase.graph.renderThrottleMs.deprecated', "The graph renderer uses a dirty-frame loop and does not throttle. This setting is ignored."),
+				description: localize('prebase.graph.renderThrottleMs', "Reserved — not read by the graph webview."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkLodNodeThreshold]: {
 				type: 'number',
 				default: 900,
 				minimum: 400,
 				maximum: 3000,
-				description: localize('prebase.graph.networkLodNodeThreshold', "Above this node count, network view uses performance mode. Reserved — not read by the graph webview yet."),
+				deprecationMessage: localize('prebase.graph.networkLodNodeThreshold.deprecated', "LOD is derived from zoom and edge semantics, not a node-count threshold. This setting is ignored."),
+				description: localize('prebase.graph.networkLodNodeThreshold', "Reserved — not read by the graph webview."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkSimulationTicks]: {
 				type: 'number',
 				default: 80,
 				minimum: 20,
 				maximum: 200,
-				description: localize('prebase.graph.networkSimulationTicks', "Force layout warmup/cooldown scale for the network view. Reserved — not applied by the current layout engine."),
+				deprecationMessage: localize('prebase.graph.networkSimulationTicks.deprecated', "The deterministic layouts use fixed iteration counts, not configurable ticks. This setting is ignored."),
+				description: localize('prebase.graph.networkSimulationTicks', "Reserved — not applied by the current layout engine."),
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkLayoutMode]: {
 				type: 'string',
@@ -242,7 +250,8 @@ export function registerPreBaseGraphConfiguration(): void {
 				default: 200,
 				minimum: 80,
 				maximum: 400,
-				description: localize('prebase.interaction.nodeDragDelayMs', "Hover delay (ms) before a graph node becomes draggable. Reserved — not read by the graph webview yet. Unrelated to Agents chat modes."),
+				deprecationMessage: localize('prebase.interaction.nodeDragDelayMs.deprecated', "Node dragging uses a movement threshold, not a hover delay. This setting is ignored."),
+				description: localize('prebase.interaction.nodeDragDelayMs', "Reserved — not read by the graph webview. Unrelated to Agents chat modes."),
 			},
 			[PreBaseGraphConfigKeys.InteractionKeepGraphCentered]: {
 				type: 'boolean',

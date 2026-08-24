@@ -1,6 +1,6 @@
-# PreBase Temporal Graph Architecture — Phase 3.3 Complete & Verified
+# PreBase Temporal Graph Architecture
 
-This document defines the current architecture, verified repairs, and complete specifications for **PreBase Temporal Graph Phase 3.3** (Semantic Correctness, Comparison Workbench, Active-Repository Ownership, Timeline Hardening & Verified Transitions).
+This document defines the architecture, verified repairs, and specifications for the PreBase Temporal Graph (Phases 3.1–3.10: semantic correctness, comparison workbench, active-repository ownership, timeline hardening, verified transitions, and Phase 3.9/3.10 viewport, interaction, accessibility, and rendering-truth work).
 
 ---
 
@@ -123,9 +123,9 @@ To support large repositories (10,000+ files) while preserving smooth 60fps 3D r
                  │                               ┌─────────────────┴─────────────────┐
                  ▼                               │      PreBase Magnus AI Agent      │
  ┌───────────────────────────────┐               │  • searchForMagnus                │
- │     Network Graph Renderer    │               │  • getNodeDetailsForMagnus        │
- │  • WebGL 3D / DOM 2D          │               │  • getDependenciesForMagnus       │
- │  • Smooth 60fps interaction   │               │  • getOverviewForMagnus           │
+│     Network Graph Renderer    │               │  • getNodeDetailsForMagnus        │
+│  • Projected Canvas 2D (LOD)  │               │  • getDependenciesForMagnus       │
+│  • Dirty-frame render loop    │               │  • getOverviewForMagnus           │
  └───────────────────────────────┘               │  • resolveNodeFocusForMagnus      │
                                                  │    (Structured focus resolution)  │
                                                  └───────────────────────────────────┘

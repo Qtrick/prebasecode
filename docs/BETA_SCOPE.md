@@ -1,6 +1,6 @@
 # PreBase Public Beta Scope
 
-Last updated: **2026-07-22** (Checkpoint #12 — final whole-diff honesty; beta candidate claim **forbidden**).  
+Last updated: **2026-08-23** (Phase 3.10 — Architecture Graph removed from required beta scope; inert graph keys deprecated).  
 Canonical backlog: [BETA_READINESS.md](BETA_READINESS.md).  
 Execution resume: [BETA_EXECUTION_CHECKPOINT.md](BETA_EXECUTION_CHECKPOINT.md).
 
@@ -14,8 +14,8 @@ This document classifies product surfaces for the upcoming public beta. A featur
 | Open folder/workspace, save, undo/redo | Native editor reliability |
 | Search, SCM, terminal, debug, Problems, Output | Core IDE |
 | Settings + keybindings + extensions (Open VSX) | |
-| Architecture Graph | Hierarchy / Pyramid / Scattered |
-| Network Graph | Organic / Sphere / Constellation / Clustered / Radial |
+| Code Graph (Network layouts) | Organic / Sphere / Constellation / Clustered / Radial; single active graph per `graphs/PRESERVED_ARCHITECTURE.md` and BETA-003 |
+| Temporal Graph | Commit timeline scrubbing, state/changes modes, comparison workbench |
 | Local Magnus (Agents) provider | Ask/Plan/Edit/Test/Agent; local API key in SecretStorage |
 | Web Runtime Preview | Supported web frameworks; process cleanup |
 | Privacy defaults | Telemetry/crash upload/surveys off; CSP on PreBase webviews |
@@ -30,7 +30,6 @@ This document classifies product surfaces for the upcoming public beta. A featur
 |---|---|
 | Supabase email/password Auth | User settings `prebase.cloud.*`; optional; IDE works signed-out |
 | Cloud preference sync (profiles/preferences) | Only when Auth configured; disclose cloud storage |
-| Reserved graph interaction/perf keys | Visible only with honest “reserved / not applied” labels until wired |
 | Managed Electron Runtime Preview | Experimental; document process ownership |
 
 ## 3. Disabled until ready
