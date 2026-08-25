@@ -3238,14 +3238,26 @@ function openNodePopup(node, clientX, clientY) {
 			} else {
 				if (popupAi) popupAi.textContent = 'Generating AI description…';
 				describeTimer = setTimeout(async () => {
-					const desc = await request('describeNode', { nodeId: node.id });
-					if (!popupNode || popupNode.id !== node.id) return;
-					if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
-						if (popupAi) popupAi.textContent = desc.aiDescription;
-					} else {
-						if (popupAi) popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
+					try {
+						const desc = await request('describeNode', { nodeId: node.id });
+						if (!popupNode || popupNode.id !== node.id) return;
+						if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
+							if (popupAi) popupAi.textContent = desc.aiDescription;
+						} else {
+							if (popupAi) popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
+						}
+					} catch (err) {
+						console.warn('[PreBase Graph] describeNode failed:', err);
+						if (popupNode && popupNode.id === node.id && popupAi) {
+							popupAi.textContent = 'AI description unavailable.';
+						}
 					}
 				}, 60);
+			}
+		}).catch(function (err) {
+			console.warn('[PreBase Graph] peekNodeDescription failed:', err);
+			if (popupNode && popupNode.id === node.id && popupAi && !popupAi.textContent) {
+				popupAi.textContent = 'AI description unavailable.';
 			}
 		});
 		dirty = true; drawNetworkFrame();
@@ -4187,6 +4199,8 @@ setTimeout(function () {
 						diagnostics = res.diagnostics;
 						if (res.graphType) graphType = res.graphType;
 						render(true);
+					}).catch(function (err) {
+						console.warn('[PreBase Graph] Retry getSnapshot failed:', err);
 					});
 				};
 			}
