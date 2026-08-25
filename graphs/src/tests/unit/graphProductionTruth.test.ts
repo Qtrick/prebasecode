@@ -6,7 +6,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import { suite, test } from 'mocha';
-import { serializeNetworkEdgeVisualSource } from '../../host/workbench/networkEdgeVisualRuntime.js';
+import { interpolateWebviewScript } from '../../host/workbench/temporalRuntimeContracts.js';
 
 /**
  * Production-truth structural tests.
@@ -27,10 +27,7 @@ function extractWebviewScript(): string {
 	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
 	const script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
 	assert.ok(script, 'webview script must be present in graphEditor.ts');
-	return script
-		.replace('${generation}', '7')
-		.replace('${initialGraphType}', 'network')
-		.replace('${serializeNetworkEdgeVisualSource()}', serializeNetworkEdgeVisualSource());
+	return interpolateWebviewScript(script, '7', 'network');
 }
 
 suite('Graph settings & webview production truth', () => {

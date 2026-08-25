@@ -116,9 +116,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 		if (this._gitHistoryService?.onDidChangeHead) {
 			this._register(this._gitHistoryService.onDidChangeHead(e => {
-				if (this._followHead) {
-					void this._handleHeadChanged(e);
-				}
+				void this._handleHeadChanged(e);
 			}));
 		}
 
@@ -482,7 +480,10 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				const commitToSelect = targetCommitSha && this._pagedTimeline.some(c => c.sha === targetCommitSha)
 					? targetCommitSha
 					: this._pagedTimeline[0].sha;
-				await this.selectCommit(commitToSelect, { immediate: true });
+				if (commitToSelect !== this._pagedTimeline[0].sha || (refName !== 'HEAD' && refName !== '')) {
+					this._followHead = false;
+				}
+				await this.selectCommit(commitToSelect, { immediate: true, preserveFollowHead: this._followHead });
 			} else {
 				this._selectedCommitSha = '';
 				this._renderedCommitSha = undefined;
@@ -514,6 +515,9 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 		const commit = this._pagedTimeline[globalIndex];
 		if (commit) {
+			if (globalIndex !== 0 || this._selectedRef !== 'HEAD') {
+				this._followHead = false;
+			}
 			await this.selectCommit(commit.sha, options);
 		}
 	}
@@ -522,6 +526,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		if (this._pagedTimeline.length === 0) {
 			return;
 		}
+		// Stepping is manual historical navigation -> turns Follow HEAD off
+		this._followHead = false;
 		const curIdx = this._pagedTimeline.findIndex(c => c.sha === this._selectedCommitSha);
 		const currentIdx = curIdx >= 0 ? curIdx : 0;
 		const targetIdx = currentIdx - delta; // delta +1: newer (towards HEAD index 0), delta -1: older (towards higher index)
@@ -623,9 +629,16 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		return commit.parents[0];
 	}
 
-	async selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean }): Promise<void> {
+	async selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean; preserveFollowHead?: boolean }): Promise<void> {
 		if (!commitSha) {
 			return;
+		}
+
+		if (!options?.preserveFollowHead) {
+			const isHeadCommit = this._pagedTimeline.length > 0 && this._pagedTimeline[0].sha === commitSha;
+			if (!isHeadCommit || this._selectedRef !== 'HEAD') {
+				this._followHead = false;
+			}
 		}
 
 		this._selectedCommitSha = commitSha;
@@ -690,7 +703,8 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 	setFollowHead(follow: boolean): void {
 		this._followHead = follow;
-		if (follow && this._selectedRef !== 'HEAD') {
+		if (follow) {
+			// Immediately resolve and navigate to actual current HEAD even if _selectedRef is already 'HEAD'
 			void this.selectRef('HEAD');
 			return;
 		}
@@ -980,12 +994,40 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	}
 
 	async retrySelection(): Promise<void> {
+		const hadHistoryError = Boolean(this._historyError || this._historyLoadMoreError);
+		const hadSelectionError = Boolean(this._selectionError);
+		const targetSha = this._selectedCommitSha;
+		const baseSha = this._compareBaseSha;
+		const root = this._getActiveRepoRoot();
+
 		this._selectionError = undefined;
 		this._historyError = undefined;
+		this._historyLoadMoreError = undefined;
+
+		if (hadHistoryError) {
+			if (this._selectedRef) {
+				await this.selectRef(this._selectedRef, this._selectedCommitSha || undefined);
+			} else {
+				await this.refresh();
+			}
+			return;
+		}
+
+		if (hadSelectionError && targetSha) {
+			if (root) {
+				const cachePrefix = `${this._activeRepositoryId || root}::${targetSha}..${baseSha || 'root'}`;
+				this._diffCache.delete(cachePrefix);
+			}
+			await this.selectCommit(targetSha, { compareBaseSha: baseSha, immediate: true, preserveFollowHead: this._followHead });
+			return;
+		}
+
 		if (this._selectedCommitSha) {
-			await this.selectCommit(this._selectedCommitSha, { immediate: true });
+			await this.selectCommit(this._selectedCommitSha, { immediate: true, preserveFollowHead: this._followHead });
 		} else if (this._selectedRef) {
 			await this.selectRef(this._selectedRef);
+		} else {
+			await this.refresh();
 		}
 	}
 

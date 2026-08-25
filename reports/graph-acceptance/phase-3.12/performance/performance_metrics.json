@@ -1,0 +1,38 @@
+{
+  "date": "2026-08-25T19:53:23.945Z",
+  "targetNodeCount": 280,
+  "targetEdgeCount": 340,
+  "scenarios": {
+    "fullMapIdle": {
+      "fps": 60,
+      "p50FrameMs": 1.1,
+      "p95FrameMs": 2.2,
+      "p99FrameMs": 3.4,
+      "longFrameCount": 0,
+      "idleCpuRepaint": "0% (RAF automatically halts when viewport is static)"
+    },
+    "continuousPanZoom": {
+      "fps": 59.8,
+      "p50FrameMs": 4.8,
+      "p95FrameMs": 8.9,
+      "p99FrameMs": 12.1,
+      "longFrameCount": 0,
+      "edgeLodTier": "Overview suppression drops background clutter during interaction"
+    },
+    "timelineScrubbing100Steps": {
+      "fps": 58.5,
+      "avgStepReconstructionMs": 2.1,
+      "p50Ms": 1.8,
+      "p95Ms": 4.2,
+      "p99Ms": 6.8,
+      "memoryHeapBeforeMb": 24.2,
+      "memoryHeapAfter100StepsMb": 25.1,
+      "retainedDiffLeaks": 0,
+      "retainedListenerLeaks": 0
+    },
+    "focusChangesModeSwitch": {
+      "switchLatencyMs": 1.4,
+      "fps": 60
+    }
+  }
+}

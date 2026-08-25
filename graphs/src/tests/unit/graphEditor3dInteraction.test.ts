@@ -5,7 +5,7 @@
 import assert from 'assert';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
-import { serializeNetworkEdgeVisualSource } from '../../host/workbench/networkEdgeVisualRuntime.js';
+import { interpolateWebviewScript } from '../../host/workbench/temporalRuntimeContracts.js';
 
 type Listener = (event: PointerEventLike) => void;
 
@@ -130,11 +130,7 @@ function createWebviewHarness(): { canvas: FakeElement; context: vm.Context; run
 	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
 	let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
 	assert.ok(script, 'webview script must be present');
-	// Interpolate host-side template substitutions exactly like _buildHtml does,
-	// including the injected authoritative edge resolver (Fix B parity path).
-	script = script.replace('${generation}', '7')
-		.replace('${initialGraphType}', 'network')
-		.replace('${serializeNetworkEdgeVisualSource()}', serializeNetworkEdgeVisualSource());
+	script = interpolateWebviewScript(script, '7', 'network');
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [

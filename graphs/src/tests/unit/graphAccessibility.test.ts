@@ -1,8 +1,13 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) PreBase. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
+
 import * as assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import * as vm from 'node:vm';
 import { suite, test } from 'mocha';
-import { serializeNetworkEdgeVisualSource } from '../../host/workbench/networkEdgeVisualRuntime.js';
+import { interpolateWebviewScript } from '../../host/workbench/temporalRuntimeContracts.js';
 
 class FakeElement {
 	id = '';
@@ -42,6 +47,9 @@ class FakeElement {
 	}
 	focus(): void {}
 	blur(): void {}
+	click(): void {
+		this.dispatchEvent({ type: 'click' });
+	}
 	getContext(_type: string, _opts?: any): any {
 		return {
 			save() {},
@@ -61,16 +69,93 @@ class FakeElement {
 	}
 }
 
-suite('GraphAccessibility (Unit - Keyboard Shortcuts & ARIA Parity)', () => {
-	function createAccessibilityHarness() {
+suite('GraphAccessibility (Unit - Real HTML Markup & Keyboard Interaction)', () => {
+	function getGeneratedHtmlTemplate(): string {
+		const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
+		const htmlStart = editorSource.indexOf('<!DOCTYPE html>');
+		const htmlEnd = editorSource.indexOf('</script>', htmlStart) + '</script>'.length;
+		assert.ok(htmlStart > 0 && htmlEnd > htmlStart, 'HTML template must be extractable from graphEditor.ts');
+		return editorSource.slice(htmlStart, htmlEnd);
+	}
+
+	function parseTagAttributes(html: string, id: string): Map<string, string> {
+		const regex = new RegExp(`<([a-zA-Z0-9]+)[^>]*id=["']${id}["'][^>]*>`, 'i');
+		const match = html.match(regex);
+		assert.ok(match, `Element with id "${id}" must exist in HTML template`);
+
+		const fullTag = match[0];
+		const attrs = new Map<string, string>();
+		const attrRegex = /([a-zA-Z0-9_-]+)(?:=["']([^"']*)["'])?/g;
+		let m: RegExpExecArray | null;
+		while ((m = attrRegex.exec(fullTag)) !== null) {
+			const name = m[1].toLowerCase();
+			const val = m[2] !== undefined ? m[2] : 'true';
+			attrs.set(name, val);
+		}
+		return attrs;
+	}
+
+	test('1. Real HTML Markup: netCanvas has role="region", correct roledescription, and updated shortcut help copy', () => {
+		const html = getGeneratedHtmlTemplate();
+		const attrs = parseTagAttributes(html, 'netCanvas');
+
+		assert.strictEqual(attrs.get('role'), 'region', 'netCanvas must have role="region" rather than aggressive role="application"');
+		assert.strictEqual(attrs.get('aria-roledescription'), 'interactive graph');
+		assert.strictEqual(attrs.get('tabindex'), '0', 'netCanvas must be keyboard focusable (tabIndex="0")');
+		assert.strictEqual(attrs.get('aria-describedby'), 'graphKbdHelp');
+
+		const label = attrs.get('aria-label') || '';
+		assert.ok(label.includes('Code Graph'), 'aria-label must describe Code Graph');
+		assert.ok(label.includes('Alt+F1') || label.includes('?'), 'aria-label must reference Alt+F1 or ? for shortcut help');
+		assert.ok(!label.includes('press F1 for help'), 'aria-label must NOT contain stale "press F1 for help" copy');
+	});
+
+	test('2. Real HTML Markup: Viewport toolbar buttons have explicit ARIA labels and toggle states', () => {
+		const html = getGeneratedHtmlTemplate();
+
+		// Center Lock button
+		const centerLockAttrs = parseTagAttributes(html, 'temporalCenterLockBtn');
+		assert.strictEqual(centerLockAttrs.get('aria-label'), 'Keep graph centered');
+		assert.strictEqual(centerLockAttrs.get('aria-pressed'), 'false', 'Initial aria-pressed must be "false"');
+		assert.ok(centerLockAttrs.has('title'), 'temporalCenterLockBtn must have title attribute');
+
+		// Fit button
+		const fitAttrs = parseTagAttributes(html, 'temporalFitBtn');
+		assert.strictEqual(fitAttrs.get('aria-label'), 'Fit to screen');
+		assert.ok(fitAttrs.has('title'), 'temporalFitBtn must have title attribute');
+
+		// Toggle details button
+		const detailsAttrs = parseTagAttributes(html, 'temporalToggleDetailsBtn');
+		assert.strictEqual(detailsAttrs.get('aria-expanded'), 'false');
+		assert.strictEqual(detailsAttrs.get('aria-controls'), 'temporalDetailsPanel');
+
+		// Retry button
+		const retryAttrs = parseTagAttributes(html, 'temporalRetryBtn');
+		assert.strictEqual(retryAttrs.get('aria-label'), 'Retry');
+	});
+
+	test('3. Real HTML Markup: No raw improvised unicode close characters (✕ or ×)', () => {
+		const html = getGeneratedHtmlTemplate();
+
+		// popupClose must use SVG codicon
+		const popupMatch = html.match(/<button[^>]*id=["']popupClose["'][^>]*>([\s\S]*?)<\/button>/i);
+		assert.ok(popupMatch, 'popupClose button must exist in HTML');
+		assert.ok(!popupMatch[1].includes('✕') && !popupMatch[1].includes('×'), 'popupClose must not use raw unicode ✕ or ×');
+		assert.ok(popupMatch[1].includes('<svg'), 'popupClose must use SVG icon');
+
+		// temporalDetailsClose must use SVG codicon
+		const detailsCloseMatch = html.match(/<button[^>]*id=["']temporalDetailsClose["'][^>]*>([\s\S]*?)<\/button>/i);
+		assert.ok(detailsCloseMatch, 'temporalDetailsClose button must exist in HTML');
+		assert.ok(!detailsCloseMatch[1].includes('✕') && !detailsCloseMatch[1].includes('×'), 'temporalDetailsClose must not use raw unicode ✕ or ×');
+		assert.ok(detailsCloseMatch[1].includes('<svg'), 'temporalDetailsClose must use SVG icon');
+	});
+
+	test('4. Keyboard Interaction: Plain F1 preserved, Alt+F1 and ? toggle help, Escape closes panels', () => {
 		const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
 		const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
 		let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
 		assert.ok(script, 'webview script must be present in graphEditor.ts');
-
-		script = script.replace('${generation}', '42')
-			.replace('${initialGraphType}', 'temporal')
-			.replace('${serializeNetworkEdgeVisualSource()}', serializeNetworkEdgeVisualSource());
+		script = interpolateWebviewScript(script, '42', 'temporal');
 
 		const elements = new Map<string, FakeElement>();
 		for (const id of [
@@ -137,79 +222,45 @@ suite('GraphAccessibility (Unit - Keyboard Shortcuts & ARIA Parity)', () => {
 
 		vm.runInContext(script, context);
 
-		return {
-			elements,
-			setActiveElement(el: any) { activeElement = el; },
-			dispatchKey(key: string, modifiers: { altKey?: boolean; metaKey?: boolean; shiftKey?: boolean; ctrlKey?: boolean } = {}) {
-				const keyListeners = [...(windowListeners.get('keydown') ?? []), ...(documentListeners.get('keydown') ?? [])];
-				let prevented = false;
-				const event = {
-					type: 'keydown',
-					key,
-					altKey: !!modifiers.altKey,
-					metaKey: !!modifiers.metaKey,
-					shiftKey: !!modifiers.shiftKey,
-					ctrlKey: !!modifiers.ctrlKey,
-					preventDefault() { prevented = true; },
-					stopPropagation() {},
-				};
-				for (const fn of keyListeners) {
-					fn(event);
-				}
-				return { prevented };
+		function dispatchKey(key: string, modifiers: { altKey?: boolean; metaKey?: boolean; shiftKey?: boolean; ctrlKey?: boolean } = {}) {
+			const keyListeners = [...(windowListeners.get('keydown') ?? []), ...(documentListeners.get('keydown') ?? [])];
+			let prevented = false;
+			const event = {
+				type: 'keydown',
+				key,
+				altKey: !!modifiers.altKey,
+				metaKey: !!modifiers.metaKey,
+				shiftKey: !!modifiers.shiftKey,
+				ctrlKey: !!modifiers.ctrlKey,
+				preventDefault() { prevented = true; },
+				stopPropagation() {},
+			};
+			for (const fn of keyListeners) {
+				fn(event);
 			}
-		};
-	}
+			return { prevented };
+		}
 
-	test('1. F1 Non-Interception: Plain F1 does NOT trigger help and is NOT prevented', () => {
-		const harness = createAccessibilityHarness();
-		const helpEl = harness.elements.get('graphKbdHelp')!;
+		// 1. Plain F1 must NOT be preventDefaulted
+		const helpEl = elements.get('graphKbdHelp')!;
 		helpEl.hidden = true;
+		const f1Result = dispatchKey('F1');
+		assert.strictEqual(f1Result.prevented, false, 'Plain F1 must pass through to VS Code');
+		assert.strictEqual(helpEl.hidden, true);
 
-		const result = harness.dispatchKey('F1');
-		assert.strictEqual(result.prevented, false, 'Plain F1 must not be preventDefaulted so VS Code Command Palette works');
-		assert.strictEqual(helpEl.hidden, true, 'Help dialog remains hidden');
-	});
+		// 2. Alt+F1 toggles help
+		const altF1Result = dispatchKey('F1', { altKey: true });
+		assert.strictEqual(altF1Result.prevented, true);
+		assert.strictEqual(helpEl.hidden, false, 'Alt+F1 opens help');
 
-	test('2. Alt+F1 & Option+F1: Alt+F1 triggers help overlay and is prevented', () => {
-		const harness = createAccessibilityHarness();
-		const helpEl = harness.elements.get('graphKbdHelp')!;
-		helpEl.hidden = true;
-
-		const result = harness.dispatchKey('F1', { altKey: true });
-		assert.strictEqual(result.prevented, true, 'Alt+F1 is handled by graph');
-		assert.strictEqual(helpEl.hidden, false, 'Help overlay is opened');
-
-		// Escape closes it
-		const escResult = harness.dispatchKey('Escape');
+		// 3. Escape closes help
+		const escResult = dispatchKey('Escape');
 		assert.strictEqual(escResult.prevented, true);
 		assert.strictEqual(helpEl.hidden, true, 'Escape closes help');
-	});
 
-	test('3. Question Mark: ? triggers help overlay', () => {
-		const harness = createAccessibilityHarness();
-		const helpEl = harness.elements.get('graphKbdHelp')!;
-		helpEl.hidden = true;
-
-		const result = harness.dispatchKey('?');
-		assert.strictEqual(result.prevented, true);
-		assert.strictEqual(helpEl.hidden, false, '? opens help overlay');
-	});
-
-	test('4. Temporal Button ARIA Attributes: Viewport buttons have proper ARIA labels and roles', () => {
-		const harness = createAccessibilityHarness();
-		const fitBtn = harness.elements.get('temporalFitBtn')!;
-		const centerLockBtn = harness.elements.get('temporalCenterLockBtn')!;
-		const zoomInBtn = harness.elements.get('temporalZoomInBtn')!;
-		const zoomOutBtn = harness.elements.get('temporalZoomOutBtn')!;
-		const resetBtn = harness.elements.get('temporalResetBtn')!;
-		const helpBtn = harness.elements.get('temporalHelpBtn')!;
-
-		assert.ok(fitBtn, 'temporalFitBtn exists');
-		assert.ok(centerLockBtn, 'temporalCenterLockBtn exists');
-		assert.ok(zoomInBtn, 'temporalZoomInBtn exists');
-		assert.ok(zoomOutBtn, 'temporalZoomOutBtn exists');
-		assert.ok(resetBtn, 'temporalResetBtn exists');
-		assert.ok(helpBtn, 'temporalHelpBtn exists');
+		// 4. ? opens help
+		const qResult = dispatchKey('?');
+		assert.strictEqual(qResult.prevented, true);
+		assert.strictEqual(helpEl.hidden, false, '? opens help');
 	});
 });

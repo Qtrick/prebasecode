@@ -8,7 +8,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { suite, test } from 'mocha';
 import { PreBaseGraphEditorInput } from '../../host/workbench/graphEditorInput.js';
-import { serializeNetworkEdgeVisualSource } from '../../host/workbench/networkEdgeVisualRuntime.js';
+import { interpolateWebviewScript } from '../../host/workbench/temporalRuntimeContracts.js';
 
 type Listener = (event: any) => void;
 
@@ -96,12 +96,7 @@ function createTemporalWebviewHarness() {
 	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
 	let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
 	assert.ok(script, 'webview script must be present');
-	// Interpolate host-side template substitutions exactly like _buildHtml does,
-	// including the injected authoritative edge resolver (Fix B parity path).
-	script = script.replace('${generation}', '7')
-		.replace('${initialGraphType}', 'network')
-		.replace('${serializeNetworkEdgeVisualSource()}', serializeNetworkEdgeVisualSource());
-	script = script.replace("let graphType = 'network';", "let graphType = 'temporal';");
+	script = interpolateWebviewScript(script, '7', 'temporal');
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [

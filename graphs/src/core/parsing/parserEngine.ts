@@ -89,100 +89,105 @@ export class ParserEngine {
 			this.extractDeclarationNames(decl, exports, functions, components, symbolLines);
 		const isComponentName = (name: string) => this.looksLikeComponent(name, file.extension);
 
-		traverse(ast, {
-			ImportDeclaration(path: NodePath<t.ImportDeclaration>) {
-				const source = path.node.source.value;
-				const specifiers = path.node.specifiers.map((s) => {
-					if (t.isImportDefaultSpecifier(s)) {
-						return 'default';
-					}
-					if (t.isImportNamespaceSpecifier(s)) {
-						return '*';
-					}
-					return s.local.name;
-				});
-				imports.push({
-					source,
-					specifiers,
-					isDefault: path.node.specifiers.some((s) => t.isImportDefaultSpecifier(s)),
-					line: path.node.loc?.start.line,
-				});
-			},
-			ExportNamedDeclaration(path: NodePath<t.ExportNamedDeclaration>) {
-				if (path.node.declaration) {
-					extractDecl(path.node.declaration);
-				}
-				path.node.specifiers.forEach((s) => {
-					if (t.isExportSpecifier(s) && t.isIdentifier(s.exported)) {
-						const line = path.node.loc?.start.line;
-						exports.push({ name: s.exported.name, line });
-						noteLine(s.exported.name, line);
-					}
-				});
-			},
-			ExportDefaultDeclaration(path: NodePath<t.ExportDefaultDeclaration>) {
-				const line = path.node.loc?.start.line;
-				const name =
-					t.isIdentifier(path.node.declaration)
-						? path.node.declaration.name
-						: t.isFunctionDeclaration(path.node.declaration) && path.node.declaration.id
-							? path.node.declaration.id.name
-							: 'default';
-				exports.push({ name, isDefault: true, line });
-				noteLine(name, line);
-				if (t.isFunctionDeclaration(path.node.declaration) && path.node.declaration.id) {
-					if (isComponentName(path.node.declaration.id.name)) {
-						components.push(path.node.declaration.id.name);
-						noteLine(path.node.declaration.id.name, path.node.declaration.loc?.start.line ?? line);
-					}
-				}
-			},
-			ExportAllDeclaration(path: NodePath<t.ExportAllDeclaration>) {
-				exports.push({ name: `* from ${path.node.source?.value ?? ''}`, line: path.node.loc?.start.line });
-			},
-			FunctionDeclaration(path: NodePath<t.FunctionDeclaration>) {
-				if (path.node.id?.name) {
-					const line = path.node.loc?.start.line;
-					functions.push(path.node.id.name);
-					noteLine(path.node.id.name, line);
-					if (isComponentName(path.node.id.name)) {
-						components.push(path.node.id.name);
-						noteLine(path.node.id.name, line);
-					}
-				}
-			},
-			VariableDeclarator(path: NodePath<t.VariableDeclarator>) {
-				if (t.isIdentifier(path.node.id) && path.node.init) {
-					const name = path.node.id.name;
-					const line = path.node.loc?.start.line;
-					if (
-						t.isArrowFunctionExpression(path.node.init) ||
-						t.isFunctionExpression(path.node.init)
-					) {
-						functions.push(name);
-						noteLine(name, line);
-						if (isComponentName(name)) {
-							components.push(name);
-							noteLine(name, line);
-							isComponentFile = true;
+		try {
+			traverse(ast, {
+				noScope: true,
+				ImportDeclaration: (path: NodePath<t.ImportDeclaration>) => {
+					const source = path.node.source.value;
+					const specifiers = path.node.specifiers.map((s) => {
+						if (t.isImportDefaultSpecifier(s)) {
+							return 'default';
 						}
-					}
-				}
-			},
-			CallExpression(path: NodePath<t.CallExpression>) {
-				if (
-					t.isIdentifier(path.node.callee, { name: 'require' }) &&
-					path.node.arguments[0] &&
-					t.isStringLiteral(path.node.arguments[0])
-				) {
+						if (t.isImportNamespaceSpecifier(s)) {
+							return '*';
+						}
+						return s.local.name;
+					});
 					imports.push({
-						source: path.node.arguments[0].value,
-						specifiers: ['require'],
+						source,
+						specifiers,
+						isDefault: path.node.specifiers.some((s) => t.isImportDefaultSpecifier(s)),
 						line: path.node.loc?.start.line,
 					});
-				}
-			},
-		});
+				},
+				ExportNamedDeclaration: (path: NodePath<t.ExportNamedDeclaration>) => {
+					if (path.node.declaration) {
+						extractDecl(path.node.declaration);
+					}
+					path.node.specifiers.forEach((s) => {
+						if (t.isExportSpecifier(s) && t.isIdentifier(s.exported)) {
+							const line = path.node.loc?.start.line;
+							exports.push({ name: s.exported.name, line });
+							noteLine(s.exported.name, line);
+						}
+					});
+				},
+				ExportDefaultDeclaration: (path: NodePath<t.ExportDefaultDeclaration>) => {
+					const line = path.node.loc?.start.line;
+					const name =
+						t.isIdentifier(path.node.declaration)
+							? path.node.declaration.name
+							: t.isFunctionDeclaration(path.node.declaration) && path.node.declaration.id
+								? path.node.declaration.id.name
+								: 'default';
+					exports.push({ name, isDefault: true, line });
+					noteLine(name, line);
+					if (t.isFunctionDeclaration(path.node.declaration) && path.node.declaration.id) {
+						if (isComponentName(path.node.declaration.id.name)) {
+							components.push(path.node.declaration.id.name);
+							noteLine(path.node.declaration.id.name, path.node.declaration.loc?.start.line ?? line);
+						}
+					}
+				},
+				ExportAllDeclaration: (path: NodePath<t.ExportAllDeclaration>) => {
+					exports.push({ name: `* from ${path.node.source?.value ?? ''}`, line: path.node.loc?.start.line });
+				},
+				FunctionDeclaration: (path: NodePath<t.FunctionDeclaration>) => {
+					if (path.node.id?.name) {
+						const line = path.node.loc?.start.line;
+						functions.push(path.node.id.name);
+						noteLine(path.node.id.name, line);
+						if (isComponentName(path.node.id.name)) {
+							components.push(path.node.id.name);
+							noteLine(path.node.id.name, line);
+						}
+					}
+				},
+				VariableDeclarator: (path: NodePath<t.VariableDeclarator>) => {
+					if (t.isIdentifier(path.node.id) && path.node.init) {
+						const name = path.node.id.name;
+						const line = path.node.loc?.start.line;
+						if (
+							t.isArrowFunctionExpression(path.node.init) ||
+							t.isFunctionExpression(path.node.init)
+						) {
+							functions.push(name);
+							noteLine(name, line);
+							if (isComponentName(name)) {
+								components.push(name);
+								noteLine(name, line);
+								isComponentFile = true;
+							}
+						}
+					}
+				},
+				CallExpression: (path: NodePath<t.CallExpression>) => {
+					if (
+						t.isIdentifier(path.node.callee, { name: 'require' }) &&
+						path.node.arguments[0] &&
+						t.isStringLiteral(path.node.arguments[0])
+					) {
+						imports.push({
+							source: path.node.arguments[0].value,
+							specifiers: ['require'],
+							line: path.node.loc?.start.line,
+						});
+					}
+				},
+			});
+		} catch {
+			return this.fallbackRegexParse(file, content);
+		}
 
 		return {
 			filePath: file.absolutePath,

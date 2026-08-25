@@ -732,4 +732,192 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)', () => {
 
 		service.dispose();
 	});
+
+	test('Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off', async () => {
+		const pages: Record<string, TemporalHistoryPage> = {
+			HEAD: {
+				commits: [
+					makeCommitSummary('c-3', 'feat: three', 300, ['c-2']),
+					makeCommitSummary('c-2', 'feat: two', 200, ['c-1']),
+					makeCommitSummary('c-1', 'feat: one', 100, []),
+				],
+				hasMore: false,
+			},
+		};
+		const entities: Record<string, TemporalEntitySnapshot[]> = {
+			'c-3': [makeEntity('e1', 'src/a.ts', 'can-a3'), makeEntity('e2', 'src/b.ts', 'can-b')],
+			'c-2': [makeEntity('e1', 'src/a.ts', 'can-a2'), makeEntity('e2', 'src/b.ts', 'can-b')],
+			'c-1': [makeEntity('e1', 'src/a.ts', 'can-a1')],
+		};
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			createMockTemporalGraphService(pages, entities) as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+			mockStorageService,
+		);
+
+		await service.initialize();
+		assert.equal(service.getState().followHead, true, 'Initial state should follow HEAD');
+		assert.equal(service.getState().selectedCommitSha, 'c-3', 'Initial commit should be HEAD commit c-3');
+
+		// Manual selection to historical commit c-2 turns Follow HEAD off
+		await service.selectCommit('c-2', { immediate: true });
+		assert.equal(service.getState().followHead, false, 'Manual selectCommit must disengage Follow HEAD');
+		assert.equal(service.getState().selectedCommitSha, 'c-2');
+
+		// Manual step older to c-1 keeps Follow HEAD off
+		await service.stepCommit(-1);
+		assert.equal(service.getState().followHead, false, 'Stepping must keep Follow HEAD off');
+		assert.equal(service.getState().selectedCommitSha, 'c-1');
+
+		// Re-enabling Follow HEAD immediately resolves and jumps back to current HEAD (c-3)
+		service.setFollowHead(true);
+		// Allow async selectRef to complete
+		await new Promise(r => setTimeout(r, 20));
+		assert.equal(service.getState().followHead, true, 'setFollowHead(true) must engage Follow HEAD');
+		assert.equal(service.getState().selectedCommitSha, 'c-3', 'Re-enabling follow must immediately navigate to HEAD commit');
+
+		// Manual selectCommitIndex > 0 turns Follow HEAD off
+		await service.selectCommitIndex(1, { immediate: true });
+		assert.equal(service.getState().followHead, false, 'selectCommitIndex(1) must disengage Follow HEAD');
+		assert.equal(service.getState().selectedCommitSha, 'c-2');
+
+		service.dispose();
+	});
+
+	test('HEAD change event handling: followHead=true advances view, followHead=false preserves selection', async () => {
+		const headChangeEmitter = new Emitter<any>();
+		const pages: Record<string, TemporalHistoryPage> = {
+			HEAD: {
+				commits: [
+					makeCommitSummary('c-3', 'feat: three', 300, ['c-2']),
+					makeCommitSummary('c-2', 'feat: two', 200, ['c-1']),
+					makeCommitSummary('c-1', 'feat: one', 100, []),
+				],
+				hasMore: false,
+			},
+		};
+		const entities: Record<string, TemporalEntitySnapshot[]> = {
+			'c-4': [makeEntity('e1', 'src/a.ts', 'can-a4'), makeEntity('e2', 'src/b.ts', 'can-b')],
+			'c-3': [makeEntity('e1', 'src/a.ts', 'can-a3'), makeEntity('e2', 'src/b.ts', 'can-b')],
+			'c-2': [makeEntity('e1', 'src/a.ts', 'can-a2'), makeEntity('e2', 'src/b.ts', 'can-b')],
+			'c-1': [makeEntity('e1', 'src/a.ts', 'can-a1')],
+		};
+
+		const gitHistory = {
+			...createMockGitHistoryService(),
+			onDidChangeHead: headChangeEmitter.event,
+		};
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			gitHistory as any,
+			createMockTemporalGraphService(pages, entities) as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+			mockStorageService,
+		);
+
+		await service.initialize();
+		assert.equal(service.getState().selectedCommitSha, 'c-3');
+
+		// New commit arrives on HEAD
+		pages.HEAD = {
+			commits: [
+				makeCommitSummary('c-4', 'feat: four', 400, ['c-3']),
+				makeCommitSummary('c-3', 'feat: three', 300, ['c-2']),
+				makeCommitSummary('c-2', 'feat: two', 200, ['c-1']),
+				makeCommitSummary('c-1', 'feat: one', 100, []),
+			],
+			hasMore: false,
+		};
+
+		// Fire HEAD changed with followHead = true -> advances to c-4
+		headChangeEmitter.fire({ repositoryId: 'repo-mock-123', headSha: 'c-4' });
+		await new Promise(r => setTimeout(r, 30));
+		assert.equal(service.getState().selectedCommitSha, 'c-4', 'Follow HEAD must advance to c-4 on HEAD change');
+
+		// Manually navigate to historical commit c-2 (turns follow off)
+		await service.selectCommit('c-2', { immediate: true });
+		assert.equal(service.getState().followHead, false);
+		assert.equal(service.getState().selectedCommitSha, 'c-2');
+
+		// Another new commit arrives on HEAD
+		pages.HEAD = {
+			commits: [makeCommitSummary('c-5', 'feat: five', 500, ['c-4']), ...pages.HEAD.commits],
+			hasMore: false,
+		};
+		headChangeEmitter.fire({ repositoryId: 'repo-mock-123', headSha: 'c-5' });
+		await new Promise(r => setTimeout(r, 30));
+
+		// Selection must remain pinned at c-2, while timeline updates to 5 commits
+		assert.equal(service.getState().selectedCommitSha, 'c-2', 'Historical selection must NOT jump when followHead is false');
+		assert.equal(service.getState().pagedTimeline.length, 5, 'Timeline must include new HEAD commit metadata');
+
+		service.dispose();
+	});
+
+	test('Layer-specific retrySelection: re-executes the layer that actually failed', async () => {
+		let historyCalls = 0;
+		let shouldFailHistory = false;
+
+		const pages: Record<string, TemporalHistoryPage> = {
+			HEAD: {
+				commits: [
+					makeCommitSummary('c-2', 'feat: two', 200, ['c-1']),
+					makeCommitSummary('c-1', 'feat: one', 100, []),
+				],
+				hasMore: false,
+			},
+		};
+		const entities: Record<string, TemporalEntitySnapshot[]> = {
+			'c-2': [makeEntity('e1', 'src/a.ts', 'can-a2')],
+			'c-1': [makeEntity('e1', 'src/a.ts', 'can-a1')],
+		};
+
+		const mockTemporal = {
+			...createMockTemporalGraphService(pages, entities),
+			getHistoryPage: async (_root: string, options?: any) => {
+				historyCalls++;
+				if (shouldFailHistory) {
+					throw new Error('Git history disk error');
+				}
+				const ref = options?.ref || 'HEAD';
+				return pages[ref] || { commits: [], hasMore: false };
+			},
+		};
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			mockTemporal as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+			mockStorageService,
+		);
+
+		await service.initialize();
+		assert.equal(service.getState().selectedCommitSha, 'c-2');
+
+		// 1. Simulate history failure on ref change
+		shouldFailHistory = true;
+		await service.selectRef('main');
+		assert.ok(service.getState().historyError, 'History error must be recorded');
+		const historyCallsBeforeRetry = historyCalls;
+
+		// 2. Retry history failure
+		shouldFailHistory = false;
+		await service.retrySelection();
+		assert.ok(historyCalls > historyCallsBeforeRetry, 'retrySelection must re-execute getHistoryPage for history error');
+		assert.equal(service.getState().historyError, undefined, 'History error must be cleared after successful retry');
+
+		service.dispose();
+	});
 });
+

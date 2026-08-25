@@ -22,8 +22,12 @@ export class CanonicalParserWorkerService implements ICanonicalParserWorkerServi
 			if (token.isCancellationRequested) {
 				break;
 			}
-			const result = await this._parserEngine.parseFile(request.file, request.content);
-			results.push(result ? extractBlobParseArtifact(result) : undefined);
+			try {
+				const result = await this._parserEngine.parseFile(request.file, request.content);
+				results.push(result ? extractBlobParseArtifact(result) : undefined);
+			} catch (err) {
+				results.push(undefined);
+			}
 		}
 		return results;
 	}

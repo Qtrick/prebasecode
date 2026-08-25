@@ -17,8 +17,12 @@ export interface TemporalFocusContextResult {
 	readonly contextFilterMode: TemporalContextFilterMode;
 	readonly visibleNodes: readonly TemporalRenderNode[];
 	readonly visibleEdges: readonly TemporalRenderEdge[];
+	readonly nodes: readonly TemporalRenderNode[];
+	readonly edges: readonly TemporalRenderEdge[];
 	readonly changedNodeIds: ReadonlySet<string>;
 	readonly directContextNodeIds: ReadonlySet<string>;
+	readonly focusSet: ReadonlySet<string>;
+	readonly directContextSet: ReadonlySet<string>;
 	readonly totalNodeCount: number;
 	readonly totalEdgeCount: number;
 	readonly hasZeroChanges: boolean;
@@ -56,8 +60,12 @@ export function computeTemporalFocusContext(
 			contextFilterMode,
 			visibleNodes: [],
 			visibleEdges: [],
+			nodes: [],
+			edges: [],
 			changedNodeIds: new Set(),
 			directContextNodeIds: new Set(),
+			focusSet: new Set(),
+			directContextSet: new Set(),
 			totalNodeCount: 0,
 			totalEdgeCount: 0,
 			hasZeroChanges: true,
@@ -69,22 +77,40 @@ export function computeTemporalFocusContext(
 
 	if (displayMode === 'state') {
 		// State mode: full target state topology, no removed ghosts
-		const visibleNodes = allNodes.filter(n => n.changeKind !== 'removed');
-		const visibleNodeIdSet = new Set(visibleNodes.map(n => n.entityId));
-		const visibleEdges = allEdges.filter(e => {
-			if (e.changeKind === 'removed') return false;
+		const visibleNodes: TemporalRenderNode[] = [];
+		const visibleNodeIdSet = new Set<string>();
+		for (let i = 0; i < allNodes.length; i++) {
+			const n = allNodes[i];
+			if (n.changeKind !== 'removed') {
+				visibleNodes.push(n);
+				visibleNodeIdSet.add(n.entityId);
+			}
+		}
+
+		const visibleEdges: TemporalRenderEdge[] = [];
+		for (let i = 0; i < allEdges.length; i++) {
+			const e = allEdges[i];
+			if (e.changeKind === 'removed') {
+				continue;
+			}
 			const src = e.sourceEntityId || (e as any).sourceId;
 			const tgt = e.targetEntityId || (e as any).targetId;
-			return visibleNodeIdSet.has(src) && visibleNodeIdSet.has(tgt);
-		});
+			if (visibleNodeIdSet.has(src) && visibleNodeIdSet.has(tgt)) {
+				visibleEdges.push(e);
+			}
+		}
 
 		return {
 			displayMode: 'state',
 			contextFilterMode,
 			visibleNodes,
 			visibleEdges,
+			nodes: visibleNodes,
+			edges: visibleEdges,
 			changedNodeIds: new Set(),
 			directContextNodeIds: visibleNodeIdSet,
+			focusSet: new Set(),
+			directContextSet: visibleNodeIdSet,
 			totalNodeCount: visibleNodes.length,
 			totalEdgeCount: visibleEdges.length,
 			hasZeroChanges: false,
@@ -143,8 +169,12 @@ export function computeTemporalFocusContext(
 			contextFilterMode,
 			visibleNodes: [],
 			visibleEdges: [],
+			nodes: [],
+			edges: [],
 			changedNodeIds,
 			directContextNodeIds,
+			focusSet: changedNodeIds,
+			directContextSet: directContextNodeIds,
 			totalNodeCount: allNodes.length,
 			totalEdgeCount: allEdges.length,
 			hasZeroChanges: true,
@@ -152,21 +182,43 @@ export function computeTemporalFocusContext(
 	}
 
 	if (contextFilterMode === 'focused') {
-		const visibleNodeIdSet = new Set<string>([...changedNodeIds, ...directContextNodeIds]);
-		const visibleNodes = allNodes.filter(n => visibleNodeIdSet.has(n.entityId));
-		const visibleEdges = allEdges.filter(e => {
+		const visibleNodeIdSet = new Set<string>();
+		for (const id of changedNodeIds) {
+			visibleNodeIdSet.add(id);
+		}
+		for (const id of directContextNodeIds) {
+			visibleNodeIdSet.add(id);
+		}
+
+		const visibleNodes: TemporalRenderNode[] = [];
+		for (let i = 0; i < allNodes.length; i++) {
+			const n = allNodes[i];
+			if (visibleNodeIdSet.has(n.entityId)) {
+				visibleNodes.push(n);
+			}
+		}
+
+		const visibleEdges: TemporalRenderEdge[] = [];
+		for (let i = 0; i < allEdges.length; i++) {
+			const e = allEdges[i];
 			const src = e.sourceEntityId || (e as any).sourceId;
 			const tgt = e.targetEntityId || (e as any).targetId;
-			return visibleNodeIdSet.has(src) && visibleNodeIdSet.has(tgt);
-		});
+			if (visibleNodeIdSet.has(src) && visibleNodeIdSet.has(tgt)) {
+				visibleEdges.push(e);
+			}
+		}
 
 		return {
 			displayMode: 'changes',
 			contextFilterMode: 'focused',
 			visibleNodes,
 			visibleEdges,
+			nodes: visibleNodes,
+			edges: visibleEdges,
 			changedNodeIds,
 			directContextNodeIds,
+			focusSet: changedNodeIds,
+			directContextSet: directContextNodeIds,
 			totalNodeCount: allNodes.length,
 			totalEdgeCount: allEdges.length,
 			hasZeroChanges: false,
@@ -179,8 +231,12 @@ export function computeTemporalFocusContext(
 		contextFilterMode: 'full',
 		visibleNodes: allNodes,
 		visibleEdges: allEdges,
+		nodes: allNodes,
+		edges: allEdges,
 		changedNodeIds,
 		directContextNodeIds,
+		focusSet: changedNodeIds,
+		directContextSet: directContextNodeIds,
 		totalNodeCount: allNodes.length,
 		totalEdgeCount: allEdges.length,
 		hasZeroChanges: false,

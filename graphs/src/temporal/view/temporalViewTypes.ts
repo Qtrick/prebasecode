@@ -77,6 +77,40 @@ export interface TemporalStructuralDiffSummary {
 	readonly edgeModifiedCount: number;
 }
 
+export interface TemporalRegionBounds {
+	readonly minX: number;
+	readonly minY: number;
+	readonly maxX: number;
+	readonly maxY: number;
+	readonly width: number;
+	readonly height: number;
+}
+
+export interface TemporalCommunityGuide {
+	readonly id: string;
+	readonly label: string;
+	readonly layerId: string;
+	readonly color: string;
+	readonly x: number;
+	readonly y: number;
+	readonly radius: number;
+	readonly bounds: TemporalRegionBounds;
+	readonly nodeIds: readonly string[];
+	readonly nodeCount: number;
+}
+
+export interface TemporalCommunityAggregateEdge {
+	readonly id: string;
+	readonly sourceCommunityId: string;
+	readonly targetCommunityId: string;
+	readonly edgeCount: number;
+	readonly changedEdgeCount: number;
+	readonly dominantKind: string;
+	readonly isHighlighted?: boolean;
+}
+
+export type TemporalGuide = TemporalCommunityGuide | any;
+
 export interface TemporalStructuralDiff {
 	readonly targetCommitSha: string;
 	readonly baseCommitSha?: string;
@@ -86,7 +120,8 @@ export interface TemporalStructuralDiff {
 	readonly isPartialLineage: boolean;
 	readonly partialLineageReason?: string;
 	readonly bands?: readonly any[];
-	readonly guides?: readonly any[];
+	readonly guides?: readonly TemporalGuide[];
+	readonly aggregateEdges?: readonly TemporalCommunityAggregateEdge[];
 	readonly entryEntityId?: string;
 }
 
@@ -144,10 +179,24 @@ export interface ITemporalViewState {
 	readonly timelineWindow?: { readonly start: number; readonly count: number };
 }
 
+export interface TemporalLayoutMetrics {
+	readonly nodeOverlapCount: number;
+	readonly minNodeSpacing: number;
+	readonly communitySeparationRatio: number;
+	readonly screenUtilization: number;
+	readonly edgeCrossingCount: number;
+	readonly dependencyDirectionRatio: number;
+	readonly medianDisplacement?: number;
+	readonly p95Displacement?: number;
+	readonly maxDisplacement?: number;
+}
+
 export interface TemporalLayoutResult {
 	readonly nodes: readonly TemporalRenderNode[];
 	readonly positions: Map<string, { x: number; y: number }>;
-	readonly guides?: readonly any[];
+	readonly guides?: readonly TemporalGuide[];
+	readonly aggregateEdges?: readonly TemporalCommunityAggregateEdge[];
+	readonly metrics?: TemporalLayoutMetrics;
 }
 
 export const IPreBaseTemporalViewService = createDecorator<IPreBaseTemporalViewService>('prebaseTemporalViewService');
@@ -162,7 +211,7 @@ export interface IPreBaseTemporalViewService {
 	initialize(): Promise<void>;
 	switchRepository(repoRoot: string): Promise<void>;
 	selectRef(refName: string): Promise<void>;
-	selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean }): Promise<void>;
+	selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean; preserveFollowHead?: boolean }): Promise<void>;
 	selectCommitIndex(globalIndex: number, options?: { immediate?: boolean }): Promise<void>;
 	stepCommit(delta: number): Promise<void>;
 	setCompareBase(compareBaseShaOrSelection: string | TemporalComparisonSelection | undefined): Promise<void>;

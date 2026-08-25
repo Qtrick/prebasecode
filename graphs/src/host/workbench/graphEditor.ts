@@ -25,6 +25,15 @@ import { INotificationService } from '../../../../../../platform/notification/co
 import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { serializeNetworkEdgeVisualSource } from './networkEdgeVisualRuntime.js';
+import {
+	serializeTemporalUnifiedStatusSource,
+	serializeTemporalFocusContextSource,
+	serializeTemporalVisualRadiusSource,
+	serializeTemporalFitTransformSource,
+	serializeTemporalCommunityAggregateEdgesSource,
+	serializeTemporalEdgeLodStyleSource,
+	serializeTemporalVisibleLabelsSource,
+} from './temporalRuntimeContracts.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
 import { IPreBaseGraphService, type PreBaseGraphType } from './prebaseGraphService.js';
@@ -803,8 +812,8 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<button id="noChangesViewSource" type="button">View Source Changes</button>
 	</div>
 	<svg id="archSvg"></svg>
-	<canvas id="netCanvas" tabindex="0" role="application" aria-roledescription="interactive graph"
-		aria-label="Code Graph. Use arrow keys to move between nodes; Enter opens details; press F1 for help."
+	<canvas id="netCanvas" tabindex="0" role="region" aria-roledescription="interactive graph"
+		aria-label="Code Graph. Use arrow keys to move between nodes; Enter opens details; press Alt+F1, Option+F1, or ? for shortcut help."
 		aria-describedby="graphKbdHelp"></canvas>
 	<div id="graphLiveRegion" role="status" aria-live="polite" style="position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;"></div>
 	<div id="graphKbdHelp" class="kbd-help" hidden>
@@ -813,12 +822,13 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<div>Enter / Space — open node details</div>
 		<div>Escape — clear selection / close panels</div>
 		<div>+ / − (or =) — zoom in / out · 0 or F — fit view · R — reset view · C — keep centered</div>
+		<div>Alt+F1 / ? — toggle this shortcut guide</div>
 		<div>Tab — leave the canvas to the toolbar and page controls</div>
 	</div>
 	<div id="temporalDetailsPanel" role="region" aria-label="Commit details and structural delta">
 		<div class="header">
 			<span>Commit Details & Structural Delta</span>
-			<button id="temporalDetailsClose" style="border:0; background:transparent; color:var(--vscode-foreground, #f4f4f5); cursor:pointer; font-size:14px;">×</button>
+			<button id="temporalDetailsClose" type="button" title="Close inspector (Esc)" aria-label="Close details" style="border:0; background:transparent; color:var(--vscode-foreground, #f4f4f5); cursor:pointer; width:22px; height:22px; display:flex; align-items:center; justify-content:center; border-radius:4px;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M13.85 2.15l-.7-.7L8 6.59 2.85 1.45l-.7.7L7.29 7.3 1.45 13.15l.7.7L7.3 8.71l5.85 5.85.7-.7L8.71 8l5.14-5.85z"/></svg></button>
 		</div>
 		<div class="meta-row">
 			<label>Commit</label>
@@ -908,7 +918,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 			<h3 id="popupTitle"></h3>
 			<div class="meta" id="popupMeta"></div>
 		</div>
-		<button id="popupClose" type="button" title="Close (Esc)" aria-label="Close details">✕</button>
+		<button id="popupClose" type="button" title="Close (Esc)" aria-label="Close details"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M13.85 2.15l-.7-.7L8 6.59 2.85 1.45l-.7.7L7.29 7.3 1.45 13.15l.7.7L7.3 8.71l5.85 5.85.7-.7L8.71 8l5.14-5.85z"/></svg></button>
 	</div>
 	<div id="popupDetailsList" class="popup-details-list"></div>
 	<div id="popupAiWrap" style="display:none;">
@@ -943,6 +953,16 @@ let graphType = initialGraphType;
 // Authoritative Network edge visual resolver, injected from
 // graphs/src/view/network/networkEdgeVisual.ts (single source of truth; parity-tested).
 const resolveNetworkEdgeVisual = ${serializeNetworkEdgeVisualSource()};
+
+// Authoritative Temporal status, Focus+Context, and LOD resolvers, injected from
+// graphs/src/temporal/view/ (single source of truth; parity-tested).
+const computeTemporalUnifiedStatus = ${serializeTemporalUnifiedStatusSource()};
+const computeTemporalFocusContext = ${serializeTemporalFocusContextSource()};
+const computeTemporalVisualRadius = ${serializeTemporalVisualRadiusSource()};
+const computeTemporalFitTransform = ${serializeTemporalFitTransformSource()};
+const computeCommunityAggregateEdges = ${serializeTemporalCommunityAggregateEdgesSource()};
+const computeEdgeLodStyle = ${serializeTemporalEdgeLodStyleSource()};
+const computeVisibleLabels = ${serializeTemporalVisibleLabelsSource()};
 
 // 2. Fast request dispatcher & pending map
 const pending = new Map();
@@ -1506,187 +1526,20 @@ function computeNetworkPickRadius(node, depthScale, entryId) {
 	return Math.max(18, vr * 2.2 + 8);
 }
 
-function computeTemporalUnifiedStatusInWebview(state) {
-	const selectedSha = (state && state.selectedCommitSha) || '';
-	const selectedShort = selectedSha ? ((state.selectedCommitSummary && state.selectedCommitSummary.shortSha) || selectedSha.slice(0, 7)) : '';
-	const renderedSha = (state && state.renderedCommitSha) || '';
-	const renderedShort = renderedSha ? ((state.renderedCommitSummary && state.renderedCommitSummary.shortSha) || renderedSha.slice(0, 7)) : '';
-
-	if (state && state.isLoadingHistory) {
-		return {
-			kind: 'loading-history',
-			label: 'Loading History…',
-			title: 'Reading commit timeline from Git repository',
-			isJobActive: true,
-			isError: false,
-			canRetry: false,
-			colorVar: 'var(--vscode-editorWarning-foreground, #d29922)',
-			bgVar: 'rgba(210, 153, 34, 0.15)'
-		};
-	}
-
-	if (state && state.isLoadingSelection) {
-		return {
-			kind: 'reconstructing',
-			label: 'Indexing…',
-			title: selectedShort ? ('Reconstructing graph for ' + selectedShort + '…') : 'Reconstructing graph for target commit…',
-			isJobActive: true,
-			isError: false,
-			canRetry: false,
-			colorVar: 'var(--vscode-editorWarning-foreground, #d29922)',
-			bgVar: 'rgba(210, 153, 34, 0.15)'
-		};
-	}
-
-	if (state && state.selectionError) {
-		const isStaleRender = Boolean(renderedSha && renderedSha !== selectedSha);
-		const errorMsg = state.selectionError;
-		const title = isStaleRender
-			? ('Could not load ' + (selectedShort || selectedSha) + '. Showing previous graph ' + (renderedShort || renderedSha) + '. ' + errorMsg)
-			: ('Failed to load graph for ' + (selectedShort || selectedSha || 'target commit') + ': ' + errorMsg);
-
-		return {
-			kind: 'error',
-			label: 'Error',
-			title: title,
-			isJobActive: false,
-			isError: true,
-			error: errorMsg,
-			staleRenderedSha: isStaleRender ? renderedSha : undefined,
-			canRetry: true,
-			colorVar: 'var(--vscode-errorForeground, #f85149)',
-			bgVar: 'rgba(248, 81, 73, 0.15)'
-		};
-	}
-
-	if (state && state.historyError) {
-		return {
-			kind: 'error',
-			label: 'Error',
-			title: 'History error: ' + state.historyError,
-			isJobActive: false,
-			isError: true,
-			error: state.historyError,
-			canRetry: true,
-			colorVar: 'var(--vscode-errorForeground, #f85149)',
-			bgVar: 'rgba(248, 81, 73, 0.15)'
-		};
-	}
-
-	if (selectedSha && renderedSha && selectedSha !== renderedSha) {
-		return {
-			kind: 'stale',
-			label: 'Stale View',
-			title: 'Showing graph for ' + (renderedShort || renderedSha) + ' (selected: ' + (selectedShort || selectedSha) + '). Click to reconcile.',
-			isJobActive: false,
-			isError: false,
-			staleRenderedSha: renderedSha,
-			canRetry: true,
-			colorVar: 'var(--vscode-descriptionForeground, #a1a1aa)',
-			bgVar: 'rgba(161, 161, 170, 0.15)'
-		};
-	}
-
-	if (state && state.isPartialLineage) {
-		return {
-			kind: 'partial',
-			label: 'Partial History',
-			title: 'Lineage coverage is partial; structural comparison is truthful.',
-			isJobActive: false,
-			isError: false,
-			canRetry: false,
-			colorVar: 'var(--vscode-descriptionForeground, #a1a1aa)',
-			bgVar: 'rgba(161, 161, 170, 0.15)'
-		};
-	}
-
-	if (!state || !state.pagedTimeline || state.pagedTimeline.length === 0) {
-		return {
-			kind: 'idle',
-			label: 'No History',
-			title: 'No commit history available for active ref',
-			isJobActive: false,
-			isError: false,
-			canRetry: false,
-			colorVar: 'var(--vscode-descriptionForeground, #a1a1aa)',
-			bgVar: 'rgba(161, 161, 170, 0.12)'
-		};
-	}
-
-	return {
-		kind: 'ready',
-		label: 'Ready',
-		title: 'Graph fully indexed and reconciled',
-		isJobActive: false,
-		isError: false,
-		canRetry: false,
-		colorVar: 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)',
-		bgVar: 'rgba(63, 185, 80, 0.15)'
-	};
-}
-
-// Cached Focus+Context derivation: recomputed only when the diff, display mode or
-// context filter actually changes (all three are immutable between updates).
+// Cached Focus+Context derivation: delegates to authoritative computeTemporalFocusContext,
+// recomputed only when the diff, display mode or context filter actually changes.
 let _temporalVisibleCache = null;
 let _temporalVisibleCacheKey = '';
 
 function computeTemporalVisibleElements(diff, mode, contextMode) {
-	const cacheKey = (diff ? 1 : 0) + '|' + mode + '|' + contextMode;
+	const cacheKey = (diff ? 1 : 0) + '|' + (mode || 'changes') + '|' + (contextMode || 'focused');
 	if (_temporalVisibleCache && _temporalVisibleCacheKey === cacheKey && _temporalVisibleCache._diff === diff) {
 		return _temporalVisibleCache;
 	}
-	_temporalVisibleCache = _computeTemporalVisibleElementsUncached(diff, mode, contextMode);
+	_temporalVisibleCache = computeTemporalFocusContext(diff, mode || 'changes', contextMode || 'focused');
 	_temporalVisibleCache._diff = diff;
 	_temporalVisibleCacheKey = cacheKey;
 	return _temporalVisibleCache;
-}
-
-function _computeTemporalVisibleElementsUncached(diff, mode, contextMode) {
-	if (!diff || !diff.nodes || !diff.nodes.length) {
-		return { nodes: [], edges: [], focusSet: new Set(), directContextSet: new Set(), hasZeroChanges: true };
-	}
-	const allNodes = diff.nodes;
-	const allEdges = diff.edges || [];
-	if (mode === 'state') {
-		const stateNodes = allNodes.filter(n => n.changeKind !== 'removed');
-		const stateIdSet = new Set(stateNodes.map(n => n.entityId));
-		const stateEdges = allEdges.filter(e => {
-			const s = e.sourceEntityId || e.sourceId;
-			const t = e.targetEntityId || e.targetId;
-			return stateIdSet.has(s) && stateIdSet.has(t) && e.changeKind !== 'removed';
-		});
-		return { nodes: stateNodes, edges: stateEdges, focusSet: stateIdSet, directContextSet: new Set(), hasZeroChanges: false };
-	}
-
-	// Changes mode
-	const focusNodes = allNodes.filter(n => n.changeKind && n.changeKind !== 'unchanged');
-	const focusSet = new Set(focusNodes.map(n => n.entityId));
-	const directContextSet = new Set();
-
-	if (focusSet.size === 0) {
-		return { nodes: [], edges: [], focusSet: new Set(), directContextSet: new Set(), hasZeroChanges: true };
-	}
-
-	for (let i = 0; i < allEdges.length; i++) {
-		const e = allEdges[i];
-		const s = e.sourceEntityId || e.sourceId;
-		const t = e.targetEntityId || e.targetId;
-		if (focusSet.has(s) && !focusSet.has(t)) directContextSet.add(t);
-		if (focusSet.has(t) && !focusSet.has(s)) directContextSet.add(s);
-	}
-
-	if (contextMode === 'focused') {
-		const visibleIdSet = new Set([...focusSet, ...directContextSet]);
-		const visibleNodes = allNodes.filter(n => visibleIdSet.has(n.entityId));
-		const visibleEdges = allEdges.filter(e => {
-			const s = e.sourceEntityId || e.sourceId;
-			const t = e.targetEntityId || e.targetId;
-			return visibleIdSet.has(s) && visibleIdSet.has(t);
-		});
-		return { nodes: visibleNodes, edges: visibleEdges, focusSet: focusSet, directContextSet: directContextSet, hasZeroChanges: false };
-	} else {
-		return { nodes: allNodes, edges: allEdges, focusSet: focusSet, directContextSet: directContextSet, hasZeroChanges: false };
-	}
 }
 
 function projectPoint(x, y, z, yaw, pitch) {
@@ -2141,16 +1994,17 @@ function updateTemporalUI(state, diff) {
 			if (temporalCommitMessage) temporalCommitMessage.textContent = commit.message || '';
 			if (temporalCommitAuthor) temporalCommitAuthor.textContent = commit.author ? 'by ' + commit.author : '';
 
-			if (temporalCommitStatus) {
-				const unifiedStatus = computeTemporalUnifiedStatusInWebview(state);
-				temporalCommitStatus.textContent = unifiedStatus.label;
-				temporalCommitStatus.title = unifiedStatus.title;
-				temporalCommitStatus.style.color = unifiedStatus.colorVar;
-				temporalCommitStatus.style.background = unifiedStatus.bgVar;
-			}
-			if (temporalRetryBtn) {
-				const unifiedStatus = computeTemporalUnifiedStatusInWebview(state);
-				temporalRetryBtn.style.display = unifiedStatus.canRetry ? 'inline-block' : 'none';
+			if (temporalCommitStatus || temporalRetryBtn) {
+				const unifiedStatus = computeTemporalUnifiedStatus(state);
+				if (temporalCommitStatus) {
+					temporalCommitStatus.textContent = unifiedStatus.label;
+					temporalCommitStatus.title = unifiedStatus.title;
+					temporalCommitStatus.style.color = unifiedStatus.colorVar;
+					temporalCommitStatus.style.background = unifiedStatus.bgVar;
+				}
+				if (temporalRetryBtn) {
+					temporalRetryBtn.style.display = unifiedStatus.canRetry ? 'inline-block' : 'none';
+				}
 			}
 			if (temporalScrubber) temporalScrubber.setAttribute('aria-valuetext', 'Commit ' + (commit.shortSha || commit.sha.slice(0, 7)) + ': ' + commit.message + (commit.author ? ', by ' + commit.author : ''));
 		}
@@ -2370,7 +2224,8 @@ function drawTemporalFrame(ts) {
 	const h = netCanvas.clientHeight || 600;
 	const theme = getComputedThemeColors();
 
-	ctx.clearRect(0, 0, w, h);
+	ctx.fillStyle = theme.bg || '#1B1C1E';
+	ctx.fillRect(0, 0, w, h);
 
 	const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const isReduced = settings.reduceMotion || prefersReduced;
@@ -2433,6 +2288,65 @@ function drawTemporalFrame(ts) {
 				ctx.restore();
 			}
 		}
+
+		// 2b. Render Overview Community-to-Community Aggregate Edges at far zoom
+		if (transform.k < 0.65 && visibleData.edges && visibleData.edges.length > 0) {
+			const aggEdges = computeCommunityAggregateEdges(visibleData.edges, temporalDiff.guides);
+			const commMap = new Map();
+			for (let g = 0; g < temporalDiff.guides.length; g++) {
+				commMap.set(temporalDiff.guides[g].id, temporalDiff.guides[g]);
+			}
+
+			for (let a = 0; a < aggEdges.length; a++) {
+				const agg = aggEdges[a];
+				const cSrc = commMap.get(agg.sourceCommunityId);
+				const cTgt = commMap.get(agg.targetCommunityId);
+				if (!cSrc || !cTgt) continue;
+
+				const dx = cTgt.x - cSrc.x;
+				const dy = cTgt.y - cSrc.y;
+				const dist = Math.hypot(dx, dy);
+				if (dist < 10) continue;
+
+				const srcX = cSrc.x + (dx / dist) * Math.min(cSrc.radius * 0.75, dist * 0.35);
+				const srcY = cSrc.y + (dy / dist) * Math.min(cSrc.radius * 0.75, dist * 0.35);
+				const tgtX = cTgt.x - (dx / dist) * Math.min(cTgt.radius * 0.75, dist * 0.35);
+				const tgtY = cTgt.y - (dy / dist) * Math.min(cTgt.radius * 0.75, dist * 0.35);
+
+				const midX = (srcX + tgtX) / 2;
+				const midY = (srcY + tgtY) / 2;
+				const cpX = midX - (dy / dist) * 16;
+				const cpY = midY + (dx / dist) * 16;
+
+				const strokeWidth = Math.min(4.0, 1.2 + Math.log2(1 + agg.edgeCount) * 0.5);
+
+				ctx.save();
+				ctx.beginPath();
+				ctx.moveTo(srcX, srcY);
+				if (typeof ctx.quadraticCurveTo === 'function') {
+					ctx.quadraticCurveTo(cpX, cpY, tgtX, tgtY);
+				} else {
+					ctx.lineTo(tgtX, tgtY);
+				}
+				ctx.strokeStyle = agg.changedEdgeCount > 0
+					? 'rgba(45, 212, 191, 0.45)'
+					: (theme.isHighContrast ? 'rgba(255, 255, 255, 0.22)' : 'rgba(99, 102, 241, 0.20)');
+				ctx.lineWidth = strokeWidth;
+				ctx.stroke();
+
+				// Count badge on aggregate edge
+				if (transform.k >= 0.38) {
+					ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+					ctx.fillRect(midX - 9, midY - 6, 18, 12);
+					ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
+					ctx.fillStyle = agg.changedEdgeCount > 0 ? '#2dd4bf' : '#94a3b8';
+					ctx.textAlign = 'center';
+					ctx.textBaseline = 'middle';
+					ctx.fillText(String(agg.edgeCount), midX, midY);
+				}
+				ctx.restore();
+			}
+		}
 	}
 
 	const visibleNodeSet = new Set(visibleData.nodes.map(n => n.entityId));
@@ -2465,16 +2379,16 @@ function drawTemporalFrame(ts) {
 			if (!visibleNodeSet.has(sourceEntityId) || !visibleNodeSet.has(targetEntityId)) continue;
 
 			const isEdgeActive = isEdgeConnectedToActive(edge);
-			const isEdgeChanged = Boolean(edge.changeKind && edge.changeKind !== 'unchanged');
+			const isInteracting = interactionState === 'drag' || interactionState === 'pan';
 
-			// Semantic Edge LOD:
-			// - Changed edges and active (selected/hovered) edges are ALWAYS rendered at any zoom.
-			// - In Full Map mode at far zoom (k < 0.65), suppress unchanged low-priority edges to prevent blob clutter.
-			// - During active drag/pan interaction, drop low-priority unchanged edges for 60fps responsiveness.
-			if (displayMode === 'state' && !isEdgeActive && !isEdgeChanged) {
-				if (transform.k < 0.65 || interactionState === 'drag' || interactionState === 'pan') {
-					continue;
-				}
+			const lodStyle = computeEdgeLodStyle(edge, transform.k, {
+				isConnectedToActive: isEdgeActive,
+				isInteracting: isInteracting,
+				isHighContrast: theme.isHighContrast,
+			});
+
+			if (!lodStyle.shouldRender && displayMode === 'state') {
+				continue;
 			}
 
 			const sp = getVisualNodePosition(sourceNode, ease);
@@ -2490,8 +2404,8 @@ function drawTemporalFrame(ts) {
 			const cpY = midY + dx * curvature * 0.35;
 
 			let edgeColor = theme.isHighContrast ? 'rgba(255, 255, 255, 0.35)' : 'rgba(148, 163, 184, 0.2)';
-			let edgeWidth = 1.0;
-			let edgeDash = [];
+			let edgeWidth = lodStyle.strokeWidth || 1.0;
+			let edgeDash = lodStyle.strokeDash ? Array.from(lodStyle.strokeDash) : [];
 
 			if (isEdgeActive) {
 				edgeColor = '#2dd4bf';
@@ -2509,6 +2423,7 @@ function drawTemporalFrame(ts) {
 			}
 
 			ctx.save();
+			ctx.globalAlpha = lodStyle.opacity || 1.0;
 			// Dark contrast halo beneath edge
 			ctx.beginPath();
 			ctx.moveTo(sp.x, sp.y);
@@ -2654,47 +2569,22 @@ function drawTemporalFrame(ts) {
 	}
 
 	// 5. Labels with Level of Detail & Screen-Space Collision Culling
-	const placedLabels = [];
-	for (let i = 0; i < nodesToRender.length; i++) {
-		const node = nodesToRender[i];
-		const isSelected = selectedNodeId === node.entityId;
-		const isHovered = hoveredNodeId === node.entityId;
-		const isFocus = Boolean(node.changeKind && node.changeKind !== 'unchanged');
-		const shouldLabel = isSelected || isHovered || isFocus || (transform.k >= 1.25);
-		if (!shouldLabel) continue;
+	const visibleLabels = computeVisibleLabels(nodesToRender, transform.k, {
+		selectedNodeId: selectedNodeId,
+		hoveredNodeId: hoveredNodeId,
+		filterQuery: filterVal,
+		measureWidth: function (t, f) { return measureTextWidth(t, f); },
+	});
 
-		const pos = getVisualNodePosition(node, ease);
-		const labelText = node.label || node.path || '';
-		const r = isFocus ? 6.5 : 4.0;
-		const labelY = pos.y + r + 10;
-		const font = (isSelected || isHovered) ? 'bold 11px ui-sans-serif, system-ui, sans-serif' : '10px ui-sans-serif, system-ui, sans-serif';
-
-		const estW = measureTextWidth(labelText, font);
-		const boxLeft = pos.x - estW / 2 - 3;
-		const boxTop = labelY - 7;
-		const boxW = estW + 6;
-		const boxH = 14;
-
-		if (!isSelected && !isHovered) {
-			let collision = false;
-			for (let b = 0; b < placedLabels.length; b++) {
-				const pb = placedLabels[b];
-				if (boxLeft < pb.x + pb.w && boxLeft + boxW > pb.x && boxTop < pb.y + pb.h && boxTop + boxH > pb.y) {
-					collision = true;
-					break;
-				}
-			}
-			if (collision) continue;
-		}
-		placedLabels.push({ x: boxLeft, y: boxTop, w: boxW, h: boxH });
-
+	for (let i = 0; i < visibleLabels.length; i++) {
+		const lbl = visibleLabels[i];
 		ctx.save();
-		ctx.font = font;
+		ctx.font = lbl.font;
 		ctx.textAlign = 'center';
 		ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
-		ctx.fillRect(boxLeft, boxTop, boxW, boxH);
-		ctx.fillStyle = isSelected ? '#2dd4bf' : (isHovered ? '#58a6ff' : (isFocus ? '#f4f4f5' : 'rgba(244, 244, 245, 0.75)'));
-		ctx.fillText(labelText, pos.x, labelY + 3);
+		ctx.fillRect(lbl.box.x, lbl.box.y, lbl.box.w, lbl.box.h);
+		ctx.fillStyle = lbl.isSelected ? '#2dd4bf' : (lbl.isHovered ? '#58a6ff' : (lbl.isChanged ? '#f4f4f5' : 'rgba(244, 244, 245, 0.75)'));
+		ctx.fillText(lbl.text, lbl.x, lbl.y + 3);
 		ctx.restore();
 	}
 
@@ -3238,26 +3128,14 @@ function openNodePopup(node, clientX, clientY) {
 			} else {
 				if (popupAi) popupAi.textContent = 'Generating AI description…';
 				describeTimer = setTimeout(async () => {
-					try {
-						const desc = await request('describeNode', { nodeId: node.id });
-						if (!popupNode || popupNode.id !== node.id) return;
-						if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
-							if (popupAi) popupAi.textContent = desc.aiDescription;
-						} else {
-							if (popupAi) popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
-						}
-					} catch (err) {
-						console.warn('[PreBase Graph] describeNode failed:', err);
-						if (popupNode && popupNode.id === node.id && popupAi) {
-							popupAi.textContent = 'AI description unavailable.';
-						}
+					const desc = await request('describeNode', { nodeId: node.id });
+					if (!popupNode || popupNode.id !== node.id) return;
+					if (desc && desc.aiStatus === 'ready' && desc.aiDescription) {
+						if (popupAi) popupAi.textContent = desc.aiDescription;
+					} else {
+						if (popupAi) popupAi.textContent = (desc && desc.aiMessage) || 'AI description unavailable.';
 					}
 				}, 60);
-			}
-		}).catch(function (err) {
-			console.warn('[PreBase Graph] peekNodeDescription failed:', err);
-			if (popupNode && popupNode.id === node.id && popupAi && !popupAi.textContent) {
-				popupAi.textContent = 'AI description unavailable.';
 			}
 		});
 		dirty = true; drawNetworkFrame();
@@ -4199,8 +4077,6 @@ setTimeout(function () {
 						diagnostics = res.diagnostics;
 						if (res.graphType) graphType = res.graphType;
 						render(true);
-					}).catch(function (err) {
-						console.warn('[PreBase Graph] Retry getSnapshot failed:', err);
 					});
 				};
 			}
