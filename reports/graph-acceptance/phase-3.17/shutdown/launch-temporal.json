@@ -1,0 +1,19 @@
+{
+  "pid": 50099,
+  "cdpPort": 58647,
+  "extHostPort": 58648,
+  "mainPort": 58649,
+  "agentHostPort": 58650,
+  "userDataDir": "/tmp/pb/20260826-170130-49850/user-data",
+  "extensionsDir": "/tmp/pb/20260826-170130-49850/user-data/extensions",
+  "sharedDataDir": "/tmp/pb/20260826-170130-49850/shared-data",
+  "runDir": "/tmp/pb/20260826-170130-49850",
+  "logFile": "/tmp/pb/20260826-170130-49850/code.log",
+  "repo": "/Users/qunyingfan/Prebasecode",
+  "agents": false,
+  "fixture": {
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-kGMiDg",
+    "head": "2647ad546bb59ea514c55f99ddb9bbf819bb0555",
+    "commits": 10
+  }
+}

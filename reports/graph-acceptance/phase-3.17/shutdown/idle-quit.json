@@ -1,0 +1,7 @@
+{
+  "t0": 1787778149815,
+  "quitMs": 406,
+  "remaining": "gone",
+  "beforeQuit": "50099     1   0.5 161952 ./.build/electron/PreBase.app/Contents/MacOS/PreBase\n50130 PreBase Helper\n50131 PreBase Helper\n50150 PreBase Helper \n50188 PreBase Helper\n50189 PreBase Helper\n50206 PreBase Helper \n50411 PreBase Helper\n50451 PreBase Helper",
+  "afterQuit": ""
+}

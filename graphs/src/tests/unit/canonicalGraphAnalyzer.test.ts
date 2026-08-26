@@ -246,6 +246,20 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		}
 	});
 
+	test('parseBatchSize does not change the canonical digest', async () => {
+		const files: Record<string, string> = {};
+		for (let i = 0; i < 12; i++) {
+			files[`src/file${i}.ts`] = `export const f${i} = ${i};\nimport { f0 } from './file0';\n`;
+		}
+		const source = new InMemoryContentSource('/workspace', files);
+		const a = await createCanonicalAnalyzer({ parseBatchSize: 1 }).analyze(source);
+		const b = await createCanonicalAnalyzer({ parseBatchSize: 32 }).analyze(source);
+		assert.ok(a && b);
+		assert.strictEqual(a.digest, b.digest);
+		assert.strictEqual(a.nodes.length, b.nodes.length);
+		assert.strictEqual(a.edges.length, b.edges.length);
+	});
+
 	test('explicitly marks truncation and incomplete coverage when exceeding maxCanonicalFiles', async () => {
 		const files: Record<string, string> = {};
 		for (let i = 0; i < 50; i++) {

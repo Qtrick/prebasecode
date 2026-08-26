@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { PackageJsonShape, ProjectProbe } from './types.js';
-import type { DesktopCapabilities, ElectronDetectionConfidence, ElectronProjectPaths, ElectronProjectProfile } from './desktopTypes.js';
+import type { DesktopCapabilities, DesktopDetectionConfidence, ElectronProjectPaths, ElectronProjectProfile } from './desktopTypes.js';
 
 const ELECTRON_SCRIPT_NAMES = ['electron', 'electron:dev', 'electron:start', 'electron:serve', 'start:electron', 'dev:electron'] as const;
 
@@ -121,28 +121,36 @@ function buildCapabilities(
 	const supportsDevServerAutostart = hasRendererDevServer;
 	const limitations: string[] = [];
 	if (supportsManagedLaunch) {
-		limitations.push('Managed mode hosts the renderer URL in a PreBase-owned native window with a top management strip. Project Electron main-process code and preload are not executed in managed mode.');
+		limitations.push('Renderer mode hosts the frontend URL in a PreBase-owned window. Project Electron main-process code and preload are not executed.');
 		if (paths.preload) {
-			limitations.push('Project preload was detected; use Open externally for full preload/IPC behavior.');
+			limitations.push('Project preload was detected; use Full app mode for preload/IPC behavior.');
 		}
 	}
 	if (supportsExternalLaunch) {
-		limitations.push('External mode launches the project Electron process. Renderer automation uses a localhost CDP endpoint; native OS dialogs and menus are not controllable.');
+		limitations.push('Full app mode launches the project Electron process. Renderer automation uses a localhost CDP endpoint; native OS dialogs and menus are not controllable.');
 	}
 
+	const automation = supportsExternalLaunch || supportsManagedLaunch;
 	return {
 		supportsManagedLaunch,
 		supportsExternalLaunch,
-		supportsCdpAttach: supportsExternalLaunch || supportsManagedLaunch,
+		supportsCdpAttach: automation,
 		supportsDevServerAutostart,
-		supportsDOMInspection: supportsExternalLaunch || supportsManagedLaunch,
-		supportsConsoleCapture: false,
+		supportsDOMInspection: automation,
+		supportsSemanticLocators: automation,
+		supportsConsoleCapture: automation,
 		supportsNetworkCapture: false,
-		supportsScreenshots: supportsExternalLaunch || supportsManagedLaunch,
-		supportsInputAutomation: false,
+		supportsScreenshots: automation,
+		supportsInputAutomation: automation,
 		supportsWindowManagement: supportsManagedLaunch,
+		supportsRendererAutomation: supportsManagedLaunch,
+		supportsFullNativeAutomation: supportsExternalLaunch,
+		supportsBackendApiAccess: false,
+		supportsMainProcessAccess: supportsExternalLaunch,
+		supportsNativeDialogAutomation: false,
 		requiresPreload: Boolean(paths.preload),
 		requiresMainProcess: Boolean(paths.main),
+		fullNativeSetupRequired: false,
 		limitations,
 		managedLaunchBlockers: supportsManagedLaunch ? [] : blockers,
 	};
@@ -190,7 +198,7 @@ export function detectElectronProject(probe: ProjectProbe): ElectronProjectProfi
 		reasons.push(`Preload entry: ${preload}`);
 	}
 
-	let confidence: ElectronDetectionConfidence = 'none';
+	let confidence: DesktopDetectionConfidence = 'none';
 	if (directElectron && (main || electronScripts.length)) {
 		confidence = 'high';
 	} else if (directElectron || (electronConfig && electronScripts.length)) {
@@ -211,7 +219,7 @@ export function detectElectronProject(probe: ProjectProbe): ElectronProjectProfi
 	const likelyDevPort = inferLikelyDevPort(probe, pkg);
 
 	return {
-		isElectron,
+		framework: 'electron',
 		confidence,
 		label: isElectron ? 'Electron' : 'Not Electron',
 		paths,

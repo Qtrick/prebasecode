@@ -29,7 +29,7 @@ suite('electronDetector', () => {
 			},
 			exists: path => path === 'electron/main.js',
 		}));
-		assert.strictEqual(profile.isElectron, true);
+		assert.strictEqual(profile.framework, 'electron');
 		assert.strictEqual(profile.confidence, 'high');
 		assert.ok(profile.capabilities.supportsManagedLaunch);
 	});
@@ -42,7 +42,7 @@ suite('electronDetector', () => {
 			},
 			exists: path => path === 'vite.config.ts',
 		}));
-		assert.strictEqual(profile.isElectron, false);
+		assert.strictEqual(profile.framework, 'electron');
 		assert.strictEqual(profile.confidence, 'none');
 	});
 
@@ -52,7 +52,7 @@ suite('electronDetector', () => {
 				scripts: { dev: 'concurrently "vite" "electron ."' },
 			},
 		}));
-		assert.strictEqual(profile.isElectron, false);
+		assert.strictEqual(profile.framework, 'electron');
 		assert.strictEqual(profile.confidence, 'low');
 	});
 
@@ -64,7 +64,7 @@ suite('electronDetector', () => {
 			},
 			exists: path => path === 'electron-builder.yml',
 		}));
-		assert.strictEqual(profile.isElectron, true);
+		assert.strictEqual(profile.framework, 'electron');
 		assert.ok(profile.capabilities.supportsExternalLaunch);
 	});
 
@@ -75,7 +75,7 @@ suite('electronDetector', () => {
 				scripts: { storybook: 'storybook dev -p 6006' },
 			},
 		}));
-		assert.strictEqual(profile.isElectron, false);
+		assert.strictEqual(profile.confidence, 'none');
 	});
 
 	test('managed launch advertises main/preload limitations', () => {
@@ -102,7 +102,7 @@ suite('electronDetector', () => {
 		}));
 
 		assert.deepStrictEqual({
-			isElectron: profile.isElectron,
+			framework: profile.framework,
 			confidence: profile.confidence,
 			renderer: profile.paths.renderer,
 			managed: profile.capabilities.supportsManagedLaunch,
@@ -111,7 +111,7 @@ suite('electronDetector', () => {
 			screenshots: profile.capabilities.supportsScreenshots,
 			blockers: profile.capabilities.managedLaunchBlockers,
 		}, {
-			isElectron: true,
+			framework: 'electron',
 			confidence: 'high',
 			renderer: 'index.html',
 			managed: false,
@@ -143,6 +143,8 @@ suite('electronDetector', () => {
 			network: profile.capabilities.supportsNetworkCapture,
 			screenshots: profile.capabilities.supportsScreenshots,
 			input: profile.capabilities.supportsInputAutomation,
+			semantic: profile.capabilities.supportsSemanticLocators,
+			nativeDialogs: profile.capabilities.supportsNativeDialogAutomation,
 		}, {
 			rendererUrlHint: 'http://localhost:5173',
 			likelyDevPort: 5173,
@@ -150,11 +152,44 @@ suite('electronDetector', () => {
 			external: true,
 			cdp: true,
 			inspection: true,
-			console: false,
+			console: true,
 			network: false,
 			screenshots: true,
-			input: false,
+			input: true,
+			semantic: true,
+			nativeDialogs: false,
 		});
 		assert.ok(profile.capabilities.limitations.some(l => l.includes('main-process code and preload are not executed')));
+	});
+
+	test('does not advertise input automation when the project is not launchable', () => {
+		const profile = detectElectronProject(probe({
+			packageJson: {
+				devDependencies: { electron: '^30.0.0' },
+			},
+		}));
+		assert.strictEqual(profile.confidence, 'medium');
+		assert.strictEqual(profile.capabilities.supportsManagedLaunch, false);
+		assert.strictEqual(profile.capabilities.supportsExternalLaunch, false);
+		assert.strictEqual(profile.capabilities.supportsInputAutomation, false);
+		assert.strictEqual(profile.capabilities.supportsSemanticLocators, false);
+		assert.strictEqual(profile.capabilities.supportsNativeDialogAutomation, false);
+		assert.strictEqual(profile.capabilities.fullNativeSetupRequired, false);
+	});
+
+	test('keeps native dialogs false even when full-app launch is available', () => {
+		const profile = detectElectronProject(probe({
+			packageJson: {
+				devDependencies: { electron: '^30.0.0' },
+				main: 'main.js',
+				scripts: { start: 'electron .' },
+			},
+			exists: path => path === 'main.js',
+		}));
+		assert.strictEqual(profile.capabilities.supportsExternalLaunch, true);
+		assert.strictEqual(profile.capabilities.supportsInputAutomation, true);
+		assert.strictEqual(profile.capabilities.supportsNativeDialogAutomation, false);
+		assert.strictEqual(profile.capabilities.supportsMainProcessAccess, true);
+		assert.strictEqual(profile.capabilities.fullNativeSetupRequired, false);
 	});
 });

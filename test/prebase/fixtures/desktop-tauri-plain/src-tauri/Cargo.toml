@@ -1,0 +1,14 @@
+[package]
+name = "prebase-desktop-tauri-plain"
+version = "0.0.0"
+edition = "2021"
+
+[lib]
+name = "prebase_desktop_tauri_plain_lib"
+crate-type = ["lib", "cdylib", "staticlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }

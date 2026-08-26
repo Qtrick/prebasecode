@@ -85,6 +85,8 @@ export interface CanonicalAnalysisOptions {
 	readonly includeFolders?: boolean;
 	readonly includeFunctions?: boolean;
 	readonly respectGitIgnore?: boolean;
+	/** Outer concurrent parse window. Inner parse of each file remains one worker call; this is not N-way CPU parallelism. */
+	readonly parseBatchSize?: number;
 	readonly parseArtifactCache?: import('../../core/canonical/parseArtifactCache.js').ICanonicalParseArtifactCache;
 	readonly parseService?: import('../../core/canonical/canonicalParseService.js').ICanonicalParseService;
 }

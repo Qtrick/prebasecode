@@ -21,6 +21,8 @@ const testExecutionSafeTools = [
 	'prebase_terminal_run_project_script',
 	'prebase_desktop_restart_session',
 	'prebase_desktop_stop_session',
+	'prebase_desktop_start_session',
+	'prebase_desktop_interact',
 ];
 
 const privilegedWriteTools = [
@@ -45,14 +47,17 @@ const runtimeTestTools = [
 // registerMagnusDesktopTools. A newly registered tool must opt into the
 // fail-closed capability map before chat can declare or invoke it.
 const registeredMagnusTools = [
+	'prebase_desktop_assert',
 	'prebase_desktop_cdp_evaluate',
 	'prebase_desktop_capture_screenshot',
 	'prebase_desktop_get_process_output',
 	'prebase_desktop_get_session',
 	'prebase_desktop_inspect_window',
+	'prebase_desktop_interact',
 	'prebase_desktop_list_sessions',
 	'prebase_desktop_reload_window',
 	'prebase_desktop_restart_session',
+	'prebase_desktop_start_session',
 	'prebase_desktop_stop_session',
 	'prebase_edit_apply',
 	'prebase_edit_apply_file',
@@ -145,5 +150,14 @@ suite('Magnus mode capability boundary', () => {
 			}
 		}
 		assert.deepStrictEqual(allModes.filter(allowsEdits), ['patch', 'agent'] as MagnusAgentMode[]);
+	});
+
+	test('keeps Ask and Plan from launching or clicking while allowing read-only desktop asserts', () => {
+		for (const mode of ['ask', 'plan'] as const) {
+			assert.strictEqual(isMagnusToolAllowed(mode, 'prebase_desktop_start_session'), false, mode);
+			assert.strictEqual(isMagnusToolAllowed(mode, 'prebase_desktop_interact'), false, mode);
+			assert.strictEqual(isMagnusToolAllowed(mode, 'prebase_desktop_assert'), true, mode);
+			assert.strictEqual(isMagnusToolAllowed(mode, 'prebase_desktop_inspect_window'), true, mode);
+		}
 	});
 });

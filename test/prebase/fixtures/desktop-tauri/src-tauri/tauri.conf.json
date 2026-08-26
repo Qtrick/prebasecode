@@ -1,0 +1,25 @@
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "PreBase Tauri Fixture",
+	"version": "0.0.0",
+	"identifier": "com.prebase.desktop-tauri-fixture",
+	"build": {
+		"frontendDist": ".."
+	},
+	"app": {
+		"withGlobalTauri": true,
+		"windows": [
+			{
+				"title": "PreBase Tauri Fixture",
+				"width": 640,
+				"height": 480
+			}
+		],
+		"security": {
+			"csp": null
+		}
+	},
+	"bundle": {
+		"active": false
+	}
+}

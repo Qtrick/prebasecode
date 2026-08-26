@@ -21,6 +21,7 @@ export interface DesktopLaunchRequest {
 	cwd?: string;
 	debugPort?: number;
 	showManagementBar: boolean;
+	purpose?: 'preview' | 'test';
 }
 
 export interface ManagedWindowState {
@@ -33,4 +34,5 @@ export interface ManagedWindowState {
 export interface IPreBaseDesktopSpawnResult {
 	pid: number;
 	debugPort?: number;
+	webDriverPort?: number;
 }

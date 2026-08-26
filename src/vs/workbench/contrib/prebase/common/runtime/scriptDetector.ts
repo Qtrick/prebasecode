@@ -5,7 +5,7 @@
 
 import type { DetectedDevScript, PackageManager, ProjectProbe } from './types.js';
 
-const DEV_SCRIPT_NAMES = ['dev', 'start', 'serve', 'electron:dev', 'preview', 'develop'] as const;
+const DEV_SCRIPT_NAMES = ['dev', 'start', 'serve', 'electron:dev', 'tauri', 'tauri:dev', 'preview', 'develop'] as const;
 
 const FRAMEWORK_DEFAULT_PORTS: Record<string, number[]> = {
 	vite: [5173, 4173],

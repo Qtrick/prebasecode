@@ -47,8 +47,8 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 			}
 		}
 
-		assert.strictEqual(registeredTools.size, 38, 'Expected 38 runtime registered tools');
-		assert.strictEqual(manifestTools.size, 38, 'Expected 38 manifest contributed tools');
+		assert.strictEqual(registeredTools.size, 41, 'Expected 41 runtime registered tools');
+		assert.strictEqual(manifestTools.size, 41, 'Expected 41 manifest contributed tools');
 
 		const missingFromManifest = Array.from(registeredTools).filter(t => !manifestTools.has(t));
 		const missingFromRuntime = Array.from(manifestTools).filter(t => !registeredTools.has(t));
@@ -56,6 +56,9 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 		assert.deepStrictEqual(missingFromManifest, [], 'No runtime tools should be missing from manifest');
 		assert.deepStrictEqual(missingFromRuntime, [], 'No manifest tools should be missing runtime implementations');
 		assert.ok(manifestTools.has('prebase_desktop_get_process_output'), 'prebase_desktop_get_process_output must be contributed');
+		assert.ok(manifestTools.has('prebase_desktop_start_session'), 'prebase_desktop_start_session must be contributed');
+		assert.ok(manifestTools.has('prebase_desktop_interact'), 'prebase_desktop_interact must be contributed');
+		assert.ok(manifestTools.has('prebase_desktop_assert'), 'prebase_desktop_assert must be contributed');
 	});
 
 	it('ensures all manifest contributed commands have handlers registered in extension source', () => {
@@ -90,10 +93,47 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 		assert.ok(events.includes('onChatParticipant:prebase.magnus.ask'));
 		assert.ok(events.includes('onLanguageModelChatProvider:magnus'));
 		const toolNames: string[] = manifest.contributes?.languageModelTools?.map((t: { name: string }) => t.name) ?? [];
-		assert.strictEqual(toolNames.length, 38);
+		assert.strictEqual(toolNames.length, 41);
 		for (const name of toolNames) {
 			assert.match(name, /^prebase_/);
 		}
+	});
+
+	it('declares start, interact, and assert schemas with bounded desktop locators', () => {
+		const tools: Array<{ name: string; modelDescription?: string; inputSchema?: { required?: string[]; properties?: Record<string, { enum?: string[]; properties?: Record<string, { enum?: string[] }>; required?: string[] }> } }> =
+			manifest.contributes?.languageModelTools ?? [];
+		const byName = new Map(tools.map(tool => [tool.name, tool]));
+
+		const start = byName.get('prebase_desktop_start_session');
+		assert.ok(start, 'prebase_desktop_start_session must be contributed');
+		assert.deepStrictEqual(start.inputSchema?.properties?.framework?.enum, ['electron', 'tauri']);
+		assert.deepStrictEqual(start.inputSchema?.properties?.mode?.enum, ['renderer', 'fullApp']);
+		assert.match(String(start.modelDescription), /Workspace Trust/);
+		assert.match(String(start.modelDescription), /Does not install dependencies/);
+
+		const interact = byName.get('prebase_desktop_interact');
+		assert.ok(interact, 'prebase_desktop_interact must be contributed');
+		assert.deepStrictEqual(interact.inputSchema?.required, ['action', 'locator']);
+		assert.deepStrictEqual(interact.inputSchema?.properties?.action?.enum, ['click', 'doubleClick', 'hover', 'fill', 'type', 'press', 'check', 'uncheck', 'select', 'focus']);
+		assert.deepStrictEqual(interact.inputSchema?.properties?.locator?.properties?.by?.enum, ['role', 'label', 'placeholder', 'text', 'testId', 'css']);
+		assert.deepStrictEqual(interact.inputSchema?.properties?.locator?.required, ['by']);
+		assert.match(String(interact.modelDescription), /Ambiguous matches fail/);
+
+		const assertTool = byName.get('prebase_desktop_assert');
+		assert.ok(assertTool, 'prebase_desktop_assert must be contributed');
+		assert.deepStrictEqual(assertTool.inputSchema?.required, ['condition']);
+		assert.deepStrictEqual(assertTool.inputSchema?.properties?.condition?.enum, ['visible', 'hidden', 'enabled', 'disabled', 'checked', 'unchecked', 'text', 'containsText', 'value', 'count', 'title', 'url']);
+		assert.deepStrictEqual(assertTool.inputSchema?.properties?.locator?.properties?.by?.enum, ['role', 'label', 'placeholder', 'text', 'testId', 'css']);
+	});
+
+	it('desktop start always launches a test-owned session and wires cancellation', () => {
+		const desktopSrc = fs.readFileSync(path.join(__dirname, 'desktopTools.ts'), 'utf8');
+		assert.match(desktopSrc, /testing:\s*true/);
+		assert.doesNotMatch(desktopSrc, /testing:\s*options\.input\.testing/);
+		assert.match(desktopSrc, /prebase\.runtime\.desktopCancelForMagnus/);
+		assert.match(desktopSrc, /prebase\.runtime\.desktopStartForMagnus/);
+		assert.match(desktopSrc, /prebase\.runtime\.desktopInteractForMagnus/);
+		assert.match(desktopSrc, /prebase\.runtime\.desktopAssertForMagnus/);
 	});
 
 	it('deactivate cancels in-flight chat requests through magnusRequestShutdown', () => {

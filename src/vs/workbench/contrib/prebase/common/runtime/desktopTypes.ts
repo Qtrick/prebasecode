@@ -10,11 +10,19 @@ export type DesktopSessionState =
 	| 'idle'
 	| 'starting'
 	| 'running'
+	| 'testing'
 	| 'stopping'
 	| 'stopped'
-	| 'error';
+	| 'error'
+	| 'setupRequired';
 
-export type ElectronDetectionConfidence = 'none' | 'low' | 'medium' | 'high';
+export type DesktopFramework = 'electron' | 'tauri';
+export type DesktopDetectionConfidence = 'none' | 'low' | 'medium' | 'high';
+export type DesktopSessionPurpose = 'preview' | 'test';
+export type DesktopAutomationBackend = 'cdp' | 'webdriver' | 'none';
+
+/** User-facing launch mode. Internally mapped onto managed (renderer) vs external (full app). */
+export type DesktopUiMode = 'renderer' | 'fullApp';
 
 export interface DesktopCapabilities {
 	supportsManagedLaunch: boolean;
@@ -22,16 +30,35 @@ export interface DesktopCapabilities {
 	supportsCdpAttach: boolean;
 	supportsDevServerAutostart: boolean;
 	supportsDOMInspection: boolean;
+	supportsSemanticLocators: boolean;
 	supportsConsoleCapture: boolean;
 	supportsNetworkCapture: boolean;
 	supportsScreenshots: boolean;
 	supportsInputAutomation: boolean;
 	supportsWindowManagement: boolean;
+	supportsRendererAutomation: boolean;
+	supportsFullNativeAutomation: boolean;
+	supportsBackendApiAccess: boolean;
+	supportsMainProcessAccess: boolean;
+	supportsNativeDialogAutomation: boolean;
 	requiresPreload: boolean;
 	requiresMainProcess: boolean;
+	fullNativeSetupRequired: boolean;
+	fullNativeSetupReason?: string;
 	/** Honest limits shown in UI / tool results. */
 	limitations: string[];
 	managedLaunchBlockers: string[];
+}
+
+export interface DesktopProjectProfileBase {
+	framework: DesktopFramework;
+	label: string;
+	confidence: DesktopDetectionConfidence;
+	capabilities: DesktopCapabilities;
+	reasons: string[];
+	rendererUrlHint?: string;
+	likelyDevPort: number;
+	appRoot?: string;
 }
 
 export interface ElectronProjectPaths {
@@ -40,16 +67,46 @@ export interface ElectronProjectPaths {
 	renderer?: string;
 }
 
-export interface ElectronProjectProfile {
-	isElectron: boolean;
-	confidence: ElectronDetectionConfidence;
-	label: string;
+export interface ElectronProjectProfile extends DesktopProjectProfileBase {
+	framework: 'electron';
 	paths: ElectronProjectPaths;
-	capabilities: DesktopCapabilities;
 	electronScriptName?: string;
-	rendererUrlHint?: string;
-	likelyDevPort: number;
-	reasons: string[];
+}
+
+export interface TauriProjectProfile extends DesktopProjectProfileBase {
+	framework: 'tauri';
+	configPath?: string;
+	cargoTomlPath?: string;
+	identifier?: string;
+	productName?: string;
+	beforeDevCommand?: string;
+	tauriScriptName?: string;
+	hasWdioPlugin: boolean;
+	hasWdioWebdriverPlugin: boolean;
+	testingCargoFeature: boolean;
+	isRustOnly: boolean;
+}
+
+export type DesktopProjectProfile = ElectronProjectProfile | TauriProjectProfile;
+
+export function isElectronProfile(profile: DesktopProjectProfile | undefined | null): profile is ElectronProjectProfile {
+	return profile?.framework === 'electron';
+}
+
+export function isTauriProfile(profile: DesktopProjectProfile | undefined | null): profile is TauriProjectProfile {
+	return profile?.framework === 'tauri';
+}
+
+export function isRecognizedDesktopApp(profile: DesktopProjectProfile | undefined | null): profile is DesktopProjectProfile {
+	return profile?.confidence === 'high' || profile?.confidence === 'medium';
+}
+
+export function desktopUiModeFromLaunch(mode: DesktopLaunchMode): DesktopUiMode {
+	return mode === 'external' ? 'fullApp' : 'renderer';
+}
+
+export function desktopLaunchFromUiMode(mode: DesktopUiMode): DesktopLaunchMode {
+	return mode === 'fullApp' ? 'external' : 'managed';
 }
 
 export interface CdpTarget {
@@ -65,13 +122,17 @@ export interface PreBaseDesktopSession {
 	workspaceRoot: string;
 	launchMode: DesktopLaunchMode;
 	state: DesktopSessionState;
-	profile: ElectronProjectProfile;
+	profile: DesktopProjectProfile;
+	purpose: DesktopSessionPurpose;
+	automationBackend: DesktopAutomationBackend;
 	rendererUrl?: string;
 	debugPort?: number;
+	webDriverPort?: number;
 	pid?: number;
 	managedWindowId?: number;
 	cdpTargets: CdpTarget[];
 	errorMessage?: string;
 	startedAt?: number;
 	ownedByPreBase: boolean;
+	testRunId?: string;
 }

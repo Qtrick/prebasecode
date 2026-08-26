@@ -79,6 +79,22 @@ suite('MagnusToolActivityDescriptor & Privacy Sanitization', () => {
 		const screenshotMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_desktop_capture_screenshot', {});
 		assert.strictEqual(screenshotMsg, 'Capturing desktop window screenshot');
 
+		const startMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_desktop_start_session', { framework: 'electron', mode: 'fullApp' });
+		assert.strictEqual(startMsg, 'Starting electron full app test session');
+
+		const clickMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_desktop_interact', { action: 'click', locator: { by: 'role', role: 'button', name: 'Sign In' } });
+		assert.strictEqual(clickMsg, 'Clicking "Sign In"');
+
+		const secretFill = MagnusToolActivityDescriptor.getInvocationMessage('prebase_desktop_interact', { action: 'fill', locator: { by: 'label', value: 'Password' }, value: 'hunter2' });
+		assert.strictEqual(secretFill, 'Filling a secret field');
+
+		const startConf = MagnusToolActivityDescriptor.getConfirmationMessage('prebase_desktop_start_session', { mode: 'fullApp' });
+		assert.strictEqual(startConf?.title, 'Start Desktop Test Session');
+		assert.match(String(startConf?.message), /executes project code/i);
+
+		const assertMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_desktop_assert', { condition: 'text', expected: 'Ready' });
+		assert.strictEqual(assertMsg, 'Asserting text "Ready"');
+
 		const webMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_web_search', { query: 'VS Code LM API' });
 		assert.strictEqual(webMsg, 'Searching the web for "VS Code LM API"');
 

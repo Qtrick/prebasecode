@@ -21,7 +21,8 @@ export interface DesktopShutdownPolicy {
  * Production shutdown policy for PreBase desktop sessions.
  * Managed windows are PreBase-owned BrowserWindow sessions.
  * Owned children are externally spawned Electron processes PreBase still tracks.
- * Intentionally detached user apps survive when stopExternalAppsOnExit is false.
+ * Intentionally detached preview apps survive when stopExternalAppsOnExit is false.
+ * Test-owned children are terminated by the caller, not by flipping this preview policy.
  */
 export function resolveDesktopShutdownPolicy(stopManagedAppsOnExit = true, stopExternalAppsOnExit = false): DesktopShutdownPolicy {
 	return {

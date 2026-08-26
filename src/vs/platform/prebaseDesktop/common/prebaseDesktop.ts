@@ -29,7 +29,7 @@ export interface IPreBaseDesktopMainService {
 	/** PNG screenshot from the renderer target on a PreBase-owned external CDP port, base64-encoded. */
 	captureScreenshotViaCdp(debugPort: number): Promise<string>;
 
-	spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env?: Record<string, string>): Promise<IPreBaseDesktopSpawnResult>;
+	spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env?: Record<string, string>, extras?: { purpose?: 'preview' | 'test'; electronCdp?: boolean; webDriver?: boolean }): Promise<IPreBaseDesktopSpawnResult>;
 	getOwnedProcessOutput(pid: number, maximumEntries?: number): Promise<{ entries: ProcessOutputEntry[]; droppedCount: number; truncated: boolean }>;
 	evaluateViaCdp(debugPort: number, expression: string): Promise<unknown>;
 	killOwnedProcess(pid: number): Promise<void>;

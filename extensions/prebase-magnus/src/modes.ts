@@ -105,6 +105,7 @@ const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgen
 	prebase_desktop_inspect_window: ALL_MAGNUS_MODES,
 	prebase_desktop_get_process_output: ALL_MAGNUS_MODES,
 	prebase_desktop_capture_screenshot: ALL_MAGNUS_MODES,
+	prebase_desktop_assert: ALL_MAGNUS_MODES,
 	prebase_edit_apply_file: WRITE_MAGNUS_MODES,
 	prebase_edit_apply: WRITE_MAGNUS_MODES,
 	prebase_edit_create_file: WRITE_MAGNUS_MODES,
@@ -119,6 +120,8 @@ const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgen
 	prebase_desktop_reload_window: WRITE_MAGNUS_MODES,
 	prebase_desktop_restart_session: TEST_EXECUTION_SAFE_MAGNUS_MODES,
 	prebase_desktop_stop_session: TEST_EXECUTION_SAFE_MAGNUS_MODES,
+	prebase_desktop_start_session: TEST_EXECUTION_SAFE_MAGNUS_MODES,
+	prebase_desktop_interact: TEST_EXECUTION_SAFE_MAGNUS_MODES,
 	prebase_desktop_cdp_evaluate: WRITE_MAGNUS_MODES,
 };
 

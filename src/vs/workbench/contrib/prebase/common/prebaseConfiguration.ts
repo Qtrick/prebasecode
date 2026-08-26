@@ -256,11 +256,11 @@ configurationRegistry.registerConfiguration({
 			type: 'string',
 			enum: ['managed', 'external'],
 			enumDescriptions: [
-				localize('prebase.runtime.desktopLaunchMode.managed', "Open Electron apps in a PreBase-managed native window with a management strip."),
-				localize('prebase.runtime.desktopLaunchMode.external', "Spawn the project's Electron process with a localhost CDP debugging port."),
+				localize('prebase.runtime.desktopLaunchMode.managed', "Renderer mode: host the app frontend in a PreBase window. Electron main/preload and Tauri Rust are not executed."),
+				localize('prebase.runtime.desktopLaunchMode.external', "Full app mode: launch the real Electron or Tauri application. Electron uses localhost CDP; Tauri full-native automation may require Enable PreBase Tauri Testing."),
 			],
 			default: 'managed',
-			description: localize('prebase.runtime.desktopLaunchMode', "How PreBase launches detected Electron desktop applications."),
+			description: localize('prebase.runtime.desktopLaunchMode', "How PreBase launches detected Electron or Tauri desktop applications."),
 		},
 		[PreBaseConfigKeys.RuntimeRememberDesktopLaunchMode]: {
 			type: 'boolean',
@@ -275,12 +275,12 @@ configurationRegistry.registerConfiguration({
 		[PreBaseConfigKeys.RuntimeStopExternalAppsOnExit]: {
 			type: 'boolean',
 			default: false,
-			description: localize('prebase.runtime.stopExternalAppsOnExit', "Stop externally launched Electron processes when PreBase exits."),
+			description: localize('prebase.runtime.stopExternalAppsOnExit', "Stop externally launched preview desktop processes when PreBase exits. Test-owned sessions always stop."),
 		},
 		[PreBaseConfigKeys.RuntimeEnableDesktopAutomation]: {
 			type: 'boolean',
 			default: false,
-			description: localize('prebase.runtime.enableDesktopAutomation', "Allow Agents/Magnus to inspect and evaluate JavaScript in PreBase-owned desktop application sessions (managed executeJavaScript or external localhost CDP)."),
+			description: localize('prebase.runtime.enableDesktopAutomation', "Allow Agents to evaluate JavaScript in PreBase-owned preview desktop sessions. Test-lab interact/assert tools already run after Start Desktop Test Session confirmation."),
 		},
 		[PreBaseConfigKeys.RuntimeConfirmApplicationTermination]: {
 			type: 'boolean',

@@ -1,0 +1,14 @@
+{
+  "framework": "electron",
+  "mode": "fullApp",
+  "backend": "cdp",
+  "appRootFixture": "test/prebase/fixtures/desktop-electron",
+  "sessionStatus": "passed",
+  "actionCount": 2,
+  "assertionCount": 1,
+  "durationMs": 3656,
+  "pid": 3816,
+  "debugPort": 56983,
+  "screenshot": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3.17/electron/full-app-greet.png",
+  "processCleanup": "clean"
+}

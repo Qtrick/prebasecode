@@ -1,0 +1,7 @@
+{
+	"name": "prebase-desktop-tauri-plain-fixture",
+	"private": true,
+	"scripts": {
+		"tauri": "tauri"
+	}
+}

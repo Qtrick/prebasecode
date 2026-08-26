@@ -12,6 +12,7 @@ import type { DesktopLaunchRequest, ExternalLaunchRequest, ManagedWindowState } 
 import { IPreBaseDesktopMainService, type IPreBaseDesktopSpawnResult } from '../common/prebaseDesktop.js';
 import { CdpConnection, type MinimalWebSocket } from '../common/cdpConnection.js';
 import { MAX_EXTERNAL_SCREENSHOT_CDP_MESSAGE_BYTES, selectOwnedCdpPageWebSocketUrl, validateCdpPngScreenshotData, type CdpDiscoveryTarget } from '../common/cdpScreenshot.js';
+import { existsSync } from 'fs';
 import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.js';
 import { ProcessOutputBuffer } from '../common/processOutputBuffer.js';
 import { terminateOwnedProcess, resolveDesktopShutdownPolicy, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, type ProcessTerminationSignal } from '../common/processTermination.js';
@@ -37,6 +38,7 @@ interface ManagedSession {
 	stripView: WebContentsView;
 	appView: WebContentsView;
 	request: DesktopLaunchRequest;
+	purpose: 'preview' | 'test';
 }
 
 function stripHtml(title: string): string {
@@ -61,6 +63,8 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 	private readonly _managed = new Map<string, ManagedSession>();
 	private readonly _ownedPids = new Set<number>();
 	private readonly _ownedDebugPorts = new Set<number>();
+	private readonly _ownedPurpose = new Map<number, 'preview' | 'test'>();
+	private readonly _ownedPortsByPid = new Map<number, number>();
 	private readonly _externalChildren = new Map<number, ChildProcess>();
 	private readonly _externalOutput = new Map<number, ProcessOutputBuffer>();
 	private _shutdownPromise: Promise<void> | undefined;
@@ -97,36 +101,43 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 		const stopExternal = this._configurationService?.getValue<boolean>('prebase.runtime.stopExternalAppsOnExit') ?? false;
 		const policy = resolveDesktopShutdownPolicy(stopManaged, stopExternal);
 
-		if (policy.closeManagedWindows) {
-			for (const session of this._managed.values()) {
+		for (const [sessionId, session] of [...this._managed]) {
+			if (policy.closeManagedWindows || session.purpose === 'test') {
 				this._destroyManagedSession(session, true);
+				this._managed.delete(sessionId);
 			}
-			this._managed.clear();
 		}
 
+		const previewPids = [...this._ownedPids].filter(pid => (this._ownedPurpose.get(pid) ?? 'preview') === 'preview');
+		const testPids = [...this._ownedPids].filter(pid => this._ownedPurpose.get(pid) === 'test');
+		const killPids = new Set(testPids);
 		if (policy.terminateOwnedChildren) {
-			await this._killAllOwnedProcessesBounded();
+			for (const pid of previewPids) {
+				killPids.add(pid);
+			}
 		} else {
-			this._detachOwnedExternalProcesses();
-		}
-	}
-
-	private _detachOwnedExternalProcesses(): void {
-		for (const child of this._externalChildren.values()) {
-			try {
-				child.unref();
-			} catch {
-				// ignore
+			for (const pid of previewPids) {
+				const child = this._externalChildren.get(pid);
+				if (child) {
+					try { child.unref(); } catch { /* ignore */ }
+				}
+				const port = this._ownedPortsByPid.get(pid);
+				if (port) {
+					this._ownedDebugPorts.delete(port);
+				}
+				this._ownedPids.delete(pid);
+				this._externalChildren.delete(pid);
+				this._externalOutput.delete(pid);
+				this._ownedPurpose.delete(pid);
+				this._ownedPortsByPid.delete(pid);
 			}
 		}
-		this._externalChildren.clear();
-		this._externalOutput.clear();
-		this._ownedPids.clear();
-		this._ownedDebugPorts.clear();
+		if (killPids.size) {
+			await this._killListedOwnedProcesses([...killPids]);
+		}
 	}
 
-	private async _killAllOwnedProcessesBounded(): Promise<void> {
-		const pids = [...this._ownedPids];
+	private async _killListedOwnedProcesses(pids: number[]): Promise<void> {
 		if (pids.length === 0) {
 			return;
 		}
@@ -137,6 +148,8 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 					this._externalChildren.delete(pid);
 					this._externalOutput.delete(pid);
 					this._ownedPids.delete(pid);
+					this._ownedPurpose.delete(pid);
+					this._ownedPortsByPid.delete(pid);
 				} else {
 					this._logService?.warn(`[PreBase Desktop] Owned process ${pid} did not confirm exit within the ${OWNED_PROCESS_SHUTDOWN_CEILING_MS}ms budget`);
 				}
@@ -198,7 +211,7 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 		window.on('resize', layout);
 		layout();
 
-		const session: ManagedSession = { window, stripView, appView, request };
+		const session: ManagedSession = { window, stripView, appView, request, purpose: request.purpose ?? 'preview' };
 		this._managed.set(request.sessionId, session);
 
 		if (request.showManagementBar) {
@@ -330,30 +343,40 @@ p{opacity:.75;margin:0;line-height:1.45}
 		return pngBase64;
 	}
 
-	async spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env: Record<string, string> = {}): Promise<IPreBaseDesktopSpawnResult> {
-		const port = debugPort > 0 ? debugPort : await this._allocateDebugPort();
+	async spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env: Record<string, string> = {}, extras?: { purpose?: 'preview' | 'test'; electronCdp?: boolean; webDriver?: boolean }): Promise<IPreBaseDesktopSpawnResult> {
+		const electronCdp = extras?.electronCdp ?? true;
+		const webDriver = extras?.webDriver === true && !electronCdp;
+		const purpose = extras?.purpose ?? 'preview';
 		if (!request.command.trim() || request.command.includes('\0') || request.args.some(arg => arg.includes('\0'))) {
 			throw new Error('Invalid external launch command.');
 		}
 		const args = [...request.args];
-		if (!args.some(arg => /^--remote-debugging-port(?:=|$)/.test(arg))) {
-			args.push(`--remote-debugging-port=${port}`);
+		const childEnv: Record<string, string> = { ...process.env as Record<string, string>, ...env };
+		delete childEnv.TAURI_WEBDRIVER_PORT;
+		const needsPort = electronCdp || webDriver;
+		const port = needsPort ? (debugPort > 0 ? debugPort : await this._allocateDebugPort()) : 0;
+		if (electronCdp) {
+			if (!args.some(arg => /^--remote-debugging-port(?:=|$)/.test(arg))) {
+				args.push(`--remote-debugging-port=${port}`);
+			}
+			if (!args.some(arg => /^--remote-debugging-address(?:=|$)/.test(arg))) {
+				args.push('--remote-debugging-address=127.0.0.1');
+			}
+			const priorExtra = process.env.ELECTRON_EXTRA_LAUNCH_ARGS ?? '';
+			childEnv.ELECTRON_EXTRA_LAUNCH_ARGS = `${priorExtra} --remote-debugging-port=${port} --remote-debugging-address=127.0.0.1`.trim();
+		} else if (webDriver) {
+			childEnv.TAURI_WEBDRIVER_PORT = String(port);
 		}
-		const command = resolveExternalLaunchCommand(request, cwd);
-		const priorExtra = process.env.ELECTRON_EXTRA_LAUNCH_ARGS ?? '';
+		const command = resolveExternalLaunchCommand(request, cwd, process.platform, existsSync);
 		const child = spawn(command, args, {
 			cwd,
-			env: {
-				...process.env,
-				...env,
-				ELECTRON_EXTRA_LAUNCH_ARGS: `${priorExtra} --remote-debugging-port=${port}`.trim(),
-			},
+			env: childEnv,
 			detached: process.platform !== 'win32',
 			stdio: ['ignore', 'pipe', 'pipe'],
 			windowsHide: true,
 		});
 		if (!child.pid) {
-			throw new Error('Failed to spawn external Electron process.');
+			throw new Error('Failed to spawn owned desktop process.');
 		}
 		await new Promise<void>((resolve, reject) => {
 			const onError = (error: Error) => {
@@ -371,20 +394,30 @@ p{opacity:.75;margin:0;line-height:1.45}
 		child.stdout?.on('data', chunk => output.append('stdout', chunk));
 		child.stderr?.on('data', chunk => output.append('stderr', chunk));
 		this._ownedPids.add(child.pid);
-		this._ownedDebugPorts.add(port);
+		this._ownedPurpose.set(child.pid, purpose);
+		if (electronCdp) {
+			this._ownedDebugPorts.add(port);
+			this._ownedPortsByPid.set(child.pid, port);
+		}
 		this._externalChildren.set(child.pid, child);
 		child.on('exit', () => {
 			if (child.pid) {
 				this._ownedPids.delete(child.pid);
 				this._externalChildren.delete(child.pid);
+				this._ownedPurpose.delete(child.pid);
+				this._ownedPortsByPid.delete(child.pid);
 			}
-			this._ownedDebugPorts.delete(port);
+			if (port) {
+				this._ownedDebugPorts.delete(port);
+			}
 		});
-		// `close` follows closure of all stdio streams; `exit` alone can arrive
-		// before their final chunks have been delivered.
 		child.once('close', () => output.flush());
 		this._rememberProcessOutput(child.pid, output);
-		return { pid: child.pid, debugPort: port };
+		return {
+			pid: child.pid,
+			debugPort: electronCdp ? port : undefined,
+			webDriverPort: webDriver ? port : undefined,
+		};
 	}
 
 	async getOwnedProcessOutput(pid: number, maximumEntries = 100): Promise<{ entries: ReturnType<ProcessOutputBuffer['getEntries']>['entries']; droppedCount: number; truncated: boolean }> {

@@ -19,6 +19,11 @@ import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/c
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
+import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
+import { IFileService } from '../../../../platform/files/common/files.js';
+import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
+import { IWorkspaceTrustManagementService } from '../../../../platform/workspace/common/workspaceTrust.js';
+import { VSBuffer } from '../../../../base/common/buffer.js';
 import { IOutputChannelRegistry, IOutputService, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
 import { IQuickInputService } from '../../../../platform/quickinput/common/quickInput.js';
@@ -30,6 +35,8 @@ import { IPreBaseRuntimeService, PreBaseRuntimeService } from './prebaseRuntimeS
 import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
 import { stopDesktopSessionForMagnus } from '../common/runtime/desktopStopForMagnus.js';
 import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
+import { isRecognizedDesktopApp, isTauriProfile } from '../common/runtime/desktopTypes.js';
+import { applyCapabilitiesTestingPermission, applyCargoTestingDependencies, applyRustTestingPlugins, previewTauriTestingSetup, tauriTestingCandidatePaths } from '../common/runtime/tauriTestingSetup.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IPreBaseCloudService, PreBaseCloudService } from './cloud/prebaseCloudService.js';
 import { IPreBaseWebSearchService, PreBaseWebSearchService, type IPreBaseWebSearchRequest } from './prebaseWebSearchService.js';
@@ -795,11 +802,11 @@ function getDesktopRuntimeService(accessor: ServicesAccessor): IPreBaseDesktopRu
 }
 
 async function ensureDesktopDetected(runtimeService: IPreBaseRuntimeService, desktop: IPreBaseDesktopRuntimeService): Promise<boolean> {
-	if (desktop.getProfile()?.isElectron) {
+	if (isRecognizedDesktopApp(desktop.getProfile() ?? undefined)) {
 		return true;
 	}
 	await runtimeService.detectConfigurations();
-	return Boolean(desktop.getProfile()?.isElectron);
+	return isRecognizedDesktopApp(desktop.getProfile() ?? undefined);
 }
 
 registerAction2(class extends Action2 {
@@ -868,6 +875,18 @@ registerAction2(class extends Action2 {
 		}
 		const runtime = accessor.get(IPreBaseRuntimeService);
 		return runtime.setDesktopLaunchMode(mode);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.selectDesktopFramework', title: localize2('prebase.runtime.selectDesktopFrameworkCmd', "Select Desktop Framework"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, framework: 'electron' | 'tauri') {
+		if (framework !== 'electron' && framework !== 'tauri') {
+			return;
+		}
+		accessor.get(IPreBaseRuntimeService).setDesktopFramework(framework);
 	}
 });
 
@@ -962,5 +981,171 @@ registerAction2(class extends Action2 {
 	}
 	run(accessor: ServicesAccessor, sessionId?: string) {
 		return getDesktopRuntimeService(accessor)?.captureScreenshotForMagnus(sessionId) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopStartForMagnus', title: localize2('prebase.runtime.desktopStartForMagnus', "Start Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	async run(accessor: ServicesAccessor, input?: { framework?: 'electron' | 'tauri'; mode?: string; rendererUrl?: string; testing?: boolean }) {
+		const desktop = getDesktopRuntimeService(accessor);
+		const runtimeService = accessor.get(IPreBaseRuntimeService);
+		if (!desktop) {
+			return { ok: false, reason: 'Desktop runtime unavailable.' };
+		}
+		if (!(await ensureDesktopDetected(runtimeService, desktop))) {
+			return { ok: false, reason: 'Not an Electron or Tauri project.' };
+		}
+		return desktop.startForMagnus(input);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopInteractForMagnus', title: localize2('prebase.runtime.desktopInteractForMagnus', "Interact with Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, input: { sessionId?: string; action: 'click' | 'doubleClick' | 'hover' | 'fill' | 'type' | 'press' | 'check' | 'uncheck' | 'select' | 'focus'; locator: unknown; value?: string; timeoutMs?: number }) {
+		return getDesktopRuntimeService(accessor)?.interactForMagnus(input) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopAssertForMagnus', title: localize2('prebase.runtime.desktopAssertForMagnus', "Assert Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, input: { sessionId?: string; condition: 'visible' | 'hidden' | 'enabled' | 'disabled' | 'checked' | 'unchecked' | 'text' | 'containsText' | 'value' | 'count' | 'title' | 'url'; locator?: unknown; expected?: string | number; timeoutMs?: number }) {
+		return getDesktopRuntimeService(accessor)?.assertForMagnus(input) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.desktopCancelForMagnus', title: localize2('prebase.runtime.desktopCancelForMagnus', "Cancel Desktop Action for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor) {
+		getDesktopRuntimeService(accessor)?.cancelActiveAction();
+		return { ok: true };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.runtime.enableTauriTesting', title: localize2('prebase.runtime.enableTauriTestingCmd', "Enable PreBase Tauri Testing…"), category: localize2('prebase.category', "PreBase"), f1: true });
+	}
+	async run(accessor: ServicesAccessor) {
+		const desktop = getDesktopRuntimeService(accessor);
+		const runtimeService = accessor.get(IPreBaseRuntimeService);
+		const dialog = accessor.get(IDialogService);
+		const fileService = accessor.get(IFileService);
+		const folder = accessor.get(IWorkspaceContextService).getWorkspace().folders[0];
+		if (!desktop || !folder) {
+			return { ok: false, reason: 'Desktop runtime or workspace unavailable.' };
+		}
+		if (!accessor.get(IWorkspaceTrustManagementService).isWorkspaceTrusted()) {
+			await dialog.info(localize('prebase.desktop.untrusted', "Workspace Restricted"), localize('prebase.desktop.untrustedDetail', "Desktop testing executes project code and is unavailable in Restricted Mode."));
+			return { ok: false, reason: 'Workspace Restricted' };
+		}
+		if (!(await ensureDesktopDetected(runtimeService, desktop))) {
+			await dialog.info(localize('prebase.desktop.notDesktop', "Not an Electron or Tauri project"), localize('prebase.desktop.notTauriDetail', "Open a Tauri app root before enabling testing plugins."));
+			return { ok: false };
+		}
+		const profile = desktop.getProfile();
+		if (!isTauriProfile(profile) || !profile.cargoTomlPath) {
+			await dialog.info(localize('prebase.desktop.notTauri', "Not a Tauri project"), localize('prebase.desktop.notTauriCargo', "PreBase needs a Tauri Cargo.toml before it can add debug-only WebDriver plugins."));
+			return { ok: false };
+		}
+
+		const cargoUri = URI.joinPath(folder.uri, profile.cargoTomlPath);
+		let cargoToml: string;
+		try {
+			cargoToml = (await fileService.readFile(cargoUri)).value.toString();
+		} catch {
+			await dialog.info(localize('prebase.desktop.cargoMissing', "Cargo.toml missing"), localize('prebase.desktop.cargoMissingDetail', "Could not read {0}.", profile.cargoTomlPath));
+			return { ok: false };
+		}
+
+		const candidates = tauriTestingCandidatePaths(profile.cargoTomlPath);
+		let rustEntryPath = candidates.rustEntries[0];
+		let rustEntry = '';
+		for (const relative of candidates.rustEntries) {
+			try {
+				rustEntry = (await fileService.readFile(URI.joinPath(folder.uri, relative))).value.toString();
+				rustEntryPath = relative;
+				break;
+			} catch {
+				// try next
+			}
+		}
+		if (!rustEntry) {
+			await dialog.info(localize('prebase.desktop.rustMissing', "Rust entry missing"), localize('prebase.desktop.rustMissingDetail', "Could not find src/lib.rs or src/main.rs next to the Tauri Cargo.toml."));
+			return { ok: false };
+		}
+
+		let capabilitiesPath = candidates.capabilities[0];
+		let capabilitiesJson: string | undefined;
+		for (const relative of candidates.capabilities) {
+			try {
+				capabilitiesJson = (await fileService.readFile(URI.joinPath(folder.uri, relative))).value.toString();
+				capabilitiesPath = relative;
+				break;
+			} catch {
+				// optional
+			}
+		}
+
+		const preview = previewTauriTestingSetup({
+			appRoot: folder.uri.fsPath,
+			cargoToml,
+			rustEntry,
+			capabilitiesJson,
+			rustEntryPath,
+			cargoPath: profile.cargoTomlPath,
+			capabilitiesPath,
+		});
+		if ('error' in preview) {
+			await dialog.info(localize('prebase.desktop.tauriSetupBlocked', "Cannot enable Tauri testing"), preview.error);
+			return { ok: false, reason: preview.error };
+		}
+		if (!preview.changes.length) {
+			await dialog.info(localize('prebase.desktop.tauriSetupDone', "Tauri testing already enabled"), localize('prebase.desktop.tauriSetupDoneDetail', "Debug-only WebDriver plugins are already present. Restart Full app mode to use them."));
+			return { ok: true, alreadyEnabled: true };
+		}
+
+		const confirmed = await dialog.confirm({
+			message: localize('prebase.desktop.tauriSetupConfirm', "Enable PreBase Tauri Testing?"),
+			detail: [
+				localize('prebase.desktop.tauriSetupWhy', "Full-app automation on macOS uses an embedded WebDriver plugin. Renderer testing works without this."),
+				preview.changes.map(change => `${change.kind} ${change.path}: ${change.reason}\n${change.preview}`).join('\n\n'),
+				preview.removeInstructions,
+			].join('\n\n'),
+			primaryButton: localize('prebase.desktop.tauriSetupEnable', "Enable"),
+		});
+		if (!confirmed.confirmed) {
+			return { ok: false, cancelled: true };
+		}
+
+		const cargoNext = applyCargoTestingDependencies(cargoToml);
+		const rustNext = applyRustTestingPlugins(rustEntry);
+		if (typeof rustNext !== 'string') {
+			await dialog.info(localize('prebase.desktop.tauriSetupBlocked', "Cannot enable Tauri testing"), rustNext.error);
+			return { ok: false, reason: rustNext.error };
+		}
+		let capsNext: string | undefined;
+		if (capabilitiesJson) {
+			const applied = applyCapabilitiesTestingPermission(capabilitiesJson);
+			if (typeof applied !== 'string') {
+				await dialog.info(localize('prebase.desktop.tauriSetupBlocked', "Cannot enable Tauri testing"), applied.error);
+				return { ok: false, reason: applied.error };
+			}
+			capsNext = applied;
+		}
+		await fileService.writeFile(cargoUri, VSBuffer.fromString(cargoNext));
+		await fileService.writeFile(URI.joinPath(folder.uri, rustEntryPath), VSBuffer.fromString(rustNext));
+		if (capsNext) {
+			await fileService.writeFile(URI.joinPath(folder.uri, capabilitiesPath), VSBuffer.fromString(capsNext));
+		}
+		await runtimeService.detectConfigurations();
+		return { ok: true, files: preview.changes.map(change => change.path) };
 	}
 });

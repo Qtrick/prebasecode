@@ -27,8 +27,9 @@ import { appendRuntimeEvidence } from '../common/runtime/evidenceBuffer.js';
 import { MAX_RUNTIME_INSPECTION_RESPONSE_BYTES, readRuntimeResponseText } from '../common/runtime/runtimeResponseReader.js';
 import { detectFramework } from '../common/runtime/frameworkDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
-import { buildNpmExternalLaunchRequest } from '../common/runtime/externalLaunchCommand.js';
-import type { DesktopLaunchMode, ElectronProjectProfile } from '../common/runtime/desktopTypes.js';
+import type { DesktopFramework, DesktopLaunchMode, DesktopProjectProfile } from '../common/runtime/desktopTypes.js';
+import { isRecognizedDesktopApp } from '../common/runtime/desktopTypes.js';
+import { TAURI_PROBE_PATHS } from '../common/runtime/tauriDetector.js';
 import { classifyNavigateUrl, classifyTerminalCommand, validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
 import { detectDevScripts, selectDefaultScript } from '../common/runtime/scriptDetector.js';
 import { managedRendererDevCommand, scriptLaunchesElectronApp } from '../common/runtime/managedRendererCommand.js';
@@ -72,7 +73,8 @@ export interface PreBaseRuntimeSession {
 	selectedScriptName: string | undefined;
 	packageManager: PackageManager | undefined;
 	terminalInstanceId: number | undefined;
-	electronProfile: ElectronProjectProfile | null;
+	desktopProfile: DesktopProjectProfile | null;
+	desktopProfiles: DesktopProjectProfile[];
 	desktopLaunchMode: DesktopLaunchMode;
 	desktopSessionActive: boolean;
 	desktopSessionState?: string;
@@ -95,6 +97,7 @@ export interface IPreBaseRuntimeService {
 	rotateViewport(): void;
 	selectScript(scriptName: string): void;
 	setDesktopLaunchMode(mode: DesktopLaunchMode): Promise<void>;
+	setDesktopFramework(framework: DesktopFramework): void;
 	detectConfigurations(): Promise<string[]>;
 	start(): Promise<void>;
 	stop(): Promise<void>;
@@ -147,6 +150,7 @@ const PROBE_PATHS = [
 	'apps/frontend',
 	'apps/client',
 	'packages/web',
+	...TAURI_PROBE_PATHS,
 ];
 
 function redactRuntimeEvidence(value: string): string {
@@ -248,7 +252,8 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			selectedScriptName: undefined,
 			packageManager: undefined,
 			terminalInstanceId: undefined,
-			electronProfile: null,
+			desktopProfile: null,
+			desktopProfiles: [],
 			desktopLaunchMode: (this.configurationService.getValue<DesktopLaunchMode>(PreBaseConfigKeys.RuntimeDesktopLaunchMode) ?? 'managed'),
 			desktopSessionActive: false,
 		};
@@ -296,9 +301,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			return;
 		}
 		this._register(desktop.onDidChangeSession(session => {
+			const active = session?.state === 'running' || session?.state === 'testing' || session?.state === 'starting' || session?.state === 'stopping';
 			this._session = {
 				...this._session,
-				desktopSessionActive: session?.state === 'running',
+				desktopSessionActive: Boolean(active),
 				desktopSessionState: session?.state,
 				desktopSessionPid: session?.pid,
 				desktopLaunchMode: session?.launchMode ?? this._session.desktopLaunchMode,
@@ -520,14 +526,30 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			}
 		}
 
+		const textMap = new Map<string, string>();
+		const textCandidates = PROBE_PATHS.filter(rel => rel.endsWith('.toml') || rel.endsWith('.json') || rel.endsWith('.json5'));
+		await Promise.all(textCandidates.map(async rel => {
+			if (!existsMap.get(rel)) {
+				return;
+			}
+			try {
+				textMap.set(rel, (await this.fileService.readFile(URI.joinPath(folder.uri, rel))).value.toString());
+			} catch {
+				// ignore unreadable probe files
+			}
+		}));
+
 		const probe: ProjectProbe = {
 			exists: rel => existsMap.get(rel) === true,
+			readText: rel => textMap.get(rel),
 			packageJson,
 			rootLabel: folder.name || folder.uri.path
 		};
 
 		const framework = detectFramework(probe);
-		const electronProfile = this._desktopService()?.detect(probe) ?? detectElectronProject(probe);
+		const desktop = this._desktopService();
+		const desktopProfile = desktop?.detect(probe) ?? detectElectronProject(probe);
+		const desktopProfiles = desktop?.getDetectedProfiles() ?? (isRecognizedDesktopApp(desktopProfile) ? [desktopProfile] : []);
 		const scripts = detectDevScripts(probe);
 		const selected = selectDefaultScript(scripts);
 		const defaultUrl = this.configurationService.getValue<string>(PreBaseConfigKeys.RuntimeDefaultUrl) || 'http://localhost:5173';
@@ -552,7 +574,8 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		this._session = {
 			...this._session,
 			framework,
-			electronProfile,
+			desktopProfile,
+			desktopProfiles: desktopProfiles.slice(),
 			desktopLaunchMode: this.configurationService.getValue<DesktopLaunchMode>(PreBaseConfigKeys.RuntimeDesktopLaunchMode) ?? 'managed',
 			workspaceRoot: folder.uri.fsPath || folder.uri.path,
 			scripts,
@@ -568,7 +591,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			framework.label,
 			scripts.length,
 			selected?.scriptName ?? 'none',
-			electronProfile.isElectron ? ` · Electron (${electronProfile.confidence})` : ''
+			isRecognizedDesktopApp(desktopProfile) ? ` · ${desktopProfile.label} (${desktopProfile.confidence})` : ''
 		));
 		this._fire();
 
@@ -596,10 +619,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 				await this.detectConfigurations();
 			}
 
-			const electronProfile = this._session.electronProfile;
+			const desktopProfile = this._session.desktopProfile;
 			const launchMode = this._session.desktopLaunchMode;
 			const desktop = this._desktopService();
-			if (electronProfile?.isElectron && desktop) {
+			if (isRecognizedDesktopApp(desktopProfile) && desktop) {
 				if (launchMode === 'managed') {
 					const script = this._session.scripts.find(s => s.scriptName === this._session.selectedScriptName)
 						?? selectDefaultScript(this._session.scripts);
@@ -641,7 +664,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 							});
 						}
 					}
-					const rendererUrl = this._session.url || electronProfile.rendererUrlHint || `http://localhost:${electronProfile.likelyDevPort}`;
+					const rendererUrl = this._session.url || desktopProfile.rendererUrlHint || `http://localhost:${desktopProfile.likelyDevPort}`;
 					const ready = await this._waitForUrl(rendererUrl, 45_000);
 					if (!ready) {
 						this._log(localize(
@@ -651,11 +674,12 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 						));
 					}
 					const session = await desktop.start({ launchMode: 'managed', rendererUrl });
+					const live = session?.state === 'running' || session?.state === 'testing';
 					this._session = {
 						...this._session,
 						url: rendererUrl,
-						desktopSessionActive: Boolean(session && session.state === 'running'),
-						running: Boolean(session && session.state === 'running'),
+						desktopSessionActive: Boolean(live),
+						running: Boolean(live),
 					};
 					this._fire();
 					return;
@@ -664,7 +688,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 					const session = await desktop.start({
 						launchMode: 'external',
 						rendererUrl: this._session.url,
-						command: electronProfile.electronScriptName ? buildNpmExternalLaunchRequest(electronProfile.electronScriptName) : undefined,
+						purpose: 'preview',
 					});
 					this._session = {
 						...this._session,
@@ -1123,6 +1147,18 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	async setDesktopLaunchMode(mode: DesktopLaunchMode): Promise<void> {
 		await this._desktopService()?.setLaunchMode(mode);
 		this._session = { ...this._session, desktopLaunchMode: mode };
+		this._fire();
+	}
+
+	setDesktopFramework(framework: DesktopFramework): void {
+		const desktop = this._desktopService();
+		desktop?.setPreferredFramework(framework);
+		const profile = desktop?.getProfile();
+		this._session = {
+			...this._session,
+			desktopProfile: profile ?? this._session.desktopProfile,
+			desktopProfiles: desktop?.getDetectedProfiles().slice() ?? this._session.desktopProfiles,
+		};
 		this._fire();
 	}
 

@@ -21,6 +21,7 @@ export type DetectedFramework =
 	| 'vue-vite'
 	| 'svelte-kit'
 	| 'electron'
+	| 'tauri'
 	| 'plain-html'
 	| 'monorepo'
 	| 'unknown';
@@ -47,6 +48,8 @@ export interface PackageJsonShape {
 /** Sync probe used by detectors after the browser layer has resolved file existence. */
 export interface ProjectProbe {
 	exists(relativePath: string): boolean;
+	/** Optional text reader used for Cargo.toml / Tauri config inspection. */
+	readText?(relativePath: string): string | undefined;
 	packageJson: PackageJsonShape | undefined;
 	rootLabel: string;
 }

@@ -1,0 +1,45 @@
+{
+  "measuredAt": "2026-08-26T20:13:07.257Z",
+  "rows": [
+    {
+      "parseBatchSize": 8,
+      "wallMs": 33,
+      "nodes": 240,
+      "digest": "7d7ce584f9db4bb1274e784affffe9d9956faead5fe9d27348971417779ea993",
+      "heapDeltaMb": 0.12,
+      "rssMb": 135.5,
+      "eventLoopLagP50Ms": 0,
+      "note": "Outer Promise.all window only; one Node parse service, not N parser utility processes."
+    },
+    {
+      "parseBatchSize": 16,
+      "wallMs": 15,
+      "nodes": 240,
+      "digest": "7d7ce584f9db4bb1274e784affffe9d9956faead5fe9d27348971417779ea993",
+      "heapDeltaMb": 13.82,
+      "rssMb": 145.1,
+      "eventLoopLagP50Ms": 0,
+      "note": "Outer Promise.all window only; one Node parse service, not N parser utility processes."
+    },
+    {
+      "parseBatchSize": 32,
+      "wallMs": 17,
+      "nodes": 240,
+      "digest": "7d7ce584f9db4bb1274e784affffe9d9956faead5fe9d27348971417779ea993",
+      "heapDeltaMb": 1.39,
+      "rssMb": 168.7,
+      "eventLoopLagP50Ms": 0,
+      "note": "Outer Promise.all window only; one Node parse service, not N parser utility processes."
+    },
+    {
+      "parseBatchSize": 64,
+      "wallMs": 13,
+      "nodes": 240,
+      "digest": "7d7ce584f9db4bb1274e784affffe9d9956faead5fe9d27348971417779ea993",
+      "heapDeltaMb": -0.96,
+      "rssMb": 187.8,
+      "eventLoopLagP50Ms": 0,
+      "note": "Outer Promise.all window only; one Node parse service, not N parser utility processes."
+    }
+  ]
+}

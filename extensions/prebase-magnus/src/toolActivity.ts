@@ -182,6 +182,32 @@ export class MagnusToolActivityDescriptor {
 			}
 			case 'prebase_desktop_inspect_window':
 				return 'Inspecting desktop window state';
+			case 'prebase_desktop_start_session': {
+				const framework = sanitizeQuery(input.framework, 20) || 'desktop';
+				const mode = input.mode === 'fullApp' ? 'full app' : 'renderer';
+				return `Starting ${framework} ${mode} test session`;
+			}
+			case 'prebase_desktop_interact': {
+				const action = sanitizeQuery(input.action, 20) || 'interact';
+				const locator = (input.locator && typeof input.locator === 'object') ? input.locator as Record<string, unknown> : {};
+				const name = sanitizeQuery(String(locator.name ?? locator.value ?? ''), 40);
+				const secret = /password|passwd|secret|token|api[_-]?key/i.test(`${locator.name ?? ''} ${locator.value ?? ''} ${action}`);
+				if (action === 'fill' && secret) {
+					return 'Filling a secret field';
+				}
+				if (action === 'click' && name) {
+					return `Clicking "${name}"`;
+				}
+				if (action === 'fill' && name) {
+					return `Filling ${name}`;
+				}
+				return name ? `Desktop ${action} on "${name}"` : `Desktop ${action}`;
+			}
+			case 'prebase_desktop_assert': {
+				const condition = sanitizeQuery(input.condition, 20) || 'state';
+				const expected = sanitizeQuery(String(input.expected ?? ''), 40);
+				return expected ? `Asserting ${condition} "${expected}"` : `Asserting ${condition}`;
+			}
 			case 'prebase_desktop_get_process_output':
 				return 'Reading desktop process output';
 			case 'prebase_desktop_reload_window':
@@ -254,6 +280,13 @@ export class MagnusToolActivityDescriptor {
 				return {
 					title: 'Run Node Command',
 					message: `Execute command "${cmd}" in project runtime?`,
+				};
+			}
+			case 'prebase_desktop_start_session': {
+				const mode = input.mode === 'fullApp' ? 'full app' : 'renderer';
+				return {
+					title: 'Start Desktop Test Session',
+					message: `Launch the workspace desktop application in ${mode} mode? This executes project code.`,
 				};
 			}
 			case 'prebase_terminal_install_dependencies': {

@@ -40,6 +40,7 @@ export class CanonicalGraphAnalyzer {
 	private readonly _includeFunctions: boolean;
 	private readonly _parseService: ICanonicalParseService;
 	private readonly _parseArtifactCache?: ICanonicalParseArtifactCache;
+	private readonly _parseBatchSize: number;
 
 	constructor(options: CanonicalAnalysisOptions = {}) {
 		this._maxCanonicalFiles = options.maxCanonicalFiles ?? DEFAULT_MAX_CANONICAL_FILES;
@@ -48,6 +49,7 @@ export class CanonicalGraphAnalyzer {
 		this._includeFunctions = options.includeFunctions ?? false;
 		this._parseArtifactCache = options.parseArtifactCache;
 		this._parseService = options.parseService ?? new UnavailableCanonicalParseService();
+		this._parseBatchSize = Math.max(1, options.parseBatchSize ?? 32);
 	}
 
 	async analyze(
@@ -93,9 +95,9 @@ export class CanonicalGraphAnalyzer {
 
 		const parseResults: ParseResult[] = [];
 		const manifestEntries: AnalysisManifestEntry[] = [];
-		// Bounded batch size matching utility worker channel capacity (32) to prevent
-		// excessive in-memory file buffers while preserving IPC throughput.
-		const batchSize = 32;
+		// Bounded outer window: files in a batch parse concurrently via Promise.all.
+		// This is not N-way native parser-process parallelism.
+		const batchSize = this._parseBatchSize;
 
 		for (let i = 0; i < files.length; i += batchSize) {
 			if (token?.isCancellationRequested) {

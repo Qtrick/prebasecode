@@ -39,6 +39,11 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 	private _desktopMeta: HTMLElement | undefined;
 	private _desktopManagedBtn: HTMLButtonElement | undefined;
 	private _desktopExternalBtn: HTMLButtonElement | undefined;
+	private _desktopEnableBtn: HTMLButtonElement | undefined;
+	private _desktopElectronBtn: HTMLButtonElement | undefined;
+	private _desktopTauriBtn: HTMLButtonElement | undefined;
+	private _desktopFrameworkRow: HTMLElement | undefined;
+	private readonly _responsiveRows: HTMLElement[] = [];
 
 	constructor(
 		options: IViewletViewOptions,
@@ -81,9 +86,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			}));
 
 			const row = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
-			row.style.display = 'grid';
-			row.style.gridTemplateColumns = '1fr 1fr';
-			row.style.gap = '4px';
+			this._responsiveRow(row);
 			this._btn(row, localize('prebase.runtime.start', "Start"), () => this.commandService.executeCommand('prebase.runtime.start'));
 			this._btn(row, localize('prebase.runtime.stop', "Stop"), () => this.commandService.executeCommand('prebase.runtime.stop'));
 			this._btn(row, localize('prebase.runtime.restart', "Restart"), () => this.commandService.executeCommand('prebase.runtime.restart'));
@@ -92,25 +95,41 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		});
 
 		// --- Desktop launch (Electron)
-		this._desktopSection = this._section(localize('prebase.runtime.desktopLaunch', "Desktop Launch"), (section) => {
+		this._desktopSection = this._section(localize('prebase.runtime.desktopLaunch', "Desktop"), (section) => {
+			this._desktopFrameworkRow = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
+			this._responsiveRow(this._desktopFrameworkRow);
+			this._desktopFrameworkRow.setAttribute('role', 'group');
+			this._desktopFrameworkRow.setAttribute('aria-label', localize('prebase.runtime.desktopFrameworkGroup', "Desktop framework"));
+			this._desktopFrameworkRow.style.display = 'none';
+			this._desktopElectronBtn = this._btn(this._desktopFrameworkRow, localize('prebase.runtime.desktopElectron', "Electron"), () => this.commandService.executeCommand('prebase.runtime.selectDesktopFramework', 'electron'));
+			this._desktopElectronBtn.setAttribute('aria-pressed', 'false');
+			this._desktopTauriBtn = this._btn(this._desktopFrameworkRow, localize('prebase.runtime.desktopTauri', "Tauri"), () => this.commandService.executeCommand('prebase.runtime.selectDesktopFramework', 'tauri'));
+			this._desktopTauriBtn.setAttribute('aria-pressed', 'false');
+
 			const modeRow = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
-			modeRow.style.display = 'grid';
-			modeRow.style.gridTemplateColumns = '1fr 1fr';
-			modeRow.style.gap = '4px';
-			this._desktopManagedBtn = this._btn(modeRow, localize('prebase.runtime.desktopManaged', "Open through PreBase"), () => this.commandService.executeCommand('prebase.runtime.selectDesktopLaunchMode', 'managed'));
-			this._desktopExternalBtn = this._btn(modeRow, localize('prebase.runtime.desktopExternal', "Open externally"), () => this.commandService.executeCommand('prebase.runtime.selectDesktopLaunchMode', 'external'));
+			this._responsiveRow(modeRow);
+			modeRow.setAttribute('role', 'group');
+			modeRow.setAttribute('aria-label', localize('prebase.runtime.desktopModeGroup', "Desktop launch mode"));
+			this._desktopManagedBtn = this._btn(modeRow, localize('prebase.runtime.desktopManaged', "Renderer"), () => this.commandService.executeCommand('prebase.runtime.selectDesktopLaunchMode', 'managed'));
+			this._desktopManagedBtn.setAttribute('aria-pressed', 'false');
+			this._desktopManagedBtn.setAttribute('aria-label', localize('prebase.runtime.desktopManagedAria', "Renderer mode: test the web frontend without the desktop backend"));
+			this._desktopExternalBtn = this._btn(modeRow, localize('prebase.runtime.desktopExternal', "Full app"), () => this.commandService.executeCommand('prebase.runtime.selectDesktopLaunchMode', 'external'));
+			this._desktopExternalBtn.setAttribute('aria-pressed', 'false');
+			this._desktopExternalBtn.setAttribute('aria-label', localize('prebase.runtime.desktopExternalAria', "Full app mode: launch the real Electron or Tauri application"));
 
 			this._desktopMeta = DOM.append(section, DOM.$('div'));
 			this._styleMeta(this._desktopMeta);
 
 			const desktopRow = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
-			desktopRow.style.display = 'grid';
-			desktopRow.style.gridTemplateColumns = '1fr 1fr';
-			desktopRow.style.gap = '4px';
+			this._responsiveRow(desktopRow);
 			this._btn(desktopRow, localize('prebase.runtime.desktopStart', "Start Desktop"), () => this.commandService.executeCommand('prebase.runtime.startDesktop'));
 			this._btn(desktopRow, localize('prebase.runtime.desktopStop', "Stop Desktop"), () => this.commandService.executeCommand('prebase.runtime.stopDesktop'));
 			this._btn(desktopRow, localize('prebase.runtime.desktopRestart', "Restart Desktop"), () => this.commandService.executeCommand('prebase.runtime.restartDesktop'));
 			this._btn(desktopRow, localize('prebase.runtime.desktopKill', "Kill Session"), () => this.commandService.executeCommand('prebase.runtime.killDesktopSession'));
+			this._desktopEnableBtn = this._btn(section, localize('prebase.runtime.enableTauriTesting', "Enable PreBase Tauri Testing…"), () => this.commandService.executeCommand('prebase.runtime.enableTauriTesting'));
+			this._desktopEnableBtn.style.display = 'none';
+			this._desktopEnableBtn.style.marginTop = '6px';
+			this._desktopEnableBtn.setAttribute('aria-label', localize('prebase.runtime.enableTauriTestingAria', "Enable debug-only Tauri WebDriver plugins for full-app testing"));
 		});
 		this._desktopSection.style.display = 'none';
 
@@ -130,9 +149,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			this._styleMeta(this._sessionMeta);
 
 			const nav = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
-			nav.style.display = 'grid';
-			nav.style.gridTemplateColumns = '1fr 1fr';
-			nav.style.gap = '4px';
+			this._responsiveRow(nav);
 			this._btn(nav, localize('prebase.runtime.connect', "Connect"), () => this.commandService.executeCommand('prebase.runtime.connect'));
 			this._btn(nav, localize('prebase.runtime.reload', "Reload"), () => this.commandService.executeCommand('prebase.runtime.reload'));
 			this._btn(nav, localize('prebase.runtime.back', "Back"), () => this.commandService.executeCommand('prebase.runtime.goBack'));
@@ -145,9 +162,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		this._section(localize('prebase.runtime.viewport', "Device / Viewport"), (section) => {
 			const presets: PreBaseViewportPreset[] = ['responsive', 'desktop', 'laptop', 'tablet', 'mobile'];
 			const presetRow = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
-			presetRow.style.display = 'grid';
-			presetRow.style.gridTemplateColumns = '1fr 1fr';
-			presetRow.style.gap = '4px';
+			this._responsiveRow(presetRow);
 			for (const preset of presets) {
 				this._btn(presetRow, preset[0].toUpperCase() + preset.slice(1), () => {
 					this.runtimeService.setViewportPreset(preset);
@@ -155,9 +170,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			}
 
 			const sizeRow = DOM.append(section, DOM.$('div'));
-			sizeRow.style.display = 'grid';
-			sizeRow.style.gridTemplateColumns = '1fr 1fr';
-			sizeRow.style.gap = '4px';
+			this._responsiveRow(sizeRow);
 			sizeRow.style.marginTop = '6px';
 
 			this._widthInput = DOM.append(sizeRow, DOM.$('input')) as HTMLInputElement;
@@ -195,9 +208,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			this._diagMeta = DOM.append(section, DOM.$('div'));
 			this._styleMeta(this._diagMeta);
 			const row = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
-			row.style.display = 'grid';
-			row.style.gridTemplateColumns = '1fr 1fr';
-			row.style.gap = '4px';
+			this._responsiveRow(row);
 			this._btn(row, localize('prebase.runtime.inspect', "Inspect"), () => this.commandService.executeCommand('prebase.runtime.inspect'));
 			this._btn(row, localize('prebase.runtime.clearDiag', "Clear"), () => this.commandService.executeCommand('prebase.runtime.clearDiagnostics'));
 			this._btn(section, localize('prebase.runtime.screenshot', "Capture Screenshot"), () => this.commandService.executeCommand('prebase.runtime.captureScreenshot'));
@@ -208,9 +219,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			this._testMeta = DOM.append(section, DOM.$('div'));
 			this._styleMeta(this._testMeta);
 			const row = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
-			row.style.display = 'grid';
-			row.style.gridTemplateColumns = '1fr 1fr';
-			row.style.gap = '4px';
+			this._responsiveRow(row);
 			this._btn(row, localize('prebase.runtime.startTest', "Start Test"), () => this.commandService.executeCommand('prebase.runtime.startTestSession'));
 			this._btn(row, localize('prebase.runtime.stopTest', "Stop Test"), () => this.commandService.executeCommand('prebase.runtime.stopTestSession'));
 			this._btn(row, localize('prebase.runtime.replayTest', "Replay"), () => this.commandService.executeCommand('prebase.runtime.replayTest'));
@@ -232,6 +241,17 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 	protected override layoutBody(height: number, width: number): void {
 		super.layoutBody(height, width);
+		const columns = width < 240 ? '1fr' : '1fr 1fr';
+		for (const row of this._responsiveRows) {
+			row.style.gridTemplateColumns = columns;
+		}
+	}
+
+	private _responsiveRow(row: HTMLElement): void {
+		row.style.display = 'grid';
+		row.style.gridTemplateColumns = '1fr 1fr';
+		row.style.gap = '4px';
+		this._responsiveRows.push(row);
 	}
 
 	private _applySize(): void {
@@ -244,10 +264,10 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 	private _section(title: string, fill: (section: HTMLElement) => void): HTMLElement {
 		const section = DOM.append(this._body!, DOM.$('.prebase-runtime-section'));
-		const heading = DOM.append(section, DOM.$('div'));
+		const heading = DOM.append(section, DOM.$('h3'));
 		heading.textContent = title;
 		heading.style.fontWeight = '600';
-		heading.style.marginBottom = '6px';
+		heading.style.margin = '0 0 6px';
 		heading.style.fontSize = '12px';
 		heading.style.letterSpacing = '0.02em';
 		heading.style.textTransform = 'uppercase';
@@ -277,6 +297,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 	private _btn(parent: HTMLElement, label: string, onClick: () => void): HTMLButtonElement {
 		const btn = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
+		btn.type = 'button';
 		btn.textContent = label;
 		btn.style.display = 'block';
 		btn.style.width = '100%';
@@ -294,31 +315,57 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 	private _refresh(): void {
 		const session = this.runtimeService.getSession();
-		const electron = session.electronProfile;
+		const desktop = session.desktopProfile;
+		const recognized = desktop && (desktop.confidence === 'high' || desktop.confidence === 'medium');
 
 		if (this._desktopSection) {
-			this._desktopSection.style.display = electron?.isElectron ? 'block' : 'none';
+			this._desktopSection.style.display = recognized ? 'block' : 'none';
 		}
-		if (this._desktopMeta && electron?.isElectron) {
-			const mode = session.desktopLaunchMode;
-			const managedOk = electron.capabilities.supportsManagedLaunch;
-			const externalOk = electron.capabilities.supportsExternalLaunch;
-			this._desktopMeta.textContent = [
-				localize('prebase.runtime.desktopConfidence', "Electron confidence: {0}", electron.confidence),
-				localize('prebase.runtime.desktopMode', "Launch mode: {0}", mode),
-				localize('prebase.runtime.desktopManagedCap', "Managed: {0}", managedOk ? 'supported' : `blocked — ${electron.capabilities.managedLaunchBlockers.join('; ')}`),
-				localize('prebase.runtime.desktopExternalCap', "External: {0}", externalOk ? 'supported' : 'blocked'),
-				electron.capabilities.limitations[0] ?? '',
-				session.desktopSessionActive
-					? localize('prebase.runtime.desktopSession', "Desktop session: {0}{1}", session.desktopSessionState ?? 'running', session.desktopSessionPid ? ` · pid ${session.desktopSessionPid}` : '')
-					: localize('prebase.runtime.desktopSessionIdle', "Desktop session: idle"),
-			].filter(Boolean).join('\n');
+		if (this._desktopMeta && recognized && desktop) {
+			const mode = session.desktopLaunchMode === 'external' ? 'Full app' : 'Renderer';
+			const status = session.desktopSessionState
+				?? (session.desktopSessionActive ? 'Ready' : 'Not running');
+			const others = (session.desktopProfiles ?? []).filter(profile => profile.framework !== desktop.framework && (profile.confidence === 'high' || profile.confidence === 'medium'));
+			const lines = [
+				others.length
+					? localize('prebase.runtime.desktopFrameworkBoth', "{0} (also {1})", desktop.label, others.map(profile => profile.label).join(', '))
+					: localize('prebase.runtime.desktopFramework', "{0}", desktop.label),
+				localize('prebase.runtime.desktopMode', "Mode: {0}", mode),
+				localize('prebase.runtime.desktopStatus', "Status: {0}", status),
+			];
+			if (desktop.capabilities.fullNativeSetupRequired && session.desktopLaunchMode === 'external') {
+				lines.push(localize('prebase.runtime.desktopSetup', "Full-app preview can start now. Agent automation needs Enable PreBase Tauri Testing."));
+			} else if (desktop.capabilities.limitations[0]) {
+				lines.push(desktop.capabilities.limitations[0]);
+			}
+			this._desktopMeta.textContent = lines.join('\n');
+			this._desktopMeta.setAttribute('role', 'status');
+			this._desktopMeta.setAttribute('aria-live', 'polite');
+			this._desktopMeta.setAttribute('aria-atomic', 'true');
+		}
+		if (this._desktopFrameworkRow && this._desktopElectronBtn && this._desktopTauriBtn) {
+			const profiles = session.desktopProfiles ?? [];
+			const both = profiles.some(profile => profile.framework === 'electron' && (profile.confidence === 'high' || profile.confidence === 'medium'))
+				&& profiles.some(profile => profile.framework === 'tauri' && (profile.confidence === 'high' || profile.confidence === 'medium'));
+			this._desktopFrameworkRow.style.display = both ? 'grid' : 'none';
+			this._desktopElectronBtn.setAttribute('aria-pressed', String(desktop?.framework === 'electron'));
+			this._desktopTauriBtn.setAttribute('aria-pressed', String(desktop?.framework === 'tauri'));
+			this._desktopElectronBtn.style.outline = desktop?.framework === 'electron' ? '2px solid var(--vscode-focusBorder)' : '';
+			this._desktopTauriBtn.style.outline = desktop?.framework === 'tauri' ? '2px solid var(--vscode-focusBorder)' : '';
+		}
+		if (this._desktopEnableBtn) {
+			const setup = Boolean(recognized && desktop?.capabilities.fullNativeSetupRequired && session.desktopLaunchMode === 'external');
+			this._desktopEnableBtn.style.display = setup ? 'block' : 'none';
 		}
 		if (this._desktopManagedBtn) {
-			this._desktopManagedBtn.style.outline = session.desktopLaunchMode === 'managed' ? '2px solid var(--vscode-focusBorder, #2dd4bf)' : '';
+			const selected = session.desktopLaunchMode === 'managed';
+			this._desktopManagedBtn.style.outline = selected ? '2px solid var(--vscode-focusBorder)' : '';
+			this._desktopManagedBtn.setAttribute('aria-pressed', String(selected));
 		}
 		if (this._desktopExternalBtn) {
-			this._desktopExternalBtn.style.outline = session.desktopLaunchMode === 'external' ? '2px solid var(--vscode-focusBorder, #2dd4bf)' : '';
+			const selected = session.desktopLaunchMode === 'external';
+			this._desktopExternalBtn.style.outline = selected ? '2px solid var(--vscode-focusBorder)' : '';
+			this._desktopExternalBtn.setAttribute('aria-pressed', String(selected));
 		}
 
 		if (this._targetMeta) {

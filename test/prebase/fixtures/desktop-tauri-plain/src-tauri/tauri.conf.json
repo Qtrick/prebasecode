@@ -1,0 +1,13 @@
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "PreBase Tauri Plain",
+	"version": "0.0.0",
+	"identifier": "com.prebase.desktop-tauri-plain",
+	"build": {
+		"frontendDist": "..",
+		"devUrl": "http://localhost:1420"
+	},
+	"app": {
+		"windows": [{ "title": "PreBase Tauri Plain", "width": 640, "height": 480 }]
+	}
+}

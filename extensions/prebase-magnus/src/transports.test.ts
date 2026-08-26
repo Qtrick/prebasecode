@@ -139,7 +139,7 @@ describe('Gemini Protocol & Schema Serialization', () => {
 		assert.equal(parsed.thoughtSignature, 'snake_case_signature_token');
 	});
 
-	it('validates schema serialization matrix for all 38 contributing Magnus tools', () => {
+	it('validates schema serialization matrix for all contributing Magnus tools', () => {
 		const currentDir = path.dirname(fileURLToPath(import.meta.url));
 		const pkgPath = path.resolve(currentDir, '../package.json');
 		const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf8'));

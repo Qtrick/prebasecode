@@ -17,9 +17,16 @@ import { asJson, IRequestService } from '../../../../platform/request/common/req
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { PREBASE_DESKTOP_CHANNEL_NAME, type IPreBaseDesktopMainService } from '../../../../platform/prebaseDesktop/common/prebaseDesktop.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
-import type { CdpTarget, DesktopLaunchMode, ElectronProjectProfile, ExternalLaunchRequest, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
+import type { CdpTarget, DesktopFramework, DesktopLaunchMode, DesktopProjectProfile, ExternalLaunchRequest, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
+import { desktopUiModeFromLaunch, isElectronProfile, isRecognizedDesktopApp, isTauriProfile } from '../common/runtime/desktopTypes.js';
+import { detectDesktopProjects, selectDesktopProfile } from '../common/runtime/desktopDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
-import { buildElectronExternalLaunchRequest, buildNpmExternalLaunchRequest } from '../common/runtime/externalLaunchCommand.js';
+import { buildElectronExternalLaunchRequest, buildNpmExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../common/runtime/externalLaunchCommand.js';
+import { assertDesktop, formatDesktopFailure, interactDesktop, runDesktopDomCommand, type DesktopEvaluateFn } from '../common/runtime/desktopAutomationHost.js';
+import { DEFAULT_ELECTRON_STARTUP_TIMEOUT_MS, DEFAULT_TAURI_STARTUP_TIMEOUT_MS, describeLocator, parseDesktopLocator, redactSecretText, validatePressKey, type DesktopAssertCondition, type DesktopInteractAction } from '../common/runtime/desktopLocators.js';
+import { createDesktopTestRun, recordDesktopTestStep, summarizeDesktopTestRun, type DesktopTestRun } from '../common/runtime/desktopTestModel.js';
+import { DesktopWebDriverClient, webDriverBaseUrl } from '../common/runtime/desktopWebDriver.js';
+import { IWorkspaceTrustManagementService } from '../../../../platform/workspace/common/workspaceTrust.js';
 import type { IPreBaseRuntimeAdapter, PreBaseDesktopLaunchOptions } from '../common/runtime/runtimeAdapter.js';
 import type { ProjectProbe } from '../common/runtime/types.js';
 import { validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
@@ -30,8 +37,14 @@ export interface IPreBaseDesktopRuntimeService extends IPreBaseRuntimeAdapter {
 	readonly _serviceBrand: undefined;
 	readonly onDidChangeSessions: Event<readonly PreBaseDesktopSession[]>;
 	getSessions(): readonly PreBaseDesktopSession[];
+	getDetectedProfiles(): readonly DesktopProjectProfile[];
+	setPreferredFramework(framework: DesktopFramework): void;
 	getSessionSummaryForMagnus(sessionId?: string): Record<string, unknown>;
-	inspectForMagnus(sessionId?: string): Promise<Record<string, unknown>>;
+	startForMagnus(input?: { framework?: DesktopFramework; mode?: string; rendererUrl?: string; testing?: boolean }): Promise<Record<string, unknown>>;
+	cancelActiveAction(): void;
+	inspectForMagnus(sessionId?: string, token?: CancellationToken): Promise<Record<string, unknown>>;
+	interactForMagnus(input: { sessionId?: string; action: DesktopInteractAction; locator: unknown; value?: string; timeoutMs?: number }, token?: CancellationToken): Promise<Record<string, unknown>>;
+	assertForMagnus(input: { sessionId?: string; condition: DesktopAssertCondition; locator?: unknown; expected?: string | number; timeoutMs?: number }, token?: CancellationToken): Promise<Record<string, unknown>>;
 	getProcessOutputForMagnus(sessionId?: string): Promise<Record<string, unknown>>;
 	evaluateForMagnus(sessionId: string | undefined, expression: string): Promise<Record<string, unknown>>;
 	captureScreenshotForMagnus(sessionId?: string): Promise<Record<string, unknown>>;
@@ -71,11 +84,19 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	private readonly _main: IPreBaseDesktopMainService;
 	private readonly _channel: IChannel;
 
-	private _profile: ElectronProjectProfile | undefined;
+	private _profile: DesktopProjectProfile | undefined;
 	private _session: PreBaseDesktopSession | undefined;
 	private _lastRequest: { rendererUrl: string; command?: ExternalLaunchRequest; cwd: string; title: string } | undefined;
 	private _launchModeOverride: DesktopLaunchMode | undefined;
-	private readonly _lifecycleCts = this._register(new CancellationTokenSource());
+	private _preferredFramework: DesktopFramework | undefined;
+	private _lastProbe: ProjectProbe | undefined;
+	private _detectedProfiles: DesktopProjectProfile[] = [];
+	private _testRun: DesktopTestRun | undefined;
+	private _webDriver: DesktopWebDriverClient | undefined;
+	private _webDriverSession: { sessionId: string; baseUrl: string } | undefined;
+	private _launchCts: CancellationTokenSource | undefined;
+	private _actionCts: CancellationTokenSource | undefined;
+	private _startTail: Promise<unknown> = Promise.resolve();
 
 	constructor(
 		@IMainProcessService mainProcessService: IMainProcessService,
@@ -83,6 +104,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		@IWorkspaceContextService private readonly workspaceService: IWorkspaceContextService,
 		@IRequestService private readonly requestService: IRequestService,
 		@IDialogService private readonly dialogService: IDialogService,
+		@IWorkspaceTrustManagementService private readonly workspaceTrust: IWorkspaceTrustManagementService,
 	) {
 		super();
 		this._channel = mainProcessService.getChannel(PREBASE_DESKTOP_CHANNEL_NAME);
@@ -120,13 +142,26 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		return this._session ? [this._session] : [];
 	}
 
-	detect(probe: ProjectProbe): ElectronProjectProfile {
-		this._profile = detectElectronProject(probe);
+	detect(probe: ProjectProbe): DesktopProjectProfile {
+		this._lastProbe = probe;
+		this._detectedProfiles = detectDesktopProjects(probe);
+		this._profile = selectDesktopProfile(this._detectedProfiles, this._preferredFramework) ?? detectElectronProject(probe);
 		return this._profile;
 	}
 
-	getProfile(): ElectronProjectProfile | undefined {
+	getProfile(): DesktopProjectProfile | undefined {
 		return this._profile;
+	}
+
+	getDetectedProfiles(): readonly DesktopProjectProfile[] {
+		return this._detectedProfiles;
+	}
+
+	setPreferredFramework(framework: DesktopFramework): void {
+		this._preferredFramework = framework;
+		if (this._lastProbe) {
+			this.detect(this._lastProbe);
+		}
 	}
 
 	getSession(): PreBaseDesktopSession | undefined {
@@ -151,11 +186,28 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	}
 
 	async start(options: PreBaseDesktopLaunchOptions = {}): Promise<PreBaseDesktopSession | undefined> {
+		const queued = this._startTail.then(() => this._doStart(options));
+		this._startTail = queued.then(() => undefined, () => undefined);
+		return queued;
+	}
+
+	private async _doStart(options: PreBaseDesktopLaunchOptions = {}): Promise<PreBaseDesktopSession | undefined> {
+		if (options.framework) {
+			this.setPreferredFramework(options.framework);
+		}
 		const profile = this._profile;
-		if (!profile?.isElectron) {
+		if (!isRecognizedDesktopApp(profile)) {
 			await this.dialogService.info(
-				localize('prebase.desktop.notElectron', "Not an Electron project"),
-				localize('prebase.desktop.notElectronDetail', "PreBase did not detect a direct Electron dependency or start script in this workspace.")
+				localize('prebase.desktop.notDesktop', "Not an Electron or Tauri project"),
+				localize('prebase.desktop.notDesktopDetail', "PreBase did not detect an Electron or Tauri app in this workspace.")
+			);
+			return undefined;
+		}
+
+		if (!this.workspaceTrust.isWorkspaceTrusted()) {
+			await this.dialogService.info(
+				localize('prebase.desktop.untrusted', "Workspace Restricted"),
+				localize('prebase.desktop.untrustedDetail', "Desktop testing executes project code and is unavailable in Restricted Mode.")
 			);
 			return undefined;
 		}
@@ -167,8 +219,32 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			return undefined;
 		}
 
+		if (this._session && this._session.state !== 'stopped' && this._session.state !== 'idle' && this._session.state !== 'setupRequired') {
+			await this.stop();
+		}
+
+		const purpose = options.purpose ?? (options.testing ? 'test' : 'preview');
+		const wantsNativeAutomation = purpose === 'test' && launchMode === 'external';
+		if (isTauriProfile(profile) && wantsNativeAutomation && profile.capabilities.fullNativeSetupRequired) {
+			this._session = {
+				id: generateUuid(),
+				workspaceRoot,
+				launchMode,
+				state: 'setupRequired',
+				profile,
+				purpose,
+				automationBackend: 'none',
+				cdpTargets: [],
+				ownedByPreBase: false,
+				startedAt: Date.now(),
+				errorMessage: profile.capabilities.fullNativeSetupReason,
+			};
+			this._fire();
+			return this._session;
+		}
+
 		const rendererUrl = await this._resolveRendererUrl(options.rendererUrl ?? profile.rendererUrlHint);
-		if (!rendererUrl) {
+		if (launchMode === 'managed' && !rendererUrl) {
 			await this.dialogService.info(
 				localize('prebase.desktop.noRenderer', "Renderer URL required"),
 				localize('prebase.desktop.noRendererDetail', "Start the renderer dev server or provide a reachable local URL before launching.")
@@ -176,22 +252,37 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			return undefined;
 		}
 
+		const tauriWebDriver = isTauriProfile(profile) && wantsNativeAutomation && profile.hasWdioWebdriverPlugin;
 		const sessionId = generateUuid();
-		const title = this.workspaceService.getWorkspace().folders[0]?.name || 'Electron App';
+		const title = this.workspaceService.getWorkspace().folders[0]?.name || profile.label;
+		const automationBackend = tauriWebDriver ? 'webdriver' : (isTauriProfile(profile) && launchMode === 'external' ? 'none' : 'cdp');
 		this._session = {
 			id: sessionId,
 			workspaceRoot,
 			launchMode,
 			state: 'starting',
 			profile,
+			purpose,
+			automationBackend,
 			rendererUrl,
 			cdpTargets: [],
 			ownedByPreBase: true,
 			startedAt: Date.now(),
 		};
-		this._lastRequest = { rendererUrl, command: options.command, cwd: workspaceRoot, title };
+		if (purpose === 'test') {
+			this._testRun = createDesktopTestRun({
+				id: sessionId,
+				framework: profile.framework,
+				mode: desktopUiModeFromLaunch(launchMode),
+				backend: this._session.automationBackend,
+				workspaceRoot,
+			});
+			this._session.testRunId = this._testRun.id;
+		}
+		this._lastRequest = { rendererUrl: rendererUrl ?? '', command: options.command, cwd: workspaceRoot, title };
 		this._fire();
 
+		const launchToken = this._beginLaunch();
 		try {
 			if (launchMode === 'managed') {
 				if (!profile.capabilities.supportsManagedLaunch) {
@@ -208,12 +299,13 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 					sessionId,
 					workspaceRoot,
 					launchMode,
-					rendererUrl,
+					rendererUrl: rendererUrl!,
 					title,
 					showManagementBar: showBar,
+					purpose,
 				});
 				this._updateSession({
-					state: 'running',
+					state: purpose === 'test' ? 'testing' : 'running',
 					managedWindowId: managed.windowId,
 					errorMessage: undefined,
 				});
@@ -226,47 +318,118 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 					this._updateSession({ state: 'error', errorMessage: 'External launch unsupported' });
 					return this._session;
 				}
-				const command = options.command ?? this._buildExternalCommand(profile);
-				// Main process allocates an ephemeral localhost CDP port when debugPort is 0.
-				const spawned = await this._main.spawnExternal(command, workspaceRoot, 0);
-				const debugPort = spawned.debugPort;
-				if (!debugPort) {
-					throw new Error('External Electron process did not receive a localhost debugging port.');
+				const command = options.command ?? this._buildExternalCommand(profile, tauriWebDriver);
+				this._lastRequest = { ...this._lastRequest!, command };
+				if (isTauriProfile(profile)) {
+					const spawned = await this._main.spawnExternal(command, tauriLaunchCwd(workspaceRoot, profile.cargoTomlPath), 0, {}, { purpose, electronCdp: false, webDriver: tauriWebDriver });
+					this._updateSession({ pid: spawned.pid, webDriverPort: spawned.webDriverPort });
+					if (tauriWebDriver) {
+						if (!spawned.webDriverPort) {
+							throw new Error('Tauri process did not receive a loopback WebDriver port.');
+						}
+						this._webDriver = new DesktopWebDriverClient(webDriverBaseUrl(spawned.webDriverPort));
+						await this._webDriver.waitUntilReady(DEFAULT_TAURI_STARTUP_TIMEOUT_MS, launchToken);
+						this._webDriverSession = await this._webDriver.newSession(launchToken);
+					}
+					this._updateSession({
+						state: purpose === 'test' ? 'testing' : 'running',
+						errorMessage: undefined,
+					});
+				} else {
+					const spawned = await this._main.spawnExternal(command, workspaceRoot, 0, {}, { purpose, electronCdp: true });
+					const debugPort = spawned.debugPort;
+					this._updateSession({ pid: spawned.pid, debugPort });
+					if (!debugPort) {
+						throw new Error('External Electron process did not receive a localhost debugging port.');
+					}
+					const targets = await this._discoverCdpTargets(debugPort);
+					if (!targets.length) {
+						throw new Error('External Electron application started without an inspectable CDP target. Verify that its launch script accepts --remote-debugging-port.');
+					}
+					this._updateSession({
+						state: purpose === 'test' ? 'testing' : 'running',
+						cdpTargets: targets,
+						errorMessage: undefined,
+					});
 				}
-				const targets = await this._discoverCdpTargets(debugPort);
-				if (!targets.length) {
-					throw new Error('External Electron application started without an inspectable CDP target. Verify that its launch script accepts --remote-debugging-port.');
-				}
-				this._updateSession({
-					state: 'running',
-					debugPort,
-					pid: spawned.pid,
-					cdpTargets: targets,
-					errorMessage: undefined,
-				});
 			}
 		} catch (err) {
+			const cancelled = launchToken.isCancellationRequested || this._session?.state === 'stopping' || this._session?.state === 'stopped';
+			const pid = this._session?.pid;
+			await this._disposeAutomation();
+			if (pid) {
+				try {
+					await this._main.killOwnedProcess(pid);
+				} catch {
+					// process may already have exited
+				}
+			}
+			if (cancelled) {
+				this._updateSession({ state: 'stopped', pid: undefined, debugPort: undefined, webDriverPort: undefined });
+				return this._session;
+			}
 			const message = err instanceof Error ? err.message : String(err);
-			this._updateSession({ state: 'error', errorMessage: message });
+			this._updateSession({ state: 'error', errorMessage: message, pid: undefined, debugPort: undefined, webDriverPort: undefined });
+		} finally {
+			if (this._session?.state !== 'starting') {
+				this._launchCts?.dispose();
+				this._launchCts = undefined;
+			}
 		}
 		return this._session;
+	}
+
+	async startForMagnus(input: { framework?: DesktopFramework; mode?: string; rendererUrl?: string; testing?: boolean } = {}): Promise<Record<string, unknown>> {
+		if (!this.workspaceTrust.isWorkspaceTrusted()) {
+			return { ok: false, reason: 'Desktop testing executes project code and is unavailable in Restricted Mode.', workspaceTrust: false };
+		}
+		const launchMode = input.mode === 'fullApp' || input.mode === 'external'
+			? 'external'
+			: input.mode === 'renderer' || input.mode === 'managed'
+				? 'managed'
+				: undefined;
+		const session = await this.start({
+			launchMode,
+			rendererUrl: input.rendererUrl,
+			testing: true,
+			framework: input.framework,
+			purpose: 'test',
+		});
+		if (!session) {
+			return { ok: false, reason: 'Desktop session did not start.' };
+		}
+		return this.getSessionSummaryForMagnus(session.id);
+	}
+
+	cancelActiveAction(): void {
+		this._actionCts?.cancel();
+		this._launchCts?.cancel();
 	}
 
 	async stop(): Promise<void> {
 		if (!this._session) {
 			return;
 		}
+		this._cancelLaunch();
+		this.cancelActiveAction();
 		this._updateSession({ state: 'stopping' });
+		await this._disposeAutomation();
 		if (this._session.launchMode === 'managed') {
 			await this._main.closeManagedWindow(this._session.id);
 		} else if (this._session.pid) {
 			await this._main.killOwnedProcess(this._session.pid);
 		}
-		this._updateSession({ state: 'stopped', pid: undefined, managedWindowId: undefined, cdpTargets: [] });
+		if (this._testRun) {
+			this._testRun.endedAt = Date.now();
+			this._testRun.cleanup = 'clean';
+		}
+		this._updateSession({ state: 'stopped', pid: undefined, managedWindowId: undefined, cdpTargets: [], webDriverPort: undefined });
 	}
 
 	async restart(): Promise<void> {
 		const mode = this._session?.launchMode ?? this.getLaunchMode();
+		const purpose = this._session?.purpose ?? 'preview';
+		const framework = this._session?.profile.framework;
 		if (mode === 'managed' && this._session && this._lastRequest) {
 			const showBar = this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeManagedApplicationBar) ?? true;
 			const rendererUrl = this._session.rendererUrl ?? this._lastRequest.rendererUrl;
@@ -279,6 +442,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 					rendererUrl,
 					title: this._lastRequest.title,
 					showManagementBar: showBar,
+					purpose: this._session.purpose,
 				});
 				this._lastRequest = { ...this._lastRequest, rendererUrl };
 				this._updateSession({
@@ -297,7 +461,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		const rendererUrl = this._session?.rendererUrl ?? this._lastRequest?.rendererUrl;
 		const command = this._lastRequest?.command;
 		await this.stop();
-		await this.start({ launchMode: mode, rendererUrl, command });
+		await this.start({ launchMode: mode, rendererUrl, command, purpose, framework, testing: purpose === 'test' });
 	}
 
 	async reload(): Promise<boolean> {
@@ -345,71 +509,115 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		return {
 			ok: true,
 			sessionId: session.id,
-			launchMode: session.launchMode,
+			framework: session.profile.framework,
+			mode: desktopUiModeFromLaunch(session.launchMode),
 			state: session.state,
-			pid: session.pid,
-			debugPort: session.debugPort,
-			rendererUrl: session.rendererUrl,
-			managedWindowId: session.managedWindowId,
+			purpose: session.purpose,
+			backend: session.automationBackend,
 			ownedByPreBase: session.ownedByPreBase,
-			cdpTargetCount: session.cdpTargets.length,
-			capabilities: session.profile.capabilities,
+			setupRequired: session.state === 'setupRequired',
+			rendererUrl: session.rendererUrl,
 			limitations: session.profile.capabilities.limitations,
 			errorMessage: session.errorMessage,
+			test: this._testRun ? summarizeDesktopTestRun(this._testRun) : undefined,
 		};
 	}
 
-	async inspectForMagnus(sessionId?: string): Promise<Record<string, unknown>> {
+	async inspectForMagnus(sessionId?: string, token: CancellationToken = CancellationToken.None): Promise<Record<string, unknown>> {
 		const session = this._resolveSession(sessionId);
 		if (!session) {
 			return { ok: false, reason: 'No owned desktop session.' };
 		}
-		if (!(this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeEnableDesktopAutomation) ?? false)) {
+		if (session.state === 'setupRequired' || session.automationBackend === 'none') {
+			return { ok: false, setupRequired: session.state === 'setupRequired' || session.profile.capabilities.fullNativeSetupRequired, reason: session.errorMessage ?? 'Full-app automation is not connected. Use Renderer mode, or Enable PreBase Tauri Testing for native WebDriver.', rendererAvailable: session.profile.capabilities.supportsRendererAutomation };
+		}
+		if (!this._automationAllowed(session)) {
 			return { ok: false, reason: 'Desktop automation is disabled in settings.' };
 		}
 		try {
-			if (session.launchMode === 'managed') {
-				const outline = await this._main.evaluateInManagedWindow(session.id, `(() => ({
-					title: document.title,
-					url: location.href,
-					visibleText: (document.body?.innerText || '').slice(0, 4000),
-					buttons: Array.from(document.querySelectorAll('button,[role="button"],a')).slice(0, 40).map(el => ({
-						tag: el.tagName.toLowerCase(),
-						text: (el.textContent || '').trim().slice(0, 80),
-						id: el.id || undefined,
-					})),
-				}))()`);
-				return {
-					ok: true,
-					launchMode: 'managed',
-					outline,
-					limitations: session.profile.capabilities.limitations,
-					unsupported: ['project main process', 'project preload', 'native IPC bridge'],
-				};
-			}
-			if (!session.debugPort) {
-				return { ok: false, reason: 'External session has no debugging endpoint.' };
-			}
-			const targets = await this._discoverCdpTargets(session.debugPort);
-			this._updateSession({ cdpTargets: targets });
-			const outline = await this._main.evaluateViaCdp(session.debugPort, `(() => ({
-				title: document.title,
-				url: location.href,
-				visibleText: (document.body?.innerText || '').slice(0, 4000),
-				buttons: Array.from(document.querySelectorAll('button,[role="button"],a')).slice(0, 40).map(el => ({
-					tag: el.tagName.toLowerCase(),
-					text: (el.textContent || '').trim().slice(0, 80),
-					id: el.id || undefined,
-				})),
-			}))()`);
+			const snapshot = await runDesktopDomCommand(this._pageEvaluate(session), { op: 'snapshot' }, this._linkedActionToken(token));
+			this._recordStep({ kind: 'inspect', action: 'snapshot', startedAt: Date.now(), durationMs: 0, ok: snapshot.ok, failure: snapshot.ok ? undefined : snapshot.code });
+			const windows = session.cdpTargets.length || (session.managedWindowId ? 1 : 0) || (session.webDriverPort ? 1 : 0);
 			return {
-				ok: true,
-				launchMode: 'external',
-				targets: targets.map(t => ({ id: t.id, type: t.type, title: t.title, url: t.url })),
-				outline,
+				ok: snapshot.ok,
+				framework: session.profile.framework,
+				mode: desktopUiModeFromLaunch(session.launchMode),
+				backend: session.automationBackend,
+				title: snapshot.title,
+				url: snapshot.url,
+				windowCount: windows,
+				windows: session.cdpTargets.map(target => ({ id: target.id, title: target.title, url: target.url, type: target.type })),
+				visibleText: snapshot.visibleText ? redactSecretText(snapshot.visibleText) : snapshot.visibleText,
+				interactive: snapshot.interactive,
+				console: (snapshot.console ?? []).map(entry => ({ ...entry, text: redactSecretText(entry.text) })),
 				limitations: session.profile.capabilities.limitations,
 				unsupported: ['native file picker', 'system menu bar', 'OS permission dialogs', 'native window controls'],
 			};
+		} catch (err) {
+			return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+		}
+	}
+
+	async interactForMagnus(input: { sessionId?: string; action: DesktopInteractAction; locator: unknown; value?: string; timeoutMs?: number }, token: CancellationToken = CancellationToken.None): Promise<Record<string, unknown>> {
+		const session = this._resolveSession(input.sessionId);
+		if (!session) {
+			return { ok: false, reason: 'No owned desktop session.' };
+		}
+		if (!this._automationAllowed(session)) {
+			return { ok: false, reason: 'Desktop automation is disabled in settings.' };
+		}
+		if (session.automationBackend === 'none') {
+			return { ok: false, reason: 'This desktop session has no automation backend. Start a test session in Renderer mode, or Enable PreBase Tauri Testing for full-app automation.' };
+		}
+		const locator = parseDesktopLocator(input.locator);
+		if ('error' in locator) {
+			return { ok: false, reason: locator.error };
+		}
+		if (input.action === 'press') {
+			const keyError = validatePressKey(String(input.value ?? ''));
+			if (keyError) {
+				return { ok: false, reason: keyError };
+			}
+		}
+		const started = Date.now();
+		try {
+			this._updateSession({ state: session.purpose === 'test' ? 'testing' : session.state });
+			const result = await interactDesktop(this._pageEvaluate(session), input.action, locator, input.value, input.timeoutMs, this._linkedActionToken(token));
+			const duration = Date.now() - started;
+			const failure = result.ok ? undefined : formatDesktopFailure(result, locator);
+			this._recordStep({ kind: 'interact', action: input.action, locator, resolvedTarget: input.value, startedAt: started, durationMs: duration, ok: result.ok, failure });
+			if (!result.ok) {
+				return { ok: false, action: input.action, locator: describeLocator(locator), reason: failure, matchCount: result.count, matches: result.matches, title: result.title, url: result.url, console: result.console, duration, framework: session.profile.framework, backend: session.automationBackend };
+			}
+			return { ok: true, action: input.action, locator: describeLocator(locator), match: result.match, title: result.title, url: result.url, duration, framework: session.profile.framework, backend: session.automationBackend };
+		} catch (err) {
+			return { ok: false, reason: err instanceof Error ? err.message : String(err) };
+		}
+	}
+
+	async assertForMagnus(input: { sessionId?: string; condition: DesktopAssertCondition; locator?: unknown; expected?: string | number; timeoutMs?: number }, token: CancellationToken = CancellationToken.None): Promise<Record<string, unknown>> {
+		const session = this._resolveSession(input.sessionId);
+		if (!session) {
+			return { ok: false, reason: 'No owned desktop session.' };
+		}
+		if (!this._automationAllowed(session)) {
+			return { ok: false, reason: 'Desktop automation is disabled in settings.' };
+		}
+		if (session.automationBackend === 'none') {
+			return { ok: false, reason: 'This desktop session has no automation backend. Start a test session in Renderer mode, or Enable PreBase Tauri Testing for full-app automation.' };
+		}
+		const locator = input.locator ? parseDesktopLocator(input.locator) : undefined;
+		if (locator && 'error' in locator) {
+			return { ok: false, reason: locator.error };
+		}
+		const started = Date.now();
+		try {
+			const asserted = await assertDesktop(this._pageEvaluate(session), input.condition, locator && !('error' in locator) ? locator : undefined, input.expected, input.timeoutMs, this._linkedActionToken(token));
+			this._recordStep({ kind: 'assert', action: input.condition, locator: locator && !('error' in locator) ? locator : undefined, startedAt: started, durationMs: asserted.duration, ok: asserted.ok, failure: asserted.ok ? undefined : formatDesktopFailure(asserted.result, locator && !('error' in locator) ? locator : undefined) });
+			if (!asserted.ok) {
+				return { ok: false, condition: input.condition, actual: asserted.actual, expected: asserted.expected, duration: asserted.duration, console: asserted.result.console, framework: session.profile.framework, backend: session.automationBackend, title: asserted.result.title, url: asserted.result.url };
+			}
+			return { ok: true, condition: input.condition, actual: asserted.actual, expected: asserted.expected, duration: asserted.duration, framework: session.profile.framework, backend: session.automationBackend };
 		} catch (err) {
 			return { ok: false, reason: err instanceof Error ? err.message : String(err) };
 		}
@@ -439,6 +647,9 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		if (!session) {
 			return { ok: false, reason: 'No owned desktop session.' };
 		}
+		if (session.automationBackend === 'webdriver') {
+			return { ok: false, reason: 'Arbitrary JavaScript evaluation is not available for Tauri WebDriver sessions. Use interact or assert.' };
+		}
 		if (!(this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeEnableDesktopAutomation) ?? false)) {
 			return { ok: false, reason: 'Desktop automation is disabled in settings.' };
 		}
@@ -465,7 +676,11 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		try {
 			if (session.launchMode === 'managed') {
 				const pngBase64 = await this._main.captureManagedScreenshot(session.id);
-				return { ok: true, mimeType: 'image/png', pngBase64, scope: 'application-content-only' };
+				return { ok: true, mimeType: 'image/png', pngBase64, scope: 'application-content-only', framework: session.profile.framework, mode: desktopUiModeFromLaunch(session.launchMode), timestamp: Date.now() };
+			}
+			if (session.webDriverPort && this._webDriver && this._webDriverSession) {
+				const pngBase64 = await this._webDriver.screenshot(this._webDriverSession);
+				return { ok: true, mimeType: 'image/png', pngBase64, scope: 'tauri-webview', framework: 'tauri', mode: desktopUiModeFromLaunch(session.launchMode), timestamp: Date.now() };
 			}
 			if (!session.debugPort) {
 				return { ok: false, reason: 'External session has no owned debugging endpoint.' };
@@ -488,28 +703,99 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	}
 
 	override dispose(): void {
-		this._lifecycleCts.cancel();
+		this._cancelLaunch();
+		this.cancelActiveAction();
+		this._actionCts?.dispose();
+		void this._disposeAutomation();
 		const stopManaged = this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeStopManagedAppsOnExit) ?? true;
 		const stopExternal = this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeStopExternalAppsOnExit) ?? false;
 		if (this._session?.ownedByPreBase) {
-			if (this._session.launchMode === 'managed' && stopManaged) {
+			const testOwned = this._session.purpose === 'test';
+			if (this._session.launchMode === 'managed' && (stopManaged || testOwned)) {
 				void this._main.closeManagedWindow(this._session.id);
 			}
-			if (this._session.launchMode === 'external' && stopExternal && this._session.pid) {
+			if (this._session.launchMode === 'external' && this._session.pid && (stopExternal || testOwned)) {
 				void this._main.killOwnedProcess(this._session.pid);
 			}
 		}
 		super.dispose();
 	}
 
-	private _buildExternalCommand(profile: ElectronProjectProfile): ExternalLaunchRequest {
-		if (profile.electronScriptName) {
-			return buildNpmExternalLaunchRequest(profile.electronScriptName);
+	private _buildExternalCommand(profile: DesktopProjectProfile, enableTauriTestingFeature = false): ExternalLaunchRequest {
+		if (isTauriProfile(profile)) {
+			return buildTauriExternalLaunchRequest(profile.tauriScriptName, enableTauriTestingFeature && profile.testingCargoFeature);
 		}
-		if (profile.paths.main) {
-			return buildElectronExternalLaunchRequest(profile.paths.main);
+		if (isElectronProfile(profile)) {
+			if (profile.electronScriptName) {
+				return buildNpmExternalLaunchRequest(profile.electronScriptName);
+			}
+			if (profile.paths.main) {
+				return buildElectronExternalLaunchRequest(profile.paths.main);
+			}
 		}
-		throw new Error('Electron project has no launch script or main entry.');
+		throw new Error('Desktop project has no launch script or main entry.');
+	}
+
+	private _automationAllowed(session: PreBaseDesktopSession): boolean {
+		return session.purpose === 'test' || (this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeEnableDesktopAutomation) ?? false);
+	}
+
+	private _beginLaunch(): CancellationToken {
+		this._cancelLaunch();
+		this._launchCts = new CancellationTokenSource();
+		return this._launchCts.token;
+	}
+
+	private _cancelLaunch(): void {
+		this._launchCts?.cancel();
+		this._launchCts?.dispose();
+		this._launchCts = undefined;
+	}
+
+	private _linkedActionToken(external: CancellationToken): CancellationToken {
+		this._actionCts?.dispose(true);
+		this._actionCts = new CancellationTokenSource();
+		if (external !== CancellationToken.None) {
+			const sub = external.onCancellationRequested(() => this._actionCts?.cancel());
+			this._actionCts.token.onCancellationRequested(() => sub.dispose());
+		}
+		return this._actionCts.token;
+	}
+
+	private _pageEvaluate(session: PreBaseDesktopSession): DesktopEvaluateFn {
+		return async (expression, token) => {
+			if (token?.isCancellationRequested) {
+				throw new Error('Cancelled');
+			}
+			if (session.launchMode === 'managed') {
+				return this._main.evaluateInManagedWindow(session.id, expression);
+			}
+			if (session.webDriverPort && this._webDriver && this._webDriverSession) {
+				return this._webDriver.execute(this._webDriverSession, `return (${expression});`, token);
+			}
+			if (!session.debugPort) {
+				throw new Error('Session has no renderer evaluation endpoint.');
+			}
+			return this._main.evaluateViaCdp(session.debugPort, expression);
+		};
+	}
+
+	private async _disposeAutomation(): Promise<void> {
+		if (this._webDriver && this._webDriverSession) {
+			try {
+				await this._webDriver.deleteSession(this._webDriverSession);
+			} catch {
+				// session may already be gone with the app
+			}
+		}
+		this._webDriver = undefined;
+		this._webDriverSession = undefined;
+	}
+
+	private _recordStep(step: Parameters<typeof recordDesktopTestStep>[1]): void {
+		if (this._testRun) {
+			recordDesktopTestStep(this._testRun, step);
+		}
 	}
 
 	private async _resolveRendererUrl(candidate?: string): Promise<string | undefined> {
@@ -531,8 +817,9 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	}
 
 	private async _discoverCdpTargets(port: number): Promise<CdpTarget[]> {
-		const token = this._lifecycleCts.token;
-		for (let attempt = 0; attempt < 20; attempt++) {
+		const token = this._launchCts?.token ?? CancellationToken.None;
+		const deadline = Date.now() + DEFAULT_ELECTRON_STARTUP_TIMEOUT_MS;
+		while (Date.now() < deadline) {
 			if (token.isCancellationRequested) {
 				return [];
 			}
