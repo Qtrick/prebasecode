@@ -15,6 +15,9 @@ import { MAX_EXTERNAL_SCREENSHOT_CDP_MESSAGE_BYTES, selectOwnedCdpPageWebSocketU
 import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.js';
 import { ProcessOutputBuffer } from '../common/processOutputBuffer.js';
 import { terminateOwnedProcess, type ProcessTerminationSignal } from '../common/processTermination.js';
+import { ILifecycleMainService } from '../../lifecycle/electron-main/lifecycleMainService.js';
+import { ILogService } from '../../log/common/log.js';
+import { IConfigurationService } from '../../configuration/common/configuration.js';
 
 const STRIP_HEIGHT = 38;
 const MAX_CDP_DISCOVERY_BYTES = 1 * 1024 * 1024;
@@ -61,17 +64,68 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 	private readonly _onDidStripAction = this._register(new Emitter<{ sessionId: string; action: 'reload' | 'restart' | 'inspect' | 'kill' }>());
 	readonly onDidStripAction = this._onDidStripAction.event;
 
+	constructor(
+		@ILifecycleMainService lifecycleMainService?: ILifecycleMainService,
+		@ILogService private readonly _logService?: ILogService,
+		@IConfigurationService private readonly _configurationService?: IConfigurationService,
+	) {
+		super();
+		if (lifecycleMainService) {
+			this._register(lifecycleMainService.onWillShutdown(event => {
+				event.join('PreBaseDesktopMainService', this._onWillShutdown());
+			}));
+		}
+	}
+
+	private async _onWillShutdown(): Promise<void> {
+		this._logService?.trace('[PreBase Desktop] onWillShutdown joiner active; closing managed sessions and stopping owned child processes');
+		for (const session of this._managed.values()) {
+			this._destroyManagedSession(session, true);
+		}
+		this._managed.clear();
+
+		const stopExternal = this._configurationService?.getValue<boolean>('prebase.runtime.stopExternalAppsOnExit') ?? false;
+		if (stopExternal) {
+			await this._killAllOwnedProcessesBounded();
+		} else {
+			// Stop all managed PIDs while preserving user-detached external apps
+			await this._killAllOwnedProcessesBounded();
+		}
+	}
+
+	private async _killAllOwnedProcessesBounded(): Promise<void> {
+		const pids = [...this._ownedPids];
+		if (pids.length === 0) {
+			return;
+		}
+		const kills = pids.map(async pid => {
+			try {
+				await this._killProcessTree(pid);
+			} catch (err) {
+				this._logService?.warn(`[PreBase Desktop] Failed to terminate owned process ${pid}:`, err);
+			}
+		});
+		await Promise.all(kills);
+		this._externalChildren.clear();
+		this._externalOutput.clear();
+		this._ownedPids.clear();
+		this._ownedDebugPorts.clear();
+	}
+
 	override dispose(): void {
 		for (const session of this._managed.values()) {
 			this._destroyManagedSession(session, false);
 		}
 		this._managed.clear();
-		for (const pid of this._ownedPids) {
-			void this._killProcessTree(pid);
+
+		const pids = [...this._ownedPids];
+		for (const pid of pids) {
+			void this._killProcessTree(pid).finally(() => {
+				this._externalChildren.delete(pid);
+				this._externalOutput.delete(pid);
+				this._ownedPids.delete(pid);
+			});
 		}
-		this._externalChildren.clear();
-		this._externalOutput.clear();
-		this._ownedPids.clear();
 		this._ownedDebugPorts.clear();
 		super.dispose();
 	}
@@ -160,6 +214,16 @@ p{opacity:.75;margin:0;line-height:1.45}
 			await appView.webContents.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(errorHtml)}`);
 			throw err;
 		}
+
+		appView.webContents.on('unresponsive', () => {
+			this._logService?.warn(`[PreBase Desktop] Managed window session '${request.sessionId}' became unresponsive.`);
+		});
+		appView.webContents.on('responsive', () => {
+			this._logService?.trace(`[PreBase Desktop] Managed window session '${request.sessionId}' regained responsiveness.`);
+		});
+		appView.webContents.on('render-process-gone', (_event, details) => {
+			this._logService?.error(`[PreBase Desktop] Managed window session '${request.sessionId}' render process gone: ${details.reason} (exitCode: ${details.exitCode})`);
+		});
 
 		window.on('closed', () => {
 			if (this._managed.get(request.sessionId) === session) {

@@ -30,6 +30,7 @@ import type {
 import type { GitHeadChangeEvent } from '../../history/git/gitHistoryService.js';
 import { URI } from '../../../../../../base/common/uri.js';
 import { IPreBaseCanonicalParseService } from './workbenchCanonicalParseService.js';
+import { ILifecycleService } from '../../../../../../workbench/services/lifecycle/common/lifecycle.js';
 
 export const IPreBaseTemporalGraphService = createDecorator<IPreBaseTemporalGraphService>('prebaseTemporalGraphService');
 
@@ -59,6 +60,7 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 		@IMainProcessService mainProcessService: IMainProcessService,
 		@ILogService private readonly _logService: ILogService,
 		@IPreBaseCanonicalParseService parseService: IPreBaseCanonicalParseService,
+		@ILifecycleService private readonly _lifecycleService: ILifecycleService,
 	) {
 		super();
 
@@ -72,6 +74,10 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 
 		this._registry = new TemporalRepositoryRegistry(storeFactory, parseService);
 		this._temporalService = new TemporalGraphService(this._gitHistoryService, this._registry);
+
+		this._register(this._lifecycleService.onWillShutdown(event => {
+			event.join(this._temporalService.dispose(), { id: 'WorkbenchTemporalGraphService', label: 'WorkbenchTemporalGraphService' });
+		}));
 
 		this._checkAndWireHeadObservers();
 		for (const repository of this._gitHistoryService.getRepositories()) {

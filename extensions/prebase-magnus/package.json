@@ -18,7 +18,6 @@
     }
   },
   "activationEvents": [
-    "onStartupFinished",
     "onLanguageModelChatProvider:magnus",
     "onChatParticipant:prebase.magnus.ask",
     "onChatParticipant:prebase.magnus.edit",

@@ -167,6 +167,8 @@ async function connectToCdp(port) {
 				detailsOpen: detailsDrawer ? !detailsDrawer.classList.contains('hidden') && detailsDrawer.style.display !== 'none' : false,
 				renderedNodeElements: nodes.length,
 				renderNodesCount: win.currentTemporalRenderNodes?.size || 0,
+				hasAuthOverlay: Boolean(doc.querySelector('.auth-overlay, #authOverlay, .modal-backdrop, [data-auth-required="true"]')),
+				renderMetrics: win.__prebaseGraphRenderMetrics || null,
 			};
 		})()`);
 		return evalRes?.result?.value || {};
@@ -289,7 +291,11 @@ async function main() {
 			name: 'Initial Viewport',
 			state: state1,
 			canvas: canvas1,
-			pass: !state1.statusText.includes('Error'),
+			pass: canvas1.isContentful === true &&
+				Boolean(state1.commitSha) &&
+				state1.statusText !== 'Indexing...' &&
+				!state1.statusText.includes('Error') &&
+				!state1.hasAuthOverlay,
 		});
 
 		console.log('2. Switching to Full Codebase Map (State Mode)...');
@@ -308,7 +314,10 @@ async function main() {
 			name: 'Full Codebase Map (State Mode)',
 			state: state2,
 			canvas: canvas2,
-			pass: !state2.statusText.includes('Error'),
+			pass: canvas2.isContentful === true &&
+				(state2.renderedNodeElements > 0 || state2.renderNodesCount > 0) &&
+				!state2.statusText.includes('Error') &&
+				!state2.hasAuthOverlay,
 		});
 
 		console.log('3. Switching to Focus Changes Mode...');
@@ -327,7 +336,9 @@ async function main() {
 			name: 'Focus Changes Mode',
 			state: state3,
 			canvas: canvas3,
-			pass: !state3.statusText.includes('Error'),
+			pass: canvas3.isContentful === true &&
+				!state3.statusText.includes('Error') &&
+				!state3.hasAuthOverlay,
 		});
 
 		console.log('4. Enabling Keep Graph Centered (Center Lock)...');
@@ -349,7 +360,9 @@ async function main() {
 			name: 'Keep Graph Centered (Center Lock)',
 			state: state4,
 			canvas: canvas4,
-			pass: state4.centerLockAriaPressed === true,
+			pass: canvas4.isContentful === true &&
+				state4.centerLockAriaPressed === true &&
+				!state4.statusText.includes('Error'),
 		});
 
 		console.log('5. Toggling Commit Details Inspector...');
@@ -368,7 +381,9 @@ async function main() {
 			name: 'Commit Details Inspector',
 			state: state5,
 			canvas: canvas5,
-			pass: true,
+			pass: canvas5.isContentful === true &&
+				state5.detailsOpen === true &&
+				!state5.statusText.includes('Error'),
 		});
 
 		console.log('6. Running Live Interactive Performance Benchmark...');

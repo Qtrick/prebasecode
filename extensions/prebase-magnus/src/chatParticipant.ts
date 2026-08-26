@@ -22,6 +22,7 @@ import {
 	type ToolCallItem,
 	type ToolExecutionTracker,
 } from './toolExecutor';
+import { paceTextStream } from './streamPace';
 
 export interface MagnusChatDefaults {
 	mode: MagnusAgentMode;
@@ -304,8 +305,18 @@ async function handleChatRequest(
 		run.status = 'completed';
 		run.completedAt = Date.now();
 		run.finalResponse = visibleAssistantText(rawText);
-		const finalVisible = run.finalResponse;
-		response.markdown(finalVisible || (enteredRunning ? 'The tool loop reached its limit before the model returned a final response.' : 'The model returned an empty response. Please retry or choose another model.'));
+		const finalVisible = run.finalResponse || (enteredRunning ? 'The tool loop reached its limit before the model returned a final response.' : 'The model returned an empty response. Please retry or choose another model.');
+
+		async function* textStream(): AsyncGenerator<string, void, unknown> {
+			yield finalVisible;
+		}
+
+		for await (const piece of paceTextStream(textStream(), { token: effectiveToken })) {
+			if (effectiveToken.isCancellationRequested) {
+				break;
+			}
+			response.markdown(piece);
+		}
 		return {};
 	} finally {
 		cancelSub.dispose();

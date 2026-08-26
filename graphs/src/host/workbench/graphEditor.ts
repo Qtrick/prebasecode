@@ -2239,6 +2239,7 @@ function updateTemporalDiffTransition(diff) {
 
 function drawTemporalFrame(ts) {
 	if (!netCanvas || !ctx) return;
+	const renderStart = performance.now();
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
 	const theme = getComputedThemeColors();
@@ -2607,6 +2608,24 @@ function drawTemporalFrame(ts) {
 		ctx.restore();
 	}
 
+	const renderEnd = performance.now();
+	try {
+		window.__prebaseGraphRenderMetrics = {
+			sequenceId: (window.__prebaseGraphRenderMetrics?.sequenceId || 0) + 1,
+			mode: 'temporal',
+			displayMode: displayMode,
+			renderStart: renderStart,
+			renderEnd: renderEnd,
+			durationMs: Math.max(0, renderEnd - renderStart),
+			nodesDrawn: nodesToRender.length,
+			edgesDrawn: (visibleData.edges || []).length,
+			labelsDrawn: visibleLabels.length,
+			lodTier: transform.k < 0.3 ? 'aggregate' : (transform.k < 0.8 ? 'direct' : 'full'),
+			isAnimating: Boolean(isAnimatingTemporal),
+			timestamp: renderEnd,
+		};
+	} catch {}
+
 	ctx.restore();
 
 	if (isAnimatingTemporal) {
@@ -2731,6 +2750,7 @@ function drawNetworkEdgeArrow(p1, p2, color, arrowSize) {
 
 function drawNetworkFrame() {
 	if (!netCanvas || !ctx) return;
+	const renderStart = performance.now();
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
 	ctx.clearRect(0, 0, w, h);
@@ -2911,6 +2931,23 @@ function drawNetworkFrame() {
 		ctx.fillText(labelText, p.x, labelY + 3);
 		ctx.restore();
 	}
+
+	const renderEnd = performance.now();
+	try {
+		window.__prebaseGraphRenderMetrics = {
+			sequenceId: (window.__prebaseGraphRenderMetrics?.sequenceId || 0) + 1,
+			mode: 'network',
+			renderStart: renderStart,
+			renderEnd: renderEnd,
+			durationMs: Math.max(0, renderEnd - renderStart),
+			nodesDrawn: nodes.length,
+			edgesDrawn: edgesToDraw.length,
+			labelsDrawn: placedLabelBoxes.length,
+			lodTier: transform.k < 0.3 ? 'low' : (transform.k < 0.8 ? 'medium' : 'high'),
+			isAnimating: false,
+			timestamp: renderEnd,
+		};
+	} catch {}
 
 	ctx.restore();
 	dirty = false;

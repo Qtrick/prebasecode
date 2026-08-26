@@ -168,6 +168,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 					try {
 						await this._configureDatabase(db);
 						await runMigrations(db);
+						// quick_check verifies B-tree structural integrity and index consistency
+						// without the unbounded overhead of scanning all page content in large caches.
 						const integrity = await readPragma(db, 'quick_check');
 						if (String(integrity).toLowerCase() !== 'ok') {
 							throw new TemporalError('DatabaseCorrupted', 'SQLite integrity check failed for the derived Temporal cache');
@@ -510,6 +512,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 				? snapshot.entityMap.values()
 				: new Map([...(delta?.entitiesAdded ?? []), ...(delta?.entitiesModified ?? [])].map(value => [value.entityId, value])).values());
 
+			const CHUNK_SIZE = 128;
+
 			if (entityTransitions.length > 0) {
 				const upsertEntityStmt = db.prepare(`
 					INSERT INTO entities (entity_id, canonical_path, kind, first_seen_commit, last_seen_commit, is_active, metadata_json)
@@ -525,31 +529,38 @@ export class SqliteTemporalStore implements ITemporalStore {
 					) VALUES (?, ?, ?, ?, ?, ?);
 				`);
 
-				await new Promise<void>((resolve, reject) => {
-					let pending = entityTransitions.length * 2;
-					let errored = false;
-					const check = (err: Error | null) => {
-						if (errored) return;
-						if (err) { errored = true; return reject(err); }
-						pending--;
-						if (pending === 0) resolve();
-					};
+				try {
+					for (let i = 0; i < entityTransitions.length; i += CHUNK_SIZE) {
+						const chunk = entityTransitions.slice(i, i + CHUNK_SIZE);
+						await new Promise<void>((resolve, reject) => {
+							let pending = chunk.length * 2;
+							let errored = false;
+							const check = (err: Error | null) => {
+								if (errored) return;
+								if (err) { errored = true; return reject(err); }
+								pending--;
+								if (pending === 0) resolve();
+							};
 
-					for (const entitySnap of entityTransitions) {
-						upsertEntityStmt.run([entitySnap.entityId, entitySnap.path, commit.commitSha, commit.commitSha], check);
-						insertEntitySnapStmt.run([
-							entitySnap.entityId,
-							commit.commitSha,
-							entitySnap.path,
-							entitySnap.blobOid ?? null,
-							entitySnap.contentHash ?? null,
-							JSON.stringify(entitySnap.nodeData),
-						], check);
+							for (const entitySnap of chunk) {
+								upsertEntityStmt.run([entitySnap.entityId, entitySnap.path, commit.commitSha, commit.commitSha], check);
+								insertEntitySnapStmt.run([
+									entitySnap.entityId,
+									commit.commitSha,
+									entitySnap.path,
+									entitySnap.blobOid ?? null,
+									entitySnap.contentHash ?? null,
+									JSON.stringify(entitySnap.nodeData),
+								], check);
+							}
+						});
 					}
-				});
-
-				await new Promise<void>((resolve, reject) => upsertEntityStmt.finalize(err => err ? reject(err) : resolve()));
-				await new Promise<void>((resolve, reject) => insertEntitySnapStmt.finalize(err => err ? reject(err) : resolve()));
+				} finally {
+					await Promise.all([
+						new Promise<void>(resolve => { try { upsertEntityStmt.finalize(() => resolve()); } catch { resolve(); } }),
+						new Promise<void>(resolve => { try { insertEntitySnapStmt.finalize(() => resolve()); } catch { resolve(); } }),
+					]);
+				}
 			}
 
 			// Mark deleted entities in this delta as inactive in entities table
@@ -593,27 +604,33 @@ export class SqliteTemporalStore implements ITemporalStore {
 					) VALUES (?, ?, ?, ?, ?, ?);
 				`);
 				const now = Date.now();
-				await new Promise<void>((resolve, reject) => {
-					let pending = nonSameLineageEvents.length;
-					let errored = false;
-					const check = (err: Error | null) => {
-						if (errored) return;
-						if (err) { errored = true; return reject(err); }
-						pending--;
-						if (pending === 0) resolve();
-					};
-					for (const event of nonSameLineageEvents) {
-						insertLineageStmt.run([
-							event.entityId,
-							event.commitSha,
-							event.parentCommitSha,
-							event.lineageCase,
-							JSON.stringify(event.evidence),
-							now,
-						], check);
+				try {
+					for (let i = 0; i < nonSameLineageEvents.length; i += CHUNK_SIZE) {
+						const chunk = nonSameLineageEvents.slice(i, i + CHUNK_SIZE);
+						await new Promise<void>((resolve, reject) => {
+							let pending = chunk.length;
+							let errored = false;
+							const check = (err: Error | null) => {
+								if (errored) return;
+								if (err) { errored = true; return reject(err); }
+								pending--;
+								if (pending === 0) resolve();
+							};
+							for (const event of chunk) {
+								insertLineageStmt.run([
+									event.entityId,
+									event.commitSha,
+									event.parentCommitSha,
+									event.lineageCase,
+									JSON.stringify(event.evidence),
+									now,
+								], check);
+							}
+						});
 					}
-				});
-				await new Promise<void>((resolve, reject) => insertLineageStmt.finalize(err => err ? reject(err) : resolve()));
+				} finally {
+					await new Promise<void>(resolve => { try { insertLineageStmt.finalize(() => resolve()); } catch { resolve(); } });
+				}
 			}
 
 			// 8. Checkpoints retain a full recoverable state; delta commits record only
@@ -636,37 +653,44 @@ export class SqliteTemporalStore implements ITemporalStore {
 					) VALUES (?, ?, ?, ?, ?, ?);
 				`);
 
-				await new Promise<void>((resolve, reject) => {
-					let pending = edgeTransitions.length * 2;
-					let errored = false;
-					const check = (err: Error | null) => {
-						if (errored) return;
-						if (err) { errored = true; return reject(err); }
-						pending--;
-						if (pending === 0) resolve();
-					};
-					for (const edgeSnap of edgeTransitions) {
-						upsertEdgeStmt.run([
-							edgeSnap.edgeId,
-							edgeSnap.sourceEntityId,
-							edgeSnap.targetEntityId,
-							edgeSnap.kind,
-							commit.commitSha,
-							commit.commitSha,
-						], check);
-						insertEdgeSnapStmt.run([
-							edgeSnap.edgeId,
-							commit.commitSha,
-							edgeSnap.sourceEntityId,
-							edgeSnap.targetEntityId,
-							edgeSnap.kind,
-							JSON.stringify(edgeSnap.edgeData),
-						], check);
+				try {
+					for (let i = 0; i < edgeTransitions.length; i += CHUNK_SIZE) {
+						const chunk = edgeTransitions.slice(i, i + CHUNK_SIZE);
+						await new Promise<void>((resolve, reject) => {
+							let pending = chunk.length * 2;
+							let errored = false;
+							const check = (err: Error | null) => {
+								if (errored) return;
+								if (err) { errored = true; return reject(err); }
+								pending--;
+								if (pending === 0) resolve();
+							};
+							for (const edgeSnap of chunk) {
+								upsertEdgeStmt.run([
+									edgeSnap.edgeId,
+									edgeSnap.sourceEntityId,
+									edgeSnap.targetEntityId,
+									edgeSnap.kind,
+									commit.commitSha,
+									commit.commitSha,
+								], check);
+								insertEdgeSnapStmt.run([
+									edgeSnap.edgeId,
+									commit.commitSha,
+									edgeSnap.sourceEntityId,
+									edgeSnap.targetEntityId,
+									edgeSnap.kind,
+									JSON.stringify(edgeSnap.edgeData),
+								], check);
+							}
+						});
 					}
-				});
-
-				await new Promise<void>((resolve, reject) => upsertEdgeStmt.finalize(err => err ? reject(err) : resolve()));
-				await new Promise<void>((resolve, reject) => insertEdgeSnapStmt.finalize(err => err ? reject(err) : resolve()));
+				} finally {
+					await Promise.all([
+						new Promise<void>(resolve => { try { upsertEdgeStmt.finalize(() => resolve()); } catch { resolve(); } }),
+						new Promise<void>(resolve => { try { insertEdgeSnapStmt.finalize(() => resolve()); } catch { resolve(); } }),
+					]);
+				}
 			}
 			for (const edge of delta?.edgesAdded ?? []) {
 				await new Promise<void>((resolve, reject) => {

@@ -20,6 +20,7 @@ import { IUriIdentityService } from '../../../../../../platform/uriIdentity/comm
 import { IEnvironmentService } from '../../../../../../platform/environment/common/environment.js';
 import { IMainProcessService } from '../../../../../../platform/ipc/common/mainProcessService.js';
 import { IEditorService } from '../../../../../../workbench/services/editor/common/editorService.js';
+import { ILifecycleService } from '../../../../../../workbench/services/lifecycle/common/lifecycle.js';
 import { IUtilityProcessWorkerWorkbenchService } from '../../../../../../workbench/services/utilityProcess/electron-browser/utilityProcessWorkerWorkbenchService.js';
 
 import { PreBaseGraphDescriptionService } from '../../host/workbench/prebaseGraphDescriptionService.js';
@@ -30,9 +31,13 @@ import { WorkbenchTemporalViewService } from '../../host/workbench/temporal/work
 import { WorkbenchCanonicalParseService, IPreBaseCanonicalParseService } from '../../host/workbench/workbenchCanonicalParseService.js';
 import { URI } from '../../../../../../base/common/uri.js';
 
-function getDepsMap(ctor: any): Map<number, string> {
-	const deps = _util.getServiceDependencies(ctor);
-	return new Map(deps.map(d => [d.index, d.id.toString()]));
+function getDepsMap(target: any): Map<number, string> {
+	const deps = _util.getServiceDependencies(target);
+	const map = new Map<number, string>();
+	for (const dep of deps) {
+		map.set(dep.index, dep.id.toString());
+	}
+	return map;
 }
 
 suite('Production Dependency Injection & Decorator Metadata Truth (P0 DI Gate)', () => {
@@ -102,9 +107,9 @@ suite('Production Dependency Injection & Decorator Metadata Truth (P0 DI Gate)',
 		assert.strictEqual(depsMap.get(6), IPreBaseCanonicalParseService.toString(), 'Param 6 must be IPreBaseCanonicalParseService');
 	});
 
-	test('5. WorkbenchTemporalGraphService has all 6 parameter decorators and DI metadata', () => {
+	test('5. WorkbenchTemporalGraphService has all 7 parameter decorators and DI metadata', () => {
 		const deps = _util.getServiceDependencies(WorkbenchTemporalGraphService as any);
-		assert.strictEqual(deps.length, 6, 'WorkbenchTemporalGraphService must have 6 injected dependencies');
+		assert.strictEqual(deps.length, 7, 'WorkbenchTemporalGraphService must have 7 injected dependencies');
 		const depsMap = getDepsMap(WorkbenchTemporalGraphService);
 		assert.strictEqual(depsMap.get(0), IWorkspaceContextService.toString(), 'Param 0 must be IWorkspaceContextService');
 		assert.strictEqual(depsMap.get(1), IEnvironmentService.toString(), 'Param 1 must be IEnvironmentService');
@@ -112,6 +117,7 @@ suite('Production Dependency Injection & Decorator Metadata Truth (P0 DI Gate)',
 		assert.strictEqual(depsMap.get(3), IMainProcessService.toString(), 'Param 3 must be IMainProcessService');
 		assert.strictEqual(depsMap.get(4), ILogService.toString(), 'Param 4 must be ILogService');
 		assert.strictEqual(depsMap.get(5), IPreBaseCanonicalParseService.toString(), 'Param 5 must be IPreBaseCanonicalParseService');
+		assert.strictEqual(depsMap.get(6), ILifecycleService.toString(), 'Param 6 must be ILifecycleService');
 	});
 
 	test('6. WorkbenchTemporalViewService has all 7 parameter decorators and DI metadata', () => {

@@ -17,25 +17,106 @@ import {
 } from '../common/temporalVersioning.js';
 import type { TemporalGraphSnapshot, TemporalIndexStatus } from '../common/temporalTypes.js';
 
+import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
+
 export class IngestionSequencer {
 	private _current: Promise<unknown> = Promise.resolve();
 	private _isDisposed = false;
+	private _activeCts: { cancel(): void; isCancellationRequested: boolean } | undefined;
+	private readonly _pendingQueue: Array<{ reject: (err: Error) => void }> = [];
 
-	queue<T>(promiseFactory: () => Promise<T>): Promise<T> {
+	queue<T>(promiseFactory: (token: CancellationTokenLike) => Promise<T>, callerToken?: CancellationTokenLike): Promise<T> {
 		if (this._isDisposed) {
 			return Promise.reject(new TemporalError('Cancelled', 'Ingestion sequencer is disposed'));
 		}
-		const res = this._current.then(
-			() => promiseFactory(),
-			() => promiseFactory()
-		);
-		this._current = res.catch(() => {});
-		return res;
+		if (callerToken?.isCancellationRequested) {
+			return Promise.reject(new TemporalError('Cancelled', 'Ingestion request was cancelled before execution'));
+		}
+
+		return new Promise<T>((resolve, reject) => {
+			const item = { reject };
+			this._pendingQueue.push(item);
+
+			const run = async () => {
+				const queueIndex = this._pendingQueue.indexOf(item);
+				if (queueIndex !== -1) {
+					this._pendingQueue.splice(queueIndex, 1);
+				}
+
+				if (this._isDisposed) {
+					throw new TemporalError('Cancelled', 'Ingestion sequencer is disposed');
+				}
+				if (callerToken?.isCancellationRequested) {
+					throw new TemporalError('Cancelled', 'Ingestion request was cancelled before execution');
+				}
+
+				let cancelled = false;
+				const listeners = new Set<() => void>();
+				const token: CancellationTokenLike = {
+					get isCancellationRequested() {
+						return cancelled || Boolean(callerToken?.isCancellationRequested);
+					},
+					onCancellationRequested(listener: () => void) {
+						listeners.add(listener);
+						const sub = callerToken?.onCancellationRequested?.(listener);
+						return {
+							dispose: () => {
+								listeners.delete(listener);
+								sub?.dispose();
+							}
+						};
+					}
+				};
+
+				const cts = {
+					get isCancellationRequested() {
+						return token.isCancellationRequested;
+					},
+					cancel: () => {
+						if (!cancelled) {
+							cancelled = true;
+							for (const listener of Array.from(listeners)) {
+								try {
+									listener();
+								} catch {
+									// ignore listener errors
+								}
+							}
+						}
+					}
+				};
+
+				this._activeCts = cts;
+				try {
+					const result = await promiseFactory(token);
+					resolve(result);
+					return result;
+				} catch (error) {
+					reject(error);
+					throw error;
+				} finally {
+					if (this._activeCts === cts) {
+						this._activeCts = undefined;
+					}
+				}
+			};
+
+			const next = this._current.then(run, run);
+			this._current = next.catch(() => {});
+		});
 	}
 
-	async dispose(): Promise<void> {
+	async dispose(timeoutMs: number = 2000): Promise<void> {
 		this._isDisposed = true;
-		await this._current;
+		this._activeCts?.cancel();
+		while (this._pendingQueue.length > 0) {
+			const pending = this._pendingQueue.shift();
+			pending?.reject(new TemporalError('Cancelled', 'Ingestion sequencer was disposed'));
+		}
+		await Promise.race([
+			this._current,
+			new Promise<void>(res => setTimeout(res, timeoutMs))
+		]);
 	}
 }
 
@@ -85,9 +166,12 @@ export class TemporalRepositoryRuntime {
 		);
 	}
 
-	queueIngestion(commitSha: string, task: () => Promise<TemporalGraphSnapshot>): Promise<TemporalGraphSnapshot> {
+	queueIngestion(commitSha: string, task: (token: CancellationTokenLike) => Promise<TemporalGraphSnapshot>, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
 		if (this._isDisposed) {
 			return Promise.reject(new TemporalError('Cancelled', `Repository runtime '${this.repositoryId}' is disposed`));
+		}
+		if (token?.isCancellationRequested) {
+			return Promise.reject(new TemporalError('Cancelled', `Ingestion of '${commitSha}' was cancelled`));
 		}
 
 		const existing = this._inFlightBySha.get(commitSha);
@@ -96,15 +180,15 @@ export class TemporalRepositoryRuntime {
 		}
 
 		this._statusBySha.set(commitSha, 'queued');
-		const queued = this._sequencer.queue(async () => {
-			if (this._isDisposed) {
-				throw new TemporalError('Cancelled', `Repository runtime '${this.repositoryId}' is disposed`);
+		const queued = this._sequencer.queue(async (combinedToken) => {
+			if (this._isDisposed || combinedToken.isCancellationRequested) {
+				throw new TemporalError('Cancelled', `Repository runtime '${this.repositoryId}' is disposed or cancelled`);
 			}
 			this._statusBySha.set(commitSha, 'indexing');
-			const snapshot = await task();
+			const snapshot = await task(combinedToken);
 			this._statusBySha.set(commitSha, snapshot.canonicalSnapshot?.coverage.completeWithinProfile === false ? 'incomplete' : 'ready');
 			return snapshot;
-		});
+		}, token);
 
 		this._inFlightBySha.set(commitSha, queued);
 		void queued.then(() => {
@@ -147,18 +231,21 @@ export class TemporalRepositoryRuntime {
 		await this.store.replaceRefs(refs);
 	}
 
-	dispose(): Promise<void> {
+	dispose(timeoutMs: number = 2500): Promise<void> {
 		if (!this._disposePromise) {
-			this._disposePromise = this._disposeOnce();
+			this._disposePromise = this._disposeOnce(timeoutMs);
 		}
 		return this._disposePromise;
 	}
 
-	private async _disposeOnce(): Promise<void> {
+	private async _disposeOnce(timeoutMs: number): Promise<void> {
 		this._isDisposed = true;
-		await this._sequencer.dispose();
+		await this._sequencer.dispose(timeoutMs);
 		this._inFlightBySha.clear();
 		this._statusBySha.clear();
-		await this.store.close();
+		await Promise.race([
+			this.store.close(),
+			new Promise<void>(res => setTimeout(res, 1000))
+		]);
 	}
 }

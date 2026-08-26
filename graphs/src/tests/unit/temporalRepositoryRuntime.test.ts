@@ -200,6 +200,77 @@ suite('TemporalRepositoryRuntime', () => {
 		assert.strictEqual(closeCalls, 1);
 	});
 
+	test('active work receives cancellation signal upon runtime disposal', async () => {
+		let wasCancelled = false;
+		let releaseTask: (() => void) | undefined;
+		const gate = new Promise<void>(resolve => releaseTask = resolve);
+		const runtime = createRuntime();
+
+		const active = runtime.queueIngestion('commit-active', async (token) => {
+			token.onCancellationRequested?.(() => {
+				wasCancelled = true;
+			});
+			await gate;
+			if (token.isCancellationRequested) {
+				throw new TemporalError('Cancelled', 'task cancelled');
+			}
+			return createSnapshot('commit-active');
+		});
+
+		await Promise.resolve();
+		const disposing = runtime.dispose();
+		await Promise.resolve();
+
+		assert.strictEqual(wasCancelled, true);
+		releaseTask?.();
+		await Promise.allSettled([active, disposing]);
+	});
+
+	test('queued pending work is immediately rejected upon disposal without waiting for active work', async () => {
+		let releaseFirst: (() => void) | undefined;
+		const firstGate = new Promise<void>(resolve => releaseFirst = resolve);
+		const runtime = createRuntime();
+
+		const first = runtime.queueIngestion('commit-1', async () => {
+			await firstGate;
+			return createSnapshot('commit-1');
+		});
+
+		let secondRan = false;
+		const second = runtime.queueIngestion('commit-2', async () => {
+			secondRan = true;
+			return createSnapshot('commit-2');
+		});
+
+		// Dispose while first is active and second is queued
+		const disposing = runtime.dispose();
+
+		// Second should be immediately rejected with Cancelled
+		await assert.rejects(second, /Cancelled/);
+		assert.strictEqual(secondRan, false);
+
+		releaseFirst?.();
+		await Promise.allSettled([first, disposing]);
+	});
+
+	test('disposal completes within bounded timeout even if active task hangs', async () => {
+		let closeCalls = 0;
+		const runtime = createRuntime(() => closeCalls++);
+
+		// Ingestion task that never resolves
+		const hanging = runtime.queueIngestion('commit-hanging', async () => {
+			return new Promise<TemporalGraphSnapshot>(() => {});
+		});
+
+		const start = Date.now();
+		await runtime.dispose(50); // fast 50ms bounded timeout for test
+		const elapsed = Date.now() - start;
+
+		assert.ok(elapsed < 1000, `Expected bounded disposal < 1000ms, took ${elapsed}ms`);
+		assert.strictEqual(closeCalls, 1);
+		await Promise.allSettled([hanging]);
+	});
+
 	test('disposal is idempotent, rejects new work, and closes the store exactly once', async () => {
 		let closeCalls = 0;
 		const runtime = createRuntime(() => closeCalls++);

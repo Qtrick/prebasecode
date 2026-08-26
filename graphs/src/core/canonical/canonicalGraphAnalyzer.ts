@@ -93,7 +93,9 @@ export class CanonicalGraphAnalyzer {
 
 		const parseResults: ParseResult[] = [];
 		const manifestEntries: AnalysisManifestEntry[] = [];
-		const batchSize = 64;
+		// Bounded batch size matching utility worker channel capacity (32) to prevent
+		// excessive in-memory file buffers while preserving IPC throughput.
+		const batchSize = 32;
 
 		for (let i = 0; i < files.length; i += batchSize) {
 			if (token?.isCancellationRequested) {

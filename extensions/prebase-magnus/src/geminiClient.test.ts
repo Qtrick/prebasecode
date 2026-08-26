@@ -127,7 +127,7 @@ suite('Gemini client cancellation transport', () => {
 			chunks.push(chunk);
 		}
 
-		assert.deepStrictEqual(chunks, ['Don', 'e']);
+		assert.deepStrictEqual(chunks, ['Done']);
 		assert.strictEqual(fetchCalls, 2);
 	});
 
