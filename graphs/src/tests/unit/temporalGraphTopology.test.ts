@@ -189,4 +189,39 @@ suite('TemporalGraphTopology (Unit - SCC, DAG Condensation & Adaptive Communitie
 		assert.ok(authComm);
 		assert.ok(authComm.nodeIds.includes('Auth2'), 'Cyclic dependencies must be co-located in the same community');
 	});
+
+	test('7. SCC Relocation Metadata Truth: Relocated nodes update community majority layer, depth, and hubs', () => {
+		// A multi-node SCC where one node originally belongs to a different folder prefix
+		// Primary node is Hub in src/services/hub.ts (entry node)
+		// Secondary node is Worker in src/utils/worker.ts (utils layer)
+		const nodes = [
+			makeNode('Hub', 'src/services/hub.ts', true),
+			makeNode('Worker', 'src/utils/worker.ts', false),
+			makeNode('Helper', 'src/utils/helper.ts', false),
+		];
+		const edges = [
+			makeEdge('e1', 'Hub', 'Worker'),
+			makeEdge('e2', 'Worker', 'Hub'), // Cycle: Worker moves into Hub community
+			makeEdge('e3', 'Worker', 'Helper'),
+		];
+
+		const communities = computeAdaptiveCommunities(nodes, edges);
+
+		// Hub and Worker must be co-located in the services community
+		const hubComm = communities.find(c => c.nodeIds.includes('Hub'));
+		assert.ok(hubComm, 'Hub community must exist');
+		assert.ok(hubComm.nodeIds.includes('Worker'), 'Worker must be co-located with Hub');
+		assert.equal(hubComm.hasEntry, true);
+		assert.equal(hubComm.totalDegree, 5);
+
+		// The remaining utils community must contain only Helper
+		const utilsComm = communities.find(c => c.nodeIds.includes('Helper'));
+		assert.ok(utilsComm, 'Utils community must exist');
+		assert.equal(utilsComm.nodeIds.length, 1);
+		assert.equal(utilsComm.nodeIds[0], 'Helper');
+		assert.equal(utilsComm.primaryHubId, 'Helper');
+		assert.equal(utilsComm.totalDegree, 1);
+		assert.equal(utilsComm.primaryLayer, 'utils');
+	});
 });
+

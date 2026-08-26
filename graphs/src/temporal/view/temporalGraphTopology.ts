@@ -440,10 +440,36 @@ export function computeAdaptiveCommunities(
 			return a.localeCompare(b);
 		});
 
+		// Recompute metadata truthfully on the final member set post-SCC co-location
+		const layerCounts = new Map<ArchitectureLayerId, number>();
+		let totalDegree = 0;
+		let maxDegree = -1;
+		let primaryHubId = bucket.nodeIds[0] || '';
+		let hasEntry = false;
+		let depthSum = 0;
+
+		for (let j = 0; j < bucket.nodeIds.length; j++) {
+			const nid = bucket.nodeIds[j];
+			const node = rawPathToNode.get(nid);
+			const layer = node ? getNodeArchitectureLayer(node) : 'other';
+			const deg = degreeByNode.get(nid) || 0;
+			const isEntry = Boolean(node?.meta?.isEntry) || layer === 'entry';
+			const depth = nodeDepths.get(nid) || 0;
+
+			layerCounts.set(layer, (layerCounts.get(layer) || 0) + 1);
+			totalDegree += deg;
+			depthSum += depth;
+			if (isEntry) hasEntry = true;
+			if (deg > maxDegree) {
+				maxDegree = deg;
+				primaryHubId = nid;
+			}
+		}
+
 		// Determine majority layer
 		let majorityLayer: ArchitectureLayerId = 'other';
 		let maxCount = -1;
-		for (const [l, count] of bucket.layerCounts.entries()) {
+		for (const [l, count] of layerCounts.entries()) {
 			if (count > maxCount) {
 				maxCount = count;
 				majorityLayer = l;
@@ -451,7 +477,7 @@ export function computeAdaptiveCommunities(
 		}
 
 		const label = formatAdaptiveCommunityLabel(bucket.pathPrefix, majorityLayer);
-		const avgDepth = bucket.depthSum / bucket.nodeIds.length;
+		const avgDepth = depthSum / bucket.nodeIds.length;
 
 		resultCommunities.push({
 			id: `comm::${bucket.pathPrefix}::${majorityLayer}`,
@@ -459,11 +485,11 @@ export function computeAdaptiveCommunities(
 			primaryLayer: majorityLayer,
 			color: getLayerColor(majorityLayer),
 			nodeIds: bucket.nodeIds,
-			primaryHubId: bucket.primaryHubId,
+			primaryHubId,
 			depth: avgDepth,
-			hasEntry: bucket.hasEntry,
-			totalDegree: bucket.totalDegree,
-			maxDegree: bucket.maxDegree,
+			hasEntry,
+			totalDegree,
+			maxDegree: Math.max(0, maxDegree),
 		});
 	}
 

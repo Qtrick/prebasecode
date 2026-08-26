@@ -727,9 +727,9 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #legend .title.spaced { margin-top:8px; }
 
 /* Temporal UI */
-#temporalToolbar { position:absolute; top:12px; left:12px; right:12px; z-index:5; display:none; gap:10px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:5px 10px; font-size:12px; backdrop-filter:blur(8px); max-width:calc(100% - 24px); box-sizing:border-box; flex-wrap:wrap; }
+#temporalToolbar { position:absolute; top:12px; left:12px; right:12px; z-index:5; display:none; gap:8px; align-items:center; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:4px 8px; font-size:11.5px; backdrop-filter:blur(8px); max-width:calc(100% - 24px); box-sizing:border-box; box-shadow:0 4px 16px rgba(0,0,0,0.2); }
 #temporalToolbar select, #temporalToolbar input { background:var(--vscode-dropdown-background, #252526); color:var(--vscode-dropdown-foreground, #cccccc); border:1px solid var(--vscode-dropdown-border, #3c3c3c); border-radius:4px; padding:3px 6px; font-size:11px; }
-#temporalDisplayModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
+#temporalDisplayModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; font-family:inherit; transition:background-color 0.12s ease, color 0.12s ease; }
 #temporalDisplayModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
 #temporalContextModeWrap button { background:transparent; color:var(--vscode-foreground, #cccccc); border:0; border-radius:3px; padding:3px 8px; cursor:pointer; font-size:11px; }
 #temporalContextModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
@@ -740,6 +740,25 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #temporalCenterLockBtn[aria-pressed="true"] .icon-unpressed { display:none; }
 #temporalCenterLockBtn[aria-pressed="true"] .icon-pressed { display:block !important; }
 #temporalRetryBtn:hover { background:var(--vscode-button-secondaryHoverBackground, #45494e); }
+
+@media (max-width: 780px) {
+	#temporalViewportControls #temporalZoomInBtn,
+	#temporalViewportControls #temporalZoomOutBtn,
+	#temporalViewportControls #temporalResetBtn {
+		display:none !important;
+	}
+}
+
+@media (max-width: 580px) {
+	#temporalBreadcrumbVs,
+	#temporalBreadcrumbBase {
+		display:none !important;
+	}
+	#temporalDiffBadges .badge-removed,
+	#temporalDiffBadges .badge-renamed {
+		display:none !important;
+	}
+}
 
 #temporalScrubberBar { position:absolute; left:12px; right:12px; bottom:12px; z-index:5; display:none; flex-direction:column; gap:6px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 94%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:8px 12px; font-size:12px; backdrop-filter:blur(8px); }
 #temporalScrubberBar .row { display:flex; align-items:center; width:100%; box-sizing:border-box; }

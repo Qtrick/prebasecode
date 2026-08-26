@@ -109,7 +109,7 @@ export interface TemporalCommunityAggregateEdge {
 	readonly isHighlighted?: boolean;
 }
 
-export type TemporalGuide = TemporalCommunityGuide | any;
+export type TemporalGuide = TemporalCommunityGuide;
 
 export interface TemporalStructuralDiff {
 	readonly targetCommitSha: string;

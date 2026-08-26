@@ -133,72 +133,35 @@ else
 	# over SSH on headless macOS). The setting overlay is per-launch and
 	# applied by default because launched instances under this skill are
 	# throwaways used for automation.
+	# Force simple file dialog and disable workspace trust prompt for throwaway automation profile
 	SETTINGS_FILE="$DEST_UDD/User/settings.json"
 	mkdir -p "$(dirname "$SETTINGS_FILE")"
-	# Data-preserving text-based merge: insert/update `files.simpleDialog.enable`
-	# without reparsing the whole file. Avoids dropping user comments and
-	# string values containing `//` (e.g. URLs). Fails loudly if the file
-	# exists but has no recognizable JSON object shape — never silently
-	# overwrites with `{}`.
 	if ! node - "$SETTINGS_FILE" <<'NODE'
 const fs = require('fs');
 const f = process.argv[2];
-const KEY = 'files.simpleDialog.enable';
+const settings = {
+	'files.simpleDialog.enable': true,
+	'security.workspace.trust.enabled': false,
+	'security.workspace.trust.startupPrompt': 'never'
+};
 
-let text;
-try { text = fs.readFileSync(f, 'utf8'); }
-catch (e) {
-	if (e.code === 'ENOENT') text = '';
-	else { console.error('[launch.sh] cannot read ' + f + ': ' + e.message); process.exit(1); }
+let json = {};
+try {
+	const raw = fs.readFileSync(f, 'utf8');
+	if (raw.trim()) {
+		json = JSON.parse(raw);
+	}
+} catch (e) {
+	json = {};
 }
-
-// Empty file → write a fresh object.
-if (text.trim() === '') {
-	fs.writeFileSync(f, '{\n  "' + KEY + '": true\n}\n');
-	process.exit(0);
-}
-
-// Key already present (with any value) → update its value to `true`
-// via a targeted regex on the value slot only.
-const keyValueRe = new RegExp('("' + KEY.replace(/\./g, '\\.') + '"\\s*:\\s*)(true|false|null|"[^"\\n]*"|-?\\d+(?:\\.\\d+)?)', 'g');
-if (keyValueRe.test(text)) {
-	const updated = text.replace(keyValueRe, '$1true');
-	fs.writeFileSync(f, updated);
-	process.exit(0);
-}
-
-// Otherwise: find the LAST `}` and insert the new key before it.
-// We deliberately don't parse JSONC — this preserves comments and
-// any other content the source profile had.
-const lastBrace = text.lastIndexOf('}');
-if (lastBrace === -1) {
-	console.error('[launch.sh] settings.json has no closing brace — refusing to clobber it: ' + f);
-	process.exit(1);
-}
-
-// Decide whether to add a leading comma. If the only thing between the
-// first `{` and the last `}` is whitespace and comments, the object is
-// empty for our purposes and no comma is needed.
-const firstBrace = text.indexOf('{');
-if (firstBrace === -1 || firstBrace >= lastBrace) {
-	console.error('[launch.sh] settings.json has no opening brace — refusing to clobber it: ' + f);
-	process.exit(1);
-}
-const between = text.slice(firstBrace + 1, lastBrace)
-	.replace(/\/\*[\s\S]*?\*\//g, '')
-	.replace(/\/\/[^\n]*/g, '')
-	.trim();
-const insertion = between.length === 0
-	? '\n  "' + KEY + '": true\n'
-	: ',\n  "' + KEY + '": true\n';
-
-fs.writeFileSync(f, text.slice(0, lastBrace) + insertion + text.slice(lastBrace));
+Object.assign(json, settings);
+fs.writeFileSync(f, JSON.stringify(json, null, 2) + '\n');
 NODE
 	then
-		echo "[launch.sh] failed to ensure files.simpleDialog.enable=true in $SETTINGS_FILE — automation may need to fall back to per-key input" >&2
+		echo "[launch.sh] failed to configure settings in $SETTINGS_FILE" >&2
 		exit 1
 	fi
-	echo "[launch.sh] automation mode: ensured files.simpleDialog.enable=true in $SETTINGS_FILE (use --native-dialogs to preserve OS dialogs for manual testing)" >&2
+	echo "[launch.sh] automation mode: ensured files.simpleDialog.enable=true & trust disabled in $SETTINGS_FILE" >&2
 fi
 
 # Strip ELECTRON_RUN_AS_NODE, commonly inherited from VS Code's integrated
