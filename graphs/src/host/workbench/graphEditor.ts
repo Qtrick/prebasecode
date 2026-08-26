@@ -3386,6 +3386,7 @@ window.addEventListener('message', function (e) {
 		temporalDiff = msg.payload;
 		updateTemporalDiffTransition(temporalDiff);
 		updateTemporalUI(temporalState, temporalDiff);
+		render(false);
 	} else if (msg.type === 'fitView') {
 		fitView(true);
 	} else if (msg.type === 'resetView') {

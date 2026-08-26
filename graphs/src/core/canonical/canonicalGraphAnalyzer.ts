@@ -93,7 +93,7 @@ export class CanonicalGraphAnalyzer {
 
 		const parseResults: ParseResult[] = [];
 		const manifestEntries: AnalysisManifestEntry[] = [];
-		const batchSize = 16;
+		const batchSize = 64;
 
 		for (let i = 0; i < files.length; i += batchSize) {
 			if (token?.isCancellationRequested) {

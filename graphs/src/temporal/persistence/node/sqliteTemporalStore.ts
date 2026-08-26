@@ -168,7 +168,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 					try {
 						await this._configureDatabase(db);
 						await runMigrations(db);
-						const integrity = await readPragma(db, 'integrity_check');
+						const integrity = await readPragma(db, 'quick_check');
 						if (String(integrity).toLowerCase() !== 'ok') {
 							throw new TemporalError('DatabaseCorrupted', 'SQLite integrity check failed for the derived Temporal cache');
 						}
@@ -219,6 +219,13 @@ export class SqliteTemporalStore implements ITemporalStore {
 		if (!this._db) {
 			this._isOpen = false;
 			return;
+		}
+
+		try {
+			// Query planner optimization on close (recommended SQLite best practice)
+			await runStatement(this._db, 'PRAGMA optimize;');
+		} catch {
+			// ignore optimize failures during shutdown
 		}
 
 		return new Promise<void>((resolve, reject) => {
@@ -499,48 +506,50 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 			// 6. Persist full entity state at a checkpoint and only actual transitions
 			// otherwise. Graph reconstruction remains the authority for unchanged state.
-			const entityTransitions = !delta
+			const entityTransitions = Array.from(!delta
 				? snapshot.entityMap.values()
-				: new Map([...(delta?.entitiesAdded ?? []), ...(delta?.entitiesModified ?? [])].map(value => [value.entityId, value])).values();
-			for (const entitySnap of entityTransitions) {
-				const entityId = entitySnap.entityId;
-				// Upsert Entity
-				await new Promise<void>((resolve, reject) => {
-					const stmt = `
-						INSERT INTO entities (entity_id, canonical_path, kind, first_seen_commit, last_seen_commit, is_active, metadata_json)
-						VALUES (?, ?, 'file', ?, ?, 1, NULL)
-						ON CONFLICT(entity_id) DO UPDATE SET
-							canonical_path = excluded.canonical_path,
-							last_seen_commit = excluded.last_seen_commit,
-							is_active = 1;
-					`;
-					db.run(
-						stmt,
-						[entityId, entitySnap.path, commit.commitSha, commit.commitSha],
-						(err) => (err ? reject(err) : resolve())
-					);
-				});
+				: new Map([...(delta?.entitiesAdded ?? []), ...(delta?.entitiesModified ?? [])].map(value => [value.entityId, value])).values());
 
-				// Insert Entity Snapshot
+			if (entityTransitions.length > 0) {
+				const upsertEntityStmt = db.prepare(`
+					INSERT INTO entities (entity_id, canonical_path, kind, first_seen_commit, last_seen_commit, is_active, metadata_json)
+					VALUES (?, ?, 'file', ?, ?, 1, NULL)
+					ON CONFLICT(entity_id) DO UPDATE SET
+						canonical_path = excluded.canonical_path,
+						last_seen_commit = excluded.last_seen_commit,
+						is_active = 1;
+				`);
+				const insertEntitySnapStmt = db.prepare(`
+					INSERT OR REPLACE INTO entity_snapshots (
+						entity_id, commit_sha, path, blob_oid, content_hash, node_data_json
+					) VALUES (?, ?, ?, ?, ?, ?);
+				`);
+
 				await new Promise<void>((resolve, reject) => {
-					const stmt = `
-						INSERT OR REPLACE INTO entity_snapshots (
-							entity_id, commit_sha, path, blob_oid, content_hash, node_data_json
-						) VALUES (?, ?, ?, ?, ?, ?);
-					`;
-					db.run(
-						stmt,
-						[
-							entityId,
+					let pending = entityTransitions.length * 2;
+					let errored = false;
+					const check = (err: Error | null) => {
+						if (errored) return;
+						if (err) { errored = true; return reject(err); }
+						pending--;
+						if (pending === 0) resolve();
+					};
+
+					for (const entitySnap of entityTransitions) {
+						upsertEntityStmt.run([entitySnap.entityId, entitySnap.path, commit.commitSha, commit.commitSha], check);
+						insertEntitySnapStmt.run([
+							entitySnap.entityId,
 							commit.commitSha,
 							entitySnap.path,
 							entitySnap.blobOid ?? null,
 							entitySnap.contentHash ?? null,
 							JSON.stringify(entitySnap.nodeData),
-						],
-						(err) => (err ? reject(err) : resolve())
-					);
+						], check);
+					}
 				});
+
+				await new Promise<void>((resolve, reject) => upsertEntityStmt.finalize(err => err ? reject(err) : resolve()));
+				await new Promise<void>((resolve, reject) => insertEntitySnapStmt.finalize(err => err ? reject(err) : resolve()));
 			}
 
 			// Mark deleted entities in this delta as inactive in entities table
@@ -576,78 +585,88 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 			// Unchanged continuity is implied by the reconstruction chain, so omit its
 			// per-commit marker. Every persisted lineage row now describes a change.
-			for (const event of lineageEvents.filter(event => event.lineageCase !== 'same-canonical-id')) {
+			const nonSameLineageEvents = lineageEvents.filter(event => event.lineageCase !== 'same-canonical-id');
+			if (nonSameLineageEvents.length > 0) {
+				const insertLineageStmt = db.prepare(`
+					INSERT INTO lineage_events (
+						entity_id, commit_sha, parent_commit_sha, lineage_case, evidence_json, created_at
+					) VALUES (?, ?, ?, ?, ?, ?);
+				`);
+				const now = Date.now();
 				await new Promise<void>((resolve, reject) => {
-					const stmt = `
-						INSERT INTO lineage_events (
-							entity_id, commit_sha, parent_commit_sha, lineage_case, evidence_json, created_at
-						) VALUES (?, ?, ?, ?, ?, ?);
-					`;
-					db.run(
-						stmt,
-						[
+					let pending = nonSameLineageEvents.length;
+					let errored = false;
+					const check = (err: Error | null) => {
+						if (errored) return;
+						if (err) { errored = true; return reject(err); }
+						pending--;
+						if (pending === 0) resolve();
+					};
+					for (const event of nonSameLineageEvents) {
+						insertLineageStmt.run([
 							event.entityId,
 							event.commitSha,
 							event.parentCommitSha,
 							event.lineageCase,
 							JSON.stringify(event.evidence),
-							Date.now(),
-						],
-						(err) => (err ? reject(err) : resolve())
-					);
+							now,
+						], check);
+					}
 				});
+				await new Promise<void>((resolve, reject) => insertLineageStmt.finalize(err => err ? reject(err) : resolve()));
 			}
 
 			// 8. Checkpoints retain a full recoverable state; delta commits record only
 			// additions or changes instead of an observation for every present edge.
-			const edgeTransitions = !delta
+			const edgeTransitions = Array.from(!delta
 				? snapshot.edgeMap.values()
-				: new Map([...(delta?.edgesAdded ?? []), ...(delta?.edgesModified ?? [])].map(value => [value.edgeId, value])).values();
-			for (const edgeSnap of edgeTransitions) {
-				const edgeId = edgeSnap.edgeId;
-				// Upsert Edge
+				: new Map([...(delta?.edgesAdded ?? []), ...(delta?.edgesModified ?? [])].map(value => [value.edgeId, value])).values());
+
+			if (edgeTransitions.length > 0) {
+				const upsertEdgeStmt = db.prepare(`
+					INSERT INTO edges (edge_id, source_entity_id, target_entity_id, kind, first_seen_commit, last_seen_commit, is_active)
+					VALUES (?, ?, ?, ?, ?, ?, 1)
+					ON CONFLICT(edge_id) DO UPDATE SET
+						last_seen_commit = excluded.last_seen_commit,
+						is_active = 1;
+				`);
+				const insertEdgeSnapStmt = db.prepare(`
+					INSERT OR REPLACE INTO edge_snapshots (
+						edge_id, commit_sha, source_entity_id, target_entity_id, kind, edge_data_json
+					) VALUES (?, ?, ?, ?, ?, ?);
+				`);
+
 				await new Promise<void>((resolve, reject) => {
-					const stmt = `
-						INSERT INTO edges (edge_id, source_entity_id, target_entity_id, kind, first_seen_commit, last_seen_commit, is_active)
-						VALUES (?, ?, ?, ?, ?, ?, 1)
-						ON CONFLICT(edge_id) DO UPDATE SET
-							last_seen_commit = excluded.last_seen_commit,
-							is_active = 1;
-					`;
-					db.run(
-						stmt,
-						[
-							edgeId,
+					let pending = edgeTransitions.length * 2;
+					let errored = false;
+					const check = (err: Error | null) => {
+						if (errored) return;
+						if (err) { errored = true; return reject(err); }
+						pending--;
+						if (pending === 0) resolve();
+					};
+					for (const edgeSnap of edgeTransitions) {
+						upsertEdgeStmt.run([
+							edgeSnap.edgeId,
 							edgeSnap.sourceEntityId,
 							edgeSnap.targetEntityId,
 							edgeSnap.kind,
 							commit.commitSha,
 							commit.commitSha,
-						],
-						(err) => (err ? reject(err) : resolve())
-					);
-				});
-
-				// Insert Edge Snapshot
-				await new Promise<void>((resolve, reject) => {
-					const stmt = `
-						INSERT OR REPLACE INTO edge_snapshots (
-							edge_id, commit_sha, source_entity_id, target_entity_id, kind, edge_data_json
-						) VALUES (?, ?, ?, ?, ?, ?);
-					`;
-					db.run(
-						stmt,
-						[
-							edgeId,
+						], check);
+						insertEdgeSnapStmt.run([
+							edgeSnap.edgeId,
 							commit.commitSha,
 							edgeSnap.sourceEntityId,
 							edgeSnap.targetEntityId,
 							edgeSnap.kind,
 							JSON.stringify(edgeSnap.edgeData),
-						],
-						(err) => (err ? reject(err) : resolve())
-					);
+						], check);
+					}
 				});
+
+				await new Promise<void>((resolve, reject) => upsertEdgeStmt.finalize(err => err ? reject(err) : resolve()));
+				await new Promise<void>((resolve, reject) => insertEdgeSnapStmt.finalize(err => err ? reject(err) : resolve()));
 			}
 			for (const edge of delta?.edgesAdded ?? []) {
 				await new Promise<void>((resolve, reject) => {
@@ -1425,6 +1444,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 			// VACUUM itself can produce WAL frames, so truncate once more before
 			// reporting the physical cache footprint to the maintenance caller.
 			await runStatement(db, 'PRAGMA wal_checkpoint(TRUNCATE);');
+			await runStatement(db, 'PRAGMA optimize;');
 			size = await databaseBytes();
 		}
 		return { databaseBytes: size, parseArtifactsEvicted: evicted, withinBudget: size <= maxDatabaseBytes };

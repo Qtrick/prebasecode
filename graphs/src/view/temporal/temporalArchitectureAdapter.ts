@@ -5,13 +5,13 @@
 import { classifyNodeLayer, ARCHITECTURE_LAYERS, type ArchitectureLayerId } from '../../core/analysis/architectureLayers.js';
 import type {
 	HierarchyRingBand,
-	HierarchyRingGuide,
 } from '../../layouts/architecture/hierarchy/hierarchyLayout.js';
 import type {
 	TemporalRenderNode,
 	TemporalRenderEdge,
 	TemporalStructuralDiff,
 	TemporalLayoutResult,
+	TemporalCommunityGuide,
 	TemporalDisplayMode,
 } from '../../temporal/view/temporalViewTypes.js';
 
@@ -25,7 +25,7 @@ export interface TemporalArchitectureLayoutOptions {
 
 export interface TemporalArchitectureLayoutResult extends TemporalLayoutResult {
 	readonly bands: readonly HierarchyRingBand[];
-	readonly guides: readonly HierarchyRingGuide[];
+	readonly guides: readonly TemporalCommunityGuide[];
 	readonly entryEntityId?: string;
 }
 

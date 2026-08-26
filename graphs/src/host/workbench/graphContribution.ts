@@ -78,8 +78,8 @@ function registerGraphSingletons(): void {
 	registerSingleton(IPreBaseCanonicalParseService, WorkbenchCanonicalParseService, InstantiationType.Delayed);
 	registerSingleton(IPreBaseGraphService, PreBaseGraphService, InstantiationType.Delayed);
 	registerSingleton(IPreBaseGraphDescriptionService, PreBaseGraphDescriptionService, InstantiationType.Delayed);
-	registerSingleton(IPreBaseTemporalGraphService, WorkbenchTemporalGraphService, InstantiationType.Eager);
-	registerSingleton(IPreBaseTemporalViewService, WorkbenchTemporalViewService, InstantiationType.Eager);
+	registerSingleton(IPreBaseTemporalGraphService, WorkbenchTemporalGraphService, InstantiationType.Delayed);
+	registerSingleton(IPreBaseTemporalViewService, WorkbenchTemporalViewService, InstantiationType.Delayed);
 }
 
 function registerGraphOutputChannel(): void {

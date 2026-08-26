@@ -38,6 +38,8 @@ CLONE_EXTENSIONS=0
 FULL=0
 NATIVE_DIALOGS=0
 
+TRUST_MODE="trusted"
+
 while [[ $# -gt 0 ]]; do
 	case "$1" in
 		--agents) AGENTS=1; shift ;;
@@ -46,6 +48,8 @@ while [[ $# -gt 0 ]]; do
 		--clone-extensions|--copy-extensions) CLONE_EXTENSIONS=1; shift ;;
 		--full) FULL=1; shift ;;
 		--native-dialogs) NATIVE_DIALOGS=1; shift ;;
+		--untrusted) TRUST_MODE="untrusted"; shift ;;
+		--trust-mode) TRUST_MODE="$2"; shift 2 ;;
 		--) shift; EXTRA_ARGS=("$@"); break ;;
 		*) echo "Unknown arg: $1" >&2; exit 2 ;;
 	esac
@@ -133,26 +137,97 @@ else
 	# over SSH on headless macOS). The setting overlay is per-launch and
 	# applied by default because launched instances under this skill are
 	# throwaways used for automation.
-	# Force simple file dialog and disable workspace trust prompt for throwaway automation profile
 	SETTINGS_FILE="$DEST_UDD/User/settings.json"
 	mkdir -p "$(dirname "$SETTINGS_FILE")"
-	if ! node - "$SETTINGS_FILE" <<'NODE'
+	if ! node - "$SETTINGS_FILE" "$TRUST_MODE" <<'NODE'
 const fs = require('fs');
 const f = process.argv[2];
+const trustMode = process.argv[3] || 'trusted';
+
+function stripJsoncComments(content) {
+	let insideString = false;
+	let stringChar = '';
+	let insideSingleLineComment = false;
+	let insideMultiLineComment = false;
+	let result = '';
+
+	for (let i = 0; i < content.length; i++) {
+		const char = content[i];
+		const nextChar = content[i + 1];
+
+		if (insideSingleLineComment) {
+			if (char === '\n' || char === '\r') {
+				insideSingleLineComment = false;
+				result += char;
+			}
+			continue;
+		}
+
+		if (insideMultiLineComment) {
+			if (char === '*' && nextChar === '/') {
+				insideMultiLineComment = false;
+				i++;
+			}
+			continue;
+		}
+
+		if (insideString) {
+			result += char;
+			if (char === '\\' && i + 1 < content.length) {
+				result += content[i + 1];
+				i++;
+			} else if (char === stringChar) {
+				insideString = false;
+			}
+			continue;
+		}
+
+		if (char === '"' || char === "'") {
+			insideString = true;
+			stringChar = char;
+			result += char;
+			continue;
+		}
+
+		if (char === '/' && nextChar === '/') {
+			insideSingleLineComment = true;
+			i++;
+			continue;
+		}
+
+		if (char === '/' && nextChar === '*') {
+			insideMultiLineComment = true;
+			i++;
+			continue;
+		}
+
+		result += char;
+	}
+
+	return result.replace(/,\s*([}\]])/g, '$1');
+}
+
 const settings = {
 	'files.simpleDialog.enable': true,
-	'security.workspace.trust.enabled': false,
-	'security.workspace.trust.startupPrompt': 'never'
 };
 
+if (trustMode === 'trusted') {
+	settings['security.workspace.trust.enabled'] = false;
+	settings['security.workspace.trust.startupPrompt'] = 'never';
+}
+
 let json = {};
-try {
+if (fs.existsSync(f)) {
 	const raw = fs.readFileSync(f, 'utf8');
 	if (raw.trim()) {
-		json = JSON.parse(raw);
+		try {
+			json = JSON.parse(stripJsoncComments(raw));
+		} catch (err) {
+			console.error('[launch.sh] Warning: Failed to parse existing JSONC settings file. Preserving existing settings content safely.', err);
+			// Fail loudly rather than silently replacing settings with an empty object
+			process.exit(1);
+		}
 	}
-} catch (e) {
-	json = {};
 }
 Object.assign(json, settings);
 fs.writeFileSync(f, JSON.stringify(json, null, 2) + '\n');
@@ -161,7 +236,7 @@ NODE
 		echo "[launch.sh] failed to configure settings in $SETTINGS_FILE" >&2
 		exit 1
 	fi
-	echo "[launch.sh] automation mode: ensured files.simpleDialog.enable=true & trust disabled in $SETTINGS_FILE" >&2
+	echo "[launch.sh] automation mode: ensured files.simpleDialog.enable=true (trustMode: $TRUST_MODE) in $SETTINGS_FILE" >&2
 fi
 
 # Strip ELECTRON_RUN_AS_NODE, commonly inherited from VS Code's integrated

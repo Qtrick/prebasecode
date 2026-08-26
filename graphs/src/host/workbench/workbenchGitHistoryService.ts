@@ -185,33 +185,58 @@ export class WorkbenchGitHistoryService implements IWorkbenchGitHistoryService {
 
 	private async _ensureRepository(rootPath: string): Promise<WorkbenchGitRepositoryLike> {
 		let repo = this._findRepository(rootPath);
-		if (!repo && typeof this._gitService.openRepository === 'function') {
+		if (repo) {
+			return repo;
+		}
+		if (typeof this._gitService.openRepository === 'function') {
 			try {
 				repo = await this._gitService.openRepository({ path: rootPath, scheme: 'file' });
-			} catch {
-				// Failed to open
-			}
-		}
-		if (!repo && Array.from(this._gitService.repositories).length === 0) {
-			// Extension host git may still be activating; wait for repository
-			for (let i = 0; i < 10; i++) {
-				await new Promise(r => setTimeout(r, 500));
-				repo = this._findRepository(rootPath);
 				if (repo) {
-					break;
+					return repo;
 				}
-				if (typeof this._gitService.openRepository === 'function') {
-					try {
-						repo = await this._gitService.openRepository({ path: rootPath, scheme: 'file' });
-						if (repo) {
-							break;
-						}
-					} catch {
-						// retry
+			} catch {
+				// Failed to open directly
+			}
+		}
+
+		if (Array.from(this._gitService.repositories).length === 0) {
+			// Extension host git may still be activating; wait event-driven for repository
+			const target = URI.file(rootPath);
+			await new Promise<void>((resolve) => {
+				let resolved = false;
+				const timeoutTimer = setTimeout(() => {
+					if (!resolved) {
+						resolved = true;
+						disposable?.dispose();
+						resolve();
 					}
+				}, 2500);
+
+				const disposable = this._gitService.onDidOpenRepository
+					? this._gitService.onDidOpenRepository((openedRepo) => {
+						const repoResource = URI.isUri(openedRepo.rootUri) ? openedRepo.rootUri : URI.parse(openedRepo.rootUri.toString());
+						if (this._uriIdentityService.extUri.isEqualOrParent(target, repoResource) || this._uriIdentityService.extUri.isEqual(repoResource, target)) {
+							if (!resolved) {
+								resolved = true;
+								clearTimeout(timeoutTimer);
+								disposable?.dispose();
+								resolve();
+							}
+						}
+					})
+					: undefined;
+			});
+
+			repo = this._findRepository(rootPath);
+			if (!repo && typeof this._gitService.openRepository === 'function') {
+				try {
+					repo = await this._gitService.openRepository({ path: rootPath, scheme: 'file' });
+				} catch {
+					// retry open
 				}
 			}
 		}
+
 		if (!repo) {
 			throw new GitHistoryError('RepositoryUnavailable', `No active Git repository for root path: ${rootPath}`);
 		}
