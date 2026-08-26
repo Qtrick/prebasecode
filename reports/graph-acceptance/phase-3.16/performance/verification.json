@@ -1,0 +1,24 @@
+{
+  "commands": [
+    {"command": "npm run test:graphs", "exitCode": 0, "files": 52, "tests": 381, "failed": 0},
+    {"command": "npm run typecheck:graphs", "exitCode": 0},
+    {"command": "npm run verify:graphs-boundary", "exitCode": 0},
+    {"command": "npm run verify:graphs-runtime-boundary", "exitCode": 0},
+    {"command": "npm run typecheck-client", "exitCode": 0},
+    {"command": "npm run transpile-client", "exitCode": 0},
+    {"command": "npm run test:prebase-pure", "exitCode": 0, "tests": 59, "failed": 0},
+    {"command": "npm run test:prebase-magnus", "exitCode": 0, "tests": 130, "suites": 24, "failed": 0},
+    {"command": "node scripts/startup/verify-magnus-out.mjs", "exitCode": 0, "note": "package script is verify:startup / compile-magnus; no verify:magnus-out npm script"},
+    {"command": "npm run verify:privacy", "exitCode": 0, "warnings": 1},
+    {"command": "npm run verify:icons", "exitCode": 0, "paths": "101/101"},
+    {"command": "npm run assurance:quick", "exitCode": 0},
+    {"command": "npm run verify:config-uniqueness", "exitCode": 0, "note": "assurance:static = assurance:quick + this"}
+  ],
+  "idleProcessSample": {
+    "browserMain": {"pid": 94319, "cpuPct": 16.3, "rssKb": 274336},
+    "gpu": {"pid": 94350, "cpuPct": 3.7, "rssKb": 112480},
+    "network": {"pid": 94351, "cpuPct": 0.0, "rssKb": 46432},
+    "renderer": {"pid": 94354, "cpuPct": 13.6, "rssKb": 662000},
+    "note": "Sampled ~3s after launch during Welcome + auth overlay. Not a sustained-load profile."
+  }
+}

@@ -1,0 +1,6 @@
+{
+  "title": "Welcome",
+  "ready": "complete",
+  "url": "vscode-file://vscode-app/Users/qunyingfan/Prebasecode/out/vs/code/electron-browser/workbench/workbench-dev.html",
+  "bodyText": "Search\nOpen in Agents\nWelcome\nPreBase Dev\n\nEditing evolved\n\nStart\nNew File...\nOpen...\nClone Git Repository...\nConnect to...\nGenerate New Workspace...\nRecent\nYou have no recent folders,open a folderto start.\nWalkthroughs\nGet started with PreBase\nCustomize your editor, learn the basics, and start coding\nLearn the Fundamentals\nTry out the new Agents window\n\nShow welcome page on startup\n\nAGENTS\nBuild "
+}

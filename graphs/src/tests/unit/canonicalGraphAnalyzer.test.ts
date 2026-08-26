@@ -384,6 +384,23 @@ suite('CanonicalGraphAnalyzer Unit Tests', () => {
 		});
 	});
 
+	test('forwards the analysis cancellation token into parseService.parse', async () => {
+		const token: CancellationTokenLike = { isCancellationRequested: false };
+		let received: CancellationTokenLike | undefined;
+		const parseService: ICanonicalParseService = {
+			parse: async (request, parseToken) => {
+				received = parseToken;
+				return new NodeCanonicalParseService().parse(request, parseToken);
+			},
+		};
+		const analyzer = new CanonicalGraphAnalyzer({ parseService });
+		const result = await analyzer.analyze(new InMemoryContentSource('/workspace', {
+			'src/a.ts': 'export const a = 1;',
+		}), token);
+		assert.ok(result);
+		assert.strictEqual(received, token);
+	});
+
 	test('respects cancellation cleanly without publishing corrupted partial graph', async () => {
 		const files: Record<string, string> = {};
 		for (let i = 0; i < 200; i++) {

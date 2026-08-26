@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { CancellationToken } from '../../../../base/common/cancellation.js';
+import { CancellationToken, CancellationTokenSource } from '../../../../base/common/cancellation.js';
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { generateUuid } from '../../../../base/common/uuid.js';
@@ -75,6 +75,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	private _session: PreBaseDesktopSession | undefined;
 	private _lastRequest: { rendererUrl: string; command?: ExternalLaunchRequest; cwd: string; title: string } | undefined;
 	private _launchModeOverride: DesktopLaunchMode | undefined;
+	private readonly _lifecycleCts = this._register(new CancellationTokenSource());
 
 	constructor(
 		@IMainProcessService mainProcessService: IMainProcessService,
@@ -487,6 +488,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	}
 
 	override dispose(): void {
+		this._lifecycleCts.cancel();
 		const stopManaged = this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeStopManagedAppsOnExit) ?? true;
 		const stopExternal = this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeStopExternalAppsOnExit) ?? false;
 		if (this._session?.ownedByPreBase) {
@@ -529,14 +531,18 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	}
 
 	private async _discoverCdpTargets(port: number): Promise<CdpTarget[]> {
+		const token = this._lifecycleCts.token;
 		for (let attempt = 0; attempt < 20; attempt++) {
+			if (token.isCancellationRequested) {
+				return [];
+			}
 			try {
 				const context = await this.requestService.request({
 					type: 'GET',
 					url: `http://127.0.0.1:${port}/json`,
 					timeout: 1500,
 					callSite: 'PreBaseDesktopRuntimeService._discoverCdpTargets',
-				}, CancellationToken.None);
+				}, token);
 				const body = await asJson<CdpTarget[]>(context);
 				if (Array.isArray(body) && body.length) {
 					return body;
@@ -544,7 +550,19 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			} catch {
 				// retry while Electron boots
 			}
-			await new Promise(resolve => setTimeout(resolve, 500));
+			if (token.isCancellationRequested) {
+				return [];
+			}
+			await new Promise<void>(resolve => {
+				const timer = setTimeout(() => {
+					sub.dispose();
+					resolve();
+				}, 500);
+				const sub = token.onCancellationRequested(() => {
+					clearTimeout(timer);
+					resolve();
+				});
+			});
 		}
 		return [];
 	}

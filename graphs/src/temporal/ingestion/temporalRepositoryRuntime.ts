@@ -6,7 +6,7 @@ import type { IGitHistoryService } from '../../history/git/gitHistoryService.js'
 import type { ITemporalStore } from '../persistence/common/temporalStore.js';
 import { BlobAnalysisCache, TwoTierParseArtifactCache } from '../analysis/blobAnalysisCache.js';
 import { IncrementalGraphAnalyzer } from '../analysis/incrementalGraphAnalyzer.js';
-import { TemporalCommitIngestionService, type ITemporalStoreProvider } from './temporalCommitIngestionService.js';
+import { TemporalCommitIngestionService, type IngestCommitOptions, type ITemporalStoreProvider } from './temporalCommitIngestionService.js';
 import { TemporalReconstructionEngine } from '../core/temporalReconstruction.js';
 import { TemporalIndexPlanner } from '../core/temporalIndexPlanner.js';
 import { TemporalError } from '../common/temporalErrors.js';
@@ -19,6 +19,10 @@ import type { TemporalGraphSnapshot, TemporalIndexStatus } from '../common/tempo
 
 import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 
+function cancelledError(message: string): TemporalError {
+	return new TemporalError('Cancelled', message);
+}
+
 export class IngestionSequencer {
 	private _current: Promise<unknown> = Promise.resolve();
 	private _isDisposed = false;
@@ -27,10 +31,10 @@ export class IngestionSequencer {
 
 	queue<T>(promiseFactory: (token: CancellationTokenLike) => Promise<T>, callerToken?: CancellationTokenLike): Promise<T> {
 		if (this._isDisposed) {
-			return Promise.reject(new TemporalError('Cancelled', 'Ingestion sequencer is disposed'));
+			return Promise.reject(cancelledError('Ingestion sequencer is disposed'));
 		}
 		if (callerToken?.isCancellationRequested) {
-			return Promise.reject(new TemporalError('Cancelled', 'Ingestion request was cancelled before execution'));
+			return Promise.reject(cancelledError('Ingestion request was cancelled before execution'));
 		}
 
 		return new Promise<T>((resolve, reject) => {
@@ -44,10 +48,10 @@ export class IngestionSequencer {
 				}
 
 				if (this._isDisposed) {
-					throw new TemporalError('Cancelled', 'Ingestion sequencer is disposed');
+					throw cancelledError('Ingestion sequencer is disposed');
 				}
 				if (callerToken?.isCancellationRequested) {
-					throw new TemporalError('Cancelled', 'Ingestion request was cancelled before execution');
+					throw cancelledError('Ingestion request was cancelled before execution');
 				}
 
 				let cancelled = false;
@@ -88,7 +92,31 @@ export class IngestionSequencer {
 
 				this._activeCts = cts;
 				try {
-					const result = await promiseFactory(token);
+					// Race the factory against cancellation so a non-cooperative inner
+					// Promise cannot pin the sequencer chain. The inner work may still
+					// run; callers observe Cancelled and disposal waits on store writes.
+					const result = await new Promise<T>((resolveFactory, rejectFactory) => {
+						let settled = false;
+						const finish = (fn: () => void) => {
+							if (settled) {
+								return;
+							}
+							settled = true;
+							cancelSub?.dispose();
+							fn();
+						};
+						const cancelSub = token.onCancellationRequested?.(() => {
+							finish(() => rejectFactory(cancelledError('Ingestion was cancelled')));
+						});
+						if (token.isCancellationRequested) {
+							finish(() => rejectFactory(cancelledError('Ingestion was cancelled')));
+							return;
+						}
+						promiseFactory(token).then(
+							value => finish(() => resolveFactory(value)),
+							error => finish(() => rejectFactory(error)),
+						);
+					});
 					resolve(result);
 					return result;
 				} catch (error) {
@@ -111,7 +139,7 @@ export class IngestionSequencer {
 		this._activeCts?.cancel();
 		while (this._pendingQueue.length > 0) {
 			const pending = this._pendingQueue.shift();
-			pending?.reject(new TemporalError('Cancelled', 'Ingestion sequencer was disposed'));
+			pending?.reject(cancelledError('Ingestion sequencer was disposed'));
 		}
 		await Promise.race([
 			this._current,
@@ -166,12 +194,26 @@ export class TemporalRepositoryRuntime {
 		);
 	}
 
+	/**
+	 * Production ingestion entry. The sequencer-owned combined token is always
+	 * the token passed to ingestCommit, so callers cannot forget disposal/shutdown
+	 * cancellation.
+	 */
+	ingestCommit(commitSha: string, options?: IngestCommitOptions, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
+		return this.queueIngestion(commitSha, combinedToken =>
+			this.ingestionService.ingestCommit(this.rootPath, commitSha, options ?? {}, combinedToken),
+			token
+		);
+	}
+
 	queueIngestion(commitSha: string, task: (token: CancellationTokenLike) => Promise<TemporalGraphSnapshot>, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
 		if (this._isDisposed) {
-			return Promise.reject(new TemporalError('Cancelled', `Repository runtime '${this.repositoryId}' is disposed`));
+			this._statusBySha.set(commitSha, 'cancelled');
+			return Promise.reject(cancelledError(`Repository runtime '${this.repositoryId}' is disposed`));
 		}
 		if (token?.isCancellationRequested) {
-			return Promise.reject(new TemporalError('Cancelled', `Ingestion of '${commitSha}' was cancelled`));
+			this._statusBySha.set(commitSha, 'cancelled');
+			return Promise.reject(cancelledError(`Ingestion of '${commitSha}' was cancelled`));
 		}
 
 		const existing = this._inFlightBySha.get(commitSha);
@@ -182,7 +224,7 @@ export class TemporalRepositoryRuntime {
 		this._statusBySha.set(commitSha, 'queued');
 		const queued = this._sequencer.queue(async (combinedToken) => {
 			if (this._isDisposed || combinedToken.isCancellationRequested) {
-				throw new TemporalError('Cancelled', `Repository runtime '${this.repositoryId}' is disposed or cancelled`);
+				throw cancelledError(`Repository runtime '${this.repositoryId}' is disposed or cancelled`);
 			}
 			this._statusBySha.set(commitSha, 'indexing');
 			const snapshot = await task(combinedToken);
@@ -240,12 +282,44 @@ export class TemporalRepositoryRuntime {
 
 	private async _disposeOnce(timeoutMs: number): Promise<void> {
 		this._isDisposed = true;
+		const started = Date.now();
 		await this._sequencer.dispose(timeoutMs);
+		try {
+			await this.store.interrupt?.();
+		} catch {
+			// interrupt is best-effort; close still depends on active-write drain
+		}
+
+		const remaining = Math.max(0, timeoutMs - (Date.now() - started));
+		if (this.store.hasActiveWrite?.()) {
+			await this._waitWhile(() => Boolean(this.store.hasActiveWrite?.()), Math.min(remaining, 1500));
+		}
+
 		this._inFlightBySha.clear();
 		this._statusBySha.clear();
-		await Promise.race([
-			this.store.close(),
-			new Promise<void>(res => setTimeout(res, 1000))
-		]);
+
+		// Never close SQLite under an active write. A timed-out sequencer is not
+		// proof that the store transaction has stopped.
+		if (this.store.hasActiveWrite?.()) {
+			return;
+		}
+		await this.store.close();
+	}
+
+	private _waitWhile(predicate: () => boolean, timeoutMs: number): Promise<void> {
+		if (!predicate() || timeoutMs <= 0) {
+			return Promise.resolve();
+		}
+		return new Promise(resolve => {
+			const started = Date.now();
+			const tick = () => {
+				if (!predicate() || Date.now() - started >= timeoutMs) {
+					resolve();
+					return;
+				}
+				setTimeout(tick, 20);
+			};
+			tick();
+		});
 	}
 }

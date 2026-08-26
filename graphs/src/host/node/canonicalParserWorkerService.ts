@@ -17,6 +17,8 @@ export class CanonicalParserWorkerService implements ICanonicalParserWorkerServi
 	private readonly _parserEngine = new ParserEngine();
 
 	async parseBatch(requests: readonly CanonicalParseRequest[], token: CancellationToken): Promise<readonly (BlobParseArtifact | undefined)[]> {
+		// Sequential parse inside the utility process. Outer splice(0, 32) only
+		// bounds IPC payload size and outstanding Promise retention.
 		const results: Array<BlobParseArtifact | undefined> = [];
 		for (const request of requests) {
 			if (token.isCancellationRequested) {

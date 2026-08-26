@@ -71,6 +71,28 @@ suite('TemporalRepositoryRuntime', () => {
 		await registry.closeAll();
 	});
 
+	test('closeAll waits for in-flight runtime creation then disposes it', async () => {
+		let openCalls = 0;
+		let releaseOpen: (() => void) | undefined;
+		const openGate = new Promise<void>(resolve => releaseOpen = resolve);
+		const store = Object.assign(Object.create(null), {
+			isOpen: () => openCalls > 0,
+			open: async () => {
+				await openGate;
+				openCalls++;
+			},
+			close: async () => {},
+		}) as ITemporalStore;
+		const registry = new TemporalRepositoryRegistry(async () => store);
+		const gitService = Object.create(null) as IGitHistoryService;
+		const creating = registry.getRuntime('repo-a', '/repo-a', gitService);
+		const closing = registry.closeAll();
+		releaseOpen?.();
+		await assert.rejects(creating, /shutting down|Cancelled/);
+		await closing;
+		assert.strictEqual(registry.hasRuntime('repo-a'), false);
+	});
+
 	test('closes a repository runtime by root path instead of treating a URI as its Git identity', async () => {
 		let closeCalls = 0;
 		const store = Object.assign(Object.create(null), {
@@ -181,27 +203,27 @@ suite('TemporalRepositoryRuntime', () => {
 		await runtime.dispose();
 	});
 
-	test('disposal drains active work before closing its store', async () => {
+	test('disposal closes the store after the sequencer settles cancelled work', async () => {
 		let closeCalls = 0;
-		let releaseTask: (() => void) | undefined;
-		const gate = new Promise<void>(resolve => releaseTask = resolve);
+		let started = false;
 		const runtime = createRuntime(() => closeCalls++);
 		const active = runtime.queueIngestion('commit-c', async () => {
-			await gate;
-			return createSnapshot('commit-c');
+			started = true;
+			return new Promise<TemporalGraphSnapshot>(() => {});
 		});
-		await Promise.resolve();
+		while (!started) {
+			await Promise.resolve();
+		}
 
-		const disposing = runtime.dispose();
-		await Promise.resolve();
 		assert.strictEqual(closeCalls, 0);
-		releaseTask?.();
-		await Promise.all([active, disposing]);
+		await runtime.dispose(50);
 		assert.strictEqual(closeCalls, 1);
+		await assert.rejects(active, /Cancelled/);
 	});
 
-	test('active work receives cancellation signal upon runtime disposal', async () => {
+	test('active cooperative work settles when runtime disposal cancels the sequencer token', async () => {
 		let wasCancelled = false;
+		let registered = false;
 		let releaseTask: (() => void) | undefined;
 		const gate = new Promise<void>(resolve => releaseTask = resolve);
 		const runtime = createRuntime();
@@ -210,6 +232,7 @@ suite('TemporalRepositoryRuntime', () => {
 			token.onCancellationRequested?.(() => {
 				wasCancelled = true;
 			});
+			registered = true;
 			await gate;
 			if (token.isCancellationRequested) {
 				throw new TemporalError('Cancelled', 'task cancelled');
@@ -217,13 +240,16 @@ suite('TemporalRepositoryRuntime', () => {
 			return createSnapshot('commit-active');
 		});
 
-		await Promise.resolve();
+		while (!registered) {
+			await Promise.resolve();
+		}
 		const disposing = runtime.dispose();
 		await Promise.resolve();
 
 		assert.strictEqual(wasCancelled, true);
 		releaseTask?.();
-		await Promise.allSettled([active, disposing]);
+		await assert.rejects(active, /Cancelled/);
+		await disposing;
 	});
 
 	test('queued pending work is immediately rejected upon disposal without waiting for active work', async () => {
@@ -253,22 +279,57 @@ suite('TemporalRepositoryRuntime', () => {
 		await Promise.allSettled([first, disposing]);
 	});
 
-	test('disposal completes within bounded timeout even if active task hangs', async () => {
+	test('active sequencer work rejects on disposal even if the inner task ignores cancellation', async () => {
+		let started = false;
 		let closeCalls = 0;
 		const runtime = createRuntime(() => closeCalls++);
 
-		// Ingestion task that never resolves
 		const hanging = runtime.queueIngestion('commit-hanging', async () => {
+			started = true;
 			return new Promise<TemporalGraphSnapshot>(() => {});
 		});
 
+		while (!started) {
+			await Promise.resolve();
+		}
+
 		const start = Date.now();
-		await runtime.dispose(50); // fast 50ms bounded timeout for test
+		await runtime.dispose(50);
 		const elapsed = Date.now() - start;
 
 		assert.ok(elapsed < 1000, `Expected bounded disposal < 1000ms, took ${elapsed}ms`);
 		assert.strictEqual(closeCalls, 1);
-		await Promise.allSettled([hanging]);
+		await assert.rejects(hanging, /Cancelled/);
+	});
+
+	test('non-cooperative store write prevents close until hasActiveWrite clears', async () => {
+		let closeCalls = 0;
+		let activeWrite = true;
+		let interrupted = false;
+		const store = Object.assign(Object.create(null), {
+			interrupt: () => { interrupted = true; },
+			hasActiveWrite: () => activeWrite,
+			close: async () => { closeCalls++; },
+		}) as ITemporalStore;
+		const runtime = new TemporalRepositoryRuntime('repo-a', '/repo-a', store, Object.create(null) as IGitHistoryService);
+
+		let started = false;
+		const hanging = runtime.queueIngestion('commit-write', async () => {
+			started = true;
+			return new Promise<TemporalGraphSnapshot>(() => {});
+		});
+		while (!started) {
+			await Promise.resolve();
+		}
+
+		await runtime.dispose(30);
+		assert.strictEqual(interrupted, true);
+		assert.strictEqual(closeCalls, 0, 'store must not close under an active write');
+
+		activeWrite = false;
+		await runtime.dispose(30);
+		assert.strictEqual(closeCalls, 0, 'dispose is memoized and must not close later from a second call after the first skipped close');
+		await assert.rejects(hanging, /Cancelled/);
 	});
 
 	test('disposal is idempotent, rejects new work, and closes the store exactly once', async () => {
@@ -349,6 +410,78 @@ suite('TemporalRepositoryRuntime', () => {
 
 		assert.strictEqual(await service.getGraphAtCommit('/repo-a', commitSha), snapshot);
 		assert.deepStrictEqual({ reconstructionCalls, ingestionCalls }, { reconstructionCalls: 1, ingestionCalls: 1 });
+		await registry.closeAll();
+	});
+
+	test('runtime.ingestCommit passes the sequencer combined token into ingestionService.ingestCommit', async () => {
+		const runtime = createRuntime();
+		let received: { isCancellationRequested: boolean; onCancellationRequested?: (listener: () => void) => { dispose(): void } } | undefined;
+		let started = false;
+		(runtime as unknown as { ingestionService: { ingestCommit(_r: string, _s: string, _o: unknown, token?: typeof received): Promise<TemporalGraphSnapshot> } }).ingestionService = {
+			ingestCommit: async (_r, _s, _o, token): Promise<TemporalGraphSnapshot> => {
+				received = token;
+				started = true;
+				await new Promise<void>((_, reject) => {
+					token?.onCancellationRequested?.(() => {
+						reject(new TemporalError('Cancelled', 'ingestion saw combined cancellation'));
+					});
+				});
+				return createSnapshot('commit-token');
+			},
+		};
+		const pending = runtime.ingestCommit('commit-token');
+		for (let i = 0; i < 50 && !started; i++) {
+			await Promise.resolve();
+		}
+		assert.ok(received, 'production ingestCommit must pass a token into ingestion');
+		const disposing = runtime.dispose(200);
+		for (let i = 0; i < 50 && !received.isCancellationRequested; i++) {
+			await Promise.resolve();
+		}
+		assert.strictEqual(received.isCancellationRequested, true);
+		await assert.rejects(pending, /Cancelled/);
+		await disposing;
+	});
+
+	test('production ingestCommit passes the sequencer combined token rather than the caller token alone', async () => {
+		const commitSha = 'commit-token';
+		let received: { isCancellationRequested: boolean; onCancellationRequested?: (listener: () => void) => { dispose(): void } } | undefined;
+		let started = false;
+		const store = Object.assign(Object.create(null), {
+			isOpen: () => true,
+			open: async () => {},
+			close: async () => {},
+		}) as ITemporalStore;
+		const gitService = Object.assign(Object.create(null), {
+			getRepositoryIdentity: async () => ({ repositoryId: 'repo-a', rootPath: '/repo-a', objectFormat: 'sha1' as const }),
+		}) as IGitHistoryService;
+		const registry = new TemporalRepositoryRegistry(async () => store);
+		const runtime = await registry.getRuntime('repo-a', '/repo-a', gitService);
+		(runtime as unknown as { ingestionService: { ingestCommit(_r: string, _s: string, _o: unknown, token?: typeof received): Promise<TemporalGraphSnapshot> } }).ingestionService = {
+			ingestCommit: async (_r, _s, _o, token): Promise<TemporalGraphSnapshot> => {
+				received = token;
+				started = true;
+				await new Promise<void>((_, reject) => {
+					token?.onCancellationRequested?.(() => {
+						reject(new TemporalError('Cancelled', 'ingestion saw combined cancellation'));
+					});
+				});
+				return createSnapshot('commit-token');
+			},
+		};
+		const service = new TemporalGraphService(gitService, registry);
+		const pending = service.ingestCommit('/repo-a', commitSha);
+		for (let i = 0; i < 50 && !started; i++) {
+			await Promise.resolve();
+		}
+		assert.ok(received, 'TemporalGraphService.ingestCommit must reach ingestion with a sequencer token');
+		const disposing = runtime.dispose(200);
+		for (let i = 0; i < 50 && !received.isCancellationRequested; i++) {
+			await Promise.resolve();
+		}
+		assert.strictEqual(received.isCancellationRequested, true);
+		await assert.rejects(pending, /Cancelled|disposed|cancelled/i);
+		await disposing;
 		await registry.closeAll();
 	});
 

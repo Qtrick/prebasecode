@@ -64,6 +64,9 @@ export class TemporalGraphService implements ITemporalGraphService {
 	}
 
 	async getCommitIndexStatus(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalCommitIndexStatus> {
+		if (token?.isCancellationRequested) {
+			return { status: 'cancelled' };
+		}
 		try {
 			const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 			const store = await this._registry.getStore(identity.repositoryId, rootPath);
@@ -100,6 +103,9 @@ export class TemporalGraphService implements ITemporalGraphService {
 	}
 
 	async ensureCommitIndexed(rootPath: string, commitSha: string, token?: CancellationTokenLike): Promise<TemporalGraphSnapshot> {
+		if (token?.isCancellationRequested) {
+			return this.ingestCommit(rootPath, commitSha, token);
+		}
 		const status = await this.getCommitIndexStatus(rootPath, commitSha, token);
 		if ((status.status === 'ready' || status.status === 'incomplete') && status.lineageCoverage?.kind !== 'partial') {
 			return this.getGraphAtCommit(rootPath, commitSha, token);
@@ -196,7 +202,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 			// misleading missing-checkpoint error. If the commit row still exists, the
 			// reconstruction chain itself is malformed and must continue to fail closed.
 			if (error instanceof TemporalError && error.code === 'CheckpointNotFound' && !(await runtime.store.getCommit(commitSha))) {
-				return runtime.queueIngestion(commitSha, () => runtime.ingestionService.ingestCommit(rootPath, commitSha, {}, token));
+				return runtime.ingestCommit(commitSha, {}, token);
 			}
 			throw error;
 		}
@@ -330,9 +336,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 		const identity = await this._gitService.getRepositoryIdentity(rootPath, token);
 		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
 
-		return runtime.queueIngestion(commitSha, async () => {
-			return runtime.ingestionService.ingestCommit(rootPath, commitSha, {}, token);
-		});
+		return runtime.ingestCommit(commitSha, {}, token);
 	}
 
 	async ingestCommitRange(rootPath: string, commitShas: string[], token?: CancellationTokenLike): Promise<void> {
@@ -341,9 +345,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 
 		for (const sha of commitShas) {
 			if (token?.isCancellationRequested) break;
-			await runtime.queueIngestion(sha, async () => {
-				return runtime.ingestionService.ingestCommit(rootPath, sha, {}, token);
-			});
+			await runtime.ingestCommit(sha, {}, token);
 		}
 	}
 
@@ -358,9 +360,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 			return;
 		}
 		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
-		await runtime.queueIngestion(event.currentHead, async () => {
-			return runtime.ingestionService.ingestCommit(rootPath, event.currentHead!, { isExplicitHead: true });
-		});
+		await runtime.ingestCommit(event.currentHead, { isExplicitHead: true });
 	}
 
 	async handleRegisteredRepositoryHeadChanged(event: GitHeadChangeEvent): Promise<void> {
@@ -371,9 +371,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 		if (!runtime) {
 			return;
 		}
-		await runtime.queueIngestion(event.currentHead, async () => {
-			return runtime.ingestionService.ingestCommit(runtime.rootPath, event.currentHead!, { isExplicitHead: true });
-		});
+		await runtime.ingestCommit(event.currentHead, { isExplicitHead: true });
 		await runtime.refreshRefs(event.currentHead);
 	}
 

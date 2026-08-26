@@ -1,0 +1,22 @@
+{
+  "phase": "3.16",
+  "generatedAt": "2026-08-26T18:44:35Z",
+  "machine": "darwin-arm64",
+  "headNote": "uncommitted work on main; not a release claim",
+  "live": {
+    "idleLaunch": true,
+    "screenshot": "screenshots/01_workbench_launch.png",
+    "workbenchRestored": true,
+    "magnusActivationCompleted": true,
+    "idleSigtermQuitLatencyS": 0.536,
+    "idleRemainingPreBaseProcesses": 0,
+    "loadQuitMatrix": false,
+    "temporalGuiAcceptance": false,
+    "magnusStreamGui": false
+  },
+  "acceptanceHarness": {
+    "phaseLabelDefault": "phase-3.16",
+    "usesProductionRenderMetrics": true,
+    "temporalReadyGateFailsIndexing": true
+  }
+}

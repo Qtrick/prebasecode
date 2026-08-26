@@ -17,6 +17,7 @@ export class TemporalRepositoryRegistry {
 	private readonly _runtimeCreations = new Map<string, Promise<TemporalRepositoryRuntime>>();
 	private readonly _storeFactory: TemporalStoreFactory;
 	private readonly _parseService?: ICanonicalParseService;
+	private _closing = false;
 
 	constructor(storeFactory: TemporalStoreFactory, parseService?: ICanonicalParseService) {
 		this._storeFactory = storeFactory;
@@ -24,6 +25,9 @@ export class TemporalRepositoryRegistry {
 	}
 
 	async getStore(repositoryId: string, rootPath: string): Promise<ITemporalStore> {
+		if (this._closing) {
+			throw new TemporalError('Cancelled', `Temporal registry is shutting down`);
+		}
 		const existing = this._stores.get(repositoryId);
 		if (existing) {
 			if (!existing.isOpen()) {
@@ -48,6 +52,9 @@ export class TemporalRepositoryRegistry {
 	}
 
 	async getRuntime(repositoryId: string, rootPath: string, gitService: IGitHistoryService): Promise<TemporalRepositoryRuntime> {
+		if (this._closing) {
+			throw new TemporalError('Cancelled', `Temporal registry is shutting down`);
+		}
 		const existing = this._runtimes.get(repositoryId);
 		if (existing) {
 			return existing;
@@ -88,6 +95,10 @@ export class TemporalRepositoryRegistry {
 	private async _createRuntime(repositoryId: string, rootPath: string, gitService: IGitHistoryService): Promise<TemporalRepositoryRuntime> {
 		const store = await this.getStore(repositoryId, rootPath);
 		const runtime = new TemporalRepositoryRuntime(repositoryId, rootPath, store, gitService, this._parseService);
+		if (this._closing) {
+			await runtime.dispose();
+			throw new TemporalError('Cancelled', `Temporal registry is shutting down`);
+		}
 		this._runtimes.set(repositoryId, runtime);
 		return runtime;
 	}
@@ -137,18 +148,25 @@ export class TemporalRepositoryRegistry {
 	}
 
 	async closeAll(): Promise<void> {
+		this._closing = true;
+		const inflight = [...this._storeCreations.values(), ...this._runtimeCreations.values()];
+		await Promise.allSettled(inflight);
+
+		const runtimes = [...this._runtimes.values()];
+		this._runtimes.clear();
 		const closedByRuntime = new Set<ITemporalStore>();
-		for (const runtime of this._runtimes.values()) {
+		// Independent per-repository stores; dispose concurrently so N roots do not
+		// stack per-runtime timeouts into a multi-minute workbench shutdown.
+		await Promise.all(runtimes.map(async runtime => {
 			await runtime.dispose();
 			closedByRuntime.add(runtime.store);
-		}
-		this._runtimes.clear();
+		}));
 
-		for (const store of this._stores.values()) {
+		await Promise.all([...this._stores.values()].map(async store => {
 			if (!closedByRuntime.has(store)) {
 				await store.close();
 			}
-		}
+		}));
 		this._stores.clear();
 	}
 

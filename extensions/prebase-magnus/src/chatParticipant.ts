@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 import type { PreBaseAIService } from './aiService';
-import type { AIContentMessage, AIContentPart } from './aiTypes';
+import type { AIContentMessage, AIContentPart, AIGenerateResult, AIGenerateResponseCandidate } from './aiTypes';
 import {
 	isMagnusAgentMode,
 	modeFromChatParticipantId,
@@ -22,7 +22,9 @@ import {
 	type ToolCallItem,
 	type ToolExecutionTracker,
 } from './toolExecutor';
-import { paceTextStream } from './streamPace';
+import { paceTextStream, createLivePacedSink, type LivePacedSink } from './streamPace';
+
+export const magnusRequestShutdown = new vscode.CancellationTokenSource();
 
 export interface MagnusChatDefaults {
 	mode: MagnusAgentMode;
@@ -57,6 +59,28 @@ function functionCalls(parts: AIContentPart[]): ToolCallItem[] {
 /** The model may return normal Markdown, including code fences, unchanged. */
 export function visibleAssistantText(raw: string): string {
 	return raw;
+}
+
+async function streamPacedCandidate(
+	aiService: PreBaseAIService,
+	request: Parameters<PreBaseAIService['streamCandidate']>[0],
+	token: vscode.CancellationToken,
+	onPiece: (piece: string) => void,
+	inspectChunk?: (chunk: { text?: string; candidate?: AIGenerateResponseCandidate }, sink: LivePacedSink) => boolean,
+): Promise<AIGenerateResult> {
+	const sink = createLivePacedSink(onPiece, { token });
+	try {
+		return await aiService.streamCandidate(request, chunk => {
+			if (inspectChunk?.(chunk, sink)) {
+				return;
+			}
+			if (chunk.text) {
+				sink.push(chunk.text);
+			}
+		}, token);
+	} finally {
+		await sink.close();
+	}
 }
 
 export function registerMagnusChatParticipants(
@@ -119,6 +143,7 @@ async function handleChatRequest(
 
 	const requestCts = new vscode.CancellationTokenSource();
 	const cancelSub = token.onCancellationRequested(() => requestCts.cancel());
+	const shutdownSub = magnusRequestShutdown.token.onCancellationRequested(() => requestCts.cancel());
 	const effectiveToken = requestCts.token;
 
 	const run: MagnusTaskRun = {
@@ -144,6 +169,7 @@ async function handleChatRequest(
 	try {
 		let rawText = '';
 		let enteredRunning = false;
+		let streamedVisible = false;
 
 		try {
 			for (let iteration = 0; iteration < assembled.budget.maxProviderRounds; iteration++) {
@@ -159,18 +185,38 @@ async function handleChatRequest(
 					break;
 				}
 
-				const result = await aiService.generateCandidate({
-					messages,
-					systemInstruction: assembled.systemInstruction,
-					tools: assembled.tools.length ? assembled.tools : undefined,
-					modelId: assembled.modelId,
-					reasoningEffort: assembled.reasoningEffort,
-				}, effectiveToken);
+				let turnStreamed = false;
+				let toolTurn = false;
+				const result = await streamPacedCandidate(
+					aiService,
+					{
+						messages,
+						systemInstruction: assembled.systemInstruction,
+						tools: assembled.tools.length ? assembled.tools : undefined,
+						modelId: assembled.modelId,
+						reasoningEffort: assembled.reasoningEffort,
+					},
+					effectiveToken,
+					piece => {
+						turnStreamed = true;
+						streamedVisible = true;
+						response.markdown(piece);
+					},
+					(chunk, sink) => {
+						const chunkParts = chunk.candidate?.content?.parts;
+						if (chunkParts && functionCalls(chunkParts).length > 0) {
+							toolTurn = true;
+							sink.discard();
+							return true;
+						}
+						return toolTurn;
+					},
+				);
 
 				const parts = result.candidate?.content?.parts ?? (result.text ? [{ text: result.text }] : []);
 				const calls = functionCalls(parts);
 
-				if (calls.length > 0) {
+				if (calls.length > 0 || toolTurn) {
 					enteredRunning = true;
 					run.status = 'running';
 					run.startedAt ??= Date.now();
@@ -195,7 +241,9 @@ async function handleChatRequest(
 				const candidateText = (result.text || textParts).trim();
 
 				if (candidateText.length > 0) {
-					rawText = candidateText;
+					if (!turnStreamed) {
+						rawText = candidateText;
+					}
 					break;
 				}
 
@@ -211,19 +259,28 @@ async function handleChatRequest(
 				}
 
 				if ((result.disposition === 'thoughtOnly' || result.disposition === 'maxTokens') && !recoveredStarvation) {
-					// Bounded recovery for reasoning token starvation: 1 synthesis request with low reasoning effort
 					recoveredStarvation = true;
 					try {
-						const recovery = await aiService.generateCandidate({
-							messages,
-							systemInstruction: `${assembled.systemInstruction}\nSynthesize and provide your final user-facing response now. Do not call additional tools.`,
-							modelId: assembled.modelId,
-							reasoningEffort: 'low',
-						}, effectiveToken);
+						const recovery = await streamPacedCandidate(
+							aiService,
+							{
+								messages,
+								systemInstruction: `${assembled.systemInstruction}\nSynthesize and provide your final user-facing response now. Do not call additional tools.`,
+								modelId: assembled.modelId,
+								reasoningEffort: 'low',
+							},
+							effectiveToken,
+							piece => {
+								streamedVisible = true;
+								response.markdown(piece);
+							},
+						);
 
 						const recoveryText = (recovery.text || recovery.candidate?.content?.parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') || '').trim();
 						if (recoveryText.length > 0) {
-							rawText = recoveryText;
+							if (!streamedVisible) {
+								rawText = recoveryText;
+							}
 							break;
 						}
 					} catch {
@@ -237,18 +294,27 @@ async function handleChatRequest(
 				if (result.disposition === 'emptyStop' && !recoveredEmptyStop) {
 					recoveredEmptyStop = true;
 					if (enteredRunning) {
-						// Continue from preserved tool results to synthesize final answer
 						try {
-							const recovery = await aiService.generateCandidate({
-								messages,
-								systemInstruction: `${assembled.systemInstruction}\nProvide your final summary to the user based on the tool results collected above.`,
-								modelId: assembled.modelId,
-								reasoningEffort: 'low',
-							}, effectiveToken);
+							const recovery = await streamPacedCandidate(
+								aiService,
+								{
+									messages,
+									systemInstruction: `${assembled.systemInstruction}\nProvide your final summary to the user based on the tool results collected above.`,
+									modelId: assembled.modelId,
+									reasoningEffort: 'low',
+								},
+								effectiveToken,
+								piece => {
+									streamedVisible = true;
+									response.markdown(piece);
+								},
+							);
 
 							const recoveryText = (recovery.text || recovery.candidate?.content?.parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') || '').trim();
 							if (recoveryText.length > 0) {
-								rawText = recoveryText;
+								if (!streamedVisible) {
+									rawText = recoveryText;
+								}
 								break;
 							}
 						} catch {
@@ -258,17 +324,26 @@ async function handleChatRequest(
 						rawText = 'The model completed execution without returning visible text. Please retry or choose another model.';
 						break;
 					} else {
-						// Single bounded retry for clean prompt
 						try {
-							const retryResult = await aiService.generateCandidate({
-								messages,
-								systemInstruction: assembled.systemInstruction,
-								modelId: assembled.modelId,
-								reasoningEffort: assembled.reasoningEffort,
-							}, effectiveToken);
+							const retryResult = await streamPacedCandidate(
+								aiService,
+								{
+									messages,
+									systemInstruction: assembled.systemInstruction,
+									modelId: assembled.modelId,
+									reasoningEffort: assembled.reasoningEffort,
+								},
+								effectiveToken,
+								piece => {
+									streamedVisible = true;
+									response.markdown(piece);
+								},
+							);
 							const retryText = (retryResult.text || retryResult.candidate?.content?.parts?.filter(p => !p.thought).map(p => p.text ?? '').join('') || '').trim();
 							if (retryText.length > 0) {
-								rawText = retryText;
+								if (!streamedVisible) {
+									rawText = retryText;
+								}
 								break;
 							}
 						} catch {
@@ -305,21 +380,22 @@ async function handleChatRequest(
 		run.status = 'completed';
 		run.completedAt = Date.now();
 		run.finalResponse = visibleAssistantText(rawText);
-		const finalVisible = run.finalResponse || (enteredRunning ? 'The tool loop reached its limit before the model returned a final response.' : 'The model returned an empty response. Please retry or choose another model.');
-
-		async function* textStream(): AsyncGenerator<string, void, unknown> {
-			yield finalVisible;
-		}
-
-		for await (const piece of paceTextStream(textStream(), { token: effectiveToken })) {
-			if (effectiveToken.isCancellationRequested) {
-				break;
+		if (!streamedVisible) {
+			const finalVisible = run.finalResponse || (enteredRunning ? 'The tool loop reached its limit before the model returned a final response.' : 'The model returned an empty response. Please retry or choose another model.');
+			async function* textStream(): AsyncGenerator<string, void, unknown> {
+				yield finalVisible;
 			}
-			response.markdown(piece);
+			for await (const piece of paceTextStream(textStream(), { token: effectiveToken })) {
+				if (effectiveToken.isCancellationRequested) {
+					break;
+				}
+				response.markdown(piece);
+			}
 		}
 		return {};
 	} finally {
 		cancelSub.dispose();
+		shutdownSub.dispose();
 		requestCts.dispose();
 	}
 }

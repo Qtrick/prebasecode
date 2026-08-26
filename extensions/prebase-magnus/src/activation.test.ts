@@ -83,6 +83,25 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 		assert.ok(registeredCommands.has('prebase.magnus.attachRuntimeContext'), 'attachRuntimeContext must be registered');
 		assert.ok(registeredCommands.has('prebase.magnus.importApiKeyFromProcessEnv'), 'importApiKeyFromProcessEnv must be registered');
 	});
+
+	it('does not restore onStartupFinished and relies on generated onLanguageModelTool events', () => {
+		const events: string[] = manifest.activationEvents ?? [];
+		assert.ok(!events.includes('onStartupFinished'), 'lazy activation must not restore onStartupFinished');
+		assert.ok(events.includes('onChatParticipant:prebase.magnus.ask'));
+		assert.ok(events.includes('onLanguageModelChatProvider:magnus'));
+		const toolNames: string[] = manifest.contributes?.languageModelTools?.map((t: { name: string }) => t.name) ?? [];
+		assert.strictEqual(toolNames.length, 38);
+		for (const name of toolNames) {
+			assert.match(name, /^prebase_/);
+		}
+	});
+
+	it('deactivate cancels in-flight chat requests through magnusRequestShutdown', () => {
+		const extensionSrc = fs.readFileSync(path.join(__dirname, 'extension.ts'), 'utf8');
+		const chatSrc = fs.readFileSync(path.join(__dirname, 'chatParticipant.ts'), 'utf8');
+		assert.match(extensionSrc, /magnusRequestShutdown\.cancel\(\)/);
+		assert.match(chatSrc, /magnusRequestShutdown\.token\.onCancellationRequested/);
+	});
 });
 
 describe('Root Resolution & Workspace Isolation', () => {

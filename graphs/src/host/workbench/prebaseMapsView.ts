@@ -116,6 +116,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _searchCts: CancellationTokenSource | null = null;
 	private _searchDebounceTimer: any = null;
 	private _historyExpanded = true;
+	private _refreshQueued = false;
 
 	constructor(
 		options: IViewletViewOptions,
@@ -136,23 +137,15 @@ export class PreBaseMapsViewPane extends ViewPane {
 		@IWorkspaceContextService private readonly workspaceContextService: IWorkspaceContextService,
 	) {
 		super(options, keybindingService, contextMenuService, configurationService, contextKeyService, viewDescriptorService, instantiationService, openerService, themeService, hoverService);
-		this._register(this.graphService.onDidChangeDiagnostics(() => this._refresh()));
-		this._register(this.graphService.onDidChangeViewState(() => this._refresh()));
-		this._register(this.graphService.onDidChangeSnapshot(() => this._refresh()));
-		this._register(this.temporalViewService.onDidChangeState(() => {
-			this._refreshTemporal();
-			this._refreshHistory();
-		}));
-		this._register(this.temporalViewService.onDidChangeTimeline(() => {
-			this._refreshTemporal();
-			this._refreshHistory();
-		}));
-		this._register(this.temporalViewService.onDidChangeDiff(() => {
-			this._refreshTemporal();
-		}));
-		this._register(this.editorService.onDidActiveEditorChange(() => this._refresh()));
-		this._register(this.workspaceContextService.onDidChangeWorkbenchState(() => this._refresh()));
-		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => this._refresh()));
+		this._register(this.graphService.onDidChangeDiagnostics(() => this._queueRefresh()));
+		this._register(this.graphService.onDidChangeViewState(() => this._queueRefresh()));
+		this._register(this.graphService.onDidChangeSnapshot(() => this._queueRefresh()));
+		this._register(this.temporalViewService.onDidChangeState(() => this._queueRefresh()));
+		this._register(this.temporalViewService.onDidChangeTimeline(() => this._queueRefresh()));
+		this._register(this.temporalViewService.onDidChangeDiff(() => this._queueRefresh()));
+		this._register(this.editorService.onDidActiveEditorChange(() => this._queueRefresh()));
+		this._register(this.workspaceContextService.onDidChangeWorkbenchState(() => this._queueRefresh()));
+		this._register(this.workspaceContextService.onDidChangeWorkspaceFolders(() => this._queueRefresh()));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkIdleAutoRotate) ||
@@ -160,7 +153,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphExplorerViewMode) ||
 				e.affectsConfiguration(PreBaseGraphConfigKeys.GraphNetworkLayoutMode)
 			) {
-				this._refresh();
+				this._queueRefresh();
 			}
 		}));
 	}
@@ -1171,6 +1164,20 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._diag.style.lineHeight = '1.45';
 		this._diag.style.whiteSpace = 'pre-wrap';
 		this._diag.style.color = MUTED;
+	}
+
+	private _queueRefresh(): void {
+		if (this._refreshQueued) {
+			return;
+		}
+		this._refreshQueued = true;
+		queueMicrotask(() => {
+			this._refreshQueued = false;
+			if (!this._scroll) {
+				return;
+			}
+			this._refresh();
+		});
 	}
 
 	private _refresh(): void {

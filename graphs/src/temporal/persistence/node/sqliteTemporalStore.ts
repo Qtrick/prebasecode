@@ -29,6 +29,7 @@ import type {
 	TemporalStructuralDelta,
 } from '../../common/temporalTypes.js';
 import type { CanonicalCoverage } from '../../../common/types/canonicalTypes.js';
+import type { CancellationTokenLike } from '../../../core/canonical/contentSource.js';
 
 export interface SqliteStoreOptions {
 	readonly dbPath: string;
@@ -69,6 +70,35 @@ function readPragma(db: sqlite3.Database, name: string): Promise<string | number
 			}
 			resolve(value);
 		});
+	});
+}
+
+function isSqliteInterrupt(error: unknown): boolean {
+	if (!(error instanceof Error)) {
+		return false;
+	}
+	const errorWithCode = error as Error & { code?: unknown; errno?: unknown };
+	const code = typeof errorWithCode.code === 'string' ? errorWithCode.code : '';
+	return code === 'SQLITE_INTERRUPT' || /SQLITE_INTERRUPT|interrupted/i.test(error.message);
+}
+
+function finalizePrepared(stmt: { finalize(cb?: (err: Error | null) => void): void }, ignoreInterrupt: boolean): Promise<void> {
+	return new Promise((resolve, reject) => {
+		try {
+			stmt.finalize(err => {
+				if (!err || (ignoreInterrupt && isSqliteInterrupt(err))) {
+					resolve();
+					return;
+				}
+				reject(err);
+			});
+		} catch (err) {
+			if (ignoreInterrupt && isSqliteInterrupt(err)) {
+				resolve();
+				return;
+			}
+			reject(err);
+		}
 	});
 }
 
@@ -115,6 +145,10 @@ export class SqliteTemporalStore implements ITemporalStore {
 	private _db: sqlite3.Database | undefined;
 	private _isOpen = false;
 	private _openPromise: Promise<void> | undefined;
+	private _closePromise: Promise<void> | undefined;
+	private _activeWrites = 0;
+	private _interruptRequested = false;
+	private _closing = false;
 
 	constructor(options: SqliteStoreOptions) {
 		this._dbPath = options.dbPath;
@@ -168,8 +202,11 @@ export class SqliteTemporalStore implements ITemporalStore {
 					try {
 						await this._configureDatabase(db);
 						await runMigrations(db);
-						// quick_check verifies B-tree structural integrity and index consistency
-						// without the unbounded overhead of scanning all page content in large caches.
+						// PRAGMA quick_check is SQLite's faster integrity_check: it still walks
+						// b-trees looking for malformed records, missing pages, and UNIQUE/NOT NULL
+						// violations, but it skips verifying that every index entry matches the
+						// corresponding table row. Use runMaintenance / integrity_check for the
+						// slower full cross-check.
 						const integrity = await readPragma(db, 'quick_check');
 						if (String(integrity).toLowerCase() !== 'ok') {
 							throw new TemporalError('DatabaseCorrupted', 'SQLite integrity check failed for the derived Temporal cache');
@@ -210,11 +247,38 @@ export class SqliteTemporalStore implements ITemporalStore {
 		}
 	}
 
+	interrupt(): void {
+		this._interruptRequested = true;
+		const db = this._db;
+		if (!db || !this._isOpen) {
+			return;
+		}
+		try {
+			db.interrupt();
+		} catch {
+			// interrupt on a closing/closed handle is a no-op
+		}
+	}
+
+	hasActiveWrite(): boolean {
+		return this._activeWrites > 0;
+	}
+
 	async close(): Promise<void> {
+		if (this._closePromise) {
+			return this._closePromise;
+		}
+		this._closePromise = this._closeOnce();
+		return this._closePromise;
+	}
+
+	private async _closeOnce(): Promise<void> {
+		this._closing = true;
 		if (this._openPromise) {
 			try {
 				await this._openPromise;
 			} catch {
+				this._isOpen = false;
 				return;
 			}
 		}
@@ -223,13 +287,22 @@ export class SqliteTemporalStore implements ITemporalStore {
 			return;
 		}
 
-		try {
-			// Query planner optimization on close (recommended SQLite best practice)
-			await runStatement(this._db, 'PRAGMA optimize;');
-		} catch {
-			// ignore optimize failures during shutdown
+		this.interrupt();
+		const drainDeadline = Date.now() + 1500;
+		while (this._activeWrites > 0 && Date.now() < drainDeadline) {
+			await new Promise(resolve => setTimeout(resolve, 20));
+		}
+		if (this._activeWrites > 0) {
+			// Leave the connection open rather than close under an active write.
+			// Process teardown / WAL recovery is safer than a racing sqlite3_close.
+			// Allow a later close() once the write drains; do not memoize a no-op close.
+			this._closing = true;
+			this._closePromise = undefined;
+			return;
 		}
 
+		// ponytail: PRAGMA optimize belongs in runMaintenance, not Quit. Close must
+		// not wait on planner analysis.
 		return new Promise<void>((resolve, reject) => {
 			this._db!.close((err) => {
 				this._db = undefined;
@@ -254,23 +327,37 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 	async runInTransaction<T>(operation: () => Promise<T>): Promise<T> {
 		const run = async () => {
-			const db = this._getDb();
-
-			await new Promise<void>((resolve, reject) => {
-				db.run('BEGIN IMMEDIATE;', (err) => (err ? reject(err) : resolve()));
-			});
-
+			this._activeWrites++;
 			try {
-				const result = await operation();
+				if (this._closing || this._interruptRequested) {
+					throw new TemporalError('Cancelled', 'Temporal store write was cancelled');
+				}
+				const db = this._getDb();
+
 				await new Promise<void>((resolve, reject) => {
-					db.run('COMMIT;', (err) => (err ? reject(err) : resolve()));
+					db.run('BEGIN IMMEDIATE;', (err) => (err ? reject(err) : resolve()));
 				});
-				return result;
-			} catch (error) {
-				await new Promise<void>((resolve) => {
-					db.run('ROLLBACK;', () => resolve());
-				});
-				throw error;
+
+				try {
+					const result = await operation();
+					await new Promise<void>((resolve, reject) => {
+						db.run('COMMIT;', (err) => (err ? reject(err) : resolve()));
+					});
+					return result;
+				} catch (error) {
+					await new Promise<void>((resolve) => {
+						db.run('ROLLBACK;', () => resolve());
+					});
+					if (isSqliteInterrupt(error) || this._interruptRequested) {
+						throw new TemporalError('Cancelled', 'Temporal store write was interrupted', error);
+					}
+					throw error;
+				}
+			} finally {
+				this._activeWrites--;
+				if (this._closing && this._activeWrites === 0 && !this._closePromise && this._db) {
+					void this.close().catch(() => undefined);
+				}
 			}
 		};
 
@@ -322,7 +409,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		commit: TemporalCommitRecord,
 		snapshot: TemporalGraphSnapshot,
 		delta?: TemporalStructuralDelta,
-		lineageEvents: readonly TemporalEntityLineageEvent[] = []
+		lineageEvents: readonly TemporalEntityLineageEvent[] = [],
+		token?: CancellationTokenLike
 	): Promise<void> {
 		validateVersion(commit.schemaVersion, 'schemaVersion');
 		validateVersion(commit.analyzerVersion, 'analyzerVersion');
@@ -343,8 +431,21 @@ export class SqliteTemporalStore implements ITemporalStore {
 		}
 
 		const db = this._getDb();
+		const throwIfCancelled = () => {
+			if (token?.isCancellationRequested || this._interruptRequested || this._closing) {
+				throw new TemporalError('Cancelled', 'Commit ingestion was cancelled');
+			}
+		};
+		if (this._closing) {
+			throw new TemporalError('Cancelled', 'Commit ingestion was cancelled');
+		}
+		if (!token?.isCancellationRequested) {
+			this._interruptRequested = false;
+		}
+		throwIfCancelled();
 
 		return this.runInTransaction(async () => {
+			throwIfCancelled();
 			// A bounded segment may first have been stored as an isolated checkpoint
 			// and later be reconciled with an indexed parent. Remove its old derived
 			// occurrence before replacing it so no stale anchor survives replay.
@@ -531,6 +632,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 				try {
 					for (let i = 0; i < entityTransitions.length; i += CHUNK_SIZE) {
+						throwIfCancelled();
 						const chunk = entityTransitions.slice(i, i + CHUNK_SIZE);
 						await new Promise<void>((resolve, reject) => {
 							let pending = chunk.length * 2;
@@ -557,8 +659,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 					}
 				} finally {
 					await Promise.all([
-						new Promise<void>(resolve => { try { upsertEntityStmt.finalize(() => resolve()); } catch { resolve(); } }),
-						new Promise<void>(resolve => { try { insertEntitySnapStmt.finalize(() => resolve()); } catch { resolve(); } }),
+						finalizePrepared(upsertEntityStmt, this._interruptRequested),
+						finalizePrepared(insertEntitySnapStmt, this._interruptRequested),
 					]);
 				}
 			}
@@ -606,6 +708,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				const now = Date.now();
 				try {
 					for (let i = 0; i < nonSameLineageEvents.length; i += CHUNK_SIZE) {
+						throwIfCancelled();
 						const chunk = nonSameLineageEvents.slice(i, i + CHUNK_SIZE);
 						await new Promise<void>((resolve, reject) => {
 							let pending = chunk.length;
@@ -629,7 +732,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 						});
 					}
 				} finally {
-					await new Promise<void>(resolve => { try { insertLineageStmt.finalize(() => resolve()); } catch { resolve(); } });
+					await finalizePrepared(insertLineageStmt, this._interruptRequested);
 				}
 			}
 
@@ -655,6 +758,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 				try {
 					for (let i = 0; i < edgeTransitions.length; i += CHUNK_SIZE) {
+						throwIfCancelled();
 						const chunk = edgeTransitions.slice(i, i + CHUNK_SIZE);
 						await new Promise<void>((resolve, reject) => {
 							let pending = chunk.length * 2;
@@ -687,8 +791,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 					}
 				} finally {
 					await Promise.all([
-						new Promise<void>(resolve => { try { upsertEdgeStmt.finalize(() => resolve()); } catch { resolve(); } }),
-						new Promise<void>(resolve => { try { insertEdgeSnapStmt.finalize(() => resolve()); } catch { resolve(); } }),
+						finalizePrepared(upsertEdgeStmt, this._interruptRequested),
+						finalizePrepared(insertEdgeSnapStmt, this._interruptRequested),
 					]);
 				}
 			}

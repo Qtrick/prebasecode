@@ -21,10 +21,12 @@ import type {
 	TemporalStructuralDelta,
 } from '../../temporal/common/temporalTypes.js';
 import type { RefRecord, RepositoryIdentityRecord, TemporalCommitIndexMetadata, TemporalStoreMaintenanceResult } from '../../temporal/persistence/common/temporalStore.js';
+import type { CancellationTokenLike } from '../../core/canonical/contentSource.js';
 
 export class WorkbenchTemporalStore implements ITemporalStore {
 	private readonly _main: ITemporalStoreMainService;
 	private _isOpen = false;
+	private _inflightWrites = 0;
 
 	constructor(channel: IChannel, private readonly _dbPath: string) {
 		this._main = ProxyChannel.toService<ITemporalStoreMainService>(channel);
@@ -32,7 +34,17 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 
 	isOpen(): boolean { return this._isOpen; }
 	async open(): Promise<void> { await this._unwrap(this._main.open(this._dbPath)); this._isOpen = true; }
-	async close(): Promise<void> { if (this._isOpen) { await this._unwrap(this._main.close(this._dbPath)); this._isOpen = false; } }
+	async close(): Promise<void> {
+		if (!this._isOpen) {
+			return;
+		}
+		await this._unwrap(this._main.close(this._dbPath));
+		if (!this.hasActiveWrite()) {
+			this._isOpen = false;
+		}
+	}
+	async interrupt(): Promise<void> { if (this._isOpen) { await this._unwrap(this._main.interrupt(this._dbPath)); } }
+	hasActiveWrite(): boolean { return this._inflightWrites > 0; }
 
 	private async _unwrap<T>(responsePromise: Promise<string>): Promise<T> {
 		const response = deserializeTemporalStoreValue<TemporalStoreIpcResponse>(await responsePromise);
@@ -49,7 +61,18 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 
 	setRepositoryIdentity(identity: RepositoryIdentityRecord): Promise<void> { return this._call('setRepositoryIdentity', identity); }
 	getRepositoryIdentity(): Promise<RepositoryIdentityRecord | undefined> { return this._call('getRepositoryIdentity'); }
-	saveCommitIngestion(commit: TemporalCommitRecord, snapshot: TemporalGraphSnapshot, delta?: TemporalStructuralDelta, lineageEvents?: readonly TemporalEntityLineageEvent[]): Promise<void> { return this._call('saveCommitIngestion', commit, snapshot, delta, lineageEvents); }
+	saveCommitIngestion(commit: TemporalCommitRecord, snapshot: TemporalGraphSnapshot, delta?: TemporalStructuralDelta, lineageEvents?: readonly TemporalEntityLineageEvent[], token?: CancellationTokenLike): Promise<void> {
+		const cancel = token?.onCancellationRequested?.(() => { void this.interrupt(); });
+		if (token?.isCancellationRequested) {
+			cancel?.dispose();
+			return Promise.reject(new TemporalError('Cancelled', 'Commit ingestion was cancelled'));
+		}
+		this._inflightWrites++;
+		return this._call<void>('saveCommitIngestion', commit, snapshot, delta, lineageEvents).finally(() => {
+			this._inflightWrites--;
+			cancel?.dispose();
+		});
+	}
 	getCommit(commitSha: string): Promise<TemporalCommitRecord | undefined> { return this._call('getCommit', commitSha); }
 	getAllCommits(): Promise<TemporalCommitRecord[]> { return this._call('getAllCommits'); }
 	getLatestCommit(): Promise<TemporalCommitRecord | undefined> { return this._call('getLatestCommit'); }

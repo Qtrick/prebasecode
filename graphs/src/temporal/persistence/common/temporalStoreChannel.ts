@@ -8,7 +8,9 @@ export interface ITemporalStoreMainService {
 	/** Every main-process operation uses the same typed result envelope. */
 	open(dbPath: string): Promise<string>;
 	close(dbPath: string): Promise<string>;
+	interrupt(dbPath: string): Promise<string>;
 	invoke(dbPath: string, method: string, argumentsJson: string): Promise<string>;
+	shutdown(): Promise<void>;
 }
 
 export type TemporalStoreIpcResponse =

@@ -313,6 +313,49 @@ suite('SqliteTemporalStore', () => {
 		mainService.dispose();
 	});
 
+	test('Electron-main store owner awaits close on shutdown instead of fire-and-forget', async () => {
+		const storageRoot = path.dirname(dbPath);
+		const mainService = new TemporalStoreMainService(storageRoot);
+		const ipcPath = path.join(storageRoot, 'shutdown-await.db');
+		await mainService.open(ipcPath);
+		await mainService.shutdown();
+		await mainService.shutdown();
+		const after = JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')) as { ok: boolean };
+		assert.strictEqual(after.ok, false);
+		mainService.dispose();
+	});
+
+	test('dispose uses the same memoized shutdown path rather than dropping stores before close', async () => {
+		const storageRoot = path.dirname(dbPath);
+		const mainService = new TemporalStoreMainService(storageRoot);
+		const ipcPath = path.join(storageRoot, 'dispose-shutdown.db');
+		await mainService.open(ipcPath);
+		const stores = (mainService as unknown as { _stores: Map<string, { close(): Promise<void> }> })._stores;
+		assert.strictEqual(stores.size, 1);
+		const store = [...stores.values()][0];
+		const originalClose = store.close.bind(store);
+		let closeStarted = false;
+		let releaseClose: (() => void) | undefined;
+		const gate = new Promise<void>(resolve => { releaseClose = resolve; });
+		store.close = async () => {
+			closeStarted = true;
+			await gate;
+			return originalClose();
+		};
+		mainService.dispose();
+		for (let i = 0; i < 50 && !closeStarted; i++) {
+			await Promise.resolve();
+		}
+		assert.strictEqual(closeStarted, true, 'dispose must start the memoized shutdown close');
+		assert.strictEqual(stores.size, 1, 'dispose must not drop the map before close finishes');
+		const during = JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')) as { ok: boolean };
+		assert.strictEqual(during.ok, true, 'store must remain reachable until awaited close completes');
+		releaseClose?.();
+		await mainService.shutdown();
+		const after = JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')) as { ok: boolean };
+		assert.strictEqual(after.ok, false);
+	});
+
 	test('Electron-main store owner deduplicates concurrent opens and serves IPC calls afterward', async () => {
 		const storageRoot = path.dirname(dbPath);
 		const mainService = new TemporalStoreMainService(storageRoot);

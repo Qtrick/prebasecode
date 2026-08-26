@@ -53,6 +53,8 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 		this._isFlushing = true;
 		try {
 			while (this._pending.length > 0) {
+				// ponytail: 32 is the IPC aggregation batch, not 32-way CPU parallelism.
+				// CanonicalParserWorkerService.parseBatch walks entries sequentially.
 				const pending = this._pending.splice(0, 32);
 				const active = pending.filter(item => {
 					if (!item.token?.isCancellationRequested) {

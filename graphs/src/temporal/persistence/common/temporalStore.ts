@@ -15,6 +15,7 @@ import type {
 	TemporalLineageCoverage,
 } from '../../common/temporalTypes.js';
 import type { CanonicalCoverage } from '../../../common/types/canonicalTypes.js';
+import type { CancellationTokenLike } from '../../../core/canonical/contentSource.js';
 
 export interface RepositoryIdentityRecord {
 	readonly repoId: string;
@@ -47,6 +48,10 @@ export interface ITemporalStore {
 	isOpen(): boolean;
 	open(): Promise<void>;
 	close(): Promise<void>;
+	/** Abort an in-flight SQLite operation. No-op if the connection is closed. */
+	interrupt?(): void | Promise<void>;
+	/** True while a write transaction (or equivalent) is executing against this store. */
+	hasActiveWrite?(): boolean;
 
 	// Repository identity
 	setRepositoryIdentity(identity: RepositoryIdentityRecord): Promise<void>;
@@ -57,7 +62,8 @@ export interface ITemporalStore {
 		commit: TemporalCommitRecord,
 		snapshot: TemporalGraphSnapshot,
 		delta?: TemporalStructuralDelta,
-		lineageEvents?: readonly TemporalEntityLineageEvent[]
+		lineageEvents?: readonly TemporalEntityLineageEvent[],
+		token?: CancellationTokenLike
 	): Promise<void>;
 
 	// Commit & DAG queries

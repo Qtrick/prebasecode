@@ -2240,6 +2240,7 @@ function updateTemporalDiffTransition(diff) {
 function drawTemporalFrame(ts) {
 	if (!netCanvas || !ctx) return;
 	const renderStart = performance.now();
+	let edgesDrawn = 0;
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
 	const theme = getComputedThemeColors();
@@ -2353,6 +2354,7 @@ function drawTemporalFrame(ts) {
 					: (theme.isHighContrast ? 'rgba(255, 255, 255, 0.22)' : 'rgba(99, 102, 241, 0.20)');
 				ctx.lineWidth = strokeWidth;
 				ctx.stroke();
+				edgesDrawn++;
 
 				// Count badge on aggregate edge
 				if (transform.k >= 0.38) {
@@ -2468,6 +2470,7 @@ function drawTemporalFrame(ts) {
 			ctx.lineWidth = edgeWidth;
 			if (edgeDash.length && typeof ctx.setLineDash === 'function') ctx.setLineDash(edgeDash);
 			ctx.stroke();
+			edgesDrawn++;
 			ctx.restore();
 		}
 	}
@@ -2609,22 +2612,23 @@ function drawTemporalFrame(ts) {
 	}
 
 	const renderEnd = performance.now();
-	try {
-		window.__prebaseGraphRenderMetrics = {
-			sequenceId: (window.__prebaseGraphRenderMetrics?.sequenceId || 0) + 1,
-			mode: 'temporal',
-			displayMode: displayMode,
-			renderStart: renderStart,
-			renderEnd: renderEnd,
-			durationMs: Math.max(0, renderEnd - renderStart),
-			nodesDrawn: nodesToRender.length,
-			edgesDrawn: (visibleData.edges || []).length,
-			labelsDrawn: visibleLabels.length,
-			lodTier: transform.k < 0.3 ? 'aggregate' : (transform.k < 0.8 ? 'direct' : 'full'),
-			isAnimating: Boolean(isAnimatingTemporal),
-			timestamp: renderEnd,
-		};
-	} catch {}
+	if (typeof window !== 'undefined' && window.__prebaseRecordRenderMetrics) {
+		try {
+			const metrics = window.__prebaseGraphRenderMetrics || (window.__prebaseGraphRenderMetrics = {});
+			metrics.sequenceId = (metrics.sequenceId || 0) + 1;
+			metrics.mode = 'temporal';
+			metrics.displayMode = displayMode;
+			metrics.renderStart = renderStart;
+			metrics.renderEnd = renderEnd;
+			metrics.durationMs = Math.max(0, renderEnd - renderStart);
+			metrics.nodesDrawn = nodesToRender.length;
+			metrics.edgesDrawn = edgesDrawn;
+			metrics.labelsDrawn = visibleLabels.length;
+			metrics.lodTier = transform.k < 0.3 ? 'aggregate' : (transform.k < 0.8 ? 'direct' : 'full');
+			metrics.isAnimating = Boolean(isAnimatingTemporal);
+			metrics.timestamp = renderEnd;
+		} catch {}
+	}
 
 	ctx.restore();
 
@@ -2751,6 +2755,7 @@ function drawNetworkEdgeArrow(p1, p2, color, arrowSize) {
 function drawNetworkFrame() {
 	if (!netCanvas || !ctx) return;
 	const renderStart = performance.now();
+	let edgesDrawn = 0;
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
 	ctx.clearRect(0, 0, w, h);
@@ -2813,6 +2818,7 @@ function drawNetworkFrame() {
 			drawNetworkEdgeArrow(p1, p2, desc.color, Math.max(3, 4 / transform.k));
 		}
 		ctx.restore();
+		edgesDrawn++;
 	}
 
 	// 2. Draw Network Nodes Sorted by Projected Z (Far-to-Near).
@@ -2933,21 +2939,22 @@ function drawNetworkFrame() {
 	}
 
 	const renderEnd = performance.now();
-	try {
-		window.__prebaseGraphRenderMetrics = {
-			sequenceId: (window.__prebaseGraphRenderMetrics?.sequenceId || 0) + 1,
-			mode: 'network',
-			renderStart: renderStart,
-			renderEnd: renderEnd,
-			durationMs: Math.max(0, renderEnd - renderStart),
-			nodesDrawn: nodes.length,
-			edgesDrawn: edgesToDraw.length,
-			labelsDrawn: placedLabelBoxes.length,
-			lodTier: transform.k < 0.3 ? 'low' : (transform.k < 0.8 ? 'medium' : 'high'),
-			isAnimating: false,
-			timestamp: renderEnd,
-		};
-	} catch {}
+	if (typeof window !== 'undefined' && window.__prebaseRecordRenderMetrics) {
+		try {
+			const metrics = window.__prebaseGraphRenderMetrics || (window.__prebaseGraphRenderMetrics = {});
+			metrics.sequenceId = (metrics.sequenceId || 0) + 1;
+			metrics.mode = 'network';
+			metrics.renderStart = renderStart;
+			metrics.renderEnd = renderEnd;
+			metrics.durationMs = Math.max(0, renderEnd - renderStart);
+			metrics.nodesDrawn = nodes.length;
+			metrics.edgesDrawn = edgesDrawn;
+			metrics.labelsDrawn = placedLabelBoxes.length;
+			metrics.lodTier = transform.k < 0.3 ? 'low' : (transform.k < 0.8 ? 'medium' : 'high');
+			metrics.isAnimating = false;
+			metrics.timestamp = renderEnd;
+		} catch {}
+	}
 
 	ctx.restore();
 	dirty = false;

@@ -14,10 +14,16 @@ import { CdpConnection, type MinimalWebSocket } from '../common/cdpConnection.js
 import { MAX_EXTERNAL_SCREENSHOT_CDP_MESSAGE_BYTES, selectOwnedCdpPageWebSocketUrl, validateCdpPngScreenshotData, type CdpDiscoveryTarget } from '../common/cdpScreenshot.js';
 import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.js';
 import { ProcessOutputBuffer } from '../common/processOutputBuffer.js';
-import { terminateOwnedProcess, type ProcessTerminationSignal } from '../common/processTermination.js';
+import { terminateOwnedProcess, resolveDesktopShutdownPolicy, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, type ProcessTerminationSignal } from '../common/processTermination.js';
 import { ILifecycleMainService } from '../../lifecycle/electron-main/lifecycleMainService.js';
 import { ILogService } from '../../log/common/log.js';
 import { IConfigurationService } from '../../configuration/common/configuration.js';
+
+/** Windows taskkill itself can hang; bound the helper process, then wait for the child. */
+const WINDOWS_TASKKILL_EXEC_TIMEOUT_MS = 4_000;
+const WINDOWS_TASKKILL_EXIT_WAIT_MS = 3_000;
+/** Ceiling for the memoized owned-process shutdown joiner (POSIX 6s or Windows ~7s). */
+const OWNED_PROCESS_SHUTDOWN_CEILING_MS = Math.max(POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, WINDOWS_TASKKILL_EXEC_TIMEOUT_MS + WINDOWS_TASKKILL_EXIT_WAIT_MS) + 500;
 
 const STRIP_HEIGHT = 38;
 const MAX_CDP_DISCOVERY_BYTES = 1 * 1024 * 1024;
@@ -57,6 +63,7 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 	private readonly _ownedDebugPorts = new Set<number>();
 	private readonly _externalChildren = new Map<number, ChildProcess>();
 	private readonly _externalOutput = new Map<number, ProcessOutputBuffer>();
+	private _shutdownPromise: Promise<void> | undefined;
 
 	private readonly _onDidCloseManagedWindow = this._register(new Emitter<{ sessionId: string }>());
 	readonly onDidCloseManagedWindow = this._onDidCloseManagedWindow.event;
@@ -78,19 +85,44 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 	}
 
 	private async _onWillShutdown(): Promise<void> {
-		this._logService?.trace('[PreBase Desktop] onWillShutdown joiner active; closing managed sessions and stopping owned child processes');
-		for (const session of this._managed.values()) {
-			this._destroyManagedSession(session, true);
+		if (!this._shutdownPromise) {
+			this._shutdownPromise = this._shutdownOnce();
 		}
-		this._managed.clear();
+		return this._shutdownPromise;
+	}
 
+	private async _shutdownOnce(): Promise<void> {
+		this._logService?.trace('[PreBase Desktop] onWillShutdown joiner active; applying managed/external process policy');
+		const stopManaged = this._configurationService?.getValue<boolean>('prebase.runtime.stopManagedAppsOnExit') ?? true;
 		const stopExternal = this._configurationService?.getValue<boolean>('prebase.runtime.stopExternalAppsOnExit') ?? false;
-		if (stopExternal) {
+		const policy = resolveDesktopShutdownPolicy(stopManaged, stopExternal);
+
+		if (policy.closeManagedWindows) {
+			for (const session of this._managed.values()) {
+				this._destroyManagedSession(session, true);
+			}
+			this._managed.clear();
+		}
+
+		if (policy.terminateOwnedChildren) {
 			await this._killAllOwnedProcessesBounded();
 		} else {
-			// Stop all managed PIDs while preserving user-detached external apps
-			await this._killAllOwnedProcessesBounded();
+			this._detachOwnedExternalProcesses();
 		}
+	}
+
+	private _detachOwnedExternalProcesses(): void {
+		for (const child of this._externalChildren.values()) {
+			try {
+				child.unref();
+			} catch {
+				// ignore
+			}
+		}
+		this._externalChildren.clear();
+		this._externalOutput.clear();
+		this._ownedPids.clear();
+		this._ownedDebugPorts.clear();
 	}
 
 	private async _killAllOwnedProcessesBounded(): Promise<void> {
@@ -100,33 +132,23 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 		}
 		const kills = pids.map(async pid => {
 			try {
-				await this._killProcessTree(pid);
+				const stopped = await this._killProcessTree(pid);
+				if (stopped) {
+					this._externalChildren.delete(pid);
+					this._externalOutput.delete(pid);
+					this._ownedPids.delete(pid);
+				} else {
+					this._logService?.warn(`[PreBase Desktop] Owned process ${pid} did not confirm exit within the ${OWNED_PROCESS_SHUTDOWN_CEILING_MS}ms budget`);
+				}
 			} catch (err) {
 				this._logService?.warn(`[PreBase Desktop] Failed to terminate owned process ${pid}:`, err);
 			}
 		});
 		await Promise.all(kills);
-		this._externalChildren.clear();
-		this._externalOutput.clear();
-		this._ownedPids.clear();
-		this._ownedDebugPorts.clear();
 	}
 
 	override dispose(): void {
-		for (const session of this._managed.values()) {
-			this._destroyManagedSession(session, false);
-		}
-		this._managed.clear();
-
-		const pids = [...this._ownedPids];
-		for (const pid of pids) {
-			void this._killProcessTree(pid).finally(() => {
-				this._externalChildren.delete(pid);
-				this._externalOutput.delete(pid);
-				this._ownedPids.delete(pid);
-			});
-		}
-		this._ownedDebugPorts.clear();
+		void this._onWillShutdown();
 		super.dispose();
 	}
 
@@ -623,9 +645,29 @@ p{opacity:.75;margin:0;line-height:1.45}
 			});
 		}
 		await new Promise<void>(resolve => {
-			execFile('taskkill', ['/pid', String(pid), '/t', '/f'], { windowsHide: true }, () => resolve());
+			let settled = false;
+			let timer: ReturnType<typeof setTimeout> | undefined;
+			const finish = () => {
+				if (settled) {
+					return;
+				}
+				settled = true;
+				if (timer !== undefined) {
+					clearTimeout(timer);
+				}
+				resolve();
+			};
+			const taskkill = execFile('taskkill', ['/pid', String(pid), '/t', '/f'], { windowsHide: true }, finish);
+			timer = setTimeout(() => {
+				try {
+					taskkill.kill();
+				} catch {
+					// ignore
+				}
+				finish();
+			}, WINDOWS_TASKKILL_EXEC_TIMEOUT_MS);
 		});
-		return this._waitForChildExit(child, 3_000);
+		return this._waitForChildExit(child, WINDOWS_TASKKILL_EXIT_WAIT_MS);
 	}
 
 	private _signalProcessTree(child: ChildProcess, pid: number, signal: ProcessTerminationSignal): boolean {

@@ -46,6 +46,26 @@ suite('CanonicalParserWorkerService', () => {
 		assert.deepStrictEqual(results, []);
 	});
 
+	test('stops between sequential files once the combined cancellation token is raised', async () => {
+		const worker = new CanonicalParserWorkerService();
+		let checks = 0;
+		const token = {
+			get isCancellationRequested() {
+				checks++;
+				return checks > 1;
+			},
+		} as Parameters<CanonicalParserWorkerService['parseBatch']>[1];
+		const results = await worker.parseBatch([
+			request('first.ts', 'export const first: number = 1;'),
+			request('second.ts', 'export const second: number = 2;'),
+			request('third.ts', 'export const third: number = 3;'),
+		], token);
+
+		assert.strictEqual(results.length, 1);
+		assert.deepStrictEqual(results[0]?.exports.map(entry => entry.name), ['first']);
+		assert.ok(checks >= 2);
+	});
+
 	test('accepts cancellation through the narrow IPC channel rather than a ProxyChannel method argument', async () => {
 		const channel = new CanonicalParserWorkerChannel(new CanonicalParserWorkerService());
 		const results = await channel.call<readonly unknown[]>('test', 'parseBatch', [request('cancelled.ts', 'export const stale = true;')], {

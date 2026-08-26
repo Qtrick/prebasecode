@@ -162,12 +162,15 @@ export class TemporalCommitIngestionService {
 			profileVersion: CURRENT_PROFILE_VERSION,
 		};
 
-		// Save atomically into SQLite Store
+		if (token?.isCancellationRequested) {
+			throw new TemporalError('Cancelled', 'Ingestion cancelled');
+		}
 		await store.saveCommitIngestion(
 			commitRecord,
 			analysisOutput.snapshot,
 			analysisOutput.delta,
-			analysisOutput.lineageEvents
+			analysisOutput.lineageEvents,
+			token
 		);
 
 		return analysisOutput.snapshot;

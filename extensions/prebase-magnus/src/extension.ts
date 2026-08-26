@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { registerMagnusChatParticipants, type MagnusChatDefaults } from './chatParticipant';
+import { magnusRequestShutdown, registerMagnusChatParticipants, type MagnusChatDefaults } from './chatParticipant';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
 import { buildModelOptions } from './models';
 import { DEFAULT_MAGNUS_AGENT_MODE, MAGNUS_AGENT_MODES, isMagnusAgentMode } from './modes';
@@ -738,6 +738,6 @@ export function activate(context: vscode.ExtensionContext): void {
 	}
 }
 
-export function deactivate(): void {
-	// Dispose any resources
+export async function deactivate(): Promise<void> {
+	magnusRequestShutdown.cancel();
 }

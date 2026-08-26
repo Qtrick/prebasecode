@@ -1344,6 +1344,9 @@ export class CodeApplication extends Disposable {
 		// storageRoot must match that directory exactly.
 		const temporalStoreRoot = join(this.environmentMainService.userDataPath, 'prebase-temporal');
 		const temporalStoreService = disposables.add(new TemporalStoreMainService(temporalStoreRoot));
+		this.lifecycleMainService.onWillShutdown(e => {
+			e.join('TemporalStoreMainService', temporalStoreService.shutdown());
+		});
 		mainProcessElectronServer.registerChannel(TEMPORAL_STORE_CHANNEL_NAME, ProxyChannel.fromService(temporalStoreService, disposables));
 
 		// Signing

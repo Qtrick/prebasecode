@@ -5,7 +5,7 @@
 
 import * as assert from 'node:assert/strict';
 import { describe, test } from 'node:test';
-import { paceTextStream } from './streamPace';
+import { paceTextStream, createLivePacedSink } from './streamPace';
 
 describe('streamPace Unit Tests', () => {
 	test('paces text in nominal chunks with injected sleep ticks', async () => {
@@ -104,5 +104,94 @@ describe('streamPace Unit Tests', () => {
 		}, /SSE stream connection severed/);
 
 		assert.strictEqual(chunks.join(''), 'hello');
+	});
+
+	test('cancellation stops a yield-paused source via return() and does not hang on a blocked source await', async () => {
+		let sourceReturned = false;
+		const sleepFn = async () => {};
+		const cancellationSource = { isCancellationRequested: false };
+
+		async function* yieldPausedSource() {
+			try {
+				yield 'abcdef';
+				yield 'stalled-at-yield';
+			} finally {
+				sourceReturned = true;
+			}
+		}
+
+		const chunks: string[] = [];
+		for await (const chunk of paceTextStream(yieldPausedSource(), { charsPerTick: 3, token: cancellationSource, sleepFn })) {
+			chunks.push(chunk);
+			if (chunks.length === 1) {
+				cancellationSource.isCancellationRequested = true;
+			}
+		}
+
+		assert.ok(chunks.length >= 1);
+		assert.strictEqual(sourceReturned, true);
+
+		async function* blockedAwaitSource() {
+			yield 'xyz';
+			await new Promise(() => {});
+		}
+		const cancellation2 = { isCancellationRequested: false };
+		let settled = false;
+		const paced = (async () => {
+			for await (const chunk of paceTextStream(blockedAwaitSource(), { charsPerTick: 3, token: cancellation2, sleepFn: async () => {} })) {
+				if (chunk) {
+					cancellation2.isCancellationRequested = true;
+				}
+			}
+			settled = true;
+		})();
+		await Promise.race([paced, new Promise(resolve => setTimeout(resolve, 200))]);
+		assert.strictEqual(settled, true, 'blocked source await must not hang paceTextStream');
+	});
+
+	test('no-op sleepFn parks on a delayed source instead of busy-polling', async () => {
+		let sleeps = 0;
+		const sleepFn = async () => {
+			sleeps++;
+		};
+		async function* delayedSource() {
+			await new Promise(resolve => setTimeout(resolve, 40));
+			yield 'hello';
+		}
+		const chunks: string[] = [];
+		for await (const chunk of paceTextStream(delayedSource(), { charsPerTick: 5, sleepFn })) {
+			chunks.push(chunk);
+		}
+		assert.strictEqual(chunks.join(''), 'hello');
+		assert.ok(sleeps < 8, `expected park-until-progress, got ${sleeps} sleepFn calls`);
+	});
+
+	test('createLivePacedSink cancel wakes a blocked waiter and settles', async () => {
+		const pieces: string[] = [];
+		let cancelled = false;
+		const listeners: Array<() => void> = [];
+		const token = {
+			get isCancellationRequested() {
+				return cancelled;
+			},
+			onCancellationRequested(listener: () => void) {
+				listeners.push(listener);
+				return { dispose() { } };
+			},
+		};
+		const sink = createLivePacedSink(piece => pieces.push(piece), { token, charsPerTick: 8, sleepFn: async () => {} });
+		await Promise.resolve();
+		await Promise.resolve();
+		assert.ok(listeners.length >= 1, 'sink must subscribe to cancellation so a blocked waiter can be woken');
+		cancelled = true;
+		for (const listener of listeners) {
+			listener();
+		}
+		sink.push('late-text');
+		let settled = false;
+		const closed = sink.close().then(() => { settled = true; });
+		await Promise.race([closed, new Promise(resolve => setTimeout(resolve, 200))]);
+		assert.strictEqual(settled, true, 'cancel must wake the waiter so close does not hang');
+		assert.deepStrictEqual(pieces, []);
 	});
 });

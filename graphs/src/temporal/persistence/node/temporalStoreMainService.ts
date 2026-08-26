@@ -25,6 +25,7 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 	private readonly _stores = new Map<string, SqliteTemporalStore>();
 	private readonly _recoveryAttempted = new Set<string>();
 	private readonly _storageRoot: string;
+	private _shutdownPromise: Promise<void> | undefined;
 
 	constructor(storageRoot: string) {
 		super();
@@ -153,8 +154,47 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 		if (!store) {
 			return;
 		}
-		this._stores.delete(dbPath);
 		await store.close();
+		if (!store.hasActiveWrite()) {
+			this._stores.delete(dbPath);
+		}
+	}
+
+	async interrupt(dbPath: string): Promise<string> {
+		return this._toIpcResponse(() => this._interrupt(dbPath));
+	}
+
+	private async _interrupt(dbPath: string): Promise<void> {
+		dbPath = this._validateDbPath(dbPath);
+		this._stores.get(dbPath)?.interrupt();
+	}
+
+	async shutdown(): Promise<void> {
+		if (!this._shutdownPromise) {
+			this._shutdownPromise = this._shutdownOnce();
+		}
+		return this._shutdownPromise;
+	}
+
+	private async _shutdownOnce(): Promise<void> {
+		const stores = [...this._stores.entries()];
+		await Promise.all(stores.map(async ([dbPath, store]) => {
+			try {
+				store.interrupt();
+				await store.close();
+			} catch (error) {
+				console.error('[TemporalStoreMainService] shutdown close failed:', dbPath, error instanceof Error ? error.message : String(error));
+			} finally {
+				if (!store.hasActiveWrite()) {
+					this._stores.delete(dbPath);
+				}
+			}
+		}));
+	}
+
+	override dispose(): void {
+		void this.shutdown();
+		super.dispose();
 	}
 
 	async invoke(dbPath: string, method: string, argumentsJson: string): Promise<string> {
@@ -229,6 +269,7 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 				args[2] as Parameters<ITemporalStore['saveCommitIngestion']>[2],
 				args[3] as Parameters<ITemporalStore['saveCommitIngestion']>[3],
 			);
+			case 'interrupt': store.interrupt(); return;
 			case 'getCommit': return store.getCommit(args[0] as string);
 			case 'getAllCommits': return store.getAllCommits();
 			case 'getLatestCommit': return store.getLatestCommit();
@@ -262,13 +303,5 @@ export class TemporalStoreMainService extends Disposable implements ITemporalSto
 			case 'clear': return store.clear();
 			default: throw new Error(`Unsupported Temporal store method '${String(method)}'`);
 		}
-	}
-
-	override dispose(): void {
-		for (const store of this._stores.values()) {
-			void store.close();
-		}
-		this._stores.clear();
-		super.dispose();
 	}
 }

@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { terminateOwnedProcess, type IProcessTerminationTarget, type ProcessTerminationSignal } from '../../../../../platform/prebaseDesktop/common/processTermination.js';
+import { terminateOwnedProcess, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, type IProcessTerminationTarget, type ProcessTerminationSignal } from '../../../../../platform/prebaseDesktop/common/processTermination.js';
 
 class FakeTerminationTarget implements IProcessTerminationTarget {
 	readonly signals: ProcessTerminationSignal[] = [];
@@ -68,5 +68,13 @@ suite('terminateOwnedProcess', () => {
 		assert.strictEqual(await terminateOwnedProcess(killFailure, 17, 29), false);
 		assert.deepStrictEqual(killFailure.signals, ['SIGTERM', 'SIGKILL']);
 		assert.deepStrictEqual(killFailure.waitTimeouts, [17]);
+	});
+
+	test('uses a 3s SIGTERM then 3s SIGKILL budget when callers omit timeouts', async () => {
+		const target = new FakeTerminationTarget(false, {}, [false, false]);
+		await terminateOwnedProcess(target);
+		assert.deepStrictEqual(target.waitTimeouts, [3_000, 3_000]);
+		assert.strictEqual(target.waitTimeouts[0] + target.waitTimeouts[1], POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS);
+		assert.notStrictEqual(POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, 4_000);
 	});
 });

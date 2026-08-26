@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { CancellationToken } from '../../../../base/common/cancellation.js';
+import { CancellationToken, CancellationTokenSource } from '../../../../base/common/cancellation.js';
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable, DisposableStore, MutableDisposable } from '../../../../base/common/lifecycle.js';
 import { removeAnsiEscapeCodes } from '../../../../base/common/strings.js';
@@ -198,6 +198,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	private _workspaceFolderUri: URI | undefined;
 	private _startInFlight: Promise<void> | undefined;
 	private _detectInFlight: Promise<string[]> | undefined;
+	private readonly _lifecycleCts = this._register(new CancellationTokenSource());
 
 	constructor(
 		@IConfigurationService private readonly configurationService: IConfigurationService,
@@ -386,7 +387,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		this._fire();
 	}
 
-	private async _probeUrl(url: string): Promise<boolean> {
+	private async _probeUrl(url: string, token: CancellationToken = this._lifecycleCts.token): Promise<boolean> {
 		try {
 			const context = await this.requestService.request({
 				type: 'GET',
@@ -395,7 +396,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 				// Do not turn reachability polling into cross-origin/private-network probing.
 				followRedirects: 0,
 				callSite: 'PreBaseRuntimeService._probeUrl',
-			}, CancellationToken.None);
+			}, token);
 			const status = context.res.statusCode ?? 0;
 			context.stream.destroy();
 			return status > 0 && status < 500;
@@ -1159,9 +1160,12 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	/** Poll until the renderer URL responds or timeout (managed launch must not race Electron). */
-	private async _waitForUrl(url: string, timeoutMs: number): Promise<boolean> {
+	private async _waitForUrl(url: string, timeoutMs: number, token: CancellationToken = this._lifecycleCts.token): Promise<boolean> {
 		const deadline = Date.now() + timeoutMs;
 		while (Date.now() < deadline) {
+			if (token.isCancellationRequested) {
+				return false;
+			}
 			try {
 				const context = await this.requestService.request({
 					type: 'GET',
@@ -1169,7 +1173,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 					timeout: 2000,
 				followRedirects: 0,
 					callSite: 'PreBaseRuntimeService._waitForUrl',
-				}, CancellationToken.None);
+				}, token);
 				const status = context.res.statusCode ?? 0;
 				context.stream.destroy();
 				if (status > 0 && status < 500) {
@@ -1178,7 +1182,19 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			} catch {
 				// keep waiting
 			}
-			await new Promise(resolve => setTimeout(resolve, 500));
+			if (token.isCancellationRequested) {
+				return false;
+			}
+			await new Promise<void>(resolve => {
+				const timer = setTimeout(() => {
+					sub.dispose();
+					resolve();
+				}, 500);
+				const sub = token.onCancellationRequested(() => {
+					clearTimeout(timer);
+					resolve();
+				});
+			});
 		}
 		return false;
 	}
@@ -1322,6 +1338,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	override dispose(): void {
+		this._lifecycleCts.cancel();
 		this._detachTerminal(true);
 		if (this._devTerminal && !this._devTerminal.isDisposed) {
 			try {

@@ -1,0 +1,6 @@
+quit_timestamp=2026-08-26T18:44:35Z
+signal=SIGTERM_to_electron
+quit_latency_s=0.536
+still_alive=0
+---remaining PreBase electron---
+none
