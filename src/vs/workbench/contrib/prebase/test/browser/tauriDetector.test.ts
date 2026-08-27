@@ -18,6 +18,7 @@ function probe(overrides: {
 	files?: Record<string, string>;
 	packageJson?: PackageJsonShape;
 	rootLabel?: string;
+	rootPath?: string;
 } = {}): ProjectProbe {
 	const files = { ...(overrides.files ?? {}) };
 	return {
@@ -25,6 +26,7 @@ function probe(overrides: {
 		readText: path => files[path],
 		packageJson: overrides.packageJson,
 		rootLabel: overrides.rootLabel ?? 'app',
+		rootPath: overrides.rootPath,
 	};
 }
 
@@ -55,10 +57,23 @@ suite('tauriDetector', () => {
 				'src-tauri/Cargo.toml': '[package]\nname="demo"\n[dependencies]\ntauri="2"\ntauri-plugin-wdio-webdriver="1"\n',
 			},
 		}));
-		assert.strictEqual(profile.confidence, 'high');
-		assert.strictEqual(profile.capabilities.supportsFullNativeAutomation, true);
-		assert.strictEqual(profile.capabilities.fullNativeSetupRequired, false);
-		assert.strictEqual(profile.hasWdioWebdriverPlugin, true);
+		assert.deepStrictEqual({
+			confidence: profile.confidence,
+			webDriverPlugin: profile.hasWdioWebdriverPlugin,
+			renderer: profile.capabilities.supportsRendererAutomation,
+			fullNativeUi: profile.capabilities.supportsFullNativeAutomation,
+			backendApi: profile.capabilities.supportsBackendApiAccess,
+			rendererConsole: profile.capabilities.supportsConsoleCapture,
+			setupRequired: profile.capabilities.fullNativeSetupRequired,
+		}, {
+			confidence: 'high',
+			webDriverPlugin: true,
+			renderer: true,
+			fullNativeUi: true,
+			backendApi: false,
+			rendererConsole: true,
+			setupRequired: false,
+		});
 	});
 
 	test('rejects a random Cargo.toml without a tauri crate', () => {
@@ -90,6 +105,67 @@ suite('tauriDetector', () => {
 		}));
 		assert.strictEqual(profile.confidence, 'medium');
 		assert.strictEqual(profile.tauriScriptName, 'tauri:dev');
+	});
+
+	test('owns the package manager detected at the Tauri app root', () => {
+		const profile = detectTauriProject(probe({
+			files: {
+				'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:1420"}}',
+				'src-tauri/Cargo.toml': '[package]\nname="demo"\n[dependencies]\ntauri="2"\n',
+				'bun.lock': '',
+			},
+			packageJson: {
+				devDependencies: { '@tauri-apps/cli': '^2.0.0' },
+				scripts: { 'tauri:dev': 'tauri dev' },
+			},
+		}));
+
+		assert.deepStrictEqual({
+			confidence: profile.confidence,
+			script: profile.tauriScriptName,
+			packageManager: profile.packageManager,
+		}, {
+			confidence: 'high',
+			script: 'tauri:dev',
+			packageManager: 'bun',
+		});
+	});
+
+	test('nested monorepo app owns its package, lockfile, and absolute app root', () => {
+		const profile = detectTauriProject(probe({
+			rootLabel: 'repo',
+			rootPath: '/repo',
+			files: {
+				'yarn.lock': '',
+				'apps/desktop/package.json': JSON.stringify({
+					devDependencies: { '@tauri-apps/cli': '^2.0.0' },
+					scripts: { 'tauri:dev': 'tauri dev' },
+				}),
+				'apps/desktop/pnpm-lock.yaml': '',
+				'apps/desktop/src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:1420"}}',
+				'apps/desktop/src-tauri/Cargo.toml': '[package]\nname="desktop"\n[dependencies]\ntauri="2"\n',
+			},
+			packageJson: {
+				devDependencies: { '@tauri-apps/cli': '^2.0.0' },
+				scripts: { tauri: 'tauri' },
+			},
+		}));
+
+		assert.deepStrictEqual({
+			confidence: profile.confidence,
+			appRoot: profile.appRoot,
+			packageManager: profile.packageManager,
+			script: profile.tauriScriptName,
+			configPath: profile.configPath,
+			cargoPath: profile.cargoTomlPath,
+		}, {
+			confidence: 'high',
+			appRoot: '/repo/apps/desktop',
+			packageManager: 'pnpm',
+			script: 'tauri:dev',
+			configPath: 'src-tauri/tauri.conf.json',
+			cargoPath: 'src-tauri/Cargo.toml',
+		});
 	});
 
 	test('rust-only Tauri project without package.json still detects', () => {
@@ -141,6 +217,7 @@ suite('tauriDetector', () => {
 			input: profile.capabilities.supportsInputAutomation,
 			semantic: profile.capabilities.supportsSemanticLocators,
 			renderer: profile.capabilities.supportsRendererAutomation,
+			rendererConsole: profile.capabilities.supportsConsoleCapture,
 			fullNative: profile.capabilities.supportsFullNativeAutomation,
 			backendApi: profile.capabilities.supportsBackendApiAccess,
 			setupRequired: profile.capabilities.fullNativeSetupRequired,
@@ -155,6 +232,7 @@ suite('tauriDetector', () => {
 			input: true,
 			semantic: true,
 			renderer: true,
+			rendererConsole: true,
 			fullNative: false,
 			backendApi: false,
 			setupRequired: true,
@@ -329,12 +407,16 @@ suite('desktopFixtures', () => {
 		assert.strictEqual(tauri.testingCargoFeature, true);
 		assert.strictEqual(tauri.capabilities.fullNativeSetupRequired, false);
 		assert.strictEqual(tauri.capabilities.supportsFullNativeAutomation, true);
+		assert.strictEqual(tauri.capabilities.supportsBackendApiAccess, false);
+		assert.strictEqual(tauri.capabilities.supportsConsoleCapture, true);
 		assert.strictEqual(tauri.productName, 'PreBase Tauri Fixture');
 
 		assert.strictEqual(tauriPlain.confidence, 'high');
 		assert.strictEqual(tauriPlain.hasWdioWebdriverPlugin, false);
 		assert.strictEqual(tauriPlain.capabilities.fullNativeSetupRequired, true);
 		assert.strictEqual(tauriPlain.capabilities.supportsFullNativeAutomation, false);
+		assert.strictEqual(tauriPlain.capabilities.supportsRendererAutomation, true);
+		assert.strictEqual(tauriPlain.capabilities.supportsConsoleCapture, true);
 		assert.strictEqual(isRecognizedDesktopApp(tauriPlain), true);
 	});
 });

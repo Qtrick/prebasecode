@@ -1419,6 +1419,7 @@ function rebuildAdjacency() {
 // Temporal State & 2D Transition Engine
 let temporalState = null;
 let temporalDiff = null;
+let hasFittedTemporalView = false;
 let previousTemporalRenderNodes = new Map();
 let currentTemporalRenderNodes = new Map();
 let animStartTime = 0;
@@ -1431,6 +1432,19 @@ let temporalContextFilterMode = 'focused';
 
 function isNetwork() { return graphType === 'network'; }
 function isTemporal() { return graphType === 'temporal'; }
+
+function hasRenderableTemporalNodes(diff) {
+	if (!diff || !diff.nodes || !diff.nodes.length) {
+		return false;
+	}
+	for (let i = 0; i < diff.nodes.length; i++) {
+		const node = diff.nodes[i];
+		if (Number.isFinite(node.x) && Number.isFinite(node.y)) {
+			return true;
+		}
+	}
+	return false;
+}
 
 // Theme tokens cached between invalidations: getComputedStyle on every frame is a
 // measurable hot-path cost (measured in Phase 3.10 profiling). Invalidate via
@@ -1733,7 +1747,10 @@ function fitView(animate) {
 		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
 		for (let i = 0; i < targetNodes.length; i++) {
 			const n = targetNodes[i];
-			const pos = { x: n.x || 0, y: n.y || 0 };
+			if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) {
+				continue;
+			}
+			const pos = { x: n.x, y: n.y };
 			const r = (n.changeKind && n.changeKind !== 'unchanged' ? 8 : 4.5) + 6;
 			minX = Math.min(minX, pos.x - r); minY = Math.min(minY, pos.y - r);
 			maxX = Math.max(maxX, pos.x + r); maxY = Math.max(maxY, pos.y + r);
@@ -2621,9 +2638,20 @@ function drawTemporalFrame(ts) {
 			metrics.renderStart = renderStart;
 			metrics.renderEnd = renderEnd;
 			metrics.durationMs = Math.max(0, renderEnd - renderStart);
+			metrics.selectedCommitSha = temporalState && temporalState.selectedCommitSha;
+			metrics.renderedCommitSha = temporalState && temporalState.renderedCommitSha;
+			metrics.isPartialLineage = Boolean(temporalState && temporalState.isPartialLineage);
+			metrics.receivedNodeCount = temporalDiff && temporalDiff.nodes ? temporalDiff.nodes.length : 0;
+			metrics.visibleNodeCount = visibleData.nodes.length;
+			metrics.finiteCoordinateCount = temporalDiff && temporalDiff.nodes
+				? temporalDiff.nodes.filter(function (node) { return Number.isFinite(node.x) && Number.isFinite(node.y); }).length
+				: 0;
 			metrics.nodesDrawn = nodesToRender.length;
 			metrics.edgesDrawn = edgesDrawn;
 			metrics.labelsDrawn = visibleLabels.length;
+			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
+			metrics.canvas = { clientWidth: w, clientHeight: h, width: netCanvas.width, height: netCanvas.height };
+			metrics.summary = temporalDiff && temporalDiff.summary;
 			metrics.lodTier = transform.k < 0.3 ? 'aggregate' : (transform.k < 0.8 ? 'direct' : 'full');
 			metrics.isAnimating = Boolean(isAnimatingTemporal);
 			metrics.timestamp = renderEnd;
@@ -2973,8 +3001,12 @@ function render(first) {
 		resizeCanvas();
 		updateLegend(null, false);
 		updateTemporalUI(temporalState, temporalDiff);
-		if (first && temporalDiff && temporalDiff.nodes && temporalDiff.nodes.length) {
+		const canFitTemporal = hasRenderableTemporalNodes(temporalDiff);
+		if (canFitTemporal && (first || !hasFittedTemporalView)) {
 			fitView(false);
+			hasFittedTemporalView = true;
+		} else if (!canFitTemporal) {
+			hasFittedTemporalView = false;
 		} else if (keepGraphCentered) {
 			applyCenterLock(true);
 		}
@@ -2983,6 +3015,7 @@ function render(first) {
 		return;
 	}
 
+	hasFittedTemporalView = false;
 	if (temporalToolbar) temporalToolbar.style.display = 'none';
 	if (temporalScrubberBar) temporalScrubberBar.style.display = 'none';
 	if (temporalDetailsPanel) temporalDetailsPanel.style.display = 'none';

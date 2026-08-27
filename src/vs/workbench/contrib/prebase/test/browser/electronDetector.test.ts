@@ -34,6 +34,27 @@ suite('electronDetector', () => {
 		assert.ok(profile.capabilities.supportsManagedLaunch);
 	});
 
+	test('owns the package manager detected at the Electron app root', () => {
+		const profile = detectElectronProject(probe({
+			packageJson: {
+				devDependencies: { electron: '^30.0.0' },
+				main: 'main.js',
+				scripts: { desktop: 'electron .' },
+			},
+			exists: path => path === 'main.js' || path === 'pnpm-lock.yaml',
+		}));
+
+		assert.deepStrictEqual({
+			confidence: profile.confidence,
+			script: profile.electronScriptName,
+			packageManager: profile.packageManager,
+		}, {
+			confidence: 'high',
+			script: 'desktop',
+			packageManager: 'pnpm',
+		});
+	});
+
 	test('rejects web-only vite react without direct electron dependency', () => {
 		const profile = detectElectronProject(probe({
 			packageJson: {

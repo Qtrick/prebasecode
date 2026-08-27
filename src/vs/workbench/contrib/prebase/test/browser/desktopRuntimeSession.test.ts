@@ -25,6 +25,7 @@ function probe(overrides: {
 	exists?: (path: string) => boolean;
 	files?: Record<string, string>;
 	packageJson?: PackageJsonShape;
+	rootPath?: string;
 } = {}): ProjectProbe {
 	const files = { ...(overrides.files ?? {}) };
 	return {
@@ -32,6 +33,7 @@ function probe(overrides: {
 		readText: path => files[path],
 		packageJson: overrides.packageJson,
 		rootLabel: 'app',
+		rootPath: overrides.rootPath,
 	};
 }
 
@@ -92,17 +94,19 @@ suite('PreBase desktop session lifecycle', () => {
 		trusted?: boolean;
 		config?: Record<string, unknown>;
 		spawn?: IPreBaseDesktopSpawnResult;
-		evaluate?: (expression: string) => unknown;
+		evaluate?: (expression: string) => unknown | Promise<unknown>;
+		onSpawn?: () => void;
 	} = {}) {
 		const killed: number[] = [];
 		const closed: string[] = [];
 		const dialogs: string[] = [];
-		const spawns: Array<{ command: unknown; extras: unknown }> = [];
+		const spawns: Array<{ command: unknown; cwd: unknown; extras: unknown }> = [];
 		const channel: IChannel = {
 			call: async <T>(command: string, arg?: unknown): Promise<T> => {
 				const args = Array.isArray(arg) ? arg : [];
 				if (command === 'spawnExternal') {
-					spawns.push({ command: args[0], extras: args[4] });
+					spawns.push({ command: args[0], cwd: args[1], extras: args[4] });
+					options.onSpawn?.();
 					return (options.spawn ?? { pid: 42, webDriverPort: 4445, debugPort: 9222 }) as T;
 				}
 				if (command === 'killOwnedProcess') {
@@ -112,6 +116,10 @@ suite('PreBase desktop session lifecycle', () => {
 				if (command === 'openManagedWindow') {
 					const request = args[0] as { sessionId: string; rendererUrl: string; title: string };
 					return { sessionId: request.sessionId, windowId: 7, rendererUrl: request.rendererUrl, title: request.title } as T;
+				}
+				if (command === 'restartManagedWindow') {
+					const request = args[1] as { sessionId: string; rendererUrl: string; title: string };
+					return { sessionId: request.sessionId, windowId: 8, rendererUrl: request.rendererUrl, title: request.title } as T;
 				}
 				if (command === 'closeManagedWindow') {
 					closed.push(args[0] as string);
@@ -187,6 +195,26 @@ suite('PreBase desktop session lifecycle', () => {
 		assert.strictEqual(inspect.rendererAvailable, true);
 	});
 
+	test('setup-required launch clears stale test evidence from the previous session', async () => {
+		const { service } = createService();
+		service.detect(probe(ELECTRON_VITE));
+		const previous = await service.startForMagnus({ framework: 'electron', mode: 'renderer', rendererUrl: 'http://127.0.0.1:5173' });
+		assert.ok((previous.test as { id?: string } | undefined)?.id);
+		await service.stop();
+
+		service.detect(probe(TAURI_PLAIN));
+		const setupRequired = await service.start({ launchMode: 'external', purpose: 'test' });
+		assert.deepStrictEqual({
+			state: setupRequired?.state,
+			testRunId: setupRequired?.testRunId,
+			summaryTest: setupRequired && service.getSessionSummaryForMagnus(setupRequired.id).test,
+		}, {
+			state: 'setupRequired',
+			testRunId: undefined,
+			summaryTest: undefined,
+		});
+	});
+
 	test('preview-launches Tauri full-app without WebDriver or testing features', async () => {
 		const { service, spawns } = createService({ spawn: { pid: 44 } });
 		service.detect(probe(TAURI_PLAIN));
@@ -199,6 +227,51 @@ suite('PreBase desktop session lifecycle', () => {
 		const inspect = await service.inspectForMagnus(session.id);
 		assert.strictEqual(inspect.ok, false);
 		assert.strictEqual(inspect.setupRequired, true);
+	});
+
+	test('launches the detected Tauri app with its owning package manager and crate cwd', async () => {
+		const { service, spawns } = createService({ spawn: { pid: 45 } });
+		service.detect(probe({
+			...TAURI_PLAIN,
+			files: { ...TAURI_PLAIN.files, 'bun.lock': '' },
+			packageJson: {
+				devDependencies: { '@tauri-apps/cli': '^2.0.0' },
+				scripts: { 'tauri:dev': 'tauri dev' },
+			},
+		}));
+
+		const session = await service.start({ launchMode: 'external', purpose: 'preview' });
+		assert.strictEqual(session?.state, 'running');
+		assert.deepStrictEqual(spawns[0], {
+			command: { command: 'bun', args: ['run', 'tauri:dev', '--'] },
+			cwd: '/app/src-tauri',
+			extras: { purpose: 'preview', electronCdp: false, webDriver: false },
+		});
+	});
+
+	test('profile app root controls the session root and external spawn cwd', async () => {
+		const { service, spawns } = createService({ spawn: { pid: 46 } });
+		const profile = service.detect(probe({
+			...TAURI_PLAIN,
+			rootPath: '/repo/apps/desktop',
+			files: { ...TAURI_PLAIN.files, 'pnpm-lock.yaml': '' },
+			packageJson: {
+				devDependencies: { '@tauri-apps/cli': '^2.0.0' },
+				scripts: { 'tauri:dev': 'tauri dev' },
+			},
+		}));
+		assert.strictEqual(profile.appRoot, '/repo/apps/desktop');
+
+		const session = await service.start({ launchMode: 'external', purpose: 'preview' });
+		assert.deepStrictEqual({
+			sessionRoot: session?.workspaceRoot,
+			command: spawns[0]?.command,
+			cwd: spawns[0]?.cwd,
+		}, {
+			sessionRoot: '/repo/apps/desktop',
+			command: { command: 'pnpm', args: ['run', 'tauri:dev', '--'] },
+			cwd: '/repo/apps/desktop/src-tauri',
+		});
 	});
 
 	test('kills the Tauri process when the driver port is missing after spawn', async () => {
@@ -220,6 +293,34 @@ suite('PreBase desktop session lifecycle', () => {
 		assert.strictEqual(session?.state, 'error');
 		assert.match(String(session.errorMessage), /debugging port/);
 		assert.deepStrictEqual(killed, [88]);
+	});
+
+	test('cancelling a Tauri launch stops the wait and cleans up the owned process', async () => {
+		const restore = installReadyWebDriverFetch();
+		try {
+			let cancel: (() => void) | undefined;
+			const { service, killed } = createService({
+				spawn: { pid: 89, webDriverPort: 4445 },
+				onSpawn: () => queueMicrotask(() => cancel?.()),
+			});
+			cancel = () => service.cancelActiveAction();
+			service.detect(probe(TAURI_READY));
+
+			const session = await service.start({ launchMode: 'external', purpose: 'test' });
+			assert.deepStrictEqual({
+				state: session?.state,
+				pid: session?.pid,
+				webDriverPort: session?.webDriverPort,
+				killed,
+			}, {
+				state: 'stopped',
+				pid: undefined,
+				webDriverPort: undefined,
+				killed: [89],
+			});
+		} finally {
+			restore();
+		}
 	});
 
 	test('stops test-owned sessions on dispose even when preview externals are kept', async () => {
@@ -277,5 +378,198 @@ suite('PreBase desktop session lifecycle', () => {
 		assert.strictEqual(blocked.ok, false);
 		assert.match(String(blocked.reason), /disabled in settings/);
 		assert.deepStrictEqual(closed, []);
+	});
+
+	test('failed assertions return bounded renderer console evidence with secrets redacted', async () => {
+		const rendererConsole = Array.from({ length: 20 }, (_, index) => ({
+			level: index === 19 ? 'error' : 'warn',
+			text: index === 0
+				? 'token=secret-token'
+				: index === 1
+					? 'password=hunter2'
+					: index === 2
+						? 'Authorization: Bearer abc123'
+						: `ordinary message ${index}`,
+			at: index,
+		}));
+		const { service } = createService({
+			evaluate: expression => expression.includes('__prebaseDesktopTest') && expression.includes('run')
+				? {
+					ok: true,
+					match: { name: 'Loading', visible: true, enabled: true },
+					title: 'Loading app',
+					url: 'http://127.0.0.1:5173/loading',
+					console: rendererConsole,
+				}
+				: true,
+		});
+		service.detect(probe(ELECTRON_VITE));
+		await service.startForMagnus({ framework: 'electron', mode: 'renderer', rendererUrl: 'http://127.0.0.1:5173' });
+
+		const failed = await service.assertForMagnus({
+			condition: 'text',
+			locator: { by: 'role', role: 'heading', name: 'Dashboard' },
+			expected: 'Dashboard',
+			timeoutMs: 1,
+		});
+		const evidence = failed.console as Array<{ level: string; text: string; at: number }>;
+		assert.deepStrictEqual({
+			ok: failed.ok,
+			title: failed.title,
+			url: failed.url,
+			count: evidence.length,
+			first: evidence.slice(0, 3).map(entry => entry.text),
+			last: evidence.at(-1),
+		}, {
+			ok: false,
+			title: 'Loading app',
+			url: 'http://127.0.0.1:5173/loading',
+			count: 20,
+			first: ['token=[redacted]', 'password=[redacted]', 'Authorization=[redacted]'],
+			last: { level: 'error', text: 'ordinary message 19', at: 19 },
+		});
+	});
+
+	test('managed test restart keeps the test identity and prior evidence', async () => {
+		const { service } = createService();
+		service.detect(probe(ELECTRON_VITE));
+		const started = await service.startForMagnus({ framework: 'electron', mode: 'renderer', rendererUrl: 'http://127.0.0.1:5173' });
+		assert.strictEqual(started.ok, true);
+		const originalSessionId = String(started.sessionId);
+		const originalTest = started.test as { id?: string; passedSteps?: number } | undefined;
+		assert.ok(originalTest?.id);
+
+		const interacted = await service.interactForMagnus({ action: 'fill', locator: { by: 'role', role: 'textbox', name: 'Name' }, value: 'Ada' });
+		assert.strictEqual(interacted.ok, true);
+		await service.restart();
+
+		const restarted = service.getSessionSummaryForMagnus(originalSessionId);
+		const restartedTest = restarted.test as { id?: string; passedSteps?: number; failedSteps?: number; cleanup?: string } | undefined;
+		assert.deepStrictEqual({
+			ok: restarted.ok,
+			sessionId: restarted.sessionId,
+			state: restarted.state,
+			test: {
+				id: restartedTest?.id,
+				passedSteps: restartedTest?.passedSteps,
+				failedSteps: restartedTest?.failedSteps,
+				cleanup: restartedTest?.cleanup,
+			},
+		}, {
+			ok: true,
+			sessionId: originalSessionId,
+			state: 'testing',
+			test: {
+				id: originalTest.id,
+				passedSteps: 2,
+				failedSteps: 0,
+				cleanup: 'pending',
+			},
+		});
+	});
+
+	test('records the actual managed inspect duration in test evidence', async () => {
+		const { service } = createService({
+			evaluate: async expression => {
+				if (expression.includes('__prebaseDesktopTest') && expression.includes('run')) {
+					await new Promise(resolve => setTimeout(resolve, 20));
+					return { ok: true, title: 'Fixture', url: 'http://127.0.0.1:5173', interactive: [] };
+				}
+				return true;
+			},
+		});
+		service.detect(probe(ELECTRON_VITE));
+		await service.startForMagnus({ framework: 'electron', mode: 'renderer', rendererUrl: 'http://127.0.0.1:5173' });
+
+		const inspected = await service.inspectForMagnus();
+		const run = Reflect.get(service, '_testRun') as {
+			steps: Array<{ index: number; kind: string; action?: string; startedAt: number; durationMs: number; ok: boolean; failure?: string }>;
+		};
+		assert.deepStrictEqual({
+			ok: inspected.ok,
+			step: run.steps.at(-1),
+		}, {
+			ok: true,
+			step: {
+				index: 0,
+				kind: 'inspect',
+				action: 'snapshot',
+				startedAt: run.steps.at(-1)?.startedAt,
+				durationMs: run.steps.at(-1)?.durationMs,
+				ok: true,
+				failure: undefined,
+			},
+		});
+		assert.ok(run.steps.at(-1)!.durationMs >= 20);
+	});
+
+	test('external test restart reconnects automation without replacing the test run', async () => {
+		const restore = installReadyWebDriverFetch();
+		try {
+			const { service, killed, spawns } = createService({ spawn: { pid: 91, webDriverPort: 4445 } });
+			service.detect(probe(TAURI_READY));
+			const started = await service.startForMagnus({ framework: 'tauri', mode: 'fullApp' });
+			assert.strictEqual(started.ok, true);
+			const originalSessionId = String(started.sessionId);
+			const originalTestId = (started.test as { id?: string } | undefined)?.id;
+			assert.ok(originalTestId);
+			assert.strictEqual((await service.interactForMagnus({ action: 'click', locator: { by: 'role', role: 'button', name: 'Save' } })).ok, true);
+
+			await service.restart();
+			const restarted = service.getSessionSummaryForMagnus();
+			assert.notStrictEqual(restarted.sessionId, originalSessionId);
+			assert.deepStrictEqual({
+				state: restarted.state,
+				test: restarted.test,
+				killed,
+				spawnCount: spawns.length,
+				cwds: spawns.map(spawn => spawn.cwd),
+			}, {
+				state: 'testing',
+				test: {
+					id: originalTestId,
+					framework: 'tauri',
+					mode: 'fullApp',
+					backend: 'webdriver',
+					passedSteps: 2,
+					failedSteps: 0,
+					duration: (restarted.test as { duration: number }).duration,
+					screenshotCount: 0,
+					cleanup: 'pending',
+					lastFailure: undefined,
+				},
+				killed: [91],
+				spawnCount: 2,
+				cwds: ['/app/src-tauri', '/app/src-tauri'],
+			});
+		} finally {
+			restore();
+		}
+	});
+
+	test('starting a preview after a completed test clears stale test-run evidence', async () => {
+		const { service } = createService();
+		service.detect(probe(ELECTRON_VITE));
+		const tested = await service.startForMagnus({ framework: 'electron', mode: 'renderer', rendererUrl: 'http://127.0.0.1:5173' });
+		assert.ok(tested.test);
+		await service.stop();
+
+		const preview = await service.start({ launchMode: 'managed', rendererUrl: 'http://127.0.0.1:5173', purpose: 'preview' });
+		assert.strictEqual(preview?.state, 'running');
+		assert.deepStrictEqual(service.getSessionSummaryForMagnus(preview?.id), {
+			ok: true,
+			sessionId: preview?.id,
+			framework: 'electron',
+			mode: 'renderer',
+			state: 'running',
+			purpose: 'preview',
+			backend: 'cdp',
+			ownedByPreBase: true,
+			setupRequired: false,
+			rendererUrl: 'http://127.0.0.1:5173',
+			limitations: preview?.profile.capabilities.limitations,
+			errorMessage: undefined,
+			test: undefined,
+		});
 	});
 });

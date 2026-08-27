@@ -36,7 +36,7 @@ import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js
 import { stopDesktopSessionForMagnus } from '../common/runtime/desktopStopForMagnus.js';
 import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { isRecognizedDesktopApp, isTauriProfile } from '../common/runtime/desktopTypes.js';
-import { applyCapabilitiesTestingPermission, applyCargoTestingDependencies, applyRustTestingPlugins, previewTauriTestingSetup, tauriTestingCandidatePaths } from '../common/runtime/tauriTestingSetup.js';
+import { applyCapabilitiesTestingPermission, applyCargoTestingDependencies, applyRustTestingPlugins, applyTauriTestingTransaction, previewTauriTestingSetup, tauriTestingCandidatePaths } from '../common/runtime/tauriTestingSetup.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IPreBaseCloudService, PreBaseCloudService } from './cloud/prebaseCloudService.js';
 import { IPreBaseWebSearchService, PreBaseWebSearchService, type IPreBaseWebSearchRequest } from './prebaseWebSearchService.js';
@@ -1005,7 +1005,7 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({ id: 'prebase.runtime.desktopInteractForMagnus', title: localize2('prebase.runtime.desktopInteractForMagnus', "Interact with Desktop Session for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
-	run(accessor: ServicesAccessor, input: { sessionId?: string; action: 'click' | 'doubleClick' | 'hover' | 'fill' | 'type' | 'press' | 'check' | 'uncheck' | 'select' | 'focus'; locator: unknown; value?: string; timeoutMs?: number }) {
+	run(accessor: ServicesAccessor, input: { sessionId?: string; action: 'click' | 'doubleClick' | 'fill' | 'type' | 'press' | 'check' | 'uncheck' | 'select' | 'focus'; locator: unknown; value?: string; timeoutMs?: number }) {
 		return getDesktopRuntimeService(accessor)?.interactForMagnus(input) ?? { ok: false, reason: 'Desktop runtime unavailable.' };
 	}
 });
@@ -1055,8 +1055,9 @@ registerAction2(class extends Action2 {
 			await dialog.info(localize('prebase.desktop.notTauri', "Not a Tauri project"), localize('prebase.desktop.notTauriCargo', "PreBase needs a Tauri Cargo.toml before it can add debug-only WebDriver plugins."));
 			return { ok: false };
 		}
+		const appRootUri = profile.appRoot ? URI.file(profile.appRoot) : folder.uri;
 
-		const cargoUri = URI.joinPath(folder.uri, profile.cargoTomlPath);
+		const cargoUri = URI.joinPath(appRootUri, profile.cargoTomlPath);
 		let cargoToml: string;
 		try {
 			cargoToml = (await fileService.readFile(cargoUri)).value.toString();
@@ -1070,7 +1071,7 @@ registerAction2(class extends Action2 {
 		let rustEntry = '';
 		for (const relative of candidates.rustEntries) {
 			try {
-				rustEntry = (await fileService.readFile(URI.joinPath(folder.uri, relative))).value.toString();
+				rustEntry = (await fileService.readFile(URI.joinPath(appRootUri, relative))).value.toString();
 				rustEntryPath = relative;
 				break;
 			} catch {
@@ -1086,7 +1087,7 @@ registerAction2(class extends Action2 {
 		let capabilitiesJson: string | undefined;
 		for (const relative of candidates.capabilities) {
 			try {
-				capabilitiesJson = (await fileService.readFile(URI.joinPath(folder.uri, relative))).value.toString();
+				capabilitiesJson = (await fileService.readFile(URI.joinPath(appRootUri, relative))).value.toString();
 				capabilitiesPath = relative;
 				break;
 			} catch {
@@ -1095,7 +1096,7 @@ registerAction2(class extends Action2 {
 		}
 
 		const preview = previewTauriTestingSetup({
-			appRoot: folder.uri.fsPath,
+			appRoot: appRootUri.fsPath,
 			cargoToml,
 			rustEntry,
 			capabilitiesJson,
@@ -1131,19 +1132,29 @@ registerAction2(class extends Action2 {
 			await dialog.info(localize('prebase.desktop.tauriSetupBlocked', "Cannot enable Tauri testing"), rustNext.error);
 			return { ok: false, reason: rustNext.error };
 		}
-		let capsNext: string | undefined;
-		if (capabilitiesJson) {
-			const applied = applyCapabilitiesTestingPermission(capabilitiesJson);
-			if (typeof applied !== 'string') {
-				await dialog.info(localize('prebase.desktop.tauriSetupBlocked', "Cannot enable Tauri testing"), applied.error);
-				return { ok: false, reason: applied.error };
+		const rustUri = URI.joinPath(appRootUri, rustEntryPath);
+		const writes: { resource: typeof cargoUri; before?: string; after: string }[] = [
+			{ resource: cargoUri, before: cargoToml, after: cargoNext },
+			{ resource: rustUri, before: rustEntry, after: rustNext },
+		].filter(write => write.after !== write.before);
+		if (preview.changes.some(change => change.path === capabilitiesPath)) {
+			const capsNext = applyCapabilitiesTestingPermission(capabilitiesJson);
+			if (typeof capsNext !== 'string') {
+				await dialog.info(localize('prebase.desktop.tauriSetupBlocked', "Cannot enable Tauri testing"), capsNext.error);
+				return { ok: false, reason: capsNext.error };
 			}
-			capsNext = applied;
+			writes.push({ resource: URI.joinPath(appRootUri, capabilitiesPath), before: capabilitiesJson, after: capsNext });
 		}
-		await fileService.writeFile(cargoUri, VSBuffer.fromString(cargoNext));
-		await fileService.writeFile(URI.joinPath(folder.uri, rustEntryPath), VSBuffer.fromString(rustNext));
-		if (capsNext) {
-			await fileService.writeFile(URI.joinPath(folder.uri, capabilitiesPath), VSBuffer.fromString(capsNext));
+		const transaction = await applyTauriTestingTransaction(writes, {
+			write: async (resource, value) => { await fileService.writeFile(resource, VSBuffer.fromString(value)); },
+			remove: resource => fileService.del(resource),
+		});
+		if (!transaction.ok) {
+			const detail = transaction.rollbackErrors.length
+				? localize('prebase.desktop.tauriSetupRollbackPartial', "Setup failed: {0}\nRollback also failed: {1}", transaction.reason, transaction.rollbackErrors.join('; '))
+				: localize('prebase.desktop.tauriSetupRolledBack', "Setup failed and all earlier file changes were restored: {0}", transaction.reason);
+			await dialog.info(localize('prebase.desktop.tauriSetupFailed', "Tauri testing setup failed"), detail);
+			return { ok: false, reason: transaction.reason, rollbackErrors: transaction.rollbackErrors };
 		}
 		await runtimeService.detectConfigurations();
 		return { ok: true, files: preview.changes.map(change => change.path) };

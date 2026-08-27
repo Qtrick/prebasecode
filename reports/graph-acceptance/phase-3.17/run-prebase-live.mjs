@@ -206,7 +206,8 @@ const evidence = {
 };
 writeFileSync(join(evidenceDir, 'temporal/live.json'), JSON.stringify(evidence, null, 2));
 writeFileSync(join(evidenceDir, 'shutdown/idle-quit.json'), JSON.stringify(evidence.quit, null, 2));
-console.log(JSON.stringify({ ok: remaining === 'gone' && nodes > 0, ...evidence }, null, 2));
-if (remaining !== 'gone') {
+const ok = remaining === 'gone' && nodes > 0;
+console.log(JSON.stringify({ ok, ...evidence }, null, 2));
+if (!ok) {
 	process.exitCode = 1;
 }

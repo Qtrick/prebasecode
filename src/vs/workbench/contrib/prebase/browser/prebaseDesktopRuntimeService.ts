@@ -21,7 +21,7 @@ import type { CdpTarget, DesktopFramework, DesktopLaunchMode, DesktopProjectProf
 import { desktopUiModeFromLaunch, isElectronProfile, isRecognizedDesktopApp, isTauriProfile } from '../common/runtime/desktopTypes.js';
 import { detectDesktopProjects, selectDesktopProfile } from '../common/runtime/desktopDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
-import { buildElectronExternalLaunchRequest, buildNpmExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../common/runtime/externalLaunchCommand.js';
+import { buildElectronExternalLaunchRequest, buildPackageScriptExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../common/runtime/externalLaunchCommand.js';
 import { assertDesktop, formatDesktopFailure, interactDesktop, runDesktopDomCommand, type DesktopEvaluateFn } from '../common/runtime/desktopAutomationHost.js';
 import { DEFAULT_ELECTRON_STARTUP_TIMEOUT_MS, DEFAULT_TAURI_STARTUP_TIMEOUT_MS, describeLocator, parseDesktopLocator, redactSecretText, validatePressKey, type DesktopAssertCondition, type DesktopInteractAction } from '../common/runtime/desktopLocators.js';
 import { createDesktopTestRun, recordDesktopTestStep, summarizeDesktopTestRun, type DesktopTestRun } from '../common/runtime/desktopTestModel.js';
@@ -92,6 +92,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 	private _lastProbe: ProjectProbe | undefined;
 	private _detectedProfiles: DesktopProjectProfile[] = [];
 	private _testRun: DesktopTestRun | undefined;
+	private _testRunToContinue: DesktopTestRun | undefined;
 	private _webDriver: DesktopWebDriverClient | undefined;
 	private _webDriverSession: { sessionId: string; baseUrl: string } | undefined;
 	private _launchCts: CancellationTokenSource | undefined;
@@ -213,7 +214,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		}
 
 		const launchMode = options.launchMode ?? this.getLaunchMode();
-		const workspaceRoot = this.workspaceService.getWorkspace().folders[0]?.uri.fsPath;
+		const workspaceRoot = profile.appRoot ?? this.workspaceService.getWorkspace().folders[0]?.uri.fsPath;
 		if (!workspaceRoot) {
 			await this.dialogService.info(localize('prebase.desktop.noWorkspace', "No workspace"), localize('prebase.desktop.noWorkspaceDetail', "Open a workspace folder before launching a desktop app."));
 			return undefined;
@@ -226,6 +227,8 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		const purpose = options.purpose ?? (options.testing ? 'test' : 'preview');
 		const wantsNativeAutomation = purpose === 'test' && launchMode === 'external';
 		if (isTauriProfile(profile) && wantsNativeAutomation && profile.capabilities.fullNativeSetupRequired) {
+			this._testRun = undefined;
+			this._testRunToContinue = undefined;
 			this._session = {
 				id: generateUuid(),
 				workspaceRoot,
@@ -269,14 +272,21 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			ownedByPreBase: true,
 			startedAt: Date.now(),
 		};
+		this._testRun = purpose === 'test' ? this._testRunToContinue : undefined;
+		this._testRunToContinue = undefined;
 		if (purpose === 'test') {
-			this._testRun = createDesktopTestRun({
-				id: sessionId,
-				framework: profile.framework,
-				mode: desktopUiModeFromLaunch(launchMode),
-				backend: this._session.automationBackend,
-				workspaceRoot,
-			});
+			if (this._testRun) {
+				this._testRun.endedAt = undefined;
+				this._testRun.cleanup = undefined;
+			} else {
+				this._testRun = createDesktopTestRun({
+					id: sessionId,
+					framework: profile.framework,
+					mode: desktopUiModeFromLaunch(launchMode),
+					backend: this._session.automationBackend,
+					workspaceRoot,
+				});
+			}
 			this._session.testRunId = this._testRun.id;
 		}
 		this._lastRequest = { rendererUrl: rendererUrl ?? '', command: options.command, cwd: workspaceRoot, title };
@@ -430,6 +440,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		const mode = this._session?.launchMode ?? this.getLaunchMode();
 		const purpose = this._session?.purpose ?? 'preview';
 		const framework = this._session?.profile.framework;
+		const startedAt = Date.now();
 		if (mode === 'managed' && this._session && this._lastRequest) {
 			const showBar = this.configurationService.getValue<boolean>(PreBaseConfigKeys.RuntimeManagedApplicationBar) ?? true;
 			const rendererUrl = this._session.rendererUrl ?? this._lastRequest.rendererUrl;
@@ -446,22 +457,41 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 				});
 				this._lastRequest = { ...this._lastRequest, rendererUrl };
 				this._updateSession({
-					state: 'running',
+					state: purpose === 'test' ? 'testing' : 'running',
 					rendererUrl,
 					managedWindowId: managed.windowId,
+					testRunId: this._testRun?.id,
 					errorMessage: undefined,
 				});
+				this._recordStep({ kind: 'restart', action: 'restart', startedAt, durationMs: Date.now() - startedAt, ok: true });
 			} catch (err) {
 				const message = err instanceof Error ? err.message : String(err);
 				this._updateSession({ state: 'error', errorMessage: message });
+				this._recordStep({ kind: 'restart', action: 'restart', startedAt, durationMs: Date.now() - startedAt, ok: false, failure: message });
 			}
 			return;
 		}
 
 		const rendererUrl = this._session?.rendererUrl ?? this._lastRequest?.rendererUrl;
 		const command = this._lastRequest?.command;
+		const continuedTestRun = purpose === 'test' ? this._testRun : undefined;
 		await this.stop();
-		await this.start({ launchMode: mode, rendererUrl, command, purpose, framework, testing: purpose === 'test' });
+		this._testRunToContinue = continuedTestRun;
+		let restarted: PreBaseDesktopSession | undefined;
+		try {
+			restarted = await this.start({ launchMode: mode, rendererUrl, command, purpose, framework, testing: purpose === 'test' });
+		} finally {
+			this._testRunToContinue = undefined;
+		}
+		const ok = restarted?.state === (purpose === 'test' ? 'testing' : 'running');
+		this._recordStep({
+			kind: 'restart',
+			action: 'restart',
+			startedAt,
+			durationMs: Date.now() - startedAt,
+			ok,
+			failure: ok ? undefined : restarted?.errorMessage ?? 'Desktop session did not restart.',
+		});
 	}
 
 	async reload(): Promise<boolean> {
@@ -535,8 +565,9 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			return { ok: false, reason: 'Desktop automation is disabled in settings.' };
 		}
 		try {
+			const started = Date.now();
 			const snapshot = await runDesktopDomCommand(this._pageEvaluate(session), { op: 'snapshot' }, this._linkedActionToken(token));
-			this._recordStep({ kind: 'inspect', action: 'snapshot', startedAt: Date.now(), durationMs: 0, ok: snapshot.ok, failure: snapshot.ok ? undefined : snapshot.code });
+			this._recordStep({ kind: 'inspect', action: 'snapshot', startedAt: started, durationMs: Date.now() - started, ok: snapshot.ok, failure: snapshot.ok ? undefined : snapshot.code });
 			const windows = session.cdpTargets.length || (session.managedWindowId ? 1 : 0) || (session.webDriverPort ? 1 : 0);
 			return {
 				ok: snapshot.ok,
@@ -615,7 +646,8 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			const asserted = await assertDesktop(this._pageEvaluate(session), input.condition, locator && !('error' in locator) ? locator : undefined, input.expected, input.timeoutMs, this._linkedActionToken(token));
 			this._recordStep({ kind: 'assert', action: input.condition, locator: locator && !('error' in locator) ? locator : undefined, startedAt: started, durationMs: asserted.duration, ok: asserted.ok, failure: asserted.ok ? undefined : formatDesktopFailure(asserted.result, locator && !('error' in locator) ? locator : undefined) });
 			if (!asserted.ok) {
-				return { ok: false, condition: input.condition, actual: asserted.actual, expected: asserted.expected, duration: asserted.duration, console: asserted.result.console, framework: session.profile.framework, backend: session.automationBackend, title: asserted.result.title, url: asserted.result.url };
+				const console = asserted.result.console?.map(entry => ({ ...entry, text: redactSecretText(entry.text) }));
+				return { ok: false, condition: input.condition, actual: asserted.actual, expected: asserted.expected, duration: asserted.duration, console, framework: session.profile.framework, backend: session.automationBackend, title: asserted.result.title, url: asserted.result.url };
 			}
 			return { ok: true, condition: input.condition, actual: asserted.actual, expected: asserted.expected, duration: asserted.duration, framework: session.profile.framework, backend: session.automationBackend };
 		} catch (err) {
@@ -723,11 +755,11 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 
 	private _buildExternalCommand(profile: DesktopProjectProfile, enableTauriTestingFeature = false): ExternalLaunchRequest {
 		if (isTauriProfile(profile)) {
-			return buildTauriExternalLaunchRequest(profile.tauriScriptName, enableTauriTestingFeature && profile.testingCargoFeature);
+			return buildTauriExternalLaunchRequest(profile.tauriScriptName, enableTauriTestingFeature && profile.testingCargoFeature, profile.packageManager);
 		}
 		if (isElectronProfile(profile)) {
 			if (profile.electronScriptName) {
-				return buildNpmExternalLaunchRequest(profile.electronScriptName);
+				return buildPackageScriptExternalLaunchRequest(profile.packageManager, profile.electronScriptName);
 			}
 			if (profile.paths.main) {
 				return buildElectronExternalLaunchRequest(profile.paths.main);

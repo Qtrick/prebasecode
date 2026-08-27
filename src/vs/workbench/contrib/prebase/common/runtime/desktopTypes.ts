@@ -5,6 +5,7 @@
 
 export type { DesktopLaunchMode, DesktopLaunchRequest, ExternalLaunchRequest, ManagedWindowState } from '../../../../../platform/prebaseDesktop/common/prebaseDesktopTypes.js';
 import type { DesktopLaunchMode } from '../../../../../platform/prebaseDesktop/common/prebaseDesktopTypes.js';
+import type { PackageManager } from './types.js';
 
 export type DesktopSessionState =
 	| 'idle'
@@ -59,6 +60,7 @@ export interface DesktopProjectProfileBase {
 	rendererUrlHint?: string;
 	likelyDevPort: number;
 	appRoot?: string;
+	packageManager: PackageManager;
 }
 
 export interface ElectronProjectPaths {

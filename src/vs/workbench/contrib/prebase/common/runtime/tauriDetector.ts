@@ -5,6 +5,7 @@
 
 import type { PackageJsonShape, ProjectProbe } from './types.js';
 import type { DesktopCapabilities, DesktopDetectionConfidence, TauriProjectProfile } from './desktopTypes.js';
+import { detectPackageManager } from './scriptDetector.js';
 
 const TAURI_CONFIG_PATHS = [
 	'src-tauri/tauri.conf.json',
@@ -140,7 +141,7 @@ function buildCapabilities(options: {
 	if (options.setupRequired) {
 		limitations.push('Full-app preview launches the real Tauri binary. Agent automation needs Enable PreBase Tauri Testing (debug-only WebDriver plugin).');
 	} else if (options.hasFullNative) {
-		limitations.push('Full-app mode launches the real Tauri binary. Native OS dialogs and menus are not controllable.');
+		limitations.push('Full-app mode provides webview UI automation and renderer console capture. Tauri backend APIs, backend logs, native OS dialogs, and menus are not controllable.');
 	}
 	limitations.push('Native operating-system UI outside the webview is unsupported.');
 
@@ -158,7 +159,7 @@ function buildCapabilities(options: {
 		supportsWindowManagement: options.isTauri && options.hasRenderer,
 		supportsRendererAutomation: options.isTauri && options.hasRenderer,
 		supportsFullNativeAutomation: options.hasFullNative,
-		supportsBackendApiAccess: options.hasFullNative,
+		supportsBackendApiAccess: false,
 		supportsMainProcessAccess: false,
 		supportsNativeDialogAutomation: false,
 		requiresPreload: false,
@@ -174,14 +175,35 @@ function buildCapabilities(options: {
 
 /** Detect Tauri v2 projects. A random Cargo.toml is not enough. */
 export function detectTauriProject(probe: ProjectProbe): TauriProjectProfile {
-	const pkg = probe.packageJson;
+	const discoveredConfigPath = findConfigPath(probe);
+	const nestedRoot = discoveredConfigPath?.includes('/src-tauri/')
+		? discoveredConfigPath.slice(0, discoveredConfigPath.indexOf('/src-tauri/'))
+		: undefined;
+	let appProbe = probe;
+	if (nestedRoot) {
+		let packageJson: PackageJsonShape | undefined;
+		try {
+			const packageText = read(probe, `${nestedRoot}/package.json`);
+			packageJson = packageText ? JSON.parse(packageText) as PackageJsonShape : undefined;
+		} catch {
+			// Detection remains valid from Cargo/config signals when package.json is unreadable.
+		}
+		appProbe = {
+			exists: relativePath => probe.exists(`${nestedRoot}/${relativePath}`),
+			readText: relativePath => probe.readText?.(`${nestedRoot}/${relativePath}`),
+			packageJson,
+			rootLabel: `${probe.rootLabel}/${nestedRoot}`,
+			rootPath: probe.rootPath ? `${probe.rootPath}/${nestedRoot}` : undefined,
+		};
+	}
+	const pkg = appProbe.packageJson;
 	const reasons: string[] = [];
-	const configPath = findConfigPath(probe);
-	const cargoPath = findCargoPath(probe, configPath);
-	const cargoToml = cargoPath ? read(probe, cargoPath) : undefined;
-	const configText = configPath ? read(probe, configPath) : undefined;
+	const configPath = findConfigPath(appProbe);
+	const cargoPath = findCargoPath(appProbe, configPath);
+	const cargoToml = cargoPath ? read(appProbe, cargoPath) : undefined;
+	const configText = configPath ? read(appProbe, configPath) : undefined;
 	const tauriInCargo = cargoDependsOnTauri(cargoToml);
-	const srcTauri = probe.exists('src-tauri') || probe.exists('apps/desktop/src-tauri');
+	const srcTauri = appProbe.exists('src-tauri');
 	const scripts = findTauriScripts(pkg);
 	const hasCli = Boolean(pkg?.dependencies?.['@tauri-apps/cli'] || pkg?.devDependencies?.['@tauri-apps/cli']);
 	const hasApi = Boolean(pkg?.dependencies?.['@tauri-apps/api'] || pkg?.devDependencies?.['@tauri-apps/api']);
@@ -221,7 +243,7 @@ export function detectTauriProject(probe: ProjectProbe): TauriProjectProfile {
 	}
 
 	const isTauri = confidence === 'high' || confidence === 'medium';
-	const likelyDevPort = inferPort(parsed.url, probe, pkg);
+	const likelyDevPort = inferPort(parsed.url, appProbe, pkg);
 	const rendererUrlHint = parsed.url?.startsWith('http') ? parsed.url : (isTauri ? `http://localhost:${likelyDevPort}` : undefined);
 	const setupRequired = isTauri && !hasWdioWebdriverPlugin;
 	const capabilities = buildCapabilities({
@@ -239,6 +261,8 @@ export function detectTauriProject(probe: ProjectProbe): TauriProjectProfile {
 		reasons,
 		rendererUrlHint,
 		likelyDevPort,
+		appRoot: appProbe.rootPath,
+		packageManager: detectPackageManager(appProbe),
 		configPath,
 		cargoTomlPath: cargoPath,
 		identifier: parsed.identifier,

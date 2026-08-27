@@ -4,7 +4,7 @@
 	"version": "0.0.0",
 	"identifier": "com.prebase.desktop-tauri-fixture",
 	"build": {
-		"frontendDist": ".."
+		"frontendDist": "../web"
 	},
 	"app": {
 		"withGlobalTauri": true,

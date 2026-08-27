@@ -243,6 +243,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 	vm.runInContext(script, context);
 
 	return {
+		context,
 		elements,
 		postedMessages,
 		drawCalls,
@@ -456,5 +457,244 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		// Verify translates do not double-count (w/2, h/2)
 		const translateCalls = harness.drawCalls.filter(c => c.type === 'translate');
 		assert.ok(translateCalls.length >= 1);
+	});
+
+	test('Temporal Graph: serialized temporalDiff message preserves node identities in the production webview', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		const diff = {
+			baseCommitSha: 'base',
+			targetCommitSha: 'target',
+			nodes: [
+				{ entityId: 'kept', canonicalNodeId: 'kept', path: 'src/kept.ts', label: 'kept.ts', kind: 'file', changeKind: 'unchanged', x: 10, y: 20 },
+				{ entityId: 'changed', canonicalNodeId: 'changed', path: 'src/changed.ts', label: 'changed.ts', kind: 'file', changeKind: 'modified', x: 30, y: 40 },
+			],
+			edges: [],
+			summary: {
+				addedCount: 0,
+				removedCount: 0,
+				modifiedCount: 1,
+				renamedCount: 0,
+				unchangedCount: 1,
+				edgeAddedCount: 0,
+				edgeRemovedCount: 0,
+				edgeModifiedCount: 0,
+			},
+			isPartialLineage: false,
+		};
+
+		harness.triggerMessage(JSON.parse(JSON.stringify({
+			type: 'temporalDiff',
+			payload: diff,
+		})));
+		const received = vm.runInContext('temporalDiff', harness.context);
+
+		assert.deepStrictEqual({
+			nodeCount: received.nodes.length,
+			nodeIds: Array.from(received.nodes, (node: any) => node.entityId),
+		}, {
+			nodeCount: 2,
+			nodeIds: ['kept', 'changed'],
+		});
+	});
+
+	test('Temporal Graph: first non-empty temporal update auto-fits and draws after empty bootstrap', () => {
+		for (const messageType of ['temporalState', 'temporalDiff']) {
+			const harness = createProductionWebviewHarness('temporal');
+			vm.runInContext('window.__prebaseRecordRenderMetrics = true', harness.context);
+			harness.triggerMessage({
+				type: 'temporalState',
+				payload: {
+					selectedCommitSha: 'target',
+					renderedCommitSha: 'target',
+					displayMode: 'state',
+					diff: {
+						baseCommitSha: 'base',
+						targetCommitSha: 'target',
+						nodes: [],
+						edges: [],
+						summary: { addedCount: 0, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 0 },
+					},
+				},
+			});
+			harness.triggerRaf();
+			harness.drawCalls.length = 0;
+
+			const diff = {
+				baseCommitSha: 'base',
+				targetCommitSha: 'target',
+				nodes: [
+					{ entityId: 'left', label: 'left.ts', path: 'src/left.ts', changeKind: 'unchanged', x: 120, y: 80 },
+					{ entityId: 'right', label: 'right.ts', path: 'src/right.ts', changeKind: 'modified', x: 320, y: 180 },
+				],
+				edges: [],
+				summary: { addedCount: 0, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 1 },
+			};
+			harness.triggerMessage(messageType === 'temporalState'
+				? {
+					type: messageType,
+					payload: {
+						selectedCommitSha: 'target',
+						renderedCommitSha: 'target',
+						displayMode: 'state',
+						diff,
+					},
+				}
+				: { type: messageType, payload: diff });
+			harness.triggerRaf(1300);
+
+			const runtime = vm.runInContext(`({
+				transform: { ...transform },
+				insets: getUsableInsets(),
+				metrics: { ...window.__prebaseGraphRenderMetrics }
+			})`, harness.context);
+			const usableCenter = {
+				x: runtime.insets.left + (800 - runtime.insets.left - runtime.insets.right) / 2,
+				y: runtime.insets.top + (600 - runtime.insets.top - runtime.insets.bottom) / 2,
+			};
+			const graphCenter = { x: 221.75, y: 131.75 };
+
+			assert.ok(
+				Number.isFinite(runtime.transform.x) &&
+				Number.isFinite(runtime.transform.y) &&
+				Number.isFinite(runtime.transform.k),
+				`${messageType} must produce a finite transform`,
+			);
+			assert.notDeepStrictEqual(runtime.transform, { x: 0, y: 0, k: 1 }, `${messageType} must replace the default transform`);
+			assert.ok(Math.abs(runtime.transform.x + graphCenter.x * runtime.transform.k - usableCenter.x) < 0.001);
+			assert.ok(Math.abs(runtime.transform.y + graphCenter.y * runtime.transform.k - usableCenter.y) < 0.001);
+			assert.deepStrictEqual({
+				receivedNodeCount: runtime.metrics.receivedNodeCount,
+				visibleNodeCount: runtime.metrics.visibleNodeCount,
+				finiteCoordinateCount: runtime.metrics.finiteCoordinateCount,
+				nodesDrawn: runtime.metrics.nodesDrawn,
+				selectedCommitSha: runtime.metrics.selectedCommitSha,
+				renderedCommitSha: runtime.metrics.renderedCommitSha,
+			}, {
+				receivedNodeCount: 2,
+				visibleNodeCount: 2,
+				finiteCoordinateCount: 2,
+				nodesDrawn: 2,
+				selectedCommitSha: 'target',
+				renderedCommitSha: 'target',
+			}, `${messageType} draw metrics must report the rendered production frame`);
+			assert.equal(
+				harness.drawCalls.filter(call => call.type === 'arc').length,
+				2,
+				`${messageType} must draw both target-active nodes`,
+			);
+		}
+	});
+
+	test('Temporal Graph: auto-fits when placeholder nodes later receive finite coordinates', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		vm.runInContext('window.__prebaseRecordRenderMetrics = true', harness.context);
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: {
+				selectedCommitSha: 'target',
+				renderedCommitSha: 'target',
+				displayMode: 'state',
+				diff: {
+					baseCommitSha: 'base',
+					targetCommitSha: 'target',
+					nodes: [
+						{ entityId: 'left', label: 'left.ts', path: 'src/left.ts', changeKind: 'unchanged', x: Number.NaN, y: Number.NaN },
+					],
+					edges: [],
+					summary: { addedCount: 0, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 1 },
+				},
+			},
+		});
+		harness.triggerRaf();
+		const before = vm.runInContext('({ x: transform.x, y: transform.y, k: transform.k })', harness.context);
+		assert.equal(before.x, 0);
+		assert.equal(before.y, 0);
+		assert.equal(before.k, 1);
+
+		harness.triggerMessage({
+			type: 'temporalDiff',
+			payload: {
+				baseCommitSha: 'base',
+				targetCommitSha: 'target',
+				nodes: [
+					{ entityId: 'left', label: 'left.ts', path: 'src/left.ts', changeKind: 'unchanged', x: 120, y: 80 },
+					{ entityId: 'right', label: 'right.ts', path: 'src/right.ts', changeKind: 'modified', x: 320, y: 180 },
+				],
+				edges: [],
+				summary: { addedCount: 0, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 1 },
+			},
+		});
+		harness.triggerRaf(1300);
+		const after = vm.runInContext('({ x: transform.x, y: transform.y, k: transform.k })', harness.context);
+		assert.ok(Number.isFinite(after.x) && Number.isFinite(after.y) && Number.isFinite(after.k));
+		assert.ok(after.x !== 0 || after.y !== 0 || after.k !== 1);
+	});
+
+	test('Temporal Graph: Full Map retains and draws all target-active nodes', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: {
+				displayMode: 'state',
+				diff: {
+					baseCommitSha: 'base',
+					targetCommitSha: 'target',
+					nodes: [
+						{ entityId: 'kept', label: 'kept.ts', path: 'src/kept.ts', changeKind: 'unchanged', x: -60, y: 0 },
+						{ entityId: 'added', label: 'added.ts', path: 'src/added.ts', changeKind: 'added', x: 0, y: 0 },
+						{ entityId: 'modified', label: 'modified.ts', path: 'src/modified.ts', changeKind: 'modified', x: 60, y: 0 },
+						{ entityId: 'removed', label: 'removed.ts', path: 'src/removed.ts', changeKind: 'removed', x: 120, y: 0 },
+					],
+					edges: [],
+					summary: { addedCount: 1, removedCount: 1, modifiedCount: 1, renamedCount: 0, unchangedCount: 1 },
+				},
+			},
+		});
+
+		const visibleNodeIds = vm.runInContext(
+			'computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode).nodes.map(n => n.entityId)',
+			harness.context,
+		);
+		harness.triggerRaf();
+
+		assert.deepStrictEqual(Array.from(visibleNodeIds), ['kept', 'added', 'modified']);
+		assert.equal(
+			harness.drawCalls.filter(call => call.type === 'arc').length,
+			3,
+			'Full Map must draw one body for every target-active node and no removed ghost',
+		);
+	});
+
+	test('Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: {
+				displayMode: 'changes',
+				diff: {
+					baseCommitSha: 'base',
+					targetCommitSha: 'target',
+					nodes: [
+						{ entityId: 'changed', label: 'changed.ts', path: 'src/changed.ts', changeKind: 'modified', x: 0, y: 0 },
+						{ entityId: 'unchanged', label: 'unchanged.ts', path: 'src/unchanged.ts', changeKind: 'unchanged', x: 80, y: 0 },
+					],
+					edges: [],
+					summary: { addedCount: 0, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 1 },
+				},
+			},
+		});
+
+		const visible = vm.runInContext(
+			'computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode)',
+			harness.context,
+		);
+		harness.triggerRaf();
+
+		assert.deepStrictEqual(Array.from(visible.nodes, (node: any) => node.entityId), ['changed']);
+		assert.equal(visible.hasZeroChanges, false);
+		assert.ok(
+			harness.drawCalls.some(call => call.type === 'arc'),
+			'a nonzero Focus Changes diff must draw its changed node',
+		);
 	});
 });

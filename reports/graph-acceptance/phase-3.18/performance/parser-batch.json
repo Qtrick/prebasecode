@@ -1,0 +1,211 @@
+{
+  "measuredAt": "2026-08-27T02:05:56.101Z",
+  "methodology": "fresh-process warmup + 3 repetitions, median/p95, graphs/src excluding tests",
+  "chosenParseBatchSize": 32,
+  "rows": [
+    {
+      "parseBatchSize": 8,
+      "fileCount": 110,
+      "nodes": 110,
+      "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+      "repetitions": 3,
+      "wallMedianMs": 197,
+      "wallP95Ms": 200,
+      "peakRssMedianMb": 320.1,
+      "rssDeltaMedianMb": 180.95,
+      "eventLoopLagP95MedianMs": 0,
+      "samples": [
+        {
+          "parseBatchSize": 8,
+          "wallMs": 197,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 320.1,
+          "rssDeltaMb": 180.86,
+          "heapDeltaMb": 61.45,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        },
+        {
+          "parseBatchSize": 8,
+          "wallMs": 195,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 319.6,
+          "rssDeltaMb": 180.95,
+          "heapDeltaMb": 61.75,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        },
+        {
+          "parseBatchSize": 8,
+          "wallMs": 200,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 322.2,
+          "rssDeltaMb": 181.66,
+          "heapDeltaMb": 70.09,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        }
+      ],
+      "note": "Fresh process per sample, including one discarded warmup. Fixture is graphs/src excluding tests."
+    },
+    {
+      "parseBatchSize": 16,
+      "fileCount": 110,
+      "nodes": 110,
+      "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+      "repetitions": 3,
+      "wallMedianMs": 203,
+      "wallP95Ms": 217,
+      "peakRssMedianMb": 321,
+      "rssDeltaMedianMb": 182.05,
+      "eventLoopLagP95MedianMs": 0,
+      "samples": [
+        {
+          "parseBatchSize": 16,
+          "wallMs": 203,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 319.1,
+          "rssDeltaMb": 182.05,
+          "heapDeltaMb": 61.69,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        },
+        {
+          "parseBatchSize": 16,
+          "wallMs": 200,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 322.5,
+          "rssDeltaMb": 182.86,
+          "heapDeltaMb": 61.49,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        },
+        {
+          "parseBatchSize": 16,
+          "wallMs": 217,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 321,
+          "rssDeltaMb": 180.75,
+          "heapDeltaMb": 61.28,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        }
+      ],
+      "note": "Fresh process per sample, including one discarded warmup. Fixture is graphs/src excluding tests."
+    },
+    {
+      "parseBatchSize": 32,
+      "fileCount": 110,
+      "nodes": 110,
+      "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+      "repetitions": 3,
+      "wallMedianMs": 198,
+      "wallP95Ms": 200,
+      "peakRssMedianMb": 321,
+      "rssDeltaMedianMb": 180.91,
+      "eventLoopLagP95MedianMs": 0,
+      "samples": [
+        {
+          "parseBatchSize": 32,
+          "wallMs": 197,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 321,
+          "rssDeltaMb": 180.91,
+          "heapDeltaMb": 61.36,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        },
+        {
+          "parseBatchSize": 32,
+          "wallMs": 198,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 321.4,
+          "rssDeltaMb": 181.03,
+          "heapDeltaMb": 61.42,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        },
+        {
+          "parseBatchSize": 32,
+          "wallMs": 200,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 320.5,
+          "rssDeltaMb": 180.83,
+          "heapDeltaMb": 70.25,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        }
+      ],
+      "note": "Fresh process per sample, including one discarded warmup. Fixture is graphs/src excluding tests."
+    },
+    {
+      "parseBatchSize": 64,
+      "fileCount": 110,
+      "nodes": 110,
+      "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+      "repetitions": 3,
+      "wallMedianMs": 195,
+      "wallP95Ms": 195,
+      "peakRssMedianMb": 320.4,
+      "rssDeltaMedianMb": 187.47,
+      "eventLoopLagP95MedianMs": 0,
+      "samples": [
+        {
+          "parseBatchSize": 64,
+          "wallMs": 193,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 320.4,
+          "rssDeltaMb": 188.25,
+          "heapDeltaMb": 61.17,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        },
+        {
+          "parseBatchSize": 64,
+          "wallMs": 195,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 321,
+          "rssDeltaMb": 187.47,
+          "heapDeltaMb": 61.52,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        },
+        {
+          "parseBatchSize": 64,
+          "wallMs": 195,
+          "fileCount": 110,
+          "nodes": 110,
+          "digest": "5364938925247547121d26ddd306df3d2727d3bf3a6623422556b4713cb3e50b",
+          "rssMb": 318.6,
+          "rssDeltaMb": 180.55,
+          "heapDeltaMb": 70.01,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 0
+        }
+      ],
+      "note": "Fresh process per sample, including one discarded warmup. Fixture is graphs/src excluding tests."
+    }
+  ]
+}

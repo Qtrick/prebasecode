@@ -1,0 +1,24 @@
+{
+  "ok": true,
+  "failures": [],
+  "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-runtime-ER1a9O",
+  "port": 62834,
+  "pid": 43550,
+  "cdpPort": 62835,
+  "logFile": "/tmp/pb/20260826-221216-43368/code.log",
+  "targetOpened": true,
+  "detectedScript": true,
+  "serverStarted": true,
+  "previewConnected": true,
+  "inspected": true,
+  "restarted": true,
+  "stopped": true,
+  "portAfterStop": [],
+  "startedBeforeQuit": true,
+  "quit": {
+    "before": "43550     1   0.1 255440 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 419,
+    "remaining": "gone"
+  },
+  "portAfterQuit": []
+}

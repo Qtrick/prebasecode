@@ -27,3 +27,34 @@ export function isRuntimeWebviewControlMessage(value: unknown, channel: string):
 	return (candidate.url === undefined || typeof candidate.url === 'string')
 		&& (candidate.reason === undefined || typeof candidate.reason === 'string');
 }
+
+export interface RuntimePreviewStatusMessage {
+	readonly type?: string;
+	readonly url?: string;
+	readonly ok?: boolean;
+	readonly detail?: string;
+}
+
+/**
+ * Webview → host preview status. Iframe `load` is user-visible truth; a successful
+ * no-cors probe may connect earlier. Probe failures are ignored because vscode-webview
+ * fetches to loopback often fail after the page has already rendered.
+ */
+export function handleRuntimePreviewStatusMessage(
+	message: RuntimePreviewStatusMessage | undefined,
+	markLoaded: (url: string, ok: boolean, detail?: string) => void,
+): void {
+	if (!message?.type) {
+		return;
+	}
+	if ((message.type === 'load' || (message.type === 'probe' && message.ok === true)) && message.url) {
+		markLoaded(message.url, true);
+		return;
+	}
+	if (message.type === 'probe') {
+		return;
+	}
+	if (message.type === 'error' && message.url) {
+		markLoaded(message.url, false, message.detail);
+	}
+}

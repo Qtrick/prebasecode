@@ -1,0 +1,497 @@
+{
+  "phase": "3.18",
+  "checkpoints": ["D", "E"],
+  "role": "mandatory-test-writer",
+  "generatedAt": "2026-08-26T21:23:00-04:00",
+  "scope": {
+    "productionFilesInspected": [
+      "src/vs/platform/prebaseDesktop/common/externalLaunchResolver.ts",
+      "src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts",
+      "src/vs/workbench/contrib/prebase/browser/prebaseDesktopRuntimeService.ts",
+      "src/vs/workbench/contrib/prebase/browser/prebaseRuntimeService.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/desktopAutomationDom.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/desktopAutomationHost.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/desktopDetector.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/desktopLocators.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/desktopTestModel.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/desktopTypes.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/electronDetector.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/externalLaunchCommand.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/scriptDetector.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/tauriDetector.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/tauriTestingSetup.ts",
+      "extensions/prebase-magnus/src/desktopTools.ts",
+      "extensions/prebase-magnus/package.json"
+    ],
+    "uncommittedChangesInspected": true,
+    "productionEdited": false,
+    "iconsEdited": false
+  },
+  "behaviorsEnumerated": [
+    {
+      "id": "package-manager-launch",
+      "behaviors": [
+        "npm, pnpm, yarn, and bun build shell-free declared-script argv",
+        "Windows resolves package managers to .cmd and POSIX resolves logical binaries",
+        "package managers reject exec/bypass forms, missing separators, path-like script names, and arbitrary extra flags",
+        "cargo permits only tauri dev with the optional exact prebase-testing feature",
+        "Tauri package-script launches preserve the owning package manager"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "app-root-selection",
+      "behaviors": [
+        "Tauri cargo launch cwd resolves beside Cargo.toml",
+        "desktop launch should honor the detected profile app root instead of workspace folder zero"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "detection-profile-ownership",
+      "behaviors": [
+        "Electron profile owns the package manager detected at its app root",
+        "Tauri profile owns the package manager detected at its app root",
+        "Tauri WebDriver profile claims renderer UI/console automation without claiming backend API control"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "locator-and-actionability",
+      "behaviors": [
+        "ambiguous locators fail instead of choosing the first match",
+        "hidden and disabled controls remain non-actionable",
+        "pointer actions scroll and require two stable rect observations",
+        "covered controls return blocker evidence and are not clicked",
+        "offscreen controls fail after scrolling",
+        "transient notStable, outsideViewport, and covered states retry",
+        "permanent wrong-control failures do not retry"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "input-actions",
+      "behaviors": [
+        "fill uses the native input setter and emits input then change",
+        "type emits ordered keydown/input/keyup events per character",
+        "modifier press carries modifier flags and Control+A selects the control",
+        "double click performs two clicks and emits a detail-two dblclick",
+        "select rejects wrong controls, missing options, and disabled options before emitting input/change"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "assertion-retry-evidence",
+      "behaviors": [
+        "assertions retry until matched or timed out",
+        "timeout returns bounded actual state, title, URL, and any evaluator-provided console evidence"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "inspect-duration",
+      "behaviors": [
+        "managed inspection records elapsed production evaluation time instead of zero"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "test-run-lifecycle",
+      "behaviors": [
+        "normal preview start clears a completed test run",
+        "managed restart preserves test identity and prior evidence",
+        "external Tauri restart replaces the session while preserving the test run and reconnecting WebDriver",
+        "Tauri setupRequired should not expose an older test run"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "cancellation-cleanup",
+      "behaviors": [
+        "cancelling a Tauri launch stops startup and kills the owned process",
+        "test-owned sessions are terminated on disposal even when preview externals are configured to remain",
+        "in-flight DOM and WebDriver waits respond to cancellation"
+      ],
+      "coverage": "implemented"
+    }
+  ],
+  "testAudit": {
+    "missingBefore": [
+      "all-package-manager resolver behavior",
+      "detector-to-runtime package-manager ownership",
+      "covered/offscreen/stability actionability",
+      "controlled fill event semantics",
+      "sequential typing event order",
+      "modifier press flags",
+      "double-click event semantics",
+      "select validation branches",
+      "inspect elapsed duration",
+      "managed and external test restart continuity",
+      "normal stale test-run clearing",
+      "launch cancellation cleanup"
+    ],
+    "misleadingOrStaleBefore": [
+      "externalLaunchCommand.test.ts imported removed buildNpmExternalLaunchRequest",
+      "activation.test.ts still advertised unsupported hover",
+      "desktopAutomation DOM fake lacked scrollIntoView, hit testing, viewport bounds, native input classes, and real event payloads",
+      "the Magnus test-ownership/cancellation check only searched production source strings"
+    ],
+    "helperOnlyOrBypassed": [
+      "desktopAutomationHost evaluator stubs prove retry/evidence propagation but do not prove the injected DOM emits console evidence",
+      "the removed Magnus source-string test did not invoke registered LanguageModelTool instances or VS Code cancellation",
+      "Tauri testing setup helpers are covered separately but are not evidence of a live Tauri app"
+    ]
+  },
+  "testsImplemented": {
+    "newIndividualTests": 23,
+    "removedSourceStringOnlyTests": 1,
+    "repairedExistingTests": [
+      "package-manager builder and Tauri argv expectations",
+      "renderer click tests updated for stability and hit-test actionability",
+      "assertion timeout evidence expectations",
+      "Magnus desktop interact schema and model description",
+      "moving-target actionability fixture supplies one rect per production observation"
+    ],
+    "individualTestNames": [
+      "resolves every supported package manager to the platform executable",
+      "rejects package-manager argv that bypasses declared scripts or adds arbitrary flags",
+      "owns the package manager detected at the Electron app root",
+      "owns the package manager detected at the Tauri app root",
+      "retries transient stability, viewport, and coverage failures",
+      "does not retry permanent wrong-control failures",
+      "reports covered, offscreen, and unstable pointer targets without clicking",
+      "fills through the native setter and emits controlled-input events",
+      "types characters sequentially with keyboard and input event ordering",
+      "presses modifier combinations and selects all through the control API",
+      "double click performs two clicks and a cancellable detail-two event",
+      "select validates control type, option existence, and disabled options before changing value",
+      "launches the detected Tauri app with its owning package manager and crate cwd",
+      "cancelling a Tauri launch stops the wait and cleans up the owned process",
+      "managed test restart keeps the test identity and prior evidence",
+      "records the actual managed inspect duration in test evidence",
+      "external test restart reconnects automation without replacing the test run",
+      "starting a preview after a completed test clears stale test-run evidence",
+      "setup-required launch clears stale test evidence from the previous session",
+      "failed renderer queries carry only the latest bounded console evidence",
+      "failed assertions return bounded renderer console evidence with secrets redacted",
+      "profile app root controls the session root and external spawn cwd",
+      "nested monorepo app owns its package, lockfile, and absolute app root"
+    ]
+  },
+  "intentionallyOmitted": [
+    {
+      "behavior": "direct Magnus LanguageModelTool cancellation forwarding",
+      "reason": "The node activation harness has no VS Code API runtime/mock capable of invoking desktopTools classes. The misleading source-string-only test was removed; workbench cancellation is behavior-tested."
+    },
+    {
+      "behavior": "hover",
+      "reason": "Production explicitly marks CSS hover unsupported and removed it from DesktopInteractAction and the manifest enum."
+    },
+    {
+      "behavior": "live Electron/Tauri native UI",
+      "reason": "Requires GUI/live acceptance and is outside deterministic focused unit coverage; existing Phase 3.18 live artifacts remain separate."
+    }
+  ],
+  "resolvedProductionDefectsVerified": [
+    {
+      "severity": "high",
+      "file": "src/vs/workbench/contrib/prebase/browser/prebaseDesktopRuntimeService.ts",
+      "summary": "DesktopProjectProfile.appRoot now controls the session root and Electron spawn cwd; Tauri derives its crate cwd from that app root.",
+      "verification": "profile app root controls the session root and external spawn cwd"
+    },
+    {
+      "severity": "high",
+      "file": "src/vs/workbench/contrib/prebase/browser/prebaseDesktopRuntimeService.ts",
+      "summary": "The Tauri setupRequired early return now clears _testRun and _testRunToContinue.",
+      "verification": "setup-required launch clears stale test evidence from the previous session"
+    },
+    {
+      "severity": "medium",
+      "files": [
+        "src/vs/workbench/contrib/prebase/common/runtime/desktopAutomationDom.ts",
+        "src/vs/workbench/contrib/prebase/browser/prebaseDesktopRuntimeService.ts"
+      ],
+      "summary": "Renderer read/query failures now carry the final 20 console entries and the runtime service redacts secrets before returning assertion failures.",
+      "verification": [
+        "failed renderer queries carry only the latest bounded console evidence",
+        "failed assertions return bounded renderer console evidence with secrets redacted"
+      ]
+    },
+    {
+      "severity": "build-blocker",
+      "file": "src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts",
+      "line": 1147,
+      "summary": "The Tauri transaction adapter type mismatch was fixed; client typecheck now passes.",
+      "verification": "npm run typecheck-client"
+    }
+  ],
+  "productionDefects": [],
+  "testFilesDiscovered": [
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.ts",
+      "suiteBlocks": 10,
+      "individualTests": 44,
+      "edited": true
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/desktopRuntimeSession.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 17,
+      "edited": true
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/externalLaunchCommand.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 10,
+      "edited": true
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/electronDetector.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 11,
+      "edited": true
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.ts",
+      "suiteBlocks": 3,
+      "individualTests": 17,
+      "edited": true
+    },
+    {
+      "file": "extensions/prebase-magnus/src/activation.test.ts",
+      "suiteBlocks": 7,
+      "individualTests": 15,
+      "edited": true
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/desktopShutdownLifecycle.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 10,
+      "edited": false
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/processTermination.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 5,
+      "edited": false
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/managedRendererCommand.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 3,
+      "edited": false
+    }
+  ],
+  "inventoryTotals": {
+    "testFiles": 9,
+    "suiteBlocks": 26,
+    "individualTests": 132,
+    "editedOrSelectedSuiteBlocks": 23,
+    "editedOrSelectedIndividualTests": 114
+  },
+  "commands": [
+    {
+      "command": "npm run typecheck-client",
+      "attempts": 2,
+      "status": "failed",
+      "durationMs": [5716, 5797],
+      "pass": 0,
+      "fail": 1,
+      "skip": 0,
+      "failure": "src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts(1147,32): TS2322 production type error; no edited test-file errors remained on the second attempt."
+    },
+    {
+      "command": "npm run gulp -- compile-extension:prebase-magnus",
+      "status": "passed",
+      "durationMs": 3482,
+      "pass": 1,
+      "fail": 0,
+      "skip": 0,
+      "details": "compile-extension:prebase-magnus completed with 0 errors; gulp task duration 568 ms."
+    },
+    {
+      "command": "node --experimental-strip-types --import=./scripts/assurance/prebase-test-register.mjs --test extensions/prebase-magnus/src/activation.test.ts",
+      "status": "passed",
+      "durationMs": 139.749375,
+      "suiteBlocks": 7,
+      "individualTests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "command": "npm run transpile-client && node ./node_modules/mocha/bin/mocha.js --ui tdd --timeout 5000 out/vs/workbench/contrib/prebase/test/browser/electronDetector.test.js out/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.js out/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.js out/vs/workbench/contrib/prebase/test/browser/desktopRuntimeSession.test.js out/vs/workbench/contrib/prebase/test/browser/externalLaunchCommand.test.js",
+      "status": "blocked-not-run",
+      "durationMs": 0,
+      "suiteBlocks": 16,
+      "individualTests": 94,
+      "pass": 0,
+      "fail": 0,
+      "skip": 0,
+      "notRun": 94,
+      "reason": "Repository policy forbids running client tests after a failed client compilation. Production code was not edited."
+    },
+    {
+      "command": "git diff --check",
+      "status": "passed",
+      "durationMs": 315,
+      "pass": 1,
+      "fail": 0,
+      "skip": 0
+    }
+  ],
+  "results": {
+    "suiteBlocksExecuted": 23,
+    "individualTestsExecuted": 114,
+    "pass": 114,
+    "fail": 0,
+    "skip": 0,
+    "blockedNotRun": 0,
+    "clientFocusedTestsFullyVerified": true,
+    "magnusFocusedTestsVerified": true
+  },
+  "secondInvocation": {
+    "generatedAt": "2026-08-26T21:23:00-04:00",
+    "productionEdited": false,
+    "behaviorsEnumerated": [
+      {
+        "behavior": "Tauri setupRequired clears stale _testRun and _testRunToContinue before publishing the replacement session",
+        "coverage": "implemented"
+      },
+      {
+        "behavior": "failed renderer read/query commands retain only the latest 20 console entries, bound each text entry, and assertion responses redact token, password, and bearer values",
+        "coverage": "implemented"
+      },
+      {
+        "behavior": "DesktopProjectProfile.appRoot controls session workspaceRoot and external spawn cwd, with Tauri crate cwd derived beneath that app root",
+        "coverage": "implemented"
+      },
+      {
+        "behavior": "a nested apps/desktop Tauri package ignores a differing root lockfile and owns its nested package.json, lockfile, absolute app root, config, and Cargo paths",
+        "coverage": "implemented"
+      },
+      {
+        "behavior": "VM-origin blocker evidence is normalized before deep comparison and moving actionability fixtures provide a rect for each production visibility/summary/actionability observation",
+        "coverage": "repaired-current-test"
+      }
+    ],
+    "testsImplemented": {
+      "newIndividualTests": 5,
+      "repairedExistingTests": 1,
+      "individualTestNames": [
+        "setup-required launch clears stale test evidence from the previous session",
+        "failed renderer queries carry only the latest bounded console evidence",
+        "failed assertions return bounded renderer console evidence with secrets redacted",
+        "profile app root controls the session root and external spawn cwd",
+        "nested monorepo app owns its package, lockfile, and absolute app root"
+      ],
+      "repairedTest": "reports covered, offscreen, and unstable pointer targets without clicking"
+    },
+    "intentionallyOmitted": [
+      {
+        "behavior": "another VM cross-realm normalization",
+        "reason": "The only VM-origin object compared structurally, blocker evidence, was already normalized with JSON serialization in the current test. No additional cross-realm failure remained."
+      }
+    ],
+    "files": {
+      "productionInspected": [
+        "src/vs/workbench/contrib/prebase/browser/prebaseDesktopRuntimeService.ts",
+        "src/vs/workbench/contrib/prebase/browser/prebaseRuntimeService.ts",
+        "src/vs/workbench/contrib/prebase/common/runtime/desktopAutomationDom.ts",
+        "src/vs/workbench/contrib/prebase/common/runtime/electronDetector.ts",
+        "src/vs/workbench/contrib/prebase/common/runtime/tauriDetector.ts",
+        "src/vs/workbench/contrib/prebase/common/runtime/types.ts"
+      ],
+      "testsChanged": [
+        "src/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.ts",
+        "src/vs/workbench/contrib/prebase/test/browser/desktopRuntimeSession.test.ts",
+        "src/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.ts"
+      ],
+      "reportChanged": "reports/graph-acceptance/phase-3.18/checkpoint-de/test-writer-results.json"
+    },
+    "testFilesDiscovered": [
+      {
+        "file": "src/vs/workbench/contrib/prebase/test/browser/electronDetector.test.ts",
+        "suiteBlocks": 1,
+        "individualTests": 11,
+        "editedThisInvocation": false
+      },
+      {
+        "file": "src/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.ts",
+        "suiteBlocks": 3,
+        "individualTests": 17,
+        "editedThisInvocation": true
+      },
+      {
+        "file": "src/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.ts",
+        "suiteBlocks": 10,
+        "individualTests": 44,
+        "editedThisInvocation": true
+      },
+      {
+        "file": "src/vs/workbench/contrib/prebase/test/browser/desktopRuntimeSession.test.ts",
+        "suiteBlocks": 1,
+        "individualTests": 17,
+        "editedThisInvocation": true
+      },
+      {
+        "file": "src/vs/workbench/contrib/prebase/test/browser/externalLaunchCommand.test.ts",
+        "suiteBlocks": 1,
+        "individualTests": 10,
+        "editedThisInvocation": false
+      }
+    ],
+    "commands": [
+      {
+        "command": "npm run typecheck-client",
+        "status": "passed",
+        "durationMs": 5271,
+        "pass": 1,
+        "fail": 0,
+        "skip": 0
+      },
+      {
+        "command": "npm run transpile-client && node ./node_modules/mocha/bin/mocha.js --ui tdd --timeout 5000 out/vs/workbench/contrib/prebase/test/browser/electronDetector.test.js out/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.js out/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.js out/vs/workbench/contrib/prebase/test/browser/desktopRuntimeSession.test.js out/vs/workbench/contrib/prebase/test/browser/externalLaunchCommand.test.js",
+        "attempt": 1,
+        "status": "failed",
+        "durationMs": 6851,
+        "testDurationMs": 823,
+        "suiteBlocks": 16,
+        "individualTests": 99,
+        "pass": 98,
+        "fail": 1,
+        "skip": 0,
+        "failure": "The existing moving-target fixture supplied too few rect observations for current production, so its second action became stable. Test fixture repaired; production unchanged."
+      },
+      {
+        "command": "npm run transpile-client && node ./node_modules/mocha/bin/mocha.js --ui tdd --timeout 5000 out/vs/workbench/contrib/prebase/test/browser/electronDetector.test.js out/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.js out/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.js out/vs/workbench/contrib/prebase/test/browser/desktopRuntimeSession.test.js out/vs/workbench/contrib/prebase/test/browser/externalLaunchCommand.test.js",
+        "attempt": 2,
+        "status": "passed",
+        "durationMs": 6210,
+        "testDurationMs": 824,
+        "suiteBlocks": 16,
+        "individualTests": 99,
+        "pass": 99,
+        "fail": 0,
+        "skip": 0
+      }
+    ],
+    "results": {
+      "suiteBlocks": 16,
+      "individualTests": 99,
+      "pass": 99,
+      "fail": 0,
+      "skip": 0,
+      "productionDefectsRemaining": 0
+    }
+  },
+  "changedFiles": [
+    "extensions/prebase-magnus/src/activation.test.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/desktopRuntimeSession.test.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/electronDetector.test.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/externalLaunchCommand.test.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.ts",
+    "reports/graph-acceptance/phase-3.18/checkpoint-de/test-writer-results.json"
+  ]
+}

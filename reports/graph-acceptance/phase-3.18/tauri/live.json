@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "framework": "tauri",
+  "mode": "fullApp",
+  "backend": "embedded-w3c",
+  "cli": "@tauri-apps/cli",
+  "cliVersion": "tauri-cli 2.11.4",
+  "appPid": 11509,
+  "webDriverPort": 61486,
+  "sessionCreated": true,
+  "semanticSnapshot": {
+    "interactive": [
+      {
+        "name": "Name",
+        "role": "textbox",
+        "value": ""
+      },
+      {
+        "name": "Greet",
+        "role": "button",
+        "value": ""
+      },
+      {
+        "name": "Ready",
+        "role": "status",
+        "value": null
+      }
+    ],
+    "title": "PreBase Tauri Fixture"
+  },
+  "actions": [
+    "fill Name with Ada",
+    "click Greet"
+  ],
+  "assertions": [
+    "status == Hello, Ada",
+    "data-backend-invoke == true"
+  ],
+  "backendProof": {
+    "backendInvoke": "true",
+    "text": "Hello, Ada"
+  },
+  "screenshotPath": "reports/graph-acceptance/phase-3.18/screenshots/tauri-full-app-rust-invoke.png",
+  "startDurationMs": 3816,
+  "durationMs": 4075,
+  "quit": {
+    "latencyMs": 257,
+    "exited": true,
+    "portReleased": true,
+    "remainingOwnedProcesses": []
+  }
+}

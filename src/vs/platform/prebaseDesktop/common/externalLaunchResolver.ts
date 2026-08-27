@@ -5,7 +5,8 @@
 
 import type { ExternalLaunchRequest } from './prebaseDesktopTypes.js';
 
-const ALLOWED_LAUNCH_COMMANDS = new Set(['npm', 'electron', 'cargo']);
+const PACKAGE_MANAGERS = new Set(['npm', 'pnpm', 'yarn', 'bun']);
+const ALLOWED_LAUNCH_COMMANDS = new Set([...PACKAGE_MANAGERS, 'electron', 'cargo']);
 
 /** Rejects arbitrary argv so desktop spawn cannot become a generic command runner. */
 export function assertExternalLaunchRequest(request: ExternalLaunchRequest): void {
@@ -15,21 +16,30 @@ export function assertExternalLaunchRequest(request: ExternalLaunchRequest): voi
 	if (request.args.some(arg => arg.includes('\0'))) {
 		throw new Error('Invalid external launch command.');
 	}
-	if (request.command === 'npm') {
+	if (PACKAGE_MANAGERS.has(request.command)) {
 		const script = request.args[1];
-		if (request.args[0] !== 'run' || typeof script !== 'string' || !script.trim() || request.args[2] !== '--') {
-			throw new Error('npm launch is limited to `npm run <script> --`.');
+		if (request.args[0] !== 'run' || typeof script !== 'string' || !script.trim()) {
+			throw new Error('Package-manager launch is limited to a declared `run <script>` invocation.');
 		}
 		if (script.includes('..') || script.includes('/') || script.includes('\\')) {
-			throw new Error('npm launch script must be a package.json script name.');
+			throw new Error('Desktop launch script must be a package.json script name.');
 		}
-		if (request.args.length === 3) {
+		let extraArgs = request.args.slice(2);
+		if (request.command !== 'yarn') {
+			if (extraArgs[0] !== '--') {
+				throw new Error('Package-manager launch is limited to a declared `run <script>` invocation.');
+			}
+			extraArgs = extraArgs.slice(1);
+		} else if (extraArgs[0] === '--') {
+			extraArgs = extraArgs.slice(1);
+		}
+		if (extraArgs.length === 0) {
 			return;
 		}
-		if (request.args.length === 5 && request.args[3] === '--features' && request.args[4] === 'prebase-testing') {
+		if (extraArgs.length === 2 && extraArgs[0] === '--features' && extraArgs[1] === 'prebase-testing') {
 			return;
 		}
-		throw new Error('npm launch extra args are limited to `--features prebase-testing`.');
+		throw new Error('Package-manager launch extra args are limited to `--features prebase-testing`.');
 	}
 	if (request.command === 'cargo') {
 		if (request.args[0] !== 'tauri' || request.args[1] !== 'dev') {
@@ -57,8 +67,11 @@ export function resolveExternalLaunchCommand(
 	exists?: (path: string) => boolean,
 ): string {
 	assertExternalLaunchRequest(request);
-	if (request.command === 'npm') {
-		return platform === 'win32' ? 'npm.cmd' : 'npm';
+	if (PACKAGE_MANAGERS.has(request.command)) {
+		if (platform !== 'win32') {
+			return request.command;
+		}
+		return request.command === 'bun' ? 'bun.exe' : `${request.command}.cmd`;
 	}
 	if (request.command === 'cargo') {
 		return platform === 'win32' ? 'cargo.exe' : 'cargo';

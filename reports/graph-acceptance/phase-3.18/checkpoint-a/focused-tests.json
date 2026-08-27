@@ -1,0 +1,738 @@
+{
+  "stats": {
+    "suites": 7,
+    "tests": 40,
+    "passes": 40,
+    "pending": 0,
+    "failures": 0,
+    "start": "2026-08-27T00:24:31.685Z",
+    "end": "2026-08-27T00:24:31.966Z",
+    "duration": 281
+  },
+  "tests": [
+    {
+      "title": "1. selectRef loads paged commit timeline, positions nodes, and selects HEAD",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 1. selectRef loads paged commit timeline, positions nodes, and selects HEAD",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 9,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 161,
+      "currentRetry": 0,
+      "speed": "slow",
+      "err": {}
+    },
+    {
+      "title": "3. Base-before-target indexing ordering & LRU diff cache",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 3. Base-before-target indexing ordering & LRU diff cache",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "5. openHistoricalFile opens revision at rendered commit via EditorService",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 5. openHistoricalFile opens revision at rendered commit via EditorService",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "8. Async History Cancellation and Error Resilience",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 8. Async History Cancellation and Error Resilience",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "selectCommitIndex and stepCommit: host-owned bounded navigation",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) selectCommitIndex and stepCommit: host-owned bounded navigation",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Non-Git workspace: availableRepositories only discovers genuine Git repositories",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Non-Git workspace: availableRepositories only discovers genuine Git repositories",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 21,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "HEAD change event handling: followHead=true advances view, followHead=false preserves selection",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) HEAD change event handling: followHead=true advances view, followHead=false preserves selection",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 63,
+      "currentRetry": 0,
+      "speed": "medium",
+      "err": {}
+    },
+    {
+      "title": "Layer-specific retrySelection: re-executes the layer that actually failed",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Layer-specific retrySelection: re-executes the layer that actually failed",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "partial lineage keeps reconstructed target nodes available to Full Map",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) partial lineage keeps reconstructed target nodes available to Full Map",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Bootstrap: executes without syntax error and immediately posts ready message",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Bootstrap: executes without syntax error and immediately posts ready message",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 2,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 3,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 7,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: serialized temporalDiff message preserves host node count at the webview boundary",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: serialized temporalDiff message preserves host node count at the webview boundary",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: Full Map retains and draws all target-active nodes",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: Full Map retains and draws all target-active nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Ready state (fully reconciled)",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Ready state (fully reconciled)",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Loading history",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Loading history",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Loading selection (reconstructing diff)",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Loading selection (reconstructing diff)",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Selection error on fresh commit",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Selection error on fresh commit",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Selection error with stale rendered fallback",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Selection error with stale rendered fallback",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: History loading error",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: History loading error",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Stale view (selection != rendered, idle)",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Stale view (selection != rendered, idle)",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Partial lineage coverage warning",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Partial lineage coverage warning",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Empty timeline (idle)",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Empty timeline (idle)",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Focused Changes mode: exact node and edge parity",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 2. computeTemporalFocusContext & computeTemporalVisibleElements Parity Focused Changes mode: exact node and edge parity",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Full Changes mode: exact node and edge parity",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 2. computeTemporalFocusContext & computeTemporalVisibleElements Parity Full Changes mode: exact node and edge parity",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "State mode: excludes removed ghosts identically",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 2. computeTemporalFocusContext & computeTemporalVisibleElements Parity State mode: excludes removed ghosts identically",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Zero changes commit returns empty nodes with hasZeroChanges: true",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 2. computeTemporalFocusContext & computeTemporalVisibleElements Parity Zero changes commit returns empty nodes with hasZeroChanges: true",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeTemporalVisualRadius produces identical values for changed vs unchanged nodes",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 3. computeTemporalVisualRadius & computeTemporalFitTransform Parity computeTemporalVisualRadius produces identical values for changed vs unchanged nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeTemporalFitTransform produces identical camera transform values",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 3. computeTemporalVisualRadius & computeTemporalFitTransform Parity computeTemporalFitTransform produces identical camera transform values",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeCommunityAggregateEdges produces identical aggregates in webview and host",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 4. computeCommunityAggregateEdges, computeEdgeLodStyle & computeVisibleLabels Parity computeCommunityAggregateEdges produces identical aggregates in webview and host",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeEdgeLodStyle produces identical styling across zoom levels",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 4. computeCommunityAggregateEdges, computeEdgeLodStyle & computeVisibleLabels Parity computeEdgeLodStyle produces identical styling across zoom levels",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeVisibleLabels produces identical prioritized labels",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 4. computeCommunityAggregateEdges, computeEdgeLodStyle & computeVisibleLabels Parity computeVisibleLabels produces identical prioritized labels",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    }
+  ],
+  "pending": [],
+  "failures": [],
+  "passes": [
+    {
+      "title": "1. selectRef loads paged commit timeline, positions nodes, and selects HEAD",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 1. selectRef loads paged commit timeline, positions nodes, and selects HEAD",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 9,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 161,
+      "currentRetry": 0,
+      "speed": "slow",
+      "err": {}
+    },
+    {
+      "title": "3. Base-before-target indexing ordering & LRU diff cache",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 3. Base-before-target indexing ordering & LRU diff cache",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "5. openHistoricalFile opens revision at rendered commit via EditorService",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 5. openHistoricalFile opens revision at rendered commit via EditorService",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "8. Async History Cancellation and Error Resilience",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 8. Async History Cancellation and Error Resilience",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "selectCommitIndex and stepCommit: host-owned bounded navigation",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) selectCommitIndex and stepCommit: host-owned bounded navigation",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Non-Git workspace: availableRepositories only discovers genuine Git repositories",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Non-Git workspace: availableRepositories only discovers genuine Git repositories",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 21,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "HEAD change event handling: followHead=true advances view, followHead=false preserves selection",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) HEAD change event handling: followHead=true advances view, followHead=false preserves selection",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 63,
+      "currentRetry": 0,
+      "speed": "medium",
+      "err": {}
+    },
+    {
+      "title": "Layer-specific retrySelection: re-executes the layer that actually failed",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Layer-specific retrySelection: re-executes the layer that actually failed",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "partial lineage keeps reconstructed target nodes available to Full Map",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) partial lineage keeps reconstructed target nodes available to Full Map",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Bootstrap: executes without syntax error and immediately posts ready message",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Bootstrap: executes without syntax error and immediately posts ready message",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 2,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 3,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 7,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: serialized temporalDiff message preserves host node count at the webview boundary",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: serialized temporalDiff message preserves host node count at the webview boundary",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: Full Map retains and draws all target-active nodes",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: Full Map retains and draws all target-active nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Ready state (fully reconciled)",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Ready state (fully reconciled)",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Loading history",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Loading history",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Loading selection (reconstructing diff)",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Loading selection (reconstructing diff)",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Selection error on fresh commit",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Selection error on fresh commit",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Selection error with stale rendered fallback",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Selection error with stale rendered fallback",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: History loading error",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: History loading error",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Stale view (selection != rendered, idle)",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Stale view (selection != rendered, idle)",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Partial lineage coverage warning",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Partial lineage coverage warning",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Parity for: Empty timeline (idle)",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 1. computeTemporalUnifiedStatus Parity Parity for: Empty timeline (idle)",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Focused Changes mode: exact node and edge parity",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 2. computeTemporalFocusContext & computeTemporalVisibleElements Parity Focused Changes mode: exact node and edge parity",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Full Changes mode: exact node and edge parity",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 2. computeTemporalFocusContext & computeTemporalVisibleElements Parity Full Changes mode: exact node and edge parity",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "State mode: excludes removed ghosts identically",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 2. computeTemporalFocusContext & computeTemporalVisibleElements Parity State mode: excludes removed ghosts identically",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Zero changes commit returns empty nodes with hasZeroChanges: true",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 2. computeTemporalFocusContext & computeTemporalVisibleElements Parity Zero changes commit returns empty nodes with hasZeroChanges: true",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeTemporalVisualRadius produces identical values for changed vs unchanged nodes",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 3. computeTemporalVisualRadius & computeTemporalFitTransform Parity computeTemporalVisualRadius produces identical values for changed vs unchanged nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeTemporalFitTransform produces identical camera transform values",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 3. computeTemporalVisualRadius & computeTemporalFitTransform Parity computeTemporalFitTransform produces identical camera transform values",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeCommunityAggregateEdges produces identical aggregates in webview and host",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 4. computeCommunityAggregateEdges, computeEdgeLodStyle & computeVisibleLabels Parity computeCommunityAggregateEdges produces identical aggregates in webview and host",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeEdgeLodStyle produces identical styling across zoom levels",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 4. computeCommunityAggregateEdges, computeEdgeLodStyle & computeVisibleLabels Parity computeEdgeLodStyle produces identical styling across zoom levels",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "computeVisibleLabels produces identical prioritized labels",
+      "fullTitle": "Temporal Production Webview Runtime Parity (State Truth & Execution) 4. computeCommunityAggregateEdges, computeEdgeLodStyle & computeVisibleLabels Parity computeVisibleLabels produces identical prioritized labels",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalProductionParity.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    }
+  ]
+}

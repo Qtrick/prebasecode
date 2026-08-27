@@ -4,7 +4,7 @@
 	"version": "0.0.0",
 	"identifier": "com.prebase.desktop-tauri-plain",
 	"build": {
-		"frontendDist": "..",
+		"frontendDist": "../web",
 		"devUrl": "http://localhost:1420"
 	},
 	"app": {

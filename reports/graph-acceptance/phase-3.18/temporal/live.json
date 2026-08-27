@@ -1,0 +1,116 @@
+{
+  "ok": true,
+  "failures": [],
+  "fixture": {
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-dqLUFP",
+    "head": "bf2583ee69f26ac03238bd32770cd4e349d4bb36",
+    "commits": 10,
+    "files": [
+      "package.json",
+      "src/greet.js",
+      "src/index.js",
+      "src/tally.js"
+    ],
+    "expectedModifiedPath": "src/tally.js",
+    "firstParentSummary": "bf2583ee69f26ac03238bd32770cd4e349d4bb36 1821267a777db3190d8454a77dbbe614e2fcdc7b fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+  },
+  "pid": 60834,
+  "cdpPort": 61089,
+  "targetOpened": true,
+  "repoLoaded": true,
+  "fullMap": {
+    "sequenceId": 13,
+    "mode": "temporal",
+    "displayMode": "state",
+    "renderStart": 468.80000001192093,
+    "renderEnd": 469,
+    "durationMs": 0.19999998807907104,
+    "selectedCommitSha": "bf2583ee69f26ac03238bd32770cd4e349d4bb36",
+    "renderedCommitSha": "bf2583ee69f26ac03238bd32770cd4e349d4bb36",
+    "isPartialLineage": true,
+    "receivedNodeCount": 4,
+    "visibleNodeCount": 4,
+    "finiteCoordinateCount": 4,
+    "nodesDrawn": 4,
+    "edgesDrawn": 2,
+    "labelsDrawn": 4,
+    "transform": {
+      "x": 445.05,
+      "y": 442.9254051130245,
+      "k": 1.8
+    },
+    "canvas": {
+      "clientWidth": 792,
+      "clientHeight": 772,
+      "width": 1584,
+      "height": 1544,
+      "distinctPixels": 234957
+    },
+    "summary": {
+      "addedCount": 0,
+      "removedCount": 0,
+      "modifiedCount": 1,
+      "renamedCount": 0,
+      "renamedModifiedCount": 0,
+      "unchangedCount": 3,
+      "edgeAddedCount": 0,
+      "edgeRemovedCount": 0,
+      "edgeModifiedCount": 0
+    },
+    "lodTier": "full",
+    "isAnimating": true,
+    "timestamp": 469
+  },
+  "focusChanges": {
+    "sequenceId": 57,
+    "mode": "temporal",
+    "displayMode": "changes",
+    "renderStart": 952,
+    "renderEnd": 952.1000000089407,
+    "durationMs": 0.10000000894069672,
+    "selectedCommitSha": "bf2583ee69f26ac03238bd32770cd4e349d4bb36",
+    "renderedCommitSha": "bf2583ee69f26ac03238bd32770cd4e349d4bb36",
+    "isPartialLineage": true,
+    "receivedNodeCount": 4,
+    "visibleNodeCount": 2,
+    "finiteCoordinateCount": 4,
+    "nodesDrawn": 2,
+    "edgesDrawn": 1,
+    "labelsDrawn": 2,
+    "transform": {
+      "x": 445.05,
+      "y": 442.9254051130245,
+      "k": 1.8
+    },
+    "canvas": {
+      "clientWidth": 792,
+      "clientHeight": 772,
+      "width": 1584,
+      "height": 1544,
+      "distinctPixels": 21957
+    },
+    "summary": {
+      "addedCount": 0,
+      "removedCount": 0,
+      "modifiedCount": 1,
+      "renamedCount": 0,
+      "renamedModifiedCount": 0,
+      "unchangedCount": 3,
+      "edgeAddedCount": 0,
+      "edgeRemovedCount": 0,
+      "edgeModifiedCount": 0
+    },
+    "lodTier": "full",
+    "isAnimating": false,
+    "timestamp": 952.1000000089407
+  },
+  "stuckIndexing": false,
+  "unexpectedError": false,
+  "quit": {
+    "startedAt": 1787791392774,
+    "quitMs": 1115,
+    "remaining": "gone",
+    "before": "60834     1  36.2 295120 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "after": "gone"
+  }
+}

@@ -20,15 +20,23 @@
 		document.getElementById('greet').addEventListener('click', async () => {
 			const name = document.getElementById('name').value || 'world';
 			console.log('renderer greet', name);
-			let greeting = `Hello, ${name}`;
+			const status = document.getElementById('status');
+			status.dataset.backendInvoke = 'false';
 			try {
 				if (window.__TAURI__?.core?.invoke) {
-					greeting = await window.__TAURI__.core.invoke('greet', { name });
+					const response = await window.__TAURI__.core.invoke('greet', { name });
+					const prefix = 'PREBASE_RUST_INVOKE::';
+					if (typeof response === 'string' && response.startsWith(prefix)) {
+						status.dataset.backendInvoke = 'true';
+						status.textContent = response.slice(prefix.length);
+						return;
+					}
 				}
 			} catch (error) {
-				greeting = String(error);
+				status.textContent = `Invoke failed: ${String(error)}`;
+				return;
 			}
-			document.getElementById('status').textContent = greeting;
+			status.textContent = 'Rust invoke unavailable';
 		});
 	</script>
 </body>

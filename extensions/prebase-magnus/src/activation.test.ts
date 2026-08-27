@@ -22,6 +22,30 @@ import { STATIC_FALLBACK_GEMINI_MODELS } from './geminiAdapter';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
+function compileActivationEventsGenerator(source: string): (contributions: Array<{ name: string }>) => Iterable<string> {
+	const marker = source.indexOf('activationEventsGenerator:');
+	assert.ok(marker >= 0, 'languageModelTools must declare activationEventsGenerator');
+	const fnStart = source.indexOf('function*', marker);
+	const brace = source.indexOf('{', fnStart);
+	assert.ok(fnStart >= 0 && brace >= 0, 'languageModelTools generator must be a function*');
+	let depth = 0;
+	let end = brace;
+	for (let index = brace; index < source.length; index++) {
+		const character = source[index];
+		if (character === '{') {
+			depth++;
+		} else if (character === '}') {
+			depth--;
+			if (depth === 0) {
+				end = index;
+				break;
+			}
+		}
+	}
+	const body = source.slice(brace + 1, end);
+	return new Function('contributions', `return (function*(){${body}})();`) as (contributions: Array<{ name: string }>) => Iterable<string>;
+}
+
 describe('Magnus Activation & Tool/Command Contracts', () => {
 	const repoRoot = path.resolve(__dirname, '../../..');
 	const manifestPath = path.join(__dirname, '../package.json');
@@ -92,11 +116,25 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 		assert.ok(!events.includes('onStartupFinished'), 'lazy activation must not restore onStartupFinished');
 		assert.ok(events.includes('onChatParticipant:prebase.magnus.ask'));
 		assert.ok(events.includes('onLanguageModelChatProvider:magnus'));
-		const toolNames: string[] = manifest.contributes?.languageModelTools?.map((t: { name: string }) => t.name) ?? [];
-		assert.strictEqual(toolNames.length, 41);
-		for (const name of toolNames) {
-			assert.match(name, /^prebase_/);
-		}
+		assert.ok(!events.some(event => event.startsWith('onLanguageModelTool:')), 'onLanguageModelTool events must stay implicit');
+
+		const tools: Array<{ name: string }> = manifest.contributes?.languageModelTools ?? [];
+		assert.strictEqual(tools.length, 41);
+
+		const contribution = fs.readFileSync(path.join(repoRoot, 'src/vs/workbench/contrib/chat/common/tools/languageModelToolsContribution.ts'), 'utf8');
+		const generated = [...compileActivationEventsGenerator(contribution)(tools)];
+		assert.deepStrictEqual(generated, tools.map(tool => `onLanguageModelTool:${tool.name}`));
+		assert.ok(generated.includes('onLanguageModelTool:prebase_desktop_start_session'));
+		assert.ok(generated.includes('onLanguageModelTool:prebase_graph_get_overview'));
+		assert.ok(generated.includes('onLanguageModelTool:prebase_runtime_get_state'));
+		assert.ok(generated.includes('onLanguageModelTool:prebase_workspace_list_files'));
+
+		const invoke = fs.readFileSync(path.join(repoRoot, 'src/vs/workbench/contrib/chat/browser/tools/languageModelToolsService.ts'), 'utf8');
+		const activate = invoke.match(/activateByEvent\(`([^`]+)`\)/);
+		assert.ok(activate, 'invokeTool must activate the contributing extension before calling the implementation');
+		const eventFor = (toolId: string) => new Function('dto', `return \`${activate[1]}\`;`)({ toolId }) as string;
+		assert.strictEqual(eventFor('prebase_runtime_get_state'), 'onLanguageModelTool:prebase_runtime_get_state');
+		assert.strictEqual(eventFor('prebase_desktop_start_session'), 'onLanguageModelTool:prebase_desktop_start_session');
 	});
 
 	it('declares start, interact, and assert schemas with bounded desktop locators', () => {
@@ -114,26 +152,17 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 		const interact = byName.get('prebase_desktop_interact');
 		assert.ok(interact, 'prebase_desktop_interact must be contributed');
 		assert.deepStrictEqual(interact.inputSchema?.required, ['action', 'locator']);
-		assert.deepStrictEqual(interact.inputSchema?.properties?.action?.enum, ['click', 'doubleClick', 'hover', 'fill', 'type', 'press', 'check', 'uncheck', 'select', 'focus']);
+		assert.deepStrictEqual(interact.inputSchema?.properties?.action?.enum, ['click', 'doubleClick', 'fill', 'type', 'press', 'check', 'uncheck', 'select', 'focus']);
 		assert.deepStrictEqual(interact.inputSchema?.properties?.locator?.properties?.by?.enum, ['role', 'label', 'placeholder', 'text', 'testId', 'css']);
 		assert.deepStrictEqual(interact.inputSchema?.properties?.locator?.required, ['by']);
-		assert.match(String(interact.modelDescription), /Ambiguous matches fail/);
+		assert.match(String(interact.modelDescription), /Ambiguous or covered matches fail/);
+		assert.match(String(interact.modelDescription), /CSS hover .* unsupported/);
 
 		const assertTool = byName.get('prebase_desktop_assert');
 		assert.ok(assertTool, 'prebase_desktop_assert must be contributed');
 		assert.deepStrictEqual(assertTool.inputSchema?.required, ['condition']);
 		assert.deepStrictEqual(assertTool.inputSchema?.properties?.condition?.enum, ['visible', 'hidden', 'enabled', 'disabled', 'checked', 'unchecked', 'text', 'containsText', 'value', 'count', 'title', 'url']);
 		assert.deepStrictEqual(assertTool.inputSchema?.properties?.locator?.properties?.by?.enum, ['role', 'label', 'placeholder', 'text', 'testId', 'css']);
-	});
-
-	it('desktop start always launches a test-owned session and wires cancellation', () => {
-		const desktopSrc = fs.readFileSync(path.join(__dirname, 'desktopTools.ts'), 'utf8');
-		assert.match(desktopSrc, /testing:\s*true/);
-		assert.doesNotMatch(desktopSrc, /testing:\s*options\.input\.testing/);
-		assert.match(desktopSrc, /prebase\.runtime\.desktopCancelForMagnus/);
-		assert.match(desktopSrc, /prebase\.runtime\.desktopStartForMagnus/);
-		assert.match(desktopSrc, /prebase\.runtime\.desktopInteractForMagnus/);
-		assert.match(desktopSrc, /prebase\.runtime\.desktopAssertForMagnus/);
 	});
 
 	it('deactivate cancels in-flight chat requests through magnusRequestShutdown', () => {

@@ -1,0 +1,9 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> tauri
+> tauri dev --features prebase-testing --no-watch
+
+     Running DevCommand (`cargo  run --no-default-features --features prebase-testing --color always --`)
+[1m[92m   Compiling[0m prebase-desktop-tauri-fixture v0.0.0 (/Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-tauri/src-tauri)
+[1m[96m    Building[0m [=======================> ] 389/392: prebase-desktop-tauri-fixtu…[1m[96m    Building[0m [=======================> ] 390/392: prebase-desktop-tauri-fixtu…[1m[96m    Building[0m [=======================> ] 391/392: prebase-desktop-tauri-fixtu…[K[1m[92m    Finished[0m `dev` profile [unoptimized] target(s) in 1.72s
+[1m[92m     Running[0m `/Users/qunyingfan/Prebasecode/.build/tauri-fixture-target/debug/prebase-desktop-tauri-fixture`

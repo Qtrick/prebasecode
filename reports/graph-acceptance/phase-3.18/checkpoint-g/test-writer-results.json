@@ -1,0 +1,270 @@
+{
+  "phase": "3.18",
+  "checkpoint": "G",
+  "role": "mandatory-test-writer",
+  "generatedAt": "2026-08-26T21:58:12-04:00",
+  "scope": {
+    "productionFilesInspected": [
+      "src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts",
+      "src/vs/workbench/contrib/prebase/browser/prebaseRuntimeService.ts",
+      "src/vs/workbench/contrib/prebase/common/runtime/runtimeWebviewProtocol.ts",
+      "src/vs/workbench/contrib/prebase/test/browser/runtimePreviewReachability.test.ts",
+      "test/prebase/acceptance/runtime-preview-live.mjs",
+      "extensions/prebase-magnus/src/activation.test.ts",
+      "extensions/prebase-magnus/package.json",
+      "src/vs/workbench/contrib/chat/common/tools/languageModelToolsContribution.ts",
+      "src/vs/workbench/contrib/chat/browser/tools/languageModelToolsService.ts",
+      "graphs/scripts/acceptance/temporal-live.mjs",
+      "graphs/src/tests/unit/temporalLiveAcceptance.test.ts"
+    ],
+    "uncommittedChangesInspected": true,
+    "productionEdited": true,
+    "iconsEdited": false
+  },
+  "behaviorsEnumerated": [
+    {
+      "id": "runtime-preview-iframe-load-connects",
+      "behaviors": [
+        "iframe load marks the current preview URL connected even when the workbench HTTP probe failed",
+        "a successful no-cors probe can connect before iframe load",
+        "a failed no-cors probe is ignored by the editor host and does not disconnect an already-rendered preview",
+        "iframe error still disconnects a previously connected preview",
+        "stale load/probe messages for a previous URL cannot change the current session"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "runtime-preview-live-fail-closed",
+      "behaviors": [
+        "live acceptance evaluation fails closed when previewConnected is false even if other steps succeeded"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "magnus-lazy-activation",
+      "behaviors": [
+        "Magnus package.json must not restore onStartupFinished",
+        "Magnus must not duplicate implicit onLanguageModelTool events",
+        "Code OSS languageModelTools activationEventsGenerator yields onLanguageModelTool:${name} for every Magnus tool",
+        "invokeTool activates by onLanguageModelTool:${dto.toolId} before requiring an implementation"
+      ],
+      "coverage": "implemented"
+    },
+    {
+      "id": "temporal-zero-nodes-fail-closed",
+      "behaviors": [
+        "temporal live evaluation fails closed on zero received/visible/drawn nodes"
+      ],
+      "coverage": "existing-sufficient"
+    }
+  ],
+  "testAudit": {
+    "missingBefore": [
+      "host dispatch of iframe load after a failed workbench HTTP probe",
+      "host ignoring a failed no-cors probe after the iframe had already connected",
+      "successful no-cors probe connecting through the host rather than only posting a webview message",
+      "live acceptance fail-closed when previewConnected is false",
+      "execution of the languageModelTools activationEventsGenerator against Magnus tools"
+    ],
+    "misleadingOrStaleBefore": [
+      "iframe load connects after a failed workbench HTTP probe called markPreviewLoaded directly and would still pass if the editor ignored load",
+      "iframe navigation errors called markPreviewLoaded directly and would still pass if the editor ignored error",
+      "stale URL guard called markPreviewLoaded directly",
+      "Magnus activation test previously only checked tool name prefixes / source-string matches instead of running the generator",
+      "stale URL expected trailing slash that production validatePreviewUrl canonicalizes away"
+    ],
+    "helperOnlyOrBypassed": [
+      "direct markPreviewLoaded calls bypass the editor host decision",
+      "Context Attachment Bounding and CoreReady tests in activation.test.ts still do not execute production (left unchanged; out of this change's scope)",
+      "mochaNodeDom.ts is Node mocha setup, not a behavior test"
+    ]
+  },
+  "testsImplemented": {
+    "newIndividualTests": 1,
+    "repairedExistingTests": [
+      "opaque no-cors response reports local reachability through the generated webview",
+      "iframe load connects after a failed workbench HTTP probe, and a later failed no-cors probe does not disconnect",
+      "iframe navigation errors disconnect a previously reachable preview",
+      "stale webview and service probe results cannot change the current URL state",
+      "does not restore onStartupFinished and relies on generated onLanguageModelTool events"
+    ],
+    "individualTestNames": [
+      "opaque no-cors response reports local reachability through the generated webview",
+      "iframe load connects after a failed workbench HTTP probe, and a later failed no-cors probe does not disconnect",
+      "iframe navigation errors disconnect a previously reachable preview",
+      "live acceptance fails closed when the preview never connects",
+      "does not restore onStartupFinished and relies on generated onLanguageModelTool events"
+    ]
+  },
+  "intentionallyOmitted": [
+    {
+      "behavior": "duplicate host-unit tests in runtimeWebviewProtocol.test.ts",
+      "reason": "Reachability tests now dispatch the same production handleRuntimePreviewStatusMessage against a real PreBaseRuntimeService. Adding mock markLoaded cases would not fail if load were ignored in a different way."
+    },
+    {
+      "behavior": "temporal live zero-node fail-closed",
+      "reason": "graphs/src/tests/unit/temporalLiveAcceptance.test.ts already fails closed on zero received/visible/drawn nodes."
+    },
+    {
+      "behavior": "live Playwright Runtime Preview GUI",
+      "reason": "test/prebase/acceptance/runtime-preview-live.mjs is the live journey; this checkpoint unit-tests the fail-closed evaluator and host connect rules instead of launching PreBase."
+    },
+    {
+      "behavior": "instantiate PreBaseRuntimeEditor in mocha",
+      "reason": "EditorPane/webview DOM construction is not available in this node mocha lane. Production editor now calls handleRuntimePreviewStatusMessage; previewHtml() asserts that call site."
+    },
+    {
+      "behavior": "helper-only Magnus Context Attachment Bounding and CoreReady mocks",
+      "reason": "Out of this production change; deleting them would not protect Runtime Preview or Magnus activation events."
+    }
+  ],
+  "productionDefects": [],
+  "productionEditsForTestability": [
+    {
+      "file": "src/vs/workbench/contrib/prebase/common/runtime/runtimeWebviewProtocol.ts",
+      "summary": "Extracted handleRuntimePreviewStatusMessage so mocha can execute the editor host load/probe/error decision without constructing EditorPane."
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts",
+      "summary": "Editor webview onMessage now delegates load/probe/error to handleRuntimePreviewStatusMessage."
+    }
+  ],
+  "testFilesDiscovered": [
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/runtimePreviewReachability.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 7,
+      "edited": true
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/runtimeWebviewProtocol.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 4,
+      "edited": false
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/runtimeSafetyBoundaries.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 3,
+      "edited": false
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/runtimeResponseReader.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 6,
+      "edited": false
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/test/browser/permissionClassifier.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 4,
+      "edited": false
+    },
+    {
+      "file": "extensions/prebase-magnus/src/activation.test.ts",
+      "suiteBlocks": 7,
+      "individualTests": 15,
+      "edited": true
+    },
+    {
+      "file": "graphs/src/tests/unit/temporalLiveAcceptance.test.ts",
+      "suiteBlocks": 1,
+      "individualTests": 2,
+      "edited": false,
+      "executed": false,
+      "reason": "Existing fail-closed coverage is sufficient for this checkpoint."
+    }
+  ],
+  "inventoryTotals": {
+    "testFiles": 6,
+    "suiteBlocks": 12,
+    "individualTests": 39,
+    "executedTestFiles": 6,
+    "executedSuiteBlocks": 12,
+    "executedIndividualTests": 39,
+    "helperFilesNotCountedAsTests": [
+      "src/vs/workbench/contrib/prebase/test/browser/mochaNodeDom.ts"
+    ]
+  },
+  "commands": [
+    {
+      "command": "npm run typecheck-client",
+      "attempt": 1,
+      "status": "passed",
+      "durationMs": 5154,
+      "pass": 1,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "command": "node --experimental-strip-types --import=./scripts/assurance/prebase-test-register.mjs --test extensions/prebase-magnus/src/activation.test.ts",
+      "status": "passed",
+      "durationMs": 142.5945,
+      "suiteBlocks": 7,
+      "individualTests": 15,
+      "pass": 15,
+      "fail": 0,
+      "skip": 0
+    },
+    {
+      "command": "npm run transpile-client && node ./node_modules/mocha/bin/mocha.js --ui tdd --timeout 5000 out/vs/workbench/contrib/prebase/test/browser/runtimePreviewReachability.test.js",
+      "attempt": 1,
+      "status": "failed",
+      "durationMs": 5760,
+      "pass": 0,
+      "fail": 1,
+      "skip": 0,
+      "failure": "MouseEvent is not defined while loading terminal.js via PreBaseRuntimeService. Added mochaNodeDom.ts polyfill; production unchanged for this failure."
+    },
+    {
+      "command": "node --import 'data:text/javascript,globalThis.MouseEvent=class MouseEvent extends Event{constructor(type,init){super(type,init)}}' ./node_modules/mocha/bin/mocha.js --ui tdd --timeout 5000 out/vs/workbench/contrib/prebase/test/browser/runtimePreviewReachability.test.js out/vs/workbench/contrib/prebase/test/browser/runtimeWebviewProtocol.test.js out/vs/workbench/contrib/prebase/test/browser/runtimeSafetyBoundaries.test.js out/vs/workbench/contrib/prebase/test/browser/runtimeResponseReader.test.js out/vs/workbench/contrib/prebase/test/browser/permissionClassifier.test.js",
+      "attempt": 2,
+      "status": "failed",
+      "durationMs": 605,
+      "suiteBlocks": 5,
+      "individualTests": 24,
+      "pass": 22,
+      "fail": 2,
+      "skip": 0,
+      "failure": "VM-realm deepEqual on iframe load message; stale URL expected a trailing slash that validatePreviewUrl strips."
+    },
+    {
+      "command": "npm run typecheck-client && npm run transpile-client && node ./node_modules/mocha/bin/mocha.js --ui tdd --timeout 5000 out/vs/workbench/contrib/prebase/test/browser/runtimePreviewReachability.test.js out/vs/workbench/contrib/prebase/test/browser/runtimeWebviewProtocol.test.js out/vs/workbench/contrib/prebase/test/browser/runtimeSafetyBoundaries.test.js out/vs/workbench/contrib/prebase/test/browser/runtimeResponseReader.test.js out/vs/workbench/contrib/prebase/test/browser/permissionClassifier.test.js",
+      "attempt": 3,
+      "status": "passed",
+      "durationMs": 10222,
+      "typecheckDurationMs": 5154,
+      "transpileDurationMs": 2907,
+      "testDurationMs": 163,
+      "suiteBlocks": 5,
+      "individualTests": 24,
+      "pass": 24,
+      "fail": 0,
+      "skip": 0
+    }
+  ],
+  "results": {
+    "suiteBlocksExecuted": 12,
+    "individualTestsExecuted": 39,
+    "pass": 39,
+    "fail": 0,
+    "skip": 0,
+    "clientFocusedTestsFullyVerified": true,
+    "magnusFocusedTestsVerified": true
+  },
+  "changedFiles": [
+    "src/vs/workbench/contrib/prebase/common/runtime/runtimeWebviewProtocol.ts",
+    "src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/runtimePreviewReachability.test.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/mochaNodeDom.ts",
+    "extensions/prebase-magnus/src/activation.test.ts",
+    "reports/graph-acceptance/phase-3.18/checkpoint-g/test-writer-results.json"
+  ],
+  "worktree": {
+    "gitAdd": false,
+    "gitCommit": false,
+    "gitPush": false,
+    "gitReset": false,
+    "gitClean": false
+  }
+}

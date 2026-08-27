@@ -4,10 +4,12 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { ExternalLaunchRequest } from './desktopTypes.js';
+import type { PackageManager } from './types.js';
 
-/** Builds the standard Electron project launch without passing project text through a shell. */
-export function buildNpmExternalLaunchRequest(scriptName: string): ExternalLaunchRequest {
-	return { command: 'npm', args: ['run', scriptName, '--'] };
+/** Builds a package-script launch without passing project text through a shell. */
+export function buildPackageScriptExternalLaunchRequest(packageManager: PackageManager, scriptName: string, extraArgs: readonly string[] = []): ExternalLaunchRequest {
+	const separator = packageManager === 'yarn' && extraArgs.length === 0 ? [] : ['--'];
+	return { command: packageManager, args: ['run', scriptName, ...separator, ...extraArgs] };
 }
 
 /** Builds a direct invocation for Electron projects that declare a main entry but no script. */
@@ -15,11 +17,11 @@ export function buildElectronExternalLaunchRequest(mainEntry: string): ExternalL
 	return { command: 'electron', args: [mainEntry] };
 }
 
-/** Builds a shell-free Tauri launch. Prefer a declared npm script, otherwise cargo tauri dev. */
-export function buildTauriExternalLaunchRequest(scriptName?: string, testingFeature = false): ExternalLaunchRequest {
+/** Builds a shell-free Tauri launch. Prefer a declared package script, otherwise cargo tauri dev. */
+export function buildTauriExternalLaunchRequest(scriptName?: string, testingFeature = false, packageManager: PackageManager = 'npm'): ExternalLaunchRequest {
 	const testingArgs = testingFeature ? ['--features', 'prebase-testing'] as const : [];
 	if (scriptName) {
-		return { command: 'npm', args: ['run', scriptName, '--', ...testingArgs] };
+		return buildPackageScriptExternalLaunchRequest(packageManager, scriptName, testingArgs);
 	}
 	return { command: 'cargo', args: ['tauri', 'dev', ...testingArgs] };
 }

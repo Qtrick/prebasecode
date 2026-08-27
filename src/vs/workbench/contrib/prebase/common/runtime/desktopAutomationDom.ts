@@ -41,12 +41,22 @@ export const DESKTOP_AUTOMATION_BOOTSTRAP = `(() => {
 		return rect.width > 0 && rect.height > 0;
 	};
 	const enabled = (el) => el && !el.disabled && el.getAttribute('aria-disabled') !== 'true';
+	const stableRects = new WeakMap();
+	const setNativeValue = (el, value) => {
+		const prototype = el instanceof HTMLTextAreaElement ? HTMLTextAreaElement.prototype
+			: el instanceof HTMLInputElement ? HTMLInputElement.prototype
+				: undefined;
+		const setter = prototype && Object.getOwnPropertyDescriptor(prototype, 'value')?.set;
+		if (!setter) { return false; }
+		setter.call(el, value);
+		return true;
+	};
 	const accessibleName = (el) => {
 		const labelled = el.getAttribute('aria-labelledby');
 		if (labelled) {
 			return labelled.split(/\\s+/).map(id => document.getElementById(id)?.textContent || '').join(' ').replace(/\\s+/g, ' ').trim();
 		}
-		return (el.getAttribute('aria-label') || el.getAttribute('name') || el.getAttribute('title') || (el.labels && el.labels[0] ? el.labels[0].textContent : '') || el.textContent || '').replace(/\\s+/g, ' ').trim();
+		return (el.getAttribute('aria-label') || el.getAttribute('name') || el.getAttribute('title') || (el.labels && el.labels[0] ? el.labels[0].textContent : '') || el.textContent || el.getAttribute('placeholder') || '').replace(/\\s+/g, ' ').trim();
 	};
 	const roleOf = (el) => {
 		const explicit = el.getAttribute('role');
@@ -130,13 +140,49 @@ export const DESKTOP_AUTOMATION_BOOTSTRAP = `(() => {
 		}
 		return { ok: true, count: 1, element: found[0], match: summarize(found[0]) };
 	};
+	const pointerActionability = (el) => {
+		el.scrollIntoView({ block: 'center', inline: 'center', behavior: 'instant' });
+		const rect = el.getBoundingClientRect();
+		const current = { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
+		const previous = stableRects.get(el);
+		stableRects.set(el, current);
+		if (!previous || Math.abs(previous.x - current.x) > 0.5 || Math.abs(previous.y - current.y) > 0.5 || Math.abs(previous.width - current.width) > 0.5 || Math.abs(previous.height - current.height) > 0.5) {
+			return { ok: false, code: 'notStable' };
+		}
+		const x = rect.left + rect.width / 2;
+		const y = rect.top + rect.height / 2;
+		if (x < 0 || y < 0 || x > window.innerWidth || y > window.innerHeight) {
+			return { ok: false, code: 'outsideViewport' };
+		}
+		const hit = document.elementFromPoint(x, y);
+		if (!hit || (hit !== el && !el.contains(hit))) {
+			return { ok: false, code: 'covered', blocker: hit ? summarize(hit) : undefined };
+		}
+		return { ok: true, point: { x, y } };
+	};
+	const keyboardInit = (value) => {
+		const parts = String(value || '').split('+').filter(Boolean);
+		const keyPart = parts.pop() || '';
+		const modifiers = new Set(parts.map(part => part.toLowerCase()));
+		const aliases = { Space: ' ', Esc: 'Escape', Del: 'Delete' };
+		return {
+			key: aliases[keyPart] || keyPart,
+			ctrlKey: modifiers.has('control') || modifiers.has('ctrl'),
+			metaKey: modifiers.has('meta') || modifiers.has('command'),
+			altKey: modifiers.has('alt') || modifiers.has('option'),
+			shiftKey: modifiers.has('shift'),
+			bubbles: true,
+			cancelable: true,
+		};
+	};
+	const withEvidence = (result) => ({ ...result, console: consoleBuffer.slice(-20) });
 	window.__prebaseDesktopTest = {
 		run(command) {
 			if (!command || typeof command !== 'object') {
 				return { ok: false, code: 'badCommand' };
 			}
 			if (command.op === 'ready') {
-				return { ok: true, title: document.title, url: location.href };
+				return withEvidence({ ok: true, title: document.title, url: location.href });
 			}
 			if (command.op === 'snapshot') {
 				const interactive = candidates().filter(visible).slice(0, MAX_NODES).map(summarize);
@@ -154,58 +200,105 @@ export const DESKTOP_AUTOMATION_BOOTSTRAP = `(() => {
 			}
 			if (command.op === 'query') {
 				const resolved = resolve(command.locator);
-				return { ...resolved, element: undefined, title: document.title, url: location.href };
+				return withEvidence({ ...resolved, element: undefined, title: document.title, url: location.href });
+			}
+			if (command.op === 'hover') {
+				return { ok: false, code: 'unsupported', reason: 'CSS hover requires a native pointer backend.', title: document.title, url: location.href };
 			}
 			const resolved = resolve(command.locator || {});
 			if (!resolved.ok) {
-				return { ...resolved, element: undefined, title: document.title, url: location.href };
+				return withEvidence({ ...resolved, element: undefined, title: document.title, url: location.href });
 			}
 			const el = resolved.element;
 			if ((command.op === 'click' || command.op === 'doubleClick' || command.op === 'fill' || command.op === 'type' || command.op === 'check' || command.op === 'uncheck' || command.op === 'select') && !enabled(el)) {
 				return { ok: false, code: 'disabled', match: resolved.match, title: document.title, url: location.href };
 			}
+			if (command.op === 'click' || command.op === 'doubleClick' || command.op === 'check' || command.op === 'uncheck') {
+				const actionable = pointerActionability(el);
+				if (!actionable.ok) {
+					return { ...actionable, match: resolved.match, title: document.title, url: location.href };
+				}
+			}
 			if (command.op === 'click') { el.click(); }
-			else if (command.op === 'doubleClick') { el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); el.click(); }
-			else if (command.op === 'hover') {
-				el.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
-				el.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true }));
+			else if (command.op === 'doubleClick') {
+				el.click();
+				el.click();
+				el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2 }));
 			}
 			else if (command.op === 'focus') { el.focus(); }
 			else if (command.op === 'fill') {
 				el.focus();
-				if ('value' in el) {
-					el.value = '';
-					el.value = String(command.value ?? '');
+				if (setNativeValue(el, String(command.value ?? ''))) {
 					el.dispatchEvent(new Event('input', { bubbles: true }));
 					el.dispatchEvent(new Event('change', { bubbles: true }));
 				} else if (el.isContentEditable) {
 					el.textContent = String(command.value ?? '');
 					el.dispatchEvent(new Event('input', { bubbles: true }));
+				} else {
+					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
 				}
 			}
 			else if (command.op === 'type') {
+				const canType = (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el.isContentEditable);
+				if (!canType) {
+					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
+				}
 				el.focus();
 				const text = String(command.value ?? '');
-				if ('value' in el) {
-					el.value = (el.value || '') + text;
-					el.dispatchEvent(new Event('input', { bubbles: true }));
+				for (const character of text) {
+					const keyboard = { key: character, bubbles: true, cancelable: true };
+					const proceed = el.dispatchEvent(new KeyboardEvent('keydown', keyboard));
+					if (proceed) {
+						if (setNativeValue(el, String(el.value || '') + character)) {
+							el.dispatchEvent(new InputEvent('input', { bubbles: true, data: character, inputType: 'insertText' }));
+						} else if (el.isContentEditable) {
+							document.execCommand('insertText', false, character);
+						}
+					}
+					el.dispatchEvent(new KeyboardEvent('keyup', keyboard));
 				}
 			}
 			else if (command.op === 'press') {
 				el.focus();
-				el.dispatchEvent(new KeyboardEvent('keydown', { key: command.value, bubbles: true }));
-				el.dispatchEvent(new KeyboardEvent('keyup', { key: command.value, bubbles: true }));
+				const keyboard = keyboardInit(command.value);
+				const proceed = el.dispatchEvent(new KeyboardEvent('keydown', keyboard));
+				if (proceed && (keyboard.ctrlKey || keyboard.metaKey) && keyboard.key.toLowerCase() === 'a' && typeof el.select === 'function') {
+					el.select();
+				}
+				el.dispatchEvent(new KeyboardEvent('keyup', keyboard));
 			}
 			else if (command.op === 'check' || command.op === 'uncheck') {
 				const want = command.op === 'check';
+				if (!(el instanceof HTMLInputElement) || (el.type !== 'checkbox' && el.type !== 'radio') || (command.op === 'uncheck' && el.type === 'radio')) {
+					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
+				}
 				if (el.checked !== want) { el.click(); }
+				if (el.checked !== want) {
+					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
+				}
 			}
 			else if (command.op === 'select') {
-				el.value = String(command.value ?? '');
+				if (!(el instanceof HTMLSelectElement)) {
+					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
+				}
+				const value = String(command.value ?? '');
+				const option = Array.from(el.options).find(candidate => candidate.value === value);
+				if (!option) {
+					return { ok: false, code: 'optionNotFound', match: resolved.match, title: document.title, url: location.href };
+				}
+				if (option.disabled) {
+					return { ok: false, code: 'optionDisabled', match: resolved.match, title: document.title, url: location.href };
+				}
+				if (el.multiple) {
+					for (const candidate of Array.from(el.options)) { candidate.selected = candidate === option; }
+				} else {
+					el.value = value;
+				}
+				el.dispatchEvent(new Event('input', { bubbles: true }));
 				el.dispatchEvent(new Event('change', { bubbles: true }));
 			}
 			else if (command.op === 'read') {
-				return { ok: true, match: summarize(el), title: document.title, url: location.href };
+				return withEvidence({ ok: true, match: summarize(el), title: document.title, url: location.href });
 			}
 			return { ok: true, match: summarize(el), title: document.title, url: location.href };
 		}

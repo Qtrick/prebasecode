@@ -1,0 +1,27 @@
+{
+  "ok": true,
+  "framework": "electron",
+  "mode": "fullApp",
+  "backend": "cdp",
+  "appRootFixture": "test/prebase/fixtures/desktop-electron",
+  "backendProof": {
+    "text": "Hello, Ada from main",
+    "ipc": "greet"
+  },
+  "actions": [
+    "fill Name with Ada",
+    "click Greet"
+  ],
+  "assertions": [
+    "status == Hello, Ada from main"
+  ],
+  "durationMs": 1653,
+  "pid": 24021,
+  "debugPort": 62701,
+  "screenshot": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3.18/screenshots/electron-full-app-ipc.png",
+  "quit": {
+    "exited": true,
+    "remaining": "gone",
+    "forced": false
+  }
+}

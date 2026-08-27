@@ -19,7 +19,7 @@ import { IEditorGroup } from '../../../services/editor/common/editorGroupsServic
 import { IWebviewElement, IWebviewService } from '../../webview/browser/webview.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import { validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
-import { createRuntimeWebviewControlMessage, type RuntimeWebviewControlType } from '../common/runtime/runtimeWebviewProtocol.js';
+import { createRuntimeWebviewControlMessage, handleRuntimePreviewStatusMessage, type RuntimeWebviewControlType } from '../common/runtime/runtimeWebviewProtocol.js';
 import { PreBaseRuntimeEditorInput } from './runtimeEditorInput.js';
 import { IPreBaseRuntimeService } from './prebaseRuntimeService.js';
 
@@ -338,7 +338,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		webview.mountTo(this._frameShell, this.window);
 		webview.setHtml(this._buildPreviewHtml(controlChannel));
 		this._sessionDisposables.add(webview.onMessage(e => {
-			const msg = e.message as { type?: string; url?: string; detail?: string } | undefined;
+			const msg = e.message as { type?: string; url?: string; ok?: boolean; detail?: string } | undefined;
 			if (!msg?.type) {
 				return;
 			}
@@ -347,13 +347,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 				this._loadUrl(true);
 				return;
 			}
-			if (msg.type === 'load' && msg.url) {
-				this.runtimeService.markPreviewLoaded(msg.url, true);
-				return;
-			}
-			if (msg.type === 'error' && msg.url) {
-				this.runtimeService.markPreviewLoaded(msg.url, false, msg.detail);
-			}
+			handleRuntimePreviewStatusMessage(msg, (url, ok, detail) => this.runtimeService.markPreviewLoaded(url, ok, detail));
 		}));
 		this._previewWebview = webview;
 		this._webviewControlChannel = controlChannel;
@@ -401,7 +395,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 <html>
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-src * http: https:;">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-src * http: https:; connect-src http: https:;">
 <style nonce="${nonce}">
 html, body { margin:0; height:100%; width:100%; background:transparent; overflow:hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
 #frame { border:0; width:100%; height:100%; display:block; margin:0; padding:0; background:transparent; }
@@ -446,6 +440,12 @@ window.addEventListener('message', function (event) {
 		}
 		currentUrl = msg.url;
 		showOverlay('Loading ' + msg.url + '…');
+		const probedUrl = currentUrl;
+		fetch(probedUrl, { mode: 'no-cors', cache: 'no-store' }).then(function () {
+			if (currentUrl === probedUrl) vscode.postMessage({ type: 'probe', url: probedUrl, ok: true });
+		}, function (err) {
+			if (currentUrl === probedUrl) vscode.postMessage({ type: 'probe', url: probedUrl, ok: false, detail: String(err) });
+		});
 		iframe.onload = function () {
 			hideOverlay();
 			vscode.postMessage({ type: 'load', url: currentUrl });

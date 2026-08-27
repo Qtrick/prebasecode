@@ -4,25 +4,54 @@
 
 import assert from 'assert';
 import { resolveExternalLaunchCommand } from '../../../../../platform/prebaseDesktop/common/externalLaunchResolver.js';
-import { buildElectronExternalLaunchRequest, buildNpmExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../../common/runtime/externalLaunchCommand.js';
+import { buildElectronExternalLaunchRequest, buildPackageScriptExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../../common/runtime/externalLaunchCommand.js';
 
 suite('externalLaunchCommand', () => {
-	test('builds an npm argv invocation that forwards Electron debugging arguments', () => {
-		assert.deepStrictEqual(buildNpmExternalLaunchRequest('electron:dev'), {
-			command: 'npm',
-			args: ['run', 'electron:dev', '--'],
-		});
+	test('builds strict package-manager argv without introducing shell parsing', () => {
+		assert.deepStrictEqual(
+			(['npm', 'pnpm', 'yarn', 'bun'] as const).map(packageManager => buildPackageScriptExternalLaunchRequest(packageManager, 'electron:dev')),
+			[
+				{ command: 'npm', args: ['run', 'electron:dev', '--'] },
+				{ command: 'pnpm', args: ['run', 'electron:dev', '--'] },
+				{ command: 'yarn', args: ['run', 'electron:dev'] },
+				{ command: 'bun', args: ['run', 'electron:dev', '--'] },
+			],
+		);
 	});
 
 	test('retains an untrusted script name as one argv value instead of shell syntax', () => {
 		const scriptName = 'dev; touch should-not-run';
-		const request = buildNpmExternalLaunchRequest(scriptName);
+		const request = buildPackageScriptExternalLaunchRequest('npm', scriptName);
 
 		assert.deepStrictEqual(request, {
 			command: 'npm',
 			args: ['run', scriptName, '--'],
 		});
 		assert.strictEqual(request.args.includes('touch'), false);
+	});
+
+	test('resolves every supported package manager to the platform executable', () => {
+		for (const packageManager of ['npm', 'pnpm', 'yarn', 'bun'] as const) {
+			const request = buildPackageScriptExternalLaunchRequest(packageManager, 'desktop');
+			assert.strictEqual(resolveExternalLaunchCommand(request, '/workspace/app', 'darwin'), packageManager);
+			assert.strictEqual(
+				resolveExternalLaunchCommand(request, 'C:\\workspace\\app', 'win32'),
+				packageManager === 'bun' ? 'bun.exe' : `${packageManager}.cmd`,
+			);
+		}
+	});
+
+	test('rejects package-manager argv that bypasses declared scripts or adds arbitrary flags', () => {
+		for (const command of ['npm', 'pnpm', 'bun'] as const) {
+			assert.throws(() => resolveExternalLaunchCommand({ command, args: ['exec', 'electron'] }, '/app', 'darwin'));
+			assert.throws(() => resolveExternalLaunchCommand({ command, args: ['run', 'desktop'] }, '/app', 'darwin'));
+			assert.throws(() => resolveExternalLaunchCommand({ command, args: ['run', 'desktop', '--', '--inspect'] }, '/app', 'darwin'));
+		}
+		assert.throws(() => resolveExternalLaunchCommand({ command: 'yarn', args: ['desktop'] }, '/app', 'darwin'));
+		assert.throws(() => resolveExternalLaunchCommand({ command: 'yarn', args: ['run', 'desktop', '--inspect'] }, '/app', 'darwin'));
+		assert.throws(() => resolveExternalLaunchCommand({ command: 'npm', args: ['run', '../desktop', '--'] }, '/app', 'darwin'));
+		assert.throws(() => resolveExternalLaunchCommand({ command: 'pnpm', args: ['run', 'apps/desktop', '--'] }, '/app', 'darwin'));
+		assert.throws(() => resolveExternalLaunchCommand({ command: 'bun', args: ['run', 'desktop', '--', '--features', 'other'] }, '/app', 'darwin'));
 	});
 
 	test('uses the logical Electron binary for a scriptless project main entry', () => {
@@ -79,12 +108,22 @@ suite('externalLaunchCommand', () => {
 			command: 'npm',
 			args: ['run', 'tauri:dev', '--', '--features', 'prebase-testing'],
 		});
+		assert.deepStrictEqual(buildTauriExternalLaunchRequest('tauri:dev', true, 'yarn'), {
+			command: 'yarn',
+			args: ['run', 'tauri:dev', '--', '--features', 'prebase-testing'],
+		});
+		assert.deepStrictEqual(buildTauriExternalLaunchRequest('tauri:dev', true, 'pnpm'), {
+			command: 'pnpm',
+			args: ['run', 'tauri:dev', '--', '--features', 'prebase-testing'],
+		});
 		assert.doesNotThrow(() => resolveExternalLaunchCommand(buildTauriExternalLaunchRequest('tauri:dev', true), '/workspace/app', 'darwin'));
 		assert.strictEqual(tauriLaunchCwd('/workspace/app', 'src-tauri/Cargo.toml'), '/workspace/app/src-tauri');
 		assert.strictEqual(tauriLaunchCwd('/workspace/app', '/abs/src-tauri/Cargo.toml'), '/abs/src-tauri');
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'cargo', args: ['tauri', 'dev', '--features', 'evil'] }, '/app', 'darwin'));
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'npm', args: ['run', 'tauri', '--', '--eval', '1'] }, '/app', 'darwin'));
 		assert.doesNotThrow(() => resolveExternalLaunchCommand({ command: 'npm', args: ['run', 'tauri', '--', '--features', 'prebase-testing'] }, '/app', 'darwin'));
+		assert.doesNotThrow(() => resolveExternalLaunchCommand({ command: 'yarn', args: ['run', 'tauri', '--', '--features', 'prebase-testing'] }, '/app', 'darwin'));
+		assert.doesNotThrow(() => resolveExternalLaunchCommand({ command: 'yarn', args: ['run', 'tauri', '--features', 'prebase-testing'] }, '/app', 'darwin'));
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'electron', args: ['/tmp/evil.js'] }, '/app', 'darwin'));
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'cargo', args: ['tauri', 'dev', '--features', 'prebase-testing', '--release'] }, '/app', 'darwin'));
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'cargo', args: ['tauri', 'build'] }, '/app', 'darwin'));

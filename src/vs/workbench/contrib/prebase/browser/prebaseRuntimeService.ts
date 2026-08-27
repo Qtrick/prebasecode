@@ -27,6 +27,7 @@ import { appendRuntimeEvidence } from '../common/runtime/evidenceBuffer.js';
 import { MAX_RUNTIME_INSPECTION_RESPONSE_BYTES, readRuntimeResponseText } from '../common/runtime/runtimeResponseReader.js';
 import { detectFramework } from '../common/runtime/frameworkDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
+import { detectDesktopProjects } from '../common/runtime/desktopDetector.js';
 import type { DesktopFramework, DesktopLaunchMode, DesktopProjectProfile } from '../common/runtime/desktopTypes.js';
 import { isRecognizedDesktopApp } from '../common/runtime/desktopTypes.js';
 import { TAURI_PROBE_PATHS } from '../common/runtime/tauriDetector.js';
@@ -131,6 +132,35 @@ export interface IPreBaseRuntimeService {
 	markPreviewLoaded(url: string, ok: boolean, detail?: string): void;
 }
 
+const DESKTOP_APP_ROOTS = ['apps/desktop', 'packages/desktop'] as const;
+const DESKTOP_APP_PROBE_PATHS = [
+	'package.json',
+	'pnpm-lock.yaml',
+	'yarn.lock',
+	'bun.lockb',
+	'bun.lock',
+	'vite.config.ts',
+	'vite.config.js',
+	'vite.config.mjs',
+	'electron-builder.yml',
+	'electron-builder.yaml',
+	'electron-builder.json',
+	'electron.vite.config.ts',
+	'electron.vite.config.js',
+	'forge.config.js',
+	'forge.config.ts',
+	'main.ts',
+	'main.js',
+	'electron/main.ts',
+	'electron/main.js',
+	'src/main/index.ts',
+	'src/main/index.js',
+	'src-tauri/tauri.conf.json',
+	'src-tauri/tauri.conf.json5',
+	'src-tauri/Tauri.toml',
+	'src-tauri/Cargo.toml',
+] as const;
+
 const PROBE_PATHS = [
 	'package.json',
 	'pnpm-lock.yaml',
@@ -151,6 +181,7 @@ const PROBE_PATHS = [
 	'apps/client',
 	'packages/web',
 	...TAURI_PROBE_PATHS,
+	...DESKTOP_APP_ROOTS.flatMap(root => DESKTOP_APP_PROBE_PATHS.map(path => `${root}/${path}`)),
 ];
 
 function redactRuntimeEvidence(value: string): string {
@@ -369,18 +400,11 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		if (!validated.ok || validated.url !== this._session.url) {
 			return;
 		}
-		// Iframe onload also fires for browser error pages, so connectivity stays probe-owned.
 		if (ok) {
 			if (!this._session.previewConnected) {
-				// Soft upgrade after Start when the page becomes reachable later.
-				void this._probeUrl(validated.url).then(reachable => {
-					if (!reachable || validated.url !== this._session.url || this._session.previewConnected) {
-						return;
-					}
-					this._session = { ...this._session, previewConnected: true };
-					this._log(localize('prebase.runtime.iframeLoaded', "Preview loaded {0}", validated.url));
-					this._fire();
-				});
+				this._session = { ...this._session, previewConnected: true };
+				this._log(localize('prebase.runtime.iframeLoaded', "Preview loaded {0}", validated.url));
+				this._fire();
 			}
 			return;
 		}
@@ -543,12 +567,36 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			exists: rel => existsMap.get(rel) === true,
 			readText: rel => textMap.get(rel),
 			packageJson,
-			rootLabel: folder.name || folder.uri.path
+			rootLabel: folder.name || folder.uri.path,
+			rootPath: folder.uri.fsPath,
 		};
 
 		const framework = detectFramework(probe);
 		const desktop = this._desktopService();
-		const desktopProfile = desktop?.detect(probe) ?? detectElectronProject(probe);
+		let desktopProbe = probe;
+		if (!detectDesktopProjects(probe).some(isRecognizedDesktopApp)) {
+			for (const relativeRoot of DESKTOP_APP_ROOTS) {
+				const packageText = textMap.get(`${relativeRoot}/package.json`);
+				let nestedPackage: PackageJsonShape | undefined;
+				try {
+					nestedPackage = packageText ? JSON.parse(packageText) as PackageJsonShape : undefined;
+				} catch {
+					this._log(localize('prebase.runtime.nestedPkgParseFail', "Failed to parse {0}/package.json.", relativeRoot));
+				}
+				const candidate: ProjectProbe = {
+					exists: rel => existsMap.get(`${relativeRoot}/${rel}`) === true,
+					readText: rel => textMap.get(`${relativeRoot}/${rel}`),
+					packageJson: nestedPackage,
+					rootLabel: `${folder.name || folder.uri.path}/${relativeRoot}`,
+					rootPath: URI.joinPath(folder.uri, ...relativeRoot.split('/')).fsPath,
+				};
+				if (detectDesktopProjects(candidate).some(isRecognizedDesktopApp)) {
+					desktopProbe = candidate;
+					break;
+				}
+			}
+		}
+		const desktopProfile = desktop?.detect(desktopProbe) ?? detectElectronProject(desktopProbe);
 		const desktopProfiles = desktop?.getDetectedProfiles() ?? (isRecognizedDesktopApp(desktopProfile) ? [desktopProfile] : []);
 		const scripts = detectDevScripts(probe);
 		const selected = selectDefaultScript(scripts);

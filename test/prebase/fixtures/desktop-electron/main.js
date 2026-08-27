@@ -16,7 +16,7 @@ function createWindow() {
 
 ipcMain.handle('greet', (_event, name) => {
 	console.log('main greet', name);
-	return `Hello, ${String(name || 'world')}`;
+	return `Hello, ${String(name || 'world')} from main`;
 });
 
 app.whenReady().then(() => {

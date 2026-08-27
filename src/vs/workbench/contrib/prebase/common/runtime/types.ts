@@ -52,6 +52,8 @@ export interface ProjectProbe {
 	readText?(relativePath: string): string | undefined;
 	packageJson: PackageJsonShape | undefined;
 	rootLabel: string;
+	/** Absolute app root when filesystem launch ownership is required. */
+	rootPath?: string;
 }
 
 export type RuntimeActionRisk = 'low' | 'medium' | 'high' | 'blocked';

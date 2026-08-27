@@ -5,6 +5,7 @@
 
 import type { PackageJsonShape, ProjectProbe } from './types.js';
 import type { DesktopCapabilities, DesktopDetectionConfidence, ElectronProjectPaths, ElectronProjectProfile } from './desktopTypes.js';
+import { detectPackageManager } from './scriptDetector.js';
 
 const ELECTRON_SCRIPT_NAMES = ['electron', 'electron:dev', 'electron:start', 'electron:serve', 'start:electron', 'dev:electron'] as const;
 
@@ -227,6 +228,8 @@ export function detectElectronProject(probe: ProjectProbe): ElectronProjectProfi
 		electronScriptName: electronScripts[0],
 		rendererUrlHint: renderer?.startsWith('http') ? renderer : (hasVite ? `http://localhost:${likelyDevPort}` : undefined),
 		likelyDevPort,
+		appRoot: probe.rootPath,
+		packageManager: detectPackageManager(probe),
 		reasons,
 	};
 }

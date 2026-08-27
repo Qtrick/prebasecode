@@ -17,20 +17,66 @@ export interface TauriTestingSetupPreview {
 	removeInstructions: string;
 }
 
-const CARGO_DEP = `tauri-plugin-wdio = { version = "1", optional = true }
-tauri-plugin-wdio-webdriver = { version = "1", optional = true }
+export interface TauriTestingWrite<Resource> {
+	resource: Resource;
+	before?: string;
+	after: string;
+}
+
+export type TauriTestingTransactionResult =
+	| { ok: true }
+	| { ok: false; reason: string; rollbackErrors: string[] };
+
+export async function applyTauriTestingTransaction<Resource>(
+	writes: readonly TauriTestingWrite<Resource>[],
+	io: { write(resource: Resource, value: string): Promise<void>; remove(resource: Resource): Promise<void> },
+): Promise<TauriTestingTransactionResult> {
+	const completed: TauriTestingWrite<Resource>[] = [];
+	try {
+		for (const write of writes) {
+			await io.write(write.resource, write.after);
+			completed.push(write);
+		}
+		return { ok: true };
+	} catch (error) {
+		const rollbackErrors: string[] = [];
+		for (const write of completed.reverse()) {
+			try {
+				if (write.before === undefined) {
+					await io.remove(write.resource);
+				} else {
+					await io.write(write.resource, write.before);
+				}
+			} catch (rollbackError) {
+				rollbackErrors.push(rollbackError instanceof Error ? rollbackError.message : String(rollbackError));
+			}
+		}
+		return {
+			ok: false,
+			reason: error instanceof Error ? error.message : String(error),
+			rollbackErrors,
+		};
+	}
+}
+
+const CARGO_DEP = `tauri-plugin-wdio-webdriver = { version = "1", optional = true }
 `;
 
-const CARGO_FEATURE = `prebase-testing = ["dep:tauri-plugin-wdio", "dep:tauri-plugin-wdio-webdriver"]
+const CARGO_FEATURE = `prebase-testing = ["dep:tauri-plugin-wdio-webdriver"]
 `;
 
 const RUST_PLUGIN = `#[cfg(all(debug_assertions, feature = "prebase-testing"))]
 {
-	builder = builder
-		.plugin(tauri_plugin_wdio::init())
-		.plugin(tauri_plugin_wdio_webdriver::init());
+	builder = builder.plugin(tauri_plugin_wdio_webdriver::init());
 }
 `;
+
+const CAPABILITIES_JSON = {
+	identifier: 'prebase-testing',
+	description: 'Debug-only embedded WebDriver access for PreBase desktop testing.',
+	windows: ['main'],
+	permissions: ['wdio-webdriver:default'],
+};
 
 export function previewTauriTestingSetup(input: {
 	appRoot: string;
@@ -57,7 +103,7 @@ export function previewTauriTestingSetup(input: {
 			path: input.cargoPath,
 			kind: 'update',
 			preview: `${CARGO_DEP}\n[features]\n${CARGO_FEATURE}`,
-			reason: 'Add optional WebDriver plugins behind the prebase-testing Cargo feature. Do not pass that feature to release builds. Cargo does not honor cfg(debug_assertions) in [dependencies].',
+			reason: 'Add the optional embedded WebDriver behind the prebase-testing Cargo feature. Do not pass that feature to release builds. Cargo does not honor cfg(debug_assertions) in [dependencies].',
 		});
 	}
 	if (!input.rustEntry.includes('tauri_plugin_wdio_webdriver')) {
@@ -69,11 +115,18 @@ export function previewTauriTestingSetup(input: {
 		});
 	}
 	const capabilities = input.capabilitiesJson ?? '';
-	if (capabilities && !capabilities.includes('wdio-webdriver:default')) {
+	if (!capabilities) {
+		changes.push({
+			path: input.capabilitiesPath,
+			kind: 'create',
+			preview: JSON.stringify(CAPABILITIES_JSON, null, 2),
+			reason: 'Create the minimal desktop capability required by the embedded WebDriver plugin.',
+		});
+	} else if (!capabilities.includes('wdio-webdriver:default')) {
 		changes.push({
 			path: input.capabilitiesPath,
 			kind: 'update',
-			preview: '"wdio:default", "wdio-webdriver:default"',
+			preview: '"wdio-webdriver:default"',
 			reason: 'Grant the debug WebDriver ACL so the embedded server can load.',
 		});
 	}
@@ -82,7 +135,7 @@ export function previewTauriTestingSetup(input: {
 		appRoot: input.appRoot,
 		productionSafe: true,
 		changes,
-		removeInstructions: 'Remove the optional tauri-plugin-wdio* dependencies, the prebase-testing feature, the cfg plugin registration, and the wdio-webdriver:default permission. Never pass --features prebase-testing to tauri build or cargo --release.',
+		removeInstructions: 'Remove the optional tauri-plugin-wdio-webdriver dependency, the prebase-testing feature, the cfg plugin registration, and the wdio-webdriver:default permission. Never pass --features prebase-testing to a release build.',
 	};
 }
 
@@ -144,7 +197,10 @@ export function applyRustTestingPlugins(rustSource: string): string | { error: s
 	);
 }
 
-export function applyCapabilitiesTestingPermission(jsonText: string): string | { error: string } {
+export function applyCapabilitiesTestingPermission(jsonText?: string): string | { error: string } {
+	if (!jsonText) {
+		return `${JSON.stringify(CAPABILITIES_JSON, null, 2)}\n`;
+	}
 	let parsed: { permissions?: string[] };
 	try {
 		parsed = JSON.parse(jsonText) as { permissions?: string[] };
@@ -152,7 +208,7 @@ export function applyCapabilitiesTestingPermission(jsonText: string): string | {
 		return { error: 'capabilities JSON is not valid.' };
 	}
 	const permissions = Array.isArray(parsed.permissions) ? [...parsed.permissions] : [];
-	for (const permission of ['wdio:default', 'wdio-webdriver:default']) {
+	for (const permission of ['wdio-webdriver:default']) {
 		if (!permissions.includes(permission)) {
 			permissions.push(permission);
 		}

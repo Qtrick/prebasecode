@@ -1,0 +1,33 @@
+{
+  "focused": {
+    "command": "node --experimental-strip-types --import=./graphs/scripts/graphs-test-setup.mjs --import=./graphs/scripts/graphs-test-register.mjs ./node_modules/mocha/bin/mocha.js graphs/src/tests/unit/workbenchTemporalViewService.test.ts graphs/src/tests/unit/graphEditorProductionWebview.test.ts graphs/src/tests/unit/temporalLiveAcceptance.test.ts --ui tdd --timeout 10000 --reporter json --reporter-option output=reports/graph-acceptance/phase-3.18/checkpoint-a/test-writer-focused-tests-final-v2.json",
+    "exitCode": 0,
+    "suiteBlocks": 3,
+    "tests": 25,
+    "passes": 25,
+    "failures": 0,
+    "skips": 0,
+    "durationMs": 715,
+    "evidence": "reports/graph-acceptance/phase-3.18/checkpoint-a/test-writer-focused-tests-final-v2.json"
+  },
+  "typecheck": {
+    "command": "npm run typecheck:graphs && npm run typecheck-client",
+    "exitCode": 0,
+    "durationMs": 5809
+  },
+  "fullGraphSuite": {
+    "command": "npm run test:graphs",
+    "exitCode": 0,
+    "testFilesDiscovered": 53,
+    "passes": 389,
+    "failures": 0,
+    "skips": 0,
+    "durationMs": 49140,
+    "note": "Rerun outside the sandbox after the sandbox denied git init access to a temporary hooks directory."
+  },
+  "boundaries": {
+    "command": "npm run verify:graphs-boundary && npm run verify:graphs-runtime-boundary",
+    "exitCode": 0,
+    "durationMs": 1338
+  }
+}

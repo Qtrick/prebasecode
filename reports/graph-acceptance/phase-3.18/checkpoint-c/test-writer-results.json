@@ -1,0 +1,98 @@
+{
+  "generatedAt": "2026-08-27T01:07:36Z",
+  "scope": "PreBase Phase 3.18 Checkpoints B/C Tauri test review",
+  "behaviorsEnumerated": [
+    "Plain Tauri exposes renderer automation and console capture while full-app test automation remains setupRequired.",
+    "Embedded WebDriver exposes full-native webview UI automation, not Tauri backend API access, and retains renderer console capture.",
+    "The rich tauri-plugin-wdio crate alone does not satisfy embedded WebDriver setup.",
+    "Setup adds only tauri-plugin-wdio-webdriver, its prebase-testing feature, guarded Rust registration, and wdio-webdriver:default ACL.",
+    "Setup preserves an existing capability and creates a minimal capability when none exists.",
+    "Setup transformations are idempotent.",
+    "Transaction failures on the first, second, and third writes restore completed work in reverse order.",
+    "Rollback deletes a newly created capability file.",
+    "Fixture frontendDist resolves to the dedicated web directory, never the fixture root or src-tauri/target.",
+    "The enabled fixture manifest, feature, and ACL contain only the embedded WebDriver plugin.",
+    "Live acceptance proves the Rust backend marker through backendInvoke=true and Hello, Ada."
+  ],
+  "weakOrMisleadingTestsFound": [
+    "The already-enabled setup test accepted the removed tauri-plugin-wdio dependency and wdio:default ACL while still reporting a no-op.",
+    "The enabled detector test omitted supportsBackendApiAccess=false and supportsConsoleCapture=true.",
+    "Setup tests used substring/length assertions that could pass while obsolete plugin, feature, or ACL entries remained.",
+    "No transaction failure or rollback deletion behavior was covered.",
+    "Committed fixture tests did not constrain frontendDist or enumerate enabled WebDriver dependencies and ACLs."
+  ],
+  "testsImplemented": {
+    "files": [
+      "src/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.ts",
+      "src/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.ts"
+    ],
+    "staticInventory": {
+      "files": 2,
+      "suiteBlocks": 13,
+      "tests": 50
+    },
+    "newOrStrengthenedBehaviors": [
+      "Enabled and setupRequired detector capability matrices.",
+      "Exact thin WebDriver Cargo dependency and feature membership.",
+      "Exact existing-capability preservation and minimal capability creation.",
+      "Thin-plugin idempotence without obsolete rich plugin or ACL.",
+      "First, second, and third transaction-write failures plus created-file deletion.",
+      "Both fixture frontendDist paths and enabled fixture plugin/feature/ACL truth."
+    ]
+  },
+  "intentionallyOmitted": [
+    {
+      "behavior": "Rust marker source-string assertion",
+      "reason": "The live Tauri acceptance already executes the Rust command and records backendInvoke=true; a source-text assertion would not prove backend execution."
+    },
+    {
+      "behavior": "Remote WebDriver protocol duplication",
+      "reason": "Existing DesktopWebDriverClient tests already cover loopback enforcement, session creation, execute errors, screenshot validation, and cancellation."
+    }
+  ],
+  "commands": [
+    {
+      "command": "npm run typecheck-client",
+      "exitCode": 1,
+      "durationMs": 5398,
+      "errors": [
+        "prebase.contribution.ts: transaction write adapter returns Promise<IFileStatWithMetadata>, not Promise<void>",
+        "externalLaunchCommand.test.ts: buildNpmExternalLaunchRequest is imported but not exported"
+      ]
+    }
+  ],
+  "suiteResults": {
+    "focused": {
+      "status": "blocked-before-run",
+      "reason": "Repository policy forbids running tests while type checking fails.",
+      "files": 0,
+      "suiteBlocks": 0,
+      "tests": 0,
+      "passes": 0,
+      "failures": 0,
+      "skips": 0,
+      "durationMs": 0
+    },
+    "neighboringPrebasePure": {
+      "status": "blocked-before-run",
+      "reason": "Repository policy forbids running tests while type checking fails.",
+      "files": 0,
+      "suiteBlocks": 0,
+      "tests": 0,
+      "passes": 0,
+      "failures": 0,
+      "skips": 0,
+      "durationMs": 0
+    }
+  },
+  "productionIssues": [
+    "The current setup command does not type-check because its write callback does not normalize the file-service result to Promise<void>.",
+    "applyTauriTestingTransaction only records a write after it resolves; if a failed write partially mutates or creates its own resource before rejecting, that failed resource is not rolled back."
+  ],
+  "evidencePaths": [
+    "reports/graph-acceptance/phase-3.18/checkpoint-c/test-writer-results.json",
+    "reports/graph-acceptance/phase-3.18/tauri/live.json",
+    "reports/graph-acceptance/phase-3.18/screenshots/tauri-full-app-rust-invoke.png",
+    "reports/graph-acceptance/phase-3.18/tauri/cargo-check-rustc.sample.txt"
+  ]
+}

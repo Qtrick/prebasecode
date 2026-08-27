@@ -1,0 +1,99 @@
+{
+  "phase": "3.18",
+  "role": "code-reviewer-editor",
+  "generatedAt": "2026-08-26T22:02:00-04:00",
+  "iconsEdited": false,
+  "gitMutatingCommands": false,
+  "productionEdited": true,
+  "findingsFixed": [
+    {
+      "file": "graphs/src/host/workbench/graphEditor.ts",
+      "rootCause": "First-nonempty auto-fit keyed off node array length and a per-message first flag. Placeholder nodes without finite x/y consumed the transition, so a later layout with real coordinates never fitted. The same flag could be spent while graphType was still network.",
+      "impact": "Empty Temporal bootstrap could stay at the default {x:0,y:0,k:1} camera after nodes became drawable.",
+      "change": "Fit when the first finite-coordinate temporal nodes appear (hasFittedTemporalView), skip non-finite nodes in fitView, reset the flag on empty diffs and when leaving temporal mode."
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/common/runtime/desktopAutomationDom.ts",
+      "rootCause": "Radio uncheck clicked a checked radio and returned ok. HTML radios do not uncheck that way. Fill/type on buttons also returned ok without changing value.",
+      "impact": "Agents could record a passing uncheck/fill/type while the control was unchanged.",
+      "change": "Radio uncheck and fill/type on non-editable controls return wrongControl. Check/uncheck also fail if the checked state does not match after click."
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/common/runtime/externalLaunchCommand.ts",
+      "rootCause": "Yarn extra args were appended without `--`, so `yarn run <script> --features prebase-testing` is parsed as Yarn flags.",
+      "impact": "Tauri testing launches through Yarn Classic fail instead of reaching the package script.",
+      "change": "Yarn with extra args now emits `run <script> -- --features prebase-testing`. Yarn with no extra args still omits `--`."
+    },
+    {
+      "file": "src/vs/platform/prebaseDesktop/common/externalLaunchResolver.ts",
+      "rootCause": "Every Windows package manager resolved to `.cmd`. Bun ships as bun.exe. Yarn extra args with `--` were rejected because Yarn was assumed never to use a separator.",
+      "impact": "Windows Bun launches miss the real binary. Yarn `--features prebase-testing` after `--` was illegally rejected.",
+      "change": "Windows Bun resolves to bun.exe. Yarn accepts optional `--` before the allowlisted extra args; npm/pnpm/bun still require `--`."
+    },
+    {
+      "file": "src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts",
+      "rootCause": "Enable Tauri Testing always rewrote Cargo, Rust, and capabilities even when preview listed only a subset. applyCapabilitiesTestingPermission pretty-prints, so an already-correct capability file was reformatted.",
+      "impact": "Unrelated capability JSON could change during a cargo-only enable, and rollback covered writes that should not have happened.",
+      "change": "Write only files whose content actually changes, and write capabilities only when preview.changes includes that path."
+    }
+  ],
+  "findingsRejected": [
+    {
+      "topic": "Runtime Preview load/probe/error",
+      "why": "runtimeEditor.ts plus handleRuntimePreviewStatusMessage already connect on load and successful probe, ignore probe failure, and disconnect only on error. Changing that would reintroduce failed-fetch disconnects."
+    },
+    {
+      "topic": "supportsBackendApiAccess / unused tauri-plugin-wdio crate",
+      "why": "Detector already reports supportsBackendApiAccess: false. Setup injects only tauri-plugin-wdio-webdriver. hasWdioPlugin remains as a detection signal that the unused crate does not count as full-native setup."
+    },
+    {
+      "topic": "Created capability identifier prebase-testing",
+      "why": "Tests and the thin-W3C intent keep a WebDriver-only capability that does not replace core:default. Expanding setup to patch tauri.conf.json is out of scope. Remaining risk: a brand-new default.json is not auto-linked in tauri.conf.json."
+    },
+    {
+      "topic": "optionNotFound / optionDisabled fail-fast",
+      "why": "Retrying those codes matches notFound: options can appear or enable within the action timeout. wrongControl already fails immediately."
+    },
+    {
+      "topic": "Control+Shift+A select-all",
+      "why": "Current tests treat Control+A with extra modifiers as select-all. Tightening that would fight the locked contract without a production failure."
+    },
+    {
+      "topic": "Delete hasWdioPlugin / duplicate runPrefix helpers",
+      "why": "hasWdioPlugin is still asserted in detector tests. scriptDetector and managedRendererCommand runPrefix functions return different prefixes and are not unused duplicates."
+    }
+  ],
+  "commands": [
+    {
+      "command": "node --experimental-strip-types --import=./graphs/scripts/graphs-test-setup.mjs --import=./graphs/scripts/graphs-test-register.mjs ./node_modules/mocha/bin/mocha.js graphs/src/tests/unit/graphEditorProductionWebview.test.ts graphs/src/tests/unit/workbenchTemporalViewService.test.ts --ui tdd --timeout 10000",
+      "result": "fail then pass",
+      "detail": "First run 23 passing / 1 failing (placeholder auto-fit test used VM-realm deepEqual). After test fix and network-mode fit reset: graphEditorProductionWebview 10/10 passing. Neighboring workbenchTemporalViewService 14/14 passing on the first run."
+    },
+    {
+      "command": "node --experimental-strip-types --import=./graphs/scripts/graphs-test-setup.mjs --import=./graphs/scripts/graphs-test-register.mjs ./node_modules/mocha/bin/mocha.js graphs/src/tests/unit/graphEditorProductionWebview.test.ts --ui tdd --timeout 10000",
+      "result": "pass",
+      "detail": "10 passing after finite-coordinate auto-fit test correction and hasFittedTemporalView network reset."
+    },
+    {
+      "command": "npm run transpile-client && node ./node_modules/mocha/bin/mocha.js --ui tdd --timeout 5000 out/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.js out/vs/workbench/contrib/prebase/test/browser/externalLaunchCommand.test.js out/vs/workbench/contrib/prebase/test/browser/desktopRuntimeSession.test.js out/vs/workbench/contrib/prebase/test/browser/tauriDetector.test.js out/vs/workbench/contrib/prebase/test/browser/electronDetector.test.js out/vs/workbench/contrib/prebase/test/browser/runtimePreviewReachability.test.js",
+      "result": "pass",
+      "detail": "107 passing (desktop automation, package-manager argv, session restart/inspect, Tauri/Electron detectors, Runtime Preview reachability)."
+    }
+  ],
+  "remainingRisks": [
+    "Created Tauri capability files with identifier prebase-testing are not registered in tauri.conf.json; Enable Testing on an app with no capabilities file may not grant WebDriver ACL.",
+    "Synthetic KeyboardEvents are not trusted; CSS :hover and some native shortcuts still need a pointer/WebDriver backend.",
+    "no-cors probe success is opacity-only reachability, not an HTTP status check. Load still connects on browser error pages by design.",
+    "Graph getSnapshot watchdog still times out in the unit harness (pre-existing); live GUI Temporal/Runtime/Tauri evidence remains in phase-3.18 acceptance, not this review."
+  ],
+  "filesChangedByThisReview": [
+    "graphs/src/host/workbench/graphEditor.ts",
+    "graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+    "src/vs/workbench/contrib/prebase/common/runtime/desktopAutomationDom.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/desktopAutomation.test.ts",
+    "src/vs/workbench/contrib/prebase/common/runtime/externalLaunchCommand.ts",
+    "src/vs/platform/prebaseDesktop/common/externalLaunchResolver.ts",
+    "src/vs/workbench/contrib/prebase/test/browser/externalLaunchCommand.test.ts",
+    "src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts"
+  ]
+}

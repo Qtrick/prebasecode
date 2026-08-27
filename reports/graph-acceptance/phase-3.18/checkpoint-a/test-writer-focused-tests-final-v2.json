@@ -1,0 +1,468 @@
+{
+  "stats": {
+    "suites": 3,
+    "tests": 25,
+    "passes": 25,
+    "pending": 0,
+    "failures": 0,
+    "start": "2026-08-27T00:47:46.002Z",
+    "end": "2026-08-27T00:47:46.717Z",
+    "duration": 715
+  },
+  "tests": [
+    {
+      "title": "1. selectRef loads paged commit timeline, positions nodes, and selects HEAD",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 1. selectRef loads paged commit timeline, positions nodes, and selects HEAD",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 9,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 162,
+      "currentRetry": 0,
+      "speed": "slow",
+      "err": {}
+    },
+    {
+      "title": "3. Base-before-target indexing ordering & LRU diff cache",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 3. Base-before-target indexing ordering & LRU diff cache",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "5. openHistoricalFile opens revision at rendered commit via EditorService",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 5. openHistoricalFile opens revision at rendered commit via EditorService",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "8. Async History Cancellation and Error Resilience",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 8. Async History Cancellation and Error Resilience",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "selectCommitIndex and stepCommit: host-owned bounded navigation",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) selectCommitIndex and stepCommit: host-owned bounded navigation",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Non-Git workspace: availableRepositories only discovers genuine Git repositories",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Non-Git workspace: availableRepositories only discovers genuine Git repositories",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 21,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "HEAD change event handling: followHead=true advances view, followHead=false preserves selection",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) HEAD change event handling: followHead=true advances view, followHead=false preserves selection",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 63,
+      "currentRetry": 0,
+      "speed": "medium",
+      "err": {}
+    },
+    {
+      "title": "Layer-specific retrySelection: re-executes the layer that actually failed",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Layer-specific retrySelection: re-executes the layer that actually failed",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "partial lineage keeps reconstructed target nodes available to Full Map",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) partial lineage keeps reconstructed target nodes available to Full Map",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 2,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Bootstrap: executes without syntax error and immediately posts ready message",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Bootstrap: executes without syntax error and immediately posts ready message",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 5,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 3,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 4,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 2,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 12,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: serialized temporalDiff message preserves node identities in the production webview",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: serialized temporalDiff message preserves node identities in the production webview",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 2,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: first non-empty temporal update auto-fits and draws after empty bootstrap",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: first non-empty temporal update auto-fits and draws after empty bootstrap",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 3,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: Full Map retains and draws all target-active nodes",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: Full Map retains and draws all target-active nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 3,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "zero received and drawn nodes with an unopened target fails closed",
+      "fullTitle": "Temporal Live Acceptance Evaluation zero received and drawn nodes with an unopened target fails closed",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalLiveAcceptance.test.ts",
+      "duration": 187,
+      "currentRetry": 0,
+      "speed": "slow",
+      "err": {}
+    },
+    {
+      "title": "representative rendered evidence passes without failures",
+      "fullTitle": "Temporal Live Acceptance Evaluation representative rendered evidence passes without failures",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalLiveAcceptance.test.ts",
+      "duration": 225,
+      "currentRetry": 0,
+      "speed": "slow",
+      "err": {}
+    }
+  ],
+  "pending": [],
+  "failures": [],
+  "passes": [
+    {
+      "title": "1. selectRef loads paged commit timeline, positions nodes, and selects HEAD",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 1. selectRef loads paged commit timeline, positions nodes, and selects HEAD",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 9,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 162,
+      "currentRetry": 0,
+      "speed": "slow",
+      "err": {}
+    },
+    {
+      "title": "3. Base-before-target indexing ordering & LRU diff cache",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 3. Base-before-target indexing ordering & LRU diff cache",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "5. openHistoricalFile opens revision at rendered commit via EditorService",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 5. openHistoricalFile opens revision at rendered commit via EditorService",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "8. Async History Cancellation and Error Resilience",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) 8. Async History Cancellation and Error Resilience",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "selectCommitIndex and stepCommit: host-owned bounded navigation",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) selectCommitIndex and stepCommit: host-owned bounded navigation",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Non-Git workspace: availableRepositories only discovers genuine Git repositories",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Non-Git workspace: availableRepositories only discovers genuine Git repositories",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 0,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 21,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "HEAD change event handling: followHead=true advances view, followHead=false preserves selection",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) HEAD change event handling: followHead=true advances view, followHead=false preserves selection",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 63,
+      "currentRetry": 0,
+      "speed": "medium",
+      "err": {}
+    },
+    {
+      "title": "Layer-specific retrySelection: re-executes the layer that actually failed",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) Layer-specific retrySelection: re-executes the layer that actually failed",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "partial lineage keeps reconstructed target nodes available to Full Map",
+      "fullTitle": "WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening) partial lineage keeps reconstructed target nodes available to Full Map",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/workbenchTemporalViewService.test.ts",
+      "duration": 2,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Bootstrap: executes without syntax error and immediately posts ready message",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Bootstrap: executes without syntax error and immediately posts ready message",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 5,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 3,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 4,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 2,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 12,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: serialized temporalDiff message preserves node identities in the production webview",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: serialized temporalDiff message preserves node identities in the production webview",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 2,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: first non-empty temporal update auto-fits and draws after empty bootstrap",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: first non-empty temporal update auto-fits and draws after empty bootstrap",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 3,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: Full Map retains and draws all target-active nodes",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: Full Map retains and draws all target-active nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 3,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes",
+      "fullTitle": "Production Graph Webview Runtime Test Suite Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/graphEditorProductionWebview.test.ts",
+      "duration": 1,
+      "currentRetry": 0,
+      "speed": "fast",
+      "err": {}
+    },
+    {
+      "title": "zero received and drawn nodes with an unopened target fails closed",
+      "fullTitle": "Temporal Live Acceptance Evaluation zero received and drawn nodes with an unopened target fails closed",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalLiveAcceptance.test.ts",
+      "duration": 187,
+      "currentRetry": 0,
+      "speed": "slow",
+      "err": {}
+    },
+    {
+      "title": "representative rendered evidence passes without failures",
+      "fullTitle": "Temporal Live Acceptance Evaluation representative rendered evidence passes without failures",
+      "file": "/Users/qunyingfan/Prebasecode/graphs/src/tests/unit/temporalLiveAcceptance.test.ts",
+      "duration": 225,
+      "currentRetry": 0,
+      "speed": "slow",
+      "err": {}
+    }
+  ]
+}

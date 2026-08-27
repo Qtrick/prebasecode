@@ -14,7 +14,6 @@ export type DesktopLocator =
 export type DesktopInteractAction =
 	| 'click'
 	| 'doubleClick'
-	| 'hover'
 	| 'fill'
 	| 'type'
 	| 'press'

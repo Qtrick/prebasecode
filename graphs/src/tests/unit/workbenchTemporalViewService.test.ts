@@ -8,6 +8,7 @@ import { suite, test } from 'mocha';
 import { URI } from '../../../../../../base/common/uri.js';
 import { Emitter } from '../../../../../../base/common/event.js';
 import { WorkbenchTemporalViewService } from '../../host/workbench/temporal/workbenchTemporalViewService.js';
+import { computeTemporalFocusContext } from '../../view/temporal/temporalFocusContext.js';
 import type { TemporalEntitySnapshot, TemporalEdgeSnapshot, TemporalHistoryPage, TemporalCommitSummary, TemporalRepositoryRef } from '../../temporal/common/temporalTypes.js';
 
 suite('WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)', () => {
@@ -916,6 +917,58 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)', () => {
 		await service.retrySelection();
 		assert.ok(historyCalls > historyCallsBeforeRetry, 'retrySelection must re-execute getHistoryPage for history error');
 		assert.equal(service.getState().historyError, undefined, 'History error must be cleared after successful retry');
+
+		service.dispose();
+	});
+
+	test('partial lineage keeps reconstructed target nodes available to Full Map', async () => {
+		const history: TemporalHistoryPage = {
+			commits: [
+				makeCommitSummary('target', 'target commit', 200, ['base']),
+				makeCommitSummary('base', 'base commit', 100, []),
+			],
+			hasMore: false,
+		};
+		const targetEntities = [
+			makeEntity('kept', 'src/kept.ts', 'kept-v1'),
+			makeEntity('added', 'src/added.ts', 'added-v1'),
+		];
+		const entities: Record<string, TemporalEntitySnapshot[]> = {
+			base: [targetEntities[0]],
+			target: targetEntities,
+		};
+		const temporalGraphService = {
+			...createMockTemporalGraphService({ HEAD: history }, entities),
+			getCommitIndexStatus: async () => ({
+				status: 'incomplete' as const,
+				lineageCoverage: { kind: 'partial' as const, unknownBeforeCommitSha: 'base' },
+			}),
+		};
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			temporalGraphService as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+			mockStorageService,
+		);
+
+		await service.initialize();
+
+		const state = service.getState();
+		assert.equal(state.isPartialLineage, true);
+		assert.deepStrictEqual(
+			state.diff?.nodes.map(node => node.entityId).sort(),
+			['added', 'kept'],
+			'partial lineage must preserve every available target entity in the host diff',
+		);
+		const fullMap = computeTemporalFocusContext(state.diff, 'state', 'full');
+		assert.deepStrictEqual(
+			fullMap.visibleNodes.map(node => node.entityId).sort(),
+			['added', 'kept'],
+			'a non-empty reconstructed target must remain non-empty in Full Map',
+		);
 
 		service.dispose();
 	});

@@ -4,7 +4,6 @@
 	"permissions": [
 		"core:default",
 		"allow-greet",
-		"wdio:default",
 		"wdio-webdriver:default"
 	]
 }

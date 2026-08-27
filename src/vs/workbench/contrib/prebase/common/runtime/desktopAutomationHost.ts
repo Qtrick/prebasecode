@@ -28,6 +28,8 @@ export interface DesktopDomResult {
 	visibleText?: string;
 	interactive?: Array<Record<string, unknown>>;
 	console?: Array<{ level: string; text: string; at: number }>;
+	blocker?: Record<string, unknown>;
+	reason?: string;
 }
 
 async function delay(ms: number, token: CancellationToken): Promise<void> {
@@ -83,7 +85,7 @@ export async function retryDesktopDomCommand(
 		if (last.ok && last.code !== 'notFound' && last.code !== 'notVisible' && last.code !== 'disabled') {
 			return last;
 		}
-		if (last.code === 'ambiguous') {
+		if (last.code === 'ambiguous' || last.code === 'unsupported' || last.code === 'wrongControl') {
 			return last;
 		}
 		await delay(50, token);
@@ -166,6 +168,31 @@ export function formatDesktopFailure(result: DesktopDomResult, locator?: Desktop
 	}
 	if (result.code === 'disabled') {
 		return `${target} is disabled.`;
+	}
+	if (result.code === 'notStable') {
+		return `${target} did not become stable before the action timeout.`;
+	}
+	if (result.code === 'outsideViewport') {
+		return `${target} remained outside the reachable viewport after scrolling.`;
+	}
+	if (result.code === 'covered') {
+		const blocker = result.blocker;
+		const description = blocker
+			? `<${String(blocker.tag ?? 'element')}>${blocker.name ? ` "${String(blocker.name)}"` : ''}`
+			: 'another element';
+		return `${target} is covered by ${description}.`;
+	}
+	if (result.code === 'wrongControl') {
+		return `${target} does not support this control action.`;
+	}
+	if (result.code === 'optionNotFound') {
+		return `${target} has no option matching the requested value.`;
+	}
+	if (result.code === 'optionDisabled') {
+		return `${target} matched a disabled option.`;
+	}
+	if (result.code === 'unsupported' && result.reason) {
+		return `${target}: ${result.reason}`;
 	}
 	return `Action failed for ${target}${result.code ? ` (${result.code})` : ''}.`;
 }
