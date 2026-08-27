@@ -6,6 +6,7 @@ import assert from 'node:assert';
 import * as fs from 'node:fs';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import sqlite3 from '@vscode/sqlite3';
 import { suite, test, beforeEach, afterEach } from 'mocha';
 import { SqliteTemporalStore } from '../../temporal/persistence/node/sqliteTemporalStore.js';
@@ -354,6 +355,48 @@ suite('SqliteTemporalStore', () => {
 		await mainService.shutdown();
 		const after = JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')) as { ok: boolean };
 		assert.strictEqual(after.ok, false);
+	});
+
+	test('Quit close does not run PRAGMA optimize', () => {
+		const source = fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../temporal/persistence/node/sqliteTemporalStore.ts'), 'utf8');
+		const closeOnce = source.slice(source.indexOf('_closeOnce'), source.indexOf('_getDb():'));
+		assert.ok(closeOnce.includes('PRAGMA optimize belongs in runMaintenance, not Quit'));
+		assert.ok(!closeOnce.includes('PRAGMA optimize;'), 'close must not wait on planner analysis');
+		assert.match(source, /async runMaintenance[\s\S]*PRAGMA optimize;/);
+	});
+
+	test('Quit shutdown interrupts an in-flight write and keeps the store until the write drains', async () => {
+		const storageRoot = path.dirname(dbPath);
+		const mainService = new TemporalStoreMainService(storageRoot);
+		const ipcPath = path.join(storageRoot, 'shutdown-write.db');
+		await mainService.open(ipcPath);
+		const stores = (mainService as unknown as { _stores: Map<string, SqliteTemporalStore> })._stores;
+		const store = [...stores.values()][0];
+		let inTransaction = false;
+		let releaseWrite: (() => void) | undefined;
+		const gate = new Promise<void>(resolve => { releaseWrite = resolve; });
+		const pending = store.runInTransaction(async () => {
+			inTransaction = true;
+			await gate;
+			return 1;
+		});
+		for (let i = 0; i < 50 && !inTransaction; i++) {
+			await Promise.resolve();
+		}
+		assert.strictEqual(store.hasActiveWrite(), true);
+
+		const shutting = mainService.shutdown();
+		await Promise.resolve();
+		assert.strictEqual(store.hasActiveWrite(), true);
+		assert.strictEqual(stores.size, 1, 'shutdown must not drop a store with an active write');
+
+		releaseWrite?.();
+		const [writeResult] = await Promise.allSettled([pending, shutting]);
+		assert.strictEqual(store.hasActiveWrite(), false);
+		assert.ok(writeResult.status === 'fulfilled' || (writeResult.status === 'rejected' && /Cancelled|interrupt/i.test(String(writeResult.reason))));
+		const after = JSON.parse(await mainService.invoke(ipcPath, 'getAllRefs', '[]')) as { ok: boolean };
+		assert.strictEqual(after.ok, false);
+		mainService.dispose();
 	});
 
 	test('Electron-main store owner deduplicates concurrent opens and serves IPC calls afterward', async () => {

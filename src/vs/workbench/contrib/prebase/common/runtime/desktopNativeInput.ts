@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { CancellationToken } from '../../../../../base/common/cancellation.js';
+import { desktopCdpKeyParams, desktopCdpModifierBits } from '../../../../../platform/prebaseDesktop/common/desktopCdpKey.js';
 
 export interface DesktopKeyModifiers {
 	ctrl: boolean;
@@ -35,23 +36,6 @@ const WEBDRIVER_KEYS: Record<string, string> = {
 	PageDown: '\uE00F',
 };
 
-const VIRTUAL_KEYS: Record<string, { code: string; vk: number }> = {
-	Enter: { code: 'Enter', vk: 13 },
-	Tab: { code: 'Tab', vk: 9 },
-	Escape: { code: 'Escape', vk: 27 },
-	Backspace: { code: 'Backspace', vk: 8 },
-	Delete: { code: 'Delete', vk: 46 },
-	Space: { code: 'Space', vk: 32 },
-	Home: { code: 'Home', vk: 36 },
-	End: { code: 'End', vk: 35 },
-	ArrowLeft: { code: 'ArrowLeft', vk: 37 },
-	ArrowUp: { code: 'ArrowUp', vk: 38 },
-	ArrowRight: { code: 'ArrowRight', vk: 39 },
-	ArrowDown: { code: 'ArrowDown', vk: 40 },
-	PageUp: { code: 'PageUp', vk: 33 },
-	PageDown: { code: 'PageDown', vk: 34 },
-};
-
 export function parseDesktopKeyChord(value: string): { key: string; modifiers: DesktopKeyModifiers } {
 	const parts = String(value || '').split('+').filter(Boolean);
 	const keyPart = parts.pop() || '';
@@ -69,23 +53,11 @@ export function parseDesktopKeyChord(value: string): { key: string; modifiers: D
 }
 
 export function cdpModifierBits(modifiers: DesktopKeyModifiers): number {
-	return (modifiers.alt ? 1 : 0) + (modifiers.ctrl ? 2 : 0) + (modifiers.meta ? 4 : 0) + (modifiers.shift ? 8 : 0);
+	return desktopCdpModifierBits(modifiers);
 }
 
 export function cdpKeyParams(key: string, modifiers: DesktopKeyModifiers, type: 'keyDown' | 'keyUp' | 'char'): Record<string, unknown> {
-	const named = VIRTUAL_KEYS[key === ' ' ? 'Space' : key];
-	const isChar = key.length === 1;
-	const text = type === 'char' && isChar ? key : (type !== 'keyUp' && (key === 'Enter' || key === 'Space') ? (key === 'Enter' ? '\r' : ' ') : '');
-	return {
-		type: type === 'keyDown' && !isChar ? 'rawKeyDown' : type,
-		key: named ? (key === 'Space' ? ' ' : key) : key,
-		code: named?.code ?? (isChar ? `Key${key.toUpperCase()}` : key),
-		windowsVirtualKeyCode: named?.vk ?? (isChar ? key.toUpperCase().charCodeAt(0) : 0),
-		nativeVirtualKeyCode: named?.vk ?? (isChar ? key.toUpperCase().charCodeAt(0) : 0),
-		modifiers: cdpModifierBits(modifiers),
-		text,
-		unmodifiedText: text,
-	};
+	return desktopCdpKeyParams(key, modifiers, type);
 }
 
 export function webDriverKeyValue(key: string): string {

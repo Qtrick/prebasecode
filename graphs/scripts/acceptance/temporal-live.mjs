@@ -14,16 +14,22 @@ import { chromium } from 'playwright-core';
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
-const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3.18');
+const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final');
 const temporalDir = join(evidenceDir, 'temporal');
 const screenshotDir = join(evidenceDir, 'screenshots');
 const shutdownDir = join(evidenceDir, 'shutdown');
 
 export function temporalAcceptanceFailures(evidence) {
 	const failures = [];
-	if (evidence.fixture?.commits !== 10) failures.push('fixture commit count is not 10');
-	if (evidence.fixture?.files?.length !== 4) failures.push('fixture HEAD does not contain four files');
-	if (evidence.fixture?.expectedModifiedPath !== 'src/tally.js') failures.push('fixture first-parent diff is not src/tally.js');
+	const large = evidence.scale === 'large';
+	if (large) {
+		if (!(evidence.fixture?.commits >= 50)) failures.push('large fixture commit count is below 50');
+		if (!(evidence.fixture?.files?.length >= 250)) failures.push('large fixture HEAD does not contain 250+ files');
+	} else {
+		if (evidence.fixture?.commits !== 10) failures.push('fixture commit count is not 10');
+		if (evidence.fixture?.files?.length !== 4) failures.push('fixture HEAD does not contain four files');
+		if (evidence.fixture?.expectedModifiedPath !== 'src/tally.js') failures.push('fixture first-parent diff is not src/tally.js');
+	}
 	if (!evidence.targetOpened) failures.push('Temporal Graph target did not open');
 	if (!evidence.repoLoaded) failures.push('Temporal fixture repository did not load');
 
@@ -41,6 +47,9 @@ export function temporalAcceptanceFailures(evidence) {
 		if (!Number.isFinite(full.transform?.x) || !Number.isFinite(full.transform?.y) || !(full.transform?.k > 0)) {
 			failures.push('Full Map transform is invalid');
 		}
+		if (large && !(full.receivedNodeCount >= 250)) failures.push('large Full Map received fewer than 250 nodes');
+		if (large && full.screenFillRatio !== undefined && full.screenFillRatio < 0.08) failures.push('large Full Map leaves a huge empty canvas');
+		if (large && full.maxCommunityOverlap !== undefined && full.maxCommunityOverlap > 0.85) failures.push('large Full Map communities overlap too much');
 	}
 
 	const focus = evidence.focusChanges;
@@ -52,10 +61,14 @@ export function temporalAcceptanceFailures(evidence) {
 		if (!(focus.visibleNodeCount > 0)) failures.push('Focus Changes exposed zero changed nodes');
 		if (!(focus.nodesDrawn > 0)) failures.push('Focus Changes drew zero changed nodes');
 		if (!(focus.canvas?.distinctPixels > 0)) failures.push('Focus Changes canvas is blank');
+		if (large && !(focus.visibleNodeCount >= 4)) failures.push('large Focus Changes did not keep a focused set visible');
 	}
 
 	if (evidence.unexpectedError) failures.push('Workbench exposed an unexpected Error state');
 	if (evidence.stuckIndexing) failures.push('Temporal indexing remained stuck');
+	if (evidence.camera?.afterUserZoom?.k && evidence.camera?.afterWait?.k && Math.abs(evidence.camera.afterWait.k - evidence.camera.afterUserZoom.k) > 0.05) {
+		failures.push('Temporal camera stole the user zoom during a same-mode refresh');
+	}
 	if (evidence.quit?.remaining !== 'gone') failures.push('PreBase did not quit');
 	return failures;
 }
@@ -94,6 +107,91 @@ function createFixture() {
 		files,
 		expectedModifiedPath,
 		firstParentSummary: git(dir, ['show', '--stat', '--oneline', '--format=%H %P %s', 'HEAD']),
+	};
+}
+
+function createLargeFixture() {
+	const layers = ['core', 'ui', 'host', 'parser', 'runtime', 'desktop', 'magnus', 'cloud', 'test', 'adapters', 'layout', 'util'];
+	const perLayer = 28;
+	const dir = mkdtempSync(join(tmpdir(), 'pb-temporal-large-'));
+	git(dir, ['init', '-q', '-b', 'main']);
+	git(dir, ['config', 'user.email', 'phase3final@prebase.local']);
+	git(dir, ['config', 'user.name', 'Phase 3 Final']);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'temporal-large', private: true }, null, 2));
+	git(dir, ['add', '--', 'package.json']);
+	git(dir, ['commit', '-qm', 'chore: init']);
+
+	const paths = [];
+	for (const layer of layers) {
+		mkdirSync(join(dir, 'src', layer), { recursive: true });
+		for (let index = 0; index < perLayer; index++) {
+			paths.push(`src/${layer}/mod-${String(index).padStart(2, '0')}.js`);
+		}
+	}
+
+	const writeModule = (relative, extraImport) => {
+		const parts = relative.split('/');
+		const layer = parts[1];
+		const index = Number(parts[2].replace(/[^\d]/g, ''));
+		const nextInLayer = `./mod-${String((index + 1) % perLayer).padStart(2, '0')}.js`;
+		const lines = [];
+		if (index < perLayer - 1) {
+			lines.push(`import { token as next } from '${nextInLayer}';`, 'void next;');
+		} else {
+			lines.push(`import { token as cycle } from './mod-00.js';`, 'void cycle;');
+		}
+		if (index % 7 === 0) {
+			const crossLayer = layers[(layers.indexOf(layer) + 3) % layers.length];
+			lines.push(`import { token as cross } from '../${crossLayer}/mod-${String(index % perLayer).padStart(2, '0')}.js';`, 'void cross;');
+		}
+		if (extraImport) {
+			lines.push(extraImport);
+		}
+		lines.push(`export const token = '${relative}';`, `export function run() { return token; }`, '');
+		writeFileSync(join(dir, relative), lines.join('\n'));
+	};
+
+	for (const relative of paths) {
+		writeModule(relative);
+	}
+	git(dir, ['add', '-A']);
+	git(dir, ['commit', '-qm', 'feat: import layered architecture']);
+
+	for (let revision = 1; revision <= 45; revision++) {
+		const relative = paths[(revision * 7) % paths.length];
+		writeModule(relative, `export const revision = ${revision};`);
+		git(dir, ['add', '--', relative]);
+		git(dir, ['commit', '-qm', `fix: revise ${relative}`]);
+	}
+
+	const renamedFrom = paths[10];
+	const renamedTo = renamedFrom.replace('.js', '.renamed.js');
+	git(dir, ['mv', renamedFrom, renamedTo]);
+	git(dir, ['commit', '-qm', `refactor: rename ${renamedFrom}`]);
+
+	const deleted = paths[20];
+	git(dir, ['rm', '-q', '--', deleted]);
+	git(dir, ['commit', '-qm', `chore: delete ${deleted}`]);
+
+	const touched = [paths[1], paths[40], paths[80], paths[120], paths[160], paths[200], paths[240], paths[300]];
+	for (const relative of touched) {
+		if (!relative || relative === deleted || relative === renamedFrom) {
+			continue;
+		}
+		writeModule(relative, 'export const wave = 1;');
+	}
+	git(dir, ['add', '-A']);
+	git(dir, ['commit', '-qm', 'feat: cross-community wave']);
+
+	const files = git(dir, ['ls-tree', '-r', '--name-only', 'HEAD']).split('\n').filter(Boolean);
+	return {
+		dir,
+		head: git(dir, ['rev-parse', 'HEAD']),
+		commits: Number(git(dir, ['rev-list', '--count', 'HEAD'])),
+		files,
+		expectedModifiedPath: git(dir, ['diff', '--name-only', 'HEAD^', 'HEAD']),
+		firstParentSummary: git(dir, ['show', '--stat', '--oneline', '--format=%H %P %s', 'HEAD']),
+		scale: 'large',
 	};
 }
 
@@ -194,7 +292,9 @@ async function run() {
 	mkdirSync(temporalDir, { recursive: true });
 	mkdirSync(screenshotDir, { recursive: true });
 	mkdirSync(shutdownDir, { recursive: true });
-	const fixture = createFixture();
+	const fixture = process.argv.includes('--large') ? createLargeFixture() : createFixture();
+	const scale = process.argv.includes('--large') ? 'large' : 'small';
+	const evidenceName = scale === 'large' ? 'large-live.json' : 'live.json';
 	const { stdout } = await execFileAsync(join(repo, '.agents/skills/launch/scripts/launch.sh'), ['--', fixture.dir], {
 		cwd: repo,
 		maxBuffer: 10 * 1024 * 1024,
@@ -202,7 +302,7 @@ async function run() {
 	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
 	let browser;
 	let quit;
-	let evidence = { fixture, pid: info.pid, cdpPort: info.cdpPort };
+	let evidence = { scale, fixture, pid: info.pid, cdpPort: info.cdpPort };
 	try {
 		browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
 		const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
@@ -210,25 +310,33 @@ async function run() {
 		await dismissAuth(page);
 		await page.getByRole('tab', { name: 'PreBase Maps', exact: true }).click();
 		await page.getByRole('button', { name: 'Temporal', exact: true }).click();
-		const frame = await findGraphFrame(page);
+		const metricTimeout = scale === 'large' ? 180_000 : 45_000;
+		const frame = await findGraphFrame(page, scale === 'large' ? 120_000 : 60_000);
 		if (!frame) throw new Error('Temporal Graph webview did not open');
 		await installMetricsBridge(frame);
 		const fullMap = await waitForMetrics(page, frame, metrics =>
 			metrics.displayMode === 'state' &&
 			metrics.renderedCommitSha === fixture.head &&
-			metrics.nodesDrawn > 0
-		);
-		await page.screenshot({ path: join(screenshotDir, 'temporal-full-map.png') });
-		await frame.locator('#netCanvas').screenshot({ path: join(screenshotDir, 'temporal-full-map-canvas.png') });
+			metrics.nodesDrawn > 0 &&
+			(scale !== 'large' || metrics.receivedNodeCount >= 250)
+		, metricTimeout);
+		await page.screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-full-map.png' : 'temporal-full-map.png') });
+		await frame.locator('#netCanvas').screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-full-map-canvas.png' : 'temporal-full-map-canvas.png') });
 
 		await page.getByRole('button', { name: 'Focus Changes', exact: true }).click();
 		const focusChanges = await waitForMetrics(page, frame, metrics =>
 			metrics.displayMode === 'changes' &&
 			metrics.summary?.modifiedCount >= 1 &&
 			metrics.nodesDrawn > 0
-		);
-		await page.screenshot({ path: join(screenshotDir, 'temporal-focus-changes.png') });
-		await frame.locator('#netCanvas').screenshot({ path: join(screenshotDir, 'temporal-focus-changes-canvas.png') });
+		, metricTimeout);
+		await page.screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-focus-changes.png' : 'temporal-focus-changes.png') });
+		await frame.locator('#netCanvas').screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-focus-changes-canvas.png' : 'temporal-focus-changes-canvas.png') });
+
+		const afterFocus = await readMetrics(frame);
+		await frame.getByRole('button', { name: 'Zoom in', exact: true }).click();
+		const afterUserZoom = await readMetrics(frame);
+		await page.waitForTimeout(1500);
+		const afterWait = await readMetrics(frame);
 
 		await frame.getByRole('button', { name: 'Fit to screen', exact: true }).click();
 		await frame.getByRole('button', { name: 'Zoom in', exact: true }).click();
@@ -244,6 +352,11 @@ async function run() {
 			repoLoaded: workbenchText.includes(fixture.dir.split('/').at(-1)),
 			fullMap,
 			focusChanges,
+			camera: {
+				afterFocus: afterFocus?.transform,
+				afterUserZoom: afterUserZoom?.transform,
+				afterWait: afterWait?.transform,
+			},
 			stuckIndexing: /Indexing/.test(workbenchText) && !fullMap?.nodesDrawn,
 			unexpectedError: /\bError\b/.test(workbenchText) && !/error\.ts/.test(workbenchText),
 		};
@@ -257,8 +370,8 @@ async function run() {
 
 	const failures = temporalAcceptanceFailures(evidence);
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
-	writeFileSync(join(temporalDir, 'live.json'), JSON.stringify(result, null, 2));
-	writeFileSync(join(shutdownDir, 'temporal-quit.json'), JSON.stringify(quit, null, 2));
+	writeFileSync(join(temporalDir, evidenceName), JSON.stringify(result, null, 2));
+	writeFileSync(join(shutdownDir, scale === 'large' ? 'temporal-large-quit.json' : 'temporal-quit.json'), JSON.stringify(quit, null, 2));
 	console.log(JSON.stringify(result, null, 2));
 	if (!result.ok) process.exitCode = 1;
 }

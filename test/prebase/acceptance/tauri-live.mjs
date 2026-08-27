@@ -18,8 +18,8 @@ import { fileURLToPath } from 'node:url';
 
 const repo = resolve(dirname(fileURLToPath(import.meta.url)), '../../..');
 const fixture = join(repo, 'test/prebase/fixtures/desktop-tauri');
-const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3.18/tauri');
-const screenshotDir = join(repo, 'reports/graph-acceptance/phase-3.18/screenshots');
+const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/tauri');
+const screenshotDir = join(repo, 'reports/graph-acceptance/phase-3-final/screenshots');
 const targetDir = join(repo, '.build/tauri-fixture-target');
 mkdirSync(evidenceDir, { recursive: true });
 mkdirSync(screenshotDir, { recursive: true });
@@ -63,8 +63,12 @@ async function waitForDriver(baseUrl, child, getLog) {
 		if (child.exitCode !== null) throw new Error(`Tauri CLI exited ${child.exitCode}: ${getLog().slice(-2_000)}`);
 		try {
 			const status = await request(`${baseUrl}/status`);
-			if (status.status > 0 && status.status < 500) return;
-			last = `HTTP ${status.status}`;
+			const body = status.body && typeof status.body === 'object' ? status.body : {};
+			const ready = body.value?.ready === true || body.ready === true;
+			if (status.status >= 200 && status.status < 300 && ready) {
+				return status;
+			}
+			last = `HTTP ${status.status} ready=${String(body.value?.ready ?? body.ready)}`;
 		} catch (error) {
 			last = error instanceof Error ? error.message : String(error);
 		}
@@ -128,7 +132,7 @@ for (const stream of [child.stdout, child.stderr]) {
 let sessionId;
 let result;
 try {
-	await waitForDriver(baseUrl, child, () => log);
+	const statusPayload = await waitForDriver(baseUrl, child, () => log);
 	const session = await request(`${baseUrl}/session`, {
 		method: 'POST',
 		body: JSON.stringify({ capabilities: { alwaysMatch: {} } }),
@@ -195,7 +199,8 @@ try {
 		actions: ['fill Name with Ada', 'click Greet'],
 		assertions: ['status == Hello, Ada', 'data-backend-invoke == true'],
 		backendProof,
-		screenshotPath: 'reports/graph-acceptance/phase-3.18/screenshots/tauri-full-app-rust-invoke.png',
+		webDriverStatus: statusPayload,
+		screenshotPath: 'reports/graph-acceptance/phase-3-final/screenshots/tauri-full-app-rust-invoke.png',
 		startDurationMs: Date.now() - startedAt,
 	};
 } catch (error) {

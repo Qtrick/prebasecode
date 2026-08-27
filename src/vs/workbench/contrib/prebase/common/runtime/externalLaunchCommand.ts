@@ -21,7 +21,8 @@ export function buildElectronExternalLaunchRequest(mainEntry: string): ExternalL
 export function buildTauriExternalLaunchRequest(scriptName?: string, testingFeature = false, packageManager: PackageManager = 'npm'): ExternalLaunchRequest {
 	const testingArgs = testingFeature ? ['--features', 'prebase-testing'] as const : [];
 	if (scriptName) {
-		return buildPackageScriptExternalLaunchRequest(packageManager, scriptName, testingArgs);
+		const extras = scriptName === 'tauri' ? ['dev', ...testingArgs] : [...testingArgs];
+		return buildPackageScriptExternalLaunchRequest(packageManager, scriptName, extras);
 	}
 	return { command: 'cargo', args: ['tauri', 'dev', ...testingArgs] };
 }

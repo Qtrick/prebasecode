@@ -1,0 +1,28 @@
+{
+  "ok": false,
+  "failures": [
+    "Code Graph did not draw nodes",
+    "Keyboard focus check failed"
+  ],
+  "prebasePid": 93789,
+  "c3_folderOpen": true,
+  "e1_saveUndo": true,
+  "e2_search": true,
+  "e3_scm": true,
+  "e4_terminal": true,
+  "codeGraph": {
+    "frameFound": true,
+    "nodesDrawn": false,
+    "selection": true
+  },
+  "themes": {
+    "dark": true
+  },
+  "error": "page.evaluate: Target page, context or browser has been closed\n    at workbenchCommand (/Users/qunyingfan/Prebasecode/test/prebase/acceptance/workbenchHarness.mjs:75:14)\n    at run (/Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-core-ide-live.mjs:79:9)\n    at async file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-core-ide-live.mjs:107:2",
+  "quit": {
+    "before": "93789     1  28.9 197040 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 113,
+    "remaining": "gone",
+    "usedSigkill": false
+  }
+}

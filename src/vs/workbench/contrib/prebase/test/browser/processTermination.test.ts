@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { terminateOwnedProcess, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, type IProcessTerminationTarget, type ProcessTerminationSignal } from '../../../../../platform/prebaseDesktop/common/processTermination.js';
+import { terminateOwnedProcess, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, sanitizeOwnedDesktopChildEnv, type IProcessTerminationTarget, type ProcessTerminationSignal } from '../../../../../platform/prebaseDesktop/common/processTermination.js';
 
 class FakeTerminationTarget implements IProcessTerminationTarget {
 	readonly signals: ProcessTerminationSignal[] = [];
@@ -76,5 +76,30 @@ suite('terminateOwnedProcess', () => {
 		assert.deepStrictEqual(target.waitTimeouts, [3_000, 3_000]);
 		assert.strictEqual(target.waitTimeouts[0] + target.waitTimeouts[1], POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS);
 		assert.notStrictEqual(POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, 4_000);
+	});
+});
+
+suite('sanitizeOwnedDesktopChildEnv', () => {
+	test('strips CARGO_TARGET_DIR even when the caller overlay tries to re-inject it', () => {
+		const childEnv = sanitizeOwnedDesktopChildEnv({
+			PATH: '/usr/bin',
+			CARGO_TARGET_DIR: '/from-process',
+			CARGO_BUILD_TARGET_DIR: '/from-process-build',
+			ELECTRON_RUN_AS_NODE: '1',
+			TAURI_WEBDRIVER_PORT: '4444',
+			KEEP: 'yes',
+		}, {
+			CARGO_TARGET_DIR: '/injected-by-caller',
+			CARGO_BUILD_TARGET_DIR: '/injected-build',
+			ELECTRON_RUN_AS_NODE: '1',
+			TAURI_WEBDRIVER_PORT: '9999',
+			KEEP: 'overlaid',
+		});
+		assert.strictEqual(childEnv.CARGO_TARGET_DIR, undefined);
+		assert.strictEqual(childEnv.CARGO_BUILD_TARGET_DIR, undefined);
+		assert.strictEqual(childEnv.ELECTRON_RUN_AS_NODE, undefined);
+		assert.strictEqual(childEnv.TAURI_WEBDRIVER_PORT, undefined);
+		assert.strictEqual(childEnv.KEEP, 'overlaid');
+		assert.strictEqual(childEnv.PATH, '/usr/bin');
 	});
 });

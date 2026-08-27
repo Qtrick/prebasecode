@@ -13,9 +13,10 @@ import { IPreBaseDesktopMainService, type IPreBaseDesktopSpawnResult } from '../
 import { CdpConnection, type MinimalWebSocket } from '../common/cdpConnection.js';
 import { MAX_EXTERNAL_SCREENSHOT_CDP_MESSAGE_BYTES, selectOwnedCdpPageWebSocketUrl, validateCdpPngScreenshotData, type CdpDiscoveryTarget } from '../common/cdpScreenshot.js';
 import { existsSync } from 'fs';
-import { resolveExternalLaunchCommand } from '../common/externalLaunchResolver.js';
+import { desktopCdpKeyParams } from '../common/desktopCdpKey.js';
+import { resolveExternalLaunchCommand, withElectronCdpLaunchArgs } from '../common/externalLaunchResolver.js';
 import { ProcessOutputBuffer } from '../common/processOutputBuffer.js';
-import { terminateOwnedProcess, resolveDesktopShutdownPolicy, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, type ProcessTerminationSignal } from '../common/processTermination.js';
+import { terminateOwnedProcess, resolveDesktopShutdownPolicy, sanitizeOwnedDesktopChildEnv, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, type ProcessTerminationSignal } from '../common/processTermination.js';
 import { ILifecycleMainService } from '../../lifecycle/electron-main/lifecycleMainService.js';
 import { ILogService } from '../../log/common/log.js';
 import { IConfigurationService } from '../../configuration/common/configuration.js';
@@ -121,15 +122,7 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 				if (child) {
 					try { child.unref(); } catch { /* ignore */ }
 				}
-				const port = this._ownedPortsByPid.get(pid);
-				if (port) {
-					this._ownedDebugPorts.delete(port);
-				}
-				this._ownedPids.delete(pid);
-				this._externalChildren.delete(pid);
-				this._externalOutput.delete(pid);
-				this._ownedPurpose.delete(pid);
-				this._ownedPortsByPid.delete(pid);
+				this._forgetOwnedPid(pid);
 			}
 		}
 		if (killPids.size) {
@@ -145,11 +138,7 @@ export class PreBaseDesktopMainService extends Disposable implements IPreBaseDes
 			try {
 				const stopped = await this._killProcessTree(pid);
 				if (stopped) {
-					this._externalChildren.delete(pid);
-					this._externalOutput.delete(pid);
-					this._ownedPids.delete(pid);
-					this._ownedPurpose.delete(pid);
-					this._ownedPortsByPid.delete(pid);
+					this._forgetOwnedPid(pid);
 				} else {
 					this._logService?.warn(`[PreBase Desktop] Owned process ${pid} did not confirm exit within the ${OWNED_PROCESS_SHUTDOWN_CEILING_MS}ms budget`);
 				}
@@ -334,6 +323,93 @@ p{opacity:.75;margin:0;line-height:1.45}
 		return this._marshalForIpc(value);
 	}
 
+	async listOwnedCdpTargets(debugPort: number): Promise<Array<{ id: string; type: string; title: string; url: string; webSocketDebuggerUrl?: string }>> {
+		if (!Number.isInteger(debugPort) || debugPort <= 0 || debugPort > 65535) {
+			throw new Error('Invalid debug port.');
+		}
+		if (!this._ownedDebugPorts.has(debugPort)) {
+			throw new Error('CDP is limited to PreBase-owned localhost debugging ports.');
+		}
+		const targets = await this._fetchJson<unknown>(`http://127.0.0.1:${debugPort}/json`);
+		if (!Array.isArray(targets)) {
+			return [];
+		}
+		return targets.flatMap((entry): Array<{ id: string; type: string; title: string; url: string; webSocketDebuggerUrl?: string }> => {
+			if (!entry || typeof entry !== 'object') {
+				return [];
+			}
+			const target = entry as { id?: unknown; type?: unknown; title?: unknown; url?: unknown; webSocketDebuggerUrl?: unknown };
+			if (typeof target.id !== 'string' || !target.id) {
+				return [];
+			}
+			return [{
+				id: target.id,
+				type: typeof target.type === 'string' ? target.type : '',
+				title: typeof target.title === 'string' ? target.title : '',
+				url: typeof target.url === 'string' ? target.url : '',
+				webSocketDebuggerUrl: typeof target.webSocketDebuggerUrl === 'string' ? target.webSocketDebuggerUrl : undefined,
+			}];
+		});
+	}
+
+	async requestOwnedLoopbackJson(url: string, init: { method?: string; body?: string; timeoutMs?: number } = {}): Promise<{ status: number; body: unknown; json: boolean }> {
+		if (!this._isLocalhostUrl(url) || !/^https?:/.test(url)) {
+			throw new Error('Owned loopback requests must use http(s) on localhost.');
+		}
+		const parsed = new URL(url);
+		const port = Number(parsed.port);
+		if (!this._ownedDebugPorts.has(port)) {
+			throw new Error('Loopback HTTP is limited to PreBase-owned WebDriver or debug ports.');
+		}
+		const method = (init.method ?? 'GET').toUpperCase();
+		if (!['GET', 'POST', 'DELETE'].includes(method)) {
+			throw new Error('Owned loopback requests are limited to GET, POST, and DELETE.');
+		}
+		if (init.body && (init.body.includes('\0') || Buffer.byteLength(init.body, 'utf8') > MAX_DESKTOP_EVALUATION_EXPRESSION_BYTES)) {
+			throw new Error('Owned loopback request body is missing or too large.');
+		}
+		const http = await import('http');
+		const timeoutMs = Math.max(1, Math.min(30_000, init.timeoutMs ?? 5_000));
+		return new Promise((resolve, reject) => {
+			const req = http.request({
+				hostname: parsed.hostname === 'localhost' ? '127.0.0.1' : parsed.hostname,
+				port: parsed.port,
+				path: `${parsed.pathname}${parsed.search}`,
+				method,
+				headers: { 'content-type': 'application/json' },
+			}, res => {
+				const chunks: Buffer[] = [];
+				let bodyBytes = 0;
+				res.on('data', (chunk: Buffer) => {
+					bodyBytes += chunk.byteLength;
+					if (bodyBytes > MAX_MANAGED_SCREENSHOT_BYTES) {
+						req.destroy(new Error('Owned loopback response exceeds the size limit.'));
+						return;
+					}
+					chunks.push(chunk);
+				});
+				res.on('end', () => {
+					const text = Buffer.concat(chunks).toString('utf8');
+					if (!text) {
+						resolve({ status: res.statusCode ?? 0, body: undefined, json: false });
+						return;
+					}
+					try {
+						resolve({ status: res.statusCode ?? 0, body: JSON.parse(text), json: true });
+					} catch {
+						resolve({ status: res.statusCode ?? 0, body: undefined, json: false });
+					}
+				});
+			});
+			req.on('error', reject);
+			req.setTimeout(timeoutMs, () => req.destroy(new Error('Owned loopback request timed out')));
+			if (init.body && method !== 'GET') {
+				req.write(init.body);
+			}
+			req.end();
+		});
+	}
+
 	async captureScreenshotViaCdp(debugPort: number): Promise<string> {
 		const pngBase64 = await this._cdpCaptureScreenshot(await this._getOwnedCdpPageWebSocketUrl(debugPort));
 		const png = Buffer.from(pngBase64, 'base64');
@@ -377,7 +453,7 @@ p{opacity:.75;margin:0;line-height:1.45}
 			modifiers.meta ? 'meta' : undefined,
 			modifiers.alt ? 'alt' : undefined,
 			modifiers.shift ? 'shift' : undefined,
-		].filter((value): value is string => Boolean(value));
+		].filter((value): value is 'control' | 'meta' | 'alt' | 'shift' => Boolean(value));
 		const electronKey = key === ' ' || key === 'Space' ? 'Space' : key;
 		const managed = target.sessionId ? this._managed.get(target.sessionId) : undefined;
 		if (managed) {
@@ -388,30 +464,16 @@ p{opacity:.75;margin:0;line-height:1.45}
 		if (!target.debugPort) {
 			throw new Error('Owned key input requires a managed session or CDP port.');
 		}
-		const bits = (modifiers.alt ? 1 : 0) + (modifiers.ctrl ? 2 : 0) + (modifiers.meta ? 4 : 0) + (modifiers.shift ? 8 : 0);
-		const named: Record<string, { code: string; vk: number }> = {
-			Enter: { code: 'Enter', vk: 13 }, Tab: { code: 'Tab', vk: 9 }, Escape: { code: 'Escape', vk: 27 },
-			Backspace: { code: 'Backspace', vk: 8 }, Delete: { code: 'Delete', vk: 46 }, Space: { code: 'Space', vk: 32 },
-			Home: { code: 'Home', vk: 36 }, End: { code: 'End', vk: 35 }, ArrowLeft: { code: 'ArrowLeft', vk: 37 },
-			ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowRight: { code: 'ArrowRight', vk: 39 }, ArrowDown: { code: 'ArrowDown', vk: 40 },
-			PageUp: { code: 'PageUp', vk: 33 }, PageDown: { code: 'PageDown', vk: 34 },
-		};
-		const info = named[key === ' ' ? 'Space' : key];
 		const isChar = key.length === 1;
-		const insertText = isChar ? key : (key === 'Enter' ? '\r' : (key === 'Space' || key === ' ' ? ' ' : ''));
-		const params = {
-			key: key === 'Space' || key === ' ' ? ' ' : key,
-			code: info?.code ?? (isChar ? `Key${key.toUpperCase()}` : key),
-			windowsVirtualKeyCode: info?.vk ?? (isChar ? key.toUpperCase().charCodeAt(0) : 0),
-			nativeVirtualKeyCode: info?.vk ?? (isChar ? key.toUpperCase().charCodeAt(0) : 0),
-			modifiers: bits,
-		};
+		const shortcut = Boolean(modifiers.ctrl || modifiers.meta || modifiers.alt);
+		const commands = (key === 'A' || key === 'a') && (modifiers.meta || modifiers.ctrl) && !modifiers.alt && !modifiers.shift ? ['SelectAll'] : undefined;
 		await this._withCdpConnection(await this._getOwnedCdpPageWebSocketUrl(target.debugPort), 'key', 64 * 1024, async connection => {
-			await connection.request('Input.dispatchKeyEvent', { ...params, type: info ? 'rawKeyDown' : 'keyDown', text: insertText });
-			if (isChar || key === 'Space' || key === ' ') {
-				await connection.request('Input.dispatchKeyEvent', { ...params, type: 'char', text: isChar ? key : ' ' });
+			await connection.request('Input.dispatchKeyEvent', { ...desktopCdpKeyParams(key, modifiers, 'keyDown'), ...(commands ? { commands } : {}) });
+			// ponytail: skip char for modifier shortcuts so Meta/Control+A selects instead of inserting "A"
+			if (!shortcut && (isChar || key === 'Space' || key === ' ')) {
+				await connection.request('Input.dispatchKeyEvent', desktopCdpKeyParams(key, modifiers, 'char'));
 			}
-			await connection.request('Input.dispatchKeyEvent', { ...params, type: 'keyUp', text: '' });
+			await connection.request('Input.dispatchKeyEvent', desktopCdpKeyParams(key, modifiers, 'keyUp'));
 		});
 	}
 
@@ -445,17 +507,11 @@ p{opacity:.75;margin:0;line-height:1.45}
 			throw new Error('Invalid external launch command.');
 		}
 		const args = [...request.args];
-		const childEnv: Record<string, string> = { ...process.env as Record<string, string>, ...env };
-		delete childEnv.TAURI_WEBDRIVER_PORT;
+		const childEnv = sanitizeOwnedDesktopChildEnv(process.env, env);
 		const needsPort = electronCdp || webDriver;
 		const port = needsPort ? (debugPort > 0 ? debugPort : await this._allocateDebugPort()) : 0;
 		if (electronCdp) {
-			if (!args.some(arg => /^--remote-debugging-port(?:=|$)/.test(arg))) {
-				args.push(`--remote-debugging-port=${port}`);
-			}
-			if (!args.some(arg => /^--remote-debugging-address(?:=|$)/.test(arg))) {
-				args.push('--remote-debugging-address=127.0.0.1');
-			}
+			args.splice(0, args.length, ...withElectronCdpLaunchArgs(request.command, args, port));
 			const priorExtra = process.env.ELECTRON_EXTRA_LAUNCH_ARGS ?? '';
 			childEnv.ELECTRON_EXTRA_LAUNCH_ARGS = `${priorExtra} --remote-debugging-port=${port} --remote-debugging-address=127.0.0.1`.trim();
 		} else if (webDriver) {
@@ -489,22 +545,13 @@ p{opacity:.75;margin:0;line-height:1.45}
 		child.stderr?.on('data', chunk => output.append('stderr', chunk));
 		this._ownedPids.add(child.pid);
 		this._ownedPurpose.set(child.pid, purpose);
-		if (electronCdp) {
+		if (electronCdp || webDriver) {
 			this._ownedDebugPorts.add(port);
 			this._ownedPortsByPid.set(child.pid, port);
 		}
 		this._externalChildren.set(child.pid, child);
-		child.on('exit', () => {
-			if (child.pid) {
-				this._ownedPids.delete(child.pid);
-				this._externalChildren.delete(child.pid);
-				this._ownedPurpose.delete(child.pid);
-				this._ownedPortsByPid.delete(child.pid);
-			}
-			if (port) {
-				this._ownedDebugPorts.delete(port);
-			}
-		});
+		// ponytail: keep pid/port owned until killOwnedProcess. cargo/npm wrappers can
+		// exit or exec while the Tauri WebDriver grandchild is still starting.
 		child.once('close', () => output.flush());
 		this._rememberProcessOutput(child.pid, output);
 		return {
@@ -531,13 +578,27 @@ p{opacity:.75;margin:0;line-height:1.45}
 	}
 
 	async killOwnedProcess(pid: number): Promise<void> {
-		if (!this._ownedPids.has(pid)) {
+		if (!this._ownedPids.has(pid) && !this._ownedPortsByPid.has(pid)) {
 			return;
 		}
 		const stopped = await this._killProcessTree(pid);
-		if (!stopped) {
-			throw new Error(`PreBase could not confirm termination of owned process ${pid}.`);
+		if (stopped) {
+			this._forgetOwnedPid(pid);
+			return;
 		}
+		throw new Error(`PreBase could not confirm termination of owned process ${pid}.`);
+	}
+
+	private _forgetOwnedPid(pid: number): void {
+		const port = this._ownedPortsByPid.get(pid);
+		if (port) {
+			this._ownedDebugPorts.delete(port);
+		}
+		this._externalChildren.delete(pid);
+		this._externalOutput.delete(pid);
+		this._ownedPids.delete(pid);
+		this._ownedPurpose.delete(pid);
+		this._ownedPortsByPid.delete(pid);
 	}
 
 	async killAllOwned(): Promise<void> {
@@ -761,14 +822,11 @@ p{opacity:.75;margin:0;line-height:1.45}
 
 	private async _killProcessTree(pid: number): Promise<boolean> {
 		const child = this._externalChildren.get(pid);
-		if (!child || child.exitCode !== null || child.signalCode !== null) {
-			return true;
-		}
 		if (process.platform !== 'win32') {
 			return terminateOwnedProcess({
-				isExited: () => child.exitCode !== null || child.signalCode !== null,
+				isExited: () => !this._processGroupAlive(pid),
 				sendSignal: signal => this._signalProcessTree(child, pid, signal),
-				waitForExit: timeoutMs => this._waitForChildExit(child, timeoutMs),
+				waitForExit: timeoutMs => this._waitForProcessGroupExit(pid, timeoutMs),
 			});
 		}
 		await new Promise<void>(resolve => {
@@ -794,16 +852,61 @@ p{opacity:.75;margin:0;line-height:1.45}
 				finish();
 			}, WINDOWS_TASKKILL_EXEC_TIMEOUT_MS);
 		});
-		return this._waitForChildExit(child, WINDOWS_TASKKILL_EXIT_WAIT_MS);
+		if (child && child.exitCode === null && child.signalCode === null) {
+			return this._waitForChildExit(child, WINDOWS_TASKKILL_EXIT_WAIT_MS);
+		}
+		return !this._processGroupAlive(pid);
 	}
 
-	private _signalProcessTree(child: ChildProcess, pid: number, signal: ProcessTerminationSignal): boolean {
+	private _processGroupAlive(pid: number): boolean {
+		if (process.platform !== 'win32') {
+			try {
+				process.kill(-pid, 0);
+				return true;
+			} catch {
+				// fall through to the single-pid probe
+			}
+		}
+		try {
+			process.kill(pid, 0);
+			return true;
+		} catch {
+			return false;
+		}
+	}
+
+	private _waitForProcessGroupExit(pid: number, timeoutMs: number): Promise<boolean> {
+		if (!this._processGroupAlive(pid)) {
+			return Promise.resolve(true);
+		}
+		return new Promise(resolve => {
+			const started = Date.now();
+			const tick = () => {
+				if (!this._processGroupAlive(pid)) {
+					resolve(true);
+					return;
+				}
+				if (Date.now() - started >= timeoutMs) {
+					resolve(false);
+					return;
+				}
+				setTimeout(tick, 50);
+			};
+			tick();
+		});
+	}
+
+	private _signalProcessTree(child: ChildProcess | undefined, pid: number, signal: ProcessTerminationSignal): boolean {
 		try {
 			process.kill(-pid, signal);
 			return true;
 		} catch {
 			try {
-				return child.kill(signal);
+				if (child) {
+					return child.kill(signal);
+				}
+				process.kill(pid, signal);
+				return true;
 			} catch {
 				return false;
 			}

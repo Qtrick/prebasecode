@@ -31,9 +31,28 @@ export interface TauriTestingSetupState {
 	dependencyPresent: boolean;
 	featurePresent: boolean;
 	featureIncludesDriver: boolean;
+	pluginPresent: boolean;
+	pluginGuarded: boolean;
+	/** String presence only. Ready requires pluginGuarded. */
 	pluginRegistered: boolean;
 	permissionPresent: boolean;
 	ready: boolean;
+}
+
+function countPluginInits(rust: string): number {
+	return rust.match(/tauri_plugin_wdio_webdriver\s*::\s*init\s*\(\s*\)/g)?.length ?? 0;
+}
+
+function countGuardedPlugins(rust: string): number {
+	return rust.match(/#\[cfg\s*\(\s*all\s*\(\s*debug_assertions\s*,\s*feature\s*=\s*"prebase-testing"\s*\)\s*\)\]\s*\{?\s*(?:builder\s*=\s*)?builder\.plugin\(\s*tauri_plugin_wdio_webdriver\s*::\s*init\s*\(\s*\)\s*\)/g)?.length ?? 0;
+}
+
+function inspectRustPlugin(rust: string): { pluginPresent: boolean; pluginGuarded: boolean } {
+	const inits = countPluginInits(rust);
+	return {
+		pluginPresent: rust.includes('tauri_plugin_wdio_webdriver'),
+		pluginGuarded: inits > 0 && inits === countGuardedPlugins(rust),
+	};
 }
 
 export function inspectTauriTestingSetup(input: {
@@ -48,15 +67,17 @@ export function inspectTauriTestingSetup(input: {
 	const featurePresent = /(?:^|\n)\s*prebase-testing\s*=/m.test(cargo);
 	const featureMembers = cargo.match(/(?:^|\n)\s*prebase-testing\s*=\s*\[([^\]]*)\]/m)?.[1] ?? '';
 	const featureIncludesDriver = featureMembers.includes('tauri-plugin-wdio-webdriver');
-	const pluginRegistered = rust.includes('tauri_plugin_wdio_webdriver');
+	const rustPlugin = inspectRustPlugin(rust);
 	const permissionPresent = capabilities.includes('wdio-webdriver:default');
 	return {
 		dependencyPresent,
 		featurePresent,
 		featureIncludesDriver,
-		pluginRegistered,
+		pluginPresent: rustPlugin.pluginPresent,
+		pluginGuarded: rustPlugin.pluginGuarded,
+		pluginRegistered: rustPlugin.pluginPresent,
 		permissionPresent,
-		ready: dependencyPresent && featurePresent && featureIncludesDriver && pluginRegistered && permissionPresent,
+		ready: dependencyPresent && featurePresent && featureIncludesDriver && rustPlugin.pluginGuarded && permissionPresent,
 	};
 }
 
@@ -81,7 +102,8 @@ export async function applyTauriTestingTransaction<Resource>(
 					await io.write(write.resource, write.before);
 				}
 			} catch (rollbackError) {
-				rollbackErrors.push(rollbackError instanceof Error ? rollbackError.message : String(rollbackError));
+				const message = rollbackError instanceof Error ? rollbackError.message : String(rollbackError);
+				rollbackErrors.push(`${String(write.resource)}: ${message}`);
 			}
 		}
 		return {
@@ -130,16 +152,38 @@ export function previewTauriTestingSetup(input: {
 		return { error: 'Rust entry does not contain a Tauri Builder; refusing unsafe source edits.' };
 	}
 
+	const state = inspectTauriTestingSetup({
+		cargoToml: input.cargoToml,
+		rustEntry: input.rustEntry,
+		capabilitiesJson: input.capabilitiesJson,
+	});
+	if (state.pluginPresent && !state.pluginGuarded) {
+		return { error: 'WebDriver plugin is registered without debug_assertions and feature prebase-testing. Manual review required; PreBase will not rewrite this Rust source.' };
+	}
+
 	const changes: TauriTestingFileChange[] = [];
-	if (!input.cargoToml.includes('tauri-plugin-wdio-webdriver')) {
+	if (!state.dependencyPresent || !state.featurePresent || !state.featureIncludesDriver) {
+		const snippets: string[] = [];
+		const reasons: string[] = [];
+		if (!state.dependencyPresent) {
+			snippets.push(CARGO_DEP.trim());
+			reasons.push('Add the optional embedded WebDriver crate.');
+		}
+		if (!state.featurePresent) {
+			snippets.push(CARGO_FEATURE.trim());
+			reasons.push('Declare the prebase-testing Cargo feature. Do not pass that feature to release builds.');
+		} else if (!state.featureIncludesDriver) {
+			snippets.push(CARGO_FEATURE.trim());
+			reasons.push('Include the WebDriver crate in the prebase-testing feature.');
+		}
 		changes.push({
 			path: input.cargoPath,
 			kind: 'update',
-			preview: `${CARGO_DEP}\n[features]\n${CARGO_FEATURE}`,
-			reason: 'Add the optional embedded WebDriver behind the prebase-testing Cargo feature. Do not pass that feature to release builds. Cargo does not honor cfg(debug_assertions) in [dependencies].',
+			preview: snippets.join('\n'),
+			reason: reasons.join(' '),
 		});
 	}
-	if (!input.rustEntry.includes('tauri_plugin_wdio_webdriver')) {
+	if (!state.pluginPresent) {
 		changes.push({
 			path: input.rustEntryPath,
 			kind: 'update',
@@ -147,20 +191,14 @@ export function previewTauriTestingSetup(input: {
 			reason: 'Register plugins only when debug_assertions and feature prebase-testing are both enabled.',
 		});
 	}
-	const capabilities = input.capabilitiesJson ?? '';
-	if (!capabilities) {
+	if (!state.permissionPresent) {
 		changes.push({
 			path: input.capabilitiesPath,
-			kind: 'create',
-			preview: JSON.stringify(CAPABILITIES_JSON, null, 2),
-			reason: 'Create the minimal desktop capability required by the embedded WebDriver plugin.',
-		});
-	} else if (!capabilities.includes('wdio-webdriver:default')) {
-		changes.push({
-			path: input.capabilitiesPath,
-			kind: 'update',
-			preview: '"wdio-webdriver:default"',
-			reason: 'Grant the debug WebDriver ACL so the embedded server can load.',
+			kind: input.capabilitiesJson ? 'update' : 'create',
+			preview: input.capabilitiesJson ? '"wdio-webdriver:default"' : JSON.stringify(CAPABILITIES_JSON, null, 2),
+			reason: input.capabilitiesJson
+				? 'Grant the debug WebDriver ACL so the embedded server can load.'
+				: 'Create the minimal desktop capability required by the embedded WebDriver plugin.',
 		});
 	}
 
@@ -185,26 +223,52 @@ const CARGO_DEPENDENCIES_HEADER = /(?:^|\n)\[dependencies\][^\n]*\n/;
 const CARGO_FEATURES_HEADER = /(?:^|\n)\[features\][^\n]*\n/;
 
 export function applyCargoTestingDependencies(cargoToml: string): string {
-	if (cargoToml.includes('tauri-plugin-wdio-webdriver')) {
+	const state = inspectTauriTestingSetup({ cargoToml });
+	if (state.dependencyPresent && state.featurePresent && state.featureIncludesDriver) {
 		return cargoToml;
 	}
 	let next = cargoToml.endsWith('\n') ? cargoToml : `${cargoToml}\n`;
 	if (!CARGO_DEPENDENCIES_HEADER.test(next)) {
 		next += `\n[dependencies]\n`;
 	}
-	next = next.replace(CARGO_DEPENDENCIES_HEADER, match => `${match}${CARGO_DEP}`);
+	if (!state.dependencyPresent) {
+		next = next.replace(CARGO_DEPENDENCIES_HEADER, match => `${match}${CARGO_DEP}`);
+	}
 	if (!CARGO_FEATURES_HEADER.test(next)) {
 		next += `\n[features]\n`;
 	}
-	if (!next.includes('prebase-testing')) {
+	if (!state.featurePresent) {
 		next = next.replace(CARGO_FEATURES_HEADER, match => `${match}${CARGO_FEATURE}`);
+		return next.endsWith('\n') ? next : `${next}\n`;
 	}
+	const featureLine = next.match(/(^|\n)(\s*prebase-testing\s*=\s*)(\[[^\]]*\]|[^\n]*)/);
+	if (!featureLine) {
+		next = next.replace(CARGO_FEATURES_HEADER, match => `${match}${CARGO_FEATURE}`);
+		return next.endsWith('\n') ? next : `${next}\n`;
+	}
+	const members = featureLine[3].match(/^\[([^\]]*)\]/);
+	if (members) {
+		if (members[1].includes('tauri-plugin-wdio-webdriver')) {
+			return next.endsWith('\n') ? next : `${next}\n`;
+		}
+		const inner = members[1].trim();
+		const updated = inner
+			? `[${inner.replace(/,?\s*$/, '')}, "dep:tauri-plugin-wdio-webdriver"]`
+			: `["dep:tauri-plugin-wdio-webdriver"]`;
+		next = next.replace(featureLine[0], `${featureLine[1]}${featureLine[2]}${updated}`);
+		return next.endsWith('\n') ? next : `${next}\n`;
+	}
+	next = next.replace(featureLine[0], `${featureLine[1]}${featureLine[2]}["dep:tauri-plugin-wdio-webdriver"]`);
 	return next.endsWith('\n') ? next : `${next}\n`;
 }
 
 export function applyRustTestingPlugins(rustSource: string): string | { error: string } {
-	if (rustSource.includes('tauri_plugin_wdio_webdriver')) {
+	const rustPlugin = inspectRustPlugin(rustSource);
+	if (rustPlugin.pluginGuarded) {
 		return rustSource;
+	}
+	if (countPluginInits(rustSource) > 0) {
+		return { error: 'WebDriver plugin is registered without debug_assertions and feature prebase-testing. Manual review required; PreBase will not rewrite this Rust source.' };
 	}
 	let source = rustSource;
 	if (/let\s+builder\s*=\s*tauri::Builder::default\(\)/.test(source) && !/let\s+mut\s+builder\s*=/.test(source)) {

@@ -1,0 +1,81 @@
+{
+  "ok": true,
+  "framework": "tauri",
+  "cycles": 10,
+  "passed": 10,
+  "failed": 0,
+  "elapsedMs": 272365,
+  "results": [
+    {
+      "cycle": 1,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 422
+    },
+    {
+      "cycle": 2,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 317
+    },
+    {
+      "cycle": 3,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 423
+    },
+    {
+      "cycle": 4,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 422
+    },
+    {
+      "cycle": 5,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 312
+    },
+    {
+      "cycle": 6,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 315
+    },
+    {
+      "cycle": 7,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 317
+    },
+    {
+      "cycle": 8,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 316
+    },
+    {
+      "cycle": 9,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 422
+    },
+    {
+      "cycle": 10,
+      "ok": true,
+      "failures": [],
+      "state": "testing",
+      "quitMs": 313
+    }
+  ],
+  "note": "Each cycle is a full PreBase product-path including restart/stop/child/port/Quit."
+}

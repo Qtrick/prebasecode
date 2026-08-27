@@ -3,6 +3,30 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+export type RuntimePreviewUiStatus = 'starting' | 'connected' | 'disconnected' | 'stopped' | 'error';
+
+export function deriveRuntimePreviewUiStatus(facts: {
+	running: boolean;
+	serverRunning: boolean;
+	httpReachable: boolean;
+	frameLoaded: boolean;
+	error?: boolean;
+}): RuntimePreviewUiStatus {
+	if (facts.error) {
+		return 'error';
+	}
+	if (facts.frameLoaded && (facts.running || facts.serverRunning)) {
+		return 'connected';
+	}
+	if (facts.running || facts.serverRunning) {
+		return 'starting';
+	}
+	if (facts.frameLoaded) {
+		return 'disconnected';
+	}
+	return 'stopped';
+}
+
 export type RuntimeWebviewControlType = 'setUrl' | 'clear' | 'back' | 'forward' | 'reload';
 
 export interface RuntimeWebviewControlMessage {
@@ -21,7 +45,7 @@ export function isRuntimeWebviewControlMessage(value: unknown, channel: string):
 	if (!value || typeof value !== 'object') {
 		return false;
 	}
-	const candidate = value as { channel?: unknown; type?: unknown; url?: unknown; reason?: unknown };
+	const candidate = value as { channel?: unknown; type?: unknown; url?: unknown; reason?: unknown; navigationId?: unknown };
 	if (candidate.channel !== channel || !['setUrl', 'clear', 'back', 'forward', 'reload'].includes(String(candidate.type))) {
 		return false;
 	}
@@ -39,25 +63,27 @@ export interface RuntimePreviewStatusMessage {
 }
 
 /**
- * Webview → host preview status. Iframe `load` is user-visible truth; a successful
- * no-cors probe may connect earlier. Probe failures are ignored because vscode-webview
- * fetches to loopback often fail after the page has already rendered.
+ * Webview → host preview status. Probe and iframe load are separate facts.
+ * A successful no-cors probe must not mark the preview Connected; iframe `load`
+ * is the user-visible connected signal. Probe failures after a loaded frame are
+ * ignored because vscode-webview fetches to loopback often fail after render.
  */
 export function handleRuntimePreviewStatusMessage(
 	message: RuntimePreviewStatusMessage | undefined,
-	markLoaded: (url: string, ok: boolean, detail?: string, navigationId?: number) => void,
+	markLoaded: (url: string, ok: boolean, detail?: string, navigationId?: number, kind?: 'probe' | 'load' | 'error') => void,
 ): void {
-	if (!message?.type) {
-		return;
-	}
-	if ((message.type === 'load' || (message.type === 'probe' && message.ok === true)) && message.url) {
-		markLoaded(message.url, true, undefined, message.navigationId);
+	if (!message?.type || !message.url) {
 		return;
 	}
 	if (message.type === 'probe') {
+		markLoaded(message.url, message.ok === true, message.detail, message.navigationId, 'probe');
 		return;
 	}
-	if (message.type === 'error' && message.url) {
-		markLoaded(message.url, false, message.detail, message.navigationId);
+	if (message.type === 'load') {
+		markLoaded(message.url, true, undefined, message.navigationId, 'load');
+		return;
+	}
+	if (message.type === 'error') {
+		markLoaded(message.url, false, message.detail, message.navigationId, 'error');
 	}
 }

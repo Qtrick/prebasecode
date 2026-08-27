@@ -31,6 +31,23 @@ export function resolveDesktopShutdownPolicy(stopManagedAppsOnExit = true, stopE
 	};
 }
 
+/**
+ * Merge process env with a caller overlay, then strip keys that must not leak into
+ * PreBase-owned Electron/Tauri children. Overlay cannot re-inject stripped keys.
+ * spawnExternal may set TAURI_WEBDRIVER_PORT afterward for an owned WebDriver session.
+ */
+export function sanitizeOwnedDesktopChildEnv(
+	processEnv: NodeJS.Dict<string>,
+	overlay: Record<string, string> = {},
+): Record<string, string> {
+	const childEnv: Record<string, string> = { ...processEnv as Record<string, string>, ...overlay };
+	delete childEnv.ELECTRON_RUN_AS_NODE;
+	delete childEnv.TAURI_WEBDRIVER_PORT;
+	delete childEnv.CARGO_TARGET_DIR;
+	delete childEnv.CARGO_BUILD_TARGET_DIR;
+	return childEnv;
+}
+
 /** POSIX SIGTERM then SIGKILL budget used by terminateOwnedProcess defaults. */
 export const POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS = 6_000;
 

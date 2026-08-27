@@ -20,6 +20,7 @@ import { IOpenerService } from '../../../../platform/opener/common/opener.js';
 import { readHeader, IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { ILifecycleService } from '../../../services/lifecycle/common/lifecycle.js';
 import { IOutputService } from '../../../services/output/common/output.js';
 import { ITerminalInstance, ITerminalService } from '../../terminal/browser/terminal.js';
 import { latestDevServerUrl } from '../common/runtime/devServerUrlParser.js';
@@ -36,6 +37,7 @@ import { detectDevScripts, selectDefaultScript } from '../common/runtime/scriptD
 import { managedRendererDevCommand, scriptLaunchesElectronApp } from '../common/runtime/managedRendererCommand.js';
 import type { DetectedDevScript, FrameworkProfile, PackageJsonShape, PackageManager, ProjectProbe } from '../common/runtime/types.js';
 import { type PreBaseViewportPreset, resolveViewportSize, VIEWPORT_PRESET_SIZES } from '../common/runtime/viewportPresets.js';
+import { deriveRuntimePreviewUiStatus, type RuntimePreviewUiStatus } from '../common/runtime/runtimeWebviewProtocol.js';
 import { PREBASE_RUNTIME_CHANNEL_ID, PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
 import { PreBaseRuntimeEditorInput } from './runtimeEditorInput.js';
 import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
@@ -54,6 +56,10 @@ export interface PreBaseRuntimeSession {
 	url: string;
 	running: boolean;
 	serverRunning: boolean;
+	previewHttpReachable: boolean;
+	previewFrameLoaded: boolean;
+	previewStatus: RuntimePreviewUiStatus;
+	previewError?: string;
 	previewConnected: boolean;
 	viewport: PreBaseRuntimeViewportState;
 	consoleCapture: boolean;
@@ -129,7 +135,7 @@ export interface IPreBaseRuntimeService {
 	openPreviewEditor(): Promise<void>;
 	recordConsoleError(message: string): void;
 	/** Called by the preview webview after iframe load/error. */
-	markPreviewLoaded(url: string, ok: boolean, detail?: string, navigationId?: number): void;
+	markPreviewLoaded(url: string, ok: boolean, detail?: string, navigationId?: number, kind?: 'probe' | 'load' | 'error'): void;
 	beginPreviewNavigation(): number;
 }
 
@@ -160,6 +166,10 @@ const DESKTOP_APP_PROBE_PATHS = [
 	'src-tauri/tauri.conf.json5',
 	'src-tauri/Tauri.toml',
 	'src-tauri/Cargo.toml',
+	'src-tauri/src/lib.rs',
+	'src-tauri/src/main.rs',
+	'src-tauri/capabilities/default.json',
+	'src-tauri/capabilities/desktop.json',
 ] as const;
 
 const PROBE_PATHS = [
@@ -250,6 +260,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		@IClipboardService private readonly clipboardService: IClipboardService,
 		@IRequestService private readonly requestService: IRequestService,
 		@IInstantiationService private readonly instantiationService: IInstantiationService,
+		@ILifecycleService private readonly lifecycleService: ILifecycleService,
 	) {
 		super();
 		const defaultUrl = this.configurationService.getValue<string>(PreBaseConfigKeys.RuntimeDefaultUrl) || 'http://localhost:5173';
@@ -259,6 +270,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			url: defaultUrl,
 			running: false,
 			serverRunning: false,
+			previewHttpReachable: false,
+			previewFrameLoaded: false,
+			previewStatus: 'stopped',
+			previewError: undefined,
 			previewConnected: false,
 			viewport: {
 				preset,
@@ -326,6 +341,27 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			void this.detectConfigurations();
 		}
 		this._registerDesktopSessionSync();
+		this._register(this.lifecycleService.onWillShutdown(event => {
+			this._lifecycleCts.cancel();
+			event.join(this._stopOwnedPreviewForShutdown(), { id: 'PreBaseRuntimeService', label: 'PreBase Runtime Preview' });
+		}));
+	}
+
+	/** ponytail: Quit must not wait unbounded on a hung terminal PTY. */
+	private _stopOwnedPreviewForShutdown(): Promise<void> {
+		this._session = {
+			...this._session,
+			running: false,
+			serverRunning: false,
+			previewHttpReachable: false,
+			previewFrameLoaded: false,
+			terminalInstanceId: undefined,
+		};
+		this._fire();
+		return Promise.race([
+			this._stopTerminal(true).then(() => undefined, () => undefined),
+			new Promise<void>(resolve => setTimeout(resolve, 800)),
+		]);
 	}
 
 	private _registerDesktopSessionSync(): void {
@@ -347,7 +383,18 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	getSession(): PreBaseRuntimeSession {
-		return this._session;
+		const previewStatus = deriveRuntimePreviewUiStatus({
+			running: this._session.running,
+			serverRunning: this._session.serverRunning,
+			httpReachable: this._session.previewHttpReachable,
+			frameLoaded: this._session.previewFrameLoaded,
+			error: Boolean(this._session.previewError),
+		});
+		return {
+			...this._session,
+			previewStatus,
+			previewConnected: previewStatus === 'connected',
+		};
 	}
 
 	async setUrl(url: string): Promise<boolean> {
@@ -368,10 +415,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		this._session = {
 			...this._session,
 			url: validated.url,
-			// Keep the preview session active so the webview can load / retry.
 			running: true,
-			// Only claim "connected" when something is actually listening.
-			previewConnected: reachable
+			previewHttpReachable: reachable,
+			previewFrameLoaded: false,
+			previewError: undefined,
 		};
 		if (this._session.networkCapture) {
 			this._pushNetwork(reachable
@@ -390,7 +437,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 				validated.url
 			));
 		} else {
-			this._log(localize('prebase.runtime.connectOk', "Connected to {0}", validated.url));
+			this._log(localize('prebase.runtime.connectReachable', "Reachable at {0}; waiting for the preview frame to load.", validated.url));
 		}
 		this._fire();
 		await this.openPreviewEditor();
@@ -399,10 +446,16 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 
 	beginPreviewNavigation(): number {
 		this._previewNavigationId += 1;
+		this._session = {
+			...this._session,
+			previewFrameLoaded: false,
+			previewError: undefined,
+		};
+		this._fire();
 		return this._previewNavigationId;
 	}
 
-	markPreviewLoaded(url: string, ok: boolean, detail?: string, navigationId?: number): void {
+	markPreviewLoaded(url: string, ok: boolean, detail?: string, navigationId?: number, kind?: 'probe' | 'load' | 'error'): void {
 		if (this._previewNavigationId > 0 && navigationId !== this._previewNavigationId) {
 			return;
 		}
@@ -410,19 +463,29 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		if (!validated.ok || validated.url !== this._session.url) {
 			return;
 		}
-		if (ok) {
-			if (!this._session.previewConnected) {
-				this._session = { ...this._session, previewConnected: true };
-				this._log(localize('prebase.runtime.iframeLoaded', "Preview loaded {0}", validated.url));
-				this._fire();
+		const source = kind ?? (ok ? 'load' : 'error');
+		if (source === 'probe') {
+			if (this._session.previewHttpReachable === ok) {
+				return;
 			}
+			this._session = { ...this._session, previewHttpReachable: ok };
+			this._fire();
 			return;
 		}
-		if (!this._session.previewConnected) {
+		if (source === 'load' && ok) {
+			if (this._session.previewFrameLoaded) {
+				return;
+			}
+			this._session = { ...this._session, previewFrameLoaded: true, previewError: undefined };
+			this._log(localize('prebase.runtime.iframeLoaded', "Preview loaded {0}", validated.url));
+			this._fire();
+			return;
+		}
+		if (!this._session.previewFrameLoaded) {
 			this._log(localize('prebase.runtime.iframeFailed', "Preview failed for {0}{1}", validated.url, detail ? `: ${detail}` : ''));
 			return;
 		}
-		this._session = { ...this._session, previewConnected: false };
+		this._session = { ...this._session, previewFrameLoaded: false };
 		this._log(localize('prebase.runtime.iframeFailed', "Preview failed for {0}{1}", validated.url, detail ? `: ${detail}` : ''));
 		this._fire();
 	}
@@ -512,7 +575,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			...this._session,
 			selectedScriptName: script.scriptName,
 			packageManager: script.packageManager,
-			url: this._session.previewConnected ? this._session.url : suggested,
+			url: this.getSession().previewConnected ? this._session.url : suggested,
 			detectedUrls: [...new Set([
 				...script.suggestedUrls.filter(u => {
 					const v = validatePreviewUrl(u);
@@ -561,7 +624,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		}
 
 		const textMap = new Map<string, string>();
-		const textCandidates = PROBE_PATHS.filter(rel => rel.endsWith('.toml') || rel.endsWith('.json') || rel.endsWith('.json5'));
+		const textCandidates = PROBE_PATHS.filter(rel => /\.(toml|json|json5|rs)$/.test(rel));
 		await Promise.all(textCandidates.map(async rel => {
 			if (!existsMap.get(rel)) {
 				return;
@@ -625,7 +688,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 				.map(v => v.url)
 		)];
 
-		const nextUrl = this._session.previewConnected || this._session.serverRunning
+		const nextUrl = this.getSession().previewConnected || this._session.serverRunning
 			? this._session.url
 			: (detectedUrls[0] ?? this._session.url);
 
@@ -845,13 +908,14 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		} catch (err) {
 			this._detachTerminal(true);
 			this._devTerminal = undefined;
+			const message = err instanceof Error ? err.message : String(err);
 			this._session = {
 				...this._session,
 				serverRunning: false,
 				running: false,
-				terminalInstanceId: undefined
+				terminalInstanceId: undefined,
+				previewError: message,
 			};
-			const message = err instanceof Error ? err.message : String(err);
 			this._log(localize('prebase.runtime.startFailed', "Start failed: {0}", message));
 			this._pushConsole(localize('prebase.runtime.startFailedConsole', "Start failed: {0}", message));
 			this._fire();
@@ -871,7 +935,9 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			...this._session,
 			running: false,
 			serverRunning: false,
-			previewConnected: false,
+			previewHttpReachable: false,
+			previewFrameLoaded: false,
+			previewError: undefined,
 			terminalInstanceId: undefined
 		};
 		this._log(localize('prebase.runtime.stopped', "Preview stopped."));
@@ -884,7 +950,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	reload(): void {
-		if (!this._session.running && !this._session.previewConnected) {
+		if (!this._session.running && !this.getSession().previewConnected) {
 			void this.connectUrl(this._session.url);
 			return;
 		}
@@ -1035,9 +1101,10 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	getContextSummaryForMagnus(): string {
-		const s = this._session;
+		const s = this.getSession();
 		return [
 			`Runtime URL: ${s.url}`,
+			`Preview status: ${s.previewStatus}`,
 			`Preview connected: ${s.previewConnected ? 'yes' : 'no'}`,
 			`Server running: ${s.serverRunning ? 'yes' : 'no'}`,
 			`Framework: ${s.framework?.label ?? 'unknown'}`,
@@ -1055,11 +1122,14 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	getStateForMagnus(): Record<string, unknown> {
-		const s = this._session;
+		const s = this.getSession();
 		const ownsServer = !!this._devTerminal && !this._devTerminal.isDisposed;
 		return {
 			url: redactRuntimeEvidence(s.url),
+			previewStatus: s.previewStatus,
 			previewConnected: s.previewConnected,
+			previewHttpReachable: s.previewHttpReachable,
+			previewFrameLoaded: s.previewFrameLoaded,
 			serverRunning: s.serverRunning,
 			serverOwnedByPreBase: ownsServer,
 			framework: s.framework?.label ?? 'unknown',
@@ -1120,7 +1190,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		if (token.isCancellationRequested) {
 			return { ok: false, reason: 'Cancelled', state: this.getStateForMagnus() };
 		}
-		const session = this._session;
+		const session = this.getSession();
 		if (!session.previewConnected) {
 			return { ok: false, reason: 'Runtime Preview is not connected.', state: this.getStateForMagnus() };
 		}
@@ -1301,7 +1371,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		return false;
 	}
 
-	private async _stopTerminal(): Promise<void> {
+	private async _stopTerminal(immediate = false): Promise<void> {
 		const term = this._devTerminal;
 		if (!term || term.isDisposed) {
 			this._detachTerminal(false);
@@ -1309,9 +1379,16 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			return;
 		}
 		try {
-			// Prefer Ctrl+C so we only interrupt our PreBase terminal, not unrelated sessions.
-			await term.sendText('\u0003', false);
-			await new Promise(resolve => setTimeout(resolve, 400));
+			if (immediate) {
+				const disposePromise = this.terminalService.safeDisposeTerminal(term).catch(() => undefined);
+				await Promise.race([
+					disposePromise,
+					new Promise<void>(resolve => setTimeout(resolve, 600)),
+				]);
+			} else {
+				await term.sendText('\u0003', false);
+				await new Promise(resolve => setTimeout(resolve, 400));
+			}
 			if (!term.isDisposed) {
 				term.dispose();
 			}
@@ -1379,7 +1456,9 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		this._session = {
 			...this._session,
 			url: validated.url,
-			previewConnected: reachable,
+			previewHttpReachable: reachable,
+			previewFrameLoaded: false,
+			previewError: undefined,
 			running: true,
 			detectedUrls: [...new Set([validated.url, ...this._session.detectedUrls])]
 		};
@@ -1436,7 +1515,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	}
 
 	private _fire(): void {
-		this._onDidChangeSession.fire(this._session);
+		this._onDidChangeSession.fire(this.getSession());
 	}
 
 	override dispose(): void {

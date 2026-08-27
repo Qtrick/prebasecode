@@ -6,7 +6,7 @@ import assert from 'assert';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { detectTauriProject } from '../../common/runtime/tauriDetector.js';
+import { detectTauriProject, TAURI_PROBE_PATHS, TAURI_TESTING_PROBE_PATHS } from '../../common/runtime/tauriDetector.js';
 import { detectDesktopProjects, selectDesktopProfile } from '../../common/runtime/desktopDetector.js';
 import { detectElectronProject } from '../../common/runtime/electronDetector.js';
 import { desktopLaunchFromUiMode, desktopUiModeFromLaunch, isElectronProfile, isRecognizedDesktopApp, isTauriProfile } from '../../common/runtime/desktopTypes.js';
@@ -90,6 +90,7 @@ suite('tauriDetector', () => {
 			featurePresent: profile.testingSetup.featurePresent,
 			featureIncludesDriver: profile.testingSetup.featureIncludesDriver,
 			pluginRegistered: profile.testingSetup.pluginRegistered,
+			pluginGuarded: profile.testingSetup.pluginGuarded,
 			permissionPresent: profile.testingSetup.permissionPresent,
 			ready: profile.testingSetup.ready,
 			fullNative: profile.capabilities.supportsFullNativeAutomation,
@@ -99,6 +100,7 @@ suite('tauriDetector', () => {
 			featurePresent: true,
 			featureIncludesDriver: false,
 			pluginRegistered: true,
+			pluginGuarded: false,
 			permissionPresent: true,
 			ready: false,
 			fullNative: false,
@@ -111,15 +113,32 @@ suite('tauriDetector', () => {
 			files: {
 				'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:5173"}}',
 				'src-tauri/Cargo.toml': '[package]\nname="demo"\n[features]\nprebase-testing=["dep:tauri-plugin-wdio-webdriver"]\n[dependencies]\ntauri="2"\ntauri-plugin-wdio-webdriver={version="1",optional=true}\n',
-				'src-tauri/src/lib.rs': 'let mut builder = tauri::Builder::default();\nbuilder.plugin(tauri_plugin_wdio_webdriver::init());\n',
+				'src-tauri/src/lib.rs': 'let mut builder = tauri::Builder::default();\n#[cfg(all(debug_assertions, feature = "prebase-testing"))]\n{\nbuilder = builder.plugin(tauri_plugin_wdio_webdriver::init());\n}\n',
 				'src-tauri/capabilities/default.json': '{"permissions":["wdio-webdriver:default"]}',
 			},
 		}));
 		assert.strictEqual(profile.testingSetup.ready, true);
+		assert.strictEqual(profile.testingSetup.pluginGuarded, true);
 		assert.strictEqual(profile.capabilities.supportsFullNativeAutomation, true);
 		assert.strictEqual(profile.capabilities.fullNativeSetupRequired, false);
 		assert.strictEqual(profile.capabilities.supportsBackendApiAccess, false);
 		assert.strictEqual(profile.capabilities.supportsMainProcessAccess, false);
+	});
+
+	test('unguarded WebDriver registration is never full-native ready', () => {
+		const profile = detectTauriProject(probe({
+			files: {
+				'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:5173"}}',
+				'src-tauri/Cargo.toml': '[package]\nname="demo"\n[features]\nprebase-testing=["dep:tauri-plugin-wdio-webdriver"]\n[dependencies]\ntauri="2"\ntauri-plugin-wdio-webdriver={version="1",optional=true}\n',
+				'src-tauri/src/lib.rs': 'let mut builder = tauri::Builder::default();\nbuilder.plugin(tauri_plugin_wdio_webdriver::init());\n',
+				'src-tauri/capabilities/default.json': '{"permissions":["wdio-webdriver:default"]}',
+			},
+		}));
+		assert.strictEqual(profile.testingSetup.pluginPresent, true);
+		assert.strictEqual(profile.testingSetup.pluginGuarded, false);
+		assert.strictEqual(profile.testingSetup.ready, false);
+		assert.strictEqual(profile.capabilities.supportsFullNativeAutomation, false);
+		assert.strictEqual(profile.capabilities.fullNativeSetupRequired, true);
 	});
 
 	test('rejects a random Cargo.toml without a tauri crate', () => {
@@ -470,6 +489,30 @@ suite('desktopFixtures', () => {
 		assert.strictEqual(tauri.hasWdioWebdriverPlugin, true);
 		assert.strictEqual(tauri.testingCargoFeature, true);
 		assert.strictEqual(tauri.testingSetup.ready, true);
+		assert.ok(TAURI_TESTING_PROBE_PATHS.includes('src-tauri/src/lib.rs'));
+		assert.ok(TAURI_PROBE_PATHS.includes('src-tauri/src/lib.rs'));
+		const workbenchStyleFiles = new Map<string, string>();
+		for (const relative of ['package.json', ...TAURI_PROBE_PATHS]) {
+			const fullPath = join(root, 'test/prebase/fixtures/desktop-tauri', relative);
+			if (existsSync(fullPath) && statSync(fullPath).isFile()) {
+				workbenchStyleFiles.set(relative, readFileSync(fullPath, 'utf8'));
+			}
+		}
+		const workbenchStyle = detectTauriProject({
+			exists: relative => workbenchStyleFiles.has(relative),
+			readText: relative => workbenchStyleFiles.get(relative),
+			packageJson: JSON.parse(workbenchStyleFiles.get('package.json') ?? '{}') as PackageJsonShape,
+			rootLabel: 'desktop-tauri',
+		});
+		assert.strictEqual(workbenchStyle.testingSetup.ready, true, 'Workbench preload must read guarded lib.rs and the WebDriver capability');
+		const jsonOnly = detectTauriProject({
+			exists: relative => workbenchStyleFiles.has(relative) && !relative.endsWith('.rs'),
+			readText: relative => relative.endsWith('.rs') ? undefined : workbenchStyleFiles.get(relative),
+			packageJson: JSON.parse(workbenchStyleFiles.get('package.json') ?? '{}') as PackageJsonShape,
+			rootLabel: 'desktop-tauri',
+		});
+		assert.strictEqual(jsonOnly.testingSetup.ready, false);
+		assert.strictEqual(jsonOnly.testingSetup.pluginGuarded, false);
 		assert.strictEqual(tauri.capabilities.fullNativeSetupRequired, false);
 		assert.strictEqual(tauri.capabilities.supportsFullNativeAutomation, true);
 		assert.strictEqual(tauri.capabilities.supportsBackendApiAccess, false);

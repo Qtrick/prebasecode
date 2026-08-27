@@ -45,7 +45,7 @@ const TAURI_READY = {
 	files: {
 		'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:1420"}}',
 		'src-tauri/Cargo.toml': '[package]\nname="demo"\n[features]\nprebase-testing=["dep:tauri-plugin-wdio-webdriver"]\n[dependencies]\ntauri="2"\ntauri-plugin-wdio-webdriver={version="1",optional=true}\n',
-		'src-tauri/src/lib.rs': 'fn run() { let mut builder = tauri::Builder::default();\nbuilder.plugin(tauri_plugin_wdio_webdriver::init());\n}\n',
+		'src-tauri/src/lib.rs': 'fn run() { let mut builder = tauri::Builder::default();\n#[cfg(all(debug_assertions, feature = "prebase-testing"))]\n{ builder = builder.plugin(tauri_plugin_wdio_webdriver::init()); }\n}\n',
 		'src-tauri/capabilities/default.json': '{"permissions":["wdio-webdriver:default"]}',
 	},
 };
@@ -149,6 +149,44 @@ suite('PreBase desktop session lifecycle', () => {
 					}
 					return true as T;
 				}
+				if (command === 'listOwnedCdpTargets') {
+					const debugPort = Number(args[0]);
+					return [{
+						id: 'page-1',
+						type: 'page',
+						title: 'Fixture',
+						url: 'file:///app/index.html',
+						webSocketDebuggerUrl: `ws://127.0.0.1:${debugPort}/devtools/page/1`,
+					}] as T;
+				}
+				if (command === 'getOwnedProcessOutput') {
+					return { entries: [], droppedCount: 0, truncated: false } as T;
+				}
+				if (command === 'requestOwnedLoopbackJson') {
+					const url = String(args[0] ?? '');
+					const init = (args[1] ?? {}) as { method?: string; body?: string };
+					const method = (init.method ?? 'GET').toUpperCase();
+					if (url.endsWith('/status')) {
+						return { status: 200, json: true, body: { value: { ready: true, message: 'ok' } } } as T;
+					}
+					if (url.endsWith('/session') && method === 'POST') {
+						return { status: 200, json: true, body: { value: { sessionId: 'wd-1' } } } as T;
+					}
+					if (url.includes('/execute/sync')) {
+						const body = String(init.body ?? '');
+						if (body.includes('__prebaseDesktopTest') && body.includes('run')) {
+							return { status: 200, json: true, body: { value: { ok: true, native: 'pointer', point: { x: 16, y: 24 }, clickCount: 1, match: { name: 'Save', visible: true, enabled: true } } } } as T;
+						}
+						return { status: 200, json: true, body: { value: true } } as T;
+					}
+					if (url.includes('/actions') && method === 'POST') {
+						return { status: 200, json: true, body: { value: null } } as T;
+					}
+					if (method === 'DELETE') {
+						return { status: 200, json: true, body: {} } as T;
+					}
+					return { status: 404, json: false, body: undefined } as T;
+				}
 				if (command === 'dispatchOwnedPointer' || command === 'dispatchOwnedKey' || command === 'dispatchOwnedInsertText') {
 					pointers.push({ command, args });
 					return undefined as T;
@@ -216,7 +254,7 @@ suite('PreBase desktop session lifecycle', () => {
 	test('does not open a PreBase managed window for rust-only Tauri even with an invented renderer URL', async () => {
 		const { service, managed, dialogs } = createService();
 		const profile = service.detect(probe(TAURI_RUST_ONLY));
-		assert.strictEqual(profile.isRustOnly, true);
+		assert.ok(profile.framework === 'tauri' && profile.isRustOnly);
 		assert.strictEqual(profile.capabilities.supportsManagedLaunch, false);
 		assert.strictEqual(profile.rendererUrlHint, undefined);
 
@@ -226,7 +264,7 @@ suite('PreBase desktop session lifecycle', () => {
 		assert.deepStrictEqual(managed, []);
 
 		const magnus = await service.startForMagnus({ framework: 'tauri', mode: 'renderer', rendererUrl: 'http://127.0.0.1:1420' });
-		assert.strictEqual(magnus.ok, true);
+		assert.strictEqual(magnus.ok, false);
 		assert.strictEqual(magnus.state, 'error');
 		assert.strictEqual(magnus.mode, 'renderer');
 		assert.deepStrictEqual(managed, []);
@@ -281,7 +319,7 @@ suite('PreBase desktop session lifecycle', () => {
 		assert.strictEqual(inspect.setupRequired, true);
 	});
 
-	test('launches the detected Tauri app with its owning package manager and crate cwd', async () => {
+	test('launches the detected Tauri app with its owning package manager at the app root', async () => {
 		const { service, spawns } = createService({ spawn: { pid: 45 } });
 		service.detect(probe({
 			...TAURI_PLAIN,
@@ -296,12 +334,12 @@ suite('PreBase desktop session lifecycle', () => {
 		assert.strictEqual(session?.state, 'running');
 		assert.deepStrictEqual(spawns[0], {
 			command: { command: 'bun', args: ['run', 'tauri:dev', '--'] },
-			cwd: '/app/src-tauri',
+			cwd: '/app',
 			extras: { purpose: 'preview', electronCdp: false, webDriver: false },
 		});
 	});
 
-	test('profile app root controls the session root and external spawn cwd', async () => {
+	test('profile app root controls the session root and package-manager spawn cwd', async () => {
 		const { service, spawns } = createService({ spawn: { pid: 46 } });
 		const profile = service.detect(probe({
 			...TAURI_PLAIN,
@@ -322,8 +360,27 @@ suite('PreBase desktop session lifecycle', () => {
 		}, {
 			sessionRoot: '/repo/apps/desktop',
 			command: { command: 'pnpm', args: ['run', 'tauri:dev', '--'] },
-			cwd: '/repo/apps/desktop/src-tauri',
+			cwd: '/repo/apps/desktop',
 		});
+	});
+
+	test('passes `dev` when the package script is the Tauri CLI shim', async () => {
+		const { service, spawns } = createService({ spawn: { pid: 47, webDriverPort: 4444 } });
+		service.detect(probe({
+			...TAURI_READY,
+			packageJson: {
+				devDependencies: { '@tauri-apps/cli': '^2.0.0' },
+				scripts: { tauri: 'tauri' },
+			},
+		}));
+		const session = await service.start({ launchMode: 'external', purpose: 'test' });
+		assert.strictEqual(session?.state, 'testing');
+		assert.deepStrictEqual(spawns[0]?.command, {
+			command: 'npm',
+			args: ['run', 'tauri', '--', 'dev', '--features', 'prebase-testing'],
+		});
+		assert.strictEqual(spawns[0]?.cwd, '/app');
+		assert.notStrictEqual(spawns[0]?.cwd, '/app/src-tauri');
 	});
 
 	test('kills the Tauri process when the driver port is missing after spawn', async () => {
@@ -335,6 +392,7 @@ suite('PreBase desktop session lifecycle', () => {
 		assert.deepStrictEqual(killed, [77]);
 		assert.strictEqual((spawns[0]?.command as { command?: string }).command, 'cargo');
 		assert.deepStrictEqual((spawns[0]?.command as { args?: string[] }).args, ['tauri', 'dev', '--features', 'prebase-testing']);
+		assert.strictEqual(spawns[0]?.cwd, '/app/src-tauri');
 		assert.deepStrictEqual(spawns[0]?.extras, { purpose: 'test', electronCdp: false, webDriver: true });
 	});
 
@@ -394,6 +452,30 @@ suite('PreBase desktop session lifecycle', () => {
 		} finally {
 			restore();
 		}
+	});
+
+	test('does not kill a preview external session on dispose when stopExternalAppsOnExit is false', async () => {
+		const { service, killed } = createService({
+			spawn: { pid: 55 },
+			config: { [PreBaseConfigKeys.RuntimeStopExternalAppsOnExit]: false },
+		});
+		service.detect(probe(TAURI_PLAIN));
+		const session = await service.start({ launchMode: 'external', purpose: 'preview' });
+		assert.strictEqual(session?.state, 'running');
+		assert.strictEqual(session.pid, 55);
+		service.dispose();
+		assert.deepStrictEqual(killed, []);
+	});
+
+	test('closes a test-owned managed window on dispose even when stopManagedAppsOnExit is false', async () => {
+		const { service, closed } = createService({
+			config: { [PreBaseConfigKeys.RuntimeStopManagedAppsOnExit]: false },
+		});
+		service.detect(probe(ELECTRON_VITE));
+		const session = await service.start({ launchMode: 'managed', rendererUrl: 'http://127.0.0.1:5173', purpose: 'test' });
+		assert.strictEqual(session?.state, 'testing');
+		service.dispose();
+		assert.deepStrictEqual(closed, [session?.id]);
 	});
 
 	test('blocks arbitrary JavaScript on Tauri WebDriver and still allows test interact without the preview setting', async () => {
@@ -631,10 +713,34 @@ suite('PreBase desktop session lifecycle', () => {
 			backend: 'cdp',
 			ownedByPreBase: true,
 			setupRequired: false,
+			pid: undefined,
+			debugPort: undefined,
+			webDriverPort: undefined,
 			rendererUrl: 'http://127.0.0.1:5173',
 			limitations: preview?.profile.capabilities.limitations,
 			errorMessage: undefined,
 			test: undefined,
+		});
+	});
+
+	test('a new test session after stop does not reuse the previous test-run identity or steps', async () => {
+		const { service } = createService();
+		service.detect(probe(ELECTRON_VITE));
+		const first = await service.startForMagnus({ framework: 'electron', mode: 'renderer', rendererUrl: 'http://127.0.0.1:5173' });
+		const firstId = (first.test as { id?: string } | undefined)?.id;
+		assert.ok(firstId);
+		assert.strictEqual((await service.interactForMagnus({ action: 'fill', locator: { by: 'role', role: 'textbox', name: 'Name' }, value: 'Ada' })).ok, true);
+		await service.stop();
+
+		const second = await service.startForMagnus({ framework: 'electron', mode: 'renderer', rendererUrl: 'http://127.0.0.1:5173' });
+		const secondTest = second.test as { id?: string; passedSteps?: number; failedSteps?: number } | undefined;
+		assert.notStrictEqual(secondTest?.id, firstId);
+		assert.deepStrictEqual({
+			passedSteps: secondTest?.passedSteps,
+			failedSteps: secondTest?.failedSteps,
+		}, {
+			passedSteps: 0,
+			failedSteps: 0,
 		});
 	});
 });

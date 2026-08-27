@@ -20,8 +20,8 @@ import { chromium } from 'playwright-core';
 
 const repo = join(dirname(fileURLToPath(import.meta.url)), '../../..');
 const fixture = join(repo, 'test/prebase/fixtures/desktop-electron');
-const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3.18/electron');
-const screenshotDir = join(repo, 'reports/graph-acceptance/phase-3.18/screenshots');
+const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/electron');
+const screenshotDir = join(repo, 'reports/graph-acceptance/phase-3-final/screenshots');
 const electronBin = join(repo, 'node_modules/.bin/electron');
 
 function allocatePort() {

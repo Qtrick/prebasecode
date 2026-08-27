@@ -1,0 +1,9 @@
+{
+  "ok": true,
+  "skipped": true,
+  "reason": "No provider credentials in throwaway acceptance profile (PREBASE_GEMINI_API_KEY / GEMINI_API_KEY unset). Repository-controlled invokeTool desktop path verified separately.",
+  "agentLoop": "external-operator-dependency",
+  "streaming": "external-operator-dependency",
+  "cancelSecondPrompt": "external-operator-dependency",
+  "generatedAt": "2026-08-27T21:40:00.000Z"
+}

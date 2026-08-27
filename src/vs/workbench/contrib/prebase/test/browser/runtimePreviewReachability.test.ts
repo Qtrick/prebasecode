@@ -10,7 +10,7 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import { runInNewContext } from 'vm';
 import { newWriteableBufferStream } from '../../../../../base/common/buffer.js';
-import { Event } from '../../../../../base/common/event.js';
+import { Emitter, Event } from '../../../../../base/common/event.js';
 import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../base/test/common/utils.js';
 import { upcastPartial } from '../../../../../base/test/common/mock.js';
 import type { IClipboardService } from '../../../../../platform/clipboard/common/clipboardService.js';
@@ -24,10 +24,11 @@ import type { IRequestService } from '../../../../../platform/request/common/req
 import type { IRequestContext } from '../../../../../base/parts/request/common/request.js';
 import type { IWorkspaceContextService } from '../../../../../platform/workspace/common/workspace.js';
 import type { IEditorService } from '../../../../services/editor/common/editorService.js';
+import type { ILifecycleService } from '../../../../services/lifecycle/common/lifecycle.js';
 import type { IOutputChannel, IOutputService } from '../../../../services/output/common/output.js';
 import type { ITerminalService } from '../../../terminal/browser/terminal.js';
 import { PreBaseRuntimeService } from '../../browser/prebaseRuntimeService.js';
-import { handleRuntimePreviewStatusMessage, type RuntimePreviewStatusMessage } from '../../common/runtime/runtimeWebviewProtocol.js';
+import { deriveRuntimePreviewUiStatus, handleRuntimePreviewStatusMessage, type RuntimePreviewStatusMessage } from '../../common/runtime/runtimeWebviewProtocol.js';
 
 interface Deferred<T> {
 	readonly promise: Promise<T>;
@@ -56,7 +57,7 @@ function previewHtml(channel: string): string {
 }
 
 function applyPreviewHostMessage(service: PreBaseRuntimeService, message: RuntimePreviewStatusMessage | undefined): void {
-	handleRuntimePreviewStatusMessage(message, (url, ok, detail, navigationId) => service.markPreviewLoaded(url, ok, detail, navigationId));
+	handleRuntimePreviewStatusMessage(message, (url, ok, detail, navigationId, kind) => service.markPreviewLoaded(url, ok, detail, navigationId, kind));
 }
 
 function createWebviewHarness(fetchImpl: (url: string, options: Record<string, unknown>) => Promise<unknown>) {
@@ -115,7 +116,7 @@ function requestContext(statusCode: number): IRequestContext {
 	return { res: { headers: {}, statusCode }, stream: newWriteableBufferStream() };
 }
 
-function createRuntimeService(disposables: ReturnType<typeof ensureNoDisposablesAreLeakedInTestSuite>, request: IRequestService['request']) {
+function createRuntimeService(disposables: ReturnType<typeof ensureNoDisposablesAreLeakedInTestSuite>, request: IRequestService['request'], lifecycle: Pick<ILifecycleService, 'onWillShutdown'> = { onWillShutdown: Event.None }) {
 	const logs: string[] = [];
 	const service = disposables.add(new PreBaseRuntimeService(
 		upcastPartial<IConfigurationService>({ getValue: () => undefined, onDidChangeConfiguration: Event.None }),
@@ -132,6 +133,7 @@ function createRuntimeService(disposables: ReturnType<typeof ensureNoDisposables
 		upcastPartial<IClipboardService>({}),
 		upcastPartial<IRequestService>({ request }),
 		upcastPartial<IInstantiationService>({ invokeFunction: () => { throw new Error('desktop service unavailable'); } }),
+		upcastPartial<ILifecycleService>(lifecycle),
 	));
 	service.openPreviewEditor = async () => undefined;
 	return { service, logs };
@@ -139,6 +141,18 @@ function createRuntimeService(disposables: ReturnType<typeof ensureNoDisposables
 
 suite('Runtime Preview reachability', () => {
 	const disposables = ensureNoDisposablesAreLeakedInTestSuite();
+
+	test('derives Starting, Connected, Disconnected, Stopped, and Error from separate facts', () => {
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: false, serverRunning: false, httpReachable: false, frameLoaded: false }), 'stopped');
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: true, serverRunning: true, httpReachable: true, frameLoaded: false }), 'starting');
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: false, serverRunning: true, httpReachable: false, frameLoaded: false }), 'starting');
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: true, serverRunning: true, httpReachable: true, frameLoaded: true }), 'connected');
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: true, serverRunning: false, httpReachable: false, frameLoaded: true }), 'connected');
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: false, serverRunning: true, httpReachable: false, frameLoaded: true }), 'connected');
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: false, serverRunning: false, httpReachable: false, frameLoaded: true }), 'disconnected');
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: false, serverRunning: false, httpReachable: false, frameLoaded: false, error: true }), 'error');
+		assert.strictEqual(deriveRuntimePreviewUiStatus({ running: true, serverRunning: true, httpReachable: true, frameLoaded: true, error: true }), 'error');
+	});
 
 	test('opaque no-cors response reports local reachability through the generated webview', async () => {
 		const fetches: Array<{ url: string; options: Record<string, unknown> }> = [];
@@ -165,8 +179,13 @@ suite('Runtime Preview reachability', () => {
 		const { service } = createRuntimeService(disposables, async () => { throw new Error('renderer CORS failure'); });
 		await service.connectUrl('http://localhost:5173');
 		assert.strictEqual(service.getSession().previewConnected, false);
+		assert.strictEqual(service.getSession().previewStatus, 'starting');
 		applyPreviewHostMessage(service, probe as RuntimePreviewStatusMessage);
+		assert.strictEqual(service.getSession().previewHttpReachable, true);
+		assert.strictEqual(service.getSession().previewConnected, false);
+		applyPreviewHostMessage(service, { type: 'load', url: 'http://localhost:5173/' });
 		assert.strictEqual(service.getSession().previewConnected, true);
+		assert.strictEqual(service.getSession().previewStatus, 'connected');
 	});
 
 	test('iframe load connects after a failed workbench HTTP probe, and a later failed no-cors probe does not disconnect', async () => {
@@ -194,9 +213,12 @@ suite('Runtime Preview reachability', () => {
 		assert.strictEqual(service.getSession().previewConnected, true);
 	});
 
-	test('iframe navigation errors disconnect a previously reachable preview', async () => {
+	test('iframe navigation errors disconnect a previously loaded preview', async () => {
 		const { service, logs } = createRuntimeService(disposables, async () => requestContext(200));
 		await service.connectUrl('http://localhost:5173');
+		assert.strictEqual(service.getSession().previewConnected, false);
+		assert.strictEqual(service.getSession().previewHttpReachable, true);
+		applyPreviewHostMessage(service, { type: 'load', url: 'http://localhost:5173/' });
 		assert.strictEqual(service.getSession().previewConnected, true);
 
 		applyPreviewHostMessage(service, {
@@ -206,16 +228,29 @@ suite('Runtime Preview reachability', () => {
 		});
 
 		assert.strictEqual(service.getSession().previewConnected, false);
+		assert.strictEqual(service.getSession().previewStatus, 'starting');
 		assert.ok(logs.some(entry => entry.includes('Preview failed') && entry.includes('Failed to navigate')));
 	});
 
-	test('stale same-URL error cannot disconnect a newer navigation generation', async () => {
+	test('stale same-URL probe, load, or error cannot overwrite a newer navigation generation', async () => {
 		const { service } = createRuntimeService(disposables, async () => requestContext(200));
 		await service.connectUrl('http://localhost:5173');
 		const current = service.beginPreviewNavigation();
 		applyPreviewHostMessage(service, { type: 'load', url: 'http://localhost:5173/', navigationId: current });
 		assert.strictEqual(service.getSession().previewConnected, true);
 		applyPreviewHostMessage(service, { type: 'error', url: 'http://localhost:5173/', detail: 'stale', navigationId: current - 1 });
+		applyPreviewHostMessage(service, { type: 'probe', url: 'http://localhost:5173/', ok: false, navigationId: current - 1 });
+		applyPreviewHostMessage(service, { type: 'load', url: 'http://localhost:5173/', navigationId: current - 1 });
+		assert.strictEqual(service.getSession().previewConnected, true);
+
+		const next = service.beginPreviewNavigation();
+		assert.strictEqual(service.getSession().previewConnected, false);
+		applyPreviewHostMessage(service, { type: 'load', url: 'http://localhost:5173/', navigationId: current });
+		applyPreviewHostMessage(service, { type: 'probe', url: 'http://localhost:5173/', ok: true, navigationId: current });
+		applyPreviewHostMessage(service, { type: 'error', url: 'http://localhost:5173/', detail: 'stale', navigationId: current });
+		assert.strictEqual(service.getSession().previewConnected, false);
+		assert.strictEqual(service.getSession().previewStatus, 'starting');
+		applyPreviewHostMessage(service, { type: 'load', url: 'http://localhost:5173/', navigationId: next });
 		assert.strictEqual(service.getSession().previewConnected, true);
 	});
 
@@ -358,5 +393,36 @@ suite('Runtime Preview reachability', () => {
 			ok: false,
 			failures: ['Runtime Preview did not connect to the fixture'],
 		});
+	});
+
+	test('quit joins a bounded preview stop so a hung terminal cannot block shutdown', () => {
+		const source = readFileSync(resolve('src/vs/workbench/contrib/prebase/browser/prebaseRuntimeService.ts'), 'utf8');
+		assert.match(source, /event\.join\(this\._stopOwnedPreviewForShutdown\(\)/);
+		assert.match(source, /Promise\.race\(\[/);
+		assert.match(source, /this\._stopTerminal\(true\)\.then\(\(\) => undefined, \(\) => undefined\)/);
+		assert.match(source, /setTimeout\(resolve, 1_500\)/);
+	});
+
+	test('quit join is bounded to 1.5s and swallows a rejected owned-preview stop', async () => {
+		const joins: Array<Promise<void>> = [];
+		const shutdown = new Emitter<{ join(promise: Promise<void>): void }>();
+		disposables.add(shutdown);
+		const { service } = createRuntimeService(disposables, async () => requestContext(200), {
+			onWillShutdown: shutdown.event as unknown as ILifecycleService['onWillShutdown'],
+		});
+		(service as unknown as { _stopTerminal: (immediate?: boolean) => Promise<void> })._stopTerminal = () => new Promise((_resolve, reject) => {
+			setTimeout(() => reject(new Error('pty hung')), 10_000);
+		});
+
+		const started = Date.now();
+		shutdown.fire({
+			join(promise) {
+				joins.push(promise);
+			},
+		});
+		assert.strictEqual(joins.length, 1);
+		await joins[0];
+		const elapsed = Date.now() - started;
+		assert.ok(elapsed >= 1_400 && elapsed < 3_500, `quit join elapsed ${elapsed}ms`);
 	});
 });

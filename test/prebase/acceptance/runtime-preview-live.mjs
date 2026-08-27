@@ -3,19 +3,22 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import { execFile, execFileSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
-
-const execFileAsync = promisify(execFile);
+import {
+	dismissStartup,
+	gracefulWorkbenchQuit,
+	portOwners,
+	waitFor,
+} from './workbenchHarness.mjs';
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
-const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3.18/runtime-preview');
-const screenshotDir = join(repo, 'reports/graph-acceptance/phase-3.18/screenshots');
+const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/runtime-preview');
+const screenshotDir = join(repo, 'reports/graph-acceptance/phase-3-final/screenshots');
 
 function allocatePort() {
 	const source = `
@@ -49,40 +52,11 @@ function createFixture(port) {
 	return dir;
 }
 
-function processState(pid) {
+function processSnapshot(pid) {
 	try {
 		return execFileSync('ps', ['-o', 'pid=,ppid=,pcpu=,rss=,comm=', '-p', String(pid)], { encoding: 'utf8' }).trim() || 'gone';
 	} catch {
 		return 'gone';
-	}
-}
-
-function portOwners(port) {
-	try {
-		return execFileSync('lsof', ['-nP', `-iTCP:${port}`, '-sTCP:LISTEN', '-t'], { encoding: 'utf8' }).trim().split('\n').filter(Boolean).map(Number);
-	} catch {
-		return [];
-	}
-}
-
-async function waitFor(predicate, timeoutMs = 45_000, intervalMs = 200) {
-	const deadline = Date.now() + timeoutMs;
-	while (Date.now() < deadline) {
-		const value = await predicate();
-		if (value) return value;
-		await new Promise(resolvePromise => setTimeout(resolvePromise, intervalMs));
-	}
-	return undefined;
-}
-
-async function dismissStartup(page) {
-	const trust = page.getByRole('button', { name: /Yes, I trust the authors/i });
-	if (await trust.waitFor({ state: 'visible', timeout: 4_000 }).then(() => true, () => false)) {
-		await trust.click();
-	}
-	const offline = page.getByRole('button', { name: 'Continue Offline', exact: true });
-	if (await offline.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
-		await offline.click();
 	}
 }
 
@@ -114,14 +88,6 @@ async function confirmStartIfNeeded(page) {
 	await page.getByRole('button', { name: /^Start$/ }).last().click();
 }
 
-async function quit(pid) {
-	const before = processState(pid);
-	const startedAt = Date.now();
-	try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
-	const gone = await waitFor(() => processState(pid) === 'gone', 15_000, 100);
-	return { before, latencyMs: Date.now() - startedAt, remaining: gone ? 'gone' : processState(pid) };
-}
-
 export function runtimePreviewAcceptanceFailures(evidence) {
 	const failures = [];
 	if (!evidence.targetOpened) failures.push('Runtime Preview target did not open');
@@ -142,25 +108,27 @@ async function run() {
 	mkdirSync(screenshotDir, { recursive: true });
 	const port = allocatePort();
 	const fixture = createFixture(port);
-	const sourceProfile = mkdtempSync(join(tmpdir(), 'pb-runtime-profile-'));
-	const launch = join(repo, '.claude/skills/launch/scripts/launch.sh');
-	const { stdout } = await execFileAsync(launch, ['--repo', repo, '--', fixture], {
+	const launch = join(repo, '.agents/skills/launch/scripts/launch.sh');
+	const { execFile } = await import('node:child_process');
+	const { promisify } = await import('node:util');
+	const execFileAsync = promisify(execFile);
+	const { stdout } = await execFileAsync(launch, ['--repo', repo, '--', '--enable-smoke-test-driver', '--skip-release-notes', '--skip-welcome', fixture], {
 		cwd: repo,
 		env: {
 			...process.env,
 			HTTP_PROXY: '',
 			HTTPS_PROXY: '',
 			ALL_PROXY: '',
-			CODE_OSS_DEV_AUTHED_USER_DATA_DIR: sourceProfile,
 		},
 		maxBuffer: 10 * 1024 * 1024,
 	});
 	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
 	let browser;
+	let page;
 	let evidence = { fixture, port, pid: info.pid, cdpPort: info.cdpPort, logFile: info.logFile };
 	try {
 		browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
-		const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
+		page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
 		if (!page) throw new Error('Workbench page not found');
 		await dismissStartup(page);
 
@@ -194,8 +162,9 @@ async function run() {
 			await urlInput.fill(`http://127.0.0.1:${port}`);
 			await runtimeView.getByRole('button', { name: 'Connect', exact: true }).click();
 			evidence.previewConnected = Boolean(await waitFor(async () => {
-				const status = await runtimeView.innerText();
-				if (!status.includes('Connected: yes')) return false;
+				const status = `${await runtimeView.innerText()} ${await page.locator('.prebase-runtime-editor').innerText().catch(() => '')}`;
+				const connected = /\bStatus:\s*connected\b/i.test(status) || /\bConnected\b/.test(status);
+				if (!connected) return false;
 				for (const frame of page.frames()) {
 					if (await frame.getByRole('heading', { name: 'Runtime Ready', exact: true }).count().catch(() => 0)) return true;
 				}
@@ -231,10 +200,16 @@ async function run() {
 	} catch (error) {
 		evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);
 	} finally {
-		if (browser) browser.close = async () => undefined;
-		evidence.quit = await quit(info.pid);
-		await waitFor(() => portOwners(port).length === 0, 15_000);
+		if (page && info?.pid) {
+			evidence.quit = await gracefulWorkbenchQuit(page, info.pid);
+		}
+		if (browser) {
+			try { await browser.close(); } catch { /* already disconnected */ }
+		}
+		await waitFor(() => portOwners(port).length === 0, 8_000);
 		evidence.portAfterQuit = portOwners(port);
+		evidence.gracefulQuitMs = evidence.quit?.latencyMs;
+		evidence.quitRequiredSigkill = evidence.quit?.latencyMs > 6_000;
 	}
 	const failures = runtimePreviewAcceptanceFailures(evidence);
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };

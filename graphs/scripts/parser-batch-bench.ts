@@ -89,6 +89,17 @@ function percentile(values: number[], p: number): number {
 async function runChild(parseBatchSize: number) {
 	const sourceRoot = join(graphsRoot, 'src');
 	const files = collectSourceFiles(sourceRoot);
+	let generated = 0;
+	while (files.size < 1000) {
+		generated += 1;
+		const dir = ['core', 'host', 'view', 'node', 'common'][generated % 5];
+		const stem = `bench_${String(generated).padStart(4, '0')}`;
+		const relative = `${dir}/generated/${stem}.ts`;
+		const previous = generated > 1
+			? `import { n${generated - 1} } from '../generated/bench_${String(generated - 1).padStart(4, '0')}.js';\nvoid n${generated - 1};\n`
+			: '';
+		files.set(relative, `${previous}export const n${generated} = ${generated};\nexport function f${generated}(x: number) { return x + ${generated}; }\n`);
+	}
 	const source = new FixtureSource(files, sourceRoot);
 	global.gc?.();
 	const beforeMem = process.memoryUsage();
@@ -195,16 +206,16 @@ if (process.argv.includes('--child')) {
 			rssDeltaMedianMb: percentile(rssDelta, 50),
 			eventLoopLagP95MedianMs: percentile(lagP95, 50),
 			samples,
-			note: 'Fresh process per sample, including one discarded warmup. Fixture is graphs/src excluding tests.',
+			note: 'Fresh process per sample, including one discarded warmup. Fixture is graphs/src plus generated files to reach 1000 TypeScript sources. parseBatchSize is the outer Promise.all window; parseBatch remains sequential inside each worker.',
 		});
 	}
 	const result = {
 		measuredAt: new Date().toISOString(),
-		methodology: 'fresh-process warmup + 3 repetitions, median/p95, graphs/src excluding tests',
+		methodology: 'fresh-process warmup + 3 repetitions, median/p95, ~1000 TS files (graphs/src plus generated). Outer parseBatchSize is Promise.all over files, not N parser-utility processes.',
 		chosenParseBatchSize: choosePareto(rows),
 		rows,
 	};
-	const outDir = join(repoRoot, 'reports/graph-acceptance/phase-3.18/performance');
+	const outDir = join(repoRoot, 'reports/graph-acceptance/phase-3-final/performance');
 	mkdirSync(outDir, { recursive: true });
 	writeFileSync(join(outDir, 'parser-batch.json'), JSON.stringify(result, null, 2));
 	console.log(JSON.stringify(result, null, 2));

@@ -14,7 +14,7 @@ import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
 import { createDecorator } from '../../../../platform/instantiation/common/instantiation.js';
 import { IMainProcessService } from '../../../../platform/ipc/common/mainProcessService.js';
 import { ProxyChannel, type IChannel } from '../../../../base/parts/ipc/common/ipc.js';
-import { asJson, IRequestService } from '../../../../platform/request/common/request.js';
+import { IRequestService } from '../../../../platform/request/common/request.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { PREBASE_DESKTOP_CHANNEL_NAME, type IPreBaseDesktopMainService } from '../../../../platform/prebaseDesktop/common/prebaseDesktop.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
@@ -330,18 +330,31 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 					this._updateSession({ state: 'error', errorMessage: 'External launch unsupported' });
 					return this._session;
 				}
-				const command = options.command ?? this._buildExternalCommand(profile, tauriWebDriver);
+					const command = options.command ?? this._buildExternalCommand(profile, tauriWebDriver);
 				this._lastRequest = { ...this._lastRequest!, command };
 				if (isTauriProfile(profile)) {
-					const spawned = await this._main.spawnExternal(command, tauriLaunchCwd(workspaceRoot, profile.cargoTomlPath), 0, {}, { purpose, electronCdp: false, webDriver: tauriWebDriver });
+					const spawnCwd = command.command === 'cargo'
+						? tauriLaunchCwd(workspaceRoot, profile.cargoTomlPath)
+						: (profile.appRoot || workspaceRoot);
+					const spawned = await this._main.spawnExternal(command, spawnCwd, 0, {}, { purpose, electronCdp: false, webDriver: tauriWebDriver });
 					this._updateSession({ pid: spawned.pid, webDriverPort: spawned.webDriverPort });
 					if (tauriWebDriver) {
 						if (!spawned.webDriverPort) {
 							throw new Error('Tauri process did not receive a loopback WebDriver port.');
 						}
-						this._webDriver = new DesktopWebDriverClient(webDriverBaseUrl(spawned.webDriverPort));
-						await this._webDriver.waitUntilReady(DEFAULT_TAURI_STARTUP_TIMEOUT_MS, launchToken);
-						this._webDriverSession = await this._webDriver.newSession(launchToken);
+						this._webDriver = this._createWebDriverClient(spawned.webDriverPort);
+						try {
+							await this._webDriver.waitUntilReady(DEFAULT_TAURI_STARTUP_TIMEOUT_MS, launchToken);
+							this._webDriverSession = await this._webDriver.newSession(launchToken);
+						} catch (error) {
+							if (error instanceof CancellationError || launchToken.isCancellationRequested) {
+								throw error;
+							}
+							const output = await this._main.getOwnedProcessOutput(spawned.pid, 24);
+							const recent = output.entries.map(entry => entry.text).join('\n').trim().slice(-1_200);
+							const message = error instanceof Error ? error.message : String(error);
+							throw new Error(recent ? `${message} Output: ${recent}` : message);
+						}
 					}
 					this._updateSession({
 						state: purpose === 'test' ? 'testing' : 'running',
@@ -356,7 +369,9 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 					}
 					const targets = await this._discoverCdpTargets(debugPort);
 					if (!targets.length) {
-						throw new Error('External Electron application started without an inspectable CDP target. Verify that its launch script accepts --remote-debugging-port.');
+						const output = await this._main.getOwnedProcessOutput(spawned.pid, 8);
+						const recent = output.entries.map(entry => entry.text).join(' ').trim().slice(0, 300);
+						throw new Error(`External Electron application started without an inspectable CDP target. Verify that its launch script accepts --remote-debugging-port.${recent ? ` Output: ${recent}` : ''}`);
 					}
 					this._updateSession({
 						state: purpose === 'test' ? 'testing' : 'running',
@@ -410,7 +425,11 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		if (!session) {
 			return { ok: false, reason: 'Desktop session did not start.' };
 		}
-		return this.getSessionSummaryForMagnus(session.id);
+		const summary = this.getSessionSummaryForMagnus(session.id);
+		if (session.state === 'testing' || session.state === 'running') {
+			return summary;
+		}
+		return { ...summary, ok: false, reason: session.errorMessage ?? 'Desktop session did not start.' };
 	}
 
 	cancelActiveAction(): void {
@@ -435,7 +454,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			this._testRun.endedAt = Date.now();
 			this._testRun.cleanup = 'clean';
 		}
-		this._updateSession({ state: 'stopped', pid: undefined, managedWindowId: undefined, cdpTargets: [], webDriverPort: undefined });
+		this._updateSession({ state: 'stopped', pid: undefined, managedWindowId: undefined, cdpTargets: [], debugPort: undefined, webDriverPort: undefined });
 	}
 
 	async restart(): Promise<void> {
@@ -548,6 +567,9 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			backend: session.automationBackend,
 			ownedByPreBase: session.ownedByPreBase,
 			setupRequired: session.state === 'setupRequired',
+			pid: session.pid,
+			debugPort: session.debugPort,
+			webDriverPort: session.webDriverPort,
 			rendererUrl: session.rendererUrl,
 			limitations: session.profile.capabilities.limitations,
 			errorMessage: session.errorMessage,
@@ -846,6 +868,19 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		};
 	}
 
+	private _createWebDriverClient(port: number): DesktopWebDriverClient {
+		return new DesktopWebDriverClient(webDriverBaseUrl(port), async (url, init, token, timeoutMs) => {
+			if (token.isCancellationRequested) {
+				throw new CancellationError();
+			}
+			return this._main.requestOwnedLoopbackJson(url, {
+				method: typeof init.method === 'string' ? init.method : 'GET',
+				body: typeof init.body === 'string' ? init.body : undefined,
+				timeoutMs,
+			});
+		});
+	}
+
 	private async _disposeAutomation(): Promise<void> {
 		if (this._webDriver && this._webDriverSession) {
 			try {
@@ -890,18 +925,12 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 				return [];
 			}
 			try {
-				const context = await this.requestService.request({
-					type: 'GET',
-					url: `http://127.0.0.1:${port}/json`,
-					timeout: 1500,
-					callSite: 'PreBaseDesktopRuntimeService._discoverCdpTargets',
-				}, token);
-				const body = await asJson<CdpTarget[]>(context);
+				const body = await this._main.listOwnedCdpTargets(port);
 				if (Array.isArray(body) && body.length) {
 					return body;
 				}
 			} catch {
-				// retry while Electron boots
+				// retry while Electron boots; workbench HTTP cannot see the child's CDP
 			}
 			if (token.isCancellationRequested) {
 				return [];

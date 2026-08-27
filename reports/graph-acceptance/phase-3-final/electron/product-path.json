@@ -1,0 +1,61 @@
+{
+  "ok": true,
+  "failures": [],
+  "framework": "electron",
+  "productPath": true,
+  "bypassedPreBase": false,
+  "expectedGreeting": "Hello, Ada from main",
+  "prebasePid": 14886,
+  "cdpPort": 54383,
+  "start": {
+    "ok": true,
+    "state": "testing",
+    "backend": "cdp",
+    "purpose": "test",
+    "sessionId": "b3817a5b-09f4-4d92-aa21-47bfed6bc250"
+  },
+  "detected": true,
+  "started": true,
+  "state": "testing",
+  "backend": "cdp",
+  "purpose": "test",
+  "sessionId": "b3817a5b-09f4-4d92-aa21-47bfed6bc250",
+  "childPid": 15041,
+  "ownedPort": 54398,
+  "inspected": true,
+  "inspectTitle": "PreBase Electron Fixture",
+  "filled": true,
+  "selectedAll": true,
+  "typed": true,
+  "clicked": true,
+  "asserted": true,
+  "assertActual": {
+    "tag": "p",
+    "role": "status",
+    "name": "Hello, Ada from main",
+    "enabled": true,
+    "visible": true
+  },
+  "screenshotOk": true,
+  "outputOk": true,
+  "outputTruncated": true,
+  "restarted": true,
+  "restartSessionId": "f6b19390-4c2c-482c-803a-b71fc95d5151",
+  "childPidAfterRestart": 15213,
+  "assertedAfterRestart": true,
+  "assertAfterRestartActual": {
+    "tag": "p",
+    "role": "status",
+    "name": "Hello, Ada from main",
+    "enabled": true,
+    "visible": true
+  },
+  "stopped": true,
+  "childAfterStop": "gone",
+  "portAfterStop": [],
+  "quit": {
+    "before": "14886     1  19.1 328096 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 421,
+    "remaining": "gone"
+  }
+}

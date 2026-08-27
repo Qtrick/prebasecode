@@ -1,0 +1,74 @@
+{
+  "ok": false,
+  "failures": [
+    "active soak did not collect active samples"
+  ],
+  "kind": "active",
+  "durationMs": 600000,
+  "intervalMs": 30000,
+  "prebasePid": 15407,
+  "samples": [
+    {
+      "at": "2026-08-27T21:37:08.404Z",
+      "phase": "active",
+      "processCount": 34,
+      "cpuSum": 114.4,
+      "rssMb": 2217.8
+    },
+    {
+      "at": "2026-08-27T21:43:48.582Z",
+      "phase": "quiesce",
+      "processCount": 14,
+      "cpuSum": 74.1,
+      "rssMb": 2302.8
+    },
+    {
+      "at": "2026-08-27T21:44:18.608Z",
+      "phase": "quiesce",
+      "processCount": 14,
+      "cpuSum": 99.3,
+      "rssMb": 1950.1
+    },
+    {
+      "at": "2026-08-27T21:44:48.636Z",
+      "phase": "quiesce",
+      "processCount": 14,
+      "cpuSum": 98.9,
+      "rssMb": 1796.3
+    },
+    {
+      "at": "2026-08-27T21:45:18.664Z",
+      "phase": "quiesce",
+      "processCount": 14,
+      "cpuSum": 100,
+      "rssMb": 1774.8
+    },
+    {
+      "at": "2026-08-27T21:45:48.690Z",
+      "phase": "quiesce",
+      "processCount": 14,
+      "cpuSum": 99.3,
+      "rssMb": 1786.9
+    },
+    {
+      "at": "2026-08-27T21:46:18.715Z",
+      "phase": "quiesce",
+      "processCount": 14,
+      "cpuSum": 100,
+      "rssMb": 1802.2
+    },
+    {
+      "at": "2026-08-27T21:46:48.743Z",
+      "phase": "quiesce",
+      "processCount": 14,
+      "cpuSum": 100,
+      "rssMb": 1810.2
+    }
+  ],
+  "quit": {
+    "before": "15407     1   0.0 138128 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 179377,
+    "remaining": "gone",
+    "usedSigkill": true
+  }
+}

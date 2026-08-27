@@ -37,6 +37,7 @@ export interface DesktopDomResult {
 	key?: string;
 	modifiers?: { ctrl: boolean; meta: boolean; alt: boolean; shift: boolean };
 	text?: string;
+	replaceSelection?: boolean;
 }
 
 async function delay(ms: number, token: CancellationToken): Promise<void> {
@@ -89,10 +90,10 @@ export async function retryDesktopDomCommand(
 			throw new CancellationError();
 		}
 		last = await runDesktopDomCommand(evaluate, command, token);
-		if (last.ok && last.code !== 'notFound' && last.code !== 'notVisible' && last.code !== 'disabled') {
+		if (last.ok && last.code !== 'notFound' && last.code !== 'notVisible' && last.code !== 'disabled' && last.code !== 'readonly' && last.code !== 'stateUnchanged') {
 			return last;
 		}
-		if (last.code === 'ambiguous' || last.code === 'unsupported' || last.code === 'wrongControl') {
+		if (last.code === 'ambiguous' || last.code === 'unsupported' || last.code === 'wrongControl' || last.code === 'readonly') {
 			return last;
 		}
 		await delay(50, token);
@@ -109,6 +110,7 @@ export async function interactDesktop(
 	token: CancellationToken = CancellationToken.None,
 	native?: DesktopNativeInputBackend,
 ): Promise<DesktopDomResult> {
+	const deadline = Date.now() + timeoutMs;
 	const prepared = await retryDesktopDomCommand(evaluate, { op: action, locator, value }, timeoutMs, token);
 	if (!prepared.ok) {
 		return prepared;
@@ -118,6 +120,24 @@ export async function interactDesktop(
 			return { ...prepared, ok: false, code: 'nativeInputRequired', reason: 'Pointer actions require the CDP or WebDriver input backend.' };
 		}
 		await native.click(prepared.point.x, prepared.point.y, prepared.clickCount ?? 1, token);
+		if (action === 'check' || action === 'uncheck') {
+			const want = action === 'check';
+			let last: DesktopDomResult = prepared;
+			do {
+				if (token.isCancellationRequested) {
+					throw new CancellationError();
+				}
+				last = await runDesktopDomCommand(evaluate, { op: 'read', locator }, token);
+				if (last.ok && last.match?.checked === want) {
+					return { ...prepared, match: last.match };
+				}
+				if (Date.now() > deadline) {
+					break;
+				}
+				await delay(50, token);
+			} while (Date.now() <= deadline);
+			return { ...prepared, ok: false, code: 'stateUnchanged', match: last.match, reason: `Control did not become ${want ? 'checked' : 'unchecked'} after the native click.` };
+		}
 		return prepared;
 	}
 	if (prepared.native === 'key') {
@@ -130,6 +150,9 @@ export async function interactDesktop(
 	if (prepared.native === 'type') {
 		if (!native) {
 			return { ...prepared, ok: false, code: 'nativeInputRequired', reason: 'Typing requires the CDP or WebDriver input backend.' };
+		}
+		if (prepared.replaceSelection) {
+			await native.press('Backspace', { ctrl: false, meta: false, alt: false, shift: false }, token);
 		}
 		await native.insertText(prepared.text ?? String(value ?? ''), token);
 		return prepared;
@@ -214,6 +237,12 @@ export function formatDesktopFailure(result: DesktopDomResult, locator?: Desktop
 			? `<${String(blocker.tag ?? 'element')}>${blocker.name ? ` "${String(blocker.name)}"` : ''}`
 			: 'another element';
 		return `${target} is covered by ${description}.`;
+	}
+	if (result.code === 'readonly') {
+		return `${target} is read-only.`;
+	}
+	if (result.code === 'stateUnchanged') {
+		return result.reason ?? `${target} did not change to the expected state.`;
 	}
 	if (result.code === 'wrongControl') {
 		return `${target} does not support this control action.`;

@@ -23,6 +23,8 @@ import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { IWorkspaceTrustManagementService } from '../../../../platform/workspace/common/workspaceTrust.js';
+import { ILanguageModelToolsService } from '../../chat/common/tools/languageModelToolsService.js';
+import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
 import { VSBuffer } from '../../../../base/common/buffer.js';
 import { IOutputChannelRegistry, IOutputService, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
@@ -1026,6 +1028,41 @@ registerAction2(class extends Action2 {
 	run(accessor: ServicesAccessor) {
 		getDesktopRuntimeService(accessor)?.cancelActiveAction();
 		return { ok: true };
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.test.invokeLanguageModelTool', title: localize2('prebase.test.invokeLanguageModelTool', "Invoke Language Model Tool (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	async run(accessor: ServicesAccessor, toolId: string, parameters?: Record<string, unknown>) {
+		if (!accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver) {
+			throw new Error('prebase.test.invokeLanguageModelTool requires --enable-smoke-test-driver');
+		}
+		const commandService = accessor.get(ICommandService);
+		const tools = accessor.get(ILanguageModelToolsService);
+		await commandService.executeCommand('_setContext', 'vscode.chat.tools.global.autoApprove.testMode', true);
+		const result = await tools.invokeTool({
+			callId: `smoke-${Date.now()}`,
+			toolId,
+			parameters: parameters ?? {},
+			context: undefined,
+		}, async () => 0, CancellationToken.None);
+		const parts = result.content?.map(part => {
+			if (part.kind === 'text') {
+				return part.value;
+			}
+			if (part.kind === 'data') {
+				return `[data:${part.mimeType ?? 'unknown'}]`;
+			}
+			return `[${part.kind}]`;
+		}) ?? [];
+		return {
+			ok: !result.isError,
+			toolId,
+			isError: Boolean(result.isError),
+			content: parts.join('\n').slice(0, 80_000),
+		};
 	}
 });
 

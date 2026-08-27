@@ -3,7 +3,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { existsSync, readdirSync, readFileSync } from 'fs';
+import { spawnSync } from 'child_process';
+import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
+import { tmpdir } from 'os';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { runInNewContext } from 'vm';
@@ -15,7 +17,7 @@ import { describeLocator, locatorLooksSecret, maskFillValue, parseDesktopLocator
 import { applyCapabilitiesTestingPermission, applyCargoTestingDependencies, applyRustTestingPlugins, applyTauriTestingTransaction, inspectTauriTestingSetup, previewTauriTestingSetup, tauriTestingCandidatePaths } from '../../common/runtime/tauriTestingSetup.js';
 import { createDesktopTestRun, recordDesktopTestStep, summarizeDesktopTestRun } from '../../common/runtime/desktopTestModel.js';
 import { cdpKeyParams, webDriverKeyActions, webDriverKeyValue } from '../../common/runtime/desktopNativeInput.js';
-import { DesktopWebDriverClient, isWebDriverReadyStatus, webDriverBaseUrl } from '../../common/runtime/desktopWebDriver.js';
+import { DesktopWebDriverClient, WEBDRIVER_DELETE_SESSION_TIMEOUT_MS, assertWebDriverSuccess, isWebDriverReadyStatus, webDriverBaseUrl, webDriverProtocolError } from '../../common/runtime/desktopWebDriver.js';
 import { resolveDesktopShutdownPolicy } from '../../../../../platform/prebaseDesktop/common/processTermination.js';
 
 function findRepoRoot(): string {
@@ -134,6 +136,110 @@ suite('desktopAutomationHost', () => {
 		assert.deepStrictEqual(clicks, []);
 	});
 
+	test('check and uncheck re-resolve the locator after the native click', async () => {
+		const locator = { by: 'role', role: 'checkbox', name: 'On' } as const;
+		const backend = (onClick: () => void) => ({
+			click: async () => { onClick(); },
+			press: async () => { },
+			insertText: async () => { },
+		});
+		const evaluateFor = (getChecked: () => boolean): DesktopEvaluateFn => async expression => {
+			if (expression.includes('"op":"check"') || expression.includes('"op":"uncheck"')) {
+				return { ok: true, native: 'pointer', point: { x: 8, y: 8 }, clickCount: 1, match: { checked: getChecked() } };
+			}
+			if (expression.includes('"op":"read"')) {
+				return { ok: true, match: { checked: getChecked() } };
+			}
+			return true;
+		};
+
+		let checked = false;
+		const failedCheck = await interactDesktop(evaluateFor(() => checked), 'check', locator, undefined, 120, CancellationToken.None, backend(() => { /* prevented */ }));
+		assert.strictEqual(failedCheck.code, 'stateUnchanged');
+
+		let reads = 0;
+		const delayedCheck: DesktopEvaluateFn = async expression => {
+			if (expression.includes('"op":"check"')) {
+				return { ok: true, native: 'pointer', point: { x: 8, y: 8 }, clickCount: 1, match: { checked: false } };
+			}
+			if (expression.includes('"op":"read"')) {
+				reads++;
+				return { ok: true, match: { checked: reads >= 2 } };
+			}
+			return true;
+		};
+		const passedCheck = await interactDesktop(delayedCheck, 'check', locator, undefined, 400, CancellationToken.None, backend(() => { }));
+		assert.strictEqual(passedCheck.ok, true);
+		assert.strictEqual(passedCheck.match?.checked, true);
+		assert.ok(reads >= 2);
+
+		let on = true;
+		const failedUncheck = await interactDesktop(evaluateFor(() => on), 'uncheck', locator, undefined, 120, CancellationToken.None, backend(() => { /* prevented */ }));
+		assert.strictEqual(failedUncheck.code, 'stateUnchanged');
+		const passedUncheck = await interactDesktop(evaluateFor(() => on), 'uncheck', locator, undefined, 200, CancellationToken.None, backend(() => { on = false; }));
+		assert.strictEqual(passedUncheck.ok, true);
+		assert.strictEqual(passedUncheck.match?.checked, false);
+
+		let exhaustedReads = 0;
+		const exhaustedUnchanged: DesktopEvaluateFn = async expression => {
+			if (expression.includes('"op":"check"')) {
+				return { ok: true, native: 'pointer', point: { x: 8, y: 8 }, clickCount: 1, match: { checked: false } };
+			}
+			if (expression.includes('"op":"read"')) {
+				exhaustedReads++;
+				return { ok: true, match: { checked: false } };
+			}
+			return true;
+		};
+		const exhaustedCheck = await interactDesktop(exhaustedUnchanged, 'check', locator, undefined, 0, CancellationToken.None, backend(() => { }));
+		assert.strictEqual(exhaustedCheck.ok, false);
+		assert.strictEqual(exhaustedCheck.code, 'stateUnchanged');
+		assert.strictEqual(exhaustedReads, 1);
+
+		let exhaustedSuccessReads = 0;
+		const exhaustedButChanged: DesktopEvaluateFn = async expression => {
+			if (expression.includes('"op":"check"')) {
+				return { ok: true, native: 'pointer', point: { x: 8, y: 8 }, clickCount: 1, match: { checked: false } };
+			}
+			if (expression.includes('"op":"read"')) {
+				exhaustedSuccessReads++;
+				return { ok: true, match: { checked: true } };
+			}
+			return true;
+		};
+		const exhaustedSuccess = await interactDesktop(exhaustedButChanged, 'check', locator, undefined, 0, CancellationToken.None, backend(() => { }));
+		assert.strictEqual(exhaustedSuccess.ok, true);
+		assert.strictEqual(exhaustedSuccess.match?.checked, true);
+		assert.strictEqual(exhaustedSuccessReads, 1);
+	});
+
+	test('fill and type on a readonly field fail closed without retrying or typing', async () => {
+		let calls = 0;
+		const inserts: string[] = [];
+		const evaluate: DesktopEvaluateFn = async expression => {
+			if (expression.startsWith('window.__prebaseDesktopTest.run(')) {
+				calls++;
+				return { ok: false, code: 'readonly', match: { name: 'Title' } };
+			}
+			return true;
+		};
+		const native = {
+			click: async () => { },
+			press: async () => { },
+			insertText: async (text: string) => { inserts.push(text); },
+		};
+		const filled = await interactDesktop(evaluate, 'fill', { by: 'label', value: 'Title' }, 'Ada', 1000, CancellationToken.None, native);
+		assert.strictEqual(filled.code, 'readonly');
+		assert.strictEqual(calls, 1);
+		const typedHost = await interactDesktop(evaluate, 'type', { by: 'label', value: 'Title' }, 'Ada', 1000, CancellationToken.None, native);
+		assert.strictEqual(typedHost.code, 'readonly');
+		assert.strictEqual(calls, 2);
+		const typed = await retryDesktopDomCommand(evaluate, { op: 'type', locator: { by: 'label', value: 'Title' }, value: 'Ada' }, 1000);
+		assert.strictEqual(typed.code, 'readonly');
+		assert.strictEqual(calls, 3);
+		assert.deepStrictEqual(inserts, []);
+	});
+
 	test('native Enter and Tab go to the input backend as named keys, not character text', async () => {
 		const presses: Array<{ key: string; modifiers: unknown }> = [];
 		const evaluate: DesktopEvaluateFn = async expression => {
@@ -169,10 +275,41 @@ suite('desktopAutomationHost', () => {
 		assert.deepStrictEqual(typed[0]?.actions.map(step => `${step.type}:${step.value}`), ['keyDown:a', 'keyUp:a', 'keyDown:b', 'keyUp:b']);
 	});
 
+	test('type deletes an existing selection before inserting native text', async () => {
+		const presses: string[] = [];
+		const inserts: string[] = [];
+		const evaluate: DesktopEvaluateFn = async expression => {
+			if (expression.includes('"op":"type"')) {
+				return { ok: true, native: 'type', text: 'Ada', replaceSelection: true };
+			}
+			return true;
+		};
+		const result = await interactDesktop(evaluate, 'type', { by: 'role', role: 'textbox', name: 'Name' }, 'Ada', 200, CancellationToken.None, {
+			click: async () => { },
+			press: async key => { presses.push(key); },
+			insertText: async text => { inserts.push(text); },
+		});
+		assert.strictEqual(result.ok, true);
+		assert.deepStrictEqual(presses, ['Backspace']);
+		assert.deepStrictEqual(inserts, ['Ada']);
+	});
+
 	test('owned CDP Space dispatch in electron-main inserts a character, not only a named key', () => {
-		const main = readFileSync(join(findRepoRoot(), 'src/vs/platform/prebaseDesktop/electron-main/prebaseDesktopMainService.ts'), 'utf8');
+		const root = findRepoRoot();
+		const main = readFileSync(join(root, 'src/vs/platform/prebaseDesktop/electron-main/prebaseDesktopMainService.ts'), 'utf8');
+		const keys = readFileSync(join(root, 'src/vs/platform/prebaseDesktop/common/desktopCdpKey.ts'), 'utf8');
+		assert.match(main, /desktopCdpKeyParams\(key, modifiers, 'char'\)/);
 		assert.match(main, /key === 'Space' \|\| key === ' '/);
-		assert.match(main, /type: 'char', text: isChar \? key : ' '/);
+		assert.match(main, /skip char for modifier shortcuts/);
+		assert.match(main, /!modifiers\.alt && !modifiers\.shift \? \['SelectAll'\]/);
+		assert.match(main, /if \(electronCdp \|\| webDriver\)/);
+		assert.match(main, /sanitizeOwnedDesktopChildEnv\(process\.env, env\)/);
+		assert.match(main, /keep pid\/port owned until killOwnedProcess/);
+		assert.match(main, /!this\._ownedPids\.has\(pid\) && !this\._ownedPortsByPid\.has\(pid\)/);
+		assert.match(main, /isExited: \(\) => !this\._processGroupAlive\(pid\)/);
+		assert.match(keys, /key === 'Enter' \? '\\r' : ' '/);
+		assert.match(keys, /isDigit \? `Digit\$\{key\}`/);
+		assert.strictEqual(cdpKeyParams('1', { ctrl: false, meta: false, alt: false, shift: false }, 'keyDown').code, 'Digit1');
 		assert.match(main, /Owned text input exceeds the/);
 		assert.match(main, /Owned pointer input requires finite coordinates/);
 	});
@@ -372,6 +509,7 @@ class MiniElement {
 	get type(): string { return (this.attrs.type || (this.tagName === 'INPUT' ? 'text' : '')).toLowerCase(); }
 	get value(): string { return this.tagName === 'OPTION' ? (this.attrs.value ?? this.text) : this.nativeValue; }
 	set value(value: string) { this.nativeValue = value; }
+	get readOnly(): boolean { return this.getAttribute('readonly') !== null || this.getAttribute('readOnly') !== null; }
 	get options(): MiniElement[] { return this.tagName === 'SELECT' ? this.children : []; }
 	get multiple(): boolean { return this.getAttribute('multiple') !== null; }
 	getAttribute(name: string): string | null { return Object.prototype.hasOwnProperty.call(this.attrs, name) ? this.attrs[name] : null; }
@@ -664,6 +802,7 @@ suite('desktopAutomationDom', () => {
 			ok: result.ok,
 			native: result.native,
 			text: result.text,
+			replaceSelection: result.replaceSelection,
 			value: field.value,
 			selectionStart: field.selectionStart,
 			selectionEnd: field.selectionEnd,
@@ -673,6 +812,7 @@ suite('desktopAutomationDom', () => {
 			ok: true,
 			native: 'type',
 			text: 'Grace',
+			replaceSelection: true,
 			value: 'Ada Lovelace',
 			selectionStart: 0,
 			selectionEnd: 'Ada Lovelace'.length,
@@ -685,7 +825,7 @@ suite('desktopAutomationDom', () => {
 		const field = el('input', { type: 'text', 'aria-label': 'Name' });
 		const api = installDomTest([field]);
 
-		const result = api.run({ op: 'press', locator: { by: 'label', value: 'Name' }, value: 'Control+Shift+A' });
+		const result = api.run({ op: 'press', locator: { by: 'label', value: 'Name' }, value: 'Control+Shift+A' }) as { ok: boolean; native?: string; key?: string; modifiers?: { ctrl: boolean; meta: boolean; alt: boolean; shift: boolean } };
 		assert.strictEqual(result.ok, true);
 		assert.strictEqual(result.native, 'key');
 		assert.strictEqual(result.key, 'A');
@@ -728,26 +868,49 @@ suite('desktopAutomationDom', () => {
 		const selected = api.run({ op: 'select', locator: { by: 'css', value: 'select' }, value: 'light' });
 		assert.deepStrictEqual({
 			ok: selected.ok,
+			native: selected.native,
 			value: select.value,
 			events: select.events.map(event => event.type),
 		}, {
 			ok: true,
+			native: undefined,
 			value: 'light',
 			events: ['input', 'change'],
 		});
+		const focused = api.run({ op: 'focus', locator: { by: 'css', value: 'input' } });
+		assert.strictEqual(focused.ok, true);
+		assert.strictEqual(focused.native, undefined);
 	});
 
 	test('refuses radio uncheck and fill/type on non-editable controls', () => {
 		const radio = el('input', { type: 'radio', 'aria-label': 'Choice' });
 		radio.checked = true;
 		const button = el('button', {}, 'Save');
-		const api = installDomTest([radio, button]);
+		const box = el('input', { type: 'checkbox', 'aria-label': 'On' });
+		box.checked = true;
+		const api = installDomTest([radio, button, box]);
 
 		assert.strictEqual(runStablePointerAction(api, { op: 'uncheck', locator: { by: 'label', value: 'Choice' } }).code, 'wrongControl');
 		assert.strictEqual(radio.checked, true);
 		assert.strictEqual(radio.clicked, 0);
 		assert.strictEqual(api.run({ op: 'fill', locator: { by: 'role', role: 'button', name: 'Save' }, value: 'Ada' }).code, 'wrongControl');
 		assert.strictEqual(api.run({ op: 'type', locator: { by: 'role', role: 'button', name: 'Save' }, value: 'ab' }).code, 'wrongControl');
+		const alreadyChecked = runStablePointerAction(api, { op: 'check', locator: { by: 'label', value: 'On' } });
+		assert.strictEqual(alreadyChecked.ok, true);
+		assert.strictEqual(alreadyChecked.native, undefined);
+		assert.strictEqual(box.clicked, 0);
+		assert.strictEqual(api.run({ op: 'uncheck', locator: { by: 'label', value: 'On' } }).native, 'pointer');
+		assert.strictEqual(box.clicked, 0);
+	});
+
+	test('refuses fill and type on readonly fields', () => {
+		const field = el('input', { type: 'text', readonly: '', 'aria-label': 'Title' });
+		const api = installDomTest([field]);
+		assert.strictEqual(api.run({ op: 'fill', locator: { by: 'label', value: 'Title' }, value: 'Ada' }).code, 'readonly');
+		assert.strictEqual(api.run({ op: 'type', locator: { by: 'label', value: 'Title' }, value: 'Ada' }).code, 'readonly');
+		assert.strictEqual(field.value, '');
+		assert.strictEqual(runStablePointerAction(api, { op: 'click', locator: { by: 'label', value: 'Title' } }).native, 'pointer');
+		assert.strictEqual(field.clicked, 0);
 	});
 
 	test('omits password values from match summaries', () => {
@@ -927,7 +1090,7 @@ suite('tauriTestingSetup', () => {
 		const enabled = previewTauriTestingSetup({
 			appRoot: '/app',
 			cargoToml: `${cargo}tauri-plugin-wdio-webdriver = { version = "1", optional = true }\n\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n`,
-			rustEntry: 'fn main() {\n    let mut builder = tauri::Builder::default();\n    tauri_plugin_wdio_webdriver::init();\n    builder.run(tauri::generate_context!()).unwrap();\n}\n',
+			rustEntry: 'fn main() {\n    let mut builder = tauri::Builder::default();\n    #[cfg(all(debug_assertions, feature = "prebase-testing"))]\n    {\n        builder = builder.plugin(tauri_plugin_wdio_webdriver::init());\n    }\n    builder.run(tauri::generate_context!()).unwrap();\n}\n',
 			capabilitiesJson: JSON.stringify({ permissions: ['core:default', 'wdio-webdriver:default'] }),
 			rustEntryPath: 'src-tauri/src/lib.rs',
 			cargoPath: 'src-tauri/Cargo.toml',
@@ -941,12 +1104,48 @@ suite('tauriTestingSetup', () => {
 	});
 
 	test('inspects partial versus complete Tauri testing setup without overclaiming ready', () => {
+		assert.deepStrictEqual(inspectTauriTestingSetup({}), {
+			dependencyPresent: false,
+			featurePresent: false,
+			featureIncludesDriver: false,
+			pluginPresent: false,
+			pluginGuarded: false,
+			pluginRegistered: false,
+			permissionPresent: false,
+			ready: false,
+		});
+		assert.deepStrictEqual(inspectTauriTestingSetup({
+			cargoToml: '[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n',
+		}), {
+			dependencyPresent: false,
+			featurePresent: true,
+			featureIncludesDriver: true,
+			pluginPresent: false,
+			pluginGuarded: false,
+			pluginRegistered: false,
+			permissionPresent: false,
+			ready: false,
+		});
+		assert.deepStrictEqual(inspectTauriTestingSetup({
+			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n[features]\nprebase-testing = []\n',
+		}), {
+			dependencyPresent: true,
+			featurePresent: true,
+			featureIncludesDriver: false,
+			pluginPresent: false,
+			pluginGuarded: false,
+			pluginRegistered: false,
+			permissionPresent: false,
+			ready: false,
+		});
 		assert.deepStrictEqual(inspectTauriTestingSetup({
 			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n',
 		}), {
 			dependencyPresent: true,
 			featurePresent: false,
 			featureIncludesDriver: false,
+			pluginPresent: false,
+			pluginGuarded: false,
 			pluginRegistered: false,
 			permissionPresent: false,
 			ready: false,
@@ -958,15 +1157,200 @@ suite('tauriTestingSetup', () => {
 			dependencyPresent: true,
 			featurePresent: true,
 			featureIncludesDriver: true,
+			pluginPresent: true,
+			pluginGuarded: false,
 			pluginRegistered: true,
 			permissionPresent: false,
 			ready: false,
 		});
-		assert.strictEqual(inspectTauriTestingSetup({
+		const guarded = inspectTauriTestingSetup({
+			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n',
+			rustEntry: '#[cfg(all(debug_assertions, feature = "prebase-testing"))] { builder = builder.plugin(tauri_plugin_wdio_webdriver::init()); }',
+			capabilitiesJson: '{"permissions":["wdio-webdriver:default"]}',
+		});
+		assert.deepStrictEqual({
+			pluginPresent: guarded.pluginPresent,
+			pluginGuarded: guarded.pluginGuarded,
+			pluginRegistered: guarded.pluginRegistered,
+			ready: guarded.ready,
+		}, {
+			pluginPresent: true,
+			pluginGuarded: true,
+			pluginRegistered: true,
+			ready: true,
+		});
+		const unguardedInit = inspectTauriTestingSetup({
 			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n',
 			rustEntry: 'tauri_plugin_wdio_webdriver::init()',
 			capabilitiesJson: '{"permissions":["wdio-webdriver:default"]}',
-		}).ready, true);
+		});
+		assert.deepStrictEqual({
+			pluginPresent: unguardedInit.pluginPresent,
+			pluginGuarded: unguardedInit.pluginGuarded,
+			ready: unguardedInit.ready,
+		}, {
+			pluginPresent: true,
+			pluginGuarded: false,
+			ready: false,
+		});
+		const unguardedBuilder = inspectTauriTestingSetup({
+			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n',
+			rustEntry: 'let mut builder = tauri::Builder::default();\nbuilder.plugin(tauri_plugin_wdio_webdriver::init());\n',
+			capabilitiesJson: '{"permissions":["wdio-webdriver:default"]}',
+		});
+		assert.deepStrictEqual({
+			pluginPresent: unguardedBuilder.pluginPresent,
+			pluginRegistered: unguardedBuilder.pluginRegistered,
+			pluginGuarded: unguardedBuilder.pluginGuarded,
+			ready: unguardedBuilder.ready,
+		}, {
+			pluginPresent: true,
+			pluginRegistered: true,
+			pluginGuarded: false,
+			ready: false,
+		});
+		const stringOnly = inspectTauriTestingSetup({
+			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n',
+			rustEntry: 'fn main() { let _ = "tauri_plugin_wdio_webdriver"; }',
+			capabilitiesJson: '{"permissions":["wdio-webdriver:default"]}',
+		});
+		assert.deepStrictEqual({
+			pluginPresent: stringOnly.pluginPresent,
+			pluginRegistered: stringOnly.pluginRegistered,
+			pluginGuarded: stringOnly.pluginGuarded,
+			permissionPresent: stringOnly.permissionPresent,
+			ready: stringOnly.ready,
+		}, {
+			pluginPresent: true,
+			pluginRegistered: true,
+			pluginGuarded: false,
+			permissionPresent: true,
+			ready: false,
+		});
+		const cargoComplete = inspectTauriTestingSetup({
+			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n',
+		});
+		assert.deepStrictEqual({
+			dependencyPresent: cargoComplete.dependencyPresent,
+			featurePresent: cargoComplete.featurePresent,
+			featureIncludesDriver: cargoComplete.featureIncludesDriver,
+			pluginGuarded: cargoComplete.pluginGuarded,
+			ready: cargoComplete.ready,
+		}, {
+			dependencyPresent: true,
+			featurePresent: true,
+			featureIncludesDriver: true,
+			pluginGuarded: false,
+			ready: false,
+		});
+	});
+
+	test('repairs every partial Cargo permutation without duplicating entries', () => {
+		const nothing = '[package]\nname="demo"\n[dependencies]\ntauri = "2"\n';
+		const depOnly = '[package]\nname="demo"\n[dependencies]\ntauri = "2"\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n';
+		const featureOnly = '[package]\nname="demo"\n[dependencies]\ntauri = "2"\n\n[features]\nprebase-testing = []\n';
+		const featureMissingDriver = '[package]\nname="demo"\n[dependencies]\ntauri = "2"\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n\n[features]\nprebase-testing = []\n';
+		const complete = '[package]\nname="demo"\n[dependencies]\ntauri = "2"\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n';
+
+		const cases = [
+			{ cargo: nothing, before: { dependencyPresent: false, featurePresent: false, featureIncludesDriver: false } },
+			{ cargo: depOnly, before: { dependencyPresent: true, featurePresent: false, featureIncludesDriver: false } },
+			{ cargo: featureOnly, before: { dependencyPresent: false, featurePresent: true, featureIncludesDriver: false } },
+			{ cargo: featureMissingDriver, before: { dependencyPresent: true, featurePresent: true, featureIncludesDriver: false } },
+			{ cargo: complete, before: { dependencyPresent: true, featurePresent: true, featureIncludesDriver: true } },
+		];
+		for (const item of cases) {
+			const before = inspectTauriTestingSetup({ cargoToml: item.cargo });
+			assert.deepStrictEqual({
+				dependencyPresent: before.dependencyPresent,
+				featurePresent: before.featurePresent,
+				featureIncludesDriver: before.featureIncludesDriver,
+				ready: before.ready,
+			}, { ...item.before, ready: false });
+			const once = applyCargoTestingDependencies(item.cargo);
+			if (item.cargo === complete) {
+				assert.strictEqual(once, item.cargo);
+			}
+			assert.match(once, /tauri-plugin-wdio-webdriver\s*=/);
+			assert.match(once, /prebase-testing\s*=\s*\[[^\]]*tauri-plugin-wdio-webdriver/);
+			assert.strictEqual(applyCargoTestingDependencies(once), once);
+			assert.strictEqual((once.match(/tauri-plugin-wdio-webdriver\s*=/g) ?? []).length, 1);
+			assert.strictEqual((once.match(/^\s*prebase-testing\s*=/gm) ?? []).length, 1);
+			const repaired = inspectTauriTestingSetup({ cargoToml: once });
+			assert.deepStrictEqual({
+				dependencyPresent: repaired.dependencyPresent,
+				featurePresent: repaired.featurePresent,
+				featureIncludesDriver: repaired.featureIncludesDriver,
+				pluginGuarded: repaired.pluginGuarded,
+				ready: repaired.ready,
+			}, {
+				dependencyPresent: true,
+				featurePresent: true,
+				featureIncludesDriver: true,
+				pluginGuarded: false,
+				ready: false,
+			});
+		}
+
+		const depOnlyPreview = previewTauriTestingSetup({
+			appRoot: '/app',
+			cargoToml: depOnly,
+			rustEntry: rust,
+			rustEntryPath: 'src-tauri/src/lib.rs',
+			cargoPath: 'src-tauri/Cargo.toml',
+			capabilitiesPath: 'src-tauri/capabilities/default.json',
+		});
+		assert.ok(!('error' in depOnlyPreview));
+		if ('error' in depOnlyPreview) {
+			return;
+		}
+		const cargoChange = depOnlyPreview.changes.find(change => change.path === 'src-tauri/Cargo.toml');
+		assert.ok(cargoChange?.preview.includes('prebase-testing'));
+		assert.ok(!cargoChange?.preview.includes('tauri-plugin-wdio-webdriver ='));
+
+		const featureOnlyPreview = previewTauriTestingSetup({
+			appRoot: '/app',
+			cargoToml: featureOnly,
+			rustEntry: rust,
+			rustEntryPath: 'src-tauri/src/lib.rs',
+			cargoPath: 'src-tauri/Cargo.toml',
+			capabilitiesPath: 'src-tauri/capabilities/default.json',
+		});
+		assert.ok(!('error' in featureOnlyPreview));
+		if ('error' in featureOnlyPreview) {
+			return;
+		}
+		const featureOnlyCargo = featureOnlyPreview.changes.find(change => change.path === 'src-tauri/Cargo.toml');
+		assert.ok(featureOnlyCargo?.preview.includes('tauri-plugin-wdio-webdriver ='));
+		assert.ok(featureOnlyCargo?.preview.includes('prebase-testing'));
+
+		const featureMissingPreview = previewTauriTestingSetup({
+			appRoot: '/app',
+			cargoToml: featureMissingDriver,
+			rustEntry: rust,
+			rustEntryPath: 'src-tauri/src/lib.rs',
+			cargoPath: 'src-tauri/Cargo.toml',
+			capabilitiesPath: 'src-tauri/capabilities/default.json',
+		});
+		assert.ok(!('error' in featureMissingPreview));
+		if ('error' in featureMissingPreview) {
+			return;
+		}
+		const featureMissingCargo = featureMissingPreview.changes.find(change => change.path === 'src-tauri/Cargo.toml');
+		assert.ok(featureMissingCargo?.preview.includes('prebase-testing'));
+		assert.ok(!featureMissingCargo?.preview.includes('tauri-plugin-wdio-webdriver ='));
+
+		assert.deepStrictEqual(previewTauriTestingSetup({
+			appRoot: '/app',
+			cargoToml: complete,
+			rustEntry: 'fn main() {\n    tauri::Builder::default().plugin(tauri_plugin_wdio_webdriver::init());\n}\n',
+			rustEntryPath: 'src-tauri/src/lib.rs',
+			cargoPath: 'src-tauri/Cargo.toml',
+			capabilitiesPath: 'src-tauri/capabilities/default.json',
+		}), { error: 'WebDriver plugin is registered without debug_assertions and feature prebase-testing. Manual review required; PreBase will not rewrite this Rust source.' });
+		assert.deepStrictEqual(applyRustTestingPlugins('fn main() { builder.plugin(tauri_plugin_wdio_webdriver::init()); }\n'), {
+			error: 'WebDriver plugin is registered without debug_assertions and feature prebase-testing. Manual review required; PreBase will not rewrite this Rust source.',
+		});
 	});
 });
 
@@ -1046,6 +1430,36 @@ suite('tauriTestingTransaction', () => {
 		]);
 	});
 
+	test('rollback failures include the resource name', async () => {
+		const files = new Map<string, string>([
+			['src-tauri/Cargo.toml', 'cargo-old'],
+			['src-tauri/src/lib.rs', 'rust-old'],
+		]);
+		const pathWrites = [
+			{ resource: 'src-tauri/Cargo.toml', before: 'cargo-old', after: 'cargo-new' },
+			{ resource: 'src-tauri/src/lib.rs', before: 'rust-old', after: 'rust-new' },
+		];
+		const result = await applyTauriTestingTransaction(pathWrites, {
+			async write(resource: string, value: string): Promise<void> {
+				if (value === 'rust-new') {
+					throw new Error('write rust failed');
+				}
+				if (value === 'cargo-old') {
+					throw new Error('disk full');
+				}
+				files.set(resource, value);
+			},
+			async remove(): Promise<void> { /* unused */ },
+		});
+		assert.strictEqual(result.ok, false);
+		if (!result.ok) {
+			assert.strictEqual(result.reason, 'write rust failed');
+			assert.deepStrictEqual(result.rollbackErrors, ['src-tauri/Cargo.toml: disk full']);
+		}
+		assert.strictEqual(files.get('src-tauri/Cargo.toml'), 'cargo-new');
+		assert.strictEqual(files.get('src-tauri/src/lib.rs'), 'rust-old');
+	});
+
 	test('rollback deletes a newly created capability before restoring older files', async () => {
 		const state = transactionIo(3);
 		const writesWithCompletedCreation = [writes[0], writes[2], writes[1]];
@@ -1062,6 +1476,200 @@ suite('tauriTestingTransaction', () => {
 			'remove capabilities.json',
 			'write Cargo.toml cargo-old',
 		]);
+	});
+
+	test('live fixture copy repairs a complete missing setup and rolls back partial writes', async () => {
+		const source = join(findRepoRoot(), 'test/prebase/fixtures/desktop-tauri-plain');
+		assert.ok(existsSync(join(source, 'src-tauri/Cargo.toml')));
+
+		const copyOnce = () => {
+			const dir = mkdtempSync(join(tmpdir(), 'pb-tauri-setup-'));
+			cpSync(source, dir, { recursive: true });
+			return {
+				dir,
+				cargoPath: join(dir, 'src-tauri/Cargo.toml'),
+				rustPath: join(dir, 'src-tauri/src/lib.rs'),
+				capsPath: join(dir, 'src-tauri/capabilities/default.json'),
+			};
+		};
+		const read = (copy: { cargoPath: string; rustPath: string; capsPath: string }) => ({
+			cargoToml: readFileSync(copy.cargoPath, 'utf8'),
+			rustEntry: readFileSync(copy.rustPath, 'utf8'),
+			capabilitiesJson: readFileSync(copy.capsPath, 'utf8'),
+		});
+		const previewOf = (copy: ReturnType<typeof copyOnce>) => {
+			const files = read(copy);
+			return previewTauriTestingSetup({
+				appRoot: copy.dir,
+				...files,
+				rustEntryPath: 'src-tauri/src/lib.rs',
+				cargoPath: 'src-tauri/Cargo.toml',
+				capabilitiesPath: 'src-tauri/capabilities/default.json',
+			});
+		};
+		const applyCopy = async (copy: ReturnType<typeof copyOnce>, failAt?: number) => {
+			const files = read(copy);
+			const cargoNext = applyCargoTestingDependencies(files.cargoToml);
+			const rustNext = applyRustTestingPlugins(files.rustEntry);
+			assert.strictEqual(typeof rustNext, 'string');
+			const capsNext = applyCapabilitiesTestingPermission(files.capabilitiesJson);
+			assert.strictEqual(typeof capsNext, 'string');
+			const writes = [
+				{ resource: copy.cargoPath, before: files.cargoToml, after: cargoNext },
+				{ resource: copy.rustPath, before: files.rustEntry, after: rustNext as string },
+				{ resource: copy.capsPath, before: files.capabilitiesJson, after: capsNext as string },
+			].filter(write => write.after !== write.before);
+			let forward = 0;
+			return applyTauriTestingTransaction(writes, {
+				async write(resource: string, value: string): Promise<void> {
+					if (failAt !== undefined && ++forward === failAt) {
+						throw new Error(`injected failure at write ${failAt}`);
+					}
+					writeFileSync(resource, value);
+				},
+				async remove(resource: string): Promise<void> {
+					rmSync(resource, { force: true });
+				},
+			});
+		};
+
+		const cancelled = copyOnce();
+		try {
+			const before = read(cancelled);
+			const preview = previewOf(cancelled);
+			assert.ok(!('error' in preview));
+			assert.ok(preview.changes.some(change => change.path.includes('Cargo.toml')));
+			assert.ok(preview.changes.some(change => change.path.includes('lib.rs')));
+			assert.deepStrictEqual(read(cancelled), before);
+			assert.strictEqual(inspectTauriTestingSetup(before).ready, false);
+		} finally {
+			rmSync(cancelled.dir, { recursive: true, force: true });
+		}
+
+		const approved = copyOnce();
+		try {
+			const result = await applyCopy(approved);
+			assert.deepStrictEqual(result, { ok: true });
+			assert.strictEqual(inspectTauriTestingSetup(read(approved)).ready, true);
+			const completePreview = previewOf(approved);
+			assert.ok(!('error' in completePreview));
+			assert.strictEqual(completePreview.changes.length, 0);
+			const again = await applyCopy(approved);
+			assert.deepStrictEqual(again, { ok: true });
+			assert.strictEqual(inspectTauriTestingSetup(read(approved)).ready, true);
+		} finally {
+			rmSync(approved.dir, { recursive: true, force: true });
+		}
+
+		const afterCargo = copyOnce();
+		try {
+			const original = read(afterCargo);
+			const result = await applyCopy(afterCargo, 2);
+			assert.strictEqual(result.ok, false);
+			if (!result.ok) {
+				assert.ok(result.reason.includes('injected failure at write 2'));
+				assert.deepStrictEqual(result.rollbackErrors, []);
+			}
+			assert.deepStrictEqual(read(afterCargo), original);
+		} finally {
+			rmSync(afterCargo.dir, { recursive: true, force: true });
+		}
+
+		const afterRust = copyOnce();
+		try {
+			const original = read(afterRust);
+			const result = await applyCopy(afterRust, 3);
+			assert.strictEqual(result.ok, false);
+			if (!result.ok) {
+				assert.ok(result.reason.includes('injected failure at write 3'));
+				assert.deepStrictEqual(result.rollbackErrors, []);
+			}
+			assert.deepStrictEqual(read(afterRust), original);
+		} finally {
+			rmSync(afterRust.dir, { recursive: true, force: true });
+		}
+	});
+
+	test('live fixture copy reconciles each Cargo permutation and does not rewrite unguarded Rust', async () => {
+		const source = join(findRepoRoot(), 'test/prebase/fixtures/desktop-tauri-plain');
+		const copyOnce = () => {
+			const dir = mkdtempSync(join(tmpdir(), 'pb-tauri-perm-'));
+			cpSync(source, dir, { recursive: true });
+			return {
+				dir,
+				cargoPath: join(dir, 'src-tauri/Cargo.toml'),
+				rustPath: join(dir, 'src-tauri/src/lib.rs'),
+			};
+		};
+		const patchCargo = (cargoPath: string, kind: 'nothing' | 'depOnly' | 'featureOnly' | 'featureMissingDriver' | 'complete') => {
+			let cargo = readFileSync(cargoPath, 'utf8');
+			if (kind === 'depOnly' || kind === 'featureMissingDriver' || kind === 'complete') {
+				cargo = cargo.replace('[dependencies]\n', '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n');
+			}
+			if (kind === 'featureOnly' || kind === 'featureMissingDriver') {
+				cargo += '\n[features]\nprebase-testing = []\n';
+			}
+			if (kind === 'complete') {
+				cargo += '\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n';
+			}
+			writeFileSync(cargoPath, cargo);
+		};
+
+		for (const kind of ['nothing', 'depOnly', 'featureOnly', 'featureMissingDriver', 'complete'] as const) {
+			const copy = copyOnce();
+			try {
+				patchCargo(copy.cargoPath, kind);
+				const before = readFileSync(copy.cargoPath, 'utf8');
+				const once = applyCargoTestingDependencies(before);
+				assert.match(once, /tauri-plugin-wdio-webdriver\s*=/);
+				assert.match(once, /prebase-testing\s*=\s*\[[^\]]*tauri-plugin-wdio-webdriver/);
+				assert.strictEqual((once.match(/tauri-plugin-wdio-webdriver\s*=/g) ?? []).length, 1);
+				assert.strictEqual((once.match(/^\s*prebase-testing\s*=/gm) ?? []).length, 1);
+				assert.strictEqual(applyCargoTestingDependencies(once), once);
+				writeFileSync(copy.cargoPath, once);
+				const state = inspectTauriTestingSetup({ cargoToml: readFileSync(copy.cargoPath, 'utf8') });
+				assert.deepStrictEqual({
+					dependencyPresent: state.dependencyPresent,
+					featurePresent: state.featurePresent,
+					featureIncludesDriver: state.featureIncludesDriver,
+				}, { dependencyPresent: true, featurePresent: true, featureIncludesDriver: true });
+				if (kind === 'complete') {
+					assert.strictEqual(once, before);
+				}
+			} finally {
+				rmSync(copy.dir, { recursive: true, force: true });
+			}
+		}
+
+		const unguarded = copyOnce();
+		try {
+			const originalRust = readFileSync(unguarded.rustPath, 'utf8');
+			const originalCargo = readFileSync(unguarded.cargoPath, 'utf8');
+			writeFileSync(unguarded.rustPath, originalRust.replace(
+				'tauri::Builder::default()',
+				'tauri::Builder::default().plugin(tauri_plugin_wdio_webdriver::init())',
+			));
+			const rustBefore = readFileSync(unguarded.rustPath, 'utf8');
+			const preview = previewTauriTestingSetup({
+				appRoot: unguarded.dir,
+				cargoToml: originalCargo,
+				rustEntry: rustBefore,
+				capabilitiesJson: readFileSync(join(unguarded.dir, 'src-tauri/capabilities/default.json'), 'utf8'),
+				rustEntryPath: 'src-tauri/src/lib.rs',
+				cargoPath: 'src-tauri/Cargo.toml',
+				capabilitiesPath: 'src-tauri/capabilities/default.json',
+			});
+			assert.deepStrictEqual(preview, {
+				error: 'WebDriver plugin is registered without debug_assertions and feature prebase-testing. Manual review required; PreBase will not rewrite this Rust source.',
+			});
+			assert.deepStrictEqual(applyRustTestingPlugins(rustBefore), {
+				error: 'WebDriver plugin is registered without debug_assertions and feature prebase-testing. Manual review required; PreBase will not rewrite this Rust source.',
+			});
+			assert.strictEqual(readFileSync(unguarded.rustPath, 'utf8'), rustBefore);
+			assert.strictEqual(readFileSync(unguarded.cargoPath, 'utf8'), originalCargo);
+		} finally {
+			rmSync(unguarded.dir, { recursive: true, force: true });
+		}
 	});
 });
 
@@ -1118,7 +1726,34 @@ suite('desktopWebDriver', () => {
 		assert.strictEqual(isWebDriverReadyStatus(200, undefined), false);
 		assert.strictEqual(isWebDriverReadyStatus(200, { value: { error: 'unknown command' } }), false);
 		assert.strictEqual(isWebDriverReadyStatus(200, { value: { ready: true, error: null } }), true);
+		assert.strictEqual(isWebDriverReadyStatus(200, { value: { ready: true, error: 'crash' } }), false);
+		assert.strictEqual(isWebDriverReadyStatus(200, { ready: 'true' }), false);
 		assert.strictEqual(isWebDriverReadyStatus(401, '<html>nope</html>'), false);
+		assert.deepStrictEqual(webDriverProtocolError({ value: { error: 'stale element reference', message: 'element is not attached' } }), {
+			error: 'stale element reference',
+			message: 'element is not attached',
+		});
+		const giant = 'x'.repeat(5_000);
+		assert.throws(() => assertWebDriverSuccess('execute', {
+			status: 200,
+			json: true,
+			body: { value: { error: 'javascript error', message: giant } },
+		}), (error: Error) => {
+			assert.match(error.message, /^execute failed \(HTTP 200, javascript error: /);
+			assert.ok(error.message.length < 400);
+			assert.ok(!error.message.includes(giant));
+			return true;
+		});
+		assert.throws(() => assertWebDriverSuccess('screenshot', {
+			status: 500,
+			json: false,
+			body: giant,
+		}), /^Error: screenshot failed \(HTTP 500, non-JSON\)\.$/);
+		assert.throws(() => assertWebDriverSuccess('execute', {
+			status: 200,
+			json: true,
+			body: { value: { error: 'javascript error', message: 'boom' } },
+		}), /execute failed \(HTTP 200, javascript error: boom\)/);
 	});
 
 	test('waitUntilReady accepts a W3C ready envelope and rejects 404, 500, and ready false', async () => {
@@ -1128,15 +1763,18 @@ suite('desktopWebDriver', () => {
 			{ status: 200, body: '{not json' },
 			{ status: 200, body: JSON.stringify({ value: { ready: false } }) },
 			{ status: 500, body: JSON.stringify({ value: { ready: true } }) },
+			{ status: 200, body: JSON.stringify({ value: { ready: true, error: 'crash' } }) },
 			{ status: 200, body: JSON.stringify({ value: { ready: true, message: 'ready' } }) },
 		];
 		globalThis.fetch = (async () => {
-			const next = statuses.shift() ?? statuses.at(-1)!;
+			const next = statuses.shift();
+			assert.ok(next, 'waitUntilReady must not treat earlier HTTP or protocol-error envelopes as ready');
 			return { status: next.status, text: async () => next.body } as Response;
 		}) as typeof fetch;
 		try {
 			const client = new DesktopWebDriverClient('http://127.0.0.1:4444');
 			await client.waitUntilReady(5_000);
+			assert.strictEqual(statuses.length, 0);
 		} finally {
 			globalThis.fetch = original;
 		}
@@ -1174,6 +1812,29 @@ suite('desktopWebDriver', () => {
 		}
 	});
 
+	test('deleteSession is bound to 2s and swallows shutdown failures', async () => {
+		assert.strictEqual(WEBDRIVER_DELETE_SESSION_TIMEOUT_MS, 2_000);
+		const original = globalThis.fetch;
+		const urls: string[] = [];
+		globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+			urls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+			await new Promise<void>((_resolve, reject) => {
+				init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+			});
+			return { status: 200, text: async () => '{}' } as Response;
+		}) as typeof fetch;
+		try {
+			const client = new DesktopWebDriverClient('http://127.0.0.1:4444');
+			const started = Date.now();
+			await client.deleteSession({ sessionId: 's-1', baseUrl: 'http://127.0.0.1:4444' });
+			const elapsed = Date.now() - started;
+			assert.deepStrictEqual(urls, ['DELETE http://127.0.0.1:4444/session/s-1']);
+			assert.ok(elapsed >= 1_500 && elapsed < 4_000, `deleteSession elapsed ${elapsed}ms`);
+		} finally {
+			globalThis.fetch = original;
+		}
+	});
+
 	test('only allows loopback URLs', () => {
 		assert.strictEqual(webDriverBaseUrl(4445), 'http://127.0.0.1:4445');
 		assert.throws(() => webDriverBaseUrl(0));
@@ -1193,6 +1854,30 @@ suite('desktopWebDriver', () => {
 		cts.cancel();
 		await assert.rejects(() => client.waitUntilReady(2_000, cts.token));
 		cts.dispose();
+	});
+
+	test('newSession, execute, screenshot, and performActions fail closed on HTTP 200 protocol errors', async () => {
+		const original = globalThis.fetch;
+		const envelope = JSON.stringify({
+			value: { sessionId: 's-fake', error: 'unknown error', message: 'driver crashed' },
+		});
+		const urls: string[] = [];
+		globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+			urls.push(`${init?.method ?? 'GET'} ${String(input)}`);
+			return { status: 200, text: async () => envelope } as Response;
+		}) as typeof fetch;
+		try {
+			const client = new DesktopWebDriverClient('http://127.0.0.1:4444');
+			await assert.rejects(() => client.newSession(), /newSession failed \(HTTP 200, unknown error: driver crashed\)/);
+			const session = { sessionId: 's-1', baseUrl: 'http://127.0.0.1:4444' };
+			await assert.rejects(() => client.execute(session, 'return 1'), /execute failed \(HTTP 200, unknown error: driver crashed\)/);
+			await assert.rejects(() => client.screenshot(session), /screenshot failed \(HTTP 200, unknown error: driver crashed\)/);
+			await assert.rejects(() => client.performActions(session, []), /actions failed \(HTTP 200, unknown error: driver crashed\)/);
+			await client.deleteSession(session);
+			assert.ok(urls.some(url => url.startsWith('DELETE ')));
+		} finally {
+			globalThis.fetch = original;
+		}
 	});
 
 	test('parses a session id and rejects a non-PNG screenshot without calling a remote host', async () => {
@@ -1351,5 +2036,72 @@ suite('tauriTestingCandidatePaths', () => {
 			['"dep:tauri-plugin-wdio-webdriver"'],
 		);
 		assert.deepStrictEqual(capability.permissions?.filter(permission => permission.startsWith('wdio')), ['wdio-webdriver:default']);
+	});
+});
+
+suite('desktopProductPathAcceptance', () => {
+	function evaluate(evidence: Record<string, unknown>) {
+		const runner = join(findRepoRoot(), 'test/prebase/acceptance/prebase-desktop-product-path.mjs');
+		const result = spawnSync(process.execPath, [runner, '--evaluate'], {
+			input: JSON.stringify(evidence),
+			encoding: 'utf8',
+		});
+		return { status: result.status, stderr: result.stderr, output: JSON.parse(result.stdout || '{}') };
+	}
+
+	function completeEvidence(overrides: Record<string, unknown> = {}) {
+		return {
+			framework: 'electron',
+			bypassedPreBase: false,
+			detected: true,
+			started: true,
+			state: 'testing',
+			backend: 'cdp',
+			inspected: true,
+			filled: true,
+			clicked: true,
+			asserted: true,
+			screenshotOk: true,
+			outputOk: true,
+			restarted: true,
+			assertedAfterRestart: true,
+			stopped: true,
+			childAfterStop: 'gone',
+			portAfterStop: [],
+			quit: { remaining: 'gone' },
+			...overrides,
+		};
+	}
+
+	test('fails when Playwright connected directly to the fixture', () => {
+		const result = evaluate(completeEvidence({ bypassedPreBase: true }));
+		assert.strictEqual(result.status, 1, result.stderr);
+		assert.deepStrictEqual(result.output.failures, ['Acceptance connected Playwright directly to the fixture']);
+	});
+
+	test('fails when the automation backend is not the PreBase product path', () => {
+		const electron = evaluate(completeEvidence({ backend: 'webdriver' }));
+		assert.strictEqual(electron.status, 1, electron.stderr);
+		assert.deepStrictEqual(electron.output.failures, ['Unexpected automation backend: webdriver']);
+		const tauri = evaluate(completeEvidence({ framework: 'tauri', backend: 'cdp' }));
+		assert.strictEqual(tauri.status, 1, tauri.stderr);
+		assert.deepStrictEqual(tauri.output.failures, ['Unexpected automation backend: cdp']);
+	});
+
+	test('fails when the session never reaches Testing', () => {
+		const result = evaluate(completeEvidence({ state: 'running' }));
+		assert.strictEqual(result.status, 1, result.stderr);
+		assert.deepStrictEqual(result.output.failures, ['Session state is running, expected testing']);
+	});
+
+	test('passes a complete product-path evidence record', () => {
+		for (const evidence of [
+			completeEvidence(),
+			completeEvidence({ framework: 'tauri', backend: 'webdriver' }),
+		]) {
+			const result = evaluate(evidence);
+			assert.strictEqual(result.status, 0, result.stderr);
+			assert.deepStrictEqual(result.output, { ok: true, failures: [] });
+		}
 	});
 });

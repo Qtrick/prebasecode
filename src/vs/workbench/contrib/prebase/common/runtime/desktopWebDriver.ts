@@ -48,10 +48,7 @@ export function isWebDriverReadyStatus(status: number, body: unknown): boolean {
 		return false;
 	}
 	const envelope = body as Record<string, unknown>;
-	if (typeof envelope.error === 'string') {
-		return false;
-	}
-	if (envelope.value && typeof envelope.value === 'object' && envelope.value !== null && typeof (envelope.value as { error?: unknown }).error === 'string') {
+	if (webDriverProtocolError(body)) {
 		return false;
 	}
 	if (envelope.value && typeof envelope.value === 'object' && !Array.isArray(envelope.value)) {
@@ -59,6 +56,44 @@ export function isWebDriverReadyStatus(status: number, body: unknown): boolean {
 	}
 	return envelope.ready === true;
 }
+
+function webDriverValue(body: unknown): unknown {
+	if (body && typeof body === 'object' && !Array.isArray(body) && 'value' in body) {
+		return (body as { value: unknown }).value;
+	}
+	return body;
+}
+
+export function webDriverProtocolError(body: unknown): { error: string; message: string } | undefined {
+	const candidates = [webDriverValue(body), body];
+	for (const candidate of candidates) {
+		if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
+			continue;
+		}
+		const envelope = candidate as Record<string, unknown>;
+		if (typeof envelope.error === 'string') {
+			const message = typeof envelope.message === 'string' ? envelope.message : envelope.error;
+			return { error: envelope.error, message: message.slice(0, 240) };
+		}
+	}
+	return undefined;
+}
+
+export function assertWebDriverSuccess(command: string, result: { status: number; body: unknown; json: boolean }): unknown {
+	if (!result.json) {
+		throw new Error(`${command} failed (HTTP ${result.status}, non-JSON).`);
+	}
+	const protocol = webDriverProtocolError(result.body);
+	if (protocol || result.status < 200 || result.status >= 300) {
+		const code = protocol?.error ?? 'http';
+		const message = protocol?.message ?? `HTTP ${result.status}`;
+		throw new Error(`${command} failed (HTTP ${result.status}, ${code}: ${message}).`);
+	}
+	return webDriverValue(result.body);
+}
+
+/** Shutdown-specific DELETE bound. Process ownership remains authoritative. */
+export const WEBDRIVER_DELETE_SESSION_TIMEOUT_MS = 2_000;
 
 async function requestJson(url: string, init: RequestInit, token: CancellationToken, timeoutMs = 5_000): Promise<{ status: number; body: unknown; json: boolean }> {
 	assertLoopback(url);
@@ -86,7 +121,10 @@ async function requestJson(url: string, init: RequestInit, token: CancellationTo
 }
 
 export class DesktopWebDriverClient {
-	constructor(private readonly _baseUrl: string) {
+	constructor(
+		private readonly _baseUrl: string,
+		private readonly _request: typeof requestJson = requestJson,
+	) {
 		assertLoopback(_baseUrl);
 	}
 
@@ -99,7 +137,7 @@ export class DesktopWebDriverClient {
 			}
 			try {
 				const remaining = Math.max(1, timeoutMs - (Date.now() - started));
-				const result = await requestJson(`${this._baseUrl.replace(/\/$/, '')}/status`, { method: 'GET' }, token, Math.min(5_000, remaining));
+				const result = await this._request(`${this._baseUrl.replace(/\/$/, '')}/status`, { method: 'GET' }, token, Math.min(5_000, remaining));
 				if (result.json && isWebDriverReadyStatus(result.status, result.body)) {
 					return;
 				}
@@ -116,15 +154,12 @@ export class DesktopWebDriverClient {
 	}
 
 	async newSession(token: CancellationToken = CancellationToken.None): Promise<WebDriverSession> {
-		const result = await requestJson(`${this._baseUrl.replace(/\/$/, '')}/session`, {
+		const result = await this._request(`${this._baseUrl.replace(/\/$/, '')}/session`, {
 			method: 'POST',
 			body: JSON.stringify({ capabilities: { alwaysMatch: {} } }),
 		}, token);
-		if (!result.json || result.status >= 400) {
-			throw new Error(`Tauri WebDriver did not create a session (HTTP ${result.status}).`);
-		}
-		const body = result.body as { value?: { sessionId?: string } | string; sessionId?: string };
-		const sessionId = typeof body?.value === 'object' ? body.value?.sessionId : (body?.sessionId ?? (typeof body?.value === 'string' ? body.value : undefined));
+		const value = assertWebDriverSuccess('newSession', result) as { sessionId?: string } | string | undefined;
+		const sessionId = typeof value === 'object' && value ? value.sessionId : (typeof value === 'string' ? value : undefined);
 		if (!sessionId) {
 			throw new Error('Tauri WebDriver did not return a session id.');
 		}
@@ -132,38 +167,36 @@ export class DesktopWebDriverClient {
 	}
 
 	async execute(session: WebDriverSession, script: string, token: CancellationToken = CancellationToken.None): Promise<unknown> {
-		const result = await requestJson(`${session.baseUrl}/session/${encodeURIComponent(session.sessionId)}/execute/sync`, {
+		const result = await this._request(`${session.baseUrl}/session/${encodeURIComponent(session.sessionId)}/execute/sync`, {
 			method: 'POST',
 			body: JSON.stringify({ script, args: [] }),
 		}, token);
-		const body = result.body as { value?: unknown };
-		if (!result.json || result.status >= 400) {
-			throw new Error(`WebDriver execute failed (${result.status}).`);
-		}
-		return body?.value;
+		return assertWebDriverSuccess('execute', result);
 	}
 
 	async screenshot(session: WebDriverSession, token: CancellationToken = CancellationToken.None): Promise<string> {
-		const result = await requestJson(`${session.baseUrl}/session/${encodeURIComponent(session.sessionId)}/screenshot`, { method: 'GET' }, token);
-		const body = result.body as { value?: string };
-		if (typeof body?.value !== 'string' || body.value.length < 8) {
+		const result = await this._request(`${session.baseUrl}/session/${encodeURIComponent(session.sessionId)}/screenshot`, { method: 'GET' }, token);
+		const value = assertWebDriverSuccess('screenshot', result);
+		if (typeof value !== 'string' || value.length < 8) {
 			throw new Error('WebDriver screenshot did not return PNG data.');
 		}
-		return body.value;
+		return value;
 	}
 
 	async deleteSession(session: WebDriverSession, token: CancellationToken = CancellationToken.None): Promise<void> {
-		await requestJson(`${session.baseUrl}/session/${encodeURIComponent(session.sessionId)}`, { method: 'DELETE' }, token, 1_500);
+		try {
+			await this._request(`${session.baseUrl}/session/${encodeURIComponent(session.sessionId)}`, { method: 'DELETE' }, token, WEBDRIVER_DELETE_SESSION_TIMEOUT_MS);
+		} catch {
+			// Shutdown is bounded; process ownership cleanup is authoritative.
+		}
 	}
 
 	async performActions(session: WebDriverSession, actions: unknown, token: CancellationToken = CancellationToken.None): Promise<void> {
-		const result = await requestJson(`${session.baseUrl}/session/${encodeURIComponent(session.sessionId)}/actions`, {
+		const result = await this._request(`${session.baseUrl}/session/${encodeURIComponent(session.sessionId)}/actions`, {
 			method: 'POST',
 			body: JSON.stringify({ actions }),
 		}, token);
-		if (!result.json || result.status >= 400) {
-			throw new Error(`WebDriver actions failed (HTTP ${result.status}).`);
-		}
+		assertWebDriverSuccess('actions', result);
 	}
 }
 

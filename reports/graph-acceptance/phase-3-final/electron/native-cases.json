@@ -1,0 +1,294 @@
+{
+  "ok": true,
+  "failures": [],
+  "productPath": true,
+  "bypassedPreBase": false,
+  "cases": {
+    "visible": {
+      "ok": true,
+      "action": "click",
+      "locator": "role=button name=Visible",
+      "match": {
+        "tag": "button",
+        "role": "button",
+        "name": "Visible",
+        "enabled": true,
+        "visible": true
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 112,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "covered": {
+      "ok": false,
+      "action": "click",
+      "locator": "role=button name=Covered",
+      "reason": "role=button name=Covered is covered by <div>.",
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 8048,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "disabled": {
+      "ok": false,
+      "action": "click",
+      "locator": "role=button name=Disabled",
+      "reason": "role=button name=Disabled is disabled.",
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 8013,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "ambiguous": {
+      "ok": false,
+      "action": "click",
+      "locator": "text=Ambiguous",
+      "reason": "Ambiguous locator text=Ambiguous: 2 matches. Narrow by role name, exact text, or testId.",
+      "matchCount": 2,
+      "matches": [
+        {
+          "tag": "button",
+          "role": "button",
+          "name": "Ambiguous",
+          "enabled": true,
+          "visible": true
+        },
+        {
+          "tag": "button",
+          "role": "button",
+          "name": "Ambiguous",
+          "enabled": true,
+          "visible": true
+        }
+      ],
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "console": [],
+      "duration": 11,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "offscreen": {
+      "ok": true,
+      "action": "click",
+      "locator": "role=button name=Offscreen",
+      "match": {
+        "tag": "button",
+        "role": "button",
+        "name": "Offscreen",
+        "enabled": true,
+        "visible": true
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 69,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "moving": {
+      "ok": true,
+      "action": "click",
+      "locator": "role=button name=Moving",
+      "match": {
+        "tag": "button",
+        "role": "button",
+        "name": "Moving",
+        "enabled": true,
+        "visible": true
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 66,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "check": {
+      "ok": true,
+      "action": "check",
+      "locator": "role=checkbox name=Agree",
+      "match": {
+        "tag": "input",
+        "role": "checkbox",
+        "name": "Agree",
+        "value": "on",
+        "enabled": true,
+        "visible": true,
+        "checked": true
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 71,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "uncheck": {
+      "ok": true,
+      "action": "uncheck",
+      "locator": "role=checkbox name=Agree",
+      "match": {
+        "tag": "input",
+        "role": "checkbox",
+        "name": "Agree",
+        "value": "on",
+        "enabled": true,
+        "visible": true,
+        "checked": false
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 11,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "readonlyFill": {
+      "ok": false,
+      "action": "fill",
+      "locator": "role=textbox name=Readonly",
+      "reason": "role=textbox name=Readonly is read-only.",
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 3,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "plainFill": {
+      "ok": true,
+      "action": "fill",
+      "locator": "role=textbox name=Plain",
+      "match": {
+        "tag": "input",
+        "role": "textbox",
+        "name": "Plain",
+        "value": "Ada",
+        "enabled": true,
+        "visible": true,
+        "checked": false
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 5,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "notesFill": {
+      "ok": true,
+      "action": "fill",
+      "locator": "role=textbox name=Notes",
+      "match": {
+        "tag": "textarea",
+        "role": "textbox",
+        "name": "Notes",
+        "value": "hello",
+        "enabled": true,
+        "visible": true
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 4,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "tab": {
+      "ok": true,
+      "action": "press",
+      "locator": "role=textbox name=Tab A",
+      "match": {
+        "tag": "input",
+        "role": "textbox",
+        "name": "Tab A",
+        "enabled": true,
+        "visible": true,
+        "checked": false
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 7,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "shiftTab": {
+      "ok": true,
+      "action": "press",
+      "locator": "role=textbox name=Tab B",
+      "match": {
+        "tag": "input",
+        "role": "textbox",
+        "name": "Tab B",
+        "enabled": true,
+        "visible": true,
+        "checked": false
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 4,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "escape": {
+      "ok": true,
+      "action": "press",
+      "locator": "role=textbox name=Tab A",
+      "match": {
+        "tag": "input",
+        "role": "textbox",
+        "name": "Tab A",
+        "enabled": true,
+        "visible": true,
+        "checked": false
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 10,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "enter": {
+      "ok": true,
+      "action": "press",
+      "locator": "role=textbox name=Name",
+      "match": {
+        "tag": "input",
+        "role": "textbox",
+        "name": "Name",
+        "enabled": true,
+        "visible": true,
+        "checked": false
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 6,
+      "framework": "electron",
+      "backend": "cdp"
+    },
+    "doubleClick": {
+      "ok": true,
+      "action": "doubleClick",
+      "locator": "role=button name=Visible",
+      "match": {
+        "tag": "button",
+        "role": "button",
+        "name": "Visible",
+        "enabled": true,
+        "visible": true
+      },
+      "title": "PreBase Electron Fixture",
+      "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+      "duration": 8,
+      "framework": "electron",
+      "backend": "cdp"
+    }
+  },
+  "state": "testing",
+  "backend": "cdp",
+  "stopped": true,
+  "childAfterStop": "gone",
+  "quit": {
+    "before": "72909     1  27.8 336496 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 316,
+    "remaining": "gone"
+  }
+}

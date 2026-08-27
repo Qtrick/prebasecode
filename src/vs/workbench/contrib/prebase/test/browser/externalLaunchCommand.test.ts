@@ -3,7 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
-import { resolveExternalLaunchCommand } from '../../../../../platform/prebaseDesktop/common/externalLaunchResolver.js';
+import { resolveExternalLaunchCommand, withElectronCdpLaunchArgs } from '../../../../../platform/prebaseDesktop/common/externalLaunchResolver.js';
 import { buildElectronExternalLaunchRequest, buildPackageScriptExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../../common/runtime/externalLaunchCommand.js';
 
 suite('externalLaunchCommand', () => {
@@ -52,6 +52,17 @@ suite('externalLaunchCommand', () => {
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'npm', args: ['run', '../desktop', '--'] }, '/app', 'darwin'));
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'pnpm', args: ['run', 'apps/desktop', '--'] }, '/app', 'darwin'));
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'bun', args: ['run', 'desktop', '--', '--features', 'other'] }, '/app', 'darwin'));
+	});
+
+	test('places Electron CDP switches after the application entry', () => {
+		assert.deepStrictEqual(
+			withElectronCdpLaunchArgs('electron', ['main.js'], 9222),
+			['main.js', '--remote-debugging-port=9222', '--remote-debugging-address=127.0.0.1'],
+		);
+		assert.deepStrictEqual(
+			withElectronCdpLaunchArgs('npm', ['run', 'electron', '--'], 9222),
+			['run', 'electron', '--', '--remote-debugging-port=9222', '--remote-debugging-address=127.0.0.1'],
+		);
 	});
 
 	test('uses the logical Electron binary for a scriptless project main entry', () => {
@@ -116,12 +127,21 @@ suite('externalLaunchCommand', () => {
 			command: 'pnpm',
 			args: ['run', 'tauri:dev', '--', '--features', 'prebase-testing'],
 		});
+		assert.deepStrictEqual(buildTauriExternalLaunchRequest('tauri', true), {
+			command: 'npm',
+			args: ['run', 'tauri', '--', 'dev', '--features', 'prebase-testing'],
+		});
+		assert.deepStrictEqual(buildTauriExternalLaunchRequest('tauri'), {
+			command: 'npm',
+			args: ['run', 'tauri', '--', 'dev'],
+		});
 		assert.doesNotThrow(() => resolveExternalLaunchCommand(buildTauriExternalLaunchRequest('tauri:dev', true), '/workspace/app', 'darwin'));
 		assert.strictEqual(tauriLaunchCwd('/workspace/app', 'src-tauri/Cargo.toml'), '/workspace/app/src-tauri');
 		assert.strictEqual(tauriLaunchCwd('/workspace/app', '/abs/src-tauri/Cargo.toml'), '/abs/src-tauri');
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'cargo', args: ['tauri', 'dev', '--features', 'evil'] }, '/app', 'darwin'));
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'npm', args: ['run', 'tauri', '--', '--eval', '1'] }, '/app', 'darwin'));
 		assert.doesNotThrow(() => resolveExternalLaunchCommand({ command: 'npm', args: ['run', 'tauri', '--', '--features', 'prebase-testing'] }, '/app', 'darwin'));
+		assert.doesNotThrow(() => resolveExternalLaunchCommand({ command: 'npm', args: ['run', 'tauri', '--', 'dev', '--features', 'prebase-testing'] }, '/app', 'darwin'));
 		assert.doesNotThrow(() => resolveExternalLaunchCommand({ command: 'yarn', args: ['run', 'tauri', '--', '--features', 'prebase-testing'] }, '/app', 'darwin'));
 		assert.doesNotThrow(() => resolveExternalLaunchCommand({ command: 'yarn', args: ['run', 'tauri', '--features', 'prebase-testing'] }, '/app', 'darwin'));
 		assert.throws(() => resolveExternalLaunchCommand({ command: 'electron', args: ['/tmp/evil.js'] }, '/app', 'darwin'));

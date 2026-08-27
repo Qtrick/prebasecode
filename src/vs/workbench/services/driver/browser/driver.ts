@@ -7,6 +7,7 @@ import { getClientArea, getTopLeftOffset, isHTMLDivElement, isHTMLTextAreaElemen
 import { mainWindow } from '../../../../base/browser/window.js';
 import { coalesce } from '../../../../base/common/arrays.js';
 import { language, locale } from '../../../../base/common/platform.js';
+import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IEnvironmentService } from '../../../../platform/environment/common/environment.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
 import { IInstantiationService } from '../../../../platform/instantiation/common/instantiation.js';
@@ -25,8 +26,14 @@ export class BrowserWindowDriver implements IWindowDriver {
 		@IFileService private readonly fileService: IFileService,
 		@IEnvironmentService private readonly environmentService: IEnvironmentService,
 		@ILifecycleService private readonly lifecycleService: ILifecycleService,
-		@ILogService private readonly logService: ILogService
+		@ILogService private readonly logService: ILogService,
+		@ICommandService private readonly commandService: ICommandService,
 	) {
+	}
+
+	/** Smoke-test driver only: run a workbench command with arguments. */
+	async executeCommand(commandId: string, ...args: unknown[]): Promise<unknown> {
+		return this.commandService.executeCommand(commandId, ...args);
 	}
 
 	async getLogs(): Promise<ILogFile[]> {

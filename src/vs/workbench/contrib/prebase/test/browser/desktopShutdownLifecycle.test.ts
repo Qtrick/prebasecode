@@ -4,7 +4,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { spawn } from 'child_process';
 import * as fs from 'fs';
+import * as net from 'net';
 import * as path from 'path';
 import { fileURLToPath } from 'url';
 import { terminateOwnedProcess, resolveDesktopShutdownPolicy, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, type IProcessTerminationTarget, type ProcessTerminationSignal } from '../../../../../platform/prebaseDesktop/common/processTermination.js';
@@ -111,6 +113,143 @@ suite('desktopShutdownLifecycle', () => {
 
 	test('POSIX owned-process termination budget is 3s+3s not 4s', () => {
 		assert.strictEqual(POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, 6_000);
+	});
+
+	test('kills the process group and releases the port after a cargo-style wrapper pid has already exited', async function () {
+		if (process.platform === 'win32') {
+			this.skip();
+		}
+		const grandchildSource = `
+			const net = require('net');
+			const server = net.createServer();
+			server.listen(0, '127.0.0.1', () => {
+				const address = server.address();
+				process.stdout.write('ready ' + process.pid + ' ' + address.port + '\\n');
+			});
+			setInterval(() => {}, 1000);
+		`;
+		const wrapperSource = `
+			const { spawn } = require('child_process');
+			const child = spawn(process.execPath, ['-e', ${JSON.stringify(grandchildSource)}], {
+				stdio: ['ignore', 'pipe', 'inherit'],
+			});
+			child.stdout.once('data', chunk => {
+				process.stdout.write(chunk);
+				process.exit(0);
+			});
+		`;
+		const wrapper = spawn(process.execPath, ['-e', wrapperSource], {
+			detached: true,
+			stdio: ['ignore', 'pipe', 'pipe'],
+		});
+		const wrapperPid = wrapper.pid;
+		assert.ok(wrapperPid, 'wrapper must have a pid');
+
+		const cleanup = () => {
+			try { process.kill(-wrapperPid, 'SIGKILL'); } catch { /* already gone */ }
+			try { process.kill(wrapperPid, 'SIGKILL'); } catch { /* already gone */ }
+		};
+
+		try {
+			const ready = await new Promise<{ grandchildPid: number; port: number }>((resolve, reject) => {
+				const timer = setTimeout(() => reject(new Error('wrapper did not report a grandchild listener')), 3_000);
+				let buffer = '';
+				wrapper.stdout?.on('data', chunk => {
+					buffer += String(chunk);
+					const match = buffer.match(/ready (\d+) (\d+)/);
+					if (match) {
+						clearTimeout(timer);
+						resolve({ grandchildPid: Number(match[1]), port: Number(match[2]) });
+					}
+				});
+				wrapper.on('error', reject);
+			});
+			assert.notStrictEqual(ready.grandchildPid, wrapperPid);
+
+			await new Promise<void>((resolve, reject) => {
+				const timer = setTimeout(() => reject(new Error('wrapper pid did not exit')), 3_000);
+				wrapper.once('exit', () => {
+					clearTimeout(timer);
+					resolve();
+				});
+			});
+
+			try {
+				process.kill(wrapperPid, 0);
+				assert.fail('wrapper pid must already have exited');
+			} catch {
+				// expected: the cargo/npm wrapper is gone
+			}
+			process.kill(-wrapperPid, 0);
+			process.kill(ready.grandchildPid, 0);
+
+			const processGroupAlive = (): boolean => {
+				try {
+					process.kill(-wrapperPid, 0);
+					return true;
+				} catch {
+					try {
+						process.kill(wrapperPid, 0);
+						return true;
+					} catch {
+						return false;
+					}
+				}
+			};
+			const waitForGroupExit = (timeoutMs: number): Promise<boolean> => new Promise(resolve => {
+				const started = Date.now();
+				const tick = () => {
+					if (!processGroupAlive()) {
+						resolve(true);
+						return;
+					}
+					if (Date.now() - started >= timeoutMs) {
+						resolve(false);
+						return;
+					}
+					setTimeout(tick, 20);
+				};
+				tick();
+			});
+
+			const stopped = await terminateOwnedProcess({
+				isExited: () => !processGroupAlive(),
+				sendSignal: signal => {
+					try {
+						process.kill(-wrapperPid, signal);
+						return true;
+					} catch {
+						try {
+							process.kill(wrapperPid, signal);
+							return true;
+						} catch {
+							return false;
+						}
+					}
+				},
+				waitForExit: timeoutMs => waitForGroupExit(timeoutMs),
+			}, 400, 400);
+			assert.strictEqual(stopped, true);
+			assert.strictEqual(processGroupAlive(), false);
+
+			try {
+				process.kill(ready.grandchildPid, 0);
+				assert.fail('grandchild must be gone after process-group kill');
+			} catch {
+				// expected
+			}
+
+			await new Promise<void>((resolve, reject) => {
+				const server = net.createServer();
+				server.once('error', reject);
+				server.listen(ready.port, '127.0.0.1', () => {
+					server.close(err => err ? reject(err) : resolve());
+				});
+			});
+		} catch (error) {
+			cleanup();
+			throw error;
+		}
 	});
 
 	test('Windows taskkill helper is bounded without requiring win32', () => {

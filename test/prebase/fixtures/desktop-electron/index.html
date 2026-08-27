@@ -7,15 +7,43 @@
 		body { font: 16px/1.4 system-ui, sans-serif; margin: 24px; }
 		label, button { display: block; margin: 12px 0; }
 		#status { min-height: 1.5em; }
+		.cases { margin-top: 32px; padding-top: 16px; border-top: 1px solid #ccc; }
+		.cover { position: relative; display: inline-block; }
+		.overlay { position: absolute; inset: 0; background: #0008; }
+		#moving { position: relative; }
+		.below-fold { margin-top: 2400px; }
 	</style>
 </head>
 <body>
 	<h1>Electron fixture</h1>
-	<label for="name">Name
-		<input id="name" type="text" aria-label="Name" placeholder="Ada">
-	</label>
-	<button type="button" id="greet">Greet</button>
+	<form id="greet-form">
+		<label for="name">Name
+			<input id="name" type="text" aria-label="Name" placeholder="Ada">
+		</label>
+		<button type="button" id="greet">Greet</button>
+	</form>
 	<p id="status" role="status" aria-live="polite">Ready</p>
+
+	<section class="cases" aria-label="Native input cases">
+		<label><input id="plain" type="text" aria-label="Plain"> Plain</label>
+		<label><input id="readonly-field" type="text" aria-label="Readonly" readonly value="locked"> Readonly</label>
+		<label><textarea id="notes" aria-label="Notes"></textarea> Notes</label>
+		<div id="editor" contenteditable="true" role="textbox" aria-label="Editor">edit me</div>
+		<label><input id="agree" type="checkbox" aria-label="Agree"> Agree</label>
+		<button type="button" id="visible">Visible</button>
+		<div class="cover">
+			<button type="button" id="covered">Covered</button>
+			<div class="overlay" aria-hidden="true"></div>
+		</div>
+		<button type="button" id="disabled" disabled>Disabled</button>
+		<button type="button" id="moving">Moving</button>
+		<button type="button" id="offscreen" class="below-fold">Offscreen</button>
+		<button type="button" class="dup">Ambiguous</button>
+		<button type="button" class="dup">Ambiguous</button>
+		<input id="tab-a" aria-label="Tab A">
+		<input id="tab-b" aria-label="Tab B">
+		<p id="escape-log">escape:0</p>
+	</section>
 	<script>
 		document.getElementById('greet').addEventListener('click', async () => {
 			const name = document.getElementById('name').value || 'world';
@@ -23,6 +51,22 @@
 			const greeting = await window.fixture.greet(name);
 			document.getElementById('status').textContent = greeting;
 		});
+		document.getElementById('greet-form').addEventListener('submit', async (event) => {
+			event.preventDefault();
+			document.getElementById('greet').click();
+		});
+		let escapes = 0;
+		document.addEventListener('keydown', (event) => {
+			if (event.key === 'Escape') {
+				escapes += 1;
+				document.getElementById('escape-log').textContent = `escape:${escapes}`;
+			}
+		});
+		let offset = 0;
+		setInterval(() => {
+			offset = (offset + 8) % 80;
+			document.getElementById('moving').style.transform = `translateX(${offset}px)`;
+		}, 80);
 	</script>
 </body>
 </html>

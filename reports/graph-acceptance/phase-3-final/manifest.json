@@ -1,0 +1,14 @@
+{
+  "productPath": {
+    "ok": true,
+    "results": [
+      {
+        "framework": "tauri",
+        "ok": true,
+        "failures": [],
+        "state": "testing"
+      }
+    ]
+  },
+  "generatedAt": "2026-08-27T17:25:26.330Z"
+}

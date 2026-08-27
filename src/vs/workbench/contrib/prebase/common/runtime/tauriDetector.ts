@@ -26,6 +26,20 @@ const TAURI_CARGO_PATHS = [
 	'Cargo.toml',
 ] as const;
 
+/** Workbench detection preloads these; omitting them falsely reports Setup Required. */
+export const TAURI_TESTING_PROBE_PATHS: readonly string[] = [
+	'src-tauri/src/lib.rs',
+	'src-tauri/src/main.rs',
+	'src-tauri/capabilities/default.json',
+	'src-tauri/capabilities/desktop.json',
+	'apps/desktop/src-tauri/src/lib.rs',
+	'apps/desktop/src-tauri/src/main.rs',
+	'apps/desktop/src-tauri/capabilities/default.json',
+	'src/lib.rs',
+	'src/main.rs',
+	'capabilities/default.json',
+];
+
 const TAURI_SCRIPT_NAMES = ['tauri', 'tauri:dev', 'tauri:dev:desktop', 'desktop:dev', 'dev:tauri'] as const;
 
 export const TAURI_PROBE_PATHS: readonly string[] = [
@@ -34,6 +48,7 @@ export const TAURI_PROBE_PATHS: readonly string[] = [
 	'apps/desktop/src-tauri',
 	...TAURI_CONFIG_PATHS,
 	...TAURI_CARGO_PATHS,
+	...TAURI_TESTING_PROBE_PATHS,
 ];
 
 function read(probe: ProjectProbe, relativePath: string): string | undefined {

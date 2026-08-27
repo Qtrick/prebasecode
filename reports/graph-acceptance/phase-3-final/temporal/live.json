@@ -1,0 +1,134 @@
+{
+  "ok": true,
+  "failures": [],
+  "scale": "small",
+  "fixture": {
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-xzRALq",
+    "head": "b019d54490e264dc5bf26d95e006c61c878485a2",
+    "commits": 10,
+    "files": [
+      "package.json",
+      "src/greet.js",
+      "src/index.js",
+      "src/tally.js"
+    ],
+    "expectedModifiedPath": "src/tally.js",
+    "firstParentSummary": "b019d54490e264dc5bf26d95e006c61c878485a2 23ac41ee3c2cab5011b9cd6ee244ee95c6d6ccb7 fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+  },
+  "pid": 74561,
+  "cdpPort": 59232,
+  "targetOpened": true,
+  "repoLoaded": true,
+  "fullMap": {
+    "sequenceId": 14,
+    "mode": "temporal",
+    "displayMode": "state",
+    "renderStart": 712.7000000029802,
+    "renderEnd": 712.8000000119209,
+    "durationMs": 0.10000000894069672,
+    "selectedCommitSha": "b019d54490e264dc5bf26d95e006c61c878485a2",
+    "renderedCommitSha": "b019d54490e264dc5bf26d95e006c61c878485a2",
+    "isPartialLineage": true,
+    "receivedNodeCount": 4,
+    "visibleNodeCount": 4,
+    "finiteCoordinateCount": 4,
+    "nodesDrawn": 4,
+    "edgesDrawn": 2,
+    "labelsDrawn": 4,
+    "transform": {
+      "x": 445.05,
+      "y": 442.9254051130245,
+      "k": 1.8
+    },
+    "canvas": {
+      "clientWidth": 792,
+      "clientHeight": 772,
+      "width": 1584,
+      "height": 1544,
+      "distinctPixels": 234921
+    },
+    "summary": {
+      "addedCount": 0,
+      "removedCount": 0,
+      "modifiedCount": 1,
+      "renamedCount": 0,
+      "renamedModifiedCount": 0,
+      "unchangedCount": 3,
+      "edgeAddedCount": 0,
+      "edgeRemovedCount": 0,
+      "edgeModifiedCount": 0
+    },
+    "lodTier": "full",
+    "isAnimating": true,
+    "timestamp": 712.8000000119209
+  },
+  "focusChanges": {
+    "sequenceId": 60,
+    "mode": "temporal",
+    "displayMode": "changes",
+    "renderStart": 1196,
+    "renderEnd": 1196.1000000089407,
+    "durationMs": 0.10000000894069672,
+    "selectedCommitSha": "b019d54490e264dc5bf26d95e006c61c878485a2",
+    "renderedCommitSha": "b019d54490e264dc5bf26d95e006c61c878485a2",
+    "isPartialLineage": true,
+    "receivedNodeCount": 4,
+    "visibleNodeCount": 2,
+    "finiteCoordinateCount": 4,
+    "nodesDrawn": 2,
+    "edgesDrawn": 1,
+    "labelsDrawn": 2,
+    "transform": {
+      "x": 427.717821972425,
+      "y": 545.8363723323108,
+      "k": 1.8
+    },
+    "canvas": {
+      "clientWidth": 792,
+      "clientHeight": 772,
+      "width": 1584,
+      "height": 1544,
+      "distinctPixels": 21959
+    },
+    "summary": {
+      "addedCount": 0,
+      "removedCount": 0,
+      "modifiedCount": 1,
+      "renamedCount": 0,
+      "renamedModifiedCount": 0,
+      "unchangedCount": 3,
+      "edgeAddedCount": 0,
+      "edgeRemovedCount": 0,
+      "edgeModifiedCount": 0
+    },
+    "lodTier": "full",
+    "isAnimating": false,
+    "timestamp": 1196.1000000089407
+  },
+  "camera": {
+    "afterFocus": {
+      "x": 427.717821972425,
+      "y": 545.8363723323108,
+      "k": 1.8
+    },
+    "afterUserZoom": {
+      "x": 427.717821972425,
+      "y": 545.8363723323108,
+      "k": 1.8
+    },
+    "afterWait": {
+      "x": 427.717821972425,
+      "y": 545.8363723323108,
+      "k": 1.8
+    }
+  },
+  "stuckIndexing": false,
+  "unexpectedError": false,
+  "quit": {
+    "startedAt": 1787846553672,
+    "quitMs": 404,
+    "remaining": "gone",
+    "before": "74561     1   6.4 343648 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "after": "gone"
+  }
+}

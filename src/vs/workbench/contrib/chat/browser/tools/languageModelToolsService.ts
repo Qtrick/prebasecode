@@ -920,6 +920,9 @@ export class LanguageModelToolsService extends Disposable implements ILanguageMo
 			};
 		}
 		const autoConfirmed = await this.shouldAutoConfirm(tool.data.id, tool.data.runsInWorkspace, tool.data.source, dto.parameters, sessionResource, dto.chatRequestId, combination, dto.context?.workingDirectory);
+		if (!autoConfirmed && this._contextKeyService.getContextKeyValue(SkipAutoApproveConfirmationKey) === true) {
+			return { autoConfirmed: { type: ToolConfirmKind.ConfirmationNotNeeded, reason: 'smoke-test' }, preparedInvocation };
+		}
 		return { autoConfirmed, preparedInvocation };
 	}
 

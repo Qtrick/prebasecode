@@ -36,10 +36,16 @@ export function assertExternalLaunchRequest(request: ExternalLaunchRequest): voi
 		if (extraArgs.length === 0) {
 			return;
 		}
+		if (extraArgs.length === 1 && extraArgs[0] === 'dev') {
+			return;
+		}
 		if (extraArgs.length === 2 && extraArgs[0] === '--features' && extraArgs[1] === 'prebase-testing') {
 			return;
 		}
-		throw new Error('Package-manager launch extra args are limited to `--features prebase-testing`.');
+		if (extraArgs.length === 3 && extraArgs[0] === 'dev' && extraArgs[1] === '--features' && extraArgs[2] === 'prebase-testing') {
+			return;
+		}
+		throw new Error('Package-manager launch extra args are limited to `dev` and `--features prebase-testing`.');
 	}
 	if (request.command === 'cargo') {
 		if (request.args[0] !== 'tauri' || request.args[1] !== 'dev') {
@@ -57,6 +63,18 @@ export function assertExternalLaunchRequest(request: ExternalLaunchRequest): voi
 	if (request.args.length !== 1 || typeof entry !== 'string' || !entry.trim() || entry.includes('..') || entry.startsWith('/') || entry.startsWith('~') || /^[A-Za-z]:[\\/]/.test(entry)) {
 		throw new Error('Electron launch is limited to a workspace-relative main entry.');
 	}
+}
+
+/**
+ * Electron's CLI rejects Chromium `--remote-debugging-*` switches before the
+ * application entry (`bad option`). They must follow the script/`.` path.
+ * Package-manager launches receive the same flags after `--`.
+ */
+export function withElectronCdpLaunchArgs(_command: string, args: readonly string[], port: number): string[] {
+	const portArg = `--remote-debugging-port=${port}`;
+	const addrArg = '--remote-debugging-address=127.0.0.1';
+	const rest = args.filter(arg => !/^--remote-debugging-(port|address)(?:=|$)/.test(arg));
+	return [...rest, portArg, addrArg];
 }
 
 /** Resolves logical PreBase launch commands without relying on a shell-managed PATH. */

@@ -213,6 +213,9 @@ export const DESKTOP_AUTOMATION_BOOTSTRAP = `(() => {
 			if ((command.op === 'click' || command.op === 'doubleClick' || command.op === 'fill' || command.op === 'type' || command.op === 'check' || command.op === 'uncheck' || command.op === 'select') && !enabled(el)) {
 				return { ok: false, code: 'disabled', match: resolved.match, title: document.title, url: location.href };
 			}
+			if ((command.op === 'fill' || command.op === 'type') && el.readOnly) {
+				return { ok: false, code: 'readonly', match: resolved.match, title: document.title, url: location.href };
+			}
 			if (command.op === 'click' || command.op === 'doubleClick' || command.op === 'check' || command.op === 'uncheck') {
 				const actionable = pointerActionability(el);
 				if (!actionable.ok) {
@@ -248,7 +251,11 @@ export const DESKTOP_AUTOMATION_BOOTSTRAP = `(() => {
 					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
 				}
 				el.focus();
-				return withEvidence({ ok: true, native: 'type', text: String(command.value ?? ''), match: summarize(el), title: document.title, url: location.href });
+				const selection = typeof window.getSelection === 'function' ? window.getSelection() : null;
+				const replaceSelection = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement
+					? el.selectionStart !== el.selectionEnd
+					: Boolean(selection && !selection.isCollapsed);
+				return withEvidence({ ok: true, native: 'type', text: String(command.value ?? ''), replaceSelection, match: summarize(el), title: document.title, url: location.href });
 			}
 			else if (command.op === 'press') {
 				el.focus();

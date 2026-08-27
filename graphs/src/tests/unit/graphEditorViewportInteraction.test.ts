@@ -1080,4 +1080,58 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		assert.ok(fullMap.k < 0.4,
 			`Full Map of a large unchanged cluster must zoom out (got k=${fullMap.k})`);
 	});
+
+	test('19. Focus Changes state refresh does not steal a user zoom after the mode switch', () => {
+		const harness = createHarness('temporal');
+		const unchanged = Array.from({ length: 40 }, (_, index) => ({
+			entityId: `far-${index}`,
+			label: `far-${index}.ts`,
+			path: `src/far-${index}.ts`,
+			changeKind: 'unchanged',
+			x: 4000 + (index % 8) * 180,
+			y: 3000 + Math.floor(index / 8) * 180,
+		}));
+		const diff = {
+			sourceCommitSha: 'c0',
+			targetCommitSha: 'c1',
+			nodes: [
+				{ entityId: 'changed-a', label: 'a.ts', path: 'src/a.ts', changeKind: 'modified', x: 10, y: 12 },
+				{ entityId: 'changed-b', label: 'b.ts', path: 'src/b.ts', changeKind: 'added', x: 40, y: 18 },
+				...unchanged,
+			],
+			edges: [],
+			summary: { addedCount: 1, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: unchanged.length },
+		};
+		const baseState = {
+			displayMode: 'state',
+			diff,
+			isSettled: true,
+			selectedCommitSha: 'c1',
+			renderedCommitSha: 'c1',
+		};
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'temporal',
+				temporalState: baseState,
+				settings: { keepGraphCentered: false, reduceMotion: true },
+			},
+		});
+		harness.sendHostMessage({ type: 'temporalState', payload: baseState });
+		harness.sendHostMessage({
+			type: 'temporalState',
+			payload: { ...baseState, displayMode: 'changes' },
+		});
+		const afterFit = harness.getTransform();
+		harness.elements.get('temporalZoomInBtn')!.onclick!();
+		const afterZoom = harness.getTransform();
+		assert.ok(afterZoom.k > afterFit.k, `user zoom must change the camera (fit k=${afterFit.k}, zoom k=${afterZoom.k})`);
+		harness.sendHostMessage({
+			type: 'temporalState',
+			payload: { ...baseState, displayMode: 'changes', selectedCommitIndex: 1 },
+		});
+		const afterRefresh = harness.getTransform();
+		assert.ok(Math.abs(afterRefresh.k - afterZoom.k) < 0.02,
+			`same-mode Temporal refresh must not steal the user zoom (got k=${afterRefresh.k}, want ${afterZoom.k})`);
+	});
 });

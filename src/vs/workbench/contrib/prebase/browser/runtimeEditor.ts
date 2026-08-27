@@ -282,12 +282,11 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			this._urlInput.value = session.url;
 		}
 		if (this._statusBadge) {
-			this._statusBadge.textContent = [
-				session.serverRunning ? 'server' : 'idle',
-				session.previewConnected ? 'connected' : 'disconnected',
-				`${session.viewport.width}×${session.viewport.height}`,
-				session.consoleErrorCount ? `err:${session.consoleErrorCount}` : ''
-			].filter(Boolean).join(' · ');
+			const label = session.previewStatus.charAt(0).toUpperCase() + session.previewStatus.slice(1);
+			this._statusBadge.textContent = label;
+			this._statusBadge.setAttribute('role', 'status');
+			this._statusBadge.setAttribute('aria-live', 'polite');
+			this._statusBadge.setAttribute('aria-atomic', 'true');
 		}
 
 		this._applyViewportChrome();
@@ -309,8 +308,8 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			addSection(localize('prebase.runtime.diagConsole', "Console Capture"), session.consoleEntries.length ? session.consoleEntries : [localize('prebase.runtime.none', "None")]);
 			addSection(localize('prebase.runtime.diagNetwork', "Network Capture"), session.networkEntries.length ? session.networkEntries : [localize('prebase.runtime.none', "None")]);
 			addSection(localize('prebase.runtime.diagSession', "Session"), [
+				localize('prebase.runtime.previewStatusState', "Status: {0}", session.previewStatus),
 				localize('prebase.runtime.runningState', "Server: {0}", session.serverRunning ? 'yes' : 'no'),
-				localize('prebase.runtime.connectedState', "Connected: {0}", session.previewConnected ? 'yes' : 'no'),
 				localize('prebase.runtime.frameworkState', "Framework: {0}", session.framework?.label ?? '—'),
 				localize('prebase.runtime.viewportStateSide', "Viewport: {0} {1}×{2}", session.viewport.preset, session.viewport.width, session.viewport.height),
 				localize('prebase.runtime.errorsState', "Errors: {0}", session.consoleErrorCount),
@@ -347,7 +346,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 				this._loadUrl(true);
 				return;
 			}
-			handleRuntimePreviewStatusMessage(msg, (url, ok, detail, navigationId) => this.runtimeService.markPreviewLoaded(url, ok, detail, navigationId));
+			handleRuntimePreviewStatusMessage(msg, (url, ok, detail, navigationId, kind) => this.runtimeService.markPreviewLoaded(url, ok, detail, navigationId, kind));
 		}));
 		this._previewWebview = webview;
 		this._webviewControlChannel = controlChannel;

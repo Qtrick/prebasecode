@@ -171,6 +171,48 @@ suite('Gemini client cancellation transport', () => {
 		assert.strictEqual(token.listenerCount, 0);
 	});
 
+	test('aborts an in-flight SSE stream on Quit without falling back to a second request', async () => {
+		const token = new TestCancellationToken();
+		let fetchCalls = 0;
+		let readerCancelled = false;
+		const transport: GeminiTransport = {
+			fetch: async (_input, init) => {
+				fetchCalls++;
+				const signal = init?.signal;
+				const body = new ReadableStream<Uint8Array>({
+					start(controller) {
+						signal?.addEventListener('abort', () => {
+							try {
+								controller.close();
+							} catch {
+								// already closed
+							}
+						}, { once: true });
+					},
+					cancel() {
+						readerCancelled = true;
+					},
+				});
+				return { ok: true, body } as Response;
+			},
+		};
+
+		const pending = (async () => {
+			const chunks: string[] = [];
+			for await (const chunk of streamGenerateContent('AIza-test', 'gemini-test', request, token, transport)) {
+				chunks.push(chunk);
+			}
+			return chunks;
+		})();
+		await Promise.resolve();
+		await Promise.resolve();
+		token.cancel();
+		assert.deepStrictEqual(await pending, []);
+		assert.strictEqual(fetchCalls, 1);
+		assert.ok(readerCancelled || token.isCancellationRequested);
+		assert.strictEqual(token.listenerCount, 0);
+	});
+
 	test('concatenates multiple text parts across non-stream response', async () => {
 		const transport: GeminiTransport = {
 			fetch: async () => ({

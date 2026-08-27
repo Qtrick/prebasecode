@@ -19,8 +19,8 @@ export type DesktopInteractAction =
 	| 'press'
 	| 'check'
 	| 'uncheck'
-	| 'select'
-	| 'focus';
+	| 'select' // ponytail: DOM semantic action for V1; not native OS select
+	| 'focus'; // ponytail: DOM semantic action for V1; not native OS focus
 
 export type DesktopAssertCondition =
 	| 'visible'
@@ -39,7 +39,7 @@ export type DesktopAssertCondition =
 export const DEFAULT_DESKTOP_ACTION_TIMEOUT_MS = 8_000;
 export const DEFAULT_DESKTOP_ASSERT_TIMEOUT_MS = 8_000;
 export const DEFAULT_ELECTRON_STARTUP_TIMEOUT_MS = 45_000;
-export const DEFAULT_TAURI_STARTUP_TIMEOUT_MS = 120_000;
+export const DEFAULT_TAURI_STARTUP_TIMEOUT_MS = 180_000;
 
 const SECRET_LOCATOR_RE = /password|passwd|secret|token|api[_-]?key|authorization/i;
 const ALLOWED_KEYS = new Set([

@@ -334,7 +334,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 				localize('prebase.runtime.desktopStatus', "Status: {0}", status),
 			];
 			if (desktop.capabilities.fullNativeSetupRequired && session.desktopLaunchMode === 'external') {
-				lines.push(localize('prebase.runtime.desktopSetup', "Full-app preview can start now. Agent automation needs Enable PreBase Tauri Testing."));
+				lines.push(localize('prebase.runtime.desktopSetup', "Renderer testing is available. Full-app Tauri testing needs a debug-only integration."));
 			} else if (desktop.capabilities.limitations[0]) {
 				lines.push(desktop.capabilities.limitations[0]);
 			}
@@ -404,7 +404,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 		if (this._sessionMeta) {
 			this._sessionMeta.textContent = [
-				localize('prebase.runtime.statusConnected', "Connected: {0}", session.previewConnected ? 'yes' : 'no'),
+				localize('prebase.runtime.statusPreview', "Status: {0}", session.previewStatus),
 				localize('prebase.runtime.statusRunning', "Running: {0}", session.running ? 'yes' : 'no'),
 				session.detectedUrls.length
 					? localize('prebase.runtime.detected', "Detected: {0}", session.detectedUrls.slice(0, 3).join(', '))
