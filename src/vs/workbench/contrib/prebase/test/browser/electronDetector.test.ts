@@ -166,6 +166,8 @@ suite('electronDetector', () => {
 			input: profile.capabilities.supportsInputAutomation,
 			semantic: profile.capabilities.supportsSemanticLocators,
 			nativeDialogs: profile.capabilities.supportsNativeDialogAutomation,
+			mainProcessAccess: profile.capabilities.supportsMainProcessAccess,
+			backendApi: profile.capabilities.supportsBackendApiAccess,
 		}, {
 			rendererUrlHint: 'http://localhost:5173',
 			likelyDevPort: 5173,
@@ -179,8 +181,11 @@ suite('electronDetector', () => {
 			input: true,
 			semantic: true,
 			nativeDialogs: false,
+			mainProcessAccess: false,
+			backendApi: false,
 		});
 		assert.ok(profile.capabilities.limitations.some(l => l.includes('main-process code and preload are not executed')));
+		assert.ok(profile.capabilities.limitations.some(l => l.includes('project main process are not controllable')));
 	});
 
 	test('does not advertise input automation when the project is not launchable', () => {
@@ -210,7 +215,7 @@ suite('electronDetector', () => {
 		assert.strictEqual(profile.capabilities.supportsExternalLaunch, true);
 		assert.strictEqual(profile.capabilities.supportsInputAutomation, true);
 		assert.strictEqual(profile.capabilities.supportsNativeDialogAutomation, false);
-		assert.strictEqual(profile.capabilities.supportsMainProcessAccess, true);
+		assert.strictEqual(profile.capabilities.supportsMainProcessAccess, false);
 		assert.strictEqual(profile.capabilities.fullNativeSetupRequired, false);
 	});
 });

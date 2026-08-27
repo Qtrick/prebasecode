@@ -1972,7 +1972,15 @@ function updateTemporalUI(state, diff) {
 	}
 
 	// Display Mode Buttons & Context Filter Toggle
-	displayMode = state.displayMode || 'state';
+	const previousDisplayMode = displayMode;
+	displayMode = state.displayMode || displayMode;
+	if (typeof state.displayMode === 'string' && previousDisplayMode !== displayMode && temporalDiff && temporalDiff.nodes && temporalDiff.nodes.length) {
+		if (keepGraphCentered) {
+			applyCenterLock(true);
+		} else {
+			fitView(!settings.reduceMotion);
+		}
+	}
 	if (temporalModeChangesBtn && temporalModeStateBtn) {
 		if (displayMode === 'changes' || displayMode === 'focus') {
 			temporalModeChangesBtn.classList.add('active');

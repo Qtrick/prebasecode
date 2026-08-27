@@ -1,0 +1,12 @@
+{
+	"$schema": "https://schema.tauri.app/config/2",
+	"productName": "PreBase Tauri Rust Only",
+	"version": "0.0.0",
+	"identifier": "com.prebase.desktop-tauri-rust-only",
+	"build": {
+		"frontendDist": "../dist"
+	},
+	"app": {
+		"windows": [{ "title": "PreBase Tauri Rust Only", "width": 640, "height": 480 }]
+	}
+}

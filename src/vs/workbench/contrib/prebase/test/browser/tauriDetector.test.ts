@@ -50,7 +50,7 @@ suite('tauriDetector', () => {
 		assert.ok(profile.capabilities.fullNativeSetupReason?.includes('WebDriver'));
 	});
 
-	test('full-native automation is advertised only when the debug WebDriver plugin is present', () => {
+	test('full-native automation stays setup-required until Cargo, feature, Rust registration, and ACL are all present', () => {
 		const profile = detectTauriProject(probe({
 			files: {
 				'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:5173"}}',
@@ -63,17 +63,63 @@ suite('tauriDetector', () => {
 			renderer: profile.capabilities.supportsRendererAutomation,
 			fullNativeUi: profile.capabilities.supportsFullNativeAutomation,
 			backendApi: profile.capabilities.supportsBackendApiAccess,
-			rendererConsole: profile.capabilities.supportsConsoleCapture,
 			setupRequired: profile.capabilities.fullNativeSetupRequired,
+			ready: profile.testingSetup.ready,
 		}, {
 			confidence: 'high',
 			webDriverPlugin: true,
 			renderer: true,
-			fullNativeUi: true,
+			fullNativeUi: false,
 			backendApi: false,
-			rendererConsole: true,
-			setupRequired: false,
+			setupRequired: true,
+			ready: false,
 		});
+	});
+
+	test('a prebase-testing feature that omits the WebDriver crate is not full-native ready', () => {
+		const profile = detectTauriProject(probe({
+			files: {
+				'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:5173"}}',
+				'src-tauri/Cargo.toml': '[package]\nname="demo"\n[features]\nprebase-testing=[]\n[dependencies]\ntauri="2"\ntauri-plugin-wdio-webdriver={version="1",optional=true}\n',
+				'src-tauri/src/lib.rs': 'builder.plugin(tauri_plugin_wdio_webdriver::init());\n',
+				'src-tauri/capabilities/default.json': '{"permissions":["wdio-webdriver:default"]}',
+			},
+		}));
+		assert.deepStrictEqual({
+			dependencyPresent: profile.testingSetup.dependencyPresent,
+			featurePresent: profile.testingSetup.featurePresent,
+			featureIncludesDriver: profile.testingSetup.featureIncludesDriver,
+			pluginRegistered: profile.testingSetup.pluginRegistered,
+			permissionPresent: profile.testingSetup.permissionPresent,
+			ready: profile.testingSetup.ready,
+			fullNative: profile.capabilities.supportsFullNativeAutomation,
+			setupRequired: profile.capabilities.fullNativeSetupRequired,
+		}, {
+			dependencyPresent: true,
+			featurePresent: true,
+			featureIncludesDriver: false,
+			pluginRegistered: true,
+			permissionPresent: true,
+			ready: false,
+			fullNative: false,
+			setupRequired: true,
+		});
+	});
+
+	test('full-native automation is ready only for a complete debug WebDriver setup', () => {
+		const profile = detectTauriProject(probe({
+			files: {
+				'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:5173"}}',
+				'src-tauri/Cargo.toml': '[package]\nname="demo"\n[features]\nprebase-testing=["dep:tauri-plugin-wdio-webdriver"]\n[dependencies]\ntauri="2"\ntauri-plugin-wdio-webdriver={version="1",optional=true}\n',
+				'src-tauri/src/lib.rs': 'let mut builder = tauri::Builder::default();\nbuilder.plugin(tauri_plugin_wdio_webdriver::init());\n',
+				'src-tauri/capabilities/default.json': '{"permissions":["wdio-webdriver:default"]}',
+			},
+		}));
+		assert.strictEqual(profile.testingSetup.ready, true);
+		assert.strictEqual(profile.capabilities.supportsFullNativeAutomation, true);
+		assert.strictEqual(profile.capabilities.fullNativeSetupRequired, false);
+		assert.strictEqual(profile.capabilities.supportsBackendApiAccess, false);
+		assert.strictEqual(profile.capabilities.supportsMainProcessAccess, false);
 	});
 
 	test('rejects a random Cargo.toml without a tauri crate', () => {
@@ -177,6 +223,23 @@ suite('tauriDetector', () => {
 		}));
 		assert.strictEqual(profile.confidence, 'high');
 		assert.strictEqual(profile.isRustOnly, true);
+		assert.strictEqual(profile.capabilities.supportsRendererAutomation, true);
+	});
+
+	test('rust-only Tauri without a configured frontend does not invent renderer mode', () => {
+		const profile = detectTauriProject(probe({
+			files: {
+				'src-tauri/tauri.conf.json': '{"build":{"frontendDist":"../dist"},"identifier":"com.demo.rust"}',
+				'src-tauri/Cargo.toml': '[package]\nname="demo"\n[dependencies]\ntauri={version="2"}\n',
+			},
+		}));
+		assert.strictEqual(profile.confidence, 'high');
+		assert.strictEqual(profile.isRustOnly, true);
+		assert.strictEqual(profile.rendererUrlHint, undefined);
+		assert.strictEqual(profile.capabilities.supportsRendererAutomation, false);
+		assert.strictEqual(profile.capabilities.supportsManagedLaunch, false);
+		assert.strictEqual(profile.capabilities.supportsInputAutomation, false);
+		assert.ok(profile.capabilities.managedLaunchBlockers.some(item => item.includes('frontend')));
 	});
 
 	test('ignores a Cargo.toml that only mentions tauri in comments or the package name', () => {
@@ -391,6 +454,7 @@ suite('desktopFixtures', () => {
 		const electron = detectElectronProject(fsProbe(join(root, 'test/prebase/fixtures/desktop-electron')));
 		const tauri = detectTauriProject(fsProbe(join(root, 'test/prebase/fixtures/desktop-tauri')));
 		const tauriPlain = detectTauriProject(fsProbe(join(root, 'test/prebase/fixtures/desktop-tauri-plain')));
+		const tauriRustOnly = detectTauriProject(fsProbe(join(root, 'test/prebase/fixtures/desktop-tauri-rust-only')));
 
 		assert.strictEqual(isElectronProfile(electron), true);
 		assert.strictEqual(isTauriProfile(electron), false);
@@ -405,6 +469,7 @@ suite('desktopFixtures', () => {
 		assert.strictEqual(tauri.confidence, 'high');
 		assert.strictEqual(tauri.hasWdioWebdriverPlugin, true);
 		assert.strictEqual(tauri.testingCargoFeature, true);
+		assert.strictEqual(tauri.testingSetup.ready, true);
 		assert.strictEqual(tauri.capabilities.fullNativeSetupRequired, false);
 		assert.strictEqual(tauri.capabilities.supportsFullNativeAutomation, true);
 		assert.strictEqual(tauri.capabilities.supportsBackendApiAccess, false);
@@ -418,5 +483,12 @@ suite('desktopFixtures', () => {
 		assert.strictEqual(tauriPlain.capabilities.supportsRendererAutomation, true);
 		assert.strictEqual(tauriPlain.capabilities.supportsConsoleCapture, true);
 		assert.strictEqual(isRecognizedDesktopApp(tauriPlain), true);
+
+		assert.strictEqual(tauriRustOnly.confidence, 'high');
+		assert.strictEqual(tauriRustOnly.isRustOnly, true);
+		assert.strictEqual(tauriRustOnly.rendererUrlHint, undefined);
+		assert.strictEqual(tauriRustOnly.capabilities.supportsRendererAutomation, false);
+		assert.strictEqual(tauriRustOnly.capabilities.supportsManagedLaunch, false);
+		assert.strictEqual(tauri.testingSetup.ready, true);
 	});
 });

@@ -45,12 +45,20 @@ const TAURI_READY = {
 	files: {
 		'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:1420"}}',
 		'src-tauri/Cargo.toml': '[package]\nname="demo"\n[features]\nprebase-testing=["dep:tauri-plugin-wdio-webdriver"]\n[dependencies]\ntauri="2"\ntauri-plugin-wdio-webdriver={version="1",optional=true}\n',
+		'src-tauri/src/lib.rs': 'fn run() { let mut builder = tauri::Builder::default();\nbuilder.plugin(tauri_plugin_wdio_webdriver::init());\n}\n',
+		'src-tauri/capabilities/default.json': '{"permissions":["wdio-webdriver:default"]}',
 	},
 };
 const TAURI_PLAIN = {
 	files: {
 		'src-tauri/tauri.conf.json': '{"build":{"devUrl":"http://localhost:1420"}}',
 		'src-tauri/Cargo.toml': '[package]\nname="demo"\n[dependencies]\ntauri="2"\n',
+	},
+};
+const TAURI_RUST_ONLY = {
+	files: {
+		'src-tauri/tauri.conf.json': '{"build":{"frontendDist":"../dist"},"identifier":"com.demo.rust"}',
+		'src-tauri/Cargo.toml': '[package]\nname="demo"\n[dependencies]\ntauri={version="2"}\n',
 	},
 };
 const ELECTRON_VITE = {
@@ -67,7 +75,7 @@ function installReadyWebDriverFetch(): () => void {
 	globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
 		const url = String(input);
 		if (url.endsWith('/status')) {
-			return { status: 200, text: async () => '{}' } as Response;
+			return { status: 200, text: async () => JSON.stringify({ value: { ready: true, message: 'ok' } }) } as Response;
 		}
 		if (url.endsWith('/session') && (init?.method ?? 'GET') === 'POST') {
 			return { status: 200, text: async () => JSON.stringify({ value: { sessionId: 'wd-1' } }) } as Response;
@@ -75,9 +83,12 @@ function installReadyWebDriverFetch(): () => void {
 		if (url.includes('/execute/sync')) {
 			const body = String(init?.body ?? '');
 			if (body.includes('__prebaseDesktopTest') && body.includes('run')) {
-				return { status: 200, text: async () => JSON.stringify({ value: { ok: true, match: { name: 'Save', visible: true, enabled: true } } }) } as Response;
+				return { status: 200, text: async () => JSON.stringify({ value: { ok: true, native: 'pointer', point: { x: 16, y: 24 }, clickCount: 1, match: { name: 'Save', visible: true, enabled: true } } }) } as Response;
 			}
 			return { status: 200, text: async () => JSON.stringify({ value: true }) } as Response;
+		}
+		if (url.includes('/actions') && (init?.method ?? 'GET') === 'POST') {
+			return { status: 200, text: async () => JSON.stringify({ value: null }) } as Response;
 		}
 		if ((init?.method ?? 'GET') === 'DELETE') {
 			return { status: 200, text: async () => '{}' } as Response;
@@ -101,6 +112,8 @@ suite('PreBase desktop session lifecycle', () => {
 		const closed: string[] = [];
 		const dialogs: string[] = [];
 		const spawns: Array<{ command: unknown; cwd: unknown; extras: unknown }> = [];
+		const managed: unknown[] = [];
+		const pointers: unknown[] = [];
 		const channel: IChannel = {
 			call: async <T>(command: string, arg?: unknown): Promise<T> => {
 				const args = Array.isArray(arg) ? arg : [];
@@ -115,6 +128,7 @@ suite('PreBase desktop session lifecycle', () => {
 				}
 				if (command === 'openManagedWindow') {
 					const request = args[0] as { sessionId: string; rendererUrl: string; title: string };
+					managed.push(request);
 					return { sessionId: request.sessionId, windowId: 7, rendererUrl: request.rendererUrl, title: request.title } as T;
 				}
 				if (command === 'restartManagedWindow') {
@@ -131,9 +145,13 @@ suite('PreBase desktop session lifecycle', () => {
 						return options.evaluate(expression) as T;
 					}
 					if (expression.includes('__prebaseDesktopTest') && expression.includes('run')) {
-						return { ok: true, match: { name: 'Save', visible: true, enabled: true } } as T;
+						return { ok: true, native: 'pointer', point: { x: 12, y: 20 }, clickCount: 1, match: { name: 'Save', visible: true, enabled: true } } as T;
 					}
 					return true as T;
+				}
+				if (command === 'dispatchOwnedPointer' || command === 'dispatchOwnedKey' || command === 'dispatchOwnedInsertText') {
+					pointers.push({ command, args });
+					return undefined as T;
 				}
 				return undefined as T;
 			},
@@ -165,7 +183,7 @@ suite('PreBase desktop session lifecycle', () => {
 				isWorkspaceTrusted: () => options.trusted !== false,
 			}),
 		));
-		return { service, killed, closed, dialogs, spawns };
+		return { service, killed, closed, dialogs, spawns, managed, pointers };
 	}
 
 	test('refuses to launch project code when the workspace is Restricted', async () => {
@@ -193,6 +211,40 @@ suite('PreBase desktop session lifecycle', () => {
 		assert.strictEqual(inspect.setupRequired, true);
 		assert.strictEqual(inspect.ok, false);
 		assert.strictEqual(inspect.rendererAvailable, true);
+	});
+
+	test('does not open a PreBase managed window for rust-only Tauri even with an invented renderer URL', async () => {
+		const { service, managed, dialogs } = createService();
+		const profile = service.detect(probe(TAURI_RUST_ONLY));
+		assert.strictEqual(profile.isRustOnly, true);
+		assert.strictEqual(profile.capabilities.supportsManagedLaunch, false);
+		assert.strictEqual(profile.rendererUrlHint, undefined);
+
+		const session = await service.start({ launchMode: 'managed', rendererUrl: `http://127.0.0.1:${profile.likelyDevPort}` });
+		assert.strictEqual(session?.state, 'error');
+		assert.ok(dialogs.some(title => /unavailable/i.test(title)));
+		assert.deepStrictEqual(managed, []);
+
+		const magnus = await service.startForMagnus({ framework: 'tauri', mode: 'renderer', rendererUrl: 'http://127.0.0.1:1420' });
+		assert.strictEqual(magnus.ok, true);
+		assert.strictEqual(magnus.state, 'error');
+		assert.strictEqual(magnus.mode, 'renderer');
+		assert.deepStrictEqual(managed, []);
+	});
+
+	test('Electron session summaries do not claim main-process access', async () => {
+		const { service } = createService({
+			config: { [PreBaseConfigKeys.RuntimeEnableDesktopAutomation]: true },
+		});
+		service.detect(probe(ELECTRON_VITE));
+		const session = await service.start({ launchMode: 'managed', rendererUrl: 'http://127.0.0.1:5173', purpose: 'test' });
+		const summary = service.getSessionSummaryForMagnus(session?.id);
+		assert.strictEqual(summary.ok, true);
+		assert.ok(!('supportsMainProcessAccess' in summary));
+		assert.ok((summary.limitations as string[]).some(item => item.includes('main-process code and preload are not executed')));
+		const inspect = await service.inspectForMagnus(session?.id);
+		assert.ok((inspect.unsupported as string[]).includes('native window controls'));
+		assert.ok((inspect.limitations as string[]).every(item => !/main process (is|are) controllable/i.test(item)));
 	});
 
 	test('setup-required launch clears stale test evidence from the previous session', async () => {
@@ -361,9 +413,22 @@ suite('PreBase desktop session lifecycle', () => {
 			assert.match(String(evalBlocked.reason), /interact or assert/i);
 			const clicked = await service.interactForMagnus({ action: 'click', locator: { by: 'role', role: 'button', name: 'Save' } });
 			assert.strictEqual(clicked.ok, true);
+			assert.strictEqual(clicked.backend, 'webdriver');
 		} finally {
 			restore();
 		}
+	});
+
+	test('managed renderer click goes through owned pointer input rather than a synthetic page click', async () => {
+		const { service, pointers } = createService({
+			config: { [PreBaseConfigKeys.RuntimeEnableDesktopAutomation]: true },
+		});
+		service.detect(probe(ELECTRON_VITE));
+		const session = await service.start({ launchMode: 'managed', rendererUrl: 'http://127.0.0.1:5173', purpose: 'test' });
+		assert.strictEqual(session?.state, 'testing');
+		const clicked = await service.interactForMagnus({ action: 'click', locator: { by: 'role', role: 'button', name: 'Save' } });
+		assert.strictEqual(clicked.ok, true);
+		assert.deepStrictEqual(pointers.map(item => (item as { command: string }).command), ['dispatchOwnedPointer']);
 	});
 
 	test('keeps preview interact gated on the automation setting', async () => {

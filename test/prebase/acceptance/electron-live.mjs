@@ -3,6 +3,14 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
+/**
+ * BACKEND/FIXTURE ACCEPTANCE.
+ * Connects Playwright to the Electron fixture over CDP. This does not prove
+ * PreBaseDesktopRuntimeService → desktop channel → interactDesktop.
+ * Product-path coverage lives in desktopRuntimeSession tests and
+ * test/prebase/acceptance/prebase-desktop-product-path.mjs.
+ */
+
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';

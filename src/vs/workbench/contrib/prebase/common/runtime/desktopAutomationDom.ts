@@ -203,7 +203,7 @@ export const DESKTOP_AUTOMATION_BOOTSTRAP = `(() => {
 				return withEvidence({ ...resolved, element: undefined, title: document.title, url: location.href });
 			}
 			if (command.op === 'hover') {
-				return { ok: false, code: 'unsupported', reason: 'CSS hover requires a native pointer backend.', title: document.title, url: location.href };
+				return { ok: false, code: 'unsupported', reason: 'Hover is not implemented for desktop automation.', title: document.title, url: location.href };
 			}
 			const resolved = resolve(command.locator || {});
 			if (!resolved.ok) {
@@ -218,14 +218,18 @@ export const DESKTOP_AUTOMATION_BOOTSTRAP = `(() => {
 				if (!actionable.ok) {
 					return { ...actionable, match: resolved.match, title: document.title, url: location.href };
 				}
+				if (command.op === 'check' || command.op === 'uncheck') {
+					const want = command.op === 'check';
+					if (!(el instanceof HTMLInputElement) || (el.type !== 'checkbox' && el.type !== 'radio') || (command.op === 'uncheck' && el.type === 'radio')) {
+						return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
+					}
+					if (el.checked === want) {
+						return { ok: true, match: summarize(el), title: document.title, url: location.href };
+					}
+				}
+				return withEvidence({ ok: true, native: 'pointer', clickCount: command.op === 'doubleClick' ? 2 : 1, point: actionable.point, match: resolved.match, title: document.title, url: location.href });
 			}
-			if (command.op === 'click') { el.click(); }
-			else if (command.op === 'doubleClick') {
-				el.click();
-				el.click();
-				el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2 }));
-			}
-			else if (command.op === 'focus') { el.focus(); }
+			if (command.op === 'focus') { el.focus(); }
 			else if (command.op === 'fill') {
 				el.focus();
 				if (setNativeValue(el, String(command.value ?? ''))) {
@@ -244,38 +248,12 @@ export const DESKTOP_AUTOMATION_BOOTSTRAP = `(() => {
 					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
 				}
 				el.focus();
-				const text = String(command.value ?? '');
-				for (const character of text) {
-					const keyboard = { key: character, bubbles: true, cancelable: true };
-					const proceed = el.dispatchEvent(new KeyboardEvent('keydown', keyboard));
-					if (proceed) {
-						if (setNativeValue(el, String(el.value || '') + character)) {
-							el.dispatchEvent(new InputEvent('input', { bubbles: true, data: character, inputType: 'insertText' }));
-						} else if (el.isContentEditable) {
-							document.execCommand('insertText', false, character);
-						}
-					}
-					el.dispatchEvent(new KeyboardEvent('keyup', keyboard));
-				}
+				return withEvidence({ ok: true, native: 'type', text: String(command.value ?? ''), match: summarize(el), title: document.title, url: location.href });
 			}
 			else if (command.op === 'press') {
 				el.focus();
 				const keyboard = keyboardInit(command.value);
-				const proceed = el.dispatchEvent(new KeyboardEvent('keydown', keyboard));
-				if (proceed && (keyboard.ctrlKey || keyboard.metaKey) && keyboard.key.toLowerCase() === 'a' && typeof el.select === 'function') {
-					el.select();
-				}
-				el.dispatchEvent(new KeyboardEvent('keyup', keyboard));
-			}
-			else if (command.op === 'check' || command.op === 'uncheck') {
-				const want = command.op === 'check';
-				if (!(el instanceof HTMLInputElement) || (el.type !== 'checkbox' && el.type !== 'radio') || (command.op === 'uncheck' && el.type === 'radio')) {
-					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
-				}
-				if (el.checked !== want) { el.click(); }
-				if (el.checked !== want) {
-					return { ok: false, code: 'wrongControl', match: resolved.match, title: document.title, url: location.href };
-				}
+				return withEvidence({ ok: true, native: 'key', key: keyboard.key, modifiers: { ctrl: keyboard.ctrlKey, meta: keyboard.metaKey, alt: keyboard.altKey, shift: keyboard.shiftKey }, match: summarize(el), title: document.title, url: location.href });
 			}
 			else if (command.op === 'select') {
 				if (!(el instanceof HTMLSelectElement)) {

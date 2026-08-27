@@ -6,6 +6,7 @@
 import type { PackageJsonShape, ProjectProbe } from './types.js';
 import type { DesktopCapabilities, DesktopDetectionConfidence, TauriProjectProfile } from './desktopTypes.js';
 import { detectPackageManager } from './scriptDetector.js';
+import { inspectTauriTestingSetup, tauriTestingCandidatePaths } from './tauriTestingSetup.js';
 
 const TAURI_CONFIG_PATHS = [
 	'src-tauri/tauri.conf.json',
@@ -121,6 +122,21 @@ function inferPort(url: string | undefined, probe: ProjectProbe, pkg: PackageJso
 	return 1420;
 }
 
+function hasConfiguredRenderer(options: {
+	devUrl?: string;
+	beforeDevCommand?: string;
+	hasFrontendPackage: boolean;
+	hasDevScript: boolean;
+}): boolean {
+	if (options.devUrl && /^(https?:)\/\//i.test(options.devUrl)) {
+		return true;
+	}
+	if (options.beforeDevCommand?.trim()) {
+		return true;
+	}
+	return options.hasFrontendPackage && options.hasDevScript;
+}
+
 function buildCapabilities(options: {
 	isTauri: boolean;
 	hasRenderer: boolean;
@@ -145,17 +161,18 @@ function buildCapabilities(options: {
 	}
 	limitations.push('Native operating-system UI outside the webview is unsupported.');
 
+	const automation = options.hasRenderer || options.hasFullNative;
 	return {
 		supportsManagedLaunch: options.isTauri && options.hasRenderer,
 		supportsExternalLaunch: options.isTauri,
 		supportsCdpAttach: false,
 		supportsDevServerAutostart: options.hasRenderer,
-		supportsDOMInspection: options.isTauri,
-		supportsSemanticLocators: options.isTauri,
-		supportsConsoleCapture: options.isTauri,
+		supportsDOMInspection: automation,
+		supportsSemanticLocators: automation,
+		supportsConsoleCapture: automation,
 		supportsNetworkCapture: false,
-		supportsScreenshots: options.isTauri,
-		supportsInputAutomation: options.isTauri,
+		supportsScreenshots: automation,
+		supportsInputAutomation: automation,
 		supportsWindowManagement: options.isTauri && options.hasRenderer,
 		supportsRendererAutomation: options.isTauri && options.hasRenderer,
 		supportsFullNativeAutomation: options.hasFullNative,
@@ -244,12 +261,26 @@ export function detectTauriProject(probe: ProjectProbe): TauriProjectProfile {
 
 	const isTauri = confidence === 'high' || confidence === 'medium';
 	const likelyDevPort = inferPort(parsed.url, appProbe, pkg);
-	const rendererUrlHint = parsed.url?.startsWith('http') ? parsed.url : (isTauri ? `http://localhost:${likelyDevPort}` : undefined);
-	const setupRequired = isTauri && !hasWdioWebdriverPlugin;
+	const hasRenderer = hasConfiguredRenderer({
+		devUrl: parsed.url,
+		beforeDevCommand: parsed.beforeDevCommand,
+		hasFrontendPackage: Boolean(pkg),
+		hasDevScript: Boolean(scripts[0] || pkg?.scripts?.dev),
+	});
+	const rendererUrlHint = hasRenderer
+		? (parsed.url?.startsWith('http') ? parsed.url : `http://localhost:${likelyDevPort}`)
+		: undefined;
+	const rustAndCapabilities = readTestingSources(appProbe, cargoPath);
+	const testingSetup = inspectTauriTestingSetup({
+		cargoToml,
+		rustEntry: rustAndCapabilities.rustEntry,
+		capabilitiesJson: rustAndCapabilities.capabilitiesJson,
+	});
+	const setupRequired = isTauri && !testingSetup.ready;
 	const capabilities = buildCapabilities({
 		isTauri,
-		hasRenderer: Boolean(rendererUrlHint),
-		hasFullNative: isTauri && hasWdioWebdriverPlugin,
+		hasRenderer,
+		hasFullNative: isTauri && testingSetup.ready,
 		setupRequired,
 	});
 
@@ -271,7 +302,36 @@ export function detectTauriProject(probe: ProjectProbe): TauriProjectProfile {
 		tauriScriptName: scripts[0],
 		hasWdioPlugin,
 		hasWdioWebdriverPlugin,
-		testingCargoFeature: Boolean(cargoToml?.includes('prebase-testing')),
+		testingCargoFeature: testingSetup.featurePresent,
+		testingSetup,
 		isRustOnly: isTauri && !pkg,
 	};
+}
+
+function readTestingSources(probe: ProjectProbe, cargoPath: string | undefined): { rustEntry?: string; capabilitiesJson?: string } {
+	if (!cargoPath) {
+		return {};
+	}
+	const candidates = tauriTestingCandidatePaths(cargoPath);
+	let rustEntry: string | undefined;
+	for (const path of candidates.rustEntries) {
+		const text = read(probe, path);
+		if (text) {
+			rustEntry = text;
+			if (text.includes('tauri_plugin_wdio_webdriver')) {
+				break;
+			}
+		}
+	}
+	let capabilitiesJson: string | undefined;
+	for (const path of candidates.capabilities) {
+		const text = read(probe, path);
+		if (text) {
+			capabilitiesJson = text;
+			if (text.includes('wdio-webdriver:default')) {
+				break;
+			}
+		}
+	}
+	return { rustEntry, capabilitiesJson };
 }

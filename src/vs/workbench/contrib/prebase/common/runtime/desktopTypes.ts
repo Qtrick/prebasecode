@@ -6,6 +6,7 @@
 export type { DesktopLaunchMode, DesktopLaunchRequest, ExternalLaunchRequest, ManagedWindowState } from '../../../../../platform/prebaseDesktop/common/prebaseDesktopTypes.js';
 import type { DesktopLaunchMode } from '../../../../../platform/prebaseDesktop/common/prebaseDesktopTypes.js';
 import type { PackageManager } from './types.js';
+import type { TauriTestingSetupState } from './tauriTestingSetup.js';
 
 export type DesktopSessionState =
 	| 'idle'
@@ -86,6 +87,7 @@ export interface TauriProjectProfile extends DesktopProjectProfileBase {
 	hasWdioPlugin: boolean;
 	hasWdioWebdriverPlugin: boolean;
 	testingCargoFeature: boolean;
+	testingSetup: TauriTestingSetupState;
 	isRustOnly: boolean;
 }
 

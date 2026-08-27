@@ -7,6 +7,7 @@ import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { CancellationError } from '../../../../../base/common/errors.js';
 import { DESKTOP_AUTOMATION_BOOTSTRAP } from './desktopAutomationDom.js';
 import { DEFAULT_DESKTOP_ACTION_TIMEOUT_MS, DEFAULT_DESKTOP_ASSERT_TIMEOUT_MS, describeLocator, type DesktopAssertCondition, type DesktopInteractAction, type DesktopLocator } from './desktopLocators.js';
+import { parseDesktopKeyChord, type DesktopNativeInputBackend } from './desktopNativeInput.js';
 
 export type DesktopEvaluateFn = (expression: string, token?: CancellationToken) => Promise<unknown>;
 
@@ -30,6 +31,12 @@ export interface DesktopDomResult {
 	console?: Array<{ level: string; text: string; at: number }>;
 	blocker?: Record<string, unknown>;
 	reason?: string;
+	native?: 'pointer' | 'key' | 'type';
+	point?: { x: number; y: number };
+	clickCount?: number;
+	key?: string;
+	modifiers?: { ctrl: boolean; meta: boolean; alt: boolean; shift: boolean };
+	text?: string;
 }
 
 async function delay(ms: number, token: CancellationToken): Promise<void> {
@@ -100,8 +107,34 @@ export async function interactDesktop(
 	value: string | undefined,
 	timeoutMs = DEFAULT_DESKTOP_ACTION_TIMEOUT_MS,
 	token: CancellationToken = CancellationToken.None,
+	native?: DesktopNativeInputBackend,
 ): Promise<DesktopDomResult> {
-	return retryDesktopDomCommand(evaluate, { op: action, locator, value }, timeoutMs, token);
+	const prepared = await retryDesktopDomCommand(evaluate, { op: action, locator, value }, timeoutMs, token);
+	if (!prepared.ok) {
+		return prepared;
+	}
+	if (prepared.native === 'pointer') {
+		if (!native || prepared.point === undefined) {
+			return { ...prepared, ok: false, code: 'nativeInputRequired', reason: 'Pointer actions require the CDP or WebDriver input backend.' };
+		}
+		await native.click(prepared.point.x, prepared.point.y, prepared.clickCount ?? 1, token);
+		return prepared;
+	}
+	if (prepared.native === 'key') {
+		if (!native || !prepared.key) {
+			return { ...prepared, ok: false, code: 'nativeInputRequired', reason: 'Key press requires the CDP or WebDriver input backend.' };
+		}
+		await native.press(prepared.key, prepared.modifiers ?? parseDesktopKeyChord(prepared.key).modifiers, token);
+		return prepared;
+	}
+	if (prepared.native === 'type') {
+		if (!native) {
+			return { ...prepared, ok: false, code: 'nativeInputRequired', reason: 'Typing requires the CDP or WebDriver input backend.' };
+		}
+		await native.insertText(prepared.text ?? String(value ?? ''), token);
+		return prepared;
+	}
+	return prepared;
 }
 
 export async function assertDesktop(
@@ -190,6 +223,9 @@ export function formatDesktopFailure(result: DesktopDomResult, locator?: Desktop
 	}
 	if (result.code === 'optionDisabled') {
 		return `${target} matched a disabled option.`;
+	}
+	if (result.code === 'nativeInputRequired') {
+		return result.reason ?? 'Native pointer or keyboard backend is required for this action.';
 	}
 	if (result.code === 'unsupported' && result.reason) {
 		return `${target}: ${result.reason}`;

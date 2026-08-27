@@ -32,6 +32,9 @@ export interface IPreBaseDesktopMainService {
 	spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env?: Record<string, string>, extras?: { purpose?: 'preview' | 'test'; electronCdp?: boolean; webDriver?: boolean }): Promise<IPreBaseDesktopSpawnResult>;
 	getOwnedProcessOutput(pid: number, maximumEntries?: number): Promise<{ entries: ProcessOutputEntry[]; droppedCount: number; truncated: boolean }>;
 	evaluateViaCdp(debugPort: number, expression: string): Promise<unknown>;
+	dispatchOwnedPointer(target: { sessionId?: string; debugPort?: number }, x: number, y: number, clickCount?: number): Promise<void>;
+	dispatchOwnedKey(target: { sessionId?: string; debugPort?: number }, key: string, modifiers?: { ctrl?: boolean; meta?: boolean; alt?: boolean; shift?: boolean }): Promise<void>;
+	dispatchOwnedInsertText(target: { sessionId?: string; debugPort?: number }, text: string): Promise<void>;
 	killOwnedProcess(pid: number): Promise<void>;
 	killAllOwned(): Promise<void>;
 }

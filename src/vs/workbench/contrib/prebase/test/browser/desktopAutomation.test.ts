@@ -7,13 +7,15 @@ import { existsSync, readdirSync, readFileSync } from 'fs';
 import { dirname, join, resolve } from 'path';
 import { fileURLToPath } from 'url';
 import { runInNewContext } from 'vm';
+import { CancellationToken } from '../../../../../base/common/cancellation.js';
 import { CancellationTokenSource } from '../../../../../base/common/cancellation.js';
 import { DESKTOP_AUTOMATION_BOOTSTRAP } from '../../common/runtime/desktopAutomationDom.js';
 import { assertDesktop, formatDesktopFailure, interactDesktop, retryDesktopDomCommand, type DesktopEvaluateFn } from '../../common/runtime/desktopAutomationHost.js';
 import { describeLocator, locatorLooksSecret, maskFillValue, parseDesktopLocator, redactSecretText, validatePressKey } from '../../common/runtime/desktopLocators.js';
-import { applyCapabilitiesTestingPermission, applyCargoTestingDependencies, applyRustTestingPlugins, applyTauriTestingTransaction, previewTauriTestingSetup, tauriTestingCandidatePaths } from '../../common/runtime/tauriTestingSetup.js';
+import { applyCapabilitiesTestingPermission, applyCargoTestingDependencies, applyRustTestingPlugins, applyTauriTestingTransaction, inspectTauriTestingSetup, previewTauriTestingSetup, tauriTestingCandidatePaths } from '../../common/runtime/tauriTestingSetup.js';
 import { createDesktopTestRun, recordDesktopTestStep, summarizeDesktopTestRun } from '../../common/runtime/desktopTestModel.js';
-import { DesktopWebDriverClient, webDriverBaseUrl } from '../../common/runtime/desktopWebDriver.js';
+import { cdpKeyParams, webDriverKeyActions, webDriverKeyValue } from '../../common/runtime/desktopNativeInput.js';
+import { DesktopWebDriverClient, isWebDriverReadyStatus, webDriverBaseUrl } from '../../common/runtime/desktopWebDriver.js';
 import { resolveDesktopShutdownPolicy } from '../../../../../platform/prebaseDesktop/common/processTermination.js';
 
 function findRepoRoot(): string {
@@ -81,13 +83,110 @@ suite('desktopAutomationHost', () => {
 				if (calls < 3) {
 					return { ok: false, code: 'notFound', count: 0 };
 				}
-				return { ok: true, match: { name: 'Save', visible: true, enabled: true } };
+				return { ok: true, native: 'pointer', point: { x: 10, y: 12 }, clickCount: 1, match: { name: 'Save', visible: true, enabled: true } };
 			}
 			return true;
 		};
-		const result = await interactDesktop(evaluate, 'click', { by: 'role', role: 'button', name: 'Save' }, undefined, 1000);
+		const clicks: Array<[number, number, number]> = [];
+		const result = await interactDesktop(evaluate, 'click', { by: 'role', role: 'button', name: 'Save' }, undefined, 1000, CancellationToken.None, {
+			click: async (x, y, clickCount) => { clicks.push([x, y, clickCount]); },
+			press: async () => { },
+			insertText: async () => { },
+		});
 		assert.strictEqual(result.ok, true);
 		assert.ok(calls >= 3);
+		assert.deepStrictEqual(clicks, [[10, 12, 1]]);
+	});
+
+	test('press and type without a native backend fail closed instead of synthesizing Enter or Tab', async () => {
+		const evaluate: DesktopEvaluateFn = async expression => {
+			if (expression.includes('"op":"press"')) {
+				return { ok: true, native: 'key', key: 'Enter', modifiers: { ctrl: false, meta: false, alt: false, shift: false } };
+			}
+			if (expression.includes('"op":"type"')) {
+				return { ok: true, native: 'type', text: 'ab' };
+			}
+			return true;
+		};
+		const pressed = await interactDesktop(evaluate, 'press', { by: 'role', role: 'textbox', name: 'Name' }, 'Enter', 200);
+		assert.strictEqual(pressed.ok, false);
+		assert.strictEqual(pressed.code, 'nativeInputRequired');
+		const typed = await interactDesktop(evaluate, 'type', { by: 'role', role: 'textbox', name: 'Name' }, 'ab', 200);
+		assert.strictEqual(typed.ok, false);
+		assert.strictEqual(typed.code, 'nativeInputRequired');
+	});
+
+	test('covered pointer targets never dispatch a native click', async () => {
+		const clicks: Array<[number, number, number]> = [];
+		const evaluate: DesktopEvaluateFn = async expression => {
+			if (expression.startsWith('window.__prebaseDesktopTest.run(')) {
+				return { ok: false, code: 'covered', blocker: { tag: 'div', name: 'Overlay' } };
+			}
+			return true;
+		};
+		const result = await interactDesktop(evaluate, 'click', { by: 'role', role: 'button', name: 'Save' }, undefined, 120, CancellationToken.None, {
+			click: async (x, y, clickCount) => { clicks.push([x, y, clickCount]); },
+			press: async () => { },
+			insertText: async () => { },
+		});
+		assert.strictEqual(result.ok, false);
+		assert.strictEqual(result.code, 'covered');
+		assert.deepStrictEqual(clicks, []);
+	});
+
+	test('native Enter and Tab go to the input backend as named keys, not character text', async () => {
+		const presses: Array<{ key: string; modifiers: unknown }> = [];
+		const evaluate: DesktopEvaluateFn = async expression => {
+			if (expression.includes('"op":"press"')) {
+				const command = JSON.parse(expression.slice(expression.indexOf('(') + 1, expression.lastIndexOf(')')));
+				return { ok: true, native: 'key', key: command.value, modifiers: { ctrl: false, meta: false, alt: false, shift: false } };
+			}
+			return true;
+		};
+		const enter = await interactDesktop(evaluate, 'press', { by: 'role', role: 'textbox', name: 'Name' }, 'Enter', 200, CancellationToken.None, {
+			click: async () => { },
+			press: async (key, modifiers) => { presses.push({ key, modifiers }); },
+			insertText: async () => { },
+		});
+		const tab = await interactDesktop(evaluate, 'press', { by: 'role', role: 'textbox', name: 'Name' }, 'Tab', 200, CancellationToken.None, {
+			click: async () => { },
+			press: async (key, modifiers) => { presses.push({ key, modifiers }); },
+			insertText: async () => { },
+		});
+		assert.strictEqual(enter.ok, true);
+		assert.strictEqual(tab.ok, true);
+		assert.deepStrictEqual(presses.map(item => item.key), ['Enter', 'Tab']);
+		assert.strictEqual(webDriverKeyValue('Enter'), '\uE007');
+		assert.strictEqual(webDriverKeyValue('Tab'), '\uE004');
+		assert.notStrictEqual(webDriverKeyValue('Enter'), 'Enter');
+		assert.strictEqual(cdpKeyParams('Tab', { ctrl: false, meta: false, alt: false, shift: false }, 'keyDown').text, '');
+		assert.strictEqual(cdpKeyParams('Space', { ctrl: false, meta: false, alt: false, shift: false }, 'keyDown').text, ' ');
+		assert.strictEqual(cdpKeyParams(' ', { ctrl: false, meta: false, alt: false, shift: false }, 'char').text, ' ');
+		const actions = webDriverKeyActions('Enter', { ctrl: false, meta: false, alt: false, shift: false }) as Array<{ actions: Array<{ value?: string }> }>;
+		assert.ok(actions[0]?.actions.some(step => step.value === '\uE007'));
+		assert.ok(!JSON.stringify(actions).includes('"Enter"'));
+		const typed = webDriverKeyActions('', { ctrl: false, meta: false, alt: false, shift: false }, 'ab') as Array<{ actions: Array<{ type?: string; value?: string }> }>;
+		assert.deepStrictEqual(typed[0]?.actions.map(step => `${step.type}:${step.value}`), ['keyDown:a', 'keyUp:a', 'keyDown:b', 'keyUp:b']);
+	});
+
+	test('owned CDP Space dispatch in electron-main inserts a character, not only a named key', () => {
+		const main = readFileSync(join(findRepoRoot(), 'src/vs/platform/prebaseDesktop/electron-main/prebaseDesktopMainService.ts'), 'utf8');
+		assert.match(main, /key === 'Space' \|\| key === ' '/);
+		assert.match(main, /type: 'char', text: isChar \? key : ' '/);
+		assert.match(main, /Owned text input exceeds the/);
+		assert.match(main, /Owned pointer input requires finite coordinates/);
+	});
+
+	test('click without a native backend fails closed instead of synthesizing DOM click', async () => {
+		const evaluate: DesktopEvaluateFn = async expression => {
+			if (expression.startsWith('window.__prebaseDesktopTest.run(')) {
+				return { ok: true, native: 'pointer', point: { x: 4, y: 8 }, clickCount: 1 };
+			}
+			return true;
+		};
+		const result = await interactDesktop(evaluate, 'click', { by: 'role', role: 'button', name: 'Save' }, undefined, 200);
+		assert.strictEqual(result.ok, false);
+		assert.strictEqual(result.code, 'nativeInputRequired');
 	});
 
 	test('retries a disabled control until it becomes actionable', async () => {
@@ -253,6 +352,8 @@ class MiniElement {
 	children: MiniElement[] = [];
 	text = '';
 	nativeValue = '';
+	selectionStart = 0;
+	selectionEnd = 0;
 	disabled = false;
 	checked = false;
 	isContentEditable = false;
@@ -435,10 +536,10 @@ suite('desktopAutomationDom', () => {
 		const label = el('label', {}, 'Name');
 		label.control = field;
 		const api = installDomTest([save, named, label, field]);
-		assert.strictEqual(runStablePointerAction(api, { op: 'click', locator: { by: 'role', role: 'button', name: 'Save' } }).ok, true);
-		assert.strictEqual(save.clicked, 1);
-		assert.strictEqual(runStablePointerAction(api, { op: 'click', locator: { by: 'testId', value: 'ok' } }).ok, true);
-		assert.strictEqual(named.clicked, 1);
+		assert.strictEqual(runStablePointerAction(api, { op: 'click', locator: { by: 'role', role: 'button', name: 'Save' } }).native, 'pointer');
+		assert.strictEqual(save.clicked, 0);
+		assert.strictEqual(runStablePointerAction(api, { op: 'click', locator: { by: 'testId', value: 'ok' } }).native, 'pointer');
+		assert.strictEqual(named.clicked, 0);
 		const filled = api.run({ op: 'fill', locator: { by: 'label', value: 'Name' }, value: 'Ada' });
 		assert.strictEqual(filled.ok, true);
 		assert.strictEqual(field.value, 'Ada');
@@ -530,52 +631,86 @@ suite('desktopAutomationDom', () => {
 		});
 	});
 
-	test('types characters sequentially with keyboard and input event ordering', () => {
+	test('prepares sequential type for the native input backend without synthesizing key events', () => {
 		const field = el('input', { type: 'text', 'aria-label': 'Message' });
 		field.value = '>';
 		const api = installDomTest([field]);
 
 		const result = api.run({ op: 'type', locator: { by: 'label', value: 'Message' }, value: 'ab' });
-		assert.strictEqual(result.ok, true);
-		assert.strictEqual(field.value, '>ab');
-		assert.deepStrictEqual(field.events.map(event => [event.type, event.key ?? event.data]), [
-			['keydown', 'a'],
-			['input', 'a'],
-			['keyup', 'a'],
-			['keydown', 'b'],
-			['input', 'b'],
-			['keyup', 'b'],
-		]);
+		assert.deepStrictEqual({
+			ok: result.ok,
+			native: result.native,
+			text: result.text,
+			value: field.value,
+			events: field.events,
+		}, {
+			ok: true,
+			native: 'type',
+			text: 'ab',
+			value: '>',
+			events: [],
+		});
 	});
 
-	test('presses modifier combinations and selects all through the control API', () => {
+	test('typing into a selected field leaves the existing selection for the native backend', () => {
+		const field = el('input', { type: 'text', 'aria-label': 'Name' });
+		field.value = 'Ada Lovelace';
+		field.selectionStart = 0;
+		field.selectionEnd = field.value.length;
+		const api = installDomTest([field]);
+
+		const result = api.run({ op: 'type', locator: { by: 'label', value: 'Name' }, value: 'Grace' });
+		assert.deepStrictEqual({
+			ok: result.ok,
+			native: result.native,
+			text: result.text,
+			value: field.value,
+			selectionStart: field.selectionStart,
+			selectionEnd: field.selectionEnd,
+			selected: field.selected,
+			events: field.events,
+		}, {
+			ok: true,
+			native: 'type',
+			text: 'Grace',
+			value: 'Ada Lovelace',
+			selectionStart: 0,
+			selectionEnd: 'Ada Lovelace'.length,
+			selected: 0,
+			events: [],
+		});
+	});
+
+	test('prepares modifier chords for the native key backend', () => {
 		const field = el('input', { type: 'text', 'aria-label': 'Name' });
 		const api = installDomTest([field]);
 
 		const result = api.run({ op: 'press', locator: { by: 'label', value: 'Name' }, value: 'Control+Shift+A' });
 		assert.strictEqual(result.ok, true);
-		assert.strictEqual(field.selected, 1);
-		assert.deepStrictEqual(field.events, [
-			{ type: 'keydown', key: 'A', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true, detail: undefined, data: undefined, inputType: undefined },
-			{ type: 'keyup', key: 'A', ctrlKey: true, metaKey: false, altKey: false, shiftKey: true, detail: undefined, data: undefined, inputType: undefined },
-		]);
+		assert.strictEqual(result.native, 'key');
+		assert.strictEqual(result.key, 'A');
+		assert.strictEqual(result.modifiers?.ctrl, true);
+		assert.strictEqual(result.modifiers?.meta, false);
+		assert.strictEqual(result.modifiers?.alt, false);
+		assert.strictEqual(result.modifiers?.shift, true);
+		assert.strictEqual(field.selected, 0);
 	});
 
-	test('double click performs two clicks and a cancellable detail-two event', () => {
+	test('double click prepares a two-count native pointer action', () => {
 		const button = el('button', {}, 'Open');
 		const api = installDomTest([button]);
 		const result = runStablePointerAction(api, { op: 'doubleClick', locator: { by: 'role', role: 'button', name: 'Open' } });
 
 		assert.deepStrictEqual({
 			ok: result.ok,
+			native: result.native,
+			clickCount: result.clickCount,
 			clicks: button.clicked,
-			events: button.events,
 		}, {
 			ok: true,
-			clicks: 2,
-			events: [
-				{ type: 'dblclick', key: undefined, ctrlKey: undefined, metaKey: undefined, altKey: undefined, shiftKey: undefined, detail: 2, data: undefined, inputType: undefined },
-			],
+			native: 'pointer',
+			clickCount: 2,
+			clicks: 0,
 		});
 	});
 
@@ -804,6 +939,35 @@ suite('tauriTestingSetup', () => {
 		}
 		assert.deepStrictEqual(enabled.changes, []);
 	});
+
+	test('inspects partial versus complete Tauri testing setup without overclaiming ready', () => {
+		assert.deepStrictEqual(inspectTauriTestingSetup({
+			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n',
+		}), {
+			dependencyPresent: true,
+			featurePresent: false,
+			featureIncludesDriver: false,
+			pluginRegistered: false,
+			permissionPresent: false,
+			ready: false,
+		});
+		assert.deepStrictEqual(inspectTauriTestingSetup({
+			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n',
+			rustEntry: 'builder.plugin(tauri_plugin_wdio_webdriver::init());',
+		}), {
+			dependencyPresent: true,
+			featurePresent: true,
+			featureIncludesDriver: true,
+			pluginRegistered: true,
+			permissionPresent: false,
+			ready: false,
+		});
+		assert.strictEqual(inspectTauriTestingSetup({
+			cargoToml: '[dependencies]\ntauri-plugin-wdio-webdriver = { version = "1", optional = true }\n[features]\nprebase-testing = ["dep:tauri-plugin-wdio-webdriver"]\n',
+			rustEntry: 'tauri_plugin_wdio_webdriver::init()',
+			capabilitiesJson: '{"permissions":["wdio-webdriver:default"]}',
+		}).ready, true);
+	});
 });
 
 suite('tauriTestingTransaction', () => {
@@ -945,6 +1109,71 @@ suite('desktopTestModel', () => {
 });
 
 suite('desktopWebDriver', () => {
+	test('only treats HTTP success plus ready true as WebDriver ready', () => {
+		assert.strictEqual(isWebDriverReadyStatus(200, { value: { ready: true, message: 'ok' } }), true);
+		assert.strictEqual(isWebDriverReadyStatus(200, { ready: true }), true);
+		assert.strictEqual(isWebDriverReadyStatus(200, { value: { ready: false } }), false);
+		assert.strictEqual(isWebDriverReadyStatus(404, { value: { ready: true } }), false);
+		assert.strictEqual(isWebDriverReadyStatus(500, { value: { ready: true } }), false);
+		assert.strictEqual(isWebDriverReadyStatus(200, undefined), false);
+		assert.strictEqual(isWebDriverReadyStatus(200, { value: { error: 'unknown command' } }), false);
+		assert.strictEqual(isWebDriverReadyStatus(200, { value: { ready: true, error: null } }), true);
+		assert.strictEqual(isWebDriverReadyStatus(401, '<html>nope</html>'), false);
+	});
+
+	test('waitUntilReady accepts a W3C ready envelope and rejects 404, 500, and ready false', async () => {
+		const original = globalThis.fetch;
+		const statuses = [
+			{ status: 404, body: 'not found' },
+			{ status: 200, body: '{not json' },
+			{ status: 200, body: JSON.stringify({ value: { ready: false } }) },
+			{ status: 500, body: JSON.stringify({ value: { ready: true } }) },
+			{ status: 200, body: JSON.stringify({ value: { ready: true, message: 'ready' } }) },
+		];
+		globalThis.fetch = (async () => {
+			const next = statuses.shift() ?? statuses.at(-1)!;
+			return { status: next.status, text: async () => next.body } as Response;
+		}) as typeof fetch;
+		try {
+			const client = new DesktopWebDriverClient('http://127.0.0.1:4444');
+			await client.waitUntilReady(5_000);
+		} finally {
+			globalThis.fetch = original;
+		}
+	});
+
+	test('waitUntilReady does not treat HTTP 404 with a ready JSON body as ready', async () => {
+		const original = globalThis.fetch;
+		let polls = 0;
+		globalThis.fetch = (async () => {
+			polls++;
+			return { status: 404, text: async () => JSON.stringify({ value: { ready: true, message: 'ok' } }) } as Response;
+		}) as typeof fetch;
+		try {
+			const client = new DesktopWebDriverClient('http://127.0.0.1:4444');
+			await assert.rejects(() => client.waitUntilReady(80), /did not become ready/);
+			assert.ok(polls >= 1);
+		} finally {
+			globalThis.fetch = original;
+		}
+	});
+
+	test('waitUntilReady times out on a hung status request', async () => {
+		const original = globalThis.fetch;
+		globalThis.fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+			await new Promise<void>((_resolve, reject) => {
+				init?.signal?.addEventListener('abort', () => reject(Object.assign(new Error('aborted'), { name: 'AbortError' })));
+			});
+			return { status: 200, text: async () => JSON.stringify({ value: { ready: true } }) } as Response;
+		}) as typeof fetch;
+		try {
+			const client = new DesktopWebDriverClient('http://127.0.0.1:4444');
+			await assert.rejects(() => client.waitUntilReady(80), /did not become ready/);
+		} finally {
+			globalThis.fetch = original;
+		}
+	});
+
 	test('only allows loopback URLs', () => {
 		assert.strictEqual(webDriverBaseUrl(4445), 'http://127.0.0.1:4445');
 		assert.throws(() => webDriverBaseUrl(0));
@@ -989,6 +1218,12 @@ suite('desktopWebDriver', () => {
 			assert.strictEqual(session.sessionId, 's-1');
 			await assert.rejects(() => client.screenshot(session), /PNG/);
 			await assert.rejects(() => client.execute(session, 'return 1'), /execute failed/);
+			globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
+				const url = String(input);
+				urls.push(`${init?.method ?? 'GET'} ${url}`);
+				return { status: 200, text: async () => 'not-json' } as Response;
+			}) as typeof fetch;
+			await assert.rejects(() => client.performActions(session, []), /actions failed/);
 			assert.ok(urls.every(url => url.includes('127.0.0.1') || url.includes('localhost')));
 		} finally {
 			globalThis.fetch = original;

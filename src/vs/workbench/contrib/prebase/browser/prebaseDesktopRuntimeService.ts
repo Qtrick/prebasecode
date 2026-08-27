@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { CancellationToken, CancellationTokenSource } from '../../../../base/common/cancellation.js';
+import { CancellationError } from '../../../../base/common/errors.js';
 import { Emitter, Event } from '../../../../base/common/event.js';
 import { Disposable } from '../../../../base/common/lifecycle.js';
 import { generateUuid } from '../../../../base/common/uuid.js';
@@ -23,6 +24,7 @@ import { detectDesktopProjects, selectDesktopProfile } from '../common/runtime/d
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
 import { buildElectronExternalLaunchRequest, buildPackageScriptExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../common/runtime/externalLaunchCommand.js';
 import { assertDesktop, formatDesktopFailure, interactDesktop, runDesktopDomCommand, type DesktopEvaluateFn } from '../common/runtime/desktopAutomationHost.js';
+import { webDriverKeyActions, webDriverPointerClickActions, type DesktopNativeInputBackend } from '../common/runtime/desktopNativeInput.js';
 import { DEFAULT_ELECTRON_STARTUP_TIMEOUT_MS, DEFAULT_TAURI_STARTUP_TIMEOUT_MS, describeLocator, parseDesktopLocator, redactSecretText, validatePressKey, type DesktopAssertCondition, type DesktopInteractAction } from '../common/runtime/desktopLocators.js';
 import { createDesktopTestRun, recordDesktopTestStep, summarizeDesktopTestRun, type DesktopTestRun } from '../common/runtime/desktopTestModel.js';
 import { DesktopWebDriverClient, webDriverBaseUrl } from '../common/runtime/desktopWebDriver.js';
@@ -255,7 +257,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			return undefined;
 		}
 
-		const tauriWebDriver = isTauriProfile(profile) && wantsNativeAutomation && profile.hasWdioWebdriverPlugin;
+		const tauriWebDriver = isTauriProfile(profile) && wantsNativeAutomation && profile.testingSetup.ready;
 		const sessionId = generateUuid();
 		const title = this.workspaceService.getWorkspace().folders[0]?.name || profile.label;
 		const automationBackend = tauriWebDriver ? 'webdriver' : (isTauriProfile(profile) && launchMode === 'external' ? 'none' : 'cdp');
@@ -613,7 +615,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		const started = Date.now();
 		try {
 			this._updateSession({ state: session.purpose === 'test' ? 'testing' : session.state });
-			const result = await interactDesktop(this._pageEvaluate(session), input.action, locator, input.value, input.timeoutMs, this._linkedActionToken(token));
+			const result = await interactDesktop(this._pageEvaluate(session), input.action, locator, input.value, input.timeoutMs, this._linkedActionToken(token), this._nativeInput(session));
 			const duration = Date.now() - started;
 			const failure = result.ok ? undefined : formatDesktopFailure(result, locator);
 			this._recordStep({ kind: 'interact', action: input.action, locator, resolvedTarget: input.value, startedAt: started, durationMs: duration, ok: result.ok, failure });
@@ -792,6 +794,38 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			this._actionCts.token.onCancellationRequested(() => sub.dispose());
 		}
 		return this._actionCts.token;
+	}
+
+	private _nativeInput(session: PreBaseDesktopSession): DesktopNativeInputBackend {
+		const assertLive = (token: CancellationToken) => {
+			if (token.isCancellationRequested) {
+				throw new CancellationError();
+			}
+		};
+		if (session.webDriverPort && this._webDriver && this._webDriverSession) {
+			const client = this._webDriver;
+			const driverSession = this._webDriverSession;
+			return {
+				click: async (x, y, clickCount, token) => client.performActions(driverSession, webDriverPointerClickActions(x, y, clickCount), token),
+				press: async (key, modifiers, token) => client.performActions(driverSession, webDriverKeyActions(key, modifiers), token),
+				insertText: async (text, token) => client.performActions(driverSession, webDriverKeyActions('', { ctrl: false, meta: false, alt: false, shift: false }, text), token),
+			};
+		}
+		const target = session.launchMode === 'managed' ? { sessionId: session.id } : { debugPort: session.debugPort };
+		return {
+			click: async (x, y, clickCount, token) => {
+				assertLive(token);
+				await this._main.dispatchOwnedPointer(target, x, y, clickCount);
+			},
+			press: async (key, modifiers, token) => {
+				assertLive(token);
+				await this._main.dispatchOwnedKey(target, key, modifiers);
+			},
+			insertText: async (text, token) => {
+				assertLive(token);
+				await this._main.dispatchOwnedInsertText(target, text);
+			},
+		};
 	}
 
 	private _pageEvaluate(session: PreBaseDesktopSession): DesktopEvaluateFn {

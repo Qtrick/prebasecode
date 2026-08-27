@@ -56,7 +56,7 @@ function previewHtml(channel: string): string {
 }
 
 function applyPreviewHostMessage(service: PreBaseRuntimeService, message: RuntimePreviewStatusMessage | undefined): void {
-	handleRuntimePreviewStatusMessage(message, (url, ok, detail) => service.markPreviewLoaded(url, ok, detail));
+	handleRuntimePreviewStatusMessage(message, (url, ok, detail, navigationId) => service.markPreviewLoaded(url, ok, detail, navigationId));
 }
 
 function createWebviewHarness(fetchImpl: (url: string, options: Record<string, unknown>) => Promise<unknown>) {
@@ -207,6 +207,63 @@ suite('Runtime Preview reachability', () => {
 
 		assert.strictEqual(service.getSession().previewConnected, false);
 		assert.ok(logs.some(entry => entry.includes('Preview failed') && entry.includes('Failed to navigate')));
+	});
+
+	test('stale same-URL error cannot disconnect a newer navigation generation', async () => {
+		const { service } = createRuntimeService(disposables, async () => requestContext(200));
+		await service.connectUrl('http://localhost:5173');
+		const current = service.beginPreviewNavigation();
+		applyPreviewHostMessage(service, { type: 'load', url: 'http://localhost:5173/', navigationId: current });
+		assert.strictEqual(service.getSession().previewConnected, true);
+		applyPreviewHostMessage(service, { type: 'error', url: 'http://localhost:5173/', detail: 'stale', navigationId: current - 1 });
+		assert.strictEqual(service.getSession().previewConnected, true);
+	});
+
+	test('a late same-URL probe from a replaced navigation cannot change the current preview', async () => {
+		const first = deferred<unknown>();
+		const second = deferred<unknown>();
+		let fetches = 0;
+		const harness = createWebviewHarness(() => {
+			fetches++;
+			return fetches === 1 ? first.promise : second.promise;
+		});
+		harness.send(harness.origin, { channel: harness.channel, type: 'setUrl', url: 'http://localhost:5173/', navigationId: 1 });
+		harness.send(harness.origin, { channel: harness.channel, type: 'setUrl', url: 'http://localhost:5173/', navigationId: 2 });
+		first.resolve({ type: 'opaque' });
+		await Promise.resolve();
+		await Promise.resolve();
+		assert.deepStrictEqual(harness.posted.filter(message => message.type === 'probe'), []);
+
+		second.resolve({ type: 'opaque' });
+		await Promise.resolve();
+		await Promise.resolve();
+		assert.deepStrictEqual(JSON.parse(JSON.stringify(harness.posted.filter(message => message.type === 'probe'))), [{
+			type: 'probe',
+			url: 'http://localhost:5173/',
+			ok: true,
+			navigationId: 2,
+		}]);
+
+		const { service } = createRuntimeService(disposables, async () => requestContext(200));
+		await service.connectUrl('http://localhost:5173');
+		const current = service.beginPreviewNavigation();
+		applyPreviewHostMessage(service, { type: 'load', url: 'http://localhost:5173/', navigationId: current });
+		applyPreviewHostMessage(service, { type: 'error', url: 'http://localhost:5173/', detail: 'stale same-url', navigationId: current - 1 });
+		applyPreviewHostMessage(service, { type: 'probe', url: 'http://localhost:5173/', ok: false, detail: 'stale probe', navigationId: current - 1 });
+		assert.strictEqual(service.getSession().previewConnected, true);
+		applyPreviewHostMessage(service, { type: 'error', url: 'http://localhost:5173/', detail: 'missing generation' });
+		assert.strictEqual(service.getSession().previewConnected, true);
+	});
+
+	test('clearing the preview ignores a late iframe load from the previous navigation', async () => {
+		const harness = createWebviewHarness(async () => ({ type: 'opaque' }));
+		harness.send(harness.origin, { channel: harness.channel, type: 'setUrl', url: 'http://localhost:5173/', navigationId: 1 });
+		const previousOnload = harness.iframe.onload;
+		harness.send(harness.origin, { channel: harness.channel, type: 'clear', reason: 'Stopped' });
+		previousOnload?.();
+		await Promise.resolve();
+		assert.ok(!harness.posted.some(message => message.type === 'load'));
+		assert.strictEqual(harness.iframe.src, undefined);
 	});
 
 	test('failed no-cors probe still navigates the iframe and does not claim disconnect', async () => {

@@ -338,7 +338,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		webview.mountTo(this._frameShell, this.window);
 		webview.setHtml(this._buildPreviewHtml(controlChannel));
 		this._sessionDisposables.add(webview.onMessage(e => {
-			const msg = e.message as { type?: string; url?: string; ok?: boolean; detail?: string } | undefined;
+			const msg = e.message as { type?: string; url?: string; ok?: boolean; detail?: string; navigationId?: number } | undefined;
 			if (!msg?.type) {
 				return;
 			}
@@ -347,13 +347,13 @@ export class PreBaseRuntimeEditor extends EditorPane {
 				this._loadUrl(true);
 				return;
 			}
-			handleRuntimePreviewStatusMessage(msg, (url, ok, detail) => this.runtimeService.markPreviewLoaded(url, ok, detail));
+			handleRuntimePreviewStatusMessage(msg, (url, ok, detail, navigationId) => this.runtimeService.markPreviewLoaded(url, ok, detail, navigationId));
 		}));
 		this._previewWebview = webview;
 		this._webviewControlChannel = controlChannel;
 	}
 
-	private _postPreviewCommand(type: RuntimeWebviewControlType, data: { url?: string; reason?: string } = {}): void {
+	private _postPreviewCommand(type: RuntimeWebviewControlType, data: { url?: string; reason?: string; navigationId?: number } = {}): void {
 		if (!this._previewWebview || !this._webviewControlChannel) {
 			return;
 		}
@@ -366,6 +366,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			return;
 		}
 		if (!(session.running || session.previewConnected || session.serverRunning)) {
+			this.runtimeService.beginPreviewNavigation();
 			this._postPreviewCommand('clear');
 			this._loadedUrl = undefined;
 			return;
@@ -380,13 +381,14 @@ export class PreBaseRuntimeEditor extends EditorPane {
 
 		const validated = validatePreviewUrl(session.url);
 		if (!validated.ok) {
+			this.runtimeService.beginPreviewNavigation();
 			this._postPreviewCommand('clear', { reason: validated.reason });
 			this._loadedUrl = undefined;
 			return;
 		}
 
 		this._loadedUrl = validated.url;
-		this._postPreviewCommand('setUrl', { url: validated.url });
+		this._postPreviewCommand('setUrl', { url: validated.url, navigationId: this.runtimeService.beginPreviewNavigation() });
 	}
 
 	private _buildPreviewHtml(controlChannel: string): string {
@@ -416,6 +418,7 @@ const iframe = document.getElementById('frame');
 const overlay = document.getElementById('overlay');
 const controlChannel = '${controlChannel}';
 let currentUrl = '';
+let currentNavigationId = 0;
 
 function showOverlay(text) {
 	overlay.textContent = text;
@@ -439,27 +442,38 @@ window.addEventListener('message', function (event) {
 			return;
 		}
 		currentUrl = msg.url;
+		const hostNavigationId = typeof msg.navigationId === 'number' ? msg.navigationId : undefined;
+		currentNavigationId = hostNavigationId !== undefined ? hostNavigationId : currentNavigationId + 1;
 		showOverlay('Loading ' + msg.url + '…');
 		const probedUrl = currentUrl;
+		const navigationId = currentNavigationId;
+		function postStatus(body) {
+			if (hostNavigationId !== undefined) body.navigationId = hostNavigationId;
+			vscode.postMessage(body);
+		}
 		fetch(probedUrl, { mode: 'no-cors', cache: 'no-store' }).then(function () {
-			if (currentUrl === probedUrl) vscode.postMessage({ type: 'probe', url: probedUrl, ok: true });
+			if (currentNavigationId === navigationId) postStatus({ type: 'probe', url: probedUrl, ok: true });
 		}, function (err) {
-			if (currentUrl === probedUrl) vscode.postMessage({ type: 'probe', url: probedUrl, ok: false, detail: String(err) });
+			if (currentNavigationId === navigationId) postStatus({ type: 'probe', url: probedUrl, ok: false, detail: String(err) });
 		});
 		iframe.onload = function () {
+			if (currentNavigationId !== navigationId) return;
 			hideOverlay();
-			vscode.postMessage({ type: 'load', url: currentUrl });
+			postStatus({ type: 'load', url: currentUrl });
 		};
 		try {
 			iframe.src = msg.url;
 		} catch (err) {
+			if (currentNavigationId !== navigationId) return;
 			showOverlay('Failed to navigate to ' + msg.url);
-			vscode.postMessage({ type: 'error', url: currentUrl, detail: String(err) });
+			postStatus({ type: 'error', url: currentUrl, detail: String(err) });
 		}
 		return;
 	}
 	if (msg.type === 'clear') {
 		currentUrl = '';
+		currentNavigationId += 1;
+		iframe.onload = null;
 		iframe.removeAttribute('src');
 		showOverlay(msg.reason || 'Start the preview server or Connect to a local URL.');
 		return;

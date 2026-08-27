@@ -168,12 +168,12 @@ interface Harness {
 	dispatchKey(key: string, extra?: Record<string, any>): void;
 }
 
-function createHarness(): Harness {
+function createHarness(initialGraphType: 'network' | 'temporal' = 'network'): Harness {
 	const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
 	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
 	let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
 	assert.ok(script, 'webview script must be present in graphEditor.ts');
-	script = interpolateWebviewScript(script, '7', 'network');
+	script = interpolateWebviewScript(script, '7', initialGraphType);
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [
@@ -1019,5 +1019,65 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		assert.strictEqual(harness.getKeepGraphCentered(), true, "'c' key enables keepGraphCentered");
 		harness.dispatchKey('c');
 		assert.strictEqual(harness.getKeepGraphCentered(), false, "subsequent 'c' key disables keepGraphCentered");
+	});
+
+	test('18. Temporal Full Map ↔ Focus Changes refits the camera to the visible node set', () => {
+		const harness = createHarness('temporal');
+		const unchanged = Array.from({ length: 40 }, (_, index) => ({
+			entityId: `far-${index}`,
+			label: `far-${index}.ts`,
+			path: `src/far-${index}.ts`,
+			changeKind: 'unchanged',
+			x: 4000 + (index % 8) * 180,
+			y: 3000 + Math.floor(index / 8) * 180,
+		}));
+		const diff = {
+			sourceCommitSha: 'c0',
+			targetCommitSha: 'c1',
+			nodes: [
+				{ entityId: 'changed-a', label: 'a.ts', path: 'src/a.ts', changeKind: 'modified', x: 10, y: 12 },
+				{ entityId: 'changed-b', label: 'b.ts', path: 'src/b.ts', changeKind: 'added', x: 40, y: 18 },
+				...unchanged,
+			],
+			edges: [],
+			summary: { addedCount: 1, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: unchanged.length },
+		};
+		const baseState = {
+			displayMode: 'state',
+			diff,
+			isSettled: true,
+			selectedCommitSha: 'c1',
+			renderedCommitSha: 'c1',
+		};
+
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'temporal',
+				temporalState: baseState,
+				settings: { keepGraphCentered: false, reduceMotion: true },
+			},
+		});
+		harness.sendHostMessage({ type: 'temporalState', payload: baseState });
+		const fullMap = harness.getTransform();
+
+		harness.sendHostMessage({
+			type: 'temporalState',
+			payload: { ...baseState, displayMode: 'changes' },
+		});
+		const focus = harness.getTransform();
+
+		harness.sendHostMessage({
+			type: 'temporalState',
+			payload: { ...baseState, displayMode: 'state' },
+		});
+		const fullMapAgain = harness.getTransform();
+
+		assert.ok(focus.k > fullMap.k,
+			`Focus Changes must zoom tighter than Full Map (focus k=${focus.k}, full k=${fullMap.k})`);
+		assert.ok(Math.abs(fullMapAgain.k - fullMap.k) < 0.02,
+			`switching back to Full Map must restore the wide fit (got ${fullMapAgain.k}, want ${fullMap.k})`);
+		assert.ok(fullMap.k < 0.4,
+			`Full Map of a large unchanged cluster must zoom out (got k=${fullMap.k})`);
 	});
 });

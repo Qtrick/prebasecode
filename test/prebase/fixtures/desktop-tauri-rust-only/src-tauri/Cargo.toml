@@ -1,0 +1,7 @@
+[package]
+name = "prebase-desktop-tauri-rust-only"
+version = "0.0.0"
+edition = "2021"
+
+[dependencies]
+tauri = { version = "2", features = [] }

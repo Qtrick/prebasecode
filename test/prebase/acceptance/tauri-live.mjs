@@ -3,6 +3,13 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
+/**
+ * BACKEND/FIXTURE ACCEPTANCE.
+ * Talks to the Tauri fixture WebDriver directly. This does not prove
+ * PreBaseDesktopRuntimeService allocating the driver, waiting for `ready`,
+ * or driving locators through interactDesktop.
+ */
+
 import { execFileSync, spawn } from 'node:child_process';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { createConnection, createServer } from 'node:net';

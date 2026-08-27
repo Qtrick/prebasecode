@@ -27,6 +27,39 @@ export type TauriTestingTransactionResult =
 	| { ok: true }
 	| { ok: false; reason: string; rollbackErrors: string[] };
 
+export interface TauriTestingSetupState {
+	dependencyPresent: boolean;
+	featurePresent: boolean;
+	featureIncludesDriver: boolean;
+	pluginRegistered: boolean;
+	permissionPresent: boolean;
+	ready: boolean;
+}
+
+export function inspectTauriTestingSetup(input: {
+	cargoToml?: string;
+	rustEntry?: string;
+	capabilitiesJson?: string;
+}): TauriTestingSetupState {
+	const cargo = input.cargoToml ?? '';
+	const rust = input.rustEntry ?? '';
+	const capabilities = input.capabilitiesJson ?? '';
+	const dependencyPresent = /(?:^|\n)\s*tauri-plugin-wdio-webdriver\s*[=\{]/m.test(cargo);
+	const featurePresent = /(?:^|\n)\s*prebase-testing\s*=/m.test(cargo);
+	const featureMembers = cargo.match(/(?:^|\n)\s*prebase-testing\s*=\s*\[([^\]]*)\]/m)?.[1] ?? '';
+	const featureIncludesDriver = featureMembers.includes('tauri-plugin-wdio-webdriver');
+	const pluginRegistered = rust.includes('tauri_plugin_wdio_webdriver');
+	const permissionPresent = capabilities.includes('wdio-webdriver:default');
+	return {
+		dependencyPresent,
+		featurePresent,
+		featureIncludesDriver,
+		pluginRegistered,
+		permissionPresent,
+		ready: dependencyPresent && featurePresent && featureIncludesDriver && pluginRegistered && permissionPresent,
+	};
+}
+
 export async function applyTauriTestingTransaction<Resource>(
 	writes: readonly TauriTestingWrite<Resource>[],
 	io: { write(resource: Resource, value: string): Promise<void>; remove(resource: Resource): Promise<void> },

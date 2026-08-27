@@ -343,6 +343,100 @@ p{opacity:.75;margin:0;line-height:1.45}
 		return pngBase64;
 	}
 
+	async dispatchOwnedPointer(target: { sessionId?: string; debugPort?: number }, x: number, y: number, clickCount = 1): Promise<void> {
+		if (!Number.isFinite(x) || !Number.isFinite(y)) {
+			throw new Error('Owned pointer input requires finite coordinates.');
+		}
+		const count = clickCount <= 1 ? 1 : 2;
+		const managed = target.sessionId ? this._managed.get(target.sessionId) : undefined;
+		if (managed) {
+			for (let i = 0; i < count; i++) {
+				managed.appView.webContents.sendInputEvent({ type: 'mouseDown', x, y, button: 'left', clickCount: i + 1 });
+				managed.appView.webContents.sendInputEvent({ type: 'mouseUp', x, y, button: 'left', clickCount: i + 1 });
+			}
+			return;
+		}
+		if (!target.debugPort) {
+			throw new Error('Owned pointer input requires a managed session or CDP port.');
+		}
+		await this._withCdpConnection(await this._getOwnedCdpPageWebSocketUrl(target.debugPort), 'pointer', 64 * 1024, async connection => {
+			for (let i = 0; i < count; i++) {
+				const params = { x, y, button: 'left', clickCount: i + 1, pointerType: 'mouse' };
+				await connection.request('Input.dispatchMouseEvent', { ...params, type: 'mousePressed' });
+				await connection.request('Input.dispatchMouseEvent', { ...params, type: 'mouseReleased' });
+			}
+		});
+	}
+
+	async dispatchOwnedKey(target: { sessionId?: string; debugPort?: number }, key: string, modifiers: { ctrl?: boolean; meta?: boolean; alt?: boolean; shift?: boolean } = {}): Promise<void> {
+		if (typeof key !== 'string' || !key || key.includes('\0') || key.length > 40) {
+			throw new Error('Owned key input is limited to a short named key or single character.');
+		}
+		const electronModifiers = [
+			modifiers.ctrl ? 'control' : undefined,
+			modifiers.meta ? 'meta' : undefined,
+			modifiers.alt ? 'alt' : undefined,
+			modifiers.shift ? 'shift' : undefined,
+		].filter((value): value is string => Boolean(value));
+		const electronKey = key === ' ' || key === 'Space' ? 'Space' : key;
+		const managed = target.sessionId ? this._managed.get(target.sessionId) : undefined;
+		if (managed) {
+			managed.appView.webContents.sendInputEvent({ type: 'keyDown', keyCode: electronKey, modifiers: electronModifiers });
+			managed.appView.webContents.sendInputEvent({ type: 'keyUp', keyCode: electronKey, modifiers: electronModifiers });
+			return;
+		}
+		if (!target.debugPort) {
+			throw new Error('Owned key input requires a managed session or CDP port.');
+		}
+		const bits = (modifiers.alt ? 1 : 0) + (modifiers.ctrl ? 2 : 0) + (modifiers.meta ? 4 : 0) + (modifiers.shift ? 8 : 0);
+		const named: Record<string, { code: string; vk: number }> = {
+			Enter: { code: 'Enter', vk: 13 }, Tab: { code: 'Tab', vk: 9 }, Escape: { code: 'Escape', vk: 27 },
+			Backspace: { code: 'Backspace', vk: 8 }, Delete: { code: 'Delete', vk: 46 }, Space: { code: 'Space', vk: 32 },
+			Home: { code: 'Home', vk: 36 }, End: { code: 'End', vk: 35 }, ArrowLeft: { code: 'ArrowLeft', vk: 37 },
+			ArrowUp: { code: 'ArrowUp', vk: 38 }, ArrowRight: { code: 'ArrowRight', vk: 39 }, ArrowDown: { code: 'ArrowDown', vk: 40 },
+			PageUp: { code: 'PageUp', vk: 33 }, PageDown: { code: 'PageDown', vk: 34 },
+		};
+		const info = named[key === ' ' ? 'Space' : key];
+		const isChar = key.length === 1;
+		const insertText = isChar ? key : (key === 'Enter' ? '\r' : (key === 'Space' || key === ' ' ? ' ' : ''));
+		const params = {
+			key: key === 'Space' || key === ' ' ? ' ' : key,
+			code: info?.code ?? (isChar ? `Key${key.toUpperCase()}` : key),
+			windowsVirtualKeyCode: info?.vk ?? (isChar ? key.toUpperCase().charCodeAt(0) : 0),
+			nativeVirtualKeyCode: info?.vk ?? (isChar ? key.toUpperCase().charCodeAt(0) : 0),
+			modifiers: bits,
+		};
+		await this._withCdpConnection(await this._getOwnedCdpPageWebSocketUrl(target.debugPort), 'key', 64 * 1024, async connection => {
+			await connection.request('Input.dispatchKeyEvent', { ...params, type: info ? 'rawKeyDown' : 'keyDown', text: insertText });
+			if (isChar || key === 'Space' || key === ' ') {
+				await connection.request('Input.dispatchKeyEvent', { ...params, type: 'char', text: isChar ? key : ' ' });
+			}
+			await connection.request('Input.dispatchKeyEvent', { ...params, type: 'keyUp', text: '' });
+		});
+	}
+
+	async dispatchOwnedInsertText(target: { sessionId?: string; debugPort?: number }, text: string): Promise<void> {
+		if (typeof text !== 'string' || text.includes('\0')) {
+			throw new Error('Owned text input must be a string without NUL bytes.');
+		}
+		if (Buffer.byteLength(text, 'utf8') > MAX_DESKTOP_EVALUATION_EXPRESSION_BYTES) {
+			throw new Error(`Owned text input exceeds the ${MAX_DESKTOP_EVALUATION_EXPRESSION_BYTES / 1024} KiB limit.`);
+		}
+		const managed = target.sessionId ? this._managed.get(target.sessionId) : undefined;
+		if (managed) {
+			for (const character of text) {
+				managed.appView.webContents.sendInputEvent({ type: 'char', keyCode: character });
+			}
+			return;
+		}
+		if (!target.debugPort) {
+			throw new Error('Owned text input requires a managed session or CDP port.');
+		}
+		await this._withCdpConnection(await this._getOwnedCdpPageWebSocketUrl(target.debugPort), 'insertText', 64 * 1024, async connection => {
+			await connection.request('Input.insertText', { text });
+		});
+	}
+
 	async spawnExternal(request: ExternalLaunchRequest, cwd: string, debugPort: number, env: Record<string, string> = {}, extras?: { purpose?: 'preview' | 'test'; electronCdp?: boolean; webDriver?: boolean }): Promise<IPreBaseDesktopSpawnResult> {
 		const electronCdp = extras?.electronCdp ?? true;
 		const webDriver = extras?.webDriver === true && !electronCdp;

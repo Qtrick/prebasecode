@@ -128,7 +128,7 @@ function buildCapabilities(
 		}
 	}
 	if (supportsExternalLaunch) {
-		limitations.push('Full app mode launches the project Electron process. Renderer automation uses a localhost CDP endpoint; native OS dialogs and menus are not controllable.');
+		limitations.push('Full app mode launches the project Electron process. Renderer automation uses a localhost CDP endpoint; native OS dialogs, menus, and the project main process are not controllable.');
 	}
 
 	const automation = supportsExternalLaunch || supportsManagedLaunch;
@@ -147,7 +147,7 @@ function buildCapabilities(
 		supportsRendererAutomation: supportsManagedLaunch,
 		supportsFullNativeAutomation: supportsExternalLaunch,
 		supportsBackendApiAccess: false,
-		supportsMainProcessAccess: supportsExternalLaunch,
+		supportsMainProcessAccess: false,
 		supportsNativeDialogAutomation: false,
 		requiresPreload: Boolean(paths.preload),
 		requiresMainProcess: Boolean(paths.main),

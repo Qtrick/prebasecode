@@ -129,7 +129,8 @@ export interface IPreBaseRuntimeService {
 	openPreviewEditor(): Promise<void>;
 	recordConsoleError(message: string): void;
 	/** Called by the preview webview after iframe load/error. */
-	markPreviewLoaded(url: string, ok: boolean, detail?: string): void;
+	markPreviewLoaded(url: string, ok: boolean, detail?: string, navigationId?: number): void;
+	beginPreviewNavigation(): number;
 }
 
 const DESKTOP_APP_ROOTS = ['apps/desktop', 'packages/desktop'] as const;
@@ -234,6 +235,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 	private _startInFlight: Promise<void> | undefined;
 	private _detectInFlight: Promise<string[]> | undefined;
 	private readonly _lifecycleCts = this._register(new CancellationTokenSource());
+	private _previewNavigationId = 0;
 
 	constructor(
 		@IConfigurationService private readonly configurationService: IConfigurationService,
@@ -395,7 +397,15 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		return true;
 	}
 
-	markPreviewLoaded(url: string, ok: boolean, detail?: string): void {
+	beginPreviewNavigation(): number {
+		this._previewNavigationId += 1;
+		return this._previewNavigationId;
+	}
+
+	markPreviewLoaded(url: string, ok: boolean, detail?: string, navigationId?: number): void {
+		if (this._previewNavigationId > 0 && navigationId !== this._previewNavigationId) {
+			return;
+		}
 		const validated = validatePreviewUrl(url);
 		if (!validated.ok || validated.url !== this._session.url) {
 			return;
@@ -712,7 +722,15 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 							});
 						}
 					}
-					const rendererUrl = this._session.url || desktopProfile.rendererUrlHint || `http://localhost:${desktopProfile.likelyDevPort}`;
+					const rendererUrl = this._session.url || desktopProfile.rendererUrlHint;
+					if (!rendererUrl) {
+						this._log(localize(
+							'prebase.runtime.managedNoRendererUrl',
+							"Managed launch needs a configured frontend URL. This project has no evidence of a renderer dev server."
+						));
+						this._fire();
+						return;
+					}
 					const ready = await this._waitForUrl(rendererUrl, 45_000);
 					if (!ready) {
 						this._log(localize(
