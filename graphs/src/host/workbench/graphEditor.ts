@@ -130,6 +130,9 @@ export class PreBaseGraphEditor extends EditorPane {
 	override clearInput(): void {
 		this._scanKickoff = false;
 		this._cancelDescription();
+		if (this._inputType === 'temporal') {
+			this.temporalViewService.pauseActiveWork();
+		}
 		this._webviewDisposables.clear();
 		this._webview = undefined;
 		if (this._container) {

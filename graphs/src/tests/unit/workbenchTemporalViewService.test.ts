@@ -972,5 +972,25 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)', () => {
 
 		service.dispose();
 	});
+
+	test('pauseActiveWork cancels in-flight history without throwing', async () => {
+		const history: TemporalHistoryPage = {
+			commits: [makeCommitSummary('commit-1', 'feat: add A', 100, [])],
+			hasMore: false,
+		};
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			createMockTemporalGraphService({ HEAD: history }, { 'commit-1': [makeEntity('ent-1', 'src/a.ts', 'can-1')] }) as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+			mockStorageService,
+		);
+		await service.initialize();
+		service.pauseActiveWork();
+		assert.equal(service.getState().selectedCommitSha, 'commit-1');
+		service.dispose();
+	});
 });
 

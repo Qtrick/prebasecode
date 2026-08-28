@@ -42,14 +42,14 @@ async function openGraphEditor(accessor: ServicesAccessor): Promise<void> {
 	const editorService = accessor.get(IEditorService);
 	const graphService = accessor.get(IPreBaseGraphService);
 	await graphService.setGraphType('network');
-	await editorService.openEditor(PreBaseGraphEditorInput.create('network'), { pinned: true });
+	await editorService.openEditor(PreBaseGraphEditorInput.create('network'), { pinned: true, revealIfOpened: true, revealIfVisible: true });
 }
 
 async function openTemporalGraphEditor(accessor: ServicesAccessor): Promise<void> {
 	const editorService = accessor.get(IEditorService);
 	const graphService = accessor.get(IPreBaseGraphService);
 	await graphService.setGraphType('temporal');
-	await editorService.openEditor(PreBaseGraphEditorInput.create('temporal'), { pinned: true });
+	await editorService.openEditor(PreBaseGraphEditorInput.create('temporal'), { pinned: true, revealIfOpened: true, revealIfVisible: true });
 }
 
 function isSupportedGraphType(value: unknown): value is 'network' | 'temporal' {

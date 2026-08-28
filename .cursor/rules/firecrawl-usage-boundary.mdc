@@ -1,0 +1,123 @@
+---
+description: Firecrawl is a product dependency only — never use it as an agent research, search, scrape, or browsing tool
+alwaysApply: true
+---
+
+# Firecrawl Usage Boundary
+
+## Core Rule
+
+**Firecrawl is a product-development dependency only. It must NEVER be used as a browsing, search, scraping, research, or information-retrieval tool by the Cursor agent itself.**
+
+Firecrawl may only be used when the software being developed intentionally includes Firecrawl as part of its own functionality, integration, backend, runtime, or test surface.
+
+## Allowed Firecrawl Usage
+
+Cursor may work with Firecrawl when doing repository-controlled development involving Firecrawl, including:
+
+- Implementing a product feature that uses the Firecrawl API.
+- Building or modifying an existing Firecrawl integration.
+- Writing application code that calls Firecrawl at runtime.
+- Creating types, adapters, wrappers, services, interfaces, or configuration for a Firecrawl-powered product feature.
+- Debugging Firecrawl functionality that belongs to the product.
+- Writing unit, integration, or end-to-end tests for the product's Firecrawl integration.
+- Mocking or stubbing Firecrawl during tests.
+- Reviewing existing Firecrawl-related application code.
+- Updating product documentation describing how the product uses Firecrawl.
+- Verifying that the product's Firecrawl integration behaves correctly.
+
+In these cases, Firecrawl is being treated as **part of the product being developed**, not as an agent utility.
+
+## Forbidden Firecrawl Usage
+
+Cursor itself must **NOT** use Firecrawl for its own work.
+
+This prohibition includes, but is not limited to:
+
+- Agent web searches.
+- Researching libraries, APIs, products, competitors, documentation, or implementation approaches.
+- Scraping websites so Cursor can inspect their content.
+- Crawling documentation websites.
+- Retrieving webpages for analysis.
+- Searching the internet through Firecrawl.
+- Using Firecrawl MCP tools as a substitute for Cursor's normal research capabilities.
+- Using Firecrawl to investigate bugs unless the product itself is specifically testing or debugging its Firecrawl integration.
+- Using a Firecrawl API key to gather context for the coding agent.
+- Calling Firecrawl simply because it is available in the environment.
+- Using Firecrawl to gather design inspiration, examples, screenshots, competitor information, or external reference material.
+- Using Firecrawl as an intermediary to access information Cursor could obtain through its normal permitted development/research tools.
+
+**The presence of Firecrawl credentials, MCP servers, SDKs, environment variables, or existing integrations does not give the Cursor agent permission to use Firecrawl for agent research.**
+
+## Required Distinction
+
+Before making any Firecrawl call, determine who the intended consumer of the result is:
+
+### Product consumes the result
+
+Allowed.
+
+Example: `PreBase feature -> Firecrawl API -> crawled data -> PreBase`
+
+This is product functionality.
+
+### Cursor agent consumes the result
+
+Forbidden.
+
+Example: `Cursor agent -> Firecrawl -> webpage/docs/search results -> Cursor reasoning`
+
+This is agent tooling and must not occur.
+
+A useful test is:
+
+> **Would this Firecrawl request still need to happen when a real end user runs the finished product?**
+
+If **yes**, it may be legitimate product functionality.
+
+If **no**, and the request exists primarily to help Cursor research, understand, plan, or implement something, **do not use Firecrawl**.
+
+## Research Alternative
+
+When external research is required during development, Cursor must use the normal research, browser, documentation, search, repository, or other explicitly approved agent tools available to it.
+
+**Do not fall back to Firecrawl when another research mechanism is unavailable or inconvenient.**
+
+If an external source cannot be accessed without using Firecrawl as an agent tool, report that limitation and continue with the best permitted alternative rather than violating this rule.
+
+## Development and Testing Exception
+
+A Firecrawl request executed during development is not automatically prohibited merely because Cursor initiated the test.
+
+It is allowed when the request is genuinely exercising **product-owned Firecrawl functionality**.
+
+For example:
+
+- Running an integration test against the application's Firecrawl service: allowed.
+- Launching the product and verifying its Firecrawl-powered feature: allowed.
+- Sending a Firecrawl request manually to reproduce a bug in the application's Firecrawl integration: allowed when directly necessary to validate that integration.
+- Asking Firecrawl to crawl React documentation so Cursor can learn how to implement something: forbidden.
+
+Keep these development calls narrowly scoped to validating the product integration.
+
+## Credentials and Security
+
+Firecrawl credentials must be treated as product secrets.
+
+Cursor must:
+
+- Never expose Firecrawl API keys in source files, logs, screenshots, prompts, reports, or generated documentation.
+- Reuse the repository's existing secret/configuration architecture.
+- Avoid creating unnecessary duplicate configuration paths.
+- Never repurpose a product Firecrawl key for agent research.
+- Prefer mocks or fixtures for tests when a real Firecrawl request is unnecessary.
+
+## Enforcement
+
+This rule is a **hard boundary**, not a preference.
+
+If Firecrawl appears available as an MCP tool, extension, SDK, API, CLI, environment integration, or any other agent-accessible mechanism, Cursor must still follow this rule.
+
+**Firecrawl exists for the product, not for Cursor.**
+
+When uncertain whether a proposed Firecrawl action qualifies, default to **not using Firecrawl** unless it is clearly part of implementing, testing, debugging, or operating an intentional Firecrawl feature of the product.

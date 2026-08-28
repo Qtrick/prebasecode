@@ -6,7 +6,7 @@
 import { execFile, execFileSync } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join, resolve } from 'node:path';
+import { basename, join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
 
@@ -114,6 +114,7 @@ export async function invokeLanguageModelTool(page, toolId, parameters = {}) {
 export function classifyProcessRole(comm = '') {
 	const value = String(comm).toLowerCase();
 	if (/gpu/i.test(value)) return 'gpu';
+	if (/(^|[\\/])git([\\/\s.-]|$)/i.test(value)) return 'git';
 	if (/extensionhost|extension-host|exthost/i.test(value)) return 'extensionHost';
 	if (/parser|canonical/i.test(value)) return 'parser';
 	if (/utility/i.test(value)) return 'utility';
@@ -182,7 +183,38 @@ function lockPidAlive() {
 	}
 }
 
-export async function acquirePhase3AcceptanceLock() {
+export function describePhase3AcceptanceLock() {
+	try {
+		const pid = Number(readFileSync(join(LOCK_DIR, 'pid'), 'utf8'));
+		let scenario = 'unknown';
+		let startedAt;
+		try {
+			const meta = JSON.parse(readFileSync(join(LOCK_DIR, 'meta.json'), 'utf8'));
+			if (typeof meta.scenario === 'string' && meta.scenario.trim()) {
+				scenario = meta.scenario.trim();
+			}
+			if (typeof meta.startedAt === 'string') {
+				startedAt = meta.startedAt;
+			}
+		} catch {
+			/* pid-only lock from older harness */
+		}
+		const ageMs = startedAt && Number.isFinite(Date.parse(startedAt)) ? Date.now() - Date.parse(startedAt) : undefined;
+		return { pid, scenario, startedAt, ageMs, alive: lockPidAlive(), lockDir: LOCK_DIR };
+	} catch {
+		return undefined;
+	}
+}
+
+export function formatPhase3LockBlockMessage(owner, stale = false) {
+	const pid = owner?.pid ?? 'unknown';
+	const scenario = owner?.scenario ?? 'unknown';
+	const age = Number.isFinite(owner?.ageMs) ? `${Math.round(owner.ageMs / 1000)}s` : 'unknown';
+	const kind = stale ? 'stale' : 'active';
+	return `[phase3-lock] ${kind} owner pid=${pid} scenario=${scenario} age=${age} lockDir=${owner?.lockDir ?? LOCK_DIR}`;
+}
+
+export async function acquirePhase3AcceptanceLock(scenario = process.env.PREBASE_PHASE3_SCENARIO || basename(process.argv[1] ?? 'unknown')) {
 	if (process.env.PREBASE_PHASE3_GATE_CHILD === '1') {
 		return () => undefined;
 	}
@@ -190,18 +222,29 @@ export async function acquirePhase3AcceptanceLock() {
 		try {
 			mkdirSync(LOCK_DIR);
 			writeFileSync(join(LOCK_DIR, 'pid'), String(process.pid));
+			writeFileSync(join(LOCK_DIR, 'meta.json'), JSON.stringify({
+				pid: process.pid,
+				scenario,
+				startedAt: new Date().toISOString(),
+			}));
 			return () => {
 				try { rmSync(LOCK_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
 			};
 		} catch {
+			const owner = describePhase3AcceptanceLock();
 			if (!lockPidAlive()) {
+				console.error(formatPhase3LockBlockMessage(owner, true));
 				try { rmSync(LOCK_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
 				continue;
+			}
+			if (attempt === 0) {
+				console.error(formatPhase3LockBlockMessage(owner, false));
 			}
 			await new Promise(resolveWait => setTimeout(resolveWait, 1_000));
 		}
 	}
-	throw new Error('Another Phase 3 PreBase acceptance instance is active; resource tests must run sequentially.');
+	const owner = describePhase3AcceptanceLock();
+	throw new Error(`Another Phase 3 PreBase acceptance instance is active (pid=${owner?.pid} scenario=${owner?.scenario} ageMs=${owner?.ageMs}); resource tests must run sequentially.`);
 }
 
 function collectOwnedPids(rootPid, ownedPids) {

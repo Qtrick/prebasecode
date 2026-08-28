@@ -3,6 +3,9 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 import * as vscode from 'vscode';
+import { executeHybridWebFetch, executeHybridWebSearch, type HybridWebContextResponse } from './hybridWebContext';
+import { toMagnusWebToolPayload } from './webContextCore';
+import type { MagnusSecretStorage } from './secretStorage';
 import { isSecretPath, isUnderWorkspace, MagnusWorkspaceTools, resolveWorkspaceUri } from './tools';
 import { WorkspaceIntelligence, type WorkspacePosition } from './workspaceIntelligence';
 import { MagnusToolActivityDescriptor } from './toolActivity';
@@ -669,8 +672,7 @@ class ProjectScriptTool implements vscode.LanguageModelTool<{ script: string }> 
 	}
 }
 
-import { executeLocalLinkupSearch } from './localLinkupClient';
-import type { MagnusSecretStorage } from './secretStorage';
+const localWebContextCache = new Map<string, HybridWebContextResponse>();
 
 interface WebSearchInput {
 	query: string;
@@ -680,13 +682,19 @@ interface WebSearchInput {
 	excludeDomains?: string[];
 	fromDate?: string;
 	toDate?: string;
+	freshness?: 'normal' | 'fresh';
+}
+
+interface WebFetchInput {
+	url: string;
+	freshness?: 'normal' | 'fresh';
 }
 
 class WebSearchTool implements vscode.LanguageModelTool<WebSearchInput> {
 	constructor(private readonly secrets?: MagnusSecretStorage) { }
 
 	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<WebSearchInput>): vscode.PreparedToolInvocation {
-		return { invocationMessage: `Searching the web for ${options.input.query?.trim().slice(0, 120) || 'current information'}` };
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_web_search', options.input as unknown as Record<string, unknown>);
 	}
 
 	async invoke(options: vscode.LanguageModelToolInvocationOptions<WebSearchInput>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
@@ -700,8 +708,11 @@ class WebSearchTool implements vscode.LanguageModelTool<WebSearchInput> {
 		if (input.depth && !['fast', 'standard', 'deep'].includes(input.depth)) {
 			throw new Error('Web search depth must be fast, standard, or deep.');
 		}
-		if (input.maxResults !== undefined && (!Number.isInteger(input.maxResults) || input.maxResults < 1 || input.maxResults > 10)) {
-			throw new Error('Web search maximum results must be an integer from 1 to 10.');
+		if (input.maxResults !== undefined && (!Number.isInteger(input.maxResults) || input.maxResults < 1 || input.maxResults > 6)) {
+			throw new Error('Web search maximum results must be an integer from 1 to 6.');
+		}
+		if (input.freshness && input.freshness !== 'normal' && input.freshness !== 'fresh') {
+			throw new Error('Web search freshness must be normal or fresh.');
 		}
 		for (const domains of [input.includeDomains, input.excludeDomains]) {
 			if (domains && (!Array.isArray(domains) || domains.length > 20 || domains.some(domain => typeof domain !== 'string' || domain.length > 253))) {
@@ -709,21 +720,50 @@ class WebSearchTool implements vscode.LanguageModelTool<WebSearchInput> {
 			}
 		}
 
-		// Check local developer LinkUp key first (source-development)
 		if (this.secrets) {
 			const linkupKey = await this.secrets.getProviderApiKey('linkup');
-			if (linkupKey) {
-				try {
-					const localResult = await executeLocalLinkupSearch(linkupKey, input, token);
-					return commandResult(localResult);
-				} catch (err) {
-					console.warn('[Magnus WebSearch] Local LinkUp search failed:', err instanceof Error ? err.message : String(err));
-					throw err;
-				}
+			const firecrawlKey = await this.secrets.getProviderApiKey('firecrawl');
+			if (linkupKey && firecrawlKey) {
+				return commandResult(toMagnusWebToolPayload(await executeHybridWebSearch(input, {
+					linkupKey,
+					firecrawlKey,
+					token,
+					cache: localWebContextCache,
+				})));
 			}
 		}
 
-		return commandResult(await vscode.commands.executeCommand('prebase.webSearch.searchForMagnus', input));
+		return commandResult(toMagnusWebToolPayload(await vscode.commands.executeCommand('prebase.webSearch.searchForMagnus', input, token)));
+	}
+}
+
+class WebFetchTool implements vscode.LanguageModelTool<WebFetchInput> {
+	constructor(private readonly secrets?: MagnusSecretStorage) { }
+
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<WebFetchInput>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_web_fetch', options.input as unknown as Record<string, unknown>);
+	}
+
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<WebFetchInput>, token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		if (token.isCancellationRequested) {
+			throw new Error('Cancelled');
+		}
+		const url = options.input.url?.trim();
+		if (!url) {
+			throw new Error('Web fetch requires a public http(s) URL.');
+		}
+		if (this.secrets) {
+			const firecrawlKey = await this.secrets.getProviderApiKey('firecrawl');
+			if (firecrawlKey) {
+				return commandResult(toMagnusWebToolPayload(await executeHybridWebFetch({ url, freshness: options.input.freshness }, {
+					linkupKey: '',
+					firecrawlKey,
+					token,
+					cache: localWebContextCache,
+				})));
+			}
+		}
+		return commandResult(toMagnusWebToolPayload(await vscode.commands.executeCommand('prebase.webSearch.fetchForMagnus', { url, freshness: options.input.freshness }, token)));
 	}
 }
 
@@ -731,6 +771,7 @@ class WebSearchTool implements vscode.LanguageModelTool<WebSearchInput> {
 export function registerMagnusLanguageModelTools(context: vscode.ExtensionContext, secrets?: MagnusSecretStorage): void {
 	context.subscriptions.push(
 		vscode.lm.registerTool('prebase_web_search', new WebSearchTool(secrets)),
+		vscode.lm.registerTool('prebase_web_fetch', new WebFetchTool(secrets)),
 		vscode.lm.registerTool('prebase_graph_search_nodes', new GraphSearchTool()),
 		vscode.lm.registerTool('prebase_graph_get_node', new GraphNodeTool()),
 		vscode.lm.registerTool('prebase_graph_get_dependencies', new GraphDependenciesTool()),

@@ -4,13 +4,20 @@
 
 /** Normalize separators to forward slashes. */
 export function normalizePath(p: string): string {
-	return p.replace(/\\/g, '/')
+	// ponytail: posix paths skip the regex; graph import resolution calls this per candidate
+	return p.indexOf('\\') === -1 ? p : p.replace(/\\/g, '/')
 }
 
 export function basename(filePath: string): string {
-	const normalized = normalizePath(filePath)
-	const parts = normalized.split('/')
-	return parts[parts.length - 1] ?? filePath
+	// ponytail: lastIndexOf avoids normalize+split allocations on the import-resolution hot path
+	const slash = Math.max(filePath.lastIndexOf('/'), filePath.lastIndexOf('\\'))
+	return slash >= 0 ? filePath.slice(slash + 1) : filePath
+}
+
+export function fileStem(filePath: string): string {
+	const name = basename(filePath)
+	const i = name.lastIndexOf('.')
+	return i > 0 ? name.slice(0, i) : name
 }
 
 export function extname(filePath: string): string {

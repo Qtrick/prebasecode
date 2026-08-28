@@ -37,7 +37,7 @@ function parseAllowlistedEnv(filePath) {
 	if (!fs.existsSync(filePath)) {
 		return new Map();
 	}
-	const allowlist = new Set(['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LINKUP_API_KEY', 'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY']);
+	const allowlist = new Set(['GEMINI_API_KEY', 'GOOGLE_API_KEY', 'LINKUP_API_KEY', 'FIRECRAWL_API_KEY', 'SUPABASE_URL', 'SUPABASE_PUBLISHABLE_KEY']);
 	const content = fs.readFileSync(filePath, 'utf8');
 	const map = new Map();
 	for (const line of content.split(/\r?\n/)) {

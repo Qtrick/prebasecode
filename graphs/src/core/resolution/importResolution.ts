@@ -3,7 +3,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import type { ParseResult } from '../../common/types/graphTypes.js'
-import { basename, extname, joinPath, normalizePath, nodeIdForPath, resolveRelative } from './paths.js'
+import { basename, extname, fileStem, joinPath, normalizePath, nodeIdForPath, resolveRelative } from './paths.js'
 
 export type PathMappings = Record<string, string[]>
 
@@ -44,15 +44,30 @@ const RESOLVE_EXTENSIONS = [
 ]
 
 function tryResolveAgainstIndex(base: string, ctx: ImportResolutionContext): string | null {
-	const normalized = normalizePath(base).replace(/^\.\//, '')
-	const candidates = [
-		...RESOLVE_EXTENSIONS.map((ext) => `${normalized}${ext}`),
-		...RESOLVE_EXTENSIONS.map((ext) => joinPath(normalized, `index${ext}`)),
-		...RESOLVE_EXTENSIONS.map((ext) => joinPath(normalized, `__init__${ext}`))
-	]
-	for (const candidate of candidates) {
-		if (ctx.pathIndex.has(candidate)) {
-			return candidate
+	let normalized = normalizePath(base)
+	if (normalized.startsWith('./')) {
+		normalized = normalized.slice(2)
+	}
+	if (ctx.pathIndex.has(normalized)) {
+		return normalized
+	}
+	for (let i = 1; i < RESOLVE_EXTENSIONS.length; i++) {
+		const file = normalized + RESOLVE_EXTENSIONS[i]
+		if (ctx.pathIndex.has(file)) {
+			return file
+		}
+	}
+	const indexPrefix = normalized ? normalized + '/' : ''
+	for (const ext of RESOLVE_EXTENSIONS) {
+		const indexPath = indexPrefix + 'index' + ext
+		if (ctx.pathIndex.has(indexPath)) {
+			return indexPath
+		}
+	}
+	for (const ext of RESOLVE_EXTENSIONS) {
+		const initPath = indexPrefix + '__init__' + ext
+		if (ctx.pathIndex.has(initPath)) {
+			return initPath
 		}
 	}
 	return null
@@ -76,11 +91,12 @@ export function buildImportResolutionContext(
 		}
 
 		const ext = extname(normalized)
-		const stem = base.replace(/\.[^.]+$/, '')
-		const existing = simpleNameIndex.get(stem) ?? []
-		if (!existing.includes(normalized)) {
+		const stem = fileStem(base)
+		let existing = simpleNameIndex.get(stem)
+		if (!existing) {
+			simpleNameIndex.set(stem, [normalized])
+		} else if (!existing.includes(normalized)) {
 			existing.push(normalized)
-			simpleNameIndex.set(stem, existing)
 		}
 
 		if ((ext === '.java' || ext === '.kt' || ext === '.kts') && result.packageName) {
@@ -117,14 +133,7 @@ function tryResolveJavaImport(importSource: string, ctx: ImportResolutionContext
 			return resolved
 		}
 	}
-	const simple = importSource.split('.').pop()
-	if (simple) {
-		const paths = (ctx.simpleNameIndex.get(simple) ?? []).filter((p) => /\.(java|kt|kts)$/.test(p))
-		if (paths.length === 1) {
-			return paths[0]
-		}
-	}
-	return null
+	return uniqueIndexedPath(ctx, importSource.split('.').pop(), (p) => /\.(java|kt|kts)$/.test(p))
 }
 
 function tryResolvePythonImport(fromFile: string, importSource: string, ctx: ImportResolutionContext): string | null {
@@ -153,14 +162,7 @@ function tryResolvePythonImport(fromFile: string, importSource: string, ctx: Imp
 		}
 	}
 
-	const simple = importSource.split('.').pop()
-	if (simple) {
-		const paths = (ctx.simpleNameIndex.get(simple) ?? []).filter((p) => p.endsWith('.py'))
-		if (paths.length === 1) {
-			return paths[0]
-		}
-	}
-	return null
+	return uniqueIndexedPath(ctx, importSource.split('.').pop(), (p) => p.endsWith('.py'))
 }
 
 function tryResolveGoImport(importSource: string, ctx: ImportResolutionContext): string | null {
@@ -172,6 +174,41 @@ function tryResolveGoImport(importSource: string, ctx: ImportResolutionContext):
 		return null
 	}
 	return tryResolveAgainstIndex(pathPart, ctx)
+}
+
+function uniqueIndexedPath(
+	ctx: ImportResolutionContext,
+	stem: string | undefined,
+	ok: (path: string) => boolean
+): string | null {
+	if (!stem) {
+		return null
+	}
+	const paths = ctx.simpleNameIndex.get(stem)
+	if (!paths) {
+		return null
+	}
+	let hit: string | null = null
+	for (const path of paths) {
+		if (!ok(path)) {
+			continue
+		}
+		if (hit) {
+			return null
+		}
+		hit = path
+	}
+	return hit
+}
+
+function importTailStem(source: string): string {
+	const base = basename(source)
+	const ext = extname(base)
+	if (ext && RESOLVE_EXTENSIONS.includes(ext)) {
+		return fileStem(base)
+	}
+	const lastDot = base.lastIndexOf('.')
+	return lastDot > 0 ? base.slice(lastDot + 1) : base
 }
 
 function fuzzyResolveImport(fromFile: string, importSource: string, ctx: ImportResolutionContext): string | null {
@@ -189,22 +226,8 @@ function fuzzyResolveImport(fromFile: string, importSource: string, ctx: ImportR
 		}
 	}
 
-	const tailName = source.split(/[/\\.]/).filter(Boolean).pop() ?? source
-	for (const path of ctx.pathIndex.keys()) {
-		if (
-			path.endsWith(`/${source}`) ||
-			path.endsWith(`/${tailName}`) ||
-			basename(path).replace(/\.[^.]+$/, '') === tailName
-		) {
-			return path
-		}
-	}
-
-	const simplePaths = ctx.simpleNameIndex.get(tailName) ?? []
-	if (simplePaths.length === 1) {
-		return simplePaths[0]
-	}
-	return null
+	// ponytail: O(1) stem index replaces the old O(n) pathIndex scan; still require a unique hit
+	return uniqueIndexedPath(ctx, importTailStem(source), () => true)
 }
 
 export function resolveImportWithContext(

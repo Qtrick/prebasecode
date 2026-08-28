@@ -6,8 +6,9 @@ import test from 'node:test';
 import { classifyHosts, lsofSelectionArgs, privacyFailures } from './prebase-privacy-runtime.mjs';
 import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER_METRICS_NAME, themesA11yFailures } from './prebase-core-ide-live.mjs';
 import { activeSoakFailures } from './prebase-active-soak.mjs';
+import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
-import { findGraphFrame, waitForWorkbenchDriver, workbenchCommandWithTimeout } from './workbenchHarness.mjs';
+import { findGraphFrame, formatPhase3LockBlockMessage, waitForWorkbenchDriver, workbenchCommandWithTimeout } from './workbenchHarness.mjs';
 import { PHASE3_REQUIRED_EVIDENCE, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
 
@@ -726,6 +727,21 @@ test('final gate rejects stale ok:true evidence after a live rerun failure', () 
 	assert.match(gate, /rerunExits/);
 });
 
+test('active soak rejects quiescent renderer CPU runaway', () => {
+	const failures = activeSoakFailures({
+		samples: [
+			{ phase: 'active', processCount: 8, cpuSum: 20 },
+			{ phase: 'active', processCount: 8, cpuSum: 22 },
+			{ phase: 'active', processCount: 8, cpuSum: 18 },
+			{ phase: 'active', processCount: 8, cpuSum: 19 },
+			{ phase: 'quiesce', processCount: 9, cpuSum: 50, topProcesses: [{ role: 'renderer', cpu: 48 }] },
+			{ phase: 'quiesce', processCount: 9, cpuSum: 51, topProcesses: [{ role: 'renderer', cpu: 49 }] },
+		],
+		quit: { remaining: 'gone', terminationPath: 'workbench', usedSigkill: false },
+	});
+	assert.ok(failures.some(item => /renderer CPU/.test(item)));
+});
+
 test('active soak cannot pass when activity threw', () => {
 	assert.ok(activeSoakFailures({
 		activityError: 'TimeoutError',
@@ -793,4 +809,34 @@ test('individual harnesses must not overwrite phase-3-final/manifest.json', () =
 	}
 	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
 	assert.match(gate, /join\(evidenceRoot,\s*['"]manifest\.json['"]\)/);
+});
+
+test('renderer CPU profile summary ranks leaf self-time and ignores idle', () => {
+	const summary = summarizeCpuProfile({
+		nodes: [
+			{ id: 1, callFrame: { functionName: '(root)', url: '' }, children: [2, 3] },
+			{ id: 2, callFrame: { functionName: '(idle)', url: '' }, children: [] },
+			{ id: 3, callFrame: { functionName: '_refresh', url: 'vscode-file://vscode-app/Users/x/Prebasecode/out/vs/workbench/contrib/prebase/graphs/host/workbench/prebaseMapsView.js', lineNumber: 1188 }, children: [] },
+		],
+		samples: [2, 3, 3, 3],
+		timeDeltas: [1000, 2000, 2000, 2000],
+	});
+	assert.equal(summary.topFunction?.function, '_refresh');
+	assert.equal(summary.topFunction?.selfMs, 6);
+	assert.match(summary.topFunction?.url ?? '', /prebaseMapsView\.js$/);
+	assert.equal(summary.idleMs, 1);
+});
+
+test('phase 3 lock block message names pid, scenario, and age immediately', () => {
+	const active = formatPhase3LockBlockMessage({
+		pid: 4242,
+		scenario: 'prebase-active-soak.mjs',
+		ageMs: 45_000,
+		lockDir: '/tmp/prebase-phase3-acceptance.lock',
+	}, false);
+	assert.match(active, /\[phase3-lock\] active owner pid=4242/);
+	assert.match(active, /scenario=prebase-active-soak\.mjs/);
+	assert.match(active, /age=45s/);
+	const stale = formatPhase3LockBlockMessage({ pid: 7, scenario: 'dead', ageMs: 1000, lockDir: '/tmp/x' }, true);
+	assert.match(stale, /\[phase3-lock\] stale owner pid=7/);
 });

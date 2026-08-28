@@ -83,8 +83,8 @@ export class MagnusSecretStorage {
 			const resolved = this.resolver.resolveGeminiKey(storedKey);
 			return resolved?.key;
 		}
-		if (norm === 'linkup') {
-			const resolved = this.resolver.resolveLinkupKey(storedKey);
+		if (norm === 'linkup' || norm === 'firecrawl') {
+			const resolved = this.resolver.resolveToolProviderKey(norm, storedKey);
 			return resolved?.key;
 		}
 		return storedKey;
@@ -96,8 +96,8 @@ export class MagnusSecretStorage {
 		if (norm === 'gemini') {
 			return this.resolver.resolveGeminiKey(storedKey);
 		}
-		if (norm === 'linkup') {
-			return this.resolver.resolveLinkupKey(storedKey);
+		if (norm === 'linkup' || norm === 'firecrawl') {
+			return this.resolver.resolveToolProviderKey(norm, storedKey);
 		}
 		return storedKey ? { key: storedKey, source: 'secret-storage', varName: 'stored' } : undefined;
 	}
@@ -165,16 +165,6 @@ export class MagnusSecretStorage {
 		};
 	}
 
-	async getLinkupKeyOrMessage(): Promise<{ key?: string; message?: string; source?: SecretSourceType }> {
-		const resolved = await this.getResolvedProviderApiKey('linkup');
-		if (resolved) {
-			return { key: resolved.key, source: resolved.source };
-		}
-		return {
-			message: 'LinkUp web search has no configured credential. Provide LINKUP_API_KEY in PreBase root .env or configure in settings.',
-		};
-	}
-
 	async hasApiKey(): Promise<boolean> {
 		return this.hasProviderApiKey('gemini');
 	}
@@ -190,6 +180,7 @@ export class MagnusSecretStorage {
 	async getDiagnostics(cloudHostedAvailable?: boolean, requestedMode: PreBaseAIExecutionMode = 'auto') {
 		const storedGemini = await this.getSecretStorageProviderApiKey('gemini');
 		const storedLinkup = await this.getSecretStorageProviderApiKey('linkup');
-		return this.resolver.getDiagnostics(storedGemini, storedLinkup, cloudHostedAvailable, requestedMode);
+		const storedFirecrawl = await this.getSecretStorageProviderApiKey('firecrawl');
+		return this.resolver.getDiagnostics(storedGemini, storedLinkup, cloudHostedAvailable, requestedMode, storedFirecrawl);
 	}
 }

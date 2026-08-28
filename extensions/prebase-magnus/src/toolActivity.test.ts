@@ -98,6 +98,9 @@ suite('MagnusToolActivityDescriptor & Privacy Sanitization', () => {
 		const webMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_web_search', { query: 'VS Code LM API' });
 		assert.strictEqual(webMsg, 'Searching the web for "VS Code LM API"');
 
+		const fetchMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_web_fetch', { url: 'https://example.com/docs' });
+		assert.strictEqual(fetchMsg, 'Fetching web source https://example.com/docs');
+
 		const runtimeMsg = MagnusToolActivityDescriptor.getInvocationMessage('prebase_runtime_get_state', {});
 		assert.strictEqual(runtimeMsg, 'Checking Runtime Preview state');
 	});

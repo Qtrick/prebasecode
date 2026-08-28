@@ -228,6 +228,10 @@ export class MagnusToolActivityDescriptor {
 				const q = sanitizeQuery(input.query, 80);
 				return q ? `Searching the web for "${q}"` : 'Searching the web';
 			}
+			case 'prebase_web_fetch': {
+				const u = sanitizeQuery(typeof input.url === 'string' ? input.url : '', 80);
+				return u ? `Fetching web source ${u}` : 'Fetching web source';
+			}
 
 			default: {
 				const cleanName = toolName.replace(/^prebase_/, '').replace(/_/g, ' ');

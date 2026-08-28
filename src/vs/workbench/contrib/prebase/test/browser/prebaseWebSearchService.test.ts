@@ -4,7 +4,7 @@
 
 import assert from 'assert';
 import { VSBuffer, bufferToStream } from '../../../../../base/common/buffer.js';
-import { CancellationToken } from '../../../../../base/common/cancellation.js';
+import { CancellationToken, CancellationTokenSource } from '../../../../../base/common/cancellation.js';
 import { Event } from '../../../../../base/common/event.js';
 import type { IRequestContext } from '../../../../../base/parts/request/common/request.js';
 import type { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
@@ -69,7 +69,7 @@ suite('PreBase web search service', () => {
 			},
 		);
 
-		await assert.rejects(service.searchForMagnus({ query: 'current security guidance' }, CancellationToken.None), /Sign in to configured PreBase Cloud/);
+		await assert.rejects(() => service.searchForMagnus({ query: 'current security guidance' }, CancellationToken.None), /Sign in to configured PreBase Cloud/);
 		assert.strictEqual(refreshed, false);
 		assert.strictEqual(requested, false);
 	});
@@ -84,7 +84,7 @@ suite('PreBase web search service', () => {
 			},
 		);
 
-		await assert.rejects(service.searchForMagnus({
+		await assert.rejects(() => service.searchForMagnus({
 			query: 'release notes',
 			includeDomains: Array.from({ length: 21 }, (_, index) => `example${index}.com`),
 		}, CancellationToken.None), /domain filters/);
@@ -107,6 +107,186 @@ suite('PreBase web search service', () => {
 		);
 
 		const result = await service.searchForMagnus({ query: 'security guidance' }, CancellationToken.None);
-		assert.deepStrictEqual(result.sources, [{ title: 'Valid', url: 'https://example.com/source', excerpt: 'trusted format, untrusted content' }]);
+		assert.deepStrictEqual(result.sources, [{
+			id: undefined,
+			title: 'Valid',
+			url: 'https://example.com/source',
+			excerpt: 'trusted format, untrusted content',
+			contentTruncated: false,
+		}]);
+	});
+
+	test('rejects private fetch URLs before contacting the gateway', async () => {
+		let requested = false;
+		const service = createService(
+			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
+			async () => {
+				requested = true;
+				return response({});
+			},
+		);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'http://127.0.0.1/secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'http://[::ffff:127.0.0.1]/secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'http://2130706433/secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'http://localhost./secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'http://app.localhost/secret' }, CancellationToken.None), /public http/);
+		assert.strictEqual(requested, false);
+	});
+
+	test('fails closed when the cloud session is signed out', async () => {
+		let requested = false;
+		const service = createService(
+			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
+			async () => {
+				requested = true;
+				return response({});
+			},
+			async () => undefined,
+		);
+		await assert.rejects(() => service.searchForMagnus({ query: 'current security guidance' }, CancellationToken.None), /Sign in to PreBase Cloud/);
+		assert.strictEqual(requested, false);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'https://example.com/docs' }, CancellationToken.None), /Sign in to PreBase Cloud/);
+		assert.strictEqual(requested, false);
+	});
+
+	test('search and fetch gateway requests never include provider API keys', async () => {
+		let headers: Record<string, string> | undefined;
+		let data: string | undefined;
+		const service = createService(
+			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
+			async (options) => {
+				headers = options.headers;
+				data = typeof options.data === 'string' ? options.data : undefined;
+				return response({
+					request_id: 'request-1',
+					sources: [{ title: 'Valid', url: 'https://example.com/source', excerpt: 'ok' }],
+					truncated: false,
+				});
+			},
+		);
+		await service.searchForMagnus({ query: 'security guidance' }, CancellationToken.None);
+		const encoded = `${JSON.stringify(headers)}\n${data}`;
+		assert.ok(!encoded.includes('FIRECRAWL'));
+		assert.ok(!encoded.includes('LINKUP'));
+		assert.ok(!encoded.includes('fc-'));
+		assert.strictEqual(headers?.Authorization, 'Bearer session-token');
+		assert.ok(!Object.values(headers ?? {}).some(value => /linkup|firecrawl/i.test(value)));
+	});
+
+	test('does not silently drop oversize excerpts without marking them truncated', async () => {
+		const service = createService(
+			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
+			async () => response({
+				request_id: 'request-1',
+				sources: [{
+					title: 'Huge',
+					url: 'https://example.com/huge',
+					excerpt: 'x'.repeat(12_500),
+					contentTruncated: false,
+				}],
+				truncated: false,
+			}),
+		);
+		const result = await service.searchForMagnus({ query: 'security guidance' }, CancellationToken.None);
+		assert.strictEqual(result.sources[0].excerpt.length, 12_000);
+		assert.strictEqual(result.sources[0].contentTruncated, true);
+		assert.ok(JSON.parse(JSON.stringify(result.sources)));
+	});
+
+	test('sends fetch operations without exposing provider keys', async () => {
+		let headers: Record<string, string> | undefined;
+		let data: string | undefined;
+		const service = createService(
+			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
+			async (options) => {
+				headers = options.headers;
+				data = typeof options.data === 'string' ? options.data : undefined;
+				return response({
+					request_id: 'fetch-1',
+					sources: [{ id: 'S1', title: 'Docs', url: 'https://example.com/docs', excerpt: 'body', contentTruncated: true }],
+					truncated: true,
+					enrichment: 'full',
+				});
+			},
+		);
+		const result = await service.fetchForMagnus({ url: 'https://example.com/docs' }, CancellationToken.None);
+		assert.strictEqual(result.enrichment, 'full');
+		assert.ok(!JSON.stringify(headers).includes('fc-'));
+		assert.ok(!String(data).includes('FIRECRAWL'));
+		assert.ok(!String(data).includes('LINKUP'));
+		assert.strictEqual(JSON.parse(data ?? '{}').operation, 'fetch');
+	});
+
+	test('does not send provider keys or leak operations metadata to Magnus', async () => {
+		let requested = false;
+		const service = createService(
+			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
+			async () => {
+				requested = true;
+				return response({
+					request_id: 'request-1',
+					operations: { linkup: 1, firecrawlSearch: 1, firecrawlScrape: 2 },
+					sources: [{
+						id: 'S1',
+						title: 'Valid',
+						url: 'https://example.com/source',
+						excerpt: 'ok',
+						discoveredBy: ['linkup', 'firecrawl'],
+						contentVerifiedBy: 'firecrawl',
+					}],
+					truncated: false,
+					enrichment: 'partial',
+				});
+			},
+		);
+		const result = await service.searchForMagnus({ query: 'security guidance' }, CancellationToken.None);
+		assert.strictEqual(requested, true);
+		assert.strictEqual('operations' in result, false);
+		assert.deepStrictEqual(result.sources, [{
+			id: 'S1',
+			title: 'Valid',
+			url: 'https://example.com/source',
+			excerpt: 'ok',
+			contentTruncated: false,
+		}]);
+		assert.strictEqual(result.enrichment, 'partial');
+	});
+
+	test('uses a longer gateway timeout for deep search than for fast search', async () => {
+		const timeouts: number[] = [];
+		const service = createService(
+			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
+			async (options) => {
+				if (typeof options.timeout === 'number') {
+					timeouts.push(options.timeout);
+				}
+				return response({
+					request_id: 'request-1',
+					sources: [{ title: 'Valid', url: 'https://example.com/source', excerpt: 'ok' }],
+					truncated: false,
+				});
+			},
+		);
+		await service.searchForMagnus({ query: 'security guidance', depth: 'fast' }, CancellationToken.None);
+		await service.searchForMagnus({ query: 'security guidance', depth: 'deep' }, CancellationToken.None);
+		assert.deepStrictEqual(timeouts, [12_000, 45_000]);
+	});
+
+	test('does not contact the gateway after refresh when the request was cancelled', async () => {
+		let requested = false;
+		const source = new CancellationTokenSource();
+		const service = createService(
+			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
+			async () => {
+				requested = true;
+				return response({});
+			},
+			async () => {
+				source.cancel();
+				return 'session-token';
+			},
+		);
+		await assert.rejects(() => service.searchForMagnus({ query: 'current security guidance' }, source.token), /Cancelled/);
+		assert.strictEqual(requested, false);
 	});
 });

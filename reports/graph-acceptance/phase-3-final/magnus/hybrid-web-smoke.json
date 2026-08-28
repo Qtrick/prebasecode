@@ -1,0 +1,10 @@
+{
+  "at": "2026-08-28T18:29:12.938Z",
+  "linkupConfigured": true,
+  "firecrawlConfigured": false,
+  "hybridAttempted": false,
+  "runs": [],
+  "failures": [
+    "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve"
+  ]
+}

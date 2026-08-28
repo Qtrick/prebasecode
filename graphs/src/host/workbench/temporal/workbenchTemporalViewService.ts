@@ -268,6 +268,10 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 	}
 
+	pauseActiveWork(): void {
+		this._cancelActiveRequests();
+	}
+
 	async switchRepository(repoRoot: string): Promise<void> {
 		if (!repoRoot || repoRoot === this._activeRepositoryRoot) {
 			return;

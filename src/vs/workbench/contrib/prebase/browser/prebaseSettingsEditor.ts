@@ -748,26 +748,44 @@ export class PreBaseSettingsEditor extends EditorPane {
 
 		const webSearchCard = this._panel(
 			this._main!,
-			localize('prebase.settings.ai.webSearchTitle', "Web Search (LinkUp)"),
-			localize('prebase.settings.ai.webSearchDesc', "Configure LinkUp API credentials for live web search tools in Agents.")
+			localize('prebase.settings.ai.webSearchTitle', "Web Search"),
+			localize('prebase.settings.ai.webSearchDesc', "Signed-in users use the hosted hybrid gateway. Local development needs both discovery and page-fetch keys; one key is not enough.")
 		);
 
 		const linkupKeyCtrl = document.createElement('div');
 		Object.assign(linkupKeyCtrl.style, { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' });
-		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.setLinkupKey', "Configure LinkUp Key…"), () => {
+		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.setLinkupKey', "Configure discovery key…"), () => {
 			void this.commandService.executeCommand('prebase.magnus.setLinkupKey');
 		}));
-		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.testLinkupConn', "Test LinkUp…"), () => {
+		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.testLinkupConn', "Test discovery…"), () => {
 			void this.commandService.executeCommand('prebase.magnus.testLinkupConnection');
 		}));
-		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.clearLinkupKey', "Clear LinkUp Key"), () => {
+		linkupKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.clearLinkupKey', "Clear discovery key"), () => {
 			void this.commandService.executeCommand('prebase.magnus.clearLinkupKey');
 		}));
 		this._row(
 			webSearchCard,
-			localize('prebase.settings.ai.linkupKeyManagement', "LinkUp Credential"),
-			localize('prebase.settings.ai.linkupKeyHint', "Enables web grounding for agentic research. Key stored in OS SecretStorage."),
+			localize('prebase.settings.ai.linkupKeyManagement', "Local discovery key"),
+			localize('prebase.settings.ai.linkupKeyHint', "Optional local credential. Stored in OS SecretStorage. Not used unless a page-fetch key is also present."),
 			linkupKeyCtrl
+		);
+
+		const firecrawlKeyCtrl = document.createElement('div');
+		Object.assign(firecrawlKeyCtrl.style, { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' });
+		firecrawlKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.setFirecrawlKey', "Configure page-fetch key…"), () => {
+			void this.commandService.executeCommand('prebase.magnus.setFirecrawlKey');
+		}));
+		firecrawlKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.testFirecrawlConn', "Test page fetch…"), () => {
+			void this.commandService.executeCommand('prebase.magnus.testFirecrawlConnection');
+		}));
+		firecrawlKeyCtrl.appendChild(this._linkBtn(localize('prebase.settings.ai.clearFirecrawlKey', "Clear page-fetch key"), () => {
+			void this.commandService.executeCommand('prebase.magnus.clearFirecrawlKey');
+		}));
+		this._row(
+			webSearchCard,
+			localize('prebase.settings.ai.firecrawlKeyManagement', "Local page-fetch key"),
+			localize('prebase.settings.ai.firecrawlKeyHint', "Optional local credential. Stored in OS SecretStorage. Search stays on the hosted gateway unless both local keys exist."),
+			firecrawlKeyCtrl
 		);
 
 		const actionsCard = this._panel(

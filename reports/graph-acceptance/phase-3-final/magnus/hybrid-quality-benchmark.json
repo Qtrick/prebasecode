@@ -1,0 +1,157 @@
+{
+  "at": "2026-08-28T19:50:43.282Z",
+  "mode": "deterministic-fixtures",
+  "note": "Compares LinkUp snippet-only envelopes with LinkUp+Firecrawl hybrid on the same ranked URLs. Not a live provider score.",
+  "rows": [
+    {
+      "id": "current-version",
+      "depth": "fast",
+      "linkupOnly": {
+        "sourceCount": 2,
+        "payloadChars": 386,
+        "containsVerifiedPhrase": false,
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 0,
+          "firecrawlScrape": 0
+        }
+      },
+      "hybrid": {
+        "sourceCount": 1,
+        "payloadChars": 288,
+        "enriched": 1,
+        "truncated": false,
+        "latencyMs": 14,
+        "containsVerifiedPhrase": true,
+        "citationUrls": [
+          "https://typescriptlang.org/docs/handbook/release-notes/typescript-5-9.html"
+        ],
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 0,
+          "firecrawlScrape": 1
+        }
+      }
+    },
+    {
+      "id": "official-docs",
+      "depth": "standard",
+      "linkupOnly": {
+        "sourceCount": 1,
+        "payloadChars": 185,
+        "containsVerifiedPhrase": false,
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 0,
+          "firecrawlScrape": 0
+        }
+      },
+      "hybrid": {
+        "sourceCount": 1,
+        "payloadChars": 304,
+        "enriched": 1,
+        "truncated": false,
+        "latencyMs": 0,
+        "containsVerifiedPhrase": true,
+        "citationUrls": [
+          "https://code.visualstudio.com/api/extension-guides/language-model"
+        ],
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 0,
+          "firecrawlScrape": 1
+        }
+      }
+    },
+    {
+      "id": "coding",
+      "depth": "deep",
+      "linkupOnly": {
+        "sourceCount": 1,
+        "payloadChars": 157,
+        "containsVerifiedPhrase": false,
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 0,
+          "firecrawlScrape": 0
+        }
+      },
+      "hybrid": {
+        "sourceCount": 1,
+        "payloadChars": 251,
+        "enriched": 1,
+        "truncated": false,
+        "latencyMs": 0,
+        "containsVerifiedPhrase": true,
+        "citationUrls": [
+          "https://github.com/microsoft/vscode/issues/1"
+        ],
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 1,
+          "firecrawlScrape": 1
+        }
+      }
+    },
+    {
+      "id": "research",
+      "depth": "deep",
+      "linkupOnly": {
+        "sourceCount": 1,
+        "payloadChars": 145,
+        "containsVerifiedPhrase": false,
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 0,
+          "firecrawlScrape": 0
+        }
+      },
+      "hybrid": {
+        "sourceCount": 1,
+        "payloadChars": 252,
+        "enriched": 1,
+        "truncated": false,
+        "latencyMs": 0,
+        "containsVerifiedPhrase": true,
+        "citationUrls": [
+          "https://arxiv.org/pdf/1706.03762"
+        ],
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 1,
+          "firecrawlScrape": 1
+        }
+      }
+    },
+    {
+      "id": "news",
+      "depth": "standard",
+      "linkupOnly": {
+        "sourceCount": 1,
+        "payloadChars": 152,
+        "containsVerifiedPhrase": false,
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 0,
+          "firecrawlScrape": 0
+        }
+      },
+      "hybrid": {
+        "sourceCount": 1,
+        "payloadChars": 250,
+        "enriched": 1,
+        "truncated": false,
+        "latencyMs": 0,
+        "containsVerifiedPhrase": true,
+        "citationUrls": [
+          "https://electronjs.org/blog/electron-39-0"
+        ],
+        "operations": {
+          "linkup": 1,
+          "firecrawlSearch": 0,
+          "firecrawlScrape": 1
+        }
+      }
+    }
+  ]
+}

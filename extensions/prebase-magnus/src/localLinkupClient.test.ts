@@ -81,6 +81,7 @@ suite('Local LinkUp search client', () => {
 						{ name: 'Invalid JS', url: 'javascript:alert(1)', content: 'bad' },
 						{ name: 'Valid Doc', url: 'https://example.com/doc', content: 'good' },
 						{ name: 'File URL', url: 'file:///etc/passwd', content: 'bad' },
+						{ name: 'Private', url: 'http://127.0.0.1/secret', content: 'bad' },
 					],
 				}),
 			}) as Response,

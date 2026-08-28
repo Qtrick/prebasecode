@@ -1,0 +1,30 @@
+{
+  "capturedAt": "2026-08-28T18:26:53Z",
+  "rawProfilesGitignored": ".build/cpu-diag/",
+  "before": {
+    "phase": "maps-only / code-graph-open",
+    "rendererCpuPct": 99.7,
+    "topFunction": "basename",
+    "sourceFile": "graphs/src/core/resolution/paths.ts",
+    "selfMs": 244510.41,
+    "samples": 1851783,
+    "caller": "fuzzyResolveImport scanned every pathIndex key per unresolved import",
+    "trigger": "Opening Maps or Code Graph runs GraphGenerator.buildFromParseResults on the workbench renderer"
+  },
+  "afterAlgorithmFix": {
+    "diag": "20s windows, typescript-lanes, 2026-08-28T18:24Z",
+    "baselineIdle": { "peakRendererCpuPct": 22.5, "lastRendererCpuPct": 0, "processCount": 7 },
+    "mapsOnly": { "peakRendererCpuPct": 86.2, "lastRendererCpuPct": 33.9, "processCount": 16 },
+    "codeGraphOpenBurst": {
+      "peakRendererCpuPct": 133.5,
+      "lastRendererCpuPct": 100.2,
+      "processCount": 9,
+      "hotFunctionDuringScan": "normalizePath",
+      "selfMs": 2246.14,
+      "samples": 16600,
+      "note": "Finite scan burst. Previous infinite basename loop is gone. Follow-up: skip regex when the path has no backslash."
+    },
+    "windowIdle": { "peakRendererCpuPct": 8.9, "lastRendererCpuPct": 0, "processCount": 9, "rssMb": 1182.8 },
+    "quit": { "remaining": "gone", "terminationPath": "workbench", "usedSigkill": false, "latencyMs": 708 }
+  }
+}

@@ -71,8 +71,8 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 			}
 		}
 
-		assert.strictEqual(registeredTools.size, 41, 'Expected 41 runtime registered tools');
-		assert.strictEqual(manifestTools.size, 41, 'Expected 41 manifest contributed tools');
+		assert.strictEqual(registeredTools.size, 42, 'Expected 42 runtime registered tools');
+		assert.strictEqual(manifestTools.size, 42, 'Expected 42 manifest contributed tools');
 
 		const missingFromManifest = Array.from(registeredTools).filter(t => !manifestTools.has(t));
 		const missingFromRuntime = Array.from(manifestTools).filter(t => !registeredTools.has(t));
@@ -119,13 +119,13 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 		assert.ok(!events.some(event => event.startsWith('onLanguageModelTool:')), 'onLanguageModelTool events must stay implicit');
 
 		const tools: Array<{ name: string }> = manifest.contributes?.languageModelTools ?? [];
-		assert.strictEqual(tools.length, 41);
+		assert.strictEqual(tools.length, 42);
 
 		const contribution = fs.readFileSync(path.join(repoRoot, 'src/vs/workbench/contrib/chat/common/tools/languageModelToolsContribution.ts'), 'utf8');
 		const generated = [...compileActivationEventsGenerator(contribution)(tools)];
 		assert.deepStrictEqual(generated, tools.map(tool => `onLanguageModelTool:${tool.name}`));
 		assert.ok(generated.includes('onLanguageModelTool:prebase_desktop_start_session'));
-		assert.ok(generated.includes('onLanguageModelTool:prebase_graph_get_overview'));
+		assert.ok(generated.includes('onLanguageModelTool:prebase_web_fetch'));
 		assert.ok(generated.includes('onLanguageModelTool:prebase_runtime_get_state'));
 		assert.ok(generated.includes('onLanguageModelTool:prebase_workspace_list_files'));
 

@@ -83,6 +83,7 @@ const TEST_EXECUTION_SAFE_MAGNUS_MODES: readonly MagnusAgentMode[] = ['runtime',
  */
 const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgentMode[]>> = {
 	prebase_web_search: ALL_MAGNUS_MODES,
+	prebase_web_fetch: ALL_MAGNUS_MODES,
 	prebase_graph_search_nodes: ALL_MAGNUS_MODES,
 	prebase_graph_get_node: ALL_MAGNUS_MODES,
 	prebase_graph_get_dependencies: ALL_MAGNUS_MODES,

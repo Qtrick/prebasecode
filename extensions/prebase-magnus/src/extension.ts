@@ -489,19 +489,24 @@ export function activate(context: vscode.ExtensionContext): void {
 			vscode.commands.registerCommand('prebase.magnus.checkConfiguration', async () => {
 				secrets.refreshRootEnv();
 				const status = await aiService.getProviderStatus();
-				const resolvedLinkup = await secrets.getResolvedProviderApiKey('linkup');
+				const resolvedDiscovery = await secrets.getResolvedProviderApiKey('linkup');
+				const resolvedPageFetch = await secrets.getResolvedProviderApiKey('firecrawl');
 				const enabled = vscode.workspace.getConfiguration('prebase.magnus').get('enabled', true);
 
 				const geminiStatus = `Gemini: ${status.safeStatusMessage}`;
-				const linkupStatus = resolvedLinkup
-					? `LinkUp: Connected (${resolvedLinkup.source === 'local-env' ? 'PreBase root .env' : 'Secure Storage'})`
-					: 'LinkUp: Not configured (Local)';
+				const discoveryStatus = resolvedDiscovery
+					? `Discovery: Connected (${resolvedDiscovery.source === 'local-env' ? 'PreBase root .env' : 'Secure Storage'})`
+					: 'Discovery: Not configured (Local)';
+				const pageFetchStatus = resolvedPageFetch
+					? `Page fetch: Connected (${resolvedPageFetch.source === 'local-env' ? 'PreBase root .env' : 'Secure Storage'})`
+					: 'Page fetch: Not configured (Local)';
 
 				const lines = [
 					`Enabled: ${enabled}`,
 					`Execution Mode: ${status.executionMode}`,
 					geminiStatus,
-					linkupStatus,
+					discoveryStatus,
+					pageFetchStatus,
 					`Default model: ${state.modelId}`,
 					`Default mode: ${state.mode}`,
 				];
@@ -517,7 +522,8 @@ export function activate(context: vscode.ExtensionContext): void {
 					`Resolved Root: ${diag.resolvedRootPresent ? (diag.resolvedRootPath ?? 'present') : 'absent'}`,
 					`Execution Mode: ${mode}`,
 					`Gemini: Local .env=${diag.gemini.localEnv}, SecretStorage=${diag.gemini.secretStorage}, Hosted=${diag.gemini.hosted} (Active: ${diag.gemini.activeSource ?? 'none'})`,
-					`LinkUp: Local .env=${diag.linkup.localEnv}, SecretStorage=${diag.linkup.secretStorage}, Hosted=${diag.linkup.hosted} (Active: ${diag.linkup.activeSource ?? 'none'})`,
+					`Discovery: Local .env=${diag.linkup.localEnv}, SecretStorage=${diag.linkup.secretStorage}, Hosted=${diag.linkup.hosted} (Active: ${diag.linkup.activeSource ?? 'none'})`,
+					`Page fetch: Local .env=${diag.firecrawl.localEnv}, SecretStorage=${diag.firecrawl.secretStorage}, Hosted=${diag.firecrawl.hosted} (Active: ${diag.firecrawl.activeSource ?? 'none'})`,
 				].join('\n');
 				void vscode.window.showInformationMessage(msg, { modal: true });
 				return diag;
@@ -619,8 +625,8 @@ export function activate(context: vscode.ExtensionContext): void {
 
 			vscode.commands.registerCommand('prebase.magnus.setLinkupKey', async () => {
 				const value = await vscode.window.showInputBox({
-					title: 'Configure Agents Web Search (LinkUp)',
-					prompt: 'Enter the LinkUp API key to store securely in OS SecretStorage. Get a key at linkup.so.',
+					title: 'Configure local web discovery key',
+					prompt: 'Enter the discovery API key to store in OS SecretStorage. Local hybrid search also requires a page-fetch key.',
 					password: true,
 					ignoreFocusOut: true,
 				});
@@ -629,19 +635,19 @@ export function activate(context: vscode.ExtensionContext): void {
 				}
 				await secrets.setProviderApiKey('linkup', value);
 				secrets.refreshRootEnv();
-				void vscode.window.showInformationMessage('LinkUp web search key configured in secure storage.');
+				void vscode.window.showInformationMessage('Local web discovery key stored securely.');
 			}),
 
 			vscode.commands.registerCommand('prebase.magnus.clearLinkupKey', async () => {
 				await secrets.clearProviderApiKey('linkup');
 				secrets.refreshRootEnv();
-				void vscode.window.showInformationMessage('Cleared the configured LinkUp web search credential from secure storage.');
+				void vscode.window.showInformationMessage('Cleared the local web discovery key from secure storage.');
 			}),
 
 			vscode.commands.registerCommand('prebase.magnus.testLinkupConnection', async () => {
 				const resolved = await secrets.getResolvedProviderApiKey('linkup');
 				if (!resolved?.key) {
-					void vscode.window.showWarningMessage('LinkUp is not configured. Use "Configure LinkUp Key…" in Agents Settings.');
+					void vscode.window.showWarningMessage('No local discovery key is configured. Signed-in users can use the hosted gateway instead.');
 					return { ok: false, error: 'notConfigured' };
 				}
 				try {
@@ -652,16 +658,68 @@ export function activate(context: vscode.ExtensionContext): void {
 						signal: AbortSignal.timeout(10_000),
 					});
 					if (res.ok || res.status === 422) {
-						// 422 = key valid but query malformed — still proves auth works
-						void vscode.window.showInformationMessage(`LinkUp connection test succeeded (HTTP ${res.status}).`);
+						void vscode.window.showInformationMessage(`Discovery connection test succeeded (HTTP ${res.status}).`);
 						return { ok: true, status: res.status };
 					}
-					const msg = `LinkUp connection test failed (HTTP ${res.status}).`;
+					const msg = `Discovery connection test failed (HTTP ${res.status}).`;
 					void vscode.window.showErrorMessage(msg);
 					return { ok: false, error: String(res.status), message: msg };
 				} catch (err) {
 					const msg = err instanceof Error ? err.message : String(err);
-					void vscode.window.showErrorMessage(`LinkUp connection test failed: ${msg}`);
+					void vscode.window.showErrorMessage(`Discovery connection test failed: ${msg}`);
+					return { ok: false, error: 'network', message: msg };
+				}
+			}),
+
+			vscode.commands.registerCommand('prebase.magnus.setFirecrawlKey', async () => {
+				const value = await vscode.window.showInputBox({
+					title: 'Configure local page-fetch key',
+					prompt: 'Enter the page-fetch API key to store in OS SecretStorage. Local hybrid search also requires a discovery key.',
+					password: true,
+					ignoreFocusOut: true,
+				});
+				if (!value) {
+					return;
+				}
+				await secrets.setProviderApiKey('firecrawl', value);
+				secrets.refreshRootEnv();
+				void vscode.window.showInformationMessage('Local page-fetch key stored securely.');
+			}),
+
+			vscode.commands.registerCommand('prebase.magnus.clearFirecrawlKey', async () => {
+				await secrets.clearProviderApiKey('firecrawl');
+				secrets.refreshRootEnv();
+				void vscode.window.showInformationMessage('Cleared the local page-fetch key from secure storage.');
+			}),
+
+			vscode.commands.registerCommand('prebase.magnus.testFirecrawlConnection', async () => {
+				const resolved = await secrets.getResolvedProviderApiKey('firecrawl');
+				if (!resolved?.key) {
+					void vscode.window.showWarningMessage('No local page-fetch key is configured. Signed-in users can use the hosted gateway instead.');
+					return { ok: false, error: 'notConfigured' };
+				}
+				try {
+					const res = await fetch('https://api.firecrawl.dev/v2/scrape', {
+						method: 'POST',
+						headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resolved.key}` },
+						body: JSON.stringify({
+							url: 'https://example.com',
+							formats: ['markdown'],
+							onlyMainContent: true,
+							maxAge: 172_800_000,
+						}),
+						signal: AbortSignal.timeout(12_000),
+					});
+					if (res.ok || res.status === 402 || res.status === 429) {
+						void vscode.window.showInformationMessage(`Page-fetch connection test succeeded (HTTP ${res.status}).`);
+						return { ok: true, status: res.status };
+					}
+					const msg = `Page-fetch connection test failed (HTTP ${res.status}).`;
+					void vscode.window.showErrorMessage(msg);
+					return { ok: false, error: String(res.status), message: msg };
+				} catch (err) {
+					const msg = err instanceof Error ? err.message : String(err);
+					void vscode.window.showErrorMessage(`Page-fetch connection test failed: ${msg}`);
 					return { ok: false, error: 'network', message: msg };
 				}
 			}),

@@ -5,7 +5,7 @@
 
 import * as vscode from 'vscode';
 import type { AIContentPart, AIToolDeclaration } from './aiTypes';
-import { processToolResultData, type ContextBudgetConfig } from './requestAssembler';
+import { processToolResultData, consumeWebToolBudget, type ContextBudgetConfig } from './requestAssembler';
 
 export interface ToolCallItem {
 	readonly id?: string;
@@ -29,6 +29,7 @@ const READ_ONLY_TOOLS = new Set<string>([
 	'prebase_graph_get_dependencies',
 	'prebase_graph_get_overview',
 	'prebase_web_search',
+	'prebase_web_fetch',
 	'prebase_runtime_get_state',
 	'prebase_runtime_inspect_page',
 	'prebase_runtime_get_evidence',
@@ -48,6 +49,7 @@ export interface ToolExecutionTracker {
 	totalToolCalls: number;
 	webSearches: number;
 	deepWebSearches: number;
+	webFetches: number;
 	cumulativeResultChars: number;
 }
 
@@ -153,21 +155,15 @@ async function executeSingleTool(
 		};
 	}
 
-	if (call.name === 'prebase_web_search') {
-		const isDeep = call.args.depth === 'deep';
-		if (tracker.webSearches >= budget.maxWebSearches || (isDeep && tracker.deepWebSearches >= budget.maxDeepWebSearches)) {
-			return {
-				functionResponse: {
-					id: call.id,
-					name: call.name,
-					response: { error: 'Web search budget reached for this task run. Please synthesize from collected sources.' },
-				},
-			};
-		}
-		tracker.webSearches++;
-		if (isDeep) {
-			tracker.deepWebSearches++;
-		}
+	const webBudgetError = consumeWebToolBudget(call, budget, tracker);
+	if (webBudgetError) {
+		return {
+			functionResponse: {
+				id: call.id,
+				name: call.name,
+				response: { error: webBudgetError },
+			},
+		};
 	}
 
 	tracker.totalToolCalls++;

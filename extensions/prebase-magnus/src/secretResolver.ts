@@ -6,9 +6,14 @@
 import * as fs from 'node:fs';
 import * as path from 'node:path';
 import * as crypto from 'node:crypto';
-import { ALLOWLISTED_LOCAL_ENV_VARIABLES, type PreBaseAIExecutionMode } from './secretCatalog';
+import { ALLOWLISTED_LOCAL_ENV_VARIABLES, getSecretDescriptor, type PreBaseAIExecutionMode } from './secretCatalog';
 
 const MAX_ENV_FILE_BYTES = 64 * 1024; // 64 KiB safety bound
+
+function toolProviderEnvName(providerId: string): string | undefined {
+	const desc = getSecretDescriptor(providerId);
+	return desc?.kind === 'tool-provider' ? desc.localEnvNames[0] : undefined;
+}
 
 export type SecretSourceType = 'local-env' | 'secret-storage' | 'process-env' | 'hosted';
 
@@ -315,44 +320,36 @@ export class PreBaseSecretResolver {
 	}
 
 	/**
+	 * Resolves a catalog tool-provider key (LinkUp, Firecrawl) with deterministic precedence.
+	 */
+	resolveToolProviderKey(providerId: string, secretStorageKey?: string): ResolvedSecret | undefined {
+		const varName = toolProviderEnvName(providerId);
+		if (!varName) {
+			return undefined;
+		}
+		if (this._isSourceDev) {
+			const rootKey = this.getRootEnv().get(varName);
+			if (rootKey) {
+				return { key: rootKey, source: 'local-env', varName };
+			}
+		}
+		if (secretStorageKey && secretStorageKey.trim()) {
+			return { key: secretStorageKey.trim(), source: 'secret-storage', varName: 'stored' };
+		}
+		if (this._isSourceDev) {
+			const procKey = process.env[varName]?.trim();
+			if (procKey) {
+				return { key: procKey, source: 'process-env', varName };
+			}
+		}
+		return undefined;
+	}
+
+	/**
 	 * Resolves LinkUp API key with deterministic precedence.
 	 */
 	resolveLinkupKey(secretStorageKey?: string): ResolvedSecret | undefined {
-		// 1. Source-development root .env
-		if (this._isSourceDev) {
-			const env = this.getRootEnv();
-			const rootLinkup = env.get('LINKUP_API_KEY');
-			if (rootLinkup) {
-				return {
-					key: rootLinkup,
-					source: 'local-env',
-					varName: 'LINKUP_API_KEY',
-				};
-			}
-		}
-
-		// 2. SecretStorage BYO key
-		if (secretStorageKey && secretStorageKey.trim()) {
-			return {
-				key: secretStorageKey.trim(),
-				source: 'secret-storage',
-				varName: 'stored',
-			};
-		}
-
-		// 3. Process environment (development fallback)
-		if (this._isSourceDev) {
-			const procKey = process.env.LINKUP_API_KEY?.trim();
-			if (procKey) {
-				return {
-					key: procKey,
-					source: 'process-env',
-					varName: 'LINKUP_API_KEY',
-				};
-			}
-		}
-
-		return undefined;
+		return this.resolveToolProviderKey('linkup', secretStorageKey);
 	}
 
 	/**
@@ -396,15 +393,16 @@ export class PreBaseSecretResolver {
 							isHosted: false,
 						};
 					}
-				} else if (normProvider === 'linkup') {
-					const rootKey = env.get('LINKUP_API_KEY');
-					if (rootKey) {
+				} else {
+					const envName = toolProviderEnvName(normProvider);
+					const rootKey = envName ? env.get(envName) : undefined;
+					if (rootKey && envName) {
 						return {
-							providerId: 'linkup',
+							providerId: normProvider,
 							executionMode: 'development-env',
 							key: rootKey,
 							source: 'local-env',
-							varName: 'LINKUP_API_KEY',
+							varName: envName,
 							configured: true,
 							isHosted: false,
 						};
@@ -462,15 +460,16 @@ export class PreBaseSecretResolver {
 						isHosted: false,
 					};
 				}
-			} else if (normProvider === 'linkup') {
-				const rootKey = env.get('LINKUP_API_KEY');
-				if (rootKey) {
+			} else {
+				const envName = toolProviderEnvName(normProvider);
+				const rootKey = envName ? env.get(envName) : undefined;
+				if (rootKey && envName) {
 					return {
-						providerId: 'linkup',
+						providerId: normProvider,
 						executionMode: 'development-env',
 						key: rootKey,
 						source: 'local-env',
-						varName: 'LINKUP_API_KEY',
+						varName: envName,
 						configured: true,
 						isHosted: false,
 					};
@@ -517,15 +516,16 @@ export class PreBaseSecretResolver {
 						isHosted: false,
 					};
 				}
-			} else if (normProvider === 'linkup') {
-				const procKey = process.env.LINKUP_API_KEY?.trim();
-				if (procKey) {
+			} else {
+				const envName = toolProviderEnvName(normProvider);
+				const procKey = envName ? process.env[envName]?.trim() : undefined;
+				if (procKey && envName) {
 					return {
-						providerId: 'linkup',
+						providerId: normProvider,
 						executionMode: 'development-env',
 						key: procKey,
 						source: 'process-env',
-						varName: 'LINKUP_API_KEY',
+						varName: envName,
 						configured: true,
 						isHosted: false,
 					};
@@ -551,6 +551,7 @@ export class PreBaseSecretResolver {
 		secretStorageLinkup?: string,
 		cloudHostedAvailable?: boolean,
 		requestedMode: PreBaseAIExecutionMode = 'auto',
+		secretStorageFirecrawl?: string,
 	): {
 		isSourceDev: boolean;
 		resolvedRootPresent: boolean;
@@ -558,6 +559,7 @@ export class PreBaseSecretResolver {
 		rootEnvPresent: boolean;
 		gemini: SecretDiagnosticStatus;
 		linkup: SecretDiagnosticStatus;
+		firecrawl: SecretDiagnosticStatus;
 	} {
 		const env = this.getRootEnv();
 		const resolvedGemini = this.resolveProviderExecution({
@@ -570,6 +572,12 @@ export class PreBaseSecretResolver {
 			providerId: 'linkup',
 			requestedMode,
 			secretStorageKey: secretStorageLinkup,
+			hostedAvailable: cloudHostedAvailable,
+		});
+		const resolvedFirecrawl = this.resolveProviderExecution({
+			providerId: 'firecrawl',
+			requestedMode,
+			secretStorageKey: secretStorageFirecrawl,
 			hostedAvailable: cloudHostedAvailable,
 		});
 
@@ -596,6 +604,15 @@ export class PreBaseSecretResolver {
 				hosted: cloudHostedAvailable ? 'available' : 'unavailable',
 				activeSource: resolvedLinkup.source,
 				activeExecutionMode: resolvedLinkup.executionMode,
+			},
+			firecrawl: {
+				id: 'firecrawl',
+				localEnv: env.has('FIRECRAWL_API_KEY') ? 'present' : 'absent',
+				secretStorage: secretStorageFirecrawl && secretStorageFirecrawl.trim() ? 'present' : 'absent',
+				processEnv: process.env.FIRECRAWL_API_KEY ? 'present' : 'absent',
+				hosted: cloudHostedAvailable ? 'available' : 'unavailable',
+				activeSource: resolvedFirecrawl.source,
+				activeExecutionMode: resolvedFirecrawl.executionMode,
 			},
 		};
 	}

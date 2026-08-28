@@ -3,7 +3,9 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import { mkdirSync, writeFileSync } from 'node:fs';
+import { cpSync, mkdirSync, mkdtempSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { execFileSync } from 'node:child_process';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -20,6 +22,15 @@ import {
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/soak');
+
+function isolatedFixtureWorkspace() {
+	const dest = mkdtempSync(join(tmpdir(), 'pb-active-soak-ws-'));
+	cpSync(join(repo, 'test/fixtures/typescript-lanes'), dest, { recursive: true });
+	execFileSync('git', ['init'], { cwd: dest, stdio: 'pipe' });
+	execFileSync('git', ['add', '.'], { cwd: dest, stdio: 'pipe' });
+	execFileSync('git', ['-c', 'user.email=soak@prebase.test', '-c', 'user.name=Soak', 'commit', '--no-gpg-sign', '-m', 'soak fixture'], { cwd: dest, stdio: 'pipe' });
+	return dest;
+}
 
 async function boundedClick(page, role, name, timeout = 2_500) {
 	const locator = page.getByRole(role, { name, exact: true });
@@ -67,6 +78,10 @@ export function activeSoakFailures(evidence) {
 	if (lastQuiesce.length && lastQuiesce.every(item => item.cpuSum >= 90)) {
 		failures.push(`quiescent CPU remained ~100% (${lastQuiesce.map(item => item.cpuSum).join(', ')})`);
 	}
+	const lastRenderer = lastQuiesce.map(item => item.topProcesses?.find(row => row.role === 'renderer')?.cpu).filter(cpu => Number.isFinite(cpu));
+	if (lastRenderer.length && lastRenderer.every(cpu => cpu >= 40)) {
+		failures.push(`quiescent renderer CPU remained high (${lastRenderer.join(', ')})`);
+	}
 	const counts = evidence.samples?.map(item => item.processCount) ?? [];
 	if (counts.length >= 2 && counts.at(-1) - counts[0] > 6) {
 		failures.push('process count grew excessively during active soak');
@@ -88,7 +103,7 @@ async function run() {
 	};
 	let activityError;
 	try {
-		launched = await launchPreBase(repo, join(repo, 'test/fixtures/typescript-lanes'));
+		launched = await launchPreBase(repo, isolatedFixtureWorkspace());
 		evidence.prebasePid = launched.info.pid;
 		await dismissStartup(launched.page);
 		await waitForWorkbenchDriver(launched.page);
@@ -107,7 +122,15 @@ async function run() {
 				.finally(() => { activityRunning = false; });
 		};
 		queueActivity();
+		let closedForQuiesce = false;
 		while (Date.now() < end) {
+			if (!closedForQuiesce && Date.now() >= activityEnd) {
+				closedForQuiesce = true;
+				await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.closeAllEditors').catch(() => undefined);
+				await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.closePanel').catch(() => undefined);
+				await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.closeSidebar').catch(() => undefined);
+				await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.closeAuxiliaryBar').catch(() => undefined);
+			}
 			evidence.samples.push(sample(launched.info.pid, Date.now() < activityEnd ? 'active' : 'quiesce'));
 			if (Date.now() < activityEnd && !activityRunning) {
 				queueActivity();

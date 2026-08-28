@@ -209,6 +209,7 @@ export interface IPreBaseTemporalViewService {
 
 	getState(): ITemporalViewState;
 	initialize(): Promise<void>;
+	pauseActiveWork(): void;
 	switchRepository(repoRoot: string): Promise<void>;
 	selectRef(refName: string): Promise<void>;
 	selectCommit(commitSha: string, options?: { compareBaseSha?: string; immediate?: boolean; preserveFollowHead?: boolean }): Promise<void>;

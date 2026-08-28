@@ -1,0 +1,87 @@
+{
+  "at": "2026-08-28T19:36:28.017Z",
+  "steps": [
+    {
+      "id": "baseline",
+      "processCount": 7,
+      "roles": {
+        "main": 1,
+        "helper": 5,
+        "renderer": 1
+      }
+    },
+    {
+      "id": "repeat-maps",
+      "processCount": 8,
+      "roles": {
+        "main": 1,
+        "helper": 6,
+        "renderer": 1
+      },
+      "deltaFromBefore": 1
+    },
+    {
+      "id": "repeat-code-graph",
+      "processCount": 9,
+      "roles": {
+        "main": 1,
+        "helper": 6,
+        "renderer": 2
+      },
+      "deltaFromBefore": -24
+    },
+    {
+      "id": "repeat-temporal",
+      "processCount": 41,
+      "roles": {
+        "main": 1,
+        "helper": 6,
+        "renderer": 3,
+        "other": 31
+      },
+      "deltaFromBefore": 30
+    },
+    {
+      "id": "repeat-runtime-view",
+      "processCount": 34,
+      "roles": {
+        "main": 1,
+        "helper": 6,
+        "renderer": 3,
+        "other": 24
+      },
+      "deltaFromBefore": 24
+    },
+    {
+      "id": "repeat-magnus",
+      "processCount": 29,
+      "roles": {
+        "main": 1,
+        "helper": 6,
+        "renderer": 3,
+        "other": 19
+      },
+      "deltaFromBefore": 11
+    },
+    {
+      "id": "after-close",
+      "processCount": 33,
+      "roles": {
+        "main": 1,
+        "helper": 6,
+        "renderer": 3,
+        "other": 23
+      }
+    }
+  ],
+  "quit": {
+    "before": "80347     1  14.2 257792 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "remaining": "gone",
+    "leftoverPids": [],
+    "latencyMs": 10890,
+    "terminationPath": "sigkill",
+    "workbenchCompleted": false,
+    "usedSigterm": true,
+    "usedSigkill": true
+  }
+}

@@ -50,7 +50,7 @@ import { isRecognizedDesktopApp, isTauriProfile } from '../common/runtime/deskto
 import { applyCapabilitiesTestingPermission, applyCargoTestingDependencies, applyRustTestingPlugins, applyTauriTestingTransaction, previewTauriTestingSetup, tauriTestingCandidatePaths } from '../common/runtime/tauriTestingSetup.js';
 import { isWeb } from '../../../../base/common/platform.js';
 import { IPreBaseCloudService, PreBaseCloudService } from './cloud/prebaseCloudService.js';
-import { IPreBaseWebSearchService, PreBaseWebSearchService, type IPreBaseWebSearchRequest } from './prebaseWebSearchService.js';
+import { IPreBaseWebSearchService, PreBaseWebSearchService, type IPreBaseWebFetchRequest, type IPreBaseWebSearchRequest } from './prebaseWebSearchService.js';
 import { IPreBaseAgentGatewayService, PreBaseAgentGatewayService } from './prebaseAgentGatewayService.js';
 import { IPreBaseAccountService, PreBaseAccountContext, PreBaseAccountService } from './prebaseAccountService.js';
 import { PreBaseCloudConfigKeys } from '../common/cloud/cloudConfiguration.js';
@@ -92,8 +92,17 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({ id: 'prebase.webSearch.searchForMagnus', title: localize2('prebase.webSearch.searchForMagnus', "Search the Web for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
-	run(accessor: ServicesAccessor, input: IPreBaseWebSearchRequest) {
-		return accessor.get(IPreBaseWebSearchService).searchForMagnus(input, CancellationToken.None);
+	run(accessor: ServicesAccessor, input: IPreBaseWebSearchRequest, token?: CancellationToken) {
+		return accessor.get(IPreBaseWebSearchService).searchForMagnus(input, token ?? CancellationToken.None);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.webSearch.fetchForMagnus', title: localize2('prebase.webSearch.fetchForMagnus', "Fetch Web Source for Agents"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor, input: IPreBaseWebFetchRequest, token?: CancellationToken) {
+		return accessor.get(IPreBaseWebSearchService).fetchForMagnus(input, token ?? CancellationToken.None);
 	}
 });
 

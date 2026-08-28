@@ -167,6 +167,7 @@ async function handleChatRequest(
 		totalToolCalls: 0,
 		webSearches: 0,
 		deepWebSearches: 0,
+		webFetches: 0,
 		cumulativeResultChars: 0,
 	};
 

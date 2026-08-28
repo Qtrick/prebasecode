@@ -78,6 +78,7 @@ const registeredMagnusTools = [
 	'prebase_terminal_install_dependencies',
 	'prebase_terminal_run_declared_node_version',
 	'prebase_terminal_run_project_script',
+	'prebase_web_fetch',
 	'prebase_web_search',
 	'prebase_workspace_get_definition',
 	'prebase_workspace_get_diagnostics',
