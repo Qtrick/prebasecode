@@ -13,6 +13,8 @@ import { registerMagnusLanguageModelTools } from './nativeTools';
 import { MagnusSecretStorage } from './secretStorage';
 import { PreBaseAIService, VsCodeWorkspaceConfigProvider } from './aiService';
 import { globalAIProviderRegistry } from './aiProviderRegistry';
+import { MagnusSmokeTransportAdapter, magnusSmokeStreamDiagnostics } from './smokeTransport';
+import { magnusLiveStreamDiagnostics } from './chatParticipant';
 import { findPreBaseSourceRoot, PreBaseSecretResolver } from './secretResolver';
 import type { PreBaseAIExecutionMode } from './secretCatalog';
 
@@ -115,6 +117,30 @@ export function activate(context: vscode.ExtensionContext): void {
 		);
 		runtimeState.describeFileRegistered = true;
 		console.log('[Magnus] describeFile registered');
+
+		context.subscriptions.push(
+			vscode.commands.registerCommand('prebase.magnus.installSmokeTransport', async () => {
+				const allowed = await vscode.commands.executeCommand('prebase.test.isSmokeDriver');
+				if (!allowed) {
+					throw new Error('prebase.magnus.installSmokeTransport requires --enable-smoke-test-driver');
+				}
+				aiService.installSmokeTransport(new MagnusSmokeTransportAdapter());
+				return { ok: true };
+			}),
+			vscode.commands.registerCommand('prebase.magnus.getStreamDiagnostics', async () => {
+				const allowed = await vscode.commands.executeCommand('prebase.test.isSmokeDriver');
+				if (!allowed) {
+					throw new Error('prebase.magnus.getStreamDiagnostics requires --enable-smoke-test-driver');
+				}
+				return {
+					streamActive: magnusLiveStreamDiagnostics.streamActive,
+					pacingActive: magnusLiveStreamDiagnostics.pacingActive,
+					sourceChunks: magnusSmokeStreamDiagnostics.sourceChunks,
+					sourceCancelled: magnusSmokeStreamDiagnostics.cancelled,
+					smokeEnabled: aiService.isSmokeTransportEnabled(),
+				};
+			}),
+		);
 
 		// 4. Register language model provider (core subsystem)
 		const lmProvider = new MagnusLanguageModelProvider(aiService);

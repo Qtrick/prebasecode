@@ -302,6 +302,54 @@ suite('TemporalRepositoryRuntime', () => {
 		await assert.rejects(hanging, /Cancelled/);
 	});
 
+	test('countActiveWrites uses hasActiveWrite, not CPU or indexingSeen', async () => {
+		const idle = Object.assign(Object.create(null), {
+			isOpen: () => true,
+			open: async () => {},
+			close: async () => {},
+			hasActiveWrite: () => false,
+			cpu: 99,
+			indexingSeen: true,
+		}) as ITemporalStore;
+		const writing = Object.assign(Object.create(null), {
+			isOpen: () => true,
+			open: async () => {},
+			close: async () => {},
+			hasActiveWrite: () => true,
+		}) as ITemporalStore;
+		const registry = new TemporalRepositoryRegistry(async (id) => id === 'busy' ? writing : idle);
+		await registry.getStore('idle', '/idle');
+		await registry.getStore('busy', '/busy');
+		assert.strictEqual(registry.countActiveWrites(), 1, 'temporalActiveWrites must come from hasActiveWrite');
+		(writing as { hasActiveWrite: () => boolean }).hasActiveWrite = () => false;
+		assert.strictEqual(registry.countActiveWrites(), 0);
+		await registry.closeAll();
+	});
+
+	test('countActiveWrites includes in-flight ingest, not CPU', async () => {
+		const store = Object.assign(Object.create(null), {
+			isOpen: () => true,
+			open: async () => { },
+			close: async () => { },
+			hasActiveWrite: () => false,
+		}) as ITemporalStore;
+		const registry = new TemporalRepositoryRegistry(async () => store);
+		const gitService = Object.create(null) as IGitHistoryService;
+		const runtime = await registry.getRuntime('repo-a', '/repo-a', gitService);
+		let release: (() => void) | undefined;
+		const gate = new Promise<void>(resolve => { release = resolve; });
+		const pending = runtime.queueIngestion('commit-a', async () => {
+			await gate;
+			return createSnapshot('commit-a');
+		});
+		assert.strictEqual(runtime.countInFlightIngests(), 1);
+		assert.strictEqual(registry.countActiveWrites(), 1, 'parser-style Quit must see queued ingest, not only the SQLite transaction pulse');
+		release?.();
+		await pending;
+		assert.strictEqual(registry.countActiveWrites(), 0);
+		await registry.closeAll();
+	});
+
 	test('non-cooperative store write prevents close until hasActiveWrite clears', async () => {
 		let closeCalls = 0;
 		let activeWrite = true;

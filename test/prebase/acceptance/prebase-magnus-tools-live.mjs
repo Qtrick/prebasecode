@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
+	acquirePhase3AcceptanceLock,
 	dismissStartup,
 	gracefulWorkbenchQuit,
 	invokeLanguageModelTool,
@@ -41,7 +42,7 @@ async function confirmIfNeeded(page, name) {
 
 export function magnusToolsFailures(evidence) {
 	const failures = [];
-	if (!evidence.magnusNotEager) failures.push('Magnus desktop tools were reachable before first invokeTool');
+	if (!evidence.firstInvokeActivatedLazyPath) failures.push('first invokeTool did not activate the lazy Magnus desktop-tool path');
 	if (!evidence.tools?.start?.ok) failures.push('prebase_desktop_start_session invokeTool failed');
 	if (!evidence.tools?.inspect?.ok) failures.push('prebase_desktop_inspect_window invokeTool failed');
 	if (!evidence.tools?.interactFill?.ok) failures.push('prebase_desktop_interact fill invokeTool failed');
@@ -122,6 +123,7 @@ async function runDesktopToolSequence(page, framework) {
 }
 
 async function run() {
+	const release = await acquirePhase3AcceptanceLock();
 	mkdirSync(evidenceDir, { recursive: true });
 	const framework = process.argv.includes('--tauri') ? 'tauri' : 'electron';
 	const fixture = join(repo, `test/prebase/fixtures/desktop-${framework}`);
@@ -133,7 +135,7 @@ async function run() {
 		await dismissStartup(launched.page);
 		await waitForWorkbenchDriver(launched.page);
 		const probe = await invokeLanguageModelTool(launched.page, 'prebase_desktop_list_sessions').catch(error => ({ ok: false, error: String(error) }));
-		evidence.magnusNotEager = probe?.ok === true;
+		evidence.firstInvokeActivatedLazyPath = probe?.ok === true;
 		await workbenchCommand(launched.page, 'prebase.runtime.detectConfigurations');
 		const confirmLoop = (async () => {
 			for (let attempt = 0; attempt < 400; attempt++) {
@@ -155,6 +157,7 @@ async function run() {
 		if (launched?.page && launched?.info?.pid) {
 			evidence.quit = await gracefulWorkbenchQuit(launched.page, launched.info.pid);
 		}
+		release();
 	}
 	const failures = magnusToolsFailures(evidence);
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };

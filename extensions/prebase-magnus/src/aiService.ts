@@ -9,6 +9,7 @@ import type {
 	AIGenerateResult,
 	AIProviderErrorClassification,
 	AIToolDeclaration,
+	IPreBaseAIProviderAdapter,
 	IPreBaseAIService,
 	NormalizedAIModel,
 	ProviderStatusResult,
@@ -121,6 +122,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 	private readonly modelCache = new Map<string, CachedModelCatalog>();
 	private readonly inFlightDiscovery = new Map<string, Promise<NormalizedAIModel[]>>();
 	private _cloudHostedAvailable: boolean = false;
+	private _smokeAdapter: IPreBaseAIProviderAdapter | undefined;
 
 	constructor(
 		secrets: MagnusSecretStorage,
@@ -139,6 +141,26 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 	isCloudHostedAvailable(): boolean {
 		return this._cloudHostedAvailable;
+	}
+
+	installSmokeTransport(adapter: IPreBaseAIProviderAdapter): void {
+		this._smokeAdapter = adapter;
+	}
+
+	clearSmokeTransport(): void {
+		this._smokeAdapter = undefined;
+	}
+
+	isSmokeTransportEnabled(): boolean {
+		return Boolean(this._smokeAdapter);
+	}
+
+	private adapterFor(providerId: string): IPreBaseAIProviderAdapter | undefined {
+		if (this._smokeAdapter) {
+			return this._smokeAdapter;
+		}
+		const normId = providerId.toLowerCase().replace(/-api$/, '');
+		return this.registry.getAdapter(normId);
 	}
 
 	invalidateModelCache(providerId?: string): void {
@@ -162,6 +184,9 @@ export class PreBaseAIService implements IPreBaseAIService {
 	}
 
 	getActiveProviderId(): string {
+		if (this._smokeAdapter) {
+			return this._smokeAdapter.id;
+		}
 		const provider = this.config.getProvider();
 		return provider.toLowerCase().replace(/-api$/, '');
 	}
@@ -190,13 +215,22 @@ export class PreBaseAIService implements IPreBaseAIService {
 
 	private async resolveCredential(providerId: string) {
 		const normId = providerId.toLowerCase().replace(/-api$/, '');
+		if (this._smokeAdapter) {
+			return {
+				providerId: this._smokeAdapter.id,
+				executionMode: this.getExecutionMode(),
+				configured: true,
+				isHosted: false,
+				source: 'process-env' as const,
+			};
+		}
 		const requestedMode = this.getExecutionMode();
 		return await this.secrets.resolveProviderExecution(normId, requestedMode, this._cloudHostedAvailable);
 	}
 
 	async getProviderStatus(providerId?: string): Promise<ProviderStatusResult> {
 		const targetId = (providerId ?? this.getActiveProviderId()).toLowerCase().replace(/-api$/, '');
-		const adapter = this.registry.getAdapter(targetId);
+		const adapter = this.adapterFor(targetId);
 		const credential = await this.resolveCredential(targetId);
 
 		const displayName = adapter?.displayName ?? targetId;
@@ -255,8 +289,11 @@ export class PreBaseAIService implements IPreBaseAIService {
 		forceRefresh?: boolean,
 		token?: AICancellationToken,
 	): Promise<NormalizedAIModel[]> {
+		if (this._smokeAdapter) {
+			return [...this._smokeAdapter.staticFallbackModels];
+		}
 		const targetId = (providerId ?? this.getActiveProviderId()).toLowerCase().replace(/-api$/, '');
-		const adapter = this.registry.getAdapter(targetId);
+		const adapter = this.adapterFor(targetId);
 		if (!adapter) {
 			return [];
 		}
@@ -280,7 +317,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 				if (discovered && discovered.length > 0) {
 					const consumerList = adapter.curateConsumerCatalog
 						? adapter.curateConsumerCatalog(discovered)
-						: discovered;
+						: discovered.filter(model => model.consumerSelectable !== false && model.visibility !== 'hidden');
 
 					this.modelCache.set(targetId, {
 						rawModels: discovered,
@@ -302,7 +339,9 @@ export class PreBaseAIService implements IPreBaseAIService {
 			const fallbackList = [...adapter.staticFallbackModels];
 			this.modelCache.set(targetId, {
 				rawModels: fallbackList,
-				consumerModels: fallbackList,
+				consumerModels: adapter.curateConsumerCatalog
+					? adapter.curateConsumerCatalog(fallbackList)
+					: fallbackList.filter(model => model.consumerSelectable !== false && model.visibility !== 'hidden'),
 				cachedAt: Date.now(),
 				source: 'fallback',
 			});
@@ -322,19 +361,26 @@ export class PreBaseAIService implements IPreBaseAIService {
 		forceRefresh?: boolean,
 		token?: AICancellationToken,
 	): Promise<NormalizedAIModel[]> {
+		if (this._smokeAdapter) {
+			const smoke = this._smokeAdapter;
+			return smoke.curateConsumerCatalog
+				? smoke.curateConsumerCatalog([...smoke.staticFallbackModels])
+				: [];
+		}
 		const targetId = (providerId ?? this.getActiveProviderId()).toLowerCase().replace(/-api$/, '');
-		const adapter = this.registry.getAdapter(targetId);
+		const adapter = this.adapterFor(targetId);
 		if (!adapter) {
 			return [];
 		}
 
 		const cached = this.modelCache.get(targetId);
 		if (!forceRefresh && cached && Date.now() - cached.cachedAt < MODEL_CACHE_TTL_MS) {
-			return cached.consumerModels;
+			return cached.consumerModels.filter(model => model.consumerSelectable !== false && model.visibility !== 'hidden');
 		}
 
 		await this.listRawModels(targetId, forceRefresh, token);
-		return this.modelCache.get(targetId)?.consumerModels ?? [...adapter.staticFallbackModels];
+		return (this.modelCache.get(targetId)?.consumerModels ?? [...adapter.staticFallbackModels])
+			.filter(model => model.consumerSelectable !== false && model.visibility !== 'hidden');
 	}
 
 	async resolveModelForExecution(
@@ -345,7 +391,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		workload?: import('./aiTypes').ModelWorkload,
 	): Promise<string> {
 		const targetId = providerId.toLowerCase().replace(/-api$/, '');
-		const adapter = this.registry.getAdapter(targetId);
+		const adapter = this.adapterFor(targetId);
 		if (!adapter) {
 			return 'gemini-2.5-flash';
 		}
@@ -399,7 +445,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		token?: AICancellationToken,
 	): Promise<string> {
 		const providerId = this.getActiveProviderId();
-		const adapter = this.registry.getAdapter(providerId);
+		const adapter = this.adapterFor(providerId);
 		if (!adapter) {
 			throw new Error(`AI Provider ${providerId} is not registered.`);
 		}
@@ -471,7 +517,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		}
 
 		const providerId = this.getActiveProviderId();
-		const adapter = this.registry.getAdapter(providerId);
+		const adapter = this.adapterFor(providerId);
 		if (!adapter) {
 			return {
 				status: 'error',
@@ -610,7 +656,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		token?: AICancellationToken,
 	): Promise<AIGenerateResult> {
 		const providerId = this.getActiveProviderId();
-		const adapter = this.registry.getAdapter(providerId);
+		const adapter = this.adapterFor(providerId);
 		if (!adapter) {
 			throw new Error(`AI Provider ${providerId} is not registered.`);
 		}
@@ -644,7 +690,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		token?: AICancellationToken,
 	): Promise<AIGenerateResult> {
 		const providerId = this.getActiveProviderId();
-		const adapter = this.registry.getAdapter(providerId);
+		const adapter = this.adapterFor(providerId);
 		if (!adapter) {
 			throw new Error(`AI Provider ${providerId} is not registered.`);
 		}
@@ -691,7 +737,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 	async diagnoseModelCatalog(providerId?: string): Promise<Record<string, unknown>> {
 		const targetId = (providerId ?? this.getActiveProviderId()).toLowerCase().replace(/-api$/, '');
 		const raw = await this.listRawModels(targetId, true);
-		const adapter = this.registry.getAdapter(targetId);
+		const adapter = this.adapterFor(targetId);
 		if (adapter && 'modelPolicy' in adapter && typeof (adapter as { modelPolicy: { formatDiagnostics: (catalog: NormalizedAIModel[]) => Record<string, unknown> } }).modelPolicy?.formatDiagnostics === 'function') {
 			return (adapter as { modelPolicy: { formatDiagnostics: (catalog: NormalizedAIModel[]) => Record<string, unknown> } }).modelPolicy.formatDiagnostics(raw);
 		}
@@ -708,7 +754,7 @@ export class PreBaseAIService implements IPreBaseAIService {
 		token?: AICancellationToken,
 	): Promise<{ ok: boolean; modelId?: string; reply?: string; error?: AIProviderErrorClassification }> {
 		const targetId = (providerId ?? this.getActiveProviderId()).toLowerCase().replace(/-api$/, '');
-		const adapter = this.registry.getAdapter(targetId);
+		const adapter = this.adapterFor(targetId);
 		if (!adapter) {
 			return {
 				ok: false,

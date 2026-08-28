@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdtempSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
@@ -81,8 +81,195 @@ export async function workbenchCommand(page, commandId, ...args) {
 	}, { id: commandId, commandArgs: args });
 }
 
+export async function workbenchCommandWithTimeout(page, timeoutMs, commandId, ...args) {
+	const previous = 12_000;
+	page.setDefaultTimeout(timeoutMs);
+	const evaluateOptions = { timeout: timeoutMs }; // Playwright evaluate ignores this; Promise.race is authoritative.
+	let timer;
+	const evaluatePromise = page.evaluate(async ({ id, commandArgs }) => {
+		const driver = window.driver;
+		if (!driver || typeof driver.executeCommand !== 'function') {
+			throw new Error('window.driver.executeCommand is unavailable; launch PreBase with --enable-smoke-test-driver');
+		}
+		return driver.executeCommand(id, ...commandArgs);
+	}, { id: commandId, commandArgs: args });
+	evaluatePromise.catch(() => undefined);
+	try {
+		return await Promise.race([
+			evaluatePromise,
+			new Promise((_, reject) => {
+				timer = setTimeout(() => reject(new Error(`workbench command timeout (${timeoutMs}ms): ${commandId}`)), evaluateOptions.timeout);
+			}),
+		]);
+	} finally {
+		clearTimeout(timer);
+		page.setDefaultTimeout(previous);
+	}
+}
+
 export async function invokeLanguageModelTool(page, toolId, parameters = {}) {
 	return workbenchCommand(page, 'prebase.test.invokeLanguageModelTool', toolId, parameters);
+}
+
+export function classifyProcessRole(comm = '') {
+	const value = String(comm).toLowerCase();
+	if (/gpu/i.test(value)) return 'gpu';
+	if (/extensionhost|extension-host|exthost/i.test(value)) return 'extensionHost';
+	if (/parser|canonical/i.test(value)) return 'parser';
+	if (/utility/i.test(value)) return 'utility';
+	if (/network service|networkservice/i.test(value)) return 'networkService';
+	if (/renderer|helper \(renderer\)/i.test(value)) return 'renderer';
+	if (/electron|code helper|prebase/i.test(value) && /helper/.test(value)) return 'helper';
+	if (/electron|prebase|code helper|code - oss/i.test(value)) return 'main';
+	if (/cargo|tauri/i.test(value)) return 'tauriChild';
+	return 'other';
+}
+
+export function summarizeProcessTree(tree, limit = 8) {
+	return [...tree]
+		.sort((a, b) => b.cpu - a.cpu || b.rssKb - a.rssKb)
+		.slice(0, limit)
+		.map(row => ({
+			pid: row.pid,
+			ppid: row.ppid,
+			cpu: row.cpu,
+			rssMb: Number((row.rssKb / 1024).toFixed(1)),
+			role: classifyProcessRole(row.comm),
+			comm: String(row.comm).slice(0, 80),
+		}));
+}
+
+export function sampleProcessTreeSockets(pids) {
+	if (!pids.length) {
+		return [];
+	}
+	try {
+		const output = execFileSync('lsof', ['-a', '-P', '-iTCP', '-p', pids.join(',')], {
+			encoding: 'utf8',
+			timeout: 8_000,
+		});
+		const rows = [];
+		for (const line of output.split('\n').slice(1)) {
+			const match = line.match(/^\S+\s+(\d+)\s+.*?\s(TCP|UDP)\s+(\S+)/);
+			if (!match) {
+				continue;
+			}
+			const peer = match[3];
+			const hostMatch = peer.match(/->([^:\s]+):(\d+)/) || peer.match(/([^:\s]+):(\d+)/);
+			if (!hostMatch) {
+				continue;
+			}
+			rows.push({ pid: Number(match[1]), host: hostMatch[1], port: Number(hostMatch[2]) });
+		}
+		return rows;
+	} catch {
+		return [];
+	}
+}
+
+const LOCK_DIR = join(tmpdir(), 'prebase-phase3-acceptance.lock');
+
+function lockPidAlive() {
+	try {
+		const pid = Number(readFileSync(join(LOCK_DIR, 'pid'), 'utf8'));
+		if (!Number.isFinite(pid) || pid === process.pid) {
+			return false;
+		}
+		process.kill(pid, 0);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+export async function acquirePhase3AcceptanceLock() {
+	if (process.env.PREBASE_PHASE3_GATE_CHILD === '1') {
+		return () => undefined;
+	}
+	for (let attempt = 0; attempt < 180; attempt++) {
+		try {
+			mkdirSync(LOCK_DIR);
+			writeFileSync(join(LOCK_DIR, 'pid'), String(process.pid));
+			return () => {
+				try { rmSync(LOCK_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
+			};
+		} catch {
+			if (!lockPidAlive()) {
+				try { rmSync(LOCK_DIR, { recursive: true, force: true }); } catch { /* ignore */ }
+				continue;
+			}
+			await new Promise(resolveWait => setTimeout(resolveWait, 1_000));
+		}
+	}
+	throw new Error('Another Phase 3 PreBase acceptance instance is active; resource tests must run sequentially.');
+}
+
+function collectOwnedPids(rootPid, ownedPids) {
+	ownedPids.add(rootPid);
+	for (const row of processTree(rootPid)) {
+		ownedPids.add(row.pid);
+	}
+	return ownedPids;
+}
+
+function remainingOwnedPids(ownedPids) {
+	return [...ownedPids].filter(pid => processState(pid) !== 'gone');
+}
+
+function signalPids(pids, signal) {
+	for (const pid of pids.slice().reverse()) {
+		try { process.kill(pid, signal); } catch { /* already gone */ }
+	}
+}
+
+function signalProcessTree(rootPid, signal, ownedPids) {
+	collectOwnedPids(rootPid, ownedPids);
+	signalPids(remainingOwnedPids(ownedPids), signal);
+}
+
+function treeGone(rootPid, ownedPids) {
+	collectOwnedPids(rootPid, ownedPids);
+	return processState(rootPid) === 'gone' && remainingOwnedPids(ownedPids).length === 0;
+}
+
+export async function gracefulWorkbenchQuit(page, pid) {
+	const startedAt = Date.now();
+	const before = processState(pid);
+	let terminationPath = 'workbench';
+	const ownedPids = collectOwnedPids(pid, new Set());
+	try {
+		await workbenchCommandWithTimeout(page, 4_000, 'workbench.action.quit');
+	} catch {
+		/* command timeout or teardown */
+	}
+	for (const name of ['Quit', 'Terminate', 'Close Anyway', 'Don\'t Save']) {
+		const button = page.getByRole('button', { name: new RegExp(`^${name}$`, 'i') });
+		if (await button.first().waitFor({ state: 'visible', timeout: 800 }).then(() => true, () => false)) {
+			await button.last().click({ timeout: 800 }).catch(() => undefined);
+		}
+	}
+	let workbenchCompleted = Boolean(await waitFor(() => treeGone(pid, ownedPids), 6_000, 100));
+	if (!workbenchCompleted) {
+		terminationPath = 'sigterm';
+		signalProcessTree(pid, 'SIGTERM', ownedPids);
+		await waitFor(() => treeGone(pid, ownedPids), 4_000, 100);
+	}
+	if (!treeGone(pid, ownedPids)) {
+		terminationPath = 'sigkill';
+		signalProcessTree(pid, 'SIGKILL', ownedPids);
+		await waitFor(() => treeGone(pid, ownedPids), 3_000, 100);
+	}
+	const leftover = remainingOwnedPids(ownedPids);
+	return {
+		before,
+		remaining: leftover.length === 0 ? 'gone' : 'tree',
+		leftoverPids: leftover,
+		latencyMs: Date.now() - startedAt,
+		terminationPath,
+		workbenchCompleted,
+		usedSigterm: terminationPath === 'sigterm' || terminationPath === 'sigkill',
+		usedSigkill: terminationPath === 'sigkill',
+	};
 }
 
 export function processTree(rootPid) {
@@ -118,39 +305,21 @@ export function processTree(rootPid) {
 	}
 }
 
-export async function gracefulWorkbenchQuit(page, pid) {
-	const startedAt = Date.now();
-	const before = processState(pid);
-	try {
-		await workbenchCommand(page, 'workbench.action.quit');
-	} catch {
-		/* tearing down */
-	}
-	for (const name of ['Quit', 'Terminate', 'Close Anyway', 'Don\'t Save']) {
-		const button = page.getByRole('button', { name: new RegExp(`^${name}$`, 'i') });
-		if (await button.first().waitFor({ state: 'visible', timeout: 1_500 }).then(() => true, () => false)) {
-			await button.last().click().catch(() => undefined);
-		}
-	}
-	let remaining = processState(pid);
-	if (remaining !== 'gone') {
-		remaining = (await waitFor(() => processState(pid) === 'gone', 8_000, 100)) ? 'gone' : processState(pid);
-	}
-	if (remaining !== 'gone') {
-		try { process.kill(pid, 'SIGTERM'); } catch { /* already gone */ }
-		remaining = (await waitFor(() => processState(pid) === 'gone', 4_000, 100)) ? 'gone' : processState(pid);
-	}
-	if (remaining !== 'gone') {
-		try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
-		await waitFor(() => processState(pid) === 'gone', 3_000, 100);
-		remaining = processState(pid);
-	}
-	return { before, latencyMs: Date.now() - startedAt, remaining, usedSigkill: remaining === 'gone' && Date.now() - startedAt > 8_000 };
-}
-
 export async function waitForWorkbenchDriver(page, timeoutMs = 90_000) {
 	await page.waitForFunction(() => window.driver && typeof window.driver.executeCommand === 'function' && typeof window.driver.whenWorkbenchRestored === 'function', null, { timeout: timeoutMs });
-	await page.evaluate(() => window.driver.whenWorkbenchRestored());
+	let timer;
+	const restored = page.evaluate(() => window.driver.whenWorkbenchRestored());
+	restored.catch(() => undefined);
+	try {
+		await Promise.race([
+			restored,
+			new Promise((_, reject) => {
+				timer = setTimeout(() => reject(new Error(`whenWorkbenchRestored timeout (${timeoutMs}ms)`)), timeoutMs);
+			}),
+		]);
+	} finally {
+		clearTimeout(timer);
+	}
 }
 
 export async function launchPreBase(repo, workspace, extraArgs = []) {
@@ -161,6 +330,7 @@ export async function launchPreBase(repo, workspace, extraArgs = []) {
 		'--source-user-data-dir', sourceProfile,
 		'--',
 		'--enable-smoke-test-driver',
+		'--disable-workspace-trust',
 		'--skip-release-notes',
 		'--skip-welcome',
 		...extraArgs,
@@ -177,13 +347,85 @@ export async function launchPreBase(repo, workspace, extraArgs = []) {
 		maxBuffer: 10 * 1024 * 1024,
 	});
 	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
-	const browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
-	const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
-	if (!page) {
-		throw new Error('Workbench page not found');
+	try {
+		const browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
+		const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
+		if (!page) {
+			throw new Error('Workbench page not found');
+		}
+		page.setDefaultTimeout(12_000);
+		return { info, browser, page, sourceProfile };
+	} catch (error) {
+		const ownedPids = new Set();
+		signalProcessTree(info.pid, 'SIGTERM', ownedPids);
+		throw error;
 	}
-	page.setDefaultTimeout(180_000);
-	return { info, browser, page, sourceProfile };
+}
+
+export async function findGraphFrame(page) {
+	for (const frame of page.frames()) {
+		if (frame.url().includes('graph-editor')) {
+			return frame;
+		}
+		const count = await frame.locator('#netCanvas').count().catch(() => 0);
+		if (count > 0) {
+			return frame;
+		}
+	}
+	return undefined;
+}
+
+export async function attachCdpNetworkObserver(page) {
+	const requests = [];
+	const session = await page.context().newCDPSession(page);
+	let disposed = false;
+	const onRequest = event => {
+		if (disposed) {
+			return;
+		}
+		const url = event.request?.url;
+		if (!url || url.startsWith('data:') || url.startsWith('blob:')) {
+			return;
+		}
+		try {
+			const parsed = new URL(url);
+			if (requests.length >= 400) {
+				requests.shift();
+			}
+			requests.push({
+				host: parsed.hostname,
+				origin: parsed.origin,
+				url: url.slice(0, 240),
+				source: 'cdp',
+				type: event.type,
+			});
+		} catch {
+			/* ignore */
+		}
+	};
+	try {
+		await session.send('Network.enable');
+	} catch (error) {
+		try { await session.detach(); } catch { /* ignore */ }
+		throw error;
+	}
+	session.on('Network.requestWillBeSent', onRequest);
+	return {
+		requests,
+		async dispose() {
+			if (disposed) {
+				return;
+			}
+			disposed = true;
+			if (typeof session.off === 'function') {
+				session.off('Network.requestWillBeSent', onRequest);
+			} else if (typeof session.removeListener === 'function') {
+				session.removeListener('Network.requestWillBeSent', onRequest);
+			}
+			try { await session.send('Network.disable'); } catch { /* ignore */ }
+			try { await session.detach(); } catch { /* ignore */ }
+		},
+	};
 }
 
 export function repoFromUrl(metaUrl) {

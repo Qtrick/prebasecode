@@ -10,6 +10,7 @@ import { AIProviderRegistry } from './aiProviderRegistry.ts';
 import { MagnusSecretStorage } from './secretStorage.ts';
 import { PreBaseSecretResolver } from './secretResolver.ts';
 import { buildModelOptions, resolveApiModel, resolveModelInfo } from './models.ts';
+import { MAGNUS_SMOKE_CHUNKS, MagnusSmokeTransportAdapter } from './smokeTransport.ts';
 import type {
 	AIGenerateRequest,
 	AIGenerateResponseCandidate,
@@ -457,5 +458,59 @@ describe('PreBaseAIService & Provider Resolution', () => {
 		assert.equal(ctx.reasoningEffort, 'low');
 		assert.equal(ctx.policyVersion, 'v7');
 		assert.equal(ctx.cacheIdentity, 'gemini:gemini-2.5-flash:description-policy-v7');
+	});
+
+	it('installSmokeTransport routes streamCandidate through the smoke adapter, not the product catalog', async () => {
+		const mockStorage = new MockSecretStorage();
+		await mockStorage.store('prebase.magnus.provider.gemini.apiKey', 'valid-key');
+		const resolver = new PreBaseSecretResolver({ forcePackaged: true });
+		const secrets = new MagnusSecretStorage(mockStorage as never, resolver);
+		const gemini = new MockAIProviderAdapter();
+		const registry = new AIProviderRegistry([gemini]);
+		const aiService = new PreBaseAIService(secrets, registry);
+
+		assert.equal(aiService.getActiveProviderId(), 'gemini');
+		assert.equal(aiService.isSmokeTransportEnabled(), false);
+
+		aiService.installSmokeTransport(new MagnusSmokeTransportAdapter());
+		assert.equal(aiService.getActiveProviderId(), 'smoke');
+		assert.equal(aiService.isSmokeTransportEnabled(), true);
+		assert.equal(registry.hasAdapter('smoke'), false, 'smoke transport must not enter the global provider registry');
+		const pickerModels = await aiService.listModels(undefined, true);
+		assert.equal(pickerModels.some(model => model.id === 'smoke-local' || model.providerId === 'smoke'), false, 'smoke-local must stay out of the product picker');
+		const discoverBefore = gemini.discoverCalls;
+		await aiService.listModels('gemini', true);
+		assert.equal(gemini.discoverCalls, discoverBefore, 'explicit gemini listModels must not escape smoke isolation or resolve product credentials');
+
+		const smokeChunks: string[] = [];
+		const smokeResult = await aiService.streamCandidate(
+			{ messages: [{ role: 'user', parts: [{ text: 'prebase-smoke-stream' }] }] },
+			chunk => {
+				if (chunk.text) {
+					smokeChunks.push(chunk.text);
+				}
+			},
+		);
+		assert.deepEqual(smokeChunks, [...MAGNUS_SMOKE_CHUNKS]);
+		assert.equal(smokeResult.providerId, 'smoke');
+		assert.equal(smokeResult.modelId, 'smoke-local');
+		assert.equal(gemini.streamCalls, 0, 'product Gemini adapter must not receive smoke-driver traffic');
+
+		aiService.clearSmokeTransport();
+		assert.equal(aiService.getActiveProviderId(), 'gemini');
+		const restored = await aiService.listModels('gemini', true);
+		assert.ok(restored.some(model => model.id === 'gemini-2.5-flash'), 'smoke listModels must not poison the product catalog cache');
+		assert.equal(restored.some(model => model.providerId === 'smoke'), false);
+		const productChunks: string[] = [];
+		await aiService.streamCandidate(
+			{ messages: [{ role: 'user', parts: [{ text: 'hello' }] }] },
+			chunk => {
+				if (chunk.text) {
+					productChunks.push(chunk.text);
+				}
+			},
+		);
+		assert.equal(gemini.streamCalls, 1);
+		assert.deepEqual(productChunks, ['Streamed part 1', 'Streamed part 2']);
 	});
 });

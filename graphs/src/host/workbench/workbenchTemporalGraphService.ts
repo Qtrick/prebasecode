@@ -36,6 +36,7 @@ export const IPreBaseTemporalGraphService = createDecorator<IPreBaseTemporalGrap
 
 export interface IPreBaseTemporalGraphService extends ITemporalGraphService {
 	readonly _serviceBrand: undefined;
+	getActiveWriteCount(): number;
 }
 
 export function computeSafeStorePath(storageHome: URI, repoId: string, rootPath: string): string {
@@ -194,6 +195,10 @@ export class WorkbenchTemporalGraphService extends Disposable implements IPreBas
 
 	handleHeadChanged(event: GitHeadChangeEvent, rootPath: string): Promise<void> {
 		return this._temporalService.handleHeadChanged(event, rootPath);
+	}
+
+	getActiveWriteCount(): number {
+		return this._registry.countActiveWrites();
 	}
 
 	override async dispose(): Promise<void> {

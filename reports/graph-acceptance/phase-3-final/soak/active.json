@@ -1,74 +1,526 @@
 {
   "ok": false,
   "failures": [
-    "active soak did not collect active samples"
+    "active soak did not collect quiesce samples",
+    "process count grew excessively during active soak"
   ],
   "kind": "active",
-  "durationMs": 600000,
-  "intervalMs": 30000,
-  "prebasePid": 15407,
+  "durationMs": 720000,
+  "intervalMs": 20000,
   "samples": [
     {
-      "at": "2026-08-27T21:37:08.404Z",
+      "at": "2026-08-28T05:40:12.663Z",
       "phase": "active",
-      "processCount": 34,
-      "cpuSum": 114.4,
-      "rssMb": 2217.8
+      "processCount": 7,
+      "cpuSum": 19.6,
+      "rssMb": 1678.4,
+      "topProcesses": [
+        {
+          "pid": 76367,
+          "ppid": 76333,
+          "cpu": 13.6,
+          "rssMb": 732.2,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76333,
+          "ppid": 1,
+          "cpu": 3.1,
+          "rssMb": 321.8,
+          "role": "main",
+          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+        },
+        {
+          "pid": 76364,
+          "ppid": 76333,
+          "cpu": 2.2,
+          "rssMb": 101.3,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76405,
+          "ppid": 76333,
+          "cpu": 0.7,
+          "rssMb": 210,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76387,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 167.9,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76388,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 94.1,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76365,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 51.2,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        }
+      ]
     },
     {
-      "at": "2026-08-27T21:43:48.582Z",
-      "phase": "quiesce",
-      "processCount": 14,
-      "cpuSum": 74.1,
-      "rssMb": 2302.8
+      "at": "2026-08-28T05:40:32.805Z",
+      "phase": "active",
+      "processCount": 36,
+      "cpuSum": 133.1,
+      "rssMb": 2350,
+      "topProcesses": [
+        {
+          "pid": 76521,
+          "ppid": 76333,
+          "cpu": 62.6,
+          "rssMb": 278.6,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76367,
+          "ppid": 76333,
+          "cpu": 30.3,
+          "rssMb": 889.1,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76405,
+          "ppid": 76333,
+          "cpu": 26.8,
+          "rssMb": 221.5,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76333,
+          "ppid": 1,
+          "cpu": 11,
+          "rssMb": 298.9,
+          "role": "main",
+          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+        },
+        {
+          "pid": 81354,
+          "ppid": 76405,
+          "cpu": 1.4,
+          "rssMb": 7.5,
+          "role": "other",
+          "comm": "(git)"
+        },
+        {
+          "pid": 81360,
+          "ppid": 76405,
+          "cpu": 0.6,
+          "rssMb": 7.6,
+          "role": "other",
+          "comm": "(git)"
+        },
+        {
+          "pid": 81362,
+          "ppid": 76405,
+          "cpu": 0.3,
+          "rssMb": 7.7,
+          "role": "other",
+          "comm": "(git)"
+        },
+        {
+          "pid": 76364,
+          "ppid": 76333,
+          "cpu": 0.1,
+          "rssMb": 92,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        }
+      ]
     },
     {
-      "at": "2026-08-27T21:44:18.608Z",
-      "phase": "quiesce",
-      "processCount": 14,
-      "cpuSum": 99.3,
-      "rssMb": 1950.1
+      "at": "2026-08-28T05:40:52.890Z",
+      "phase": "active",
+      "processCount": 26,
+      "cpuSum": 198.6,
+      "rssMb": 2648.7,
+      "topProcesses": [
+        {
+          "pid": 76367,
+          "ppid": 76333,
+          "cpu": 101.9,
+          "rssMb": 1009.9,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76521,
+          "ppid": 76333,
+          "cpu": 56.7,
+          "rssMb": 279.9,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76405,
+          "ppid": 76333,
+          "cpu": 24.2,
+          "rssMb": 230.5,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76333,
+          "ppid": 1,
+          "cpu": 9.9,
+          "rssMb": 256.9,
+          "role": "main",
+          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+        },
+        {
+          "pid": 85892,
+          "ppid": 76405,
+          "cpu": 1.5,
+          "rssMb": 7.5,
+          "role": "other",
+          "comm": "(git)"
+        },
+        {
+          "pid": 85900,
+          "ppid": 76405,
+          "cpu": 1.5,
+          "rssMb": 4.3,
+          "role": "other",
+          "comm": "(git)"
+        },
+        {
+          "pid": 85897,
+          "ppid": 76405,
+          "cpu": 0.9,
+          "rssMb": 7.8,
+          "role": "other",
+          "comm": "(git)"
+        },
+        {
+          "pid": 85898,
+          "ppid": 76405,
+          "cpu": 0.6,
+          "rssMb": 7.8,
+          "role": "other",
+          "comm": "(git)"
+        }
+      ]
     },
     {
-      "at": "2026-08-27T21:44:48.636Z",
-      "phase": "quiesce",
-      "processCount": 14,
-      "cpuSum": 98.9,
-      "rssMb": 1796.3
-    },
-    {
-      "at": "2026-08-27T21:45:18.664Z",
-      "phase": "quiesce",
+      "at": "2026-08-28T05:41:12.918Z",
+      "phase": "active",
       "processCount": 14,
       "cpuSum": 100,
-      "rssMb": 1774.8
+      "rssMb": 2664.4,
+      "topProcesses": [
+        {
+          "pid": 76367,
+          "ppid": 76333,
+          "cpu": 100,
+          "rssMb": 913.8,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76521,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 282.5,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76333,
+          "ppid": 1,
+          "cpu": 0,
+          "rssMb": 244.4,
+          "role": "main",
+          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+        },
+        {
+          "pid": 76405,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 217.5,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 86063,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 133.9,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76526,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 115.4,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 85998,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 114.6,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 81573,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 113.9,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        }
+      ]
     },
     {
-      "at": "2026-08-27T21:45:48.690Z",
-      "phase": "quiesce",
-      "processCount": 14,
-      "cpuSum": 99.3,
-      "rssMb": 1786.9
-    },
-    {
-      "at": "2026-08-27T21:46:18.715Z",
-      "phase": "quiesce",
+      "at": "2026-08-28T05:41:32.948Z",
+      "phase": "active",
       "processCount": 14,
       "cpuSum": 100,
-      "rssMb": 1802.2
+      "rssMb": 2618,
+      "topProcesses": [
+        {
+          "pid": 76367,
+          "ppid": 76333,
+          "cpu": 100,
+          "rssMb": 904.8,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76521,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 280.7,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76333,
+          "ppid": 1,
+          "cpu": 0,
+          "rssMb": 244.8,
+          "role": "main",
+          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+        },
+        {
+          "pid": 76405,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 216.8,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 86063,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 116.2,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76526,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 115.4,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 81573,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 113.9,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76498,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 106.3,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        }
+      ]
     },
     {
-      "at": "2026-08-27T21:46:48.743Z",
-      "phase": "quiesce",
+      "at": "2026-08-28T05:41:52.975Z",
+      "phase": "active",
       "processCount": 14,
-      "cpuSum": 100,
-      "rssMb": 1810.2
+      "cpuSum": 99.7,
+      "rssMb": 2563.8,
+      "topProcesses": [
+        {
+          "pid": 76367,
+          "ppid": 76333,
+          "cpu": 99.7,
+          "rssMb": 855.8,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76521,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 279,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76333,
+          "ppid": 1,
+          "cpu": 0,
+          "rssMb": 243.9,
+          "role": "main",
+          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+        },
+        {
+          "pid": 76405,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 216.4,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 86063,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 115.8,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76526,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 115.5,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 81573,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 113.6,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76498,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 106.4,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        }
+      ]
+    },
+    {
+      "at": "2026-08-28T05:42:13.002Z",
+      "phase": "active",
+      "processCount": 14,
+      "cpuSum": 99.7,
+      "rssMb": 2585.8,
+      "topProcesses": [
+        {
+          "pid": 76367,
+          "ppid": 76333,
+          "cpu": 99.7,
+          "rssMb": 877.4,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76521,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 279,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76333,
+          "ppid": 1,
+          "cpu": 0,
+          "rssMb": 243.9,
+          "role": "main",
+          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+        },
+        {
+          "pid": 76405,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 216.4,
+          "role": "helper",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 86063,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 115.9,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76526,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 115.5,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 81573,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 113.8,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        },
+        {
+          "pid": 76498,
+          "ppid": 76333,
+          "cpu": 0,
+          "rssMb": 106.4,
+          "role": "renderer",
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/Pr"
+        }
+      ]
     }
   ],
+  "prebasePid": 76333,
   "quit": {
-    "before": "15407     1   0.0 138128 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
-    "latencyMs": 179377,
+    "before": "76333     1   0.0 181872 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
-    "usedSigkill": true
+    "leftoverPids": [],
+    "latencyMs": 13693,
+    "terminationPath": "sigterm",
+    "workbenchCompleted": false,
+    "usedSigterm": true,
+    "usedSigkill": false
   }
 }

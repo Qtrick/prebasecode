@@ -1,0 +1,26 @@
+{
+  "ok": true,
+  "failures": [],
+  "kind": "deterministic-smoke-stream",
+  "prebasePid": 41690,
+  "smokeInstalled": true,
+  "firstChunkAt": 2086,
+  "uiTextAt": 2241,
+  "completed": true,
+  "chunkCount": 4,
+  "progressiveChunks": true,
+  "duplicate": false,
+  "cancelled": true,
+  "secondRequestOk": true,
+  "uiSample": "Prebasecode\n1\nOpen in Agents\n44\nEXPLORER\nPREBASECODE\n.agents\n.artifacts\n.claude\n.config\n.cursor\n.devcontainer\n.eslint-plugin-local\n.github\n.opencode\n.playwright-cli\n.tmp-task-snapshots\n.vscode\n.vscode-oss-dev\nbuild\ncli\ndocs\nextensions\nFFATU\ngraphs\nnode_modules\nout\nout-build\nout-vscode\nprivate\nremote\nreports\nresources\nscreenshots\nscripts\nsrc\nsupabase\ntest\n.aiexclude\nOUTLINE\nTIMELINE\nPreBase Home\nWe",
+  "quit": {
+    "before": "41690     1   0.4 286944 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "remaining": "gone",
+    "leftoverPids": [],
+    "latencyMs": 721,
+    "terminationPath": "workbench",
+    "workbenchCompleted": true,
+    "usedSigterm": false,
+    "usedSigkill": false
+  }
+}

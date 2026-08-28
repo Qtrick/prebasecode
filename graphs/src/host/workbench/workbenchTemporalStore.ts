@@ -39,9 +39,7 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 			return;
 		}
 		await this._unwrap(this._main.close(this._dbPath));
-		if (!this.hasActiveWrite()) {
-			this._isOpen = false;
-		}
+		this._isOpen = false;
 	}
 	async interrupt(): Promise<void> { if (this._isOpen) { await this._unwrap(this._main.interrupt(this._dbPath)); } }
 	hasActiveWrite(): boolean { return this._inflightWrites > 0; }
@@ -59,7 +57,14 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 		return this._unwrap<T>(this._main.invoke(this._dbPath, method, serializeTemporalStoreValue(args)));
 	}
 
-	setRepositoryIdentity(identity: RepositoryIdentityRecord): Promise<void> { return this._call('setRepositoryIdentity', identity); }
+	private writeCall<T>(method: keyof ITemporalStore, ...args: readonly unknown[]): Promise<T> {
+		this._inflightWrites++;
+		return this._call<T>(method, ...args).finally(() => {
+			this._inflightWrites = Math.max(0, this._inflightWrites - 1);
+		});
+	}
+
+	setRepositoryIdentity(identity: RepositoryIdentityRecord): Promise<void> { return this.writeCall('setRepositoryIdentity', identity); }
 	getRepositoryIdentity(): Promise<RepositoryIdentityRecord | undefined> { return this._call('getRepositoryIdentity'); }
 	saveCommitIngestion(commit: TemporalCommitRecord, snapshot: TemporalGraphSnapshot, delta?: TemporalStructuralDelta, lineageEvents?: readonly TemporalEntityLineageEvent[], token?: CancellationTokenLike): Promise<void> {
 		const cancel = token?.onCancellationRequested?.(() => { void this.interrupt(); });
@@ -69,7 +74,7 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 		}
 		this._inflightWrites++;
 		return this._call<void>('saveCommitIngestion', commit, snapshot, delta, lineageEvents).finally(() => {
-			this._inflightWrites--;
+			this._inflightWrites = Math.max(0, this._inflightWrites - 1);
 			cancel?.dispose();
 		});
 	}
@@ -95,13 +100,13 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 	getEdgeHistory(edgeId: string): Promise<TemporalEdgeSnapshot[]> { return this._call('getEdgeHistory', edgeId); }
 	getEdgeHistoryReachableFrom(edgeId: string, targetCommitSha: string): Promise<TemporalEdgeSnapshot[]> { return this._call('getEdgeHistoryReachableFrom', edgeId, targetCommitSha); }
 	getEdgeLifecycleEventsReachableFrom(edgeId: string, targetCommitSha: string): Promise<import('../../temporal/common/temporalTypes.js').TemporalEdgeLifecycleEvent[]> { return this._call('getEdgeLifecycleEventsReachableFrom', edgeId, targetCommitSha); }
-	saveRef(ref: RefRecord): Promise<void> { return this._call('saveRef', ref); }
-	replaceRefs(refs: readonly RefRecord[]): Promise<void> { return this._call('replaceRefs', refs); }
+	saveRef(ref: RefRecord): Promise<void> { return this.writeCall('saveRef', ref); }
+	replaceRefs(refs: readonly RefRecord[]): Promise<void> { return this.writeCall('replaceRefs', refs); }
 	getRef(refName: string): Promise<RefRecord | undefined> { return this._call('getRef', refName); }
 	getAllRefs(): Promise<RefRecord[]> { return this._call('getAllRefs'); }
 	getBlobAnalysis(blobOid: string, analyzerVersion: number, profileVersion: number, language: string): Promise<BlobAnalysisRecord | undefined> { return this._call('getBlobAnalysis', blobOid, analyzerVersion, profileVersion, language); }
-	saveBlobAnalysis(record: BlobAnalysisRecord): Promise<void> { return this._call('saveBlobAnalysis', record); }
-	runMaintenance(maxDatabaseBytes: number): Promise<TemporalStoreMaintenanceResult> { return this._call('runMaintenance', maxDatabaseBytes); }
-	vacuum(): Promise<void> { return this._call('vacuum'); }
-	clear(): Promise<void> { return this._call('clear'); }
+	saveBlobAnalysis(record: BlobAnalysisRecord): Promise<void> { return this.writeCall('saveBlobAnalysis', record); }
+	runMaintenance(maxDatabaseBytes: number): Promise<TemporalStoreMaintenanceResult> { return this.writeCall('runMaintenance', maxDatabaseBytes); }
+	vacuum(): Promise<void> { return this.writeCall('vacuum'); }
+	clear(): Promise<void> { return this.writeCall('clear'); }
 }

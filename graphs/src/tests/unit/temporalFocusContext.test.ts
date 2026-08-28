@@ -125,6 +125,21 @@ suite('TemporalFocusContext (Unit - Focus+Context & Spatial Quality)', () => {
 		assert.equal(full.changedNodeIds.size, 2, 'Full context mode must identify exactly 2 focus nodes');
 	});
 
+	test('focused clusters occupy a tighter bounding box than the original Full Map gaps', () => {
+		const farLeft = { entityId: 'a', canonicalNodeId: 'a', path: 'a.ts', label: 'a', kind: 'file', x: -800, y: 0, changeKind: 'modified' };
+		const farRight = { entityId: 'b', canonicalNodeId: 'b', path: 'b.ts', label: 'b', kind: 'file', x: 800, y: 0, changeKind: 'added' };
+		const diff = {
+			targetCommitSha: 'c',
+			nodes: [farLeft, farRight],
+			edges: [],
+			summary: { addedCount: 1, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 0, edgeAddedCount: 0, edgeRemovedCount: 0, edgeModifiedCount: 0 },
+			isPartialLineage: false,
+		};
+		const focused = computeTemporalFocusContext(diff as any, 'changes', 'focused');
+		const xs = focused.visibleNodes.map(node => node.x);
+		assert.ok(Math.max(...xs) - Math.min(...xs) < 400, 'Focus Changes must pack disconnected clusters instead of leaving huge empty gaps');
+	});
+
 	test('2. State Mode Invariants: State mode returns all active nodes and excludes removed ghosts', () => {
 		const baseEntities = [
 			makeEntity('ent-1', 'src/kept.ts'),
@@ -240,5 +255,79 @@ suite('TemporalFocusContext (Unit - Focus+Context & Spatial Quality)', () => {
 			focusedTransform.k > fullTransform.k,
 			`Focused mode zoom (${focusedTransform.k}) must be tighter/closer than full mode zoom (${fullTransform.k})`
 		);
+
+		assert.equal(focusedFC.nodes.length, focusedFC.visibleNodes.length);
+		for (let i = 0; i < focusedFC.nodes.length; i++) {
+			assert.equal(focusedFC.nodes[i].x, focusedFC.visibleNodes[i].x);
+			assert.equal(focusedFC.nodes[i].y, focusedFC.visibleNodes[i].y);
+		}
+	});
+
+	test('6. Focused disconnected clusters are packed onto a shared grid', () => {
+		const nodes: TemporalRenderNode[] = [
+			makeRenderNode('left-a', 'src/left/a.ts', 'modified', -800, 0),
+			makeRenderNode('left-b', 'src/left/b.ts', 'unchanged', -760, 20),
+			makeRenderNode('right-a', 'src/right/a.ts', 'modified', 800, 0),
+			makeRenderNode('right-b', 'src/right/b.ts', 'unchanged', 840, 20),
+		];
+		const diff: TemporalStructuralDiff = {
+			targetCommitSha: 'sha2',
+			baseCommitSha: 'sha1',
+			nodes,
+			edges: [
+				makeRenderEdge('e-left', 'left-a', 'left-b', 'modified'),
+				makeRenderEdge('e-right', 'right-a', 'right-b', 'modified'),
+			],
+			summary: {
+				addedCount: 0,
+				removedCount: 0,
+				modifiedCount: 2,
+				renamedCount: 0,
+				unchangedCount: 2,
+				edgeAddedCount: 0,
+				edgeRemovedCount: 0,
+				edgeModifiedCount: 2,
+			},
+			isPartialLineage: false,
+		};
+		const focused = computeTemporalFocusContext(diff, 'changes', 'focused');
+		const xs = focused.visibleNodes.map(node => node.x);
+		assert.ok(Math.max(...xs) - Math.min(...xs) < 400, 'disconnected focus clusters must pack closer than the original 1600px split');
+		assert.equal(focused.nodes[0].x, focused.visibleNodes[0].x);
+	});
+
+	test('7. Weakly connected far communities still pack by directory so Focus Changes is not empty canvas', () => {
+		const nodes: TemporalRenderNode[] = [
+			makeRenderNode('left-a', 'src/ui/a.ts', 'modified', -900, -400),
+			makeRenderNode('left-b', 'src/ui/b.ts', 'unchanged', -860, -360),
+			makeRenderNode('right-a', 'src/data/a.ts', 'modified', 900, 400),
+			makeRenderNode('right-b', 'src/data/b.ts', 'unchanged', 940, 440),
+		];
+		const diff: TemporalStructuralDiff = {
+			targetCommitSha: 'sha2',
+			baseCommitSha: 'sha1',
+			nodes,
+			edges: [
+				makeRenderEdge('e-left', 'left-a', 'left-b', 'modified'),
+				makeRenderEdge('e-right', 'right-a', 'right-b', 'modified'),
+				makeRenderEdge('e-bridge', 'left-b', 'right-b', 'unchanged'),
+			],
+			summary: {
+				addedCount: 0,
+				removedCount: 0,
+				modifiedCount: 2,
+				renamedCount: 0,
+				unchangedCount: 2,
+				edgeAddedCount: 0,
+				edgeRemovedCount: 0,
+				edgeModifiedCount: 2,
+			},
+			isPartialLineage: false,
+		};
+		const focused = computeTemporalFocusContext(diff, 'changes', 'focused');
+		const xs = focused.visibleNodes.map(node => node.x);
+		const ys = focused.visibleNodes.map(node => node.y);
+		assert.ok(Math.max(...xs) - Math.min(...xs) < 500, 'bridged far communities must still pack horizontally');
+		assert.ok(Math.max(...ys) - Math.min(...ys) < 500, 'bridged far communities must still pack vertically');
 	});
 });

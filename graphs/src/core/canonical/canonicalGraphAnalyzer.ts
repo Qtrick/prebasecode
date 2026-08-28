@@ -113,6 +113,7 @@ export class CanonicalGraphAnalyzer {
 					manifestEntries.push(item.manifestEntry);
 				}
 			}
+			await new Promise<void>(resolve => setTimeout(resolve, 0));
 		}
 
 		if (token?.isCancellationRequested) {

@@ -111,6 +111,19 @@ export class TemporalRepositoryRegistry {
 		return this._runtimes.has(repositoryId);
 	}
 
+	countActiveWrites(): number {
+		let count = 0;
+		for (const store of this._stores.values()) {
+			if (store.hasActiveWrite?.()) {
+				count++;
+			}
+		}
+		for (const runtime of this._runtimes.values()) {
+			count += runtime.countInFlightIngests();
+		}
+		return count;
+	}
+
 	getExistingRuntime(repositoryId: string): TemporalRepositoryRuntime | undefined {
 		return this._runtimes.get(repositoryId);
 	}

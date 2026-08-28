@@ -400,10 +400,10 @@ suite('Runtime Preview reachability', () => {
 		assert.match(source, /event\.join\(this\._stopOwnedPreviewForShutdown\(\)/);
 		assert.match(source, /Promise\.race\(\[/);
 		assert.match(source, /this\._stopTerminal\(true\)\.then\(\(\) => undefined, \(\) => undefined\)/);
-		assert.match(source, /setTimeout\(resolve, 1_500\)/);
+		assert.match(source, /setTimeout\(resolve, 800\)/);
 	});
 
-	test('quit join is bounded to 1.5s and swallows a rejected owned-preview stop', async () => {
+	test('quit join is bounded to 800ms and swallows a rejected owned-preview stop', async () => {
 		const joins: Array<Promise<void>> = [];
 		const shutdown = new Emitter<{ join(promise: Promise<void>): void }>();
 		disposables.add(shutdown);
@@ -423,6 +423,6 @@ suite('Runtime Preview reachability', () => {
 		assert.strictEqual(joins.length, 1);
 		await joins[0];
 		const elapsed = Date.now() - started;
-		assert.ok(elapsed >= 1_400 && elapsed < 3_500, `quit join elapsed ${elapsed}ms`);
+		assert.ok(elapsed >= 700 && elapsed < 1_200, `quit join elapsed ${elapsed}ms; 1.5s would still pass a 2s ceiling`);
 	});
 });

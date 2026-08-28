@@ -117,6 +117,149 @@ export function computeTemporalFocusContext(
 		};
 	}
 
+	function packFocusedClusters(nodes: TemporalRenderNode[], edges: TemporalRenderEdge[]): TemporalRenderNode[] {
+		if (nodes.length < 2) {
+			return nodes;
+		}
+		const index = new Map<string, number>();
+		for (let i = 0; i < nodes.length; i++) {
+			index.set(nodes[i].entityId, i);
+		}
+		const parent: number[] = [];
+		for (let i = 0; i < nodes.length; i++) {
+			parent.push(i);
+		}
+		function find(i: number): number {
+			while (parent[i] !== i) {
+				parent[i] = parent[parent[i]];
+				i = parent[i];
+			}
+			return i;
+		}
+		function unite(a: number, b: number): void {
+			const ra = find(a);
+			const rb = find(b);
+			if (ra !== rb) {
+				parent[rb] = ra;
+			}
+		}
+		for (let i = 0; i < edges.length; i++) {
+			const src = edges[i].sourceEntityId || (edges[i] as TemporalRenderEdge & { sourceId?: string }).sourceId;
+			const tgt = edges[i].targetEntityId || (edges[i] as TemporalRenderEdge & { targetId?: string }).targetId;
+			const si = src ? index.get(src) : undefined;
+			const ti = tgt ? index.get(tgt) : undefined;
+			if (si !== undefined && ti !== undefined) {
+				unite(si, ti);
+			}
+		}
+		const groups = new Map<number, TemporalRenderNode[]>();
+		for (let i = 0; i < nodes.length; i++) {
+			const root = find(i);
+			const list = groups.get(root) ?? [];
+			list.push(nodes[i]);
+			groups.set(root, list);
+		}
+		const clusters = Array.from(groups.values());
+		clusters.sort(function (a, b) {
+			return a[0].entityId < b[0].entityId ? -1 : 1;
+		});
+		if (clusters.length < 2) {
+			let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+			for (let i = 0; i < nodes.length; i++) {
+				const n = nodes[i];
+				if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) {
+					continue;
+				}
+				minX = Math.min(minX, n.x);
+				minY = Math.min(minY, n.y);
+				maxX = Math.max(maxX, n.x);
+				maxY = Math.max(maxY, n.y);
+			}
+			if (!Number.isFinite(minX) || ((maxX - minX) < 360 && (maxY - minY) < 360)) {
+				return nodes;
+			}
+			const byDir = new Map<string, TemporalRenderNode[]>();
+			for (let i = 0; i < nodes.length; i++) {
+				const node = nodes[i];
+				const parts = String(node.path || node.label || '').split(/[/\\]/).filter(Boolean);
+				const key = parts.slice(0, 2).join('/') || node.entityId;
+				const list = byDir.get(key) ?? [];
+				list.push(node);
+				byDir.set(key, list);
+			}
+			if (byDir.size < 2) {
+				return nodes;
+			}
+			clusters.length = 0;
+			const dirs = Array.from(byDir.keys()).sort();
+			for (let i = 0; i < dirs.length; i++) {
+				clusters.push(byDir.get(dirs[i])!);
+			}
+		}
+		const stats: { cluster: TemporalRenderNode[]; cx: number; cy: number; w: number; h: number }[] = [];
+		for (let c = 0; c < clusters.length; c++) {
+			const cluster = clusters[c];
+			let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+			for (let i = 0; i < cluster.length; i++) {
+				const n = cluster[i];
+				if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) {
+					continue;
+				}
+				minX = Math.min(minX, n.x);
+				minY = Math.min(minY, n.y);
+				maxX = Math.max(maxX, n.x);
+				maxY = Math.max(maxY, n.y);
+			}
+			if (!Number.isFinite(minX)) {
+				stats.push({ cluster, cx: 0, cy: 0, w: 48, h: 48 });
+			} else {
+				stats.push({
+					cluster,
+					cx: (minX + maxX) / 2,
+					cy: (minY + maxY) / 2,
+					w: Math.max(48, maxX - minX),
+					h: Math.max(48, maxY - minY),
+				});
+			}
+		}
+		const cols = Math.max(1, Math.ceil(Math.sqrt(stats.length * 1.6)));
+		const gap = 56;
+		const colW: number[] = [];
+		const rowH: number[] = [];
+		for (let i = 0; i < stats.length; i++) {
+			const col = i % cols;
+			const row = Math.floor(i / cols);
+			colW[col] = Math.max(colW[col] || 0, stats[i].w);
+			rowH[row] = Math.max(rowH[row] || 0, stats[i].h);
+		}
+		const packed: TemporalRenderNode[] = [];
+		let y = 0;
+		for (let row = 0; row < rowH.length; row++) {
+			let x = 0;
+			for (let col = 0; col < cols; col++) {
+				const i = row * cols + col;
+				if (i >= stats.length) {
+					break;
+				}
+				const item = stats[i];
+				const destCx = x + (colW[col] || item.w) / 2;
+				const destCy = y + (rowH[row] || item.h) / 2;
+				const dx = destCx - item.cx;
+				const dy = destCy - item.cy;
+				for (let n = 0; n < item.cluster.length; n++) {
+					const node = item.cluster[n];
+					packed.push(Object.assign({}, node, {
+						x: Number.isFinite(node.x) ? node.x + dx : node.x,
+						y: Number.isFinite(node.y) ? node.y + dy : node.y,
+					}));
+				}
+				x += (colW[col] || item.w) + gap;
+			}
+			y += (rowH[row] || 48) + gap;
+		}
+		return packed;
+	}
+
 	// Changes Mode: Identify changed nodes
 	const changedNodeIds = new Set<string>();
 	for (let i = 0; i < allNodes.length; i++) {
@@ -208,12 +351,14 @@ export function computeTemporalFocusContext(
 			}
 		}
 
+		const packedNodes = packFocusedClusters(visibleNodes, visibleEdges);
+
 		return {
 			displayMode: 'changes',
 			contextFilterMode: 'focused',
-			visibleNodes,
+			visibleNodes: packedNodes,
 			visibleEdges,
-			nodes: visibleNodes,
+			nodes: packedNodes,
 			edges: visibleEdges,
 			changedNodeIds,
 			directContextNodeIds,
@@ -310,9 +455,12 @@ export function computeTemporalFitTransform(
 
 	for (let i = 0; i < visibleNodes.length; i++) {
 		const node = visibleNodes[i];
+		if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) {
+			continue;
+		}
 		const r = computeTemporalVisualRadius(node) + 6;
-		const nx = node.x || 0;
-		const ny = node.y || 0;
+		const nx = node.x;
+		const ny = node.y;
 		minX = Math.min(minX, nx - r);
 		minY = Math.min(minY, ny - r);
 		maxX = Math.max(maxX, nx + r);

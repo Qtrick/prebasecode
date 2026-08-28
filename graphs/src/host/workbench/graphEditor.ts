@@ -1153,7 +1153,7 @@ let activeCameraAnim = null;
 // they were built on every snapshot but never read by any render path.)
 let nodeNeighborsMap = new Map();
 
-let dragging = false, panning = false, rotating = false;
+let dragging = false, panning = false, rotating = false, draggingNode = false;
 let lastX = 0, lastY = 0, moved = false;
 let activePointerId = null, activePointerHost = null;
 let layoutKey = '';
@@ -1479,6 +1479,7 @@ function canIdleRotate() {
 		&& !dragging
 		&& !panning
 		&& !rotating
+		&& !draggingNode
 		&& !selectedNodeId);
 }
 
@@ -1492,6 +1493,25 @@ function mapPointerDeltaToGraphRotation(dx, dy) {
 	const direction = settings.networkDragDirection === 'inverted' ? -1 : 1;
 	const sensitivity = 0.005 * direction;
 	return { yaw: -dx * sensitivity, pitch: dy * sensitivity };
+}
+
+function mapPointerDeltaToNodeWorld(dx, dy, depthScale) {
+	const direction = settings.networkDragDirection === 'inverted' ? -1 : 1;
+	const k = Math.max(0.001, transform.k);
+	const ds = Math.max(0.001, Number(depthScale) || 1);
+	const dProjX = (dx / k) * direction;
+	const dProjY = (dy / k) * direction;
+	const dx2 = dProjX / ds;
+	const dy1 = dProjY / ds;
+	const cy = Math.cos(rotation.yaw), sy = Math.sin(rotation.yaw);
+	const cp = Math.cos(rotation.pitch), sp = Math.sin(rotation.pitch);
+	const worldDx = dx2 * cy;
+	const dz1 = dx2 * sy;
+	return {
+		x: worldDx,
+		y: dy1 * cp + dz1 * sp,
+		z: -dy1 * sp + dz1 * cp
+	};
 }
 
 function wrapRotationAngle(angle) {
@@ -1606,6 +1626,7 @@ function resizeCanvas() {
 
 function kickRaf() {
 	if (rafScheduled) return;
+	if (typeof document !== 'undefined' && document.hidden) return;
 	rafScheduled = true;
 	requestAnimationFrame(rafLoop);
 }
@@ -1741,27 +1762,17 @@ function fitView(animate) {
 	if (isTemporal()) {
 		if (!temporalDiff || !temporalDiff.nodes || !temporalDiff.nodes.length) return;
 		const fc = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
-		const targetNodes = fc.nodes;
+		const targetNodes = (fc.visibleNodes || fc.nodes || []).filter(function (node) {
+			return Number.isFinite(node.x) && Number.isFinite(node.y);
+		});
 		if (!targetNodes || targetNodes.length === 0) return;
 		const isFocusMode = (displayMode === 'changes' || displayMode === 'focus');
-		let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
-		for (let i = 0; i < targetNodes.length; i++) {
-			const n = targetNodes[i];
-			if (!Number.isFinite(n.x) || !Number.isFinite(n.y)) {
-				continue;
-			}
-			const pos = { x: n.x, y: n.y };
-			const r = (n.changeKind && n.changeKind !== 'unchanged' ? 8 : 4.5) + 6;
-			minX = Math.min(minX, pos.x - r); minY = Math.min(minY, pos.y - r);
-			maxX = Math.max(maxX, pos.x + r); maxY = Math.max(maxY, pos.y + r);
-		}
-		if (!isFinite(minX)) return;
-		const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
-		const padding = isFocusMode ? 80 : 64;
-		const k = Math.max(MIN_ZOOM, Math.min(1.8, Math.min((usableW - padding * 2) / bw, (usableH - padding * 2) / bh)));
-		const graphCenterX = (minX + maxX) / 2;
-		const graphCenterY = (minY + maxY) / 2;
-		const targetTransform = { k: k, x: centerX - graphCenterX * k, y: centerY - graphCenterY * k };
+		const targetTransform = computeTemporalFitTransform(targetNodes, vw, vh, {
+			padding: isFocusMode ? 48 : 64,
+			insets: insets,
+			minZoom: MIN_ZOOM,
+			maxZoom: isFocusMode ? 2.6 : 1.8,
+		});
 		if (shouldAnimate && animMs > 0) {
 			animateViewportTo(targetTransform, animMs);
 		} else {
@@ -2300,39 +2311,45 @@ function drawTemporalFrame(ts) {
 	ctx.scale(transform.k, transform.k);
 
 	// 2. Render Architecture Hierarchy / Community Region Boundaries in Full Codebase Mode
-	if (displayMode === 'state' && temporalDiff && Array.isArray(temporalDiff.guides)) {
+	if (displayMode === 'state' && temporalDiff && Array.isArray(temporalDiff.guides) && transform.k >= 0.22) {
 		for (let g = 0; g < temporalDiff.guides.length; g++) {
 			const guide = temporalDiff.guides[g];
-			if (guide && guide.radius > 0) {
-				ctx.save();
-				const gRadius = guide.radius || 70;
-				const gx = guide.x || 0;
-				const gy = guide.y || 0;
-				ctx.beginPath();
-				ctx.arc(gx, gy, gRadius, 0, Math.PI * 2);
-				ctx.fillStyle = theme.isHighContrast
-					? 'rgba(255, 255, 255, 0.03)'
-					: (guide.color ? (guide.color + '0c') : 'rgba(99, 102, 241, 0.04)');
-				ctx.fill();
-				ctx.strokeStyle = theme.isHighContrast
-					? 'rgba(255, 255, 255, 0.18)'
-					: (guide.color ? (guide.color + '38') : 'rgba(99, 102, 241, 0.18)');
-				ctx.lineWidth = 1.2;
-				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([4, 6]);
-				ctx.stroke();
-
-				// Region Header Label (Upper edge of cluster hull)
-				if (guide.label && transform.k >= 0.35) {
-					ctx.font = '600 10px ui-sans-serif, system-ui, sans-serif';
-					ctx.fillStyle = theme.isHighContrast
-						? 'rgba(255, 255, 255, 0.65)'
-						: (guide.color || 'var(--vscode-descriptionForeground, #a1a1aa)');
-					ctx.textAlign = 'center';
-					ctx.textBaseline = 'bottom';
-					ctx.fillText(guide.label.toUpperCase(), gx, gy - gRadius - 6);
-				}
-				ctx.restore();
+			const bounds = guide && guide.bounds;
+			if (!bounds) continue;
+			ctx.save();
+			const gx = bounds.minX;
+			const gy = bounds.minY;
+			const gw = Math.max(8, bounds.maxX - bounds.minX);
+			const gh = Math.max(8, bounds.maxY - bounds.minY);
+			const radius = Math.min(18, Math.min(gw, gh) * 0.18);
+			const hexColor = typeof guide.color === 'string' && /^#[0-9a-fA-F]{6}$/.test(guide.color) ? guide.color : '';
+			ctx.beginPath();
+			if (typeof ctx.roundRect === 'function') {
+				ctx.roundRect(gx, gy, gw, gh, radius);
+			} else {
+				ctx.rect(gx, gy, gw, gh);
 			}
+			ctx.fillStyle = theme.isHighContrast
+				? 'rgba(255, 255, 255, 0.02)'
+				: (hexColor ? (hexColor + '08') : 'rgba(99, 102, 241, 0.03)');
+			ctx.fill();
+			ctx.strokeStyle = theme.isHighContrast
+				? 'rgba(255, 255, 255, 0.16)'
+				: (hexColor ? (hexColor + '2e') : 'rgba(99, 102, 241, 0.14)');
+			ctx.lineWidth = 1;
+			if (typeof ctx.setLineDash === 'function') ctx.setLineDash([3, 7]);
+			ctx.stroke();
+			if (guide.label && transform.k >= 0.18) {
+				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+				ctx.font = '600 15px ui-sans-serif, system-ui, sans-serif';
+				ctx.fillStyle = theme.isHighContrast
+					? 'rgba(255, 255, 255, 0.78)'
+					: (hexColor || 'var(--vscode-descriptionForeground, #a1a1aa)');
+				ctx.textAlign = 'left';
+				ctx.textBaseline = 'bottom';
+				ctx.fillText(guide.label, gx + 6, gy - 4);
+			}
+			ctx.restore();
 		}
 
 		// 2b. Render Overview Community-to-Community Aggregate Edges at far zoom
@@ -2657,6 +2674,7 @@ function drawTemporalFrame(ts) {
 			metrics.nodesDrawn = nodesToRender.length;
 			metrics.edgesDrawn = edgesDrawn;
 			metrics.labelsDrawn = visibleLabels.length;
+			metrics.selectedNodeId = selectedNodeId;
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
 			metrics.canvas = { clientWidth: w, clientHeight: h, width: netCanvas.width, height: netCanvas.height };
 			metrics.summary = temporalDiff && temporalDiff.summary;
@@ -2741,6 +2759,18 @@ function toggleTemporalPlay() {
 			stepTemporalCommit(1);
 		}, 900);
 	}
+}
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+	document.addEventListener('visibilitychange', function () {
+		if (document.hidden && isPlayingHistory) {
+			toggleTemporalPlay();
+		}
+		if (!document.hidden) {
+			dirty = true;
+			kickRaf();
+		}
+	});
 }
 
 function pickNetworkNode(clientX, clientY) {
@@ -2983,11 +3013,28 @@ function drawNetworkFrame() {
 			metrics.renderStart = renderStart;
 			metrics.renderEnd = renderEnd;
 			metrics.durationMs = Math.max(0, renderEnd - renderStart);
-			metrics.nodesDrawn = nodes.length;
+			metrics.nodesDrawn = sortedPairs.length;
+			metrics.receivedNodeCount = snapshot && snapshot.nodes ? snapshot.nodes.length : 0;
 			metrics.edgesDrawn = edgesDrawn;
 			metrics.labelsDrawn = placedLabelBoxes.length;
+			metrics.selectedNodeId = selectedNodeId;
+			metrics.networkLayoutMode = snapshot && snapshot.networkLayoutMode;
+			metrics.networkIdleAutoRotate = Boolean(settings.networkIdleAutoRotate);
+			metrics.rotation = { yaw: rotation.yaw, pitch: rotation.pitch };
+			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
+			metrics.nodeHits = [];
+			for (let hi = 0; hi < nodes.length && metrics.nodeHits.length < 16; hi++) {
+				const hitNode = nodes[hi];
+				const hitPos = projected[hitNode.id];
+				if (!hitPos) continue;
+				metrics.nodeHits.push({
+					id: hitNode.id,
+					x: hitPos.x * transform.k + transform.x,
+					y: hitPos.y * transform.k + transform.y
+				});
+			}
 			metrics.lodTier = transform.k < 0.3 ? 'low' : (transform.k < 0.8 ? 'medium' : 'high');
-			metrics.isAnimating = false;
+			metrics.isAnimating = canIdleRotate() && !idlePaused;
 			metrics.timestamp = renderEnd;
 		} catch {}
 	}
@@ -3300,7 +3347,7 @@ function onPointerUp(e, cancelled) {
 		pointerHost.releasePointerCapture(e.pointerId);
 	}
 	const wasMoved = moved || cancelled;
-	dragging = false; panning = false; rotating = false;
+	dragging = false; panning = false; rotating = false; draggingNode = false;
 	interactionState = cancelled ? 'cancelled' : 'idle';
 	pointerDownNode = null;
 	if (netCanvas) {
@@ -3355,11 +3402,35 @@ function onPointerMove(e) {
 	if (total > dragThreshold) moved = true;
 
 	if (interactionState === 'pressed' && !panning && isNetwork() && moved) {
-		rotating = true;
-		interactionState = 'rotating';
-		scheduleIdleResume();
+		if (pointerDownNode) {
+			draggingNode = true;
+			interactionState = 'draggingNode';
+		} else {
+			rotating = true;
+			interactionState = 'rotating';
+			scheduleIdleResume();
+		}
 	}
 	lastX = e.clientX; lastY = e.clientY;
+
+	if (draggingNode && pointerDownNode && isNetwork()) {
+		const nodeId = pointerDownNode.entityId || pointerDownNode.id;
+		const current = base3d[nodeId] || { x: 0, y: 0, z: 0 };
+		const projectedNow = projected[nodeId] || { depthScale: 1 };
+		const delta = mapPointerDeltaToNodeWorld(dx, dy, projectedNow.depthScale);
+		base3d[nodeId] = {
+			x: current.x + delta.x,
+			y: current.y + delta.y,
+			z: current.z + delta.z
+		};
+		projectAll();
+		if (keepGraphCentered) {
+			applyCenterLock(true);
+		}
+		dirty = true;
+		kickRaf();
+		return;
+	}
 
 	if (rotating && isNetwork()) {
 		const mapped = mapPointerDeltaToGraphRotation(dx, dy);
@@ -4092,6 +4163,9 @@ if (typeof ResizeObserver !== 'undefined') {
 
 function rafLoop(ts) {
 	rafScheduled = false;
+	if (typeof document !== 'undefined' && document.hidden) {
+		return;
+	}
 	const dt = Math.min(0.05, Math.max(0, (ts - (lastRafTs || ts)) / 1000));
 	lastRafTs = ts;
 
@@ -4110,10 +4184,11 @@ function rafLoop(ts) {
 	}
 
 	if (isTemporal()) {
-		if (dirty || isAnimatingTemporal) {
+		if (dirty || isAnimatingTemporal || activeCameraAnim) {
 			drawTemporalFrame(ts);
 			dirty = false;
 		}
+		if (isAnimatingTemporal || activeCameraAnim) kickRaf();
 	} else {
 		const animating = canIdleRotate() && !idlePaused;
 		if (animating) {

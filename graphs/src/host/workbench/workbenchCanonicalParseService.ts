@@ -24,12 +24,17 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 	private _flushScheduled = false;
 	private _isFlushing = false;
 	private _activeBatchCancellation: CancellationTokenSource | undefined;
+	private _activeFlushSize = 0;
 	private _workerTerminated = false;
 	private _isDisposed = false;
 
 	constructor(@IUtilityProcessWorkerWorkbenchService workers: IUtilityProcessWorkerWorkbenchService) {
 		super();
 		this._workers = workers;
+	}
+
+	getActiveRequestCount(): number {
+		return this._pending.length + this._activeFlushSize;
 	}
 
 	parse(request: CanonicalParseRequest, token?: CancellationTokenLike): Promise<BlobParseArtifact | undefined> {
@@ -55,7 +60,9 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 			while (this._pending.length > 0) {
 				// ponytail: 32 is the IPC aggregation batch, not 32-way CPU parallelism.
 				// CanonicalParserWorkerService.parseBatch walks entries sequentially.
-				const pending = this._pending.splice(0, 32);
+				const take = Math.min(32, this._pending.length);
+				this._activeFlushSize = take;
+				const pending = this._pending.splice(0, take);
 				const active = pending.filter(item => {
 					if (!item.token?.isCancellationRequested) {
 						return true;
@@ -64,8 +71,10 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 					return false;
 				});
 				if (active.length === 0) {
+					this._activeFlushSize = 0;
 					continue;
 				}
+				this._activeFlushSize = active.length;
 				const batchCancellation = new CancellationTokenSource();
 				this._activeBatchCancellation = batchCancellation;
 				const cancellationListeners = new DisposableStore();
@@ -116,6 +125,7 @@ export class WorkbenchCanonicalParseService extends Disposable implements ICanon
 						item.reject(parseError);
 					}
 				} finally {
+					this._activeFlushSize = 0;
 					if (this._activeBatchCancellation === batchCancellation) {
 						this._activeBatchCancellation = undefined;
 					}
@@ -193,4 +203,5 @@ export const IPreBaseCanonicalParseService = createDecorator<IPreBaseCanonicalPa
 /** The desktop canonical parser service shared by Network and Temporal graph ingestion. */
 export interface IPreBaseCanonicalParseService extends ICanonicalParseService {
 	readonly _serviceBrand: undefined;
+	getActiveRequestCount(): number;
 }

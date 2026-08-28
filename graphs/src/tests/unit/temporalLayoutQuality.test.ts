@@ -7,6 +7,7 @@ import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
 import {
 	computeSemanticTemporalInitialLayout,
+	derivePostCollisionGuides,
 	layoutTemporalGraph,
 } from '../../temporal/view/temporalLayoutEngine.js';
 import { measureLayoutQuality } from '../../temporal/view/temporalLayoutQuality.js';
@@ -250,5 +251,91 @@ suite('TemporalLayoutQuality (Unit - Mathematical Layout Metrics & Guide Enclosu
 			assert.equal(pos1.x, pos2.x, `X coordinate mismatch under permutation for ${id}`);
 			assert.equal(pos1.y, pos2.y, `Y coordinate mismatch under permutation for ${id}`);
 		}
+	});
+
+	test('4. Elongated community guides are padded AABBs that enclose every member, not giant circumcircles', () => {
+		const guides = derivePostCollisionGuides(
+			[{
+				id: 'wide',
+				label: 'wide',
+				primaryLayer: 'ui',
+				color: '#6366f1',
+				nodeIds: ['a', 'b', 'c'],
+				primaryHubId: 'a',
+				depth: 0,
+				hasEntry: true,
+				totalDegree: 2,
+				maxDegree: 2,
+			}],
+			new Map([
+				['a', { x: -200, y: 0 }],
+				['b', { x: 0, y: 0 }],
+				['c', { x: 200, y: 0 }],
+			]),
+			24,
+		);
+		assert.equal(guides.length, 1);
+		const guide = guides[0];
+		for (const pos of [{ x: -200, y: 0 }, { x: 0, y: 0 }, { x: 200, y: 0 }]) {
+			assert.ok(pos.x >= guide.bounds.minX && pos.x <= guide.bounds.maxX);
+			assert.ok(pos.y >= guide.bounds.minY && pos.y <= guide.bounds.maxY);
+		}
+		const aabbHeight = guide.bounds.maxY - guide.bounds.minY;
+		const aabbWidth = guide.bounds.maxX - guide.bounds.minX;
+		assert.equal(guide.bounds.height, aabbHeight, 'bounds.height must be the padded AABB, not the circumcircle diameter');
+		assert.equal(guide.bounds.width, aabbWidth);
+		assert.ok(aabbHeight < aabbWidth / 2, `AABB height ${aabbHeight} must stay a padded box, not the circumcircle diameter ${guide.radius * 2}`);
+		assert.ok(aabbHeight <= 48 + 1, `flat community AABB height ${aabbHeight} must be padding, not a giant circle`);
+	});
+
+	test('5. Sparse rank stagger stays permutation-invariant', () => {
+		function node(entityId: string, path: string, isEntry = false): TemporalRenderNode {
+			return {
+				entityId,
+				canonicalNodeId: `can-${entityId}`,
+				path,
+				label: entityId,
+				kind: 'file',
+				x: 0,
+				y: 0,
+				changeKind: 'unchanged',
+				meta: { isEntry },
+			};
+		}
+		function edge(sourceEntityId: string, targetEntityId: string): TemporalRenderEdge {
+			return {
+				edgeId: `${sourceEntityId}->${targetEntityId}`,
+				sourceEntityId,
+				targetEntityId,
+				sourcePath: `src/${sourceEntityId}.ts`,
+				targetPath: `src/${targetEntityId}.ts`,
+				kind: 'imports',
+				changeKind: 'unchanged',
+			};
+		}
+		const nodes = [
+			node('entry', 'src/index.ts', true),
+			node('ui', 'src/ui/app.ts'),
+			node('svc', 'src/services/api.ts'),
+			node('db', 'src/database/store.ts'),
+		];
+		const edges = [
+			edge('entry', 'ui'),
+			edge('ui', 'svc'),
+			edge('svc', 'db'),
+		];
+		const layout1 = computeSemanticTemporalInitialLayout(nodes, edges);
+		const layout2 = computeSemanticTemporalInitialLayout([...nodes].reverse(), [...edges].reverse());
+		assert.equal(layout1.positions.size, 4);
+		for (const [id, pos1] of layout1.positions) {
+			const pos2 = layout2.positions.get(id);
+			assert.ok(pos2);
+			assert.equal(pos1.x, pos2.x, `staggered X for ${id} must be permutation-invariant`);
+			assert.equal(pos1.y, pos2.y, `staggered Y for ${id} must be permutation-invariant`);
+		}
+		const guides = [...(layout1.guides ?? [])].sort((a, b) => a.y - b.y || a.x - b.x);
+		assert.ok(guides.length >= 3, `sparse pipeline must produce multiple rank guides, got ${guides.length}`);
+		const xs = [...new Set(guides.map(guide => guide.x))];
+		assert.ok(xs.length > 1, `sparse ranks must stagger horizontally, got x=${xs.join(',')}`);
 	});
 });

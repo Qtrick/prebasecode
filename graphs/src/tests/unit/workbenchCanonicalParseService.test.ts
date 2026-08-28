@@ -70,6 +70,32 @@ suite('WorkbenchCanonicalParseService quit', () => {
 		assert.strictEqual(state.createCalls, 0);
 	});
 
+	test('getActiveRequestCount counts queued parses, not a CPU heuristic', async () => {
+		const state = { createCalls: 0, workerDisposed: 0, callStarted: false };
+		const service = new WorkbenchCanonicalParseService(hangingWorkers(state));
+		assert.strictEqual(service.getActiveRequestCount(), 0);
+		const first = service.parse(parseRequest());
+		const second = service.parse(parseRequest());
+		assert.strictEqual(service.getActiveRequestCount(), 2, 'parser-active Quit must use in-flight request count, not process CPU');
+		service.dispose();
+		assert.strictEqual(await first, undefined);
+		assert.strictEqual(await second, undefined);
+		assert.strictEqual(service.getActiveRequestCount(), 0);
+	});
+
+	test('getActiveRequestCount is positive while a batch is in flight', async () => {
+		const state = { createCalls: 0, workerDisposed: 0, callStarted: false };
+		const service = new WorkbenchCanonicalParseService(hangingWorkers(state));
+		const pending = service.parse(parseRequest());
+		for (let i = 0; i < 50 && !state.callStarted; i++) {
+			await Promise.resolve();
+		}
+		assert.ok(service.getActiveRequestCount() > 0, 'parser-active Quit must see an authoritative in-flight count');
+		service.dispose();
+		assert.strictEqual(await pending, undefined);
+		assert.strictEqual(service.getActiveRequestCount(), 0);
+	});
+
 	test('dispose cancels an in-flight parse batch without killing a fake OS process', async () => {
 		const state = { createCalls: 0, workerDisposed: 0, callStarted: false };
 		const service = new WorkbenchCanonicalParseService(hangingWorkers(state));

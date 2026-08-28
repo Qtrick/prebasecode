@@ -283,18 +283,23 @@ suite('PreBase graph editor 3D interaction', () => {
 				edges: []
 			};
 			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
 			settings.networkIdleAutoRotate = true;
 			settings.reduceMotion = false;
 		`, harness.context);
 
-		const initialYaw = vm.runInContext('rotation.yaw', harness.context);
+		const initial = vm.runInContext('({ yaw: rotation.yaw, x: base3d.a.x, y: base3d.a.y, z: base3d.a.z })', harness.context);
 		harness.canvas.dispatch('pointerdown', { clientX: 100, clientY: 100 });
 		harness.canvas.dispatch('pointermove', { clientX: 102, clientY: 100 });
-		assert.strictEqual(vm.runInContext('rotation.yaw', harness.context), initialYaw);
+		assert.strictEqual(vm.runInContext('rotation.yaw', harness.context), initial.yaw);
 
 		harness.canvas.dispatch('pointermove', { clientX: 120, clientY: 100 });
-		assert.notStrictEqual(vm.runInContext('rotation.yaw', harness.context), initialYaw);
-		assert.strictEqual(vm.runInContext('rotating', harness.context), true);
+		const during = vm.runInContext('({ yaw: rotation.yaw, rotating, draggingNode, x: base3d.a.x, y: base3d.a.y, z: base3d.a.z })', harness.context);
+		assert.notStrictEqual(during.yaw, initial.yaw);
+		assert.strictEqual(during.rotating, true);
+		assert.strictEqual(during.draggingNode, false, 'empty-canvas rotate must not enter node-drag');
+		assert.deepStrictEqual({ x: during.x, y: during.y, z: during.z }, { x: initial.x, y: initial.y, z: initial.z });
 
 		harness.canvas.dispatch('pointerup', { clientX: 120, clientY: 100 });
 		assert.strictEqual(vm.runInContext('rotating', harness.context), false);
@@ -310,6 +315,8 @@ suite('PreBase graph editor 3D interaction', () => {
 				edges: []
 			};
 			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
 			settings.networkDragDirection = 'natural';
 		`, harness.context);
 
@@ -330,6 +337,61 @@ suite('PreBase graph editor 3D interaction', () => {
 
 		assert.ok(naturalYaw < 0.55, 'natural drag to the right should rotate yaw negatively');
 		assert.ok(invertedYaw > 0.55, 'inverted drag to the right should rotate yaw positively');
+	});
+
+	test('dragging a picked node updates its world position without rotating the camera', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+		`, harness.context);
+
+		const before = vm.runInContext('({ ...base3d.a, yaw: rotation.yaw })', harness.context);
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
+		harness.canvas.dispatch('pointermove', { clientX: 40, clientY: 10 });
+		const during = vm.runInContext('({ ...base3d.a, yaw: rotation.yaw, draggingNode, rotating })', harness.context);
+		assert.strictEqual(during.draggingNode, true);
+		assert.strictEqual(during.rotating, false, 'picked-node drag must not rotate the camera');
+		assert.ok(Math.hypot(during.x - before.x, during.y - before.y, during.z - before.z) > 1, 'picked node must move in world space');
+		assert.strictEqual(during.yaw, before.yaw, 'node drag must not steal camera rotation');
+
+		harness.canvas.dispatch('pointerup', { clientX: 40, clientY: 10 });
+		assert.strictEqual(vm.runInContext('draggingNode', harness.context), false);
+	});
+
+	test('pointer starting on empty canvas rotates the camera without dragging a node', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+		`, harness.context);
+
+		assert.ok(vm.runInContext('pickNetworkNode(0, 0)', harness.context), 'origin must be a real node hit so empty-canvas is a distinct branch');
+		assert.strictEqual(vm.runInContext('pickNetworkNode(100, 100)', harness.context), null);
+
+		const before = vm.runInContext('({ ...base3d.a, yaw: rotation.yaw })', harness.context);
+		harness.canvas.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+		harness.canvas.dispatch('pointermove', { clientX: 140, clientY: 110 });
+		const during = vm.runInContext('({ ...base3d.a, yaw: rotation.yaw, draggingNode, rotating })', harness.context);
+
+		assert.strictEqual(during.draggingNode, false);
+		assert.strictEqual(during.rotating, true);
+		assert.deepStrictEqual({ x: during.x, y: during.y, z: during.z }, { x: before.x, y: before.y, z: before.z });
+		assert.notStrictEqual(during.yaw, before.yaw);
+
+		harness.canvas.dispatch('pointerup', { clientX: 140, clientY: 110 });
+		assert.strictEqual(vm.runInContext('rotating', harness.context), false);
+		assert.strictEqual(vm.runInContext('draggingNode', harness.context), false);
 	});
 
 	test('selection locks idle camera rotation even when a previously scheduled resume races selection', () => {

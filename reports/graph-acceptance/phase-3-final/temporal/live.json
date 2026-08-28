@@ -3,8 +3,8 @@
   "failures": [],
   "scale": "small",
   "fixture": {
-    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-xzRALq",
-    "head": "b019d54490e264dc5bf26d95e006c61c878485a2",
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-VLmXQd",
+    "head": "b6309de26a2eb2b73f636e6411a5f4796ad25430",
     "commits": 10,
     "files": [
       "package.json",
@@ -13,21 +13,21 @@
       "src/tally.js"
     ],
     "expectedModifiedPath": "src/tally.js",
-    "firstParentSummary": "b019d54490e264dc5bf26d95e006c61c878485a2 23ac41ee3c2cab5011b9cd6ee244ee95c6d6ccb7 fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+    "firstParentSummary": "b6309de26a2eb2b73f636e6411a5f4796ad25430 b6f68dc83c8c04e153de53026ee43e2cd7277d13 fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
   },
-  "pid": 74561,
-  "cdpPort": 59232,
+  "pid": 92328,
+  "cdpPort": 61652,
   "targetOpened": true,
   "repoLoaded": true,
   "fullMap": {
-    "sequenceId": 14,
+    "sequenceId": 11,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 712.7000000029802,
-    "renderEnd": 712.8000000119209,
-    "durationMs": 0.10000000894069672,
-    "selectedCommitSha": "b019d54490e264dc5bf26d95e006c61c878485a2",
-    "renderedCommitSha": "b019d54490e264dc5bf26d95e006c61c878485a2",
+    "renderStart": 734.1999999880791,
+    "renderEnd": 734.2999999821186,
+    "durationMs": 0.09999999403953552,
+    "selectedCommitSha": "b6309de26a2eb2b73f636e6411a5f4796ad25430",
+    "renderedCommitSha": "b6309de26a2eb2b73f636e6411a5f4796ad25430",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 4,
@@ -35,17 +35,18 @@
     "nodesDrawn": 4,
     "edgesDrawn": 2,
     "labelsDrawn": 4,
+    "selectedNodeId": null,
     "transform": {
-      "x": 445.05,
-      "y": 442.9254051130245,
+      "x": 318.12,
+      "y": 399.8554051130245,
       "k": 1.8
     },
     "canvas": {
-      "clientWidth": 792,
-      "clientHeight": 772,
-      "width": 1584,
-      "height": 1544,
-      "distinctPixels": 234921
+      "clientWidth": 552,
+      "clientHeight": 708,
+      "width": 1104,
+      "height": 1416,
+      "distinctPixels": 166129
     },
     "summary": {
       "addedCount": 0,
@@ -60,17 +61,17 @@
     },
     "lodTier": "full",
     "isAnimating": true,
-    "timestamp": 712.8000000119209
+    "timestamp": 734.2999999821186
   },
   "focusChanges": {
-    "sequenceId": 60,
+    "sequenceId": 64,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 1196,
-    "renderEnd": 1196.1000000089407,
-    "durationMs": 0.10000000894069672,
-    "selectedCommitSha": "b019d54490e264dc5bf26d95e006c61c878485a2",
-    "renderedCommitSha": "b019d54490e264dc5bf26d95e006c61c878485a2",
+    "renderStart": 1232.5999999940395,
+    "renderEnd": 1232.5999999940395,
+    "durationMs": 0,
+    "selectedCommitSha": "b6309de26a2eb2b73f636e6411a5f4796ad25430",
+    "renderedCommitSha": "b6309de26a2eb2b73f636e6411a5f4796ad25430",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 2,
@@ -78,17 +79,18 @@
     "nodesDrawn": 2,
     "edgesDrawn": 1,
     "labelsDrawn": 2,
+    "selectedNodeId": null,
     "transform": {
-      "x": 427.717821972425,
-      "y": 545.8363723323108,
-      "k": 1.8
+      "x": 304.1384299031426,
+      "y": 553.4717186025559,
+      "k": 2.3672040808463812
     },
     "canvas": {
-      "clientWidth": 792,
-      "clientHeight": 772,
-      "width": 1584,
-      "height": 1544,
-      "distinctPixels": 21959
+      "clientWidth": 552,
+      "clientHeight": 708,
+      "width": 1104,
+      "height": 1416,
+      "distinctPixels": 38014
     },
     "summary": {
       "addedCount": 0,
@@ -103,32 +105,32 @@
     },
     "lodTier": "full",
     "isAnimating": false,
-    "timestamp": 1196.1000000089407
+    "timestamp": 1232.5999999940395
   },
   "camera": {
     "afterFocus": {
-      "x": 427.717821972425,
-      "y": 545.8363723323108,
-      "k": 1.8
+      "x": 300.32783688120605,
+      "y": 595.3389229425319,
+      "k": 2.5217921491043915
     },
     "afterUserZoom": {
-      "x": 427.717821972425,
-      "y": 545.8363723323108,
-      "k": 1.8
+      "x": 309.01551295842387,
+      "y": 692.7800242576923,
+      "k": 3.5
     },
     "afterWait": {
-      "x": 427.717821972425,
-      "y": 545.8363723323108,
-      "k": 1.8
+      "x": 309.01551295842387,
+      "y": 692.7800242576923,
+      "k": 3.5
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1787846553672,
-    "quitMs": 404,
+    "startedAt": 1787890183190,
+    "quitMs": 405,
     "remaining": "gone",
-    "before": "74561     1   6.4 343648 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "92328     1  22.5 287696 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "after": "gone"
   }
 }

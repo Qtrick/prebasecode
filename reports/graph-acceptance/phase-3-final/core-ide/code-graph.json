@@ -1,0 +1,52 @@
+{
+  "ok": true,
+  "failures": [],
+  "codeGraph": {
+    "opened": true,
+    "frameFound": true,
+    "metricName": "__prebaseGraphRenderMetrics",
+    "metrics": {
+      "nodesDrawn": 5,
+      "receivedNodeCount": 5,
+      "selectedNodeId": "file:README.md",
+      "networkLayoutMode": "radial",
+      "networkIdleAutoRotate": true,
+      "nodeHits": [
+        {
+          "id": "file:README.md",
+          "x": 421.1522978943081,
+          "y": 270.60294683541787
+        },
+        {
+          "id": "file:src/errors.ts",
+          "x": 334.9547292225291,
+          "y": 375.6167486514695
+        },
+        {
+          "id": "file:src/hello.ts",
+          "x": 313.6690644023805,
+          "y": 419.3853609015755
+        },
+        {
+          "id": "file:src/js-check.js",
+          "x": 562.9912167956091,
+          "y": 147.79377677976305
+        },
+        {
+          "id": "file:tsconfig.json",
+          "x": 197.68727652563663,
+          "y": 71.4398851762057
+        }
+      ]
+    },
+    "nodesDrawn": true,
+    "selection": true,
+    "layoutModes": true,
+    "rotate": true,
+    "drag": true,
+    "idleRotateArmed": true,
+    "pick": true,
+    "sphereVsRadial": true,
+    "selectionLock": true
+  }
+}

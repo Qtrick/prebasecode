@@ -66,6 +66,9 @@ export function temporalAcceptanceFailures(evidence) {
 
 	if (evidence.unexpectedError) failures.push('Workbench exposed an unexpected Error state');
 	if (evidence.stuckIndexing) failures.push('Temporal indexing remained stuck');
+	if (evidence.camera?.afterFocus?.k && evidence.camera?.afterUserZoom?.k && Math.abs(evidence.camera.afterUserZoom.k - evidence.camera.afterFocus.k) < 0.02) {
+		failures.push('manual camera zoom did not change the transform');
+	}
 	if (evidence.camera?.afterUserZoom?.k && evidence.camera?.afterWait?.k && Math.abs(evidence.camera.afterWait.k - evidence.camera.afterUserZoom.k) > 0.05) {
 		failures.push('Temporal camera stole the user zoom during a same-mode refresh');
 	}
@@ -333,17 +336,24 @@ async function run() {
 		await frame.locator('#netCanvas').screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-focus-changes-canvas.png' : 'temporal-focus-changes-canvas.png') });
 
 		const afterFocus = await readMetrics(frame);
-		await frame.getByRole('button', { name: 'Zoom in', exact: true }).click();
+		const canvas = frame.locator('#netCanvas');
+		const box = await canvas.boundingBox();
+		if (box) {
+			await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+			await page.mouse.wheel(0, -600);
+			await page.waitForTimeout(400);
+		}
 		const afterUserZoom = await readMetrics(frame);
+		if (afterUserZoom?.transform && afterFocus?.transform && Math.abs((afterUserZoom.transform.k || 0) - (afterFocus.transform.k || 0)) < 0.01) {
+			await page.mouse.wheel(0, -800);
+			await page.waitForTimeout(400);
+		}
 		await page.waitForTimeout(1500);
 		const afterWait = await readMetrics(frame);
 
-		await frame.getByRole('button', { name: 'Fit to screen', exact: true }).click();
-		await frame.getByRole('button', { name: 'Zoom in', exact: true }).click();
-		await frame.getByRole('button', { name: 'Zoom out', exact: true }).click();
-		await frame.getByRole('button', { name: 'Reset View', exact: true }).click();
-		await frame.getByRole('button', { name: 'Keep graph centered', exact: true }).click();
-		await frame.getByRole('button', { name: 'Fit to screen', exact: true }).click();
+		await frame.locator('#temporalFitBtn').click();
+		await frame.locator('#temporalCenterLockBtn').click();
+		await frame.locator('#temporalFitBtn').click();
 
 		const workbenchText = await page.locator('.monaco-workbench').innerText().catch(() => '');
 		evidence = {

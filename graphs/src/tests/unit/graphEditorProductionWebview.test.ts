@@ -8,6 +8,7 @@ import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { suite, test } from 'mocha';
 import { interpolateWebviewScript } from '../../host/workbench/temporalRuntimeContracts.js';
+import { computeTemporalFitTransform } from '../../view/temporal/temporalFocusContext.js';
 
 type Listener = (event: any) => void;
 
@@ -129,6 +130,8 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 		fill() { drawCalls.push({ type: 'fill', args: [] }); },
 		fillRect(...args: any[]) { drawCalls.push({ type: 'fillRect', args }); },
 		arc(...args: any[]) { drawCalls.push({ type: 'arc', args }); },
+		rect(...args: any[]) { drawCalls.push({ type: 'rect', args }); },
+		roundRect(...args: any[]) { drawCalls.push({ type: 'roundRect', args }); },
 		fillText(...args: any[]) { drawCalls.push({ type: 'fillText', args }); },
 		measureText() { return { width: 10 }; },
 		scale(...args: any[]) { drawCalls.push({ type: 'scale', args }); },
@@ -147,6 +150,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 
 	const postedMessages: any[] = [];
 	const windowListeners = new Map<string, Listener[]>();
+	let documentHidden = false;
 	const document = {
 		body: new FakeElement(),
 		documentElement: new FakeElement(),
@@ -166,7 +170,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 			list.push(listener);
 			windowListeners.set(type, list);
 		},
-		get hidden(): boolean { return false; },
+		get hidden(): boolean { return documentHidden; },
 	};
 
 	let rafCallback: ((ts: number) => void) | null = null;
@@ -258,7 +262,16 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 				rafCallback = null;
 				cb(ts);
 			}
-		}
+		},
+		hasPendingRaf() {
+			return Boolean(rafCallback);
+		},
+		setHidden(hidden: boolean) {
+			documentHidden = hidden;
+			for (const listener of windowListeners.get('visibilitychange') ?? []) {
+				listener({});
+			}
+		},
 	};
 }
 
@@ -270,6 +283,16 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		assert.ok(readyMsg, 'Ready message must be posted');
 		assert.strictEqual(readyMsg.generation, 42);
 		assert.strictEqual(readyMsg.payload.graphType, 'network');
+	});
+
+	test('hidden documents halt RAF; visibilitychange resumes without idle-rotating while hidden', () => {
+		const harness = createProductionWebviewHarness('network');
+		assert.ok(harness.hasPendingRaf(), 'bootstrap schedules a frame');
+		harness.setHidden(true);
+		harness.triggerRaf();
+		assert.equal(harness.hasPendingRaf(), false, 'document.hidden must not keep the RAF loop alive');
+		harness.setHidden(false);
+		assert.ok(harness.hasPendingRaf(), 'becoming visible must schedule a fresh frame');
 	});
 
 	test('Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity', () => {
@@ -392,6 +415,106 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 
 		// Verify selection message was dispatched or handled
 		assert.ok(harness.drawCalls.length > 0);
+	});
+
+	test('network render metrics include canvas-space nodeHits when recording is enabled', () => {
+		const harness = createProductionWebviewHarness('network');
+		vm.runInContext('window.__prebaseRecordRenderMetrics = true', harness.context);
+		harness.triggerMessage({
+			type: 'snapshot',
+			payload: {
+				snapshot: {
+					nodes: [
+						{ id: 'n1', kind: 'file', label: 'first.ts', path: 'src/first.ts', parentId: null, isEntry: true, depth: 0, meta: {} },
+						{ id: 'n2', kind: 'file', label: 'second.ts', path: 'src/second.ts', parentId: null, isEntry: false, depth: 1, meta: {} }
+					],
+					edges: [{ source: 'n1', target: 'n2' }],
+					positions3d: {
+						n1: { x: -100, y: 0, z: 0 },
+						n2: { x: 100, y: 0, z: 0 }
+					},
+					networkLayoutMode: 'organic',
+					scannedAt: 3000
+				},
+				graphType: 'network'
+			}
+		});
+		vm.runInContext('transform = { x: 12, y: -8, k: 2 }; dirty = true;', harness.context);
+		harness.triggerRaf(1080);
+		const runtime = vm.runInContext(`({
+			hits: window.__prebaseGraphRenderMetrics.nodeHits,
+			transform: { ...transform },
+			projected: { n1: { ...projected.n1 }, n2: { ...projected.n2 } }
+		})`, harness.context);
+		assert.ok(Array.isArray(runtime.hits));
+		assert.equal(runtime.hits.length, 2);
+		for (const hit of runtime.hits) {
+			const projectedHit = runtime.projected[hit.id];
+			assert.ok(projectedHit, `missing projected position for ${hit.id}`);
+			assert.ok(Math.abs(hit.x - (projectedHit.x * runtime.transform.k + runtime.transform.x)) < 0.001);
+			assert.ok(Math.abs(hit.y - (projectedHit.y * runtime.transform.k + runtime.transform.y)) < 0.001);
+		}
+	});
+
+	test('network nodeHits stay absent unless __prebaseRecordRenderMetrics is set', () => {
+		const harness = createProductionWebviewHarness('network');
+		vm.runInContext('window.__prebaseGraphRenderMetrics = { sequenceId: 7, nodeHits: [{ id: "stale", x: 1, y: 1 }] }', harness.context);
+		harness.triggerMessage({
+			type: 'snapshot',
+			payload: {
+				snapshot: {
+					nodes: [
+						{ id: 'n1', kind: 'file', label: 'first.ts', path: 'src/first.ts', parentId: null, isEntry: true, depth: 0, meta: {} }
+					],
+					edges: [],
+					positions3d: { n1: { x: 40, y: 10, z: 0 } },
+					networkLayoutMode: 'organic',
+					scannedAt: 3100
+				},
+				graphType: 'network'
+			}
+		});
+		harness.triggerRaf(1090);
+		assert.ok(harness.drawCalls.some(call => call.type === 'arc'), 'the network frame must actually draw so missing nodeHits is not a skipped RAF');
+		const runtime = vm.runInContext(`({
+			flag: window.__prebaseRecordRenderMetrics,
+			metrics: window.__prebaseGraphRenderMetrics && { ...window.__prebaseGraphRenderMetrics, nodeHits: window.__prebaseGraphRenderMetrics.nodeHits }
+		})`, harness.context);
+		assert.equal(runtime.flag, undefined);
+		assert.equal(runtime.metrics.sequenceId, 7, 'drawing without the record flag must not refresh metrics');
+		assert.equal(runtime.metrics.nodeHits.length, 1);
+		assert.equal(runtime.metrics.nodeHits[0].id, 'stale');
+		assert.equal(runtime.metrics.nodeHits[0].x, 1);
+		assert.equal(runtime.metrics.nodeHits[0].y, 1);
+	});
+
+	test('network nodeHits record at most 16 canvas-space hits', () => {
+		const harness = createProductionWebviewHarness('network');
+		const nodes = Array.from({ length: 18 }, (_, i) => ({
+			id: `n${i}`,
+			kind: 'file',
+			label: `f${i}.ts`,
+			path: `src/f${i}.ts`,
+			parentId: null,
+			isEntry: i === 0,
+			depth: i,
+			meta: {}
+		}));
+		const positions3d = Object.fromEntries(nodes.map((node, i) => [node.id, { x: i * 10, y: 0, z: 0 }]));
+		vm.runInContext('window.__prebaseRecordRenderMetrics = true', harness.context);
+		harness.triggerMessage({
+			type: 'snapshot',
+			payload: {
+				snapshot: { nodes, edges: [], positions3d, networkLayoutMode: 'organic', scannedAt: 3200 },
+				graphType: 'network'
+			}
+		});
+		harness.triggerRaf(1100);
+		const hits = vm.runInContext('window.__prebaseGraphRenderMetrics.nodeHits', harness.context);
+		assert.equal(hits.length, 16);
+		assert.equal(hits[0].id, 'n0');
+		assert.equal(hits[15].id, 'n15');
+		assert.equal(hits.some(hit => hit.id === 'n16' || hit.id === 'n17'), false);
 	});
 
 	test('Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting', () => {
@@ -523,8 +646,8 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 				baseCommitSha: 'base',
 				targetCommitSha: 'target',
 				nodes: [
-					{ entityId: 'left', label: 'left.ts', path: 'src/left.ts', changeKind: 'unchanged', x: 120, y: 80 },
-					{ entityId: 'right', label: 'right.ts', path: 'src/right.ts', changeKind: 'modified', x: 320, y: 180 },
+					{ entityId: 'left', canonicalNodeId: 'left', label: 'left.ts', path: 'src/left.ts', kind: 'file' as const, changeKind: 'unchanged' as const, x: 120, y: 80 },
+					{ entityId: 'right', canonicalNodeId: 'right', label: 'right.ts', path: 'src/right.ts', kind: 'file' as const, changeKind: 'modified' as const, x: 320, y: 180 },
 				],
 				edges: [],
 				summary: { addedCount: 0, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 1 },
@@ -547,11 +670,12 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 				insets: getUsableInsets(),
 				metrics: { ...window.__prebaseGraphRenderMetrics }
 			})`, harness.context);
-			const usableCenter = {
-				x: runtime.insets.left + (800 - runtime.insets.left - runtime.insets.right) / 2,
-				y: runtime.insets.top + (600 - runtime.insets.top - runtime.insets.bottom) / 2,
-			};
-			const graphCenter = { x: 221.75, y: 131.75 };
+			const expected = computeTemporalFitTransform(diff.nodes, 800, 600, {
+				padding: 64,
+				insets: runtime.insets,
+				minZoom: 0.15,
+				maxZoom: 1.8,
+			});
 
 			assert.ok(
 				Number.isFinite(runtime.transform.x) &&
@@ -560,8 +684,9 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 				`${messageType} must produce a finite transform`,
 			);
 			assert.notDeepStrictEqual(runtime.transform, { x: 0, y: 0, k: 1 }, `${messageType} must replace the default transform`);
-			assert.ok(Math.abs(runtime.transform.x + graphCenter.x * runtime.transform.k - usableCenter.x) < 0.001);
-			assert.ok(Math.abs(runtime.transform.y + graphCenter.y * runtime.transform.k - usableCenter.y) < 0.001);
+			assert.ok(Math.abs(runtime.transform.x - expected.x) < 0.001, `${messageType} x ${runtime.transform.x} vs ${expected.x}`);
+			assert.ok(Math.abs(runtime.transform.y - expected.y) < 0.001, `${messageType} y ${runtime.transform.y} vs ${expected.y}`);
+			assert.ok(Math.abs(runtime.transform.k - expected.k) < 0.001, `${messageType} k ${runtime.transform.k} vs ${expected.k}`);
 			assert.deepStrictEqual({
 				receivedNodeCount: runtime.metrics.receivedNodeCount,
 				visibleNodeCount: runtime.metrics.visibleNodeCount,
@@ -598,7 +723,7 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 					baseCommitSha: 'base',
 					targetCommitSha: 'target',
 					nodes: [
-						{ entityId: 'left', label: 'left.ts', path: 'src/left.ts', changeKind: 'unchanged', x: Number.NaN, y: Number.NaN },
+						{ entityId: 'left', canonicalNodeId: 'left', label: 'left.ts', path: 'src/left.ts', kind: 'file' as const, changeKind: 'unchanged' as const, x: Number.NaN, y: Number.NaN },
 					],
 					edges: [],
 					summary: { addedCount: 0, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 1 },
@@ -617,8 +742,8 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 				baseCommitSha: 'base',
 				targetCommitSha: 'target',
 				nodes: [
-					{ entityId: 'left', label: 'left.ts', path: 'src/left.ts', changeKind: 'unchanged', x: 120, y: 80 },
-					{ entityId: 'right', label: 'right.ts', path: 'src/right.ts', changeKind: 'modified', x: 320, y: 180 },
+					{ entityId: 'left', canonicalNodeId: 'left', label: 'left.ts', path: 'src/left.ts', kind: 'file' as const, changeKind: 'unchanged' as const, x: 120, y: 80 },
+					{ entityId: 'right', canonicalNodeId: 'right', label: 'right.ts', path: 'src/right.ts', kind: 'file' as const, changeKind: 'modified' as const, x: 320, y: 180 },
 				],
 				edges: [],
 				summary: { addedCount: 0, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 1 },
@@ -640,7 +765,7 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 					baseCommitSha: 'base',
 					targetCommitSha: 'target',
 					nodes: [
-						{ entityId: 'kept', label: 'kept.ts', path: 'src/kept.ts', changeKind: 'unchanged', x: -60, y: 0 },
+						{ entityId: 'kept', canonicalNodeId: 'kept', label: 'kept.ts', path: 'src/kept.ts', kind: 'file' as const, changeKind: 'unchanged' as const, x: -60, y: 0 },
 						{ entityId: 'added', label: 'added.ts', path: 'src/added.ts', changeKind: 'added', x: 0, y: 0 },
 						{ entityId: 'modified', label: 'modified.ts', path: 'src/modified.ts', changeKind: 'modified', x: 60, y: 0 },
 						{ entityId: 'removed', label: 'removed.ts', path: 'src/removed.ts', changeKind: 'removed', x: 120, y: 0 },
@@ -676,7 +801,7 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 					targetCommitSha: 'target',
 					nodes: [
 						{ entityId: 'changed', label: 'changed.ts', path: 'src/changed.ts', changeKind: 'modified', x: 0, y: 0 },
-						{ entityId: 'unchanged', label: 'unchanged.ts', path: 'src/unchanged.ts', changeKind: 'unchanged', x: 80, y: 0 },
+						{ entityId: 'unchanged', canonicalNodeId: 'unchanged', label: 'unchanged.ts', path: 'src/unchanged.ts', kind: 'file' as const, changeKind: 'unchanged' as const, x: 80, y: 0 },
 					],
 					edges: [],
 					summary: { addedCount: 0, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: 1 },
@@ -695,6 +820,77 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		assert.ok(
 			harness.drawCalls.some(call => call.type === 'arc'),
 			'a nonzero Focus Changes diff must draw its changed node',
+		);
+	});
+
+	test('blank temporal canvas records nodesDrawn 0 on __prebaseGraphRenderMetrics, not __prebaseGraphMetrics', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		vm.runInContext('window.__prebaseRecordRenderMetrics = true', harness.context);
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: {
+				selectedCommitSha: 'target',
+				renderedCommitSha: 'target',
+				displayMode: 'state',
+				diff: {
+					baseCommitSha: 'base',
+					targetCommitSha: 'target',
+					nodes: [],
+					edges: [],
+					summary: { addedCount: 0, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 0 },
+				},
+			},
+		});
+		harness.triggerRaf(1300);
+		const runtime = vm.runInContext(`({
+			render: window.__prebaseGraphRenderMetrics,
+			wrong: window.__prebaseGraphMetrics,
+			canvasDisplay: document.getElementById('netCanvas').style.display,
+		})`, harness.context);
+		assert.equal(runtime.wrong, undefined, 'legacy __prebaseGraphMetrics must not be the metrics source');
+		assert.ok(runtime.render, 'production metrics must be written to __prebaseGraphRenderMetrics');
+		assert.equal(runtime.render.nodesDrawn, 0);
+		assert.equal(runtime.render.receivedNodeCount, 0);
+		assert.equal(runtime.canvasDisplay, 'block', 'an empty canvas can still be visible');
+	});
+
+	test('Temporal Full Map draws community guides as rounded AABBs from bounds, not giant circles', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: {
+				displayMode: 'state',
+				diff: {
+					baseCommitSha: 'base',
+					targetCommitSha: 'target',
+					nodes: [
+						{ entityId: 'left', canonicalNodeId: 'left', label: 'left.ts', path: 'src/left.ts', kind: 'file' as const, changeKind: 'unchanged' as const, x: -40, y: 0 },
+						{ entityId: 'right', canonicalNodeId: 'right', label: 'right.ts', path: 'src/right.ts', kind: 'file' as const, changeKind: 'unchanged' as const, x: 40, y: 0 },
+					],
+					edges: [],
+					guides: [{
+						id: 'ui',
+						label: 'UI',
+						color: '#6366f1',
+						x: 0,
+						y: 0,
+						radius: 400,
+						bounds: { minX: -50, minY: -16, maxX: 50, maxY: 16, width: 100, height: 32 },
+						nodeIds: ['left', 'right'],
+						nodeCount: 2,
+					}],
+					summary: { addedCount: 0, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 2 },
+				},
+			},
+		});
+		harness.triggerRaf();
+		const boxes = harness.drawCalls.filter(call => call.type === 'roundRect' || call.type === 'rect');
+		assert.ok(boxes.length >= 1, 'Full Map community guides must fill a rounded AABB');
+		assert.ok(boxes.some(call => call.args[0] === -50 && call.args[1] === -16 && call.args[2] === 100 && call.args[3] === 32));
+		assert.equal(
+			harness.drawCalls.filter(call => call.type === 'arc' && Number(call.args[2]) >= 40).length,
+			0,
+			'community guides must not stroke a giant circumcircle',
 		);
 	});
 });

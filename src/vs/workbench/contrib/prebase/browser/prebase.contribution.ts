@@ -25,6 +25,11 @@ import { IWorkspaceContextService } from '../../../../platform/workspace/common/
 import { IWorkspaceTrustManagementService } from '../../../../platform/workspace/common/workspaceTrust.js';
 import { ILanguageModelToolsService } from '../../chat/common/tools/languageModelToolsService.js';
 import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
+import { IWorkbenchThemeService } from '../../../services/themes/common/workbenchThemeService.js';
+import { IConfigurationService } from '../../../../platform/configuration/common/configuration.js';
+import { getZoomLevel, setZoomLevel } from '../../../../base/browser/browser.js';
+import { mainWindow } from '../../../../base/browser/window.js';
+import { requireSmokeTestDriver } from '../common/smokeTestGuard.js';
 import { VSBuffer } from '../../../../base/common/buffer.js';
 import { IOutputChannelRegistry, IOutputService, Extensions as OutputExtensions } from '../../../services/output/common/output.js';
 import { IWorkspacesService } from '../../../../platform/workspaces/common/workspaces.js';
@@ -35,6 +40,10 @@ import { PREBASE_RUNTIME_CHANNEL_ID, PREBASE_RUNTIME_CHANNEL_LABEL } from '../co
 import type { PreBaseViewportPreset } from '../common/runtime/viewportPresets.js';
 import { IPreBaseRuntimeService, PreBaseRuntimeService } from './prebaseRuntimeService.js';
 import { IPreBaseDesktopRuntimeService } from './prebaseDesktopRuntimeService.js';
+// eslint-disable-next-line local/code-import-patterns -- Graph sources are intentionally mounted here through the graphs ownership symlink.
+import { IPreBaseCanonicalParseService } from '../graphs/host/workbench/workbenchCanonicalParseService.js';
+// eslint-disable-next-line local/code-import-patterns -- Graph sources are intentionally mounted here through the graphs ownership symlink.
+import { IPreBaseTemporalGraphService } from '../graphs/host/workbench/workbenchTemporalGraphService.js';
 import { stopDesktopSessionForMagnus } from '../common/runtime/desktopStopForMagnus.js';
 import type { DesktopLaunchMode } from '../common/runtime/desktopTypes.js';
 import { isRecognizedDesktopApp, isTauriProfile } from '../common/runtime/desktopTypes.js';
@@ -1036,9 +1045,7 @@ registerAction2(class extends Action2 {
 		super({ id: 'prebase.test.invokeLanguageModelTool', title: localize2('prebase.test.invokeLanguageModelTool', "Invoke Language Model Tool (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
 	async run(accessor: ServicesAccessor, toolId: string, parameters?: Record<string, unknown>) {
-		if (!accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver) {
-			throw new Error('prebase.test.invokeLanguageModelTool requires --enable-smoke-test-driver');
-		}
+		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.invokeLanguageModelTool');
 		const commandService = accessor.get(ICommandService);
 		const tools = accessor.get(ILanguageModelToolsService);
 		await commandService.executeCommand('_setContext', 'vscode.chat.tools.global.autoApprove.testMode', true);
@@ -1053,16 +1060,110 @@ registerAction2(class extends Action2 {
 				return part.value;
 			}
 			if (part.kind === 'data') {
-				return `[data:${part.mimeType ?? 'unknown'}]`;
+				return '[data]';
 			}
 			return `[${part.kind}]`;
 		}) ?? [];
+		const toolError = Boolean((result as { isError?: boolean }).isError);
 		return {
-			ok: !result.isError,
+			ok: !toolError,
 			toolId,
-			isError: Boolean(result.isError),
+			isError: toolError,
 			content: parts.join('\n').slice(0, 80_000),
 		};
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.test.isSmokeDriver', title: localize2('prebase.test.isSmokeDriver', "Is Smoke Test Driver (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	run(accessor: ServicesAccessor) {
+		return Boolean(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.test.getDiagnostics', title: localize2('prebase.test.getDiagnostics', "Get PreBase Diagnostics (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	async run(accessor: ServicesAccessor, request?: { applyColorTheme?: string; zoomLevel?: number }) {
+		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.getDiagnostics');
+		const allowedThemes = new Set(['PreBase Dark', 'PreBase Light', 'Default High Contrast', 'Default High Contrast Light', 'Dark Modern', 'Light Modern']);
+		const applyId = typeof request?.applyColorTheme === 'string' ? request.applyColorTheme : '';
+		const zoom = request?.zoomLevel;
+		const themeService = accessor.get(IWorkbenchThemeService);
+		const configurationService = accessor.get(IConfigurationService);
+		const commandService = accessor.get(ICommandService);
+		let parserActiveRequests = 0;
+		let temporalActiveWrites = 0;
+		let runtimePreviewServerRunning = false;
+		let runtimePreviewStatus = '';
+		let desktopSessionState: Record<string, unknown> | null = null;
+		try { parserActiveRequests = accessor.get(IPreBaseCanonicalParseService).getActiveRequestCount(); } catch { /* optional */ }
+		try { temporalActiveWrites = accessor.get(IPreBaseTemporalGraphService).getActiveWriteCount(); } catch { /* optional */ }
+		try {
+			const runtimeState = accessor.get(IPreBaseRuntimeService).getStateForMagnus();
+			runtimePreviewServerRunning = Boolean(runtimeState.serverRunning);
+			runtimePreviewStatus = typeof runtimeState.previewStatus === 'string' ? runtimeState.previewStatus.slice(0, 120) : '';
+		} catch { /* optional */ }
+		try {
+			const session = getDesktopRuntimeService(accessor)?.getSession();
+			desktopSessionState = session ? { state: session.state, pid: session.pid, framework: session.profile.framework } : null;
+		} catch { /* optional */ }
+		if (typeof zoom === 'number' && Number.isFinite(zoom) && zoom >= 0 && zoom <= 8) {
+			// ponytail: do not await configuration listeners; they can deadlock inside executeCommand.
+			setZoomLevel(zoom, mainWindow);
+			void configurationService.updateValue('window.zoomLevel', zoom);
+		}
+		if (applyId && allowedThemes.has(applyId)) {
+			const themes = await themeService.getColorThemes();
+			const match = themes.find(item => item.settingsId === applyId || item.id === applyId || item.label === applyId);
+			if (match) {
+				await themeService.setColorTheme(match.id, 'auto');
+			}
+		}
+		const theme = themeService.getColorTheme();
+		const result: Record<string, unknown> = {
+			parserActiveRequests,
+			temporalActiveWrites,
+			runtimePreviewServerRunning,
+			runtimePreviewStatus,
+			desktopSessionState,
+			magnusStreamActive: 0,
+			magnusPacingActive: 0,
+			magnusSmokeEnabled: false,
+			magnusSourceCancelled: false,
+			magnusSourceChunks: 0,
+			colorTheme: theme.settingsId,
+			colorThemeType: theme.type,
+			zoomLevel: getZoomLevel(mainWindow),
+		};
+		if (applyId || typeof zoom === 'number') {
+			return result;
+		}
+		try {
+			const magnusStream = await Promise.race([
+				commandService.executeCommand('prebase.magnus.getStreamDiagnostics') as Promise<Record<string, unknown> | undefined>,
+				new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), 2000)),
+			]);
+			result.magnusStreamActive = Number(magnusStream?.streamActive ?? 0);
+			result.magnusPacingActive = Number(magnusStream?.pacingActive ?? 0);
+			result.magnusSmokeEnabled = Boolean(magnusStream?.smokeEnabled);
+			result.magnusSourceCancelled = Boolean(magnusStream?.sourceCancelled);
+			result.magnusSourceChunks = Number(magnusStream?.sourceChunks ?? 0);
+		} catch { /* same */ }
+		return result;
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.test.installMagnusSmokeTransport', title: localize2('prebase.test.installMagnusSmokeTransport', "Install Magnus Smoke Transport (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	async run(accessor: ServicesAccessor) {
+		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.installMagnusSmokeTransport');
+		return accessor.get(ICommandService).executeCommand('prebase.magnus.installSmokeTransport');
 	}
 });
 

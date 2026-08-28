@@ -247,6 +247,10 @@ export class TemporalRepositoryRuntime {
 		return this._inFlightBySha.has(commitSha);
 	}
 
+	countInFlightIngests(): number {
+		return this._inFlightBySha.size;
+	}
+
 	getIndexStatus(commitSha: string): TemporalIndexStatus | undefined {
 		return this._statusBySha.get(commitSha);
 	}

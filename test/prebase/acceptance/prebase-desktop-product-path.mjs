@@ -289,7 +289,6 @@ async function run() {
 		ok: results.every(result => result.ok),
 		results: results.map(result => ({ framework: result.framework, ok: result.ok, failures: result.failures, state: result.state })),
 	};
-	writeFileSync(join(evidenceRoot, 'manifest.json'), JSON.stringify({ productPath: combined, generatedAt: new Date().toISOString() }, null, 2));
 	console.log(JSON.stringify(combined, null, 2));
 	if (!combined.ok) {
 		process.exitCode = 1;

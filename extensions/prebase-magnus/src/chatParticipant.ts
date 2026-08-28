@@ -61,6 +61,11 @@ export function visibleAssistantText(raw: string): string {
 	return raw;
 }
 
+export const magnusLiveStreamDiagnostics = {
+	streamActive: 0,
+	pacingActive: 0,
+};
+
 async function streamPacedCandidate(
 	aiService: PreBaseAIService,
 	request: Parameters<PreBaseAIService['streamCandidate']>[0],
@@ -68,6 +73,8 @@ async function streamPacedCandidate(
 	onPiece: (piece: string) => void,
 	inspectChunk?: (chunk: { text?: string; candidate?: AIGenerateResponseCandidate }, sink: LivePacedSink) => boolean,
 ): Promise<AIGenerateResult> {
+	magnusLiveStreamDiagnostics.streamActive++;
+	magnusLiveStreamDiagnostics.pacingActive++;
 	const sink = createLivePacedSink(onPiece, { token });
 	try {
 		return await aiService.streamCandidate(request, chunk => {
@@ -80,6 +87,8 @@ async function streamPacedCandidate(
 		}, token);
 	} finally {
 		await sink.close();
+		magnusLiveStreamDiagnostics.streamActive = Math.max(0, magnusLiveStreamDiagnostics.streamActive - 1);
+		magnusLiveStreamDiagnostics.pacingActive = Math.max(0, magnusLiveStreamDiagnostics.pacingActive - 1);
 	}
 }
 

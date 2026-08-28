@@ -90,14 +90,14 @@ export function derivePostCollisionGuides(
 			if (distSq > maxDistSq) maxDistSq = distSq;
 		}
 
-		const radius = Math.round(Math.sqrt(maxDistSq) + padding);
+		const radius = Math.round(Math.sqrt(maxDistSq) + Math.min(padding, 16));
 		const bounds: TemporalRegionBounds = {
 			minX: minX - padding,
 			minY: minY - padding,
 			maxX: maxX + padding,
 			maxY: maxY + padding,
-			width: Math.max(radius * 2, (maxX - minX) + padding * 2),
-			height: Math.max(radius * 2, (maxY - minY) + padding * 2),
+			width: (maxX - minX) + padding * 2,
+			height: (maxY - minY) + padding * 2,
 		};
 
 		guides.push({
@@ -188,7 +188,7 @@ export function computeSemanticTemporalInitialLayout(
 		const level = sortedRankLevels[r];
 		const commsInRank = depthRanks.get(level)!;
 		const totalComms = commsInRank.length;
-		const targetCols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(totalComms * 1.5))));
+		const targetCols = Math.max(2, Math.min(7, Math.ceil(Math.sqrt(totalComms * 2.4))));
 		const numSubRows = Math.ceil(totalComms / targetCols);
 
 		let rankH = 0;
@@ -200,10 +200,10 @@ export function computeSemanticTemporalInitialLayout(
 				const rVal = commRadiusMap.get(commsInRank[idx].id) || 50;
 				if (rVal > subRowMaxR) subRowMaxR = rVal;
 			}
-			rankH += subRowMaxR * 2 + 32;
+			rankH += subRowMaxR * 2 + 20;
 		}
 		rankHeights.push(rankH);
-		totalMacroHeight += rankH + (r > 0 ? 40 : 0);
+		totalMacroHeight += rankH + (r > 0 ? 24 : 0);
 	}
 
 	let startY = -Math.round(totalMacroHeight / 2);
@@ -211,7 +211,7 @@ export function computeSemanticTemporalInitialLayout(
 		const level = sortedRankLevels[r];
 		const commsInRank = depthRanks.get(level)!;
 		const totalComms = commsInRank.length;
-		const targetCols = Math.max(1, Math.min(4, Math.ceil(Math.sqrt(totalComms * 1.5))));
+		const targetCols = Math.max(2, Math.min(7, Math.ceil(Math.sqrt(totalComms * 2.4))));
 		const numSubRows = Math.ceil(totalComms / targetCols);
 
 		let subRowStartY = startY;
@@ -224,26 +224,29 @@ export function computeSemanticTemporalInitialLayout(
 			let maxR = 0;
 			for (let c = 0; c < subRowComms.length; c++) {
 				const rVal = commRadiusMap.get(subRowComms[c].id) || 50;
-				subRowWidth += rVal * 2 + 32;
+				subRowWidth += rVal * 2 + 24;
 				if (rVal > maxR) maxR = rVal;
 			}
 
 			let currentX = -Math.round(subRowWidth / 2);
+			if (sortedRankLevels.length > 2 && totalComms <= 2) {
+				currentX += (r % 2 === 0 ? -1 : 1) * Math.round(maxR * 1.85);
+			}
 			const rowY = subRowStartY + maxR;
 
 			for (let c = 0; c < subRowComms.length; c++) {
 				const comm = subRowComms[c];
 				const rVal = commRadiusMap.get(comm.id) || 50;
 				const cx = currentX + rVal;
-				currentX += rVal * 2 + 32;
+				currentX += rVal * 2 + 24;
 
 				clusterCenters.set(comm.id, { x: cx, y: rowY, estimatedRadius: rVal });
 			}
 
-			subRowStartY += maxR * 2 + 32;
+			subRowStartY += maxR * 2 + 20;
 		}
 
-		startY = subRowStartY + 36;
+		startY = subRowStartY + 20;
 	}
 
 	// 3. Intra-Community Micro Placement (Golden Angle Phyllotaxis centered on primary hub)

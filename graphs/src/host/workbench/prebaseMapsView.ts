@@ -116,7 +116,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _searchCts: CancellationTokenSource | null = null;
 	private _searchDebounceTimer: any = null;
 	private _historyExpanded = true;
-	private _refreshQueued = false;
+	private _refreshTimer: ReturnType<typeof setTimeout> | undefined;
 
 	constructor(
 		options: IViewletViewOptions,
@@ -156,6 +156,12 @@ export class PreBaseMapsViewPane extends ViewPane {
 				this._queueRefresh();
 			}
 		}));
+		this._register({ dispose: () => {
+			if (this._refreshTimer !== undefined) {
+				clearTimeout(this._refreshTimer);
+				this._refreshTimer = undefined;
+			}
+		} });
 	}
 
 	protected override renderBody(container: HTMLElement): void {
@@ -1167,17 +1173,16 @@ export class PreBaseMapsViewPane extends ViewPane {
 	}
 
 	private _queueRefresh(): void {
-		if (this._refreshQueued) {
+		if (this._refreshTimer !== undefined) {
 			return;
 		}
-		this._refreshQueued = true;
-		queueMicrotask(() => {
-			this._refreshQueued = false;
+		this._refreshTimer = setTimeout(() => {
+			this._refreshTimer = undefined;
 			if (!this._scroll) {
 				return;
 			}
 			this._refresh();
-		});
+		}, 120);
 	}
 
 	private _refresh(): void {
