@@ -27,7 +27,7 @@ import { IEnvironmentMainService } from '../../environment/electron-main/environ
 import { createDecorator, IInstantiationService } from '../../instantiation/common/instantiation.js';
 import { ILifecycleMainService, IRelaunchOptions } from '../../lifecycle/electron-main/lifecycleMainService.js';
 import { ILogService } from '../../log/common/log.js';
-import { FocusMode, ICommonNativeHostService, INativeHostOptions, INativeSystemWideKeybinding, INativeSystemWideKeybindingResult, IOSProperties, IOSStatistics, IStartTracingOptions, IToastOptions, IToastResult, PowerSaveBlockerType, SystemIdleState, ThermalState } from '../common/native.js';
+import { FocusMode, ICommonNativeHostService, INativeHostOptions, INativeSystemWideKeybinding, INativeSystemWideKeybindingResult, IOSProperties, IOSStatistics, IStartTracingOptions, IToastOptions, IToastResult, IWebContentsInventoryEntry, PowerSaveBlockerType, SystemIdleState, ThermalState } from '../common/native.js';
 import { IGlobalKeybindingsMainService } from '../../globalKeybindings/electron-main/globalKeybindingsMainService.js';
 import { IProductService } from '../../product/common/productService.js';
 import { IPartsSplash } from '../../theme/common/themeService.js';
@@ -984,6 +984,46 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
 
 	async killProcess(windowId: number | undefined, pid: number, code: string): Promise<void> {
 		process.kill(pid, code);
+	}
+
+	/**
+	 * Smoke diagnostics only request this through a guarded workbench command.
+	 * Do not expose URLs here: lifecycle evidence needs categories, never content
+	 * or potentially sensitive origins.
+	 */
+	async getWebContentsInventory(_windowId: number | undefined): Promise<IWebContentsInventoryEntry[]> {
+		return webContents.getAllWebContents().flatMap(contents => {
+			try {
+				const destroyed = contents.isDestroyed();
+				const url = destroyed ? '' : contents.getURL();
+				const owner = BrowserWindow.fromWebContents(contents);
+				const ownerCategory: IWebContentsInventoryEntry['ownerCategory'] = owner && this.windowsMainService.getWindowById(owner.id)
+					? 'workbenchWindow'
+					: owner && this.auxiliaryWindowsMainService.getWindowByWebContents(contents)
+						? 'auxiliaryWindow'
+						: 'unowned';
+				return [{
+					id: contents.id,
+					type: contents.getType(),
+					destroyed,
+					loading: !destroyed && contents.isLoadingMainFrame(),
+					urlCategory: this.webContentsUrlCategory(url),
+					ownerCategory,
+				}];
+			} catch {
+				return [];
+			}
+		});
+	}
+
+	private webContentsUrlCategory(url: string): IWebContentsInventoryEntry['urlCategory'] {
+		if (!url) return 'empty';
+		if (url.startsWith('vscode-webview://')) return 'webview';
+		if (url.startsWith('vscode-file://') || url.startsWith('vscode-remote://')) return 'workbench';
+		if (url.startsWith('devtools://')) return 'devtools';
+		if (url.startsWith('file://')) return 'file';
+		if (/^https?:\/\//i.test(url)) return 'external';
+		return 'other';
 	}
 
 	//#endregion

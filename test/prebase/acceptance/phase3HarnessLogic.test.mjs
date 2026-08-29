@@ -5,12 +5,15 @@ import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { classifyHosts, lsofSelectionArgs, privacyFailures } from './prebase-privacy-runtime.mjs';
 import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER_METRICS_NAME, themesA11yFailures } from './prebase-core-ide-live.mjs';
-import { activeSoakFailures } from './prebase-active-soak.mjs';
+import { ACTIVE_SOAK_FINAL_MIN_DURATION_MS, activeSoakEvidenceTarget, activeSoakFailures } from './prebase-active-soak.mjs';
 import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
 import { findGraphFrame, formatPhase3LockBlockMessage, waitForWorkbenchDriver, workbenchCommandWithTimeout } from './workbenchHarness.mjs';
 import { PHASE3_REQUIRED_EVIDENCE, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
+import { PHASE3_EVIDENCE_SCHEMA_VERSION, phase3EvidenceMetadata } from './phase3Evidence.mjs';
+import { assuranceCommandLabel, assuranceEvidenceOk, PHASE3_ASSURANCE_COMMANDS, reportedTestCount } from './prebase-phase3-assurance.mjs';
+import { lifecycleFailures } from './prebase-process-leak-diag.mjs';
 
 const acceptanceDir = dirname(fileURLToPath(import.meta.url));
 const repoRoot = join(acceptanceDir, '../../..');
@@ -57,6 +60,10 @@ function provenA11y() {
 		zoom200: true,
 		beforeZoom: { zoom: 1, width: 1200, zoomLevel: 0, innerWidth: 1200 },
 		afterZoom: { zoom: 2, width: 600, zoomLevel: 2, innerWidth: 600 },
+		screenReaderAuto: 'auto',
+		screenReaderOn: 'on',
+		graphLiveRegion: true,
+		prebaseForcesAccessibilityOff: false,
 	};
 }
 
@@ -619,6 +626,9 @@ test('core-ide live proves layouts via Maps data-network-layout chips and metric
 	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
 	const maps = readFileSync(join(acceptanceDir, '../../../graphs/src/host/workbench/prebaseMapsView.ts'), 'utf8');
 	assert.match(maps, /dataset\['networkLayout'\] = m\.id/);
+	assert.match(maps, /layoutCol\.style\.flexWrap = 'wrap'/);
+	assert.match(maps, /localize\('prebase\.maps\.liveBadge', "Live"\)/);
+	assert.doesNotMatch(maps, /textContent = ['"]●|localize\([^)]*●/);
 	assert.match(live, /button\[data-network-layout="\$\{mode\}"\]/);
 	assert.match(live, /layoutModes: Boolean\(sphereMode && radialMode && sphereMode !== radialMode\)/);
 	assert.match(live, /sphereVsRadial: sphereMode === 'sphere' && radialMode === 'radial'/);
@@ -630,6 +640,53 @@ test('core-ide live proves layouts via Maps data-network-layout chips and metric
 	assert.doesNotMatch(live, /afterInner !== beforeInner|devicePixelRatio/);
 	assert.doesNotMatch(live, /Math\.max\(8, hits\[0\]\.x\)/);
 	assert.match(live, /after > before/);
+});
+
+test('Runtime Preview and Desktop Test Lab keep Detect accessible name and primary/secondary hierarchy', () => {
+	const runtime = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseRuntimeView.ts'), 'utf8');
+	assert.match(runtime, /localize\('prebase\.runtime\.detect', "Detect"\)/);
+	assert.match(runtime, /localize\('prebase\.runtime\.detectAria', "Detect Configurations"\)/);
+	assert.match(runtime, /setAttribute\('aria-label', localize\('prebase\.runtime\.detectAria'/);
+	const start = runtime.indexOf("localize('prebase.runtime.start'");
+	const detect = runtime.indexOf("localize('prebase.runtime.detect'");
+	const startPrimary = runtime.slice(start, start + 280);
+	const detectSlice = runtime.slice(detect, detect + 280);
+	assert.match(startPrimary, /'primary'/);
+	assert.match(detectSlice, /'secondary'/);
+	assert.match(runtime, /localize\('prebase\.runtime\.desktopStart', "Start Desktop"\)[\s\S]{0,120}'primary'/);
+	assert.match(runtime, /localize\('prebase\.runtime\.desktopStop', "Stop Desktop"\)[\s\S]{0,120}'secondary'/);
+	assert.match(runtime, /--vscode-button-background/);
+	assert.match(runtime, /--vscode-button-secondaryBackground/);
+	assert.match(runtime, /--vscode-button-foreground/);
+	assert.match(runtime, /--vscode-button-secondaryForeground/);
+});
+
+test('Web Search settings put hosted hybrid first and hide local keys behind details', () => {
+	const settings = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts'), 'utf8');
+	assert.match(settings, /hosted hybrid web context when you are signed in/);
+	assert.match(settings, /Hosted Hybrid Web Context is the default for signed-in users/);
+	assert.match(settings, /Configure local web search…/);
+	const hostedIdx = settings.indexOf('webSearchHosted');
+	const advancedIdx = settings.indexOf('webSearchAdvanced');
+	const detailsIdx = settings.indexOf("document.createElement('details')");
+	assert.ok(hostedIdx > 0 && advancedIdx > hostedIdx, 'hosted hybrid copy must appear before local-key advanced summary');
+	assert.ok(detailsIdx > 0 && settings.indexOf('setLinkupKey') > detailsIdx, 'local discovery key controls must live inside details');
+	assert.ok(settings.indexOf('setFirecrawlKey') > detailsIdx, 'local page-fetch key controls must live inside details');
+	assert.match(settings, /resetBtn\.textContent = localize\('prebase\.settings\.resetAll', "Reset all"\)/);
+	assert.doesNotMatch(settings, /⟳|Reset all ⟳|textContent = ['"]⟳/);
+	assert.match(settings, /--vscode-button-background/);
+	assert.match(settings, /--vscode-button-secondaryBackground/);
+	const onboarding = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseOnboardingEditor.ts'), 'utf8');
+	assert.match(onboarding, /--vscode-button-background/);
+	assert.match(onboarding, /--vscode-button-secondaryBackground/);
+	assert.match(onboarding, /--vscode-button-foreground/);
+	assert.match(onboarding, /--vscode-button-secondaryForeground/);
+	const home = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseHomeEditor.ts'), 'utf8');
+	assert.match(home, /--vscode-button-background/);
+	assert.match(home, /--vscode-button-secondaryBackground/);
+	assert.match(home, /--vscode-button-foreground/);
+	assert.match(home, /--vscode-button-secondaryForeground/);
+	assert.doesNotMatch(home, /primary \? '#042f2e'/);
 });
 
 test('active soak rejects one blocked sample and SIGKILL', () => {
@@ -733,6 +790,7 @@ test('active-soak final evidence rejects diagnostic, short, and stale-HEAD recor
 	const current = 'current-head';
 	const valid = {
 		ok: true,
+		scenario: 'active-soak',
 		evidenceKind: 'final',
 		durationMs: activeSoak.minDurationMs,
 		sourceHead: current,
@@ -743,11 +801,31 @@ test('active-soak final evidence rejects diagnostic, short, and stale-HEAD recor
 	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, { ...valid, sourceHead: 'stale-head' }).ok, false);
 });
 
+test('short soak writes diagnostic evidence and must not overwrite canonical final', () => {
+	assert.equal(ACTIVE_SOAK_FINAL_MIN_DURATION_MS, 10 * 60 * 1000);
+	assert.deepEqual(activeSoakEvidenceTarget(ACTIVE_SOAK_FINAL_MIN_DURATION_MS - 1), {
+		evidenceKind: 'diagnostic',
+		fileName: 'active-diagnostic.json',
+	});
+	assert.deepEqual(activeSoakEvidenceTarget(ACTIVE_SOAK_FINAL_MIN_DURATION_MS), {
+		evidenceKind: 'final',
+		fileName: 'active.json',
+	});
+	const active = readFileSync(join(acceptanceDir, 'prebase-active-soak.mjs'), 'utf8');
+	assert.match(active, /activeSoakEvidenceTarget\(durationMs\)/);
+	assert.match(active, /writeFileSync\(join\(evidenceDir, fileName\)/);
+	assert.doesNotMatch(active, /writeFileSync\(join\(evidenceDir, 'active\.json'\)/);
+	assert.match(active, /import \{ monotonicGrowth \} from '\.\/prebase-process-leak-diag\.mjs'/);
+	assert.doesNotMatch(active, /function monotonicGrowth/);
+	const leak = readFileSync(join(acceptanceDir, 'prebase-process-leak-diag.mjs'), 'utf8');
+	assert.match(leak, /export function monotonicGrowth/);
+});
+
 test('active soak protects canonical final evidence and final gate has explicit bounded modes', () => {
 	const active = readFileSync(join(acceptanceDir, 'prebase-active-soak.mjs'), 'utf8');
 	assert.match(active, /ACTIVE_SOAK_FINAL_MIN_DURATION_MS = 10 \* 60 \* 1000/);
-	assert.match(active, /evidenceKind === 'final' \? 'active\.json' : 'active-diagnostic\.json'/);
-	assert.match(active, /sourceHead: execFileSync\('git', \['rev-parse', 'HEAD'\]/);
+	assert.match(active, /phase3EvidenceMetadata\(repo, 'active-soak'\)/);
+	assert.doesNotMatch(active, /sourceHead:\s*execFileSync\('git'/);
 	assert.doesNotMatch(active, /process count grew excessively during active soak/);
 
 	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
@@ -772,7 +850,7 @@ test('every live final-gate child has a deadline, log, and timeout failure path'
 test('final gate requires current successful assurance evidence instead of a prose reminder', () => {
 	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
 	assert.match(gate, /readJson\('assurance\.json'\)/);
-	assert.match(gate, /scenarioOk\(\{ id: 'assurance', sourceHead: head \}, assurance\)/);
+	assert.match(gate, /assuranceEvidenceOk\(entry\.sourceHead, evidence\)/);
 	assert.match(gate, /failures\.push\(`assurance: \$\{assuranceVerdict\.reason\}`\)/);
 	assert.match(gate, /assurance: \{ path: 'assurance\.json', ok: assuranceVerdict\.ok, reason: assuranceVerdict\.reason \}/);
 	assert.doesNotMatch(gate, /assuranceSummary/);
@@ -823,6 +901,7 @@ test('final manifest requires every Phase 3 scenario', () => {
 		'themes-a11y',
 		'privacy',
 		'active-soak',
+		'lifecycle-cycles',
 	]) {
 		assert.ok(ids.includes(required), `manifest is missing ${required}`);
 	}
@@ -834,32 +913,196 @@ test('scenarioOk rejects missing evidence, ok:false, and omitted ok', () => {
 	assert.equal(scenarioOk({}, { missing: true }).ok, false);
 	assert.equal(scenarioOk({}, { ok: false, failures: ['x'] }).ok, false);
 	assert.equal(scenarioOk({}, {}).ok, false);
-	assert.equal(scenarioOk({}, { ok: true }).ok, true);
+	const missingHead = scenarioOk({}, { ok: true });
+	assert.equal(missingHead.ok, false, 'ok:true without sourceHead must not pass the final gate');
+	assert.match(missingHead.reason, /source HEAD/);
+	assert.equal(scenarioOk({}, { ok: true, sourceHead: 'current-head' }).ok, true);
+});
+
+test('final evidence requires the canonical sourceHead field, not the retired head alias', () => {
+	const entry = { id: 'core-ide', sourceHead: 'current-head' };
+	assert.equal(scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'current-head' }).ok, true);
+	const missing = scenarioOk(entry, { ok: true, scenario: 'core-ide' });
+	assert.equal(missing.ok, false, 'final evidence without sourceHead must fail the gate');
+	assert.match(missing.reason, /source HEAD/);
+	const legacy = scenarioOk(entry, { ok: true, scenario: 'core-ide', head: 'current-head' });
+	assert.equal(legacy.ok, false, 'a legacy head field can otherwise conceal writers that never adopted the final evidence contract');
+	assert.match(legacy.reason, /source HEAD/);
+	const stale = scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'stale-head' });
+	assert.equal(stale.ok, false);
+	assert.match(stale.reason, /source HEAD does not match/);
+});
+
+test('final evidence rejects a missing or mismatched scenario label even when its source head is current', () => {
+	const entry = { id: 'core-ide', sourceHead: 'current-head' };
+	assert.equal(scenarioOk(entry, { ok: true, sourceHead: 'current-head' }).ok, false);
+	assert.equal(scenarioOk(entry, { ok: true, scenario: 'privacy', sourceHead: 'current-head' }).ok, false);
+	assert.equal(scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'current-head' }).ok, true);
+});
+
+test('shared Phase 3 metadata is bounded, current, and rejects an unlabelled scenario', () => {
+	assert.throws(() => phase3EvidenceMetadata(repoRoot, ''), /scenario is required/);
+	const metadata = phase3EvidenceMetadata(repoRoot, 'contract-test');
+	assert.deepEqual(Object.keys(metadata).sort(), ['generatedAt', 'scenario', 'schemaVersion', 'sourceHead']);
+	assert.equal(metadata.schemaVersion, PHASE3_EVIDENCE_SCHEMA_VERSION);
+	assert.equal(metadata.scenario, 'contract-test');
+	assert.match(metadata.sourceHead, /^[0-9a-f]{40}$/);
+	assert.ok(Number.isFinite(Date.parse(metadata.generatedAt)));
+});
+
+test('final assurance has an authoritative, complete command matrix and records only bounded outcome data', () => {
+	assert.deepEqual(PHASE3_ASSURANCE_COMMANDS, [
+		['verify:icons'],
+		['compile-magnus'],
+		['transpile-client'],
+		['typecheck-client'],
+		['typecheck:graphs'],
+		['test:graphs'],
+		['test:prebase-pure'],
+		['test:prebase-magnus'],
+		['verify:graphs-boundary'],
+		['verify:graphs-runtime-boundary'],
+		['node', 'scripts/startup/verify-magnus-out.mjs'],
+		['verify:privacy'],
+		['verify:config-uniqueness'],
+		['assurance:quick'],
+		['assurance:static'],
+	]);
+	assert.equal(reportedTestCount('63 passing'), 63);
+	assert.equal(reportedTestCount('# pass 181'), 181);
+	assert.equal(reportedTestCount('tests 42'), 42);
+	assert.equal(reportedTestCount('no test runner summary'), undefined);
+	const source = readFileSync(join(acceptanceDir, 'prebase-phase3-assurance.mjs'), 'utf8');
+	assert.match(source, /phase3EvidenceMetadata\(repo, 'assurance'\)/);
+	assert.match(source, /exitCode/);
+	assert.match(source, /durationMs/);
+	assert.match(source, /testCount: reportedTestCount/);
+	assert.match(source, /commands\.every\(command => command\.passed\)/);
+	assert.doesNotMatch(source, /process\.env\.FIRECRAWL_API_KEY|process\.env\.LINKUP_API_KEY/);
+});
+
+test('final gate accepts only a complete current assurance matrix with passed bounded command records', () => {
+	const entry = { id: 'assurance', sourceHead: 'current-head' };
+	const commands = PHASE3_ASSURANCE_COMMANDS.map(command => ({
+		command: assuranceCommandLabel(command),
+		exitCode: 0,
+		durationMs: 1,
+		passed: true,
+		log: 'reports/graph-acceptance/phase-3-final/assurance-logs/command.log',
+	}));
+	const passing = { ok: true, scenario: 'assurance', sourceHead: 'current-head', commands };
+	assert.equal(assuranceEvidenceOk(entry.sourceHead, passing).ok, true);
+	assert.equal(scenarioOk(entry, passing).ok, true);
+	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, commands: [] }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, commands: [...commands.slice(0, -1), { ...commands.at(-1), passed: false, exitCode: 1 }] }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, commands: commands.map((command, index) => index === 0 ? { ...command, durationMs: undefined } : command) }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, sourceHead: 'stale-head' }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, scenario: 'core-ide' }).ok, false);
+	const missingHead = scenarioOk(entry, { ok: true, scenario: 'assurance', commands });
+	assert.equal(missingHead.ok, false, 'assurance.json without sourceHead must fail the final gate');
+	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, commands: commands.map((command, index) => index === 0 ? { ...command, command: 'not-the-matrix' } : command) }).ok, false);
+});
+
+test('every required Phase 3 evidence writer delegates current metadata to the shared contract', () => {
+	const writers = [
+		'test/prebase/acceptance/prebase-desktop-product-path.mjs',
+		'test/prebase/acceptance/prebase-desktop-native-cases.mjs',
+		'test/prebase/acceptance/runtime-preview-live.mjs',
+		'graphs/scripts/acceptance/temporal-live.mjs',
+		'test/prebase/acceptance/prebase-magnus-tools-live.mjs',
+		'test/prebase/acceptance/prebase-magnus-stream-live.mjs',
+		'test/prebase/acceptance/prebase-load-quit-live.mjs',
+		'test/prebase/acceptance/prebase-idle-soak.mjs',
+		'test/prebase/acceptance/prebase-active-soak.mjs',
+		'test/prebase/acceptance/prebase-process-leak-diag.mjs',
+		'test/prebase/acceptance/prebase-restart-soak.mjs',
+		'test/prebase/acceptance/prebase-core-ide-live.mjs',
+		'test/prebase/acceptance/prebase-privacy-runtime.mjs',
+		'graphs/scripts/parser-batch-bench.ts',
+		'test/prebase/acceptance/prebase-hybrid-web-smoke.mjs',
+		'test/prebase/acceptance/prebase-phase3-assurance.mjs',
+	];
+	const helper = join(acceptanceDir, 'phase3Evidence.mjs');
+	assert.match(readFileSync(helper, 'utf8'), /export function phase3EvidenceMetadata\b/);
+	for (const relative of writers) {
+		const source = readFileSync(join(repoRoot, relative), 'utf8');
+		assert.match(source, /phase3EvidenceMetadata\(/, `${relative} must use the shared Phase 3 metadata contract`);
+		assert.doesNotMatch(source, /sourceHead:\s*execFileSync\('git'/, `${relative} must not fork its own source-head metadata implementation`);
+	}
 });
 
 test('individual harnesses must not overwrite phase-3-final/manifest.json', () => {
 	const dirs = [
 		acceptanceDir,
 		join(repoRoot, 'graphs/scripts/acceptance'),
+		join(repoRoot, 'graphs/scripts'),
 	];
-	for (const dir of dirs) {
-		const files = readdirSync(dir).filter(name =>
-			name.endsWith('.mjs') &&
-			!name.endsWith('.test.mjs') &&
-			name !== 'prebase-phase3-final-gate.mjs' &&
-			name !== 'workbenchHarness.mjs'
+	const extra = [join(repoRoot, 'graphs/scripts/parser-batch-bench.ts')];
+	const files = [
+		...dirs.flatMap(dir => readdirSync(dir)
+			.filter(name =>
+				(name.endsWith('.mjs') || name.endsWith('.ts')) &&
+				!name.endsWith('.test.mjs') &&
+				!name.endsWith('.test.ts') &&
+				name !== 'prebase-phase3-final-gate.mjs' &&
+				name !== 'workbenchHarness.mjs'
+			)
+			.map(name => join(dir, name))),
+		...extra,
+	];
+	for (const file of new Set(files)) {
+		const source = readFileSync(file, 'utf8');
+		assert.equal(
+			/phase-3-final\/manifest\.json/.test(source) || /join\(evidenceRoot,\s*['"]manifest\.json['"]\)/.test(source),
+			false,
+			`${file} must not write the final Phase 3 manifest`,
 		);
-		for (const name of files) {
-			const source = readFileSync(join(dir, name), 'utf8');
-			assert.equal(
-				/phase-3-final\/manifest\.json/.test(source) || /join\(evidenceRoot,\s*['"]manifest\.json['"]\)/.test(source),
-				false,
-				`${name} must not write the final Phase 3 manifest`,
-			);
-		}
 	}
 	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
 	assert.match(gate, /join\(evidenceRoot,\s*['"]manifest\.json['"]\)/);
+});
+
+test('lifecycle cycles reject monotonic WebContents growth and accept a stable warm baseline', () => {
+	const quit = { remaining: 'gone', terminationPath: 'workbench', usedSigkill: false };
+	const stable = () => ({ processCount: 14, webContents: { liveCount: 6 } });
+	assert.deepEqual(lifecycleFailures({
+		cold: { processCount: 7, webContents: { liveCount: 3 } },
+		warm: { processCount: 14, webContents: { liveCount: 6 } },
+		cycles: [1, 2, 3, 4, 5, 6].map(stable),
+		quit,
+	}), [], 'cold 7 → warm 14 that then stays at 14 is provisioning, not a leak');
+	assert.ok(lifecycleFailures({
+		cold: { processCount: 7, webContents: { liveCount: 3 } },
+		warm: { processCount: 14, webContents: { liveCount: 6 } },
+		cycles: [8, 10, 12, 14, 16, 18].map(count => ({ processCount: 14, webContents: { liveCount: count } })),
+		classification: 'warm-provisioning',
+		quit,
+	}).some(item => /monotonically/.test(item)), 'monotonic live WebContents growth must fail even when classification is not leak');
+	assert.ok(lifecycleFailures({
+		cold: { processCount: 7, webContents: { liveCount: 3 } },
+		warm: { processCount: 14, webContents: { liveCount: 6 } },
+		cycles: [1, 2, 3, 4, 5, 6].map(() => ({ processCount: 14 })),
+		quit,
+	}).some(item => /live WebContents counts/.test(item)), 'missing WebContents samples must fail closed');
+});
+
+test('smoke diagnostics expose redacted WebContents inventory and never write accessibilitySupport off', () => {
+	const contribution = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
+	assert.match(contribution, /getWebContentsInventory\(\)/);
+	assert.match(contribution, /inventory\.filter\(item => !item\.destroyed\)/);
+	assert.match(contribution, /liveCount: live\.length/);
+	assert.match(contribution, /urlCategory/);
+	assert.doesNotMatch(contribution, /contents\.getURL\(\)/);
+	assert.doesNotMatch(contribution, /liveCount:\s*inventory\.length/);
+	assert.match(contribution, /a11yMode === 'auto' \|\| a11yMode === 'on'/);
+	assert.doesNotMatch(contribution, /updateValue\('editor\.accessibilitySupport', 'off'\)/);
+	const native = readFileSync(join(repoRoot, 'src/vs/platform/native/electron-main/nativeHostMainService.ts'), 'utf8');
+	const inventoryStart = native.indexOf('async getWebContentsInventory');
+	const inventory = native.slice(inventoryStart, native.indexOf('private webContentsUrlCategory'));
+	assert.match(inventory, /contents\.isDestroyed\(\)/);
+	assert.match(inventory, /destroyed \? '' : contents\.getURL\(\)/);
+	assert.match(inventory, /urlCategory: this\.webContentsUrlCategory\(url\)/);
+	assert.doesNotMatch(inventory, /\burl:/);
 });
 
 test('renderer CPU profile summary ranks leaf self-time and ignores idle', () => {
@@ -890,4 +1133,28 @@ test('phase 3 lock block message names pid, scenario, and age immediately', () =
 	assert.match(active, /age=45s/);
 	const stale = formatPhase3LockBlockMessage({ pid: 7, scenario: 'dead', ageMs: 1000, lockDir: '/tmp/x' }, true);
 	assert.match(stale, /\[phase3-lock\] stale owner pid=7/);
+});
+
+test('Magnus, Edge, and workbench URL policy share the same private-host and userinfo guards', () => {
+	const files = [
+		join(repoRoot, 'extensions/prebase-magnus/src/webContextCore.ts'),
+		join(repoRoot, 'supabase/functions/web-search/web_context.ts'),
+		join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseWebSearchService.ts'),
+	];
+	const privateHost = String.raw`/^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1|\[::1\])$/i`;
+	const userinfo = 'url.username || url.password';
+	for (const file of files) {
+		const source = readFileSync(file, 'utf8');
+		assert.ok(source.includes(privateHost), `${file} missing shared private-host pattern`);
+		assert.ok(source.includes(userinfo), `${file} missing URL userinfo rejection`);
+	}
+	const fixture = JSON.parse(readFileSync(join(repoRoot, 'test/prebase/fixtures/web-url-policy.json'), 'utf8'));
+	assert.ok(fixture.allow.length >= 2);
+	assert.ok(fixture.reject.some(url => url.includes('user:password@')));
+	const magnusTest = readFileSync(join(repoRoot, 'extensions/prebase-magnus/src/webContextCore.test.ts'), 'utf8');
+	const edgeTest = readFileSync(join(repoRoot, 'supabase/functions/web-search/web_context.test.ts'), 'utf8');
+	const workbenchTest = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/test/browser/prebaseWebSearchService.test.ts'), 'utf8');
+	assert.match(magnusTest, /web-url-policy\.json/);
+	assert.match(edgeTest, /web-url-policy\.json/);
+	assert.match(workbenchTest, /web-url-policy\.json/);
 });

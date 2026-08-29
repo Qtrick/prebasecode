@@ -10,6 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { chromium } from 'playwright-core';
+import { phase3EvidenceMetadata } from '../../../test/prebase/acceptance/phase3Evidence.mjs';
 
 const execFileAsync = promisify(execFile);
 const scriptPath = fileURLToPath(import.meta.url);
@@ -305,7 +306,7 @@ async function run() {
 	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
 	let browser;
 	let quit;
-	let evidence = { scale, fixture, pid: info.pid, cdpPort: info.cdpPort };
+	let evidence = { ...phase3EvidenceMetadata(repo, scale === 'large' ? 'temporal-large' : 'temporal-small'), scale, fixture, pid: info.pid, cdpPort: info.cdpPort };
 	try {
 		browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
 		const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
@@ -381,7 +382,11 @@ async function run() {
 	const failures = temporalAcceptanceFailures(evidence);
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
 	writeFileSync(join(temporalDir, evidenceName), JSON.stringify(result, null, 2));
-	writeFileSync(join(shutdownDir, scale === 'large' ? 'temporal-large-quit.json' : 'temporal-quit.json'), JSON.stringify(quit, null, 2));
+	writeFileSync(join(shutdownDir, scale === 'large' ? 'temporal-large-quit.json' : 'temporal-quit.json'), JSON.stringify({
+		...phase3EvidenceMetadata(repo, scale === 'large' ? 'temporal-large-quit' : 'temporal-quit'),
+		ok: quit?.remaining === 'gone',
+		quit,
+	}, null, 2));
 	console.log(JSON.stringify(result, null, 2));
 	if (!result.ok) process.exitCode = 1;
 }

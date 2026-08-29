@@ -131,7 +131,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 			width: '100%',
 			background: COLORS.bg,
 			color: COLORS.text,
-			fontFamily: 'system-ui, -apple-system, Segoe UI, sans-serif',
+			fontFamily: 'var(--vscode-font-family)',
 			overflow: 'hidden',
 		});
 
@@ -174,7 +174,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		});
 		const resetBtn = DOM.append(resetWrap, DOM.$('button')) as HTMLButtonElement;
 		resetBtn.type = 'button';
-		resetBtn.textContent = localize('prebase.settings.resetAll', "⟳  Reset all");
+		resetBtn.textContent = localize('prebase.settings.resetAll', "Reset all");
 		Object.assign(resetBtn.style, {
 			background: 'transparent',
 			border: 'none',
@@ -453,11 +453,11 @@ export class PreBaseSettingsEditor extends EditorPane {
 		Object.assign(btn.style, {
 			fontSize: '12px',
 			padding: '6px 12px',
-			borderRadius: '8px',
+			borderRadius: 'var(--vscode-cornerRadius-medium, 6px)',
 			cursor: 'pointer',
-			border: primary ? `1px solid ${COLORS.accentBorder}` : `1px solid ${COLORS.border}`,
-			background: primary ? COLORS.accentDim : COLORS.muted,
-			color: primary ? COLORS.accent : COLORS.text,
+			border: '1px solid var(--vscode-button-border, transparent)',
+			background: primary ? 'var(--vscode-button-background)' : 'var(--vscode-button-secondaryBackground)',
+			color: primary ? 'var(--vscode-button-foreground)' : 'var(--vscode-button-secondaryForeground)',
 		});
 		return btn;
 	}
@@ -749,8 +749,21 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const webSearchCard = this._panel(
 			this._main!,
 			localize('prebase.settings.ai.webSearchTitle', "Web Search"),
-			localize('prebase.settings.ai.webSearchDesc', "Signed-in users use the hosted hybrid gateway. Local development needs both discovery and page-fetch keys; one key is not enough.")
+			localize('prebase.settings.ai.webSearchDesc', "Search the Web and Fetch Web Source use hosted hybrid web context when you are signed in. Local keys are an advanced developer override.")
 		);
+
+		const hostedStatus = document.createElement('div');
+		hostedStatus.setAttribute('role', 'status');
+		hostedStatus.textContent = localize('prebase.settings.ai.webSearchHosted', "Hosted Hybrid Web Context is the default for signed-in users. Provider names stay in this advanced section.");
+		Object.assign(hostedStatus.style, { fontSize: '12px', color: COLORS.textMuted, lineHeight: '1.45', padding: '10px 0', borderBottom: `1px solid color-mix(in srgb, ${COLORS.border} 55%, transparent)` });
+		webSearchCard.appendChild(hostedStatus);
+
+		const advanced = document.createElement('details');
+		Object.assign(advanced.style, { padding: '8px 0 4px' });
+		const summary = document.createElement('summary');
+		summary.textContent = localize('prebase.settings.ai.webSearchAdvanced', "Configure local web search…");
+		Object.assign(summary.style, { cursor: 'pointer', fontSize: '13px', color: COLORS.text, marginBottom: '8px' });
+		advanced.appendChild(summary);
 
 		const linkupKeyCtrl = document.createElement('div');
 		Object.assign(linkupKeyCtrl.style, { display: 'flex', gap: '8px', flexWrap: 'wrap', justifyContent: 'flex-end' });
@@ -764,7 +777,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 			void this.commandService.executeCommand('prebase.magnus.clearLinkupKey');
 		}));
 		this._row(
-			webSearchCard,
+			advanced,
 			localize('prebase.settings.ai.linkupKeyManagement', "Local discovery key"),
 			localize('prebase.settings.ai.linkupKeyHint', "Optional local credential. Stored in OS SecretStorage. Not used unless a page-fetch key is also present."),
 			linkupKeyCtrl
@@ -782,11 +795,12 @@ export class PreBaseSettingsEditor extends EditorPane {
 			void this.commandService.executeCommand('prebase.magnus.clearFirecrawlKey');
 		}));
 		this._row(
-			webSearchCard,
+			advanced,
 			localize('prebase.settings.ai.firecrawlKeyManagement', "Local page-fetch key"),
 			localize('prebase.settings.ai.firecrawlKeyHint', "Optional local credential. Stored in OS SecretStorage. Search stays on the hosted gateway unless both local keys exist."),
 			firecrawlKeyCtrl
 		);
+		webSearchCard.appendChild(advanced);
 
 		const actionsCard = this._panel(
 			this._main!,

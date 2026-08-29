@@ -1,0 +1,21 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 transpile-client
+> node build/next/index.ts transpile && npm run gulp -- copy-codicons && node -e "import('node:fs').then(fs=>{const s='node_modules/@vscode/codicons/dist/codicon.ttf';const d='out/vs/base/browser/ui/codicons/codicon/codicon.ttf';fs.mkdirSync('out/vs/base/browser/ui/codicons/codicon',{recursive:true});fs.copyFileSync(s,d);})"
+
+[clean] out
+[transpile] src → out
+[transpile] Found 7541 files
+[resources] Copying all non-TS files to out...
+[resources] Copied 1385 files
+[transpile] Done in 2938ms
+
+✓ Total: 3555ms
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 gulp
+> node --experimental-strip-types --max-old-space-size=8192 ./node_modules/gulp/bin/gulp.js copy-codicons
+
+[22:45:15] Using gulpfile ~/Prebasecode/gulpfile.mjs
+[22:45:15] Starting 'copy-codicons'...
+[22:45:15] Finished 'copy-codicons' after 2.13 ms

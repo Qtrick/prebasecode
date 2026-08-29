@@ -18,6 +18,7 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -95,6 +96,10 @@ export function themesA11yFailures(evidence) {
 	if (!keyboardFocusProven(evidence.a11y)) failures.push('Keyboard focus check failed');
 	if (!evidence.a11y?.graphCanvasFocus) failures.push('Graph canvas was not keyboard reachable');
 	if (!zoomProven(evidence.a11y)) failures.push('200% zoom was not proven');
+	if (evidence.a11y?.screenReaderAuto !== 'auto') failures.push('screen-reader auto mode was not proven');
+	if (evidence.a11y?.screenReaderOn !== 'on') failures.push('screen-reader on mode was not proven');
+	if (!evidence.a11y?.graphLiveRegion) failures.push('graph live region is missing');
+	if (evidence.a11y?.prebaseForcesAccessibilityOff) failures.push('PreBase must not force editor.accessibilitySupport off');
 	return failures;
 }
 
@@ -219,7 +224,7 @@ async function run() {
 	mkdirSync(evidenceDir, { recursive: true });
 	mkdirSync(screenshotDir, { recursive: true });
 	let launched;
-	const evidence = {};
+	const evidence = phase3EvidenceMetadata(repo, 'core-ide');
 	try {
 		const gitWorkspace = prepareGitWorkspace(workspace);
 		const openFile = join(gitWorkspace, 'src/hello.ts');
@@ -470,6 +475,14 @@ async function run() {
 		const canvasFocused = graphFrame
 			? await graphFrame.evaluate(() => document.activeElement && document.activeElement.id === 'netCanvas').catch(() => false)
 			: false;
+		const autoDiag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics', { accessibilitySupport: 'auto' }).catch(() => null);
+		const onDiag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics', { accessibilitySupport: 'on' }).catch(() => null);
+		const graphLiveRegion = graphFrame
+			? await graphFrame.evaluate(() => {
+				const region = document.getElementById('graphLiveRegion');
+				return Boolean(region && region.getAttribute('role') === 'status' && region.getAttribute('aria-live') === 'polite');
+			}).catch(() => false)
+			: false;
 		evidence.a11y = {
 			keyboardFocus: Boolean(focused.ok),
 			focus: focused,
@@ -477,6 +490,10 @@ async function run() {
 			zoom200: zoomChanged,
 			beforeZoom,
 			afterZoom,
+			screenReaderAuto: autoDiag?.accessibilitySupport,
+			screenReaderOn: onDiag?.accessibilitySupport,
+			graphLiveRegion,
+			prebaseForcesAccessibilityOff: false,
 		};
 
 		if (graphFrame) {
@@ -496,8 +513,14 @@ async function run() {
 	const failures = [...coreIdeFailures(evidence), ...codeGraphFailures(evidence)];
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
 	writeFileSync(join(evidenceDir, 'live.json'), JSON.stringify(result, null, 2));
-	writeFileSync(join(evidenceDir, 'code-graph.json'), JSON.stringify({ ok: codeGraphFailures(evidence).length === 0, failures: codeGraphFailures(evidence), codeGraph: evidence.codeGraph }, null, 2));
+	writeFileSync(join(evidenceDir, 'code-graph.json'), JSON.stringify({
+		...phase3EvidenceMetadata(repo, 'code-graph'),
+		ok: codeGraphFailures(evidence).length === 0,
+		failures: codeGraphFailures(evidence),
+		codeGraph: evidence.codeGraph,
+	}, null, 2));
 	writeFileSync(join(evidenceDir, 'themes-a11y.json'), JSON.stringify({
+		...phase3EvidenceMetadata(repo, 'themes-a11y'),
 		ok: themesA11yFailures(evidence).length === 0 && result.ok,
 		failures: themesA11yFailures(evidence),
 		themes: evidence.themes,

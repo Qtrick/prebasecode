@@ -9,6 +9,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { acquirePhase3AcceptanceLock } from './workbenchHarness.mjs';
+import { assuranceEvidenceOk } from './prebase-phase3-assurance.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -26,8 +27,10 @@ export const PHASE3_REQUIRED_EVIDENCE = [
 	{ id: 'magnus-electron-tools', path: 'magnus/electron-tools-live.json' },
 	{ id: 'magnus-tauri-tools', path: 'magnus/tauri-tools-live.json' },
 	{ id: 'magnus-streaming-smoke', path: 'magnus/streaming-smoke.json', rerun: ['node', 'test/prebase/acceptance/prebase-magnus-stream-live.mjs'], timeoutMs: 180_000 },
+	{ id: 'hybrid-web-smoke', path: 'magnus/hybrid-web-smoke.json', rerun: ['node', 'test/prebase/acceptance/prebase-hybrid-web-smoke.mjs'], timeoutMs: 180_000 },
 	{ id: 'load-quit', path: 'shutdown/load-quit-matrix.json', rerun: ['node', 'test/prebase/acceptance/prebase-load-quit-live.mjs'], timeoutMs: 240_000 },
 	{ id: 'idle-soak', path: 'soak/idle.json' },
+	{ id: 'lifecycle-cycles', path: 'soak/lifecycle.json', rerun: ['node', 'test/prebase/acceptance/prebase-process-leak-diag.mjs'], timeoutMs: 240_000 },
 	{ id: 'electron-restart-soak', path: 'soak/electron-restart.json' },
 	{ id: 'tauri-restart-soak', path: 'soak/tauri-restart.json' },
 	{ id: 'core-ide', path: 'core-ide/live.json', rerun: ['node', 'test/prebase/acceptance/prebase-core-ide-live.mjs'], timeoutMs: 240_000 },
@@ -56,14 +59,23 @@ export function scenarioOk(entry, evidence) {
 	if (evidence.ok !== true) {
 		return { ok: false, reason: 'ok field is not true' };
 	}
+	if (typeof evidence.sourceHead !== 'string' || !evidence.sourceHead) {
+		return { ok: false, reason: 'evidence source HEAD is missing' };
+	}
 	if (entry.evidenceKind && evidence.evidenceKind !== entry.evidenceKind) {
 		return { ok: false, reason: `expected ${entry.evidenceKind} evidence` };
 	}
 	if (entry.minDurationMs && (!Number.isFinite(evidence.durationMs) || evidence.durationMs < entry.minDurationMs)) {
 		return { ok: false, reason: `evidence duration is below ${entry.minDurationMs}ms` };
 	}
-	if (entry.sourceHead && evidence.sourceHead !== entry.sourceHead && evidence.head !== entry.sourceHead) {
+	if (entry.sourceHead && evidence.sourceHead !== entry.sourceHead) {
 		return { ok: false, reason: 'evidence source HEAD does not match current HEAD' };
+	}
+	if (entry.id === 'assurance') {
+		return assuranceEvidenceOk(entry.sourceHead, evidence);
+	}
+	if (entry.id && evidence.scenario !== entry.id) {
+		return { ok: false, reason: 'evidence scenario does not match required scenario' };
 	}
 	return { ok: true };
 }

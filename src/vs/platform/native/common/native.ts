@@ -121,6 +121,19 @@ export interface INativeSystemWideKeybindingResult {
 	readonly failed: string[];
 }
 
+/**
+ * Deliberately redacted Electron WebContents state used by smoke-only lifecycle
+ * checks. URLs are categorized in the main process and are never returned.
+ */
+export interface IWebContentsInventoryEntry {
+	readonly id: number;
+	readonly type: string;
+	readonly destroyed: boolean;
+	readonly loading: boolean;
+	readonly urlCategory: 'empty' | 'workbench' | 'webview' | 'file' | 'external' | 'devtools' | 'other';
+	readonly ownerCategory: 'workbenchWindow' | 'auxiliaryWindow' | 'unowned';
+}
+
 export interface ICommonNativeHostService {
 
 	readonly _serviceBrand: undefined;
@@ -254,6 +267,7 @@ export interface ICommonNativeHostService {
 	// Process
 	getProcessId(): Promise<number | undefined>;
 	killProcess(pid: number, code: string): Promise<void>;
+	getWebContentsInventory(): Promise<IWebContentsInventoryEntry[]>;
 
 	// Clipboard
 	triggerPaste(options?: INativeHostOptions): Promise<void>;

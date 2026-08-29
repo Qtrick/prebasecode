@@ -15,6 +15,7 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommand,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -43,7 +44,7 @@ async function run() {
 	const release = await acquirePhase3AcceptanceLock();
 	mkdirSync(evidenceDir, { recursive: true });
 	let launched;
-	const evidence = { kind: 'deterministic-smoke-stream' };
+	const evidence = { ...phase3EvidenceMetadata(repo, 'magnus-streaming-smoke'), kind: 'deterministic-smoke-stream' };
 	try {
 		launched = await launchPreBase(repo, repo);
 		evidence.prebasePid = launched.info.pid;

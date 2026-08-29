@@ -1,0 +1,6 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:graphs-runtime-boundary
+> node graphs/scripts/verify-boundary/verify-runtime-boundary.mjs
+
+Graph runtime boundary check OK (scanned 86 files)

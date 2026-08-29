@@ -97,6 +97,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		this._root.style.boxSizing = 'border-box';
 		this._root.style.background = `radial-gradient(ellipse at center, rgba(45,212,191,0.08) 0%, transparent 65%), ${PAGE_BG}`;
 		this._root.style.color = TEXT;
+		this._root.style.fontFamily = 'var(--vscode-font-family)';
 		this._body = DOM.append(this._root, DOM.$('.prebase-home-body'));
 		this._body.style.maxWidth = '960px';
 		this._body.style.margin = '0 auto';
@@ -643,9 +644,9 @@ export class PreBaseHomeEditor extends EditorPane {
 		btn.style.fontSize = '12px';
 		btn.style.fontWeight = '550';
 		btn.style.cursor = 'pointer';
-		btn.style.border = primary ? `1px solid ${ACCENT}` : `1px solid ${BORDER}`;
-		btn.style.background = primary ? ACCENT : SURFACE;
-		btn.style.color = primary ? '#042f2e' : TEXT;
+		btn.style.border = '1px solid var(--vscode-button-border, transparent)';
+		btn.style.background = primary ? 'var(--vscode-button-background)' : 'var(--vscode-button-secondaryBackground)';
+		btn.style.color = primary ? 'var(--vscode-button-foreground)' : 'var(--vscode-button-secondaryForeground)';
 		btn.style.outline = 'none';
 		this._attachFocusRing(btn);
 		this._renderDisposables.add(DOM.addDisposableListener(btn, 'click', onClick));

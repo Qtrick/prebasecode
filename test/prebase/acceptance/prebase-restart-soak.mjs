@@ -7,6 +7,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { runFramework } from './prebase-desktop-product-path.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -27,6 +28,7 @@ async function run() {
 	}
 	const passed = results.filter(item => item.ok).length;
 	const evidence = {
+		...phase3EvidenceMetadata(repo, `${framework}-restart-soak`),
 		ok: passed === cycles,
 		framework,
 		cycles,

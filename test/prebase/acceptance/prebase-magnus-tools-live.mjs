@@ -16,6 +16,7 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommand,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -127,7 +128,7 @@ async function run() {
 	mkdirSync(evidenceDir, { recursive: true });
 	const framework = process.argv.includes('--tauri') ? 'tauri' : 'electron';
 	const fixture = join(repo, `test/prebase/fixtures/desktop-${framework}`);
-	const evidence = { framework, invokeToolPath: true, tools: {} };
+	const evidence = { ...phase3EvidenceMetadata(repo, `magnus-${framework}-tools`), framework, invokeToolPath: true, tools: {} };
 	let launched;
 	try {
 		launched = await launchPreBase(repo, fixture);

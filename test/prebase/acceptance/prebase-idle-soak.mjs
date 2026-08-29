@@ -14,6 +14,7 @@ import {
 	quitPreBase,
 	waitForWorkbenchDriver,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -69,6 +70,7 @@ async function run() {
 	const intervalMs = Number(process.env.PREBASE_SOAK_INTERVAL_MS || 30_000);
 	const launched = await launchPreBase(repo, repo);
 	const evidence = {
+		...phase3EvidenceMetadata(repo, 'idle-soak'),
 		kind: 'idle',
 		durationMs,
 		intervalMs,

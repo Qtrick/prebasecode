@@ -53,7 +53,7 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 	return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
-function isPublicHttpUrl(value: string): boolean {
+export function isPublicHttpUrl(value: string): boolean {
 	try {
 		const url = new URL(value);
 		if (url.protocol !== 'http:' && url.protocol !== 'https:') {
@@ -63,13 +63,13 @@ function isPublicHttpUrl(value: string): boolean {
 			return false;
 		}
 		const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.+$/, '').toLowerCase();
-		if (!host || host === 'localhost' || host.endsWith('.localhost') || /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)$/i.test(host) || /\.(local|internal|lan|home|corp|intranet)$/i.test(host)) {
+		if (!host || host === 'localhost' || host.endsWith('.localhost') || /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1|\[::1\])$/i.test(host) || /\.(local|internal|lan|home|corp|intranet)$/i.test(host)) {
 			return false;
 		}
 		if (/^(10\.|127\.|169\.254\.|192\.168\.|0\.)|(^172\.(1[6-9]|2\d|3[0-1])\.)|(^100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\.)/.test(host)) {
 			return false;
 		}
-		if (/^(fe80:|fc00:|fd[0-9a-f]{2}:)/i.test(host) || /^::ffff:/i.test(host) || /^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
+		if (/^(::1|fe80:|fc00:|fd[0-9a-f]{2}:)/i.test(host) || /^::ffff:/i.test(host) || /^\d+$/.test(host) || /^0x[0-9a-f]+$/i.test(host)) {
 			return false;
 		}
 		if (/^(?:\d+\.){3}\d+$/.test(host)) {

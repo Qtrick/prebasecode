@@ -10,6 +10,7 @@
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -38,7 +39,7 @@ async function main() {
 	const linkup = resolver.resolveToolProviderKey?.('linkup') ?? resolver.resolveLinkupKey();
 	const firecrawl = resolver.resolveToolProviderKey?.('firecrawl');
 	const evidence = {
-		at: new Date().toISOString(),
+		...phase3EvidenceMetadata(repo, 'hybrid-web-smoke'),
 		linkupConfigured: Boolean(linkup?.key),
 		firecrawlConfigured: Boolean(firecrawl?.key),
 		hybridAttempted: false,
@@ -47,7 +48,7 @@ async function main() {
 	};
 	if (!linkup?.key || !firecrawl?.key) {
 		evidence.failures.push('local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve');
-		writeFileSync(evidencePath, JSON.stringify(evidence, null, 2));
+		writeFileSync(evidencePath, JSON.stringify({ ...evidence, ok: false }, null, 2));
 		console.log(JSON.stringify({ skipped: true, linkupConfigured: evidence.linkupConfigured, firecrawlConfigured: evidence.firecrawlConfigured }));
 		return;
 	}
@@ -150,7 +151,8 @@ async function main() {
 	if (!evidence.runs.some(run => run.ok && run.enriched > 0 && run.operations?.linkup > 0)) {
 		evidence.failures.push('no run produced hybrid LinkUp discovery plus Firecrawl enrichment');
 	}
-	writeFileSync(evidencePath, JSON.stringify(evidence, null, 2));
+	const result = { ...evidence, ok: evidence.failures.length === 0 };
+	writeFileSync(evidencePath, JSON.stringify(result, null, 2));
 	if (evidence.failures.length) {
 		console.error(JSON.stringify({ ok: false, failures: evidence.failures, runCount: evidence.runs.length }));
 		process.exit(1);

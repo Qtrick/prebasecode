@@ -11,6 +11,7 @@ import { CanonicalGraphAnalyzer } from '../src/core/canonical/canonicalGraphAnal
 import { NodeCanonicalParseService } from '../src/node/canonicalParseService.js';
 import type { IRepositoryContentSource, CancellationTokenLike, ScannedFileInventory } from '../src/core/canonical/contentSource.js';
 import type { ScannedFile } from '../src/common/types/graphTypes.js';
+import { phase3EvidenceMetadata } from '../../test/prebase/acceptance/phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const graphsRoot = join(dirname(scriptPath), '..');
@@ -210,7 +211,8 @@ if (process.argv.includes('--child')) {
 		});
 	}
 	const result = {
-		measuredAt: new Date().toISOString(),
+		...phase3EvidenceMetadata(repoRoot, 'parser-benchmark'),
+		ok: true,
 		methodology: 'fresh-process warmup + 3 repetitions, median/p95, ~1000 TS files (graphs/src plus generated). Outer parseBatchSize is Promise.all over files, not N parser-utility processes.',
 		chosenParseBatchSize: choosePareto(rows),
 		rows,

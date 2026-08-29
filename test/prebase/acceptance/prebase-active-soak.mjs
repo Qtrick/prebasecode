@@ -18,11 +18,21 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
+import { monotonicGrowth } from './prebase-process-leak-diag.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/soak');
 export const ACTIVE_SOAK_FINAL_MIN_DURATION_MS = 10 * 60 * 1000;
+
+export function activeSoakEvidenceTarget(durationMs) {
+	const evidenceKind = durationMs >= ACTIVE_SOAK_FINAL_MIN_DURATION_MS ? 'final' : 'diagnostic';
+	return {
+		evidenceKind,
+		fileName: evidenceKind === 'final' ? 'active.json' : 'active-diagnostic.json',
+	};
+}
 
 function isolatedFixtureWorkspace() {
 	const dest = mkdtempSync(join(tmpdir(), 'pb-active-soak-ws-'));
@@ -52,8 +62,10 @@ async function runActivityOnce(page) {
 	await workbenchCommandWithTimeout(page, 8_000, 'prebase.magnus.open').catch(() => undefined);
 }
 
-function sample(pid, phase) {
+async function sample(page, pid, phase) {
 	const tree = processTree(pid);
+	const diagnostics = await workbenchCommandWithTimeout(page, 5_000, 'prebase.test.getDiagnostics').catch(() => undefined);
+	const inventory = diagnostics?.webContents;
 	return {
 		at: new Date().toISOString(),
 		phase,
@@ -61,6 +73,11 @@ function sample(pid, phase) {
 		cpuSum: Number(tree.reduce((sum, row) => sum + row.cpu, 0).toFixed(1)),
 		rssMb: Number((tree.reduce((sum, row) => sum + row.rssKb, 0) / 1024).toFixed(1)),
 		topProcesses: summarizeProcessTree(tree, 8),
+		webContentsLiveCount: Number.isFinite(inventory?.liveCount) ? inventory.liveCount : undefined,
+		webContentsLiveIds: Array.isArray(inventory?.liveIds) ? inventory.liveIds : [],
+		runtimePreviewStatus: typeof diagnostics?.runtimePreviewStatus === 'string' ? diagnostics.runtimePreviewStatus : undefined,
+		parserActiveRequests: Number(diagnostics?.parserActiveRequests ?? 0),
+		temporalActiveWrites: Number(diagnostics?.temporalActiveWrites ?? 0),
 	};
 }
 
@@ -83,6 +100,17 @@ export function activeSoakFailures(evidence) {
 	if (lastRenderer.length && lastRenderer.every(cpu => cpu >= 40)) {
 		failures.push(`quiescent renderer CPU remained high (${lastRenderer.join(', ')})`);
 	}
+	const quiesceLive = quiesce.map(item => item.webContentsLiveCount).filter(count => Number.isFinite(count));
+	if (quiesce.length >= 3 && quiesceLive.length < 3) {
+		failures.push('soak quiescence did not record live WebContents counts');
+	}
+	if (monotonicGrowth(quiesceLive)) {
+		failures.push('live WebContents count grew monotonically during soak quiescence');
+	}
+	const quiesceProcesses = quiesce.map(item => item.processCount).filter(count => Number.isFinite(count));
+	if (monotonicGrowth(quiesceProcesses, 2)) {
+		failures.push('owned process count grew monotonically during soak quiescence');
+	}
 	return failures;
 }
 
@@ -91,12 +119,12 @@ async function run() {
 	mkdirSync(evidenceDir, { recursive: true });
 	const durationMs = Number(process.env.PREBASE_ACTIVE_SOAK_MS || 12 * 60 * 1000);
 	const intervalMs = Number(process.env.PREBASE_SOAK_INTERVAL_MS || 20_000);
-	const evidenceKind = durationMs >= ACTIVE_SOAK_FINAL_MIN_DURATION_MS ? 'final' : 'diagnostic';
+	const { evidenceKind, fileName } = activeSoakEvidenceTarget(durationMs);
 	let launched;
 	const evidence = {
+		...phase3EvidenceMetadata(repo, 'active-soak'),
 		kind: 'active',
 		evidenceKind,
-		sourceHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(),
 		durationMs,
 		intervalMs,
 		samples: [],
@@ -131,7 +159,7 @@ async function run() {
 				await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.closeSidebar').catch(() => undefined);
 				await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.closeAuxiliaryBar').catch(() => undefined);
 			}
-			evidence.samples.push(sample(launched.info.pid, Date.now() < activityEnd ? 'active' : 'quiesce'));
+			evidence.samples.push(await sample(launched.page, launched.info.pid, Date.now() < activityEnd ? 'active' : 'quiesce'));
 			if (Date.now() < activityEnd && !activityRunning) {
 				queueActivity();
 			}
@@ -155,7 +183,7 @@ async function run() {
 	}
 	const failures = activeSoakFailures(evidence);
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
-	writeFileSync(join(evidenceDir, evidenceKind === 'final' ? 'active.json' : 'active-diagnostic.json'), JSON.stringify(result, null, 2));
+	writeFileSync(join(evidenceDir, fileName), JSON.stringify(result, null, 2));
 	console.log(JSON.stringify({ ok: result.ok, failures, samples: evidence.samples.length, durationMs, quit: evidence.quit }, null, 2));
 	if (!result.ok) process.exitCode = 1;
 }

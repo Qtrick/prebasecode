@@ -47,7 +47,11 @@ class FakeElement {
 	}
 	focus(): void {}
 	blur(): void {}
+	onclick: ((evt?: any) => void) | null = null;
 	click(): void {
+		if (typeof this.onclick === 'function') {
+			this.onclick({ type: 'click' });
+		}
 		this.dispatchEvent({ type: 'click' });
 	}
 	getContext(_type: string, _opts?: any): any {
@@ -106,8 +110,18 @@ suite('GraphAccessibility (Unit - Real HTML Markup & Keyboard Interaction)', () 
 
 		const label = attrs.get('aria-label') || '';
 		assert.ok(label.includes('Code Graph'), 'aria-label must describe Code Graph');
-		assert.ok(label.includes('Alt+F1') || label.includes('?'), 'aria-label must reference Alt+F1 or ? for shortcut help');
+		assert.ok(label.includes('?'), 'aria-label must reference ? for shortcut help');
+		assert.ok(!label.includes('Alt+F1') && !label.includes('Option+F1'), 'aria-label must preserve VS Code Accessibility Help shortcuts');
 		assert.ok(!label.includes('press F1 for help'), 'aria-label must NOT contain stale "press F1 for help" copy');
+
+		const liveRegion = parseTagAttributes(html, 'graphLiveRegion');
+		assert.equal(liveRegion.get('role'), 'status');
+		assert.equal(liveRegion.get('aria-live'), 'polite');
+
+		const helpBtn = parseTagAttributes(html, 'graphHelpBtn');
+		assert.ok(helpBtn.size, 'Code Graph must expose a visible help button');
+		assert.ok((helpBtn.get('title') || '').includes('?'), 'help button tooltip must mention ?');
+		assert.equal(helpBtn.get('aria-label'), 'Keyboard Shortcuts');
 	});
 
 	test('2. Real HTML Markup: Viewport toolbar buttons have explicit ARIA labels and toggle states', () => {
@@ -148,9 +162,15 @@ suite('GraphAccessibility (Unit - Real HTML Markup & Keyboard Interaction)', () 
 		assert.ok(detailsCloseMatch, 'temporalDetailsClose button must exist in HTML');
 		assert.ok(!detailsCloseMatch[1].includes('✕') && !detailsCloseMatch[1].includes('×'), 'temporalDetailsClose must not use raw unicode ✕ or ×');
 		assert.ok(detailsCloseMatch[1].includes('<svg'), 'temporalDetailsClose must use SVG icon');
+
+		const legendCloseMatch = html.match(/<button[^>]*id=["']legendCloseBtn["'][^>]*>([\s\S]*?)<\/button>/i);
+		assert.ok(legendCloseMatch, 'legendCloseBtn must exist in the generated legend markup');
+		assert.ok(!legendCloseMatch[1].includes('✕') && !legendCloseMatch[1].includes('×'), 'legend close must not use raw unicode ✕ or ×');
+		assert.ok(legendCloseMatch[1].includes('<svg'), 'legend close must use SVG icon');
+		assert.ok(!html.includes('>✕</button>'), 'no PreBase-owned close control may use a raw ✕ glyph');
 	});
 
-	test('4. Keyboard Interaction: Plain F1 preserved, Alt+F1 and ? toggle help, Escape closes panels', () => {
+	test('4. Keyboard Interaction: F1 and Alt/Option+F1 pass through, ? toggles help, Escape closes panels', () => {
 		const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
 		const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
 		let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
@@ -170,7 +190,7 @@ suite('GraphAccessibility (Unit - Real HTML Markup & Keyboard Interaction)', () 
 			'detailsCommitSha', 'detailsCommitMsg', 'detailsCommitAuthor', 'detailsCommitParents', 'detailsDeltaSummary', 'detailsEntityList',
 			'popup', 'popupTitle', 'popupMeta', 'popupLayerBadge', 'popupChangeBadge', 'popupDetailsList', 'popupAiWrap', 'popupAi', 'popupAiProvenance',
 			'popupClose', 'popupOpen', 'popupHistoricalView', 'popupSourceDiff', 'popupSetBase', 'popupReveal', 'popupMagnus', 'noChangesCard', 'noChangesViewSource',
-			'graphLiveRegion', 'graphKbdHelp', 'zoomIn', 'zoomOut', 'fit', 'centerLock', 'reset', 'temporalLegendBtn'
+			'graphLiveRegion', 'graphKbdHelp', 'graphHelpBtn', 'zoomIn', 'zoomOut', 'fit', 'centerLock', 'reset', 'temporalLegendBtn'
 		]) {
 			const el = new FakeElement();
 			el.id = id;
@@ -248,19 +268,59 @@ suite('GraphAccessibility (Unit - Real HTML Markup & Keyboard Interaction)', () 
 		assert.strictEqual(f1Result.prevented, false, 'Plain F1 must pass through to VS Code');
 		assert.strictEqual(helpEl.hidden, true);
 
-		// 2. Alt+F1 toggles help
+		// 2. Alt/Option+F1 must pass through to VS Code Accessibility Help even if help is already open.
+		helpEl.hidden = false;
 		const altF1Result = dispatchKey('F1', { altKey: true });
-		assert.strictEqual(altF1Result.prevented, true);
-		assert.strictEqual(helpEl.hidden, false, 'Alt+F1 opens help');
+		assert.strictEqual(altF1Result.prevented, false);
+		assert.strictEqual(helpEl.hidden, false, 'Alt/Option+F1 must not toggle PreBase help');
+		helpEl.hidden = true;
+		const optionF1Result = dispatchKey('F1', { altKey: true });
+		assert.strictEqual(optionF1Result.prevented, false);
+		assert.strictEqual(helpEl.hidden, true, 'Alt+F1 does not hijack VS Code Accessibility Help');
 
-		// 3. Escape closes help
+		// 3. ? toggles local graph help.
+		const questionResult = dispatchKey('?');
+		assert.strictEqual(questionResult.prevented, true);
+		assert.strictEqual(helpEl.hidden, false, '? opens local graph help');
+
+		// 4. Escape closes help
 		const escResult = dispatchKey('Escape');
 		assert.strictEqual(escResult.prevented, true);
 		assert.strictEqual(helpEl.hidden, true, 'Escape closes help');
 
-		// 4. ? opens help
-		const qResult = dispatchKey('?');
-		assert.strictEqual(qResult.prevented, true);
-		assert.strictEqual(helpEl.hidden, false, '? opens help');
+		// 5. graphHelpBtn is the visible PreBase help control (not F1).
+		const helpBtn = elements.get('graphHelpBtn')!;
+		assert.equal(typeof helpBtn.onclick, 'function', 'graphHelpBtn must wire toggleGraphHelp');
+		helpBtn.click();
+		assert.strictEqual(helpEl.hidden, false, 'graphHelpBtn opens local graph help');
+		helpBtn.click();
+		assert.strictEqual(helpEl.hidden, true, 'graphHelpBtn toggles local graph help closed');
+
+	});
+
+	test('5. Narrow-viewport temporal zoom controls use display:none, not visually-hidden a11y duplicates', () => {
+		const html = getGeneratedHtmlTemplate();
+		const media = html.match(/@media \(max-width: 780px\) \{([\s\S]*?display:none !important;[\s\S]*?)\}/)?.[0];
+		assert.ok(media, '780px breakpoint must exist for temporal viewport controls');
+		assert.match(media, /#temporalViewportControls #temporalZoomInBtn/);
+		assert.match(media, /#temporalViewportControls #temporalZoomOutBtn/);
+		assert.match(media, /#temporalViewportControls #temporalResetBtn/);
+		assert.match(media, /display:none !important/);
+		assert.doesNotMatch(media, /visibility:\s*hidden|opacity:\s*0|clip(?:-path)?:|sr-only|visually-hidden/);
+		assert.equal((html.match(/id="temporalZoomInBtn"/g) || []).length, 1, 'temporal zoom-in must exist once, not as a queryable duplicate');
+		assert.equal((html.match(/id="temporalZoomOutBtn"/g) || []).length, 1, 'temporal zoom-out must exist once, not as a queryable duplicate');
+		assert.equal((html.match(/id="zoomIn"/g) || []).length, 1, 'network zoom-in is a separate control, not a 780px duplicate');
+	});
+
+	test('6. Temporal camera preserves user pan/zoom; small graphs fit more tightly', () => {
+		const html = getGeneratedHtmlTemplate();
+		assert.match(html, /canFitTemporal && \(first \|\| !hasFittedTemporalView\) && !userAdjustedViewport/);
+		assert.match(html, /keepGraphCentered && !userAdjustedViewport/);
+		assert.match(html, /userAdjustedViewport = true/);
+		assert.match(html, /function zoomByFactor\(factor\) \{[\s\S]{0,500}userAdjustedViewport = true/);
+		assert.match(html, /case '\+':[\s\S]{0,80}zoomByFactor\(1\.25\)/);
+		assert.match(html, /case '-':[\s\S]{0,80}zoomByFactor\(0\.8\)/);
+		assert.match(html, /nodes\.length <= 10 \? 3\.2 : 1\.6/);
+		assert.match(html, /No dependency edges were detected in this view/);
 	});
 });

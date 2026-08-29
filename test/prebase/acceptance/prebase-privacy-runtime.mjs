@@ -18,6 +18,7 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommand,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -112,7 +113,7 @@ async function run() {
 	const release = await acquirePhase3AcceptanceLock();
 	mkdirSync(evidenceDir, { recursive: true });
 	let launched;
-	const evidence = { observations: [] };
+	const evidence = { ...phase3EvidenceMetadata(repo, 'privacy'), observations: [] };
 	let observer;
 	try {
 		launched = await launchPreBase(repo, repo);

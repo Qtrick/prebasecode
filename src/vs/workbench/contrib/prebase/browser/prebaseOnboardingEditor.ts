@@ -74,6 +74,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		this._root.style.overflow = 'auto';
 		this._root.style.background = `radial-gradient(ellipse at top, rgba(45,212,191,0.1) 0%, transparent 55%), ${PAGE_BG}`;
 		this._root.style.color = TEXT;
+		this._root.style.fontFamily = 'var(--vscode-font-family)';
 		this._body = DOM.append(this._root, DOM.$('.prebase-onboarding-body'));
 		this._body.style.maxWidth = '720px';
 		this._body.style.margin = '0 auto';
@@ -128,13 +129,20 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		progress.setAttribute('aria-label', localize('prebase.onboarding.progress', "Onboarding progress, step {0} of {1}", this._step + 1, STEPS.length));
 		STEPS.forEach((label, i) => {
 			const pill = DOM.append(progress, DOM.$('span'));
-			pill.textContent = `${i + 1}. ${label}`;
+			const current = i === this._step;
+			const done = i < this._step;
+			pill.textContent = current ? `${i + 1}. ${label}` : String(i + 1);
+			pill.title = label;
 			pill.style.fontSize = '10px';
-			pill.style.padding = '3px 8px';
+			pill.style.padding = current ? '3px 8px' : '3px 7px';
 			pill.style.borderRadius = '999px';
-			pill.style.border = `1px solid ${i === this._step ? ACCENT : BORDER}`;
-			pill.style.color = i === this._step ? ACCENT : MUTED;
-			pill.style.background = i === this._step ? 'rgba(45,212,191,0.12)' : 'transparent';
+			pill.style.border = `1px solid ${current ? ACCENT : BORDER}`;
+			pill.style.color = current ? ACCENT : MUTED;
+			pill.style.background = current ? 'rgba(45,212,191,0.12)' : 'transparent';
+			pill.style.opacity = done ? '0.55' : '1';
+			if (current) {
+				pill.setAttribute('aria-current', 'step');
+			}
 		});
 
 		const panel = DOM.append(this._body, DOM.$('div'));
@@ -330,11 +338,19 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		btn.textContent = label;
 		btn.style.padding = '8px 12px';
 		btn.style.borderRadius = '8px';
-		btn.style.border = primary ? `1px solid ${ACCENT}` : `1px solid ${BORDER}`;
-		btn.style.background = primary ? ACCENT : 'transparent';
-		btn.style.color = primary ? '#042f2e' : TEXT;
+		btn.style.border = '1px solid var(--vscode-button-border, transparent)';
+		btn.style.background = primary ? 'var(--vscode-button-background)' : 'var(--vscode-button-secondaryBackground)';
+		btn.style.color = primary ? 'var(--vscode-button-foreground)' : 'var(--vscode-button-secondaryForeground)';
 		btn.style.cursor = 'pointer';
 		btn.style.fontSize = '12px';
+		btn.style.outline = 'none';
+		this._ui.add(DOM.addDisposableListener(btn, 'focus', () => {
+			btn.style.outline = '1px solid var(--vscode-focusBorder)';
+			btn.style.outlineOffset = '2px';
+		}));
+		this._ui.add(DOM.addDisposableListener(btn, 'blur', () => {
+			btn.style.outline = 'none';
+		}));
 		this._ui.add(DOM.addDisposableListener(btn, 'click', () => {
 			try {
 				onClick();

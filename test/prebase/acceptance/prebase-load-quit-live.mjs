@@ -20,6 +20,7 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -284,7 +285,7 @@ async function run() {
 		release();
 	}
 	const failures = loadQuitFailures(results);
-	const result = { ok: failures.length === 0, failures, results, generatedAt: new Date().toISOString() };
+	const result = { ...phase3EvidenceMetadata(repo, 'load-quit'), ok: failures.length === 0, failures, results };
 	writeFileSync(join(evidenceDir, 'load-quit-matrix.json'), JSON.stringify(result, null, 2));
 	console.log(JSON.stringify({ ok: result.ok, failures, scenarios: results.map(item => ({ scenario: item.scenario, quitMs: item.quit?.latencyMs, remaining: item.quit?.remaining, skipped: item.skipped })) }, null, 2));
 	if (!result.ok) process.exitCode = 1;

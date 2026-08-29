@@ -684,7 +684,7 @@ export class PreBaseGraphEditor extends EditorPane {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}' 'unsafe-inline'; style-src-elem 'nonce-${nonce}'; style-src-attr 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style nonce="${nonce}">
-html, body { margin:0; height:100%; background:var(--vscode-editor-background, #1B1C1E); color:var(--vscode-foreground, #f4f4f5); font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, sans-serif; overflow:hidden; }
+html, body { margin:0; height:100%; background:var(--vscode-editor-background, #1B1C1E); color:var(--vscode-foreground, #f4f4f5); font-family: var(--vscode-font-family, ui-sans-serif, system-ui, sans-serif); overflow:hidden; }
 #stage { position:absolute; inset:0; }
 #archSvg, #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; }
 #archSvg { cursor:grab; }
@@ -835,7 +835,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	</div>
 	<svg id="archSvg"></svg>
 	<canvas id="netCanvas" tabindex="0" role="region" aria-roledescription="interactive graph"
-		aria-label="Code Graph. Use arrow keys to move between nodes; Enter opens details; press Alt+F1, Option+F1, or ? for shortcut help."
+		aria-label="Code Graph. Use arrow keys to move between nodes; Enter opens details; press ? for shortcut help."
 		aria-describedby="graphKbdHelp"></canvas>
 	<div id="graphLiveRegion" role="status" aria-live="polite" style="position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip:rect(0 0 0 0); white-space:nowrap;"></div>
 	<div id="graphKbdHelp" class="kbd-help" hidden>
@@ -844,7 +844,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<div>Enter / Space — open node details</div>
 		<div>Escape — clear selection / close panels</div>
 		<div>+ / − (or =) — zoom in / out · 0 or F — fit view · R — reset view · C — keep centered</div>
-		<div>Alt+F1 / ? — toggle this shortcut guide</div>
+		<div>? (or Shift+/) — toggle this shortcut guide</div>
 		<div>Tab — leave the canvas to the toolbar and page controls</div>
 	</div>
 	<div id="temporalDetailsPanel" role="region" aria-label="Commit details and structural delta">
@@ -894,7 +894,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 		<button id="temporalZoomInBtn" type="button" title="Zoom in (+)" aria-label="Zoom in" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M7.5 2a5.5 5.5 0 0 1 4.383 8.838l4.471 4.47-.707.707-4.47-4.47A5.5 5.5 0 1 1 7.5 2zm0 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM8 5v2h2v1H8v2H7V8H5V7h2V5h1z"/></svg></button>
 		<button id="temporalZoomOutBtn" type="button" title="Zoom out (-)" aria-label="Zoom out" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M7.5 2a5.5 5.5 0 0 1 4.383 8.838l4.471 4.47-.707.707-4.47-4.47A5.5 5.5 0 1 1 7.5 2zm0 1a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9zM5 7h5v1H5V7z"/></svg></button>
 		<button id="temporalResetBtn" type="button" title="Reset View (R)" aria-label="Reset View" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M13.45 8.17c-.44 2.61-2.72 4.58-5.45 4.58A5.5 5.5 0 0 1 2.5 7.25h1.01a4.5 4.5 0 0 0 4.49 4.5c2.17 0 3.98-1.55 4.42-3.6l-1.71.57-.32-.95 3.12-1.04.95 3.12-.95.32-.06-.99zM2.55 6.83C2.99 4.22 5.27 2.25 8 2.25a5.5 5.5 0 0 1 5.5 5.5h-1.01a4.5 4.5 0 0 0-4.49-4.5c-2.17 0-3.98 1.55-4.42 3.6l1.71-.57.32.95-3.12 1.04L1.54 5.15l.95-.32.06.99z"/></svg></button>
-		<button id="temporalHelpBtn" type="button" title="Keyboard Shortcuts (Alt+F1 or ?)" aria-label="Keyboard Shortcuts" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6zm-.1 2.5a2.2 2.2 0 0 0-2.2 2.2.6.6 0 0 0 1.2 0 .99.99 0 1 1 1.69.7.6.6 0 0 0-.15.42v1a.6.6 0 0 0 1.2 0v-.66a2.2 2.2 0 0 0-.74-1.66 1 1 0 0 0-.1-.08A1 1 0 0 1 7.9 4.7zm.1 6.3a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z"/></svg></button>
+		<button id="temporalHelpBtn" type="button" title="Keyboard Shortcuts (?)" aria-label="Keyboard Shortcuts" style="width:24px; height:24px; display:flex; align-items:center; justify-content:center; background:transparent; border:0; color:var(--vscode-foreground, #f4f4f5); border-radius:4px; cursor:pointer;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6zm-.1 2.5a2.2 2.2 0 0 0-2.2 2.2.6.6 0 0 0 1.2 0 .99.99 0 1 1 1.69.7.6.6 0 0 0-.15.42v1a.6.6 0 0 0 1.2 0v-.66a2.2 2.2 0 0 0-.74-1.66 1 1 0 0 0-.1-.08A1 1 0 0 1 7.9 4.7zm.1 6.3a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z"/></svg></button>
 	</div>
 	<div id="temporalDiffBadges" style="display:flex; gap:4px; font-size:10.5px; margin-left:auto; flex-shrink:0; align-items:center;">
 		<span id="badgeAdded" class="badge-added" title="Added nodes">+0</span>
@@ -962,6 +962,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	<button id="fit" type="button" title="Fit View" aria-label="Fit View"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 2L6.5 2 6.5 3 3.707 3 7.354 6.646 6.646 7.354 3 3.707 3 6.5 2 6.5z M14 14L9.5 14 9.5 13 12.293 13 8.646 9.354 9.354 8.646 13 12.293 13 9.5 14 9.5z"/></svg></button>
 	<button id="centerLock" type="button" title="Keep graph centered" aria-label="Keep graph centered" aria-pressed="false"><svg class="icon-unpressed" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a6 6 0 0 1 6 6c0 2.3-1.5 4.05-3.15 5.07A11 11 0 0 1 8 13.44a11 11 0 0 1-2.85-1.37C3.5 11.05 2 9.3 2 7a6 6 0 0 1 6-6zm0 1a5 5 0 0 0-5 5c0 .34.03.66.1.96C3.53 9.86 5.63 10.94 8 12.4c2.37-1.46 4.47-2.54 4.9-4.44.07-.3.1-.62.1-.96a5 5 0 0 0-5-5zm0 2.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg><svg class="icon-pressed" viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a6 6 0 0 1 6 6c0 2.3-1.5 4.05-3.15 5.07A11 11 0 0 1 8 13.44a11 11 0 0 1-2.85-1.37C3.5 11.05 2 9.3 2 7a6 6 0 0 1 6-6zm0 3.5a2.5 2.5 0 1 1 0 5 2.5 2.5 0 0 1 0-5z"/></svg></button>
 	<button id="reset" type="button" title="Reset View" aria-label="Reset View"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M13.45 8.17c-.44 2.61-2.72 4.58-5.45 4.58A5.5 5.5 0 0 1 2.5 7.25h1.01a4.5 4.5 0 0 0 4.49 4.5c2.17 0 3.98-1.55 4.42-3.6l-1.71.57-.32-.95 3.12-1.04.95 3.12-.95.32-.06-.99zM2.55 6.83C2.99 4.22 5.27 2.25 8 2.25a5.5 5.5 0 0 1 5.5 5.5h-1.01a4.5 4.5 0 0 0-4.49-4.5c-2.17 0-3.98 1.55-4.42 3.6l1.71-.57.32.95-3.12 1.04L1.54 5.15l.95-.32.06.99z"/></svg></button>
+	<button id="graphHelpBtn" type="button" title="Keyboard Shortcuts (?)" aria-label="Keyboard Shortcuts"><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm0 1.2a5.8 5.8 0 1 1 0 11.6 5.8 5.8 0 0 1 0-11.6zm-.1 2.5a2.2 2.2 0 0 0-2.2 2.2.6.6 0 0 0 1.2 0 .99.99 0 1 1 1.69.7.6.6 0 0 0-.15.42v1a.6.6 0 0 0 1.2 0v-.66a2.2 2.2 0 0 0-.74-1.66 1 1 0 0 0-.1-.08A1 1 0 0 1 7.9 4.7zm.1 6.3a.8.8 0 1 0 0 1.6.8.8 0 0 0 0-1.6z"/></svg></button>
 	<label id="idleToggleWrap"><input type="checkbox" id="idleToggle" aria-label="Auto-rotate when idle"> Idle</label>
 </div>
 <div id="status">Scanning…</div>
@@ -1053,6 +1054,7 @@ const temporalZoomInBtn = document.getElementById('temporalZoomInBtn');
 const temporalZoomOutBtn = document.getElementById('temporalZoomOutBtn');
 const temporalResetBtn = document.getElementById('temporalResetBtn');
 const temporalHelpBtn = document.getElementById('temporalHelpBtn');
+const graphHelpBtn = document.getElementById('graphHelpBtn');
 const temporalRetryBtn = document.getElementById('temporalRetryBtn');
 const badgeAdded = document.getElementById('badgeAdded');
 const badgeRemoved = document.getElementById('badgeRemoved');
@@ -1423,6 +1425,7 @@ function rebuildAdjacency() {
 let temporalState = null;
 let temporalDiff = null;
 let hasFittedTemporalView = false;
+let userAdjustedViewport = false;
 let previousTemporalRenderNodes = new Map();
 let currentTemporalRenderNodes = new Map();
 let animStartTime = 0;
@@ -1802,7 +1805,8 @@ function fitView(animate) {
 	if (!isFinite(minX)) return;
 	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 	const initialZoom = settings.initialZoom || 1;
-	const k = Math.max(MIN_ZOOM, Math.min(1.6, Math.min((usableW - 96) / bw, (usableH - 96) / bh) * initialZoom));
+	const maxFitZoom = nodes.length <= 10 ? 3.2 : 1.6;
+	const k = Math.max(MIN_ZOOM, Math.min(maxFitZoom, Math.min((usableW - 96) / bw, (usableH - 96) / bh) * initialZoom));
 	const graphCenterX = (minX + maxX) / 2;
 	const graphCenterY = (minY + maxY) / 2;
 	const targetTransform = { k: k, x: centerX - graphCenterX * k, y: centerY - graphCenterY * k };
@@ -1820,7 +1824,7 @@ function updateLegend(s, network) {
 	if (isTemporal()) {
 		let html = '<div class="header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--vscode-widget-border, #3c3c3c); padding-bottom:4px;">';
 		html += '<span class="title" style="margin:0; font-weight:700;">Temporal Legend</span>';
-		html += '<button id="legendCloseBtn" style="border:0; background:transparent; color:var(--vscode-foreground, #ccc); cursor:pointer; font-size:12px;">✕</button></div>';
+		html += '<button id="legendCloseBtn" type="button" title="Close legend" aria-label="Close legend" style="border:0; background:transparent; color:var(--vscode-foreground, #ccc); cursor:pointer; width:22px; height:22px; display:flex; align-items:center; justify-content:center;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M13.85 2.15l-.7-.7L8 6.59 2.85 1.45l-.7.7L7.29 7.3 1.45 13.15l.7.7L7.3 8.71l5.85 5.85.7-.7L8.71 8l5.14-5.85z"/></svg></button></div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-addedResourceForeground, #3fb950)"></span>Added (+)</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-deletedResourceForeground, #f85149)"></span>Removed (-)</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)"></span>Modified (~)</div>';
@@ -1856,7 +1860,13 @@ function updateLegend(s, network) {
 	html += '<div class="row"><span class="swatch line import"></span>Import</div>';
 	html += '<div class="row"><span class="swatch line composition"></span>Composition</div>';
 	legend.innerHTML = html;
+	const compact = (s.nodes || []).length <= 10;
 	legend.style.display = 'block';
+	legend.style.padding = compact ? '6px 8px' : '10px 12px';
+	legend.style.minWidth = compact ? '108px' : '140px';
+	legend.style.maxWidth = compact ? '160px' : '220px';
+	legend.style.fontSize = compact ? '10px' : '11px';
+	legend.style.bottom = compact ? '16px' : '100px';
 }
 
 function updateTemporalUI(state, diff) {
@@ -1989,6 +1999,7 @@ function updateTemporalUI(state, diff) {
 	const previousDisplayMode = displayMode;
 	displayMode = state.displayMode || displayMode;
 	if (typeof state.displayMode === 'string' && previousDisplayMode !== displayMode && temporalDiff && temporalDiff.nodes && temporalDiff.nodes.length) {
+		userAdjustedViewport = false;
 		if (keepGraphCentered) {
 			applyCenterLock(true);
 		} else {
@@ -3060,12 +3071,12 @@ function render(first) {
 		updateLegend(null, false);
 		updateTemporalUI(temporalState, temporalDiff);
 		const canFitTemporal = hasRenderableTemporalNodes(temporalDiff);
-		if (canFitTemporal && (first || !hasFittedTemporalView)) {
+		if (canFitTemporal && (first || !hasFittedTemporalView) && !userAdjustedViewport) {
 			fitView(false);
 			hasFittedTemporalView = true;
-		} else if (!canFitTemporal) {
+		} else if (!canFitTemporal && first) {
 			hasFittedTemporalView = false;
-		} else if (keepGraphCentered) {
+		} else if (keepGraphCentered && !userAdjustedViewport) {
 			applyCenterLock(true);
 		}
 		dirty = true;
@@ -3102,7 +3113,9 @@ function render(first) {
 	updateLegend(snapshot, true);
 	if (status) {
 		status.style.display = 'block';
-		status.textContent = snapshot.nodes.length + ' files · ' + (snapshot.edges || []).length + ' edges';
+		const edgeCount = (snapshot.edges || []).length;
+		status.textContent = snapshot.nodes.length + ' files · ' + edgeCount + ' edges'
+			+ (snapshot.nodes.length > 0 && edgeCount === 0 ? ' · No dependency edges were detected in this view.' : '');
 	}
 	if (first || layoutChanged) {
 		projectAll();
@@ -3460,6 +3473,7 @@ function onPointerMove(e) {
 		: 1.0;
 	transform.x += dx * panSens;
 	transform.y += dy * panSens;
+	userAdjustedViewport = true;
 	dirty = true;
 	kickRaf();
 }
@@ -3491,6 +3505,7 @@ function onWheel(e) {
 		transform = applyZoomAroundCursor(transform, factor, mx, my, MIN_ZOOM, MAX_ZOOM);
 	}
 
+	userAdjustedViewport = true;
 	dirty = true;
 	kickRaf();
 }
@@ -3865,6 +3880,12 @@ function zoomByFactor(factor) {
 	} else {
 		animateViewportTo(target, 160);
 	}
+	userAdjustedViewport = true;
+}
+
+function toggleGraphHelp() {
+	const helpEl = document.getElementById('graphKbdHelp');
+	if (helpEl) helpEl.hidden = !helpEl.hidden;
 }
 
 window.addEventListener('keydown', function (e) {
@@ -3886,9 +3907,9 @@ window.addEventListener('keydown', function (e) {
 	if (isTextInput) return;
 
 	const canvasFocused = document.activeElement === netCanvas;
-	if (((e.key === 'F1' && (e.altKey || e.metaKey)) || (e.key === '/' && e.shiftKey) || e.key === '?') && canvasFocused) {
-		const helpEl = document.getElementById('graphKbdHelp');
-		if (helpEl) helpEl.hidden = !helpEl.hidden;
+	// Keep F1 and Alt/Option+F1 available to VS Code Accessibility Help.
+	if (((e.key === '/' && e.shiftKey) || e.key === '?') && canvasFocused) {
+		toggleGraphHelp();
 		e.preventDefault();
 		return;
 	}
@@ -3922,10 +3943,21 @@ window.addEventListener('keydown', function (e) {
 		case '0':
 		case 'f':
 		case 'F':
-			e.preventDefault(); fitView(!settings.reduceMotion); announceGraph('Fit view'); break;
+			e.preventDefault();
+			cancelCameraAnimation();
+			userAdjustedViewport = false;
+			fitView(!settings.reduceMotion);
+			announceGraph('Fit view');
+			break;
 		case 'r':
 		case 'R':
-			e.preventDefault(); resetCamera(false); fitView(true); announceGraph('View reset'); break;
+			e.preventDefault();
+			cancelCameraAnimation();
+			userAdjustedViewport = false;
+			resetCamera(false);
+			fitView(true);
+			announceGraph('View reset');
+			break;
 		case 'c':
 		case 'C':
 			e.preventDefault();
@@ -3991,40 +4023,24 @@ if (temporalCenterLockBtn) {
 if (temporalFitBtn) {
 	temporalFitBtn.onclick = function () {
 		cancelCameraAnimation();
+		userAdjustedViewport = false;
 		fitView(true);
 		announceGraph('Fit view');
 	};
 }
 
 if (temporalZoomInBtn) {
-	temporalZoomInBtn.onclick = function () {
-		cancelCameraAnimation();
-		const w = netCanvas ? netCanvas.clientWidth : 800;
-		const h = netCanvas ? netCanvas.clientHeight : 600;
-		const insets = getUsableInsets();
-		const target = keepGraphCentered
-			? applyZoomAroundCenter(transform, 1.25, w, h, MIN_ZOOM, MAX_ZOOM, insets)
-			: applyZoomAroundCenter(transform, 1.25, w, h, MIN_ZOOM, MAX_ZOOM);
-		animateViewportTo(target, 180);
-	};
+	temporalZoomInBtn.onclick = function () { zoomByFactor(1.25); };
 }
 
 if (temporalZoomOutBtn) {
-	temporalZoomOutBtn.onclick = function () {
-		cancelCameraAnimation();
-		const w = netCanvas ? netCanvas.clientWidth : 800;
-		const h = netCanvas ? netCanvas.clientHeight : 600;
-		const insets = getUsableInsets();
-		const target = keepGraphCentered
-			? applyZoomAroundCenter(transform, 0.8, w, h, MIN_ZOOM, MAX_ZOOM, insets)
-			: applyZoomAroundCenter(transform, 0.8, w, h, MIN_ZOOM, MAX_ZOOM);
-		animateViewportTo(target, 180);
-	};
+	temporalZoomOutBtn.onclick = function () { zoomByFactor(0.8); };
 }
 
 if (temporalResetBtn) {
 	temporalResetBtn.onclick = function () {
 		cancelCameraAnimation();
+		userAdjustedViewport = false;
 		resetCamera(false);
 		fitView(true);
 		announceGraph('View reset');
@@ -4032,10 +4048,10 @@ if (temporalResetBtn) {
 }
 
 if (temporalHelpBtn) {
-	temporalHelpBtn.onclick = function () {
-		const helpEl = document.getElementById('graphKbdHelp');
-		if (helpEl) helpEl.hidden = !helpEl.hidden;
-	};
+	temporalHelpBtn.onclick = toggleGraphHelp;
+}
+if (graphHelpBtn) {
+	graphHelpBtn.onclick = toggleGraphHelp;
 }
 
 if (temporalRetryBtn) {
@@ -4046,36 +4062,19 @@ if (temporalRetryBtn) {
 
 const zoomInBtn = document.getElementById('zoomIn');
 if (zoomInBtn) {
-	zoomInBtn.onclick = function () {
-		cancelCameraAnimation();
-		const w = netCanvas ? netCanvas.clientWidth : 800;
-		const h = netCanvas ? netCanvas.clientHeight : 600;
-		const insets = getUsableInsets();
-		const target = keepGraphCentered
-			? applyZoomAroundCenter(transform, 1.25, w, h, MIN_ZOOM, MAX_ZOOM, insets)
-			: applyZoomAroundCenter(transform, 1.25, w, h, MIN_ZOOM, MAX_ZOOM);
-		animateViewportTo(target, 180);
-	};
+	zoomInBtn.onclick = function () { zoomByFactor(1.25); };
 }
 
 const zoomOutBtn = document.getElementById('zoomOut');
 if (zoomOutBtn) {
-	zoomOutBtn.onclick = function () {
-		cancelCameraAnimation();
-		const w = netCanvas ? netCanvas.clientWidth : 800;
-		const h = netCanvas ? netCanvas.clientHeight : 600;
-		const insets = getUsableInsets();
-		const target = keepGraphCentered
-			? applyZoomAroundCenter(transform, 0.8, w, h, MIN_ZOOM, MAX_ZOOM, insets)
-			: applyZoomAroundCenter(transform, 0.8, w, h, MIN_ZOOM, MAX_ZOOM);
-		animateViewportTo(target, 180);
-	};
+	zoomOutBtn.onclick = function () { zoomByFactor(0.8); };
 }
 
 const fitBtn = document.getElementById('fit');
 if (fitBtn) {
 	fitBtn.onclick = function () {
 		cancelCameraAnimation();
+		userAdjustedViewport = false;
 		fitView(true);
 	};
 }
@@ -4084,6 +4083,7 @@ const resetBtn = document.getElementById('reset');
 if (resetBtn) {
 	resetBtn.onclick = function () {
 		cancelCameraAnimation();
+		userAdjustedViewport = false;
 		resetCamera(false);
 		fitView(true);
 	};
@@ -4271,4 +4271,3 @@ setTimeout(function () {
 </html>`;
 	}
 }
-

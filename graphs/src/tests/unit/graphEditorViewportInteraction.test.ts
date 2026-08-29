@@ -165,7 +165,7 @@ interface Harness {
 	getUsableInsets(): Record<string, number>;
 	callUpdateCanvasCursor(): void;
 	focusCanvas(): void;
-	dispatchKey(key: string, extra?: Record<string, any>): void;
+	dispatchKey(key: string, extra?: Record<string, any>): { prevented: boolean };
 }
 
 function createHarness(initialGraphType: 'network' | 'temporal' = 'network'): Harness {
@@ -189,7 +189,7 @@ function createHarness(initialGraphType: 'network' | 'temporal' = 'network'): Ha
 		'detailsCommitSha', 'detailsCommitMsg', 'detailsCommitAuthor', 'detailsCommitParents', 'detailsDeltaSummary', 'detailsEntityList',
 		'popup', 'popupTitle', 'popupMeta', 'popupLayerBadge', 'popupChangeBadge', 'popupDetailsList', 'popupAiWrap', 'popupAi', 'popupAiProvenance',
 		'popupClose', 'popupOpen', 'popupHistoricalView', 'popupSourceDiff', 'popupSetBase', 'popupReveal', 'popupMagnus', 'noChangesCard', 'noChangesViewSource',
-		'zoomIn', 'zoomOut', 'fit', 'centerLock', 'reset', 'temporalLegendBtn'
+		'zoomIn', 'zoomOut', 'fit', 'centerLock', 'reset', 'graphHelpBtn', 'temporalLegendBtn'
 	]) {
 		elements.set(id, new FakeElement());
 	}
@@ -329,16 +329,18 @@ function createHarness(initialGraphType: 'network' | 'temporal' = 'network'): Ha
 		focusCanvas(): void {
 			sandbox.document.activeElement = elements.get('netCanvas')!;
 		},
-		dispatchKey(key: string, extra: Record<string, any> = {}): void {
+		dispatchKey(key: string, extra: Record<string, any> = {}): { prevented: boolean } {
+			let prevented = false;
 			const event = {
 				key,
 				target: sandbox.document.activeElement || sandbox.document.body,
-				preventDefault() { },
 				...extra,
+				preventDefault() { prevented = true; },
 			};
 			for (const listener of windowListeners.get('keydown') ?? []) {
 				listener(event);
 			}
+			return { prevented };
 		},
 	};
 }
@@ -517,19 +519,19 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 
 	test('6. Programmatic Camera Animation: Zoom in/out triggers cubic ease-out interpolation when reduceMotion is false', () => {
 		const harness = createHarness();
+		const nodes = Array.from({ length: 11 }, (_, i) => ({ id: `n${i}`, path: `n${i}.ts`, x: 0, y: 0, z: 0 }));
+		const positions3d = Object.fromEntries(nodes.map((node, i) => [node.id, { x: (i % 4) * 80, y: Math.floor(i / 4) * 80, z: 0 }]));
 		harness.sendHostMessage({
 			type: 'snapshot',
 			payload: {
 				graphType: 'network',
-				snapshot: {
-					nodes: [{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 }],
-					positions3d: { 'a': { x: 0, y: 0, z: 0 } },
-				},
+				snapshot: { nodes, positions3d, edges: [] },
 				settings: { reduceMotion: false, keepGraphCentered: false },
 			},
 		});
 
 		const initialK = harness.getTransform().k;
+		assert.ok(initialK <= 1.6 + 1e-6, `11-node fit must leave zoom headroom under MAX_ZOOM (got k=${initialK})`);
 		const zoomInBtn = harness.elements.get('zoomIn')!;
 		assert.ok(zoomInBtn, 'zoomIn button exists');
 
@@ -539,6 +541,7 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		const anim = harness.getActiveCameraAnim();
 		assert.ok(anim !== null, 'activeCameraAnim is active');
 		assert.strictEqual(anim.from.k, initialK);
+		assert.ok(Math.abs(anim.to.k - initialK * 1.25) < 0.05, `zoom-in target is 1.25x when under MAX_ZOOM (to=${anim.to.k}, from=${initialK})`);
 
 		// Advance animation halfway (90ms into 180ms duration)
 		harness.runAnimationFrame(1090);
@@ -551,7 +554,7 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		harness.runAnimationFrame(1200);
 
 		assert.ok(harness.getActiveCameraAnim() === null, 'activeCameraAnim finishes and cleans up');
-		assert.ok(Math.abs(harness.getTransform().k - initialK * 1.25) < 0.05, 'final zoom matches 1.25 target');
+		assert.ok(Math.abs(harness.getTransform().k - anim.to.k) < 0.05, 'final zoom matches the animation target');
 	});
 
 	test('7. Reduced Motion Honor: When reduceMotion is active, programmatic viewport updates apply immediately without RAF easing', () => {
@@ -958,7 +961,7 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		assert.strictEqual(hovered, null, 'hovered node cleared on Escape');
 	});
 
-	test('17. Keyboard Shortcuts: F1 toggles help overlay, + / - zoom, 0/f fit, r resets, and c toggles center-lock', () => {
+	test('17. Keyboard Shortcuts: ? toggles help overlay while F1 variants pass through; + / - zoom, 0/f fit, r resets, and c toggles center-lock', () => {
 		const harness = createHarness();
 		harness.sendHostMessage({
 			type: 'snapshot',
@@ -982,21 +985,32 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		const helpEl = harness.elements.get('graphKbdHelp')!;
 		helpEl.hidden = true;
 
-		// Plain F1 must NOT open help (preserves VS Code command palette)
-		harness.dispatchKey('F1');
+		// Plain F1 must NOT open help or swallow the event (preserves VS Code command palette)
+		const f1 = harness.dispatchKey('F1');
+		assert.strictEqual(f1.prevented, false, 'Plain F1 must pass through to Command Palette');
 		assert.strictEqual(helpEl.hidden, true, 'Plain F1 does not hijack command palette');
 
-		// Alt+F1 opens help
-		harness.dispatchKey('F1', { altKey: true });
-		assert.strictEqual(helpEl.hidden, false, 'Alt+F1 toggles help overlay on');
+		// Alt/Option+F1 must pass through to VS Code Accessibility Help even if help is already open.
+		helpEl.hidden = false;
+		const altF1Open = harness.dispatchKey('F1', { altKey: true });
+		assert.strictEqual(altF1Open.prevented, false, 'Alt/Option+F1 must not be preventDefaulted');
+		assert.strictEqual(helpEl.hidden, false, 'Alt/Option+F1 must not toggle PreBase help');
+		helpEl.hidden = true;
+		const altF1 = harness.dispatchKey('F1', { altKey: true });
+		assert.strictEqual(altF1.prevented, false, 'Alt/Option+F1 must not be preventDefaulted');
+		assert.strictEqual(helpEl.hidden, true, 'Alt+F1 does not hijack VS Code Accessibility Help');
 
-		// Escape closes help
-		harness.dispatchKey('Escape');
-		assert.strictEqual(helpEl.hidden, true, 'Escape closes help overlay');
+		// ? opens local graph help.
+		const question = harness.dispatchKey('?');
+		assert.strictEqual(question.prevented, true);
+		assert.strictEqual(helpEl.hidden, false, '? toggles help overlay on');
 
-		// '?' opens help
-		harness.dispatchKey('?');
-		assert.strictEqual(helpEl.hidden, false, "'?' toggles help overlay on");
+		// graphHelpBtn is the visible PreBase help control.
+		helpEl.hidden = true;
+		const helpBtn = harness.elements.get('graphHelpBtn')!;
+		assert.equal(typeof helpBtn.onclick, 'function');
+		helpBtn.click();
+		assert.strictEqual(helpEl.hidden, false, 'graphHelpBtn opens local graph help');
 
 		// Escape closes help
 		harness.dispatchKey('Escape');
@@ -1007,6 +1021,7 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		harness.dispatchKey('+');
 		const zoomedIn = harness.getTransform().k;
 		assert.ok(zoomedIn > startZoom, `'+' zooms in: ${zoomedIn} > ${startZoom}`);
+		assert.equal(vm.runInContext('userAdjustedViewport', harness.context), true, 'keyboard +/- must mark the viewport as user-adjusted');
 
 		// '-' zooms out
 		harness.dispatchKey('-');
@@ -1133,5 +1148,209 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		const afterRefresh = harness.getTransform();
 		assert.ok(Math.abs(afterRefresh.k - afterZoom.k) < 0.02,
 			`same-mode Temporal refresh must not steal the user zoom (got k=${afterRefresh.k}, want ${afterZoom.k})`);
+	});
+
+	test('20. Hidden mode-specific graph controls are not left queryable as active duplicates', () => {
+		const harness = createHarness('network');
+		const toolbar = harness.elements.get('toolbar')!;
+		const temporalToolbar = harness.elements.get('temporalToolbar')!;
+		const networkSnapshot = {
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 }],
+					positions3d: { a: { x: 0, y: 0, z: 0 } },
+				},
+				settings: {},
+			},
+		};
+		const temporalSnapshot = {
+			type: 'snapshot',
+			payload: {
+				graphType: 'temporal',
+				temporalState: {
+					displayMode: 'changes',
+					diff: {
+						sourceCommitSha: 'c0',
+						targetCommitSha: 'c1',
+						nodes: [{ entityId: 'e1', label: 'a.ts', path: 'src/a.ts', changeKind: 'added', x: 10, y: 20 }],
+						edges: [],
+						summary: { addedCount: 1, removedCount: 0, modifiedCount: 0, renamedCount: 0 },
+					},
+				},
+				settings: {},
+			},
+		};
+
+		harness.sendHostMessage(networkSnapshot);
+		assert.notStrictEqual(toolbar.style.display, 'none', 'network toolbar is the active chrome');
+		assert.strictEqual(temporalToolbar.style.display, 'none', 'temporal toolbar is display:none in network mode');
+
+		harness.sendHostMessage(temporalSnapshot);
+		assert.strictEqual(toolbar.style.display, 'none', 'network toolbar is display:none in temporal mode');
+		assert.notStrictEqual(temporalToolbar.style.display, 'none', 'temporal toolbar is the active chrome');
+
+		harness.sendHostMessage(networkSnapshot);
+		assert.notStrictEqual(toolbar.style.display, 'none');
+		assert.strictEqual(temporalToolbar.style.display, 'none', 'switching back must hide temporal chrome so Zoom in is not duplicated');
+	});
+
+	test('21. Zero-edge graphs keep files visible and add informational copy; edges omit that copy', () => {
+		const harness = createHarness('network');
+		const snapshot = {
+			nodes: [
+				{ id: 'a', path: 'a.ts', x: 0, y: 0, z: 0 },
+				{ id: 'b', path: 'b.ts', x: 80, y: 40, z: 0 },
+			],
+			positions3d: { a: { x: 0, y: 0, z: 0 }, b: { x: 80, y: 40, z: 0 } },
+		};
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: { graphType: 'network', snapshot, settings: { reduceMotion: true } },
+		});
+		const status = harness.elements.get('status')!;
+		assert.match(status.textContent, /2 files · 0 edges/);
+		assert.match(status.textContent, /No dependency edges were detected in this view/);
+
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: { ...snapshot, edges: [{ id: 'e1', source: 'a', target: 'b', kind: 'import' }] },
+				settings: { reduceMotion: true },
+			},
+		});
+		assert.match(status.textContent, /2 files · 1 edges/);
+		assert.equal(status.textContent.includes('No dependency edges were detected in this view'), false);
+	});
+
+	test('22. Small graphs (≤10 nodes) fit at a higher zoom cap than 11-node graphs', () => {
+		const harness = createHarness('network');
+		function clustered(count: number) {
+			const nodes = [];
+			const positions3d: Record<string, { x: number; y: number; z: number }> = {};
+			for (let i = 0; i < count; i++) {
+				nodes.push({ id: `n${i}`, path: `n${i}.ts`, x: 0, y: 0, z: 0 });
+				positions3d[`n${i}`] = { x: (i % 3) * 4, y: Math.floor(i / 3) * 4, z: 0 };
+			}
+			return { nodes, positions3d, edges: [] as unknown[] };
+		}
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: { graphType: 'network', snapshot: clustered(10), settings: { reduceMotion: true, keepGraphCentered: false } },
+		});
+		harness.elements.get('fit')!.click();
+		const smallK = harness.getTransform().k;
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: { graphType: 'network', snapshot: clustered(11), settings: { reduceMotion: true, keepGraphCentered: false } },
+		});
+		harness.elements.get('fit')!.click();
+		const largeK = harness.getTransform().k;
+		assert.ok(smallK > 1.6, `≤10 node fit must be allowed past the 1.6 large-graph cap (got k=${smallK})`);
+		assert.ok(smallK <= 3.2 + 1e-6, `≤10 node fit must cap at 3.2 (got k=${smallK})`);
+		assert.ok(largeK <= 1.6 + 1e-6, `11+ node fit must cap at 1.6 (got k=${largeK})`);
+		assert.ok(smallK > largeK, `small-graph cap must zoom tighter than the 11-node cap (${smallK} > ${largeK})`);
+	});
+
+	test('23. Wheel zoom then Temporal state refresh must not steal the camera', () => {
+		const harness = createHarness('temporal');
+		const baseState = {
+			displayMode: 'changes',
+			diff: {
+				sourceCommitSha: 'c0',
+				targetCommitSha: 'c1',
+				nodes: [{ entityId: 'e1', label: 'a.ts', path: 'src/a.ts', changeKind: 'added', x: 10, y: 20 }],
+				edges: [],
+				summary: { addedCount: 1, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 0 },
+			},
+			isSettled: true,
+			selectedCommitSha: 'c1',
+			renderedCommitSha: 'c1',
+		};
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: { graphType: 'temporal', temporalState: baseState, settings: { keepGraphCentered: false, reduceMotion: true } },
+		});
+		harness.sendHostMessage({ type: 'temporalState', payload: baseState });
+		const afterFit = harness.getTransform();
+		harness.canvas.dispatch('wheel', { deltaY: -80, deltaMode: 0, ctrlKey: false, clientX: 400, clientY: 300 });
+		const afterZoom = harness.getTransform();
+		assert.ok(afterZoom.k > afterFit.k, `wheel zoom must change the camera (fit k=${afterFit.k}, zoom k=${afterZoom.k})`);
+		vm.runInContext('hasFittedTemporalView = false', harness.context);
+		harness.sendHostMessage({
+			type: 'temporalState',
+			payload: { ...baseState, selectedCommitIndex: 2, renderedCommitSha: 'c2' },
+		});
+		const afterRefresh = harness.getTransform();
+		assert.ok(Math.abs(afterRefresh.k - afterZoom.k) < 0.02,
+			`Temporal refresh must not steal a user wheel zoom (got k=${afterRefresh.k}, want ${afterZoom.k})`);
+	});
+
+	test('25. Keyboard +/- zoom then Temporal state refresh must not steal the camera', () => {
+		const harness = createHarness('temporal');
+		const baseState = {
+			displayMode: 'changes',
+			diff: {
+				sourceCommitSha: 'c0',
+				targetCommitSha: 'c1',
+				nodes: [{ entityId: 'e1', label: 'a.ts', path: 'src/a.ts', changeKind: 'added', x: 10, y: 20 }],
+				edges: [],
+				summary: { addedCount: 1, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 0 },
+			},
+			isSettled: true,
+			selectedCommitSha: 'c1',
+			renderedCommitSha: 'c1',
+		};
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: { graphType: 'temporal', temporalState: baseState, settings: { keepGraphCentered: false, reduceMotion: true } },
+		});
+		harness.sendHostMessage({ type: 'temporalState', payload: baseState });
+		harness.focusCanvas();
+		const afterFit = harness.getTransform();
+		harness.dispatchKey('+');
+		const afterZoom = harness.getTransform();
+		assert.ok(afterZoom.k > afterFit.k, `keyboard zoom must change the camera (fit k=${afterFit.k}, zoom k=${afterZoom.k})`);
+		assert.equal(vm.runInContext('userAdjustedViewport', harness.context), true);
+		vm.runInContext('hasFittedTemporalView = false', harness.context);
+		harness.sendHostMessage({
+			type: 'temporalState',
+			payload: { ...baseState, selectedCommitIndex: 2, renderedCommitSha: 'c2' },
+		});
+		const afterRefresh = harness.getTransform();
+		assert.ok(Math.abs(afterRefresh.k - afterZoom.k) < 0.02,
+			`Temporal refresh must not steal a keyboard zoom (got k=${afterRefresh.k}, want ${afterZoom.k})`);
+	});
+
+	test('24. Temporal legend close is an SVG control that hides the legend', () => {
+		const harness = createHarness('temporal');
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'temporal',
+				temporalState: {
+					displayMode: 'changes',
+					diff: {
+						sourceCommitSha: 'c0',
+						targetCommitSha: 'c1',
+						nodes: [{ entityId: 'e1', label: 'a.ts', path: 'src/a.ts', changeKind: 'added', x: 10, y: 20 }],
+						edges: [],
+						summary: { addedCount: 1, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 0 },
+					},
+				},
+				settings: { reduceMotion: true },
+			},
+		});
+		const legend = harness.elements.get('legend')!;
+		legend.style.display = 'block';
+		assert.match(legend.innerHTML, /id="legendCloseBtn"/);
+		assert.match(legend.innerHTML, /<svg/);
+		assert.equal(legend.innerHTML.includes('✕') || legend.innerHTML.includes('×'), false, 'legend close must not use a raw ✕/× glyph');
+		const closeBtn = harness.elements.get('legendCloseBtn')!;
+		assert.equal(typeof closeBtn.onclick, 'function');
+		closeBtn.click();
+		assert.strictEqual(legend.style.display, 'none', 'legend close hides the legend');
 	});
 });

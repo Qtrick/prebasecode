@@ -1,0 +1,119 @@
+{
+  "schemaVersion": 1,
+  "scenario": "assurance",
+  "sourceHead": "460e988ffb270bae484f4d7d5fadd450e2c57100",
+  "generatedAt": "2026-08-29T02:45:07.944Z",
+  "ok": true,
+  "commands": [
+    {
+      "command": "verify:icons",
+      "exitCode": 0,
+      "durationMs": 151,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-icons.log"
+    },
+    {
+      "command": "compile-magnus",
+      "exitCode": 0,
+      "durationMs": 2310,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/compile-magnus.log"
+    },
+    {
+      "command": "transpile-client",
+      "exitCode": 0,
+      "durationMs": 5525,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/transpile-client.log"
+    },
+    {
+      "command": "typecheck-client",
+      "exitCode": 0,
+      "durationMs": 8395,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/typecheck-client.log"
+    },
+    {
+      "command": "typecheck:graphs",
+      "exitCode": 0,
+      "durationMs": 312,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/typecheck-graphs.log"
+    },
+    {
+      "command": "test:graphs",
+      "exitCode": 0,
+      "durationMs": 52723,
+      "passed": true,
+      "testCount": 3,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/test-graphs.log"
+    },
+    {
+      "command": "test:prebase-pure",
+      "exitCode": 0,
+      "durationMs": 29342,
+      "passed": true,
+      "testCount": 232,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/test-prebase-pure.log"
+    },
+    {
+      "command": "test:prebase-magnus",
+      "exitCode": 0,
+      "durationMs": 2535,
+      "passed": true,
+      "testCount": 183,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/test-prebase-magnus.log"
+    },
+    {
+      "command": "verify:graphs-boundary",
+      "exitCode": 0,
+      "durationMs": 528,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-graphs-boundary.log"
+    },
+    {
+      "command": "verify:graphs-runtime-boundary",
+      "exitCode": 0,
+      "durationMs": 458,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-graphs-runtime-boundary.log"
+    },
+    {
+      "command": "node scripts/startup/verify-magnus-out.mjs",
+      "exitCode": 0,
+      "durationMs": 27,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/node.log"
+    },
+    {
+      "command": "verify:privacy",
+      "exitCode": 0,
+      "durationMs": 122,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-privacy.log"
+    },
+    {
+      "command": "verify:config-uniqueness",
+      "exitCode": 0,
+      "durationMs": 117,
+      "passed": true,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-config-uniqueness.log"
+    },
+    {
+      "command": "assurance:quick",
+      "exitCode": 0,
+      "durationMs": 60765,
+      "passed": true,
+      "testCount": 10,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/assurance-quick.log"
+    },
+    {
+      "command": "assurance:static",
+      "exitCode": 0,
+      "durationMs": 61337,
+      "passed": true,
+      "testCount": 10,
+      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/assurance-static.log"
+    }
+  ]
+}

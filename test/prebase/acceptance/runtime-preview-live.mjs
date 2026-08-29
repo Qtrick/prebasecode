@@ -15,6 +15,7 @@ import {
 	portOwners,
 	waitFor,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/runtime-preview');
@@ -125,7 +126,7 @@ async function run() {
 	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
 	let browser;
 	let page;
-	let evidence = { fixture, port, pid: info.pid, cdpPort: info.cdpPort, logFile: info.logFile };
+	let evidence = { ...phase3EvidenceMetadata(repo, 'runtime-preview'), fixture, port, pid: info.pid, cdpPort: info.cdpPort, logFile: info.logFile };
 	try {
 		browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
 		page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));

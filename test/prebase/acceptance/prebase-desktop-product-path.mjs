@@ -22,6 +22,7 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommand,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -110,6 +111,7 @@ export async function runFramework(framework) {
 	mkdirSync(screenshotDir, { recursive: true });
 	const expectedGreeting = framework === 'tauri' ? 'Hello, Ada' : 'Hello, Ada from main';
 	const evidence = {
+		...phase3EvidenceMetadata(repo, `${framework}-product-path`),
 		framework,
 		productPath: true,
 		bypassedPreBase: false,

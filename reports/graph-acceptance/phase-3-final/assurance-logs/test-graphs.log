@@ -1,0 +1,1008 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 test:graphs
+> node graphs/scripts/run-unit-tests.mjs
+
+[graphs:unit-tests] Discovered 55 test files in graphs/src/tests/unit/
+
+
+  Architecture pick
+    ✔ hit radius never drops below min CSS pixels when zoomed out
+    ✔ hit radius grows with visual size when zoomed in
+    ✔ world halo expands when zoomed out so screen min stays ~10px
+    ✔ picks node within halo and prefers closer center
+    ✔ miss outside halo
+    ✔ stable tie-break by id
+    ✔ zoomed-out pick still hits near node (not world-fixed Network radius)
+
+
+  7 passing (3ms)
+
+
+
+  CanonicalGraphAnalyzer Unit Tests
+    ✔ analyzes full repository with ParserEngine AST parity, manifest, and deterministic digest
+    ✔ ParserEngine strips code-like comments and strings, preventing false structural history
+    ✔ classifies Vue and Svelte files as components via ParserEngine fallback
+    ✔ preserves direct ParserEngine artifact parity across supported source formats
+    ✔ parseBatchSize does not change the canonical digest
+    ✔ explicitly marks truncation and incomplete coverage when exceeding maxCanonicalFiles
+    ✔ truthfully propagates truncation when content source pre-truncates inventory
+    ✔ safely excludes oversized and binary files with typed exclusion breakdown
+    ✔ measures uncached Unicode source by UTF-8 bytes rather than UTF-16 code units
+    ✔ reuses a cached parse artifact without invoking the parser service again
+    ✔ propagates a systemic parser-service failure instead of publishing a fake partial graph
+    ✔ forwards the analysis cancellation token into parseService.parse
+    ✔ respects cancellation cleanly without publishing corrupted partial graph
+    ✔ structural digest is invariant to node and edge ordering in input
+
+
+  14 passing (65ms)
+
+
+
+  CanonicalGraphDiff Unit Tests
+    ✔ computes added, removed, and updated nodes and edges accurately
+    ✔ returns identical for snapshots with identical structural properties
+    ✔ handles incompatible schema versions gracefully with isIncompatible flag
+    ✔ fails closed when version metadata is missing
+
+
+  4 passing (3ms)
+
+
+
+  CanonicalParserWorkerService
+    ✔ loads the real parser in the Node worker environment and preserves batch result association
+    ✔ stops a pre-cancelled batch before parsing or returning stale artifacts
+    ✔ stops between sequential files once the combined cancellation token is raised
+    ✔ accepts cancellation through the narrow IPC channel rather than a ProxyChannel method argument
+
+
+  4 passing (10ms)
+
+
+
+  CanonicalProjection Unit Tests
+    ✔ projects canonical snapshot to 2D and 3D network coordinates respecting budget
+    ✔ prioritizes entry node and high degree nodes when capping large graph
+    ✔ prioritizes entry-connected edges and high-importance connections over arbitrary slicing
+
+
+  3 passing (3ms)
+
+
+
+  CanonicalQueryIndex Unit Tests
+    ✔ indexes nodes by ID and by relative and file: paths
+    ✔ indexes incoming and outgoing edges for instant traversal
+    ✔ indexes nodes by architecture layer and collects unique languages
+    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (103ms)
+
+
+  4 passing (105ms)
+
+
+
+  Software Architecture Clustered Layout (Unit - Phase 3.8)
+    ✔ 1. Entry nodes are always classified to entry cluster regardless of language
+    ✔ 2. Architecture layers (components, services, api, database) override language fileTypeId
+    ✔ 3. Meaningful top-level directory/module is inferred when layer is not pre-assigned
+    ✔ 4. Multi-language monorepo does NOT collapse all files into massive monolithic language blobs
+    ✔ 5. layoutClustered produces deterministic, finite 3D coordinates on sphere
+
+
+  5 passing (10ms)
+
+
+
+  PreBase dependencyDepth
+    ✔ uses undirected shortest import paths while excluding folders, non-imports, and dangling edges
+    ✔ returns every layout node as unreachable when the requested entry is absent
+    ✔ visits a wide cyclic import topology once and preserves its breadth-first depths
+
+
+  3 passing (17ms)
+
+
+
+  Production Git Bridge & Real Git Fixture E2E Tests
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ root commit diff with --root captures all initial files and blob OIDs (63ms)
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ divergent branches: exact tree diff vs review range (merge-base) diff (136ms)
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ rename tracking captures old and new paths with similarity score (73ms)
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ comment-only commit invariant: exact tree diff detects blob change, canonical AST is identical (213ms)
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ annotated vs lightweight tags peeling and metadata
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ safely rejects option injection in refs
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ handles unborn repository gracefully without throwing or stalling (82ms)
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (102ms)
+Switched to a new branch 'feature'
+Switched to branch 'main'
+    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (2936ms)
+
+
+  9 passing (8s)
+
+
+
+  GitHistoryService & Node Adapter Unit Tests
+    ✔ isGitRepository and getRepositoryIdentity (59ms)
+    ✔ listBranches parses branch names and commits cleanly via %00
+    ✔ listTags distinguishes lightweight from annotated tags and peels annotated tags
+    ✔ resolveRef strictly resolves commits with --verify and throws UnknownRef for invalid refs (43ms)
+    ✔ log returns bounded commits with machine-stable timestamps and parent links
+    ✔ listTree parses objectId, mode, and size using -l (43ms)
+    ✔ diffCommitTrees captures rename and modifications with exact blob hashes (58ms)
+    ✔ diffCommitToParent for root commit correctly diffs against empty tree (74ms)
+    ✔ HEAD change observer notifies on event fire
+
+
+  9 passing (2s)
+
+
+
+  GitRemoteSyncService & GitHubAppWebhookReceiver
+    GitRemoteSyncService
+      ✔ detects newly added remote branches
+      ✔ detects updated remote branch tips
+      ✔ detects deleted/pruned remote branches
+    GitHubAppWebhookReceiver
+      ✔ validates timing-safe HMAC-SHA256 signatures accurately
+      ✔ processes valid push event and dispatches callback
+      ✔ deduplicates duplicate deliveries without re-processing
+      ✔ rejects unsigned or improperly signed webhooks with 401
+      ✔ acknowledges ping events with 200 OK
+
+
+  8 passing (5ms)
+
+
+
+  GitTreeHistoricalAnalysis Integration Tests
+    ✔ analyzes historical commit 1 without checkout (73ms)
+    ✔ analyzes historical commit 2 without checkout (67ms)
+    ✔ diffs historical snapshots 1 and 2 yielding exact structural diff (125ms)
+    ✔ dirty working tree changes do NOT contaminate historical git analysis (66ms)
+
+
+  4 passing (1s)
+
+
+
+  GraphAccessibility (Unit - Real HTML Markup & Keyboard Interaction)
+    ✔ 1. Real HTML Markup: netCanvas has role="region", correct roledescription, and updated shortcut help copy
+    ✔ 2. Real HTML Markup: Viewport toolbar buttons have explicit ARIA labels and toggle states
+    ✔ 3. Real HTML Markup: No raw improvised unicode close characters (✕ or ×)
+    ✔ 4. Keyboard Interaction: F1 and Alt/Option+F1 pass through, ? toggles help, Escape closes panels
+    ✔ 5. Narrow-viewport temporal zoom controls use display:none, not visually-hidden a11y duplicates
+    ✔ 6. Temporal camera preserves user pan/zoom; small graphs fit more tightly
+
+
+  6 passing (8ms)
+
+
+
+  PreBaseGraphDescriptionService (Unit - v9 File-Aware Cache)
+    ✔ normalizes descriptions to concise 1-sentence forms and trims filler prefixes
+    ✔ skips sensitive or credential files safely
+    ✔ 1. Same file viewed 10 times -> exactly 1 AI call; clean cache hit returns without disk read or AI call
+    ✔ 2. Model switch -> 0 extra AI calls (model changes do not invalidate cache for unchanged files)
+    ✔ 3. File edit -> 0 AI calls on save, exactly 1 lazy AI call on next view
+    ✔ 4. Unrelated file edit -> 0 extra AI calls for other nodes
+    ✔ 5. Stale in-flight race protection: discards result if file changed during in-flight generation
+    ✔ 6. Persistence across restart and 500-node scale capacity (73ms)
+    ✔ 7. Restart freshness: external edit while closed prevents stale peek and updates on view
+    ✔ 8. Prompt semantic fingerprint: layer or imports change invalidates cache
+    ✔ 9. Multi-root workspace: events in Folder B do not invalidate Folder A
+    ✔ 10. File MOVE / COPY operations update cache accordingly
+    ✔ 11. contentIdentity cache match returns cached description without file read or AI invocation
+    ✔ 12. Explicit projectRoot isolates identical relative paths across workspace folders
+
+
+  14 passing (91ms)
+
+
+
+  PreBase graph editor 3D interaction
+    ✔ starts the browser graph surface in Network mode before any restored snapshot arrives
+    ✔ projects around the graph center with finite depth scaling as yaw changes
+    ✔ rebuilds canonical network positions when a relayout advances without a rescan
+    ✔ rotates only after the pointer crosses its drag threshold, then cleans up on release
+    ✔ honors natural and inverted drag direction without exposing unbounded camera angles
+    ✔ dragging a picked node updates its world position without rotating the camera
+    ✔ pointer starting on empty canvas rotates the camera without dragging a node
+    ✔ selection locks idle camera rotation even when a previously scheduled resume races selection
+    ✔ closing a popup retains selection lock, while deselection resumes only after its idle delay
+    ✔ responsive stage resize shifts camera center by half delta while preserving zoom, pan, and rotation
+
+
+  10 passing (21ms)
+
+
+
+  Production Graph Webview Runtime Test Suite
+    ✔ Bootstrap: executes without syntax error and immediately posts ready message
+    ✔ hidden documents halt RAF; visibilitychange resumes without idle-rotating while hidden
+    ✔ Code Graph: consumes production GraphSnapshot contract with positions3d (no node x/y/z) and demonstrates spatial diversity
+    ✔ Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin
+    ✔ Code Graph: camera transform, fitting, and pointer picking operate correctly with perspective
+    ✔ network render metrics include canvas-space nodeHits when recording is enabled
+    ✔ network nodeHits stay absent unless __prebaseRecordRenderMetrics is set
+    ✔ network nodeHits record at most 16 canvas-space hits
+    ✔ Temporal Graph: renders 2D temporal diff transitions without coordinate offset double-counting
+    ✔ Temporal Graph: serialized temporalDiff message preserves node identities in the production webview
+    ✔ Temporal Graph: first non-empty temporal update auto-fits and draws after empty bootstrap
+    ✔ Temporal Graph: auto-fits when placeholder nodes later receive finite coordinates
+    ✔ Temporal Graph: Full Map retains and draws all target-active nodes
+    ✔ Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes
+    ✔ blank temporal canvas records nodesDrawn 0 on __prebaseGraphRenderMetrics, not __prebaseGraphMetrics
+    ✔ Temporal Full Map draws community guides as rounded AABBs from bounds, not giant circles
+
+
+  16 passing (48ms)
+
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+
+
+  GraphEditorTemporalWebview (Unit - Phase 3.5 VM & Webview)
+    ✔ 1. Webview HTML structure includes all Phase 3.5 UI components with secure CSP and nonces
+    ✔ 2. Visual position interpolation function computes synchronized node & edge positions
+    ✔ 3. Production Webview VM: Bounded navigation, scrubber calculation, and relative stepping messages
+    ✔ 4. Details panel displays loading truth and rendered diff summary with renamedModifiedCount
+
+
+  4 passing (18ms)
+
+
+
+  GraphEditor Production Webview Viewport Interaction & Center Lock
+    ✔ 1. Continuous Wheel Zoom: Small trackpad delta produces proportional continuous scale factor without runaway jumps
+    ✔ 2. Trackpad Pinch Gesture & Sensitivity Scaling: ctrlKey doubles zoom rate and sensitivity scales appropriately
+    ✔ 3. Cursor Anchoring: Zooming around (mx, my) maintains the world coordinate under the cursor
+    ✔ 4. Center Lock Toggle: Button toggles state, updates aria-pressed, sends host message, and re-centers
+    ✔ 5. Center Lock 3D Orbit & Pan Invariants: Panning is suppressed and 3D rotation maintains center alignment
+    ✔ 6. Programmatic Camera Animation: Zoom in/out triggers cubic ease-out interpolation when reduceMotion is false
+    ✔ 7. Reduced Motion Honor: When reduceMotion is active, programmatic viewport updates apply immediately without RAF easing
+    ✔ 8. Adjacency Indexing and Edge Opacity Multiplier: Snapshot load constructs O(1) neighbor maps and scales edge alpha
+    ✔ 9. Pointer capture lifecycle: pointerdown acquires capture, pointerup releases it and clears drag state
+    ✔ 10. Pointercancel mid-drag cancels cleanly without leaving stuck dragging state or stale capture
+    ✔ 11. Window blur mid-drag force-releases the drag so no grabbing cursor or dragging class survives
+    ✔ 12. updateCanvasCursor truth table: dragging > hover > network grab > default (center lock & temporal)
+    ✔ 13. getUsableInsets grows with the temporal details panel and clamps at tiny viewports
+    ✔ 14. applyCenterLock yields to an in-flight camera animation and rafLoop re-locks after it completes
+    ✔ 15. Temporal visible-elements memoization: same diff/mode/context returns the cached object identity
+    ✔ 16. Keyboard Accessibility: Arrow keys traverse nodes, live region announces focus, Enter opens popup, Escape clears selection
+    ✔ 17. Keyboard Shortcuts: ? toggles help overlay while F1 variants pass through; + / - zoom, 0/f fit, r resets, and c toggles center-lock
+    ✔ 18. Temporal Full Map ↔ Focus Changes refits the camera to the visible node set
+    ✔ 19. Focus Changes state refresh does not steal a user zoom after the mode switch
+    ✔ 20. Hidden mode-specific graph controls are not left queryable as active duplicates
+    ✔ 21. Zero-edge graphs keep files visible and add informational copy; edges omit that copy
+    ✔ 22. Small graphs (≤10 nodes) fit at a higher zoom cap than 11-node graphs
+    ✔ 23. Wheel zoom then Temporal state refresh must not steal the camera
+    ✔ 25. Keyboard +/- zoom then Temporal state refresh must not steal the camera
+    ✔ 24. Temporal legend close is an SVG control that hides the legend
+
+
+  25 passing (45ms)
+
+
+
+  Graph Ignore Scanning & .gitignore integration
+    ✔ always ignores hard-coded performance exclusion directories by default
+    ✔ allows legitimate source files through default patterns
+    ✔ respects workspace .gitignore patterns including .reference and custom directories
+
+
+  3 passing (7ms)
+
+
+
+  Graph ownership boundary (Phase A)
+    ✔ compiled graph editor input normalizes a legacy Architecture restore to the Code Graph
+    ✔ graphs/src/core has no flat shim .ts files
+    ✔ graphSettingsUi.ts exports public Settings UI surface
+    ✔ settings/ui.ts re-exports Settings UI helpers; settings/index.ts stays DOM-free
+    ✔ prebaseSettingsEditor routes through graphSettingsUi and does not bind PreBaseGraphConfigKeys
+
+
+  5 passing (31ms)
+
+
+
+  Graph settings & webview production truth
+    ✔ graphSettingsUi exposes no "Reserved — not applied" rows: every rendered control is wired
+    ✔ inert graph settings carry deprecationMessage so VS Code marks them honestly
+    ✔ webview script consumes the shared edge resolver and contains no resurrected dead caches
+
+
+  3 passing (3ms)
+
+
+
+  GraphViewportMath (Unit - Viewport & Interaction Mathematics)
+    ✔ 1. Pixel trackpad deltas produce tiny proportionate zoom changes without runaway
+    ✔ 2. Rapid 50-event trackpad stream behaves smoothly without infinite runaway
+    ✔ 3. Mouse wheel line mode and page mode normalization
+    ✔ 4. Pinch gesture with ctrlKey accounts for pinch ratio
+    ✔ 5. Zoom sensitivity scaling (0.5x vs 1.0x vs 2.0x)
+    ✔ 6. Cursor-anchored zoom keeps world point under pointer invariant
+    ✔ 7. Center-locked transform centers bounds at usable viewport center while preserving zoom
+    ✔ 8. Center dead-zone prevents micro-jitter repaint triggers
+    ✔ 9. Smooth viewport interpolation and cubic ease-out
+    ✔ 10. applyZoomAroundCenter anchors zoom at usable viewport center with insets
+
+
+  10 passing (4ms)
+
+
+
+  Import resolution CPU-safe fuzzy match
+    ✔ basename does not allocate a split array for posix paths
+    ✔ resolves relative and unique stem imports without scanning every path
+    ✔ ambiguous stems do not invent an edge
+    ✔ unresolved package imports stay cheap on a large file set
+
+
+  4 passing (18ms)
+
+
+
+  BlobAnalysisCache & IncrementalGraphAnalyzer
+    ✔ BlobAnalysisCache tracks hits, misses, and enforces capacity eviction
+    ✔ computeAnalysisCacheKey fails closed on invalid versions
+    ✔ IncrementalGraphAnalyzer produces identical structural truth to CanonicalGraphAnalyzer
+    ✔ IncrementalGraphAnalyzer reuses blob cache and handles path-independent renames
+    ✔ Identical structural state detection on comment-only change
+
+
+  5 passing (22ms)
+
+
+
+  PreBase layoutOrganization
+    ✔ ranks inbound imports above equivalent outbound imports and ignores non-import edges
+    ✔ groups directory depth relative to the entry across POSIX and Windows paths
+    ✔ does not let non-import topology change import-importance organization
+
+
+  3 passing (8ms)
+
+
+
+  NetworkEdgeVisual production parity
+    ✔ serialized source round-trips through Function() and matches the module resolver
+    ✔ strategy wrapper stays consistent with the shared resolver contract
+    ✔ LOD suppression is identical between strategy visibility and runtime null
+    ✔ entryNodeId parameter parity: runtime copy derives entry emphasis exactly like the module resolver
+
+
+  4 passing (6ms)
+
+
+
+  NetworkEdgeRenderStrategy (Unit - Semantic Edge Variants & LOD)
+    ✔ 1. Highlighted / Selected incident edge receives prominent accent styling and highest priority
+    ✔ 2. Unrelated edges during node selection are dimmed to background
+    ✔ 3. Contains edge is quiet and suppressed at macro zoom, visible at detail zoom
+    ✔ 4. Aggregate dependency edge is visible at macro/overview zoom with strong stroke
+    ✔ 5. Dynamic import edge has distinct dashed pattern and accent style
+    ✔ 6. Entry-related edge receives amber token and higher overview visibility
+    ✔ 7. Standard import edge LOD suppresses raw imports at extreme macro view
+    ✔ 8. Edge opacity setting scales alpha through the authoritative resolver
+
+
+  8 passing (3ms)
+
+
+
+  PreBase networkLayout
+    ✔ sphere radius scales with node count and spread
+    ✔ organic is deterministic and 3D
+    ✔ sphere is deterministic and 3D
+    ✔ constellation is deterministic and 3D
+    ✔ clustered is deterministic and 3D
+    ✔ radial is deterministic and 3D
+    ✔ organic keeps a high-degree hub central in three dimensions
+    ✔ organic normalizes its final bounds uniformly across all axes
+    ✔ network layouts retain all nodes and finite volumetric positions with dangling links
+    ✔ radial pins the entry root and orders undirected BFS shells, unlike the even sphere shell
+    ✔ radial keeps disconnected components distinct on a bounded outer shell
+    ✔ network runtime collision, link-distance, and force controls materially change geometry without dropping nodes
+
+
+  12 passing (40ms)
+
+
+
+  NetworkRenderMath (Unit - Visual Fidelity & Radius Invariants)
+    ✔ 1. Bounded Depth Scaling: Depth factor strictly clamped in [0.78, 1.28] for extreme depths
+    ✔ 2. Visual Radius Invariants: Ordinary nodes are 3-6px, hubs 6-10px, never giant bubbles
+    ✔ 3. Generous Pick Radius: Hit test target is at least 18px and strictly larger than visual radius
+    ✔ 4. 3D Projection: Perspective projection maintains depth ordering and positive depthScale
+    ✔ 5. Non-Distorting Fit View: Correctly encompasses 280-node / 420-edge topology without zero or NaN transforms
+    ✔ 6. Label LOD Policy: Overview mode displays only high-importance nodes; deep zoom shows detail
+
+
+  6 passing (3ms)
+
+
+
+  Production Dependency Injection & Decorator Metadata Truth (P0 DI Gate)
+    ✔ 1. PreBaseGraphDescriptionService has all 4 parameter decorators and DI metadata
+    ✔ 2. InstantiationService creates PreBaseGraphDescriptionService with resolved dependencies
+    ✔ 3. WorkbenchGitHistoryService has @IGitService and @IUriIdentityService decorator metadata
+    ✔ 4. PreBaseGraphService has all 7 parameter decorators and DI metadata
+    ✔ 5. WorkbenchTemporalGraphService has all 7 parameter decorators and DI metadata
+    ✔ 6. WorkbenchTemporalViewService has all 7 parameter decorators and DI metadata
+    ✔ 7. WorkbenchCanonicalParseService has @IUtilityProcessWorkerWorkbenchService decorator metadata
+
+
+  7 passing (3ms)
+
+
+
+  Production Git Bridge Contract Unit Tests
+    ✔ distinguishes exact tree diff from review range diff on divergent branches
+    ✔ peels annotated tags and marks isAnnotated truthfully
+    ✔ preserves committer distinct from author with valid timestamps
+    ✔ rejects option-like ref injection safely
+    ✔ supports firstParent log option for merge DAG traversal
+    ✔ propagates OversizedBlob error code when reading content beyond limit
+
+
+  6 passing (5ms)
+
+
+
+  PureSha256 Unit Tests
+    ✔ matches official NIST FIPS 180-4 standard test vectors
+    ✔ matches Node crypto.createHash across various input shapes and Unicode
+    ✔ computes hash over a 200KB payload efficiently without errors
+
+
+  3 passing (8ms)
+
+
+
+  SqlitePreparedStatements & Finalize Safety
+    ✔ persists large commit transitions using bounded chunks without statement leaks
+    ✔ guarantees rollback and clean close when commit ingestion encounters an error
+    ✔ cancels between 128-item chunks when the ingestion token is cancelled
+    ✔ interrupt() aborts an in-flight write and leaves the store usable
+    ✔ close during an in-flight ingestion drains the write instead of closing underneath it
+    ✔ prepared statement callback errors finalize statements and roll back
+
+
+  6 passing (74ms)
+
+
+
+  SqliteTemporalStore
+    ✔ opens with WAL mode and runs migrations
+    ✔ deduplicates concurrent open calls on one store instance
+    ✔ fails closed when a database claims v4 but lacks required schema
+    ✔ transactionally migrates a valid v1 database to the current schema
+    ✔ transactionally migrates a valid v2 database to the current schema
+    ✔ transactionally migrates a valid v3 database to the current schema
+    ✔ transactionally migrates a valid v4 database to v5: clears derived history, preserves repo identity, refs, and blob parse artifacts
+    ✔ rolls back a v4 migration when an error is injected
+    ✔ rejects a future schema version without rewriting it
+    ✔ rolls back a v1 migration when legacy parent topology is malformed
+[TemporalStoreMainService] validation mismatch: {
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-Bdr8dk',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T',
+  ext: '.db',
+  isSymlink: false,
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/escaped.db'
+}
+[TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
+    at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
+    at TemporalStoreMainService._open (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:67:17)
+    at file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:63:41
+    at TemporalStoreMainService._toIpcResponse (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:230:100)
+    at TemporalStoreMainService.open (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:63:15)
+    at Context.<anonymous> (file:///Users/qunyingfan/Prebasecode/graphs/src/tests/unit/sqliteTemporalStore.test.ts:310:48)
+    ✔ Electron-main store owner rejects database paths outside its cache root
+[TemporalStoreMainService] IPC operation failed: [Temporal:StoreNotOpen] Temporal store is not open TemporalError: [Temporal:StoreNotOpen] Temporal store is not open
+    at file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:205:11
+    at TemporalStoreMainService._toIpcResponse (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:230:100)
+    at TemporalStoreMainService.invoke (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:201:15)
+    at Context.<anonymous> (file:///Users/qunyingfan/Prebasecode/graphs/src/tests/unit/sqliteTemporalStore.test.ts:324:46)
+    ✔ Electron-main store owner awaits close on shutdown instead of fire-and-forget
+[TemporalStoreMainService] IPC operation failed: [Temporal:StoreNotOpen] Temporal store is not open TemporalError: [Temporal:StoreNotOpen] Temporal store is not open
+    at file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:205:11
+    at TemporalStoreMainService._toIpcResponse (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:230:100)
+    at TemporalStoreMainService.invoke (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:201:15)
+    at Context.<anonymous> (file:///Users/qunyingfan/Prebasecode/graphs/src/tests/unit/sqliteTemporalStore.test.ts:356:46)
+    ✔ dispose uses the same memoized shutdown path rather than dropping stores before close
+    ✔ Quit close does not run PRAGMA optimize
+[TemporalStoreMainService] IPC operation failed: [Temporal:StoreNotOpen] Temporal store is not open TemporalError: [Temporal:StoreNotOpen] Temporal store is not open
+    at file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:205:11
+    at TemporalStoreMainService._toIpcResponse (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:230:100)
+    at TemporalStoreMainService.invoke (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:201:15)
+    at Context.<anonymous> (file:///Users/qunyingfan/Prebasecode/graphs/src/tests/unit/sqliteTemporalStore.test.ts:397:46)
+    ✔ Quit shutdown interrupts an in-flight write and keeps the store until the write drains
+    ✔ Electron-main store owner deduplicates concurrent opens and serves IPC calls afterward
+[TemporalStoreMainService] IPC operation failed: [Temporal:StoreNotOpen] Temporal store is not open TemporalError: [Temporal:StoreNotOpen] Temporal store is not open
+    at file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:205:11
+    at TemporalStoreMainService._toIpcResponse (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:230:100)
+    at TemporalStoreMainService.invoke (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:201:15)
+    at Context.<anonymous> (file:///Users/qunyingfan/Prebasecode/graphs/src/tests/unit/sqliteTemporalStore.test.ts:419:50)
+    at callFn (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:364:21)
+    at Runnable.run (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:352:5)
+    at Runner.runTest (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:677:10)
+    at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:800:12
+    at next (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:592:14)
+    at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:602:7
+    at next (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:485:14)
+    at cbHookRun (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:550:7)
+    at done (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:308:5)
+    at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:369:11
+[TemporalStoreMainService] IPC operation failed: [Temporal:StorageLimitExceeded] Temporal maintenance requires a positive database budget TemporalError: [Temporal:StorageLimitExceeded] Temporal maintenance requires a positive database budget
+    at SqliteTemporalStore.runMaintenance (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/sqliteTemporalStore.ts:1541:10)
+    at TemporalStoreMainService._invokeStore (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:301:40)
+    at file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:210:25
+    at TemporalStoreMainService._toIpcResponse (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:230:100)
+    at TemporalStoreMainService.invoke (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:201:15)
+    at Context.<anonymous> (file:///Users/qunyingfan/Prebasecode/graphs/src/tests/unit/sqliteTemporalStore.test.ts:425:55)
+    ✔ Electron-main store owner preserves typed operational failures in its IPC response envelope
+    ✔ Electron-main store owner recovers corruption detected after open and retries the safe read
+    ✔ Electron-main store owner quarantines one corrupt derived cache and recreates it without touching siblings
+    ✔ Electron-main store owner bounds DB, WAL, and SHM quarantine companions by generation
+[TemporalStoreMainService] validation mismatch: {
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-hucnDv',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-hucnDv/nested',
+  ext: '.db',
+  isSymlink: false,
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-hucnDv/nested/store.db'
+}
+[TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
+    at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
+    at TemporalStoreMainService._open (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:67:17)
+    at file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:63:41
+    at TemporalStoreMainService._toIpcResponse (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:230:100)
+    at TemporalStoreMainService.open (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:63:15)
+    at Context.<anonymous> (file:///Users/qunyingfan/Prebasecode/graphs/src/tests/unit/sqliteTemporalStore.test.ts:525:47)
+    at callFn (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:364:21)
+    at Runnable.run (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:352:5)
+    at Runner.runTest (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:677:10)
+    at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:800:12
+    at next (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:592:14)
+    at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:602:7
+    at next (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:485:14)
+    at cbHookRun (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runner.js:550:7)
+    at done (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:308:5)
+    at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:369:11
+[TemporalStoreMainService] validation mismatch: {
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-hucnDv',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-hucnDv',
+  ext: '.db',
+  isSymlink: true,
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-hucnDv/linked.db'
+}
+[TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
+    at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
+    at TemporalStoreMainService._open (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:67:17)
+    at file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:63:41
+    at TemporalStoreMainService._toIpcResponse (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:230:100)
+    at TemporalStoreMainService.open (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:63:15)
+    at Context.<anonymous> (file:///Users/qunyingfan/Prebasecode/graphs/src/tests/unit/sqliteTemporalStore.test.ts:537:48)
+    ✔ Electron-main store owner rejects nested and symlink database escapes
+    ✔ repository identity record persistence
+    ✔ checkpoint restart preserves complete canonical snapshot metadata
+    ✔ rejects a tampered direct checkpoint by recomputing its canonical digest
+    ✔ digest-keyed graph state excludes commit-specific temporal occurrences
+    ✔ does not collapse canonical states with identical structure but incompatible coverage truth
+    ✔ saveCommitIngestion saves commit, commit_parents, checkpoint, delta, entities, and edges atomically
+    ✔ refs persistence and retrieval
+    ✔ atomically replaces refs and prunes deleted branches and tags
+    ✔ fails closed when legacy commit parent topology is malformed
+    ✔ runInTransaction rolls back modifications on error
+    ✔ maintenance evicts only regenerable parse artifacts and preserves reachable checkpoint and refs
+    ✔ blob analysis cache persists and retrieves entries
+
+
+  33 passing (341ms)
+
+
+
+  Temporal bounded cold-history indexing
+    ✔ keeps metadata browsing cheap and indexes one isolated checkpoint from a 50,000-commit cold history (40ms)
+    ✔ does not start Git or parser work for a pre-cancelled cold-history selection
+    ✔ reconciles an isolated child anchor after its parent segment is indexed
+    ✔ multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D) (50ms)
+
+
+  4 passing (135ms)
+
+
+
+  TemporalComparisonTruth (Unit - Elimination of +493/-490 False Comparison)
+    ✔ 1. Same 500 files with different cold-anchor entity IDs produces ZERO false adds/removes
+    ✔ 2. Single modified file among cold anchors yields exactly 1 modified
+    ✔ 3. Single added file and single deleted file across cold anchors
+    ✔ 4. Git Rename Evidence (diff-tree -M) pairs files accurately across path changes
+    ✔ 5. Rename and edit detected simultaneously with isRenamedAndModified
+    ✔ 6. Duplicate empty/template blobs fail closed without arbitrary incorrect pairing
+
+
+  6 passing (8ms)
+
+
+
+  TemporalDeltaEngine & TemporalReconstructionEngine
+    ✔ computeDelta calculates added, modified, renamed, and deleted entities
+    ✔ applyDelta reproduces exact state and node data
+    ✔ reconstruct sequentially applies multi-step delta chain
+    ✔ reconstruct throws DeltaReconstructionFailed on broken chain continuity
+    ✔ delta replay restores target canonical metadata instead of inheriting checkpoint metadata
+    ✔ delta replay recomputes canonical digest and rejects tampered content
+
+
+  6 passing (5ms)
+
+
+
+  TemporalEdgeLod (Unit - Aggregation & Level of Detail Tiers)
+    ✔ 1. Community Aggregation: Cross-community edges are aggregated with count and change summary
+    ✔ 2. Edge LOD Tiers: Overview zoom suppresses unchanged background edges, preserves changed and active
+    ✔ 3. Edge LOD Tiers: Detail zoom renders individual dependency edges with full opacity
+    ✔ 4. Active drag/pan interaction drops low-priority unchanged edges for 60fps fluidity
+
+
+  4 passing (3ms)
+
+
+
+  TemporalFocusContext (Unit - Focus+Context & Spatial Quality)
+    ✔ 1. Focus+Context Culling: 2 changed nodes in a 280-node codebase return ONLY changed + 1-hop context
+    ✔ focused clusters occupy a tighter bounding box than the original Full Map gaps
+    ✔ 2. State Mode Invariants: State mode returns all active nodes and excludes removed ghosts
+    ✔ 3. Visual Hierarchy Radius: Changed nodes (5.5-7.5px) dominate context nodes (3-4px)
+    ✔ 4. Sunflower Layout Density: Compact bounded growth without hollow circular annular void
+    ✔ 5. Mode-Aware Fit View: Focused changes mode fits focus set without zooming out to empty space
+    ✔ 6. Focused disconnected clusters are packed onto a shared grid
+    ✔ 7. Weakly connected far communities still pack by directory so Focus Changes is not empty canvas
+
+
+  8 passing (17ms)
+
+
+
+  TemporalGraphTopology (Unit - SCC, DAG Condensation & Adaptive Communities)
+    ✔ 1. SCC Detection: Acyclic DAG yields all singleton SCCs
+    ✔ 2. SCC Detection: 2-node cycle and 3-node cycle correctly grouped
+    ✔ 3. Permutation Invariance: Shuffled input nodes and edges produce identical SCCs and IDs
+    ✔ 4. DAG Condensation: Creates cycle-free meta-graph
+    ✔ 5. Topological Depths: Entry/producers receive depth 0 and downstream receives increasing depths
+    ✔ 6. Adaptive Communities: Partitions codebase and keeps SCC cycles co-located
+    ✔ 7. SCC Relocation Metadata Truth: Relocated nodes update community majority layer, depth, and hubs
+
+
+  7 passing (9ms)
+
+
+
+  Temporal Graph E2E Ingestion & Reconstruction
+    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (699ms)
+    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (1721ms)
+    ✔ Handles branch merge commits and preserves multi-parent DAG relations (1574ms)
+    ✔ scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order (1265ms)
+    ✔ exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs (881ms)
+    ✔ Ingests commits in a SHA-256 repository (317ms)
+    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (773ms)
+    ✔ Multi-root concurrent event routing and FIFO ingestion queue (712ms)
+
+
+  8 passing (8s)
+
+
+
+  TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)
+    ✔ 1. Selected and Hovered nodes have highest priority and bypass collision culling
+    ✔ 2. Changed nodes have priority over unchanged nodes
+    ✔ 3. Screen-Space Collision Culling: Overlapping text boxes are culled for non-selected nodes
+
+
+  3 passing (8ms)
+
+
+
+  TemporalLayoutEngine (Unit - Stable 2D Layout Invariants)
+    ✔ 1. Continuity Invariant: Unaffected surviving nodes experience ZERO displacement across commits
+    ✔ 2. Determinism: Initial layout is completely deterministic given same node set
+    ✔ 3. Connected added node is placed in proximity to its neighbors
+    ✔ 4. Phantom exiting nodes for removed entities maintain previous coordinates
+    ✔ 5. Performance: 500-node snapshot layout executes in under 15ms
+
+
+  5 passing (23ms)
+
+
+
+  TemporalLayoutQuality (Unit - Mathematical Layout Metrics & Guide Enclosure)
+    ✔ 1. Realistic 280-Node Repository Layout: Zero node collisions, high community separation, and bounded coordinates
+    ✔ 2. Guide Persistence Across Multi-Commit Transitions: Guides present on every commit and strictly enclose final positions
+    ✔ 3. Permutation Invariance: Shuffled input nodes and edges produce identical layout coordinates
+    ✔ 4. Elongated community guides are padded AABBs that enclose every member, not giant circumcircles
+    ✔ 5. Sparse rank stagger stays permutation-invariant
+
+
+  5 passing (25ms)
+
+
+
+  TemporalLineageResolver & TemporalEdgeLineage
+    ✔ Case 1: Unchanged file preserves entity ID and records same-canonical-id event
+    ✔ Case 2: Modified in place preserves entity ID and records modified-in-place event
+    ✔ Case 3: Exact rename (R100) preserves entity ID at new path
+    ✔ Case 4: Rename + edit (R<100) preserves entity ID and records git-rename-edit event
+    ✔ Case 6: Forked copy preserves source entity and generates fresh entity ID for target
+    ✔ Case 7: Deleted file records terminated event
+    ✔ Case 8: Recreated file after deletion receives fresh entity ID
+    ✔ Case 11: Swapped paths correctly follows content/git evidence
+    ✔ TemporalEdgeLineageResolver binds edges across resolved entity IDs
+
+
+  9 passing (4ms)
+
+
+
+  Temporal Live Acceptance Evaluation
+    ✔ zero received and drawn nodes with an unopened target fails closed (180ms)
+    ✔ representative rendered evidence passes without failures (175ms)
+
+
+  2 passing (361ms)
+
+
+
+  Temporal Production Webview Runtime Parity (State Truth & Execution)
+    1. computeTemporalUnifiedStatus Parity
+      ✔ Parity for: Ready state (fully reconciled)
+      ✔ Parity for: Loading history
+      ✔ Parity for: Loading selection (reconstructing diff)
+      ✔ Parity for: Selection error on fresh commit
+      ✔ Parity for: Selection error with stale rendered fallback
+      ✔ Parity for: History loading error
+      ✔ Parity for: Stale view (selection != rendered, idle)
+      ✔ Parity for: Partial lineage coverage warning
+      ✔ Parity for: Empty timeline (idle)
+    2. computeTemporalFocusContext & computeTemporalVisibleElements Parity
+      ✔ Focused Changes mode: exact node and edge parity
+      ✔ Full Changes mode: exact node and edge parity
+      ✔ State mode: excludes removed ghosts identically
+      ✔ Zero changes commit returns empty nodes with hasZeroChanges: true
+    3. computeTemporalVisualRadius & computeTemporalFitTransform Parity
+      ✔ computeTemporalVisualRadius produces identical values for changed vs unchanged nodes
+      ✔ computeTemporalFitTransform produces identical camera transform values
+    4. computeCommunityAggregateEdges, computeEdgeLodStyle & computeVisibleLabels Parity
+      ✔ computeCommunityAggregateEdges produces identical aggregates in webview and host
+      ✔ computeEdgeLodStyle produces identical styling across zoom levels
+      ✔ computeVisibleLabels produces identical prioritized labels
+
+
+  18 passing (7ms)
+
+
+
+  TemporalRepositoryRuntime
+    ✔ cold-start runtime creation is deduplicated per repository
+    ✔ closeAll waits for in-flight runtime creation then disposes it
+    ✔ closes a repository runtime by root path instead of treating a URI as its Git identity
+    ✔ deduplicates simultaneous work for one commit SHA
+    ✔ refreshRefs replaces the observed set so deleted refs are pruned
+    ✔ continues FIFO processing after a failed job
+    ✔ clears failed in-flight work so the same commit can be retried
+    ✔ disposal closes the store after the sequencer settles cancelled work
+    ✔ active cooperative work settles when runtime disposal cancels the sequencer token
+    ✔ queued pending work is immediately rejected upon disposal without waiting for active work
+    ✔ active sequencer work rejects on disposal even if the inner task ignores cancellation
+    ✔ countActiveWrites uses hasActiveWrite, not CPU or indexingSeen
+    ✔ countActiveWrites includes in-flight ingest, not CPU
+    ✔ non-cooperative store write prevents close until hasActiveWrite clears (42ms)
+    ✔ disposal is idempotent, rejects new work, and closes the store exactly once
+    ✔ reports repository failures as structured diagnostics instead of unregistered without context
+    ✔ reports persisted cache corruption as failed instead of masking it as an unregistered repository
+    ✔ reindexes a requested graph after recovery leaves the derived cache empty
+    ✔ runtime.ingestCommit passes the sequencer combined token into ingestionService.ingestCommit
+    ✔ production ingestCommit passes the sequencer combined token rather than the caller token alone
+    ✔ derives incomplete status from persisted canonical coverage after runtime restart
+
+
+  21 passing (50ms)
+
+
+
+  Temporal Service E2E Tests (Phase 3.5)
+    ✔ Full Phase 3.5 Lifecycle: DAG, Bounded Navigation, Relative Stepping, Renamed+Modified, Pinned Compare & Zero-byte Empty Tree (5439ms)
+
+
+  1 passing (5s)
+
+
+
+  Temporal sparse persistence
+    ✔ stores only structural transitions across a long unchanged delta run
+    ✔ records observed-at-anchor for cold checkpoints and replaces them with transitions upon reconciliation
+    ✔ garbage collects obsolete provisional master entity and edge records upon reconciliation
+    ✔ proves sparse order-of-growth across 100 commits with 500 entities and 500 edges (309ms)
+
+
+  4 passing (345ms)
+
+
+
+  TemporalStatusModel (Unit - Authoritative Status & Precedence)
+    ✔ 1. Ready State: Reconciled selected and rendered commit returns Ready
+    ✔ 2. Loading History: Active history loading takes top precedence
+    ✔ 3. Reconstructing / Indexing: Active selection reconstruction returns Indexing with commit target
+    ✔ 4. Error Precedence: When reconstruction fails, status is Error (NEVER Indexing)
+    ✔ 5. Stale Render Explanation: When selection differs from render without error and not indexing
+    ✔ 6. Partial History Lineage: When history is partial, surfaces Partial History badge
+    ✔ 7. Empty / Idle State: When no commits exist, returns No History
+
+
+  7 passing (2ms)
+
+
+
+  TemporalStructuralDiff (Unit - Phase 3.1 & 3.2)
+    ✔ 1. Root commit (base undefined): all entities and edges are added
+    ✔ 2. Unchanged commit: all entities and edges preserve unchanged status
+    ✔ 3. File modification in place: same entityId, changed canonicalNodeId -> modified
+    ✔ 4. File rename with modification: detects renamed and sets isRenamedAndModified
+    ✔ 5. Cross-anchor entity ID difference at same path: reconciled as modified without false add/remove
+    ✔ 6. Path swapping (A -> B, B -> A): correctly follows entity continuity
+    ✔ 7. Edge modification detection: metadata change triggers edgeModifiedCount
+    ✔ 8. Partial lineage warning annotation
+    ✔ 9. Pure rename: path and canonicalNodeId change, but blobOid/contentIdentity unchanged -> isModified is FALSE
+    ✔ 10. GraphEdge production comparison: specifier order independence and meta fields
+
+
+  10 passing (3ms)
+
+
+
+  WorkbenchCanonicalParseService quit
+    ✔ parse after dispose returns undefined without starting a worker
+    ✔ dispose resolves queued parses as undefined before a worker is created
+    ✔ getActiveRequestCount counts queued parses, not a CPU heuristic
+    ✔ getActiveRequestCount is positive while a batch is in flight
+    ✔ dispose cancels an in-flight parse batch without killing a fake OS process
+[WorkbenchCanonicalParseService] parseBatch failed: CanonicalParseServiceError: Canonical parser service was disposed during worker startup.
+    at WorkbenchCanonicalParseService._createWorker (file:///Users/qunyingfan/Prebasecode/out/vs/workbench/contrib/prebase/graphs/host/workbench/workbenchCanonicalParseService.js:144:15)
+    at async WorkbenchCanonicalParseService._flush (file:///Users/qunyingfan/Prebasecode/out/vs/workbench/contrib/prebase/graphs/host/workbench/workbenchCanonicalParseService.js:73:26) {
+  code: 'worker-terminated',
+  [cause]: undefined
+}
+    ✔ dispose during worker startup disposes the just-created worker
+
+
+  6 passing (3ms)
+
+
+
+  WorkbenchGitHistoryService Unit Tests
+    ✔ resolves references and fetches commit details accurately
+    ✔ lists tree entries, reads blobs, and diffs trees via bridge
+    ✔ preserves producer truncation metadata across the workbench bridge
+    ✔ emits deduplicated onDidChangeHead events
+    ✔ wraps failures into typed GitHistoryError without silent swallowing
+    ✔ preserves extension-host log cancellation as typed Git control flow
+    ✔ tracks HEAD changes per repository — events from different repos are independent
+    ✔ per-repo deduplication: identical SHA on one repo does not suppress the same SHA on another
+    searchHistory Intelligent Search
+      ✔ searches commits by plain text query matching message
+      ✔ parses author: prefix filter
+      ✔ parses msg: prefix filter
+      ✔ direct SHA lookup resolves exact commit
+
+
+  12 passing (4ms)
+
+
+
+  WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)
+    ✔ 1. selectRef loads paged commit timeline, positions nodes, and selects HEAD
+    ✔ 2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state (163ms)
+    ✔ 3. Base-before-target indexing ordering & LRU diff cache
+    ✔ 4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree
+    ✔ 5. openHistoricalFile opens revision at rendered commit via EditorService
+    ✔ 6. Multi-repository ownership, untrusted path rejection, and reset on switchRepository
+    ✔ 7. Comparison State Machine: first-parent dynamic scrubbing, explicit-parent, pinned, and reset
+    ✔ 8. Async History Cancellation and Error Resilience
+    ✔ selectCommitIndex and stepCommit: host-owned bounded navigation
+    ✔ Non-Git workspace: availableRepositories only discovers genuine Git repositories
+    ✔ Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off
+    ✔ HEAD change event handling: followHead=true advances view, followHead=false preserves selection (63ms)
+    ✔ Layer-specific retrySelection: re-executes the layer that actually failed
+    ✔ partial lineage keeps reconstructed target nodes available to Full Map
+    ✔ pauseActiveWork cancels in-flight history without throwing
+
+
+  15 passing (263ms)
+
+[graphs:unit-tests] All 55 test files passed successfully.

@@ -3,6 +3,9 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'assert';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { suite, test } from 'node:test';
 import {
 	UNTRUSTED_WEB_WARNING,
@@ -17,29 +20,16 @@ import {
 	WEB_CONTEXT_BUDGET,
 } from './webContextCore';
 
+const policy = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../test/prebase/fixtures/web-url-policy.json'), 'utf8')) as { allow: string[]; reject: string[] };
+
 suite('webContextCore URL policy', () => {
 	test('accepts public http(s) and rejects private/localhost destinations', () => {
-		assert.ok(publicHttpUrl('https://docs.python.org/3/'));
-		assert.equal(publicHttpUrl('ftp://example.com/a'), undefined);
-		assert.equal(publicHttpUrl('http://localhost/admin'), undefined);
-		assert.equal(publicHttpUrl('http://127.0.0.1/'), undefined);
-		assert.equal(publicHttpUrl('http://10.0.0.4/'), undefined);
-		assert.equal(publicHttpUrl('http://192.168.1.1/'), undefined);
-		assert.equal(publicHttpUrl('http://169.254.1.1/'), undefined);
-		assert.equal(publicHttpUrl('http://[::1]/'), undefined);
-		assert.equal(publicHttpUrl('http://router.local/'), undefined);
-		assert.equal(publicHttpUrl('http://2130706433/'), undefined);
-		assert.equal(publicHttpUrl('http://[::ffff:127.0.0.1]/'), undefined);
-		assert.equal(publicHttpUrl('http://0.0.0.0/'), undefined);
-		assert.equal(publicHttpUrl('http://172.16.0.1/'), undefined);
-		assert.equal(publicHttpUrl('http://100.64.1.1/'), undefined);
-		assert.equal(publicHttpUrl('http://[fc00::1]/'), undefined);
-		assert.equal(publicHttpUrl('http://localhost./admin'), undefined);
-		assert.equal(publicHttpUrl('http://127.0.0.1./'), undefined);
-		assert.equal(publicHttpUrl('http://app.localhost/'), undefined);
-		assert.equal(publicHttpUrl('http://0177.0.0.1/'), undefined);
-		assert.equal(publicHttpUrl('https://token@example.com/docs'), undefined);
-		assert.equal(publicHttpUrl('https://user:password@example.com/docs'), undefined);
+		for (const url of policy.allow) {
+			assert.ok(publicHttpUrl(url), url);
+		}
+		for (const url of policy.reject) {
+			assert.equal(publicHttpUrl(url), undefined, url);
+		}
 	});
 
 	test('canonicalizes www, tracking params, and trailing slashes without merging distinct articles', () => {
@@ -69,6 +59,11 @@ suite('webContextCore routing and budget', () => {
 		assert.deepEqual(firecrawlSearchCategories('RFC 9110 PDF specification', 'deep'), ['pdf']);
 	});
 
+	test('model-facing web payload budget is 14k characters', () => {
+		assert.equal(WEB_CONTEXT_BUDGET.maxPayloadChars, 14_000);
+		assert.equal(WEB_CONTEXT_BUDGET.maxFetchChars, 12_000);
+	});
+
 	test('fresh queries disable Firecrawl cache age', () => {
 		assert.equal(inferFreshness('latest Node.js release'), 'fresh');
 		assert.equal(inferFreshness('python list sort docs'), 'normal');
@@ -76,7 +71,7 @@ suite('webContextCore routing and budget', () => {
 		assert.equal(firecrawlMaxAgeMs('normal'), 172_800_000);
 	});
 
-	test('bounds search payload under the 16k tool budget and keeps URL/title when clipping', () => {
+	test('bounds search payload under the 14k tool budget and keeps URL/title when clipping', () => {
 		const huge = 'x'.repeat(8_000);
 		const result = boundWebSources(
 			Array.from({ length: 10 }, (_, i) => ({

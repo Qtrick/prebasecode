@@ -296,9 +296,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._sectionLabel(this._networkSection, localize('prebase.maps.networkLayout', "Network Layout"));
 		const layoutCol = DOM.append(this._networkSection, DOM.$('div'));
 		layoutCol.style.display = 'flex';
-		layoutCol.style.flexDirection = 'column';
-		layoutCol.style.gap = '2px';
+		layoutCol.style.flexWrap = 'wrap';
+		layoutCol.style.gap = '4px';
 		layoutCol.style.marginBottom = '8px';
+		layoutCol.setAttribute('role', 'group');
+		layoutCol.setAttribute('aria-label', localize('prebase.maps.networkLayout', "Network Layout"));
 		const modes: { id: string; label: string }[] = [
 			{ id: 'organic', label: localize('prebase.maps.net.organic', "Organic") },
 			{ id: 'sphere', label: localize('prebase.maps.net.sphere', "Sphere") },
@@ -309,7 +311,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		for (const m of modes) {
 			const btn = this._chipBtn(layoutCol, m.label, () => {
 				void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, m.id);
-			}, true, true);
+			});
 			btn.dataset['networkLayout'] = m.id;
 			this._networkLayoutButtons.set(m.id, btn);
 		}
@@ -848,11 +850,18 @@ export class PreBaseMapsViewPane extends ViewPane {
 			wtLine1.style.gap = '6px';
 
 			const wtBadge = DOM.append(wtLine1, DOM.$('span'));
-			wtBadge.textContent = '● Live';
-			wtBadge.style.fontSize = '10px';
-			wtBadge.style.fontWeight = '600';
-			wtBadge.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+			wtBadge.setAttribute('aria-hidden', 'true');
+			wtBadge.style.width = '6px';
+			wtBadge.style.height = '6px';
+			wtBadge.style.borderRadius = '50%';
 			wtBadge.style.flexShrink = '0';
+			wtBadge.style.background = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+			const wtLive = DOM.append(wtLine1, DOM.$('span'));
+			wtLive.textContent = localize('prebase.maps.liveBadge', "Live");
+			wtLive.style.fontSize = '10px';
+			wtLive.style.fontWeight = '600';
+			wtLive.style.color = 'var(--vscode-gitDecoration-addedResourceForeground, #3fb950)';
+			wtLive.style.flexShrink = '0';
 
 			const wtMsg = DOM.append(wtLine1, DOM.$('span'));
 			wtMsg.textContent = localize('prebase.maps.workingTree', "Working Tree · Live Codebase");
@@ -1256,7 +1265,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		const networkLayout = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
 		for (const [mode, btn] of this._networkLayoutButtons) {
-			this._styleChipActive(btn, mode === networkLayout, true);
+			this._styleChipActive(btn, mode === networkLayout);
 			btn.disabled = !hasProject;
 			btn.style.opacity = hasProject ? '1' : '0.45';
 			btn.style.cursor = hasProject ? 'pointer' : 'not-allowed';

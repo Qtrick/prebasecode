@@ -15,6 +15,7 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommand,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -41,7 +42,7 @@ async function run() {
 	mkdirSync(evidenceDir, { recursive: true });
 	const fixture = join(repo, 'test/prebase/fixtures/desktop-electron');
 	const launched = await launchPreBase(repo, fixture);
-	const evidence = { productPath: true, bypassedPreBase: false, cases: {} };
+	const evidence = { ...phase3EvidenceMetadata(repo, 'electron-native-cases'), productPath: true, bypassedPreBase: false, cases: {} };
 	try {
 		await dismissStartup(launched.page);
 		await waitForWorkbenchDriver(launched.page);

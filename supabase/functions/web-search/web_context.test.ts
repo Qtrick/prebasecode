@@ -1,4 +1,7 @@
 import * as assert from 'assert';
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { suite, test } from 'node:test';
 import {
 	boundWebSources,
@@ -6,20 +9,19 @@ import {
 	dedupeCandidates,
 	firecrawlSearchCategories,
 	publicHttpUrl,
+	WEB_CONTEXT_BUDGET,
 } from './web_context.ts';
+
+const policy = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '../../../test/prebase/fixtures/web-url-policy.json'), 'utf8')) as { allow: string[]; reject: string[] };
 
 suite('Edge web_context policy', () => {
 	test('rejects private URLs and keeps public canonical URLs', () => {
-		assert.equal(publicHttpUrl('http://127.0.0.1/x'), undefined);
-		assert.equal(publicHttpUrl('http://2130706433/'), undefined);
-		assert.equal(publicHttpUrl('http://[::ffff:127.0.0.1]/'), undefined);
-		assert.equal(publicHttpUrl('javascript:alert(1)'), undefined);
-		assert.equal(publicHttpUrl('not a url'), undefined);
-		assert.equal(publicHttpUrl('http://localhost./admin'), undefined);
-		assert.equal(publicHttpUrl('http://app.localhost/'), undefined);
-		assert.equal(publicHttpUrl('http://0177.0.0.1/'), undefined);
-		assert.equal(publicHttpUrl('https://token@example.com/docs'), undefined);
-		assert.equal(publicHttpUrl('https://user:password@example.com/docs'), undefined);
+		for (const url of policy.allow) {
+			assert.ok(publicHttpUrl(url), url);
+		}
+		for (const url of policy.reject) {
+			assert.equal(publicHttpUrl(url), undefined, url);
+		}
 		assert.equal(canonicalPublicUrl('https://www.example.com/docs/?utm_source=x'), 'https://example.com/docs');
 	});
 
@@ -39,7 +41,7 @@ suite('Edge web_context policy', () => {
 		assert.deepEqual(firecrawlSearchCategories('github issue in repo vscode', 'deep'), ['github']);
 	});
 
-	test('bounds payload under the Magnus 16k tool budget', () => {
+	test('bounds payload under the Magnus 14k tool budget', () => {
 		const result = boundWebSources(
 			Array.from({ length: 8 }, (_, i) => ({
 				title: `Source ${i}`,
@@ -51,7 +53,7 @@ suite('Edge web_context policy', () => {
 			{ maxSources: 6, excerptChars: 1400 },
 		);
 		assert.ok(result.truncated);
-		assert.ok(JSON.stringify(result.sources).length < 16_000);
+		assert.ok(JSON.stringify(result.sources).length <= 14_000);
 		assert.equal(result.sources[0].url, 'https://example.com/0');
 		assert.ok(result.sources[0].excerpt.startsWith('UNTRUSTED_WEB_DATA:'));
 		assert.equal('discoveredBy' in result.sources[0], false);
@@ -71,5 +73,16 @@ suite('Edge web_context policy', () => {
 		const parsed = JSON.parse(serialized) as Array<{ url: string; excerpt: string }>;
 		assert.equal(parsed[0].url, 'https://example.com/trap');
 		assert.ok(parsed[0].excerpt.includes('UNTRUSTED_WEB_DATA:'));
+	});
+
+	test('model-facing web payload budget is 14k characters', () => {
+		assert.equal(WEB_CONTEXT_BUDGET.maxPayloadChars, 14_000);
+		assert.equal(WEB_CONTEXT_BUDGET.maxFetchChars, 12_000);
+	});
+
+	test('fetch disables Firecrawl storeInCache; search enrichment keeps it enabled', () => {
+		const index = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'index.ts'), 'utf8');
+		assert.match(index, /firecrawlScrape\(input\.url, firecrawlMaxAgeMs\(input\.freshness\), WEB_CONTEXT_BUDGET\.firecrawlTimeoutMs\.fetch, req\.signal, false/);
+		assert.match(index, /firecrawlScrape\(target\.url, maxAge, timeoutMs, req\.signal, true/);
 	});
 });

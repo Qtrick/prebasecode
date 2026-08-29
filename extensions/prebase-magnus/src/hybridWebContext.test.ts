@@ -124,6 +124,7 @@ suite('hybrid web context', () => {
 				]),
 				firecrawlTransport: firecrawlTransport((url, body) => {
 					assert.equal(url.includes('search'), false);
+					assert.equal(body.storeInCache, true, 'search enrichment may use Firecrawl cache');
 					scrapeUrls.push(String(body.url));
 					return jsonResponse({ success: true, data: { markdown: '# Official docs\n\nsorted(list)', metadata: { title: 'Python docs', url: 'https://python.org/doc' } } });
 				}),
@@ -136,7 +137,7 @@ suite('hybrid web context', () => {
 		assert.equal(result.sources[0].url, 'https://python.org/doc');
 		assert.match(result.sources[0].excerpt, /UNTRUSTED_WEB_DATA/);
 		assert.match(result.sources[0].excerpt, /Official docs/);
-		assert.ok(JSON.stringify(result.sources).length < 16_000);
+		assert.ok(JSON.stringify(result.sources).length <= 14_000);
 	});
 
 	test('returns partial enrichment when one scrape fails and another succeeds', async () => {
@@ -453,8 +454,58 @@ suite('hybrid web context', () => {
 		);
 		assert.equal(result.sources[0].url, 'https://example.com/trap');
 		assert.equal(result.sources[0].contentTruncated, true);
-		assert.ok(JSON.stringify(result).length < 16_000);
+		assert.match(result.sources[0].excerpt, /UNTRUSTED_WEB_DATA:/);
+		assert.match(result.sources[0].excerpt, /Ignore previous instructions/);
+		assert.ok(JSON.stringify(result).length <= 14_000);
 		assert.ok(!JSON.stringify(result).includes('linkup-key'));
 		assert.ok(!JSON.stringify(result).includes('fc-key'));
+	});
+
+	test('search enrichment scrapes may cache; fetch never writes provider cache', async () => {
+		const searchBodies: Array<Record<string, unknown>> = [];
+		const fetchBodies: Array<Record<string, unknown>> = [];
+		const fetchHeaders: string[] = [];
+		await executeHybridWebSearch(
+			{ query: 'python docs', depth: 'fast' },
+			{
+				linkupKey: 'linkup-secret-sentinel',
+				firecrawlKey: 'fc-secret-sentinel',
+				linkupTransport: linkupTransport([{ name: 'Docs', url: 'https://example.com/docs', content: 'snippet' }]),
+				firecrawlTransport: firecrawlTransport((_url, body) => {
+					searchBodies.push(body);
+					return jsonResponse({
+						success: true,
+						data: { markdown: 'verified', metadata: { title: 'Docs', url: 'https://example.com/docs' } },
+					});
+				}),
+			},
+		);
+		assert.equal(searchBodies.length, 1);
+		assert.equal(searchBodies[0].storeInCache, true);
+		assert.equal(JSON.stringify(searchBodies[0]).includes('linkup-secret-sentinel'), false);
+		assert.equal(JSON.stringify(searchBodies[0]).includes('fc-secret-sentinel'), false);
+
+		const fetched = await executeHybridWebFetch(
+			{ url: 'https://example.com/docs' },
+			{
+				linkupKey: 'linkup-secret-sentinel',
+				firecrawlKey: 'fc-secret-sentinel',
+				firecrawlTransport: {
+					fetch: async (_input, init) => {
+						fetchHeaders.push(JSON.stringify(init?.headers ?? {}));
+						fetchBodies.push(JSON.parse(String(init?.body)));
+						return jsonResponse({
+							success: true,
+							data: { markdown: 'page', metadata: { title: 'Docs', url: 'https://example.com/docs' } },
+						});
+					},
+				},
+			},
+		);
+		assert.equal(fetchBodies[0].storeInCache, false);
+		assert.equal(JSON.stringify(fetched).includes('fc-secret-sentinel'), false);
+		assert.equal(JSON.stringify(fetched).includes('linkup-secret-sentinel'), false);
+		assert.equal(JSON.stringify(fetchBodies[0]).includes('fc-secret-sentinel'), false);
+		assert.ok(fetchHeaders.some(header => header.includes('Bearer fc-secret-sentinel')));
 	});
 });

@@ -3,6 +3,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'assert';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import { VSBuffer, bufferToStream } from '../../../../../base/common/buffer.js';
 import { CancellationToken, CancellationTokenSource } from '../../../../../base/common/cancellation.js';
 import { Event } from '../../../../../base/common/event.js';
@@ -10,8 +12,10 @@ import type { IHeaders, IRequestContext } from '../../../../../base/parts/reques
 import type { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import type { IRequestService } from '../../../../../platform/request/common/request.js';
 import type { IPreBaseCloudAuthConfig } from '../../common/cloud/cloudTypes.js';
-import { PreBaseWebSearchService } from '../../browser/prebaseWebSearchService.js';
+import { PreBaseWebSearchService, isPublicHttpUrl } from '../../browser/prebaseWebSearchService.js';
 import type { IPreBaseCloudService } from '../../browser/cloud/prebaseCloudService.js';
+
+const urlPolicy = JSON.parse(readFileSync(resolve('test/prebase/fixtures/web-url-policy.json'), 'utf8')) as { allow: string[]; reject: string[] };
 
 function response(body: unknown, statusCode = 200): IRequestContext {
 	return {
@@ -132,7 +136,19 @@ suite('PreBase web search service', () => {
 		await assert.rejects(() => service.fetchForMagnus({ url: 'http://app.localhost/secret' }, CancellationToken.None), /public http/);
 		await assert.rejects(() => service.fetchForMagnus({ url: 'https://token@example.com/secret' }, CancellationToken.None), /public http/);
 		await assert.rejects(() => service.fetchForMagnus({ url: 'https://user:password@example.com/secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'http://10.0.0.4/secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'http://172.16.0.1/secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'http://[fc00::1]/secret' }, CancellationToken.None), /public http/);
 		assert.strictEqual(requested, false);
+	});
+
+	test('URL policy matches Magnus/Edge public-http allow/reject cases', () => {
+		for (const url of urlPolicy.allow) {
+			assert.strictEqual(isPublicHttpUrl(url), true, url);
+		}
+		for (const url of urlPolicy.reject) {
+			assert.strictEqual(isPublicHttpUrl(url), false, url);
+		}
 	});
 
 	test('fails closed when the cloud session is signed out', async () => {

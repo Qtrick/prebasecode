@@ -87,11 +87,12 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 			const row = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
 			this._responsiveRow(row);
-			this._btn(row, localize('prebase.runtime.start', "Start"), () => this.commandService.executeCommand('prebase.runtime.start'));
-			this._btn(row, localize('prebase.runtime.stop', "Stop"), () => this.commandService.executeCommand('prebase.runtime.stop'));
-			this._btn(row, localize('prebase.runtime.restart', "Restart"), () => this.commandService.executeCommand('prebase.runtime.restart'));
-			this._btn(row, localize('prebase.runtime.openTerminal', "Open Terminal"), () => this.commandService.executeCommand('prebase.runtime.openTerminal'));
-			this._btn(section, localize('prebase.runtime.detect', "Detect Configurations"), () => this.commandService.executeCommand('prebase.runtime.detectConfigurations'));
+			this._btn(row, localize('prebase.runtime.start', "Start"), () => this.commandService.executeCommand('prebase.runtime.start'), 'primary');
+			this._btn(row, localize('prebase.runtime.stop', "Stop"), () => this.commandService.executeCommand('prebase.runtime.stop'), 'secondary');
+			this._btn(row, localize('prebase.runtime.restart', "Restart"), () => this.commandService.executeCommand('prebase.runtime.restart'), 'secondary');
+			this._btn(row, localize('prebase.runtime.openTerminal', "Open Terminal"), () => this.commandService.executeCommand('prebase.runtime.openTerminal'), 'secondary');
+			const detectBtn = this._btn(row, localize('prebase.runtime.detect', "Detect"), () => this.commandService.executeCommand('prebase.runtime.detectConfigurations'), 'secondary');
+			detectBtn.setAttribute('aria-label', localize('prebase.runtime.detectAria', "Detect Configurations"));
 		});
 
 		// --- Desktop launch (Electron)
@@ -122,10 +123,10 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 			const desktopRow = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
 			this._responsiveRow(desktopRow);
-			this._btn(desktopRow, localize('prebase.runtime.desktopStart', "Start Desktop"), () => this.commandService.executeCommand('prebase.runtime.startDesktop'));
-			this._btn(desktopRow, localize('prebase.runtime.desktopStop', "Stop Desktop"), () => this.commandService.executeCommand('prebase.runtime.stopDesktop'));
-			this._btn(desktopRow, localize('prebase.runtime.desktopRestart', "Restart Desktop"), () => this.commandService.executeCommand('prebase.runtime.restartDesktop'));
-			this._btn(desktopRow, localize('prebase.runtime.desktopKill', "Kill Session"), () => this.commandService.executeCommand('prebase.runtime.killDesktopSession'));
+			this._btn(desktopRow, localize('prebase.runtime.desktopStart', "Start Desktop"), () => this.commandService.executeCommand('prebase.runtime.startDesktop'), 'primary');
+			this._btn(desktopRow, localize('prebase.runtime.desktopStop', "Stop Desktop"), () => this.commandService.executeCommand('prebase.runtime.stopDesktop'), 'secondary');
+			this._btn(desktopRow, localize('prebase.runtime.desktopRestart', "Restart Desktop"), () => this.commandService.executeCommand('prebase.runtime.restartDesktop'), 'secondary');
+			this._btn(desktopRow, localize('prebase.runtime.desktopKill', "Kill Session"), () => this.commandService.executeCommand('prebase.runtime.killDesktopSession'), 'secondary');
 			this._desktopEnableBtn = this._btn(section, localize('prebase.runtime.enableTauriTesting', "Enable PreBase Tauri Testing…"), () => this.commandService.executeCommand('prebase.runtime.enableTauriTesting'));
 			this._desktopEnableBtn.style.display = 'none';
 			this._desktopEnableBtn.style.marginTop = '6px';
@@ -150,12 +151,14 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 
 			const nav = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
 			this._responsiveRow(nav);
-			this._btn(nav, localize('prebase.runtime.connect', "Connect"), () => this.commandService.executeCommand('prebase.runtime.connect'));
-			this._btn(nav, localize('prebase.runtime.reload', "Reload"), () => this.commandService.executeCommand('prebase.runtime.reload'));
-			this._btn(nav, localize('prebase.runtime.back', "Back"), () => this.commandService.executeCommand('prebase.runtime.goBack'));
-			this._btn(nav, localize('prebase.runtime.forward', "Forward"), () => this.commandService.executeCommand('prebase.runtime.goForward'));
-			this._btn(nav, localize('prebase.runtime.openExternal', "Open External"), () => this.commandService.executeCommand('prebase.runtime.openExternal'));
-			this._btn(nav, localize('prebase.runtime.copyUrl', "Copy URL"), () => this.commandService.executeCommand('prebase.runtime.copyUrl'));
+			this._btn(nav, localize('prebase.runtime.connect', "Connect"), () => this.commandService.executeCommand('prebase.runtime.connect'), 'primary');
+			this._btn(nav, localize('prebase.runtime.reload', "Reload"), () => this.commandService.executeCommand('prebase.runtime.reload'), 'secondary');
+			this._btn(nav, localize('prebase.runtime.back', "Back"), () => this.commandService.executeCommand('prebase.runtime.goBack'), 'secondary');
+			this._btn(nav, localize('prebase.runtime.forward', "Forward"), () => this.commandService.executeCommand('prebase.runtime.goForward'), 'secondary');
+			const advancedNav = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
+			this._responsiveRow(advancedNav);
+			this._btn(advancedNav, localize('prebase.runtime.openExternal', "Open External"), () => this.commandService.executeCommand('prebase.runtime.openExternal'), 'secondary');
+			this._btn(advancedNav, localize('prebase.runtime.copyUrl', "Copy URL"), () => this.commandService.executeCommand('prebase.runtime.copyUrl'), 'secondary');
 		});
 
 		// --- Device / viewport
@@ -220,10 +223,10 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 			this._styleMeta(this._testMeta);
 			const row = DOM.append(section, DOM.$('.prebase-runtime-btn-row'));
 			this._responsiveRow(row);
-			this._btn(row, localize('prebase.runtime.startTest', "Start Test"), () => this.commandService.executeCommand('prebase.runtime.startTestSession'));
-			this._btn(row, localize('prebase.runtime.stopTest', "Stop Test"), () => this.commandService.executeCommand('prebase.runtime.stopTestSession'));
-			this._btn(row, localize('prebase.runtime.replayTest', "Replay"), () => this.commandService.executeCommand('prebase.runtime.replayTest'));
-			this._btn(row, localize('prebase.runtime.showReports', "Show Reports"), () => this.commandService.executeCommand('prebase.runtime.showReports'));
+			this._btn(row, localize('prebase.runtime.startTest', "Start Test"), () => this.commandService.executeCommand('prebase.runtime.startTestSession'), 'primary');
+			this._btn(row, localize('prebase.runtime.stopTest', "Stop Test"), () => this.commandService.executeCommand('prebase.runtime.stopTestSession'), 'secondary');
+			this._btn(row, localize('prebase.runtime.replayTest', "Replay"), () => this.commandService.executeCommand('prebase.runtime.replayTest'), 'secondary');
+			this._btn(row, localize('prebase.runtime.showReports', "Reports"), () => this.commandService.executeCommand('prebase.runtime.showReports'), 'secondary');
 			this._reportsList = DOM.append(section, DOM.$('div'));
 			this._styleMeta(this._reportsList);
 		});
@@ -295,7 +298,7 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		el.style.lineHeight = '1.4';
 	}
 
-	private _btn(parent: HTMLElement, label: string, onClick: () => void): HTMLButtonElement {
+	private _btn(parent: HTMLElement, label: string, onClick: () => void, kind: 'primary' | 'secondary' = 'secondary'): HTMLButtonElement {
 		const btn = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
 		btn.type = 'button';
 		btn.textContent = label;
@@ -303,12 +306,16 @@ export class PreBaseRuntimeViewPane extends ViewPane {
 		btn.style.width = '100%';
 		btn.style.marginBottom = '4px';
 		btn.style.padding = '7px 8px';
-		btn.style.borderRadius = '6px';
+		btn.style.borderRadius = 'var(--vscode-cornerRadius-medium, 6px)';
 		btn.style.border = '1px solid var(--vscode-button-border, transparent)';
-		btn.style.background = 'var(--vscode-button-background, #2dd4bf)';
-		btn.style.color = 'var(--vscode-button-foreground, #141516)';
+		btn.style.background = kind === 'primary'
+			? 'var(--vscode-button-background)'
+			: 'var(--vscode-button-secondaryBackground)';
+		btn.style.color = kind === 'primary'
+			? 'var(--vscode-button-foreground)'
+			: 'var(--vscode-button-secondaryForeground)';
 		btn.style.cursor = 'pointer';
-		btn.style.fontSize = '12px';
+		btn.style.fontSize = 'var(--vscode-bodyFontSize-small, 12px)';
 		this._register(DOM.addDisposableListener(btn, 'click', onClick));
 		return btn;
 	}

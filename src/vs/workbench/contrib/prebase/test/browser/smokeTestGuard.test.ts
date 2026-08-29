@@ -52,6 +52,12 @@ suite('smokeTestGuard', () => {
 		assert.match(diagnostics, /colorTheme: theme\.settingsId/);
 		assert.match(diagnostics, /colorThemeType: theme\.type/);
 		assert.match(diagnostics, /zoomLevel: getZoomLevel\(mainWindow\)/);
+		assert.match(diagnostics, /getWebContentsInventory\(\)/);
+		assert.match(diagnostics, /inventory\.filter\(item => !item\.destroyed\)/);
+		assert.match(diagnostics, /liveCount: live\.length/);
+		assert.match(diagnostics, /accessibilitySupport/);
+		assert.match(diagnostics, /a11yMode === 'auto' \|\| a11yMode === 'on'/);
+		assert.doesNotMatch(diagnostics, /accessibilitySupport === 'off'|accessibilitySupport: 'off'|updateValue\('editor\.accessibilitySupport', 'off'\)/);
 		assert.match(diagnostics, /new Set\(\['PreBase Dark', 'PreBase Light', 'Default High Contrast', 'Default High Contrast Light', 'Dark Modern', 'Light Modern'\]\)/);
 		assert.match(diagnostics, /const themeService = accessor\.get\(IWorkbenchThemeService\)/);
 		assert.match(diagnostics, /await themeService\.setColorTheme\(match\.id, 'auto'\)/);
@@ -71,5 +77,23 @@ suite('smokeTestGuard', () => {
 		assert.match(install, /f1: false/);
 		assert.match(install, /requireSmokeTestDriver\([^,]+, 'prebase.test.installMagnusSmokeTransport'\)/);
 		assert.match(install, /executeCommand\('prebase\.magnus\.installSmokeTransport'\)/);
+	});
+
+	test('PreBase must not write editor.accessibilitySupport off', () => {
+		const files = [
+			'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts',
+			'src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts',
+			'src/vs/workbench/contrib/prebase/browser/prebaseRuntimeView.ts',
+			'src/vs/workbench/contrib/prebase/browser/prebaseOnboardingEditor.ts',
+			'src/vs/workbench/contrib/prebase/browser/prebaseHomeEditor.ts',
+		];
+		for (const file of files) {
+			const source = readFileSync(resolve(file), 'utf8');
+			assert.doesNotMatch(source, /updateValue\(\s*['"]editor\.accessibilitySupport['"]\s*,\s*['"]off['"]\s*\)/, file);
+			assert.doesNotMatch(source, /accessibilitySupport:\s*['"]off['"]/, file);
+		}
+		const contribution = readFileSync(resolve('src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
+		assert.match(contribution, /a11yMode === 'auto' \|\| a11yMode === 'on'/);
+		assert.match(contribution, /never write 'off'/);
 	});
 });
