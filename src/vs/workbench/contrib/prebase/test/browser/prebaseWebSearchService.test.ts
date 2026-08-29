@@ -6,7 +6,7 @@ import assert from 'assert';
 import { VSBuffer, bufferToStream } from '../../../../../base/common/buffer.js';
 import { CancellationToken, CancellationTokenSource } from '../../../../../base/common/cancellation.js';
 import { Event } from '../../../../../base/common/event.js';
-import type { IRequestContext } from '../../../../../base/parts/request/common/request.js';
+import type { IHeaders, IRequestContext } from '../../../../../base/parts/request/common/request.js';
 import type { IConfigurationService } from '../../../../../platform/configuration/common/configuration.js';
 import type { IRequestService } from '../../../../../platform/request/common/request.js';
 import type { IPreBaseCloudAuthConfig } from '../../common/cloud/cloudTypes.js';
@@ -23,7 +23,7 @@ function response(body: unknown, statusCode = 200): IRequestContext {
 function createService(
 	config: IPreBaseCloudAuthConfig,
 	request: (options: Parameters<IRequestService['request']>[0]) => Promise<IRequestContext>,
-	refreshAccessToken = async () => 'session-token',
+	refreshAccessToken: () => Promise<string | undefined> = async () => 'session-token',
 ): PreBaseWebSearchService {
 	const requestService: IRequestService = {
 		_serviceBrand: undefined,
@@ -130,6 +130,8 @@ suite('PreBase web search service', () => {
 		await assert.rejects(() => service.fetchForMagnus({ url: 'http://2130706433/secret' }, CancellationToken.None), /public http/);
 		await assert.rejects(() => service.fetchForMagnus({ url: 'http://localhost./secret' }, CancellationToken.None), /public http/);
 		await assert.rejects(() => service.fetchForMagnus({ url: 'http://app.localhost/secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'https://token@example.com/secret' }, CancellationToken.None), /public http/);
+		await assert.rejects(() => service.fetchForMagnus({ url: 'https://user:password@example.com/secret' }, CancellationToken.None), /public http/);
 		assert.strictEqual(requested, false);
 	});
 
@@ -150,7 +152,7 @@ suite('PreBase web search service', () => {
 	});
 
 	test('search and fetch gateway requests never include provider API keys', async () => {
-		let headers: Record<string, string> | undefined;
+		let headers: IHeaders | undefined;
 		let data: string | undefined;
 		const service = createService(
 			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },
@@ -170,7 +172,7 @@ suite('PreBase web search service', () => {
 		assert.ok(!encoded.includes('LINKUP'));
 		assert.ok(!encoded.includes('fc-'));
 		assert.strictEqual(headers?.Authorization, 'Bearer session-token');
-		assert.ok(!Object.values(headers ?? {}).some(value => /linkup|firecrawl/i.test(value)));
+		assert.ok(!Object.values(headers ?? {}).flatMap(value => Array.isArray(value) ? value : [value ?? '']).some(value => /linkup|firecrawl/i.test(value)));
 	});
 
 	test('does not silently drop oversize excerpts without marking them truncated', async () => {
@@ -194,7 +196,7 @@ suite('PreBase web search service', () => {
 	});
 
 	test('sends fetch operations without exposing provider keys', async () => {
-		let headers: Record<string, string> | undefined;
+		let headers: IHeaders | undefined;
 		let data: string | undefined;
 		const service = createService(
 			{ mode: 'supabase', supabaseUrl: 'https://example.supabase.co', publishableKey: 'pk-test' },

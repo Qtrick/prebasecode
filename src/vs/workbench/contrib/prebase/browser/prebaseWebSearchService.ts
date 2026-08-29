@@ -59,6 +59,9 @@ function isPublicHttpUrl(value: string): boolean {
 		if (url.protocol !== 'http:' && url.protocol !== 'https:') {
 			return false;
 		}
+		if (url.username || url.password) {
+			return false;
+		}
 		const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.+$/, '').toLowerCase();
 		if (!host || host === 'localhost' || host.endsWith('.localhost') || /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1)$/i.test(host) || /\.(local|internal|lan|home|corp|intranet)$/i.test(host)) {
 			return false;
@@ -142,14 +145,14 @@ export class PreBaseWebSearchService implements IPreBaseWebSearchService {
 		@IPreBaseCloudService private readonly cloudService: IPreBaseCloudService,
 	) { }
 
-	searchForMagnus(input: IPreBaseWebSearchRequest, token: CancellationToken): Promise<IPreBaseWebSearchResponse> {
+	async searchForMagnus(input: IPreBaseWebSearchRequest, token: CancellationToken): Promise<IPreBaseWebSearchResponse> {
 		validateSearchInput(input);
-		return this.postGateway(input, input.depth === 'deep' ? 45_000 : input.depth === 'fast' ? 12_000 : 22_000, token);
+		return await this.postGateway(input, input.depth === 'deep' ? 45_000 : input.depth === 'fast' ? 12_000 : 22_000, token);
 	}
 
-	fetchForMagnus(input: IPreBaseWebFetchRequest, token: CancellationToken): Promise<IPreBaseWebSearchResponse> {
+	async fetchForMagnus(input: IPreBaseWebFetchRequest, token: CancellationToken): Promise<IPreBaseWebSearchResponse> {
 		validateFetchInput(input);
-		return this.postGateway({ operation: 'fetch', url: input.url, freshness: input.freshness ?? 'normal' }, 14_000, token);
+		return await this.postGateway({ operation: 'fetch', url: input.url, freshness: input.freshness ?? 'normal' }, 14_000, token);
 	}
 
 	private async postGateway(payload: unknown, timeout: number, token: CancellationToken): Promise<IPreBaseWebSearchResponse> {

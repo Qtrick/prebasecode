@@ -510,7 +510,7 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 			}
 		});
 		harness.triggerRaf(1100);
-		const hits = vm.runInContext('window.__prebaseGraphRenderMetrics.nodeHits', harness.context);
+		const hits = vm.runInContext('window.__prebaseGraphRenderMetrics.nodeHits', harness.context) as Array<{ id: string }>;
 		assert.equal(hits.length, 16);
 		assert.equal(hits[0].id, 'n0');
 		assert.equal(hits[15].id, 'n15');

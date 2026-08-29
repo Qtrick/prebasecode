@@ -73,16 +73,42 @@ suite('hybrid web context', () => {
 			{
 				linkupKey: '',
 				firecrawlKey: 'fc-key',
-				firecrawlTransport: firecrawlTransport(() => jsonResponse({
-					success: true,
-					data: { markdown: 'page', metadata: { title: 'Docs', url: 'https://example.com/docs' } },
-				})),
+				firecrawlTransport: firecrawlTransport((_url, body) => {
+					assert.equal(body.storeInCache, false);
+					return jsonResponse({
+						success: true,
+						data: { markdown: 'page', metadata: { title: 'Docs', url: 'https://example.com/docs' } },
+					});
+				}),
 			},
 		);
 		assert.equal(fetched.operations.linkup, 0);
 		assert.equal(fetched.operations.firecrawlScrape, 1);
 		assert.equal(fetched.sources[0].url, 'https://example.com/docs');
 		assert.match(fetched.sources[0].excerpt, /UNTRUSTED_WEB_DATA/);
+	});
+
+	test('counts every retry attempt when fetching one known URL', async () => {
+		let attempts = 0;
+		const fetched = await executeHybridWebFetch(
+			{ url: 'https://example.com/docs' },
+			{
+				linkupKey: '',
+				firecrawlKey: 'fc-key',
+				firecrawlTransport: firecrawlTransport(() => {
+					attempts++;
+					if (attempts === 1) {
+						return jsonResponse({ success: false }, 503);
+					}
+					return jsonResponse({
+						success: true,
+						data: { markdown: 'page', metadata: { title: 'Docs', url: 'https://example.com/docs' } },
+					});
+				}),
+			},
+		);
+		assert.equal(attempts, 2);
+		assert.equal(fetched.operations.firecrawlScrape, 2);
 	});
 
 	test('LinkUp discovers and Firecrawl enriches without duplicate scrapes', async () => {
@@ -273,7 +299,7 @@ suite('hybrid web context', () => {
 		assert.equal(scrapeCalls, 0);
 	});
 
-	test('counts only successful Firecrawl scrapes in operations', async () => {
+	test('counts every attempted Firecrawl scrape in operations, including failed enrichments', async () => {
 		const result = await executeHybridWebSearch(
 			{ query: 'docs', depth: 'standard' },
 			{
@@ -293,7 +319,31 @@ suite('hybrid web context', () => {
 		);
 		assert.equal(result.operations.linkup, 1);
 		assert.equal(result.operations.firecrawlSearch, 0);
-		assert.equal(result.operations.firecrawlScrape, 1);
+		assert.equal(result.operations.firecrawlScrape, 2);
+	});
+
+	test('counts a retryable Firecrawl request for every provider attempt', async () => {
+		let attempts = 0;
+		const result = await executeHybridWebSearch(
+			{ query: 'docs', depth: 'fast' },
+			{
+				linkupKey: 'linkup-key',
+				firecrawlKey: 'fc-key',
+				linkupTransport: linkupTransport([{ name: 'A', url: 'https://a.example.com/one', content: 'a' }]),
+				firecrawlTransport: firecrawlTransport((_url, body) => {
+					attempts++;
+					if (attempts === 1) {
+						return jsonResponse({ success: false }, 503);
+					}
+					return jsonResponse({
+						success: true,
+						data: { markdown: 'verified A', metadata: { title: 'A', url: String(body.url) } },
+					});
+				}),
+			},
+		);
+		assert.equal(attempts, 2);
+		assert.equal(result.operations.firecrawlScrape, 2);
 	});
 
 	test('failed deep Firecrawl search still enriches LinkUp results', async () => {

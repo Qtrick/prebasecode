@@ -38,6 +38,8 @@ suite('webContextCore URL policy', () => {
 		assert.equal(publicHttpUrl('http://127.0.0.1./'), undefined);
 		assert.equal(publicHttpUrl('http://app.localhost/'), undefined);
 		assert.equal(publicHttpUrl('http://0177.0.0.1/'), undefined);
+		assert.equal(publicHttpUrl('https://token@example.com/docs'), undefined);
+		assert.equal(publicHttpUrl('https://user:password@example.com/docs'), undefined);
 	});
 
 	test('canonicalizes www, tracking params, and trailing slashes without merging distinct articles', () => {

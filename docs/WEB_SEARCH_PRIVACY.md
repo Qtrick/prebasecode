@@ -12,6 +12,6 @@ When both LinkUp and Firecrawl keys are present in source development, Magnus ma
 
 ## Third-party retention
 
-PreBase does not persist query text or result bodies. Firecrawl may cache scraped pages according to the request `maxAge` / `storeInCache` settings (normal freshness uses a modest cache age; fresh/current queries use `maxAge: 0`). This repository does not claim Firecrawl zero-data-retention unless the deployed account and request mode actually enable it.
+PreBase does not persist query text or result bodies. Search-discovered public pages permit Firecrawl caching (`storeInCache: true`; normal freshness uses a modest cache age and fresh/current queries use `maxAge: 0`). Explicit user-supplied fetches set `storeInCache: false` to avoid provider caching of a URL that may contain sensitive query parameters. This repository does not claim Firecrawl zero-data-retention unless the deployed account and request mode actually enable it.
 
 Cloud authentication tokens remain in OS-backed SecretStorage; no hosted provider credential reaches the client.

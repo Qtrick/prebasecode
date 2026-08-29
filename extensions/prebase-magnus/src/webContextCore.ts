@@ -60,6 +60,9 @@ export function publicHttpUrl(value: string): URL | undefined {
 		if (url.protocol !== 'http:' && url.protocol !== 'https:') {
 			return undefined;
 		}
+		if (url.username || url.password) {
+			return undefined;
+		}
 		const host = url.hostname.replace(/^\[|\]$/g, '').replace(/\.+$/, '').toLowerCase();
 		if (isBlockedHostname(host)) {
 			return undefined;
@@ -220,7 +223,7 @@ export function toMagnusWebToolPayload(value: unknown): MagnusWebToolPayload {
 				return [];
 			}
 			const row = source as Record<string, unknown>;
-			if (typeof row.title !== 'string' || typeof row.url !== 'string' || typeof row.excerpt !== 'string') {
+			if (typeof row.title !== 'string' || typeof row.url !== 'string' || typeof row.excerpt !== 'string' || !publicHttpUrl(row.url)) {
 				return [];
 			}
 			return [{

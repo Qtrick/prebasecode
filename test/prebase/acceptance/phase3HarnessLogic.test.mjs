@@ -724,7 +724,58 @@ test('smoke diagnostics and transport stay off the Command Palette and require t
 test('final gate rejects stale ok:true evidence after a live rerun failure', () => {
 	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
 	assert.match(gate, /stale evidence: live rerun exited/);
-	assert.match(gate, /rerunExits/);
+	assert.match(gate, /reruns/);
+});
+
+test('active-soak final evidence rejects diagnostic, short, and stale-HEAD records', () => {
+	const activeSoak = PHASE3_REQUIRED_EVIDENCE.find(item => item.id === 'active-soak');
+	assert.ok(activeSoak);
+	const current = 'current-head';
+	const valid = {
+		ok: true,
+		evidenceKind: 'final',
+		durationMs: activeSoak.minDurationMs,
+		sourceHead: current,
+	};
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, valid).ok, true);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, { ...valid, evidenceKind: 'diagnostic' }).ok, false);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, { ...valid, durationMs: activeSoak.minDurationMs - 1 }).ok, false);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, { ...valid, sourceHead: 'stale-head' }).ok, false);
+});
+
+test('active soak protects canonical final evidence and final gate has explicit bounded modes', () => {
+	const active = readFileSync(join(acceptanceDir, 'prebase-active-soak.mjs'), 'utf8');
+	assert.match(active, /ACTIVE_SOAK_FINAL_MIN_DURATION_MS = 10 \* 60 \* 1000/);
+	assert.match(active, /evidenceKind === 'final' \? 'active\.json' : 'active-diagnostic\.json'/);
+	assert.match(active, /sourceHead: execFileSync\('git', \['rev-parse', 'HEAD'\]/);
+	assert.doesNotMatch(active, /process count grew excessively during active soak/);
+
+	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
+	assert.match(gate, /process\.argv\.includes\('--validate-evidence'\)/);
+	assert.match(gate, /process\.argv\.includes\('--rerun-live'\)/);
+	assert.match(gate, /expected \$\{entry\.evidenceKind\} evidence/);
+	assert.match(gate, /evidence duration is below \$\{entry\.minDurationMs\}ms/);
+	assert.match(gate, /evidence source HEAD does not match current HEAD/);
+});
+
+test('every live final-gate child has a deadline, log, and timeout failure path', () => {
+	const rerunnable = PHASE3_REQUIRED_EVIDENCE.filter(item => item.rerun);
+	assert.ok(rerunnable.length > 0);
+	assert.ok(rerunnable.every(item => Number.isFinite(item.timeoutMs) && item.timeoutMs > 0));
+	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
+	assert.match(gate, /gate-logs/);
+	assert.match(gate, /child\.kill\('SIGTERM'\)/);
+	assert.match(gate, /child\.kill\('SIGKILL'\)/);
+	assert.match(gate, /live rerun timed out after/);
+});
+
+test('final gate requires current successful assurance evidence instead of a prose reminder', () => {
+	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
+	assert.match(gate, /readJson\('assurance\.json'\)/);
+	assert.match(gate, /scenarioOk\(\{ id: 'assurance', sourceHead: head \}, assurance\)/);
+	assert.match(gate, /failures\.push\(`assurance: \$\{assuranceVerdict\.reason\}`\)/);
+	assert.match(gate, /assurance: \{ path: 'assurance\.json', ok: assuranceVerdict\.ok, reason: assuranceVerdict\.reason \}/);
+	assert.doesNotMatch(gate, /assuranceSummary/);
 });
 
 test('active soak rejects quiescent renderer CPU runaway', () => {

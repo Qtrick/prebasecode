@@ -43,6 +43,9 @@ export function publicHttpUrl(value: string): URL | undefined {
 		if (url.protocol !== "http:" && url.protocol !== "https:") {
 			return undefined;
 		}
+		if (url.username || url.password) {
+			return undefined;
+		}
 		const host = url.hostname.replace(/^\[|\]$/g, "").replace(/\.+$/, "").toLowerCase();
 		if (isBlockedHostname(host)) {
 			return undefined;

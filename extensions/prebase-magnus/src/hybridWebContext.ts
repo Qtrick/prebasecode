@@ -28,6 +28,7 @@ export interface HybridWebContextResponse {
 	warning: string;
 	truncated: boolean;
 	enrichment: 'full' | 'partial' | 'unavailable';
+	/** Provider calls attempted, including bounded retries. */
 	operations: { linkup: number; firecrawlSearch: number; firecrawlScrape: number };
 }
 
@@ -135,8 +136,7 @@ export async function executeHybridWebSearch(
 			throw new Error('Cancelled');
 		}
 		try {
-			const page = await scrapePublicUrl(deps.firecrawlKey, { url: target.url, maxAge, timeoutMs }, deps.token, deps.firecrawlTransport);
-			operations.firecrawlScrape++;
+			const page = await scrapePublicUrl(deps.firecrawlKey, { url: target.url, maxAge, timeoutMs, onAttempt: () => operations.firecrawlScrape++ }, deps.token, deps.firecrawlTransport);
 			return {
 				...target,
 				title: page.title || target.title,
@@ -194,10 +194,13 @@ export async function executeHybridWebFetch(
 	if (cached) {
 		return cached;
 	}
+	let firecrawlScrapeAttempts = 0;
 	const page = await scrapePublicUrl(deps.firecrawlKey, {
 		url: parsed.toString(),
 		maxAge: firecrawlMaxAgeMs(freshness),
 		timeoutMs: WEB_CONTEXT_BUDGET.firecrawlTimeoutMs.fetch,
+		storeInCache: false,
+		onAttempt: () => firecrawlScrapeAttempts++,
 	}, deps.token, deps.firecrawlTransport);
 	const bounded = boundWebSources([{
 		title: page.title,
@@ -212,7 +215,7 @@ export async function executeHybridWebFetch(
 		warning: UNTRUSTED_WEB_WARNING,
 		truncated: bounded.truncated,
 		enrichment: 'full',
-		operations: { linkup: 0, firecrawlSearch: 0, firecrawlScrape: 1 },
+		operations: { linkup: 0, firecrawlSearch: 0, firecrawlScrape: firecrawlScrapeAttempts },
 	};
 	cacheSet(cache, cacheKey, result);
 	return result;

@@ -272,7 +272,7 @@ function retryable(status: number): boolean {
 	return status === 408 || status === 429 || status >= 500;
 }
 
-async function firecrawlScrape(url: string, maxAge: number, timeoutMs: number, signal: AbortSignal): Promise<{ title: string; url: string; markdown: string }> {
+async function firecrawlScrape(url: string, maxAge: number, timeoutMs: number, signal: AbortSignal, storeInCache = true, onAttempt?: () => void): Promise<{ title: string; url: string; markdown: string }> {
 	const apiKey = Deno.env.get("FIRECRAWL_API_KEY");
 	if (!apiKey) {
 		throw new Error("firecrawl_unavailable");
@@ -285,13 +285,14 @@ async function firecrawlScrape(url: string, maxAge: number, timeoutMs: number, s
 		if (signal.aborted) {
 			throw new Error("Cancelled");
 		}
+		onAttempt?.();
 		last = await providerFetch("https://api.firecrawl.dev/v2/scrape", apiKey, {
 			url,
 			formats: ["markdown"],
 			onlyMainContent: true,
 			removeBase64Images: true,
 			blockAds: true,
-			storeInCache: true,
+			storeInCache,
 			maxAge,
 			timeout: Math.min(timeoutMs, 20_000),
 		}, timeoutMs, signal);
@@ -392,7 +393,7 @@ Deno.serve(async req => {
 	if (!serviceUrl || !serviceKey) {
 		return json(req, requestId, 503, { error: "usage_check_unavailable" });
 	}
-	if (!Deno.env.get("LINKUP_API_KEY") || !Deno.env.get("FIRECRAWL_API_KEY")) {
+	if (!Deno.env.get("FIRECRAWL_API_KEY") || (input.operation === "search" && !Deno.env.get("LINKUP_API_KEY"))) {
 		return json(req, requestId, 503, { error: "provider_unavailable" });
 	}
 	const admin = createClient(serviceUrl, serviceKey, { auth: { persistSession: false, autoRefreshToken: false } });
@@ -417,7 +418,8 @@ Deno.serve(async req => {
 			return await fail(499, "cancelled");
 		}
 		if (input.operation === "fetch") {
-			const page = await firecrawlScrape(input.url, firecrawlMaxAgeMs(input.freshness), WEB_CONTEXT_BUDGET.firecrawlTimeoutMs.fetch, req.signal);
+			let firecrawlScrapeOps = 0;
+			const page = await firecrawlScrape(input.url, firecrawlMaxAgeMs(input.freshness), WEB_CONTEXT_BUDGET.firecrawlTimeoutMs.fetch, req.signal, false, () => firecrawlScrapeOps++);
 			const bounded = boundWebSources([{
 				title: page.title,
 				url: page.url,
@@ -430,7 +432,7 @@ Deno.serve(async req => {
 				source_count: bounded.sources.length,
 				enriched_count: 1,
 				operation_kind: "fetch",
-				firecrawl_scrape_ops: 1,
+				firecrawl_scrape_ops: firecrawlScrapeOps,
 			}).eq("request_id", requestId);
 			return json(req, requestId, 200, {
 				...bounded,
@@ -477,8 +479,7 @@ Deno.serve(async req => {
 				throw new Error("Cancelled");
 			}
 			try {
-				const page = await firecrawlScrape(target.url, maxAge, timeoutMs, req.signal);
-				firecrawlScrapeOps++;
+				const page = await firecrawlScrape(target.url, maxAge, timeoutMs, req.signal, true, () => firecrawlScrapeOps++);
 				return {
 					...target,
 					title: page.title || target.title,

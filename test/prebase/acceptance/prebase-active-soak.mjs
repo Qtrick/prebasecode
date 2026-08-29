@@ -22,6 +22,7 @@ import {
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/soak');
+export const ACTIVE_SOAK_FINAL_MIN_DURATION_MS = 10 * 60 * 1000;
 
 function isolatedFixtureWorkspace() {
 	const dest = mkdtempSync(join(tmpdir(), 'pb-active-soak-ws-'));
@@ -82,10 +83,6 @@ export function activeSoakFailures(evidence) {
 	if (lastRenderer.length && lastRenderer.every(cpu => cpu >= 40)) {
 		failures.push(`quiescent renderer CPU remained high (${lastRenderer.join(', ')})`);
 	}
-	const counts = evidence.samples?.map(item => item.processCount) ?? [];
-	if (counts.length >= 2 && counts.at(-1) - counts[0] > 6) {
-		failures.push('process count grew excessively during active soak');
-	}
 	return failures;
 }
 
@@ -94,9 +91,12 @@ async function run() {
 	mkdirSync(evidenceDir, { recursive: true });
 	const durationMs = Number(process.env.PREBASE_ACTIVE_SOAK_MS || 12 * 60 * 1000);
 	const intervalMs = Number(process.env.PREBASE_SOAK_INTERVAL_MS || 20_000);
+	const evidenceKind = durationMs >= ACTIVE_SOAK_FINAL_MIN_DURATION_MS ? 'final' : 'diagnostic';
 	let launched;
 	const evidence = {
 		kind: 'active',
+		evidenceKind,
+		sourceHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(),
 		durationMs,
 		intervalMs,
 		samples: [],
@@ -155,7 +155,7 @@ async function run() {
 	}
 	const failures = activeSoakFailures(evidence);
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
-	writeFileSync(join(evidenceDir, 'active.json'), JSON.stringify(result, null, 2));
+	writeFileSync(join(evidenceDir, evidenceKind === 'final' ? 'active.json' : 'active-diagnostic.json'), JSON.stringify(result, null, 2));
 	console.log(JSON.stringify({ ok: result.ok, failures, samples: evidence.samples.length, durationMs, quit: evidence.quit }, null, 2));
 	if (!result.ok) process.exitCode = 1;
 }

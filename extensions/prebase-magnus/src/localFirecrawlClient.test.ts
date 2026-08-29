@@ -41,8 +41,24 @@ suite('local Firecrawl client', () => {
 		assert.equal(body.onlyMainContent, true);
 		assert.equal(body.removeBase64Images, true);
 		assert.equal(body.blockAds, true);
+		assert.equal(body.storeInCache, true);
 		assert.equal(body.maxAge, 0);
 		assert.equal(result.markdown, '# Hello');
+	});
+
+	test('can disable Firecrawl provider caching for explicit user fetches', async () => {
+		let calledBody = '';
+		const transport: FirecrawlTransport = {
+			fetch: async (_input, init) => {
+				calledBody = String(init?.body);
+				return jsonResponse({
+					success: true,
+					data: { markdown: '# Hello', metadata: { title: 'Hello', url: 'https://example.com/doc' } },
+				});
+			},
+		};
+		await scrapePublicUrl('fc-key', { url: 'https://example.com/doc', maxAge: 0, timeoutMs: 8_000, storeInCache: false }, undefined, transport);
+		assert.equal(JSON.parse(calledBody).storeInCache, false);
 	});
 
 	test('Firecrawl Search stays compact and does not request markdown scrapeOptions', async () => {

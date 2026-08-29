@@ -20,6 +20,8 @@ export interface FirecrawlScrapeRequest {
 	url: string;
 	maxAge: number;
 	timeoutMs: number;
+	storeInCache?: boolean;
+	onAttempt?: () => void;
 }
 
 export interface FirecrawlScrapeResult {
@@ -117,13 +119,14 @@ export async function scrapePublicUrl(
 	}
 	let last: Response | undefined;
 	for (let attempt = 0; attempt < 2; attempt++) {
+		input.onAttempt?.();
 		last = await firecrawlFetch(apiKey, FIRECRAWL_SCRAPE, {
 			url: input.url,
 			formats: ['markdown'],
 			onlyMainContent: true,
 			removeBase64Images: true,
 			blockAds: true,
-			storeInCache: true,
+			storeInCache: input.storeInCache ?? true,
 			maxAge: input.maxAge,
 			timeout: Math.min(input.timeoutMs, 20_000),
 		}, token, input.timeoutMs, transport);
