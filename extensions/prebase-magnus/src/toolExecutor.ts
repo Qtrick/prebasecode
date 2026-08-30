@@ -6,7 +6,11 @@
 import * as vscode from 'vscode';
 import type { AIContentPart, AIToolDeclaration } from './aiTypes';
 import { processToolResultData, consumeWebToolBudget, type ContextBudgetConfig } from './requestAssembler';
-import { registerGuidanceTargetsFromToolCalls } from './projectGuidanceJit';
+import {
+	type MutationPreflightContext,
+	preflightMutationGuidance,
+	registerReadTargetsBeforeExecution,
+} from './projectGuidanceJit';
 
 export interface ToolCallItem {
 	readonly id?: string;
@@ -65,10 +69,13 @@ export async function executeToolCallBatch(
 	supportsMultimodal: boolean = true,
 	folders?: readonly { uri: { fsPath: string } }[],
 	preferredRoot?: string,
+	mutationPreflight?: MutationPreflightContext,
 ): Promise<AIContentPart[]> {
 	if (calls.length === 0) {
 		return [];
 	}
+
+	registerReadTargetsBeforeExecution(calls, folders, preferredRoot);
 
 	const responseParts: AIContentPart[] = new Array(calls.length);
 
@@ -99,14 +106,32 @@ export async function executeToolCallBatch(
 				responseParts[readBatch[b].index] = results[b];
 			}
 		} else {
-			// Mutating or side-effecting tool: execute sequentially
+			// Mutating or side-effecting tool: preflight guidance, then execute sequentially
+			if (mutationPreflight) {
+				const preflight = await preflightMutationGuidance(current, folders, preferredRoot, mutationPreflight);
+				if (preflight.defer) {
+					responseParts[current.index] = {
+						functionResponse: {
+							id: current.id,
+							name: current.name,
+							response: {
+								deferred: true,
+								paths: preflight.paths,
+								message: 'Additional project guidance applies to this target and has been loaded. Re-evaluate the operation under the updated guidance and issue the edit again if still appropriate.',
+								guidanceUpdate: preflight.deltaBlock,
+							},
+						},
+						...(preflight.deltaBlock ? { text: preflight.deltaBlock } : {}),
+					};
+					i++;
+					continue;
+				}
+			}
 			const result = await executeSingleTool(current, availableTools, toolInvocationToken, token, budget, tracker, supportsMultimodal);
 			responseParts[current.index] = result;
 			i++;
 		}
 	}
-
-	registerGuidanceTargetsFromToolCalls(calls, folders, preferredRoot);
 
 	return responseParts.filter(Boolean);
 }

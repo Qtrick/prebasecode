@@ -55,6 +55,8 @@ export interface SkillMetadata {
 	readonly path: string;
 	readonly ecosystem: string;
 	readonly scopePrefix: string;
+	/** Cursor `paths` or legacy `globs` from skill frontmatter. */
+	readonly pathGlobs: readonly string[];
 	readonly argumentHint?: string;
 	readonly userInvocable?: boolean;
 	readonly modelInvocable?: boolean;
@@ -229,6 +231,9 @@ function parseSkillMetadata(skillPath: string, text: string, ecosystem: string, 
 	const allowedToolsHint = metaString(merged, 'allowed-tools') ?? metaString(merged, 'allowedTools');
 	const license = metaString(merged, 'license');
 	const compatibility = metaString(merged, 'compatibility');
+	const pathGlobs = metaStringList(meta, 'paths');
+	const legacyGlobs = pathGlobs.length ? [] : metaStringList(meta, 'globs');
+	const normalizedPathGlobs = pathGlobs.length ? pathGlobs : legacyGlobs;
 	return {
 		id: skillId(ecosystem, workspaceRoot, skillPath),
 		name,
@@ -236,6 +241,7 @@ function parseSkillMetadata(skillPath: string, text: string, ecosystem: string, 
 		path: skillPath,
 		ecosystem,
 		scopePrefix,
+		pathGlobs: normalizedPathGlobs,
 		...(argumentHint ? { argumentHint } : {}),
 		...(userInvocable === false ? { userInvocable: false } : userInvocable === true ? { userInvocable: true } : {}),
 		...(disableModel ? { modelInvocable: false } : {}),
@@ -468,11 +474,44 @@ function ruleActivationMode(ecosystem: string, meta: Record<string, FrontmatterV
 }
 
 function skillMatchesTarget(metadata: SkillMetadata, targetPaths: readonly string[]): boolean {
-	if (!metadata.scopePrefix) {
-		return true;
+	if (metadata.scopePrefix) {
+		const prefix = metadata.scopePrefix.endsWith('/') ? metadata.scopePrefix : `${metadata.scopePrefix}/`;
+		if (!targetPaths.some(path => path === metadata.scopePrefix || path.startsWith(prefix))) {
+			return false;
+		}
 	}
-	const prefix = metadata.scopePrefix.endsWith('/') ? metadata.scopePrefix : `${metadata.scopePrefix}/`;
-	return targetPaths.some(path => path === metadata.scopePrefix || path.startsWith(prefix));
+	if (metadata.pathGlobs.length) {
+		return targetPaths.some(path => matchesAnyGlob(metadata.pathGlobs, path));
+	}
+	return true;
+}
+
+/** Container directory for nested rule roots (e.g. packages/web/.cursor/rules → packages/web). */
+function ruleContainerScope(ruleDir: string, configuredDir: string): string {
+	if (ruleDir === configuredDir) {
+		return '';
+	}
+	const suffix = `/${configuredDir}`;
+	if (ruleDir.endsWith(suffix)) {
+		return normalizeRel(ruleDir.slice(0, -suffix.length));
+	}
+	return '';
+}
+
+function targetMatchesRuleScope(
+	targetPath: string,
+	globs: readonly string[],
+	containerScope: string,
+	mode: GuidanceActivationMode,
+): boolean {
+	if (globs.length) {
+		return matchesAnyGlob(globs, targetPath);
+	}
+	if (containerScope) {
+		const prefix = containerScope.endsWith('/') ? containerScope : `${containerScope}/`;
+		return targetPath === containerScope || targetPath.startsWith(prefix);
+	}
+	return mode === 'always';
 }
 
 function resolveSkillByIdOrName(
@@ -738,12 +777,16 @@ export class ProjectGuidanceService {
 					const { meta, body } = parseFrontmatter(text);
 					const globs = globsFromMeta(meta, text);
 					const mode = ruleActivationMode(ruleDir.ecosystem, meta, globs);
+					const containerScope = ruleDir.nested ? ruleContainerScope(dir, ruleDir.dir) : '';
 					const alwaysApply = mode === 'always';
 					const description = metaString(meta, 'description');
+					const scopeLabel = globs.length
+						? globs.join(', ')
+						: (containerScope ? `nested:${containerScope}` : (alwaysApply ? 'repository' : mode));
 					const source: GuidanceSource = {
 						path: rel,
 						ecosystem: ruleDir.ecosystem,
-						scope: globs.length ? globs.join(', ') : (alwaysApply ? 'repository' : mode),
+						scope: scopeLabel,
 						alwaysApply,
 						activationMode: mode,
 						description,
@@ -756,7 +799,8 @@ export class ProjectGuidanceService {
 							continue;
 						}
 					}
-					if (mode === 'path' && !normalizedTargets.some(path => matchesAnyGlob(globs, path))) {
+					if ((mode === 'path' || mode === 'always') && normalizedTargets.length
+						&& !normalizedTargets.some(path => targetMatchesRuleScope(path, globs, containerScope, mode))) {
 						continue;
 					}
 					sources.push({ source, text: body.trim() });
@@ -846,14 +890,23 @@ export class ProjectGuidanceService {
 		const deduped = dedupeByHash([...sources, ...activatedPlaybookBlocks]);
 		diagnostics.push(...deduped.diagnostics);
 
+		const isNestedScoped = (source: GuidanceSource): boolean => source.scope.startsWith('nested:');
+		const nestedScopePrefix = (source: GuidanceSource): string => source.scope.slice('nested:'.length);
+
 		const alwaysApplicable = deduped.items.filter(item =>
-			item.source.activationMode === 'always'
-			|| item.source.alwaysApply
-			|| (!item.source.globs.length && item.source.scope === 'repository' && item.source.activationMode !== 'manual'));
-		const pathApplicable = deduped.items.filter(item =>
-			item.source.activationMode === 'path'
-			&& item.source.globs.length
-			&& normalizedTargets.some(path => matchesAnyGlob(item.source.globs, path)));
+			(item.source.activationMode === 'always' || item.source.alwaysApply)
+			&& !isNestedScoped(item.source)
+			&& item.source.activationMode !== 'manual');
+		const pathApplicable = deduped.items.filter(item => {
+			if (item.source.activationMode === 'path' && item.source.globs.length) {
+				return normalizedTargets.some(path => matchesAnyGlob(item.source.globs, path));
+			}
+			if (isNestedScoped(item.source)) {
+				const prefix = nestedScopePrefix(item.source);
+				return normalizedTargets.some(path => targetMatchesRuleScope(path, [], prefix, 'always'));
+			}
+			return false;
+		});
 		const activatedRules = deduped.items.filter(item =>
 			(item.source.activationMode === 'intelligent' || item.source.activationMode === 'manual')
 			&& normalizedActivatedRules.includes(item.source.path));
@@ -872,7 +925,9 @@ export class ProjectGuidanceService {
 			if (metadata && !skillIdsSeen.has(metadata.id)) {
 				skillIdsSeen.add(metadata.id);
 				skillContentSeen.add(contentKey);
-				skillCatalog.push(metadata);
+				if (!normalizedTargets.length || skillMatchesTarget(metadata, normalizedTargets)) {
+					skillCatalog.push(metadata);
+				}
 			}
 		}
 

@@ -41,6 +41,7 @@ import {
 	serializeTemporalEdgeLodStyleSource,
 	serializeTemporalAggregateEdgeRouteSource,
 	serializeTemporalVisibleLabelsSource,
+	serializeTemporalLabelLayoutSource,
 } from './temporalRuntimeContracts.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
@@ -1002,6 +1003,7 @@ const computeCommunityAggregateEdges = ${serializeTemporalCommunityAggregateEdge
 const computeEdgeLodStyle = ${serializeTemporalEdgeLodStyleSource()};
 const computeAggregateEdgeRoute = ${serializeTemporalAggregateEdgeRouteSource()};
 const computeVisibleLabels = ${serializeTemporalVisibleLabelsSource()};
+${serializeTemporalLabelLayoutSource()};
 
 // 2. Fast request dispatcher & pending map
 const pending = new Map();
@@ -2378,17 +2380,6 @@ function drawTemporalFrame(ts) {
 			ctx.lineWidth = 1;
 			if (typeof ctx.setLineDash === 'function') ctx.setLineDash([3, 7]);
 			ctx.stroke();
-			if (guide.label && transform.k >= 0.18) {
-				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
-				const guideFont = computeNetworkLabelWorldFontSize(15, transform.k, { minScreenPx: 11, maxScreenPx: 20 });
-				ctx.font = canvasFont('600', guideFont);
-				ctx.fillStyle = theme.isHighContrast
-					? 'rgba(255, 255, 255, 0.78)'
-					: (hexColor || 'var(--vscode-descriptionForeground, #a1a1aa)');
-				ctx.textAlign = 'left';
-				ctx.textBaseline = 'bottom';
-				ctx.fillText(guide.label, gx + 6, gy - 4);
-			}
 			ctx.restore();
 		}
 
@@ -2695,13 +2686,33 @@ function drawTemporalFrame(ts) {
 		ctx.restore();
 	}
 
-	// 5. Labels with Level of Detail & Screen-Space Collision Culling
-	const visibleLabels = computeVisibleLabels(nodesToRender, transform.k, {
+	// 5. Labels with unified community + node occupancy
+	const visibleNodeIdSet = new Set();
+	for (let ni = 0; ni < nodesToRender.length; ni++) {
+		visibleNodeIdSet.add(nodesToRender[ni].entityId);
+	}
+	const labelLayout = computeTemporalLabelLayout(nodesToRender, temporalDiff.guides || [], transform.k, {
 		selectedNodeId: selectedNodeId,
 		hoveredNodeId: hoveredNodeId,
 		filterQuery: filterVal,
 		measureWidth: function (t, f) { return measureTextWidth(t, f); },
+		visibleNodeIds: visibleNodeIdSet,
 	});
+	const visibleLabels = labelLayout.nodeLabels;
+	const guideLabels = labelLayout.guideLabels;
+
+	for (let gi = 0; gi < guideLabels.length; gi++) {
+		const gl = guideLabels[gi];
+		ctx.save();
+		ctx.font = gl.font;
+		ctx.textAlign = 'left';
+		ctx.textBaseline = 'bottom';
+		ctx.fillStyle = theme.isHighContrast
+			? 'rgba(255, 255, 255, 0.72)'
+			: 'rgba(161, 161, 170, 0.82)';
+		ctx.fillText(gl.text, gl.x, gl.y);
+		ctx.restore();
+	}
 
 	for (let i = 0; i < visibleLabels.length; i++) {
 		const lbl = visibleLabels[i];
@@ -2736,6 +2747,8 @@ function drawTemporalFrame(ts) {
 			metrics.nodesDrawn = nodesToRender.length;
 			metrics.edgesDrawn = edgesDrawn;
 			metrics.labelsDrawn = visibleLabels.length;
+			metrics.guideLabelsDrawn = guideLabels.length;
+			metrics.labelOverlapCount = labelLayout.labelOverlapCount;
 			metrics.selectedNodeId = selectedNodeId;
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
 			metrics.canvas = { clientWidth: w, clientHeight: h, width: netCanvas.width, height: netCanvas.height };

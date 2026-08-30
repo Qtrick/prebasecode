@@ -1,6 +1,6 @@
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve as resolvePath } from 'node:path';
-import { existsSync } from 'node:fs';
+import { existsSync, statSync } from 'node:fs';
 
 /**
  * Resolve graph unit-test imports that use .js suffix to on-disk .ts sources,
@@ -46,7 +46,15 @@ export async function resolve(specifier, context, nextResolve) {
 
 		if (resolvedTarget.includes('/graphs/src/host/workbench/')) {
 			const rel = resolvedTarget.slice(resolvedTarget.indexOf('/graphs/src/host/workbench/') + '/graphs/src/host/workbench/'.length);
+			const tsPath = resolvePath(process.cwd(), 'graphs/src/host/workbench', rel.replace(/\.js$/, '.ts'));
 			const outTarget = resolvePath(process.cwd(), 'out/vs/workbench/contrib/prebase/graphs/host/workbench', rel.replace(/\.ts$/, '.js'));
+			if (existsSync(tsPath) && existsSync(outTarget)) {
+				const preferTs = statSync(tsPath).mtimeMs >= statSync(outTarget).mtimeMs;
+				return nextResolve(pathToFileURL(preferTs ? tsPath : outTarget).href, context);
+			}
+			if (existsSync(tsPath)) {
+				return nextResolve(pathToFileURL(tsPath).href, context);
+			}
 			if (existsSync(outTarget)) {
 				return nextResolve(pathToFileURL(outTarget).href, context);
 			}

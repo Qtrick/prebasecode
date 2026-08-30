@@ -9,6 +9,7 @@ import {
 	type NetworkLayoutMode,
 	type Point3D,
 } from '../../layouts/network/index.js';
+import { RADIAL_LAYOUT_VERSION } from '../../layouts/network/radialLayout.js';
 
 suite('PreBase networkLayout', () => {
 	function makeGraph(n: number) {
@@ -87,7 +88,10 @@ suite('PreBase networkLayout', () => {
 			assert.ok(m.vars[0] > 1);
 			assert.ok(m.vars[1] > 1);
 			if (mode === 'radial') {
-				assert.ok(m.vars[2] >= 0, 'radial may use subtle Z only');
+				assert.strictEqual(m.vars[2], 0, 'radial v4 is strictly planar (z=0)');
+				for (const p of a.values()) {
+					assert.strictEqual(p.z, 0);
+				}
 			} else {
 				assert.ok(m.vars[2] > (mode === 'organic' ? 0.5 : 1));
 			}
@@ -189,6 +193,68 @@ suite('PreBase networkLayout', () => {
 		const bRoot = layout.get('b-root')!;
 		assert.ok(Math.min(radius(aRoot), radius(bRoot)) > mainRadius, 'disconnected components must remain outside the entry component');
 		assert.ok(Math.hypot(aRoot.x - bRoot.x, aRoot.y - bRoot.y, aRoot.z - bRoot.z) >= 4, 'disconnected component roots must not overlap');
+	});
+
+	test('radial v4 is permutation-invariant and sector-stable for sibling subtrees', () => {
+		assert.strictEqual(RADIAL_LAYOUT_VERSION, 4);
+		const nodes = [
+			{ id: 'entry', isEntry: true },
+			{ id: 'branch-a' },
+			{ id: 'branch-b' },
+			{ id: 'a-leaf-1' },
+			{ id: 'a-leaf-2' },
+			{ id: 'a-leaf-3' },
+			{ id: 'b-leaf-1' },
+			{ id: 'b-leaf-2' },
+		];
+		const links = [
+			{ source: 'entry', target: 'branch-a' },
+			{ source: 'entry', target: 'branch-b' },
+			{ source: 'branch-a', target: 'a-leaf-1' },
+			{ source: 'branch-a', target: 'a-leaf-2' },
+			{ source: 'branch-a', target: 'a-leaf-3' },
+			{ source: 'branch-b', target: 'b-leaf-1' },
+			{ source: 'branch-b', target: 'b-leaf-2' },
+		];
+		const config = { sphereRadius: 240, collisionRadius: 8, linkDistance: 40, forceStrength: 0 };
+		const baseline = layoutNetworkGraph('radial', nodes, links, config);
+		const permuted = layoutNetworkGraph('radial', [...nodes].reverse(), links, config);
+		for (const id of baseline.keys()) {
+			assert.deepStrictEqual(baseline.get(id), permuted.get(id), `permutation must not move ${id}`);
+		}
+
+		const angleOf = (id: string) => Math.atan2(baseline.get(id)!.y, baseline.get(id)!.x);
+		const angularGap = (a: number, b: number) => {
+			let d = Math.abs(a - b);
+			while (d > Math.PI) {
+				d = Math.PI * 2 - d;
+			}
+			return d;
+		};
+		const branchA = angleOf('branch-a');
+		const aLeaves = ['a-leaf-1', 'a-leaf-2', 'a-leaf-3'].map(angleOf);
+		const bLeaves = ['b-leaf-1', 'b-leaf-2'].map(angleOf);
+		const intraA = Math.max(...aLeaves.map(a => angularGap(a, branchA)));
+		const intraB = Math.max(...bLeaves.map(b => angularGap(b, angleOf('branch-b'))));
+		const cross = angularGap(aLeaves[0], bLeaves[0]);
+		assert.ok(intraA < cross, 'branch-a subtree stays in a contiguous angular sector');
+		assert.ok(intraB < cross, 'branch-b subtree stays in a contiguous angular sector');
+	});
+
+	test('radial v4 keeps all nodes planar with no z-depth explosion under collision relaxation', () => {
+		const graph = makeGraph(96);
+		const layout = layoutNetworkGraph('radial', graph.nodes, graph.links, {
+			sphereRadius: 240,
+			collisionRadius: 24,
+			linkDistance: 80,
+			forceStrength: 0.35,
+		});
+		let maxAbsZ = 0;
+		for (const p of layout.values()) {
+			assert.strictEqual(p.z, 0);
+			maxAbsZ = Math.max(maxAbsZ, Math.abs(p.z));
+		}
+		assert.strictEqual(maxAbsZ, 0, 'collision relaxation must not introduce z depth');
 	});
 
 	test('network runtime collision, link-distance, and force controls materially change geometry without dropping nodes', () => {

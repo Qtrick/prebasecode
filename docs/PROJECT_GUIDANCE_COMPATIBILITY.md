@@ -4,6 +4,8 @@ PreBase Magnus discovers trusted, workspace-bound project guidance from common A
 
 Setting: `prebase.magnus.projectGuidance.enabled` (default `true`).
 
+**Mutation preflight:** mutating workspace tools (`prebase_edit_*`) register target paths and defer execution when unseen path-specific guidance would apply; the model receives a guidance delta and must reissue the edit. Read tools register targets without deferring.
+
 Hard limits: workspace trust, path traversal blocking, secret scrubbing, `MAX_PROMPT_GUIDANCE_CHARS=16000`.
 
 ## Support matrix
@@ -39,7 +41,7 @@ Hard limits: workspace trust, path traversal blocking, secret scrubbing, `MAX_PR
 | Codex agents | `.codex/agents/*.md` | Codex | Agent profile catalog only | Catalog only | Bodies not injected | Catalog |
 | Agents skills | `.agents/skills/**/SKILL.md` | Agents | Skill catalog | Explicit activate | Content-hash dedupe | Full |
 | Cognition / Codeium skills | `.cognition/skills/**`, `.codeium/skills/**` | Cognition / Codeium | Skill catalog | Explicit activate | Content-hash dedupe | Full |
-| Skill metadata | Skill `SKILL.md` frontmatter | Multi | Optional `argumentHint`, invocable flags, `allowedToolsHint`, triggers, license, compatibility, nested `metadata` map | Catalog filters `modelInvocable=false` from model prompt list | `allowed-tools` advisory only | Full |
+| Skill metadata | Skill `SKILL.md` frontmatter | Multi | Optional `paths` (Cursor) or legacy `globs`, `argumentHint`, invocable flags, `allowedToolsHint`, triggers, license, compatibility, nested `metadata` map | Catalog filters `modelInvocable=false` from model prompt list; path + nested scope must both match | `allowed-tools` advisory only | Full |
 | Private / user-global memory | `~/.…`, auto-memory | Multi | **Not imported** | — | Intentionally unsupported | Unsupported |
 
 ## Activation tool

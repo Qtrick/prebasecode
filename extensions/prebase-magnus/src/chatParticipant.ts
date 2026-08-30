@@ -39,6 +39,7 @@ import {
 	type ToolCallItem,
 	type ToolExecutionTracker,
 } from './toolExecutor';
+import type { MutationPreflightContext } from './projectGuidanceJit';
 
 import { paceTextStream, createLivePacedSink, type LivePacedSink } from './streamPace';
 
@@ -313,6 +314,17 @@ async function handleChatRequest(
 						? resolveWorkspaceRootForPath(activeEditor.document.uri.fsPath, folders)
 						: folders[0]?.uri.fsPath;
 
+					const mutationPreflight: MutationPreflightContext | undefined =
+						guidanceEnabled && projectGuidanceService && previousGuidanceSnapshot
+							? {
+								service: projectGuidanceService,
+								session: guidanceSession,
+								getPreviousSnapshot: () => previousGuidanceSnapshot,
+								updateSnapshot: snapshot => { previousGuidanceSnapshot = snapshot; },
+								enabled: true,
+							}
+							: undefined;
+
 					const responseParts = await executeToolCallBatch(
 						calls,
 						assembled.tools,
@@ -323,6 +335,7 @@ async function handleChatRequest(
 						true,
 						folders,
 						guidancePreferredRoot,
+						mutationPreflight,
 					);
 
 					const guidanceStateChanged =

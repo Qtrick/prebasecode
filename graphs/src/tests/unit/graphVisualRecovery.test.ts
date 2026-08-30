@@ -129,7 +129,7 @@ suite('Graph visual recovery contracts', () => {
 		const near = Math.hypot(radial.get('m1')!.x, radial.get('m1')!.y);
 		const far = Math.hypot(radial.get('m50')!.x, radial.get('m50')!.y);
 		assert.ok(near < far, 'BFS depth one must precede deeper nodes');
-		assert.ok(RADIAL_LAYOUT_VERSION >= 2 && GRAPH_LAYOUT_VERSION >= 2);
+		assert.ok(RADIAL_LAYOUT_VERSION >= 4 && GRAPH_LAYOUT_VERSION >= 2);
 	});
 
 	test('radial has no global scale explosion: collision grows locally, isolates leave main intact', () => {

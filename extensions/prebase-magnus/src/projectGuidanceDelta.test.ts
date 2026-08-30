@@ -75,6 +75,7 @@ describe('projectGuidanceDelta', () => {
 				path: '.agents/skills/review/SKILL.md',
 				ecosystem: 'agents',
 				scopePrefix: '',
+				pathGlobs: [],
 			}],
 		};
 		const delta = computeGuidanceDelta(previous, current, session);

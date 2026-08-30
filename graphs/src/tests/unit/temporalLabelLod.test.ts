@@ -5,7 +5,13 @@
 
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
-import { computeVisibleLabels } from '../../temporal/view/temporalLabelLod.js';
+import {
+	computeVisibleLabels,
+	computeVisibleCommunityGuideLabels,
+	computeTemporalLabelLayout,
+	shortenCommunityLabel,
+	type LabelBox,
+} from '../../temporal/view/temporalLabelLod.js';
 import type { TemporalRenderNode } from '../../temporal/view/temporalViewTypes.js';
 
 suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () => {
@@ -65,6 +71,62 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		// Only one label can occupy that screen box without collision
 		assert.equal(labels.length, 1);
 		assert.equal(labels[0].entityId, 'n1');
+	});
+
+	test('5. shortenCommunityLabel keeps hierarchical leaf when it fits the budget', () => {
+		assert.equal(shortenCommunityLabel('Platform · Services · AuthModule', 28), 'AuthModule');
+		assert.equal(shortenCommunityLabel('Core / UI / Dashboard', 20), 'Dashboard');
+	});
+
+	test('6. shortenCommunityLabel ellipsizes flat long names deterministically', () => {
+		const long = 'VeryLongCommunityNameWithoutSeparators';
+		const out = shortenCommunityLabel(long, 20);
+		assert.ok(out.length <= 20);
+		assert.ok(out.includes('…'));
+		assert.equal(out, shortenCommunityLabel(long, 20));
+	});
+
+	test('7. community guide labels respect zoom-tier budgets and suppress below overview threshold', () => {
+		const guides = Array.from({ length: 30 }, (_, i) => ({
+			id: `g${i}`,
+			label: `Community ${i}`,
+			bounds: { minX: i * 220, minY: 0, maxX: i * 220 + 120, maxY: 120 },
+			nodeCount: 30 - i,
+		}));
+		assert.equal(computeVisibleCommunityGuideLabels(guides, 0.1, []).length, 0);
+		assert.ok(computeVisibleCommunityGuideLabels(guides, 0.25, []).length <= 6);
+		assert.ok(computeVisibleCommunityGuideLabels(guides, 0.5, []).length <= 12);
+		assert.ok(computeVisibleCommunityGuideLabels(guides, 1.0, []).length <= 24);
+	});
+
+	test('8. community guide labels skip lower-priority guides on box collision', () => {
+		const sharedBounds = { minX: 100, minY: 100, maxX: 300, maxY: 300 };
+		const guides = [
+			{ id: 'high', label: 'High Priority', bounds: sharedBounds, nodeCount: 50 },
+			{ id: 'low', label: 'Low Priority', bounds: sharedBounds, nodeCount: 2 },
+		];
+		const placed: LabelBox[] = [];
+		const labels = computeVisibleCommunityGuideLabels(guides, 1.0, placed);
+		assert.equal(labels.length, 1);
+		assert.equal(labels[0].guideId, 'high');
+		assert.ok(placed.length >= 1, 'winning guide must seed shared occupancy');
+	});
+
+	test('9. unified layout reserves guide occupancy before placing node labels', () => {
+		const guide = {
+			id: 'comm1',
+			label: 'Services Layer',
+			bounds: { minX: 90, minY: 90, maxX: 220, maxY: 220 },
+			nodeCount: 5,
+		};
+		// Place node so its label box sits under the guide's top-left occupancy slot.
+		const node = makeNode('n1', 'src/file.ts', 'modified', 100, 70);
+		const layout = computeTemporalLabelLayout([node], [guide], 0.8);
+		assert.ok(layout.guideLabels.some(g => g.guideId === 'comm1'));
+		assert.equal(layout.nodeLabels.length, 0, 'node label must yield to guide occupancy');
+
+		const withSelected = computeTemporalLabelLayout([node], [guide], 0.8, { selectedNodeId: 'n1' });
+		assert.ok(withSelected.nodeLabels.some(l => l.entityId === 'n1'), 'selected nodes bypass occupancy culling');
 	});
 
 	test('4. Hoists the workbench font family once per pass into every visible label', () => {

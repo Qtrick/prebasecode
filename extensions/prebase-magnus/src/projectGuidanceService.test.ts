@@ -630,4 +630,68 @@ triggers:
 		const activated = await service.getSnapshot(root, ['src/main.ts'], [], true, ['.github/instructions/general.instructions.md']);
 		assert.ok(activated.activatedRules.some(item => item.source.path.endsWith('general.instructions.md')));
 	});
+
+	test('skill metadata exposes pathGlobs and gates activation by target paths', async () => {
+		const root = tempGuidanceRoot('guidance-skill-paths');
+		try {
+			mkdirSync(join(root, '.agents/skills/graph-edit'), { recursive: true });
+			writeFileSync(join(root, '.agents/skills/graph-edit/SKILL.md'), `---
+name: graph-edit
+description: Edit graph files only
+paths:
+  - graphs/**
+---
+# Graph edit
+Scoped skill body for graphs only.
+`);
+			const service = new ProjectGuidanceService(makeReader(root));
+			const catalog = await service.getSnapshot(root);
+			const skill = catalog.skillCatalog.find(item => item.name === 'graph-edit');
+			assert.ok(skill);
+			assert.deepEqual(skill!.pathGlobs, ['graphs/**']);
+
+			const graphsActivated = await service.getSnapshot(root, ['graphs/src/foo.ts'], ['graph-edit']);
+			assert.equal(graphsActivated.activatedSkills.length, 1);
+			assert.match(graphsActivated.activatedSkills[0].body, /Scoped skill body/);
+
+			const otherTarget = await service.getSnapshot(root, ['src/main.ts'], ['graph-edit']);
+			assert.equal(otherTarget.activatedSkills.length, 0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test('skill metadata accepts legacy globs frontmatter as pathGlobs', async () => {
+		const root = tempGuidanceRoot('guidance-skill-legacy-globs');
+		try {
+			mkdirSync(join(root, '.agents/skills/src-only'), { recursive: true });
+			writeFileSync(join(root, '.agents/skills/src-only/SKILL.md'), `---
+name: src-only
+description: Source tree skill
+globs:
+  - src/**
+---
+# Src only
+`);
+			const service = new ProjectGuidanceService(makeReader(root));
+			const skill = (await service.getSnapshot(root)).skillCatalog.find(item => item.name === 'src-only');
+			assert.ok(skill);
+			assert.deepEqual(skill!.pathGlobs, ['src/**']);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test('nested alwaysApply Cursor rules stay scoped to their package container', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-monorepo');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const pkgTarget = await service.getSnapshot(root, ['packages/web/app.ts']);
+		assert.ok(pkgTarget.alwaysApplicable.some(item => item.source.path.endsWith('.cursor/rules/always.mdc')));
+		assert.ok(pkgTarget.pathApplicable.some(item => item.source.path.endsWith('packages/web/.cursor/rules/pkg-always.mdc')));
+		assert.ok(pkgTarget.pathApplicable.some(item => /Package web only always cursor rule/.test(item.text)));
+
+		const graphsTarget = await service.getSnapshot(root, ['graphs/src/foo.ts']);
+		assert.ok(graphsTarget.alwaysApplicable.some(item => item.source.path.endsWith('.cursor/rules/always.mdc')));
+		assert.equal(graphsTarget.pathApplicable.some(item => /Package web only always cursor rule/.test(item.text)), false);
+	});
 });

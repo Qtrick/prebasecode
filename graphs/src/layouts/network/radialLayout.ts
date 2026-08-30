@@ -6,13 +6,15 @@ import type { NetworkLayoutLink, NetworkLayoutNode, NetworkLayoutRuntimeConfig, 
 import { relaxLinksTowardDistance, resolveCollisions3D } from './networkNormalization.js';
 
 /** Bumped with Radial geometry semantics; callers may invalidate caches alongside GRAPH_LAYOUT_VERSION. */
-export const RADIAL_LAYOUT_VERSION = 3;
+export const RADIAL_LAYOUT_VERSION = 4;
 const GOLDEN_ANGLE = Math.PI * (3 - Math.sqrt(5));
+const TWO_PI = Math.PI * 2;
 
 interface RadialComponent {
 	root: NetworkLayoutNode;
 	nodesByDepth: Map<number, NetworkLayoutNode[]>;
 	parentOf: Map<string, string>;
+	childrenOf: Map<string, string[]>;
 	members: NetworkLayoutNode[];
 	size: number;
 }
@@ -29,46 +31,77 @@ function compareImportance(a: NetworkLayoutNode, b: NetworkLayoutNode, degree: R
 	return degreeDifference || a.id.localeCompare(b.id);
 }
 
-/** Place a BFS layer across one or more concentric rings so dense layers stay compact. */
-function placeLayerOnConcentricRings(
-	layer: NetworkLayoutNode[],
+function subtreeDemand(
+	nodeId: string,
+	childrenOf: ReadonlyMap<string, string[]>,
+	memo: Map<string, number>,
+): number {
+	const cached = memo.get(nodeId);
+	if (cached !== undefined) {
+		return cached;
+	}
+	const kids = childrenOf.get(nodeId) ?? [];
+	let demand = 1;
+	for (const childId of kids) {
+		demand += subtreeDemand(childId, childrenOf, memo);
+	}
+	memo.set(nodeId, demand);
+	return demand;
+}
+
+/** Sector-aware radial tree placement: each parent reserves contiguous angular sectors for child subtrees. */
+function layoutRadialTreeSectors(
+	rootId: string,
 	depth: number,
+	angleStart: number,
+	angleEnd: number,
 	minimumDistance: number,
 	layerSpacing: number,
+	childrenOf: ReadonlyMap<string, string[]>,
+	demandMemo: Map<string, number>,
 	angleOf: Map<string, number>,
-	parentOf: ReadonlyMap<string, string>,
 	target: Map<string, Point3D>,
-): number {
-	if (layer.length === 0) {
-		return 0;
+): void {
+	const angle = (angleStart + angleEnd) / 2;
+	if (depth > 0) {
+		const radius = layerSpacing * (depth + 0.35 * Math.sqrt(Math.max(0, depth - 1)));
+		target.set(rootId, {
+			x: Math.cos(angle) * radius,
+			y: Math.sin(angle) * radius,
+			z: 0,
+		});
+		angleOf.set(rootId, angle);
+	} else {
+		target.set(rootId, { x: 0, y: 0, z: 0 });
+		angleOf.set(rootId, 0);
 	}
-	const depthRadius = layerSpacing * (depth + 0.35 * Math.sqrt(Math.max(0, depth - 1)));
-	let ringR = Math.max(depthRadius, minimumDistance * 0.9);
-	let index = 0;
-	let maxR = 0;
-	while (index < layer.length) {
-		const capacity = Math.max(8, Math.floor((2 * Math.PI * ringR) / (minimumDistance * 0.88)));
-		const batch = layer.slice(index, index + capacity);
-		for (let i = 0; i < batch.length; i++) {
-			const node = batch[i];
-			const parentId = parentOf.get(node.id);
-			const parentAngle = parentId !== undefined ? (angleOf.get(parentId) ?? 0) : 0;
-			const even = ((index + i) / Math.max(1, layer.length)) * Math.PI * 2 + depth * 0.11;
-			const local = (i / Math.max(1, batch.length)) * Math.PI * 2;
-			const angle = batch.length === 1 ? parentAngle : local * 0.7 + even * 0.15 + parentAngle * 0.15;
-			angleOf.set(node.id, angle);
-			const z = Math.sin(angle * 1.7 + depth) * Math.min(layerSpacing * 0.18, 14);
-			target.set(node.id, {
-				x: Math.cos(angle) * ringR,
-				y: Math.sin(angle) * ringR,
-				z,
-			});
-			maxR = Math.max(maxR, ringR);
-		}
-		index += batch.length;
-		ringR += minimumDistance * 0.88;
+
+	const children = [...(childrenOf.get(rootId) ?? [])].sort();
+	if (!children.length) {
+		return;
 	}
-	return maxR;
+	const demands = children.map(childId => Math.max(1, subtreeDemand(childId, childrenOf, demandMemo)));
+	const totalDemand = demands.reduce((sum, value) => sum + value, 0) || 1;
+	const span = angleEnd - angleStart;
+	const minSector = (minimumDistance * 0.55) / Math.max(layerSpacing * (depth + 1), 1);
+	let cursor = angleStart;
+	for (let i = 0; i < children.length; i++) {
+		const childSpan = Math.max(minSector, span * (demands[i] / totalDemand));
+		const childEnd = i === children.length - 1 ? angleEnd : Math.min(angleEnd, cursor + childSpan);
+		layoutRadialTreeSectors(
+			children[i],
+			depth + 1,
+			cursor,
+			childEnd,
+			minimumDistance,
+			layerSpacing,
+			childrenOf,
+			demandMemo,
+			angleOf,
+			target,
+		);
+		cursor = childEnd;
+	}
 }
 
 function layoutComponentLocally(
@@ -78,23 +111,20 @@ function layoutComponentLocally(
 ): { locals: Map<string, Point3D>; radius: number } {
 	const locals = new Map<string, Point3D>();
 	const angleOf = new Map<string, number>();
+	const demandMemo = new Map<string, number>();
+	layoutRadialTreeSectors(
+		component.root.id,
+		0,
+		0,
+		TWO_PI,
+		minimumDistance,
+		layerSpacing * 0.85,
+		component.childrenOf,
+		demandMemo,
+		angleOf,
+		locals,
+	);
 	let localExtent = 0;
-	for (const [depth, layer] of [...component.nodesByDepth.entries()].sort((a, b) => a[0] - b[0])) {
-		if (depth === 0) {
-			locals.set(component.root.id, { x: 0, y: 0, z: 0 });
-			angleOf.set(component.root.id, 0);
-			continue;
-		}
-		localExtent = Math.max(localExtent, placeLayerOnConcentricRings(
-			layer,
-			depth,
-			minimumDistance,
-			layerSpacing * 0.85,
-			angleOf,
-			component.parentOf,
-			locals,
-		));
-	}
 	if (component.size > 1) {
 		resolveCollisions3D(locals, minimumDistance * 0.95, 4, new Set([component.root.id]));
 		for (const p of locals.values()) {
@@ -106,7 +136,7 @@ function layoutComponentLocally(
 }
 
 /**
- * Structure-first Radial layout: concentric BFS rings for the main component,
+ * Structure-first Radial layout: sector-reserved spanning forest for the main component,
  * individually laid-out disconnected components packed in a bounded outer band.
  *
  * Collision resolution is LOCAL (per component). There is no global scale pass.
@@ -169,6 +199,8 @@ export function layoutRadial(
 		const depths = new Map<string, number>([[root.id, 0]]);
 		const bfs = [root.id];
 		const parentOf = new Map<string, string>();
+		const childrenOf = new Map<string, string[]>();
+		childrenOf.set(root.id, []);
 		for (let cursor = 0; cursor < bfs.length; cursor++) {
 			const id = bfs[cursor];
 			const depth = depths.get(id)!;
@@ -176,6 +208,10 @@ export function layoutRadial(
 				if (!depths.has(neighbour)) {
 					depths.set(neighbour, depth + 1);
 					parentOf.set(neighbour, id);
+					const kids = childrenOf.get(id) ?? [];
+					kids.push(neighbour);
+					childrenOf.set(id, kids);
+					childrenOf.set(neighbour, []);
 					bfs.push(neighbour);
 				}
 			}
@@ -198,7 +234,7 @@ export function layoutRadial(
 				return pa.localeCompare(pb) || a.id.localeCompare(b.id);
 			});
 		}
-		components.push({ root, nodesByDepth, parentOf, members, size: members.length });
+		components.push({ root, nodesByDepth, parentOf, childrenOf, members, size: members.length });
 	}
 
 	components.sort((a, b) => (a.root.id === globalRoot.id ? -1 : b.root.id === globalRoot.id ? 1 : b.size - a.size || a.root.id.localeCompare(b.root.id)));
@@ -207,33 +243,28 @@ export function layoutRadial(
 	const layerSpacing = Math.max(config.linkDistance, minimumDistance * 1.15);
 
 	const angleOf = new Map<string, number>();
-	let mainExtent = 0;
+	const demandMemo = new Map<string, number>();
 	const mainLocals = new Map<string, Point3D>();
+	layoutRadialTreeSectors(
+		globalRoot.id,
+		0,
+		0,
+		TWO_PI,
+		minimumDistance,
+		layerSpacing,
+		mainComponent.childrenOf,
+		demandMemo,
+		angleOf,
+		mainLocals,
+	);
 
-	for (const [depth, layer] of [...mainComponent.nodesByDepth.entries()].sort((a, b) => a[0] - b[0])) {
-		if (depth === 0) {
-			mainLocals.set(globalRoot.id, { x: 0, y: 0, z: 0 });
-			angleOf.set(globalRoot.id, 0);
-			continue;
-		}
-		const layerMax = placeLayerOnConcentricRings(
-			layer,
-			depth,
-			minimumDistance,
-			layerSpacing,
-			angleOf,
-			mainComponent.parentOf,
-			mainLocals,
-		);
-		mainExtent = Math.max(mainExtent, layerMax);
-	}
-
+	let mainExtent = 0;
 	const pinnedIds = new Set([globalRoot.id]);
 	const mainIds = new Set(mainComponent.members.map(m => m.id));
-	// Collision + mild link polish BEFORE packing disconnected comps so main never expands into them.
 	resolveCollisions3D(mainLocals, minimumDistance * 0.95, 4, pinnedIds);
 	for (const [id, p] of mainLocals) {
 		positions.set(id, { ...p });
+		mainExtent = Math.max(mainExtent, Math.hypot(p.x, p.y));
 	}
 	const mainLinks = links.filter(l => mainIds.has(l.source) && mainIds.has(l.target));
 	relaxLinksTowardDistance(positions, mainLinks, config.linkDistance, 2, config.forceStrength * 0.012, pinnedIds);
@@ -263,7 +294,6 @@ export function layoutRadial(
 	}
 	isolates.sort((a, b) => a.id.localeCompare(b.id));
 
-	// Multi-node disconnected components: compact arc packing just outside the main rings.
 	const gap = Math.max(minimumDistance * 0.55, 10);
 	let multiRing = mainExtent + gap + (multiPacked[0]?.radius ?? 0);
 	let multiAngle = 0;
@@ -271,9 +301,9 @@ export function layoutRadial(
 		const { locals, radius } = multiPacked[i];
 		const stepAngle = Math.max(
 			(radius * 2 + gap) / Math.max(multiRing, 1),
-			(2 * Math.PI) / Math.max(10, multiPacked.length * 1.2),
+			TWO_PI / Math.max(10, multiPacked.length * 1.2),
 		);
-		if (multiAngle + stepAngle > Math.PI * 2 && i > 0) {
+		if (multiAngle + stepAngle > TWO_PI && i > 0) {
 			multiRing += gap + radius * 0.85;
 			multiAngle = 0;
 		}
@@ -281,14 +311,11 @@ export function layoutRadial(
 		multiAngle += stepAngle;
 		const cx = Math.cos(angle) * multiRing;
 		const cy = Math.sin(angle) * multiRing;
-		const cz = Math.sin(angle * 1.9) * Math.min(8, gap * 0.2);
 		for (const [id, local] of locals) {
-			positions.set(id, { x: cx + local.x, y: cy + local.y, z: cz + local.z });
+			positions.set(id, { x: cx + local.x, y: cy + local.y, z: 0 });
 		}
 	}
 
-	// Isolates: compact sunflower lobes beside the main component — NOT distant full outer shells.
-	// Two side lobes keep Fit bounds dominated by the readable radial core.
 	const isoSep = minimumDistance * 0.92;
 	const lobeCount = Math.max(1, Math.min(3, Math.ceil(isolates.length / 56)));
 	const perLobe = Math.ceil(isolates.length / lobeCount);
@@ -311,7 +338,7 @@ export function layoutRadial(
 			positions.set(slice[i].id, {
 				x: cx + Math.cos(angle) * r,
 				y: cy + Math.sin(angle) * r,
-				z: Math.sin(angle * 1.7 + lobe) * Math.min(6, isoSep * 0.12),
+				z: 0,
 			});
 		}
 	}

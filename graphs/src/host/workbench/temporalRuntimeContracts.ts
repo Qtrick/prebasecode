@@ -25,6 +25,10 @@ import {
 } from '../../temporal/view/temporalEdgeLod.js';
 import {
 	computeVisibleLabels,
+	computeTemporalLabelLayout,
+	computeVisibleCommunityGuideLabels,
+	shortenCommunityLabel,
+	boxesOverlap,
 } from '../../temporal/view/temporalLabelLod.js';
 
 /**
@@ -84,6 +88,15 @@ export function serializeTemporalVisibleLabelsSource(): string {
 	return serializeSelfContainedFunction(computeVisibleLabels as (...args: unknown[]) => unknown);
 }
 
+export function serializeTemporalLabelLayoutSource(): string {
+	return [
+		serializeSelfContainedFunction(boxesOverlap as (...args: unknown[]) => unknown),
+		serializeSelfContainedFunction(shortenCommunityLabel as (...args: unknown[]) => unknown),
+		serializeSelfContainedFunction(computeVisibleCommunityGuideLabels as (...args: unknown[]) => unknown),
+		serializeSelfContainedFunction(computeTemporalLabelLayout as (...args: unknown[]) => unknown),
+	].join('\n\n');
+}
+
 /**
  * Helper for test harnesses to interpolate all injected functions into extracted webview scripts.
  */
@@ -104,6 +117,7 @@ export function interpolateWebviewScript(script: string, generation = '42', init
 		.replace('${serializeTemporalCommunityAggregateEdgesSource()}', serializeTemporalCommunityAggregateEdgesSource())
 		.replace('${serializeTemporalEdgeLodStyleSource()}', serializeTemporalEdgeLodStyleSource())
 		.replace('${serializeTemporalAggregateEdgeRouteSource()}', serializeTemporalAggregateEdgeRouteSource())
-		.replace('${serializeTemporalVisibleLabelsSource()}', serializeTemporalVisibleLabelsSource());
+		.replace('${serializeTemporalVisibleLabelsSource()}', serializeTemporalVisibleLabelsSource())
+		.replace('${serializeTemporalLabelLayoutSource()}', serializeTemporalLabelLayoutSource());
 }
 
