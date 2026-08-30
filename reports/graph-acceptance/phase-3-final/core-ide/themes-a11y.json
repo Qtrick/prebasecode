@@ -1,9 +1,12 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "scenario": "themes-a11y",
-  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
-  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
-  "generatedAt": "2026-08-30T00:42:37.653Z",
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "sourceFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
+  "productFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
+  "generatedAt": "2026-08-30T01:47:29.983Z",
+  "producerId": "core-ide",
+  "producerFingerprint": "51265e51e899d505e6971a28168d9e2465563f3064b5559a8771631be708ae01",
   "ok": true,
   "failures": [],
   "themes": {
@@ -40,8 +43,8 @@
     "dark": {
       "query": "PreBase Dark",
       "settingsId": "PreBase Dark",
-      "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe vs-dark vscode-theme-defaults-themes-prebase_dark-json",
+      "applied": false,
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe hc-light vscode-theme-defaults-themes-hc_light-json border",
       "colorTheme": "PreBase Dark",
       "colorThemeType": "dark",
       "pickerVisible": true,
@@ -78,10 +81,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "33234     1  17.2 250480 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "54781     1  13.5 226528 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 624,
+    "latencyMs": 673,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

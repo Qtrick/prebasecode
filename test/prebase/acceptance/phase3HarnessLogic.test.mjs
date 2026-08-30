@@ -12,7 +12,7 @@ import { findGraphFrame, formatPhase3LockBlockMessage, waitForWorkbenchDriver, w
 import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
 import { PHASE3_EVIDENCE_SCHEMA_VERSION, phase3EvidenceMetadata } from './phase3Evidence.mjs';
-import { assuranceCommandLabel, assuranceEvidenceOk, PHASE3_ASSURANCE_COMMANDS, reportedTestCount } from './prebase-phase3-assurance.mjs';
+import { assuranceCommandLabel, assuranceEvidenceOk, PHASE3_ASSURANCE_COMMANDS, PHASE3_ASSURANCE_LEAF_COVERAGE, reportedTestCount } from './prebase-phase3-assurance.mjs';
 import { lifecycleFailures } from './prebase-process-leak-diag.mjs';
 
 const acceptanceDir = dirname(fileURLToPath(import.meta.url));
@@ -1043,7 +1043,7 @@ test('final evidence rejects a missing or mismatched scenario label even when it
 test('shared Phase 3 metadata is bounded, current, and rejects an unlabelled scenario', () => {
 	assert.throws(() => phase3EvidenceMetadata(repoRoot, ''), /scenario is required/);
 	const metadata = phase3EvidenceMetadata(repoRoot, 'contract-test');
-	assert.deepEqual(Object.keys(metadata).sort(), ['generatedAt', 'scenario', 'schemaVersion', 'sourceFingerprint', 'sourceHead']);
+	assert.deepEqual(Object.keys(metadata).sort(), ['generatedAt', 'productFingerprint', 'scenario', 'schemaVersion', 'sourceFingerprint', 'sourceHead']);
 	assert.equal(metadata.schemaVersion, PHASE3_EVIDENCE_SCHEMA_VERSION);
 	assert.equal(metadata.scenario, 'contract-test');
 	assert.match(metadata.sourceHead, /^[0-9a-f]{40}$/);
@@ -1059,15 +1059,18 @@ test('final assurance has an authoritative, complete command matrix and records 
 		['typecheck-client'],
 		['typecheck:graphs'],
 		['test:graphs'],
-		['test:prebase-pure'],
+		['test:prebase-pure:compiled'],
 		['test:prebase-magnus'],
 		['verify:graphs-boundary'],
 		['verify:graphs-runtime-boundary'],
 		['node', 'scripts/startup/verify-magnus-out.mjs'],
 		['verify:privacy'],
 		['verify:config-uniqueness'],
-		['assurance:quick'],
-		['assurance:static'],
+		['verify:startup'],
+		['verify:dialog-routing'],
+		['verify:typescript'],
+		['verify:supabase-migrations'],
+		['verify:supabase-rls-static'],
 	]);
 	assert.equal(reportedTestCount('63 passing'), 63);
 	assert.equal(reportedTestCount('# pass 181'), 181);
@@ -1080,6 +1083,18 @@ test('final assurance has an authoritative, complete command matrix and records 
 	assert.match(source, /testCount: reportedTestCount/);
 	assert.match(source, /commands\.every\(command => command\.passed\)/);
 	assert.doesNotMatch(source, /process\.env\.FIRECRAWL_API_KEY|process\.env\.LINKUP_API_KEY/);
+});
+
+test('assurance leaf coverage replaces nested assurance:quick and assurance:static reruns', () => {
+	assert.equal(PHASE3_ASSURANCE_COMMANDS.some(command => assuranceCommandLabel(command) === 'assurance:quick'), false);
+	assert.equal(PHASE3_ASSURANCE_COMMANDS.some(command => assuranceCommandLabel(command) === 'assurance:static'), false);
+	const covered = new Set(Object.values(PHASE3_ASSURANCE_LEAF_COVERAGE).flat());
+	for (const leaf of covered) {
+		assert.ok(PHASE3_ASSURANCE_COMMANDS.some(command => assuranceCommandLabel(command) === leaf), `leaf ${leaf} missing from PHASE3_ASSURANCE_COMMANDS`);
+	}
+	const source = readFileSync(join(acceptanceDir, 'prebase-phase3-assurance.mjs'), 'utf8');
+	assert.match(source, /PHASE3_ASSURANCE_LEAF_COVERAGE/);
+	assert.doesNotMatch(source, /\['assurance:quick'\]|\['assurance:static'\]|npm run assurance:quick|npm run assurance:static/);
 });
 
 test('final gate accepts only a complete current assurance matrix with passed bounded command records', () => {

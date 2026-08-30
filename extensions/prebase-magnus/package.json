@@ -209,8 +209,8 @@
         "category": "Agents"
       },
       {
-        "command": "prebase.magnus.open.walkthrough",
-        "title": "Open Walkthrough",
+        "command": "prebase.magnus.viewProjectGuidance",
+        "title": "View Project Guidance…",
         "category": "Agents"
       },
       {

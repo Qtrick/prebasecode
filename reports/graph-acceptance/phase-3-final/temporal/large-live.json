@@ -1,15 +1,18 @@
 {
   "ok": true,
   "failures": [],
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "scenario": "temporal-large",
-  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
-  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
-  "generatedAt": "2026-08-30T00:43:35.681Z",
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "sourceFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
+  "productFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
+  "generatedAt": "2026-08-30T01:48:32.471Z",
+  "producerId": "temporal-large",
+  "producerFingerprint": "17f537422ce11f70eba7e0ebb3b0db8137b68e5917a1cf3ff742988c86c402de",
   "scale": "large",
   "fixture": {
-    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-large-xm4Ruf",
-    "head": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-large-fWvRZh",
+    "head": "a302b28c41ab03526cbc41780cc413cf96711a1d",
     "commits": 50,
     "files": [
       "package.json",
@@ -350,20 +353,20 @@
       "src/util/mod-27.js"
     ],
     "expectedModifiedPath": "src/cloud/mod-04.js\nsrc/core/mod-01.js\nsrc/desktop/mod-20.js\nsrc/host/mod-24.js\nsrc/layout/mod-20.js\nsrc/runtime/mod-08.js\nsrc/test/mod-16.js\nsrc/ui/mod-12.js",
-    "firstParentSummary": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3 f55a137c0eac3e20d1a21534b3c01ad763a0e30c feat: cross-community wave\n\n src/cloud/mod-04.js   | 1 +\n src/core/mod-01.js    | 1 +\n src/desktop/mod-20.js | 1 +\n src/host/mod-24.js    | 1 +\n src/layout/mod-20.js  | 1 +\n src/runtime/mod-08.js | 1 +\n src/test/mod-16.js    | 1 +\n src/ui/mod-12.js      | 1 +\n 8 files changed, 8 insertions(+)",
+    "firstParentSummary": "a302b28c41ab03526cbc41780cc413cf96711a1d 43b2c0ba1efede03e81ccd459af7ea82978a3c83 feat: cross-community wave\n\n src/cloud/mod-04.js   | 1 +\n src/core/mod-01.js    | 1 +\n src/desktop/mod-20.js | 1 +\n src/host/mod-24.js    | 1 +\n src/layout/mod-20.js  | 1 +\n src/runtime/mod-08.js | 1 +\n src/test/mod-16.js    | 1 +\n src/ui/mod-12.js      | 1 +\n 8 files changed, 8 insertions(+)",
     "scale": "large"
   },
-  "pid": 51745,
-  "cdpPort": 58496,
+  "pid": 73886,
+  "cdpPort": 62784,
   "fullMap": {
-    "sequenceId": 25,
+    "sequenceId": 26,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 1819.2000000178814,
-    "renderEnd": 1819.5,
-    "durationMs": 0.29999998211860657,
-    "selectedCommitSha": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
-    "renderedCommitSha": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
+    "renderStart": 2346.899999976158,
+    "renderEnd": 2347.2999999821186,
+    "durationMs": 0.4000000059604645,
+    "selectedCommitSha": "a302b28c41ab03526cbc41780cc413cf96711a1d",
+    "renderedCommitSha": "a302b28c41ab03526cbc41780cc413cf96711a1d",
     "isPartialLineage": true,
     "receivedNodeCount": 338,
     "visibleNodeCount": 338,
@@ -397,7 +400,7 @@
     },
     "lodTier": "aggregate",
     "isAnimating": true,
-    "timestamp": 1819.5,
+    "timestamp": 2347.2999999821186,
     "viewportWidth": 552,
     "viewportHeight": 708,
     "labelCount": 8,
@@ -415,11 +418,11 @@
     "sequenceId": 59,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 2269.2000000178814,
-    "renderEnd": 2269.2000000178814,
-    "durationMs": 0,
-    "selectedCommitSha": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
-    "renderedCommitSha": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
+    "renderStart": 2796.7999999821186,
+    "renderEnd": 2797,
+    "durationMs": 0.20000001788139343,
+    "selectedCommitSha": "a302b28c41ab03526cbc41780cc413cf96711a1d",
+    "renderedCommitSha": "a302b28c41ab03526cbc41780cc413cf96711a1d",
     "isPartialLineage": true,
     "receivedNodeCount": 338,
     "visibleNodeCount": 24,
@@ -429,16 +432,16 @@
     "labelsDrawn": 8,
     "selectedNodeId": null,
     "transform": {
-      "x": 136.3640656517855,
-      "y": 281.9575466956487,
-      "k": 0.26167962838861253
+      "x": 141.36676328280632,
+      "y": 284.2693403544936,
+      "k": 0.26116368699569315
     },
     "canvas": {
       "clientWidth": 552,
       "clientHeight": 708,
       "width": 1104,
       "height": 1416,
-      "distinctPixels": 7630
+      "distinctPixels": 7495
     },
     "summary": {
       "addedCount": 0,
@@ -452,47 +455,47 @@
       "edgeModifiedCount": 0
     },
     "lodTier": "aggregate",
-    "isAnimating": false,
-    "timestamp": 2269.2000000178814,
+    "isAnimating": true,
+    "timestamp": 2797,
     "viewportWidth": 552,
     "viewportHeight": 708,
     "labelCount": 8,
     "projectedBounds": {
-      "minX": 136.3640656517855,
-      "minY": 281.9575466956487,
-      "maxX": 565.2569765807214,
-      "maxY": 475.33879207483335,
-      "width": 428.89291092893586,
-      "height": 193.38124537918463
+      "minX": 141.36676328280632,
+      "minY": 284.2693403544936,
+      "maxX": 569.4140462687474,
+      "maxY": 477.26930504431084,
+      "width": 428.047282985941,
+      "height": 192.99996468981726
     },
-    "screenUtilization": 0.21222223565499193
+    "screenUtilization": 0.21138620348670173
   },
   "targetOpened": true,
   "repoLoaded": true,
   "camera": {
     "afterFocus": {
-      "x": 84.78276809868788,
-      "y": 258.12134363216103,
-      "k": 0.2669993435645031
+      "x": 87.32540449901634,
+      "y": 259.2963198431114,
+      "k": 0.2667371147705943
     },
     "afterUserZoom": {
-      "x": -80.0762625994821,
-      "y": 176.3687819343994,
-      "k": 0.46726014374245833
+      "x": -76.965188546727,
+      "y": 177.80643853446233,
+      "k": 0.466939290475153
     },
     "afterWait": {
-      "x": -80.0762625994821,
-      "y": 176.3687819343994,
-      "k": 0.46726014374245833
+      "x": -76.965188546727,
+      "y": 177.80643853446233,
+      "k": 0.466939290475153
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1788050621675,
-    "quitMs": 409,
+    "startedAt": 1788054518721,
+    "quitMs": 201,
     "remaining": "gone",
-    "before": "51745     1  28.1 369904 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "73886     1  19.9 344208 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "after": "gone"
   }
 }

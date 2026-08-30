@@ -4,19 +4,58 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquirePhase3AcceptanceLock, processState, processTree, terminateOwnedProcessTree } from './workbenchHarness.mjs';
 import { assuranceEvidenceOk } from './prebase-phase3-assurance.mjs';
 import { currentSourceIdentity } from './phase3Evidence.mjs';
+import {
+	PRODUCER_DOMAINS,
+	PRODUCER_ESTIMATED_DURATION_MS,
+	computeProducerFingerprint,
+	sortProducersByExecutionOrder,
+} from './phase3ProducerDomains.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceRoot = join(repo, 'reports/graph-acceptance/phase-3-final');
 const gateLogRoot = join(evidenceRoot, 'gate-logs');
+const validationPlanPath = join(evidenceRoot, 'validation-plan.json');
 export const ACTIVE_SOAK_FINAL_MIN_DURATION_MS = 10 * 60 * 1000;
 const TREE_DRAIN_MS = 8_000;
+const FAILURE_LOG_TAIL_LINES = 60;
+
+export function expectedProducerFingerprint(repo, producerId) {
+	return computeProducerFingerprint(repo, producerId);
+}
+
+function formatDuration(ms) {
+	if (!Number.isFinite(ms) || ms < 0) {
+		return '0s';
+	}
+	const totalSeconds = Math.floor(ms / 1000);
+	const minutes = Math.floor(totalSeconds / 60);
+	const seconds = totalSeconds % 60;
+	return minutes > 0 ? `${minutes}m${seconds}s` : `${seconds}s`;
+}
+
+function timestamp() {
+	return new Date().toISOString().slice(11, 19);
+}
+
+function tailLog(logPath, maxLines = FAILURE_LOG_TAIL_LINES) {
+	try {
+		const lines = readFileSync(logPath, 'utf8').split('\n');
+		return lines.slice(-maxLines).join('\n');
+	} catch {
+		return '';
+	}
+}
+
+export function planCheckpointPath(runId) {
+	return join(evidenceRoot, `validation-plan-${runId}.json`);
+}
 
 export function activeSoakProducerTimeoutMs(env = process.env) {
 	const configured = Number(env.PREBASE_ACTIVE_SOAK_MS || 12 * 60 * 1000);
@@ -122,7 +161,14 @@ export function scenarioOk(entry, evidence) {
 	if (entry.sourceHead && evidence.sourceHead !== entry.sourceHead) {
 		return { ok: false, reason: 'evidence source HEAD does not match current HEAD' };
 	}
-	if (entry.sourceFingerprint && evidence.sourceFingerprint !== entry.sourceFingerprint) {
+	if (entry.expectedProducerFingerprint) {
+		if (typeof evidence.producerFingerprint !== 'string' || !evidence.producerFingerprint) {
+			return { ok: false, reason: 'evidence producer fingerprint is missing' };
+		}
+		if (evidence.producerFingerprint !== entry.expectedProducerFingerprint) {
+			return { ok: false, reason: 'evidence producer fingerprint does not match current producer inputs' };
+		}
+	} else if (entry.sourceFingerprint && evidence.sourceFingerprint !== entry.sourceFingerprint) {
 		return { ok: false, reason: 'evidence source fingerprint does not match current worktree' };
 	}
 	if (entry.id === 'assurance') {
@@ -149,19 +195,93 @@ export function hybridFirecrawlExternalSkip(evidence, identity) {
 	return true;
 }
 
-export function classifyRequiredEvidence(identity, evidenceById = undefined) {
+function entryIdentity(repo, identity, spec) {
+	const producer = producerForArtifact(spec.id);
+	const producerId = producer?.id;
+	return {
+		...spec,
+		sourceHead: identity.sourceHead,
+		sourceFingerprint: identity.sourceFingerprint,
+		productFingerprint: identity.productFingerprint ?? identity.sourceFingerprint,
+		producerId,
+		expectedProducerFingerprint: producerId ? expectedProducerFingerprint(repo, producerId) : undefined,
+	};
+}
+
+export function classifyRequiredEvidence(identity, evidenceById = undefined, repoRoot = repo) {
 	const stale = [];
 	for (const spec of PHASE3_REQUIRED_EVIDENCE) {
 		const evidence = evidenceById?.get(spec.id) ?? readJson(spec.path);
 		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity)) {
 			continue;
 		}
-		const verdict = scenarioOk({ ...spec, sourceHead: identity.sourceHead, sourceFingerprint: identity.sourceFingerprint }, evidence);
+		const verdict = scenarioOk(entryIdentity(repoRoot, identity, spec), evidence);
 		if (!verdict.ok) {
 			stale.push({ id: spec.id, path: spec.path, reason: verdict.reason, producer: producerForArtifact(spec.id)?.id });
 		}
 	}
 	return stale;
+}
+
+export function classifyProducerStatus(repo, identity, producer) {
+	const artifacts = producer.artifacts.map(id => PHASE3_REQUIRED_EVIDENCE.find(spec => spec.id === id)).filter(Boolean);
+	const producerFingerprint = expectedProducerFingerprint(repo, producer.id);
+	const dependencies = PRODUCER_DOMAINS[producer.id] ?? [];
+	let status = 'CURRENT_GREEN';
+	let reason = 'current';
+	for (const spec of artifacts) {
+		const evidence = readJson(spec.path);
+		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity)) {
+			continue;
+		}
+		const verdict = scenarioOk(entryIdentity(repo, identity, spec), evidence);
+		if (!verdict.ok) {
+			status = evidence.missing ? 'MISSING' : 'STALE';
+			reason = verdict.reason;
+			break;
+		}
+	}
+	return {
+		id: producer.id,
+		expectedProducerFingerprint: producerFingerprint,
+		status,
+		reason,
+		estimatedDurationMs: PRODUCER_ESTIMATED_DURATION_MS[producer.id] ?? producer.timeoutMs,
+		artifacts: producer.artifacts,
+		dependencies,
+	};
+}
+
+export function buildValidationPlan(repo, identity) {
+	const runId = new Date().toISOString().replaceAll(/[:.]/g, '-');
+	const producers = PHASE3_PRODUCERS.map(producer => classifyProducerStatus(repo, identity, producer));
+	const assurance = readJson('assurance.json');
+	const assuranceVerdict = scenarioOk({
+		id: 'assurance',
+		sourceHead: identity.sourceHead,
+		sourceFingerprint: identity.sourceFingerprint,
+		expectedProducerFingerprint: expectedProducerFingerprint(repo, 'assurance'),
+	}, assurance);
+	producers.push({
+		id: 'assurance',
+		expectedProducerFingerprint: expectedProducerFingerprint(repo, 'assurance'),
+		status: assuranceVerdict.ok ? 'CURRENT_GREEN' : (assurance.missing ? 'MISSING' : 'STALE'),
+		reason: assuranceVerdict.ok ? 'current' : assuranceVerdict.reason,
+		estimatedDurationMs: PRODUCER_ESTIMATED_DURATION_MS.assurance,
+		artifacts: ['assurance.json'],
+		dependencies: PRODUCER_DOMAINS.assurance ?? [],
+	});
+	const remaining = producers.filter(item => item.status !== 'CURRENT_GREEN' && item.status !== 'EXTERNAL');
+	const totalEstimatedDurationMs = remaining.reduce((sum, item) => sum + item.estimatedDurationMs, 0);
+	return {
+		runId,
+		sourceHead: identity.sourceHead,
+		productFingerprint: identity.productFingerprint ?? identity.sourceFingerprint,
+		sourceFingerprint: identity.sourceFingerprint,
+		createdAt: new Date().toISOString(),
+		totalEstimatedDurationMs,
+		producers: sortProducersByExecutionOrder(producers.map(item => item.id)).map(id => producers.find(item => item.id === id)),
+	};
 }
 
 async function drainOwnedTree(pid) {
@@ -179,9 +299,14 @@ async function drainOwnedTree(pid) {
 	return processTree(pid).map(row => row.pid);
 }
 
-async function runProcess(id, command, args, timeoutMs) {
+async function runProcess(id, command, args, timeoutMs, options = {}) {
+	const verbose = options.verbose === true;
 	mkdirSync(gateLogRoot, { recursive: true });
 	const log = join(gateLogRoot, `${id}.log`);
+	const estimatedMs = PRODUCER_ESTIMATED_DURATION_MS[id] ?? timeoutMs;
+	console.error(`[${timestamp()}] START ${id}`);
+	console.error(`estimated ${formatDuration(estimatedMs)}`);
+	console.error(`log: ${log}`);
 	return new Promise((resolveRun, reject) => {
 		const startedAt = Date.now();
 		const output = createWriteStream(log);
@@ -192,19 +317,35 @@ async function runProcess(id, command, args, timeoutMs) {
 			stdio: ['ignore', 'pipe', 'pipe'],
 			env: { ...process.env, PREBASE_PHASE3_GATE_CHILD: '1' },
 		});
-		child.stdout.pipe(process.stdout);
-		child.stderr.pipe(process.stderr);
+		if (verbose) {
+			child.stdout.pipe(process.stdout);
+			child.stderr.pipe(process.stderr);
+		}
 		child.stdout.pipe(output);
 		child.stderr.pipe(output);
 		const finish = async (code) => {
+			const elapsedMs = Date.now() - startedAt;
 			const leftoverPids = [...new Set([
 				...(termination?.leftoverPids ?? []),
 				...(await drainOwnedTree(child.pid)),
 			])].filter(pid => processState(pid) !== 'gone');
+			const ok = (code ?? 1) === 0 && !timedOut && leftoverPids.length === 0;
+			console.error(`[${timestamp()}] ${ok ? 'PASS' : 'FAIL'} ${id}`);
+			console.error(`elapsed ${formatDuration(elapsedMs)}`);
+			if (!ok) {
+				console.error(`exit=${code ?? 1} timedOut=${timedOut} leftoverPids=${leftoverPids.join(',') || 'none'}`);
+				console.error(`full log: ${log}`);
+				const tail = tailLog(log);
+				if (tail) {
+					console.error('--- log tail ---');
+					console.error(tail);
+					console.error('--- end tail ---');
+				}
+			}
 			output.end(() => resolveRun({
 				code: code ?? 1,
 				timedOut,
-				elapsedMs: Date.now() - startedAt,
+				elapsedMs,
 				log,
 				harnessPid: child.pid,
 				timeoutMs,
@@ -227,14 +368,191 @@ async function runProcess(id, command, args, timeoutMs) {
 }
 
 function parseMode(argv) {
+	const verbose = argv.includes('--verbose');
+	const plan = argv.includes('--plan');
+	const executePlanIndex = argv.findIndex(arg => arg === '--execute-plan' || arg === '--resume-plan');
+	const executePlan = executePlanIndex >= 0 ? argv[executePlanIndex + 1] : undefined;
+	const resumePlan = argv.includes('--resume-plan');
 	const validateEvidence = argv.includes('--validate-evidence');
 	const rerunStale = argv.includes('--rerun-stale') || argv.includes('--rerun-required');
 	const rerunAll = argv.includes('--rerun-all') || argv.includes('--rerun-live');
-	const selected = [validateEvidence, rerunStale, rerunAll].filter(Boolean).length;
-	if (selected !== 1) {
-		throw new Error('Specify exactly one of --validate-evidence, --rerun-stale, or --rerun-all.');
+	const modes = [plan, Boolean(executePlan), validateEvidence, rerunStale, rerunAll].filter(Boolean);
+	if (modes.length !== 1) {
+		throw new Error('Specify exactly one of --plan, --execute-plan <runId>, --resume-plan <runId>, --validate-evidence, --rerun-stale, or --rerun-all.');
 	}
-	return { validateEvidence, rerunStale, rerunAll };
+	return { verbose, plan, executePlan, resumePlan, validateEvidence, rerunStale, rerunAll };
+}
+
+export function loadPlan(runId) {
+	const checkpoint = planCheckpointPath(runId);
+	if (existsSync(checkpoint)) {
+		return JSON.parse(readFileSync(checkpoint, 'utf8'));
+	}
+	if (existsSync(validationPlanPath)) {
+		const primary = JSON.parse(readFileSync(validationPlanPath, 'utf8'));
+		if (primary.runId === runId) {
+			return primary;
+		}
+	}
+	throw new Error(`validation plan not found for runId=${runId}`);
+}
+
+function writeJsonAtomic(targetPath, data) {
+	const tmp = `${targetPath}.${process.pid}.tmp`;
+	writeFileSync(tmp, JSON.stringify(data, null, 2));
+	renameSync(tmp, targetPath);
+}
+
+export function persistPlan(plan) {
+	writeJsonAtomic(validationPlanPath, plan);
+	writeJsonAtomic(planCheckpointPath(plan.runId), plan);
+}
+
+function readJsonFileSafe(fullPath) {
+	if (!existsSync(fullPath)) {
+		return undefined;
+	}
+	return JSON.parse(readFileSync(fullPath, 'utf8'));
+}
+
+export function assertPlanIdentity(plan, identity) {
+	if (plan.sourceHead !== identity.sourceHead) {
+		throw new Error(`plan stale due to code change: sourceHead ${plan.sourceHead} != ${identity.sourceHead}`);
+	}
+	const productFingerprint = identity.productFingerprint ?? identity.sourceFingerprint;
+	if (plan.productFingerprint !== productFingerprint) {
+		throw new Error('plan stale due to code change: product fingerprint mismatch');
+	}
+}
+
+async function executeValidationPlan(plan, identity, options = {}) {
+	const reruns = new Map();
+	for (const entry of plan.producers) {
+		if (entry.execution?.status === 'RUNNING') {
+			delete entry.execution;
+		}
+		if (entry.status === 'CURRENT_GREEN' || entry.status === 'EXTERNAL' || entry.execution?.status === 'COMPLETE') {
+			continue;
+		}
+		const currentFingerprint = entry.id === 'assurance'
+			? expectedProducerFingerprint(repo, 'assurance')
+			: expectedProducerFingerprint(repo, entry.id);
+		if (currentFingerprint !== entry.expectedProducerFingerprint) {
+			throw new Error(`plan stale due to code change: producer ${entry.id} fingerprint mismatch`);
+		}
+		entry.execution = { status: 'RUNNING', startedAt: new Date().toISOString() };
+		persistPlan(plan);
+		let result;
+		if (entry.id === 'assurance') {
+			result = await runProcess('assurance', process.execPath, ['test/prebase/acceptance/prebase-phase3-assurance.mjs'], PRODUCER_ESTIMATED_DURATION_MS.assurance, options);
+		} else {
+			const producer = PHASE3_PRODUCERS.find(item => item.id === entry.id);
+			if (!producer) {
+				throw new Error(`unknown producer in plan: ${entry.id}`);
+			}
+			result = await runProcess(producer.id, producer.command[0], producer.command.slice(1), producer.timeoutMs, options);
+		}
+		entry.execution = {
+			status: result.code === 0 && !result.timedOut && result.leftoverPids.length === 0 ? 'COMPLETE' : 'FAILED',
+			startedAt: entry.execution.startedAt,
+			finishedAt: new Date().toISOString(),
+			exitCode: result.code,
+			timedOut: result.timedOut,
+			durationMs: result.elapsedMs,
+			log: result.log,
+			leftoverPids: result.leftoverPids,
+		};
+		if (entry.id !== 'assurance') {
+			const producer = PHASE3_PRODUCERS.find(item => item.id === entry.id);
+			reruns.set(entry.id, result);
+			for (const artifactId of producer.artifacts) {
+				reruns.set(artifactId, result);
+			}
+		}
+		persistPlan(plan);
+		if (entry.execution.status === 'FAILED') {
+			throw new Error(`producer failed: ${entry.id} exit=${result.code} timedOut=${result.timedOut}`);
+		}
+		if (result.leftoverPids.length) {
+			await terminateOwnedProcessTree(result.harnessPid);
+			for (const pid of result.leftoverPids) {
+				if (processState(pid) !== 'gone') {
+					try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+				}
+			}
+		}
+	}
+	return reruns;
+}
+
+function writeManifest(identity, planned, reruns = new Map()) {
+	const scenarios = PHASE3_REQUIRED_EVIDENCE.map(spec => {
+		const evidence = readJson(spec.path);
+		const producer = producerForArtifact(spec.id);
+		const rerun = reruns.get(spec.id) ?? (producer ? reruns.get(producer.id) : undefined);
+		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity)) {
+			return {
+				id: spec.id,
+				path: spec.path,
+				ok: true,
+				reason: HYBRID_FIRECRAWL_EXTERNAL_REASON,
+				externalSkip: true,
+				quit: evidence.quit ?? undefined,
+				rerun,
+			};
+		}
+		const verdict = scenarioOk(entryIdentity(repo, identity, spec), evidence);
+		if (rerun && (rerun.code !== 0 || rerun.timedOut) && verdict.ok) {
+			if (rerun.timedOut && (rerun.leftoverPids?.length ?? 0) === 0) {
+				return { id: spec.id, path: spec.path, ok: true, reason: verdict.reason, quit: evidence.quit ?? undefined, rerun };
+			}
+			return {
+				id: spec.id,
+				path: spec.path,
+				ok: false,
+				reason: rerun.timedOut ? `live rerun timed out after ${rerun.elapsedMs}ms` : `stale evidence: live rerun exited ${rerun.code}`,
+				rerun,
+				quit: evidence.quit ?? undefined,
+			};
+		}
+		return { id: spec.id, path: spec.path, ok: verdict.ok, reason: verdict.reason, quit: evidence.quit ?? undefined, rerun };
+	});
+	const assurance = readJson('assurance.json');
+	const assuranceVerdict = scenarioOk({
+		id: 'assurance',
+		sourceHead: identity.sourceHead,
+		sourceFingerprint: identity.sourceFingerprint,
+		expectedProducerFingerprint: expectedProducerFingerprint(repo, 'assurance'),
+	}, assurance);
+	const failures = scenarios.filter(item => !item.ok).map(item => `${item.id}: ${item.reason}`);
+	if (!assuranceVerdict.ok) {
+		failures.push(`assurance: ${assuranceVerdict.reason}`);
+	}
+	const externalBlockers = [
+		{ id: 'gemini-provider-roundtrip', reason: 'Isolated acceptance profile has no Gemini key; classified as external compatibility smoke.' },
+		{ id: 'release-signing', reason: 'Release signing credentials are operator-owned (BETA-015).' },
+		...scenarios.filter(item => item.externalSkip).map(item => ({ id: item.id, reason: item.reason })),
+	];
+	const producerFingerprints = Object.fromEntries(
+		[...PHASE3_PRODUCERS.map(item => item.id), 'assurance'].map(id => [id, expectedProducerFingerprint(repo, id)]),
+	);
+	const manifest = {
+		phase: '3-final',
+		sourceHead: identity.sourceHead,
+		sourceFingerprint: identity.sourceFingerprint,
+		productFingerprint: identity.productFingerprint ?? identity.sourceFingerprint,
+		producerFingerprints,
+		validationRunId: planned.runId,
+		generatedAt: new Date().toISOString(),
+		overallRepositoryControlledGate: failures.length === 0,
+		externalBlockers,
+		failures,
+		scenarios,
+		assurance: { path: 'assurance.json', ok: assuranceVerdict.ok, reason: assuranceVerdict.reason },
+		plannedProducers: planned.producers?.filter(item => item.execution?.status === 'COMPLETE' || item.status !== 'CURRENT_GREEN').map(item => item.id) ?? [],
+	};
+	writeFileSync(join(evidenceRoot, 'manifest.json'), JSON.stringify(manifest, null, 2));
+	return manifest;
 }
 
 async function run() {
@@ -242,33 +560,72 @@ async function run() {
 	try {
 		const mode = parseMode(process.argv);
 		const identity = currentSourceIdentity(repo);
-		const planned = [];
-		if (mode.rerunAll) {
-			planned.push(...PHASE3_PRODUCERS);
-		} else if (mode.rerunStale) {
-			const stale = classifyRequiredEvidence(identity);
-			const assurance = readJson('assurance.json');
-			const assuranceVerdict = scenarioOk({ id: 'assurance', sourceHead: identity.sourceHead, sourceFingerprint: identity.sourceFingerprint }, assurance);
-			planned.push(...producersForArtifacts(stale.map(item => item.id)));
-			console.error(`[phase3-final-gate] stale/missing/red artifacts: ${stale.length === 0 ? 'none' : stale.map(item => `${item.id} (${item.reason})`).join('; ')}`);
-			if (!assuranceVerdict.ok) {
-				console.error(`[phase3-final-gate] assurance is not current (${assuranceVerdict.reason}); rerun npm run test:prebase-phase3-assurance separately`);
-			}
-		}
-		if (planned.length) {
-			console.error(`[phase3-final-gate] planned producers (${planned.length}): ${planned.map(item => item.id).join(', ')}`);
+
+		if (mode.plan) {
+			const plan = buildValidationPlan(repo, identity);
+			persistPlan(plan);
+			console.log(JSON.stringify(plan, null, 2));
+			console.error(`[phase3-final-gate] validation plan ${plan.runId}`);
+			console.error(`estimated remaining ${formatDuration(plan.totalEstimatedDurationMs)}`);
+			return;
 		}
 
+		if (mode.executePlan) {
+			const plan = loadPlan(mode.executePlan);
+			assertPlanIdentity(plan, identity);
+			const reruns = await executeValidationPlan(plan, identity, { verbose: mode.verbose });
+			const manifest = writeManifest(identity, plan, reruns);
+			console.log(JSON.stringify({
+				ok: manifest.overallRepositoryControlledGate,
+				failures: manifest.failures,
+				sourceHead: identity.sourceHead,
+				productFingerprint: manifest.productFingerprint,
+				validationRunId: plan.runId,
+			}, null, 2));
+			if (!manifest.overallRepositoryControlledGate) {
+				process.exitCode = 1;
+			}
+			return;
+		}
+
+		if (mode.validateEvidence) {
+			const manifest = writeManifest(identity, { runId: readJsonFileSafe(validationPlanPath)?.runId, producers: [] });
+			console.log(JSON.stringify({
+				ok: manifest.overallRepositoryControlledGate,
+				failures: manifest.failures,
+				sourceHead: identity.sourceHead,
+				productFingerprint: manifest.productFingerprint,
+			}, null, 2));
+			if (!manifest.overallRepositoryControlledGate) {
+				process.exitCode = 1;
+			}
+			return;
+		}
+
+		const planned = { producers: [] };
 		const reruns = new Map();
-		for (const producer of planned) {
-			console.error(`[phase3-final-gate] running ${producer.id}`);
-			const result = await runProcess(producer.id, producer.command[0], producer.command.slice(1), producer.timeoutMs);
+		if (mode.rerunAll) {
+			planned.producers = PHASE3_PRODUCERS.map(producer => ({ id: producer.id, status: 'STALE' }));
+		} else if (mode.rerunStale) {
+			const stale = classifyRequiredEvidence(identity);
+			planned.producers = producersForArtifacts(stale.map(item => item.id)).map(producer => ({ id: producer.id, status: 'STALE' }));
+			console.error(`[phase3-final-gate] stale/missing/red artifacts: ${stale.length === 0 ? 'none' : stale.map(item => `${item.id} (${item.reason})`).join('; ')}`);
+		}
+		const producersToRun = mode.rerunAll || mode.rerunStale
+			? PHASE3_PRODUCERS.filter(producer => planned.producers.some(item => item.id === producer.id))
+			: [];
+		if (producersToRun.length) {
+			console.error(`[phase3-final-gate] planned producers (${producersToRun.length}): ${producersToRun.map(item => item.id).join(', ')}`);
+		}
+		for (const producer of producersToRun) {
+			const result = await runProcess(producer.id, producer.command[0], producer.command.slice(1), producer.timeoutMs, { verbose: mode.verbose });
 			reruns.set(producer.id, result);
 			for (const artifactId of producer.artifacts) {
 				reruns.set(artifactId, result);
 			}
 			if (result.code !== 0 || result.timedOut || result.leftoverPids.length) {
-				console.error(`[phase3-final-gate] ${producer.id} ${result.timedOut ? 'timed out' : `exited ${result.code}`}${result.leftoverPids.length ? ` leftoverPids=${result.leftoverPids.join(',')}` : ''}`);
+				console.error(`[phase3-final-gate] stopping after ${producer.id} failure`);
+				break;
 			}
 			if (result.leftoverPids.length) {
 				await terminateOwnedProcessTree(result.harnessPid);
@@ -280,78 +637,10 @@ async function run() {
 			}
 		}
 
-		const scenarios = PHASE3_REQUIRED_EVIDENCE.map(spec => {
-			const evidence = readJson(spec.path);
-			const producer = producerForArtifact(spec.id);
-			const rerun = reruns.get(spec.id) ?? (producer ? reruns.get(producer.id) : undefined);
-			if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity)) {
-				return {
-					id: spec.id,
-					path: spec.path,
-					ok: true,
-					reason: HYBRID_FIRECRAWL_EXTERNAL_REASON,
-					externalSkip: true,
-					quit: evidence.quit ?? undefined,
-					rerun,
-				};
-			}
-			const verdict = scenarioOk({ ...spec, sourceHead: identity.sourceHead, sourceFingerprint: identity.sourceFingerprint }, evidence);
-			if (rerun && (rerun.code !== 0 || rerun.timedOut) && verdict.ok) {
-				if (rerun.timedOut && (rerun.leftoverPids?.length ?? 0) === 0) {
-					return {
-						id: spec.id,
-						path: spec.path,
-						ok: true,
-						reason: verdict.reason,
-						quit: evidence.quit ?? undefined,
-						rerun,
-					};
-				}
-				return {
-					id: spec.id,
-					path: spec.path,
-					ok: false,
-					reason: rerun.timedOut ? `live rerun timed out after ${rerun.elapsedMs}ms` : `stale evidence: live rerun exited ${rerun.code}`,
-					rerun,
-					quit: evidence.quit ?? undefined,
-				};
-			}
-			return {
-				id: spec.id,
-				path: spec.path,
-				ok: verdict.ok,
-				reason: verdict.reason,
-				quit: evidence.quit ?? undefined,
-				rerun,
-			};
-		});
-		const assurance = readJson('assurance.json');
-		const assuranceVerdict = scenarioOk({ id: 'assurance', sourceHead: identity.sourceHead, sourceFingerprint: identity.sourceFingerprint }, assurance);
-		const failures = scenarios.filter(item => !item.ok).map(item => `${item.id}: ${item.reason}`);
-		if (!assuranceVerdict.ok) {
-			failures.push(`assurance: ${assuranceVerdict.reason}`);
-		}
-		const externalBlockers = [
-			{ id: 'gemini-provider-roundtrip', reason: 'Isolated acceptance profile has no Gemini key; classified as external compatibility smoke.' },
-			{ id: 'release-signing', reason: 'Release signing credentials are operator-owned (BETA-015).' },
-			...scenarios.filter(item => item.externalSkip).map(item => ({ id: item.id, reason: item.reason })),
-		];
-		const manifest = {
-			phase: '3-final',
-			sourceHead: identity.sourceHead,
-			sourceFingerprint: identity.sourceFingerprint,
-			generatedAt: new Date().toISOString(),
-			overallRepositoryControlledGate: failures.length === 0,
-			externalBlockers,
-			failures,
-			scenarios,
-			assurance: { path: 'assurance.json', ok: assuranceVerdict.ok, reason: assuranceVerdict.reason },
-			plannedProducers: planned.map(item => item.id),
-		};
-		writeFileSync(join(evidenceRoot, 'manifest.json'), JSON.stringify(manifest, null, 2));
+		const manifest = writeManifest(identity, { runId: undefined, producers: planned.producers }, reruns);
 		console.log(JSON.stringify({
 			ok: manifest.overallRepositoryControlledGate,
-			failures,
+			failures: manifest.failures,
 			sourceHead: identity.sourceHead,
 			sourceFingerprint: identity.sourceFingerprint,
 			plannedProducers: manifest.plannedProducers,

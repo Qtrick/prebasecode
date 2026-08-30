@@ -19,13 +19,21 @@ import {
 	PHASE3_PRODUCERS,
 	PHASE3_REQUIRED_EVIDENCE,
 	activeSoakProducerTimeoutMs,
+	assertPlanIdentity,
+	buildValidationPlan,
 	classifyRequiredEvidence,
+	expectedProducerFingerprint,
+	loadPlan,
+	persistPlan,
+	planCheckpointPath,
 	producerForArtifact,
 	producersForArtifacts,
 	scenarioOk,
 } from './prebase-phase3-final-gate.mjs';
+import { computeProducerFingerprint, producerIdForScenario } from './phase3ProducerDomains.mjs';
 import {
 	PHASE3_ASSURANCE_COMMANDS,
+	PHASE3_ASSURANCE_LEAF_COVERAGE,
 	PHASE3_ASSURANCE_TIMEOUT_MS,
 	assuranceCommandLabel,
 	assuranceEvidenceOk,
@@ -78,11 +86,14 @@ function passingAssuranceCommands() {
 }
 
 function passingEvidence(spec, identity) {
+	const producerId = producerIdForScenario(spec.id);
 	return {
 		ok: true,
 		scenario: spec.id,
 		sourceHead: identity.sourceHead,
 		sourceFingerprint: identity.sourceFingerprint,
+		producerId,
+		producerFingerprint: producerId ? computeProducerFingerprint(repo, producerId) : undefined,
 		evidenceKind: spec.evidenceKind,
 		durationMs: spec.minDurationMs,
 	};
@@ -276,15 +287,16 @@ describe('phase 3 gate / lifecycle / timeout contracts', () => {
 		assert.match(verdict.reason, /expected final evidence/);
 	});
 
-	test('matching HEAD with a stale fingerprint classifies every required artifact as stale', () => {
+	test('matching HEAD with stale producer fingerprints classifies every required artifact as stale', () => {
 		const identity = { sourceHead: 'current-head', sourceFingerprint: 'fp-current' };
-		const staleById = new Map(PHASE3_REQUIRED_EVIDENCE.map(spec => [spec.id, passingEvidence(spec, {
-			sourceHead: identity.sourceHead,
+		const staleById = new Map(PHASE3_REQUIRED_EVIDENCE.map(spec => [spec.id, {
+			...passingEvidence(spec, identity),
 			sourceFingerprint: 'fp-old',
-		})]));
+			producerFingerprint: 'stale-producer-fingerprint',
+		}]));
 		const stale = classifyRequiredEvidence(identity, staleById);
 		assert.equal(stale.length, PHASE3_REQUIRED_EVIDENCE.length);
-		assert.ok(stale.every(item => /fingerprint/.test(item.reason)));
+		assert.ok(stale.every(item => /fingerprint|HEAD/.test(item.reason)));
 		const planned = producersForArtifacts(stale.map(item => item.id));
 		for (const spec of PHASE3_REQUIRED_EVIDENCE) {
 			assert.ok(planned.some(producer => producer.artifacts.includes(spec.id)), `--rerun-stale must cover ${spec.id}`);
@@ -315,6 +327,11 @@ describe('phase 3 gate / lifecycle / timeout contracts', () => {
 			const label = assuranceCommandLabel(command);
 			assert.ok(Number.isFinite(PHASE3_ASSURANCE_TIMEOUT_MS[label]) && PHASE3_ASSURANCE_TIMEOUT_MS[label] > 0, `${label} missing from PHASE3_ASSURANCE_TIMEOUT_MS`);
 		}
+		assert.equal(PHASE3_ASSURANCE_COMMANDS.some(command => assuranceCommandLabel(command) === 'assurance:quick'), false);
+		const covered = new Set(Object.values(PHASE3_ASSURANCE_LEAF_COVERAGE).flat());
+		for (const leaf of covered) {
+			assert.ok(PHASE3_ASSURANCE_COMMANDS.some(command => assuranceCommandLabel(command) === leaf), `leaf ${leaf} missing from PHASE3_ASSURANCE_COMMANDS`);
+		}
 	});
 
 	test('lifecycle closeSidebar is in the production harness and per-surface open/close is required', () => {
@@ -340,14 +357,17 @@ describe('phase 3 gate / lifecycle / timeout contracts', () => {
 		assert.match(gate, /terminateOwnedProcessTree\(child\.pid\)/);
 		assert.match(gate, /live rerun timed out after/);
 		assert.doesNotMatch(gate, /child\.kill\(/);
-		assert.match(gate, /for \(const producer of planned\)/);
+		assert.match(gate, /executeValidationPlan|for \(const producer of producersToRun\)/);
 		assert.match(gate, /await runProcess\(/);
 		assert.doesNotMatch(gate, /Promise\.all\(\s*planned/);
 		assert.match(gate, /argv\.includes\('--rerun-all'\) \|\| argv\.includes\('--rerun-live'\)/);
-		assert.match(gate, /planned\.push\(\.\.\.PHASE3_PRODUCERS\)/);
-		assert.match(gate, /planned\.push\(\.\.\.producersForArtifacts\(stale\.map/);
-		assert.match(gate, /scenarioOk\(\{ id: 'assurance', sourceHead: identity\.sourceHead, sourceFingerprint: identity\.sourceFingerprint \}/);
-		assert.match(gate, /return assuranceEvidenceOk\(entry, evidence\)/);
+		assert.match(gate, /argv\.includes\('--plan'\)/);
+		assert.match(gate, /buildValidationPlan/);
+		assert.match(gate, /if \(verbose\)[\s\S]*child\.stdout\.pipe\(process\.stdout\)/);
+		assert.match(gate, /options\.verbose === true/);
+		assert.match(gate, /planned\.producers = PHASE3_PRODUCERS\.map/);
+		assert.match(gate, /planned\.producers = producersForArtifacts\(stale\.map/);
+		assert.match(gate, /expectedProducerFingerprint/);
 		const harness = readFileSync(join(acceptanceDir, 'workbenchHarness.mjs'), 'utf8');
 		const start = harness.indexOf('export async function terminateOwnedProcessTree');
 		assert.ok(start >= 0);
@@ -427,6 +447,68 @@ describe('phase 3 gate / lifecycle / timeout contracts', () => {
 				try { process.kill(child.pid, 'SIGKILL'); } catch { /* already gone */ }
 			}
 		}
+	});
+
+	test('validation plan checkpoint persists and reloads by runId', () => {
+		const identity = currentSourceIdentity(repo);
+		const plan = buildValidationPlan(repo, identity);
+		persistPlan(plan);
+		const checkpoint = planCheckpointPath(plan.runId);
+		assert.equal(existsSync(checkpoint), true);
+		const loaded = loadPlan(plan.runId);
+		assert.equal(loaded.runId, plan.runId);
+		assert.equal(loaded.sourceHead, identity.sourceHead);
+		assert.deepEqual(loaded.producers.map(item => item.id), plan.producers.map(item => item.id));
+	});
+
+	test('assertPlanIdentity rejects stale product fingerprint before resume', () => {
+		const identity = currentSourceIdentity(repo);
+		const plan = buildValidationPlan(repo, identity);
+		assert.doesNotThrow(() => assertPlanIdentity(plan, identity));
+		assert.throws(
+			() => assertPlanIdentity({ ...plan, productFingerprint: 'stale-product-fingerprint' }, identity),
+			/product fingerprint mismatch/,
+		);
+		assert.throws(
+			() => assertPlanIdentity({ ...plan, sourceHead: '0'.repeat(40) }, identity),
+			/sourceHead/,
+		);
+	});
+
+	test('scenarioOk prefers producer fingerprint over whole-tree source fingerprint', () => {
+		const identity = currentSourceIdentity(repo);
+		const producerId = producerForArtifact('core-ide')?.id;
+		assert.ok(producerId);
+		const expected = expectedProducerFingerprint(repo, producerId);
+		const entry = {
+			id: 'core-ide',
+			sourceHead: identity.sourceHead,
+			sourceFingerprint: identity.sourceFingerprint,
+			expectedProducerFingerprint: expected,
+		};
+		const scopedMatch = {
+			ok: true,
+			scenario: 'core-ide',
+			sourceHead: identity.sourceHead,
+			sourceFingerprint: 'whole-tree-stale-fingerprint',
+			producerFingerprint: expected,
+		};
+		assert.equal(scenarioOk(entry, scopedMatch).ok, true);
+		const scopedStale = {
+			...scopedMatch,
+			producerFingerprint: 'stale-producer-fingerprint',
+		};
+		const verdict = scenarioOk(entry, scopedStale);
+		assert.equal(verdict.ok, false);
+		assert.match(verdict.reason, /producer fingerprint/);
+	});
+
+	test('phase3EvidenceMetadata schema v3 attaches producerFingerprint for mapped scenarios', () => {
+		const metadata = phase3EvidenceMetadata(repo, 'core-ide');
+		assert.equal(metadata.schemaVersion, PHASE3_EVIDENCE_SCHEMA_VERSION);
+		assert.equal(metadata.producerId, 'core-ide');
+		assert.match(metadata.producerFingerprint ?? '', /^[0-9a-f]{64}$/);
+		assert.equal(metadata.producerFingerprint, computeProducerFingerprint(repo, 'core-ide'));
 	});
 });
 

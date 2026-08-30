@@ -1,0 +1,6 @@
+reports/graph-acceptance/**/gate-logs/
+reports/graph-acceptance/**/assurance-logs/
+reports/graph-acceptance/**/screenshots/
+**/*.cpuprofile
+**/*.heapsnapshot
+**/.code-oss-dev/

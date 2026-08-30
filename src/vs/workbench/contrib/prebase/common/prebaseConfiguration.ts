@@ -360,6 +360,11 @@ configurationRegistry.registerConfiguration({
 			default: 'gemini',
 			description: localize('prebase.magnus.provider', "Active AI model provider for PreBase Agents."),
 		},
+		'prebase.magnus.projectGuidance.enabled': {
+			type: 'boolean',
+			default: true,
+			description: localize('prebase.magnus.projectGuidance.enabled', "Apply trusted repository instruction files (AGENTS.md, Cursor rules, Copilot instructions, skills metadata) to Agents requests."),
+		},
 	}
 });
 

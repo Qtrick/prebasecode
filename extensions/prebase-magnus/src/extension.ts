@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { magnusRequestShutdown, registerMagnusChatParticipants, type MagnusChatDefaults } from './chatParticipant';
+import { magnusRequestShutdown, registerMagnusChatParticipants, setProjectGuidanceService, type MagnusChatDefaults } from './chatParticipant';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
 import { buildModelOptions } from './models';
 import { DEFAULT_MAGNUS_AGENT_MODE, MAGNUS_AGENT_MODES, isMagnusAgentMode } from './modes';
@@ -16,6 +16,7 @@ import { globalAIProviderRegistry } from './aiProviderRegistry';
 import { MagnusSmokeTransportAdapter, magnusSmokeStreamDiagnostics } from './smokeTransport';
 import { magnusLiveStreamDiagnostics } from './chatParticipant';
 import { findPreBaseSourceRoot, PreBaseSecretResolver } from './secretResolver';
+import { ProjectGuidanceService, resolveGuidancePath, type GuidanceFileReader } from './projectGuidanceService';
 import type { PreBaseAIExecutionMode } from './secretCatalog';
 
 export interface SafeMagnusError {
@@ -86,6 +87,82 @@ export function activate(context: vscode.ExtensionContext): void {
 		const resolver = new PreBaseSecretResolver({ explicitRoot, allowAmbientRootDiscovery: false });
 		const secrets = new MagnusSecretStorage(context.secrets, resolver);
 		console.log('[Magnus] secret resolver initialized');
+
+		const guidanceReader: GuidanceFileReader = {
+			exists: async (path) => {
+				try {
+					await vscode.workspace.fs.stat(vscode.Uri.file(path));
+					return true;
+				} catch {
+					return false;
+				}
+			},
+			readFile: async (path) => Buffer.from(await vscode.workspace.fs.readFile(vscode.Uri.file(path))).toString('utf8'),
+			readDirectory: async (path) => (await vscode.workspace.fs.readDirectory(vscode.Uri.file(path))).map(([name]) => name),
+			isTrusted: () => vscode.workspace.isTrusted,
+		};
+		const projectGuidance = new ProjectGuidanceService(guidanceReader);
+		setProjectGuidanceService(projectGuidance);
+		const invalidateGuidance = () => projectGuidance.invalidate();
+		for (const pattern of [
+			'**/AGENTS.md',
+			'**/AGENTS.override.md',
+			'**/.cursor/rules/**',
+			'**/.github/copilot-instructions.md',
+			'**/.agents/skills/**/SKILL.md',
+			'**/.cursor/skills/**/SKILL.md',
+		]) {
+			const watcher = vscode.workspace.createFileSystemWatcher(pattern);
+			context.subscriptions.push(
+				watcher,
+				watcher.onDidChange(invalidateGuidance),
+				watcher.onDidCreate(invalidateGuidance),
+				watcher.onDidDelete(invalidateGuidance),
+			);
+		}
+		context.subscriptions.push(
+			vscode.commands.registerCommand('prebase.magnus.viewProjectGuidance', async () => {
+				const folder = vscode.workspace.workspaceFolders?.[0];
+				if (!folder) {
+					void vscode.window.showInformationMessage('Open a workspace to inspect project guidance.');
+					return;
+				}
+				if (!vscode.workspace.isTrusted) {
+					void vscode.window.showWarningMessage('Project guidance is disabled until this workspace is trusted.');
+					return;
+				}
+				const snapshot = await projectGuidance.getSnapshot(folder.uri.fsPath);
+				const lines = [
+					`Project guidance: ${snapshot.alwaysApplicable.length} always-on, ${snapshot.pathApplicable.length} path-scoped, ${snapshot.skillCatalog.length} skills`,
+					...snapshot.diagnostics.slice(0, 6),
+				];
+				const pick = await vscode.window.showQuickPick(
+					[
+						{ label: '$(book) Open AGENTS.md', relPath: 'AGENTS.md' },
+						...snapshot.alwaysApplicable.slice(0, 8).map(item => ({
+							label: `$(law) ${item.source.path}`,
+							description: item.source.ecosystem,
+							relPath: item.source.path,
+						})),
+						...snapshot.skillCatalog.slice(0, 8).map(item => ({
+							label: `$(sparkle) ${item.name}`,
+							description: item.description,
+							relPath: item.path,
+						})),
+					],
+					{ title: 'Project Guidance', placeHolder: lines.join(' • ') },
+				);
+				if (pick?.relPath) {
+					const fullPath = resolveGuidancePath(folder.uri.fsPath, pick.relPath);
+					if (!fullPath) {
+						void vscode.window.showErrorMessage('That guidance path is not allowed.');
+						return;
+					}
+					const doc = await vscode.workspace.openTextDocument(fullPath);
+					await vscode.window.showTextDocument(doc, { preview: true });
+				}
+			}),
+		);
 
 		// 2. Initialize AI service
 		const configProvider = new VsCodeWorkspaceConfigProvider(() => vscode.workspace.getConfiguration('prebase.magnus'));
@@ -824,5 +901,6 @@ export function activate(context: vscode.ExtensionContext): void {
 }
 
 export async function deactivate(): Promise<void> {
+	setProjectGuidanceService(undefined);
 	magnusRequestShutdown.cancel();
 }

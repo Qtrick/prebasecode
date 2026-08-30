@@ -6,8 +6,9 @@ import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { lstatSync, readFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { computeProducerFingerprint, producerIdForScenario } from './phase3ProducerDomains.mjs';
 
-export const PHASE3_EVIDENCE_SCHEMA_VERSION = 2;
+export const PHASE3_EVIDENCE_SCHEMA_VERSION = 3;
 
 /**
  * Pathspecs whose working-tree bytes can change product or acceptance behavior
@@ -71,9 +72,9 @@ export function isHashableWorkingTreeFile(repo, relativePath) {
  * Deleted working-tree files are omitted (their absence changes the digest).
  * Secret basenames are listed nowhere and never read.
  */
-export function listSourceFingerprintFiles(repo) {
-	const tracked = gitNulList(repo, ['ls-files', '-z', '--', ...SOURCE_FINGERPRINT_PATHSPECS]);
-	const others = gitNulList(repo, ['ls-files', '-z', '--others', '--exclude-standard', '--', ...SOURCE_FINGERPRINT_PATHSPECS]);
+export function listFilesUnderPathspecs(repo, pathspecs) {
+	const tracked = gitNulList(repo, ['ls-files', '-z', '--', ...pathspecs]);
+	const others = gitNulList(repo, ['ls-files', '-z', '--others', '--exclude-standard', '--', ...pathspecs]);
 	const seen = new Set();
 	const files = [];
 	for (const relativePath of [...tracked, ...others]) {
@@ -88,9 +89,17 @@ export function listSourceFingerprintFiles(repo) {
 	return files;
 }
 
-export function computeSourceFingerprint(repo) {
+export function listSourceFingerprintFiles(repo) {
+	return listFilesUnderPathspecs(repo, SOURCE_FINGERPRINT_PATHSPECS);
+}
+
+export function computePathspecFingerprint(repo, pathspecs, label = '') {
 	const hash = createHash('sha256');
-	for (const relativePath of listSourceFingerprintFiles(repo)) {
+	if (label) {
+		hash.update(label);
+		hash.update('\0');
+	}
+	for (const relativePath of listFilesUnderPathspecs(repo, pathspecs)) {
 		hash.update(relativePath);
 		hash.update('\0');
 		hash.update(readFileSync(join(repo, relativePath)));
@@ -99,10 +108,16 @@ export function computeSourceFingerprint(repo) {
 	return hash.digest('hex');
 }
 
+export function computeSourceFingerprint(repo) {
+	return computePathspecFingerprint(repo, SOURCE_FINGERPRINT_PATHSPECS, 'product');
+}
+
 export function currentSourceIdentity(repo) {
+	const sourceFingerprint = computeSourceFingerprint(repo);
 	return {
 		sourceHead: execFileSync('git', ['rev-parse', 'HEAD'], { cwd: repo, encoding: 'utf8' }).trim(),
-		sourceFingerprint: computeSourceFingerprint(repo),
+		sourceFingerprint,
+		productFingerprint: sourceFingerprint,
 	};
 }
 
@@ -112,16 +127,23 @@ export function currentSourceIdentity(repo) {
  * This intentionally stays acceptance-local: it proves that evidence came from
  * the current commit AND the current dirty/untracked source tree.
  */
-export function phase3EvidenceMetadata(repo, scenario) {
+export function phase3EvidenceMetadata(repo, scenario, options = {}) {
 	if (!scenario) {
 		throw new Error('Phase 3 evidence scenario is required.');
 	}
 	const identity = currentSourceIdentity(repo);
-	return {
+	const metadata = {
 		schemaVersion: PHASE3_EVIDENCE_SCHEMA_VERSION,
 		scenario,
 		sourceHead: identity.sourceHead,
 		sourceFingerprint: identity.sourceFingerprint,
+		productFingerprint: identity.productFingerprint,
 		generatedAt: new Date().toISOString(),
 	};
+	const producerId = options.producerId ?? producerIdForScenario(scenario);
+	if (producerId) {
+		metadata.producerId = producerId;
+		metadata.producerFingerprint = options.producerFingerprint ?? computeProducerFingerprint(repo, producerId);
+	}
+	return metadata;
 }

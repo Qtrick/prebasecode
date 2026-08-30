@@ -123,6 +123,7 @@ export function isSensitiveFile(filePath: string): boolean {
 export function buildSystemPrompt(
 	mode: MagnusAgentMode,
 	attachedContexts: string[],
+	projectGuidance?: string,
 ): string {
 	const parts = [
 		'You are Agents, the PreBase AI coding assistant inside VS Code.',
@@ -139,6 +140,9 @@ export function buildSystemPrompt(
 		for (const ctx of attachedContexts) {
 			parts.push(ctx);
 		}
+	}
+	if (projectGuidance?.trim()) {
+		parts.push(projectGuidance.trim());
 	}
 	return parts.join('\n');
 }
@@ -362,6 +366,7 @@ export function assembleChatRequest(
 	budget: ContextBudgetConfig = DEFAULT_CONTEXT_BUDGET,
 	defaultModelConfig?: string,
 	host: IRequestAssemblerHost = defaultVscodeHost,
+	projectGuidance?: string,
 ): AssembledChatRequest {
 	const requestModel = (request as unknown as { model?: { id?: string } }).model?.id;
 	let activeModelId = requestModel;
@@ -387,7 +392,7 @@ export function assembleChatRequest(
 
 	const reasoningEffort = resolveSupportedReasoningEffort(activeModelId, rawEffort);
 
-	const systemInstruction = buildSystemPrompt(mode, resolvedAttachments);
+	const systemInstruction = buildSystemPrompt(mode, resolvedAttachments, projectGuidance);
 
 	const historyMessages = context?.history
 		? extractConversationHistory(context.history, budget.maxHistoryTurns, budget.maxHistoryChars)

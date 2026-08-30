@@ -23,16 +23,26 @@ export const PHASE3_ASSURANCE_COMMANDS = [
 	['typecheck-client'],
 	['typecheck:graphs'],
 	['test:graphs'],
-	['test:prebase-pure'],
+	['test:prebase-pure:compiled'],
 	['test:prebase-magnus'],
 	['verify:graphs-boundary'],
 	['verify:graphs-runtime-boundary'],
 	['node', 'scripts/startup/verify-magnus-out.mjs'],
 	['verify:privacy'],
 	['verify:config-uniqueness'],
-	['assurance:quick'],
-	['assurance:static'],
+	['verify:startup'],
+	['verify:dialog-routing'],
+	['verify:typescript'],
+	['verify:supabase-migrations'],
+	['verify:supabase-rls-static'],
 ];
+
+/** Semantic coverage required by assurance:static without nested quick/static reruns. */
+export const PHASE3_ASSURANCE_LEAF_COVERAGE = {
+	'assurance:quick': ['verify:graphs-boundary', 'verify:graphs-runtime-boundary', 'verify:startup', 'verify:dialog-routing', 'verify:typescript', 'verify:icons', 'verify:supabase-migrations', 'verify:supabase-rls-static', 'typecheck:graphs', 'typecheck-client', 'test:graphs', 'test:prebase-magnus'],
+	'assurance:static': ['verify:config-uniqueness'],
+	'phase3-extra': ['compile-magnus', 'transpile-client', 'test:prebase-pure:compiled', 'node scripts/startup/verify-magnus-out.mjs', 'verify:privacy'],
+};
 
 export function assuranceCommandLabel(command) {
 	return command.join(' ');
@@ -52,8 +62,12 @@ export const PHASE3_ASSURANCE_TIMEOUT_MS = {
 	'node scripts/startup/verify-magnus-out.mjs': 30_000,
 	'verify:privacy': 60_000,
 	'verify:config-uniqueness': 30_000,
-	'assurance:quick': 360_000,
-	'assurance:static': 600_000,
+	'verify:startup': 60_000,
+	'verify:dialog-routing': 30_000,
+	'verify:typescript': 60_000,
+	'verify:supabase-migrations': 60_000,
+	'verify:supabase-rls-static': 60_000,
+	'test:prebase-pure:compiled': 120_000,
 };
 
 export function assuranceCommandTimeoutMs(command) {
@@ -68,6 +82,14 @@ export function assuranceEvidenceOk(entry, evidence) {
 	const sourceFingerprint = entry.sourceFingerprint;
 	if (!evidence || evidence.ok !== true || evidence.sourceHead !== sourceHead || evidence.scenario !== 'assurance') {
 		return { ok: false, reason: 'assurance metadata is invalid' };
+	}
+	if (entry.expectedProducerFingerprint) {
+		if (typeof evidence.producerFingerprint !== 'string' || !evidence.producerFingerprint) {
+			return { ok: false, reason: 'assurance producer fingerprint is missing' };
+		}
+		if (evidence.producerFingerprint !== entry.expectedProducerFingerprint) {
+			return { ok: false, reason: 'assurance producer fingerprint does not match current producer inputs' };
+		}
 	}
 	if (typeof evidence.sourceFingerprint !== 'string' || !evidence.sourceFingerprint) {
 		return { ok: false, reason: 'assurance source fingerprint is missing' };

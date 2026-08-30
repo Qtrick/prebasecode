@@ -1,9 +1,12 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "scenario": "code-graph",
-  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
-  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
-  "generatedAt": "2026-08-30T00:42:37.606Z",
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "sourceFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
+  "productFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
+  "generatedAt": "2026-08-30T01:47:29.889Z",
+  "producerId": "core-ide",
+  "producerFingerprint": "51265e51e899d505e6971a28168d9e2465563f3064b5559a8771631be708ae01",
   "ok": true,
   "failures": [],
   "codeGraph": {
@@ -17,42 +20,42 @@
       "networkLayoutMode": "radial",
       "networkIdleAutoRotate": true,
       "viewportWidth": 792,
-      "viewportHeight": 543,
+      "viewportHeight": 541,
       "projectedBounds": {
-        "minX": 296.2769233284762,
-        "minY": 87.21383113040628,
-        "maxX": 554.6877556086977,
-        "maxY": 433.0235503596622,
-        "width": 258.4108322802215,
-        "height": 345.8097192292559
+        "minX": 296.8031664771386,
+        "minY": 87.07022252285796,
+        "maxX": 553.8503532044301,
+        "maxY": 431.16062924958476,
+        "width": 257.04718672729155,
+        "height": 344.09040672672677
       },
-      "screenUtilization": 0.20778916549617196,
+      "screenUtilization": 0.20642532307584774,
       "labelCount": 2,
       "nodeHits": [
         {
           "id": "file:README.md",
-          "x": 378.0946761660141,
-          "y": 433.0235503596622
+          "x": 378.37913697780294,
+          "y": 431.16062924958476
         },
         {
           "id": "file:src/errors.ts",
-          "x": 405.431051968435,
-          "y": 302.4087518550891
+          "x": 405.38128388416885,
+          "y": 301.129549998334
         },
         {
           "id": "file:src/hello.ts",
-          "x": 474.5726441572215,
-          "y": 315.70730246103244
+          "x": 474.1580127896372,
+          "y": 314.3579235562249
         },
         {
           "id": "file:src/js-check.js",
-          "x": 296.2769233284762,
-          "y": 424.4849084611376
+          "x": 296.8031664771386,
+          "y": 422.5615052502609
         },
         {
           "id": "file:tsconfig.json",
-          "x": 554.6877556086977,
-          "y": 87.21383113040628
+          "x": 553.8503532044301,
+          "y": 87.07022252285796
         }
       ]
     },

@@ -18,10 +18,21 @@ import {
 	type AssembledChatRequest,
 } from './requestAssembler';
 import {
+	formatProjectGuidanceForPrompt,
+	guidanceTargetsFromReferences,
+	type ProjectGuidanceService,
+} from './projectGuidanceService';
+import {
 	executeToolCallBatch,
 	type ToolCallItem,
 	type ToolExecutionTracker,
 } from './toolExecutor';
+
+let projectGuidanceService: ProjectGuidanceService | undefined;
+
+export function setProjectGuidanceService(service: ProjectGuidanceService | undefined): void {
+	projectGuidanceService = service;
+}
 import { paceTextStream, createLivePacedSink, type LivePacedSink } from './streamPace';
 
 export const magnusRequestShutdown = new vscode.CancellationTokenSource();
@@ -142,12 +153,30 @@ async function handleChatRequest(
 	// 2. Resolve Native References & Context
 	const resolvedAttachments = await resolveNativeReferences(request.references);
 
+	let projectGuidanceBlock = '';
+	const guidanceEnabled = vscode.workspace.getConfiguration('prebase.magnus').get<boolean>('projectGuidance.enabled', true);
+	const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+	if (guidanceEnabled && projectGuidanceService && workspaceFolder) {
+		const targetPaths = guidanceTargetsFromReferences(request.references, value => {
+			if (value && typeof value === 'object' && 'fsPath' in value) {
+				return vscode.workspace.asRelativePath(value as vscode.Uri, false);
+			}
+			return undefined;
+		});
+		const snapshot = await projectGuidanceService.getSnapshot(workspaceFolder.uri.fsPath, targetPaths);
+		projectGuidanceBlock = formatProjectGuidanceForPrompt(snapshot);
+	}
+
 	// 3. Assemble Request and Context Budget
 	const assembled: AssembledChatRequest = assembleChatRequest(
 		mode,
 		request,
 		chatContext,
 		resolvedAttachments,
+		undefined,
+		undefined,
+		undefined,
+		projectGuidanceBlock,
 	);
 
 	const requestCts = new vscode.CancellationTokenSource();

@@ -830,6 +830,19 @@ export class PreBaseSettingsEditor extends EditorPane {
 			keyCtrl
 		);
 
+		const guidanceActionLabel = localize('prebase.settings.ai.viewProjectGuidance', "View project guidance…");
+		const guidanceRowLabel = localize('prebase.settings.ai.projectGuidance', "Project guidance");
+		const guidanceBtn = this._linkBtn(guidanceActionLabel, () => {
+			void this.commandService.executeCommand('prebase.magnus.viewProjectGuidance');
+		});
+		guidanceBtn.setAttribute('aria-label', `${guidanceActionLabel} — ${guidanceRowLabel}`);
+		this._row(
+			actionsCard,
+			guidanceRowLabel,
+			localize('prebase.settings.ai.projectGuidanceHint', "Inspect AGENTS.md, Cursor rules, Copilot instructions, and skill metadata Agents applies in trusted workspaces."),
+			guidanceBtn
+		);
+
 		const note = DOM.append(actionsCard, DOM.$('p'));
 		note.textContent = localize(
 			'prebase.settings.ai.privacyNotice',
