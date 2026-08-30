@@ -1,17 +1,20 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "scenario": "load-quit",
-  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
-  "sourceFingerprint": "c1d4105dffbd858951207159886fff623563d09be222fbaebd486b324f54af30",
-  "generatedAt": "2026-08-29T23:50:39.047Z",
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "generatedAt": "2026-08-30T03:30:31.815Z",
+  "producerId": "load-quit",
+  "producerFingerprint": "29b0c3f7f9e593e1598828609a8cec29dc4d21f5f0aae610556e3f1b285e1461",
   "ok": true,
   "failures": [],
   "results": [
     {
       "scenario": "parser-active-1",
-      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-AaMxp1",
-      "prebasePid": 57789,
-      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-AaMxp1",
+      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-jtBx6O",
+      "prebasePid": 77435,
+      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-jtBx6O",
       "scanStarted": true,
       "diagnostics": {
         "parserActiveRequests": 32,
@@ -53,67 +56,67 @@
       "parserActiveRequests": 32,
       "processTreeBeforeQuit": [
         {
-          "pid": 57789,
+          "pid": 77435,
           "ppid": 1,
-          "cpu": 6.8,
-          "rssKb": 327424,
+          "cpu": 0.5,
+          "rssKb": 326272,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 57804,
-          "ppid": 57789,
-          "cpu": 7,
-          "rssKb": 103312,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 57805,
-          "ppid": 57789,
+          "pid": 77453,
+          "ppid": 77435,
           "cpu": 0,
-          "rssKb": 52432,
+          "rssKb": 110272,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 57807,
-          "ppid": 57789,
-          "cpu": 21.2,
-          "rssKb": 768448,
+          "pid": 77454,
+          "ppid": 77435,
+          "cpu": 0,
+          "rssKb": 52512,
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+        },
+        {
+          "pid": 77457,
+          "ppid": 77435,
+          "cpu": 2.7,
+          "rssKb": 767984,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 57827,
-          "ppid": 57789,
-          "cpu": 2.7,
-          "rssKb": 179312,
+          "pid": 77484,
+          "ppid": 77435,
+          "cpu": 2.2,
+          "rssKb": 171568,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 57828,
-          "ppid": 57789,
+          "pid": 77485,
+          "ppid": 77435,
           "cpu": 0,
-          "rssKb": 96208,
+          "rssKb": 96144,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 57829,
-          "ppid": 57789,
-          "cpu": 0.8,
-          "rssKb": 214624,
+          "pid": 77502,
+          "ppid": 77435,
+          "cpu": 0,
+          "rssKb": 216240,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 57922,
-          "ppid": 57789,
+          "pid": 77576,
+          "ppid": 77435,
           "cpu": 0,
-          "rssKb": 23856,
+          "rssKb": 57168,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         }
       ],
       "quit": {
-        "before": "57789     1   6.8 327408 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "77435     1   0.5 326272 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 510,
+        "latencyMs": 521,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -123,9 +126,9 @@
     },
     {
       "scenario": "parser-active-2",
-      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-c4czrd",
-      "prebasePid": 58618,
-      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-c4czrd",
+      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-mxF0ct",
+      "prebasePid": 78268,
+      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-mxF0ct",
       "scanStarted": true,
       "diagnostics": {
         "parserActiveRequests": 32,
@@ -167,67 +170,67 @@
       "parserActiveRequests": 32,
       "processTreeBeforeQuit": [
         {
-          "pid": 58618,
+          "pid": 78268,
           "ppid": 1,
-          "cpu": 10.5,
-          "rssKb": 331168,
+          "cpu": 9.3,
+          "rssKb": 326176,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 58633,
-          "ppid": 58618,
-          "cpu": 7.8,
-          "rssKb": 104560,
+          "pid": 78283,
+          "ppid": 78268,
+          "cpu": 6.5,
+          "rssKb": 106832,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 58634,
-          "ppid": 58618,
+          "pid": 78284,
+          "ppid": 78268,
           "cpu": 0,
-          "rssKb": 52352,
+          "rssKb": 52400,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 58636,
-          "ppid": 58618,
-          "cpu": 25.6,
-          "rssKb": 771312,
+          "pid": 78286,
+          "ppid": 78268,
+          "cpu": 19.7,
+          "rssKb": 784944,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 58655,
-          "ppid": 58618,
-          "cpu": 1.4,
-          "rssKb": 177168,
+          "pid": 78326,
+          "ppid": 78268,
+          "cpu": 3.5,
+          "rssKb": 172640,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 58656,
-          "ppid": 58618,
+          "pid": 78327,
+          "ppid": 78268,
           "cpu": 0,
-          "rssKb": 96064,
+          "rssKb": 96496,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 58657,
-          "ppid": 58618,
-          "cpu": 1.2,
-          "rssKb": 215776,
+          "pid": 78328,
+          "ppid": 78268,
+          "cpu": 1,
+          "rssKb": 216544,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 58747,
-          "ppid": 58618,
-          "cpu": 3.7,
-          "rssKb": 25136,
+          "pid": 78402,
+          "ppid": 78268,
+          "cpu": 6.9,
+          "rssKb": 29024,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         }
       ],
       "quit": {
-        "before": "58618     1  10.5 331200 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "78268     1   9.3 326176 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 520,
+        "latencyMs": 533,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -237,9 +240,9 @@
     },
     {
       "scenario": "parser-active-3",
-      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-ccjZwH",
-      "prebasePid": 59448,
-      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-ccjZwH",
+      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-XPhsIm",
+      "prebasePid": 79096,
+      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-parser-quit-XPhsIm",
       "scanStarted": true,
       "diagnostics": {
         "parserActiveRequests": 32,
@@ -281,67 +284,67 @@
       "parserActiveRequests": 32,
       "processTreeBeforeQuit": [
         {
-          "pid": 59448,
+          "pid": 79096,
           "ppid": 1,
-          "cpu": 4.6,
-          "rssKb": 322416,
+          "cpu": 0.3,
+          "rssKb": 323824,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 59467,
-          "ppid": 59448,
-          "cpu": 0.2,
-          "rssKb": 103536,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 59468,
-          "ppid": 59448,
+          "pid": 79111,
+          "ppid": 79096,
           "cpu": 0,
-          "rssKb": 52432,
+          "rssKb": 106608,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 59470,
-          "ppid": 59448,
-          "cpu": 9.7,
-          "rssKb": 775600,
+          "pid": 79112,
+          "ppid": 79096,
+          "cpu": 0,
+          "rssKb": 52464,
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+        },
+        {
+          "pid": 79114,
+          "ppid": 79096,
+          "cpu": 2.8,
+          "rssKb": 777424,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 59489,
-          "ppid": 59448,
-          "cpu": 6.6,
-          "rssKb": 176688,
+          "pid": 79139,
+          "ppid": 79096,
+          "cpu": 4.5,
+          "rssKb": 172848,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 59490,
-          "ppid": 59448,
+          "pid": 79140,
+          "ppid": 79096,
           "cpu": 0,
-          "rssKb": 96000,
+          "rssKb": 96272,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 59507,
-          "ppid": 59448,
-          "cpu": 0.3,
-          "rssKb": 215888,
+          "pid": 79157,
+          "ppid": 79096,
+          "cpu": 0.2,
+          "rssKb": 215248,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 59582,
-          "ppid": 59448,
+          "pid": 79231,
+          "ppid": 79096,
           "cpu": 0,
-          "rssKb": 53312,
+          "rssKb": 34512,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         }
       ],
       "quit": {
-        "before": "59448     1  12.7 322416 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "79096     1  19.2 323824 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 519,
+        "latencyMs": 580,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -351,9 +354,9 @@
     },
     {
       "scenario": "temporal-sqlite-write-1",
-      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-NRcYVa",
-      "prebasePid": 61539,
-      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-NRcYVa",
+      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-eGGYEG",
+      "prebasePid": 81194,
+      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-eGGYEG",
       "temporalOpened": true,
       "diagnostics": {
         "parserActiveRequests": 0,
@@ -395,74 +398,74 @@
       "temporalActiveWrites": 1,
       "processTreeBeforeQuit": [
         {
-          "pid": 61539,
+          "pid": 81194,
           "ppid": 1,
-          "cpu": 17,
-          "rssKb": 334832,
+          "cpu": 25.1,
+          "rssKb": 329728,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 61554,
-          "ppid": 61539,
-          "cpu": 3.7,
-          "rssKb": 106320,
+          "pid": 81209,
+          "ppid": 81194,
+          "cpu": 2.4,
+          "rssKb": 108224,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 61555,
-          "ppid": 61539,
+          "pid": 81210,
+          "ppid": 81194,
           "cpu": 0.2,
-          "rssKb": 52576,
+          "rssKb": 52624,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 61557,
-          "ppid": 61539,
-          "cpu": 70,
-          "rssKb": 777760,
+          "pid": 81228,
+          "ppid": 81194,
+          "cpu": 68.5,
+          "rssKb": 776112,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 61576,
-          "ppid": 61539,
+          "pid": 81252,
+          "ppid": 81194,
           "cpu": 0,
-          "rssKb": 176224,
+          "rssKb": 174976,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 61577,
-          "ppid": 61539,
+          "pid": 81253,
+          "ppid": 81194,
           "cpu": 0,
-          "rssKb": 96464,
+          "rssKb": 96208,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 61578,
-          "ppid": 61539,
-          "cpu": 5.2,
-          "rssKb": 218368,
+          "pid": 81254,
+          "ppid": 81194,
+          "cpu": 4.2,
+          "rssKb": 220400,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 61732,
-          "ppid": 61578,
+          "pid": 81407,
+          "ppid": 81254,
           "cpu": 0,
-          "rssKb": 176,
+          "rssKb": 6736,
           "comm": "(git)"
         },
         {
-          "pid": 61719,
-          "ppid": 61539,
-          "cpu": 24.4,
-          "rssKb": 127136,
+          "pid": 81379,
+          "ppid": 81194,
+          "cpu": 21.8,
+          "rssKb": 120960,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         }
       ],
       "quit": {
-        "before": "61539     1  17.0 335248 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "81194     1  25.1 329744 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 622,
+        "latencyMs": 596,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -472,9 +475,9 @@
     },
     {
       "scenario": "temporal-sqlite-write-2",
-      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-evsb8y",
-      "prebasePid": 64678,
-      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-evsb8y",
+      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-cfgUn5",
+      "prebasePid": 83451,
+      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-cfgUn5",
       "temporalOpened": true,
       "diagnostics": {
         "parserActiveRequests": 0,
@@ -516,74 +519,74 @@
       "temporalActiveWrites": 1,
       "processTreeBeforeQuit": [
         {
-          "pid": 64678,
+          "pid": 83451,
           "ppid": 1,
-          "cpu": 19.6,
-          "rssKb": 332368,
+          "cpu": 0,
+          "rssKb": 328752,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 64695,
-          "ppid": 64678,
-          "cpu": 1.2,
-          "rssKb": 105888,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 64696,
-          "ppid": 64678,
+          "pid": 83466,
+          "ppid": 83451,
           "cpu": 0,
-          "rssKb": 52608,
+          "rssKb": 106880,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 64715,
-          "ppid": 64678,
-          "cpu": 15.4,
-          "rssKb": 780016,
+          "pid": 83467,
+          "ppid": 83451,
+          "cpu": 0,
+          "rssKb": 52432,
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+        },
+        {
+          "pid": 83469,
+          "ppid": 83451,
+          "cpu": 0.1,
+          "rssKb": 803728,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 64735,
-          "ppid": 64678,
+          "pid": 83509,
+          "ppid": 83451,
           "cpu": 0,
-          "rssKb": 177600,
+          "rssKb": 174592,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 64736,
-          "ppid": 64678,
-          "cpu": 0.1,
-          "rssKb": 96128,
+          "pid": 83510,
+          "ppid": 83451,
+          "cpu": 0,
+          "rssKb": 96416,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 64737,
-          "ppid": 64678,
-          "cpu": 0.7,
-          "rssKb": 218160,
+          "pid": 83511,
+          "ppid": 83451,
+          "cpu": 0,
+          "rssKb": 217264,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 64880,
-          "ppid": 64737,
+          "pid": 83662,
+          "ppid": 83511,
           "cpu": 0,
-          "rssKb": 7328,
+          "rssKb": 1216,
           "comm": "(git)"
         },
         {
-          "pid": 64868,
-          "ppid": 64678,
-          "cpu": 3.6,
-          "rssKb": 114144,
+          "pid": 83637,
+          "ppid": 83451,
+          "cpu": 0,
+          "rssKb": 88992,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         }
       ],
       "quit": {
-        "before": "64678     1  39.1 332576 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "83451     1   0.0 329840 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 981,
+        "latencyMs": 575,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -593,9 +596,9 @@
     },
     {
       "scenario": "temporal-sqlite-write-3",
-      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-XQ5hcM",
-      "prebasePid": 67254,
-      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-XQ5hcM",
+      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-hKi0Hd",
+      "prebasePid": 85636,
+      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-quit-hKi0Hd",
       "temporalOpened": true,
       "diagnostics": {
         "parserActiveRequests": 0,
@@ -637,74 +640,74 @@
       "temporalActiveWrites": 1,
       "processTreeBeforeQuit": [
         {
-          "pid": 67254,
+          "pid": 85636,
           "ppid": 1,
-          "cpu": 10.3,
-          "rssKb": 335568,
+          "cpu": 20.2,
+          "rssKb": 334656,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 67269,
-          "ppid": 67254,
-          "cpu": 1.6,
-          "rssKb": 108400,
+          "pid": 85667,
+          "ppid": 85636,
+          "cpu": 4.4,
+          "rssKb": 111984,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 67270,
-          "ppid": 67254,
-          "cpu": 0,
-          "rssKb": 52560,
+          "pid": 85668,
+          "ppid": 85636,
+          "cpu": 0.1,
+          "rssKb": 52640,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 67272,
-          "ppid": 67254,
-          "cpu": 17.9,
-          "rssKb": 781872,
+          "pid": 85670,
+          "ppid": 85636,
+          "cpu": 69.4,
+          "rssKb": 784032,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 67291,
-          "ppid": 67254,
+          "pid": 85694,
+          "ppid": 85636,
           "cpu": 0,
-          "rssKb": 176384,
+          "rssKb": 174448,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 67292,
-          "ppid": 67254,
-          "cpu": 0.1,
-          "rssKb": 96624,
+          "pid": 85695,
+          "ppid": 85636,
+          "cpu": 0,
+          "rssKb": 96672,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 67309,
-          "ppid": 67254,
-          "cpu": 1.7,
-          "rssKb": 218208,
+          "pid": 85696,
+          "ppid": 85636,
+          "cpu": 5.2,
+          "rssKb": 218384,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 67447,
-          "ppid": 67309,
+          "pid": 85849,
+          "ppid": 85696,
           "cpu": 0,
-          "rssKb": 7760,
+          "rssKb": 6016,
           "comm": "(git)"
         },
         {
-          "pid": 67434,
-          "ppid": 67254,
-          "cpu": 9,
-          "rssKb": 118656,
+          "pid": 85836,
+          "ppid": 85636,
+          "cpu": 26.9,
+          "rssKb": 124448,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         }
       ],
       "quit": {
-        "before": "67254     1  14.8 335840 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "85636     1  20.2 335040 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 648,
+        "latencyMs": 563,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -714,9 +717,9 @@
     },
     {
       "scenario": "runtime-preview-active",
-      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-runtime-quit-QZVWNc",
-      "prebasePid": 69282,
-      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-runtime-quit-QZVWNc",
+      "workspace": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-runtime-quit-JtW16l",
+      "prebasePid": 86846,
+      "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-runtime-quit-JtW16l",
       "diagnostics": {
         "parserActiveRequests": 0,
         "temporalActiveWrites": 0,
@@ -758,95 +761,109 @@
       "runtimePreviewStatus": "starting",
       "processTreeBeforeQuit": [
         {
-          "pid": 69282,
+          "pid": 86846,
           "ppid": 1,
-          "cpu": 16.8,
-          "rssKb": 325504,
+          "cpu": 14.8,
+          "rssKb": 327280,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 69313,
-          "ppid": 69282,
-          "cpu": 17.9,
-          "rssKb": 115360,
+          "pid": 86877,
+          "ppid": 86846,
+          "cpu": 17.6,
+          "rssKb": 118176,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 69314,
-          "ppid": 69282,
+          "pid": 86878,
+          "ppid": 86846,
           "cpu": 0,
-          "rssKb": 52576,
+          "rssKb": 52544,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 69316,
-          "ppid": 69282,
-          "cpu": 72.5,
-          "rssKb": 818768,
+          "pid": 86880,
+          "ppid": 86846,
+          "cpu": 66.6,
+          "rssKb": 826880,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 69335,
-          "ppid": 69282,
-          "cpu": 0.2,
-          "rssKb": 171808,
+          "pid": 86904,
+          "ppid": 86846,
+          "cpu": 0.3,
+          "rssKb": 171008,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 69336,
-          "ppid": 69282,
+          "pid": 86905,
+          "ppid": 86846,
           "cpu": 0,
-          "rssKb": 96128,
+          "rssKb": 96176,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 69337,
-          "ppid": 69282,
-          "cpu": 2.2,
-          "rssKb": 220528,
+          "pid": 86906,
+          "ppid": 86846,
+          "cpu": 2,
+          "rssKb": 218800,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 69434,
-          "ppid": 69337,
+          "pid": 87001,
+          "ppid": 86906,
           "cpu": 0,
-          "rssKb": 7312,
+          "rssKb": 2080,
           "comm": "(git)"
         },
         {
-          "pid": 69426,
-          "ppid": 69282,
-          "cpu": 29,
-          "rssKb": 101184,
+          "pid": 86994,
+          "ppid": 86846,
+          "cpu": 42.2,
+          "rssKb": 101376,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 69427,
-          "ppid": 69426,
+          "pid": 86995,
+          "ppid": 86994,
           "cpu": 0,
           "rssKb": 2720,
           "comm": "/bin/zsh"
         },
         {
-          "pid": 69452,
-          "ppid": 69427,
+          "pid": 86998,
+          "ppid": 86995,
           "cpu": 0,
-          "rssKb": 176,
-          "comm": "(env)"
+          "rssKb": 2128,
+          "comm": "(bash)"
         },
         {
-          "pid": 69429,
-          "ppid": 69282,
+          "pid": 87018,
+          "ppid": 86998,
           "cpu": 0,
-          "rssKb": 3168,
+          "rssKb": 1696,
+          "comm": "(bash)"
+        },
+        {
+          "pid": 87019,
+          "ppid": 87018,
+          "cpu": 0,
+          "rssKb": 672,
+          "comm": "(ps)"
+        },
+        {
+          "pid": 86996,
+          "ppid": 86846,
+          "cpu": 0,
+          "rssKb": 1328,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         }
       ],
       "quit": {
-        "before": "69282     1  16.8 325696 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "86846     1  14.8 327472 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 9758,
+        "latencyMs": 9818,
         "terminationPath": "sigterm",
         "workbenchCompleted": false,
         "usedSigterm": true,
@@ -857,10 +874,10 @@
     {
       "scenario": "electron-test-lab-active",
       "workspace": "/Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron",
-      "prebasePid": 72148,
+      "prebasePid": 92066,
       "start": {
         "ok": true,
-        "sessionId": "9fbc8a53-df10-4e6f-953a-cde358f2bff4",
+        "sessionId": "095fa5c0-53d0-4e55-aeca-17d768bef476",
         "framework": "electron",
         "mode": "fullApp",
         "state": "testing",
@@ -868,26 +885,26 @@
         "backend": "cdp",
         "ownedByPreBase": true,
         "setupRequired": false,
-        "pid": 72290,
-        "debugPort": 55641,
+        "pid": 92197,
+        "debugPort": 55865,
         "limitations": [
           "Full app mode launches the project Electron process. Renderer automation uses a localhost CDP endpoint; native OS dialogs, menus, and the project main process are not controllable."
         ],
         "test": {
-          "id": "9fbc8a53-df10-4e6f-953a-cde358f2bff4",
+          "id": "095fa5c0-53d0-4e55-aeca-17d768bef476",
           "framework": "electron",
           "mode": "fullApp",
           "backend": "cdp",
           "passedSteps": 0,
           "failedSteps": 0,
-          "duration": 533,
+          "duration": 549,
           "screenshotCount": 0,
           "cleanup": "pending"
         }
       },
       "session": {
         "ok": true,
-        "sessionId": "9fbc8a53-df10-4e6f-953a-cde358f2bff4",
+        "sessionId": "095fa5c0-53d0-4e55-aeca-17d768bef476",
         "framework": "electron",
         "mode": "fullApp",
         "state": "testing",
@@ -895,123 +912,123 @@
         "backend": "cdp",
         "ownedByPreBase": true,
         "setupRequired": false,
-        "pid": 72290,
-        "debugPort": 55641,
+        "pid": 92197,
+        "debugPort": 55865,
         "limitations": [
           "Full app mode launches the project Electron process. Renderer automation uses a localhost CDP endpoint; native OS dialogs, menus, and the project main process are not controllable."
         ],
         "test": {
-          "id": "9fbc8a53-df10-4e6f-953a-cde358f2bff4",
+          "id": "095fa5c0-53d0-4e55-aeca-17d768bef476",
           "framework": "electron",
           "mode": "fullApp",
           "backend": "cdp",
           "passedSteps": 0,
           "failedSteps": 0,
-          "duration": 8539,
+          "duration": 8551,
           "screenshotCount": 0,
           "cleanup": "pending"
         }
       },
-      "childPid": 72290,
-      "ownedPort": 55641,
+      "childPid": 92197,
+      "ownedPort": 55865,
       "processTreeBeforeQuit": [
         {
-          "pid": 72148,
+          "pid": 92066,
           "ppid": 1,
-          "cpu": 0.3,
-          "rssKb": 329856,
+          "cpu": 0,
+          "rssKb": 214064,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 72163,
-          "ppid": 72148,
-          "cpu": 0.5,
-          "rssKb": 100304,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 72164,
-          "ppid": 72148,
+          "pid": 92081,
+          "ppid": 92066,
           "cpu": 0,
-          "rssKb": 52512,
+          "rssKb": 78960,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 72182,
-          "ppid": 72148,
-          "cpu": 2.9,
-          "rssKb": 807296,
+          "pid": 92082,
+          "ppid": 92066,
+          "cpu": 0,
+          "rssKb": 45168,
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+        },
+        {
+          "pid": 92084,
+          "ppid": 92066,
+          "cpu": 0.6,
+          "rssKb": 474512,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 72201,
-          "ppid": 72148,
+          "pid": 92124,
+          "ppid": 92066,
           "cpu": 0,
-          "rssKb": 173488,
+          "rssKb": 105168,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 72202,
-          "ppid": 72148,
+          "pid": 92125,
+          "ppid": 92066,
           "cpu": 0,
-          "rssKb": 96368,
+          "rssKb": 73088,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 72203,
-          "ppid": 72148,
+          "pid": 92126,
+          "ppid": 92066,
           "cpu": 0,
-          "rssKb": 225808,
+          "rssKb": 152288,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 72329,
-          "ppid": 72203,
+          "pid": 92253,
+          "ppid": 92126,
           "cpu": 0,
-          "rssKb": 81264,
+          "rssKb": 81360,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 72290,
-          "ppid": 72148,
+          "pid": 92197,
+          "ppid": 92066,
           "cpu": 0,
-          "rssKb": 47200,
+          "rssKb": 36288,
           "comm": "node"
         },
         {
-          "pid": 72291,
-          "ppid": 72290,
+          "pid": 92198,
+          "ppid": 92197,
           "cpu": 0,
-          "rssKb": 143504,
+          "rssKb": 130896,
           "comm": "/Users/qunyingfan/Prebasecode/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron"
         },
         {
-          "pid": 72293,
-          "ppid": 72291,
-          "cpu": 2.5,
-          "rssKb": 91264,
+          "pid": 92215,
+          "ppid": 92198,
+          "cpu": 0.3,
+          "rssKb": 83840,
           "comm": "/Users/qunyingfan/Prebasecode/node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper"
         },
         {
-          "pid": 72294,
-          "ppid": 72291,
+          "pid": 92216,
+          "ppid": 92198,
           "cpu": 0,
-          "rssKb": 45024,
+          "rssKb": 39808,
           "comm": "/Users/qunyingfan/Prebasecode/node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Helper.app/Contents/MacOS/Electron Helper"
         },
         {
-          "pid": 72295,
-          "ppid": 72291,
-          "cpu": 2.3,
-          "rssKb": 92864,
+          "pid": 92219,
+          "ppid": 92198,
+          "cpu": 0.4,
+          "rssKb": 93024,
           "comm": "/Users/qunyingfan/Prebasecode/node_modules/electron/dist/Electron.app/Contents/Frameworks/Electron Helper (Renderer).app/Contents/MacOS/Electron Helper (Renderer)"
         }
       ],
       "quit": {
-        "before": "72148     1   0.3 329856 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "92066     1   0.0 214064 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 533,
+        "latencyMs": 550,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -1022,10 +1039,10 @@
     {
       "scenario": "tauri-test-lab-active",
       "workspace": "/Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-tauri",
-      "prebasePid": 73358,
+      "prebasePid": 93318,
       "start": {
         "ok": true,
-        "sessionId": "54c3a7ee-9afb-4b95-8c71-f4115ae328b7",
+        "sessionId": "ba6b6cf1-6bd3-4940-a2e5-8efabe7956a0",
         "framework": "tauri",
         "mode": "fullApp",
         "state": "testing",
@@ -1033,8 +1050,8 @@
         "backend": "webdriver",
         "ownedByPreBase": true,
         "setupRequired": false,
-        "pid": 73506,
-        "webDriverPort": 55662,
+        "pid": 93459,
+        "webDriverPort": 55912,
         "rendererUrl": "http://localhost:1420",
         "limitations": [
           "Renderer mode tests the web frontend only. The Tauri Rust backend and invoke() commands are not executed.",
@@ -1042,20 +1059,20 @@
           "Native operating-system UI outside the webview is unsupported."
         ],
         "test": {
-          "id": "54c3a7ee-9afb-4b95-8c71-f4115ae328b7",
+          "id": "ba6b6cf1-6bd3-4940-a2e5-8efabe7956a0",
           "framework": "tauri",
           "mode": "fullApp",
           "backend": "webdriver",
           "passedSteps": 0,
           "failedSteps": 0,
-          "duration": 1861,
+          "duration": 1878,
           "screenshotCount": 0,
           "cleanup": "pending"
         }
       },
       "session": {
         "ok": true,
-        "sessionId": "54c3a7ee-9afb-4b95-8c71-f4115ae328b7",
+        "sessionId": "ba6b6cf1-6bd3-4940-a2e5-8efabe7956a0",
         "framework": "tauri",
         "mode": "fullApp",
         "state": "testing",
@@ -1063,8 +1080,8 @@
         "backend": "webdriver",
         "ownedByPreBase": true,
         "setupRequired": false,
-        "pid": 73506,
-        "webDriverPort": 55662,
+        "pid": 93459,
+        "webDriverPort": 55912,
         "rendererUrl": "http://localhost:1420",
         "limitations": [
           "Renderer mode tests the web frontend only. The Tauri Rust backend and invoke() commands are not executed.",
@@ -1072,103 +1089,103 @@
           "Native operating-system UI outside the webview is unsupported."
         ],
         "test": {
-          "id": "54c3a7ee-9afb-4b95-8c71-f4115ae328b7",
+          "id": "ba6b6cf1-6bd3-4940-a2e5-8efabe7956a0",
           "framework": "tauri",
           "mode": "fullApp",
           "backend": "webdriver",
           "passedSteps": 0,
           "failedSteps": 0,
-          "duration": 9865,
+          "duration": 9881,
           "screenshotCount": 0,
           "cleanup": "pending"
         }
       },
-      "childPid": 73506,
-      "ownedPort": 55662,
+      "childPid": 93459,
+      "ownedPort": 55912,
       "processTreeBeforeQuit": [
         {
-          "pid": 73358,
+          "pid": 93318,
           "ppid": 1,
-          "cpu": 0.1,
-          "rssKb": 327296,
+          "cpu": 0,
+          "rssKb": 313264,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 73389,
-          "ppid": 73358,
-          "cpu": 0.4,
-          "rssKb": 96848,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 73390,
-          "ppid": 73358,
+          "pid": 93333,
+          "ppid": 93318,
           "cpu": 0,
-          "rssKb": 53360,
+          "rssKb": 92048,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 73392,
-          "ppid": 73358,
-          "cpu": 0.8,
-          "rssKb": 784144,
+          "pid": 93334,
+          "ppid": 93318,
+          "cpu": 0,
+          "rssKb": 52960,
+          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+        },
+        {
+          "pid": 93336,
+          "ppid": 93318,
+          "cpu": 0.4,
+          "rssKb": 650864,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 73411,
-          "ppid": 73358,
+          "pid": 93377,
+          "ppid": 93318,
           "cpu": 0,
-          "rssKb": 169776,
+          "rssKb": 117456,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 73412,
-          "ppid": 73358,
+          "pid": 93378,
+          "ppid": 93318,
           "cpu": 0,
-          "rssKb": 96352,
+          "rssKb": 78592,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 73413,
-          "ppid": 73358,
+          "pid": 93379,
+          "ppid": 93318,
           "cpu": 0,
-          "rssKb": 226960,
+          "rssKb": 158352,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 73800,
-          "ppid": 73413,
+          "pid": 93772,
+          "ppid": 93379,
           "cpu": 0,
-          "rssKb": 81168,
+          "rssKb": 81248,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 73506,
-          "ppid": 73358,
+          "pid": 93459,
+          "ppid": 93318,
           "cpu": 0,
-          "rssKb": 71008,
+          "rssKb": 53920,
           "comm": "npm run tauri dev --features prebase-testing"
         },
         {
-          "pid": 73530,
-          "ppid": 73506,
+          "pid": 93483,
+          "ppid": 93459,
           "cpu": 0,
-          "rssKb": 83488,
+          "rssKb": 58816,
           "comm": "node"
         },
         {
-          "pid": 73702,
-          "ppid": 73530,
-          "cpu": 0.4,
-          "rssKb": 98224,
+          "pid": 93672,
+          "ppid": 93483,
+          "cpu": 0.1,
+          "rssKb": 99008,
           "comm": "target/debug/prebase-desktop-tauri-fixture"
         }
       ],
       "quit": {
-        "before": "73358     1   0.6 327296 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "93318     1   0.0 313264 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 536,
+        "latencyMs": 527,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -1179,12 +1196,12 @@
     {
       "scenario": "magnus-stream-active",
       "workspace": "/Users/qunyingfan/Prebasecode/test/fixtures/typescript-lanes",
-      "prebasePid": 74779,
+      "prebasePid": 94744,
       "smokeTransport": {
         "ok": true
       },
       "diagnostics": {
-        "parserActiveRequests": 10,
+        "parserActiveRequests": 32,
         "temporalActiveWrites": 1,
         "runtimePreviewServerRunning": false,
         "runtimePreviewStatus": "stopped",
@@ -1224,81 +1241,67 @@
       "magnusPacingActive": 1,
       "processTreeBeforeQuit": [
         {
-          "pid": 74779,
+          "pid": 94744,
           "ppid": 1,
-          "cpu": 19.5,
-          "rssKb": 334992,
+          "cpu": 20.5,
+          "rssKb": 332640,
           "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
         },
         {
-          "pid": 74794,
-          "ppid": 74779,
-          "cpu": 11.6,
-          "rssKb": 110704,
+          "pid": 94759,
+          "ppid": 94744,
+          "cpu": 12,
+          "rssKb": 110720,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 74795,
-          "ppid": 74779,
+          "pid": 94760,
+          "ppid": 94744,
           "cpu": 0,
-          "rssKb": 52448,
+          "rssKb": 52528,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 74813,
-          "ppid": 74779,
-          "cpu": 37.3,
-          "rssKb": 926256,
+          "pid": 94778,
+          "ppid": 94744,
+          "cpu": 46.7,
+          "rssKb": 886624,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
         },
         {
-          "pid": 74832,
-          "ppid": 74779,
-          "cpu": 0,
-          "rssKb": 172256,
+          "pid": 94802,
+          "ppid": 94744,
+          "cpu": 0.1,
+          "rssKb": 177600,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 74833,
-          "ppid": 74779,
+          "pid": 94803,
+          "ppid": 94744,
           "cpu": 0,
-          "rssKb": 96912,
+          "rssKb": 96928,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         },
         {
-          "pid": 74834,
-          "ppid": 74779,
-          "cpu": 17.6,
-          "rssKb": 248944,
+          "pid": 94804,
+          "ppid": 94744,
+          "cpu": 24.1,
+          "rssKb": 249472,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
         },
         {
-          "pid": 75020,
-          "ppid": 74834,
-          "cpu": 0,
-          "rssKb": 0,
-          "comm": "(git)"
-        },
-        {
-          "pid": 75028,
-          "ppid": 74834,
-          "cpu": 0,
-          "rssKb": 752,
-          "comm": "(git)"
-        },
-        {
-          "pid": 74996,
-          "ppid": 74779,
-          "cpu": 51.1,
-          "rssKb": 121920,
+          "pid": 94950,
+          "ppid": 94744,
+          "cpu": 14.5,
+          "rssKb": 68624,
           "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
         }
       ],
       "quit": {
-        "before": "74779     1  16.2 335216 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "94744     1  20.5 332640 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 546,
+        "latencyMs": 521,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,

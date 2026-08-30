@@ -1,0 +1,5 @@
+---
+alwaysApply: false
+description: Use when polishing UI styling
+---
+Intelligent rule body stays hidden until activate_rule.

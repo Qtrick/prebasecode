@@ -1,0 +1,47 @@
+[03:11:00] START parser-benchmark
+estimated 1m30s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/parser-benchmark.log
+[03:11:08] PASS parser-benchmark
+elapsed 7s
+[03:11:08] START magnus-streaming-smoke
+estimated 45s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log
+[03:11:21] PASS magnus-streaming-smoke
+elapsed 13s
+[03:11:21] START core-ide
+estimated 2m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log
+[03:12:51] FAIL core-ide
+elapsed 1m29s
+exit=1 timedOut=false leftoverPids=none
+full log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log
+--- log tail ---
+{
+  "ok": false,
+  "failures": [
+    "Theme matrix incomplete",
+    "Keyboard focus check failed",
+    "Graph canvas was not keyboard reachable",
+    "200% zoom was not proven",
+    "screen-reader auto mode was not proven",
+    "screen-reader on mode was not proven",
+    "graph live region is missing",
+    "Maps disclosures were not proven with aria-expanded",
+    "Maps layout group role was not proven",
+    "PreBase Settings web-search status live region was not proven",
+    "Code Graph canvas region role was not proven"
+  ]
+}
+
+--- end tail ---
+file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-phase3-final-gate.mjs:474
+			throw new Error(`producer failed: ${entry.id} exit=${result.code} timedOut=${result.timedOut}`);
+			      ^
+
+Error: producer failed: core-ide exit=1 timedOut=false
+    at executeValidationPlan (file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-phase3-final-gate.mjs:474:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async run (file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-phase3-final-gate.mjs:576:19)
+    at async file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-phase3-final-gate.mjs:657:2
+
+Node.js v24.17.0

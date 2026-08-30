@@ -97,6 +97,7 @@ const MAGNUS_TOOL_MODE_CAPABILITIES: Readonly<Record<string, readonly MagnusAgen
 	prebase_workspace_get_definition: ALL_MAGNUS_MODES,
 	prebase_workspace_get_references: ALL_MAGNUS_MODES,
 	prebase_workspace_get_diagnostics: ALL_MAGNUS_MODES,
+	prebase_project_guidance: ALL_MAGNUS_MODES,
 	prebase_runtime_get_state: ALL_MAGNUS_MODES,
 	prebase_runtime_inspect_page: ALL_MAGNUS_MODES,
 	prebase_runtime_get_evidence: ALL_MAGNUS_MODES,

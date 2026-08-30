@@ -1188,6 +1188,8 @@ registerAction2(class extends Action2 {
 							ownerCategory: item.ownerCategory,
 						})),
 					};
+				} else {
+					result.webContents = { liveCount: 0, liveIds: [], entries: [] };
 				}
 			} catch { /* inventory is smoke-only and best-effort */ }
 		}

@@ -1,0 +1,10 @@
+file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-phase3-final-gate.mjs:424
+		throw new Error('plan stale due to code change: product fingerprint mismatch');
+		      ^
+
+Error: plan stale due to code change: product fingerprint mismatch
+    at assertPlanIdentity (file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-phase3-final-gate.mjs:424:9)
+    at run (file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-phase3-final-gate.mjs:575:4)
+    at async file:///Users/qunyingfan/Prebasecode/test/prebase/acceptance/prebase-phase3-final-gate.mjs:657:2
+
+Node.js v24.17.0

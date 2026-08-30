@@ -31,6 +31,7 @@ const READ_ONLY_TOOLS = new Set<string>([
 	'prebase_web_search',
 	'prebase_web_fetch',
 	'prebase_runtime_get_state',
+	'prebase_project_guidance',
 	'prebase_runtime_inspect_page',
 	'prebase_runtime_get_evidence',
 	'prebase_desktop_list_sessions',

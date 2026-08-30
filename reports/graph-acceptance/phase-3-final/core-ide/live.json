@@ -4,12 +4,12 @@
   "schemaVersion": 3,
   "scenario": "core-ide",
   "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "sourceFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
-  "productFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
-  "generatedAt": "2026-08-30T01:46:07.213Z",
+  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "generatedAt": "2026-08-30T03:17:00.729Z",
   "producerId": "core-ide",
-  "producerFingerprint": "51265e51e899d505e6971a28168d9e2465563f3064b5559a8771631be708ae01",
-  "prebasePid": 54781,
+  "producerFingerprint": "5c7ebe9a2c5491f11e67c5d172bd2602815d155853cddf23002b82dcf1362c0e",
+  "prebasePid": 37876,
   "c3_folderOpen": true,
   "p2_offline": true,
   "e1_saveUndo": true,
@@ -32,42 +32,42 @@
       "networkLayoutMode": "radial",
       "networkIdleAutoRotate": true,
       "viewportWidth": 792,
-      "viewportHeight": 541,
+      "viewportHeight": 545,
       "projectedBounds": {
-        "minX": 296.8031664771386,
-        "minY": 87.07022252285796,
-        "maxX": 553.8503532044301,
-        "maxY": 431.16062924958476,
-        "width": 257.04718672729155,
-        "height": 344.09040672672677
+        "minX": 295.7506801798138,
+        "minY": 87.35743973795459,
+        "maxX": 555.5251580129652,
+        "maxY": 434.8864714697396,
+        "width": 259.7744778331514,
+        "height": 347.52903173178504
       },
-      "screenUtilization": 0.20642532307584774,
+      "screenUtilization": 0.2091538614354211,
       "labelCount": 2,
       "nodeHits": [
         {
           "id": "file:README.md",
-          "x": 378.37913697780294,
-          "y": 431.16062924958476
+          "x": 377.81021535422525,
+          "y": 434.8864714697396
         },
         {
           "id": "file:src/errors.ts",
-          "x": 405.38128388416885,
-          "y": 301.129549998334
+          "x": 405.4808200527011,
+          "y": 303.6879537118442
         },
         {
           "id": "file:src/hello.ts",
-          "x": 474.1580127896372,
-          "y": 314.3579235562249
+          "x": 474.98727552480574,
+          "y": 317.05668136584
         },
         {
           "id": "file:src/js-check.js",
-          "x": 296.8031664771386,
-          "y": 422.5615052502609
+          "x": 295.7506801798138,
+          "y": 426.40831167201435
         },
         {
           "id": "file:tsconfig.json",
-          "x": 553.8503532044301,
-          "y": 87.07022252285796
+          "x": 555.5251580129652,
+          "y": 87.35743973795459
         }
       ]
     },
@@ -153,10 +153,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "54781     1  13.5 226528 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "37876     1  13.3 214544 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 673,
+    "latencyMs": 645,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

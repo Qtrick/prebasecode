@@ -1,16 +1,25 @@
 {
-  "runId": "2026-08-30T01-45-27-394Z",
-  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "productFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
-  "sourceFingerprint": "0f22697da0f4c1618b93f95bbea4305e894cbdf468ae299f68dd207c7f3c6fe4",
-  "createdAt": "2026-08-30T01:45:28.823Z",
-  "totalEstimatedDurationMs": 4640000,
+  "runId": "2026-08-30T15-27-47-508Z",
+  "planKey": "012ecb4b4293bd1ff469acd6d1fe46d69b48a0730bbe2cf2037a597b8f99117e",
+  "plannedAtHead": "73f7cca594f768177aede71b143ec97a27a419a2",
+  "currentHead": "73f7cca594f768177aede71b143ec97a27a419a2",
+  "sourceHead": "73f7cca594f768177aede71b143ec97a27a419a2",
+  "productFingerprint": "b16c3f9cf41069deaada740ed094de439f3bb0d798d209276ff307d2f1fff28d",
+  "sourceFingerprint": "b16c3f9cf41069deaada740ed094de439f3bb0d798d209276ff307d2f1fff28d",
+  "prerequisites": {
+    "firecrawlConfigured": false,
+    "linkupConfigured": false,
+    "geminiConfigured": false
+  },
+  "createdAt": "2026-08-30T15:27:48.747Z",
+  "reused": true,
+  "totalEstimatedDurationMs": 5870000,
   "producers": [
     {
       "id": "parser-benchmark",
-      "expectedProducerFingerprint": "2d800673cffcd8f821d18739852c99ad2c28795e38b9bbcfa7412eb0910dd53a",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
+      "expectedProducerFingerprint": "0c60605cf8894515e84ec8ee08ae25093a3f3430be38b014c563dd33d0c61f66",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "artifacts": [
         "parser-benchmark"
@@ -22,9 +31,9 @@
     },
     {
       "id": "magnus-streaming-smoke",
-      "expectedProducerFingerprint": "021cf9b6331efa67c27b2ee29206aa28c56293c8b140b7323a738935eb0d8fc7",
+      "expectedProducerFingerprint": "775d7bf2e0b0aa325fde50f731a8db95530febb86e7a6a7190ef6c08f571fa4d",
       "status": "STALE",
-      "reason": "smoke transport was not installed; source never emitted a first chunk; UI never showed streamed text; stream did not produce multiple progressive chunks; source chunk count did not increase while streaming; stream did not complete; cancellation was not observed; second prompt after cancel did not succeed; PreBase did not quit",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 45000,
       "artifacts": [
         "magnus-streaming-smoke"
@@ -34,23 +43,13 @@
         "shared-workbench",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-08-30T01:45:53.237Z",
-        "finishedAt": "2026-08-30T01:46:06.880Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 13605,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log",
-        "leftoverPids": []
-      }
+      ]
     },
     {
       "id": "core-ide",
-      "expectedProducerFingerprint": "51265e51e899d505e6971a28168d9e2465563f3064b5559a8771631be708ae01",
+      "expectedProducerFingerprint": "bbe0a0f4c68c3559a1de03a8ba65442e66b3950d38d04df108fa56619c676e76",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 120000,
       "artifacts": [
         "core-ide",
@@ -66,23 +65,13 @@
         "magnus-core",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-08-30T01:46:06.937Z",
-        "finishedAt": "2026-08-30T01:47:30.103Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 83141,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "leftoverPids": []
-      }
+      ]
     },
     {
       "id": "runtime-preview",
-      "expectedProducerFingerprint": "b63cd6c85701dd956eaa326aacf1c4f74c4937d4111487aa17ae420038e89dbd",
+      "expectedProducerFingerprint": "fb5e86ae4754b11b4f18a52687a54e090ba2b6c3bcd68b743381ac5b6b0e1f07",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 60000,
       "artifacts": [
         "runtime-preview"
@@ -91,23 +80,13 @@
         "runtime-preview",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-08-30T01:47:30.133Z",
-        "finishedAt": "2026-08-30T01:48:18.281Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 48124,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/runtime-preview.log",
-        "leftoverPids": []
-      }
+      ]
     },
     {
       "id": "temporal-small",
-      "expectedProducerFingerprint": "7640277dbe7ba674171c5d5bdc82eddcd5d9bea9ed72f29558a6c553f85994e5",
+      "expectedProducerFingerprint": "25a1d93ec8bdf0dd36c1ce96bccdf1a17afa062163a356f50637e6c8a2ae0bc0",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "artifacts": [
         "temporal-small"
@@ -119,23 +98,13 @@
         "shared-workbench",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-08-30T01:48:18.324Z",
-        "finishedAt": "2026-08-30T01:48:26.961Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 8612,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
-        "leftoverPids": []
-      }
+      ]
     },
     {
       "id": "temporal-large",
-      "expectedProducerFingerprint": "17f537422ce11f70eba7e0ebb3b0db8137b68e5917a1cf3ff742988c86c402de",
+      "expectedProducerFingerprint": "693ca16c8bdbbd15a8797ff35f0d891772240f28d7a21973df02289e7a732b47",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 150000,
       "artifacts": [
         "temporal-large"
@@ -147,23 +116,13 @@
         "shared-workbench",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-08-30T01:48:26.997Z",
-        "finishedAt": "2026-08-30T01:48:39.025Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 12003,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/temporal-large.log",
-        "leftoverPids": []
-      }
+      ]
     },
     {
       "id": "electron-product-path",
-      "expectedProducerFingerprint": "7a7d5fdaf28012c87004b0a88fc7ea02222da9a7cd6a33d28b1c29fcb6d39c8b",
+      "expectedProducerFingerprint": "de77870a83d03787b093f0ceafd17125ac867eb95c204e418c7ec14cd25b4be5",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 30000,
       "artifacts": [
         "electron-product-path"
@@ -174,23 +133,13 @@
         "magnus-desktop-tools",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-08-30T01:48:39.058Z",
-        "finishedAt": "2026-08-30T01:49:04.689Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 25604,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/electron-product-path.log",
-        "leftoverPids": []
-      }
+      ]
     },
     {
       "id": "electron-native-cases",
-      "expectedProducerFingerprint": "003f2ef66048f4e384ad5ce2f97aae014ae7c01a1ed45cb5fa16253a74df9fe8",
+      "expectedProducerFingerprint": "0f1be246d3bbcf167d815e9785fa7419fbc9e6f711adf10d7f56b081cb627712",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 35000,
       "artifacts": [
         "electron-native-cases"
@@ -201,23 +150,13 @@
         "magnus-desktop-tools",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-08-30T01:49:04.724Z",
-        "finishedAt": "2026-08-30T01:49:37.546Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 32794,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/electron-native-cases.log",
-        "leftoverPids": []
-      }
+      ]
     },
     {
       "id": "tauri-product-path",
-      "expectedProducerFingerprint": "435d4defc7838e692edc49ff502ba4643243f7f6623472547dd908538665aa00",
+      "expectedProducerFingerprint": "dcf1d1cde1f98d1b52ee97daf5ea4be1ebc65922bd9fc63fbcd25c8a42c1fc97",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 30000,
       "artifacts": [
         "tauri-product-path"
@@ -228,23 +167,13 @@
         "magnus-desktop-tools",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-08-30T01:49:37.593Z",
-        "finishedAt": "2026-08-30T01:50:05.349Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 27730,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/tauri-product-path.log",
-        "leftoverPids": []
-      }
+      ]
     },
     {
       "id": "magnus-electron-tools",
-      "expectedProducerFingerprint": "e2f4bf2b9c6225f0338a24733ec0e31fac3f5326d1dabe9ba87ce172448d7175",
+      "expectedProducerFingerprint": "c3f787b6e44814c3823288ee83f1e30a231e936fee7485aa99167fae48f151a3",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 150000,
       "artifacts": [
         "magnus-electron-tools"
@@ -256,17 +185,13 @@
         "desktop-runtime",
         "launch-harness",
         "acceptance-shared"
-      ],
-      "execution": {
-        "status": "RUNNING",
-        "startedAt": "2026-08-30T01:50:05.391Z"
-      }
+      ]
     },
     {
       "id": "magnus-tauri-tools",
-      "expectedProducerFingerprint": "e23242d5824e2794ac36e979560c34389303349b1cfcf7dc30a15884d7efc4dc",
+      "expectedProducerFingerprint": "9bb01661cd4fc8f3822fb332487ba3472649ddc11aea58bd68cd29999b7f8f95",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 240000,
       "artifacts": [
         "magnus-tauri-tools"
@@ -282,7 +207,7 @@
     },
     {
       "id": "hybrid-web-smoke",
-      "expectedProducerFingerprint": "8b1f3798bf6db7ed46c7dd48841f3295c1bd20de4c5e364762db6703ee02bc5a",
+      "expectedProducerFingerprint": "effde425d07e4a72634ca9b43bcfd1933716fb719d9bea4142cc98b464328a83",
       "status": "STALE",
       "reason": "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
       "estimatedDurationMs": 60000,
@@ -298,9 +223,9 @@
     },
     {
       "id": "privacy",
-      "expectedProducerFingerprint": "809db6c2b3469d646246601f28fdc9f0cf388b69a0b9682f1a5404871c753513",
+      "expectedProducerFingerprint": "7ade31f0dde18761eb66d25dc948604400ff51222abf39908df2f3acfe7fbe1a",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "artifacts": [
         "privacy"
@@ -314,9 +239,9 @@
     },
     {
       "id": "load-quit",
-      "expectedProducerFingerprint": "301757464d48759750668ef1fc141be1a44877ff3a8be675938533f64389f9d7",
+      "expectedProducerFingerprint": "037f8ab28c735ed4ac95c4aa077a8effec66751092b09933a3666aec48d7ffa5",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 120000,
       "artifacts": [
         "load-quit"
@@ -335,10 +260,10 @@
     },
     {
       "id": "lifecycle-cycles",
-      "expectedProducerFingerprint": "06b1627c3416d2dc620e49405c69b35950c611f448c8fc6e9fa3718c4cc4449c",
+      "expectedProducerFingerprint": "240e6cde37c4ec2d4e50a5bf3075e5bc3eae46a10fcf29f8ea6c437a24456a5a",
       "status": "STALE",
-      "reason": "lifecycle did not record live WebContents counts for each cycle; lifecycle did not close code-graph; lifecycle did not open runtime; lifecycle did not open magnus",
-      "estimatedDurationMs": 180000,
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 1320000,
       "artifacts": [
         "lifecycle-cycles"
       ],
@@ -351,9 +276,9 @@
     },
     {
       "id": "electron-restart-soak",
-      "expectedProducerFingerprint": "b2923ebacb2bda61b67e20ec759cad1bd54288d49c693d88cc548ea6d87dafcb",
+      "expectedProducerFingerprint": "5d5ff8b2a756d795fa56d1a1b0c9d5f71d30dfae65d5a1db813b55104c1173a6",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 900000,
       "artifacts": [
         "electron-restart-soak"
@@ -367,9 +292,9 @@
     },
     {
       "id": "tauri-restart-soak",
-      "expectedProducerFingerprint": "76295878a496afb586a902e68b001e4ab58ba4cc3f7d2b0e67133675ee3e3bf8",
+      "expectedProducerFingerprint": "4a854e587cb93558f71395ec54a659546a5e9cd9c87d37aa31e08cbf2ef64656",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 240000,
       "artifacts": [
         "tauri-restart-soak"
@@ -383,9 +308,9 @@
     },
     {
       "id": "idle-soak",
-      "expectedProducerFingerprint": "95a2ddf9484104d82fab530e8b8884cd01f64161a204d86becb36762e1e3af1a",
+      "expectedProducerFingerprint": "7c5c4d6f4808dc55d35ba1ef9c6fecda8958aee018bd776827f7c44dbefaebb7",
       "status": "STALE",
-      "reason": "ok:false",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 900000,
       "artifacts": [
         "idle-soak"
@@ -398,9 +323,9 @@
     },
     {
       "id": "active-soak",
-      "expectedProducerFingerprint": "b55963004970347c76c8757cc88a1cb8650521ded55cc423e25ef03b61016e80",
+      "expectedProducerFingerprint": "d8613b0743a81eca541021c54e103f3a2b0b4bc0a76885f2754f79fed762872f",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 720000,
       "artifacts": [
         "active-soak"
@@ -418,9 +343,9 @@
     },
     {
       "id": "assurance",
-      "expectedProducerFingerprint": "bc289504d607f24c361a883b491bf80764caf9f562bc5306a2a7f2da1b77d5de",
+      "expectedProducerFingerprint": "4c352b187192b37a33b87d581c8d03b4805d8c6c9b0bee61d89131d0719e4d69",
       "status": "STALE",
-      "reason": "evidence source HEAD does not match current HEAD",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 480000,
       "artifacts": [
         "assurance.json"

@@ -1,85 +1,88 @@
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "scenario": "tauri-restart-soak",
-  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
-  "sourceFingerprint": "c1d4105dffbd858951207159886fff623563d09be222fbaebd486b324f54af30",
-  "generatedAt": "2026-08-30T00:11:50.651Z",
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "generatedAt": "2026-08-30T03:44:14.893Z",
+  "producerId": "tauri-restart-soak",
+  "producerFingerprint": "0d72f7b3a92839bbc8fe5db99624876fd61b32b8121dbe177ea26bfe6faa74f6",
   "ok": true,
   "framework": "tauri",
   "cycles": 10,
   "passed": 10,
   "failed": 0,
-  "elapsedMs": 260280,
+  "elapsedMs": 268046,
   "results": [
     {
       "cycle": 1,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 316
+      "quitMs": 421
     },
     {
       "cycle": 2,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 316
+      "quitMs": 315
     },
     {
       "cycle": 3,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 317
+      "quitMs": 315
     },
     {
       "cycle": 4,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 420
+      "quitMs": 316
     },
     {
       "cycle": 5,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 315
+      "quitMs": 417
     },
     {
       "cycle": 6,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 321
+      "quitMs": 315
     },
     {
       "cycle": 7,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 316
+      "quitMs": 421
     },
     {
       "cycle": 8,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 417
+      "quitMs": 317
     },
     {
       "cycle": 9,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 423
+      "quitMs": 315
     },
     {
       "cycle": 10,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 418
+      "quitMs": 321
     }
   ],
   "note": "Each cycle is a full PreBase product-path including restart/stop/child/port/Quit."

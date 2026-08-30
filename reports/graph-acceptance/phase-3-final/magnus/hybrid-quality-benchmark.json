@@ -1,5 +1,5 @@
 {
-  "at": "2026-08-30T01:41:13.902Z",
+  "at": "2026-08-30T15:27:40.542Z",
   "mode": "deterministic-fixtures",
   "note": "Compares LinkUp snippet-only envelopes with LinkUp+Firecrawl hybrid on the same ranked URLs. Not a live provider score.",
   "rows": [
@@ -21,7 +21,7 @@
         "payloadChars": 292,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 23,
+        "latencyMs": 52,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-9.html"
@@ -51,7 +51,7 @@
         "payloadChars": 304,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 1,
+        "latencyMs": 0,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://code.visualstudio.com/api/extension-guides/language-model"
@@ -141,7 +141,7 @@
         "payloadChars": 254,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 0,
+        "latencyMs": 1,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://www.electronjs.org/blog/electron-39-0"

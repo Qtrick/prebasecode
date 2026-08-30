@@ -1,4 +1,66 @@
-{"scenario":"parser-active-1","quitMs":538,"remaining":"gone","parserActiveRequests":32}
-{"scenario":"parser-active-2","quitMs":523,"remaining":"gone","parserActiveRequests":32}
-{"scenario":"parser-active-3","quitMs":526,"remaining":"gone","parserActiveRequests":32}
-{"scenario":"temporal-sqlite-write-1","quitMs":129,"remaining":"gone","error":"page.waitForFunction: Target page, context or browser has been closed\n    at waitForWorkbenchDriver (/Users/qunyingfan/Prebasecode/test/prebase/acceptance/workbenchHarness.mjs:372:"}
+{"scenario":"parser-active-1","quitMs":521,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"parser-active-2","quitMs":533,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"parser-active-3","quitMs":580,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"temporal-sqlite-write-1","quitMs":596,"remaining":"gone","temporalActiveWrites":1}
+{"scenario":"temporal-sqlite-write-2","quitMs":575,"remaining":"gone","temporalActiveWrites":1}
+{"scenario":"temporal-sqlite-write-3","quitMs":563,"remaining":"gone","temporalActiveWrites":1}
+{"scenario":"runtime-preview-active","quitMs":9818,"remaining":"gone","runtimePreviewServerRunning":true}
+{"scenario":"electron-test-lab-active","quitMs":550,"remaining":"gone"}
+{"scenario":"tauri-test-lab-active","quitMs":527,"remaining":"gone"}
+{"scenario":"magnus-stream-active","quitMs":521,"remaining":"gone"}
+{
+  "ok": true,
+  "failures": [],
+  "scenarios": [
+    {
+      "scenario": "parser-active-1",
+      "quitMs": 521,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "parser-active-2",
+      "quitMs": 533,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "parser-active-3",
+      "quitMs": 580,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "temporal-sqlite-write-1",
+      "quitMs": 596,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "temporal-sqlite-write-2",
+      "quitMs": 575,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "temporal-sqlite-write-3",
+      "quitMs": 563,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "runtime-preview-active",
+      "quitMs": 9818,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "electron-test-lab-active",
+      "quitMs": 550,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "tauri-test-lab-active",
+      "quitMs": 527,
+      "remaining": "gone"
+    },
+    {
+      "scenario": "magnus-stream-active",
+      "quitMs": 521,
+      "remaining": "gone"
+    }
+  ]
+}

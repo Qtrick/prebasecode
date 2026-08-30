@@ -68,6 +68,7 @@ const registeredMagnusTools = [
 	'prebase_graph_get_node',
 	'prebase_graph_get_overview',
 	'prebase_graph_search_nodes',
+	'prebase_project_guidance',
 	'prebase_runtime_control_test',
 	'prebase_runtime_get_evidence',
 	'prebase_runtime_get_state',

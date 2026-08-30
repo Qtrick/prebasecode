@@ -8,7 +8,7 @@ import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER
 import { ACTIVE_SOAK_FINAL_MIN_DURATION_MS, activeSoakEvidenceTarget, activeSoakFailures } from './prebase-active-soak.mjs';
 import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
-import { findGraphFrame, formatPhase3LockBlockMessage, waitForWorkbenchDriver, workbenchCommandWithTimeout } from './workbenchHarness.mjs';
+import { findGraphFrame, formatPhase3LockBlockMessage, recoverHungWorkbenchPage, waitForWorkbenchDriver, workbenchCommandWithTimeout } from './workbenchHarness.mjs';
 import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
 import { PHASE3_EVIDENCE_SCHEMA_VERSION, phase3EvidenceMetadata } from './phase3Evidence.mjs';
@@ -35,7 +35,24 @@ function hangingEvaluatePage() {
 			timeouts.push(ms);
 		},
 		waitForFunction: async () => undefined,
+		reload: async () => undefined,
 		evaluate: () => new Promise(() => { }),
+	};
+}
+
+function recoveringEvaluatePage() {
+	let hung = true;
+	const timeouts = [];
+	return {
+		timeouts,
+		setDefaultTimeout(ms) {
+			timeouts.push(ms);
+		},
+		waitForFunction: async () => true,
+		async reload() {
+			hung = false;
+		},
+		evaluate: () => hung ? new Promise(() => { }) : Promise.resolve('ok'),
 	};
 }
 
@@ -210,6 +227,14 @@ test('process-tree socket sampler uses lsof AND semantics', () => {
 	assert.doesNotMatch(source, /frames\(\)\.find\s*\(\s*async/);
 });
 
+test('launchPreBase waits for the workbench page after CDP connect', () => {
+	const source = readFileSync(join(acceptanceDir, 'workbenchHarness.mjs'), 'utf8');
+	const body = exportedSource(source, 'launchPreBase');
+	assert.match(body, /waitFor\(async \(\) =>/);
+	assert.match(body, /candidate\.url\(\)\.includes\('workbench'\)/);
+	assert.match(body, /45_000/);
+});
+
 test('workbenchCommandWithTimeout races evaluate against an explicit timer', () => {
 	const source = readFileSync(join(acceptanceDir, 'workbenchHarness.mjs'), 'utf8');
 	const body = exportedSource(source, 'workbenchCommandWithTimeout');
@@ -217,8 +242,15 @@ test('workbenchCommandWithTimeout races evaluate against an explicit timer', () 
 	assert.match(body, /workbench command timeout \(\$\{timeoutMs\}ms\): \$\{commandId\}/);
 	assert.match(body, /page\.evaluate\(/);
 	assert.match(body, /evaluateOptions = \{ timeout: timeoutMs \}/);
+	assert.doesNotMatch(body, /recoverHungWorkbenchPage/);
 	assert.doesNotMatch(body, /commandArgs: args \},\s*\{ timeout/);
 	assert.doesNotMatch(body, /usedSigkill|latencyMs\s*>/);
+});
+
+test('recoverHungWorkbenchPage reloads after a hung evaluate so later commands can proceed', { timeout: 1_500 }, async () => {
+	const page = recoveringEvaluatePage();
+	await recoverHungWorkbenchPage(page, 60);
+	assert.equal(await workbenchCommandWithTimeout(page, 60, 'prebase.graph.openNetwork'), 'ok');
 });
 
 test('hung page.evaluate cannot block workbenchCommandWithTimeout for minutes', { timeout: 1_500 }, async () => {
@@ -887,7 +919,7 @@ test('active-soak final evidence rejects diagnostic, short, and stale-HEAD recor
 	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, valid).ok, true);
 	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, { ...valid, evidenceKind: 'diagnostic' }).ok, false);
 	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, { ...valid, durationMs: activeSoak.minDurationMs - 1 }).ok, false);
-	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, { ...valid, sourceHead: 'stale-head' }).ok, false);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current', expectedProducerFingerprint: 'pf-active' }, { ...valid, sourceHead: 'stale-head', sourceFingerprint: 'fp-current', producerFingerprint: 'pf-active' }).ok, true);
 	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, { ...valid, sourceFingerprint: 'fp-stale' }).ok, false);
 });
 
@@ -925,7 +957,8 @@ test('active soak protects canonical final evidence and final gate has explicit 
 	assert.match(gate, /evidence source fingerprint does not match current worktree/);
 	assert.match(gate, /expected \$\{entry\.evidenceKind\} evidence/);
 	assert.match(gate, /evidence duration is below \$\{entry\.minDurationMs\}ms/);
-	assert.match(gate, /evidence source HEAD does not match current HEAD/);
+	assert.match(gate, /evidence producer fingerprint does not match current producer inputs/);
+	assert.doesNotMatch(gate, /plan stale due to code change: sourceHead/);
 });
 
 test('every live final-gate producer has a deadline, log, and process-tree timeout path', () => {
@@ -1025,9 +1058,9 @@ test('final evidence requires the canonical sourceHead field, not the retired he
 	const legacy = scenarioOk(entry, { ok: true, scenario: 'core-ide', head: 'current-head' });
 	assert.equal(legacy.ok, false, 'a legacy head field can otherwise conceal writers that never adopted the final evidence contract');
 	assert.match(legacy.reason, /source HEAD/);
-	const stale = scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'stale-head', sourceFingerprint: 'fp' });
-	assert.equal(stale.ok, false);
-	assert.match(stale.reason, /source HEAD does not match/);
+	const stale = scenarioOk({ ...entry, expectedProducerFingerprint: 'pf-core' }, { ok: true, scenario: 'core-ide', sourceHead: 'stale-head', sourceFingerprint: 'fp', producerFingerprint: 'pf-core' });
+	assert.equal(stale.ok, true, 'sourceHead mismatch alone must not invalidate evidence when producer fingerprint matches');
+	assert.equal(stale.provenanceHeadMismatch, true);
 	const staleFp = scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'current-head', sourceFingerprint: 'other' });
 	assert.equal(staleFp.ok, false);
 	assert.match(staleFp.reason, /fingerprint does not match/);
@@ -1389,6 +1422,8 @@ test('gate keeps current ok evidence when a producer times out with no leftover 
 
 test('lifecycle opens Runtime explorer and retries layout/editor close', () => {
 	const diag = readFileSync(join(acceptanceDir, 'prebase-process-leak-diag.mjs'), 'utf8');
+	assert.match(diag, /async function lifecycleCommand/);
+	assert.match(diag, /recoverHungWorkbenchPage/);
 	assert.match(diag, /workbench\.view\.prebase\.runtime\.explorer/);
 	assert.match(diag, /workbench\.action\.closeActiveEditor/);
 	assert.match(diag, /attempt < 3 && !opened/);
@@ -1419,5 +1454,48 @@ test('missing Firecrawl key is an external hybrid skip, not a stale repo-control
 	passing['hybrid-web-smoke'] = skipped;
 	const stale = classifyRequiredEvidence(identity, new Map(Object.entries(passing)));
 	assert.equal(stale.some(item => item.id === 'hybrid-web-smoke'), false);
-	assert.equal(scenarioOk({ id: 'hybrid-web-smoke', sourceHead: identity.sourceHead, sourceFingerprint: identity.sourceFingerprint }, skipped).ok, false);
+	assert.equal(scenarioOk({ id: 'hybrid-web-smoke', sourceHead: identity.sourceHead, sourceFingerprint: identity.sourceFingerprint, expectedProducerFingerprint: 'pf-hybrid' }, skipped).ok, false);
+});
+
+test('producer fingerprint controls freshness; sourceHead is provenance only', () => {
+	const producerFp = 'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa';
+	const entry = {
+		id: 'core-ide',
+		sourceHead: 'head-b-after-commit',
+		sourceFingerprint: 'product-fp-unchanged',
+		expectedProducerFingerprint: producerFp,
+	};
+	const evidence = {
+		ok: true,
+		scenario: 'core-ide',
+		sourceHead: 'head-a-before-commit',
+		sourceFingerprint: 'product-fp-unchanged',
+		producerFingerprint: producerFp,
+	};
+	const verdict = scenarioOk(entry, evidence);
+	assert.equal(verdict.ok, true);
+	assert.equal(verdict.provenanceHeadMismatch, true);
+	assert.equal(scenarioOk(entry, { ...evidence, producerFingerprint: 'changed-producer-fp' }).ok, false);
+});
+
+test('assertPlanIdentity accepts matching product fingerprint when HEAD changed', async () => {
+	const { assertPlanIdentity, expectedProducerFingerprint } = await import('./prebase-phase3-final-gate.mjs');
+	const identity = { sourceHead: 'new-head', sourceFingerprint: 'fp1', productFingerprint: 'fp1' };
+	const plan = {
+		productFingerprint: 'fp1',
+		sourceHead: 'old-head',
+		plannedAtHead: 'old-head',
+		producers: [{ id: 'core-ide', expectedProducerFingerprint: expectedProducerFingerprint(repoRoot, 'core-ide') }],
+		prerequisites: { firecrawlConfigured: false, linkupConfigured: false },
+	};
+	assert.doesNotThrow(() => assertPlanIdentity(plan, identity, repoRoot));
+});
+
+test('computePlanKey is stable for identical validation state', async () => {
+	const { computePlanKey, probeEnvironmentPrerequisites } = await import('./prebase-phase3-final-gate.mjs');
+	const identity = { productFingerprint: 'abc', sourceFingerprint: 'abc' };
+	const a = computePlanKey(repoRoot, identity, { firecrawlConfigured: false, linkupConfigured: true, geminiConfigured: false });
+	const b = computePlanKey(repoRoot, identity, { firecrawlConfigured: false, linkupConfigured: true, geminiConfigured: false });
+	assert.equal(a, b);
+	assert.notEqual(a, computePlanKey(repoRoot, { productFingerprint: 'other', sourceFingerprint: 'other' }, probeEnvironmentPrerequisites()));
 });

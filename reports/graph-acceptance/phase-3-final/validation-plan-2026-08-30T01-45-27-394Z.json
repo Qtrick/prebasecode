@@ -258,8 +258,14 @@
         "acceptance-shared"
       ],
       "execution": {
-        "status": "RUNNING",
-        "startedAt": "2026-08-30T01:50:05.391Z"
+        "status": "COMPLETE",
+        "startedAt": "2026-08-30T01:50:05.391Z",
+        "finishedAt": "2026-08-30T01:52:29.996Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 144566,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-electron-tools.log",
+        "leftoverPids": []
       }
     },
     {
@@ -278,7 +284,17 @@
         "desktop-runtime",
         "launch-harness",
         "acceptance-shared"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-08-30T01:52:30.049Z",
+        "finishedAt": "2026-08-30T01:56:39.017Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 248927,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-tauri-tools.log",
+        "leftoverPids": []
+      }
     },
     {
       "id": "hybrid-web-smoke",
@@ -294,7 +310,17 @@
         "magnus-core",
         "cloud-auth",
         "acceptance-shared"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-08-30T01:56:39.063Z",
+        "finishedAt": "2026-08-30T01:56:39.289Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 204,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/hybrid-web-smoke.log",
+        "leftoverPids": []
+      }
     },
     {
       "id": "privacy",
@@ -310,7 +336,17 @@
         "shared-workbench",
         "launch-harness",
         "acceptance-shared"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-08-30T01:56:39.318Z",
+        "finishedAt": "2026-08-30T01:56:52.812Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 13472,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/privacy.log",
+        "leftoverPids": []
+      }
     },
     {
       "id": "load-quit",
@@ -331,7 +367,17 @@
         "tauri-test-lab",
         "launch-harness",
         "acceptance-shared"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-08-30T01:56:52.853Z",
+        "finishedAt": "2026-08-30T01:58:44.413Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 111538,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log",
+        "leftoverPids": []
+      }
     },
     {
       "id": "lifecycle-cycles",
@@ -347,7 +393,17 @@
         "graphs-common",
         "launch-harness",
         "acceptance-shared"
-      ]
+      ],
+      "execution": {
+        "status": "FAILED",
+        "startedAt": "2026-08-30T01:58:44.448Z",
+        "finishedAt": "2026-08-30T02:13:44.549Z",
+        "exitCode": 1,
+        "timedOut": true,
+        "durationMs": 900078,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log",
+        "leftoverPids": []
+      }
     },
     {
       "id": "electron-restart-soak",

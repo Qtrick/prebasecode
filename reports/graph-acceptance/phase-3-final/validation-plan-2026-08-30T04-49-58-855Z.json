@@ -1,0 +1,364 @@
+{
+  "runId": "2026-08-30T04-49-58-855Z",
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "createdAt": "2026-08-30T04:49:59.976Z",
+  "totalEstimatedDurationMs": 1320000,
+  "producers": [
+    {
+      "id": "parser-benchmark",
+      "expectedProducerFingerprint": "4cb2c6ac4c2e63d636d7d98723ad86dced6505229026be5ba8e4f27023baacdd",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 90000,
+      "artifacts": [
+        "parser-benchmark"
+      ],
+      "dependencies": [
+        "graphs-common",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "magnus-streaming-smoke",
+      "expectedProducerFingerprint": "5a8409952f75035d065863c09fe7f3fef6563a3bb5d942f0eda84e668be8fde1",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 45000,
+      "artifacts": [
+        "magnus-streaming-smoke"
+      ],
+      "dependencies": [
+        "magnus-core",
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "core-ide",
+      "expectedProducerFingerprint": "5c7ebe9a2c5491f11e67c5d172bd2602815d155853cddf23002b82dcf1362c0e",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 120000,
+      "artifacts": [
+        "core-ide",
+        "code-graph",
+        "themes-a11y"
+      ],
+      "dependencies": [
+        "core-ide",
+        "shared-workbench",
+        "graphs-common",
+        "network-graph",
+        "runtime-preview",
+        "magnus-core",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "runtime-preview",
+      "expectedProducerFingerprint": "8b2ee395a510235eae09b2094745329c160dbc595ecee553c02efbf6cf57fa09",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 60000,
+      "artifacts": [
+        "runtime-preview"
+      ],
+      "dependencies": [
+        "runtime-preview",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "temporal-small",
+      "expectedProducerFingerprint": "c7f8ee39e4e091d567db4039c355ccde630a0de59db2f23203bd24ca9be28856",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 90000,
+      "artifacts": [
+        "temporal-small"
+      ],
+      "dependencies": [
+        "temporal",
+        "graphs-common",
+        "network-graph",
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "temporal-large",
+      "expectedProducerFingerprint": "e66798e4c117cab5b482a679c5c83140de0ecc49ba48b908bffe1403d42ed28b",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 150000,
+      "artifacts": [
+        "temporal-large"
+      ],
+      "dependencies": [
+        "temporal",
+        "graphs-common",
+        "network-graph",
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "electron-product-path",
+      "expectedProducerFingerprint": "55b5281291451b57d55fd1e8283038593bf15606e7ff74dbd7ce269ae5247e0a",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 30000,
+      "artifacts": [
+        "electron-product-path"
+      ],
+      "dependencies": [
+        "desktop-runtime",
+        "electron-test-lab",
+        "magnus-desktop-tools",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "electron-native-cases",
+      "expectedProducerFingerprint": "386b829943fb3ab5928761bdb8bd03475000f56e607fca4611606e92db2bf76b",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 35000,
+      "artifacts": [
+        "electron-native-cases"
+      ],
+      "dependencies": [
+        "electron-test-lab",
+        "desktop-runtime",
+        "magnus-desktop-tools",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "tauri-product-path",
+      "expectedProducerFingerprint": "80f97ca4a353ed7c1e41af8e28f2c4dc96e28dfc6c9225ea25636643fc9945d8",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 30000,
+      "artifacts": [
+        "tauri-product-path"
+      ],
+      "dependencies": [
+        "desktop-runtime",
+        "tauri-test-lab",
+        "magnus-desktop-tools",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "magnus-electron-tools",
+      "expectedProducerFingerprint": "fc1743ada3d4e38c7aeaeed5331df58b362a0fda9ba50bbdda305c8fb0b0741e",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 150000,
+      "artifacts": [
+        "magnus-electron-tools"
+      ],
+      "dependencies": [
+        "magnus-core",
+        "magnus-desktop-tools",
+        "electron-test-lab",
+        "desktop-runtime",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "magnus-tauri-tools",
+      "expectedProducerFingerprint": "cc35d9a8714e4b66fb047868cb9f24960471494df3ff9e41c61b4dd833d0e872",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 240000,
+      "artifacts": [
+        "magnus-tauri-tools"
+      ],
+      "dependencies": [
+        "magnus-core",
+        "magnus-desktop-tools",
+        "tauri-test-lab",
+        "desktop-runtime",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "hybrid-web-smoke",
+      "expectedProducerFingerprint": "c1494c4bd367f471673fa8eace71b3efc60280ab29d519e6d76f606cfe4e7e26",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 60000,
+      "artifacts": [
+        "hybrid-web-smoke"
+      ],
+      "dependencies": [
+        "web-context",
+        "magnus-core",
+        "cloud-auth",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "privacy",
+      "expectedProducerFingerprint": "ea82c342674e4f9487c9d8d1b4a75fe0a3811cc0a3e03721204e06b8752ea09d",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 90000,
+      "artifacts": [
+        "privacy"
+      ],
+      "dependencies": [
+        "privacy",
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "load-quit",
+      "expectedProducerFingerprint": "29b0c3f7f9e593e1598828609a8cec29dc4d21f5f0aae610556e3f1b285e1461",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 120000,
+      "artifacts": [
+        "load-quit"
+      ],
+      "dependencies": [
+        "shared-workbench",
+        "graphs-common",
+        "temporal",
+        "runtime-preview",
+        "magnus-core",
+        "electron-test-lab",
+        "tauri-test-lab",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "lifecycle-cycles",
+      "expectedProducerFingerprint": "980174627728a216cc16d83231710fb07598e7d9dd920cf61b121f24e2a96950",
+      "status": "STALE",
+      "reason": "lifecycle did not record live WebContents counts for each cycle; lifecycle did not open runtime; lifecycle did not open magnus",
+      "estimatedDurationMs": 1320000,
+      "artifacts": [
+        "lifecycle-cycles"
+      ],
+      "dependencies": [
+        "shared-workbench",
+        "graphs-common",
+        "launch-harness",
+        "acceptance-shared"
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-08-30T04:50:04.127Z",
+        "finishedAt": "2026-08-30T04:51:04.069Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 59917,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log",
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "electron-restart-soak",
+      "expectedProducerFingerprint": "5134912de248c9dff6561e1ec57bc939137f316f3816bda7898e13a39e45df36",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 900000,
+      "artifacts": [
+        "electron-restart-soak"
+      ],
+      "dependencies": [
+        "desktop-runtime",
+        "electron-test-lab",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "tauri-restart-soak",
+      "expectedProducerFingerprint": "0d72f7b3a92839bbc8fe5db99624876fd61b32b8121dbe177ea26bfe6faa74f6",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 240000,
+      "artifacts": [
+        "tauri-restart-soak"
+      ],
+      "dependencies": [
+        "desktop-runtime",
+        "tauri-test-lab",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "idle-soak",
+      "expectedProducerFingerprint": "be1b74cefd0fa436431f772c72446826c46af7c8d80a13c0a911fffa4d187e67",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 900000,
+      "artifacts": [
+        "idle-soak"
+      ],
+      "dependencies": [
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "active-soak",
+      "expectedProducerFingerprint": "ba0e1efb8b00c7d5f2e31b8f2bc3beb0971c1695773c88b7b486ed64503aedd5",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 720000,
+      "artifacts": [
+        "active-soak"
+      ],
+      "dependencies": [
+        "shared-workbench",
+        "graphs-common",
+        "network-graph",
+        "temporal",
+        "runtime-preview",
+        "magnus-core",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "assurance",
+      "expectedProducerFingerprint": "546a8356aa79e11a0c54d18847219d6d2cf9aecd334dec789a97cbc6af6d98d8",
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 480000,
+      "artifacts": [
+        "assurance.json"
+      ],
+      "dependencies": [
+        "assurance-leaf",
+        "acceptance-shared",
+        "magnus-core",
+        "graphs-common",
+        "shared-workbench",
+        "privacy"
+      ]
+    }
+  ]
+}

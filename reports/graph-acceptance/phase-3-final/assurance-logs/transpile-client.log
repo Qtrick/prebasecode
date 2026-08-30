@@ -8,14 +8,14 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
 [transpile] Found 7541 files
 [resources] Copying all non-TS files to out...
 [resources] Copied 1385 files
-[transpile] Done in 2455ms
+[transpile] Done in 2836ms
 
-✓ Total: 2878ms
+✓ Total: 3386ms
 npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
 
 > code-oss-dev@1.128.0 gulp
 > node --experimental-strip-types --max-old-space-size=8192 ./node_modules/gulp/bin/gulp.js copy-codicons
 
-[20:37:50] Using gulpfile ~/Prebasecode/gulpfile.mjs
-[20:37:50] Starting 'copy-codicons'...
-[20:37:50] Finished 'copy-codicons' after 6.12 ms
+[00:11:40] Using gulpfile ~/Prebasecode/gulpfile.mjs
+[00:11:40] Starting 'copy-codicons'...
+[00:11:40] Finished 'copy-codicons' after 5.08 ms

@@ -1,0 +1,102 @@
+[03:18:54] START parser-benchmark
+estimated 1m30s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/parser-benchmark.log
+[03:19:02] PASS parser-benchmark
+elapsed 7s
+[03:19:02] START magnus-streaming-smoke
+estimated 45s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log
+[03:19:17] PASS magnus-streaming-smoke
+elapsed 14s
+[03:19:17] START runtime-preview
+estimated 1m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/runtime-preview.log
+[03:20:04] PASS runtime-preview
+elapsed 47s
+[03:20:04] START temporal-small
+estimated 1m30s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log
+[03:20:13] PASS temporal-small
+elapsed 8s
+[03:20:13] START temporal-large
+estimated 2m30s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/temporal-large.log
+[03:20:25] PASS temporal-large
+elapsed 11s
+[03:20:25] START electron-product-path
+estimated 30s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/electron-product-path.log
+[03:20:50] PASS electron-product-path
+elapsed 25s
+[03:20:50] START electron-native-cases
+estimated 35s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/electron-native-cases.log
+[03:21:23] PASS electron-native-cases
+elapsed 32s
+[03:21:23] START tauri-product-path
+estimated 30s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/tauri-product-path.log
+[03:21:52] PASS tauri-product-path
+elapsed 28s
+[03:21:52] START magnus-electron-tools
+estimated 2m30s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-electron-tools.log
+[03:24:17] PASS magnus-electron-tools
+elapsed 2m25s
+[03:24:17] START magnus-tauri-tools
+estimated 4m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-tauri-tools.log
+[03:28:26] PASS magnus-tauri-tools
+elapsed 4m8s
+[03:28:26] START hybrid-web-smoke
+estimated 1m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/hybrid-web-smoke.log
+[03:28:26] PASS hybrid-web-smoke
+elapsed 0s
+[03:28:26] START privacy
+estimated 1m30s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/privacy.log
+[03:28:40] PASS privacy
+elapsed 13s
+[03:28:40] START load-quit
+estimated 2m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log
+[03:30:31] PASS load-quit
+elapsed 1m51s
+[03:30:31] START lifecycle-cycles
+estimated 22m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log
+[03:31:28] PASS lifecycle-cycles
+elapsed 56s
+[03:31:28] START electron-restart-soak
+estimated 15m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/electron-restart-soak.log
+[03:39:46] PASS electron-restart-soak
+elapsed 8m17s
+[03:39:46] START tauri-restart-soak
+estimated 4m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/tauri-restart-soak.log
+[03:44:14] PASS tauri-restart-soak
+elapsed 4m28s
+[03:44:14] START idle-soak
+estimated 15m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/idle-soak.log
+[03:59:22] PASS idle-soak
+elapsed 15m7s
+[03:59:22] START active-soak
+estimated 12m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/active-soak.log
+[04:11:33] PASS active-soak
+elapsed 12m10s
+[04:11:33] START assurance
+estimated 8m0s
+log: /Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/assurance.log
+[04:12:55] PASS assurance
+elapsed 1m21s
+{
+  "ok": true,
+  "failures": [],
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "validationRunId": "2026-08-30T03-18-49-741Z"
+}

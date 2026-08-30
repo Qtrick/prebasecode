@@ -1,0 +1,17 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:dialog-routing
+> node scripts/assurance/verify-dialog-routing.mjs
+
+================================================================
+ PreBase File-Dialog Routing & Default Invariants Verification
+================================================================
+
+  ✓ files.simpleDialog.enable default is false in files.contribution.ts
+  ✓ product.json does not force simpleDialog
+  ✓ scripts/code.sh does not force simpleDialog or smoke test mode
+  ✓ launch.sh isolates simpleDialog to automation and supports --native-dialogs
+
+================================================================
+ PREBASE FILE-DIALOG ROUTING VERIFICATION: PASS (All checks passed)
+================================================================

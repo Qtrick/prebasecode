@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { tmpdir } from 'node:os';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 import {
 	ProjectGuidanceService,
@@ -9,9 +9,15 @@ import {
 	guidanceTargetsFromReferences,
 	scrubSecretsFromGuidance,
 } from './projectGuidanceService';
+import { beginProjectGuidanceSession, endProjectGuidanceSession } from './projectGuidanceSession';
+import { getProjectGuidanceService, setProjectGuidanceService } from './projectGuidanceRegistry';
+
+const magnusDir = dirname(fileURLToPath(import.meta.url));
+const guidanceTmpRoot = join(magnusDir, '../../../test/prebase/tmp/guidance-runs');
 
 function tempGuidanceRoot(prefix: string): string {
-	return mkdtempSync(join(tmpdir(), `pb-${prefix}-`));
+	mkdirSync(guidanceTmpRoot, { recursive: true });
+	return mkdtempSync(join(guidanceTmpRoot, `${prefix}-`));
 }
 
 function makeReader(root: string) {
@@ -28,14 +34,14 @@ describe('projectGuidanceService', () => {
 		const root = tempGuidanceRoot('guidance');
 		try {
 			writeFileSync(join(root, 'AGENTS.md'), '# Agents\nNever modify application icons.\n');
-			mkdirSync(join(root, '.cursor/rules'), { recursive: true });
-			writeFileSync(join(root, '.cursor/rules/graphs.mdc'), '---\nalwaysApply: true\n---\nGraph code lives under graphs/.\n');
+			mkdirSync(join(root, '.clinerules'), { recursive: true });
+			writeFileSync(join(root, '.clinerules/graphs.md'), '---\nalwaysApply: true\n---\nGraph code lives under graphs/.\n');
 			mkdirSync(join(root, '.agents/skills/launch'), { recursive: true });
 			writeFileSync(join(root, '.agents/skills/launch/SKILL.md'), '---\nname: launch\ndescription: Launch PreBase dev build\n---\n# Launch\n');
 			const service = new ProjectGuidanceService(makeReader(root));
 			const snapshot = await service.getSnapshot(root);
 			assert.ok(snapshot.alwaysApplicable.some(item => item.source.path === 'AGENTS.md'));
-			assert.ok(snapshot.alwaysApplicable.some(item => item.source.path === '.cursor/rules/graphs.mdc'));
+			assert.ok(snapshot.alwaysApplicable.some(item => item.source.path === '.clinerules/graphs.md'));
 			assert.equal(snapshot.skillCatalog.some(item => item.name === 'launch'), true);
 			assert.equal(snapshot.activatedSkills.length, 0);
 			const prompt = formatProjectGuidanceForPrompt(snapshot);
@@ -50,13 +56,13 @@ describe('projectGuidanceService', () => {
 	test('path-scoped Cursor globs apply only to matching targets', async () => {
 		const root = tempGuidanceRoot('guidance-scope');
 		try {
-			mkdirSync(join(root, '.cursor/rules'), { recursive: true });
-			writeFileSync(join(root, '.cursor/rules/graph-only.mdc'), '---\nalwaysApply: false\nglobs: graphs/**\n---\nOnly edit graphs/.\n');
+			mkdirSync(join(root, '.clinerules'), { recursive: true });
+			writeFileSync(join(root, '.clinerules/graph-only.md'), '---\nalwaysApply: false\napplyTo: graphs/**\n---\nOnly edit graphs/.\n');
 			const service = new ProjectGuidanceService(makeReader(root));
 			const graphs = await service.getSnapshot(root, ['graphs/src/foo.ts']);
 			const other = await service.getSnapshot(root, ['src/main.ts']);
-			assert.ok(graphs.pathApplicable.some(item => item.source.path.endsWith('graph-only.mdc')));
-			assert.equal(other.pathApplicable.some(item => item.source.path.endsWith('graph-only.mdc')), false);
+			assert.ok(graphs.pathApplicable.some(item => item.source.path.endsWith('graph-only.md')));
+			assert.equal(other.pathApplicable.some(item => item.source.path.endsWith('graph-only.md')), false);
 		} finally {
 			rmSync(root, { recursive: true, force: true });
 		}
@@ -86,9 +92,9 @@ describe('projectGuidanceService', () => {
 	test('conflicting indentation guidance in the same scope is surfaced', async () => {
 		const root = tempGuidanceRoot('guidance-conflict');
 		try {
-			mkdirSync(join(root, '.cursor/rules'), { recursive: true });
-			writeFileSync(join(root, '.cursor/rules/tabs.mdc'), '---\nalwaysApply: true\n---\nUse tabs for indentation.\n');
-			writeFileSync(join(root, '.cursor/rules/spaces.mdc'), '---\nalwaysApply: true\n---\nUse spaces for indentation.\n');
+			mkdirSync(join(root, '.clinerules'), { recursive: true });
+			writeFileSync(join(root, '.clinerules/tabs.md'), '---\nalwaysApply: true\n---\nUse tabs for indentation.\n');
+			writeFileSync(join(root, '.clinerules/spaces.md'), '---\nalwaysApply: true\n---\nUse spaces for indentation.\n');
 			const service = new ProjectGuidanceService(makeReader(root));
 			const snapshot = await service.getSnapshot(root);
 			assert.equal(snapshot.conflicts.length, 1);
@@ -157,5 +163,90 @@ describe('projectGuidanceService', () => {
 			{ value: { fsPath: '/tmp/workspace/src/main.ts' } },
 		], value => typeof value === 'object' && value && 'fsPath' in value ? 'src/main.ts' : undefined);
 		assert.deepEqual(paths.sort(), ['graphs/src/foo.ts', 'src/main.ts']);
+	});
+
+	test('activated intelligent/manual rules appear in snapshot and prompt', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-monorepo');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const catalog = await service.getSnapshot(root, ['src/main.ts']);
+		assert.ok(catalog.onDemandRules.some(item => item.source.path.endsWith('intelligent-hint.mdc')));
+		assert.equal(catalog.activatedRules.length, 0);
+		const activated = await service.getSnapshot(root, ['src/main.ts'], [], true, ['.cursor/rules/intelligent-hint.mdc']);
+		assert.equal(activated.activatedRules.length, 1);
+		assert.match(formatProjectGuidanceForPrompt(activated), /Intelligent rule body stays hidden/);
+	});
+
+	test('cache invalidates all snapshots for a workspace root', async () => {
+		const root = tempGuidanceRoot('guidance-cache');
+		try {
+			writeFileSync(join(root, 'AGENTS.md'), 'Version one.\n');
+			const service = new ProjectGuidanceService(makeReader(root));
+			const first = await service.getSnapshot(root);
+			assert.match(first.alwaysApplicable[0]?.text ?? '', /Version one/);
+			writeFileSync(join(root, 'AGENTS.md'), 'Version two.\n');
+			service.invalidate(root);
+			const second = await service.getSnapshot(root);
+			assert.match(second.alwaysApplicable[0]?.text ?? '', /Version two/);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test('nested AGENTS.override and OpenCode skills in cross-ecosystem fixture', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-monorepo');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const pkg = await service.getSnapshot(root, ['packages/web/app.ts']);
+		assert.ok(pkg.alwaysApplicable.some(item => item.source.path === 'AGENTS.md'));
+		assert.ok(pkg.alwaysApplicable.some(item => item.source.path === 'packages/AGENTS.override.md'));
+		assert.equal(pkg.alwaysApplicable.some(item => item.source.path === 'packages/AGENTS.md'), false);
+		const graphs = await service.getSnapshot(root, ['graphs/src/foo.ts']);
+		assert.ok(graphs.pathApplicable.some(item => item.source.path.endsWith('graph.mdc')));
+		assert.equal(graphs.alwaysApplicable.some(item => item.text.includes('Manual rule body')), false);
+		assert.ok(graphs.skillCatalog.some(item => item.name === 'ui-ux-pro-max'));
+		assert.ok(graphs.skillCatalog.some(item => item.name === 'deploy' && item.ecosystem === 'codex'));
+		const activated = await service.getSnapshot(root, [], ['ui-ux-pro-max']);
+		assert.equal(activated.activatedSkills.length, 1);
+		assert.match(activated.activatedSkills[0].body, /native VS Code/);
+	});
+
+	test('intelligent and manual Cursor rules stay on-demand until activate_rule', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-monorepo');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const baseline = await service.getSnapshot(root);
+		assert.ok(baseline.onDemandRules.some(item => item.source.path.endsWith('manual-only.mdc') && item.source.activationMode === 'manual'));
+		assert.ok(baseline.onDemandRules.some(item => item.source.path.endsWith('intelligent-hint.mdc') && item.source.activationMode === 'intelligent'));
+		assert.equal(baseline.alwaysApplicable.some(item => item.text.includes('Manual rule body')), false);
+		assert.equal(baseline.alwaysApplicable.some(item => item.text.includes('Intelligent rule body')), false);
+		const activated = await service.getSnapshot(root, [], [], true, ['.cursor/rules/manual-only.mdc', '.cursor/rules/intelligent-hint.mdc']);
+		const bodies = activated.activatedRules.map(item => item.text).join('\n');
+		assert.match(bodies, /Manual rule body stays hidden/);
+		assert.match(bodies, /Intelligent rule body stays hidden/);
+	});
+
+	test('prebase_project_guidance activation path loads skill bodies through session state', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-monorepo');
+		const service = new ProjectGuidanceService(makeReader(root));
+		setProjectGuidanceService(service);
+		endProjectGuidanceSession();
+		const session = beginProjectGuidanceSession(['graphs/src/foo.ts']);
+		session.activateSkill('deploy');
+		try {
+			const snapshot = await service.getSnapshot(
+				root,
+				session.getTargetPaths(),
+				session.getActivatedSkillNames(),
+				true,
+				session.getActivatedRulePaths(),
+			);
+			assert.equal(getProjectGuidanceService(), service);
+			assert.equal(snapshot.activatedSkills.length, 1);
+			assert.equal(snapshot.activatedSkills[0].metadata.name, 'deploy');
+			assert.match(snapshot.activatedSkills[0].body, /Deploy/);
+			const missing = await service.getSnapshot(root, [], ['missing-skill']);
+			assert.equal(missing.activatedSkills.length, 0);
+		} finally {
+			endProjectGuidanceSession();
+			setProjectGuidanceService(undefined);
+		}
 	});
 });

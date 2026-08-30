@@ -1,6 +1,6 @@
 [PreBase SecretResolver] Notice: PreBase root .env has group/world readable permissions.
 {"skipped":true,"linkupConfigured":true,"firecrawlConfigured":false}
-(node:65535) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/secretResolver.ts is not specified and it doesn't parse as CommonJS.
+(node:75499) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/secretResolver.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)

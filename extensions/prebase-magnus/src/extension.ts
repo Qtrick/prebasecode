@@ -4,7 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { magnusRequestShutdown, registerMagnusChatParticipants, setProjectGuidanceService, type MagnusChatDefaults } from './chatParticipant';
+import { magnusRequestShutdown, registerMagnusChatParticipants, type MagnusChatDefaults } from './chatParticipant';
+import { setProjectGuidanceService } from './projectGuidanceRegistry';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
 import { buildModelOptions } from './models';
 import { DEFAULT_MAGNUS_AGENT_MODE, MAGNUS_AGENT_MODES, isMagnusAgentMode } from './modes';
@@ -16,7 +17,7 @@ import { globalAIProviderRegistry } from './aiProviderRegistry';
 import { MagnusSmokeTransportAdapter, magnusSmokeStreamDiagnostics } from './smokeTransport';
 import { magnusLiveStreamDiagnostics } from './chatParticipant';
 import { findPreBaseSourceRoot, PreBaseSecretResolver } from './secretResolver';
-import { ProjectGuidanceService, resolveGuidancePath, type GuidanceFileReader } from './projectGuidanceService';
+import { ProjectGuidanceService, resolveGuidancePath, resolveWorkspaceRootForPath, type GuidanceFileReader } from './projectGuidanceService';
 import type { PreBaseAIExecutionMode } from './secretCatalog';
 
 export interface SafeMagnusError {
@@ -107,10 +108,24 @@ export function activate(context: vscode.ExtensionContext): void {
 		for (const pattern of [
 			'**/AGENTS.md',
 			'**/AGENTS.override.md',
+			'**/CLAUDE.md',
+			'**/CLAUDE.local.md',
+			'**/.claude/CLAUDE.md',
+			'**/.claude/rules/**',
 			'**/.cursor/rules/**',
 			'**/.github/copilot-instructions.md',
+			'**/.github/instructions/**',
+			'**/GEMINI.md',
+			'**/.clinerules/**',
+			'**/.windsurfrules',
+			'**/.windsurf/rules/**',
 			'**/.agents/skills/**/SKILL.md',
 			'**/.cursor/skills/**/SKILL.md',
+			'**/.claude/skills/**/SKILL.md',
+			'**/.codex/skills/**/SKILL.md',
+			'**/.opencode/skills/**/SKILL.md',
+			'**/.cline/skills/**/SKILL.md',
+			'**/.windsurf/skills/**/SKILL.md',
 		]) {
 			const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 			context.subscriptions.push(
@@ -122,8 +137,8 @@ export function activate(context: vscode.ExtensionContext): void {
 		}
 		context.subscriptions.push(
 			vscode.commands.registerCommand('prebase.magnus.viewProjectGuidance', async () => {
-				const folder = vscode.workspace.workspaceFolders?.[0];
-				if (!folder) {
+				const folders = vscode.workspace.workspaceFolders ?? [];
+				if (!folders.length) {
 					void vscode.window.showInformationMessage('Open a workspace to inspect project guidance.');
 					return;
 				}
@@ -131,29 +146,57 @@ export function activate(context: vscode.ExtensionContext): void {
 					void vscode.window.showWarningMessage('Project guidance is disabled until this workspace is trusted.');
 					return;
 				}
-				const snapshot = await projectGuidance.getSnapshot(folder.uri.fsPath);
-				const lines = [
-					`Project guidance: ${snapshot.alwaysApplicable.length} always-on, ${snapshot.pathApplicable.length} path-scoped, ${snapshot.skillCatalog.length} skills`,
-					...snapshot.diagnostics.slice(0, 6),
-				];
+				const activeEditor = vscode.window.activeTextEditor;
+				const workspaceRoot = activeEditor
+					? resolveWorkspaceRootForPath(activeEditor.document.uri.fsPath, folders)
+					: folders[0].uri.fsPath;
+				if (!workspaceRoot) {
+					void vscode.window.showInformationMessage('Open a workspace to inspect project guidance.');
+					return;
+				}
+				const activePath = activeEditor
+					? vscode.workspace.asRelativePath(activeEditor.document.uri, false)
+					: undefined;
+				const snapshot = await projectGuidance.getSnapshot(workspaceRoot, activePath ? [activePath] : []);
 				const pick = await vscode.window.showQuickPick(
 					[
-						{ label: '$(book) Open AGENTS.md', relPath: 'AGENTS.md' },
-						...snapshot.alwaysApplicable.slice(0, 8).map(item => ({
+						{ label: '$(check) Currently applied', kind: vscode.QuickPickItemKind.Separator, relPath: '' },
+						...snapshot.alwaysApplicable.map(item => ({
 							label: `$(law) ${item.source.path}`,
-							description: item.source.ecosystem,
+							description: `${item.source.ecosystem} • always`,
 							relPath: item.source.path,
 						})),
-						...snapshot.skillCatalog.slice(0, 8).map(item => ({
+						...snapshot.pathApplicable.map(item => ({
+							label: `$(folder) ${item.source.path}`,
+							description: `${item.source.ecosystem} • path-scoped`,
+							relPath: item.source.path,
+						})),
+						{ label: '$(lightbulb) Available on demand', kind: vscode.QuickPickItemKind.Separator, relPath: '' },
+						...snapshot.onDemandRules.map(item => ({
+							label: `$(symbol-event) ${item.source.path}`,
+							description: `${item.source.activationMode}: ${item.description}`,
+							relPath: item.source.path,
+						})),
+						...snapshot.skillCatalog.map(item => ({
 							label: `$(sparkle) ${item.name}`,
-							description: item.description,
+							description: `${item.ecosystem} skill • ${item.description}`,
 							relPath: item.path,
 						})),
-					],
-					{ title: 'Project Guidance', placeHolder: lines.join(' • ') },
+						...(snapshot.diagnostics.length ? [{ label: '$(warning) Diagnostics', kind: vscode.QuickPickItemKind.Separator, relPath: '' }] : []),
+						...snapshot.diagnostics.slice(0, 6).map(message => ({
+							label: `$(info) ${message}`,
+							description: 'diagnostic',
+							relPath: '',
+						})),
+					].filter(item => item.label),
+					{
+						title: 'Project Guidance',
+						placeHolder: `${snapshot.alwaysApplicable.length} always-on • ${snapshot.pathApplicable.length} path-scoped • ${snapshot.skillCatalog.length} skills`,
+						matchOnDescription: true,
+					},
 				);
 				if (pick?.relPath) {
-					const fullPath = resolveGuidancePath(folder.uri.fsPath, pick.relPath);
+					const fullPath = resolveGuidancePath(workspaceRoot, pick.relPath);
 					if (!fullPath) {
 						void vscode.window.showErrorMessage('That guidance path is not allowed.');
 						return;

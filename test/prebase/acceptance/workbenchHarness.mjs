@@ -81,6 +81,22 @@ export async function workbenchCommand(page, commandId, ...args) {
 	}, { id: commandId, commandArgs: args });
 }
 
+export async function recoverHungWorkbenchPage(page, timeoutMs = 60_000) {
+	await Promise.race([
+		(async () => {
+			// Playwright serializes page.evaluate calls; a timed-out command can still block the queue.
+			// Navigation aborts the hung evaluate so later harness commands can proceed.
+			if (typeof page.reload === 'function') {
+				await page.reload({ waitUntil: 'domcontentloaded', timeout: timeoutMs }).catch(() => undefined);
+			}
+			await waitForWorkbenchDriver(page, timeoutMs);
+		})(),
+		new Promise((_, reject) => {
+			setTimeout(() => reject(new Error(`recoverHungWorkbenchPage timeout (${timeoutMs}ms)`)), timeoutMs);
+		}),
+	]).catch(() => undefined);
+}
+
 export async function workbenchCommandWithTimeout(page, timeoutMs, commandId, ...args) {
 	const previous = 12_000;
 	page.setDefaultTimeout(timeoutMs);
@@ -412,7 +428,11 @@ export async function launchPreBase(repo, workspace, extraArgs = []) {
 	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
 	try {
 		const browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
-		const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
+		const page = await waitFor(async () => {
+			return browser.contexts()
+				.flatMap(context => context.pages())
+				.find(candidate => candidate.url().includes('workbench'));
+		}, 45_000, 250);
 		if (!page) {
 			throw new Error('Workbench page not found');
 		}

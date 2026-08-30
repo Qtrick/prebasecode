@@ -71,8 +71,8 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 			}
 		}
 
-		assert.strictEqual(registeredTools.size, 42, 'Expected 42 runtime registered tools');
-		assert.strictEqual(manifestTools.size, 42, 'Expected 42 manifest contributed tools');
+		assert.strictEqual(registeredTools.size, 43, 'Expected 43 runtime registered tools');
+		assert.strictEqual(manifestTools.size, 43, 'Expected 43 manifest contributed tools');
 
 		const missingFromManifest = Array.from(registeredTools).filter(t => !manifestTools.has(t));
 		const missingFromRuntime = Array.from(manifestTools).filter(t => !registeredTools.has(t));
@@ -119,7 +119,7 @@ describe('Magnus Activation & Tool/Command Contracts', () => {
 		assert.ok(!events.some(event => event.startsWith('onLanguageModelTool:')), 'onLanguageModelTool events must stay implicit');
 
 		const tools: Array<{ name: string }> = manifest.contributes?.languageModelTools ?? [];
-		assert.strictEqual(tools.length, 42);
+		assert.strictEqual(tools.length, 43);
 
 		const contribution = fs.readFileSync(path.join(repoRoot, 'src/vs/workbench/contrib/chat/common/tools/languageModelToolsContribution.ts'), 'utf8');
 		const generated = [...compileActivationEventsGenerator(contribution)(tools)];

@@ -9,6 +9,9 @@ import type { MagnusSecretStorage } from './secretStorage';
 import { isSecretPath, isUnderWorkspace, MagnusWorkspaceTools, resolveWorkspaceUri } from './tools';
 import { WorkspaceIntelligence, type WorkspacePosition } from './workspaceIntelligence';
 import { MagnusToolActivityDescriptor } from './toolActivity';
+import { getProjectGuidanceService } from './projectGuidanceRegistry';
+import { getProjectGuidanceSession } from './projectGuidanceSession';
+import { resolveWorkspaceRootForPath } from './projectGuidanceService';
 import { ProjectSafetyService } from './projectSafetyService';
 
 function result(value: string): vscode.LanguageModelToolResult {
@@ -767,9 +770,88 @@ class WebFetchTool implements vscode.LanguageModelTool<WebFetchInput> {
 	}
 }
 
+class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; rulePath?: string; paths?: string[] }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; rulePath?: string; paths?: string[] }>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_project_guidance', options.input as Record<string, unknown>);
+	}
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; rulePath?: string; paths?: string[] }>, _token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+		const service = getProjectGuidanceService();
+		if (!service) {
+			throw new Error('Project guidance is unavailable.');
+		}
+		const session = getProjectGuidanceSession();
+		const folders = vscode.workspace.workspaceFolders;
+		const editorPath = vscode.window.activeTextEditor?.document.uri.fsPath;
+		const workspaceRoot = editorPath
+			? resolveWorkspaceRootForPath(editorPath, folders)
+			: folders?.[0]?.uri.fsPath;
+		if (!workspaceRoot) {
+			throw new Error('Open a workspace to use project guidance.');
+		}
+		const operation = options.input.operation;
+		if (operation === 'get_for_paths') {
+			for (const path of options.input.paths ?? []) {
+				session?.addTargets([path]);
+			}
+		} else if (operation === 'activate_skill') {
+			const name = options.input.skillName?.trim();
+			if (!name) {
+				throw new Error('skillName is required for activate_skill.');
+			}
+			session?.activateSkill(name);
+		} else if (operation === 'activate_rule') {
+			const rulePath = options.input.rulePath?.trim();
+			if (!rulePath) {
+				throw new Error('rulePath is required for activate_rule.');
+			}
+			session?.activateRule(rulePath.replace(/\\/g, '/'));
+		}
+		const snapshot = await service.getSnapshot(
+			workspaceRoot,
+			session?.getTargetPaths() ?? options.input.paths ?? [],
+			session?.getActivatedSkillNames() ?? (options.input.skillName ? [options.input.skillName] : []),
+			true,
+			session?.getActivatedRulePaths() ?? (options.input.rulePath ? [options.input.rulePath] : []),
+		);
+		if (operation === 'activate_skill') {
+			const skill = snapshot.activatedSkills.find(item => item.metadata.name === options.input.skillName);
+			if (!skill) {
+				return result(JSON.stringify({ ok: false, reason: 'Skill not found or not activatable.', catalog: snapshot.skillCatalog.map(item => item.name) }));
+			}
+			return result(JSON.stringify({
+				ok: true,
+				skill: skill.metadata.name,
+				root: skill.root,
+				files: skill.files,
+				body: skill.body,
+				note: 'Supporting files are not loaded automatically; read them on demand.',
+			}));
+		}
+		if (operation === 'activate_rule') {
+			const path = options.input.rulePath?.replace(/\\/g, '/');
+			const match = snapshot.activatedRules.find(item => item.source.path === path)
+				?? [...snapshot.alwaysApplicable, ...snapshot.pathApplicable].find(item => item.source.path === path);
+			return result(JSON.stringify({
+				ok: Boolean(match),
+				path,
+				body: match?.text ?? '',
+				catalog: match ? undefined : snapshot.onDemandRules.map(item => item.source.path),
+			}));
+		}
+		return result(JSON.stringify({
+			ok: true,
+			always: snapshot.alwaysApplicable.map(item => item.source.path),
+			pathScoped: snapshot.pathApplicable.map(item => item.source.path),
+			onDemand: snapshot.onDemandRules.map(item => item.source.path),
+			skills: snapshot.skillCatalog.map(item => item.name),
+		}));
+	}
+}
+
 /** Registers structured native tools; no model output is interpreted as shell or edit directives. */
 export function registerMagnusLanguageModelTools(context: vscode.ExtensionContext, secrets?: MagnusSecretStorage): void {
 	context.subscriptions.push(
+		vscode.lm.registerTool('prebase_project_guidance', new ProjectGuidanceTool()),
 		vscode.lm.registerTool('prebase_web_search', new WebSearchTool(secrets)),
 		vscode.lm.registerTool('prebase_web_fetch', new WebFetchTool(secrets)),
 		vscode.lm.registerTool('prebase_graph_search_nodes', new GraphSearchTool()),

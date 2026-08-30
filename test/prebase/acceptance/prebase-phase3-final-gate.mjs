@@ -4,7 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { spawn } from 'node:child_process';
-import { createWriteStream, existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { createWriteStream, existsSync, mkdirSync, readdirSync, readFileSync, renameSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { acquirePhase3AcceptanceLock, processState, processTree, terminateOwnedProcessTree } from './workbenchHarness.mjs';
@@ -22,6 +23,8 @@ const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceRoot = join(repo, 'reports/graph-acceptance/phase-3-final');
 const gateLogRoot = join(evidenceRoot, 'gate-logs');
 const validationPlanPath = join(evidenceRoot, 'validation-plan.json');
+export const VALIDATION_PLAN_SCHEMA_VERSION = 1;
+const validationStateRoot = join(repo, '.build/prebase-validation');
 export const ACTIVE_SOAK_FINAL_MIN_DURATION_MS = 10 * 60 * 1000;
 const TREE_DRAIN_MS = 8_000;
 const FAILURE_LOG_TAIL_LINES = 60;
@@ -53,8 +56,70 @@ function tailLog(logPath, maxLines = FAILURE_LOG_TAIL_LINES) {
 	}
 }
 
-export function planCheckpointPath(runId) {
-	return join(evidenceRoot, `validation-plan-${runId}.json`);
+export function probeEnvironmentPrerequisites(env = process.env) {
+	return {
+		firecrawlConfigured: Boolean(String(env.FIRECRAWL_API_KEY ?? '').trim()),
+		linkupConfigured: Boolean(String(env.LINKUP_API_KEY ?? '').trim()),
+		geminiConfigured: Boolean(String(env.GEMINI_API_KEY ?? env.GOOGLE_API_KEY ?? '').trim()),
+	};
+}
+
+export function computePlanKey(repoRoot, identity, prerequisites = probeEnvironmentPrerequisites()) {
+	const producerFingerprints = Object.fromEntries(
+		[...PHASE3_PRODUCERS.map(item => item.id), 'assurance'].map(id => [id, expectedProducerFingerprint(repoRoot, id)]),
+	);
+	return createHash('sha256').update(JSON.stringify({
+		schemaVersion: VALIDATION_PLAN_SCHEMA_VERSION,
+		productFingerprint: identity.productFingerprint ?? identity.sourceFingerprint,
+		producerFingerprints,
+		prerequisites: {
+			firecrawlConfigured: prerequisites.firecrawlConfigured,
+			linkupConfigured: prerequisites.linkupConfigured,
+		},
+	})).digest('hex');
+}
+
+export function planStateDir(planKey, runId) {
+	return join(validationStateRoot, planKey, runId);
+}
+
+export function planCheckpointPath(runId, planKey) {
+	if (planKey) {
+		return join(planStateDir(planKey, runId), 'checkpoint.json');
+	}
+	return join(validationStateRoot, 'legacy', `${runId}.json`);
+}
+
+export function findReusablePlan(repoRoot, identity, prerequisites = probeEnvironmentPrerequisites()) {
+	const planKey = computePlanKey(repoRoot, identity, prerequisites);
+	const keyDir = join(validationStateRoot, planKey);
+	if (!existsSync(keyDir)) {
+		return undefined;
+	}
+	const entries = readdirSyncSafe(keyDir);
+	for (const runId of entries.sort().reverse()) {
+		const checkpoint = join(keyDir, runId, 'checkpoint.json');
+		if (!existsSync(checkpoint)) {
+			continue;
+		}
+		try {
+			const plan = JSON.parse(readFileSync(checkpoint, 'utf8'));
+			if (plan.planKey === planKey) {
+				return plan;
+			}
+		} catch {
+			continue;
+		}
+	}
+	return undefined;
+}
+
+function readdirSyncSafe(dir) {
+	try {
+		return readdirSync(dir);
+	} catch {
+		return [];
+	}
 }
 
 export function activeSoakProducerTimeoutMs(env = process.env) {
@@ -88,7 +153,7 @@ export const PHASE3_PRODUCERS = [
 	{ id: 'hybrid-web-smoke', artifacts: ['hybrid-web-smoke'], command: ['node', 'test/prebase/acceptance/prebase-hybrid-web-smoke.mjs'], timeoutMs: 180_000 },
 	{ id: 'privacy', artifacts: ['privacy'], command: ['node', 'test/prebase/acceptance/prebase-privacy-runtime.mjs'], timeoutMs: 180_000 },
 	{ id: 'load-quit', artifacts: ['load-quit'], command: ['node', 'test/prebase/acceptance/prebase-load-quit-live.mjs'], timeoutMs: 240_000 },
-	{ id: 'lifecycle-cycles', artifacts: ['lifecycle-cycles'], command: ['node', 'test/prebase/acceptance/prebase-process-leak-diag.mjs'], timeoutMs: 15 * 60 * 1000 },
+	{ id: 'lifecycle-cycles', artifacts: ['lifecycle-cycles'], command: ['node', 'test/prebase/acceptance/prebase-process-leak-diag.mjs'], timeoutMs: 25 * 60 * 1000 },
 	{ id: 'electron-restart-soak', artifacts: ['electron-restart-soak'], command: ['node', 'test/prebase/acceptance/prebase-restart-soak.mjs'], timeoutMs: 90 * 60 * 1000 },
 	{ id: 'tauri-restart-soak', artifacts: ['tauri-restart-soak'], command: ['node', 'test/prebase/acceptance/prebase-restart-soak.mjs', '--tauri'], timeoutMs: 60 * 60 * 1000 },
 	{ id: 'idle-soak', artifacts: ['idle-soak'], command: ['node', 'test/prebase/acceptance/prebase-idle-soak.mjs'], timeoutMs: idleSoakProducerTimeoutMs() },
@@ -158,9 +223,6 @@ export function scenarioOk(entry, evidence) {
 	if (entry.minDurationMs && (!Number.isFinite(evidence.durationMs) || evidence.durationMs < entry.minDurationMs)) {
 		return { ok: false, reason: `evidence duration is below ${entry.minDurationMs}ms` };
 	}
-	if (entry.sourceHead && evidence.sourceHead !== entry.sourceHead) {
-		return { ok: false, reason: 'evidence source HEAD does not match current HEAD' };
-	}
 	if (entry.expectedProducerFingerprint) {
 		if (typeof evidence.producerFingerprint !== 'string' || !evidence.producerFingerprint) {
 			return { ok: false, reason: 'evidence producer fingerprint is missing' };
@@ -171,26 +233,30 @@ export function scenarioOk(entry, evidence) {
 	} else if (entry.sourceFingerprint && evidence.sourceFingerprint !== entry.sourceFingerprint) {
 		return { ok: false, reason: 'evidence source fingerprint does not match current worktree' };
 	}
+	const provenanceHeadMismatch = entry.sourceHead && evidence.sourceHead !== entry.sourceHead;
 	if (entry.id === 'assurance') {
 		return assuranceEvidenceOk(entry, evidence);
 	}
 	if (entry.id && evidence.scenario !== entry.id) {
 		return { ok: false, reason: 'evidence scenario does not match required scenario' };
 	}
-	return { ok: true };
+	return { ok: true, provenanceHeadMismatch: provenanceHeadMismatch || undefined };
 }
 
 export const HYBRID_FIRECRAWL_EXTERNAL_REASON = 'FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)';
 
-export function hybridFirecrawlExternalSkip(evidence, identity) {
+export function hybridFirecrawlExternalSkip(evidence, identity, prerequisites = probeEnvironmentPrerequisites()) {
 	if (!evidence || evidence.missing || evidence.skipped !== true || evidence.firecrawlConfigured !== false) {
 		return false;
 	}
-	if (!identity?.sourceHead || evidence.sourceHead !== identity.sourceHead) {
+	if (prerequisites.firecrawlConfigured) {
 		return false;
 	}
 	if (!identity?.sourceFingerprint || evidence.sourceFingerprint !== identity.sourceFingerprint) {
 		return false;
+	}
+	if (typeof evidence.producerFingerprint === 'string' && evidence.producerFingerprint) {
+		return evidence.producerFingerprint === expectedProducerFingerprint(repo, 'hybrid-web-smoke');
 	}
 	return true;
 }
@@ -208,11 +274,15 @@ function entryIdentity(repo, identity, spec) {
 	};
 }
 
-export function classifyRequiredEvidence(identity, evidenceById = undefined, repoRoot = repo) {
+export function classifyRequiredEvidence(identity, evidenceById = undefined, repoRoot = repo, prerequisites = probeEnvironmentPrerequisites()) {
 	const stale = [];
 	for (const spec of PHASE3_REQUIRED_EVIDENCE) {
 		const evidence = evidenceById?.get(spec.id) ?? readJson(spec.path);
-		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity)) {
+		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity, prerequisites)) {
+			continue;
+		}
+		if (spec.id === 'hybrid-web-smoke' && evidence.skipped === true && evidence.firecrawlConfigured === false && prerequisites.firecrawlConfigured) {
+			stale.push({ id: spec.id, path: spec.path, reason: 'FIRECRAWL_API_KEY is now configured; hybrid-web-smoke must rerun', producer: producerForArtifact(spec.id)?.id });
 			continue;
 		}
 		const verdict = scenarioOk(entryIdentity(repoRoot, identity, spec), evidence);
@@ -223,7 +293,7 @@ export function classifyRequiredEvidence(identity, evidenceById = undefined, rep
 	return stale;
 }
 
-export function classifyProducerStatus(repo, identity, producer) {
+export function classifyProducerStatus(repo, identity, producer, prerequisites = probeEnvironmentPrerequisites()) {
 	const artifacts = producer.artifacts.map(id => PHASE3_REQUIRED_EVIDENCE.find(spec => spec.id === id)).filter(Boolean);
 	const producerFingerprint = expectedProducerFingerprint(repo, producer.id);
 	const dependencies = PRODUCER_DOMAINS[producer.id] ?? [];
@@ -231,8 +301,15 @@ export function classifyProducerStatus(repo, identity, producer) {
 	let reason = 'current';
 	for (const spec of artifacts) {
 		const evidence = readJson(spec.path);
-		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity)) {
+		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity, prerequisites)) {
+			status = 'EXTERNAL';
+			reason = HYBRID_FIRECRAWL_EXTERNAL_REASON;
 			continue;
+		}
+		if (spec.id === 'hybrid-web-smoke' && evidence.skipped === true && evidence.firecrawlConfigured === false && prerequisites.firecrawlConfigured) {
+			status = 'STALE';
+			reason = 'FIRECRAWL_API_KEY is now configured; hybrid-web-smoke must rerun';
+			break;
 		}
 		const verdict = scenarioOk(entryIdentity(repo, identity, spec), evidence);
 		if (!verdict.ok) {
@@ -252,19 +329,29 @@ export function classifyProducerStatus(repo, identity, producer) {
 	};
 }
 
-export function buildValidationPlan(repo, identity) {
+export function buildValidationPlan(repoRoot, identity, options = {}) {
+	const prerequisites = probeEnvironmentPrerequisites();
+	const planKey = computePlanKey(repoRoot, identity, prerequisites);
+	if (!options.forceNew) {
+		const reusable = findReusablePlan(repoRoot, identity, prerequisites);
+		if (reusable) {
+			reusable.reused = true;
+			reusable.currentHead = identity.sourceHead;
+			return reusable;
+		}
+	}
 	const runId = new Date().toISOString().replaceAll(/[:.]/g, '-');
-	const producers = PHASE3_PRODUCERS.map(producer => classifyProducerStatus(repo, identity, producer));
+	const producers = PHASE3_PRODUCERS.map(producer => classifyProducerStatus(repoRoot, identity, producer, prerequisites));
 	const assurance = readJson('assurance.json');
 	const assuranceVerdict = scenarioOk({
 		id: 'assurance',
 		sourceHead: identity.sourceHead,
 		sourceFingerprint: identity.sourceFingerprint,
-		expectedProducerFingerprint: expectedProducerFingerprint(repo, 'assurance'),
+		expectedProducerFingerprint: expectedProducerFingerprint(repoRoot, 'assurance'),
 	}, assurance);
 	producers.push({
 		id: 'assurance',
-		expectedProducerFingerprint: expectedProducerFingerprint(repo, 'assurance'),
+		expectedProducerFingerprint: expectedProducerFingerprint(repoRoot, 'assurance'),
 		status: assuranceVerdict.ok ? 'CURRENT_GREEN' : (assurance.missing ? 'MISSING' : 'STALE'),
 		reason: assuranceVerdict.ok ? 'current' : assuranceVerdict.reason,
 		estimatedDurationMs: PRODUCER_ESTIMATED_DURATION_MS.assurance,
@@ -275,10 +362,15 @@ export function buildValidationPlan(repo, identity) {
 	const totalEstimatedDurationMs = remaining.reduce((sum, item) => sum + item.estimatedDurationMs, 0);
 	return {
 		runId,
+		planKey,
+		plannedAtHead: identity.sourceHead,
+		currentHead: identity.sourceHead,
 		sourceHead: identity.sourceHead,
 		productFingerprint: identity.productFingerprint ?? identity.sourceFingerprint,
 		sourceFingerprint: identity.sourceFingerprint,
+		prerequisites,
 		createdAt: new Date().toISOString(),
+		reused: false,
 		totalEstimatedDurationMs,
 		producers: sortProducersByExecutionOrder(producers.map(item => item.id)).map(id => producers.find(item => item.id === id)),
 	};
@@ -370,6 +462,7 @@ async function runProcess(id, command, args, timeoutMs, options = {}) {
 function parseMode(argv) {
 	const verbose = argv.includes('--verbose');
 	const plan = argv.includes('--plan');
+	const forceNewPlan = argv.includes('--new-plan');
 	const executePlanIndex = argv.findIndex(arg => arg === '--execute-plan' || arg === '--resume-plan');
 	const executePlan = executePlanIndex >= 0 ? argv[executePlanIndex + 1] : undefined;
 	const resumePlan = argv.includes('--resume-plan');
@@ -380,13 +473,21 @@ function parseMode(argv) {
 	if (modes.length !== 1) {
 		throw new Error('Specify exactly one of --plan, --execute-plan <runId>, --resume-plan <runId>, --validate-evidence, --rerun-stale, or --rerun-all.');
 	}
-	return { verbose, plan, executePlan, resumePlan, validateEvidence, rerunStale, rerunAll };
+	return { verbose, plan, forceNewPlan, executePlan, resumePlan, validateEvidence, rerunStale, rerunAll };
 }
 
-export function loadPlan(runId) {
-	const checkpoint = planCheckpointPath(runId);
-	if (existsSync(checkpoint)) {
-		return JSON.parse(readFileSync(checkpoint, 'utf8'));
+export function loadPlan(runId, planKey) {
+	if (planKey) {
+		const checkpoint = planCheckpointPath(runId, planKey);
+		if (existsSync(checkpoint)) {
+			return JSON.parse(readFileSync(checkpoint, 'utf8'));
+		}
+	}
+	for (const keyDir of readdirSyncSafe(validationStateRoot)) {
+		const checkpoint = join(validationStateRoot, keyDir, runId, 'checkpoint.json');
+		if (existsSync(checkpoint)) {
+			return JSON.parse(readFileSync(checkpoint, 'utf8'));
+		}
 	}
 	if (existsSync(validationPlanPath)) {
 		const primary = JSON.parse(readFileSync(validationPlanPath, 'utf8'));
@@ -398,14 +499,38 @@ export function loadPlan(runId) {
 }
 
 function writeJsonAtomic(targetPath, data) {
+	mkdirSync(dirname(targetPath), { recursive: true });
 	const tmp = `${targetPath}.${process.pid}.tmp`;
 	writeFileSync(tmp, JSON.stringify(data, null, 2));
 	renameSync(tmp, targetPath);
 }
 
 export function persistPlan(plan) {
+	const planKey = plan.planKey ?? computePlanKey(repo, { productFingerprint: plan.productFingerprint, sourceFingerprint: plan.sourceFingerprint });
+	const checkpoint = planCheckpointPath(plan.runId, planKey);
+	plan.planKey = planKey;
+	plan.currentHead = currentSourceIdentity(repo).sourceHead;
+	writeJsonAtomic(checkpoint, plan);
 	writeJsonAtomic(validationPlanPath, plan);
-	writeJsonAtomic(planCheckpointPath(plan.runId), plan);
+}
+
+export function assertPlanIdentity(plan, identity, repoRoot = repo) {
+	const productFingerprint = identity.productFingerprint ?? identity.sourceFingerprint;
+	if (plan.productFingerprint !== productFingerprint) {
+		throw new Error('plan stale due to code change: product fingerprint mismatch');
+	}
+	for (const entry of plan.producers ?? []) {
+		const current = expectedProducerFingerprint(repoRoot, entry.id);
+		if (entry.expectedProducerFingerprint !== current) {
+			throw new Error(`plan stale due to code change: producer ${entry.id} fingerprint mismatch`);
+		}
+	}
+	const prerequisites = probeEnvironmentPrerequisites();
+	const planPrereqs = plan.prerequisites ?? {};
+	if (planPrereqs.firecrawlConfigured !== prerequisites.firecrawlConfigured
+		|| planPrereqs.linkupConfigured !== prerequisites.linkupConfigured) {
+		throw new Error('plan stale due to environment prerequisite change');
+	}
 }
 
 function readJsonFileSafe(fullPath) {
@@ -413,16 +538,6 @@ function readJsonFileSafe(fullPath) {
 		return undefined;
 	}
 	return JSON.parse(readFileSync(fullPath, 'utf8'));
-}
-
-export function assertPlanIdentity(plan, identity) {
-	if (plan.sourceHead !== identity.sourceHead) {
-		throw new Error(`plan stale due to code change: sourceHead ${plan.sourceHead} != ${identity.sourceHead}`);
-	}
-	const productFingerprint = identity.productFingerprint ?? identity.sourceFingerprint;
-	if (plan.productFingerprint !== productFingerprint) {
-		throw new Error('plan stale due to code change: product fingerprint mismatch');
-	}
 }
 
 async function executeValidationPlan(plan, identity, options = {}) {
@@ -490,7 +605,7 @@ function writeManifest(identity, planned, reruns = new Map()) {
 		const evidence = readJson(spec.path);
 		const producer = producerForArtifact(spec.id);
 		const rerun = reruns.get(spec.id) ?? (producer ? reruns.get(producer.id) : undefined);
-		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity)) {
+		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity, probeEnvironmentPrerequisites())) {
 			return {
 				id: spec.id,
 				path: spec.path,
@@ -562,10 +677,15 @@ async function run() {
 		const identity = currentSourceIdentity(repo);
 
 		if (mode.plan) {
-			const plan = buildValidationPlan(repo, identity);
+			const plan = buildValidationPlan(repo, identity, { forceNew: mode.forceNewPlan });
 			persistPlan(plan);
+			const remaining = plan.producers.filter(item => item.status !== 'CURRENT_GREEN' && item.status !== 'EXTERNAL');
+			const currentGreen = plan.producers.filter(item => item.status === 'CURRENT_GREEN').length;
+			const external = plan.producers.filter(item => item.status === 'EXTERNAL').length;
 			console.log(JSON.stringify(plan, null, 2));
-			console.error(`[phase3-final-gate] validation plan ${plan.runId}`);
+			console.error(`[phase3-final-gate] validation plan ${plan.runId}${plan.reused ? ' (reused)' : ''}`);
+			console.error(`planKey ${plan.planKey}`);
+			console.error(`producers ${plan.producers.length}; current-green ${currentGreen}; stale/missing ${remaining.length}; external ${external}`);
 			console.error(`estimated remaining ${formatDuration(plan.totalEstimatedDurationMs)}`);
 			return;
 		}

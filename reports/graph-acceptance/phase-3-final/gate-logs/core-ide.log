@@ -1,4 +1,16 @@
 {
-  "ok": true,
-  "failures": []
+  "ok": false,
+  "failures": [
+    "Theme matrix incomplete",
+    "Keyboard focus check failed",
+    "Graph canvas was not keyboard reachable",
+    "200% zoom was not proven",
+    "screen-reader auto mode was not proven",
+    "screen-reader on mode was not proven",
+    "graph live region is missing",
+    "Maps disclosures were not proven with aria-expanded",
+    "Maps layout group role was not proven",
+    "PreBase Settings web-search status live region was not proven",
+    "Code Graph canvas region role was not proven"
+  ]
 }

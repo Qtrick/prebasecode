@@ -1,44 +1,44 @@
 {
-  "ok": false,
-  "failures": [
-    "lifecycle did not record live WebContents counts for each cycle",
-    "lifecycle did not close code-graph",
-    "lifecycle did not open runtime",
-    "lifecycle did not open magnus"
-  ],
+  "ok": true,
+  "failures": [],
   "classification": "warm-provisioning",
   "cold": 7,
-  "warm": 12,
+  "warm": 10,
   "cycles": [
     {
       "id": "cycle-1",
-      "processCount": 10
+      "processCount": 33,
+      "liveCount": 1
     },
     {
       "id": "cycle-2",
-      "processCount": 10
+      "processCount": 45,
+      "liveCount": 1
     },
     {
       "id": "cycle-3",
-      "processCount": 10
+      "processCount": 47,
+      "liveCount": 1
     },
     {
       "id": "cycle-4",
-      "processCount": 10
+      "processCount": 18,
+      "liveCount": 1
     },
     {
       "id": "cycle-5",
-      "processCount": 10
+      "processCount": 20,
+      "liveCount": 1
     }
   ],
   "quit": {
-    "before": "76089     1   0.0 241856 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "51814     1 129.8 1087184 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 6554,
-    "terminationPath": "sigterm",
-    "workbenchCompleted": false,
-    "usedSigterm": true,
+    "latencyMs": 2052,
+    "terminationPath": "workbench",
+    "workbenchCompleted": true,
+    "usedSigterm": false,
     "usedSigkill": false
   }
 }

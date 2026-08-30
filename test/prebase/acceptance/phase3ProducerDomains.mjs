@@ -151,7 +151,7 @@ export const PRODUCER_ESTIMATED_DURATION_MS = {
 	'hybrid-web-smoke': 60_000,
 	'privacy': 90_000,
 	'load-quit': 120_000,
-	'lifecycle-cycles': 180_000,
+	'lifecycle-cycles': 22 * 60 * 1000,
 	'electron-restart-soak': 15 * 60 * 1000,
 	'tauri-restart-soak': 4 * 60 * 1000,
 	'idle-soak': 15 * 60 * 1000,

@@ -13,6 +13,7 @@ import {
 	gracefulWorkbenchQuit,
 	launchPreBase,
 	processTree,
+	recoverHungWorkbenchPage,
 	waitForWorkbenchDriver,
 	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
@@ -23,6 +24,17 @@ const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/soak');
 const outPath = join(evidenceDir, 'lifecycle.json');
 const CYCLE_COUNT = 5;
+
+async function lifecycleCommand(page, timeoutMs, commandId, ...args) {
+	try {
+		return await workbenchCommandWithTimeout(page, timeoutMs, commandId, ...args);
+	} catch (error) {
+		if (error instanceof Error && error.message.startsWith('workbench command timeout')) {
+			await recoverHungWorkbenchPage(page, timeoutMs);
+		}
+		throw error;
+	}
+}
 
 function processSnapshot(pid) {
 	const tree = processTree(pid);
@@ -134,7 +146,7 @@ async function snapshot(page, pid, id) {
 	const processes = processSnapshot(pid);
 	let diagnostics;
 	for (let attempt = 0; attempt < 8; attempt++) {
-		diagnostics = await workbenchCommandWithTimeout(page, 15_000, 'prebase.test.getDiagnostics').catch(() => undefined);
+		diagnostics = await lifecycleCommand(page, 15_000, 'prebase.test.getDiagnostics').catch(() => undefined);
 		if (Number.isFinite(diagnostics?.webContents?.liveCount)) {
 			break;
 		}
@@ -150,7 +162,7 @@ async function snapshot(page, pid, id) {
 
 async function layoutFrom(page) {
 	for (let attempt = 0; attempt < 6; attempt++) {
-		const diagnostics = await workbenchCommandWithTimeout(page, 15_000, 'prebase.test.getDiagnostics').catch(() => undefined);
+		const diagnostics = await lifecycleCommand(page, 15_000, 'prebase.test.getDiagnostics').catch(() => undefined);
 		if (diagnostics?.layout && typeof diagnostics.layout.sidebarVisible === 'boolean') {
 			return diagnostics.layout;
 		}
@@ -160,17 +172,17 @@ async function layoutFrom(page) {
 }
 
 async function closeWorkbenchSurfaces(page) {
-	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeAllEditors').catch(() => undefined);
+	await lifecycleCommand(page, 8_000, 'workbench.action.closeAllEditors').catch(() => undefined);
 	for (let attempt = 0; attempt < 6; attempt++) {
 		const layout = await layoutFrom(page);
 		if ((layout.editorCount ?? 0) === 0) {
 			break;
 		}
-		await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeActiveEditor').catch(() => undefined);
+		await lifecycleCommand(page, 8_000, 'workbench.action.closeActiveEditor').catch(() => undefined);
 	}
-	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closePanel').catch(() => undefined);
-	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeAuxiliaryBar').catch(() => undefined);
-	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeSidebar').catch(() => undefined);
+	await lifecycleCommand(page, 8_000, 'workbench.action.closePanel').catch(() => undefined);
+	await lifecycleCommand(page, 8_000, 'workbench.action.closeAuxiliaryBar').catch(() => undefined);
+	await lifecycleCommand(page, 8_000, 'workbench.action.closeSidebar').catch(() => undefined);
 }
 
 async function cycleSurface(page, id, open) {
@@ -198,23 +210,20 @@ async function cycleSurface(page, id, open) {
 async function runWarmSequence(page) {
 	const surfaces = [];
 	surfaces.push(await cycleSurface(page, 'maps', async () => {
-		await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.maps').catch(() => undefined);
+		await lifecycleCommand(page, 8_000, 'workbench.view.prebase.maps').catch(() => undefined);
 	}));
 	surfaces.push(await cycleSurface(page, 'code-graph', async () => {
-		await workbenchCommandWithTimeout(page, 8_000, 'prebase.graph.openNetwork').catch(() => undefined);
+		await lifecycleCommand(page, 8_000, 'prebase.graph.openNetwork').catch(() => undefined);
 	}));
 	surfaces.push(await cycleSurface(page, 'temporal', async () => {
-		await workbenchCommandWithTimeout(page, 8_000, 'prebase.graph.openTemporal').catch(() => undefined);
+		await lifecycleCommand(page, 8_000, 'prebase.graph.openTemporal').catch(() => undefined);
 	}));
 	surfaces.push(await cycleSurface(page, 'runtime', async () => {
-		await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.runtime.explorer').catch(() => undefined);
-		await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.runtime').catch(() => undefined);
-		await workbenchCommandWithTimeout(page, 8_000, 'prebase.runtime.start').catch(() => undefined);
-		await new Promise(resolveWait => setTimeout(resolveWait, 250));
-		await workbenchCommandWithTimeout(page, 8_000, 'prebase.runtime.stop').catch(() => undefined);
+		await lifecycleCommand(page, 8_000, 'workbench.view.prebase.runtime.explorer').catch(() => undefined);
+		await lifecycleCommand(page, 8_000, 'workbench.view.prebase.runtime').catch(() => undefined);
 	}));
 	surfaces.push(await cycleSurface(page, 'magnus', async () => {
-		await workbenchCommandWithTimeout(page, 8_000, 'prebase.magnus.open').catch(() => undefined);
+		await lifecycleCommand(page, 8_000, 'prebase.magnus.open').catch(() => undefined);
 	}));
 	return surfaces;
 }

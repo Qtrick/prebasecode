@@ -1,302 +1,587 @@
 {
-  "ok": false,
-  "failures": [
-    "lifecycle did not record live WebContents counts for each cycle",
-    "lifecycle did not close code-graph",
-    "lifecycle did not open runtime",
-    "lifecycle did not open magnus"
-  ],
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "scenario": "lifecycle-cycles",
-  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
-  "sourceFingerprint": "c1d4105dffbd858951207159886fff623563d09be222fbaebd486b324f54af30",
-  "generatedAt": "2026-08-29T23:50:39.279Z",
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
+  "generatedAt": "2026-08-30T04:50:04.316Z",
+  "producerId": "lifecycle-cycles",
+  "producerFingerprint": "980174627728a216cc16d83231710fb07598e7d9dd920cf61b121f24e2a96950",
   "kind": "lifecycle",
   "cycleCount": 5,
   "cycles": [
     {
       "id": "cycle-1",
-      "at": "2026-08-29T23:51:24.351Z",
-      "processCount": 10,
+      "at": "2026-08-30T04:50:28.439Z",
+      "processCount": 33,
       "roles": {
         "main": 1,
         "helper": 6,
-        "renderer": 3
+        "renderer": 5,
+        "other": 21
       },
-      "cpuSum": 121.1,
-      "rssMb": 2494.6,
+      "cpuSum": 118.3,
+      "rssMb": 2520.9,
       "webContents": {
-        "liveIds": [],
-        "byType": {},
-        "byUrlCategory": {}
+        "liveCount": 1,
+        "liveIds": [
+          1
+        ],
+        "byType": {
+          "window": 1
+        },
+        "byUrlCategory": {
+          "workbench": 1
+        }
       },
       "surfaces": [
         {
           "id": "maps",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "code-graph",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "temporal",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "runtime",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "magnus",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": true,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         }
       ]
     },
     {
       "id": "cycle-2",
-      "at": "2026-08-29T23:51:33.670Z",
-      "processCount": 10,
+      "at": "2026-08-30T04:50:36.117Z",
+      "processCount": 45,
       "roles": {
         "main": 1,
         "helper": 6,
-        "renderer": 3
+        "renderer": 7,
+        "other": 25,
+        "git": 6
       },
-      "cpuSum": 99.9,
-      "rssMb": 2393.5,
+      "cpuSum": 191.3,
+      "rssMb": 2957.9,
       "webContents": {
-        "liveIds": [],
-        "byType": {},
-        "byUrlCategory": {}
+        "liveCount": 1,
+        "liveIds": [
+          1
+        ],
+        "byType": {
+          "window": 1
+        },
+        "byUrlCategory": {
+          "workbench": 1
+        }
       },
       "surfaces": [
         {
           "id": "maps",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "code-graph",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "temporal",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "runtime",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "magnus",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": true,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         }
       ]
     },
     {
       "id": "cycle-3",
-      "at": "2026-08-29T23:51:43.323Z",
-      "processCount": 10,
+      "at": "2026-08-30T04:50:43.738Z",
+      "processCount": 47,
       "roles": {
         "main": 1,
         "helper": 6,
-        "renderer": 3
+        "renderer": 9,
+        "other": 31
       },
-      "cpuSum": 100.7,
-      "rssMb": 2399.1,
+      "cpuSum": 236,
+      "rssMb": 3096.2,
       "webContents": {
-        "liveIds": [],
-        "byType": {},
-        "byUrlCategory": {}
+        "liveCount": 1,
+        "liveIds": [
+          1
+        ],
+        "byType": {
+          "window": 1
+        },
+        "byUrlCategory": {
+          "workbench": 1
+        }
       },
       "surfaces": [
         {
           "id": "maps",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "code-graph",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "temporal",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "runtime",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "magnus",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": true,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         }
       ]
     },
     {
       "id": "cycle-4",
-      "at": "2026-08-29T23:51:52.635Z",
-      "processCount": 10,
+      "at": "2026-08-30T04:50:51.379Z",
+      "processCount": 18,
       "roles": {
         "main": 1,
         "helper": 6,
-        "renderer": 3
+        "renderer": 11
       },
-      "cpuSum": 100.7,
-      "rssMb": 2402.8,
+      "cpuSum": 180.3,
+      "rssMb": 3141.4,
       "webContents": {
-        "liveIds": [],
-        "byType": {},
-        "byUrlCategory": {}
+        "liveCount": 1,
+        "liveIds": [
+          1
+        ],
+        "byType": {
+          "window": 1
+        },
+        "byUrlCategory": {
+          "workbench": 1
+        }
       },
       "surfaces": [
         {
           "id": "maps",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "code-graph",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "temporal",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "runtime",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "magnus",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": true,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         }
       ]
     },
     {
       "id": "cycle-5",
-      "at": "2026-08-29T23:52:01.946Z",
-      "processCount": 10,
+      "at": "2026-08-30T04:51:01.982Z",
+      "processCount": 20,
       "roles": {
         "main": 1,
         "helper": 6,
-        "renderer": 3
+        "renderer": 13
       },
-      "cpuSum": 100.5,
-      "rssMb": 2201.5,
+      "cpuSum": 130.3,
+      "rssMb": 3595.8,
       "webContents": {
-        "liveIds": [],
-        "byType": {},
-        "byUrlCategory": {}
+        "liveCount": 1,
+        "liveIds": [
+          1
+        ],
+        "byType": {
+          "window": 1
+        },
+        "byUrlCategory": {
+          "workbench": 1
+        }
       },
       "surfaces": [
         {
           "id": "maps",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "code-graph",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "temporal",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 1
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "runtime",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": true,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         },
         {
           "id": "magnus",
-          "opened": false,
+          "opened": true,
           "closed": true,
-          "openedLayout": {},
-          "closedLayout": {}
+          "openedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": true,
+            "editorCount": 0
+          },
+          "closedLayout": {
+            "sidebarVisible": false,
+            "panelVisible": false,
+            "auxiliaryBarVisible": false,
+            "editorCount": 0
+          }
         }
       ]
     }
   ],
-  "prebasePid": 76089,
+  "prebasePid": 51814,
   "cold": {
     "id": "cold",
-    "at": "2026-08-29T23:50:45.894Z",
+    "at": "2026-08-30T04:50:12.682Z",
     "processCount": 7,
     "roles": {
       "main": 1,
       "helper": 5,
       "renderer": 1
     },
-    "cpuSum": 23.6,
-    "rssMb": 1708.2,
+    "cpuSum": 18.4,
+    "rssMb": 1510.9,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -331,7 +616,7 @@
     {
       "id": "code-graph",
       "opened": true,
-      "closed": false,
+      "closed": true,
       "openedLayout": {
         "sidebarVisible": false,
         "panelVisible": false,
@@ -342,7 +627,7 @@
         "sidebarVisible": false,
         "panelVisible": false,
         "auxiliaryBarVisible": false,
-        "editorCount": 1
+        "editorCount": 0
       }
     },
     {
@@ -364,46 +649,75 @@
     },
     {
       "id": "runtime",
-      "opened": false,
+      "opened": true,
       "closed": true,
-      "openedLayout": {},
-      "closedLayout": {}
+      "openedLayout": {
+        "sidebarVisible": true,
+        "panelVisible": false,
+        "auxiliaryBarVisible": false,
+        "editorCount": 0
+      },
+      "closedLayout": {
+        "sidebarVisible": false,
+        "panelVisible": false,
+        "auxiliaryBarVisible": false,
+        "editorCount": 0
+      }
     },
     {
       "id": "magnus",
-      "opened": false,
+      "opened": true,
       "closed": true,
-      "openedLayout": {},
-      "closedLayout": {}
+      "openedLayout": {
+        "sidebarVisible": false,
+        "panelVisible": false,
+        "auxiliaryBarVisible": true,
+        "editorCount": 0
+      },
+      "closedLayout": {
+        "sidebarVisible": false,
+        "panelVisible": false,
+        "auxiliaryBarVisible": false,
+        "editorCount": 0
+      }
     }
   ],
   "closedPrimarySidebar": true,
   "warm": {
     "id": "warm",
-    "at": "2026-08-29T23:51:15.028Z",
-    "processCount": 12,
+    "at": "2026-08-30T04:50:20.783Z",
+    "processCount": 10,
     "roles": {
       "main": 1,
       "helper": 6,
-      "renderer": 5
+      "renderer": 3
     },
-    "cpuSum": 102.8,
-    "rssMb": 2714.2,
+    "cpuSum": 169.2,
+    "rssMb": 2166.5,
     "webContents": {
-      "liveIds": [],
-      "byType": {},
-      "byUrlCategory": {}
+      "liveCount": 1,
+      "liveIds": [
+        1
+      ],
+      "byType": {
+        "window": 1
+      },
+      "byUrlCategory": {
+        "workbench": 1
+      }
     }
   },
   "classification": "warm-provisioning",
   "quit": {
-    "before": "76089     1   0.0 241856 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "51814     1 129.8 1087184 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 6554,
-    "terminationPath": "sigterm",
-    "workbenchCompleted": false,
-    "usedSigterm": true,
+    "latencyMs": 2052,
+    "terminationPath": "workbench",
+    "workbenchCompleted": true,
+    "usedSigterm": false,
     "usedSigkill": false
-  }
+  },
+  "ok": true,
+  "failures": []
 }

@@ -1,0 +1,25 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:typescript
+> node graphs/scripts/verify-typescript-lanes.mjs
+
+TypeScript compiler lanes
+
+[primary CLI]
+  package.json: npm:typescript@^7.0.2
+  installed:    typescript@7.0.2
+  executable:   Version 7.0.2
+  used by:      typecheck-client, typecheck:ts7, build/lib/typescriptCompiler.ts → tsc, monaco/valid-layers checks
+
+[compat API / tsc6]
+  package.json: npm:@typescript/typescript6@^6.0.2
+  installed:    @typescript/typescript6@6.0.2
+  import API:   6.0.3
+  executable:   Version 6.0.3
+  used by:      build/lib/* `import from "typescript"`, typescript-eslint, html language features
+
+[editor language service]
+  Prefer TypeScript 7 LSP / native preview extension where available;
+  built-in typescript-language-features may still use bundled/workspace TS6 until configured.
+
+Reference: docs/TYPESCRIPT_7_MIGRATION.md

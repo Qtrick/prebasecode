@@ -1,0 +1,354 @@
+{
+  "runId": "2026-08-30T03-01-07-780Z",
+  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
+  "productFingerprint": "28cc343a4a28de29de2a29904260031921efa3657be32c17993c5bda661c2a54",
+  "sourceFingerprint": "28cc343a4a28de29de2a29904260031921efa3657be32c17993c5bda661c2a54",
+  "createdAt": "2026-08-30T03:01:09.327Z",
+  "totalEstimatedDurationMs": 5870000,
+  "producers": [
+    {
+      "id": "parser-benchmark",
+      "expectedProducerFingerprint": "54156c444563c6c08c47a7fe4dc2921edca9bf2f2527bca52273e99153ce87db",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 90000,
+      "artifacts": [
+        "parser-benchmark"
+      ],
+      "dependencies": [
+        "graphs-common",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "magnus-streaming-smoke",
+      "expectedProducerFingerprint": "a5d44f5f6ec66338c4cdfc6e3673adebcde4141ed644970271db803fe57fc9d6",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 45000,
+      "artifacts": [
+        "magnus-streaming-smoke"
+      ],
+      "dependencies": [
+        "magnus-core",
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "core-ide",
+      "expectedProducerFingerprint": "e40b7ee2f895b2467fd64a5ab39390969057d35331301208cefcae8c864ca630",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 120000,
+      "artifacts": [
+        "core-ide",
+        "code-graph",
+        "themes-a11y"
+      ],
+      "dependencies": [
+        "core-ide",
+        "shared-workbench",
+        "graphs-common",
+        "network-graph",
+        "runtime-preview",
+        "magnus-core",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "runtime-preview",
+      "expectedProducerFingerprint": "1054d965afb5ccc353c2f3bd55adbfcd7afd890180c7097b5162f63fef8a370a",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 60000,
+      "artifacts": [
+        "runtime-preview"
+      ],
+      "dependencies": [
+        "runtime-preview",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "temporal-small",
+      "expectedProducerFingerprint": "3c1b836474dbfcad659fe0bf19946ffb4b8041224f2ff3c309ebe57853d68fec",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 90000,
+      "artifacts": [
+        "temporal-small"
+      ],
+      "dependencies": [
+        "temporal",
+        "graphs-common",
+        "network-graph",
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "temporal-large",
+      "expectedProducerFingerprint": "5b860f7e0cd7a362d7f9df1014ce80d069f961faaa12cf8b6d8c670b61f93442",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 150000,
+      "artifacts": [
+        "temporal-large"
+      ],
+      "dependencies": [
+        "temporal",
+        "graphs-common",
+        "network-graph",
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "electron-product-path",
+      "expectedProducerFingerprint": "255b3690a991744ac08a899df8d453c13ce683db59755cf653344919bb7145c7",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 30000,
+      "artifacts": [
+        "electron-product-path"
+      ],
+      "dependencies": [
+        "desktop-runtime",
+        "electron-test-lab",
+        "magnus-desktop-tools",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "electron-native-cases",
+      "expectedProducerFingerprint": "8819567f5d7f0036d3d9783319867da0b44e341d0d6d7a95d825e27d659a1c9e",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 35000,
+      "artifacts": [
+        "electron-native-cases"
+      ],
+      "dependencies": [
+        "electron-test-lab",
+        "desktop-runtime",
+        "magnus-desktop-tools",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "tauri-product-path",
+      "expectedProducerFingerprint": "2937dc1cd0abcebeb0c646fbb5d4568d0b70bc705413f9aad68b86be1698c3af",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 30000,
+      "artifacts": [
+        "tauri-product-path"
+      ],
+      "dependencies": [
+        "desktop-runtime",
+        "tauri-test-lab",
+        "magnus-desktop-tools",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "magnus-electron-tools",
+      "expectedProducerFingerprint": "05d54eb8536c267f086a98abb02ad27217f24f1cae5129471be24c0b0b629b2d",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 150000,
+      "artifacts": [
+        "magnus-electron-tools"
+      ],
+      "dependencies": [
+        "magnus-core",
+        "magnus-desktop-tools",
+        "electron-test-lab",
+        "desktop-runtime",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "magnus-tauri-tools",
+      "expectedProducerFingerprint": "9b86775fb719e2b3f60b6c29a476b339e4d810331375c12377803d4625d2a79b",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 240000,
+      "artifacts": [
+        "magnus-tauri-tools"
+      ],
+      "dependencies": [
+        "magnus-core",
+        "magnus-desktop-tools",
+        "tauri-test-lab",
+        "desktop-runtime",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "hybrid-web-smoke",
+      "expectedProducerFingerprint": "adb89faf7c46bf8b9c2f59fc83f980f44869b247aebb7fd674cd7bdc7143f383",
+      "status": "STALE",
+      "reason": "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
+      "estimatedDurationMs": 60000,
+      "artifacts": [
+        "hybrid-web-smoke"
+      ],
+      "dependencies": [
+        "web-context",
+        "magnus-core",
+        "cloud-auth",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "privacy",
+      "expectedProducerFingerprint": "47b1fce4791d91e8f5e70085fbeb8d8da202ae122fe4a5d31acd4ed086355c50",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 90000,
+      "artifacts": [
+        "privacy"
+      ],
+      "dependencies": [
+        "privacy",
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "load-quit",
+      "expectedProducerFingerprint": "315bf065cca292567710c21ac2f7c3aa60a05efc51c47474f107a4ac0f0b985f",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 120000,
+      "artifacts": [
+        "load-quit"
+      ],
+      "dependencies": [
+        "shared-workbench",
+        "graphs-common",
+        "temporal",
+        "runtime-preview",
+        "magnus-core",
+        "electron-test-lab",
+        "tauri-test-lab",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "lifecycle-cycles",
+      "expectedProducerFingerprint": "6cecc66c4121106ce92a32e5b10e49bce8530469eb1d91f7b063e6c6eae5cecc",
+      "status": "STALE",
+      "reason": "lifecycle did not record live WebContents counts for each cycle; lifecycle did not close code-graph; lifecycle did not open runtime; lifecycle did not open magnus",
+      "estimatedDurationMs": 1320000,
+      "artifacts": [
+        "lifecycle-cycles"
+      ],
+      "dependencies": [
+        "shared-workbench",
+        "graphs-common",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "electron-restart-soak",
+      "expectedProducerFingerprint": "f258bce0899737f0ffd45def1823efca190574a68e8d1c18c90fe4b43b64959b",
+      "status": "STALE",
+      "reason": "evidence source HEAD does not match current HEAD",
+      "estimatedDurationMs": 900000,
+      "artifacts": [
+        "electron-restart-soak"
+      ],
+      "dependencies": [
+        "desktop-runtime",
+        "electron-test-lab",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "tauri-restart-soak",
+      "expectedProducerFingerprint": "a43ae31d3aa5a946b21d26510e2f06d2d21b42de4cedd4a3aa29d302dd735148",
+      "status": "STALE",
+      "reason": "evidence source HEAD does not match current HEAD",
+      "estimatedDurationMs": 240000,
+      "artifacts": [
+        "tauri-restart-soak"
+      ],
+      "dependencies": [
+        "desktop-runtime",
+        "tauri-test-lab",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "idle-soak",
+      "expectedProducerFingerprint": "1df0eaef14719e8b78ce7ea39e0fc61d241b780aa686a3319a8b6ab79645af3c",
+      "status": "STALE",
+      "reason": "ok:false",
+      "estimatedDurationMs": 900000,
+      "artifacts": [
+        "idle-soak"
+      ],
+      "dependencies": [
+        "shared-workbench",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "active-soak",
+      "expectedProducerFingerprint": "3a2a5ddd784a9a9cfb17614c699190fe837b57849cacaad1d77eb99af208ea44",
+      "status": "STALE",
+      "reason": "evidence source HEAD does not match current HEAD",
+      "estimatedDurationMs": 720000,
+      "artifacts": [
+        "active-soak"
+      ],
+      "dependencies": [
+        "shared-workbench",
+        "graphs-common",
+        "network-graph",
+        "temporal",
+        "runtime-preview",
+        "magnus-core",
+        "launch-harness",
+        "acceptance-shared"
+      ]
+    },
+    {
+      "id": "assurance",
+      "expectedProducerFingerprint": "26a6cd48a6f98af92c221659bd4d68f52dd946ed813024132d7b7333ad060186",
+      "status": "STALE",
+      "reason": "evidence source HEAD does not match current HEAD",
+      "estimatedDurationMs": 480000,
+      "artifacts": [
+        "assurance.json"
+      ],
+      "dependencies": [
+        "assurance-leaf",
+        "acceptance-shared",
+        "magnus-core",
+        "graphs-common",
+        "shared-workbench",
+        "privacy"
+      ]
+    }
+  ]
+}
