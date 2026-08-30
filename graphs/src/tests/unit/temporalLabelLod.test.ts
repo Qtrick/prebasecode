@@ -66,4 +66,32 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.equal(labels.length, 1);
 		assert.equal(labels[0].entityId, 'n1');
 	});
+
+	test('4. Hoists the workbench font family once per pass into every visible label', () => {
+		const previousDocument = globalThis.document;
+		const previousGetComputedStyle = globalThis.getComputedStyle;
+		let familyReads = 0;
+		globalThis.document = { body: { id: 'workbench-body' } } as unknown as Document;
+		globalThis.getComputedStyle = ((element: { id?: string }) => {
+			assert.equal(element?.id, 'workbench-body');
+			familyReads++;
+			return { fontFamily: 'Menlo, Monaco, monospace' } as CSSStyleDeclaration;
+		}) as typeof getComputedStyle;
+		try {
+			const nodes = [
+				makeNode('n1', 'src/file1.ts', 'modified', 0, 0),
+				makeNode('n2', 'src/file2.ts', 'modified', 80, 0),
+				makeNode('n3', 'src/file3.ts', 'unchanged', 160, 0),
+			];
+			const labels = computeVisibleLabels(nodes, 2.0, { selectedNodeId: 'n1' });
+			assert.ok(labels.length >= 2, 'more than one label must be measured in this pass');
+			assert.equal(familyReads, 1, 'getComputedStyle must run once per pass, not per label');
+			assert.ok(labels.every(label => label.font.includes('Menlo, Monaco, monospace')));
+			assert.ok(labels.some(label => label.font.startsWith('bold 11px')));
+			assert.ok(labels.some(label => label.font.startsWith('10px')));
+		} finally {
+			globalThis.document = previousDocument;
+			globalThis.getComputedStyle = previousGetComputedStyle;
+		}
+	});
 });

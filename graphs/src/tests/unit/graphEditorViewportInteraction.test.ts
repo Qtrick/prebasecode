@@ -237,6 +237,7 @@ function createHarness(initialGraphType: 'network' | 'temporal' = 'network'): Ha
 			},
 		},
 		getComputedStyle: () => ({
+			fontFamily: 'var(--vscode-font-family, sans-serif)',
 			getPropertyValue: (prop: string) => {
 				if (prop === '--vscode-editor-background') return '#1B1C1E';
 				if (prop === '--vscode-foreground') return '#f4f4f5';
@@ -531,7 +532,7 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		});
 
 		const initialK = harness.getTransform().k;
-		assert.ok(initialK <= 1.6 + 1e-6, `11-node fit must leave zoom headroom under MAX_ZOOM (got k=${initialK})`);
+		assert.ok(initialK <= 2.4 + 1e-6, `11-node fit must leave zoom headroom under MAX_ZOOM (got k=${initialK})`);
 		const zoomInBtn = harness.elements.get('zoomIn')!;
 		assert.ok(zoomInBtn, 'zoomIn button exists');
 
@@ -1248,9 +1249,9 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		});
 		harness.elements.get('fit')!.click();
 		const largeK = harness.getTransform().k;
-		assert.ok(smallK > 1.6, `≤10 node fit must be allowed past the 1.6 large-graph cap (got k=${smallK})`);
+		assert.ok(smallK > 1.6, `≤10 node fit must be allowed past the previous 1.6 large-graph cap (got k=${smallK})`);
 		assert.ok(smallK <= 3.2 + 1e-6, `≤10 node fit must cap at 3.2 (got k=${smallK})`);
-		assert.ok(largeK <= 1.6 + 1e-6, `11+ node fit must cap at 1.6 (got k=${largeK})`);
+		assert.ok(largeK <= 2.4 + 1e-6, `11+ node fit must cap at 2.4 (got k=${largeK})`);
 		assert.ok(smallK > largeK, `small-graph cap must zoom tighter than the 11-node cap (${smallK} > ${largeK})`);
 	});
 
@@ -1352,5 +1353,68 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		assert.equal(typeof closeBtn.onclick, 'function');
 		closeBtn.click();
 		assert.strictEqual(legend.style.display, 'none', 'legend close hides the legend');
+	});
+
+	test('26. Temporal focus caps zoom at 3.2 for ≤4 nodes and 2.4 for 5+; Full Map caps at 2.4', () => {
+		function clustered(count: number) {
+			return Array.from({ length: count }, (_, i) => ({
+				entityId: `n${i}`,
+				label: `n${i}.ts`,
+				path: `src/app/n${i}.ts`,
+				changeKind: 'added',
+				x: (i % 2) * 2,
+				y: Math.floor(i / 2) * 2,
+			}));
+		}
+		function fitK(mode: 'changes' | 'focus' | 'state', count: number) {
+			const harness = createHarness('temporal');
+			const diff = {
+				sourceCommitSha: 'c0',
+				targetCommitSha: 'c1',
+				nodes: clustered(count),
+				edges: Array.from({ length: Math.max(0, count - 1) }, (_, i) => ({
+					sourceEntityId: `n${i}`,
+					targetEntityId: `n${i + 1}`,
+					kind: 'import',
+				})),
+				summary: { addedCount: count, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 0 },
+			};
+			const state = {
+				displayMode: mode,
+				diff,
+				isSettled: true,
+				selectedCommitSha: 'c1',
+				renderedCommitSha: 'c1',
+			};
+			harness.sendHostMessage({
+				type: 'snapshot',
+				payload: { graphType: 'temporal', temporalState: state, settings: { keepGraphCentered: false, reduceMotion: true } },
+			});
+			harness.sendHostMessage({ type: 'temporalState', payload: state });
+			return harness.getTransform().k;
+		}
+		const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
+		const fitStart = editorSource.indexOf('function fitView(');
+		const fitEnd = editorSource.indexOf('function updateLegend(');
+		assert.ok(fitStart >= 0 && fitEnd > fitStart, 'fitView must be locatable in graphEditor.ts');
+		const fitView = editorSource.slice(fitStart, fitEnd);
+		assert.match(fitView, /isFocusMode && targetNodes\.length <= 4 \? 3\.2 : 2\.4/);
+		assert.doesNotMatch(fitView, /4\.2/, 'fitView must not keep a leftover 4.2 zoom cap');
+
+		const changes4 = fitK('changes', 4);
+		const focus4 = fitK('focus', 4);
+		const changes5 = fitK('changes', 5);
+		const focus5 = fitK('focus', 5);
+		const fullMap = fitK('state', 5);
+		for (const [label, k] of [['changes≤4', changes4], ['focus≤4', focus4]] as const) {
+			assert.ok(k <= 3.2 + 1e-6, `${label} must cap at 3.2 (got k=${k})`);
+			assert.ok(Math.abs(k - 3.2) < 0.05, `tight ${label} should hit the 3.2 cap (got k=${k})`);
+		}
+		for (const [label, k] of [['changes 5+', changes5], ['focus 5+', focus5], ['Full Map', fullMap]] as const) {
+			assert.ok(k <= 2.4 + 1e-6, `${label} must cap at 2.4 (got k=${k})`);
+			assert.ok(Math.abs(k - 2.4) < 0.05, `tight ${label} should hit the 2.4 cap (got k=${k})`);
+		}
+		assert.ok(focus4 > focus5, `small focus must zoom tighter than large focus (${focus4} > ${focus5})`);
+		assert.ok(focus4 > fullMap, `focus must zoom tighter than Full Map (${focus4} > ${fullMap})`);
 	});
 });

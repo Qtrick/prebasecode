@@ -89,7 +89,7 @@ interface CanvasDrawCall {
 	args: any[];
 }
 
-function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'network') {
+function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'network', workbenchFontFamily = 'Menlo, Monaco, monospace') {
 	const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
 	const htmlMatch = editorSource.slice(editorSource.indexOf('return `<!DOCTYPE html>'));
 	const rawScriptMatch = htmlMatch.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/);
@@ -197,6 +197,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 		},
 		getComputedStyle() {
 			return {
+				fontFamily: workbenchFontFamily,
 				getPropertyValue(prop: string) {
 					if (prop === '--vscode-editor-background') return '#1B1C1E';
 					if (prop === '--vscode-foreground') return '#f4f4f5';
@@ -671,10 +672,10 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 				metrics: { ...window.__prebaseGraphRenderMetrics }
 			})`, harness.context);
 			const expected = computeTemporalFitTransform(diff.nodes, 800, 600, {
-				padding: 64,
+				padding: 56,
 				insets: runtime.insets,
 				minZoom: 0.15,
-				maxZoom: 1.8,
+				maxZoom: 2.4,
 			});
 
 			assert.ok(
@@ -892,5 +893,55 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 			0,
 			'community guides must not stroke a giant circumcircle',
 		);
+	});
+
+	test('canvasFont uses the computed workbench font family, not a hardcoded canvas face', () => {
+		const family = '"PreBase Workbench Face", ui-sans-serif';
+		const harness = createProductionWebviewHarness('network', family);
+		const font = vm.runInContext('canvasFont("600", 15)', harness.context) as string;
+		assert.equal(font, `600 15px ${family}`);
+		assert.doesNotMatch(font, /Menlo|Monaco|Segoe UI|Consolas/);
+		const afterInvalidate = vm.runInContext('invalidateThemeColors(); canvasFont("600", 15)', harness.context) as string;
+		assert.equal(afterInvalidate, font, 'theme cache must still resolve to the workbench family');
+	});
+
+	test('network render records projectedBounds, screenUtilization, and labelCount on __prebaseGraphRenderMetrics', () => {
+		const harness = createProductionWebviewHarness('network');
+		vm.runInContext('window.__prebaseRecordRenderMetrics = true', harness.context);
+		harness.triggerMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'network',
+				snapshot: {
+					nodes: [
+						{ id: 'a', kind: 'file', label: 'a.ts', path: 'src/a.ts', parentId: null, isEntry: true, depth: 0, meta: {} },
+						{ id: 'b', kind: 'file', label: 'b.ts', path: 'src/b.ts', parentId: null, isEntry: false, depth: 1, meta: {} },
+					],
+					edges: [{ source: 'a', target: 'b' }],
+					positions3d: {
+						a: { x: 40, y: 10, z: 0 },
+						b: { x: -30, y: -20, z: 0 },
+					},
+					entryNodeId: 'a',
+					networkLayoutMode: 'organic',
+					scannedAt: 1000,
+				},
+				diagnostics: { status: 'ready', fileCount: 2, nodeCount: 2, edgeCount: 1 },
+			},
+		});
+		harness.triggerRaf(1016);
+		const metrics = vm.runInContext('({ ...window.__prebaseGraphRenderMetrics })', harness.context) as {
+			projectedBounds?: { minX: number; minY: number; maxX: number; maxY: number; width: number; height: number } | null;
+			screenUtilization?: number;
+			labelCount?: number;
+			labelsDrawn?: number;
+			nodesDrawn?: number;
+		};
+		assert.ok(metrics.projectedBounds, 'projectedBounds must be recorded');
+		assert.equal(typeof metrics.projectedBounds?.minX, 'number');
+		assert.equal(typeof metrics.projectedBounds?.width, 'number');
+		assert.ok(Number.isFinite(metrics.screenUtilization) && (metrics.screenUtilization ?? 0) > 0);
+		assert.equal(metrics.labelCount, metrics.labelsDrawn);
+		assert.ok((metrics.nodesDrawn ?? 0) >= 2);
 	});
 });

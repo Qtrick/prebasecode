@@ -40,8 +40,9 @@ const FILTERS: { id: GraphFilterId; label: string }[] = [
 	{ id: 'dependencies', label: 'Dependencies' },
 ];
 
-const ACCENT = '#2dd4bf';
-const ACCENT_SOFT = '#2dd4bf22';
+const ACCENT = 'var(--vscode-focusBorder, var(--vscode-button-background))';
+const ACCENT_SOFT = 'color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-button-background)) 14%, transparent)';
+const ACCENT_BORDER = 'color-mix(in srgb, var(--vscode-focusBorder, var(--vscode-button-background)) 45%, transparent)';
 const TEXT = 'var(--vscode-foreground)';
 const MUTED = 'var(--vscode-descriptionForeground)';
 const SURFACE = 'var(--vscode-input-background)';
@@ -243,7 +244,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._graphModeOpenBtn.style.fontSize = '10px';
 		this._graphModeOpenBtn.style.borderRadius = '6px';
 		this._graphModeOpenBtn.style.cursor = 'pointer';
-		this._graphModeOpenBtn.style.border = `1px solid ${ACCENT}66`;
+		this._graphModeOpenBtn.style.border = `1px solid ${ACCENT_BORDER}`;
 		this._graphModeOpenBtn.style.background = ACCENT_SOFT;
 		this._graphModeOpenBtn.style.color = ACCENT;
 		this._register(DOM.addDisposableListener(this._graphModeOpenBtn, 'click', () => {
@@ -291,8 +292,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 	private _renderNetwork(): void {
 		this._networkSection = DOM.append(this._scroll!, DOM.$('div'));
-		this._sectionLabel(this._networkSection, localize('prebase.maps.networkSection', "Network"));
-
 		this._sectionLabel(this._networkSection, localize('prebase.maps.networkLayout', "Network Layout"));
 		const layoutCol = DOM.append(this._networkSection, DOM.$('div'));
 		layoutCol.style.display = 'flex';
@@ -347,11 +346,9 @@ export class PreBaseMapsViewPane extends ViewPane {
 		});
 	}
 
-	private _renderDisplay(): void {
-		this._displaySection = DOM.append(this._scroll!, DOM.$('div'));
-		const header = DOM.append(this._displaySection, DOM.$('button')) as HTMLButtonElement;
+	private _disclosureHeader(parent: HTMLElement, label: string, expanded: boolean): HTMLButtonElement {
+		const header = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
 		header.type = 'button';
-		header.textContent = localize('prebase.maps.display', "▸ Display");
 		header.style.all = 'unset';
 		header.style.fontSize = '10px';
 		header.style.fontWeight = '600';
@@ -360,7 +357,28 @@ export class PreBaseMapsViewPane extends ViewPane {
 		header.style.color = MUTED;
 		header.style.cursor = 'pointer';
 		header.style.marginBottom = '4px';
-		header.style.display = 'block';
+		header.style.display = 'inline-flex';
+		header.style.alignItems = 'center';
+		header.style.gap = '4px';
+		const twistie = DOM.append(header, DOM.$('span.codicon'));
+		twistie.setAttribute('aria-hidden', 'true');
+		DOM.append(header, DOM.$('span')).textContent = label;
+		this._setDisclosureExpanded(header, expanded);
+		return header;
+	}
+
+	private _setDisclosureExpanded(header: HTMLButtonElement, expanded: boolean): void {
+		header.setAttribute('aria-expanded', String(expanded));
+		const twistie = header.querySelector('.codicon');
+		if (twistie) {
+			twistie.classList.toggle('codicon-chevron-down', expanded);
+			twistie.classList.toggle('codicon-chevron-right', !expanded);
+		}
+	}
+
+	private _renderDisplay(): void {
+		this._displaySection = DOM.append(this._scroll!, DOM.$('div'));
+		const header = this._disclosureHeader(this._displaySection, localize('prebase.maps.display', "Display"), false);
 
 		this._displayBody = DOM.append(this._displaySection, DOM.$('div'));
 		this._displayBody.style.display = 'none';
@@ -394,9 +412,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			if (this._displayBody) {
 				this._displayBody.style.display = open ? 'none' : 'block';
 			}
-			header.textContent = open
-				? localize('prebase.maps.display', "▸ Display")
-				: localize('prebase.maps.displayOpen', "▾ Display");
+			this._setDisclosureExpanded(header, !open);
 		}));
 	}
 
@@ -405,20 +421,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._temporalSection.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
 		this._temporalSection.style.paddingTop = '8px';
 
-		const header = DOM.append(this._temporalSection, DOM.$('button')) as HTMLButtonElement;
-		header.type = 'button';
-		header.textContent = this._temporalExpanded
-			? localize('prebase.maps.temporalOpen', "▾ Temporal & Compare")
-			: localize('prebase.maps.temporalClosed', "▸ Temporal & Compare");
-		header.style.all = 'unset';
-		header.style.fontSize = '10px';
-		header.style.fontWeight = '600';
-		header.style.letterSpacing = '0.06em';
-		header.style.textTransform = 'uppercase';
-		header.style.color = MUTED;
-		header.style.cursor = 'pointer';
-		header.style.marginBottom = '6px';
-		header.style.display = 'block';
+		const header = this._disclosureHeader(this._temporalSection, localize('prebase.maps.temporal', "Temporal & Compare"), this._temporalExpanded);
 
 		this._temporalBody = DOM.append(this._temporalSection, DOM.$('div'));
 		this._temporalBody.style.display = this._temporalExpanded ? 'flex' : 'none';
@@ -593,9 +596,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			if (this._temporalBody) {
 				this._temporalBody.style.display = this._temporalExpanded ? 'flex' : 'none';
 			}
-			header.textContent = this._temporalExpanded
-				? localize('prebase.maps.temporalOpen', "▾ Temporal & Compare")
-				: localize('prebase.maps.temporalClosed', "▸ Temporal & Compare");
+			this._setDisclosureExpanded(header, this._temporalExpanded);
 		}));
 	}
 
@@ -604,20 +605,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._historySection.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
 		this._historySection.style.paddingTop = '8px';
 
-		const header = DOM.append(this._historySection, DOM.$('button')) as HTMLButtonElement;
-		header.type = 'button';
-		header.textContent = this._historyExpanded
-			? localize('prebase.maps.historyOpen', "▾ History")
-			: localize('prebase.maps.historyClosed', "▸ History");
-		header.style.all = 'unset';
-		header.style.fontSize = '10px';
-		header.style.fontWeight = '600';
-		header.style.letterSpacing = '0.06em';
-		header.style.textTransform = 'uppercase';
-		header.style.color = MUTED;
-		header.style.cursor = 'pointer';
-		header.style.marginBottom = '6px';
-		header.style.display = 'block';
+		const header = this._disclosureHeader(this._historySection, localize('prebase.maps.history', "History"), this._historyExpanded);
 
 		this._historyBody = DOM.append(this._historySection, DOM.$('div'));
 		this._historyBody.style.display = this._historyExpanded ? 'flex' : 'none';
@@ -690,9 +678,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			if (this._historyBody) {
 				this._historyBody.style.display = this._historyExpanded ? 'flex' : 'none';
 			}
-			header.textContent = this._historyExpanded
-				? localize('prebase.maps.historyOpen', "▾ History")
-				: localize('prebase.maps.historyClosed', "▸ History");
+			this._setDisclosureExpanded(header, this._historyExpanded);
 		}));
 	}
 
@@ -841,7 +827,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			wtRow.style.boxSizing = 'border-box';
 			wtRow.style.width = '100%';
 			wtRow.style.background = isWtSelected ? ACCENT_SOFT : 'transparent';
-			wtRow.style.border = isWtSelected ? `1px solid ${ACCENT}88` : '1px solid transparent';
+			wtRow.style.border = isWtSelected ? `1px solid ${ACCENT_BORDER}` : '1px solid transparent';
 			wtRow.style.outline = 'none';
 
 			const wtLine1 = DOM.append(wtRow, DOM.$('div'));
@@ -937,7 +923,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			row.style.boxSizing = 'border-box';
 			row.style.width = '100%';
 			row.style.background = isSelected ? ACCENT_SOFT : 'transparent';
-			row.style.border = isSelected ? `1px solid ${ACCENT}88` : '1px solid transparent';
+			row.style.border = isSelected ? `1px solid ${ACCENT_BORDER}` : '1px solid transparent';
 			row.style.outline = 'none';
 
 			// Line 1: message (prominent) + HEAD badge + isMerge badge
@@ -955,7 +941,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 				headBadge.style.padding = '0 4px';
 				headBadge.style.borderRadius = '3px';
 				headBadge.style.background = 'rgba(45, 212, 191, 0.2)';
-				headBadge.style.color = '#2dd4bf';
+				headBadge.style.color = ACCENT;
 				headBadge.style.flexShrink = '0';
 			}
 
@@ -1090,7 +1076,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			}
 			r.setAttribute('aria-selected', isSel ? 'true' : 'false');
 			r.style.background = isSel ? ACCENT_SOFT : 'transparent';
-			r.style.border = isSel ? `1px solid ${ACCENT}88` : '1px solid transparent';
+			r.style.border = isSel ? `1px solid ${ACCENT_BORDER}` : '1px solid transparent';
 			const shaEl = r.querySelector('span[style*="monospace"]');
 			if (shaEl) {
 				(shaEl as HTMLElement).style.color = isSel ? ACCENT : 'var(--vscode-textLink-foreground, #58a6ff)';
@@ -1682,8 +1668,9 @@ export class PreBaseMapsViewPane extends ViewPane {
 		const row = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
 		row.type = 'button';
 		const expanded = this._expandedDirs.has(entry.fullPath) || this._searchQuery.length > 0;
-		row.textContent = `${expanded ? '▾' : '▸'} ${entry.name || '/'}`;
-		row.style.display = 'block';
+		row.style.display = 'flex';
+		row.style.alignItems = 'center';
+		row.style.gap = '4px';
 		row.style.width = '100%';
 		row.style.textAlign = 'left';
 		row.style.padding = `3px 6px 3px ${6 + depth * 12}px`;
@@ -1693,6 +1680,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 		row.style.border = 'none';
 		row.style.borderRadius = '4px';
 		row.style.cursor = 'pointer';
+		row.setAttribute('aria-expanded', String(expanded));
+		const twistie = DOM.append(row, DOM.$('span.codicon'));
+		twistie.classList.add(expanded ? 'codicon-chevron-down' : 'codicon-chevron-right');
+		twistie.setAttribute('aria-hidden', 'true');
+		DOM.append(row, DOM.$('span')).textContent = entry.name || '/';
 		this._explorerDisposables.add(DOM.addDisposableListener(row, 'click', () => {
 			if (this._expandedDirs.has(entry.fullPath)) {
 				this._expandedDirs.delete(entry.fullPath);
@@ -1843,7 +1835,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		if (active) {
 			btn.style.background = ACCENT_SOFT;
 			btn.style.color = ACCENT;
-			btn.style.boxShadow = `0 0 0 1px ${ACCENT}55`;
+			btn.style.boxShadow = `0 0 0 1px ${ACCENT_BORDER}`;
 		} else {
 			btn.style.background = 'transparent';
 			btn.style.color = MUTED;
@@ -1859,7 +1851,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			btn.style.background = ACCENT_SOFT;
 			btn.style.borderColor = ACCENT;
 			btn.style.color = ACCENT;
-			btn.style.boxShadow = block ? `0 0 0 1px ${ACCENT}55` : 'none';
+			btn.style.boxShadow = block ? `0 0 0 1px ${ACCENT_BORDER}` : 'none';
 		} else {
 			btn.style.background = SURFACE;
 			btn.style.borderColor = BORDER;

@@ -1,14 +1,476 @@
 {
-  "productPath": {
-    "ok": true,
-    "results": [
-      {
-        "framework": "tauri",
-        "ok": true,
-        "failures": [],
-        "state": "testing"
+  "phase": "3-final",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "c1d4105dffbd858951207159886fff623563d09be222fbaebd486b324f54af30",
+  "generatedAt": "2026-08-30T00:32:58.091Z",
+  "overallRepositoryControlledGate": false,
+  "externalBlockers": [
+    {
+      "id": "gemini-provider-roundtrip",
+      "reason": "Isolated acceptance profile has no Gemini key; classified as external compatibility smoke."
+    },
+    {
+      "id": "release-signing",
+      "reason": "Release signing credentials are operator-owned (BETA-015)."
+    },
+    {
+      "id": "hybrid-web-smoke",
+      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)"
+    }
+  ],
+  "failures": [
+    "idle-soak: ok:false",
+    "lifecycle-cycles: lifecycle did not record live WebContents counts for each cycle; lifecycle did not close code-graph; lifecycle did not open runtime; lifecycle did not open magnus",
+    "active-soak: live rerun timed out after 1225775ms"
+  ],
+  "scenarios": [
+    {
+      "id": "electron-product-path",
+      "path": "electron/product-path.json",
+      "ok": true,
+      "quit": {
+        "before": "97784     1  12.6 256224 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "latencyMs": 423,
+        "remaining": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 25817,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/electron-product-path.log",
+        "harnessPid": 42875,
+        "timeoutMs": 180000,
+        "leftoverPids": []
       }
-    ]
+    },
+    {
+      "id": "tauri-product-path",
+      "path": "tauri/product-path.json",
+      "ok": true,
+      "quit": {
+        "before": "11460     1   4.0 323568 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "latencyMs": 418,
+        "remaining": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 26793,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/tauri-product-path.log",
+        "harnessPid": 44755,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "electron-native-cases",
+      "path": "electron/native-cases.json",
+      "ok": true,
+      "quit": {
+        "before": "43942     1  27.1 345328 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "latencyMs": 315,
+        "remaining": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 32331,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/electron-native-cases.log",
+        "harnessPid": 43772,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "runtime-preview",
+      "path": "runtime-preview/live.json",
+      "ok": true,
+      "quit": {
+        "before": "30537     1   0.6 275776 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 805,
+        "terminationPath": "workbench",
+        "workbenchCompleted": true,
+        "usedSigterm": false,
+        "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 46664,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/runtime-preview.log",
+        "harnessPid": 30368,
+        "timeoutMs": 180000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "temporal-small",
+      "path": "temporal/live.json",
+      "ok": true,
+      "quit": {
+        "startedAt": 1788046827245,
+        "quitMs": 404,
+        "remaining": "gone",
+        "before": "40004     1   4.2 338768 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "after": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 8370,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
+        "harnessPid": 39407,
+        "timeoutMs": 180000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "temporal-large",
+      "path": "temporal/large-live.json",
+      "ok": true,
+      "quit": {
+        "startedAt": 1788046838079,
+        "quitMs": 403,
+        "remaining": "gone",
+        "before": "42164     1  25.3 325792 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "after": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 10851,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/temporal-large.log",
+        "harnessPid": 40352,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "magnus-electron-tools",
+      "path": "magnus/electron-tools-live.json",
+      "ok": true,
+      "quit": {
+        "before": "46395     1   2.8 329648 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 521,
+        "terminationPath": "workbench",
+        "workbenchCompleted": true,
+        "usedSigterm": false,
+        "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 144084,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-electron-tools.log",
+        "harnessPid": 46184,
+        "timeoutMs": 300000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "magnus-tauri-tools",
+      "path": "magnus/tauri-tools-live.json",
+      "ok": true,
+      "quit": {
+        "before": "49988     1   1.8 267072 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 428,
+        "terminationPath": "workbench",
+        "workbenchCompleted": true,
+        "usedSigterm": false,
+        "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 247544,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-tauri-tools.log",
+        "harnessPid": 49760,
+        "timeoutMs": 420000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "magnus-streaming-smoke",
+      "path": "magnus/streaming-smoke.json",
+      "ok": true,
+      "quit": {
+        "before": "22130     1   0.4 337696 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 548,
+        "terminationPath": "workbench",
+        "workbenchCompleted": true,
+        "usedSigterm": false,
+        "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 14610,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log",
+        "harnessPid": 21877,
+        "timeoutMs": 180000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "hybrid-web-smoke",
+      "path": "magnus/hybrid-web-smoke.json",
+      "ok": true,
+      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)",
+      "externalSkip": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 212,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/hybrid-web-smoke.log",
+        "harnessPid": 55947,
+        "timeoutMs": 180000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "load-quit",
+      "path": "shutdown/load-quit-matrix.json",
+      "ok": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 110395,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log",
+        "harnessPid": 57606,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "idle-soak",
+      "path": "soak/idle.json",
+      "ok": false,
+      "reason": "ok:false",
+      "quit": {
+        "before": "12861     1   2.4 281632 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "latencyMs": 323,
+        "remaining": "gone"
+      },
+      "rerun": {
+        "code": 1,
+        "timedOut": false,
+        "elapsedMs": 41631,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/idle-soak.log",
+        "harnessPid": 12692,
+        "timeoutMs": 1140000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "lifecycle-cycles",
+      "path": "soak/lifecycle.json",
+      "ok": false,
+      "reason": "lifecycle did not record live WebContents counts for each cycle; lifecycle did not close code-graph; lifecycle did not open runtime; lifecycle did not open magnus",
+      "quit": {
+        "before": "76089     1   0.0 241856 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 6554,
+        "terminationPath": "sigterm",
+        "workbenchCompleted": false,
+        "usedSigterm": true,
+        "usedSigkill": false
+      },
+      "rerun": {
+        "code": 1,
+        "timedOut": false,
+        "elapsedMs": 89444,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log",
+        "harnessPid": 75878,
+        "timeoutMs": 900000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "electron-restart-soak",
+      "path": "soak/electron-restart.json",
+      "ok": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 921704,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/electron-restart-soak.log",
+        "harnessPid": 81209,
+        "timeoutMs": 5400000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "tauri-restart-soak",
+      "path": "soak/tauri-restart.json",
+      "ok": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 260446,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/tauri-restart-soak.log",
+        "harnessPid": 98514,
+        "timeoutMs": 3600000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "core-ide",
+      "path": "core-ide/live.json",
+      "ok": true,
+      "quit": {
+        "before": "23459     1  18.8 248576 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 591,
+        "terminationPath": "workbench",
+        "workbenchCompleted": true,
+        "usedSigterm": false,
+        "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 76261,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "harnessPid": 23243,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "code-graph",
+      "path": "core-ide/code-graph.json",
+      "ok": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 76261,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "harnessPid": 23243,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "themes-a11y",
+      "path": "core-ide/themes-a11y.json",
+      "ok": true,
+      "quit": {
+        "before": "23459     1  18.8 248576 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 591,
+        "terminationPath": "workbench",
+        "workbenchCompleted": true,
+        "usedSigterm": false,
+        "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 76261,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "harnessPid": 23243,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "privacy",
+      "path": "privacy/runtime-observation.json",
+      "ok": true,
+      "quit": {
+        "before": "56235     1   2.9 334544 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 505,
+        "terminationPath": "workbench",
+        "workbenchCompleted": true,
+        "usedSigterm": false,
+        "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 13321,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/privacy.log",
+        "harnessPid": 56007,
+        "timeoutMs": 180000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "parser-benchmark",
+      "path": "performance/parser-batch.json",
+      "ok": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 7249,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/parser-benchmark.log",
+        "harnessPid": 21646,
+        "timeoutMs": 1500000,
+        "leftoverPids": []
+      }
+    },
+    {
+      "id": "active-soak",
+      "path": "soak/active.json",
+      "ok": false,
+      "reason": "live rerun timed out after 1225775ms",
+      "rerun": {
+        "code": 0,
+        "timedOut": true,
+        "elapsedMs": 1225775,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/active-soak.log",
+        "harnessPid": 13932,
+        "timeoutMs": 960000,
+        "leftoverPids": []
+      },
+      "quit": {
+        "before": "14188     1   0.3 266848 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "remaining": "gone",
+        "leftoverPids": [],
+        "latencyMs": 575,
+        "terminationPath": "workbench",
+        "workbenchCompleted": true,
+        "usedSigterm": false,
+        "usedSigkill": false
+      }
+    }
+  ],
+  "assurance": {
+    "path": "assurance.json",
+    "ok": true
   },
-  "generatedAt": "2026-08-27T17:25:26.330Z"
+  "plannedProducers": [
+    "parser-benchmark",
+    "magnus-streaming-smoke",
+    "core-ide",
+    "runtime-preview",
+    "temporal-small",
+    "temporal-large",
+    "electron-product-path",
+    "electron-native-cases",
+    "tauri-product-path",
+    "magnus-electron-tools",
+    "magnus-tauri-tools",
+    "hybrid-web-smoke",
+    "privacy",
+    "load-quit",
+    "lifecycle-cycles",
+    "electron-restart-soak",
+    "tauri-restart-soak",
+    "idle-soak",
+    "active-soak"
+  ]
 }

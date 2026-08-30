@@ -34,12 +34,12 @@ import {
 } from '../graphs/host/workbench/settings/graphSettingsUi.js';
 import { classifyColorTheme, type ThemeGroup } from '../common/prebaseThemeClassify.js';
 import { PreBaseSettingsEditorInput } from './prebaseSettingsEditorInput.js';
+import { IPreBaseAccountService } from './prebaseAccountService.js';
 
 type SettingsCategory =
 	| 'appearance'
 	| 'graph'
 	| 'ai'
-	| 'sidebar'
 	| 'editor'
 	| 'extensions'
 	| 'interaction'
@@ -50,7 +50,6 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: string }[] = [
 	{ id: 'appearance', label: localize('prebase.settings.cat.appearance', "Appearance"), icon: '$(symbol-color)' },
 	{ id: 'graph', label: localize('prebase.settings.cat.graph', "Graph"), icon: '$(type-hierarchy)' },
 	{ id: 'ai', label: localize('prebase.settings.cat.ai', "Agents & AI"), icon: '$(sparkle)' },
-	{ id: 'sidebar', label: localize('prebase.settings.cat.sidebar', "Sidebar"), icon: '$(layout-sidebar-left)' },
 	{ id: 'editor', label: localize('prebase.settings.cat.editor', "Editor"), icon: '$(edit)' },
 	{ id: 'extensions', label: localize('prebase.settings.cat.extensions', "Extensions"), icon: '$(extensions)' },
 	{ id: 'interaction', label: localize('prebase.settings.cat.interaction', "Interaction"), icon: '$(target)' },
@@ -61,25 +60,14 @@ const CATEGORIES: { id: SettingsCategory; label: string; icon: string }[] = [
 const COLORS = {
 	bg: 'var(--vscode-editor-background)',
 	surface: 'var(--vscode-sideBar-background)',
-	overlay: 'var(--vscode-editorWidget-background)',
 	border: 'var(--vscode-input-border, var(--vscode-widget-border))',
 	muted: 'var(--vscode-input-background)',
 	text: 'var(--vscode-foreground)',
 	textSecondary: 'var(--vscode-descriptionForeground)',
 	textMuted: 'var(--vscode-descriptionForeground)',
-	accent: '#2dd4bf',
-	accentDim: 'rgba(45, 212, 191, 0.15)',
-	accentBorder: 'rgba(45, 212, 191, 0.28)',
+	accent: 'var(--vscode-focusBorder, var(--vscode-button-background))',
 	navActive: 'var(--vscode-list-inactiveSelectionBackground, var(--vscode-input-background))',
 };
-
-interface SidebarDraft {
-	min: number;
-	max: number;
-	left: number;
-	collapsed: number;
-	inspector: number;
-}
 
 export class PreBaseSettingsEditor extends EditorPane {
 	static readonly ID = 'workbench.editor.prebaseSettings';
@@ -90,8 +78,6 @@ export class PreBaseSettingsEditor extends EditorPane {
 	private _advanced: HTMLElement | undefined;
 	private _category: SettingsCategory = 'appearance';
 	private readonly _renderDisposables = this._register(new DisposableStore());
-	private _sidebarDraft: SidebarDraft | undefined;
-	private _sidebarSavedEl: HTMLElement | undefined;
 
 	constructor(
 		group: IEditorGroup,
@@ -104,6 +90,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		@INotificationService private readonly notificationService: INotificationService,
 		@IPreBaseGraphService private readonly graphService: IPreBaseGraphService,
 		@IWorkbenchThemeService private readonly workbenchThemeService: IWorkbenchThemeService,
+		@IPreBaseAccountService private readonly accountService: IPreBaseAccountService,
 	) {
 		super(PreBaseSettingsEditor.ID, group, telemetryService, themeService, storageService);
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
@@ -118,6 +105,11 @@ export class PreBaseSettingsEditor extends EditorPane {
 		}));
 		this._register(this.graphService.onDidChangeViewState(() => {
 			if (this._category === 'graph') {
+				this._render();
+			}
+		}));
+		this._register(this.accountService.onDidChangeState(() => {
+			if (this._category === 'ai') {
 				this._render();
 			}
 		}));
@@ -283,7 +275,6 @@ export class PreBaseSettingsEditor extends EditorPane {
 		for (const key of PREBASE_RESETTABLE_CONFIG_KEYS) {
 			await this.configurationService.updateValue(key, undefined);
 		}
-		this._sidebarDraft = undefined;
 		this.notificationService.info(localize('prebase.settings.resetDone', "PreBase settings restored to defaults. Editor preferences were left unchanged."));
 		this._render();
 	}
@@ -340,7 +331,6 @@ export class PreBaseSettingsEditor extends EditorPane {
 			case 'appearance': this._renderAppearance(); break;
 			case 'graph': this._renderGraph(); break;
 			case 'ai': this._renderAI(); break;
-			case 'sidebar': this._renderSidebar(); break;
 			case 'editor': this._renderEditor(); break;
 			case 'extensions': this._renderExtensions(); break;
 			case 'interaction': this._renderInteraction(); break;
@@ -472,7 +462,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const card = this._panel(
 			this._main!,
 			localize('prebase.settings.appearance.title', "Appearance"),
-			localize('prebase.settings.appearance.desc', "Theme, density, and motion preferences.")
+			localize('prebase.settings.appearance.desc', "Theme and motion preferences.")
 		);
 
 		const themeCtrl = document.createElement('div');
@@ -602,18 +592,6 @@ export class PreBaseSettingsEditor extends EditorPane {
 			localize('prebase.settings.fileIconThemeHint', "Includes Minimal, Seti, and Modern Icons when available."),
 			fileIconCtrl
 		);
-
-		const density = document.createElement('select');
-		this._selectStyle(density);
-		for (const [v, label] of [['comfortable', 'Comfortable'], ['compact', 'Compact']] as const) {
-			const opt = document.createElement('option');
-			opt.value = v;
-			opt.textContent = label;
-			density.appendChild(opt);
-		}
-		density.value = this._get(PreBaseConfigKeys.UiDensity, 'comfortable');
-		this._renderDisposables.add(DOM.addDisposableListener(density, 'change', () => void this._set(PreBaseConfigKeys.UiDensity, density.value)));
-		this._row(card, localize('prebase.settings.uiDensity', "UI density"), localize('prebase.settings.uiDensityHint', "Reserved — Maps/Runtime UI does not read this setting yet."), density);
 
 		const reduceCard = card;
 		renderGraphReduceMotionRow(this._graphSettingsHost(), reduceCard);
@@ -754,7 +732,13 @@ export class PreBaseSettingsEditor extends EditorPane {
 
 		const hostedStatus = document.createElement('div');
 		hostedStatus.setAttribute('role', 'status');
-		hostedStatus.textContent = localize('prebase.settings.ai.webSearchHosted', "Hosted Hybrid Web Context is the default for signed-in users. Provider names stay in this advanced section.");
+		const signedIn = this.accountService.state === 'signedIn';
+		const cloudConfigured = this.accountService.apiConfigured;
+		hostedStatus.textContent = !cloudConfigured
+			? localize('prebase.settings.ai.webSearchUnconfigured', "Cloud sign-in is not configured. Use local web search in the advanced section if you have developer keys.")
+			: signedIn
+				? localize('prebase.settings.ai.webSearchSignedIn', "Hosted web context will be used.")
+				: localize('prebase.settings.ai.webSearchSignedOut', "Sign in to use hosted web context.");
 		Object.assign(hostedStatus.style, { fontSize: '12px', color: COLORS.textMuted, lineHeight: '1.45', padding: '10px 0', borderBottom: `1px solid color-mix(in srgb, ${COLORS.border} 55%, transparent)` });
 		webSearchCard.appendChild(hostedStatus);
 
@@ -852,86 +836,6 @@ export class PreBaseSettingsEditor extends EditorPane {
 			"PreBase Privacy & Security: PreBase telemetry and analytics are disabled by default. AI prompt content and file context are transmitted strictly to your configured model provider or PreBase gateway as needed to perform requested AI operations. Credentials and workspace secrets are never uploaded."
 		);
 		Object.assign(note.style, { fontSize: '11px', color: COLORS.textMuted, padding: '8px 0 0', lineHeight: '1.45', margin: '0' });
-	}
-
-	private _renderSidebar(): void {
-		const card = this._panel(
-			this._main!,
-			localize('prebase.settings.sidebar.title', "Sidebar"),
-			localize('prebase.settings.sidebar.desc', "Graph sidebar behavior.")
-		);
-		const collapse = this._accentCheckbox();
-		collapse.checked = this._get(PreBaseConfigKeys.UiCollapseLongSections, true);
-		this._renderDisposables.add(DOM.addDisposableListener(collapse, 'change', () => void this._set(PreBaseConfigKeys.UiCollapseLongSections, collapse.checked)));
-		this._row(
-			card,
-			localize('prebase.settings.collapseSections', "Collapse long sections by default"),
-			localize('prebase.settings.collapseSectionsHint', "Reserved — Maps UI does not read this setting yet."),
-			collapse
-		);
-
-		if (!this._sidebarDraft) {
-			this._sidebarDraft = {
-				min: this._get(PreBaseConfigKeys.UiSidebarMinWidth, 180),
-				max: this._get(PreBaseConfigKeys.UiSidebarMaxWidth, 420),
-				left: this._get(PreBaseConfigKeys.UiSidebarLeftWidth, 224),
-				collapsed: this._get(PreBaseConfigKeys.UiSidebarCollapsedWidth, 36),
-				inspector: this._get(PreBaseConfigKeys.UiSidebarInspectorWidth, 240),
-			};
-		}
-		const draft = this._sidebarDraft;
-		const custom = this._panel(
-			this._main!,
-			localize('prebase.settings.sidebarCustom.title', "Sidebar customization"),
-			localize('prebase.settings.sidebarCustom.desc', "Stored width preferences. Reserved — not applied to the workbench sidebar yet.")
-		);
-
-		const addSlider = (label: string, key: keyof SidebarDraft, min: number, max: number) => {
-			const wrap = document.createElement('div');
-			Object.assign(wrap.style, { display: 'flex', alignItems: 'center', gap: '8px' });
-			const range = this._range(min, max, 1, draft[key]);
-			const val = document.createElement('span');
-			val.textContent = String(draft[key]);
-			Object.assign(val.style, { fontSize: '10px', color: COLORS.textMuted, width: '28px', textAlign: 'right' });
-			this._renderDisposables.add(DOM.addDisposableListener(range, 'input', () => {
-				draft[key] = Number(range.value);
-				val.textContent = range.value;
-			}));
-			wrap.append(range, val);
-			this._row(custom, label, undefined, wrap);
-		};
-
-		addSlider(localize('prebase.settings.sidebarMin', "Minimum width"), 'min', 160, 280);
-		addSlider(localize('prebase.settings.sidebarMax', "Maximum width"), 'max', 300, 560);
-		addSlider(localize('prebase.settings.sidebarLeft', "Left sidebar width"), 'left', 160, 560);
-		addSlider(localize('prebase.settings.sidebarCollapsed', "Collapsed rail width"), 'collapsed', 32, 56);
-		addSlider(localize('prebase.settings.sidebarInspector', "Right (inspector) width"), 'inspector', 160, 560);
-
-		const saveRow = DOM.append(custom, DOM.$('div'));
-		Object.assign(saveRow.style, { display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 0' });
-		const saveBtn = this._btn(localize('prebase.settings.sidebarSave', "Save"), true);
-		this._renderDisposables.add(DOM.addDisposableListener(saveBtn, 'click', async () => {
-			const min = Math.min(draft.min, draft.max);
-			const max = Math.max(draft.min, draft.max);
-			const clamp = (v: number) => Math.min(max, Math.max(min, v));
-			await this._set(PreBaseConfigKeys.UiSidebarMinWidth, min);
-			await this._set(PreBaseConfigKeys.UiSidebarMaxWidth, max);
-			await this._set(PreBaseConfigKeys.UiSidebarLeftWidth, clamp(draft.left));
-			await this._set(PreBaseConfigKeys.UiSidebarCollapsedWidth, draft.collapsed);
-			await this._set(PreBaseConfigKeys.UiSidebarInspectorWidth, clamp(draft.inspector));
-			draft.min = min;
-			draft.max = max;
-			draft.left = clamp(draft.left);
-			draft.inspector = clamp(draft.inspector);
-			if (this._sidebarSavedEl) {
-				this._sidebarSavedEl.style.display = '';
-				setTimeout(() => { if (this._sidebarSavedEl) { this._sidebarSavedEl.style.display = 'none'; } }, 2000);
-			}
-		}));
-		saveRow.appendChild(saveBtn);
-		this._sidebarSavedEl = DOM.append(saveRow, DOM.$('span'));
-		this._sidebarSavedEl.textContent = localize('prebase.settings.saved', "Saved");
-		Object.assign(this._sidebarSavedEl.style, { fontSize: '11px', color: COLORS.accent, display: 'none' });
 	}
 
 	private _renderEditor(): void {

@@ -21,11 +21,13 @@ suite('local Firecrawl client', () => {
 		let calledUrl = '';
 		let calledHeaders: HeadersInit | undefined;
 		let calledBody = '';
+		let calledCache: RequestCache | undefined;
 		const transport: FirecrawlTransport = {
 			fetch: async (input, init) => {
 				calledUrl = String(input);
 				calledHeaders = init?.headers;
 				calledBody = String(init?.body);
+				calledCache = init?.cache;
 				return jsonResponse({
 					success: true,
 					data: { markdown: '# Hello', metadata: { title: 'Hello', url: 'https://example.com/doc' } },
@@ -43,6 +45,8 @@ suite('local Firecrawl client', () => {
 		assert.equal(body.blockAds, true);
 		assert.equal(body.storeInCache, true);
 		assert.equal(body.maxAge, 0);
+		assert.equal(calledCache, 'no-store');
+		assert.equal((calledHeaders as Record<string, string>)['Cache-Control'], 'no-cache');
 		assert.equal(result.markdown, '# Hello');
 	});
 
@@ -63,9 +67,13 @@ suite('local Firecrawl client', () => {
 
 	test('Firecrawl Search stays compact and does not request markdown scrapeOptions', async () => {
 		let calledBody = '';
+		let calledCache: RequestCache | undefined;
+		let calledHeaders: HeadersInit | undefined;
 		const transport: FirecrawlTransport = {
 			fetch: async (_input, init) => {
 				calledBody = String(init?.body);
+				calledCache = init?.cache;
+				calledHeaders = init?.headers;
 				return jsonResponse({ data: { web: [{ title: 'Issue', url: 'https://github.com/x/y/issues/1', description: 'bug' }] } });
 			},
 		};
@@ -73,6 +81,8 @@ suite('local Firecrawl client', () => {
 		const body = JSON.parse(calledBody);
 		assert.equal(body.scrapeOptions, undefined);
 		assert.equal(hits[0].url, 'https://github.com/x/y/issues/1');
+		assert.equal(calledCache, 'no-store');
+		assert.equal((calledHeaders as Record<string, string>)['Cache-Control'], 'no-cache');
 	});
 
 	test('cancels in-flight scrape without retrying', async () => {
@@ -197,5 +207,38 @@ suite('local Firecrawl client', () => {
 		};
 		await assert.rejects(scrapePublicUrl('fc-key', { url: 'https://example.com', maxAge: 0, timeoutMs: 30 }, undefined, transport), /timed out/);
 		assert.equal(calls, 1);
+	});
+
+	test('uses only v2 scrape/search endpoints and never sends ZDR or Interact fields', async () => {
+		const urls: string[] = [];
+		const bodies: Array<Record<string, unknown>> = [];
+		const transport: FirecrawlTransport = {
+			fetch: async (input, init) => {
+				urls.push(String(input));
+				bodies.push(JSON.parse(String(init?.body)));
+				return jsonResponse({
+					success: true,
+					data: {
+						markdown: 'page',
+						metadata: { title: 'Docs', url: 'https://example.com' },
+						web: [{ title: 'Docs', url: 'https://example.com', description: 'ok' }],
+					},
+				});
+			},
+		};
+		await scrapePublicUrl('fc-key', { url: 'https://example.com/doc', maxAge: 0, timeoutMs: 8_000, storeInCache: false }, undefined, transport);
+		await searchFirecrawlCompact('fc-key', 'python docs', [], undefined, transport);
+		assert.deepEqual(urls, [
+			'https://api.firecrawl.dev/v2/scrape',
+			'https://api.firecrawl.dev/v2/search',
+		]);
+		assert.equal(bodies[0].storeInCache, false);
+		assert.equal(bodies[0].maxAge, 0);
+		for (const body of bodies) {
+			assert.equal('zeroDataRetention' in body, false);
+			assert.equal('zero_data_retention' in body, false);
+			assert.equal('zdr' in body, false);
+			assert.equal(JSON.stringify(body).toLowerCase().includes('interact'), false);
+		}
 	});
 });

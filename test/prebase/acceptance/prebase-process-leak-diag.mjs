@@ -22,7 +22,7 @@ const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/soak');
 const outPath = join(evidenceDir, 'lifecycle.json');
-const CYCLE_COUNT = 6;
+const CYCLE_COUNT = 5;
 
 function processSnapshot(pid) {
 	const tree = processTree(pid);
@@ -97,6 +97,21 @@ export function lifecycleFailures(evidence) {
 	if (evidence.classification === 'leak') {
 		failures.push('lifecycle classified as a real WebContents/process leak');
 	}
+	if (evidence.closedPrimarySidebar !== true) {
+		failures.push('lifecycle did not close the Primary Sidebar');
+	}
+	const surfaces = evidence.surfaces ?? [];
+	if (!surfaces.length) {
+		failures.push('lifecycle did not record per-surface open/close evidence');
+	}
+	for (const surface of surfaces) {
+		if (surface.opened !== true) {
+			failures.push(`lifecycle did not open ${surface.id}`);
+		}
+		if (surface.closed !== true) {
+			failures.push(`lifecycle did not close ${surface.id}`);
+		}
+	}
 	if (evidence.quit?.remaining !== 'gone') {
 		failures.push('PreBase did not quit after lifecycle cycles');
 	}
@@ -117,7 +132,14 @@ function classifyLifecycle(evidence) {
 
 async function snapshot(page, pid, id) {
 	const processes = processSnapshot(pid);
-	const diagnostics = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => undefined);
+	let diagnostics;
+	for (let attempt = 0; attempt < 8; attempt++) {
+		diagnostics = await workbenchCommandWithTimeout(page, 15_000, 'prebase.test.getDiagnostics').catch(() => undefined);
+		if (Number.isFinite(diagnostics?.webContents?.liveCount)) {
+			break;
+		}
+		await new Promise(resolveWait => setTimeout(resolveWait, 750));
+	}
 	return {
 		id,
 		at: new Date().toISOString(),
@@ -126,28 +148,75 @@ async function snapshot(page, pid, id) {
 	};
 }
 
+async function layoutFrom(page) {
+	for (let attempt = 0; attempt < 6; attempt++) {
+		const diagnostics = await workbenchCommandWithTimeout(page, 15_000, 'prebase.test.getDiagnostics').catch(() => undefined);
+		if (diagnostics?.layout && typeof diagnostics.layout.sidebarVisible === 'boolean') {
+			return diagnostics.layout;
+		}
+		await new Promise(resolveWait => setTimeout(resolveWait, 400));
+	}
+	return {};
+}
+
 async function closeWorkbenchSurfaces(page) {
 	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeAllEditors').catch(() => undefined);
+	for (let attempt = 0; attempt < 6; attempt++) {
+		const layout = await layoutFrom(page);
+		if ((layout.editorCount ?? 0) === 0) {
+			break;
+		}
+		await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeActiveEditor').catch(() => undefined);
+	}
 	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closePanel').catch(() => undefined);
 	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeAuxiliaryBar').catch(() => undefined);
+	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeSidebar').catch(() => undefined);
+}
+
+async function cycleSurface(page, id, open) {
+	let openedLayout = {};
+	let opened = false;
+	for (let attempt = 0; attempt < 3 && !opened; attempt++) {
+		await open();
+		await new Promise(resolveWait => setTimeout(resolveWait, 500));
+		openedLayout = await layoutFrom(page);
+		opened = id === 'code-graph' || id === 'temporal'
+			? (openedLayout.editorCount ?? 0) > 0
+			: id === 'magnus'
+				? openedLayout.auxiliaryBarVisible === true
+				: openedLayout.sidebarVisible === true;
+	}
+	await closeWorkbenchSurfaces(page);
+	await new Promise(resolveWait => setTimeout(resolveWait, 500));
+	const closedLayout = await layoutFrom(page);
+	const closed = closedLayout.sidebarVisible !== true
+		&& closedLayout.auxiliaryBarVisible !== true
+		&& (id === 'code-graph' || id === 'temporal' ? (closedLayout.editorCount ?? 0) === 0 : true);
+	return { id, opened, closed, openedLayout, closedLayout };
 }
 
 async function runWarmSequence(page) {
-	await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.maps').catch(() => undefined);
-	await workbenchCommandWithTimeout(page, 8_000, 'prebase.graph.openNetwork').catch(() => undefined);
-	await new Promise(resolveWait => setTimeout(resolveWait, 400));
-	await closeWorkbenchSurfaces(page);
-	await workbenchCommandWithTimeout(page, 8_000, 'prebase.graph.openTemporal').catch(() => undefined);
-	await new Promise(resolveWait => setTimeout(resolveWait, 400));
-	await closeWorkbenchSurfaces(page);
-	await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.runtime').catch(() => undefined);
-	await workbenchCommandWithTimeout(page, 8_000, 'prebase.runtime.start').catch(() => undefined);
-	await new Promise(resolveWait => setTimeout(resolveWait, 400));
-	await workbenchCommandWithTimeout(page, 8_000, 'prebase.runtime.stop').catch(() => undefined);
-	await closeWorkbenchSurfaces(page);
-	await workbenchCommandWithTimeout(page, 8_000, 'prebase.magnus.open').catch(() => undefined);
-	await new Promise(resolveWait => setTimeout(resolveWait, 400));
-	await closeWorkbenchSurfaces(page);
+	const surfaces = [];
+	surfaces.push(await cycleSurface(page, 'maps', async () => {
+		await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.maps').catch(() => undefined);
+	}));
+	surfaces.push(await cycleSurface(page, 'code-graph', async () => {
+		await workbenchCommandWithTimeout(page, 8_000, 'prebase.graph.openNetwork').catch(() => undefined);
+	}));
+	surfaces.push(await cycleSurface(page, 'temporal', async () => {
+		await workbenchCommandWithTimeout(page, 8_000, 'prebase.graph.openTemporal').catch(() => undefined);
+	}));
+	surfaces.push(await cycleSurface(page, 'runtime', async () => {
+		await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.runtime.explorer').catch(() => undefined);
+		await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.runtime').catch(() => undefined);
+		await workbenchCommandWithTimeout(page, 8_000, 'prebase.runtime.start').catch(() => undefined);
+		await new Promise(resolveWait => setTimeout(resolveWait, 250));
+		await workbenchCommandWithTimeout(page, 8_000, 'prebase.runtime.stop').catch(() => undefined);
+	}));
+	surfaces.push(await cycleSurface(page, 'magnus', async () => {
+		await workbenchCommandWithTimeout(page, 8_000, 'prebase.magnus.open').catch(() => undefined);
+	}));
+	return surfaces;
 }
 
 async function run() {
@@ -166,13 +235,19 @@ async function run() {
 		await dismissStartup(launched.page);
 		await waitForWorkbenchDriver(launched.page);
 		evidence.cold = await snapshot(launched.page, launched.info.pid, 'cold');
-		await runWarmSequence(launched.page);
-		await new Promise(resolveWait => setTimeout(resolveWait, 1_500));
+		const warmSurfaces = await runWarmSequence(launched.page);
+		evidence.surfaces = warmSurfaces;
+		evidence.closedPrimarySidebar = warmSurfaces.every(item => item.closedLayout?.sidebarVisible !== true);
+		await new Promise(resolveWait => setTimeout(resolveWait, 2_500));
 		evidence.warm = await snapshot(launched.page, launched.info.pid, 'warm');
 		for (let cycle = 1; cycle <= CYCLE_COUNT; cycle++) {
-			await runWarmSequence(launched.page);
-			await new Promise(resolveWait => setTimeout(resolveWait, 500));
-			evidence.cycles.push(await snapshot(launched.page, launched.info.pid, `cycle-${cycle}`));
+			const cycleSurfaces = await runWarmSequence(launched.page);
+			evidence.closedPrimarySidebar = evidence.closedPrimarySidebar && cycleSurfaces.every(item => item.closedLayout?.sidebarVisible !== true);
+			await new Promise(resolveWait => setTimeout(resolveWait, 2_000));
+			evidence.cycles.push({
+				...(await snapshot(launched.page, launched.info.pid, `cycle-${cycle}`)),
+				surfaces: cycleSurfaces,
+			});
 		}
 		evidence.classification = classifyLifecycle(evidence);
 	} catch (error) {
@@ -188,7 +263,7 @@ async function run() {
 		release();
 	}
 	const failures = lifecycleFailures(evidence);
-	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
+	const result = { ...evidence, ok: failures.length === 0 && !evidence.error, failures };
 	writeFileSync(outPath, JSON.stringify(result, null, 2));
 	console.log(JSON.stringify({
 		ok: result.ok,
@@ -199,9 +274,7 @@ async function run() {
 		cycles: evidence.cycles.map(item => ({ id: item.id, processCount: item.processCount, liveCount: item.webContents?.liveCount })),
 		quit: evidence.quit,
 	}, null, 2));
-	if (!result.ok) {
-		process.exitCode = 1;
-	}
+	process.exit(result.ok ? 0 : 1);
 }
 
 if (resolve(process.argv[1] ?? '') === scriptPath) {

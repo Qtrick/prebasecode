@@ -16,7 +16,9 @@ import {
 	firecrawlSearchCategories,
 	inferFreshness,
 	publicHttpUrl,
+	sourceDedupeKey,
 	toMagnusWebToolPayload,
+	validatedSourceUrl,
 	WEB_CONTEXT_BUDGET,
 } from './webContextCore';
 
@@ -32,22 +34,34 @@ suite('webContextCore URL policy', () => {
 		}
 	});
 
-	test('canonicalizes www, tracking params, and trailing slashes without merging distinct articles', () => {
-		assert.equal(canonicalPublicUrl('https://WWW.Example.com/docs/?utm_source=x&b=2&a=1#frag'), 'https://example.com/docs?a=1&b=2');
+	test('canonicalizes scheme/host casing without rewriting www to apex', () => {
+		assert.equal(canonicalPublicUrl('https://WWW.Example.com/docs/?utm_source=x&b=2&a=1#frag'), 'https://www.example.com/docs?utm_source=x&b=2&a=1');
 		assert.notEqual(canonicalPublicUrl('https://example.com/a'), canonicalPublicUrl('https://example.com/b'));
+		assert.equal(canonicalPublicUrl('https://www.example.com/docs'), 'https://www.example.com/docs');
+		assert.notEqual(canonicalPublicUrl('https://www.example.com/docs'), canonicalPublicUrl('https://example.com/docs'));
 	});
 
-	test('dedupes www/non-www duplicates from LinkUp and Firecrawl while keeping first ranking', () => {
+	test('dedupes www/non-www duplicates from LinkUp and Firecrawl without mutating the kept source URL', () => {
+		assert.equal(sourceDedupeKey('https://www.example.com/x?utm_campaign=1'), sourceDedupeKey('https://example.com/x'));
 		const deduped = dedupeCandidates([
 			{ title: 'Docs', url: 'https://www.example.com/x?utm_campaign=1', excerpt: 'short', discoveredBy: ['linkup'] },
 			{ title: 'Docs', url: 'https://example.com/x', excerpt: 'longer verified page', discoveredBy: ['firecrawl'], contentVerifiedBy: 'firecrawl' },
 			{ title: 'Private', url: 'http://127.0.0.1/secret', discoveredBy: ['linkup'] },
 		]);
 		assert.equal(deduped.length, 1);
-		assert.equal(deduped[0].url, 'https://example.com/x');
+		assert.equal(deduped[0].url, 'https://www.example.com/x?utm_campaign=1');
 		assert.deepEqual(deduped[0].discoveredBy, ['linkup', 'firecrawl']);
 		assert.equal(deduped[0].contentVerifiedBy, 'firecrawl');
 		assert.equal(deduped[0].excerpt, 'longer verified page');
+	});
+
+	test('preserves functional query parameters including generic ref while stripping known tracking families from the dedupe key only', () => {
+		assert.equal(validatedSourceUrl('https://example.com/article?ref=product&page=2'), 'https://example.com/article?ref=product&page=2');
+		assert.equal(sourceDedupeKey('https://example.com/article?utm_source=x&ref=product'), sourceDedupeKey('https://example.com/article?ref=product'));
+		assert.notEqual(sourceDedupeKey('https://example.com/article?ref=product'), sourceDedupeKey('https://example.com/article'));
+		assert.equal(sourceDedupeKey('https://www.example.com/x?fbclid=abc&gclid=def'), sourceDedupeKey('https://example.com/x'));
+		assert.equal(validatedSourceUrl('https://www.example.com/x?fbclid=abc'), 'https://www.example.com/x?fbclid=abc');
+		assert.notEqual(canonicalPublicUrl('https://www.example.com/x'), canonicalPublicUrl('https://example.com/x'));
 	});
 });
 

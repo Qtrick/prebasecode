@@ -9,6 +9,7 @@ import {
 	dedupeCandidates,
 	firecrawlSearchCategories,
 	publicHttpUrl,
+	sourceDedupeKey,
 	WEB_CONTEXT_BUDGET,
 } from './web_context.ts';
 
@@ -22,7 +23,11 @@ suite('Edge web_context policy', () => {
 		for (const url of policy.reject) {
 			assert.equal(publicHttpUrl(url), undefined, url);
 		}
-		assert.equal(canonicalPublicUrl('https://www.example.com/docs/?utm_source=x'), 'https://example.com/docs');
+		assert.equal(canonicalPublicUrl('https://www.example.com/docs/?utm_source=x'), 'https://www.example.com/docs?utm_source=x');
+		assert.equal(sourceDedupeKey('https://www.example.com/docs/?utm_source=x'), sourceDedupeKey('https://example.com/docs'));
+		assert.notEqual(canonicalPublicUrl('https://www.example.com/docs'), canonicalPublicUrl('https://example.com/docs'));
+		assert.equal(sourceDedupeKey('https://www.example.com/x?fbclid=abc&gclid=def'), sourceDedupeKey('https://example.com/x'));
+		assert.notEqual(sourceDedupeKey('https://example.com/article?ref=product'), sourceDedupeKey('https://example.com/article'));
 	});
 
 	test('dedupes duplicate discovery URLs and drops private hits', () => {
@@ -32,7 +37,7 @@ suite('Edge web_context policy', () => {
 			{ title: 'Private', url: 'http://10.0.0.4/secret', discoveredBy: ['linkup'] },
 		]);
 		assert.equal(deduped.length, 1);
-		assert.equal(deduped[0].url, 'https://example.com/x');
+		assert.equal(deduped[0].url, 'https://www.example.com/x?utm_campaign=1');
 		assert.deepEqual(deduped[0].discoveredBy, ['linkup', 'firecrawl']);
 	});
 
@@ -82,7 +87,10 @@ suite('Edge web_context policy', () => {
 
 	test('fetch disables Firecrawl storeInCache; search enrichment keeps it enabled', () => {
 		const index = readFileSync(join(dirname(fileURLToPath(import.meta.url)), 'index.ts'), 'utf8');
-		assert.match(index, /firecrawlScrape\(input\.url, firecrawlMaxAgeMs\(input\.freshness\), WEB_CONTEXT_BUDGET\.firecrawlTimeoutMs\.fetch, req\.signal, false/);
+		assert.match(index, /firecrawlScrape\(validatedSourceUrl\(input\.url\) \?\? input\.url, firecrawlMaxAgeMs\(input\.freshness\), WEB_CONTEXT_BUDGET\.firecrawlTimeoutMs\.fetch, req\.signal, false/);
 		assert.match(index, /firecrawlScrape\(target\.url, maxAge, timeoutMs, req\.signal, true/);
+		const providerFetch = index.slice(index.indexOf('async function providerFetch'), index.indexOf('async function linkupSearch'));
+		assert.match(providerFetch, /cache: "no-store"/);
+		assert.match(providerFetch, /"Cache-Control": "no-cache"/);
 	});
 });

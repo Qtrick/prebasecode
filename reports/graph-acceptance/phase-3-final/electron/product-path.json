@@ -1,27 +1,32 @@
 {
   "ok": true,
   "failures": [],
+  "schemaVersion": 2,
+  "scenario": "electron-product-path",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
+  "generatedAt": "2026-08-30T00:43:42.353Z",
   "framework": "electron",
   "productPath": true,
   "bypassedPreBase": false,
   "expectedGreeting": "Hello, Ada from main",
-  "prebasePid": 14886,
-  "cdpPort": 54383,
+  "prebasePid": 52680,
+  "cdpPort": 58516,
   "start": {
     "ok": true,
     "state": "testing",
     "backend": "cdp",
     "purpose": "test",
-    "sessionId": "b3817a5b-09f4-4d92-aa21-47bfed6bc250"
+    "sessionId": "2ee89771-237f-4571-b9be-862f7163217b"
   },
   "detected": true,
   "started": true,
   "state": "testing",
   "backend": "cdp",
   "purpose": "test",
-  "sessionId": "b3817a5b-09f4-4d92-aa21-47bfed6bc250",
-  "childPid": 15041,
-  "ownedPort": 54398,
+  "sessionId": "2ee89771-237f-4571-b9be-862f7163217b",
+  "childPid": 52817,
+  "ownedPort": 58532,
   "inspected": true,
   "inspectTitle": "PreBase Electron Fixture",
   "filled": true,
@@ -40,8 +45,8 @@
   "outputOk": true,
   "outputTruncated": true,
   "restarted": true,
-  "restartSessionId": "f6b19390-4c2c-482c-803a-b71fc95d5151",
-  "childPidAfterRestart": 15213,
+  "restartSessionId": "1829777d-1346-4449-9de9-db4509941418",
+  "childPidAfterRestart": 53011,
   "assertedAfterRestart": true,
   "assertAfterRestartActual": {
     "tag": "p",
@@ -54,8 +59,8 @@
   "childAfterStop": "gone",
   "portAfterStop": [],
   "quit": {
-    "before": "14886     1  19.1 328096 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
-    "latencyMs": 421,
+    "before": "52680     1  10.4 328448 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 316,
     "remaining": "gone"
   }
 }

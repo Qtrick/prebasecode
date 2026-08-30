@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "results": [
+    {
+      "framework": "electron",
+      "ok": true,
+      "failures": [],
+      "state": "testing"
+    }
+  ]
+}

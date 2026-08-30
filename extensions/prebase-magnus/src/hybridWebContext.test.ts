@@ -88,6 +88,47 @@ suite('hybrid web context', () => {
 		assert.match(fetched.sources[0].excerpt, /UNTRUSTED_WEB_DATA/);
 	});
 
+	test('fetch/cite keep www on the source URL; cache and search dedupe are www-insensitive', async () => {
+		let scrapeCalls = 0;
+		const cache = new Map();
+		const deps = {
+			linkupKey: '',
+			firecrawlKey: 'fc-key',
+			cache,
+			firecrawlTransport: firecrawlTransport((_url, body) => {
+				scrapeCalls++;
+				return jsonResponse({
+					success: true,
+					data: { markdown: 'page', metadata: { title: 'Docs', url: String(body.url) } },
+				});
+			}),
+		};
+		const www = await executeHybridWebFetch({ url: 'https://www.example.com/docs' }, deps);
+		assert.equal(www.sources[0].url, 'https://www.example.com/docs');
+		assert.equal(scrapeCalls, 1);
+		const apex = await executeHybridWebFetch({ url: 'https://example.com/docs' }, deps);
+		assert.equal(scrapeCalls, 1, 'www and apex must share the sourceDedupeKey cache');
+		assert.equal(apex.sources[0].url, 'https://www.example.com/docs', 'cached cite must keep the original www URL');
+
+		const search = await executeHybridWebSearch(
+			{ query: 'docs', depth: 'fast' },
+			{
+				linkupKey: 'linkup-key',
+				firecrawlKey: 'fc-key',
+				linkupTransport: linkupTransport([
+					{ name: 'Docs', url: 'https://www.example.com/x?utm_source=x', content: 'snippet' },
+					{ name: 'Docs apex', url: 'https://example.com/x', content: 'snippet 2' },
+				]),
+				firecrawlTransport: firecrawlTransport((_url, body) => jsonResponse({
+					success: true,
+					data: { markdown: 'verified', metadata: { title: 'Docs', url: String(body.url) } },
+				})),
+			},
+		);
+		assert.equal(search.sources.length, 1);
+		assert.equal(search.sources[0].url, 'https://www.example.com/x?utm_source=x');
+	});
+
 	test('counts every retry attempt when fetching one known URL', async () => {
 		let attempts = 0;
 		const fetched = await executeHybridWebFetch(
@@ -507,5 +548,23 @@ suite('hybrid web context', () => {
 		assert.equal(JSON.stringify(fetched).includes('linkup-secret-sentinel'), false);
 		assert.equal(JSON.stringify(fetchBodies[0]).includes('fc-secret-sentinel'), false);
 		assert.ok(fetchHeaders.some(header => header.includes('Bearer fc-secret-sentinel')));
+
+		const freshBodies: Array<Record<string, unknown>> = [];
+		await executeHybridWebFetch(
+			{ url: 'https://example.com/docs', freshness: 'fresh' },
+			{
+				linkupKey: '',
+				firecrawlKey: 'fc-key',
+				firecrawlTransport: firecrawlTransport((_url, body) => {
+					freshBodies.push(body);
+					return jsonResponse({
+						success: true,
+						data: { markdown: 'fresh page', metadata: { title: 'Docs', url: 'https://example.com/docs' } },
+					});
+				}),
+			},
+		);
+		assert.equal(freshBodies[0].storeInCache, false);
+		assert.equal(freshBodies[0].maxAge, 0);
 	});
 });

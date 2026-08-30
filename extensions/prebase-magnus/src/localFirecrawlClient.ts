@@ -70,7 +70,9 @@ async function firecrawlFetch(
 			headers: {
 				Authorization: `Bearer ${apiKey}`,
 				'Content-Type': 'application/json',
+				'Cache-Control': 'no-cache',
 			},
+			cache: 'no-store',
 			body: JSON.stringify(body),
 			signal: handle.signal,
 		});

@@ -1,10 +1,16 @@
 {
-  "at": "2026-08-28T23:32:34.721Z",
+  "schemaVersion": 2,
+  "scenario": "hybrid-web-smoke",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
+  "generatedAt": "2026-08-30T00:51:39.203Z",
   "linkupConfigured": true,
   "firecrawlConfigured": false,
   "hybridAttempted": false,
   "runs": [],
   "failures": [
     "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve"
-  ]
+  ],
+  "ok": false,
+  "skipped": true
 }

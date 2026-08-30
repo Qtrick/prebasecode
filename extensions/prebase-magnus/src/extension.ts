@@ -701,7 +701,8 @@ export function activate(context: vscode.ExtensionContext): void {
 				try {
 					const res = await fetch('https://api.firecrawl.dev/v2/scrape', {
 						method: 'POST',
-						headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resolved.key}` },
+						headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${resolved.key}`, 'Cache-Control': 'no-cache' },
+						cache: 'no-store',
 						body: JSON.stringify({
 							url: 'https://example.com',
 							formats: ['markdown'],

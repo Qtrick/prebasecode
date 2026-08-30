@@ -318,14 +318,20 @@ async function run() {
 		const frame = await findGraphFrame(page, scale === 'large' ? 120_000 : 60_000);
 		if (!frame) throw new Error('Temporal Graph webview did not open');
 		await installMetricsBridge(frame);
+		const canvasShot = (name) => frame.locator('#netCanvas').screenshot({
+			path: join(screenshotDir, name),
+			animations: 'disabled',
+			timeout: 8_000,
+		});
 		const fullMap = await waitForMetrics(page, frame, metrics =>
 			metrics.displayMode === 'state' &&
 			metrics.renderedCommitSha === fixture.head &&
 			metrics.nodesDrawn > 0 &&
 			(scale !== 'large' || metrics.receivedNodeCount >= 250)
 		, metricTimeout);
+		evidence.fullMap = fullMap;
 		await page.screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-full-map.png' : 'temporal-full-map.png') });
-		await frame.locator('#netCanvas').screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-full-map-canvas.png' : 'temporal-full-map-canvas.png') });
+		await canvasShot(scale === 'large' ? 'temporal-large-full-map-canvas.png' : 'temporal-full-map-canvas.png');
 
 		await page.getByRole('button', { name: 'Focus Changes', exact: true }).click();
 		const focusChanges = await waitForMetrics(page, frame, metrics =>
@@ -333,8 +339,9 @@ async function run() {
 			metrics.summary?.modifiedCount >= 1 &&
 			metrics.nodesDrawn > 0
 		, metricTimeout);
+		evidence.focusChanges = focusChanges;
 		await page.screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-focus-changes.png' : 'temporal-focus-changes.png') });
-		await frame.locator('#netCanvas').screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-focus-changes-canvas.png' : 'temporal-focus-changes-canvas.png') });
+		await canvasShot(scale === 'large' ? 'temporal-large-focus-changes-canvas.png' : 'temporal-focus-changes-canvas.png');
 
 		const afterFocus = await readMetrics(frame);
 		const canvas = frame.locator('#netCanvas');

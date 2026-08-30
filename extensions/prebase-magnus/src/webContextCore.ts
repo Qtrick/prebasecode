@@ -32,7 +32,7 @@ export const WEB_CONTEXT_BUDGET = {
 	linkupTimeoutMs: { fast: 8_000, standard: 14_000, deep: 35_000 } as const,
 };
 
-const TRACKING_PARAMS = /^(utm_|fbclid|gclid|mc_|igshid|ref$|ref_src$|_hs)/i;
+const TRACKING_PARAMS = /^(utm_|fbclid|gclid|mc_|igshid|_hsenc|_hsmi|ref_src$)/i;
 const PRIVATE_HOST = /^(localhost|127\.0\.0\.1|0\.0\.0\.0|::1|\[::1\])$/i;
 const INTERNAL_HOST = /\.(local|internal|lan|home|corp|intranet)$/i;
 const PRIVATE_V4 = /^(10\.|127\.|169\.254\.|192\.168\.|0\.)|(^172\.(1[6-9]|2\d|3[0-1])\.)|(^100\.(6[4-9]|[7-9]\d|1[0-1]\d|12[0-7])\.)/;
@@ -73,41 +73,63 @@ export function publicHttpUrl(value: string): URL | undefined {
 	}
 }
 
-export function canonicalPublicUrl(value: string): string | undefined {
+function withSafeUrlNormalizations(url: URL): URL {
+	url.hash = '';
+	url.hostname = url.hostname.toLowerCase();
+	if ((url.protocol === 'http:' && url.port === '80') || (url.protocol === 'https:' && url.port === '443')) {
+		url.port = '';
+	}
+	if (url.pathname !== '/' && url.pathname.endsWith('/')) {
+		url.pathname = url.pathname.slice(0, -1);
+	}
+	return url;
+}
+
+/** URL we actually fetch and cite. Does not rewrite www to apex. */
+export function validatedSourceUrl(value: string): string | undefined {
 	const url = publicHttpUrl(value);
 	if (!url) {
 		return undefined;
 	}
-	url.hash = '';
-	url.hostname = url.hostname.replace(/^www\./i, '').toLowerCase();
-	if ((url.protocol === 'http:' && url.port === '80') || (url.protocol === 'https:' && url.port === '443')) {
-		url.port = '';
+	return withSafeUrlNormalizations(url).toString();
+}
+
+/** Conservative duplicate identity only. Prefer a missed duplicate over the wrong host. */
+export function sourceDedupeKey(value: string): string | undefined {
+	const url = publicHttpUrl(value);
+	if (!url) {
+		return undefined;
 	}
+	withSafeUrlNormalizations(url);
+	url.hostname = url.hostname.replace(/^www\./i, '');
 	const kept = [...url.searchParams.entries()].filter(([key]) => !TRACKING_PARAMS.test(key));
 	url.search = '';
 	for (const [key, val] of kept.sort(([a], [b]) => a.localeCompare(b))) {
 		url.searchParams.append(key, val);
 	}
-	if (url.pathname !== '/' && url.pathname.endsWith('/')) {
-		url.pathname = url.pathname.slice(0, -1);
-	}
 	return url.toString();
 }
 
+/** @deprecated Use validatedSourceUrl for fetch/cite and sourceDedupeKey for identity. */
+export function canonicalPublicUrl(value: string): string | undefined {
+	return validatedSourceUrl(value);
+}
+
 export function dedupeCandidates(candidates: readonly WebSourceCandidate[]): WebSourceCandidate[] {
-	const byCanonical = new Map<string, WebSourceCandidate>();
+	const byKey = new Map<string, WebSourceCandidate>();
 	for (const candidate of candidates) {
-		const canonical = canonicalPublicUrl(candidate.url);
-		if (!canonical) {
+		const url = validatedSourceUrl(candidate.url);
+		const key = sourceDedupeKey(candidate.url);
+		if (!url || !key) {
 			continue;
 		}
-		const existing = byCanonical.get(canonical);
+		const existing = byKey.get(key);
 		if (!existing) {
-			byCanonical.set(canonical, { ...candidate, url: canonical, title: candidate.title.trim().slice(0, WEB_CONTEXT_BUDGET.maxTitleChars) || canonical });
+			byKey.set(key, { ...candidate, url, title: candidate.title.trim().slice(0, WEB_CONTEXT_BUDGET.maxTitleChars) || url });
 			continue;
 		}
 		const discoveredBy = [...new Set([...existing.discoveredBy, ...candidate.discoveredBy])];
-		byCanonical.set(canonical, {
+		byKey.set(key, {
 			...existing,
 			discoveredBy,
 			contentVerifiedBy: existing.contentVerifiedBy ?? candidate.contentVerifiedBy,
@@ -115,7 +137,7 @@ export function dedupeCandidates(candidates: readonly WebSourceCandidate[]): Web
 			title: existing.title || candidate.title,
 		});
 	}
-	return [...byCanonical.values()];
+	return [...byKey.values()];
 }
 
 export function scrapeLimitForDepth(depth: SearchDepth): number {

@@ -1,0 +1,11 @@
+{
+  "ok": false,
+  "failures": [],
+  "samples": 2,
+  "durationMs": 900000,
+  "quit": {
+    "before": "12861     1   2.4 281632 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 323,
+    "remaining": "gone"
+  }
+}

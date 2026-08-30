@@ -1,0 +1,11 @@
+{
+  "ok": true,
+  "results": [
+    {
+      "framework": "tauri",
+      "ok": true,
+      "failures": [],
+      "state": "testing"
+    }
+  ]
+}

@@ -48,7 +48,7 @@ async function main() {
 	};
 	if (!linkup?.key || !firecrawl?.key) {
 		evidence.failures.push('local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve');
-		writeFileSync(evidencePath, JSON.stringify({ ...evidence, ok: false }, null, 2));
+		writeFileSync(evidencePath, JSON.stringify({ ...evidence, ok: false, skipped: true }, null, 2));
 		console.log(JSON.stringify({ skipped: true, linkupConfigured: evidence.linkupConfigured, firecrawlConfigured: evidence.firecrawlConfigured }));
 		return;
 	}

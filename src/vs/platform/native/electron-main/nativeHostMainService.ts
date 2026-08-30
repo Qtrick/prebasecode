@@ -995,7 +995,10 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
 		return webContents.getAllWebContents().flatMap(contents => {
 			try {
 				const destroyed = contents.isDestroyed();
-				const url = destroyed ? '' : contents.getURL();
+				const type = destroyed ? 'destroyed' : contents.getType();
+				// ponytail: getURL/isLoadingMainFrame on webview/guest contents can block main during editor teardown.
+				const inspectUrl = !destroyed && (type === 'window' || type === 'browserView');
+				const url = inspectUrl ? contents.getURL() : '';
 				const owner = BrowserWindow.fromWebContents(contents);
 				const ownerCategory: IWebContentsInventoryEntry['ownerCategory'] = owner && this.windowsMainService.getWindowById(owner.id)
 					? 'workbenchWindow'
@@ -1004,10 +1007,10 @@ export class NativeHostMainService extends Disposable implements INativeHostMain
 						: 'unowned';
 				return [{
 					id: contents.id,
-					type: contents.getType(),
+					type,
 					destroyed,
-					loading: !destroyed && contents.isLoadingMainFrame(),
-					urlCategory: this.webContentsUrlCategory(url),
+					loading: inspectUrl && contents.isLoadingMainFrame(),
+					urlCategory: type === 'webview' ? 'webview' : this.webContentsUrlCategory(url),
 					ownerCategory,
 				}];
 			} catch {

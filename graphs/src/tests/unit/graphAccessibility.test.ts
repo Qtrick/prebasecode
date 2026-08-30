@@ -320,7 +320,23 @@ suite('GraphAccessibility (Unit - Real HTML Markup & Keyboard Interaction)', () 
 		assert.match(html, /function zoomByFactor\(factor\) \{[\s\S]{0,500}userAdjustedViewport = true/);
 		assert.match(html, /case '\+':[\s\S]{0,80}zoomByFactor\(1\.25\)/);
 		assert.match(html, /case '-':[\s\S]{0,80}zoomByFactor\(0\.8\)/);
-		assert.match(html, /nodes\.length <= 10 \? 3\.2 : 1\.6/);
+		assert.match(html, /nodes\.length <= 10 \? 3\.2 : 2\.4/);
+		assert.match(html, /isFocusMode && targetNodes\.length <= 4 \? 3\.2 : 2\.4/);
+		assert.doesNotMatch(html, /isFocusMode[^;\n]*4\.2/, 'Temporal focus must not keep a leftover 4.2 zoom cap');
 		assert.match(html, /No dependency edges were detected in this view/);
+	});
+
+	test('7. Maps/graph chrome uses vscode focus and button tokens, not a hardcoded teal', () => {
+		const html = getGeneratedHtmlTemplate();
+		assert.match(html, /outline:1px solid var\(--vscode-focusBorder/);
+		assert.match(html, /#toolbar button\[aria-pressed="true"\] \{ color:var\(--vscode-button-background/);
+		assert.match(html, /#temporalDisplayModeWrap button\.active \{ background:var\(--vscode-button-background/);
+		assert.doesNotMatch(html, /outline:[^;]*#2dd4bf/, 'focus rings must not hardcode the teal hex');
+		const maps = readFileSync(new URL('../../host/workbench/prebaseMapsView.ts', import.meta.url), 'utf8');
+		assert.match(maps, /const ACCENT = 'var\(--vscode-focusBorder, var\(--vscode-button-background\)\)'/);
+		assert.doesNotMatch(maps, /#2dd4bf/);
+		const settings = readFileSync(new URL('../../../../src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts', import.meta.url), 'utf8');
+		assert.match(settings, /accent: 'var\(--vscode-focusBorder, var\(--vscode-button-background\)\)'/);
+		assert.doesNotMatch(settings, /#2dd4bf/);
 	});
 });

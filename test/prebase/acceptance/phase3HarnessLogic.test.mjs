@@ -9,7 +9,7 @@ import { ACTIVE_SOAK_FINAL_MIN_DURATION_MS, activeSoakEvidenceTarget, activeSoak
 import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
 import { findGraphFrame, formatPhase3LockBlockMessage, waitForWorkbenchDriver, workbenchCommandWithTimeout } from './workbenchHarness.mjs';
-import { PHASE3_REQUIRED_EVIDENCE, scenarioOk } from './prebase-phase3-final-gate.mjs';
+import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
 import { PHASE3_EVIDENCE_SCHEMA_VERSION, phase3EvidenceMetadata } from './phase3Evidence.mjs';
 import { assuranceCommandLabel, assuranceEvidenceOk, PHASE3_ASSURANCE_COMMANDS, reportedTestCount } from './prebase-phase3-assurance.mjs';
@@ -63,6 +63,11 @@ function provenA11y() {
 		screenReaderAuto: 'auto',
 		screenReaderOn: 'on',
 		graphLiveRegion: true,
+		mapsAriaExpanded: true,
+		mapsLayoutGroup: true,
+		settingsStatusRole: 'status',
+		settingsStatusClaimsAvailable: false,
+		graphCanvasRole: 'region',
 		prebaseForcesAccessibilityOff: false,
 	};
 }
@@ -596,6 +601,49 @@ test('200% zoom cannot pass on innerWidth change with unchanged zoomLevel', () =
 	assert.ok(failures.some(item => /zoom/.test(item)));
 });
 
+test('a11y cannot pass on accessibilitySupport auto/on without Maps, Settings, and graph semantics', () => {
+	const settingOnly = themesA11yFailures(passingCore({
+		a11y: {
+			keyboardFocus: true,
+			focus: { ok: true, tag: 'TEXTAREA', role: 'textbox', outline: 'solid' },
+			graphCanvasFocus: true,
+			zoom200: true,
+			beforeZoom: { zoom: 1, zoomLevel: 0, innerWidth: 1200 },
+			afterZoom: { zoom: 2, zoomLevel: 2, innerWidth: 600 },
+			screenReaderAuto: 'auto',
+			screenReaderOn: 'on',
+			graphLiveRegion: true,
+			prebaseForcesAccessibilityOff: false,
+		},
+	}));
+	assert.ok(settingOnly.some(item => /Maps disclosures/.test(item)));
+	assert.ok(settingOnly.some(item => /layout group/.test(item)));
+	assert.ok(settingOnly.some(item => /web-search status live region/.test(item)));
+	assert.ok(settingOnly.some(item => /canvas region role/.test(item)));
+	assert.equal(settingOnly.some(item => /screen-reader/.test(item)), false, 'setting values must not be treated as sufficient a11y proof');
+	const availableStatus = themesA11yFailures(passingCore({
+		a11y: { ...provenA11y(), settingsStatusClaimsAvailable: true },
+	}));
+	assert.ok(availableStatus.some(item => /must not claim available/.test(item)));
+});
+
+test('core IDE live inspects Maps aria-expanded, Settings status, and Code Graph region rather than only accessibilitySupport', () => {
+	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
+	assert.match(live, /button\[aria-expanded\]/);
+	assert.match(live, /\[role="group"\]\[aria-label\]/);
+	assert.match(live, /ensureSidebar\(launched\.page\)/);
+	assert.match(live, /workbench\.view\.prebase\.maps/);
+	assert.match(live, /prebase\.settings\.open/);
+	assert.match(live, /\[role="status"\]/);
+	assert.match(live, /settingsStatusRole/);
+	assert.match(live, /graphCanvasRole/);
+	assert.match(live, /netCanvas.*getAttribute\('role'\)/);
+	const mapsCollect = live.indexOf("locator('.prebase-maps-view [role=\"group\"][aria-label]')");
+	const activityBar = live.indexOf('workbench.action.focusActivityBar');
+	assert.ok(mapsCollect > 0 && activityBar > 0 && activityBar < mapsCollect, 'Maps semantics must be collected after reopening Maps, not from a leftover sidebar');
+	assert.doesNotMatch(live, /screen reader was used|VoiceOver|NVDA|JAWS/i);
+});
+
 test('organic then organic cannot satisfy layoutModes or Sphere vs Radial', () => {
 	assert.deepEqual(codeGraphFailures({ codeGraph: passingCodeGraph() }), []);
 	const failures = codeGraphFailures({
@@ -659,14 +707,24 @@ test('Runtime Preview and Desktop Test Lab keep Detect accessible name and prima
 	assert.match(runtime, /--vscode-button-secondaryBackground/);
 	assert.match(runtime, /--vscode-button-foreground/);
 	assert.match(runtime, /--vscode-button-secondaryForeground/);
+	assert.match(runtime, /btn\.style\.width = 'auto'/);
+	assert.doesNotMatch(runtime, /btn\.style\.width = '100%'/);
 });
 
 test('Web Search settings put hosted hybrid first and hide local keys behind details', () => {
 	const settings = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts'), 'utf8');
+	assert.match(settings, /hostedStatus\.setAttribute\('role', 'status'\)/);
+	assert.match(settings, /!cloudConfigured\s*\n\s*\? localize\('prebase\.settings\.ai\.webSearchUnconfigured'/);
+	assert.match(settings, /: signedIn\s*\n\s*\? localize\('prebase\.settings\.ai\.webSearchSignedIn'/);
+	assert.match(settings, /: localize\('prebase\.settings\.ai\.webSearchSignedOut'/);
 	assert.match(settings, /hosted hybrid web context when you are signed in/);
-	assert.match(settings, /Hosted Hybrid Web Context is the default for signed-in users/);
+	assert.match(settings, /Sign in to use hosted web context/);
+	assert.match(settings, /Hosted web context will be used/);
+	assert.match(settings, /Cloud sign-in is not configured/);
 	assert.match(settings, /Configure local web search…/);
-	const hostedIdx = settings.indexOf('webSearchHosted');
+	assert.doesNotMatch(settings, /webSearchAvailable|Hosted Hybrid Web Context is available|Hosted web context is available/);
+	assert.doesNotMatch(settings, /webSearchProvider|Firecrawl Interact|provider picker/i);
+	const hostedIdx = settings.indexOf('webSearchSignedIn');
 	const advancedIdx = settings.indexOf('webSearchAdvanced');
 	const detailsIdx = settings.indexOf("document.createElement('details')");
 	assert.ok(hostedIdx > 0 && advancedIdx > hostedIdx, 'hosted hybrid copy must appear before local-key advanced summary');
@@ -687,6 +745,36 @@ test('Web Search settings put hosted hybrid first and hide local keys behind det
 	assert.match(home, /--vscode-button-foreground/);
 	assert.match(home, /--vscode-button-secondaryForeground/);
 	assert.doesNotMatch(home, /primary \? '#042f2e'/);
+});
+
+test('inert Settings sliders are hidden and Maps disclosures use Codicon twisties', () => {
+	const settings = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts'), 'utf8');
+	assert.doesNotMatch(settings, /Reserved —/);
+	assert.doesNotMatch(settings, /sidebarMinWidth|collapseLongSections|ui\.density/);
+	assert.doesNotMatch(settings, /Hosted Hybrid Web Context is the default for signed-in users/);
+	assert.doesNotMatch(settings, /textContent = localize\('prebase\.settings\.save'/);
+	assert.doesNotMatch(settings, /"Save"/);
+	const graphSettings = readFileSync(join(repoRoot, 'graphs/src/host/workbench/settings/graphSettingsUi.ts'), 'utf8');
+	assert.doesNotMatch(graphSettings, /sidebarMinWidth|sidebarMaxWidth|sidebarLeftWidth|sidebarCollapsedWidth|sidebarInspectorWidth/);
+	assert.doesNotMatch(graphSettings, /localize\('prebase\.settings\.save'/);
+	const config = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts'), 'utf8');
+	const reservedBlocks = [...config.matchAll(/\[PreBaseConfigKeys\.[^\]]+\]:\s*\{([\s\S]*?)\n\t\t\},/g)];
+	const reserved = reservedBlocks.filter(block => /deprecationMessage:[\s\S]*Reserved/.test(block[1]));
+	assert.ok(reserved.length >= 8, `expected reserved schema keys, got ${reserved.length}`);
+	for (const block of reserved) {
+		assert.match(block[1], /included:\s*false/, `reserved key ${block[0].slice(0, 80)} must set included:false`);
+	}
+	const maps = readFileSync(join(repoRoot, 'graphs/src/host/workbench/prebaseMapsView.ts'), 'utf8');
+	assert.doesNotMatch(maps, /▸|▾/);
+	assert.match(maps, /codicon-chevron-right/);
+	assert.match(maps, /header\.type = 'button'/);
+	assert.match(maps, /header\.setAttribute\('aria-expanded', String\(expanded\)\)/);
+	assert.match(maps, /layoutCol\.setAttribute\('role', 'group'\)/);
+	assert.match(maps, /addBadge\(`⇄\$\{renamed\}`/);
+	const runtime = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseRuntimeView.ts'), 'utf8');
+	assert.match(runtime, /DOM\.\$\('details'\)/);
+	const runtimeEditor = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts'), 'utf8');
+	assert.match(runtimeEditor, /font-family:\s*var\(--vscode-font-family/);
 });
 
 test('active soak rejects one blocked sample and SIGKILL', () => {
@@ -794,11 +882,13 @@ test('active-soak final evidence rejects diagnostic, short, and stale-HEAD recor
 		evidenceKind: 'final',
 		durationMs: activeSoak.minDurationMs,
 		sourceHead: current,
+		sourceFingerprint: 'fp-current',
 	};
-	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, valid).ok, true);
-	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, { ...valid, evidenceKind: 'diagnostic' }).ok, false);
-	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, { ...valid, durationMs: activeSoak.minDurationMs - 1 }).ok, false);
-	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current }, { ...valid, sourceHead: 'stale-head' }).ok, false);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, valid).ok, true);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, { ...valid, evidenceKind: 'diagnostic' }).ok, false);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, { ...valid, durationMs: activeSoak.minDurationMs - 1 }).ok, false);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, { ...valid, sourceHead: 'stale-head' }).ok, false);
+	assert.equal(scenarioOk({ ...activeSoak, sourceHead: current, sourceFingerprint: 'fp-current' }, { ...valid, sourceFingerprint: 'fp-stale' }).ok, false);
 });
 
 test('short soak writes diagnostic evidence and must not overwrite canonical final', () => {
@@ -829,28 +919,32 @@ test('active soak protects canonical final evidence and final gate has explicit 
 	assert.doesNotMatch(active, /process count grew excessively during active soak/);
 
 	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
-	assert.match(gate, /process\.argv\.includes\('--validate-evidence'\)/);
-	assert.match(gate, /process\.argv\.includes\('--rerun-live'\)/);
+	assert.match(gate, /argv\.includes\('--validate-evidence'\)/);
+	assert.match(gate, /argv\.includes\('--rerun-stale'\)/);
+	assert.match(gate, /argv\.includes\('--rerun-all'\) \|\| argv\.includes\('--rerun-live'\)/);
+	assert.match(gate, /evidence source fingerprint does not match current worktree/);
 	assert.match(gate, /expected \$\{entry\.evidenceKind\} evidence/);
 	assert.match(gate, /evidence duration is below \$\{entry\.minDurationMs\}ms/);
 	assert.match(gate, /evidence source HEAD does not match current HEAD/);
 });
 
-test('every live final-gate child has a deadline, log, and timeout failure path', () => {
-	const rerunnable = PHASE3_REQUIRED_EVIDENCE.filter(item => item.rerun);
-	assert.ok(rerunnable.length > 0);
-	assert.ok(rerunnable.every(item => Number.isFinite(item.timeoutMs) && item.timeoutMs > 0));
+test('every live final-gate producer has a deadline, log, and process-tree timeout path', () => {
+	assert.ok(PHASE3_PRODUCERS.length > 0);
+	assert.ok(PHASE3_PRODUCERS.every(item => Number.isFinite(item.timeoutMs) && item.timeoutMs > 0));
+	assert.ok(PHASE3_REQUIRED_EVIDENCE.every(item => producerForArtifact(item.id)), 'every required artifact must have a producer');
+	const coreIde = PHASE3_PRODUCERS.find(item => item.id === 'core-ide');
+	assert.deepEqual(coreIde?.artifacts, ['core-ide', 'code-graph', 'themes-a11y']);
+	assert.ok(activeSoakProducerTimeoutMs({ PREBASE_ACTIVE_SOAK_MS: String(20 * 60 * 1000) }) > 20 * 60 * 1000);
 	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
 	assert.match(gate, /gate-logs/);
-	assert.match(gate, /child\.kill\('SIGTERM'\)/);
-	assert.match(gate, /child\.kill\('SIGKILL'\)/);
+	assert.match(gate, /terminateOwnedProcessTree/);
 	assert.match(gate, /live rerun timed out after/);
 });
 
 test('final gate requires current successful assurance evidence instead of a prose reminder', () => {
 	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
 	assert.match(gate, /readJson\('assurance\.json'\)/);
-	assert.match(gate, /assuranceEvidenceOk\(entry\.sourceHead, evidence\)/);
+	assert.match(gate, /assuranceEvidenceOk\(entry, evidence\)/);
 	assert.match(gate, /failures\.push\(`assurance: \$\{assuranceVerdict\.reason\}`\)/);
 	assert.match(gate, /assurance: \{ path: 'assurance\.json', ok: assuranceVerdict\.ok, reason: assuranceVerdict\.reason \}/);
 	assert.doesNotMatch(gate, /assuranceSummary/);
@@ -916,37 +1010,44 @@ test('scenarioOk rejects missing evidence, ok:false, and omitted ok', () => {
 	const missingHead = scenarioOk({}, { ok: true });
 	assert.equal(missingHead.ok, false, 'ok:true without sourceHead must not pass the final gate');
 	assert.match(missingHead.reason, /source HEAD/);
-	assert.equal(scenarioOk({}, { ok: true, sourceHead: 'current-head' }).ok, true);
+	const missingFingerprint = scenarioOk({}, { ok: true, sourceHead: 'current-head' });
+	assert.equal(missingFingerprint.ok, false, 'ok:true without sourceFingerprint must not pass the final gate');
+	assert.match(missingFingerprint.reason, /fingerprint/);
+	assert.equal(scenarioOk({}, { ok: true, sourceHead: 'current-head', sourceFingerprint: 'fp' }).ok, true);
 });
 
 test('final evidence requires the canonical sourceHead field, not the retired head alias', () => {
-	const entry = { id: 'core-ide', sourceHead: 'current-head' };
-	assert.equal(scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'current-head' }).ok, true);
+	const entry = { id: 'core-ide', sourceHead: 'current-head', sourceFingerprint: 'fp' };
+	assert.equal(scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'current-head', sourceFingerprint: 'fp' }).ok, true);
 	const missing = scenarioOk(entry, { ok: true, scenario: 'core-ide' });
 	assert.equal(missing.ok, false, 'final evidence without sourceHead must fail the gate');
 	assert.match(missing.reason, /source HEAD/);
 	const legacy = scenarioOk(entry, { ok: true, scenario: 'core-ide', head: 'current-head' });
 	assert.equal(legacy.ok, false, 'a legacy head field can otherwise conceal writers that never adopted the final evidence contract');
 	assert.match(legacy.reason, /source HEAD/);
-	const stale = scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'stale-head' });
+	const stale = scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'stale-head', sourceFingerprint: 'fp' });
 	assert.equal(stale.ok, false);
 	assert.match(stale.reason, /source HEAD does not match/);
+	const staleFp = scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'current-head', sourceFingerprint: 'other' });
+	assert.equal(staleFp.ok, false);
+	assert.match(staleFp.reason, /fingerprint does not match/);
 });
 
 test('final evidence rejects a missing or mismatched scenario label even when its source head is current', () => {
-	const entry = { id: 'core-ide', sourceHead: 'current-head' };
-	assert.equal(scenarioOk(entry, { ok: true, sourceHead: 'current-head' }).ok, false);
-	assert.equal(scenarioOk(entry, { ok: true, scenario: 'privacy', sourceHead: 'current-head' }).ok, false);
-	assert.equal(scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'current-head' }).ok, true);
+	const entry = { id: 'core-ide', sourceHead: 'current-head', sourceFingerprint: 'fp' };
+	assert.equal(scenarioOk(entry, { ok: true, sourceHead: 'current-head', sourceFingerprint: 'fp' }).ok, false);
+	assert.equal(scenarioOk(entry, { ok: true, scenario: 'privacy', sourceHead: 'current-head', sourceFingerprint: 'fp' }).ok, false);
+	assert.equal(scenarioOk(entry, { ok: true, scenario: 'core-ide', sourceHead: 'current-head', sourceFingerprint: 'fp' }).ok, true);
 });
 
 test('shared Phase 3 metadata is bounded, current, and rejects an unlabelled scenario', () => {
 	assert.throws(() => phase3EvidenceMetadata(repoRoot, ''), /scenario is required/);
 	const metadata = phase3EvidenceMetadata(repoRoot, 'contract-test');
-	assert.deepEqual(Object.keys(metadata).sort(), ['generatedAt', 'scenario', 'schemaVersion', 'sourceHead']);
+	assert.deepEqual(Object.keys(metadata).sort(), ['generatedAt', 'scenario', 'schemaVersion', 'sourceFingerprint', 'sourceHead']);
 	assert.equal(metadata.schemaVersion, PHASE3_EVIDENCE_SCHEMA_VERSION);
 	assert.equal(metadata.scenario, 'contract-test');
 	assert.match(metadata.sourceHead, /^[0-9a-f]{40}$/);
+	assert.match(metadata.sourceFingerprint, /^[0-9a-f]{64}$/);
 	assert.ok(Number.isFinite(Date.parse(metadata.generatedAt)));
 });
 
@@ -982,7 +1083,7 @@ test('final assurance has an authoritative, complete command matrix and records 
 });
 
 test('final gate accepts only a complete current assurance matrix with passed bounded command records', () => {
-	const entry = { id: 'assurance', sourceHead: 'current-head' };
+	const entry = { id: 'assurance', sourceHead: 'current-head', sourceFingerprint: 'fp' };
 	const commands = PHASE3_ASSURANCE_COMMANDS.map(command => ({
 		command: assuranceCommandLabel(command),
 		exitCode: 0,
@@ -990,17 +1091,19 @@ test('final gate accepts only a complete current assurance matrix with passed bo
 		passed: true,
 		log: 'reports/graph-acceptance/phase-3-final/assurance-logs/command.log',
 	}));
-	const passing = { ok: true, scenario: 'assurance', sourceHead: 'current-head', commands };
-	assert.equal(assuranceEvidenceOk(entry.sourceHead, passing).ok, true);
+	const passing = { ok: true, scenario: 'assurance', sourceHead: 'current-head', sourceFingerprint: 'fp', commands };
+	assert.equal(assuranceEvidenceOk(entry.sourceHead, passing).ok, false, 'a sourceHead-only identity must not accept assurance evidence');
+	assert.equal(assuranceEvidenceOk(entry, passing).ok, true);
 	assert.equal(scenarioOk(entry, passing).ok, true);
-	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, commands: [] }).ok, false);
-	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, commands: [...commands.slice(0, -1), { ...commands.at(-1), passed: false, exitCode: 1 }] }).ok, false);
-	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, commands: commands.map((command, index) => index === 0 ? { ...command, durationMs: undefined } : command) }).ok, false);
-	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, sourceHead: 'stale-head' }).ok, false);
-	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, scenario: 'core-ide' }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry, { ...passing, sourceFingerprint: 'other' }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry, { ...passing, commands: [] }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry, { ...passing, commands: [...commands.slice(0, -1), { ...commands.at(-1), passed: false, exitCode: 1 }] }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry, { ...passing, commands: commands.map((command, index) => index === 0 ? { ...command, durationMs: undefined } : command) }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry, { ...passing, sourceHead: 'stale-head' }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry, { ...passing, scenario: 'core-ide' }).ok, false);
 	const missingHead = scenarioOk(entry, { ok: true, scenario: 'assurance', commands });
 	assert.equal(missingHead.ok, false, 'assurance.json without sourceHead must fail the final gate');
-	assert.equal(assuranceEvidenceOk(entry.sourceHead, { ...passing, commands: commands.map((command, index) => index === 0 ? { ...command, command: 'not-the-matrix' } : command) }).ok, false);
+	assert.equal(assuranceEvidenceOk(entry, { ...passing, commands: commands.map((command, index) => index === 0 ? { ...command, command: 'not-the-matrix' } : command) }).ok, false);
 });
 
 test('every required Phase 3 evidence writer delegates current metadata to the shared contract', () => {
@@ -1064,11 +1167,14 @@ test('individual harnesses must not overwrite phase-3-final/manifest.json', () =
 
 test('lifecycle cycles reject monotonic WebContents growth and accept a stable warm baseline', () => {
 	const quit = { remaining: 'gone', terminationPath: 'workbench', usedSigkill: false };
+	const surfaces = ['maps', 'code-graph', 'temporal', 'runtime', 'magnus'].map(id => ({ id, opened: true, closed: true }));
 	const stable = () => ({ processCount: 14, webContents: { liveCount: 6 } });
 	assert.deepEqual(lifecycleFailures({
 		cold: { processCount: 7, webContents: { liveCount: 3 } },
 		warm: { processCount: 14, webContents: { liveCount: 6 } },
 		cycles: [1, 2, 3, 4, 5, 6].map(stable),
+		closedPrimarySidebar: true,
+		surfaces,
 		quit,
 	}), [], 'cold 7 → warm 14 that then stays at 14 is provisioning, not a leak');
 	assert.ok(lifecycleFailures({
@@ -1076,14 +1182,26 @@ test('lifecycle cycles reject monotonic WebContents growth and accept a stable w
 		warm: { processCount: 14, webContents: { liveCount: 6 } },
 		cycles: [8, 10, 12, 14, 16, 18].map(count => ({ processCount: 14, webContents: { liveCount: count } })),
 		classification: 'warm-provisioning',
+		closedPrimarySidebar: true,
+		surfaces,
 		quit,
 	}).some(item => /monotonically/.test(item)), 'monotonic live WebContents growth must fail even when classification is not leak');
 	assert.ok(lifecycleFailures({
 		cold: { processCount: 7, webContents: { liveCount: 3 } },
 		warm: { processCount: 14, webContents: { liveCount: 6 } },
 		cycles: [1, 2, 3, 4, 5, 6].map(() => ({ processCount: 14 })),
+		closedPrimarySidebar: true,
+		surfaces,
 		quit,
 	}).some(item => /live WebContents counts/.test(item)), 'missing WebContents samples must fail closed');
+	assert.ok(lifecycleFailures({
+		cold: { processCount: 7, webContents: { liveCount: 3 } },
+		warm: { processCount: 14, webContents: { liveCount: 6 } },
+		cycles: [1, 2, 3, 4, 5, 6].map(stable),
+		closedPrimarySidebar: false,
+		surfaces,
+		quit,
+	}).some(item => /Primary Sidebar/.test(item)), 'leaving the Primary Sidebar open must fail');
 });
 
 test('smoke diagnostics expose redacted WebContents inventory and never write accessibilitySupport off', () => {
@@ -1095,13 +1213,16 @@ test('smoke diagnostics expose redacted WebContents inventory and never write ac
 	assert.doesNotMatch(contribution, /contents\.getURL\(\)/);
 	assert.doesNotMatch(contribution, /liveCount:\s*inventory\.length/);
 	assert.match(contribution, /a11yMode === 'auto' \|\| a11yMode === 'on'/);
+	assert.match(contribution, /await configurationService\.updateValue\('editor\.accessibilitySupport', a11yMode\)/);
+	assert.ok(contribution.indexOf('getWebContentsInventory()') < contribution.indexOf('prebase.magnus.getStreamDiagnostics'));
 	assert.doesNotMatch(contribution, /updateValue\('editor\.accessibilitySupport', 'off'\)/);
 	const native = readFileSync(join(repoRoot, 'src/vs/platform/native/electron-main/nativeHostMainService.ts'), 'utf8');
 	const inventoryStart = native.indexOf('async getWebContentsInventory');
 	const inventory = native.slice(inventoryStart, native.indexOf('private webContentsUrlCategory'));
 	assert.match(inventory, /contents\.isDestroyed\(\)/);
-	assert.match(inventory, /destroyed \? '' : contents\.getURL\(\)/);
-	assert.match(inventory, /urlCategory: this\.webContentsUrlCategory\(url\)/);
+	assert.match(inventory, /inspectUrl \? contents\.getURL\(\)/);
+	assert.match(inventory, /type === 'window' \|\| type === 'browserView'/);
+	assert.match(inventory, /urlCategory: type === 'webview' \? 'webview' : this\.webContentsUrlCategory\(url\)/);
 	assert.doesNotMatch(inventory, /\burl:/);
 });
 
@@ -1157,4 +1278,131 @@ test('Magnus, Edge, and workbench URL policy share the same private-host and use
 	assert.match(magnusTest, /web-url-policy\.json/);
 	assert.match(edgeTest, /web-url-policy\.json/);
 	assert.match(workbenchTest, /web-url-policy\.json/);
+});
+
+test('Firecrawl clients call v2 scrape/search only and never claim ZDR, Interact, or a web-search provider picker', () => {
+	const firecrawl = readFileSync(join(repoRoot, 'extensions/prebase-magnus/src/localFirecrawlClient.ts'), 'utf8');
+	assert.match(firecrawl, /const FIRECRAWL_SCRAPE = 'https:\/\/api\.firecrawl\.dev\/v2\/scrape'/);
+	assert.match(firecrawl, /const FIRECRAWL_SEARCH = 'https:\/\/api\.firecrawl\.dev\/v2\/search'/);
+	assert.doesNotMatch(firecrawl, /\/v1\/|\/agent|\/interact|zeroDataRetention|zero_data_retention|\bzdr\b/i);
+	assert.match(firecrawl, /cache:\s*'no-store'/);
+	assert.match(firecrawl, /'Cache-Control':\s*'no-cache'/);
+	const hybrid = readFileSync(join(repoRoot, 'extensions/prebase-magnus/src/hybridWebContext.ts'), 'utf8');
+	assert.match(hybrid, /storeInCache:\s*false/);
+	assert.match(hybrid, /maxAge:\s*firecrawlMaxAgeMs\(freshness\)/);
+	assert.doesNotMatch(hybrid, /zeroDataRetention|\/interact/i);
+	const edge = readFileSync(join(repoRoot, 'supabase/functions/web-search/index.ts'), 'utf8');
+	assert.match(edge, /api\.firecrawl\.dev\/v2\/scrape/);
+	assert.match(edge, /api\.firecrawl\.dev\/v2\/search/);
+	assert.match(edge, /cache:\s*"no-store"/);
+	assert.doesNotMatch(edge, /\/v1\/interact|zeroDataRetention/i);
+	const settings = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebaseSettingsEditor.ts'), 'utf8');
+	assert.doesNotMatch(settings, /webSearchProvider|Firecrawl Interact|LinkUp vs Firecrawl/);
+});
+
+test('Firecrawl HTTP fetch on Magnus client, connection-test, and edge providerFetch sends no-store/no-cache', () => {
+	const firecrawl = readFileSync(join(repoRoot, 'extensions/prebase-magnus/src/localFirecrawlClient.ts'), 'utf8');
+	const fetchFn = firecrawl.slice(firecrawl.indexOf('async function firecrawlFetch'), firecrawl.indexOf('function retryable'));
+	assert.match(fetchFn, /cache:\s*'no-store'/);
+	assert.match(fetchFn, /'Cache-Control':\s*'no-cache'/);
+	assert.doesNotMatch(fetchFn, /zeroDataRetention|zero_data_retention|\bzdr\b|\/interact/i);
+
+	const extension = readFileSync(join(repoRoot, 'extensions/prebase-magnus/src/extension.ts'), 'utf8');
+	const connection = extension.slice(extension.indexOf("registerCommand('prebase.magnus.testFirecrawlConnection'"), extension.indexOf("registerCommand('prebase.magnus.refreshModels'"));
+	assert.match(connection, /api\.firecrawl\.dev\/v2\/scrape/);
+	assert.match(connection, /'Cache-Control': 'no-cache'/);
+	assert.match(connection, /cache: 'no-store'/);
+	assert.doesNotMatch(connection, /zeroDataRetention|\/interact|\bzdr\b/i);
+
+	const edge = readFileSync(join(repoRoot, 'supabase/functions/web-search/index.ts'), 'utf8');
+	const providerFetch = edge.slice(edge.indexOf('async function providerFetch'), edge.indexOf('async function linkupSearch'));
+	assert.match(providerFetch, /"Cache-Control": "no-cache"/);
+	assert.match(providerFetch, /cache: "no-store"/);
+	assert.doesNotMatch(providerFetch, /zeroDataRetention|\/interact|\bzdr\b/i);
+});
+
+test('final gate leftover PIDs after parent death SIGKILL only the owned tree', () => {
+	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
+	const drain = gate.slice(gate.indexOf('async function drainOwnedTree'), gate.indexOf('async function runProcess'));
+	assert.match(drain, /processTree\(pid\)\.map\(row => row\.pid\)/);
+	assert.doesNotMatch(drain, /pgrep|pkill|PreBase\.app|Electron/);
+
+	const runProcess = gate.slice(gate.indexOf('async function runProcess'), gate.indexOf('function parseMode'));
+	assert.match(runProcess, /leftoverPids = \[\.\.\.new Set\(\[/);
+	assert.match(runProcess, /termination\?\.leftoverPids \?\? \[\]/);
+	assert.match(runProcess, /await drainOwnedTree\(child\.pid\)/);
+
+	const leftoverKill = gate.slice(gate.indexOf('if (result.leftoverPids.length)'), gate.indexOf('const scenarios = PHASE3_REQUIRED_EVIDENCE'));
+	assert.match(leftoverKill, /await terminateOwnedProcessTree\(result\.harnessPid\)/);
+	assert.match(leftoverKill, /for \(const pid of result\.leftoverPids\)/);
+	assert.match(leftoverKill, /process\.kill\(pid, 'SIGKILL'\)/);
+	assert.doesNotMatch(leftoverKill, /pgrep|pkill|-u \$USER|PreBase\.app/);
+
+	const harness = readFileSync(join(acceptanceDir, 'workbenchHarness.mjs'), 'utf8');
+	const tree = harness.slice(harness.indexOf('export function processTree'), harness.indexOf('export async function waitForWorkbenchDriver'));
+	assert.match(tree, /walk\(rootPid\)/);
+	assert.match(tree, /children\.get\(pid\)/);
+	assert.doesNotMatch(tree, /pgrep|pkill|comm === ['"]PreBase|killall/);
+});
+
+test('lifecycle producer timeout covers 5 warm sequences instead of dying at 6 minutes', () => {
+	const lifecycle = PHASE3_PRODUCERS.find(item => item.id === 'lifecycle-cycles');
+	assert.ok(lifecycle.timeoutMs >= 15 * 60 * 1000);
+	const diag = readFileSync(join(acceptanceDir, 'prebase-process-leak-diag.mjs'), 'utf8');
+	assert.match(diag, /const CYCLE_COUNT = 5;/);
+});
+
+test('Temporal canvas screenshots disable animations so idle RAF cannot flake stability', () => {
+	const live = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-live.mjs'), 'utf8');
+	assert.match(live, /animations: 'disabled'/);
+	assert.match(live, /evidence\.fullMap = fullMap/);
+	assert.match(live, /evidence\.focusChanges = focusChanges/);
+});
+
+test('idle soak sleeps on the Node clock and surfaces CDP abort as a failure', () => {
+	const idle = readFileSync(join(acceptanceDir, 'prebase-idle-soak.mjs'), 'utf8');
+	assert.doesNotMatch(idle, /page\.waitForTimeout\(intervalMs\)/);
+	assert.match(idle, /setTimeout\(resolveWait, waitMs\)/);
+	assert.match(idle, /idle soak aborted/);
+	assert.match(idle, /process\.exit\(result\.ok \? 0 : 1\)/);
+});
+
+test('gate keeps current ok evidence when a producer times out with no leftover PIDs', () => {
+	const gate = readFileSync(join(acceptanceDir, 'prebase-phase3-final-gate.mjs'), 'utf8');
+	assert.match(gate, /rerun\.timedOut && \(rerun\.leftoverPids\?\.length \?\? 0\) === 0/);
+});
+
+test('lifecycle opens Runtime explorer and retries layout/editor close', () => {
+	const diag = readFileSync(join(acceptanceDir, 'prebase-process-leak-diag.mjs'), 'utf8');
+	assert.match(diag, /workbench\.view\.prebase\.runtime\.explorer/);
+	assert.match(diag, /workbench\.action\.closeActiveEditor/);
+	assert.match(diag, /attempt < 3 && !opened/);
+});
+
+test('missing Firecrawl key is an external hybrid skip, not a stale repo-controlled artifact', () => {
+	const identity = { sourceHead: 'head', sourceFingerprint: 'fp' };
+	const skipped = {
+		ok: false,
+		skipped: true,
+		firecrawlConfigured: false,
+		linkupConfigured: true,
+		sourceHead: identity.sourceHead,
+		sourceFingerprint: identity.sourceFingerprint,
+		scenario: 'hybrid-web-smoke',
+		failures: ['local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve'],
+	};
+	assert.equal(hybridFirecrawlExternalSkip(skipped, identity), true);
+	assert.equal(hybridFirecrawlExternalSkip({ ...skipped, sourceFingerprint: 'other' }, identity), false);
+	assert.equal(hybridFirecrawlExternalSkip({ ...skipped, skipped: false, firecrawlConfigured: true }, identity), false);
+	const passing = Object.fromEntries(PHASE3_REQUIRED_EVIDENCE.map(spec => [spec.id, {
+		ok: true,
+		scenario: spec.id,
+		sourceHead: identity.sourceHead,
+		sourceFingerprint: identity.sourceFingerprint,
+		...(spec.evidenceKind ? { evidenceKind: spec.evidenceKind, durationMs: spec.minDurationMs } : {}),
+	}]));
+	passing['hybrid-web-smoke'] = skipped;
+	const stale = classifyRequiredEvidence(identity, new Map(Object.entries(passing)));
+	assert.equal(stale.some(item => item.id === 'hybrid-web-smoke'), false);
+	assert.equal(scenarioOk({ id: 'hybrid-web-smoke', sourceHead: identity.sourceHead, sourceFingerprint: identity.sourceFingerprint }, skipped).ok, false);
 });

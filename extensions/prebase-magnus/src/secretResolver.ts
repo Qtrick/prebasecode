@@ -112,7 +112,7 @@ export function parseAllowlistedEnv(content: string, allowlist: ReadonlySet<stri
 		}
 
 		const eqIndex = trimmed.indexOf('=');
-		const varName = trimmed.slice(0, eqIndex).trim();
+		const varName = trimmed.slice(0, eqIndex).trim().replace(/^export\s+/, '');
 		if (!allowlist.has(varName)) {
 			continue;
 		}

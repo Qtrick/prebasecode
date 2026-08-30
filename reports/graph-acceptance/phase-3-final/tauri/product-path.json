@@ -1,27 +1,32 @@
 {
   "ok": true,
   "failures": [],
+  "schemaVersion": 2,
+  "scenario": "tauri-product-path",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
+  "generatedAt": "2026-08-30T00:44:39.834Z",
   "framework": "tauri",
   "productPath": true,
   "bypassedPreBase": false,
   "expectedGreeting": "Hello, Ada",
-  "prebasePid": 63747,
-  "cdpPort": 52332,
+  "prebasePid": 54564,
+  "cdpPort": 59188,
   "start": {
     "ok": true,
     "state": "testing",
     "backend": "webdriver",
     "purpose": "test",
-    "sessionId": "3544eae4-9a42-4237-a46c-001079965f95"
+    "sessionId": "0f68129a-6067-42d0-b2bb-daf06adc3917"
   },
   "detected": true,
   "started": true,
   "state": "testing",
   "backend": "webdriver",
   "purpose": "test",
-  "sessionId": "3544eae4-9a42-4237-a46c-001079965f95",
-  "childPid": 63899,
-  "ownedPort": 52346,
+  "sessionId": "0f68129a-6067-42d0-b2bb-daf06adc3917",
+  "childPid": 54697,
+  "ownedPort": 59204,
   "inspected": true,
   "inspectTitle": "PreBase Tauri Fixture",
   "filled": true,
@@ -42,8 +47,8 @@
   "outputOk": true,
   "outputTruncated": false,
   "restarted": true,
-  "restartSessionId": "ee757af6-c341-4fc0-8e61-1ca9bdc8b431",
-  "childPidAfterRestart": 64361,
+  "restartSessionId": "20dafd62-018e-4c20-9215-7ddfec076ba3",
+  "childPidAfterRestart": 55155,
   "assertedAfterRestart": true,
   "assertAfterRestartActual": {
     "checked": null,
@@ -58,8 +63,8 @@
   "childAfterStop": "gone",
   "portAfterStop": [],
   "quit": {
-    "before": "63747     1   3.6 324496 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
-    "latencyMs": 313,
+    "before": "54564     1   3.8 329696 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 422,
     "remaining": "gone"
   }
 }

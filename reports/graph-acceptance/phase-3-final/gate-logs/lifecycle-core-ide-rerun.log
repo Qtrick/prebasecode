@@ -1,0 +1,56 @@
+[rerun] start 2026-08-29T03:31:25Z HEAD=b736017122e253d2da27e8d21fdbe6891994d6d2
+[rerun] 1/2 lifecycle-cycles
+{
+  "ok": false,
+  "failures": [
+    "lifecycle did not record live WebContents counts for each cycle"
+  ],
+  "classification": "warm-provisioning",
+  "cold": 7,
+  "warm": 36,
+  "cycles": [
+    {
+      "id": "cycle-1",
+      "processCount": 14,
+      "liveCount": 1
+    },
+    {
+      "id": "cycle-2",
+      "processCount": 18
+    },
+    {
+      "id": "cycle-3",
+      "processCount": 18
+    },
+    {
+      "id": "cycle-4",
+      "processCount": 16
+    },
+    {
+      "id": "cycle-5",
+      "processCount": 13
+    },
+    {
+      "id": "cycle-6",
+      "processCount": 10
+    }
+  ],
+  "quit": {
+    "before": "88493     1   0.1 134432 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "remaining": "gone",
+    "leftoverPids": [],
+    "latencyMs": 7927,
+    "terminationPath": "sigterm",
+    "workbenchCompleted": false,
+    "usedSigterm": true,
+    "usedSigkill": false
+  }
+}
+[rerun] lifecycle exit=1
+[rerun] 2/2 core-ide-live
+{
+  "ok": true,
+  "failures": []
+}
+[rerun] core-ide exit=0
+[rerun] done 2026-08-29T03:43:22Z

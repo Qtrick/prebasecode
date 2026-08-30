@@ -182,10 +182,10 @@ async function run() {
 		evidence.activityError = activityError;
 	}
 	const failures = activeSoakFailures(evidence);
-	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
+	const result = { ...evidence, ok: failures.length === 0 && !evidence.error, failures };
 	writeFileSync(join(evidenceDir, fileName), JSON.stringify(result, null, 2));
 	console.log(JSON.stringify({ ok: result.ok, failures, samples: evidence.samples.length, durationMs, quit: evidence.quit }, null, 2));
-	if (!result.ok) process.exitCode = 1;
+	process.exit(result.ok ? 0 : 1);
 }
 
 if (resolve(process.argv[1] ?? '') === scriptPath) {

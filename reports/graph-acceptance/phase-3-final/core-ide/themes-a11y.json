@@ -1,4 +1,9 @@
 {
+  "schemaVersion": 2,
+  "scenario": "themes-a11y",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
+  "generatedAt": "2026-08-30T00:42:37.653Z",
   "ok": true,
   "failures": [],
   "themes": {
@@ -61,13 +66,22 @@
     "afterZoom": {
       "zoomLevel": 4,
       "innerWidth": 1440
-    }
+    },
+    "screenReaderAuto": "auto",
+    "screenReaderOn": "on",
+    "graphLiveRegion": true,
+    "graphCanvasRole": "region",
+    "mapsAriaExpanded": true,
+    "mapsLayoutGroup": true,
+    "settingsStatusRole": "status",
+    "settingsStatusClaimsAvailable": false,
+    "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "22029     1  17.2 224656 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "33234     1  17.2 250480 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 657,
+    "latencyMs": 624,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

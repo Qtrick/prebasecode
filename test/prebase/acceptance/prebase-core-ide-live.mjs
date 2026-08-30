@@ -99,6 +99,11 @@ export function themesA11yFailures(evidence) {
 	if (evidence.a11y?.screenReaderAuto !== 'auto') failures.push('screen-reader auto mode was not proven');
 	if (evidence.a11y?.screenReaderOn !== 'on') failures.push('screen-reader on mode was not proven');
 	if (!evidence.a11y?.graphLiveRegion) failures.push('graph live region is missing');
+	if (!evidence.a11y?.mapsAriaExpanded) failures.push('Maps disclosures were not proven with aria-expanded');
+	if (!evidence.a11y?.mapsLayoutGroup) failures.push('Maps layout group role was not proven');
+	if (evidence.a11y?.settingsStatusRole !== 'status') failures.push('PreBase Settings web-search status live region was not proven');
+	if (evidence.a11y?.settingsStatusClaimsAvailable) failures.push('Web Search status must not claim available as a default');
+	if (evidence.a11y?.graphCanvasRole !== 'region') failures.push('Code Graph canvas region role was not proven');
 	if (evidence.a11y?.prebaseForcesAccessibilityOff) failures.push('PreBase must not force editor.accessibilitySupport off');
 	return failures;
 }
@@ -414,6 +419,11 @@ async function run() {
 				selectedNodeId: metrics.selectedNodeId,
 				networkLayoutMode: metrics.networkLayoutMode,
 				networkIdleAutoRotate: metrics.networkIdleAutoRotate,
+				viewportWidth: metrics.viewportWidth,
+				viewportHeight: metrics.viewportHeight,
+				projectedBounds: metrics.projectedBounds ?? null,
+				screenUtilization: metrics.screenUtilization,
+				labelCount: metrics.labelCount ?? metrics.labelsDrawn,
 				nodeHits: Array.isArray(metrics.nodeHits) ? metrics.nodeHits.slice(0, 8) : [],
 			} : null,
 			nodesDrawn: nodesDrawnFromMetrics(metrics),
@@ -483,6 +493,37 @@ async function run() {
 				return Boolean(region && region.getAttribute('role') === 'status' && region.getAttribute('aria-live') === 'polite');
 			}).catch(() => false)
 			: false;
+		const graphCanvasRole = graphFrame
+			? await graphFrame.evaluate(() => document.getElementById('netCanvas')?.getAttribute('role') || '').catch(() => '')
+			: '';
+		await ensureSidebar(launched.page);
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.prebase.maps').catch(() => undefined);
+		await launched.page.locator('.prebase-maps-view').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
+		await launched.page.getByRole('button', { name: 'Code Graph', exact: true }).click({ timeout: 4_000 }).catch(() => undefined);
+		await launched.page.locator('.prebase-maps-view [role="group"][aria-label]').first().waitFor({ state: 'visible', timeout: 6_000 }).catch(() => undefined);
+		const mapsSemantics = await launched.page.evaluate(() => {
+			const root = document.querySelector('.prebase-maps-view');
+			if (!root) {
+				return { ariaExpanded: false, layoutGroup: false };
+			}
+			return {
+				ariaExpanded: Boolean(root.querySelector('button[aria-expanded]')),
+				layoutGroup: Boolean(root.querySelector('[role="group"][aria-label]')),
+			};
+		}).catch(() => ({ ariaExpanded: false, layoutGroup: false }));
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.settings.open').catch(() => undefined);
+		await launched.page.locator('.prebase-settings-editor').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
+		await launched.page.locator('.prebase-settings-editor button', { hasText: 'Agents & AI' }).first().click({ timeout: 4_000 }).catch(() => undefined);
+		await launched.page.locator('.prebase-settings-editor [role="status"]').first().waitFor({ state: 'visible', timeout: 6_000 }).catch(() => undefined);
+		const settingsSemantics = await launched.page.evaluate(() => {
+			const root = document.querySelector('.prebase-settings-editor');
+			const status = root?.querySelector('[role="status"]');
+			const text = String(status?.textContent || '');
+			return {
+				statusRole: status?.getAttribute('role') || '',
+				statusClaimsAvailable: /\bavailable\b/i.test(text) && !/not available/i.test(text),
+			};
+		}).catch(() => ({ statusRole: '', statusClaimsAvailable: false }));
 		evidence.a11y = {
 			keyboardFocus: Boolean(focused.ok),
 			focus: focused,
@@ -493,6 +534,11 @@ async function run() {
 			screenReaderAuto: autoDiag?.accessibilitySupport,
 			screenReaderOn: onDiag?.accessibilitySupport,
 			graphLiveRegion,
+			graphCanvasRole,
+			mapsAriaExpanded: Boolean(mapsSemantics.ariaExpanded),
+			mapsLayoutGroup: Boolean(mapsSemantics.layoutGroup),
+			settingsStatusRole: settingsSemantics.statusRole,
+			settingsStatusClaimsAvailable: Boolean(settingsSemantics.statusClaimsAvailable),
 			prebaseForcesAccessibilityOff: false,
 		};
 

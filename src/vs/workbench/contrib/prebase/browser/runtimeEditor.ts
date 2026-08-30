@@ -398,7 +398,7 @@ export class PreBaseRuntimeEditor extends EditorPane {
 <meta charset="UTF-8">
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}'; script-src 'nonce-${nonce}'; frame-src * http: https:; connect-src http: https:;">
 <style nonce="${nonce}">
-html, body { margin:0; height:100%; width:100%; background:transparent; overflow:hidden; font-family: ui-sans-serif, system-ui, sans-serif; }
+html, body { margin:0; height:100%; width:100%; background:transparent; overflow:hidden; font-family: var(--vscode-font-family, sans-serif); }
 #frame { border:0; width:100%; height:100%; display:block; margin:0; padding:0; background:transparent; }
 #overlay {
 	position:absolute; inset:0; display:flex; align-items:center; justify-content:center;

@@ -1,10 +1,15 @@
 {
   "ok": true,
   "failures": [],
+  "schemaVersion": 2,
+  "scenario": "temporal-large",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
+  "generatedAt": "2026-08-30T00:43:35.681Z",
   "scale": "large",
   "fixture": {
-    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-large-AomIbn",
-    "head": "f72a042b9d04b2904e6b496c45914f0ad4e1fdaa",
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-large-xm4Ruf",
+    "head": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
     "commits": 50,
     "files": [
       "package.json",
@@ -345,22 +350,20 @@
       "src/util/mod-27.js"
     ],
     "expectedModifiedPath": "src/cloud/mod-04.js\nsrc/core/mod-01.js\nsrc/desktop/mod-20.js\nsrc/host/mod-24.js\nsrc/layout/mod-20.js\nsrc/runtime/mod-08.js\nsrc/test/mod-16.js\nsrc/ui/mod-12.js",
-    "firstParentSummary": "f72a042b9d04b2904e6b496c45914f0ad4e1fdaa e9fcc874d8b9bb10bedb8f21146d91cca1017938 feat: cross-community wave\n\n src/cloud/mod-04.js   | 1 +\n src/core/mod-01.js    | 1 +\n src/desktop/mod-20.js | 1 +\n src/host/mod-24.js    | 1 +\n src/layout/mod-20.js  | 1 +\n src/runtime/mod-08.js | 1 +\n src/test/mod-16.js    | 1 +\n src/ui/mod-12.js      | 1 +\n 8 files changed, 8 insertions(+)",
+    "firstParentSummary": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3 f55a137c0eac3e20d1a21534b3c01ad763a0e30c feat: cross-community wave\n\n src/cloud/mod-04.js   | 1 +\n src/core/mod-01.js    | 1 +\n src/desktop/mod-20.js | 1 +\n src/host/mod-24.js    | 1 +\n src/layout/mod-20.js  | 1 +\n src/runtime/mod-08.js | 1 +\n src/test/mod-16.js    | 1 +\n src/ui/mod-12.js      | 1 +\n 8 files changed, 8 insertions(+)",
     "scale": "large"
   },
-  "pid": 95538,
-  "cdpPort": 61709,
-  "targetOpened": true,
-  "repoLoaded": true,
+  "pid": 51745,
+  "cdpPort": 58496,
   "fullMap": {
-    "sequenceId": 34,
+    "sequenceId": 25,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 2286.0999999940395,
-    "renderEnd": 2286.5999999940395,
-    "durationMs": 0.5,
-    "selectedCommitSha": "f72a042b9d04b2904e6b496c45914f0ad4e1fdaa",
-    "renderedCommitSha": "f72a042b9d04b2904e6b496c45914f0ad4e1fdaa",
+    "renderStart": 1819.2000000178814,
+    "renderEnd": 1819.5,
+    "durationMs": 0.29999998211860657,
+    "selectedCommitSha": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
+    "renderedCommitSha": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
     "isPartialLineage": true,
     "receivedNodeCount": 338,
     "visibleNodeCount": 338,
@@ -370,16 +373,16 @@
     "labelsDrawn": 8,
     "selectedNodeId": null,
     "transform": {
-      "x": 285.9431818181818,
-      "y": 350.9839015151515,
-      "k": 0.23674242424242425
+      "x": 286.34090909090907,
+      "y": 351.26325757575756,
+      "k": 0.24621212121212122
     },
     "canvas": {
       "clientWidth": 552,
       "clientHeight": 708,
       "width": 1104,
       "height": 1416,
-      "distinctPixels": 256348
+      "distinctPixels": 277078
     },
     "summary": {
       "addedCount": 0,
@@ -393,18 +396,30 @@
       "edgeModifiedCount": 0
     },
     "lodTier": "aggregate",
-    "isAnimating": false,
-    "timestamp": 2286.5999999940395
+    "isAnimating": true,
+    "timestamp": 1819.5,
+    "viewportWidth": 552,
+    "viewportHeight": 708,
+    "labelCount": 8,
+    "projectedBounds": {
+      "minX": 70.41287878787875,
+      "minY": 122.53219696969694,
+      "maxX": 481.5871212121212,
+      "maxY": 565.467803030303,
+      "width": 411.17424242424244,
+      "height": 442.93560606060606
+    },
+    "screenUtilization": 0.4660088437133904
   },
   "focusChanges": {
-    "sequenceId": 64,
+    "sequenceId": 59,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 2779.4000000059605,
-    "renderEnd": 2779.5,
-    "durationMs": 0.09999999403953552,
-    "selectedCommitSha": "f72a042b9d04b2904e6b496c45914f0ad4e1fdaa",
-    "renderedCommitSha": "f72a042b9d04b2904e6b496c45914f0ad4e1fdaa",
+    "renderStart": 2269.2000000178814,
+    "renderEnd": 2269.2000000178814,
+    "durationMs": 0,
+    "selectedCommitSha": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
+    "renderedCommitSha": "9fc06324ab41e1cc5d12ac97b60710df8b9034a3",
     "isPartialLineage": true,
     "receivedNodeCount": 338,
     "visibleNodeCount": 24,
@@ -414,16 +429,16 @@
     "labelsDrawn": 8,
     "selectedNodeId": null,
     "transform": {
-      "x": 131.97055823901044,
-      "y": 279.83640779287566,
-      "k": 0.2530902615101482
+      "x": 136.3640656517855,
+      "y": 281.9575466956487,
+      "k": 0.26167962838861253
     },
     "canvas": {
       "clientWidth": 552,
       "clientHeight": 708,
       "width": 1104,
       "height": 1416,
-      "distinctPixels": 7463
+      "distinctPixels": 7630
     },
     "summary": {
       "addedCount": 0,
@@ -438,32 +453,46 @@
     },
     "lodTier": "aggregate",
     "isAnimating": false,
-    "timestamp": 2779.5
+    "timestamp": 2269.2000000178814,
+    "viewportWidth": 552,
+    "viewportHeight": 708,
+    "labelCount": 8,
+    "projectedBounds": {
+      "minX": 136.3640656517855,
+      "minY": 281.9575466956487,
+      "maxX": 565.2569765807214,
+      "maxY": 475.33879207483335,
+      "width": 428.89291092893586,
+      "height": 193.38124537918463
+    },
+    "screenUtilization": 0.21222223565499193
   },
+  "targetOpened": true,
+  "repoLoaded": true,
   "camera": {
     "afterFocus": {
-      "x": 86.76691718031051,
-      "y": 258.9487610561546,
-      "k": 0.2578896976096198
+      "x": 84.78276809868788,
+      "y": 258.12134363216103,
+      "k": 0.2669993435645031
     },
     "afterUserZoom": {
-      "x": -64.1017117013563,
-      "y": 183.5953092861909,
-      "k": 0.450140433153714
+      "x": -80.0762625994821,
+      "y": 176.3687819343994,
+      "k": 0.46726014374245833
     },
     "afterWait": {
-      "x": -64.1017117013563,
-      "y": 183.5953092861909,
-      "k": 0.450140433153714
+      "x": -80.0762625994821,
+      "y": 176.3687819343994,
+      "k": 0.46726014374245833
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1787890249662,
-    "quitMs": 404,
+    "startedAt": 1788050621675,
+    "quitMs": 409,
     "remaining": "gone",
-    "before": "95538     1  24.8 346592 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "51745     1  28.1 369904 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "after": "gone"
   }
 }

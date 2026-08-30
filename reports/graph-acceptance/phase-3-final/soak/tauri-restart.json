@@ -1,80 +1,85 @@
 {
+  "schemaVersion": 2,
+  "scenario": "tauri-restart-soak",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "c1d4105dffbd858951207159886fff623563d09be222fbaebd486b324f54af30",
+  "generatedAt": "2026-08-30T00:11:50.651Z",
   "ok": true,
   "framework": "tauri",
   "cycles": 10,
   "passed": 10,
   "failed": 0,
-  "elapsedMs": 272365,
+  "elapsedMs": 260280,
   "results": [
     {
       "cycle": 1,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 422
+      "quitMs": 316
     },
     {
       "cycle": 2,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 317
+      "quitMs": 316
     },
     {
       "cycle": 3,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 423
+      "quitMs": 317
     },
     {
       "cycle": 4,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 422
+      "quitMs": 420
     },
     {
       "cycle": 5,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 312
+      "quitMs": 315
     },
     {
       "cycle": 6,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 315
+      "quitMs": 321
     },
     {
       "cycle": 7,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 317
+      "quitMs": 316
     },
     {
       "cycle": 8,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 316
+      "quitMs": 417
     },
     {
       "cycle": 9,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 422
+      "quitMs": 423
     },
     {
       "cycle": 10,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 313
+      "quitMs": 418
     }
   ],
   "note": "Each cycle is a full PreBase product-path including restart/stop/child/port/Quit."

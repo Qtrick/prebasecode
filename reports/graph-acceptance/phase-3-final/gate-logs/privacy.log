@@ -1,0 +1,8 @@
+{
+  "ok": true,
+  "failures": [],
+  "cdpHosts": [
+    "open-vsx.org"
+  ],
+  "forbiddenHosts": []
+}

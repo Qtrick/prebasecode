@@ -18,6 +18,7 @@ import { IInstantiationService, ServicesAccessor } from '../../../../platform/in
 import { Action2, MenuId, registerAction2 } from '../../../../platform/actions/common/actions.js';
 import { ICommandService } from '../../../../platform/commands/common/commands.js';
 import { IEditorService } from '../../../services/editor/common/editorService.js';
+import { IWorkbenchLayoutService, Parts } from '../../../services/layout/browser/layoutService.js';
 import { INotificationService, Severity } from '../../../../platform/notification/common/notification.js';
 import { IDialogService } from '../../../../platform/dialogs/common/dialogs.js';
 import { IFileService } from '../../../../platform/files/common/files.js';
@@ -1105,12 +1106,14 @@ registerAction2(class extends Action2 {
 		const themeService = accessor.get(IWorkbenchThemeService);
 		const configurationService = accessor.get(IConfigurationService);
 		const commandService = accessor.get(ICommandService);
+		const layoutService = accessor.get(IWorkbenchLayoutService);
+		const editorService = accessor.get(IEditorService);
 		let nativeHost: INativeHostService | undefined;
 		try { nativeHost = accessor.get(INativeHostService); } catch { /* web workbench */ }
 		const a11yMode = request?.accessibilitySupport;
 		if (a11yMode === 'auto' || a11yMode === 'on') {
 			// Isolated smoke profiles only; never write 'off' and never a user's real profile.
-			void configurationService.updateValue('editor.accessibilitySupport', a11yMode);
+			await configurationService.updateValue('editor.accessibilitySupport', a11yMode);
 		}
 		let parserActiveRequests = 0;
 		let temporalActiveWrites = 0;
@@ -1156,9 +1159,37 @@ registerAction2(class extends Action2 {
 			colorThemeType: theme.type,
 			zoomLevel: getZoomLevel(mainWindow),
 			accessibilitySupport: configurationService.getValue('editor.accessibilitySupport'),
+			layout: {
+				sidebarVisible: layoutService.isVisible(Parts.SIDEBAR_PART),
+				panelVisible: layoutService.isVisible(Parts.PANEL_PART),
+				auxiliaryBarVisible: layoutService.isVisible(Parts.AUXILIARYBAR_PART),
+				editorCount: editorService.visibleEditors.length,
+			},
 		};
 		if (applyId || typeof zoom === 'number') {
 			return result;
+		}
+		if (nativeHost) {
+			try {
+				const inventory = await Promise.race([
+					nativeHost.getWebContentsInventory(),
+					new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), 2000)),
+				]);
+				if (Array.isArray(inventory)) {
+					const live = inventory.filter(item => !item.destroyed);
+					result.webContents = {
+						liveCount: live.length,
+						liveIds: live.map(item => item.id),
+						entries: live.map(item => ({
+							id: item.id,
+							type: item.type,
+							loading: item.loading,
+							urlCategory: item.urlCategory,
+							ownerCategory: item.ownerCategory,
+						})),
+					};
+				}
+			} catch { /* inventory is smoke-only and best-effort */ }
 		}
 		try {
 			const magnusStream = await Promise.race([
@@ -1171,23 +1202,6 @@ registerAction2(class extends Action2 {
 			result.magnusSourceCancelled = Boolean(magnusStream?.sourceCancelled);
 			result.magnusSourceChunks = Number(magnusStream?.sourceChunks ?? 0);
 		} catch { /* same */ }
-		if (nativeHost) {
-			try {
-				const inventory = await nativeHost.getWebContentsInventory();
-				const live = inventory.filter(item => !item.destroyed);
-				result.webContents = {
-					liveCount: live.length,
-					liveIds: live.map(item => item.id),
-					entries: live.map(item => ({
-						id: item.id,
-						type: item.type,
-						loading: item.loading,
-						urlCategory: item.urlCategory,
-						ownerCategory: item.ownerCategory,
-					})),
-				};
-			} catch { /* inventory is smoke-only and best-effort */ }
-		}
 		return result;
 	}
 });

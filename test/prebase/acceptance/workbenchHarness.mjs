@@ -275,6 +275,26 @@ function treeGone(rootPid, ownedPids) {
 	return processState(rootPid) === 'gone' && remainingOwnedPids(ownedPids).length === 0;
 }
 
+/**
+ * Terminate a test-owned process tree (harness + Electron/Tauri/npm descendants).
+ * Collects descendants before signalling so a dead parent cannot hide children.
+ */
+export async function terminateOwnedProcessTree(rootPid, { termMs = 5_000, killMs = 3_000 } = {}) {
+	const ownedPids = collectOwnedPids(rootPid, new Set());
+	if (remainingOwnedPids(ownedPids).length === 0 && processState(rootPid) === 'gone') {
+		return { leftoverPids: [], ownedPids: [...ownedPids], usedSigkill: false };
+	}
+	signalProcessTree(rootPid, 'SIGTERM', ownedPids);
+	await waitFor(() => treeGone(rootPid, ownedPids), termMs, 100);
+	let usedSigkill = false;
+	if (!treeGone(rootPid, ownedPids)) {
+		usedSigkill = true;
+		signalProcessTree(rootPid, 'SIGKILL', ownedPids);
+		await waitFor(() => treeGone(rootPid, ownedPids), killMs, 100);
+	}
+	return { leftoverPids: remainingOwnedPids(ownedPids), ownedPids: [...ownedPids], usedSigkill };
+}
+
 export async function gracefulWorkbenchQuit(page, pid) {
 	const startedAt = Date.now();
 	const before = processState(pid);

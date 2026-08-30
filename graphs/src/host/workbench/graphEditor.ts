@@ -702,14 +702,14 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 	outline:1px solid var(--vscode-focusBorder, #007fd4); outline-offset:1px;
 }
 /* Center Lock active state: shape change + outline + accent, never color alone. */
-#toolbar button[aria-pressed="true"] { color:var(--vscode-button-background, #2dd4bf); border-color:var(--vscode-button-background, #2dd4bf); background:rgba(45, 212, 191, 0.14); }
+#toolbar button[aria-pressed="true"] { color:var(--vscode-button-background, #2dd4bf); border-color:var(--vscode-button-background, #2dd4bf); background:color-mix(in srgb, var(--vscode-button-background, #2dd4bf) 14%, transparent); }
 #toolbar button .icon-pressed { display:none; }
 #toolbar button[aria-pressed="true"] .icon-unpressed { display:none; }
 #toolbar button[aria-pressed="true"] .icon-pressed { display:block; }
 #toolbar label { display:flex; gap:4px; align-items:center; user-select:none; opacity:.9; }
 #idleToggleWrap { display:none; }
 #status { position:absolute; left:50%; transform:translateX(-50%); bottom:14px; z-index:4; font-size:12px; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:999px; padding:6px 14px; white-space:nowrap; max-width:90%; overflow:hidden; text-overflow:ellipsis; }
-#legend { position:absolute; left:12px; bottom:100px; z-index:4; display:none; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:10px; padding:10px 12px; font-size:11px; min-width:140px; max-width:220px; }
+#legend { position:absolute; left:12px; bottom:72px; z-index:4; display:none; background:color-mix(in srgb, var(--vscode-editorWidget-background, #303030) 90%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:8px 10px; font-size:10px; min-width:112px; max-width:168px; }
 #legend .title { font-weight:700; margin-bottom:6px; letter-spacing:.02em; text-transform:uppercase; opacity:.75; font-size:10px; }
 #legend .row { display:flex; align-items:center; gap:8px; margin:3px 0; }
 #legend .swatch { width:10px; height:10px; border-radius:2px; flex:0 0 auto; }
@@ -738,7 +738,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #temporalContextModeWrap button.active { background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); font-weight:600; }
 #temporalViewportControls button:hover { background:var(--vscode-toolbar-hoverBackground, rgba(255,255,255,0.1)); }
 #temporalViewportControls button:focus-visible { outline:1px solid var(--vscode-focusBorder, #007fd4); outline-offset:1px; }
-#temporalCenterLockBtn[aria-pressed="true"] { color:var(--vscode-button-background, #2dd4bf) !important; border-color:var(--vscode-button-background, #2dd4bf) !important; background:rgba(45, 212, 191, 0.16) !important; }
+#temporalCenterLockBtn[aria-pressed="true"] { color:var(--vscode-button-background, #2dd4bf) !important; border-color:var(--vscode-button-background, #2dd4bf) !important; background:color-mix(in srgb, var(--vscode-button-background, #2dd4bf) 16%, transparent) !important; }
 #temporalCenterLockBtn .icon-pressed { display:none; }
 #temporalCenterLockBtn[aria-pressed="true"] .icon-unpressed { display:none; }
 #temporalCenterLockBtn[aria-pressed="true"] .icon-pressed { display:block !important; }
@@ -1183,6 +1183,36 @@ function clamp(val, min, max) {
 	return Math.max(min, Math.min(max, val));
 }
 
+function uiFontFamily() {
+	return getComputedThemeColors().fontFamily;
+}
+function canvasFont(style, sizePx) {
+	return (style ? style + ' ' : '') + sizePx + 'px ' + uiFontFamily();
+}
+function recordProjectedUtilization(metrics, screenPoints, viewportW, viewportH) {
+	metrics.viewportWidth = viewportW;
+	metrics.viewportHeight = viewportH;
+	metrics.labelCount = metrics.labelsDrawn;
+	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	for (let i = 0; i < screenPoints.length; i++) {
+		const p = screenPoints[i];
+		if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
+		minX = Math.min(minX, p.x);
+		minY = Math.min(minY, p.y);
+		maxX = Math.max(maxX, p.x);
+		maxY = Math.max(maxY, p.y);
+	}
+	if (!Number.isFinite(minX) || viewportW <= 0 || viewportH <= 0) {
+		metrics.projectedBounds = null;
+		metrics.screenUtilization = 0;
+		return;
+	}
+	const width = Math.max(0, maxX - minX);
+	const height = Math.max(0, maxY - minY);
+	metrics.projectedBounds = { minX: minX, minY: minY, maxX: maxX, maxY: maxY, width: width, height: height };
+	metrics.screenUtilization = (width * height) / (viewportW * viewportH);
+}
+
 function normalizeWheelZoomDelta(options) {
 	const deltaY = options.deltaY || 0;
 	const deltaMode = options.deltaMode !== undefined ? options.deltaMode : DOM_DELTA_PIXEL;
@@ -1468,6 +1498,9 @@ function getComputedThemeColors() {
 		modified: s.getPropertyValue('--vscode-gitDecoration-modifiedResourceForeground').trim() || '#d29922',
 		renamed: s.getPropertyValue('--vscode-gitDecoration-renamedResourceForeground').trim() || '#58a6ff',
 		accent: s.getPropertyValue('--vscode-button-background').trim() || '#2dd4bf',
+		fontFamily: (document.body && window.getComputedStyle)
+			? (window.getComputedStyle(document.body).fontFamily || 'sans-serif')
+			: 'sans-serif',
 		isHighContrast: document.body.classList.contains('vscode-high-contrast') || s.getPropertyValue('--vscode-contrastBorder').trim() !== '',
 	};
 	return _themeColors;
@@ -1774,10 +1807,10 @@ function fitView(animate) {
 		if (!targetNodes || targetNodes.length === 0) return;
 		const isFocusMode = (displayMode === 'changes' || displayMode === 'focus');
 		const targetTransform = computeTemporalFitTransform(targetNodes, vw, vh, {
-			padding: isFocusMode ? 48 : 64,
+			padding: isFocusMode ? 40 : 56,
 			insets: insets,
 			minZoom: MIN_ZOOM,
-			maxZoom: isFocusMode ? 2.6 : 1.8,
+			maxZoom: isFocusMode && targetNodes.length <= 4 ? 3.2 : 2.4,
 		});
 		if (shouldAnimate && animMs > 0) {
 			animateViewportTo(targetTransform, animMs);
@@ -1805,7 +1838,7 @@ function fitView(animate) {
 	if (!isFinite(minX)) return;
 	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
 	const initialZoom = settings.initialZoom || 1;
-	const maxFitZoom = nodes.length <= 10 ? 3.2 : 1.6;
+	const maxFitZoom = nodes.length <= 10 ? 3.2 : 2.4;
 	const k = Math.max(MIN_ZOOM, Math.min(maxFitZoom, Math.min((usableW - 96) / bw, (usableH - 96) / bh) * initialZoom));
 	const graphCenterX = (minX + maxX) / 2;
 	const graphCenterY = (minY + maxY) / 2;
@@ -2355,7 +2388,7 @@ function drawTemporalFrame(ts) {
 			ctx.stroke();
 			if (guide.label && transform.k >= 0.18) {
 				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
-				ctx.font = '600 15px ui-sans-serif, system-ui, sans-serif';
+				ctx.font = canvasFont('600', 15);
 				ctx.fillStyle = theme.isHighContrast
 					? 'rgba(255, 255, 255, 0.78)'
 					: (hexColor || 'var(--vscode-descriptionForeground, #a1a1aa)');
@@ -2406,7 +2439,7 @@ function drawTemporalFrame(ts) {
 					ctx.lineTo(tgtX, tgtY);
 				}
 				ctx.strokeStyle = agg.changedEdgeCount > 0
-					? 'rgba(45, 212, 191, 0.45)'
+					? theme.accent
 					: (theme.isHighContrast ? 'rgba(255, 255, 255, 0.22)' : 'rgba(99, 102, 241, 0.20)');
 				ctx.lineWidth = strokeWidth;
 				ctx.stroke();
@@ -2416,8 +2449,8 @@ function drawTemporalFrame(ts) {
 				if (transform.k >= 0.38) {
 					ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
 					ctx.fillRect(midX - 9, midY - 6, 18, 12);
-					ctx.font = '600 9px ui-sans-serif, system-ui, sans-serif';
-					ctx.fillStyle = agg.changedEdgeCount > 0 ? '#2dd4bf' : '#94a3b8';
+					ctx.font = canvasFont('600', 9);
+					ctx.fillStyle = agg.changedEdgeCount > 0 ? theme.accent : '#94a3b8';
 					ctx.textAlign = 'center';
 					ctx.textBaseline = 'middle';
 					ctx.fillText(String(agg.edgeCount), midX, midY);
@@ -2486,7 +2519,7 @@ function drawTemporalFrame(ts) {
 			let edgeDash = lodStyle.strokeDash ? Array.from(lodStyle.strokeDash) : [];
 
 			if (isEdgeActive) {
-				edgeColor = '#2dd4bf';
+				edgeColor = theme.accent;
 				edgeWidth = 2.4;
 			} else if (edge.changeKind === 'added') {
 				edgeColor = theme.added;
@@ -2594,7 +2627,7 @@ function drawTemporalFrame(ts) {
 		if (isSelected) {
 			ctx.beginPath();
 			ctx.arc(pos.x, pos.y, r + 4.5, 0, Math.PI * 2);
-			ctx.strokeStyle = '#2dd4bf';
+			ctx.strokeStyle = theme.accent;
 			ctx.lineWidth = 2.5;
 			ctx.stroke();
 		} else if (isHovered) {
@@ -2662,7 +2695,7 @@ function drawTemporalFrame(ts) {
 		ctx.textAlign = 'center';
 		ctx.fillStyle = 'rgba(15, 23, 42, 0.78)';
 		ctx.fillRect(lbl.box.x, lbl.box.y, lbl.box.w, lbl.box.h);
-		ctx.fillStyle = lbl.isSelected ? '#2dd4bf' : (lbl.isHovered ? '#58a6ff' : (lbl.isChanged ? '#f4f4f5' : 'rgba(244, 244, 245, 0.75)'));
+		ctx.fillStyle = lbl.isSelected ? theme.accent : (lbl.isHovered ? '#58a6ff' : (lbl.isChanged ? '#f4f4f5' : 'rgba(244, 244, 245, 0.75)'));
 		ctx.fillText(lbl.text, lbl.x, lbl.y + 3);
 		ctx.restore();
 	}
@@ -2695,6 +2728,14 @@ function drawTemporalFrame(ts) {
 			metrics.lodTier = transform.k < 0.3 ? 'aggregate' : (transform.k < 0.8 ? 'direct' : 'full');
 			metrics.isAnimating = Boolean(isAnimatingTemporal);
 			metrics.timestamp = renderEnd;
+			const screenPoints = [];
+			for (let ni = 0; ni < nodesToRender.length; ni++) {
+				const n = nodesToRender[ni];
+				if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
+					screenPoints.push({ x: n.x * transform.k + transform.x, y: n.y * transform.k + transform.y });
+				}
+			}
+			recordProjectedUtilization(metrics, screenPoints, w, h);
 		} catch {}
 	}
 
@@ -2835,6 +2876,7 @@ function drawNetworkEdgeArrow(p1, p2, color, arrowSize) {
 function drawNetworkFrame() {
 	if (!netCanvas || !ctx) return;
 	const renderStart = performance.now();
+	const theme = getComputedThemeColors();
 	let edgesDrawn = 0;
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
@@ -2927,7 +2969,7 @@ function drawNetworkFrame() {
 		if (isSelected) {
 			ctx.beginPath();
 			ctx.arc(p.x, p.y, r + 4, 0, 2 * Math.PI);
-			ctx.strokeStyle = '#2dd4bf';
+			ctx.strokeStyle = theme.accent;
 			ctx.lineWidth = 2.5;
 			ctx.stroke();
 		} else if (isHovered) {
@@ -2942,7 +2984,7 @@ function drawNetworkFrame() {
 		ctx.arc(p.x, p.y, r, 0, 2 * Math.PI);
 		ctx.fillStyle = nodeColor(node, entryId);
 		ctx.fill();
-		ctx.strokeStyle = isSelected ? '#2dd4bf' : (isHovered ? '#58a6ff' : 'rgba(27, 28, 30, 0.85)');
+		ctx.strokeStyle = isSelected ? theme.accent : (isHovered ? '#58a6ff' : 'rgba(27, 28, 30, 0.85)');
 		ctx.lineWidth = isSelected || isHovered ? 1.8 : 1.0;
 		ctx.stroke();
 		ctx.restore();
@@ -3006,14 +3048,14 @@ function drawNetworkFrame() {
 		placedLabelBoxes.push({ x: boxLeft, y: boxTop, w: boxWidth, h: boxHeight });
 
 		ctx.save();
-		ctx.font = (isSelected || isHovered) ? 'bold 11px ui-sans-serif, system-ui, sans-serif' : '10px ui-sans-serif, system-ui, sans-serif';
+		ctx.font = canvasFont((isSelected || isHovered) ? 'bold' : '', isSelected || isHovered ? 11 : 10);
 		ctx.textAlign = 'center';
 
 		// Backdrop for contrast
 		ctx.fillStyle = 'rgba(15, 23, 42, 0.75)';
 		ctx.fillRect(boxLeft, boxTop, boxWidth, boxHeight);
 
-		ctx.fillStyle = (isSelected || isHovered) ? '#2dd4bf' : '#f4f4f5';
+		ctx.fillStyle = (isSelected || isHovered) ? theme.accent : '#f4f4f5';
 		ctx.fillText(labelText, p.x, labelY + 3);
 		ctx.restore();
 	}
@@ -3050,6 +3092,13 @@ function drawNetworkFrame() {
 			metrics.lodTier = transform.k < 0.3 ? 'low' : (transform.k < 0.8 ? 'medium' : 'high');
 			metrics.isAnimating = canIdleRotate() && !idlePaused;
 			metrics.timestamp = renderEnd;
+			const screenPoints = [];
+			for (let hi = 0; hi < nodes.length; hi++) {
+				const hitPos = projected[nodes[hi].id];
+				if (!hitPos) continue;
+				screenPoints.push({ x: hitPos.x * transform.k + transform.x, y: hitPos.y * transform.k + transform.y });
+			}
+			recordProjectedUtilization(metrics, screenPoints, netCanvas.clientWidth || 0, netCanvas.clientHeight || 0);
 		} catch {}
 	}
 

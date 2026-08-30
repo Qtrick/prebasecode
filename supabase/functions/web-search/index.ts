@@ -8,12 +8,12 @@ import {
 	WEB_CONTEXT_BUDGET,
 	UNTRUSTED_WEB_WARNING,
 	boundWebSources,
-	canonicalPublicUrl,
 	dedupeCandidates,
 	firecrawlMaxAgeMs,
 	firecrawlSearchCategories,
 	inferFreshness,
 	publicHttpUrl,
+	validatedSourceUrl,
 	type Depth,
 	type Freshness,
 	type SourceCandidate,
@@ -218,7 +218,8 @@ async function providerFetch(url: string, apiKey: string, body: unknown, timeout
 	try {
 		return await fetch(url, {
 			method: "POST",
-			headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+			headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json", "Cache-Control": "no-cache" },
+			cache: "no-store",
 			body: JSON.stringify(body),
 			signal: controller.signal,
 		});
@@ -320,7 +321,7 @@ async function firecrawlScrape(url: string, maxAge: number, timeoutMs: number, s
 	if (!publicHttpUrl(resolved)) {
 		throw new Error("invalid_url");
 	}
-	return { title, url: canonicalPublicUrl(resolved) ?? resolved, markdown };
+	return { title, url: validatedSourceUrl(resolved) ?? resolved, markdown };
 }
 
 async function firecrawlSearchCompact(query: string, categories: Array<"github" | "research" | "pdf">, signal: AbortSignal): Promise<SourceCandidate[]> {
@@ -419,7 +420,7 @@ Deno.serve(async req => {
 		}
 		if (input.operation === "fetch") {
 			let firecrawlScrapeOps = 0;
-			const page = await firecrawlScrape(input.url, firecrawlMaxAgeMs(input.freshness), WEB_CONTEXT_BUDGET.firecrawlTimeoutMs.fetch, req.signal, false, () => firecrawlScrapeOps++);
+			const page = await firecrawlScrape(validatedSourceUrl(input.url) ?? input.url, firecrawlMaxAgeMs(input.freshness), WEB_CONTEXT_BUDGET.firecrawlTimeoutMs.fetch, req.signal, false, () => firecrawlScrapeOps++);
 			const bounded = boundWebSources([{
 				title: page.title,
 				url: page.url,

@@ -1,7 +1,11 @@
 {
 	"allow": [
 		"https://docs.python.org/3/",
-		"https://example.com/docs"
+		"https://example.com/docs",
+		"https://www.example.com/docs",
+		"https://example.com/article?ref=product",
+		"https://example.com:443/docs",
+		"https://example.com/docs#section"
 	],
 	"reject": [
 		"ftp://example.com/a",

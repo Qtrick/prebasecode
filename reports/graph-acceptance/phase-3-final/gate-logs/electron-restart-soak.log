@@ -1,0 +1,7 @@
+{
+  "ok": true,
+  "framework": "electron",
+  "passed": 20,
+  "cycles": 20,
+  "elapsedMs": 921514
+}

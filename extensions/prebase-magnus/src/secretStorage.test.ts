@@ -111,6 +111,7 @@ suite('MagnusSecretStorage & Precedence', () => {
 			'  GEMINI_API_KEY = "test-gemini-key-123"  ',
 			'GOOGLE_API_KEY=\'test-google-alias\'',
 			'LINKUP_API_KEY=test-linkup-key',
+			'export FIRECRAWL_API_KEY=test-firecrawl-key',
 			'AWS_SECRET_ACCESS_KEY=should-be-ignored',
 			'DATABASE_URL=postgres://ignore:ignore@localhost/db',
 			'EMPTY_VAR=',
@@ -121,6 +122,7 @@ suite('MagnusSecretStorage & Precedence', () => {
 		assert.strictEqual(parsed.get('GEMINI_API_KEY'), 'test-gemini-key-123');
 		assert.strictEqual(parsed.get('GOOGLE_API_KEY'), 'test-google-alias');
 		assert.strictEqual(parsed.get('LINKUP_API_KEY'), 'test-linkup-key');
+		assert.strictEqual(parsed.get('FIRECRAWL_API_KEY'), 'test-firecrawl-key');
 		assert.strictEqual(parsed.has('AWS_SECRET_ACCESS_KEY'), false);
 		assert.strictEqual(parsed.has('DATABASE_URL'), false);
 		assert.strictEqual(parsed.has('EMPTY_VAR'), false);

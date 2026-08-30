@@ -8,6 +8,7 @@ import { createWriteStream, mkdirSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
+import { terminateOwnedProcessTree } from './workbenchHarness.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -37,9 +38,45 @@ export function assuranceCommandLabel(command) {
 	return command.join(' ');
 }
 
-export function assuranceEvidenceOk(sourceHead, evidence) {
+export const PHASE3_ASSURANCE_TIMEOUT_MS = {
+	'verify:icons': 30_000,
+	'compile-magnus': 180_000,
+	'transpile-client': 240_000,
+	'typecheck-client': 360_000,
+	'typecheck:graphs': 180_000,
+	'test:graphs': 180_000,
+	'test:prebase-pure': 180_000,
+	'test:prebase-magnus': 180_000,
+	'verify:graphs-boundary': 30_000,
+	'verify:graphs-runtime-boundary': 30_000,
+	'node scripts/startup/verify-magnus-out.mjs': 30_000,
+	'verify:privacy': 60_000,
+	'verify:config-uniqueness': 30_000,
+	'assurance:quick': 360_000,
+	'assurance:static': 600_000,
+};
+
+export function assuranceCommandTimeoutMs(command) {
+	return PHASE3_ASSURANCE_TIMEOUT_MS[assuranceCommandLabel(command)] ?? 120_000;
+}
+
+export function assuranceEvidenceOk(entry, evidence) {
+	if (typeof entry === 'string' || !entry || typeof entry.sourceHead !== 'string' || !entry.sourceHead) {
+		return { ok: false, reason: 'assurance identity must include sourceHead and sourceFingerprint' };
+	}
+	const sourceHead = entry.sourceHead;
+	const sourceFingerprint = entry.sourceFingerprint;
 	if (!evidence || evidence.ok !== true || evidence.sourceHead !== sourceHead || evidence.scenario !== 'assurance') {
 		return { ok: false, reason: 'assurance metadata is invalid' };
+	}
+	if (typeof evidence.sourceFingerprint !== 'string' || !evidence.sourceFingerprint) {
+		return { ok: false, reason: 'assurance source fingerprint is missing' };
+	}
+	if (typeof sourceFingerprint !== 'string' || !sourceFingerprint) {
+		return { ok: false, reason: 'assurance identity must include sourceFingerprint' };
+	}
+	if (evidence.sourceFingerprint !== sourceFingerprint) {
+		return { ok: false, reason: 'assurance source fingerprint does not match current worktree' };
 	}
 	if (!Array.isArray(evidence.commands) || evidence.commands.length !== PHASE3_ASSURANCE_COMMANDS.length) {
 		return { ok: false, reason: 'assurance command matrix is incomplete' };
@@ -76,12 +113,14 @@ function commandDetails(command) {
 
 function runCommand(command) {
 	const details = commandDetails(command);
+	const timeoutMs = assuranceCommandTimeoutMs(command);
 	const logPath = join(logRoot, `${command[0].replaceAll(':', '-')}.log`);
 	return new Promise(resolveRun => {
 		const startedAt = Date.now();
 		const log = createWriteStream(logPath);
 		let output = '';
 		let settled = false;
+		let timedOut = false;
 		const finish = result => {
 			if (settled) {
 				return;
@@ -97,11 +136,27 @@ function runCommand(command) {
 		};
 		child.stdout.on('data', record);
 		child.stderr.on('data', record);
+		const deadline = setTimeout(() => {
+			timedOut = true;
+			log.write(`\n[phase3-assurance] timed out after ${timeoutMs}ms; terminating owned process tree pid=${child.pid}\n`);
+			void terminateOwnedProcessTree(child.pid);
+		}, timeoutMs);
 		child.on('error', error => {
-			finish({ command: details.label, exitCode: 1, durationMs: Date.now() - startedAt, passed: false, error: error.message, log: logPath });
+			clearTimeout(deadline);
+			finish({ command: details.label, exitCode: 1, durationMs: Date.now() - startedAt, passed: false, timedOut, timeoutMs, error: error.message, log: logPath });
 		});
 		child.on('close', exitCode => {
-			finish({ command: details.label, exitCode: exitCode ?? 1, durationMs: Date.now() - startedAt, passed: exitCode === 0, testCount: reportedTestCount(output), log: logPath });
+			clearTimeout(deadline);
+			finish({
+				command: details.label,
+				exitCode: timedOut ? 124 : (exitCode ?? 1),
+				durationMs: Date.now() - startedAt,
+				passed: !timedOut && exitCode === 0,
+				timedOut,
+				timeoutMs,
+				testCount: reportedTestCount(output),
+				log: logPath,
+			});
 		});
 	});
 }

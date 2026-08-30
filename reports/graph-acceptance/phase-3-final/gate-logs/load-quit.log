@@ -1,0 +1,4 @@
+{"scenario":"parser-active-1","quitMs":538,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"parser-active-2","quitMs":523,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"parser-active-3","quitMs":526,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"temporal-sqlite-write-1","quitMs":129,"remaining":"gone","error":"page.waitForFunction: Target page, context or browser has been closed\n    at waitForWorkbenchDriver (/Users/qunyingfan/Prebasecode/test/prebase/acceptance/workbenchHarness.mjs:372:"}

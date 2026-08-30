@@ -8,7 +8,6 @@ import {
 	UNTRUSTED_WEB_WARNING,
 	WEB_CONTEXT_BUDGET,
 	boundWebSources,
-	canonicalPublicUrl,
 	dedupeCandidates,
 	excerptLimitForDepth,
 	firecrawlMaxAgeMs,
@@ -16,6 +15,8 @@ import {
 	inferFreshness,
 	publicHttpUrl,
 	scrapeLimitForDepth,
+	sourceDedupeKey,
+	validatedSourceUrl,
 	type BoundedWebSource,
 	type Freshness,
 	type SearchDepth,
@@ -140,7 +141,7 @@ export async function executeHybridWebSearch(
 			return {
 				...target,
 				title: page.title || target.title,
-				url: canonicalPublicUrl(page.url) ?? target.url,
+				url: validatedSourceUrl(page.url) ?? target.url,
 				excerpt: page.markdown || target.excerpt,
 				contentVerifiedBy: 'firecrawl' as const,
 			} satisfies WebSourceCandidate;
@@ -187,16 +188,17 @@ export async function executeHybridWebFetch(
 	if (!parsed) {
 		throw new Error('Web fetch only accepts public http(s) URLs.');
 	}
+	const fetchUrl = validatedSourceUrl(input.url) ?? parsed.toString();
 	const freshness = input.freshness ?? 'normal';
 	const cache = deps.cache;
-	const cacheKey = JSON.stringify({ k: 'fetch', url: canonicalPublicUrl(parsed.toString()), freshness });
+	const cacheKey = JSON.stringify({ k: 'fetch', url: sourceDedupeKey(fetchUrl) ?? fetchUrl, freshness });
 	const cached = cacheGet(cache, cacheKey);
 	if (cached) {
 		return cached;
 	}
 	let firecrawlScrapeAttempts = 0;
 	const page = await scrapePublicUrl(deps.firecrawlKey, {
-		url: parsed.toString(),
+		url: fetchUrl,
 		maxAge: firecrawlMaxAgeMs(freshness),
 		timeoutMs: WEB_CONTEXT_BUDGET.firecrawlTimeoutMs.fetch,
 		storeInCache: false,
@@ -204,7 +206,7 @@ export async function executeHybridWebFetch(
 	}, deps.token, deps.firecrawlTransport);
 	const bounded = boundWebSources([{
 		title: page.title,
-		url: canonicalPublicUrl(page.url) ?? parsed.toString(),
+		url: validatedSourceUrl(page.url) ?? fetchUrl,
 		excerpt: page.markdown,
 		discoveredBy: ['firecrawl'],
 		contentVerifiedBy: 'firecrawl',

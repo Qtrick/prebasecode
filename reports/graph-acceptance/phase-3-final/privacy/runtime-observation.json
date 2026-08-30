@@ -1,57 +1,56 @@
 {
   "ok": true,
   "failures": [],
+  "schemaVersion": 2,
+  "scenario": "privacy",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
+  "generatedAt": "2026-08-30T00:51:39.413Z",
   "observations": [
     {
       "phase": "startup",
       "cdpHosts": [],
       "sockets": [
         {
-          "pid": 48543,
+          "pid": 65829,
           "host": "localhost",
-          "port": 56776,
+          "port": 59572,
           "role": "main"
         },
         {
-          "pid": 48543,
+          "pid": 65829,
           "host": "localhost",
-          "port": 56774,
+          "port": 59570,
           "role": "main"
         },
         {
-          "pid": 48543,
+          "pid": 65829,
           "host": "localhost",
-          "port": 56782,
+          "port": 59578,
           "role": "main"
         },
         {
-          "pid": 48559,
-          "host": "cdn-185-199-111-133.github.com",
+          "pid": 65861,
+          "host": "cdn-185-199-110-133.github.com",
           "port": 443,
           "role": "helper"
         },
         {
-          "pid": 48600,
+          "pid": 65886,
           "host": "localhost",
-          "port": 5879,
+          "port": 59571,
           "role": "helper"
         },
         {
-          "pid": 48619,
-          "host": "localhost",
-          "port": 56775,
-          "role": "helper"
-        },
-        {
-          "pid": 48619,
-          "host": "172.217.117.4",
+          "pid": 65886,
+          "host": "172.217.118.4",
           "port": 443,
           "role": "helper"
         },
         {
-          "pid": 48638,
+          "pid": 65903,
           "host": "localhost",
-          "port": 6681,
+          "port": 6462,
           "role": "helper"
         }
       ]
@@ -73,15 +72,58 @@
       "cdpHosts": [
         "open-vsx.org"
       ],
-      "sockets": []
+      "sockets": [
+        {
+          "pid": 65829,
+          "host": "localhost",
+          "port": 59572,
+          "role": "main"
+        },
+        {
+          "pid": 65829,
+          "host": "localhost",
+          "port": 59570,
+          "role": "main"
+        },
+        {
+          "pid": 65829,
+          "host": "localhost",
+          "port": 59578,
+          "role": "main"
+        },
+        {
+          "pid": 65861,
+          "host": "cdn-185-199-110-133.github.com",
+          "port": 443,
+          "role": "helper"
+        },
+        {
+          "pid": 65861,
+          "host": "151.101.65.242",
+          "port": 443,
+          "role": "helper"
+        },
+        {
+          "pid": 65886,
+          "host": "localhost",
+          "port": 59571,
+          "role": "helper"
+        },
+        {
+          "pid": 65903,
+          "host": "localhost",
+          "port": 6462,
+          "role": "helper"
+        }
+      ]
     }
   ],
-  "prebasePid": 48543,
+  "prebasePid": 65829,
   "quit": {
-    "before": "48543     1   4.2 289088 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "65829     1   8.4 208656 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 576,
+    "latencyMs": 543,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
@@ -103,6 +145,20 @@
     "cdpHostnameCount": 1
   },
   "cdpRequests": [
+    {
+      "host": "open-vsx.org",
+      "origin": "https://open-vsx.org",
+      "url": "https://open-vsx.org/vscode/gallery/vscode/dbaeumer/vscode-eslint/latest",
+      "source": "cdp",
+      "type": "Other"
+    },
+    {
+      "host": "open-vsx.org",
+      "origin": "https://open-vsx.org",
+      "url": "https://open-vsx.org/vscode/gallery/vscode/github/vscode-pull-request-github/latest",
+      "source": "cdp",
+      "type": "Other"
+    },
     {
       "host": "open-vsx.org",
       "origin": "https://open-vsx.org",
@@ -151,20 +207,6 @@
       "url": "https://open-vsx.org/vscode/gallery/vscode/connor4312/esbuild-problem-matchers/latest",
       "source": "cdp",
       "type": "Fetch"
-    },
-    {
-      "host": "open-vsx.org",
-      "origin": "https://open-vsx.org",
-      "url": "https://open-vsx.org/vscode/gallery/vscode/dbaeumer/vscode-eslint/latest",
-      "source": "cdp",
-      "type": "Other"
-    },
-    {
-      "host": "open-vsx.org",
-      "origin": "https://open-vsx.org",
-      "url": "https://open-vsx.org/vscode/gallery/vscode/github/vscode-pull-request-github/latest",
-      "source": "cdp",
-      "type": "Other"
     },
     {
       "host": "open-vsx.org",
@@ -222,24 +264,27 @@
   "allHosts": [
     "open-vsx.org",
     "localhost",
-    "cdn-185-199-111-133.github.com",
-    "172.217.117.4"
+    "cdn-185-199-110-133.github.com",
+    "172.217.118.4",
+    "151.101.65.242"
   ],
   "socketHosts": [
     "localhost",
-    "cdn-185-199-111-133.github.com",
-    "172.217.117.4"
+    "cdn-185-199-110-133.github.com",
+    "172.217.118.4",
+    "151.101.65.242"
   ],
   "expectedHosts": [
     "open-vsx.org",
     "localhost",
-    "cdn-185-199-111-133.github.com"
+    "cdn-185-199-110-133.github.com"
   ],
   "unexpectedHosts": [],
   "forbiddenHosts": [],
   "unresolvedNumericHosts": [],
   "socketUnresolvedHosts": [
-    "172.217.117.4"
+    "172.217.118.4",
+    "151.101.65.242"
   ],
   "classifications": [
     {
@@ -253,12 +298,17 @@
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "cdn-185-199-111-133.github.com",
+      "host": "cdn-185-199-110-133.github.com",
       "kind": "expected",
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "172.217.117.4",
+      "host": "172.217.118.4",
+      "kind": "socket-numeric",
+      "why": "process-tree socket numeric; hostname identity comes from CDP"
+    },
+    {
+      "host": "151.101.65.242",
       "kind": "socket-numeric",
       "why": "process-tree socket numeric; hostname identity comes from CDP"
     }

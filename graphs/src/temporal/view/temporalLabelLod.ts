@@ -98,6 +98,10 @@ export function computeVisibleLabels(
 	const visibleLabels: VisibleLabelItem[] = [];
 	const placedBoxes: { x: number; y: number; w: number; h: number }[] = [];
 
+	const family = (typeof document !== 'undefined' && document.body && typeof getComputedStyle === 'function')
+		? (getComputedStyle(document.body).fontFamily || 'sans-serif')
+		: 'sans-serif';
+
 	for (let i = 0; i < scored.length && visibleLabels.length < maxLabels; i++) {
 		const item = scored[i];
 		const node = item.node;
@@ -105,8 +109,8 @@ export function computeVisibleLabels(
 		if (!labelText) continue;
 
 		const font = (item.isSelected || item.isHovered)
-			? 'bold 11px ui-sans-serif, system-ui, sans-serif'
-			: '10px ui-sans-serif, system-ui, sans-serif';
+			? `bold 11px ${family}`
+			: `10px ${family}`;
 
 		const textW = measureWidth(labelText, font);
 		const r = item.isChanged ? 7.0 : 4.0;

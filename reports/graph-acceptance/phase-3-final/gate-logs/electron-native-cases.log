@@ -1,0 +1,38 @@
+{
+  "ok": true,
+  "failures": [],
+  "moving": {
+    "ok": true,
+    "action": "click",
+    "locator": "role=button name=Moving",
+    "match": {
+      "tag": "button",
+      "role": "button",
+      "name": "Moving",
+      "enabled": true,
+      "visible": true
+    },
+    "title": "PreBase Electron Fixture",
+    "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+    "duration": 252,
+    "framework": "electron",
+    "backend": "cdp"
+  },
+  "doubleClick": {
+    "ok": true,
+    "action": "doubleClick",
+    "locator": "role=button name=Visible",
+    "match": {
+      "tag": "button",
+      "role": "button",
+      "name": "Visible",
+      "enabled": true,
+      "visible": true
+    },
+    "title": "PreBase Electron Fixture",
+    "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
+    "duration": 5,
+    "framework": "electron",
+    "backend": "cdp"
+  }
+}

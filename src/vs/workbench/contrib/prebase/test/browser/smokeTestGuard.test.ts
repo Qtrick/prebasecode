@@ -53,8 +53,11 @@ suite('smokeTestGuard', () => {
 		assert.match(diagnostics, /colorThemeType: theme\.type/);
 		assert.match(diagnostics, /zoomLevel: getZoomLevel\(mainWindow\)/);
 		assert.match(diagnostics, /getWebContentsInventory\(\)/);
+		assert.match(diagnostics, /sidebarVisible: layoutService\.isVisible\(Parts\.SIDEBAR_PART\)/);
 		assert.match(diagnostics, /inventory\.filter\(item => !item\.destroyed\)/);
 		assert.match(diagnostics, /liveCount: live\.length/);
+		assert.ok(diagnostics.indexOf('getWebContentsInventory()') < diagnostics.indexOf('prebase.magnus.getStreamDiagnostics'), 'WebContents inventory must be collected before Magnus stream diagnostics');
+		assert.match(diagnostics, /await configurationService\.updateValue\('editor\.accessibilitySupport', a11yMode\)/);
 		assert.match(diagnostics, /accessibilitySupport/);
 		assert.match(diagnostics, /a11yMode === 'auto' \|\| a11yMode === 'on'/);
 		assert.doesNotMatch(diagnostics, /accessibilitySupport === 'off'|accessibilitySupport: 'off'|updateValue\('editor\.accessibilitySupport', 'off'\)/);

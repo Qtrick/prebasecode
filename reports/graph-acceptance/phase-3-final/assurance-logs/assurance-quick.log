@@ -124,7 +124,7 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
     ✔ zoomed-out pick still hits near node (not world-fixed Network radius)
 
 
-  7 passing (3ms)
+  7 passing (1ms)
 
 
 
@@ -145,7 +145,7 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
     ✔ structural digest is invariant to node and edge ordering in input
 
 
-  14 passing (97ms)
+  14 passing (50ms)
 
 
 
@@ -156,7 +156,7 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
     ✔ fails closed when version metadata is missing
 
 
-  4 passing (4ms)
+  4 passing (2ms)
 
 
 
@@ -167,7 +167,7 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
     ✔ accepts cancellation through the narrow IPC channel rather than a ProxyChannel method argument
 
 
-  4 passing (8ms)
+  4 passing (7ms)
 
 
 
@@ -185,10 +185,10 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
     ✔ indexes nodes by ID and by relative and file: paths
     ✔ indexes incoming and outgoing edges for instant traversal
     ✔ indexes nodes by architecture layer and collects unique languages
-    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (124ms)
+    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (99ms)
 
 
-  4 passing (126ms)
+  4 passing (101ms)
 
 
 
@@ -200,7 +200,7 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
     ✔ 5. layoutClustered produces deterministic, finite 3D coordinates on sphere
 
 
-  5 passing (9ms)
+  5 passing (8ms)
 
 
 
@@ -210,23 +210,23 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
     ✔ visits a wide cyclic import topology once and preserves its breadth-first depths
 
 
-  3 passing (22ms)
+  3 passing (14ms)
 
 
 
   Production Git Bridge & Real Git Fixture E2E Tests
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ root commit diff with --root captures all initial files and blob OIDs (57ms)
+    ✔ root commit diff with --root captures all initial files and blob OIDs (42ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ divergent branches: exact tree diff vs review range (merge-base) diff (127ms)
+    ✔ divergent branches: exact tree diff vs review range (merge-base) diff (98ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ rename tracking captures old and new paths with similarity score (67ms)
+    ✔ rename tracking captures old and new paths with similarity score (49ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ comment-only commit invariant: exact tree diff detects blob change, canonical AST is identical (199ms)
+    ✔ comment-only commit invariant: exact tree diff detects blob change, canonical AST is identical (170ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
     ✔ annotated vs lightweight tags peeling and metadata
@@ -235,28 +235,28 @@ Switched to branch 'main'
     ✔ safely rejects option injection in refs
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ handles unborn repository gracefully without throwing or stalling (72ms)
+    ✔ handles unborn repository gracefully without throwing or stalling (55ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (103ms)
+    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (96ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (2641ms)
+    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (2056ms)
 
 
-  9 passing (7s)
+  9 passing (6s)
 
 
 
   GitHistoryService & Node Adapter Unit Tests
-    ✔ isGitRepository and getRepositoryIdentity (55ms)
+    ✔ isGitRepository and getRepositoryIdentity (43ms)
     ✔ listBranches parses branch names and commits cleanly via %00
     ✔ listTags distinguishes lightweight from annotated tags and peels annotated tags
-    ✔ resolveRef strictly resolves commits with --verify and throws UnknownRef for invalid refs (40ms)
+    ✔ resolveRef strictly resolves commits with --verify and throws UnknownRef for invalid refs
     ✔ log returns bounded commits with machine-stable timestamps and parent links
-    ✔ listTree parses objectId, mode, and size using -l (42ms)
-    ✔ diffCommitTrees captures rename and modifications with exact blob hashes (61ms)
-    ✔ diffCommitToParent for root commit correctly diffs against empty tree (66ms)
+    ✔ listTree parses objectId, mode, and size using -l
+    ✔ diffCommitTrees captures rename and modifications with exact blob hashes (43ms)
+    ✔ diffCommitToParent for root commit correctly diffs against empty tree (55ms)
     ✔ HEAD change observer notifies on event fire
 
 
@@ -277,18 +277,18 @@ Switched to branch 'main'
       ✔ acknowledges ping events with 200 OK
 
 
-  8 passing (4ms)
+  8 passing (5ms)
 
 
 
   GitTreeHistoricalAnalysis Integration Tests
-    ✔ analyzes historical commit 1 without checkout (72ms)
-    ✔ analyzes historical commit 2 without checkout (67ms)
-    ✔ diffs historical snapshots 1 and 2 yielding exact structural diff (126ms)
-    ✔ dirty working tree changes do NOT contaminate historical git analysis (59ms)
+    ✔ analyzes historical commit 1 without checkout (59ms)
+    ✔ analyzes historical commit 2 without checkout (52ms)
+    ✔ diffs historical snapshots 1 and 2 yielding exact structural diff (98ms)
+    ✔ dirty working tree changes do NOT contaminate historical git analysis (51ms)
 
 
-  4 passing (1s)
+  4 passing (787ms)
 
 
 
@@ -299,9 +299,10 @@ Switched to branch 'main'
     ✔ 4. Keyboard Interaction: F1 and Alt/Option+F1 pass through, ? toggles help, Escape closes panels
     ✔ 5. Narrow-viewport temporal zoom controls use display:none, not visually-hidden a11y duplicates
     ✔ 6. Temporal camera preserves user pan/zoom; small graphs fit more tightly
+    ✔ 7. Maps/graph chrome uses vscode focus and button tokens, not a hardcoded teal
 
 
-  6 passing (9ms)
+  7 passing (7ms)
 
 
 
@@ -313,7 +314,7 @@ Switched to branch 'main'
     ✔ 3. File edit -> 0 AI calls on save, exactly 1 lazy AI call on next view
     ✔ 4. Unrelated file edit -> 0 extra AI calls for other nodes
     ✔ 5. Stale in-flight race protection: discards result if file changed during in-flight generation
-    ✔ 6. Persistence across restart and 500-node scale capacity (77ms)
+    ✔ 6. Persistence across restart and 500-node scale capacity (68ms)
     ✔ 7. Restart freshness: external edit while closed prevents stale peek and updates on view
     ✔ 8. Prompt semantic fingerprint: layer or imports change invalidates cache
     ✔ 9. Multi-root workspace: events in Folder B do not invalidate Folder A
@@ -322,7 +323,7 @@ Switched to branch 'main'
     ✔ 12. Explicit projectRoot isolates identical relative paths across workspace folders
 
 
-  14 passing (97ms)
+  14 passing (86ms)
 
 
 
@@ -339,7 +340,7 @@ Switched to branch 'main'
     ✔ responsive stage resize shifts camera center by half delta while preserving zoom, pan, and rotation
 
 
-  10 passing (16ms)
+  10 passing (15ms)
 
 
 
@@ -360,76 +361,86 @@ Switched to branch 'main'
     ✔ Temporal Graph: nonzero Focus Changes diff exposes and draws changed nodes
     ✔ blank temporal canvas records nodesDrawn 0 on __prebaseGraphRenderMetrics, not __prebaseGraphMetrics
     ✔ Temporal Full Map draws community guides as rounded AABBs from bounds, not giant circles
+    ✔ canvasFont uses the computed workbench font family, not a hardcoded canvas face
+    ✔ network render records projectedBounds, screenUtilization, and labelCount on __prebaseGraphRenderMetrics
 
 
-  16 passing (39ms)
+  18 passing (36ms)
 
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:802:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
+    at listOnTimeout (node:internal/timers:605:17)
+    at process.processTimers (node:internal/timers:541:7)
+[PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
+    at Timeout._onTimeout (evalmachine.<anonymous>:803:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 
@@ -441,7 +452,7 @@ Switched to branch 'main'
     ✔ 4. Details panel displays loading truth and rendered diff summary with renamedModifiedCount
 
 
-  4 passing (16ms)
+  4 passing (14ms)
 
 
 
@@ -471,9 +482,10 @@ Switched to branch 'main'
     ✔ 23. Wheel zoom then Temporal state refresh must not steal the camera
     ✔ 25. Keyboard +/- zoom then Temporal state refresh must not steal the camera
     ✔ 24. Temporal legend close is an SVG control that hides the legend
+    ✔ 26. Temporal focus caps zoom at 3.2 for ≤4 nodes and 2.4 for 5+; Full Map caps at 2.4
 
 
-  25 passing (42ms)
+  26 passing (37ms)
 
 
 
@@ -483,7 +495,7 @@ Switched to branch 'main'
     ✔ respects workspace .gitignore patterns including .reference and custom directories
 
 
-  3 passing (8ms)
+  3 passing (7ms)
 
 
 
@@ -495,7 +507,7 @@ Switched to branch 'main'
     ✔ prebaseSettingsEditor routes through graphSettingsUi and does not bind PreBaseGraphConfigKeys
 
 
-  5 passing (30ms)
+  5 passing (25ms)
 
 
 
@@ -505,7 +517,7 @@ Switched to branch 'main'
     ✔ webview script consumes the shared edge resolver and contains no resurrected dead caches
 
 
-  3 passing (4ms)
+  3 passing (3ms)
 
 
 
@@ -522,7 +534,7 @@ Switched to branch 'main'
     ✔ 10. applyZoomAroundCenter anchors zoom at usable viewport center with insets
 
 
-  10 passing (5ms)
+  10 passing (3ms)
 
 
 
@@ -533,7 +545,7 @@ Switched to branch 'main'
     ✔ unresolved package imports stay cheap on a large file set
 
 
-  4 passing (20ms)
+  4 passing (14ms)
 
 
 
@@ -545,7 +557,7 @@ Switched to branch 'main'
     ✔ Identical structural state detection on comment-only change
 
 
-  5 passing (23ms)
+  5 passing (20ms)
 
 
 
@@ -555,7 +567,7 @@ Switched to branch 'main'
     ✔ does not let non-import topology change import-importance organization
 
 
-  3 passing (9ms)
+  3 passing (7ms)
 
 
 
@@ -566,7 +578,7 @@ Switched to branch 'main'
     ✔ entryNodeId parameter parity: runtime copy derives entry emphasis exactly like the module resolver
 
 
-  4 passing (6ms)
+  4 passing (5ms)
 
 
 
@@ -600,7 +612,7 @@ Switched to branch 'main'
     ✔ network runtime collision, link-distance, and force controls materially change geometry without dropping nodes
 
 
-  12 passing (39ms)
+  12 passing (34ms)
 
 
 
@@ -627,7 +639,7 @@ Switched to branch 'main'
     ✔ 7. WorkbenchCanonicalParseService has @IUtilityProcessWorkerWorkbenchService decorator metadata
 
 
-  7 passing (3ms)
+  7 passing (2ms)
 
 
 
@@ -640,7 +652,7 @@ Switched to branch 'main'
     ✔ propagates OversizedBlob error code when reading content beyond limit
 
 
-  6 passing (4ms)
+  6 passing (3ms)
 
 
 
@@ -650,7 +662,7 @@ Switched to branch 'main'
     ✔ computes hash over a 200KB payload efficiently without errors
 
 
-  3 passing (7ms)
+  3 passing (6ms)
 
 
 
@@ -663,7 +675,7 @@ Switched to branch 'main'
     ✔ prepared statement callback errors finalize statements and roll back
 
 
-  6 passing (76ms)
+  6 passing (62ms)
 
 
 
@@ -679,7 +691,7 @@ Switched to branch 'main'
     ✔ rejects a future schema version without rewriting it
     ✔ rolls back a v1 migration when legacy parent topology is malformed
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-AeJXW9',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-2pPn6l',
   resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T',
   ext: '.db',
   isSymlink: false,
@@ -740,11 +752,11 @@ Switched to branch 'main'
     ✔ Electron-main store owner quarantines one corrupt derived cache and recreates it without touching siblings
     ✔ Electron-main store owner bounds DB, WAL, and SHM quarantine companions by generation
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-8Kf8EN',
-  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-8Kf8EN/nested',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-s53XbU',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-s53XbU/nested',
   ext: '.db',
   isSymlink: false,
-  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-8Kf8EN/nested/store.db'
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-s53XbU/nested/store.db'
 }
 [TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
     at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
@@ -764,11 +776,11 @@ Switched to branch 'main'
     at done (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:308:5)
     at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:369:11
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-8Kf8EN',
-  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-8Kf8EN',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-s53XbU',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-s53XbU',
   ext: '.db',
   isSymlink: true,
-  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-8Kf8EN/linked.db'
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-s53XbU/linked.db'
 }
 [TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
     at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
@@ -792,7 +804,7 @@ Switched to branch 'main'
     ✔ blob analysis cache persists and retrieves entries
 
 
-  33 passing (294ms)
+  33 passing (244ms)
 
 
 
@@ -800,10 +812,10 @@ Switched to branch 'main'
     ✔ keeps metadata browsing cheap and indexes one isolated checkpoint from a 50,000-commit cold history
     ✔ does not start Git or parser work for a pre-cancelled cold-history selection
     ✔ reconciles an isolated child anchor after its parent segment is indexed
-    ✔ multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D) (41ms)
+    ✔ multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D)
 
 
-  4 passing (120ms)
+  4 passing (104ms)
 
 
 
@@ -816,7 +828,7 @@ Switched to branch 'main'
     ✔ 6. Duplicate empty/template blobs fail closed without arbitrary incorrect pairing
 
 
-  6 passing (14ms)
+  6 passing (7ms)
 
 
 
@@ -829,7 +841,7 @@ Switched to branch 'main'
     ✔ delta replay recomputes canonical digest and rejects tampered content
 
 
-  6 passing (9ms)
+  6 passing (3ms)
 
 
 
@@ -840,7 +852,7 @@ Switched to branch 'main'
     ✔ 4. Active drag/pan interaction drops low-priority unchanged edges for 60fps fluidity
 
 
-  4 passing (3ms)
+  4 passing (2ms)
 
 
 
@@ -855,7 +867,7 @@ Switched to branch 'main'
     ✔ 7. Weakly connected far communities still pack by directory so Focus Changes is not empty canvas
 
 
-  8 passing (16ms)
+  8 passing (15ms)
 
 
 
@@ -869,22 +881,22 @@ Switched to branch 'main'
     ✔ 7. SCC Relocation Metadata Truth: Relocated nodes update community majority layer, depth, and hubs
 
 
-  7 passing (12ms)
+  7 passing (10ms)
 
 
 
   Temporal Graph E2E Ingestion & Reconstruction
-    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (637ms)
-    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (1531ms)
-    ✔ Handles branch merge commits and preserves multi-parent DAG relations (1271ms)
-    ✔ scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order (1062ms)
-    ✔ exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs (845ms)
-    ✔ Ingests commits in a SHA-256 repository (299ms)
-    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (753ms)
-    ✔ Multi-root concurrent event routing and FIFO ingestion queue (574ms)
+    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (490ms)
+    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (1169ms)
+    ✔ Handles branch merge commits and preserves multi-parent DAG relations (992ms)
+    ✔ scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order (808ms)
+    ✔ exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs (603ms)
+    ✔ Ingests commits in a SHA-256 repository (233ms)
+    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (532ms)
+    ✔ Multi-root concurrent event routing and FIFO ingestion queue (484ms)
 
 
-  8 passing (7s)
+  8 passing (5s)
 
 
 
@@ -892,9 +904,10 @@ Switched to branch 'main'
     ✔ 1. Selected and Hovered nodes have highest priority and bypass collision culling
     ✔ 2. Changed nodes have priority over unchanged nodes
     ✔ 3. Screen-Space Collision Culling: Overlapping text boxes are culled for non-selected nodes
+    ✔ 4. Hoists the workbench font family once per pass into every visible label
 
 
-  3 passing (7ms)
+  4 passing (8ms)
 
 
 
@@ -906,7 +919,7 @@ Switched to branch 'main'
     ✔ 5. Performance: 500-node snapshot layout executes in under 15ms
 
 
-  5 passing (21ms)
+  5 passing (17ms)
 
 
 
@@ -918,7 +931,7 @@ Switched to branch 'main'
     ✔ 5. Sparse rank stagger stays permutation-invariant
 
 
-  5 passing (24ms)
+  5 passing (19ms)
 
 
 
@@ -934,16 +947,16 @@ Switched to branch 'main'
     ✔ TemporalEdgeLineageResolver binds edges across resolved entity IDs
 
 
-  9 passing (4ms)
+  9 passing (3ms)
 
 
 
   Temporal Live Acceptance Evaluation
-    ✔ zero received and drawn nodes with an unopened target fails closed (169ms)
-    ✔ representative rendered evidence passes without failures (165ms)
+    ✔ zero received and drawn nodes with an unopened target fails closed (143ms)
+    ✔ representative rendered evidence passes without failures (141ms)
 
 
-  2 passing (337ms)
+  2 passing (286ms)
 
 
 
@@ -972,7 +985,7 @@ Switched to branch 'main'
       ✔ computeVisibleLabels produces identical prioritized labels
 
 
-  18 passing (7ms)
+  18 passing (5ms)
 
 
 
@@ -990,7 +1003,7 @@ Switched to branch 'main'
     ✔ active sequencer work rejects on disposal even if the inner task ignores cancellation
     ✔ countActiveWrites uses hasActiveWrite, not CPU or indexingSeen
     ✔ countActiveWrites includes in-flight ingest, not CPU
-    ✔ non-cooperative store write prevents close until hasActiveWrite clears (41ms)
+    ✔ non-cooperative store write prevents close until hasActiveWrite clears (44ms)
     ✔ disposal is idempotent, rejects new work, and closes the store exactly once
     ✔ reports repository failures as structured diagnostics instead of unregistered without context
     ✔ reports persisted cache corruption as failed instead of masking it as an unregistered repository
@@ -1000,15 +1013,15 @@ Switched to branch 'main'
     ✔ derives incomplete status from persisted canonical coverage after runtime restart
 
 
-  21 passing (49ms)
+  21 passing (50ms)
 
 
 
   Temporal Service E2E Tests (Phase 3.5)
-    ✔ Full Phase 3.5 Lifecycle: DAG, Bounded Navigation, Relative Stepping, Renamed+Modified, Pinned Compare & Zero-byte Empty Tree (5135ms)
+    ✔ Full Phase 3.5 Lifecycle: DAG, Bounded Navigation, Relative Stepping, Renamed+Modified, Pinned Compare & Zero-byte Empty Tree (3808ms)
 
 
-  1 passing (5s)
+  1 passing (4s)
 
 
 
@@ -1016,10 +1029,10 @@ Switched to branch 'main'
     ✔ stores only structural transitions across a long unchanged delta run
     ✔ records observed-at-anchor for cold checkpoints and replaces them with transitions upon reconciliation
     ✔ garbage collects obsolete provisional master entity and edge records upon reconciliation
-    ✔ proves sparse order-of-growth across 100 commits with 500 entities and 500 edges (352ms)
+    ✔ proves sparse order-of-growth across 100 commits with 500 entities and 500 edges (262ms)
 
 
-  4 passing (391ms)
+  4 passing (293ms)
 
 
 
@@ -1050,7 +1063,7 @@ Switched to branch 'main'
     ✔ 10. GraphEdge production comparison: specifier order independence and meta fields
 
 
-  10 passing (4ms)
+  10 passing (3ms)
 
 
 
@@ -1069,7 +1082,7 @@ Switched to branch 'main'
     ✔ dispose during worker startup disposes the just-created worker
 
 
-  6 passing (3ms)
+  6 passing (4ms)
 
 
 
@@ -1105,13 +1118,13 @@ Switched to branch 'main'
     ✔ selectCommitIndex and stepCommit: host-owned bounded navigation
     ✔ Non-Git workspace: availableRepositories only discovers genuine Git repositories
     ✔ Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off
-    ✔ HEAD change event handling: followHead=true advances view, followHead=false preserves selection (63ms)
+    ✔ HEAD change event handling: followHead=true advances view, followHead=false preserves selection (69ms)
     ✔ Layer-specific retrySelection: re-executes the layer that actually failed
     ✔ partial lineage keeps reconstructed target nodes available to Full Map
     ✔ pauseActiveWork cancels in-flight history without throwing
 
 
-  15 passing (267ms)
+  15 passing (274ms)
 
 [graphs:unit-tests] All 55 test files passed successfully.
 npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
@@ -1123,339 +1136,342 @@ npm warn Unknown env config "devdir". This will stop working in the next major v
 [PreBase SecretResolver] Notice: PreBase root .env has group/world readable permissions.
 [PreBase SecretResolver] Notice: PreBase root .env has group/world readable permissions.
 ▶ Magnus Activation & Tool/Command Contracts
-  ✔ ensures exact parity between manifest languageModelTools and runtime registrations (7.207542ms)
-  ✔ ensures all manifest contributed commands have handlers registered in extension source (2.592708ms)
-  ✔ does not restore onStartupFinished and relies on generated onLanguageModelTool events (0.560708ms)
-  ✔ declares start, interact, and assert schemas with bounded desktop locators (0.173416ms)
-  ✔ deactivate cancels in-flight chat requests through magnusRequestShutdown (0.251417ms)
-✔ Magnus Activation & Tool/Command Contracts (11.693666ms)
+  ✔ ensures exact parity between manifest languageModelTools and runtime registrations (2.579584ms)
+  ✔ ensures all manifest contributed commands have handlers registered in extension source (1.319125ms)
+  ✔ does not restore onStartupFinished and relies on generated onLanguageModelTool events (0.391334ms)
+  ✔ declares start, interact, and assert schemas with bounded desktop locators (0.156041ms)
+  ✔ deactivate cancels in-flight chat requests through magnusRequestShutdown (0.126792ms)
+✔ Magnus Activation & Tool/Command Contracts (4.994084ms)
 ▶ Root Resolution & Workspace Isolation
-  ✔ resolves authentic PreBase source root from extension path (1.404625ms)
-  ✔ strictly isolates arbitrary user workspace directories from being identified as PreBase root (0.758542ms)
-  ✔ strictly rejects fake PreBase roots missing critical markers (0.454666ms)
-  ✔ disables source development in packaged mode (0.058125ms)
-✔ Root Resolution & Workspace Isolation (2.819209ms)
+  ✔ resolves authentic PreBase source root from extension path (0.739375ms)
+  ✔ strictly isolates arbitrary user workspace directories from being identified as PreBase root (0.722625ms)
+  ✔ strictly rejects fake PreBase roots missing critical markers (0.747208ms)
+  ✔ disables source development in packaged mode (0.080833ms)
+✔ Root Resolution & Workspace Isolation (2.41825ms)
 ▶ Root .env Freshness & Hot Reload
-  ✔ detects added, changed, and removed keys without restarting or recreating resolver (2.584041ms)
-✔ Root .env Freshness & Hot Reload (2.631166ms)
+  ✔ detects added, changed, and removed keys without restarting or recreating resolver (1.756583ms)
+✔ Root .env Freshness & Hot Reload (1.795917ms)
 ▶ Model Fallback Integrity
-  ✔ does not contain shut-down gemini-2.0 models in fallback models list (0.086458ms)
-✔ Model Fallback Integrity (0.119042ms)
+  ✔ does not contain shut-down gemini-2.0 models in fallback models list (0.0775ms)
+✔ Model Fallback Integrity (0.102958ms)
 ▶ Execution Mode & Fallback Distinction
-  ✔ correctly resolves LinkUp local credential vs cloud fallback (1.858375ms)
-✔ Execution Mode & Fallback Distinction (1.911125ms)
+  ✔ correctly resolves LinkUp local credential vs cloud fallback (0.707833ms)
+✔ Execution Mode & Fallback Distinction (0.736083ms)
 ▶ Context Attachment Bounding
-  ✔ safely bounds large graph selection strings (0.060125ms)
-  ✔ safely serializes and bounds object context (0.132209ms)
-✔ Context Attachment Bounding (0.243125ms)
+  ✔ safely bounds large graph selection strings (0.042042ms)
+  ✔ safely serializes and bounds object context (0.104125ms)
+✔ Context Attachment Bounding (0.1755ms)
 ▶ MagnusRuntimeState CoreReady Computation
-  ✔ correctly computes coreReady=true only when all core subsystems are registered with no errors (0.062041ms)
-✔ MagnusRuntimeState CoreReady Computation (0.081333ms)
-(node:32804) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/activation.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ correctly computes coreReady=true only when all core subsystems are registered with no errors (0.050834ms)
+✔ MagnusRuntimeState CoreReady Computation (0.068458ms)
+(node:89991) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/activation.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ PreBaseAIService & Provider Resolution
-  ✔ resolves execution modes and updates provider status cleanly (0.66325ms)
-  ✔ reads and writes configuration via PreBaseAIConfigProvider (0.112334ms)
-  ✔ works with VsCodeWorkspaceConfigProvider adapter pattern (0.099875ms)
-  ✔ discovers and caches models with TTL and handles auto model resolution (0.234958ms)
-  ✔ builds model options correctly from both NormalizedAIModel and legacy formats (0.725167ms)
-  ✔ generates text and stream candidates cleanly (0.264708ms)
-  ✔ generates structured architectural file descriptions with dynamic cache identity (0.555209ms)
-  ✔ handles unconfigured description requests gracefully with clear status (0.446917ms)
-  ✔ tests provider connectivity with connection ping (0.349041ms)
-  ✔ retries describeFile automatically on token starvation / MAX_TOKENS (0.226291ms)
-  ✔ resolves description context with low reasoning effort and v7 cache identity (0.114042ms)
-(node:32805) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/aiService.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ resolves execution modes and updates provider status cleanly (0.668375ms)
+  ✔ reads and writes configuration via PreBaseAIConfigProvider (0.112042ms)
+  ✔ works with VsCodeWorkspaceConfigProvider adapter pattern (0.099041ms)
+  ✔ discovers and caches models with TTL and handles auto model resolution (0.22375ms)
+  ✔ builds model options correctly from both NormalizedAIModel and legacy formats (0.704667ms)
+  ✔ generates text and stream candidates cleanly (0.270125ms)
+  ✔ generates structured architectural file descriptions with dynamic cache identity (0.169ms)
+  ✔ handles unconfigured description requests gracefully with clear status (0.08075ms)
+  ✔ tests provider connectivity with connection ping (0.123792ms)
+  ✔ retries describeFile automatically on token starvation / MAX_TOKENS (0.182167ms)
+  ✔ resolves description context with low reasoning effort and v7 cache identity (0.096208ms)
+(node:89992) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/aiService.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ installSmokeTransport routes streamCandidate through the smoke adapter, not the product catalog (885.507834ms)
-✔ PreBaseAIService & Provider Resolution (890.055584ms)
+  ✔ installSmokeTransport routes streamCandidate through the smoke adapter, not the product catalog (887.606334ms)
+✔ PreBaseAIService & Provider Resolution (891.275625ms)
 ▶ Gemini client cancellation transport
-  ✔ sends non-stream credentials only in x-goog-api-key and never in the URL or Authorization header (2.6575ms)
-  ✔ sends SSE credentials only in x-goog-api-key and never in the URL or Authorization header (1.276ms)
-  ✔ rejects an oversized unterminated SSE frame without falling back to a second request (0.846208ms)
-  ✔ falls back to a bounded non-stream request when the SSE endpoint declines the request (0.137625ms)
-  ✔ does not start a request when cancellation has already been requested (0.095208ms)
-  ✔ aborts an in-flight content request without retrying alternative authentication (0.124833ms)
-  ✔ aborts an in-flight SSE stream on Quit without falling back to a second request (0.221042ms)
-  ✔ concatenates multiple text parts across non-stream response (18.434875ms)
-  ✔ rejects an oversized non-stream response body (2.153584ms)
-✔ Gemini client cancellation transport (39.633084ms)
+  ✔ sends non-stream credentials only in x-goog-api-key and never in the URL or Authorization header (1.628166ms)
+  ✔ sends SSE credentials only in x-goog-api-key and never in the URL or Authorization header (1.206708ms)
+  ✔ rejects an oversized unterminated SSE frame without falling back to a second request (0.822166ms)
+  ✔ falls back to a bounded non-stream request when the SSE endpoint declines the request (0.147666ms)
+  ✔ does not start a request when cancellation has already been requested (0.09725ms)
+  ✔ aborts an in-flight content request without retrying alternative authentication (0.133542ms)
+  ✔ aborts an in-flight SSE stream on Quit without falling back to a second request (0.243792ms)
+  ✔ concatenates multiple text parts across non-stream response (0.086666ms)
+  ✔ rejects an oversized non-stream response body (0.174042ms)
+✔ Gemini client cancellation transport (5.085834ms)
 ▶ classifyGeminiError
-  ✔ classifies authentication errors safely without key logging (8.445ms)
-  ✔ classifies rate limit errors as retryable (5.751125ms)
-  ✔ classifies model unavailable errors (1.337792ms)
-  ✔ classifies network failures as retryable (0.532167ms)
-  ✔ classifies cancellation requests (1.344833ms)
-✔ classifyGeminiError (17.57725ms)
-(node:32806) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/geminiClient.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ classifies authentication errors safely without key logging (1.156791ms)
+  ✔ classifies rate limit errors as retryable (0.494541ms)
+  ✔ classifies model unavailable errors (1.380916ms)
+  ✔ classifies network failures as retryable (0.355084ms)
+  ✔ classifies cancellation requests (0.497041ms)
+✔ classifyGeminiError (4.060041ms)
+(node:89993) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/geminiClient.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ hybrid quality vs LinkUp-only snippets
-  ✔ hybrid enrichment improves citations and stays inside the 16k tool budget (34.028666ms)
-✔ hybrid quality vs LinkUp-only snippets (35.230958ms)
-(node:32807) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/hybridQualityBenchmark.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ hybrid enrichment improves citations and stays inside the 16k tool budget (22.198375ms)
+✔ hybrid quality vs LinkUp-only snippets (22.675625ms)
+(node:89994) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/hybridQualityBenchmark.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:32808) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/hybridWebContext.test.ts is not specified and it doesn't parse as CommonJS.
+(node:89995) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/hybridWebContext.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ hybrid web context
-  ✔ does not silently become LinkUp-only when Firecrawl is unavailable (266.650667ms)
-  ✔ does not run local hybrid with only one provider key (0.169917ms)
-  ✔ fetch may be Firecrawl-only but search never becomes Firecrawl-only (1.0675ms)
-  ✔ counts every retry attempt when fetching one known URL (251.024667ms)
-  ✔ LinkUp discovers and Firecrawl enriches without duplicate scrapes (0.729958ms)
-  ✔ returns partial enrichment when one scrape fails and another succeeds (0.421542ms)
-  ✔ a scrape timeout is not treated as user cancellation (0.647042ms)
-  ✔ rejects private URL fetch (0.126542ms)
-  ✔ reuses in-memory search results for the identical query in one run (0.274291ms)
-  ✔ does not let maxResults bypass the depth scrape budget (0.317125ms)
-  ✔ deep Firecrawl search does not scrape a duplicate of a LinkUp URL (0.611209ms)
-  ✔ cancelled Firecrawl search does not fall back to LinkUp-only results (0.358041ms)
-  ✔ counts every attempted Firecrawl scrape in operations, including failed enrichments (0.268375ms)
-  ✔ counts a retryable Firecrawl request for every provider attempt (250.856125ms)
-  ✔ failed deep Firecrawl search still enriches LinkUp results (0.668541ms)
-  ✔ Firecrawl 429 on every scrape fails closed instead of returning LinkUp-only results (251.248375ms)
-  ✔ cancelled scrape does not return LinkUp-only results or cache them (0.387959ms)
-  ✔ cancelled fetch does not cache a failed scrape for the next call (0.214833ms)
-  ✔ treats prompt-injection page text as source data and keeps URLs when clipping (0.162875ms)
-  ✔ search enrichment scrapes may cache; fetch never writes provider cache (0.164625ms)
-✔ hybrid web context (1027.651334ms)
+  ✔ does not silently become LinkUp-only when Firecrawl is unavailable (264.013208ms)
+  ✔ does not run local hybrid with only one provider key (0.165291ms)
+  ✔ fetch may be Firecrawl-only but search never becomes Firecrawl-only (0.396958ms)
+  ✔ fetch/cite keep www on the source URL; cache and search dedupe are www-insensitive (0.461834ms)
+  ✔ counts every retry attempt when fetching one known URL (253.555125ms)
+  ✔ LinkUp discovers and Firecrawl enriches without duplicate scrapes (1.646459ms)
+  ✔ returns partial enrichment when one scrape fails and another succeeds (0.740584ms)
+  ✔ a scrape timeout is not treated as user cancellation (0.641ms)
+  ✔ rejects private URL fetch (0.221833ms)
+  ✔ reuses in-memory search results for the identical query in one run (0.628708ms)
+  ✔ does not let maxResults bypass the depth scrape budget (0.559459ms)
+  ✔ deep Firecrawl search does not scrape a duplicate of a LinkUp URL (0.811916ms)
+  ✔ cancelled Firecrawl search does not fall back to LinkUp-only results (0.516041ms)
+  ✔ counts every attempted Firecrawl scrape in operations, including failed enrichments (1.597708ms)
+  ✔ counts a retryable Firecrawl request for every provider attempt (252.285291ms)
+  ✔ failed deep Firecrawl search still enriches LinkUp results (1.551291ms)
+  ✔ Firecrawl 429 on every scrape fails closed instead of returning LinkUp-only results (252.885667ms)
+  ✔ cancelled scrape does not return LinkUp-only results or cache them (0.603042ms)
+  ✔ cancelled fetch does not cache a failed scrape for the next call (0.371459ms)
+  ✔ treats prompt-injection page text as source data and keeps URLs when clipping (0.363791ms)
+  ✔ search enrichment scrapes may cache; fetch never writes provider cache (0.451083ms)
+✔ hybrid web context (1035.874ms)
 ▶ local Firecrawl client
-  ✔ sends scrape to v2/scrape with markdown/main-content and never puts the key in the URL (14.051291ms)
-  ✔ can disable Firecrawl provider caching for explicit user fetches (0.133167ms)
-  ✔ Firecrawl Search stays compact and does not request markdown scrapeOptions (0.136666ms)
-  ✔ cancels in-flight scrape without retrying (0.282458ms)
-  ✔ rejects private destinations before calling Firecrawl (0.078125ms)
-  ✔ rejects a private URL returned in scrape metadata (0.096542ms)
-(node:32809) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/localFirecrawlClient.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ sends scrape to v2/scrape with markdown/main-content and never puts the key in the URL (9.649375ms)
+  ✔ can disable Firecrawl provider caching for explicit user fetches (0.119083ms)
+  ✔ Firecrawl Search stays compact and does not request markdown scrapeOptions (0.135167ms)
+  ✔ cancels in-flight scrape without retrying (0.269458ms)
+  ✔ rejects private destinations before calling Firecrawl (0.07425ms)
+  ✔ rejects a private URL returned in scrape metadata (0.100333ms)
+(node:89996) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/localFirecrawlClient.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ retries a retryable scrape at most once (257.843667ms)
-  ✔ Firecrawl Search drops private hits and does not retry a 429 (0.264792ms)
-  ✔ cancels in-flight search without retrying (0.182333ms)
-  ✔ aborts a hung scrape on timeout without a nested retry storm (31.586916ms)
-✔ local Firecrawl client (305.365834ms)
+  ✔ retries a retryable scrape at most once (251.20925ms)
+  ✔ Firecrawl Search drops private hits and does not retry a 429 (0.242584ms)
+  ✔ cancels in-flight search without retrying (0.179375ms)
+  ✔ aborts a hung scrape on timeout without a nested retry storm (30.411708ms)
+  ✔ uses only v2 scrape/search endpoints and never sends ZDR or Interact fields (0.214334ms)
+✔ local Firecrawl client (293.18175ms)
 ▶ Local LinkUp search client
-  ✔ sends credentials in Authorization Bearer and never in URL (34.716084ms)
-  ✔ validates input boundaries and rejects invalid queries (0.30775ms)
-  ✔ filters out invalid or non-http URLs (0.357709ms)
-  ✔ handles rate limit HTTP 429 and auth HTTP 401 cleanly (0.127875ms)
-✔ Local LinkUp search client (36.004125ms)
-(node:32810) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/localLinkupClient.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ sends credentials in Authorization Bearer and never in URL (2.107917ms)
+  ✔ validates input boundaries and rejects invalid queries (0.238459ms)
+  ✔ filters out invalid or non-http URLs (0.266333ms)
+  ✔ handles rate limit HTTP 429 and auth HTTP 401 cleanly (0.113416ms)
+✔ Local LinkUp search client (3.139375ms)
+(node:89997) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/localLinkupClient.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ GeminiModelPolicy & Model Curation Layer
-  ✔ classifies stable Flash and Pro models as consumer selectable (1.346208ms)
-  ✔ hides all preview models from consumer selector (0.1415ms)
-  ✔ hides experimental, latest aliases, and flash-lite models from consumer picker (0.064792ms)
-  ✔ hides specialized non-coding models (media, audio, embeddings, robotics, gemma) (0.096ms)
-  ✔ curates a 50-model raw provider catalog dump down to Auto + 2-4 stable models (0.296417ms)
-  ✔ resolves Auto dynamically using version hierarchy (0.087084ms)
-  ✔ routes workload profiles to appropriate model classes (0.111875ms)
-  ✔ safely migrates obsolete, preview, or invalid saved model selections (0.106042ms)
-  ✔ formats safe diagnostics without sensitive leakage (0.164166ms)
-  ✔ demonstrates future provider extensibility via provider-agnostic IModelPolicy interface (0.11575ms)
-  ✔ fails closed for unrecognized models with unknown release channel (0.053208ms)
-  ✔ synthesizes accurate reasoning metadata for Flash, Pro, and Auto models (0.367625ms)
-  ✔ resolves supported reasoning effort safely defending against unsupported model efforts (0.050291ms)
-  ✔ creates navigation configuration schema for models with thinking support (6.107958ms)
-✔ GeminiModelPolicy & Model Curation Layer (9.672041ms)
-(node:32811) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/modelPolicy.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ classifies stable Flash and Pro models as consumer selectable (1.254ms)
+  ✔ hides all preview models from consumer selector (0.139625ms)
+  ✔ hides experimental, latest aliases, and flash-lite models from consumer picker (0.063375ms)
+  ✔ hides specialized non-coding models (media, audio, embeddings, robotics, gemma) (0.091875ms)
+  ✔ curates a 50-model raw provider catalog dump down to Auto + 2-4 stable models (0.294625ms)
+  ✔ resolves Auto dynamically using version hierarchy (0.090542ms)
+  ✔ routes workload profiles to appropriate model classes (0.11475ms)
+  ✔ safely migrates obsolete, preview, or invalid saved model selections (0.106ms)
+  ✔ formats safe diagnostics without sensitive leakage (0.154708ms)
+  ✔ demonstrates future provider extensibility via provider-agnostic IModelPolicy interface (0.11525ms)
+  ✔ fails closed for unrecognized models with unknown release channel (0.047ms)
+  ✔ synthesizes accurate reasoning metadata for Flash, Pro, and Auto models (0.3605ms)
+  ✔ resolves supported reasoning effort safely defending against unsupported model efforts (0.047959ms)
+  ✔ creates navigation configuration schema for models with thinking support (0.086916ms)
+✔ GeminiModelPolicy & Model Curation Layer (3.49725ms)
+(node:89998) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/modelPolicy.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus Models & Providers
-  ✔ defines Gemini as the primary provider with standard capabilities (0.322875ms)
-  ✔ contains active Gemini models and auto (0.294041ms)
-  ✔ resolveApiModel resolves auto to gemini-2.5-flash (0.076458ms)
-  ✔ resolveModelInfo migrates retired models safely to auto/gemini-2.5-flash (0.259625ms)
-  ✔ getModelOption falls back to auto option on unknown model id (0.150417ms)
-  ✔ resolveModelOrFallback returns known model or falls back to auto (0.110291ms)
-  ✔ resolveAutoModelFromDiscovered selects flash 3.x over 2.5 and 2.5 over pro (1.143959ms)
-  ✔ formatContextWindowLabel formats token counts cleanly (0.129042ms)
-  ✔ buildMagnusLanguageModelInformation includes purpose descriptions and imageInput capability (3.139125ms)
-✔ Magnus Models & Providers (6.355792ms)
-(node:32812) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/models.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ defines Gemini as the primary provider with standard capabilities (0.304958ms)
+  ✔ contains active Gemini models and auto (0.292084ms)
+  ✔ resolveApiModel resolves auto to gemini-2.5-flash (0.07425ms)
+  ✔ resolveModelInfo migrates retired models safely to auto/gemini-2.5-flash (0.052208ms)
+  ✔ getModelOption falls back to auto option on unknown model id (0.046417ms)
+  ✔ resolveModelOrFallback returns known model or falls back to auto (0.050208ms)
+  ✔ resolveAutoModelFromDiscovered selects flash 3.x over 2.5 and 2.5 over pro (0.518625ms)
+  ✔ formatContextWindowLabel formats token counts cleanly (0.05775ms)
+  ✔ buildMagnusLanguageModelInformation includes purpose descriptions and imageInput capability (5.428958ms)
+✔ Magnus Models & Providers (7.353958ms)
+(node:89999) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/models.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus mode capability boundary
-  ✔ recognizes only declared modes and keeps the Ask default (0.3295ms)
-  ✔ maps participant ids to the least-privileged matching mode (0.062084ms)
-  ✔ fails closed for unknown tools in every mode (0.052ms)
-  ✔ accounts for every registered Magnus tool in the fail-closed capability registry (0.407583ms)
-  ✔ allows Test mode the dedicated Runtime Preview and bounded test-execution surfaces (1.576125ms)
-  ✔ keeps environment mutation and arbitrary runtime evaluation restricted to Edit and Agent modes (0.281375ms)
-  ✔ keeps Ask and Plan from launching or clicking while allowing read-only desktop asserts (0.114209ms)
-✔ Magnus mode capability boundary (3.399542ms)
-(node:32813) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/modes.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ recognizes only declared modes and keeps the Ask default (0.309417ms)
+  ✔ maps participant ids to the least-privileged matching mode (0.058958ms)
+  ✔ fails closed for unknown tools in every mode (0.046125ms)
+  ✔ accounts for every registered Magnus tool in the fail-closed capability registry (0.791166ms)
+  ✔ allows Test mode the dedicated Runtime Preview and bounded test-execution surfaces (0.088542ms)
+  ✔ keeps environment mutation and arbitrary runtime evaluation restricted to Edit and Agent modes (0.104333ms)
+  ✔ keeps Ask and Plan from launching or clicking while allowing read-only desktop asserts (0.049041ms)
+✔ Magnus mode capability boundary (1.913667ms)
+(node:90000) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/modes.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus process output formatter
-  ✔ returns JSON-safe process output when unexpected values contain cycles and bigints (0.38325ms)
-  ✔ retains only the newest bounded output entries and marks tool truncation (0.383625ms)
-  ✔ truncates an oversized entry and preserves explicit upstream truncation (0.069583ms)
-✔ Magnus process output formatter (1.232916ms)
-(node:32814) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/processOutputFormatter.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ returns JSON-safe process output when unexpected values contain cycles and bigints (0.368916ms)
+  ✔ retains only the newest bounded output entries and marks tool truncation (0.339625ms)
+  ✔ truncates an oversized entry and preserves explicit upstream truncation (0.062958ms)
+✔ Magnus process output formatter (1.155917ms)
+(node:90001) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/processOutputFormatter.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ ProjectSafetyService Unit Tests
-  ✔ identifies sensitive credential and secret paths (0.456166ms)
-  ✔ permits standard non-sensitive project paths (0.088916ms)
-  ✔ rejects read/write actions on sensitive paths (0.883916ms)
-  ✔ allows read action on standard project paths (2.944917ms)
-  ✔ rejects explicit sensitiveFileRead and sensitiveFileWrite categories (0.138917ms)
-  ✔ validates workspaceRead and workspaceWrite categories (0.081791ms)
-  ✔ handles trusted network URLs without prompt (0.064334ms)
-✔ ProjectSafetyService Unit Tests (5.302375ms)
-(node:32847) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/projectSafetyService.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ identifies sensitive credential and secret paths (0.36025ms)
+  ✔ permits standard non-sensitive project paths (0.065416ms)
+  ✔ rejects read/write actions on sensitive paths (0.666542ms)
+  ✔ allows read action on standard project paths (0.066583ms)
+  ✔ rejects explicit sensitiveFileRead and sensitiveFileWrite categories (0.047959ms)
+  ✔ validates workspaceRead and workspaceWrite categories (0.053167ms)
+  ✔ handles trusted network URLs without prompt (0.049625ms)
+✔ ProjectSafetyService Unit Tests (1.7625ms)
+(node:90002) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/projectSafetyService.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus Request Assembler & Context Budget
-  ✔ isSensitiveFile identifies private keys, tokens, and env files (0.72275ms)
-  ✔ resolveNativeReferences skips sensitive files and reads bounded content via host (1.807542ms)
-  ✔ buildSystemPrompt includes mode instructions and attached context (0.095583ms)
-  ✔ extractConversationHistory converts request and response turns into AIContentMessage[] (0.101416ms)
-  ✔ extractConversationHistory respects maxTurns and maxChars limits (0.079916ms)
-  ✔ processToolResultData handles text and extracts multimodal image data (0.101167ms)
-  ✔ processToolResultData applies head/tail compaction when exceeding maxChars (0.147208ms)
-  ✔ filterToolDeclarations prioritizes referenced tools (0.142375ms)
-  ✔ assembleChatRequest constructs full request tuple with bounded defaults (0.246667ms)
-  ✔ consumeWebToolBudget caps search, deep search, and fetch independently (2.31975ms)
-✔ Magnus Request Assembler & Context Budget (6.463ms)
-(node:32848) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/requestAssembler.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ isSensitiveFile identifies private keys, tokens, and env files (0.704959ms)
+  ✔ resolveNativeReferences skips sensitive files and reads bounded content via host (0.438125ms)
+  ✔ buildSystemPrompt includes mode instructions and attached context (0.084167ms)
+  ✔ extractConversationHistory converts request and response turns into AIContentMessage[] (0.096041ms)
+  ✔ extractConversationHistory respects maxTurns and maxChars limits (0.070125ms)
+  ✔ processToolResultData handles text and extracts multimodal image data (0.097833ms)
+  ✔ processToolResultData applies head/tail compaction when exceeding maxChars (0.062917ms)
+  ✔ filterToolDeclarations prioritizes referenced tools (0.117334ms)
+  ✔ assembleChatRequest constructs full request tuple with bounded defaults (0.113041ms)
+  ✔ consumeWebToolBudget caps search, deep search, and fetch independently (0.171125ms)
+✔ Magnus Request Assembler & Context Budget (2.452584ms)
+(node:90003) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/requestAssembler.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ MagnusSecretStorage & Precedence
-  ✔ getProviderSecretKey formats scoped keys correctly (0.378916ms)
-  ✔ stores and retrieves provider-scoped keys in packaged mode (0.244917ms)
-  ✔ automatically and idempotently migrates legacy un-scoped key to scoped gemini key (0.083917ms)
-  ✔ getGeminiKeyOrMessage returns clear guidance when unconfigured (0.094459ms)
-  ✔ rejects empty API keys (0.217875ms)
-  ✔ clearing provider key also cleans legacy key (0.082542ms)
-  ✔ parseAllowlistedEnv handles quotes, whitespace, comments, and filters variables (0.126583ms)
-  ✔ isPreBaseSourceRoot strictly rejects arbitrary workspace folders (0.122708ms)
-  ✔ PreBaseSecretResolver respects allowAmbientRootDiscovery: false (0.055667ms)
-✔ MagnusSecretStorage & Precedence (1.923417ms)
-(node:32849) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/secretStorage.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ getProviderSecretKey formats scoped keys correctly (0.397958ms)
+  ✔ stores and retrieves provider-scoped keys in packaged mode (0.206542ms)
+  ✔ automatically and idempotently migrates legacy un-scoped key to scoped gemini key (0.078ms)
+  ✔ getGeminiKeyOrMessage returns clear guidance when unconfigured (0.106708ms)
+  ✔ rejects empty API keys (0.211584ms)
+  ✔ clearing provider key also cleans legacy key (0.088333ms)
+  ✔ parseAllowlistedEnv handles quotes, whitespace, comments, and filters variables (0.147166ms)
+  ✔ isPreBaseSourceRoot strictly rejects arbitrary workspace folders (0.1245ms)
+  ✔ PreBaseSecretResolver respects allowAmbientRootDiscovery: false (0.059292ms)
+✔ MagnusSecretStorage & Precedence (1.911791ms)
+(node:90004) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/secretStorage.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus smoke transport
-  ✔ smoke model uses NormalizedAIModel fields, is hidden, and is not product-selectable (1.702417ms)
-  ✔ installSmokeTransport and stream diagnostics stay behind the smoke-test driver (1.713792ms)
-(node:32850) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/smokeTransport.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ smoke model uses NormalizedAIModel fields, is hidden, and is not product-selectable (0.530583ms)
+  ✔ installSmokeTransport and stream diagnostics stay behind the smoke-test driver (0.892625ms)
+(node:90005) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/smokeTransport.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ smoke transport streams progressive chunks then completes (885.642042ms)
-  ✔ smoke transport reports streamActive while chunks are in flight (883.776959ms)
-  ✔ smoke transport cancel before the first chunk emits nothing (0.546ms)
-  ✔ smoke transport cancellation stops further source chunks (220.808584ms)
-✔ Magnus smoke transport (1995.388708ms)
+  ✔ smoke transport streams progressive chunks then completes (889.12825ms)
+  ✔ smoke transport reports streamActive while chunks are in flight (890.185333ms)
+  ✔ smoke transport cancel before the first chunk emits nothing (0.690542ms)
+  ✔ smoke transport cancellation stops further source chunks (222.369792ms)
+✔ Magnus smoke transport (2005.246333ms)
 ▶ streamPace Unit Tests
-  ✔ paces text in nominal chunks with injected sleep ticks (0.902084ms)
-  ✔ preserves UTF-16 surrogate pairs and avoids splitting high and low surrogates (0.965875ms)
-  ✔ adaptively catches up when backlog is large and source finishes (0.30175ms)
-  ✔ immediately terminates on cancellation without yielding further (0.123666ms)
-  ✔ propagates upstream source errors faithfully (0.305125ms)
-(node:32851) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/streamPace.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ paces text in nominal chunks with injected sleep ticks (0.73725ms)
+  ✔ preserves UTF-16 surrogate pairs and avoids splitting high and low surrogates (0.091416ms)
+  ✔ adaptively catches up when backlog is large and source finishes (0.251083ms)
+  ✔ immediately terminates on cancellation without yielding further (0.09375ms)
+  ✔ propagates upstream source errors faithfully (0.239667ms)
+(node:90006) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/streamPace.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ cancellation stops a yield-paused source via return() and does not hang on a blocked source await (101.264208ms)
-  ✔ no-op sleepFn parks on a delayed source instead of busy-polling (41.539166ms)
-  ✔ createLivePacedSink cancel wakes a blocked waiter and settles (0.450625ms)
-✔ streamPace Unit Tests (146.541375ms)
+  ✔ cancellation stops a yield-paused source via return() and does not hang on a blocked source await (103.654584ms)
+  ✔ no-op sleepFn parks on a delayed source instead of busy-polling (41.488ms)
+  ✔ createLivePacedSink cancel wakes a blocked waiter and settles (0.361625ms)
+✔ streamPace Unit Tests (147.841584ms)
 ▶ Magnus taskRunModel
-  ✔ formats durations from timestamps (0.318542ms)
-  ✔ run header labels depend on status (0.111125ms)
-  ✔ migrates legacy turns once (0.5565ms)
-  ✔ migrates user-only legacy turns without work groups (0.1575ms)
-✔ Magnus taskRunModel (1.884125ms)
-(node:32852) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/taskRunModel.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ formats durations from timestamps (0.302042ms)
+  ✔ run header labels depend on status (0.10475ms)
+  ✔ migrates legacy turns once (0.126041ms)
+  ✔ migrates user-only legacy turns without work groups (0.049208ms)
+✔ Magnus taskRunModel (1.010459ms)
+(node:90007) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/taskRunModel.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ MagnusToolActivityDescriptor & Privacy Sanitization
-  ✔ sanitizes paths cleanly (0.363875ms)
-  ✔ bounds query length and masks sensitive tokens in queries (0.278542ms)
-  ✔ formats informative invocation messages for workspace and edit tools (0.195333ms)
-  ✔ formats informative invocation messages for graph tools (2.549ms)
-  ✔ formats informative invocation messages for terminal, desktop, web search, and runtime tools (0.294583ms)
-  ✔ generates confirmation messages for destructive operations (0.065958ms)
-✔ MagnusToolActivityDescriptor & Privacy Sanitization (4.215ms)
-(node:32853) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/toolActivity.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ sanitizes paths cleanly (0.350167ms)
+  ✔ bounds query length and masks sensitive tokens in queries (0.266584ms)
+  ✔ formats informative invocation messages for workspace and edit tools (0.54625ms)
+  ✔ formats informative invocation messages for graph tools (0.080625ms)
+  ✔ formats informative invocation messages for terminal, desktop, web search, and runtime tools (0.208458ms)
+  ✔ generates confirmation messages for destructive operations (0.055167ms)
+✔ MagnusToolActivityDescriptor & Privacy Sanitization (1.942416ms)
+(node:90008) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/toolActivity.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Gemini Protocol & Schema Serialization
-  ✔ serializes function declarations using parametersJsonSchema without dropping additionalProperties (0.686625ms)
-  ✔ serializes multi-turn function calls and responses preserving IDs and thought signatures (0.078083ms)
-  ✔ parses raw Gemini candidates preserving functionCall IDs and thought signatures (0.092125ms)
-  ✔ parses thought_signature snake_case variant from Gemini API (0.0465ms)
-  ✔ validates schema serialization matrix for all contributing Magnus tools (0.3965ms)
-✔ Gemini Protocol & Schema Serialization (1.731417ms)
+  ✔ serializes function declarations using parametersJsonSchema without dropping additionalProperties (0.625417ms)
+  ✔ serializes multi-turn function calls and responses preserving IDs and thought signatures (0.0715ms)
+  ✔ parses raw Gemini candidates preserving functionCall IDs and thought signatures (0.089833ms)
+  ✔ parses thought_signature snake_case variant from Gemini API (0.045ms)
+  ✔ validates schema serialization matrix for all contributing Magnus tools (0.400833ms)
+✔ Gemini Protocol & Schema Serialization (1.637667ms)
 ▶ DirectGeminiTransport
-  ✔ sends credentials strictly via x-goog-api-key header and never in URL (11.03275ms)
-  ✔ handles streaming SSE chunks and bounds accumulation (0.618625ms)
-  ✔ classifies direct HTTP errors with safe messages (0.14875ms)
-  ✔ discovers models across multiple pages and filters out specialized modalities (0.427084ms)
-✔ DirectGeminiTransport (12.360541ms)
+  ✔ sends credentials strictly via x-goog-api-key header and never in URL (8.809709ms)
+  ✔ handles streaming SSE chunks and bounds accumulation (0.553625ms)
+  ✔ classifies direct HTTP errors with safe messages (0.141375ms)
+  ✔ discovers models across multiple pages and filters out specialized modalities (0.400375ms)
+✔ DirectGeminiTransport (10.024ms)
 ▶ HostedGeminiTransport
-  ✔ dispatches to gatewayClient or edge function endpoint with Bearer auth (0.855375ms)
-  ✔ classifies hosted errors accurately (0.101875ms)
-  ✔ serializes reasoning effort accurately for Gemini 3.x vs Gemini 2.5 vs default (0.155458ms)
-  ✔ filters thought parts from visible answer text and captures usageMetadata in generate and streamGenerate (0.339917ms)
-✔ HostedGeminiTransport (1.5345ms)
-(node:32854) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/transports.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ dispatches to gatewayClient or edge function endpoint with Bearer auth (0.588292ms)
+  ✔ classifies hosted errors accurately (0.083958ms)
+  ✔ serializes reasoning effort accurately for Gemini 3.x vs Gemini 2.5 vs default (0.127208ms)
+  ✔ filters thought parts from visible answer text and captures usageMetadata in generate and streamGenerate (0.289375ms)
+✔ HostedGeminiTransport (1.157625ms)
+(node:90009) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/transports.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ webContextCore URL policy
-  ✔ accepts public http(s) and rejects private/localhost destinations (0.684333ms)
-  ✔ canonicalizes www, tracking params, and trailing slashes without merging distinct articles (6.384666ms)
-  ✔ dedupes www/non-www duplicates from LinkUp and Firecrawl while keeping first ranking (0.411417ms)
-✔ webContextCore URL policy (7.904542ms)
+  ✔ accepts public http(s) and rejects private/localhost destinations (0.611833ms)
+  ✔ canonicalizes scheme/host casing without rewriting www to apex (0.169125ms)
+  ✔ dedupes www/non-www duplicates from LinkUp and Firecrawl without mutating the kept source URL (0.550041ms)
+  ✔ preserves functional query parameters including generic ref while stripping known tracking families from the dedupe key only (0.154375ms)
+✔ webContextCore URL policy (2.243709ms)
 ▶ webContextCore routing and budget
-  ✔ uses Firecrawl search categories only in deep mode when the query earns them (0.320083ms)
-  ✔ model-facing web payload budget is 14k characters (0.0415ms)
-  ✔ fresh queries disable Firecrawl cache age (0.217833ms)
-  ✔ bounds search payload under the 14k tool budget and keeps URL/title when clipping (0.278875ms)
-  ✔ keeps valid JSON when clipping excerpts that contain quotes and escapes (0.091167ms)
-  ✔ drops a source instead of emitting a tiny remnant when the payload is already full (0.072792ms)
-  ✔ drops provider internals from the Magnus-facing payload (0.140833ms)
-✔ webContextCore routing and budget (1.350833ms)
-(node:32855) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/webContextCore.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ uses Firecrawl search categories only in deep mode when the query earns them (0.315916ms)
+  ✔ model-facing web payload budget is 14k characters (0.037542ms)
+  ✔ fresh queries disable Firecrawl cache age (0.13875ms)
+  ✔ bounds search payload under the 14k tool budget and keeps URL/title when clipping (0.20125ms)
+  ✔ keeps valid JSON when clipping excerpts that contain quotes and escapes (0.071709ms)
+  ✔ drops a source instead of emitting a tiny remnant when the payload is already full (0.08075ms)
+  ✔ drops provider internals from the Magnus-facing payload (0.111334ms)
+✔ webContextCore routing and budget (1.094792ms)
+(node:90010) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/webContextCore.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus web-context payload boundary
-  ✔ does not forward credentialed or private gateway sources to the model (0.730625ms)
-✔ Magnus web-context payload boundary (1.055042ms)
-(node:32856) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/webContextPayload.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ does not forward credentialed or private gateway sources to the model (0.693417ms)
+✔ Magnus web-context payload boundary (1.0075ms)
+(node:90011) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/webContextPayload.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-ℹ tests 183
+ℹ tests 186
 ℹ suites 31
-ℹ pass 183
+ℹ pass 186
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 2382.229417
+ℹ duration_ms 2289.44025

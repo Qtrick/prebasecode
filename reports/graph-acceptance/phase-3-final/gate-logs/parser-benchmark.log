@@ -1,0 +1,216 @@
+{
+  "schemaVersion": 2,
+  "scenario": "parser-benchmark",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
+  "generatedAt": "2026-08-30T00:41:07.696Z",
+  "ok": true,
+  "methodology": "fresh-process warmup + 3 repetitions, median/p95, ~1000 TS files (graphs/src plus generated). Outer parseBatchSize is Promise.all over files, not N parser-utility processes.",
+  "chosenParseBatchSize": 64,
+  "rows": [
+    {
+      "parseBatchSize": 8,
+      "fileCount": 1000,
+      "nodes": 1000,
+      "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+      "repetitions": 3,
+      "wallMedianMs": 422,
+      "wallP95Ms": 426,
+      "peakRssMedianMb": 277.8,
+      "rssDeltaMedianMb": 136.78,
+      "eventLoopLagP95MedianMs": 1,
+      "samples": [
+        {
+          "parseBatchSize": 8,
+          "wallMs": 422,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 277.5,
+          "rssDeltaMb": 136.75,
+          "heapDeltaMb": 93.18,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 1
+        },
+        {
+          "parseBatchSize": 8,
+          "wallMs": 426,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 278.5,
+          "rssDeltaMb": 138.39,
+          "heapDeltaMb": 85.21,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 1
+        },
+        {
+          "parseBatchSize": 8,
+          "wallMs": 422,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 277.8,
+          "rssDeltaMb": 136.78,
+          "heapDeltaMb": 84.94,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 11
+        }
+      ],
+      "note": "Fresh process per sample, including one discarded warmup. Fixture is graphs/src plus generated files to reach 1000 TypeScript sources. parseBatchSize is the outer Promise.all window; parseBatch remains sequential inside each worker."
+    },
+    {
+      "parseBatchSize": 16,
+      "fileCount": 1000,
+      "nodes": 1000,
+      "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+      "repetitions": 3,
+      "wallMedianMs": 329,
+      "wallP95Ms": 331,
+      "peakRssMedianMb": 272,
+      "rssDeltaMedianMb": 132.97,
+      "eventLoopLagP95MedianMs": 20,
+      "samples": [
+        {
+          "parseBatchSize": 16,
+          "wallMs": 329,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 272,
+          "rssDeltaMb": 132.91,
+          "heapDeltaMb": 83.28,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 20
+        },
+        {
+          "parseBatchSize": 16,
+          "wallMs": 331,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 272,
+          "rssDeltaMb": 132.97,
+          "heapDeltaMb": 74.48,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 23
+        },
+        {
+          "parseBatchSize": 16,
+          "wallMs": 301,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 280.6,
+          "rssDeltaMb": 138.84,
+          "heapDeltaMb": 74.28,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 1
+        }
+      ],
+      "note": "Fresh process per sample, including one discarded warmup. Fixture is graphs/src plus generated files to reach 1000 TypeScript sources. parseBatchSize is the outer Promise.all window; parseBatch remains sequential inside each worker."
+    },
+    {
+      "parseBatchSize": 32,
+      "fileCount": 1000,
+      "nodes": 1000,
+      "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+      "repetitions": 3,
+      "wallMedianMs": 283,
+      "wallP95Ms": 287,
+      "peakRssMedianMb": 276.3,
+      "rssDeltaMedianMb": 136.02,
+      "eventLoopLagP95MedianMs": 2,
+      "samples": [
+        {
+          "parseBatchSize": 32,
+          "wallMs": 267,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 279.3,
+          "rssDeltaMb": 138.14,
+          "heapDeltaMb": 82.21,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 13
+        },
+        {
+          "parseBatchSize": 32,
+          "wallMs": 283,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 275.4,
+          "rssDeltaMb": 136.02,
+          "heapDeltaMb": 82.39,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 1
+        },
+        {
+          "parseBatchSize": 32,
+          "wallMs": 287,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 276.3,
+          "rssDeltaMb": 134.72,
+          "heapDeltaMb": 82.31,
+          "eventLoopLagP50Ms": 0,
+          "eventLoopLagP95Ms": 2
+        }
+      ],
+      "note": "Fresh process per sample, including one discarded warmup. Fixture is graphs/src plus generated files to reach 1000 TypeScript sources. parseBatchSize is the outer Promise.all window; parseBatch remains sequential inside each worker."
+    },
+    {
+      "parseBatchSize": 64,
+      "fileCount": 1000,
+      "nodes": 1000,
+      "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+      "repetitions": 3,
+      "wallMedianMs": 231,
+      "wallP95Ms": 238,
+      "peakRssMedianMb": 273.6,
+      "rssDeltaMedianMb": 132.31,
+      "eventLoopLagP95MedianMs": 7,
+      "samples": [
+        {
+          "parseBatchSize": 64,
+          "wallMs": 238,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 280.6,
+          "rssDeltaMb": 141.41,
+          "heapDeltaMb": 64.78,
+          "eventLoopLagP50Ms": 13,
+          "eventLoopLagP95Ms": 41
+        },
+        {
+          "parseBatchSize": 64,
+          "wallMs": 231,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 273.6,
+          "rssDeltaMb": 132.31,
+          "heapDeltaMb": 76.18,
+          "eventLoopLagP50Ms": 2,
+          "eventLoopLagP95Ms": 5
+        },
+        {
+          "parseBatchSize": 64,
+          "wallMs": 225,
+          "fileCount": 1000,
+          "nodes": 1000,
+          "digest": "7aa5fa041eeaf7520446becdba214c613353fdb3b85cef514a5271db955b9828",
+          "rssMb": 272.8,
+          "rssDeltaMb": 131.28,
+          "heapDeltaMb": 83.79,
+          "eventLoopLagP50Ms": 2,
+          "eventLoopLagP95Ms": 7
+        }
+      ],
+      "note": "Fresh process per sample, including one discarded warmup. Fixture is graphs/src plus generated files to reach 1000 TypeScript sources. parseBatchSize is the outer Promise.all window; parseBatch remains sequential inside each worker."
+    }
+  ]
+}

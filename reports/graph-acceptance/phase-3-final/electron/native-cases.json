@@ -1,6 +1,11 @@
 {
   "ok": true,
   "failures": [],
+  "schemaVersion": 2,
+  "scenario": "electron-native-cases",
+  "sourceHead": "b736017122e253d2da27e8d21fdbe6891994d6d2",
+  "sourceFingerprint": "6a0b48d4aa267b42be8da08bf0e002af1d838cbe5e0016d9912d2f954c51aa7f",
+  "generatedAt": "2026-08-30T00:44:09.773Z",
   "productPath": true,
   "bypassedPreBase": false,
   "cases": {
@@ -17,7 +22,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 112,
+      "duration": 93,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -28,7 +33,7 @@
       "reason": "role=button name=Covered is covered by <div>.",
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 8048,
+      "duration": 8051,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -68,7 +73,7 @@
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
       "console": [],
-      "duration": 11,
+      "duration": 10,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -102,7 +107,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 66,
+      "duration": 252,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -121,7 +126,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 71,
+      "duration": 76,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -140,7 +145,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 11,
+      "duration": 10,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -151,7 +156,7 @@
       "reason": "role=textbox name=Readonly is read-only.",
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 3,
+      "duration": 4,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -170,7 +175,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 5,
+      "duration": 3,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -206,7 +211,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 7,
+      "duration": 6,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -242,7 +247,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 10,
+      "duration": 5,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -260,7 +265,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 6,
+      "duration": 4,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -277,7 +282,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 8,
+      "duration": 5,
       "framework": "electron",
       "backend": "cdp"
     }
@@ -287,8 +292,8 @@
   "stopped": true,
   "childAfterStop": "gone",
   "quit": {
-    "before": "72909     1  27.8 336496 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
-    "latencyMs": 316,
+    "before": "53503     1  28.5 341248 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "latencyMs": 422,
     "remaining": "gone"
   }
 }

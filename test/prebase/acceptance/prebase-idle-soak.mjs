@@ -55,6 +55,7 @@ function processTree(rootPid) {
 
 export function soakFailures(evidence) {
 	const failures = [];
+	if (evidence.error) failures.push(`idle soak aborted: ${String(evidence.error).split('\n')[0]}`);
 	if (!(evidence.samples?.length >= 2)) failures.push('soak did not collect samples');
 	if (evidence.quit?.remaining !== 'gone') failures.push('PreBase did not quit after soak');
 	const cpus = (evidence.samples ?? []).map(sample => sample.cpuSum).filter(Number.isFinite);
@@ -90,7 +91,10 @@ async function run() {
 				rssMb: Number((tree.reduce((sum, row) => sum + row.rssKb, 0) / 1024).toFixed(1)),
 				processes: tree.map(row => ({ pid: row.pid, ppid: row.ppid, cpu: row.cpu, rssMb: Number((row.rssKb / 1024).toFixed(1)), comm: row.comm })),
 			});
-			await launched.page.waitForTimeout(intervalMs);
+			const waitMs = Math.min(intervalMs, Math.max(250, deadline - Date.now()));
+			if (waitMs > 0) {
+				await new Promise(resolveWait => setTimeout(resolveWait, waitMs));
+			}
 		}
 	} catch (error) {
 		evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);
@@ -102,10 +106,10 @@ async function run() {
 		evidence.remaining = processState(launched.info.pid);
 	}
 	const failures = soakFailures(evidence);
-	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
+	const result = { ...evidence, ok: failures.length === 0 && !evidence.error, failures };
 	writeFileSync(join(evidenceDir, 'idle.json'), JSON.stringify(result, null, 2));
 	console.log(JSON.stringify({ ok: result.ok, failures, samples: evidence.samples.length, durationMs, quit: evidence.quit }, null, 2));
-	if (!result.ok) process.exitCode = 1;
+	process.exit(result.ok ? 0 : 1);
 }
 
 if (resolve(process.argv[1] ?? '') === scriptPath) {
