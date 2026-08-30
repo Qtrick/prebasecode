@@ -1,0 +1,21 @@
+name: Deva push review
+
+on: push
+
+permissions: {}
+
+jobs:
+  notify:
+    name: Notify webhook
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post push event to webhook
+        env:
+          DEVA_WEBHOOK_KEY: ${{ secrets.DEVA_WEBHOOK_KEY }}
+        run: |
+          curl --fail-with-body --silent --show-error \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer $DEVA_WEBHOOK_KEY" \
+            --data-binary @"$GITHUB_EVENT_PATH" \
+            https://api2.cursor.sh/automations/webhook/0b466f3c-8c01-5ce6-86fc-d7f87ebca210
