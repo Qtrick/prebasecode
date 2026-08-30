@@ -12,6 +12,8 @@ import { MagnusToolActivityDescriptor } from './toolActivity';
 import { getProjectGuidanceService } from './projectGuidanceRegistry';
 import { getProjectGuidanceSession } from './projectGuidanceSession';
 import { resolveWorkspaceRootForPath } from './projectGuidanceService';
+import { computeGuidanceDelta, formatGetForPathsResult } from './projectGuidanceDelta';
+import { resolveGuidanceTarget } from './projectGuidanceJit';
 import { ProjectSafetyService } from './projectSafetyService';
 
 function result(value: string): vscode.LanguageModelToolResult {
@@ -770,11 +772,11 @@ class WebFetchTool implements vscode.LanguageModelTool<WebFetchInput> {
 	}
 }
 
-class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; rulePath?: string; paths?: string[] }> {
-	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; rulePath?: string; paths?: string[] }>): vscode.PreparedToolInvocation {
+class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; skillId?: string; rulePath?: string; paths?: string[] }> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; skillId?: string; rulePath?: string; paths?: string[] }>): vscode.PreparedToolInvocation {
 		return MagnusToolActivityDescriptor.describeInvocation('prebase_project_guidance', options.input as Record<string, unknown>);
 	}
-	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; rulePath?: string; paths?: string[] }>, _token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; skillId?: string; rulePath?: string; paths?: string[] }>, _token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		const service = getProjectGuidanceService();
 		if (!service) {
 			throw new Error('Project guidance is unavailable.');
@@ -782,23 +784,44 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'acti
 		const session = getProjectGuidanceSession();
 		const folders = vscode.workspace.workspaceFolders;
 		const editorPath = vscode.window.activeTextEditor?.document.uri.fsPath;
-		const workspaceRoot = editorPath
+		const defaultRoot = editorPath
 			? resolveWorkspaceRootForPath(editorPath, folders)
 			: folders?.[0]?.uri.fsPath;
-		if (!workspaceRoot) {
+		if (!defaultRoot && !session?.getTargets().length) {
 			throw new Error('Open a workspace to use project guidance.');
 		}
 		const operation = options.input.operation;
+		const previous = session?.getTargets().length
+			? await service.getCombinedSnapshot(
+				session.getTargets(),
+				session.getActivatedSkillIds(),
+				true,
+				session.getActivatedRulePaths(),
+			)
+			: defaultRoot
+				? await service.getSnapshot(
+					defaultRoot,
+					session?.getTargetPathsForRoot(defaultRoot) ?? options.input.paths ?? [],
+					session?.getActivatedSkillIds() ?? [],
+					true,
+					session?.getActivatedRulePaths() ?? [],
+				)
+				: undefined;
 		if (operation === 'get_for_paths') {
 			for (const path of options.input.paths ?? []) {
-				session?.addTargets([path]);
+				const target = resolveGuidanceTarget(path, folders, defaultRoot);
+				if (target) {
+					session?.addTarget(target.workspaceRoot, target.relativePath);
+				} else if (defaultRoot) {
+					session?.addTarget(defaultRoot, path);
+				}
 			}
 		} else if (operation === 'activate_skill') {
-			const name = options.input.skillName?.trim();
-			if (!name) {
-				throw new Error('skillName is required for activate_skill.');
+			const idOrName = options.input.skillId?.trim() || options.input.skillName?.trim();
+			if (!idOrName) {
+				throw new Error('skillId or skillName is required for activate_skill.');
 			}
-			session?.activateSkill(name);
+			session?.activateSkillId(idOrName);
 		} else if (operation === 'activate_rule') {
 			const rulePath = options.input.rulePath?.trim();
 			if (!rulePath) {
@@ -806,21 +829,30 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'acti
 			}
 			session?.activateRule(rulePath.replace(/\\/g, '/'));
 		}
-		const snapshot = await service.getSnapshot(
-			workspaceRoot,
-			session?.getTargetPaths() ?? options.input.paths ?? [],
-			session?.getActivatedSkillNames() ?? (options.input.skillName ? [options.input.skillName] : []),
-			true,
-			session?.getActivatedRulePaths() ?? (options.input.rulePath ? [options.input.rulePath] : []),
-		);
+		const snapshot = session?.getTargets().length
+			? await service.getCombinedSnapshot(
+				session.getTargets(),
+				session.getActivatedSkillIds(),
+				true,
+				session.getActivatedRulePaths(),
+			)
+			: await service.getSnapshot(
+				defaultRoot!,
+				options.input.paths ?? [],
+				session?.getActivatedSkillIds() ?? (options.input.skillName ? [options.input.skillName] : []),
+				true,
+				session?.getActivatedRulePaths() ?? (options.input.rulePath ? [options.input.rulePath] : []),
+			);
 		if (operation === 'activate_skill') {
-			const skill = snapshot.activatedSkills.find(item => item.metadata.name === options.input.skillName);
+			const idOrName = options.input.skillId?.trim() || options.input.skillName?.trim() || '';
+			const skill = snapshot.activatedSkills.find(item => item.metadata.id === idOrName || item.metadata.name === idOrName);
 			if (!skill) {
-				return result(JSON.stringify({ ok: false, reason: 'Skill not found or not activatable.', catalog: snapshot.skillCatalog.map(item => item.name) }));
+				return result(JSON.stringify({ ok: false, reason: 'Skill not found or ambiguous.', catalog: snapshot.skillCatalog.map(item => ({ id: item.id, name: item.name, path: item.path })) }));
 			}
 			return result(JSON.stringify({
 				ok: true,
 				skill: skill.metadata.name,
+				skillId: skill.metadata.id,
 				root: skill.root,
 				files: skill.files,
 				body: skill.body,
@@ -838,13 +870,10 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'acti
 				catalog: match ? undefined : snapshot.onDemandRules.map(item => item.source.path),
 			}));
 		}
-		return result(JSON.stringify({
-			ok: true,
-			always: snapshot.alwaysApplicable.map(item => item.source.path),
-			pathScoped: snapshot.pathApplicable.map(item => item.source.path),
-			onDemand: snapshot.onDemandRules.map(item => item.source.path),
-			skills: snapshot.skillCatalog.map(item => item.name),
-		}));
+		const delta = previous && session
+			? computeGuidanceDelta(previous, snapshot, session)
+			: { newlyApplied: [], newlyAvailableRules: [], newlyAvailableSkills: [], diagnostics: [] };
+		return result(JSON.stringify(formatGetForPathsResult(snapshot, delta)));
 	}
 }
 

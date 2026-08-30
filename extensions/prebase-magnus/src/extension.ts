@@ -17,7 +17,9 @@ import { globalAIProviderRegistry } from './aiProviderRegistry';
 import { MagnusSmokeTransportAdapter, magnusSmokeStreamDiagnostics } from './smokeTransport';
 import { magnusLiveStreamDiagnostics } from './chatParticipant';
 import { findPreBaseSourceRoot, PreBaseSecretResolver } from './secretResolver';
-import { ProjectGuidanceService, resolveGuidancePath, resolveWorkspaceRootForPath, type GuidanceFileReader } from './projectGuidanceService';
+import { ProjectGuidanceService, resolveGuidancePath, resolveWorkspaceRootForPath, GUIDANCE_WATCH_PATTERNS, type GuidanceFileReader } from './projectGuidanceService';
+import { createProjectGuidanceSession, runWithProjectGuidanceSession } from './projectGuidanceSession';
+import { computeGuidanceDelta, formatGuidanceDeltaForPrompt, seedSessionFromSnapshot } from './projectGuidanceDelta';
 import type { PreBaseAIExecutionMode } from './secretCatalog';
 
 export interface SafeMagnusError {
@@ -104,35 +106,23 @@ export function activate(context: vscode.ExtensionContext): void {
 		};
 		const projectGuidance = new ProjectGuidanceService(guidanceReader);
 		setProjectGuidanceService(projectGuidance);
-		const invalidateGuidance = () => projectGuidance.invalidate();
-		for (const pattern of [
-			'**/AGENTS.md',
-			'**/AGENTS.override.md',
-			'**/CLAUDE.md',
-			'**/CLAUDE.local.md',
-			'**/.claude/CLAUDE.md',
-			'**/.claude/rules/**',
-			'**/.cursor/rules/**',
-			'**/.github/copilot-instructions.md',
-			'**/.github/instructions/**',
-			'**/GEMINI.md',
-			'**/.clinerules/**',
-			'**/.windsurfrules',
-			'**/.windsurf/rules/**',
-			'**/.agents/skills/**/SKILL.md',
-			'**/.cursor/skills/**/SKILL.md',
-			'**/.claude/skills/**/SKILL.md',
-			'**/.codex/skills/**/SKILL.md',
-			'**/.opencode/skills/**/SKILL.md',
-			'**/.cline/skills/**/SKILL.md',
-			'**/.windsurf/skills/**/SKILL.md',
-		]) {
+		const invalidateGuidance = (uri?: vscode.Uri) => {
+			if (uri) {
+				const root = resolveWorkspaceRootForPath(uri.fsPath, vscode.workspace.workspaceFolders);
+				if (root) {
+					projectGuidance.invalidate(root);
+					return;
+				}
+			}
+			projectGuidance.invalidate();
+		};
+		for (const pattern of GUIDANCE_WATCH_PATTERNS) {
 			const watcher = vscode.workspace.createFileSystemWatcher(pattern);
 			context.subscriptions.push(
 				watcher,
-				watcher.onDidChange(invalidateGuidance),
-				watcher.onDidCreate(invalidateGuidance),
-				watcher.onDidDelete(invalidateGuidance),
+				watcher.onDidChange(uri => invalidateGuidance(uri)),
+				watcher.onDidCreate(uri => invalidateGuidance(uri)),
+				watcher.onDidDelete(uri => invalidateGuidance(uri)),
 			);
 		}
 		context.subscriptions.push(
@@ -147,14 +137,22 @@ export function activate(context: vscode.ExtensionContext): void {
 					return;
 				}
 				const activeEditor = vscode.window.activeTextEditor;
-				const workspaceRoot = activeEditor
+				let workspaceRoot = activeEditor
 					? resolveWorkspaceRootForPath(activeEditor.document.uri.fsPath, folders)
-					: folders[0].uri.fsPath;
-				if (!workspaceRoot) {
-					void vscode.window.showInformationMessage('Open a workspace to inspect project guidance.');
-					return;
+					: undefined;
+				if (!workspaceRoot && folders.length > 1) {
+					const picked = await vscode.window.showQuickPick(
+						folders.map(folder => ({
+							label: folder.name,
+							description: folder.uri.fsPath,
+							root: folder.uri.fsPath,
+						})),
+						{ title: 'Project Guidance', placeHolder: 'Choose a workspace folder' },
+					);
+					workspaceRoot = picked?.root;
 				}
-				const activePath = activeEditor
+				workspaceRoot ??= folders[0].uri.fsPath;
+				const activePath = activeEditor && resolveWorkspaceRootForPath(activeEditor.document.uri.fsPath, folders) === workspaceRoot
 					? vscode.workspace.asRelativePath(activeEditor.document.uri, false)
 					: undefined;
 				const snapshot = await projectGuidance.getSnapshot(workspaceRoot, activePath ? [activePath] : []);
@@ -177,9 +175,16 @@ export function activate(context: vscode.ExtensionContext): void {
 							description: `${item.source.activationMode}: ${item.description}`,
 							relPath: item.source.path,
 						})),
+						...(snapshot.playbookCatalog?.length ? [{ label: '$(book) Playbooks', kind: vscode.QuickPickItemKind.Separator, relPath: '' }] : []),
+						...(snapshot.playbookCatalog ?? []).map(item => ({
+							label: `$(book) ${item.name}`,
+							description: `${item.ecosystem} playbook • ${item.description}`,
+							relPath: item.path,
+						})),
+						...(snapshot.skillCatalog.length ? [{ label: '$(sparkle) Skills', kind: vscode.QuickPickItemKind.Separator, relPath: '' }] : []),
 						...snapshot.skillCatalog.map(item => ({
 							label: `$(sparkle) ${item.name}`,
-							description: `${item.ecosystem} skill • ${item.description}`,
+							description: `${item.id} • ${item.ecosystem} • ${item.description}`,
 							relPath: item.path,
 						})),
 						...(snapshot.diagnostics.length ? [{ label: '$(warning) Diagnostics', kind: vscode.QuickPickItemKind.Separator, relPath: '' }] : []),
@@ -191,7 +196,7 @@ export function activate(context: vscode.ExtensionContext): void {
 					].filter(item => item.label),
 					{
 						title: 'Project Guidance',
-						placeHolder: `${snapshot.alwaysApplicable.length} always-on • ${snapshot.pathApplicable.length} path-scoped • ${snapshot.skillCatalog.length} skills`,
+						placeHolder: `${snapshot.alwaysApplicable.length} always-on • ${snapshot.pathApplicable.length} path-scoped • ${snapshot.skillCatalog.length} skills • ${snapshot.playbookCatalog?.length ?? 0} playbooks`,
 						matchOnDescription: true,
 					},
 				);
@@ -204,6 +209,68 @@ export function activate(context: vscode.ExtensionContext): void {
 					const doc = await vscode.workspace.openTextDocument(fullPath);
 					await vscode.window.showTextDocument(doc, { preview: true });
 				}
+			}),
+			vscode.commands.registerCommand('prebase.magnus.getGuidanceSnapshotForSmoke', async (request?: { targetPaths?: string[] }) => {
+				const allowed = await vscode.commands.executeCommand('prebase.test.isSmokeDriver');
+				if (!allowed) {
+					throw new Error('prebase.magnus.getGuidanceSnapshotForSmoke requires --enable-smoke-test-driver');
+				}
+				const folders = vscode.workspace.workspaceFolders ?? [];
+				const workspaceRoot = folders[0]?.uri.fsPath;
+				if (!workspaceRoot) {
+					return { ok: false, reason: 'no workspace' };
+				}
+				const targetPaths = request?.targetPaths ?? [];
+				const snapshot = await projectGuidance.getSnapshot(workspaceRoot, targetPaths);
+				return {
+					ok: true,
+					enabled: snapshot.enabled,
+					workspaceRoot,
+					always: snapshot.alwaysApplicable.map(item => ({ path: item.source.path, body: item.text.slice(0, 400) })),
+					pathScoped: snapshot.pathApplicable.map(item => ({ path: item.source.path, body: item.text.slice(0, 400) })),
+					onDemand: snapshot.onDemandRules.map(item => item.source.path),
+					skills: snapshot.skillCatalog.map(item => ({ id: item.id, name: item.name, path: item.path })),
+				};
+			}),
+			vscode.commands.registerCommand('prebase.magnus.runGuidanceJitSmoke', async () => {
+				const allowed = await vscode.commands.executeCommand('prebase.test.isSmokeDriver');
+				if (!allowed) {
+					throw new Error('prebase.magnus.runGuidanceJitSmoke requires --enable-smoke-test-driver');
+				}
+				const folders = vscode.workspace.workspaceFolders ?? [];
+				const root = folders[0]?.uri.fsPath;
+				if (!root) {
+					return { ok: false, reason: 'no workspace' };
+				}
+				const session = createProjectGuidanceSession([{ workspaceRoot: root, relativePath: 'src/main.ts' }]);
+				return runWithProjectGuidanceSession(session, async () => {
+					const initial = await projectGuidance.getSnapshot(
+						root,
+						session.getTargetPathsForRoot(root),
+						session.getActivatedSkillIds(),
+						true,
+						session.getActivatedRulePaths(),
+					);
+					seedSessionFromSnapshot(initial, session);
+					session.addTarget(root, 'graphs/src/foo.ts');
+					const after = await projectGuidance.getCombinedSnapshot(
+						session.getTargets(),
+						session.getActivatedSkillIds(),
+						true,
+						session.getActivatedRulePaths(),
+					);
+					const delta = computeGuidanceDelta(initial, after, session);
+					const deltaBlock = formatGuidanceDeltaForPrompt(delta);
+					return {
+						ok: true,
+						initialPathScoped: initial.pathApplicable.length,
+						afterPathScoped: after.pathApplicable.length,
+						deltaApplied: delta.newlyApplied.length,
+						deltaChars: deltaBlock.length,
+						deltaHasGraphRule: /Graph path rule/.test(deltaBlock),
+						packageRuleAbsent: !/packages\/AGENTS\.override/.test(deltaBlock),
+					};
+				});
 			}),
 		);
 

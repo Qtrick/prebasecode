@@ -6,6 +6,7 @@
 import * as vscode from 'vscode';
 import type { AIContentPart, AIToolDeclaration } from './aiTypes';
 import { processToolResultData, consumeWebToolBudget, type ContextBudgetConfig } from './requestAssembler';
+import { registerGuidanceTargetsFromToolCalls } from './projectGuidanceJit';
 
 export interface ToolCallItem {
 	readonly id?: string;
@@ -62,6 +63,8 @@ export async function executeToolCallBatch(
 	budget: ContextBudgetConfig,
 	tracker: ToolExecutionTracker,
 	supportsMultimodal: boolean = true,
+	folders?: readonly { uri: { fsPath: string } }[],
+	preferredRoot?: string,
 ): Promise<AIContentPart[]> {
 	if (calls.length === 0) {
 		return [];
@@ -102,6 +105,8 @@ export async function executeToolCallBatch(
 			i++;
 		}
 	}
+
+	registerGuidanceTargetsFromToolCalls(calls, folders, preferredRoot);
 
 	return responseParts.filter(Boolean);
 }

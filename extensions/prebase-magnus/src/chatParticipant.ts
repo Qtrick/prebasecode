@@ -25,9 +25,15 @@ import {
 import { getProjectGuidanceService } from './projectGuidanceRegistry';
 export { setProjectGuidanceService } from './projectGuidanceRegistry';
 import {
-	beginProjectGuidanceSession,
-	endProjectGuidanceSession,
+	createProjectGuidanceSession,
+	runWithProjectGuidanceSession,
+	type GuidanceTarget,
 } from './projectGuidanceSession';
+import {
+	computeGuidanceDelta,
+	formatGuidanceDeltaForPrompt,
+	seedSessionFromSnapshot,
+} from './projectGuidanceDelta';
 import {
 	executeToolCallBatch,
 	type ToolCallItem,
@@ -117,7 +123,9 @@ export function registerMagnusChatParticipants(
 
 	for (const id of ids) {
 		const participant = vscode.chat.createChatParticipant(id, async (request, chatContext, response, token) => {
-			return handleChatRequest(id, request, chatContext, response, token, aiService);
+			const session = createProjectGuidanceSession();
+			return runWithProjectGuidanceSession(session, () =>
+				handleChatRequest(id, request, chatContext, response, token, aiService, session));
 		});
 		participant.iconPath = undefined;
 		context.subscriptions.push(participant);
@@ -131,6 +139,7 @@ async function handleChatRequest(
 	response: vscode.ChatResponseStream,
 	token: vscode.CancellationToken,
 	aiService: PreBaseAIService,
+	guidanceSession: ReturnType<typeof createProjectGuidanceSession>,
 ): Promise<vscode.ChatResult | void> {
 	const enabled = vscode.workspace.getConfiguration('prebase.magnus').get<boolean>('enabled', true);
 	if (!enabled) {
@@ -154,32 +163,52 @@ async function handleChatRequest(
 	// 2. Resolve Native References & Context
 	const resolvedAttachments = await resolveNativeReferences(request.references);
 
-	const targetPaths = guidanceTargetsFromReferences(request.references, value => {
-		if (value && typeof value === 'object' && 'fsPath' in value) {
-			return vscode.workspace.asRelativePath(value as vscode.Uri, false);
-		}
-		return undefined;
-	});
+	const folders = vscode.workspace.workspaceFolders ?? [];
+	const initialTargets: GuidanceTarget[] = guidanceTargetsFromReferences(
+		request.references,
+		value => {
+			if (value && typeof value === 'object' && 'fsPath' in value) {
+				const uri = value as vscode.Uri;
+				return {
+					relativePath: vscode.workspace.asRelativePath(uri, false),
+					fsPath: uri.fsPath,
+				};
+			}
+			return undefined;
+		},
+		folders,
+	);
 	const activeEditor = vscode.window.activeTextEditor;
 	if (activeEditor && activeEditor.document.uri.scheme !== 'untitled') {
-		targetPaths.push(vscode.workspace.asRelativePath(activeEditor.document.uri, false));
+		const root = resolveWorkspaceRootForPath(activeEditor.document.uri.fsPath, folders);
+		if (root) {
+			initialTargets.push({
+				workspaceRoot: root,
+				relativePath: vscode.workspace.asRelativePath(activeEditor.document.uri, false),
+			});
+		}
 	}
-	const guidanceSession = beginProjectGuidanceSession(targetPaths);
+	guidanceSession.addTargets(initialTargets);
 
 	let projectGuidanceBlock = '';
+	let previousGuidanceSnapshot = undefined as Awaited<ReturnType<NonNullable<ReturnType<typeof getProjectGuidanceService>>['getCombinedSnapshot']>> | undefined;
 	const guidanceEnabled = vscode.workspace.getConfiguration('prebase.magnus').get<boolean>('projectGuidance.enabled', true);
-	const workspaceRoot = activeEditor
-		? resolveWorkspaceRootForPath(activeEditor.document.uri.fsPath, vscode.workspace.workspaceFolders)
-		: vscode.workspace.workspaceFolders?.[0]?.uri.fsPath;
 	const projectGuidanceService = getProjectGuidanceService();
-	if (guidanceEnabled && projectGuidanceService && workspaceRoot) {
-		const snapshot = await projectGuidanceService.getSnapshot(
-			workspaceRoot,
-			guidanceSession.getTargetPaths(),
-			guidanceSession.getActivatedSkillNames(),
+	if (guidanceEnabled && projectGuidanceService && guidanceSession.getTargets().length) {
+		const snapshot = await projectGuidanceService.getCombinedSnapshot(
+			guidanceSession.getTargets(),
+			guidanceSession.getActivatedSkillIds(),
 			true,
 			guidanceSession.getActivatedRulePaths(),
 		);
+		previousGuidanceSnapshot = snapshot;
+		seedSessionFromSnapshot(snapshot, guidanceSession);
+		projectGuidanceBlock = formatProjectGuidanceForPrompt(snapshot);
+	} else if (guidanceEnabled && projectGuidanceService && folders[0]) {
+		const root = folders[0].uri.fsPath;
+		const snapshot = await projectGuidanceService.getSnapshot(root, [], guidanceSession.getActivatedSkillIds(), true, guidanceSession.getActivatedRulePaths());
+		previousGuidanceSnapshot = snapshot;
+		seedSessionFromSnapshot(snapshot, guidanceSession);
 		projectGuidanceBlock = formatProjectGuidanceForPrompt(snapshot);
 	}
 
@@ -277,6 +306,13 @@ async function handleChatRequest(
 					run.startedAt ??= Date.now();
 					messages.push({ role: 'model', parts });
 
+					const targetCountBefore = guidanceSession.getTargets().length;
+					const activatedSkillsBefore = guidanceSession.getActivatedSkillIds().length;
+					const activatedRulesBefore = guidanceSession.getActivatedRulePaths().length;
+					const guidancePreferredRoot = activeEditor
+						? resolveWorkspaceRootForPath(activeEditor.document.uri.fsPath, folders)
+						: folders[0]?.uri.fsPath;
+
 					const responseParts = await executeToolCallBatch(
 						calls,
 						assembled.tools,
@@ -285,7 +321,30 @@ async function handleChatRequest(
 						assembled.budget,
 						tracker,
 						true,
+						folders,
+						guidancePreferredRoot,
 					);
+
+					const guidanceStateChanged =
+						guidanceSession.getTargets().length > targetCountBefore
+						|| guidanceSession.getActivatedSkillIds().length > activatedSkillsBefore
+						|| guidanceSession.getActivatedRulePaths().length > activatedRulesBefore
+						|| calls.some(call => call.name === 'prebase_project_guidance');
+
+					if (guidanceEnabled && projectGuidanceService && previousGuidanceSnapshot && guidanceStateChanged) {
+						const currentSnapshot = await projectGuidanceService.getCombinedSnapshot(
+							guidanceSession.getTargets(),
+							guidanceSession.getActivatedSkillIds(),
+							true,
+							guidanceSession.getActivatedRulePaths(),
+						);
+						const delta = computeGuidanceDelta(previousGuidanceSnapshot, currentSnapshot, guidanceSession);
+						const deltaBlock = formatGuidanceDeltaForPrompt(delta);
+						if (deltaBlock) {
+							responseParts.push({ text: deltaBlock });
+						}
+						previousGuidanceSnapshot = currentSnapshot;
+					}
 
 					messages.push({ role: 'user', parts: responseParts });
 					continue;
@@ -449,7 +508,6 @@ async function handleChatRequest(
 		}
 		return {};
 	} finally {
-		endProjectGuidanceSession();
 		cancelSub.dispose();
 		shutdownSub.dispose();
 		requestCts.dispose();

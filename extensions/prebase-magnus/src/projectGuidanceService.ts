@@ -10,14 +10,22 @@ import {
 	agentsAncestorDirs,
 	boundedJoin,
 	cursorRuleMode,
+	discoverNestedDirectories,
 	discoverSkillFiles,
+	GUIDANCE_WATCH_PATTERNS,
+	listSkillResourceManifest,
+	matchesAnyGlob,
 	metaStringList,
 	normalizeRel as normalizeRelPath,
 	parseApplyTo,
 	parseFrontmatter,
 	resolveMarkdownImports,
 	walkBoundedFiles,
+	windsurfRuleMode,
 } from './projectGuidanceDiscovery';
+import type { GuidanceTarget } from './projectGuidanceSession';
+
+export { GUIDANCE_WATCH_PATTERNS };
 
 export type GuidanceActivationMode = 'always' | 'path' | 'intelligent' | 'manual';
 
@@ -33,6 +41,16 @@ export interface GuidanceSource {
 }
 
 export interface SkillMetadata {
+	readonly id: string;
+	readonly name: string;
+	readonly description: string;
+	readonly path: string;
+	readonly ecosystem: string;
+	readonly scopePrefix: string;
+}
+
+export interface PlaybookMetadata {
+	readonly id: string;
 	readonly name: string;
 	readonly description: string;
 	readonly path: string;
@@ -44,14 +62,21 @@ export interface GuidanceConflict {
 	readonly sources: readonly string[];
 }
 
+export interface GuidanceTextBlock {
+	readonly source: GuidanceSource;
+	readonly text: string;
+	readonly workspaceRoot: string;
+}
+
 export interface ProjectGuidanceSnapshot {
 	readonly enabled: boolean;
 	readonly workspaceRoot: string;
-	readonly alwaysApplicable: readonly { source: GuidanceSource; text: string }[];
-	readonly pathApplicable: readonly { source: GuidanceSource; text: string }[];
-	readonly activatedRules: readonly { source: GuidanceSource; text: string }[];
+	readonly alwaysApplicable: readonly GuidanceTextBlock[];
+	readonly pathApplicable: readonly GuidanceTextBlock[];
+	readonly activatedRules: readonly GuidanceTextBlock[];
 	readonly onDemandRules: readonly { source: GuidanceSource; description: string }[];
 	readonly skillCatalog: readonly SkillMetadata[];
+	readonly playbookCatalog: readonly PlaybookMetadata[];
 	readonly activatedSkills: readonly { metadata: SkillMetadata; body: string; root: string; files: readonly string[] }[];
 	readonly conflicts: readonly GuidanceConflict[];
 	readonly diagnostics: readonly string[];
@@ -88,12 +113,18 @@ const ROOT_ALWAYS_FILES = [
 const CLAUDE_ROOT_FILES = ['CLAUDE.md', 'CLAUDE.local.md', '.claude/CLAUDE.md'];
 const GEMINI_ROOT_FILES = ['GEMINI.md'];
 const RULE_DIRS = [
-	{ dir: '.cursor/rules', ext: '.mdc', ecosystem: 'cursor' },
-	{ dir: '.claude/rules', ext: '.md', ecosystem: 'claude' },
-	{ dir: '.github/instructions', ext: '.instructions.md', ecosystem: 'github' },
-	{ dir: '.clinerules', ext: '.md', ecosystem: 'cline' },
-	{ dir: '.clinerules', ext: '.txt', ecosystem: 'cline' },
-	{ dir: '.windsurf/rules', ext: '.md', ecosystem: 'windsurf' },
+	{ dir: '.cursor/rules', ext: '.mdc', ecosystem: 'cursor', nested: true },
+	{ dir: '.claude/rules', ext: '.md', ecosystem: 'claude', nested: true },
+	{ dir: '.github/instructions', ext: '.instructions.md', ecosystem: 'github', nested: true },
+	{ dir: '.cline/rules', ext: '.md', ecosystem: 'cline', nested: true },
+	{ dir: '.clinerules', ext: '.md', ecosystem: 'cline', nested: false },
+	{ dir: '.clinerules', ext: '.txt', ecosystem: 'cline', nested: false },
+	{ dir: '.windsurf/rules', ext: '.md', ecosystem: 'windsurf', nested: true },
+];
+const PLAYBOOK_DIRS = [
+	{ dir: '.github/prompts', ext: '.prompt.md', ecosystem: 'github' },
+	{ dir: '.windsurf/workflows', ext: '.md', ecosystem: 'windsurf' },
+	{ dir: '.cline/workflows', ext: '.md', ecosystem: 'cline' },
 ];
 const SKILL_DIRS = [
 	{ dir: '.agents/skills', ecosystem: 'agents' },
@@ -151,7 +182,15 @@ function hashContent(text: string): string {
 	return createHash('sha256').update(text).digest('hex').slice(0, 16);
 }
 
-function parseSkillMetadata(skillPath: string, text: string, ecosystem: string): SkillMetadata | undefined {
+function tagGuidanceBlocks(workspaceRoot: string, items: readonly { source: GuidanceSource; text: string }[]): GuidanceTextBlock[] {
+	return items.map(item => ({ ...item, workspaceRoot: resolve(workspaceRoot) }));
+}
+
+function skillId(ecosystem: string, workspaceRoot: string, relPath: string): string {
+	return `${ecosystem}:${hashContent(`${workspaceRoot}:${relPath}`).slice(0, 12)}:${basename(dirname(relPath))}`;
+}
+
+function parseSkillMetadata(skillPath: string, text: string, ecosystem: string, workspaceRoot: string, scopePrefix: string): SkillMetadata | undefined {
 	const { meta, body } = parseFrontmatter(text);
 	const name = typeof meta.name === 'string' ? meta.name : basename(dirname(skillPath));
 	const description = typeof meta.description === 'string'
@@ -160,17 +199,18 @@ function parseSkillMetadata(skillPath: string, text: string, ecosystem: string):
 	if (!description) {
 		return undefined;
 	}
-	return { name, description, path: skillPath, ecosystem };
+	return {
+		id: skillId(ecosystem, workspaceRoot, skillPath),
+		name,
+		description,
+		path: skillPath,
+		ecosystem,
+		scopePrefix,
+	};
 }
 
 async function listSkillManifest(skillRootRel: string, reader: GuidanceFileReader, workspaceRoot: string): Promise<string[]> {
-	const abs = join(workspaceRoot, skillRootRel);
-	try {
-		const entries = await reader.readDirectory(abs);
-		return entries.filter(entry => entry !== 'SKILL.md').map(entry => normalizeRel(join(skillRootRel, entry))).slice(0, 32);
-	} catch {
-		return [];
-	}
+	return listSkillResourceManifest(reader, workspaceRoot, skillRootRel);
 }
 
 async function loadAgentsHierarchy(
@@ -249,9 +289,10 @@ async function loadClaudeGeminiRoots(
 			const expanded = await resolveMarkdownImports(
 				reader,
 				workspaceRoot,
+				rel,
 				body,
 				isBlockedGuidancePath,
-				relPath => resolveGuidancePath(workspaceRoot, relPath.startsWith('./') ? relPath.slice(2) : relPath),
+				relPath => resolveGuidancePath(workspaceRoot, relPath),
 			);
 			results.push({
 				source: {
@@ -271,33 +312,45 @@ async function loadClaudeGeminiRoots(
 	return results;
 }
 
-function globMatches(pattern: string, targetPath: string): boolean {
-	const normalized = normalizeRel(targetPath);
-	const glob = normalizeRel(pattern);
-	if (glob === '**' || glob === '**/*') {
-		return true;
+function ruleActivationMode(ecosystem: string, meta: Record<string, import('./projectGuidanceDiscovery').FrontmatterValue>, globs: string[]): GuidanceActivationMode {
+	if (ecosystem === 'cursor') {
+		return cursorRuleMode(meta, globs);
 	}
-	if (glob.endsWith('/**')) {
-		return normalized.startsWith(glob.slice(0, -3));
+	if (ecosystem === 'windsurf') {
+		return windsurfRuleMode(meta, globs);
 	}
-	if (glob.includes('*')) {
-		const escaped = glob.replace(/[.+?^${}()|[\]\\]/g, '\\$&').replace(/\*\*/g, '.*').replace(/\*/g, '[^/]*');
-		return new RegExp(`^${escaped}$`).test(normalized);
-	}
-	return normalized === glob || normalized.endsWith(`/${glob}`) || normalized.startsWith(`${glob}/`);
+	return globs.length ? 'path' : 'always';
 }
 
-function matchesAnyGlob(globs: readonly string[], targetPath: string | undefined): boolean {
-	if (!globs.length) {
+function skillMatchesTarget(metadata: SkillMetadata, targetPaths: readonly string[]): boolean {
+	if (!metadata.scopePrefix) {
 		return true;
 	}
-	if (!targetPath) {
-		return false;
-	}
-	return globs.some(glob => globMatches(glob, targetPath));
+	const prefix = metadata.scopePrefix.endsWith('/') ? metadata.scopePrefix : `${metadata.scopePrefix}/`;
+	return targetPaths.some(path => path === metadata.scopePrefix || path.startsWith(prefix));
 }
 
-function detectConflicts(sources: readonly { source: GuidanceSource; text: string }[]): GuidanceConflict[] {
+function resolveSkillByIdOrName(
+	catalog: readonly SkillMetadata[],
+	idOrName: string,
+	targetPaths: readonly string[],
+): { skill?: SkillMetadata; ambiguous?: SkillMetadata[] } {
+	const trimmed = idOrName.trim();
+	const byId = catalog.filter(item => item.id === trimmed);
+	if (byId.length === 1) {
+		return { skill: byId[0] };
+	}
+	const byName = catalog.filter(item => item.name === trimmed && skillMatchesTarget(item, targetPaths));
+	if (byName.length === 1) {
+		return { skill: byName[0] };
+	}
+	if (byName.length > 1) {
+		return { ambiguous: byName };
+	}
+	return {};
+}
+
+function detectNarrowConflicts(sources: readonly { source: GuidanceSource; text: string }[]): GuidanceConflict[] {
 	const conflicts: GuidanceConflict[] = [];
 	const tabs = sources.filter(item => /\buse tabs\b/i.test(item.text));
 	const spaces = sources.filter(item => /\buse spaces\b/i.test(item.text));
@@ -374,6 +427,7 @@ export class ProjectGuidanceService {
 				activatedRules: [],
 				onDemandRules: [],
 				skillCatalog: [],
+				playbookCatalog: [],
 				activatedSkills: [],
 				conflicts: [],
 				diagnostics: this.reader.isTrusted?.() === false ? ['Workspace is not trusted; project guidance is disabled.'] : [],
@@ -422,47 +476,83 @@ export class ProjectGuidanceService {
 		}
 
 		for (const ruleDir of RULE_DIRS) {
-			const fullDir = join(workspaceRoot, ruleDir.dir);
-			if (!(await this.reader.exists(fullDir))) {
-				continue;
-			}
-			const ruleFiles = await walkBoundedFiles(
-				this.reader,
-				fullDir,
-				rel => rel.endsWith(ruleDir.ext),
-				{ maxDepth: 6 },
-			);
-			for (const relUnder of ruleFiles) {
-				const rel = normalizeRel(join(ruleDir.dir, relUnder));
-				if (isBlockedGuidancePath(rel)) {
+			const ruleDirs = ruleDir.nested
+				? await discoverNestedDirectories(this.reader, workspaceRoot, ruleDir.dir)
+				: [ruleDir.dir];
+			for (const dir of ruleDirs) {
+				const fullDir = join(workspaceRoot, dir);
+				if (!(await this.reader.exists(fullDir))) {
 					continue;
 				}
-				const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, rel)));
-				const { meta, body } = parseFrontmatter(text);
-				const globs = metaStringList(meta, 'globs').length ? metaStringList(meta, 'globs') : parseApplyTo(text);
-				const mode = ruleDir.ecosystem === 'cursor' ? cursorRuleMode(meta, globs) : (globs.length ? 'path' : 'always');
-				const alwaysApply = mode === 'always';
-				const description = typeof meta.description === 'string' ? meta.description : undefined;
-				const source: GuidanceSource = {
-					path: rel,
-					ecosystem: ruleDir.ecosystem,
-					scope: globs.length ? globs.join(', ') : (alwaysApply ? 'repository' : mode),
-					alwaysApply,
-					activationMode: mode,
-					description,
-					globs,
-					contentHash: hashContent(body),
-				};
-				if (mode === 'intelligent' || mode === 'manual') {
-					onDemandRules.push({ source, description: description ?? basename(rel) });
-					if (!normalizedActivatedRules.includes(rel)) {
+				const ruleFiles = await walkBoundedFiles(
+					this.reader,
+					fullDir,
+					rel => rel.endsWith(ruleDir.ext),
+					{ maxDepth: 6 },
+				);
+				for (const relUnder of ruleFiles) {
+					const rel = normalizeRel(join(dir, relUnder));
+					if (isBlockedGuidancePath(rel)) {
 						continue;
 					}
+					const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, rel)));
+					const { meta, body } = parseFrontmatter(text);
+					const globs = metaStringList(meta, 'globs').length ? metaStringList(meta, 'globs') : parseApplyTo(text);
+					const mode = ruleActivationMode(ruleDir.ecosystem, meta, globs);
+					const alwaysApply = mode === 'always';
+					const description = typeof meta.description === 'string' ? meta.description : undefined;
+					const source: GuidanceSource = {
+						path: rel,
+						ecosystem: ruleDir.ecosystem,
+						scope: globs.length ? globs.join(', ') : (alwaysApply ? 'repository' : mode),
+						alwaysApply,
+						activationMode: mode,
+						description,
+						globs,
+						contentHash: hashContent(body),
+					};
+					if (mode === 'intelligent' || mode === 'manual') {
+						onDemandRules.push({ source, description: description ?? basename(rel) });
+						if (!normalizedActivatedRules.includes(rel)) {
+							continue;
+						}
+					}
+					if (mode === 'path' && !normalizedTargets.some(path => matchesAnyGlob(globs, path))) {
+						continue;
+					}
+					sources.push({ source, text: body.trim() });
 				}
-				if (mode === 'path' && !normalizedTargets.some(path => matchesAnyGlob(globs, path))) {
+			}
+		}
+
+		const playbookCatalog: PlaybookMetadata[] = [];
+		for (const playbookDir of PLAYBOOK_DIRS) {
+			const dirs = await discoverNestedDirectories(this.reader, workspaceRoot, playbookDir.dir);
+			for (const dir of dirs) {
+				const fullDir = join(workspaceRoot, dir);
+				if (!(await this.reader.exists(fullDir))) {
 					continue;
 				}
-				sources.push({ source, text: body.trim() });
+				const files = await walkBoundedFiles(this.reader, fullDir, rel => rel.endsWith(playbookDir.ext), { maxDepth: 4 });
+				for (const relUnder of files) {
+					const rel = normalizeRel(join(dir, relUnder));
+					if (isBlockedGuidancePath(rel)) {
+						continue;
+					}
+					const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, rel)));
+					const { meta, body } = parseFrontmatter(text);
+					const name = typeof meta.name === 'string' ? meta.name : basename(rel, playbookDir.ext);
+					const description = typeof meta.description === 'string'
+						? meta.description
+						: body.split('\n').find(line => line.trim() && !line.startsWith('#'))?.trim() ?? name;
+					playbookCatalog.push({
+						id: `${playbookDir.ecosystem}:${hashContent(rel).slice(0, 12)}`,
+						name,
+						description: scrubSecretsFromGuidance(description),
+						path: rel,
+						ecosystem: playbookDir.ecosystem,
+					});
+				}
 			}
 		}
 
@@ -483,17 +573,24 @@ export class ProjectGuidanceService {
 
 		const skillFiles = await discoverSkillFiles(this.reader, workspaceRoot, SKILL_DIRS, isBlockedGuidancePath);
 		const skillCatalog: SkillMetadata[] = [];
+		const skillIdsSeen = new Set<string>();
 		for (const skill of skillFiles) {
 			const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, skill.relPath)));
-			const metadata = parseSkillMetadata(skill.relPath, text, skill.ecosystem);
-			if (metadata) {
+			const metadata = parseSkillMetadata(skill.relPath, text, skill.ecosystem, workspaceRoot, skill.scopePrefix);
+			if (metadata && !skillIdsSeen.has(metadata.id)) {
+				skillIdsSeen.add(metadata.id);
 				skillCatalog.push(metadata);
 			}
 		}
 
 		const activatedSkills: { metadata: SkillMetadata; body: string; root: string; files: string[] }[] = [];
-		for (const name of normalizedSkills) {
-			const metadata = skillCatalog.find(item => item.name === name);
+		for (const idOrName of normalizedSkills) {
+			const resolved = resolveSkillByIdOrName(skillCatalog, idOrName, normalizedTargets);
+			if (resolved.ambiguous?.length) {
+				diagnostics.push(`Ambiguous skill "${idOrName}": ${resolved.ambiguous.map(item => `${item.name}@${item.path}`).join(', ')}`);
+				continue;
+			}
+			const metadata = resolved.skill;
 			if (!metadata) {
 				continue;
 			}
@@ -508,7 +605,7 @@ export class ProjectGuidanceService {
 			});
 		}
 
-		const conflicts = detectConflicts([...alwaysApplicable, ...pathApplicable, ...activatedRules]);
+		const conflicts = detectNarrowConflicts([...alwaysApplicable, ...pathApplicable, ...activatedRules]);
 		const totalChars =
 			boundedJoin(alwaysApplicable.map(item => item.text), this.budget.maxAlwaysChars).length +
 			boundedJoin(pathApplicable.map(item => item.text), this.budget.maxPathChars).length +
@@ -516,12 +613,13 @@ export class ProjectGuidanceService {
 			skillCatalog.reduce((sum, item) => sum + item.description.length, 0);
 		const snapshot: ProjectGuidanceSnapshot = {
 			enabled: true,
-			workspaceRoot,
-			alwaysApplicable: alwaysApplicable.slice(0, 32),
-			pathApplicable,
-			activatedRules,
+			workspaceRoot: resolve(workspaceRoot),
+			alwaysApplicable: tagGuidanceBlocks(workspaceRoot, alwaysApplicable).slice(0, 32),
+			pathApplicable: tagGuidanceBlocks(workspaceRoot, pathApplicable),
+			activatedRules: tagGuidanceBlocks(workspaceRoot, activatedRules),
 			onDemandRules: onDemandRules.slice(0, 48),
 			skillCatalog: skillCatalog.slice(0, this.budget.maxSkillCatalogEntries),
+			playbookCatalog: playbookCatalog.slice(0, 32),
 			activatedSkills,
 			conflicts,
 			diagnostics,
@@ -530,6 +628,71 @@ export class ProjectGuidanceService {
 		this.cache.set(cacheKey, snapshot);
 		return snapshot;
 	}
+
+	async getCombinedSnapshot(
+		targets: readonly GuidanceTarget[],
+		activatedSkillIds: readonly string[] = [],
+		enabled = true,
+		activatedRulePaths: readonly string[] = [],
+	): Promise<ProjectGuidanceSnapshot> {
+		const byRoot = new Map<string, string[]>();
+		for (const target of targets) {
+			const list = byRoot.get(target.workspaceRoot) ?? [];
+			list.push(target.relativePath);
+			byRoot.set(target.workspaceRoot, list);
+		}
+		if (!byRoot.size && targets.length === 0) {
+			return this.getSnapshot('', [], activatedSkillIds, enabled, activatedRulePaths);
+		}
+		const snapshots: ProjectGuidanceSnapshot[] = [];
+		for (const [root, paths] of byRoot) {
+			snapshots.push(await this.getSnapshot(root, [...new Set(paths)], activatedSkillIds, enabled, activatedRulePaths));
+		}
+		if (snapshots.length === 1) {
+			return snapshots[0];
+		}
+		const primary = snapshots[0];
+		return {
+			enabled: snapshots.every(item => item.enabled),
+			workspaceRoot: primary.workspaceRoot,
+			alwaysApplicable: snapshots.flatMap(item => item.alwaysApplicable),
+			pathApplicable: snapshots.flatMap(item => item.pathApplicable),
+			activatedRules: snapshots.flatMap(item => item.activatedRules),
+			onDemandRules: snapshots.flatMap(item => item.onDemandRules),
+			skillCatalog: dedupeSkillCatalog(snapshots.flatMap(item => item.skillCatalog)),
+			playbookCatalog: dedupePlaybooks(snapshots.flatMap(item => item.playbookCatalog)),
+			activatedSkills: snapshots.flatMap(item => item.activatedSkills),
+			conflicts: snapshots.flatMap(item => item.conflicts),
+			diagnostics: snapshots.flatMap(item => item.diagnostics),
+			totalChars: snapshots.reduce((sum, item) => sum + item.totalChars, 0),
+		};
+	}
+}
+
+function dedupeSkillCatalog(items: readonly SkillMetadata[]): SkillMetadata[] {
+	const seen = new Set<string>();
+	const out: SkillMetadata[] = [];
+	for (const item of items) {
+		if (seen.has(item.id)) {
+			continue;
+		}
+		seen.add(item.id);
+		out.push(item);
+	}
+	return out;
+}
+
+function dedupePlaybooks(items: readonly PlaybookMetadata[]): PlaybookMetadata[] {
+	const seen = new Set<string>();
+	const out: PlaybookMetadata[] = [];
+	for (const item of items) {
+		if (seen.has(item.id)) {
+			continue;
+		}
+		seen.add(item.id);
+		out.push(item);
+	}
+	return out;
 }
 
 export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot, budget: ProjectGuidanceBudget = DEFAULT_GUIDANCE_BUDGET): string {
@@ -559,7 +722,7 @@ export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot
 		const catalogLines = ['AVAILABLE PROJECT SKILLS (metadata only; activate with prebase_project_guidance before using body/resources)'];
 		let catalogChars = catalogLines[0].length;
 		for (const skill of snapshot.skillCatalog) {
-			const line = `- ${skill.name}: ${scrubSecretsFromGuidance(skill.description)} (${skill.path})`;
+			const line = `- ${skill.name} (${skill.id}): ${scrubSecretsFromGuidance(skill.description)} (${skill.path})`;
 			if (catalogChars + line.length + 1 > budget.maxPathChars) {
 				break;
 			}
@@ -567,6 +730,13 @@ export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot
 			catalogChars += line.length + 1;
 		}
 		parts.push(catalogLines.join('\n'));
+	}
+	if (snapshot.playbookCatalog?.length) {
+		const lines = ['AVAILABLE PROJECT PLAYBOOKS (on demand only; not automatic instructions)'];
+		for (const playbook of snapshot.playbookCatalog.slice(0, 16)) {
+			lines.push(`- ${playbook.name}: ${scrubSecretsFromGuidance(playbook.description)} (${playbook.path})`);
+		}
+		parts.push(lines.join('\n'));
 	}
 	if (snapshot.onDemandRules.length) {
 		const lines = ['AVAILABLE ON-DEMAND RULES (intelligent/manual; activate when relevant)'];
@@ -608,7 +778,41 @@ export function resolveWorkspaceRootForPath(fsPath: string, folders: readonly { 
 	return folders?.[0]?.uri.fsPath;
 }
 
-export function guidanceTargetsFromReferences(references: readonly { value: unknown }[] | undefined, asRelativePath?: (value: unknown) => string | undefined): string[] {
+export function guidanceTargetsFromReferences(
+	references: readonly { value: unknown }[] | undefined,
+	asRelativePath?: (value: unknown) => { relativePath: string; fsPath?: string } | string | undefined,
+	folders?: readonly { uri: { fsPath: string } }[],
+): GuidanceTarget[] {
+	const targets: GuidanceTarget[] = [];
+	for (const ref of references ?? []) {
+		const value = ref.value;
+		if (typeof value === 'string') {
+			const normalized = normalizeRel(value);
+			if (normalized.includes('/') && !normalized.startsWith('/') && !/^[a-zA-Z]:/.test(normalized)) {
+				if (folders?.length === 1) {
+					targets.push({ workspaceRoot: resolve(folders[0].uri.fsPath), relativePath: normalized });
+				}
+			}
+		} else if (value && typeof value === 'object') {
+			const resolved = asRelativePath?.(value);
+			const relativePath = typeof resolved === 'string' ? resolved : resolved?.relativePath;
+			const fsPath = typeof resolved === 'object' && resolved && 'fsPath' in resolved ? resolved.fsPath : undefined;
+			if (relativePath) {
+				const normalized = normalizeRel(relativePath);
+				const root = fsPath ? resolveWorkspaceRootForPath(fsPath, folders) : folders?.[0]?.uri.fsPath;
+				if (root && !normalized.startsWith('/') && !/^[a-zA-Z]:/.test(normalized)) {
+					targets.push({ workspaceRoot: resolve(root), relativePath: normalized });
+				}
+			}
+		}
+	}
+	return targets;
+}
+
+export function guidanceTargetPathsFromReferences(
+	references: readonly { value: unknown }[] | undefined,
+	asRelativePath?: (value: unknown) => string | undefined,
+): string[] {
 	const paths = new Set<string>();
 	for (const ref of references ?? []) {
 		const value = ref.value;

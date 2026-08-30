@@ -6,10 +6,10 @@ import { describe, test } from 'node:test';
 import {
 	ProjectGuidanceService,
 	formatProjectGuidanceForPrompt,
-	guidanceTargetsFromReferences,
+	guidanceTargetPathsFromReferences,
 	scrubSecretsFromGuidance,
 } from './projectGuidanceService';
-import { beginProjectGuidanceSession, endProjectGuidanceSession } from './projectGuidanceSession';
+import { createProjectGuidanceSession, runWithProjectGuidanceSession } from './projectGuidanceSession';
 import { getProjectGuidanceService, setProjectGuidanceService } from './projectGuidanceRegistry';
 
 const magnusDir = dirname(fileURLToPath(import.meta.url));
@@ -157,8 +157,8 @@ describe('projectGuidanceService', () => {
 		}
 	});
 
-	test('guidanceTargetsFromReferences extracts relative paths from chat references', () => {
-		const paths = guidanceTargetsFromReferences([
+	test('guidanceTargetPathsFromReferences extracts relative paths from chat references', () => {
+		const paths = guidanceTargetPathsFromReferences([
 			{ value: 'graphs/src/foo.ts' },
 			{ value: { fsPath: '/tmp/workspace/src/main.ts' } },
 		], value => typeof value === 'object' && value && 'fsPath' in value ? 'src/main.ts' : undefined);
@@ -223,18 +223,37 @@ describe('projectGuidanceService', () => {
 		assert.match(bodies, /Intelligent rule body stays hidden/);
 	});
 
+	test('ecosystem fixture covers Claude imports, GitHub, Windsurf triggers, and Cline paths', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-ecosystems');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const web = await service.getSnapshot(root, ['packages/web/src/a.ts']);
+		assert.ok(web.alwaysApplicable.some(item => item.source.path === 'CLAUDE.md'));
+		assert.ok(web.alwaysApplicable.some(item => item.text.includes('Package-specific testing policy')));
+		assert.match(web.alwaysApplicable.find(item => item.source.path.endsWith('CLAUDE.md') && item.source.path.includes('packages/web'))?.text ?? '', /integration tests before merge/);
+		assert.ok(web.pathApplicable.some(item => item.source.path.endsWith('web-paths.md')));
+		assert.ok(web.alwaysApplicable.some(item => item.source.path.endsWith('copilot-instructions.md')));
+		const api = await service.getSnapshot(root, ['packages/api/src/index.ts']);
+		assert.ok(api.pathApplicable.some(item => item.source.path.endsWith('typescript.instructions.md')));
+		assert.ok(api.pathApplicable.some(item => item.text.includes('API package guidance')));
+		assert.ok(api.alwaysApplicable.some(item => item.text.includes('Windsurf always-on')));
+		assert.equal(api.alwaysApplicable.some(item => item.text.includes('Performance tuning body')), false);
+		assert.ok(api.onDemandRules.some(item => item.source.path.endsWith('model-decision.md')));
+		assert.ok(api.pathApplicable.some(item => item.source.path.endsWith('glob-api.md')));
+		assert.equal(api.alwaysApplicable.some(item => item.text.includes('Manual windsurf rule body')), false);
+		const cline = await service.getSnapshot(root, ['packages/web/src/a.ts']);
+		assert.ok(cline.pathApplicable.some(item => item.source.path.endsWith('web-conditional.md')));
+	});
+
 	test('prebase_project_guidance activation path loads skill bodies through session state', async () => {
 		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-monorepo');
 		const service = new ProjectGuidanceService(makeReader(root));
 		setProjectGuidanceService(service);
-		endProjectGuidanceSession();
-		const session = beginProjectGuidanceSession(['graphs/src/foo.ts']);
+		const session = createProjectGuidanceSession([{ workspaceRoot: root, relativePath: 'graphs/src/foo.ts' }]);
 		session.activateSkill('deploy');
-		try {
-			const snapshot = await service.getSnapshot(
-				root,
-				session.getTargetPaths(),
-				session.getActivatedSkillNames(),
+		await runWithProjectGuidanceSession(session, async () => {
+			const snapshot = await service.getCombinedSnapshot(
+				session.getTargets(),
+				session.getActivatedSkillIds(),
 				true,
 				session.getActivatedRulePaths(),
 			);
@@ -244,9 +263,76 @@ describe('projectGuidanceService', () => {
 			assert.match(snapshot.activatedSkills[0].body, /Deploy/);
 			const missing = await service.getSnapshot(root, [], ['missing-skill']);
 			assert.equal(missing.activatedSkills.length, 0);
-		} finally {
-			endProjectGuidanceSession();
-			setProjectGuidanceService(undefined);
-		}
+		});
+		setProjectGuidanceService(undefined);
+	});
+
+	test('getCombinedSnapshot keeps path rules distinct per workspace root', async () => {
+		const fixture = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-multi-root');
+		const rootA = join(fixture, 'root-a');
+		const rootB = join(fixture, 'root-b');
+		const service = new ProjectGuidanceService(makeReader(rootA));
+		const combined = await service.getCombinedSnapshot([
+			{ workspaceRoot: rootA, relativePath: 'shared/file.ts' },
+			{ workspaceRoot: rootB, relativePath: 'shared/file.ts' },
+		]);
+		const bodies = combined.pathApplicable.map(item => item.text);
+		assert.ok(bodies.some(text => /Root A path-scoped rule/.test(text)));
+		assert.ok(bodies.some(text => /Root B path-scoped rule/.test(text)));
+	});
+
+	test('duplicate skill names receive stable distinct IDs', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-duplicate-skills');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const snapshot = await service.getSnapshot(root);
+		const deploySkills = snapshot.skillCatalog.filter(item => item.name === 'deploy');
+		assert.equal(deploySkills.length, 2);
+		assert.equal(new Set(deploySkills.map(item => item.id)).size, 2);
+		assert.ok(deploySkills.some(item => item.ecosystem === 'agents'));
+		assert.ok(deploySkills.some(item => item.ecosystem === 'codex'));
+	});
+
+	test('windsurf trigger semantics classify rules into always, path, intelligent, and manual', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-windsurf');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const always = await service.getSnapshot(root);
+		assert.ok(always.alwaysApplicable.some(item => item.source.path.endsWith('always-on.md')));
+		const graphs = await service.getSnapshot(root, ['graphs/src/foo.ts']);
+		assert.ok(graphs.pathApplicable.some(item => item.source.path.endsWith('glob-scoped.md')));
+		assert.ok(graphs.onDemandRules.some(item => item.source.path.endsWith('model-decision.md') && item.source.activationMode === 'intelligent'));
+		assert.ok(graphs.onDemandRules.some(item => item.source.path.endsWith('manual-only.md') && item.source.activationMode === 'manual'));
+		assert.equal(graphs.alwaysApplicable.some(item => item.text.includes('Windsurf manual rule body')), false);
+	});
+
+	test('claude fixture expands source-relative imports into guidance text', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-claude');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const snapshot = await service.getSnapshot(root, ['src/main.ts']);
+		const claude = snapshot.alwaysApplicable.find(item => item.source.path === 'CLAUDE.md');
+		assert.ok(claude);
+		assert.match(claude!.text, /Shared Claude import body/);
+		assert.doesNotMatch(claude!.text, /This import must not appear/);
+	});
+
+	test('github copilot instructions are discovered as always-applicable guidance', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-github');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const snapshot = await service.getSnapshot(root);
+		assert.ok(snapshot.alwaysApplicable.some(item => item.source.path === '.github/copilot-instructions.md'));
+		assert.match(snapshot.alwaysApplicable.find(item => item.source.path === '.github/copilot-instructions.md')!.text, /security/);
+	});
+
+	test('gemini root guidance is discovered as always-applicable', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-gemini');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const snapshot = await service.getSnapshot(root);
+		assert.ok(snapshot.alwaysApplicable.some(item => item.source.path === 'GEMINI.md'));
+	});
+
+	test('cline rules are discovered from .cline/rules', async () => {
+		const root = join(magnusDir, '../../../test/prebase/fixtures/project-guidance-cline');
+		const service = new ProjectGuidanceService(makeReader(root));
+		const snapshot = await service.getSnapshot(root);
+		assert.ok(snapshot.alwaysApplicable.some(item => item.source.path.endsWith('.cline/rules/always.md')));
 	});
 });

@@ -10,7 +10,7 @@ import {
 	listFilesUnderPathspecs,
 } from './phase3Evidence.mjs';
 
-/** @typedef {'shared-workbench'|'core-ide'|'graphs-common'|'network-graph'|'temporal'|'desktop-runtime'|'electron-test-lab'|'tauri-test-lab'|'runtime-preview'|'magnus-core'|'magnus-desktop-tools'|'web-context'|'privacy'|'cloud-auth'|'launch-harness'|'acceptance-shared'|'assurance-leaf'} Phase3Domain */
+/** @typedef {'shared-workbench'|'core-ide'|'graphs-common'|'network-graph'|'temporal'|'desktop-runtime'|'electron-test-lab'|'tauri-test-lab'|'runtime-preview'|'magnus-core'|'magnus-guidance'|'magnus-desktop-tools'|'web-context'|'privacy'|'cloud-auth'|'launch-harness'|'acceptance-shared'|'assurance-leaf'} Phase3Domain */
 
 /** @type {Record<Phase3Domain, string[]>} */
 export const DOMAIN_PATHSPECS = {
@@ -23,7 +23,31 @@ export const DOMAIN_PATHSPECS = {
 	'electron-test-lab': ['test/prebase/fixtures/desktop-electron', 'test/prebase/acceptance/prebase-desktop-product-path.mjs', 'test/prebase/acceptance/prebase-desktop-native-cases.mjs', 'test/prebase/acceptance/prebase-restart-soak.mjs'],
 	'tauri-test-lab': ['test/prebase/fixtures/desktop-tauri', 'test/prebase/acceptance/prebase-desktop-product-path.mjs', 'test/prebase/acceptance/prebase-restart-soak.mjs'],
 	'runtime-preview': ['src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts', 'src/vs/workbench/contrib/prebase/browser/prebaseRuntimeView.ts', 'test/prebase/acceptance/runtime-preview-live.mjs'],
-	'magnus-core': ['extensions/prebase-magnus'],
+	'magnus-core': [
+		'extensions/prebase-magnus/package.json',
+		'extensions/prebase-magnus/src/aiService.ts',
+		'extensions/prebase-magnus/src/chatParticipant.ts',
+		'extensions/prebase-magnus/src/extension.ts',
+		'extensions/prebase-magnus/src/languageModelProvider.ts',
+		'extensions/prebase-magnus/src/modes.ts',
+		'extensions/prebase-magnus/src/requestAssembler.ts',
+		'extensions/prebase-magnus/src/smokeTransport.ts',
+		'extensions/prebase-magnus/src/toolExecutor.ts',
+		'extensions/prebase-magnus/src/transports.ts',
+	],
+	'magnus-guidance': [
+		'extensions/prebase-magnus/src/projectGuidanceDiscovery.ts',
+		'extensions/prebase-magnus/src/projectGuidanceService.ts',
+		'extensions/prebase-magnus/src/projectGuidanceSession.ts',
+		'extensions/prebase-magnus/src/projectGuidanceRegistry.ts',
+		'extensions/prebase-magnus/src/projectGuidanceDelta.ts',
+		'extensions/prebase-magnus/src/projectGuidanceJit.ts',
+		'extensions/prebase-magnus/src/nativeTools.ts',
+		'extensions/prebase-magnus/src/chatParticipant.ts',
+		'extensions/prebase-magnus/src/toolExecutor.ts',
+		'extensions/prebase-magnus/src/extension.ts',
+		'test/prebase/fixtures/project-guidance-monorepo',
+	],
 	'magnus-desktop-tools': ['extensions/prebase-magnus/src/desktopTools.ts', 'extensions/prebase-magnus/src/nativeTools.ts', 'test/prebase/acceptance/prebase-magnus-tools-live.mjs'],
 	'web-context': ['extensions/prebase-magnus/src/hybridWebContext.ts', 'extensions/prebase-magnus/src/webContextCore.ts', 'extensions/prebase-magnus/src/localFirecrawlClient.ts', 'supabase/functions/web-search', 'test/prebase/acceptance/prebase-hybrid-web-smoke.mjs'],
 	'privacy': ['scripts/privacy', 'test/prebase/acceptance/prebase-privacy-runtime.mjs'],
@@ -50,7 +74,16 @@ export const PATH_PREFIX_DOMAINS = [
 	['extensions/prebase-magnus/src/hybridWebContext.ts', 'web-context'],
 	['extensions/prebase-magnus/src/webContextCore.ts', 'web-context'],
 	['extensions/prebase-magnus/src/localFirecrawlClient.ts', 'web-context'],
-	['extensions/prebase-magnus/', 'magnus-core'],
+	['extensions/prebase-magnus/src/projectGuidanceDiscovery.ts', 'magnus-guidance'],
+	['extensions/prebase-magnus/src/projectGuidanceService.ts', 'magnus-guidance'],
+	['extensions/prebase-magnus/src/projectGuidanceSession.ts', 'magnus-guidance'],
+	['extensions/prebase-magnus/src/projectGuidanceRegistry.ts', 'magnus-guidance'],
+	['extensions/prebase-magnus/src/projectGuidanceDelta.ts', 'magnus-guidance'],
+	['extensions/prebase-magnus/src/projectGuidanceJit.ts', 'magnus-guidance'],
+	['extensions/prebase-magnus/src/projectGuidanceService.test.ts', 'magnus-guidance'],
+	['extensions/prebase-magnus/src/projectGuidanceSession.test.ts', 'magnus-guidance'],
+	['extensions/prebase-magnus/src/projectGuidanceDiscovery.test.ts', 'magnus-guidance'],
+	['test/prebase/fixtures/project-guidance-monorepo/', 'magnus-guidance'],
 	['supabase/functions/web-search/', 'web-context'],
 	['supabase/', 'cloud-auth'],
 	['scripts/privacy/', 'privacy'],
@@ -89,7 +122,7 @@ export const PATH_PREFIX_DOMAINS = [
 /** @type {Record<string, Phase3Domain[]>} */
 export const PRODUCER_DOMAINS = {
 	'parser-benchmark': ['graphs-common', 'acceptance-shared'],
-	'magnus-streaming-smoke': ['magnus-core', 'shared-workbench', 'launch-harness', 'acceptance-shared'],
+	'magnus-streaming-smoke': ['magnus-core', 'magnus-guidance', 'shared-workbench', 'launch-harness', 'acceptance-shared'],
 	'core-ide': ['core-ide', 'shared-workbench', 'graphs-common', 'network-graph', 'runtime-preview', 'magnus-core', 'launch-harness', 'acceptance-shared'],
 	'runtime-preview': ['runtime-preview', 'launch-harness', 'acceptance-shared'],
 	'temporal-small': ['temporal', 'graphs-common', 'network-graph', 'shared-workbench', 'launch-harness', 'acceptance-shared'],

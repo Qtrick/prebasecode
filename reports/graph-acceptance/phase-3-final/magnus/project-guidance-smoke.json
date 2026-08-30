@@ -1,0 +1,120 @@
+{
+  "ok": true,
+  "failures": [],
+  "schemaVersion": 3,
+  "scenario": "magnus-guidance-smoke",
+  "sourceHead": "549de394b85e6526a15a42d767214e1d2afeb954",
+  "sourceFingerprint": "aea41b89e5711307d3a4afb511de15fc233e2a404b5928809309c45797b1f72d",
+  "productFingerprint": "aea41b89e5711307d3a4afb511de15fc233e2a404b5928809309c45797b1f72d",
+  "generatedAt": "2026-08-30T16:30:09.578Z",
+  "kind": "project-guidance-live-smoke",
+  "prebasePid": 58545,
+  "launchMs": 4794,
+  "rootSnapshot": {
+    "ok": true,
+    "enabled": true,
+    "workspaceRoot": "/Users/qunyingfan/Prebasecode/test/prebase/fixtures/project-guidance-monorepo",
+    "always": [
+      {
+        "path": "AGENTS.md",
+        "body": "# Root agents\nRoot guidance applies everywhere."
+      },
+      {
+        "path": ".cursor/rules/always.mdc",
+        "body": "Always cursor rule."
+      }
+    ],
+    "pathScoped": [],
+    "onDemand": [
+      ".cursor/rules/intelligent-hint.mdc",
+      ".cursor/rules/manual-only.mdc"
+    ],
+    "skills": [
+      {
+        "id": "codex:607fd205956a:deploy",
+        "name": "deploy",
+        "path": ".codex/skills/deploy/SKILL.md"
+      },
+      {
+        "id": "opencode:0579ed3010cd:ui-ux-pro-max",
+        "name": "ui-ux-pro-max",
+        "path": ".opencode/skills/ui-ux-pro-max/SKILL.md"
+      }
+    ]
+  },
+  "graphSnapshot": {
+    "ok": true,
+    "enabled": true,
+    "workspaceRoot": "/Users/qunyingfan/Prebasecode/test/prebase/fixtures/project-guidance-monorepo",
+    "always": [
+      {
+        "path": "AGENTS.md",
+        "body": "# Root agents\nRoot guidance applies everywhere."
+      },
+      {
+        "path": ".cursor/rules/always.mdc",
+        "body": "Always cursor rule."
+      }
+    ],
+    "pathScoped": [
+      {
+        "path": ".cursor/rules/graph.mdc",
+        "body": "Graph path rule."
+      }
+    ],
+    "onDemand": [
+      ".cursor/rules/intelligent-hint.mdc",
+      ".cursor/rules/manual-only.mdc"
+    ],
+    "skills": [
+      {
+        "id": "codex:607fd205956a:deploy",
+        "name": "deploy",
+        "path": ".codex/skills/deploy/SKILL.md"
+      },
+      {
+        "id": "opencode:0579ed3010cd:ui-ux-pro-max",
+        "name": "ui-ux-pro-max",
+        "path": ".opencode/skills/ui-ux-pro-max/SKILL.md"
+      }
+    ]
+  },
+  "toolGetForPaths": {
+    "ok": true,
+    "toolId": "prebase_project_guidance",
+    "isError": false,
+    "content": "{\"ok\":true,\"root\":\"/Users/qunyingfan/Prebasecode/test/prebase/fixtures/project-guidance-monorepo\",\"paths\":[\".cursor/rules/graph.mdc\"],\"newlyApplied\":[],\"newlyAvailableRules\":[],\"newlyAvailableSkills\":[],\"always\":[{\"path\":\"AGENTS.md\",\"body\":\"# Root agents\\nRoot guidance applies everywhere.\"},{\"path\":\".cursor/rules/always.mdc\",\"body\":\"Always cursor rule.\"}],\"pathScoped\":[{\"path\":\".cursor/rules/graph.mdc\",\"body\":\"Graph path rule.\"}],\"onDemand\":[{\"path\":\".cursor/rules/intelligent-hint.mdc\",\"description\":\"Use when polishing UI styling\"},{\"path\":\".cursor/rules/manual-only.mdc\",\"description\":\"manual-only.mdc\"}],\"skills\":[{\"id\":\"codex:607fd205956a:deploy\",\"name\":\"deploy\",\"description\":\"Deploy skill\",\"path\":\".codex/skills/deploy/SKILL.md\"},{\"id\":\"opencode:0579ed3010cd:ui-ux-pro-max\",\"name\":\"ui-ux-pro-max\",\"description\":\"UI UX Pro Max design guidance\",\"path\":\".opencode/skills/ui-ux-pro-max/SKILL.md\"}],\"playbooks\":[],\"diagnostics\":[]}"
+  },
+  "jitSmoke": {
+    "ok": true,
+    "initialPathScoped": 0,
+    "afterPathScoped": 1,
+    "deltaApplied": 1,
+    "deltaChars": 217,
+    "deltaHasGraphRule": true,
+    "packageRuleAbsent": true
+  },
+  "skillActivate": {
+    "ok": true,
+    "toolId": "prebase_project_guidance",
+    "isError": false,
+    "content": "{\"ok\":true,\"skill\":\"deploy\",\"skillId\":\"codex:607fd205956a:deploy\",\"root\":\".codex/skills/deploy\",\"files\":[],\"body\":\"# Deploy\",\"note\":\"Supporting files are not loaded automatically; read them on demand.\"}"
+  },
+  "workspaceRead": {
+    "ok": true,
+    "toolId": "prebase_workspace_read_file",
+    "isError": false,
+    "content": "// Fixture file for project-guidance live smoke (graphs/** path rule).\n\nexport const graphFixture = true;\n"
+  },
+  "durationMs": 9570,
+  "quit": {
+    "before": "58545     1  13.1 269056 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "remaining": "gone",
+    "leftoverPids": [],
+    "latencyMs": 529,
+    "terminationPath": "workbench",
+    "workbenchCompleted": true,
+    "usedSigterm": false,
+    "usedSigkill": false
+  }
+}

@@ -1,0 +1,5 @@
+---
+globs:
+  - shared/**
+---
+Root B path-scoped rule.
