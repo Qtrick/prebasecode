@@ -25,7 +25,7 @@ import {
 	type TemporalComparisonMode,
 } from '../../../temporal/view/temporalViewTypes.js';
 import { computeTemporalStructuralDiff } from '../../../temporal/view/temporalStructuralDiff.js';
-import { layoutTemporalGraph } from '../../../temporal/view/temporalLayoutEngine.js';
+import { layoutTemporalGraph, TEMPORAL_INITIAL_LAYOUT_VERSION } from '../../../temporal/view/temporalLayoutEngine.js';
 import { GitHistoryError, type GitHeadChangeEvent } from '../../../history/git/gitHistoryService.js';
 import type {
 	TemporalCommitSummary as ITemporalStoreCommitSummary,
@@ -94,6 +94,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private _currentDiff?: TemporalStructuralDiff;
 
 	private readonly _positions = new Map<string, { x: number; y: number }>();
+	private _positionsLayoutVersion = 0;
 	private readonly _diffCache = new Map<string, TemporalStructuralDiff>();
 	private _scrubTimer: any = undefined;
 	private _historyGenerationToken: number = 0;
@@ -825,8 +826,15 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				},
 			);
 
+			if (this._positionsLayoutVersion !== TEMPORAL_INITIAL_LAYOUT_VERSION) {
+				this._positions.clear();
+				this._positionsLayoutVersion = TEMPORAL_INITIAL_LAYOUT_VERSION;
+			}
+
 			const layoutResult = layoutTemporalGraph(rawDiff, this._positions, {
 				nodeSpacing: 48,
+				width: 1400,
+				height: 800,
 			});
 
 			for (const [id, pos] of layoutResult.positions) {

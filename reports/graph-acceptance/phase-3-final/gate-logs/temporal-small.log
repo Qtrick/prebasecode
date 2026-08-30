@@ -3,16 +3,16 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "temporal-small",
-  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "generatedAt": "2026-08-30T03:20:08.503Z",
+  "sourceHead": "0dbe96ca961fee9a98cebaa14e6d7dd24cbb4305",
+  "sourceFingerprint": "468a7910fc0f2f6f2153c58032aba21b2fc1ca60a759a9f25e78352b15f15f56",
+  "productFingerprint": "468a7910fc0f2f6f2153c58032aba21b2fc1ca60a759a9f25e78352b15f15f56",
+  "generatedAt": "2026-08-30T19:55:07.617Z",
   "producerId": "temporal-small",
-  "producerFingerprint": "c7f8ee39e4e091d567db4039c355ccde630a0de59db2f23203bd24ca9be28856",
+  "producerFingerprint": "9529255ff86c5b95658fdb9f89436b699005a7a48c046e183985b27e2e05486c",
   "scale": "small",
   "fixture": {
-    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-nULnSJ",
-    "head": "ae022f7541363e8ff996d02cc96af026011c2c3e",
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-ox5oi8",
+    "head": "a55e71d42fa75b76455b3f8ee2f5fd7e59a9b903",
     "commits": 10,
     "files": [
       "package.json",
@@ -21,19 +21,19 @@
       "src/tally.js"
     ],
     "expectedModifiedPath": "src/tally.js",
-    "firstParentSummary": "ae022f7541363e8ff996d02cc96af026011c2c3e a29323efe2eb20cb4c7b528e702cd025e2d88772 fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+    "firstParentSummary": "a55e71d42fa75b76455b3f8ee2f5fd7e59a9b903 fcff0ccc1dae042e940b2951c3ccef993bbd4c1d fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
   },
-  "pid": 58603,
-  "cdpPort": 54332,
+  "pid": 63483,
+  "cdpPort": 58929,
   "fullMap": {
-    "sequenceId": 33,
+    "sequenceId": 32,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 936.5,
-    "renderEnd": 936.5999999940395,
-    "durationMs": 0.09999999403953552,
-    "selectedCommitSha": "ae022f7541363e8ff996d02cc96af026011c2c3e",
-    "renderedCommitSha": "ae022f7541363e8ff996d02cc96af026011c2c3e",
+    "renderStart": 971.6000000238419,
+    "renderEnd": 972,
+    "durationMs": 0.3999999761581421,
+    "selectedCommitSha": "a55e71d42fa75b76455b3f8ee2f5fd7e59a9b903",
+    "renderedCommitSha": "a55e71d42fa75b76455b3f8ee2f5fd7e59a9b903",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 4,
@@ -43,16 +43,16 @@
     "labelsDrawn": 4,
     "selectedNodeId": null,
     "transform": {
-      "x": 328.01482452279646,
-      "y": 412.9769490884064,
-      "k": 2.222855748837456
+      "x": 308.15999999999997,
+      "y": 382.64,
+      "k": 2.4
     },
     "canvas": {
       "clientWidth": 552,
       "clientHeight": 708,
       "width": 1104,
       "height": 1416,
-      "distinctPixels": 252700
+      "distinctPixels": 282533
     },
     "summary": {
       "addedCount": 0,
@@ -67,29 +67,29 @@
     },
     "lodTier": "full",
     "isAnimating": false,
-    "timestamp": 936.5999999940395,
+    "timestamp": 972,
     "viewportWidth": 552,
     "viewportHeight": 708,
     "labelCount": 4,
     "projectedBounds": {
-      "minX": 234.65488307162332,
-      "minY": 132.89712473488692,
-      "maxX": 310.23197853209683,
-      "maxY": 562.2160136613929,
-      "width": 75.57709546047352,
-      "height": 429.318888926506
+      "minX": 164.15999999999997,
+      "minY": 135.44,
+      "maxX": 380.15999999999997,
+      "maxY": 560.24,
+      "width": 216,
+      "height": 424.8
     },
-    "screenUtilization": 0.0830228922341536
+    "screenUtilization": 0.23478260869565218
   },
   "focusChanges": {
-    "sequenceId": 59,
+    "sequenceId": 57,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 1393.8999999761581,
-    "renderEnd": 1393.8999999761581,
-    "durationMs": 0,
-    "selectedCommitSha": "ae022f7541363e8ff996d02cc96af026011c2c3e",
-    "renderedCommitSha": "ae022f7541363e8ff996d02cc96af026011c2c3e",
+    "renderStart": 1430,
+    "renderEnd": 1430.1000000238419,
+    "durationMs": 0.10000002384185791,
+    "selectedCommitSha": "a55e71d42fa75b76455b3f8ee2f5fd7e59a9b903",
+    "renderedCommitSha": "a55e71d42fa75b76455b3f8ee2f5fd7e59a9b903",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 2,
@@ -99,16 +99,16 @@
     "labelsDrawn": 2,
     "selectedNodeId": null,
     "transform": {
-      "x": 312.5774192433077,
-      "y": 581.2292116498115,
-      "k": 2.83992331597586
+      "x": 230.0726920967782,
+      "y": 519.5635834040729,
+      "k": 2.8923537698816
     },
     "canvas": {
       "clientWidth": 552,
       "clientHeight": 708,
       "width": 1104,
       "height": 1416,
-      "distinctPixels": 57603
+      "distinctPixels": 51830
     },
     "summary": {
       "addedCount": 0,
@@ -123,46 +123,46 @@
     },
     "lodTier": "full",
     "isAnimating": true,
-    "timestamp": 1393.8999999761581,
+    "timestamp": 1430.1000000238419,
     "viewportWidth": 552,
     "viewportHeight": 708,
     "labelCount": 2,
     "projectedBounds": {
-      "minX": 277.2749555294834,
-      "minY": 223.39887383685317,
-      "maxX": 289.8580327155008,
-      "maxY": 352.81196244962877,
-      "width": 12.58307718601742,
-      "height": 129.4130886127756
+      "minX": 305.27389011369985,
+      "minY": 221.65114510626807,
+      "maxX": 316.84330519322623,
+      "maxY": 354.6994185208217,
+      "width": 11.56941507952638,
+      "height": 133.04827341455365
     },
-    "screenUtilization": 0.004166704748258688
+    "screenUtilization": 0.003938658347527445
   },
   "targetOpened": true,
   "repoLoaded": true,
   "camera": {
     "afterFocus": {
-      "x": 306.91997558277853,
-      "y": 642.8896836633594,
-      "k": 3.0660639745011466
+      "x": 199.99895485105148,
+      "y": 572.296914602286,
+      "k": 3.0819738029568002
     },
     "afterUserZoom": {
-      "x": 309.50159557713863,
-      "y": 692.8980102438856,
+      "x": 182.1062281207105,
+      "y": 613.6423000883967,
       "k": 3.5
     },
     "afterWait": {
-      "x": 309.50159557713863,
-      "y": 692.8980102438856,
+      "x": 182.1062281207105,
+      "y": 613.6423000883967,
       "k": 3.5
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1788060013184,
-    "quitMs": 405,
+    "startedAt": 1788119712820,
+    "quitMs": 404,
     "remaining": "gone",
-    "before": "58603     1   2.9 258528 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "63483     1   6.2 290752 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "after": "gone"
   }
 }

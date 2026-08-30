@@ -39,7 +39,7 @@ suite('NetworkRenderMath (Unit - Visual Fidelity & Radius Invariants)', () => {
 		}
 	});
 
-	test('2. Visual Radius Invariants: Ordinary nodes are 3-6px, hubs 6-10px, never giant bubbles', () => {
+	test('2. Visual Radius Invariants: Ordinary/hub/entry hierarchy with screen-aware zoom', () => {
 		const ordinaryNode: NetworkNodeLike = {
 			id: 'file:src/utils/math.ts',
 			label: 'math.ts',
@@ -63,27 +63,35 @@ suite('NetworkRenderMath (Unit - Visual Fidelity & Radius Invariants)', () => {
 			isEntry: true,
 		};
 
-		// Test semantic weights
 		assert.equal(computeNetworkSemanticWeight(entryNode), 10);
 		assert.ok(computeNetworkSemanticWeight(hubNode) > 2.0);
 
-		// Test across varying depth scales
+		// At zoom=1, world radius ≈ intended screen base size.
 		for (const depthScale of [0.7, 1.0, 1.3]) {
-			const ordR = computeNetworkVisualRadius(ordinaryNode, depthScale, { entryNodeId: 'file:src/main.ts' });
-			assert.ok(ordR >= 3.0 && ordR <= 6.0, `Ordinary node radius must be 3-6px, got ${ordR} at depthScale ${depthScale}`);
+			const ordR = computeNetworkVisualRadius(ordinaryNode, depthScale, { entryNodeId: 'file:src/main.ts', zoom: 1 });
+			assert.ok(ordR >= 2.8 && ordR <= 7.0, `Ordinary node radius must be readable, got ${ordR} at depthScale ${depthScale}`);
 
-			const hubR = computeNetworkVisualRadius(hubNode, depthScale, { entryNodeId: 'file:src/main.ts' });
-			assert.ok(hubR >= 4.8 && hubR <= 10.5, `Hub node radius must be ~5-10px, got ${hubR} at depthScale ${depthScale}`);
+			const hubR = computeNetworkVisualRadius(hubNode, depthScale, { entryNodeId: 'file:src/main.ts', zoom: 1 });
+			assert.ok(hubR >= 4.5 && hubR <= 12.0, `Hub node radius must be ~5-12px, got ${hubR} at depthScale ${depthScale}`);
 
-			const entryR = computeNetworkVisualRadius(entryNode, depthScale, { entryNodeId: 'file:src/main.ts' });
-			assert.ok(entryR >= 5.0 && entryR <= 10.5, `Entry node radius must be ~5-10px, got ${entryR} at depthScale ${depthScale}`);
+			const entryR = computeNetworkVisualRadius(entryNode, depthScale, { entryNodeId: 'file:src/main.ts', zoom: 1 });
+			assert.ok(entryR >= 5.0 && entryR <= 12.0, `Entry node radius must be ~5-12px, got ${entryR} at depthScale ${depthScale}`);
 
-			// Hover and selected states should be subtle, not giant
-			const hoverR = computeNetworkVisualRadius(ordinaryNode, depthScale, { entryNodeId: 'file:src/main.ts', isHovered: true });
-			assert.ok(hoverR <= 7.0, `Hovered node must not balloon into giant bubble, got ${hoverR}`);
+			assert.ok(hubR > ordR, 'Hub must exceed ordinary');
+			assert.ok(entryR >= hubR * 0.85, 'Entry must be at least comparable to hub');
 
-			const selR = computeNetworkVisualRadius(hubNode, depthScale, { entryNodeId: 'file:src/main.ts', isSelected: true });
-			assert.ok(selR <= 14.0, `Selected hub must not balloon into giant bubble, got ${selR}`);
+			const hoverR = computeNetworkVisualRadius(ordinaryNode, depthScale, { entryNodeId: 'file:src/main.ts', isHovered: true, zoom: 1 });
+			assert.ok(hoverR <= 9.0, `Hovered node must not balloon into giant bubble, got ${hoverR}`);
+
+			const selR = computeNetworkVisualRadius(hubNode, depthScale, { entryNodeId: 'file:src/main.ts', isSelected: true, zoom: 1 });
+			assert.ok(selR <= 16.0, `Selected hub must not balloon into giant bubble, got ${selR}`);
+		}
+
+		// Screen-space contract: ordinary nodes stay above ~2.8px across Fit View zooms.
+		for (const zoom of [0.15, 0.25, 0.5, 1, 2, 3.5]) {
+			const world = computeNetworkVisualRadius(ordinaryNode, 1.0, { zoom });
+			const screen = world * zoom;
+			assert.ok(screen >= 2.75 && screen <= 26.5, `ordinary screen radius at k=${zoom} was ${screen}`);
 		}
 	});
 
@@ -149,7 +157,8 @@ suite('NetworkRenderMath (Unit - Visual Fidelity & Radius Invariants)', () => {
 		assert.ok(Number.isFinite(transform.k), 'Scale k must be finite');
 		assert.ok(Number.isFinite(transform.x), 'Transform X must be finite');
 		assert.ok(Number.isFinite(transform.y), 'Transform Y must be finite');
-		assert.ok(transform.k >= 0.2 && transform.k <= 2.5, `Scale k (${transform.k}) must be in usable range [0.2, 2.5]`);
+		// Production MIN_ZOOM is 0.15 — do not false-green by requiring a higher floor.
+		assert.ok(transform.k >= 0.15 && transform.k <= 2.5, `Scale k (${transform.k}) must be in usable range [0.15, 2.5]`);
 	});
 
 	test('6. Label LOD Policy: Overview mode displays only high-importance nodes; deep zoom shows detail', () => {

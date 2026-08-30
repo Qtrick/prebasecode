@@ -173,3 +173,56 @@ export function computeEdgeLodStyle(
 		isAggregate: false,
 	};
 }
+
+/**
+ * Deterministic community-aggregate quadratic control point.
+ * Lane offsets prevent many vertical pairs from sharing one spear corridor.
+ * Self-contained for webview serialization.
+ */
+export function computeAggregateEdgeRoute(
+	srcX: number,
+	srcY: number,
+	tgtX: number,
+	tgtY: number,
+	srcRadius: number,
+	tgtRadius: number,
+	pairIndex: number,
+	pairCount: number,
+	sourceCommunityId: string,
+	targetCommunityId: string,
+): { readonly x1: number; readonly y1: number; readonly x2: number; readonly y2: number; readonly cpX: number; readonly cpY: number } {
+	const dx = tgtX - srcX;
+	const dy = tgtY - srcY;
+	const dist = Math.hypot(dx, dy) || 1;
+	const ux = dx / dist;
+	const uy = dy / dist;
+	const x1 = srcX + ux * Math.min(srcRadius * 0.75, dist * 0.35);
+	const y1 = srcY + uy * Math.min(srcRadius * 0.75, dist * 0.35);
+	const x2 = tgtX - ux * Math.min(tgtRadius * 0.75, dist * 0.35);
+	const y2 = tgtY - uy * Math.min(tgtRadius * 0.75, dist * 0.35);
+	const midX = (x1 + x2) / 2;
+	const midY = (y1 + y2) / 2;
+	let hash = 2166136261;
+	const key = String(sourceCommunityId) + '>' + String(targetCommunityId);
+	for (let i = 0; i < key.length; i++) {
+		hash ^= key.charCodeAt(i);
+		hash = Math.imul(hash, 16777619);
+	}
+	const laneFromId = ((hash >>> 0) % 11) - 5;
+	// pairIndex/pairCount are local to one undirected community pair — clamp so a
+	// mistaken global index cannot blow the corridor into a spear.
+	const rawCentered = pairCount > 1 ? (pairIndex - (pairCount - 1) / 2) : 0;
+	const centered = Math.max(-3, Math.min(3, rawCentered));
+	const lane = laneFromId + centered;
+	const base = 14 + Math.min(36, dist * 0.07);
+	const offset = base + lane * 10;
+	const reciprocal = sourceCommunityId > targetCommunityId ? -1 : 1;
+	return {
+		x1: x1,
+		y1: y1,
+		x2: x2,
+		y2: y2,
+		cpX: midX - uy * offset * reciprocal,
+		cpY: midY + ux * offset * reciprocal,
+	};
+}

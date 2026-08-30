@@ -8,6 +8,7 @@ import { suite, test } from 'mocha';
 import {
 	computeCommunityAggregateEdges,
 	computeEdgeLodStyle,
+	computeAggregateEdgeRoute,
 } from '../../temporal/view/temporalEdgeLod.js';
 import type {
 	TemporalRenderEdge,
@@ -98,5 +99,30 @@ suite('TemporalEdgeLod (Unit - Aggregation & Level of Detail Tiers)', () => {
 
 		const styleDragChanged = computeEdgeLodStyle(changedEdge, 1.0, { isInteracting: true });
 		assert.equal(styleDragChanged.shouldRender, true, 'Drag interaction must retain changed focus edges');
+	});
+
+	test('5. Aggregate routes: lane index and community hash keep parallel corridors from collapsing into one spear', () => {
+		const lanes = [0, 1, 2, 3, 4].map(i =>
+			computeAggregateEdgeRoute(0, 0, 0, 400, 40, 40, i, 5, 'commSrc', 'commTgt'),
+		);
+		for (let i = 1; i < lanes.length; i++) {
+			const sep = Math.hypot(lanes[i].cpX - lanes[i - 1].cpX, lanes[i].cpY - lanes[i - 1].cpY);
+			assert.ok(sep >= 10, `lane step separation must be visible (got ${sep})`);
+		}
+
+		const corridorPairs = [
+			['alpha', 'beta'],
+			['gamma', 'delta'],
+			['epsilon', 'zeta'],
+			['eta', 'theta'],
+			['iota', 'kappa'],
+			['lambda', 'mu'],
+		] as const;
+		const cps = corridorPairs.map(([a, b], i) =>
+			computeAggregateEdgeRoute(50, 0, 50, 450, 28, 28, i % 3, 3, a, b),
+		);
+		const unique = new Set(cps.map(p => `${p.cpX.toFixed(1)},${p.cpY.toFixed(1)}`));
+		assert.ok(unique.size >= 4, `hash+lane diversification must yield multiple control points (got ${unique.size})`);
+		assert.notEqual(cps[0].cpX, 50, 'control point must leave the shared vertical mid-line');
 	});
 });

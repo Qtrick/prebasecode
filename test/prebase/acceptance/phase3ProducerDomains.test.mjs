@@ -101,6 +101,22 @@ describe('phase3 producer domains', () => {
 		}
 	});
 
+	test('graph layout / temporal product edits schedule temporal-small but not release soaks', () => {
+		const { producers, unknown } = producersForCommitTier([
+			'graphs/src/layouts/network/radialLayout.ts',
+			'graphs/src/temporal/view/temporalLayoutEngine.ts',
+			'graphs/src/view/network/networkRenderMath.ts',
+			'test/prebase/acceptance/prebase-graph-visual-recovery-live.mjs',
+		]);
+		assert.equal(unknown.length, 0);
+		assert.ok(producers.includes('temporal-small'));
+		assert.equal(producers.includes('active-soak'), false);
+		assert.equal(producers.includes('load-quit'), false);
+		assert.equal(producers.includes('temporal-large'), false);
+		assert.equal(producers.includes('idle-soak'), false);
+		assert.equal(producers.includes('parser-benchmark'), false);
+	});
+
 	test('nativeTools / chatParticipant map to guidance so commit tier schedules smoke', () => {
 		assert.ok(domainsForPath('extensions/prebase-magnus/src/nativeTools.ts').includes('magnus-guidance'));
 		assert.ok(domainsForPath('extensions/prebase-magnus/src/chatParticipant.ts').includes('magnus-guidance'));

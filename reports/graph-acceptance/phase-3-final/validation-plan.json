@@ -1,32 +1,31 @@
 {
-  "runId": "2026-08-30T18-39-39-147Z",
-  "planKey": "7961e731e27b64e3d06cf4b08b3bb9d0c17d8d5139c088681af068574c9d6f6d:commit",
+  "runId": "2026-08-30T19-51-15-837Z",
+  "planKey": "a32258e5d18a2a406f7946d0533472cc4c603ae474f17387b5cbc4d93c468794:commit",
   "tier": "commit",
   "onlyProducers": [],
-  "plannedAtHead": "4212c414e50610778fb1cfdad1e9a1ee570eedb6",
-  "currentHead": "4212c414e50610778fb1cfdad1e9a1ee570eedb6",
-  "sourceHead": "4212c414e50610778fb1cfdad1e9a1ee570eedb6",
-  "productFingerprint": "5e16770df3c1cbd42d3d07d1eb24b8a4640a11e09f4a8e71598d97a1e4e75cba",
-  "sourceFingerprint": "5e16770df3c1cbd42d3d07d1eb24b8a4640a11e09f4a8e71598d97a1e4e75cba",
+  "plannedAtHead": "0dbe96ca961fee9a98cebaa14e6d7dd24cbb4305",
+  "currentHead": "0dbe96ca961fee9a98cebaa14e6d7dd24cbb4305",
+  "sourceHead": "0dbe96ca961fee9a98cebaa14e6d7dd24cbb4305",
+  "productFingerprint": "468a7910fc0f2f6f2153c58032aba21b2fc1ca60a759a9f25e78352b15f15f56",
+  "sourceFingerprint": "468a7910fc0f2f6f2153c58032aba21b2fc1ca60a759a9f25e78352b15f15f56",
   "prerequisites": {
     "firecrawlConfigured": false,
     "linkupConfigured": false,
     "geminiConfigured": false
   },
-  "createdAt": "2026-08-30T18:39:40.820Z",
+  "createdAt": "2026-08-30T19:51:17.827Z",
   "reused": false,
-  "totalEstimatedDurationMs": 57071,
-  "changedPathCount": 47,
+  "totalEstimatedDurationMs": 90000,
+  "changedPathCount": 22,
   "changedDomains": [
-    "validation-orchestration",
-    "magnus-guidance",
-    "magnus-core",
-    "magnus-desktop-tools"
+    "graphs-common",
+    "network-graph",
+    "temporal",
+    "validation-orchestration"
   ],
   "unknownChangedPaths": [
-    "reports/graph-acceptance/phase-3-final/magnus/hybrid-quality-benchmark.json",
-    "reports/graph-acceptance/phase-3-final/magnus/project-guidance-smoke.json",
-    "reports/graph-acceptance/phase-3-final/validation-plan.json"
+    "reports/graph-acceptance/phase-3-final/validation-plan.json",
+    "reports/graph-acceptance/phase-3-final/visual-recovery/visual-recovery.json"
   ],
   "deferredReleaseProducers": [
     "parser-benchmark",
@@ -42,7 +41,7 @@
   "producers": [
     {
       "id": "parser-benchmark",
-      "expectedProducerFingerprint": "97b2a8f591f46316e5b27218c13124d434952c854472a0aa3912cac1122e3e56",
+      "expectedProducerFingerprint": "f4a6ea97c947ef73ff86e4e411a607ecf0650a749103a7349687c519bdab0481",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 90000,
@@ -56,9 +55,9 @@
     },
     {
       "id": "magnus-streaming-smoke",
-      "expectedProducerFingerprint": "612c04a0144c668d860de091df34275f57ff3ae9cc31c094e02ef8a929f2a0a9",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "9005d3603f80dfa46d6e2913a024923633d1bf5eb6c63084690662381df70933",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 45000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -73,9 +72,9 @@
     },
     {
       "id": "magnus-guidance-smoke",
-      "expectedProducerFingerprint": "19a76b935fd09ef0634519dab0f3d2c619cf9bd34b758e7b8ae2185b78f8720f",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "85c92ba7044a643edf5d89580baea13fae69fc6ea0cfe057e0917542e647b6d6",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 12071,
       "timeoutMs": 180000,
       "artifacts": [
@@ -90,7 +89,7 @@
     },
     {
       "id": "core-ide",
-      "expectedProducerFingerprint": "3d9280d6e0d217aaea27e972a4a18b41c2ce6bb21ba2894e1ab5bc2cdc38ccee",
+      "expectedProducerFingerprint": "43cc73fd66fbb75f40a54e1496b024746c5c68689cd0b22dc38419fa07784d5e",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 120000,
@@ -127,9 +126,9 @@
     },
     {
       "id": "temporal-small",
-      "expectedProducerFingerprint": "f796c9f0d9952dc5131150500393ce8eccd2b01295e86827ff6a37e6848f9395",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "9529255ff86c5b95658fdb9f89436b699005a7a48c046e183985b27e2e05486c",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -141,11 +140,22 @@
         "network-graph",
         "shared-workbench",
         "launch-harness"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-08-30T19:55:02.754Z",
+        "finishedAt": "2026-08-30T19:55:13.321Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 10484,
+        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "temporal-large",
-      "expectedProducerFingerprint": "0d08aae58be4ca75699de4308241ffb4cdc767621aa6c9fca1570445e0a84ad6",
+      "expectedProducerFingerprint": "71d88854acbeb3ad4ad042eef74b92027368b73ce0ecb563ea23a6d85440c384",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 150000,
@@ -283,7 +293,7 @@
     },
     {
       "id": "load-quit",
-      "expectedProducerFingerprint": "bd913efea6a5f069410cfc7e112790d09841987fe4ff6fe82364ce1bd4fea548",
+      "expectedProducerFingerprint": "1d97451ef4f75de3405f026c7c186442ca3679a1cae79ad33d1485d6e8379b7e",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 120000,
@@ -305,7 +315,7 @@
     },
     {
       "id": "lifecycle-cycles",
-      "expectedProducerFingerprint": "b36c6375fe85abead7cabe4889433dabb95e312108bade9e1db269214ca298ee",
+      "expectedProducerFingerprint": "49616b824d1c7266b733cd48403e09be0d1e9926eef210b69ed0b38da333769c",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 90000,
@@ -370,7 +380,7 @@
     },
     {
       "id": "active-soak",
-      "expectedProducerFingerprint": "86d0dabd4ffa537a1ff7ffde05e2ef7ea5842956999b676db6aebcf339edb0da",
+      "expectedProducerFingerprint": "b9ea328549c24846c5c1b1c80081634b1e8f95808668dcbc59a4593f2086e1b0",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 720000,
@@ -391,7 +401,7 @@
     },
     {
       "id": "assurance",
-      "expectedProducerFingerprint": "2598e35857f238044bfd5c69225d6db727e044b3e5692f1763a69dbbabbb74e6",
+      "expectedProducerFingerprint": "5731ac29a3b5bbeba1127ed25916be8bea92bd7524e1f466bca73be67ab95b3c",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 480000,

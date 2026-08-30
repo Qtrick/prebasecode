@@ -36,6 +36,7 @@ export const NETWORK_FOCAL_LENGTH = 1100;
 
 /**
  * Clamp a number to a bounded [min, max] range.
+ * Self-contained for webview serialization.
  */
 export function clamp(val: number, min: number, max: number): number {
 	return Math.max(min, Math.min(max, val));
@@ -43,28 +44,29 @@ export function clamp(val: number, min: number, max: number): number {
 
 /**
  * Normalizes depthScale into a smooth, bounded [0, 1] range.
- * Near nodes approach 1.0, far nodes approach 0.0.
+ * Matches production webview historical mapping.
  */
 export function normalizeDepthScale(depthScale: number): number {
-	return clamp((depthScale - 0.75) / 0.5, 0, 1);
+	if (!Number.isFinite(depthScale)) {
+		return 0.5;
+	}
+	return Math.max(0, Math.min(1, (depthScale - 0.65) / 0.85));
 }
 
 /**
- * Computes depth factor for node sizing.
- * Perspective influences node glyphs sublinearly so nodes do not balloon into giant circles.
- * Output is strictly bounded between [0.82, 1.22].
+ * Computes depth factor for node sizing. Bounded [0.78, 1.28].
  */
 export function computeNetworkDepthSizeFactor(depthScale: number): number {
 	const norm = normalizeDepthScale(depthScale);
-	return clamp(0.82 + norm * 0.38, 0.82, 1.22);
+	return Math.max(0.78, Math.min(1.28, 0.78 + norm * 0.46));
 }
 
 /**
- * Computes depth alpha for subtle 3D depth cueing without hiding distant topology.
- * Output is bounded in [minAlpha, maxAlpha].
+ * Computes depth alpha for subtle 3D depth cueing.
+ * Self-contained for webview serialization.
  */
 export function computeDepthAlpha(depthScale: number, minAlpha = 0.45, maxAlpha = 1.0): number {
-	const norm = normalizeDepthScale(depthScale);
+	const norm = !Number.isFinite(depthScale) ? 0.5 : Math.max(0, Math.min(1, (depthScale - 0.65) / 0.85));
 	return minAlpha + norm * (maxAlpha - minAlpha);
 }
 
@@ -104,39 +106,39 @@ export function projectPoint3D(
 
 /**
  * Computes the semantic node weight based on architectural importance, degree, or entry status.
+ * Self-contained body for serialization.
  */
 export function computeNetworkSemanticWeight(node: NetworkNodeLike, entryNodeId?: string): number {
+	if (!node) {
+		return 1.5;
+	}
 	if (typeof node.val === 'number' && Number.isFinite(node.val) && node.val > 0) {
 		return node.val;
 	}
-
-	const isEntry = Boolean(node.isEntry || (entryNodeId && node.id === entryNodeId));
-	if (isEntry) {
+	if (node.isEntry || (entryNodeId && node.id === entryNodeId)) {
 		return 10;
 	}
-
-	const importance = node.importance ?? node.meta?.importance ?? 0;
-	const degree = node.degree ?? 0;
-
-	if (importance > 0 || degree > 0) {
-		const impWeight = importance > 0
-			? (importance <= 1.0 ? 1.2 + Math.sqrt(importance * 10) * 1.8 : 1.2 + Math.sqrt(importance) * 1.8)
-			: 0;
-		const degWeight = degree > 0 ? 1.2 + Math.sqrt(degree) * 1.4 : 0;
-		return Math.max(1.5, impWeight, degWeight);
-	}
-
-	return 1.5;
+	const importance = typeof node.importance === 'number' && Number.isFinite(node.importance)
+		? node.importance
+		: (node.meta && typeof node.meta.importance === 'number' ? node.meta.importance : 0);
+	const degree = typeof node.degree === 'number' && Number.isFinite(node.degree) ? node.degree : 0;
+	const impWeight = importance > 0
+		? (importance <= 1.0 ? 1.2 + Math.sqrt(importance * 10) * 1.8 : 1.2 + Math.sqrt(importance) * 1.8)
+		: 0;
+	const degWeight = degree > 0 ? 1.2 + Math.sqrt(degree) * 1.4 : 0;
+	return Math.max(1.5, impWeight, degWeight);
 }
 
 /**
- * Computes the VISUAL screen-space radius of a node glyph.
- * Invariants:
- * - Ordinary file nodes: ~3-6px radius
- * - Hub nodes: ~6-10px radius
- * - Entry nodes: ~7-11px radius
- * - Perspective effect is bounded by computeNetworkDepthSizeFactor.
- * - Ordinary nodes NEVER explode into 30-100px bubbles.
+ * WORLD-SPACE visual radius for network node glyphs.
+ *
+ * `zoom` is the canvas transform.k. Returned values are drawn AFTER ctx.scale(zoom),
+ * so screen radius ≈ returnValue * zoom. Zoom compensation keeps ordinary nodes
+ * readable at Fit View without turning them into giant bubbles when zoomed in.
+ *
+ * Hierarchy: ordinary < hub < entry < selected (via options).
+ *
+ * Self-contained for webview serialization — do not reference other module symbols.
  */
 export function computeNetworkVisualRadius(
 	node: NetworkNodeLike,
@@ -146,29 +148,51 @@ export function computeNetworkVisualRadius(
 		readonly isSelected?: boolean;
 		readonly isHovered?: boolean;
 		readonly nodeScale?: number;
+		readonly zoom?: number;
 	},
 ): number {
-	const nodeScale = options?.nodeScale ?? 1.0;
-	const weight = computeNetworkSemanticWeight(node, options?.entryNodeId);
-	const depthFactor = computeNetworkDepthSizeFactor(depthScale);
-
-	// Base formula matching known-good PreBase: sqrt(weight) * scale * 1.6 + 1.6
-	let radius = (Math.sqrt(weight) * nodeScale * 1.6 + 1.6) * depthFactor;
-
-	if (options?.isHovered) {
-		radius *= 1.15;
+	const nodeScale = options && typeof options.nodeScale === 'number' && Number.isFinite(options.nodeScale)
+		? Math.max(0.5, Math.min(2.0, options.nodeScale))
+		: 1.0;
+	const entryId = options ? options.entryNodeId : undefined;
+	let weight = 1.5;
+	if (node) {
+		if (typeof node.val === 'number' && Number.isFinite(node.val) && node.val > 0) {
+			weight = node.val;
+		} else if (node.isEntry || (entryId && node.id === entryId)) {
+			weight = 10;
+		} else {
+			const importance = typeof node.importance === 'number' && Number.isFinite(node.importance)
+				? node.importance
+				: (node.meta && typeof node.meta.importance === 'number' ? node.meta.importance : 0);
+			const degree = typeof node.degree === 'number' && Number.isFinite(node.degree) ? node.degree : 0;
+			const impWeight = importance > 0
+				? (importance <= 1.0 ? 1.2 + Math.sqrt(importance * 10) * 1.8 : 1.2 + Math.sqrt(importance) * 1.8)
+				: 0;
+			const degWeight = degree > 0 ? 1.2 + Math.sqrt(degree) * 1.4 : 0;
+			weight = Math.max(1.5, impWeight, degWeight);
+		}
 	}
-	if (options?.isSelected) {
-		radius *= 1.25;
+	const depthNorm = !Number.isFinite(depthScale) ? 0.5 : Math.max(0, Math.min(1, (depthScale - 0.65) / 0.85));
+	const depthFactor = Math.max(0.78, Math.min(1.28, 0.78 + depthNorm * 0.46));
+	let baseScreen = (Math.sqrt(weight) * nodeScale * 1.6 + 1.6) * depthFactor;
+	if (options && options.isHovered) {
+		baseScreen *= 1.15;
 	}
+	if (options && options.isSelected) {
+		baseScreen *= 1.25;
+	}
+	baseScreen = Math.max(2.5, Math.min(20, baseScreen));
 
-	// Clamp within sane visual bounds: ordinary nodes never exceed 20px base glyph
-	return clamp(radius, 2.5, 20);
+	const zoom = options && typeof options.zoom === 'number' && Number.isFinite(options.zoom) ? options.zoom : 1;
+	const k = Math.max(0.001, zoom);
+	const desiredScreen = Math.max(2.8, Math.min(26, baseScreen * Math.pow(k, 0.5)));
+	return desiredScreen / k;
 }
 
 /**
- * Computes the PICK / HIT radius of a node for mouse/touch interaction.
- * Hit target is intentionally much larger than visual radius (~16-24px) for comfortable picking.
+ * WORLD-SPACE pick radius. Ensures comfortable ~16–24px screen targets across zoom.
+ * Self-contained for webview serialization.
  */
 export function computeNetworkPickRadius(
 	node: NetworkNodeLike,
@@ -176,15 +200,20 @@ export function computeNetworkPickRadius(
 	options?: {
 		readonly entryNodeId?: string;
 		readonly nodeScale?: number;
+		readonly zoom?: number;
 	},
 ): number {
 	const visualR = computeNetworkVisualRadius(node, depthScale, options);
-	return Math.max(18, visualR * 2.2 + 8);
+	const zoom = options && typeof options.zoom === 'number' && Number.isFinite(options.zoom) ? options.zoom : 1;
+	const k = Math.max(0.001, zoom);
+	const minScreenPick = 18;
+	return Math.max(visualR * 2.2 + 8 / k, minScreenPick / k);
 }
 
 /**
- * Computes bounded fitView bounds and camera transform.
- * Uses bounded glyph extents rather than raw unconstrained depth-scale multiplier.
+ * Fit View transform matching production webview semantics (insets + node-count zoom cap).
+ * Self-contained for webview serialization except it calls computeNetworkVisualRadius above
+ * — when injecting into the webview, inject BOTH and bind locally.
  */
 export function computeNetworkFitTransform(
 	nodes: readonly NetworkNodeLike[],
@@ -195,10 +224,32 @@ export function computeNetworkFitTransform(
 		readonly padding?: number;
 		readonly initialZoom?: number;
 		readonly nodeScale?: number;
+		readonly entryNodeId?: string;
+		readonly insets?: { readonly top?: number; readonly bottom?: number; readonly left?: number; readonly right?: number };
+		readonly minZoom?: number;
+		readonly maxZoom?: number;
 	},
 ): { readonly x: number; readonly y: number; readonly k: number } {
-	const pad = options?.padding ?? 72;
-	const initialZoom = options?.initialZoom ?? 1.0;
+	const pad = options && typeof options.padding === 'number' ? options.padding : 48;
+	const initialZoom = options && typeof options.initialZoom === 'number' ? options.initialZoom : 1.0;
+	const nodeScale = options ? options.nodeScale : undefined;
+	const entryNodeId = options ? options.entryNodeId : undefined;
+	const insetOpts = options ? options.insets : undefined;
+	const insets = {
+		top: insetOpts && typeof insetOpts.top === 'number' ? insetOpts.top : 0,
+		bottom: insetOpts && typeof insetOpts.bottom === 'number' ? insetOpts.bottom : 0,
+		left: insetOpts && typeof insetOpts.left === 'number' ? insetOpts.left : 0,
+		right: insetOpts && typeof insetOpts.right === 'number' ? insetOpts.right : 0,
+	};
+	const usableW = Math.max(100, viewportWidth - insets.left - insets.right);
+	const usableH = Math.max(100, viewportHeight - insets.top - insets.bottom);
+	const centerX = insets.left + usableW / 2;
+	const centerY = insets.top + usableH / 2;
+	const minZoom = options && typeof options.minZoom === 'number' ? options.minZoom : 0.15;
+	const maxZoom = options && typeof options.maxZoom === 'number'
+		? options.maxZoom
+		: (nodes.length <= 10 ? 3.2 : 2.4);
+
 	let minX = Infinity;
 	let minY = Infinity;
 	let maxX = -Infinity;
@@ -208,9 +259,15 @@ export function computeNetworkFitTransform(
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
 		const p = projectedMap[node.id];
-		if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) continue;
-
-		const r = computeNetworkVisualRadius(node, p.depthScale, { nodeScale: options?.nodeScale });
+		if (!p || !Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+			continue;
+		}
+		// Fit uses zoom=1 world radii (layout extents). Screen-aware sizing applies at draw time.
+		const r = computeNetworkVisualRadius(node, p.depthScale, {
+			nodeScale: nodeScale,
+			entryNodeId: entryNodeId,
+			zoom: 1,
+		});
 		minX = Math.min(minX, p.x - r);
 		minY = Math.min(minY, p.y - r);
 		maxX = Math.max(maxX, p.x + r);
@@ -219,24 +276,22 @@ export function computeNetworkFitTransform(
 	}
 
 	if (count === 0 || !Number.isFinite(minX)) {
-		return { x: 0, y: 0, k: 1 };
+		return { x: centerX, y: centerY, k: 1 };
 	}
 
 	const boxW = Math.max(1, maxX - minX);
 	const boxH = Math.max(1, maxY - minY);
-	const usableW = Math.max(100, viewportWidth - pad * 2);
-	const usableH = Math.max(100, viewportHeight - pad * 2);
+	const scale = Math.min((usableW - pad * 2) / boxW, (usableH - pad * 2) / boxH) * initialZoom;
+	const k = Math.max(minZoom, Math.min(maxZoom, scale));
 
-	const scale = Math.min(usableW / boxW, usableH / boxH, 2.0) * initialZoom;
-	const k = clamp(scale, 0.6, 1.4);
+	const graphCenterX = (minX + maxX) / 2;
+	const graphCenterY = (minY + maxY) / 2;
 
-	const centerX = (minX + maxX) / 2;
-	const centerY = (minY + maxY) / 2;
-
-	const x = (viewportWidth / 2) - centerX * k;
-	const y = (viewportHeight / 2) - centerY * k;
-
-	return { x, y, k };
+	return {
+		x: centerX - graphCenterX * k,
+		y: centerY - graphCenterY * k,
+		k,
+	};
 }
 
 /**
@@ -258,7 +313,6 @@ export function isNetworkLabelEligible(
 	}
 
 	if (isMoving) {
-		// During active rotation/pan, only show selected/hovered to maintain 60fps and avoid visual noise
 		return false;
 	}
 
@@ -274,6 +328,21 @@ export function isNetworkLabelEligible(
 		return true;
 	}
 
-	// General node labels only visible at deeper zoom (hover-first at overview)
 	return transformK >= 1.6;
+}
+
+/**
+ * World-space font size so text remains readable after ctx.scale(zoom).
+ * Self-contained for webview serialization.
+ */
+export function computeNetworkLabelWorldFontSize(
+	baseScreenPx: number,
+	zoom: number,
+	options?: { readonly minScreenPx?: number; readonly maxScreenPx?: number },
+): number {
+	const k = Math.max(0.001, Number.isFinite(zoom) ? zoom : 1);
+	const minScreen = options && typeof options.minScreenPx === 'number' ? options.minScreenPx : 9;
+	const maxScreen = options && typeof options.maxScreenPx === 'number' ? options.maxScreenPx : 18;
+	const desired = Math.max(minScreen, Math.min(maxScreen, baseScreenPx * Math.pow(k, 0.5)));
+	return desired / k;
 }

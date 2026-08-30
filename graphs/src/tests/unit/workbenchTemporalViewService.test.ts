@@ -9,6 +9,7 @@ import { URI } from '../../../../../../base/common/uri.js';
 import { Emitter } from '../../../../../../base/common/event.js';
 import { WorkbenchTemporalViewService } from '../../host/workbench/temporal/workbenchTemporalViewService.js';
 import { computeTemporalFocusContext } from '../../view/temporal/temporalFocusContext.js';
+import { TEMPORAL_INITIAL_LAYOUT_VERSION } from '../../temporal/view/temporalLayoutEngine.js';
 import type { TemporalEntitySnapshot, TemporalEdgeSnapshot, TemporalHistoryPage, TemporalCommitSummary, TemporalRepositoryRef } from '../../temporal/common/temporalTypes.js';
 
 suite('WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)', () => {
@@ -990,6 +991,66 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)', () => {
 		await service.initialize();
 		service.pauseActiveWork();
 		assert.equal(service.getState().selectedCommitSha, 'commit-1');
+		service.dispose();
+	});
+
+	test('stale layout version discards poisoned positions; matching version preserves mental map', async () => {
+		const history: TemporalHistoryPage = {
+			commits: [
+				makeCommitSummary('commit-3', 'feat: add C', 300, ['commit-2']),
+				makeCommitSummary('commit-2', 'feat: add B', 200, ['commit-1']),
+				makeCommitSummary('commit-1', 'feat: add A', 100, []),
+			],
+			hasMore: false,
+		};
+		const entities: Record<string, TemporalEntitySnapshot[]> = {
+			'commit-3': [
+				makeEntity('ent-1', 'src/a.ts', 'can-1'),
+				makeEntity('ent-2', 'src/b.ts', 'can-2'),
+				makeEntity('ent-3', 'src/c.ts', 'can-3'),
+			],
+			'commit-2': [
+				makeEntity('ent-1', 'src/a.ts', 'can-1'),
+				makeEntity('ent-2', 'src/b.ts', 'can-2'),
+			],
+			'commit-1': [makeEntity('ent-1', 'src/a.ts', 'can-1')],
+		};
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			createMockTemporalGraphService({ HEAD: history }, entities) as any,
+			createMockCommandService() as any,
+			createMockEditorService() as any,
+			mockLogService,
+			mockStorageService,
+		);
+		await service.initialize();
+
+		const positions = (service as any)._positions as Map<string, { x: number; y: number }>;
+		const diffCache = (service as any)._diffCache as Map<string, unknown>;
+
+		// Matching version: mental-map reuse keeps poisoned tall-stripe coords.
+		diffCache.clear();
+		positions.clear();
+		positions.set('ent-1', { x: 11, y: 9999 });
+		positions.set('ent-2', { x: 22, y: 8888 });
+		(service as any)._positionsLayoutVersion = TEMPORAL_INITIAL_LAYOUT_VERSION;
+		await service.selectCommit('commit-3', { immediate: true });
+		assert.equal(positions.get('ent-1')?.y, 9999, 'matching layout version must reuse cached mental-map positions');
+
+		// Stale version: must clear before reconstruct so old rank coords cannot stick.
+		diffCache.clear();
+		positions.clear();
+		positions.set('ent-1', { x: 11, y: 9999 });
+		positions.set('ent-2', { x: 22, y: 8888 });
+		positions.set('ent-3', { x: 33, y: 7777 });
+		(service as any)._positionsLayoutVersion = 1;
+		await service.selectCommit('commit-3', { immediate: true });
+		assert.equal((service as any)._positionsLayoutVersion, TEMPORAL_INITIAL_LAYOUT_VERSION);
+		assert.notEqual(positions.get('ent-1')?.y, 9999, 'stale layout version must discard poisoned tall-stripe cache');
+		assert.ok(positions.has('ent-1'), 'fresh layout must reposition surviving entities');
+
 		service.dispose();
 	});
 });

@@ -175,6 +175,21 @@ suite('TemporalFocusContext (Unit - Focus+Context & Spatial Quality)', () => {
 		assert.ok(rChanged > rContext * 1.4, 'Changed node must visually dominate context node');
 	});
 
+	test('3b. Zoom-aware temporal radii stay readable at Fit k=0.2 (uncompensated would vanish)', () => {
+		const unchanged = makeRenderNode('ent-ctx', 'src/ctx.ts', 'unchanged', 0, 0);
+		const changed = makeRenderNode('ent-chg', 'src/chg.ts', 'modified', 0, 0);
+		const baseUnchanged = computeTemporalVisualRadius(unchanged, { zoom: 1 });
+		assert.ok(baseUnchanged * 0.2 < 1.5, 'uncompensated unchanged mark must be subpixel-class at k=0.2');
+
+		for (const zoom of [0.15, 0.2, 0.5, 1, 2]) {
+			const uScreen = computeTemporalVisualRadius(unchanged, { zoom }) * zoom;
+			const cScreen = computeTemporalVisualRadius(changed, { zoom }) * zoom;
+			assert.ok(uScreen >= 3.0 && uScreen <= 16.5, `unchanged screen ${uScreen} at k=${zoom}`);
+			assert.ok(cScreen >= 4.5 && cScreen <= 22.5, `changed screen ${cScreen} at k=${zoom}`);
+			assert.ok(cScreen > uScreen, 'changed marks must remain larger than context across zoom');
+		}
+	});
+
 	test('4. Sunflower Layout Density: Compact bounded growth without hollow circular annular void', () => {
 		// 150 nodes across 15 directories
 		const nodes: TemporalRenderNode[] = [];

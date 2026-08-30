@@ -7,7 +7,7 @@ import type { GraphVersionMetadata } from '../../common/types/canonicalTypes.js'
 export const GRAPH_SCHEMA_VERSION = 1;
 export const GRAPH_ANALYZER_VERSION = 1;
 export const GRAPH_IDENTITY_VERSION = 1;
-export const GRAPH_LAYOUT_VERSION = 1;
+export const GRAPH_LAYOUT_VERSION = 3;
 export const GRAPH_ANALYSIS_PROFILE_VERSION = 1;
 
 export function createCurrentVersionMetadata(): GraphVersionMetadata {

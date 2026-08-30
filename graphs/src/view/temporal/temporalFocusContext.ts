@@ -389,9 +389,11 @@ export function computeTemporalFocusContext(
 }
 
 /**
- * Computes visual radius for Temporal nodes.
- * Changed nodes are prominent (6.0 - 8.0px).
- * Unchanged context nodes are quiet (3.0 - 4.5px).
+ * Computes WORLD-SPACE visual radius for Temporal nodes.
+ * Drawn after ctx.scale(zoom); zoom compensation keeps marks readable at Fit View.
+ *
+ * Changed nodes remain larger than unchanged context nodes.
+ * Self-contained for webview serialization.
  */
 export function computeTemporalVisualRadius(
 	node: TemporalRenderNode,
@@ -399,19 +401,27 @@ export function computeTemporalVisualRadius(
 		readonly isSelected?: boolean;
 		readonly isHovered?: boolean;
 		readonly isChanged?: boolean;
+		readonly zoom?: number;
 	},
 ): number {
-	const isChanged = options?.isChanged ?? (node.changeKind && node.changeKind !== 'unchanged');
-	let r = isChanged ? 7.0 : 3.8;
+	const isChanged = options && options.isChanged !== undefined
+		? options.isChanged
+		: Boolean(node && node.changeKind && node.changeKind !== 'unchanged');
+	let baseScreen = isChanged ? 7.0 : 3.8;
 
-	if (options?.isHovered) {
-		r *= 1.25;
+	if (options && options.isHovered) {
+		baseScreen *= 1.25;
 	}
-	if (options?.isSelected) {
-		r *= 1.35;
+	if (options && options.isSelected) {
+		baseScreen *= 1.35;
 	}
 
-	return r;
+	const zoom = options && typeof options.zoom === 'number' && Number.isFinite(options.zoom) ? options.zoom : 1;
+	const k = Math.max(0.001, zoom);
+	const minScreen = isChanged ? 4.5 : 3.2;
+	const maxScreen = isChanged ? 22 : 16;
+	const desired = Math.max(minScreen, Math.min(maxScreen, baseScreen * Math.pow(k, 0.5)));
+	return desired / k;
 }
 
 /**
@@ -432,15 +442,16 @@ export function computeTemporalFitTransform(
 		return { x: 0, y: 0, k: 1 };
 	}
 
-	const padding = options?.padding ?? 64;
-	const minZoom = options?.minZoom ?? 0.15;
-	const maxZoom = options?.maxZoom ?? 2.0;
+	const padding = options && typeof options.padding === 'number' ? options.padding : 64;
+	const minZoom = options && typeof options.minZoom === 'number' ? options.minZoom : 0.15;
+	const maxZoom = options && typeof options.maxZoom === 'number' ? options.maxZoom : 2.0;
 
+	const insetOpts = options ? options.insets : undefined;
 	const insets = {
-		top: options?.insets?.top ?? 0,
-		bottom: options?.insets?.bottom ?? 0,
-		left: options?.insets?.left ?? 0,
-		right: options?.insets?.right ?? 0,
+		top: insetOpts && typeof insetOpts.top === 'number' ? insetOpts.top : 0,
+		bottom: insetOpts && typeof insetOpts.bottom === 'number' ? insetOpts.bottom : 0,
+		left: insetOpts && typeof insetOpts.left === 'number' ? insetOpts.left : 0,
+		right: insetOpts && typeof insetOpts.right === 'number' ? insetOpts.right : 0,
 	};
 
 	const usableW = Math.max(100, viewportWidth - insets.left - insets.right);
@@ -458,7 +469,7 @@ export function computeTemporalFitTransform(
 		if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) {
 			continue;
 		}
-		const r = computeTemporalVisualRadius(node) + 6;
+		const r = computeTemporalVisualRadius(node, { zoom: 1 }) + 6;
 		const nx = node.x;
 		const ny = node.y;
 		minX = Math.min(minX, nx - r);

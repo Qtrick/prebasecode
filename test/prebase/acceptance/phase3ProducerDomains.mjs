@@ -129,6 +129,7 @@ export const PATH_PREFIX_DOMAINS = [
 	['test/prebase/acceptance/prebase-privacy-runtime.mjs', 'privacy'],
 	['test/prebase/acceptance/runtime-preview-live.mjs', 'runtime-preview'],
 	['test/prebase/acceptance/prebase-core-ide-live.mjs', 'core-ide'],
+	['test/prebase/acceptance/prebase-graph-visual-recovery-live.mjs', 'graphs-common'],
 	['test/prebase/acceptance/prebase-magnus-stream-live.mjs', 'magnus-core'],
 	['test/prebase/acceptance/prebase-active-soak.mjs', 'active-soak-lab'],
 	['test/prebase/acceptance/prebase-idle-soak.mjs', 'idle-soak-lab'],
@@ -393,7 +394,7 @@ export function producersAffectedByDomains(domainSet) {
 	return [...affected];
 }
 
-/** Heavy desktop/product producers: commit-tier only when their lab domain is touched. */
+/** Heavy desktop/product producers: commit-tier only when their lab/product domain is touched. */
 export const COMMIT_HEAVY_PRODUCERS = new Set([
 	'core-ide',
 	'electron-product-path',
@@ -407,7 +408,12 @@ export const COMMIT_HEAVY_PRODUCERS = new Set([
 	'privacy',
 ]);
 
-function commitLabDomainsForProducer(producerId) {
+/**
+ * Domains that unlock a COMMIT_HEAVY smoke when touched (product + lab).
+ * Release-only soaks must NOT use this list — product domains like `temporal`
+ * would otherwise pull active-soak / load-quit into every layout commit.
+ */
+function commitHeavyGateDomains(producerId) {
 	return (PRODUCER_DOMAINS[producerId] ?? []).filter(domain =>
 		domain.endsWith('-lab')
 		|| domain === 'electron-test-lab'
@@ -421,9 +427,21 @@ function commitLabDomainsForProducer(producerId) {
 	);
 }
 
+/** Release-only: unlock only when the soak/lab harness itself (or privacy/assurance leaf) is touched. */
+function releaseOnlyGateDomains(producerId) {
+	return (PRODUCER_DOMAINS[producerId] ?? []).filter(domain =>
+		domain.endsWith('-lab')
+		|| domain === 'electron-test-lab'
+		|| domain === 'tauri-test-lab'
+		|| domain === 'assurance-leaf'
+		|| domain === 'privacy'
+	);
+}
+
 /**
  * Commit-tier producers: fast relevant checks for normal feature commits.
- * Release soaks and heavy desktop matrices stay out unless their own lab/product domain was touched.
+ * Release soaks stay out unless their own lab harness domain was touched.
+ * Heavy product smokes run when their product/lab domain was touched.
  */
 export function producersForCommitTier(changedPaths, options = {}) {
 	const { unknown, domains } = classifyChangedPaths(undefined, changedPaths);
@@ -432,9 +450,11 @@ export function producersForCommitTier(changedPaths, options = {}) {
 		affected.add('assurance');
 	}
 	const filtered = [...affected].filter(id => {
-		if (RELEASE_ONLY_PRODUCERS.has(id) || COMMIT_HEAVY_PRODUCERS.has(id)) {
-			const labs = commitLabDomainsForProducer(id);
-			return labs.some(domain => domains.includes(domain));
+		if (RELEASE_ONLY_PRODUCERS.has(id)) {
+			return releaseOnlyGateDomains(id).some(domain => domains.includes(domain));
+		}
+		if (COMMIT_HEAVY_PRODUCERS.has(id)) {
+			return commitHeavyGateDomains(id).some(domain => domains.includes(domain));
 		}
 		return true;
 	});

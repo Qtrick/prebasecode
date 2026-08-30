@@ -26,12 +26,20 @@ import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
 import { serializeNetworkEdgeVisualSource } from './networkEdgeVisualRuntime.js';
 import {
+	serializeNetworkVisualRadiusSource,
+	serializeNetworkPickRadiusSource,
+	serializeNetworkFitTransformSource,
+	serializeNetworkDepthAlphaSource,
+	serializeNetworkLabelWorldFontSizeSource,
+} from './networkRenderMathRuntime.js';
+import {
 	serializeTemporalUnifiedStatusSource,
 	serializeTemporalFocusContextSource,
 	serializeTemporalVisualRadiusSource,
 	serializeTemporalFitTransformSource,
 	serializeTemporalCommunityAggregateEdgesSource,
 	serializeTemporalEdgeLodStyleSource,
+	serializeTemporalAggregateEdgeRouteSource,
 	serializeTemporalVisibleLabelsSource,
 } from './temporalRuntimeContracts.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
@@ -977,6 +985,13 @@ let graphType = initialGraphType;
 // graphs/src/view/network/networkEdgeVisual.ts (single source of truth; parity-tested).
 const resolveNetworkEdgeVisual = ${serializeNetworkEdgeVisualSource()};
 
+// Authoritative Network node visual / pick / fit / depth math (single source of truth).
+const computeNetworkVisualRadius = ${serializeNetworkVisualRadiusSource()};
+const computeNetworkPickRadius = ${serializeNetworkPickRadiusSource()};
+const computeNetworkFitTransform = ${serializeNetworkFitTransformSource()};
+const computeDepthAlpha = ${serializeNetworkDepthAlphaSource()};
+const computeNetworkLabelWorldFontSize = ${serializeNetworkLabelWorldFontSizeSource()};
+
 // Authoritative Temporal status, Focus+Context, and LOD resolvers, injected from
 // graphs/src/temporal/view/ (single source of truth; parity-tested).
 const computeTemporalUnifiedStatus = ${serializeTemporalUnifiedStatusSource()};
@@ -985,6 +1000,7 @@ const computeTemporalVisualRadius = ${serializeTemporalVisualRadiusSource()};
 const computeTemporalFitTransform = ${serializeTemporalFitTransformSource()};
 const computeCommunityAggregateEdges = ${serializeTemporalCommunityAggregateEdgesSource()};
 const computeEdgeLodStyle = ${serializeTemporalEdgeLodStyleSource()};
+const computeAggregateEdgeRoute = ${serializeTemporalAggregateEdgeRouteSource()};
 const computeVisibleLabels = ${serializeTemporalVisibleLabelsSource()};
 
 // 2. Fast request dispatcher & pending map
@@ -1573,49 +1589,28 @@ function fileType(path) {
 	return { id:'other', name: ext ? ext.toUpperCase() : 'Other', color:FILE_COLORS.other };
 }
 
-function normalizeDepthScale(depthScale) {
-	if (!Number.isFinite(depthScale)) return 0.5;
-	return Math.max(0, Math.min(1, (depthScale - 0.65) / 0.85));
-}
-
-function computeNetworkDepthFactor(depthScale) {
-	const norm = normalizeDepthScale(depthScale);
-	return Math.max(0.78, Math.min(1.28, 0.78 + norm * 0.46));
-}
-
-function computeDepthAlpha(depthScale) {
-	const norm = normalizeDepthScale(depthScale);
-	return Math.max(0.45, Math.min(1.0, 0.45 + norm * 0.55));
-}
-
-function computeSemanticWeight(node, entryId) {
-	if (!node) return 1.5;
-	if (typeof node.val === 'number' && Number.isFinite(node.val) && node.val > 0) return node.val;
-	if (node.id === entryId || node.isEntry) return 10;
-	const imp = (typeof node.importance === 'number' && Number.isFinite(node.importance))
-		? node.importance
-		: (node.meta && typeof node.meta.importance === 'number' ? node.meta.importance : 0);
-	if (imp > 0) return Math.max(1.5, 1.2 + Math.sqrt(imp) * 1.8);
-	const deg = (typeof node.degree === 'number' && Number.isFinite(node.degree)) ? node.degree : 0;
-	if (deg > 0) return Math.max(1.5, 1.2 + Math.sqrt(deg) * 1.4);
-	return 1.5;
-}
-
-function computeNetworkVisualRadius(node, depthScale, entryId, isSelected, isHovered) {
-	const weight = computeSemanticWeight(node, entryId);
-	const depthFactor = computeNetworkDepthFactor(depthScale);
-	const nodeScale = (typeof settings.nodeScale === 'number' && Number.isFinite(settings.nodeScale))
+function networkNodeScale() {
+	return (typeof settings.nodeScale === 'number' && Number.isFinite(settings.nodeScale))
 		? Math.max(0.5, Math.min(2.0, settings.nodeScale))
 		: 1.0;
-	let r = (Math.sqrt(weight) * nodeScale * 1.6 + 1.6) * depthFactor;
-	if (isHovered) r *= 1.15;
-	if (isSelected) r *= 1.25;
-	return Math.max(2.5, Math.min(20, r));
 }
 
-function computeNetworkPickRadius(node, depthScale, entryId) {
-	const vr = computeNetworkVisualRadius(node, depthScale, entryId, false, false);
-	return Math.max(18, vr * 2.2 + 8);
+function networkVisualRadius(node, depthScale, entryId, isSelected, isHovered) {
+	return computeNetworkVisualRadius(node, depthScale, {
+		entryNodeId: entryId,
+		isSelected: isSelected,
+		isHovered: isHovered,
+		nodeScale: networkNodeScale(),
+		zoom: transform.k,
+	});
+}
+
+function networkPickRadius(node, depthScale, entryId) {
+	return computeNetworkPickRadius(node, depthScale, {
+		entryNodeId: entryId,
+		nodeScale: networkNodeScale(),
+		zoom: transform.k,
+	});
 }
 
 // Cached Focus+Context derivation: delegates to authoritative computeTemporalFocusContext,
@@ -1826,23 +1821,20 @@ function fitView(animate) {
 	projectAll();
 	const nodes = snapshot.nodes;
 	const entryId = snapshot.entryNodeId;
-	let minX = Infinity, minY = Infinity, maxX = -Infinity, maxY = -Infinity;
+	const projectedMap = {};
 	for (let i = 0; i < nodes.length; i++) {
-		const node = nodes[i];
-		const p = screenPos(node.id);
-		if (!p) continue;
-		const r = computeNetworkVisualRadius(node, p.depthScale || 1, entryId, false, false);
-		minX = Math.min(minX, p.x - r); minY = Math.min(minY, p.y - r);
-		maxX = Math.max(maxX, p.x + r); maxY = Math.max(maxY, p.y + r);
+		const p = screenPos(nodes[i].id);
+		if (p) projectedMap[nodes[i].id] = { x: p.x, y: p.y, depthScale: p.depthScale || 1 };
 	}
-	if (!isFinite(minX)) return;
-	const bw = Math.max(1, maxX - minX), bh = Math.max(1, maxY - minY);
-	const initialZoom = settings.initialZoom || 1;
-	const maxFitZoom = nodes.length <= 10 ? 3.2 : 2.4;
-	const k = Math.max(MIN_ZOOM, Math.min(maxFitZoom, Math.min((usableW - 96) / bw, (usableH - 96) / bh) * initialZoom));
-	const graphCenterX = (minX + maxX) / 2;
-	const graphCenterY = (minY + maxY) / 2;
-	const targetTransform = { k: k, x: centerX - graphCenterX * k, y: centerY - graphCenterY * k };
+	const targetTransform = computeNetworkFitTransform(nodes, projectedMap, vw, vh, {
+		padding: 48,
+		initialZoom: settings.initialZoom || 1,
+		nodeScale: networkNodeScale(),
+		entryNodeId: entryId,
+		insets: insets,
+		minZoom: MIN_ZOOM,
+		maxZoom: nodes.length <= 10 ? 3.2 : 2.4,
+	});
 	if (shouldAnimate && animMs > 0) {
 		animateViewportTo(targetTransform, animMs);
 	} else {
@@ -2388,7 +2380,8 @@ function drawTemporalFrame(ts) {
 			ctx.stroke();
 			if (guide.label && transform.k >= 0.18) {
 				if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
-				ctx.font = canvasFont('600', 15);
+				const guideFont = computeNetworkLabelWorldFontSize(15, transform.k, { minScreenPx: 11, maxScreenPx: 20 });
+				ctx.font = canvasFont('600', guideFont);
 				ctx.fillStyle = theme.isHighContrast
 					? 'rgba(255, 255, 255, 0.78)'
 					: (hexColor || 'var(--vscode-descriptionForeground, #a1a1aa)');
@@ -2406,6 +2399,17 @@ function drawTemporalFrame(ts) {
 			for (let g = 0; g < temporalDiff.guides.length; g++) {
 				commMap.set(temporalDiff.guides[g].id, temporalDiff.guides[g]);
 			}
+			// Lane index is per undirected community pair (not global agg list index).
+			const pairLaneCounts = new Map();
+			const pairLaneIndex = new Map();
+			for (let a = 0; a < aggEdges.length; a++) {
+				const agg = aggEdges[a];
+				const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
+				const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
+				const key = lo + '::' + hi;
+				pairLaneIndex.set(a, pairLaneCounts.get(key) || 0);
+				pairLaneCounts.set(key, (pairLaneCounts.get(key) || 0) + 1);
+			}
 
 			for (let a = 0; a < aggEdges.length; a++) {
 				const agg = aggEdges[a];
@@ -2418,25 +2422,25 @@ function drawTemporalFrame(ts) {
 				const dist = Math.hypot(dx, dy);
 				if (dist < 10) continue;
 
-				const srcX = cSrc.x + (dx / dist) * Math.min(cSrc.radius * 0.75, dist * 0.35);
-				const srcY = cSrc.y + (dy / dist) * Math.min(cSrc.radius * 0.75, dist * 0.35);
-				const tgtX = cTgt.x - (dx / dist) * Math.min(cTgt.radius * 0.75, dist * 0.35);
-				const tgtY = cTgt.y - (dy / dist) * Math.min(cTgt.radius * 0.75, dist * 0.35);
+				const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
+				const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
+				const pairKey = lo + '::' + hi;
+				const route = computeAggregateEdgeRoute(
+					cSrc.x, cSrc.y, cTgt.x, cTgt.y,
+					cSrc.radius || 40, cTgt.radius || 40,
+					pairLaneIndex.get(a) || 0, pairLaneCounts.get(pairKey) || 1,
+					agg.sourceCommunityId, agg.targetCommunityId
+				);
 
-				const midX = (srcX + tgtX) / 2;
-				const midY = (srcY + tgtY) / 2;
-				const cpX = midX - (dy / dist) * 16;
-				const cpY = midY + (dx / dist) * 16;
-
-				const strokeWidth = Math.min(4.0, 1.2 + Math.log2(1 + agg.edgeCount) * 0.5);
+				const strokeWidth = Math.min(4.0, 1.2 + Math.log2(1 + agg.edgeCount) * 0.5) / Math.max(0.35, Math.sqrt(transform.k));
 
 				ctx.save();
 				ctx.beginPath();
-				ctx.moveTo(srcX, srcY);
+				ctx.moveTo(route.x1, route.y1);
 				if (typeof ctx.quadraticCurveTo === 'function') {
-					ctx.quadraticCurveTo(cpX, cpY, tgtX, tgtY);
+					ctx.quadraticCurveTo(route.cpX, route.cpY, route.x2, route.y2);
 				} else {
-					ctx.lineTo(tgtX, tgtY);
+					ctx.lineTo(route.x2, route.y2);
 				}
 				ctx.strokeStyle = agg.changedEdgeCount > 0
 					? theme.accent
@@ -2445,11 +2449,14 @@ function drawTemporalFrame(ts) {
 				ctx.stroke();
 				edgesDrawn++;
 
-				// Count badge on aggregate edge
+				// Count badge on the quadratic midpoint (not the chord).
 				if (transform.k >= 0.38) {
+					const midX = 0.25 * route.x1 + 0.5 * route.cpX + 0.25 * route.x2;
+					const midY = 0.25 * route.y1 + 0.5 * route.cpY + 0.25 * route.y2;
+					const badgeFont = computeNetworkLabelWorldFontSize(9, transform.k, { minScreenPx: 8, maxScreenPx: 14 });
 					ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-					ctx.fillRect(midX - 9, midY - 6, 18, 12);
-					ctx.font = canvasFont('600', 9);
+					ctx.fillRect(midX - 9 / transform.k, midY - 6 / transform.k, 18 / transform.k, 12 / transform.k);
+					ctx.font = canvasFont('600', badgeFont);
 					ctx.fillStyle = agg.changedEdgeCount > 0 ? theme.accent : '#94a3b8';
 					ctx.textAlign = 'center';
 					ctx.textBaseline = 'middle';
@@ -2584,7 +2591,15 @@ function drawTemporalFrame(ts) {
 		const isDirectContext = directContextSet.has(node.entityId);
 
 		const layerColor = getArchitectureLayerColor(node.meta?.architectureLayer);
-		let r = isFocus ? 7.0 : (isDirectContext ? 4.5 : 3.5);
+		let r = computeTemporalVisualRadius(node, {
+			isChanged: isFocus,
+			isSelected: isSelected,
+			isHovered: isHovered,
+			zoom: transform.k,
+		});
+		if (!isFocus && isDirectContext) {
+			r = Math.max(r, computeTemporalVisualRadius(node, { isChanged: false, zoom: transform.k }) * 1.12);
+		}
 		let fillColor = layerColor;
 		let strokeColor = theme.isHighContrast ? '#ffffff' : '#6e7681';
 		let alpha = isFocus ? 1.0 : (isDirectContext ? 0.85 : 0.45);
@@ -2844,7 +2859,7 @@ function pickNetworkNode(clientX, clientY) {
 		const node = nodes[i];
 		const p = screenPos(node.id);
 		if (!p) continue;
-		const pickR = computeNetworkPickRadius(node, p.depthScale || 1, entryId);
+		const pickR = networkPickRadius(node, p.depthScale || 1, entryId);
 		const d = Math.hypot(wx - p.x, wy - p.y);
 		if (d <= pickR && (d < bestDist || (d === bestDist && best && node.id < best.id))) {
 			bestDist = d;
@@ -2959,7 +2974,7 @@ function drawNetworkFrame() {
 
 		const isSelected = selectedNodeId === node.id;
 		const isHovered = hoveredNodeId === node.id;
-		const r = computeNetworkVisualRadius(node, p.depthScale || 1, entryId, isSelected, isHovered);
+		const r = networkVisualRadius(node, p.depthScale || 1, entryId, isSelected, isHovered);
 		const depthAlpha = computeDepthAlpha(p.depthScale || 1);
 		const isDimmed = Boolean(activeHighlightId && connectedNodeIds && !connectedNodeIds.has(node.id));
 
@@ -3018,7 +3033,7 @@ function drawNetworkFrame() {
 
 		if (!shouldShowLabel) continue;
 
-		const r = computeNetworkVisualRadius(node, p.depthScale || 1, entryId, isSelected, isHovered);
+		const r = networkVisualRadius(node, p.depthScale || 1, entryId, isSelected, isHovered);
 		const labelText = node.label || node.id;
 		const labelY = p.y + r + 10;
 
@@ -3047,8 +3062,12 @@ function drawNetworkFrame() {
 
 		placedLabelBoxes.push({ x: boxLeft, y: boxTop, w: boxWidth, h: boxHeight });
 
+		const labelFontPx = computeNetworkLabelWorldFontSize(isSelected || isHovered ? 11 : 10, transform.k, {
+			minScreenPx: isSelected || isHovered ? 11 : 9,
+			maxScreenPx: 18,
+		});
 		ctx.save();
-		ctx.font = canvasFont((isSelected || isHovered) ? 'bold' : '', isSelected || isHovered ? 11 : 10);
+		ctx.font = canvasFont((isSelected || isHovered) ? 'bold' : '', labelFontPx);
 		ctx.textAlign = 'center';
 
 		// Backdrop for contrast

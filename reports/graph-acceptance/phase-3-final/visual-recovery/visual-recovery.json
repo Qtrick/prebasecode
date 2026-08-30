@@ -1,0 +1,165 @@
+{
+  "workspace": "/Users/qunyingfan/Prebasecode",
+  "startedAt": "2026-08-30T20:04:40.891Z",
+  "network": {
+    "organic": {
+      "mode": "organic",
+      "ok": true,
+      "nodesDrawn": 280,
+      "receivedNodeCount": 280,
+      "edgesDrawn": 420,
+      "labelsDrawn": 1,
+      "transformK": 1.173955766759394,
+      "screenUtilization": 0.4861655584036419,
+      "medianHitRadius": null,
+      "p10HitRadius": null,
+      "lodTier": "high",
+      "networkLayoutMode": "organic",
+      "projectedBounds": {
+        "minX": 126.53769717790567,
+        "minY": 88.76502545298132,
+        "maxX": 665.007574828275,
+        "maxY": 644.3736461211269,
+        "width": 538.4698776503693,
+        "height": 555.6086206681455
+      }
+    },
+    "sphere": {
+      "mode": "sphere",
+      "ok": true,
+      "nodesDrawn": 280,
+      "receivedNodeCount": 280,
+      "edgesDrawn": 420,
+      "labelsDrawn": 1,
+      "transformK": 0.9856742516951225,
+      "screenUtilization": 0.5504541242381258,
+      "medianHitRadius": null,
+      "p10HitRadius": null,
+      "lodTier": "high",
+      "networkLayoutMode": "sphere",
+      "projectedBounds": {
+        "minX": 92.56123890554721,
+        "minY": 86.39216880710819,
+        "maxX": 696.2947943300773,
+        "maxY": 647.4685869498118,
+        "width": 603.7335554245301,
+        "height": 561.0764181427036
+      }
+    },
+    "constellation": {
+      "mode": "constellation",
+      "ok": true,
+      "nodesDrawn": 280,
+      "receivedNodeCount": 280,
+      "edgesDrawn": 420,
+      "labelsDrawn": 1,
+      "transformK": 1.0389596970596207,
+      "screenUtilization": 0.5220468125691161,
+      "medianHitRadius": null,
+      "p10HitRadius": null,
+      "lodTier": "high",
+      "networkLayoutMode": "constellation",
+      "projectedBounds": {
+        "minX": 92.14532513842084,
+        "minY": 101.99126276204908,
+        "maxX": 701.0111095548045,
+        "maxY": 629.6268499940852,
+        "width": 608.8657844163837,
+        "height": 527.6355872320362
+      }
+    },
+    "clustered": {
+      "mode": "clustered",
+      "ok": true,
+      "nodesDrawn": 280,
+      "receivedNodeCount": 280,
+      "edgesDrawn": 420,
+      "labelsDrawn": 1,
+      "transformK": 1.0331960048933857,
+      "screenUtilization": 0.33803152515236645,
+      "medianHitRadius": null,
+      "p10HitRadius": null,
+      "lodTier": "high",
+      "networkLayoutMode": "clustered",
+      "projectedBounds": {
+        "minX": 88.22237066958041,
+        "minY": 196.5588993234846,
+        "maxX": 699.514102762437,
+        "maxY": 536.8533629213749,
+        "width": 611.2917320928566,
+        "height": 340.2944635978903
+      }
+    },
+    "radial": {
+      "mode": "radial",
+      "ok": true,
+      "nodesDrawn": 280,
+      "receivedNodeCount": 280,
+      "edgesDrawn": 420,
+      "labelsDrawn": 1,
+      "transformK": 0.6367253090887025,
+      "screenUtilization": 0.42431925691366085,
+      "medianHitRadius": null,
+      "p10HitRadius": null,
+      "lodTier": "medium",
+      "networkLayoutMode": "radial",
+      "projectedBounds": {
+        "minX": 167.12078320128012,
+        "minY": 82.98034770012217,
+        "maxX": 621.954654606699,
+        "maxY": 657.0784921274663,
+        "width": 454.8338714054189,
+        "height": 574.0981444273442
+      }
+    }
+  },
+  "temporal": {
+    "state": {
+      "mode": "state",
+      "ok": true,
+      "nodesDrawn": 9679,
+      "receivedNodeCount": 9679,
+      "edgesDrawn": 8,
+      "labelsDrawn": 18,
+      "transformK": 0.2129062281858373,
+      "screenUtilization": 0.5728376017139692,
+      "medianHitRadius": null,
+      "p10HitRadius": null,
+      "lodTier": "aggregate",
+      "displayMode": "state",
+      "projectedBounds": {
+        "minX": 72.4889862716202,
+        "minY": 106.08648103622119,
+        "maxX": 719.5110137283798,
+        "maxY": 650.9135189637789,
+        "width": 647.0220274567596,
+        "height": 544.8270379275577
+      }
+    },
+    "changes": {
+      "mode": "changes",
+      "ok": true,
+      "nodesDrawn": 52,
+      "receivedNodeCount": 9679,
+      "edgesDrawn": 120,
+      "labelsDrawn": 18,
+      "transformK": 0.5092917251051894,
+      "screenUtilization": 0.48159252642925254,
+      "medianHitRadius": null,
+      "p10HitRadius": null,
+      "lodTier": "direct",
+      "displayMode": "changes",
+      "projectedBounds": {
+        "minX": 135.75192847124822,
+        "minY": 92.99105890603084,
+        "maxX": 656.2480715287518,
+        "maxY": 662.3792075736326,
+        "width": 520.4961430575036,
+        "height": 569.3881486676017
+      }
+    }
+  },
+  "failures": [],
+  "finishedAt": "2026-08-30T20:06:44.618Z",
+  "ok": true
+}

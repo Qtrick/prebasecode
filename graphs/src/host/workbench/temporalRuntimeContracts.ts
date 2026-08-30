@@ -4,6 +4,13 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { serializeSelfContainedFunction, serializeNetworkEdgeVisualSource } from './networkEdgeVisualRuntime.js';
+import {
+	serializeNetworkVisualRadiusSource,
+	serializeNetworkPickRadiusSource,
+	serializeNetworkFitTransformSource,
+	serializeNetworkDepthAlphaSource,
+	serializeNetworkLabelWorldFontSizeSource,
+} from './networkRenderMathRuntime.js';
 import { computeTemporalUnifiedStatus } from '../../temporal/view/temporalStatusModel.js';
 import {
 	computeTemporalFocusContext,
@@ -14,6 +21,7 @@ import {
 import {
 	computeCommunityAggregateEdges,
 	computeEdgeLodStyle,
+	computeAggregateEdgeRoute,
 } from '../../temporal/view/temporalEdgeLod.js';
 import {
 	computeVisibleLabels,
@@ -63,6 +71,13 @@ export function serializeTemporalEdgeLodStyleSource(): string {
 }
 
 /**
+ * Serialized source of the authoritative aggregate edge route computation.
+ */
+export function serializeTemporalAggregateEdgeRouteSource(): string {
+	return serializeSelfContainedFunction(computeAggregateEdgeRoute as (...args: unknown[]) => unknown);
+}
+
+/**
  * Serialized source of the authoritative Temporal Visible Labels LOD computation.
  */
 export function serializeTemporalVisibleLabelsSource(): string {
@@ -77,12 +92,18 @@ export function interpolateWebviewScript(script: string, generation = '42', init
 		.replace('${generation}', generation)
 		.replace('${initialGraphType}', initialGraphType)
 		.replace('${serializeNetworkEdgeVisualSource()}', serializeNetworkEdgeVisualSource())
+		.replace('${serializeNetworkVisualRadiusSource()}', serializeNetworkVisualRadiusSource())
+		.replace('${serializeNetworkPickRadiusSource()}', serializeNetworkPickRadiusSource())
+		.replace('${serializeNetworkFitTransformSource()}', serializeNetworkFitTransformSource())
+		.replace('${serializeNetworkDepthAlphaSource()}', serializeNetworkDepthAlphaSource())
+		.replace('${serializeNetworkLabelWorldFontSizeSource()}', serializeNetworkLabelWorldFontSizeSource())
 		.replace('${serializeTemporalUnifiedStatusSource()}', serializeTemporalUnifiedStatusSource())
 		.replace('${serializeTemporalFocusContextSource()}', serializeTemporalFocusContextSource())
 		.replace('${serializeTemporalVisualRadiusSource()}', serializeTemporalVisualRadiusSource())
 		.replace('${serializeTemporalFitTransformSource()}', serializeTemporalFitTransformSource())
 		.replace('${serializeTemporalCommunityAggregateEdgesSource()}', serializeTemporalCommunityAggregateEdgesSource())
 		.replace('${serializeTemporalEdgeLodStyleSource()}', serializeTemporalEdgeLodStyleSource())
+		.replace('${serializeTemporalAggregateEdgeRouteSource()}', serializeTemporalAggregateEdgeRouteSource())
 		.replace('${serializeTemporalVisibleLabelsSource()}', serializeTemporalVisibleLabelsSource());
 }
 
