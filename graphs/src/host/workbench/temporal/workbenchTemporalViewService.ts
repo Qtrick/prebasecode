@@ -84,6 +84,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private _displayMode: TemporalDisplayMode = 'state';
 	private _filterQuery: string = '';
 	private _selectedEntityId?: string;
+	private _currentFileEntityId?: string;
 
 	private _pagedTimeline: TemporalCommitSummary[] = [];
 	private _loadedCommitCount: number = 0;
@@ -118,6 +119,14 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		if (this._gitHistoryService?.onDidChangeHead) {
 			this._register(this._gitHistoryService.onDidChangeHead(e => {
 				void this._handleHeadChanged(e);
+			}));
+		}
+
+		if (this._editorService.onDidActiveEditorChange) {
+			this._register(this._editorService.onDidActiveEditorChange(() => {
+				if (this._assignCurrentFileEntityId(this._resolveEntityIdForEditorResource(this._getActiveEditorResource()))) {
+					this._notifyStateChanged();
+				}
 			}));
 		}
 
@@ -215,6 +224,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			isPartialLineage: this._isPartialLineage,
 			diff: this._currentDiff,
 			selectedEntityId: this._selectedEntityId,
+			currentFileEntityId: this._currentFileEntityId,
 			filterQuery: this._filterQuery,
 			timelineWindow: { start: windowStart, count: windowedTimeline.length },
 		};
@@ -295,6 +305,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		this._compareBaseSha = undefined;
 		this._renderedCompareBaseSha = undefined;
 		this._selectedEntityId = undefined;
+		this._currentFileEntityId = undefined;
 
 		this._diffCache.clear();
 		this._positions.clear();
@@ -749,6 +760,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			this._isSettled = true;
 			this._isPartialLineage = cached.isPartialLineage;
 			this._onDidChangeDiff.fire(cached);
+			this._syncCurrentFileEntityFromEditor();
 			this._notifyStateChanged();
 			return;
 		}
@@ -874,6 +886,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 			this._currentDiff = diffWithLayout;
 
 			this._onDidChangeDiff.fire(diffWithLayout);
+			this._syncCurrentFileEntityFromEditor();
 			this._notifyStateChanged();
 		} catch (err: any) {
 			if (!cts.token.isCancellationRequested && this._generationToken === currentGen) {
@@ -928,6 +941,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 
 			const title = `${node.label} (${baseSha ? baseSha.slice(0, 7) : 'Empty'} ↔ ${targetSha ? targetSha.slice(0, 7) : 'Current'})`;
 			await this._commandService.executeCommand('vscode.diff', baseUri, targetUri, title);
+			this._setCurrentFileEntityId(entityId);
 			return { ok: true };
 		} catch (err: any) {
 			const message = err?.message || String(err);
@@ -960,12 +974,73 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 				const gitUri = this._createGitResourceUri(root, node.path, this._currentDiff.targetCommitSha);
 				await this._editorService.openEditor({ resource: gitUri, options: { pinned: false } });
 			}
+			this._setCurrentFileEntityId(entityId);
 			return { ok: true };
 		} catch (err: any) {
 			const message = err?.message || String(err);
 			this._logService.warn('[WorkbenchTemporalViewService] Open historical file failed:', err);
 			return { ok: false, message };
 		}
+	}
+
+	private _setCurrentFileEntityId(entityId: string | undefined): void {
+		if (this._assignCurrentFileEntityId(entityId)) {
+			this._notifyStateChanged();
+		}
+	}
+
+	private _syncCurrentFileEntityFromEditor(): void {
+		this._assignCurrentFileEntityId(this._resolveEntityIdForEditorResource(this._getActiveEditorResource()));
+	}
+
+	private _getActiveEditorResource(): URI | undefined {
+		const editor = this._editorService.activeEditor;
+		return editor && 'resource' in editor ? editor.resource : undefined;
+	}
+
+	private _assignCurrentFileEntityId(entityId: string | undefined): boolean {
+		if (this._currentFileEntityId === entityId) {
+			return false;
+		}
+		this._currentFileEntityId = entityId;
+		return true;
+	}
+
+	private _resolveEntityIdForEditorResource(resource?: URI): string | undefined {
+		if (!resource || !this._currentDiff?.nodes?.length) {
+			return undefined;
+		}
+
+		let relPath: string | undefined;
+		if (resource.scheme === 'git') {
+			try {
+				const query = JSON.parse(resource.query);
+				const fsPath = typeof query?.path === 'string' ? query.path : undefined;
+				const root = this._getActiveRepoRoot();
+				if (fsPath && root && fsPath.startsWith(root)) {
+					relPath = fsPath.slice(root.length).replace(/^[/\\]+/, '');
+				}
+			} catch {
+				relPath = undefined;
+			}
+		} else if (resource.scheme === 'file') {
+			const root = this._getActiveRepoRoot();
+			if (root && resource.fsPath.startsWith(root)) {
+				relPath = resource.fsPath.slice(root.length).replace(/^[/\\]+/, '');
+			}
+		}
+
+		if (!relPath) {
+			return undefined;
+		}
+
+		const normalized = relPath.replace(/\\/g, '/');
+		const node = this._currentDiff.nodes.find(candidate => {
+			const path = (candidate.path || '').replace(/\\/g, '/');
+			const oldPath = (candidate.oldPath || '').replace(/\\/g, '/');
+			return path === normalized || oldPath === normalized;
+		});
+		return node?.entityId;
 	}
 
 	private _createGitResourceUri(rootFsPath: string, relativePath: string, ref: string): URI {

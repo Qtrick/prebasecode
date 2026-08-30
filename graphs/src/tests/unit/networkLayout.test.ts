@@ -6,10 +6,13 @@ import assert from 'assert';
 import {
 	computeNetworkSphereRadius,
 	layoutNetworkGraph,
-	type NetworkLayoutMode,
+	normalizeNetworkLayoutMode,
+	isLegacyNetworkLayoutMode,
+	NETWORK_LAYOUT_MODES,
+	NETWORK_LAYOUT_OPTIONS,
+	LEGACY_NETWORK_LAYOUT_MODES,
 	type Point3D,
 } from '../../layouts/network/index.js';
-import { RADIAL_LAYOUT_VERSION } from '../../layouts/network/radialLayout.js';
 
 suite('PreBase networkLayout', () => {
 	function makeGraph(n: number) {
@@ -51,10 +54,6 @@ suite('PreBase networkLayout', () => {
 		return { cx, cy, cz, vars, minNN };
 	}
 
-	function radius(position: Point3D): number {
-		return Math.hypot(position.x, position.y, position.z);
-	}
-
 	function totalLinkLength(layout: Map<string, Point3D>, links: Array<{ source: string; target: string }>): number {
 		return links.reduce((total, link) => total + Math.hypot(
 			layout.get(link.source)!.x - layout.get(link.target)!.x,
@@ -68,7 +67,7 @@ suite('PreBase networkLayout', () => {
 		assert.ok(computeNetworkSphereRadius(100, 2) > computeNetworkSphereRadius(100, 1));
 	});
 
-	for (const mode of ['organic', 'sphere', 'constellation', 'clustered', 'radial'] as NetworkLayoutMode[]) {
+	for (const mode of NETWORK_LAYOUT_MODES) {
 		test(`${mode} is deterministic and 3D`, () => {
 			const g = makeGraph(48);
 			const r = computeNetworkSphereRadius(g.nodes.length, 1);
@@ -81,20 +80,10 @@ suite('PreBase networkLayout', () => {
 				assert.deepStrictEqual(p1, p2);
 			}
 			const m = metrics(a);
-			if (mode !== 'radial') {
-				assert.ok(Math.hypot(m.cx, m.cy, m.cz) < 1e-6);
-			}
-			// Radial is intentionally near-planar (concentric rings). Other layouts keep volumetric depth.
+			assert.ok(Math.hypot(m.cx, m.cy, m.cz) < 1e-6);
 			assert.ok(m.vars[0] > 1);
 			assert.ok(m.vars[1] > 1);
-			if (mode === 'radial') {
-				assert.strictEqual(m.vars[2], 0, 'radial v4 is strictly planar (z=0)');
-				for (const p of a.values()) {
-					assert.strictEqual(p.z, 0);
-				}
-			} else {
-				assert.ok(m.vars[2] > (mode === 'organic' ? 0.5 : 1));
-			}
+			assert.ok(m.vars[2] > (mode === 'organic' ? 0.5 : 1));
 			assert.ok(m.minNN > 0.5);
 		});
 	}
@@ -135,7 +124,7 @@ suite('PreBase networkLayout', () => {
 			{ source: 'missing', target: 'isolated' },
 		];
 
-		for (const mode of ['organic', 'sphere', 'constellation', 'clustered', 'radial'] as NetworkLayoutMode[]) {
+		for (const mode of NETWORK_LAYOUT_MODES) {
 			const layout = layoutNetworkGraph(mode, nodes, links, 240);
 			assert.strictEqual(layout.size, nodes.length, mode);
 			for (const node of nodes) {
@@ -145,130 +134,40 @@ suite('PreBase networkLayout', () => {
 		}
 	});
 
-	test('radial pins the entry root and orders undirected BFS shells, unlike the even sphere shell', () => {
-		const nodes = [
-			{ id: 'entry', fileTypeId: 'typescript', val: 1, isEntry: true },
-			{ id: 'near-a', fileTypeId: 'typescript', val: 20, isEntry: false },
-			{ id: 'near-b', fileTypeId: 'typescript', val: 2, isEntry: false },
-			{ id: 'far-a', fileTypeId: 'typescript', val: 100, isEntry: false },
-			{ id: 'far-b', fileTypeId: 'typescript', val: 1, isEntry: false },
-		];
-		const links = [
-			{ source: 'entry', target: 'near-a' },
-			{ source: 'entry', target: 'near-b' },
-			{ source: 'near-a', target: 'far-a' },
-			{ source: 'near-b', target: 'far-b' },
-		];
-		const config = { sphereRadius: 240, collisionRadius: 16, linkDistance: 80, forceStrength: 0.35 };
-		const radial = layoutNetworkGraph('radial', nodes, links, config);
-		const sphere = layoutNetworkGraph('sphere', nodes, links, config);
-
-		assert.deepStrictEqual(radial.get('entry'), { x: 0, y: 0, z: 0 });
-		const nearRadius = Math.max(radius(radial.get('near-a')!), radius(radial.get('near-b')!));
-		const farRadius = Math.min(radius(radial.get('far-a')!), radius(radial.get('far-b')!));
-		assert.ok(nearRadius < farRadius, `BFS depth one (${nearRadius}) must precede depth two (${farRadius})`);
-		assert.ok(radius(sphere.get('entry')!) > 1, 'sphere must not adopt radial root-at-origin semantics');
-		assert.ok(Math.abs(radius(sphere.get('near-a')!) - radius(sphere.get('far-a')!)) < farRadius - nearRadius, 'sphere remains a tighter shell than BFS radial layers');
+	test('legacy persisted radial falls back to organic and is not a live layout mode', () => {
+		assert.strictEqual(normalizeNetworkLayoutMode('radial'), 'organic');
+		assert.strictEqual(normalizeNetworkLayoutMode('RADIAL'), 'organic');
+		assert.strictEqual(normalizeNetworkLayoutMode(undefined), 'organic');
+		assert.strictEqual(normalizeNetworkLayoutMode('clustered'), 'clustered');
+		assert.ok(isLegacyNetworkLayoutMode('radial'));
+		assert.equal(isLegacyNetworkLayoutMode('organic'), false);
+		assert.ok(!(NETWORK_LAYOUT_MODES as readonly string[]).includes('radial'));
+		const g = makeGraph(16);
+		const viaOrganic = layoutNetworkGraph('organic', g.nodes, g.links, 240);
+		const viaNormalized = layoutNetworkGraph(normalizeNetworkLayoutMode('radial'), g.nodes, g.links, 240);
+		assert.deepStrictEqual([...viaNormalized.entries()], [...viaOrganic.entries()]);
+		const viaDefaultCase = layoutNetworkGraph('radial' as any, g.nodes, g.links, 240);
+		assert.deepStrictEqual([...viaDefaultCase.entries()], [...viaOrganic.entries()]);
 	});
 
-	test('radial keeps disconnected components distinct outside the main rings', () => {
-		const nodes = [
-			{ id: 'entry', isEntry: true },
-			{ id: 'main-leaf' },
-			{ id: 'a-root', val: 10 },
-			{ id: 'a-1' },
-			{ id: 'a-2' },
-			{ id: 'a-3' },
-			{ id: 'b-root', val: 1 },
-		];
-		const links = [
-			{ source: 'entry', target: 'main-leaf' },
-			{ source: 'a-root', target: 'a-1' },
-			{ source: 'a-1', target: 'a-2' },
-			{ source: 'a-2', target: 'a-3' },
-		];
-		const layout = layoutNetworkGraph('radial', nodes, links, { sphereRadius: 240, collisionRadius: 2, linkDistance: 50, forceStrength: 0 });
-		const mainRadius = radius(layout.get('main-leaf')!);
-		const aRoot = layout.get('a-root')!;
-		const bRoot = layout.get('b-root')!;
-		assert.ok(Math.min(radius(aRoot), radius(bRoot)) > mainRadius, 'disconnected components must remain outside the entry component');
-		assert.ok(Math.hypot(aRoot.x - bRoot.x, aRoot.y - bRoot.y, aRoot.z - bRoot.z) >= 4, 'disconnected component roots must not overlap');
+	test('NETWORK_LAYOUT_OPTIONS and live modes exclude retired radial', () => {
+		assert.deepStrictEqual([...LEGACY_NETWORK_LAYOUT_MODES], ['radial']);
+		assert.deepStrictEqual(NETWORK_LAYOUT_OPTIONS.map(o => o.id), [...NETWORK_LAYOUT_MODES]);
+		assert.ok(!NETWORK_LAYOUT_OPTIONS.some(o => /radial/i.test(o.id) || /radial/i.test(o.label)));
 	});
 
-	test('radial v4 is permutation-invariant and sector-stable for sibling subtrees', () => {
-		assert.strictEqual(RADIAL_LAYOUT_VERSION, 4);
-		const nodes = [
-			{ id: 'entry', isEntry: true },
-			{ id: 'branch-a' },
-			{ id: 'branch-b' },
-			{ id: 'a-leaf-1' },
-			{ id: 'a-leaf-2' },
-			{ id: 'a-leaf-3' },
-			{ id: 'b-leaf-1' },
-			{ id: 'b-leaf-2' },
-		];
-		const links = [
-			{ source: 'entry', target: 'branch-a' },
-			{ source: 'entry', target: 'branch-b' },
-			{ source: 'branch-a', target: 'a-leaf-1' },
-			{ source: 'branch-a', target: 'a-leaf-2' },
-			{ source: 'branch-a', target: 'a-leaf-3' },
-			{ source: 'branch-b', target: 'b-leaf-1' },
-			{ source: 'branch-b', target: 'b-leaf-2' },
-		];
-		const config = { sphereRadius: 240, collisionRadius: 8, linkDistance: 40, forceStrength: 0 };
-		const baseline = layoutNetworkGraph('radial', nodes, links, config);
-		const permuted = layoutNetworkGraph('radial', [...nodes].reverse(), links, config);
-		for (const id of baseline.keys()) {
-			assert.deepStrictEqual(baseline.get(id), permuted.get(id), `permutation must not move ${id}`);
-		}
-
-		const angleOf = (id: string) => Math.atan2(baseline.get(id)!.y, baseline.get(id)!.x);
-		const angularGap = (a: number, b: number) => {
-			let d = Math.abs(a - b);
-			while (d > Math.PI) {
-				d = Math.PI * 2 - d;
-			}
-			return d;
-		};
-		const branchA = angleOf('branch-a');
-		const aLeaves = ['a-leaf-1', 'a-leaf-2', 'a-leaf-3'].map(angleOf);
-		const bLeaves = ['b-leaf-1', 'b-leaf-2'].map(angleOf);
-		const intraA = Math.max(...aLeaves.map(a => angularGap(a, branchA)));
-		const intraB = Math.max(...bLeaves.map(b => angularGap(b, angleOf('branch-b'))));
-		const cross = angularGap(aLeaves[0], bLeaves[0]);
-		assert.ok(intraA < cross, 'branch-a subtree stays in a contiguous angular sector');
-		assert.ok(intraB < cross, 'branch-b subtree stays in a contiguous angular sector');
-	});
-
-	test('radial v4 keeps all nodes planar with no z-depth explosion under collision relaxation', () => {
-		const graph = makeGraph(96);
-		const layout = layoutNetworkGraph('radial', graph.nodes, graph.links, {
-			sphereRadius: 240,
-			collisionRadius: 24,
-			linkDistance: 80,
-			forceStrength: 0.35,
-		});
-		let maxAbsZ = 0;
-		for (const p of layout.values()) {
-			assert.strictEqual(p.z, 0);
-			maxAbsZ = Math.max(maxAbsZ, Math.abs(p.z));
-		}
-		assert.strictEqual(maxAbsZ, 0, 'collision relaxation must not introduce z depth');
-	});
-
-	test('network runtime collision, link-distance, and force controls materially change geometry without dropping nodes', () => {
+	test('network runtime collision, link-distance, and force controls retain all nodes', () => {
 		const nodes = Array.from({ length: 12 }, (_, index) => ({ id: `n${index}`, fileTypeId: 'typescript', val: 1, isEntry: index === 0 }));
 		const links = nodes.slice(1).map(node => ({ source: 'n0', target: node.id }));
-		const closeRadial = layoutNetworkGraph('radial', nodes, links, { sphereRadius: 240, collisionRadius: 8, linkDistance: 24, forceStrength: 0 });
-		const spacedRadial = layoutNetworkGraph('radial', nodes, links, { sphereRadius: 240, collisionRadius: 40, linkDistance: 136, forceStrength: 0 });
-		assert.strictEqual(closeRadial.size, nodes.length);
-		assert.strictEqual(spacedRadial.size, nodes.length);
-		assert.ok(metrics(spacedRadial).minNN > metrics(closeRadial).minNN * 2, 'collision radius and link distance must expand radial spacing');
-		assert.ok(metrics(spacedRadial).minNN >= 70, 'radial collision pass must preserve roughly twice the configured radius');
+		for (const mode of NETWORK_LAYOUT_MODES) {
+			const close = layoutNetworkGraph(mode, nodes, links, { sphereRadius: 240, collisionRadius: 8, linkDistance: 24, forceStrength: 0 });
+			const spaced = layoutNetworkGraph(mode, nodes, links, { sphereRadius: 240, collisionRadius: 40, linkDistance: 136, forceStrength: 0 });
+			assert.strictEqual(close.size, nodes.length, `${mode} must keep every node at tight collision`);
+			assert.strictEqual(spaced.size, nodes.length, `${mode} must keep every node at loose collision`);
+		}
 
 		const noForce = layoutNetworkGraph('constellation', nodes, links, { sphereRadius: 240, collisionRadius: 16, linkDistance: 24, forceStrength: 0 });
 		const strongForce = layoutNetworkGraph('constellation', nodes, links, { sphereRadius: 240, collisionRadius: 16, linkDistance: 24, forceStrength: 2 });
-		assert.ok(Math.abs(totalLinkLength(noForce, links) - totalLinkLength(strongForce, links)) > 1, 'force strength must affect link relaxation geometry');
+		assert.ok(Math.abs(totalLinkLength(noForce, links) - totalLinkLength(strongForce, links)) > 1, 'force strength must affect constellation link geometry');
 	});
 });

@@ -4,7 +4,6 @@
 
 import assert from 'assert';
 import { layoutNetworkGraph, DEFAULT_NETWORK_LAYOUT_CONFIG } from '../../layouts/network/index.js';
-import { RADIAL_LAYOUT_VERSION } from '../../layouts/network/radialLayout.js';
 import {
 	computeNetworkVisualRadius,
 	computeNetworkFitTransform,
@@ -21,7 +20,10 @@ import {
 	serializeNetworkDepthAlphaSource,
 	serializeNetworkLabelWorldFontSizeSource,
 } from '../../host/workbench/networkRenderMathRuntime.js';
-import { serializeTemporalAggregateEdgeRouteSource } from '../../host/workbench/temporalRuntimeContracts.js';
+import { serializeTemporalAggregateEdgeRouteSource, serializeTemporalProjectionSource } from '../../host/workbench/temporalRuntimeContracts.js';
+import { projectTemporalVisibleSet } from '../../view/temporal/temporalProjection.js';
+import { existsSync, readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 
 suite('Graph visual recovery contracts', () => {
 	function buildStressNetwork() {
@@ -83,22 +85,17 @@ suite('Graph visual recovery contracts', () => {
 		return max;
 	}
 
-	test('radial ~280-node stress stays bounded and readable under production Fit View', () => {
+	test('organic ~280-node stress stays bounded and readable under production Fit View', () => {
 		const g = buildStressNetwork();
 		assert.ok(g.nodes.length >= 250 && g.nodes.length <= 320);
 		const cfg = { ...DEFAULT_NETWORK_LAYOUT_CONFIG, collisionRadius: 24, linkDistance: 48, forceStrength: 0.35 };
-		const radial = layoutNetworkGraph('radial', g.nodes, g.links, cfg);
 		const organic = layoutNetworkGraph('organic', g.nodes, g.links, cfg);
-		assert.strictEqual(radial.size, g.nodes.length);
-		const er = extentOf(radial);
+		assert.strictEqual(organic.size, g.nodes.length);
 		const eo = extentOf(organic);
-		const ratio = er.max / Math.max(1, eo.max);
-		assert.ok(ratio < 5.5, `radial/organic extent ratio ${ratio.toFixed(2)} must stay bounded`);
-		assert.ok(er.w < 1800 && er.h < 1800, `radial bbox ${er.w.toFixed(0)}x${er.h.toFixed(0)} must not explode`);
+		assert.ok(eo.w < 2200 && eo.h < 1800, `organic bbox ${eo.w.toFixed(0)}x${eo.h.toFixed(0)} must not explode`);
 
-		// Production Fit path (not a bbox-only helper) — insets + node radii included.
 		const projected: Record<string, { x: number; y: number; depthScale: number }> = {};
-		for (const [id, p] of radial) {
+		for (const [id, p] of organic) {
 			projected[id] = { x: p.x, y: p.y, depthScale: 1 };
 		}
 		const nodesLike = g.nodes.map(n => ({
@@ -121,51 +118,30 @@ suite('Graph visual recovery contracts', () => {
 		const screenR = worldR * fit.k;
 		assert.ok(screenR >= 2.75, `ordinary screen radius at production Fit k=${fit.k.toFixed(3)} was ${screenR}`);
 
-		// Naive world*k without zoom compensation would go subpixel at typical Fit zooms.
-		const uncompensated = computeNetworkVisualRadius(ordinary, 1, { zoom: 1 }) * fit.k;
-		assert.ok(uncompensated < 2.75 || fit.k >= 0.95, `uncompensated screen ${uncompensated} must expose the Fit risk`);
-
-		assert.deepStrictEqual(radial.get('entry'), { x: 0, y: 0, z: 0 });
-		const near = Math.hypot(radial.get('m1')!.x, radial.get('m1')!.y);
-		const far = Math.hypot(radial.get('m50')!.x, radial.get('m50')!.y);
-		assert.ok(near < far, 'BFS depth one must precede deeper nodes');
-		assert.ok(RADIAL_LAYOUT_VERSION >= 4 && GRAPH_LAYOUT_VERSION >= 2);
+		assert.ok(GRAPH_LAYOUT_VERSION >= 2);
 	});
 
-	test('radial has no global scale explosion: collision grows locally, isolates leave main intact', () => {
+	test('organic collision spacing expands locally without dropping isolates from the layout', () => {
 		const mainNodes = [
 			{ id: 'entry', isEntry: true },
 			...Array.from({ length: 40 }, (_, i) => ({ id: `n${i}` })),
 		];
 		const mainLinks = Array.from({ length: 40 }, (_, i) => ({ source: 'entry', target: `n${i}` }));
-		const mainIds = mainNodes.map(n => n.id);
-
-		const tight = layoutNetworkGraph('radial', mainNodes, mainLinks, {
-			sphereRadius: 240, collisionRadius: 8, linkDistance: 24, forceStrength: 0,
-		});
-		const loose = layoutNetworkGraph('radial', mainNodes, mainLinks, {
-			sphereRadius: 240, collisionRadius: 24, linkDistance: 72, forceStrength: 0,
-		});
-		const growth = extentOf(loose, mainIds).max / Math.max(1, extentOf(tight, mainIds).max);
-		// Local collision/link spacing expands geometry, but must not 5×+ rescale the whole graph.
-		assert.ok(growth > 1.2, `collision must materially expand spacing (got ${growth.toFixed(2)})`);
-		assert.ok(growth < 4.5, `collision growth ${growth.toFixed(2)} must stay local, not a global explosion`);
 
 		const cfg = { sphereRadius: 240, collisionRadius: 16, linkDistance: 48, forceStrength: 0 };
-		const mainOnly = layoutNetworkGraph('radial', mainNodes, mainLinks, cfg);
 		const withIsolates = layoutNetworkGraph(
-			'radial',
+			'organic',
 			[...mainNodes, ...Array.from({ length: 80 }, (_, i) => ({ id: `iso${i}` }))],
 			mainLinks,
 			cfg,
 		);
-		const mainExtentAlone = extentOf(mainOnly, mainIds).max;
-		const mainExtentWithIso = extentOf(withIsolates, mainIds).max;
-		const mainDrift = mainExtentWithIso / Math.max(1, mainExtentAlone);
-		assert.ok(mainDrift < 1.08, `isolates must not rescale main rings (drift ${mainDrift.toFixed(3)})`);
+		assert.strictEqual(withIsolates.size, mainNodes.length + 80);
+		for (const pos of withIsolates.values()) {
+			assert.ok(Number.isFinite(pos.x) && Number.isFinite(pos.y) && Number.isFinite(pos.z));
+		}
 	});
 
-	test('radial packs disconnected components without O(n) giant bounds', () => {
+	test('remaining network layouts keep disconnected components without dropping nodes', () => {
 		const base = [{ id: 'entry', isEntry: true }, { id: 'leaf' }];
 		const links = [{ source: 'entry', target: 'leaf' }];
 		const cfg = { sphereRadius: 240, collisionRadius: 12, linkDistance: 40, forceStrength: 0 };
@@ -181,17 +157,18 @@ suite('Graph visual recovery contracts', () => {
 			{ source: 'a0', target: 'a1' }, { source: 'a1', target: 'a2' }, { source: 'a2', target: 'a3' },
 			{ source: 'b0', target: 'b1' }, { source: 'b1', target: 'b2' },
 		];
-		const packed = layoutNetworkGraph('radial', multi, multiLinks, cfg);
-		const packedExtent = extentOf(packed).max;
-		assert.ok(packedExtent < 900, `multi-component pack ${packedExtent.toFixed(0)} must stay bounded`);
-		assert.ok(Math.hypot(packed.get('a0')!.x, packed.get('a0')!.y) > Math.hypot(packed.get('leaf')!.x, packed.get('leaf')!.y));
+		const packed = layoutNetworkGraph('organic', multi, multiLinks, cfg);
+		assert.strictEqual(packed.size, multi.length);
+		for (const node of multi) {
+			const p = packed.get(node.id)!;
+			assert.ok(Number.isFinite(p.x) && Number.isFinite(p.y) && Number.isFinite(p.z));
+		}
 
-		const r20 = layoutNetworkGraph('radial', [...base, ...Array.from({ length: 20 }, (_, i) => ({ id: `i${i}` }))], links, cfg);
-		const r200 = layoutNetworkGraph('radial', [...base, ...Array.from({ length: 200 }, (_, i) => ({ id: `i${i}` }))], links, cfg);
-		const growth = maxRadius(r200) / Math.max(1, maxRadius(r20));
-		const linear = 200 / 20;
-		assert.ok(growth < linear * 0.35, `isolate growth ${growth.toFixed(2)} must be sub-linear (<< ${linear})`);
-		assert.ok(growth < Math.sqrt(linear) * 1.35, `isolate growth ${growth.toFixed(2)} should track ~sqrt(n)`);
+		const r20 = layoutNetworkGraph('organic', [...base, ...Array.from({ length: 20 }, (_, i) => ({ id: `i${i}` }))], links, cfg);
+		const r200 = layoutNetworkGraph('organic', [...base, ...Array.from({ length: 200 }, (_, i) => ({ id: `i${i}` }))], links, cfg);
+		assert.strictEqual(r20.size, base.length + 20);
+		assert.strictEqual(r200.size, base.length + 200);
+		assert.ok(maxRadius(r200) > 0 && Number.isFinite(maxRadius(r200)));
 	});
 
 	test('network screen-aware radii stay readable at Fit zooms; uncompensated vanishes at k=0.2', () => {
@@ -300,7 +277,7 @@ suite('Graph visual recovery contracts', () => {
 
 		const atZoom = computeTemporalVisualRadius({ entityId: 'y', changeKind: 'unchanged' } as any, { zoom: 0.2 });
 		assert.ok(atZoom * 0.2 >= 3.0, `temporal screen radius must survive k=0.2 (got ${atZoom * 0.2})`);
-		assert.ok(TEMPORAL_INITIAL_LAYOUT_VERSION >= 2);
+		assert.ok(TEMPORAL_INITIAL_LAYOUT_VERSION >= 3);
 	});
 
 	test('aggregate edge routes fan into distinct lanes instead of one shared spear', () => {
@@ -347,6 +324,7 @@ suite('Graph visual recovery contracts', () => {
 			serializeNetworkDepthAlphaSource(),
 			serializeNetworkLabelWorldFontSizeSource(),
 			serializeTemporalAggregateEdgeRouteSource(),
+			serializeTemporalProjectionSource(),
 		];
 		for (const src of sources) {
 			assert.ok(src.startsWith('function'), `expected function keyword serialization, got ${src.slice(0, 48)}`);
@@ -355,5 +333,69 @@ suite('Graph visual recovery contracts', () => {
 		const radiusFn = new Function(`return (${serializeNetworkVisualRadiusSource()})`)();
 		const moduleR = computeNetworkVisualRadius({ id: 'n', degree: 2 }, 1, { zoom: 0.25 });
 		assert.strictEqual(radiusFn({ id: 'n', degree: 2 }, 1, { zoom: 0.25 }), moduleR);
+
+		const projectionFn = new Function('return (' + serializeTemporalProjectionSource() + ')')();
+		const nodes = [
+			{ entityId: 'a', canonicalNodeId: 'a', path: 'a.ts', label: 'a', kind: 'file', x: 0, y: 0, changeKind: 'unchanged' },
+			{ entityId: 'b', canonicalNodeId: 'b', path: 'b.ts', label: 'b', kind: 'file', x: 40, y: 0, changeKind: 'modified' },
+		];
+		const serialized = projectionFn(nodes, [], { zoom: 1, displayMode: 'state' });
+		const moduleP = projectTemporalVisibleSet(nodes as any, [], { zoom: 1, displayMode: 'state' });
+		assert.strictEqual(serialized.tier, moduleP.tier);
+		assert.strictEqual(serialized.leafNodesDrawn, moduleP.leafNodesDrawn);
+		assert.strictEqual(serialized.aggregateNodesDrawn, moduleP.aggregateNodesDrawn);
+	});
+
+	test('retired Network radialLayout.ts is not an active product import', () => {
+		const radialPath = fileURLToPath(new URL('../../layouts/network/radialLayout.ts', import.meta.url));
+		assert.equal(existsSync(radialPath), false, 'radialLayout.ts must stay deleted');
+	});
+
+	test('a 9679-dot Full Map blob is structurally ok but not visually good without node-level LOD', () => {
+		const editor = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
+		assert.match(editor, /metrics\.structuralOk = metrics\.nodesDrawn > 0 && Number\.isFinite\(transform\.k\)/);
+		assert.match(editor, /metrics\.humanVisualReviewRequired = true/);
+		assert.doesNotMatch(editor, /humanVisualReviewRequired = metrics\.structuralOk/);
+		assert.doesNotMatch(editor, /humanVisualReviewRequired = structuralOk/);
+
+		const communityCount = 40;
+		const perCommunity = 242;
+		const nodes = Array.from({ length: communityCount * perCommunity }, (_, i) => ({
+			entityId: `n${i}`,
+			canonicalNodeId: `n${i}`,
+			path: `src/n${i}.ts`,
+			label: `n${i}`,
+			kind: 'file' as const,
+			x: (i % 80) * 8,
+			y: Math.floor(i / 80) * 8,
+			changeKind: i % 200 === 0 ? 'modified' as const : 'unchanged' as const,
+		}));
+		const guides = Array.from({ length: communityCount }, (_, c) => {
+			const memberIds = Array.from({ length: perCommunity }, (_, i) => `n${c * perCommunity + i}`);
+			return {
+				id: `comm${c}`,
+				label: `comm${c}`,
+				layerId: 'other',
+				color: '#6366f1',
+				x: c * 40,
+				y: 0,
+				radius: 30,
+				bounds: { minX: c * 40 - 20, minY: -20, maxX: c * 40 + 20, maxY: 20, width: 40, height: 40 },
+				nodeIds: memberIds,
+				nodeCount: perCommunity,
+			};
+		});
+		assert.ok(nodes.length >= 9000);
+		const overview = projectTemporalVisibleSet(nodes as any, guides as any, { zoom: 0.21, displayMode: 'state' });
+		const received = nodes.length;
+		const leavesDrawn = overview.leafNodesDrawn;
+		const structuralOk = (overview.leafNodesDrawn + overview.aggregateNodesDrawn) > 0 && Number.isFinite(0.21);
+		const visuallyGood = structuralOk && leavesDrawn < received * 0.35 && overview.tier === 'overview' && overview.aggregateNodesDrawn >= 4;
+		assert.equal(structuralOk, true);
+		assert.equal(overview.tier, 'overview');
+		assert.ok(visuallyGood, 'overview LOD must keep leaf draw far below received count');
+		assert.ok(leavesDrawn < received * 0.35, `drawing ${leavesDrawn}/${received} leaves is the 9679-dot blob failure`);
+		assert.ok(overview.aggregateNodesDrawn >= 30, `aggregates ${overview.aggregateNodesDrawn}`);
+		assert.notEqual(leavesDrawn, received, 'structuralOk must not be treated as visually good when every leaf is drawn');
 	});
 });

@@ -1,0 +1,146 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+# npm audit report
+
+@hono/node-server  <2.0.5
+Severity: moderate
+Node.js Adapter for Hono: Path traversal in `serve-static` on Windows via encoded backslash (`%5C`) - https://github.com/advisories/GHSA-frvp-7c67-39w9
+fix available via `npm audit fix`
+node_modules/@hono/node-server
+  @modelcontextprotocol/sdk  1.25.0 - 1.29.0
+  Depends on vulnerable versions of @hono/node-server
+  node_modules/@modelcontextprotocol/sdk
+
+body-parser  2.0.0 - 2.2.2
+body-parser vulnerable to denial of service when invalid limit value silently disables size enforcement - https://github.com/advisories/GHSA-v422-hmwv-36x6
+fix available via `npm audit fix`
+node_modules/body-parser
+
+brace-expansion  <=1.1.17 || 2.0.0 - 2.1.3 || 3.0.0 - 5.0.8
+Severity: high
+brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups - https://github.com/advisories/GHSA-3jxr-9vmj-r5cp
+brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups - https://github.com/advisories/GHSA-3jxr-9vmj-r5cp
+brace-expansion: DoS via exponential-time expansion of consecutive non-expanding {} groups - https://github.com/advisories/GHSA-3jxr-9vmj-r5cp
+brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash - https://github.com/advisories/GHSA-mh99-v99m-4gvg
+brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash - https://github.com/advisories/GHSA-mh99-v99m-4gvg
+brace-expansion: DoS via unbounded expansion length causing an out-of-memory process crash - https://github.com/advisories/GHSA-mh99-v99m-4gvg
+brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation - https://github.com/advisories/GHSA-rgw5-rvv9-x895
+brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation - https://github.com/advisories/GHSA-rgw5-rvv9-x895
+brace-expansion: DoS via unbounded intermediate arrays, bypassing the CVE-2026-14257 mitigation - https://github.com/advisories/GHSA-rgw5-rvv9-x895
+fix available via `npm audit fix`
+node_modules/@ts-morph/common/node_modules/brace-expansion
+node_modules/@typescript-eslint/typescript-estree/node_modules/brace-expansion
+node_modules/@vscode/l10n-dev/node_modules/brace-expansion
+node_modules/@vscode/test-cli/node_modules/brace-expansion
+node_modules/brace-expansion
+node_modules/mocha/node_modules/brace-expansion
+node_modules/vite-plugin-istanbul/node_modules/brace-expansion
+node_modules/vite-plugin-istanbul/node_modules/glob/node_modules/brace-expansion
+
+electron  42.0.0-alpha.1 - 42.5.0
+Severity: moderate
+Electron: ProtocolResponse.url reuses the default session cache instead of the registering session - https://github.com/advisories/GHSA-r4w5-6pfg-jxp5
+fix available via `npm audit fix --force`
+Will install electron@42.8.1, which is outside the stated dependency range
+node_modules/electron
+
+fast-uri  3.0.0 - 3.1.4
+Severity: high
+fast-uri vulnerable to host confusion via literal backslash authority delimiter - https://github.com/advisories/GHSA-v2hh-gcrm-f6hx
+fast-uri vulnerable to host confusion via backslash authority introducer - https://github.com/advisories/GHSA-7p8r-x3mc-p8w7
+fast-uri vulnerable to host confusion via failed IDN canonicalization - https://github.com/advisories/GHSA-4c8g-83qw-93j6
+fix available via `npm audit fix`
+node_modules/fast-uri
+
+hono  <=4.12.33
+Severity: moderate
+Hono: API Gateway v1 adapter can drop a distinct repeated request header value during de-duplication - https://github.com/advisories/GHSA-xgm2-5f3f-mvvc
+hono/jsx does not isolate context per request, leading to cross-request data disclosure - https://github.com/advisories/GHSA-hvrm-45r6-mjfj
+Hono: Server-Side XSS via JSX Escaping Bypass in cx() Utility - https://github.com/advisories/GHSA-w62v-xxxg-mg59
+Hono: ReDoS in CORS middleware via Access-Control-Request-Headers - https://github.com/advisories/GHSA-8j4g-w8fx-2239
+Hono: `memo()` retains SSR output across requests, leading to cross-user data disclosure - https://github.com/advisories/GHSA-f23p-vx2j-j53r
+Hono: Proxy Helper does not remove response headers listed in the `Connection` header - https://github.com/advisories/GHSA-79qm-7rj5-m7r9
+Hono: Algorithmic Complexity DoS in Language Middleware - https://github.com/advisories/GHSA-54fx-42gc-7vw4
+fix available via `npm audit fix`
+node_modules/hono
+
+ip-address  <=10.3.0
+Severity: high
+ip-address: Address4 decodes leading-zero octets as decimal while resolvers decode them as octal, allowing SSRF and trust-boundary bypass - https://github.com/advisories/GHSA-mwp4-54f8-5fhr
+ip-address: a CIDR suffix on the parsed address suppresses special-use classification and can bypass SSRF and trust-boundary checks - https://github.com/advisories/GHSA-4xrf-jv44-h6hh
+ip-address: misclassification of IPv4-mapped/NAT64 IPv6 addresses can bypass SSRF and trust-boundary checks - https://github.com/advisories/GHSA-22jq-vg5j-6vgg
+fix available via `npm audit fix`
+node_modules/ip-address
+
+js-yaml  3.0.0 - 3.15.0 || 4.0.0 - 4.3.0
+Severity: high
+js-yaml: YAML merge-key chains can force quadratic CPU consumption - https://github.com/advisories/GHSA-52cp-r559-cp3m
+JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) — CVE-2026-59870 fix not backported - https://github.com/advisories/GHSA-5p4m-2wfm-xmqj
+JS-YAML: Quadratic CPU consumption in !!omap resolution (3.x and 4.x) — CVE-2026-59870 fix not backported - https://github.com/advisories/GHSA-5p4m-2wfm-xmqj
+fix available via `npm audit fix`
+node_modules/@istanbuljs/load-nyc-config/node_modules/js-yaml
+node_modules/js-yaml
+
+linkify-it  <=5.0.1
+Severity: high
+linkify-it: Quadratic-complexity DoS via the `mailto:` validator scan-loop on attacker text - https://github.com/advisories/GHSA-v245-v573-v5vm
+fix available via `npm audit fix`
+node_modules/linkify-it
+
+nanoid  <3.3.17
+Severity: high
+nanoid: custom generators can loop indefinitely when size is zero - https://github.com/advisories/GHSA-2v37-7h3g-55p8
+fix available via `npm audit fix`
+node_modules/nanoid
+
+postcss  <=8.5.22
+Severity: moderate
+PostCSS: incomplete fix of GHSA-6g55-p6wh-862q — attacker-controlled sourceMappingURL reads arbitrary .map files when `from` is unset - https://github.com/advisories/GHSA-fxqj-rqcc-2cmp
+fix available via `npm audit fix --force`
+Will install gulp-sourcemaps@2.6.5, which is a breaking change
+node_modules/postcss
+  @gulp-sourcemaps/identity-map  >=2.0.0
+  Depends on vulnerable versions of postcss
+  node_modules/@gulp-sourcemaps/identity-map
+    gulp-sourcemaps  >=3.0.0
+    Depends on vulnerable versions of @gulp-sourcemaps/identity-map
+    node_modules/gulp-sourcemaps
+
+shell-quote  <=1.8.4
+Severity: high
+shell-quote: Quadratic-complexity Denial of Service in `parse()` (CWE-407) - https://github.com/advisories/GHSA-395f-4hp3-45gv
+fix available via `npm audit fix`
+node_modules/shell-quote
+
+svgo  1.0.0 - 2.8.2
+Severity: high
+SVGO removeScripts plugin leaves some executable scripts intact - https://github.com/advisories/GHSA-2p49-hgcm-8545
+fix available via `npm audit fix`
+node_modules/svgo
+
+tar  <=7.5.20
+Severity: critical
+node-tar: Process crash via PAX numeric path type confusion - https://github.com/advisories/GHSA-w8wr-v893-vjvp
+node-tar: Decompression/parse DoS via unlimited input - https://github.com/advisories/GHSA-23hp-3jrh-7fpw
+node-tar: Negative tar entry size causes infinite loop in archive replace - https://github.com/advisories/GHSA-8x88-c5mf-7j5w
+node-tar: Uncaught Exception DoS via NUL byte in PAX path/linkpath records - https://github.com/advisories/GHSA-gvwx-54wh-qm9j
+node-tar: Uncontrolled recursion in mapHas/filesFilter allows uncatchable stack-overflow DoS via crafted long-path tar with member selection - https://github.com/advisories/GHSA-r292-9mhp-454m
+fix available via `npm audit fix`
+node_modules/tar
+
+undici  7.0.0 - 7.28.0
+Severity: high
+undici vulnerable to downstream response desynchronization via retry interceptor - https://github.com/advisories/GHSA-8xcm-r25x-g524
+undici vulnerable to cross-user information disclosure and parse-time crash via degenerate private cache directives - https://github.com/advisories/GHSA-4cwx-7wf7-3272
+undici vulnerable to CRLF Injection via blob-like body 'type' property - https://github.com/advisories/GHSA-m8rv-5g2x-5cg5
+undici vulnerable to cross-user information disclosure via whitespace around equals in Cache-Control directives - https://github.com/advisories/GHSA-jr45-8vmc-qm54
+undici vulnerable to cookie attribute injection via unsanitized domain and unparsed setCookie fields - https://github.com/advisories/GHSA-v3r7-h72x-cjcm
+fix available via `npm audit fix`
+node_modules/undici
+
+18 vulnerabilities (1 low, 7 moderate, 9 high, 1 critical)
+
+To address issues that do not require attention, run:
+  npm audit fix
+
+To address all issues (including breaking changes), run:
+  npm audit fix --force

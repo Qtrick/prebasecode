@@ -269,7 +269,7 @@ export class PreBaseOnboardingEditor extends EditorPane {
 		const p = DOM.append(panel, DOM.$('p'));
 		p.style.color = MUTED;
 		p.style.fontSize = '12px';
-		p.textContent = localize('prebase.onboarding.graphBody', "Code Graph uses Organic, Sphere, Constellation, Clustered, and Radial 3D layouts. Drag the graph to rotate it. A project must be open before it becomes available.");
+		p.textContent = localize('prebase.onboarding.graphBody', "Code Graph uses Organic, Sphere, Constellation, and Clustered 3D layouts. Drag the graph to rotate it. A project must be open before it becomes available.");
 		const row = DOM.append(panel, DOM.$('div'));
 		row.style.display = 'flex';
 		row.style.gap = '8px';

@@ -17,6 +17,15 @@ class FakeClassList {
 	add(...names: string[]): void { for (const n of names) this.values.add(n); }
 	remove(...names: string[]): void { for (const n of names) this.values.delete(n); }
 	contains(name: string): boolean { return this.values.has(name); }
+	toggle(name: string, force?: boolean): boolean {
+		const shouldHave = force === undefined ? !this.values.has(name) : force;
+		if (shouldHave) {
+			this.values.add(name);
+		} else {
+			this.values.delete(name);
+		}
+		return shouldHave;
+	}
 }
 
 class FakeElement {
@@ -347,27 +356,26 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		assert.ok(uniqueY.size >= 2, `Expected spatially distinct Y coordinates, got ${uniqueY.size}`);
 	});
 
-	test('Code Graph: correctly centers Organic, Sphere, Constellation, Clustered layouts while preserving Radial origin', () => {
+	test('Code Graph: remaining layouts keep a finite camera center', () => {
 		const harness = createProductionWebviewHarness('network');
 
-		// Test Radial layout (must preserve origin (0,0) as center)
-		const radialSnapshot = {
+		const organicSnapshot = {
 			nodes: [
 				{ id: 'center', kind: 'file', label: 'center.ts', path: 'src/center.ts', parentId: null, isEntry: true, depth: 0, meta: {} },
 				{ id: 'leaf1', kind: 'file', label: 'leaf1.ts', path: 'src/leaf1.ts', parentId: null, isEntry: false, depth: 1, meta: {} },
 			],
 			edges: [{ source: 'center', target: 'leaf1' }],
 			positions3d: {
-				'center': { x: 0, y: 0, z: 0 },
+				'center': { x: -80, y: 0, z: 0 },
 				'leaf1': { x: 200, y: 0, z: 0 }
 			},
-			networkLayoutMode: 'radial',
+			networkLayoutMode: 'organic',
 			scannedAt: 2000
 		};
 
 		harness.triggerMessage({
 			type: 'snapshot',
-			payload: { snapshot: radialSnapshot, graphType: 'network' }
+			payload: { snapshot: organicSnapshot, graphType: 'network' }
 		});
 		harness.triggerRaf(1032);
 
@@ -756,7 +764,7 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		assert.ok(after.x !== 0 || after.y !== 0 || after.k !== 1);
 	});
 
-	test('Temporal Graph: Full Map retains and draws all target-active nodes', () => {
+	test('Temporal Graph: Full Map draws all target-active nodes at detail zoom', () => {
 		const harness = createProductionWebviewHarness('temporal');
 		harness.triggerMessage({
 			type: 'temporalState',
@@ -787,7 +795,7 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		assert.equal(
 			harness.drawCalls.filter(call => call.type === 'arc').length,
 			3,
-			'Full Map must draw one body for every target-active node and no removed ghost',
+			'Small Full Map at detail zoom must draw one body for every target-active node and no removed ghost',
 		);
 	});
 
@@ -943,5 +951,160 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		assert.ok(Number.isFinite(metrics.screenUtilization) && (metrics.screenUtilization ?? 0) > 0);
 		assert.equal(metrics.labelCount, metrics.labelsDrawn);
 		assert.ok((metrics.nodesDrawn ?? 0) >= 2);
+	});
+
+	function buildOverviewTemporalDiff(communityCount: number, perCommunity: number, piercing = true) {
+		const nodes: any[] = [];
+		const guides: any[] = [];
+		const edges: any[] = [];
+		for (let c = 0; c < communityCount; c++) {
+			const ids: string[] = [];
+			for (let i = 0; i < perCommunity; i++) {
+				const id = `c${c}_${i}`;
+				ids.push(id);
+				nodes.push({
+					entityId: id,
+					canonicalNodeId: id,
+					path: `src/${id}.ts`,
+					label: id,
+					kind: 'file',
+					changeKind: piercing && i === 0 && c % 3 === 0 ? 'modified' : 'unchanged',
+					x: c * 140 + i,
+					y: c * 90,
+				});
+			}
+			guides.push({
+				id: `comm${c}`,
+				label: `comm${c}`,
+				layerId: 'other',
+				color: '#6366f1',
+				x: c * 140,
+				y: c * 90,
+				radius: 40,
+				bounds: { minX: c * 140 - 40, minY: c * 90 - 40, maxX: c * 140 + 40, maxY: c * 90 + 40, width: 80, height: 80 },
+				nodeIds: ids,
+				nodeCount: ids.length,
+			});
+			if (c > 0) {
+				edges.push({
+					sourceEntityId: `c${c - 1}_0`,
+					targetEntityId: `c${c}_0`,
+					changeKind: 'unchanged',
+				});
+			}
+		}
+		return {
+			baseCommitSha: 'base',
+			targetCommitSha: 'target',
+			nodes,
+			edges,
+			guides,
+			summary: { addedCount: 0, removedCount: 0, modifiedCount: Math.ceil(communityCount / 3), renamedCount: 0, unchangedCount: nodes.length },
+		};
+	}
+
+	test('Temporal Full Map overview records leaf cap, aggregates, and humanVisualReviewRequired', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		vm.runInContext('window.__prebaseRecordRenderMetrics = true', harness.context);
+		const diff = buildOverviewTemporalDiff(8, 70);
+		assert.ok(diff.nodes.length > 400);
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: { selectedCommitSha: 'target', renderedCommitSha: 'target', displayMode: 'state', diff },
+		});
+		vm.runInContext('displayMode = "state"; transform = { x: 400, y: 300, k: 0.21 }; dirty = true; hasFittedTemporalView = true; drawTemporalFrame(1400);', harness.context);
+		const metrics = vm.runInContext('({ ...window.__prebaseGraphRenderMetrics })', harness.context) as any;
+		assert.equal(metrics.projectionTier, 'overview');
+		assert.ok(metrics.receivedNodeCount > 400);
+		assert.ok(metrics.leafNodesDrawn < metrics.receivedNodeCount * 0.35, `overview still draws ${metrics.leafNodesDrawn} of ${metrics.receivedNodeCount}`);
+		assert.ok(metrics.aggregateNodesDrawn >= 6, `aggregates ${metrics.aggregateNodesDrawn}`);
+		assert.equal(metrics.structuralOk, true);
+		assert.equal(metrics.humanVisualReviewRequired, true);
+		assert.notEqual(metrics.leafNodesDrawn, metrics.receivedNodeCount, 'must not call the 9679-dot blob visually good');
+	});
+
+	test('empty-canvas Temporal click still picks aggregates and piercing leaves', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: {
+				selectedCommitSha: 'target',
+				renderedCommitSha: 'target',
+				displayMode: 'state',
+				diff: {
+					baseCommitSha: 'base',
+					targetCommitSha: 'target',
+					nodes: [],
+					edges: [],
+					summary: { addedCount: 0, removedCount: 0, modifiedCount: 0, renamedCount: 0, unchangedCount: 0 },
+				},
+			},
+		});
+		harness.triggerRaf();
+		const canvasEl = harness.elements.get('netCanvas')!;
+		canvasEl.dispatch('pointerdown', { isPrimary: true, button: 0, clientX: 400, clientY: 300, pointerId: 1, pointerType: 'mouse' });
+		canvasEl.dispatch('pointerup', { pointerId: 1, clientX: 400, clientY: 300 });
+
+		const diff = buildOverviewTemporalDiff(8, 70);
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: { selectedCommitSha: 'target', renderedCommitSha: 'target', displayMode: 'state', diff },
+		});
+		vm.runInContext('transform = { x: 400, y: 300, k: 0.21 }; dirty = true; hasFittedTemporalView = true;', harness.context);
+		harness.triggerRaf(1500);
+
+		const aggHit = vm.runInContext('pickTemporalNode(400, 300)', harness.context) as any;
+		assert.ok(aggHit, 'click on empty-looking overview canvas must still hit an aggregate');
+		assert.equal(aggHit.kind, 'aggregate');
+		assert.ok(Array.isArray(aggHit.memberIds) && aggHit.memberIds.includes('c0_0'));
+
+		canvasEl.dispatch('pointerdown', { isPrimary: true, button: 0, clientX: 400, clientY: 300, pointerId: 2, pointerType: 'mouse' });
+		canvasEl.dispatch('pointerup', { pointerId: 2, clientX: 400, clientY: 300 });
+		const afterAggClick = vm.runInContext('({ expanded: expandedTemporalGuideId, selected: selectedNodeId })', harness.context);
+		assert.equal(afterAggClick.expanded, 'comm0');
+
+		const leafWorldX = 60;
+		const leafScreenX = 400 + 0.21 * leafWorldX;
+		const leafHit = vm.runInContext(`pickTemporalNode(${leafScreenX}, 300)`, harness.context) as any;
+		assert.ok(leafHit, 'expanded community member must be pickable as a real leaf');
+		assert.equal(leafHit.entityId, 'c0_60');
+		assert.notEqual(leafHit.kind, 'aggregate');
+	});
+
+	test('reduced motion snaps Temporal interpolation without exploding layout', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		harness.triggerMessage({ type: 'settings', payload: { reduceMotion: true, keepGraphCentered: false } });
+		const first = buildOverviewTemporalDiff(6, 40);
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: { selectedCommitSha: 'target', renderedCommitSha: 'target', displayMode: 'state', diff: first },
+		});
+		harness.triggerRaf(1600);
+		const shifted = {
+			...first,
+			nodes: first.nodes.map((node: any) => ({ ...node, x: node.x + 80, y: node.y + 40 })),
+			guides: first.guides.map((g: any) => ({ ...g, x: g.x + 80, y: g.y + 40 })),
+		};
+		harness.triggerMessage({ type: 'temporalDiff', payload: shifted });
+		harness.triggerRaf(1700);
+		const runtime = vm.runInContext(`({
+			animDuration,
+			isAnimatingTemporal,
+			nodes: Array.from(currentTemporalRenderNodes.values()).map(function (n) { return { id: n.entityId, x: n.x, y: n.y }; }),
+			transform: { ...transform },
+		})`, harness.context) as any;
+		assert.equal(runtime.animDuration, 0);
+		assert.equal(runtime.isAnimatingTemporal, false);
+		assert.equal(runtime.nodes.length, shifted.nodes.length);
+		for (const node of runtime.nodes) {
+			assert.ok(Number.isFinite(node.x) && Number.isFinite(node.y), `${node.id} must stay finite under reduced motion`);
+		}
+		const expected = shifted.nodes.find((n: any) => n.entityId === 'c0_0');
+		const got = runtime.nodes.find((n: any) => n.id === 'c0_0');
+		assert.equal(got.x, expected.x);
+		assert.equal(got.y, expected.y);
+		assert.ok(Number.isFinite(runtime.transform.k) && runtime.transform.k > 0);
+		const xs = runtime.nodes.map((n: any) => n.x);
+		assert.ok(Math.max(...xs) - Math.min(...xs) < 4000, 'reduced motion must not explode node extent');
 	});
 });

@@ -27,7 +27,7 @@ function makeGraph(n) {
 	return { nodes, links };
 }
 
-const modes = ['organic', 'sphere', 'constellation', 'clustered', 'radial'];
+const modes = ['organic', 'sphere', 'constellation', 'clustered'];
 const sizes = [100, 280, 500, 1000, 2000];
 
 console.log('network layout micro-benchmark (ms per run, median of iterations)');

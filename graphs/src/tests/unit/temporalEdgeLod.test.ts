@@ -10,6 +10,7 @@ import {
 	computeEdgeLodStyle,
 	computeAggregateEdgeRoute,
 } from '../../temporal/view/temporalEdgeLod.js';
+import { projectTemporalVisibleSet } from '../../view/temporal/temporalProjection.js';
 import type {
 	TemporalRenderEdge,
 	TemporalCommunityGuide,
@@ -124,5 +125,35 @@ suite('TemporalEdgeLod (Unit - Aggregation & Level of Detail Tiers)', () => {
 		const unique = new Set(cps.map(p => `${p.cpX.toFixed(1)},${p.cpY.toFixed(1)}`));
 		assert.ok(unique.size >= 4, `hash+lane diversification must yield multiple control points (got ${unique.size})`);
 		assert.notEqual(cps[0].cpX, 50, 'control point must leave the shared vertical mid-line');
+	});
+
+	test('6. Overview node aggregates reuse community guide IDs from temporalEdgeLod, not a second system', () => {
+		const guides = [
+			makeGuide('commA', Array.from({ length: 80 }, (_, i) => `a${i}`)),
+			makeGuide('commB', Array.from({ length: 80 }, (_, i) => `b${i}`)),
+		];
+		const nodes = [...guides[0].nodeIds, ...guides[1].nodeIds].map((id, i) => ({
+			entityId: id,
+			canonicalNodeId: id,
+			path: `src/${id}.ts`,
+			label: id,
+			kind: 'file' as const,
+			x: i * 10,
+			y: 0,
+			changeKind: 'unchanged' as const,
+		}));
+		const edges = [
+			makeEdge('e1', 'a1', 'b1', 'unchanged'),
+			makeEdge('e2', 'a2', 'b2', 'modified'),
+		];
+		const projection = projectTemporalVisibleSet(nodes as any, guides, { zoom: 0.2, displayMode: 'state' });
+		const aggEdges = computeCommunityAggregateEdges(edges, guides);
+		const guideIds = new Set(projection.items.filter(item => item.kind === 'aggregate').map(item => item.guideId));
+		assert.ok(guideIds.has('commA') && guideIds.has('commB'));
+		assert.equal(aggEdges.length, 1);
+		assert.ok(guideIds.has(aggEdges[0].sourceCommunityId));
+		assert.ok(guideIds.has(aggEdges[0].targetCommunityId));
+		assert.equal(aggEdges[0].edgeCount, 2);
+		assert.equal(aggEdges[0].changedEdgeCount, 1);
 	});
 });

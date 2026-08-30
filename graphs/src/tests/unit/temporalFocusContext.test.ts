@@ -342,7 +342,45 @@ suite('TemporalFocusContext (Unit - Focus+Context & Spatial Quality)', () => {
 		const focused = computeTemporalFocusContext(diff, 'changes', 'focused');
 		const xs = focused.visibleNodes.map(node => node.x);
 		const ys = focused.visibleNodes.map(node => node.y);
-		assert.ok(Math.max(...xs) - Math.min(...xs) < 500, 'bridged far communities must still pack horizontally');
-		assert.ok(Math.max(...ys) - Math.min(...ys) < 500, 'bridged far communities must still pack vertically');
+		const origW = 940 - (-900);
+		const origH = 440 - (-400);
+		assert.ok(Math.max(...xs) - Math.min(...xs) < origW * 0.55, 'bridged far communities must compact horizontally as one sparse cluster');
+		assert.ok(Math.max(...ys) - Math.min(...ys) < origH * 0.55, 'bridged far communities must compact vertically as one sparse cluster');
+	});
+
+	test('8. A sparse single connected cluster is scaled into a compact disc', () => {
+		const nodes: TemporalRenderNode[] = [
+			makeRenderNode('a', 'src/pkg/a.ts', 'modified', -420, -40),
+			makeRenderNode('b', 'src/pkg/b.ts', 'modified', 420, 40),
+			makeRenderNode('c', 'src/pkg/c.ts', 'unchanged', -360, 20),
+			makeRenderNode('d', 'src/pkg/d.ts', 'unchanged', 380, -10),
+		];
+		const diff: TemporalStructuralDiff = {
+			targetCommitSha: 'sha2',
+			baseCommitSha: 'sha1',
+			nodes,
+			edges: [
+				makeRenderEdge('e-ab', 'a', 'b', 'modified'),
+				makeRenderEdge('e-ac', 'a', 'c', 'unchanged'),
+				makeRenderEdge('e-bd', 'b', 'd', 'unchanged'),
+			],
+			summary: {
+				addedCount: 0,
+				removedCount: 0,
+				modifiedCount: 2,
+				renamedCount: 0,
+				unchangedCount: 2,
+				edgeAddedCount: 0,
+				edgeRemovedCount: 0,
+				edgeModifiedCount: 2,
+			},
+			isPartialLineage: false,
+		};
+		const focused = computeTemporalFocusContext(diff, 'changes', 'focused');
+		const xs = focused.visibleNodes.map(node => node.x);
+		const ys = focused.visibleNodes.map(node => node.y);
+		assert.ok(Math.max(...xs) - Math.min(...xs) < 520, 'single sparse cluster must compact horizontally');
+		assert.ok(Math.max(...ys) - Math.min(...ys) < 200, 'single sparse cluster must compact vertically');
+		assert.equal(focused.visibleNodes.length, 4);
 	});
 });

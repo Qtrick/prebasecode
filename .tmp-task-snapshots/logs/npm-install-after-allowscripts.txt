@@ -1,0 +1,109 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 preinstall
+> node build/npm/preinstall.ts
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+up to date, audited 100 packages in 562ms
+
+16 packages are looking for funding
+  run `npm fund` for details
+
+4 vulnerabilities (1 moderate, 2 high, 1 critical)
+
+To address all issues, run:
+  npm audit fix
+
+Run `npm audit` for details.
+gyp info it worked if it ends with ok
+gyp info using node-gyp@11.2.0
+gyp info using node@24.17.0 | darwin | arm64
+gyp http GET https://electronjs.org/headers/v42.8.0/node-v42.8.0-headers.tar.gz
+gyp http 403 https://electronjs.org/headers/v42.8.0/node-v42.8.0-headers.tar.gz
+gyp WARN install got an error, rolling back install
+gyp ERR! install error 
+gyp ERR! stack Error: 403 response downloading https://electronjs.org/headers/v42.8.0/node-v42.8.0-headers.tar.gz
+gyp ERR! stack at go (/Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/node-gyp/lib/install.js:223:21)
+gyp ERR! stack at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+gyp ERR! stack at async install (/Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/node-gyp/lib/install.js:116:14)
+gyp ERR! stack at async run (/Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/node-gyp/bin/node-gyp.js:81:18)
+gyp ERR! System Darwin 25.6.0
+gyp ERR! command "/Users/qunyingfan/.nvm/versions/node/v24.17.0/bin/node" "/Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/.bin/node-gyp" "install" "--dist-url" "https://electronjs.org/headers" "42.8.0"
+gyp ERR! cwd /Users/qunyingfan/Prebasecode
+gyp ERR! node -v v24.17.0
+gyp ERR! node-gyp -v v11.2.0
+gyp ERR! not ok 
+node:internal/errors:985
+  const err = new Error(message);
+              ^
+
+Error: Command failed: /Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/.bin/node-gyp install --dist-url https://electronjs.org/headers 42.8.0
+gyp info it worked if it ends with ok
+gyp info using node-gyp@11.2.0
+gyp info using node@24.17.0 | darwin | arm64
+gyp http GET https://electronjs.org/headers/v42.8.0/node-v42.8.0-headers.tar.gz
+gyp http 403 https://electronjs.org/headers/v42.8.0/node-v42.8.0-headers.tar.gz
+gyp WARN install got an error, rolling back install
+gyp ERR! install error 
+gyp ERR! stack Error: 403 response downloading https://electronjs.org/headers/v42.8.0/node-v42.8.0-headers.tar.gz
+gyp ERR! stack at go (/Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/node-gyp/lib/install.js:223:21)
+gyp ERR! stack at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+gyp ERR! stack at async install (/Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/node-gyp/lib/install.js:116:14)
+gyp ERR! stack at async run (/Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/node-gyp/bin/node-gyp.js:81:18)
+gyp ERR! System Darwin 25.6.0
+gyp ERR! command "/Users/qunyingfan/.nvm/versions/node/v24.17.0/bin/node" "/Users/qunyingfan/Prebasecode/build/npm/gyp/node_modules/.bin/node-gyp" "install" "--dist-url" "https://electronjs.org/headers" "42.8.0"
+gyp ERR! cwd /Users/qunyingfan/Prebasecode
+gyp ERR! node -v v24.17.0
+gyp ERR! node-gyp -v v11.2.0
+gyp ERR! not ok 
+
+    at genericNodeError (node:internal/errors:985:15)
+    at wrappedFn (node:internal/errors:539:14)
+    at checkExecSyncError (node:child_process:925:11)
+    at Module.execFileSync (node:child_process:961:15)
+    at installHeaders (file:///Users/qunyingfan/Prebasecode/build/npm/preinstall.ts:144:17)
+    at file:///Users/qunyingfan/Prebasecode/build/npm/preinstall.ts:76:1
+    at ModuleJob.run (node:internal/modules/esm/module_job:439:25)
+    at async node:internal/modules/esm/loader:633:26
+    at async asyncRunEntryPointWithESMLoader (node:internal/modules/run_main:101:5) {
+  status: 1,
+  signal: null,
+  output: [
+    null,
+    Buffer(1) [Uint8Array] [ 10 ],
+    Buffer(1266) [Uint8Array] [
+      103, 121, 112,  32, 105, 110, 102, 111,  32, 105, 116,  32,
+      119, 111, 114, 107, 101, 100,  32, 105, 102,  32, 105, 116,
+       32, 101, 110, 100, 115,  32, 119, 105, 116, 104,  32, 111,
+      107,  10, 103, 121, 112,  32, 105, 110, 102, 111,  32, 117,
+      115, 105, 110, 103,  32, 110, 111, 100, 101,  45, 103, 121,
+      112,  64,  49,  49,  46,  50,  46,  48,  10, 103, 121, 112,
+       32, 105, 110, 102, 111,  32, 117, 115, 105, 110, 103,  32,
+      110, 111, 100, 101,  64,  50,  52,  46,  49,  55,  46,  48,
+       32, 124,  32, 100,
+      ... 1166 more items
+    ]
+  ],
+  pid: 75151,
+  stdout: Buffer(1) [Uint8Array] [ 10 ],
+  stderr: Buffer(1266) [Uint8Array] [
+    103, 121, 112,  32, 105, 110, 102, 111,  32, 105, 116,  32,
+    119, 111, 114, 107, 101, 100,  32, 105, 102,  32, 105, 116,
+     32, 101, 110, 100, 115,  32, 119, 105, 116, 104,  32, 111,
+    107,  10, 103, 121, 112,  32, 105, 110, 102, 111,  32, 117,
+    115, 105, 110, 103,  32, 110, 111, 100, 101,  45, 103, 121,
+    112,  64,  49,  49,  46,  50,  46,  48,  10, 103, 121, 112,
+     32, 105, 110, 102, 111,  32, 117, 115, 105, 110, 103,  32,
+    110, 111, 100, 101,  64,  50,  52,  46,  49,  55,  46,  48,
+     32, 124,  32, 100,
+    ... 1166 more items
+  ]
+}
+
+Node.js v24.17.0
+npm error code 1
+npm error path /Users/qunyingfan/Prebasecode
+npm error command failed
+npm error command sh -c node build/npm/preinstall.ts
+npm error A complete log of this run can be found in: /var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/cursor-sandbox-cache/cfb260caff4fb26d03c3784b6274eedc/npm/_logs/2026-08-09T18_48_52_219Z-debug-0.log

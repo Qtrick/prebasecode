@@ -1,0 +1,46 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+added 3 packages, changed 24 packages, and audited 1519 packages in 3s
+
+335 packages are looking for funding
+  run `npm fund` for details
+
+# npm audit report
+
+electron  42.0.0-alpha.1 - 42.5.0
+Severity: moderate
+Electron: ProtocolResponse.url reuses the default session cache instead of the registering session - https://github.com/advisories/GHSA-r4w5-6pfg-jxp5
+fix available via `npm audit fix --force`
+Will install electron@42.8.1, which is outside the stated dependency range
+node_modules/electron
+
+1 moderate severity vulnerability
+
+To address all issues, run:
+  npm audit fix --force
+npm warn allow-scripts 23 packages have install scripts not yet covered by allowScripts:
+npm warn allow-scripts   @parcel/watcher@2.5.6 (install: node-gyp rebuild)
+npm warn allow-scripts   @playwright/browser-chromium@1.61.1 (install: node install.js)
+npm warn allow-scripts   @vscode/deviceid@0.1.5 (install: node-gyp rebuild)
+npm warn allow-scripts   @vscode/native-watchdog@1.4.6 (install: node-gyp rebuild)
+npm warn allow-scripts   @vscode/policy-watcher@1.4.0 (install: node-gyp rebuild)
+npm warn allow-scripts   @vscode/ripgrep@1.17.1 (postinstall: node ./lib/postinstall.js)
+npm warn allow-scripts   @vscode/spdlog@0.15.8 (install: node-gyp rebuild)
+npm warn allow-scripts   @vscode/sqlite3@5.1.12-vscode (install: node-gyp rebuild)
+npm warn allow-scripts   @vscode/windows-mutex@0.5.3 (install: node-gyp rebuild)
+npm warn allow-scripts   @vscode/windows-process-tree@0.7.0 (install: node-gyp rebuild)
+npm warn allow-scripts   @vscode/windows-registry@1.2.0 (install: node-gyp rebuild)
+npm warn allow-scripts   bufferutil@4.1.0 (install: node-gyp rebuild)
+npm warn allow-scripts   es5-ext@0.10.64 (postinstall:  node -e "try{require('./_postinstall')}catch(e){}" || exit 0)
+npm warn allow-scripts   fsevents@2.3.2 (install: (install scripts present))
+npm warn allow-scripts   fsevents@1.2.13 (install: node-gyp rebuild)
+npm warn allow-scripts   husky@0.13.4 (install: node ./bin/install.js)
+npm warn allow-scripts   kerberos@2.1.1 (install: node-gyp rebuild)
+npm warn allow-scripts   native-is-elevated@0.9.0 (install: node-gyp rebuild)
+npm warn allow-scripts   native-keymap@3.3.9 (install: node-gyp rebuild)
+npm warn allow-scripts   node-pty@1.2.0-beta.13 (install: node-gyp rebuild)
+npm warn allow-scripts   ssh2@1.17.0 (install: node install.js)
+npm warn allow-scripts   utf-8-validate@5.0.10 (install: node-gyp rebuild)
+npm warn allow-scripts   windows-foreground-love@0.6.1 (install: node-gyp rebuild)
+npm warn allow-scripts
+npm warn allow-scripts Run `npm install-scripts ls` to review, or `npm install-scripts approve <pkg>` to allow.

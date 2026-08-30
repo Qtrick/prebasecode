@@ -24,6 +24,7 @@ import { IEditorService } from '../../../../../services/editor/common/editorServ
 import { computeLanguageStats } from '../../core/analysis/languageStats.js';
 import type { GraphNode } from '../../common/types/graphTypes.js';
 import { PreBaseGraphConfigKeys } from '../../common/configuration/graphConfigKeys.js';
+import { normalizeNetworkLayoutMode } from '../../layouts/network/index.js';
 import { IPreBaseTemporalViewService, computeTemporalUnifiedStatus } from '../../temporal/view/temporalViewTypes.js';
 import { IWorkbenchGitHistoryService } from './workbenchGitHistoryService.js';
 import type { GitCommitMetadata } from '../../history/git/gitTypes.js';
@@ -305,7 +306,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 			{ id: 'sphere', label: localize('prebase.maps.net.sphere', "Sphere") },
 			{ id: 'constellation', label: localize('prebase.maps.net.constellation', "Constellation") },
 			{ id: 'clustered', label: localize('prebase.maps.net.clustered', "Clustered") },
-			{ id: 'radial', label: localize('prebase.maps.net.radial', "Radial") },
 		];
 		for (const m of modes) {
 			const btn = this._chipBtn(layoutCol, m.label, () => {
@@ -1249,7 +1249,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 			this._legendCheckbox.checked = this.configurationService.getValue<boolean>(PreBaseGraphConfigKeys.GraphShowLegend) !== false;
 		}
 
-		const networkLayout = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
+		const networkLayoutRaw = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
+		const networkLayout = normalizeNetworkLayoutMode(networkLayoutRaw);
+		if (networkLayoutRaw !== networkLayout) {
+			void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, networkLayout);
+		}
 		for (const [mode, btn] of this._networkLayoutButtons) {
 			this._styleChipActive(btn, mode === networkLayout);
 			btn.disabled = !hasProject;

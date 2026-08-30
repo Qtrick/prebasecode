@@ -101,9 +101,24 @@ describe('phase3 producer domains', () => {
 		}
 	});
 
+	test('live-activity files schedule magnus-live-activity without electron restart soak', () => {
+		const domains = domainsForPath('native/prebase-live-activity/src/live_activity.mm');
+		assert.deepEqual(domains, ['live-activity']);
+		const { producers, unknown } = producersForCommitTier([
+			'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts',
+			'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts',
+			'native/prebase-live-activity/src/live_activity.mm',
+		]);
+		assert.equal(unknown.length, 0);
+		assert.ok(producers.includes('magnus-live-activity'));
+		assert.equal(producers.includes('electron-restart-soak'), false);
+		assert.equal(producers.includes('idle-soak'), false);
+		assert.equal(producers.includes('parser-benchmark'), false);
+	});
+
 	test('graph layout / temporal product edits schedule temporal-small but not release soaks', () => {
 		const { producers, unknown } = producersForCommitTier([
-			'graphs/src/layouts/network/radialLayout.ts',
+			'graphs/src/layouts/network/index.ts',
 			'graphs/src/temporal/view/temporalLayoutEngine.ts',
 			'graphs/src/view/network/networkRenderMath.ts',
 			'test/prebase/acceptance/prebase-graph-visual-recovery-live.mjs',

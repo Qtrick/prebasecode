@@ -1,0 +1,16 @@
+AdaptivePackage: PASS
+{
+  "bundlePath": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app",
+  "adaptiveSource": "/Users/qunyingfan/Prebasecode/resources/darwin/adaptive/PreBase.icon",
+  "runtimeOverride": "none-detected",
+  "classification": "PASS",
+  "bundleIdentifier": "com.prebase.ide",
+  "executable": "PreBase",
+  "CFBundleIconName": "PreBase",
+  "CFBundleIconFile": "PreBase.icns",
+  "assetsCarBytes": 1631720,
+  "assetsCarSha256": "71ad7fff2dc48d782841e387601db01e2f3d7089ddacebce6c194630b167c2b9",
+  "assetsCarPath": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Resources/Assets.car",
+  "assetutilOk": true,
+  "legacyIcnsPath": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Resources/PreBase.icns"
+}

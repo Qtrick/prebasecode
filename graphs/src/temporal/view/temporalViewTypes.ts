@@ -175,6 +175,7 @@ export interface ITemporalViewState {
 	readonly isPartialLineage: boolean;
 	readonly diff?: TemporalStructuralDiff;
 	readonly selectedEntityId?: string;
+	readonly currentFileEntityId?: string;
 	readonly filterQuery?: string;
 	readonly timelineWindow?: { readonly start: number; readonly count: number };
 }

@@ -12,6 +12,7 @@ import { computeTemporalUnifiedStatus } from '../../temporal/view/temporalStatus
 import { computeTemporalFocusContext, computeTemporalVisualRadius, computeTemporalFitTransform } from '../../view/temporal/temporalFocusContext.js';
 import { computeCommunityAggregateEdges, computeEdgeLodStyle } from '../../temporal/view/temporalEdgeLod.js';
 import { computeVisibleLabels } from '../../temporal/view/temporalLabelLod.js';
+import { projectTemporalVisibleSet } from '../../view/temporal/temporalProjection.js';
 import { interpolateWebviewScript } from '../../host/workbench/temporalRuntimeContracts.js';
 import type {
 	ITemporalViewState,
@@ -145,6 +146,7 @@ function createWebviewRuntimeContext(): vm.Context {
 		globalThis.computeCommunityAggregateEdges = computeCommunityAggregateEdges;
 		globalThis.computeEdgeLodStyle = computeEdgeLodStyle;
 		globalThis.computeVisibleLabels = computeVisibleLabels;
+		globalThis.projectTemporalVisibleSet = projectTemporalVisibleSet;
 	`, ctx);
 	return ctx;
 }
@@ -458,6 +460,38 @@ suite('Temporal Production Webview Runtime Parity (State Truth & Execution)', ()
 			const webviewLabels = webviewCtx.computeVisibleLabels(nodes, 1.5, { selectedNodeId: '1' });
 
 			assert.deepStrictEqual(JSON.parse(JSON.stringify(webviewLabels)), JSON.parse(JSON.stringify(hostLabels)));
+		});
+
+		test('projectTemporalVisibleSet overview matches host for community aggregates', () => {
+			const guides: TemporalCommunityGuide[] = [
+				{ id: 'commA', label: 'Comm A', layerId: 'ui', color: '#ff0000', x: 0, y: 0, radius: 50, bounds: { minX: -50, minY: -50, maxX: 50, maxY: 50, width: 100, height: 100 }, nodeIds: Array.from({ length: 80 }, (_, i) => `a${i}`), nodeCount: 80 },
+				{ id: 'commB', label: 'Comm B', layerId: 'services', color: '#00ff00', x: 200, y: 0, radius: 50, bounds: { minX: 150, minY: -50, maxX: 250, maxY: 50, width: 100, height: 100 }, nodeIds: Array.from({ length: 80 }, (_, i) => `b${i}`), nodeCount: 80 },
+			];
+			const nodes: TemporalRenderNode[] = [];
+			for (const prefix of ['a', 'b'] as const) {
+				for (let i = 0; i < 80; i++) {
+					nodes.push({
+						entityId: `${prefix}${i}`,
+						canonicalNodeId: `${prefix}${i}`,
+						path: `src/${prefix}${i}.ts`,
+						label: `${prefix}${i}`,
+						kind: 'file',
+						x: prefix === 'a' ? i : 200 + i,
+						y: 0,
+						changeKind: i === 0 ? 'modified' : 'unchanged',
+					});
+				}
+			}
+			const options = { zoom: 0.2, displayMode: 'state' };
+			const host = projectTemporalVisibleSet(nodes, guides, options);
+			const webview = webviewCtx.projectTemporalVisibleSet(nodes, guides, options);
+			assert.strictEqual(webview.tier, host.tier);
+			assert.strictEqual(webview.leafNodesDrawn, host.leafNodesDrawn);
+			assert.strictEqual(webview.aggregateNodesDrawn, host.aggregateNodesDrawn);
+			assert.deepStrictEqual(
+				JSON.parse(JSON.stringify(webview.items.filter((item: any) => item.kind === 'aggregate').map((item: any) => item.guideId))),
+				host.items.filter(item => item.kind === 'aggregate').map(item => item.guideId),
+			);
 		});
 	});
 });

@@ -1,0 +1,128 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 assurance:quick
+> npm run verify:graphs-boundary && npm run verify:startup && npm run verify:typescript && npm run verify:icons && npm run verify:supabase-migrations && npm run verify:supabase-rls-static && npm run typecheck:graphs && npm run typecheck-client && npm run test:graphs
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:graphs-boundary
+> node graphs/scripts/verify-boundary/verify.mjs
+
+Graph boundary check OK
+Allowlist exceptions: 9
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:startup
+> node scripts/startup/verify-workbench-startup.mjs
+
+verify:startup: static checks PASS
+verify:startup: launch skipped (set PREBASE_STARTUP_LAUNCH=1 to enable)
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:typescript
+> node graphs/scripts/verify-typescript-lanes.mjs
+
+TypeScript compiler lanes
+
+[primary CLI]
+  package.json: npm:typescript@^7.0.2
+  installed:    typescript@7.0.2
+  executable:   Version 7.0.2
+  used by:      typecheck-client, typecheck:ts7, build/lib/typescriptCompiler.ts → tsc, monaco/valid-layers checks
+
+[compat API / tsc6]
+  package.json: npm:@typescript/typescript6@^6.0.2
+  installed:    @typescript/typescript6@6.0.2
+  import API:   6.0.3
+  executable:   Version 6.0.3
+  used by:      build/lib/* `import from "typescript"`, typescript-eslint, html language features
+
+[editor language service]
+  Prefer TypeScript 7 LSP / native preview extension where available;
+  built-in typescript-language-features may still use bundled/workspace TS6 until configured.
+
+Reference: docs/TYPESCRIPT_7_MIGRATION.md
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:icons
+> node scripts/icons/verify-icons.mjs
+
+verify:icons: 101/101 OK
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:supabase-migrations
+> node scripts/supabase/verify-migrations.mjs
+
+verify:supabase-migrations: 5 migrations, 6 tables, RLS OK
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:supabase-rls-static
+> node scripts/supabase/verify-rls-static.mjs
+
+verify:supabase-rls-static: PASS (policy shape)
+Runtime adversarial checklist (manual / CI test project):
+ - Create User A and User B via Auth
+ - As A: insert profile, preferences, session, run, event
+ - As B: SELECT each table — expect 0 rows from A
+ - As B: UPDATE/DELETE A rows — expect deny
+ - As B: INSERT with user_id=A — expect deny
+ - Anonymous + publishable key only — expect deny on all user tables
+ - As A: INSERT into agent_usage — expect deny (server-only writes)
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 typecheck:graphs
+> npm run typecheck --prefix graphs
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> @prebase/graphs@0.1.0 typecheck
+> tsc -p ./tsconfig.json --noEmit
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 typecheck-client
+> tsc -p ./src/tsconfig.json --noEmit --skipLibCheck
+
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 test:graphs
+> node graphs/scripts/run-unit-tests.mjs
+
+
+
+  Architecture pick
+    ✔ hit radius never drops below min CSS pixels when zoomed out
+    ✔ hit radius grows with visual size when zoomed in
+    ✔ world halo expands when zoomed out so screen min stays ~10px
+    ✔ picks node within halo and prefers closer center
+    ✔ miss outside halo
+    ✔ stable tie-break by id
+    ✔ zoomed-out pick still hits near node (not world-fixed Network radius)
+
+
+  7 passing (2ms)
+
+
+
+  PreBase networkLayout
+    ✔ sphere radius scales with node count and spread
+    ✔ organic is deterministic and 3D
+    ✔ sphere is deterministic and 3D
+    ✔ constellation is deterministic and 3D
+    ✔ clustered is deterministic and 3D
+    ✔ radial is deterministic and 3D
+
+
+  6 passing (16ms)
+
+
+
+  Graph ownership boundary (Phase A)
+    ✔ graphs/src/core has no flat shim .ts files
+    ✔ graphSettingsUi.ts exports public Settings UI surface
+    ✔ settings/ui.ts re-exports Settings UI helpers; settings/index.ts stays DOM-free
+    ✔ prebaseSettingsEditor routes through graphSettingsUi and does not bind PreBaseGraphConfigKeys
+
+
+  4 passing (3ms)
+

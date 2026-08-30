@@ -21,8 +21,10 @@ export type NetworkLayoutMode =
 	| 'organic'
 	| 'sphere'
 	| 'constellation'
-	| 'clustered'
-	| 'radial';
+	| 'clustered';
+
+/** Persisted values that are no longer product modes. */
+export const LEGACY_NETWORK_LAYOUT_MODES = ['radial'] as const;
 
 export interface Point3D {
 	x: number;

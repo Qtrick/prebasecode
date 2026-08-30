@@ -1,0 +1,21 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 verify:macos-adaptive-icon
+> node scripts/icons/verify-macos-adaptive-icon.mjs
+
+AdaptivePackage: PASS
+{
+  "bundlePath": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app",
+  "bundleIdentifier": "com.prebase.ide",
+  "executable": "PreBase",
+  "CFBundleIconName": "PreBase",
+  "CFBundleIconFile": "PreBase.icns",
+  "assetsCarPath": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Resources/Assets.car",
+  "assetsCarBytes": 1631720,
+  "assetsCarSha256": "71ad7fff2dc48d782841e387601db01e2f3d7089ddacebce6c194630b167c2b9",
+  "legacyIcnsPath": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Resources/PreBase.icns",
+  "adaptiveSource": "/Users/qunyingfan/Prebasecode/resources/darwin/adaptive/PreBase.icon",
+  "assetutilOk": true,
+  "runtimeOverride": "none-detected",
+  "classification": "PASS"
+}

@@ -11,11 +11,28 @@ export type {
 } from './types.js';
 
 import type { NetworkLayoutLink, NetworkLayoutMode, NetworkLayoutNode, NetworkLayoutRuntimeConfig, Point3D } from './types.js';
+import { LEGACY_NETWORK_LAYOUT_MODES } from './types.js';
 import { layoutClustered } from './clusteredLayout.js';
 import { layoutConstellation } from './constellationLayout.js';
 import { layoutOrganic } from './organicLayout.js';
-import { layoutRadial } from './radialLayout.js';
 import { layoutSphere } from './sphereLayout.js';
+
+export { LEGACY_NETWORK_LAYOUT_MODES } from './types.js';
+
+export const NETWORK_LAYOUT_MODES: readonly NetworkLayoutMode[] = ['organic', 'sphere', 'constellation', 'clustered'];
+export const DEFAULT_NETWORK_LAYOUT_MODE: NetworkLayoutMode = 'organic';
+
+/** Maps unknown or retired persisted values (including `"radial"`) to a supported mode. */
+export function normalizeNetworkLayoutMode(mode: string | undefined | null): NetworkLayoutMode {
+	if (mode && (NETWORK_LAYOUT_MODES as readonly string[]).includes(mode)) {
+		return mode as NetworkLayoutMode;
+	}
+	return DEFAULT_NETWORK_LAYOUT_MODE;
+}
+
+export function isLegacyNetworkLayoutMode(mode: string | undefined | null): boolean {
+	return typeof mode === 'string' && (LEGACY_NETWORK_LAYOUT_MODES as readonly string[]).includes(mode);
+}
 
 export function computeNetworkSphereRadius(nodeCount: number, spreadScale: number): number {
 	return Math.max(190, Math.min(310, Math.sqrt(Math.max(1, nodeCount)) * 22)) * spreadScale;
@@ -52,8 +69,6 @@ export function layoutNetworkGraph(
 			return layoutConstellation(nodes, links, config);
 		case 'clustered':
 			return layoutClustered(nodes, links, config);
-		case 'radial':
-			return layoutRadial(nodes, links, config);
 		case 'organic':
 		default:
 			return layoutOrganic(nodes, links, config);
@@ -84,10 +99,5 @@ export const NETWORK_LAYOUT_OPTIONS: {
 		id: 'clustered',
 		label: 'Clustered',
 		blurb: 'Groups by file type in separate 3D clusters.'
-	},
-	{
-		id: 'radial',
-		label: 'Radial',
-		blurb: 'Graph-distance layers radiate from an entry or central file.'
 	}
 ];

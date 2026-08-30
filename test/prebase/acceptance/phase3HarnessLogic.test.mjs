@@ -101,7 +101,7 @@ function passingCodeGraph(overrides = {}) {
 		drag: true,
 		idleRotateArmed: true,
 		pick: true,
-		sphereVsRadial: true,
+		sphereVsClustered: true,
 		selectionLock: true,
 		...overrides,
 	};
@@ -676,17 +676,17 @@ test('core IDE live inspects Maps aria-expanded, Settings status, and Code Graph
 	assert.doesNotMatch(live, /screen reader was used|VoiceOver|NVDA|JAWS/i);
 });
 
-test('organic then organic cannot satisfy layoutModes or Sphere vs Radial', () => {
+test('organic then organic cannot satisfy layoutModes or Sphere vs Clustered', () => {
 	assert.deepEqual(codeGraphFailures({ codeGraph: passingCodeGraph() }), []);
 	const failures = codeGraphFailures({
 		codeGraph: passingCodeGraph({
 			layoutModes: Boolean('organic' && 'organic' && 'organic' !== 'organic'),
-			sphereVsRadial: 'organic' === 'sphere' && 'organic' === 'radial',
+			sphereVsClustered: 'organic' === 'sphere' && 'organic' === 'clustered',
 			metrics: { nodesDrawn: 12, receivedNodeCount: 12, networkLayoutMode: 'organic' },
 		}),
 	});
 	assert.ok(failures.some(item => /N2 layout modes/.test(item)));
-	assert.ok(failures.some(item => /N8 Sphere vs Radial/.test(item)));
+	assert.ok(failures.some(item => /N8 Sphere vs Clustered/.test(item)));
 });
 
 test('code graph screenshot is not a substitute for render metrics', () => {
@@ -710,8 +710,8 @@ test('core-ide live proves layouts via Maps data-network-layout chips and metric
 	assert.match(maps, /localize\('prebase\.maps\.liveBadge', "Live"\)/);
 	assert.doesNotMatch(maps, /textContent = ['"]●|localize\([^)]*●/);
 	assert.match(live, /button\[data-network-layout="\$\{mode\}"\]/);
-	assert.match(live, /layoutModes: Boolean\(sphereMode && radialMode && sphereMode !== radialMode\)/);
-	assert.match(live, /sphereVsRadial: sphereMode === 'sphere' && radialMode === 'radial'/);
+	assert.match(live, /layoutModes: Boolean\(sphereMode && clusteredMode && sphereMode !== clusteredMode\)/);
+	assert.match(live, /sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered'/);
 	assert.match(live, /screenshot\(\{ path: join\(screenshotDir, 'code-graph-live\.png'\), timeout: 5_000 \}\)\.catch\(\(\) => undefined\)/);
 	assert.match(live, /nodesDrawnFromMetrics/);
 	assert.match(live, /waitForTimeout\(1_800\)/);
@@ -1382,8 +1382,9 @@ test('final gate leftover PIDs after parent death SIGKILL only the owned tree', 
 
 	const leftoverKill = gate.slice(gate.indexOf('if (result.leftoverPids.length)'), gate.indexOf('const scenarios = PHASE3_REQUIRED_EVIDENCE'));
 	assert.match(leftoverKill, /await terminateOwnedProcessTree\(result\.harnessPid\)/);
-	assert.match(leftoverKill, /for \(const pid of result\.leftoverPids\)/);
-	assert.match(leftoverKill, /process\.kill\(pid, 'SIGKILL'\)/);
+	assert.match(leftoverKill, /killLeftoverPids\(result\.leftoverPids\)/);
+	assert.match(gate, /function killLeftoverPids\(pids\)/);
+	assert.match(gate, /process\.kill\(pid, 'SIGKILL'\)/);
 	assert.doesNotMatch(leftoverKill, /pgrep|pkill|-u \$USER|PreBase\.app/);
 
 	const harness = readFileSync(join(acceptanceDir, 'workbenchHarness.mjs'), 'utf8');

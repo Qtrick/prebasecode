@@ -19,7 +19,7 @@ import {
 } from './temporalGraphTopology.js';
 
 /** Bump when initial Temporal geometry algorithm changes so in-memory positions reset. */
-export const TEMPORAL_INITIAL_LAYOUT_VERSION = 2;
+export const TEMPORAL_INITIAL_LAYOUT_VERSION = 3;
 
 export interface TemporalLayoutOptions {
 	readonly width?: number;
@@ -201,7 +201,7 @@ export function computeSemanticTemporalInitialLayout(
 	const clusterCenters = new Map<string, { x: number; y: number; estimatedRadius: number }>();
 	const packStepBase = Math.max(48, nodeSpacing * 0.95);
 	// Keep macro extent from exploding with hundreds of communities on large repos.
-	const packStep = packStepBase / Math.sqrt(Math.max(1, sortedCommunities.length / 16));
+	const packStep = packStepBase;
 
 	for (let i = 0; i < sortedCommunities.length; i++) {
 		const comm = sortedCommunities[i];
@@ -288,11 +288,11 @@ export function computeSemanticTemporalInitialLayout(
 		}
 		const bw = Math.max(1, maxX - minX);
 		const bh = Math.max(1, maxY - minY);
-		const targetW = 900 * Math.sqrt(aspect);
-		const targetH = 900 / Math.sqrt(aspect);
+		const targetW = Math.max(viewportW * 0.88, 1200) * Math.sqrt(aspect);
+		const targetH = Math.max(viewportH * 0.82, 900) / Math.sqrt(aspect);
 		const scale = Math.min(1, targetW / bw, targetH / bh);
 		// Only compress extreme outliers; keep local community footprints intact.
-		if (scale < 0.85) {
+		if (scale < 0.55) {
 			const cx = (minX + maxX) / 2;
 			const cy = (minY + maxY) / 2;
 			for (const c of centerList) {

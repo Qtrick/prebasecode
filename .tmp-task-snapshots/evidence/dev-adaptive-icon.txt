@@ -1,0 +1,8 @@
+buildSha=ab379c6e05fcd688dcf2dee372434ff7510e5d9e
+appPath=/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app
+bundleId=com.prebase.ide
+CFBundleIconName=PreBase
+CFBundleIconFile=PreBase.icns
+assetsCarSha256=71ad7fff2dc48d782841e387601db01e2f3d7089ddacebce6c194630b167c2b9
+assetsCarBytes= 1631720
+legacyIcnsSha256=68378872d8ebff545b37dbe575e54c944355243709022f847d15ca07e7671b4c

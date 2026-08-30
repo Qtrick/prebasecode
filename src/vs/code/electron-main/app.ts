@@ -42,6 +42,8 @@ import { BrowserViewMainService, IBrowserViewMainService } from '../../platform/
 import { BrowserViewGroupMainService, IBrowserViewGroupMainService } from '../../platform/browserView/electron-main/browserViewGroupMainService.js';
 import { PREBASE_DESKTOP_CHANNEL_NAME, IPreBaseDesktopMainService } from '../../platform/prebaseDesktop/common/prebaseDesktop.js';
 import { PreBaseDesktopMainService } from '../../platform/prebaseDesktop/electron-main/prebaseDesktopMainService.js';
+import { MAGNUS_LIVE_ACTIVITY_CHANNEL, IMagnusLiveActivityMainService } from '../../platform/prebaseLiveActivity/common/prebaseLiveActivity.js';
+import { MagnusLiveActivityMainService } from '../../platform/prebaseLiveActivity/electron-main/prebaseLiveActivityMainService.js';
 import { TEMPORAL_STORE_CHANNEL_NAME } from '../../workbench/contrib/prebase/graphs/temporal/persistence/common/temporalStoreChannel.js';
 import { TemporalStoreMainService } from '../../workbench/contrib/prebase/graphs/temporal/persistence/node/temporalStoreMainService.js';
 import { NativeParsedArgs } from '../../platform/environment/common/argv.js';
@@ -1144,6 +1146,7 @@ export class CodeApplication extends Disposable {
 
 		// PreBase Desktop Runtime
 		services.set(IPreBaseDesktopMainService, new SyncDescriptor(PreBaseDesktopMainService, undefined, false /* proxied to other processes */));
+		services.set(IMagnusLiveActivityMainService, new SyncDescriptor(MagnusLiveActivityMainService, undefined, false /* proxied to other processes */));
 
 		// Keyboard Layout
 		services.set(IKeyboardLayoutMainService, new SyncDescriptor(KeyboardLayoutMainService));
@@ -1336,6 +1339,9 @@ export class CodeApplication extends Disposable {
 		// PreBase Desktop Runtime
 		const prebaseDesktopChannel = ProxyChannel.fromService(accessor.get(IPreBaseDesktopMainService), disposables);
 		mainProcessElectronServer.registerChannel(PREBASE_DESKTOP_CHANNEL_NAME, prebaseDesktopChannel);
+
+		const magnusLiveActivityChannel = ProxyChannel.fromService(accessor.get(IMagnusLiveActivityMainService), disposables);
+		mainProcessElectronServer.registerChannel(MAGNUS_LIVE_ACTIVITY_CHANNEL, magnusLiveActivityChannel);
 
 		// PreBase Temporal persistence stays in the Electron main process. The
 		// sandboxed workbench reaches it only through this typed IPC channel.

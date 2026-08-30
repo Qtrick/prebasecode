@@ -54,8 +54,8 @@ dist
 .agents/skills/.local/
 .github/skills/.local/
 
-# Task baseline snapshots (local)
-.tmp-task-snapshots/
+# Native Live Activity addon build output
+native/prebase-live-activity/build/
 
 # TEMPORARY FFATU — LOCAL TRANSFER ONLY
 # REMOVE WHEN USER SAYS FFATU IS NO LONGER NEEDED

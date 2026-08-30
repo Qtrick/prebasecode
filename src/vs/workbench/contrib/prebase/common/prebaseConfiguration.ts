@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { localize } from '../../../../nls.js';
+import { isMacintosh } from '../../../../base/common/platform.js';
 import { Extensions as ConfigurationExtensions, IConfigurationRegistry } from '../../../../platform/configuration/common/configurationRegistry.js';
 import { Registry } from '../../../../platform/registry/common/platform.js';
 import { registerPreBaseGraphConfiguration } from '../graphs/host/workbench/graphConfigurationContribution.js';
@@ -364,6 +365,36 @@ configurationRegistry.registerConfiguration({
 			type: 'boolean',
 			default: true,
 			description: localize('prebase.magnus.projectGuidance.enabled', "Apply trusted repository instruction files (AGENTS.md, Cursor rules, Copilot instructions, skills metadata) to Agents requests."),
+		},
+		'prebase.magnus.liveActivity.mode': {
+			type: 'string',
+			enum: ['background', 'alwaysWorking', 'attentionOnly', 'off'],
+			enumDescriptions: [
+				localize('prebase.magnus.liveActivity.mode.background', "Show Magnus Live Activity on the MacBook notch (or a top pill) when PreBase is in the background."),
+				localize('prebase.magnus.liveActivity.mode.alwaysWorking', "Show Live Activity whenever Magnus is working, even if PreBase is focused."),
+				localize('prebase.magnus.liveActivity.mode.attentionOnly', "Show Live Activity only when Magnus needs approval or an answer."),
+				localize('prebase.magnus.liveActivity.mode.off', "Disable Magnus Live Activity."),
+			],
+			default: 'background',
+			description: localize('prebase.magnus.liveActivity.mode', "macOS-only: when to project the active Magnus session onto the notch / Live Activity surface. Follow-ups and approvals use the same chat session."),
+			included: isMacintosh,
+		},
+		'prebase.magnus.liveActivity.display': {
+			type: 'string',
+			enum: ['builtin', 'active'],
+			enumDescriptions: [
+				localize('prebase.magnus.liveActivity.display.builtin', "Prefer the built-in display (notched MacBook screen when present)."),
+				localize('prebase.magnus.liveActivity.display.active', "Follow the active display."),
+			],
+			default: 'builtin',
+			description: localize('prebase.magnus.liveActivity.display', "macOS-only: which display hosts Magnus Live Activity."),
+			included: isMacintosh,
+		},
+		'prebase.magnus.liveActivity.hideDetails': {
+			type: 'boolean',
+			default: false,
+			description: localize('prebase.magnus.liveActivity.hideDetails', "macOS-only: hide activity details on the Live Activity surface (status only)."),
+			included: isMacintosh,
 		},
 	}
 });

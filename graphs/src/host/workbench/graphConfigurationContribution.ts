@@ -189,13 +189,12 @@ export function registerPreBaseGraphConfiguration(): void {
 			},
 			[PreBaseGraphConfigKeys.GraphNetworkLayoutMode]: {
 				type: 'string',
-				enum: ['organic', 'sphere', 'constellation', 'clustered', 'radial'],
+				enum: ['organic', 'sphere', 'constellation', 'clustered'],
 				enumDescriptions: [
 					localize('prebase.graph.networkLayoutMode.organic', "Balanced 3D cloud."),
 					localize('prebase.graph.networkLayoutMode.sphere', "Even Fibonacci sphere shell."),
 					localize('prebase.graph.networkLayoutMode.constellation', "Connected files pull closer in 3D."),
 					localize('prebase.graph.networkLayoutMode.clustered', "Groups files by architectural role and module."),
-					localize('prebase.graph.networkLayoutMode.radial', "Entry-centered 3D layers by graph distance."),
 				],
 				default: 'organic',
 				description: localize('prebase.graph.networkLayoutMode', "Layout algorithm for the Network Graph."),

@@ -42,6 +42,7 @@ import {
 	serializeTemporalAggregateEdgeRouteSource,
 	serializeTemporalVisibleLabelsSource,
 	serializeTemporalLabelLayoutSource,
+	serializeTemporalProjectionSource,
 } from './temporalRuntimeContracts.js';
 import { PreBaseGraphEditorInput } from './graphEditorInput.js';
 import { IPreBaseGraphDescriptionService } from './prebaseGraphDescriptionService.js';
@@ -1004,6 +1005,7 @@ const computeEdgeLodStyle = ${serializeTemporalEdgeLodStyleSource()};
 const computeAggregateEdgeRoute = ${serializeTemporalAggregateEdgeRouteSource()};
 const computeVisibleLabels = ${serializeTemporalVisibleLabelsSource()};
 ${serializeTemporalLabelLayoutSource()};
+const projectTemporalVisibleSet = ${serializeTemporalProjectionSource()};
 
 // 2. Fast request dispatcher & pending map
 const pending = new Map();
@@ -1153,6 +1155,7 @@ let rotation = { yaw: 0.55, pitch: 0.28 };
 let snapshot = null;
 let diagnostics = null;
 let selectedNodeId = null;
+let expandedTemporalGuideId = null;
 let hoveredNodeId = null;
 let settings = {
 	showLegend: true,
@@ -1735,8 +1738,7 @@ function rebuildBase3d(s) {
 		}
 	}
 
-	const preserveSemanticCenter = s.networkLayoutMode === 'radial';
-	centroid = preserveSemanticCenter ? { x: 0, y: 0 } : (validCount > 1 ? { x: sx / validCount, y: sy / validCount } : { x: 0, y: 0 });
+	centroid = validCount > 1 ? { x: sx / validCount, y: sy / validCount } : { x: 0, y: 0 };
 
 	return validCount > 0;
 }
@@ -1798,16 +1800,37 @@ function fitView(animate) {
 	if (isTemporal()) {
 		if (!temporalDiff || !temporalDiff.nodes || !temporalDiff.nodes.length) return;
 		const fc = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
-		const targetNodes = (fc.visibleNodes || fc.nodes || []).filter(function (node) {
+		const visibleNodes = (fc.visibleNodes || fc.nodes || []).filter(function (node) {
 			return Number.isFinite(node.x) && Number.isFinite(node.y);
 		});
-		if (!targetNodes || targetNodes.length === 0) return;
+		const largeOverview = displayMode === 'state' && visibleNodes.length > 400 && !expandedTemporalGuideId;
+		const projection = projectTemporalVisibleSet(visibleNodes, temporalDiff.guides, {
+			zoom: largeOverview ? 0.25 : (transform.k || 0.25),
+			displayMode: displayMode,
+			selectedEntityId: selectedNodeId,
+			hoveredEntityId: hoveredNodeId,
+			expandedGuideId: expandedTemporalGuideId,
+			currentFileEntityId: temporalState && temporalState.currentFileEntityId,
+		});
+		const targetNodes = [];
+		for (let i = 0; i < projection.items.length; i++) {
+			const item = projection.items[i];
+			if (item.kind === 'leaf') {
+				targetNodes.push(item.node);
+			} else {
+				targetNodes.push({ entityId: item.entityId, x: item.x, y: item.y, changeKind: item.changedCount ? 'modified' : 'unchanged' });
+			}
+		}
+		if (!targetNodes.length) return;
 		const isFocusMode = (displayMode === 'changes' || displayMode === 'focus');
-		const targetTransform = computeTemporalFitTransform(targetNodes, vw, vh, {
+		// Fit the full architecture extent at overview, not the reduced glyph set.
+		// Fitting only aggregates zooms in past the overview threshold and draws every leaf.
+		const fitNodes = largeOverview ? visibleNodes : targetNodes;
+		const targetTransform = computeTemporalFitTransform(fitNodes, vw, vh, {
 			padding: isFocusMode ? 40 : 56,
 			insets: insets,
 			minZoom: MIN_ZOOM,
-			maxZoom: isFocusMode && targetNodes.length <= 4 ? 3.2 : 2.4,
+			maxZoom: largeOverview ? 0.48 : (isFocusMode && targetNodes.length <= 4 ? 3.2 : 2.4),
 		});
 		if (shouldAnimate && animMs > 0) {
 			animateViewportTo(targetTransform, animMs);
@@ -2337,8 +2360,37 @@ function drawTemporalFrame(ts) {
 
 	const filterVal = (temporalFilterInput && temporalFilterInput.value) ? temporalFilterInput.value.toLowerCase().trim() : '';
 
-	// 1. Calculate Focus+Context visible elements
+	// 1. Calculate Focus+Context visible elements, then node-level LOD projection
 	const visibleData = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
+	const kNow = Math.max(0.001, transform.k);
+	const worldViewport = {
+		minX: (0 - transform.x) / kNow,
+		minY: (0 - transform.y) / kNow,
+		maxX: (w - transform.x) / kNow,
+		maxY: (h - transform.y) / kNow,
+	};
+	const temporalProjection = projectTemporalVisibleSet(visibleData.nodes, temporalDiff && temporalDiff.guides, {
+		zoom: transform.k,
+		displayMode: displayMode,
+		selectedEntityId: selectedNodeId,
+		hoveredEntityId: hoveredNodeId,
+		searchQuery: filterVal,
+		expandedGuideId: expandedTemporalGuideId,
+		viewport: worldViewport,
+		currentFileEntityId: temporalState && temporalState.currentFileEntityId,
+	});
+	const projectedLeafIds = new Set();
+	const projectedLeaves = [];
+	const projectedAggregates = [];
+	for (let pi = 0; pi < temporalProjection.items.length; pi++) {
+		const item = temporalProjection.items[pi];
+		if (item.kind === 'aggregate') {
+			projectedAggregates.push(item);
+		} else {
+			projectedLeafIds.add(item.entityId);
+			projectedLeaves.push(item.node);
+		}
+	}
 
 	if (visibleData.hasZeroChanges && displayMode === 'changes') {
 		if (noChangesCard) noChangesCard.style.display = 'flex';
@@ -2352,7 +2404,7 @@ function drawTemporalFrame(ts) {
 	ctx.scale(transform.k, transform.k);
 
 	// 2. Render Architecture Hierarchy / Community Region Boundaries in Full Codebase Mode
-	if (displayMode === 'state' && temporalDiff && Array.isArray(temporalDiff.guides) && transform.k >= 0.22) {
+	if (displayMode === 'state' && temporalDiff && Array.isArray(temporalDiff.guides) && (temporalProjection.tier === 'overview' || transform.k >= 0.22)) {
 		for (let g = 0; g < temporalDiff.guides.length; g++) {
 			const guide = temporalDiff.guides[g];
 			const bounds = guide && guide.bounds;
@@ -2486,6 +2538,7 @@ function drawTemporalFrame(ts) {
 			const targetNode = currentTemporalRenderNodes.get(targetEntityId);
 			if (!sourceNode || !targetNode) continue;
 			if (!visibleNodeSet.has(sourceEntityId) || !visibleNodeSet.has(targetEntityId)) continue;
+			if (temporalProjection.tier === 'overview' && !projectedLeafIds.has(sourceEntityId) && !projectedLeafIds.has(targetEntityId)) continue;
 
 			const isEdgeActive = isEdgeConnectedToActive(edge);
 			const isInteracting = interactionState === 'drag' || interactionState === 'pan';
@@ -2562,8 +2615,32 @@ function drawTemporalFrame(ts) {
 		}
 	}
 
-	// 4. Render Nodes (Distant Context -> Direct Context -> Changed Focus Nodes)
-	const nodesToRender = visibleData.nodes.slice();
+	// 4. Render node-level LOD: community aggregates, then piercing / detail leaves
+	if (projectedAggregates.length) {
+		for (let a = 0; a < projectedAggregates.length; a++) {
+			const agg = projectedAggregates[a];
+			const markerR = Math.max(2.4, 4.2 / Math.max(0.4, transform.k));
+			ctx.save();
+			ctx.beginPath();
+			ctx.arc(agg.x, agg.y, markerR, 0, Math.PI * 2);
+			ctx.fillStyle = agg.changedCount > 0
+				? theme.accent
+				: (theme.isHighContrast ? '#ffffff' : 'rgba(230, 237, 243, 0.78)');
+			ctx.fill();
+			const countFont = computeNetworkLabelWorldFontSize(10, transform.k, { minScreenPx: 8, maxScreenPx: 13 });
+			ctx.font = canvasFont('600', countFont);
+			ctx.fillStyle = theme.isHighContrast ? '#ffffff' : '#e6edf3';
+			ctx.textAlign = 'center';
+			ctx.textBaseline = 'top';
+			const countLabel = agg.changedCount > 0
+				? (String(agg.nodeCount) + ' · ' + String(agg.changedCount))
+				: String(agg.nodeCount);
+			ctx.fillText(countLabel, agg.x, agg.y + markerR + 2 / Math.max(0.4, transform.k));
+			ctx.restore();
+		}
+	}
+
+	const nodesToRender = projectedLeaves.slice();
 	nodesToRender.sort(function (a, b) {
 		const aRank = a.changeKind && a.changeKind !== 'unchanged' ? 2 : (directContextSet.has(a.entityId) ? 1 : 0);
 		const bRank = b.changeKind && b.changeKind !== 'unchanged' ? 2 : (directContextSet.has(b.entityId) ? 1 : 0);
@@ -2744,7 +2821,18 @@ function drawTemporalFrame(ts) {
 			metrics.finiteCoordinateCount = temporalDiff && temporalDiff.nodes
 				? temporalDiff.nodes.filter(function (node) { return Number.isFinite(node.x) && Number.isFinite(node.y); }).length
 				: 0;
-			metrics.nodesDrawn = nodesToRender.length;
+			metrics.nodesDrawn = temporalProjection.leafNodesDrawn + temporalProjection.aggregateNodesDrawn;
+			metrics.leafNodesDrawn = temporalProjection.leafNodesDrawn;
+			metrics.aggregateNodesDrawn = temporalProjection.aggregateNodesDrawn;
+			metrics.receivedLeafNodeCount = temporalProjection.receivedLeafNodeCount;
+			metrics.communitiesRepresented = temporalProjection.communitiesRepresented;
+			metrics.visibleChangedNodeCount = temporalProjection.visibleChangedNodeCount;
+			metrics.visibleChangedAggregateCount = temporalProjection.visibleChangedAggregateCount;
+			metrics.culledLeafCount = temporalProjection.culledLeafCount;
+			metrics.projectionTier = temporalProjection.tier;
+			metrics.lodTier = temporalProjection.tier === 'overview' ? 'aggregate' : (temporalProjection.tier === 'medium' ? 'direct' : 'full');
+			metrics.structuralOk = metrics.nodesDrawn > 0 && Number.isFinite(transform.k);
+			metrics.humanVisualReviewRequired = true;
 			metrics.edgesDrawn = edgesDrawn;
 			metrics.labelsDrawn = visibleLabels.length;
 			metrics.guideLabelsDrawn = guideLabels.length;
@@ -2753,12 +2841,11 @@ function drawTemporalFrame(ts) {
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
 			metrics.canvas = { clientWidth: w, clientHeight: h, width: netCanvas.width, height: netCanvas.height };
 			metrics.summary = temporalDiff && temporalDiff.summary;
-			metrics.lodTier = transform.k < 0.3 ? 'aggregate' : (transform.k < 0.8 ? 'direct' : 'full');
 			metrics.isAnimating = Boolean(isAnimatingTemporal);
 			metrics.timestamp = renderEnd;
 			const screenPoints = [];
-			for (let ni = 0; ni < nodesToRender.length; ni++) {
-				const n = nodesToRender[ni];
+			for (let ni = 0; ni < temporalProjection.items.length; ni++) {
+				const n = temporalProjection.items[ni];
 				if (Number.isFinite(n.x) && Number.isFinite(n.y)) {
 					screenPoints.push({ x: n.x * transform.k + transform.x, y: n.y * transform.k + transform.y });
 				}
@@ -2785,11 +2872,48 @@ function pickTemporalNode(clientX, clientY) {
 	const wy = (sy - transform.y) / k;
 
 	const visibleData = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
-	const visibleNodeSet = new Set(visibleData.nodes.map(n => n.entityId));
+	const projection = projectTemporalVisibleSet(visibleData.nodes, temporalDiff && temporalDiff.guides, {
+		zoom: transform.k,
+		displayMode: displayMode,
+		selectedEntityId: selectedNodeId,
+		hoveredEntityId: hoveredNodeId,
+		expandedGuideId: expandedTemporalGuideId,
+		currentFileEntityId: temporalState && temporalState.currentFileEntityId,
+	});
+	const visibleNodeSet = new Set();
+	for (let i = 0; i < projection.items.length; i++) {
+		if (projection.items[i].kind === 'leaf') {
+			visibleNodeSet.add(projection.items[i].entityId);
+		}
+	}
 
 	let best = null;
 	let bestDist = Infinity;
 	const minPickR = Math.max(18, 22 / k);
+
+	for (let a = 0; a < projection.items.length; a++) {
+		const item = projection.items[a];
+		if (item.kind !== 'aggregate') continue;
+		const pickR = Math.max(22, (item.radius || 28) * 0.5, 26 / k);
+		const d = Math.hypot(wx - item.x, wy - item.y);
+		let hit = d <= pickR;
+		if (!hit && temporalDiff && temporalDiff.guides) {
+			for (let g = 0; g < temporalDiff.guides.length; g++) {
+				const guide = temporalDiff.guides[g];
+				if (guide.id !== item.guideId || !guide.bounds) {
+					continue;
+				}
+				const b = guide.bounds;
+				if (wx >= b.minX && wx <= b.maxX && wy >= b.minY && wy <= b.maxY) {
+					hit = true;
+				}
+			}
+		}
+		if (hit && d < bestDist) {
+			bestDist = d;
+			best = { entityId: item.entityId, guideId: item.guideId, kind: 'aggregate', x: item.x, y: item.y, memberIds: item.memberIds, label: item.label };
+		}
+	}
 
 	currentTemporalRenderNodes.forEach(function (node) {
 		if (!visibleNodeSet.has(node.entityId)) return;
@@ -3234,6 +3358,18 @@ function placePopupNear(clientX, clientY) {
 let describeTimer = null;
 function openNodePopup(node, clientX, clientY) {
 	if (!popup) return;
+	if (node && node.kind === 'aggregate') {
+		expandedTemporalGuideId = node.guideId;
+		selectedNodeId = node.entityId;
+		announceGraph((node.label || 'Community') + ', ' + (node.memberIds ? node.memberIds.length : 0) + ' files');
+		if (popupTitle) popupTitle.textContent = node.label || 'Community';
+		if (popupMeta) popupMeta.textContent = (node.memberIds ? node.memberIds.length : 0) + ' files — click again or zoom to inspect';
+		placePopupNear(clientX, clientY);
+		popup.style.display = 'block';
+		dirty = true;
+		drawTemporalFrame(performance.now());
+		return;
+	}
 	popupNode = node;
 	if (describeTimer) {
 		clearTimeout(describeTimer);
@@ -3462,6 +3598,7 @@ function onPointerUp(e, cancelled) {
 				return;
 			}
 			selectedNodeId = null;
+			expandedTemporalGuideId = null;
 			request('selectTemporalEntity', { entityId: null });
 			closePopup();
 			dirty = true; drawTemporalFrame(performance.now());

@@ -10,7 +10,7 @@ import {
 	computePathspecFingerprint,
 } from './phase3Evidence.mjs';
 
-/** @typedef {'shared-workbench'|'core-ide'|'graphs-common'|'network-graph'|'temporal'|'desktop-runtime'|'electron-test-lab'|'tauri-test-lab'|'runtime-preview'|'magnus-core'|'magnus-guidance'|'magnus-desktop-tools'|'web-context'|'privacy'|'cloud-auth'|'launch-harness'|'validation-orchestration'|'assurance-leaf'|'load-quit-lab'|'lifecycle-lab'|'idle-soak-lab'|'active-soak-lab'} Phase3Domain */
+/** @typedef {'shared-workbench'|'core-ide'|'graphs-common'|'network-graph'|'temporal'|'desktop-runtime'|'electron-test-lab'|'tauri-test-lab'|'runtime-preview'|'magnus-core'|'magnus-guidance'|'magnus-desktop-tools'|'web-context'|'privacy'|'cloud-auth'|'launch-harness'|'validation-orchestration'|'assurance-leaf'|'load-quit-lab'|'lifecycle-lab'|'idle-soak-lab'|'active-soak-lab'|'live-activity'} Phase3Domain */
 
 /** @type {Record<Phase3Domain, string[]>} */
 export const DOMAIN_PATHSPECS = {
@@ -18,7 +18,7 @@ export const DOMAIN_PATHSPECS = {
 	'core-ide': ['src/vs/workbench/contrib/prebase', 'test/fixtures/typescript-lanes'],
 	'graphs-common': ['graphs'],
 	'network-graph': ['graphs/src/host/workbench', 'graphs/src/core'],
-	'temporal': ['graphs/src/temporal', 'graphs/scripts/acceptance'],
+	'temporal': ['graphs/src/temporal', 'graphs/src/view/temporal', 'graphs/scripts/acceptance'],
 	'desktop-runtime': ['src/vs/workbench/contrib/prebase', 'src/vs/platform/native'],
 	'electron-test-lab': ['test/prebase/fixtures/desktop-electron', 'test/prebase/acceptance/prebase-desktop-product-path.mjs', 'test/prebase/acceptance/prebase-desktop-native-cases.mjs', 'test/prebase/acceptance/prebase-restart-soak.mjs'],
 	'tauri-test-lab': ['test/prebase/fixtures/desktop-tauri', 'test/prebase/acceptance/prebase-desktop-product-path.mjs', 'test/prebase/acceptance/prebase-restart-soak.mjs'],
@@ -77,6 +77,12 @@ export const DOMAIN_PATHSPECS = {
 	],
 	'load-quit-lab': ['test/prebase/acceptance/prebase-load-quit-live.mjs'],
 	'lifecycle-lab': ['test/prebase/acceptance/prebase-process-leak-diag.mjs'],
+	'live-activity': [
+		'src/vs/platform/prebaseLiveActivity',
+		'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts',
+		'native/prebase-live-activity',
+		'test/prebase/acceptance/prebase-magnus-live-activity-live.mjs',
+	],
 	'idle-soak-lab': ['test/prebase/acceptance/prebase-idle-soak.mjs'],
 	'active-soak-lab': ['test/prebase/acceptance/prebase-active-soak.mjs'],
 	'assurance-leaf': ['scripts/assurance', 'scripts/icons', 'scripts/privacy', 'scripts/startup', 'scripts/supabase', 'graphs/scripts/verify-boundary', 'graphs/scripts/verify-typescript-lanes.mjs', 'package.json', 'package-lock.json', 'product.json'],
@@ -86,7 +92,12 @@ export const DOMAIN_PATHSPECS = {
 /** @type {Array<[string, Phase3Domain]>} */
 export const PATH_PREFIX_DOMAINS = [
 	['graphs/src/temporal/', 'temporal'],
+	['graphs/src/view/temporal/', 'temporal'],
 	['graphs/scripts/acceptance/', 'temporal'],
+	['src/vs/platform/prebaseLiveActivity/', 'live-activity'],
+	['src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts', 'live-activity'],
+	['native/prebase-live-activity/', 'live-activity'],
+	['test/prebase/acceptance/prebase-magnus-live-activity-live.mjs', 'live-activity'],
 	['graphs/src/host/workbench/', 'network-graph'],
 	['graphs/', 'graphs-common'],
 	['extensions/prebase-magnus/src/desktopTools.ts', 'magnus-desktop-tools'],
@@ -158,6 +169,7 @@ export const PRODUCER_DOMAINS = {
 	'parser-benchmark': ['graphs-common'],
 	'magnus-streaming-smoke': ['magnus-core', 'magnus-guidance', 'shared-workbench', 'launch-harness'],
 	'magnus-guidance-smoke': ['magnus-guidance', 'magnus-core', 'shared-workbench', 'launch-harness'],
+	'magnus-live-activity': ['live-activity', 'magnus-core', 'launch-harness'],
 	'core-ide': ['core-ide', 'shared-workbench', 'graphs-common', 'network-graph', 'runtime-preview', 'magnus-core', 'launch-harness'],
 	'runtime-preview': ['runtime-preview', 'launch-harness'],
 	'temporal-small': ['temporal', 'graphs-common', 'network-graph', 'shared-workbench', 'launch-harness'],
@@ -169,8 +181,8 @@ export const PRODUCER_DOMAINS = {
 	'magnus-tauri-tools': ['magnus-core', 'magnus-desktop-tools', 'tauri-test-lab', 'desktop-runtime', 'launch-harness'],
 	'hybrid-web-smoke': ['web-context', 'magnus-core', 'cloud-auth', 'launch-harness'],
 	'privacy': ['privacy', 'shared-workbench', 'launch-harness'],
-	'load-quit': ['shared-workbench', 'graphs-common', 'temporal', 'runtime-preview', 'magnus-core', 'electron-test-lab', 'tauri-test-lab', 'launch-harness', 'load-quit-lab'],
-	'lifecycle-cycles': ['shared-workbench', 'graphs-common', 'launch-harness', 'lifecycle-lab'],
+	'load-quit': ['shared-workbench', 'graphs-common', 'temporal', 'runtime-preview', 'magnus-core', 'electron-test-lab', 'tauri-test-lab', 'launch-harness', 'load-quit-lab', 'live-activity'],
+	'lifecycle-cycles': ['shared-workbench', 'graphs-common', 'launch-harness', 'lifecycle-lab', 'live-activity'],
 	'electron-restart-soak': ['desktop-runtime', 'electron-test-lab', 'launch-harness'],
 	'tauri-restart-soak': ['desktop-runtime', 'tauri-test-lab', 'launch-harness'],
 	'idle-soak': ['shared-workbench', 'launch-harness', 'idle-soak-lab'],
@@ -197,6 +209,7 @@ export const PRODUCER_HARNESS_PATHS = {
 	'parser-benchmark': ['graphs/scripts/parser-batch-bench.ts', 'graphs/scripts/graphs-test-register.mjs'],
 	'magnus-streaming-smoke': ['test/prebase/acceptance/prebase-magnus-stream-live.mjs'],
 	'magnus-guidance-smoke': ['test/prebase/acceptance/prebase-magnus-guidance-live.mjs'],
+	'magnus-live-activity': ['test/prebase/acceptance/prebase-magnus-live-activity-live.mjs'],
 	'core-ide': ['test/prebase/acceptance/prebase-core-ide-live.mjs'],
 	'runtime-preview': ['test/prebase/acceptance/runtime-preview-live.mjs'],
 	'temporal-small': ['graphs/scripts/acceptance/temporal-live.mjs'],
@@ -222,6 +235,7 @@ export const PRODUCER_ESTIMATED_DURATION_MS = {
 	'parser-benchmark': 90_000,
 	'magnus-streaming-smoke': 45_000,
 	'magnus-guidance-smoke': 20_000,
+	'magnus-live-activity': 45_000,
 	'core-ide': 120_000,
 	'runtime-preview': 60_000,
 	'temporal-small': 90_000,
@@ -289,6 +303,8 @@ export const PRODUCER_EXECUTION_ORDER = [
 	'parser-benchmark',
 	'magnus-streaming-smoke',
 	'magnus-guidance-smoke',
+	'magnus-live-activity',
+	'core-ide',
 	'core-ide',
 	'runtime-preview',
 	'temporal-small',

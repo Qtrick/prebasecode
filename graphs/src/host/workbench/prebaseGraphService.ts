@@ -20,7 +20,7 @@ import { WorkingTreeContentSource } from '../../core/canonical/contentSource.js'
 import { computeCanonicalGraphDiff, type CanonicalGraphDiff } from '../../core/canonical/canonicalGraphDiff.js';
 import { projectNetworkGraph } from '../../core/projection/graphProjection.js';
 import { CanonicalQueryIndex, type AdjacentEdgeInfo } from '../../core/query/canonicalQueryIndex.js';
-import type { NetworkLayoutMode } from '../../layouts/network/index.js';
+import { normalizeNetworkLayoutMode, type NetworkLayoutMode } from '../../layouts/network/index.js';
 import { basename } from '../../core/resolution/paths.js';
 import type { GraphNode, GraphSnapshot, LayoutMode } from '../../common/types/graphTypes.js';
 import { GitTreeContentSource } from '../../history/git/gitTreeContentSource.js';
@@ -774,8 +774,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 
 	private _getNetworkLayoutMode(): NetworkLayoutMode {
 		const mode = this.configurationService.getValue<string>(PreBaseGraphConfigKeys.GraphNetworkLayoutMode) || 'organic';
-		const valid: NetworkLayoutMode[] = ['organic', 'sphere', 'constellation', 'clustered', 'radial'];
-		return (valid.includes(mode as NetworkLayoutMode) ? mode : 'organic') as NetworkLayoutMode;
+		const normalized = normalizeNetworkLayoutMode(mode);
+		if (mode !== normalized) {
+			void this.configurationService.updateValue(PreBaseGraphConfigKeys.GraphNetworkLayoutMode, normalized);
+		}
+		return normalized;
 	}
 
 	/** Returns the IGitRepository for the given filesystem path, if open and known. */

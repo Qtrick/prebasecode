@@ -175,7 +175,23 @@ export function computeTemporalFocusContext(
 				maxX = Math.max(maxX, n.x);
 				maxY = Math.max(maxY, n.y);
 			}
-			if (!Number.isFinite(minX) || ((maxX - minX) < 360 && (maxY - minY) < 360)) {
+			const extentW = maxX - minX;
+			const extentH = maxY - minY;
+			if (Number.isFinite(minX) && (extentW > 520 || extentH > 520)) {
+				const cx = (minX + maxX) / 2;
+				const cy = (minY + maxY) / 2;
+				const scale = Math.max(0.42, Math.min(0.72, 420 / Math.max(extentW, extentH)));
+				const packedSingle: TemporalRenderNode[] = [];
+				for (let i = 0; i < nodes.length; i++) {
+					const node = nodes[i];
+					packedSingle.push(Object.assign({}, node, {
+						x: Number.isFinite(node.x) ? cx + (node.x - cx) * scale : node.x,
+						y: Number.isFinite(node.y) ? cy + (node.y - cy) * scale : node.y,
+					}));
+				}
+				return packedSingle;
+			}
+			if (!Number.isFinite(minX) || (extentW < 360 && extentH < 360)) {
 				return nodes;
 			}
 			const byDir = new Map<string, TemporalRenderNode[]>();

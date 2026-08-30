@@ -68,6 +68,7 @@ import { PreBaseHomeEditorInput } from './prebaseHomeEditorInput.js';
 import { PreBaseOnboardingEditor } from './prebaseOnboardingEditor.js';
 import { PreBaseOnboardingEditorInput } from './prebaseOnboardingEditorInput.js';
 import './prebaseRecentHistory.js';
+import './magnusLiveActivityContribution.js';
 import { PreBaseWorkspaceOpeningEditor } from './prebaseWorkspaceOpeningEditor.js';
 import { PreBaseWorkspaceOpeningEditorInput } from './prebaseWorkspaceOpeningEditorInput.js';
 import { PreBaseWorkspaceOpenPhase } from './prebaseWorkspaceOpening.js';

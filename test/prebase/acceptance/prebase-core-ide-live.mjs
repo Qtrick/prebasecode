@@ -140,7 +140,7 @@ export function codeGraphFailures(evidence) {
 	if (!graph.drag) failures.push('N4 node drag was not proven');
 	if (!graph.idleRotateArmed) failures.push('N5 idle auto-rotate was not enabled');
 	if (!graph.pick) failures.push('N7 pick hit-test was not proven');
-	if (!graph.sphereVsRadial) failures.push('N8 Sphere vs Radial was not switched');
+	if (!graph.sphereVsClustered) failures.push('N8 Sphere vs Clustered was not switched');
 	if (!graph.selectionLock) failures.push('N10 selected-node idle lock was not proven');
 	return failures;
 }
@@ -323,7 +323,7 @@ async function run() {
 		}
 		let metrics = null;
 		let sphereMode = '';
-		let radialMode = '';
+		let clusteredMode = '';
 		let yawBeforeRotate = 0;
 		let yawAfterRotate = 0;
 		let hitBeforeDrag = null;
@@ -355,8 +355,8 @@ async function run() {
 			};
 			const sphereMetrics = await clickLayout('sphere').catch(() => undefined);
 			sphereMode = sphereMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
-			const radialMetrics = await clickLayout('radial').catch(() => undefined);
-			radialMode = radialMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
+			const clusteredMetrics = await clickLayout('clustered').catch(() => undefined);
+			clusteredMode = clusteredMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 
 			const idle = launched.page.locator('.prebase-maps-view label', { hasText: 'Idle auto-rotate' }).locator('input[type="checkbox"]');
 			if (await idle.first().count()) {
@@ -428,12 +428,12 @@ async function run() {
 			} : null,
 			nodesDrawn: nodesDrawnFromMetrics(metrics),
 			selection: selected,
-			layoutModes: Boolean(sphereMode && radialMode && sphereMode !== radialMode),
+			layoutModes: Boolean(sphereMode && clusteredMode && sphereMode !== clusteredMode),
 			rotate: Number.isFinite(yawBeforeRotate) && Number.isFinite(yawAfterRotate) && Math.abs(yawAfterRotate - yawBeforeRotate) > 0.01,
 			drag: Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1)),
 			idleRotateArmed: Boolean(metrics?.networkIdleAutoRotate),
 			pick: picked,
-			sphereVsRadial: sphereMode === 'sphere' && radialMode === 'radial',
+			sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered',
 			selectionLock: picked && Math.abs(yawAfterLockWait - yawAtSelection) < 0.05,
 		};
 

@@ -55,9 +55,14 @@ function summarize(metrics, mode) {
 	const p10Hit = radii.length ? radii[Math.floor(radii.length * 0.1)] : null;
 	return {
 		mode,
+		structuralOk: nodes > 0 && k > 0,
+		humanVisualReviewRequired: true,
 		ok: nodes > 0 && k > 0,
 		nodesDrawn: nodes,
 		receivedNodeCount: metrics.receivedNodeCount,
+		leafNodesDrawn: metrics.leafNodesDrawn,
+		aggregateNodesDrawn: metrics.aggregateNodesDrawn,
+		projectionTier: metrics.projectionTier || metrics.lodTier,
 		edgesDrawn: metrics.edgesDrawn,
 		labelsDrawn: metrics.labelsDrawn,
 		transformK: k,
@@ -98,9 +103,13 @@ async function main() {
 				return m?.nodesDrawn > 0 ? m : undefined;
 			}, 90_000, 500);
 
-			const layouts = ['organic', 'sphere', 'constellation', 'clustered', 'radial'];
+			const layouts = ['organic', 'sphere', 'constellation', 'clustered'];
 			await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.prebase.maps').catch(() => undefined);
 			await launched.page.locator('.prebase-maps-view').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
+			const radialChip = await launched.page.locator('.prebase-maps-view button[data-network-layout="radial"]').count();
+			if (radialChip > 0) {
+				evidence.failures.push('Maps still exposes a Radial layout chip');
+			}
 			for (const mode of layouts) {
 				const button = launched.page.locator(`.prebase-maps-view button[data-network-layout="${mode}"]`);
 				await button.first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
@@ -121,13 +130,13 @@ async function main() {
 				}).catch(() => undefined);
 			}
 
-			const radial = evidence.network.radial;
+			const clustered = evidence.network.clustered;
 			const organic = evidence.network.organic;
-			if (radial?.transformK && organic?.transformK && radial.transformK < organic.transformK * 0.25) {
-				evidence.failures.push(`Radial Fit k ${radial.transformK} is far below Organic ${organic.transformK}`);
+			if (clustered?.ok === false || organic?.ok === false) {
+				evidence.failures.push('Remaining Network layouts failed structural Fit');
 			}
-			if (radial?.ok && radial.transformK < 0.12) {
-				evidence.failures.push(`Radial Fit k ${radial.transformK} still pathological`);
+			if (evidence.network.radial) {
+				evidence.failures.push('Radial must not remain an active Network layout');
 			}
 		}
 
@@ -162,12 +171,21 @@ async function main() {
 			if (full?.screenUtilization !== undefined && full.screenUtilization < 0.04) {
 				evidence.failures.push(`Temporal Full Map utilization ${full.screenUtilization} too low`);
 			}
+			const received = Number(full?.receivedNodeCount || 0);
+			const leavesDrawn = Number(full?.leafNodesDrawn ?? full?.nodesDrawn || 0);
+			if (received > 500 && leavesDrawn >= received * 0.35) {
+				evidence.failures.push(`Temporal overview still draws ${leavesDrawn} leaves of ${received} (node-level LOD required; a ${received}-dot blob is not visually good)`);
+			}
+			if (full?.structuralOk && full?.humanVisualReviewRequired !== true) {
+				evidence.failures.push('structuralOk must not be treated as visually good without humanVisualReviewRequired');
+			}
 		}
 
 		evidence.finishedAt = new Date().toISOString();
 		evidence.ok = evidence.failures.length === 0
-			&& Boolean(evidence.network.radial?.ok)
-			&& Boolean(evidence.network.organic?.ok);
+			&& Boolean(evidence.network.organic?.structuralOk)
+			&& Boolean(evidence.network.clustered?.structuralOk);
+		evidence.humanVisualReviewRequired = true;
 		writeFileSync(join(evidenceDir, 'visual-recovery.json'), JSON.stringify(evidence, null, 2));
 		console.log(JSON.stringify({
 			ok: evidence.ok,

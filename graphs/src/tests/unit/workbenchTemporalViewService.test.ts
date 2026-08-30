@@ -417,6 +417,7 @@ suite('WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)', () => {
 		// Open normal surviving node -> target commit ref
 		const histRes1 = await service.openHistoricalFile('ent-1');
 		assert.equal(histRes1.ok, true);
+		assert.equal(service.getState().currentFileEntityId, 'ent-1');
 		assert.equal(editorService.openedEditors.length, 1);
 		const openedUri1 = editorService.openedEditors[0].resource;
 		assert.equal(openedUri1.scheme, 'git');

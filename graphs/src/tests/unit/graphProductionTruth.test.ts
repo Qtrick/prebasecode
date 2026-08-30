@@ -70,6 +70,35 @@ suite('Graph settings & webview production truth', () => {
 			`GraphNetworkPhysicsStrength description must describe real behavior, got: ${physics[1]}`);
 	});
 
+	test('Network Radial is retired from Settings, Maps chips, persist rewrite, and imports', () => {
+		const contribution = readRepoFile('../../host/workbench/graphConfigurationContribution.ts');
+		const maps = readRepoFile('../../host/workbench/prebaseMapsView.ts');
+		const service = readRepoFile('../../host/workbench/prebaseGraphService.ts');
+		const layoutIndex = readRepoFile('../../layouts/network/index.ts');
+		const editor = readRepoFile('../../host/workbench/graphEditor.ts');
+
+		const enumBlock = contribution.match(/\[PreBaseGraphConfigKeys\.GraphNetworkLayoutMode\]:\s*\{([\s\S]*?)\},\n/);
+		assert.ok(enumBlock, 'GraphNetworkLayoutMode setting exists');
+		assert.match(enumBlock[1], /enum:\s*\[\s*'organic',\s*'sphere',\s*'constellation',\s*'clustered'\s*\]/);
+		assert.doesNotMatch(enumBlock[1], /radial/i);
+
+		const chipModes = maps.match(/const modes: \{ id: string; label: string \}\[\] = \[([\s\S]*?)\];/);
+		assert.ok(chipModes, 'Maps Network Layout chips exist');
+		assert.doesNotMatch(chipModes[1], /radial/i);
+		assert.match(chipModes[1], /organic/);
+		assert.match(chipModes[1], /clustered/);
+
+		assert.match(service, /normalizeNetworkLayoutMode\(mode\)/);
+		assert.match(service, /if \(mode !== normalized\) \{[\s\S]*?updateValue\(PreBaseGraphConfigKeys\.GraphNetworkLayoutMode, normalized\)/);
+		assert.match(maps, /normalizeNetworkLayoutMode\(networkLayoutRaw\)/);
+		assert.match(maps, /if \(networkLayoutRaw !== networkLayout\) \{[\s\S]*?updateValue\(PreBaseGraphConfigKeys\.GraphNetworkLayoutMode, networkLayout\)/);
+
+		assert.doesNotMatch(layoutIndex, /radialLayout/);
+		assert.doesNotMatch(layoutIndex, /from ['"]\.\/radialLayout/);
+		assert.doesNotMatch(editor, /radialLayout/);
+		assert.doesNotMatch(editor, /networkLayoutMode === ['"]radial['"]/);
+	});
+
 	test('webview script consumes the shared edge resolver and contains no resurrected dead caches', () => {
 		const script = extractWebviewScript();
 		assert.ok(script.includes('resolveNetworkEdgeVisual'),
@@ -79,5 +108,11 @@ suite('Graph settings & webview production truth', () => {
 			assert.ok(!script.includes(deadSymbol),
 				`webview script must not reference deleted symbol ${deadSymbol} (edge visuals moved to the shared resolver)`);
 		}
+
+		assert.ok(script.includes('projectTemporalVisibleSet'), 'draw and pick must use the injected node-level LOD projection');
+		assert.ok(script.includes('pickTemporalNode'), 'Temporal click path must pick through pickTemporalNode');
+		assert.match(script, /isTemporal\(\)\s*\n?\s*\? pickTemporalNode/);
+		assert.ok(script.includes('computeCommunityAggregateEdges'), 'overview edges must reuse temporalEdgeLod');
+		assert.doesNotMatch(script, /function computeNodeClusterAggregates|function aggregateLeaves\(/);
 	});
 });

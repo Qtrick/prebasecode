@@ -30,6 +30,7 @@ import {
 	shortenCommunityLabel,
 	boxesOverlap,
 } from '../../temporal/view/temporalLabelLod.js';
+import { projectTemporalVisibleSet } from '../../view/temporal/temporalProjection.js';
 
 /**
  * Serialized source of the authoritative Temporal unified status resolver.
@@ -97,6 +98,10 @@ export function serializeTemporalLabelLayoutSource(): string {
 	].join('\n\n');
 }
 
+export function serializeTemporalProjectionSource(): string {
+	return serializeSelfContainedFunction(projectTemporalVisibleSet as (...args: unknown[]) => unknown);
+}
+
 /**
  * Helper for test harnesses to interpolate all injected functions into extracted webview scripts.
  */
@@ -118,6 +123,7 @@ export function interpolateWebviewScript(script: string, generation = '42', init
 		.replace('${serializeTemporalEdgeLodStyleSource()}', serializeTemporalEdgeLodStyleSource())
 		.replace('${serializeTemporalAggregateEdgeRouteSource()}', serializeTemporalAggregateEdgeRouteSource())
 		.replace('${serializeTemporalVisibleLabelsSource()}', serializeTemporalVisibleLabelsSource())
-		.replace('${serializeTemporalLabelLayoutSource()}', serializeTemporalLabelLayoutSource());
+		.replace('${serializeTemporalLabelLayoutSource()}', serializeTemporalLabelLayoutSource())
+		.replace('${serializeTemporalProjectionSource()}', serializeTemporalProjectionSource());
 }
 

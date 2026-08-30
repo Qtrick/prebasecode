@@ -1047,6 +1047,33 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 			x: 4000 + (index % 8) * 180,
 			y: 3000 + Math.floor(index / 8) * 180,
 		}));
+		const farIds = unchanged.map((node) => node.entityId);
+		const guides = [
+			{
+				id: 'near',
+				label: 'near',
+				layerId: 'other',
+				color: '#6366f1',
+				x: 25,
+				y: 15,
+				radius: 40,
+				bounds: { minX: -20, minY: -20, maxX: 80, maxY: 50, width: 100, height: 70 },
+				nodeIds: ['changed-a', 'changed-b'],
+				nodeCount: 2,
+			},
+			{
+				id: 'far',
+				label: 'far',
+				layerId: 'other',
+				color: '#6366f1',
+				x: 4360,
+				y: 3360,
+				radius: 80,
+				bounds: { minX: 4000, minY: 3000, maxX: 5260, maxY: 3900, width: 1260, height: 900 },
+				nodeIds: farIds,
+				nodeCount: farIds.length,
+			},
+		];
 		const diff = {
 			sourceCommitSha: 'c0',
 			targetCommitSha: 'c1',
@@ -1056,6 +1083,7 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 				...unchanged,
 			],
 			edges: [],
+			guides,
 			summary: { addedCount: 1, removedCount: 0, modifiedCount: 1, renamedCount: 0, unchangedCount: unchanged.length },
 		};
 		const baseState = {
@@ -1095,6 +1123,85 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 			`switching back to Full Map must restore the wide fit (got ${fullMapAgain.k}, want ${fullMap.k})`);
 		assert.ok(fullMap.k < 0.4,
 			`Full Map of a large unchanged cluster must zoom out (got k=${fullMap.k})`);
+	});
+
+	test('18b. Large Full Map Fit stays zoomed out under node-level LOD (overview leaf cap)', () => {
+		const harness = createHarness('temporal');
+		const nodes: Array<Record<string, unknown>> = [];
+		const guides: Array<Record<string, unknown>> = [];
+		const communityCount = 8;
+		const perCommunity = 55;
+		for (let c = 0; c < communityCount; c++) {
+			const memberIds: string[] = [];
+			const gx = c * 900;
+			const gy = (c % 2) * 700;
+			for (let i = 0; i < perCommunity; i++) {
+				const entityId = `c${c}_${i}`;
+				memberIds.push(entityId);
+				nodes.push({
+					entityId,
+					label: `${entityId}.ts`,
+					path: `src/${entityId}.ts`,
+					changeKind: c === 0 && i < 2 ? 'modified' : 'unchanged',
+					x: gx + (i % 11) * 18,
+					y: gy + Math.floor(i / 11) * 18,
+				});
+			}
+			guides.push({
+				id: `comm${c}`,
+				label: `comm${c}`,
+				layerId: 'other',
+				color: '#6366f1',
+				x: gx,
+				y: gy,
+				radius: 48,
+				bounds: { minX: gx - 40, minY: gy - 40, maxX: gx + 220, maxY: gy + 120, width: 260, height: 160 },
+				nodeIds: memberIds,
+				nodeCount: memberIds.length,
+			});
+		}
+		assert.ok(nodes.length > 400, 'fixture must trip the large-overview Fit path');
+		const diff = {
+			sourceCommitSha: 'c0',
+			targetCommitSha: 'c1',
+			nodes,
+			edges: [],
+			guides,
+			summary: { addedCount: 0, removedCount: 0, modifiedCount: 2, renamedCount: 0, unchangedCount: nodes.length - 2 },
+		};
+		const baseState = {
+			displayMode: 'state',
+			diff,
+			isSettled: true,
+			selectedCommitSha: 'c1',
+			renderedCommitSha: 'c1',
+		};
+		harness.sendHostMessage({
+			type: 'snapshot',
+			payload: {
+				graphType: 'temporal',
+				temporalState: baseState,
+				settings: { keepGraphCentered: false, reduceMotion: true },
+			},
+		});
+		harness.sendHostMessage({ type: 'temporalState', payload: baseState });
+		const fullMap = harness.getTransform();
+		harness.sendHostMessage({
+			type: 'temporalState',
+			payload: { ...baseState, displayMode: 'changes' },
+		});
+		const focus = harness.getTransform();
+		harness.sendHostMessage({
+			type: 'temporalState',
+			payload: { ...baseState, displayMode: 'state' },
+		});
+		const fullMapAgain = harness.getTransform();
+
+		assert.ok(fullMap.k <= 0.48 + 1e-6, `large Full Map Fit must stay at overview zoom (got k=${fullMap.k})`);
+		assert.ok(focus.k > fullMap.k,
+			`Focus Changes must zoom tighter than large Full Map (focus k=${focus.k}, full k=${fullMap.k})`);
+		assert.ok(Math.abs(fullMapAgain.k - fullMap.k) < 0.02,
+			`switching back to large Full Map must restore the wide fit (got ${fullMapAgain.k}, want ${fullMap.k})`);
 	});
 
 	test('19. Focus Changes state refresh does not steal a user zoom after the mode switch', () => {

@@ -1,0 +1,43 @@
+npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
+
+> code-oss-dev@1.128.0 test:graphs
+> node graphs/scripts/run-unit-tests.mjs
+
+
+
+  Architecture pick
+    ✔ hit radius never drops below min CSS pixels when zoomed out
+    ✔ hit radius grows with visual size when zoomed in
+    ✔ world halo expands when zoomed out so screen min stays ~10px
+    ✔ picks node within halo and prefers closer center
+    ✔ miss outside halo
+    ✔ stable tie-break by id
+    ✔ zoomed-out pick still hits near node (not world-fixed Network radius)
+
+
+  7 passing (4ms)
+
+
+
+  PreBase networkLayout
+    ✔ sphere radius scales with node count and spread
+    ✔ organic is deterministic and 3D
+    ✔ sphere is deterministic and 3D
+    ✔ constellation is deterministic and 3D
+    ✔ clustered is deterministic and 3D
+    ✔ radial is deterministic and 3D
+
+
+  6 passing (20ms)
+
+
+
+  Graph ownership boundary (Phase A)
+    ✔ graphs/src/core has no flat shim .ts files
+    ✔ graphSettingsUi.ts exports public Settings UI surface
+    ✔ settings/ui.ts re-exports Settings UI helpers; settings/index.ts stays DOM-free
+    ✔ prebaseSettingsEditor routes through graphSettingsUi and does not bind PreBaseGraphConfigKeys
+
+
+  4 passing (5ms)
+
