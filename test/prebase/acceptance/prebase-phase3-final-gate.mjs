@@ -14,7 +14,13 @@ import { currentSourceIdentity } from './phase3Evidence.mjs';
 import {
 	PRODUCER_DOMAINS,
 	PRODUCER_ESTIMATED_DURATION_MS,
+	RELEASE_ONLY_PRODUCERS,
+	classifyChangedPaths,
 	computeProducerFingerprint,
+	estimateProducerDurationMs,
+	isTransientProducerFailure,
+	listChangedSourcePaths,
+	producersForCommitTier,
 	sortProducersByExecutionOrder,
 } from './phase3ProducerDomains.mjs';
 
@@ -141,6 +147,7 @@ export function idleSoakProducerTimeoutMs(env = process.env) {
 export const PHASE3_PRODUCERS = [
 	{ id: 'parser-benchmark', artifacts: ['parser-benchmark'], command: ['node', '--experimental-strip-types', '--import=./graphs/scripts/graphs-test-register.mjs', 'graphs/scripts/parser-batch-bench.ts'], timeoutMs: 25 * 60 * 1000 },
 	{ id: 'magnus-streaming-smoke', artifacts: ['magnus-streaming-smoke'], command: ['node', 'test/prebase/acceptance/prebase-magnus-stream-live.mjs'], timeoutMs: 180_000 },
+	{ id: 'magnus-guidance-smoke', artifacts: ['magnus-guidance-smoke'], command: ['node', 'test/prebase/acceptance/prebase-magnus-guidance-live.mjs'], timeoutMs: 180_000 },
 	{ id: 'core-ide', artifacts: ['core-ide', 'code-graph', 'themes-a11y'], command: ['node', 'test/prebase/acceptance/prebase-core-ide-live.mjs'], timeoutMs: 240_000 },
 	{ id: 'runtime-preview', artifacts: ['runtime-preview'], command: ['node', 'test/prebase/acceptance/runtime-preview-live.mjs'], timeoutMs: 180_000 },
 	{ id: 'temporal-small', artifacts: ['temporal-small'], command: ['node', 'graphs/scripts/acceptance/temporal-live.mjs'], timeoutMs: 180_000 },
@@ -170,6 +177,7 @@ export const PHASE3_REQUIRED_EVIDENCE = [
 	{ id: 'magnus-electron-tools', path: 'magnus/electron-tools-live.json' },
 	{ id: 'magnus-tauri-tools', path: 'magnus/tauri-tools-live.json' },
 	{ id: 'magnus-streaming-smoke', path: 'magnus/streaming-smoke.json' },
+	{ id: 'magnus-guidance-smoke', path: 'magnus/project-guidance-smoke.json' },
 	{ id: 'hybrid-web-smoke', path: 'magnus/hybrid-web-smoke.json' },
 	{ id: 'load-quit', path: 'shutdown/load-quit-matrix.json' },
 	{ id: 'idle-soak', path: 'soak/idle.json' },
@@ -323,7 +331,8 @@ export function classifyProducerStatus(repo, identity, producer, prerequisites =
 		expectedProducerFingerprint: producerFingerprint,
 		status,
 		reason,
-		estimatedDurationMs: PRODUCER_ESTIMATED_DURATION_MS[producer.id] ?? producer.timeoutMs,
+		estimatedDurationMs: estimateProducerDurationMs(repo, producer.id),
+		timeoutMs: producer.timeoutMs,
 		artifacts: producer.artifacts,
 		dependencies,
 	};
@@ -334,14 +343,14 @@ export function buildValidationPlan(repoRoot, identity, options = {}) {
 	const planKey = computePlanKey(repoRoot, identity, prerequisites);
 	if (!options.forceNew) {
 		const reusable = findReusablePlan(repoRoot, identity, prerequisites);
-		if (reusable) {
+		if (reusable && !options.tier && !(options.onlyProducers?.length)) {
 			reusable.reused = true;
 			reusable.currentHead = identity.sourceHead;
 			return reusable;
 		}
 	}
 	const runId = new Date().toISOString().replaceAll(/[:.]/g, '-');
-	const producers = PHASE3_PRODUCERS.map(producer => classifyProducerStatus(repoRoot, identity, producer, prerequisites));
+	let producers = PHASE3_PRODUCERS.map(producer => classifyProducerStatus(repoRoot, identity, producer, prerequisites));
 	const assurance = readJson('assurance.json');
 	const assuranceVerdict = scenarioOk({
 		id: 'assurance',
@@ -354,15 +363,63 @@ export function buildValidationPlan(repoRoot, identity, options = {}) {
 		expectedProducerFingerprint: expectedProducerFingerprint(repoRoot, 'assurance'),
 		status: assuranceVerdict.ok ? 'CURRENT_GREEN' : (assurance.missing ? 'MISSING' : 'STALE'),
 		reason: assuranceVerdict.ok ? 'current' : assuranceVerdict.reason,
-		estimatedDurationMs: PRODUCER_ESTIMATED_DURATION_MS.assurance,
+		estimatedDurationMs: estimateProducerDurationMs(repoRoot, 'assurance'),
+		timeoutMs: PRODUCER_ESTIMATED_DURATION_MS.assurance,
 		artifacts: ['assurance.json'],
 		dependencies: PRODUCER_DOMAINS.assurance ?? [],
 	});
-	const remaining = producers.filter(item => item.status !== 'CURRENT_GREEN' && item.status !== 'EXTERNAL');
+
+	const changedPaths = options.changedPaths ?? listChangedSourcePaths(repoRoot);
+	const classification = classifyChangedPaths(repoRoot, changedPaths);
+	let deferredRelease = [];
+	let onlyFilter = options.onlyProducers?.length ? new Set(options.onlyProducers) : undefined;
+
+	if (options.tier === 'commit') {
+		const commitPlan = producersForCommitTier(changedPaths);
+		const allow = new Set(commitPlan.producers);
+		deferredRelease = producers
+			.filter(item => RELEASE_ONLY_PRODUCERS.has(item.id) && !allow.has(item.id) && item.status !== 'CURRENT_GREEN' && item.status !== 'EXTERNAL')
+			.map(item => item.id);
+		producers = producers.map(item => {
+			if (item.status === 'CURRENT_GREEN' || item.status === 'EXTERNAL') {
+				return item;
+			}
+			if (allow.has(item.id) || (onlyFilter && onlyFilter.has(item.id))) {
+				return item;
+			}
+			return {
+				...item,
+				status: 'DEFERRED_RELEASE',
+				reason: 'commit-tier excludes release-only / unaffected producer',
+			};
+		});
+	}
+
+	if (onlyFilter) {
+		producers = producers.map(item => {
+			if (onlyFilter.has(item.id)) {
+				return item.status === 'CURRENT_GREEN' || item.status === 'EXTERNAL'
+					? item
+					: { ...item, status: item.status === 'DEFERRED_RELEASE' ? 'STALE' : item.status };
+			}
+			if (item.status === 'CURRENT_GREEN' || item.status === 'EXTERNAL') {
+				return item;
+			}
+			return {
+				...item,
+				status: 'SKIPPED',
+				reason: `excluded by --only-producer (selected: ${[...onlyFilter].join(', ')})`,
+			};
+		});
+	}
+
+	const remaining = producers.filter(item => item.status !== 'CURRENT_GREEN' && item.status !== 'EXTERNAL' && item.status !== 'DEFERRED_RELEASE' && item.status !== 'SKIPPED');
 	const totalEstimatedDurationMs = remaining.reduce((sum, item) => sum + item.estimatedDurationMs, 0);
 	return {
 		runId,
-		planKey,
+		planKey: options.tier || onlyFilter ? `${planKey}:${options.tier ?? 'only'}` : planKey,
+		tier: options.tier ?? 'release',
+		onlyProducers: options.onlyProducers ?? [],
 		plannedAtHead: identity.sourceHead,
 		currentHead: identity.sourceHead,
 		sourceHead: identity.sourceHead,
@@ -372,6 +429,10 @@ export function buildValidationPlan(repoRoot, identity, options = {}) {
 		createdAt: new Date().toISOString(),
 		reused: false,
 		totalEstimatedDurationMs,
+		changedPathCount: changedPaths.length,
+		changedDomains: classification.domains,
+		unknownChangedPaths: classification.unknown,
+		deferredReleaseProducers: deferredRelease,
 		producers: sortProducersByExecutionOrder(producers.map(item => item.id)).map(id => producers.find(item => item.id === id)),
 	};
 }
@@ -391,13 +452,21 @@ async function drainOwnedTree(pid) {
 	return processTree(pid).map(row => row.pid);
 }
 
+function killLeftoverPids(pids) {
+	for (const pid of pids ?? []) {
+		if (processState(pid) !== 'gone') {
+			try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
+		}
+	}
+}
+
 async function runProcess(id, command, args, timeoutMs, options = {}) {
 	const verbose = options.verbose === true;
 	mkdirSync(gateLogRoot, { recursive: true });
 	const log = join(gateLogRoot, `${id}.log`);
-	const estimatedMs = PRODUCER_ESTIMATED_DURATION_MS[id] ?? timeoutMs;
+	const estimatedMs = estimateProducerDurationMs(repo, id);
 	console.error(`[${timestamp()}] START ${id}`);
-	console.error(`estimated ${formatDuration(estimatedMs)}`);
+	console.error(`estimated ${formatDuration(estimatedMs)} (timeout ${formatDuration(timeoutMs)})`);
 	console.error(`log: ${log}`);
 	return new Promise((resolveRun, reject) => {
 		const startedAt = Date.now();
@@ -439,6 +508,7 @@ async function runProcess(id, command, args, timeoutMs, options = {}) {
 				timedOut,
 				elapsedMs,
 				log,
+				logTail: ok ? '' : tailLog(log),
 				harnessPid: child.pid,
 				timeoutMs,
 				termination,
@@ -459,7 +529,7 @@ async function runProcess(id, command, args, timeoutMs, options = {}) {
 	});
 }
 
-function parseMode(argv) {
+export function parseMode(argv) {
 	const verbose = argv.includes('--verbose');
 	const plan = argv.includes('--plan');
 	const forceNewPlan = argv.includes('--new-plan');
@@ -469,11 +539,36 @@ function parseMode(argv) {
 	const validateEvidence = argv.includes('--validate-evidence');
 	const rerunStale = argv.includes('--rerun-stale') || argv.includes('--rerun-required');
 	const rerunAll = argv.includes('--rerun-all') || argv.includes('--rerun-live');
+	const tierIndex = argv.findIndex(arg => arg === '--tier');
+	const tierRaw = tierIndex >= 0 ? argv[tierIndex + 1] : undefined;
+	const tier = tierRaw === 'commit' || tierRaw === 'release' ? tierRaw : undefined;
+	if (tierIndex >= 0 && !tier) {
+		throw new Error('--tier requires commit or release');
+	}
+	const onlyIndex = argv.findIndex(arg => arg === '--only-producer');
+	const onlyProducers = onlyIndex >= 0
+		? String(argv[onlyIndex + 1] ?? '').split(',').map(item => item.trim()).filter(Boolean)
+		: [];
+	if (onlyIndex >= 0 && onlyProducers.length === 0) {
+		throw new Error('--only-producer requires a producer id');
+	}
 	const modes = [plan, Boolean(executePlan), validateEvidence, rerunStale, rerunAll].filter(Boolean);
 	if (modes.length !== 1) {
 		throw new Error('Specify exactly one of --plan, --execute-plan <runId>, --resume-plan <runId>, --validate-evidence, --rerun-stale, or --rerun-all.');
 	}
-	return { verbose, plan, forceNewPlan, executePlan, resumePlan, validateEvidence, rerunStale, rerunAll };
+	if ((tier || onlyProducers.length) && !plan && !executePlan && !rerunStale && !rerunAll) {
+		throw new Error('--tier / --only-producer require --plan, --execute-plan/--resume-plan, or a rerun mode.');
+	}
+	return { verbose, plan, forceNewPlan, executePlan, resumePlan, validateEvidence, rerunStale, rerunAll, tier, onlyProducers };
+}
+
+/** Resume/execute skip: never restart producers already COMPLETE (or deferred/skipped/green). */
+export function shouldSkipProducerExecution(entry) {
+	return entry.status === 'CURRENT_GREEN'
+		|| entry.status === 'EXTERNAL'
+		|| entry.status === 'DEFERRED_RELEASE'
+		|| entry.status === 'SKIPPED'
+		|| entry.execution?.status === 'COMPLETE';
 }
 
 export function loadPlan(runId, planKey) {
@@ -516,10 +611,13 @@ export function persistPlan(plan) {
 
 export function assertPlanIdentity(plan, identity, repoRoot = repo) {
 	const productFingerprint = identity.productFingerprint ?? identity.sourceFingerprint;
-	if (plan.productFingerprint !== productFingerprint) {
+	if (plan.productFingerprint !== productFingerprint && plan.tier !== 'commit' && !(plan.onlyProducers?.length)) {
 		throw new Error('plan stale due to code change: product fingerprint mismatch');
 	}
 	for (const entry of plan.producers ?? []) {
+		if (entry.status === 'DEFERRED_RELEASE' || entry.status === 'SKIPPED' || entry.status === 'CURRENT_GREEN' || entry.status === 'EXTERNAL') {
+			continue;
+		}
 		const current = expectedProducerFingerprint(repoRoot, entry.id);
 		if (entry.expectedProducerFingerprint !== current) {
 			throw new Error(`plan stale due to code change: producer ${entry.id} fingerprint mismatch`);
@@ -542,11 +640,15 @@ function readJsonFileSafe(fullPath) {
 
 async function executeValidationPlan(plan, identity, options = {}) {
 	const reruns = new Map();
+	const onlyFilter = options.onlyProducers?.length ? new Set(options.onlyProducers) : undefined;
 	for (const entry of plan.producers) {
 		if (entry.execution?.status === 'RUNNING') {
 			delete entry.execution;
 		}
-		if (entry.status === 'CURRENT_GREEN' || entry.status === 'EXTERNAL' || entry.execution?.status === 'COMPLETE') {
+		if (shouldSkipProducerExecution(entry)) {
+			continue;
+		}
+		if (onlyFilter && !onlyFilter.has(entry.id)) {
 			continue;
 		}
 		const currentFingerprint = entry.id === 'assurance'
@@ -555,18 +657,34 @@ async function executeValidationPlan(plan, identity, options = {}) {
 		if (currentFingerprint !== entry.expectedProducerFingerprint) {
 			throw new Error(`plan stale due to code change: producer ${entry.id} fingerprint mismatch`);
 		}
-		entry.execution = { status: 'RUNNING', startedAt: new Date().toISOString() };
+		entry.execution = { status: 'RUNNING', startedAt: new Date().toISOString(), attempts: 0 };
 		persistPlan(plan);
-		let result;
-		if (entry.id === 'assurance') {
-			result = await runProcess('assurance', process.execPath, ['test/prebase/acceptance/prebase-phase3-assurance.mjs'], PRODUCER_ESTIMATED_DURATION_MS.assurance, options);
-		} else {
+
+		const runOnce = async () => {
+			if (entry.id === 'assurance') {
+				return runProcess('assurance', process.execPath, ['test/prebase/acceptance/prebase-phase3-assurance.mjs'], PRODUCER_ESTIMATED_DURATION_MS.assurance, options);
+			}
 			const producer = PHASE3_PRODUCERS.find(item => item.id === entry.id);
 			if (!producer) {
 				throw new Error(`unknown producer in plan: ${entry.id}`);
 			}
-			result = await runProcess(producer.id, producer.command[0], producer.command.slice(1), producer.timeoutMs, options);
+			return runProcess(producer.id, producer.command[0], producer.command.slice(1), producer.timeoutMs, options);
+		};
+
+		let result = await runOnce();
+		entry.execution.attempts = 1;
+		if (result.code !== 0 || result.timedOut || result.leftoverPids.length) {
+			if (isTransientProducerFailure(result)) {
+				console.error(`[${timestamp()}] transient failure for ${entry.id}; cleaning up and retrying once`);
+				if (result.harnessPid) {
+					await terminateOwnedProcessTree(result.harnessPid);
+				}
+				killLeftoverPids(result.leftoverPids);
+				result = await runOnce();
+				entry.execution.attempts = 2;
+			}
 		}
+
 		entry.execution = {
 			status: result.code === 0 && !result.timedOut && result.leftoverPids.length === 0 ? 'COMPLETE' : 'FAILED',
 			startedAt: entry.execution.startedAt,
@@ -576,6 +694,7 @@ async function executeValidationPlan(plan, identity, options = {}) {
 			durationMs: result.elapsedMs,
 			log: result.log,
 			leftoverPids: result.leftoverPids,
+			attempts: entry.execution.attempts,
 		};
 		if (entry.id !== 'assurance') {
 			const producer = PHASE3_PRODUCERS.find(item => item.id === entry.id);
@@ -590,11 +709,7 @@ async function executeValidationPlan(plan, identity, options = {}) {
 		}
 		if (result.leftoverPids.length) {
 			await terminateOwnedProcessTree(result.harnessPid);
-			for (const pid of result.leftoverPids) {
-				if (processState(pid) !== 'gone') {
-					try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
-				}
-			}
+			killLeftoverPids(result.leftoverPids);
 		}
 	}
 	return reruns;
@@ -677,15 +792,26 @@ async function run() {
 		const identity = currentSourceIdentity(repo);
 
 		if (mode.plan) {
-			const plan = buildValidationPlan(repo, identity, { forceNew: mode.forceNewPlan });
+			const plan = buildValidationPlan(repo, identity, {
+				forceNew: mode.forceNewPlan || Boolean(mode.tier) || mode.onlyProducers.length > 0,
+				tier: mode.tier,
+				onlyProducers: mode.onlyProducers,
+			});
 			persistPlan(plan);
-			const remaining = plan.producers.filter(item => item.status !== 'CURRENT_GREEN' && item.status !== 'EXTERNAL');
+			const remaining = plan.producers.filter(item => item.status !== 'CURRENT_GREEN' && item.status !== 'EXTERNAL' && item.status !== 'DEFERRED_RELEASE' && item.status !== 'SKIPPED');
 			const currentGreen = plan.producers.filter(item => item.status === 'CURRENT_GREEN').length;
 			const external = plan.producers.filter(item => item.status === 'EXTERNAL').length;
+			const deferred = plan.producers.filter(item => item.status === 'DEFERRED_RELEASE').length;
 			console.log(JSON.stringify(plan, null, 2));
-			console.error(`[phase3-final-gate] validation plan ${plan.runId}${plan.reused ? ' (reused)' : ''}`);
+			console.error(`[phase3-final-gate] validation plan ${plan.runId}${plan.reused ? ' (reused)' : ''}${plan.tier ? ` tier=${plan.tier}` : ''}`);
 			console.error(`planKey ${plan.planKey}`);
-			console.error(`producers ${plan.producers.length}; current-green ${currentGreen}; stale/missing ${remaining.length}; external ${external}`);
+			console.error(`producers ${plan.producers.length}; current-green ${currentGreen}; stale/missing ${remaining.length}; external ${external}; deferred-release ${deferred}`);
+			if (plan.unknownChangedPaths?.length) {
+				console.error(`[phase3-final-gate] unknown changed paths (assign a domain if they affect live behavior): ${plan.unknownChangedPaths.slice(0, 20).join(', ')}${plan.unknownChangedPaths.length > 20 ? ' …' : ''}`);
+			}
+			if (plan.deferredReleaseProducers?.length) {
+				console.error(`[phase3-final-gate] release-only deferred: ${plan.deferredReleaseProducers.join(', ')}`);
+			}
 			console.error(`estimated remaining ${formatDuration(plan.totalEstimatedDurationMs)}`);
 			return;
 		}
@@ -693,7 +819,7 @@ async function run() {
 		if (mode.executePlan) {
 			const plan = loadPlan(mode.executePlan);
 			assertPlanIdentity(plan, identity);
-			const reruns = await executeValidationPlan(plan, identity, { verbose: mode.verbose });
+			const reruns = await executeValidationPlan(plan, identity, { verbose: mode.verbose, onlyProducers: mode.onlyProducers });
 			const manifest = writeManifest(identity, plan, reruns);
 			console.log(JSON.stringify({
 				ok: manifest.overallRepositoryControlledGate,
@@ -749,11 +875,7 @@ async function run() {
 			}
 			if (result.leftoverPids.length) {
 				await terminateOwnedProcessTree(result.harnessPid);
-				for (const pid of result.leftoverPids) {
-					if (processState(pid) !== 'gone') {
-						try { process.kill(pid, 'SIGKILL'); } catch { /* already gone */ }
-					}
-				}
+				killLeftoverPids(result.leftoverPids);
 			}
 		}
 

@@ -827,7 +827,11 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'acti
 			if (!rulePath) {
 				throw new Error('rulePath is required for activate_rule.');
 			}
-			session?.activateRule(rulePath.replace(/\\/g, '/'));
+			const normalizedRule = rulePath.replace(/\\/g, '/');
+			if (normalizedRule.split('/').includes('..') || normalizedRule.startsWith('/') || /^[a-zA-Z]:/.test(normalizedRule)) {
+				return result(JSON.stringify({ ok: false, reason: 'rulePath must be a workspace-relative path.', path: normalizedRule }));
+			}
+			session?.activateRule(normalizedRule);
 		}
 		const snapshot = session?.getTargets().length
 			? await service.getCombinedSnapshot(
@@ -841,7 +845,7 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'acti
 				options.input.paths ?? [],
 				session?.getActivatedSkillIds() ?? (options.input.skillName ? [options.input.skillName] : []),
 				true,
-				session?.getActivatedRulePaths() ?? (options.input.rulePath ? [options.input.rulePath] : []),
+				session?.getActivatedRulePaths() ?? (options.input.rulePath ? [options.input.rulePath.replace(/\\/g, '/')] : []),
 			);
 		if (operation === 'activate_skill') {
 			const idOrName = options.input.skillId?.trim() || options.input.skillName?.trim() || '';
@@ -863,11 +867,19 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'acti
 			const path = options.input.rulePath?.replace(/\\/g, '/');
 			const match = snapshot.activatedRules.find(item => item.source.path === path)
 				?? [...snapshot.alwaysApplicable, ...snapshot.pathApplicable].find(item => item.source.path === path);
+			const playbookHint = !match && path
+				? snapshot.playbookCatalog?.find(item => item.path === path)
+				: undefined;
 			return result(JSON.stringify({
 				ok: Boolean(match),
 				path,
 				body: match?.text ?? '',
-				catalog: match ? undefined : snapshot.onDemandRules.map(item => item.source.path),
+				kind: match?.source.scope === 'playbook' ? 'playbook' : 'rule',
+				catalog: match ? undefined : [
+					...snapshot.onDemandRules.map(item => item.source.path),
+					...(snapshot.playbookCatalog?.map(item => item.path) ?? []),
+				],
+				playbook: playbookHint ? { id: playbookHint.id, name: playbookHint.name } : undefined,
 			}));
 		}
 		const delta = previous && session

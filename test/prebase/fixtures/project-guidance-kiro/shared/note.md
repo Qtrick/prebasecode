@@ -1,0 +1,1 @@
+Kiro shared note body.

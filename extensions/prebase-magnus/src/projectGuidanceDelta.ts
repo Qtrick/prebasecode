@@ -7,6 +7,7 @@ import { boundedJoin } from './projectGuidanceDiscovery';
 import {
 	DEFAULT_GUIDANCE_BUDGET,
 	formatProjectGuidanceForPrompt,
+	MAX_PROMPT_GUIDANCE_CHARS,
 	type ProjectGuidanceSnapshot,
 	scrubSecretsFromGuidance,
 } from './projectGuidanceService';
@@ -105,7 +106,11 @@ export function formatGuidanceDeltaForPrompt(delta: GuidanceDelta, maxChars = DE
 		}
 		parts.push(lines.join('\n'));
 	}
-	return parts.join('\n\n').trim();
+	let result = parts.join('\n\n').trim();
+	if (result.length > MAX_PROMPT_GUIDANCE_CHARS) {
+		result = `${result.slice(0, MAX_PROMPT_GUIDANCE_CHARS)}\n\n[project guidance update truncated]`;
+	}
+	return result;
 }
 
 export function seedSessionFromSnapshot(snapshot: ProjectGuidanceSnapshot, session: ProjectGuidanceSession): void {
@@ -142,9 +147,10 @@ export function formatGetForPathsResult(
 		pathScoped: hasDelta
 			? snapshot.pathApplicable.map(item => item.source.path)
 			: snapshot.pathApplicable.map(item => ({ path: item.source.path, body: scrubSecretsFromGuidance(item.text) })),
-		onDemand: snapshot.onDemandRules.map(item => ({ path: item.source.path, description: item.description })),
-		skills: snapshot.skillCatalog.map(item => ({ id: item.id, name: item.name, description: item.description, path: item.path })),
-		playbooks: snapshot.playbookCatalog?.map(item => ({ id: item.id, name: item.name, description: item.description, path: item.path })) ?? [],
+		onDemand: snapshot.onDemandRules.map(item => ({ path: item.source.path, description: scrubSecretsFromGuidance(item.description) })),
+		skills: snapshot.skillCatalog.map(item => ({ id: item.id, name: item.name, description: scrubSecretsFromGuidance(item.description), path: item.path })),
+		playbooks: snapshot.playbookCatalog?.map(item => ({ id: item.id, name: item.name, description: scrubSecretsFromGuidance(item.description), path: item.path })) ?? [],
+		agentProfiles: snapshot.agentProfileCatalog?.map(item => ({ id: item.id, name: item.name, description: scrubSecretsFromGuidance(item.description), path: item.path })) ?? [],
 		diagnostics: [...snapshot.diagnostics, ...delta.diagnostics],
 	};
 }

@@ -1375,7 +1375,7 @@ test('final gate leftover PIDs after parent death SIGKILL only the owned tree', 
 	assert.match(drain, /processTree\(pid\)\.map\(row => row\.pid\)/);
 	assert.doesNotMatch(drain, /pgrep|pkill|PreBase\.app|Electron/);
 
-	const runProcess = gate.slice(gate.indexOf('async function runProcess'), gate.indexOf('function parseMode'));
+	const runProcess = gate.slice(gate.indexOf('async function runProcess'), gate.indexOf('export function parseMode'));
 	assert.match(runProcess, /leftoverPids = \[\.\.\.new Set\(\[/);
 	assert.match(runProcess, /termination\?\.leftoverPids \?\? \[\]/);
 	assert.match(runProcess, /await drainOwnedTree\(child\.pid\)/);

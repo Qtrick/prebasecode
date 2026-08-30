@@ -61,3 +61,10 @@ dist
 # REMOVE WHEN USER SAYS FFATU IS NO LONGER NEEDED
 FFATU/
 opencode.json
+
+# Allow project-guidance fixtures that intentionally ship ignored AI-tool config names.
+!test/prebase/fixtures/**/opencode.json
+!test/prebase/fixtures/**/.opencode/
+!test/prebase/fixtures/**/.opencode/**
+!test/prebase/fixtures/**/.claude/
+!test/prebase/fixtures/**/.claude/**

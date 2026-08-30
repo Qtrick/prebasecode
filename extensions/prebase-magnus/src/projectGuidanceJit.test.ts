@@ -73,4 +73,40 @@ describe('projectGuidanceJit', () => {
 			assert.equal(session.getTargets().length, 0);
 		});
 	});
+
+	test('registerGuidanceTargetsFromToolCalls is a no-op without an active guidance session', () => {
+		assert.equal(getProjectGuidanceSession(), undefined);
+		const root = tempRoot('jit-nosession');
+		try {
+			const added = registerGuidanceTargetsFromToolCalls([
+				{ name: 'prebase_workspace_read_file', args: { path: 'src/main.ts' } },
+			], [{ uri: { fsPath: root } }]);
+			assert.equal(added.length, 0);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
+
+	test('registerGuidanceTargetsFromToolCalls covers workspace search/list/definition tools', () => {
+		const root = tempRoot('jit-tools');
+		try {
+			writeFileSync(join(root, 'src/a.ts'), 'export {};\n');
+			writeFileSync(join(root, 'src/b.ts'), 'export {};\n');
+			const session = createProjectGuidanceSession();
+			runWithProjectGuidanceSession(session, () => {
+				const added = registerGuidanceTargetsFromToolCalls([
+					{ name: 'prebase_workspace_search_text', args: { path: 'src/a.ts', query: 'export' } },
+					{ name: 'prebase_workspace_list_files', args: { path: 'src' } },
+					{ name: 'prebase_workspace_get_definition', args: { filePath: 'src/b.ts' } },
+					{ name: 'prebase_project_guidance', args: { operation: 'get_for_paths', paths: ['src/a.ts'] } },
+				], [{ uri: { fsPath: root } }]);
+				assert.ok(added.some(item => item.relativePath === 'src/a.ts'));
+				assert.ok(added.some(item => item.relativePath === 'src/b.ts' || item.relativePath === 'src'));
+				assert.ok(session.getTargetPathsForRoot(root).includes('src/a.ts'));
+				assert.equal(session.getTargetPathsForRoot(root).includes('graphs/src/foo.ts'), false);
+			});
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });

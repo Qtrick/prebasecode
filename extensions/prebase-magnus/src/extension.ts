@@ -155,52 +155,87 @@ export function activate(context: vscode.ExtensionContext): void {
 				const activePath = activeEditor && resolveWorkspaceRootForPath(activeEditor.document.uri.fsPath, folders) === workspaceRoot
 					? vscode.workspace.asRelativePath(activeEditor.document.uri, false)
 					: undefined;
+				const guidanceEnabled = vscode.workspace.getConfiguration('prebase.magnus').get<boolean>('projectGuidance.enabled', true);
+				if (!guidanceEnabled) {
+					void vscode.window.showInformationMessage('Project guidance is disabled in Settings (prebase.magnus.projectGuidance.enabled).');
+					return;
+				}
 				const snapshot = await projectGuidance.getSnapshot(workspaceRoot, activePath ? [activePath] : []);
-				const pick = await vscode.window.showQuickPick(
-					[
-						{ label: '$(check) Currently applied', kind: vscode.QuickPickItemKind.Separator, relPath: '' },
-						...snapshot.alwaysApplicable.map(item => ({
-							label: `$(law) ${item.source.path}`,
-							description: `${item.source.ecosystem} • always`,
-							relPath: item.source.path,
-						})),
-						...snapshot.pathApplicable.map(item => ({
-							label: `$(folder) ${item.source.path}`,
-							description: `${item.source.ecosystem} • path-scoped`,
-							relPath: item.source.path,
-						})),
-						{ label: '$(lightbulb) Available on demand', kind: vscode.QuickPickItemKind.Separator, relPath: '' },
-						...snapshot.onDemandRules.map(item => ({
-							label: `$(symbol-event) ${item.source.path}`,
-							description: `${item.source.activationMode}: ${item.description}`,
-							relPath: item.source.path,
-						})),
-						...(snapshot.playbookCatalog?.length ? [{ label: '$(book) Playbooks', kind: vscode.QuickPickItemKind.Separator, relPath: '' }] : []),
-						...(snapshot.playbookCatalog ?? []).map(item => ({
-							label: `$(book) ${item.name}`,
-							description: `${item.ecosystem} playbook • ${item.description}`,
-							relPath: item.path,
-						})),
-						...(snapshot.skillCatalog.length ? [{ label: '$(sparkle) Skills', kind: vscode.QuickPickItemKind.Separator, relPath: '' }] : []),
-						...snapshot.skillCatalog.map(item => ({
-							label: `$(sparkle) ${item.name}`,
-							description: `${item.id} • ${item.ecosystem} • ${item.description}`,
-							relPath: item.path,
-						})),
-						...(snapshot.diagnostics.length ? [{ label: '$(warning) Diagnostics', kind: vscode.QuickPickItemKind.Separator, relPath: '' }] : []),
-						...snapshot.diagnostics.slice(0, 6).map(message => ({
-							label: `$(info) ${message}`,
-							description: 'diagnostic',
-							relPath: '',
-						})),
-					].filter(item => item.label),
-					{
-						title: 'Project Guidance',
-						placeHolder: `${snapshot.alwaysApplicable.length} always-on • ${snapshot.pathApplicable.length} path-scoped • ${snapshot.skillCatalog.length} skills • ${snapshot.playbookCatalog?.length ?? 0} playbooks`,
-						matchOnDescription: true,
-					},
-				);
-				if (pick?.relPath) {
+				const manuals = snapshot.onDemandRules.filter(item => item.source.activationMode === 'manual').length;
+				const summaryLabel = `Applied: ${snapshot.alwaysApplicable.length} instructions, ${snapshot.pathApplicable.length} path rules · Available: ${snapshot.skillCatalog.length} skills, ${manuals + (snapshot.playbookCatalog?.length ?? 0)} manuals/playbooks · Diagnostics: ${snapshot.diagnostics.length}`;
+				type GuidancePick = { label: string; description?: string; detail?: string; relPath: string; kind?: vscode.QuickPickItemKind; openable?: boolean };
+				const provenance = (ecosystem: string, note: string) => `${ecosystem} · ${note}`;
+				const items: GuidancePick[] = [
+					{ label: summaryLabel, description: 'Summary', relPath: '', openable: false },
+				];
+				const pushSection = (label: string, entries: GuidancePick[]) => {
+					if (!entries.length) {
+						return;
+					}
+					items.push({ label, kind: vscode.QuickPickItemKind.Separator, relPath: '' }, ...entries);
+				};
+				pushSection('Currently Applied', snapshot.alwaysApplicable.map(item => ({
+					label: item.source.path,
+					description: provenance(item.source.ecosystem, 'Always'),
+					detail: item.source.description,
+					relPath: item.source.path,
+					openable: true,
+				})));
+				pushSection('Path-Specific', snapshot.pathApplicable.map(item => ({
+					label: item.source.path,
+					description: provenance(item.source.ecosystem, `Matches glob ${item.source.globs.join(', ') || item.source.scope}`),
+					relPath: item.source.path,
+					openable: true,
+				})));
+				pushSection('On Demand', snapshot.onDemandRules.map(item => ({
+					label: item.source.path,
+					description: provenance(
+						item.source.ecosystem,
+						item.source.activationMode === 'intelligent' ? 'Intelligent available' : 'Manual',
+					),
+					detail: item.description,
+					relPath: item.source.path,
+					openable: true,
+				})));
+				pushSection('Skills', snapshot.skillCatalog.map(item => ({
+					label: item.name,
+					description: provenance(
+						item.ecosystem,
+						item.modelInvocable === false
+							? 'Manual (hidden from model auto catalog)'
+							: 'Activate via prebase_project_guidance',
+					),
+					detail: item.description,
+					relPath: item.path,
+					openable: true,
+				})));
+				pushSection('Playbooks', (snapshot.playbookCatalog ?? []).map(item => ({
+					label: item.name,
+					description: provenance(item.ecosystem, 'Manual (activate_rule)'),
+					detail: item.description,
+					relPath: item.path,
+					openable: true,
+				})));
+				pushSection('Agent Profiles', (snapshot.agentProfileCatalog ?? []).map(item => ({
+					label: item.name,
+					description: provenance(item.ecosystem, 'Catalog only'),
+					detail: item.description,
+					relPath: item.path,
+					openable: true,
+				})));
+				pushSection('Diagnostics', snapshot.diagnostics.slice(0, 8).map(message => ({
+					label: message,
+					description: 'Diagnostic',
+					relPath: '',
+					openable: false,
+				})));
+				const pick = await vscode.window.showQuickPick(items.filter(item => item.label), {
+					title: 'Project Guidance',
+					placeHolder: summaryLabel,
+					matchOnDescription: true,
+					matchOnDetail: true,
+				});
+				if (pick?.relPath && pick.openable !== false) {
 					const fullPath = resolveGuidancePath(workspaceRoot, pick.relPath);
 					if (!fullPath) {
 						void vscode.window.showErrorMessage('That guidance path is not allowed.');
@@ -226,10 +261,13 @@ export function activate(context: vscode.ExtensionContext): void {
 					ok: true,
 					enabled: snapshot.enabled,
 					workspaceRoot,
-					always: snapshot.alwaysApplicable.map(item => ({ path: item.source.path, body: item.text.slice(0, 400) })),
-					pathScoped: snapshot.pathApplicable.map(item => ({ path: item.source.path, body: item.text.slice(0, 400) })),
-					onDemand: snapshot.onDemandRules.map(item => item.source.path),
-					skills: snapshot.skillCatalog.map(item => ({ id: item.id, name: item.name, path: item.path })),
+					always: snapshot.alwaysApplicable.map(item => ({ path: item.source.path, ecosystem: item.source.ecosystem, body: item.text.slice(0, 400) })),
+					pathScoped: snapshot.pathApplicable.map(item => ({ path: item.source.path, ecosystem: item.source.ecosystem, body: item.text.slice(0, 400) })),
+					onDemand: snapshot.onDemandRules.map(item => ({ path: item.source.path, mode: item.source.activationMode })),
+					skills: snapshot.skillCatalog.map(item => ({ id: item.id, name: item.name, path: item.path, ecosystem: item.ecosystem, modelInvocable: item.modelInvocable !== false })),
+					playbooks: (snapshot.playbookCatalog ?? []).map(item => ({ name: item.name, path: item.path, ecosystem: item.ecosystem })),
+					agentProfiles: (snapshot.agentProfileCatalog ?? []).map(item => ({ name: item.name, path: item.path, ecosystem: item.ecosystem })),
+					diagnostics: snapshot.diagnostics.slice(0, 24),
 				};
 			}),
 			vscode.commands.registerCommand('prebase.magnus.runGuidanceJitSmoke', async () => {

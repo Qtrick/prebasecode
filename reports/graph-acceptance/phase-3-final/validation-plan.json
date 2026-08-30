@@ -1,40 +1,66 @@
 {
-  "runId": "2026-08-30T16-23-49-310Z",
-  "planKey": "d35b1ea4e48c2ad905a4fadb1f2d35caa658cff3884434b9be6c84341a96d937",
-  "plannedAtHead": "549de394b85e6526a15a42d767214e1d2afeb954",
-  "currentHead": "549de394b85e6526a15a42d767214e1d2afeb954",
-  "sourceHead": "549de394b85e6526a15a42d767214e1d2afeb954",
-  "productFingerprint": "6f70a95d8e2216f3d682e1dfb5723d769095c2e1c063ad4957390ff247d07f6d",
-  "sourceFingerprint": "6f70a95d8e2216f3d682e1dfb5723d769095c2e1c063ad4957390ff247d07f6d",
+  "runId": "2026-08-30T18-39-39-147Z",
+  "planKey": "7961e731e27b64e3d06cf4b08b3bb9d0c17d8d5139c088681af068574c9d6f6d:commit",
+  "tier": "commit",
+  "onlyProducers": [],
+  "plannedAtHead": "4212c414e50610778fb1cfdad1e9a1ee570eedb6",
+  "currentHead": "4212c414e50610778fb1cfdad1e9a1ee570eedb6",
+  "sourceHead": "4212c414e50610778fb1cfdad1e9a1ee570eedb6",
+  "productFingerprint": "5e16770df3c1cbd42d3d07d1eb24b8a4640a11e09f4a8e71598d97a1e4e75cba",
+  "sourceFingerprint": "5e16770df3c1cbd42d3d07d1eb24b8a4640a11e09f4a8e71598d97a1e4e75cba",
   "prerequisites": {
     "firecrawlConfigured": false,
     "linkupConfigured": false,
     "geminiConfigured": false
   },
-  "createdAt": "2026-08-30T16:23:51.047Z",
+  "createdAt": "2026-08-30T18:39:40.820Z",
   "reused": false,
-  "totalEstimatedDurationMs": 5870000,
+  "totalEstimatedDurationMs": 57071,
+  "changedPathCount": 47,
+  "changedDomains": [
+    "validation-orchestration",
+    "magnus-guidance",
+    "magnus-core",
+    "magnus-desktop-tools"
+  ],
+  "unknownChangedPaths": [
+    "reports/graph-acceptance/phase-3-final/magnus/hybrid-quality-benchmark.json",
+    "reports/graph-acceptance/phase-3-final/magnus/project-guidance-smoke.json",
+    "reports/graph-acceptance/phase-3-final/validation-plan.json"
+  ],
+  "deferredReleaseProducers": [
+    "parser-benchmark",
+    "temporal-large",
+    "load-quit",
+    "lifecycle-cycles",
+    "electron-restart-soak",
+    "tauri-restart-soak",
+    "idle-soak",
+    "active-soak",
+    "assurance"
+  ],
   "producers": [
     {
       "id": "parser-benchmark",
-      "expectedProducerFingerprint": "b3d21a7d8abc37c6f15ca88c7cff1672aeebf3700794edac43969f9dc820b0f7",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "97b2a8f591f46316e5b27218c13124d434952c854472a0aa3912cac1122e3e56",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 90000,
+      "timeoutMs": 1500000,
       "artifacts": [
         "parser-benchmark"
       ],
       "dependencies": [
-        "graphs-common",
-        "acceptance-shared"
+        "graphs-common"
       ]
     },
     {
       "id": "magnus-streaming-smoke",
-      "expectedProducerFingerprint": "3bf35130fcc19738d23bbfda0488a3bd6e23ea480b8820315355a4d555c6c697",
+      "expectedProducerFingerprint": "612c04a0144c668d860de091df34275f57ff3ae9cc31c094e02ef8a929f2a0a9",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 45000,
+      "timeoutMs": 180000,
       "artifacts": [
         "magnus-streaming-smoke"
       ],
@@ -42,16 +68,33 @@
         "magnus-core",
         "magnus-guidance",
         "shared-workbench",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
+      ]
+    },
+    {
+      "id": "magnus-guidance-smoke",
+      "expectedProducerFingerprint": "19a76b935fd09ef0634519dab0f3d2c619cf9bd34b758e7b8ae2185b78f8720f",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 12071,
+      "timeoutMs": 180000,
+      "artifacts": [
+        "magnus-guidance-smoke"
+      ],
+      "dependencies": [
+        "magnus-guidance",
+        "magnus-core",
+        "shared-workbench",
+        "launch-harness"
       ]
     },
     {
       "id": "core-ide",
-      "expectedProducerFingerprint": "fae302966c4281d7b51c4f0a10b36337d767a4e6f0f4045d589e5cbd5c407859",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "3d9280d6e0d217aaea27e972a4a18b41c2ce6bb21ba2894e1ab5bc2cdc38ccee",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 120000,
+      "timeoutMs": 240000,
       "artifacts": [
         "core-ide",
         "code-graph",
@@ -64,31 +107,31 @@
         "network-graph",
         "runtime-preview",
         "magnus-core",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "runtime-preview",
-      "expectedProducerFingerprint": "7886bab63abb8a594dbbe55035c709d5d835c2f7ece0764cd4902d0f2ba3b309",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "ae6468992a5a5b01d378aeabcad59c14e522bf6d6fec811385aeeb5061c57fee",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 60000,
+      "timeoutMs": 180000,
       "artifacts": [
         "runtime-preview"
       ],
       "dependencies": [
         "runtime-preview",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "temporal-small",
-      "expectedProducerFingerprint": "260e1f3dbe2fe5ad01762e900105806860e2e3cd3ea6739a6ccf6152c002b48e",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "f796c9f0d9952dc5131150500393ce8eccd2b01295e86827ff6a37e6848f9395",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 90000,
+      "timeoutMs": 180000,
       "artifacts": [
         "temporal-small"
       ],
@@ -97,16 +140,16 @@
         "graphs-common",
         "network-graph",
         "shared-workbench",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "temporal-large",
-      "expectedProducerFingerprint": "aec0ddbe161d14f24be9a3a164b9f25fd2922d16d308d198bb16b1bbe096c29e",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "0d08aae58be4ca75699de4308241ffb4cdc767621aa6c9fca1570445e0a84ad6",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 150000,
+      "timeoutMs": 240000,
       "artifacts": [
         "temporal-large"
       ],
@@ -115,16 +158,16 @@
         "graphs-common",
         "network-graph",
         "shared-workbench",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "electron-product-path",
-      "expectedProducerFingerprint": "75a8df8a5885b6b67006dbee8f12189bee572f4fd589c8205cb1dfb1813b57d0",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "c7a6b03863fe371604553559d46962c552b120733370b5f736689ed968d8abba",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 30000,
+      "timeoutMs": 180000,
       "artifacts": [
         "electron-product-path"
       ],
@@ -132,16 +175,16 @@
         "desktop-runtime",
         "electron-test-lab",
         "magnus-desktop-tools",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "electron-native-cases",
-      "expectedProducerFingerprint": "956d1f029063e04ff50bdcc54213975731dcdc086580f25f52b076c4f101483b",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "9fb3934e0883178dfda69e57e4f5516992b66acce47235a1d2b5c4876def6555",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 35000,
+      "timeoutMs": 240000,
       "artifacts": [
         "electron-native-cases"
       ],
@@ -149,16 +192,16 @@
         "electron-test-lab",
         "desktop-runtime",
         "magnus-desktop-tools",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "tauri-product-path",
-      "expectedProducerFingerprint": "46ce07ff9ec7882ac86458fded8579622d746702a978f453ff1ebeb8054b0e78",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "56cc7932f8f9baa1b4e5a1514e4b19de75d7d9da9d49748573bf844e47c36442",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 30000,
+      "timeoutMs": 240000,
       "artifacts": [
         "tauri-product-path"
       ],
@@ -166,16 +209,16 @@
         "desktop-runtime",
         "tauri-test-lab",
         "magnus-desktop-tools",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "magnus-electron-tools",
-      "expectedProducerFingerprint": "4c3b30a84c3f9c45fd535ea39be8a74397b27ae4daf404632c253d94692ed649",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "f543a79520c99cd40ee9d13313601f8930e2fcaccd64d5a3a568c449e726325e",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 150000,
+      "timeoutMs": 300000,
       "artifacts": [
         "magnus-electron-tools"
       ],
@@ -184,16 +227,16 @@
         "magnus-desktop-tools",
         "electron-test-lab",
         "desktop-runtime",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "magnus-tauri-tools",
-      "expectedProducerFingerprint": "9390679630b1656a6a6cae2ad209e7370e483ac96910775698976d5ecde4e399",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "ce3bb0f1fb99c72ffa1ad8d28116281e40a56d06b4c17d813fe7d653ed78bc09",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 240000,
+      "timeoutMs": 420000,
       "artifacts": [
         "magnus-tauri-tools"
       ],
@@ -202,16 +245,16 @@
         "magnus-desktop-tools",
         "tauri-test-lab",
         "desktop-runtime",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "hybrid-web-smoke",
-      "expectedProducerFingerprint": "70086c65e30f65a469983e7fe1b561f94d1f0de5b309eb1849babd8e4b3e0751",
-      "status": "STALE",
-      "reason": "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
+      "expectedProducerFingerprint": "409fc136cfe80dc670436866a0b5031015593578bc9705aa43c646148a1212e8",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 60000,
+      "timeoutMs": 180000,
       "artifacts": [
         "hybrid-web-smoke"
       ],
@@ -219,31 +262,32 @@
         "web-context",
         "magnus-core",
         "cloud-auth",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "privacy",
-      "expectedProducerFingerprint": "20e47c7b44c72525863bfc2bc4e4f832c14e682c5655a95db44c8d3ab12def51",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "0eec9969e33e81fd3277f37aaca3317e34b358213b18782b0f9cb90fc073ee3d",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 90000,
+      "timeoutMs": 180000,
       "artifacts": [
         "privacy"
       ],
       "dependencies": [
         "privacy",
         "shared-workbench",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "load-quit",
-      "expectedProducerFingerprint": "53b014148f707ba1ac912709511c93466c2736421ccaf3a1a802013f6d787600",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "bd913efea6a5f069410cfc7e112790d09841987fe4ff6fe82364ce1bd4fea548",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 120000,
+      "timeoutMs": 240000,
       "artifacts": [
         "load-quit"
       ],
@@ -256,15 +300,16 @@
         "electron-test-lab",
         "tauri-test-lab",
         "launch-harness",
-        "acceptance-shared"
+        "load-quit-lab"
       ]
     },
     {
       "id": "lifecycle-cycles",
-      "expectedProducerFingerprint": "c667779f5613faa608dfe92452839f508c723593110741daba74da6aa9ef8aae",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
-      "estimatedDurationMs": 1320000,
+      "expectedProducerFingerprint": "b36c6375fe85abead7cabe4889433dabb95e312108bade9e1db269214ca298ee",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
+      "estimatedDurationMs": 90000,
+      "timeoutMs": 1500000,
       "artifacts": [
         "lifecycle-cycles"
       ],
@@ -272,62 +317,64 @@
         "shared-workbench",
         "graphs-common",
         "launch-harness",
-        "acceptance-shared"
+        "lifecycle-lab"
       ]
     },
     {
       "id": "electron-restart-soak",
-      "expectedProducerFingerprint": "5018a87af48773d483e0efd302155574edbc330e2494e2191bcd6cd099e54401",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "00c1f9217882a24a8cd23d2d47ac774b0c2c77055c783616fbc793f4110da8c0",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 900000,
+      "timeoutMs": 5400000,
       "artifacts": [
         "electron-restart-soak"
       ],
       "dependencies": [
         "desktop-runtime",
         "electron-test-lab",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "tauri-restart-soak",
-      "expectedProducerFingerprint": "68cbf84f62830051350dd4807cebc5d6c6cf8230c9077f2d6a159b5d2e5cae89",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "1c6b350ecf938937e4ec77838c8067fc5875911a8c6b96e22edd3470d964e27d",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 240000,
+      "timeoutMs": 3600000,
       "artifacts": [
         "tauri-restart-soak"
       ],
       "dependencies": [
         "desktop-runtime",
         "tauri-test-lab",
-        "launch-harness",
-        "acceptance-shared"
+        "launch-harness"
       ]
     },
     {
       "id": "idle-soak",
-      "expectedProducerFingerprint": "81b8224968161bfb6e7bd6cc93a1e1f787851896e7f2e692d4a41fc5ea1ab4c8",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "3e7e87b5d795b83f1f284b024072d806aaf05a35e26fc94fb372de64fa3a3f99",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 900000,
+      "timeoutMs": 1140000,
       "artifacts": [
         "idle-soak"
       ],
       "dependencies": [
         "shared-workbench",
         "launch-harness",
-        "acceptance-shared"
+        "idle-soak-lab"
       ]
     },
     {
       "id": "active-soak",
-      "expectedProducerFingerprint": "36910e8a9a3aae64c11744498b2f0c9898a295eb0865493a9286409ea59e1a2d",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "86d0dabd4ffa537a1ff7ffde05e2ef7ea5842956999b676db6aebcf339edb0da",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 720000,
+      "timeoutMs": 960000,
       "artifacts": [
         "active-soak"
       ],
@@ -339,21 +386,21 @@
         "runtime-preview",
         "magnus-core",
         "launch-harness",
-        "acceptance-shared"
+        "active-soak-lab"
       ]
     },
     {
       "id": "assurance",
-      "expectedProducerFingerprint": "df44832fa0d54a4763c8205fef3c25edb27312ca561ada2fca5c4401abd60c7f",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "expectedProducerFingerprint": "2598e35857f238044bfd5c69225d6db727e044b3e5692f1763a69dbbabbb74e6",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 480000,
+      "timeoutMs": 480000,
       "artifacts": [
         "assurance.json"
       ],
       "dependencies": [
         "assurance-leaf",
-        "acceptance-shared",
         "magnus-core",
         "graphs-common",
         "shared-workbench",

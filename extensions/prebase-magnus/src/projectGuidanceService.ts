@@ -12,16 +12,24 @@ import {
 	cursorRuleMode,
 	discoverNestedDirectories,
 	discoverSkillFiles,
+	expandKiroFileRefs,
+	firstNonHeadingLine,
+	globsFromMeta,
 	GUIDANCE_WATCH_PATTERNS,
+	kiroSteeringMode,
 	listSkillResourceManifest,
 	matchesAnyGlob,
+	metaBoolean,
+	metaMap,
+	metaString,
 	metaStringList,
-	normalizeRel as normalizeRelPath,
-	parseApplyTo,
+	normalizeRel,
 	parseFrontmatter,
 	resolveMarkdownImports,
+	SKILL_DIRS,
 	walkBoundedFiles,
 	windsurfRuleMode,
+	type FrontmatterValue,
 } from './projectGuidanceDiscovery';
 import type { GuidanceTarget } from './projectGuidanceSession';
 
@@ -47,9 +55,25 @@ export interface SkillMetadata {
 	readonly path: string;
 	readonly ecosystem: string;
 	readonly scopePrefix: string;
+	readonly argumentHint?: string;
+	readonly userInvocable?: boolean;
+	readonly modelInvocable?: boolean;
+	readonly contextMode?: string;
+	readonly allowedToolsHint?: string;
+	readonly triggers?: readonly string[];
+	readonly license?: string;
+	readonly compatibility?: string;
 }
 
 export interface PlaybookMetadata {
+	readonly id: string;
+	readonly name: string;
+	readonly description: string;
+	readonly path: string;
+	readonly ecosystem: string;
+}
+
+export interface AgentProfileMetadata {
 	readonly id: string;
 	readonly name: string;
 	readonly description: string;
@@ -77,6 +101,7 @@ export interface ProjectGuidanceSnapshot {
 	readonly onDemandRules: readonly { source: GuidanceSource; description: string }[];
 	readonly skillCatalog: readonly SkillMetadata[];
 	readonly playbookCatalog: readonly PlaybookMetadata[];
+	readonly agentProfileCatalog: readonly AgentProfileMetadata[];
 	readonly activatedSkills: readonly { metadata: SkillMetadata; body: string; root: string; files: readonly string[] }[];
 	readonly conflicts: readonly GuidanceConflict[];
 	readonly diagnostics: readonly string[];
@@ -100,7 +125,7 @@ export const DEFAULT_GUIDANCE_BUDGET: ProjectGuidanceBudget = {
 /** Hard ceiling for injected project-guidance system prompt text. */
 export const MAX_PROMPT_GUIDANCE_CHARS = 16_000;
 
-const SECRET_INLINE_PATTERN = /(?:api[_-]?key|secret(?:[_-]?key)?|access[_-]?token|auth(?:[_-]?token)?|password|passwd|private[_-]?key)\s*[:=]\s*\S+/gi;
+const SECRET_INLINE_PATTERN = /(?:api[_-]?key|secret(?:[_-]?key)?|access[_-]?token|auth(?:[_-]?token)?|\btoken\b|password|passwd|private[_-]?key)\s*[:=]\s*\S+/gi;
 const PEM_BLOCK_PATTERN = /-----BEGIN [A-Z ]+-----[\s\S]*?-----END [A-Z ]+-----/g;
 const BEARER_TOKEN_PATTERN = /\bBearer\s+[A-Za-z0-9\-._~+/]+=*/gi;
 const AWS_KEY_PATTERN = /\b(AKIA[0-9A-Z]{16}|ASIA[0-9A-Z]{16})\b/g;
@@ -120,23 +145,24 @@ const RULE_DIRS = [
 	{ dir: '.clinerules', ext: '.md', ecosystem: 'cline', nested: false },
 	{ dir: '.clinerules', ext: '.txt', ecosystem: 'cline', nested: false },
 	{ dir: '.windsurf/rules', ext: '.md', ecosystem: 'windsurf', nested: true },
+	{ dir: '.devin/rules', ext: '.md', ecosystem: 'devin', nested: true },
 ];
 const PLAYBOOK_DIRS = [
 	{ dir: '.github/prompts', ext: '.prompt.md', ecosystem: 'github' },
 	{ dir: '.windsurf/workflows', ext: '.md', ecosystem: 'windsurf' },
 	{ dir: '.cline/workflows', ext: '.md', ecosystem: 'cline' },
+	{ dir: '.cursor/commands', ext: '.md', ecosystem: 'cursor' },
+	{ dir: '.claude/commands', ext: '.md', ecosystem: 'claude' },
 ];
-const SKILL_DIRS = [
-	{ dir: '.agents/skills', ecosystem: 'agents' },
-	{ dir: '.cursor/skills', ecosystem: 'cursor' },
-	{ dir: '.claude/skills', ecosystem: 'claude' },
-	{ dir: '.codex/skills', ecosystem: 'codex' },
-	{ dir: '.github/skills', ecosystem: 'github' },
-	{ dir: '.cline/skills', ecosystem: 'cline' },
-	{ dir: '.clinerules/skills', ecosystem: 'cline' },
-	{ dir: '.windsurf/skills', ecosystem: 'windsurf' },
-	{ dir: '.opencode/skills', ecosystem: 'opencode' },
+const AGENT_PROFILE_DIRS = [
+	{ dir: '.cursor/agents', ext: '.md', ecosystem: 'cursor' },
+	{ dir: '.claude/agents', ext: '.md', ecosystem: 'claude' },
+	{ dir: '.codex/agents', ext: '.md', ecosystem: 'codex' },
 ];
+const OPENCODE_CONFIG_FILES = ['opencode.json', '.opencode/opencode.json'];
+const CLAUDE_SETTINGS_FILES = ['.claude/settings.json', '.claude/settings.local.json'];
+const GEMINI_SETTINGS_FILE = '.gemini/settings.json';
+const KIRO_STEERING_DIR = '.kiro/steering';
 
 export interface GuidanceFileReader {
 	exists(path: string): boolean | Promise<boolean>;
@@ -145,13 +171,8 @@ export interface GuidanceFileReader {
 	isTrusted?(): boolean;
 }
 
-function normalizeRel(path: string): string {
-	return normalizeRelPath(path);
-}
-
 function isBlockedGuidancePath(relPath: string): boolean {
-	const normalized = normalizeRel(relPath);
-	return isSensitiveFile(normalized);
+	return isSensitiveFile(normalizeRel(relPath));
 }
 
 export function resolveGuidancePath(workspaceRoot: string, relPath: string): string | undefined {
@@ -192,13 +213,22 @@ function skillId(ecosystem: string, workspaceRoot: string, relPath: string): str
 
 function parseSkillMetadata(skillPath: string, text: string, ecosystem: string, workspaceRoot: string, scopePrefix: string): SkillMetadata | undefined {
 	const { meta, body } = parseFrontmatter(text);
-	const name = typeof meta.name === 'string' ? meta.name : basename(dirname(skillPath));
-	const description = typeof meta.description === 'string'
-		? meta.description
-		: body.split('\n').find(line => line.trim() && !line.startsWith('#'))?.trim() ?? '';
+	const name = metaString(meta, 'name') ?? basename(dirname(skillPath));
+	const description = metaString(meta, 'description') ?? firstNonHeadingLine(body);
 	if (!description) {
 		return undefined;
 	}
+	const metadataMap = metaMap(meta, 'metadata') ?? {};
+	const merged: Record<string, FrontmatterValue> = { ...metadataMap, ...meta };
+	const triggers = metaStringList(merged, 'triggers');
+	const disableModel = metaBoolean(merged, 'disable-model-invocation') === true
+		|| (triggers.length > 0 && triggers.every(item => item.toLowerCase() === 'user'));
+	const userInvocable = metaBoolean(merged, 'user-invocable');
+	const argumentHint = metaString(merged, 'argument-hint') ?? metaString(merged, 'argumentHint');
+	const contextMode = metaString(merged, 'context') ?? metaString(merged, 'contextMode');
+	const allowedToolsHint = metaString(merged, 'allowed-tools') ?? metaString(merged, 'allowedTools');
+	const license = metaString(merged, 'license');
+	const compatibility = metaString(merged, 'compatibility');
 	return {
 		id: skillId(ecosystem, workspaceRoot, skillPath),
 		name,
@@ -206,11 +236,109 @@ function parseSkillMetadata(skillPath: string, text: string, ecosystem: string, 
 		path: skillPath,
 		ecosystem,
 		scopePrefix,
+		...(argumentHint ? { argumentHint } : {}),
+		...(userInvocable === false ? { userInvocable: false } : userInvocable === true ? { userInvocable: true } : {}),
+		...(disableModel ? { modelInvocable: false } : {}),
+		...(contextMode ? { contextMode } : {}),
+		...(allowedToolsHint ? { allowedToolsHint } : {}),
+		...(triggers.length ? { triggers } : {}),
+		...(license ? { license } : {}),
+		...(compatibility ? { compatibility } : {}),
 	};
 }
 
-async function listSkillManifest(skillRootRel: string, reader: GuidanceFileReader, workspaceRoot: string): Promise<string[]> {
-	return listSkillResourceManifest(reader, workspaceRoot, skillRootRel);
+async function readJsonObject(reader: GuidanceFileReader, absPath: string): Promise<Record<string, unknown> | undefined> {
+	try {
+		const raw = await reader.readFile(absPath);
+		const parsed = JSON.parse(raw) as unknown;
+		return parsed && typeof parsed === 'object' && !Array.isArray(parsed) ? parsed as Record<string, unknown> : undefined;
+	} catch {
+		return undefined;
+	}
+}
+
+async function loadClaudeMdExcludes(reader: GuidanceFileReader, workspaceRoot: string): Promise<string[]> {
+	const excludes: string[] = [];
+	for (const rel of CLAUDE_SETTINGS_FILES) {
+		const full = resolveGuidancePath(workspaceRoot, rel);
+		if (!full || !(await reader.exists(full))) {
+			continue;
+		}
+		const json = await readJsonObject(reader, full);
+		const value = json?.claudeMdExcludes;
+		if (Array.isArray(value)) {
+			for (const item of value) {
+				if (typeof item === 'string' && item.trim()) {
+					excludes.push(item.trim());
+				}
+			}
+		}
+	}
+	return excludes;
+}
+
+function isExcludedByClaudeSettings(relPath: string, excludes: readonly string[]): boolean {
+	if (!excludes.length) {
+		return false;
+	}
+	return excludes.some(pattern => matchesAnyGlob([pattern], relPath));
+}
+
+async function loadGeminiContextFileNames(reader: GuidanceFileReader, workspaceRoot: string): Promise<string[]> {
+	const full = resolveGuidancePath(workspaceRoot, GEMINI_SETTINGS_FILE);
+	if (!full || !(await reader.exists(full))) {
+		return [];
+	}
+	const json = await readJsonObject(reader, full);
+	const context = json?.context;
+	if (!context || typeof context !== 'object' || Array.isArray(context)) {
+		return [];
+	}
+	const fileName = (context as Record<string, unknown>).fileName;
+	if (typeof fileName === 'string' && fileName.trim()) {
+		return [fileName.trim()];
+	}
+	if (Array.isArray(fileName)) {
+		return fileName.filter((item): item is string => typeof item === 'string' && Boolean(item.trim())).map(item => item.trim());
+	}
+	return [];
+}
+
+async function loadOpenCodeInstructions(
+	reader: GuidanceFileReader,
+	workspaceRoot: string,
+): Promise<{ localPaths: string[]; diagnostics: string[] }> {
+	const localPaths: string[] = [];
+	const diagnostics: string[] = [];
+	const seenConfigs = new Set<string>();
+	for (const rel of OPENCODE_CONFIG_FILES) {
+		const full = resolveGuidancePath(workspaceRoot, rel);
+		if (!full || seenConfigs.has(full) || !(await reader.exists(full))) {
+			continue;
+		}
+		seenConfigs.add(full);
+		const json = await readJsonObject(reader, full);
+		const instructions = json?.instructions;
+		if (!Array.isArray(instructions)) {
+			continue;
+		}
+		for (const item of instructions) {
+			if (typeof item !== 'string' || !item.trim()) {
+				continue;
+			}
+			const entry = item.trim();
+			if (/^https?:\/\//i.test(entry)) {
+				diagnostics.push('Remote OpenCode instruction URL not auto-loaded by PreBase.');
+				continue;
+			}
+			if (entry.startsWith('~/') || entry.startsWith('~\\')) {
+				diagnostics.push(`Skipped user-global OpenCode path: ${entry}`);
+				continue;
+			}
+			localPaths.push(entry);
+		}
+	}
+	return { localPaths, diagnostics };
 }
 
 async function loadAgentsHierarchy(
@@ -263,6 +391,7 @@ async function loadClaudeGeminiRoots(
 	targetPaths: readonly string[],
 	kind: 'claude' | 'gemini',
 	files: readonly string[],
+	excludes: readonly string[] = [],
 ): Promise<{ source: GuidanceSource; text: string; diagnostics: string[] }[]> {
 	const results: { source: GuidanceSource; text: string; diagnostics: string[] }[] = [];
 	const dirs = new Set<string>(['']);
@@ -276,12 +405,22 @@ async function loadClaudeGeminiRoots(
 			continue;
 		}
 		for (const fileName of files) {
-			const rel = dir ? normalizeRel(join(dir, fileName)) : fileName;
-			if (isBlockedGuidancePath(rel)) {
+			const normalizedName = normalizeRel(fileName);
+			// Allow fixed nested roots such as `.claude/CLAUDE.md`; reject traversal / absolute names.
+			if (
+				!normalizedName
+				|| normalizedName.startsWith('/')
+				|| /^[a-zA-Z]:/.test(normalizedName)
+				|| normalizedName.split('/').some(part => part === '..' || part === '')
+			) {
 				continue;
 			}
-			const full = join(workspaceRoot, rel);
-			if (!(await reader.exists(full))) {
+			const rel = dir ? normalizeRel(join(dir, normalizedName)) : normalizedName;
+			if (isBlockedGuidancePath(rel) || (kind === 'claude' && isExcludedByClaudeSettings(rel, excludes))) {
+				continue;
+			}
+			const full = resolveGuidancePath(workspaceRoot, rel);
+			if (!full || !(await reader.exists(full))) {
 				continue;
 			}
 			const raw = scrubSecretsFromGuidance(await reader.readFile(full));
@@ -312,12 +451,18 @@ async function loadClaudeGeminiRoots(
 	return results;
 }
 
-function ruleActivationMode(ecosystem: string, meta: Record<string, import('./projectGuidanceDiscovery').FrontmatterValue>, globs: string[]): GuidanceActivationMode {
+function ruleActivationMode(ecosystem: string, meta: Record<string, FrontmatterValue>, globs: string[]): GuidanceActivationMode {
 	if (ecosystem === 'cursor') {
 		return cursorRuleMode(meta, globs);
 	}
-	if (ecosystem === 'windsurf') {
+	if (ecosystem === 'windsurf' || ecosystem === 'devin') {
 		return windsurfRuleMode(meta, globs);
+	}
+	if (ecosystem === 'kiro') {
+		return kiroSteeringMode(meta, globs);
+	}
+	if (ecosystem === 'github') {
+		return globs.length ? 'path' : 'manual';
 	}
 	return globs.length ? 'path' : 'always';
 }
@@ -380,6 +525,42 @@ function dedupeByHash(items: readonly { source: GuidanceSource; text: string }[]
 	return { items: [...seen.values()], diagnostics };
 }
 
+async function loadNamedMarkdownCatalog(
+	reader: GuidanceFileReader,
+	workspaceRoot: string,
+	roots: readonly { dir: string; ext: string; ecosystem: string }[],
+): Promise<Array<{ id: string; name: string; description: string; path: string; ecosystem: string }>> {
+	const catalog: Array<{ id: string; name: string; description: string; path: string; ecosystem: string }> = [];
+	for (const root of roots) {
+		const dirs = await discoverNestedDirectories(reader, workspaceRoot, root.dir);
+		for (const dir of dirs) {
+			const fullDir = join(workspaceRoot, dir);
+			if (!(await reader.exists(fullDir))) {
+				continue;
+			}
+			const files = await walkBoundedFiles(reader, fullDir, rel => rel.endsWith(root.ext), { maxDepth: 4 });
+			for (const relUnder of files) {
+				const rel = normalizeRel(join(dir, relUnder));
+				if (isBlockedGuidancePath(rel)) {
+					continue;
+				}
+				const text = scrubSecretsFromGuidance(await reader.readFile(join(workspaceRoot, rel)));
+				const { meta, body } = parseFrontmatter(text);
+				const name = metaString(meta, 'name') ?? basename(rel, root.ext);
+				const description = scrubSecretsFromGuidance(metaString(meta, 'description') ?? (firstNonHeadingLine(body) || name));
+				catalog.push({
+					id: `${root.ecosystem}:${hashContent(rel).slice(0, 12)}`,
+					name,
+					description,
+					path: rel,
+					ecosystem: root.ecosystem,
+				});
+			}
+		}
+	}
+	return catalog;
+}
+
 export class ProjectGuidanceService {
 	private cache = new Map<string, ProjectGuidanceSnapshot>();
 	private readonly reader: GuidanceFileReader;
@@ -428,6 +609,7 @@ export class ProjectGuidanceService {
 				onDemandRules: [],
 				skillCatalog: [],
 				playbookCatalog: [],
+				agentProfileCatalog: [],
 				activatedSkills: [],
 				conflicts: [],
 				diagnostics: this.reader.isTrusted?.() === false ? ['Workspace is not trusted; project guidance is disabled.'] : [],
@@ -466,13 +648,70 @@ export class ProjectGuidanceService {
 			});
 		}
 
-		for (const loaded of await loadClaudeGeminiRoots(this.reader, workspaceRoot, normalizedTargets, 'claude', CLAUDE_ROOT_FILES)) {
+		const claudeExcludes = await loadClaudeMdExcludes(this.reader, workspaceRoot);
+		for (const loaded of await loadClaudeGeminiRoots(this.reader, workspaceRoot, normalizedTargets, 'claude', CLAUDE_ROOT_FILES, claudeExcludes)) {
 			diagnostics.push(...loaded.diagnostics);
 			sources.push({ source: loaded.source, text: loaded.text });
 		}
-		for (const loaded of await loadClaudeGeminiRoots(this.reader, workspaceRoot, normalizedTargets, 'gemini', GEMINI_ROOT_FILES)) {
+		const geminiExtraNames = await loadGeminiContextFileNames(this.reader, workspaceRoot);
+		const geminiFiles = [...GEMINI_ROOT_FILES, ...geminiExtraNames.filter(name => !GEMINI_ROOT_FILES.includes(name) && !name.includes('/') && !name.includes('..'))];
+		for (const loaded of await loadClaudeGeminiRoots(this.reader, workspaceRoot, normalizedTargets, 'gemini', geminiFiles)) {
 			diagnostics.push(...loaded.diagnostics);
 			sources.push({ source: loaded.source, text: loaded.text });
+		}
+
+		const openCode = await loadOpenCodeInstructions(this.reader, workspaceRoot);
+		diagnostics.push(...openCode.diagnostics);
+		for (const instruction of openCode.localPaths) {
+			if (instruction.includes('*') || instruction.includes('?') || instruction.includes('{')) {
+				const matches = await walkBoundedFiles(
+					this.reader,
+					workspaceRoot,
+					rel => matchesAnyGlob([instruction], rel) && (rel.endsWith('.md') || rel.endsWith('.txt')),
+					{ maxDepth: 6 },
+				);
+				for (const rel of matches.slice(0, 24)) {
+					if (isBlockedGuidancePath(rel)) {
+						continue;
+					}
+					const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, rel)));
+					sources.push({
+						source: {
+							path: rel,
+							ecosystem: 'opencode',
+							scope: 'repository',
+							alwaysApply: true,
+							activationMode: 'always',
+							globs: [],
+							contentHash: hashContent(text),
+						},
+						text: text.trim(),
+					});
+				}
+				continue;
+			}
+			const resolved = resolveGuidancePath(workspaceRoot, instruction);
+			if (!resolved) {
+				diagnostics.push(`Skipped outside-workspace OpenCode instruction: ${instruction}`);
+				continue;
+			}
+			const rel = normalizeRel(instruction);
+			if (isBlockedGuidancePath(rel) || !(await this.reader.exists(resolved))) {
+				continue;
+			}
+			const text = scrubSecretsFromGuidance(await this.reader.readFile(resolved));
+			sources.push({
+				source: {
+					path: rel,
+					ecosystem: 'opencode',
+					scope: 'repository',
+					alwaysApply: true,
+					activationMode: 'always',
+					globs: [],
+					contentHash: hashContent(text),
+				},
+				text: text.trim(),
+			});
 		}
 
 		for (const ruleDir of RULE_DIRS) {
@@ -492,15 +731,15 @@ export class ProjectGuidanceService {
 				);
 				for (const relUnder of ruleFiles) {
 					const rel = normalizeRel(join(dir, relUnder));
-					if (isBlockedGuidancePath(rel)) {
+					if (isBlockedGuidancePath(rel) || (ruleDir.ecosystem === 'claude' && isExcludedByClaudeSettings(rel, claudeExcludes))) {
 						continue;
 					}
 					const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, rel)));
 					const { meta, body } = parseFrontmatter(text);
-					const globs = metaStringList(meta, 'globs').length ? metaStringList(meta, 'globs') : parseApplyTo(text);
+					const globs = globsFromMeta(meta, text);
 					const mode = ruleActivationMode(ruleDir.ecosystem, meta, globs);
 					const alwaysApply = mode === 'always';
-					const description = typeof meta.description === 'string' ? meta.description : undefined;
+					const description = metaString(meta, 'description');
 					const source: GuidanceSource = {
 						path: rel,
 						ecosystem: ruleDir.ecosystem,
@@ -525,44 +764,92 @@ export class ProjectGuidanceService {
 			}
 		}
 
-		const playbookCatalog: PlaybookMetadata[] = [];
-		for (const playbookDir of PLAYBOOK_DIRS) {
-			const dirs = await discoverNestedDirectories(this.reader, workspaceRoot, playbookDir.dir);
-			for (const dir of dirs) {
-				const fullDir = join(workspaceRoot, dir);
-				if (!(await this.reader.exists(fullDir))) {
+		const kiroDirs = await discoverNestedDirectories(this.reader, workspaceRoot, KIRO_STEERING_DIR);
+		for (const dir of kiroDirs) {
+			const fullDir = join(workspaceRoot, dir);
+			if (!(await this.reader.exists(fullDir))) {
+				continue;
+			}
+			const files = await walkBoundedFiles(this.reader, fullDir, rel => rel.endsWith('.md'), { maxDepth: 6 });
+			for (const relUnder of files) {
+				const rel = normalizeRel(join(dir, relUnder));
+				if (isBlockedGuidancePath(rel)) {
 					continue;
 				}
-				const files = await walkBoundedFiles(this.reader, fullDir, rel => rel.endsWith(playbookDir.ext), { maxDepth: 4 });
-				for (const relUnder of files) {
-					const rel = normalizeRel(join(dir, relUnder));
-					if (isBlockedGuidancePath(rel)) {
+				const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, rel)));
+				const { meta, body } = parseFrontmatter(text);
+				const globs = globsFromMeta(meta, text, ['fileMatchPattern', 'globs']);
+				const mode = kiroSteeringMode(meta, globs);
+				const expanded = await expandKiroFileRefs(
+					this.reader,
+					workspaceRoot,
+					rel,
+					body,
+					isBlockedGuidancePath,
+					relPath => resolveGuidancePath(workspaceRoot, relPath),
+				);
+				diagnostics.push(...expanded.diagnostics);
+				const description = metaString(meta, 'description');
+				const source: GuidanceSource = {
+					path: rel,
+					ecosystem: 'kiro',
+					scope: globs.length ? globs.join(', ') : (mode === 'always' ? 'repository' : mode),
+					alwaysApply: mode === 'always',
+					activationMode: mode,
+					description,
+					globs,
+					contentHash: hashContent(expanded.text),
+				};
+				if (mode === 'intelligent' || mode === 'manual') {
+					onDemandRules.push({ source, description: description ?? basename(rel) });
+					if (!normalizedActivatedRules.includes(rel)) {
 						continue;
 					}
-					const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, rel)));
-					const { meta, body } = parseFrontmatter(text);
-					const name = typeof meta.name === 'string' ? meta.name : basename(rel, playbookDir.ext);
-					const description = typeof meta.description === 'string'
-						? meta.description
-						: body.split('\n').find(line => line.trim() && !line.startsWith('#'))?.trim() ?? name;
-					playbookCatalog.push({
-						id: `${playbookDir.ecosystem}:${hashContent(rel).slice(0, 12)}`,
-						name,
-						description: scrubSecretsFromGuidance(description),
-						path: rel,
-						ecosystem: playbookDir.ecosystem,
-					});
 				}
+				if (mode === 'path' && !normalizedTargets.some(path => matchesAnyGlob(globs, path))) {
+					continue;
+				}
+				sources.push({ source, text: expanded.text.trim() });
 			}
 		}
 
-		const deduped = dedupeByHash(sources);
+		const playbookCatalog = await loadNamedMarkdownCatalog(this.reader, workspaceRoot, PLAYBOOK_DIRS);
+		const agentProfileCatalog = await loadNamedMarkdownCatalog(this.reader, workspaceRoot, AGENT_PROFILE_DIRS);
+
+		const activatedPlaybookBlocks: { source: GuidanceSource; text: string }[] = [];
+		for (const activatedPath of normalizedActivatedRules) {
+			const playbook = playbookCatalog.find(item => item.path === activatedPath);
+			if (!playbook) {
+				continue;
+			}
+			const full = join(workspaceRoot, playbook.path);
+			if (!(await this.reader.exists(full))) {
+				continue;
+			}
+			const text = scrubSecretsFromGuidance(await this.reader.readFile(full));
+			const { body } = parseFrontmatter(text);
+			activatedPlaybookBlocks.push({
+				source: {
+					path: playbook.path,
+					ecosystem: playbook.ecosystem,
+					scope: 'playbook',
+					alwaysApply: false,
+					activationMode: 'manual',
+					description: playbook.description,
+					globs: [],
+					contentHash: hashContent(body),
+				},
+				text: body.trim(),
+			});
+		}
+
+		const deduped = dedupeByHash([...sources, ...activatedPlaybookBlocks]);
 		diagnostics.push(...deduped.diagnostics);
 
 		const alwaysApplicable = deduped.items.filter(item =>
 			item.source.activationMode === 'always'
 			|| item.source.alwaysApply
-			|| (!item.source.globs.length && item.source.scope === 'repository'));
+			|| (!item.source.globs.length && item.source.scope === 'repository' && item.source.activationMode !== 'manual'));
 		const pathApplicable = deduped.items.filter(item =>
 			item.source.activationMode === 'path'
 			&& item.source.globs.length
@@ -574,11 +861,17 @@ export class ProjectGuidanceService {
 		const skillFiles = await discoverSkillFiles(this.reader, workspaceRoot, SKILL_DIRS, isBlockedGuidancePath);
 		const skillCatalog: SkillMetadata[] = [];
 		const skillIdsSeen = new Set<string>();
+		const skillContentSeen = new Set<string>();
 		for (const skill of skillFiles) {
 			const text = scrubSecretsFromGuidance(await this.reader.readFile(join(workspaceRoot, skill.relPath)));
+			const contentKey = hashContent(text);
+			if (skillContentSeen.has(contentKey)) {
+				continue;
+			}
 			const metadata = parseSkillMetadata(skill.relPath, text, skill.ecosystem, workspaceRoot, skill.scopePrefix);
 			if (metadata && !skillIdsSeen.has(metadata.id)) {
 				skillIdsSeen.add(metadata.id);
+				skillContentSeen.add(contentKey);
 				skillCatalog.push(metadata);
 			}
 		}
@@ -601,7 +894,7 @@ export class ProjectGuidanceService {
 				metadata,
 				body: body.trim().slice(0, this.budget.maxActivatedSkillChars),
 				root: skillRoot,
-				files: await listSkillManifest(skillRoot, this.reader, workspaceRoot),
+				files: await listSkillResourceManifest(this.reader, workspaceRoot, skillRoot),
 			});
 		}
 
@@ -620,6 +913,7 @@ export class ProjectGuidanceService {
 			onDemandRules: onDemandRules.slice(0, 48),
 			skillCatalog: skillCatalog.slice(0, this.budget.maxSkillCatalogEntries),
 			playbookCatalog: playbookCatalog.slice(0, 32),
+			agentProfileCatalog: agentProfileCatalog.slice(0, 32),
 			activatedSkills,
 			conflicts,
 			diagnostics,
@@ -661,6 +955,7 @@ export class ProjectGuidanceService {
 			onDemandRules: snapshots.flatMap(item => item.onDemandRules),
 			skillCatalog: dedupeSkillCatalog(snapshots.flatMap(item => item.skillCatalog)),
 			playbookCatalog: dedupePlaybooks(snapshots.flatMap(item => item.playbookCatalog)),
+			agentProfileCatalog: dedupeAgentProfiles(snapshots.flatMap(item => item.agentProfileCatalog ?? [])),
 			activatedSkills: snapshots.flatMap(item => item.activatedSkills),
 			conflicts: snapshots.flatMap(item => item.conflicts),
 			diagnostics: snapshots.flatMap(item => item.diagnostics),
@@ -695,6 +990,19 @@ function dedupePlaybooks(items: readonly PlaybookMetadata[]): PlaybookMetadata[]
 	return out;
 }
 
+function dedupeAgentProfiles(items: readonly AgentProfileMetadata[]): AgentProfileMetadata[] {
+	const seen = new Set<string>();
+	const out: AgentProfileMetadata[] = [];
+	for (const item of items) {
+		if (seen.has(item.id)) {
+			continue;
+		}
+		seen.add(item.id);
+		out.push(item);
+	}
+	return out;
+}
+
 export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot, budget: ProjectGuidanceBudget = DEFAULT_GUIDANCE_BUDGET): string {
 	if (!snapshot.enabled) {
 		return '';
@@ -718,11 +1026,13 @@ export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot
 	if (activatedRuleJoined) {
 		parts.push(activatedRuleJoined);
 	}
-	if (snapshot.skillCatalog.length) {
+	const modelSkills = snapshot.skillCatalog.filter(skill => skill.modelInvocable !== false);
+	if (modelSkills.length) {
 		const catalogLines = ['AVAILABLE PROJECT SKILLS (metadata only; activate with prebase_project_guidance before using body/resources)'];
 		let catalogChars = catalogLines[0].length;
-		for (const skill of snapshot.skillCatalog) {
-			const line = `- ${skill.name} (${skill.id}): ${scrubSecretsFromGuidance(skill.description)} (${skill.path})`;
+		for (const skill of modelSkills) {
+			const hint = skill.allowedToolsHint ? ` [tools hint: ${skill.allowedToolsHint}]` : '';
+			const line = `- ${skill.name} (${skill.id}): ${scrubSecretsFromGuidance(skill.description)} (${skill.path})${hint}`;
 			if (catalogChars + line.length + 1 > budget.maxPathChars) {
 				break;
 			}
@@ -732,9 +1042,16 @@ export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot
 		parts.push(catalogLines.join('\n'));
 	}
 	if (snapshot.playbookCatalog?.length) {
-		const lines = ['AVAILABLE PROJECT PLAYBOOKS (on demand only; not automatic instructions)'];
+		const lines = ['AVAILABLE PROJECT PLAYBOOKS (on demand; activate with prebase_project_guidance activate_rule + rulePath)'];
 		for (const playbook of snapshot.playbookCatalog.slice(0, 16)) {
 			lines.push(`- ${playbook.name}: ${scrubSecretsFromGuidance(playbook.description)} (${playbook.path})`);
+		}
+		parts.push(lines.join('\n'));
+	}
+	if (snapshot.agentProfileCatalog?.length) {
+		const lines = ['AVAILABLE AGENT PROFILES (catalog only; not auto-injected)'];
+		for (const profile of snapshot.agentProfileCatalog.slice(0, 12)) {
+			lines.push(`- ${profile.name}: ${scrubSecretsFromGuidance(profile.description)} (${profile.path})`);
 		}
 		parts.push(lines.join('\n'));
 	}

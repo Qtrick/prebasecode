@@ -3,13 +3,15 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "magnus-guidance-smoke",
-  "sourceHead": "549de394b85e6526a15a42d767214e1d2afeb954",
-  "sourceFingerprint": "aea41b89e5711307d3a4afb511de15fc233e2a404b5928809309c45797b1f72d",
-  "productFingerprint": "aea41b89e5711307d3a4afb511de15fc233e2a404b5928809309c45797b1f72d",
-  "generatedAt": "2026-08-30T16:30:09.578Z",
+  "sourceHead": "4212c414e50610778fb1cfdad1e9a1ee570eedb6",
+  "sourceFingerprint": "b147c434764fd62f54749197da0f121cab1c19b6abdb91959b7a256d04f0ea6b",
+  "productFingerprint": "b147c434764fd62f54749197da0f121cab1c19b6abdb91959b7a256d04f0ea6b",
+  "generatedAt": "2026-08-30T18:36:50.614Z",
+  "producerId": "magnus-guidance-smoke",
+  "producerFingerprint": "c7ace032c2bcd30d16e28615d87d9240b09c85a75887e194945ed0306a78b764",
   "kind": "project-guidance-live-smoke",
-  "prebasePid": 58545,
-  "launchMs": 4794,
+  "prebasePid": 38842,
+  "launchMs": 5512,
   "rootSnapshot": {
     "ok": true,
     "enabled": true,
@@ -17,29 +19,84 @@
     "always": [
       {
         "path": "AGENTS.md",
+        "ecosystem": "agents",
         "body": "# Root agents\nRoot guidance applies everywhere."
       },
       {
+        "path": "CLAUDE.md",
+        "ecosystem": "claude",
+        "body": "# CLAUDE\n\nClaude root guidance for monorepo live smoke."
+      },
+      {
+        "path": "GEMINI.md",
+        "ecosystem": "gemini",
+        "body": "# GEMINI\n\nGemini default context for monorepo live smoke."
+      },
+      {
+        "path": "TEAM.md",
+        "ecosystem": "gemini",
+        "body": "# TEAM\n\nGemini custom context.fileName for monorepo live smoke."
+      },
+      {
+        "path": "docs/local-guide.md",
+        "ecosystem": "opencode",
+        "body": "OpenCode local instruction for monorepo live smoke."
+      },
+      {
         "path": ".cursor/rules/always.mdc",
+        "ecosystem": "cursor",
         "body": "Always cursor rule."
+      },
+      {
+        "path": ".kiro/steering/always.md",
+        "ecosystem": "kiro",
+        "body": "Kiro always steering for monorepo live smoke."
       }
     ],
     "pathScoped": [],
     "onDemand": [
-      ".cursor/rules/intelligent-hint.mdc",
-      ".cursor/rules/manual-only.mdc"
+      {
+        "path": ".cursor/rules/intelligent-hint.mdc",
+        "mode": "intelligent"
+      },
+      {
+        "path": ".cursor/rules/manual-only.mdc",
+        "mode": "manual"
+      }
     ],
     "skills": [
       {
+        "id": "agents:47d1b0ce4216:interop",
+        "name": "interop",
+        "path": ".agents/skills/interop/SKILL.md",
+        "ecosystem": "agents",
+        "modelInvocable": true
+      },
+      {
         "id": "codex:607fd205956a:deploy",
         "name": "deploy",
-        "path": ".codex/skills/deploy/SKILL.md"
+        "path": ".codex/skills/deploy/SKILL.md",
+        "ecosystem": "codex",
+        "modelInvocable": true
       },
       {
         "id": "opencode:0579ed3010cd:ui-ux-pro-max",
         "name": "ui-ux-pro-max",
-        "path": ".opencode/skills/ui-ux-pro-max/SKILL.md"
+        "path": ".opencode/skills/ui-ux-pro-max/SKILL.md",
+        "ecosystem": "opencode",
+        "modelInvocable": true
       }
+    ],
+    "playbooks": [
+      {
+        "name": "ship",
+        "path": ".cursor/commands/ship.md",
+        "ecosystem": "cursor"
+      }
+    ],
+    "agentProfiles": [],
+    "diagnostics": [
+      "Remote OpenCode instruction URL not auto-loaded by PreBase."
     ]
   },
   "graphSnapshot": {
@@ -49,48 +106,109 @@
     "always": [
       {
         "path": "AGENTS.md",
+        "ecosystem": "agents",
         "body": "# Root agents\nRoot guidance applies everywhere."
       },
       {
+        "path": "CLAUDE.md",
+        "ecosystem": "claude",
+        "body": "# CLAUDE\n\nClaude root guidance for monorepo live smoke."
+      },
+      {
+        "path": "GEMINI.md",
+        "ecosystem": "gemini",
+        "body": "# GEMINI\n\nGemini default context for monorepo live smoke."
+      },
+      {
+        "path": "TEAM.md",
+        "ecosystem": "gemini",
+        "body": "# TEAM\n\nGemini custom context.fileName for monorepo live smoke."
+      },
+      {
+        "path": "docs/local-guide.md",
+        "ecosystem": "opencode",
+        "body": "OpenCode local instruction for monorepo live smoke."
+      },
+      {
         "path": ".cursor/rules/always.mdc",
+        "ecosystem": "cursor",
         "body": "Always cursor rule."
+      },
+      {
+        "path": ".kiro/steering/always.md",
+        "ecosystem": "kiro",
+        "body": "Kiro always steering for monorepo live smoke."
       }
     ],
     "pathScoped": [
       {
         "path": ".cursor/rules/graph.mdc",
+        "ecosystem": "cursor",
         "body": "Graph path rule."
+      },
+      {
+        "path": ".kiro/steering/file-match.md",
+        "ecosystem": "kiro",
+        "body": "Kiro path steering for graphs in monorepo live smoke."
       }
     ],
     "onDemand": [
-      ".cursor/rules/intelligent-hint.mdc",
-      ".cursor/rules/manual-only.mdc"
+      {
+        "path": ".cursor/rules/intelligent-hint.mdc",
+        "mode": "intelligent"
+      },
+      {
+        "path": ".cursor/rules/manual-only.mdc",
+        "mode": "manual"
+      }
     ],
     "skills": [
       {
+        "id": "agents:47d1b0ce4216:interop",
+        "name": "interop",
+        "path": ".agents/skills/interop/SKILL.md",
+        "ecosystem": "agents",
+        "modelInvocable": true
+      },
+      {
         "id": "codex:607fd205956a:deploy",
         "name": "deploy",
-        "path": ".codex/skills/deploy/SKILL.md"
+        "path": ".codex/skills/deploy/SKILL.md",
+        "ecosystem": "codex",
+        "modelInvocable": true
       },
       {
         "id": "opencode:0579ed3010cd:ui-ux-pro-max",
         "name": "ui-ux-pro-max",
-        "path": ".opencode/skills/ui-ux-pro-max/SKILL.md"
+        "path": ".opencode/skills/ui-ux-pro-max/SKILL.md",
+        "ecosystem": "opencode",
+        "modelInvocable": true
       }
+    ],
+    "playbooks": [
+      {
+        "name": "ship",
+        "path": ".cursor/commands/ship.md",
+        "ecosystem": "cursor"
+      }
+    ],
+    "agentProfiles": [],
+    "diagnostics": [
+      "Remote OpenCode instruction URL not auto-loaded by PreBase."
     ]
   },
   "toolGetForPaths": {
     "ok": true,
     "toolId": "prebase_project_guidance",
     "isError": false,
-    "content": "{\"ok\":true,\"root\":\"/Users/qunyingfan/Prebasecode/test/prebase/fixtures/project-guidance-monorepo\",\"paths\":[\".cursor/rules/graph.mdc\"],\"newlyApplied\":[],\"newlyAvailableRules\":[],\"newlyAvailableSkills\":[],\"always\":[{\"path\":\"AGENTS.md\",\"body\":\"# Root agents\\nRoot guidance applies everywhere.\"},{\"path\":\".cursor/rules/always.mdc\",\"body\":\"Always cursor rule.\"}],\"pathScoped\":[{\"path\":\".cursor/rules/graph.mdc\",\"body\":\"Graph path rule.\"}],\"onDemand\":[{\"path\":\".cursor/rules/intelligent-hint.mdc\",\"description\":\"Use when polishing UI styling\"},{\"path\":\".cursor/rules/manual-only.mdc\",\"description\":\"manual-only.mdc\"}],\"skills\":[{\"id\":\"codex:607fd205956a:deploy\",\"name\":\"deploy\",\"description\":\"Deploy skill\",\"path\":\".codex/skills/deploy/SKILL.md\"},{\"id\":\"opencode:0579ed3010cd:ui-ux-pro-max\",\"name\":\"ui-ux-pro-max\",\"description\":\"UI UX Pro Max design guidance\",\"path\":\".opencode/skills/ui-ux-pro-max/SKILL.md\"}],\"playbooks\":[],\"diagnostics\":[]}"
+    "content": "{\"ok\":true,\"root\":\"/Users/qunyingfan/Prebasecode/test/prebase/fixtures/project-guidance-monorepo\",\"paths\":[\".cursor/rules/graph.mdc\",\".kiro/steering/file-match.md\"],\"newlyApplied\":[],\"newlyAvailableRules\":[],\"newlyAvailableSkills\":[],\"always\":[{\"path\":\"AGENTS.md\",\"body\":\"# Root agents\\nRoot guidance applies everywhere.\"},{\"path\":\"CLAUDE.md\",\"body\":\"# CLAUDE\\n\\nClaude root guidance for monorepo live smoke.\"},{\"path\":\"GEMINI.md\",\"body\":\"# GEMINI\\n\\nGemini default context for monorepo live smoke.\"},{\"path\":\"TEAM.md\",\"body\":\"# TEAM\\n\\nGemini custom context.fileName for monorepo live smoke.\"},{\"path\":\"docs/local-guide.md\",\"body\":\"OpenCode local instruction for monorepo live smoke.\"},{\"path\":\".cursor/rules/always.mdc\",\"body\":\"Always cursor rule.\"},{\"path\":\".kiro/steering/always.md\",\"body\":\"Kiro always steering for monorepo live smoke.\"}],\"pathScoped\":[{\"path\":\".cursor/rules/graph.mdc\",\"body\":\"Graph path rule.\"},{\"path\":\".kiro/steering/file-match.md\",\"body\":\"Kiro path steering for graphs in monorepo live smoke.\"}],\"onDemand\":[{\"path\":\".cursor/rules/intelligent-hint.mdc\",\"description\":\"Use when polishing UI styling\"},{\"path\":\".cursor/rules/manual-only.mdc\",\"description\":\"manual-only.mdc\"}],\"skills\":[{\"id\":\"agents:47d1b0ce4216:interop\",\"name\":\"interop\",\"description\":\"Interoperable Agent Skill for live smoke\",\"path\":\".agents/skills/interop/SKILL.md\"},{\"id\":\"codex:607fd205956a:deploy\",\"name\":\"deploy\",\"description\":\"Deploy skill\",\"path\":\".codex/skills/deploy/SKILL.md\"},{\"id\":\"opencode:0579ed3010cd:ui-ux-pro-max\",\"name\":\"ui-ux-pro-max\",\"description\":\"UI UX Pro Max design guidance\",\"path\":\".opencode/skills/ui-ux-pro-max/SKILL.md\"}],\"playbooks\":[{\"id\":\"cursor:5ca8b290f199\",\"name\":\"ship\",\"description\":\"Ship playbook for live smoke\",\"path\":\".cursor/commands/ship.md\"}],\"agentProfiles\":[],\"diagnostics\":[\"Remote OpenCode instruction URL not auto-loaded by PreBase.\"]}"
   },
   "jitSmoke": {
     "ok": true,
     "initialPathScoped": 0,
-    "afterPathScoped": 1,
-    "deltaApplied": 1,
-    "deltaChars": 217,
+    "afterPathScoped": 2,
+    "deltaApplied": 2,
+    "deltaChars": 401,
     "deltaHasGraphRule": true,
     "packageRuleAbsent": true
   },
@@ -100,18 +218,24 @@
     "isError": false,
     "content": "{\"ok\":true,\"skill\":\"deploy\",\"skillId\":\"codex:607fd205956a:deploy\",\"root\":\".codex/skills/deploy\",\"files\":[],\"body\":\"# Deploy\",\"note\":\"Supporting files are not loaded automatically; read them on demand.\"}"
   },
+  "playbookActivate": {
+    "ok": true,
+    "toolId": "prebase_project_guidance",
+    "isError": false,
+    "content": "{\"ok\":true,\"path\":\".cursor/commands/ship.md\",\"body\":\"Manual ship playbook body.\",\"kind\":\"playbook\"}"
+  },
   "workspaceRead": {
     "ok": true,
     "toolId": "prebase_workspace_read_file",
     "isError": false,
     "content": "// Fixture file for project-guidance live smoke (graphs/** path rule).\n\nexport const graphFixture = true;\n"
   },
-  "durationMs": 9570,
+  "durationMs": 12071,
   "quit": {
-    "before": "58545     1  13.1 269056 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "38842     1  16.1 271040 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 529,
+    "latencyMs": 546,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

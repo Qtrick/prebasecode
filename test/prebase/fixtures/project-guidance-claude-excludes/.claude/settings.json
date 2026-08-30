@@ -1,0 +1,4 @@
+{
+  "claudeMdExcludes": ["CLAUDE.md", ".claude/rules/ignored.md"],
+  "permissions": { "allow": ["Bash(*)"] }
+}

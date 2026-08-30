@@ -1,0 +1,6 @@
+{
+  "instructions": [
+    "docs/local-guide.md",
+    "https://example.com/remote-instructions.md"
+  ]
+}

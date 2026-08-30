@@ -6,46 +6,95 @@
 import { basename, dirname, join } from 'node:path';
 import type { GuidanceFileReader } from './projectGuidanceService';
 
-/** Shared discovery + watcher patterns (single registry). */
-export const GUIDANCE_WATCH_PATTERNS = [
+/** Declarative skill roots — discovery + watcher patterns derive from this. */
+export const SKILL_DIRS = [
+	{ dir: '.agents/skills', ecosystem: 'agents' },
+	{ dir: '.cursor/skills', ecosystem: 'cursor' },
+	{ dir: '.claude/skills', ecosystem: 'claude' },
+	{ dir: '.codex/skills', ecosystem: 'codex' },
+	{ dir: '.github/skills', ecosystem: 'github' },
+	{ dir: '.cline/skills', ecosystem: 'cline' },
+	{ dir: '.clinerules/skills', ecosystem: 'cline' },
+	{ dir: '.windsurf/skills', ecosystem: 'windsurf' },
+	{ dir: '.opencode/skills', ecosystem: 'opencode' },
+	{ dir: '.gemini/skills', ecosystem: 'gemini' },
+	{ dir: '.kiro/skills', ecosystem: 'kiro' },
+	{ dir: '.devin/skills', ecosystem: 'devin' },
+	{ dir: '.cognition/skills', ecosystem: 'cognition' },
+	{ dir: '.codeium/skills', ecosystem: 'codeium' },
+] as const;
+
+/** Non-skill watcher patterns (ecosystem semantics stay explicit). */
+const GUIDANCE_WATCH_BASE = [
 	'**/AGENTS.md',
 	'**/AGENTS.override.md',
 	'**/CLAUDE.md',
 	'**/CLAUDE.local.md',
 	'**/.claude/CLAUDE.md',
 	'**/.claude/rules/**',
+	'**/.claude/settings.json',
+	'**/.claude/settings.local.json',
+	'**/.claude/commands/**',
+	'**/.claude/agents/**',
 	'**/.cursor/rules/**',
+	'**/.cursor/commands/**',
+	'**/.cursor/agents/**',
 	'**/.cursorrules',
+	'**/.codex/agents/**',
 	'**/.github/copilot-instructions.md',
 	'**/.github/instructions/**',
 	'**/.github/prompts/**',
-	'**/.github/skills/**/SKILL.md',
 	'**/GEMINI.md',
 	'**/.gemini/settings.json',
 	'**/.cline/rules/**',
 	'**/.clinerules/**',
+	'**/.cline/workflows/**',
 	'**/.windsurfrules',
 	'**/.windsurf/rules/**',
 	'**/.windsurf/workflows/**',
-	'**/.agents/skills/**/SKILL.md',
-	'**/.cursor/skills/**/SKILL.md',
-	'**/.claude/skills/**/SKILL.md',
-	'**/.codex/skills/**/SKILL.md',
-	'**/.opencode/skills/**/SKILL.md',
-	'**/.cline/skills/**/SKILL.md',
-	'**/.windsurf/skills/**/SKILL.md',
+	'**/.devin/rules/**',
+	'**/.kiro/steering/**',
+	'**/opencode.json',
+	'**/.opencode/opencode.json',
+	'**/TEAM.md',
 ] as const;
+
+/** Shared discovery + watcher patterns (skill globs derived from SKILL_DIRS). */
+export const GUIDANCE_WATCH_PATTERNS: readonly string[] = [
+	...GUIDANCE_WATCH_BASE,
+	...SKILL_DIRS.map(({ dir }) => `**/${dir}/**/SKILL.md`),
+];
 
 const SKIP_DIR_NAMES = new Set(['.git', 'node_modules', '.build', 'out', 'dist', 'coverage']);
 const MAX_WALK_DIRS = 400;
 const MAX_WALK_DEPTH = 8;
 const MAX_IMPORT_DEPTH = 4;
 const MAX_IMPORT_BYTES = 48_000;
+const MAX_FRONTMATTER_CHARS = 8_000;
+const MAX_FRONTMATTER_MAP_DEPTH = 2;
+const FRONTMATTER_KEY = /^[A-Za-z0-9_-]+$/;
 
-export type FrontmatterValue = string | boolean | string[];
+export type FrontmatterValue = string | boolean | string[] | { [key: string]: FrontmatterValue };
 
 export function normalizeRel(path: string): string {
 	return path.replace(/\\/g, '/');
+}
+
+function parseScalarFrontmatter(raw: string): FrontmatterValue {
+	if (raw === 'true') {
+		return true;
+	}
+	if (raw === 'false') {
+		return false;
+	}
+	if (raw.startsWith('[') && raw.endsWith(']')) {
+		return raw.slice(1, -1).split(',').map(item => item.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
+	}
+	return raw.replace(/^['"]|['"]$/g, '');
+}
+
+function isUnsafeYamlToken(line: string): boolean {
+	return /(?:^|\s)[!&*]/.test(line) || line.includes('!!') || /:\s*[!&*]/.test(line);
 }
 
 export function parseFrontmatter(text: string): { meta: Record<string, FrontmatterValue>; body: string } {
@@ -56,40 +105,97 @@ export function parseFrontmatter(text: string): { meta: Record<string, Frontmatt
 	if (end < 0) {
 		return { meta: {}, body: text };
 	}
-	const header = text.slice(3, end).trim();
+	const header = text.slice(3, end).replace(/^\n/, '');
+	if (header.length > MAX_FRONTMATTER_CHARS) {
+		return { meta: {}, body: text.slice(end + 4).replace(/^\n/, '') };
+	}
 	const body = text.slice(end + 4).replace(/^\n/, '');
 	const meta: Record<string, FrontmatterValue> = {};
+	const stack: Array<{ indent: number; map: Record<string, FrontmatterValue> }> = [{ indent: -1, map: meta }];
+	let pendingMapKey: { owner: Record<string, FrontmatterValue>; key: string; indent: number } | undefined;
 	let currentListKey: string | undefined;
+	let currentListOwner: Record<string, FrontmatterValue> | undefined;
+
 	for (const rawLine of header.split('\n')) {
-		const line = rawLine.trim();
-		if (!line || line.startsWith('#')) {
+		if (!rawLine.trim() || rawLine.trimStart().startsWith('#')) {
 			continue;
 		}
+		if (isUnsafeYamlToken(rawLine)) {
+			return { meta: {}, body };
+		}
+		const indent = rawLine.match(/^ */)?.[0].length ?? 0;
+		const line = rawLine.trim();
+		while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+			stack.pop();
+			currentListKey = undefined;
+			currentListOwner = undefined;
+			pendingMapKey = undefined;
+		}
+		const owner = stack[stack.length - 1].map;
+
+		if (pendingMapKey && indent > pendingMapKey.indent) {
+			const listItem = /^-\s+(.+)$/.exec(line);
+			if (listItem) {
+				pendingMapKey.owner[pendingMapKey.key] = [listItem[1].replace(/^['"]|['"]$/g, '')];
+				currentListKey = pendingMapKey.key;
+				currentListOwner = pendingMapKey.owner;
+				pendingMapKey = undefined;
+				continue;
+			}
+			const childMatch = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
+			if (childMatch && FRONTMATTER_KEY.test(childMatch[1]) && stack.length - 1 < MAX_FRONTMATTER_MAP_DEPTH) {
+				const child: Record<string, FrontmatterValue> = {};
+				pendingMapKey.owner[pendingMapKey.key] = child;
+				stack.push({ indent: pendingMapKey.indent, map: child });
+				pendingMapKey = undefined;
+				const [, childKey, childRaw] = childMatch;
+				if (childRaw === '' || childRaw === '[]') {
+					if (childRaw === '[]') {
+						child[childKey] = [];
+						currentListKey = childKey;
+						currentListOwner = child;
+					} else {
+						pendingMapKey = { owner: child, key: childKey, indent };
+					}
+				} else {
+					child[childKey] = parseScalarFrontmatter(childRaw);
+				}
+				continue;
+			}
+			pendingMapKey = undefined;
+		} else if (pendingMapKey) {
+			pendingMapKey.owner[pendingMapKey.key] = [];
+			pendingMapKey = undefined;
+		}
+
 		const listItem = /^-\s+(.+)$/.exec(line);
-		if (listItem && currentListKey) {
-			const existing = meta[currentListKey];
+		if (listItem && currentListKey && currentListOwner) {
+			const existing = currentListOwner[currentListKey];
 			const value = listItem[1].replace(/^['"]|['"]$/g, '');
-			meta[currentListKey] = Array.isArray(existing) ? [...existing, value] : [value];
+			currentListOwner[currentListKey] = Array.isArray(existing) ? [...existing, value] : [value];
 			continue;
 		}
 		currentListKey = undefined;
+		currentListOwner = undefined;
 		const match = /^([A-Za-z0-9_-]+):\s*(.*)$/.exec(line);
-		if (!match) {
+		if (!match || !FRONTMATTER_KEY.test(match[1])) {
 			continue;
 		}
 		const [, key, raw] = match;
-		if (raw === 'true') {
-			meta[key] = true;
-		} else if (raw === 'false') {
-			meta[key] = false;
-		} else if (raw === '' || raw === '[]') {
-			meta[key] = [];
+		if (raw === '[]') {
+			owner[key] = [];
 			currentListKey = key;
-		} else if (raw.startsWith('[') && raw.endsWith(']')) {
-			meta[key] = raw.slice(1, -1).split(',').map(item => item.trim().replace(/^['"]|['"]$/g, '')).filter(Boolean);
-		} else {
-			meta[key] = raw.replace(/^['"]|['"]$/g, '');
+			currentListOwner = owner;
+			continue;
 		}
+		if (raw === '') {
+			pendingMapKey = { owner, key, indent };
+			continue;
+		}
+		owner[key] = parseScalarFrontmatter(raw);
+	}
+	if (pendingMapKey) {
+		pendingMapKey.owner[pendingMapKey.key] = [];
 	}
 	return { meta, body };
 }
@@ -103,6 +209,31 @@ export function metaStringList(meta: Record<string, FrontmatterValue>, key: stri
 		return value.split(',').map(item => item.trim()).filter(Boolean);
 	}
 	return [];
+}
+
+export function metaString(meta: Record<string, FrontmatterValue>, key: string): string | undefined {
+	const value = meta[key];
+	if (typeof value === 'string' && value.trim()) {
+		return value.trim();
+	}
+	if (Array.isArray(value)) {
+		const joined = value.map(item => String(item).trim()).filter(Boolean).join(', ');
+		return joined || undefined;
+	}
+	return undefined;
+}
+
+export function metaBoolean(meta: Record<string, FrontmatterValue>, key: string): boolean | undefined {
+	const value = meta[key];
+	return typeof value === 'boolean' ? value : undefined;
+}
+
+export function metaMap(meta: Record<string, FrontmatterValue>, key: string): Record<string, FrontmatterValue> | undefined {
+	const value = meta[key];
+	if (value && typeof value === 'object' && !Array.isArray(value)) {
+		return value;
+	}
+	return undefined;
 }
 
 export function parseApplyTo(text: string): string[] {
@@ -121,6 +252,37 @@ export function parseApplyTo(text: string): string[] {
 	}
 	const match = body.match(/applyTo:\s*([^\n]+)/);
 	return match ? match[1].split(',').map(item => item.trim()).filter(Boolean) : [];
+}
+
+/** Prefer explicit frontmatter keys, then fall back to parseApplyTo. */
+export function globsFromMeta(
+	meta: Record<string, FrontmatterValue>,
+	text: string,
+	preferredKeys: readonly string[] = ['globs'],
+): string[] {
+	for (const key of preferredKeys) {
+		const list = metaStringList(meta, key);
+		if (list.length) {
+			return list;
+		}
+	}
+	return parseApplyTo(text);
+}
+
+export function firstNonHeadingLine(body: string): string {
+	return body.split('\n').find(line => line.trim() && !line.startsWith('#'))?.trim() ?? '';
+}
+
+/** Package/subdir scope for a nested skill root (e.g. packages/web/.agents/skills → packages/web). */
+export function skillScopePrefix(discoveredDir: string, skillRootDir: string): string {
+	if (discoveredDir === skillRootDir) {
+		return '';
+	}
+	const suffix = `/${skillRootDir}`;
+	if (discoveredDir.endsWith(suffix)) {
+		return discoveredDir.slice(0, -suffix.length);
+	}
+	return discoveredDir.replace(/\/skills$/, '');
 }
 
 export function boundedJoin(blocks: readonly string[], maxChars: number): string {
@@ -260,15 +422,27 @@ export async function resolveMarkdownImports(
 			lastIndex = index + match[0].length;
 			const atImport = match[0];
 			const rawRef = normalizeRel(match[1]);
-			const rel = atImport.startsWith('@./') || atImport.startsWith('@../') || rawRef.startsWith('./') || rawRef.startsWith('../')
+			const looksAbsoluteAt = /^@\/(?!\.)/.test(atImport) || /^@[a-zA-Z]:/.test(atImport) || rawRef.startsWith('/') || /^[a-zA-Z]:/.test(rawRef);
+			const rel = !looksAbsoluteAt && (atImport.startsWith('@./') || atImport.startsWith('@../') || rawRef.startsWith('./') || rawRef.startsWith('../'))
 				? normalizeRel(join(originDir, rawRef.replace(/^\.\//, '')))
 				: rawRef;
+			if (looksAbsoluteAt) {
+				diagnostics.push(`Blocked outside-workspace or absolute @ import: ${atImport} (workspace-bound paths only)`);
+				continue;
+			}
 			if (isBlocked(rel) || stack.includes(rel)) {
 				diagnostics.push(`Skipped import ${rel}`);
 				continue;
 			}
 			const full = resolveGuidancePath(rel);
-			if (!full || seen.has(full)) {
+			if (!full) {
+				const escape = rel.split('/').includes('..') || rawRef.split('/').includes('..');
+				diagnostics.push(escape
+					? `Blocked outside-workspace or absolute @ import: ${atImport} (workspace-bound paths only)`
+					: `Missing or cyclic import: ${rel}`);
+				continue;
+			}
+			if (seen.has(full)) {
 				diagnostics.push(`Missing or cyclic import: ${rel}`);
 				continue;
 			}
@@ -309,8 +483,11 @@ export function globMatches(pattern: string, targetPath: string): boolean {
 	if (alternatives) {
 		return alternatives[1].split(',').some(alt => globMatches(alt.trim(), normalized));
 	}
-	const regex = globToRegExp(glob);
-	return regex.test(normalized);
+	try {
+		return globToRegExp(glob).test(normalized);
+	} catch {
+		return false;
+	}
 }
 
 function globToRegExp(glob: string): RegExp {
@@ -386,6 +563,67 @@ export function windsurfRuleMode(meta: Record<string, FrontmatterValue>, globs: 
 	}
 }
 
+/** Kiro steering inclusion → PreBase activation modes. */
+export function kiroSteeringMode(meta: Record<string, FrontmatterValue>, globs: string[]): 'always' | 'path' | 'intelligent' | 'manual' {
+	const inclusion = typeof meta.inclusion === 'string' ? meta.inclusion.trim() : '';
+	switch (inclusion) {
+		case 'always':
+			return 'always';
+		case 'fileMatch':
+			return 'path';
+		case 'manual':
+			return 'manual';
+		case 'auto':
+			return 'intelligent';
+		default:
+			return globs.length ? 'path' : 'always';
+	}
+}
+
+/** Expand Kiro `#[[file:rel]]` references (workspace-bound only). */
+export async function expandKiroFileRefs(
+	reader: GuidanceFileReader,
+	_workspaceRoot: string,
+	sourceRel: string,
+	body: string,
+	isBlocked: (rel: string) => boolean,
+	resolveGuidancePath: (rel: string) => string | undefined,
+): Promise<{ text: string; diagnostics: string[] }> {
+	const diagnostics: string[] = [];
+	const sourceDir = dirname(normalizeRel(sourceRel));
+	const pattern = /#\[\[file:([^\]]+)\]\]/g;
+	let result = '';
+	let lastIndex = 0;
+	for (const match of body.matchAll(pattern)) {
+		const index = match.index ?? 0;
+		result += body.slice(lastIndex, index);
+		lastIndex = index + match[0].length;
+		const rawRef = normalizeRel(match[1].trim());
+		const rel = rawRef.startsWith('./') || rawRef.startsWith('../')
+			? normalizeRel(join(sourceDir, rawRef.replace(/^\.\//, '')))
+			: rawRef;
+		if (isBlocked(rel)) {
+			diagnostics.push(`Skipped blocked Kiro file ref: ${rel}`);
+			continue;
+		}
+		const full = resolveGuidancePath(rel);
+		if (!full) {
+			diagnostics.push(`Blocked outside-workspace Kiro file ref: ${match[0]}`);
+			continue;
+		}
+		try {
+			const imported = await reader.readFile(full);
+			result += imported.length > MAX_IMPORT_BYTES
+				? `${imported.slice(0, MAX_IMPORT_BYTES)}\n[import truncated]`
+				: imported;
+		} catch {
+			diagnostics.push(`Unreadable Kiro file ref: ${rel}`);
+		}
+	}
+	result += body.slice(lastIndex);
+	return { text: result, diagnostics };
+}
+
 export async function discoverNestedDirectories(
 	reader: GuidanceFileReader,
 	workspaceRoot: string,
@@ -441,8 +679,7 @@ export async function discoverSkillFiles(
 					continue;
 				}
 				seen.add(relPath);
-				const scopePrefix = dir === root.dir ? '' : dir.replace(/\/skills$/, '').replace(/\/\.(cursor|claude|codex|agents|opencode|cline|windsurf|github)\/skills$/, '');
-				found.push({ relPath, ecosystem: root.ecosystem, scopePrefix });
+				found.push({ relPath, ecosystem: root.ecosystem, scopePrefix: skillScopePrefix(dir, root.dir) });
 			}
 		}
 	}

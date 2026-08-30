@@ -62,9 +62,10 @@ export class ProjectGuidanceSession {
 
 	activateRule(path: string): void {
 		const normalized = normalizeRel(path.trim());
-		if (normalized) {
-			this.activatedRulePaths.add(normalized);
+		if (!normalized || normalized.split('/').includes('..') || normalized.startsWith('/') || /^[a-zA-Z]:/.test(normalized)) {
+			return;
 		}
+		this.activatedRulePaths.add(normalized);
 	}
 
 	getActivatedSkillIds(): readonly string[] {
