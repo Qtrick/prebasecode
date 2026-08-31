@@ -3,15 +3,15 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "magnus-guidance-smoke",
-  "sourceHead": "4212c414e50610778fb1cfdad1e9a1ee570eedb6",
-  "sourceFingerprint": "b147c434764fd62f54749197da0f121cab1c19b6abdb91959b7a256d04f0ea6b",
-  "productFingerprint": "b147c434764fd62f54749197da0f121cab1c19b6abdb91959b7a256d04f0ea6b",
-  "generatedAt": "2026-08-30T18:36:50.614Z",
+  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
+  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "generatedAt": "2026-08-31T18:31:19.511Z",
   "producerId": "magnus-guidance-smoke",
-  "producerFingerprint": "c7ace032c2bcd30d16e28615d87d9240b09c85a75887e194945ed0306a78b764",
+  "producerFingerprint": "908d4dad4bc2210d78a9a06f55ca85c082a4af58a8beb8e22f74069f17b3ac48",
   "kind": "project-guidance-live-smoke",
-  "prebasePid": 38842,
-  "launchMs": 5512,
+  "prebasePid": 80167,
+  "launchMs": 3402,
   "rootSnapshot": {
     "ok": true,
     "enabled": true,
@@ -222,7 +222,7 @@
     "ok": true,
     "toolId": "prebase_project_guidance",
     "isError": false,
-    "content": "{\"ok\":true,\"path\":\".cursor/commands/ship.md\",\"body\":\"Manual ship playbook body.\",\"kind\":\"playbook\"}"
+    "content": "{\"ok\":true,\"path\":\".cursor/commands/ship.md\",\"body\":\"Manual ship playbook body.\",\"kind\":\"playbook\",\"playbook\":{\"id\":\"cursor:5ca8b290f199\",\"name\":\"ship\"}}"
   },
   "workspaceRead": {
     "ok": true,
@@ -230,12 +230,12 @@
     "isError": false,
     "content": "// Fixture file for project-guidance live smoke (graphs/** path rule).\n\nexport const graphFixture = true;\n"
   },
-  "durationMs": 12071,
+  "durationMs": 10557,
   "quit": {
-    "before": "38842     1  16.1 271040 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "80167     1  14.9 278032 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 546,
+    "latencyMs": 552,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

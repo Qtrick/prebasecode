@@ -140,8 +140,18 @@ static NSString *JSString(Napi::Value value) {
 		self.ignoresMouse = YES;
 		self.displayMode = @"builtin";
 		[self buildPanel];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+		                                         selector:@selector(screenParametersChanged:)
+		                                             name:NSApplicationDidChangeScreenParametersNotification
+		                                           object:nil];
 	}
 	return self;
+}
+
+- (void)screenParametersChanged:(NSNotification *)notification {
+	if (self.visible && !gDisposed) {
+		[self layoutForScreen];
+	}
 }
 
 - (void)buildPanel {
@@ -246,17 +256,19 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat collapsedH = 34;
 	NSRect win;
 	if (notched) {
-		CGFloat housing = MAX(24, NSWidth(frame) - auxLeft.size.width - auxRight.size.width);
+		CGFloat housing = MAX(24, NSMinX(auxRight) - NSMaxX(auxLeft));
 		self.content.housingWidth = housing;
 		CGFloat leftW = 124;
 		CGFloat rightW = 124;
 		CGFloat y = NSMaxY(frame) - MAX(insets.top, collapsedH) - 1;
+		CGFloat totalW = leftW + housing + rightW;
+		CGFloat winX = NSMaxX(auxLeft) - leftW;
 		if (self.content.expanded || self.pinned) {
-			win = NSMakeRect(auxLeft.origin.x - leftW + NSMinX(frame), y - 168, leftW + housing + rightW, 200);
+			win = NSMakeRect(winX, y - 168, totalW, 200);
 		} else {
-			win = NSMakeRect(auxLeft.origin.x - leftW + NSMinX(frame), y, leftW + housing + rightW, MAX(insets.top, collapsedH));
+			win = NSMakeRect(winX, y, totalW, MAX(insets.top, collapsedH));
 		}
-		self.collapsedHit = NSMakeRect(win.origin.x, y, leftW - 8, MAX(insets.top, collapsedH));
+		self.collapsedHit = NSMakeRect(winX, y, totalW, MAX(insets.top, collapsedH));
 	} else {
 		self.content.housingWidth = 0;
 		CGFloat w = self.content.expanded || self.pinned ? 320 : 228;
@@ -481,6 +493,7 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingKind = @"";
 	self.pendingOptions = @[];
 	self.content.pendingTitle = @"";
+	self.openButton.title = @"Open in PreBase";
 	if (self.panel) {
 		[self layoutControls:self.panel.frame];
 	}
@@ -637,13 +650,19 @@ static NSString *JSString(Napi::Value value) {
 	self.pinned = pinned;
 	self.reducedMotion = reduced;
 	self.content.reducedMotion = reduced;
-	self.content.expanded = pinned || self.content.expanded;
+	self.content.expanded = pinned || (visible && self.content.expanded);
 	self.panel.animationBehavior = reduced ? NSWindowAnimationBehaviorNone : NSWindowAnimationBehaviorUtilityWindow;
 	if (!visible) {
 		[self.panel orderOut:nil];
 		self.panel.ignoresMouseEvents = YES;
+		if (!pinned) {
+			self.content.expanded = NO;
+			self.hovering = NO;
+		}
 		[self.hoverTimer invalidate];
+		self.hoverTimer = nil;
 		[self.exitTimer invalidate];
+		self.exitTimer = nil;
 		[self removeMonitors];
 		return;
 	}
@@ -656,6 +675,9 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)teardown {
+	[[NSNotificationCenter defaultCenter] removeObserver:self
+	                                                name:NSApplicationDidChangeScreenParametersNotification
+	                                              object:nil];
 	[self.hoverTimer invalidate];
 	self.hoverTimer = nil;
 	[self.exitTimer invalidate];
@@ -876,10 +898,15 @@ static Napi::Value DisposeNative(const Napi::CallbackInfo &info) {
 		gCommandTsfn.Release();
 		gCommandTsfn = {};
 	}
-	dispatch_sync(dispatch_get_main_queue(), ^{
+	if ([NSThread isMainThread]) {
 		[gController teardown];
 		gController = nil;
-	});
+	} else {
+		dispatch_sync(dispatch_get_main_queue(), ^{
+			[gController teardown];
+			gController = nil;
+		});
+	}
 	gDisposed = false;
 	return info.Env().Undefined();
 }

@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 /**
@@ -78,7 +79,6 @@ export async function* paceTextStream(
 
 	const paceWait = () => new Promise<void>(resolve => {
 		let settled = false;
-		let sub: { dispose(): void } | undefined;
 		const finish = () => {
 			if (settled) {
 				return;
@@ -87,7 +87,7 @@ export async function* paceTextStream(
 			sub?.dispose();
 			resolve();
 		};
-		sub = token?.onCancellationRequested?.(finish);
+		const sub = token?.onCancellationRequested?.(finish);
 		void sleep(intervalMs).then(finish);
 		if (token?.isCancellationRequested) {
 			finish();

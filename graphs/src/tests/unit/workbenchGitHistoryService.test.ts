@@ -62,8 +62,8 @@ suite('WorkbenchGitHistoryService Unit Tests', () => {
 				}
 			];
 			return all.filter(c => {
-				if (options?.grep && !c.message.toLowerCase().includes(options.grep.toLowerCase())) return false;
-				if (options?.author && !c.author.name.toLowerCase().includes(options.author.toLowerCase())) return false;
+				if (options?.grep && !c.message.toLowerCase().includes(options.grep.toLowerCase())) {return false;}
+				if (options?.author && !c.author.name.toLowerCase().includes(options.author.toLowerCase())) {return false;}
 				return true;
 			});
 		},

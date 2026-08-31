@@ -1,12 +1,8 @@
 #!/usr/bin/env node
-/**
- * Verifies PreBase file-dialog routing invariants and configuration defaults.
- * Ensures:
- * 1. `files.simpleDialog.enable` defaults to `false` in files.contribution.ts.
- * 2. product.json does not force `files.simpleDialog.enable: true`.
- * 3. scripts/code.sh does not force simple dialogs or smoke test mode.
- * 4. .agents/skills/launch/scripts/launch.sh explicitly isolates simple dialogs to automation and supports --native-dialogs.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

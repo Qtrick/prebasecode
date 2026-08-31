@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type { TemporalCommunityGuide, TemporalRenderNode } from '../../temporal/view/temporalViewTypes.js';

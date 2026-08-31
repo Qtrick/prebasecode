@@ -1,5 +1,5 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
@@ -23,6 +23,9 @@ import { IHostService } from '../../../services/host/browser/host.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { IChatService, IChatToolInvocation, ToolConfirmKind } from '../../chat/common/chatService/chatService.js';
 import type { IChatModel, IChatRequestModel } from '../../chat/common/model/chatModel.js';
+import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
+import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
+import { requireSmokeTestDriver } from '../common/smokeTestGuard.js';
 import { ITerminalChatService, ITerminalService } from '../../terminal/browser/terminal.js';
 import { ILanguageModelToolsService } from '../../chat/common/tools/languageModelToolsService.js';
 import { IChatToolRiskAssessmentService, ToolRiskLevel } from '../../chat/browser/tools/chatToolRiskAssessmentService.js';
@@ -423,7 +426,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		}
 		const model = selectPrimaryMagnusModel(this.chatService.chatModels.get());
 		this._revision += 1;
-		const hideDetails = this._screenLocked || Boolean(this.configurationService.getValue<boolean>('prebase.magnus.liveActivity.hideDetails'));
+		const userHideDetails = Boolean(this.configurationService.getValue<boolean>('prebase.magnus.liveActivity.hideDetails'));
 		const snapshot = buildMagnusLiveActivitySnapshot(extractSessionInput(model, {
 			terminalChat: this.terminalChatService,
 			risk: { isDestructive: (toolId, parameters) => this._isDestructive(toolId, parameters) },
@@ -431,7 +434,8 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			revision: this._revision,
 			prebaseForeground: this.hostService.hasFocus,
 			connected: this._nativeConnected,
-			screenLocked: hideDetails,
+			screenLocked: this._screenLocked,
+			hideDetails: userHideDetails,
 		});
 		this._lastSnapshot = snapshot;
 		const visible = shouldShowLiveActivity(this._mode(), snapshot);
@@ -510,8 +514,8 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			this.logService.info('[MagnusLiveActivity] approval failed closed: invocation missing');
 			return;
 		}
-		if (command.kind === 'answer' && snapshot.pendingInteraction?.kind === 'question' && snapshot.pendingInteraction.resolveId && command.optionId) {
-			const pending = snapshot.pendingInteraction;
+		const pending = snapshot.pendingInteraction;
+		if (command.kind === 'answer' && pending?.kind === 'question' && pending.resolveId && command.optionId) {
 			const requestId = pending.requestId ?? last?.id;
 			if (!requestId) {
 				this.logService.info('[MagnusLiveActivity] answer failed closed: missing question/option');
@@ -585,11 +589,12 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({
 			id: 'prebase.magnus.liveActivity.simulate',
-			title: localize2('prebase.magnus.liveActivity.simulate', "Magnus Live Activity Simulate Action"),
+			title: localize2('prebase.magnus.liveActivity.simulate', "Magnus Live Activity Simulate Action (Smoke Test)"),
 			f1: false,
 		});
 	}
-	async run(accessor: unknown, action: string, extras?: unknown) {
+	async run(accessor: ServicesAccessor, action: string, extras?: unknown) {
+		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.magnus.liveActivity.simulate');
 		return MagnusLiveActivityContribution.instance?.simulateAction(action, extras);
 	}
 });

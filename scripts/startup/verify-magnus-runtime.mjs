@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-/**
- * Dedicated Magnus Runtime Smoke Assurance.
- * Launches PreBase with Magnus enabled in a clean temporary profile,
- * verifies full activation lifecycle, confirms provider registration,
- * and ensures no activation errors occur.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { spawn } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

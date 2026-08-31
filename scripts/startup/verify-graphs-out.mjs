@@ -1,10 +1,8 @@
 #!/usr/bin/env node
-/**
- * Lightweight gate: graphs symlink + canonical transpiled modules under out/.
- *
- * assurance:quick does NOT run transpile-client. Run `npm run transpile-client`
- * locally (or watch-client-transpile) before relying on out/ being current.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from 'node:fs';
 import crypto from 'node:crypto';
 import path from 'node:path';

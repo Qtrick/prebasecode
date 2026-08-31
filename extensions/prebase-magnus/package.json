@@ -58,7 +58,9 @@
         "description": "Ask Agent about your project (read-only)",
         "isDefault": true,
         "modes": [
-          "ask"
+          "ask",
+          "agent",
+          "edit"
         ]
       },
       {
@@ -68,7 +70,9 @@
         "description": "Edit code with Agent",
         "isDefault": true,
         "modes": [
-          "edit"
+          "edit",
+          "agent",
+          "ask"
         ]
       },
       {
@@ -78,9 +82,10 @@
         "description": "Agent mode — plan, edit, and verify with Agent",
         "isDefault": true,
         "modes": [
-          "agent"
-        ],
-        "when": "config.chat.agent.enabled"
+          "agent",
+          "ask",
+          "edit"
+        ]
       }
     ],
     "languageModelTools": [

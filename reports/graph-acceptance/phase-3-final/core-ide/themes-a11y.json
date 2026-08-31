@@ -1,12 +1,12 @@
 {
   "schemaVersion": 3,
   "scenario": "themes-a11y",
-  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "generatedAt": "2026-08-30T03:18:37.591Z",
+  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
+  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "generatedAt": "2026-08-31T18:33:12.158Z",
   "producerId": "core-ide",
-  "producerFingerprint": "5c7ebe9a2c5491f11e67c5d172bd2602815d155853cddf23002b82dcf1362c0e",
+  "producerFingerprint": "3cc630b83ea66c7bbc817a1eb70418fc5fca4d8e3d165f81585b803aa13118f1",
   "ok": true,
   "failures": [],
   "themes": {
@@ -81,10 +81,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "37876     1  13.3 214544 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "82777     1  13.2 227072 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 645,
+    "latencyMs": 669,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type {
@@ -64,7 +63,7 @@ export function derivePostCollisionGuides(
 	for (let i = 0; i < communities.length; i++) {
 		const comm = communities[i];
 		const memberIds = comm.nodeIds;
-		if (memberIds.length === 0) continue;
+		if (memberIds.length === 0) {continue;}
 
 		let minX = Infinity;
 		let minY = Infinity;
@@ -76,14 +75,14 @@ export function derivePostCollisionGuides(
 			const pos = positions.get(memberIds[m]);
 			if (pos) {
 				presentCoords.push(pos);
-				if (pos.x < minX) minX = pos.x;
-				if (pos.y < minY) minY = pos.y;
-				if (pos.x > maxX) maxX = pos.x;
-				if (pos.y > maxY) maxY = pos.y;
+				if (pos.x < minX) {minX = pos.x;}
+				if (pos.y < minY) {minY = pos.y;}
+				if (pos.x > maxX) {maxX = pos.x;}
+				if (pos.y > maxY) {maxY = pos.y;}
 			}
 		}
 
-		if (presentCoords.length === 0) continue;
+		if (presentCoords.length === 0) {continue;}
 
 		const cx = Math.round((minX + maxX) / 2);
 		const cy = Math.round((minY + maxY) / 2);
@@ -92,7 +91,7 @@ export function derivePostCollisionGuides(
 		for (let p = 0; p < presentCoords.length; p++) {
 			const pt = presentCoords[p];
 			const distSq = (pt.x - cx) * (pt.x - cx) + (pt.y - cy) * (pt.y - cy);
-			if (distSq > maxDistSq) maxDistSq = distSq;
+			if (distSq > maxDistSq) {maxDistSq = distSq;}
 		}
 
 		const radius = Math.round(Math.sqrt(maxDistSq) + Math.min(padding, 16));
@@ -141,13 +140,13 @@ function buildCommunityLinkWeights(
 	const weights = new Map<string, number>();
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
-		if (e.changeKind === 'removed') continue;
+		if (e.changeKind === 'removed') {continue;}
 		const src = e.sourceEntityId || (e as { sourceId?: string }).sourceId;
 		const tgt = e.targetEntityId || (e as { targetId?: string }).targetId;
-		if (!src || !tgt) continue;
+		if (!src || !tgt) {continue;}
 		const a = nodeToComm.get(src);
 		const b = nodeToComm.get(tgt);
-		if (!a || !b || a === b) continue;
+		if (!a || !b || a === b) {continue;}
 		const key = a < b ? `${a}::${b}` : `${b}::${a}`;
 		weights.set(key, (weights.get(key) ?? 0) + 1);
 	}
@@ -246,7 +245,7 @@ export function computeSemanticTemporalInitialLayout(
 			const link = links[l];
 			const a = centerById.get(link.source);
 			const b = centerById.get(link.target);
-			if (!a || !b) continue;
+			if (!a || !b) {continue;}
 			const dx = b.x - a.x;
 			const dy = b.y - a.y;
 			const dist = Math.hypot(dx, dy);
@@ -313,16 +312,16 @@ export function computeSemanticTemporalInitialLayout(
 			for (let l = 0; l < links.length; l++) {
 				const link = links[l];
 				let otherId: string | undefined;
-				if (link.source === c.id) otherId = link.target;
-				else if (link.target === c.id) otherId = link.source;
-				if (!otherId) continue;
+				if (link.source === c.id) {otherId = link.target;}
+				else if (link.target === c.id) {otherId = link.source;}
+				if (!otherId) {continue;}
 				const other = clusterCenters.get(otherId);
-				if (!other) continue;
+				if (!other) {continue;}
 				sx += other.x * link.weight;
 				sy += other.y * link.weight;
 				w += link.weight;
 			}
-			if (w <= 0) continue;
+			if (w <= 0) {continue;}
 			const bx = sx / w;
 			const by = sy / w;
 			c.x = Math.round(c.x + (bx - c.x) * 0.12);
@@ -373,7 +372,7 @@ export function computeSemanticTemporalInitialLayout(
 	const nodePosList = resultNodes.map(n => ({ id: n.entityId, x: n.x, y: n.y, communityId: '' as string }));
 	const nodeToComm = new Map<string, string>();
 	for (const comm of communities) {
-		for (const id of comm.nodeIds) nodeToComm.set(id, comm.id);
+		for (const id of comm.nodeIds) {nodeToComm.set(id, comm.id);}
 	}
 	for (const p of nodePosList) {
 		p.communityId = nodeToComm.get(p.id) || '';
@@ -467,7 +466,7 @@ export function layoutTemporalGraph(
 		if (edge.changeKind !== 'removed') {
 			const src = edge.sourceEntityId || (edge as { sourceId?: string }).sourceId;
 			const tgt = edge.targetEntityId || (edge as { targetId?: string }).targetId;
-			if (!src || !tgt) continue;
+			if (!src || !tgt) {continue;}
 
 			let srcSet = connectedNeighbors.get(src);
 			if (!srcSet) {

@@ -200,6 +200,9 @@ export class PreBaseAIService implements IPreBaseAIService {
 	}
 
 	getActiveModelId(): string {
+		if (this._smokeAdapter) {
+			return this._smokeAdapter.defaultModel;
+		}
 		return this.config.getDefaultModel();
 	}
 
@@ -390,6 +393,9 @@ export class PreBaseAIService implements IPreBaseAIService {
 		token?: AICancellationToken,
 		workload?: import('./aiTypes').ModelWorkload,
 	): Promise<string> {
+		if (this._smokeAdapter) {
+			return this._smokeAdapter.defaultModel;
+		}
 		const targetId = providerId.toLowerCase().replace(/-api$/, '');
 		const adapter = this.adapterFor(targetId);
 		if (!adapter) {
@@ -738,8 +744,9 @@ export class PreBaseAIService implements IPreBaseAIService {
 		const targetId = (providerId ?? this.getActiveProviderId()).toLowerCase().replace(/-api$/, '');
 		const raw = await this.listRawModels(targetId, true);
 		const adapter = this.adapterFor(targetId);
-		if (adapter && 'modelPolicy' in adapter && typeof (adapter as { modelPolicy: { formatDiagnostics: (catalog: NormalizedAIModel[]) => Record<string, unknown> } }).modelPolicy?.formatDiagnostics === 'function') {
-			return (adapter as { modelPolicy: { formatDiagnostics: (catalog: NormalizedAIModel[]) => Record<string, unknown> } }).modelPolicy.formatDiagnostics(raw);
+		const policy = (adapter as { modelPolicy?: { formatDiagnostics?: (catalog: NormalizedAIModel[]) => Record<string, unknown> } })?.modelPolicy;
+		if (policy && typeof policy.formatDiagnostics === 'function') {
+			return policy.formatDiagnostics(raw);
 		}
 		return {
 			providerId: targetId,

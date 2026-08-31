@@ -3,10 +3,13 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { selectOwnedCdpPageWebSocketUrl, validateCdpPngScreenshotData } from '../../../../../platform/prebaseDesktop/common/cdpScreenshot.js';
 
 suite('PreBase external CDP screenshots', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('selects only a renderer target served by the exact owned loopback port', () => {
 		const targets = [
 			{ type: 'page', url: 'devtools://devtools', webSocketDebuggerUrl: 'ws://127.0.0.1:9222/devtools/page/devtools' },

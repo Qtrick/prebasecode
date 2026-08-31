@@ -59,7 +59,7 @@ export function getCopilotPackagingPlan(enabled: boolean, platform: string, arch
  * Validates the packaged desktop app's extension policy after all package tasks run.
  * The check deliberately accepts dormant Copilot source outside the app bundle.
  */
-export function verifyPreBaseDesktopPackage(appBase: string, copilotEnabled: boolean): void {
+export function verifyPreBaseDesktopPackage(appBase: string, copilotEnabled: boolean, platform?: string): void {
 	const productPath = path.join(appBase, 'product.json');
 	if (!fs.existsSync(productPath)) {
 		throw new Error(`[verifyPreBaseDesktopPackage] Product metadata not found at ${productPath}`);
@@ -77,6 +77,14 @@ export function verifyPreBaseDesktopPackage(appBase: string, copilotEnabled: boo
 	const magnusExtensionJs = path.join(appBase, 'extensions', 'prebase-magnus', 'out', 'extension.js');
 	if (!fs.existsSync(magnusExtensionJs) || fs.statSync(magnusExtensionJs).size === 0) {
 		throw new Error(`[verifyPreBaseDesktopPackage] PreBase Magnus compiled entrypoint missing or empty at ${magnusExtensionJs}`);
+	}
+
+	const isDarwin = platform === 'darwin' || (platform === undefined && process.platform === 'darwin');
+	if (isDarwin) {
+		const liveActivityNode = path.join(appBase, 'native', 'prebase-live-activity', 'build', 'Release', 'prebase_live_activity.node');
+		if (!fs.existsSync(liveActivityNode) || fs.statSync(liveActivityNode).size === 0) {
+			throw new Error(`[verifyPreBaseDesktopPackage] Darwin native Live Activity addon missing or empty at ${liveActivityNode}`);
+		}
 	}
 
 	const bundledRootEnv = path.join(appBase, '.env');

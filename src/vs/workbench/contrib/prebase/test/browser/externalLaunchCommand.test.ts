@@ -1,12 +1,16 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { resolveExternalLaunchCommand, withElectronCdpLaunchArgs } from '../../../../../platform/prebaseDesktop/common/externalLaunchResolver.js';
 import { buildElectronExternalLaunchRequest, buildPackageScriptExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../../common/runtime/externalLaunchCommand.js';
 
 suite('externalLaunchCommand', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('builds strict package-manager argv without introducing shell parsing', () => {
 		assert.deepStrictEqual(
 			(['npm', 'pnpm', 'yarn', 'bun'] as const).map(packageManager => buildPackageScriptExternalLaunchRequest(packageManager, 'electron:dev')),

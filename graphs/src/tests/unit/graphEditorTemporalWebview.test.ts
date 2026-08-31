@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'node:assert/strict';
@@ -14,8 +13,8 @@ type Listener = (event: any) => void;
 
 class FakeClassList {
 	private readonly values = new Set<string>();
-	add(...names: string[]): void { for (const n of names) this.values.add(n); }
-	remove(...names: string[]): void { for (const n of names) this.values.delete(n); }
+	add(...names: string[]): void { for (const n of names) {this.values.add(n);} }
+	remove(...names: string[]): void { for (const n of names) {this.values.delete(n);} }
 	contains(name: string): boolean { return this.values.has(name); }
 }
 
@@ -74,7 +73,7 @@ class FakeElement {
 	}
 	appendChild(child: FakeElement): FakeElement {
 		this.children.push(child);
-		if (!this.firstChild) this.firstChild = child;
+		if (!this.firstChild) {this.firstChild = child;}
 		return child;
 	}
 	removeChild(child: FakeElement): FakeElement {

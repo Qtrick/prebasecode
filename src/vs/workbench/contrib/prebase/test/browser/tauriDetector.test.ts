@@ -1,7 +1,9 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { existsSync, readFileSync, statSync } from 'fs';
 import { dirname, join } from 'path';
@@ -31,6 +33,8 @@ function probe(overrides: {
 }
 
 suite('tauriDetector', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('high confidence requires Tauri config and Cargo tauri crate', () => {
 		const profile = detectTauriProject(probe({
 			files: {
@@ -364,6 +368,8 @@ suite('tauriDetector', () => {
 });
 
 suite('desktopDetector', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('keeps Electron detection unchanged for a typical electron-vite app', () => {
 		const electron = detectElectronProject(probe({
 			packageJson: {
@@ -468,6 +474,8 @@ function fsProbe(appRoot: string): ProjectProbe {
 }
 
 suite('desktopFixtures', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('detects the committed Electron and Tauri fixtures with discriminated profiles', () => {
 		const root = findRepoRoot();
 		const electron = detectElectronProject(fsProbe(join(root, 'test/prebase/fixtures/desktop-electron')));

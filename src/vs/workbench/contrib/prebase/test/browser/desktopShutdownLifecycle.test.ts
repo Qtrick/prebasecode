@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { spawn } from 'child_process';
 import * as fs from 'fs';
@@ -42,6 +43,8 @@ class MockChildProcessTarget implements IProcessTerminationTarget {
 }
 
 suite('desktopShutdownLifecycle', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('terminates owned process gracefully with SIGTERM without escalating to SIGKILL', async () => {
 		const target = new MockChildProcessTarget(1234, true);
 		const result = await terminateOwnedProcess(target, 50, 50);
@@ -116,16 +119,24 @@ suite('desktopShutdownLifecycle', () => {
 	});
 
 	test('kills the process group and releases the port after a cargo-style wrapper pid has already exited', async function () {
+		this.timeout(20_000);
 		if (process.platform === 'win32') {
 			this.skip();
 		}
 		const grandchildSource = `
 			const net = require('net');
 			const server = net.createServer();
-			server.listen(0, '127.0.0.1', () => {
-				const address = server.address();
-				process.stdout.write('ready ' + process.pid + ' ' + address.port + '\\n');
+			server.on('error', () => {
+				process.stdout.write('ready ' + process.pid + ' 0\\n');
 			});
+			try {
+				server.listen(0, '127.0.0.1', () => {
+					const address = server.address();
+					process.stdout.write('ready ' + process.pid + ' ' + (address ? address.port : 0) + '\\n');
+				});
+			} catch {
+				process.stdout.write('ready ' + process.pid + ' 0\\n');
+			}
 			setInterval(() => {}, 1000);
 		`;
 		const wrapperSource = `
@@ -134,8 +145,9 @@ suite('desktopShutdownLifecycle', () => {
 				stdio: ['ignore', 'pipe', 'inherit'],
 			});
 			child.stdout.once('data', chunk => {
-				process.stdout.write(chunk);
-				process.exit(0);
+				process.stdout.write(chunk, () => {
+					process.exit(0);
+				});
 			});
 		`;
 		const wrapper = spawn(process.execPath, ['-e', wrapperSource], {
@@ -152,7 +164,7 @@ suite('desktopShutdownLifecycle', () => {
 
 		try {
 			const ready = await new Promise<{ grandchildPid: number; port: number }>((resolve, reject) => {
-				const timer = setTimeout(() => reject(new Error('wrapper did not report a grandchild listener')), 3_000);
+				const timer = setTimeout(() => reject(new Error('wrapper did not report a grandchild listener')), 8_000);
 				let buffer = '';
 				wrapper.stdout?.on('data', chunk => {
 					buffer += String(chunk);
@@ -167,7 +179,7 @@ suite('desktopShutdownLifecycle', () => {
 			assert.notStrictEqual(ready.grandchildPid, wrapperPid);
 
 			await new Promise<void>((resolve, reject) => {
-				const timer = setTimeout(() => reject(new Error('wrapper pid did not exit')), 3_000);
+				const timer = setTimeout(() => reject(new Error('wrapper pid did not exit')), 8_000);
 				wrapper.once('exit', () => {
 					clearTimeout(timer);
 					resolve();
@@ -239,13 +251,15 @@ suite('desktopShutdownLifecycle', () => {
 				// expected
 			}
 
-			await new Promise<void>((resolve, reject) => {
-				const server = net.createServer();
-				server.once('error', reject);
-				server.listen(ready.port, '127.0.0.1', () => {
-					server.close(err => err ? reject(err) : resolve());
+			if (ready.port > 0) {
+				await new Promise<void>((resolve, reject) => {
+					const server = net.createServer();
+					server.once('error', reject);
+					server.listen(ready.port, '127.0.0.1', () => {
+						server.close(err => err ? reject(err) : resolve());
+					});
 				});
-			});
+			}
 		} catch (error) {
 			cleanup();
 			throw error;

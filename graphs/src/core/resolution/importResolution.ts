@@ -2,16 +2,16 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import type { ParseResult } from '../../common/types/graphTypes.js'
-import { basename, extname, fileStem, joinPath, normalizePath, nodeIdForPath, resolveRelative } from './paths.js'
+import type { ParseResult } from '../../common/types/graphTypes.js';
+import { basename, extname, fileStem, joinPath, normalizePath, nodeIdForPath, resolveRelative } from './paths.js';
 
-export type PathMappings = Record<string, string[]>
+export type PathMappings = Record<string, string[]>;
 
 export interface ImportResolutionContext {
-	pathIndex: Map<string, string>
-	javaFqnIndex: Map<string, string>
-	simpleNameIndex: Map<string, string[]>
-	goModulePath: string | null
+	pathIndex: Map<string, string>;
+	javaFqnIndex: Map<string, string>;
+	simpleNameIndex: Map<string, string[]>;
+	goModulePath: string | null;
 }
 
 const RESOLVE_EXTENSIONS = [
@@ -41,36 +41,36 @@ const RESOLVE_EXTENSIONS = [
 	'.scala',
 	'.vue',
 	'.svelte'
-]
+];
 
 function tryResolveAgainstIndex(base: string, ctx: ImportResolutionContext): string | null {
-	let normalized = normalizePath(base)
+	let normalized = normalizePath(base);
 	if (normalized.startsWith('./')) {
-		normalized = normalized.slice(2)
+		normalized = normalized.slice(2);
 	}
 	if (ctx.pathIndex.has(normalized)) {
-		return normalized
+		return normalized;
 	}
 	for (let i = 1; i < RESOLVE_EXTENSIONS.length; i++) {
-		const file = normalized + RESOLVE_EXTENSIONS[i]
+		const file = normalized + RESOLVE_EXTENSIONS[i];
 		if (ctx.pathIndex.has(file)) {
-			return file
+			return file;
 		}
 	}
-	const indexPrefix = normalized ? normalized + '/' : ''
+	const indexPrefix = normalized ? normalized + '/' : '';
 	for (const ext of RESOLVE_EXTENSIONS) {
-		const indexPath = indexPrefix + 'index' + ext
+		const indexPath = indexPrefix + 'index' + ext;
 		if (ctx.pathIndex.has(indexPath)) {
-			return indexPath
+			return indexPath;
 		}
 	}
 	for (const ext of RESOLVE_EXTENSIONS) {
-		const initPath = indexPrefix + '__init__' + ext
+		const initPath = indexPrefix + '__init__' + ext;
 		if (ctx.pathIndex.has(initPath)) {
-			return initPath
+			return initPath;
 		}
 	}
-	return null
+	return null;
 }
 
 export function buildImportResolutionContext(
@@ -78,102 +78,102 @@ export function buildImportResolutionContext(
 	results: ParseResult[],
 	goModulePath: string | null = null
 ): ImportResolutionContext {
-	const pathIndex = new Map<string, string>()
-	const javaFqnIndex = new Map<string, string>()
-	const simpleNameIndex = new Map<string, string[]>()
+	const pathIndex = new Map<string, string>();
+	const javaFqnIndex = new Map<string, string>();
+	const simpleNameIndex = new Map<string, string[]>();
 
 	for (const result of results) {
-		const normalized = normalizePath(result.relativePath)
-		pathIndex.set(normalized, nodeIdForPath(normalized))
-		const base = basename(normalized)
+		const normalized = normalizePath(result.relativePath);
+		pathIndex.set(normalized, nodeIdForPath(normalized));
+		const base = basename(normalized);
 		if (!pathIndex.has(base)) {
-			pathIndex.set(base, nodeIdForPath(normalized))
+			pathIndex.set(base, nodeIdForPath(normalized));
 		}
 
-		const ext = extname(normalized)
-		const stem = fileStem(base)
-		let existing = simpleNameIndex.get(stem)
+		const ext = extname(normalized);
+		const stem = fileStem(base);
+		const existing = simpleNameIndex.get(stem);
 		if (!existing) {
-			simpleNameIndex.set(stem, [normalized])
+			simpleNameIndex.set(stem, [normalized]);
 		} else if (!existing.includes(normalized)) {
-			existing.push(normalized)
+			existing.push(normalized);
 		}
 
 		if ((ext === '.java' || ext === '.kt' || ext === '.kts') && result.packageName) {
-			javaFqnIndex.set(`${result.packageName}.${stem}`, normalized)
-			const pathSuffix = `${result.packageName.replace(/\./g, '/')}/${stem}`
-			javaFqnIndex.set(pathSuffix, normalized)
+			javaFqnIndex.set(`${result.packageName}.${stem}`, normalized);
+			const pathSuffix = `${result.packageName.replace(/\./g, '/')}/${stem}`;
+			javaFqnIndex.set(pathSuffix, normalized);
 		}
 
 		if (ext === '.java' || ext === '.kt' || ext === '.kts') {
 			for (const prefix of ['src/main/java/', 'src/main/kotlin/', 'src/']) {
 				if (!normalized.startsWith(prefix)) {
-					continue
+					continue;
 				}
-				const suffix = normalized.slice(prefix.length).replace(/\.(java|kt|kts)$/, '')
-				javaFqnIndex.set(suffix.replace(/\//g, '.'), normalized)
-				javaFqnIndex.set(suffix, normalized)
+				const suffix = normalized.slice(prefix.length).replace(/\.(java|kt|kts)$/, '');
+				javaFqnIndex.set(suffix.replace(/\//g, '.'), normalized);
+				javaFqnIndex.set(suffix, normalized);
 			}
 		}
 	}
 
-	return { pathIndex, javaFqnIndex, simpleNameIndex, goModulePath }
+	return { pathIndex, javaFqnIndex, simpleNameIndex, goModulePath };
 }
 
 function tryResolveJavaImport(importSource: string, ctx: ImportResolutionContext): string | null {
-	const fromIndex = ctx.javaFqnIndex.get(importSource)
+	const fromIndex = ctx.javaFqnIndex.get(importSource);
 	if (fromIndex) {
-		return fromIndex
+		return fromIndex;
 	}
-	const pathLike = importSource.replace(/\./g, '/')
+	const pathLike = importSource.replace(/\./g, '/');
 	for (const prefix of ['src/main/java', 'src/main/kotlin', 'src', 'app/src/main/java', '']) {
-		const base = prefix ? joinPath(prefix, pathLike) : pathLike
-		const resolved = tryResolveAgainstIndex(base, ctx)
+		const base = prefix ? joinPath(prefix, pathLike) : pathLike;
+		const resolved = tryResolveAgainstIndex(base, ctx);
 		if (resolved) {
-			return resolved
+			return resolved;
 		}
 	}
-	return uniqueIndexedPath(ctx, importSource.split('.').pop(), (p) => /\.(java|kt|kts)$/.test(p))
+	return uniqueIndexedPath(ctx, importSource.split('.').pop(), (p) => /\.(java|kt|kts)$/.test(p));
 }
 
 function tryResolvePythonImport(fromFile: string, importSource: string, ctx: ImportResolutionContext): string | null {
-	const modulePath = importSource.replace(/\./g, '/')
-	const fromDir = fromFile.replace(/\/[^/]+$/, '')
+	const modulePath = importSource.replace(/\./g, '/');
+	const fromDir = fromFile.replace(/\/[^/]+$/, '');
 
 	if (importSource.startsWith('.')) {
-		const relative = importSource.replace(/^\.+/, '').replace(/\./g, '/')
-		const base = relative ? resolveRelative(fromDir, relative) : fromDir
-		const resolved = tryResolveAgainstIndex(base, ctx)
+		const relative = importSource.replace(/^\.+/, '').replace(/\./g, '/');
+		const base = relative ? resolveRelative(fromDir, relative) : fromDir;
+		const resolved = tryResolveAgainstIndex(base, ctx);
 		if (resolved) {
-			return resolved
+			return resolved;
 		}
 	}
 
-	const relative = tryResolveAgainstIndex(resolveRelative(fromDir, modulePath), ctx)
+	const relative = tryResolveAgainstIndex(resolveRelative(fromDir, modulePath), ctx);
 	if (relative) {
-		return relative
+		return relative;
 	}
 
 	for (const root of ['', 'src', 'app']) {
-		const base = root ? joinPath(root, modulePath) : modulePath
-		const resolved = tryResolveAgainstIndex(base, ctx)
+		const base = root ? joinPath(root, modulePath) : modulePath;
+		const resolved = tryResolveAgainstIndex(base, ctx);
 		if (resolved) {
-			return resolved
+			return resolved;
 		}
 	}
 
-	return uniqueIndexedPath(ctx, importSource.split('.').pop(), (p) => p.endsWith('.py'))
+	return uniqueIndexedPath(ctx, importSource.split('.').pop(), (p) => p.endsWith('.py'));
 }
 
 function tryResolveGoImport(importSource: string, ctx: ImportResolutionContext): string | null {
-	let pathPart = importSource
+	let pathPart = importSource;
 	if (ctx.goModulePath && importSource.startsWith(ctx.goModulePath)) {
-		pathPart = importSource.slice(ctx.goModulePath.length).replace(/^\//, '')
+		pathPart = importSource.slice(ctx.goModulePath.length).replace(/^\//, '');
 	}
 	if (pathPart.startsWith('.')) {
-		return null
+		return null;
 	}
-	return tryResolveAgainstIndex(pathPart, ctx)
+	return tryResolveAgainstIndex(pathPart, ctx);
 }
 
 function uniqueIndexedPath(
@@ -182,52 +182,52 @@ function uniqueIndexedPath(
 	ok: (path: string) => boolean
 ): string | null {
 	if (!stem) {
-		return null
+		return null;
 	}
-	const paths = ctx.simpleNameIndex.get(stem)
+	const paths = ctx.simpleNameIndex.get(stem);
 	if (!paths) {
-		return null
+		return null;
 	}
-	let hit: string | null = null
+	let hit: string | null = null;
 	for (const path of paths) {
 		if (!ok(path)) {
-			continue
+			continue;
 		}
 		if (hit) {
-			return null
+			return null;
 		}
-		hit = path
+		hit = path;
 	}
-	return hit
+	return hit;
 }
 
 function importTailStem(source: string): string {
-	const base = basename(source)
-	const ext = extname(base)
+	const base = basename(source);
+	const ext = extname(base);
 	if (ext && RESOLVE_EXTENSIONS.includes(ext)) {
-		return fileStem(base)
+		return fileStem(base);
 	}
-	const lastDot = base.lastIndexOf('.')
-	return lastDot > 0 ? base.slice(lastDot + 1) : base
+	const lastDot = base.lastIndexOf('.');
+	return lastDot > 0 ? base.slice(lastDot + 1) : base;
 }
 
 function fuzzyResolveImport(fromFile: string, importSource: string, ctx: ImportResolutionContext): string | null {
-	const source = importSource.split('?')[0].trim()
+	const source = importSource.split('?')[0].trim();
 	if (!source) {
-		return null
+		return null;
 	}
 
 	if (source.startsWith('.')) {
-		const fromDir = fromFile.replace(/\/[^/]+$/, '')
-		const joined = resolveRelative(fromDir, source.replace(/^\.\//, ''))
-		const hit = tryResolveAgainstIndex(joined, ctx)
+		const fromDir = fromFile.replace(/\/[^/]+$/, '');
+		const joined = resolveRelative(fromDir, source.replace(/^\.\//, ''));
+		const hit = tryResolveAgainstIndex(joined, ctx);
 		if (hit) {
-			return hit
+			return hit;
 		}
 	}
 
 	// ponytail: O(1) stem index replaces the old O(n) pathIndex scan; still require a unique hit
-	return uniqueIndexedPath(ctx, importTailStem(source), () => true)
+	return uniqueIndexedPath(ctx, importTailStem(source), () => true);
 }
 
 export function resolveImportWithContext(
@@ -237,73 +237,73 @@ export function resolveImportWithContext(
 	pathMappings: PathMappings,
 	ctx: ImportResolutionContext
 ): string | null {
-	const source = importSource.split('?')[0].trim()
+	const source = importSource.split('?')[0].trim();
 	if (!source) {
-		return null
+		return null;
 	}
 
-	const ext = extname(fromFile)
-	const fromDir = fromFile.replace(/\/[^/]+$/, '')
+	const ext = extname(fromFile);
+	const fromDir = fromFile.replace(/\/[^/]+$/, '');
 
 	if (source.startsWith('.')) {
-		const hit = tryResolveAgainstIndex(resolveRelative(fromDir, source), ctx)
+		const hit = tryResolveAgainstIndex(resolveRelative(fromDir, source), ctx);
 		if (hit) {
-			return hit
+			return hit;
 		}
 	}
 
 	if (ext === '.java' || ext === '.kt' || ext === '.kts') {
-		const java = tryResolveJavaImport(source, ctx)
+		const java = tryResolveJavaImport(source, ctx);
 		if (java) {
-			return java
+			return java;
 		}
 	}
 
 	if (ext === '.py') {
-		const py = tryResolvePythonImport(fromFile, source, ctx)
+		const py = tryResolvePythonImport(fromFile, source, ctx);
 		if (py) {
-			return py
+			return py;
 		}
 	}
 
 	if (ext === '.go') {
-		const go = tryResolveGoImport(source, ctx)
+		const go = tryResolveGoImport(source, ctx);
 		if (go) {
-			return go
+			return go;
 		}
 	}
 
 	if (/^[a-zA-Z_][\w.]*$/.test(source) && source.includes('.') && !source.startsWith('@')) {
-		const java = tryResolveJavaImport(source, ctx)
+		const java = tryResolveJavaImport(source, ctx);
 		if (java) {
-			return java
+			return java;
 		}
 	}
 
 	for (const [pattern, targets] of Object.entries(pathMappings)) {
 		if (!source.startsWith(pattern)) {
-			continue
+			continue;
 		}
-		const rest = source.slice(pattern.length)
+		const rest = source.slice(pattern.length);
 		for (const targetRoot of targets) {
-			const root = normalizePath(targetRoot)
+			const root = normalizePath(targetRoot);
 			// Prefer project-relative roots; fall back to last path segments of absolute roots.
 			const relativeRoot = root.includes('/') && !root.startsWith('/') && !/^[A-Za-z]:/.test(root)
 				? root
-				: root.split('/').slice(-2).join('/')
-			const resolved = tryResolveAgainstIndex(joinPath(relativeRoot, rest), ctx)
+				: root.split('/').slice(-2).join('/');
+			const resolved = tryResolveAgainstIndex(joinPath(relativeRoot, rest), ctx);
 			if (resolved) {
-				return resolved
+				return resolved;
 			}
 		}
 	}
 
 	if (source.includes('/')) {
-		const resolved = tryResolveAgainstIndex(source.replace(/^\//, ''), ctx)
+		const resolved = tryResolveAgainstIndex(source.replace(/^\//, ''), ctx);
 		if (resolved) {
-			return resolved
+			return resolved;
 		}
 	}
 
-	return fuzzyResolveImport(fromFile, source, ctx)
+	return fuzzyResolveImport(fromFile, source, ctx);
 }

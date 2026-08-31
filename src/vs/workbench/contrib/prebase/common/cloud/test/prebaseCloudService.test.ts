@@ -1,7 +1,9 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { CancellationToken } from '../../../../../../base/common/cancellation.js';
 import { Event } from '../../../../../../base/common/event.js';
@@ -14,6 +16,8 @@ import { PreBaseCloudService } from '../../../browser/cloud/prebaseCloudService.
 import type { PreBaseSupabaseAuthClient } from '../../../browser/cloud/prebaseSupabaseAuthClient.js';
 
 suite('PreBaseCloudService session concurrency', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('a failed stale refresh cannot clear a replacement sign-in session', async () => {
 		const secrets = new Map<string, string>();
 		const secretStorage = Object.assign(Object.create(null), {

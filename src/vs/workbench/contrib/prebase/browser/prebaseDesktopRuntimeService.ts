@@ -18,14 +18,13 @@ import { IRequestService } from '../../../../platform/request/common/request.js'
 import { IWorkspaceContextService } from '../../../../platform/workspace/common/workspace.js';
 import { PREBASE_DESKTOP_CHANNEL_NAME, type IPreBaseDesktopMainService } from '../../../../platform/prebaseDesktop/common/prebaseDesktop.js';
 import { PreBaseConfigKeys } from '../common/prebaseConfiguration.js';
-import type { CdpTarget, DesktopFramework, DesktopLaunchMode, DesktopProjectProfile, ExternalLaunchRequest, PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
-import { desktopUiModeFromLaunch, isElectronProfile, isRecognizedDesktopApp, isTauriProfile } from '../common/runtime/desktopTypes.js';
+import { desktopUiModeFromLaunch, isElectronProfile, isRecognizedDesktopApp, isTauriProfile, type CdpTarget, type DesktopFramework, type DesktopLaunchMode, type DesktopProjectProfile, type ExternalLaunchRequest, type PreBaseDesktopSession } from '../common/runtime/desktopTypes.js';
 import { detectDesktopProjects, selectDesktopProfile } from '../common/runtime/desktopDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
 import { buildElectronExternalLaunchRequest, buildPackageScriptExternalLaunchRequest, buildTauriExternalLaunchRequest, tauriLaunchCwd } from '../common/runtime/externalLaunchCommand.js';
 import { assertDesktop, formatDesktopFailure, interactDesktop, runDesktopDomCommand, type DesktopEvaluateFn } from '../common/runtime/desktopAutomationHost.js';
 import { webDriverKeyActions, webDriverPointerClickActions, type DesktopNativeInputBackend } from '../common/runtime/desktopNativeInput.js';
-import { DEFAULT_ELECTRON_STARTUP_TIMEOUT_MS, DEFAULT_TAURI_STARTUP_TIMEOUT_MS, describeLocator, parseDesktopLocator, redactSecretText, validatePressKey, type DesktopAssertCondition, type DesktopInteractAction } from '../common/runtime/desktopLocators.js';
+import { DEFAULT_ELECTRON_STARTUP_TIMEOUT_MS, DEFAULT_TAURI_STARTUP_TIMEOUT_MS, describeLocator, parseDesktopLocator, redactSecretText, validatePressKey, type DesktopAssertCondition, type DesktopInteractAction, type DesktopLocator } from '../common/runtime/desktopLocators.js';
 import { createDesktopTestRun, recordDesktopTestStep, summarizeDesktopTestRun, type DesktopTestRun } from '../common/runtime/desktopTestModel.js';
 import { DesktopWebDriverClient, webDriverBaseUrl } from '../common/runtime/desktopWebDriver.js';
 import { IWorkspaceTrustManagementService } from '../../../../platform/workspace/common/workspaceTrust.js';
@@ -625,9 +624,10 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 			return { ok: false, reason: 'This desktop session has no automation backend. Start a test session in Renderer mode, or Enable PreBase Tauri Testing for full-app automation.' };
 		}
 		const locator = parseDesktopLocator(input.locator);
-		if ('error' in locator) {
-			return { ok: false, reason: locator.error };
+		if (typeof (locator as { error?: string }).error === 'string') {
+			return { ok: false, reason: (locator as { error: string }).error };
 		}
+		const validLocator = locator as DesktopLocator;
 		if (input.action === 'press') {
 			const keyError = validatePressKey(String(input.value ?? ''));
 			if (keyError) {
@@ -637,14 +637,14 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		const started = Date.now();
 		try {
 			this._updateSession({ state: session.purpose === 'test' ? 'testing' : session.state });
-			const result = await interactDesktop(this._pageEvaluate(session), input.action, locator, input.value, input.timeoutMs, this._linkedActionToken(token), this._nativeInput(session));
+			const result = await interactDesktop(this._pageEvaluate(session), input.action, validLocator, input.value, input.timeoutMs, this._linkedActionToken(token), this._nativeInput(session));
 			const duration = Date.now() - started;
-			const failure = result.ok ? undefined : formatDesktopFailure(result, locator);
-			this._recordStep({ kind: 'interact', action: input.action, locator, resolvedTarget: input.value, startedAt: started, durationMs: duration, ok: result.ok, failure });
+			const failure = result.ok ? undefined : formatDesktopFailure(result, validLocator);
+			this._recordStep({ kind: 'interact', action: input.action, locator: validLocator, resolvedTarget: input.value, startedAt: started, durationMs: duration, ok: result.ok, failure });
 			if (!result.ok) {
-				return { ok: false, action: input.action, locator: describeLocator(locator), reason: failure, matchCount: result.count, matches: result.matches, title: result.title, url: result.url, console: result.console, duration, framework: session.profile.framework, backend: session.automationBackend };
+				return { ok: false, action: input.action, locator: describeLocator(validLocator), reason: failure, matchCount: result.count, matches: result.matches, title: result.title, url: result.url, console: result.console, duration, framework: session.profile.framework, backend: session.automationBackend };
 			}
-			return { ok: true, action: input.action, locator: describeLocator(locator), match: result.match, title: result.title, url: result.url, duration, framework: session.profile.framework, backend: session.automationBackend };
+			return { ok: true, action: input.action, locator: describeLocator(validLocator), match: result.match, title: result.title, url: result.url, duration, framework: session.profile.framework, backend: session.automationBackend };
 		} catch (err) {
 			return { ok: false, reason: err instanceof Error ? err.message : String(err) };
 		}
@@ -661,14 +661,15 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 		if (session.automationBackend === 'none') {
 			return { ok: false, reason: 'This desktop session has no automation backend. Start a test session in Renderer mode, or Enable PreBase Tauri Testing for full-app automation.' };
 		}
-		const locator = input.locator ? parseDesktopLocator(input.locator) : undefined;
-		if (locator && 'error' in locator) {
-			return { ok: false, reason: locator.error };
+		const parsedLocator = input.locator ? parseDesktopLocator(input.locator) : undefined;
+		if (parsedLocator && typeof (parsedLocator as { error?: string }).error === 'string') {
+			return { ok: false, reason: (parsedLocator as { error: string }).error };
 		}
+		const validLocator = parsedLocator as DesktopLocator | undefined;
 		const started = Date.now();
 		try {
-			const asserted = await assertDesktop(this._pageEvaluate(session), input.condition, locator && !('error' in locator) ? locator : undefined, input.expected, input.timeoutMs, this._linkedActionToken(token));
-			this._recordStep({ kind: 'assert', action: input.condition, locator: locator && !('error' in locator) ? locator : undefined, startedAt: started, durationMs: asserted.duration, ok: asserted.ok, failure: asserted.ok ? undefined : formatDesktopFailure(asserted.result, locator && !('error' in locator) ? locator : undefined) });
+			const asserted = await assertDesktop(this._pageEvaluate(session), input.condition, validLocator, input.expected, input.timeoutMs, this._linkedActionToken(token));
+			this._recordStep({ kind: 'assert', action: input.condition, locator: validLocator, startedAt: started, durationMs: asserted.duration, ok: asserted.ok, failure: asserted.ok ? undefined : formatDesktopFailure(asserted.result, validLocator) });
 			if (!asserted.ok) {
 				const console = asserted.result.console?.map(entry => ({ ...entry, text: redactSecretText(entry.text) }));
 				return { ok: false, condition: input.condition, actual: asserted.actual, expected: asserted.expected, duration: asserted.duration, console, framework: session.profile.framework, backend: session.automationBackend, title: asserted.result.title, url: asserted.result.url };

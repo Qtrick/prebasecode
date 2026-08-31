@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'assert';
@@ -168,9 +169,9 @@ suite('webContextCore routing and budget', () => {
 			excerpt: 'UNTRUSTED_WEB_DATA:\nbody',
 			contentTruncated: true,
 		});
-		assert.equal('operations' in payload, false);
-		assert.equal('discoveredBy' in payload.sources[0], false);
-		assert.equal('enrichment' in payload, false);
+		assert.equal((payload as { operations?: unknown }).operations, undefined);
+		assert.equal((payload.sources[0] as { discoveredBy?: unknown }).discoveredBy, undefined);
+		assert.equal((payload as { enrichment?: unknown }).enrichment, undefined);
 		assert.equal(payload.warning, UNTRUSTED_WEB_WARNING);
 	});
 });

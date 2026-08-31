@@ -2,17 +2,17 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import type { ParseResult, ScannedFile } from '../../common/types/graphTypes.js'
+import type { ParseResult, ScannedFile } from '../../common/types/graphTypes.js';
 
 export type NativeParseBatchHook = (
 	projectRoot: string,
 	files: ScannedFile[]
-) => Promise<ParseResult[] | null>
+) => Promise<ParseResult[] | null>;
 
-let nativeParseHook: NativeParseBatchHook | null = null
+let nativeParseHook: NativeParseBatchHook | null = null;
 
 export function setNativeParseBatchHook(hook: NativeParseBatchHook | null): void {
-	nativeParseHook = hook
+	nativeParseHook = hook;
 }
 
 export async function runNativeParseBatch(
@@ -20,12 +20,12 @@ export async function runNativeParseBatch(
 	files: ScannedFile[]
 ): Promise<ParseResult[] | null> {
 	if (!nativeParseHook) {
-		return null
+		return null;
 	}
 	try {
-		return await nativeParseHook(projectRoot, files)
+		return await nativeParseHook(projectRoot, files);
 	} catch (err) {
-		console.warn('[ParseHooks] Native parse batch failed:', err)
-		return null
+		console.warn('[ParseHooks] Native parse batch failed:', err);
+		return null;
 	}
 }

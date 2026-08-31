@@ -127,18 +127,33 @@ export async function invokeLanguageModelTool(page, toolId, parameters = {}) {
 	return workbenchCommand(page, 'prebase.test.invokeLanguageModelTool', toolId, parameters);
 }
 
-export function classifyProcessRole(comm = '') {
-	const value = String(comm).toLowerCase();
-	if (/gpu/i.test(value)) return 'gpu';
-	if (/(^|[\\/])git([\\/\s.-]|$)/i.test(value)) return 'git';
-	if (/extensionhost|extension-host|exthost/i.test(value)) return 'extensionHost';
-	if (/parser|canonical/i.test(value)) return 'parser';
-	if (/utility/i.test(value)) return 'utility';
-	if (/network service|networkservice/i.test(value)) return 'networkService';
-	if (/renderer|helper \(renderer\)/i.test(value)) return 'renderer';
-	if (/electron|code helper|prebase/i.test(value) && /helper/.test(value)) return 'helper';
-	if (/electron|prebase|code helper|code - oss/i.test(value)) return 'main';
-	if (/cargo|tauri/i.test(value)) return 'tauriChild';
+const SECRET_ARG_PATTERN = /\b(authorization|token|key|secret|password|bearer)=([^\s]+)/gi;
+
+export function redactCommandLine(command = '') {
+	return String(command)
+		.replace(SECRET_ARG_PATTERN, '$1=[redacted]')
+		.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[redacted]')
+		.replace(/\bAIza[A-Za-z0-9_-]{10,}\b/g, '[redacted]');
+}
+
+export function classifyProcessRole(comm = '', command = '') {
+	const text = `${comm} ${command}`.toLowerCase();
+	if (/--type=gpu-process|type=gpu-process|\bgpu\b/i.test(text)) return 'gpu';
+	if (/--type=renderer|type=renderer|helper \(renderer\)/i.test(text)) return 'renderer';
+	if (/--utility-sub-type=network|network\s*service|networkservice/i.test(text)) return 'networkService';
+	if (/--type=utility|type=utility/i.test(text)) {
+		if (/extensionhost|extension-host/i.test(text)) return 'extensionHost';
+		if (/tsserver/i.test(text)) return 'tsserver';
+		return 'utility';
+	}
+	if (/extensionhost|extension-host|exthost/i.test(text)) return 'extensionHost';
+	if (/tsserver|typescript.*tsserver/i.test(text)) return 'tsserver';
+	if (/ptyhost|pty-host|conpty/i.test(text)) return 'ptyHost';
+	if (/(^|[\\/])git([\\/\s.-]|$)/i.test(text)) return 'git';
+	if (/parser|canonical/i.test(text)) return 'parser';
+	if (/cargo|tauri/i.test(text)) return 'tauriChild';
+	if (/code helper|prebase helper/i.test(text) && /helper/.test(text)) return 'helper';
+	if (/electron|prebase|code helper|code - oss/i.test(text)) return 'main';
 	return 'other';
 }
 
@@ -151,8 +166,8 @@ export function summarizeProcessTree(tree, limit = 8) {
 			ppid: row.ppid,
 			cpu: row.cpu,
 			rssMb: Number((row.rssKb / 1024).toFixed(1)),
-			role: classifyProcessRole(row.comm),
-			comm: String(row.comm).slice(0, 80),
+			role: classifyProcessRole(row.comm, row.command),
+			comm: redactCommandLine(String(row.comm ?? '')).slice(0, 80),
 		}));
 }
 
@@ -353,13 +368,15 @@ export async function gracefulWorkbenchQuit(page, pid) {
 
 export function processTree(rootPid) {
 	try {
-		const table = execFileSync('ps', ['-axo', 'pid=,ppid=,pcpu=,rss=,comm='], { encoding: 'utf8' });
+		const table = execFileSync('ps', ['-axo', 'pid=,ppid=,pcpu=,rss=,command='], { encoding: 'utf8' });
 		const rows = table.trim().split('\n').map(line => {
 			const match = line.trim().match(/^(\d+)\s+(\d+)\s+([\d.]+)\s+(\d+)\s+(.*)$/);
 			if (!match) {
 				return undefined;
 			}
-			return { pid: Number(match[1]), ppid: Number(match[2]), cpu: Number(match[3]), rssKb: Number(match[4]), comm: match[5] };
+			const fullCommand = match[5];
+			const comm = fullCommand.split(/\s+/)[0] || '';
+			return { pid: Number(match[1]), ppid: Number(match[2]), cpu: Number(match[3]), rssKb: Number(match[4]), comm, command: fullCommand };
 		}).filter(Boolean);
 		const children = new Map();
 		for (const row of rows) {

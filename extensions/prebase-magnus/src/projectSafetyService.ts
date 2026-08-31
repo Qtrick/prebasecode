@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as path from 'path';
@@ -48,7 +49,7 @@ function getVsCode(): typeof import('vscode') | undefined {
 		return _cachedVsCode;
 	}
 	try {
-		const g = globalThis as any;
+		const g = globalThis as { vscode?: typeof import('vscode') };
 		if (g.vscode) {
 			_cachedVsCode = g.vscode;
 		} else if (typeof require === 'function') {

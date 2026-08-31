@@ -434,7 +434,11 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 				.pipe(rename('bin/code'));
 			const policyDest = gulp.src('.build/policies/darwin/**', { base: '.build/policies/darwin' })
 				.pipe(rename(f => f.dirname = `policies/${f.dirname}`));
-			all = es.merge(all, shortcut, policyDest);
+			const liveActivityAddon = gulp.src([
+				'native/prebase-live-activity/build/Release/prebase_live_activity.node',
+				'native/prebase-live-activity/package.json'
+			], { base: '.', allowEmpty: true });
+			all = es.merge(all, shortcut, policyDest, liveActivityAddon);
 		}
 
 		const electronConfig = {
@@ -640,7 +644,7 @@ function verifyPreBasePackageTask(platform: string, destinationFolderName: strin
 		const appBase = platform === 'darwin'
 			? path.join(outputDir, `${product.nameLong}.app`, 'Contents', 'Resources', 'app')
 			: path.join(outputDir, versionedResourcesFolder, 'resources', 'app');
-		verifyPreBaseDesktopPackage(appBase, builtInCopilotEnabled);
+		verifyPreBaseDesktopPackage(appBase, builtInCopilotEnabled, platform);
 	};
 }
 

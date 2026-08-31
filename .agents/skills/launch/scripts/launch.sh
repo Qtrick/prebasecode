@@ -74,7 +74,17 @@ pick_port() {
 	node -e '
 		const net = require("net");
 		const s = net.createServer();
-		s.listen(0, "127.0.0.1", () => { const p = s.address().port; s.close(() => console.log(p)); });
+		let done = false;
+		s.once("error", () => {
+			if (!done) { done = true; console.log(10000 + Math.floor(Math.random() * 40000)); }
+		});
+		try {
+			s.listen(0, "127.0.0.1", () => {
+				if (!done) { done = true; const p = s.address().port; s.close(() => console.log(p)); }
+			});
+		} catch {
+			if (!done) { done = true; console.log(10000 + Math.floor(Math.random() * 40000)); }
+		}
 	'
 }
 
@@ -85,7 +95,8 @@ AGENTHOST_PORT=$(pick_port)
 
 STAMP=$(date +%Y%m%d-%H%M%S)-$$
 # Keep path short to stay safely under macOS 103-char UNIX socket path limit
-RUN_DIR="/tmp/pb/$STAMP"
+BASE_TMP="${TMPDIR:-/tmp}"
+RUN_DIR="${BASE_TMP%/}/pb/$STAMP"
 DEST_UDD="$RUN_DIR/user-data"
 SHARED_DATA_DIR="$RUN_DIR/shared-data"
 mkdir -p "$DEST_UDD" "$SHARED_DATA_DIR"

@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'node:assert/strict';
@@ -197,7 +196,7 @@ suite('GraphAccessibility (Unit - Real HTML Markup & Keyboard Interaction)', () 
 			elements.set(id, el);
 		}
 
-		let activeElement: any = elements.get('netCanvas');
+		const activeElement: any = elements.get('netCanvas');
 		const documentListeners = new Map<string, Array<(evt: any) => void>>();
 		const windowListeners = new Map<string, Array<(evt: any) => void>>();
 

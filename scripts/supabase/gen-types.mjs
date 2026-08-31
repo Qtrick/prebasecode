@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-/**
- * Regenerate src/.../database.types.ts from local or linked Supabase schema.
- * Skips gracefully when the Supabase CLI is not installed.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import { spawnSync } from 'node:child_process';
 import fs from 'node:fs';
 import path from 'node:path';

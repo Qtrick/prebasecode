@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type { TemporalRenderNode, TemporalRenderEdge } from './temporalViewTypes.js';
@@ -76,7 +75,7 @@ export function computeStronglyConnectedComponents(
 
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
-		if (e.changeKind === 'removed') continue;
+		if (e.changeKind === 'removed') {continue;}
 		const src = e.sourceEntityId || (e as any).sourceId;
 		const tgt = e.targetEntityId || (e as any).targetId;
 		if (src && tgt && nodeMap.has(src) && nodeMap.has(tgt) && src !== tgt) {
@@ -122,7 +121,7 @@ export function computeStronglyConnectedComponents(
 				const w = stack.pop()!;
 				onStack.delete(w);
 				sccMembers.push(w);
-				if (w === v) break;
+				if (w === v) {break;}
 			}
 			sccMembers.sort();
 			rawSccs.push(sccMembers);
@@ -190,10 +189,10 @@ export function condenseToDag(
 
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
-		if (e.changeKind === 'removed') continue;
+		if (e.changeKind === 'removed') {continue;}
 		const src = e.sourceEntityId || (e as any).sourceId;
 		const tgt = e.targetEntityId || (e as any).targetId;
-		if (!src || !tgt) continue;
+		if (!src || !tgt) {continue;}
 
 		const srcScc = nodeToSccId.get(src);
 		const tgtScc = nodeToSccId.get(tgt);
@@ -268,13 +267,13 @@ export function computeTopologicalDepths(
 		// Soft layer compensation for unranked or isolated nodes
 		if (d === 0) {
 			const layer = getNodeArchitectureLayer(n);
-			if (layer === 'entry') d = 0;
-			else if (layer === 'frontend' || layer === 'ui' || layer === 'components') d = 1;
-			else if (layer === 'api') d = 2;
-			else if (layer === 'services' || layer === 'backend') d = 3;
-			else if (layer === 'database') d = 4;
-			else if (layer === 'utils' || layer === 'config') d = 5;
-			else if (layer === 'tests') d = 6;
+			if (layer === 'entry') {d = 0;}
+			else if (layer === 'frontend' || layer === 'ui' || layer === 'components') {d = 1;}
+			else if (layer === 'api') {d = 2;}
+			else if (layer === 'services' || layer === 'backend') {d = 3;}
+			else if (layer === 'database') {d = 4;}
+			else if (layer === 'utils' || layer === 'config') {d = 5;}
+			else if (layer === 'tests') {d = 6;}
 		}
 
 		nodeDepths.set(n.entityId, d);
@@ -309,11 +308,11 @@ export function computeAdaptiveCommunities(
 	}
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
-		if (e.changeKind === 'removed') continue;
+		if (e.changeKind === 'removed') {continue;}
 		const src = e.sourceEntityId || (e as any).sourceId;
 		const tgt = e.targetEntityId || (e as any).targetId;
-		if (src && degreeByNode.has(src)) degreeByNode.set(src, degreeByNode.get(src)! + 1);
-		if (tgt && degreeByNode.has(tgt)) degreeByNode.set(tgt, degreeByNode.get(tgt)! + 1);
+		if (src && degreeByNode.has(src)) {degreeByNode.set(src, degreeByNode.get(src)! + 1);}
+		if (tgt && degreeByNode.has(tgt)) {degreeByNode.set(tgt, degreeByNode.get(tgt)! + 1);}
 	}
 
 	// 1. Initial adaptive prefix clustering based on directory depth and node count
@@ -336,11 +335,11 @@ export function computeAdaptiveCommunities(
 
 	// Helper to extract adaptive path prefix
 	function getAdaptivePrefix(path: string): string {
-		if (!path) return 'root';
+		if (!path) {return 'root';}
 		const parts = path.replace(/\\/g, '/').split('/').filter(Boolean);
-		if (parts.length <= 1) return 'root';
+		if (parts.length <= 1) {return 'root';}
 		const dirParts = parts.slice(0, -1);
-		if (dirParts.length === 0) return 'root';
+		if (dirParts.length === 0) {return 'root';}
 
 		if (dirParts[0] === 'src' && dirParts.length >= 4 && dirParts[1] === 'vs') {
 			// e.g. src/vs/workbench/contrib or src/vs/platform/configuration
@@ -385,7 +384,7 @@ export function computeAdaptiveCommunities(
 		bucket.layerCounts.set(layer, (bucket.layerCounts.get(layer) || 0) + 1);
 		bucket.totalDegree += deg;
 		bucket.depthSum += depth;
-		if (isEntry) bucket.hasEntry = true;
+		if (isEntry) {bucket.hasEntry = true;}
 		if (deg >= bucket.maxDegree) {
 			bucket.maxDegree = deg;
 			bucket.primaryHubId = node.entityId;
@@ -395,17 +394,17 @@ export function computeAdaptiveCommunities(
 	// 2. Co-locate SCC members if any multi-node SCC spans multiple buckets
 	for (let i = 0; i < sccs.length; i++) {
 		const scc = sccs[i];
-		if (!scc.isCycle) continue;
+		if (!scc.isCycle) {continue;}
 
 		// Find the bucket containing the primary node of the SCC
 		const targetBucketPrefix = getAdaptivePrefix(rawPathToNode.get(scc.primaryNodeId)?.path || '');
 		const targetBucket = buckets.get(targetBucketPrefix);
-		if (!targetBucket) continue;
+		if (!targetBucket) {continue;}
 
 		for (let m = 0; m < scc.members.length; m++) {
 			const memberId = scc.members[m];
 			const memberNode = rawPathToNode.get(memberId);
-			if (!memberNode) continue;
+			if (!memberNode) {continue;}
 			const currentPrefix = getAdaptivePrefix(memberNode.path || '');
 			if (currentPrefix !== targetBucketPrefix) {
 				const currentBucket = buckets.get(currentPrefix);
@@ -426,7 +425,7 @@ export function computeAdaptiveCommunities(
 	const sortedPrefixes = Array.from(buckets.keys()).sort();
 	for (let i = 0; i < sortedPrefixes.length; i++) {
 		const bucket = buckets.get(sortedPrefixes[i])!;
-		if (bucket.nodeIds.length === 0) continue;
+		if (bucket.nodeIds.length === 0) {continue;}
 
 		// Sort members canonically
 		bucket.nodeIds.sort((a, b) => {
@@ -434,9 +433,9 @@ export function computeAdaptiveCommunities(
 			const nb = rawPathToNode.get(b);
 			const da = degreeByNode.get(a) || 0;
 			const db = degreeByNode.get(b) || 0;
-			if (Boolean(na?.meta?.isEntry) && !Boolean(nb?.meta?.isEntry)) return -1;
-			if (Boolean(nb?.meta?.isEntry) && !Boolean(na?.meta?.isEntry)) return 1;
-			if (db !== da) return db - da;
+			if (Boolean(na?.meta?.isEntry) && !Boolean(nb?.meta?.isEntry)) {return -1;}
+			if (Boolean(nb?.meta?.isEntry) && !Boolean(na?.meta?.isEntry)) {return 1;}
+			if (db !== da) {return db - da;}
 			return a.localeCompare(b);
 		});
 
@@ -459,7 +458,7 @@ export function computeAdaptiveCommunities(
 			layerCounts.set(layer, (layerCounts.get(layer) || 0) + 1);
 			totalDegree += deg;
 			depthSum += depth;
-			if (isEntry) hasEntry = true;
+			if (isEntry) {hasEntry = true;}
 			if (deg > maxDegree) {
 				maxDegree = deg;
 				primaryHubId = nid;
@@ -495,10 +494,10 @@ export function computeAdaptiveCommunities(
 
 	// Sort communities canonically by entry, then topological depth, then totalDegree, then label
 	resultCommunities.sort((a, b) => {
-		if (a.hasEntry && !b.hasEntry) return -1;
-		if (b.hasEntry && !a.hasEntry) return 1;
-		if (Math.abs(a.depth - b.depth) > 0.01) return a.depth - b.depth;
-		if (b.totalDegree !== a.totalDegree) return b.totalDegree - a.totalDegree;
+		if (a.hasEntry && !b.hasEntry) {return -1;}
+		if (b.hasEntry && !a.hasEntry) {return 1;}
+		if (Math.abs(a.depth - b.depth) > 0.01) {return a.depth - b.depth;}
+		if (b.totalDegree !== a.totalDegree) {return b.totalDegree - a.totalDegree;}
 		return a.id.localeCompare(b.id);
 	});
 

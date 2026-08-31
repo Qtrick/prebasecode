@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-/**
- * Lightweight gate: verifies Magnus extension compiled output under extensions/prebase-magnus/out/.
- * Dynamically derives expected output files from src/ (excluding test/declaration files).
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

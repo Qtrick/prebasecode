@@ -1,13 +1,8 @@
 #!/usr/bin/env node
-/**
- * Verifies complete excision of GitHub Copilot product code from PreBase.
- * Ensures:
- * 1. extensions/copilot does not exist
- * 2. PreBase product policy has built-in Copilot disabled
- * 3. Magnus is registered as the exclusive primary agent provider
- * 4. Generic Language Model and Chat infrastructure is intact
- * 5. GitHub social OAuth authentication provider is preserved
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

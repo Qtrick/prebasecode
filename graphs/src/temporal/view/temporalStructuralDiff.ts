@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type { TemporalEntitySnapshot, TemporalEdgeSnapshot } from '../common/temporalTypes.js';
@@ -32,7 +31,7 @@ const EMPTY_BLOB_HASHES = new Set([
 ]);
 
 function normalizePath(p: string | undefined): string {
-	if (!p) return '';
+	if (!p) {return '';}
 	return p.replace(/\\/g, '/').replace(/^\.\//, '').replace(/^\//, '');
 }
 
@@ -169,7 +168,7 @@ export function computeTemporalStructuralDiff(
 		// STEP 4 — UNIQUE FULL BLOB / CONTENT IDENTITY MATCH (Unambiguous 1-to-1 exact moves/renames)
 		const unmatchedBaseByBlob = new Map<string, TemporalEntitySnapshot[]>();
 		for (const be of baseEntities) {
-			if (matchedBaseEntityIds.has(be.entityId)) continue;
+			if (matchedBaseEntityIds.has(be.entityId)) {continue;}
 			const blob = be.blobOid || (be as any).contentIdentity || be.contentHash;
 			if (blob && blob.length >= 7) {
 				const list = unmatchedBaseByBlob.get(blob) ?? [];
@@ -180,7 +179,7 @@ export function computeTemporalStructuralDiff(
 
 		const unmatchedTargetByBlob = new Map<string, TemporalEntitySnapshot[]>();
 		for (const te of targetEntities) {
-			if (matchedTargetEntityToBase.has(te.entityId)) continue;
+			if (matchedTargetEntityToBase.has(te.entityId)) {continue;}
 			const blob = te.blobOid || (te as any).contentIdentity || te.contentHash;
 			if (blob && blob.length >= 7) {
 				const list = unmatchedTargetByBlob.get(blob) ?? [];
@@ -433,22 +432,22 @@ function hasNodeContentChanged(te: TemporalEntitySnapshot, be?: TemporalEntitySn
 }
 
 function hasNodeDataChanged(a: any, b: any): boolean {
-	if (!a && !b) return false;
-	if (!a || !b) return true;
+	if (!a && !b) {return false;}
+	if (!a || !b) {return true;}
 
-	if (a.kind && b.kind && a.kind !== b.kind) return true;
+	if (a.kind && b.kind && a.kind !== b.kind) {return true;}
 
 	const aMeta = a.meta || {};
 	const bMeta = b.meta || {};
 
-	if (aMeta.architectureLayer !== bMeta.architectureLayer) return true;
-	if (aMeta.language !== bMeta.language) return true;
-	if (aMeta.isComponent !== bMeta.isComponent) return true;
-	if (aMeta.functionCount !== bMeta.functionCount) return true;
-	if (aMeta.componentCount !== bMeta.componentCount) return true;
+	if (aMeta.architectureLayer !== bMeta.architectureLayer) {return true;}
+	if (aMeta.language !== bMeta.language) {return true;}
+	if (aMeta.isComponent !== bMeta.isComponent) {return true;}
+	if (aMeta.functionCount !== bMeta.functionCount) {return true;}
+	if (aMeta.componentCount !== bMeta.componentCount) {return true;}
 
-	if (!areStringArraysEquivalent(aMeta.exports, bMeta.exports)) return true;
-	if (!areStringArraysEquivalent(aMeta.imports, bMeta.imports)) return true;
+	if (!areStringArraysEquivalent(aMeta.exports, bMeta.exports)) {return true;}
+	if (!areStringArraysEquivalent(aMeta.imports, bMeta.imports)) {return true;}
 
 	return false;
 }
@@ -477,9 +476,9 @@ function hasEdgeDataChanged(a: any, b: any): boolean {
 		return true;
 	}
 
-	if (aMeta.importSource !== bMeta.importSource) return true;
-	if (Boolean(aMeta.isDefault) !== Boolean(bMeta.isDefault)) return true;
-	if (Boolean(aMeta.isDynamic) !== Boolean(bMeta.isDynamic)) return true;
+	if (aMeta.importSource !== bMeta.importSource) {return true;}
+	if (Boolean(aMeta.isDefault) !== Boolean(bMeta.isDefault)) {return true;}
+	if (Boolean(aMeta.isDynamic) !== Boolean(bMeta.isDynamic)) {return true;}
 
 	if (!areStringArraysEquivalent(aMeta.specifiers, bMeta.specifiers)) {
 		return true;
@@ -488,10 +487,10 @@ function hasEdgeDataChanged(a: any, b: any): boolean {
 	const aKeys = Object.keys(aMeta).filter(k => k !== 'line' && k !== 'importSource' && k !== 'isDefault' && k !== 'isDynamic' && k !== 'specifiers');
 	const bKeys = Object.keys(bMeta).filter(k => k !== 'line' && k !== 'importSource' && k !== 'isDefault' && k !== 'isDynamic' && k !== 'specifiers');
 
-	if (aKeys.length !== bKeys.length) return true;
+	if (aKeys.length !== bKeys.length) {return true;}
 	for (const k of aKeys) {
 		if (Array.isArray(aMeta[k]) && Array.isArray(bMeta[k])) {
-			if (!areStringArraysEquivalent(aMeta[k], bMeta[k])) return true;
+			if (!areStringArraysEquivalent(aMeta[k], bMeta[k])) {return true;}
 		} else if (aMeta[k] !== bMeta[k]) {
 			return true;
 		}
@@ -501,13 +500,13 @@ function hasEdgeDataChanged(a: any, b: any): boolean {
 }
 
 function areStringArraysEquivalent(a?: readonly string[], b?: readonly string[]): boolean {
-	if (!a && !b) return true;
-	if (!a || !b) return false;
-	if (a.length !== b.length) return false;
+	if (!a && !b) {return true;}
+	if (!a || !b) {return false;}
+	if (a.length !== b.length) {return false;}
 	const sortedA = [...a].sort();
 	const sortedB = [...b].sort();
 	for (let i = 0; i < sortedA.length; i++) {
-		if (sortedA[i] !== sortedB[i]) return false;
+		if (sortedA[i] !== sortedB[i]) {return false;}
 	}
 	return true;
 }

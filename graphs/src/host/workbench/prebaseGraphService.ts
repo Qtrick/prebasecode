@@ -478,10 +478,11 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 	}
 
 	async setLayoutMode(layoutMode: LayoutMode): Promise<void> {
-		if (this._viewState.layoutMode === layoutMode) {
+		const normalized = normalizeNetworkLayoutMode(layoutMode) as LayoutMode;
+		if (this._viewState.layoutMode === normalized) {
 			return;
 		}
-		this._viewState = { ...this._viewState, layoutMode };
+		this._viewState = { ...this._viewState, layoutMode: normalized };
 		this._onDidChangeViewState.fire(this._viewState);
 		if (this._canonicalSnapshot) {
 			void this.relayout();
@@ -541,7 +542,7 @@ export class PreBaseGraphService extends Disposable implements IPreBaseGraphServ
 					readDirectory: async (p: string) => {
 						const uri = URI.file(p);
 						const stat = await this.fileService.resolve(uri);
-						if (!stat.children) return [];
+						if (!stat.children) {return [];}
 						return stat.children.map(c => ({ name: c.name, isDirectory: c.isDirectory }));
 					},
 					getFileSize: async (p: string) => {

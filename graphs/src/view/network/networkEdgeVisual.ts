@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 /**
@@ -105,7 +104,7 @@ export function resolveNetworkEdgeVisual(
 	const kind = edge.kind || 'import';
 
 	if (kind === 'contains') {
-		if (zoom < 0.8) return null;
+		if (zoom < 0.8) {return null;}
 		return {
 			color: 'rgba(100, 116, 139, 0.25)',
 			width: 0.75 / zoom,
@@ -139,7 +138,7 @@ export function resolveNetworkEdgeVisual(
 	}
 
 	if (meta.isDynamic) {
-		if (zoom < 0.45) return null;
+		if (zoom < 0.45) {return null;}
 		return {
 			color: 'rgba(244, 114, 182, 0.6)',
 			width: 1.1 / zoom,
@@ -151,7 +150,7 @@ export function resolveNetworkEdgeVisual(
 	}
 
 	if (kind === 'reference' || kind === 'export') {
-		if (zoom < 0.6) return null;
+		if (zoom < 0.6) {return null;}
 		return {
 			color: 'rgba(148, 163, 184, 0.32)',
 			width: 0.8 / zoom,
@@ -163,7 +162,7 @@ export function resolveNetworkEdgeVisual(
 	}
 
 	// Default standard import
-	if (zoom < 0.38) return null;
+	if (zoom < 0.38) {return null;}
 	return {
 		color: 'rgba(148, 163, 184, 0.22)',
 		width: 0.85 / zoom,

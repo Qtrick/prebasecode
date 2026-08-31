@@ -392,8 +392,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT * FROM repository_identity LIMIT 1;', (err, row: any) => {
-				if (err) return reject(err);
-				if (!row) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row) {return resolve(undefined);}
 				resolve({
 					repoId: row.repo_id,
 					rootPath: row.root_path,
@@ -638,10 +638,10 @@ export class SqliteTemporalStore implements ITemporalStore {
 							let pending = chunk.length * 2;
 							let errored = false;
 							const check = (err: Error | null) => {
-								if (errored) return;
+								if (errored) {return;}
 								if (err) { errored = true; return reject(err); }
 								pending--;
-								if (pending === 0) resolve();
+								if (pending === 0) {resolve();}
 							};
 
 							for (const entitySnap of chunk) {
@@ -714,10 +714,10 @@ export class SqliteTemporalStore implements ITemporalStore {
 							let pending = chunk.length;
 							let errored = false;
 							const check = (err: Error | null) => {
-								if (errored) return;
+								if (errored) {return;}
 								if (err) { errored = true; return reject(err); }
 								pending--;
-								if (pending === 0) resolve();
+								if (pending === 0) {resolve();}
 							};
 							for (const event of chunk) {
 								insertLineageStmt.run([
@@ -764,10 +764,10 @@ export class SqliteTemporalStore implements ITemporalStore {
 							let pending = chunk.length * 2;
 							let errored = false;
 							const check = (err: Error | null) => {
-								if (errored) return;
+								if (errored) {return;}
 								if (err) { errored = true; return reject(err); }
 								pending--;
-								if (pending === 0) resolve();
+								if (pending === 0) {resolve();}
 							};
 							for (const edgeSnap of chunk) {
 								upsertEdgeStmt.run([
@@ -860,8 +860,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT * FROM commits WHERE commit_sha = ?;', [commitSha], (err, row: any) => {
-				if (err) return reject(err);
-				if (!row) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row) {return resolve(undefined);}
 				resolve(this._mapCommitRecord(row));
 			});
 		});
@@ -871,7 +871,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.all('SELECT * FROM commits ORDER BY ingested_at ASC;', (err, rows: any[]) => {
-				if (err) return reject(err);
+				if (err) {return reject(err);}
 				resolve((rows || []).map(r => this._mapCommitRecord(r)));
 			});
 		});
@@ -881,8 +881,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT * FROM commits ORDER BY ingested_at DESC LIMIT 1;', (err, row: any) => {
-				if (err) return reject(err);
-				if (!row) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row) {return resolve(undefined);}
 				resolve(this._mapCommitRecord(row));
 			});
 		});
@@ -961,7 +961,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				 WHERE commits.commit_sha IN (${placeholders});`,
 				commitShas,
 				(error, rows: Array<{ commit_sha: string; lineage_coverage?: string; lineage_anchor_sha?: string; snapshot_json?: string }>) => {
-					if (error) return reject(error);
+					if (error) {return reject(error);}
 					try {
 						resolve(rows.map(row => {
 							const lineageCoverage = row.lineage_coverage === 'partial'
@@ -970,7 +970,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 							if (!lineageCoverage) {
 								throw new TemporalError('DatabaseCorrupted', `Invalid lineage coverage for ${row.commit_sha}`);
 							}
-							if (!row.snapshot_json) return { commitSha: row.commit_sha, lineageCoverage };
+							if (!row.snapshot_json) {return { commitSha: row.commit_sha, lineageCoverage };}
 							const snapshot = JSON.parse(row.snapshot_json) as { coverage?: CanonicalCoverage; completeness?: CanonicalCoverage };
 							const coverage = snapshot.coverage ?? snapshot.completeness;
 							if (!coverage || typeof coverage.completeWithinProfile !== 'boolean') {
@@ -993,14 +993,14 @@ export class SqliteTemporalStore implements ITemporalStore {
 				'SELECT parent_sha FROM commit_parents WHERE commit_sha = ? ORDER BY parent_index ASC;',
 				[commitSha],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					if (rows && rows.length > 0) {
 						return resolve(rows.map(r => r.parent_sha));
 					}
 					// Fallback to commits.parent_shas JSON if commit_parents is empty
 					db.get('SELECT parent_shas FROM commits WHERE commit_sha = ?;', [commitSha], (cErr, cRow: any) => {
-						if (cErr) return reject(cErr);
-						if (!cRow) return resolve([]);
+						if (cErr) {return reject(cErr);}
+						if (!cRow) {return resolve([]);}
 						try {
 							const parents = JSON.parse(cRow.parent_shas);
 							if (!Array.isArray(parents) || parents.some(parent => typeof parent !== 'string' || parent.length === 0)) {
@@ -1023,7 +1023,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				'SELECT commit_sha FROM commit_parents WHERE parent_sha = ?;',
 				[commitSha],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					resolve((rows || []).map(r => r.commit_sha));
 				}
 			);
@@ -1034,8 +1034,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT snapshot_json, canonical_digest FROM checkpoints WHERE commit_sha = ?;', [commitSha], (err, row: any) => {
-				if (err) return reject(err);
-				if (!row || !row.snapshot_json) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row || !row.snapshot_json) {return resolve(undefined);}
 
 				try {
 					const parsed = JSON.parse(row.snapshot_json);
@@ -1100,8 +1100,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT delta_json FROM deltas WHERE commit_sha = ?;', [commitSha], (err, row: any) => {
-				if (err) return reject(err);
-				if (!row || !row.delta_json) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row || !row.delta_json) {return resolve(undefined);}
 
 				try {
 					const delta = JSON.parse(row.delta_json);
@@ -1117,8 +1117,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT * FROM graph_states WHERE canonical_digest = ? ORDER BY created_at DESC LIMIT 1;', [digest], (err, row: any) => {
-				if (err) return reject(err);
-				if (!row) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row) {return resolve(undefined);}
 				resolve({
 					stateId: row.state_id,
 					canonicalDigest: row.canonical_digest,
@@ -1132,8 +1132,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT * FROM entities WHERE entity_id = ?;', [entityId], (err, row: any) => {
-				if (err) return reject(err);
-				if (!row) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row) {return resolve(undefined);}
 				resolve({
 					entityId: row.entity_id,
 					canonicalPath: row.canonical_path,
@@ -1154,7 +1154,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				'SELECT es.* FROM entity_snapshots es LEFT JOIN commits c ON es.commit_sha = c.commit_sha WHERE es.entity_id = ? ORDER BY c.ingested_at ASC, c.author_timestamp ASC;',
 				[entityId],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					const snapshots: TemporalEntitySnapshot[] = (rows || []).map(r => ({
 						entityId: r.entity_id,
 						commitSha: r.commit_sha,
@@ -1185,7 +1185,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				ORDER BY commits.committer_timestamp ASC, commits.ingested_at ASC;`,
 				[targetCommitSha, entityId],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					try {
 						resolve((rows || []).map(row => ({
 							entityId: row.entity_id,
@@ -1210,7 +1210,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				'SELECT * FROM lineage_events WHERE entity_id = ? ORDER BY created_at ASC;',
 				[entityId],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					const events: TemporalEntityLineageEvent[] = (rows || []).map(r => ({
 						entityId: r.entity_id,
 						commitSha: r.commit_sha,
@@ -1240,7 +1240,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				ORDER BY commits.committer_timestamp ASC, commits.ingested_at ASC;`,
 				[targetCommitSha, entityId],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					try {
 						resolve((rows || []).map(row => ({
 							entityId: row.entity_id,
@@ -1264,7 +1264,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				'SELECT * FROM entity_snapshots WHERE commit_sha = ?;',
 				[commitSha],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					const list: TemporalEntitySnapshot[] = (rows || []).map(r => ({
 						entityId: r.entity_id,
 						commitSha: r.commit_sha,
@@ -1295,7 +1295,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				JOIN ancestry ON ancestry.commit_sha = deletions.commit_sha;`,
 				[baseCommitSha],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					const map = new Map<string, string>();
 					for (const r of rows || []) {
 						if (r.canonical_path && r.entity_id) {
@@ -1312,8 +1312,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT * FROM edges WHERE edge_id = ?;', [edgeId], (err, row: any) => {
-				if (err) return reject(err);
-				if (!row) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row) {return resolve(undefined);}
 				resolve({
 					edgeId: row.edge_id,
 					sourceEntityId: row.source_entity_id,
@@ -1334,7 +1334,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				'SELECT es.* FROM edge_snapshots es LEFT JOIN commits c ON es.commit_sha = c.commit_sha WHERE es.edge_id = ? ORDER BY c.ingested_at ASC;',
 				[edgeId],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					const snapshots: TemporalEdgeSnapshot[] = (rows || []).map(r => ({
 						edgeId: r.edge_id,
 						commitSha: r.commit_sha,
@@ -1365,7 +1365,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				ORDER BY commits.committer_timestamp ASC, commits.ingested_at ASC;`,
 				[targetCommitSha, edgeId],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					try {
 						resolve((rows || []).map(row => ({
 							edgeId: row.edge_id,
@@ -1401,7 +1401,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 				ORDER BY commits.committer_timestamp ASC, commits.ingested_at ASC;`,
 				[targetCommitSha, edgeId],
 				(err, rows: any[]) => {
-					if (err) return reject(err);
+					if (err) {return reject(err);}
 					resolve((rows || []).map(row => ({
 						edgeId: row.edge_id,
 						commitSha: row.commit_sha,
@@ -1448,8 +1448,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.get('SELECT * FROM refs WHERE ref_name = ?;', [refName], (err, row: any) => {
-				if (err) return reject(err);
-				if (!row) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row) {return resolve(undefined);}
 				resolve({
 					refName: row.ref_name,
 					targetSha: row.target_sha,
@@ -1464,7 +1464,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 		const db = this._getDb();
 		return new Promise((resolve, reject) => {
 			db.all('SELECT * FROM refs ORDER BY last_observed DESC;', (err, rows: any[]) => {
-				if (err) return reject(err);
+				if (err) {return reject(err);}
 				resolve((rows || []).map(r => ({
 					refName: r.ref_name,
 					targetSha: r.target_sha,
@@ -1486,8 +1486,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 
 		return new Promise((resolve, reject) => {
 			db.get('SELECT * FROM blob_parse_artifacts WHERE cache_key = ?;', [key], (err, row: any) => {
-				if (err) return reject(err);
-				if (!row) return resolve(undefined);
+				if (err) {return reject(err);}
+				if (!row) {return resolve(undefined);}
 				try {
 					resolve({
 						blobOid: row.blob_oid,
@@ -1548,7 +1548,7 @@ export class SqliteTemporalStore implements ITemporalStore {
 		while (size > maxDatabaseBytes) {
 			const removed = await new Promise<number>((resolve, reject) => {
 				db.run('DELETE FROM blob_parse_artifacts WHERE cache_key IN (SELECT cache_key FROM blob_parse_artifacts ORDER BY analyzed_at ASC LIMIT 256);', function(error) {
-					if (error) return reject(error);
+					if (error) {return reject(error);}
 					resolve(this.changes ?? 0);
 				});
 			});

@@ -3,6 +3,8 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+/* eslint-disable local/code-no-unexternalized-strings */
+
 import type {
 	ModelCapabilityFlags,
 	ModelReleaseChannel,
@@ -44,10 +46,10 @@ export function getReasoningEffortLabel(effort: import('./aiTypes').AIReasoningE
 export function getReasoningEffortDescription(effort: import('./aiTypes').AIReasoningEffort): string {
 	switch (effort) {
 		case 'default': return "Uses this model's recommended/provider-native reasoning behavior.";
-		case 'minimal': return 'Fastest response with very little reasoning.';
-		case 'low': return 'Prioritizes speed and lower cost for straightforward tasks.';
-		case 'medium': return 'Balanced reasoning for normal coding work.';
-		case 'high': return 'Uses more reasoning for difficult debugging, architecture, or multi-step work.';
+		case 'minimal': return "Fastest response with very little reasoning.";
+		case 'low': return "Prioritizes speed and lower cost for straightforward tasks.";
+		case 'medium': return "Balanced reasoning for normal coding work.";
+		case 'high': return "Uses more reasoning for difficult debugging, architecture, or multi-step work.";
 		default: return "Uses this model's recommended/provider-native reasoning behavior.";
 	}
 }

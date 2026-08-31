@@ -210,7 +210,7 @@ export class GeminiProviderAdapter implements IPreBaseAIProviderAdapter {
 	}
 
 	normalizeError(error: unknown): AIProviderErrorClassification {
-		if (error && typeof error === 'object' && 'code' in error && typeof (error as { code: unknown }).code === 'string') {
+		if (error && typeof error === 'object' && typeof (error as { code?: unknown }).code === 'string') {
 			return error as AIProviderErrorClassification;
 		}
 		const msg = error instanceof Error ? error.message : String(error);

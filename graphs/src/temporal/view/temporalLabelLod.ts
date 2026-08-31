@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type { TemporalRenderNode } from './temporalViewTypes.js';
@@ -215,16 +214,16 @@ export function computeVisibleLabels(
 		const isEntry = Boolean(node.meta?.isEntry);
 
 		let score = 0;
-		if (isSelected) score += 1000;
-		if (isHovered) score += 900;
-		if (isChanged) score += 500;
-		if (isEntry) score += 300;
+		if (isSelected) {score += 1000;}
+		if (isHovered) {score += 900;}
+		if (isChanged) {score += 500;}
+		if (isEntry) {score += 300;}
 
 		const isQueryMatch = filterQuery && (
 			(node.label && node.label.toLowerCase().includes(filterQuery)) ||
 			(node.path && node.path.toLowerCase().includes(filterQuery))
 		);
-		if (isQueryMatch) score += 400;
+		if (isQueryMatch) {score += 400;}
 
 		if (zoom >= 1.25) {
 			score += 100;
@@ -242,7 +241,7 @@ export function computeVisibleLabels(
 	}
 
 	scored.sort(function (a, b) {
-		if (b.score !== a.score) return b.score - a.score;
+		if (b.score !== a.score) {return b.score - a.score;}
 		return a.node.entityId.localeCompare(b.node.entityId);
 	});
 
@@ -257,7 +256,7 @@ export function computeVisibleLabels(
 		const item = scored[i];
 		const node = item.node;
 		const labelText = node.label || node.path || '';
-		if (!labelText) continue;
+		if (!labelText) {continue;}
 
 		const font = (item.isSelected || item.isHovered)
 			? `bold 11px ${family}`

@@ -1,8 +1,6 @@
-/**
- * Isolated parseBatchSize comparison. Each candidate runs in a fresh process
- * so RSS cannot accumulate across sizes. Outer window is Promise.all over N
- * files — not N parser-utility processes.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) PreBase. All rights reserved.
+ *--------------------------------------------------------------------------------------------*/
 import { spawnSync } from 'node:child_process';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';

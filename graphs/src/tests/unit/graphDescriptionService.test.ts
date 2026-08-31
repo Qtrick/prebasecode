@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'node:assert/strict';
@@ -593,8 +592,8 @@ suite('PreBaseGraphDescriptionService (Unit - v9 File-Aware Cache)', () => {
 			getWorkspace: () => ({ folders: [folderA, folderB] }),
 			getWorkspaceFolder: (uri: URI) => {
 				const s = uri.toString();
-				if (s.startsWith(folderA_Uri.toString())) return folderA;
-				if (s.startsWith(folderB_Uri.toString())) return folderB;
+				if (s.startsWith(folderA_Uri.toString())) {return folderA;}
+				if (s.startsWith(folderB_Uri.toString())) {return folderB;}
 				return undefined;
 			},
 		} as any;
@@ -741,8 +740,8 @@ suite('PreBaseGraphDescriptionService (Unit - v9 File-Aware Cache)', () => {
 			getWorkspace: () => ({ folders: [folderA, folderB] }),
 			getWorkspaceFolder: (uri: URI) => {
 				const s = uri.toString();
-				if (s.startsWith(folderA_Uri.toString())) return folderA;
-				if (s.startsWith(folderB_Uri.toString())) return folderB;
+				if (s.startsWith(folderA_Uri.toString())) {return folderA;}
+				if (s.startsWith(folderB_Uri.toString())) {return folderB;}
 				return undefined;
 			},
 		} as any;

@@ -831,26 +831,17 @@ p{opacity:.75;margin:0;line-height:1.45}
 		}
 		await new Promise<void>(resolve => {
 			let settled = false;
-			let timer: ReturnType<typeof setTimeout> | undefined;
 			const finish = () => {
 				if (settled) {
 					return;
 				}
 				settled = true;
-				if (timer !== undefined) {
-					clearTimeout(timer);
-				}
+				clearTimeout(timer);
 				resolve();
 			};
+			const timer = setTimeout(finish, 2_000);
 			const taskkill = execFile('taskkill', ['/pid', String(pid), '/t', '/f'], { windowsHide: true }, finish);
-			timer = setTimeout(() => {
-				try {
-					taskkill.kill();
-				} catch {
-					// ignore
-				}
-				finish();
-			}, WINDOWS_TASKKILL_EXEC_TIMEOUT_MS);
+			taskkill.on('error', finish);
 		});
 		if (child && child.exitCode === null && child.signalCode === null) {
 			return this._waitForChildExit(child, WINDOWS_TASKKILL_EXIT_WAIT_MS);

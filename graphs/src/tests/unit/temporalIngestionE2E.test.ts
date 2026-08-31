@@ -372,10 +372,10 @@ suite('Temporal Graph E2E Ingestion & Reconstruction', () => {
 							return value;
 						}
 						return (...args: unknown[]) => {
-							if (property === 'getCommit') storeCalls.commit++;
-							if (property === 'getCommitCoverage') storeCalls.coverage++;
-							if (property === 'getCommitIndexMetadata') storeCalls.metadata++;
-							if (property === 'replaceRefs') storeCalls.replaceRefs++;
+							if (property === 'getCommit') {storeCalls.commit++;}
+							if (property === 'getCommitCoverage') {storeCalls.coverage++;}
+							if (property === 'getCommitIndexMetadata') {storeCalls.metadata++;}
+							if (property === 'replaceRefs') {storeCalls.replaceRefs++;}
 							return value.apply(target, args);
 						};
 					},

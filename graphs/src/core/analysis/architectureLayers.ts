@@ -2,8 +2,8 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js'
-import { isMetadataFile } from '../scanning/projectFiles.js'
+import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js';
+import { isMetadataFile } from '../scanning/projectFiles.js';
 
 export type ArchitectureLayerId =
 	| 'entry'
@@ -18,13 +18,13 @@ export type ArchitectureLayerId =
 	| 'utils'
 	| 'config'
 	| 'tests'
-	| 'other'
+	| 'other';
 
 export interface ArchitectureLayerDef {
-	id: ArchitectureLayerId
-	label: string
-	color: string
-	defaultEnabled: boolean
+	id: ArchitectureLayerId;
+	label: string;
+	color: string;
+	defaultEnabled: boolean;
 }
 
 export const ARCHITECTURE_LAYERS: ArchitectureLayerDef[] = [
@@ -41,146 +41,146 @@ export const ARCHITECTURE_LAYERS: ArchitectureLayerDef[] = [
 	{ id: 'config', label: 'Config', color: '#52525b', defaultEnabled: true },
 	{ id: 'tests', label: 'Tests', color: '#52525b', defaultEnabled: true },
 	{ id: 'other', label: 'Other', color: '#6366f1', defaultEnabled: true }
-]
+];
 
 function pathSegments(p: string): string[] {
-	return p.split('/').filter(Boolean)
+	return p.split('/').filter(Boolean);
 }
 
 function hasSegment(p: string, ...names: string[]): boolean {
-	const segs = pathSegments(p)
-	return segs.some((s) => names.includes(s.toLowerCase()))
+	const segs = pathSegments(p);
+	return segs.some((s) => names.includes(s.toLowerCase()));
 }
 
 function classifyJvmLayer(p: string): ArchitectureLayerId | null {
-	if (hasSegment(p, 'controller', 'controllers', 'rest', 'resource', 'resources')) return 'api'
-	if (hasSegment(p, 'service', 'services')) return 'services'
+	if (hasSegment(p, 'controller', 'controllers', 'rest', 'resource', 'resources')) {return 'api';}
+	if (hasSegment(p, 'service', 'services')) {return 'services';}
 	if (hasSegment(p, 'repository', 'repositories', 'dao', 'model', 'models', 'entity', 'entities', 'domain')) {
-		return 'database'
+		return 'database';
 	}
-	if (hasSegment(p, 'config', 'configuration')) return 'config'
-	if (hasSegment(p, 'util', 'utils', 'helper', 'helpers')) return 'utils'
-	if (hasSegment(p, 'test', 'tests')) return 'tests'
-	if (hasSegment(p, 'ui', 'view', 'views', 'screen', 'screens', 'activity', 'activities')) return 'ui'
-	if (hasSegment(p, 'component', 'components')) return 'components'
-	return null
+	if (hasSegment(p, 'config', 'configuration')) {return 'config';}
+	if (hasSegment(p, 'util', 'utils', 'helper', 'helpers')) {return 'utils';}
+	if (hasSegment(p, 'test', 'tests')) {return 'tests';}
+	if (hasSegment(p, 'ui', 'view', 'views', 'screen', 'screens', 'activity', 'activities')) {return 'ui';}
+	if (hasSegment(p, 'component', 'components')) {return 'components';}
+	return null;
 }
 
 function classifyPythonLayer(p: string): ArchitectureLayerId | null {
-	if (hasSegment(p, 'api', 'routes', 'views', 'endpoints')) return 'api'
-	if (hasSegment(p, 'services', 'service')) return 'services'
-	if (hasSegment(p, 'models', 'model', 'db', 'database')) return 'database'
-	if (hasSegment(p, 'utils', 'util', 'helpers', 'lib')) return 'utils'
-	if (hasSegment(p, 'tests', 'test')) return 'tests'
-	if (hasSegment(p, 'config', 'settings')) return 'config'
-	return null
+	if (hasSegment(p, 'api', 'routes', 'views', 'endpoints')) {return 'api';}
+	if (hasSegment(p, 'services', 'service')) {return 'services';}
+	if (hasSegment(p, 'models', 'model', 'db', 'database')) {return 'database';}
+	if (hasSegment(p, 'utils', 'util', 'helpers', 'lib')) {return 'utils';}
+	if (hasSegment(p, 'tests', 'test')) {return 'tests';}
+	if (hasSegment(p, 'config', 'settings')) {return 'config';}
+	return null;
 }
 
 function classifyGoLayer(p: string): ArchitectureLayerId | null {
-	if (hasSegment(p, 'cmd', 'main')) return 'backend'
-	if (hasSegment(p, 'internal', 'pkg')) return 'services'
-	if (hasSegment(p, 'api', 'handler', 'handlers', 'route', 'routes')) return 'api'
-	if (hasSegment(p, 'model', 'models', 'store', 'repository')) return 'database'
-	if (hasSegment(p, 'util', 'utils')) return 'utils'
-	if (hasSegment(p, 'test', 'tests')) return 'tests'
-	return null
+	if (hasSegment(p, 'cmd', 'main')) {return 'backend';}
+	if (hasSegment(p, 'internal', 'pkg')) {return 'services';}
+	if (hasSegment(p, 'api', 'handler', 'handlers', 'route', 'routes')) {return 'api';}
+	if (hasSegment(p, 'model', 'models', 'store', 'repository')) {return 'database';}
+	if (hasSegment(p, 'util', 'utils')) {return 'utils';}
+	if (hasSegment(p, 'test', 'tests')) {return 'tests';}
+	return null;
 }
 
 function classifyRustLayer(p: string): ArchitectureLayerId | null {
-	if (hasSegment(p, 'bin', 'main')) return 'backend'
-	if (hasSegment(p, 'lib')) return 'services'
-	if (hasSegment(p, 'api', 'handler', 'handlers')) return 'api'
-	if (hasSegment(p, 'model', 'models', 'db')) return 'database'
-	if (hasSegment(p, 'util', 'utils')) return 'utils'
-	if (hasSegment(p, 'tests')) return 'tests'
-	return null
+	if (hasSegment(p, 'bin', 'main')) {return 'backend';}
+	if (hasSegment(p, 'lib')) {return 'services';}
+	if (hasSegment(p, 'api', 'handler', 'handlers')) {return 'api';}
+	if (hasSegment(p, 'model', 'models', 'db')) {return 'database';}
+	if (hasSegment(p, 'util', 'utils')) {return 'utils';}
+	if (hasSegment(p, 'tests')) {return 'tests';}
+	return null;
 }
 
 export function classifyNodeLayer(path: string | undefined, isEntry?: boolean): ArchitectureLayerId {
-	if (isEntry) return 'entry'
-	const p = (path ?? '').toLowerCase().replace(/\\/g, '/')
-	const ext = p.split('.').pop() ?? ''
+	if (isEntry) {return 'entry';}
+	const p = (path ?? '').toLowerCase().replace(/\\/g, '/');
+	const ext = p.split('.').pop() ?? '';
 
-	if (isMetadataFile(path ?? '')) return 'config'
+	if (isMetadataFile(path ?? '')) {return 'config';}
 
-	if (/\.(test|spec)\.(tsx?|jsx?|java|kt|kts|py|go|rs|cs|swift|rb|php)$/.test(p)) return 'tests'
-	if (/__tests__|\/tests?\//.test(p)) return 'tests'
+	if (/\.(test|spec)\.(tsx?|jsx?|java|kt|kts|py|go|rs|cs|swift|rb|php)$/.test(p)) {return 'tests';}
+	if (/__tests__|\/tests?\//.test(p)) {return 'tests';}
 
 	if (ext === 'java' || ext === 'kt' || ext === 'kts') {
-		const jvm = classifyJvmLayer(p)
-		if (jvm) return jvm
+		const jvm = classifyJvmLayer(p);
+		if (jvm) {return jvm;}
 	}
 	if (ext === 'py') {
-		const py = classifyPythonLayer(p)
-		if (py) return py
+		const py = classifyPythonLayer(p);
+		if (py) {return py;}
 	}
 	if (ext === 'go') {
-		const go = classifyGoLayer(p)
-		if (go) return go
+		const go = classifyGoLayer(p);
+		if (go) {return go;}
 	}
 	if (ext === 'rs') {
-		const rs = classifyRustLayer(p)
-		if (rs) return rs
+		const rs = classifyRustLayer(p);
+		if (rs) {return rs;}
 	}
 
-	if (/auth|login|session|oauth|passport/.test(p)) return 'auth'
-	if (/\/api\/|\/routes\/|\/endpoints\/|\.route\.|\.controller\./.test(p)) return 'api'
-	if (/prisma|database|db\/|\/models\/|drizzle|typeorm/.test(p)) return 'database'
-	if (/\.service\.|\/services\/|\/service\//.test(p)) return 'services'
-	if (/server\.|\/server\/|\/backend\/|express|fastify|hono/.test(p)) return 'backend'
+	if (/auth|login|session|oauth|passport/.test(p)) {return 'auth';}
+	if (/\/api\/|\/routes\/|\/endpoints\/|\.route\.|\.controller\./.test(p)) {return 'api';}
+	if (/prisma|database|db\/|\/models\/|drizzle|typeorm/.test(p)) {return 'database';}
+	if (/\.service\.|\/services\/|\/service\//.test(p)) {return 'services';}
+	if (/server\.|\/server\/|\/backend\/|express|fastify|hono/.test(p)) {return 'backend';}
 	if (/components\/|\/components\/|\.component\./.test(p) || /[A-Z][a-zA-Z]+\.tsx$/.test(p)) {
-		return 'components'
+		return 'components';
 	}
-	if (/pages\/|app\/|views\/|screens\/|layouts\//.test(p)) return 'ui'
-	if (/\/(utils?|helpers?|lib|common|shared)\//.test(p)) return 'utils'
-	if (/\/(config|configuration|settings)\//.test(p) || /\.config\./.test(p)) return 'config'
-	if (/hooks\/|store\/|state\//.test(p)) return 'frontend'
+	if (/pages\/|app\/|views\/|screens\/|layouts\//.test(p)) {return 'ui';}
+	if (/\/(utils?|helpers?|lib|common|shared)\//.test(p)) {return 'utils';}
+	if (/\/(config|configuration|settings)\//.test(p) || /\.config\./.test(p)) {return 'config';}
+	if (/hooks\/|store\/|state\//.test(p)) {return 'frontend';}
 
-	return 'other'
+	return 'other';
 }
 
 export function assignLayersToNodes(nodes: GraphNode[], entryNodeId: string | null): GraphNode[] {
 	return nodes.map((n) => {
-		const isEntry = n.isEntry || n.id === entryNodeId
-		const architectureLayer = classifyNodeLayer(n.path, isEntry)
+		const isEntry = n.isEntry || n.id === entryNodeId;
+		const architectureLayer = classifyNodeLayer(n.path, isEntry);
 		return {
 			...n,
 			meta: { ...n.meta, architectureLayer }
-		}
-	})
+		};
+	});
 }
 
 export function buildDefaultLayerVisibility(): Record<ArchitectureLayerId, boolean> {
-	const vis = {} as Record<ArchitectureLayerId, boolean>
+	const vis = {} as Record<ArchitectureLayerId, boolean>;
 	for (const layer of ARCHITECTURE_LAYERS) {
-		vis[layer.id] = layer.defaultEnabled
+		vis[layer.id] = layer.defaultEnabled;
 	}
-	return vis
+	return vis;
 }
 
 export function countNodesPerLayer(nodes: GraphNode[]): Record<ArchitectureLayerId, number> {
-	const counts = {} as Record<ArchitectureLayerId, number>
-	for (const layer of ARCHITECTURE_LAYERS) counts[layer.id] = 0
+	const counts = {} as Record<ArchitectureLayerId, number>;
+	for (const layer of ARCHITECTURE_LAYERS) {counts[layer.id] = 0;}
 	for (const n of nodes) {
-		const id = (n.meta?.architectureLayer as ArchitectureLayerId) ?? 'other'
-		counts[id] = (counts[id] ?? 0) + 1
+		const id = (n.meta?.architectureLayer as ArchitectureLayerId) ?? 'other';
+		counts[id] = (counts[id] ?? 0) + 1;
 	}
-	return counts
+	return counts;
 }
 
 export function computeNodeImportance(
 	nodeId: string,
 	edges: GraphEdge[]
 ): { inDegree: number; outDegree: number; score: number } {
-	let inDegree = 0
-	let outDegree = 0
+	let inDegree = 0;
+	let outDegree = 0;
 	for (const e of edges) {
-		if (e.kind !== 'import') continue
-		if (e.target === nodeId) inDegree++
-		if (e.source === nodeId) outDegree++
+		if (e.kind !== 'import') {continue;}
+		if (e.target === nodeId) {inDegree++;}
+		if (e.source === nodeId) {outDegree++;}
 	}
-	const score = inDegree * 1.2 + outDegree * 0.8
-	return { inDegree, outDegree, score }
+	const score = inDegree * 1.2 + outDegree * 0.8;
+	return { inDegree, outDegree, score };
 }
 
 /** Sidebar Architecture mode ids (`prebase.graph.architectureMode`). */
@@ -190,7 +190,7 @@ export type ArchitectureModeId =
 	| 'dependency'
 	| 'state'
 	| 'infrastructure'
-	| 'overview'
+	| 'overview';
 
 /**
  * Layer / connectivity filter for an architecture mode.
@@ -204,22 +204,22 @@ export function architectureModeFilter(
 			return new Set([
 				'entry', 'frontend', 'ui', 'components', 'api', 'auth',
 				'services', 'backend', 'database', 'utils'
-			])
+			]);
 		case 'file':
 			// Source-focused: hide build/config/test noise.
 			return new Set([
 				'entry', 'frontend', 'ui', 'components', 'api', 'auth',
 				'services', 'backend', 'database', 'utils', 'other'
-			])
+			]);
 		case 'dependency':
-			return 'connected'
+			return 'connected';
 		case 'state':
-			return new Set(['frontend', 'api', 'auth', 'services', 'database'])
+			return new Set(['frontend', 'api', 'auth', 'services', 'database']);
 		case 'infrastructure':
-			return new Set(['config', 'tests', 'other'])
+			return new Set(['config', 'tests', 'other']);
 		case 'overview':
 		default:
-			return 'all'
+			return 'all';
 	}
 }
 
@@ -230,30 +230,30 @@ export function filterNodesForArchitectureMode(
 	mode: string | undefined,
 	entryNodeId: string | null
 ): GraphNode[] {
-	const filter = architectureModeFilter(mode)
+	const filter = architectureModeFilter(mode);
 	if (filter === 'all') {
-		return [...nodes]
+		return [...nodes];
 	}
 
 	if (filter === 'connected') {
-		const connected = new Set<string>()
+		const connected = new Set<string>();
 		for (const e of edges) {
 			if (e.kind !== 'import') {
-				continue
+				continue;
 			}
-			connected.add(e.source)
-			connected.add(e.target)
+			connected.add(e.source);
+			connected.add(e.target);
 		}
 		return nodes.filter(n =>
 			n.id === entryNodeId || n.isEntry || connected.has(n.id)
-		)
+		);
 	}
 
 	return nodes.filter(n => {
 		if (n.id === entryNodeId || n.isEntry) {
-			return true
+			return true;
 		}
-		const layer = (n.meta?.architectureLayer as ArchitectureLayerId | undefined) ?? classifyNodeLayer(n.path, false)
-		return filter.has(layer)
-	})
+		const layer = (n.meta?.architectureLayer as ArchitectureLayerId | undefined) ?? classifyNodeLayer(n.path, false);
+		return filter.has(layer);
+	});
 }

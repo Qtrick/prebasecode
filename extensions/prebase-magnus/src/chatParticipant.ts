@@ -85,7 +85,7 @@ export const magnusLiveStreamDiagnostics = {
 	pacingActive: 0,
 };
 
-async function streamPacedCandidate(
+export async function streamPacedCandidate(
 	aiService: PreBaseAIService,
 	request: Parameters<PreBaseAIService['streamCandidate']>[0],
 	token: vscode.CancellationToken,
@@ -168,7 +168,7 @@ async function handleChatRequest(
 	const initialTargets: GuidanceTarget[] = guidanceTargetsFromReferences(
 		request.references,
 		value => {
-			if (value && typeof value === 'object' && 'fsPath' in value) {
+			if (value && typeof value === 'object' && typeof (value as { fsPath?: string }).fsPath === 'string') {
 				const uri = value as vscode.Uri;
 				return {
 					relativePath: vscode.workspace.asRelativePath(uri, false),

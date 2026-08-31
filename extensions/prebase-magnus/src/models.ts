@@ -169,15 +169,18 @@ export const globalGeminiModelCache = new GeminiModelCache();
 export type DiscoveredModelInput = DiscoveredGeminiModel | import('./aiTypes').NormalizedAIModel;
 
 function toNormalizedModel(m: DiscoveredModelInput): import('./aiTypes').NormalizedAIModel {
-	if ('capabilities' in m && typeof m.capabilities === 'object') {
-		return m as import('./aiTypes').NormalizedAIModel;
+	const maybeNorm = m as import('./aiTypes').NormalizedAIModel;
+	if (maybeNorm.capabilities && typeof maybeNorm.capabilities === 'object') {
+		return maybeNorm;
 	}
-	const supportsGenerate = ('supportedGenerationMethods' in m && Array.isArray(m.supportedGenerationMethods))
-		? m.supportedGenerationMethods.includes('generateContent')
+	const disc = m as DiscoveredGeminiModel;
+	const supportsGenerate = Array.isArray(disc.supportedGenerationMethods)
+		? disc.supportedGenerationMethods.includes('generateContent')
 		: true;
+	const modelName = typeof disc.name === 'string' && disc.name ? disc.name : `models/${m.id}`;
 	return {
 		id: m.id,
-		name: ('name' in m && m.name) ? m.name : `models/${m.id}`,
+		name: modelName,
 		displayName: m.displayName || m.id,
 		description: m.description || `Google Gemini model (${m.id}).`,
 		inputTokenLimit: m.inputTokenLimit || 1_000_000,
@@ -201,7 +204,9 @@ function toNormalizedModel(m: DiscoveredModelInput): import('./aiTypes').Normali
 }
 
 function getModelDisplayName(m: DiscoveredModelInput): string {
-	return m.displayName || ('name' in m && m.name ? m.name : m.id);
+	const disc = m as DiscoveredGeminiModel;
+	const discName = typeof disc.name === 'string' && disc.name ? disc.name : undefined;
+	return m.displayName || discName || m.id;
 }
 
 /**

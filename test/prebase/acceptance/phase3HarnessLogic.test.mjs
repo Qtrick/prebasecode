@@ -8,9 +8,10 @@ import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER
 import { ACTIVE_SOAK_FINAL_MIN_DURATION_MS, activeSoakEvidenceTarget, activeSoakFailures } from './prebase-active-soak.mjs';
 import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
-import { findGraphFrame, formatPhase3LockBlockMessage, recoverHungWorkbenchPage, waitForWorkbenchDriver, workbenchCommandWithTimeout } from './workbenchHarness.mjs';
+import { findGraphFrame, formatPhase3LockBlockMessage, recoverHungWorkbenchPage, waitForWorkbenchDriver, workbenchCommandWithTimeout, classifyProcessRole, redactCommandLine } from './workbenchHarness.mjs';
 import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
+import { liveActivityLiveFailures } from './prebase-magnus-live-activity-live.mjs';
 import { PHASE3_EVIDENCE_SCHEMA_VERSION, phase3EvidenceMetadata } from './phase3Evidence.mjs';
 import { assuranceCommandLabel, assuranceEvidenceOk, PHASE3_ASSURANCE_COMMANDS, PHASE3_ASSURANCE_LEAF_COVERAGE, reportedTestCount } from './prebase-phase3-assurance.mjs';
 import { lifecycleFailures } from './prebase-process-leak-diag.mjs';
@@ -1548,4 +1549,52 @@ test('computePlanKey is stable for identical validation state', async () => {
 	const b = computePlanKey(repoRoot, identity, { firecrawlConfigured: false, linkupConfigured: true, geminiConfigured: false });
 	assert.equal(a, b);
 	assert.notEqual(a, computePlanKey(repoRoot, { productFingerprint: 'other', sourceFingerprint: 'other' }, probeEnvironmentPrerequisites()));
+});
+
+test('classifyProcessRole and redactCommandLine correctly categorize processes and redact secrets', () => {
+	assert.equal(classifyProcessRole('Code Helper (Renderer)', '/path/to/PreBase --type=renderer --site-per-process'), 'renderer');
+	assert.equal(classifyProcessRole('Code Helper (GPU)', '/path/to/PreBase --type=gpu-process'), 'gpu');
+	assert.equal(classifyProcessRole('Code Helper (Plugin)', '/path/to/PreBase --type=utility --utility-sub-type=node.mojom.NodeService --extensionHost'), 'extensionHost');
+	assert.equal(classifyProcessRole('Code Helper (Network)', '/path/to/PreBase --type=utility --utility-sub-type=network.mojom.NetworkService'), 'networkService');
+	assert.equal(classifyProcessRole('node', 'node /path/to/node_modules/typescript/lib/tsserver.js'), 'tsserver');
+	assert.equal(classifyProcessRole('node', '/path/to/node_modules/node-pty/build/Release/ptyHost'), 'ptyHost');
+	assert.equal(classifyProcessRole('git', '/usr/bin/git status'), 'git');
+	assert.equal(classifyProcessRole('PreBase', '/path/to/PreBase /workspace'), 'main');
+
+	const redacted = redactCommandLine('tool --token=sk-1234567890abcdef --key=AIzaSyD-1234567890 --password=secretPass');
+	assert.match(redacted, /token=\[redacted\]/);
+	assert.match(redacted, /key=\[redacted\]/);
+	assert.match(redacted, /password=\[redacted\]/);
+	assert.doesNotMatch(redacted, /secretPass/);
+	assert.doesNotMatch(redacted, /sk-1234567890abcdef/);
+});
+
+test('liveActivityLiveFailures validates factual native diagnostics and handles non-mac', () => {
+	const nonMac = { platform: 'linux', nativePresent: false };
+	assert.deepEqual(liveActivityLiveFailures(nonMac), []);
+
+	const missingNative = { platform: 'darwin', nativePresent: false };
+	assert.ok(liveActivityLiveFailures(missingNative).some(f => /native AppKit module missing/.test(f)));
+
+	const validDarwin = {
+		platform: 'darwin',
+		nativePresent: true,
+		diagnosticsAfterOpen: { backend: 'native-appkit', sessionId: 'sess-1', status: 'working' },
+		smokeTransportInstalled: true,
+		nativeDiagnostics: {
+			panelCreated: true,
+			panelVisible: true,
+			panelFrame: { x: 100, y: 1000, width: 300, height: 34 },
+		},
+		followUpSimulation: { ok: true },
+		nativeScreenshot: { captured: true },
+		quit: { remaining: 'gone' },
+	};
+	assert.deepEqual(liveActivityLiveFailures(validDarwin), []);
+
+	const invalidFrame = {
+		...validDarwin,
+		nativeDiagnostics: { panelCreated: true, panelVisible: true, panelFrame: { x: 0, y: 0, width: 0, height: 0 } },
+	};
+	assert.ok(liveActivityLiveFailures(invalidFrame).some(f => /frame invalid/.test(f)));
 });

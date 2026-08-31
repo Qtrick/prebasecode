@@ -3,58 +3,64 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "privacy",
-  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "generatedAt": "2026-08-30T03:28:26.579Z",
+  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
+  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "generatedAt": "2026-08-31T18:36:06.589Z",
   "producerId": "privacy",
-  "producerFingerprint": "ea82c342674e4f9487c9d8d1b4a75fe0a3811cc0a3e03721204e06b8752ea09d",
+  "producerFingerprint": "53f7ab7055bd97e1d0672680feeb34c2099308e33e94ec501170ca0f50b47869",
   "observations": [
     {
       "phase": "startup",
       "cdpHosts": [],
       "sockets": [
         {
-          "pid": 75898,
+          "pid": 7596,
           "host": "localhost",
-          "port": 55665,
+          "port": 55415,
           "role": "main"
         },
         {
-          "pid": 75898,
+          "pid": 7596,
           "host": "localhost",
-          "port": 55663,
+          "port": 55413,
           "role": "main"
         },
         {
-          "pid": 75898,
+          "pid": 7596,
           "host": "localhost",
-          "port": 55672,
+          "port": 55422,
           "role": "main"
         },
         {
-          "pid": 75914,
-          "host": "cdn-185-199-110-133.github.com",
+          "pid": 7629,
+          "host": "cdn-185-199-111-133.github.com",
           "port": 443,
-          "role": "helper"
+          "role": "main"
         },
         {
-          "pid": 75962,
+          "pid": 7672,
           "host": "localhost",
-          "port": 55664,
-          "role": "helper"
+          "port": 5879,
+          "role": "main"
         },
         {
-          "pid": 75962,
-          "host": "172.217.115.4",
+          "pid": 7674,
+          "host": "localhost",
+          "port": 55414,
+          "role": "main"
+        },
+        {
+          "pid": 7674,
+          "host": "172.217.119.4",
           "port": 443,
-          "role": "helper"
+          "role": "main"
         },
         {
-          "pid": 75979,
+          "pid": 7697,
           "host": "localhost",
-          "port": 6006,
-          "role": "helper"
+          "port": 6344,
+          "role": "main"
         }
       ]
     },
@@ -78,12 +84,12 @@
       "sockets": []
     }
   ],
-  "prebasePid": 75898,
+  "prebasePid": 7596,
   "quit": {
-    "before": "75898     1   3.9 288160 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "7596     1   3.9 233808 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 517,
+    "latencyMs": 742,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
@@ -224,24 +230,24 @@
   "allHosts": [
     "open-vsx.org",
     "localhost",
-    "cdn-185-199-110-133.github.com",
-    "172.217.115.4"
+    "cdn-185-199-111-133.github.com",
+    "172.217.119.4"
   ],
   "socketHosts": [
     "localhost",
-    "cdn-185-199-110-133.github.com",
-    "172.217.115.4"
+    "cdn-185-199-111-133.github.com",
+    "172.217.119.4"
   ],
   "expectedHosts": [
     "open-vsx.org",
     "localhost",
-    "cdn-185-199-110-133.github.com"
+    "cdn-185-199-111-133.github.com"
   ],
   "unexpectedHosts": [],
   "forbiddenHosts": [],
   "unresolvedNumericHosts": [],
   "socketUnresolvedHosts": [
-    "172.217.115.4"
+    "172.217.119.4"
   ],
   "classifications": [
     {
@@ -255,12 +261,12 @@
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "cdn-185-199-110-133.github.com",
+      "host": "cdn-185-199-111-133.github.com",
       "kind": "expected",
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "172.217.115.4",
+      "host": "172.217.119.4",
       "kind": "socket-numeric",
       "why": "process-tree socket numeric; hostname identity comes from CDP"
     }

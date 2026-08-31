@@ -7,8 +7,7 @@ import { existsSync } from 'node:fs';
 import { join, resolve, sep } from 'node:path';
 import { normalizeRel } from './projectGuidanceDiscovery';
 import { computeGuidanceDelta, formatGuidanceDeltaForPrompt } from './projectGuidanceDelta';
-import type { ProjectGuidanceService, ProjectGuidanceSnapshot } from './projectGuidanceService';
-import { resolveWorkspaceRootForPath } from './projectGuidanceService';
+import { resolveWorkspaceRootForPath, type ProjectGuidanceService, type ProjectGuidanceSnapshot } from './projectGuidanceService';
 import { getProjectGuidanceSession, type GuidanceTarget, type ProjectGuidanceSession } from './projectGuidanceSession';
 import type { ToolCallItem } from './toolExecutor';
 
@@ -30,14 +29,22 @@ const JIT_WORKSPACE_TOOLS = new Set<string>([
 	'prebase_workspace_get_definition',
 	'prebase_workspace_get_references',
 	'prebase_workspace_get_diagnostics',
+	'prebase_project_guidance',
+	...MUTATION_WORKSPACE_TOOLS,
 ]);
 
 function extractPathArg(args: Record<string, unknown>): string | undefined {
-	for (const key of ['path', 'file', 'filePath', 'relativePath']) {
+	if (!args || typeof args !== 'object') {
+		return undefined;
+	}
+	for (const key of ['path', 'file', 'filePath', 'relativePath', 'rootPath', 'targetFile', 'target_file', 'file_path', 'dirPath', 'dir_path', 'searchPath', 'search_path']) {
 		const value = args[key];
 		if (typeof value === 'string' && value.trim()) {
 			return value.trim();
 		}
+	}
+	if (Array.isArray(args.paths) && typeof args.paths[0] === 'string' && args.paths[0].trim()) {
+		return args.paths[0].trim();
 	}
 	return undefined;
 }
@@ -134,8 +141,11 @@ export function extractMutationPathStrings(call: ToolCallItem): string[] {
 			const files = call.args.files;
 			if (Array.isArray(files)) {
 				for (const file of files) {
-					if (file && typeof file === 'object' && 'path' in file) {
-						push((file as { path?: unknown }).path);
+					if (file && typeof file === 'object') {
+						const pathVal = (file as { path?: unknown }).path;
+						if (typeof pathVal === 'string') {
+							push(pathVal);
+						}
 					}
 				}
 			}

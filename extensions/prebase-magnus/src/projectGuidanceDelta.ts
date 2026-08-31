@@ -7,11 +7,11 @@ import { boundedJoin } from './projectGuidanceDiscovery';
 import {
 	DEFAULT_GUIDANCE_BUDGET,
 	formatProjectGuidanceForPrompt,
+	type GuidanceTextBlock,
 	MAX_PROMPT_GUIDANCE_CHARS,
 	type ProjectGuidanceSnapshot,
 	scrubSecretsFromGuidance,
 } from './projectGuidanceService';
-import type { GuidanceTextBlock } from './projectGuidanceService';
 import type { ProjectGuidanceSession } from './projectGuidanceSession';
 
 export interface GuidanceDelta {

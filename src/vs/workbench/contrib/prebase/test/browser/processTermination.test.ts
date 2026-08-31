@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { terminateOwnedProcess, POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS, sanitizeOwnedDesktopChildEnv, type IProcessTerminationTarget, type ProcessTerminationSignal } from '../../../../../platform/prebaseDesktop/common/processTermination.js';
 
@@ -34,6 +35,8 @@ class FakeTerminationTarget implements IProcessTerminationTarget {
 }
 
 suite('terminateOwnedProcess', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('does not signal or wait for an already-exited target', async () => {
 		const target = new FakeTerminationTarget(true);
 
@@ -80,6 +83,8 @@ suite('terminateOwnedProcess', () => {
 });
 
 suite('sanitizeOwnedDesktopChildEnv', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('strips CARGO_TARGET_DIR even when the caller overlay tries to re-inject it', () => {
 		const childEnv = sanitizeOwnedDesktopChildEnv({
 			PATH: '/usr/bin',

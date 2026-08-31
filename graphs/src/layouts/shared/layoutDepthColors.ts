@@ -2,12 +2,12 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import { isUnreachableDepth } from '../../core/analysis/dependencyDepth.js'
+import { isUnreachableDepth } from '../../core/analysis/dependencyDepth.js';
 
 /** Shared depth palette for Hierarchy rings and Pyramid bands. */
 
-const ENTRY_COLOR = 'rgba(232,184,74,0.42)'
-const UNREACHABLE_COLOR = 'rgba(148,163,184,0.30)'
+const ENTRY_COLOR = 'rgba(232,184,74,0.42)';
+const UNREACHABLE_COLOR = 'rgba(148,163,184,0.30)';
 
 /** Depth 1+ ring/band colors (entry uses ENTRY_COLOR). */
 const DEPTH_COLORS = [
@@ -19,13 +19,13 @@ const DEPTH_COLORS = [
 	'rgba(74,222,128,0.26)', // depth 6 — green
 	'rgba(196,181,253,0.24)',
 	'rgba(148,163,184,0.22)'
-] as const
+] as const;
 
 /** Color for a depth level (0 = entry, 1 = innermost ring/band after entry). */
 export function depthLevelColor(depth: number): string {
-	if (isUnreachableDepth(depth)) return UNREACHABLE_COLOR
-	if (depth <= 0) return ENTRY_COLOR
-	return DEPTH_COLORS[(depth - 1) % DEPTH_COLORS.length]
+	if (isUnreachableDepth(depth)) {return UNREACHABLE_COLOR;}
+	if (depth <= 0) {return ENTRY_COLOR;}
+	return DEPTH_COLORS[(depth - 1) % DEPTH_COLORS.length];
 }
 
 /**
@@ -39,12 +39,12 @@ export function depthLevelColorBase(depth: number): string {
 	return depthLevelColor(depth).replace(
 		/rgba\((\d+),\s*(\d+),\s*(\d+),[\d.]+\)/,
 		'rgb($1,$2,$3)'
-	)
+	);
 }
 
 /** Border color with higher opacity for selected state. */
 export function depthLevelBorderColor(depth: number, selected = false): string {
-	const base = depthLevelColor(depth)
-	if (!selected) return base.replace(/[\d.]+\)$/, '0.48)')
-	return base.replace(/[\d.]+\)$/, '0.72)')
+	const base = depthLevelColor(depth);
+	if (!selected) {return base.replace(/[\d.]+\)$/, '0.48)');}
+	return base.replace(/[\d.]+\)$/, '0.72)');
 }

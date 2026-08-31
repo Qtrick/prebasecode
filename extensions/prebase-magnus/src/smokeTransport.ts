@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type {
@@ -66,19 +67,23 @@ function sleep(ms: number, token?: AICancellationToken): Promise<void> {
 			settled = true;
 			fn();
 		};
-		let sub: { dispose(): void } | undefined;
-		const timer = setTimeout(() => {
-			sub?.dispose();
-			finish(resolve);
-		}, ms);
-		sub = token?.onCancellationRequested?.(() => {
-			clearTimeout(timer);
-			sub?.dispose();
+		const handle: { timer?: ReturnType<typeof setTimeout>; sub?: { dispose(): void } } = {};
+		handle.sub = token?.onCancellationRequested?.(() => {
+			if (handle.timer !== undefined) {
+				clearTimeout(handle.timer);
+			}
+			handle.sub?.dispose();
 			finish(() => reject(Object.assign(new Error('Cancelled'), { name: 'CancellationError' })));
 		});
+		handle.timer = setTimeout(() => {
+			handle.sub?.dispose();
+			finish(resolve);
+		}, ms);
 		if (token?.isCancellationRequested) {
-			clearTimeout(timer);
-			sub?.dispose();
+			if (handle.timer !== undefined) {
+				clearTimeout(handle.timer);
+			}
+			handle.sub?.dispose();
 			finish(() => reject(Object.assign(new Error('Cancelled'), { name: 'CancellationError' })));
 		}
 	});

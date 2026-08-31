@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type {
@@ -64,10 +63,10 @@ export function measureLayoutQuality(
 
 	for (let i = 0; i < totalNodes; i++) {
 		const p1 = nodes[i];
-		if (p1.x < minX) minX = p1.x;
-		if (p1.y < minY) minY = p1.y;
-		if (p1.x > maxX) maxX = p1.x;
-		if (p1.y > maxY) maxY = p1.y;
+		if (p1.x < minX) {minX = p1.x;}
+		if (p1.y < minY) {minY = p1.y;}
+		if (p1.x > maxX) {maxX = p1.x;}
+		if (p1.y > maxY) {maxY = p1.y;}
 
 		for (let j = i + 1; j < totalNodes; j++) {
 			const p2 = nodes[j];
@@ -152,7 +151,7 @@ export function measureLayoutQuality(
 		const e1 = edges[i];
 		const p1 = nodePosMap.get(e1.sourceEntityId || (e1 as any).sourceId);
 		const p2 = nodePosMap.get(e1.targetEntityId || (e1 as any).targetId);
-		if (!p1 || !p2) continue;
+		if (!p1 || !p2) {continue;}
 
 		for (let j = i + 1; j < sampleLimit; j++) {
 			const e2 = edges[j];
@@ -162,7 +161,7 @@ export function measureLayoutQuality(
 			}
 			const p3 = nodePosMap.get(e2.sourceEntityId || (e2 as any).sourceId);
 			const p4 = nodePosMap.get(e2.targetEntityId || (e2 as any).targetId);
-			if (!p3 || !p4) continue;
+			if (!p3 || !p4) {continue;}
 
 			if (doLineSegmentsIntersect(p1, p2, p3, p4)) {
 				edgeCrossingCount++;

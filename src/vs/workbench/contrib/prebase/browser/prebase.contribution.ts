@@ -1120,6 +1120,10 @@ registerAction2(class extends Action2 {
 		if (liveActivityMode === 'background' || liveActivityMode === 'alwaysWorking' || liveActivityMode === 'attentionOnly' || liveActivityMode === 'off') {
 			await configurationService.updateValue('prebase.magnus.liveActivity.mode', liveActivityMode);
 		}
+		const networkLayoutMode = (request as { networkLayoutMode?: string } | undefined)?.networkLayoutMode;
+		if (typeof networkLayoutMode === 'string') {
+			await configurationService.updateValue('prebase.graph.networkLayoutMode', networkLayoutMode);
+		}
 		let parserActiveRequests = 0;
 		let temporalActiveWrites = 0;
 		let runtimePreviewServerRunning = false;
@@ -1220,6 +1224,16 @@ registerAction2(class extends Action2 {
 	async run(accessor: ServicesAccessor) {
 		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.installMagnusSmokeTransport');
 		return accessor.get(ICommandService).executeCommand('prebase.magnus.installSmokeTransport');
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({ id: 'prebase.test.runMagnusSmokeStream', title: localize2('prebase.test.runMagnusSmokeStream', "Run Magnus Smoke Stream (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
+	}
+	async run(accessor: ServicesAccessor, options?: { prompt?: string; cancelAfterMs?: number }) {
+		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.runMagnusSmokeStream');
+		return accessor.get(ICommandService).executeCommand('prebase.magnus.runSmokeStream', options);
 	}
 });
 

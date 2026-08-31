@@ -3,6 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import {
 	appendRuntimeEvidence,
@@ -13,6 +14,8 @@ import {
 import { stopDesktopSessionForMagnus, type DesktopSessionTerminator } from '../../common/runtime/desktopStopForMagnus.js';
 
 suite('PreBase Runtime safety boundaries', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('bounds evidence by entry count while retaining the newest tail', () => {
 		let entries: string[] = [];
 		let droppedCount = 0;

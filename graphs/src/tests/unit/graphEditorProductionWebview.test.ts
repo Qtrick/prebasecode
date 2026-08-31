@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'node:assert/strict';
@@ -14,8 +13,8 @@ type Listener = (event: any) => void;
 
 class FakeClassList {
 	private readonly values = new Set<string>();
-	add(...names: string[]): void { for (const n of names) this.values.add(n); }
-	remove(...names: string[]): void { for (const n of names) this.values.delete(n); }
+	add(...names: string[]): void { for (const n of names) {this.values.add(n);} }
+	remove(...names: string[]): void { for (const n of names) {this.values.delete(n);} }
 	contains(name: string): boolean { return this.values.has(name); }
 	toggle(name: string, force?: boolean): boolean {
 		const shouldHave = force === undefined ? !this.values.has(name) : force;
@@ -83,7 +82,7 @@ class FakeElement {
 	}
 	appendChild(child: FakeElement): FakeElement {
 		this.children.push(child);
-		if (!this.firstChild) this.firstChild = child;
+		if (!this.firstChild) {this.firstChild = child;}
 		return child;
 	}
 	removeChild(child: FakeElement): FakeElement {
@@ -104,7 +103,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 	const rawScriptMatch = htmlMatch.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/);
 	assert.ok(rawScriptMatch, 'webview script must be present in graphEditor.ts');
 
-	let script = interpolateWebviewScript(rawScriptMatch[1], '42', initialType);
+	const script = interpolateWebviewScript(rawScriptMatch[1], '42', initialType);
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [
@@ -208,14 +207,14 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 			return {
 				fontFamily: workbenchFontFamily,
 				getPropertyValue(prop: string) {
-					if (prop === '--vscode-editor-background') return '#1B1C1E';
-					if (prop === '--vscode-foreground') return '#f4f4f5';
-					if (prop === '--vscode-widget-border') return '#3C3C3C';
-					if (prop === '--vscode-gitDecoration-addedResourceForeground') return '#3fb950';
-					if (prop === '--vscode-gitDecoration-deletedResourceForeground') return '#f85149';
-					if (prop === '--vscode-gitDecoration-modifiedResourceForeground') return '#d29922';
-					if (prop === '--vscode-gitDecoration-renamedResourceForeground') return '#58a6ff';
-					if (prop === '--vscode-button-background') return '#2dd4bf';
+					if (prop === '--vscode-editor-background') {return '#1B1C1E';}
+					if (prop === '--vscode-foreground') {return '#f4f4f5';}
+					if (prop === '--vscode-widget-border') {return '#3C3C3C';}
+					if (prop === '--vscode-gitDecoration-addedResourceForeground') {return '#3fb950';}
+					if (prop === '--vscode-gitDecoration-deletedResourceForeground') {return '#f85149';}
+					if (prop === '--vscode-gitDecoration-modifiedResourceForeground') {return '#d29922';}
+					if (prop === '--vscode-gitDecoration-renamedResourceForeground') {return '#58a6ff';}
+					if (prop === '--vscode-button-background') {return '#2dd4bf';}
 					return '';
 				}
 			};

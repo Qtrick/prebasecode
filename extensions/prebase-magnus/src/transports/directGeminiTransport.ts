@@ -355,15 +355,15 @@ export async function sleepWithCancellation(ms: number, token?: AICancellationTo
 		throw new Error('Cancelled');
 	}
 	return new Promise((resolve, reject) => {
-		let timer: ReturnType<typeof setTimeout> | undefined;
-		const sub = token?.onCancellationRequested?.(() => {
-			if (timer) {
-				clearTimeout(timer);
+		const handle: { timer?: ReturnType<typeof setTimeout>; sub?: { dispose(): void } } = {};
+		handle.sub = token?.onCancellationRequested?.(() => {
+			if (handle.timer !== undefined) {
+				clearTimeout(handle.timer);
 			}
 			reject(new Error('Cancelled'));
 		});
-		timer = setTimeout(() => {
-			sub?.dispose();
+		handle.timer = setTimeout(() => {
+			handle.sub?.dispose();
 			resolve();
 		}, ms);
 	});

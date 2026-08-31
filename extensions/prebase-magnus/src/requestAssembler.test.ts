@@ -38,17 +38,17 @@ suite('Magnus Request Assembler & Context Budget', () => {
 
 	test('resolveNativeReferences skips sensitive files and reads bounded content via host', async () => {
 		const mockHost = {
-			readFile: async (uri: any) => Buffer.from(`content for ${uri.path}`),
-			asRelativePath: (uri: any) => uri.path,
+			readFile: async (uri: { path: string }) => Buffer.from(`content for ${uri.path}`),
+			asRelativePath: (uri: { path: string }) => uri.path,
 		};
 
 		const references = [
 			{ value: { fsPath: '.env', scheme: 'file', path: '.env' } },
 			{ value: { fsPath: 'src/main.ts', scheme: 'file', path: 'src/main.ts' } },
-		] as any;
+		] as unknown as vscode.ChatPromptReference[];
 
 		const { resolveNativeReferences } = await import('./requestAssembler');
-		const resolved = await resolveNativeReferences(references, DEFAULT_CONTEXT_BUDGET, mockHost as any);
+		const resolved = await resolveNativeReferences(references, DEFAULT_CONTEXT_BUDGET, mockHost as unknown as import('./requestAssembler').IRequestAssemblerHost);
 
 		assert.strictEqual(resolved.length, 2);
 		assert.ok(resolved[0].includes('[SKIPPED - Sensitive]'));

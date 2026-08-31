@@ -1,7 +1,9 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { spawnSync } from 'child_process';
 import { cpSync, existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from 'fs';
@@ -46,6 +48,8 @@ function collectTsFiles(dir: string, files: string[] = []): string[] {
 }
 
 suite('desktopLocators', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('parses semantic locators and rejects deep nth-child CSS', () => {
 		assert.deepStrictEqual(parseDesktopLocator({ by: 'role', role: 'button', name: 'Save' }), { by: 'role', role: 'button', name: 'Save', exact: false });
 		assert.ok('error' in parseDesktopLocator({ by: 'css', value: 'div:nth-child(3) > div:nth-child(7) > span:nth-child(2) > button' }));
@@ -77,6 +81,8 @@ suite('desktopLocators', () => {
 });
 
 suite('desktopAutomationHost', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('retries until visible then returns', async () => {
 		let calls = 0;
 		const evaluate: DesktopEvaluateFn = async expression => {
@@ -153,7 +159,7 @@ suite('desktopAutomationHost', () => {
 			return true;
 		};
 
-		let checked = false;
+		const checked = false;
 		const failedCheck = await interactDesktop(evaluateFor(() => checked), 'check', locator, undefined, 120, CancellationToken.None, backend(() => { /* prevented */ }));
 		assert.strictEqual(failedCheck.code, 'stateUnchanged');
 
@@ -667,6 +673,8 @@ function runStablePointerAction(api: { run: (command: unknown) => Record<string,
 }
 
 suite('desktopAutomationDom', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('clicks a unique role, testId, and labelled control', () => {
 		const save = el('button', {}, 'Save');
 		const named = el('button', { 'data-testid': 'ok' }, 'OK');
@@ -939,6 +947,8 @@ suite('desktopAutomationDom', () => {
 });
 
 suite('tauriTestingSetup', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	const cargo = '[package]\nname="demo"\n[dependencies]\ntauri = "2"\n';
 	const rust = 'fn main() {\n    tauri::Builder::default().run(tauri::generate_context!()).unwrap();\n}\n';
 
@@ -1355,6 +1365,8 @@ suite('tauriTestingSetup', () => {
 });
 
 suite('tauriTestingTransaction', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	const writes = [
 		{ resource: 'Cargo.toml', before: 'cargo-old', after: 'cargo-new' },
 		{ resource: 'lib.rs', before: 'rust-old', after: 'rust-new' },
@@ -1674,6 +1686,8 @@ suite('tauriTestingTransaction', () => {
 });
 
 suite('desktopTestModel', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('records steps and redacts secret fill values', () => {
 		const run = createDesktopTestRun({ id: 't1', framework: 'electron', mode: 'renderer', backend: 'cdp', workspaceRoot: '/app' });
 		recordDesktopTestStep(run, {
@@ -1717,6 +1731,8 @@ suite('desktopTestModel', () => {
 });
 
 suite('desktopWebDriver', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('only treats HTTP success plus ready true as WebDriver ready', () => {
 		assert.strictEqual(isWebDriverReadyStatus(200, { value: { ready: true, message: 'ok' } }), true);
 		assert.strictEqual(isWebDriverReadyStatus(200, { ready: true }), true);
@@ -1917,6 +1933,8 @@ suite('desktopWebDriver', () => {
 });
 
 suite('desktopShutdownPolicy', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('test-owned processes terminate even when preview externals are detached', () => {
 		assert.deepStrictEqual(resolveDesktopShutdownPolicy(true, false), {
 			closeManagedWindows: true,
@@ -1933,6 +1951,8 @@ suite('desktopShutdownPolicy', () => {
 });
 
 suite('desktopAutomationLazyLoad', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('production desktop runtime does not import Playwright or WebdriverIO', () => {
 		const root = findRepoRoot();
 		const files = [
@@ -1955,6 +1975,8 @@ suite('desktopAutomationLazyLoad', () => {
 });
 
 suite('tauriTestingCandidatePaths', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('resolves lib.rs and capabilities next to src-tauri Cargo.toml', () => {
 		assert.deepStrictEqual(tauriTestingCandidatePaths('src-tauri/Cargo.toml'), {
 			rustEntries: ['src-tauri/src/lib.rs', 'src-tauri/src/main.rs'],
@@ -2040,6 +2062,8 @@ suite('tauriTestingCandidatePaths', () => {
 });
 
 suite('desktopProductPathAcceptance', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	function evaluate(evidence: Record<string, unknown>) {
 		const runner = join(findRepoRoot(), 'test/prebase/acceptance/prebase-desktop-product-path.mjs');
 		const result = spawnSync(process.execPath, [runner, '--evaluate'], {

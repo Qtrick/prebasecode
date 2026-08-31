@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type { GraphEdge, GraphNode } from '../../common/types/graphTypes.js';
@@ -124,15 +123,15 @@ export class NetworkEdgeRenderStrategy {
 		}
 
 		let variant: NetworkEdgeVisualVariant;
-		if (edgeKind === 'contains') variant = 'contains';
-		else if (edgeKind === 'dependency') variant = 'dependency';
-		else if (edgeKind === 'reference') variant = 'reference';
-		else if (edgeKind === 'export') variant = 'export';
-		else if (isDynamic) variant = 'dynamic';
+		if (edgeKind === 'contains') {variant = 'contains';}
+		else if (edgeKind === 'dependency') {variant = 'dependency';}
+		else if (edgeKind === 'reference') {variant = 'reference';}
+		else if (edgeKind === 'export') {variant = 'export';}
+		else if (isDynamic) {variant = 'dynamic';}
 		// GraphEdge.meta has no entry flags; entry emphasis is derived from
 		// context.entryNodeId via the shared resolver.
-		else if (isIncidentToEntry) variant = 'entry';
-		else variant = 'import';
+		else if (isIncidentToEntry) {variant = 'entry';}
+		else {variant = 'import';}
 
 		return {
 			variant,

@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'assert';
@@ -235,9 +236,10 @@ suite('local Firecrawl client', () => {
 		assert.equal(bodies[0].storeInCache, false);
 		assert.equal(bodies[0].maxAge, 0);
 		for (const body of bodies) {
-			assert.equal('zeroDataRetention' in body, false);
-			assert.equal('zero_data_retention' in body, false);
-			assert.equal('zdr' in body, false);
+			const rec = body as Record<string, unknown>;
+			assert.equal(rec.zeroDataRetention, undefined);
+			assert.equal(rec.zero_data_retention, undefined);
+			assert.equal(rec.zdr, undefined);
 			assert.equal(JSON.stringify(body).toLowerCase().includes('interact'), false);
 		}
 	});

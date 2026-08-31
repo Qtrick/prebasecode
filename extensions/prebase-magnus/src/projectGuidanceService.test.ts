@@ -1,3 +1,7 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import assert from 'node:assert/strict';
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -182,7 +186,7 @@ describe('projectGuidanceService', () => {
 		const paths = guidanceTargetPathsFromReferences([
 			{ value: 'graphs/src/foo.ts' },
 			{ value: { fsPath: '/tmp/workspace/src/main.ts' } },
-		], value => typeof value === 'object' && value && 'fsPath' in value ? 'src/main.ts' : undefined);
+		], value => typeof value === 'object' && value && typeof (value as { fsPath?: unknown }).fsPath === 'string' ? 'src/main.ts' : undefined);
 		assert.deepEqual(paths.sort(), ['graphs/src/foo.ts', 'src/main.ts']);
 	});
 

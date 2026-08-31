@@ -1051,7 +1051,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 	}
 
 	private _refreshHistorySelection(): void {
-		if (!this._historyList) return;
+		if (!this._historyList) {return;}
 		const isNetwork = this._getActiveGraphType() === 'network';
 		const historicalSha = this.graphService.getSelectedHistoricalCommitSha();
 		const state = this.temporalViewService.getState();
@@ -1281,13 +1281,13 @@ export class PreBaseMapsViewPane extends ViewPane {
 	}
 
 	private _refreshTemporal(): void {
-		if (!this._temporalSection) return;
+		if (!this._temporalSection) {return;}
 		const activeGraphType = this._getActiveGraphType();
 		const isTemporal = activeGraphType === 'temporal';
 		const hasProject = this._hasOpenProject();
 
 		this._temporalSection.style.display = isTemporal && hasProject ? 'block' : 'none';
-		if (!isTemporal || !hasProject) return;
+		if (!isTemporal || !hasProject) {return;}
 
 		const state = this.temporalViewService.getState();
 		const diff = state.diff;
@@ -1308,7 +1308,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 			optHead.selected = state.selectedRef === 'HEAD';
 
 			for (const r of refs) {
-				if (r.name === 'HEAD') continue;
+				if (r.name === 'HEAD') {continue;}
 				const opt = DOM.append(this._temporalRefSelect, DOM.$('option')) as HTMLOptionElement;
 				opt.value = r.name;
 				opt.textContent = `${r.kind === 'branch' ? '⑂ ' : '🏷 '}${r.name}`;
@@ -1365,7 +1365,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 				this._register(DOM.addDisposableListener(badge, 'click', () => {
 					const cur = this._temporalFilterInput?.value || '';
 					const next = cur === queryFilter ? '' : queryFilter;
-					if (this._temporalFilterInput) this._temporalFilterInput.value = next;
+					if (this._temporalFilterInput) {this._temporalFilterInput.value = next;}
 					this.temporalViewService.setFilterQuery(next);
 				}));
 			};

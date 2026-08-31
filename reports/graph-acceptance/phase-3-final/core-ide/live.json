@@ -3,20 +3,21 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "core-ide",
-  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "generatedAt": "2026-08-30T03:17:00.729Z",
+  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
+  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "generatedAt": "2026-08-31T18:31:48.676Z",
   "producerId": "core-ide",
-  "producerFingerprint": "5c7ebe9a2c5491f11e67c5d172bd2602815d155853cddf23002b82dcf1362c0e",
-  "prebasePid": 37876,
+  "producerFingerprint": "3cc630b83ea66c7bbc817a1eb70418fc5fca4d8e3d165f81585b803aa13118f1",
+  "prebasePid": 82777,
   "c3_folderOpen": true,
   "p2_offline": true,
   "e1_saveUndo": true,
   "e2_search": true,
   "e3_scm": true,
   "e4_terminal": true,
-  "e5_debug": false,
+  "e5_debug": true,
+  "e6_typescript": true,
   "c5_reload": true,
   "p1_settings": true,
   "p4_runtime": true,
@@ -29,56 +30,59 @@
       "nodesDrawn": 5,
       "receivedNodeCount": 5,
       "selectedNodeId": "file:README.md",
-      "networkLayoutMode": "radial",
+      "networkLayoutMode": "organic",
       "networkIdleAutoRotate": true,
       "viewportWidth": 792,
-      "viewportHeight": 545,
+      "viewportHeight": 544,
       "projectedBounds": {
-        "minX": 295.7506801798138,
-        "minY": 87.35743973795459,
-        "maxX": 555.5251580129652,
-        "maxY": 434.8864714697396,
-        "width": 259.7744778331514,
-        "height": 347.52903173178504
+        "minX": 323.99951283034045,
+        "minY": 81.42657820778749,
+        "maxX": 491.67479556623374,
+        "maxY": 419.3966345851833,
+        "width": 167.6752827358933,
+        "height": 337.9700563773958
       },
-      "screenUtilization": 0.2091538614354211,
-      "labelCount": 2,
+      "screenUtilization": 0.13152950636731664,
+      "labelCount": 5,
       "nodeHits": [
         {
           "id": "file:README.md",
-          "x": 377.81021535422525,
-          "y": 434.8864714697396
+          "x": 323.99951283034045,
+          "y": 295.22829615971045
         },
         {
           "id": "file:src/errors.ts",
-          "x": 405.4808200527011,
-          "y": 303.6879537118442
+          "x": 491.67479556623374,
+          "y": 324.384853405781
         },
         {
           "id": "file:src/hello.ts",
-          "x": 474.98727552480574,
-          "y": 317.05668136584
+          "x": 432.03317555832575,
+          "y": 274.89352915053786
         },
         {
           "id": "file:src/js-check.js",
-          "x": 295.7506801798138,
-          "y": 426.40831167201435
+          "x": 469.2472742580369,
+          "y": 419.3966345851833
         },
         {
           "id": "file:tsconfig.json",
-          "x": 555.5251580129652,
-          "y": 87.35743973795459
+          "x": 483.8540552723057,
+          "y": 81.42657820778749
         }
       ]
     },
     "nodesDrawn": true,
     "selection": true,
     "layoutModes": true,
+    "legacyRadialNormalized": true,
     "rotate": true,
     "drag": true,
     "idleRotateArmed": true,
+    "semanticZoom": true,
     "pick": true,
-    "sphereVsRadial": true,
+    "sphereVsClustered": true,
+    "labelDensity": true,
     "selectionLock": true
   },
   "themes": {
@@ -153,10 +157,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "37876     1  13.3 214544 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "82777     1  13.2 227072 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 645,
+    "latencyMs": 669,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

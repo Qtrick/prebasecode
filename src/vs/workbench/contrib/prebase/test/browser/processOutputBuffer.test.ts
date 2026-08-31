@@ -3,12 +3,15 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { MAX_PROCESS_OUTPUT_ENTRIES, MAX_PROCESS_OUTPUT_ENTRY_BYTES, ProcessOutputBuffer } from '../../../../../platform/prebaseDesktop/common/processOutputBuffer.js';
 
 const encoder = new TextEncoder();
 
 suite('ProcessOutputBuffer', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('frames stdout and stderr independently across chunks and preserves timestamps', () => {
 		const output = new ProcessOutputBuffer();
 		output.append('stdout', encoder.encode('out one\r\npartial'), 10);

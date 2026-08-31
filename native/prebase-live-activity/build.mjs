@@ -29,11 +29,12 @@ const pythonBin = existsSync('/usr/bin/python3') ? '/usr/bin/python3' : (existsS
 const isJs = nodeGyp.endsWith('.js');
 const command = isJs ? process.execPath : (nodeGyp === 'node-gyp' ? 'npx' : nodeGyp);
 const args = isJs ? [nodeGyp] : (command === 'npx' ? ['--no-install', 'node-gyp'] : []);
+const targetArch = process.env.npm_config_arch || process.arch || 'arm64';
 args.push(
 	'rebuild',
 	'--directory', here,
 	`--target=${electronVersion}`,
-	'--arch=arm64',
+	`--arch=${targetArch}`,
 	'--dist-url=https://electronjs.org/headers',
 	'--runtime=electron',
 	`--python=${pythonBin}`,

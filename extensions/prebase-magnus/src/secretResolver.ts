@@ -119,9 +119,9 @@ export function parseAllowlistedEnv(content: string, allowlist: ReadonlySet<stri
 
 		let val = trimmed.slice(eqIndex + 1).trim();
 		if (val.length >= 2) {
-			const first = val[0];
-			const last = val[val.length - 1];
-			if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+			const first = val.charCodeAt(0);
+			const last = val.charCodeAt(val.length - 1);
+			if ((first === 34 && last === 34) || (first === 39 && last === 39)) {
 				val = val.slice(1, -1);
 			}
 		}

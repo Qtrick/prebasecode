@@ -324,7 +324,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 
 		const results: TemporalGraphSnapshot[] = [];
 		for (const commit of filtered) {
-			if (token?.isCancellationRequested) break;
+			if (token?.isCancellationRequested) {break;}
 			const snap = await runtime.ingestionService.reconstructGraphAtCommit(rootPath, commit.commitSha, token);
 			results.push(snap);
 		}
@@ -344,7 +344,7 @@ export class TemporalGraphService implements ITemporalGraphService {
 		const runtime = await this._registry.getRuntime(identity.repositoryId, rootPath, this._gitService);
 
 		for (const sha of commitShas) {
-			if (token?.isCancellationRequested) break;
+			if (token?.isCancellationRequested) {break;}
 			await runtime.ingestCommit(sha, {}, token);
 		}
 	}

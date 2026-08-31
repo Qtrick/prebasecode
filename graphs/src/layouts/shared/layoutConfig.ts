@@ -2,19 +2,19 @@
  *  Copyright (c) PreBase. All rights reserved.
  *--------------------------------------------------------------------------------------------*/
 
-import type { LayoutOrganizationMethod } from './layoutOrganization.js'
+import type { LayoutOrganizationMethod } from './layoutOrganization.js';
 
 /** Runtime layout tuning passed from settings into the layout engine. */
 export interface LayoutRuntimeConfig {
-	layerRadiusScale: number
-	maxNodesPerLayer: number
-	layerGap: number
-	centerClearance: number
-	scatterRelaxIterations: number
+	layerRadiusScale: number;
+	maxNodesPerLayer: number;
+	layerGap: number;
+	centerClearance: number;
+	scatterRelaxIterations: number;
 	/** Multiplier from sidebar spacing control (compact / balanced / spacious). */
-	spacingScale: number
+	spacingScale: number;
 	/** How files are ranked into rings/tiers (hierarchy & pyramid). */
-	organizationMethod: LayoutOrganizationMethod
+	organizationMethod: LayoutOrganizationMethod;
 }
 
 export const DEFAULT_LAYOUT_RUNTIME: LayoutRuntimeConfig = {
@@ -25,10 +25,10 @@ export const DEFAULT_LAYOUT_RUNTIME: LayoutRuntimeConfig = {
 	scatterRelaxIterations: 22,
 	spacingScale: 1,
 	organizationMethod: 'dependency-depth'
-}
+};
 
 export function mergeLayoutRuntime(
 	partial?: Partial<LayoutRuntimeConfig>
 ): LayoutRuntimeConfig {
-	return { ...DEFAULT_LAYOUT_RUNTIME, ...partial }
+	return { ...DEFAULT_LAYOUT_RUNTIME, ...partial };
 }

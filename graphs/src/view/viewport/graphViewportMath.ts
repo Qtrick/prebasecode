@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 export interface Transform2D {
@@ -176,7 +175,7 @@ export function computeGraphBounds(
 
 	for (let i = 0; i < nodes.length; i++) {
 		const node = nodes[i];
-		if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) continue;
+		if (!Number.isFinite(node.x) || !Number.isFinite(node.y)) {continue;}
 		const r = node.radius ?? 0;
 		minX = Math.min(minX, node.x - r);
 		maxX = Math.max(maxX, node.x + r);

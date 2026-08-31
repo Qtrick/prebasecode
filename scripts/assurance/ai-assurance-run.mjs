@@ -1,14 +1,8 @@
 #!/usr/bin/env node
-/**
- * Safe PreBase Live AI Assurance Suite.
- * Executes live tests for:
- * 1. Root .env bounded discovery & precedence
- * 2. Gemini model discovery, error classification, and live generation
- * 3. LinkUp web search client
- * 4. Model capability filtering & dynamic selection
- * 5. Secret sanitization and zero leakage
- * Generates an auditable report under reports/ai-assurance/<RUN_ID>/
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -684,7 +684,7 @@ async function loadNamedMarkdownCatalog(
 						|| metaBoolean(meta, 'model-invocable') === false;
 					const toolsHint = metaString(meta, 'tools') ?? metaString(meta, 'allowed-tools') ?? metaString(meta, 'allowedTools');
 					const modelHint = metaString(meta, 'model') ?? metaString(meta, 'model-provider');
-					catalog.push({
+					const profile: AgentProfileMetadata = {
 						id: `${root.ecosystem}:${hashContent(rel).slice(0, 12)}`,
 						name,
 						description,
@@ -695,16 +695,18 @@ async function loadNamedMarkdownCatalog(
 						...(argumentHint ? { argumentHint } : {}),
 						...(toolsHint ? { toolsHint } : {}),
 						...(modelHint ? { modelHint } : {}),
-					} as AgentProfileMetadata);
+					};
+					catalog.push(profile);
 				} else {
-					catalog.push({
+					const playbook: PlaybookMetadata = {
 						id: `${root.ecosystem}:${hashContent(rel).slice(0, 12)}`,
 						name,
 						description,
 						path: rel,
 						ecosystem: root.ecosystem,
 						...(argumentHint ? { argumentHint } : {}),
-					} as PlaybookMetadata);
+					};
+					catalog.push(playbook);
 				}
 			}
 		}
@@ -1383,7 +1385,7 @@ export function guidanceTargetsFromReferences(
 		} else if (value && typeof value === 'object') {
 			const resolved = asRelativePath?.(value);
 			const relativePath = typeof resolved === 'string' ? resolved : resolved?.relativePath;
-			const fsPath = typeof resolved === 'object' && resolved && 'fsPath' in resolved ? resolved.fsPath : undefined;
+			const fsPath = typeof resolved === 'object' && resolved && typeof (resolved as { fsPath?: string }).fsPath === 'string' ? (resolved as { fsPath: string }).fsPath : undefined;
 			if (relativePath) {
 				const normalized = normalizeRel(relativePath);
 				const root = fsPath ? resolveWorkspaceRootForPath(fsPath, folders) : folders?.[0]?.uri.fsPath;

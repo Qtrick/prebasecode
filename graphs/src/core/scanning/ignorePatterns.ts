@@ -29,4 +29,4 @@ export const DEFAULT_IGNORE_PATTERNS = [
 	'**/*.map',
 	'**/.DS_Store',
 	'**/Thumbs.db'
-]
+];

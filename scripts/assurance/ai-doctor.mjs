@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-/**
- * Safe PreBase AI Provider Doctor.
- * Verifies local developer credentials, live model discovery, live generation,
- * and live LinkUp search without ever logging or exposing secret values.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

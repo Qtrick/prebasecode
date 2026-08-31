@@ -1,9 +1,8 @@
 #!/usr/bin/env node
-/**
- * Static adversarial RLS checklist for PreBase cloud tables.
- * Runtime two-user tests require a dedicated test project + Auth users;
- * this script documents required cases and fails if migrations lack ownership checks.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

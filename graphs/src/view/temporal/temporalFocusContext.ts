@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type {
@@ -291,7 +290,7 @@ export function computeTemporalFocusContext(
 		const edge = allEdges[i];
 		const src = edge.sourceEntityId || (edge as any).sourceId;
 		const tgt = edge.targetEntityId || (edge as any).targetId;
-		if (!src || !tgt) continue;
+		if (!src || !tgt) {continue;}
 
 		let sSet = adjacency.get(src);
 		if (!sSet) {

@@ -1,7 +1,9 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { newWriteableBufferStream, VSBuffer } from '../../../../../../base/common/buffer.js';
 import { CancellationToken } from '../../../../../../base/common/cancellation.js';
@@ -10,6 +12,8 @@ import { buildSupabaseAuthUrl, redactSensitiveForLog } from '../supabaseAuthRest
 import { PreBaseSupabaseAuthClient } from '../../../browser/cloud/prebaseSupabaseAuthClient.js';
 
 suite('PreBase cloud configuration', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('missing url and key yields unconfigured', () => {
 		const cfg = resolvePreBaseCloudAuthConfig(() => undefined);
 		assert.strictEqual(cfg.mode, 'unconfigured');
@@ -84,6 +88,8 @@ suite('PreBase cloud configuration', () => {
 });
 
 suite('PreBase Supabase auth client helpers', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('buildSupabaseAuthUrl normalizes trailing slash', () => {
 		const url = buildSupabaseAuthUrl('https://ref.supabase.co/', '/token?grant_type=password');
 		assert.strictEqual(url, 'https://ref.supabase.co/auth/v1/token?grant_type=password');

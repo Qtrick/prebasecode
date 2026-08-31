@@ -24,56 +24,56 @@ export function temporalAcceptanceFailures(evidence) {
 	const failures = [];
 	const large = evidence.scale === 'large';
 	if (large) {
-		if (!(evidence.fixture?.commits >= 50)) failures.push('large fixture commit count is below 50');
-		if (!(evidence.fixture?.files?.length >= 250)) failures.push('large fixture HEAD does not contain 250+ files');
+		if (!(evidence.fixture?.commits >= 50)) {failures.push('large fixture commit count is below 50');}
+		if (!(evidence.fixture?.files?.length >= 250)) {failures.push('large fixture HEAD does not contain 250+ files');}
 	} else {
-		if (evidence.fixture?.commits !== 10) failures.push('fixture commit count is not 10');
-		if (evidence.fixture?.files?.length !== 4) failures.push('fixture HEAD does not contain four files');
-		if (evidence.fixture?.expectedModifiedPath !== 'src/tally.js') failures.push('fixture first-parent diff is not src/tally.js');
+		if (evidence.fixture?.commits !== 10) {failures.push('fixture commit count is not 10');}
+		if (evidence.fixture?.files?.length !== 4) {failures.push('fixture HEAD does not contain four files');}
+		if (evidence.fixture?.expectedModifiedPath !== 'src/tally.js') {failures.push('fixture first-parent diff is not src/tally.js');}
 	}
-	if (!evidence.targetOpened) failures.push('Temporal Graph target did not open');
-	if (!evidence.repoLoaded) failures.push('Temporal fixture repository did not load');
+	if (!evidence.targetOpened) {failures.push('Temporal Graph target did not open');}
+	if (!evidence.repoLoaded) {failures.push('Temporal fixture repository did not load');}
 
 	const full = evidence.fullMap;
 	if (!full) {
 		failures.push('Full Map metrics are missing');
 	} else {
-		if (full.selectedCommitSha !== evidence.fixture?.head) failures.push('Full Map selected SHA does not equal fixture HEAD');
-		if (full.renderedCommitSha !== evidence.fixture?.head) failures.push('Full Map rendered SHA does not equal fixture HEAD');
-		if (!(full.receivedNodeCount > 0)) failures.push('Full Map received zero nodes');
-		if (!(full.visibleNodeCount > 0)) failures.push('Full Map exposed zero visible nodes');
-		if (!(full.nodesDrawn > 0)) failures.push('Full Map drew zero nodes');
-		if (full.finiteCoordinateCount !== full.receivedNodeCount) failures.push('Full Map contains non-finite node coordinates');
-		if (!(full.canvas?.distinctPixels > 0)) failures.push('Full Map canvas is blank');
+		if (full.selectedCommitSha !== evidence.fixture?.head) {failures.push('Full Map selected SHA does not equal fixture HEAD');}
+		if (full.renderedCommitSha !== evidence.fixture?.head) {failures.push('Full Map rendered SHA does not equal fixture HEAD');}
+		if (!(full.receivedNodeCount > 0)) {failures.push('Full Map received zero nodes');}
+		if (!(full.visibleNodeCount > 0)) {failures.push('Full Map exposed zero visible nodes');}
+		if (!(full.nodesDrawn > 0)) {failures.push('Full Map drew zero nodes');}
+		if (full.finiteCoordinateCount !== full.receivedNodeCount) {failures.push('Full Map contains non-finite node coordinates');}
+		if (!(full.canvas?.distinctPixels > 0)) {failures.push('Full Map canvas is blank');}
 		if (!Number.isFinite(full.transform?.x) || !Number.isFinite(full.transform?.y) || !(full.transform?.k > 0)) {
 			failures.push('Full Map transform is invalid');
 		}
-		if (large && !(full.receivedNodeCount >= 250)) failures.push('large Full Map received fewer than 250 nodes');
-		if (large && full.screenFillRatio !== undefined && full.screenFillRatio < 0.08) failures.push('large Full Map leaves a huge empty canvas');
-		if (large && full.maxCommunityOverlap !== undefined && full.maxCommunityOverlap > 0.85) failures.push('large Full Map communities overlap too much');
+		if (large && !(full.receivedNodeCount >= 250)) {failures.push('large Full Map received fewer than 250 nodes');}
+		if (large && full.screenFillRatio !== undefined && full.screenFillRatio < 0.08) {failures.push('large Full Map leaves a huge empty canvas');}
+		if (large && full.maxCommunityOverlap !== undefined && full.maxCommunityOverlap > 0.85) {failures.push('large Full Map communities overlap too much');}
 	}
 
 	const focus = evidence.focusChanges;
 	if (!focus) {
 		failures.push('Focus Changes metrics are missing');
 	} else {
-		if (!(focus.summary?.modifiedCount >= 1)) failures.push('Focus Changes has no modified diff');
-		if (focus.displayMode !== 'changes') failures.push('Focus Changes mode did not activate');
-		if (!(focus.visibleNodeCount > 0)) failures.push('Focus Changes exposed zero changed nodes');
-		if (!(focus.nodesDrawn > 0)) failures.push('Focus Changes drew zero changed nodes');
-		if (!(focus.canvas?.distinctPixels > 0)) failures.push('Focus Changes canvas is blank');
-		if (large && !(focus.visibleNodeCount >= 4)) failures.push('large Focus Changes did not keep a focused set visible');
+		if (!(focus.summary?.modifiedCount >= 1)) {failures.push('Focus Changes has no modified diff');}
+		if (focus.displayMode !== 'changes') {failures.push('Focus Changes mode did not activate');}
+		if (!(focus.visibleNodeCount > 0)) {failures.push('Focus Changes exposed zero changed nodes');}
+		if (!(focus.nodesDrawn > 0)) {failures.push('Focus Changes drew zero changed nodes');}
+		if (!(focus.canvas?.distinctPixels > 0)) {failures.push('Focus Changes canvas is blank');}
+		if (large && !(focus.visibleNodeCount >= 4)) {failures.push('large Focus Changes did not keep a focused set visible');}
 	}
 
-	if (evidence.unexpectedError) failures.push('Workbench exposed an unexpected Error state');
-	if (evidence.stuckIndexing) failures.push('Temporal indexing remained stuck');
+	if (evidence.unexpectedError) {failures.push('Workbench exposed an unexpected Error state');}
+	if (evidence.stuckIndexing) {failures.push('Temporal indexing remained stuck');}
 	if (evidence.camera?.afterFocus?.k && evidence.camera?.afterUserZoom?.k && Math.abs(evidence.camera.afterUserZoom.k - evidence.camera.afterFocus.k) < 0.02) {
 		failures.push('manual camera zoom did not change the transform');
 	}
 	if (evidence.camera?.afterUserZoom?.k && evidence.camera?.afterWait?.k && Math.abs(evidence.camera.afterWait.k - evidence.camera.afterUserZoom.k) > 0.05) {
 		failures.push('Temporal camera stole the user zoom during a same-mode refresh');
 	}
-	if (evidence.quit?.remaining !== 'gone') failures.push('PreBase did not quit');
+	if (evidence.quit?.remaining !== 'gone') {failures.push('PreBase did not quit');}
 	return failures;
 }
 
@@ -210,7 +210,7 @@ function processSnapshot(pid) {
 async function dismissAuth(page) {
 	const offline = page.getByRole('button', { name: 'Continue Offline', exact: true });
 	const appeared = await offline.waitFor({ state: 'visible', timeout: 10_000 }).then(() => true, () => false);
-	if (!appeared) return false;
+	if (!appeared) {return false;}
 	await offline.click();
 	await page.getByRole('dialog', { name: 'Sign in to PreBase' }).waitFor({ state: 'hidden', timeout: 5_000 });
 	return true;
@@ -220,7 +220,7 @@ async function findGraphFrame(page, timeoutMs = 60_000) {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		for (const frame of page.frames()) {
-			if (frame !== page.mainFrame() && await frame.locator('#netCanvas').count()) return frame;
+			if (frame !== page.mainFrame() && await frame.locator('#netCanvas').count()) {return frame;}
 		}
 		await page.waitForTimeout(250);
 	}
@@ -269,7 +269,7 @@ async function waitForMetrics(page, frame, predicate, timeoutMs = 45_000) {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		const metrics = await readMetrics(frame).catch(() => undefined);
-		if (metrics && predicate(metrics)) return metrics;
+		if (metrics && predicate(metrics)) {return metrics;}
 		await page.waitForTimeout(250);
 	}
 	return readMetrics(frame).catch(() => undefined);
@@ -310,13 +310,13 @@ async function run() {
 	try {
 		browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
 		const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
-		if (!page) throw new Error('Workbench page not found');
+		if (!page) {throw new Error('Workbench page not found');}
 		await dismissAuth(page);
 		await page.getByRole('tab', { name: 'PreBase Maps', exact: true }).click();
 		await page.getByRole('button', { name: 'Temporal', exact: true }).click();
 		const metricTimeout = scale === 'large' ? 180_000 : 45_000;
 		const frame = await findGraphFrame(page, scale === 'large' ? 120_000 : 60_000);
-		if (!frame) throw new Error('Temporal Graph webview did not open');
+		if (!frame) {throw new Error('Temporal Graph webview did not open');}
 		await installMetricsBridge(frame);
 		const canvasShot = (name) => frame.locator('#netCanvas').screenshot({
 			path: join(screenshotDir, name),
@@ -381,7 +381,7 @@ async function run() {
 	} catch (error) {
 		evidence = { ...evidence, error: error instanceof Error ? error.stack ?? error.message : String(error) };
 	} finally {
-		if (browser) browser.close = async () => undefined;
+		if (browser) {browser.close = async () => undefined;}
 		quit = await quitOwnedApp(info.pid);
 		evidence = { ...evidence, quit };
 	}
@@ -395,7 +395,7 @@ async function run() {
 		quit,
 	}, null, 2));
 	console.log(JSON.stringify(result, null, 2));
-	if (!result.ok) process.exitCode = 1;
+	if (!result.ok) {process.exitCode = 1;}
 }
 
 if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {
@@ -404,7 +404,7 @@ if (process.argv[1] && resolve(process.argv[1]) === scriptPath) {
 		const failures = temporalAcceptanceFailures(evidence);
 		const result = { ok: failures.length === 0 && !evidence.error, failures };
 		console.log(JSON.stringify(result));
-		if (!result.ok) process.exitCode = 1;
+		if (!result.ok) {process.exitCode = 1;}
 	} else {
 		await run();
 	}

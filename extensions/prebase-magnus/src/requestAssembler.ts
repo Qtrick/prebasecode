@@ -105,11 +105,26 @@ export interface IRequestAssemblerHost {
 }
 
 const defaultVscodeHost: IRequestAssemblerHost = {
-	readFile: (uri) => (globalThis as any).vscode?.workspace?.fs?.readFile(uri),
-	openTextDocument: (uri) => (globalThis as any).vscode?.workspace?.openTextDocument(uri),
-	asRelativePath: (uri, inc) => (globalThis as any).vscode?.workspace?.asRelativePath(uri, inc),
-	getLanguageModelTools: () => (globalThis as any).vscode?.lm?.tools ?? [],
-	getConfiguration: (section) => (globalThis as any).vscode?.workspace?.getConfiguration(section),
+	readFile: (uri) => {
+		const vs = (globalThis as { vscode?: typeof import('vscode') }).vscode;
+		return vs?.workspace?.fs?.readFile(uri) as Promise<Uint8Array>;
+	},
+	openTextDocument: (uri) => {
+		const vs = (globalThis as { vscode?: typeof import('vscode') }).vscode;
+		return vs?.workspace?.openTextDocument(uri) as unknown as Promise<{ getText(range?: vscode.Range): string }>;
+	},
+	asRelativePath: (uri, inc) => {
+		const vs = (globalThis as { vscode?: typeof import('vscode') }).vscode;
+		return vs?.workspace?.asRelativePath(uri, inc) ?? '';
+	},
+	getLanguageModelTools: () => {
+		const vs = (globalThis as { vscode?: typeof import('vscode') }).vscode;
+		return (vs?.lm?.tools ?? []) as readonly vscode.LanguageModelToolInformation[];
+	},
+	getConfiguration: (section) => {
+		const vs = (globalThis as { vscode?: typeof import('vscode') }).vscode;
+		return vs?.workspace?.getConfiguration(section) as { get<T>(key: string, defaultValue?: T): T };
+	},
 };
 
 export function isSensitiveFile(filePath: string): boolean {
@@ -161,9 +176,10 @@ export function extractConversationHistory(
 	let totalChars = 0;
 
 	for (const turn of boundedTurns) {
-		if ('prompt' in turn) {
+		const promptVal = (turn as { prompt?: string }).prompt;
+		if (typeof promptVal === 'string') {
 			// ChatRequestTurn
-			const promptText = (turn.prompt || '').trim();
+			const promptText = promptVal.trim();
 			if (promptText) {
 				messages.push({
 					role: 'user',
@@ -171,19 +187,17 @@ export function extractConversationHistory(
 				});
 				totalChars += promptText.length;
 			}
-		} else if ('response' in turn) {
+		} else if (Array.isArray((turn as { response?: readonly unknown[] }).response)) {
 			// ChatResponseTurn
 			const parts = (turn as { response: readonly unknown[] }).response;
 			const textSnippets: string[] = [];
 			for (const part of parts) {
 				if (part && typeof part === 'object') {
-					if ('value' in part) {
-						const val = (part as { value: unknown }).value;
-						if (typeof val === 'string') {
-							textSnippets.push(val);
-						} else if (val && typeof val === 'object' && 'value' in val && typeof (val as { value: string }).value === 'string') {
-							textSnippets.push((val as { value: string }).value);
-						}
+					const val = (part as { value?: unknown }).value;
+					if (typeof val === 'string') {
+						textSnippets.push(val);
+					} else if (val && typeof val === 'object' && typeof (val as { value?: string }).value === 'string') {
+						textSnippets.push((val as { value: string }).value);
 					}
 				}
 			}
@@ -236,7 +250,7 @@ export async function resolveNativeReferences(
 				const snippet = value.slice(0, budget.maxSingleAttachmentChars);
 				attached.push(`Reference note: ${snippet}`);
 				cumulativeChars += snippet.length;
-			} else if (value && typeof value === 'object' && 'fsPath' in value && 'scheme' in value) {
+			} else if (value && typeof value === 'object' && typeof (value as { fsPath?: string }).fsPath === 'string' && typeof (value as { scheme?: string }).scheme === 'string') {
 				const uri = value as vscode.Uri;
 				const fsPath = uri.fsPath || uri.path || '';
 				if (isSensitiveFile(fsPath)) {
@@ -255,7 +269,7 @@ export async function resolveNativeReferences(
 				} catch {
 					attached.push(`Attached file (${fsPath}): [Unable to read file content]`);
 				}
-			} else if (value && typeof value === 'object' && 'uri' in value && 'range' in value) {
+			} else if (value && typeof value === 'object' && Boolean((value as { uri?: unknown }).uri) && Boolean((value as { range?: unknown }).range)) {
 				const loc = value as vscode.Location;
 				const uri = loc.uri;
 				const range = loc.range;
@@ -330,11 +344,12 @@ export function processToolResultData(
 	if (toolResult && Array.isArray(toolResult.content)) {
 		for (const part of toolResult.content) {
 			if (part && typeof part === 'object') {
-				if ('value' in part && typeof (part as { value: unknown }).value === 'string') {
-					textParts.push((part as { value: string }).value);
-				} else if ('mimeType' in part && 'data' in part) {
-					const mimeType = String((part as { mimeType: string }).mimeType || '');
-					const rawData = (part as { data: Uint8Array }).data;
+				const partObj = part as { value?: unknown; mimeType?: unknown; data?: unknown };
+				if (typeof partObj.value === 'string') {
+					textParts.push(partObj.value);
+				} else if (typeof partObj.mimeType === 'string' && partObj.data instanceof Uint8Array) {
+					const mimeType = String(partObj.mimeType || '');
+					const rawData = partObj.data;
 					if (mimeType.startsWith('image/') && rawData) {
 						const base64Data = Buffer.from(rawData).toString('base64');
 						inlineImages.push({ mimeType, data: base64Data });

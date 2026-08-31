@@ -26,8 +26,8 @@ class FakeClassList {
 
 	toggle(name: string, force?: boolean): boolean {
 		if (force !== undefined) {
-			if (force) this.values.add(name);
-			else this.values.delete(name);
+			if (force) {this.values.add(name);}
+			else {this.values.delete(name);}
 			return force;
 		}
 		if (this.values.has(name)) {
@@ -239,9 +239,9 @@ function createHarness(initialGraphType: 'network' | 'temporal' = 'network'): Ha
 		getComputedStyle: () => ({
 			fontFamily: 'var(--vscode-font-family, sans-serif)',
 			getPropertyValue: (prop: string) => {
-				if (prop === '--vscode-editor-background') return '#1B1C1E';
-				if (prop === '--vscode-foreground') return '#f4f4f5';
-				if (prop === '--vscode-button-background') return '#2dd4bf';
+				if (prop === '--vscode-editor-background') {return '#1B1C1E';}
+				if (prop === '--vscode-foreground') {return '#f4f4f5';}
+				if (prop === '--vscode-button-background') {return '#2dd4bf';}
 				return '';
 			},
 		}),

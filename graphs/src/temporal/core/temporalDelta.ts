@@ -16,48 +16,48 @@ import type {
 } from '../common/temporalTypes.js';
 
 function areStringArraysEqual(a?: readonly string[], b?: readonly string[]): boolean {
-	if (a === b) return true;
-	if (!a || !b) return false;
-	if (a.length !== b.length) return false;
+	if (a === b) {return true;}
+	if (!a || !b) {return false;}
+	if (a.length !== b.length) {return false;}
 	for (let i = 0; i < a.length; i++) {
-		if (a[i] !== b[i]) return false;
+		if (a[i] !== b[i]) {return false;}
 	}
 	return true;
 }
 
 function areNodesStructurallyEqual(a: TemporalEntitySnapshot, b: TemporalEntitySnapshot): boolean {
-	if (a.path !== b.path) return false;
-	if (a.blobOid !== b.blobOid || a.contentHash !== b.contentHash) return false;
+	if (a.path !== b.path) {return false;}
+	if (a.blobOid !== b.blobOid || a.contentHash !== b.contentHash) {return false;}
 
 	const an: GraphNodeData | undefined = a.nodeData;
 	const bn: GraphNodeData | undefined = b.nodeData;
-	if (!an || !bn) return an === bn;
+	if (!an || !bn) {return an === bn;}
 
-	if (an.id !== bn.id) return false;
-	if (an.kind !== bn.kind) return false;
-	if (Boolean(an.isEntry) !== Boolean(bn.isEntry)) return false;
-	if ((an.meta?.architectureLayer ?? null) !== (bn.meta?.architectureLayer ?? null)) return false;
-	if ((an.meta?.language ?? null) !== (bn.meta?.language ?? null)) return false;
+	if (an.id !== bn.id) {return false;}
+	if (an.kind !== bn.kind) {return false;}
+	if (Boolean(an.isEntry) !== Boolean(bn.isEntry)) {return false;}
+	if ((an.meta?.architectureLayer ?? null) !== (bn.meta?.architectureLayer ?? null)) {return false;}
+	if ((an.meta?.language ?? null) !== (bn.meta?.language ?? null)) {return false;}
 
-	if (!areStringArraysEqual(an.meta?.exports, bn.meta?.exports)) return false;
-	if (!areStringArraysEqual(an.meta?.imports, bn.meta?.imports)) return false;
+	if (!areStringArraysEqual(an.meta?.exports, bn.meta?.exports)) {return false;}
+	if (!areStringArraysEqual(an.meta?.imports, bn.meta?.imports)) {return false;}
 
 	return true;
 }
 
 function areEdgesStructurallyEqual(a: TemporalEdgeSnapshot, b: TemporalEdgeSnapshot): boolean {
-	if (a.kind !== b.kind) return false;
-	if (a.sourceEntityId !== b.sourceEntityId || a.targetEntityId !== b.targetEntityId) return false;
+	if (a.kind !== b.kind) {return false;}
+	if (a.sourceEntityId !== b.sourceEntityId || a.targetEntityId !== b.targetEntityId) {return false;}
 
 	const ae: GraphEdgeData | undefined = a.edgeData;
 	const be: GraphEdgeData | undefined = b.edgeData;
-	if (!ae || !be) return ae === be;
+	if (!ae || !be) {return ae === be;}
 
-	if (ae.id !== be.id) return false;
-	if (ae.source !== be.source || ae.target !== be.target) return false;
-	if (ae.kind !== be.kind) return false;
+	if (ae.id !== be.id) {return false;}
+	if (ae.source !== be.source || ae.target !== be.target) {return false;}
+	if (ae.kind !== be.kind) {return false;}
 
-	if (!areStringArraysEqual(ae.meta?.specifiers, be.meta?.specifiers)) return false;
+	if (!areStringArraysEqual(ae.meta?.specifiers, be.meta?.specifiers)) {return false;}
 
 	return true;
 }

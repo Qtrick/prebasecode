@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import * as vscode from 'vscode';
-import { magnusRequestShutdown, registerMagnusChatParticipants, type MagnusChatDefaults } from './chatParticipant';
+import { magnusLiveStreamDiagnostics, magnusRequestShutdown, registerMagnusChatParticipants, streamPacedCandidate, type MagnusChatDefaults } from './chatParticipant';
 import { setProjectGuidanceService } from './projectGuidanceRegistry';
 import { MagnusLanguageModelProvider } from './languageModelProvider';
 import { buildModelOptions } from './models';
@@ -15,7 +15,6 @@ import { MagnusSecretStorage } from './secretStorage';
 import { PreBaseAIService, VsCodeWorkspaceConfigProvider } from './aiService';
 import { globalAIProviderRegistry } from './aiProviderRegistry';
 import { MagnusSmokeTransportAdapter, magnusSmokeStreamDiagnostics } from './smokeTransport';
-import { magnusLiveStreamDiagnostics } from './chatParticipant';
 import { findPreBaseSourceRoot, PreBaseSecretResolver } from './secretResolver';
 import { ProjectGuidanceService, resolveGuidancePath, resolveWorkspaceRootForPath, GUIDANCE_WATCH_PATTERNS, type GuidanceFileReader } from './projectGuidanceService';
 import { createProjectGuidanceSession, runWithProjectGuidanceSession } from './projectGuidanceSession';
@@ -371,6 +370,50 @@ export function activate(context: vscode.ExtensionContext): void {
 				aiService.installSmokeTransport(new MagnusSmokeTransportAdapter());
 				return { ok: true };
 			}),
+			vscode.commands.registerCommand('prebase.magnus.runSmokeStream', async (options?: { prompt?: string; cancelAfterMs?: number }) => {
+				const allowed = await vscode.commands.executeCommand('prebase.test.isSmokeDriver');
+				if (!allowed) {
+					throw new Error('prebase.magnus.runSmokeStream requires --enable-smoke-test-driver');
+				}
+				const prompt = options?.prompt || 'smoke stream test';
+				const cts = new vscode.CancellationTokenSource();
+				const cancelHandle = { timer: undefined as ReturnType<typeof setTimeout> | undefined };
+				if (options?.cancelAfterMs) {
+					cancelHandle.timer = setTimeout(() => {
+						cts.cancel();
+					}, options.cancelAfterMs);
+				}
+				const collected: string[] = [];
+				try {
+					const result = await streamPacedCandidate(
+						aiService,
+						{
+							messages: [{ role: 'user', parts: [{ text: prompt }] }],
+							modelId: 'smoke-local',
+						},
+						cts.token,
+						piece => {
+							collected.push(piece);
+						},
+					);
+					return {
+						ok: true,
+						result,
+						collected,
+						diagnostics: {
+							streamActive: magnusLiveStreamDiagnostics.streamActive,
+							pacingActive: magnusLiveStreamDiagnostics.pacingActive,
+							sourceChunks: magnusSmokeStreamDiagnostics.sourceChunks,
+							sourceCancelled: magnusSmokeStreamDiagnostics.cancelled,
+							smokeEnabled: aiService.isSmokeTransportEnabled(),
+						},
+					};
+				} finally {
+					if (cancelHandle.timer !== undefined) {
+						clearTimeout(cancelHandle.timer);
+					}
+				}
+			}),
 			vscode.commands.registerCommand('prebase.magnus.getStreamDiagnostics', async () => {
 				const allowed = await vscode.commands.executeCommand('prebase.test.isSmokeDriver');
 				if (!allowed) {
@@ -651,9 +694,9 @@ export function activate(context: vscode.ExtensionContext): void {
 					if (name === 'GEMINI_API_KEY' || name === 'GOOGLE_API_KEY') {
 						let val = rest.join('=').trim();
 						if (val.length >= 2) {
-							const first = val[0];
-							const last = val[val.length - 1];
-							if ((first === '"' && last === '"') || (first === "'" && last === "'")) {
+							const first = val.charCodeAt(0);
+							const last = val.charCodeAt(val.length - 1);
+							if ((first === 34 && last === 34) || (first === 39 && last === 39)) {
 								val = val.slice(1, -1);
 							}
 						}

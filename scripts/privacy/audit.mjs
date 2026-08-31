@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-/**
- * Static PreBase privacy audit: product telemetry flags, forbidden endpoints,
- * secret-storage patterns, and webview CSP presence for graph/runtime editors.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

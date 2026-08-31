@@ -378,13 +378,14 @@ async function run() {
 			const sphereMetrics = await clickLayout('sphere').catch(() => undefined);
 			sphereMode = sphereMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 			const constellationMetrics = await clickLayout('constellation').catch(() => undefined);
-			const constellationMode = constellationMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
+			constellationMode = constellationMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 			const clusteredMetrics = await clickLayout('clustered').catch(() => undefined);
 			clusteredMode = clusteredMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 
 			// Exercise legacy persisted radial layout normalization to organic
-			await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.graph.setLayoutMode', 'radial').catch(() => undefined);
-			await launched.page.waitForTimeout(400);
+			await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics', { networkLayoutMode: 'radial' }).catch(() => undefined);
+			await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.graph.rescanWorkspace').catch(() => undefined);
+			await launched.page.waitForTimeout(600);
 			const radialMetrics = await readGraphMetrics(graphFrame);
 			legacyRadialNormalized = radialMetrics?.networkLayoutMode === 'organic';
 

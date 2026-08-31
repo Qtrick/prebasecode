@@ -71,6 +71,7 @@ export interface MagnusLiveActivitySnapshot {
 	readonly connected: boolean;
 	readonly prebaseForeground: boolean;
 	readonly screenLocked?: boolean;
+	readonly hideDetails?: boolean;
 	readonly presentationLabel?: string;
 }
 
@@ -145,6 +146,7 @@ export function buildMagnusLiveActivitySnapshot(
 		prebaseForeground: boolean;
 		connected: boolean;
 		screenLocked?: boolean;
+		hideDetails?: boolean;
 	},
 ): MagnusLiveActivitySnapshot {
 	if (!options.connected) {
@@ -159,6 +161,7 @@ export function buildMagnusLiveActivitySnapshot(
 			connected: false,
 			prebaseForeground: options.prebaseForeground,
 			screenLocked: options.screenLocked,
+			hideDetails: options.hideDetails,
 			presentationLabel: 'Magnus status unavailable',
 		};
 	}
@@ -173,6 +176,7 @@ export function buildMagnusLiveActivitySnapshot(
 			connected: true,
 			prebaseForeground: options.prebaseForeground,
 			screenLocked: options.screenLocked,
+			hideDetails: options.hideDetails,
 			presentationLabel: 'Magnus',
 		};
 	}
@@ -188,7 +192,7 @@ export function buildMagnusLiveActivitySnapshot(
 		status = 'completed';
 	}
 
-	const hideDetails = Boolean(options.screenLocked);
+	const hide = Boolean(options.screenLocked || options.hideDetails);
 	const actions = (input.recentActions ?? []).slice(-LIVE_ACTIVITY_MAX_ACTIONS).map(action => ({
 		id: action.id,
 		label: redactLiveActivityText(action.label),
@@ -201,14 +205,14 @@ export function buildMagnusLiveActivitySnapshot(
 		sessionResource: input.sessionResource,
 		startedAt: input.startedAt,
 		status,
-		taskTitle: hideDetails ? undefined : input.title,
-		currentActivity: hideDetails ? undefined : redactLiveActivityText(input.currentActivity),
-		recentActions: hideDetails ? [] : actions,
-		latestShortMessage: hideDetails ? undefined : redactLiveActivityText(input.latestShortMessage),
-		workspaceDiff: input.workspaceDiff,
-		terminalCount: input.terminalCount,
+		taskTitle: hide ? undefined : input.title,
+		currentActivity: hide ? undefined : redactLiveActivityText(input.currentActivity),
+		recentActions: hide ? [] : actions,
+		latestShortMessage: hide ? undefined : redactLiveActivityText(input.latestShortMessage),
+		workspaceDiff: hide ? undefined : input.workspaceDiff,
+		terminalCount: hide ? undefined : input.terminalCount,
 		testState: input.testState,
-		pendingInteraction: hideDetails ? undefined : input.pendingInteraction && {
+		pendingInteraction: hide ? undefined : input.pendingInteraction && {
 			...input.pendingInteraction,
 			title: redactLiveActivityText(input.pendingInteraction.title),
 			message: redactLiveActivityText(input.pendingInteraction.message),
@@ -216,6 +220,7 @@ export function buildMagnusLiveActivitySnapshot(
 		connected: true,
 		prebaseForeground: options.prebaseForeground,
 		screenLocked: options.screenLocked,
+		hideDetails: options.hideDetails,
 		presentationLabel: '',
 	};
 	return { ...snapshot, presentationLabel: collapsedStatusLabel(snapshot) };

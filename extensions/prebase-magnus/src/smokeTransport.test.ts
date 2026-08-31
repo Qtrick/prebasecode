@@ -1,5 +1,6 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import assert from 'node:assert/strict';
@@ -39,7 +40,7 @@ test('smoke model uses NormalizedAIModel fields, is hidden, and is not product-s
 		assert.equal(model.capabilities.streaming, true);
 		assert.equal(model.capabilities.functionCalling, false);
 		assert.equal(model.capabilities.agentCompatible, false);
-		assert.equal('label' in model, false, 'NormalizedAIModel must not use a legacy label field');
+		assert.equal((model as { label?: unknown }).label, undefined, 'NormalizedAIModel must not use a legacy label field');
 	}
 	assert.deepEqual(adapter.curateConsumerCatalog(), [], 'smoke models must not appear in the product picker catalog');
 });

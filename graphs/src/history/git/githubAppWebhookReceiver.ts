@@ -1,3 +1,6 @@
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) PreBase. All rights reserved.
+ *--------------------------------------------------------------------------------------------*/
 import { computePureHmacSha256, timingSafeEqualStrings } from '../../core/canonical/pureSha256.js';
 
 export interface IGitHubWebhookHeaders {

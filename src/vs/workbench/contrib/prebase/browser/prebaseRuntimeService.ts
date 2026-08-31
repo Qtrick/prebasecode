@@ -29,8 +29,7 @@ import { MAX_RUNTIME_INSPECTION_RESPONSE_BYTES, readRuntimeResponseText } from '
 import { detectFramework } from '../common/runtime/frameworkDetector.js';
 import { detectElectronProject } from '../common/runtime/electronDetector.js';
 import { detectDesktopProjects } from '../common/runtime/desktopDetector.js';
-import type { DesktopFramework, DesktopLaunchMode, DesktopProjectProfile } from '../common/runtime/desktopTypes.js';
-import { isRecognizedDesktopApp } from '../common/runtime/desktopTypes.js';
+import { isRecognizedDesktopApp, type DesktopFramework, type DesktopLaunchMode, type DesktopProjectProfile } from '../common/runtime/desktopTypes.js';
 import { TAURI_PROBE_PATHS } from '../common/runtime/tauriDetector.js';
 import { classifyNavigateUrl, classifyTerminalCommand, validatePreviewUrl } from '../common/runtime/permissionClassifier.js';
 import { detectDevScripts, selectDefaultScript } from '../common/runtime/scriptDetector.js';

@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import type {
@@ -49,15 +48,15 @@ export function computeCommunityAggregateEdges(
 
 	for (let i = 0; i < edges.length; i++) {
 		const e = edges[i];
-		if (e.changeKind === 'removed') continue;
+		if (e.changeKind === 'removed') {continue;}
 
 		const src = e.sourceEntityId || (e as any).sourceId;
 		const tgt = e.targetEntityId || (e as any).targetId;
-		if (!src || !tgt) continue;
+		if (!src || !tgt) {continue;}
 
 		const srcComm = nodeToCommMap.get(src);
 		const tgtComm = nodeToCommMap.get(tgt);
-		if (!srcComm || !tgtComm || srcComm === tgtComm) continue;
+		if (!srcComm || !tgtComm || srcComm === tgtComm) {continue;}
 
 		const key = srcComm + '::to::' + tgtComm;
 		let entry = aggMap.get(key);

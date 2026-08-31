@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import { Disposable } from '../../../../../../../base/common/lifecycle.js';
@@ -177,7 +176,7 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		if (total > TIMELINE_WINDOW_SIZE && currentIdx >= 0) {
 			const half = Math.floor(TIMELINE_WINDOW_SIZE / 2);
 			let start = Math.max(0, currentIdx - half);
-			let end = Math.min(total, start + TIMELINE_WINDOW_SIZE);
+			const end = Math.min(total, start + TIMELINE_WINDOW_SIZE);
 			if (end - start < TIMELINE_WINDOW_SIZE) {
 				start = Math.max(0, end - TIMELINE_WINDOW_SIZE);
 			}

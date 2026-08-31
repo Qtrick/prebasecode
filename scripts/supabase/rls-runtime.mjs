@@ -1,8 +1,8 @@
 #!/usr/bin/env node
-/**
- * Opt-in adversarial RLS probe for two dedicated non-production Supabase users.
- * It uses only publishable-key Auth/PostgREST calls; service-role credentials are never read.
- */
+/*---------------------------------------------------------------------------------------------
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
+ *--------------------------------------------------------------------------------------------*/
 import crypto from 'node:crypto';
 import fs from 'node:fs/promises';
 import path from 'node:path';
@@ -173,7 +173,7 @@ async function main() {
 		cases: [],
 	};
 	const record = (id, status, detail) => artifact.cases.push({ id, status, ...(detail ? { detail } : {}) });
-	let cleanup = [];
+	const cleanup = [];
 
 	try {
 		const config = loadConfiguration();

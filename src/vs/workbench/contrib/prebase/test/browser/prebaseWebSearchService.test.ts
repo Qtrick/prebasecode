@@ -1,7 +1,9 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
+ *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -58,6 +60,8 @@ function createService(
 }
 
 suite('PreBase web search service', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('fails closed before refresh or request when cloud sign-in is unavailable', async () => {
 		let refreshed = false;
 		let requested = false;
@@ -229,7 +233,7 @@ suite('PreBase web search service', () => {
 		);
 		const result = await service.fetchForMagnus({ url: 'https://example.com/docs' }, CancellationToken.None);
 		assert.strictEqual(result.enrichment, 'full');
-		assert.ok(!JSON.stringify(headers).includes('fc-'));
+		assert.ok(!Object.values(headers ?? {}).some(v => typeof v === 'string' && (v.startsWith('fc-') || v.includes('firecrawl'))));
 		assert.ok(!String(data).includes('FIRECRAWL'));
 		assert.ok(!String(data).includes('LINKUP'));
 		assert.strictEqual(JSON.parse(data ?? '{}').operation, 'fetch');

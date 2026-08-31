@@ -77,7 +77,7 @@ suite('Temporal node-level LOD projection', () => {
 		assert.deepStrictEqual([...firstAgg.memberIds], [...guides[0].nodeIds]);
 		const nodeIds = new Set(nodes.map(n => n.entityId));
 		for (const item of projection.items) {
-			if (item.kind !== 'aggregate') continue;
+			if (item.kind !== 'aggregate') {continue;}
 			for (const id of item.memberIds) {
 				assert.ok(nodeIds.has(id), `aggregate ${item.guideId} member ${id} must be a real entity`);
 			}
@@ -201,7 +201,7 @@ suite('Temporal node-level LOD projection', () => {
 		assert.strictEqual(projection.aggregateNodesDrawn, guides.length);
 		assert.ok(!aggregates.some(item => item.kind === 'aggregate' && item.guideId === 'ghost'));
 		for (const item of aggregates) {
-			if (item.kind !== 'aggregate') continue;
+			if (item.kind !== 'aggregate') {continue;}
 			assert.ok(item.memberIds.length > 0);
 			for (const id of item.memberIds) {
 				assert.ok(nodeIds.has(id), `aggregate ${item.guideId} member ${id} must be a real entity`);

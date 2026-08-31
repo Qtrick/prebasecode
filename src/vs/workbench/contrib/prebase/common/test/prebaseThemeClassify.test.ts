@@ -1,12 +1,15 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { classifyColorTheme } from '../prebaseThemeClassify.js';
 
 suite('classifyColorTheme', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('skips themes from test/colorize/fixture extensions (case-insensitive)', () => {
 		assert.strictEqual(
 			classifyColorTheme({ settingsId: 'Some Theme', extensionData: { extensionIsBuiltin: false, extensionName: 'vscode-theme-colorize-tests' } }),

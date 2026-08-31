@@ -157,7 +157,6 @@ export const PATH_PREFIX_DOMAINS = [
 	['test/fixtures/', 'core-ide'],
 	['.agents/skills/launch/', 'launch-harness'],
 	['.agents/skills/prebase-validation/', 'validation-orchestration'],
-	['reports/', 'validation-orchestration'],
 	['package.json', 'assurance-leaf'],
 	['package-lock.json', 'assurance-leaf'],
 	['product.json', 'assurance-leaf'],
@@ -384,7 +383,9 @@ export function listChangedSourcePaths(repo) {
 	const staged = execFileSync('git', ['diff', '--name-only', '-z', '--cached'], { cwd: repo, encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
 		.split('\0')
 		.filter(Boolean);
-	return [...new Set([...tracked, ...untracked, ...staged].map(normalizePath))].sort();
+	return [...new Set([...tracked, ...untracked, ...staged].map(normalizePath))]
+		.filter(p => !p.startsWith('reports/'))
+		.sort();
 }
 
 export function classifyChangedPaths(repo, changedPaths = listChangedSourcePaths(repo)) {

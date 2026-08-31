@@ -1,6 +1,5 @@
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
 import * as assert from 'node:assert/strict';
@@ -181,7 +180,7 @@ suite('TemporalLayoutQuality (Unit - Mathematical Layout Metrics & Guide Enclosu
 
 		// Second commit (incremental: 2 nodes added, 3 modified)
 		const entities2 = entities1.map((e, idx) => {
-			if (idx === 1 || idx === 2) return makeEntity(e.entityId, e.path + '-v2');
+			if (idx === 1 || idx === 2) {return makeEntity(e.entityId, e.path + '-v2');}
 			return e;
 		});
 		entities2.push(makeEntity('e-new-1', 'src/pkg_0/file_new1.ts'));

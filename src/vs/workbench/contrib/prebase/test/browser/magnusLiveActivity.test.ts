@@ -1,8 +1,9 @@
 /*---------------------------------------------------------------------------------------------
- *  Copyright (c) PreBase. All rights reserved.
+ *  Copyright (c) Microsoft Corporation. All rights reserved.
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
+import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../base/test/common/utils.js";
 import assert from 'assert';
 import { readFileSync } from 'fs';
 import { resolve } from 'path';
@@ -44,6 +45,8 @@ function readRepo(relativePath: string): string {
 }
 
 suite('Magnus Live Activity projection', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('is a projection of Magnus participants only', () => {
 		assert.strictEqual(isMagnusParticipantId('prebase.magnus.agent'), true);
 		assert.strictEqual(isMagnusParticipantId('github.copilot'), false);
@@ -556,6 +559,8 @@ suite('Magnus Live Activity projection', () => {
 });
 
 suite('Magnus Live Activity contribution contracts', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('follow-up uses sendRequest on the snapshot sessionResource and never starts a second session', () => {
 		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
 		const handleStart = contribution.indexOf('private async _handleCommand');
@@ -661,8 +666,9 @@ suite('Magnus Live Activity contribution contracts', () => {
 		const publish = contribution.slice(contribution.indexOf('private _publish(): void'), contribution.indexOf('private async _handleCommand'));
 		assert.match(publish, /this\._revision \+= 1/);
 		assert.ok(publish.indexOf('this._revision += 1') < publish.indexOf('revision: this._revision'), 'publish must bump revision before snapshot');
-		assert.match(publish, /this\._screenLocked \|\| Boolean\(this\.configurationService\.getValue<boolean>\('prebase\.magnus\.liveActivity\.hideDetails'\)\)/);
-		assert.match(publish, /screenLocked: hideDetails/);
+		assert.match(publish, /prebase\.magnus\.liveActivity\.hideDetails/);
+		assert.match(publish, /screenLocked: this\._screenLocked/);
+		assert.match(publish, /hideDetails: userHideDetails/);
 		assert.match(contribution, /onDidLockScreen/);
 		assert.match(contribution, /this\._screenLocked = true/);
 		assert.match(contribution, /onDidUnlockScreen/);
@@ -693,6 +699,8 @@ suite('Magnus Live Activity contribution contracts', () => {
 });
 
 suite('Magnus Live Activity native and settings contracts', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
 	test('live activity settings are macOS-only', () => {
 		const config = readRepo('src/vs/workbench/contrib/prebase/common/prebaseConfiguration.ts');
 		for (const key of [
