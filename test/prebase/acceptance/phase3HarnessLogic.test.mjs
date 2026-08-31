@@ -937,10 +937,12 @@ test('short soak writes diagnostic evidence and must not overwrite canonical fin
 	assert.match(active, /activeSoakEvidenceTarget\(durationMs\)/);
 	assert.match(active, /writeFileSync\(join\(evidenceDir, fileName\)/);
 	assert.doesNotMatch(active, /writeFileSync\(join\(evidenceDir, 'active\.json'\)/);
-	assert.match(active, /import \{ monotonicGrowth \} from '\.\/prebase-process-leak-diag\.mjs'/);
+	assert.match(active, /import \{ activePhaseResourceFailures, monotonicGrowth \} from '\.\/prebase-process-leak-diag\.mjs'/);
 	assert.doesNotMatch(active, /function monotonicGrowth/);
+	assert.match(active, /activePhaseResourceFailures/);
 	const leak = readFileSync(join(acceptanceDir, 'prebase-process-leak-diag.mjs'), 'utf8');
 	assert.match(leak, /export function monotonicGrowth/);
+	assert.match(leak, /export function activePhaseResourceFailures/);
 });
 
 test('active soak protects canonical final evidence and final gate has explicit bounded modes', () => {
@@ -996,6 +998,23 @@ test('active soak rejects quiescent renderer CPU runaway', () => {
 		quit: { remaining: 'gone', terminationPath: 'workbench', usedSigkill: false },
 	});
 	assert.ok(failures.some(item => /renderer CPU/.test(item)));
+});
+
+test('active soak rejects active-phase process growth that plateaus in quiescence', () => {
+	const failures = activeSoakFailures({
+		samples: [
+			{ phase: 'active', processCount: 7, cpuSum: 20, rssMb: 1500, webContentsLiveCount: 2 },
+			{ phase: 'active', processCount: 20, cpuSum: 40, rssMb: 2800, webContentsLiveCount: 8 },
+			{ phase: 'active', processCount: 40, cpuSum: 55, rssMb: 4200, webContentsLiveCount: 14 },
+			{ phase: 'active', processCount: 54, cpuSum: 60, rssMb: 5000, webContentsLiveCount: 18 },
+			{ phase: 'quiesce', processCount: 56, cpuSum: 8, rssMb: 5100, webContentsLiveCount: 18 },
+			{ phase: 'quiesce', processCount: 56, cpuSum: 6, rssMb: 5050, webContentsLiveCount: 18 },
+			{ phase: 'quiesce', processCount: 56, cpuSum: 5, rssMb: 5000, webContentsLiveCount: 18 },
+		],
+		quit: { remaining: 'gone', terminationPath: 'workbench', usedSigkill: false },
+	});
+	assert.ok(failures.some(item => /active-phase process growth unbounded/.test(item)), failures.join('; '));
+	assert.ok(failures.some(item => /quiesce process count elevated/.test(item)), failures.join('; '));
 });
 
 test('active soak cannot pass when activity threw', () => {

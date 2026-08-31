@@ -335,10 +335,19 @@ export function acceptLiveActivityCommand(
 		if (!command.interactionId || command.interactionId !== pending.interactionId) {
 			return { ok: false, reason: 'stale-interaction' };
 		}
-		if (command.kind === 'answer' && pending.kind !== 'question') {
-			return { ok: false, reason: 'not-a-question' };
+		if (command.kind === 'answer') {
+			if (pending.kind !== 'question') {
+				return { ok: false, reason: 'not-a-question' };
+			}
+			if (!command.optionId) {
+				return { ok: false, reason: 'missing-option' };
+			}
+			if (pending.options && !pending.options.some(option => option.id === command.optionId)) {
+				return { ok: false, reason: 'stale-option' };
+			}
+			return { ok: true };
 		}
-		if ((command.kind === 'approve' || command.kind === 'deny') && pending.kind !== 'approval') {
+		if (pending.kind !== 'approval') {
 			return { ok: false, reason: 'not-an-approval' };
 		}
 		return { ok: true };
@@ -420,18 +429,22 @@ export function collapsedStatusLabel(snapshot: MagnusLiveActivitySnapshot, now =
 		return snapshot.latestShortMessage ? `Magnus stopped · ${snapshot.latestShortMessage}` : 'Magnus stopped';
 	}
 	if (snapshot.status === 'completed') {
-		const files = snapshot.workspaceDiff?.files;
-		return files ? `Finished · ${files} files` : 'Finished';
+		const diff = formatDiffMetric(snapshot.workspaceDiff);
+		return diff ? `Finished · ${diff}` : 'Finished';
 	}
 	const elapsed = snapshot.startedAt ? formatElapsed(now - snapshot.startedAt) : '';
 	if (snapshot.testState === 'running') {
 		return elapsed ? `Running tests · ${elapsed}` : 'Running tests';
 	}
+	const diff = formatDiffMetric(snapshot.workspaceDiff);
+	const terminalBit = snapshot.terminalCount && snapshot.terminalCount > 0 ? `${snapshot.terminalCount} task${snapshot.terminalCount === 1 ? '' : 's'}` : '';
 	if (snapshot.currentActivity) {
-		return elapsed ? `${snapshot.currentActivity} · ${elapsed}` : snapshot.currentActivity;
+		const extras = [elapsed, diff, terminalBit].filter(Boolean).join(' · ');
+		return extras ? `${snapshot.currentActivity} · ${extras}` : snapshot.currentActivity;
 	}
-	if (elapsed) {
-		return elapsed;
+	const glance = [elapsed, diff, terminalBit].filter(Boolean).join(' · ');
+	if (glance) {
+		return glance;
 	}
 	return snapshot.taskTitle || 'Magnus';
 }
@@ -450,6 +463,80 @@ export function formatElapsed(ms: number): string {
 		return `${minutes}m`;
 	}
 	return `${Math.max(1, totalSec)}s`;
+}
+
+/**
+ * Build Magnus-attributed workspace diff.
+ * Prefer editing-session line stats when present; otherwise unique edited-file URIs only
+ * (omit additions/deletions rather than inventing git numbers).
+ */
+export function summarizeMagnusWorkspaceDiff(args: {
+	editedFileUris: readonly string[];
+	sessionFileCount?: number;
+	additions?: number;
+	deletions?: number;
+}): MagnusLiveActivityDiffSummary | undefined {
+	const uniqueEdited = new Set(args.editedFileUris.filter(Boolean));
+	const files = Math.max(uniqueEdited.size, args.sessionFileCount ?? 0);
+	const hasLineStats = (args.additions !== undefined && args.additions > 0)
+		|| (args.deletions !== undefined && args.deletions > 0);
+	if (files <= 0 && !hasLineStats) {
+		return undefined;
+	}
+	return {
+		files: files > 0 ? files : 1,
+		...(hasLineStats ? {
+			additions: args.additions ?? 0,
+			deletions: args.deletions ?? 0,
+		} : {}),
+		attributedToMagnus: true,
+	};
+}
+
+/** Derive test state only from tool invocations that look like test runs in this session. */
+export function deriveMagnusTestStateFromInvocations(
+	invocations: readonly { toolId: string; state: 'running' | 'passed' | 'failed' | 'other' }[],
+): 'running' | 'passed' | 'failed' | undefined {
+	const isTestTool = (toolId: string) => /runTests|testing\.|vscode\.test|test_run|prebase_.*test/i.test(toolId);
+	let sawRunning = false;
+	let sawFailed = false;
+	let sawPassed = false;
+	for (const item of invocations) {
+		if (!isTestTool(item.toolId)) {
+			continue;
+		}
+		if (item.state === 'running') {
+			sawRunning = true;
+		} else if (item.state === 'failed') {
+			sawFailed = true;
+		} else if (item.state === 'passed') {
+			sawPassed = true;
+		}
+	}
+	if (sawRunning) {
+		return 'running';
+	}
+	if (sawFailed) {
+		return 'failed';
+	}
+	if (sawPassed) {
+		return 'passed';
+	}
+	return undefined;
+}
+
+export function formatDiffMetric(diff: MagnusLiveActivityDiffSummary | undefined): string {
+	if (!diff) {
+		return '';
+	}
+	const parts: string[] = [];
+	if (diff.additions !== undefined || diff.deletions !== undefined) {
+		parts.push(`+${diff.additions ?? 0} −${diff.deletions ?? 0}`);
+	}
+	if (diff.files > 0) {
+		parts.push(`${diff.files} file${diff.files === 1 ? '' : 's'}`);
+	}
+	return parts.join(' · ');
 }
 
 export interface NativeLiveActivityHandle {

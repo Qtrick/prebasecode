@@ -1099,7 +1099,7 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({ id: 'prebase.test.getDiagnostics', title: localize2('prebase.test.getDiagnostics', "Get PreBase Diagnostics (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
-	async run(accessor: ServicesAccessor, request?: { applyColorTheme?: string; zoomLevel?: number; accessibilitySupport?: 'auto' | 'on' }) {
+	async run(accessor: ServicesAccessor, request?: { applyColorTheme?: string; zoomLevel?: number; accessibilitySupport?: 'auto' | 'on'; liveActivityMode?: string }) {
 		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.getDiagnostics');
 		const allowedThemes = new Set(['PreBase Dark', 'PreBase Light', 'Default High Contrast', 'Default High Contrast Light', 'Dark Modern', 'Light Modern']);
 		const applyId = typeof request?.applyColorTheme === 'string' ? request.applyColorTheme : '';
@@ -1115,6 +1115,10 @@ registerAction2(class extends Action2 {
 		if (a11yMode === 'auto' || a11yMode === 'on') {
 			// Isolated smoke profiles only; never write 'off' and never a user's real profile.
 			await configurationService.updateValue('editor.accessibilitySupport', a11yMode);
+		}
+		const liveActivityMode = request?.liveActivityMode;
+		if (liveActivityMode === 'background' || liveActivityMode === 'alwaysWorking' || liveActivityMode === 'attentionOnly' || liveActivityMode === 'off') {
+			await configurationService.updateValue('prebase.magnus.liveActivity.mode', liveActivityMode);
 		}
 		let parserActiveRequests = 0;
 		let temporalActiveWrites = 0;

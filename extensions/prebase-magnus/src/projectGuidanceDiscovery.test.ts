@@ -225,7 +225,8 @@ argumentHint = "[environment]"
 prompt = """
 You are a deployment specialist.
 Deploy to the specified target environment: {{args}}
-Do not run foreign shell interpolation $(rm -rf /).
+Do not run foreign shell interpolation !{rm -rf /}.
+Do not expand @{/etc/passwd}.
 """
 `;
 		const parsed = parseTomlCommand(toml);
@@ -233,7 +234,9 @@ Do not run foreign shell interpolation $(rm -rf /).
 		assert.equal(parsed.description, 'Deploy a preview instance');
 		assert.equal(parsed.argumentHint, '[environment]');
 		assert.match(parsed.prompt, /Deploy to the specified target environment/);
-		assert.match(parsed.prompt, /\$\(rm -rf \/\)/);
+		assert.match(parsed.prompt, /!\{rm -rf \/\}/);
+		assert.match(parsed.prompt, /@\{\/etc\/passwd\}/);
+		assert.match(parsed.prompt, /\{\{args\}\}/);
 	});
 
 	test('discoverHookDeclarations discovers hooks without executing them', async () => {

@@ -11,7 +11,7 @@ import { WorkspaceIntelligence, type WorkspacePosition } from './workspaceIntell
 import { MagnusToolActivityDescriptor } from './toolActivity';
 import { getProjectGuidanceService } from './projectGuidanceRegistry';
 import { getProjectGuidanceSession } from './projectGuidanceSession';
-import { resolveWorkspaceRootForPath } from './projectGuidanceService';
+import { resolveWorkspaceRootForPath, resolveCatalogRef } from './projectGuidanceService';
 import { computeGuidanceDelta, formatGetForPathsResult } from './projectGuidanceDelta';
 import { resolveGuidanceTarget } from './projectGuidanceJit';
 import { ProjectSafetyService } from './projectSafetyService';
@@ -805,22 +805,26 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<ProjectGuidanceToo
 			throw new Error('Open a workspace to use project guidance.');
 		}
 		const operation = options.input.operation;
-		const previous = session?.getTargets().length
-			? await service.getCombinedSnapshot(
-				session.getTargets(),
-				session.getActivatedSkillIds(),
-				true,
-				session.getActivatedRulePaths(),
-			)
-			: defaultRoot
-				? await service.getSnapshot(
-					defaultRoot,
-					session?.getTargetPathsForRoot(defaultRoot) ?? options.input.paths ?? [],
-					session?.getActivatedSkillIds() ?? [],
+		// Activate ops return early without delta — skip the unused baseline snapshot.
+		const needsPrevious = operation === 'get_for_paths';
+		const previous = needsPrevious
+			? (session?.getTargets().length
+				? await service.getCombinedSnapshot(
+					session.getTargets(),
+					session.getActivatedSkillIds(),
 					true,
-					session?.getActivatedRulePaths() ?? [],
+					session.getActivatedRulePaths(),
 				)
-				: undefined;
+				: defaultRoot
+					? await service.getSnapshot(
+						defaultRoot,
+						session?.getTargetPathsForRoot(defaultRoot) ?? options.input.paths ?? [],
+						session?.getActivatedSkillIds() ?? [],
+						true,
+						session?.getActivatedRulePaths() ?? [],
+					)
+					: undefined)
+			: undefined;
 		if (operation === 'get_for_paths') {
 			for (const path of options.input.paths ?? []) {
 				const target = resolveGuidanceTarget(path, folders, defaultRoot);
@@ -848,6 +852,7 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<ProjectGuidanceToo
 			if (normalizedRule.split('/').includes('..') || normalizedRule.startsWith('/') || /^[a-zA-Z]:/.test(normalizedRule)) {
 				return result(JSON.stringify({ ok: false, reason: 'Path must be a workspace-relative path.', path: normalizedRule }));
 			}
+			// Name/id/colon-alias → path expansion happens inside getSnapshot via resolveCatalogRef.
 			session?.activateRule(normalizedRule);
 		} else if (operation === 'activate_agent_profile') {
 			const profileRef = options.input.profilePath?.trim()
@@ -896,14 +901,31 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<ProjectGuidanceToo
 			const profileRef = options.input.profilePath?.trim()
 				|| options.input.profileId?.trim()
 				|| options.input.profileName?.trim() || '';
-			const profile = (snapshot.agentProfileCatalog ?? []).find(item =>
-				item.path === profileRef || item.id === profileRef || item.name === profileRef);
+			const profile = resolveCatalogRef(snapshot.agentProfileCatalog ?? [], profileRef);
 			if (!profile) {
+				session?.clearActivatedRule(profileRef.replace(/\\/g, '/'));
 				return result(JSON.stringify({
 					ok: false,
 					reason: 'Agent profile not found in catalog.',
 					catalog: (snapshot.agentProfileCatalog ?? []).map(item => ({ id: item.id, name: item.name, path: item.path })),
 				}));
+			}
+			if (profile.userInvocable === false) {
+				session?.clearActivatedRule(profileRef.replace(/\\/g, '/'));
+				session?.clearActivatedRule(profile.path);
+				session?.clearActivatedRule(profile.name);
+				session?.clearActivatedRule(profile.id);
+				return result(JSON.stringify({
+					ok: false,
+					reason: 'Agent profile is marked user-invocable: false and cannot be manually activated.',
+					path: profile.path,
+					name: profile.name,
+				}));
+			}
+			// Canonicalize session ref to path so later turns do not rely on name alias alone.
+			if (profile.path !== profileRef.replace(/\\/g, '/')) {
+				session?.clearActivatedRule(profileRef.replace(/\\/g, '/'));
+				session?.activateAgentProfile(profile.path);
 			}
 			const activated = (snapshot.activatedAgentProfiles ?? []).find(item => item.metadata.path === profile.path || item.metadata.id === profile.id);
 			return result(JSON.stringify({
@@ -920,21 +942,25 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<ProjectGuidanceToo
 		}
 		if (operation === 'activate_rule' || operation === 'activate_playbook') {
 			const path = (options.input.rulePath || options.input.playbookPath || options.input.playbookId || options.input.playbookName)?.replace(/\\/g, '/');
-			const match = snapshot.activatedRules.find(item => item.source.path === path)
-				?? [...snapshot.alwaysApplicable, ...snapshot.pathApplicable].find(item => item.source.path === path);
-			const playbookHint = !match && path
-				? snapshot.playbookCatalog?.find(item => item.path === path || item.id === path || item.name === path)
-				: undefined;
+			const playbook = path ? resolveCatalogRef(snapshot.playbookCatalog ?? [], path) : undefined;
+			if (playbook && path && playbook.path !== path) {
+				session?.clearActivatedRule(path);
+				session?.activateRule(playbook.path);
+			}
+			const match = playbook
+				? snapshot.activatedRules.find(item => item.source.path === playbook.path)
+				: snapshot.activatedRules.find(item => item.source.path === path)
+					?? [...snapshot.alwaysApplicable, ...snapshot.pathApplicable].find(item => item.source.path === path);
 			return result(JSON.stringify({
 				ok: Boolean(match),
-				path,
+				path: playbook?.path ?? path,
 				body: match?.text ?? '',
 				kind: match?.source.scope === 'playbook' ? 'playbook' : 'rule',
 				catalog: match ? undefined : [
 					...snapshot.onDemandRules.map(item => item.source.path),
 					...(snapshot.playbookCatalog?.map(item => item.path) ?? []),
 				],
-				playbook: playbookHint ? { id: playbookHint.id, name: playbookHint.name } : undefined,
+				playbook: playbook ? { id: playbook.id, name: playbook.name } : undefined,
 			}));
 		}
 		const delta = previous && session

@@ -76,6 +76,14 @@ export class ProjectGuidanceSession {
 		this.activateRule(pathOrId);
 	}
 
+	/** Remove a previously activated rule/playbook/profile ref (e.g. after a rejected activation). */
+	clearActivatedRule(pathOrId: string): void {
+		const normalized = normalizeRel(pathOrId.trim());
+		if (normalized) {
+			this.activatedRulePaths.delete(normalized);
+		}
+	}
+
 	getActivatedSkillIds(): readonly string[] {
 		return [...this.activatedSkillIds];
 	}

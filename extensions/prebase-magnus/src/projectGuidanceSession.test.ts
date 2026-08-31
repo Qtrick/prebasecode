@@ -19,6 +19,8 @@ describe('projectGuidanceSession', () => {
 		assert.deepEqual(session.getTargetPathsForRoot(ROOT).sort(), ['graphs/src/bar.ts', 'graphs/src/foo.ts']);
 		assert.deepEqual(session.getActivatedSkillIds(), ['deploy']);
 		assert.deepEqual(session.getActivatedRulePaths(), ['.cursor/rules/manual-only.mdc']);
+		session.clearActivatedRule('.cursor/rules/manual-only.mdc');
+		assert.deepEqual(session.getActivatedRulePaths(), []);
 	});
 
 	test('AsyncLocalStorage isolates concurrent sessions', async () => {

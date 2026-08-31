@@ -216,13 +216,25 @@ export function activate(context: vscode.ExtensionContext): void {
 					relPath: item.path,
 					openable: true,
 				})));
-				pushSection('Agent Profiles', (snapshot.agentProfileCatalog ?? []).map(item => ({
+				pushSection('Agent Profiles', (snapshot.agentProfileCatalog ?? [])
+					.filter(item => item.userInvocable !== false)
+					.map(item => ({
 					label: item.name,
 					description: provenance(item.ecosystem, item.modelInvocable === false ? 'Catalog only (manual profile)' : 'Catalog only (activate_agent_profile)'),
 					detail: item.description,
 					relPath: item.path,
 					openable: true,
 				})));
+				const hiddenManualProfiles = (snapshot.agentProfileCatalog ?? []).filter(item => item.userInvocable === false);
+				if (hiddenManualProfiles.length) {
+					pushSection('Not Manually Invocable', hiddenManualProfiles.map(item => ({
+						label: item.name,
+						description: provenance(item.ecosystem, 'user-invocable: false'),
+						detail: item.description,
+						relPath: item.path,
+						openable: true,
+					})));
+				}
 				pushSection('Detected Executable Hooks', (snapshot.detectedHooks ?? []).map(hookPath => ({
 					label: hookPath,
 					description: 'Detected project hook (not auto-executed)',

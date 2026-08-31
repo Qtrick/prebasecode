@@ -1,27 +1,87 @@
 {
-  "ok": true,
-  "failures": [],
-  "platform": "darwin",
-  "architectureChosen": "native-appkit",
-  "nativePresent": true,
-  "notchGeometry": "NSScreen.safeAreaInsets + auxiliaryTopLeftArea/auxiliaryTopRightArea",
-  "noNotchFallback": "center-top floating pill",
-  "sessionIdentity": "IChatService sessionResource — follow-up uses chatService.sendRequest",
-  "approvalContinuity": "IChatToolInvocation.confirmWith on the same toolCallId",
-  "projectGuidance": "follow-up uses the canonical Magnus request path",
-  "mutationPreflight": "same chatParticipant/toolExecutor path as Agents UI",
-  "focusBehavior": "NSPanel nonactivating; hover does not focus PreBase",
-  "reduceMotion": "workbench.reduceMotion / IAccessibilityService.isMotionReduced",
-  "privacy": "redactLiveActivityText; screen-lock hides details",
-  "quit": "lifecycleMainService.onWillShutdown joins disposeNative (monitors, timers, panel, TSFN)",
-  "liveGui": "source-contracts-only",
-  "durationMs": 1,
   "schemaVersion": 3,
   "scenario": "magnus-live-activity",
-  "sourceHead": "4a52b9acfb072b9d494331c0509bf8acfbd17acf",
-  "sourceFingerprint": "257e2d5bb14a48424023becdd7bf8f6a1df7991de7c5c1ec0466906d7446bc7f",
-  "productFingerprint": "257e2d5bb14a48424023becdd7bf8f6a1df7991de7c5c1ec0466906d7446bc7f",
-  "generatedAt": "2026-08-31T14:53:17.539Z",
+  "sourceHead": "b7a828a5005a02b8b60ae7304b892492491e8fd1",
+  "sourceFingerprint": "23f308a9699812150f3a14cc3f0f539d8890e63cf91207602e8af00c7c10709a",
+  "productFingerprint": "23f308a9699812150f3a14cc3f0f539d8890e63cf91207602e8af00c7c10709a",
+  "generatedAt": "2026-08-31T16:41:32.336Z",
   "producerId": "magnus-live-activity",
-  "producerFingerprint": "9023cf260c06111cda06cc5c1b92fa203dcdeb6e31918ee6a3b65c2abf560772"
+  "producerFingerprint": "687c0e4530d6ff070e03ffebdb9e127e82e2a4af46db3212643fe26df7326fe8",
+  "kind": "magnus-live-activity-live",
+  "testKind": "live-runtime",
+  "liveGui": "workbench-diagnostics-runtime",
+  "platform": "darwin",
+  "nativePresent": true,
+  "mode": "alwaysWorking",
+  "prebasePid": 28110,
+  "launchMs": 3571,
+  "smokeTransportInstalled": true,
+  "diagnosticsAfterOpen": {
+    "backend": "native-appkit",
+    "revision": 3,
+    "sessionId": "b2a36f8c-3590-4450-a709-108dd8e5e6e9",
+    "sessionResource": "vscode-chat-session://local/YjJhMzZmOGMtMzU5MC00NDUwLWE3MDktMTA4ZGQ4ZTVlNmU5",
+    "status": "waiting",
+    "visible": true,
+    "presentationLabel": "3s"
+  },
+  "blurredDiagnostics": {
+    "backend": "native-appkit",
+    "revision": 3,
+    "sessionId": "b2a36f8c-3590-4450-a709-108dd8e5e6e9",
+    "sessionResource": "vscode-chat-session://local/YjJhMzZmOGMtMzU5MC00NDUwLWE3MDktMTA4ZGQ4ZTVlNmU5",
+    "status": "waiting",
+    "visible": true,
+    "presentationLabel": "3s"
+  },
+  "workbenchDiagnostics": {
+    "parserActiveRequests": 0,
+    "temporalActiveWrites": 0,
+    "runtimePreviewServerRunning": false,
+    "runtimePreviewStatus": "stopped",
+    "desktopSessionState": null,
+    "magnusStreamActive": 0,
+    "magnusPacingActive": 0,
+    "magnusSmokeEnabled": true,
+    "magnusSourceCancelled": false,
+    "magnusSourceChunks": 0,
+    "colorTheme": "PreBase Dark",
+    "colorThemeType": "dark",
+    "zoomLevel": 0,
+    "accessibilitySupport": "auto",
+    "layout": {
+      "sidebarVisible": true,
+      "panelVisible": false,
+      "auxiliaryBarVisible": true,
+      "editorCount": 1
+    },
+    "webContents": {
+      "liveCount": 1,
+      "liveIds": [
+        1
+      ],
+      "entries": [
+        {
+          "id": 1,
+          "type": "window",
+          "loading": false,
+          "urlCategory": "workbench",
+          "ownerCategory": "workbenchWindow"
+        }
+      ]
+    }
+  },
+  "quit": {
+    "before": "28110     1   1.8 275648 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "remaining": "gone",
+    "leftoverPids": [],
+    "latencyMs": 1974,
+    "terminationPath": "workbench",
+    "workbenchCompleted": true,
+    "usedSigterm": false,
+    "usedSigkill": false
+  },
+  "durationMs": 11126,
+  "ok": true,
+  "failures": []
 }

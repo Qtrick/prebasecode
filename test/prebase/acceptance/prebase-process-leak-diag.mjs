@@ -83,6 +83,47 @@ export function monotonicGrowth(values, slack = 1) {
 	return grew === values.length - 1;
 }
 
+/**
+ * Catch active-phase leaks that plateau during quiescence (false-green class):
+ * baseline → large growth → hold steady must still fail.
+ */
+export function activePhaseResourceFailures(samples, opts = {}) {
+	const failures = [];
+	const active = samples?.filter(item => item.phase === 'active') ?? [];
+	const quiesce = samples?.filter(item => item.phase === 'quiesce') ?? [];
+	if (active.length < 2) {
+		return failures;
+	}
+	const baseline = active[0];
+	const peakProcess = Math.max(...active.map(item => item.processCount).filter(Number.isFinite));
+	const peakLive = Math.max(...active.map(item => item.webContentsLiveCount).filter(Number.isFinite), 0);
+	const lastQuiesce = quiesce.at(-1);
+	const maxActiveProcessDelta = opts.maxActiveProcessDelta ?? 18;
+	const maxQuiesceProcessDelta = opts.maxQuiesceProcessDelta ?? 12;
+	const maxActiveLiveDelta = opts.maxActiveLiveDelta ?? 10;
+	const maxQuiesceLiveDelta = opts.maxQuiesceLiveDelta ?? 8;
+	const maxRssGrowthMb = opts.maxRssGrowthMb ?? 2_800;
+
+	if (Number.isFinite(peakProcess) && peakProcess - baseline.processCount > maxActiveProcessDelta) {
+		failures.push(`active-phase process growth unbounded: ${baseline.processCount} → peak ${peakProcess} (max Δ ${maxActiveProcessDelta})`);
+	}
+	if (lastQuiesce && Number.isFinite(lastQuiesce.processCount) && lastQuiesce.processCount - baseline.processCount > maxQuiesceProcessDelta) {
+		failures.push(`quiesce process count elevated vs baseline: ${baseline.processCount} → ${lastQuiesce.processCount} (max Δ ${maxQuiesceProcessDelta})`);
+	}
+	if (Number.isFinite(baseline.webContentsLiveCount) && Number.isFinite(peakLive) && peakLive - baseline.webContentsLiveCount > maxActiveLiveDelta) {
+		failures.push(`active-phase live WebContents growth unbounded: ${baseline.webContentsLiveCount} → peak ${peakLive} (max Δ ${maxActiveLiveDelta})`);
+	}
+	if (lastQuiesce && Number.isFinite(baseline.webContentsLiveCount) && Number.isFinite(lastQuiesce.webContentsLiveCount)
+		&& lastQuiesce.webContentsLiveCount - baseline.webContentsLiveCount > maxQuiesceLiveDelta) {
+		failures.push(`quiesce live WebContents elevated vs baseline: ${baseline.webContentsLiveCount} → ${lastQuiesce.webContentsLiveCount} (max Δ ${maxQuiesceLiveDelta})`);
+	}
+	if (lastQuiesce && Number.isFinite(baseline.rssMb) && Number.isFinite(lastQuiesce.rssMb)
+		&& lastQuiesce.rssMb - baseline.rssMb > maxRssGrowthMb) {
+		failures.push(`quiesce RSS elevated vs baseline: ${baseline.rssMb}MB → ${lastQuiesce.rssMb}MB (max Δ ${maxRssGrowthMb}MB)`);
+	}
+	return failures;
+}
+
 export function lifecycleFailures(evidence) {
 	const failures = [];
 	if (evidence.activityError) {

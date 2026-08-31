@@ -226,6 +226,50 @@ function hashContent(text: string): string {
 	return createHash('sha256').update(text).digest('hex').slice(0, 16);
 }
 
+/**
+ * Nested path under a catalog root → ecosystem-native display/activation name.
+ * OpenCode: `.opencode/agents/team/reviewer.md` → `team/reviewer` (slash).
+ * Gemini nested TOML: `.gemini/commands/foo/bar.toml` → `foo:bar` (colon).
+ * Other nested Markdown catalogs keep colon namespaces for historical PreBase compatibility.
+ */
+export function nestedPathCatalogName(ecosystem: string, relUnder: string, ext: string): string {
+	const stem = relUnder.endsWith(ext) ? relUnder.slice(0, -ext.length) : relUnder;
+	if (!stem.includes('/')) {
+		return basename(stem);
+	}
+	if (ecosystem === 'opencode') {
+		return stem;
+	}
+	return stem.replace(/\//g, ':');
+}
+
+/** OpenCode slash names also match legacy colonized refs (`team:reviewer` ↔ `team/reviewer`). */
+export function catalogNameMatches(ecosystem: string, catalogName: string, ref: string): boolean {
+	if (catalogName === ref) {
+		return true;
+	}
+	if (ecosystem === 'opencode' && catalogName.includes('/') && ref.includes(':')) {
+		return catalogName.replace(/\//g, ':') === ref;
+	}
+	return false;
+}
+
+export function resolveCatalogRef<T extends { path: string; id: string; name: string; ecosystem: string }>(
+	catalog: readonly T[],
+	ref: string,
+): T | undefined {
+	const trimmed = ref.trim().replace(/\\/g, '/');
+	if (!trimmed) {
+		return undefined;
+	}
+	// Prefer exact path/id/name so Gemini `deploy:prod` is not stolen by an OpenCode `deploy/prod` colon alias.
+	return catalog.find(item => item.path === trimmed || item.id === trimmed || item.name === trimmed)
+		?? catalog.find(item =>
+			item.ecosystem === 'opencode'
+			&& item.name.includes('/')
+			&& item.name.replace(/\//g, ':') === trimmed);
+}
+
 function tagGuidanceBlocks(workspaceRoot: string, items: readonly { source: GuidanceSource; text: string }[]): GuidanceTextBlock[] {
 	return items.map(item => ({ ...item, workspaceRoot: resolve(workspaceRoot) }));
 }
@@ -491,6 +535,19 @@ function ruleActivationMode(ecosystem: string, meta: Record<string, FrontmatterV
 	if (ecosystem === 'github') {
 		return globs.length ? 'path' : 'manual';
 	}
+	if (ecosystem === 'continue') {
+		if (metaBoolean(meta, 'alwaysApply') === true) {
+			return 'always';
+		}
+		if (globs.length) {
+			return 'path';
+		}
+		// Continue `regex` is advisory/unsupported — do not treat as always-applicable.
+		if (metaString(meta, 'regex')) {
+			return 'manual';
+		}
+		return 'always';
+	}
 	return globs.length ? 'path' : 'always';
 }
 
@@ -615,7 +672,7 @@ async function loadNamedMarkdownCatalog(
 				if (root.ext === '.agent.md') {
 					defaultName = basename(rel, '.agent.md');
 				} else if (relUnder.includes('/')) {
-					defaultName = relUnder.slice(0, -root.ext.length).replace(/\//g, ':');
+					defaultName = nestedPathCatalogName(root.ecosystem, relUnder, root.ext);
 				}
 				const name = metaString(meta, 'name') ?? defaultName;
 				const description = scrubSecretsFromGuidance(metaString(meta, 'description') ?? (firstNonHeadingLine(body) || name));
@@ -674,9 +731,7 @@ async function loadGeminiCommandCatalog(
 		try {
 			const text = scrubSecretsFromGuidance(await reader.readFile(join(workspaceRoot, rel)));
 			const parsed = parseTomlCommand(text);
-			const defaultName = relUnder.includes('/')
-				? relUnder.slice(0, -'.toml'.length).replace(/\//g, ':')
-				: basename(rel, '.toml');
+			const defaultName = nestedPathCatalogName('gemini', relUnder, '.toml');
 			const name = parsed.name || defaultName;
 			const description = scrubSecretsFromGuidance(parsed.description || firstNonHeadingLine(parsed.prompt) || name);
 			catalog.push({
@@ -871,6 +926,9 @@ export class ProjectGuidanceService {
 					const { meta, body } = parseFrontmatter(text);
 					const globs = globsFromMeta(meta, text);
 					const mode = ruleActivationMode(ruleDir.ecosystem, meta, globs);
+					if (ruleDir.ecosystem === 'continue' && metaString(meta, 'regex') && !globs.length && metaBoolean(meta, 'alwaysApply') !== true) {
+						diagnostics.push(`Continue rule regex in ${rel} is advisory only — PreBase does not evaluate foreign regex against file contents.`);
+					}
 					const containerScope = ruleDir.nested ? ruleContainerScope(dir, ruleDir.dir) : '';
 					const alwaysApply = mode === 'always';
 					const description = metaString(meta, 'description');
@@ -960,8 +1018,23 @@ export class ProjectGuidanceService {
 			diagnostics.push(`Executable project hook detected in ${hook} — not automatically imported by PreBase for security.`);
 		}
 
+		// Expand name/id/colon-alias refs to canonical catalog paths for activation matching.
+		const expandedActivatedRules = new Set(normalizedActivatedRules);
+		for (const ref of normalizedActivatedRules) {
+			const playbook = resolveCatalogRef(playbookCatalog, ref);
+			if (playbook) {
+				expandedActivatedRules.add(playbook.path);
+			}
+			const profile = resolveCatalogRef(agentProfileCatalog, ref);
+			if (profile) {
+				expandedActivatedRules.add(profile.path);
+			}
+		}
+		const activatedRefs = [...expandedActivatedRules];
+
 		const activatedPlaybookBlocks: { source: GuidanceSource; text: string }[] = [];
-		for (const activatedPath of normalizedActivatedRules) {
+		for (const activatedPath of activatedRefs) {
+			// Only load by canonical path (name/id aliases were expanded into activatedRefs above).
 			const playbook = playbookCatalog.find(item => item.path === activatedPath);
 			if (!playbook) {
 				continue;
@@ -995,9 +1068,13 @@ export class ProjectGuidanceService {
 		}
 
 		const activatedAgentProfiles: ActivatedAgentProfile[] = [];
-		for (const activatedPath of normalizedActivatedRules) {
-			const profile = agentProfileCatalog.find(item => item.path === activatedPath || item.id === activatedPath);
+		for (const activatedPath of activatedRefs) {
+			const profile = agentProfileCatalog.find(item => item.path === activatedPath);
 			if (!profile) {
+				continue;
+			}
+			if (profile.userInvocable === false) {
+				diagnostics.push(`Agent profile ${profile.path} is marked user-invocable: false and was not activated.`);
 				continue;
 			}
 			const full = join(workspaceRoot, profile.path);
@@ -1034,7 +1111,7 @@ export class ProjectGuidanceService {
 		});
 		const activatedRules = deduped.items.filter(item =>
 			(item.source.activationMode === 'intelligent' || item.source.activationMode === 'manual')
-			&& normalizedActivatedRules.includes(item.source.path));
+			&& activatedRefs.includes(item.source.path));
 
 		const skillFiles = await discoverSkillFiles(this.reader, workspaceRoot, SKILL_DIRS, isBlockedGuidancePath);
 		const skillCatalog: SkillMetadata[] = [];
@@ -1233,7 +1310,8 @@ export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot
 		parts.push(lines.join('\n'));
 	}
 	if (snapshot.agentProfileCatalog?.length) {
-		const modelProfiles = snapshot.agentProfileCatalog.filter(profile => profile.modelInvocable !== false);
+		const modelProfiles = snapshot.agentProfileCatalog.filter(profile =>
+			profile.modelInvocable !== false && profile.userInvocable !== false);
 		if (modelProfiles.length) {
 			const lines = ['AVAILABLE AGENT PROFILES (catalog only; not auto-injected; activate with prebase_project_guidance activate_agent_profile)'];
 			for (const profile of modelProfiles.slice(0, 12)) {

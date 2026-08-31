@@ -16,6 +16,8 @@ static NSString *JSString(Napi::Value value) {
 @interface PrebaseLiveActivityView : NSView
 @property (nonatomic, copy) NSString *statusLabel;
 @property (nonatomic, copy) NSString *activityLabel;
+@property (nonatomic, copy) NSString *metricsLabel;
+@property (nonatomic, copy) NSString *pendingTitle;
 @property (nonatomic, copy) NSArray<NSString *> *actions;
 @property (nonatomic, copy) NSString *status;
 @property (nonatomic, assign) BOOL expanded;
@@ -33,6 +35,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) NSButton *openButton;
 @property (nonatomic, strong) NSButton *approveButton;
 @property (nonatomic, strong) NSButton *denyButton;
+@property (nonatomic, strong) NSMutableArray<NSButton *> *optionButtons;
+@property (nonatomic, copy) NSArray<NSDictionary *> *pendingOptions;
 @property (nonatomic, assign) BOOL visible;
 @property (nonatomic, assign) BOOL pinned;
 @property (nonatomic, assign) BOOL hovering;
@@ -52,6 +56,7 @@ static NSString *JSString(Napi::Value value) {
 - (void)applySnapshotDict:(NSDictionary *)snapshot;
 - (void)teardown;
 - (void)mouseUp:(NSEvent *)event;
+- (void)clearPendingInteraction;
 @end
 
 @implementation PrebaseLiveActivityView
@@ -92,6 +97,17 @@ static NSString *JSString(Napi::Value value) {
 		for (NSString *action in self.actions) {
 			[action drawAtPoint:NSMakePoint(18, y) withAttributes:attrs];
 			y += 16;
+		}
+		if (self.pendingTitle.length) {
+			attrs[NSFontAttributeName] = [NSFont systemFontOfSize:11 weight:NSFontWeightMedium];
+			attrs[NSForegroundColorAttributeName] = [NSColor colorWithCalibratedWhite:0.9 alpha:1.0];
+			[self.pendingTitle drawAtPoint:NSMakePoint(14, y + 4) withAttributes:attrs];
+			y += 20;
+		}
+		if (self.metricsLabel.length) {
+			attrs[NSFontAttributeName] = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
+			attrs[NSForegroundColorAttributeName] = [NSColor colorWithCalibratedWhite:0.7 alpha:1.0];
+			[self.metricsLabel drawAtPoint:NSMakePoint(14, MAX(y + 6, NSHeight(bounds) - 56)) withAttributes:attrs];
 		}
 	}
 }
@@ -166,6 +182,13 @@ static NSString *JSString(Napi::Value value) {
 	self.denyButton = [self makeButton:@"Deny" action:@selector(deny:)];
 	self.approveButton.hidden = YES;
 	self.denyButton.hidden = YES;
+	self.optionButtons = [NSMutableArray array];
+	for (NSInteger i = 0; i < 4; i++) {
+		NSButton *button = [self makeButton:[NSString stringWithFormat:@"Option %ld", (long)(i + 1)] action:@selector(answerOption:)];
+		button.tag = i;
+		button.hidden = YES;
+		[self.optionButtons addObject:button];
+	}
 }
 
 - (NSButton *)makeButton:(NSString *)title action:(SEL)action {
@@ -242,9 +265,14 @@ static NSString *JSString(Napi::Value value) {
 	BOOL showInput = self.pinned;
 	self.input.hidden = !showInput;
 	self.openButton.hidden = !(self.content.expanded || self.pinned);
-	BOOL attention = [self.pendingKind isEqualToString:@"approval"];
-	self.approveButton.hidden = !(attention && (self.content.expanded || self.pinned));
+	BOOL approval = [self.pendingKind isEqualToString:@"approval"];
+	BOOL question = [self.pendingKind isEqualToString:@"question"];
+	BOOL showAttention = (self.content.expanded || self.pinned);
+	self.approveButton.hidden = !(approval && showAttention);
 	self.denyButton.hidden = self.approveButton.hidden;
+	for (NSButton *button in self.optionButtons) {
+		button.hidden = YES;
+	}
 	CGFloat y = 12;
 	if (showInput) {
 		self.input.frame = NSMakeRect(12, y, NSWidth(win) - 24, 24);
@@ -256,6 +284,25 @@ static NSString *JSString(Napi::Value value) {
 	if (!self.approveButton.hidden) {
 		self.denyButton.frame = NSMakeRect(12, y, 70, 22);
 		self.approveButton.frame = NSMakeRect(88, y, 78, 22);
+	}
+	if (question && showAttention) {
+		NSInteger count = MIN((NSInteger)self.pendingOptions.count, (NSInteger)self.optionButtons.count);
+		CGFloat x = 12;
+		for (NSInteger i = 0; i < count; i++) {
+			NSDictionary *option = self.pendingOptions[i];
+			NSButton *button = self.optionButtons[i];
+			NSString *label = option[@"label"] ?: option[@"id"] ?: @"Option";
+			button.title = label;
+			button.accessibilityLabel = label;
+			button.hidden = NO;
+			CGFloat width = MIN(120, MAX(64, label.length * 7.0));
+			if (x + width > NSWidth(win) - 140) {
+				x = 12;
+				y += 26;
+			}
+			button.frame = NSMakeRect(x, y, width, 22);
+			x += width + 8;
+		}
 	}
 }
 
@@ -395,10 +442,41 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)approve:(id)sender {
 	[self emit:@"approve" extras:@{ @"interactionId": self.interactionId ?: @"" }];
+	[self clearPendingInteraction];
 }
 
 - (void)deny:(id)sender {
 	[self emit:@"deny" extras:@{ @"interactionId": self.interactionId ?: @"" }];
+	[self clearPendingInteraction];
+}
+
+- (void)answerOption:(id)sender {
+	NSButton *button = (NSButton *)sender;
+	if (button.tag < 0 || button.tag >= (NSInteger)self.pendingOptions.count) {
+		return;
+	}
+	NSDictionary *option = self.pendingOptions[button.tag];
+	NSString *optionId = option[@"id"] ?: @"";
+	if (optionId.length == 0) {
+		return;
+	}
+	NSString *interactionId = self.interactionId ?: @"";
+	[self emit:@"answer" extras:@{
+		@"interactionId": interactionId,
+		@"optionId": optionId
+	}];
+	[self clearPendingInteraction];
+}
+
+- (void)clearPendingInteraction {
+	self.interactionId = @"";
+	self.pendingKind = @"";
+	self.pendingOptions = @[];
+	self.content.pendingTitle = @"";
+	if (self.panel) {
+		[self layoutControls:self.panel.frame];
+	}
+	[self.content setNeedsDisplay:YES];
 }
 
 - (void)mouseUp:(NSEvent *)event {
@@ -429,9 +507,15 @@ static NSString *JSString(Napi::Value value) {
 	self.content.statusLabel = label;
 	self.content.activityLabel = snapshot[@"currentActivity"] ?: @"";
 	self.content.actions = snapshot[@"recentActions"] ?: @[];
+	self.content.metricsLabel = snapshot[@"metricsLabel"] ?: @"";
+	self.content.pendingTitle = snapshot[@"pendingTitle"] ?: @"";
 	self.interactionId = snapshot[@"interactionId"] ?: @"";
 	self.pendingKind = snapshot[@"pendingKind"] ?: @"";
+	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
 	[self.content setNeedsDisplay:YES];
+	if (self.panel) {
+		[self layoutControls:self.panel.frame];
+	}
 }
 
 - (void)setVisible:(BOOL)visible pinned:(BOOL)pinned reduced:(BOOL)reduced {
@@ -501,13 +585,70 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 		}
 	}
 	payload[@"recentActions"] = actions;
+
+	NSMutableArray *metricParts = [NSMutableArray array];
+	if (snapshot.Get("workspaceDiff").IsObject()) {
+		Napi::Object diff = snapshot.Get("workspaceDiff").As<Napi::Object>();
+		bool hasAdd = diff.Get("additions").IsNumber();
+		bool hasDel = diff.Get("deletions").IsNumber();
+		if (hasAdd || hasDel) {
+			double additions = hasAdd ? diff.Get("additions").As<Napi::Number>().DoubleValue() : 0;
+			double deletions = hasDel ? diff.Get("deletions").As<Napi::Number>().DoubleValue() : 0;
+			[metricParts addObject:[NSString stringWithFormat:@"+%.0f −%.0f", additions, deletions]];
+		}
+		if (diff.Get("files").IsNumber()) {
+			double files = diff.Get("files").As<Napi::Number>().DoubleValue();
+			if (files > 0) {
+				[metricParts addObject:[NSString stringWithFormat:@"%.0f file%s", files, files == 1 ? "" : "s"]];
+			}
+		}
+	}
+	if (snapshot.Get("terminalCount").IsNumber()) {
+		double terminals = snapshot.Get("terminalCount").As<Napi::Number>().DoubleValue();
+		if (terminals > 0) {
+			[metricParts addObject:[NSString stringWithFormat:@"%.0f task%s", terminals, terminals == 1 ? "" : "s"]];
+		}
+	}
+	NSString *testState = JSString(snapshot.Get("testState"));
+	if (testState.length) {
+		[metricParts addObject:[NSString stringWithFormat:@"tests %@", testState]];
+	}
+	payload[@"metricsLabel"] = [metricParts componentsJoinedByString:@" · "];
+
 	if (snapshot.Get("pendingInteraction").IsObject()) {
 		Napi::Object pending = snapshot.Get("pendingInteraction").As<Napi::Object>();
 		payload[@"interactionId"] = JSString(pending.Get("interactionId"));
 		payload[@"pendingKind"] = JSString(pending.Get("kind"));
+		payload[@"pendingTitle"] = JSString(pending.Get("title"));
+		// Only surface destructive when explicitly true — never invent false.
+		if (pending.Get("destructive").IsBoolean() && pending.Get("destructive").As<Napi::Boolean>().Value()) {
+			payload[@"destructive"] = @YES;
+		}
+		NSMutableArray *options = [NSMutableArray array];
+		if (pending.Get("options").IsArray()) {
+			Napi::Array arr = pending.Get("options").As<Napi::Array>();
+			for (uint32_t i = 0; i < arr.Length() && options.count < 4; i++) {
+				Napi::Value item = arr.Get(i);
+				if (!item.IsObject()) {
+					continue;
+				}
+				Napi::Object option = item.As<Napi::Object>();
+				NSString *optionId = JSString(option.Get("id"));
+				if (optionId.length == 0) {
+					continue;
+				}
+				[options addObject:@{
+					@"id": optionId,
+					@"label": JSString(option.Get("label"))
+				}];
+			}
+		}
+		payload[@"pendingOptions"] = options;
 	} else {
 		payload[@"interactionId"] = @"";
 		payload[@"pendingKind"] = @"";
+		payload[@"pendingTitle"] = @"";
+		payload[@"pendingOptions"] = @[];
 	}
 	return payload;
 }

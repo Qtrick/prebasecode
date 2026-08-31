@@ -5,8 +5,11 @@ import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 import {
 	ProjectGuidanceService,
+	catalogNameMatches,
 	formatProjectGuidanceForPrompt,
 	guidanceTargetPathsFromReferences,
+	nestedPathCatalogName,
+	resolveCatalogRef,
 	scrubSecretsFromGuidance,
 } from './projectGuidanceService';
 import { createProjectGuidanceSession, runWithProjectGuidanceSession } from './projectGuidanceSession';
@@ -30,6 +33,24 @@ function makeReader(root: string) {
 }
 
 describe('projectGuidanceService', () => {
+	test('nestedPathCatalogName keeps OpenCode slashes and Gemini colons', () => {
+		assert.equal(nestedPathCatalogName('opencode', 'team/reviewer.md', '.md'), 'team/reviewer');
+		assert.equal(nestedPathCatalogName('opencode', 'review/code.md', '.md'), 'review/code');
+		assert.equal(nestedPathCatalogName('gemini', 'deploy/prod.toml', '.toml'), 'deploy:prod');
+		assert.equal(nestedPathCatalogName('cursor', 'nested/cmd.md', '.md'), 'nested:cmd');
+		assert.equal(catalogNameMatches('opencode', 'review/code', 'review:code'), true);
+		assert.equal(catalogNameMatches('opencode', 'review/code', 'review/code'), true);
+		assert.equal(catalogNameMatches('gemini', 'deploy:prod', 'deploy/prod'), false);
+		assert.ok(resolveCatalogRef([{ path: 'a.md', id: 'x', name: 'team/reviewer', ecosystem: 'opencode' }], 'team:reviewer'));
+		// Exact Gemini name wins over OpenCode slash→colon alias collision.
+		const collided = resolveCatalogRef([
+			{ path: '.opencode/commands/deploy/prod.md', id: 'oc', name: 'deploy/prod', ecosystem: 'opencode' },
+			{ path: '.gemini/commands/deploy/prod.toml', id: 'gm', name: 'deploy:prod', ecosystem: 'gemini' },
+		], 'deploy:prod');
+		assert.equal(collided?.ecosystem, 'gemini');
+		assert.equal(collided?.path, '.gemini/commands/deploy/prod.toml');
+	});
+
 	test('discovers AGENTS.md and always-on Cursor rules without dumping skill bodies', async () => {
 		const root = tempGuidanceRoot('guidance');
 		try {
@@ -699,9 +720,9 @@ globs:
 		const root = tempGuidanceRoot('guidance-v2-interop');
 		try {
 			mkdirSync(join(root, '.github/agents'), { recursive: true });
-			mkdirSync(join(root, '.opencode/agents'), { recursive: true });
+			mkdirSync(join(root, '.opencode/agents/team'), { recursive: true });
 			mkdirSync(join(root, '.opencode/commands/review'), { recursive: true });
-			mkdirSync(join(root, '.gemini/commands'), { recursive: true });
+			mkdirSync(join(root, '.gemini/commands/deploy'), { recursive: true });
 			mkdirSync(join(root, '.clinerules/workflows'), { recursive: true });
 			mkdirSync(join(root, '.continue/rules'), { recursive: true });
 			mkdirSync(join(root, '.cursor'), { recursive: true });
@@ -709,30 +730,50 @@ globs:
 
 			// 1. GitHub Agent
 			writeFileSync(join(root, '.github/agents/planner.agent.md'), '---\nname: GitHub Planner\ndescription: Plans architecture changes\ntools: ["workspace_search"]\nmodel: "claude-3-5-sonnet"\n---\nYou are a planner.\n');
-			// 2. OpenCode Agent (manual only)
+			writeFileSync(join(root, '.github/agents/hidden.agent.md'), '---\nname: Hidden Agent\ndescription: Not manually selectable\nuser-invocable: false\n---\nShould not activate manually.\n');
+			// 2. OpenCode Agent (manual only + nested slash ID)
 			writeFileSync(join(root, '.opencode/agents/debugger.md'), '---\nname: OpenCode Debugger\ndescription: Debugs test failures\ndisable-model-invocation: true\n---\nYou are a debugger.\n');
-			// 3. OpenCode Command (nested namespace)
+			writeFileSync(join(root, '.opencode/agents/team/reviewer.md'), '---\ndescription: Nested OpenCode reviewer\n---\nReview carefully.\n');
+			// 3. OpenCode Command (nested slash namespace)
 			writeFileSync(join(root, '.opencode/commands/review/code.md'), '---\ndescription: Review code quality\nargument-hint: [pr-number]\n---\nReview changes in PR.\n');
-			// 4. Gemini TOML Command
-			writeFileSync(join(root, '.gemini/commands/deploy.toml'), 'name = "deploy-env"\ndescription = "Deploy environment"\nargumentHint = "[env]"\nprompt = """\nDeploy target $(danger_shell_exec) safely.\n"""\n');
+			// 4. Gemini TOML Command with real dynamic syntax (must stay inert)
+			const shellCanary = join(root, 'gemini-shell-canary.txt');
+			const fileCanary = join(root, 'gemini-file-canary.md');
+			writeFileSync(fileCanary, 'SECRET_CANARY_CONTENT\n');
+			writeFileSync(join(root, '.gemini/commands/deploy/prod.toml'), `description = "Deploy environment"\nargumentHint = "[env]"\nprompt = """\nDeploy target !{touch ${shellCanary.replace(/\\/g, '/')}} and include @{gemini-file-canary.md} with {{args}} safely.\n"""\n`);
 			// 5. Cline workflow
 			writeFileSync(join(root, '.clinerules/workflows/e2e.md'), '---\ndescription: Run end to end test flow\n---\nRun e2e steps.\n');
-			// 6. Continue rule
+			// 6. Continue rule (always) + regex-only (unsupported)
 			writeFileSync(join(root, '.continue/rules/style.md'), '---\nalwaysApply: true\n---\nAdhere to project code style.\n');
-			// 7. Hooks
-			writeFileSync(join(root, '.cursor/hooks.json'), '{"preTool": "echo test"}');
+			writeFileSync(join(root, '.continue/rules/regex-only.md'), '---\nregex: "TODO:"\ndescription: Match TODO comments\n---\nFlag TODOs.\n');
+			// 7. Hooks with canary side effect that must never run
+			const hookCanary = join(root, 'hook-exec-canary.txt');
+			writeFileSync(join(root, '.cursor/hooks.json'), `{"preTool": "touch ${hookCanary.replace(/\\/g, '/')}"}`);
 			writeFileSync(join(root, '.github/hooks/post-commit.json'), '{"action": "notify"}');
 
-			const service = new ProjectGuidanceService(makeReader(root));
+			const readPaths: string[] = [];
+			const baseReader = makeReader(root);
+			const reader = {
+				...baseReader,
+				readFile: async (p: string) => {
+					readPaths.push(p);
+					return baseReader.readFile(p);
+				},
+			};
+			const service = new ProjectGuidanceService(reader);
 			const snapshot = await service.getSnapshot(root);
 
-			// Check Continue rule discovered as always-applicable
+			// Check Continue always rule + regex unsupported
 			assert.ok(snapshot.alwaysApplicable.some(item => item.source.path === '.continue/rules/style.md'));
+			assert.equal(snapshot.alwaysApplicable.some(item => item.source.path === '.continue/rules/regex-only.md'), false);
+			assert.ok(snapshot.onDemandRules.some(item => item.source.path === '.continue/rules/regex-only.md'));
+			assert.ok(snapshot.diagnostics.some(d => d.includes('.continue/rules/regex-only.md') && /advisory only|does not evaluate foreign regex/i.test(d)));
 
-			// Check Playbook Catalog includes OpenCode nested command, Gemini TOML command, and Cline workflow
-			assert.ok(snapshot.playbookCatalog.some(item => item.name === 'review:code' && item.path === '.opencode/commands/review/code.md'));
-			assert.ok(snapshot.playbookCatalog.some(item => item.name === 'deploy-env' && item.path === '.gemini/commands/deploy.toml' && item.argumentHint === '[env]'));
+			// OpenCode nested = slash; Gemini nested = colon
+			assert.ok(snapshot.playbookCatalog.some(item => item.name === 'review/code' && item.path === '.opencode/commands/review/code.md'));
+			assert.ok(snapshot.playbookCatalog.some(item => item.name === 'deploy:prod' && item.path === '.gemini/commands/deploy/prod.toml' && item.argumentHint === '[env]'));
 			assert.ok(snapshot.playbookCatalog.some(item => item.name === 'e2e' && item.path === '.clinerules/workflows/e2e.md'));
+			assert.ok(snapshot.agentProfileCatalog.some(item => item.name === 'team/reviewer' && item.path === '.opencode/agents/team/reviewer.md'));
 
 			// Check Agent Profile Catalog
 			const githubPlanner = snapshot.agentProfileCatalog.find(item => item.path === '.github/agents/planner.agent.md');
@@ -741,23 +782,45 @@ globs:
 			assert.equal(githubPlanner!.toolsHint, 'workspace_search');
 			assert.equal(githubPlanner!.modelHint, 'claude-3-5-sonnet');
 
+			const hiddenAgent = snapshot.agentProfileCatalog.find(item => item.path === '.github/agents/hidden.agent.md');
+			assert.ok(hiddenAgent);
+			assert.equal(hiddenAgent!.userInvocable, false);
+
 			const openCodeDebugger = snapshot.agentProfileCatalog.find(item => item.path === '.opencode/agents/debugger.md');
 			assert.ok(openCodeDebugger);
 			assert.equal(openCodeDebugger!.modelInvocable, false);
 
-			// Check Hook Discovery & Diagnostics
+			// Check Hook Discovery & Diagnostics — no execution
 			assert.ok(snapshot.detectedHooks?.includes('.cursor/hooks.json'));
 			assert.ok(snapshot.detectedHooks?.includes('.github/hooks/post-commit.json'));
 			assert.ok(snapshot.diagnostics.some(d => d.includes('.cursor/hooks.json') && d.includes('not automatically imported')));
+			assert.equal(existsSync(hookCanary), false);
 
-			// Check formatProjectGuidanceForPrompt filters model-non-invocable agent profiles
+			// Check formatProjectGuidanceForPrompt filters model-non-invocable and user-non-invocable agent profiles
 			const prompt = formatProjectGuidanceForPrompt(snapshot);
 			assert.match(prompt, /GitHub Planner/);
 			assert.doesNotMatch(prompt, /OpenCode Debugger/);
+			assert.doesNotMatch(prompt, /Hidden Agent/);
 
-			// Check Gemini prompt text keeps shell string without execution
-			const activatedGemini = await service.getSnapshot(root, [], [], true, ['.gemini/commands/deploy.toml']);
-			assert.ok(activatedGemini.activatedRules.some(item => item.source.path === '.gemini/commands/deploy.toml' && item.text.includes('$(danger_shell_exec)')));
+			// user-invocable:false must not inject body even when path is passed for activation
+			const blockedProfile = await service.getSnapshot(root, [], [], true, ['.github/agents/hidden.agent.md']);
+			assert.equal(blockedProfile.activatedAgentProfiles?.some(p => p.metadata.path === '.github/agents/hidden.agent.md'), false);
+			assert.ok(blockedProfile.diagnostics.some(d => d.includes('user-invocable: false') && d.includes('hidden.agent.md')));
+			assert.doesNotMatch(formatProjectGuidanceForPrompt(blockedProfile), /Should not activate manually/);
+
+			// Gemini inert: literal dynamic syntax retained; no shell canary; no @{…} file read beyond the TOML
+			const activatedGemini = await service.getSnapshot(root, [], [], true, ['.gemini/commands/deploy/prod.toml']);
+			const geminiRule = activatedGemini.activatedRules.find(item => item.source.path === '.gemini/commands/deploy/prod.toml');
+			assert.ok(geminiRule);
+			assert.match(geminiRule!.text, /!\{touch /);
+			assert.match(geminiRule!.text, /@\{gemini-file-canary\.md\}/);
+			assert.match(geminiRule!.text, /\{\{args\}\}/);
+			assert.equal(existsSync(shellCanary), false);
+			assert.equal(readPaths.some(p => p.includes('gemini-file-canary.md')), false);
+
+			// OpenCode colonized legacy name still resolves to slash catalog entry
+			const activatedByColonAlias = await service.getSnapshot(root, [], [], true, ['review:code']);
+			assert.ok(activatedByColonAlias.activatedRules.some(item => item.source.path === '.opencode/commands/review/code.md'));
 
 			// Check Agent Profile activation
 			const activatedProfileSnapshot = await service.getSnapshot(root, [], [], true, ['.github/agents/planner.agent.md']);

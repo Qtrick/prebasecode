@@ -11,8 +11,11 @@ import {
 	buildMagnusLiveActivitySnapshot,
 	collapsedStatusLabel,
 	deriveLiveActivityGeometry,
+	deriveMagnusTestStateFromInvocations,
+	formatDiffMetric,
 	isMagnusParticipantId,
 	selectPrimaryMagnusSession,
+	summarizeMagnusWorkspaceDiff,
 	LIVE_ACTIVITY_EXIT_GRACE_MS,
 	LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS,
 	LIVE_ACTIVITY_MAX_ACTIONS,
@@ -111,16 +114,18 @@ suite('Magnus Live Activity projection', () => {
 	test('approve/deny/answer fail closed when the pending kind does not match', () => {
 		const question = buildMagnusLiveActivitySnapshot(session({
 			needsInput: true,
-			pendingInteraction: { kind: 'question', interactionId: 'q-1', title: 'Which file?', message: 'Pick one' },
+			pendingInteraction: { kind: 'question', interactionId: 'q-1', title: 'Which file?', message: 'Pick one', options: [{ id: 'a', label: 'A' }] },
 		}), { revision: 1, prebaseForeground: false, connected: true });
 		assert.deepStrictEqual(acceptLiveActivityCommand(question, { kind: 'approve', interactionId: 'q-1', revision: 1 }), { ok: false, reason: 'not-an-approval' });
-		assert.deepStrictEqual(acceptLiveActivityCommand(question, { kind: 'answer', interactionId: 'q-1', revision: 1 }), { ok: true });
+		assert.deepStrictEqual(acceptLiveActivityCommand(question, { kind: 'answer', interactionId: 'q-1', revision: 1 }), { ok: false, reason: 'missing-option' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(question, { kind: 'answer', interactionId: 'q-1', optionId: 'nope', revision: 1 }), { ok: false, reason: 'stale-option' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(question, { kind: 'answer', interactionId: 'q-1', optionId: 'a', revision: 1 }), { ok: true });
 
 		const approval = buildMagnusLiveActivitySnapshot(session({
 			needsInput: true,
 			pendingInteraction: { kind: 'approval', interactionId: 'a-1', title: 'Run rm?', message: 'destructive' },
 		}), { revision: 1, prebaseForeground: false, connected: true });
-		assert.deepStrictEqual(acceptLiveActivityCommand(approval, { kind: 'answer', interactionId: 'a-1', revision: 1 }), { ok: false, reason: 'not-a-question' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(approval, { kind: 'answer', interactionId: 'a-1', optionId: 'a', revision: 1 }), { ok: false, reason: 'not-a-question' });
 		assert.deepStrictEqual(acceptLiveActivityCommand(approval, { kind: 'deny', interactionId: 'a-1', revision: 1 }), { ok: true });
 
 		const none = buildMagnusLiveActivitySnapshot(session(), { revision: 1, prebaseForeground: false, connected: true });
@@ -438,6 +443,116 @@ suite('Magnus Live Activity projection', () => {
 		assert.strictEqual(collapsedStatusLabel(snap), 'Finished · 6 files');
 		assert.strictEqual(snap.workspaceDiff?.attributedToMagnus, true);
 	});
+
+	test('summarizeMagnusWorkspaceDiff omits +/- when only edited file URIs are known', () => {
+		const summary = summarizeMagnusWorkspaceDiff({
+			editedFileUris: ['file:///a.ts', 'file:///b.ts', 'file:///a.ts', ''],
+		});
+		assert.deepStrictEqual(summary, { files: 2, attributedToMagnus: true });
+		assert.strictEqual('additions' in (summary ?? {}), false);
+		assert.strictEqual('deletions' in (summary ?? {}), false);
+		assert.strictEqual(formatDiffMetric(summary), '2 files');
+		assert.strictEqual(summarizeMagnusWorkspaceDiff({ editedFileUris: [] }), undefined);
+	});
+
+	test('summarizeMagnusWorkspaceDiff includes line stats when provided and always attributes to Magnus', () => {
+		assert.deepStrictEqual(summarizeMagnusWorkspaceDiff({
+			editedFileUris: ['file:///a.ts'],
+			sessionFileCount: 3,
+			additions: 12,
+			deletions: 4,
+		}), { files: 3, additions: 12, deletions: 4, attributedToMagnus: true });
+		assert.deepStrictEqual(summarizeMagnusWorkspaceDiff({
+			editedFileUris: [],
+			additions: 0,
+			deletions: 5,
+		}), { files: 1, additions: 0, deletions: 5, attributedToMagnus: true });
+	});
+
+	test('deriveMagnusTestStateFromInvocations prefers running, then failed, and ignores non-test tools', () => {
+		assert.strictEqual(deriveMagnusTestStateFromInvocations([
+			{ toolId: 'runTests', state: 'passed' },
+			{ toolId: 'testing.runAll', state: 'running' },
+			{ toolId: 'runTests', state: 'failed' },
+		]), 'running');
+		assert.strictEqual(deriveMagnusTestStateFromInvocations([
+			{ toolId: 'vscode.test.run', state: 'passed' },
+			{ toolId: 'prebase_run_test', state: 'failed' },
+		]), 'failed');
+		assert.strictEqual(deriveMagnusTestStateFromInvocations([
+			{ toolId: 'runTests', state: 'passed' },
+		]), 'passed');
+		assert.strictEqual(deriveMagnusTestStateFromInvocations([
+			{ toolId: 'edit_file', state: 'failed' },
+			{ toolId: 'run_terminal', state: 'running' },
+		]), undefined);
+		assert.strictEqual(deriveMagnusTestStateFromInvocations([]), undefined);
+	});
+
+	test('finished collapsed label shows +/- · N files when line stats are present', () => {
+		const snap = buildMagnusLiveActivitySnapshot(session({
+			isInProgress: false,
+			completed: true,
+			workspaceDiff: { files: 2, additions: 8, deletions: 3, attributedToMagnus: true },
+		}), { revision: 6, prebaseForeground: false, connected: true });
+		assert.strictEqual(collapsedStatusLabel(snap), 'Finished · +8 −3 · 2 files');
+		assert.strictEqual(formatDiffMetric(snap.workspaceDiff), '+8 −3 · 2 files');
+	});
+
+	test('working collapsed label includes diff and terminal counts when present', () => {
+		const snap = buildMagnusLiveActivitySnapshot(session({
+			currentActivity: 'Editing graph',
+			startedAt: 1_000,
+			workspaceDiff: { files: 1, additions: 2, deletions: 0, attributedToMagnus: true },
+			terminalCount: 2,
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		assert.strictEqual(collapsedStatusLabel(snap, 1_000 + 45_000), 'Editing graph · 45s · +2 −0 · 1 file · 2 tasks');
+		const oneTask = buildMagnusLiveActivitySnapshot(session({
+			currentActivity: undefined,
+			startedAt: undefined,
+			terminalCount: 1,
+			workspaceDiff: { files: 4, attributedToMagnus: true },
+		}), { revision: 2, prebaseForeground: false, connected: true });
+		assert.strictEqual(collapsedStatusLabel(oneTask), '4 files · 1 task');
+	});
+
+	test('answer accept requires pendingInteraction.interactionId (question id), not resolveId', () => {
+		const snap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'question-42',
+				resolveId: 'resolve-carousel-7',
+				title: 'Which approach?',
+				message: 'Pick one',
+				options: [{ id: 'a', label: 'A' }],
+			},
+		}), { revision: 3, prebaseForeground: false, connected: true });
+		assert.deepStrictEqual(acceptLiveActivityCommand(snap, {
+			kind: 'answer',
+			interactionId: 'resolve-carousel-7',
+			optionId: 'a',
+			revision: 3,
+		}), { ok: false, reason: 'stale-interaction' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(snap, {
+			kind: 'answer',
+			interactionId: 'question-other',
+			optionId: 'a',
+			revision: 3,
+		}), { ok: false, reason: 'stale-interaction' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(snap, {
+			kind: 'answer',
+			interactionId: 'question-42',
+			optionId: 'nope',
+			revision: 3,
+		}), { ok: false, reason: 'stale-option' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(snap, {
+			kind: 'answer',
+			interactionId: 'question-42',
+			optionId: 'a',
+			revision: 3,
+		}), { ok: true });
+	});
 });
 
 suite('Magnus Live Activity contribution contracts', () => {
@@ -475,6 +590,39 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.match(handle, /approval failed closed: invocation missing/);
 		assert.doesNotMatch(handle, /invokeTool/);
 		assert.doesNotMatch(handle, /lm\.invokeTool/);
+	});
+
+	test('question pendingInteraction uses question.id; answers key by that id; destructive only when Red', () => {
+		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
+		const extractStart = contribution.indexOf('function extractPending');
+		const extractEnd = contribution.indexOf('function extractActions');
+		assert.ok(extractStart >= 0 && extractEnd > extractStart, 'must locate extractPending');
+		const extract = contribution.slice(extractStart, extractEnd);
+		assert.match(extract, /interactionId:\s*first\.id/);
+		assert.match(extract, /resolveId:\s*part\.resolveId/);
+		assert.ok(extract.indexOf('interactionId: first.id') < extract.indexOf('resolveId: part.resolveId'));
+		assert.doesNotMatch(extract, /interactionId:\s*part\.resolveId/);
+		assert.doesNotMatch(extract, /destructive:\s*false/);
+		assert.match(extract, /\.\.\.\(destructive === true \? \{ destructive: true \} : \{\}\)/);
+		assert.match(extract, /id:\s*option\.value\s*\|\|\s*option\.id/);
+
+		const handle = contribution.slice(contribution.indexOf('private async _handleCommand'), contribution.indexOf('override dispose'));
+		assert.match(handle, /notifyQuestionCarouselAnswer\(/);
+		assert.match(handle, /pending\.requestId\s*\?\?\s*last\?\.id/);
+		assert.match(handle, /\{\s*\[pending\.interactionId\]:\s*\{\s*selectedValue:\s*command\.optionId\s*\}\s*\}/);
+		assert.match(handle, /pending\.resolveId/);
+		assert.match(handle, /carousel missing\/used/);
+	});
+
+	test('terminalCount refreshes on tool-session register and terminal dispose/change', () => {
+		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
+		const ctor = contribution.slice(contribution.indexOf('constructor('), contribution.indexOf('private _bindModels'));
+		assert.match(ctor, /ITerminalService/);
+		assert.match(ctor, /onDidRegisterTerminalInstanceWithToolSession/);
+		assert.match(ctor, /onDidDisposeInstance/);
+		assert.match(ctor, /onDidChangeInstances/);
+		assert.match(ctor, /Event\.any\(/);
+		assert.match(contribution, /countSessionTerminals\(deps\.terminalChat, model\.sessionResource\)/);
 	});
 
 	test('non-mac constructor returns before the native channel and dispose tears the panel down', () => {
@@ -631,6 +779,23 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.match(native, /button\.accessibilityLabel = title/);
 		assert.match(native, /NSAccessibilityButtonRole/);
 		assert.match(native, /if \(self\.globalMonitor\) \{\s*return;/);
+	});
+
+	test('native SnapshotToDict emits metrics and pending options; answers clear pending locally', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /payload\[@"metricsLabel"\]/);
+		assert.match(native, /workspaceDiff/);
+		assert.match(native, /terminalCount/);
+		assert.match(native, /testState/);
+		assert.match(native, /pendingOptions/);
+		assert.match(native, /answerOption:/);
+		assert.match(native, /@"optionId": optionId/);
+		assert.match(native, /clearPendingInteraction/);
+		assert.match(native, /\[self clearPendingInteraction\]/);
+		// Never invent destructive:false — only set @YES when explicitly true.
+		assert.doesNotMatch(native, /@"destructive"\]\s*=\s*@NO/);
+		assert.doesNotMatch(native, /Get\("destructive"\)\.ToBoolean/);
+		assert.match(native, /Get\("destructive"\)\.IsBoolean/);
 	});
 
 	test('native emits session identity with revision and honors Reduce Motion', () => {

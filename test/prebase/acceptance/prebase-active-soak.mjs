@@ -19,7 +19,7 @@ import {
 	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
 import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
-import { monotonicGrowth } from './prebase-process-leak-diag.mjs';
+import { activePhaseResourceFailures, monotonicGrowth } from './prebase-process-leak-diag.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -60,6 +60,9 @@ async function runActivityOnce(page) {
 	await boundedClick(page, 'button', 'Focus Changes');
 	await workbenchCommandWithTimeout(page, 8_000, 'workbench.view.prebase.runtime').catch(() => undefined);
 	await workbenchCommandWithTimeout(page, 8_000, 'prebase.magnus.open').catch(() => undefined);
+	// Reclaim editor/webview surfaces between cycles so active-phase growth is product-owned, not harness accumulation.
+	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closeAllEditors').catch(() => undefined);
+	await workbenchCommandWithTimeout(page, 8_000, 'workbench.action.closePanel').catch(() => undefined);
 }
 
 async function sample(page, pid, phase) {
@@ -111,6 +114,7 @@ export function activeSoakFailures(evidence) {
 	if (monotonicGrowth(quiesceProcesses, 2)) {
 		failures.push('owned process count grew monotonically during soak quiescence');
 	}
+	failures.push(...activePhaseResourceFailures(evidence.samples ?? []));
 	return failures;
 }
 

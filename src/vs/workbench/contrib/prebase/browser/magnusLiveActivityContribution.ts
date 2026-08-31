@@ -6,6 +6,7 @@
 import { URI } from '../../../../base/common/uri.js';
 import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
 import { RunOnceScheduler } from '../../../../base/common/async.js';
+import { Event } from '../../../../base/common/event.js';
 import { isMacintosh, isWeb } from '../../../../base/common/platform.js';
 import { ProxyChannel } from '../../../../base/parts/ipc/common/ipc.js';
 import { mainWindow } from '../../../../base/browser/window.js';
@@ -22,6 +23,9 @@ import { IHostService } from '../../../services/host/browser/host.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
 import { IChatService, IChatToolInvocation, ToolConfirmKind } from '../../chat/common/chatService/chatService.js';
 import type { IChatModel, IChatRequestModel } from '../../chat/common/model/chatModel.js';
+import { ITerminalChatService, ITerminalService } from '../../terminal/browser/terminal.js';
+import { ILanguageModelToolsService } from '../../chat/common/tools/languageModelToolsService.js';
+import { IChatToolRiskAssessmentService, ToolRiskLevel } from '../../chat/browser/tools/chatToolRiskAssessmentService.js';
 import {
 	MAGNUS_LIVE_ACTIVITY_CHANNEL,
 	type IMagnusLiveActivityMainService,
@@ -29,10 +33,12 @@ import {
 import {
 	acceptLiveActivityCommand,
 	buildMagnusLiveActivitySnapshot,
+	deriveMagnusTestStateFromInvocations,
 	isMagnusParticipantId,
 	redactLiveActivityText,
 	selectPrimaryMagnusSession,
 	shouldShowLiveActivity,
+	summarizeMagnusWorkspaceDiff,
 	type LiveActivityCommand,
 	type MagnusLiveActivityAction,
 	type MagnusLiveActivityMode,
@@ -79,34 +85,66 @@ function selectPrimaryMagnusModel(models: Iterable<IChatModel>): IChatModel | un
 	return selectPrimaryMagnusSession(sessions)?.model;
 }
 
-function extractPending(request: IChatRequestModel | undefined): MagnusLiveActivityPendingInteraction | undefined {
+function toolInvocationState(invocation: IChatToolInvocation): 'running' | 'passed' | 'failed' | 'other' {
+	const state = invocation.state.get();
+	if (state.type === IChatToolInvocation.StateKind.Executing || state.type === IChatToolInvocation.StateKind.Streaming) {
+		return 'running';
+	}
+	if (state.type === IChatToolInvocation.StateKind.Cancelled) {
+		return 'failed';
+	}
+	if (state.type === IChatToolInvocation.StateKind.Completed) {
+		const details = state.resultDetails;
+		if (details && typeof details === 'object' && 'isError' in details && (details as { isError?: boolean }).isError) {
+			return 'failed';
+		}
+		return 'passed';
+	}
+	return 'other';
+}
+
+function extractPending(
+	request: IChatRequestModel | undefined,
+	risk?: { isDestructive(toolId: string, parameters: unknown): boolean },
+): MagnusLiveActivityPendingInteraction | undefined {
 	const parts = request?.response?.entireResponse.value ?? [];
 	for (const part of parts) {
 		if (part.kind === 'toolInvocation') {
 			const invocation = part as IChatToolInvocation;
 			const state = invocation.state.get();
 			if (state.type === IChatToolInvocation.StateKind.WaitingForConfirmation || state.type === IChatToolInvocation.StateKind.WaitingForPostApproval) {
-				const confirmation = 'confirmationMessages' in state ? state.confirmationMessages : undefined;
+				const confirmation = IChatToolInvocation.getConfirmationMessages(invocation);
+				const parameters = IChatToolInvocation.getParameters(invocation);
+				const destructive = risk?.isDestructive(invocation.toolId, parameters);
 				return {
 					kind: 'approval',
 					interactionId: invocation.toolCallId,
 					title: redactLiveActivityText(asPlainText(confirmation?.title) || asPlainText(invocation.invocationMessage) || 'Approve tool'),
 					message: redactLiveActivityText(asPlainText(confirmation?.message) || asPlainText(invocation.originMessage)),
-					destructive: false,
+					...(destructive === true ? { destructive: true } : {}),
 				};
 			}
 		}
 		if (part.kind === 'questionCarousel' && !part.isUsed) {
 			const first = part.questions?.[0];
-			const options = first?.options?.slice(0, 4).map(option => ({ id: option.id, label: option.label }));
+			if (!first) {
+				continue;
+			}
+			// AskQuestions equates option id/value/label; answer map keys by question.id; optionId = value.
+			const options = first.options?.slice(0, 4)
+				.map(option => ({
+					id: option.value || option.id,
+					label: option.label || option.value || option.id,
+				}))
+				.filter(option => Boolean(option.id));
 			return {
 				kind: 'question',
-				interactionId: part.resolveId || request!.id,
+				interactionId: first.id,
 				requestId: request!.id,
 				resolveId: part.resolveId,
-				title: redactLiveActivityText(first?.title || asPlainText(part.message) || 'Magnus has a question'),
-				message: redactLiveActivityText(asPlainText(first?.message) || asPlainText(part.message)),
-				options,
+				title: redactLiveActivityText(first.title || asPlainText(part.message) || 'Magnus has a question'),
+				message: redactLiveActivityText(asPlainText(first.message) || asPlainText(part.message)),
+				options: options?.length ? options : undefined,
 			};
 		}
 	}
@@ -146,14 +184,7 @@ function extractCurrentActivity(request: IChatRequestModel | undefined): string 
 	return undefined;
 }
 
-function extractSessionInput(model: IChatModel | undefined): MagnusLiveActivitySessionInput | undefined {
-	if (!model) {
-		return undefined;
-	}
-	const last = model.lastRequest;
-	const pending = extractPending(last);
-	const failed = last?.response?.isCanceled === false && last?.response?.isComplete && Boolean(last.response.result?.errorDetails);
-	const completed = Boolean(last?.response?.isComplete && !last.response.isCanceled && !failed && !model.requestInProgress.get());
+function collectEditedFileUris(model: IChatModel): string[] {
 	const files = new Set<string>();
 	for (const request of model.getRequests()) {
 		for (const event of request.editedFileEvents ?? []) {
@@ -162,6 +193,86 @@ function extractSessionInput(model: IChatModel | undefined): MagnusLiveActivityS
 			}
 		}
 	}
+	return [...files];
+}
+
+function editingSessionLineStats(model: IChatModel): { fileCount: number; additions: number; deletions: number } | undefined {
+	const session = model.editingSession;
+	if (!session) {
+		return undefined;
+	}
+	const sessionDiff = session.getDiffForSession().get();
+	const entries = session.entries.get();
+	let additions = 0;
+	let deletions = 0;
+	const uris = new Set<string>();
+	for (const entry of entries) {
+		uris.add(String(entry.modifiedURI));
+		additions += entry.linesAdded?.get() ?? 0;
+		deletions += entry.linesRemoved?.get() ?? 0;
+	}
+	if (sessionDiff && (sessionDiff.added > 0 || sessionDiff.removed > 0)) {
+		additions = sessionDiff.added;
+		deletions = sessionDiff.removed;
+	}
+	if (uris.size === 0 && additions === 0 && deletions === 0) {
+		return undefined;
+	}
+	return { fileCount: uris.size, additions, deletions };
+}
+
+function collectToolInvocations(model: IChatModel): { toolId: string; state: 'running' | 'passed' | 'failed' | 'other' }[] {
+	const out: { toolId: string; state: 'running' | 'passed' | 'failed' | 'other' }[] = [];
+	for (const request of model.getRequests()) {
+		for (const part of request.response?.entireResponse.value ?? []) {
+			if (part.kind === 'toolInvocation') {
+				const invocation = part as IChatToolInvocation;
+				out.push({ toolId: invocation.toolId, state: toolInvocationState(invocation) });
+			}
+		}
+	}
+	return out;
+}
+
+function countSessionTerminals(terminalChat: ITerminalChatService | undefined, sessionResource: URI): number | undefined {
+	if (!terminalChat) {
+		return undefined;
+	}
+	const target = sessionResource.toString();
+	let count = 0;
+	for (const instance of terminalChat.getToolSessionTerminalInstances()) {
+		const resource = terminalChat.getChatSessionResourceForInstance(instance);
+		if (resource?.toString() === target) {
+			count++;
+		}
+	}
+	return count > 0 ? count : undefined;
+}
+
+function extractSessionInput(
+	model: IChatModel | undefined,
+	deps: {
+		terminalChat?: ITerminalChatService;
+		risk?: { isDestructive(toolId: string, parameters: unknown): boolean };
+	} = {},
+): MagnusLiveActivitySessionInput | undefined {
+	if (!model) {
+		return undefined;
+	}
+	const last = model.lastRequest;
+	const pending = extractPending(last, deps.risk);
+	const failed = last?.response?.isCanceled === false && last?.response?.isComplete && Boolean(last.response.result?.errorDetails);
+	const completed = Boolean(last?.response?.isComplete && !last.response.isCanceled && !failed && !model.requestInProgress.get());
+	const editedUris = collectEditedFileUris(model);
+	const lineStats = editingSessionLineStats(model);
+	const workspaceDiff = summarizeMagnusWorkspaceDiff({
+		editedFileUris: editedUris,
+		sessionFileCount: lineStats?.fileCount,
+		additions: lineStats?.additions,
+		deletions: lineStats?.deletions,
+	});
+	const testState = deriveMagnusTestStateFromInvocations(collectToolInvocations(model));
+	const terminalCount = countSessionTerminals(deps.terminalChat, model.sessionResource);
 	return {
 		sessionId: model.sessionId,
 		sessionResource: model.sessionResource.toString(),
@@ -175,7 +286,9 @@ function extractSessionInput(model: IChatModel | undefined): MagnusLiveActivityS
 		completed,
 		failed: Boolean(failed || last?.response?.isCanceled),
 		pendingInteraction: pending,
-		workspaceDiff: files.size > 0 ? { files: files.size, attributedToMagnus: true } : undefined,
+		workspaceDiff,
+		terminalCount,
+		testState,
 	};
 }
 
@@ -187,6 +300,12 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		sessionId?: string;
 		sessionResource?: string;
 		status?: string;
+		visible?: boolean;
+		pendingKind?: string;
+		workspaceDiff?: MagnusLiveActivitySnapshot['workspaceDiff'];
+		terminalCount?: number;
+		testState?: MagnusLiveActivitySnapshot['testState'];
+		presentationLabel?: string;
 	} = { backend: isMacintosh && !isWeb ? 'unavailable' : 'non-mac', revision: 0 };
 
 	private readonly _main: IMagnusLiveActivityMainService | undefined;
@@ -207,6 +326,10 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		@IMainProcessService mainProcessService: IMainProcessService,
 		@IAccessibilityService private readonly accessibilityService: IAccessibilityService,
 		@INativeHostService private readonly nativeHostService: INativeHostService,
+		@ITerminalChatService private readonly terminalChatService: ITerminalChatService,
+		@ITerminalService private readonly terminalService: ITerminalService,
+		@ILanguageModelToolsService private readonly toolsService: ILanguageModelToolsService,
+		@IChatToolRiskAssessmentService private readonly riskAssessmentService: IChatToolRiskAssessmentService,
 	) {
 		super();
 		this._push = this._register(new RunOnceScheduler(() => this._publish(), 120));
@@ -223,6 +346,12 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		this._register(this.chatService.onDidCreateModel(() => this._bindModels()));
 		this._register(this.chatService.onDidDisposeSession(() => this._bindModels()));
 		this._register(this.hostService.onDidChangeFocus(() => this._push.schedule()));
+		// Register + dispose/change: tool-session terminals drop out of the map on dispose without a dedicated chat event.
+		this._register(Event.any(
+			this.terminalChatService.onDidRegisterTerminalInstanceWithToolSession,
+			this.terminalService.onDidDisposeInstance,
+			this.terminalService.onDidChangeInstances,
+		)(() => this._push.schedule()));
 		this._register(this.configurationService.onDidChangeConfiguration(e => {
 			if (e.affectsConfiguration('prebase.magnus.liveActivity')) {
 				this._push.schedule();
@@ -246,6 +375,15 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		});
 		this._bindModels();
 		this._push.schedule();
+	}
+
+	private _isDestructive(toolId: string, parameters: unknown): boolean {
+		const tool = this.toolsService.getTool(toolId);
+		if (!tool) {
+			return false;
+		}
+		const cached = this.riskAssessmentService.getCached(tool, parameters);
+		return cached?.risk === ToolRiskLevel.Red;
 	}
 
 	private _bindModels(): void {
@@ -275,21 +413,30 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		const model = selectPrimaryMagnusModel(this.chatService.chatModels.get());
 		this._revision += 1;
 		const hideDetails = this._screenLocked || Boolean(this.configurationService.getValue<boolean>('prebase.magnus.liveActivity.hideDetails'));
-		const snapshot = buildMagnusLiveActivitySnapshot(extractSessionInput(model), {
+		const snapshot = buildMagnusLiveActivitySnapshot(extractSessionInput(model, {
+			terminalChat: this.terminalChatService,
+			risk: { isDestructive: (toolId, parameters) => this._isDestructive(toolId, parameters) },
+		}), {
 			revision: this._revision,
 			prebaseForeground: this.hostService.hasFocus,
 			connected: this._nativeConnected,
 			screenLocked: hideDetails,
 		});
 		this._lastSnapshot = snapshot;
+		const visible = shouldShowLiveActivity(this._mode(), snapshot);
 		MagnusLiveActivityContribution.diagnostics = {
 			backend: !isMacintosh || isWeb ? 'non-mac' : (this._nativeConnected ? 'native-appkit' : 'unavailable'),
 			revision: snapshot.revision,
 			sessionId: snapshot.sessionId,
 			sessionResource: snapshot.sessionResource,
 			status: snapshot.status,
+			visible,
+			pendingKind: snapshot.pendingInteraction?.kind,
+			workspaceDiff: snapshot.workspaceDiff,
+			terminalCount: snapshot.terminalCount,
+			testState: snapshot.testState,
+			presentationLabel: snapshot.presentationLabel,
 		};
-		const visible = shouldShowLiveActivity(this._mode(), snapshot);
 		const reducedMotion = this.accessibilityService.isMotionReduced()
 			|| Boolean(this.configurationService.getValue<boolean>('prebase.graph.reduceMotion'));
 		void this._main.setSnapshot(snapshot);
@@ -352,9 +499,32 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			this.logService.info('[MagnusLiveActivity] approval failed closed: invocation missing');
 			return;
 		}
-		if (command.kind === 'answer' && snapshot.pendingInteraction?.resolveId && last) {
-			this.chatService.notifyQuestionCarouselAnswer(last.id, snapshot.pendingInteraction.resolveId, command.optionId ? { [snapshot.pendingInteraction.interactionId]: { selectedValue: command.optionId } } : undefined);
+		if (command.kind === 'answer' && snapshot.pendingInteraction?.kind === 'question' && snapshot.pendingInteraction.resolveId && command.optionId) {
+			const pending = snapshot.pendingInteraction;
+			const requestId = pending.requestId ?? last?.id;
+			if (!requestId) {
+				this.logService.info('[MagnusLiveActivity] answer failed closed: missing question/option');
+				return;
+			}
+			const request = pending.requestId
+				? model?.getRequests().find(r => r.id === pending.requestId)
+				: last;
+			const carousel = (request?.response?.entireResponse.value ?? []).find(part =>
+				part.kind === 'questionCarousel' && part.resolveId === pending.resolveId && !part.isUsed);
+			if (!carousel) {
+				this.logService.info('[MagnusLiveActivity] answer failed closed: carousel missing/used');
+				return;
+			}
+			this.chatService.notifyQuestionCarouselAnswer(
+				requestId,
+				pending.resolveId,
+				{ [pending.interactionId]: { selectedValue: command.optionId } },
+			);
 			this._push.schedule();
+			return;
+		}
+		if (command.kind === 'answer') {
+			this.logService.info('[MagnusLiveActivity] answer failed closed: missing question/option');
 		}
 	}
 
