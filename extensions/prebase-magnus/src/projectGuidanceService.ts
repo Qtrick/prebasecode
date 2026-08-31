@@ -10,6 +10,7 @@ import {
 	agentsAncestorDirs,
 	boundedJoin,
 	cursorRuleMode,
+	discoverHookDeclarations,
 	discoverNestedDirectories,
 	discoverSkillFiles,
 	expandKiroFileRefs,
@@ -25,6 +26,7 @@ import {
 	metaStringList,
 	normalizeRel,
 	parseFrontmatter,
+	parseTomlCommand,
 	resolveMarkdownImports,
 	SKILL_DIRS,
 	walkBoundedFiles,
@@ -73,6 +75,7 @@ export interface PlaybookMetadata {
 	readonly description: string;
 	readonly path: string;
 	readonly ecosystem: string;
+	readonly argumentHint?: string;
 }
 
 export interface AgentProfileMetadata {
@@ -81,6 +84,16 @@ export interface AgentProfileMetadata {
 	readonly description: string;
 	readonly path: string;
 	readonly ecosystem: string;
+	readonly modelInvocable?: boolean;
+	readonly userInvocable?: boolean;
+	readonly argumentHint?: string;
+	readonly toolsHint?: string;
+	readonly modelHint?: string;
+}
+
+export interface ActivatedAgentProfile {
+	readonly metadata: AgentProfileMetadata;
+	readonly body: string;
 }
 
 export interface GuidanceConflict {
@@ -105,6 +118,8 @@ export interface ProjectGuidanceSnapshot {
 	readonly playbookCatalog: readonly PlaybookMetadata[];
 	readonly agentProfileCatalog: readonly AgentProfileMetadata[];
 	readonly activatedSkills: readonly { metadata: SkillMetadata; body: string; root: string; files: readonly string[] }[];
+	readonly activatedAgentProfiles?: readonly ActivatedAgentProfile[];
+	readonly detectedHooks?: readonly string[];
 	readonly conflicts: readonly GuidanceConflict[];
 	readonly diagnostics: readonly string[];
 	readonly totalChars: number;
@@ -148,18 +163,24 @@ const RULE_DIRS = [
 	{ dir: '.clinerules', ext: '.txt', ecosystem: 'cline', nested: false },
 	{ dir: '.windsurf/rules', ext: '.md', ecosystem: 'windsurf', nested: true },
 	{ dir: '.devin/rules', ext: '.md', ecosystem: 'devin', nested: true },
+	{ dir: '.continue/rules', ext: '.md', ecosystem: 'continue', nested: true },
 ];
 const PLAYBOOK_DIRS = [
 	{ dir: '.github/prompts', ext: '.prompt.md', ecosystem: 'github' },
 	{ dir: '.windsurf/workflows', ext: '.md', ecosystem: 'windsurf' },
 	{ dir: '.cline/workflows', ext: '.md', ecosystem: 'cline' },
+	{ dir: '.clinerules/workflows', ext: '.md', ecosystem: 'cline' },
 	{ dir: '.cursor/commands', ext: '.md', ecosystem: 'cursor' },
 	{ dir: '.claude/commands', ext: '.md', ecosystem: 'claude' },
+	{ dir: '.opencode/commands', ext: '.md', ecosystem: 'opencode' },
 ];
 const AGENT_PROFILE_DIRS = [
 	{ dir: '.cursor/agents', ext: '.md', ecosystem: 'cursor' },
 	{ dir: '.claude/agents', ext: '.md', ecosystem: 'claude' },
 	{ dir: '.codex/agents', ext: '.md', ecosystem: 'codex' },
+	{ dir: '.github/agents', ext: '.agent.md', ecosystem: 'github' },
+	{ dir: '.github/agents', ext: '.md', ecosystem: 'github' },
+	{ dir: '.opencode/agents', ext: '.md', ecosystem: 'opencode' },
 ];
 const OPENCODE_CONFIG_FILES = ['opencode.json', '.opencode/opencode.json'];
 const CLAUDE_SETTINGS_FILES = ['.claude/settings.json', '.claude/settings.local.json'];
@@ -567,11 +588,15 @@ function dedupeByHash(items: readonly { source: GuidanceSource; text: string }[]
 async function loadNamedMarkdownCatalog(
 	reader: GuidanceFileReader,
 	workspaceRoot: string,
-	roots: readonly { dir: string; ext: string; ecosystem: string }[],
-): Promise<Array<{ id: string; name: string; description: string; path: string; ecosystem: string }>> {
-	const catalog: Array<{ id: string; name: string; description: string; path: string; ecosystem: string }> = [];
+	roots: readonly { dir: string; ext: string; ecosystem: string; nested?: boolean }[],
+	kind: 'playbook' | 'agent-profile' = 'playbook',
+): Promise<Array<PlaybookMetadata | AgentProfileMetadata>> {
+	const catalog: Array<PlaybookMetadata | AgentProfileMetadata> = [];
+	const seenPaths = new Set<string>();
 	for (const root of roots) {
-		const dirs = await discoverNestedDirectories(reader, workspaceRoot, root.dir);
+		const dirs = root.nested !== false
+			? await discoverNestedDirectories(reader, workspaceRoot, root.dir)
+			: [root.dir];
 		for (const dir of dirs) {
 			const fullDir = join(workspaceRoot, dir);
 			if (!(await reader.exists(fullDir))) {
@@ -580,21 +605,90 @@ async function loadNamedMarkdownCatalog(
 			const files = await walkBoundedFiles(reader, fullDir, rel => rel.endsWith(root.ext), { maxDepth: 4 });
 			for (const relUnder of files) {
 				const rel = normalizeRel(join(dir, relUnder));
-				if (isBlockedGuidancePath(rel)) {
+				if (isBlockedGuidancePath(rel) || seenPaths.has(rel)) {
 					continue;
 				}
+				seenPaths.add(rel);
 				const text = scrubSecretsFromGuidance(await reader.readFile(join(workspaceRoot, rel)));
 				const { meta, body } = parseFrontmatter(text);
-				const name = metaString(meta, 'name') ?? basename(rel, root.ext);
+				let defaultName = basename(rel, root.ext);
+				if (root.ext === '.agent.md') {
+					defaultName = basename(rel, '.agent.md');
+				} else if (relUnder.includes('/')) {
+					defaultName = relUnder.slice(0, -root.ext.length).replace(/\//g, ':');
+				}
+				const name = metaString(meta, 'name') ?? defaultName;
 				const description = scrubSecretsFromGuidance(metaString(meta, 'description') ?? (firstNonHeadingLine(body) || name));
-				catalog.push({
-					id: `${root.ecosystem}:${hashContent(rel).slice(0, 12)}`,
-					name,
-					description,
-					path: rel,
-					ecosystem: root.ecosystem,
-				});
+				const argumentHint = metaString(meta, 'argument-hint') ?? metaString(meta, 'argumentHint');
+
+				if (kind === 'agent-profile') {
+					const userInvocable = metaBoolean(meta, 'user-invocable');
+					const disableModel = metaBoolean(meta, 'disable-model-invocation') === true
+						|| metaBoolean(meta, 'model-invocable') === false;
+					const toolsHint = metaString(meta, 'tools') ?? metaString(meta, 'allowed-tools') ?? metaString(meta, 'allowedTools');
+					const modelHint = metaString(meta, 'model') ?? metaString(meta, 'model-provider');
+					catalog.push({
+						id: `${root.ecosystem}:${hashContent(rel).slice(0, 12)}`,
+						name,
+						description,
+						path: rel,
+						ecosystem: root.ecosystem,
+						...(userInvocable !== undefined ? { userInvocable } : {}),
+						...(disableModel ? { modelInvocable: false } : {}),
+						...(argumentHint ? { argumentHint } : {}),
+						...(toolsHint ? { toolsHint } : {}),
+						...(modelHint ? { modelHint } : {}),
+					} as AgentProfileMetadata);
+				} else {
+					catalog.push({
+						id: `${root.ecosystem}:${hashContent(rel).slice(0, 12)}`,
+						name,
+						description,
+						path: rel,
+						ecosystem: root.ecosystem,
+						...(argumentHint ? { argumentHint } : {}),
+					} as PlaybookMetadata);
+				}
 			}
+		}
+	}
+	return catalog;
+}
+
+async function loadGeminiCommandCatalog(
+	reader: GuidanceFileReader,
+	workspaceRoot: string,
+): Promise<PlaybookMetadata[]> {
+	const catalog: PlaybookMetadata[] = [];
+	const geminiDir = '.gemini/commands';
+	const fullDir = join(workspaceRoot, geminiDir);
+	if (!(await reader.exists(fullDir))) {
+		return catalog;
+	}
+	const files = await walkBoundedFiles(reader, fullDir, rel => rel.endsWith('.toml'), { maxDepth: 4 });
+	for (const relUnder of files) {
+		const rel = normalizeRel(join(geminiDir, relUnder));
+		if (isBlockedGuidancePath(rel)) {
+			continue;
+		}
+		try {
+			const text = scrubSecretsFromGuidance(await reader.readFile(join(workspaceRoot, rel)));
+			const parsed = parseTomlCommand(text);
+			const defaultName = relUnder.includes('/')
+				? relUnder.slice(0, -'.toml'.length).replace(/\//g, ':')
+				: basename(rel, '.toml');
+			const name = parsed.name || defaultName;
+			const description = scrubSecretsFromGuidance(parsed.description || firstNonHeadingLine(parsed.prompt) || name);
+			catalog.push({
+				id: `gemini:${hashContent(rel).slice(0, 12)}`,
+				name,
+				description,
+				path: rel,
+				ecosystem: 'gemini',
+				...(parsed.argumentHint ? { argumentHint: parsed.argumentHint } : {}),
+			});
+		} catch {
+			// Ignore unparseable command files
 		}
 	}
 	return catalog;
@@ -857,8 +951,14 @@ export class ProjectGuidanceService {
 			}
 		}
 
-		const playbookCatalog = await loadNamedMarkdownCatalog(this.reader, workspaceRoot, PLAYBOOK_DIRS);
-		const agentProfileCatalog = await loadNamedMarkdownCatalog(this.reader, workspaceRoot, AGENT_PROFILE_DIRS);
+		const markdownPlaybooks = (await loadNamedMarkdownCatalog(this.reader, workspaceRoot, PLAYBOOK_DIRS, 'playbook')) as PlaybookMetadata[];
+		const geminiPlaybooks = await loadGeminiCommandCatalog(this.reader, workspaceRoot);
+		const playbookCatalog = dedupePlaybooks([...markdownPlaybooks, ...geminiPlaybooks]);
+		const agentProfileCatalog = (await loadNamedMarkdownCatalog(this.reader, workspaceRoot, AGENT_PROFILE_DIRS, 'agent-profile')) as AgentProfileMetadata[];
+		const detectedHooks = await discoverHookDeclarations(this.reader, workspaceRoot);
+		for (const hook of detectedHooks) {
+			diagnostics.push(`Executable project hook detected in ${hook} — not automatically imported by PreBase for security.`);
+		}
 
 		const activatedPlaybookBlocks: { source: GuidanceSource; text: string }[] = [];
 		for (const activatedPath of normalizedActivatedRules) {
@@ -870,8 +970,15 @@ export class ProjectGuidanceService {
 			if (!(await this.reader.exists(full))) {
 				continue;
 			}
-			const text = scrubSecretsFromGuidance(await this.reader.readFile(full));
-			const { body } = parseFrontmatter(text);
+			const raw = scrubSecretsFromGuidance(await this.reader.readFile(full));
+			let bodyText = '';
+			if (playbook.path.endsWith('.toml')) {
+				const parsed = parseTomlCommand(raw);
+				bodyText = parsed.prompt;
+			} else {
+				const { body } = parseFrontmatter(raw);
+				bodyText = body;
+			}
 			activatedPlaybookBlocks.push({
 				source: {
 					path: playbook.path,
@@ -881,9 +988,27 @@ export class ProjectGuidanceService {
 					activationMode: 'manual',
 					description: playbook.description,
 					globs: [],
-					contentHash: hashContent(body),
+					contentHash: hashContent(bodyText),
 				},
-				text: body.trim(),
+				text: bodyText.trim(),
+			});
+		}
+
+		const activatedAgentProfiles: ActivatedAgentProfile[] = [];
+		for (const activatedPath of normalizedActivatedRules) {
+			const profile = agentProfileCatalog.find(item => item.path === activatedPath || item.id === activatedPath);
+			if (!profile) {
+				continue;
+			}
+			const full = join(workspaceRoot, profile.path);
+			if (!(await this.reader.exists(full))) {
+				continue;
+			}
+			const text = scrubSecretsFromGuidance(await this.reader.readFile(full));
+			const { body } = parseFrontmatter(text);
+			activatedAgentProfiles.push({
+				metadata: profile,
+				body: body.trim(),
 			});
 		}
 
@@ -970,6 +1095,8 @@ export class ProjectGuidanceService {
 			playbookCatalog: playbookCatalog.slice(0, 32),
 			agentProfileCatalog: agentProfileCatalog.slice(0, 32),
 			activatedSkills,
+			activatedAgentProfiles,
+			detectedHooks,
 			conflicts,
 			diagnostics,
 			totalChars,
@@ -1012,6 +1139,8 @@ export class ProjectGuidanceService {
 			playbookCatalog: dedupePlaybooks(snapshots.flatMap(item => item.playbookCatalog)),
 			agentProfileCatalog: dedupeAgentProfiles(snapshots.flatMap(item => item.agentProfileCatalog ?? [])),
 			activatedSkills: snapshots.flatMap(item => item.activatedSkills),
+			activatedAgentProfiles: snapshots.flatMap(item => item.activatedAgentProfiles ?? []),
+			detectedHooks: [...new Set(snapshots.flatMap(item => item.detectedHooks ?? []))],
 			conflicts: snapshots.flatMap(item => item.conflicts),
 			diagnostics: snapshots.flatMap(item => item.diagnostics),
 			totalChars: snapshots.reduce((sum, item) => sum + item.totalChars, 0),
@@ -1104,11 +1233,15 @@ export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot
 		parts.push(lines.join('\n'));
 	}
 	if (snapshot.agentProfileCatalog?.length) {
-		const lines = ['AVAILABLE AGENT PROFILES (catalog only; not auto-injected)'];
-		for (const profile of snapshot.agentProfileCatalog.slice(0, 12)) {
-			lines.push(`- ${profile.name}: ${scrubSecretsFromGuidance(profile.description)} (${profile.path})`);
+		const modelProfiles = snapshot.agentProfileCatalog.filter(profile => profile.modelInvocable !== false);
+		if (modelProfiles.length) {
+			const lines = ['AVAILABLE AGENT PROFILES (catalog only; not auto-injected; activate with prebase_project_guidance activate_agent_profile)'];
+			for (const profile of modelProfiles.slice(0, 12)) {
+				const hint = profile.toolsHint ? ` [tools hint: ${profile.toolsHint}]` : '';
+				lines.push(`- ${profile.name} (${profile.id}): ${scrubSecretsFromGuidance(profile.description)} (${profile.path})${hint}`);
+			}
+			parts.push(lines.join('\n'));
 		}
-		parts.push(lines.join('\n'));
 	}
 	if (snapshot.onDemandRules.length) {
 		const lines = ['AVAILABLE ON-DEMAND RULES (intelligent/manual; activate when relevant)'];
@@ -1125,6 +1258,10 @@ export function formatProjectGuidanceForPrompt(snapshot: ProjectGuidanceSnapshot
 		}
 		parts.push(block);
 		activatedChars += block.length;
+	}
+	for (const profile of snapshot.activatedAgentProfiles ?? []) {
+		const block = `ACTIVATED AGENT PROFILE: ${profile.metadata.name}\n${scrubSecretsFromGuidance(profile.body)}`;
+		parts.push(block);
 	}
 	for (const conflict of snapshot.conflicts) {
 		parts.push(`GUIDANCE CONFLICT: ${conflict.message} Sources: ${conflict.sources.join(', ')}`);

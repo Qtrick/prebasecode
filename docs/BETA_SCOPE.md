@@ -14,7 +14,7 @@ This document classifies product surfaces for the upcoming public beta. A featur
 | Open folder/workspace, save, undo/redo | Native editor reliability |
 | Search, SCM, terminal, debug, Problems, Output | Core IDE |
 | Settings + keybindings + extensions (Open VSX) | |
-| Code Graph (Network layouts) | Organic / Sphere / Constellation / Clustered / Radial; single active graph per `graphs/PRESERVED_ARCHITECTURE.md` and BETA-003 |
+| Code Graph (Network layouts) | Organic / Sphere / Constellation / Clustered (4 active layouts; legacy "radial" normalized to "organic" per BETA-003 and `graphs/PRESERVED_ARCHITECTURE.md`) |
 | Temporal Graph | Commit timeline scrubbing, state/changes modes, comparison workbench |
 | Local Magnus (Agents) provider | Ask/Plan/Edit/Test/Agent; local API key in SecretStorage |
 | Web Runtime Preview | Supported web frameworks; process cleanup |

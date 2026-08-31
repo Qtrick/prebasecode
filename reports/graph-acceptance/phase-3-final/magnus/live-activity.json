@@ -18,10 +18,10 @@
   "durationMs": 1,
   "schemaVersion": 3,
   "scenario": "magnus-live-activity",
-  "sourceHead": "6c5cf6d737fe0665828e7f78aeea4ff5613e7036",
-  "sourceFingerprint": "0fb797de19b3f525c43d3e705ebc62161ec5234a654c4941f11a12c9b32da5c3",
-  "productFingerprint": "0fb797de19b3f525c43d3e705ebc62161ec5234a654c4941f11a12c9b32da5c3",
-  "generatedAt": "2026-08-30T23:11:09.404Z",
+  "sourceHead": "4a52b9acfb072b9d494331c0509bf8acfbd17acf",
+  "sourceFingerprint": "257e2d5bb14a48424023becdd7bf8f6a1df7991de7c5c1ec0466906d7446bc7f",
+  "productFingerprint": "257e2d5bb14a48424023becdd7bf8f6a1df7991de7c5c1ec0466906d7446bc7f",
+  "generatedAt": "2026-08-31T14:53:17.539Z",
   "producerId": "magnus-live-activity",
-  "producerFingerprint": "925d970c36c9bc1a27c439de127b466f61348249250ea1ae1b16cc32dc40f272"
+  "producerFingerprint": "9023cf260c06111cda06cc5c1b92fa203dcdeb6e31918ee6a3b65c2abf560772"
 }

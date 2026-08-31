@@ -29,10 +29,10 @@ Re-run after layout changes and update the table below with date and `node -v`.
 
 ## Results (CPU layout only)
 
-**Run date:** 2026-08-13
+**Run date:** 2026-08-13 (Active 4-layout modes: Organic, Sphere, Constellation, Clustered; legacy Radial retired)
 **Environment:** local dev, Node v24.17.0, median ms per layout invocation
 
-| Nodes | Organic | Sphere | Constellation | Clustered | Radial |
+| Nodes | Organic | Sphere | Constellation | Clustered | Legacy Radial (Retired) |
 |---:|---:|---:|---:|---:|---:|
 | 100 | 16.79 | 0.26 | 0.10 | 0.13 | 0.93 |
 | 280 | 93.80 | 0.12 | 0.21 | 0.21 | 11.37 |
@@ -43,11 +43,10 @@ Re-run after layout changes and update the table below with date and `node -v`.
 **Interpretation:** These are milliseconds per synthetic layout invocation on
 Node v24.17.0, not GUI FPS or memory. The 1,000- and 2,000-node rows are stress
 inputs, not the workbench cap: the current scan flow limits Network layout work
-to 600 nodes before rendering. The structure-first Radial layout is materially
-cheaper than Organic at all measured sizes, but its final exact collision
-validation is quadratic and reaches 144ms at 2,000 nodes. The normal 280-node
-render cap measured 11ms. GUI FPS, heap, and idle CPU still need in-product
-evidence before BETA-024 can close.
+to 600 nodes before rendering. Active Code Graph features 4 layout modes: Organic,
+Sphere, Constellation, and Clustered. Legacy persisted "radial" mode is normalized
+to Organic upon loading per `graphs/PRESERVED_ARCHITECTURE.md` and BETA-003.
+GUI FPS, heap, and idle CPU still need in-product evidence before BETA-024 can close.
 
 ## Procedure: architecture layout (planned)
 

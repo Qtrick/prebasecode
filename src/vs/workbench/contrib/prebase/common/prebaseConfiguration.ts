@@ -364,7 +364,7 @@ configurationRegistry.registerConfiguration({
 		'prebase.magnus.projectGuidance.enabled': {
 			type: 'boolean',
 			default: true,
-			description: localize('prebase.magnus.projectGuidance.enabled', "Apply trusted repository instruction files (AGENTS.md, Cursor rules, Copilot instructions, skills metadata) to Agents requests."),
+			description: localize('prebase.magnus.projectGuidance.enabled', "Use compatible project instructions, rules, skills, and playbooks from this workspace."),
 		},
 		'prebase.magnus.liveActivity.mode': {
 			type: 'string',

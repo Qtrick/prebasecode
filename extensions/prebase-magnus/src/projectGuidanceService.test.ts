@@ -694,4 +694,79 @@ globs:
 		assert.ok(graphsTarget.alwaysApplicable.some(item => item.source.path.endsWith('.cursor/rules/always.mdc')));
 		assert.equal(graphsTarget.pathApplicable.some(item => /Package web only always cursor rule/.test(item.text)), false);
 	});
+
+	test('Project Guidance V2 interoperability: GitHub agents, OpenCode agents/commands, Gemini commands, Cline workflows, Continue rules, and hook diagnostics', async () => {
+		const root = tempGuidanceRoot('guidance-v2-interop');
+		try {
+			mkdirSync(join(root, '.github/agents'), { recursive: true });
+			mkdirSync(join(root, '.opencode/agents'), { recursive: true });
+			mkdirSync(join(root, '.opencode/commands/review'), { recursive: true });
+			mkdirSync(join(root, '.gemini/commands'), { recursive: true });
+			mkdirSync(join(root, '.clinerules/workflows'), { recursive: true });
+			mkdirSync(join(root, '.continue/rules'), { recursive: true });
+			mkdirSync(join(root, '.cursor'), { recursive: true });
+			mkdirSync(join(root, '.github/hooks'), { recursive: true });
+
+			// 1. GitHub Agent
+			writeFileSync(join(root, '.github/agents/planner.agent.md'), '---\nname: GitHub Planner\ndescription: Plans architecture changes\ntools: ["workspace_search"]\nmodel: "claude-3-5-sonnet"\n---\nYou are a planner.\n');
+			// 2. OpenCode Agent (manual only)
+			writeFileSync(join(root, '.opencode/agents/debugger.md'), '---\nname: OpenCode Debugger\ndescription: Debugs test failures\ndisable-model-invocation: true\n---\nYou are a debugger.\n');
+			// 3. OpenCode Command (nested namespace)
+			writeFileSync(join(root, '.opencode/commands/review/code.md'), '---\ndescription: Review code quality\nargument-hint: [pr-number]\n---\nReview changes in PR.\n');
+			// 4. Gemini TOML Command
+			writeFileSync(join(root, '.gemini/commands/deploy.toml'), 'name = "deploy-env"\ndescription = "Deploy environment"\nargumentHint = "[env]"\nprompt = """\nDeploy target $(danger_shell_exec) safely.\n"""\n');
+			// 5. Cline workflow
+			writeFileSync(join(root, '.clinerules/workflows/e2e.md'), '---\ndescription: Run end to end test flow\n---\nRun e2e steps.\n');
+			// 6. Continue rule
+			writeFileSync(join(root, '.continue/rules/style.md'), '---\nalwaysApply: true\n---\nAdhere to project code style.\n');
+			// 7. Hooks
+			writeFileSync(join(root, '.cursor/hooks.json'), '{"preTool": "echo test"}');
+			writeFileSync(join(root, '.github/hooks/post-commit.json'), '{"action": "notify"}');
+
+			const service = new ProjectGuidanceService(makeReader(root));
+			const snapshot = await service.getSnapshot(root);
+
+			// Check Continue rule discovered as always-applicable
+			assert.ok(snapshot.alwaysApplicable.some(item => item.source.path === '.continue/rules/style.md'));
+
+			// Check Playbook Catalog includes OpenCode nested command, Gemini TOML command, and Cline workflow
+			assert.ok(snapshot.playbookCatalog.some(item => item.name === 'review:code' && item.path === '.opencode/commands/review/code.md'));
+			assert.ok(snapshot.playbookCatalog.some(item => item.name === 'deploy-env' && item.path === '.gemini/commands/deploy.toml' && item.argumentHint === '[env]'));
+			assert.ok(snapshot.playbookCatalog.some(item => item.name === 'e2e' && item.path === '.clinerules/workflows/e2e.md'));
+
+			// Check Agent Profile Catalog
+			const githubPlanner = snapshot.agentProfileCatalog.find(item => item.path === '.github/agents/planner.agent.md');
+			assert.ok(githubPlanner);
+			assert.equal(githubPlanner!.name, 'GitHub Planner');
+			assert.equal(githubPlanner!.toolsHint, 'workspace_search');
+			assert.equal(githubPlanner!.modelHint, 'claude-3-5-sonnet');
+
+			const openCodeDebugger = snapshot.agentProfileCatalog.find(item => item.path === '.opencode/agents/debugger.md');
+			assert.ok(openCodeDebugger);
+			assert.equal(openCodeDebugger!.modelInvocable, false);
+
+			// Check Hook Discovery & Diagnostics
+			assert.ok(snapshot.detectedHooks?.includes('.cursor/hooks.json'));
+			assert.ok(snapshot.detectedHooks?.includes('.github/hooks/post-commit.json'));
+			assert.ok(snapshot.diagnostics.some(d => d.includes('.cursor/hooks.json') && d.includes('not automatically imported')));
+
+			// Check formatProjectGuidanceForPrompt filters model-non-invocable agent profiles
+			const prompt = formatProjectGuidanceForPrompt(snapshot);
+			assert.match(prompt, /GitHub Planner/);
+			assert.doesNotMatch(prompt, /OpenCode Debugger/);
+
+			// Check Gemini prompt text keeps shell string without execution
+			const activatedGemini = await service.getSnapshot(root, [], [], true, ['.gemini/commands/deploy.toml']);
+			assert.ok(activatedGemini.activatedRules.some(item => item.source.path === '.gemini/commands/deploy.toml' && item.text.includes('$(danger_shell_exec)')));
+
+			// Check Agent Profile activation
+			const activatedProfileSnapshot = await service.getSnapshot(root, [], [], true, ['.github/agents/planner.agent.md']);
+			assert.ok(activatedProfileSnapshot.activatedAgentProfiles?.some(p => p.metadata.name === 'GitHub Planner' && p.body.includes('You are a planner.')));
+			const promptWithProfile = formatProjectGuidanceForPrompt(activatedProfileSnapshot);
+			assert.match(promptWithProfile, /ACTIVATED AGENT PROFILE: GitHub Planner/);
+			assert.match(promptWithProfile, /You are a planner\./);
+		} finally {
+			rmSync(root, { recursive: true, force: true });
+		}
+	});
 });

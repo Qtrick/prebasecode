@@ -5,12 +5,14 @@ import { fileURLToPath } from 'node:url';
 import { describe, test } from 'node:test';
 import {
 	cursorRuleMode,
+	discoverHookDeclarations,
 	expandKiroFileRefs,
 	globMatches,
 	GUIDANCE_WATCH_PATTERNS,
 	kiroSteeringMode,
 	matchesAnyGlob,
 	parseFrontmatter,
+	parseTomlCommand,
 	resolveMarkdownImports,
 	skillScopePrefix,
 	SKILL_DIRS,
@@ -212,5 +214,72 @@ body
 		const deltaIdx = chat.indexOf('responseParts.push({ text: deltaBlock })');
 		const continueIdx = chat.indexOf('messages.push({ role: \'user\', parts: responseParts })');
 		assert.ok(deltaIdx > 0 && continueIdx > deltaIdx, 'delta must be appended before the next model turn');
+	});
+
+	test('parseTomlCommand parses basic and multiline TOML commands with argument hints', () => {
+		const toml = `
+# Gemini command definition
+name = "deploy-preview"
+description = "Deploy a preview instance"
+argumentHint = "[environment]"
+prompt = """
+You are a deployment specialist.
+Deploy to the specified target environment: {{args}}
+Do not run foreign shell interpolation $(rm -rf /).
+"""
+`;
+		const parsed = parseTomlCommand(toml);
+		assert.equal(parsed.name, 'deploy-preview');
+		assert.equal(parsed.description, 'Deploy a preview instance');
+		assert.equal(parsed.argumentHint, '[environment]');
+		assert.match(parsed.prompt, /Deploy to the specified target environment/);
+		assert.match(parsed.prompt, /\$\(rm -rf \/\)/);
+	});
+
+	test('discoverHookDeclarations discovers hooks without executing them', async () => {
+		const mockFileSystem: Record<string, string> = {
+			'/test-root/.cursor/hooks.json': '{"preCommit": "echo test"}',
+			'/test-root/.github/hooks/pre-push.json': '{"command": "echo test"}',
+			'/test-root/.clinerules/hooks/post-tool.sh': '#!/bin/sh\necho test',
+			'/test-root/.claude/settings.json': '{"hooks": {"beforePrompt": "echo test"}}',
+		};
+		const reader = {
+			exists: (p: string) => Boolean(mockFileSystem[p]) || Object.keys(mockFileSystem).some(k => k.startsWith(p.endsWith('/') ? p : `${p}/`)),
+			readFile: (p: string) => mockFileSystem[p] ?? '',
+			readDirectory: (p: string) => {
+				if (mockFileSystem[p] !== undefined) {
+					throw new Error('ENOTDIR');
+				}
+				const prefix = p.endsWith('/') ? p : `${p}/`;
+				const matches = Object.keys(mockFileSystem)
+					.filter(k => k.startsWith(prefix))
+					.map(k => k.slice(prefix.length).split('/')[0]);
+				return [...new Set(matches)];
+			},
+		};
+		const hooks = await discoverHookDeclarations(reader, '/test-root');
+		assert.ok(hooks.includes('.cursor/hooks.json'));
+		assert.ok(hooks.includes('.github/hooks/pre-push.json'));
+		assert.ok(hooks.includes('.clinerules/hooks/post-tool.sh'));
+		assert.ok(hooks.includes('.claude/settings.json (hooks declaration)'));
+	});
+
+	test('GUIDANCE_WATCH_PATTERNS contains GitHub agents, Gemini commands, Cline workflows, and hook patterns', () => {
+		const expected = [
+			'**/.github/agents/**',
+			'**/.gemini/commands/**',
+			'**/.clinerules/workflows/**',
+			'**/.opencode/agents/**',
+			'**/.opencode/commands/**',
+			'**/.continue/rules/**',
+			'**/.cursor/hooks.json',
+			'**/.github/hooks/**',
+			'**/.clinerules/hooks/**',
+			'**/.cline/hooks/**',
+			'**/.claude/hooks/**',
+		];
+		for (const pattern of expected) {
+			assert.ok(GUIDANCE_WATCH_PATTERNS.includes(pattern), `Missing watch pattern: ${pattern}`);
+		}
 	});
 });

@@ -191,7 +191,7 @@ export function activate(context: vscode.ExtensionContext): void {
 					label: item.source.path,
 					description: provenance(
 						item.source.ecosystem,
-						item.source.activationMode === 'intelligent' ? 'Intelligent available' : 'Manual',
+						item.source.activationMode === 'intelligent' ? 'Intelligent available' : 'Manual (activate_rule)',
 					),
 					detail: item.description,
 					relPath: item.source.path,
@@ -211,16 +211,23 @@ export function activate(context: vscode.ExtensionContext): void {
 				})));
 				pushSection('Playbooks', (snapshot.playbookCatalog ?? []).map(item => ({
 					label: item.name,
-					description: provenance(item.ecosystem, 'Manual (activate_rule)'),
+					description: provenance(item.ecosystem, 'On demand (activate_playbook)'),
 					detail: item.description,
 					relPath: item.path,
 					openable: true,
 				})));
 				pushSection('Agent Profiles', (snapshot.agentProfileCatalog ?? []).map(item => ({
 					label: item.name,
-					description: provenance(item.ecosystem, 'Catalog only'),
+					description: provenance(item.ecosystem, item.modelInvocable === false ? 'Catalog only (manual profile)' : 'Catalog only (activate_agent_profile)'),
 					detail: item.description,
 					relPath: item.path,
+					openable: true,
+				})));
+				pushSection('Detected Executable Hooks', (snapshot.detectedHooks ?? []).map(hookPath => ({
+					label: hookPath,
+					description: 'Detected project hook (not auto-executed)',
+					detail: 'PreBase security boundary: foreign executable automation is discovered but not automatically executed.',
+					relPath: hookPath.replace(/ \(hooks declaration\)$/, ''),
 					openable: true,
 				})));
 				pushSection('Diagnostics', snapshot.diagnostics.slice(0, 8).map(message => ({

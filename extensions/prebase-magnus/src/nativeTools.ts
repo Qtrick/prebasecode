@@ -772,11 +772,25 @@ class WebFetchTool implements vscode.LanguageModelTool<WebFetchInput> {
 	}
 }
 
-class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; skillId?: string; rulePath?: string; paths?: string[] }> {
-	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; skillId?: string; rulePath?: string; paths?: string[] }>): vscode.PreparedToolInvocation {
-		return MagnusToolActivityDescriptor.describeInvocation('prebase_project_guidance', options.input as Record<string, unknown>);
+interface ProjectGuidanceToolInput {
+	operation: 'activate_skill' | 'activate_rule' | 'activate_playbook' | 'activate_agent_profile' | 'get_for_paths';
+	skillName?: string;
+	skillId?: string;
+	rulePath?: string;
+	playbookPath?: string;
+	playbookId?: string;
+	playbookName?: string;
+	profilePath?: string;
+	profileId?: string;
+	profileName?: string;
+	paths?: string[];
+}
+
+class ProjectGuidanceTool implements vscode.LanguageModelTool<ProjectGuidanceToolInput> {
+	prepareInvocation(options: vscode.LanguageModelToolInvocationPrepareOptions<ProjectGuidanceToolInput>): vscode.PreparedToolInvocation {
+		return MagnusToolActivityDescriptor.describeInvocation('prebase_project_guidance', options.input as unknown as Record<string, unknown>);
 	}
-	async invoke(options: vscode.LanguageModelToolInvocationOptions<{ operation: 'activate_skill' | 'activate_rule' | 'get_for_paths'; skillName?: string; skillId?: string; rulePath?: string; paths?: string[] }>, _token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
+	async invoke(options: vscode.LanguageModelToolInvocationOptions<ProjectGuidanceToolInput>, _token: vscode.CancellationToken): Promise<vscode.LanguageModelToolResult> {
 		const service = getProjectGuidanceService();
 		if (!service) {
 			throw new Error('Project guidance is unavailable.');
@@ -822,16 +836,31 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'acti
 				throw new Error('skillId or skillName is required for activate_skill.');
 			}
 			session?.activateSkillId(idOrName);
-		} else if (operation === 'activate_rule') {
-			const rulePath = options.input.rulePath?.trim();
+		} else if (operation === 'activate_rule' || operation === 'activate_playbook') {
+			const rulePath = options.input.rulePath?.trim()
+				|| options.input.playbookPath?.trim()
+				|| options.input.playbookId?.trim()
+				|| options.input.playbookName?.trim();
 			if (!rulePath) {
-				throw new Error('rulePath is required for activate_rule.');
+				throw new Error('rulePath or playbook identifier is required.');
 			}
 			const normalizedRule = rulePath.replace(/\\/g, '/');
 			if (normalizedRule.split('/').includes('..') || normalizedRule.startsWith('/') || /^[a-zA-Z]:/.test(normalizedRule)) {
-				return result(JSON.stringify({ ok: false, reason: 'rulePath must be a workspace-relative path.', path: normalizedRule }));
+				return result(JSON.stringify({ ok: false, reason: 'Path must be a workspace-relative path.', path: normalizedRule }));
 			}
 			session?.activateRule(normalizedRule);
+		} else if (operation === 'activate_agent_profile') {
+			const profileRef = options.input.profilePath?.trim()
+				|| options.input.profileId?.trim()
+				|| options.input.profileName?.trim();
+			if (!profileRef) {
+				throw new Error('profilePath, profileId, or profileName is required for activate_agent_profile.');
+			}
+			const normalizedProfile = profileRef.replace(/\\/g, '/');
+			if (normalizedProfile.split('/').includes('..') || normalizedProfile.startsWith('/') || /^[a-zA-Z]:/.test(normalizedProfile)) {
+				return result(JSON.stringify({ ok: false, reason: 'Profile path must be workspace-relative.', path: normalizedProfile }));
+			}
+			session?.activateAgentProfile(normalizedProfile);
 		}
 		const snapshot = session?.getTargets().length
 			? await service.getCombinedSnapshot(
@@ -863,12 +892,38 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<{ operation: 'acti
 				note: 'Supporting files are not loaded automatically; read them on demand.',
 			}));
 		}
-		if (operation === 'activate_rule') {
-			const path = options.input.rulePath?.replace(/\\/g, '/');
+		if (operation === 'activate_agent_profile') {
+			const profileRef = options.input.profilePath?.trim()
+				|| options.input.profileId?.trim()
+				|| options.input.profileName?.trim() || '';
+			const profile = (snapshot.agentProfileCatalog ?? []).find(item =>
+				item.path === profileRef || item.id === profileRef || item.name === profileRef);
+			if (!profile) {
+				return result(JSON.stringify({
+					ok: false,
+					reason: 'Agent profile not found in catalog.',
+					catalog: (snapshot.agentProfileCatalog ?? []).map(item => ({ id: item.id, name: item.name, path: item.path })),
+				}));
+			}
+			const activated = (snapshot.activatedAgentProfiles ?? []).find(item => item.metadata.path === profile.path || item.metadata.id === profile.id);
+			return result(JSON.stringify({
+				ok: true,
+				profile: profile.name,
+				profileId: profile.id,
+				path: profile.path,
+				ecosystem: profile.ecosystem,
+				body: activated?.body ?? '',
+				advisoryTools: profile.toolsHint,
+				advisoryModel: profile.modelHint,
+				note: 'Foreign permissions, tools, and model preferences are advisory metadata only and not auto-imported by PreBase.',
+			}));
+		}
+		if (operation === 'activate_rule' || operation === 'activate_playbook') {
+			const path = (options.input.rulePath || options.input.playbookPath || options.input.playbookId || options.input.playbookName)?.replace(/\\/g, '/');
 			const match = snapshot.activatedRules.find(item => item.source.path === path)
 				?? [...snapshot.alwaysApplicable, ...snapshot.pathApplicable].find(item => item.source.path === path);
 			const playbookHint = !match && path
-				? snapshot.playbookCatalog?.find(item => item.path === path)
+				? snapshot.playbookCatalog?.find(item => item.path === path || item.id === path || item.name === path)
 				: undefined;
 			return result(JSON.stringify({
 				ok: Boolean(match),

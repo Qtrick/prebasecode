@@ -36,26 +36,37 @@ const GUIDANCE_WATCH_BASE = [
 	'**/.claude/settings.local.json',
 	'**/.claude/commands/**',
 	'**/.claude/agents/**',
+	'**/.claude/hooks/**',
 	'**/.cursor/rules/**',
 	'**/.cursor/commands/**',
 	'**/.cursor/agents/**',
+	'**/.cursor/hooks.json',
 	'**/.cursorrules',
 	'**/.codex/agents/**',
 	'**/.github/copilot-instructions.md',
 	'**/.github/instructions/**',
 	'**/.github/prompts/**',
+	'**/.github/agents/**',
+	'**/.github/hooks/**',
 	'**/GEMINI.md',
 	'**/.gemini/settings.json',
+	'**/.gemini/commands/**',
 	'**/.cline/rules/**',
 	'**/.clinerules/**',
 	'**/.cline/workflows/**',
+	'**/.cline/hooks/**',
+	'**/.clinerules/workflows/**',
+	'**/.clinerules/hooks/**',
 	'**/.windsurfrules',
 	'**/.windsurf/rules/**',
 	'**/.windsurf/workflows/**',
 	'**/.devin/rules/**',
+	'**/.continue/rules/**',
 	'**/.kiro/steering/**',
 	'**/opencode.json',
 	'**/.opencode/opencode.json',
+	'**/.opencode/agents/**',
+	'**/.opencode/commands/**',
 	'**/TEAM.md',
 ] as const;
 
@@ -723,4 +734,105 @@ export async function listSkillResourceManifest(
 	}
 	await walk('', 0);
 	return results.sort();
+}
+
+/**
+ * Safely parse Gemini TOML command definitions without executing any foreign shell interpolations.
+ */
+export function parseTomlCommand(text: string): { name?: string; description?: string; prompt: string; argumentHint?: string } {
+	let name: string | undefined;
+	let description: string | undefined;
+	let prompt = '';
+	let argumentHint: string | undefined;
+
+	if (text.length > 64_000) {
+		text = text.slice(0, 64_000);
+	}
+
+	const multilinePromptMatch = text.match(/prompt\s*=\s*(?:"""([\s\S]*?)"""|'''([\s\S]*?)''')/);
+	if (multilinePromptMatch) {
+		prompt = (multilinePromptMatch[1] ?? multilinePromptMatch[2] ?? '').replace(/^\n/, '').trim();
+	}
+
+	const lines = text.split('\n');
+	for (const rawLine of lines) {
+		const line = rawLine.trim();
+		if (!line || line.startsWith('#')) {
+			continue;
+		}
+		if (!prompt) {
+			const promptMatch = line.match(/^prompt\s*=\s*["']([^"']*)["']/);
+			if (promptMatch) {
+				prompt = promptMatch[1].trim();
+				continue;
+			}
+		}
+		const descMatch = line.match(/^description\s*=\s*(?:"""([\s\S]*?)"""|["']([^"']*)["'])/);
+		if (descMatch && !description) {
+			description = (descMatch[1] ?? descMatch[2] ?? '').trim();
+			continue;
+		}
+		const nameMatch = line.match(/^name\s*=\s*["']([^"']*)["']/);
+		if (nameMatch && !name) {
+			name = nameMatch[1].trim();
+			continue;
+		}
+		const argMatch = line.match(/^(?:argument_hint|argumentHint|parameters)\s*=\s*["']([^"']*)["']/);
+		if (argMatch && !argumentHint) {
+			argumentHint = argMatch[1].trim();
+			continue;
+		}
+	}
+
+	if (!prompt && text.trim()) {
+		prompt = lines.filter(l => !l.trim().startsWith('#') && !l.trim().startsWith('description')).join('\n').trim();
+	}
+
+	return { name, description, prompt, argumentHint };
+}
+
+/**
+ * Discover project hook configurations across major coding agent ecosystems.
+ * Discovered hooks are reported in diagnostics as non-executing notifications.
+ */
+export async function discoverHookDeclarations(
+	reader: GuidanceFileReader,
+	workspaceRoot: string,
+): Promise<string[]> {
+	const hooks: string[] = [];
+	const knownHookFiles = [
+		'.cursor/hooks.json',
+		'.cursor/hooks/hooks.json',
+	];
+	for (const rel of knownHookFiles) {
+		const full = join(workspaceRoot, rel);
+		if (await reader.exists(full)) {
+			hooks.push(rel);
+		}
+	}
+	const hookDirs = ['.github/hooks', '.clinerules/hooks', '.cline/hooks', '.claude/hooks'];
+	for (const dir of hookDirs) {
+		const fullDir = join(workspaceRoot, dir);
+		if (await reader.exists(fullDir)) {
+			const files = await walkBoundedFiles(reader, fullDir, rel => rel.endsWith('.json') || rel.endsWith('.sh') || rel.endsWith('.js') || rel.endsWith('.mjs'), { maxDepth: 4 });
+			for (const f of files) {
+				hooks.push(normalizeRel(join(dir, f)));
+			}
+		}
+	}
+	for (const rel of ['.claude/settings.json', '.claude/settings.local.json']) {
+		const full = join(workspaceRoot, rel);
+		if (await reader.exists(full)) {
+			try {
+				const content = await reader.readFile(full);
+				const json = JSON.parse(content) as Record<string, unknown>;
+				if (json && (json.hooks || json.lifecycleHooks)) {
+					hooks.push(`${rel} (hooks declaration)`);
+				}
+			} catch {
+				// Ignore JSON parse errors
+			}
+		}
+	}
+	return hooks.sort();
 }

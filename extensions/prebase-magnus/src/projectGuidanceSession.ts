@@ -68,6 +68,14 @@ export class ProjectGuidanceSession {
 		this.activatedRulePaths.add(normalized);
 	}
 
+	activatePlaybook(path: string): void {
+		this.activateRule(path);
+	}
+
+	activateAgentProfile(pathOrId: string): void {
+		this.activateRule(pathOrId);
+	}
+
 	getActivatedSkillIds(): readonly string[] {
 		return [...this.activatedSkillIds];
 	}

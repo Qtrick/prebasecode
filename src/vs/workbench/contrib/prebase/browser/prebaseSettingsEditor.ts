@@ -839,7 +839,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 		this._row(
 			actionsCard,
 			guidanceRowLabel,
-			localize('prebase.settings.ai.projectGuidanceHint', "Inspect AGENTS.md, Cursor rules, Copilot instructions, and skill metadata Agents applies in trusted workspaces."),
+			localize('prebase.settings.ai.projectGuidanceHint', "Inspect compatible project instructions, rules, skills, and playbooks Agents applies in trusted workspaces."),
 			guidanceBtn
 		);
 
