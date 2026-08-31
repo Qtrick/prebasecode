@@ -19,6 +19,8 @@ interface NativeAddon {
 	setSnapshot(snapshot: MagnusLiveActivitySnapshot): void;
 	setPresentation(state: { visible: boolean; pinned: boolean; reducedMotion: boolean; display: MagnusLiveActivityDisplay }): void;
 	setCommandHandler(handler: (command: LiveActivityCommand) => void): void;
+	getDiagnostics?(): Record<string, unknown>;
+	simulateAction?(action: string, extras?: unknown): boolean;
 	dispose(): void;
 }
 
@@ -86,6 +88,30 @@ export class MagnusLiveActivityMainService extends Disposable implements IMagnus
 		return this._backend;
 	}
 
+	async getNativeDiagnostics(): Promise<Record<string, unknown> | undefined> {
+		if (!this._native?.getDiagnostics) {
+			return undefined;
+		}
+		try {
+			return this._native.getDiagnostics();
+		} catch (err) {
+			this.logService.warn('[MagnusLiveActivity] getNativeDiagnostics error', err);
+			return undefined;
+		}
+	}
+
+	async simulateAction(action: string, extras?: unknown): Promise<boolean> {
+		if (!this._native?.simulateAction) {
+			return false;
+		}
+		try {
+			return this._native.simulateAction(action, extras);
+		} catch (err) {
+			this.logService.warn('[MagnusLiveActivity] simulateAction error', err);
+			return false;
+		}
+	}
+
 	async disposeNative(): Promise<void> {
 		this._teardown();
 	}
@@ -100,3 +126,4 @@ export class MagnusLiveActivityMainService extends Disposable implements IMagnus
 		this._backend = 'unavailable';
 	}
 }
+

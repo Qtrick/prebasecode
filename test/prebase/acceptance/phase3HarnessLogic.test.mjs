@@ -93,15 +93,18 @@ function passingCodeGraph(overrides = {}) {
 	return {
 		opened: true,
 		metricName: GRAPH_RENDER_METRICS_NAME,
-		metrics: { nodesDrawn: 12, receivedNodeCount: 12 },
+		metrics: { nodesDrawn: 12, receivedNodeCount: 12, labelCount: 6, projectedBounds: { minX: 0, maxX: 100, minY: 0, maxY: 100 } },
 		nodesDrawn: true,
 		selection: true,
 		layoutModes: true,
+		legacyRadialNormalized: true,
 		rotate: true,
 		drag: true,
 		idleRotateArmed: true,
+		semanticZoom: true,
 		pick: true,
 		sphereVsClustered: true,
+		labelDensity: true,
 		selectionLock: true,
 		...overrides,
 	};
@@ -115,7 +118,10 @@ function passingCore(overrides = {}) {
 		e2_search: true,
 		e3_scm: true,
 		e4_terminal: true,
+		e5_debug: true,
+		e6_typescript: true,
 		p1_settings: true,
+		p2_offline: true,
 		p4_runtime: true,
 		p5_magnus: true,
 		codeGraph: passingCodeGraph(),
@@ -680,13 +686,36 @@ test('organic then organic cannot satisfy layoutModes or Sphere vs Clustered', (
 	assert.deepEqual(codeGraphFailures({ codeGraph: passingCodeGraph() }), []);
 	const failures = codeGraphFailures({
 		codeGraph: passingCodeGraph({
-			layoutModes: Boolean('organic' && 'organic' && 'organic' !== 'organic'),
-			sphereVsClustered: 'organic' === 'sphere' && 'organic' === 'clustered',
+			layoutModes: false,
+			sphereVsClustered: false,
 			metrics: { nodesDrawn: 12, receivedNodeCount: 12, networkLayoutMode: 'organic' },
 		}),
 	});
-	assert.ok(failures.some(item => /N2 layout modes/.test(item)));
+	assert.ok(failures.some(item => /N2 all 4 layout modes/.test(item)));
 	assert.ok(failures.some(item => /N8 Sphere vs Clustered/.test(item)));
+});
+
+test('code graph fails when legacy radial normalization or semantic zoom or label density is missing', () => {
+	const f1 = codeGraphFailures({ codeGraph: passingCodeGraph({ legacyRadialNormalized: false }) });
+	assert.ok(f1.some(item => /N2 legacy radial layout was not normalized to organic/.test(item)));
+
+	const f2 = codeGraphFailures({ codeGraph: passingCodeGraph({ semanticZoom: false }) });
+	assert.ok(f2.some(item => /N6 semantic zoom/.test(item)));
+
+	const f3 = codeGraphFailures({ codeGraph: passingCodeGraph({ labelDensity: false }) });
+	assert.ok(f3.some(item => /N9 dynamic label density/.test(item)));
+});
+
+test('core IDE fails when e5_debug, e6_typescript, or p2_offline is missing', () => {
+	assert.deepEqual(coreIdeFailures(passingCore()), []);
+	const debugFail = coreIdeFailures(passingCore({ e5_debug: false }));
+	assert.ok(debugFail.some(item => /E5 debug/.test(item)));
+
+	const tsFail = coreIdeFailures(passingCore({ e6_typescript: false }));
+	assert.ok(tsFail.some(item => /E6 TypeScript/.test(item)));
+
+	const offlineFail = coreIdeFailures(passingCore({ p2_offline: false }));
+	assert.ok(offlineFail.some(item => /P2 offline/.test(item)));
 });
 
 test('code graph screenshot is not a substitute for render metrics', () => {
@@ -710,7 +739,8 @@ test('core-ide live proves layouts via Maps data-network-layout chips and metric
 	assert.match(maps, /localize\('prebase\.maps\.liveBadge', "Live"\)/);
 	assert.doesNotMatch(maps, /textContent = ['"]●|localize\([^)]*●/);
 	assert.match(live, /button\[data-network-layout="\$\{mode\}"\]/);
-	assert.match(live, /layoutModes: Boolean\(sphereMode && clusteredMode && sphereMode !== clusteredMode\)/);
+	assert.match(live, /layoutModes: Boolean\(organicMode === 'organic' && sphereMode === 'sphere' && constellationMode === 'constellation' && clusteredMode === 'clustered'\)/);
+	assert.match(live, /legacyRadialNormalized: Boolean\(legacyRadialNormalized\)/);
 	assert.match(live, /sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered'/);
 	assert.match(live, /screenshot\(\{ path: join\(screenshotDir, 'code-graph-live\.png'\), timeout: 5_000 \}\)\.catch\(\(\) => undefined\)/);
 	assert.match(live, /nodesDrawnFromMetrics/);

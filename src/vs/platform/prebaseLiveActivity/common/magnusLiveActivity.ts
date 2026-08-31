@@ -385,14 +385,14 @@ export function deriveLiveActivityGeometry(screen: LiveActivityScreenMetrics): L
 	const auxLeftH = Math.max(0, screen.auxLeftHeight);
 	const auxRightH = Math.max(0, screen.auxRightHeight);
 	const notched = safeTop > 8 && auxLeft > 40 && auxRight > 40;
-	const collapsedH = 32 / scale;
+	const collapsedH = 34 / scale;
 	if (notched) {
 		const housingW = Math.max(24, width - auxLeft - auxRight);
-		const housingH = Math.max(safeTop, Math.max(auxLeftH, auxRightH, 32 / scale));
-		const leftX = Math.max(0, auxLeft - 118);
-		const leftW = Math.max(72, auxLeft - leftX - 4);
-		const rightX = auxLeft + housingW + 4;
-		const rightW = Math.max(72, Math.min(118, width - rightX - 8));
+		const housingH = Math.max(safeTop, Math.max(auxLeftH, auxRightH, 34 / scale));
+		const leftX = Math.max(0, auxLeft - 124);
+		const leftW = 124;
+		const rightX = auxLeft + housingW;
+		const rightW = 124;
 		const y = 0;
 		return {
 			notched: true,
@@ -401,11 +401,11 @@ export function deriveLiveActivityGeometry(screen: LiveActivityScreenMetrics): L
 			leftWing: { x: leftX, y, width: leftW, height: Math.max(collapsedH, housingH) },
 			rightWing: { x: rightX, y, width: rightW, height: Math.max(collapsedH, housingH) },
 			pill: { x: leftX, y, width: leftW + housingW + rightW, height: Math.max(collapsedH, housingH) },
-			hit: { x: leftX, y, width: leftW + 4, height: Math.max(collapsedH, housingH) },
+			hit: { x: leftX, y, width: leftW - 8, height: Math.max(collapsedH, housingH) },
 		};
 	}
-	const pillW = 220;
-	const pillH = 28;
+	const pillW = 228;
+	const pillH = 30;
 	const x = Math.round((width - pillW) / 2);
 	return {
 		notched: false,
@@ -413,8 +413,8 @@ export function deriveLiveActivityGeometry(screen: LiveActivityScreenMetrics): L
 		cameraHousingHeight: 0,
 		leftWing: { x: 0, y: 0, width: 0, height: 0 },
 		rightWing: { x: 0, y: 0, width: 0, height: 0 },
-		pill: { x, y: 6, width: pillW, height: pillH },
-		hit: { x, y: 6, width: pillW, height: pillH },
+		pill: { x, y: 8, width: pillW, height: pillH },
+		hit: { x, y: 8, width: pillW, height: pillH },
 	};
 }
 

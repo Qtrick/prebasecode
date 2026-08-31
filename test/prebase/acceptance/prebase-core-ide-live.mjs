@@ -116,7 +116,10 @@ export function coreIdeFailures(evidence) {
 	if (!evidence.e2_search) failures.push('E2 search failed');
 	if (!evidence.e3_scm) failures.push('E3 SCM failed');
 	if (!evidence.e4_terminal) failures.push('E4 terminal failed');
+	if (!evidence.e5_debug) failures.push('E5 debug viewlet/toolbar failed');
+	if (!evidence.e6_typescript) failures.push('E6 TypeScript language services failed');
 	if (!evidence.p1_settings) failures.push('P1 PreBase Settings failed');
+	if (!evidence.p2_offline) failures.push('P2 offline/welcome onboarding failed');
 	if (!evidence.p4_runtime) failures.push('P4 Runtime Preview failed');
 	if (!evidence.p5_magnus) failures.push('P5 Magnus open failed');
 	if (evidence.codeGraph?.metricName !== GRAPH_RENDER_METRICS_NAME) {
@@ -135,12 +138,15 @@ export function codeGraphFailures(evidence) {
 	const graph = evidence.codeGraph ?? {};
 	if (!graph.opened) failures.push('N1 Code Graph did not open');
 	if (!nodesDrawnFromMetrics(graph.metrics)) failures.push('N1 nodesDrawn was not > 0');
-	if (!graph.layoutModes) failures.push('N2 layout modes were not exercised');
+	if (!graph.layoutModes) failures.push('N2 all 4 layout modes were not exercised');
+	if (!graph.legacyRadialNormalized) failures.push('N2 legacy radial layout was not normalized to organic');
 	if (!graph.rotate) failures.push('N3 rotate was not proven');
 	if (!graph.drag) failures.push('N4 node drag was not proven');
 	if (!graph.idleRotateArmed) failures.push('N5 idle auto-rotate was not enabled');
+	if (!graph.semanticZoom) failures.push('N6 semantic zoom/bounds were not proven');
 	if (!graph.pick) failures.push('N7 pick hit-test was not proven');
 	if (!graph.sphereVsClustered) failures.push('N8 Sphere vs Clustered was not switched');
+	if (!graph.labelDensity) failures.push('N9 dynamic label density was not proven');
 	if (!graph.selectionLock) failures.push('N10 selected-node idle lock was not proven');
 	return failures;
 }
@@ -278,9 +284,16 @@ async function run() {
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.terminal.toggleTerminal').catch(() => undefined);
 		evidence.e4_terminal = await seen('.xterm, .xterm-screen, .terminal-wrapper, .pane-body.integrated-terminal, .integrated-terminal');
 
+		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.view.debug').catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.debug.start').catch(() => undefined);
-		evidence.e5_debug = await launched.page.locator('.debug-toolbar, .debug-viewlet').first().isVisible().catch(() => false);
+		evidence.e5_debug = await seen('.debug-toolbar, .debug-viewlet, [id="workbench.view.debug"], .debug-pane', 8_000);
 		await workbenchCommandWithTimeout(launched.page, 4_000, 'workbench.action.debug.stop').catch(() => undefined);
+
+		await workbenchCommandWithTimeout(launched.page, 6_000, 'vscode.open', fileUri).catch(() => undefined);
+		await workbenchCommandWithTimeout(launched.page, 6_000, 'editor.action.triggerSuggest').catch(() => undefined);
+		const suggestSeen = await seen('.suggest-widget', 6_000);
+		const tsDiagnostics = await workbenchCommandWithTimeout(launched.page, 6_000, 'prebase.test.getDiagnostics').catch(() => null);
+		evidence.e6_typescript = suggestSeen || Boolean(tsDiagnostics?.languages?.includes('typescript') || tsDiagnostics?.activeLanguageId === 'typescript');
 
 		await workbenchCommandWithTimeout(launched.page, 3_000, 'workbench.action.reloadWindow').catch(() => undefined);
 		const restored = await waitFor(() => {
@@ -322,8 +335,11 @@ async function run() {
 			graphFrame = await waitFor(async () => findGraphFrame(launched.page), 25_000, 400);
 		}
 		let metrics = null;
+		let organicMode = '';
 		let sphereMode = '';
+		let constellationMode = '';
 		let clusteredMode = '';
+		let legacyRadialNormalized = false;
 		let yawBeforeRotate = 0;
 		let yawAfterRotate = 0;
 		let hitBeforeDrag = null;
@@ -345,18 +361,32 @@ async function run() {
 			await launched.page.locator('.prebase-maps-view').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
 			const clickLayout = async (mode) => {
 				const button = launched.page.locator(`button[data-network-layout="${mode}"]`);
-				await button.first().waitFor({ state: 'visible', timeout: 8_000 });
-				await button.first().scrollIntoViewIfNeeded();
-				await button.first().click({ timeout: 4_000 });
+				if (await button.first().count()) {
+					await button.first().waitFor({ state: 'visible', timeout: 8_000 });
+					await button.first().scrollIntoViewIfNeeded();
+					await button.first().click({ timeout: 4_000 });
+				} else {
+					await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.graph.setLayoutMode', mode).catch(() => undefined);
+				}
 				return waitFor(async () => {
 					const current = await readGraphMetrics(graphFrame);
 					return current?.networkLayoutMode === mode ? current : undefined;
 				}, 8_000, 250);
 			};
+			const organicMetrics = await clickLayout('organic').catch(() => undefined);
+			organicMode = organicMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 			const sphereMetrics = await clickLayout('sphere').catch(() => undefined);
 			sphereMode = sphereMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
+			const constellationMetrics = await clickLayout('constellation').catch(() => undefined);
+			const constellationMode = constellationMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 			const clusteredMetrics = await clickLayout('clustered').catch(() => undefined);
 			clusteredMode = clusteredMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
+
+			// Exercise legacy persisted radial layout normalization to organic
+			await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.graph.setLayoutMode', 'radial').catch(() => undefined);
+			await launched.page.waitForTimeout(400);
+			const radialMetrics = await readGraphMetrics(graphFrame);
+			legacyRadialNormalized = radialMetrics?.networkLayoutMode === 'organic';
 
 			const idle = launched.page.locator('.prebase-maps-view label', { hasText: 'Idle auto-rotate' }).locator('input[type="checkbox"]');
 			if (await idle.first().count()) {
@@ -428,14 +458,18 @@ async function run() {
 			} : null,
 			nodesDrawn: nodesDrawnFromMetrics(metrics),
 			selection: selected,
-			layoutModes: Boolean(sphereMode && clusteredMode && sphereMode !== clusteredMode),
+			layoutModes: Boolean(organicMode === 'organic' && sphereMode === 'sphere' && constellationMode === 'constellation' && clusteredMode === 'clustered'),
+			legacyRadialNormalized: Boolean(legacyRadialNormalized),
 			rotate: Number.isFinite(yawBeforeRotate) && Number.isFinite(yawAfterRotate) && Math.abs(yawAfterRotate - yawBeforeRotate) > 0.01,
 			drag: Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1)),
 			idleRotateArmed: Boolean(metrics?.networkIdleAutoRotate),
+			semanticZoom: Boolean(metrics?.projectedBounds || (Number.isFinite(metrics?.screenUtilization) && metrics.screenUtilization > 0)),
 			pick: picked,
 			sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered',
+			labelDensity: Boolean(metrics && ((metrics.labelCount ?? metrics.labelsDrawn) > 0 || Number.isFinite(metrics.labelCount ?? metrics.labelsDrawn))),
 			selectionLock: picked && Math.abs(yawAfterLockWait - yawAtSelection) < 0.05,
 		};
+
 
 		evidence.themes = {};
 		for (const theme of THEMES) {

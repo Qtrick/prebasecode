@@ -157,10 +157,12 @@ export const PATH_PREFIX_DOMAINS = [
 	['test/fixtures/', 'core-ide'],
 	['.agents/skills/launch/', 'launch-harness'],
 	['.agents/skills/prebase-validation/', 'validation-orchestration'],
+	['reports/', 'validation-orchestration'],
 	['package.json', 'assurance-leaf'],
 	['package-lock.json', 'assurance-leaf'],
 	['product.json', 'assurance-leaf'],
 ];
+
 
 /**
  * Product + harness domains only. validation-orchestration is intentionally omitted

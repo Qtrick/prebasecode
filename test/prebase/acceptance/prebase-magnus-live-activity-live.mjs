@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 /*---------------------------------------------------------------------------------------------
  *  Copyright (c) PreBase. All rights reserved.
- *  Real Live Activity acceptance: launches PreBase and observes runtime diagnostics.
- *  Native NSPanel pixels are not CDP-visible; this proves workbench→native plumbing + session continuity.
+ *  Real Live Activity acceptance: launches PreBase and observes factual native AppKit diagnostics & interactions.
  *--------------------------------------------------------------------------------------------*/
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { execSync } from 'node:child_process';
+import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -21,6 +21,7 @@ import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/magnus');
+const screenshotDir = join(repo, 'reports/graph-acceptance/phase-3-final/screenshots');
 const fixture = join(repo, 'test/fixtures/typescript-lanes');
 const nativeAddon = join(repo, 'native/prebase-live-activity/build/Release/prebase_live_activity.node');
 
@@ -52,15 +53,60 @@ export function liveActivityLiveFailures(evidence) {
 			failures.push('Live Activity lost session state after blur in alwaysWorking mode');
 		}
 	}
+	if (!evidence.nativeDiagnostics) {
+		failures.push('factual native AppKit diagnostics unavailable');
+	} else {
+		if (!evidence.nativeDiagnostics.panelCreated) {
+			failures.push('native NSPanel was not created');
+		}
+		if (!evidence.nativeDiagnostics.panelVisible) {
+			failures.push('native NSPanel was not visible');
+		}
+		const frame = evidence.nativeDiagnostics.panelFrame;
+		if (!frame || typeof frame.width !== 'number' || frame.width <= 0 || typeof frame.height !== 'number' || frame.height <= 0) {
+			failures.push('native NSPanel frame invalid or zero-sized');
+		}
+	}
+	if (evidence.followUpSimulation && !evidence.followUpSimulation.ok) {
+		failures.push('native follow-up message simulation failed');
+	}
+	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured) {
+		failures.push('native panel screenshot capture failed');
+	}
 	if (evidence.quit?.remaining !== 'gone') {
 		failures.push('PreBase did not quit cleanly after Live Activity live acceptance');
 	}
 	return failures;
 }
 
+function captureNativePanelScreenshot(panelFrame, screenFrame, outPath) {
+	if (!panelFrame || !screenFrame || process.platform !== 'darwin') {
+		return { captured: false, reason: 'unsupported platform or missing geometry' };
+	}
+	try {
+		const screenH = screenFrame.height || 1080;
+		const captureX = Math.max(0, Math.round(panelFrame.x));
+		const captureY = Math.max(0, Math.round(screenH - (panelFrame.y + panelFrame.height)));
+		const captureW = Math.max(10, Math.round(panelFrame.width));
+		const captureH = Math.max(10, Math.round(panelFrame.height));
+		const rectArg = `-R${captureX},${captureY},${captureW},${captureH}`;
+		execSync(`screencapture -x ${rectArg} "${outPath}"`, { timeout: 5000, stdio: 'pipe' });
+		const stat = statSync(outPath);
+		return {
+			captured: stat.size > 0,
+			sizeBytes: stat.size,
+			rect: { x: captureX, y: captureY, width: captureW, height: captureH },
+			outPath,
+		};
+	} catch (err) {
+		return { captured: false, error: err instanceof Error ? err.message : String(err) };
+	}
+}
+
 async function run() {
 	const release = await acquirePhase3AcceptanceLock('magnus-live-activity');
 	mkdirSync(evidenceDir, { recursive: true });
+	mkdirSync(screenshotDir, { recursive: true });
 	const startedAt = Date.now();
 	const platform = process.platform;
 	const nativePresent = existsSync(nativeAddon);
@@ -69,7 +115,7 @@ async function run() {
 		...phase3EvidenceMetadata(repo, 'magnus-live-activity'),
 		kind: 'magnus-live-activity-live',
 		testKind: 'live-runtime',
-		liveGui: 'workbench-diagnostics-runtime',
+		liveGui: 'native-appkit-panel',
 		platform,
 		nativePresent,
 		mode: 'alwaysWorking',
@@ -114,6 +160,21 @@ async function run() {
 			await new Promise(r => setTimeout(r, 500));
 		}
 
+		// Query factual native AppKit diagnostics directly
+		evidence.nativeDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+
+		// Test native follow-up message simulation through native text field
+		const followUpSim = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'followUp', 'follow-up from native activity').catch(() => false);
+		evidence.followUpSimulation = { ok: Boolean(followUpSim) };
+
+		// Capture native NSPanel screenshot using native panel bounds
+		const screenshotFile = join(screenshotDir, 'magnus-live-activity-native.png');
+		evidence.nativeScreenshot = captureNativePanelScreenshot(
+			evidence.nativeDiagnostics?.panelFrame,
+			evidence.nativeDiagnostics?.screenFrame,
+			screenshotFile,
+		);
+
 		await launched.page.evaluate(() => {
 			window.dispatchEvent(new Event('blur'));
 		}).catch(() => undefined);
@@ -147,6 +208,10 @@ async function run() {
 		out,
 		backend: result.diagnosticsAfterOpen?.backend,
 		status: result.diagnosticsAfterOpen?.status,
+		nativePanelCreated: result.nativeDiagnostics?.panelCreated,
+		nativePanelVisible: result.nativeDiagnostics?.panelVisible,
+		nativePanelFrame: result.nativeDiagnostics?.panelFrame,
+		nativeScreenshot: result.nativeScreenshot,
 		durationMs: result.durationMs,
 		liveGui: result.liveGui,
 	}, null, 2));
@@ -156,3 +221,4 @@ async function run() {
 if (resolve(process.argv[1] ?? '') === scriptPath) {
 	await run();
 }
+

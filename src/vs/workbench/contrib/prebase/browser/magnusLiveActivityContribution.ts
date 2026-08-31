@@ -294,6 +294,7 @@ function extractSessionInput(
 
 export class MagnusLiveActivityContribution extends Disposable implements IWorkbenchContribution {
 	static readonly ID = 'workbench.contrib.prebase.magnusLiveActivity';
+	static instance: MagnusLiveActivityContribution | undefined;
 	static diagnostics: {
 		backend: 'native-appkit' | 'unavailable' | 'non-mac';
 		revision: number;
@@ -323,6 +324,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		@IConfigurationService private readonly configurationService: IConfigurationService,
 		@ILogService private readonly logService: ILogService,
 		@ICommandService private readonly commandService: ICommandService,
+
 		@IMainProcessService mainProcessService: IMainProcessService,
 		@IAccessibilityService private readonly accessibilityService: IAccessibilityService,
 		@INativeHostService private readonly nativeHostService: INativeHostService,
@@ -373,8 +375,17 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			MagnusLiveActivityContribution.diagnostics.backend = this._nativeConnected ? 'native-appkit' : 'unavailable';
 			this._push.schedule();
 		});
+		MagnusLiveActivityContribution.instance = this;
 		this._bindModels();
 		this._push.schedule();
+	}
+
+	async getNativeDiagnostics(): Promise<Record<string, unknown> | undefined> {
+		return this._main?.getNativeDiagnostics();
+	}
+
+	async simulateAction(action: string, extras?: unknown): Promise<boolean> {
+		return (await this._main?.simulateAction(action, extras)) ?? false;
 	}
 
 	private _isDestructive(toolId: string, parameters: unknown): boolean {
@@ -529,6 +540,9 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	}
 
 	override dispose(): void {
+		if (MagnusLiveActivityContribution.instance === this) {
+			MagnusLiveActivityContribution.instance = undefined;
+		}
 		this._nativeConnected = false;
 		void this._main?.disposeNative();
 		super.dispose();
@@ -545,7 +559,38 @@ registerAction2(class extends Action2 {
 			f1: false,
 		});
 	}
-	run() {
-		return MagnusLiveActivityContribution.diagnostics;
+	async run() {
+		const native = await MagnusLiveActivityContribution.instance?.getNativeDiagnostics();
+		return {
+			...MagnusLiveActivityContribution.diagnostics,
+			...(native ? { native } : {}),
+		};
 	}
 });
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.magnus.liveActivity.nativeDiagnostics',
+			title: localize2('prebase.magnus.liveActivity.nativeDiagnostics', "Magnus Live Activity Native Diagnostics"),
+			f1: false,
+		});
+	}
+	async run() {
+		return MagnusLiveActivityContribution.instance?.getNativeDiagnostics();
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.magnus.liveActivity.simulate',
+			title: localize2('prebase.magnus.liveActivity.simulate', "Magnus Live Activity Simulate Action"),
+			f1: false,
+		});
+	}
+	async run(accessor: unknown, action: string, extras?: unknown) {
+		return MagnusLiveActivityContribution.instance?.simulateAction(action, extras);
+	}
+});
+

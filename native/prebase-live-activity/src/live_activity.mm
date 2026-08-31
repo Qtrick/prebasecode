@@ -53,10 +53,17 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) NSTimer *exitTimer;
 @property (nonatomic, assign) NSRect collapsedHit;
 @property (nonatomic, copy) NSString *displayMode;
+@property (nonatomic, copy) NSString *lastNativeCommand;
 - (void)applySnapshotDict:(NSDictionary *)snapshot;
 - (void)teardown;
 - (void)mouseUp:(NSEvent *)event;
 - (void)clearPendingInteraction;
+- (NSDictionary *)diagnosticsDict;
+- (BOOL)simulateClickOptionIndex:(NSInteger)index;
+- (BOOL)simulateClickApprove;
+- (BOOL)simulateClickDeny;
+- (BOOL)simulateSubmitFollowUp:(NSString *)text;
+- (BOOL)simulateClickOpenInPrebase;
 @end
 
 @implementation PrebaseLiveActivityView
@@ -399,6 +406,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)emit:(NSString *)kind extras:(NSDictionary *)extras {
+	self.lastNativeCommand = kind;
 	if (!gCommandTsfn || gDisposed) {
 		return;
 	}
@@ -479,6 +487,111 @@ static NSString *JSString(Napi::Value value) {
 	[self.content setNeedsDisplay:YES];
 }
 
+- (NSDictionary *)diagnosticsDict {
+	NSMutableDictionary *dict = [NSMutableDictionary dictionary];
+	dict[@"panelCreated"] = @(self.panel != nil);
+	dict[@"panelVisible"] = @(self.panel != nil && self.panel.isVisible);
+	if (self.panel) {
+		NSRect f = self.panel.frame;
+		dict[@"panelFrame"] = @{
+			@"x": @(f.origin.x),
+			@"y": @(f.origin.y),
+			@"width": @(f.size.width),
+			@"height": @(f.size.height)
+		};
+	}
+	NSScreen *screen = [self targetScreen];
+	if (screen) {
+		NSRect sf = screen.frame;
+		NSEdgeInsets insets = screen.safeAreaInsets;
+		dict[@"screenFrame"] = @{
+			@"x": @(sf.origin.x),
+			@"y": @(sf.origin.y),
+			@"width": @(sf.size.width),
+			@"height": @(sf.size.height)
+		};
+		dict[@"safeAreaTop"] = @(insets.top);
+		dict[@"screenLocalizedName"] = screen.localizedName ?: @"";
+	}
+	dict[@"notchDetected"] = @(self.content.notched);
+	dict[@"expanded"] = @(self.content.expanded);
+	dict[@"hovered"] = @(self.hovering);
+	dict[@"pinned"] = @(self.pinned);
+	dict[@"keyWindow"] = @(self.panel != nil && self.panel.isKeyWindow);
+	dict[@"activeInputControl"] = self.input.hidden ? @"none" : (self.panel.firstResponder == self.input.currentEditor ? @"input-focused" : @"input-ready");
+	dict[@"statusLabel"] = self.content.statusLabel ?: @"";
+	dict[@"activityLabel"] = self.content.activityLabel ?: @"";
+	dict[@"metricsLabel"] = self.content.metricsLabel ?: @"";
+	dict[@"pendingTitle"] = self.content.pendingTitle ?: @"";
+	dict[@"pendingKind"] = self.pendingKind ?: @"";
+	dict[@"interactionId"] = self.interactionId ?: @"";
+	dict[@"approvalControlsVisible"] = @(!self.approveButton.hidden);
+	dict[@"openInPreBaseVisible"] = @(!self.openButton.hidden);
+	NSInteger visibleOptions = 0;
+	NSMutableArray *optLabels = [NSMutableArray array];
+	for (NSButton *btn in self.optionButtons) {
+		if (!btn.hidden) {
+			visibleOptions++;
+			[optLabels addObject:btn.title ?: @""];
+		}
+	}
+	dict[@"questionButtonCount"] = @(visibleOptions);
+	dict[@"questionButtonLabels"] = optLabels;
+	dict[@"accessibilityRole"] = self.content.accessibilityRole ?: @"";
+	dict[@"accessibilityLabel"] = self.content.accessibilityLabel ?: @"";
+	dict[@"lastNativeCommand"] = self.lastNativeCommand ?: @"";
+	NSRect hit = self.collapsedHit;
+	dict[@"collapsedHit"] = @{
+		@"x": @(hit.origin.x),
+		@"y": @(hit.origin.y),
+		@"width": @(hit.size.width),
+		@"height": @(hit.size.height)
+	};
+	return dict;
+}
+
+- (BOOL)simulateClickOptionIndex:(NSInteger)index {
+	if (index < 0 || index >= (NSInteger)self.optionButtons.count) {
+		return NO;
+	}
+	NSButton *button = self.optionButtons[index];
+	if (button.hidden) {
+		return NO;
+	}
+	[self answerOption:button];
+	return YES;
+}
+
+- (BOOL)simulateClickApprove {
+	if (self.approveButton.hidden) {
+		return NO;
+	}
+	[self approve:self.approveButton];
+	return YES;
+}
+
+- (BOOL)simulateClickDeny {
+	if (self.denyButton.hidden) {
+		return NO;
+	}
+	[self deny:self.denyButton];
+	return YES;
+}
+
+- (BOOL)simulateSubmitFollowUp:(NSString *)text {
+	self.input.stringValue = text ?: @"";
+	[self submitFollowUp:self.input];
+	return YES;
+}
+
+- (BOOL)simulateClickOpenInPrebase {
+	if (self.openButton.hidden) {
+		return NO;
+	}
+	[self openInPrebase:self.openButton];
+	return YES;
+}
+
 - (void)mouseUp:(NSEvent *)event {
 	if (!self.pinned) {
 		self.pinned = YES;
@@ -512,6 +625,7 @@ static NSString *JSString(Napi::Value value) {
 	self.interactionId = snapshot[@"interactionId"] ?: @"";
 	self.pendingKind = snapshot[@"pendingKind"] ?: @"";
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
+	self.lastNativeCommand = @"";
 	[self.content setNeedsDisplay:YES];
 	if (self.panel) {
 		[self layoutControls:self.panel.frame];
@@ -653,6 +767,70 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 	return payload;
 }
 
+static Napi::Value DictToJs(Napi::Env env, id value) {
+	if ([value isKindOfClass:[NSDictionary class]]) {
+		Napi::Object obj = Napi::Object::New(env);
+		NSDictionary *dict = (NSDictionary *)value;
+		for (NSString *key in dict) {
+			obj.Set(key.UTF8String, DictToJs(env, dict[key]));
+		}
+		return obj;
+	}
+	if ([value isKindOfClass:[NSArray class]]) {
+		Napi::Array arr = Napi::Array::New(env);
+		NSArray *list = (NSArray *)value;
+		for (NSUInteger i = 0; i < list.count; i++) {
+			arr.Set(i, DictToJs(env, list[i]));
+		}
+		return arr;
+	}
+	if ([value isKindOfClass:[NSNumber class]]) {
+		NSNumber *num = (NSNumber *)value;
+		if (strcmp(num.objCType, @encode(BOOL)) == 0 || strcmp(num.objCType, "c") == 0) {
+			return Napi::Boolean::New(env, num.boolValue);
+		}
+		return Napi::Number::New(env, num.doubleValue);
+	}
+	if ([value isKindOfClass:[NSString class]]) {
+		return Napi::String::New(env, [(NSString *)value UTF8String] ?: "");
+	}
+	return env.Null();
+}
+
+static Napi::Value GetDiagnostics(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+	PrebaseLiveActivityController *controller = EnsureController();
+	NSDictionary *diag = [controller diagnosticsDict];
+	return DictToJs(env, diag);
+}
+
+static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+	if (info.Length() < 1 || !info[0].IsString()) {
+		return Napi::Boolean::New(env, false);
+	}
+	std::string action = info[0].As<Napi::String>().Utf8Value();
+	PrebaseLiveActivityController *controller = EnsureController();
+	if (action == "approve") {
+		return Napi::Boolean::New(env, [controller simulateClickApprove]);
+	}
+	if (action == "deny") {
+		return Napi::Boolean::New(env, [controller simulateClickDeny]);
+	}
+	if (action == "openInPrebase") {
+		return Napi::Boolean::New(env, [controller simulateClickOpenInPrebase]);
+	}
+	if (action == "option" && info.Length() >= 2 && info[1].IsNumber()) {
+		NSInteger index = info[1].As<Napi::Number>().Int64Value();
+		return Napi::Boolean::New(env, [controller simulateClickOptionIndex:index]);
+	}
+	if (action == "followUp" && info.Length() >= 2 && info[1].IsString()) {
+		NSString *text = [NSString stringWithUTF8String:info[1].As<Napi::String>().Utf8Value().c_str()];
+		return Napi::Boolean::New(env, [controller simulateSubmitFollowUp:text]);
+	}
+	return Napi::Boolean::New(env, false);
+}
+
 static Napi::Value SetSnapshot(const Napi::CallbackInfo &info) {
 	if (gDisposed || info.Length() < 1 || !info[0].IsObject()) {
 		return info.Env().Undefined();
@@ -710,8 +888,11 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 	exports.Set("setSnapshot", Napi::Function::New(env, SetSnapshot));
 	exports.Set("setPresentation", Napi::Function::New(env, SetPresentation));
 	exports.Set("setCommandHandler", Napi::Function::New(env, SetCommandHandler));
+	exports.Set("getDiagnostics", Napi::Function::New(env, GetDiagnostics));
+	exports.Set("simulateAction", Napi::Function::New(env, SimulateAction));
 	exports.Set("dispose", Napi::Function::New(env, DisposeNative));
 	return exports;
 }
 
 NODE_API_MODULE(prebase_live_activity, Init)
+

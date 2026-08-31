@@ -18,6 +18,9 @@ export interface IMagnusLiveActivityMainService {
 	setPresentation(state: { visible: boolean; pinned: boolean; reducedMotion: boolean; display: MagnusLiveActivityDisplay }): Promise<void>;
 	disposeNative(): Promise<void>;
 	getNativeBackend(): Promise<'native-appkit' | 'unavailable'>;
+	getNativeDiagnostics(): Promise<Record<string, unknown> | undefined>;
+	simulateAction(action: string, extras?: unknown): Promise<boolean>;
 }
 
 export const IMagnusLiveActivityMainService = createDecorator<IMagnusLiveActivityMainService>('magnusLiveActivityMainService');
+
