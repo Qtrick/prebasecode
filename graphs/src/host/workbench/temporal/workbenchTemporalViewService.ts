@@ -104,16 +104,31 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 	private _activeCts?: CancellationTokenSource;
 	private _initPromise?: Promise<void>;
 
+	private readonly _workspaceContextService: IWorkspaceContextService;
+	private readonly _gitHistoryService: IWorkbenchGitHistoryService;
+	private readonly _temporalGraphService: IPreBaseTemporalGraphService;
+	private readonly _commandService: ICommandService;
+	private readonly _editorService: IEditorService;
+	private readonly _logService: ILogService;
+	private readonly _storageService: IStorageService;
+
 	constructor(
-		@IWorkspaceContextService private readonly _workspaceContextService: IWorkspaceContextService,
-		@IWorkbenchGitHistoryService private readonly _gitHistoryService: IWorkbenchGitHistoryService,
-		@IPreBaseTemporalGraphService private readonly _temporalGraphService: IPreBaseTemporalGraphService,
-		@ICommandService private readonly _commandService: ICommandService,
-		@IEditorService private readonly _editorService: IEditorService,
-		@ILogService private readonly _logService: ILogService,
-		@IStorageService private readonly _storageService: IStorageService,
+		@IWorkspaceContextService workspaceContextService: IWorkspaceContextService,
+		@IWorkbenchGitHistoryService gitHistoryService: IWorkbenchGitHistoryService,
+		@IPreBaseTemporalGraphService temporalGraphService: IPreBaseTemporalGraphService,
+		@ICommandService commandService: ICommandService,
+		@IEditorService editorService: IEditorService,
+		@ILogService logService: ILogService,
+		@IStorageService storageService: IStorageService,
 	) {
 		super();
+		this._workspaceContextService = workspaceContextService;
+		this._gitHistoryService = gitHistoryService;
+		this._temporalGraphService = temporalGraphService;
+		this._commandService = commandService;
+		this._editorService = editorService;
+		this._logService = logService;
+		this._storageService = storageService;
 
 		if (this._gitHistoryService?.onDidChangeHead) {
 			this._register(this._gitHistoryService.onDidChangeHead(e => {

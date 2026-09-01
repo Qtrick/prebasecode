@@ -28,7 +28,10 @@ export class WorkbenchTemporalStore implements ITemporalStore {
 	private _isOpen = false;
 	private _inflightWrites = 0;
 
-	constructor(channel: IChannel, private readonly _dbPath: string) {
+	private readonly _dbPath: string;
+
+	constructor(channel: IChannel, dbPath: string) {
+		this._dbPath = dbPath;
 		this._main = ProxyChannel.toService<ITemporalStoreMainService>(channel);
 	}
 

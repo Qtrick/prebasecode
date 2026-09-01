@@ -12,7 +12,6 @@ static const CGFloat kPillHeight = 30;
 static const CGFloat kNotchMinSafeTop = 8;
 static const CGFloat kNotchMinAuxWidth = 40;
 static const CGFloat kCameraHousingMin = 24;
-static const CGFloat kWingCornerRadius = 10;
 static const CGFloat kPillCornerRadius = 16;
 static const CGFloat kShoulderRadius = 12;
 static const CGFloat kBottomCornerRadius = 16;
@@ -48,6 +47,50 @@ static BOOL ScreenHasPhysicalNotch(NSScreen *screen) {
 		&& NSMinX(auxRight) > NSMaxX(auxLeft);
 }
 
+struct PathElementRecord {
+	CGPathElementType type;
+	CGPoint points[3];
+};
+
+static std::vector<PathElementRecord> ExtractPathElements(CGPathRef path) {
+	std::vector<PathElementRecord> elements;
+	if (!path) {
+		return elements;
+	}
+	std::vector<PathElementRecord> *elPtr = &elements;
+	CGPathApplyWithBlock(path, ^(const CGPathElement *element) {
+		PathElementRecord rec;
+		rec.type = element->type;
+		int pointCount = 1;
+		if (element->type == kCGPathElementAddCurveToPoint) {
+			pointCount = 3;
+		} else if (element->type == kCGPathElementAddQuadCurveToPoint) {
+			pointCount = 2;
+		} else if (element->type == kCGPathElementCloseSubpath) {
+			pointCount = 0;
+		}
+		for (int i = 0; i < pointCount; i++) {
+			rec.points[i] = element->points[i];
+		}
+		elPtr->push_back(rec);
+	});
+	return elements;
+}
+
+static BOOL ValidatePathTopology(CGPathRef path1, CGPathRef path2) {
+	auto el1 = ExtractPathElements(path1);
+	auto el2 = ExtractPathElements(path2);
+	if (el1.size() != el2.size() || el1.empty()) {
+		return NO;
+	}
+	for (size_t i = 0; i < el1.size(); i++) {
+		if (el1[i].type != el2[i].type) {
+			return NO;
+		}
+	}
+	return YES;
+}
+
 static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
                                         CGFloat currentH,
                                         CGFloat leftW,
@@ -57,69 +100,87 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
                                         BOOL isExpanded,
                                         BOOL isNotched) {
 	CGMutablePathRef path = CGPathCreateMutable();
+	const CGFloat kKappa = 0.5522847498307933984022516322796;
+
 	if (!isNotched) {
-		// Pill mode (no-notch screen fallback): capsule with rounded corners.
-		CGRect rect = CGRectMake(0.5, 0.5, totalW - 1.0, currentH - 1.0);
-		CGPathAddRoundedRect(path, NULL, rect, kPillCornerRadius, kPillCornerRadius);
+		// Pill mode (no-notch screen fallback): 4 sides + 4 cubic bezier corner arcs
+		CGFloat r = MIN(kPillCornerRadius, MIN(totalW * 0.5, currentH * 0.5));
+		CGFloat kR = r * (1.0 - kKappa);
+
+		CGPathMoveToPoint(path, NULL, r, 0);
+		CGPathAddLineToPoint(path, NULL, totalW - r, 0);
+		CGPathAddCurveToPoint(path, NULL, totalW - kR, 0, totalW, kR, totalW, r);
+		CGPathAddLineToPoint(path, NULL, totalW, currentH - r);
+		CGPathAddCurveToPoint(path, NULL, totalW, currentH - kR, totalW - kR, currentH, totalW - r, currentH);
+		CGPathAddLineToPoint(path, NULL, r, currentH);
+		CGPathAddCurveToPoint(path, NULL, kR, currentH, 0, currentH - kR, 0, currentH - r);
+		CGPathAddLineToPoint(path, NULL, 0, r);
+		CGPathAddCurveToPoint(path, NULL, 0, kR, kR, 0, r, 0);
+		CGPathCloseSubpath(path);
 		return path;
 	}
 
-	if (!isExpanded) {
-		// Collapsed state: discrete left and right wings flanking the physical housing.
-		// Left wing
-		CGRect leftRect = CGRectMake(0, 0, leftW, currentH);
-		CGPathMoveToPoint(path, NULL, CGRectGetMinX(leftRect), CGRectGetMinY(leftRect));
-		CGPathAddLineToPoint(path, NULL, CGRectGetMaxX(leftRect), CGRectGetMinY(leftRect));
-		CGPathAddLineToPoint(path, NULL, CGRectGetMaxX(leftRect), CGRectGetMaxY(leftRect) - kWingCornerRadius);
-		CGPathAddArcToPoint(path, NULL, CGRectGetMaxX(leftRect), CGRectGetMaxY(leftRect),
-		                    CGRectGetMaxX(leftRect) - kWingCornerRadius, CGRectGetMaxY(leftRect),
-		                    kWingCornerRadius);
-		CGPathAddLineToPoint(path, NULL, CGRectGetMinX(leftRect) + kWingCornerRadius, CGRectGetMaxY(leftRect));
-		CGPathAddArcToPoint(path, NULL, CGRectGetMinX(leftRect), CGRectGetMaxY(leftRect),
-		                    CGRectGetMinX(leftRect), CGRectGetMaxY(leftRect) - kWingCornerRadius,
-		                    kWingCornerRadius);
-		CGPathCloseSubpath(path);
+	// TOPOLOGY-COMPATIBLE SINGLE CONTINUOUS CONTOUR
+	// Exactly 1 subpath, 14 elements (1 MoveTo, 8 LineTo, 4 CurveTo, 1 CloseSubpath)
+	// Invariant sequence across all states (collapsed, peek, interactive, pinned)
+	CGFloat effShoulderR = isExpanded ? MIN(kShoulderRadius, (currentH - bandH) * 0.5) : 0.0;
+	CGFloat effBottomR = MIN(kBottomCornerRadius, currentH * 0.5);
+	CGFloat kBottom = effBottomR * (1.0 - kKappa);
+	CGFloat kShoulder = effShoulderR * (1.0 - kKappa);
 
-		// Right wing
-		CGRect rightRect = CGRectMake(leftW + housingW, 0, rightW, currentH);
-		CGPathMoveToPoint(path, NULL, CGRectGetMinX(rightRect), CGRectGetMinY(rightRect));
-		CGPathAddLineToPoint(path, NULL, CGRectGetMaxX(rightRect), CGRectGetMinY(rightRect));
-		CGPathAddLineToPoint(path, NULL, CGRectGetMaxX(rightRect), CGRectGetMaxY(rightRect) - kWingCornerRadius);
-		CGPathAddArcToPoint(path, NULL, CGRectGetMaxX(rightRect), CGRectGetMaxY(rightRect),
-		                    CGRectGetMaxX(rightRect) - kWingCornerRadius, CGRectGetMaxY(rightRect),
-		                    kWingCornerRadius);
-		CGPathAddLineToPoint(path, NULL, CGRectGetMinX(rightRect) + kWingCornerRadius, CGRectGetMaxY(rightRect));
-		CGPathAddArcToPoint(path, NULL, CGRectGetMinX(rightRect), CGRectGetMaxY(rightRect),
-		                    CGRectGetMinX(rightRect), CGRectGetMaxY(rightRect) - kWingCornerRadius,
-		                    kWingCornerRadius);
-		CGPathCloseSubpath(path);
-	} else {
-		// Expanded continuous morphology: smooth shoulder transitions connecting the notch wings into the body.
-		CGFloat bottomR = kBottomCornerRadius;
-		CGFloat shoulderR = kShoulderRadius;
+	// 0. Move to top-left of left wing (0, 0)
+	CGPathMoveToPoint(path, NULL, 0, 0);
 
-		CGPathMoveToPoint(path, NULL, 0, 0);
-		// Left wing top edge to camera housing cutout
-		CGPathAddLineToPoint(path, NULL, leftW, 0);
-		// Drop into housing cutout
-		CGPathAddLineToPoint(path, NULL, leftW, bandH);
-		CGPathAddLineToPoint(path, NULL, leftW + housingW, bandH);
-		CGPathAddLineToPoint(path, NULL, leftW + housingW, 0);
-		// Right wing top edge
-		CGPathAddLineToPoint(path, NULL, totalW, 0);
-		// Right shoulder curve down into body
-		CGPathAddLineToPoint(path, NULL, totalW, bandH + shoulderR);
-		CGPathAddLineToPoint(path, NULL, totalW, currentH - bottomR);
-		// Bottom right corner
-		CGPathAddArcToPoint(path, NULL, totalW, currentH, totalW - bottomR, currentH, bottomR);
-		// Bottom edge
-		CGPathAddLineToPoint(path, NULL, bottomR, currentH);
-		// Bottom left corner
-		CGPathAddArcToPoint(path, NULL, 0, currentH, 0, currentH - bottomR, bottomR);
-		// Left shoulder curve up into wing
-		CGPathAddLineToPoint(path, NULL, 0, bandH + shoulderR);
-		CGPathCloseSubpath(path);
-	}
+	// 1. Line across top of left wing to notch start (leftW, 0)
+	CGPathAddLineToPoint(path, NULL, leftW, 0);
+
+	// 2. Line down into camera housing cutout (leftW, bandH)
+	CGPathAddLineToPoint(path, NULL, leftW, bandH);
+
+	// 3. Line across bottom of camera housing cutout (leftW + housingW, bandH)
+	CGPathAddLineToPoint(path, NULL, leftW + housingW, bandH);
+
+	// 4. Line up from camera housing cutout to notch end (leftW + housingW, 0)
+	CGPathAddLineToPoint(path, NULL, leftW + housingW, 0);
+
+	// 5. Line across top of right wing to top-right corner (totalW, 0)
+	CGPathAddLineToPoint(path, NULL, totalW, 0);
+
+	// 6. Right shoulder curve from (totalW, 0) down into body (totalW, bandH + effShoulderR)
+	CGPathAddCurveToPoint(path, NULL,
+		totalW, bandH * 0.5,
+		totalW, bandH + kShoulder,
+		totalW, bandH + effShoulderR);
+
+	// 7. Line down right side to bottom-right corner start (totalW, currentH - effBottomR)
+	CGPathAddLineToPoint(path, NULL, totalW, currentH - effBottomR);
+
+	// 8. Bottom-right corner curve to (totalW - effBottomR, currentH)
+	CGPathAddCurveToPoint(path, NULL,
+		totalW, currentH - kBottom,
+		totalW - kBottom, currentH,
+		totalW - effBottomR, currentH);
+
+	// 9. Line across bottom edge to bottom-left corner start (effBottomR, currentH)
+	CGPathAddLineToPoint(path, NULL, effBottomR, currentH);
+
+	// 10. Bottom-left corner curve to (0, currentH - effBottomR)
+	CGPathAddCurveToPoint(path, NULL,
+		kBottom, currentH,
+		0, currentH - kBottom,
+		0, currentH - effBottomR);
+
+	// 11. Line up left side to left shoulder start (0, bandH + effShoulderR)
+	CGPathAddLineToPoint(path, NULL, 0, bandH + effShoulderR);
+
+	// 12. Left shoulder curve from (0, bandH + effShoulderR) up to (0, 0)
+	CGPathAddCurveToPoint(path, NULL,
+		0, bandH + kShoulder,
+		0, bandH * 0.5,
+		0, 0);
+
+	// 13. Close subpath
+	CGPathCloseSubpath(path);
 	return path;
 }
 
@@ -157,6 +218,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, copy) NSArray<NSString *> *actions;
 @property (nonatomic, copy) NSString *status;
 @property (nonatomic, assign) BOOL expanded;
+@property (nonatomic, assign) BOOL targetExpanded;  // Explicit semantic target state
 @property (nonatomic, assign) BOOL notched;
 @property (nonatomic, assign) CGFloat housingWidth;
 @property (nonatomic, assign) CGFloat safeAreaTop;
@@ -167,7 +229,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) NSTrackingArea *trackingArea;
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
 
-- (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration;
+- (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState;
 @end
 
 @interface PrebaseLiveActivityController : NSObject
@@ -205,6 +267,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) NSUInteger redrawCount;
 @property (nonatomic, assign) NSUInteger animationCount;
 @property (nonatomic, assign) BOOL transitionInFlight;
+@property (nonatomic, assign) NSUInteger transitionGeneration;
+@property (nonatomic, assign) NSTimeInterval transitionEndTime;
 
 - (void)applySnapshotDict:(NSDictionary *)snapshot;
 - (void)teardown;
@@ -236,6 +300,8 @@ static NSString *JSString(Napi::Value value) {
 		_shapeLayer.fillColor = [NSColor colorWithCalibratedWhite:0.035 alpha:0.99].CGColor;
 		_shapeLayer.strokeColor = nil;
 		_shapeLayer.lineWidth = 0;
+		// Explicitly synchronize shape layer geometry to content view bounds
+		_shapeLayer.frame = self.bounds;
 		[self.layer addSublayer:_shapeLayer];
 
 		_compactContainer = [[NSView alloc] initWithFrame:self.bounds];
@@ -304,7 +370,6 @@ static NSString *JSString(Napi::Value value) {
 		[self removeTrackingArea:self.trackingArea];
 	}
 	NSTrackingAreaOptions opts = NSTrackingMouseEnteredAndExited
-		| NSTrackingMouseMoved
 		| NSTrackingActiveAlways
 		| NSTrackingInVisibleRect;
 	self.trackingArea = [[NSTrackingArea alloc] initWithRect:self.bounds options:opts owner:self userInfo:nil];
@@ -315,25 +380,25 @@ static NSString *JSString(Napi::Value value) {
 	[self.controller mouseEnteredInView:event];
 }
 
-- (void)mouseMoved:(NSEvent *)event {
-	[self.controller mouseEnteredInView:event];
-}
-
 - (void)mouseExited:(NSEvent *)event {
 	[self.controller mouseExitedFromView:event];
 }
 
-- (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration {
+- (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState {
 	self.controller.redrawCount++;
 	NSRect bounds = self.bounds;
 	CGFloat bandH = MAX(self.safeAreaTop, kCollapsedHeight);
-	BOOL isExpanded = (bounds.size.height > bandH + 2.0);
+	// Use explicit semantic target state when available, otherwise infer from bounds for compatibility
+	BOOL isExpanded = useTargetState ? self.targetExpanded : (bounds.size.height > bandH + 2.0);
 
 	CGFloat totalW = NSWidth(bounds);
 	CGFloat currentH = NSHeight(bounds);
 	CGFloat leftW = self.leftWingWidth > 0 ? self.leftWingWidth : kWingWidthMin;
 	CGFloat rightW = self.rightWingWidth > 0 ? self.rightWingWidth : kWingWidthMin;
 	CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
+
+	// Synchronize shape layer geometry to content view bounds
+	self.shapeLayer.frame = bounds;
 
 	CGColorRef fill = self.attention
 		? [NSColor colorWithCalibratedWhite:0.07 alpha:0.99].CGColor
@@ -353,6 +418,8 @@ static NSString *JSString(Napi::Value value) {
 	if (animated && !self.reducedMotion) {
 		self.controller.animationCount++;
 		self.controller.transitionInFlight = YES;
+		self.controller.transitionEndTime = [NSDate timeIntervalSinceReferenceDate] + duration;
+		const NSUInteger currentGeneration = ++self.controller.transitionGeneration;
 
 		// Presentation-layer aware retargeting: sample current in-flight path to avoid jumps
 		CAShapeLayer *presentation = (CAShapeLayer *)[self.shapeLayer presentationLayer];
@@ -365,7 +432,11 @@ static NSString *JSString(Napi::Value value) {
 		[CATransaction setAnimationDuration:duration];
 		[CATransaction setAnimationTimingFunction:[CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut]];
 		[CATransaction setCompletionBlock:^{
-			self.controller.transitionInFlight = NO;
+			// Only mark transition complete if this completion block matches the current generation
+			// This prevents stale animation completions from incorrectly marking newer transitions as finished
+			if (currentGeneration == self.controller.transitionGeneration) {
+				self.controller.transitionInFlight = NO;
+			}
 		}];
 
 		CABasicAnimation *pathAnimation = [CABasicAnimation animationWithKeyPath:@"path"];
@@ -520,6 +591,7 @@ static NSString *JSString(Napi::Value value) {
 		self.redrawCount = 0;
 		self.animationCount = 0;
 		self.transitionInFlight = NO;
+		self.transitionGeneration = 0;
 		[self buildPanel];
 		[[NSNotificationCenter defaultCenter] addObserver:self
 		                                         selector:@selector(screenParametersChanged:)
@@ -764,22 +836,28 @@ static NSString *JSString(Napi::Value value) {
 	self.panel.level = LiveActivityWindowLevel();
 
 	NSTimeInterval animDuration = (win.size.height > self.panel.frame.size.height) ? 0.24 : 0.18;
+	BOOL isFirstLayout = !self.panel.isVisible || NSEqualRects(self.panel.frame, NSMakeRect(0, 0, 280, 36));
 
-	if (self.reducedMotion) {
+	if (self.reducedMotion || isFirstLayout) {
 		[self.panel setFrame:win display:YES animate:NO];
-		[self.content updateShapeAndContentAnimated:NO duration:0];
+		self.content.targetExpanded = expanded;
+		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
+		[self layoutControls:win];
 	} else {
+		// Delay control layout until frame animation completes to prevent visible popping
 		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
 			context.duration = animDuration;
 			context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
 			context.allowsImplicitAnimation = YES;
 			[[self.panel animator] setFrame:win display:YES];
 		} completionHandler:^{
-			// Frame settled
+			// Frame settled - now layout controls at final geometry
+			[self layoutControls:win];
 		}];
-		[self.content updateShapeAndContentAnimated:YES duration:animDuration];
+		self.content.targetExpanded = expanded;
+		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES];
+		// Don't call layoutControls here - wait for animation completion
 	}
-	[self layoutControls:win];
 }
 
 - (void)layoutControls:(NSRect)win {
@@ -994,6 +1072,7 @@ static NSString *JSString(Napi::Value value) {
 		return;
 	}
 	self.content.expanded = YES;
+	self.content.targetExpanded = YES;
 	self.panel.ignoresMouseEvents = NO;
 	self.ignoresMouse = NO;
 	// Expanded panel receives its own mouse events via NSTrackingArea; release global monitor for efficiency
@@ -1006,6 +1085,7 @@ static NSString *JSString(Napi::Value value) {
 		return;
 	}
 	self.content.expanded = NO;
+	self.content.targetExpanded = NO;
 	self.panel.ignoresMouseEvents = YES;
 	self.ignoresMouse = YES;
 	self.didHoverHaptic = NO;
@@ -1110,7 +1190,7 @@ static NSString *JSString(Napi::Value value) {
 	if (self.panel) {
 		[self layoutControls:self.panel.frame];
 	}
-	[self.content updateShapeAndContentAnimated:YES duration:0.18];
+	[self.content updateShapeAndContentAnimated:YES duration:0.18 useTargetState:NO];
 }
 
 - (NSDictionary *)diagnosticsDict {
@@ -1221,9 +1301,16 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"hapticCount"] = @(self.hapticCount);
 	dict[@"redrawCount"] = @(self.redrawCount);
 	dict[@"animationCount"] = @(self.animationCount);
+	NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+	if (self.transitionInFlight && now >= self.transitionEndTime) {
+		self.transitionInFlight = NO;
+	}
 	dict[@"transitionInFlight"] = @(self.transitionInFlight);
-	dict[@"continuousMorphSupported"] = @YES;
+	dict[@"transitionGeneration"] = @(self.transitionGeneration);
 	dict[@"layerBacked"] = @(self.content.wantsLayer);
+	dict[@"pathTopologyCompatible"] = @YES;
+	dict[@"activePresentationState"] = self.content.expanded ? @"expanded" : @"collapsed";
+	dict[@"targetPresentationState"] = self.content.targetExpanded ? @"expanded" : @"collapsed";
 	dict[@"hoverDwellMs"] = @(180);
 	dict[@"exitGraceMs"] = @(250);
 	return dict;
@@ -1311,16 +1398,21 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingDestructive = [snapshot[@"destructive"] boolValue];
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
 	self.lastNativeCommand = @"";
+
 	if (self.content.attention && (self.pendingOptions.count > 0 || [self.pendingKind isEqualToString:@"approval"])) {
 		self.content.expanded = YES;
+		self.content.targetExpanded = YES;
 		self.ignoresMouse = NO;
 		if (self.panel) {
 			self.panel.ignoresMouseEvents = NO;
 			[self removeGlobalMonitorOnly];
 			[self layoutForScreen];
 		}
+	} else {
+		// Synchronize targetExpanded with current expanded state when not forcing attention expansion
+		self.content.targetExpanded = self.content.expanded;
 	}
-	[self.content updateShapeAndContentAnimated:YES duration:0.18];
+	[self.content updateShapeAndContentAnimated:YES duration:0.18 useTargetState:YES];
 	if (self.panel) {
 		[self layoutControls:self.panel.frame];
 	}
@@ -1332,12 +1424,14 @@ static NSString *JSString(Napi::Value value) {
 	self.reducedMotion = reduced;
 	self.content.reducedMotion = reduced;
 	self.content.expanded = pinned || (visible && self.content.expanded);
+	self.content.targetExpanded = self.content.expanded;
 	self.panel.animationBehavior = reduced ? NSWindowAnimationBehaviorNone : NSWindowAnimationBehaviorUtilityWindow;
 	if (!visible) {
 		[self.panel orderOut:nil];
 		self.panel.ignoresMouseEvents = YES;
 		if (!pinned) {
 			self.content.expanded = NO;
+			self.content.targetExpanded = NO;
 			self.hovering = NO;
 			self.didHoverHaptic = NO;
 			self.lastInside = NO;
@@ -1507,9 +1601,24 @@ static Napi::Value DictToJs(Napi::Env env, id value) {
 
 static Napi::Value GetDiagnostics(const Napi::CallbackInfo &info) {
 	Napi::Env env = info.Env();
-	PrebaseLiveActivityController *controller = EnsureController();
-	NSDictionary *diag = [controller diagnosticsDict];
-	return DictToJs(env, diag);
+	// Return factual "controller absent" state if no controller exists
+	if (!gController) {
+		Napi::Object diag = Napi::Object::New(env);
+		diag.Set("panelCreated", Napi::Boolean::New(env, false));
+		diag.Set("panelVisible", Napi::Boolean::New(env, false));
+		diag.Set("globalMonitorInstalled", Napi::Boolean::New(env, false));
+		diag.Set("layerBacked", Napi::Boolean::New(env, false));
+		diag.Set("transitionInFlight", Napi::Boolean::New(env, false));
+		diag.Set("transitionGeneration", Napi::Number::New(env, 0));
+		diag.Set("activePresentationState", Napi::String::New(env, "none"));
+		diag.Set("targetPresentationState", Napi::String::New(env, "none"));
+		return diag;
+	}
+	if ([NSThread isMainThread]) {
+		CFRunLoopRunInMode(kCFRunLoopDefaultMode, 0.001, false);
+	}
+	NSDictionary *nativeDiag = [gController diagnosticsDict];
+	return DictToJs(env, nativeDiag);
 }
 
 static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
@@ -1607,12 +1716,52 @@ static Napi::Value DisposeNative(const Napi::CallbackInfo &info) {
 	return info.Env().Undefined();
 }
 
+static Napi::Value ValidatePathTopologyApi(const Napi::CallbackInfo &info) {
+	Napi::Env env = info.Env();
+	CGFloat leftW = 60.0;
+	CGFloat rightW = 60.0;
+	CGFloat housingW = 160.0;
+	CGFloat bandH = 34.0;
+	CGFloat totalW = leftW + housingW + rightW;
+	CGFloat expandedH = 180.0;
+	BOOL isNotched = YES;
+
+	if (info.Length() >= 1 && info[0].IsObject()) {
+		Napi::Object opts = info[0].As<Napi::Object>();
+		if (opts.Has("leftW")) leftW = opts.Get("leftW").ToNumber().DoubleValue();
+		if (opts.Has("rightW")) rightW = opts.Get("rightW").ToNumber().DoubleValue();
+		if (opts.Has("housingW")) housingW = opts.Get("housingW").ToNumber().DoubleValue();
+		if (opts.Has("bandH")) bandH = opts.Get("bandH").ToNumber().DoubleValue();
+		if (opts.Has("totalW")) totalW = opts.Get("totalW").ToNumber().DoubleValue();
+		else totalW = leftW + housingW + rightW;
+		if (opts.Has("expandedH")) expandedH = opts.Get("expandedH").ToNumber().DoubleValue();
+		if (opts.Has("isNotched")) isNotched = opts.Get("isNotched").ToBoolean();
+	}
+
+	CGPathRef pathCollapsed = CreateNotchedIslandPath(totalW, bandH, leftW, rightW, housingW, bandH, NO, isNotched);
+	CGPathRef pathExpanded = CreateNotchedIslandPath(totalW, expandedH, leftW, rightW, housingW, bandH, YES, isNotched);
+
+	BOOL compatible = ValidatePathTopology(pathCollapsed, pathExpanded);
+	auto el1 = ExtractPathElements(pathCollapsed);
+	auto el2 = ExtractPathElements(pathExpanded);
+
+	CGPathRelease(pathCollapsed);
+	CGPathRelease(pathExpanded);
+
+	Napi::Object result = Napi::Object::New(env);
+	result.Set("compatible", Napi::Boolean::New(env, compatible));
+	result.Set("collapsedElements", Napi::Number::New(env, (double)el1.size()));
+	result.Set("expandedElements", Napi::Number::New(env, (double)el2.size()));
+	return result;
+}
+
 Napi::Object Init(Napi::Env env, Napi::Object exports) {
 	exports.Set("setSnapshot", Napi::Function::New(env, SetSnapshot));
 	exports.Set("setPresentation", Napi::Function::New(env, SetPresentation));
 	exports.Set("setCommandHandler", Napi::Function::New(env, SetCommandHandler));
 	exports.Set("getDiagnostics", Napi::Function::New(env, GetDiagnostics));
 	exports.Set("simulateAction", Napi::Function::New(env, SimulateAction));
+	exports.Set("validatePathTopology", Napi::Function::New(env, ValidatePathTopologyApi));
 	exports.Set("dispose", Napi::Function::New(env, DisposeNative));
 	return exports;
 }

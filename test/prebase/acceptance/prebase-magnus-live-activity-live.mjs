@@ -5,7 +5,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { execSync } from 'node:child_process';
-import { existsSync, mkdirSync, statSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, statSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
@@ -120,6 +120,28 @@ export function notchPlacementFailures(native) {
 	return failures;
 }
 
+function isPngValid(filePath) {
+	try {
+		const buf = readFileSync(filePath);
+		if (buf.length < 8) {
+			return false;
+		}
+		// Standard PNG magic bytes: \x89PNG\r\n\x1a\n (0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
+		return (
+			buf[0] === 0x89 &&
+			buf[1] === 0x50 &&
+			buf[2] === 0x4E &&
+			buf[3] === 0x47 &&
+			buf[4] === 0x0D &&
+			buf[5] === 0x0A &&
+			buf[6] === 0x1A &&
+			buf[7] === 0x0A
+		);
+	} catch {
+		return false;
+	}
+}
+
 function captureNativePanelScreenshot(panelFrame, screenFrame, outPath) {
 	if (!panelFrame || !screenFrame || process.platform !== 'darwin') {
 		return { captured: false, reason: 'unsupported platform or missing geometry' };
@@ -135,23 +157,31 @@ function captureNativePanelScreenshot(panelFrame, screenFrame, outPath) {
 		try {
 			execSync(`screencapture -x ${rectArg} "${outPath}"`, { timeout: 5000, stdio: 'pipe' });
 			const stat = statSync(outPath);
-			if (stat.size > 0) {
+			if (stat.size > 0 && isPngValid(outPath)) {
 				return {
 					captured: true,
+					format: 'png',
 					sizeBytes: stat.size,
 					rect: { x: captureX, y: captureY, width: captureW, height: captureH },
 					outPath,
 				};
 			}
-		} catch {
-			// Screencapture CLI is unavailable or blocked by macOS TCC permissions in background terminal;
-			// write verified AppKit panel geometry artifact.
-			writeFileSync(outPath, `<svg xmlns="http://www.w3.org/2000/svg" width="${captureW}" height="${captureH}"><rect width="100%" height="100%" fill="#0a0a0a"/><text x="20" y="40" fill="#fff" font-family="sans-serif" font-size="14">Magnus Live Activity Panel: ${panelFrame.width}x${panelFrame.height}</text></svg>\n`);
 			return {
-				captured: true,
-				fallback: 'svg-geometry-verified',
+				captured: false,
+				reason: 'invalid-png-magic-bytes',
 				rect: { x: captureX, y: captureY, width: captureW, height: captureH },
-				outPath,
+			};
+		} catch (captureErr) {
+			// Screencapture CLI is unavailable or blocked by macOS TCC permissions in background terminal;
+			// Write geometry artifact to .svg extension without faking .png format
+			const svgPath = outPath.replace(/\.png$/, '.svg');
+			writeFileSync(svgPath, `<svg xmlns="http://www.w3.org/2000/svg" width="${captureW}" height="${captureH}"><rect width="100%" height="100%" fill="#0a0a0a"/><text x="20" y="40" fill="#fff" font-family="sans-serif" font-size="14">Magnus Live Activity Panel: ${panelFrame.width}x${panelFrame.height}</text></svg>\n`);
+			return {
+				captured: false,
+				reason: 'screencapture-unavailable',
+				svgGeometryArtifact: svgPath,
+				error: captureErr instanceof Error ? captureErr.message : String(captureErr),
+				rect: { x: captureX, y: captureY, width: captureW, height: captureH },
 			};
 		}
 	} catch (err) {
