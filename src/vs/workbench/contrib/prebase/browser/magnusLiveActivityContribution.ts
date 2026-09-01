@@ -40,6 +40,7 @@ import {
 	buildMagnusLiveActivitySnapshot,
 	deriveMagnusTestStateFromInvocations,
 	isMagnusParticipantId,
+	LIVE_ACTIVITY_COMPLETED_HOLD_MS,
 	redactLiveActivityText,
 	selectPrimaryMagnusSession,
 	shouldShowLiveActivity,
@@ -271,6 +272,8 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	private _pinned = false;
 	private _screenLocked = false;
 	private _nativeConnected = false;
+	private _completionHoldUntil: number | undefined;
+	private _completionHidden = false;
 	private _lastSnapshot: MagnusLiveActivitySnapshot | undefined;
 	private readonly _modelListeners = this._register(new DisposableStore());
 	private readonly _push: RunOnceScheduler;
@@ -395,8 +398,19 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			screenLocked: this._screenLocked,
 			hideDetails: userHideDetails,
 		});
+		const prevStatus = this._lastSnapshot?.status;
 		this._lastSnapshot = snapshot;
-		const visible = shouldShowLiveActivity(this._mode(), snapshot);
+		const terminalStatus = snapshot.status === 'completed' || snapshot.status === 'failed';
+		if (terminalStatus && prevStatus !== snapshot.status) {
+			this._completionHoldUntil = Date.now() + LIVE_ACTIVITY_COMPLETED_HOLD_MS;
+			this._completionHidden = false;
+		} else if (!terminalStatus) {
+			this._completionHoldUntil = undefined;
+			this._completionHidden = false;
+		} else if (this._completionHoldUntil !== undefined && Date.now() >= this._completionHoldUntil && !this._pinned) {
+			this._completionHidden = true;
+		}
+		const visible = !this._completionHidden && shouldShowLiveActivity(this._mode(), snapshot);
 		MagnusLiveActivityContribution.diagnostics = {
 			backend: !isMacintosh || isWeb ? 'non-mac' : (this._nativeConnected ? 'native-appkit' : 'unavailable'),
 			revision: snapshot.revision,
@@ -433,6 +447,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		}
 		if (command.kind === 'pin') {
 			this._pinned = true;
+			this._completionHidden = false;
 			this._push.schedule();
 			return;
 		}

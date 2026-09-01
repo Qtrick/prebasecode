@@ -17,13 +17,19 @@ import {
 	isMagnusParticipantId,
 	selectPrimaryMagnusSession,
 	summarizeMagnusWorkspaceDiff,
+	LIVE_ACTIVITY_COMPLETED_HOLD_MS,
+	LIVE_ACTIVITY_EXPANDED_HEIGHT,
 	LIVE_ACTIVITY_EXIT_GRACE_MS,
 	LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS,
 	LIVE_ACTIVITY_MAX_ACTIONS,
 	LIVE_ACTIVITY_MAX_MESSAGE_CHARS,
+	LIVE_ACTIVITY_PILL_HEIGHT,
+	LIVE_ACTIVITY_PILL_WIDTH,
+	LIVE_ACTIVITY_WING_WIDTH,
 	redactLiveActivityText,
 	resolveLiveActivityPanelState,
 	shouldShowLiveActivity,
+	type LiveActivityGeometry,
 	type MagnusLiveActivitySessionInput,
 	type MagnusLiveActivitySnapshot,
 } from '../../../../../platform/prebaseLiveActivity/common/magnusLiveActivity.js';
@@ -48,6 +54,76 @@ function session(partial: Partial<MagnusLiveActivitySessionInput> = {}): MagnusL
 
 function readRepo(relativePath: string): string {
 	return readFileSync(resolve(relativePath), 'utf8');
+}
+
+interface LiveActivityScreenLayout {
+	readonly originX: number;
+	readonly originY: number;
+	readonly width: number;
+	readonly height: number;
+	readonly scaleFactor: number;
+	readonly safeAreaTop: number;
+	readonly auxLeftWidth: number;
+	readonly auxRightWidth: number;
+	readonly auxLeftHeight: number;
+	readonly auxRightHeight: number;
+}
+
+function layoutLiveActivityPanelFrame(screen: LiveActivityScreenLayout, expanded = false): {
+	readonly geo: LiveActivityGeometry;
+	readonly frame: { x: number; y: number; width: number; height: number };
+	readonly topY: number;
+	readonly collapsedBandTop: number;
+} {
+	const geo = deriveLiveActivityGeometry({
+		width: screen.width,
+		height: screen.height,
+		scaleFactor: screen.scaleFactor,
+		safeAreaTop: screen.safeAreaTop,
+		auxLeftWidth: screen.auxLeftWidth,
+		auxRightWidth: screen.auxRightWidth,
+		auxLeftHeight: screen.auxLeftHeight,
+		auxRightHeight: screen.auxRightHeight,
+	});
+	const topY = screen.originY + screen.height;
+	if (geo.notched) {
+		const bandH = geo.pill.height;
+		const height = expanded ? LIVE_ACTIVITY_EXPANDED_HEIGHT : bandH;
+		return {
+			geo,
+			topY,
+			collapsedBandTop: topY - bandH,
+			frame: {
+				x: screen.originX + geo.pill.x,
+				y: topY - height,
+				width: geo.pill.width,
+				height,
+			},
+		};
+	}
+	const width = expanded ? 320 : geo.pill.width;
+	const height = expanded ? LIVE_ACTIVITY_EXPANDED_HEIGHT : geo.pill.height;
+	return {
+		geo,
+		topY,
+		collapsedBandTop: topY - geo.pill.height,
+		frame: {
+			x: screen.originX + Math.round((screen.width - width) / 2),
+			y: topY - height,
+			width,
+			height,
+		},
+	};
+}
+
+function axisAlignedRectsIntersect(
+	a: { x: number; y: number; width: number; height: number },
+	b: { x: number; y: number; width: number; height: number },
+): boolean {
+	return a.x < b.x + b.width
+		&& a.x + a.width > b.x
+		&& a.y < b.y + b.height
+		&& a.y + a.height > b.y;
 }
 
 function mockRequest(parts: IChatProgressResponseContent[], id = 'req-1'): IChatRequestModel {
@@ -345,13 +421,16 @@ suite('Magnus Live Activity projection', () => {
 		assert.strictEqual(snap.pendingInteraction, undefined);
 	});
 
-	test('notched geometry does not use a hardcoded MacBook model and no-notch uses a center pill', () => {
+	test('notched geometry is top-anchored with housing derived from aux metrics', () => {
 		const notched = deriveLiveActivityGeometry({
 			width: 1512, height: 982, scaleFactor: 2,
 			safeAreaTop: 32, auxLeftWidth: 620, auxRightWidth: 620, auxLeftHeight: 32, auxRightHeight: 32,
 		});
 		assert.strictEqual(notched.notched, true);
-		assert.ok(notched.cameraHousingWidth > 24);
+		assert.strictEqual(notched.pill.y, 0, 'top anchor uses screen.frame.maxY (y=0 in screen-relative coords)');
+		assert.strictEqual(notched.pill.height, 32);
+		assert.strictEqual(notched.cameraHousingWidth, 272);
+		assert.strictEqual(notched.pill.width, 124 + 272 + 124);
 		assert.ok(notched.hit.width < 200, 'collapsed hit target must stay small');
 		const pill = deriveLiveActivityGeometry({
 			width: 1920, height: 1080, scaleFactor: 1,
@@ -361,6 +440,7 @@ suite('Magnus Live Activity projection', () => {
 		assert.strictEqual(pill.cameraHousingWidth, 0);
 		assert.strictEqual(pill.leftWing.width, 0);
 		assert.strictEqual(pill.rightWing.width, 0);
+		assert.strictEqual(pill.pill.y, 0, 'no-notch pill is flush with screen top');
 		assert.ok(pill.pill.width < 300, 'no-notch fallback must not invent a giant fake notch');
 		assert.ok(Math.abs(pill.pill.x - (1920 - pill.pill.width) / 2) < 1);
 	});
@@ -400,6 +480,14 @@ suite('Magnus Live Activity projection', () => {
 		assert.strictEqual(borderline.notched, false);
 		assert.strictEqual(borderline.cameraHousingWidth, 0);
 		assert.ok(Math.abs(borderline.pill.x - (1512 - borderline.pill.width) / 2) < 1);
+	});
+
+	test('overlapping aux widths do not invent a physical notch', () => {
+		const overlap = deriveLiveActivityGeometry({
+			width: 1000, height: 700, scaleFactor: 1,
+			safeAreaTop: 32, auxLeftWidth: 500, auxRightWidth: 500, auxLeftHeight: 32, auxRightHeight: 32,
+		});
+		assert.strictEqual(overlap.notched, false);
 	});
 
 	test('disconnected snapshot is labeled unavailable and rejects commands', () => {
@@ -643,6 +731,157 @@ suite('Magnus Live Activity projection', () => {
 			optionId: 'a',
 			revision: 3,
 		}), { ok: true });
+	});
+});
+
+suite('Magnus Live Activity notch alignment (P0)', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
+
+	const builtinNotched: LiveActivityScreenLayout = {
+		originX: 0,
+		originY: 0,
+		width: 1512,
+		height: 982,
+		scaleFactor: 2,
+		safeAreaTop: 32,
+		auxLeftWidth: 620,
+		auxRightWidth: 620,
+		auxLeftHeight: 32,
+		auxRightHeight: 32,
+	};
+
+	const externalRight: LiveActivityScreenLayout = {
+		originX: 1728,
+		originY: 0,
+		width: 1920,
+		height: 1080,
+		scaleFactor: 1,
+		safeAreaTop: 0,
+		auxLeftWidth: 0,
+		auxRightWidth: 0,
+		auxLeftHeight: 0,
+		auxRightHeight: 0,
+	};
+
+	const externalLeft: LiveActivityScreenLayout = {
+		originX: -1920,
+		originY: 0,
+		width: 1920,
+		height: 1080,
+		scaleFactor: 1,
+		safeAreaTop: 0,
+		auxLeftWidth: 0,
+		auxRightWidth: 0,
+		auxLeftHeight: 0,
+		auxRightHeight: 0,
+	};
+
+	test('collapsed panel top is flush with screen.frame.maxY, not a visibleFrame menu-bar gap', () => {
+		const collapsed = layoutLiveActivityPanelFrame(builtinNotched, false);
+		assert.strictEqual(collapsed.frame.y + collapsed.frame.height, collapsed.topY);
+		assert.strictEqual(collapsed.collapsedBandTop, collapsed.frame.y);
+		assert.notStrictEqual(collapsed.frame.y, collapsed.topY - collapsed.frame.height - 8, 'detached floating pill offset must not return');
+
+		const pill = layoutLiveActivityPanelFrame(externalRight, false);
+		assert.strictEqual(pill.frame.y + pill.frame.height, pill.topY);
+		assert.strictEqual(pill.topY, 1080);
+	});
+
+	test('notched wings bracket the housing and never overlap the camera exclusion band', () => {
+		const { geo, frame, topY } = layoutLiveActivityPanelFrame(builtinNotched, false);
+		const bandTop = topY - geo.pill.height;
+		const housing = {
+			x: builtinNotched.originX + builtinNotched.auxLeftWidth,
+			y: bandTop,
+			width: geo.cameraHousingWidth,
+			height: geo.pill.height,
+		};
+		const leftWing = {
+			x: builtinNotched.originX + geo.leftWing.x,
+			y: bandTop,
+			width: geo.leftWing.width,
+			height: geo.leftWing.height,
+		};
+		const rightWing = {
+			x: builtinNotched.originX + geo.rightWing.x,
+			y: bandTop,
+			width: geo.rightWing.width,
+			height: geo.rightWing.height,
+		};
+		assert.strictEqual(leftWing.x + leftWing.width, housing.x);
+		assert.strictEqual(rightWing.x, housing.x + housing.width);
+		assert.strictEqual(axisAlignedRectsIntersect(leftWing, housing), false);
+		assert.strictEqual(axisAlignedRectsIntersect(rightWing, housing), false);
+		assert.strictEqual(frame.width, LIVE_ACTIVITY_WING_WIDTH + geo.cameraHousingWidth + LIVE_ACTIVITY_WING_WIDTH);
+		assert.ok(frame.width < builtinNotched.width, 'collapsed width must be notch+wings, not full-screen pill');
+	});
+
+	test('expanded layout keeps the same top anchor and grows downward', () => {
+		const collapsed = layoutLiveActivityPanelFrame(builtinNotched, false);
+		const expanded = layoutLiveActivityPanelFrame(builtinNotched, true);
+		assert.strictEqual(expanded.frame.x, collapsed.frame.x);
+		assert.strictEqual(expanded.frame.width, collapsed.frame.width);
+		assert.strictEqual(expanded.frame.y + expanded.frame.height, collapsed.topY);
+		assert.strictEqual(expanded.frame.height, LIVE_ACTIVITY_EXPANDED_HEIGHT);
+		assert.ok(expanded.frame.height > collapsed.frame.height);
+		assert.strictEqual(expanded.frame.y, collapsed.topY - LIVE_ACTIVITY_EXPANDED_HEIGHT);
+		assert.strictEqual(expanded.collapsedBandTop, collapsed.collapsedBandTop);
+	});
+
+	test('notched vs no-notch fallback modes choose wings or a small center pill', () => {
+		const notched = layoutLiveActivityPanelFrame(builtinNotched, false);
+		assert.strictEqual(notched.geo.notched, true);
+		assert.strictEqual(notched.geo.leftWing.width, LIVE_ACTIVITY_WING_WIDTH);
+		assert.strictEqual(notched.geo.rightWing.width, LIVE_ACTIVITY_WING_WIDTH);
+
+		const pill = layoutLiveActivityPanelFrame(externalRight, false);
+		assert.strictEqual(pill.geo.notched, false);
+		assert.strictEqual(pill.geo.leftWing.width, 0);
+		assert.strictEqual(pill.frame.width, LIVE_ACTIVITY_PILL_WIDTH);
+		assert.strictEqual(pill.frame.height, LIVE_ACTIVITY_PILL_HEIGHT);
+		assert.ok(Math.abs(pill.frame.x - (externalRight.originX + (externalRight.width - LIVE_ACTIVITY_PILL_WIDTH) / 2)) < 1);
+	});
+
+	test('multi-display screen origins offset absolute panel frames without re-centering on primary', () => {
+		const primary = layoutLiveActivityPanelFrame(builtinNotched, false);
+		const right = layoutLiveActivityPanelFrame(externalRight, false);
+		const left = layoutLiveActivityPanelFrame(externalLeft, false);
+
+		assert.strictEqual(primary.frame.x, builtinNotched.originX + primary.geo.pill.x);
+		assert.strictEqual(primary.topY, 982);
+		assert.strictEqual(right.frame.x, 1728 + Math.round((1920 - LIVE_ACTIVITY_PILL_WIDTH) / 2));
+		assert.strictEqual(right.topY, 1080);
+		assert.strictEqual(left.frame.x, -1920 + Math.round((1920 - LIVE_ACTIVITY_PILL_WIDTH) / 2));
+		assert.strictEqual(left.topY, 1080);
+		assert.notStrictEqual(right.frame.x, primary.frame.x);
+		assert.notStrictEqual(left.frame.x, primary.frame.x);
+	});
+
+	test('completed status stays visible transiently and wins collapsed hover state', () => {
+		const completed = buildMagnusLiveActivitySnapshot(session({ isInProgress: false, completed: true }), {
+			revision: 1,
+			prebaseForeground: false,
+			connected: true,
+		});
+		assert.strictEqual(shouldShowLiveActivity('alwaysWorking', completed), true);
+		assert.strictEqual(shouldShowLiveActivity('background', completed), true);
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true,
+			hovering: false,
+			pinned: false,
+			snapshot: completed,
+			now: 0,
+		}), 'completedTransient');
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true,
+			hovering: true,
+			pinned: false,
+			snapshot: completed,
+			now: 500,
+			hoverSince: 0,
+		}), 'completedTransient');
+		assert.strictEqual(LIVE_ACTIVITY_COMPLETED_HOLD_MS, 8_000);
 	});
 });
 
@@ -1251,6 +1490,16 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.match(contribution, /reducedMotion,/);
 	});
 
+	test('live activity simulate command is smoke-driver gated at the workbench boundary', () => {
+		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
+		const simulateStart = contribution.indexOf('id: \'prebase.magnus.liveActivity.simulate\'');
+		assert.ok(simulateStart >= 0, 'must register simulate command');
+		const simulateEnd = contribution.indexOf('registerAction2(class extends Action2 {', simulateStart + 1);
+		const simulateBlock = contribution.slice(simulateStart, simulateEnd > simulateStart ? simulateEnd : contribution.length);
+		assert.match(simulateBlock, /requireSmokeTestDriver\(accessor\.get\(IWorkbenchEnvironmentService\)\.enableSmokeTestDriver, 'prebase\.magnus\.liveActivity\.simulate'\)/);
+		assert.ok(simulateBlock.indexOf('requireSmokeTestDriver') < simulateBlock.indexOf('simulateAction'), 'smoke guard must run before native simulateAction');
+	});
+
 	test('Open in PreBase focuses the host, opens Magnus, and unpins', () => {
 		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
 		const handle = contribution.slice(contribution.indexOf('private async _handleCommand'), contribution.indexOf('override dispose'));
@@ -1329,6 +1578,13 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.ok(loader.indexOf('if (!isMacintosh)') < loader.indexOf('createRequire'), 'Windows/Linux must not require the .node');
 
 		assert.match(main, /if \(!isMacintosh\) \{\s*return;\s*\}/);
+		assert.match(main, /enable-smoke-test-driver/);
+		const simulateStart = main.indexOf('async simulateAction');
+		const disposeStart = main.indexOf('async disposeNative');
+		assert.ok(simulateStart >= 0 && disposeStart > simulateStart, 'must locate simulateAction');
+		const simulate = main.slice(simulateStart, disposeStart);
+		assert.match(simulate, /if \(!this\.environmentMainService\.args\['enable-smoke-test-driver'\]\)/);
+		assert.ok(simulate.indexOf('enable-smoke-test-driver') < simulate.indexOf('this._native?.simulateAction'), 'simulateAction must be smoke-gated');
 		assert.match(main, /onWillShutdown\(e => \{\s*e\.join\('MagnusLiveActivityMainService', this\.disposeNative\(\)\)/);
 		assert.match(main, /this\._native\?\.dispose\(\)/);
 		assert.match(main, /this\._native = undefined/);
@@ -1417,7 +1673,7 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.match(native, /@"sessionResource": self\.sessionResource/);
 		assert.match(native, /@"revision": @\(self\.revision\)/);
 		assert.match(native, /animationBehavior = reduced \? NSWindowAnimationBehaviorNone/);
-		assert.match(native, /animate:!self\.reducedMotion/);
+		assert.match(native, /setFrame:win display:YES animate:NO/);
 		assert.doesNotMatch(native, /MacBook Pro|MacBookAir|14-inch|16-inch/);
 	});
 
@@ -1479,17 +1735,28 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		const target = native.slice(targetStart, layoutStart);
 		assert.match(target, /\[self\.displayMode isEqualToString:@"active"\]/);
 		assert.match(target, /\[NSEvent mouseLocation\]/);
-		assert.match(target, /safeAreaInsets\.top > 8/);
+		assert.match(target, /ScreenHasPhysicalNotch/);
+		assert.match(target, /IsBuiltinScreen\(screen\)/);
+		assert.match(native, /CGDisplayIsBuiltin/);
 		assert.match(target, /\[NSScreen mainScreen\]/);
 
 		const layout = native.slice(layoutStart, controlsStart);
 		assert.match(layout, /screen\.safeAreaInsets/);
 		assert.match(layout, /screen\.auxiliaryTopLeftArea/);
 		assert.match(layout, /screen\.auxiliaryTopRightArea/);
-		assert.match(layout, /insets\.top > 8 && auxLeft\.size\.width > 40 && auxRight\.size\.width > 40/);
+		assert.match(layout, /topY = NSMaxY\(frame\)/);
+		assert.match(layout, /topY - height/);
+		assert.match(layout, /hasShadow = !notched/);
+		assert.doesNotMatch(layout, /topY - h - 8/);
+		assert.doesNotMatch(layout, /NSMaxY\(frame\) - h - 8/);
+		assert.match(layout, /ScreenHasPhysicalNotch\(screen\)/);
+		assert.match(native, /NSMinX\(auxRight\) > NSMaxX\(auxLeft\)/);
 		assert.match(layout, /self\.content\.housingWidth = 0/);
 		assert.match(layout, /NSMidX\(frame\) - w \/ 2\.0/);
+		assert.match(layout, /LiveActivityWindowLevel/);
 		assert.doesNotMatch(layout, /MacBook Pro|MacBookAir|14-inch|16-inch/);
+		assert.match(native, /wingPathInRect/);
+		assert.match(native, /if \(self\.notched\)/);
 	});
 
 	test('non-mac stub exports unavailable and does not create a panel', () => {

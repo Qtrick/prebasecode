@@ -66,6 +66,7 @@ export function liveActivityLiveFailures(evidence) {
 		if (!frame || typeof frame.width !== 'number' || frame.width <= 0 || typeof frame.height !== 'number' || frame.height <= 0) {
 			failures.push('native NSPanel frame invalid or zero-sized');
 		}
+		failures.push(...notchPlacementFailures(evidence.nativeDiagnostics));
 	}
 	if (evidence.followUpSimulation && !evidence.followUpSimulation.ok) {
 		failures.push('native follow-up message simulation failed');
@@ -85,16 +86,51 @@ export function liveActivityLiveFailures(evidence) {
 	return failures;
 }
 
+/** Fail if a notched display panel is detached below the screen top or absurdly wide. */
+export function notchPlacementFailures(native) {
+	const failures = [];
+	if (!native?.notchDetected) {
+		return failures;
+	}
+	const pf = native.panelFrame;
+	const sf = native.screenFrame;
+	if (!pf || !sf) {
+		failures.push('notch geometry missing panelFrame or screenFrame');
+		return failures;
+	}
+	const topDelta = typeof native.topAnchorDelta === 'number'
+		? native.topAnchorDelta
+		: ((sf.y + sf.height) - (pf.y + pf.height));
+	if (Math.abs(topDelta) > 2) {
+		failures.push(`notch panel top anchor delta ${topDelta}px (expected <= 2)`);
+	}
+	if (topDelta > 4) {
+		failures.push('regression: detached floating pill below screen top');
+	}
+	if (pf.width > sf.width * 0.45) {
+		failures.push(`notch collapsed panel too wide (${pf.width}px on ${sf.width}px screen)`);
+	}
+	const notch = native.notchGeometry;
+	if (notch && typeof notch.centerX === 'number' && typeof pf.x === 'number' && typeof pf.width === 'number') {
+		const panelCenterX = pf.x + pf.width / 2;
+		if (Math.abs(panelCenterX - notch.centerX) > 24) {
+			failures.push(`notch panel center ${panelCenterX} misaligned to hardware center ${notch.centerX}`);
+		}
+	}
+	return failures;
+}
+
 function captureNativePanelScreenshot(panelFrame, screenFrame, outPath) {
 	if (!panelFrame || !screenFrame || process.platform !== 'darwin') {
 		return { captured: false, reason: 'unsupported platform or missing geometry' };
 	}
 	try {
 		const screenH = screenFrame.height || 1080;
-		const captureX = Math.max(0, Math.round(panelFrame.x));
-		const captureY = Math.max(0, Math.round(screenH - (panelFrame.y + panelFrame.height)));
-		const captureW = Math.max(10, Math.round(panelFrame.width));
-		const captureH = Math.max(10, Math.round(panelFrame.height));
+		const contextPadTop = 72;
+		const captureX = Math.max(0, Math.round(Math.min(panelFrame.x, screenFrame.x + screenFrame.width / 2 - 240)));
+		const captureY = Math.max(0, Math.round(screenH - (panelFrame.y + panelFrame.height + contextPadTop)));
+		const captureW = Math.max(10, Math.round(Math.min(screenFrame.width, Math.max(panelFrame.width + 80, 480))));
+		const captureH = Math.max(10, Math.round(panelFrame.height + contextPadTop));
 		const rectArg = `-R${captureX},${captureY},${captureW},${captureH}`;
 		execSync(`screencapture -x ${rectArg} "${outPath}"`, { timeout: 5000, stdio: 'pipe' });
 		const stat = statSync(outPath);

@@ -81,6 +81,15 @@ export const LIVE_ACTIVITY_POINTER_SAMPLE_MS = 50;
 export const LIVE_ACTIVITY_COMPLETED_HOLD_MS = 8_000;
 export const LIVE_ACTIVITY_MAX_ACTIONS = 4;
 export const LIVE_ACTIVITY_MAX_MESSAGE_CHARS = 160;
+/** Keep in sync with native/prebase-live-activity/src/live_activity.mm */
+export const LIVE_ACTIVITY_COLLAPSED_HEIGHT = 34;
+export const LIVE_ACTIVITY_WING_WIDTH = 124;
+export const LIVE_ACTIVITY_EXPANDED_HEIGHT = 200;
+export const LIVE_ACTIVITY_PILL_WIDTH = 228;
+export const LIVE_ACTIVITY_PILL_HEIGHT = 30;
+export const LIVE_ACTIVITY_NOTCH_MIN_SAFE_TOP = 8;
+export const LIVE_ACTIVITY_NOTCH_MIN_AUX_WIDTH = 40;
+export const LIVE_ACTIVITY_CAMERA_HOUSING_MIN = 24;
 
 export interface MagnusLiveActivitySessionInput {
 	readonly sessionId: string;
@@ -396,37 +405,41 @@ export function deriveLiveActivityGeometry(screen: LiveActivityScreenMetrics): L
 	const auxRight = Math.max(0, screen.auxRightWidth);
 	const auxLeftH = Math.max(0, screen.auxLeftHeight);
 	const auxRightH = Math.max(0, screen.auxRightHeight);
-	const notched = safeTop > 8 && auxLeft > 40 && auxRight > 40;
-	const collapsedH = 34 / scale;
+	const housingGap = width - auxLeft - auxRight;
+	const notched = safeTop > LIVE_ACTIVITY_NOTCH_MIN_SAFE_TOP
+		&& auxLeft > LIVE_ACTIVITY_NOTCH_MIN_AUX_WIDTH
+		&& auxRight > LIVE_ACTIVITY_NOTCH_MIN_AUX_WIDTH
+		&& housingGap >= LIVE_ACTIVITY_CAMERA_HOUSING_MIN;
+	const collapsedH = LIVE_ACTIVITY_COLLAPSED_HEIGHT / scale;
+	const wingW = LIVE_ACTIVITY_WING_WIDTH;
 	if (notched) {
-		const housingW = Math.max(24, width - auxLeft - auxRight);
-		const housingH = Math.max(safeTop, Math.max(auxLeftH, auxRightH, 34 / scale));
-		const leftX = Math.max(0, auxLeft - 124);
-		const leftW = 124;
+		const housingW = Math.max(LIVE_ACTIVITY_CAMERA_HOUSING_MIN, width - auxLeft - auxRight);
+		const bandH = Math.max(safeTop, collapsedH, auxLeftH, auxRightH);
+		const leftX = Math.max(0, auxLeft - wingW);
 		const rightX = auxLeft + housingW;
-		const rightW = 124;
 		const y = 0;
 		return {
 			notched: true,
 			cameraHousingWidth: housingW,
-			cameraHousingHeight: housingH,
-			leftWing: { x: leftX, y, width: leftW, height: Math.max(collapsedH, housingH) },
-			rightWing: { x: rightX, y, width: rightW, height: Math.max(collapsedH, housingH) },
-			pill: { x: leftX, y, width: leftW + housingW + rightW, height: Math.max(collapsedH, housingH) },
-			hit: { x: leftX, y, width: leftW - 8, height: Math.max(collapsedH, housingH) },
+			cameraHousingHeight: bandH,
+			leftWing: { x: leftX, y, width: wingW, height: bandH },
+			rightWing: { x: rightX, y, width: wingW, height: bandH },
+			pill: { x: leftX, y, width: wingW + housingW + wingW, height: bandH },
+			hit: { x: leftX, y, width: wingW - 8, height: bandH },
 		};
 	}
-	const pillW = 228;
-	const pillH = 30;
+	const pillW = LIVE_ACTIVITY_PILL_WIDTH;
+	const pillH = LIVE_ACTIVITY_PILL_HEIGHT / scale;
 	const x = Math.round((width - pillW) / 2);
+	const y = 0;
 	return {
 		notched: false,
 		cameraHousingWidth: 0,
 		cameraHousingHeight: 0,
 		leftWing: { x: 0, y: 0, width: 0, height: 0 },
 		rightWing: { x: 0, y: 0, width: 0, height: 0 },
-		pill: { x, y: 8, width: pillW, height: pillH },
-		hit: { x, y: 8, width: pillW, height: pillH },
+		pill: { x, y, width: pillW, height: pillH },
+		hit: { x, y, width: pillW, height: pillH },
 	};
 }
 

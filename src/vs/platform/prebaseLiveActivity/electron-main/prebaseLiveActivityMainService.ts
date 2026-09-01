@@ -10,6 +10,7 @@ import { join } from 'node:path';
 import { Emitter } from '../../../base/common/event.js';
 import { Disposable } from '../../../base/common/lifecycle.js';
 import { isMacintosh } from '../../../base/common/platform.js';
+import { IEnvironmentMainService } from '../../environment/electron-main/environmentMainService.js';
 import { ILifecycleMainService } from '../../lifecycle/electron-main/lifecycleMainService.js';
 import { ILogService } from '../../log/common/log.js';
 import type { LiveActivityCommand, MagnusLiveActivityDisplay, MagnusLiveActivitySnapshot } from '../common/magnusLiveActivity.js';
@@ -47,6 +48,7 @@ export class MagnusLiveActivityMainService extends Disposable implements IMagnus
 
 	constructor(
 		@ILogService private readonly logService: ILogService,
+		@IEnvironmentMainService private readonly environmentMainService: IEnvironmentMainService,
 		@ILifecycleMainService lifecycleMainService?: ILifecycleMainService,
 	) {
 		super();
@@ -101,6 +103,9 @@ export class MagnusLiveActivityMainService extends Disposable implements IMagnus
 	}
 
 	async simulateAction(action: string, extras?: unknown): Promise<boolean> {
+		if (!this.environmentMainService.args['enable-smoke-test-driver']) {
+			return false;
+		}
 		if (!this._native?.simulateAction) {
 			return false;
 		}

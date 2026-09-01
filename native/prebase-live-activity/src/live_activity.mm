@@ -1,5 +1,45 @@
 #include <napi.h>
 #import <AppKit/AppKit.h>
+#import <CoreGraphics/CoreGraphics.h>
+
+// Keep in sync with magnusLiveActivity.ts LIVE_ACTIVITY_* constants.
+static const CGFloat kCollapsedHeight = 34;
+static const CGFloat kWingWidth = 124;
+static const CGFloat kExpandedHeight = 200;
+static const CGFloat kPillWidth = 228;
+static const CGFloat kPillHeight = 30;
+static const CGFloat kNotchMinSafeTop = 8;
+static const CGFloat kNotchMinAuxWidth = 40;
+static const CGFloat kCameraHousingMin = 24;
+static const CGFloat kWingCornerRadius = 10;
+static const CGFloat kPillCornerRadius = 14;
+
+static NSInteger LiveActivityWindowLevel(void) {
+	// Borderless panels at normal status/menu levels are clamped below the notch band.
+	return CGWindowLevelForKey(kCGMaximumWindowLevelKey) - 1;
+}
+
+static BOOL IsBuiltinScreen(NSScreen *screen) {
+	NSNumber *screenNumber = screen.deviceDescription[@"NSScreenNumber"];
+	if (!screenNumber) {
+		return NO;
+	}
+	CGDirectDisplayID displayID = [screenNumber unsignedIntValue];
+	return CGDisplayIsBuiltin(displayID);
+}
+
+static BOOL ScreenHasPhysicalNotch(NSScreen *screen) {
+	if (!screen) {
+		return NO;
+	}
+	NSEdgeInsets insets = screen.safeAreaInsets;
+	NSRect auxLeft = screen.auxiliaryTopLeftArea;
+	NSRect auxRight = screen.auxiliaryTopRightArea;
+	return insets.top > kNotchMinSafeTop
+		&& auxLeft.size.width > kNotchMinAuxWidth
+		&& auxRight.size.width > kNotchMinAuxWidth
+		&& NSMinX(auxRight) > NSMaxX(auxLeft);
+}
 
 static Napi::ThreadSafeFunction gCommandTsfn;
 static bool gDisposed = false;
@@ -23,6 +63,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL expanded;
 @property (nonatomic, assign) BOOL notched;
 @property (nonatomic, assign) CGFloat housingWidth;
+@property (nonatomic, assign) CGFloat safeAreaTop;
 @property (nonatomic, assign) BOOL reducedMotion;
 @property (nonatomic, assign) BOOL attention;
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
@@ -53,6 +94,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) NSTimer *hoverTimer;
 @property (nonatomic, strong) NSTimer *exitTimer;
 @property (nonatomic, assign) NSRect collapsedHit;
+@property (nonatomic, assign) NSRect lastRequestedFrame;
 @property (nonatomic, copy) NSString *displayMode;
 @property (nonatomic, copy) NSString *lastNativeCommand;
 - (void)applySnapshotDict:(NSDictionary *)snapshot;
@@ -71,18 +113,61 @@ static NSString *JSString(Napi::Value value) {
 - (BOOL)isFlipped { return YES; }
 - (BOOL)acceptsFirstMouse:(NSEvent *)event { return YES; }
 
+- (NSBezierPath *)wingPathInRect:(NSRect)rect radius:(CGFloat)radius {
+	CGFloat minX = NSMinX(rect);
+	CGFloat maxX = NSMaxX(rect);
+	CGFloat minY = NSMinY(rect);
+	CGFloat maxY = NSMaxY(rect);
+	NSBezierPath *path = [NSBezierPath bezierPath];
+	[path moveToPoint:NSMakePoint(minX, minY)];
+	[path lineToPoint:NSMakePoint(maxX, minY)];
+	[path lineToPoint:NSMakePoint(maxX, maxY - radius)];
+	[path appendBezierPathWithArcFromPoint:NSMakePoint(maxX, maxY)
+	                               toPoint:NSMakePoint(maxX - radius, maxY)
+	                                radius:radius];
+	[path lineToPoint:NSMakePoint(minX + radius, maxY)];
+	[path appendBezierPathWithArcFromPoint:NSMakePoint(minX, maxY)
+	                               toPoint:NSMakePoint(minX, maxY - radius)
+	                                radius:radius];
+	[path closePath];
+	return path;
+}
+
 - (void)drawRect:(NSRect)dirtyRect {
 	NSRect bounds = self.bounds;
 	NSColor *fill = self.attention
 		? [NSColor colorWithCalibratedWhite:0.11 alpha:0.96]
 		: [NSColor colorWithCalibratedWhite:0.07 alpha:0.94];
-	NSColor *stroke = [NSColor colorWithCalibratedWhite:1.0 alpha:0.14];
-	NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds, 0.5, 0.5) xRadius:14 yRadius:14];
-	[fill setFill];
-	[path fill];
-	[stroke setStroke];
-	path.lineWidth = 1.0;
-	[path stroke];
+
+	if (self.notched) {
+		CGFloat bandH = MAX(self.safeAreaTop, kCollapsedHeight);
+		CGFloat wingH = self.expanded ? bandH : NSHeight(bounds);
+		NSRect leftWing = NSMakeRect(0, 0, kWingWidth, wingH);
+		NSRect rightWing = NSMakeRect(kWingWidth + self.housingWidth, 0, kWingWidth, wingH);
+		NSBezierPath *leftPath = [self wingPathInRect:leftWing radius:kWingCornerRadius];
+		NSBezierPath *rightPath = [self wingPathInRect:rightWing radius:kWingCornerRadius];
+		[fill setFill];
+		[leftPath fill];
+		[rightPath fill];
+		if (self.expanded && NSHeight(bounds) > bandH) {
+			NSRect body = NSMakeRect(0, bandH, NSWidth(bounds), NSHeight(bounds) - bandH);
+			NSBezierPath *bodyPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(body, 0.5, 0.5)
+			                                                         xRadius:kPillCornerRadius
+			                                                         yRadius:kPillCornerRadius];
+			[fill setFill];
+			[bodyPath fill];
+		}
+	} else {
+		NSColor *stroke = [NSColor colorWithCalibratedWhite:1.0 alpha:0.14];
+		NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds, 0.5, 0.5)
+		                                                     xRadius:kPillCornerRadius
+		                                                     yRadius:kPillCornerRadius];
+		[fill setFill];
+		[path fill];
+		[stroke setStroke];
+		path.lineWidth = 1.0;
+		[path stroke];
+	}
 
 	NSMutableDictionary *attrs = [@{
 		NSFontAttributeName: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
@@ -90,11 +175,26 @@ static NSString *JSString(Napi::Value value) {
 	} mutableCopy];
 	NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
 	NSSize size = [label sizeWithAttributes:attrs];
-	NSPoint origin = NSMakePoint(14, MAX(6, (NSHeight(bounds) - size.height) / 2.0));
+	CGFloat labelX = self.notched ? 14 : 14;
+	CGFloat maxLabelWidth = self.notched ? (kWingWidth - 20) : (NSWidth(bounds) - 28);
+	if (size.width > maxLabelWidth) {
+		label = [[label substringToIndex:MIN(label.length, 18)] stringByAppendingString:@"…"];
+		size = [label sizeWithAttributes:attrs];
+	}
+	NSPoint origin = NSMakePoint(labelX, MAX(6, (NSHeight(bounds) - size.height) / 2.0));
 	if (self.expanded) {
 		origin.y = 10;
 	}
 	[label drawAtPoint:origin withAttributes:attrs];
+
+	if (self.notched && !self.expanded && self.metricsLabel.length) {
+		attrs[NSFontAttributeName] = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
+		attrs[NSForegroundColorAttributeName] = [NSColor colorWithCalibratedWhite:0.72 alpha:1.0];
+		NSSize metricsSize = [self.metricsLabel sizeWithAttributes:attrs];
+		CGFloat metricsX = kWingWidth + self.housingWidth + MAX(8, kWingWidth - metricsSize.width - 8);
+		NSPoint metricsOrigin = NSMakePoint(metricsX, MAX(6, (NSHeight(bounds) - metricsSize.height) / 2.0));
+		[self.metricsLabel drawAtPoint:metricsOrigin withAttributes:attrs];
+	}
 
 	if (self.expanded && self.activityLabel.length) {
 		attrs[NSFontAttributeName] = [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
@@ -164,7 +264,8 @@ static NSString *JSString(Napi::Value value) {
 	self.panel.opaque = NO;
 	self.panel.backgroundColor = NSColor.clearColor;
 	self.panel.hasShadow = YES;
-	self.panel.level = NSStatusWindowLevel;
+	// Must sit above the menu-bar clamp so the surface can attach to the physical notch band.
+	self.panel.level = LiveActivityWindowLevel();
 	self.panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces
 		| NSWindowCollectionBehaviorFullScreenAuxiliary
 		| NSWindowCollectionBehaviorTransient
@@ -235,9 +336,17 @@ static NSString *JSString(Napi::Value value) {
 	}
 	NSScreen *builtin = nil;
 	for (NSScreen *screen in [NSScreen screens]) {
-		if (screen.safeAreaInsets.top > 8) {
+		if (IsBuiltinScreen(screen) && ScreenHasPhysicalNotch(screen)) {
 			builtin = screen;
 			break;
+		}
+	}
+	if (!builtin) {
+		for (NSScreen *screen in [NSScreen screens]) {
+			if (ScreenHasPhysicalNotch(screen)) {
+				builtin = screen;
+				break;
+			}
 		}
 	}
 	return builtin ?: [NSScreen mainScreen] ?: [NSScreen screens].firstObject;
@@ -252,32 +361,32 @@ static NSString *JSString(Napi::Value value) {
 	NSEdgeInsets insets = screen.safeAreaInsets;
 	NSRect auxLeft = screen.auxiliaryTopLeftArea;
 	NSRect auxRight = screen.auxiliaryTopRightArea;
-	BOOL notched = insets.top > 8 && auxLeft.size.width > 40 && auxRight.size.width > 40;
+	BOOL notched = ScreenHasPhysicalNotch(screen);
 	self.content.notched = notched;
-	CGFloat collapsedH = 34;
+	self.content.safeAreaTop = insets.top;
+	self.panel.hasShadow = !notched;
+	CGFloat topY = NSMaxY(frame);
+	BOOL expanded = self.content.expanded || self.pinned;
+	CGFloat bandH = MAX(insets.top, kCollapsedHeight);
 	NSRect win;
 	if (notched) {
-		CGFloat housing = MAX(24, NSMinX(auxRight) - NSMaxX(auxLeft));
+		CGFloat housing = MAX(kCameraHousingMin, NSMinX(auxRight) - NSMaxX(auxLeft));
 		self.content.housingWidth = housing;
-		CGFloat leftW = 124;
-		CGFloat rightW = 124;
-		CGFloat y = NSMaxY(frame) - MAX(insets.top, collapsedH) - 1;
-		CGFloat totalW = leftW + housing + rightW;
-		CGFloat winX = NSMaxX(auxLeft) - leftW;
-		if (self.content.expanded || self.pinned) {
-			win = NSMakeRect(winX, y - 168, totalW, 200);
-		} else {
-			win = NSMakeRect(winX, y, totalW, MAX(insets.top, collapsedH));
-		}
-		self.collapsedHit = NSMakeRect(winX, y, totalW, MAX(insets.top, collapsedH));
+		CGFloat totalW = kWingWidth + housing + kWingWidth;
+		CGFloat winX = NSMaxX(auxLeft) - kWingWidth;
+		CGFloat height = expanded ? kExpandedHeight : bandH;
+		win = NSMakeRect(winX, topY - height, totalW, height);
+		self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
 	} else {
 		self.content.housingWidth = 0;
-		CGFloat w = self.content.expanded || self.pinned ? 320 : 228;
-		CGFloat h = self.content.expanded || self.pinned ? 196 : 30;
-		win = NSMakeRect(NSMidX(frame) - w / 2.0, NSMaxY(frame) - h - 8, w, h);
+		CGFloat w = expanded ? 320 : kPillWidth;
+		CGFloat h = expanded ? kExpandedHeight : kPillHeight;
+		win = NSMakeRect(NSMidX(frame) - w / 2.0, topY - h, w, h);
 		self.collapsedHit = win;
 	}
-	[self.panel setFrame:win display:YES animate:!self.reducedMotion && self.panel.isVisible];
+	self.lastRequestedFrame = win;
+	self.panel.level = LiveActivityWindowLevel();
+	[self.panel setFrame:win display:YES animate:NO];
 	[self layoutControls:win];
 }
 
@@ -510,6 +619,13 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"panelCreated"] = @(self.panel != nil);
 	dict[@"panelVisible"] = @(self.panel != nil && self.panel.isVisible);
 	if (self.panel) {
+		NSRect rf = self.lastRequestedFrame;
+		dict[@"requestedFrame"] = @{
+			@"x": @(rf.origin.x),
+			@"y": @(rf.origin.y),
+			@"width": @(rf.size.width),
+			@"height": @(rf.size.height)
+		};
 		NSRect f = self.panel.frame;
 		dict[@"panelFrame"] = @{
 			@"x": @(f.origin.x),
@@ -522,6 +638,8 @@ static NSString *JSString(Napi::Value value) {
 	if (screen) {
 		NSRect sf = screen.frame;
 		NSEdgeInsets insets = screen.safeAreaInsets;
+		NSRect auxLeft = screen.auxiliaryTopLeftArea;
+		NSRect auxRight = screen.auxiliaryTopRightArea;
 		dict[@"screenFrame"] = @{
 			@"x": @(sf.origin.x),
 			@"y": @(sf.origin.y),
@@ -530,8 +648,41 @@ static NSString *JSString(Napi::Value value) {
 		};
 		dict[@"safeAreaTop"] = @(insets.top);
 		dict[@"screenLocalizedName"] = screen.localizedName ?: @"";
+		dict[@"auxiliaryTopLeftArea"] = @{
+			@"x": @(auxLeft.origin.x),
+			@"y": @(auxLeft.origin.y),
+			@"width": @(auxLeft.size.width),
+			@"height": @(auxLeft.size.height)
+		};
+		dict[@"auxiliaryTopRightArea"] = @{
+			@"x": @(auxRight.origin.x),
+			@"y": @(auxRight.origin.y),
+			@"width": @(auxRight.size.width),
+			@"height": @(auxRight.size.height)
+		};
+		if (self.content.notched) {
+			CGFloat housingW = MAX(kCameraHousingMin, NSMinX(auxRight) - NSMaxX(auxLeft));
+			CGFloat notchCenterX = NSMaxX(auxLeft) + housingW / 2.0;
+			dict[@"notchGeometry"] = @{
+				@"leadingX": @(NSMaxX(auxLeft)),
+				@"trailingX": @(NSMinX(auxRight)),
+				@"width": @(housingW),
+				@"centerX": @(notchCenterX),
+				@"height": @(MAX(insets.top, kCollapsedHeight))
+			};
+		}
+	}
+	if (self.panel) {
+		NSRect sf = screen ? screen.frame : NSZeroRect;
+		NSRect pf = self.panel.frame;
+		CGFloat screenTopY = NSMaxY(sf);
+		CGFloat panelTopY = NSMaxY(pf);
+		dict[@"panelTopY"] = @(panelTopY);
+		dict[@"screenTopY"] = @(screenTopY);
+		dict[@"topAnchorDelta"] = @(screenTopY - panelTopY);
 	}
 	dict[@"notchDetected"] = @(self.content.notched);
+	dict[@"panelLevel"] = @(self.panel.level);
 	dict[@"expanded"] = @(self.content.expanded);
 	dict[@"hovered"] = @(self.hovering);
 	dict[@"pinned"] = @(self.pinned);
@@ -597,7 +748,10 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateSubmitFollowUp:(NSString *)text {
-	self.input.stringValue = text ?: @"";
+	if (!text.length) {
+		return NO;
+	}
+	self.input.stringValue = text;
 	[self submitFollowUp:self.input];
 	return YES;
 }

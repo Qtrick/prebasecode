@@ -24,6 +24,8 @@ if (platform === 'darwin' && !nativePresent) {
 	failures.push('native AppKit module missing; run npm run compile:live-activity');
 }
 
+const magnusCommon = readFileSync(join(repo, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'), 'utf8');
+const mainService = readFileSync(join(repo, 'src/vs/platform/prebaseLiveActivity/electron-main/prebaseLiveActivityMainService.ts'), 'utf8');
 const contributionPath = join(repo, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
 const sessionPath = join(repo, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts');
 const contribution = readFileSync(contributionPath, 'utf8') + readFileSync(sessionPath, 'utf8');
@@ -62,6 +64,24 @@ const native = readFileSync(join(repo, 'native/prebase-live-activity/src/live_ac
 if (!native.includes('safeAreaInsets') || !native.includes('auxiliaryTopLeftArea')) {
 	failures.push('native geometry must use NSScreen safeAreaInsets and auxiliary areas');
 }
+if (!native.includes('LiveActivityWindowLevel') && !native.includes('kCGMaximumWindowLevelKey')) {
+	failures.push('native panel must use elevated window level to escape menu-bar clamp');
+}
+if (!native.includes('ScreenHasPhysicalNotch') || !native.includes('NSMinX(auxRight) > NSMaxX(auxLeft)')) {
+	failures.push('native notch detection must require a real auxiliary gap between left and right areas');
+}
+if (!native.includes('CGDisplayIsBuiltin')) {
+	failures.push('builtin display selection must prefer CGDisplayIsBuiltin notched screen');
+}
+if (!native.includes('topY - height') && !native.includes('topY - bandH')) {
+	failures.push('native layout must top-anchor at screen.frame.maxY and grow downward');
+}
+if (!native.includes('wingPathInRect') || !native.includes('self.notched')) {
+	failures.push('native drawRect must branch notch wings vs pill capsule');
+}
+if (!native.includes('hasShadow = !notched')) {
+	failures.push('native notch mode must disable floating shadow');
+}
 if (!native.includes('removeMonitors') || !native.includes('event.keyCode != 53')) {
 	failures.push('native Escape/unpin and monitor teardown missing');
 }
@@ -73,6 +93,25 @@ if (!native.includes('pendingOptions') || !native.includes('answerOption:')) {
 }
 if (!native.includes('metricsLabel')) {
 	failures.push('native metricsLabel serialization missing');
+}
+if (!magnusCommon.includes('LIVE_ACTIVITY_COMPLETED_HOLD_MS')) {
+	failures.push('completed hold constant missing from magnusLiveActivity.ts');
+}
+if (!/LIVE_ACTIVITY_COMPLETED_HOLD_MS\s*=\s*8_000/.test(magnusCommon)) {
+	failures.push('completed hold must remain 8s for transient finished state');
+}
+if (!mainService.includes('enable-smoke-test-driver')) {
+	failures.push('simulateAction must be gated behind enable-smoke-test-driver in main service');
+}
+if (!/async simulateAction[\s\S]*enable-smoke-test-driver[\s\S]*return false/.test(mainService)) {
+	failures.push('simulateAction must fail closed when smoke test driver is disabled');
+}
+const contributionSource = readFileSync(contributionPath, 'utf8');
+if (!contributionSource.includes('requireSmokeTestDriver') || !contributionSource.includes('prebase.magnus.liveActivity.simulate')) {
+	failures.push('workbench simulate command must require smoke test driver');
+}
+if (/topY - h - 8|NSMaxY\(frame\) - h - 8|pill: \{ x, y: 8/.test(native + magnusCommon)) {
+	failures.push('detached floating pill below menu bar must not return (no top offset gap)');
 }
 
 const evidence = {
