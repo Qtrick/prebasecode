@@ -4,11 +4,23 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { classifyHosts, lsofSelectionArgs, privacyFailures } from './prebase-privacy-runtime.mjs';
-import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER_METRICS_NAME, themesA11yFailures } from './prebase-core-ide-live.mjs';
+import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER_METRICS_NAME, themesA11yFailures, selectedNodeWorldDragProven, labelDensityProven } from './prebase-core-ide-live.mjs';
+import {
+	nodeHitHasWorldCoords,
+	worldDragProven,
+	worldInvarianceProven,
+	rotationProven,
+	selectionRotationLockProven,
+	shiftPanProven,
+	semanticZoomLodProven,
+	labelDensityDynamicProven,
+	pointerCaptureOnCanvasProven,
+	startupOnboardingProven,
+} from './codeGraphProof.mjs';
 import { ACTIVE_SOAK_FINAL_MIN_DURATION_MS, activeSoakEvidenceTarget, activeSoakFailures } from './prebase-active-soak.mjs';
 import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
-import { findGraphFrame, formatPhase3LockBlockMessage, recoverHungWorkbenchPage, waitForWorkbenchDriver, workbenchCommandWithTimeout, classifyProcessRole, redactCommandLine } from './workbenchHarness.mjs';
+import { findGraphFrame, formatPhase3LockBlockMessage, recoverHungWorkbenchPage, waitForWorkbenchDriver, workbenchCommandWithTimeout, classifyProcessRole, redactCommandLine, p2OfflineOnboardingProven } from './workbenchHarness.mjs';
 import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
 import { liveActivityLiveFailures } from './prebase-magnus-live-activity-live.mjs';
@@ -101,6 +113,13 @@ function passingCodeGraph(overrides = {}) {
 		legacyRadialNormalized: true,
 		rotate: true,
 		drag: true,
+		worldDrag: true,
+		unselectedDragRotated: true,
+		unselectedWorldInvariant: true,
+		backgroundDragRotated: true,
+		unselectedNodeSelectedFromDrag: false,
+		shiftPan: true,
+		pointerCaptureOnCanvas: true,
 		idleRotateArmed: true,
 		semanticZoom: true,
 		pick: true,
@@ -719,6 +738,109 @@ test('code graph fails when legacy radial normalization or semantic zoom or labe
 	assert.ok(f3.some(item => /N9 dynamic label density/.test(item)));
 });
 
+test('code graph interaction proofs fail closed on missing world drag, shift pan, and camera rotation evidence', () => {
+	const failures = codeGraphFailures({
+		codeGraph: passingCodeGraph({
+			drag: false,
+			worldDrag: false,
+			unselectedDragRotated: false,
+			unselectedWorldInvariant: false,
+			backgroundDragRotated: false,
+			shiftPan: false,
+			unselectedNodeSelectedFromDrag: true,
+		}),
+	});
+	assert.ok(failures.some(item => /N4 node drag/.test(item)));
+	assert.ok(failures.some(item => /unselected node drag did not rotate/.test(item)));
+	assert.ok(failures.some(item => /background drag did not rotate/.test(item)));
+	assert.ok(failures.some(item => /shift pan/.test(item)));
+	assert.ok(failures.some(item => /unselected node drag must not select/.test(item)));
+	assert.ok(failures.some(item => /world XYZ position was not invariant/.test(item)));
+});
+
+test('selected node world drag and semantic zoom helpers reject fallback-to-zero proofs', () => {
+	assert.equal(selectedNodeWorldDragProven({ id: 'a', worldX: 0, worldY: 0, worldZ: 0 }, { id: 'a', worldX: 0.2, worldY: 0.1, worldZ: 0 }), false);
+	assert.equal(selectedNodeWorldDragProven({ id: 'a', worldX: 0, worldY: 0, worldZ: 0 }, { id: 'a', worldX: 2, worldY: 0, worldZ: 0 }), true);
+	assert.ok(semanticZoomLodProven({ transform: { k: 1 }, lodTier: 'high' }, { transform: { k: 1.3 }, lodTier: 'medium' }, { transform: { k: 1.05 }, lodTier: 'medium' }));
+	assert.equal(semanticZoomLodProven({ transform: { k: 1 } }, { transform: { k: 1 } }, { transform: { k: 1 } }), false);
+	assert.equal(labelDensityProven({ labelCount: 12 }, { labelCount: 6 }), true);
+	assert.equal(labelDensityProven({ labelCount: 4 }, { labelCount: 4 }), false);
+});
+
+test('P2 offline onboarding cannot pass on workbench presence alone', () => {
+	const harness = readFileSync(join(acceptanceDir, 'workbenchHarness.mjs'), 'utf8');
+	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
+	assert.match(harness, /offlinePromptSeen/);
+	assert.match(harness, /export function p2OfflineOnboardingProven/);
+	assert.match(harness, /completeOnboardingWelcomeFlow/);
+	assert.match(live, /completeOnboardingWelcomeFlow/);
+	assert.match(live, /onboardingFlow\.onboardingCompleted/);
+	assert.doesNotMatch(live, /offlineDismissed \|\| await launched\.page\.evaluate\(\(\) => document\.querySelector\('\.monaco-workbench'\)/);
+	assert.equal(p2OfflineOnboardingProven({ offlineDismissed: true, offlinePromptSeen: true }), true);
+	assert.equal(p2OfflineOnboardingProven({ offlineDismissed: false, offlinePromptSeen: false }), true);
+	assert.equal(p2OfflineOnboardingProven({ offlineDismissed: false, offlinePromptSeen: true }), false);
+});
+
+test('Campaign XII proof helpers reject screen-only drag and yaw-only rotation', () => {
+	const worldHitBefore = { id: 'a', x: 100, y: 120, worldX: 10, worldY: 5, worldZ: 2 };
+	const worldHitAfter = { id: 'a', x: 140, y: 150, worldX: 24, worldY: 11, worldZ: 2.5 };
+	assert.ok(worldDragProven(worldHitBefore, worldHitAfter));
+
+	const screenOnlyAfter = { id: 'a', x: 140, y: 150, worldX: 10, worldY: 5, worldZ: 2 };
+	assert.equal(worldDragProven(worldHitBefore, screenOnlyAfter), false, 'screen delta without world delta must fail');
+
+	assert.ok(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.2, pitch: 0.35 }));
+	assert.equal(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.2, pitch: 0.2 }), false, 'yaw-only rotation must fail');
+
+	assert.ok(selectionRotationLockProven(true, { yaw: 0.4, pitch: 0.2 }, { yaw: 0.41, pitch: 0.19 }));
+	assert.equal(selectionRotationLockProven(true, { yaw: 0.4, pitch: 0.2 }, { yaw: 0.41, pitch: 0.5 }), false, 'pitch drift must fail selection lock');
+
+	assert.ok(shiftPanProven({ x: 10, y: 20 }, { x: 40, y: 20 }));
+	assert.ok(semanticZoomLodProven({ transform: { k: 1 }, lodTier: 'high' }, { transform: { k: 1.3 }, lodTier: 'medium' }, { transform: { k: 1.05 }, lodTier: 'medium' }));
+	assert.ok(labelDensityDynamicProven({ labelCount: 12 }, { labelCount: 6 }));
+	assert.equal(labelDensityDynamicProven({ labelCount: 4 }, { labelCount: 4 }), false, 'unchanged label count must fail dynamic density proof');
+	assert.ok(pointerCaptureOnCanvasProven('netCanvas'));
+	assert.equal(pointerCaptureOnCanvasProven('document'), false);
+	assert.ok(worldInvarianceProven({ id: 'b', worldX: 1, worldY: 2, worldZ: 3 }, { id: 'b', worldX: 1, worldY: 2, worldZ: 3 }));
+	assert.equal(worldInvarianceProven({ id: 'b', worldX: 1, worldY: 2, worldZ: 3 }, { id: 'b', x: 1, y: 2 }), false);
+});
+
+test('codeGraphFailures fails closed on Campaign XII shift pan and drag rotation fields', () => {
+	const failures = codeGraphFailures({
+		codeGraph: passingCodeGraph({
+			shiftPan: false,
+			unselectedDragRotated: false,
+			backgroundDragRotated: false,
+		}),
+	});
+	assert.ok(failures.some(item => /shift pan/.test(item)));
+	assert.ok(failures.some(item => /unselected node drag did not rotate/.test(item)));
+	assert.ok(failures.some(item => /background drag did not rotate/.test(item)));
+});
+
+test('core-ide live must prove world drag, pitch rotation, shift pan, and strict semantic zoom when Campaign XII lands', () => {
+	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
+	const campaignMarkers = [
+		/worldDragProven|worldX|worldY|worldZ/,
+		/pitchBefore|pitchAfter|rotation\?\.pitch/,
+		/shiftPan|transformBeforePan|transformAfterPan/,
+		/semanticZoomLodProven|zoomMetrics1|lodTier/,
+		/labelDensityDynamicProven|zoomMetrics2/,
+		/pointerCaptureOnCanvas|hasPointerCapture\(.*netCanvas/,
+	];
+	const matched = campaignMarkers.filter(pattern => pattern.test(live)).length;
+	assert.ok(matched >= 3, `core-ide live should wire at least 3 Campaign XII proof markers (matched ${matched}/6)`);
+});
+
+test('dismissStartup reports onboarding visibility and dismissal for harness consumers', () => {
+	const source = readFileSync(join(acceptanceDir, 'workbenchHarness.mjs'), 'utf8');
+	const body = exportedSource(source, 'dismissStartup');
+	assert.match(body, /return \{ trustDismissed, offlineDismissed/);
+	assert.match(body, /onboardingDismissed/);
+	assert.match(body, /onboardingVisible/);
+	assert.ok(startupOnboardingProven({ trustDismissed: false, offlineDismissed: true, onboardingDismissed: true, onboardingVisible: false }));
+});
+
 test('code graph fails when any of the two-stage drag fields fail closed', () => {
 	const f1 = codeGraphFailures({ codeGraph: passingCodeGraph({ unselectedNodeDragRotatedCamera: false }) });
 	assert.ok(f1.some(item => /N11 unselected node drag must rotate camera/.test(item)));
@@ -787,6 +909,10 @@ test('core-ide live proves layouts via Maps data-network-layout chips and metric
 	assert.match(live, /layoutModes: Boolean\(organicMode === 'organic' && sphereMode === 'sphere' && constellationMode === 'constellation' && clusteredMode === 'clustered'\)/);
 	assert.match(live, /legacyRadialNormalized: Boolean\(legacyRadialNormalized\)/);
 	assert.match(live, /sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered'/);
+	assert.match(live, /worldDragProven\(hitBeforeDrag, hitAfterDrag\)/);
+	assert.match(live, /semanticZoomLodProven\(zoomMetrics1, zoomMetrics2, metrics\)/);
+	assert.match(live, /labelDensityDynamicProven\(zoomMetrics2, metrics\)/);
+	assert.match(live, /pointerCaptureOnCanvas,/);
 	assert.match(live, /screenshot\(\{ path: join\(screenshotDir, 'code-graph-live\.png'\), timeout: 5_000 \}\)\.catch\(\(\) => undefined\)/);
 	assert.match(live, /nodesDrawnFromMetrics/);
 	assert.match(live, /waitForTimeout\(1_800\)/);
@@ -1500,6 +1626,9 @@ test('Temporal canvas screenshots disable animations so idle RAF cannot flake st
 	assert.match(live, /animations: 'disabled'/);
 	assert.match(live, /evidence\.fullMap = fullMap/);
 	assert.match(live, /evidence\.focusChanges = focusChanges/);
+	assert.match(live, /moduleCount: paths\.length/);
+	assert.match(live, /expectedHeadFileCount: paths\.length - 1/);
+	assert.match(live, /large fixture module seed count is not 336/);
 });
 
 test('idle soak sleeps on the Node clock and surfaces CDP abort as a failure', () => {

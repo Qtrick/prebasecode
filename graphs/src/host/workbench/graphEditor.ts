@@ -2784,12 +2784,20 @@ function drawTemporalFrame(ts) {
 	for (let ni = 0; ni < nodesToRender.length; ni++) {
 		visibleNodeIdSet.add(nodesToRender[ni].entityId);
 	}
+	const representedGuideIdSet = new Set();
+	for (let pi = 0; pi < temporalProjection.items.length; pi++) {
+		const guideId = temporalProjection.items[pi].guideId;
+		if (guideId) {
+			representedGuideIdSet.add(guideId);
+		}
+	}
 	const labelLayout = computeTemporalLabelLayout(nodesToRender, temporalDiff.guides || [], transform.k, {
 		selectedNodeId: selectedNodeId,
 		hoveredNodeId: hoveredNodeId,
 		filterQuery: filterVal,
 		measureWidth: function (t, f) { return measureTextWidth(t, f); },
 		visibleNodeIds: visibleNodeIdSet,
+		representedGuideIds: representedGuideIdSet,
 	});
 	const visibleLabels = labelLayout.nodeLabels;
 	const guideLabels = labelLayout.guideLabels;
@@ -3285,20 +3293,23 @@ function drawNetworkFrame() {
 			metrics.networkIdleAutoRotate = Boolean(settings.networkIdleAutoRotate);
 			metrics.rotation = { yaw: rotation.yaw, pitch: rotation.pitch };
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
+			metrics.interactionState = interactionState;
 			metrics.nodeHits = [];
 			for (let hi = 0; hi < nodes.length && metrics.nodeHits.length < 16; hi++) {
 				const hitNode = nodes[hi];
 				const hitPos = projected[hitNode.id];
-				if (!hitPos) continue;
 				const world = base3d[hitNode.id] || null;
+				if (!hitPos) continue;
 				metrics.nodeHits.push({
 					id: hitNode.id,
 					x: hitPos.x * transform.k + transform.x,
 					y: hitPos.y * transform.k + transform.y,
-					worldX: world ? world.x : undefined,
-					worldY: world ? world.y : undefined,
-					worldZ: world ? world.z : undefined,
-					world: world ? { x: world.x, y: world.y, z: world.z } : undefined,
+					worldX: world && Number.isFinite(world.x) ? world.x : Number.NaN,
+					worldY: world && Number.isFinite(world.y) ? world.y : Number.NaN,
+					worldZ: world && Number.isFinite(world.z) ? world.z : Number.NaN,
+					world: world && Number.isFinite(world.x) && Number.isFinite(world.y) && Number.isFinite(world.z)
+						? { x: world.x, y: world.y, z: world.z }
+						: undefined,
 				});
 			}
 			metrics.lodTier = transform.k < 0.3 ? 'low' : (transform.k < 0.8 ? 'medium' : 'high');
@@ -3612,6 +3623,13 @@ function onPointerDown(e, host) {
 		// (window edges, overlays, other editors); released in onPointerUp.
 		if (typeof host.setPointerCapture === 'function') {
 			try { host.setPointerCapture(e.pointerId); } catch (err) { /* stale/invalid pointer id */ }
+		}
+		if (typeof window !== 'undefined' && window.__prebaseRecordRenderMetrics) {
+			try {
+				const metrics = window.__prebaseGraphRenderMetrics || (window.__prebaseGraphRenderMetrics = {});
+				metrics.pointerCaptureHost = host.id || '';
+				metrics.pointerCaptureActive = typeof host.hasPointerCapture === 'function' && host.hasPointerCapture(e.pointerId);
+			} catch {}
 		}
 		host.classList.add('dragging');
 	}
