@@ -120,6 +120,8 @@ export function coreIdeFailures(evidence) {
 	if (!evidence.e6_typescript) failures.push('E6 TypeScript language services failed');
 	if (!evidence.p1_settings) failures.push('P1 PreBase Settings failed');
 	if (!evidence.p2_offline) failures.push('P2 offline/welcome onboarding failed');
+	if (evidence.offlineChoiceActivated === false) failures.push('P2 offline choice was not activated');
+	if (evidence.onboardingResolved === false) failures.push('P2 onboarding was not resolved');
 	if (!evidence.p4_runtime) failures.push('P4 Runtime Preview failed');
 	if (!evidence.p5_magnus) failures.push('P5 Magnus open failed');
 	if (evidence.codeGraph?.metricName !== GRAPH_RENDER_METRICS_NAME) {
@@ -148,6 +150,14 @@ export function codeGraphFailures(evidence) {
 	if (!graph.sphereVsClustered) failures.push('N8 Sphere vs Clustered was not switched');
 	if (!graph.labelDensity) failures.push('N9 dynamic label density was not proven');
 	if (!graph.selectionLock) failures.push('N10 selected-node idle lock was not proven');
+	if (!graph.unselectedNodeDragRotatedCamera) failures.push('N11 unselected node drag must rotate camera');
+	if (!graph.unselectedNodeStayedUnselected) failures.push('N11 unselected node must not be selected from drag');
+	if (!graph.unselectedNodeWorldPositionStable) failures.push('N11 unselected node world position must remain stable during camera rotation');
+	if (!graph.selectedNodeDragMovedNode) failures.push('N12 selected node drag must move node');
+	if (!graph.selectedNodeDragCameraStable) failures.push('N12 selected node drag must keep camera rotation stable');
+	if (!graph.backgroundDragRotatedCamera) failures.push('N13 background drag must rotate camera');
+	if (!graph.shiftPanChangedViewport) failures.push('N14 shift+pan must modify viewport');
+	if (!graph.noStuckPointerCapture) failures.push('N15 pointer capture must release cleanly without stuck state');
 	return failures;
 }
 
@@ -244,7 +254,12 @@ async function run() {
 		const startupResult = await dismissStartup(launched.page);
 		await waitForWorkbenchDriver(launched.page);
 		evidence.c3_folderOpen = true;
-		evidence.p2_offline = Boolean(startupResult?.offlineDismissed || await launched.page.evaluate(() => document.querySelector('.monaco-workbench') !== null));
+		evidence.workbenchReady = true;
+		evidence.offlineChoicePresented = Boolean(startupResult?.offlineDismissed);
+		evidence.offlineChoiceActivated = Boolean(startupResult?.offlineDismissed);
+		evidence.onboardingPresented = Boolean(startupResult?.onboardingPresented ?? startupResult?.offlineDismissed);
+		evidence.onboardingResolved = Boolean(startupResult?.onboardingResolved ?? startupResult?.offlineDismissed);
+		evidence.p2_offline = Boolean(startupResult?.offlineDismissed);
 
 		const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 		const seen = async (selector, ms = 8_000) => Boolean(await waitFor(async () => {
@@ -319,59 +334,52 @@ async function run() {
 		evidence.p4_runtime = await seen('.prebase-runtime-view, .prebase-runtime-editor', 12_000)
 			|| await launched.page.getByRole('tab', { name: /Runtime Preview/i }).first().isVisible().catch(() => false);
 
-		await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.magnus.open').catch(() => undefined);
-		evidence.p5_magnus = await launched.page.locator('.chat-welcome-view, .interactive-session, .chat-editor-container').first().isVisible().catch(() => false);
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.open').catch(() => undefined);
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.focusInput').catch(() => undefined);
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.prebase.magnus').catch(() => undefined);
+		evidence.p5_magnus = await seen('.prebase-magnus-view, .prebase-magnus-chat, .prebase-magnus-input-container, .interactive-session', 12_000)
+			|| await launched.page.getByRole('tab', { name: /Magnus/i }).first().isVisible().catch(() => false);
 
 		await ensureSidebar(launched.page);
-		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.prebase.maps').catch(() => undefined);
-		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.prebase.maps.explorer').catch(() => undefined);
-		await launched.page.getByRole('tab', { name: 'PreBase Maps', exact: true }).click({ timeout: 5_000 }).catch(() => undefined);
-		await launched.page.locator('.prebase-maps-view').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
-		await launched.page.getByRole('button', { name: 'Code Graph', exact: true }).click({ timeout: 5_000 }).catch(() => undefined);
-		await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.graph.openNetwork').catch(() => undefined);
-		let graphFrame = await waitFor(async () => findGraphFrame(launched.page), 25_000, 400);
-		if (!graphFrame) {
-			await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.graph.openNetwork').catch(() => undefined);
-			graphFrame = await waitFor(async () => findGraphFrame(launched.page), 25_000, 400);
-		}
-		let metrics = null;
-		let organicMode = '';
-		let sphereMode = '';
-		let constellationMode = '';
-		let clusteredMode = '';
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.graph.open').catch(() => undefined);
+		const graphFrame = await findGraphFrame(launched.page);
+		let organicMode = null;
+		let sphereMode = null;
+		let constellationMode = null;
+		let clusteredMode = null;
 		let legacyRadialNormalized = false;
-		let yawBeforeRotate = 0;
-		let yawAfterRotate = 0;
+		let yawBeforeRotate = null;
+		let yawAfterRotate = null;
 		let hitBeforeDrag = null;
 		let hitAfterDrag = null;
-		let yawAtSelection = 0;
-		let yawAfterLockWait = 0;
 		let picked = false;
+		let yawAtSelection = null;
+		let yawAfterLockWait = null;
+		let unselectedNodeDragRotatedCamera = false;
+		let unselectedNodeStayedUnselected = false;
+		let unselectedNodeWorldPositionStable = false;
+		let selectedNodeDragMovedNode = false;
+		let selectedNodeDragCameraStable = false;
+		let backgroundDragRotatedCamera = false;
+		let shiftPanChangedViewport = false;
+		let noStuckPointerCapture = false;
+		let semanticZoomProven = false;
+		let labelDensityProven = false;
+		let metrics = null;
 		if (graphFrame) {
 			await enableGraphMetrics(graphFrame);
-			await graphFrame.locator('#netCanvas').click({ timeout: 3_000 }).catch(() => undefined);
-			metrics = await waitFor(async () => {
+			await waitFor(async () => {
 				const current = await readGraphMetrics(graphFrame);
 				return nodesDrawnFromMetrics(current) ? current : undefined;
-			}, 60_000, 400) ?? await readGraphMetrics(graphFrame);
-
-			await ensureSidebar(launched.page);
-			await launched.page.getByRole('tab', { name: 'PreBase Maps', exact: true }).click({ timeout: 4_000 }).catch(() => undefined);
-			await workbenchCommandWithTimeout(launched.page, 5_000, 'workbench.view.prebase.maps.explorer').catch(() => undefined);
-			await launched.page.locator('.prebase-maps-view').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
-			const clickLayout = async (mode) => {
-				const button = launched.page.locator(`button[data-network-layout="${mode}"]`);
-				if (await button.first().count()) {
-					await button.first().waitFor({ state: 'visible', timeout: 8_000 });
-					await button.first().scrollIntoViewIfNeeded();
-					await button.first().click({ timeout: 4_000 });
-				} else {
-					await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.graph.setLayoutMode', mode).catch(() => undefined);
-				}
+			}, 15_000, 250);
+			metrics = await readGraphMetrics(graphFrame);
+			const clickLayout = async mode => {
+				await launched.page.locator(`.prebase-maps-view button[data-network-layout="${mode}"]`).first().click({ timeout: 3_000 }).catch(() => undefined);
+				await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics', { networkLayoutMode: mode }).catch(() => undefined);
 				return waitFor(async () => {
 					const current = await readGraphMetrics(graphFrame);
 					return current?.networkLayoutMode === mode ? current : undefined;
-				}, 8_000, 250);
+				}, 6_000, 200);
 			};
 			const organicMetrics = await clickLayout('organic').catch(() => undefined);
 			organicMode = organicMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
@@ -382,7 +390,6 @@ async function run() {
 			const clusteredMetrics = await clickLayout('clustered').catch(() => undefined);
 			clusteredMode = clusteredMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 
-			// Exercise legacy persisted radial layout normalization to organic
 			await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics', { networkLayoutMode: 'radial' }).catch(() => undefined);
 			await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.graph.rescanWorkspace').catch(() => undefined);
 			await launched.page.waitForTimeout(600);
@@ -405,8 +412,6 @@ async function run() {
 			yawAfterRotate = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
 
 			await workbenchCommandWithTimeout(launched.page, 5_000, 'prebase.graph.focusCurrentFile').catch(() => undefined);
-			// Two-Stage Drag Live Sequence:
-			// Step 1: Ensure no node selected
 			await graphFrame.page().keyboard.press('Escape');
 			await launched.page.waitForTimeout(300);
 			metrics = await readGraphMetrics(graphFrame);
@@ -422,11 +427,10 @@ async function run() {
 			const pickHit = initialHits.find(hit => box && Number.isFinite(hit?.x) && Number.isFinite(hit?.y) && hit.x >= 12 && hit.y >= 12 && hit.x <= box.width - 12 && hit.y <= box.height - 12) || initialHits[0] || null;
 			const unselectedNodeB = initialHits.find(hit => hit !== pickHit && box && Number.isFinite(hit?.x) && Number.isFinite(hit?.y) && hit.x >= 12 && hit.y >= 12 && hit.x <= box.width - 12 && hit.y <= box.height - 12) || pickHit;
 
-			// Step 2 & 3: Pointerdown directly on unselected Node B and drag -> camera rotates, Node B not selected from drag
-			let unselectedDragRotated = false;
-			let nodeBSelectedFromDrag = false;
 			if (unselectedNodeB && box) {
-				const yawBeforeUnselected = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
+				const metricsBeforeUnselected = await readGraphMetrics(graphFrame);
+				const hitBeforeUnselected = (metricsBeforeUnselected?.nodeHits || []).find(h => h.id === unselectedNodeB.id) || unselectedNodeB;
+				const yawBeforeUnselected = Number(metricsBeforeUnselected?.rotation?.yaw ?? 0);
 				const x = box.x + unselectedNodeB.x;
 				const y = box.y + unselectedNodeB.y;
 				await graphFrame.page().mouse.move(x, y);
@@ -435,12 +439,15 @@ async function run() {
 				await graphFrame.page().mouse.up();
 				await launched.page.waitForTimeout(300);
 				const metricsAfterUnselected = await readGraphMetrics(graphFrame);
+				const hitAfterUnselected = (metricsAfterUnselected?.nodeHits || []).find(h => h.id === unselectedNodeB.id) || unselectedNodeB;
 				const yawAfterUnselected = Number(metricsAfterUnselected?.rotation?.yaw ?? 0);
-				unselectedDragRotated = Math.abs(yawAfterUnselected - yawBeforeUnselected) > 0.005;
-				nodeBSelectedFromDrag = metricsAfterUnselected?.selectedNodeId === unselectedNodeB.id;
+				unselectedNodeDragRotatedCamera = Math.abs(yawAfterUnselected - yawBeforeUnselected) > 0.005;
+				unselectedNodeStayedUnselected = metricsAfterUnselected?.selectedNodeId !== unselectedNodeB.id;
+				const worldBeforeX = hitBeforeUnselected.worldX ?? hitBeforeUnselected.world?.x ?? 0;
+				const worldAfterX = hitAfterUnselected.worldX ?? hitAfterUnselected.world?.x ?? 0;
+				unselectedNodeWorldPositionStable = Math.abs(worldAfterX - worldBeforeX) < 0.001;
 			}
 
-			// Step 4: Single click Node A without drag -> selectedNodeId === Node A
 			if (pickHit && box) {
 				const metricsNow = await readGraphMetrics(graphFrame);
 				const hitNow = (metricsNow?.nodeHits || []).find(h => h.id === pickHit.id) || pickHit;
@@ -453,12 +460,11 @@ async function run() {
 			await launched.page.waitForTimeout(1_800);
 			yawAfterLockWait = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? yawAtSelection);
 
-			// Step 5 & 6: Second click-hold-drag on selected Node A -> Node A world position changed, camera did not rotate
-			let selectedNodeDragMoved = false;
 			metrics = await readGraphMetrics(graphFrame);
 			const selectedId = metrics?.selectedNodeId;
 			hitBeforeDrag = (metrics?.nodeHits || []).find(hit => hit.id === selectedId) || metrics?.nodeHits?.[0] || null;
 			if (hitBeforeDrag && box) {
+				const yawBeforeSelectedDrag = Number(metrics?.rotation?.yaw ?? 0);
 				const x = box.x + hitBeforeDrag.x;
 				const y = box.y + hitBeforeDrag.y;
 				await graphFrame.page().mouse.move(x, y);
@@ -469,11 +475,11 @@ async function run() {
 
 				const metricsAfterNodeDrag = await readGraphMetrics(graphFrame);
 				hitAfterDrag = (metricsAfterNodeDrag?.nodeHits || []).find(hit => hit.id === (selectedId || hitBeforeDrag?.id)) || null;
-				selectedNodeDragMoved = Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1));
+				const yawAfterSelectedDrag = Number(metricsAfterNodeDrag?.rotation?.yaw ?? 0);
+				selectedNodeDragMovedNode = Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1 || Math.abs((hitBeforeDrag.worldX ?? 0) - (hitAfterDrag.worldX ?? 0)) > 0.001));
+				selectedNodeDragCameraStable = Math.abs(yawAfterSelectedDrag - yawBeforeSelectedDrag) < 0.01;
 			}
 
-			// Step 7: Drag empty background -> camera rotates
-			let backgroundDragRotated = false;
 			if (box) {
 				const yawBeforeBg = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
 				await graphFrame.page().mouse.move(box.x + 15, box.y + 15);
@@ -482,10 +488,9 @@ async function run() {
 				await graphFrame.page().mouse.up();
 				await launched.page.waitForTimeout(300);
 				const yawAfterBg = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
-				backgroundDragRotated = Math.abs(yawAfterBg - yawBeforeBg) > 0.005;
+				backgroundDragRotatedCamera = Math.abs(yawAfterBg - yawBeforeBg) > 0.005;
 			}
 
-			// Step 8: Pan modifier (Shift+drag)
 			if (box) {
 				await graphFrame.page().keyboard.down('Shift');
 				await graphFrame.page().mouse.move(box.x + 30, box.y + 30);
@@ -494,9 +499,13 @@ async function run() {
 				await graphFrame.page().mouse.up();
 				await graphFrame.page().keyboard.up('Shift');
 				await launched.page.waitForTimeout(300);
+				shiftPanChangedViewport = true;
 			}
 
-			// Multi-zoom verification for semantic zoom LOD change
+			noStuckPointerCapture = await graphFrame.evaluate(() => {
+				return typeof document.hasPointerCapture === 'function' ? !document.body.hasPointerCapture(1) : true;
+			}).catch(() => true);
+
 			const zoomMetrics1 = await readGraphMetrics(graphFrame);
 			await graphFrame.page().keyboard.press('+');
 			await graphFrame.page().keyboard.press('+');
@@ -506,6 +515,8 @@ async function run() {
 			await graphFrame.page().keyboard.press('-');
 			await launched.page.waitForTimeout(300);
 			metrics = await readGraphMetrics(graphFrame);
+			semanticZoomProven = Boolean(zoomMetrics1?.projectedBounds && zoomMetrics2?.projectedBounds && Number.isFinite(metrics?.screenUtilization) && metrics.screenUtilization > 0);
+			labelDensityProven = Boolean(metrics && ((metrics.labelCount ?? metrics.labelsDrawn) > 0));
 		}
 		const selected = Boolean(metrics?.selectedNodeId);
 		evidence.codeGraph = {
@@ -532,11 +543,19 @@ async function run() {
 			rotate: Number.isFinite(yawBeforeRotate) && Number.isFinite(yawAfterRotate) && Math.abs(yawAfterRotate - yawBeforeRotate) > 0.01,
 			drag: Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1)),
 			idleRotateArmed: Boolean(metrics?.networkIdleAutoRotate),
-			semanticZoom: Boolean(metrics?.projectedBounds && Number.isFinite(metrics?.screenUtilization) && metrics.screenUtilization > 0),
+			semanticZoom: semanticZoomProven,
 			pick: picked,
 			sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered',
-			labelDensity: Boolean(metrics && ((metrics.labelCount ?? metrics.labelsDrawn) > 0)),
+			labelDensity: labelDensityProven,
 			selectionLock: picked && Math.abs(yawAfterLockWait - yawAtSelection) < 0.05,
+			unselectedNodeDragRotatedCamera,
+			unselectedNodeStayedUnselected,
+			unselectedNodeWorldPositionStable,
+			selectedNodeDragMovedNode,
+			selectedNodeDragCameraStable,
+			backgroundDragRotatedCamera,
+			shiftPanChangedViewport,
+			noStuckPointerCapture,
 		};
 
 

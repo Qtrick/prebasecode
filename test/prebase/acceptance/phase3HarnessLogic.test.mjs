@@ -107,6 +107,14 @@ function passingCodeGraph(overrides = {}) {
 		sphereVsClustered: true,
 		labelDensity: true,
 		selectionLock: true,
+		unselectedNodeDragRotatedCamera: true,
+		unselectedNodeStayedUnselected: true,
+		unselectedNodeWorldPositionStable: true,
+		selectedNodeDragMovedNode: true,
+		selectedNodeDragCameraStable: true,
+		backgroundDragRotatedCamera: true,
+		shiftPanChangedViewport: true,
+		noStuckPointerCapture: true,
 		...overrides,
 	};
 }
@@ -123,6 +131,8 @@ function passingCore(overrides = {}) {
 		e6_typescript: true,
 		p1_settings: true,
 		p2_offline: true,
+		offlineChoiceActivated: true,
+		onboardingResolved: true,
 		p4_runtime: true,
 		p5_magnus: true,
 		codeGraph: passingCodeGraph(),
@@ -709,6 +719,32 @@ test('code graph fails when legacy radial normalization or semantic zoom or labe
 	assert.ok(f3.some(item => /N9 dynamic label density/.test(item)));
 });
 
+test('code graph fails when any of the two-stage drag fields fail closed', () => {
+	const f1 = codeGraphFailures({ codeGraph: passingCodeGraph({ unselectedNodeDragRotatedCamera: false }) });
+	assert.ok(f1.some(item => /N11 unselected node drag must rotate camera/.test(item)));
+
+	const f2 = codeGraphFailures({ codeGraph: passingCodeGraph({ unselectedNodeStayedUnselected: false }) });
+	assert.ok(f2.some(item => /N11 unselected node must not be selected from drag/.test(item)));
+
+	const f3 = codeGraphFailures({ codeGraph: passingCodeGraph({ unselectedNodeWorldPositionStable: false }) });
+	assert.ok(f3.some(item => /N11 unselected node world position must remain stable/.test(item)));
+
+	const f4 = codeGraphFailures({ codeGraph: passingCodeGraph({ selectedNodeDragMovedNode: false }) });
+	assert.ok(f4.some(item => /N12 selected node drag must move node/.test(item)));
+
+	const f5 = codeGraphFailures({ codeGraph: passingCodeGraph({ selectedNodeDragCameraStable: false }) });
+	assert.ok(f5.some(item => /N12 selected node drag must keep camera rotation stable/.test(item)));
+
+	const f6 = codeGraphFailures({ codeGraph: passingCodeGraph({ backgroundDragRotatedCamera: false }) });
+	assert.ok(f6.some(item => /N13 background drag must rotate camera/.test(item)));
+
+	const f7 = codeGraphFailures({ codeGraph: passingCodeGraph({ shiftPanChangedViewport: false }) });
+	assert.ok(f7.some(item => /N14 shift\+pan must modify viewport/.test(item)));
+
+	const f8 = codeGraphFailures({ codeGraph: passingCodeGraph({ noStuckPointerCapture: false }) });
+	assert.ok(f8.some(item => /N15 pointer capture must release cleanly/.test(item)));
+});
+
 test('core IDE fails when e5_debug, e6_typescript, or p2_offline is missing', () => {
 	assert.deepEqual(coreIdeFailures(passingCore()), []);
 	const debugFail = coreIdeFailures(passingCore({ e5_debug: false }));
@@ -719,6 +755,12 @@ test('core IDE fails when e5_debug, e6_typescript, or p2_offline is missing', ()
 
 	const offlineFail = coreIdeFailures(passingCore({ p2_offline: false }));
 	assert.ok(offlineFail.some(item => /P2 offline/.test(item)));
+
+	const offlineChoiceFail = coreIdeFailures(passingCore({ offlineChoiceActivated: false }));
+	assert.ok(offlineChoiceFail.some(item => /P2 offline choice was not activated/.test(item)));
+
+	const onboardingFail = coreIdeFailures(passingCore({ onboardingResolved: false }));
+	assert.ok(onboardingFail.some(item => /P2 onboarding was not resolved/.test(item)));
 });
 
 test('code graph screenshot is not a substitute for render metrics', () => {
