@@ -186,6 +186,9 @@ export interface TemporalLayoutMetrics {
 	readonly screenUtilization: number;
 	readonly edgeCrossingCount: number;
 	readonly dependencyDirectionRatio: number;
+	readonly guideOverlapCount?: number;
+	readonly guideOverlapRatio?: number;
+	readonly maxGuideOverlapRatio?: number;
 	readonly medianDisplacement?: number;
 	readonly p95Displacement?: number;
 	readonly maxDisplacement?: number;

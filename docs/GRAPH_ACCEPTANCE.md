@@ -23,12 +23,12 @@ Settings registration lives under `graphs/` (`registerPreBaseGraphConfiguration`
 | N1 | Open Code Graph | Maps → Code Graph | 3D graph visible | Needs Verification | — |
 | N2 | Layout modes | organic, sphere, constellation, clustered (4 active modes; legacy "radial" normalized to "organic") | Deterministic relayout; mode persists in session | Needs Verification | — |
 | N3 | Rotate | Drag on background / orbit controls | Camera rotates; no stuck pointer | Needs Verification | — |
-| N4 | Node drag | Drag node | Position updates; `networkDragDirection` respected | Needs Verification | — |
+| N4 | Two-stage node drag | Drag unselected node/canvas orbits camera; single click selects; drag on selected node moves node along configured `networkDragDirection` plane | Two-stage drag respected; selected node moves smoothly without camera rotation; unselected node drag rotates camera without selection or displacement | Needs Verification | — |
 | N5 | Idle auto-rotate | Wait with `networkIdleAutoRotate` enabled | Idle rotation when configured | Needs Verification | — |
-| N6 | Physics settings | Adjust force/link/charge in settings | Simulation behavior changes | Needs Verification | — |
+| N6 | Active Code Graph settings | Adjust `networkLayoutMode`, `networkDragDirection`, `networkIdleAutoRotate` in PreBase Settings | Settings take effect deterministically across workbench sessions | Needs Verification | — |
 | N7 | Pick hit test | Click small node while zoomed out | Node picked (see unit tests `architecturePick`) | Needs Verification | — |
 | N8 | Layout mode distinctness | Switch between organic, sphere, constellation, clustered | Distinct structural projections; legacy persisted "radial" cleanly maps to organic | Needs Verification | Unit coverage across 4 active layouts + normalization tests |
-| N9 | Node spacing and settings | Change node spacing and link length; rotate and zoom active layout | Spacing increases node separation; settings take effect deterministically | Needs Verification | Deterministic unit coverage; GUI screen-space inspection |
+| N9 | Settings integration & visual LOD | Adjust theme, fit padding, or zoom level | Node/label LOD and canvas styling adapt smoothly; settings persist | Needs Verification | Deterministic unit coverage; GUI screen-space inspection |
 | N10 | Selected-node idle lock | Enable idle rotation, select node, close popup, drag, wait, then deselect | Camera stays fixed for the entire selection; manual drag works; only deselection resumes after idle delay | Needs Verification | Webview lifecycle tests; GUI timing evidence required |
 
 ## Preserved Architecture assets

@@ -41,14 +41,19 @@ export async function waitFor(predicate, timeoutMs = 45_000, intervalMs = 200) {
 }
 
 export async function dismissStartup(page) {
+	let trustDismissed = false;
+	let offlineDismissed = false;
 	const trust = page.getByRole('button', { name: /Yes, I trust the authors/i });
 	if (await trust.waitFor({ state: 'visible', timeout: 4_000 }).then(() => true, () => false)) {
 		await trust.click();
+		trustDismissed = true;
 	}
 	const offline = page.getByRole('button', { name: 'Continue Offline', exact: true });
 	if (await offline.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
 		await offline.click();
+		offlineDismissed = true;
 	}
+	return { trustDismissed, offlineDismissed };
 }
 
 export async function quitPreBase(pid) {

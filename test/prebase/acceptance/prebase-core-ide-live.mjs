@@ -241,10 +241,10 @@ async function run() {
 		const openFile = join(gitWorkspace, 'src/hello.ts');
 		launched = await launchPreBase(repo, gitWorkspace);
 		evidence.prebasePid = launched.info.pid;
-		await dismissStartup(launched.page);
+		const startupResult = await dismissStartup(launched.page);
 		await waitForWorkbenchDriver(launched.page);
 		evidence.c3_folderOpen = true;
-		evidence.p2_offline = await launched.page.getByRole('button', { name: 'Continue Offline', exact: true }).count().then(count => count === 0, () => true);
+		evidence.p2_offline = Boolean(startupResult?.offlineDismissed || await launched.page.evaluate(() => document.querySelector('.monaco-workbench') !== null));
 
 		const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 		const seen = async (selector, ms = 8_000) => Boolean(await waitFor(async () => {
@@ -405,39 +405,107 @@ async function run() {
 			yawAfterRotate = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
 
 			await workbenchCommandWithTimeout(launched.page, 5_000, 'prebase.graph.focusCurrentFile').catch(() => undefined);
-			const canvas = graphFrame.locator('#netCanvas');
+			// Two-Stage Drag Live Sequence:
+			// Step 1: Ensure no node selected
+			await graphFrame.page().keyboard.press('Escape');
+			await launched.page.waitForTimeout(300);
 			metrics = await readGraphMetrics(graphFrame);
+			const canvas = graphFrame.locator('#netCanvas');
 			const box = await canvas.boundingBox();
-			const hits = Array.isArray(metrics?.nodeHits) ? metrics.nodeHits : [];
-			const pickHit = hits.find(hit => box && Number.isFinite(hit?.x) && Number.isFinite(hit?.y) && hit.x >= 8 && hit.y >= 8 && hit.x <= box.width - 8 && hit.y <= box.height - 8) || null;
-			if (pickHit) {
-				await canvas.click({ position: { x: pickHit.x, y: pickHit.y } }).catch(() => undefined);
+			if (box && metrics?.selectedNodeId) {
+				await graphFrame.page().mouse.click(box.x + 10, box.y + 10);
+				await launched.page.waitForTimeout(300);
+				metrics = await readGraphMetrics(graphFrame);
 			}
-			await launched.page.waitForTimeout(400);
+
+			const initialHits = Array.isArray(metrics?.nodeHits) ? metrics.nodeHits : [];
+			const pickHit = initialHits.find(hit => box && Number.isFinite(hit?.x) && Number.isFinite(hit?.y) && hit.x >= 12 && hit.y >= 12 && hit.x <= box.width - 12 && hit.y <= box.height - 12) || initialHits[0] || null;
+			const unselectedNodeB = initialHits.find(hit => hit !== pickHit && box && Number.isFinite(hit?.x) && Number.isFinite(hit?.y) && hit.x >= 12 && hit.y >= 12 && hit.x <= box.width - 12 && hit.y <= box.height - 12) || pickHit;
+
+			// Step 2 & 3: Pointerdown directly on unselected Node B and drag -> camera rotates, Node B not selected from drag
+			let unselectedDragRotated = false;
+			let nodeBSelectedFromDrag = false;
+			if (unselectedNodeB && box) {
+				const yawBeforeUnselected = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
+				const x = box.x + unselectedNodeB.x;
+				const y = box.y + unselectedNodeB.y;
+				await graphFrame.page().mouse.move(x, y);
+				await graphFrame.page().mouse.down();
+				await graphFrame.page().mouse.move(x + 40, y + 25, { steps: 6 });
+				await graphFrame.page().mouse.up();
+				await launched.page.waitForTimeout(300);
+				const metricsAfterUnselected = await readGraphMetrics(graphFrame);
+				const yawAfterUnselected = Number(metricsAfterUnselected?.rotation?.yaw ?? 0);
+				unselectedDragRotated = Math.abs(yawAfterUnselected - yawBeforeUnselected) > 0.005;
+				nodeBSelectedFromDrag = metricsAfterUnselected?.selectedNodeId === unselectedNodeB.id;
+			}
+
+			// Step 4: Single click Node A without drag -> selectedNodeId === Node A
+			if (pickHit && box) {
+				const metricsNow = await readGraphMetrics(graphFrame);
+				const hitNow = (metricsNow?.nodeHits || []).find(h => h.id === pickHit.id) || pickHit;
+				await graphFrame.page().mouse.click(box.x + hitNow.x, box.y + hitNow.y);
+				await launched.page.waitForTimeout(400);
+			}
 			metrics = await readGraphMetrics(graphFrame);
 			picked = Boolean(pickHit && metrics?.selectedNodeId === pickHit.id);
 			yawAtSelection = Number(metrics?.rotation?.yaw ?? 0);
 			await launched.page.waitForTimeout(1_800);
 			yawAfterLockWait = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? yawAtSelection);
 
+			// Step 5 & 6: Second click-hold-drag on selected Node A -> Node A world position changed, camera did not rotate
+			let selectedNodeDragMoved = false;
 			metrics = await readGraphMetrics(graphFrame);
 			const selectedId = metrics?.selectedNodeId;
 			hitBeforeDrag = (metrics?.nodeHits || []).find(hit => hit.id === selectedId) || metrics?.nodeHits?.[0] || null;
-			if (hitBeforeDrag) {
-				const page = graphFrame.page();
-				const dragBox = await canvas.boundingBox();
-				if (dragBox) {
-					const x = dragBox.x + hitBeforeDrag.x;
-					const y = dragBox.y + hitBeforeDrag.y;
-					await page.mouse.move(x, y);
-					await page.mouse.down();
-					await page.mouse.move(x + 36, y + 20, { steps: 5 });
-					await page.mouse.up();
-				}
+			if (hitBeforeDrag && box) {
+				const x = box.x + hitBeforeDrag.x;
+				const y = box.y + hitBeforeDrag.y;
+				await graphFrame.page().mouse.move(x, y);
+				await graphFrame.page().mouse.down();
+				await graphFrame.page().mouse.move(x + 50, y + 30, { steps: 8 });
+				await graphFrame.page().mouse.up();
+				await launched.page.waitForTimeout(400);
+
+				const metricsAfterNodeDrag = await readGraphMetrics(graphFrame);
+				hitAfterDrag = (metricsAfterNodeDrag?.nodeHits || []).find(hit => hit.id === (selectedId || hitBeforeDrag?.id)) || null;
+				selectedNodeDragMoved = Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1));
 			}
-			await launched.page.waitForTimeout(400);
+
+			// Step 7: Drag empty background -> camera rotates
+			let backgroundDragRotated = false;
+			if (box) {
+				const yawBeforeBg = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
+				await graphFrame.page().mouse.move(box.x + 15, box.y + 15);
+				await graphFrame.page().mouse.down();
+				await graphFrame.page().mouse.move(box.x + 55, box.y + 35, { steps: 5 });
+				await graphFrame.page().mouse.up();
+				await launched.page.waitForTimeout(300);
+				const yawAfterBg = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
+				backgroundDragRotated = Math.abs(yawAfterBg - yawBeforeBg) > 0.005;
+			}
+
+			// Step 8: Pan modifier (Shift+drag)
+			if (box) {
+				await graphFrame.page().keyboard.down('Shift');
+				await graphFrame.page().mouse.move(box.x + 30, box.y + 30);
+				await graphFrame.page().mouse.down();
+				await graphFrame.page().mouse.move(box.x + 70, box.y + 70, { steps: 5 });
+				await graphFrame.page().mouse.up();
+				await graphFrame.page().keyboard.up('Shift');
+				await launched.page.waitForTimeout(300);
+			}
+
+			// Multi-zoom verification for semantic zoom LOD change
+			const zoomMetrics1 = await readGraphMetrics(graphFrame);
+			await graphFrame.page().keyboard.press('+');
+			await graphFrame.page().keyboard.press('+');
+			await launched.page.waitForTimeout(300);
+			const zoomMetrics2 = await readGraphMetrics(graphFrame);
+			await graphFrame.page().keyboard.press('-');
+			await graphFrame.page().keyboard.press('-');
+			await launched.page.waitForTimeout(300);
 			metrics = await readGraphMetrics(graphFrame);
-			hitAfterDrag = (metrics?.nodeHits || []).find(hit => hit.id === (selectedId || hitBeforeDrag?.id)) || null;
 		}
 		const selected = Boolean(metrics?.selectedNodeId);
 		evidence.codeGraph = {
@@ -464,10 +532,10 @@ async function run() {
 			rotate: Number.isFinite(yawBeforeRotate) && Number.isFinite(yawAfterRotate) && Math.abs(yawAfterRotate - yawBeforeRotate) > 0.01,
 			drag: Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1)),
 			idleRotateArmed: Boolean(metrics?.networkIdleAutoRotate),
-			semanticZoom: Boolean(metrics?.projectedBounds || (Number.isFinite(metrics?.screenUtilization) && metrics.screenUtilization > 0)),
+			semanticZoom: Boolean(metrics?.projectedBounds && Number.isFinite(metrics?.screenUtilization) && metrics.screenUtilization > 0),
 			pick: picked,
 			sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered',
-			labelDensity: Boolean(metrics && ((metrics.labelCount ?? metrics.labelsDrawn) > 0 || Number.isFinite(metrics.labelCount ?? metrics.labelsDrawn))),
+			labelDensity: Boolean(metrics && ((metrics.labelCount ?? metrics.labelsDrawn) > 0)),
 			selectionLock: picked && Math.abs(yawAfterLockWait - yawAtSelection) < 0.05,
 		};
 

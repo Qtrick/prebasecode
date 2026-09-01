@@ -96,6 +96,11 @@ export function computeCommunityAggregateEdges(
 	return results;
 }
 
+export const TEMPORAL_EDGE_LOD = {
+	OVERVIEW_MAX_ZOOM: 0.50,
+	DETAIL_MIN_ZOOM: 0.85,
+} as const;
+
 /**
  * Determines Level of Detail (LOD) visibility and rendering style for an edge.
  */
@@ -108,6 +113,8 @@ export function computeEdgeLodStyle(
 		readonly isHighContrast?: boolean;
 	},
 ): EdgeLodStyle {
+	const OVERVIEW_MAX_ZOOM = 0.50;
+	const DETAIL_MIN_ZOOM = 0.85;
 	const isConnected = Boolean(options?.isConnectedToActive);
 	const isInteracting = Boolean(options?.isInteracting);
 	const isChanged = Boolean(edge.changeKind && edge.changeKind !== 'unchanged');
@@ -138,8 +145,8 @@ export function computeEdgeLodStyle(
 	}
 
 	// Unchanged background edges:
-	// Overview mode (zoom < 0.60) or active panning/dragging: suppress dense background clutter
-	if (zoom < 0.60 || isInteracting) {
+	// Overview mode (zoom < 0.50) or active panning/dragging: suppress dense background clutter
+	if (zoom < OVERVIEW_MAX_ZOOM || isInteracting) {
 		return {
 			shouldRender: false,
 			opacity: 0,
@@ -150,11 +157,11 @@ export function computeEdgeLodStyle(
 		};
 	}
 
-	// Transition / Intermediate zoom (0.60 <= zoom < 1.05)
-	if (zoom < 1.05) {
-		const t = (zoom - 0.60) / 0.45;
-		const opacity = 0.15 + t * 0.25;
-		const strokeWidth = 0.8 + t * 0.25;
+	// Transition / Intermediate zoom (0.50 <= zoom < 0.85)
+	if (zoom < DETAIL_MIN_ZOOM) {
+		const t = (zoom - OVERVIEW_MAX_ZOOM) / (DETAIL_MIN_ZOOM - OVERVIEW_MAX_ZOOM);
+		const opacity = 0.08 + t * 0.37;
+		const strokeWidth = 0.75 + t * 0.30;
 		return {
 			shouldRender: true,
 			opacity,
@@ -165,7 +172,7 @@ export function computeEdgeLodStyle(
 		};
 	}
 
-	// Full Detail zoom (zoom >= 1.05)
+	// Full Detail zoom (zoom >= 0.85)
 	return {
 		shouldRender: true,
 		opacity: 0.55,

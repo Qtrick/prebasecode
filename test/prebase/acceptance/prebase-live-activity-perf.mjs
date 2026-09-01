@@ -154,7 +154,7 @@ async function run() {
 			});
 			native.setPresentation({
 				visible: true,
-				pinned: false,
+				pinned: true,
 				reducedMotion: false,
 				display: 'builtin',
 			});
@@ -206,7 +206,7 @@ async function run() {
 		});
 		native.setPresentation({
 			visible: true,
-			pinned: false,
+			pinned: true,
 			reducedMotion: false,
 			display: 'builtin',
 		});

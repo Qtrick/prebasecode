@@ -1873,15 +1873,20 @@ function fitView(animate) {
 function updateLegend(s, network) {
 	if (!legend) return;
 	if (isTemporal()) {
+		if (settings.showLegend === false) {
+			legend.style.display = 'none';
+			return;
+		}
 		let html = '<div class="header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--vscode-widget-border, #3c3c3c); padding-bottom:4px;">';
 		html += '<span class="title" style="margin:0; font-weight:700;">Temporal Legend</span>';
 		html += '<button id="legendCloseBtn" type="button" title="Close legend" aria-label="Close legend" style="border:0; background:transparent; color:var(--vscode-foreground, #ccc); cursor:pointer; width:22px; height:22px; display:flex; align-items:center; justify-content:center;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M13.85 2.15l-.7-.7L8 6.59 2.85 1.45l-.7.7L7.29 7.3 1.45 13.15l.7.7L7.3 8.71l5.85 5.85.7-.7L8.71 8l5.14-5.85z"/></svg></button></div>';
+		html += '<div class="title spaced" style="margin-top:4px; font-weight:700; text-transform:uppercase; font-size:10px; opacity:0.75;">Git Changes</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-addedResourceForeground, #3fb950)"></span>Added (+)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-deletedResourceForeground, #f85149)"></span>Removed (-)</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-deletedResourceForeground, #f85149); border:1px dashed #f85149;"></span>Removed (-)</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)"></span>Modified (~)</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-renamedResourceForeground, #58a6ff)"></span>Renamed (⇄)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-descriptionForeground, #8b949e)"></span>Unchanged</div>';
-		html += '<div class="title spaced" style="margin-top:8px; font-weight:700; text-transform:uppercase; font-size:10px; opacity:0.75;">Architecture Layers</div>';
+		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-descriptionForeground, #8b949e)"></span>Unchanged (•)</div>';
+		html += '<div class="title spaced" style="margin-top:8px; font-weight:700; text-transform:uppercase; font-size:10px; opacity:0.75;">Architecture Regions</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:#f59e0b"></span>Entry Root</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:#818cf8"></span>Frontend / UI</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:#38bdf8"></span>API / Backend</div>';
@@ -1889,6 +1894,12 @@ function updateLegend(s, network) {
 		html += '<div class="row"><span class="swatch circle" style="background:#fb923c"></span>Database / Data</div>';
 		html += '<div class="row"><span class="swatch circle" style="background:#71717a"></span>Utils / Config</div>';
 		legend.innerHTML = html;
+		legend.style.display = 'block';
+		legend.style.padding = '8px 12px';
+		legend.style.minWidth = '140px';
+		legend.style.maxWidth = '200px';
+		legend.style.fontSize = '10px';
+		legend.style.bottom = '80px';
 		const closeBtn = document.getElementById('legendCloseBtn');
 		if (closeBtn) closeBtn.onclick = function() { legend.style.display = 'none'; };
 		return;
@@ -2443,7 +2454,8 @@ function drawTemporalFrame(ts) {
 
 				ctx.font = canvasFont('600', headerFont);
 				const titleW = measureTextWidth(labelText, ctx.font);
-				const badgeW = Math.min(gw - 16, titleW + 22 / Math.max(0.4, transform.k));
+				const subW = measureTextWidth(subText, canvasFont('400', subFont));
+				const badgeW = Math.min(gw - 16, Math.max(titleW, subW) + 24 / Math.max(0.4, transform.k));
 				const badgeH = headerFont + subFont + 8 / Math.max(0.4, transform.k);
 				const pillX = gx + 8;
 				const pillY = gy + 8;
@@ -2484,77 +2496,81 @@ function drawTemporalFrame(ts) {
 			ctx.restore();
 		}
 
-		// 2b. Render Overview Community-to-Community Aggregate Edges at far zoom
-		if (transform.k < 0.65 && visibleData.edges && visibleData.edges.length > 0) {
-			const aggEdges = computeCommunityAggregateEdges(visibleData.edges, temporalDiff.guides);
-			const commMap = new Map();
-			for (let g = 0; g < temporalDiff.guides.length; g++) {
-				commMap.set(temporalDiff.guides[g].id, temporalDiff.guides[g]);
-			}
-			// Lane index is per undirected community pair (not global agg list index).
-			const pairLaneCounts = new Map();
-			const pairLaneIndex = new Map();
-			for (let a = 0; a < aggEdges.length; a++) {
-				const agg = aggEdges[a];
-				const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
-				const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
-				const key = lo + '::' + hi;
-				pairLaneIndex.set(a, pairLaneCounts.get(key) || 0);
-				pairLaneCounts.set(key, (pairLaneCounts.get(key) || 0) + 1);
-			}
-
-			for (let a = 0; a < aggEdges.length; a++) {
-				const agg = aggEdges[a];
-				const cSrc = commMap.get(agg.sourceCommunityId);
-				const cTgt = commMap.get(agg.targetCommunityId);
-				if (!cSrc || !cTgt) continue;
-
-				const dx = cTgt.x - cSrc.x;
-				const dy = cTgt.y - cSrc.y;
-				const dist = Math.hypot(dx, dy);
-				if (dist < 10) continue;
-
-				const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
-				const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
-				const pairKey = lo + '::' + hi;
-				const route = computeAggregateEdgeRoute(
-					cSrc.x, cSrc.y, cTgt.x, cTgt.y,
-					cSrc.radius || 40, cTgt.radius || 40,
-					pairLaneIndex.get(a) || 0, pairLaneCounts.get(pairKey) || 1,
-					agg.sourceCommunityId, agg.targetCommunityId
-				);
-
-				const strokeWidth = Math.min(4.0, 1.2 + Math.log2(1 + agg.edgeCount) * 0.5) / Math.max(0.35, Math.sqrt(transform.k));
-
-				ctx.save();
-				ctx.beginPath();
-				ctx.moveTo(route.x1, route.y1);
-				if (typeof ctx.quadraticCurveTo === 'function') {
-					ctx.quadraticCurveTo(route.cpX, route.cpY, route.x2, route.y2);
-				} else {
-					ctx.lineTo(route.x2, route.y2);
+		// 2b. Render Overview Community-to-Community Aggregate Edges with coordinated crossfade
+		if (transform.k < 0.85 && visibleData.edges && visibleData.edges.length > 0) {
+			const aggAlpha = transform.k < 0.50 ? 0.85 : Math.max(0, 0.85 * (1 - (transform.k - 0.50) / 0.35));
+			if (aggAlpha > 0.01) {
+				const aggEdges = computeCommunityAggregateEdges(visibleData.edges, temporalDiff.guides);
+				const commMap = new Map();
+				for (let g = 0; g < temporalDiff.guides.length; g++) {
+					commMap.set(temporalDiff.guides[g].id, temporalDiff.guides[g]);
 				}
-				ctx.strokeStyle = agg.changedEdgeCount > 0
-					? theme.accent
-					: (theme.isHighContrast ? 'rgba(255, 255, 255, 0.22)' : 'rgba(99, 102, 241, 0.20)');
-				ctx.lineWidth = strokeWidth;
-				ctx.stroke();
-				edgesDrawn++;
-
-				// Count badge on the quadratic midpoint (not the chord).
-				if (transform.k >= 0.38) {
-					const midX = 0.25 * route.x1 + 0.5 * route.cpX + 0.25 * route.x2;
-					const midY = 0.25 * route.y1 + 0.5 * route.cpY + 0.25 * route.y2;
-					const badgeFont = computeNetworkLabelWorldFontSize(9, transform.k, { minScreenPx: 8, maxScreenPx: 14 });
-					ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-					ctx.fillRect(midX - 9 / transform.k, midY - 6 / transform.k, 18 / transform.k, 12 / transform.k);
-					ctx.font = canvasFont('600', badgeFont);
-					ctx.fillStyle = agg.changedEdgeCount > 0 ? theme.accent : '#94a3b8';
-					ctx.textAlign = 'center';
-					ctx.textBaseline = 'middle';
-					ctx.fillText(String(agg.edgeCount), midX, midY);
+				// Lane index is per undirected community pair (not global agg list index).
+				const pairLaneCounts = new Map();
+				const pairLaneIndex = new Map();
+				for (let a = 0; a < aggEdges.length; a++) {
+					const agg = aggEdges[a];
+					const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
+					const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
+					const key = lo + '::' + hi;
+					pairLaneIndex.set(a, pairLaneCounts.get(key) || 0);
+					pairLaneCounts.set(key, (pairLaneCounts.get(key) || 0) + 1);
 				}
-				ctx.restore();
+
+				for (let a = 0; a < aggEdges.length; a++) {
+					const agg = aggEdges[a];
+					const cSrc = commMap.get(agg.sourceCommunityId);
+					const cTgt = commMap.get(agg.targetCommunityId);
+					if (!cSrc || !cTgt) continue;
+
+					const dx = cTgt.x - cSrc.x;
+					const dy = cTgt.y - cSrc.y;
+					const dist = Math.hypot(dx, dy);
+					if (dist < 10) continue;
+
+					const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
+					const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
+					const pairKey = lo + '::' + hi;
+					const route = computeAggregateEdgeRoute(
+						cSrc.x, cSrc.y, cTgt.x, cTgt.y,
+						cSrc.radius || 40, cTgt.radius || 40,
+						pairLaneIndex.get(a) || 0, pairLaneCounts.get(pairKey) || 1,
+						agg.sourceCommunityId, agg.targetCommunityId
+					);
+
+					const strokeWidth = Math.min(4.0, 1.2 + Math.log2(1 + agg.edgeCount) * 0.5) / Math.max(0.35, Math.sqrt(transform.k));
+
+					ctx.save();
+					ctx.globalAlpha = aggAlpha;
+					ctx.beginPath();
+					ctx.moveTo(route.x1, route.y1);
+					if (typeof ctx.quadraticCurveTo === 'function') {
+						ctx.quadraticCurveTo(route.cpX, route.cpY, route.x2, route.y2);
+					} else {
+						ctx.lineTo(route.x2, route.y2);
+					}
+					ctx.strokeStyle = agg.changedEdgeCount > 0
+						? theme.accent
+						: (theme.isHighContrast ? 'rgba(255, 255, 255, 0.22)' : 'rgba(99, 102, 241, 0.20)');
+					ctx.lineWidth = strokeWidth;
+					ctx.stroke();
+					edgesDrawn++;
+
+					// Count badge on the quadratic midpoint (not the chord).
+					if (transform.k >= 0.38) {
+						const midX = 0.25 * route.x1 + 0.5 * route.cpX + 0.25 * route.x2;
+						const midY = 0.25 * route.y1 + 0.5 * route.cpY + 0.25 * route.y2;
+						const badgeFont = computeNetworkLabelWorldFontSize(9, transform.k, { minScreenPx: 8, maxScreenPx: 14 });
+						ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+						ctx.fillRect(midX - 9 / transform.k, midY - 6 / transform.k, 18 / transform.k, 12 / transform.k);
+						ctx.font = canvasFont('600', badgeFont);
+						ctx.fillStyle = agg.changedEdgeCount > 0 ? theme.accent : '#94a3b8';
+						ctx.textAlign = 'center';
+						ctx.textBaseline = 'middle';
+						ctx.fillText(String(agg.edgeCount), midX, midY);
+					}
+					ctx.restore();
+				}
 			}
 		}
 	}
@@ -2598,7 +2614,7 @@ function drawTemporalFrame(ts) {
 				isHighContrast: theme.isHighContrast,
 			});
 
-			if (!lodStyle.shouldRender && displayMode === 'state') {
+			if (!lodStyle.shouldRender) {
 				continue;
 			}
 
@@ -2634,7 +2650,7 @@ function drawTemporalFrame(ts) {
 			}
 
 			ctx.save();
-			ctx.globalAlpha = lodStyle.opacity || 1.0;
+			ctx.globalAlpha = (typeof lodStyle.opacity === 'number' && Number.isFinite(lodStyle.opacity)) ? lodStyle.opacity : 1.0;
 			// Dark contrast halo beneath edge
 			ctx.beginPath();
 			ctx.moveTo(sp.x, sp.y);
@@ -2829,6 +2845,16 @@ function drawTemporalFrame(ts) {
 
 	for (let gi = 0; gi < guideLabels.length; gi++) {
 		const gl = guideLabels[gi];
+		if (transform.k >= 0.24 && temporalDiff.guides) {
+			const guideObj = temporalDiff.guides.find(function(g) { return g.id === gl.guideId; });
+			if (guideObj && guideObj.bounds) {
+				const gw = Math.max(8, guideObj.bounds.maxX - guideObj.bounds.minX);
+				const gh = Math.max(8, guideObj.bounds.maxY - guideObj.bounds.minY);
+				if (gw > 60 && gh > 40) {
+					continue;
+				}
+			}
+		}
 		ctx.save();
 		ctx.font = gl.font;
 		ctx.textAlign = 'left';

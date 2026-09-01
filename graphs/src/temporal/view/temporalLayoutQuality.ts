@@ -67,15 +67,45 @@ export function measureLayoutQuality(
 		if (p1.y < minY) {minY = p1.y;}
 		if (p1.x > maxX) {maxX = p1.x;}
 		if (p1.y > maxY) {maxY = p1.y;}
+	}
 
-		for (let j = i + 1; j < totalNodes; j++) {
-			const p2 = nodes[j];
-			const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
-			if (dist < minSpacing) {
-				minSpacing = dist;
-			}
-			if (dist < TARGET_MIN_SPACING) {
-				nodeOverlapCount++;
+	const gridCellSize = Math.max(TARGET_MIN_SPACING, 48);
+	const grid = new Map<string, number[]>();
+	for (let i = 0; i < totalNodes; i++) {
+		const p = nodes[i];
+		const cx = Math.floor(p.x / gridCellSize);
+		const cy = Math.floor(p.y / gridCellSize);
+		const key = `${cx},${cy}`;
+		let bucket = grid.get(key);
+		if (!bucket) {
+			bucket = [];
+			grid.set(key, bucket);
+		}
+		bucket.push(i);
+	}
+
+	for (let i = 0; i < totalNodes; i++) {
+		const p1 = nodes[i];
+		const cx = Math.floor(p1.x / gridCellSize);
+		const cy = Math.floor(p1.y / gridCellSize);
+		for (let dx = -1; dx <= 1; dx++) {
+			for (let dy = -1; dy <= 1; dy++) {
+				const bucket = grid.get(`${cx + dx},${cy + dy}`);
+				if (bucket) {
+					for (let b = 0; b < bucket.length; b++) {
+						const j = bucket[b];
+						if (j > i) {
+							const p2 = nodes[j];
+							const dist = Math.hypot(p2.x - p1.x, p2.y - p1.y);
+							if (dist < minSpacing) {
+								minSpacing = dist;
+							}
+							if (dist < TARGET_MIN_SPACING) {
+								nodeOverlapCount++;
+							}
+						}
+					}
+				}
 			}
 		}
 	}
@@ -120,6 +150,44 @@ export function measureLayoutQuality(
 		const avgIntraDist = intraCount > 0 ? (totalIntraDist / intraCount) : 40;
 		communitySeparationRatio = avgIntraDist > 0 ? (avgInterDist / avgIntraDist) : 2.5;
 	}
+
+	// 3b. Guide-Guide Overlap Calculation
+	let guideOverlapCount = 0;
+	let totalGuideOverlapArea = 0;
+	let totalGuideArea = 0;
+	let maxGuideOverlapRatio = 0;
+
+	for (let i = 0; i < guides.length; i++) {
+		const g1 = guides[i];
+		const b1 = g1.bounds;
+		const a1 = b1 ? Math.max(1, (b1.maxX - b1.minX) * (b1.maxY - b1.minY)) : Math.max(1, Math.PI * g1.radius * g1.radius);
+		totalGuideArea += a1;
+
+		for (let j = i + 1; j < guides.length; j++) {
+			const g2 = guides[j];
+			const b2 = g2.bounds;
+			if (b1 && b2) {
+				const overlapW = Math.max(0, Math.min(b1.maxX, b2.maxX) - Math.max(b1.minX, b2.minX));
+				const overlapH = Math.max(0, Math.min(b1.maxY, b2.maxY) - Math.max(b1.minY, b2.minY));
+				const overlapArea = overlapW * overlapH;
+				if (overlapArea > 0) {
+					guideOverlapCount++;
+					totalGuideOverlapArea += overlapArea;
+					const a2 = Math.max(1, (b2.maxX - b2.minX) * (b2.maxY - b2.minY));
+					const ratio = overlapArea / Math.min(a1, a2);
+					if (ratio > maxGuideOverlapRatio) {
+						maxGuideOverlapRatio = ratio;
+					}
+				}
+			} else {
+				const dist = Math.hypot(g2.x - g1.x, g2.y - g1.y);
+				if (dist < (g1.radius + g2.radius) * 0.85) {
+					guideOverlapCount++;
+				}
+			}
+		}
+	}
+	const guideOverlapRatio = totalGuideArea > 0 ? (totalGuideOverlapArea / totalGuideArea) : 0;
 
 	// 4. Edge Crossings & Direction Flow
 	const edges: TemporalRenderEdge[] = (diff?.edges || []).filter(e => e.changeKind !== 'removed');
@@ -202,6 +270,9 @@ export function measureLayoutQuality(
 		screenUtilization,
 		edgeCrossingCount,
 		dependencyDirectionRatio,
+		guideOverlapCount,
+		guideOverlapRatio,
+		maxGuideOverlapRatio,
 		medianDisplacement,
 		p95Displacement,
 		maxDisplacement,
@@ -216,6 +287,60 @@ export function measureLayoutQuality(
 			width,
 			height,
 		},
+	};
+}
+
+/**
+ * Computes guide-guide overlap metrics for a collection of community guides.
+ */
+export function computeGuideOverlaps(guides: readonly TemporalCommunityGuide[]): {
+	readonly guideOverlapCount: number;
+	readonly guideOverlapRatio: number;
+	readonly maxGuideOverlapRatio: number;
+	readonly overlappingPairs: readonly [string, string][];
+} {
+	if (!guides || guides.length < 2) {
+		return { guideOverlapCount: 0, guideOverlapRatio: 0, maxGuideOverlapRatio: 0, overlappingPairs: [] };
+	}
+
+	let guideOverlapCount = 0;
+	let totalGuideOverlapArea = 0;
+	let totalGuideArea = 0;
+	let maxGuideOverlapRatio = 0;
+	const overlappingPairs: [string, string][] = [];
+
+	for (let i = 0; i < guides.length; i++) {
+		const g1 = guides[i];
+		const b1 = g1.bounds;
+		const a1 = b1 ? Math.max(1, (b1.maxX - b1.minX) * (b1.maxY - b1.minY)) : Math.max(1, Math.PI * g1.radius * g1.radius);
+		totalGuideArea += a1;
+
+		for (let j = i + 1; j < guides.length; j++) {
+			const g2 = guides[j];
+			const b2 = g2.bounds;
+			if (b1 && b2) {
+				const overlapW = Math.max(0, Math.min(b1.maxX, b2.maxX) - Math.max(b1.minX, b2.minX));
+				const overlapH = Math.max(0, Math.min(b1.maxY, b2.maxY) - Math.max(b1.minY, b2.minY));
+				const overlapArea = overlapW * overlapH;
+				if (overlapArea > 0) {
+					guideOverlapCount++;
+					totalGuideOverlapArea += overlapArea;
+					overlappingPairs.push([g1.id, g2.id]);
+					const a2 = Math.max(1, (b2.maxX - b2.minX) * (b2.maxY - b2.minY));
+					const ratio = overlapArea / Math.min(a1, a2);
+					if (ratio > maxGuideOverlapRatio) {
+						maxGuideOverlapRatio = ratio;
+					}
+				}
+			}
+		}
+	}
+
+	return {
+		guideOverlapCount,
+		guideOverlapRatio: totalGuideArea > 0 ? (totalGuideOverlapArea / totalGuideArea) : 0,
+		maxGuideOverlapRatio,
+		overlappingPairs,
 	};
 }
 

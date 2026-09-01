@@ -16,6 +16,9 @@ import {
 	getLayerColor,
 	type AdaptiveCommunity,
 } from './temporalGraphTopology.js';
+import {
+	computeGuideOverlaps,
+} from './temporalLayoutQuality.js';
 
 /** Bump when initial Temporal geometry algorithm changes so in-memory positions reset. */
 export const TEMPORAL_INITIAL_LAYOUT_VERSION = 4;
@@ -456,7 +459,7 @@ export function computeSemanticTemporalInitialLayout(
 		}
 	}
 	// Global polish for boundary overlaps between communities
-	for (let iter = 0; iter < 8; iter++) {
+	for (let iter = 0; iter < 4; iter++) {
 		grid.clear();
 		for (let i = 0; i < nodePosList.length; i++) {
 			grid.insert(i, nodePosList[i].x, nodePosList[i].y);
@@ -545,6 +548,13 @@ export function layoutTemporalGraph(
 		}
 	}
 
+	if (previousPositions.size === 0) {
+		return computeSemanticTemporalInitialLayout(diff.nodes, diff.edges, nodeSpacing, {
+			width: options?.width,
+			height: options?.height,
+		});
+	}
+
 	for (let i = 0; i < diff.nodes.length; i++) {
 		const node = diff.nodes[i];
 		const prev = previousPositions.get(node.entityId);
@@ -558,18 +568,6 @@ export function layoutTemporalGraph(
 		} else {
 			unpositionedNodes.push(node);
 		}
-	}
-
-	if (previousPositions.size === 0) {
-		const initialResult = computeSemanticTemporalInitialLayout(diff.nodes, diff.edges, nodeSpacing, {
-			width: options?.width,
-			height: options?.height,
-		});
-		return {
-			nodes: initialResult.nodes.map(enrichNodeWithLayer),
-			positions: initialResult.positions,
-			guides: initialResult.guides,
-		};
 	}
 
 	const occupiedCoords: { x: number; y: number }[] = Array.from(nextPositions.values());
@@ -670,7 +668,129 @@ export function layoutTemporalGraph(
 
 	const activeNodes = positionedNodes.filter(n => n.changeKind !== 'removed');
 	const activeCommunities = computeAdaptiveCommunities(activeNodes, diff.edges);
-	const guides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
+	let guides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
+
+	// Bounded Local Relaxation:
+	// If local degradation is detected (overlapping guides),
+	// perform bounded local relaxation on the affected subset while keeping far-away
+	// unaffected communities strictly anchored (mental map preservation).
+	const guideOverlap = computeGuideOverlaps(guides);
+	const hasDegradation = guideOverlap.guideOverlapCount > 0;
+
+	if (hasDegradation && previousPositions.size > 0) {
+		const overlappingCommIds = new Set<string>();
+		for (let p = 0; p < guideOverlap.overlappingPairs.length; p++) {
+			overlappingCommIds.add(guideOverlap.overlappingPairs[p][0]);
+			overlappingCommIds.add(guideOverlap.overlappingPairs[p][1]);
+		}
+
+		// Identify affected entity IDs
+		const affectedEntityIds = new Set<string>();
+		for (let u = 0; u < unpositionedNodes.length; u++) {
+			affectedEntityIds.add(unpositionedNodes[u].entityId);
+		}
+		for (let i = 0; i < positionedNodes.length; i++) {
+			const n = positionedNodes[i];
+			if (n.changeKind && n.changeKind !== 'unchanged') {
+				affectedEntityIds.add(n.entityId);
+			}
+		}
+		for (let c = 0; c < activeCommunities.length; c++) {
+			const comm = activeCommunities[c];
+			if (overlappingCommIds.has(comm.id)) {
+				for (let m = 0; m < comm.nodeIds.length; m++) {
+					affectedEntityIds.add(comm.nodeIds[m]);
+				}
+			}
+		}
+
+		if (affectedEntityIds.size > 0) {
+			const initialPositions = new Map<string, { x: number; y: number }>();
+			for (const id of affectedEntityIds) {
+				const pos = nextPositions.get(id);
+				if (pos) {
+					initialPositions.set(id, { x: pos.x, y: pos.y });
+				}
+			}
+
+			const affectedArray = Array.from(affectedEntityIds);
+			const relaxationPasses = Math.min(5, Math.max(2, Math.floor(guideOverlap.guideOverlapCount * 2) + (unpositionedNodes.length > 0 ? 2 : 0)));
+
+			for (let pass = 0; pass < relaxationPasses; pass++) {
+				for (let a = 0; a < affectedArray.length; a++) {
+					const id = affectedArray[a];
+					const pos = nextPositions.get(id);
+					const initial = initialPositions.get(id);
+					if (!pos || !initial) {continue;}
+
+					let fx = 0;
+					let fy = 0;
+
+					// 1. Repulsive forces from close neighbors
+					const nearby = occupiedGrid.queryNearby(pos.x, pos.y);
+					for (let n = 0; n < nearby.length; n++) {
+						const other = occupiedCoords[nearby[n]];
+						if (!other || (other.x === pos.x && other.y === pos.y)) {continue;}
+						const dx = pos.x - other.x;
+						const dy = pos.y - other.y;
+						const dist = Math.hypot(dx, dy) || 1;
+						if (dist < MIN_NODE_DISTANCE) {
+							const repFactor = (MIN_NODE_DISTANCE - dist) / dist;
+							fx += dx * repFactor * 0.4;
+							fy += dy * repFactor * 0.4;
+						}
+					}
+
+					// 2. Spring attraction towards connected neighbors
+					const neighbors = connectedNeighbors.get(id);
+					if (neighbors && neighbors.size > 0) {
+						for (const neighborId of neighbors) {
+							const nPos = nextPositions.get(neighborId);
+							if (nPos) {
+								fx += (nPos.x - pos.x) * 0.05;
+								fy += (nPos.y - pos.y) * 0.05;
+							}
+						}
+					}
+
+					// 3. Anchor force restoring towards original coordinate
+					fx -= (pos.x - initial.x) * 0.45;
+					fy -= (pos.y - initial.y) * 0.45;
+
+					const isUnchanged = !unpositionedNodes.some(u => u.entityId === id) && !diff.nodes.some(d => d.entityId === id && d.changeKind && d.changeKind !== 'unchanged');
+					const maxDelta = isUnchanged ? 12 : 36;
+
+					let newX = pos.x + fx * 0.25;
+					let newY = pos.y + fy * 0.25;
+
+					const dispFromInit = Math.hypot(newX - initial.x, newY - initial.y);
+					if (dispFromInit > maxDelta) {
+						const scale = maxDelta / dispFromInit;
+						newX = initial.x + (newX - initial.x) * scale;
+						newY = initial.y + (newY - initial.y) * scale;
+					}
+
+					pos.x = Math.round(newX);
+					pos.y = Math.round(newY);
+				}
+			}
+
+			// Update positionedNodes x/y coordinates
+			for (let i = 0; i < positionedNodes.length; i++) {
+				const n = positionedNodes[i];
+				const p = nextPositions.get(n.entityId);
+				if (p) {
+					positionedNodes[i] = enrichNodeWithLayer({
+						...n,
+						x: p.x,
+						y: p.y,
+					});
+				}
+			}
+
+			guides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
+		}
+	}
 
 	return {
 		nodes: positionedNodes,
