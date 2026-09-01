@@ -1,18 +1,19 @@
 #include <napi.h>
 #import <AppKit/AppKit.h>
 #import <CoreGraphics/CoreGraphics.h>
+#import <QuartzCore/QuartzCore.h>
 
 // Keep in sync with magnusLiveActivity.ts LIVE_ACTIVITY_* constants.
 static const CGFloat kCollapsedHeight = 34;
-static const CGFloat kWingWidth = 124;
-static const CGFloat kExpandedHeight = 200;
+static const CGFloat kWingWidthMin = 52;
+static const CGFloat kWingWidthMax = 136;
 static const CGFloat kPillWidth = 228;
 static const CGFloat kPillHeight = 30;
 static const CGFloat kNotchMinSafeTop = 8;
 static const CGFloat kNotchMinAuxWidth = 40;
 static const CGFloat kCameraHousingMin = 24;
 static const CGFloat kWingCornerRadius = 10;
-static const CGFloat kPillCornerRadius = 14;
+static const CGFloat kPillCornerRadius = 16;
 
 static NSInteger LiveActivityWindowLevel(void) {
 	// Borderless panels at normal status/menu levels are clamped below the notch band.
@@ -64,8 +65,11 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL notched;
 @property (nonatomic, assign) CGFloat housingWidth;
 @property (nonatomic, assign) CGFloat safeAreaTop;
+@property (nonatomic, assign) CGFloat leftWingWidth;
+@property (nonatomic, assign) CGFloat rightWingWidth;
 @property (nonatomic, assign) BOOL reducedMotion;
 @property (nonatomic, assign) BOOL attention;
+@property (nonatomic, strong) NSTrackingArea *trackingArea;
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
 @end
 
@@ -100,8 +104,11 @@ static NSString *JSString(Napi::Value value) {
 - (void)applySnapshotDict:(NSDictionary *)snapshot;
 - (void)teardown;
 - (void)mouseUp:(NSEvent *)event;
+- (void)mouseEnteredInView:(NSEvent *)event;
+- (void)mouseExitedFromView:(NSEvent *)event;
 - (void)clearPendingInteraction;
 - (NSDictionary *)diagnosticsDict;
+- (void)performUserHaptic;
 - (BOOL)simulateClickOptionIndex:(NSInteger)index;
 - (BOOL)simulateClickApprove;
 - (BOOL)simulateClickDeny;
@@ -110,8 +117,34 @@ static NSString *JSString(Napi::Value value) {
 @end
 
 @implementation PrebaseLiveActivityView
+
 - (BOOL)isFlipped { return YES; }
 - (BOOL)acceptsFirstMouse:(NSEvent *)event { return YES; }
+
+- (void)updateTrackingAreas {
+	[super updateTrackingAreas];
+	if (self.trackingArea) {
+		[self removeTrackingArea:self.trackingArea];
+	}
+	NSTrackingAreaOptions opts = NSTrackingMouseEnteredAndExited
+		| NSTrackingMouseMoved
+		| NSTrackingActiveAlways
+		| NSTrackingInVisibleRect;
+	self.trackingArea = [[NSTrackingArea alloc] initWithRect:self.bounds options:opts owner:self userInfo:nil];
+	[self addTrackingArea:self.trackingArea];
+}
+
+- (void)mouseEntered:(NSEvent *)event {
+	[self.controller mouseEnteredInView:event];
+}
+
+- (void)mouseMoved:(NSEvent *)event {
+	[self.controller mouseEnteredInView:event];
+}
+
+- (void)mouseExited:(NSEvent *)event {
+	[self.controller mouseExitedFromView:event];
+}
 
 - (NSBezierPath *)wingPathInRect:(NSRect)rect radius:(CGFloat)radius {
 	CGFloat minX = NSMinX(rect);
@@ -135,87 +168,158 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)drawRect:(NSRect)dirtyRect {
 	NSRect bounds = self.bounds;
+	CGFloat bandH = MAX(self.safeAreaTop, kCollapsedHeight);
+	BOOL isExpanded = (bounds.size.height > bandH + 2.0);
+
+	// Optical black fill: near-opaque to merge seamlessly with physical camera housing and prevent ghosting.
 	NSColor *fill = self.attention
-		? [NSColor colorWithCalibratedWhite:0.11 alpha:0.96]
-		: [NSColor colorWithCalibratedWhite:0.07 alpha:0.94];
+		? [NSColor colorWithCalibratedWhite:0.07 alpha:0.99]
+		: [NSColor colorWithCalibratedWhite:0.035 alpha:0.99];
 
 	if (self.notched) {
-		CGFloat bandH = MAX(self.safeAreaTop, kCollapsedHeight);
-		CGFloat wingH = self.expanded ? bandH : NSHeight(bounds);
-		NSRect leftWing = NSMakeRect(0, 0, kWingWidth, wingH);
-		NSRect rightWing = NSMakeRect(kWingWidth + self.housingWidth, 0, kWingWidth, wingH);
-		NSBezierPath *leftPath = [self wingPathInRect:leftWing radius:kWingCornerRadius];
-		NSBezierPath *rightPath = [self wingPathInRect:rightWing radius:kWingCornerRadius];
-		[fill setFill];
-		[leftPath fill];
-		[rightPath fill];
-		if (self.expanded && NSHeight(bounds) > bandH) {
-			NSRect body = NSMakeRect(0, bandH, NSWidth(bounds), NSHeight(bounds) - bandH);
-			NSBezierPath *bodyPath = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(body, 0.5, 0.5)
-			                                                         xRadius:kPillCornerRadius
-			                                                         yRadius:kPillCornerRadius];
+		CGFloat totalW = NSWidth(bounds);
+		CGFloat currentH = NSHeight(bounds);
+		CGFloat leftW = self.leftWingWidth > 0 ? self.leftWingWidth : kWingWidthMin;
+		CGFloat rightW = self.rightWingWidth > 0 ? self.rightWingWidth : kWingWidthMin;
+		CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
+
+		if (!isExpanded) {
+			// Collapsed state: discrete left and right wings flanking the physical housing.
+			NSRect leftWing = NSMakeRect(0, 0, leftW, currentH);
+			NSRect rightWing = NSMakeRect(leftW + housing, 0, rightW, currentH);
+			NSBezierPath *leftPath = [self wingPathInRect:leftWing radius:kWingCornerRadius];
+			NSBezierPath *rightPath = [self wingPathInRect:rightWing radius:kWingCornerRadius];
 			[fill setFill];
-			[bodyPath fill];
+			[leftPath fill];
+			[rightPath fill];
+		} else {
+			// Continuous unified notched Dynamic Island path: seamless shoulder connections and rounded bottom body.
+			CGFloat bottomRadius = kPillCornerRadius;
+			NSBezierPath *islandPath = [NSBezierPath bezierPath];
+			[islandPath moveToPoint:NSMakePoint(0, 0)];
+			[islandPath lineToPoint:NSMakePoint(leftW, 0)];
+			[islandPath lineToPoint:NSMakePoint(leftW, bandH)];
+			[islandPath lineToPoint:NSMakePoint(leftW + housing, bandH)];
+			[islandPath lineToPoint:NSMakePoint(leftW + housing, 0)];
+			[islandPath lineToPoint:NSMakePoint(totalW, 0)];
+			[islandPath lineToPoint:NSMakePoint(totalW, currentH - bottomRadius)];
+			[islandPath appendBezierPathWithArcFromPoint:NSMakePoint(totalW, currentH)
+			                                     toPoint:NSMakePoint(totalW - bottomRadius, currentH)
+			                                      radius:bottomRadius];
+			[islandPath lineToPoint:NSMakePoint(bottomRadius, currentH)];
+			[islandPath appendBezierPathWithArcFromPoint:NSMakePoint(0, currentH)
+			                                     toPoint:NSMakePoint(0, currentH - bottomRadius)
+			                                      radius:bottomRadius];
+			[islandPath closePath];
+
+			[fill setFill];
+			[islandPath fill];
 		}
 	} else {
-		NSColor *stroke = [NSColor colorWithCalibratedWhite:1.0 alpha:0.14];
+		// Pill mode (no-notch screen fallback).
 		NSBezierPath *path = [NSBezierPath bezierPathWithRoundedRect:NSInsetRect(bounds, 0.5, 0.5)
 		                                                     xRadius:kPillCornerRadius
 		                                                     yRadius:kPillCornerRadius];
 		[fill setFill];
 		[path fill];
+		NSColor *stroke = [NSColor colorWithCalibratedWhite:1.0 alpha:0.14];
 		[stroke setStroke];
 		path.lineWidth = 1.0;
 		[path stroke];
 	}
 
-	NSMutableDictionary *attrs = [@{
-		NSFontAttributeName: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
-		NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0]
-	} mutableCopy];
-	NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
-	NSSize size = [label sizeWithAttributes:attrs];
-	CGFloat labelX = self.notched ? 14 : 14;
-	CGFloat maxLabelWidth = self.notched ? (kWingWidth - 20) : (NSWidth(bounds) - 28);
-	if (size.width > maxLabelWidth) {
-		label = [[label substringToIndex:MIN(label.length, 18)] stringByAppendingString:@"…"];
-		size = [label sizeWithAttributes:attrs];
-	}
-	NSPoint origin = NSMakePoint(labelX, MAX(6, (NSHeight(bounds) - size.height) / 2.0));
-	if (self.expanded) {
-		origin.y = 10;
-	}
-	[label drawAtPoint:origin withAttributes:attrs];
+	if (!isExpanded) {
+		// Collapsed typography: left wing label (e.g. status/elapsed), right wing metrics.
+		NSMutableDictionary *attrs = [@{
+			NSFontAttributeName: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+			NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.94 alpha:1.0]
+		} mutableCopy];
 
-	if (self.notched && !self.expanded && self.metricsLabel.length) {
-		attrs[NSFontAttributeName] = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
-		attrs[NSForegroundColorAttributeName] = [NSColor colorWithCalibratedWhite:0.72 alpha:1.0];
-		NSSize metricsSize = [self.metricsLabel sizeWithAttributes:attrs];
-		CGFloat metricsX = kWingWidth + self.housingWidth + MAX(8, kWingWidth - metricsSize.width - 8);
-		NSPoint metricsOrigin = NSMakePoint(metricsX, MAX(6, (NSHeight(bounds) - metricsSize.height) / 2.0));
-		[self.metricsLabel drawAtPoint:metricsOrigin withAttributes:attrs];
-	}
+		NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
+		NSSize size = [label sizeWithAttributes:attrs];
+		CGFloat labelX = 14;
+		CGFloat maxLabelWidth = self.notched ? (self.leftWingWidth - 20) : (NSWidth(bounds) - 28);
+		if (size.width > maxLabelWidth && maxLabelWidth > 20) {
+			label = [[label substringToIndex:MIN(label.length, 16)] stringByAppendingString:@"…"];
+			size = [label sizeWithAttributes:attrs];
+		}
+		NSPoint origin = NSMakePoint(labelX, MAX(6, (NSHeight(bounds) - size.height) / 2.0));
+		[label drawAtPoint:origin withAttributes:attrs];
 
-	if (self.expanded && self.activityLabel.length) {
-		attrs[NSFontAttributeName] = [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
-		attrs[NSForegroundColorAttributeName] = [NSColor colorWithCalibratedWhite:0.78 alpha:1.0];
-		[self.activityLabel drawAtPoint:NSMakePoint(14, 32) withAttributes:attrs];
-		CGFloat y = 52;
-		attrs[NSFontAttributeName] = [NSFont systemFontOfSize:10 weight:NSFontWeightRegular];
-		for (NSString *action in self.actions) {
-			[action drawAtPoint:NSMakePoint(18, y) withAttributes:attrs];
-			y += 16;
-		}
-		if (self.pendingTitle.length) {
-			attrs[NSFontAttributeName] = [NSFont systemFontOfSize:11 weight:NSFontWeightMedium];
-			attrs[NSForegroundColorAttributeName] = [NSColor colorWithCalibratedWhite:0.9 alpha:1.0];
-			[self.pendingTitle drawAtPoint:NSMakePoint(14, y + 4) withAttributes:attrs];
-			y += 20;
-		}
-		if (self.metricsLabel.length) {
+		if (self.notched && self.metricsLabel.length) {
 			attrs[NSFontAttributeName] = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
-			attrs[NSForegroundColorAttributeName] = [NSColor colorWithCalibratedWhite:0.7 alpha:1.0];
-			[self.metricsLabel drawAtPoint:NSMakePoint(14, MAX(y + 6, NSHeight(bounds) - 56)) withAttributes:attrs];
+			attrs[NSForegroundColorAttributeName] = [NSColor colorWithCalibratedWhite:0.75 alpha:1.0];
+			NSSize metricsSize = [self.metricsLabel sizeWithAttributes:attrs];
+			CGFloat metricsX = self.leftWingWidth + self.housingWidth + MAX(10, self.rightWingWidth - metricsSize.width - 12);
+			NSPoint metricsOrigin = NSMakePoint(metricsX, MAX(6, (NSHeight(bounds) - metricsSize.height) / 2.0));
+			[self.metricsLabel drawAtPoint:metricsOrigin withAttributes:attrs];
+		}
+	} else {
+		// Expanded Content Hierarchy: All interactive and readable elements start strictly BELOW the hardware band.
+		CGFloat bodyY = bandH + 8;
+
+		// 1. Header: Magnus branding + Status pill badge on trailing side.
+		NSMutableDictionary *headerAttrs = [@{
+			NSFontAttributeName: [NSFont systemFontOfSize:12 weight:NSFontWeightSemibold],
+			NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.96 alpha:1.0]
+		} mutableCopy];
+		[@"Magnus" drawAtPoint:NSMakePoint(16, bodyY) withAttributes:headerAttrs];
+
+		NSString *statusText = self.attention ? @"Attention" : (self.status.length ? [self.status capitalizedString] : @"Working");
+		NSColor *badgeColor = self.attention
+			? [NSColor colorWithCalibratedRed:0.98 green:0.65 blue:0.18 alpha:0.9]
+			: [NSColor colorWithCalibratedWhite:0.65 alpha:1.0];
+		NSMutableDictionary *badgeAttrs = [@{
+			NSFontAttributeName: [NSFont systemFontOfSize:10 weight:NSFontWeightMedium],
+			NSForegroundColorAttributeName: badgeColor
+		} mutableCopy];
+		NSSize badgeSize = [statusText sizeWithAttributes:badgeAttrs];
+		[statusText drawAtPoint:NSMakePoint(NSWidth(bounds) - badgeSize.width - 16, bodyY + 1) withAttributes:badgeAttrs];
+
+		bodyY += 22;
+
+		// 2. Current Activity description.
+		if (self.activityLabel.length) {
+			NSMutableDictionary *actAttrs = [@{
+				NSFontAttributeName: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.88 alpha:1.0]
+			} mutableCopy];
+			[self.activityLabel drawAtPoint:NSMakePoint(16, bodyY) withAttributes:actAttrs];
+			bodyY += 18;
+		}
+
+		// 3. Recent Observable Actions (up to 3 bullets).
+		if (self.actions.count > 0) {
+			NSMutableDictionary *actionAttrs = [@{
+				NSFontAttributeName: [NSFont systemFontOfSize:10 weight:NSFontWeightRegular],
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.72 alpha:1.0]
+			} mutableCopy];
+			NSInteger limit = MIN((NSInteger)self.actions.count, 3);
+			for (NSInteger i = 0; i < limit; i++) {
+				NSString *bulletAction = [NSString stringWithFormat:@"•  %@", self.actions[i]];
+				[bulletAction drawAtPoint:NSMakePoint(18, bodyY) withAttributes:actionAttrs];
+				bodyY += 15;
+			}
+		}
+
+		// 4. Pending interaction title if present.
+		if (self.pendingTitle.length) {
+			bodyY += 2;
+			NSMutableDictionary *pendingAttrs = [@{
+				NSFontAttributeName: [NSFont systemFontOfSize:11 weight:NSFontWeightSemibold],
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.95 alpha:1.0]
+			} mutableCopy];
+			[self.pendingTitle drawAtPoint:NSMakePoint(16, bodyY) withAttributes:pendingAttrs];
+			bodyY += 18;
+		}
+
+		// 5. Metrics line (diff, tasks, elapsed).
+		if (self.metricsLabel.length) {
+			NSMutableDictionary *metricsAttrs = [@{
+				NSFontAttributeName: [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular],
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.62 alpha:1.0]
+			} mutableCopy];
+			[self.metricsLabel drawAtPoint:NSMakePoint(16, bodyY) withAttributes:metricsAttrs];
 		}
 	}
 }
@@ -231,6 +335,7 @@ static NSString *JSString(Napi::Value value) {
 - (void)mouseUp:(NSEvent *)event {
 	[self.controller mouseUp:event];
 }
+
 @end
 
 @implementation PrebaseLiveActivityController
@@ -264,7 +369,7 @@ static NSString *JSString(Napi::Value value) {
 	self.panel.opaque = NO;
 	self.panel.backgroundColor = NSColor.clearColor;
 	self.panel.hasShadow = YES;
-	// Must sit above the menu-bar clamp so the surface can attach to the physical notch band.
+	// Elevated window level to escape menu-bar clamp and connect physically to the notch.
 	self.panel.level = LiveActivityWindowLevel();
 	self.panel.collectionBehavior = NSWindowCollectionBehaviorCanJoinAllSpaces
 		| NSWindowCollectionBehaviorFullScreenAuxiliary
@@ -287,9 +392,13 @@ static NSString *JSString(Napi::Value value) {
 	self.content.accessibilityElement = YES;
 	self.content.accessibilityRole = NSAccessibilityGroupRole;
 
-	self.input = [[NSTextField alloc] initWithFrame:NSMakeRect(12, 0, 200, 22)];
-	self.input.placeholderString = @"Message Magnus";
-	self.input.font = [NSFont systemFontOfSize:12];
+	self.input = [[NSTextField alloc] initWithFrame:NSMakeRect(14, 0, 200, 24)];
+	self.input.placeholderString = @"Message Magnus...";
+	self.input.font = [NSFont systemFontOfSize:11];
+	self.input.focusRingType = NSFocusRingTypeNone;
+	self.input.bordered = YES;
+	self.input.backgroundColor = [NSColor colorWithCalibratedWhite:0.12 alpha:0.9];
+	self.input.textColor = [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
 	self.input.hidden = YES;
 	self.input.target = self;
 	self.input.action = @selector(submitFollowUp:);
@@ -352,6 +461,71 @@ static NSString *JSString(Napi::Value value) {
 	return builtin ?: [NSScreen mainScreen] ?: [NSScreen screens].firstObject;
 }
 
+- (CGFloat)measureStringWidth:(NSString *)str font:(NSFont *)font {
+	if (!str.length) {
+		return 0;
+	}
+	NSDictionary *attrs = @{ NSFontAttributeName: font };
+	return [str sizeWithAttributes:attrs].width;
+}
+
+- (CGFloat)computeLeftWingWidth {
+	NSString *label = self.content.statusLabel.length ? self.content.statusLabel : @"Magnus";
+	CGFloat textW = [self measureStringWidth:label font:[NSFont systemFontOfSize:11 weight:NSFontWeightMedium]];
+	return MIN(kWingWidthMax, MAX(kWingWidthMin, textW + 28));
+}
+
+- (CGFloat)computeRightWingWidth {
+	if (!self.content.metricsLabel.length) {
+		return kWingWidthMin;
+	}
+	CGFloat textW = [self measureStringWidth:self.content.metricsLabel font:[NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular]];
+	return MIN(kWingWidthMax, MAX(kWingWidthMin, textW + 26));
+}
+
+- (CGFloat)computeTargetContentHeight:(CGFloat)bandH {
+	BOOL expanded = self.content.expanded || self.pinned;
+	if (!expanded) {
+		return bandH;
+	}
+	// Content-aware expanded sizing:
+	// Header (22) + Activity (18) + Actions (actions.count * 15) + Pending (18) + Metrics (16) + interactive controls padding.
+	CGFloat h = bandH + 8; // Top padding below notch band
+	h += 22; // Header
+	if (self.content.activityLabel.length) {
+		h += 18;
+	}
+	if (self.content.actions.count > 0) {
+		h += MIN((NSInteger)self.content.actions.count, 3) * 15;
+	}
+	if (self.content.pendingTitle.length) {
+		h += 20;
+	}
+	if (self.content.metricsLabel.length) {
+		h += 18;
+	}
+	h += 10; // Spacing before controls
+
+	BOOL hasOptions = ([self.pendingKind isEqualToString:@"question"] && self.pendingOptions.count > 0);
+	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
+	BOOL showInput = self.pinned;
+
+	if (hasOptions) {
+		h += 30; // Options row
+	}
+	if (hasApproval) {
+		h += 28; // Approval buttons row
+	}
+	if (showInput) {
+		h += 32; // Follow-up message row
+	} else if (!hasOptions && !hasApproval) {
+		h += 24; // Open in PreBase row
+	}
+
+	h += 10; // Bottom corner inset
+	return MIN(220.0, MAX(86.0, h));
+}
+
 - (void)layoutForScreen {
 	NSScreen *screen = [self targetScreen];
 	if (!screen) {
@@ -368,25 +542,64 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat topY = NSMaxY(frame);
 	BOOL expanded = self.content.expanded || self.pinned;
 	CGFloat bandH = MAX(insets.top, kCollapsedHeight);
+
 	NSRect win;
 	if (notched) {
 		CGFloat housing = MAX(kCameraHousingMin, NSMinX(auxRight) - NSMaxX(auxLeft));
 		self.content.housingWidth = housing;
-		CGFloat totalW = kWingWidth + housing + kWingWidth;
-		CGFloat winX = NSMaxX(auxLeft) - kWingWidth;
-		CGFloat height = expanded ? kExpandedHeight : bandH;
-		win = NSMakeRect(winX, topY - height, totalW, height);
-		self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
+		CGFloat leftW = [self computeLeftWingWidth];
+		CGFloat rightW = [self computeRightWingWidth];
+		self.content.leftWingWidth = leftW;
+		self.content.rightWingWidth = rightW;
+
+		CGFloat totalW = leftW + housing + rightW;
+		CGFloat height = [self computeTargetContentHeight:bandH];
+
+		if (expanded) {
+			CGFloat minExpandedW = MAX(totalW, 360.0);
+			if (minExpandedW > totalW) {
+				totalW = minExpandedW;
+				CGFloat notchCenterX = NSMaxX(auxLeft) + housing / 2.0;
+				CGFloat winX = notchCenterX - totalW / 2.0;
+				self.content.leftWingWidth = NSMaxX(auxLeft) - winX;
+				self.content.rightWingWidth = totalW - (self.content.leftWingWidth + housing);
+				win = NSMakeRect(winX, topY - height, totalW, height);
+				self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
+			} else {
+				CGFloat winX = NSMaxX(auxLeft) - leftW;
+				win = NSMakeRect(winX, topY - height, totalW, height);
+				self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
+			}
+		} else {
+			CGFloat winX = NSMaxX(auxLeft) - leftW;
+			win = NSMakeRect(winX, topY - bandH, totalW, bandH);
+			self.collapsedHit = win;
+		}
 	} else {
 		self.content.housingWidth = 0;
-		CGFloat w = expanded ? 320 : kPillWidth;
-		CGFloat h = expanded ? kExpandedHeight : kPillHeight;
+		CGFloat height = [self computeTargetContentHeight:kPillHeight];
+		CGFloat w = expanded ? 340 : kPillWidth;
+		CGFloat h = expanded ? height : kPillHeight;
 		win = NSMakeRect(NSMidX(frame) - w / 2.0, topY - h, w, h);
-		self.collapsedHit = win;
+		self.collapsedHit = NSMakeRect(NSMidX(frame) - kPillWidth / 2.0, topY - kPillHeight, kPillWidth, kPillHeight);
 	}
 	self.lastRequestedFrame = win;
 	self.panel.level = LiveActivityWindowLevel();
-	[self.panel setFrame:win display:YES animate:NO];
+
+	if (self.reducedMotion) {
+		[self.panel setFrame:win display:YES animate:NO];
+	} else {
+		BOOL expanding = (win.size.height > self.panel.frame.size.height);
+		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
+			context.duration = expanding ? 0.26 : 0.20;
+			context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+			context.allowsImplicitAnimation = YES;
+			[[self.panel animator] setFrame:win display:YES];
+		} completionHandler:^{
+			// Frame update complete
+		}];
+	}
+	[self.content setNeedsDisplay:YES];
 	[self layoutControls:win];
 }
 
@@ -402,24 +615,38 @@ static NSString *JSString(Napi::Value value) {
 	for (NSButton *button in self.optionButtons) {
 		button.hidden = YES;
 	}
-	CGFloat y = 12;
+
+	CGFloat bandH = MAX(self.content.safeAreaTop, kCollapsedHeight);
+	if (win.size.height <= bandH + 2.0) {
+		// Collapsed state: hide all interactive body controls.
+		self.input.hidden = YES;
+		self.openButton.hidden = YES;
+		self.approveButton.hidden = YES;
+		self.denyButton.hidden = YES;
+		return;
+	}
+
+	CGFloat bottomY = win.size.height - 30;
+
 	if (showInput) {
-		self.input.frame = NSMakeRect(12, y, NSWidth(win) - 24, 24);
-		y += 30;
+		self.input.frame = NSMakeRect(14, bottomY, NSWidth(win) - 146, 24);
+		self.openButton.frame = NSMakeRect(NSWidth(win) - 128, bottomY, 114, 22);
+		bottomY -= 30;
+	} else {
+		self.openButton.frame = NSMakeRect(NSWidth(win) - 128, bottomY, 114, 22);
 	}
-	if (!self.openButton.hidden) {
-		self.openButton.frame = NSMakeRect(NSWidth(win) - 132, y, 118, 22);
-	}
+
 	if (!self.approveButton.hidden) {
 		NSString *approveTitle = self.pendingDestructive ? @"Approve (destructive)" : @"Approve";
 		self.approveButton.title = approveTitle;
 		self.approveButton.accessibilityLabel = approveTitle;
-		self.denyButton.frame = NSMakeRect(12, y, 70, 22);
-		self.approveButton.frame = NSMakeRect(88, y, 78, 22);
+		self.denyButton.frame = NSMakeRect(14, bottomY, 68, 22);
+		self.approveButton.frame = NSMakeRect(86, bottomY, self.pendingDestructive ? 144 : 78, 22);
 	}
+
 	if (question && showAttention) {
 		NSInteger count = MIN((NSInteger)self.pendingOptions.count, (NSInteger)self.optionButtons.count);
-		CGFloat x = 12;
+		CGFloat x = 14;
 		for (NSInteger i = 0; i < count; i++) {
 			NSDictionary *option = self.pendingOptions[i];
 			NSButton *button = self.optionButtons[i];
@@ -427,14 +654,21 @@ static NSString *JSString(Napi::Value value) {
 			button.title = label;
 			button.accessibilityLabel = label;
 			button.hidden = NO;
-			CGFloat width = MIN(120, MAX(64, label.length * 7.0));
-			if (x + width > NSWidth(win) - 140) {
-				x = 12;
-				y += 26;
+			CGFloat width = MIN(130, MAX(64, label.length * 7.0 + 16.0));
+			if (x + width > NSWidth(win) - 134) {
+				x = 14;
+				bottomY -= 26;
 			}
-			button.frame = NSMakeRect(x, y, width, 22);
-			x += width + 8;
+			button.frame = NSMakeRect(x, bottomY, width, 22);
+			x += width + 6;
 		}
+	}
+}
+
+- (void)performUserHaptic {
+	id<NSHapticFeedbackPerformer> performer = [NSHapticFeedbackManager defaultPerformer];
+	if (performer) {
+		[performer performFeedbackPattern:NSHapticFeedbackPatternGeneric performanceTime:NSHapticFeedbackPerformanceTimeNow];
 	}
 }
 
@@ -449,6 +683,12 @@ static NSString *JSString(Napi::Value value) {
 			return;
 		}
 		NSPoint p = [NSEvent mouseLocation];
+		NSScreen *screen = [strong targetScreen];
+		if (screen && !NSPointInRect(p, screen.frame)) {
+			// Pointer is on another display; ignore
+			[strong pointerInside:NO];
+			return;
+		}
 		BOOL inside = NSPointInRect(p, strong.collapsedHit) || (strong.content.expanded && NSPointInRect(p, strong.panel.frame));
 		[strong pointerInside:inside];
 	}];
@@ -478,6 +718,22 @@ static NSString *JSString(Napi::Value value) {
 	}
 }
 
+- (void)mouseEnteredInView:(NSEvent *)event {
+	[self.exitTimer invalidate];
+	self.exitTimer = nil;
+}
+
+- (void)mouseExitedFromView:(NSEvent *)event {
+	if (self.pinned || !self.content.expanded) {
+		return;
+	}
+	[self.exitTimer invalidate];
+	__weak PrebaseLiveActivityController *weakSelf = self;
+	self.exitTimer = [NSTimer scheduledTimerWithTimeInterval:0.10 repeats:NO block:^(NSTimer *timer) {
+		[weakSelf collapse];
+	}];
+}
+
 - (void)pointerInside:(BOOL)inside {
 	if (self.pinned) {
 		return;
@@ -490,6 +746,7 @@ static NSString *JSString(Napi::Value value) {
 			[self.hoverTimer invalidate];
 			__weak PrebaseLiveActivityController *weakSelf = self;
 			self.hoverTimer = [NSTimer scheduledTimerWithTimeInterval:0.15 repeats:NO block:^(NSTimer *timer) {
+				[weakSelf performUserHaptic];
 				[weakSelf expandPreview];
 			}];
 		}
@@ -499,6 +756,7 @@ static NSString *JSString(Napi::Value value) {
 		self.hovering = NO;
 		if (self.content.expanded) {
 			__weak PrebaseLiveActivityController *weakSelf = self;
+			[self.exitTimer invalidate];
 			self.exitTimer = [NSTimer scheduledTimerWithTimeInterval:0.10 repeats:NO block:^(NSTimer *timer) {
 				[weakSelf collapse];
 			}];
@@ -563,22 +821,26 @@ static NSString *JSString(Napi::Value value) {
 	if (text.length == 0) {
 		return;
 	}
+	[self performUserHaptic];
 	[self emit:@"followUp" extras:@{ @"text": text }];
 	self.input.stringValue = @"";
 }
 
 - (void)openInPrebase:(id)sender {
+	[self performUserHaptic];
 	self.pinned = NO;
 	[self emit:@"openInPrebase" extras:nil];
 	[self collapse];
 }
 
 - (void)approve:(id)sender {
+	[self performUserHaptic];
 	[self emit:@"approve" extras:@{ @"interactionId": self.interactionId ?: @"" }];
 	[self clearPendingInteraction];
 }
 
 - (void)deny:(id)sender {
+	[self performUserHaptic];
 	[self emit:@"deny" extras:@{ @"interactionId": self.interactionId ?: @"" }];
 	[self clearPendingInteraction];
 }
@@ -593,6 +855,7 @@ static NSString *JSString(Napi::Value value) {
 	if (optionId.length == 0) {
 		return;
 	}
+	[self performUserHaptic];
 	NSString *interactionId = self.interactionId ?: @"";
 	[self emit:@"answer" extras:@{
 		@"interactionId": interactionId,
@@ -766,6 +1029,7 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)mouseUp:(NSEvent *)event {
 	if (!self.pinned) {
+		[self performUserHaptic];
 		self.pinned = YES;
 		self.content.expanded = YES;
 		self.panel.ignoresMouseEvents = NO;
@@ -1090,4 +1354,3 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 }
 
 NODE_API_MODULE(prebase_live_activity, Init)
-

@@ -974,7 +974,7 @@ suite('Magnus Live Activity pending projection (runtime)', () => {
 			resolveId: 'resolve-x',
 			isUsed: false,
 		};
-		assert.strictEqual(extractPending({ response: { entireResponse: { value: [carousel] } } } as IChatRequestModel), undefined);
+		assert.strictEqual(extractPending({ response: { entireResponse: { value: [carousel] } } } as unknown as IChatRequestModel), undefined);
 	});
 });
 
@@ -1037,7 +1037,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => model,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { },
 			},
 			logService: { info: () => { } },
@@ -1051,7 +1051,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => model,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { },
 			},
 			logService: { info: () => { } },
@@ -1095,7 +1095,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => model,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: (requestId, resolveId, answers) => {
 					answerArgs = { requestId, resolveId, answers: answers ?? {} };
 				},
@@ -1143,7 +1143,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => model,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { notified = true; },
 			},
 			logService: { info: () => { } },
@@ -1177,7 +1177,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 					lastRequest: executedRequest,
 					getRequests: () => [executedRequest],
 				} as IChatModel),
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { confirmCount++; },
 			},
 			logService: { info: () => { } },
@@ -1197,7 +1197,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => undefined,
-				sendRequest: async (resource, text) => { sent = { resource, text }; },
+				sendRequest: async (resource, text) => { sent = { resource, text }; return {} as any; },
 				notifyQuestionCarouselAnswer: () => { },
 			},
 			logService: { info: () => { } },
@@ -1226,7 +1226,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => wrongModel,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { },
 			},
 			logService: { info: msg => logs.push(msg) },
@@ -1242,7 +1242,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 			isUsed: false,
 		};
 		const questionRequest = mockRequest([carousel], 'req-q');
-		const questionModel = { sessionId: 'sess-1', lastRequest: questionRequest, getRequests: () => [questionRequest] } as IChatModel;
+		void questionRequest;
 		let notified = false;
 		logs.length = 0;
 		const questionSnap = buildMagnusLiveActivitySnapshot(session({
@@ -1266,7 +1266,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => undefined,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { notified = true; },
 			},
 			logService: { info: msg => logs.push(msg) },
@@ -1308,7 +1308,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => model,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { notified = true; },
 			},
 			logService: { info: msg => logs.push(msg) },
@@ -1349,7 +1349,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => questionModel,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { },
 			},
 			logService: { info: msg => logs.push(msg) },
@@ -1379,7 +1379,7 @@ suite('Magnus Live Activity session command dispatch (runtime)', () => {
 		}, {
 			chatService: {
 				getSession: () => approvalModel,
-				sendRequest: async () => undefined,
+				sendRequest: async () => ({} as any),
 				notifyQuestionCarouselAnswer: () => { notified = true; },
 			},
 			logService: { info: msg => logs.push(msg) },
@@ -1765,3 +1765,91 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.doesNotMatch(stub, /setSnapshot|setPresentation|NSPanel|AppKit/);
 	});
 });
+
+suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction contracts', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
+
+	test('native wing widths scale dynamically between min and max based on measured content', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /computeLeftWingWidth/);
+		assert.match(native, /computeRightWingWidth/);
+		assert.match(native, /measureStringWidth/);
+		assert.match(native, /kWingWidthMin = 52/);
+		assert.match(native, /kWingWidthMax = 136/);
+		assert.doesNotMatch(native, /const CGFloat kWingWidth = 124;/);
+	});
+
+	test('native expanded height scales dynamically from content rather than a fixed 200pt slab', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /computeTargetContentHeight:/);
+		assert.match(native, /recentActions/);
+		assert.match(native, /pendingTitle/);
+		assert.match(native, /pendingOptions/);
+		assert.match(native, /metricsLabel/);
+		assert.doesNotMatch(native, /const CGFloat kExpandedHeight = 200;/);
+	});
+
+	test('native uses optical black fill to eliminate ghosting behind camera housing', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /colorWithCalibratedWhite:0\.035 alpha:0\.99/);
+		assert.doesNotMatch(native, /colorWithCalibratedWhite:0\.07 alpha:0\.94/);
+	});
+
+	test('native integrates NSHapticFeedbackManager on hover threshold and user interactions', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /performUserHaptic/);
+		assert.match(native, /NSHapticFeedbackManager defaultPerformer/);
+		assert.match(native, /NSHapticFeedbackPatternGeneric/);
+		assert.match(native, /NSHapticFeedbackPerformanceTimeNow/);
+
+		const hoverStart = native.indexOf('- (void)pointerInside:(BOOL)inside {');
+		const hoverEnd = native.indexOf('- (void)expandPreview {');
+		const hover = native.slice(hoverStart, hoverEnd);
+		assert.match(hover, /performUserHaptic/);
+
+		const controllerImpl = native.indexOf('@implementation PrebaseLiveActivityController');
+		const mouseUpStart = native.indexOf('- (void)mouseUp:(NSEvent *)event {', controllerImpl);
+		const mouseUpEnd = native.indexOf('- (void)applySnapshotDict:', mouseUpStart);
+		const mouseUp = native.slice(mouseUpStart, mouseUpEnd);
+		assert.match(mouseUp, /performUserHaptic/);
+	});
+
+	test('native tracking model pairs global monitor with active NSTrackingArea and exit grace', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /NSTrackingArea/);
+		assert.match(native, /updateTrackingAreas/);
+		assert.match(native, /NSTrackingMouseEnteredAndExited/);
+		assert.match(native, /mouseEnteredInView:/);
+		assert.match(native, /mouseExitedFromView:/);
+		assert.match(native, /exitTimer/);
+	});
+
+	test('interactive controls are placed strictly below the physical notch safe area', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		const layoutControlsStart = native.indexOf('- (void)layoutControls:(NSRect)win {');
+		const layoutControlsEnd = native.indexOf('- (void)performUserHaptic {', layoutControlsStart);
+		const layoutControls = native.slice(layoutControlsStart, layoutControlsEnd);
+		assert.match(layoutControls, /bandH = MAX\(self\.content\.safeAreaTop, kCollapsedHeight\)/);
+		assert.match(layoutControls, /bottomY = win\.size\.height - 30/);
+		assert.match(layoutControls, /openButton\.frame = NSMakeRect\(NSWidth\(win\) - 128/);
+	});
+
+	test('retargetable animation handles spring group and honors reducedMotion setting', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /NSAnimationContext runAnimationGroup:/);
+		assert.match(native, /kCAMediaTimingFunctionEaseInEaseOut/);
+		assert.match(native, /\[\[self\.panel animator\] setFrame:win display:YES\]/);
+		assert.match(native, /if \(self\.reducedMotion\)/);
+		assert.match(native, /\[self\.panel setFrame:win display:YES animate:NO\]/);
+	});
+
+	test('completion hold timer auto-retracts and publishes when completed hold expires', () => {
+		const contrib = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
+		assert.match(contrib, /_completionTimer/);
+		assert.match(contrib, /_completionTimer\.schedule\(LIVE_ACTIVITY_COMPLETED_HOLD_MS/);
+		assert.match(contrib, /_completionTimer\.cancel\(\)/);
+		assert.match(contrib, /_completionHidden = true/);
+	});
+});
+

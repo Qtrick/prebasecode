@@ -52,7 +52,7 @@ import {
 	type MagnusLiveActivitySessionInput,
 	type MagnusLiveActivitySnapshot,
 } from '../../../../platform/prebaseLiveActivity/common/magnusLiveActivity.js';
-import { applyMagnusLiveActivitySessionCommand, extractPending, extractPendingFromModel } from './magnusLiveActivitySession.js';
+import { applyMagnusLiveActivitySessionCommand, extractPendingFromModel } from './magnusLiveActivitySession.js';
 
 function asPlainText(value: unknown): string {
 	if (!value) {
@@ -277,6 +277,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	private _lastSnapshot: MagnusLiveActivitySnapshot | undefined;
 	private readonly _modelListeners = this._register(new DisposableStore());
 	private readonly _push: RunOnceScheduler;
+	private readonly _completionTimer: RunOnceScheduler;
 
 	constructor(
 		@IChatService private readonly chatService: IChatService,
@@ -295,6 +296,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	) {
 		super();
 		this._push = this._register(new RunOnceScheduler(() => this._publish(), 120));
+		this._completionTimer = this._register(new RunOnceScheduler(() => this._publish(), LIVE_ACTIVITY_COMPLETED_HOLD_MS));
 		if (isWeb || !isMacintosh) {
 			return;
 		}
@@ -404,9 +406,11 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		if (terminalStatus && prevStatus !== snapshot.status) {
 			this._completionHoldUntil = Date.now() + LIVE_ACTIVITY_COMPLETED_HOLD_MS;
 			this._completionHidden = false;
+			this._completionTimer.schedule(LIVE_ACTIVITY_COMPLETED_HOLD_MS + 25);
 		} else if (!terminalStatus) {
 			this._completionHoldUntil = undefined;
 			this._completionHidden = false;
+			this._completionTimer.cancel();
 		} else if (this._completionHoldUntil !== undefined && Date.now() >= this._completionHoldUntil && !this._pinned) {
 			this._completionHidden = true;
 		}
@@ -448,11 +452,20 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		if (command.kind === 'pin') {
 			this._pinned = true;
 			this._completionHidden = false;
+			this._completionTimer.cancel();
 			this._push.schedule();
 			return;
 		}
 		if (command.kind === 'unpin') {
 			this._pinned = false;
+			if (this._completionHoldUntil !== undefined) {
+				const remaining = this._completionHoldUntil - Date.now();
+				if (remaining > 0) {
+					this._completionTimer.schedule(remaining + 25);
+				} else {
+					this._completionHidden = true;
+				}
+			}
 			this._push.schedule();
 			return;
 		}
