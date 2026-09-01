@@ -15,7 +15,7 @@
     ✔ zoomed-out pick still hits near node (not world-fixed Network radius)
 
 
-  7 passing (3ms)
+  7 passing (2ms)
 
 
 
@@ -36,7 +36,7 @@
     ✔ structural digest is invariant to node and edge ordering in input
 
 
-  14 passing (50ms)
+  14 passing (52ms)
 
 
 
@@ -58,7 +58,7 @@
     ✔ accepts cancellation through the narrow IPC channel rather than a ProxyChannel method argument
 
 
-  4 passing (8ms)
+  4 passing (7ms)
 
 
 
@@ -76,10 +76,10 @@
     ✔ indexes nodes by ID and by relative and file: paths
     ✔ indexes incoming and outgoing edges for instant traversal
     ✔ indexes nodes by architecture layer and collects unique languages
-    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (97ms)
+    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (102ms)
 
 
-  4 passing (100ms)
+  4 passing (104ms)
 
 
 
@@ -91,7 +91,7 @@
     ✔ 5. layoutClustered produces deterministic, finite 3D coordinates on sphere
 
 
-  5 passing (8ms)
+  5 passing (9ms)
 
 
 
@@ -101,20 +101,20 @@
     ✔ visits a wide cyclic import topology once and preserves its breadth-first depths
 
 
-  3 passing (16ms)
+  3 passing (15ms)
 
 
 
   Production Git Bridge & Real Git Fixture E2E Tests
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ root commit diff with --root captures all initial files and blob OIDs (58ms)
+    ✔ root commit diff with --root captures all initial files and blob OIDs (51ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
     ✔ divergent branches: exact tree diff vs review range (merge-base) diff (114ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ rename tracking captures old and new paths with similarity score (60ms)
+    ✔ rename tracking captures old and new paths with similarity score (64ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
     ✔ comment-only commit invariant: exact tree diff detects blob change, canonical AST is identical (188ms)
@@ -126,28 +126,28 @@ Switched to branch 'main'
     ✔ safely rejects option injection in refs
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ handles unborn repository gracefully without throwing or stalling (71ms)
+    ✔ handles unborn repository gracefully without throwing or stalling (66ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (106ms)
+    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (102ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (2397ms)
+    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (2114ms)
 
 
-  9 passing (7s)
+  9 passing (6s)
 
 
 
   GitHistoryService & Node Adapter Unit Tests
-    ✔ isGitRepository and getRepositoryIdentity (47ms)
+    ✔ isGitRepository and getRepositoryIdentity (40ms)
     ✔ listBranches parses branch names and commits cleanly via %00
     ✔ listTags distinguishes lightweight from annotated tags and peels annotated tags
-    ✔ resolveRef strictly resolves commits with --verify and throws UnknownRef for invalid refs (42ms)
+    ✔ resolveRef strictly resolves commits with --verify and throws UnknownRef for invalid refs
     ✔ log returns bounded commits with machine-stable timestamps and parent links
     ✔ listTree parses objectId, mode, and size using -l
-    ✔ diffCommitTrees captures rename and modifications with exact blob hashes (56ms)
-    ✔ diffCommitToParent for root commit correctly diffs against empty tree (69ms)
+    ✔ diffCommitTrees captures rename and modifications with exact blob hashes (44ms)
+    ✔ diffCommitToParent for root commit correctly diffs against empty tree (54ms)
     ✔ HEAD change observer notifies on event fire
 
 
@@ -173,13 +173,13 @@ Switched to branch 'main'
 
 
   GitTreeHistoricalAnalysis Integration Tests
-    ✔ analyzes historical commit 1 without checkout (64ms)
-    ✔ analyzes historical commit 2 without checkout (66ms)
-    ✔ diffs historical snapshots 1 and 2 yielding exact structural diff (111ms)
-    ✔ dirty working tree changes do NOT contaminate historical git analysis (56ms)
+    ✔ analyzes historical commit 1 without checkout (55ms)
+    ✔ analyzes historical commit 2 without checkout (54ms)
+    ✔ diffs historical snapshots 1 and 2 yielding exact structural diff (98ms)
+    ✔ dirty working tree changes do NOT contaminate historical git analysis (47ms)
 
 
-  4 passing (913ms)
+  4 passing (809ms)
 
 
 
@@ -193,7 +193,7 @@ Switched to branch 'main'
     ✔ 7. Maps/graph chrome uses vscode focus and button tokens, not a hardcoded teal
 
 
-  7 passing (9ms)
+  7 passing (8ms)
 
 
 
@@ -205,7 +205,7 @@ Switched to branch 'main'
     ✔ 3. File edit -> 0 AI calls on save, exactly 1 lazy AI call on next view
     ✔ 4. Unrelated file edit -> 0 extra AI calls for other nodes
     ✔ 5. Stale in-flight race protection: discards result if file changed during in-flight generation
-    ✔ 6. Persistence across restart and 500-node scale capacity (72ms)
+    ✔ 6. Persistence across restart and 500-node scale capacity (67ms)
     ✔ 7. Restart freshness: external edit while closed prevents stale peek and updates on view
     ✔ 8. Prompt semantic fingerprint: layer or imports change invalidates cache
     ✔ 9. Multi-root workspace: events in Folder B do not invalidate Folder A
@@ -214,7 +214,7 @@ Switched to branch 'main'
     ✔ 12. Explicit projectRoot isolates identical relative paths across workspace folders
 
 
-  14 passing (90ms)
+  14 passing (85ms)
 
 
 
@@ -231,7 +231,7 @@ Switched to branch 'main'
     ✔ responsive stage resize shifts camera center by half delta while preserving zoom, pan, and rotation
 
 
-  10 passing (25ms)
+  10 passing (18ms)
 
 
 
@@ -259,7 +259,7 @@ Switched to branch 'main'
     ✔ reduced motion snaps Temporal interpolation without exploding layout
 
 
-  21 passing (67ms)
+  21 passing (58ms)
 
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
     at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
@@ -392,7 +392,7 @@ Switched to branch 'main'
     ✔ 26. Temporal focus caps zoom at 3.2 for ≤4 nodes and 2.4 for 5+; Full Map caps at 2.4
 
 
-  27 passing (64ms)
+  27 passing (53ms)
 
 
 
@@ -414,7 +414,7 @@ Switched to branch 'main'
     ✔ prebaseSettingsEditor routes through graphSettingsUi and does not bind PreBaseGraphConfigKeys
 
 
-  5 passing (24ms)
+  5 passing (25ms)
 
 
 
@@ -447,9 +447,9 @@ Switched to branch 'main'
 
 
   Graph visual recovery contracts
-    ✔ organic ~280-node stress stays bounded and readable under production Fit View (102ms)
+    ✔ organic ~280-node stress stays bounded and readable under production Fit View (93ms)
     ✔ organic collision spacing expands locally without dropping isolates from the layout
-    ✔ remaining network layouts keep disconnected components without dropping nodes (53ms)
+    ✔ remaining network layouts keep disconnected components without dropping nodes (52ms)
     ✔ network screen-aware radii stay readable at Fit zooms; uncompensated vanishes at k=0.2
     ✔ network fit transform uses production clamps and rejects the old 0.6–1.4 helper band
     ✔ temporal deep community chain stays compact (not a tall vertical stripe)
@@ -459,7 +459,7 @@ Switched to branch 'main'
     ✔ a 9679-dot Full Map blob is structurally ok but not visually good without node-level LOD
 
 
-  10 passing (196ms)
+  10 passing (188ms)
 
 
 
@@ -482,7 +482,7 @@ Switched to branch 'main'
     ✔ Identical structural state detection on comment-only change
 
 
-  5 passing (20ms)
+  5 passing (19ms)
 
 
 
@@ -492,7 +492,7 @@ Switched to branch 'main'
     ✔ does not let non-import topology change import-importance organization
 
 
-  3 passing (7ms)
+  3 passing (8ms)
 
 
 
@@ -503,7 +503,7 @@ Switched to branch 'main'
     ✔ entryNodeId parameter parity: runtime copy derives entry emphasis exactly like the module resolver
 
 
-  4 passing (5ms)
+  4 passing (6ms)
 
 
 
@@ -536,7 +536,7 @@ Switched to branch 'main'
     ✔ network runtime collision, link-distance, and force controls retain all nodes
 
 
-  11 passing (37ms)
+  11 passing (34ms)
 
 
 
@@ -549,7 +549,7 @@ Switched to branch 'main'
     ✔ 6. Label LOD Policy: Overview mode displays only high-importance nodes; deep zoom shows detail
 
 
-  6 passing (4ms)
+  6 passing (3ms)
 
 
 
@@ -559,7 +559,7 @@ Switched to branch 'main'
     ✔ serialized label font size matches module at low Fit zoom
 
 
-  3 passing (3ms)
+  3 passing (4ms)
 
 
 
@@ -625,7 +625,7 @@ Switched to branch 'main'
     ✔ rejects a future schema version without rewriting it
     ✔ rolls back a v1 migration when legacy parent topology is malformed
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-TjAh6E',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-JX89IO',
   resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T',
   ext: '.db',
   isSymlink: false,
@@ -686,11 +686,11 @@ Switched to branch 'main'
     ✔ Electron-main store owner quarantines one corrupt derived cache and recreates it without touching siblings
     ✔ Electron-main store owner bounds DB, WAL, and SHM quarantine companions by generation
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-6tRFl4',
-  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-6tRFl4/nested',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu/nested',
   ext: '.db',
   isSymlink: false,
-  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-6tRFl4/nested/store.db'
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu/nested/store.db'
 }
 [TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
     at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
@@ -710,11 +710,11 @@ Switched to branch 'main'
     at done (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:308:5)
     at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:369:11
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-6tRFl4',
-  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-6tRFl4',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu',
   ext: '.db',
   isSymlink: true,
-  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-6tRFl4/linked.db'
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu/linked.db'
 }
 [TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
     at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
@@ -738,18 +738,18 @@ Switched to branch 'main'
     ✔ blob analysis cache persists and retrieves entries
 
 
-  33 passing (289ms)
+  33 passing (260ms)
 
 
 
   Temporal bounded cold-history indexing
     ✔ keeps metadata browsing cheap and indexes one isolated checkpoint from a 50,000-commit cold history
     ✔ does not start Git or parser work for a pre-cancelled cold-history selection
-    ✔ reconciles an isolated child anchor after its parent segment is indexed (66ms)
-    ✔ multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D) (52ms)
+    ✔ reconciles an isolated child anchor after its parent segment is indexed
+    ✔ multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D) (39ms)
 
 
-  4 passing (195ms)
+  4 passing (115ms)
 
 
 
@@ -762,7 +762,7 @@ Switched to branch 'main'
     ✔ 6. Duplicate empty/template blobs fail closed without arbitrary incorrect pairing
 
 
-  6 passing (8ms)
+  6 passing (7ms)
 
 
 
@@ -805,7 +805,7 @@ Switched to branch 'main'
     ✔ 8. A sparse single connected cluster is scaled into a compact disc
 
 
-  10 passing (19ms)
+  10 passing (17ms)
 
 
 
@@ -824,17 +824,17 @@ Switched to branch 'main'
 
 
   Temporal Graph E2E Ingestion & Reconstruction
-    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (575ms)
-    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (1404ms)
-    ✔ Handles branch merge commits and preserves multi-parent DAG relations (1327ms)
-    ✔ scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order (1068ms)
-    ✔ exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs (724ms)
-    ✔ Ingests commits in a SHA-256 repository (273ms)
-    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (638ms)
-    ✔ Multi-root concurrent event routing and FIFO ingestion queue (627ms)
+    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (395ms)
+    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (1180ms)
+    ✔ Handles branch merge commits and preserves multi-parent DAG relations (1007ms)
+    ✔ scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order (818ms)
+    ✔ exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs (618ms)
+    ✔ Ingests commits in a SHA-256 repository (242ms)
+    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (550ms)
+    ✔ Multi-root concurrent event routing and FIFO ingestion queue (502ms)
 
 
-  8 passing (7s)
+  8 passing (5s)
 
 
 
@@ -874,7 +874,7 @@ Switched to branch 'main'
     ✔ 5. Sparse rank stagger stays permutation-invariant
 
 
-  5 passing (26ms)
+  5 passing (28ms)
 
 
 
@@ -895,11 +895,11 @@ Switched to branch 'main'
 
 
   Temporal Live Acceptance Evaluation
-    ✔ zero received and drawn nodes with an unopened target fails closed (162ms)
-    ✔ representative rendered evidence passes without failures (156ms)
+    ✔ zero received and drawn nodes with an unopened target fails closed (151ms)
+    ✔ representative rendered evidence passes without failures (148ms)
 
 
-  2 passing (319ms)
+  2 passing (300ms)
 
 
 
@@ -929,7 +929,7 @@ Switched to branch 'main'
       ✔ projectTemporalVisibleSet overview matches host for community aggregates
 
 
-  19 passing (6ms)
+  19 passing (5ms)
 
 
 
@@ -946,7 +946,7 @@ Switched to branch 'main'
     ✔ empty or undefined inputs yield an empty projection without throwing
 
 
-  10 passing (13ms)
+  10 passing (12ms)
 
 
 
@@ -964,7 +964,7 @@ Switched to branch 'main'
     ✔ active sequencer work rejects on disposal even if the inner task ignores cancellation
     ✔ countActiveWrites uses hasActiveWrite, not CPU or indexingSeen
     ✔ countActiveWrites includes in-flight ingest, not CPU
-    ✔ non-cooperative store write prevents close until hasActiveWrite clears (42ms)
+    ✔ non-cooperative store write prevents close until hasActiveWrite clears (45ms)
     ✔ disposal is idempotent, rejects new work, and closes the store exactly once
     ✔ reports repository failures as structured diagnostics instead of unregistered without context
     ✔ reports persisted cache corruption as failed instead of masking it as an unregistered repository
@@ -974,15 +974,15 @@ Switched to branch 'main'
     ✔ derives incomplete status from persisted canonical coverage after runtime restart
 
 
-  21 passing (49ms)
+  21 passing (51ms)
 
 
 
   Temporal Service E2E Tests (Phase 3.5)
-    ✔ Full Phase 3.5 Lifecycle: DAG, Bounded Navigation, Relative Stepping, Renamed+Modified, Pinned Compare & Zero-byte Empty Tree (4931ms)
+    ✔ Full Phase 3.5 Lifecycle: DAG, Bounded Navigation, Relative Stepping, Renamed+Modified, Pinned Compare & Zero-byte Empty Tree (3881ms)
 
 
-  1 passing (5s)
+  1 passing (4s)
 
 
 
@@ -990,10 +990,10 @@ Switched to branch 'main'
     ✔ stores only structural transitions across a long unchanged delta run
     ✔ records observed-at-anchor for cold checkpoints and replaces them with transitions upon reconciliation
     ✔ garbage collects obsolete provisional master entity and edge records upon reconciliation
-    ✔ proves sparse order-of-growth across 100 commits with 500 entities and 500 edges (314ms)
+    ✔ proves sparse order-of-growth across 100 commits with 500 entities and 500 edges (268ms)
 
 
-  4 passing (350ms)
+  4 passing (300ms)
 
 
 
@@ -1007,7 +1007,7 @@ Switched to branch 'main'
     ✔ 7. Empty / Idle State: When no commits exist, returns No History
 
 
-  7 passing (3ms)
+  7 passing (2ms)
 
 
 
@@ -1069,7 +1069,7 @@ Switched to branch 'main'
 
   WorkbenchTemporalViewService (Unit - Phase 3.4 Hardening)
     ✔ 1. selectRef loads paged commit timeline, positions nodes, and selects HEAD
-    ✔ 2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state (161ms)
+    ✔ 2. Scrubbing with debouncing: rapid selectCommit coalesces and updates selection state (162ms)
     ✔ 3. Base-before-target indexing ordering & LRU diff cache
     ✔ 4. openSourceDiff operates on rendered diff commit SHAs with getEmptyTree
     ✔ 5. openHistoricalFile opens revision at rendered commit via EditorService
@@ -1086,6 +1086,6 @@ Switched to branch 'main'
     ✔ stale layout version discards poisoned positions; matching version preserves mental map
 
 
-  16 passing (268ms)
+  16 passing (270ms)
 
 [graphs:unit-tests] All 58 test files passed successfully.

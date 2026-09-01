@@ -1,0 +1,286 @@
+{
+  "timestamp": "2026-09-01T03:21:31.187Z",
+  "platform": "darwin",
+  "arch": "arm64",
+  "tests": [
+    {
+      "name": "hidden-baseline",
+      "ok": true,
+      "details": {
+        "diag": {
+          "requestedFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
+          },
+          "panelFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 280,
+            "height": 36
+          },
+          "panelVisible": false,
+          "panelCreated": true,
+          "auxiliaryTopLeftArea": {
+            "y": 950,
+            "x": 0,
+            "width": 663,
+            "height": 32
+          },
+          "pinned": false,
+          "questionButtonLabels": [],
+          "accessibilityLabel": "Magnus live activity",
+          "hapticCount": 0,
+          "panelLevel": 3,
+          "animationCount": 0,
+          "screenTopY": 982,
+          "trackingAreaCount": 0,
+          "redrawCount": 0,
+          "layerBacked": true,
+          "exitGraceMs": 250,
+          "continuousMorphSupported": true,
+          "keyWindow": false,
+          "pendingKind": "",
+          "expanded": false,
+          "statusLabel": "",
+          "collapsedHit": {
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
+          },
+          "safeAreaTop": 32,
+          "auxiliaryTopRightArea": {
+            "y": 950,
+            "x": 848,
+            "width": 664,
+            "height": 32
+          },
+          "openInPreBaseVisible": false,
+          "lastNativeCommand": "",
+          "hoverDwellMs": 180,
+          "topAnchorDelta": 946,
+          "pendingTitle": "",
+          "questionButtonCount": 0,
+          "accessibilityRole": "AXGroup",
+          "screenLocalizedName": "Built-in Retina Display",
+          "approvalControlsVisible": false,
+          "interactionId": "",
+          "screenFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 1512,
+            "height": 982
+          },
+          "hovered": false,
+          "activityLabel": "",
+          "notchDetected": false,
+          "globalMonitorInstalled": false,
+          "panelTopY": 36,
+          "transitionInFlight": false,
+          "activeInputControl": "none",
+          "localMonitorInstalled": false,
+          "metricsLabel": ""
+        }
+      }
+    },
+    {
+      "name": "collapsed-idle-monitoring",
+      "ok": true,
+      "details": {
+        "diagCollapsed": {
+          "requestedFrame": {
+            "y": 948,
+            "x": 591,
+            "width": 309,
+            "height": 34
+          },
+          "panelFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 280,
+            "height": 36
+          },
+          "panelVisible": true,
+          "panelCreated": true,
+          "auxiliaryTopLeftArea": {
+            "y": 950,
+            "x": 0,
+            "width": 663,
+            "height": 32
+          },
+          "pinned": false,
+          "questionButtonLabels": [],
+          "accessibilityLabel": "Magnus live activity",
+          "hapticCount": 0,
+          "panelLevel": 2147483630,
+          "animationCount": 2,
+          "screenTopY": 982,
+          "trackingAreaCount": 0,
+          "redrawCount": 2,
+          "layerBacked": true,
+          "exitGraceMs": 250,
+          "continuousMorphSupported": true,
+          "keyWindow": false,
+          "pendingKind": "",
+          "expanded": false,
+          "statusLabel": "",
+          "collapsedHit": {
+            "y": 948,
+            "x": 591,
+            "width": 309,
+            "height": 34
+          },
+          "safeAreaTop": 32,
+          "auxiliaryTopRightArea": {
+            "y": 950,
+            "x": 848,
+            "width": 664,
+            "height": 32
+          },
+          "openInPreBaseVisible": false,
+          "lastNativeCommand": "",
+          "hoverDwellMs": 180,
+          "topAnchorDelta": 946,
+          "pendingTitle": "",
+          "questionButtonCount": 0,
+          "accessibilityRole": "AXGroup",
+          "screenLocalizedName": "Built-in Retina Display",
+          "approvalControlsVisible": false,
+          "interactionId": "",
+          "screenFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 1512,
+            "height": 982
+          },
+          "notchGeometry": {
+            "trailingX": 848,
+            "centerX": 755.5,
+            "width": 185,
+            "leadingX": 663,
+            "height": 34
+          },
+          "hovered": false,
+          "notchDetected": true,
+          "activityLabel": "",
+          "panelTopY": 36,
+          "globalMonitorInstalled": true,
+          "transitionInFlight": true,
+          "activeInputControl": "none",
+          "localMonitorInstalled": true,
+          "metricsLabel": ""
+        }
+      }
+    },
+    {
+      "name": "morphing-stress-100-cycles",
+      "ok": true,
+      "details": {
+        "duration100CyclesMs": 200,
+        "diagAfterStress": {
+          "requestedFrame": {
+            "y": 874,
+            "x": 575.5,
+            "width": 360,
+            "height": 108
+          },
+          "panelFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 280,
+            "height": 36
+          },
+          "panelVisible": true,
+          "panelCreated": true,
+          "auxiliaryTopLeftArea": {
+            "y": 950,
+            "x": 0,
+            "width": 663,
+            "height": 32
+          },
+          "pinned": false,
+          "questionButtonLabels": [],
+          "accessibilityLabel": "Magnus live activity",
+          "hapticCount": 0,
+          "panelLevel": 2147483630,
+          "animationCount": 202,
+          "screenTopY": 982,
+          "trackingAreaCount": 0,
+          "redrawCount": 202,
+          "layerBacked": true,
+          "exitGraceMs": 250,
+          "continuousMorphSupported": true,
+          "keyWindow": false,
+          "pendingKind": "",
+          "expanded": true,
+          "statusLabel": "",
+          "collapsedHit": {
+            "y": 948,
+            "x": 575.5,
+            "width": 360,
+            "height": 34
+          },
+          "safeAreaTop": 32,
+          "auxiliaryTopRightArea": {
+            "y": 950,
+            "x": 848,
+            "width": 664,
+            "height": 32
+          },
+          "openInPreBaseVisible": true,
+          "lastNativeCommand": "",
+          "hoverDwellMs": 180,
+          "topAnchorDelta": 946,
+          "pendingTitle": "",
+          "questionButtonCount": 0,
+          "accessibilityRole": "AXGroup",
+          "screenLocalizedName": "Built-in Retina Display",
+          "approvalControlsVisible": false,
+          "interactionId": "",
+          "screenFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 1512,
+            "height": 982
+          },
+          "notchGeometry": {
+            "trailingX": 848,
+            "centerX": 755.5,
+            "width": 185,
+            "leadingX": 663,
+            "height": 34
+          },
+          "hovered": false,
+          "notchDetected": true,
+          "activityLabel": "",
+          "panelTopY": 36,
+          "globalMonitorInstalled": false,
+          "transitionInFlight": true,
+          "activeInputControl": "none",
+          "localMonitorInstalled": true,
+          "metricsLabel": ""
+        }
+      }
+    },
+    {
+      "name": "user-simulation-actions",
+      "ok": true,
+      "details": {
+        "optionSimResult": true,
+        "followUpSim": true
+      }
+    },
+    {
+      "name": "memory-stability",
+      "ok": true,
+      "details": {
+        "heapDiffKb": 81,
+        "heapUsedMb": 4.4
+      }
+    }
+  ],
+  "failures": [],
+  "ok": true
+}

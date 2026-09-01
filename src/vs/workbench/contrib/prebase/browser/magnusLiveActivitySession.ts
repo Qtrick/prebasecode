@@ -55,8 +55,8 @@ export function extractPending(
 				continue;
 			}
 			// AskQuestions equates option id/value/label; answer map keys by question.id; optionId = value.
-			const options = first.options?.slice(0, 4)
-				.map(option => ({
+			const options = first.options
+				?.map(option => ({
 					id: option.value || option.id,
 					label: option.label || option.value || option.id,
 				}))

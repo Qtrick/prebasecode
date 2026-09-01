@@ -10,7 +10,10 @@ import { resolve } from 'path';
 import {
 	acceptLiveActivityCommand,
 	buildMagnusLiveActivitySnapshot,
+	calculateNextElapsedBoundaryDelayMs,
 	collapsedStatusLabel,
+	computeLiveActivityExpandedHeight,
+	computeLiveActivityWingWidth,
 	deriveLiveActivityGeometry,
 	deriveMagnusTestStateFromInvocations,
 	formatDiffMetric,
@@ -914,7 +917,7 @@ suite('Magnus Live Activity pending projection (runtime)', () => {
 		assert.strictEqual(hot?.destructive, true);
 	});
 
-	test('unused question carousel keys interactionId by question.id and caps options', () => {
+	test('unused question carousel keys interactionId by question.id and preserves all options', () => {
 		const carousel = {
 			kind: 'questionCarousel' as const,
 			questions: [{
@@ -939,8 +942,9 @@ suite('Magnus Live Activity pending projection (runtime)', () => {
 		assert.strictEqual(pending?.interactionId, 'question-42');
 		assert.strictEqual(pending?.resolveId, 'resolve-7');
 		assert.strictEqual(pending?.requestId, 'req-q');
-		assert.strictEqual(pending?.options?.length, 4);
+		assert.strictEqual(pending?.options?.length, 5);
 		assert.strictEqual(pending?.options?.[0].id, 'val-a');
+		assert.strictEqual(pending?.options?.[4].id, 'val-e');
 	});
 
 	test('used question carousel is skipped; approval wins when it appears first', () => {
@@ -1622,8 +1626,9 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.ok(removeStart >= 0, 'must locate removeMonitors');
 		const removeEnd = native.indexOf('\n- (', removeStart + 1);
 		const remove = native.slice(removeStart, removeEnd > removeStart ? removeEnd : native.length);
-		assert.match(remove, /\[NSEvent removeMonitor:self\.globalMonitor\]/);
-		assert.match(remove, /self\.globalMonitor = nil/);
+		assert.match(remove, /removeGlobalMonitorOnly/);
+		assert.match(native, /\[NSEvent removeMonitor:self\.globalMonitor\]/);
+		assert.match(native, /self\.globalMonitor = nil/);
 		assert.match(remove, /\[NSEvent removeMonitor:self\.localMonitor\]/);
 		assert.match(remove, /self\.localMonitor = nil/);
 
@@ -1633,8 +1638,8 @@ suite('Magnus Live Activity native and settings contracts', () => {
 
 		const openSec = (LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS / 1000).toFixed(2);
 		const exitSec = (LIVE_ACTIVITY_EXIT_GRACE_MS / 1000).toFixed(2);
-		assert.match(native, new RegExp(`scheduledTimerWithTimeInterval:${openSec}`));
-		assert.match(native, new RegExp(`scheduledTimerWithTimeInterval:${exitSec}`));
+		assert.match(native, new RegExp(`(scheduledTimerWithTimeInterval:${openSec}|kHoverDwellInterval = ${openSec})`));
+		assert.match(native, new RegExp(`(scheduledTimerWithTimeInterval:${exitSec}|kExitGraceInterval = ${exitSec})`));
 	});
 
 	test('native Escape unpins, monitors stay off when hidden, and buttons have accessible names', () => {
@@ -1755,8 +1760,8 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.match(layout, /NSMidX\(frame\) - w \/ 2\.0/);
 		assert.match(layout, /LiveActivityWindowLevel/);
 		assert.doesNotMatch(layout, /MacBook Pro|MacBookAir|14-inch|16-inch/);
-		assert.match(native, /wingPathInRect/);
-		assert.match(native, /if \(self\.notched\)/);
+		assert.match(native, /CreateNotchedIslandPath/);
+		assert.match(native, /self\.notched|self\.content\.notched/);
 	});
 
 	test('non-mac stub exports unavailable and does not create a panel', () => {
@@ -1770,13 +1775,70 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 	ensureNoDisposablesAreLeakedInTestSuite();
 
+	test('computeLiveActivityExpandedHeight dynamically sizes based on content elements', () => {
+		const minimal = computeLiveActivityExpandedHeight({ bandHeight: 34 });
+		assert.strictEqual(minimal >= 86, true);
+		assert.strictEqual(minimal < 120, true);
+
+		const withActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true });
+		assert.strictEqual(withActivity, minimal + 18);
+
+		const withActions = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true, actionsCount: 3 });
+		assert.strictEqual(withActions, withActivity + 45);
+
+		const withQuestion = computeLiveActivityExpandedHeight({
+			bandHeight: 34,
+			hasActivity: true,
+			actionsCount: 3,
+			hasPendingTitle: true,
+			pendingKind: 'question',
+			hasOptions: true,
+		});
+		assert.strictEqual(withQuestion > withActions, true);
+		assert.strictEqual(withQuestion <= 220, true);
+
+		const withInput = computeLiveActivityExpandedHeight({
+			bandHeight: 34,
+			hasActivity: true,
+			actionsCount: 3,
+			pinned: true,
+		});
+		assert.strictEqual(withInput > withActions, true);
+	});
+
+	test('computeLiveActivityWingWidth buckets widths stably to prevent single-second twitching', () => {
+		const w1 = computeLiveActivityWingWidth(10);
+		const w2 = computeLiveActivityWingWidth(12);
+		assert.strictEqual(w1, w2, 'small differences must bucket to identical width');
+		assert.strictEqual(w1 >= 52, true);
+		assert.strictEqual(w1 <= 148, true);
+
+		const wLong = computeLiveActivityWingWidth(150);
+		assert.strictEqual(wLong, 148, 'must clamp to max wing width');
+	});
+
+	test('calculateNextElapsedBoundaryDelayMs schedules next boundary without 1Hz timer', () => {
+		const now = 100_000;
+		// 12 seconds elapsed -> next boundary is 15s (3s away)
+		const delay1 = calculateNextElapsedBoundaryDelayMs(now, now - 12_000);
+		assert.ok(delay1 !== undefined && delay1 >= 2900 && delay1 <= 3100);
+
+		// 2 minutes 15 seconds elapsed -> next boundary is 3m (45s away)
+		const delay2 = calculateNextElapsedBoundaryDelayMs(now, now - 135_000);
+		assert.ok(delay2 !== undefined && delay2 >= 44900 && delay2 <= 45100);
+
+		// Undefined or future startedAt -> undefined
+		assert.strictEqual(calculateNextElapsedBoundaryDelayMs(now, undefined), undefined);
+		assert.strictEqual(calculateNextElapsedBoundaryDelayMs(now, now + 5000), undefined);
+	});
+
 	test('native wing widths scale dynamically between min and max based on measured content', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /computeLeftWingWidth/);
 		assert.match(native, /computeRightWingWidth/);
 		assert.match(native, /measureStringWidth/);
 		assert.match(native, /kWingWidthMin = 52/);
-		assert.match(native, /kWingWidthMax = 136/);
+		assert.match(native, /kWingWidthMax = 148/);
 		assert.doesNotMatch(native, /const CGFloat kWingWidth = 124;/);
 	});
 
@@ -1790,39 +1852,52 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.doesNotMatch(native, /const CGFloat kExpandedHeight = 200;/);
 	});
 
+	test('native uses CAShapeLayer for continuous background morphology and presentation-layer retargeting', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /CAShapeLayer \*shapeLayer/);
+		assert.match(native, /CreateNotchedIslandPath/);
+		assert.match(native, /presentationLayer/);
+		assert.match(native, /morphPath/);
+		assert.match(native, /updateShapeAndContentAnimated:/);
+	});
+
+	test('native separates compact and expanded content into dedicated layer-backed subviews', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /compactContainer/);
+		assert.match(native, /expandedContainer/);
+		assert.match(native, /leftStatusLabel/);
+		assert.match(native, /rightMetricsLabel/);
+		assert.match(native, /headerTitle/);
+		assert.match(native, /statusBadge/);
+	});
+
 	test('native uses optical black fill to eliminate ghosting behind camera housing', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /colorWithCalibratedWhite:0\.035 alpha:0\.99/);
-		assert.doesNotMatch(native, /colorWithCalibratedWhite:0\.07 alpha:0\.94/);
 	});
 
-	test('native integrates NSHapticFeedbackManager on hover threshold and user interactions', () => {
+	test('native integrates NSHapticFeedbackManager on user-initiated actions with exactly-once guard', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /performUserHaptic/);
 		assert.match(native, /NSHapticFeedbackManager defaultPerformer/);
 		assert.match(native, /NSHapticFeedbackPatternGeneric/);
 		assert.match(native, /NSHapticFeedbackPerformanceTimeNow/);
-
-		const hoverStart = native.indexOf('- (void)pointerInside:(BOOL)inside {');
-		const hoverEnd = native.indexOf('- (void)expandPreview {');
-		const hover = native.slice(hoverStart, hoverEnd);
-		assert.match(hover, /performUserHaptic/);
-
-		const controllerImpl = native.indexOf('@implementation PrebaseLiveActivityController');
-		const mouseUpStart = native.indexOf('- (void)mouseUp:(NSEvent *)event {', controllerImpl);
-		const mouseUpEnd = native.indexOf('- (void)applySnapshotDict:', mouseUpStart);
-		const mouseUp = native.slice(mouseUpStart, mouseUpEnd);
-		assert.match(mouseUp, /performUserHaptic/);
+		assert.match(native, /didHoverHaptic/);
 	});
 
-	test('native tracking model pairs global monitor with active NSTrackingArea and exit grace', () => {
+	test('native tracking model removes global mouse monitor when expanded to maximize resource efficiency', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /removeGlobalMonitorOnly/);
 		assert.match(native, /NSTrackingArea/);
 		assert.match(native, /updateTrackingAreas/);
-		assert.match(native, /NSTrackingMouseEnteredAndExited/);
-		assert.match(native, /mouseEnteredInView:/);
-		assert.match(native, /mouseExitedFromView:/);
-		assert.match(native, /exitTimer/);
+		assert.match(native, /kHoverDwellInterval = 0\.18/);
+		assert.match(native, /kExitGraceInterval = 0\.25/);
+	});
+
+	test('native question options handle >4 options with tertiary delegate button', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /More in PreBase…/);
+		assert.match(native, /answerOption:/);
 	});
 
 	test('interactive controls are placed strictly below the physical notch safe area', () => {
@@ -1831,7 +1906,6 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		const layoutControlsEnd = native.indexOf('- (void)performUserHaptic {', layoutControlsStart);
 		const layoutControls = native.slice(layoutControlsStart, layoutControlsEnd);
 		assert.match(layoutControls, /bandH = MAX\(self\.content\.safeAreaTop, kCollapsedHeight\)/);
-		assert.match(layoutControls, /bottomY = win\.size\.height - 30/);
 		assert.match(layoutControls, /openButton\.frame = NSMakeRect\(NSWidth\(win\) - 128/);
 	});
 

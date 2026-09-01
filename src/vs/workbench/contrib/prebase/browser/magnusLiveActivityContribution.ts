@@ -38,6 +38,7 @@ import {
 import {
 	acceptLiveActivityCommand,
 	buildMagnusLiveActivitySnapshot,
+	calculateNextElapsedBoundaryDelayMs,
 	deriveMagnusTestStateFromInvocations,
 	isMagnusParticipantId,
 	LIVE_ACTIVITY_COMPLETED_HOLD_MS,
@@ -278,6 +279,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	private readonly _modelListeners = this._register(new DisposableStore());
 	private readonly _push: RunOnceScheduler;
 	private readonly _completionTimer: RunOnceScheduler;
+	private readonly _elapsedTimer: RunOnceScheduler;
 
 	constructor(
 		@IChatService private readonly chatService: IChatService,
@@ -297,6 +299,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		super();
 		this._push = this._register(new RunOnceScheduler(() => this._publish(), 120));
 		this._completionTimer = this._register(new RunOnceScheduler(() => this._publish(), LIVE_ACTIVITY_COMPLETED_HOLD_MS));
+		this._elapsedTimer = this._register(new RunOnceScheduler(() => this._publish(), 5_000));
 		if (isWeb || !isMacintosh) {
 			return;
 		}
@@ -415,6 +418,16 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			this._completionHidden = true;
 		}
 		const visible = !this._completionHidden && shouldShowLiveActivity(this._mode(), snapshot);
+		if (visible && (snapshot.status === 'working' || snapshot.status === 'waiting' || snapshot.status === 'attention')) {
+			const delay = calculateNextElapsedBoundaryDelayMs(Date.now(), snapshot.startedAt);
+			if (delay !== undefined) {
+				this._elapsedTimer.schedule(delay);
+			} else {
+				this._elapsedTimer.cancel();
+			}
+		} else {
+			this._elapsedTimer.cancel();
+		}
 		MagnusLiveActivityContribution.diagnostics = {
 			backend: !isMacintosh || isWeb ? 'non-mac' : (this._nativeConnected ? 'native-appkit' : 'unavailable'),
 			revision: snapshot.revision,

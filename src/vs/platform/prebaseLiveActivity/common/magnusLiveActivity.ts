@@ -75,21 +75,94 @@ export interface MagnusLiveActivitySnapshot {
 	readonly presentationLabel?: string;
 }
 
-export const LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS = 150;
-export const LIVE_ACTIVITY_EXIT_GRACE_MS = 100;
-export const LIVE_ACTIVITY_POINTER_SAMPLE_MS = 50;
+export const LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS = 180;
+export const LIVE_ACTIVITY_EXIT_GRACE_MS = 250;
 export const LIVE_ACTIVITY_COMPLETED_HOLD_MS = 8_000;
 export const LIVE_ACTIVITY_MAX_ACTIONS = 4;
 export const LIVE_ACTIVITY_MAX_MESSAGE_CHARS = 160;
-/** Keep in sync with native/prebase-live-activity/src/live_activity.mm */
+
+/** Dynamic geometry metrics matching native/prebase-live-activity/src/live_activity.mm */
 export const LIVE_ACTIVITY_COLLAPSED_HEIGHT = 34;
-export const LIVE_ACTIVITY_WING_WIDTH = 124;
+export const LIVE_ACTIVITY_WING_WIDTH_MIN = 52;
+export const LIVE_ACTIVITY_WING_WIDTH_MAX = 148;
+export const LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 124;
+export const LIVE_ACTIVITY_WING_WIDTH = LIVE_ACTIVITY_WING_WIDTH_DEFAULT;
+export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 86;
+export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 220;
 export const LIVE_ACTIVITY_EXPANDED_HEIGHT = 200;
 export const LIVE_ACTIVITY_PILL_WIDTH = 228;
 export const LIVE_ACTIVITY_PILL_HEIGHT = 30;
 export const LIVE_ACTIVITY_NOTCH_MIN_SAFE_TOP = 8;
 export const LIVE_ACTIVITY_NOTCH_MIN_AUX_WIDTH = 40;
 export const LIVE_ACTIVITY_CAMERA_HOUSING_MIN = 24;
+
+export function computeLiveActivityExpandedHeight(args: {
+	bandHeight: number;
+	hasActivity?: boolean;
+	actionsCount?: number;
+	hasPendingTitle?: boolean;
+	hasMetrics?: boolean;
+	pendingKind?: 'approval' | 'question' | string;
+	hasOptions?: boolean;
+	pinned?: boolean;
+}): number {
+	let h = args.bandHeight + 8; // Top padding below notch band
+	h += 22; // Header
+	if (args.hasActivity) {
+		h += 18;
+	}
+	if (args.actionsCount && args.actionsCount > 0) {
+		h += Math.min(args.actionsCount, 3) * 15;
+	}
+	if (args.hasPendingTitle) {
+		h += 20;
+	}
+	if (args.hasMetrics) {
+		h += 18;
+	}
+	h += 10; // Spacing before controls
+	const hasOptions = args.pendingKind === 'question' && Boolean(args.hasOptions);
+	const hasApproval = args.pendingKind === 'approval';
+	const showInput = Boolean(args.pinned);
+
+	if (hasOptions) {
+		h += 30; // Options row
+	}
+	if (hasApproval) {
+		h += 28; // Approval buttons row
+	}
+	if (showInput) {
+		h += 32; // Follow-up message row
+	} else if (!hasOptions && !hasApproval) {
+		h += 24; // Open in PreBase row
+	}
+	h += 10; // Bottom corner inset
+	return Math.min(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, Math.max(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, h));
+}
+
+export function computeLiveActivityWingWidth(rawTextWidth: number): number {
+	const raw = rawTextWidth + 28;
+	const bucketed = Math.ceil(raw / 8) * 8;
+	return Math.min(LIVE_ACTIVITY_WING_WIDTH_MAX, Math.max(LIVE_ACTIVITY_WING_WIDTH_MIN, bucketed));
+}
+
+export function calculateNextElapsedBoundaryDelayMs(now: number, startedAt: number | undefined): number | undefined {
+	if (!startedAt || !Number.isFinite(startedAt) || startedAt > now) {
+		return undefined;
+	}
+	const elapsedMs = now - startedAt;
+	const elapsedSec = Math.floor(elapsedMs / 1000);
+	if (elapsedSec < 60) {
+		const secInWindow = elapsedSec % 5;
+		const nextSec = 5 - secInWindow;
+		const msToNext = (nextSec * 1000) - (elapsedMs % 1000);
+		return Math.max(250, msToNext);
+	}
+	const secInMin = elapsedSec % 60;
+	const nextMinSec = 60 - secInMin;
+	const msToNext = (nextMinSec * 1000) - (elapsedMs % 1000);
+	return Math.max(500, msToNext);
+}
 
 export interface MagnusLiveActivitySessionInput {
 	readonly sessionId: string;

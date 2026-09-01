@@ -76,8 +76,8 @@ if (!native.includes('CGDisplayIsBuiltin')) {
 if (!native.includes('topY - height') && !native.includes('topY - bandH')) {
 	failures.push('native layout must top-anchor at screen.frame.maxY and grow downward');
 }
-if (!native.includes('wingPathInRect') || !native.includes('self.notched')) {
-	failures.push('native drawRect must branch notch wings vs pill capsule');
+if ((!native.includes('wingPathInRect') && !native.includes('CreateNotchedIslandPath')) || !native.includes('self.notched')) {
+	failures.push('native shape creation must branch notch wings vs pill capsule');
 }
 if (!native.includes('hasShadow = !notched')) {
 	failures.push('native notch mode must disable floating shadow');
