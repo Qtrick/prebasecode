@@ -2444,55 +2444,6 @@ function drawTemporalFrame(ts) {
 			ctx.lineWidth = 1;
 			if (typeof ctx.setLineDash === 'function') ctx.setLineDash([3, 7]);
 			ctx.stroke();
-
-			// Community Header Card inside region (at overview and medium zoom)
-			if (gw > 60 && gh > 40 && transform.k >= 0.24) {
-				const headerFont = computeNetworkLabelWorldFontSize(10, transform.k, { minScreenPx: 8, maxScreenPx: 12 });
-				const subFont = computeNetworkLabelWorldFontSize(8, transform.k, { minScreenPx: 7, maxScreenPx: 10 });
-				const labelText = shortenCommunityLabel(guide.label || guide.id, 24);
-				const subText = String(guide.nodeCount || 0) + ' files · ' + String(guide.layerId || 'module').toUpperCase();
-
-				ctx.font = canvasFont('600', headerFont);
-				const titleW = measureTextWidth(labelText, ctx.font);
-				const subW = measureTextWidth(subText, canvasFont('400', subFont));
-				const badgeW = Math.min(gw - 16, Math.max(titleW, subW) + 24 / Math.max(0.4, transform.k));
-				const badgeH = headerFont + subFont + 8 / Math.max(0.4, transform.k);
-				const pillX = gx + 8;
-				const pillY = gy + 8;
-				const pillR = Math.min(4, radius * 0.4);
-
-				ctx.fillStyle = theme.isHighContrast ? 'rgba(0, 0, 0, 0.90)' : 'rgba(15, 23, 42, 0.82)';
-				if (typeof ctx.roundRect === 'function') {
-					ctx.beginPath();
-					ctx.roundRect(pillX, pillY, badgeW, badgeH, pillR);
-					ctx.fill();
-					ctx.strokeStyle = hexColor ? (hexColor + '55') : 'rgba(99, 102, 241, 0.35)';
-					ctx.lineWidth = 1;
-					if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
-					ctx.stroke();
-				} else {
-					ctx.fillRect(pillX, pillY, badgeW, badgeH);
-				}
-
-				// Layer color dot
-				ctx.beginPath();
-				const dotR = Math.max(2, 3 / Math.max(0.4, transform.k));
-				ctx.arc(pillX + 7 / Math.max(0.4, transform.k), pillY + headerFont * 0.7, dotR, 0, Math.PI * 2);
-				ctx.fillStyle = hexColor || theme.accent;
-				ctx.fill();
-
-				// Community Title
-				ctx.textAlign = 'left';
-				ctx.textBaseline = 'top';
-				ctx.fillStyle = theme.isHighContrast ? '#ffffff' : '#f1f5f9';
-				ctx.fillText(labelText, pillX + 14 / Math.max(0.4, transform.k), pillY + 3 / Math.max(0.4, transform.k));
-
-				// Subtitle
-				ctx.font = canvasFont('400', subFont);
-				ctx.fillStyle = theme.isHighContrast ? '#cccccc' : '#94a3b8';
-				ctx.fillText(subText, pillX + 14 / Math.max(0.4, transform.k), pillY + headerFont + 4 / Math.max(0.4, transform.k));
-			}
-
 			ctx.restore();
 		}
 
@@ -2606,7 +2557,7 @@ function drawTemporalFrame(ts) {
 			if (temporalProjection.tier === 'overview' && !projectedLeafIds.has(sourceEntityId) && !projectedLeafIds.has(targetEntityId)) continue;
 
 			const isEdgeActive = isEdgeConnectedToActive(edge);
-			const isInteracting = interactionState === 'drag' || interactionState === 'pan';
+			const isInteracting = isTemporal() && (panning || interactionState === 'panning' || (dragging && moved));
 
 			const lodStyle = computeEdgeLodStyle(edge, transform.k, {
 				isConnectedToActive: isEdgeActive,
@@ -2853,24 +2804,49 @@ function drawTemporalFrame(ts) {
 
 	for (let gi = 0; gi < guideLabels.length; gi++) {
 		const gl = guideLabels[gi];
-		if (transform.k >= 0.24 && temporalDiff.guides) {
-			const guideObj = temporalDiff.guides.find(function(g) { return g.id === gl.guideId; });
-			if (guideObj && guideObj.bounds) {
-				const gw = Math.max(8, guideObj.bounds.maxX - guideObj.bounds.minX);
-				const gh = Math.max(8, guideObj.bounds.maxY - guideObj.bounds.minY);
-				if (gw > 60 && gh > 40) {
-					continue;
-				}
-			}
-		}
 		ctx.save();
+		const hexColor = gl.color || (gl.layerId ? getArchitectureLayerColor(gl.layerId) : null);
+		const pillX = gl.box.x;
+		const pillY = gl.box.y;
+		const badgeW = gl.box.w;
+		const badgeH = gl.box.h;
+		const pillR = Math.min(6, Math.max(3, 4 / Math.max(0.4, transform.k)));
+
+		ctx.fillStyle = theme.isHighContrast ? 'rgba(0, 0, 0, 0.90)' : 'rgba(15, 23, 42, 0.84)';
+		if (typeof ctx.roundRect === 'function') {
+			ctx.beginPath();
+			ctx.roundRect(pillX, pillY, badgeW, badgeH, pillR);
+			ctx.fill();
+			ctx.strokeStyle = hexColor ? (hexColor + '55') : 'rgba(99, 102, 241, 0.35)';
+			ctx.lineWidth = 1;
+			if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+			ctx.stroke();
+		} else {
+			ctx.fillRect(pillX, pillY, badgeW, badgeH);
+		}
+
+		// Layer color dot
+		const fontMatch = gl.font ? gl.font.match(/(\d+)px/) : null;
+		const fontPx = fontMatch ? parseInt(fontMatch[1], 10) : 12;
+		const dotR = Math.max(2, Math.round(3 / Math.max(0.4, transform.k)));
+		ctx.beginPath();
+		ctx.arc(pillX + Math.max(5, 7 / Math.max(0.4, transform.k)), pillY + fontPx * 0.55, dotR, 0, Math.PI * 2);
+		ctx.fillStyle = hexColor || theme.accent;
+		ctx.fill();
+
+		// Community Title
 		ctx.font = gl.font;
 		ctx.textAlign = 'left';
-		ctx.textBaseline = 'bottom';
-		ctx.fillStyle = theme.isHighContrast
-			? 'rgba(255, 255, 255, 0.72)'
-			: 'rgba(161, 161, 170, 0.82)';
-		ctx.fillText(gl.text, gl.x, gl.y);
+		ctx.textBaseline = 'top';
+		ctx.fillStyle = theme.isHighContrast ? '#ffffff' : '#f1f5f9';
+		ctx.fillText(gl.text, pillX + Math.max(12, 14 / Math.max(0.4, transform.k)), pillY + Math.max(2, 3 / Math.max(0.4, transform.k)));
+
+		// Subtitle
+		if (gl.subText && gl.subFont) {
+			ctx.font = gl.subFont;
+			ctx.fillStyle = theme.isHighContrast ? '#cccccc' : '#94a3b8';
+			ctx.fillText(gl.subText, pillX + Math.max(12, 14 / Math.max(0.4, transform.k)), pillY + fontPx + Math.max(3, 4 / Math.max(0.4, transform.k)));
+		}
 		ctx.restore();
 	}
 
@@ -3322,7 +3298,7 @@ function drawNetworkFrame() {
 			for (let hi = 0; hi < nodes.length && metrics.nodeHits.length < 16; hi++) {
 				const hitNode = nodes[hi];
 				const hitPos = projected[hitNode.id];
-				const world = base3d[hitNode.id];
+				const world = base3d[hitNode.id] || null;
 				if (!hitPos) continue;
 				metrics.nodeHits.push({
 					id: hitNode.id,
@@ -3331,6 +3307,9 @@ function drawNetworkFrame() {
 					worldX: world && Number.isFinite(world.x) ? world.x : Number.NaN,
 					worldY: world && Number.isFinite(world.y) ? world.y : Number.NaN,
 					worldZ: world && Number.isFinite(world.z) ? world.z : Number.NaN,
+					world: world && Number.isFinite(world.x) && Number.isFinite(world.y) && Number.isFinite(world.z)
+						? { x: world.x, y: world.y, z: world.z }
+						: undefined,
 				});
 			}
 			metrics.lodTier = transform.k < 0.3 ? 'low' : (transform.k < 0.8 ? 'medium' : 'high');

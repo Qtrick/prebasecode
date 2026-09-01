@@ -93,8 +93,8 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 			nodeCount: 30 - i,
 		}));
 		assert.equal(computeVisibleCommunityGuideLabels(guides, 0.1, []).length, 0);
-		assert.ok(computeVisibleCommunityGuideLabels(guides, 0.25, []).length <= 6);
-		assert.ok(computeVisibleCommunityGuideLabels(guides, 0.5, []).length <= 12);
+		assert.ok(computeVisibleCommunityGuideLabels(guides, 0.25, []).length <= 8);
+		assert.ok(computeVisibleCommunityGuideLabels(guides, 0.5, []).length <= 14);
 		assert.ok(computeVisibleCommunityGuideLabels(guides, 1.0, []).length <= 24);
 	});
 
@@ -119,13 +119,35 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 			nodeCount: 5,
 		};
 		// Place node so its label box sits under the guide's top-left occupancy slot.
-		const node = makeNode('n1', 'src/file.ts', 'modified', 100, 70);
+		const node = makeNode('n1', 'src/file.ts', 'modified', 100, 100);
 		const layout = computeTemporalLabelLayout([node], [guide], 0.8);
 		assert.ok(layout.guideLabels.some(g => g.guideId === 'comm1'));
 		assert.equal(layout.nodeLabels.length, 0, 'node label must yield to guide occupancy');
 
 		const withSelected = computeTemporalLabelLayout([node], [guide], 0.8, { selectedNodeId: 'n1' });
 		assert.ok(withSelected.nodeLabels.some(l => l.entityId === 'n1'), 'selected nodes bypass occupancy culling');
+	});
+
+	test('10. Screen-Space Legibility: community landmarks at low zoom (k=0.21) maintain readable screen-size fonts', () => {
+		const guide = {
+			id: 'cloud',
+			label: 'Cloud Infrastructure',
+			bounds: { minX: 0, minY: 0, maxX: 400, maxY: 300 },
+			nodeCount: 112,
+			layerId: 'services',
+		};
+		const labels = computeVisibleCommunityGuideLabels([guide], 0.21, []);
+		assert.equal(labels.length, 1);
+		const landmark = labels[0];
+		assert.ok(landmark.isCard, 'must be marked as landmark card');
+		assert.ok(landmark.font.includes('px'));
+		const match = landmark.font.match(/(\d+)px/);
+		assert.ok(match, 'font must contain pixel size');
+		const worldPx = parseInt(match[1], 10);
+		// At k = 0.21, worldPx * 0.21 must produce >= 10px screen size
+		const screenPx = worldPx * 0.21;
+		assert.ok(screenPx >= 10, `Screen font must be >= 10px (actual: ${screenPx.toFixed(1)}px from world ${worldPx}px)`);
+		assert.ok(landmark.subText?.includes('112 files'), 'subtext must explain node count clearly');
 	});
 
 	test('4. Hoists the workbench font family once per pass into every visible label', () => {

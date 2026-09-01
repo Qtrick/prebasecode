@@ -34,7 +34,8 @@ export type TemporalClusterGuide = TemporalCommunityGuide;
 const GOLDEN_ANGLE = 2.399963229728653;
 
 /**
- * Lightweight 2D Spatial Grid for O(1) neighborhood collision checks and free-slot queries.
+ * Lightweight 2D Spatial Grid for spatially-local neighborhood collision checks and free-slot queries.
+ * Provides expected near-constant bucket access under normal node distribution and avoids global pairwise node scans.
  */
 export class Spatial2DGrid {
 	private readonly cellSize: number;
@@ -229,7 +230,8 @@ export function computeSemanticTemporalInitialLayout(
 	const communities = computeAdaptiveCommunities(nodes, edges);
 	const viewportW = options?.width && options.width > 0 ? options.width : 1400;
 	const viewportH = options?.height && options.height > 0 ? options.height : 800;
-	const aspect = Math.max(0.75, Math.min(1.85, viewportW / Math.max(1, viewportH)));
+	const rawAspect = viewportW / Math.max(1, viewportH);
+	const aspect = Math.max(0.85, Math.min(1.45, Math.sqrt(rawAspect)));
 
 	const sortedCommunities = [...communities].sort((a, b) =>
 		b.nodeIds.length - a.nodeIds.length || a.id.localeCompare(b.id)
@@ -237,25 +239,27 @@ export function computeSemanticTemporalInitialLayout(
 
 	const commRadiusMap = new Map<string, number>();
 	let meanDepth = 0;
+	let meanR = 0;
 	for (let i = 0; i < sortedCommunities.length; i++) {
 		const comm = sortedCommunities[i];
 		const estR = Math.max(40, Math.sqrt(comm.nodeIds.length) * (nodeSpacing * 0.48) + 16);
 		commRadiusMap.set(comm.id, estR);
+		meanR += estR;
 		meanDepth += comm.depth;
 	}
 	meanDepth = sortedCommunities.length > 0 ? meanDepth / sortedCommunities.length : 0;
+	meanR = sortedCommunities.length > 0 ? meanR / sortedCommunities.length : 50;
 
 	const clusterCenters = new Map<string, { x: number; y: number; estimatedRadius: number }>();
 	const packStepBase = Math.max(48, nodeSpacing * 0.95);
-	// Keep macro extent from exploding with hundreds of communities on large repos.
-	const packStep = packStepBase;
+	const packStep = Math.max(packStepBase, meanR * 2.2);
 
 	for (let i = 0; i < sortedCommunities.length; i++) {
 		const comm = sortedCommunities[i];
 		const rVal = commRadiusMap.get(comm.id) || 50;
 		const angle = i * GOLDEN_ANGLE;
-		const ring = Math.sqrt(i) * packStep + rVal * 0.35;
-		const depthBias = (comm.depth - meanDepth) * Math.min(42, packStep * 0.55);
+		const ring = Math.sqrt(i) * packStep + rVal * 0.5;
+		const depthBias = (comm.depth - meanDepth) * Math.min(42, packStepBase * 0.55);
 		const cx = Math.round(Math.cos(angle) * ring * Math.sqrt(aspect));
 		const cy = Math.round(Math.sin(angle) * ring / Math.sqrt(aspect) + depthBias);
 		clusterCenters.set(comm.id, { x: cx, y: cy, estimatedRadius: rVal });
@@ -270,7 +274,7 @@ export function computeSemanticTemporalInitialLayout(
 	centerList.sort((a, b) => a.id.localeCompare(b.id));
 	const centerById = new Map(centerList.map(c => [c.id, c]));
 
-	for (let iter = 0; iter < 10; iter++) {
+	for (let iter = 0; iter < 12; iter++) {
 		for (let i = 0; i < centerList.length; i++) {
 			for (let j = i + 1; j < centerList.length; j++) {
 				const a = centerList[i];
@@ -278,7 +282,7 @@ export function computeSemanticTemporalInitialLayout(
 				const dx = b.x - a.x;
 				const dy = b.y - a.y;
 				const dist = Math.hypot(dx, dy);
-				const minDist = a.r + b.r + 28;
+				const minDist = (a.r + b.r) * 1.35 + 48;
 				if (dist < minDist) {
 					const angle = dist > 0.001 ? Math.atan2(dy, dx) : (i * 0.618 + iter * 0.17);
 					const overlap = (minDist - Math.max(dist, 0.001)) / 2;
@@ -297,7 +301,7 @@ export function computeSemanticTemporalInitialLayout(
 			const dx = b.x - a.x;
 			const dy = b.y - a.y;
 			const dist = Math.hypot(dx, dy);
-			const ideal = a.r + b.r + 90;
+			const ideal = (a.r + b.r) * 1.35 + 110;
 			if (dist > ideal + 40) {
 				const pull = Math.min(0.12, 0.02 + link.weight * 0.008);
 				const mx = dx * pull * 0.5;
@@ -335,8 +339,10 @@ export function computeSemanticTemporalInitialLayout(
 		}
 		const bw = Math.max(1, maxX - minX);
 		const bh = Math.max(1, maxY - minY);
-		const targetW = Math.max(viewportW * 0.88, 1200) * Math.sqrt(aspect);
-		const targetH = Math.max(viewportH * 0.82, 900) / Math.sqrt(aspect);
+		const minTargetW = Math.max(viewportW * 0.88, Math.sqrt(nodes.length) * nodeSpacing * 1.6);
+		const minTargetH = Math.max(viewportH * 0.82, Math.sqrt(nodes.length) * nodeSpacing * 1.3);
+		const targetW = minTargetW * Math.sqrt(aspect);
+		const targetH = minTargetH / Math.sqrt(aspect);
 		const scale = Math.min(1, targetW / bw, targetH / bh);
 		// Only compress extreme outliers; keep local community footprints intact.
 		if (scale < 0.55) {
@@ -378,13 +384,17 @@ export function computeSemanticTemporalInitialLayout(
 		}
 	}
 
+	const sortedForPlacement = [...sortedCommunities].sort((a, b) =>
+		a.depth - b.depth || b.nodeIds.length - a.nodeIds.length || a.id.localeCompare(b.id)
+	);
+
 	const nodeMap = new Map<string, TemporalRenderNode>();
 	for (let i = 0; i < nodes.length; i++) {
 		nodeMap.set(nodes[i].entityId, enrichNodeWithLayer(nodes[i]));
 	}
 
-	for (let i = 0; i < communities.length; i++) {
-		const comm = communities[i];
+	for (let i = 0; i < sortedForPlacement.length; i++) {
+		const comm = sortedForPlacement[i];
 		const center = clusterCenters.get(comm.id) || { x: 0, y: 0, estimatedRadius: 60 };
 		const memberIds = comm.nodeIds;
 		const count = memberIds.length;
@@ -400,7 +410,7 @@ export function computeSemanticTemporalInitialLayout(
 					ny = center.y;
 				} else {
 					const localAngle = idx * GOLDEN_ANGLE;
-					const localDist = Math.sqrt(idx) * (nodeSpacing * 0.58) + 12;
+					const localDist = Math.sqrt(idx) * (nodeSpacing * 0.78) + 18;
 					nx = Math.round(center.x + Math.cos(localAngle) * localDist);
 					ny = Math.round(center.y + Math.sin(localAngle) * localDist * 0.90);
 				}
@@ -416,7 +426,7 @@ export function computeSemanticTemporalInitialLayout(
 	}
 
 	// Community-local collision first (cheaper), then a short global polish pass.
-	const MIN_NODE_DIST = Math.max(34, nodeSpacing * 0.70);
+	const MIN_NODE_DIST = Math.max(34, nodeSpacing * 0.72);
 	const nodePosList = resultNodes.map(n => ({ id: n.entityId, x: n.x, y: n.y, communityId: '' as string }));
 	const nodeToComm = new Map<string, string>();
 	for (const comm of communities) {
@@ -427,9 +437,9 @@ export function computeSemanticTemporalInitialLayout(
 	}
 	nodePosList.sort((a, b) => a.id.localeCompare(b.id));
 
-	const grid = new Spatial2DGrid(MIN_NODE_DIST);
+	const grid = new Spatial2DGrid(Math.max(MIN_NODE_DIST * 1.3, 48));
 
-	for (let iter = 0; iter < 5; iter++) {
+	for (let iter = 0; iter < 8; iter++) {
 		grid.clear();
 		for (let i = 0; i < nodePosList.length; i++) {
 			grid.insert(i, nodePosList[i].x, nodePosList[i].y);
@@ -459,7 +469,7 @@ export function computeSemanticTemporalInitialLayout(
 		}
 	}
 	// Global polish for boundary overlaps between communities
-	for (let iter = 0; iter < 4; iter++) {
+	for (let iter = 0; iter < 6; iter++) {
 		grid.clear();
 		for (let i = 0; i < nodePosList.length; i++) {
 			grid.insert(i, nodePosList[i].x, nodePosList[i].y);
@@ -674,62 +684,71 @@ export function layoutTemporalGraph(
 	// If local degradation is detected (overlapping guides),
 	// perform bounded local relaxation on the affected subset while keeping far-away
 	// unaffected communities strictly anchored (mental map preservation).
-	const guideOverlap = computeGuideOverlaps(guides);
-	const hasDegradation = guideOverlap.guideOverlapCount > 0;
+	const initialOverlap = computeGuideOverlaps(guides);
+	const hasDegradation = initialOverlap.guideOverlapCount > 0;
 
 	if (hasDegradation && previousPositions.size > 0) {
-		const entityCommunityId = new Map<string, string>();
+		const overlappingCommIds = new Set<string>();
+		for (let p = 0; p < initialOverlap.overlappingPairs.length; p++) {
+			overlappingCommIds.add(initialOverlap.overlappingPairs[p][0]);
+			overlappingCommIds.add(initialOverlap.overlappingPairs[p][1]);
+		}
+
+		// Precompute sets ONCE to avoid repeated O(N) scans inside inner loop
+		const newEntityIdSet = new Set<string>();
+		for (let u = 0; u < unpositionedNodes.length; u++) {
+			newEntityIdSet.add(unpositionedNodes[u].entityId);
+		}
+		const changedEntityIdSet = new Set<string>();
+		for (let i = 0; i < diff.nodes.length; i++) {
+			const d = diff.nodes[i];
+			if (d.changeKind && d.changeKind !== 'unchanged') {
+				changedEntityIdSet.add(d.entityId);
+			}
+		}
+
+		// Map community ID for fast lookup of member's community
+		const nodeCommunityMap = new Map<string, AdaptiveCommunity>();
 		for (let c = 0; c < activeCommunities.length; c++) {
 			const comm = activeCommunities[c];
 			for (let m = 0; m < comm.nodeIds.length; m++) {
-				entityCommunityId.set(comm.nodeIds[m], comm.id);
-			}
-		}
-		const changedCommunityIds = new Set<string>();
-		for (let u = 0; u < unpositionedNodes.length; u++) {
-			const commId = entityCommunityId.get(unpositionedNodes[u].entityId);
-			if (commId) {
-				changedCommunityIds.add(commId);
-			}
-		}
-		for (let i = 0; i < positionedNodes.length; i++) {
-			const n = positionedNodes[i];
-			if (n.changeKind && n.changeKind !== 'unchanged') {
-				const commId = entityCommunityId.get(n.entityId);
-				if (commId) {
-					changedCommunityIds.add(commId);
-				}
+				nodeCommunityMap.set(comm.nodeIds[m], comm);
 			}
 		}
 
-		const localOverlappingPairs: [string, string][] = [];
-		const overlappingCommIds = new Set<string>();
-		for (let p = 0; p < guideOverlap.overlappingPairs.length; p++) {
-			const pair = guideOverlap.overlappingPairs[p];
-			if (changedCommunityIds.has(pair[0]) || changedCommunityIds.has(pair[1])) {
-				localOverlappingPairs.push(pair);
-				overlappingCommIds.add(pair[0]);
-				overlappingCommIds.add(pair[1]);
+		// Find communities directly containing new or changed entities
+		const directlyAffectedCommIds = new Set<string>();
+		for (const id of newEntityIdSet) {
+			const comm = nodeCommunityMap.get(id);
+			if (comm) directlyAffectedCommIds.add(comm.id);
+		}
+		for (const id of changedEntityIdSet) {
+			const comm = nodeCommunityMap.get(id);
+			if (comm) directlyAffectedCommIds.add(comm.id);
+		}
+
+		// Identify overlapping pairs that involve a directly affected community
+		const relevantOverlappingCommIds = new Set<string>();
+		for (let p = 0; p < initialOverlap.overlappingPairs.length; p++) {
+			const idA = initialOverlap.overlappingPairs[p][0];
+			const idB = initialOverlap.overlappingPairs[p][1];
+			if (directlyAffectedCommIds.has(idA) || directlyAffectedCommIds.has(idB)) {
+				relevantOverlappingCommIds.add(idA);
+				relevantOverlappingCommIds.add(idB);
 			}
 		}
 
-		if (localOverlappingPairs.length === 0) {
-			// Global guide overlap exists but not near changed/new communities — preserve mental map.
-			return {
-				nodes: positionedNodes,
-				positions: nextPositions,
-				guides,
-			};
-		}
-
-		// Identify affected entity IDs: new/unpositioned nodes plus communities in local overlap pairs only.
+		// Identify affected entity IDs
 		const affectedEntityIds = new Set<string>();
-		for (let u = 0; u < unpositionedNodes.length; u++) {
-			affectedEntityIds.add(unpositionedNodes[u].entityId);
+		for (const id of newEntityIdSet) {
+			affectedEntityIds.add(id);
+		}
+		for (const id of changedEntityIdSet) {
+			affectedEntityIds.add(id);
 		}
 		for (let c = 0; c < activeCommunities.length; c++) {
 			const comm = activeCommunities[c];
-			if (overlappingCommIds.has(comm.id)) {
+			if (directlyAffectedCommIds.has(comm.id) || relevantOverlappingCommIds.has(comm.id)) {
 				for (let m = 0; m < comm.nodeIds.length; m++) {
 					affectedEntityIds.add(comm.nodeIds[m]);
 				}
@@ -737,36 +756,34 @@ export function layoutTemporalGraph(
 		}
 
 		if (affectedEntityIds.size > 0) {
+			const snapshotPositions = new Map<string, { x: number; y: number }>();
 			const initialPositions = new Map<string, { x: number; y: number }>();
 			for (const id of affectedEntityIds) {
 				const pos = nextPositions.get(id);
 				if (pos) {
+					snapshotPositions.set(id, { x: pos.x, y: pos.y });
 					initialPositions.set(id, { x: pos.x, y: pos.y });
 				}
 			}
 
 			const affectedArray = Array.from(affectedEntityIds);
-			const relaxationPasses = Math.min(5, Math.max(2, Math.floor(guideOverlap.guideOverlapCount * 2) + (unpositionedNodes.length > 0 ? 2 : 0)));
-
-			const rebuildOccupiedIndex = (): void => {
-				occupiedCoords.length = 0;
-				occupiedGrid.clear();
-				for (const pos of nextPositions.values()) {
-					const idx = occupiedCoords.length;
-					occupiedCoords.push(pos);
-					occupiedGrid.insert(idx, pos.x, pos.y);
-				}
-			};
+			const relaxationPasses = Math.min(5, Math.max(2, Math.floor(initialOverlap.guideOverlapCount * 2) + (unpositionedNodes.length > 0 ? 2 : 0)));
 
 			for (let pass = 0; pass < relaxationPasses; pass++) {
-				rebuildOccupiedIndex();
-				const passGuides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
-				const passOverlap = computeGuideOverlaps(passGuides);
-				const passOverlappingCommIds = new Set<string>();
-				for (let p = 0; p < passOverlap.overlappingPairs.length; p++) {
-					passOverlappingCommIds.add(passOverlap.overlappingPairs[p][0]);
-					passOverlappingCommIds.add(passOverlap.overlappingPairs[p][1]);
+				// Rebuild spatial grid for accurate neighborhood queries as positions update
+				const passCoords: { x: number; y: number }[] = Array.from(nextPositions.values());
+				const passGrid = new Spatial2DGrid(MIN_NODE_DISTANCE);
+				for (let i = 0; i < passCoords.length; i++) {
+					passGrid.insert(i, passCoords[i].x, passCoords[i].y);
 				}
+
+				// Current guide centers for community-separation force
+				const currentGuides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
+				const currentGuideMap = new Map<string, TemporalCommunityGuide>();
+				for (let g = 0; g < currentGuides.length; g++) {
+					currentGuideMap.set(currentGuides[g].id, currentGuides[g]);
+				}
+
 				for (let a = 0; a < affectedArray.length; a++) {
 					const id = affectedArray[a];
 					const pos = nextPositions.get(id);
@@ -776,10 +793,10 @@ export function layoutTemporalGraph(
 					let fx = 0;
 					let fy = 0;
 
-					// 1. Repulsive forces from close neighbors
-					const nearby = occupiedGrid.queryNearby(pos.x, pos.y);
+					// 1. Repulsive forces from close neighbors (using up-to-date spatial grid)
+					const nearby = passGrid.queryNearby(pos.x, pos.y);
 					for (let n = 0; n < nearby.length; n++) {
-						const other = occupiedCoords[nearby[n]];
+						const other = passCoords[nearby[n]];
 						if (!other || (other.x === pos.x && other.y === pos.y)) {continue;}
 						const dx = pos.x - other.x;
 						const dy = pos.y - other.y;
@@ -803,11 +820,37 @@ export function layoutTemporalGraph(
 						}
 					}
 
-					// 3. Anchor force restoring towards original coordinate
+					// 3. Community-separation force for overlapping community pairs
+					const myComm = nodeCommunityMap.get(id);
+					if (myComm && overlappingCommIds.has(myComm.id)) {
+						const myGuide = currentGuideMap.get(myComm.id);
+						if (myGuide) {
+							for (let p = 0; p < initialOverlap.overlappingPairs.length; p++) {
+								const [c1Id, c2Id] = initialOverlap.overlappingPairs[p];
+								const otherId = myComm.id === c1Id ? c2Id : (myComm.id === c2Id ? c1Id : null);
+								if (otherId) {
+									const otherGuide = currentGuideMap.get(otherId);
+									if (otherGuide) {
+										const cdx = myGuide.x - otherGuide.x;
+										const cdy = myGuide.y - otherGuide.y;
+										const cdist = Math.hypot(cdx, cdy) || 1;
+										const desiredDist = (myGuide.radius + otherGuide.radius) * 0.9;
+										if (cdist < desiredDist) {
+											const sepForce = (desiredDist - cdist) / desiredDist;
+											fx += (cdx / cdist) * sepForce * 3.5;
+											fy += (cdy / cdist) * sepForce * 3.5;
+										}
+									}
+								}
+							}
+						}
+					}
+
+					// 4. Anchor force restoring towards original coordinate
 					fx -= (pos.x - initial.x) * 0.45;
 					fy -= (pos.y - initial.y) * 0.45;
 
-					const isUnchanged = !unpositionedNodes.some(u => u.entityId === id) && !diff.nodes.some(d => d.entityId === id && d.changeKind && d.changeKind !== 'unchanged');
+					const isUnchanged = !newEntityIdSet.has(id) && !changedEntityIdSet.has(id);
 					const maxDelta = isUnchanged ? 12 : 36;
 
 					let newX = pos.x + fx * 0.25;
@@ -825,46 +868,38 @@ export function layoutTemporalGraph(
 				}
 			}
 
+			// Measure quality after relaxation: only keep relaxed positions if guide overlap improved
 			const relaxedGuides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
-			const overlapAfter = computeGuideOverlaps(relaxedGuides);
-			const overlapEpsilon = 1e-6;
-			const qualityImproved = overlapAfter.guideOverlapCount < guideOverlap.guideOverlapCount
-				|| (overlapAfter.guideOverlapCount === guideOverlap.guideOverlapCount
-					&& overlapAfter.guideOverlapRatio < guideOverlap.guideOverlapRatio - overlapEpsilon)
-				|| (Math.abs(overlapAfter.guideOverlapRatio - guideOverlap.guideOverlapRatio) <= overlapEpsilon
-					&& overlapAfter.maxGuideOverlapRatio < guideOverlap.maxGuideOverlapRatio - overlapEpsilon);
+			const relaxedOverlap = computeGuideOverlaps(relaxedGuides);
+
+			const qualityImproved = relaxedOverlap.guideOverlapCount < initialOverlap.guideOverlapCount ||
+				(relaxedOverlap.guideOverlapCount === initialOverlap.guideOverlapCount && relaxedOverlap.guideOverlapRatio <= initialOverlap.guideOverlapRatio + 0.001);
 
 			if (qualityImproved) {
-				for (let i = 0; i < positionedNodes.length; i++) {
-					const n = positionedNodes[i];
-					const p = nextPositions.get(n.entityId);
-					if (p) {
-						positionedNodes[i] = enrichNodeWithLayer({
-							...n,
-							x: p.x,
-							y: p.y,
-						});
-					}
-				}
+				// Accept relaxed positions and guides
 				guides = relaxedGuides;
 			} else {
-				for (const [id, pos] of initialPositions) {
-					const live = nextPositions.get(id);
-					if (live) {
-						live.x = pos.x;
-						live.y = pos.y;
+				// Revert to initial pre-relaxation positions to preserve mental map stability
+				for (const [id, pos] of snapshotPositions) {
+					const cur = nextPositions.get(id);
+					if (cur) {
+						cur.x = pos.x;
+						cur.y = pos.y;
 					}
 				}
-				for (let i = 0; i < positionedNodes.length; i++) {
-					const n = positionedNodes[i];
-					const p = initialPositions.get(n.entityId);
-					if (p) {
-						positionedNodes[i] = enrichNodeWithLayer({
-							...n,
-							x: p.x,
-							y: p.y,
-						});
-					}
+				guides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
+			}
+
+			// Update positionedNodes x/y coordinates
+			for (let i = 0; i < positionedNodes.length; i++) {
+				const n = positionedNodes[i];
+				const p = nextPositions.get(n.entityId);
+				if (p) {
+					positionedNodes[i] = enrichNodeWithLayer({
+						...n,
+						x: p.x,
+						y: p.y,
+					});
 				}
 			}
 		}

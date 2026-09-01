@@ -26,10 +26,17 @@ export interface VisibleLabelItem {
 export interface CommunityGuideLabelItem {
 	readonly guideId: string;
 	readonly text: string;
+	readonly subText?: string;
+	readonly layerId?: string;
+	readonly color?: string;
 	readonly x: number;
 	readonly y: number;
 	readonly box: LabelBox;
 	readonly font: string;
+	readonly subFont?: string;
+	readonly isCard: boolean;
+	readonly badgeWidth: number;
+	readonly badgeHeight: number;
 }
 
 export interface TemporalLabelLayout {
@@ -41,6 +48,8 @@ export interface TemporalLabelLayout {
 export interface TemporalCommunityGuideInput {
 	readonly id: string;
 	readonly label?: string;
+	readonly layerId?: string;
+	readonly color?: string;
 	readonly bounds?: {
 		readonly minX: number;
 		readonly minY: number;
@@ -88,11 +97,11 @@ export function computeVisibleCommunityGuideLabels(
 		readonly overlapCount?: { count: number };
 	},
 ): CommunityGuideLabelItem[] {
-	if (!guides.length || zoom < 0.18) {
+	if (!guides.length || zoom < 0.15) {
 		return [];
 	}
-	const maxLabels = options?.maxLabels ?? (zoom < 0.35 ? 6 : zoom < 0.65 ? 12 : 24);
-	const measureWidth = options?.measureWidth || function (text: string) { return text.length * 6.8; };
+	const maxLabels = options?.maxLabels ?? (zoom < 0.35 ? 8 : zoom < 0.65 ? 14 : 24);
+	const measureWidth = options?.measureWidth || function (text: string) { return text.length * 7.0; };
 	const visibleNodeIds = options?.visibleNodeIds;
 	const representedGuideIds = options?.representedGuideIds;
 
@@ -138,19 +147,44 @@ export function computeVisibleCommunityGuideLabels(
 		? (getComputedStyle(document.body).fontFamily || 'sans-serif')
 		: 'sans-serif';
 
+	const safeZoom = Math.max(0.001, Number.isFinite(zoom) ? zoom : 1);
+	const screenFontPx = safeZoom < 0.35 ? 11 : (safeZoom < 0.65 ? 12 : 11);
+	const worldFontPx = Math.max(10, Math.round(screenFontPx / safeZoom));
+	const subScreenFontPx = safeZoom < 0.35 ? 8.5 : 9.5;
+	const subWorldFontPx = Math.max(8, Math.round(subScreenFontPx / safeZoom));
+
+	const font = `600 ${worldFontPx}px ${family}`;
+	const subFont = `400 ${subWorldFontPx}px ${family}`;
+
 	const out: CommunityGuideLabelItem[] = [];
 	for (let i = 0; i < scored.length && out.length < maxLabels; i++) {
 		const guide = scored[i].guide;
 		const bounds = guide.bounds!;
-		const text = shortenCommunityLabel(guide.label!);
-		const font = `600 ${zoom < 0.45 ? 10 : 11}px ${family}`;
-		const textW = measureWidth(text, font);
+		const gw = Math.max(8, bounds.maxX - bounds.minX);
+
+		const text = shortenCommunityLabel(guide.label!, 24);
+		const count = guide.nodeCount ?? guide.nodeIds?.length ?? 0;
+		const layerStr = String(guide.layerId || 'module').toUpperCase();
+		const subText = safeZoom < 0.35
+			? `${count} files`
+			: `${count} files · ${layerStr}`;
+
+		const titleW = measureWidth(text, font);
+		const subW = measureWidth(subText, subFont);
+		const pad = Math.max(4, Math.round(8 / Math.max(0.35, safeZoom)));
+		const badgeW = Math.min(Math.max(20, gw - pad * 2), Math.max(titleW, subW) + Math.round(24 / Math.max(0.35, safeZoom)));
+		const badgeH = Math.round(worldFontPx + subWorldFontPx + 8 / Math.max(0.35, safeZoom));
+
+		const cardX = bounds.minX + pad;
+		const cardY = bounds.minY + pad;
+
 		const box: LabelBox = {
-			x: bounds.minX + 4,
-			y: bounds.minY - 16,
-			w: textW + 8,
-			h: 14,
+			x: cardX,
+			y: cardY,
+			w: badgeW,
+			h: badgeH,
 		};
+
 		let collision = false;
 		for (let b = 0; b < placedBoxes.length; b++) {
 			if (boxesOverlap(box, placedBoxes[b])) {
@@ -168,10 +202,17 @@ export function computeVisibleCommunityGuideLabels(
 		out.push({
 			guideId: guide.id,
 			text,
-			x: bounds.minX + 6,
-			y: bounds.minY - 4,
+			subText,
+			layerId: guide.layerId,
+			color: guide.color,
+			x: cardX,
+			y: cardY,
 			box,
 			font,
+			subFont,
+			isCard: true,
+			badgeWidth: badgeW,
+			badgeHeight: badgeH,
 		});
 	}
 	return out;
