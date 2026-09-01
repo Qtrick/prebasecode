@@ -716,7 +716,18 @@ export function layoutTemporalGraph(
 			const affectedArray = Array.from(affectedEntityIds);
 			const relaxationPasses = Math.min(5, Math.max(2, Math.floor(guideOverlap.guideOverlapCount * 2) + (unpositionedNodes.length > 0 ? 2 : 0)));
 
+			const rebuildOccupiedIndex = (): void => {
+				occupiedCoords.length = 0;
+				occupiedGrid.clear();
+				for (const pos of nextPositions.values()) {
+					const idx = occupiedCoords.length;
+					occupiedCoords.push(pos);
+					occupiedGrid.insert(idx, pos.x, pos.y);
+				}
+			};
+
 			for (let pass = 0; pass < relaxationPasses; pass++) {
+				rebuildOccupiedIndex();
 				for (let a = 0; a < affectedArray.length; a++) {
 					const id = affectedArray[a];
 					const pos = nextPositions.get(id);
@@ -775,20 +786,44 @@ export function layoutTemporalGraph(
 				}
 			}
 
-			// Update positionedNodes x/y coordinates
-			for (let i = 0; i < positionedNodes.length; i++) {
-				const n = positionedNodes[i];
-				const p = nextPositions.get(n.entityId);
-				if (p) {
-					positionedNodes[i] = enrichNodeWithLayer({
-						...n,
-						x: p.x,
-						y: p.y,
-					});
+			const relaxedGuides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
+			const overlapAfter = computeGuideOverlaps(relaxedGuides);
+			const qualityImproved = overlapAfter.guideOverlapCount < guideOverlap.guideOverlapCount
+				|| overlapAfter.maxGuideOverlapRatio < guideOverlap.maxGuideOverlapRatio;
+
+			if (qualityImproved) {
+				for (let i = 0; i < positionedNodes.length; i++) {
+					const n = positionedNodes[i];
+					const p = nextPositions.get(n.entityId);
+					if (p) {
+						positionedNodes[i] = enrichNodeWithLayer({
+							...n,
+							x: p.x,
+							y: p.y,
+						});
+					}
+				}
+				guides = relaxedGuides;
+			} else {
+				for (const [id, pos] of initialPositions) {
+					const live = nextPositions.get(id);
+					if (live) {
+						live.x = pos.x;
+						live.y = pos.y;
+					}
+				}
+				for (let i = 0; i < positionedNodes.length; i++) {
+					const n = positionedNodes[i];
+					const p = initialPositions.get(n.entityId);
+					if (p) {
+						positionedNodes[i] = enrichNodeWithLayer({
+							...n,
+							x: p.x,
+							y: p.y,
+						});
+					}
 				}
 			}
-
-			guides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
 		}
 	}
 
