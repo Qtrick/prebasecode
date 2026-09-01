@@ -1159,6 +1159,7 @@ registerAction2(class extends Action2 {
 			runtimePreviewServerRunning,
 			runtimePreviewStatus,
 			desktopSessionState,
+			onboardingComplete: accessor.get(IPreBaseAccountService).isOnboardingComplete(),
 			magnusStreamActive: 0,
 			magnusPacingActive: 0,
 			magnusSmokeEnabled: false,

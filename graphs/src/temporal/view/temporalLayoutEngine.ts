@@ -738,17 +738,22 @@ export function layoutTemporalGraph(
 			}
 		}
 
-		// Identify affected entity IDs
+		// Only relax communities that participate in the current guide overlap pairs.
 		const affectedEntityIds = new Set<string>();
-		for (const id of newEntityIdSet) {
-			affectedEntityIds.add(id);
-		}
-		for (const id of changedEntityIdSet) {
-			affectedEntityIds.add(id);
-		}
+		const commById = new Map<string, AdaptiveCommunity>();
 		for (let c = 0; c < activeCommunities.length; c++) {
-			const comm = activeCommunities[c];
-			if (directlyAffectedCommIds.has(comm.id) || relevantOverlappingCommIds.has(comm.id)) {
+			commById.set(activeCommunities[c].id, activeCommunities[c]);
+		}
+		for (let p = 0; p < initialOverlap.overlappingPairs.length; p++) {
+			const [idA, idB] = initialOverlap.overlappingPairs[p];
+			for (const commId of [idA, idB]) {
+				if (!directlyAffectedCommIds.has(commId) && !relevantOverlappingCommIds.has(commId)) {
+					continue;
+				}
+				const comm = commById.get(commId);
+				if (!comm) {
+					continue;
+				}
 				for (let m = 0; m < comm.nodeIds.length; m++) {
 					affectedEntityIds.add(comm.nodeIds[m]);
 				}
@@ -781,6 +786,7 @@ export function layoutTemporalGraph(
 				for (let g = 0; g < currentGuides.length; g++) {
 					currentGuideMap.set(currentGuides[g].id, currentGuides[g]);
 				}
+				const passOverlap = computeGuideOverlaps(currentGuides);
 
 				const pendingMoves: { id: string; x: number; y: number }[] = [];
 
@@ -822,8 +828,8 @@ export function layoutTemporalGraph(
 					if (myComm && overlappingCommIds.has(myComm.id)) {
 						const myGuide = currentGuideMap.get(myComm.id);
 						if (myGuide) {
-							for (let p = 0; p < initialOverlap.overlappingPairs.length; p++) {
-								const [c1Id, c2Id] = initialOverlap.overlappingPairs[p];
+							for (let p = 0; p < passOverlap.overlappingPairs.length; p++) {
+								const [c1Id, c2Id] = passOverlap.overlappingPairs[p];
 								const otherId = myComm.id === c1Id ? c2Id : (myComm.id === c2Id ? c1Id : null);
 								if (otherId) {
 									const otherGuide = currentGuideMap.get(otherId);

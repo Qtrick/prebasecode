@@ -3295,6 +3295,7 @@ function drawNetworkFrame() {
 				&& typeof activePointerHost.hasPointerCapture === 'function'
 				&& activePointerHost.hasPointerCapture(activePointerId)
 			);
+			metrics.interactionState = interactionState;
 			metrics.nodeHits = [];
 			for (let hi = 0; hi < nodes.length && metrics.nodeHits.length < 16; hi++) {
 				const hitNode = nodes[hi];

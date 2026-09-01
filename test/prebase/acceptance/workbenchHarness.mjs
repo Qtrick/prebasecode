@@ -40,6 +40,49 @@ export async function waitFor(predicate, timeoutMs = 45_000, intervalMs = 200) {
 	return undefined;
 }
 
+export async function completeOnboardingWelcomeFlow(page) {
+	const result = {
+		welcomeOpened: false,
+		onboardingComplete: false,
+		onboardingPersisted: false,
+		onboardingReopened: false,
+		onboardingReturnSessionCorrect: false,
+	};
+	const welcome = page.getByRole('button', { name: /Welcome to PreBase|Continue/i }).first();
+	if (await welcome.waitFor({ state: 'visible', timeout: 6_000 }).then(() => true, () => false)) {
+		result.welcomeOpened = true;
+	}
+	for (let step = 0; step < 8; step++) {
+		const finish = page.getByRole('button', { name: 'Finish', exact: true });
+		if (await finish.isVisible().catch(() => false)) {
+			await finish.click({ timeout: 3_000 }).catch(() => undefined);
+			break;
+		}
+		const cont = page.getByRole('button', { name: /Continue|Skip for now|Skip/i }).first();
+		if (await cont.isVisible().catch(() => false)) {
+			await cont.click({ timeout: 3_000 }).catch(() => undefined);
+		} else {
+			break;
+		}
+		await page.waitForTimeout(400);
+	}
+	const afterFinish = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
+	result.onboardingComplete = Boolean(afterFinish?.onboardingComplete);
+	await page.keyboard.press(process.platform === 'darwin' ? 'Meta+R' : 'Control+R').catch(() => undefined);
+	await workbenchCommandWithTimeout(page, 4_000, 'workbench.action.reloadWindow').catch(() => undefined);
+	await waitForWorkbenchDriver(page, 90_000);
+	const afterReload = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
+	result.onboardingPersisted = Boolean(afterReload?.onboardingComplete);
+	await workbenchCommandWithTimeout(page, 8_000, 'prebase.onboarding.open').catch(() => undefined);
+	result.onboardingReopened = await page.getByText('Welcome to PreBase').first().isVisible().catch(() => false);
+	await workbenchCommandWithTimeout(page, 8_000, 'prebase.onboarding.reset').catch(() => undefined);
+	const afterReset = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
+	result.onboardingReturnSessionCorrect = result.onboardingReopened
+		&& result.onboardingPersisted
+		&& Boolean(afterReset?.onboardingComplete === false || afterReset?.onboardingComplete === undefined);
+	return result;
+}
+
 export async function dismissStartup(page) {
 	let trustDismissed = false;
 	let offlineDismissed = false;

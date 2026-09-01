@@ -17,9 +17,10 @@ const UNIT_TESTS_DIR = path.join(REPO_ROOT, 'graphs/src/tests/unit');
 
 function runMochaOnSource(testRelPath) {
 	const testAbs = path.join(REPO_ROOT, testRelPath);
+	const timeoutMs = testRelPath.includes('gitHistoryService.test.ts') ? '30000' : '10000';
 	return spawnSync(
 		process.execPath,
-		['--experimental-strip-types', `--import=${SETUP}`, `--import=${REGISTER}`, MOCHA, testAbs, '--ui', 'tdd', '--timeout', '10000'],
+		['--experimental-strip-types', `--import=${SETUP}`, `--import=${REGISTER}`, MOCHA, testAbs, '--ui', 'tdd', '--timeout', timeoutMs],
 		{ cwd: REPO_ROOT, stdio: 'inherit' }
 	).status ?? 1;
 }

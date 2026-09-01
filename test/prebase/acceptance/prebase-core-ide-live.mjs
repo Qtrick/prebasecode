@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
 	acquirePhase3AcceptanceLock,
+	completeOnboardingWelcomeFlow,
 	dismissStartup,
 	findGraphFrame,
 	gracefulWorkbenchQuit,
@@ -19,6 +20,16 @@ import {
 	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
 import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
+import {
+	cameraRotationStable,
+	rotationProven,
+	worldPositionFinite,
+	worldDisplacement,
+	shiftPanProven,
+	pointerCaptureLifecycleProven,
+	semanticZoomProven as proveSemanticZoom,
+	labelDensityProven as proveLabelDensity,
+} from './networkGraphAcceptance.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -122,6 +133,7 @@ export function coreIdeFailures(evidence) {
 	if (!evidence.p2_offline) failures.push('P2 offline/welcome onboarding failed');
 	if (evidence.offlineChoiceActivated === false) failures.push('P2 offline choice was not activated');
 	if (evidence.onboardingResolved === false) failures.push('P2 onboarding was not resolved');
+	if (evidence.onboardingReturnSessionCorrect === false) failures.push('P2 onboarding return session was not proven');
 	if (!evidence.p4_runtime) failures.push('P4 Runtime Preview failed');
 	if (!evidence.p5_magnus) failures.push('P5 Magnus open failed');
 	if (evidence.codeGraph?.metricName !== GRAPH_RENDER_METRICS_NAME) {
@@ -252,14 +264,18 @@ async function run() {
 		launched = await launchPreBase(repo, gitWorkspace);
 		evidence.prebasePid = launched.info.pid;
 		const startupResult = await dismissStartup(launched.page);
+		const onboardingFlow = await completeOnboardingWelcomeFlow(launched.page).catch(() => null);
 		await waitForWorkbenchDriver(launched.page);
 		evidence.c3_folderOpen = true;
 		evidence.workbenchReady = true;
 		evidence.offlineChoicePresented = Boolean(startupResult?.offlineDismissed);
 		evidence.offlineChoiceActivated = Boolean(startupResult?.offlineDismissed);
-		evidence.onboardingPresented = Boolean(startupResult?.onboardingPresented ?? startupResult?.offlineDismissed);
-		evidence.onboardingResolved = Boolean(startupResult?.onboardingResolved ?? startupResult?.offlineDismissed);
-		evidence.p2_offline = Boolean(startupResult?.offlineDismissed);
+		evidence.onboardingPresented = Boolean(onboardingFlow?.welcomeOpened ?? startupResult?.offlineDismissed);
+		evidence.onboardingResolved = Boolean(onboardingFlow?.onboardingComplete);
+		evidence.onboardingPersisted = Boolean(onboardingFlow?.onboardingPersisted);
+		evidence.onboardingReopened = Boolean(onboardingFlow?.onboardingReopened);
+		evidence.onboardingReturnSessionCorrect = Boolean(onboardingFlow?.onboardingReturnSessionCorrect);
+		evidence.p2_offline = Boolean(startupResult?.offlineDismissed && onboardingFlow?.onboardingComplete);
 
 		const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 		const seen = async (selector, ms = 8_000) => Boolean(await waitFor(async () => {
@@ -350,6 +366,8 @@ async function run() {
 		let legacyRadialNormalized = false;
 		let yawBeforeRotate = null;
 		let yawAfterRotate = null;
+		let rotationBeforeGesture = null;
+		let rotationAfterGesture = null;
 		let hitBeforeDrag = null;
 		let hitAfterDrag = null;
 		let picked = false;
@@ -406,10 +424,14 @@ async function run() {
 				return current?.networkIdleAutoRotate ? current : undefined;
 			}, 8_000, 250);
 
-			yawBeforeRotate = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
+			const metricsBeforeRotate = await readGraphMetrics(graphFrame);
+			rotationBeforeGesture = metricsBeforeRotate?.rotation;
+			yawBeforeRotate = Number(rotationBeforeGesture?.yaw ?? 0);
 			await canvasGesture(graphFrame);
 			await launched.page.waitForTimeout(300);
-			yawAfterRotate = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
+			const metricsAfterRotate = await readGraphMetrics(graphFrame);
+			rotationAfterGesture = metricsAfterRotate?.rotation;
+			yawAfterRotate = Number(rotationAfterGesture?.yaw ?? 0);
 
 			await workbenchCommandWithTimeout(launched.page, 5_000, 'prebase.graph.focusCurrentFile').catch(() => undefined);
 			await graphFrame.page().keyboard.press('Escape');
@@ -430,7 +452,7 @@ async function run() {
 			if (unselectedNodeB && box) {
 				const metricsBeforeUnselected = await readGraphMetrics(graphFrame);
 				const hitBeforeUnselected = (metricsBeforeUnselected?.nodeHits || []).find(h => h.id === unselectedNodeB.id) || unselectedNodeB;
-				const yawBeforeUnselected = Number(metricsBeforeUnselected?.rotation?.yaw ?? 0);
+				const rotationBeforeUnselected = metricsBeforeUnselected?.rotation;
 				const x = box.x + unselectedNodeB.x;
 				const y = box.y + unselectedNodeB.y;
 				await graphFrame.page().mouse.move(x, y);
@@ -440,12 +462,14 @@ async function run() {
 				await launched.page.waitForTimeout(300);
 				const metricsAfterUnselected = await readGraphMetrics(graphFrame);
 				const hitAfterUnselected = (metricsAfterUnselected?.nodeHits || []).find(h => h.id === unselectedNodeB.id) || unselectedNodeB;
-				const yawAfterUnselected = Number(metricsAfterUnselected?.rotation?.yaw ?? 0);
-				unselectedNodeDragRotatedCamera = Math.abs(yawAfterUnselected - yawBeforeUnselected) > 0.005;
+				const rotationAfterUnselected = metricsAfterUnselected?.rotation;
+				unselectedNodeDragRotatedCamera = rotationProven(rotationBeforeUnselected, rotationAfterUnselected);
 				unselectedNodeStayedUnselected = metricsAfterUnselected?.selectedNodeId !== unselectedNodeB.id;
-				const worldBeforeX = hitBeforeUnselected.worldX ?? hitBeforeUnselected.world?.x ?? 0;
-				const worldAfterX = hitAfterUnselected.worldX ?? hitAfterUnselected.world?.x ?? 0;
-				unselectedNodeWorldPositionStable = Math.abs(worldAfterX - worldBeforeX) < 0.001;
+				const displacement = worldDisplacement(hitBeforeUnselected, hitAfterUnselected);
+				unselectedNodeWorldPositionStable = worldPositionFinite(hitBeforeUnselected)
+					&& worldPositionFinite(hitAfterUnselected)
+					&& displacement !== null
+					&& displacement < 0.001;
 			}
 
 			if (pickHit && box) {
@@ -464,7 +488,8 @@ async function run() {
 			const selectedId = metrics?.selectedNodeId;
 			hitBeforeDrag = (metrics?.nodeHits || []).find(hit => hit.id === selectedId) || metrics?.nodeHits?.[0] || null;
 			if (hitBeforeDrag && box) {
-				const yawBeforeSelectedDrag = Number(metrics?.rotation?.yaw ?? 0);
+				const metricsBeforeSelectedDrag = await readGraphMetrics(graphFrame);
+				const rotationBeforeSelectedDrag = metricsBeforeSelectedDrag?.rotation;
 				const x = box.x + hitBeforeDrag.x;
 				const y = box.y + hitBeforeDrag.y;
 				await graphFrame.page().mouse.move(x, y);
@@ -475,20 +500,24 @@ async function run() {
 
 				const metricsAfterNodeDrag = await readGraphMetrics(graphFrame);
 				hitAfterDrag = (metricsAfterNodeDrag?.nodeHits || []).find(hit => hit.id === (selectedId || hitBeforeDrag?.id)) || null;
-				const yawAfterSelectedDrag = Number(metricsAfterNodeDrag?.rotation?.yaw ?? 0);
-				selectedNodeDragMovedNode = Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1 || Math.abs((hitBeforeDrag.worldX ?? 0) - (hitAfterDrag.worldX ?? 0)) > 0.001));
-				selectedNodeDragCameraStable = Math.abs(yawAfterSelectedDrag - yawBeforeSelectedDrag) < 0.01;
+				const rotationAfterSelectedDrag = metricsAfterNodeDrag?.rotation;
+				const worldBefore = hitBeforeDrag;
+				const worldAfter = hitAfterDrag;
+				const worldMove = worldDisplacement(worldBefore, worldAfter);
+				selectedNodeDragMovedNode = worldMove !== null && worldMove > 0.001;
+				selectedNodeDragCameraStable = cameraRotationStable(rotationBeforeSelectedDrag, rotationAfterSelectedDrag);
 			}
 
 			if (box) {
-				const yawBeforeBg = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
+				const metricsBeforeBg = await readGraphMetrics(graphFrame);
+				const rotationBeforeBg = metricsBeforeBg?.rotation;
 				await graphFrame.page().mouse.move(box.x + 15, box.y + 15);
 				await graphFrame.page().mouse.down();
 				await graphFrame.page().mouse.move(box.x + 55, box.y + 35, { steps: 5 });
 				await graphFrame.page().mouse.up();
 				await launched.page.waitForTimeout(300);
-				const yawAfterBg = Number((await readGraphMetrics(graphFrame))?.rotation?.yaw ?? 0);
-				backgroundDragRotatedCamera = Math.abs(yawAfterBg - yawBeforeBg) > 0.005;
+				const metricsAfterBg = await readGraphMetrics(graphFrame);
+				backgroundDragRotatedCamera = rotationProven(rotationBeforeBg, metricsAfterBg?.rotation);
 			}
 
 			if (box) {
@@ -509,52 +538,63 @@ async function run() {
 				await graphFrame.page().keyboard.up('Shift');
 				await launched.page.waitForTimeout(300);
 				const panAfter = await readGraphMetrics(graphFrame);
-				const tx0 = Number(panBefore?.transform?.x);
-				const ty0 = Number(panBefore?.transform?.y);
-				const tx1 = Number(panAfter?.transform?.x);
-				const ty1 = Number(panAfter?.transform?.y);
-				shiftPanChangedViewport = Number.isFinite(tx0) && Number.isFinite(ty0) && Number.isFinite(tx1) && Number.isFinite(ty1)
-					&& (Math.abs(tx1 - tx0) > 0.5 || Math.abs(ty1 - ty0) > 0.5);
+				const selectedHit = (panBefore?.nodeHits || []).find(hit => hit.id === panBefore?.selectedNodeId) || null;
+				const selectedHitAfter = (panAfter?.nodeHits || []).find(hit => hit.id === panAfter?.selectedNodeId) || selectedHit;
+				const beforeWorld = selectedHit ? {
+					x: selectedHit.worldX ?? selectedHit.world?.x ?? 0,
+					y: selectedHit.worldY ?? selectedHit.world?.y ?? 0,
+					z: selectedHit.worldZ ?? selectedHit.world?.z ?? 0,
+				} : { x: 0, y: 0, z: 0 };
+				const afterWorld = selectedHitAfter ? {
+					x: selectedHitAfter.worldX ?? selectedHitAfter.world?.x ?? 0,
+					y: selectedHitAfter.worldY ?? selectedHitAfter.world?.y ?? 0,
+					z: selectedHitAfter.worldZ ?? selectedHitAfter.world?.z ?? 0,
+				} : beforeWorld;
+				shiftPanChangedViewport = shiftPanProven({
+					beforeTransform: panBefore?.transform ?? { x: 0, y: 0, k: 1 },
+					afterTransform: panAfter?.transform ?? { x: 0, y: 0, k: 1 },
+					beforeRotation: panBefore?.rotation ?? { yaw: 0, pitch: 0 },
+					afterRotation: panAfter?.rotation ?? { yaw: 0, pitch: 0 },
+					beforeNodeWorld: beforeWorld,
+					afterNodeWorld: afterWorld,
+				});
 			}
 
 			noStuckPointerCapture = await graphFrame.evaluate(() => {
 				const canvas = document.getElementById('netCanvas');
 				const metrics = window.__prebaseGraphRenderMetrics;
+				let captureHeld = false;
 				if (metrics && typeof metrics.pointerCaptureHeld === 'boolean') {
-					return metrics.pointerCaptureHeld === false;
-				}
-				if (!canvas || typeof canvas.hasPointerCapture !== 'function') {
-					return true;
-				}
-				for (let pointerId = 0; pointerId < 8; pointerId++) {
-					if (canvas.hasPointerCapture(pointerId)) {
-						return false;
+					captureHeld = metrics.pointerCaptureHeld;
+				} else if (canvas && typeof canvas.hasPointerCapture === 'function') {
+					for (let pointerId = 0; pointerId < 8; pointerId++) {
+						if (canvas.hasPointerCapture(pointerId)) {
+							captureHeld = true;
+							break;
+						}
 					}
 				}
-				return true;
+				const bodyCapture = typeof document.body?.hasPointerCapture === 'function'
+					? document.body.hasPointerCapture(1)
+					: false;
+				return captureHeld === false && bodyCapture === false;
 			}).catch(() => false);
 
-			const zoomMetrics1 = await readGraphMetrics(graphFrame);
-			await graphFrame.page().keyboard.press('+');
-			await graphFrame.page().keyboard.press('+');
-			await launched.page.waitForTimeout(300);
-			const zoomMetrics2 = await readGraphMetrics(graphFrame);
+			const zoomMetricsOut = await readGraphMetrics(graphFrame);
+			await graphFrame.page().keyboard.press('-');
 			await graphFrame.page().keyboard.press('-');
 			await graphFrame.page().keyboard.press('-');
 			await launched.page.waitForTimeout(300);
-			metrics = await readGraphMetrics(graphFrame);
-			const zoomK1 = Number(zoomMetrics1?.transform?.k);
-			const zoomK2 = Number(zoomMetrics2?.transform?.k);
-			const boundsW1 = Number(zoomMetrics1?.projectedBounds?.width);
-			const boundsW2 = Number(zoomMetrics2?.projectedBounds?.width);
-			semanticZoomProven = Boolean(
-				zoomMetrics1?.projectedBounds
-				&& zoomMetrics2?.projectedBounds
-				&& Number.isFinite(zoomK1) && Number.isFinite(zoomK2) && zoomK2 > zoomK1
-				&& Number.isFinite(boundsW1) && Number.isFinite(boundsW2) && boundsW2 < boundsW1
-				&& Number.isFinite(metrics?.screenUtilization) && metrics.screenUtilization > 0
-			);
-			labelDensityProven = Boolean(metrics && ((metrics.labelCount ?? metrics.labelsDrawn) > 0));
+			const zoomMetricsMid = await readGraphMetrics(graphFrame);
+			await graphFrame.page().keyboard.press('+');
+			await graphFrame.page().keyboard.press('+');
+			await graphFrame.page().keyboard.press('+');
+			await graphFrame.page().keyboard.press('+');
+			await launched.page.waitForTimeout(300);
+			const zoomMetricsIn = await readGraphMetrics(graphFrame);
+			semanticZoomProven = proveSemanticZoom(zoomMetricsOut, zoomMetricsIn);
+			labelDensityProven = proveLabelDensity(zoomMetricsOut, zoomMetricsIn, zoomMetricsMid);
+			metrics = zoomMetricsMid;
 		}
 		const selected = Boolean(metrics?.selectedNodeId);
 		evidence.codeGraph = {
@@ -578,7 +618,7 @@ async function run() {
 			selection: selected,
 			layoutModes: Boolean(organicMode === 'organic' && sphereMode === 'sphere' && constellationMode === 'constellation' && clusteredMode === 'clustered'),
 			legacyRadialNormalized: Boolean(legacyRadialNormalized),
-			rotate: Number.isFinite(yawBeforeRotate) && Number.isFinite(yawAfterRotate) && Math.abs(yawAfterRotate - yawBeforeRotate) > 0.01,
+			rotate: rotationProven(rotationBeforeGesture, rotationAfterGesture, 0.01),
 			drag: Boolean(hitBeforeDrag && hitAfterDrag && (Math.abs(hitBeforeDrag.x - hitAfterDrag.x) > 1 || Math.abs(hitBeforeDrag.y - hitAfterDrag.y) > 1)),
 			idleRotateArmed: Boolean(metrics?.networkIdleAutoRotate),
 			semanticZoom: semanticZoomProven,
