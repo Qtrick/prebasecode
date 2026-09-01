@@ -838,7 +838,12 @@ static NSString *JSString(Napi::Value value) {
 	NSTimeInterval animDuration = (win.size.height > self.panel.frame.size.height) ? 0.24 : 0.18;
 	BOOL isFirstLayout = !self.panel.isVisible || NSEqualRects(self.panel.frame, NSMakeRect(0, 0, 280, 36));
 
-	if (self.reducedMotion || isFirstLayout) {
+	if (self.reducedMotion) {
+		[self.panel setFrame:win display:YES animate:NO];
+		self.content.targetExpanded = expanded;
+		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
+		[self layoutControls:win];
+	} else if (isFirstLayout) {
 		[self.panel setFrame:win display:YES animate:NO];
 		self.content.targetExpanded = expanded;
 		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];

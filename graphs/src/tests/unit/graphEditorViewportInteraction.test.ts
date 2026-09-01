@@ -728,10 +728,16 @@ suite('GraphEditor Production Webview Viewport Interaction & Center Lock', () =>
 		assert.strictEqual(harness.canvas.style.cursor, 'default', 'center-locked background uses default cursor');
 		vm.runInContext('keepGraphCentered = false;', harness.context);
 
-		// Hovering a selectable node beats the background affordance
-		vm.runInContext("hoveredNodeId = 'a';", harness.context);
+		// Hovering an unselected selectable node uses pointer affordance
+		vm.runInContext("selectedNodeId = null; hoveredNodeId = 'a';", harness.context);
 		harness.callUpdateCanvasCursor();
-		assert.strictEqual(harness.canvas.style.cursor, 'pointer', 'hover over node uses pointer');
+		assert.strictEqual(harness.canvas.style.cursor, 'pointer', 'hover over unselected node uses pointer');
+
+		// Hovering an ALREADY SELECTED node uses grab affordance (indicating it is draggable)
+		vm.runInContext("selectedNodeId = 'a'; hoveredNodeId = 'a';", harness.context);
+		harness.callUpdateCanvasCursor();
+		assert.strictEqual(harness.canvas.style.cursor, 'grab', 'hover over selected node uses grab');
+		vm.runInContext("selectedNodeId = null;", harness.context);
 
 		// Active manipulation dominates hover
 		vm.runInContext('dragging = true;', harness.context);

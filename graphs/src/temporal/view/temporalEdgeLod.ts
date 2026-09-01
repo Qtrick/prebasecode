@@ -138,8 +138,8 @@ export function computeEdgeLodStyle(
 	}
 
 	// Unchanged background edges:
-	// Overview mode (zoom < 0.65) or active panning/dragging: suppress dense background clutter
-	if (zoom < 0.65 || isInteracting) {
+	// Overview mode (zoom < 0.60) or active panning/dragging: suppress dense background clutter
+	if (zoom < 0.60 || isInteracting) {
 		return {
 			shouldRender: false,
 			opacity: 0,
@@ -150,19 +150,22 @@ export function computeEdgeLodStyle(
 		};
 	}
 
-	// Intermediate zoom (0.65 <= zoom < 1.1)
-	if (zoom < 1.1) {
+	// Transition / Intermediate zoom (0.60 <= zoom < 1.05)
+	if (zoom < 1.05) {
+		const t = (zoom - 0.60) / 0.45;
+		const opacity = 0.15 + t * 0.25;
+		const strokeWidth = 0.8 + t * 0.25;
 		return {
 			shouldRender: true,
-			opacity: 0.35,
-			strokeWidth: 0.9,
+			opacity,
+			strokeWidth,
 			strokeDash: [],
 			isHighlighted: false,
 			isAggregate: false,
 		};
 	}
 
-	// Full Detail zoom (zoom >= 1.1)
+	// Full Detail zoom (zoom >= 1.05)
 	return {
 		shouldRender: true,
 		opacity: 0.55,

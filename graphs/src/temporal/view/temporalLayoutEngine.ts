@@ -18,7 +18,7 @@ import {
 } from './temporalGraphTopology.js';
 
 /** Bump when initial Temporal geometry algorithm changes so in-memory positions reset. */
-export const TEMPORAL_INITIAL_LAYOUT_VERSION = 3;
+export const TEMPORAL_INITIAL_LAYOUT_VERSION = 4;
 
 export interface TemporalLayoutOptions {
 	readonly width?: number;
@@ -29,6 +29,51 @@ export interface TemporalLayoutOptions {
 export type TemporalClusterGuide = TemporalCommunityGuide;
 
 const GOLDEN_ANGLE = 2.399963229728653;
+
+/**
+ * Lightweight 2D Spatial Grid for O(1) neighborhood collision checks and free-slot queries.
+ */
+export class Spatial2DGrid {
+	private readonly cellSize: number;
+	private readonly grid = new Map<string, number[]>();
+
+	constructor(cellSize: number) {
+		this.cellSize = Math.max(1, cellSize);
+	}
+
+	clear(): void {
+		this.grid.clear();
+	}
+
+	insert(index: number, x: number, y: number): void {
+		const cx = Math.floor(x / this.cellSize);
+		const cy = Math.floor(y / this.cellSize);
+		const k = `${cx},${cy}`;
+		let cell = this.grid.get(k);
+		if (!cell) {
+			cell = [];
+			this.grid.set(k, cell);
+		}
+		cell.push(index);
+	}
+
+	queryNearby(x: number, y: number): number[] {
+		const cx = Math.floor(x / this.cellSize);
+		const cy = Math.floor(y / this.cellSize);
+		const result: number[] = [];
+		for (let dx = -1; dx <= 1; dx++) {
+			for (let dy = -1; dy <= 1; dy++) {
+				const cell = this.grid.get(`${cx + dx},${cy + dy}`);
+				if (cell) {
+					for (let i = 0; i < cell.length; i++) {
+						result.push(cell[i]);
+					}
+				}
+			}
+		}
+		return result;
+	}
+}
 
 export function getArchitectureLayerColor(layerId?: string): string {
 	return getLayerColor(layerId);
@@ -379,10 +424,19 @@ export function computeSemanticTemporalInitialLayout(
 	}
 	nodePosList.sort((a, b) => a.id.localeCompare(b.id));
 
+	const grid = new Spatial2DGrid(MIN_NODE_DIST);
+
 	for (let iter = 0; iter < 5; iter++) {
+		grid.clear();
 		for (let i = 0; i < nodePosList.length; i++) {
-			for (let j = i + 1; j < nodePosList.length; j++) {
-				const p1 = nodePosList[i];
+			grid.insert(i, nodePosList[i].x, nodePosList[i].y);
+		}
+		for (let i = 0; i < nodePosList.length; i++) {
+			const p1 = nodePosList[i];
+			const nearby = grid.queryNearby(p1.x, p1.y);
+			for (let n = 0; n < nearby.length; n++) {
+				const j = nearby[n];
+				if (j <= i) continue;
 				const p2 = nodePosList[j];
 				if (p1.communityId && p2.communityId && p1.communityId !== p2.communityId) {
 					continue;
@@ -403,10 +457,17 @@ export function computeSemanticTemporalInitialLayout(
 	}
 	// Global polish for boundary overlaps between communities
 	for (let iter = 0; iter < 8; iter++) {
+		grid.clear();
+		for (let i = 0; i < nodePosList.length; i++) {
+			grid.insert(i, nodePosList[i].x, nodePosList[i].y);
+		}
 		let adjusted = false;
 		for (let i = 0; i < nodePosList.length; i++) {
-			for (let j = i + 1; j < nodePosList.length; j++) {
-				const p1 = nodePosList[i];
+			const p1 = nodePosList[i];
+			const nearby = grid.queryNearby(p1.x, p1.y);
+			for (let n = 0; n < nearby.length; n++) {
+				const j = nearby[n];
+				if (j <= i) continue;
 				const p2 = nodePosList[j];
 				const dx = p2.x - p1.x;
 				const dy = p2.y - p1.y;
@@ -513,12 +574,18 @@ export function layoutTemporalGraph(
 
 	const occupiedCoords: { x: number; y: number }[] = Array.from(nextPositions.values());
 	const MIN_NODE_DISTANCE = Math.max(30, nodeSpacing * 0.65);
+	const occupiedGrid = new Spatial2DGrid(MIN_NODE_DISTANCE);
+	for (let i = 0; i < occupiedCoords.length; i++) {
+		occupiedGrid.insert(i, occupiedCoords[i].x, occupiedCoords[i].y);
+	}
 
 	function isSlotFree(x: number, y: number): boolean {
-		for (let i = 0; i < occupiedCoords.length; i++) {
-			const p = occupiedCoords[i];
+		const nearby = occupiedGrid.queryNearby(x, y);
+		const threshSq = MIN_NODE_DISTANCE * MIN_NODE_DISTANCE;
+		for (let i = 0; i < nearby.length; i++) {
+			const p = occupiedCoords[nearby[i]];
 			const distSq = (p.x - x) * (p.x - x) + (p.y - y) * (p.y - y);
-			if (distSq < MIN_NODE_DISTANCE * MIN_NODE_DISTANCE) {
+			if (distSq < threshSq) {
 				return false;
 			}
 		}
@@ -590,7 +657,9 @@ export function layoutTemporalGraph(
 
 		const slot = findFreeSlotNear(targetX, targetY, hashString(node.entityId));
 		nextPositions.set(node.entityId, slot);
+		const newIdx = occupiedCoords.length;
 		occupiedCoords.push(slot);
+		occupiedGrid.insert(newIdx, slot.x, slot.y);
 
 		positionedNodes.push(enrichNodeWithLayer({
 			...node,

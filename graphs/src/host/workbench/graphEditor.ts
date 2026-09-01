@@ -1099,6 +1099,8 @@ const noChangesViewSource = document.getElementById('noChangesViewSource');
 
 let popupNode = null;
 let pointerDownNode = null;
+let pointerDownNodeId = null;
+let nodeWasSelectedAtPointerDown = false;
 let pointerDownX = 0, pointerDownY = 0;
 let interactionState = 'idle';
 let dragThreshold = 4;
@@ -2431,6 +2433,54 @@ function drawTemporalFrame(ts) {
 			ctx.lineWidth = 1;
 			if (typeof ctx.setLineDash === 'function') ctx.setLineDash([3, 7]);
 			ctx.stroke();
+
+			// Community Header Card inside region (at overview and medium zoom)
+			if (gw > 60 && gh > 40 && transform.k >= 0.24) {
+				const headerFont = computeNetworkLabelWorldFontSize(10, transform.k, { minScreenPx: 8, maxScreenPx: 12 });
+				const subFont = computeNetworkLabelWorldFontSize(8, transform.k, { minScreenPx: 7, maxScreenPx: 10 });
+				const labelText = shortenCommunityLabel(guide.label || guide.id, 24);
+				const subText = String(guide.nodeCount || 0) + ' files · ' + String(guide.layerId || 'module').toUpperCase();
+
+				ctx.font = canvasFont('600', headerFont);
+				const titleW = measureTextWidth(labelText, ctx.font);
+				const badgeW = Math.min(gw - 16, titleW + 22 / Math.max(0.4, transform.k));
+				const badgeH = headerFont + subFont + 8 / Math.max(0.4, transform.k);
+				const pillX = gx + 8;
+				const pillY = gy + 8;
+				const pillR = Math.min(4, radius * 0.4);
+
+				ctx.fillStyle = theme.isHighContrast ? 'rgba(0, 0, 0, 0.90)' : 'rgba(15, 23, 42, 0.82)';
+				if (typeof ctx.roundRect === 'function') {
+					ctx.beginPath();
+					ctx.roundRect(pillX, pillY, badgeW, badgeH, pillR);
+					ctx.fill();
+					ctx.strokeStyle = hexColor ? (hexColor + '55') : 'rgba(99, 102, 241, 0.35)';
+					ctx.lineWidth = 1;
+					if (typeof ctx.setLineDash === 'function') ctx.setLineDash([]);
+					ctx.stroke();
+				} else {
+					ctx.fillRect(pillX, pillY, badgeW, badgeH);
+				}
+
+				// Layer color dot
+				ctx.beginPath();
+				const dotR = Math.max(2, 3 / Math.max(0.4, transform.k));
+				ctx.arc(pillX + 7 / Math.max(0.4, transform.k), pillY + headerFont * 0.7, dotR, 0, Math.PI * 2);
+				ctx.fillStyle = hexColor || theme.accent;
+				ctx.fill();
+
+				// Community Title
+				ctx.textAlign = 'left';
+				ctx.textBaseline = 'top';
+				ctx.fillStyle = theme.isHighContrast ? '#ffffff' : '#f1f5f9';
+				ctx.fillText(labelText, pillX + 14 / Math.max(0.4, transform.k), pillY + 3 / Math.max(0.4, transform.k));
+
+				// Subtitle
+				ctx.font = canvasFont('400', subFont);
+				ctx.fillStyle = theme.isHighContrast ? '#cccccc' : '#94a3b8';
+				ctx.fillText(subText, pillX + 14 / Math.max(0.4, transform.k), pillY + headerFont + 4 / Math.max(0.4, transform.k));
+			}
+
 			ctx.restore();
 		}
 
@@ -2618,13 +2668,13 @@ function drawTemporalFrame(ts) {
 	if (projectedAggregates.length) {
 		for (let a = 0; a < projectedAggregates.length; a++) {
 			const agg = projectedAggregates[a];
-			const markerR = Math.max(2.4, 4.2 / Math.max(0.4, transform.k));
+			const markerR = Math.max(3.0, 4.8 / Math.max(0.4, transform.k));
 			ctx.save();
 			ctx.beginPath();
 			ctx.arc(agg.x, agg.y, markerR, 0, Math.PI * 2);
 			ctx.fillStyle = agg.changedCount > 0
 				? theme.accent
-				: (theme.isHighContrast ? '#ffffff' : 'rgba(230, 237, 243, 0.78)');
+				: (theme.isHighContrast ? '#ffffff' : (agg.color || 'rgba(230, 237, 243, 0.78)'));
 			ctx.fill();
 			const countFont = computeNetworkLabelWorldFontSize(10, transform.k, { minScreenPx: 8, maxScreenPx: 13 });
 			ctx.font = canvasFont('600', countFont);
@@ -2632,8 +2682,8 @@ function drawTemporalFrame(ts) {
 			ctx.textAlign = 'center';
 			ctx.textBaseline = 'top';
 			const countLabel = agg.changedCount > 0
-				? (String(agg.nodeCount) + ' · ' + String(agg.changedCount))
-				: String(agg.nodeCount);
+				? (String(agg.nodeCount) + ' files · ' + String(agg.changedCount) + ' changed')
+				: (String(agg.nodeCount) + ' files');
 			ctx.fillText(countLabel, agg.x, agg.y + markerR + 2 / Math.max(0.4, transform.k));
 			ctx.restore();
 		}
@@ -3539,6 +3589,13 @@ function onPointerDown(e, host) {
 	pointerDownNode = isTemporal()
 		? pickTemporalNode(e.clientX, e.clientY)
 		: pickNetworkNode(e.clientX, e.clientY);
+	pointerDownNodeId = pointerDownNode ? (pointerDownNode.entityId || pointerDownNode.id) : null;
+	nodeWasSelectedAtPointerDown = Boolean(
+		pointerDownNode &&
+		pointerDownNodeId &&
+		selectedNodeId &&
+		pointerDownNodeId === selectedNodeId
+	);
 
 	const wantPan = e.button === 1 || e.shiftKey || isTemporal();
 	panning = wantPan;
@@ -3559,7 +3616,7 @@ function onPointerDown(e, host) {
 
 /**
  * Single source of truth for the canvas cursor, derived from the live interaction state.
- * Order: active manipulation > selectable node hover > background affordance.
+ * Order: active manipulation > selectable/draggable node hover > background affordance.
  */
 function updateCanvasCursor() {
 	if (!netCanvas) return;
@@ -3567,7 +3624,12 @@ function updateCanvasCursor() {
 		netCanvas.style.cursor = 'grabbing';
 		return;
 	}
-	netCanvas.style.cursor = hoveredNodeId ? 'pointer' : (isNetwork() && !keepGraphCentered ? 'grab' : 'default');
+	if (hoveredNodeId) {
+		const isHoveredSelected = Boolean(selectedNodeId && hoveredNodeId === selectedNodeId && isNetwork());
+		netCanvas.style.cursor = isHoveredSelected ? 'grab' : 'pointer';
+		return;
+	}
+	netCanvas.style.cursor = (isNetwork() && !keepGraphCentered) ? 'grab' : 'default';
 }
 
 function onPointerUp(e, cancelled) {
@@ -3582,6 +3644,8 @@ function onPointerUp(e, cancelled) {
 	dragging = false; panning = false; rotating = false; draggingNode = false;
 	interactionState = cancelled ? 'cancelled' : 'idle';
 	pointerDownNode = null;
+	pointerDownNodeId = null;
+	nodeWasSelectedAtPointerDown = false;
 	if (netCanvas) {
 		netCanvas.classList.remove('dragging');
 		netCanvas.classList.remove('panning');
@@ -3635,7 +3699,8 @@ function onPointerMove(e) {
 	if (total > dragThreshold) moved = true;
 
 	if (interactionState === 'pressed' && !panning && isNetwork() && moved) {
-		if (pointerDownNode) {
+		const nodeDragEligible = Boolean(pointerDownNode && nodeWasSelectedAtPointerDown && !panning);
+		if (nodeDragEligible) {
 			draggingNode = true;
 			interactionState = 'draggingNode';
 		} else {

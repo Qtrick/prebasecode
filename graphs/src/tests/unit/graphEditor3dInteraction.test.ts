@@ -108,9 +108,13 @@ class FakeElement {
 			save() { },
 			restore() { },
 			clearRect() { },
+			fillRect() { },
+			strokeRect() { },
+			roundRect() { },
 			beginPath() { },
 			moveTo() { },
 			lineTo() { },
+			quadraticCurveTo() { },
 			stroke() { },
 			fill() { },
 			arc() { },
@@ -339,7 +343,7 @@ suite('PreBase graph editor 3D interaction', () => {
 		assert.ok(invertedYaw > 0.55, 'inverted drag to the right should rotate yaw positively');
 	});
 
-	test('dragging a picked node updates its world position without rotating the camera', () => {
+	test('unselected node + drag rotates the camera, does not move the node, and does not select on release', () => {
 		const harness = createWebviewHarness();
 		vm.runInContext(`
 			snapshot = {
@@ -349,19 +353,96 @@ suite('PreBase graph editor 3D interaction', () => {
 			rebuildBase3d(snapshot);
 			projectAll();
 			transform = { x: 0, y: 0, k: 1 };
+			selectedNodeId = null;
 		`, harness.context);
 
 		const before = vm.runInContext('({ ...base3d.a, yaw: rotation.yaw })', harness.context);
 		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
 		harness.canvas.dispatch('pointermove', { clientX: 40, clientY: 10 });
 		const during = vm.runInContext('({ ...base3d.a, yaw: rotation.yaw, draggingNode, rotating })', harness.context);
-		assert.strictEqual(during.draggingNode, true);
-		assert.strictEqual(during.rotating, false, 'picked-node drag must not rotate the camera');
-		assert.ok(Math.hypot(during.x - before.x, during.y - before.y, during.z - before.z) > 1, 'picked node must move in world space');
-		assert.strictEqual(during.yaw, before.yaw, 'node drag must not steal camera rotation');
+		assert.strictEqual(during.draggingNode, false, 'unselected node drag must not enter draggingNode');
+		assert.strictEqual(during.rotating, true, 'unselected node drag must rotate the camera');
+		assert.deepStrictEqual({ x: during.x, y: during.y, z: during.z }, { x: before.x, y: before.y, z: before.z }, 'unselected node position must be unchanged');
+		assert.notStrictEqual(during.yaw, before.yaw, 'camera yaw must change during rotation');
+
+		harness.canvas.dispatch('pointerup', { clientX: 40, clientY: 10 });
+		assert.strictEqual(vm.runInContext('rotating', harness.context), false);
+		assert.strictEqual(vm.runInContext('selectedNodeId', harness.context), null, 'unselected node drag must not select node on release');
+	});
+
+	test('unselected node + single click selects the node', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+			selectedNodeId = null;
+		`, harness.context);
+
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
+		harness.canvas.dispatch('pointerup', { clientX: 1, clientY: 1 });
+		assert.strictEqual(vm.runInContext('selectedNodeId', harness.context), 'a', 'single click selects the unselected node');
+	});
+
+	test('already-selected node + second click-hold-drag updates its world position without rotating camera', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+			selectedNodeId = 'a';
+		`, harness.context);
+
+		const before = vm.runInContext('({ ...base3d.a, yaw: rotation.yaw })', harness.context);
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
+		harness.canvas.dispatch('pointermove', { clientX: 40, clientY: 10 });
+		const during = vm.runInContext('({ ...base3d.a, yaw: rotation.yaw, draggingNode, rotating })', harness.context);
+		assert.strictEqual(during.draggingNode, true, 'selected node drag must enter draggingNode');
+		assert.strictEqual(during.rotating, false, 'selected node drag must not rotate camera');
+		assert.ok(Math.hypot(during.x - before.x, during.y - before.y, during.z - before.z) > 1, 'selected node must move in world space');
+		assert.strictEqual(during.yaw, before.yaw, 'camera yaw must remain unchanged');
 
 		harness.canvas.dispatch('pointerup', { clientX: 40, clientY: 10 });
 		assert.strictEqual(vm.runInContext('draggingNode', harness.context), false);
+		assert.strictEqual(vm.runInContext('selectedNodeId', harness.context), 'a', 'node remains selected after drag release');
+	});
+
+	test('selected node A + subsequent drag on unselected node B rotates graph without dragging B', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [
+					{ id: 'a', x: 0, y: 0, z: 0 },
+					{ id: 'b', x: 100, y: 0, z: 0 }
+				],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+			selectedNodeId = 'a';
+		`, harness.context);
+
+		const beforeB = vm.runInContext('({ ...base3d.b, yaw: rotation.yaw })', harness.context);
+		const bScreen = vm.runInContext('({ x: projected.b.x, y: projected.b.y })', harness.context);
+
+		harness.canvas.dispatch('pointerdown', { clientX: bScreen.x, clientY: bScreen.y });
+		harness.canvas.dispatch('pointermove', { clientX: bScreen.x + 30, clientY: bScreen.y + 10 });
+		const during = vm.runInContext('({ ...base3d.b, yaw: rotation.yaw, draggingNode, rotating })', harness.context);
+		assert.strictEqual(during.draggingNode, false, 'dragging unselected node B must not enter draggingNode');
+		assert.strictEqual(during.rotating, true, 'dragging unselected node B must rotate camera');
+		assert.deepStrictEqual({ x: during.x, y: during.y, z: during.z }, { x: beforeB.x, y: beforeB.y, z: beforeB.z });
+
+		harness.canvas.dispatch('pointerup', { clientX: bScreen.x + 30, clientY: bScreen.y + 10 });
+		assert.strictEqual(vm.runInContext('rotating', harness.context), false);
 	});
 
 	test('pointer starting on empty canvas rotates the camera without dragging a node', () => {
@@ -437,22 +518,94 @@ suite('PreBase graph editor 3D interaction', () => {
 		assert.strictEqual(vm.runInContext('canIdleRotate() && !idlePaused', harness.context), true);
 	});
 
-	test('responsive stage resize shifts camera center by half delta while preserving zoom, pan, and rotation', () => {
+	test('selected node + small movement below threshold does not accidentally move node', () => {
 		const harness = createWebviewHarness();
 		vm.runInContext(`
-			transform = { x: 10, y: 20, k: 1.5 };
-			rotation = { yaw: 0.8, pitch: -0.2 };
-			lastViewportW = 800;
-			lastViewportH = 600;
-			onStageResize(900, 700);
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+			selectedNodeId = 'a';
 		`, harness.context);
 
-		const updatedTransform = vm.runInContext('({ ...transform })', harness.context);
-		const updatedRotation = vm.runInContext('({ ...rotation })', harness.context);
+		const before = vm.runInContext('({ ...base3d.a })', harness.context);
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
+		// Movement of 2px is below dragThreshold (4px)
+		harness.canvas.dispatch('pointermove', { clientX: 2, clientY: 1 });
+		const during = vm.runInContext('({ ...base3d.a, draggingNode, rotating })', harness.context);
+		assert.strictEqual(during.draggingNode, false);
+		assert.strictEqual(during.rotating, false);
+		assert.deepStrictEqual({ x: during.x, y: during.y, z: during.z }, { x: before.x, y: before.y, z: before.z });
 
-		assert.strictEqual(updatedTransform.k, 1.5);
-		assert.strictEqual(updatedTransform.x, 60);
-		assert.strictEqual(updatedTransform.y, 70);
-		assert.deepStrictEqual({ ...updatedRotation }, { yaw: 0.8, pitch: -0.2 });
+		harness.canvas.dispatch('pointerup', { clientX: 2, clientY: 1 });
+		assert.strictEqual(vm.runInContext('selectedNodeId', harness.context), 'a');
+	});
+
+	test('Shift-key or middle-button pan overrides selected-node drag into viewport panning', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+			selectedNodeId = 'a';
+		`, harness.context);
+
+		const beforeNode = vm.runInContext('({ ...base3d.a })', harness.context);
+		const beforeTransform = vm.runInContext('({ ...transform })', harness.context);
+
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0, shiftKey: true });
+		harness.canvas.dispatch('pointermove', { clientX: 30, clientY: 20, shiftKey: true });
+		const during = vm.runInContext('({ ...base3d.a, draggingNode, rotating, panning, transform: { ...transform } })', harness.context);
+
+		assert.strictEqual(during.draggingNode, false, 'shift-pan must not enter draggingNode');
+		assert.strictEqual(during.panning, true, 'shift-pan must enter panning');
+		assert.deepStrictEqual({ x: during.x, y: during.y, z: during.z }, { x: beforeNode.x, y: beforeNode.y, z: beforeNode.z }, 'node must not move during pan');
+		assert.notStrictEqual(during.transform.x, beforeTransform.x);
+
+		harness.canvas.dispatch('pointerup', { clientX: 30, clientY: 20, shiftKey: true });
+	});
+
+	test('reduced-motion setting preserves two-stage interaction semantics identically', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+			settings.reduceMotion = true;
+			selectedNodeId = null;
+		`, harness.context);
+
+		// First drag on unselected node rotates
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
+		harness.canvas.dispatch('pointermove', { clientX: 30, clientY: 10 });
+		assert.strictEqual(vm.runInContext('rotating', harness.context), true);
+		assert.strictEqual(vm.runInContext('draggingNode', harness.context), false);
+		harness.canvas.dispatch('pointerup', { clientX: 30, clientY: 10 });
+
+		// Click selects
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
+		harness.canvas.dispatch('pointerup', { clientX: 0, clientY: 0 });
+		assert.strictEqual(vm.runInContext('selectedNodeId', harness.context), 'a');
+
+		// Second drag moves node
+		const before = vm.runInContext('({ ...base3d.a })', harness.context);
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
+		harness.canvas.dispatch('pointermove', { clientX: 40, clientY: 15 });
+		assert.strictEqual(vm.runInContext('draggingNode', harness.context), true);
+		assert.strictEqual(vm.runInContext('rotating', harness.context), false);
+		const after = vm.runInContext('({ ...base3d.a })', harness.context);
+		assert.ok(Math.hypot(after.x - before.x, after.y - before.y) > 1);
+		harness.canvas.dispatch('pointerup', { clientX: 40, clientY: 15 });
 	});
 });

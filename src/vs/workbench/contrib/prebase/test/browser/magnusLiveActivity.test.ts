@@ -836,8 +836,8 @@ suite('Magnus Live Activity path topology compatibility (P0)', () => {
 			height: 982,
 			scaleFactor: 2,
 			safeAreaTop: 32,
-			auxLeftWidth: 600,  // Narrower wings
-			auxRightWidth: 600,
+			auxLeftWidth: 650,  // Narrower screen wings
+			auxRightWidth: 650,
 			auxLeftHeight: 32,
 			auxRightHeight: 32,
 		};
@@ -845,12 +845,12 @@ suite('Magnus Live Activity path topology compatibility (P0)', () => {
 		const wideWing: LiveActivityScreenLayout = {
 			originX: 0,
 			originY: 0,
-			width: 1512,
-			height: 982,
+			width: 1612,
+			height: 1000,
 			scaleFactor: 2,
 			safeAreaTop: 32,
-			auxLeftWidth: 650,  // Wider wings
-			auxRightWidth: 650,
+			auxLeftWidth: 700,  // Wider screen wings
+			auxRightWidth: 700,
 			auxLeftHeight: 32,
 			auxRightHeight: 32,
 		};
