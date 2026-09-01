@@ -263,6 +263,7 @@ static NSString *JSString(Napi::Value value) {
 
 @property (nonatomic, assign) BOOL lastInside;
 @property (nonatomic, assign) BOOL didHoverHaptic;
+@property (nonatomic, assign) BOOL didAttentionHaptic;
 @property (nonatomic, assign) NSUInteger hapticCount;
 @property (nonatomic, assign) NSUInteger redrawCount;
 @property (nonatomic, assign) NSUInteger animationCount;
@@ -587,6 +588,7 @@ static NSString *JSString(Napi::Value value) {
 		self.ignoresMouse = YES;
 		self.displayMode = @"builtin";
 		self.didHoverHaptic = NO;
+		self.didAttentionHaptic = NO;
 		self.hapticCount = 0;
 		self.redrawCount = 0;
 		self.animationCount = 0;
@@ -1094,6 +1096,7 @@ static NSString *JSString(Napi::Value value) {
 	self.panel.ignoresMouseEvents = YES;
 	self.ignoresMouse = YES;
 	self.didHoverHaptic = NO;
+	self.didAttentionHaptic = NO;
 	self.lastInside = NO;
 	self.input.hidden = YES;
 	[self.panel makeFirstResponder:nil];
@@ -1314,8 +1317,14 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"transitionGeneration"] = @(self.transitionGeneration);
 	dict[@"layerBacked"] = @(self.content.wantsLayer);
 	dict[@"pathTopologyCompatible"] = @YES;
-	dict[@"activePresentationState"] = self.content.expanded ? @"expanded" : @"collapsed";
-	dict[@"targetPresentationState"] = self.content.targetExpanded ? @"expanded" : @"collapsed";
+	dict[@"activePresentationState"] = self.pinned
+		? @"pinned"
+		: (self.content.expanded
+			? (self.content.attention ? @"attention" : @"peek")
+			: @"collapsed");
+	dict[@"targetPresentationState"] = self.content.targetExpanded
+		? (self.content.attention ? @"attention" : @"peek")
+		: @"collapsed";
 	dict[@"hoverDwellMs"] = @(180);
 	dict[@"exitGraceMs"] = @(250);
 	return dict;
@@ -1404,16 +1413,21 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
 	self.lastNativeCommand = @"";
 
-	if (self.content.attention && (self.pendingOptions.count > 0 || [self.pendingKind isEqualToString:@"approval"])) {
+	if (self.content.attention && !self.pinned) {
 		self.content.expanded = YES;
 		self.content.targetExpanded = YES;
 		self.ignoresMouse = NO;
+		if (!self.didAttentionHaptic) {
+			self.didAttentionHaptic = YES;
+			[self performUserHaptic];
+		}
 		if (self.panel) {
 			self.panel.ignoresMouseEvents = NO;
 			[self removeGlobalMonitorOnly];
 			[self layoutForScreen];
 		}
 	} else {
+		self.didAttentionHaptic = NO;
 		// Synchronize targetExpanded with current expanded state when not forcing attention expansion
 		self.content.targetExpanded = self.content.expanded;
 	}

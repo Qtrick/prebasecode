@@ -492,6 +492,15 @@ async function run() {
 			}
 
 			if (box) {
+				await graphFrame.evaluate(() => {
+					if (typeof keepGraphCentered !== 'undefined') {
+						keepGraphCentered = false;
+					}
+					if (typeof settings === 'object' && settings) {
+						settings.keepGraphCentered = false;
+					}
+				}).catch(() => undefined);
+				const panBefore = await readGraphMetrics(graphFrame);
 				await graphFrame.page().keyboard.down('Shift');
 				await graphFrame.page().mouse.move(box.x + 30, box.y + 30);
 				await graphFrame.page().mouse.down();
@@ -499,12 +508,31 @@ async function run() {
 				await graphFrame.page().mouse.up();
 				await graphFrame.page().keyboard.up('Shift');
 				await launched.page.waitForTimeout(300);
-				shiftPanChangedViewport = true;
+				const panAfter = await readGraphMetrics(graphFrame);
+				const tx0 = Number(panBefore?.transform?.x);
+				const ty0 = Number(panBefore?.transform?.y);
+				const tx1 = Number(panAfter?.transform?.x);
+				const ty1 = Number(panAfter?.transform?.y);
+				shiftPanChangedViewport = Number.isFinite(tx0) && Number.isFinite(ty0) && Number.isFinite(tx1) && Number.isFinite(ty1)
+					&& (Math.abs(tx1 - tx0) > 0.5 || Math.abs(ty1 - ty0) > 0.5);
 			}
 
 			noStuckPointerCapture = await graphFrame.evaluate(() => {
-				return typeof document.hasPointerCapture === 'function' ? !document.body.hasPointerCapture(1) : true;
-			}).catch(() => true);
+				const canvas = document.getElementById('netCanvas');
+				const metrics = window.__prebaseGraphRenderMetrics;
+				if (metrics && typeof metrics.pointerCaptureHeld === 'boolean') {
+					return metrics.pointerCaptureHeld === false;
+				}
+				if (!canvas || typeof canvas.hasPointerCapture !== 'function') {
+					return true;
+				}
+				for (let pointerId = 0; pointerId < 8; pointerId++) {
+					if (canvas.hasPointerCapture(pointerId)) {
+						return false;
+					}
+				}
+				return true;
+			}).catch(() => false);
 
 			const zoomMetrics1 = await readGraphMetrics(graphFrame);
 			await graphFrame.page().keyboard.press('+');
@@ -515,7 +543,17 @@ async function run() {
 			await graphFrame.page().keyboard.press('-');
 			await launched.page.waitForTimeout(300);
 			metrics = await readGraphMetrics(graphFrame);
-			semanticZoomProven = Boolean(zoomMetrics1?.projectedBounds && zoomMetrics2?.projectedBounds && Number.isFinite(metrics?.screenUtilization) && metrics.screenUtilization > 0);
+			const zoomK1 = Number(zoomMetrics1?.transform?.k);
+			const zoomK2 = Number(zoomMetrics2?.transform?.k);
+			const boundsW1 = Number(zoomMetrics1?.projectedBounds?.width);
+			const boundsW2 = Number(zoomMetrics2?.projectedBounds?.width);
+			semanticZoomProven = Boolean(
+				zoomMetrics1?.projectedBounds
+				&& zoomMetrics2?.projectedBounds
+				&& Number.isFinite(zoomK1) && Number.isFinite(zoomK2) && zoomK2 > zoomK1
+				&& Number.isFinite(boundsW1) && Number.isFinite(boundsW2) && boundsW2 < boundsW1
+				&& Number.isFinite(metrics?.screenUtilization) && metrics.screenUtilization > 0
+			);
 			labelDensityProven = Boolean(metrics && ((metrics.labelCount ?? metrics.labelsDrawn) > 0));
 		}
 		const selected = Boolean(metrics?.selectedNodeId);

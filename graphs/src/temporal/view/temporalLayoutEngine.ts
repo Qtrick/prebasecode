@@ -770,19 +770,19 @@ export function layoutTemporalGraph(
 			const relaxationPasses = Math.min(5, Math.max(2, Math.floor(initialOverlap.guideOverlapCount * 2) + (unpositionedNodes.length > 0 ? 2 : 0)));
 
 			for (let pass = 0; pass < relaxationPasses; pass++) {
-				// Rebuild spatial grid for accurate neighborhood queries as positions update
 				const passCoords: { x: number; y: number }[] = Array.from(nextPositions.values());
 				const passGrid = new Spatial2DGrid(MIN_NODE_DISTANCE);
 				for (let i = 0; i < passCoords.length; i++) {
 					passGrid.insert(i, passCoords[i].x, passCoords[i].y);
 				}
 
-				// Current guide centers for community-separation force
 				const currentGuides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
 				const currentGuideMap = new Map<string, TemporalCommunityGuide>();
 				for (let g = 0; g < currentGuides.length; g++) {
 					currentGuideMap.set(currentGuides[g].id, currentGuides[g]);
 				}
+
+				const pendingMoves: { id: string; x: number; y: number }[] = [];
 
 				for (let a = 0; a < affectedArray.length; a++) {
 					const id = affectedArray[a];
@@ -793,7 +793,6 @@ export function layoutTemporalGraph(
 					let fx = 0;
 					let fy = 0;
 
-					// 1. Repulsive forces from close neighbors (using up-to-date spatial grid)
 					const nearby = passGrid.queryNearby(pos.x, pos.y);
 					for (let n = 0; n < nearby.length; n++) {
 						const other = passCoords[nearby[n]];
@@ -808,7 +807,6 @@ export function layoutTemporalGraph(
 						}
 					}
 
-					// 2. Spring attraction towards connected neighbors
 					const neighbors = connectedNeighbors.get(id);
 					if (neighbors && neighbors.size > 0) {
 						for (const neighborId of neighbors) {
@@ -820,7 +818,6 @@ export function layoutTemporalGraph(
 						}
 					}
 
-					// 3. Community-separation force for overlapping community pairs
 					const myComm = nodeCommunityMap.get(id);
 					if (myComm && overlappingCommIds.has(myComm.id)) {
 						const myGuide = currentGuideMap.get(myComm.id);
@@ -846,7 +843,6 @@ export function layoutTemporalGraph(
 						}
 					}
 
-					// 4. Anchor force restoring towards original coordinate
 					fx -= (pos.x - initial.x) * 0.45;
 					fy -= (pos.y - initial.y) * 0.45;
 
@@ -863,8 +859,16 @@ export function layoutTemporalGraph(
 						newY = initial.y + (newY - initial.y) * scale;
 					}
 
-					pos.x = Math.round(newX);
-					pos.y = Math.round(newY);
+					pendingMoves.push({ id, x: Math.round(newX), y: Math.round(newY) });
+				}
+
+				for (let m = 0; m < pendingMoves.length; m++) {
+					const move = pendingMoves[m];
+					const pos = nextPositions.get(move.id);
+					if (pos) {
+						pos.x = move.x;
+						pos.y = move.y;
+					}
 				}
 			}
 
@@ -873,7 +877,8 @@ export function layoutTemporalGraph(
 			const relaxedOverlap = computeGuideOverlaps(relaxedGuides);
 
 			const qualityImproved = relaxedOverlap.guideOverlapCount < initialOverlap.guideOverlapCount ||
-				(relaxedOverlap.guideOverlapCount === initialOverlap.guideOverlapCount && relaxedOverlap.guideOverlapRatio <= initialOverlap.guideOverlapRatio + 0.001);
+				(relaxedOverlap.guideOverlapCount === initialOverlap.guideOverlapCount
+					&& relaxedOverlap.guideOverlapRatio + 1e-6 < initialOverlap.guideOverlapRatio);
 
 			if (qualityImproved) {
 				// Accept relaxed positions and guides

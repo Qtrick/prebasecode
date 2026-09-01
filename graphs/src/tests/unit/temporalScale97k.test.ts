@@ -33,6 +33,10 @@ suite('TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Accepta
 
 			for (let i = 0; i < NODES_PER_COMMUNITY; i++) {
 				const id = `ent-c${c}-n${i}`;
+				const isRemoved = options?.mutate && c === 5 && i < 10;
+				if (isRemoved) {
+					continue;
+				}
 				const isMutated = options?.mutate && (c === 3 || c === 7) && (i < 8);
 				const isRenamed = options?.mutate && c === 4 && i === 1;
 				const path = isRenamed
@@ -44,7 +48,7 @@ suite('TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Accepta
 					entityId: id,
 					commitSha,
 					path,
-					blobOid: `blob-${id}`,
+					blobOid: isMutated ? `blob-${id}-v2` : `blob-${id}`,
 					nodeData: {
 						id: canonicalNodeId,
 						kind: 'file',
@@ -129,7 +133,7 @@ suite('TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Accepta
 			}
 		}
 
-		// If mutate requested, add 20 fresh nodes and 10 removals
+		// If mutate requested, add 20 fresh nodes; removals are applied by caller via filter
 		if (options?.mutate) {
 			for (let a = 0; a < 20; a++) {
 				const newId = `ent-new-${a}`;
@@ -190,15 +194,33 @@ suite('TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Accepta
 		const diff1 = computeTemporalStructuralDiff('commit-1', baseFixture.entities, baseFixture.edges, undefined, undefined, undefined);
 		const baseLayout = computeSemanticTemporalInitialLayout(diff1.nodes, diff1.edges, 48);
 
-		// Target commit with modifications, additions, renames
+		// Target commit with modifications, additions, renames, and 10 removals
 		const targetFixture = generate97kFixture('commit-2', { mutate: true });
+		assert.equal(targetFixture.entities.length, TOTAL_NODES + 20 - 10, 'Mutated fixture must add 20 nodes and remove 10');
 		const diff2 = computeTemporalStructuralDiff('commit-2', targetFixture.entities, targetFixture.edges, 'commit-1', baseFixture.entities, baseFixture.edges);
+
+		assert.equal(diff2.summary.modifiedCount, 16, 'communities 3 and 7 must contribute 16 modified nodes');
+		assert.equal(diff2.summary.removedCount, 10, 'fixture must remove exactly 10 entities');
+		assert.equal(diff2.summary.addedCount, 20, 'fixture must add exactly 20 entities');
+		assert.equal(diff2.summary.renamedCount, 1, 'community 4 must contribute one rename');
+		assert.ok(diff2.summary.edgeAddedCount >= 20, 'added nodes must introduce new edges');
+		assert.ok(diff2.summary.edgeRemovedCount >= 10, 'removed nodes must drop incident edges');
+
+		const modifiedNodes = diff2.nodes.filter(n => n.changeKind === 'modified');
+		assert.equal(modifiedNodes.length, 16);
+		for (const node of modifiedNodes) {
+			const baseEntity = baseFixture.entities.find(e => e.entityId === node.entityId);
+			const targetEntity = targetFixture.entities.find(e => e.entityId === node.entityId);
+			assert.ok(baseEntity && targetEntity, `modified node ${node.entityId} must exist in both commits`);
+			assert.notEqual(targetEntity.blobOid, baseEntity.blobOid, `modified node ${node.entityId} must change blobOid`);
+		}
 
 		const start = performance.now();
 		const targetLayout = layoutTemporalGraph(diff2, baseLayout.positions);
 		const duration = performance.now() - start;
 
-		assert.ok(targetLayout.nodes.length >= TOTAL_NODES, 'Target layout must contain all surviving + added nodes');
+		assert.equal(targetLayout.nodes.filter(n => n.changeKind !== 'removed').length, TOTAL_NODES + 20 - 10, 'Target layout must contain surviving nodes plus additions minus removals');
+		assert.equal(targetLayout.nodes.filter(n => n.changeKind === 'removed').length, 10, 'Removed entities must remain visible for mental-map continuity');
 		assert.ok(duration < 3000, `9.7k incremental layout must complete in < 3000ms (actual: ${duration.toFixed(2)}ms)`);
 
 		// Measure displacement across surviving unchanged nodes
@@ -222,10 +244,12 @@ suite('TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Accepta
 		assert.ok(p95 <= 13, `p95 unchanged displacement must be <= 13px (actual: ${p95.toFixed(2)}px)`);
 	});
 
-	test('3. 9.7k Multi-Tier Projection: Overview tier (k=0.21) collapses 9.7k nodes into community aggregates with 60fps bounds', () => {
+	test('3. 9.7k Multi-Tier Projection: overview/medium/detail tiers project mutated 9.7k graph within duration budget', () => {
 		const baseFixture = generate97kFixture('commit-1');
 		const targetFixture = generate97kFixture('commit-2', { mutate: true });
 		const diff = computeTemporalStructuralDiff('commit-2', targetFixture.entities, targetFixture.edges, 'commit-1', baseFixture.entities, baseFixture.edges);
+
+		const projectionStart = performance.now();
 		const layout = computeSemanticTemporalInitialLayout(diff.nodes, diff.edges, 48);
 
 		// Overview zoom (Fit View k = 0.21 on ~9.7k nodes)
@@ -266,5 +290,8 @@ suite('TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Accepta
 		});
 		assert.equal(detailProj.tier, 'detail');
 		assert.equal(detailProj.aggregateNodesDrawn, 0, 'Detail tier must not draw aggregate disc overlays');
+
+		const projectionDuration = performance.now() - projectionStart;
+		assert.ok(projectionDuration < 1500, `multi-tier projection must complete in < 1500ms (actual: ${projectionDuration.toFixed(2)}ms)`);
 	});
 });
