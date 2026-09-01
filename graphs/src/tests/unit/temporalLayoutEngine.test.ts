@@ -4,8 +4,10 @@
 
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
-import { layoutTemporalGraph, Spatial2DGrid } from '../../temporal/view/temporalLayoutEngine.js';
+import { layoutTemporalGraph, Spatial2DGrid, derivePostCollisionGuides } from '../../temporal/view/temporalLayoutEngine.js';
 import { computeTemporalStructuralDiff } from '../../temporal/view/temporalStructuralDiff.js';
+import { computeAdaptiveCommunities } from '../../temporal/view/temporalGraphTopology.js';
+import { computeGuideOverlaps } from '../../temporal/view/temporalLayoutQuality.js';
 import type { TemporalEntitySnapshot, TemporalEdgeSnapshot } from '../../temporal/common/temporalTypes.js';
 
 suite('TemporalLayoutEngine (Unit - Stable 2D Layout Invariants)', () => {
@@ -213,23 +215,41 @@ suite('TemporalLayoutEngine (Unit - Stable 2D Layout Invariants)', () => {
 			const baseEntities = [
 				makeEntity('c1-1', 'src/comm1/a.ts', 'can-1a'),
 				makeEntity('c1-2', 'src/comm1/b.ts', 'can-1b'),
+				makeEntity('c1-3', 'src/comm1/c.ts', 'can-1c'),
 				makeEntity('c2-1', 'src/comm2/a.ts', 'can-2a'),
 				makeEntity('c2-2', 'src/comm2/b.ts', 'can-2b'),
+				makeEntity('c2-3', 'src/comm2/c.ts', 'can-2c'),
 			];
-			const diff = computeTemporalStructuralDiff('c2', baseEntities, [], 'c1', baseEntities, []);
-			// Overlapping community positions
+			const targetEntities = [
+				makeEntity('c1-1', 'src/comm1/a.ts', 'can-1a'),
+				makeEntity('c1-2', 'src/comm1/b.ts', 'can-1b'),
+				makeEntity('c1-3', 'src/comm1/c.ts', 'can-1c'),
+				makeEntity('c2-1', 'src/comm2/a.ts', 'can-2a-v2'),
+				makeEntity('c2-2', 'src/comm2/b.ts', 'can-2b'),
+				makeEntity('c2-3', 'src/comm2/c.ts', 'can-2c'),
+			];
+			const diff = computeTemporalStructuralDiff('c2', targetEntities, [], 'c1', baseEntities, []);
 			const prevPositions = new Map<string, { x: number; y: number }>([
-				['c1-1', { x: 10, y: 10 }],
-				['c1-2', { x: 20, y: 10 }],
-				['c2-1', { x: 15, y: 12 }],
-				['c2-2', { x: 25, y: 12 }],
+				['c1-1', { x: 40, y: 40 }],
+				['c1-2', { x: 55, y: 42 }],
+				['c1-3', { x: 48, y: 52 }],
+				['c2-1', { x: 46, y: 44 }],
+				['c2-2', { x: 58, y: 48 }],
+				['c2-3', { x: 50, y: 56 }],
 			]);
+			const activeCommunities = computeAdaptiveCommunities(diff.nodes.filter(n => n.changeKind !== 'removed'), diff.edges);
+			const beforeGuides = derivePostCollisionGuides(activeCommunities, prevPositions, 24);
+			const beforeOverlap = computeGuideOverlaps(beforeGuides);
+			assert.ok(beforeOverlap.guideOverlapCount > 0, 'fixture must start with overlapping guides');
+
 			const result = layoutTemporalGraph(diff, prevPositions);
 			assert.ok(result.guides && result.guides.length >= 1, 'Guides must be derived');
-			// Nodes should have been boundedly separated
-			const p1 = result.positions.get('c1-1')!;
-			const p2 = result.positions.get('c2-1')!;
-			assert.ok(p1 && p2, 'Positions must exist');
+			const afterOverlap = computeGuideOverlaps(result.guides);
+			assert.ok(
+				afterOverlap.guideOverlapCount < beforeOverlap.guideOverlapCount
+				|| afterOverlap.guideOverlapRatio < beforeOverlap.guideOverlapRatio,
+				`relaxation must improve overlap (before count=${beforeOverlap.guideOverlapCount}, after=${afterOverlap.guideOverlapCount}, before ratio=${beforeOverlap.guideOverlapRatio.toFixed(3)}, after=${afterOverlap.guideOverlapRatio.toFixed(3)})`,
+			);
 		});
 
 		test('TEST C — Far-Away Community: Far-away unaffected community experiences zero movement', () => {
@@ -255,6 +275,57 @@ suite('TemporalLayoutEngine (Unit - Stable 2D Layout Invariants)', () => {
 			const farPos2 = result.positions.get('far-2');
 			assert.deepEqual(farPos1, { x: 1500, y: 1500 }, 'Far-away node far-1 must have zero displacement');
 			assert.deepEqual(farPos2, { x: 1550, y: 1500 }, 'Far-away node far-2 must have zero displacement');
+		});
+
+		test('TEST C2 — Unrelated Changed Community: distant modified community stays anchored when overlap is elsewhere', () => {
+			const baseEntities = [
+				makeEntity('c1-1', 'src/comm1/a.ts', 'can-1a'),
+				makeEntity('c1-2', 'src/comm1/b.ts', 'can-1b'),
+				makeEntity('c2-1', 'src/comm2/a.ts', 'can-2a'),
+				makeEntity('c2-2', 'src/comm2/b.ts', 'can-2b'),
+				makeEntity('far-1', 'src/far_comm/a.ts', 'can-far-a'),
+			];
+			const targetEntities = [
+				makeEntity('c1-1', 'src/comm1/a.ts', 'can-1a'),
+				makeEntity('c1-2', 'src/comm1/b.ts', 'can-1b'),
+				makeEntity('c2-1', 'src/comm2/a.ts', 'can-2a'),
+				makeEntity('c2-2', 'src/comm2/b.ts', 'can-2b'),
+				makeEntity('far-1', 'src/far_comm/a.ts', 'can-far-a-v2'),
+			];
+			const diff = computeTemporalStructuralDiff('c2', targetEntities, [], 'c1', baseEntities, []);
+			const prevPositions = new Map<string, { x: number; y: number }>([
+				['c1-1', { x: 0, y: 0 }],
+				['c1-2', { x: 10, y: 0 }],
+				['c2-1', { x: 5, y: 5 }],
+				['c2-2', { x: 15, y: 5 }],
+				['far-1', { x: 1800, y: 1800 }],
+			]);
+			const result = layoutTemporalGraph(diff, prevPositions);
+			assert.deepEqual(result.positions.get('far-1'), { x: 1800, y: 1800 }, 'unrelated changed community must not move');
+		});
+
+		test('TEST G2 — Quality Gate: relaxation reverts when overlap ratio would worsen', () => {
+			const baseEntities = [
+				makeEntity('c1-1', 'src/comm1/a.ts', 'can-1a'),
+				makeEntity('c1-2', 'src/comm1/b.ts', 'can-1b'),
+				makeEntity('c2-1', 'src/comm2/a.ts', 'can-2a'),
+				makeEntity('c2-2', 'src/comm2/b.ts', 'can-2b'),
+				makeEntity('c3-1', 'src/comm3/a.ts', 'can-3a'),
+				makeEntity('c3-2', 'src/comm3/b.ts', 'can-3b'),
+			];
+			const diff = computeTemporalStructuralDiff('c2', baseEntities, [], 'c1', baseEntities, []);
+			const prevPositions = new Map<string, { x: number; y: number }>([
+				['c1-1', { x: 0, y: 0 }],
+				['c1-2', { x: 8, y: 0 }],
+				['c2-1', { x: 4, y: 4 }],
+				['c2-2', { x: 12, y: 4 }],
+				['c3-1', { x: 120, y: 0 }],
+				['c3-2', { x: 128, y: 0 }],
+			]);
+			const result = layoutTemporalGraph(diff, prevPositions);
+			for (const [id, prev] of prevPositions) {
+				assert.deepEqual(result.positions.get(id), prev, `positions must remain stable when relaxation cannot improve overlap for ${id}`);
+			}
 		});
 
 		test('TEST D — Unchanged Affected Node: Movement is strictly bounded within unchanged budget (<= 12px)', () => {

@@ -150,6 +150,31 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.ok(landmark.subText?.includes('112 files'), 'subtext must explain node count clearly');
 	});
 
+	test('11. aggregate guide labels reserve shared occupancy before node labels are placed', () => {
+		const guides = [
+			{
+				id: 'comm-a',
+				label: 'Services',
+				bounds: { minX: 0, minY: 0, maxX: 180, maxY: 140 },
+				nodeCount: 40,
+			},
+			{
+				id: 'comm-b',
+				label: 'Database',
+				bounds: { minX: 200, minY: 0, maxX: 380, maxY: 140 },
+				nodeCount: 35,
+			},
+		];
+		const nodes = [
+			makeNode('n-under-a', 'src/a.ts', 'modified', 40, 30),
+			makeNode('n-under-b', 'src/b.ts', 'modified', 240, 30),
+		];
+		const layout = computeTemporalLabelLayout(nodes, guides, 0.75);
+		assert.equal(layout.guideLabels.length, 2, 'both aggregate guide labels should be placed');
+		assert.equal(layout.nodeLabels.length, 0, 'node labels must yield to aggregate guide occupancy');
+		assert.ok(layout.labelOverlapCount >= 0);
+	});
+
 	test('4. Hoists the workbench font family once per pass into every visible label', () => {
 		const previousDocument = globalThis.document;
 		const previousGetComputedStyle = globalThis.getComputedStyle;
