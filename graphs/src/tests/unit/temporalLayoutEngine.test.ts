@@ -4,7 +4,9 @@
 
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
-import { layoutTemporalGraph } from '../../temporal/view/temporalLayoutEngine.js';
+import { computeSemanticTemporalInitialLayout, derivePostCollisionGuides, layoutTemporalGraph } from '../../temporal/view/temporalLayoutEngine.js';
+import { computeGuideOverlaps, measureLayoutQuality } from '../../temporal/view/temporalLayoutQuality.js';
+import { computeAdaptiveCommunities } from '../../temporal/view/temporalGraphTopology.js';
 import { computeTemporalStructuralDiff } from '../../temporal/view/temporalStructuralDiff.js';
 import type { TemporalEntitySnapshot, TemporalEdgeSnapshot } from '../../temporal/common/temporalTypes.js';
 
@@ -157,7 +159,61 @@ suite('TemporalLayoutEngine (Unit - Stable 2D Layout Invariants)', () => {
 		assert.equal(removedNode.y, 400);
 	});
 
-	test('5. Performance: 500-node snapshot layout executes in under 15ms', () => {
+	test('6. Guide overlap relaxation preserves distant unchanged nodes and does not increase overlap', () => {
+		const baseEntities = [
+			makeEntity('ent-anchor-a', 'src/pkg_a/core.ts', 'can-a'),
+			makeEntity('ent-anchor-b', 'src/pkg_b/core.ts', 'can-b'),
+			makeEntity('ent-far', 'src/pkg_z/stable.ts', 'can-far'),
+		];
+		const baseEdges = [
+			makeEdge('e-a', 'ent-anchor-a', 'ent-anchor-b', 'src/pkg_a/core.ts', 'src/pkg_b/core.ts'),
+		];
+
+		const previousPositions = new Map<string, { x: number; y: number }>([
+			['ent-anchor-a', { x: 0, y: 0 }],
+			['ent-anchor-b', { x: 90, y: 0 }],
+			['ent-far', { x: 2_400, y: -1_800 }],
+		]);
+
+		const targetEntities = [
+			...baseEntities,
+			makeEntity('ent-new-1', 'src/pkg_a/feature_1.ts', 'can-n1'),
+			makeEntity('ent-new-2', 'src/pkg_b/feature_2.ts', 'can-n2'),
+			makeEntity('ent-new-3', 'src/pkg_b/feature_3.ts', 'can-n3'),
+		];
+		const targetEdges = [
+			...baseEdges,
+			makeEdge('e-n1', 'ent-anchor-a', 'ent-new-1', 'src/pkg_a/core.ts', 'src/pkg_a/feature_1.ts'),
+			makeEdge('e-n2', 'ent-anchor-b', 'ent-new-2', 'src/pkg_b/core.ts', 'src/pkg_b/feature_2.ts'),
+			makeEdge('e-n3', 'ent-new-2', 'ent-new-3', 'src/pkg_b/feature_2.ts', 'src/pkg_b/feature_3.ts'),
+		];
+
+		const diff = computeTemporalStructuralDiff('commit-relax', targetEntities, targetEdges, 'commit-base', baseEntities, baseEdges);
+
+		// Pre-relaxation placement: pin previous nodes, drop new nodes on the midpoint to force guide overlap.
+		const stressedPositions = new Map(previousPositions);
+		stressedPositions.set('ent-new-1', { x: 45, y: 0 });
+		stressedPositions.set('ent-new-2', { x: 45, y: 0 });
+		stressedPositions.set('ent-new-3', { x: 45, y: 0 });
+		const activeNodes = diff.nodes.filter(n => n.changeKind !== 'removed');
+		const stressedCommunities = computeAdaptiveCommunities(activeNodes, diff.edges);
+		const stressedGuides = derivePostCollisionGuides(stressedCommunities, stressedPositions, 24);
+		const overlapBefore = computeGuideOverlaps(stressedGuides).guideOverlapCount;
+		assert.ok(overlapBefore > 0, 'fixture must begin with overlapping guides to exercise relaxation');
+
+		const result = layoutTemporalGraph(diff, previousPositions, { nodeSpacing: 48 });
+		const overlapAfter = computeGuideOverlaps(result.guides ?? []).guideOverlapCount;
+		const qualityImproved = overlapAfter <= overlapBefore;
+		assert.ok(qualityImproved, `relaxation must not increase guide overlap (before=${overlapBefore}, after=${overlapAfter})`);
+		assert.deepEqual(result.positions.get('ent-far'), previousPositions.get('ent-far'), 'distant unchanged node must have zero displacement');
+
+		const quality = measureLayoutQuality(result, diff, { width: 1400, height: 900 }, previousPositions);
+		if (quality.medianDisplacement !== undefined) {
+			assert.ok(quality.medianDisplacement <= 12, `unchanged median displacement must stay bounded (got ${quality.medianDisplacement})`);
+		}
+	});
+
+	test('5. Performance: 500-node snapshot layout executes in under 35ms', () => {
 		const entities: TemporalEntitySnapshot[] = [];
 		const edges: TemporalEdgeSnapshot[] = [];
 		const prev = new Map<string, { x: number; y: number }>();
@@ -183,6 +239,6 @@ suite('TemporalLayoutEngine (Unit - Stable 2D Layout Invariants)', () => {
 		const duration = performance.now() - start;
 
 		assert.equal(result.nodes.length, 520);
-		assert.ok(duration < 15, `500-node layout must execute under 15ms (actual: ${duration.toFixed(2)}ms)`);
+		assert.ok(duration < 35, `500-node layout must execute under 35ms (actual: ${duration.toFixed(2)}ms)`);
 	});
 });

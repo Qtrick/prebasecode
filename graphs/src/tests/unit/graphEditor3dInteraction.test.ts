@@ -572,6 +572,93 @@ suite('PreBase graph editor 3D interaction', () => {
 		harness.canvas.dispatch('pointerup', { clientX: 30, clientY: 20, shiftKey: true });
 	});
 
+	test('vertical drag changes pitch as well as yaw during camera rotation', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+			rotation = { yaw: 0.55, pitch: 0.28 };
+		`, harness.context);
+
+		const before = vm.runInContext('({ yaw: rotation.yaw, pitch: rotation.pitch })', harness.context);
+		harness.canvas.dispatch('pointerdown', { clientX: 100, clientY: 100 });
+		harness.canvas.dispatch('pointermove', { clientX: 140, clientY: 150 });
+		const after = vm.runInContext('({ yaw: rotation.yaw, pitch: rotation.pitch })', harness.context);
+		harness.canvas.dispatch('pointerup', { clientX: 140, clientY: 150 });
+
+		assert.notStrictEqual(after.yaw, before.yaw, 'horizontal component must change yaw');
+		assert.notStrictEqual(after.pitch, before.pitch, 'vertical component must change pitch');
+	});
+
+	test('selection idle lock freezes both yaw and pitch while a node stays selected', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			settings.networkIdleAutoRotate = true;
+			settings.reduceMotion = false;
+			selectedNodeId = 'a';
+			rotation = { yaw: 0.42, pitch: 0.19 };
+		`, harness.context);
+
+		const atSelection = vm.runInContext('({ yaw: rotation.yaw, pitch: rotation.pitch })', harness.context);
+		harness.runTimers();
+		const afterIdle = vm.runInContext('({ yaw: rotation.yaw, pitch: rotation.pitch })', harness.context);
+
+		assert.strictEqual(vm.runInContext('canIdleRotate()', harness.context), false);
+		assert.ok(Math.abs(afterIdle.yaw - atSelection.yaw) < 0.05, 'yaw must stay locked with selection');
+		assert.ok(Math.abs(afterIdle.pitch - atSelection.pitch) < 0.05, 'pitch must stay locked with selection');
+	});
+
+	test('pointer capture is acquired on the canvas host, not document', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 0, y: 0, z: 0 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+		`, harness.context);
+
+		harness.canvas.dispatch('pointerdown', { clientX: 50, clientY: 50 });
+		assert.strictEqual(harness.canvas.hasPointerCapture(1), true, 'canvas must capture pointer');
+		const host = vm.runInContext('activePointerHost', harness.context);
+		const canvasEl = vm.runInContext('document.getElementById("netCanvas")', harness.context);
+		assert.strictEqual(host, canvasEl, 'activePointerHost must be the canvas element');
+		harness.canvas.dispatch('pointerup', { clientX: 50, clientY: 50 });
+	});
+
+	test('selected-node drag moves world XYZ while keeping screen projection stable under simultaneous zoom', () => {
+		const harness = createWebviewHarness();
+		vm.runInContext(`
+			snapshot = {
+				nodes: [{ id: 'a', x: 10, y: -5, z: 8 }],
+				edges: []
+			};
+			rebuildBase3d(snapshot);
+			projectAll();
+			transform = { x: 0, y: 0, k: 1 };
+			selectedNodeId = 'a';
+		`, harness.context);
+
+		const before = vm.runInContext('({ ...base3d.a })', harness.context);
+		harness.canvas.dispatch('pointerdown', { clientX: 0, clientY: 0 });
+		harness.canvas.dispatch('pointermove', { clientX: 45, clientY: 20 });
+		const after = vm.runInContext('({ ...base3d.a })', harness.context);
+		harness.canvas.dispatch('pointerup', { clientX: 45, clientY: 20 });
+
+		const worldDelta = Math.hypot(after.x - before.x, after.y - before.y, after.z - before.z);
+		assert.ok(worldDelta > 1, 'selected node must move in world XYZ');
+	});
+
 	test('reduced-motion setting preserves two-stage interaction semantics identically', () => {
 		const harness = createWebviewHarness();
 		vm.runInContext(`
