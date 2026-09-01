@@ -26,6 +26,10 @@ export function temporalAcceptanceFailures(evidence) {
 	if (large) {
 		if (!(evidence.fixture?.commits >= 50)) {failures.push('large fixture commit count is below 50');}
 		if (!(evidence.fixture?.files?.length >= 250)) {failures.push('large fixture HEAD does not contain 250+ files');}
+		if (evidence.fixture?.moduleCount !== 336) {failures.push('large fixture module seed count is not 336');}
+		if (evidence.fixture?.expectedHeadFileCount && evidence.fixture.files?.length !== evidence.fixture.expectedHeadFileCount) {
+			failures.push('large fixture HEAD file count does not match expected module graph');
+		}
 	} else {
 		if (evidence.fixture?.commits !== 10) {failures.push('fixture commit count is not 10');}
 		if (evidence.fixture?.files?.length !== 4) {failures.push('fixture HEAD does not contain four files');}
@@ -193,6 +197,10 @@ function createLargeFixture() {
 		head: git(dir, ['rev-parse', 'HEAD']),
 		commits: Number(git(dir, ['rev-list', '--count', 'HEAD'])),
 		files,
+		layerCount: layers.length,
+		perLayer,
+		moduleCount: paths.length,
+		expectedHeadFileCount: paths.length - 1,
 		expectedModifiedPath: git(dir, ['diff', '--name-only', 'HEAD^', 'HEAD']),
 		firstParentSummary: git(dir, ['show', '--stat', '--oneline', '--format=%H %P %s', 'HEAD']),
 		scale: 'large',

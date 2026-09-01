@@ -1153,13 +1153,14 @@ registerAction2(class extends Action2 {
 			}
 		}
 		const theme = themeService.getColorTheme();
+		const accountService = accessor.get(IPreBaseAccountService);
 		const result: Record<string, unknown> = {
 			parserActiveRequests,
 			temporalActiveWrites,
 			runtimePreviewServerRunning,
 			runtimePreviewStatus,
 			desktopSessionState,
-			onboardingComplete: accessor.get(IPreBaseAccountService).isOnboardingComplete(),
+			onboardingComplete: accountService.isOnboardingComplete(),
 			magnusStreamActive: 0,
 			magnusPacingActive: 0,
 			magnusSmokeEnabled: false,

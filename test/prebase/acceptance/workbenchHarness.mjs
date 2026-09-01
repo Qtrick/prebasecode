@@ -40,41 +40,95 @@ export async function waitFor(predicate, timeoutMs = 45_000, intervalMs = 200) {
 	return undefined;
 }
 
+export async function dismissStartup(page, options = {}) {
+	const skipOffline = Boolean(options.skipOffline);
+	let trustDismissed = false;
+	let offlineDismissed = false;
+	let offlinePromptSeen = false;
+	let onboardingVisible = false;
+	let onboardingDismissed = false;
+	const trust = page.getByRole('button', { name: /Yes, I trust the authors/i });
+	if (await trust.waitFor({ state: 'visible', timeout: 4_000 }).then(() => true, () => false)) {
+		await trust.click();
+		trustDismissed = true;
+	}
+	if (await page.locator('.prebase-onboarding').first().waitFor({ state: 'visible', timeout: 2_000 }).then(() => true, () => false)) {
+		onboardingVisible = true;
+	}
+	const signInDialog = page.getByRole('dialog', { name: 'Sign in to PreBase' });
+	if (await signInDialog.waitFor({ state: 'visible', timeout: 2_000 }).then(() => true, () => false)) {
+		onboardingVisible = true;
+	}
+	const offline = page.getByRole('button', { name: 'Continue Offline', exact: true });
+	if (!skipOffline && await offline.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
+		offlinePromptSeen = true;
+		await offline.click();
+		offlineDismissed = true;
+		await signInDialog.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => undefined);
+	} else if (!onboardingVisible) {
+		onboardingDismissed = true;
+	}
+	return { trustDismissed, offlineDismissed, offlinePromptSeen, onboardingVisible, onboardingDismissed };
+}
+
+/**
+ * Complete the Welcome to PreBase onboarding editor when it appears after offline gate.
+ * Returns distinct lifecycle facts for P2 fail-closed acceptance.
+ */
 export async function completeOnboardingWelcomeFlow(page) {
 	const result = {
-		welcomeOpened: false,
-		onboardingComplete: false,
+		offlineChoicePresented: false,
+		offlineChoiceActivated: false,
+		onboardingPresented: false,
+		onboardingCompleted: false,
 		onboardingPersisted: false,
 		onboardingReopened: false,
 		onboardingReturnSessionCorrect: false,
+		onboardingDismissed: false,
+		onboardingVisible: false,
 	};
-	const welcome = page.getByRole('button', { name: /Welcome to PreBase|Continue/i }).first();
-	if (await welcome.waitFor({ state: 'visible', timeout: 6_000 }).then(() => true, () => false)) {
-		result.welcomeOpened = true;
+	const offline = page.getByRole('button', { name: 'Continue Offline', exact: true });
+	if (await offline.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
+		result.offlineChoicePresented = true;
+		await offline.click();
+		result.offlineChoiceActivated = true;
 	}
-	for (let step = 0; step < 8; step++) {
-		const finish = page.getByRole('button', { name: 'Finish', exact: true });
-		if (await finish.isVisible().catch(() => false)) {
-			await finish.click({ timeout: 3_000 }).catch(() => undefined);
-			break;
+	const welcome = page.locator('.prebase-onboarding').first();
+	if (await welcome.waitFor({ state: 'visible', timeout: 12_000 }).then(() => true, () => false)) {
+		result.onboardingPresented = true;
+		result.onboardingVisible = true;
+		for (let step = 0; step < 8; step++) {
+			const finish = page.getByRole('button', { name: 'Finish', exact: true });
+			if (await finish.isVisible().catch(() => false)) {
+				await finish.click({ timeout: 4_000 }).catch(() => undefined);
+				break;
+			}
+			const cont = page.getByRole('button', { name: 'Continue', exact: true });
+			if (await cont.isVisible().catch(() => false)) {
+				await cont.click({ timeout: 4_000 }).catch(() => undefined);
+			} else {
+				const skip = page.getByRole('button', { name: 'Skip', exact: true });
+				if (await skip.isVisible().catch(() => false)) {
+					await skip.click({ timeout: 4_000 }).catch(() => undefined);
+				}
+			}
+			await page.waitForTimeout(400);
 		}
-		const cont = page.getByRole('button', { name: /Continue|Skip for now|Skip/i }).first();
-		if (await cont.isVisible().catch(() => false)) {
-			await cont.click({ timeout: 3_000 }).catch(() => undefined);
-		} else {
-			break;
-		}
-		await page.waitForTimeout(400);
+		await welcome.waitFor({ state: 'hidden', timeout: 15_000 }).catch(() => undefined);
+		result.onboardingCompleted = !(await welcome.isVisible().catch(() => false));
+		result.onboardingDismissed = result.onboardingCompleted;
+		result.onboardingVisible = !result.onboardingCompleted;
 	}
-	const afterFinish = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
-	result.onboardingComplete = Boolean(afterFinish?.onboardingComplete);
+	const diag = await workbenchCommandWithTimeout(page, 6_000, 'prebase.test.getDiagnostics').catch(() => null);
+	result.onboardingPersisted = Boolean(diag?.onboardingComplete);
 	await page.keyboard.press(process.platform === 'darwin' ? 'Meta+R' : 'Control+R').catch(() => undefined);
 	await workbenchCommandWithTimeout(page, 4_000, 'workbench.action.reloadWindow').catch(() => undefined);
 	await waitForWorkbenchDriver(page, 90_000);
 	const afterReload = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
 	result.onboardingPersisted = Boolean(afterReload?.onboardingComplete);
 	await workbenchCommandWithTimeout(page, 8_000, 'prebase.onboarding.open').catch(() => undefined);
-	result.onboardingReopened = await page.getByText('Welcome to PreBase').first().isVisible().catch(() => false);
+	result.onboardingReopened = await page.locator('.prebase-onboarding').first().isVisible().catch(() => false)
+		|| await page.getByText('Welcome to PreBase').first().isVisible().catch(() => false);
 	await workbenchCommandWithTimeout(page, 8_000, 'prebase.onboarding.reset').catch(() => undefined);
 	const afterReset = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
 	result.onboardingReturnSessionCorrect = result.onboardingReopened
@@ -83,20 +137,15 @@ export async function completeOnboardingWelcomeFlow(page) {
 	return result;
 }
 
-export async function dismissStartup(page) {
-	let trustDismissed = false;
-	let offlineDismissed = false;
-	const trust = page.getByRole('button', { name: /Yes, I trust the authors/i });
-	if (await trust.waitFor({ state: 'visible', timeout: 4_000 }).then(() => true, () => false)) {
-		await trust.click();
-		trustDismissed = true;
+/** P2 passes only when offline onboarding was dismissed or never appeared. */
+export function p2OfflineOnboardingProven(startupResult) {
+	if (!startupResult || typeof startupResult !== 'object') {
+		return false;
 	}
-	const offline = page.getByRole('button', { name: 'Continue Offline', exact: true });
-	if (await offline.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
-		await offline.click();
-		offlineDismissed = true;
+	if (startupResult.offlineDismissed) {
+		return true;
 	}
-	return { trustDismissed, offlineDismissed };
+	return startupResult.offlinePromptSeen === false;
 }
 
 export async function quitPreBase(pid) {

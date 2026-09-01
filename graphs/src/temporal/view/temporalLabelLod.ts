@@ -93,6 +93,7 @@ export function computeVisibleCommunityGuideLabels(
 		readonly maxLabels?: number;
 		readonly measureWidth?: (text: string, font: string) => number;
 		readonly visibleNodeIds?: ReadonlySet<string>;
+		readonly representedGuideIds?: ReadonlySet<string>;
 		readonly overlapCount?: { count: number };
 	},
 ): CommunityGuideLabelItem[] {
@@ -102,6 +103,7 @@ export function computeVisibleCommunityGuideLabels(
 	const maxLabels = options?.maxLabels ?? (zoom < 0.35 ? 8 : zoom < 0.65 ? 14 : 24);
 	const measureWidth = options?.measureWidth || function (text: string) { return text.length * 7.0; };
 	const visibleNodeIds = options?.visibleNodeIds;
+	const representedGuideIds = options?.representedGuideIds;
 
 	interface ScoredGuide {
 		readonly guide: TemporalCommunityGuideInput;
@@ -124,8 +126,12 @@ export function computeVisibleCommunityGuideLabels(
 			}
 			visibleMembers = count;
 		}
-		if (visibleMembers <= 0 && zoom < 0.5) {
-			continue;
+		if (visibleMembers <= 0) {
+			if (representedGuideIds?.has(guide.id)) {
+				visibleMembers = guide.nodeCount ?? guide.nodeIds?.length ?? 1;
+			} else if (zoom < 0.5) {
+				continue;
+			}
 		}
 		const score = visibleMembers * 10 + (guide.nodeCount ?? 0);
 		scored.push({ guide, score });
@@ -358,6 +364,7 @@ export function computeTemporalLabelLayout(
 		readonly maxGuideLabels?: number;
 		readonly measureWidth?: (text: string, font: string) => number;
 		readonly visibleNodeIds?: ReadonlySet<string>;
+		readonly representedGuideIds?: ReadonlySet<string>;
 	},
 ): TemporalLabelLayout {
 	const measureWidth = options?.measureWidth;
@@ -367,6 +374,7 @@ export function computeTemporalLabelLayout(
 		maxLabels: options?.maxGuideLabels,
 		measureWidth,
 		visibleNodeIds: options?.visibleNodeIds,
+		representedGuideIds: options?.representedGuideIds,
 		overlapCount,
 	});
 	const nodeLabels = computeVisibleLabels(nodes, zoom, {
