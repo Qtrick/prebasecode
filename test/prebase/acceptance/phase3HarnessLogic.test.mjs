@@ -8,6 +8,7 @@ import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER
 import {
 	nodeHitHasWorldCoords,
 	worldDragProven,
+	worldInvarianceProven,
 	rotationProven,
 	selectionRotationLockProven,
 	shiftPanProven,
@@ -114,6 +115,7 @@ function passingCodeGraph(overrides = {}) {
 		drag: true,
 		worldDrag: true,
 		unselectedDragRotated: true,
+		unselectedWorldInvariant: true,
 		backgroundDragRotated: true,
 		unselectedNodeSelectedFromDrag: false,
 		shiftPan: true,
@@ -730,7 +732,9 @@ test('code graph interaction proofs fail closed on missing world drag, shift pan
 	const failures = codeGraphFailures({
 		codeGraph: passingCodeGraph({
 			drag: false,
+			worldDrag: false,
 			unselectedDragRotated: false,
+			unselectedWorldInvariant: false,
 			backgroundDragRotated: false,
 			shiftPan: false,
 			unselectedNodeSelectedFromDrag: true,
@@ -741,6 +745,7 @@ test('code graph interaction proofs fail closed on missing world drag, shift pan
 	assert.ok(failures.some(item => /background drag did not rotate/.test(item)));
 	assert.ok(failures.some(item => /shift pan/.test(item)));
 	assert.ok(failures.some(item => /unselected node drag must not select/.test(item)));
+	assert.ok(failures.some(item => /world XYZ position was not invariant/.test(item)));
 });
 
 test('selected node world drag and semantic zoom helpers reject fallback-to-zero proofs', () => {
@@ -757,7 +762,9 @@ test('P2 offline onboarding cannot pass on workbench presence alone', () => {
 	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
 	assert.match(harness, /offlinePromptSeen/);
 	assert.match(harness, /export function p2OfflineOnboardingProven/);
-	assert.match(live, /p2OfflineOnboardingProven\(startupResult\)/);
+	assert.match(harness, /completeOnboardingWelcomeFlow/);
+	assert.match(live, /completeOnboardingWelcomeFlow/);
+	assert.match(live, /onboardingFlow\.onboardingCompleted/);
 	assert.doesNotMatch(live, /offlineDismissed \|\| await launched\.page\.evaluate\(\(\) => document\.querySelector\('\.monaco-workbench'\)/);
 	assert.equal(p2OfflineOnboardingProven({ offlineDismissed: true, offlinePromptSeen: true }), true);
 	assert.equal(p2OfflineOnboardingProven({ offlineDismissed: false, offlinePromptSeen: false }), true);
@@ -782,8 +789,12 @@ test('Campaign XII proof helpers reject screen-only drag and yaw-only rotation',
 	assert.ok(semanticZoomLodProven({ transform: { k: 1 }, lodTier: 'high' }, { transform: { k: 1.3 }, lodTier: 'medium' }, { transform: { k: 1.05 }, lodTier: 'medium' }));
 	assert.ok(labelDensityDynamicProven({ labelCount: 12 }, { labelCount: 6 }));
 	assert.equal(labelDensityDynamicProven({ labelCount: 4 }, { labelCount: 4 }), false, 'unchanged label count must fail dynamic density proof');
+	assert.ok(labelDensityDynamicProven({ labelCount: 12 }, { labelCount: 6 }));
+	assert.equal(labelDensityDynamicProven({ labelCount: 4 }, { labelCount: 4 }), false, 'unchanged label count must fail dynamic density proof');
 	assert.ok(pointerCaptureOnCanvasProven('netCanvas'));
 	assert.equal(pointerCaptureOnCanvasProven('document'), false);
+	assert.ok(worldInvarianceProven({ id: 'b', worldX: 1, worldY: 2, worldZ: 3 }, { id: 'b', worldX: 1, worldY: 2, worldZ: 3 }));
+	assert.equal(worldInvarianceProven({ id: 'b', worldX: 1, worldY: 2, worldZ: 3 }, { id: 'b', x: 1, y: 2 }), false);
 });
 
 test('codeGraphFailures fails closed on Campaign XII shift pan and drag rotation fields', () => {

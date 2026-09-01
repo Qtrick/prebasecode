@@ -2833,12 +2833,20 @@ function drawTemporalFrame(ts) {
 	for (let ni = 0; ni < nodesToRender.length; ni++) {
 		visibleNodeIdSet.add(nodesToRender[ni].entityId);
 	}
+	const representedGuideIdSet = new Set();
+	for (let pi = 0; pi < temporalProjection.items.length; pi++) {
+		const guideId = temporalProjection.items[pi].guideId;
+		if (guideId) {
+			representedGuideIdSet.add(guideId);
+		}
+	}
 	const labelLayout = computeTemporalLabelLayout(nodesToRender, temporalDiff.guides || [], transform.k, {
 		selectedNodeId: selectedNodeId,
 		hoveredNodeId: hoveredNodeId,
 		filterQuery: filterVal,
 		measureWidth: function (t, f) { return measureTextWidth(t, f); },
 		visibleNodeIds: visibleNodeIdSet,
+		representedGuideIds: representedGuideIdSet,
 	});
 	const visibleLabels = labelLayout.nodeLabels;
 	const guideLabels = labelLayout.guideLabels;
@@ -3320,9 +3328,9 @@ function drawNetworkFrame() {
 					id: hitNode.id,
 					x: hitPos.x * transform.k + transform.x,
 					y: hitPos.y * transform.k + transform.y,
-					worldX: world ? world.x : hitPos.x,
-					worldY: world ? world.y : hitPos.y,
-					worldZ: world ? world.z : 0,
+					worldX: world && Number.isFinite(world.x) ? world.x : Number.NaN,
+					worldY: world && Number.isFinite(world.y) ? world.y : Number.NaN,
+					worldZ: world && Number.isFinite(world.z) ? world.z : Number.NaN,
 				});
 			}
 			metrics.lodTier = transform.k < 0.3 ? 'low' : (transform.k < 0.8 ? 'medium' : 'high');

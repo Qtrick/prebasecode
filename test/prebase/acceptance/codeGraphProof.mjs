@@ -15,6 +15,19 @@ export function nodeHitHasWorldCoords(hit) {
 	);
 }
 
+/** Unselected-node drag must leave world XYZ invariant (fail-closed on missing coords). */
+export function worldInvarianceProven(hitBefore, hitAfter, maxDisplacement = 0.001) {
+	if (!nodeHitHasWorldCoords(hitBefore) || !nodeHitHasWorldCoords(hitAfter)) {
+		return false;
+	}
+	const displacement = Math.hypot(
+		hitAfter.worldX - hitBefore.worldX,
+		hitAfter.worldY - hitBefore.worldY,
+		hitAfter.worldZ - hitBefore.worldZ,
+	);
+	return Number.isFinite(displacement) && displacement <= maxDisplacement;
+}
+
 /** Selected-node drag must move world XYZ; screen-only delta is a false-green. */
 export function worldDragProven(hitBefore, hitAfter, minWorldDelta = 0.5) {
 	if (!nodeHitHasWorldCoords(hitBefore) || !nodeHitHasWorldCoords(hitAfter)) {

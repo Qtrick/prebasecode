@@ -678,22 +678,54 @@ export function layoutTemporalGraph(
 	const hasDegradation = guideOverlap.guideOverlapCount > 0;
 
 	if (hasDegradation && previousPositions.size > 0) {
-		const overlappingCommIds = new Set<string>();
-		for (let p = 0; p < guideOverlap.overlappingPairs.length; p++) {
-			overlappingCommIds.add(guideOverlap.overlappingPairs[p][0]);
-			overlappingCommIds.add(guideOverlap.overlappingPairs[p][1]);
+		const entityCommunityId = new Map<string, string>();
+		for (let c = 0; c < activeCommunities.length; c++) {
+			const comm = activeCommunities[c];
+			for (let m = 0; m < comm.nodeIds.length; m++) {
+				entityCommunityId.set(comm.nodeIds[m], comm.id);
+			}
 		}
-
-		// Identify affected entity IDs
-		const affectedEntityIds = new Set<string>();
+		const changedCommunityIds = new Set<string>();
 		for (let u = 0; u < unpositionedNodes.length; u++) {
-			affectedEntityIds.add(unpositionedNodes[u].entityId);
+			const commId = entityCommunityId.get(unpositionedNodes[u].entityId);
+			if (commId) {
+				changedCommunityIds.add(commId);
+			}
 		}
 		for (let i = 0; i < positionedNodes.length; i++) {
 			const n = positionedNodes[i];
 			if (n.changeKind && n.changeKind !== 'unchanged') {
-				affectedEntityIds.add(n.entityId);
+				const commId = entityCommunityId.get(n.entityId);
+				if (commId) {
+					changedCommunityIds.add(commId);
+				}
 			}
+		}
+
+		const localOverlappingPairs: [string, string][] = [];
+		const overlappingCommIds = new Set<string>();
+		for (let p = 0; p < guideOverlap.overlappingPairs.length; p++) {
+			const pair = guideOverlap.overlappingPairs[p];
+			if (changedCommunityIds.has(pair[0]) || changedCommunityIds.has(pair[1])) {
+				localOverlappingPairs.push(pair);
+				overlappingCommIds.add(pair[0]);
+				overlappingCommIds.add(pair[1]);
+			}
+		}
+
+		if (localOverlappingPairs.length === 0) {
+			// Global guide overlap exists but not near changed/new communities — preserve mental map.
+			return {
+				nodes: positionedNodes,
+				positions: nextPositions,
+				guides,
+			};
+		}
+
+		// Identify affected entity IDs: new/unpositioned nodes plus communities in local overlap pairs only.
+		const affectedEntityIds = new Set<string>();
+		for (let u = 0; u < unpositionedNodes.length; u++) {
+			affectedEntityIds.add(unpositionedNodes[u].entityId);
 		}
 		for (let c = 0; c < activeCommunities.length; c++) {
 			const comm = activeCommunities[c];
@@ -728,6 +760,13 @@ export function layoutTemporalGraph(
 
 			for (let pass = 0; pass < relaxationPasses; pass++) {
 				rebuildOccupiedIndex();
+				const passGuides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
+				const passOverlap = computeGuideOverlaps(passGuides);
+				const passOverlappingCommIds = new Set<string>();
+				for (let p = 0; p < passOverlap.overlappingPairs.length; p++) {
+					passOverlappingCommIds.add(passOverlap.overlappingPairs[p][0]);
+					passOverlappingCommIds.add(passOverlap.overlappingPairs[p][1]);
+				}
 				for (let a = 0; a < affectedArray.length; a++) {
 					const id = affectedArray[a];
 					const pos = nextPositions.get(id);
@@ -788,8 +827,12 @@ export function layoutTemporalGraph(
 
 			const relaxedGuides = derivePostCollisionGuides(activeCommunities, nextPositions, 24);
 			const overlapAfter = computeGuideOverlaps(relaxedGuides);
+			const overlapEpsilon = 1e-6;
 			const qualityImproved = overlapAfter.guideOverlapCount < guideOverlap.guideOverlapCount
-				|| overlapAfter.maxGuideOverlapRatio < guideOverlap.maxGuideOverlapRatio;
+				|| (overlapAfter.guideOverlapCount === guideOverlap.guideOverlapCount
+					&& overlapAfter.guideOverlapRatio < guideOverlap.guideOverlapRatio - overlapEpsilon)
+				|| (Math.abs(overlapAfter.guideOverlapRatio - guideOverlap.guideOverlapRatio) <= overlapEpsilon
+					&& overlapAfter.maxGuideOverlapRatio < guideOverlap.maxGuideOverlapRatio - overlapEpsilon);
 
 			if (qualityImproved) {
 				for (let i = 0; i < positionedNodes.length; i++) {

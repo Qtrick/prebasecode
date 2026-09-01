@@ -10,6 +10,7 @@ import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
 	acquirePhase3AcceptanceLock,
+	completeOnboardingWelcomeFlow,
 	dismissStartup,
 	findGraphFrame,
 	gracefulWorkbenchQuit,
@@ -28,6 +29,8 @@ import {
 	shiftPanProven,
 	startupOnboardingProven,
 	worldDragProven,
+	worldInvarianceProven,
+	nodeHitHasWorldCoords,
 } from './codeGraphProof.mjs';
 import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
@@ -171,6 +174,7 @@ export function codeGraphFailures(evidence) {
 	if (!graph.worldDrag) failures.push('N4 world drag was not proven in graph space');
 	if (graph.unselectedNodeSelectedFromDrag) failures.push('N4 unselected node drag must not select the node');
 	if (!graph.unselectedDragRotated) failures.push('N4 unselected node drag did not rotate the camera');
+	if (!graph.unselectedWorldInvariant) failures.push('N4 unselected node world XYZ position was not invariant during camera drag');
 	if (!graph.backgroundDragRotated) failures.push('N4 background drag did not rotate the camera');
 	if (!graph.shiftPan) failures.push('N4b shift pan did not move the viewport');
 	if (!graph.pointerCaptureOnCanvas) failures.push('N4 pointer capture was not on the graph canvas');
@@ -273,10 +277,17 @@ async function run() {
 		const openFile = join(gitWorkspace, 'src/hello.ts');
 		launched = await launchPreBase(repo, gitWorkspace);
 		evidence.prebasePid = launched.info.pid;
-		const startupResult = await dismissStartup(launched.page);
+		const startupResult = await dismissStartup(launched.page, { skipOffline: true });
 		await waitForWorkbenchDriver(launched.page);
+		const onboardingFlow = await completeOnboardingWelcomeFlow(launched.page);
 		evidence.c3_folderOpen = true;
-		evidence.p2_offline = p2OfflineOnboardingProven(startupResult) && startupOnboardingProven(startupResult);
+		evidence.p2 = onboardingFlow;
+		evidence.p2_offline = Boolean(
+			onboardingFlow.onboardingCompleted &&
+			onboardingFlow.onboardingPersisted &&
+			p2OfflineOnboardingProven({ offlineDismissed: onboardingFlow.offlineChoiceActivated, offlinePromptSeen: onboardingFlow.offlineChoicePresented }) &&
+			startupOnboardingProven({ onboardingDismissed: onboardingFlow.onboardingDismissed, onboardingVisible: onboardingFlow.onboardingVisible }),
+		);
 
 		const mod = process.platform === 'darwin' ? 'Meta' : 'Control';
 		const seen = async (selector, ms = 8_000) => Boolean(await waitFor(async () => {
@@ -384,6 +395,8 @@ async function run() {
 		let pitchAfterLockWait;
 		let picked = false;
 		let unselectedDragRotated = false;
+		let unselectedWorldInvariant = false;
+		let unselectedWorldDisplacement = null;
 		let unselectedNodeSelectedFromDrag = false;
 		let selectedNodeDragMoved = false;
 		let backgroundDragRotated = false;
@@ -472,7 +485,9 @@ async function run() {
 
 			// Step 2 & 3: Pointerdown directly on unselected Node B and drag -> camera rotates, Node B not selected from drag
 			if (unselectedNodeB && box) {
-				const rotationBeforeUnselected = rotationFromMetrics(await readGraphMetrics(graphFrame));
+				const metricsBeforeUnselected = await readGraphMetrics(graphFrame);
+				const hitBeforeUnselected = (metricsBeforeUnselected?.nodeHits || []).find(h => h.id === unselectedNodeB.id) || unselectedNodeB;
+				const rotationBeforeUnselected = rotationFromMetrics(metricsBeforeUnselected);
 				const x = box.x + unselectedNodeB.x;
 				const y = box.y + unselectedNodeB.y;
 				await graphFrame.page().mouse.move(x, y);
@@ -481,9 +496,18 @@ async function run() {
 				await graphFrame.page().mouse.up();
 				await launched.page.waitForTimeout(300);
 				const metricsAfterUnselected = await readGraphMetrics(graphFrame);
+				const hitAfterUnselected = (metricsAfterUnselected?.nodeHits || []).find(h => h.id === unselectedNodeB.id) || null;
 				const rotationAfterUnselected = rotationFromMetrics(metricsAfterUnselected);
 				unselectedDragRotated = rotationProven(rotationBeforeUnselected, rotationAfterUnselected);
 				unselectedNodeSelectedFromDrag = metricsAfterUnselected?.selectedNodeId === unselectedNodeB.id;
+				unselectedWorldInvariant = worldInvarianceProven(hitBeforeUnselected, hitAfterUnselected);
+				if (nodeHitHasWorldCoords(hitBeforeUnselected) && nodeHitHasWorldCoords(hitAfterUnselected)) {
+					unselectedWorldDisplacement = Math.hypot(
+						hitAfterUnselected.worldX - hitBeforeUnselected.worldX,
+						hitAfterUnselected.worldY - hitBeforeUnselected.worldY,
+						hitAfterUnselected.worldZ - hitBeforeUnselected.worldZ,
+					);
+				}
 				pointerCaptureOnCanvas = pointerCaptureOnCanvasProven(metricsAfterUnselected?.pointerCaptureHost);
 			}
 
@@ -551,7 +575,8 @@ async function run() {
 				shiftPan = shiftPanProven(panBefore?.transform, panAfter?.transform);
 			}
 
-			// Multi-zoom verification for semantic zoom LOD change
+			// Multi-zoom verification for semantic zoom LOD change (canvas must be focused for +/- keys)
+			await graphFrame.locator('#netCanvas').focus({ timeout: 3_000 }).catch(() => undefined);
 			zoomMetrics1 = await readGraphMetrics(graphFrame);
 			await graphFrame.page().keyboard.press('+');
 			await graphFrame.page().keyboard.press('+');
@@ -592,6 +617,8 @@ async function run() {
 			drag: selectedNodeDragMoved,
 			worldDrag: selectedNodeDragMoved,
 			unselectedDragRotated,
+			unselectedWorldInvariant,
+			unselectedWorldDisplacement,
 			unselectedNodeSelectedFromDrag,
 			backgroundDragRotated,
 			shiftPan,
