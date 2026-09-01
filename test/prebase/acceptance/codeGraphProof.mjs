@@ -58,6 +58,16 @@ export function rotationProven(before, after, minDelta = 0.005) {
 	return yawDelta > minDelta && pitchDelta > minDelta;
 }
 
+/** Node-drag proofs require both yaw and pitch to remain within tolerance. */
+export function cameraRotationStable(before, after, tolerance = 0.01) {
+	if (!before || !after || !Number.isFinite(before.yaw) || !Number.isFinite(after.yaw)
+		|| !Number.isFinite(before.pitch) || !Number.isFinite(after.pitch)) {
+		return false;
+	}
+	return Math.abs(after.yaw - before.yaw) <= tolerance
+		&& Math.abs(after.pitch - before.pitch) <= tolerance;
+}
+
 /** Idle selection lock must freeze both yaw and pitch. */
 export function selectionRotationLockProven(picked, atSelection, afterWait, tolerance = 0.05) {
 	if (!picked) {
@@ -78,6 +88,29 @@ export function shiftPanProven(beforeTransform, afterTransform, minDelta = 2) {
 		return false;
 	}
 	return Math.abs(ax - bx) > minDelta || Math.abs(ay - by) > minDelta;
+}
+
+/** Shift-pan must move the viewport while keeping camera rotation and node world XYZ stable. */
+export function shiftPanViewportProven(input) {
+	const transformTolerance = input.transformTolerance ?? 0.5;
+	const rotationTolerance = input.rotationTolerance ?? 0.01;
+	const nodeTolerance = input.nodeTolerance ?? 0.001;
+	const transformMoved = Math.hypot(
+		input.afterTransform.x - input.beforeTransform.x,
+		input.afterTransform.y - input.beforeTransform.y,
+	) > transformTolerance;
+	if (!transformMoved) {
+		return false;
+	}
+	if (!cameraRotationStable(input.beforeRotation, input.afterRotation, rotationTolerance)) {
+		return false;
+	}
+	const nodeDelta = Math.hypot(
+		input.afterNodeWorld.x - input.beforeNodeWorld.x,
+		input.afterNodeWorld.y - input.beforeNodeWorld.y,
+	);
+	const nodeZDelta = Math.abs((input.afterNodeWorld.z ?? 0) - (input.beforeNodeWorld.z ?? 0));
+	return nodeDelta <= nodeTolerance && nodeZDelta <= nodeTolerance;
 }
 
 /** Semantic zoom must prove LOD or scale change across zoom in/out, not static bounds alone. */

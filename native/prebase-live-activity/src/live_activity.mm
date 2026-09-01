@@ -5,6 +5,7 @@
 
 // Dynamic geometry metrics
 static const CGFloat kCollapsedHeight = 34;
+static const CGFloat kPeekBodyHeight = 56;
 static const CGFloat kWingWidthMin = 52;
 static const CGFloat kWingWidthMax = 148;
 static const CGFloat kPillWidth = 228;
@@ -226,7 +227,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) CGFloat rightWingWidth;
 @property (nonatomic, assign) BOOL reducedMotion;
 @property (nonatomic, assign) BOOL attention;
-@property (nonatomic, strong) NSTrackingArea *trackingArea;
+@property (nonatomic, assign) BOOL peekOnly;
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
 
 - (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState;
@@ -263,6 +264,8 @@ static NSString *JSString(Napi::Value value) {
 
 @property (nonatomic, assign) BOOL lastInside;
 @property (nonatomic, assign) BOOL didHoverHaptic;
+@property (nonatomic, assign) BOOL didAttentionHaptic;
+@property (nonatomic, assign) BOOL attentionPeek;
 @property (nonatomic, assign) NSUInteger hapticCount;
 @property (nonatomic, assign) NSUInteger redrawCount;
 @property (nonatomic, assign) NSUInteger animationCount;
@@ -587,6 +590,7 @@ static NSString *JSString(Napi::Value value) {
 		self.ignoresMouse = YES;
 		self.displayMode = @"builtin";
 		self.didHoverHaptic = NO;
+		self.didAttentionHaptic = NO;
 		self.hapticCount = 0;
 		self.redrawCount = 0;
 		self.animationCount = 0;
@@ -738,6 +742,18 @@ static NSString *JSString(Napi::Value value) {
 	if (!expanded) {
 		return bandH;
 	}
+	if (self.attentionPeek && !self.pinned) {
+		CGFloat h = bandH + 8;
+		if (self.content.pendingTitle.length) {
+			h += 20;
+		} else if (self.content.activityLabel.length) {
+			h += 18;
+		} else {
+			h += 16;
+		}
+		h += 8;
+		return MIN(bandH + kPeekBodyHeight, h);
+	}
 	// Content-aware expanded sizing
 	CGFloat h = bandH + 8; // Top padding below notch band
 	h += 22; // Header
@@ -869,7 +885,7 @@ static NSString *JSString(Napi::Value value) {
 	BOOL showInput = self.pinned;
 	BOOL approval = [self.pendingKind isEqualToString:@"approval"];
 	BOOL question = [self.pendingKind isEqualToString:@"question"];
-	BOOL showAttention = (self.content.expanded || self.pinned);
+	BOOL showAttention = (self.content.expanded || self.pinned) && !self.content.peekOnly;
 	self.approveButton.hidden = !(approval && showAttention);
 	self.denyButton.hidden = self.approveButton.hidden;
 	for (NSButton *button in self.optionButtons) {
@@ -1076,6 +1092,8 @@ static NSString *JSString(Napi::Value value) {
 	if (!self.visible) {
 		return;
 	}
+	self.attentionPeek = NO;
+	self.content.peekOnly = NO;
 	self.content.expanded = YES;
 	self.content.targetExpanded = YES;
 	self.panel.ignoresMouseEvents = NO;
@@ -1089,11 +1107,14 @@ static NSString *JSString(Napi::Value value) {
 	if (self.pinned) {
 		return;
 	}
+	self.attentionPeek = NO;
+	self.content.peekOnly = NO;
 	self.content.expanded = NO;
 	self.content.targetExpanded = NO;
 	self.panel.ignoresMouseEvents = YES;
 	self.ignoresMouse = YES;
 	self.didHoverHaptic = NO;
+	self.didAttentionHaptic = NO;
 	self.lastInside = NO;
 	self.input.hidden = YES;
 	[self.panel makeFirstResponder:nil];
@@ -1314,8 +1335,14 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"transitionGeneration"] = @(self.transitionGeneration);
 	dict[@"layerBacked"] = @(self.content.wantsLayer);
 	dict[@"pathTopologyCompatible"] = @YES;
-	dict[@"activePresentationState"] = self.content.expanded ? @"expanded" : @"collapsed";
-	dict[@"targetPresentationState"] = self.content.targetExpanded ? @"expanded" : @"collapsed";
+	dict[@"activePresentationState"] = self.pinned
+		? @"pinned"
+		: (self.content.expanded
+			? (self.attentionPeek ? @"attentionPeek" : (self.content.attention ? @"attention" : @"interactive"))
+			: @"compact");
+	dict[@"targetPresentationState"] = self.content.targetExpanded
+		? (self.attentionPeek ? @"attentionPeek" : (self.content.attention ? @"attention" : @"interactive"))
+		: @"compact";
 	dict[@"hoverDwellMs"] = @(180);
 	dict[@"exitGraceMs"] = @(250);
 	return dict;
@@ -1404,16 +1431,26 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
 	self.lastNativeCommand = @"";
 
-	if (self.content.attention && (self.pendingOptions.count > 0 || [self.pendingKind isEqualToString:@"approval"])) {
+	if (self.content.attention && !self.pinned) {
+		// Glanceable attention peek: compact wings + short body, not full interactive panel.
+		self.attentionPeek = YES;
+		self.content.peekOnly = YES;
 		self.content.expanded = YES;
 		self.content.targetExpanded = YES;
 		self.ignoresMouse = NO;
+		if (!self.didAttentionHaptic) {
+			self.didAttentionHaptic = YES;
+			[self performUserHaptic];
+		}
 		if (self.panel) {
 			self.panel.ignoresMouseEvents = NO;
 			[self removeGlobalMonitorOnly];
 			[self layoutForScreen];
 		}
 	} else {
+		self.attentionPeek = NO;
+		self.content.peekOnly = NO;
+		self.didAttentionHaptic = NO;
 		// Synchronize targetExpanded with current expanded state when not forcing attention expansion
 		self.content.targetExpanded = self.content.expanded;
 	}

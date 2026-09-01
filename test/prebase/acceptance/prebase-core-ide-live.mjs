@@ -24,9 +24,11 @@ import {
 	labelDensityDynamicProven,
 	pointerCaptureOnCanvasProven,
 	rotationProven,
+	cameraRotationStable,
 	selectionRotationLockProven,
 	semanticZoomLodProven,
 	shiftPanProven,
+	shiftPanViewportProven,
 	startupOnboardingProven,
 	worldDragProven,
 	worldInvarianceProven,
@@ -292,9 +294,16 @@ async function run() {
 		const onboardingFlow = await completeOnboardingWelcomeFlow(launched.page);
 		evidence.c3_folderOpen = true;
 		evidence.p2 = onboardingFlow;
+		evidence.offlineChoicePresented = Boolean(onboardingFlow.offlineChoicePresented);
+		evidence.offlineChoiceActivated = Boolean(onboardingFlow.offlineChoiceActivated);
+		evidence.onboardingResolved = Boolean(onboardingFlow.onboardingCompleted);
+		evidence.onboardingPersisted = Boolean(onboardingFlow.onboardingPersisted);
+		evidence.onboardingReopened = Boolean(onboardingFlow.onboardingReopened);
+		evidence.onboardingReturnSessionCorrect = Boolean(onboardingFlow.onboardingReturnSessionCorrect);
 		evidence.p2_offline = Boolean(
 			onboardingFlow.onboardingCompleted &&
 			onboardingFlow.onboardingPersisted &&
+			onboardingFlow.onboardingReturnSessionCorrect &&
 			p2OfflineOnboardingProven({ offlineDismissed: onboardingFlow.offlineChoiceActivated, offlinePromptSeen: onboardingFlow.offlineChoicePresented }) &&
 			startupOnboardingProven({ onboardingDismissed: onboardingFlow.onboardingDismissed, onboardingVisible: onboardingFlow.onboardingVisible }),
 		);
@@ -405,7 +414,9 @@ async function run() {
 		let selectedNodeDragCameraStable = false;
 		let backgroundDragRotated = false;
 		let shiftPan = false;
+		let shiftPanChangedViewport = false;
 		let pointerCaptureOnCanvas = false;
+		let noStuckPointerCapture = false;
 		let zoomMetrics1 = null;
 		let zoomMetrics2 = null;
 		let metrics = null;
@@ -537,7 +548,7 @@ async function run() {
 				hitAfterDrag = (metricsAfterNodeDrag?.nodeHits || []).find(hit => hit.id === (selectedId || hitBeforeDrag?.id)) || null;
 				selectedNodeDragMoved = worldDragProven(hitBeforeDrag, hitAfterDrag);
 				const rotationAfterSelectedDrag = rotationFromMetrics(metricsAfterNodeDrag);
-				selectedNodeDragCameraStable = !rotationProven(rotationBeforeSelectedDrag, rotationAfterSelectedDrag, 0.01);
+				selectedNodeDragCameraStable = cameraRotationStable(rotationBeforeSelectedDrag, rotationAfterSelectedDrag);
 			}
 
 			if (box) {
@@ -552,6 +563,14 @@ async function run() {
 			}
 
 			if (box) {
+				await graphFrame.evaluate(() => {
+					if (typeof keepGraphCentered !== 'undefined') {
+						keepGraphCentered = false;
+					}
+					if (typeof settings === 'object' && settings) {
+						settings.keepGraphCentered = false;
+					}
+				}).catch(() => undefined);
 				const panBefore = await readGraphMetrics(graphFrame);
 				await graphFrame.page().keyboard.down('Shift');
 				await graphFrame.page().mouse.move(box.x + 30, box.y + 30);
@@ -562,7 +581,47 @@ async function run() {
 				await launched.page.waitForTimeout(300);
 				const panAfter = await readGraphMetrics(graphFrame);
 				shiftPan = shiftPanProven(panBefore?.transform, panAfter?.transform);
+				const selectedHit = (panBefore?.nodeHits || []).find(hit => hit.id === panBefore?.selectedNodeId) || null;
+				const selectedHitAfter = (panAfter?.nodeHits || []).find(hit => hit.id === panAfter?.selectedNodeId) || selectedHit;
+				const beforeWorld = selectedHit ? {
+					x: selectedHit.worldX ?? selectedHit.world?.x ?? 0,
+					y: selectedHit.worldY ?? selectedHit.world?.y ?? 0,
+					z: selectedHit.worldZ ?? selectedHit.world?.z ?? 0,
+				} : { x: 0, y: 0, z: 0 };
+				const afterWorld = selectedHitAfter ? {
+					x: selectedHitAfter.worldX ?? selectedHitAfter.world?.x ?? 0,
+					y: selectedHitAfter.worldY ?? selectedHitAfter.world?.y ?? 0,
+					z: selectedHitAfter.worldZ ?? selectedHitAfter.world?.z ?? 0,
+				} : beforeWorld;
+				shiftPanChangedViewport = shiftPanViewportProven({
+					beforeTransform: panBefore?.transform ?? { x: 0, y: 0, k: 1 },
+					afterTransform: panAfter?.transform ?? { x: 0, y: 0, k: 1 },
+					beforeRotation: rotationFromMetrics(panBefore) ?? { yaw: 0, pitch: 0 },
+					afterRotation: rotationFromMetrics(panAfter) ?? { yaw: 0, pitch: 0 },
+					beforeNodeWorld: beforeWorld,
+					afterNodeWorld: afterWorld,
+				});
 			}
+
+			noStuckPointerCapture = await graphFrame.evaluate(() => {
+				const canvas = document.getElementById('netCanvas');
+				const metrics = window.__prebaseGraphRenderMetrics;
+				let captureHeld = false;
+				if (metrics && typeof metrics.pointerCaptureHeld === 'boolean') {
+					captureHeld = metrics.pointerCaptureHeld;
+				} else if (canvas && typeof canvas.hasPointerCapture === 'function') {
+					for (let pointerId = 0; pointerId < 8; pointerId++) {
+						if (canvas.hasPointerCapture(pointerId)) {
+							captureHeld = true;
+							break;
+						}
+					}
+				}
+				const bodyCapture = typeof document.body?.hasPointerCapture === 'function'
+					? document.body.hasPointerCapture(1)
+					: false;
+				return captureHeld === false && bodyCapture === false;
+			}).catch(() => false);
 
 			await graphFrame.locator('#netCanvas').focus({ timeout: 3_000 }).catch(() => undefined);
 			zoomMetrics1 = await readGraphMetrics(graphFrame);
@@ -627,8 +686,8 @@ async function run() {
 			selectedNodeDragMovedNode: selectedNodeDragMoved,
 			selectedNodeDragCameraStable,
 			backgroundDragRotatedCamera: backgroundDragRotated,
-			shiftPanChangedViewport: shiftPan,
-			noStuckPointerCapture: pointerCaptureOnCanvas,
+			shiftPanChangedViewport,
+			noStuckPointerCapture,
 		};
 
 

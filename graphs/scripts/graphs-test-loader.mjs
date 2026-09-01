@@ -2,6 +2,8 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { dirname, resolve as resolvePath } from 'node:path';
 import { existsSync, statSync } from 'node:fs';
 
+const CANCELLATION_SHIM = resolvePath(process.cwd(), 'graphs/src/tests/shims/vscodeCancellation.ts');
+
 /**
  * Resolve graph unit-test imports that use .js suffix to on-disk .ts sources,
  * while mapping core VS Code imports (src/vs/) to compiled out/vs/ JavaScript.
@@ -41,6 +43,9 @@ export async function resolve(specifier, context, nextResolve) {
 			const outTarget = resolvedTarget.replace('/src/vs/', '/out/vs/');
 			if (existsSync(outTarget)) {
 				return nextResolve(pathToFileURL(outTarget).href, context);
+			}
+			if (resolvedTarget.endsWith('/base/common/cancellation.js') && existsSync(CANCELLATION_SHIM)) {
+				return nextResolve(pathToFileURL(CANCELLATION_SHIM).href, context);
 			}
 		}
 

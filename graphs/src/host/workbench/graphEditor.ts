@@ -2643,15 +2643,18 @@ function drawTemporalFrame(ts) {
 				? theme.accent
 				: (theme.isHighContrast ? '#ffffff' : (agg.color || 'rgba(230, 237, 243, 0.78)'));
 			ctx.fill();
-			const countFont = computeNetworkLabelWorldFontSize(10, transform.k, { minScreenPx: 8, maxScreenPx: 13 });
-			ctx.font = canvasFont('600', countFont);
-			ctx.fillStyle = theme.isHighContrast ? '#ffffff' : '#e6edf3';
-			ctx.textAlign = 'center';
-			ctx.textBaseline = 'top';
-			const countLabel = agg.changedCount > 0
-				? (String(agg.nodeCount) + ' files · ' + String(agg.changedCount) + ' changed')
-				: (String(agg.nodeCount) + ' files');
-			ctx.fillText(countLabel, agg.x, agg.y + markerR + 2 / Math.max(0.4, transform.k));
+			// Landmark guide cards already carry file-count subtitles at overview zoom.
+			if (transform.k >= 0.35) {
+				const countFont = computeNetworkLabelWorldFontSize(10, transform.k, { minScreenPx: 8, maxScreenPx: 13 });
+				ctx.font = canvasFont('600', countFont);
+				ctx.fillStyle = theme.isHighContrast ? '#ffffff' : '#e6edf3';
+				ctx.textAlign = 'center';
+				ctx.textBaseline = 'top';
+				const countLabel = agg.changedCount > 0
+					? (String(agg.nodeCount) + ' files · ' + String(agg.changedCount) + ' changed')
+					: (String(agg.nodeCount) + ' files');
+				ctx.fillText(countLabel, agg.x, agg.y + markerR + 2 / Math.max(0.4, transform.k));
+			}
 			ctx.restore();
 		}
 	}
@@ -3293,6 +3296,13 @@ function drawNetworkFrame() {
 			metrics.networkIdleAutoRotate = Boolean(settings.networkIdleAutoRotate);
 			metrics.rotation = { yaw: rotation.yaw, pitch: rotation.pitch };
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
+			metrics.activePointerId = activePointerId;
+			metrics.pointerCaptureHeld = Boolean(
+				activePointerHost
+				&& activePointerId !== null
+				&& typeof activePointerHost.hasPointerCapture === 'function'
+				&& activePointerHost.hasPointerCapture(activePointerId)
+			);
 			metrics.interactionState = interactionState;
 			metrics.nodeHits = [];
 			for (let hi = 0; hi < nodes.length && metrics.nodeHits.length < 16; hi++) {

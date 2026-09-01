@@ -82,6 +82,7 @@ export async function completeOnboardingWelcomeFlow(page) {
 		onboardingPresented: false,
 		onboardingCompleted: false,
 		onboardingPersisted: false,
+		onboardingReopened: false,
 		onboardingReturnSessionCorrect: false,
 		onboardingDismissed: false,
 		onboardingVisible: false,
@@ -120,6 +121,19 @@ export async function completeOnboardingWelcomeFlow(page) {
 	}
 	const diag = await workbenchCommandWithTimeout(page, 6_000, 'prebase.test.getDiagnostics').catch(() => null);
 	result.onboardingPersisted = Boolean(diag?.onboardingComplete);
+	await page.keyboard.press(process.platform === 'darwin' ? 'Meta+R' : 'Control+R').catch(() => undefined);
+	await workbenchCommandWithTimeout(page, 4_000, 'workbench.action.reloadWindow').catch(() => undefined);
+	await waitForWorkbenchDriver(page, 90_000);
+	const afterReload = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
+	result.onboardingPersisted = Boolean(afterReload?.onboardingComplete);
+	await workbenchCommandWithTimeout(page, 8_000, 'prebase.onboarding.open').catch(() => undefined);
+	result.onboardingReopened = await page.locator('.prebase-onboarding').first().isVisible().catch(() => false)
+		|| await page.getByText('Welcome to PreBase').first().isVisible().catch(() => false);
+	await workbenchCommandWithTimeout(page, 8_000, 'prebase.onboarding.reset').catch(() => undefined);
+	const afterReset = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
+	result.onboardingReturnSessionCorrect = result.onboardingReopened
+		&& result.onboardingPersisted
+		&& Boolean(afterReset?.onboardingComplete === false || afterReset?.onboardingComplete === undefined);
 	return result;
 }
 
