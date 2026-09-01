@@ -24,18 +24,23 @@ if (platform === 'darwin' && !nativePresent) {
 	failures.push('native AppKit module missing; run npm run compile:live-activity');
 }
 
-const contribution = readFileSync(join(repo, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
-if (!contribution.includes('this.chatService.sendRequest(sessionResource')) {
+const contributionPath = join(repo, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
+const sessionPath = join(repo, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts');
+const contribution = readFileSync(contributionPath, 'utf8') + readFileSync(sessionPath, 'utf8');
+if (!contribution.includes('chatService.sendRequest(sessionResource')) {
 	failures.push('follow-up must use chatService.sendRequest on the snapshot session');
 }
 if (contribution.includes('startNewLocalSession')) {
 	failures.push('Live Activity must not start a second chat session');
 }
-if (!contribution.includes('IChatToolInvocation.confirmWith')) {
+if (!contribution.includes('applyMagnusLiveActivitySessionCommand')) {
+	failures.push('Live Activity commands must dispatch through magnusLiveActivitySession');
+}
+if (!readFileSync(sessionPath, 'utf8').includes('IChatToolInvocation.confirmWith')) {
 	failures.push('approvals must resolve the canonical tool invocation');
 }
-if (contribution.includes('invokeTool')) {
-	failures.push('notch must not call invokeTool');
+if (readFileSync(sessionPath, 'utf8').includes('invokeTool')) {
+	failures.push('session command path must not call invokeTool');
 }
 if (!contribution.includes('summarizeMagnusWorkspaceDiff') && !contribution.includes('editingSessionLineStats')) {
 	failures.push('workspaceDiff must use Magnus editing-session / edited-file attribution');
@@ -46,7 +51,10 @@ if (!contribution.includes('countSessionTerminals') && !contribution.includes('I
 if (/\bdestructive:\s*false\b/.test(contribution)) {
 	failures.push('destructive must not be hardcoded false');
 }
-if (!contribution.includes('first.id') && !contribution.includes('interactionId: first.id')) {
+if (!contribution.includes('prebase.test.seedMagnusLiveActivityPending')) {
+	failures.push('smoke seed command for pending approval/question missing');
+}
+if (!contribution.includes('interactionId: first.id')) {
 	failures.push('question pendingInteraction.interactionId must be question.id');
 }
 

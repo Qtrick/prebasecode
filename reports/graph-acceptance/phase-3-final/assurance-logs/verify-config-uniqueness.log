@@ -1,6 +1,5 @@
-npm warn Unknown env config "devdir". This will stop working in the next major version of npm. See `npm help npmrc` for supported config options.
 
 > code-oss-dev@1.128.0 verify:config-uniqueness
 > node scripts/assurance/verify-config-uniqueness.mjs
 
-verify:config-uniqueness: 27 command IDs, 71 configuration keys, 11 manifest keys cross-checked — OK
+verify:config-uniqueness: 27 command IDs, 71 configuration keys, 12 manifest keys cross-checked — OK

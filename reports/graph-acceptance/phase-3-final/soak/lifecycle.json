@@ -1,27 +1,25 @@
 {
   "schemaVersion": 3,
   "scenario": "lifecycle-cycles",
-  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "generatedAt": "2026-08-30T04:50:04.316Z",
+  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
+  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
+  "generatedAt": "2026-08-31T18:45:34.637Z",
   "producerId": "lifecycle-cycles",
-  "producerFingerprint": "980174627728a216cc16d83231710fb07598e7d9dd920cf61b121f24e2a96950",
+  "producerFingerprint": "5f0456fd7b6009994d2bb212c46040a4ac2db104321999567461e2a40c2f222a",
   "kind": "lifecycle",
   "cycleCount": 5,
   "cycles": [
     {
       "id": "cycle-1",
-      "at": "2026-08-30T04:50:28.439Z",
-      "processCount": 33,
+      "at": "2026-08-31T18:45:58.558Z",
+      "processCount": 30,
       "roles": {
-        "main": 1,
-        "helper": 6,
-        "renderer": 5,
-        "other": 21
+        "main": 12,
+        "other": 18
       },
-      "cpuSum": 118.3,
-      "rssMb": 2520.9,
+      "cpuSum": 142.8,
+      "rssMb": 2091.6,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -124,17 +122,14 @@
     },
     {
       "id": "cycle-2",
-      "at": "2026-08-30T04:50:36.117Z",
-      "processCount": 45,
+      "at": "2026-08-31T18:46:06.173Z",
+      "processCount": 39,
       "roles": {
-        "main": 1,
-        "helper": 6,
-        "renderer": 7,
-        "other": 25,
-        "git": 6
+        "main": 14,
+        "other": 25
       },
-      "cpuSum": 191.3,
-      "rssMb": 2957.9,
+      "cpuSum": 148.7,
+      "rssMb": 2385.5,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -237,16 +232,14 @@
     },
     {
       "id": "cycle-3",
-      "at": "2026-08-30T04:50:43.738Z",
-      "processCount": 47,
+      "at": "2026-08-31T18:46:13.660Z",
+      "processCount": 24,
       "roles": {
-        "main": 1,
-        "helper": 6,
-        "renderer": 9,
-        "other": 31
+        "main": 16,
+        "other": 8
       },
-      "cpuSum": 236,
-      "rssMb": 3096.2,
+      "cpuSum": 179.5,
+      "rssMb": 2521.6,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -349,15 +342,13 @@
     },
     {
       "id": "cycle-4",
-      "at": "2026-08-30T04:50:51.379Z",
+      "at": "2026-08-31T18:46:24.119Z",
       "processCount": 18,
       "roles": {
-        "main": 1,
-        "helper": 6,
-        "renderer": 11
+        "main": 18
       },
-      "cpuSum": 180.3,
-      "rssMb": 3141.4,
+      "cpuSum": 125.1,
+      "rssMb": 2867.1,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -460,15 +451,13 @@
     },
     {
       "id": "cycle-5",
-      "at": "2026-08-30T04:51:01.982Z",
+      "at": "2026-08-31T18:46:31.395Z",
       "processCount": 20,
       "roles": {
-        "main": 1,
-        "helper": 6,
-        "renderer": 13
+        "main": 20
       },
-      "cpuSum": 130.3,
-      "rssMb": 3595.8,
+      "cpuSum": 1.6,
+      "rssMb": 3006.7,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -570,18 +559,16 @@
       ]
     }
   ],
-  "prebasePid": 51814,
+  "prebasePid": 50579,
   "cold": {
     "id": "cold",
-    "at": "2026-08-30T04:50:12.682Z",
+    "at": "2026-08-31T18:45:43.028Z",
     "processCount": 7,
     "roles": {
-      "main": 1,
-      "helper": 5,
-      "renderer": 1
+      "main": 7
     },
-    "cpuSum": 18.4,
-    "rssMb": 1510.9,
+    "cpuSum": 50.5,
+    "rssMb": 1522.7,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -685,15 +672,14 @@
   "closedPrimarySidebar": true,
   "warm": {
     "id": "warm",
-    "at": "2026-08-30T04:50:20.783Z",
-    "processCount": 10,
+    "at": "2026-08-31T18:45:51.117Z",
+    "processCount": 28,
     "roles": {
-      "main": 1,
-      "helper": 6,
-      "renderer": 3
+      "main": 10,
+      "other": 18
     },
-    "cpuSum": 169.2,
-    "rssMb": 2166.5,
+    "cpuSum": 151.1,
+    "rssMb": 1890.8,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -709,10 +695,10 @@
   },
   "classification": "warm-provisioning",
   "quit": {
-    "before": "51814     1 129.8 1087184 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "50579     1   0.1 725232 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 2052,
+    "latencyMs": 674,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

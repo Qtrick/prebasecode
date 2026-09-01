@@ -350,6 +350,8 @@ test('Magnus stream live path installs smoke transport then asks the chat partic
 	assert.match(source, /magnusSourceChunks/);
 	assert.match(source, /sourceChunksMax/);
 	assert.match(source, /completes > completesBeforeSecond/);
+	assert.match(source, /UI_STREAM_CHUNK_MARKER/);
+	assert.match(source, /readChatText\(launched\.page\)/);
 	assert.doesNotMatch(source, /magnusStreamActive > 0 \|\| \/Smoke stream chunk/);
 	assert.doesNotMatch(source, /chunkCount = \(first\?\.text\.match/);
 	assert.doesNotMatch(source, /streamGenerate\(/);

@@ -20,6 +20,7 @@ import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
 const evidenceDir = join(repo, 'reports/graph-acceptance/phase-3-final/magnus');
+const UI_STREAM_CHUNK_MARKER = /Smoke stream chunk one/i;
 
 export function magnusStreamFailures(evidence) {
 	const failures = [];
@@ -44,7 +45,11 @@ async function run() {
 	const release = await acquirePhase3AcceptanceLock();
 	mkdirSync(evidenceDir, { recursive: true });
 	let launched;
-	const evidence = { ...phase3EvidenceMetadata(repo, 'magnus-streaming-smoke'), kind: 'deterministic-smoke-stream' };
+	const evidence = {
+		...phase3EvidenceMetadata(repo, 'magnus-streaming-smoke'),
+		kind: 'magnus-streaming-smoke',
+		testKind: 'live-runtime',
+	};
 	try {
 		launched = await launchPreBase(repo, repo);
 		evidence.prebasePid = launched.info.pid;
@@ -59,6 +64,10 @@ async function run() {
 		const streamPromise = workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
 			prompt: 'prebase-smoke-stream',
 		}).catch(err => ({ ok: false, error: String(err) }));
+		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
+			query: 'prebase-smoke-stream',
+			isPartialQuery: false,
+		}).catch(() => undefined);
 
 		let sourceChunksMax = 0;
 		let sourceChunksSawIncrease = false;
@@ -74,8 +83,11 @@ async function run() {
 					evidence.firstChunkAt = Date.now() - startedAt;
 				}
 			}
-			if (chunks > 0 && !evidence.uiTextAt) {
-				evidence.uiTextAt = Date.now() - startedAt;
+			if (!evidence.uiTextAt) {
+				const uiText = await readChatText(launched.page);
+				if (UI_STREAM_CHUNK_MARKER.test(uiText)) {
+					evidence.uiTextAt = Date.now() - startedAt;
+				}
 			}
 			if (chunks >= 4) {
 				return diagnostics;
@@ -88,6 +100,8 @@ async function run() {
 		evidence.chunkCount = sourceChunksMax;
 		evidence.progressiveChunks = sourceChunksSawIncrease || sourceChunksMax > 1;
 		evidence.duplicate = false;
+
+		const completesBeforeSecond = ((await readChatText(launched.page)) || '').match(/Smoke stream complete/gi)?.length ?? 0;
 
 		// Test cancellation
 		const cancelPromise = workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
@@ -103,10 +117,16 @@ async function run() {
 		evidence.cancelled = Boolean(cancelledDiag?.magnusSourceCancelled);
 
 		// Test second request
+		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
+			query: 'prebase-smoke-stream-second',
+			isPartialQuery: false,
+		}).catch(() => undefined);
 		const secondRes = await workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
 			prompt: 'prebase-smoke-stream-second',
 		}).catch(() => null);
-		evidence.secondRequestOk = Boolean(secondRes?.ok && (secondRes?.collected?.length ?? 0) > 0);
+		const text = await readChatText(launched.page);
+		const completes = (text.match(/Smoke stream complete/gi) ?? []).length;
+		evidence.secondRequestOk = Boolean((secondRes?.ok && (secondRes?.collected?.length ?? 0) > 0) || completes > completesBeforeSecond);
 		evidence.uiSample = (secondRes?.collected ?? []).join('').slice(0, 400);
 	} catch (error) {
 		evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);

@@ -4,6 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { URI } from '../../../../base/common/uri.js';
+import { CancellationToken } from '../../../../base/common/cancellation.js';
 import { Disposable, DisposableStore } from '../../../../base/common/lifecycle.js';
 import { RunOnceScheduler } from '../../../../base/common/async.js';
 import { Event } from '../../../../base/common/event.js';
@@ -21,13 +22,14 @@ import { ICommandService } from '../../../../platform/commands/common/commands.j
 import { localize2 } from '../../../../nls.js';
 import { IHostService } from '../../../services/host/browser/host.js';
 import { IWorkbenchContribution, registerWorkbenchContribution2, WorkbenchPhase } from '../../../common/contributions.js';
-import { IChatService, IChatToolInvocation, ToolConfirmKind } from '../../chat/common/chatService/chatService.js';
+import { IChatService, IChatToolInvocation } from '../../chat/common/chatService/chatService.js';
 import type { IChatModel, IChatRequestModel } from '../../chat/common/model/chatModel.js';
 import { IWorkbenchEnvironmentService } from '../../../services/environment/common/environmentService.js';
 import { ServicesAccessor } from '../../../../platform/instantiation/common/instantiation.js';
 import { requireSmokeTestDriver } from '../common/smokeTestGuard.js';
 import { ITerminalChatService, ITerminalService } from '../../terminal/browser/terminal.js';
 import { ILanguageModelToolsService } from '../../chat/common/tools/languageModelToolsService.js';
+import { AskQuestionsToolId } from '../../chat/common/tools/builtinTools/askQuestionsTool.js';
 import { IChatToolRiskAssessmentService, ToolRiskLevel } from '../../chat/browser/tools/chatToolRiskAssessmentService.js';
 import {
 	MAGNUS_LIVE_ACTIVITY_CHANNEL,
@@ -46,10 +48,10 @@ import {
 	type MagnusLiveActivityAction,
 	type MagnusLiveActivityMode,
 	type MagnusLiveActivityDisplay,
-	type MagnusLiveActivityPendingInteraction,
 	type MagnusLiveActivitySessionInput,
 	type MagnusLiveActivitySnapshot,
 } from '../../../../platform/prebaseLiveActivity/common/magnusLiveActivity.js';
+import { applyMagnusLiveActivitySessionCommand, extractPending, extractPendingFromModel } from './magnusLiveActivitySession.js';
 
 function asPlainText(value: unknown): string {
 	if (!value) {
@@ -104,54 +106,6 @@ function toolInvocationState(invocation: IChatToolInvocation): 'running' | 'pass
 		return 'passed';
 	}
 	return 'other';
-}
-
-function extractPending(
-	request: IChatRequestModel | undefined,
-	risk?: { isDestructive(toolId: string, parameters: unknown): boolean },
-): MagnusLiveActivityPendingInteraction | undefined {
-	const parts = request?.response?.entireResponse.value ?? [];
-	for (const part of parts) {
-		if (part.kind === 'toolInvocation') {
-			const invocation = part as IChatToolInvocation;
-			const state = invocation.state.get();
-			if (state.type === IChatToolInvocation.StateKind.WaitingForConfirmation || state.type === IChatToolInvocation.StateKind.WaitingForPostApproval) {
-				const confirmation = IChatToolInvocation.getConfirmationMessages(invocation);
-				const parameters = IChatToolInvocation.getParameters(invocation);
-				const destructive = risk?.isDestructive(invocation.toolId, parameters);
-				return {
-					kind: 'approval',
-					interactionId: invocation.toolCallId,
-					title: redactLiveActivityText(asPlainText(confirmation?.title) || asPlainText(invocation.invocationMessage) || 'Approve tool'),
-					message: redactLiveActivityText(asPlainText(confirmation?.message) || asPlainText(invocation.originMessage)),
-					...(destructive === true ? { destructive: true } : {}),
-				};
-			}
-		}
-		if (part.kind === 'questionCarousel' && !part.isUsed) {
-			const first = part.questions?.[0];
-			if (!first) {
-				continue;
-			}
-			// AskQuestions equates option id/value/label; answer map keys by question.id; optionId = value.
-			const options = first.options?.slice(0, 4)
-				.map(option => ({
-					id: option.value || option.id,
-					label: option.label || option.value || option.id,
-				}))
-				.filter(option => Boolean(option.id));
-			return {
-				kind: 'question',
-				interactionId: first.id,
-				requestId: request!.id,
-				resolveId: part.resolveId,
-				title: redactLiveActivityText(first.title || asPlainText(part.message) || 'Magnus has a question'),
-				message: redactLiveActivityText(asPlainText(first.message) || asPlainText(part.message)),
-				options: options?.length ? options : undefined,
-			};
-		}
-	}
-	return undefined;
 }
 
 function extractActions(request: IChatRequestModel | undefined): MagnusLiveActivityAction[] {
@@ -263,7 +217,7 @@ function extractSessionInput(
 		return undefined;
 	}
 	const last = model.lastRequest;
-	const pending = extractPending(last, deps.risk);
+	const pending = extractPendingFromModel(model, deps.risk);
 	const failed = last?.response?.isCanceled === false && last?.response?.isComplete && Boolean(last.response.result?.errorDetails);
 	const completed = Boolean(last?.response?.isComplete && !last.response.isCanceled && !failed && !model.requestInProgress.get());
 	const editedUris = collectEditedFileUris(model);
@@ -391,6 +345,10 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		return (await this._main?.simulateAction(action, extras)) ?? false;
 	}
 
+	flushSnapshotForSmoke(): void {
+		this._publish();
+	}
+
 	private _isDestructive(toolId: string, parameters: unknown): boolean {
 		const tool = this.toolsService.getTool(toolId);
 		if (!tool) {
@@ -490,57 +448,11 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			this._push.schedule();
 			return;
 		}
-		if (!snapshot.sessionResource) {
-			return;
-		}
-		const sessionResource = URI.parse(snapshot.sessionResource);
-		if (command.kind === 'followUp') {
-			await this.chatService.sendRequest(sessionResource, (command.text ?? '').trim());
-			return;
-		}
-		const model = this.chatService.getSession(sessionResource);
-		const last = model?.lastRequest;
-		if (command.kind === 'approve' || command.kind === 'deny') {
-			const parts = last?.response?.entireResponse.value ?? [];
-			for (const part of parts) {
-				if (part.kind === 'toolInvocation' && (part as IChatToolInvocation).toolCallId === command.interactionId) {
-					IChatToolInvocation.confirmWith(part as IChatToolInvocation, {
-						type: command.kind === 'approve' ? ToolConfirmKind.UserAction : ToolConfirmKind.Denied,
-					});
-					this._push.schedule();
-					return;
-				}
-			}
-			this.logService.info('[MagnusLiveActivity] approval failed closed: invocation missing');
-			return;
-		}
-		const pending = snapshot.pendingInteraction;
-		if (command.kind === 'answer' && pending?.kind === 'question' && pending.resolveId && command.optionId) {
-			const requestId = pending.requestId ?? last?.id;
-			if (!requestId) {
-				this.logService.info('[MagnusLiveActivity] answer failed closed: missing question/option');
-				return;
-			}
-			const request = pending.requestId
-				? model?.getRequests().find(r => r.id === pending.requestId)
-				: last;
-			const carousel = (request?.response?.entireResponse.value ?? []).find(part =>
-				part.kind === 'questionCarousel' && part.resolveId === pending.resolveId && !part.isUsed);
-			if (!carousel) {
-				this.logService.info('[MagnusLiveActivity] answer failed closed: carousel missing/used');
-				return;
-			}
-			this.chatService.notifyQuestionCarouselAnswer(
-				requestId,
-				pending.resolveId,
-				{ [pending.interactionId]: { selectedValue: command.optionId } },
-			);
-			this._push.schedule();
-			return;
-		}
-		if (command.kind === 'answer') {
-			this.logService.info('[MagnusLiveActivity] answer failed closed: missing question/option');
-		}
+		await applyMagnusLiveActivitySessionCommand(snapshot, command, {
+			chatService: this.chatService,
+			logService: this.logService,
+			onInteractionApplied: () => this._push.schedule(),
+		});
 	}
 
 	override dispose(): void {
@@ -596,6 +508,87 @@ registerAction2(class extends Action2 {
 	async run(accessor: ServicesAccessor, action: string, extras?: unknown) {
 		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.magnus.liveActivity.simulate');
 		return MagnusLiveActivityContribution.instance?.simulateAction(action, extras);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.test.seedMagnusLiveActivityPending',
+			title: localize2('prebase.test.seedMagnusLiveActivityPending', "Seed Magnus Live Activity Pending Interaction (Smoke Test)"),
+			f1: false,
+		});
+	}
+	async run(accessor: ServicesAccessor, options?: { kind?: 'approval' | 'question' }) {
+		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.seedMagnusLiveActivityPending');
+		const kind = options?.kind === 'question' ? 'question' : 'approval';
+		const chatService = accessor.get(IChatService);
+		const commandService = accessor.get(ICommandService);
+		const toolsService = accessor.get(ILanguageModelToolsService);
+		const riskAssessmentService = accessor.get(IChatToolRiskAssessmentService);
+		const configurationService = accessor.get(IConfigurationService);
+		await commandService.executeCommand('_setContext', 'vscode.chat.tools.global.autoApprove.testMode', false);
+		await configurationService.updateValue('chat.autoReply', false);
+		const model = selectPrimaryMagnusModel(chatService.chatModels.get());
+		const requestId = model?.lastRequest?.id;
+		const targetSessionId = model?.sessionId;
+		if (!model || !requestId || !targetSessionId) {
+			return { ok: false, reason: 'no-magnus-session' };
+		}
+		const callId = `smoke-la-${kind}-${Date.now()}`;
+		const isQuestion = kind === 'question';
+		let invokeError: string | undefined;
+		void toolsService.invokeTool({
+			callId,
+			toolId: isQuestion ? AskQuestionsToolId : 'prebase_edit_delete_file',
+			parameters: isQuestion ? {
+				questions: [{
+					header: 'Smoke',
+					question: 'Live Activity smoke question?',
+					options: [{ label: 'Option A' }, { label: 'Option B' }],
+					allowFreeformInput: false,
+				}],
+			} : {
+				path: 'package.json',
+			},
+			context: { sessionResource: model.sessionResource },
+			chatRequestId: requestId,
+		}, async () => 0, CancellationToken.None).catch(error => {
+			invokeError = error instanceof Error ? error.message : String(error);
+		});
+		const risk = {
+			isDestructive: (toolId: string, parameters: unknown) => {
+				const tool = toolsService.getTool(toolId);
+				if (!tool) {
+					return false;
+				}
+				return riskAssessmentService.getCached(tool, parameters)?.risk === ToolRiskLevel.Red;
+			},
+		};
+		const deadline = Date.now() + 8_000;
+		while (Date.now() < deadline) {
+			await new Promise(resolve => setTimeout(resolve, 200));
+			const activeModel = selectPrimaryMagnusModel(chatService.chatModels.get());
+			if (!activeModel || activeModel.sessionId !== targetSessionId) {
+				continue;
+			}
+			const pending = extractPendingFromModel(activeModel, risk);
+			if (pending?.kind === kind) {
+				MagnusLiveActivityContribution.instance?.flushSnapshotForSmoke();
+				const diag = MagnusLiveActivityContribution.diagnostics;
+				return {
+					ok: true,
+					kind: pending.kind,
+					interactionId: pending.interactionId,
+					optionId: pending.options?.[0]?.id,
+					sessionId: activeModel.sessionId,
+					revision: diag.revision,
+					liveActivityPendingKind: diag.pendingKind,
+					liveActivityStatus: diag.status,
+				};
+			}
+		}
+		return { ok: false, reason: 'pending-timeout', kind, invokeError };
 	}
 });
 

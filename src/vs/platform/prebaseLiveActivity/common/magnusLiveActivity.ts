@@ -308,7 +308,14 @@ export function acceptLiveActivityCommand(
 		return { ok: false, reason: 'disconnected' };
 	}
 	if (command.revision !== undefined && command.revision !== snapshot.revision) {
-		return { ok: false, reason: 'stale-revision' };
+		const pending = snapshot.pendingInteraction;
+		const interactionBound = command.kind === 'approve' || command.kind === 'deny' || command.kind === 'answer';
+		const kindMatches = command.kind === 'answer'
+			? pending?.kind === 'question'
+			: (command.kind === 'approve' || command.kind === 'deny') ? pending?.kind === 'approval' : false;
+		if (!interactionBound || !kindMatches || !command.interactionId || command.interactionId !== pending?.interactionId) {
+			return { ok: false, reason: 'stale-revision' };
+		}
 	}
 	if (command.kind === 'openInPrebase' || command.kind === 'pin' || command.kind === 'unpin') {
 		if (command.sessionId && snapshot.sessionId && command.sessionId !== snapshot.sessionId) {

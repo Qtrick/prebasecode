@@ -47,6 +47,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) double revision;
 @property (nonatomic, copy) NSString *interactionId;
 @property (nonatomic, copy) NSString *pendingKind;
+@property (nonatomic, assign) BOOL pendingDestructive;
 @property (nonatomic, strong) id globalMonitor;
 @property (nonatomic, strong) id localMonitor;
 @property (nonatomic, strong) NSTimer *hoverTimer;
@@ -301,6 +302,9 @@ static NSString *JSString(Napi::Value value) {
 		self.openButton.frame = NSMakeRect(NSWidth(win) - 132, y, 118, 22);
 	}
 	if (!self.approveButton.hidden) {
+		NSString *approveTitle = self.pendingDestructive ? @"Approve (destructive)" : @"Approve";
+		self.approveButton.title = approveTitle;
+		self.approveButton.accessibilityLabel = approveTitle;
 		self.denyButton.frame = NSMakeRect(12, y, 70, 22);
 		self.approveButton.frame = NSMakeRect(88, y, 78, 22);
 	}
@@ -491,6 +495,7 @@ static NSString *JSString(Napi::Value value) {
 - (void)clearPendingInteraction {
 	self.interactionId = @"";
 	self.pendingKind = @"";
+	self.pendingDestructive = NO;
 	self.pendingOptions = @[];
 	self.content.pendingTitle = @"";
 	self.openButton.title = @"Open in PreBase";
@@ -637,8 +642,17 @@ static NSString *JSString(Napi::Value value) {
 	self.content.pendingTitle = snapshot[@"pendingTitle"] ?: @"";
 	self.interactionId = snapshot[@"interactionId"] ?: @"";
 	self.pendingKind = snapshot[@"pendingKind"] ?: @"";
+	self.pendingDestructive = [snapshot[@"destructive"] boolValue];
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
 	self.lastNativeCommand = @"";
+	if (self.content.attention && (self.pendingOptions.count > 0 || [self.pendingKind isEqualToString:@"approval"])) {
+		self.content.expanded = YES;
+		self.ignoresMouse = NO;
+		if (self.panel) {
+			self.panel.ignoresMouseEvents = NO;
+			[self layoutForScreen];
+		}
+	}
 	[self.content setNeedsDisplay:YES];
 	if (self.panel) {
 		[self layoutControls:self.panel.frame];

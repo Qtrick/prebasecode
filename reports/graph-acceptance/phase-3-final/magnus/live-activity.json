@@ -1,29 +1,29 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity",
-  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
-  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "generatedAt": "2026-08-31T18:31:33.237Z",
+  "sourceHead": "b4e2de52da6fbd7c58a5c114bb579ad2b8eea20e",
+  "sourceFingerprint": "cfe0a5358f5744292fad8fb9b03ac0a1bbf2c56729418803bdd0a3b62ce76382",
+  "productFingerprint": "cfe0a5358f5744292fad8fb9b03ac0a1bbf2c56729418803bdd0a3b62ce76382",
+  "generatedAt": "2026-09-01T01:30:01.445Z",
   "producerId": "magnus-live-activity",
-  "producerFingerprint": "696fb431d89edeabb63ace50ea6b29b5e64ca5daadf0c69e3673642d480508eb",
+  "producerFingerprint": "042ca607020ac3708da9ca717400839f3b52a16f59ff3a25459a15c9822c43bf",
   "kind": "magnus-live-activity-live",
   "testKind": "live-runtime",
   "liveGui": "native-appkit-panel",
   "platform": "darwin",
   "nativePresent": true,
   "mode": "alwaysWorking",
-  "prebasePid": 81201,
-  "launchMs": 3144,
+  "prebasePid": 32088,
+  "launchMs": 5265,
   "smokeTransportInstalled": true,
   "diagnosticsAfterOpen": {
     "backend": "native-appkit",
     "revision": 3,
-    "sessionId": "9d365788-87a9-4f66-b5bc-b6976d0e8185",
-    "sessionResource": "vscode-chat-session://local/OWQzNjU3ODgtODdhOS00ZjY2LWI1YmMtYjY5NzZkMGU4MTg1",
+    "sessionId": "ff4aa837-f4e9-433b-a0c1-b335d79883a3",
+    "sessionResource": "vscode-chat-session://local/ZmY0YWE4MzctZjRlOS00MzNiLWEwYzEtYjMzNWQ3OTg4M2Ez",
     "status": "waiting",
     "visible": true,
-    "presentationLabel": "4s",
+    "presentationLabel": "3s",
     "native": {
       "approvalControlsVisible": false,
       "screenFrame": {
@@ -57,7 +57,7 @@
       "activeInputControl": "none",
       "safeAreaTop": 32,
       "notchDetected": true,
-      "statusLabel": "4s",
+      "statusLabel": "3s",
       "panelCreated": true,
       "activityLabel": "",
       "metricsLabel": "",
@@ -65,7 +65,7 @@
       "pendingTitle": "",
       "pinned": false,
       "screenLocalizedName": "Built-in Retina Display",
-      "accessibilityLabel": "4s"
+      "accessibilityLabel": "3s"
     }
   },
   "nativeDiagnostics": {
@@ -101,7 +101,7 @@
     "activeInputControl": "none",
     "safeAreaTop": 32,
     "notchDetected": true,
-    "statusLabel": "4s",
+    "statusLabel": "3s",
     "panelCreated": true,
     "activityLabel": "",
     "metricsLabel": "",
@@ -109,14 +109,152 @@
     "pendingTitle": "",
     "pinned": false,
     "screenLocalizedName": "Built-in Retina Display",
-    "accessibilityLabel": "4s"
+    "accessibilityLabel": "3s"
+  },
+  "questionSeed": {
+    "ok": true,
+    "kind": "question",
+    "interactionId": "smoke-la-question-1788226211427:0",
+    "optionId": "Option A",
+    "sessionId": "ff4aa837-f4e9-433b-a0c1-b335d79883a3",
+    "revision": 4,
+    "liveActivityPendingKind": "question",
+    "liveActivityStatus": "attention"
+  },
+  "questionDiagnosticsBefore": {
+    "backend": "native-appkit",
+    "revision": 4,
+    "sessionId": "ff4aa837-f4e9-433b-a0c1-b335d79883a3",
+    "sessionResource": "vscode-chat-session://local/ZmY0YWE4MzctZjRlOS00MzNiLWEwYzEtYjMzNWQ3OTg4M2Ez",
+    "status": "attention",
+    "visible": true,
+    "pendingKind": "question",
+    "presentationLabel": "Magnus needs an answer",
+    "native": {
+      "approvalControlsVisible": false,
+      "screenFrame": {
+        "y": 0,
+        "x": 0,
+        "width": 1512,
+        "height": 982
+      },
+      "panelFrame": {
+        "y": 749,
+        "x": 539,
+        "width": 433,
+        "height": 200
+      },
+      "questionButtonLabels": [
+        "Option A",
+        "Option B"
+      ],
+      "keyWindow": false,
+      "openInPreBaseVisible": true,
+      "pendingKind": "question",
+      "lastNativeCommand": "",
+      "panelVisible": true,
+      "questionButtonCount": 2,
+      "interactionId": "smoke-la-question-1788226211427:0",
+      "accessibilityRole": "AXGroup",
+      "collapsedHit": {
+        "y": 947,
+        "x": 539,
+        "width": 433,
+        "height": 34
+      },
+      "hovered": false,
+      "activeInputControl": "none",
+      "safeAreaTop": 32,
+      "notchDetected": true,
+      "statusLabel": "Magnus needs an answer",
+      "panelCreated": true,
+      "activityLabel": "Asking a question (Smoke)",
+      "metricsLabel": "",
+      "expanded": true,
+      "pendingTitle": "Smoke",
+      "pinned": false,
+      "screenLocalizedName": "Built-in Retina Display",
+      "accessibilityLabel": "Magnus needs an answer"
+    }
+  },
+  "questionContinuity": {
+    "ok": true,
+    "interactionId": "smoke-la-question-1788226211427:0",
+    "liveActivityPendingKind": "question",
+    "liveActivityStatus": "attention"
+  },
+  "approvalSeed": {
+    "ok": true,
+    "kind": "approval",
+    "interactionId": "smoke-la-approval-1788226212324",
+    "sessionId": "ff4aa837-f4e9-433b-a0c1-b335d79883a3",
+    "revision": 6,
+    "liveActivityPendingKind": "approval",
+    "liveActivityStatus": "attention"
+  },
+  "approvalDiagnosticsBefore": {
+    "backend": "native-appkit",
+    "revision": 6,
+    "sessionId": "ff4aa837-f4e9-433b-a0c1-b335d79883a3",
+    "sessionResource": "vscode-chat-session://local/ZmY0YWE4MzctZjRlOS00MzNiLWEwYzEtYjMzNWQ3OTg4M2Ez",
+    "status": "attention",
+    "visible": true,
+    "pendingKind": "approval",
+    "presentationLabel": "Magnus needs approval",
+    "native": {
+      "approvalControlsVisible": true,
+      "screenFrame": {
+        "y": 0,
+        "x": 0,
+        "width": 1512,
+        "height": 982
+      },
+      "panelFrame": {
+        "y": 749,
+        "x": 539,
+        "width": 433,
+        "height": 200
+      },
+      "questionButtonLabels": [],
+      "keyWindow": false,
+      "openInPreBaseVisible": true,
+      "pendingKind": "approval",
+      "lastNativeCommand": "",
+      "panelVisible": true,
+      "questionButtonCount": 0,
+      "interactionId": "smoke-la-approval-1788226212324",
+      "accessibilityRole": "AXGroup",
+      "collapsedHit": {
+        "y": 947,
+        "x": 539,
+        "width": 433,
+        "height": 34
+      },
+      "hovered": false,
+      "activeInputControl": "none",
+      "safeAreaTop": 32,
+      "notchDetected": true,
+      "statusLabel": "Magnus needs approval",
+      "panelCreated": true,
+      "activityLabel": "",
+      "metricsLabel": "",
+      "expanded": true,
+      "pendingTitle": "Allow Agents to delete this file?",
+      "pinned": false,
+      "screenLocalizedName": "Built-in Retina Display",
+      "accessibilityLabel": "Magnus needs approval"
+    }
+  },
+  "approvalContinuity": {
+    "ok": true,
+    "interactionId": "smoke-la-approval-1788226212324"
   },
   "followUpSimulation": {
     "ok": true
   },
   "nativeScreenshot": {
     "captured": true,
-    "sizeBytes": 10502,
+    "sizeBytes": 21497,
     "rect": {
       "x": 539,
       "y": 33,
@@ -127,12 +265,12 @@
   },
   "blurredDiagnostics": {
     "backend": "native-appkit",
-    "revision": 3,
-    "sessionId": "9d365788-87a9-4f66-b5bc-b6976d0e8185",
-    "sessionResource": "vscode-chat-session://local/OWQzNjU3ODgtODdhOS00ZjY2LWI1YmMtYjY5NzZkMGU4MTg1",
+    "revision": 7,
+    "sessionId": "ff4aa837-f4e9-433b-a0c1-b335d79883a3",
+    "sessionResource": "vscode-chat-session://local/ZmY0YWE4MzctZjRlOS00MzNiLWEwYzEtYjMzNWQ3OTg4M2Ez",
     "status": "waiting",
     "visible": true,
-    "presentationLabel": "4s",
+    "presentationLabel": "5s",
     "native": {
       "approvalControlsVisible": false,
       "screenFrame": {
@@ -166,7 +304,7 @@
       "activeInputControl": "none",
       "safeAreaTop": 32,
       "notchDetected": true,
-      "statusLabel": "4s",
+      "statusLabel": "5s",
       "panelCreated": true,
       "activityLabel": "",
       "metricsLabel": "",
@@ -174,7 +312,7 @@
       "pendingTitle": "",
       "pinned": false,
       "screenLocalizedName": "Built-in Retina Display",
-      "accessibilityLabel": "4s"
+      "accessibilityLabel": "5s"
     }
   },
   "workbenchDiagnostics": {
@@ -215,16 +353,16 @@
     }
   },
   "quit": {
-    "before": "81201     1   2.4 280064 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "32088     1   7.6 289440 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 1928,
+    "latencyMs": 3426,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
     "usedSigkill": false
   },
-  "durationMs": 10805,
+  "durationMs": 16216,
   "ok": true,
   "failures": []
 }

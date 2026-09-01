@@ -70,6 +70,12 @@ export function liveActivityLiveFailures(evidence) {
 	if (evidence.followUpSimulation && !evidence.followUpSimulation.ok) {
 		failures.push('native follow-up message simulation failed');
 	}
+	if (evidence.questionContinuity && !evidence.questionContinuity.ok) {
+		failures.push(`question continuity failed: ${evidence.questionContinuity.reason ?? 'unknown'}`);
+	}
+	if (evidence.approvalContinuity && !evidence.approvalContinuity.ok) {
+		failures.push(`approval continuity failed: ${evidence.approvalContinuity.reason ?? 'unknown'}`);
+	}
 	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured) {
 		failures.push('native panel screenshot capture failed');
 	}
@@ -163,7 +169,85 @@ async function run() {
 		// Query factual native AppKit diagnostics directly
 		evidence.nativeDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
 
-		// Test native follow-up message simulation through native text field
+		// Question continuity: seed pending carousel → native option → canonical answer
+		const questionSeed = await workbenchCommandWithTimeout(launched.page, 15_000, 'prebase.test.seedMagnusLiveActivityPending', { kind: 'question' }).catch(() => ({ ok: false }));
+		evidence.questionSeed = questionSeed;
+		let questionPending = Boolean(questionSeed?.ok && (questionSeed?.liveActivityPendingKind === 'question' || questionSeed?.liveActivityStatus === 'attention'));
+		const questionDeadline = Date.now() + 12_000;
+		while (!questionPending && Date.now() < questionDeadline) {
+			const diag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+			if (diag?.pendingKind === 'question' && questionSeed?.interactionId) {
+				questionPending = true;
+				evidence.questionDiagnosticsBefore = diag;
+				break;
+			}
+			await new Promise(r => setTimeout(r, 400));
+		}
+		if (questionPending && !evidence.questionDiagnosticsBefore) {
+			evidence.questionDiagnosticsBefore = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+		}
+		const questionAnswerSim = questionPending
+			? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'option', 0).catch(() => false)
+			: false;
+		const questionDiagAfter = questionAnswerSim
+			? await (async () => {
+				const deadline = Date.now() + 10_000;
+				while (Date.now() < deadline) {
+					const diag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+					if (diag?.pendingKind !== 'question') {
+						return diag;
+					}
+					await new Promise(r => setTimeout(r, 400));
+				}
+				return await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+			})()
+			: null;
+		evidence.questionContinuity = {
+			ok: Boolean(questionSeed?.ok && questionAnswerSim && questionDiagAfter?.pendingKind !== 'question'),
+			reason: !questionSeed?.ok ? `seed-failed${questionSeed?.invokeError ? `:${questionSeed.invokeError}` : ''}` : (!questionAnswerSim ? 'native-option-failed' : (questionDiagAfter?.pendingKind === 'question' ? 'pending-not-cleared' : undefined)),
+			interactionId: questionSeed?.interactionId,
+			liveActivityPendingKind: questionSeed?.liveActivityPendingKind,
+			liveActivityStatus: questionSeed?.liveActivityStatus,
+		};
+
+		// Approval continuity: seed pending tool approval → native deny (safe) → pending clears
+		const approvalSeed = await workbenchCommandWithTimeout(launched.page, 15_000, 'prebase.test.seedMagnusLiveActivityPending', { kind: 'approval' }).catch(() => ({ ok: false }));
+		evidence.approvalSeed = approvalSeed;
+		let approvalPending = Boolean(approvalSeed?.ok);
+		const approvalDeadline = Date.now() + 12_000;
+		while (Date.now() < approvalDeadline) {
+			const diag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+			const native = diag?.native ?? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+			if (diag?.pendingKind === 'approval' && approvalSeed?.interactionId) {
+				approvalPending = true;
+				evidence.approvalDiagnosticsBefore = { ...diag, native };
+				break;
+			}
+			await new Promise(r => setTimeout(r, 400));
+		}
+		const approvalDenySim = approvalPending
+			? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'deny').catch(() => false)
+			: false;
+		const approvalDiagAfter = approvalDenySim
+			? await (async () => {
+				const deadline = Date.now() + 10_000;
+				while (Date.now() < deadline) {
+					const diag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+					if (diag?.pendingKind !== 'approval') {
+						return diag;
+					}
+					await new Promise(r => setTimeout(r, 400));
+				}
+				return await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+			})()
+			: null;
+		evidence.approvalContinuity = {
+			ok: Boolean(approvalSeed?.ok && approvalDenySim && approvalDiagAfter?.pendingKind !== 'approval'),
+			reason: !approvalSeed?.ok ? `seed-failed${approvalSeed?.invokeError ? `:${approvalSeed.invokeError}` : approvalSeed?.reason ? `:${approvalSeed.reason}` : ''}` : (!approvalDenySim ? 'native-deny-failed' : (approvalDiagAfter?.pendingKind === 'approval' ? 'pending-not-cleared' : undefined)),
+			interactionId: approvalSeed?.interactionId,
+		};
+
+		// Test native follow-up message simulation through native text field (after pending interactions)
 		const followUpSim = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'followUp', 'follow-up from native activity').catch(() => false);
 		evidence.followUpSimulation = { ok: Boolean(followUpSim) };
 

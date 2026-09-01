@@ -264,10 +264,7 @@ export function resolveCatalogRef<T extends { path: string; id: string; name: st
 	}
 	// Prefer exact path/id/name so Gemini `deploy:prod` is not stolen by an OpenCode `deploy/prod` colon alias.
 	return catalog.find(item => item.path === trimmed || item.id === trimmed || item.name === trimmed)
-		?? catalog.find(item =>
-			item.ecosystem === 'opencode'
-			&& item.name.includes('/')
-			&& item.name.replace(/\//g, ':') === trimmed);
+		?? catalog.find(item => catalogNameMatches(item.ecosystem, item.name, trimmed));
 }
 
 function tagGuidanceBlocks(workspaceRoot: string, items: readonly { source: GuidanceSource; text: string }[]): GuidanceTextBlock[] {

@@ -25,7 +25,13 @@ import {
 	resolveLiveActivityPanelState,
 	shouldShowLiveActivity,
 	type MagnusLiveActivitySessionInput,
+	type MagnusLiveActivitySnapshot,
 } from '../../../../../platform/prebaseLiveActivity/common/magnusLiveActivity.js';
+import { applyMagnusLiveActivitySessionCommand, extractPending } from '../../browser/magnusLiveActivitySession.js';
+import { observableValue } from '../../../../../base/common/observable.js';
+import { URI } from '../../../../../base/common/uri.js';
+import { IChatToolInvocation, ToolConfirmKind, type ConfirmedReason } from '../../../chat/common/chatService/chatService.js';
+import type { IChatModel, IChatRequestModel, IChatResponseModel, IResponse, IChatProgressResponseContent } from '../../../chat/common/model/chatModel.js';
 
 function session(partial: Partial<MagnusLiveActivitySessionInput> = {}): MagnusLiveActivitySessionInput {
 	return {
@@ -42,6 +48,57 @@ function session(partial: Partial<MagnusLiveActivitySessionInput> = {}): MagnusL
 
 function readRepo(relativePath: string): string {
 	return readFileSync(resolve(relativePath), 'utf8');
+}
+
+function mockRequest(parts: IChatProgressResponseContent[], id = 'req-1'): IChatRequestModel {
+	const response: Partial<IChatResponseModel> = {
+		entireResponse: {
+			value: parts,
+			getMarkdown: () => '',
+			getFinalResponse: () => '',
+			toString: () => '',
+		} satisfies IResponse,
+	};
+	return {
+		id,
+		response: response as IChatResponseModel,
+	} as IChatRequestModel;
+}
+
+function mockToolInvocation(options: {
+	toolCallId: string;
+	state: IChatToolInvocation.State;
+	toolId?: string;
+	invocationMessage?: string;
+}): IChatToolInvocation {
+	return {
+		kind: 'toolInvocation',
+		toolCallId: options.toolCallId,
+		toolId: options.toolId ?? 'test-tool',
+		invocationMessage: options.invocationMessage ?? 'Run tool',
+		pastTenseMessage: undefined,
+		originMessage: undefined,
+		presentation: undefined!,
+		source: undefined!,
+		state: observableValue('toolState', options.state),
+		toolSpecificData: undefined,
+		toolSpecificDataKind: observableValue('test', undefined),
+		isAttachedToThinking: false,
+		toJSON: () => undefined!,
+	};
+}
+
+function waitingConfirmationState(confirm?: (reason: ConfirmedReason) => void): IChatToolInvocation.State {
+	return {
+		type: IChatToolInvocation.StateKind.WaitingForConfirmation,
+		parameters: { path: '/tmp/x' },
+		confirmationMessages: { title: 'Delete file?', message: 'Remove obsolete.ts' },
+		confirm: confirm ?? (() => { }),
+	} as IChatToolInvocation.State;
+}
+
+function connectedSnapshot(partial: Partial<MagnusLiveActivitySessionInput> = {}): MagnusLiveActivitySnapshot {
+	return buildMagnusLiveActivitySnapshot(session(partial), { revision: 1, prebaseForeground: false, connected: true });
 }
 
 suite('Magnus Live Activity projection', () => {
@@ -78,10 +135,41 @@ suite('Magnus Live Activity projection', () => {
 			isInProgress: true,
 		}), { revision: 4, prebaseForeground: false, connected: true });
 		assert.strictEqual(snap.status, 'attention');
-		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'approve', interactionId: 'tool-9', revision: 3 }), { ok: false, reason: 'stale-revision' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'approve', interactionId: 'tool-9', revision: 3 }), { ok: true });
+		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'followUp', text: 'hello', revision: 3 }), { ok: false, reason: 'stale-revision' });
 		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'approve', interactionId: 'tool-8', revision: 4 }), { ok: false, reason: 'stale-interaction' });
 		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'approve', interactionId: 'tool-9', revision: 4 }), { ok: true });
 		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'followUp', sessionId: 'other', text: 'hello', revision: 4 }), { ok: false, reason: 'session-mismatch' });
+	});
+
+	test('stale revision bypass requires matching pending kind', () => {
+		const approvalSnap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'tool-9', title: 'Delete?', message: '' },
+		}), { revision: 4, prebaseForeground: false, connected: true });
+		assert.deepStrictEqual(acceptLiveActivityCommand(approvalSnap, { kind: 'answer', interactionId: 'tool-9', optionId: 'a', revision: 3 }), { ok: false, reason: 'stale-revision' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(approvalSnap, { kind: 'deny', interactionId: 'tool-9', revision: 3 }), { ok: true });
+
+		const questionSnap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'question', interactionId: 'q-1', title: 'Pick', message: '', options: [{ id: 'a', label: 'A' }] },
+		}), { revision: 5, prebaseForeground: false, connected: true });
+		assert.deepStrictEqual(acceptLiveActivityCommand(questionSnap, { kind: 'approve', interactionId: 'q-1', revision: 4 }), { ok: false, reason: 'stale-revision' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(questionSnap, { kind: 'answer', interactionId: 'q-1', optionId: 'a', revision: 4 }), { ok: true });
+	});
+
+	test('snapshot preserves destructive only when explicitly true', () => {
+		const destructive = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'tool-danger', title: 'Delete?', message: 'Remove', destructive: true },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		assert.strictEqual(destructive.pendingInteraction?.destructive, true);
+
+		const safe = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'tool-safe', title: 'Run?', message: 'Safe op' },
+		}), { revision: 2, prebaseForeground: false, connected: true });
+		assert.strictEqual(safe.pendingInteraction?.destructive, undefined);
 	});
 
 	test('follow-up is accepted only for the canonical session', () => {
@@ -558,6 +646,518 @@ suite('Magnus Live Activity projection', () => {
 	});
 });
 
+suite('Magnus Live Activity pending projection (runtime)', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
+
+	test('WaitingForConfirmation maps to approval with toolCallId and confirmation copy', () => {
+		const invocation = mockToolInvocation({
+			toolCallId: 'tool-9',
+			state: waitingConfirmationState(),
+		});
+		const pending = extractPending(mockRequest([invocation]));
+		assert.strictEqual(pending?.kind, 'approval');
+		assert.strictEqual(pending?.interactionId, 'tool-9');
+		assert.strictEqual(pending?.title, 'Delete file?');
+		assert.strictEqual(pending?.message, 'Remove obsolete.ts');
+		assert.strictEqual(pending?.destructive, undefined);
+	});
+
+	test('destructive is set only when risk assessment returns true', () => {
+		const invocation = mockToolInvocation({
+			toolCallId: 'tool-danger',
+			state: waitingConfirmationState(),
+			toolId: 'rm_rf',
+		});
+		const safe = extractPending(mockRequest([invocation]), { isDestructive: () => false });
+		const hot = extractPending(mockRequest([invocation]), { isDestructive: () => true });
+		assert.strictEqual(safe?.destructive, undefined);
+		assert.strictEqual(hot?.destructive, true);
+	});
+
+	test('unused question carousel keys interactionId by question.id and caps options', () => {
+		const carousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{
+				id: 'question-42',
+				type: 'singleSelect' as const,
+				title: 'Which approach?',
+				message: 'Pick one',
+				options: [
+					{ id: 'a', value: 'val-a', label: 'A' },
+					{ id: 'b', value: 'val-b', label: 'B' },
+					{ id: 'c', value: 'val-c', label: 'C' },
+					{ id: 'd', value: 'val-d', label: 'D' },
+					{ id: 'e', value: 'val-e', label: 'E' },
+				],
+			}],
+			allowSkip: false,
+			resolveId: 'resolve-7',
+			isUsed: false,
+		};
+		const pending = extractPending(mockRequest([carousel], 'req-q'));
+		assert.strictEqual(pending?.kind, 'question');
+		assert.strictEqual(pending?.interactionId, 'question-42');
+		assert.strictEqual(pending?.resolveId, 'resolve-7');
+		assert.strictEqual(pending?.requestId, 'req-q');
+		assert.strictEqual(pending?.options?.length, 4);
+		assert.strictEqual(pending?.options?.[0].id, 'val-a');
+	});
+
+	test('used question carousel is skipped; approval wins when it appears first', () => {
+		const usedCarousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{ id: 'q1', type: 'text' as const, title: 'Old question' }],
+			allowSkip: false,
+			resolveId: 'resolve-used',
+			isUsed: true,
+		};
+		assert.strictEqual(extractPending(mockRequest([usedCarousel])), undefined);
+
+		const approval = mockToolInvocation({ toolCallId: 'tool-first', state: waitingConfirmationState() });
+		const openCarousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{ id: 'q2', type: 'text' as const, title: 'Later question' }],
+			allowSkip: false,
+			resolveId: 'resolve-open',
+			isUsed: false,
+		};
+		const mixed = extractPending(mockRequest([approval, openCarousel]));
+		assert.strictEqual(mixed?.kind, 'approval');
+		assert.strictEqual(mixed?.interactionId, 'tool-first');
+	});
+
+	test('question carousel without request id is ignored', () => {
+		const carousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{ id: 'q-no-req', type: 'text' as const, title: 'No request' }],
+			allowSkip: false,
+			resolveId: 'resolve-x',
+			isUsed: false,
+		};
+		assert.strictEqual(extractPending({ response: { entireResponse: { value: [carousel] } } } as IChatRequestModel), undefined);
+	});
+});
+
+suite('Magnus Live Activity session command dispatch (runtime)', () => {
+
+	ensureNoDisposablesAreLeakedInTestSuite();
+
+	test('approve confirms the canonical tool invocation on the snapshot session', async () => {
+		let confirmed: ConfirmedReason | undefined;
+		const invocation = mockToolInvocation({
+			toolCallId: 'tool-9',
+			state: waitingConfirmationState(reason => { confirmed = reason; }),
+		});
+		const sessionResource = URI.parse('vscode-chat://local/sess-1');
+		const model = {
+			sessionId: 'sess-1',
+			lastRequest: mockRequest([invocation]),
+			getRequests: () => [mockRequest([invocation], 'req-1')],
+		} as IChatModel;
+		let notified = false;
+		const snapshot = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'tool-9', title: 'Delete?', message: 'Remove' },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+
+		await applyMagnusLiveActivitySessionCommand(snapshot, {
+			kind: 'approve',
+			interactionId: 'tool-9',
+			revision: 1,
+		}, {
+			chatService: {
+				getSession: resource => resource.toString() === sessionResource.toString() ? model : undefined,
+				sendRequest: async () => { throw new Error('sendRequest must not run'); },
+				notifyQuestionCarouselAnswer: () => { notified = true; },
+			},
+			logService: { info: () => { } },
+		});
+
+		assert.strictEqual(confirmed?.type, ToolConfirmKind.UserAction);
+		assert.strictEqual(notified, false);
+	});
+
+	test('deny confirms denied; stale snapshot pending rejects without a second confirm', async () => {
+		let confirmCount = 0;
+		const invocation = mockToolInvocation({
+			toolCallId: 'tool-9',
+			state: waitingConfirmationState(() => { confirmCount++; }),
+		});
+		const request = mockRequest([invocation]);
+		const model = { sessionId: 'sess-1', lastRequest: request, getRequests: () => [request] } as IChatModel;
+		const snapshot = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'tool-9', title: 'Delete?', message: '' },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+
+		await applyMagnusLiveActivitySessionCommand(snapshot, {
+			kind: 'deny',
+			interactionId: 'tool-9',
+			revision: 1,
+		}, {
+			chatService: {
+				getSession: () => model,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { },
+			},
+			logService: { info: () => { } },
+		});
+		assert.strictEqual(confirmCount, 1);
+
+		await applyMagnusLiveActivitySessionCommand(snapshot, {
+			kind: 'approve',
+			interactionId: 'tool-other',
+			revision: 1,
+		}, {
+			chatService: {
+				getSession: () => model,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { },
+			},
+			logService: { info: () => { } },
+		});
+		assert.strictEqual(confirmCount, 1, 'stale interaction must not confirm again');
+	});
+
+	test('answer notifies chat with question.id keyed map on the pending request', async () => {
+		const carousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{ id: 'question-42', type: 'singleSelect' as const, title: 'Pick', options: [{ id: 'a', value: 'val-a', label: 'A' }] }],
+			allowSkip: false,
+			resolveId: 'resolve-7',
+			isUsed: false,
+		};
+		const older = mockRequest([carousel], 'req-old');
+		const model = {
+			sessionId: 'sess-1',
+			lastRequest: mockRequest([], 'req-new'),
+			getRequests: () => [older],
+		} as IChatModel;
+		let answerArgs: { requestId: string; resolveId: string; answers: Record<string, unknown> } | undefined;
+		const snapshot = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'question-42',
+				requestId: 'req-old',
+				resolveId: 'resolve-7',
+				title: 'Pick',
+				message: '',
+				options: [{ id: 'val-a', label: 'A' }],
+			},
+		}), { revision: 2, prebaseForeground: false, connected: true });
+
+		await applyMagnusLiveActivitySessionCommand(snapshot, {
+			kind: 'answer',
+			interactionId: 'question-42',
+			optionId: 'val-a',
+			revision: 2,
+		}, {
+			chatService: {
+				getSession: () => model,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: (requestId, resolveId, answers) => {
+					answerArgs = { requestId, resolveId, answers: answers ?? {} };
+				},
+			},
+			logService: { info: () => { } },
+		});
+
+		assert.deepStrictEqual(answerArgs, {
+			requestId: 'req-old',
+			resolveId: 'resolve-7',
+			answers: { 'question-42': { selectedValue: 'val-a' } },
+		});
+	});
+
+	test('answer fails closed when carousel is used or invocation left waiting state', async () => {
+		const usedCarousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{ id: 'q1', type: 'text' as const, title: 'Used' }],
+			allowSkip: false,
+			resolveId: 'resolve-used',
+			isUsed: true,
+		};
+		const model = {
+			sessionId: 'sess-1',
+			lastRequest: mockRequest([usedCarousel], 'req-1'),
+			getRequests: () => [mockRequest([usedCarousel], 'req-1')],
+		} as IChatModel;
+		let notified = false;
+		const questionSnap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'q1',
+				requestId: 'req-1',
+				resolveId: 'resolve-used',
+				title: 'Used',
+				message: '',
+			},
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		await applyMagnusLiveActivitySessionCommand(questionSnap, {
+			kind: 'answer',
+			interactionId: 'q1',
+			optionId: 'x',
+			revision: 1,
+		}, {
+			chatService: {
+				getSession: () => model,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { notified = true; },
+			},
+			logService: { info: () => { } },
+		});
+		assert.strictEqual(notified, false);
+
+		let confirmCount = 0;
+		const executedInvocation = mockToolInvocation({
+			toolCallId: 'tool-exec',
+			state: {
+				type: IChatToolInvocation.StateKind.Executing,
+				parameters: {},
+				confirmed: { type: ToolConfirmKind.UserAction },
+				progress: observableValue('progress', { message: undefined, progress: undefined }),
+			} as IChatToolInvocation.State,
+		});
+		const executedRequest = mockRequest([executedInvocation]);
+		const approvalSnap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'tool-exec', title: 'Run', message: '' },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		let applied = false;
+		await applyMagnusLiveActivitySessionCommand(approvalSnap, {
+			kind: 'approve',
+			interactionId: 'tool-exec',
+			revision: 1,
+		}, {
+			chatService: {
+				getSession: () => ({
+					sessionId: 'sess-1',
+					lastRequest: executedRequest,
+					getRequests: () => [executedRequest],
+				} as IChatModel),
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { confirmCount++; },
+			},
+			logService: { info: () => { } },
+			onInteractionApplied: () => { applied = true; },
+		});
+		assert.strictEqual(applied, false);
+		assert.strictEqual(confirmCount, 0);
+	});
+
+	test('follow-up sends trimmed text on snapshot sessionResource only', async () => {
+		const sessionResource = URI.parse('vscode-chat://local/sess-1');
+		let sent: { resource: URI; text: string } | undefined;
+		const snapshot = connectedSnapshot();
+		await applyMagnusLiveActivitySessionCommand(snapshot, {
+			kind: 'followUp',
+			text: '  continue refactor  ',
+		}, {
+			chatService: {
+				getSession: () => undefined,
+				sendRequest: async (resource, text) => { sent = { resource, text }; },
+				notifyQuestionCarouselAnswer: () => { },
+			},
+			logService: { info: () => { } },
+		});
+		assert.deepStrictEqual(sent, { resource: sessionResource, text: 'continue refactor' });
+	});
+
+	test('approve and answer fail closed when snapshot sessionId mismatches live model', async () => {
+		let confirmed = false;
+		const invocation = mockToolInvocation({
+			toolCallId: 'tool-9',
+			state: waitingConfirmationState(() => { confirmed = true; }),
+		});
+		const request = mockRequest([invocation]);
+		const wrongModel = { sessionId: 'sess-other', lastRequest: request, getRequests: () => [request] } as IChatModel;
+		const logs: string[] = [];
+		const approvalSnap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'tool-9', title: 'Delete?', message: '' },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+
+		await applyMagnusLiveActivitySessionCommand(approvalSnap, {
+			kind: 'approve',
+			interactionId: 'tool-9',
+			revision: 1,
+		}, {
+			chatService: {
+				getSession: () => wrongModel,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { },
+			},
+			logService: { info: msg => logs.push(msg) },
+		});
+		assert.strictEqual(confirmed, false);
+		assert.ok(logs.some(l => l.includes('session mismatch')));
+
+		const carousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{ id: 'q-1', type: 'singleSelect' as const, title: 'Pick', options: [{ id: 'a', value: 'val-a', label: 'A' }] }],
+			allowSkip: false,
+			resolveId: 'resolve-1',
+			isUsed: false,
+		};
+		const questionRequest = mockRequest([carousel], 'req-q');
+		const questionModel = { sessionId: 'sess-1', lastRequest: questionRequest, getRequests: () => [questionRequest] } as IChatModel;
+		let notified = false;
+		logs.length = 0;
+		const questionSnap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'q-1',
+				requestId: 'req-q',
+				resolveId: 'resolve-1',
+				title: 'Pick',
+				message: '',
+				options: [{ id: 'val-a', label: 'A' }],
+			},
+		}), { revision: 2, prebaseForeground: false, connected: true });
+
+		await applyMagnusLiveActivitySessionCommand(questionSnap, {
+			kind: 'answer',
+			interactionId: 'q-1',
+			optionId: 'val-a',
+			revision: 2,
+		}, {
+			chatService: {
+				getSession: () => undefined,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { notified = true; },
+			},
+			logService: { info: msg => logs.push(msg) },
+		});
+		assert.strictEqual(notified, false);
+		assert.ok(logs.some(l => l.includes('session mismatch')));
+	});
+
+	test('answer rejects stale optionId against live carousel, not snapshot options alone', async () => {
+		const carousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{ id: 'question-42', type: 'singleSelect' as const, title: 'Pick', options: [{ id: 'a', value: 'val-a', label: 'A' }] }],
+			allowSkip: false,
+			resolveId: 'resolve-7',
+			isUsed: false,
+		};
+		const request = mockRequest([carousel], 'req-1');
+		const model = { sessionId: 'sess-1', lastRequest: request, getRequests: () => [request] } as IChatModel;
+		let notified = false;
+		const logs: string[] = [];
+		const snapshot = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'question-42',
+				requestId: 'req-1',
+				resolveId: 'resolve-7',
+				title: 'Pick',
+				message: '',
+				options: [{ id: 'val-a', label: 'A' }],
+			},
+		}), { revision: 1, prebaseForeground: false, connected: true });
+
+		await applyMagnusLiveActivitySessionCommand(snapshot, {
+			kind: 'answer',
+			interactionId: 'question-42',
+			optionId: 'stale-option',
+			revision: 1,
+		}, {
+			chatService: {
+				getSession: () => model,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { notified = true; },
+			},
+			logService: { info: msg => logs.push(msg) },
+		});
+		assert.strictEqual(notified, false);
+		assert.ok(logs.some(l => l.includes('stale option')));
+	});
+
+	test('approve on question pending and answer on approval pending fail closed at dispatch', async () => {
+		const carousel = {
+			kind: 'questionCarousel' as const,
+			questions: [{ id: 'q-1', type: 'singleSelect' as const, title: 'Pick', options: [{ id: 'a', value: 'val-a', label: 'A' }] }],
+			allowSkip: false,
+			resolveId: 'resolve-q',
+			isUsed: false,
+		};
+		const questionRequest = mockRequest([carousel], 'req-q');
+		const questionModel = { sessionId: 'sess-1', lastRequest: questionRequest, getRequests: () => [questionRequest] } as IChatModel;
+		let confirmed = false;
+		const logs: string[] = [];
+		const questionSnap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'q-1',
+				requestId: 'req-q',
+				resolveId: 'resolve-q',
+				title: 'Pick',
+				message: '',
+				options: [{ id: 'val-a', label: 'A' }],
+			},
+		}), { revision: 1, prebaseForeground: false, connected: true });
+
+		await applyMagnusLiveActivitySessionCommand(questionSnap, {
+			kind: 'approve',
+			interactionId: 'q-1',
+			revision: 1,
+		}, {
+			chatService: {
+				getSession: () => questionModel,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { },
+			},
+			logService: { info: msg => logs.push(msg) },
+			onInteractionApplied: () => { confirmed = true; },
+		});
+		assert.strictEqual(confirmed, false);
+		assert.ok(logs.some(l => l.includes('stale interaction')));
+
+		const invocation = mockToolInvocation({
+			toolCallId: 'tool-9',
+			state: waitingConfirmationState(),
+		});
+		const approvalRequest = mockRequest([invocation]);
+		const approvalModel = { sessionId: 'sess-1', lastRequest: approvalRequest, getRequests: () => [approvalRequest] } as IChatModel;
+		let notified = false;
+		logs.length = 0;
+		const approvalSnap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'tool-9', title: 'Delete?', message: '' },
+		}), { revision: 2, prebaseForeground: false, connected: true });
+
+		await applyMagnusLiveActivitySessionCommand(approvalSnap, {
+			kind: 'answer',
+			interactionId: 'tool-9',
+			optionId: 'val-a',
+			revision: 2,
+		}, {
+			chatService: {
+				getSession: () => approvalModel,
+				sendRequest: async () => undefined,
+				notifyQuestionCarouselAnswer: () => { notified = true; },
+			},
+			logService: { info: msg => logs.push(msg) },
+		});
+		assert.strictEqual(notified, false);
+		assert.ok(logs.some(l => l.includes('stale interaction')));
+	});
+});
+
+function readSessionCommandDispatch(sessionSource: string): string {
+	return sessionSource;
+}
+
+function readSessionModule(): string {
+	return readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts');
+}
+
 suite('Magnus Live Activity contribution contracts', () => {
 
 	ensureNoDisposablesAreLeakedInTestSuite();
@@ -567,42 +1167,46 @@ suite('Magnus Live Activity contribution contracts', () => {
 		const handleEnd = contribution.indexOf('override dispose');
 		assert.ok(handleStart >= 0 && handleEnd > handleStart, 'must locate _handleCommand');
 		const handle = contribution.slice(handleStart, handleEnd);
+		const session = readSessionCommandDispatch(readSessionModule());
 
 		assert.match(handle, /acceptLiveActivityCommand\(snapshot, command\)/);
 		assert.match(handle, /if \(!accepted\.ok\)/);
-		assert.ok(handle.indexOf('acceptLiveActivityCommand') < handle.indexOf('this.chatService.sendRequest'), 'fail-closed accept must run before sendRequest');
+		assert.ok(handle.indexOf('acceptLiveActivityCommand') < handle.indexOf('applyMagnusLiveActivitySessionCommand'), 'fail-closed accept must run before session dispatch');
 
-		assert.match(handle, /const sessionResource = URI\.parse\(snapshot\.sessionResource\)/);
-		assert.match(handle, /this\.chatService\.sendRequest\(sessionResource, \(command\.text \?\? ''\)\.trim\(\)\)/);
-		assert.strictEqual((handle.match(/sendRequest\(/g) || []).length, 1, 'follow-up must have exactly one sendRequest');
-		assert.ok(handle.indexOf("command.kind === 'followUp'") < handle.indexOf('this.chatService.sendRequest'), 'sendRequest is the follow-up path');
+		assert.match(session, /const sessionResource = URI\.parse\(snapshot\.sessionResource\)/);
+		assert.match(session, /deps\.chatService\.sendRequest\(sessionResource, \(command\.text \?\? ''\)\.trim\(\)\)/);
+		assert.strictEqual((session.match(/sendRequest\(/g) || []).length, 1, 'follow-up must have exactly one sendRequest');
+		assert.ok(session.indexOf("command.kind === 'followUp'") < session.indexOf('deps.chatService.sendRequest'), 'sendRequest is the follow-up path');
 
 		assert.doesNotMatch(contribution, /startNewLocalSession/);
 		assert.doesNotMatch(contribution, /vscode\.lm/);
-		assert.doesNotMatch(contribution, /invokeTool/);
-		assert.doesNotMatch(handle, /new.*Session/);
-		assert.doesNotMatch(handle, /URI\.parse\(command\.sessionResource\)/);
-		assert.strictEqual((contribution.match(/this\.chatService\.sendRequest\(/g) || []).length, 1, 'sendRequest is the only message path');
+		assert.doesNotMatch(handle, /invokeTool/);
+		assert.match(contribution, /prebase\.test\.seedMagnusLiveActivityPending/);
+		assert.doesNotMatch(session, /new.*Session/);
+		assert.doesNotMatch(session, /URI\.parse\(command\.sessionResource\)/);
+		assert.strictEqual((session.match(/sendRequest\(/g) || []).length, 1, 'sendRequest is the only message path');
 	});
 
 	test('approvals confirm the same tool invocation and do not invoke tools', () => {
-		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
-		const handle = contribution.slice(contribution.indexOf('private async _handleCommand'), contribution.indexOf('override dispose'));
-		assert.match(handle, /IChatToolInvocation\.confirmWith\(/);
-		assert.match(handle, /ToolConfirmKind\.UserAction/);
-		assert.match(handle, /ToolConfirmKind\.Denied/);
-		assert.match(handle, /toolCallId === command\.interactionId/);
-		assert.match(handle, /approval failed closed: invocation missing/);
-		assert.doesNotMatch(handle, /invokeTool/);
-		assert.doesNotMatch(handle, /lm\.invokeTool/);
+		const session = readSessionCommandDispatch(readSessionModule());
+		assert.match(session, /IChatToolInvocation\.confirmWith\(/);
+		assert.match(session, /ToolConfirmKind\.UserAction/);
+		assert.match(session, /ToolConfirmKind\.Denied/);
+		assert.match(session, /toolCallId !== command\.interactionId/);
+		assert.match(session, /command failed closed: session mismatch/);
+		assert.match(session, /approval failed closed: stale interaction/);
+		assert.match(session, /approval failed closed: invocation no longer pending/);
+		assert.match(session, /approval failed closed: invocation missing/);
+		assert.doesNotMatch(session, /invokeTool/);
+		assert.doesNotMatch(session, /lm\.invokeTool/);
 	});
 
 	test('question pendingInteraction uses question.id; answers key by that id; destructive only when Red', () => {
-		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
-		const extractStart = contribution.indexOf('function extractPending');
-		const extractEnd = contribution.indexOf('function extractActions');
+		const sessionModule = readSessionModule();
+		const extractStart = sessionModule.indexOf('export function extractPending');
+		const extractEnd = sessionModule.indexOf('export async function applyMagnusLiveActivitySessionCommand');
 		assert.ok(extractStart >= 0 && extractEnd > extractStart, 'must locate extractPending');
-		const extract = contribution.slice(extractStart, extractEnd);
+		const extract = sessionModule.slice(extractStart, extractEnd);
 		assert.match(extract, /interactionId:\s*first\.id/);
 		assert.match(extract, /resolveId:\s*part\.resolveId/);
 		assert.ok(extract.indexOf('interactionId: first.id') < extract.indexOf('resolveId: part.resolveId'));
@@ -611,12 +1215,13 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.match(extract, /\.\.\.\(destructive === true \? \{ destructive: true \} : \{\}\)/);
 		assert.match(extract, /id:\s*option\.value\s*\|\|\s*option\.id/);
 
-		const handle = contribution.slice(contribution.indexOf('private async _handleCommand'), contribution.indexOf('override dispose'));
-		assert.match(handle, /notifyQuestionCarouselAnswer\(/);
-		assert.match(handle, /pending\.requestId\s*\?\?\s*last\?\.id/);
-		assert.match(handle, /\{\s*\[pending\.interactionId\]:\s*\{\s*selectedValue:\s*command\.optionId\s*\}\s*\}/);
-		assert.match(handle, /pending\.resolveId/);
-		assert.match(handle, /carousel missing\/used/);
+		const session = readSessionCommandDispatch(readSessionModule());
+		assert.match(session, /notifyQuestionCarouselAnswer\(/);
+		assert.match(session, /pending\.requestId\s*\?\?\s*last\?\.id/);
+		assert.match(session, /\{\s*\[pending\.interactionId\]:\s*\{\s*selectedValue:\s*command\.optionId\s*\}\s*\}/);
+		assert.match(session, /pending\.resolveId/);
+		assert.match(session, /carousel missing\/used/);
+		assert.match(session, /answer failed closed: stale interaction/);
 	});
 
 	test('terminalCount refreshes on tool-session register and terminal dispose/change', () => {
@@ -681,9 +1286,9 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.match(contribution, /this\.chatService\.onDidDisposeSession/);
 		assert.match(contribution, /selectPrimaryMagnusModel\(this\.chatService\.chatModels\.get\(\)\)/);
 		assert.match(contribution, /isMagnusParticipantId/);
-		const handle = contribution.slice(contribution.indexOf('private async _handleCommand'), contribution.indexOf('override dispose'));
-		assert.match(handle, /this\.chatService\.getSession\(sessionResource\)/);
-		assert.ok(handle.indexOf('URI.parse(snapshot.sessionResource)') < handle.indexOf('this.chatService.getSession'), 'approvals use the snapshot session');
+		const session = readSessionCommandDispatch(readSessionModule());
+		assert.match(session, /deps\.chatService\.getSession\(sessionResource\)/);
+		assert.ok(session.indexOf('URI.parse(snapshot.sessionResource)') < session.indexOf('deps.chatService.getSession'), 'approvals use the snapshot session');
 		assert.match(contribution, /prebase\.magnus\.liveActivity\.display'\) === 'active' \? 'active' : 'builtin'/);
 	});
 
@@ -694,7 +1299,7 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.match(contribution, /this\._nativeConnected = backend === 'native-appkit'/);
 		assert.match(contribution, /connected: this\._nativeConnected/);
 		assert.doesNotMatch(contribution, /connected:\s*true/);
-		assert.match(contribution, /notifyQuestionCarouselAnswer/);
+		assert.match(readSessionModule(), /notifyQuestionCarouselAnswer/);
 	});
 });
 
