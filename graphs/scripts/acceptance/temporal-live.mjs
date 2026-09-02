@@ -22,8 +22,16 @@ const shutdownDir = join(evidenceDir, 'shutdown');
 
 export function temporalAcceptanceFailures(evidence) {
 	const failures = [];
+	const canonicalScale = evidence.scale === 'canonical-scale';
 	const large = evidence.scale === 'large';
-	if (large) {
+	if (canonicalScale) {
+		if (!(evidence.fixture?.commits >= 50)) {failures.push('canonical-scale fixture commit count is below 50');}
+		if (!(evidence.fixture?.files?.length >= 9000)) {failures.push('canonical-scale fixture HEAD does not contain 9000+ files');}
+		if (evidence.fixture?.moduleCount !== 9680) {failures.push('canonical-scale fixture module seed count is not 9680');}
+		if (evidence.fixture?.expectedHeadFileCount && evidence.fixture.files?.length !== evidence.fixture.expectedHeadFileCount) {
+			failures.push('canonical-scale fixture HEAD file count does not match expected module graph');
+		}
+	} else if (large) {
 		if (!(evidence.fixture?.commits >= 50)) {failures.push('large fixture commit count is below 50');}
 		if (!(evidence.fixture?.files?.length >= 250)) {failures.push('large fixture HEAD does not contain 250+ files');}
 		if (evidence.fixture?.moduleCount !== 336) {failures.push('large fixture module seed count is not 336');}
@@ -53,8 +61,9 @@ export function temporalAcceptanceFailures(evidence) {
 			failures.push('Full Map transform is invalid');
 		}
 		if (large && !(full.receivedNodeCount >= 250)) {failures.push('large Full Map received fewer than 250 nodes');}
-		if (large && full.screenFillRatio !== undefined && full.screenFillRatio < 0.08) {failures.push('large Full Map leaves a huge empty canvas');}
-		if (large && full.maxCommunityOverlap !== undefined && full.maxCommunityOverlap > 0.85) {failures.push('large Full Map communities overlap too much');}
+		if (canonicalScale && !(full.receivedNodeCount >= 9000)) {failures.push('canonical-scale Full Map received fewer than 9000 nodes');}
+		if ((large || canonicalScale) && full.screenFillRatio !== undefined && full.screenFillRatio < 0.08) {failures.push(`${large ? 'large' : 'canonical-scale'} Full Map leaves a huge empty canvas`);}
+		if ((large || canonicalScale) && full.maxCommunityOverlap !== undefined && full.maxCommunityOverlap > 0.85) {failures.push(`${large ? 'large' : 'canonical-scale'} Full Map communities overlap too much`);}
 	}
 
 	const focus = evidence.focusChanges;
@@ -66,7 +75,7 @@ export function temporalAcceptanceFailures(evidence) {
 		if (!(focus.visibleNodeCount > 0)) {failures.push('Focus Changes exposed zero changed nodes');}
 		if (!(focus.nodesDrawn > 0)) {failures.push('Focus Changes drew zero changed nodes');}
 		if (!(focus.canvas?.distinctPixels > 0)) {failures.push('Focus Changes canvas is blank');}
-		if (large && !(focus.visibleNodeCount >= 4)) {failures.push('large Focus Changes did not keep a focused set visible');}
+		if ((large || canonicalScale) && !(focus.visibleNodeCount >= 4)) {failures.push(`${large ? 'large' : 'canonical-scale'} Focus Changes did not keep a focused set visible`);}
 	}
 
 	if (evidence.unexpectedError) {failures.push('Workbench exposed an unexpected Error state');}
@@ -207,6 +216,115 @@ function createLargeFixture() {
 	};
 }
 
+function createCanonicalScaleFixture() {
+	const COMMUNITY_COUNT = 55;
+	const NODES_PER_COMMUNITY = 176;
+	const LAYERS = ['frontend', 'ui', 'components', 'services', 'backend', 'api', 'database', 'utils', 'config', 'tests'];
+	const dir = mkdtempSync(join(tmpdir(), 'pb-temporal-canonical-'));
+	git(dir, ['init', '-q', '-b', 'main']);
+	git(dir, ['config', 'user.email', 'phase3canonical@prebase.local']);
+	git(dir, ['config', 'user.name', 'Phase 3 Canonical']);
+	writeFileSync(join(dir, 'package.json'), JSON.stringify({ name: 'temporal-canonical', private: true }, null, 2));
+	git(dir, ['add', '--', 'package.json']);
+	git(dir, ['commit', '-qm', 'chore: init']);
+
+	const paths = [];
+	const writeModule = (relative, extraLines = []) => {
+		const parts = relative.split('/');
+		const commName = parts[1];
+		const commIndex = Number(commName.replace(/\D/g, ''));
+		const fileIndex = Number(parts[2].replace(/\D/g, ''));
+		const layer = LAYERS[commIndex % LAYERS.length];
+		const lines = [];
+		if (fileIndex > 0) {
+			lines.push(`import { token as prev } from './file_${fileIndex - 1}.ts';`, 'void prev;');
+		}
+		if (fileIndex % 2 === 0 && fileIndex >= 2) {
+			lines.push(`import { token as hop2 } from './file_${fileIndex - 1}.ts';`, 'void hop2;');
+		}
+		if (fileIndex % 3 === 0 && fileIndex >= 3) {
+			lines.push(`import { token as hop3 } from './file_${fileIndex - 2}.ts';`, 'void hop3;');
+		}
+		if (commIndex > 0 && fileIndex === 0) {
+			const prevComm = `module_${String(commIndex - 1).padStart(2, '0')}`;
+			lines.push(`import { token as inter } from '../${prevComm}/file_0.ts';`, 'void inter;');
+		}
+		for (const extra of extraLines) {
+			lines.push(extra);
+		}
+		lines.push(`export const token = '${relative}';`, `export const layer = '${layer}';`, `export function run() { return token; }`, '');
+		writeFileSync(join(dir, relative), lines.join('\n'));
+	};
+
+	for (let community = 0; community < COMMUNITY_COUNT; community++) {
+		const commName = `module_${String(community).padStart(2, '0')}`;
+		mkdirSync(join(dir, 'src', commName), { recursive: true });
+		const batch = [];
+		for (let index = 0; index < NODES_PER_COMMUNITY; index++) {
+			const relative = `src/${commName}/file_${index}.ts`;
+			paths.push(relative);
+			writeModule(relative);
+			batch.push(relative);
+		}
+		git(dir, ['add', '--', ...batch]);
+		git(dir, ['commit', '-qm', `feat: seed ${commName}`]);
+	}
+
+	for (let revision = 1; revision <= 45; revision++) {
+		const relative = paths[(revision * 137) % paths.length];
+		writeModule(relative, [`export const revision = ${revision};`]);
+		git(dir, ['add', '--', relative]);
+		git(dir, ['commit', '-qm', `fix: revise ${relative}`]);
+	}
+
+	const renamedFrom = paths[500];
+	const renamedTo = renamedFrom.replace('.ts', '.renamed.ts');
+	git(dir, ['mv', renamedFrom, renamedTo]);
+	git(dir, ['commit', '-qm', `refactor: rename ${renamedFrom}`]);
+
+	const deleted = paths[1000];
+	git(dir, ['rm', '-q', '--', deleted]);
+	git(dir, ['commit', '-qm', `chore: delete ${deleted}`]);
+
+	const touched = [paths[1], paths[500], paths[1500], paths[3000], paths[5000], paths[7000], paths[9000]];
+	for (const relative of touched) {
+		if (!relative || relative === deleted || relative === renamedFrom) {
+			continue;
+		}
+		writeModule(relative, ['export const wave = 1;']);
+	}
+	git(dir, ['add', '-A']);
+	git(dir, ['commit', '-qm', 'feat: cross-community wave']);
+
+	const files = git(dir, ['ls-tree', '-r', '--name-only', 'HEAD']).split('\n').filter(Boolean);
+	return {
+		dir,
+		head: git(dir, ['rev-parse', 'HEAD']),
+		commits: Number(git(dir, ['rev-list', '--count', 'HEAD'])),
+		files,
+		communityCount: COMMUNITY_COUNT,
+		perCommunity: NODES_PER_COMMUNITY,
+		moduleCount: paths.length,
+		expectedHeadFileCount: paths.length - 1,
+		expectedModifiedPath: git(dir, ['diff', '--name-only', 'HEAD^', 'HEAD']),
+		firstParentSummary: git(dir, ['show', '--stat', '--oneline', '--format=%H %P %s', 'HEAD']),
+		scale: 'canonical-scale',
+	};
+}
+
+function resolveTemporalScale(argv) {
+	if (argv.includes('--canonical-scale') && argv.includes('--large')) {
+		throw new Error('temporal-live: --canonical-scale and --large are mutually exclusive');
+	}
+	if (argv.includes('--canonical-scale')) {
+		return 'canonical-scale';
+	}
+	if (argv.includes('--large')) {
+		return 'large';
+	}
+	return 'small';
+}
+
 function processSnapshot(pid) {
 	try {
 		return execFileSync('ps', ['-o', 'pid=,ppid=,pcpu=,rss=,comm=', '-p', String(pid)], { encoding: 'utf8' }).trim() || 'gone';
@@ -304,9 +422,22 @@ async function run() {
 	mkdirSync(temporalDir, { recursive: true });
 	mkdirSync(screenshotDir, { recursive: true });
 	mkdirSync(shutdownDir, { recursive: true });
-	const fixture = process.argv.includes('--large') ? createLargeFixture() : createFixture();
-	const scale = process.argv.includes('--large') ? 'large' : 'small';
-	const evidenceName = scale === 'large' ? 'large-live.json' : 'live.json';
+	const scale = resolveTemporalScale(process.argv);
+	const fixture = scale === 'canonical-scale'
+		? createCanonicalScaleFixture()
+		: scale === 'large'
+			? createLargeFixture()
+			: createFixture();
+	const evidenceName = scale === 'canonical-scale'
+		? 'canonical-scale-live.json'
+		: scale === 'large'
+			? 'large-live.json'
+			: 'live.json';
+	const producerId = scale === 'canonical-scale'
+		? 'temporal-canonical-scale'
+		: scale === 'large'
+			? 'temporal-large'
+			: 'temporal-small';
 	const { stdout } = await execFileAsync(join(repo, '.agents/skills/launch/scripts/launch.sh'), ['--', fixture.dir], {
 		cwd: repo,
 		maxBuffer: 10 * 1024 * 1024,
@@ -314,7 +445,10 @@ async function run() {
 	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
 	let browser;
 	let quit;
-	let evidence = { ...phase3EvidenceMetadata(repo, scale === 'large' ? 'temporal-large' : 'temporal-small'), scale, fixture, pid: info.pid, cdpPort: info.cdpPort };
+	let evidence = { ...phase3EvidenceMetadata(repo, producerId), scale, fixture, pid: info.pid, cdpPort: info.cdpPort };
+	const metricTimeout = scale === 'canonical-scale' ? 360_000 : scale === 'large' ? 180_000 : 45_000;
+	const graphFrameTimeout = scale === 'canonical-scale' ? 240_000 : scale === 'large' ? 120_000 : 60_000;
+	const minReceivedNodes = scale === 'canonical-scale' ? 9000 : scale === 'large' ? 250 : 1;
 	try {
 		browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
 		const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
@@ -322,8 +456,7 @@ async function run() {
 		await dismissAuth(page);
 		await page.getByRole('tab', { name: 'PreBase Maps', exact: true }).click();
 		await page.getByRole('button', { name: 'Temporal', exact: true }).click();
-		const metricTimeout = scale === 'large' ? 180_000 : 45_000;
-		const frame = await findGraphFrame(page, scale === 'large' ? 120_000 : 60_000);
+		const frame = await findGraphFrame(page, graphFrameTimeout);
 		if (!frame) {throw new Error('Temporal Graph webview did not open');}
 		await installMetricsBridge(frame);
 		const canvasShot = (name) => frame.locator('#netCanvas').screenshot({
@@ -335,11 +468,12 @@ async function run() {
 			metrics.displayMode === 'state' &&
 			metrics.renderedCommitSha === fixture.head &&
 			metrics.nodesDrawn > 0 &&
-			(scale !== 'large' || metrics.receivedNodeCount >= 250)
+			metrics.receivedNodeCount >= minReceivedNodes
 		, metricTimeout);
 		evidence.fullMap = fullMap;
-		await page.screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-full-map.png' : 'temporal-full-map.png') });
-		await canvasShot(scale === 'large' ? 'temporal-large-full-map-canvas.png' : 'temporal-full-map-canvas.png');
+		const fullMapShotPrefix = scale === 'canonical-scale' ? 'temporal-canonical-scale' : scale === 'large' ? 'temporal-large' : 'temporal';
+		await page.screenshot({ path: join(screenshotDir, `${fullMapShotPrefix}-full-map.png`) });
+		await canvasShot(`${fullMapShotPrefix}-full-map-canvas.png`);
 
 		await page.getByRole('button', { name: 'Focus Changes', exact: true }).click();
 		const focusChanges = await waitForMetrics(page, frame, metrics =>
@@ -348,8 +482,8 @@ async function run() {
 			metrics.nodesDrawn > 0
 		, metricTimeout);
 		evidence.focusChanges = focusChanges;
-		await page.screenshot({ path: join(screenshotDir, scale === 'large' ? 'temporal-large-focus-changes.png' : 'temporal-focus-changes.png') });
-		await canvasShot(scale === 'large' ? 'temporal-large-focus-changes-canvas.png' : 'temporal-focus-changes-canvas.png');
+		await page.screenshot({ path: join(screenshotDir, `${fullMapShotPrefix}-focus-changes.png`) });
+		await canvasShot(`${fullMapShotPrefix}-focus-changes-canvas.png`);
 
 		const afterFocus = await readMetrics(frame);
 		const canvas = frame.locator('#netCanvas');
@@ -397,8 +531,18 @@ async function run() {
 	const failures = temporalAcceptanceFailures(evidence);
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
 	writeFileSync(join(temporalDir, evidenceName), JSON.stringify(result, null, 2));
-	writeFileSync(join(shutdownDir, scale === 'large' ? 'temporal-large-quit.json' : 'temporal-quit.json'), JSON.stringify({
-		...phase3EvidenceMetadata(repo, scale === 'large' ? 'temporal-large-quit' : 'temporal-quit'),
+	const quitEvidenceName = scale === 'canonical-scale'
+		? 'temporal-canonical-scale-quit.json'
+		: scale === 'large'
+			? 'temporal-large-quit.json'
+			: 'temporal-quit.json';
+	const quitProducerId = scale === 'canonical-scale'
+		? 'temporal-canonical-scale-quit'
+		: scale === 'large'
+			? 'temporal-large-quit'
+			: 'temporal-quit';
+	writeFileSync(join(shutdownDir, quitEvidenceName), JSON.stringify({
+		...phase3EvidenceMetadata(repo, quitProducerId),
 		ok: quit?.remaining === 'gone',
 		quit,
 	}, null, 2));

@@ -37,20 +37,34 @@ suite('NetworkAcceptanceMath (Unit - Live Acceptance Truth)', () => {
 	});
 
 	suite('rotationProven', () => {
-		test('passes for horizontal-only orbit', () => {
-			assert.equal(rotationProven(baseRotation, { yaw: 0.90, pitch: 0.28 }), true);
+		test('passes for yaw-only orbit above minDelta', () => {
+			assert.equal(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.2, pitch: 0.2 }), true);
 		});
 
-		test('passes for vertical-only orbit', () => {
-			assert.equal(rotationProven(baseRotation, { yaw: 0.55, pitch: 0.45 }), true);
+		test('passes for pitch-only orbit above minDelta', () => {
+			assert.equal(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.1, pitch: 0.35 }), true);
 		});
 
-		test('passes for diagonal orbit', () => {
-			assert.equal(rotationProven(baseRotation, { yaw: 0.80, pitch: 0.40 }), true);
-		});
-
-		test('fails when no rotation movement occurred', () => {
+		test('fails when neither axis exceeds minDelta', () => {
 			assert.equal(rotationProven(baseRotation, { yaw: 0.5501, pitch: 0.2801 }), false);
+			assert.equal(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.105, pitch: 0.204 }), false);
+		});
+
+		test('fails closed when rotation coordinates are missing or non-finite', () => {
+			assert.equal(rotationProven(undefined, baseRotation), false);
+			assert.equal(rotationProven(baseRotation, { yaw: Number.NaN, pitch: 0.28 }), false);
+		});
+
+		test('uses strict greater-than at minDelta boundary', () => {
+			assert.equal(rotationProven({ yaw: 0, pitch: 0 }, { yaw: 0.005, pitch: 0 }), false);
+			assert.equal(rotationProven({ yaw: 0, pitch: 0 }, { yaw: 0.0051, pitch: 0 }), true);
+		});
+
+		test('single-axis orbit passes rotationProven but fails cameraRotationStable', () => {
+			const before = { yaw: 0.1, pitch: 0.2 };
+			const yawOnlyAfter = { yaw: 0.2, pitch: 0.2 };
+			assert.equal(rotationProven(before, yawOnlyAfter), true);
+			assert.equal(cameraRotationStable(before, yawOnlyAfter), false);
 		});
 	});
 

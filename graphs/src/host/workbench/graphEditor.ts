@@ -1183,6 +1183,10 @@ let nodeNeighborsMap = new Map();
 let dragging = false, panning = false, rotating = false, draggingNode = false;
 let lastX = 0, lastY = 0, moved = false;
 let activePointerId = null, activePointerHost = null;
+let lastPointerCaptureId = null;
+let pointerCaptureAcquired = false;
+let pointerCaptureReleased = false;
+let lostPointerCaptureObserved = false;
 let layoutKey = '';
 let base3d = Object.create(null);
 let centroid = { x: 0, y: 0 };
@@ -3297,6 +3301,10 @@ function drawNetworkFrame() {
 			metrics.rotation = { yaw: rotation.yaw, pitch: rotation.pitch };
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
 			metrics.activePointerId = activePointerId;
+			metrics.lastPointerCaptureId = lastPointerCaptureId;
+			metrics.pointerCaptureAcquired = pointerCaptureAcquired;
+			metrics.pointerCaptureReleased = pointerCaptureReleased;
+			metrics.lostPointerCaptureObserved = lostPointerCaptureObserved;
 			metrics.pointerCaptureHeld = Boolean(
 				activePointerHost
 				&& activePointerId !== null
@@ -3610,6 +3618,10 @@ function onPointerDown(e, host) {
 	}
 	activePointerId = e.pointerId;
 	activePointerHost = host;
+	lastPointerCaptureId = e.pointerId;
+	pointerCaptureAcquired = true;
+	pointerCaptureReleased = false;
+	lostPointerCaptureObserved = false;
 	interactionState = 'pressed';
 	dragThreshold = thresholdForPointer(e.pointerType);
 	dragging = true; moved = false; lastX = e.clientX; lastY = e.clientY;
@@ -3670,11 +3682,27 @@ function updateCanvasCursor() {
 function onPointerUp(e, cancelled) {
 	if (e.pointerId !== activePointerId) return;
 	const pointerHost = activePointerHost;
+	const releasedPointerId = e.pointerId;
+	const hadCapture = Boolean(
+		pointerHost
+		&& typeof pointerHost.hasPointerCapture === 'function'
+		&& pointerHost.hasPointerCapture(releasedPointerId)
+	);
+	if (hadCapture && pointerHost && typeof pointerHost.releasePointerCapture === 'function') {
+		try { pointerHost.releasePointerCapture(releasedPointerId); } catch (err) { /* stale pointer */ }
+	}
+	const captureStillHeld = Boolean(
+		pointerHost
+		&& typeof pointerHost.hasPointerCapture === 'function'
+		&& pointerHost.hasPointerCapture(releasedPointerId)
+	);
+	pointerCaptureReleased = pointerCaptureAcquired && !captureStillHeld;
+	if (cancelled) {
+		lostPointerCaptureObserved = true;
+	}
+	pointerCaptureAcquired = false;
 	activePointerId = null;
 	activePointerHost = null;
-	if (pointerHost && typeof pointerHost.hasPointerCapture === 'function' && pointerHost.hasPointerCapture(e.pointerId)) {
-		pointerHost.releasePointerCapture(e.pointerId);
-	}
 	const wasMoved = moved || cancelled;
 	dragging = false; panning = false; rotating = false; draggingNode = false;
 	interactionState = cancelled ? 'cancelled' : 'idle';

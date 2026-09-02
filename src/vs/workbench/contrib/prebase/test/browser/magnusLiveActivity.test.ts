@@ -2041,6 +2041,13 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(native, /didHoverHaptic/);
 	});
 
+	test('native attention arrival must not trigger automatic haptic feedback', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		const attentionBlock = native.slice(native.indexOf('if (self.content.attention && !self.pinned)'), native.indexOf('} else {', native.indexOf('if (self.content.attention && !self.pinned)')));
+		assert.doesNotMatch(attentionBlock, /performUserHaptic/);
+		assert.match(attentionBlock, /didAttentionHaptic = NO/);
+	});
+
 	test('native tracking model removes global mouse monitor when expanded to maximize resource efficiency', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /removeGlobalMonitorOnly/);

@@ -9,19 +9,24 @@ import {
 	nodeHitHasWorldCoords,
 	worldDragProven,
 	worldInvarianceProven,
-	rotationProven,
 	selectionRotationLockProven,
-	shiftPanProven,
-	semanticZoomLodProven,
-	labelDensityDynamicProven,
 	pointerCaptureOnCanvasProven,
 	startupOnboardingProven,
 } from './codeGraphProof.mjs';
+import {
+	cameraRotationStable,
+	rotationProven,
+	shiftPanProven,
+	semanticZoomProven,
+	pointerCaptureLifecycleProven,
+	labelDensityProven as networkLabelDensityProven,
+} from './networkGraphAcceptance.mjs';
 import { ACTIVE_SOAK_FINAL_MIN_DURATION_MS, activeSoakEvidenceTarget, activeSoakFailures } from './prebase-active-soak.mjs';
 import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
 import { findGraphFrame, formatPhase3LockBlockMessage, recoverHungWorkbenchPage, waitForWorkbenchDriver, workbenchCommandWithTimeout, classifyProcessRole, redactCommandLine, p2OfflineOnboardingProven } from './workbenchHarness.mjs';
 import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
+import { temporalAcceptanceFailures } from '../../../graphs/scripts/acceptance/temporal-live.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
 import { liveActivityLiveFailures } from './prebase-magnus-live-activity-live.mjs';
 import { PHASE3_EVIDENCE_SCHEMA_VERSION, phase3EvidenceMetadata } from './phase3Evidence.mjs';
@@ -764,10 +769,24 @@ test('code graph interaction proofs fail closed on missing world drag, shift pan
 test('selected node world drag and semantic zoom helpers reject fallback-to-zero proofs', () => {
 	assert.equal(selectedNodeWorldDragProven({ id: 'a', worldX: 0, worldY: 0, worldZ: 0 }, { id: 'a', worldX: 0.2, worldY: 0.1, worldZ: 0 }), false);
 	assert.equal(selectedNodeWorldDragProven({ id: 'a', worldX: 0, worldY: 0, worldZ: 0 }, { id: 'a', worldX: 2, worldY: 0, worldZ: 0 }), true);
-	assert.ok(semanticZoomLodProven({ transform: { k: 1 }, lodTier: 'high' }, { transform: { k: 1.3 }, lodTier: 'medium' }, { transform: { k: 1.05 }, lodTier: 'medium' }));
-	assert.equal(semanticZoomLodProven({ transform: { k: 1 } }, { transform: { k: 1 } }, { transform: { k: 1 } }), false);
-	assert.equal(labelDensityProven({ labelCount: 12 }, { labelCount: 6 }), true);
-	assert.equal(labelDensityProven({ labelCount: 4 }, { labelCount: 4 }), false);
+	const semanticBase = {
+		lodTier: 'medium',
+		labelsDrawn: 12,
+		edgesDrawn: 40,
+		projectedBounds: { minX: 0, minY: 0, maxX: 400, maxY: 300, width: 400, height: 300 },
+		screenUtilization: 0.42,
+	};
+	assert.ok(semanticZoomProven(
+		{ ...semanticBase, transform: { x: 0, y: 0, k: 0.25 }, lodTier: 'low' },
+		{ ...semanticBase, transform: { x: 0, y: 0, k: 0.95 }, lodTier: 'high' },
+	));
+	assert.equal(semanticZoomProven(
+		{ ...semanticBase, transform: { x: 0, y: 0, k: 0.8 } },
+		{ ...semanticBase, transform: { x: 0, y: 0, k: 1.2 } },
+	), false);
+	assert.equal(labelDensityProven({ labelCount: 12, nodesDrawn: 120 }), true);
+	assert.equal(labelDensityProven({ labelCount: 4, nodesDrawn: 120 }), true);
+	assert.equal(labelDensityProven({ labelCount: 0, nodesDrawn: 120 }), false);
 });
 
 test('P2 offline onboarding cannot pass on workbench presence alone', () => {
@@ -784,7 +803,7 @@ test('P2 offline onboarding cannot pass on workbench presence alone', () => {
 	assert.equal(p2OfflineOnboardingProven({ offlineDismissed: false, offlinePromptSeen: true }), false);
 });
 
-test('Campaign XII proof helpers reject screen-only drag and yaw-only rotation', () => {
+test('Campaign XII proof helpers reject screen-only drag and accept yaw-only rotation', () => {
 	const worldHitBefore = { id: 'a', x: 100, y: 120, worldX: 10, worldY: 5, worldZ: 2 };
 	const worldHitAfter = { id: 'a', x: 140, y: 150, worldX: 24, worldY: 11, worldZ: 2.5 };
 	assert.ok(worldDragProven(worldHitBefore, worldHitAfter));
@@ -793,19 +812,65 @@ test('Campaign XII proof helpers reject screen-only drag and yaw-only rotation',
 	assert.equal(worldDragProven(worldHitBefore, screenOnlyAfter), false, 'screen delta without world delta must fail');
 
 	assert.ok(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.2, pitch: 0.35 }));
-	assert.equal(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.2, pitch: 0.2 }), false, 'yaw-only rotation must fail');
+	assert.ok(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.2, pitch: 0.2 }), 'yaw-only rotation must pass with OR semantics');
+	assert.equal(rotationProven({ yaw: 0.1, pitch: 0.2 }, { yaw: 0.1001, pitch: 0.2001 }), false, 'sub-threshold rotation must fail');
 
 	assert.ok(selectionRotationLockProven(true, { yaw: 0.4, pitch: 0.2 }, { yaw: 0.41, pitch: 0.19 }));
 	assert.equal(selectionRotationLockProven(true, { yaw: 0.4, pitch: 0.2 }, { yaw: 0.41, pitch: 0.5 }), false, 'pitch drift must fail selection lock');
 
-	assert.ok(shiftPanProven({ x: 10, y: 20 }, { x: 40, y: 20 }));
-	assert.ok(semanticZoomLodProven({ transform: { k: 1 }, lodTier: 'high' }, { transform: { k: 1.3 }, lodTier: 'medium' }, { transform: { k: 1.05 }, lodTier: 'medium' }));
-	assert.ok(labelDensityDynamicProven({ labelCount: 12 }, { labelCount: 6 }));
-	assert.equal(labelDensityDynamicProven({ labelCount: 4 }, { labelCount: 4 }), false, 'unchanged label count must fail dynamic density proof');
+	assert.ok(shiftPanProven({
+		beforeTransform: { x: 10, y: 20, k: 1 },
+		afterTransform: { x: 40, y: 20, k: 1 },
+		beforeRotation: { yaw: 0.1, pitch: 0.2 },
+		afterRotation: { yaw: 0.1, pitch: 0.2 },
+		beforeNodeWorld: { x: 1, y: 2, z: 3 },
+		afterNodeWorld: { x: 1, y: 2, z: 3 },
+	}));
+	const semanticBase = {
+		lodTier: 'medium',
+		labelsDrawn: 12,
+		edgesDrawn: 40,
+		projectedBounds: { minX: 0, minY: 0, maxX: 400, maxY: 300, width: 400, height: 300 },
+		screenUtilization: 0.42,
+	};
+	assert.ok(semanticZoomProven(
+		{ ...semanticBase, transform: { x: 0, y: 0, k: 0.25 }, lodTier: 'low' },
+		{ ...semanticBase, transform: { x: 0, y: 0, k: 0.95 }, lodTier: 'high' },
+	));
+	assert.ok(networkLabelDensityProven({ nodesDrawn: 120, labelCount: 12 }));
+	assert.equal(networkLabelDensityProven({ nodesDrawn: 120, labelCount: 0 }), false);
 	assert.ok(pointerCaptureOnCanvasProven('netCanvas'));
 	assert.equal(pointerCaptureOnCanvasProven('document'), false);
+	assert.ok(pointerCaptureLifecycleProven({ hasPointerCaptureAfterRelease: false, hasPointerCaptureOnBody: false }));
+	assert.equal(pointerCaptureLifecycleProven({ hasPointerCaptureAfterRelease: true }), false);
 	assert.ok(worldInvarianceProven({ id: 'b', worldX: 1, worldY: 2, worldZ: 3 }, { id: 'b', worldX: 1, worldY: 2, worldZ: 3 }));
 	assert.equal(worldInvarianceProven({ id: 'b', worldX: 1, worldY: 2, worldZ: 3 }, { id: 'b', x: 1, y: 2 }), false);
+});
+
+const ROTATION_PROOF_VECTORS = [
+	{ before: { yaw: 0.1, pitch: 0.2 }, after: { yaw: 0.2, pitch: 0.2 }, expected: true, label: 'yaw-only orbit' },
+	{ before: { yaw: 0.1, pitch: 0.2 }, after: { yaw: 0.1, pitch: 0.35 }, expected: true, label: 'pitch-only orbit' },
+	{ before: { yaw: 0.1, pitch: 0.2 }, after: { yaw: 0.105, pitch: 0.204 }, expected: false, label: 'sub-threshold drift' },
+];
+
+test('Campaign XIV canonical rotationProven accepts single-axis orbit', () => {
+	for (const vector of ROTATION_PROOF_VECTORS) {
+		assert.equal(
+			rotationProven(vector.before, vector.after),
+			vector.expected,
+			`${vector.label} must match graphs/src/view/network/networkAcceptanceMath.ts`,
+		);
+	}
+	const before = { yaw: 0.1, pitch: 0.2 };
+	const yawOnlyAfter = { yaw: 0.2, pitch: 0.2 };
+	assert.equal(rotationProven(before, yawOnlyAfter), true);
+	assert.equal(cameraRotationStable(before, yawOnlyAfter), false, 'single-axis drift must fail camera stability');
+});
+
+test('codeGraphProof does not duplicate rotationProven after Campaign XIV consolidation', () => {
+	const source = readFileSync(join(acceptanceDir, 'codeGraphProof.mjs'), 'utf8');
+	assert.doesNotMatch(source, /export function rotationProven\b/, 'rotationProven must live only in networkGraphAcceptance.mjs');
+	assert.doesNotMatch(source, /yawDelta > minDelta && pitchDelta/, 'must not reintroduce AND-based rotation proof');
 });
 
 test('codeGraphFailures fails closed on Campaign XII shift pan and drag rotation fields', () => {
@@ -827,9 +892,9 @@ test('core-ide live must prove world drag, pitch rotation, shift pan, and strict
 		/worldDragProven|worldX|worldY|worldZ/,
 		/pitchBefore|pitchAfter|rotation\?\.pitch/,
 		/shiftPan|transformBeforePan|transformAfterPan/,
-		/semanticZoomLodProven|zoomMetrics1|lodTier/,
-		/labelDensityDynamicProven|zoomMetrics2/,
-		/pointerCaptureOnCanvas|hasPointerCapture\(.*netCanvas/,
+		/semanticZoomProven|zoomMetrics1|lodTier/,
+		/labelDensityProven|nodesDrawn/,
+		/pointerCaptureOnCanvas|pointerCaptureLifecycleProven/,
 	];
 	const matched = campaignMarkers.filter(pattern => pattern.test(live)).length;
 	assert.ok(matched >= 3, `core-ide live should wire at least 3 Campaign XII proof markers (matched ${matched}/6)`);
@@ -913,8 +978,9 @@ test('core-ide live proves layouts via Maps data-network-layout chips and metric
 	assert.match(live, /legacyRadialNormalized: Boolean\(legacyRadialNormalized\)/);
 	assert.match(live, /sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered'/);
 	assert.match(live, /worldDragProven\(hitBeforeDrag, hitAfterDrag\)/);
-	assert.match(live, /semanticZoomLodProven\(zoomMetrics1, zoomMetrics2, metrics\)/);
-	assert.match(live, /labelDensityDynamicProven\(zoomMetrics2, metrics\)/);
+	assert.match(live, /semanticZoomProven\(zoomMetrics1, zoomMetrics2\)/);
+	assert.match(live, /semanticZoomProven\(zoomMetrics2, metrics\)/);
+	assert.match(live, /labelDensityProven\(metrics\)/);
 	assert.match(live, /pointerCaptureOnCanvas,/);
 	assert.match(live, /screenshot\(\{ path: join\(screenshotDir, 'code-graph-live\.png'\), timeout: 5_000 \}\)\.catch\(\(\) => undefined\)/);
 	assert.match(live, /nodesDrawnFromMetrics/);
@@ -1244,6 +1310,7 @@ test('final manifest requires every Phase 3 scenario', () => {
 		'runtime-preview',
 		'temporal-small',
 		'temporal-large',
+		'temporal-canonical-scale',
 		'magnus-streaming-smoke',
 		'load-quit',
 		'core-ide',
@@ -1632,6 +1699,64 @@ test('Temporal canvas screenshots disable animations so idle RAF cannot flake st
 	assert.match(live, /moduleCount: paths\.length/);
 	assert.match(live, /expectedHeadFileCount: paths\.length - 1/);
 	assert.match(live, /large fixture module seed count is not 336/);
+	assert.match(live, /canonical-scale fixture module seed count is not 9680/);
+	assert.match(live, /createCanonicalScaleFixture/);
+	assert.match(live, /--canonical-scale/);
+});
+
+test('temporal canonical-scale acceptance requires 9000+ received nodes and 9680 module seed', () => {
+	const canonicalEvidence = {
+		scale: 'canonical-scale',
+		fixture: {
+			commits: 103,
+			files: new Array(9680).fill('src/module_00/file_0.ts'),
+			moduleCount: 9680,
+			head: 'target',
+		},
+		targetOpened: true,
+		repoLoaded: true,
+		fullMap: {
+			selectedCommitSha: 'target',
+			renderedCommitSha: 'target',
+			receivedNodeCount: 9680,
+			visibleNodeCount: 9680,
+			nodesDrawn: 9680,
+			finiteCoordinateCount: 9680,
+			canvas: { distinctPixels: 200 },
+			transform: { x: 400, y: 290, k: 0.21 },
+		},
+		focusChanges: {
+			displayMode: 'changes',
+			visibleNodeCount: 8,
+			nodesDrawn: 8,
+			summary: { modifiedCount: 7 },
+			canvas: { distinctPixels: 100 },
+		},
+		unexpectedError: false,
+		stuckIndexing: false,
+		quit: { remaining: 'gone' },
+	};
+	assert.deepEqual(temporalAcceptanceFailures(canonicalEvidence), []);
+	const lowNodeCount = {
+		...canonicalEvidence,
+		fullMap: { ...canonicalEvidence.fullMap, receivedNodeCount: 8999, finiteCoordinateCount: 8999 },
+	};
+	assert.ok(temporalAcceptanceFailures(lowNodeCount).some(item => /fewer than 9000 nodes/.test(item)));
+	const wrongSeed = {
+		...canonicalEvidence,
+		fixture: { ...canonicalEvidence.fixture, moduleCount: 336 },
+	};
+	assert.ok(temporalAcceptanceFailures(wrongSeed).some(item => /module seed count is not 9680/.test(item)));
+});
+
+test('temporal canonical-scale producer is release-only with canonical-scale CLI wiring', () => {
+	const producer = PHASE3_PRODUCERS.find(item => item.id === 'temporal-canonical-scale');
+	assert.ok(producer);
+	assert.deepEqual(producer.command, ['node', 'graphs/scripts/acceptance/temporal-live.mjs', '--canonical-scale']);
+	assert.ok(producer.timeoutMs >= 600_000);
+	const evidence = PHASE3_REQUIRED_EVIDENCE.find(item => item.id === 'temporal-canonical-scale');
+	assert.ok(evidence);
+	assert.equal(evidence.path, 'temporal/canonical-scale-live.json');
 });
 
 test('idle soak sleeps on the Node clock and surfaces CDP abort as a failure', () => {

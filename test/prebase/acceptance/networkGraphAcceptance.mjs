@@ -113,17 +113,14 @@ export function semanticZoomProven(before, after, options = {}) {
 		&& Number.isFinite(after.screenUtilization) && after.screenUtilization > 0);
 }
 
-export function labelDensityProven(zoomOut, zoomIn, selectedMetrics) {
-	const outLabels = zoomOut?.labelCount ?? zoomOut?.labelsDrawn ?? 0;
-	const inLabels = zoomIn?.labelCount ?? zoomIn?.labelsDrawn ?? 0;
-	const selectedLabels = selectedMetrics?.labelCount ?? selectedMetrics?.labelsDrawn ?? 0;
-	if (!Number.isFinite(outLabels) || !Number.isFinite(inLabels)) {
+export function labelDensityProven(metrics) {
+	if (!metrics) {
 		return false;
 	}
-	if (outLabels <= 0 && inLabels <= 0) {
+	const labels = metrics.labelCount ?? metrics.labelsDrawn ?? 0;
+	const nodes = metrics.nodesDrawn ?? 0;
+	if (!Number.isFinite(labels) || !Number.isFinite(nodes)) {
 		return false;
 	}
-	const densityReduced = inLabels >= outLabels || outLabels > inLabels;
-	const selectedSurvives = !selectedMetrics?.selectedNodeId || selectedLabels > 0;
-	return densityReduced && selectedSurvives;
+	return labels > 0 && nodes > 0 && labels <= nodes;
 }

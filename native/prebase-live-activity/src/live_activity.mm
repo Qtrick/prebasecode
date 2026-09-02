@@ -1433,15 +1433,13 @@ static NSString *JSString(Napi::Value value) {
 
 	if (self.content.attention && !self.pinned) {
 		// Glanceable attention peek: compact wings + short body, not full interactive panel.
+		// Attention arrival is not user-initiated; do not haptic (Apple AppKit guidance).
 		self.attentionPeek = YES;
 		self.content.peekOnly = YES;
 		self.content.expanded = YES;
 		self.content.targetExpanded = YES;
 		self.ignoresMouse = NO;
-		if (!self.didAttentionHaptic) {
-			self.didAttentionHaptic = YES;
-			[self performUserHaptic];
-		}
+		self.didAttentionHaptic = NO;
 		if (self.panel) {
 			self.panel.ignoresMouseEvents = NO;
 			[self removeGlobalMonitorOnly];

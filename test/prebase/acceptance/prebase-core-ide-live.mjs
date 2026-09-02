@@ -21,19 +21,22 @@ import {
 	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
 import {
-	labelDensityDynamicProven,
 	pointerCaptureOnCanvasProven,
-	rotationProven,
-	cameraRotationStable,
 	selectionRotationLockProven,
-	semanticZoomLodProven,
-	shiftPanProven,
-	shiftPanViewportProven,
 	startupOnboardingProven,
 	worldDragProven,
 	worldInvarianceProven,
 	nodeHitHasWorldCoords,
 } from './codeGraphProof.mjs';
+import {
+	cameraRotationStable,
+	labelDensityProven,
+	pointerCaptureLifecycleProven,
+	rotationProven,
+	semanticZoomProven,
+	shiftPanProven,
+	worldPositionFinite,
+} from './networkGraphAcceptance.mjs';
 import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
@@ -59,7 +62,19 @@ export function nodesDrawnFromMetrics(metrics) {
 	return typeof metrics.nodesDrawn === 'number' && metrics.nodesDrawn > 0;
 }
 
-export { worldDragProven as selectedNodeWorldDragProven, labelDensityDynamicProven as labelDensityProven } from './codeGraphProof.mjs';
+export { worldDragProven as selectedNodeWorldDragProven } from './codeGraphProof.mjs';
+export { labelDensityProven } from './networkGraphAcceptance.mjs';
+
+function worldPositionFromHit(hit) {
+	if (!worldPositionFinite(hit)) {
+		return null;
+	}
+	return {
+		x: hit.worldX ?? hit.world.x,
+		y: hit.worldY ?? hit.world.y,
+		z: hit.worldZ ?? hit.world.z,
+	};
+}
 
 function rotationFromMetrics(metrics) {
 	const rotation = metrics?.rotation;
@@ -419,6 +434,10 @@ async function run() {
 		let noStuckPointerCapture = false;
 		let zoomMetrics1 = null;
 		let zoomMetrics2 = null;
+		let rotationBeforeGesture;
+		let rotationAfterGesture;
+		let rotationAtSelection;
+		let rotationAfterLockWait;
 		let metrics = null;
 		if (graphFrame) {
 			await enableGraphMetrics(graphFrame);
@@ -460,12 +479,12 @@ async function run() {
 				return current?.networkIdleAutoRotate ? current : undefined;
 			}, 8_000, 250);
 
-			const rotationBeforeGesture = rotationFromMetrics(await readGraphMetrics(graphFrame));
+			rotationBeforeGesture = rotationFromMetrics(await readGraphMetrics(graphFrame));
 			await canvasGesture(graphFrame);
 			await launched.page.waitForTimeout(300);
-			const rotationAfterGesture = rotationFromMetrics(await readGraphMetrics(graphFrame));
-			yawBeforeRotate = rotationBeforeGesture?.yaw ?? 0;
-			yawAfterRotate = rotationAfterGesture?.yaw ?? 0;
+			rotationAfterGesture = rotationFromMetrics(await readGraphMetrics(graphFrame));
+			yawBeforeRotate = rotationBeforeGesture?.yaw;
+			yawAfterRotate = rotationAfterGesture?.yaw;
 			pitchBeforeRotate = rotationBeforeGesture?.pitch;
 			pitchAfterRotate = rotationAfterGesture?.pitch;
 
@@ -520,13 +539,13 @@ async function run() {
 			}
 			metrics = await readGraphMetrics(graphFrame);
 			picked = Boolean(pickHit && metrics?.selectedNodeId === pickHit.id);
-			const rotationAtSelection = rotationFromMetrics(metrics);
-			yawAtSelection = rotationAtSelection?.yaw ?? 0;
+			rotationAtSelection = rotationFromMetrics(metrics);
+			yawAtSelection = rotationAtSelection?.yaw;
 			pitchAtSelection = rotationAtSelection?.pitch;
 			await launched.page.waitForTimeout(1_800);
-			const rotationAfterLockWait = rotationFromMetrics(await readGraphMetrics(graphFrame));
-			yawAfterLockWait = rotationAfterLockWait?.yaw ?? yawAtSelection;
-			pitchAfterLockWait = rotationAfterLockWait?.pitch ?? pitchAtSelection;
+			rotationAfterLockWait = rotationFromMetrics(await readGraphMetrics(graphFrame));
+			yawAfterLockWait = rotationAfterLockWait?.yaw;
+			pitchAfterLockWait = rotationAfterLockWait?.pitch;
 
 			metrics = await readGraphMetrics(graphFrame);
 			const selectedId = metrics?.selectedNodeId;
@@ -580,48 +599,58 @@ async function run() {
 				await graphFrame.page().keyboard.up('Shift');
 				await launched.page.waitForTimeout(300);
 				const panAfter = await readGraphMetrics(graphFrame);
-				shiftPan = shiftPanProven(panBefore?.transform, panAfter?.transform);
+				const panBeforeRotation = rotationFromMetrics(panBefore);
+				const panAfterRotation = rotationFromMetrics(panAfter);
 				const selectedHit = (panBefore?.nodeHits || []).find(hit => hit.id === panBefore?.selectedNodeId) || null;
-				const selectedHitAfter = (panAfter?.nodeHits || []).find(hit => hit.id === panAfter?.selectedNodeId) || selectedHit;
-				const beforeWorld = selectedHit ? {
-					x: selectedHit.worldX ?? selectedHit.world?.x ?? 0,
-					y: selectedHit.worldY ?? selectedHit.world?.y ?? 0,
-					z: selectedHit.worldZ ?? selectedHit.world?.z ?? 0,
-				} : { x: 0, y: 0, z: 0 };
-				const afterWorld = selectedHitAfter ? {
-					x: selectedHitAfter.worldX ?? selectedHitAfter.world?.x ?? 0,
-					y: selectedHitAfter.worldY ?? selectedHitAfter.world?.y ?? 0,
-					z: selectedHitAfter.worldZ ?? selectedHitAfter.world?.z ?? 0,
-				} : beforeWorld;
-				shiftPanChangedViewport = shiftPanViewportProven({
-					beforeTransform: panBefore?.transform ?? { x: 0, y: 0, k: 1 },
-					afterTransform: panAfter?.transform ?? { x: 0, y: 0, k: 1 },
-					beforeRotation: rotationFromMetrics(panBefore) ?? { yaw: 0, pitch: 0 },
-					afterRotation: rotationFromMetrics(panAfter) ?? { yaw: 0, pitch: 0 },
-					beforeNodeWorld: beforeWorld,
-					afterNodeWorld: afterWorld,
-				});
+				const selectedHitAfter = (panAfter?.nodeHits || []).find(hit => hit.id === panAfter?.selectedNodeId) || null;
+				const beforeWorld = worldPositionFromHit(selectedHit);
+				const afterWorld = worldPositionFromHit(selectedHitAfter);
+				const shiftPanProvenResult = Boolean(
+					panBefore?.transform
+					&& panAfter?.transform
+					&& panBeforeRotation
+					&& panAfterRotation
+					&& beforeWorld
+					&& afterWorld
+					&& shiftPanProven({
+						beforeTransform: panBefore.transform,
+						afterTransform: panAfter.transform,
+						beforeRotation: panBeforeRotation,
+						afterRotation: panAfterRotation,
+						beforeNodeWorld: beforeWorld,
+						afterNodeWorld: afterWorld,
+					}),
+				);
+				shiftPan = shiftPanProvenResult;
+				shiftPanChangedViewport = shiftPanProvenResult;
 			}
 
 			noStuckPointerCapture = await graphFrame.evaluate(() => {
-				const canvas = document.getElementById('netCanvas');
 				const metrics = window.__prebaseGraphRenderMetrics;
-				let captureHeld = false;
-				if (metrics && typeof metrics.pointerCaptureHeld === 'boolean') {
-					captureHeld = metrics.pointerCaptureHeld;
-				} else if (canvas && typeof canvas.hasPointerCapture === 'function') {
-					for (let pointerId = 0; pointerId < 8; pointerId++) {
-						if (canvas.hasPointerCapture(pointerId)) {
-							captureHeld = true;
-							break;
+				const canvas = document.getElementById('netCanvas');
+				const lastPointerId = metrics?.lastPointerCaptureId;
+				let canvasStillHoldsCapture = false;
+				if (canvas && typeof canvas.hasPointerCapture === 'function' && Number.isFinite(lastPointerId)) {
+					canvasStillHoldsCapture = canvas.hasPointerCapture(lastPointerId);
+				}
+				let bodyHoldsCapture = false;
+				const body = document.body;
+				if (body && typeof body.hasPointerCapture === 'function') {
+					if (Number.isFinite(lastPointerId) && body.hasPointerCapture(lastPointerId)) {
+						bodyHoldsCapture = true;
+					} else {
+						for (let pointerId = 0; pointerId < 8 && !bodyHoldsCapture; pointerId++) {
+							if (body.hasPointerCapture(pointerId)) {
+								bodyHoldsCapture = true;
+							}
 						}
 					}
 				}
-				const bodyCapture = typeof document.body?.hasPointerCapture === 'function'
-					? document.body.hasPointerCapture(1)
-					: false;
-				return captureHeld === false && bodyCapture === false;
-			}).catch(() => false);
+				return {
+					hasPointerCaptureAfterRelease: metrics?.pointerCaptureHeld === true || canvasStillHoldsCapture,
+					hasPointerCaptureOnBody: bodyHoldsCapture,
+				};
+			}).then(result => pointerCaptureLifecycleProven(result)).catch(() => false);
 
 			await graphFrame.locator('#netCanvas').focus({ timeout: 3_000 }).catch(() => undefined);
 			zoomMetrics1 = await readGraphMetrics(graphFrame);
@@ -656,11 +685,7 @@ async function run() {
 			selection: selected,
 			layoutModes: Boolean(organicMode === 'organic' && sphereMode === 'sphere' && constellationMode === 'constellation' && clusteredMode === 'clustered'),
 			legacyRadialNormalized: Boolean(legacyRadialNormalized),
-			rotate: rotationProven(
-				{ yaw: yawBeforeRotate, pitch: pitchBeforeRotate ?? 0 },
-				{ yaw: yawAfterRotate, pitch: pitchAfterRotate ?? 0 },
-				0.01,
-			),
+			rotate: rotationProven(rotationBeforeGesture, rotationAfterGesture, 0.01),
 			drag: selectedNodeDragMoved,
 			worldDrag: selectedNodeDragMoved,
 			unselectedDragRotated,
@@ -671,14 +696,20 @@ async function run() {
 			shiftPan,
 			pointerCaptureOnCanvas,
 			idleRotateArmed: Boolean(metrics?.networkIdleAutoRotate),
-			semanticZoom: semanticZoomLodProven(zoomMetrics1, zoomMetrics2, metrics),
+			semanticZoom: Boolean(
+				zoomMetrics1
+				&& zoomMetrics2
+				&& metrics
+				&& semanticZoomProven(zoomMetrics1, zoomMetrics2)
+				&& semanticZoomProven(zoomMetrics2, metrics),
+			),
 			pick: picked,
 			sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered',
-			labelDensity: labelDensityDynamicProven(zoomMetrics2, metrics),
+			labelDensity: labelDensityProven(metrics),
 			selectionLock: selectionRotationLockProven(
 				picked,
-				{ yaw: yawAtSelection, pitch: pitchAtSelection ?? 0 },
-				{ yaw: yawAfterLockWait, pitch: pitchAfterLockWait ?? 0 },
+				rotationAtSelection,
+				rotationAfterLockWait,
 			),
 			unselectedNodeDragRotatedCamera: unselectedDragRotated,
 			unselectedNodeStayedUnselected: !unselectedNodeSelectedFromDrag,

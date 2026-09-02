@@ -128,6 +128,7 @@ describe('phase3 producer domains', () => {
 		assert.equal(producers.includes('active-soak'), false);
 		assert.equal(producers.includes('load-quit'), false);
 		assert.equal(producers.includes('temporal-large'), false);
+		assert.equal(producers.includes('temporal-canonical-scale'), false);
 		assert.equal(producers.includes('idle-soak'), false);
 		assert.equal(producers.includes('parser-benchmark'), false);
 	});
