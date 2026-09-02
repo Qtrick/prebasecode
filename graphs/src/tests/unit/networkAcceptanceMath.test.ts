@@ -94,6 +94,52 @@ suite('NetworkAcceptanceMath (Unit - Live Acceptance Truth)', () => {
 				afterNodeWorld: nodeWorld,
 			}), false);
 		});
+
+		test('fails closed when transform or node world coordinates are missing or non-finite', () => {
+			assert.equal(shiftPanProven({
+				beforeTransform: baseTransform,
+				afterTransform: { x: 48, y: 62, k: 1.0 },
+				beforeRotation: baseRotation,
+				afterRotation: baseRotation,
+				beforeNodeWorld: { x: 120, y: -40 },
+				afterNodeWorld: nodeWorld,
+			}), false, 'missing z must not coerce to zero');
+			assert.equal(shiftPanProven({
+				beforeTransform: baseTransform,
+				afterTransform: { x: Number.NaN, y: 62, k: 1.0 },
+				beforeRotation: baseRotation,
+				afterRotation: baseRotation,
+				beforeNodeWorld: nodeWorld,
+				afterNodeWorld: nodeWorld,
+			}), false);
+			assert.equal(shiftPanProven({
+				beforeTransform: baseTransform,
+				afterTransform: { x: 48, y: 62, k: 1.0 },
+				beforeRotation: baseRotation,
+				afterRotation: baseRotation,
+				beforeNodeWorld: { x: 120, y: -40, z: Number.NaN },
+				afterNodeWorld: nodeWorld,
+			}), false);
+			assert.equal(shiftPanProven({
+				beforeTransform: baseTransform,
+				afterTransform: { x: 48, y: 62, k: 1.0 },
+				beforeRotation: baseRotation,
+				afterRotation: baseRotation,
+				beforeNodeWorld: nodeWorld,
+				afterNodeWorld: { x: 120, y: Number.POSITIVE_INFINITY, z: 5 },
+			}), false, 'Infinity world coordinates must fail');
+		});
+
+		test('passes with stable finite XYZ world coordinates within tolerance', () => {
+			assert.equal(shiftPanProven({
+				beforeTransform: baseTransform,
+				afterTransform: { x: 48, y: 62, k: 1.0 },
+				beforeRotation: baseRotation,
+				afterRotation: baseRotation,
+				beforeNodeWorld: nodeWorld,
+				afterNodeWorld: { x: 120.0005, y: -39.9995, z: 5.0002 },
+			}), true);
+		});
 	});
 
 	suite('pointerCaptureLifecycleProven', () => {
@@ -216,6 +262,13 @@ suite('NetworkAcceptanceMath (Unit - Live Acceptance Truth)', () => {
 				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 0.8 }, lodTier: 'medium' },
 				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 0.81 }, lodTier: 'medium' },
 			]), false);
+		});
+
+		test('fails when only LOD tier changes without labelsDrawn delta', () => {
+			assert.equal(labelDensityProven([
+				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 0.25 }, lodTier: 'low' },
+				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 1.2 }, lodTier: 'high' },
+			]), false, 'network renderer contract keys off placed labels, not lodTier alone');
 		});
 
 		test('edges alone must not prove label density at multiple zoom levels', () => {

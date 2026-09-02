@@ -23,6 +23,7 @@ class FakeElement {
 	readonly clientHeight = 600;
 	id = '';
 	private capturedPointer: number | undefined;
+	captureBehavior: 'normal' | 'reject-set' | 'silent-fail' = 'normal';
 
 	addEventListener(type: string, listener: Listener): void {
 		const list = this.listeners.get(type) ?? [];
@@ -48,7 +49,12 @@ class FakeElement {
 	}
 
 	setPointerCapture(pointerId: number): void {
-		this.capturedPointer = pointerId;
+		if (this.captureBehavior === 'reject-set') {
+			throw new Error('setPointerCapture rejected');
+		}
+		if (this.captureBehavior !== 'silent-fail') {
+			this.capturedPointer = pointerId;
+		}
 	}
 
 	hasPointerCapture(pointerId: number): boolean {
@@ -306,6 +312,7 @@ suite('PreBase graph editor pointer capture lifecycle metrics (Campaign XVI)', (
 		const after = harness.flushMetrics();
 		assert.strictEqual(after?.activePointerId, null, 'active pointer must clear after release');
 		assert.strictEqual(after?.lastPointerCaptureId, 1, 'last gesture pointer id must persist for diagnostics');
+		assert.strictEqual(after?.lastGestureTerminationReason, 'pointerup');
 		assert.strictEqual(after?.pointerCaptureActive, false, 'active capture flag must clear after gesture');
 		assert.strictEqual(after?.lastGestureCaptureAcquired, true, 'last-gesture acquisition must persist for proofs');
 		assert.strictEqual(after?.pointerCaptureAcquired, true, 'legacy alias must mirror last-gesture acquisition');
@@ -315,39 +322,86 @@ suite('PreBase graph editor pointer capture lifecycle metrics (Campaign XVI)', (
 		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
 	});
 
-	test('pointercancel releases capture and records lostPointerCaptureObserved', () => {
+	test('pointercancel releases capture without recording lostPointerCaptureObserved', () => {
 		const harness = createMetricsHarness();
 		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 2, clientX: 220, clientY: 220 });
 		harness.canvas.dispatch('pointercancel', { pointerId: 2, clientX: 260, clientY: 260 });
 		const metrics = harness.flushMetrics();
-		assert.strictEqual(metrics?.lostPointerCaptureObserved, true);
+		assert.strictEqual(metrics?.lostPointerCaptureObserved, false);
+		assert.strictEqual(metrics?.lastGestureTerminationReason, 'pointercancel');
+		assert.strictEqual(metrics?.interactionState, 'idle');
 		assert.strictEqual(metrics?.lastGestureCaptureReleased, true);
 		assert.strictEqual(metrics?.pointerCaptureActive, false);
 		assert.strictEqual(harness.canvas.hasPointerCapture(2), false);
 		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
 	});
 
-	test('lostpointercapture ends gesture the same way as pointercancel', () => {
+	test('lostpointercapture records lostPointerCaptureObserved and returns idle interactionState', () => {
 		const harness = createMetricsHarness();
 		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 3, clientX: 180, clientY: 180 });
 		harness.canvas.dispatch('lostpointercapture', { pointerId: 3, clientX: 180, clientY: 180 });
 		const metrics = harness.flushMetrics();
 		assert.strictEqual(metrics?.lostPointerCaptureObserved, true);
-		assert.strictEqual(metrics?.interactionState, 'cancelled');
+		assert.strictEqual(metrics?.lastGestureTerminationReason, 'lostpointercapture');
+		assert.strictEqual(metrics?.interactionState, 'idle');
 		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
 	});
 
-	test('window blur mid-drag force-releases capture without leaving pointerCaptureHeld', () => {
+	test('window blur mid-drag force-releases capture and records blur termination', () => {
 		const harness = createMetricsHarness();
 		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 4, clientX: 240, clientY: 240 });
 		assert.strictEqual(harness.canvas.hasPointerCapture(4), true);
 		(harness.context.window as { dispatchWindowEvent(type: string): void }).dispatchWindowEvent('blur');
 		const metrics = harness.flushMetrics();
 		assert.strictEqual(metrics?.activePointerId, null);
+		assert.strictEqual(metrics?.lastGestureTerminationReason, 'blur');
+		assert.strictEqual(metrics?.lostPointerCaptureObserved, false);
 		assert.strictEqual(metrics?.lastGestureCaptureReleased, true);
 		assert.strictEqual(metrics?.pointerCaptureActive, false);
 		assert.strictEqual(metrics?.pointerCaptureHeld, false);
 		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
+	});
+
+	test('normal pointerdown acquires capture and pointerup releases with lifecycle proof', () => {
+		const harness = createMetricsHarness();
+		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 8, clientX: 160, clientY: 160 });
+		assert.strictEqual(harness.canvas.hasPointerCapture(8), true);
+		const during = harness.flushMetrics();
+		assert.strictEqual(during?.lastGestureCaptureAcquired, true);
+		assert.strictEqual(during?.pointerCaptureActive, true);
+		assert.strictEqual(during?.lostPointerCaptureObserved, false);
+
+		harness.canvas.dispatch('pointerup', { pointerId: 8, clientX: 160, clientY: 160 });
+		const after = harness.flushMetrics();
+		assert.strictEqual(harness.canvas.hasPointerCapture(8), false);
+		assert.strictEqual(after?.lastGestureTerminationReason, 'pointerup');
+		assert.strictEqual(after?.lostPointerCaptureObserved, false);
+		assert.strictEqual(after?.interactionState, 'idle');
+		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
+	});
+
+	test('adversarial: setPointerCapture throw leaves acquisition unproven', () => {
+		const harness = createMetricsHarness();
+		harness.canvas.captureBehavior = 'reject-set';
+		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 6, clientX: 100, clientY: 100 });
+		const during = harness.flushMetrics();
+		assert.strictEqual(during?.pointerCaptureActive, false);
+		assert.strictEqual(during?.lastGestureCaptureAcquired, false);
+		assert.strictEqual(during?.pointerCaptureHeld, false);
+		harness.canvas.dispatch('pointerup', { pointerId: 6, clientX: 100, clientY: 100 });
+		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), false);
+	});
+
+	test('adversarial: silent setPointerCapture failure leaves acquisition unproven', () => {
+		const harness = createMetricsHarness();
+		harness.canvas.captureBehavior = 'silent-fail';
+		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 7, clientX: 120, clientY: 120 });
+		const during = harness.flushMetrics();
+		assert.strictEqual(during?.pointerCaptureActive, false);
+		assert.strictEqual(during?.lastGestureCaptureAcquired, false);
+		assert.strictEqual(harness.canvas.hasPointerCapture(7), false);
+		harness.canvas.dispatch('pointerup', { pointerId: 7, clientX: 120, clientY: 120 });
+		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), false);
 	});
 
 	test('diagnostic break: missing last-gesture acquisition fails closed', () => {

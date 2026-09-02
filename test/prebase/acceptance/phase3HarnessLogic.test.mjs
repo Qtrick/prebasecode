@@ -1729,8 +1729,8 @@ test('Temporal canvas screenshots disable animations so idle RAF cannot flake st
 	assert.match(live, /--canonical-scale/);
 });
 
-test('temporal canonical-scale acceptance requires 9000+ received nodes and 9680 module seed', () => {
-	const canonicalEvidence = {
+function canonicalScaleTemporalEvidence(fullMapOverrides = {}, evidenceOverrides = {}) {
+	return {
 		scale: 'canonical-scale',
 		fixture: {
 			commits: 103,
@@ -1745,10 +1745,20 @@ test('temporal canonical-scale acceptance requires 9000+ received nodes and 9680
 			renderedCommitSha: 'target',
 			receivedNodeCount: 9680,
 			visibleNodeCount: 9680,
-			nodesDrawn: 9680,
+			nodesDrawn: 120,
+			leafNodesDrawn: 40,
+			aggregateNodesDrawn: 80,
+			projectionTier: 'overview',
+			aggregateEdgesDrawn: 35,
+			leafEdgesDrawn: 12,
+			communitiesRepresented: 40,
+			communityLabelsDrawn: 8,
+			labelCollisionCullCount: 15,
+			renderedLabelOverlapCount: 0,
 			finiteCoordinateCount: 9680,
 			canvas: { distinctPixels: 200 },
 			transform: { x: 400, y: 290, k: 0.21 },
+			...fullMapOverrides,
 		},
 		focusChanges: {
 			displayMode: 'changes',
@@ -1760,18 +1770,95 @@ test('temporal canonical-scale acceptance requires 9000+ received nodes and 9680
 		unexpectedError: false,
 		stuckIndexing: false,
 		quit: { remaining: 'gone' },
+		...evidenceOverrides,
 	};
+}
+
+test('temporal canonical-scale acceptance requires 9000+ received nodes and 9680 module seed', () => {
+	const canonicalEvidence = canonicalScaleTemporalEvidence();
 	assert.deepEqual(temporalAcceptanceFailures(canonicalEvidence), []);
-	const lowNodeCount = {
-		...canonicalEvidence,
-		fullMap: { ...canonicalEvidence.fullMap, receivedNodeCount: 8999, finiteCoordinateCount: 8999 },
-	};
+	const underreportedDraw = canonicalScaleTemporalEvidence({
+		nodesDrawn: 50,
+		leafNodesDrawn: 9000,
+		aggregateNodesDrawn: 680,
+	});
+	assert.ok(
+		temporalAcceptanceFailures(underreportedDraw).some(item => /dot galaxy|too many leaf nodes|too many total nodes/.test(item)),
+		'low nodesDrawn override must not green dense leaf+aggregate draws',
+	);
+	const lowNodeCount = canonicalScaleTemporalEvidence({
+		receivedNodeCount: 8999,
+		finiteCoordinateCount: 8999,
+	});
 	assert.ok(temporalAcceptanceFailures(lowNodeCount).some(item => /fewer than 9000 nodes/.test(item)));
-	const wrongSeed = {
-		...canonicalEvidence,
-		fixture: { ...canonicalEvidence.fixture, moduleCount: 336 },
-	};
+	const wrongSeed = canonicalScaleTemporalEvidence({}, {
+		fixture: { commits: 103, files: new Array(9680).fill('src/module_00/file_0.ts'), moduleCount: 336, head: 'target' },
+	});
 	assert.ok(temporalAcceptanceFailures(wrongSeed).some(item => /module seed count is not 9680/.test(item)));
+});
+
+test('temporal canonical-scale live-like overview metrics pass semantic gates', () => {
+	const evidence = canonicalScaleTemporalEvidence({
+		receivedNodeCount: 9682,
+		visibleNodeCount: 9682,
+		finiteCoordinateCount: 9682,
+		nodesDrawn: 59,
+		leafNodesDrawn: 3,
+		aggregateNodesDrawn: 56,
+		leafEdgesDrawn: 0,
+		aggregateEdgesDrawn: 56,
+		communitiesRepresented: 56,
+		communityLabelsDrawn: 8,
+		labelCollisionCullCount: 0,
+		renderedLabelOverlapCount: 0,
+	});
+	assert.deepEqual(temporalAcceptanceFailures(evidence), []);
+});
+
+test('temporal canonical-scale omitting leaf and aggregate drawn counts fails closed', () => {
+	const omittedDrawCounts = canonicalScaleTemporalEvidence({
+		leafNodesDrawn: undefined,
+		aggregateNodesDrawn: undefined,
+		nodesDrawn: 59,
+	});
+	assert.ok(
+		temporalAcceptanceFailures(omittedDrawCounts).some(item => /aggregate communities/.test(item)),
+		'omitting leafNodesDrawn/aggregateNodesDrawn must fail even when nodesDrawn looks healthy',
+	);
+});
+
+test('temporal canonical-scale dot galaxy overview fails semantic gates', () => {
+	const dotGalaxy = canonicalScaleTemporalEvidence({
+		receivedNodeCount: 9680,
+		leafNodesDrawn: 9000,
+		aggregateNodesDrawn: 680,
+		nodesDrawn: 9680,
+		aggregateEdgesDrawn: 40,
+		leafEdgesDrawn: 500,
+		labelCollisionCullCount: 0,
+	});
+	assert.ok(
+		temporalAcceptanceFailures(dotGalaxy).some(item => /dot galaxy|too many leaf nodes/.test(item)),
+	);
+});
+
+test('temporal canonical-scale semantic gates fail closed on omitted overview metrics', () => {
+	const failures = temporalAcceptanceFailures(canonicalScaleTemporalEvidence({
+		projectionTier: undefined,
+		aggregateEdgesDrawn: undefined,
+		leafEdgesDrawn: undefined,
+		communitiesRepresented: undefined,
+		communityLabelsDrawn: undefined,
+		labelCollisionCullCount: undefined,
+		renderedLabelOverlapCount: undefined,
+	}));
+	assert.ok(failures.some(item => /projection tier/.test(item)), 'missing projectionTier at overview zoom');
+	assert.ok(failures.some(item => /aggregate edges/.test(item)), 'missing aggregateEdgesDrawn');
+	assert.ok(failures.some(item => /leaf-edge hairball/.test(item)), 'missing leafEdgesDrawn');
+	assert.ok(failures.some(item => /too few communities/.test(item)), 'missing communitiesRepresented');
+	assert.ok(failures.some(item => /community labels/.test(item)), 'missing communityLabelsDrawn');
+	assert.ok(failures.some(item => /labelCollisionCullCount is not finite/.test(item)), 'missing labelCollisionCullCount');
+	assert.ok(failures.some(item => /rendered label overlaps/.test(item)), 'missing renderedLabelOverlapCount');
 });
 
 test('temporal canonical-scale producer is release-only with canonical-scale CLI wiring', () => {

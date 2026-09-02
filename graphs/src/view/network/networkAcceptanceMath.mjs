@@ -46,8 +46,35 @@ export function rotationProven(before, after, minDelta = 0.005) {
 	return yawDelta > minDelta || pitchDelta > minDelta;
 }
 
+function finiteWorldPosition(pos) {
+	return Boolean(
+		pos
+		&& Number.isFinite(pos.x)
+		&& Number.isFinite(pos.y)
+		&& Number.isFinite(pos.z),
+	);
+}
+
+function finiteTransform(transform) {
+	return Boolean(
+		transform
+		&& Number.isFinite(transform.x)
+		&& Number.isFinite(transform.y),
+	);
+}
+
 /** Shift-pan must move viewport transform while camera rotation and node world stay stable. */
 export function shiftPanProven(input) {
+	if (!finiteTransform(input.beforeTransform) || !finiteTransform(input.afterTransform)) {
+		return false;
+	}
+	if (!finiteRotation(input.beforeRotation) || !finiteRotation(input.afterRotation)) {
+		return false;
+	}
+	if (!finiteWorldPosition(input.beforeNodeWorld) || !finiteWorldPosition(input.afterNodeWorld)) {
+		return false;
+	}
+
 	const transformTolerance = input.transformTolerance ?? DEFAULT_TRANSFORM_TOLERANCE;
 	const rotationTolerance = input.rotationTolerance ?? DEFAULT_ROTATION_TOLERANCE;
 	const nodeTolerance = input.nodeTolerance ?? DEFAULT_NODE_TOLERANCE;
@@ -68,7 +95,7 @@ export function shiftPanProven(input) {
 		input.afterNodeWorld.x - input.beforeNodeWorld.x,
 		input.afterNodeWorld.y - input.beforeNodeWorld.y,
 	);
-	const nodeZDelta = Math.abs((input.afterNodeWorld.z ?? 0) - (input.beforeNodeWorld.z ?? 0));
+	const nodeZDelta = Math.abs(input.afterNodeWorld.z - input.beforeNodeWorld.z);
 	return nodeDelta <= nodeTolerance && nodeZDelta <= nodeTolerance;
 }
 
@@ -150,8 +177,8 @@ export function labelDensitySnapshotProven(metrics) {
 }
 
 /**
- * Multi-zoom label LOD: requires distinct zoom levels with intentional semantic progression.
- * Accepts monotonic label reduction OR LOD tier change OR meaningful label count delta.
+ * Multi-zoom label LOD: requires distinct zoom levels with a real labelsDrawn delta.
+ * LOD tier changes alone are insufficient — the network renderer contract keys off placed labels.
  */
 export function labelDensityProven(metricsOrSamples) {
 	const samples = Array.isArray(metricsOrSamples) ? metricsOrSamples : [metricsOrSamples];
@@ -173,17 +200,8 @@ export function labelDensityProven(metricsOrSamples) {
 		return false;
 	}
 
-	const lodTiers = new Set(samples.map(sample => sample.lodTier).filter(Boolean));
-	if (lodTiers.size >= 2) {
-		return true;
-	}
-
 	const labelCounts = samples.map(labelCountFromMetrics);
 	const minLabels = Math.min(...labelCounts);
 	const maxLabels = Math.max(...labelCounts);
-	if (maxLabels > minLabels) {
-		return true;
-	}
-
-	return false;
+	return maxLabels > minLabels;
 }

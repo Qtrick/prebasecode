@@ -1191,6 +1191,8 @@ let lastGestureCaptureAcquired = false;
 /** Last completed gesture: capture was released (persists until the next pointer down). */
 let lastGestureCaptureReleased = false;
 let lostPointerCaptureObserved = false;
+/** Last completed gesture termination: pointerup | pointercancel | lostpointercapture | blur */
+let lastGestureTerminationReason = '';
 let layoutKey = '';
 let base3d = Object.create(null);
 let centroid = { x: 0, y: 0 };
@@ -2921,8 +2923,12 @@ function drawTemporalFrame(ts) {
 			metrics.fileLabelsDrawn = visibleLabels.length;
 			metrics.communityLabelsDrawn = guideLabels.length;
 			metrics.routeBadgesDrawn = routeBadgesDrawn;
-			metrics.labelOverlapCount = labelLayout.labelOverlapCount;
+			metrics.totalLabelsDrawn = visibleLabels.length + guideLabels.length + routeBadgesDrawn;
+			metrics.labelCollisionCullCount = labelLayout.labelCollisionCullCount;
+			metrics.renderedLabelOverlapCount = labelLayout.renderedLabelOverlapCount;
 			metrics.compositeLabelOverlapCount = labelLayout.compositeLabelOverlapCount;
+			// Back-compat alias for acceptance reports keyed to the old metric name.
+			metrics.labelOverlapCount = labelLayout.labelCollisionCullCount;
 			metrics.selectedNodeId = selectedNodeId;
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
 			metrics.canvas = { clientWidth: w, clientHeight: h, width: netCanvas.width, height: netCanvas.height };
@@ -3329,6 +3335,7 @@ function drawNetworkFrame() {
 			metrics.pointerCaptureAcquired = lastGestureCaptureAcquired;
 			metrics.pointerCaptureReleased = lastGestureCaptureReleased;
 			metrics.lostPointerCaptureObserved = lostPointerCaptureObserved;
+			metrics.lastGestureTerminationReason = lastGestureTerminationReason;
 			metrics.pointerCaptureHeld = Boolean(
 				activePointerHost
 				&& activePointerId !== null
@@ -3643,10 +3650,11 @@ function onPointerDown(e, host) {
 	activePointerId = e.pointerId;
 	activePointerHost = host;
 	lastPointerCaptureId = e.pointerId;
-	pointerCaptureActive = true;
-	lastGestureCaptureAcquired = true;
+	pointerCaptureActive = false;
+	lastGestureCaptureAcquired = false;
 	lastGestureCaptureReleased = false;
 	lostPointerCaptureObserved = false;
+	lastGestureTerminationReason = '';
 	interactionState = 'pressed';
 	dragThreshold = thresholdForPointer(e.pointerType);
 	dragging = true; moved = false; lastX = e.clientX; lastY = e.clientY;
@@ -3671,11 +3679,16 @@ function onPointerDown(e, host) {
 		if (typeof host.setPointerCapture === 'function') {
 			try { host.setPointerCapture(e.pointerId); } catch (err) { /* stale/invalid pointer id */ }
 		}
+		const captureConfirmed = typeof host.hasPointerCapture === 'function' && host.hasPointerCapture(e.pointerId);
+		if (captureConfirmed) {
+			pointerCaptureActive = true;
+			lastGestureCaptureAcquired = true;
+		}
 		if (typeof window !== 'undefined' && window.__prebaseRecordRenderMetrics) {
 			try {
 				const metrics = window.__prebaseGraphRenderMetrics || (window.__prebaseGraphRenderMetrics = {});
 				metrics.pointerCaptureHost = host.id || '';
-				metrics.pointerCaptureActive = typeof host.hasPointerCapture === 'function' && host.hasPointerCapture(e.pointerId);
+				metrics.pointerCaptureActive = captureConfirmed;
 			} catch {}
 		}
 		host.classList.add('dragging');
@@ -3704,7 +3717,7 @@ function updateCanvasCursor() {
 	netCanvas.style.cursor = (isNetwork() && !keepGraphCentered) ? 'grab' : 'default';
 }
 
-function onPointerUp(e, cancelled) {
+function onPointerUp(e, terminationReason) {
 	if (e.pointerId !== activePointerId) return;
 	const pointerHost = activePointerHost;
 	const releasedPointerId = e.pointerId;
@@ -3723,15 +3736,17 @@ function onPointerUp(e, cancelled) {
 	);
 	const gestureReleased = pointerCaptureActive && !captureStillHeld;
 	lastGestureCaptureReleased = gestureReleased;
-	if (cancelled) {
+	if (terminationReason === 'lostpointercapture') {
 		lostPointerCaptureObserved = true;
 	}
+	lastGestureTerminationReason = terminationReason || '';
 	pointerCaptureActive = false;
 	activePointerId = null;
 	activePointerHost = null;
-	const wasMoved = moved || cancelled;
+	const wasAborted = terminationReason && terminationReason !== 'pointerup';
+	const wasMoved = moved || wasAborted;
 	dragging = false; panning = false; rotating = false; draggingNode = false;
-	interactionState = cancelled ? 'cancelled' : 'idle';
+	interactionState = 'idle';
 	pointerDownNode = null;
 	pointerDownNodeId = null;
 	nodeWasSelectedAtPointerDown = false;
@@ -3944,15 +3959,15 @@ window.addEventListener('message', function (e) {
 if (netCanvas) {
 	netCanvas.addEventListener('pointerdown', function (e) { onPointerDown(e, netCanvas); });
 	netCanvas.addEventListener('pointermove', onPointerMove);
-	netCanvas.addEventListener('pointerup', function (e) { onPointerUp(e, false); });
-	netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, true); });
-	netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, true); });
+	netCanvas.addEventListener('pointerup', function (e) { onPointerUp(e, 'pointerup'); });
+	netCanvas.addEventListener('pointercancel', function (e) { onPointerUp(e, 'pointercancel'); });
+	netCanvas.addEventListener('lostpointercapture', function (e) { onPointerUp(e, 'lostpointercapture'); });
 	netCanvas.addEventListener('wheel', onWheel, { passive: false });
 
 	// Editor/window losing focus mid-drag must not leave a stuck grabbing state.
 	window.addEventListener('blur', function () {
 		if (activePointerId !== null) {
-			onPointerUp({ pointerId: activePointerId }, true);
+			onPointerUp({ pointerId: activePointerId }, 'blur');
 		}
 	});
 

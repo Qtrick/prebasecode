@@ -5,6 +5,8 @@
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
 import {
+	boxesOverlap,
+	countRenderedLabelOverlaps,
 	computeVisibleLabels,
 	computeVisibleCommunityGuideLabels,
 	computeVisibleRouteBadges,
@@ -56,6 +58,16 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.equal(labels.length, 1);
 		assert.equal(labels[0].entityId, 'n-modified');
 		assert.equal(labels[0].isChanged, true);
+	});
+
+	test('2b. Entry nodes outrank changed nodes at the same screen slot', () => {
+		const nodes = [
+			makeNode('n-modified', 'src/modified.ts', 'modified', 300, 300),
+			makeNode('n-entry', 'src/index.ts', 'unchanged', 300, 300, true),
+		];
+		const labels = computeVisibleLabels(nodes, 1.0);
+		assert.equal(labels.length, 1);
+		assert.equal(labels[0].entityId, 'n-entry');
 	});
 
 	test('3. Screen-Space Collision Culling: Overlapping text boxes are culled for non-selected nodes', () => {
@@ -173,7 +185,8 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		const layout = computeTemporalLabelLayout(nodes, guides, 0.75);
 		assert.equal(layout.guideLabels.length, 2, 'both aggregate guide labels should be placed');
 		assert.equal(layout.nodeLabels.length, 0, 'node labels must yield to aggregate guide occupancy');
-		assert.ok(layout.labelOverlapCount >= 0);
+		assert.ok(layout.labelCollisionCullCount >= 0);
+		assert.ok(layout.renderedLabelOverlapCount >= 0);
 	});
 
 	test('7. Route badges share occupancy with guide labels and rank changed relationships', () => {
@@ -198,7 +211,87 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 			],
 		});
 		assert.ok(layout.routeBadges.length <= 1, 'overlapping route badges must be culled');
-		assert.equal(layout.compositeLabelOverlapCount, layout.labelOverlapCount);
+		assert.equal(layout.compositeLabelOverlapCount, layout.labelCollisionCullCount + layout.renderedLabelOverlapCount);
+	});
+
+	test('12. labelCollisionCullCount counts each rejected label candidate during layout', () => {
+		const nodes = [
+			makeNode('n1', 'src/file1.ts', 'modified', 300, 300),
+			makeNode('n2', 'src/file2.ts', 'modified', 300, 300),
+			makeNode('n3', 'src/file3.ts', 'modified', 300, 300),
+		];
+		const layout = computeTemporalLabelLayout(nodes, [], 1.0);
+		assert.equal(layout.nodeLabels.length, 1, 'only one modified label can occupy the shared slot');
+		assert.equal(layout.labelCollisionCullCount, 2, 'each rejected candidate must increment the cull counter');
+		assert.equal(layout.renderedLabelOverlapCount, 0, 'rendered set must remain non-overlapping for culled candidates');
+	});
+
+	test('13. renderedLabelOverlapCount detects overlaps among labels that bypass culling', () => {
+		const nodes = [
+			makeNode('n-selected', 'src/selected.ts', 'unchanged', 100, 100),
+			makeNode('n-hovered', 'src/hovered.ts', 'unchanged', 102, 102),
+		];
+		const layout = computeTemporalLabelLayout(nodes, [], 1.5, {
+			selectedNodeId: 'n-selected',
+			hoveredNodeId: 'n-hovered',
+		});
+		assert.equal(layout.nodeLabels.length, 2);
+		assert.ok(layout.renderedLabelOverlapCount >= 1, 'selected and hovered bypass must allow measurable rendered overlap');
+		assert.equal(layout.compositeLabelOverlapCount, layout.labelCollisionCullCount + layout.renderedLabelOverlapCount);
+		const renderedBoxes = layout.nodeLabels.map(l => l.box);
+		assert.equal(countRenderedLabelOverlaps(renderedBoxes), layout.renderedLabelOverlapCount);
+	});
+
+	test('14. selected and hovered node labels beat route badge occupancy at the same slot', () => {
+		const shared = { x: 120, y: 130 };
+		const selectedNode = makeNode('n-selected', 'src/selected.ts', 'unchanged', shared.x, shared.y);
+		const hoveredNode = makeNode('n-hovered', 'src/hovered.ts', 'modified', shared.x + 200, shared.y);
+		const badgeAtSelected = {
+			id: 'sel::peer',
+			text: '6',
+			x: shared.x,
+			y: shared.y + 12,
+			edgeCount: 6,
+			changedEdgeCount: 0,
+		};
+		const selectedLayout = computeTemporalLabelLayout([selectedNode], [], 0.8, {
+			selectedNodeId: 'n-selected',
+			routeBadgeCandidates: [badgeAtSelected],
+		});
+		assert.ok(selectedLayout.routeBadges.length >= 1, 'route badge seeds occupancy first');
+		assert.ok(
+			selectedLayout.nodeLabels.some(l => l.entityId === 'n-selected'),
+			'selected node label must bypass route badge occupancy',
+		);
+
+		const badgeAtHovered = {
+			id: 'hov::peer',
+			text: '4',
+			x: shared.x + 200,
+			y: shared.y + 12,
+			edgeCount: 4,
+			changedEdgeCount: 0,
+		};
+		const hoveredLayout = computeTemporalLabelLayout([hoveredNode], [], 0.8, {
+			hoveredNodeId: 'n-hovered',
+			routeBadgeCandidates: [badgeAtHovered],
+		});
+		assert.ok(hoveredLayout.nodeLabels.some(l => l.entityId === 'n-hovered'), 'hovered node label must bypass route badge occupancy');
+	});
+
+	test('15. entry and changed node labels outrank unchanged labels before route badges consume occupancy', () => {
+		const nodes = [
+			makeNode('n-plain', 'src/plain.ts', 'unchanged', 400, 400),
+			makeNode('n-changed', 'src/changed.ts', 'modified', 400, 400),
+		];
+		const withoutBadge = computeVisibleLabels(nodes, 1.0);
+		assert.equal(withoutBadge.length, 1);
+		assert.equal(withoutBadge[0].entityId, 'n-changed');
+
+		const entryNode = makeNode('n-entry', 'src/index.ts', 'unchanged', 400, 400, true);
+		const withEntry = computeVisibleLabels([...nodes, entryNode], 1.0);
+		assert.equal(withEntry.length, 1);
+		assert.equal(withEntry[0].entityId, 'n-entry', 'entry/current node must win the shared slot over changed/plain');
 	});
 
 	test('4. Hoists the workbench font family once per pass into every visible label', () => {

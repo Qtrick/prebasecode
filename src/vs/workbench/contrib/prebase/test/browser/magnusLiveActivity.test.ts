@@ -2120,6 +2120,44 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		const trackingCode = native.slice(trackingStart, trackingEnd);
 		assert.doesNotMatch(trackingCode, /NSTrackingMouseMoved/);
 		assert.match(trackingCode, /NSTrackingMouseEnteredAndExited/);
+		assert.match(trackingCode, /self\.trackingArea/);
+		assert.match(native, /@property \(nonatomic, strong\) NSTrackingArea \*trackingArea/);
+	});
+
+	test('native attention peek keeps compact wings and hides interactive chrome', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		const peekStart = native.indexOf('if (self.peekOnly) {');
+		assert.ok(peekStart > 0);
+		const peekEnd = native.indexOf('return;', peekStart);
+		const peekBlock = native.slice(peekStart, peekEnd);
+		assert.match(native, /keepCompactWings/);
+		assert.match(native, /compactContainer\.animator\.alphaValue = keepCompactWings \? 1\.0 : 0\.0/);
+		assert.match(peekBlock, /leftStatusLabel/);
+		assert.match(peekBlock, /headerTitle\.hidden = YES/);
+		assert.match(peekBlock, /actionLabels/);
+		assert.doesNotMatch(peekBlock, /approve|deny|followUp|NSButton/i);
+	});
+
+	test('native attention peek collapses when attention resolves without pin or hover', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		const attentionStart = native.indexOf('if (self.content.attention && !self.pinned)');
+		const attentionEnd = native.indexOf('[self.content updateShapeAndContentAnimated:YES duration:0.18 useTargetState:YES]', attentionStart);
+		const attentionBlock = native.slice(attentionStart, attentionEnd);
+		assert.match(attentionBlock, /self\.content\.peekOnly = YES/);
+		assert.match(attentionBlock, /self\.panel\.ignoresMouseEvents = YES/);
+		assert.match(attentionBlock, /BOOL wasAttentionPeek = self\.attentionPeek/);
+		assert.match(attentionBlock, /if \(wasAttentionPeek && !self\.pinned && !self\.hovering\) \{\s*\[self collapse\]/);
+	});
+
+	test('native active-display mode relayouts when target screen changes', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		const monitorStart = native.indexOf('addGlobalMonitorForEventsMatchingMask:NSEventMaskMouseMoved');
+		const monitorEnd = native.indexOf('if (!self.localMonitor)', monitorStart);
+		const monitorBlock = native.slice(monitorStart, monitorEnd);
+		assert.match(monitorBlock, /\[strong\.displayMode isEqualToString:@"active"\]/);
+		assert.match(monitorBlock, /activeScreen != strong\.layoutScreen/);
+		assert.match(monitorBlock, /\[strong layoutForScreen\]/);
+		assert.match(native, /self\.layoutScreen = screen/);
 	});
 });
 

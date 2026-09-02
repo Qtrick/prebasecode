@@ -62,7 +62,8 @@ export interface TemporalLabelLayout {
 	readonly nodeLabels: readonly VisibleLabelItem[];
 	readonly guideLabels: readonly CommunityGuideLabelItem[];
 	readonly routeBadges: readonly RouteBadgeLabelItem[];
-	readonly labelOverlapCount: number;
+	readonly labelCollisionCullCount: number;
+	readonly renderedLabelOverlapCount: number;
 	readonly compositeLabelOverlapCount: number;
 }
 
@@ -83,6 +84,19 @@ export interface TemporalCommunityGuideInput {
 
 export function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
 	return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+/** Count overlapping pairs among labels that were actually rendered. */
+export function countRenderedLabelOverlaps(boxes: readonly LabelBox[]): number {
+	let overlaps = 0;
+	for (let i = 0; i < boxes.length; i++) {
+		for (let j = i + 1; j < boxes.length; j++) {
+			if (boxesOverlap(boxes[i], boxes[j])) {
+				overlaps++;
+			}
+		}
+	}
+	return overlaps;
 }
 
 /** Deterministic shortening for hierarchical community names (metadata preserved in full label elsewhere). */
@@ -280,18 +294,17 @@ export function computeVisibleLabels(
 		const isHovered = hoveredId === node.entityId;
 		const isChanged = Boolean(node.changeKind && node.changeKind !== 'unchanged');
 		const isEntry = Boolean(node.meta?.isEntry);
-
-		let score = 0;
-		if (isSelected) {score += 1000;}
-		if (isHovered) {score += 900;}
-		if (isChanged) {score += 500;}
-		if (isEntry) {score += 300;}
-
 		const isQueryMatch = filterQuery && (
 			(node.label && node.label.toLowerCase().includes(filterQuery)) ||
 			(node.path && node.path.toLowerCase().includes(filterQuery))
 		);
-		if (isQueryMatch) {score += 400;}
+
+		let score = 0;
+		if (isSelected) {score += 1000;}
+		if (isHovered) {score += 900;}
+		if (isQueryMatch) {score += 800;}
+		if (isEntry) {score += 700;}
+		if (isChanged) {score += 500;}
 
 		if (zoom >= 1.25) {
 			score += 100;
@@ -491,11 +504,23 @@ export function computeTemporalLabelLayout(
 		occupancySeed: placedBoxes,
 		overlapCount,
 	});
+	const renderedBoxes: LabelBox[] = [];
+	for (let gi = 0; gi < guideLabels.length; gi++) {
+		renderedBoxes.push(guideLabels[gi].box);
+	}
+	for (let ri = 0; ri < routeBadges.length; ri++) {
+		renderedBoxes.push(routeBadges[ri].box);
+	}
+	for (let ni = 0; ni < nodeLabels.length; ni++) {
+		renderedBoxes.push(nodeLabels[ni].box);
+	}
+	const renderedLabelOverlapCount = countRenderedLabelOverlaps(renderedBoxes);
 	return {
 		nodeLabels,
 		guideLabels,
 		routeBadges,
-		labelOverlapCount: overlapCount.count,
-		compositeLabelOverlapCount: overlapCount.count,
+		labelCollisionCullCount: overlapCount.count,
+		renderedLabelOverlapCount,
+		compositeLabelOverlapCount: overlapCount.count + renderedLabelOverlapCount,
 	};
 }

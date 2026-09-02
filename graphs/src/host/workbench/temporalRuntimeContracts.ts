@@ -29,6 +29,7 @@ import {
 	computeVisibleRouteBadges,
 	shortenCommunityLabel,
 	boxesOverlap,
+	countRenderedLabelOverlaps,
 } from '../../temporal/view/temporalLabelLod.js';
 import { projectTemporalVisibleSet } from '../../view/temporal/temporalProjection.js';
 
@@ -92,6 +93,7 @@ export function serializeTemporalVisibleLabelsSource(): string {
 export function serializeTemporalLabelLayoutSource(): string {
 	return [
 		serializeSelfContainedFunction(boxesOverlap as (...args: unknown[]) => unknown),
+		serializeSelfContainedFunction(countRenderedLabelOverlaps as (...args: unknown[]) => unknown),
 		serializeSelfContainedFunction(shortenCommunityLabel as (...args: unknown[]) => unknown),
 		serializeSelfContainedFunction(computeVisibleCommunityGuideLabels as (...args: unknown[]) => unknown),
 		serializeSelfContainedFunction(computeVisibleRouteBadges as (...args: unknown[]) => unknown),

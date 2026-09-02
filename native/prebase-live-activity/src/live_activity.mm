@@ -499,20 +499,37 @@ static NSString *JSString(Napi::Value value) {
 	} else {
 		// Expanded content layout
 		self.expandedContainer.hidden = NO;
+		BOOL keepCompactWings = self.peekOnly;
 		if (animated && !self.reducedMotion) {
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
 				ctx.duration = duration;
-				self.compactContainer.animator.alphaValue = 0.0;
+				// Peek keeps compact leading/trailing wings (Live Activity);
+				// Interactive fades them for the detailed widget surface.
+				self.compactContainer.animator.alphaValue = keepCompactWings ? 1.0 : 0.0;
 				self.expandedContainer.animator.alphaValue = 1.0;
 			}];
 		} else {
-			self.compactContainer.alphaValue = 0.0;
+			self.compactContainer.alphaValue = keepCompactWings ? 1.0 : 0.0;
 			self.expandedContainer.alphaValue = 1.0;
 			self.expandedContainer.hidden = NO;
 		}
 
 		if (self.peekOnly) {
-			// Attention peek: short glance body only — no interactive chrome.
+			// Sapphire-style Live Activity peek: compact wings stay readable;
+			// body is a single glance reason — not a cropped Interactive panel.
+			NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
+			self.leftStatusLabel.stringValue = label;
+			CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
+			self.leftStatusLabel.frame = NSMakeRect(14, MAX(4, (bandH - 18) / 2.0), maxLabelWidth, 18);
+			if (self.notched && self.metricsLabel.length) {
+				self.rightMetricsLabel.stringValue = self.metricsLabel;
+				self.rightMetricsLabel.hidden = NO;
+				CGFloat metricsX = leftW + housing + 8;
+				CGFloat metricsW = MAX(20, rightW - 16);
+				self.rightMetricsLabel.frame = NSMakeRect(metricsX, MAX(4, (bandH - 18) / 2.0), metricsW, 18);
+			} else {
+				self.rightMetricsLabel.hidden = YES;
+			}
 			self.headerTitle.hidden = YES;
 			self.statusBadge.hidden = YES;
 			for (NSInteger i = 0; i < 3; i++) {

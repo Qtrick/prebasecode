@@ -76,6 +76,39 @@ export function temporalAcceptanceFailures(evidence) {
 		if (canonicalScale && !(full.receivedNodeCount >= 9000)) {failures.push('canonical-scale Full Map received fewer than 9000 nodes');}
 		if ((large || canonicalScale) && full.screenFillRatio !== undefined && full.screenFillRatio < 0.08) {failures.push(`${large ? 'large' : 'canonical-scale'} Full Map leaves a huge empty canvas`);}
 		if ((large || canonicalScale) && full.maxCommunityOverlap !== undefined && full.maxCommunityOverlap > 0.85) {failures.push(`${large ? 'large' : 'canonical-scale'} Full Map communities overlap too much`);}
+		if (canonicalScale) {
+			const received = full.receivedNodeCount;
+			const leafDrawn = Number.isFinite(full.leafNodesDrawn) ? full.leafNodesDrawn : 0;
+			const aggregateDrawn = Number.isFinite(full.aggregateNodesDrawn) ? full.aggregateNodesDrawn : 0;
+			// Density budget must use leaf+aggregate — a low nodesDrawn override must not green a dense draw.
+			const nodesDrawn = leafDrawn + aggregateDrawn;
+			if (!(aggregateDrawn > 0)) {failures.push('canonical-scale Full Map drew zero aggregate communities');}
+			if (leafDrawn >= received * 0.08) {
+				failures.push(`canonical-scale Full Map drew too many leaf nodes (${leafDrawn}/${received}) — overview must not recreate the dot galaxy`);
+			}
+			if (nodesDrawn >= received * 0.1) {
+				failures.push(`canonical-scale Full Map drew too many total nodes (${nodesDrawn}/${received})`);
+			}
+			if ((full.transform?.k ?? 1) < 0.35 && full.projectionTier !== 'overview') {
+				failures.push(`canonical-scale Full Map projection tier is ${full.projectionTier || 'missing'} at overview zoom`);
+			}
+			if (!(full.aggregateEdgesDrawn > 0)) {failures.push('canonical-scale Full Map drew zero aggregate edges');}
+			if (!Number.isFinite(full.leafEdgesDrawn) || full.leafEdgesDrawn > Math.max(250, received * 0.04)) {
+				failures.push(`canonical-scale Full Map leaf-edge hairball too dense (${full.leafEdgesDrawn})`);
+			}
+			if (!(full.communitiesRepresented >= 4)) {
+				failures.push(`canonical-scale Full Map represents too few communities (${full.communitiesRepresented})`);
+			}
+			if (!(full.communityLabelsDrawn >= 1)) {
+				failures.push('canonical-scale Full Map drew zero community labels');
+			}
+			if (!Number.isFinite(full.labelCollisionCullCount)) {
+				failures.push('canonical-scale Full Map labelCollisionCullCount is not finite');
+			}
+			if (!Number.isFinite(full.renderedLabelOverlapCount) || full.renderedLabelOverlapCount > 0) {
+				failures.push(`canonical-scale Full Map has rendered label overlaps (${full.renderedLabelOverlapCount})`);
+			}
+		}
 	}
 
 	const focus = evidence.focusChanges;
