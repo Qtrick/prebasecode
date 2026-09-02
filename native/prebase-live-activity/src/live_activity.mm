@@ -228,6 +228,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL reducedMotion;
 @property (nonatomic, assign) BOOL attention;
 @property (nonatomic, assign) BOOL peekOnly;
+@property (nonatomic, strong) NSTrackingArea *trackingArea;
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
 
 - (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState;
@@ -261,6 +262,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) NSRect lastRequestedFrame;
 @property (nonatomic, copy) NSString *displayMode;
 @property (nonatomic, copy) NSString *lastNativeCommand;
+@property (nonatomic, weak) NSScreen *layoutScreen;
 
 @property (nonatomic, assign) BOOL lastInside;
 @property (nonatomic, assign) BOOL didHoverHaptic;
@@ -849,6 +851,7 @@ static NSString *JSString(Napi::Value value) {
 		self.collapsedHit = NSMakeRect(NSMidX(frame) - kPillWidth / 2.0, topY - kPillHeight, kPillWidth, kPillHeight);
 	}
 	self.lastRequestedFrame = win;
+	self.layoutScreen = screen;
 	self.panel.level = LiveActivityWindowLevel();
 
 	NSTimeInterval animDuration = (win.size.height > self.panel.frame.size.height) ? 0.24 : 0.18;
@@ -986,8 +989,14 @@ static NSString *JSString(Napi::Value value) {
 		if (!strong || gDisposed || !strong.visible) {
 			return;
 		}
-		if (strong.pinned || strong.content.expanded) {
+		if (strong.pinned || (strong.content.expanded && !strong.attentionPeek)) {
 			return;
+		}
+		if ([strong.displayMode isEqualToString:@"active"]) {
+			NSScreen *activeScreen = [strong targetScreen];
+			if (activeScreen && activeScreen != strong.layoutScreen) {
+				[strong layoutForScreen];
+			}
 		}
 		NSPoint p = [NSEvent mouseLocation];
 		NSScreen *screen = [strong targetScreen];
@@ -1437,20 +1446,23 @@ static NSString *JSString(Napi::Value value) {
 		self.attentionPeek = YES;
 		self.content.peekOnly = YES;
 		self.content.expanded = YES;
-		self.content.targetExpanded = YES;
-		self.ignoresMouse = NO;
+		self.content.targetExpanded = NO;
+		self.ignoresMouse = YES;
 		self.didAttentionHaptic = NO;
 		if (self.panel) {
-			self.panel.ignoresMouseEvents = NO;
-			[self removeGlobalMonitorOnly];
+			self.panel.ignoresMouseEvents = YES;
 			[self layoutForScreen];
 		}
 	} else {
+		BOOL wasAttentionPeek = self.attentionPeek;
 		self.attentionPeek = NO;
 		self.content.peekOnly = NO;
 		self.didAttentionHaptic = NO;
-		// Synchronize targetExpanded with current expanded state when not forcing attention expansion
-		self.content.targetExpanded = self.content.expanded;
+		if (wasAttentionPeek && !self.pinned && !self.hovering) {
+			[self collapse];
+		} else if (!self.pinned) {
+			self.content.targetExpanded = self.content.expanded;
+		}
 	}
 	[self.content updateShapeAndContentAnimated:YES duration:0.18 useTargetState:YES];
 	if (self.panel) {

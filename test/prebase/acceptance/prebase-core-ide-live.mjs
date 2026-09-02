@@ -635,18 +635,13 @@ async function run() {
 				}
 				let bodyHoldsCapture = false;
 				const body = document.body;
-				if (body && typeof body.hasPointerCapture === 'function') {
-					if (Number.isFinite(lastPointerId) && body.hasPointerCapture(lastPointerId)) {
-						bodyHoldsCapture = true;
-					} else {
-						for (let pointerId = 0; pointerId < 8 && !bodyHoldsCapture; pointerId++) {
-							if (body.hasPointerCapture(pointerId)) {
-								bodyHoldsCapture = true;
-							}
-						}
-					}
+				if (body && typeof body.hasPointerCapture === 'function' && Number.isFinite(lastPointerId)) {
+					bodyHoldsCapture = body.hasPointerCapture(lastPointerId);
 				}
 				return {
+					captureAcquired: metrics?.pointerCaptureAcquired === true,
+					captureReleased: metrics?.pointerCaptureReleased === true,
+					pointerCaptureReleased: metrics?.pointerCaptureReleased === true,
 					hasPointerCaptureAfterRelease: metrics?.pointerCaptureHeld === true || canvasStillHoldsCapture,
 					hasPointerCaptureOnBody: bodyHoldsCapture,
 				};
@@ -705,7 +700,9 @@ async function run() {
 			),
 			pick: picked,
 			sphereVsClustered: sphereMode === 'sphere' && clusteredMode === 'clustered',
-			labelDensity: labelDensityProven(metrics),
+			labelDensity: labelDensityProven(
+				[zoomMetrics1, zoomMetrics2, metrics].filter(sample => sample && typeof sample === 'object'),
+			),
 			selectionLock: selectionRotationLockProven(
 				picked,
 				rotationAtSelection,

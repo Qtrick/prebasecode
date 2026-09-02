@@ -11,6 +11,7 @@ import {
 	pointerCaptureLifecycleProven,
 	semanticZoomProven,
 	labelDensityProven,
+	labelDensitySnapshotProven,
 	type NetworkRenderMetricsSnapshot,
 } from '../../view/network/networkAcceptanceMath.js';
 
@@ -153,15 +154,28 @@ suite('NetworkAcceptanceMath (Unit - Live Acceptance Truth)', () => {
 	});
 
 	suite('labelDensityProven', () => {
-		test('passes when labels are drawn within node budget', () => {
+		test('passes single-snapshot sanity when labels are drawn within node budget', () => {
+			assert.equal(labelDensitySnapshotProven({ nodesDrawn: 120, labelsDrawn: 18 }), true);
+			assert.equal(labelDensitySnapshotProven({ nodesDrawn: 120, labelCount: 18 }), true);
 			assert.equal(labelDensityProven({ nodesDrawn: 120, labelsDrawn: 18 }), true);
-			assert.equal(labelDensityProven({ nodesDrawn: 120, labelCount: 18 }), true);
 		});
 
 		test('fails when labels are absent or exceed node count', () => {
-			assert.equal(labelDensityProven({ nodesDrawn: 120, labelsDrawn: 0 }), false);
-			assert.equal(labelDensityProven({ nodesDrawn: 10, labelsDrawn: 25 }), false);
+			assert.equal(labelDensitySnapshotProven({ nodesDrawn: 120, labelsDrawn: 0 }), false);
+			assert.equal(labelDensitySnapshotProven({ nodesDrawn: 10, labelsDrawn: 25 }), false);
 			assert.equal(labelDensityProven(null), false);
+			assert.equal(labelDensityProven({ nodesDrawn: 120, labelsDrawn: 0 }), false);
+		});
+
+		test('requires multi-zoom semantic progression when multiple samples are provided', () => {
+			assert.equal(labelDensityProven([
+				{ nodesDrawn: 120, labelsDrawn: 24, transform: { x: 0, y: 0, k: 0.4 }, lodTier: 'low' },
+				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 1.1 }, lodTier: 'high' },
+			]), true);
+			assert.equal(labelDensityProven([
+				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 0.8 }, lodTier: 'medium' },
+				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 0.81 }, lodTier: 'medium' },
+			]), false);
 		});
 	});
 });

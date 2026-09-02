@@ -787,6 +787,14 @@ test('selected node world drag and semantic zoom helpers reject fallback-to-zero
 	assert.equal(labelDensityProven({ labelCount: 12, nodesDrawn: 120 }), true);
 	assert.equal(labelDensityProven({ labelCount: 4, nodesDrawn: 120 }), true);
 	assert.equal(labelDensityProven({ labelCount: 0, nodesDrawn: 120 }), false);
+	assert.equal(labelDensityProven([
+		{ labelCount: 24, nodesDrawn: 120, transform: { k: 0.4 }, lodTier: 'low' },
+		{ labelCount: 12, nodesDrawn: 120, transform: { k: 1.1 }, lodTier: 'high' },
+	]), true);
+	assert.equal(labelDensityProven([
+		{ labelCount: 12, nodesDrawn: 120, transform: { k: 0.8 }, lodTier: 'medium' },
+		{ labelCount: 12, nodesDrawn: 120, transform: { k: 0.81 }, lodTier: 'medium' },
+	]), false);
 });
 
 test('P2 offline onboarding cannot pass on workbench presence alone', () => {
@@ -865,6 +873,13 @@ test('Campaign XIV canonical rotationProven accepts single-axis orbit', () => {
 	const yawOnlyAfter = { yaw: 0.2, pitch: 0.2 };
 	assert.equal(rotationProven(before, yawOnlyAfter), true);
 	assert.equal(cameraRotationStable(before, yawOnlyAfter), false, 'single-axis drift must fail camera stability');
+});
+
+test('networkGraphAcceptance re-exports canonical math from graphs networkAcceptanceMath.mjs', () => {
+	const harness = readFileSync(join(acceptanceDir, 'networkGraphAcceptance.mjs'), 'utf8');
+	assert.match(harness, /from '\.\.\/\.\.\/\.\.\/graphs\/src\/view\/network\/networkAcceptanceMath\.mjs'/);
+	assert.doesNotMatch(harness, /export function cameraRotationStable\b/);
+	assert.doesNotMatch(harness, /export function semanticZoomProven\b/);
 });
 
 test('codeGraphProof does not duplicate rotationProven after Campaign XIV consolidation', () => {
@@ -980,7 +995,7 @@ test('core-ide live proves layouts via Maps data-network-layout chips and metric
 	assert.match(live, /worldDragProven\(hitBeforeDrag, hitAfterDrag\)/);
 	assert.match(live, /semanticZoomProven\(zoomMetrics1, zoomMetrics2\)/);
 	assert.match(live, /semanticZoomProven\(zoomMetrics2, metrics\)/);
-	assert.match(live, /labelDensityProven\(metrics\)/);
+	assert.match(live, /labelDensityProven\(\s*\[zoomMetrics1, zoomMetrics2, metrics\]/);
 	assert.match(live, /pointerCaptureOnCanvas,/);
 	assert.match(live, /screenshot\(\{ path: join\(screenshotDir, 'code-graph-live\.png'\), timeout: 5_000 \}\)\.catch\(\(\) => undefined\)/);
 	assert.match(live, /nodesDrawnFromMetrics/);
@@ -1693,11 +1708,16 @@ test('lifecycle producer timeout covers 5 warm sequences instead of dying at 6 m
 
 test('Temporal canvas screenshots disable animations so idle RAF cannot flake stability', () => {
 	const live = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-live.mjs'), 'utf8');
+	const fixtures = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-fixtures.mjs'), 'utf8');
 	assert.match(live, /animations: 'disabled'/);
 	assert.match(live, /evidence\.fullMap = fullMap/);
 	assert.match(live, /evidence\.focusChanges = focusChanges/);
-	assert.match(live, /moduleCount: paths\.length/);
-	assert.match(live, /expectedHeadFileCount: paths\.length - 1/);
+	assert.match(live, /from '\.\/temporal-fixtures\.mjs'/);
+	assert.match(fixtures, /moduleCount: moduleSeedCount/);
+	assert.match(fixtures, /expectedHeadFileCount: expectedRepositoryHeadFileCount\(moduleSeedCount\)/);
+	assert.match(fixtures, /export function createFixture/);
+	assert.match(fixtures, /export function createLargeFixture/);
+	assert.match(fixtures, /export function createCanonicalScaleFixture/);
 	assert.match(live, /large fixture module seed count is not 336/);
 	assert.match(live, /canonical-scale fixture module seed count is not 9680/);
 	assert.match(live, /createCanonicalScaleFixture/);

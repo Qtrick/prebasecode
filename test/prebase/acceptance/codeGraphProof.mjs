@@ -4,6 +4,8 @@
  *  Fail-closed proof helpers for Code Graph live acceptance (Campaign XII).
  *--------------------------------------------------------------------------------------------*/
 
+import { cameraRotationStable } from '../../../graphs/src/view/network/networkAcceptanceMath.mjs';
+
 /** Node hit includes canonical world-space coordinates, not just screen projection. */
 export function nodeHitHasWorldCoords(hit) {
 	return Boolean(
@@ -51,18 +53,12 @@ export function worldDragProven(hitBefore, hitAfter, minWorldDelta = 0.5) {
 	return worldMoved && !screenOnly;
 }
 
-/** Idle selection lock must freeze both yaw and pitch. */
+/** Idle selection lock must freeze both yaw and pitch via canonical camera stability math. */
 export function selectionRotationLockProven(picked, atSelection, afterWait, tolerance = 0.05) {
 	if (!picked) {
 		return false;
 	}
-	if (!atSelection || !afterWait || !Number.isFinite(atSelection.yaw) || !Number.isFinite(atSelection.pitch)
-		|| !Number.isFinite(afterWait.yaw) || !Number.isFinite(afterWait.pitch)) {
-		return false;
-	}
-	const yawLocked = Math.abs(afterWait.yaw - atSelection.yaw) < tolerance;
-	const pitchLocked = Math.abs(afterWait.pitch - atSelection.pitch) < tolerance;
-	return yawLocked && pitchLocked;
+	return cameraRotationStable(atSelection, afterWait, tolerance);
 }
 
 /** Pointer capture must be on the graph canvas element, not document. */
