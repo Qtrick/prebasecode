@@ -39,10 +39,31 @@ export interface CommunityGuideLabelItem {
 	readonly badgeHeight: number;
 }
 
+export interface AggregateRouteBadgeCandidate {
+	readonly id: string;
+	readonly text: string;
+	readonly x: number;
+	readonly y: number;
+	readonly edgeCount: number;
+	readonly changedEdgeCount: number;
+}
+
+export interface RouteBadgeLabelItem {
+	readonly id: string;
+	readonly text: string;
+	readonly x: number;
+	readonly y: number;
+	readonly box: LabelBox;
+	readonly font: string;
+	readonly isChanged: boolean;
+}
+
 export interface TemporalLabelLayout {
 	readonly nodeLabels: readonly VisibleLabelItem[];
 	readonly guideLabels: readonly CommunityGuideLabelItem[];
+	readonly routeBadges: readonly RouteBadgeLabelItem[];
 	readonly labelOverlapCount: number;
+	readonly compositeLabelOverlapCount: number;
 }
 
 export interface TemporalCommunityGuideInput {
@@ -352,6 +373,86 @@ export function computeVisibleLabels(
 	return visibleLabels;
 }
 
+/** Ranked aggregate route count badges sharing the same occupancy grid as file/guide labels. */
+export function computeVisibleRouteBadges(
+	candidates: readonly AggregateRouteBadgeCandidate[],
+	zoom: number,
+	placedBoxes: LabelBox[],
+	options?: {
+		readonly maxBadges?: number;
+		readonly minZoom?: number;
+		readonly overlapCount?: { count: number };
+	},
+): RouteBadgeLabelItem[] {
+	const minZoom = options?.minZoom ?? 0.38;
+	if (!candidates.length || zoom < minZoom) {
+		return [];
+	}
+	const safeZoom = Math.max(0.001, Number.isFinite(zoom) ? zoom : 1);
+	const maxBadges = options?.maxBadges ?? (safeZoom < 0.45 ? 6 : safeZoom < 0.65 ? 10 : 16);
+	const badgeW = 18 / safeZoom;
+	const badgeH = 12 / safeZoom;
+	const family = (typeof document !== 'undefined' && document.body && typeof getComputedStyle === 'function')
+		? (getComputedStyle(document.body).fontFamily || 'sans-serif')
+		: 'sans-serif';
+	const font = `600 ${Math.max(8, Math.round(9 / safeZoom))}px ${family}`;
+
+	interface ScoredRoute {
+		readonly candidate: AggregateRouteBadgeCandidate;
+		readonly score: number;
+	}
+
+	const scored: ScoredRoute[] = [];
+	for (let i = 0; i < candidates.length; i++) {
+		const candidate = candidates[i];
+		if (!candidate.text || !Number.isFinite(candidate.x) || !Number.isFinite(candidate.y)) {
+			continue;
+		}
+		const score = (candidate.changedEdgeCount > 0 ? 10000 : 0)
+			+ candidate.edgeCount * 10
+			+ Math.log2(1 + candidate.edgeCount);
+		scored.push({ candidate, score });
+	}
+	scored.sort(function (a, b) {
+		if (b.score !== a.score) {
+			return b.score - a.score;
+		}
+		return (a.candidate.id || '').localeCompare(b.candidate.id || '');
+	});
+
+	const out: RouteBadgeLabelItem[] = [];
+	for (let i = 0; i < scored.length && out.length < maxBadges; i++) {
+		const candidate = scored[i].candidate;
+		const boxLeft = candidate.x - badgeW / 2;
+		const boxTop = candidate.y - badgeH / 2;
+		const curBox = { x: boxLeft, y: boxTop, w: badgeW, h: badgeH };
+		let collision = false;
+		for (let b = 0; b < placedBoxes.length; b++) {
+			if (boxesOverlap(curBox, placedBoxes[b])) {
+				collision = true;
+				break;
+			}
+		}
+		if (collision) {
+			if (options?.overlapCount) {
+				options.overlapCount.count++;
+			}
+			continue;
+		}
+		placedBoxes.push(curBox);
+		out.push({
+			id: candidate.id,
+			text: candidate.text,
+			x: candidate.x,
+			y: candidate.y,
+			box: curBox,
+			font,
+			isChanged: candidate.changedEdgeCount > 0,
+		});
+	}
+	return out;
+}
+
 export function computeTemporalLabelLayout(
 	nodes: readonly TemporalRenderNode[],
 	guides: readonly TemporalCommunityGuideInput[],
@@ -365,6 +466,7 @@ export function computeTemporalLabelLayout(
 		readonly measureWidth?: (text: string, font: string) => number;
 		readonly visibleNodeIds?: ReadonlySet<string>;
 		readonly representedGuideIds?: ReadonlySet<string>;
+		readonly routeBadgeCandidates?: readonly AggregateRouteBadgeCandidate[];
 	},
 ): TemporalLabelLayout {
 	const measureWidth = options?.measureWidth;
@@ -375,6 +477,9 @@ export function computeTemporalLabelLayout(
 		measureWidth,
 		visibleNodeIds: options?.visibleNodeIds,
 		representedGuideIds: options?.representedGuideIds,
+		overlapCount,
+	});
+	const routeBadges = computeVisibleRouteBadges(options?.routeBadgeCandidates || [], zoom, placedBoxes, {
 		overlapCount,
 	});
 	const nodeLabels = computeVisibleLabels(nodes, zoom, {
@@ -389,6 +494,8 @@ export function computeTemporalLabelLayout(
 	return {
 		nodeLabels,
 		guideLabels,
+		routeBadges,
 		labelOverlapCount: overlapCount.count,
+		compositeLabelOverlapCount: overlapCount.count,
 	};
 }

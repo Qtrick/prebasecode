@@ -45,15 +45,40 @@ suite('copilot', () => {
 	test('accepts a PreBase desktop package with Magnus and rejects a disabled Copilot manifest', () => {
 		const appBase = fs.mkdtempSync(path.join(os.tmpdir(), 'prebase-copilot-package-test-'));
 		try {
-			fs.mkdirSync(path.join(appBase, 'extensions', 'prebase-magnus'), { recursive: true });
+			fs.mkdirSync(path.join(appBase, 'extensions', 'prebase-magnus', 'out'), { recursive: true });
 			fs.writeFileSync(path.join(appBase, 'product.json'), JSON.stringify({ nameShort: 'PreBase' }));
 			fs.writeFileSync(path.join(appBase, 'extensions', 'prebase-magnus', 'package.json'), '{}');
+			fs.writeFileSync(path.join(appBase, 'extensions', 'prebase-magnus', 'out', 'extension.js'), '// stub');
 
-			assert.doesNotThrow(() => verifyPreBaseDesktopPackage(appBase, false));
+			assert.doesNotThrow(() => verifyPreBaseDesktopPackage(appBase, false, 'win32'));
 
 			fs.mkdirSync(path.join(appBase, 'extensions', 'copilot'), { recursive: true });
 			fs.writeFileSync(path.join(appBase, 'extensions', 'copilot', 'package.json'), '{}');
-			assert.throws(() => verifyPreBaseDesktopPackage(appBase, false), /contains disabled Copilot manifest/);
+			assert.throws(() => verifyPreBaseDesktopPackage(appBase, false, 'win32'), /contains disabled Copilot manifest/);
+		} finally {
+			fs.rmSync(appBase, { recursive: true, force: true });
+		}
+	});
+
+	test('rejects Live Activity notch addon on Windows and Linux packages', () => {
+		const appBase = fs.mkdtempSync(path.join(os.tmpdir(), 'prebase-live-activity-boundary-test-'));
+		try {
+			fs.mkdirSync(path.join(appBase, 'extensions', 'prebase-magnus', 'out'), { recursive: true });
+			fs.writeFileSync(path.join(appBase, 'product.json'), JSON.stringify({ nameShort: 'PreBase' }));
+			fs.writeFileSync(path.join(appBase, 'extensions', 'prebase-magnus', 'package.json'), '{}');
+			fs.writeFileSync(path.join(appBase, 'extensions', 'prebase-magnus', 'out', 'extension.js'), '// stub');
+			const liveActivityNode = path.join(appBase, 'native', 'prebase-live-activity', 'build', 'Release', 'prebase_live_activity.node');
+			fs.mkdirSync(path.dirname(liveActivityNode), { recursive: true });
+			fs.writeFileSync(liveActivityNode, 'stub');
+
+			assert.throws(
+				() => verifyPreBaseDesktopPackage(appBase, false, 'win32'),
+				/Live Activity notch addon must not ship on win32/,
+			);
+			assert.throws(
+				() => verifyPreBaseDesktopPackage(appBase, false, 'linux'),
+				/Live Activity notch addon must not ship on linux/,
+			);
 		} finally {
 			fs.rmSync(appBase, { recursive: true, force: true });
 		}

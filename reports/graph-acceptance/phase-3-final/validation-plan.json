@@ -1,48 +1,41 @@
 {
-  "runId": "2026-09-01T01-30-23-599Z",
-  "planKey": "c96de91ee58826f4e227f462ec14877f49551b6ad5980b06d4c2a117836488ec:commit",
-  "tier": "commit",
+  "runId": "2026-09-02T02-57-57-545Z",
+  "planKey": "ea3b3c3724958db70aba0984a7967d9e41e6e0ec6fdb336ffb37a1d53643eb64",
+  "tier": "release",
   "onlyProducers": [],
-  "plannedAtHead": "b4e2de52da6fbd7c58a5c114bb579ad2b8eea20e",
-  "currentHead": "b4e2de52da6fbd7c58a5c114bb579ad2b8eea20e",
-  "sourceHead": "b4e2de52da6fbd7c58a5c114bb579ad2b8eea20e",
-  "productFingerprint": "cfe0a5358f5744292fad8fb9b03ac0a1bbf2c56729418803bdd0a3b62ce76382",
-  "sourceFingerprint": "cfe0a5358f5744292fad8fb9b03ac0a1bbf2c56729418803bdd0a3b62ce76382",
+  "plannedAtHead": "fdfbd8f601a3c48726e896e813c333572404de4f",
+  "currentHead": "fdfbd8f601a3c48726e896e813c333572404de4f",
+  "sourceHead": "fdfbd8f601a3c48726e896e813c333572404de4f",
+  "productFingerprint": "b0c3f330b3b4ae5602878f03abe042232754e29086aebdd9ebebb5d7f7e4d3ae",
+  "sourceFingerprint": "b0c3f330b3b4ae5602878f03abe042232754e29086aebdd9ebebb5d7f7e4d3ae",
   "prerequisites": {
     "firecrawlConfigured": false,
     "linkupConfigured": false,
     "geminiConfigured": false
   },
-  "createdAt": "2026-09-01T01:30:25.321Z",
+  "createdAt": "2026-09-02T02:57:59.572Z",
   "reused": false,
-  "totalEstimatedDurationMs": 55557,
-  "changedPathCount": 11,
+  "totalEstimatedDurationMs": 4995557,
+  "changedPathCount": 14,
   "changedDomains": [
-    "magnus-guidance",
+    "temporal",
+    "graphs-common",
+    "network-graph",
     "live-activity",
-    "shared-workbench",
     "validation-orchestration",
-    "magnus-core"
+    "core-ide"
   ],
   "unknownChangedPaths": [
-    ".eslintcache-prebase-security"
+    "build/lib/copilot.ts",
+    "build/lib/test/copilot.test.ts"
   ],
-  "deferredReleaseProducers": [
-    "temporal-large",
-    "load-quit",
-    "lifecycle-cycles",
-    "electron-restart-soak",
-    "tauri-restart-soak",
-    "idle-soak",
-    "active-soak",
-    "assurance"
-  ],
+  "deferredReleaseProducers": [],
   "producers": [
     {
       "id": "parser-benchmark",
-      "expectedProducerFingerprint": "ceaaa7b857af3e56f528e1ba5ba45a317a1998a304d7c5554251f9aeadf52695",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
+      "expectedProducerFingerprint": "60fb79ac78baad704d8882127630c10b30aa545be19e28e7d4df33313a0206a1",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "timeoutMs": 1500000,
       "artifacts": [
@@ -54,7 +47,7 @@
     },
     {
       "id": "magnus-streaming-smoke",
-      "expectedProducerFingerprint": "434680ae006f933bcee1ad3d2cd13f35305cdd64bf1b249c9b2005453fab74f2",
+      "expectedProducerFingerprint": "e50176c4a526e8bb2e4e9d8dd1f757d64dc01a61b52f421382452920d617552d",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 45000,
@@ -71,7 +64,7 @@
     },
     {
       "id": "magnus-guidance-smoke",
-      "expectedProducerFingerprint": "c7a6b26e235f15735e3dd5b272765d7a866af403df82ccbcfeef7c16dcfd1277",
+      "expectedProducerFingerprint": "0a37d8e41f0fd21db765f32f09a2638a13a979f0bd2d5392e8a2c848ac2b8c99",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 10557,
@@ -88,9 +81,9 @@
     },
     {
       "id": "magnus-live-activity",
-      "expectedProducerFingerprint": "042ca607020ac3708da9ca717400839f3b52a16f59ff3a25459a15c9822c43bf",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
+      "expectedProducerFingerprint": "11693a45f3095c96d3534783a1445aca397740ac52adb12ec81ad60b03a925cb",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 45000,
       "timeoutMs": 120000,
       "artifacts": [
@@ -104,9 +97,9 @@
     },
     {
       "id": "core-ide",
-      "expectedProducerFingerprint": "2e44bc524fd5da6b21272e944e150f8764dab6301f33bd88e102248c60777bbd",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "f52500c7dd977d9ec99075c7b9fa1ae25979452a825487aca684e4067397a4b4",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -126,9 +119,9 @@
     },
     {
       "id": "runtime-preview",
-      "expectedProducerFingerprint": "f59ac3e91196a535ab234eaa8837914b7f4292bb834f8c0438bbd6435e2a3e30",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
+      "expectedProducerFingerprint": "3ef661ae93916de15cd2a38f4a64e2073425589ec2694d6490344fdea4a1df87",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 60000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -141,9 +134,9 @@
     },
     {
       "id": "temporal-small",
-      "expectedProducerFingerprint": "074f9cffb0d95a62bb4135418418f4c7276467c4c592e3d46a58e34810bfcaf2",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "82613f9cef89800352b681e6cef0f12230cdf33c028e6b59fab8d8f5d663a3d5",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -159,9 +152,9 @@
     },
     {
       "id": "temporal-large",
-      "expectedProducerFingerprint": "d79506a0dd5208395a9cd494c360d2e124c42cba8cd62a95f1f2b344423c6899",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "eab537d5a7400275bd787e83337519a94bd4c9fb44448ed46b2190cbf18fc070",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 150000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -176,10 +169,28 @@
       ]
     },
     {
+      "id": "temporal-canonical-scale",
+      "expectedProducerFingerprint": "a929accd2ee04fa2205af4127d6394446579f5854bbf0d3012649842290bd20a",
+      "status": "MISSING",
+      "reason": "missing evidence",
+      "estimatedDurationMs": 300000,
+      "timeoutMs": 600000,
+      "artifacts": [
+        "temporal-canonical-scale"
+      ],
+      "dependencies": [
+        "temporal",
+        "graphs-common",
+        "network-graph",
+        "shared-workbench",
+        "launch-harness"
+      ]
+    },
+    {
       "id": "electron-product-path",
-      "expectedProducerFingerprint": "cfed976843c723b24a35b035fe4024823c662236702efda0de73a51658db5e8d",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "937e470d1996d538e456d87f3de28d0a74b75c6b84c09e8e2c7ce985b41b94e4",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 30000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -194,9 +205,9 @@
     },
     {
       "id": "electron-native-cases",
-      "expectedProducerFingerprint": "d15b738813819e73646d2902716f53cdd048ac6bbdde5dab99196fde6c07b6dc",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "71d91f8cc1c4c273c3844a79201b9c2906e367b4e499d2596dd3cce44c3f5129",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 35000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -211,9 +222,9 @@
     },
     {
       "id": "tauri-product-path",
-      "expectedProducerFingerprint": "c74a60ab742cb02b0b361f45b55fb4168dcc6e0e08f32662df6c9f04963a4a43",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "5fa569326a585a9b31c8c140a5b0e49a1ba818d0ac60c1ade3f0e6f8bfddee8d",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 30000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -228,9 +239,9 @@
     },
     {
       "id": "magnus-electron-tools",
-      "expectedProducerFingerprint": "b74259a4628a69207c4310657622f055124eae3feef7ceb113d1220f319c6dba",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "1df58293ef98da8c4b16f94272475f00a9d62c9bca1d90c952d200ab540be6c5",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 150000,
       "timeoutMs": 300000,
       "artifacts": [
@@ -246,9 +257,9 @@
     },
     {
       "id": "magnus-tauri-tools",
-      "expectedProducerFingerprint": "fca710196da8dce98dd740c0b89ef9d8fb69523d1bd1cae377d6b5ae66e1978f",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "e59bf61a069ec3e1bfca565aa8a2b7fda8f1100d9e4626b66a61fcc6f39baea4",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 240000,
       "timeoutMs": 420000,
       "artifacts": [
@@ -264,9 +275,9 @@
     },
     {
       "id": "hybrid-web-smoke",
-      "expectedProducerFingerprint": "e19adea22d758e3411cb62be687178e454d56b44f331bd0dd82e94627c2705d7",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "ab727dfcdbf359d5a1e4900602befe94f307ba09825a080fd46bd12b648d1bfa",
+      "status": "STALE",
+      "reason": "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
       "estimatedDurationMs": 60000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -281,9 +292,9 @@
     },
     {
       "id": "privacy",
-      "expectedProducerFingerprint": "0a2f13243035926aaa4632fdbb459a592f4a6b4936e5e8bb9b2e6d26a0da9f3b",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "92cbdd4503a267b170654e1af936ac37828f50e78b2cd27392624c0b13ae6f4d",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -297,9 +308,9 @@
     },
     {
       "id": "load-quit",
-      "expectedProducerFingerprint": "5aab09fe2729c4ccb97fe69ab874de7f9911f37d00d400f42ff71058b36d0196",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "ed68d8a48a4f2891ca049272a3f179cddc49332642eb0d4342e69c6041deeb52",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -320,9 +331,9 @@
     },
     {
       "id": "lifecycle-cycles",
-      "expectedProducerFingerprint": "1270ee7d108a944ea952adb8281518daabc9bc889e0791e2bbcd37e3907c93bd",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "6aca329ad45acdb62b054f23bf82e716051a218715f8322ae7848f6cbc19af7c",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "timeoutMs": 1500000,
       "artifacts": [
@@ -338,9 +349,9 @@
     },
     {
       "id": "electron-restart-soak",
-      "expectedProducerFingerprint": "92d9078e762c756b1ca594dbd121d8ae3626d0abd6c743b445e89cf5f7d6cf77",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "3a88a030f932cdf3c6c2f0b94e1328db285364e34675b8305efcc865515608db",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 900000,
       "timeoutMs": 5400000,
       "artifacts": [
@@ -354,9 +365,9 @@
     },
     {
       "id": "tauri-restart-soak",
-      "expectedProducerFingerprint": "6a399a6f11d5ad74764dff950a667c709b5e23d3acdd836f4f921f3557a8606c",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "c2e3313d27d626be33390a8c25cac0093a362760105755235be8ade19a523857",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 240000,
       "timeoutMs": 3600000,
       "artifacts": [
@@ -370,9 +381,9 @@
     },
     {
       "id": "idle-soak",
-      "expectedProducerFingerprint": "b8caed79e2790379e8c3f1f2021dbc0dbc0ac7a1d3158d859efcf616b1e162f9",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "38fe779dda8e5e4bb43f201da28f42c6316546bdbb2851dceb01feb48d8a4d37",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 900000,
       "timeoutMs": 1140000,
       "artifacts": [
@@ -386,9 +397,9 @@
     },
     {
       "id": "active-soak",
-      "expectedProducerFingerprint": "c34b9ad084c9a20dd48204066e702bf980420b4de0a7283971ea8db72908dfd7",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "9c1e29ec20fa89aaf7f2c7c9fe40a075af00c89790eb6e3869f99b8f50f7e02f",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 720000,
       "timeoutMs": 960000,
       "artifacts": [
@@ -407,9 +418,9 @@
     },
     {
       "id": "assurance",
-      "expectedProducerFingerprint": "4eda797bc4dc4ae3860ecc6d80ece631267739fa9aa4f16d4adcf290a23895d3",
-      "status": "DEFERRED_RELEASE",
-      "reason": "commit-tier excludes release-only / unaffected producer",
+      "expectedProducerFingerprint": "b8e634edd0a0862c86311b01a9fbc723ac2f1d22bb228659054f019b9633c430",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 480000,
       "timeoutMs": 480000,
       "artifacts": [

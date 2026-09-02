@@ -80,11 +80,13 @@ export function verifyPreBaseDesktopPackage(appBase: string, copilotEnabled: boo
 	}
 
 	const isDarwin = platform === 'darwin' || (platform === undefined && process.platform === 'darwin');
+	const liveActivityNode = path.join(appBase, 'native', 'prebase-live-activity', 'build', 'Release', 'prebase_live_activity.node');
 	if (isDarwin) {
-		const liveActivityNode = path.join(appBase, 'native', 'prebase-live-activity', 'build', 'Release', 'prebase_live_activity.node');
 		if (!fs.existsSync(liveActivityNode) || fs.statSync(liveActivityNode).size === 0) {
 			throw new Error(`[verifyPreBaseDesktopPackage] Darwin native Live Activity addon missing or empty at ${liveActivityNode}`);
 		}
+	} else if (fs.existsSync(liveActivityNode)) {
+		throw new Error(`[verifyPreBaseDesktopPackage] Live Activity notch addon must not ship on ${platform ?? 'non-darwin'} (${liveActivityNode})`);
 	}
 
 	const bundledRootEnv = path.join(appBase, '.env');

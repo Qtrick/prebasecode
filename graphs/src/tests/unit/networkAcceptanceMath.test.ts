@@ -97,20 +97,60 @@ suite('NetworkAcceptanceMath (Unit - Live Acceptance Truth)', () => {
 	});
 
 	suite('pointerCaptureLifecycleProven', () => {
-		test('passes when capture is released after gesture', () => {
-			assert.equal(pointerCaptureLifecycleProven({
-				hasPointerCaptureAfterRelease: false,
-				hasPointerCaptureOnBody: false,
-			}), true);
+		const releasedGesture = {
+			hasPointerCaptureAfterRelease: false,
+			hasPointerCaptureOnBody: false,
+			captureAcquired: true,
+			captureReleased: true,
+			pointerCaptureReleased: true,
+		};
+
+		test('passes when capture is released after gesture with acquisition proof', () => {
+			assert.equal(pointerCaptureLifecycleProven(releasedGesture), true);
 		});
 
-		test('fails when pointer capture remains stuck', () => {
+		test('fails closed when capture was never acquired', () => {
 			assert.equal(pointerCaptureLifecycleProven({
-				hasPointerCaptureAfterRelease: true,
+				...releasedGesture,
+				captureAcquired: false,
 			}), false);
 			assert.equal(pointerCaptureLifecycleProven({
 				hasPointerCaptureAfterRelease: false,
+				hasPointerCaptureOnBody: false,
+				captureReleased: true,
+				pointerCaptureReleased: true,
+			}), false, 'missing acquisition must fail even when release flags are set');
+		});
+
+		test('fails closed when release was not recorded on stale metrics', () => {
+			assert.equal(pointerCaptureLifecycleProven({
+				hasPointerCaptureAfterRelease: false,
+				hasPointerCaptureOnBody: false,
+				captureAcquired: true,
+				captureReleased: false,
+				pointerCaptureReleased: false,
+			}), false);
+		});
+
+		test('fails when pointer capture remains stuck on canvas or body', () => {
+			assert.equal(pointerCaptureLifecycleProven({
+				...releasedGesture,
+				hasPointerCaptureAfterRelease: true,
+			}), false);
+			assert.equal(pointerCaptureLifecycleProven({
+				...releasedGesture,
 				hasPointerCaptureOnBody: true,
+			}), false);
+		});
+
+		test('fails when stuck capture is checked against wrong pointer id (false negative on release)', () => {
+			// Simulates live harness reading hasPointerCapture(staleId) while canvas still holds the active id.
+			assert.equal(pointerCaptureLifecycleProven({
+				captureAcquired: true,
+				captureReleased: true,
+				pointerCaptureReleased: true,
+				hasPointerCaptureAfterRelease: true,
+				hasPointerCaptureOnBody: false,
 			}), false);
 		});
 	});
@@ -176,6 +216,23 @@ suite('NetworkAcceptanceMath (Unit - Live Acceptance Truth)', () => {
 				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 0.8 }, lodTier: 'medium' },
 				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 0.81 }, lodTier: 'medium' },
 			]), false);
+		});
+
+		test('edges alone must not prove label density at multiple zoom levels', () => {
+			const edgeOnlySamples = [
+				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 0.4 }, lodTier: 'medium', edgesDrawn: 80 },
+				{ nodesDrawn: 120, labelsDrawn: 12, transform: { x: 0, y: 0, k: 1.1 }, lodTier: 'medium', edgesDrawn: 220 },
+			];
+			assert.equal(labelDensityProven(edgeOnlySamples), false);
+			assert.equal(semanticZoomProven(edgeOnlySamples[0], edgeOnlySamples[1]), false,
+				'edge-only deltas must not satisfy semantic zoom either');
+		});
+
+		test('label-specific LOD progression passes when label counts change across zoom', () => {
+			assert.equal(labelDensityProven([
+				{ nodesDrawn: 200, labelsDrawn: 6, transform: { x: 0, y: 0, k: 0.25 }, lodTier: 'low' },
+				{ nodesDrawn: 200, labelsDrawn: 48, transform: { x: 0, y: 0, k: 1.2 }, lodTier: 'high', edgesDrawn: 40 },
+			]), true);
 		});
 	});
 });

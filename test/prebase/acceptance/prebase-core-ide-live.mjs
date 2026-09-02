@@ -639,9 +639,9 @@ async function run() {
 					bodyHoldsCapture = body.hasPointerCapture(lastPointerId);
 				}
 				return {
-					captureAcquired: metrics?.pointerCaptureAcquired === true,
-					captureReleased: metrics?.pointerCaptureReleased === true,
-					pointerCaptureReleased: metrics?.pointerCaptureReleased === true,
+					captureAcquired: metrics?.lastGestureCaptureAcquired === true || metrics?.pointerCaptureAcquired === true,
+					captureReleased: metrics?.lastGestureCaptureReleased === true || metrics?.pointerCaptureReleased === true,
+					pointerCaptureReleased: metrics?.lastGestureCaptureReleased === true || metrics?.pointerCaptureReleased === true,
 					hasPointerCaptureAfterRelease: metrics?.pointerCaptureHeld === true || canvasStillHoldsCapture,
 					hasPointerCaptureOnBody: bodyHoldsCapture,
 				};

@@ -1184,8 +1184,12 @@ let dragging = false, panning = false, rotating = false, draggingNode = false;
 let lastX = 0, lastY = 0, moved = false;
 let activePointerId = null, activePointerHost = null;
 let lastPointerCaptureId = null;
-let pointerCaptureAcquired = false;
-let pointerCaptureReleased = false;
+/** True only while an active pointer gesture holds capture. */
+let pointerCaptureActive = false;
+/** Last completed gesture: capture was acquired (persists until the next pointer down). */
+let lastGestureCaptureAcquired = false;
+/** Last completed gesture: capture was released (persists until the next pointer down). */
+let lastGestureCaptureReleased = false;
 let lostPointerCaptureObserved = false;
 let layoutKey = '';
 let base3d = Object.create(null);
@@ -2357,6 +2361,9 @@ function drawTemporalFrame(ts) {
 	if (!netCanvas || !ctx) return;
 	const renderStart = performance.now();
 	let edgesDrawn = 0;
+	let aggregateEdgesDrawn = 0;
+	let leafEdgesDrawn = 0;
+	let routeBadgesDrawn = 0;
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
 	const theme = getComputedThemeColors();
@@ -2415,6 +2422,88 @@ function drawTemporalFrame(ts) {
 		if (noChangesCard) noChangesCard.style.display = 'none';
 	}
 
+	const directContextSet = visibleData.directContextSet;
+	const nodesToRender = projectedLeaves.slice();
+	nodesToRender.sort(function (a, b) {
+		const aRank = a.changeKind && a.changeKind !== 'unchanged' ? 2 : (directContextSet.has(a.entityId) ? 1 : 0);
+		const bRank = b.changeKind && b.changeKind !== 'unchanged' ? 2 : (directContextSet.has(b.entityId) ? 1 : 0);
+		return aRank - bRank;
+	});
+	const visibleNodeIdSet = new Set();
+	for (let ni = 0; ni < nodesToRender.length; ni++) {
+		visibleNodeIdSet.add(nodesToRender[ni].entityId);
+	}
+	const representedGuideIdSet = new Set();
+	for (let pi = 0; pi < temporalProjection.items.length; pi++) {
+		const guideId = temporalProjection.items[pi].guideId;
+		if (guideId) {
+			representedGuideIdSet.add(guideId);
+		}
+	}
+	const filterValForLabels = filterVal;
+	const routeBadgeCandidates = [];
+	const pendingAggEdges = [];
+	if (displayMode === 'state' && temporalDiff && Array.isArray(temporalDiff.guides) && transform.k < 0.85 && visibleData.edges && visibleData.edges.length > 0) {
+		const aggEdges = computeCommunityAggregateEdges(visibleData.edges, temporalDiff.guides);
+		const commMap = new Map();
+		for (let g = 0; g < temporalDiff.guides.length; g++) {
+			commMap.set(temporalDiff.guides[g].id, temporalDiff.guides[g]);
+		}
+		const pairLaneCounts = new Map();
+		const pairLaneIndex = new Map();
+		for (let a = 0; a < aggEdges.length; a++) {
+			const agg = aggEdges[a];
+			const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
+			const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
+			const key = lo + '::' + hi;
+			pairLaneIndex.set(a, pairLaneCounts.get(key) || 0);
+			pairLaneCounts.set(key, (pairLaneCounts.get(key) || 0) + 1);
+		}
+		for (let a = 0; a < aggEdges.length; a++) {
+			const agg = aggEdges[a];
+			const cSrc = commMap.get(agg.sourceCommunityId);
+			const cTgt = commMap.get(agg.targetCommunityId);
+			if (!cSrc || !cTgt) continue;
+			const dx = cTgt.x - cSrc.x;
+			const dy = cTgt.y - cSrc.y;
+			if (Math.hypot(dx, dy) < 10) continue;
+			const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
+			const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
+			const pairKey = lo + '::' + hi;
+			const route = computeAggregateEdgeRoute(
+				cSrc.x, cSrc.y, cTgt.x, cTgt.y,
+				cSrc.radius || 40, cTgt.radius || 40,
+				pairLaneIndex.get(a) || 0, pairLaneCounts.get(pairKey) || 1,
+				agg.sourceCommunityId, agg.targetCommunityId
+			);
+			pendingAggEdges.push({ agg, route });
+			if (transform.k >= 0.38) {
+				const midX = 0.25 * route.x1 + 0.5 * route.cpX + 0.25 * route.x2;
+				const midY = 0.25 * route.y1 + 0.5 * route.cpY + 0.25 * route.y2;
+				routeBadgeCandidates.push({
+					id: agg.sourceCommunityId + '::' + agg.targetCommunityId,
+					text: String(agg.edgeCount),
+					x: midX,
+					y: midY,
+					edgeCount: agg.edgeCount,
+					changedEdgeCount: agg.changedEdgeCount,
+				});
+			}
+		}
+	}
+	const labelLayout = computeTemporalLabelLayout(nodesToRender, temporalDiff.guides || [], transform.k, {
+		selectedNodeId: selectedNodeId,
+		hoveredNodeId: hoveredNodeId,
+		filterQuery: filterValForLabels,
+		measureWidth: function (t, f) { return measureTextWidth(t, f); },
+		visibleNodeIds: visibleNodeIdSet,
+		representedGuideIds: representedGuideIdSet,
+		routeBadgeCandidates: routeBadgeCandidates,
+	});
+	const visibleLabels = labelLayout.nodeLabels;
+	const guideLabels = labelLayout.guideLabels;
+	const routeBadges = labelLayout.routeBadges || [];
+
 	ctx.save();
 	ctx.translate(transform.x, transform.y);
 	ctx.scale(transform.k, transform.k);
@@ -2452,47 +2541,13 @@ function drawTemporalFrame(ts) {
 		}
 
 		// 2b. Render Overview Community-to-Community Aggregate Edges with coordinated crossfade
-		if (transform.k < 0.85 && visibleData.edges && visibleData.edges.length > 0) {
+		if (pendingAggEdges.length > 0) {
 			const aggAlpha = transform.k < 0.50 ? 0.85 : Math.max(0, 0.85 * (1 - (transform.k - 0.50) / 0.35));
 			if (aggAlpha > 0.01) {
-				const aggEdges = computeCommunityAggregateEdges(visibleData.edges, temporalDiff.guides);
-				const commMap = new Map();
-				for (let g = 0; g < temporalDiff.guides.length; g++) {
-					commMap.set(temporalDiff.guides[g].id, temporalDiff.guides[g]);
-				}
-				// Lane index is per undirected community pair (not global agg list index).
-				const pairLaneCounts = new Map();
-				const pairLaneIndex = new Map();
-				for (let a = 0; a < aggEdges.length; a++) {
-					const agg = aggEdges[a];
-					const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
-					const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
-					const key = lo + '::' + hi;
-					pairLaneIndex.set(a, pairLaneCounts.get(key) || 0);
-					pairLaneCounts.set(key, (pairLaneCounts.get(key) || 0) + 1);
-				}
-
-				for (let a = 0; a < aggEdges.length; a++) {
-					const agg = aggEdges[a];
-					const cSrc = commMap.get(agg.sourceCommunityId);
-					const cTgt = commMap.get(agg.targetCommunityId);
-					if (!cSrc || !cTgt) continue;
-
-					const dx = cTgt.x - cSrc.x;
-					const dy = cTgt.y - cSrc.y;
-					const dist = Math.hypot(dx, dy);
-					if (dist < 10) continue;
-
-					const lo = agg.sourceCommunityId < agg.targetCommunityId ? agg.sourceCommunityId : agg.targetCommunityId;
-					const hi = agg.sourceCommunityId < agg.targetCommunityId ? agg.targetCommunityId : agg.sourceCommunityId;
-					const pairKey = lo + '::' + hi;
-					const route = computeAggregateEdgeRoute(
-						cSrc.x, cSrc.y, cTgt.x, cTgt.y,
-						cSrc.radius || 40, cTgt.radius || 40,
-						pairLaneIndex.get(a) || 0, pairLaneCounts.get(pairKey) || 1,
-						agg.sourceCommunityId, agg.targetCommunityId
-					);
-
+				for (let a = 0; a < pendingAggEdges.length; a++) {
+					const pending = pendingAggEdges[a];
+					const agg = pending.agg;
+					const route = pending.route;
 					const strokeWidth = Math.min(4.0, 1.2 + Math.log2(1 + agg.edgeCount) * 0.5) / Math.max(0.35, Math.sqrt(transform.k));
 
 					ctx.save();
@@ -2510,20 +2565,20 @@ function drawTemporalFrame(ts) {
 					ctx.lineWidth = strokeWidth;
 					ctx.stroke();
 					edgesDrawn++;
-
-					// Count badge on the quadratic midpoint (not the chord).
-					if (transform.k >= 0.38) {
-						const midX = 0.25 * route.x1 + 0.5 * route.cpX + 0.25 * route.x2;
-						const midY = 0.25 * route.y1 + 0.5 * route.cpY + 0.25 * route.y2;
-						const badgeFont = computeNetworkLabelWorldFontSize(9, transform.k, { minScreenPx: 8, maxScreenPx: 14 });
-						ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
-						ctx.fillRect(midX - 9 / transform.k, midY - 6 / transform.k, 18 / transform.k, 12 / transform.k);
-						ctx.font = canvasFont('600', badgeFont);
-						ctx.fillStyle = agg.changedEdgeCount > 0 ? theme.accent : '#94a3b8';
-						ctx.textAlign = 'center';
-						ctx.textBaseline = 'middle';
-						ctx.fillText(String(agg.edgeCount), midX, midY);
-					}
+					aggregateEdgesDrawn++;
+					ctx.restore();
+				}
+				for (let rb = 0; rb < routeBadges.length; rb++) {
+					const badge = routeBadges[rb];
+					ctx.save();
+					ctx.fillStyle = 'rgba(15, 23, 42, 0.85)';
+					ctx.fillRect(badge.box.x, badge.box.y, badge.box.w, badge.box.h);
+					ctx.font = badge.font;
+					ctx.fillStyle = badge.isChanged ? theme.accent : '#94a3b8';
+					ctx.textAlign = 'center';
+					ctx.textBaseline = 'middle';
+					ctx.fillText(badge.text, badge.x, badge.y);
+					routeBadgesDrawn++;
 					ctx.restore();
 				}
 			}
@@ -2532,7 +2587,6 @@ function drawTemporalFrame(ts) {
 
 	const visibleNodeSet = new Set(visibleData.nodes.map(n => n.entityId));
 	const focusSet = visibleData.focusSet;
-	const directContextSet = visibleData.directContextSet;
 
 	// 3. Render Edges (Curved Bezier with Dark Contrast Halo & LOD)
 	if (visibleData.edges) {
@@ -2631,6 +2685,7 @@ function drawTemporalFrame(ts) {
 			if (edgeDash.length && typeof ctx.setLineDash === 'function') ctx.setLineDash(edgeDash);
 			ctx.stroke();
 			edgesDrawn++;
+			leafEdgesDrawn++;
 			ctx.restore();
 		}
 	}
@@ -2650,13 +2705,6 @@ function drawTemporalFrame(ts) {
 			ctx.restore();
 		}
 	}
-
-	const nodesToRender = projectedLeaves.slice();
-	nodesToRender.sort(function (a, b) {
-		const aRank = a.changeKind && a.changeKind !== 'unchanged' ? 2 : (directContextSet.has(a.entityId) ? 1 : 0);
-		const bRank = b.changeKind && b.changeKind !== 'unchanged' ? 2 : (directContextSet.has(b.entityId) ? 1 : 0);
-		return aRank - bRank;
-	});
 
 	const isChangesMode = displayMode === 'changes';
 
@@ -2775,28 +2823,6 @@ function drawTemporalFrame(ts) {
 	}
 
 	// 5. Labels with unified community + node occupancy
-	const visibleNodeIdSet = new Set();
-	for (let ni = 0; ni < nodesToRender.length; ni++) {
-		visibleNodeIdSet.add(nodesToRender[ni].entityId);
-	}
-	const representedGuideIdSet = new Set();
-	for (let pi = 0; pi < temporalProjection.items.length; pi++) {
-		const guideId = temporalProjection.items[pi].guideId;
-		if (guideId) {
-			representedGuideIdSet.add(guideId);
-		}
-	}
-	const labelLayout = computeTemporalLabelLayout(nodesToRender, temporalDiff.guides || [], transform.k, {
-		selectedNodeId: selectedNodeId,
-		hoveredNodeId: hoveredNodeId,
-		filterQuery: filterVal,
-		measureWidth: function (t, f) { return measureTextWidth(t, f); },
-		visibleNodeIds: visibleNodeIdSet,
-		representedGuideIds: representedGuideIdSet,
-	});
-	const visibleLabels = labelLayout.nodeLabels;
-	const guideLabels = labelLayout.guideLabels;
-
 	for (let gi = 0; gi < guideLabels.length; gi++) {
 		const gl = guideLabels[gi];
 		ctx.save();
@@ -2888,9 +2914,15 @@ function drawTemporalFrame(ts) {
 			metrics.structuralOk = metrics.nodesDrawn > 0 && Number.isFinite(transform.k);
 			metrics.humanVisualReviewRequired = true;
 			metrics.edgesDrawn = edgesDrawn;
+			metrics.leafEdgesDrawn = leafEdgesDrawn;
+			metrics.aggregateEdgesDrawn = aggregateEdgesDrawn;
 			metrics.labelsDrawn = visibleLabels.length;
 			metrics.guideLabelsDrawn = guideLabels.length;
+			metrics.fileLabelsDrawn = visibleLabels.length;
+			metrics.communityLabelsDrawn = guideLabels.length;
+			metrics.routeBadgesDrawn = routeBadgesDrawn;
 			metrics.labelOverlapCount = labelLayout.labelOverlapCount;
+			metrics.compositeLabelOverlapCount = labelLayout.compositeLabelOverlapCount;
 			metrics.selectedNodeId = selectedNodeId;
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
 			metrics.canvas = { clientWidth: w, clientHeight: h, width: netCanvas.width, height: netCanvas.height };
@@ -3290,8 +3322,12 @@ function drawNetworkFrame() {
 			metrics.transform = { x: transform.x, y: transform.y, k: transform.k };
 			metrics.activePointerId = activePointerId;
 			metrics.lastPointerCaptureId = lastPointerCaptureId;
-			metrics.pointerCaptureAcquired = pointerCaptureAcquired;
-			metrics.pointerCaptureReleased = pointerCaptureReleased;
+			metrics.pointerCaptureActive = pointerCaptureActive;
+			metrics.lastGestureCaptureAcquired = lastGestureCaptureAcquired;
+			metrics.lastGestureCaptureReleased = lastGestureCaptureReleased;
+			// Back-compat aliases for acceptance harnesses reading legacy metric keys.
+			metrics.pointerCaptureAcquired = lastGestureCaptureAcquired;
+			metrics.pointerCaptureReleased = lastGestureCaptureReleased;
 			metrics.lostPointerCaptureObserved = lostPointerCaptureObserved;
 			metrics.pointerCaptureHeld = Boolean(
 				activePointerHost
@@ -3607,8 +3643,9 @@ function onPointerDown(e, host) {
 	activePointerId = e.pointerId;
 	activePointerHost = host;
 	lastPointerCaptureId = e.pointerId;
-	pointerCaptureAcquired = true;
-	pointerCaptureReleased = false;
+	pointerCaptureActive = true;
+	lastGestureCaptureAcquired = true;
+	lastGestureCaptureReleased = false;
 	lostPointerCaptureObserved = false;
 	interactionState = 'pressed';
 	dragThreshold = thresholdForPointer(e.pointerType);
@@ -3684,11 +3721,12 @@ function onPointerUp(e, cancelled) {
 		&& typeof pointerHost.hasPointerCapture === 'function'
 		&& pointerHost.hasPointerCapture(releasedPointerId)
 	);
-	pointerCaptureReleased = pointerCaptureAcquired && !captureStillHeld;
+	const gestureReleased = pointerCaptureActive && !captureStillHeld;
+	lastGestureCaptureReleased = gestureReleased;
 	if (cancelled) {
 		lostPointerCaptureObserved = true;
 	}
-	pointerCaptureAcquired = false;
+	pointerCaptureActive = false;
 	activePointerId = null;
 	activePointerHost = null;
 	const wasMoved = moved || cancelled;

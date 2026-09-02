@@ -6,6 +6,7 @@ import assert from 'assert';
 import { readFileSync } from 'node:fs';
 import vm from 'node:vm';
 import { interpolateWebviewScript } from '../../host/workbench/temporalRuntimeContracts.js';
+import { pointerCaptureLifecycleProven } from '../../view/network/networkAcceptanceMath.js';
 
 type Listener = (event: Record<string, unknown>) => void;
 
@@ -93,7 +94,13 @@ class FakeElement {
 	}
 }
 
-function createMetricsHarness(): { canvas: FakeElement; context: vm.Context; flushMetrics(): Record<string, unknown> | null } {
+function createMetricsHarness(): {
+	canvas: FakeElement;
+	context: vm.Context;
+	windowListeners: Map<string, Listener[]>;
+	flushMetrics(): Record<string, unknown> | null;
+	evaluateCaptureLifecycle(): Record<string, unknown>;
+} {
 	const editorSource = readFileSync(new URL('../../host/workbench/graphEditor.ts', import.meta.url), 'utf8');
 	const html = editorSource.slice(editorSource.indexOf('<script nonce="${nonce}">'));
 	let script = html.match(/<script nonce="\$\{nonce\}">([\s\S]*?)<\/script>/)?.[1];
@@ -119,6 +126,8 @@ function createMetricsHarness(): { canvas: FakeElement; context: vm.Context; flu
 		elements.set(id, el);
 	}
 
+	const windowListeners = new Map<string, Listener[]>();
+
 	const context = vm.createContext({
 		acquireVsCodeApi: () => ({ postMessage() { } }),
 		document: {
@@ -137,8 +146,17 @@ function createMetricsHarness(): { canvas: FakeElement; context: vm.Context; flu
 			devicePixelRatio: 1,
 			innerWidth: 800,
 			innerHeight: 600,
-			addEventListener: () => undefined,
-			matchMedia: () => ({ matches: false }),
+			addEventListener(type: string, listener: Listener) {
+				const list = windowListeners.get(type) ?? [];
+				list.push(listener);
+				windowListeners.set(type, list);
+			},
+			removeEventListener: () => undefined,
+			dispatchWindowEvent(type: string, event: Record<string, unknown> = {}) {
+				for (const listener of windowListeners.get(type) ?? []) {
+					listener(event);
+				}
+			},
 			__prebaseRecordRenderMetrics: true,
 			__prebaseGraphRenderMetrics: { sequenceId: 0 },
 		},
@@ -172,9 +190,35 @@ function createMetricsHarness(): { canvas: FakeElement; context: vm.Context; flu
 	return {
 		canvas,
 		context,
+		windowListeners,
 		flushMetrics(): Record<string, unknown> | null {
 			vm.runInContext('drawNetworkFrame();', context);
 			return vm.runInContext('window.__prebaseGraphRenderMetrics ?? null', context) as Record<string, unknown> | null;
+		},
+		evaluateCaptureLifecycle(): Record<string, unknown> {
+			return vm.runInContext(`
+				(() => {
+					const metrics = window.__prebaseGraphRenderMetrics || {};
+					const canvas = document.getElementById('netCanvas');
+					const lastPointerId = metrics.lastPointerCaptureId;
+					let canvasStillHoldsCapture = false;
+					if (canvas && typeof canvas.hasPointerCapture === 'function' && Number.isFinite(lastPointerId)) {
+						canvasStillHoldsCapture = canvas.hasPointerCapture(lastPointerId);
+					}
+					let bodyHoldsCapture = false;
+					const body = document.body;
+					if (body && typeof body.hasPointerCapture === 'function' && Number.isFinite(lastPointerId)) {
+						bodyHoldsCapture = body.hasPointerCapture(lastPointerId);
+					}
+					return {
+						captureAcquired: metrics.lastGestureCaptureAcquired === true || metrics.pointerCaptureAcquired === true,
+						captureReleased: metrics.lastGestureCaptureReleased === true || metrics.pointerCaptureReleased === true,
+						pointerCaptureReleased: metrics.lastGestureCaptureReleased === true || metrics.pointerCaptureReleased === true,
+						hasPointerCaptureAfterRelease: metrics.pointerCaptureHeld === true || metrics.pointerCaptureActive === true || canvasStillHoldsCapture,
+						hasPointerCaptureOnBody: bodyHoldsCapture,
+					};
+				})()
+			`, context) as Record<string, unknown>;
 		},
 	};
 }
@@ -238,5 +282,94 @@ suite('PreBase graph editor network render metrics (Campaign XII)', () => {
 		assert.strictEqual(hitAfter!.worldX, hitBefore!.worldX);
 		assert.strictEqual(hitAfter!.worldY, hitBefore!.worldY);
 		assert.strictEqual(hitAfter!.worldZ, hitBefore!.worldZ);
+	});
+});
+
+suite('PreBase graph editor pointer capture lifecycle metrics (Campaign XVI)', () => {
+	function captureProofInput(harness: ReturnType<typeof createMetricsHarness>): Record<string, unknown> {
+		return harness.evaluateCaptureLifecycle();
+	}
+
+	test('pointerup preserves lastPointerCaptureId while clearing activePointerId and active capture flags', () => {
+		const harness = createMetricsHarness();
+		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 1, clientX: 200, clientY: 200 });
+		const during = harness.flushMetrics();
+		assert.strictEqual(during?.activePointerId, 1);
+		assert.strictEqual(during?.lastPointerCaptureId, 1);
+		assert.strictEqual(during?.pointerCaptureActive, true);
+		assert.strictEqual(during?.lastGestureCaptureAcquired, true);
+		assert.strictEqual(during?.pointerCaptureAcquired, true);
+		assert.strictEqual(during?.pointerCaptureReleased, false);
+		assert.strictEqual(during?.pointerCaptureHeld, true);
+
+		harness.canvas.dispatch('pointerup', { pointerId: 1, clientX: 200, clientY: 200 });
+		const after = harness.flushMetrics();
+		assert.strictEqual(after?.activePointerId, null, 'active pointer must clear after release');
+		assert.strictEqual(after?.lastPointerCaptureId, 1, 'last gesture pointer id must persist for diagnostics');
+		assert.strictEqual(after?.pointerCaptureActive, false, 'active capture flag must clear after gesture');
+		assert.strictEqual(after?.lastGestureCaptureAcquired, true, 'last-gesture acquisition must persist for proofs');
+		assert.strictEqual(after?.pointerCaptureAcquired, true, 'legacy alias must mirror last-gesture acquisition');
+		assert.strictEqual(after?.lastGestureCaptureReleased, true, 'last-gesture release must latch after clean pointerup');
+		assert.strictEqual(after?.pointerCaptureReleased, true, 'legacy alias must mirror last-gesture release');
+		assert.strictEqual(after?.pointerCaptureHeld, false);
+		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
+	});
+
+	test('pointercancel releases capture and records lostPointerCaptureObserved', () => {
+		const harness = createMetricsHarness();
+		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 2, clientX: 220, clientY: 220 });
+		harness.canvas.dispatch('pointercancel', { pointerId: 2, clientX: 260, clientY: 260 });
+		const metrics = harness.flushMetrics();
+		assert.strictEqual(metrics?.lostPointerCaptureObserved, true);
+		assert.strictEqual(metrics?.lastGestureCaptureReleased, true);
+		assert.strictEqual(metrics?.pointerCaptureActive, false);
+		assert.strictEqual(harness.canvas.hasPointerCapture(2), false);
+		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
+	});
+
+	test('lostpointercapture ends gesture the same way as pointercancel', () => {
+		const harness = createMetricsHarness();
+		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 3, clientX: 180, clientY: 180 });
+		harness.canvas.dispatch('lostpointercapture', { pointerId: 3, clientX: 180, clientY: 180 });
+		const metrics = harness.flushMetrics();
+		assert.strictEqual(metrics?.lostPointerCaptureObserved, true);
+		assert.strictEqual(metrics?.interactionState, 'cancelled');
+		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
+	});
+
+	test('window blur mid-drag force-releases capture without leaving pointerCaptureHeld', () => {
+		const harness = createMetricsHarness();
+		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 4, clientX: 240, clientY: 240 });
+		assert.strictEqual(harness.canvas.hasPointerCapture(4), true);
+		(harness.context.window as { dispatchWindowEvent(type: string): void }).dispatchWindowEvent('blur');
+		const metrics = harness.flushMetrics();
+		assert.strictEqual(metrics?.activePointerId, null);
+		assert.strictEqual(metrics?.lastGestureCaptureReleased, true);
+		assert.strictEqual(metrics?.pointerCaptureActive, false);
+		assert.strictEqual(metrics?.pointerCaptureHeld, false);
+		assert.strictEqual(pointerCaptureLifecycleProven(captureProofInput(harness) as any), true);
+	});
+
+	test('diagnostic break: missing last-gesture acquisition fails closed', () => {
+		assert.strictEqual(pointerCaptureLifecycleProven({
+			captureAcquired: false,
+			captureReleased: true,
+			pointerCaptureReleased: true,
+			hasPointerCaptureAfterRelease: false,
+			hasPointerCaptureOnBody: false,
+		} as any), false);
+	});
+
+	test('diagnostic break: wrong pointer id hides stuck capture and fails closed when release proof is absent', () => {
+		const harness = createMetricsHarness();
+		harness.canvas.dispatch('pointerdown', { button: 1, pointerId: 5, clientX: 300, clientY: 300 });
+		const midGesture = {
+			captureAcquired: true,
+			captureReleased: false,
+			pointerCaptureReleased: false,
+			hasPointerCaptureAfterRelease: harness.canvas.hasPointerCapture(99),
+			hasPointerCaptureOnBody: false,
+		};
+		assert.strictEqual(pointerCaptureLifecycleProven(midGesture as any), false);
 	});
 });

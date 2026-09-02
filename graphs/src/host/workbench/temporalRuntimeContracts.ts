@@ -26,6 +26,7 @@ import {
 	computeVisibleLabels,
 	computeTemporalLabelLayout,
 	computeVisibleCommunityGuideLabels,
+	computeVisibleRouteBadges,
 	shortenCommunityLabel,
 	boxesOverlap,
 } from '../../temporal/view/temporalLabelLod.js';
@@ -93,6 +94,7 @@ export function serializeTemporalLabelLayoutSource(): string {
 		serializeSelfContainedFunction(boxesOverlap as (...args: unknown[]) => unknown),
 		serializeSelfContainedFunction(shortenCommunityLabel as (...args: unknown[]) => unknown),
 		serializeSelfContainedFunction(computeVisibleCommunityGuideLabels as (...args: unknown[]) => unknown),
+		serializeSelfContainedFunction(computeVisibleRouteBadges as (...args: unknown[]) => unknown),
 		serializeSelfContainedFunction(computeTemporalLabelLayout as (...args: unknown[]) => unknown),
 	].join('\n\n');
 }

@@ -7,6 +7,7 @@ import { suite, test } from 'mocha';
 import {
 	computeVisibleLabels,
 	computeVisibleCommunityGuideLabels,
+	computeVisibleRouteBadges,
 	computeTemporalLabelLayout,
 	shortenCommunityLabel,
 	type LabelBox,
@@ -173,6 +174,31 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.equal(layout.guideLabels.length, 2, 'both aggregate guide labels should be placed');
 		assert.equal(layout.nodeLabels.length, 0, 'node labels must yield to aggregate guide occupancy');
 		assert.ok(layout.labelOverlapCount >= 0);
+	});
+
+	test('7. Route badges share occupancy with guide labels and rank changed relationships', () => {
+		const placed: LabelBox[] = [{
+			x: 90,
+			y: 60,
+			w: 40,
+			h: 20,
+		}];
+		const candidates = [
+			{ id: 'a::b', text: '12', x: 100, y: 70, edgeCount: 12, changedEdgeCount: 0 },
+			{ id: 'c::d', text: '3', x: 200, y: 70, edgeCount: 3, changedEdgeCount: 2 },
+		];
+		const badges = computeVisibleRouteBadges(candidates, 0.5, placed);
+		assert.equal(badges.length, 1);
+		assert.equal(badges[0].id, 'c::d');
+		assert.equal(badges[0].isChanged, true);
+		const layout = computeTemporalLabelLayout([], [], 0.5, {
+			routeBadgeCandidates: [
+				{ id: 'x::y', text: '8', x: 50, y: 50, edgeCount: 8, changedEdgeCount: 0 },
+				{ id: 'y::z', text: '4', x: 52, y: 52, edgeCount: 4, changedEdgeCount: 0 },
+			],
+		});
+		assert.ok(layout.routeBadges.length <= 1, 'overlapping route badges must be culled');
+		assert.equal(layout.compositeLabelOverlapCount, layout.labelOverlapCount);
 	});
 
 	test('4. Hoists the workbench font family once per pass into every visible label', () => {

@@ -10,6 +10,7 @@ import { projectTemporalVisibleSet } from '../../view/temporal/temporalProjectio
 import { measureLayoutQuality } from '../../temporal/view/temporalLayoutQuality.js';
 import { computeTemporalLabelLayout } from '../../temporal/view/temporalLabelLod.js';
 import type { TemporalEntitySnapshot, TemporalEdgeSnapshot } from '../../temporal/common/temporalTypes.js';
+import type { TemporalRenderNode } from '../../temporal/view/temporalViewTypes.js';
 
 suite('TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Acceptance)', () => {
 	const COMMUNITY_COUNT = 55;
@@ -263,17 +264,40 @@ suite('TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Accepta
 		// Changed nodes pierce, but dense unchanged leaves are culled into aggregates
 		assert.ok(overviewProj.leafNodesDrawn <= 50, `Overview must cull dense unchanged leaves (drawn: ${overviewProj.leafNodesDrawn})`);
 
-		// Community Landmark Labels at k = 0.21
-		const visibleNodes = overviewProj.items
-			.filter((it): it is { kind: 'leaf'; entityId: string; node: any; x: number; y: number } => it.kind === 'leaf')
+		// Community Landmark Labels at k = 0.21 (production visibility path)
+		const overviewNodesToRender = overviewProj.items
+			.filter((it): it is { kind: 'leaf'; entityId: string; node: TemporalRenderNode; x: number; y: number } => it.kind === 'leaf')
 			.map(it => it.node);
-		const labelLayout = computeTemporalLabelLayout(visibleNodes, layout.guides ?? [], 0.21);
+		const visibleNodeIdSet = new Set(overviewNodesToRender.map(node => node.entityId));
+		const representedGuideIdSet = new Set<string>();
+		for (let pi = 0; pi < overviewProj.items.length; pi++) {
+			const item = overviewProj.items[pi];
+			if (item.kind === 'aggregate') {
+				representedGuideIdSet.add(item.guideId);
+			}
+		}
+		assert.ok(representedGuideIdSet.size >= 40, 'overview projection must represent community aggregates for landmark labels');
+		const labelLayout = computeTemporalLabelLayout(overviewNodesToRender, layout.guides ?? [], 0.21, {
+			visibleNodeIds: visibleNodeIdSet,
+			representedGuideIds: representedGuideIdSet,
+		});
 		assert.ok(labelLayout.guideLabels.length >= 6, `Must provide >= 6 major landmark labels at overview (actual: ${labelLayout.guideLabels.length})`);
 		// Landmark labels must have screen-space readable fonts
 		for (const gl of labelLayout.guideLabels) {
 			assert.ok(gl.font.includes('px'));
 			const fontPx = parseInt(gl.font.match(/(\d+)px/)![1], 10);
 			assert.ok(fontPx * 0.21 >= 10, `Screen size must be >= 10px (actual: ${(fontPx * 0.21).toFixed(1)}px)`);
+		}
+
+		const culledGuide = layout.guides?.find(g => g.id && !visibleNodeIdSet.has(g.nodeIds?.[0] ?? ''));
+		assert.ok(culledGuide, 'fixture must include at least one aggregate-only community at overview');
+		if (culledGuide?.id) {
+			assert.ok(representedGuideIdSet.has(culledGuide.id), 'culled community must still be represented by overview aggregates');
+			const aggregateOnlyLayout = computeTemporalLabelLayout([], [culledGuide], 0.21, {
+				representedGuideIds: new Set([culledGuide.id]),
+			});
+			assert.equal(aggregateOnlyLayout.guideLabels.length, 1,
+				'aggregate-represented community must receive a landmark label without visible member leaves');
 		}
 
 		// Medium zoom (k = 0.60)

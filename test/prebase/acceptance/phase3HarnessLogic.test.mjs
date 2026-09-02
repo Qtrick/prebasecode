@@ -849,8 +849,13 @@ test('Campaign XII proof helpers reject screen-only drag and accept yaw-only rot
 	assert.equal(networkLabelDensityProven({ nodesDrawn: 120, labelCount: 0 }), false);
 	assert.ok(pointerCaptureOnCanvasProven('netCanvas'));
 	assert.equal(pointerCaptureOnCanvasProven('document'), false);
-	assert.ok(pointerCaptureLifecycleProven({ hasPointerCaptureAfterRelease: false, hasPointerCaptureOnBody: false }));
-	assert.equal(pointerCaptureLifecycleProven({ hasPointerCaptureAfterRelease: true }), false);
+	assert.ok(pointerCaptureLifecycleProven({
+		hasPointerCaptureAfterRelease: false,
+		hasPointerCaptureOnBody: false,
+		captureAcquired: true,
+		captureReleased: true,
+	}));
+	assert.equal(pointerCaptureLifecycleProven({ hasPointerCaptureAfterRelease: true, captureAcquired: true, captureReleased: true }), false);
 	assert.ok(worldInvarianceProven({ id: 'b', worldX: 1, worldY: 2, worldZ: 3 }, { id: 'b', worldX: 1, worldY: 2, worldZ: 3 }));
 	assert.equal(worldInvarianceProven({ id: 'b', worldX: 1, worldY: 2, worldZ: 3 }, { id: 'b', x: 1, y: 2 }), false);
 });

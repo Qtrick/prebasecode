@@ -80,10 +80,10 @@ export function pointerCaptureLifecycleProven(input) {
 	if (input.hasPointerCaptureOnBody) {
 		return false;
 	}
-	if (input.captureAcquired === false) {
+	if (input.captureAcquired !== true) {
 		return false;
 	}
-	if (input.captureReleased === false && input.pointerCaptureReleased === false) {
+	if (input.captureReleased !== true && input.pointerCaptureReleased !== true) {
 		return false;
 	}
 	return true;
@@ -182,11 +182,6 @@ export function labelDensityProven(metricsOrSamples) {
 	const minLabels = Math.min(...labelCounts);
 	const maxLabels = Math.max(...labelCounts);
 	if (maxLabels > minLabels) {
-		return true;
-	}
-
-	const edgesDrawn = samples.map(sample => sample.edgesDrawn ?? 0);
-	if (Math.max(...edgesDrawn) > Math.min(...edgesDrawn)) {
 		return true;
 	}
 

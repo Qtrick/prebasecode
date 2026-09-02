@@ -511,6 +511,30 @@ static NSString *JSString(Napi::Value value) {
 			self.expandedContainer.hidden = NO;
 		}
 
+		if (self.peekOnly) {
+			// Attention peek: short glance body only — no interactive chrome.
+			self.headerTitle.hidden = YES;
+			self.statusBadge.hidden = YES;
+			for (NSInteger i = 0; i < 3; i++) {
+				self.actionLabels[i].hidden = YES;
+			}
+			self.pendingInteractionTitle.hidden = YES;
+			self.expandedMetricsLabel.hidden = YES;
+			CGFloat bodyY = 6;
+			if (self.activityLabel.length) {
+				self.activityDescription.stringValue = self.activityLabel;
+				self.activityDescription.hidden = NO;
+				self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+			} else if (self.pendingTitle.length) {
+				self.activityDescription.stringValue = self.pendingTitle;
+				self.activityDescription.hidden = NO;
+				self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+			} else {
+				self.activityDescription.hidden = YES;
+			}
+			return;
+		}
+
 		CGFloat bodyY = 6;
 		// Header row
 		self.headerTitle.frame = NSMakeRect(16, bodyY, 120, 18);
@@ -989,7 +1013,7 @@ static NSString *JSString(Napi::Value value) {
 		if (!strong || gDisposed || !strong.visible) {
 			return;
 		}
-		if (strong.pinned || (strong.content.expanded && !strong.attentionPeek)) {
+		if (strong.pinned || strong.attentionPeek || strong.content.peekOnly || (strong.content.expanded && !strong.attentionPeek)) {
 			return;
 		}
 		if ([strong.displayMode isEqualToString:@"active"]) {
@@ -1063,7 +1087,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)pointerInside:(BOOL)inside {
-	if (self.pinned) {
+	if (self.pinned || self.attentionPeek || self.content.peekOnly) {
 		return;
 	}
 	if (inside) {
@@ -1446,7 +1470,7 @@ static NSString *JSString(Napi::Value value) {
 		self.attentionPeek = YES;
 		self.content.peekOnly = YES;
 		self.content.expanded = YES;
-		self.content.targetExpanded = NO;
+		self.content.targetExpanded = YES;
 		self.ignoresMouse = YES;
 		self.didAttentionHaptic = NO;
 		if (self.panel) {
