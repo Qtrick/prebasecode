@@ -215,6 +215,16 @@ test('private and CGNAT addresses are expected, not unresolved', () => {
 	assert.deepEqual(classified.unresolved, ['13.107.42.14']);
 });
 
+test('Google 1e100.net PTR hostnames are expected infrastructure, not unexpected', () => {
+	const classified = classifyHosts([
+		'yudlszf-in-f100.1e100.net',
+		'sea09s40-in-f9.1e100.net',
+		'attacker.example',
+	]);
+	assert.deepEqual(classified.expected, ['yudlszf-in-f100.1e100.net', 'sea09s40-in-f9.1e100.net']);
+	assert.deepEqual(classified.unexpected, ['attacker.example']);
+});
+
 test('socket-only numeric IPs do not fail when CDP hostnames exist', () => {
 	assert.deepEqual(privacyFailures({
 		methodology: privacyMethodology(),

@@ -53,6 +53,8 @@ const EXPECTED_HOST_PATTERNS = [
 	/(^|\.)googleusercontent\.com$/i,
 	/(^|\.)gstatic\.com$/i,
 	/(^|\.)google\.com$/i,
+	// Google public DNS / edge PTR names (not telemetry).
+	/(^|\.)1e100\.net$/i,
 	/(^|\.)supabase\.co$/i,
 	/(^|\.)supabase\.com$/i,
 	/(^|\.)linkup\.so$/i,

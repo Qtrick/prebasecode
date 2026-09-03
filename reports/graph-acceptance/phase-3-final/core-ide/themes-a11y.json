@@ -1,12 +1,12 @@
 {
   "schemaVersion": 3,
   "scenario": "themes-a11y",
-  "sourceHead": "8a6e1612aad7686fe148382e41d5f1b1d2382287",
-  "sourceFingerprint": "509bef047944fde9256f1dcb81652ce02e3eb98182ddaf3a568bbb621c028d9d",
-  "productFingerprint": "509bef047944fde9256f1dcb81652ce02e3eb98182ddaf3a568bbb621c028d9d",
-  "generatedAt": "2026-09-03T08:21:46.623Z",
+  "sourceHead": "0fc0b5fafffea070a814e26afe5df8f8e0784470",
+  "sourceFingerprint": "d7c179c41da383aee5395456cfc992f5d1f9bfaf0239d633e0a2c9e38694c6b6",
+  "productFingerprint": "d7c179c41da383aee5395456cfc992f5d1f9bfaf0239d633e0a2c9e38694c6b6",
+  "generatedAt": "2026-09-03T08:49:40.069Z",
   "producerId": "core-ide",
-  "producerFingerprint": "a7bf862e3e99a75d9243ad0ae11379be02f9e444f7d6ce8ea0205649d72d28a3",
+  "producerFingerprint": "642d3a7dd457a52684f9b3f01524a44bdcfaee1bbb7363f6019aa94b5043a244",
   "ok": true,
   "failures": [],
   "themes": {
@@ -92,10 +92,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "115044       1 49.1 278104 prebase",
+    "before": "121206       1 50.6 280516 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 379,
+    "latencyMs": 400,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

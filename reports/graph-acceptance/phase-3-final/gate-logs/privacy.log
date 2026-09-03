@@ -1,8 +1,6 @@
 {
-  "ok": false,
-  "failures": [
-    "unexpected hosts: yudlszf-in-f100.1e100.net, sea09s40-in-f9.1e100.net"
-  ],
+  "ok": true,
+  "failures": [],
   "cdpHosts": [
     "localhost",
     "open-vsx.org"
