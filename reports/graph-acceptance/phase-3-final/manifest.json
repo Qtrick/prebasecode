@@ -1,6 +1,6 @@
 {
   "phase": "3-final",
-  "sourceHead": "1c13ed2292844afd9d9551bc688fdac38ce2e6fc",
+  "sourceHead": "7fb44f2481cd7482aa36bd8b7c4fdf912348d3c0",
   "sourceFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
   "productFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
   "producerFingerprints": {
@@ -28,8 +28,8 @@
     "active-soak": "13a50e233dc029db8f18300cecc435eddb5ef28dc98e983ebfd063dc2b401c2b",
     "assurance": "467bd89dace08c784c6ca535caf0574635de73f5f55c739a848e1e4f717be5b3"
   },
-  "validationRunId": "2026-09-03T09-59-30-082Z",
-  "generatedAt": "2026-09-03T10:04:13.648Z",
+  "validationRunId": "2026-09-03T10-05-25-026Z",
+  "generatedAt": "2026-09-03T10:10:17.934Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -39,27 +39,23 @@
     {
       "id": "release-signing",
       "reason": "Release signing credentials are operator-owned (BETA-015)."
+    },
+    {
+      "id": "magnus-live-activity",
+      "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)"
     }
   ],
   "failures": [
     "electron-product-path: evidence producer fingerprint does not match current producer inputs",
     "electron-native-cases: evidence producer fingerprint does not match current producer inputs",
-    "temporal-small: evidence producer fingerprint does not match current producer inputs",
-    "temporal-large: evidence producer fingerprint does not match current producer inputs",
     "temporal-canonical-scale: evidence producer fingerprint does not match current producer inputs",
     "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
-    "magnus-streaming-smoke: evidence producer fingerprint does not match current producer inputs",
-    "magnus-guidance-smoke: evidence producer fingerprint does not match current producer inputs",
-    "magnus-live-activity: Live Activity AppKit path is macOS-only",
     "hybrid-web-smoke: local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
     "load-quit: evidence producer fingerprint does not match current producer inputs",
     "idle-soak: evidence producer fingerprint does not match current producer inputs",
     "lifecycle-cycles: evidence producer fingerprint does not match current producer inputs",
     "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
     "tauri-restart-soak: evidence producer fingerprint does not match current producer inputs",
-    "core-ide: evidence producer fingerprint does not match current producer inputs",
-    "code-graph: evidence producer fingerprint does not match current producer inputs",
-    "themes-a11y: evidence producer fingerprint does not match current producer inputs",
     "privacy: evidence producer fingerprint does not match current producer inputs",
     "active-soak: evidence producer fingerprint does not match current producer inputs",
     "assurance: evidence producer fingerprint does not match current producer inputs"
@@ -84,16 +80,6 @@
         "before": "177117       1 12.8 242096 prebase",
         "latencyMs": 214,
         "remaining": "gone"
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 32738,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/tauri-product-path.log",
-        "logTail": "",
-        "harnessPid": 177044,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
@@ -125,27 +111,35 @@
     {
       "id": "temporal-small",
       "path": "temporal/live.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "startedAt": 1788427136855,
-        "quitMs": 201,
+        "startedAt": 1788430123507,
+        "quitMs": 200,
         "remaining": "gone",
-        "before": "135837       1 20.1 293276 prebase",
+        "before": "182461       1 20.1 292980 prebase",
         "after": "gone"
       }
     },
     {
       "id": "temporal-large",
       "path": "temporal/large-live.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "startedAt": 1788429119830,
-        "quitMs": 200,
+        "startedAt": 1788430216684,
+        "quitMs": 301,
         "remaining": "gone",
-        "before": "173782       1 20.2 304036 prebase",
+        "before": "183230       1 20.4 302672 prebase",
         "after": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 91720,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-large.log",
+        "logTail": "",
+        "harnessPid": 182904,
+        "timeoutMs": 240000,
+        "leftoverPids": []
       }
     },
     {
@@ -190,28 +184,17 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 248622,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-tauri-tools.log",
-        "logTail": "",
-        "harnessPid": 177925,
-        "timeoutMs": 420000,
-        "leftoverPids": []
       }
     },
     {
       "id": "magnus-streaming-smoke",
       "path": "magnus/streaming-smoke.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "133428       1 25.3 282028 prebase",
+        "before": "179416       1 25.5 282816 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 315,
+        "latencyMs": 331,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -221,13 +204,12 @@
     {
       "id": "magnus-guidance-smoke",
       "path": "magnus/project-guidance-smoke.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "133773       1 29.7 280732 prebase",
+        "before": "179906       1 29.9 284276 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 308,
+        "latencyMs": 324,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -237,8 +219,9 @@
     {
       "id": "magnus-live-activity",
       "path": "magnus/live-activity.json",
-      "ok": false,
-      "reason": "Live Activity AppKit path is macOS-only"
+      "ok": true,
+      "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
+      "externalSkip": true
     },
     {
       "id": "hybrid-web-smoke",
@@ -294,13 +277,12 @@
     {
       "id": "core-ide",
       "path": "core-ide/live.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "135428       1 48.5 281720 prebase",
+        "before": "181925       1 49.7 281540 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 347,
+        "latencyMs": 365,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -310,19 +292,17 @@
     {
       "id": "code-graph",
       "path": "core-ide/code-graph.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs"
+      "ok": true
     },
     {
       "id": "themes-a11y",
       "path": "core-ide/themes-a11y.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "135428       1 48.5 281720 prebase",
+        "before": "181925       1 49.7 281540 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 347,
+        "latencyMs": 365,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -382,9 +362,7 @@
     "temporal-canonical-scale",
     "electron-product-path",
     "electron-native-cases",
-    "tauri-product-path",
     "magnus-electron-tools",
-    "magnus-tauri-tools",
     "hybrid-web-smoke",
     "privacy",
     "load-quit",
