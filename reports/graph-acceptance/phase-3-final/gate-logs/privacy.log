@@ -2,6 +2,7 @@
   "ok": true,
   "failures": [],
   "cdpHosts": [
+    "localhost",
     "open-vsx.org"
   ],
   "forbiddenHosts": []

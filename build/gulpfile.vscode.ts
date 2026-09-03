@@ -434,10 +434,14 @@ function packageTask(platform: string, arch: string, sourceFolderName: string, d
 				.pipe(rename('bin/code'));
 			const policyDest = gulp.src('.build/policies/darwin/**', { base: '.build/policies/darwin' })
 				.pipe(rename(f => f.dirname = `policies/${f.dirname}`));
+			const liveActivityNode = 'native/prebase-live-activity/build/Release/prebase_live_activity.node';
+			if (!fs.existsSync(liveActivityNode)) {
+				throw new Error(`[package] Darwin Live Activity AppKit addon missing at ${liveActivityNode}. Run npm run compile:live-activity before packaging.`);
+			}
 			const liveActivityAddon = gulp.src([
-				'native/prebase-live-activity/build/Release/prebase_live_activity.node',
+				liveActivityNode,
 				'native/prebase-live-activity/package.json'
-			], { base: '.', allowEmpty: true });
+			], { base: '.', allowEmpty: false });
 			all = es.merge(all, shortcut, policyDest, liveActivityAddon);
 		}
 

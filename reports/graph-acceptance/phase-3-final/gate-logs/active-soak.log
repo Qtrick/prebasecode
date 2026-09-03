@@ -1,13 +1,17 @@
 {
-  "ok": true,
-  "failures": [],
+  "ok": false,
+  "failures": [
+    "active-phase process growth unbounded: 10 → peak 57 (max Δ 18)",
+    "quiesce process count elevated vs baseline: 10 → 59 (max Δ 12)",
+    "quiesce RSS elevated vs baseline: 1826MB → 7249.8MB (max Δ 2800MB)"
+  ],
   "samples": 36,
   "durationMs": 720000,
   "quit": {
-    "before": "62553     1   0.0 178976 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "317647       1  1.1 263336 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 785,
+    "latencyMs": 970,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

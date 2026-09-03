@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-03T02:27:03.529Z",
+  "at": "2026-09-03T12:22:07.551Z",
   "mode": "deterministic-fixtures",
   "note": "Compares LinkUp snippet-only envelopes with LinkUp+Firecrawl hybrid on the same ranked URLs. Not a live provider score.",
   "rows": [
@@ -21,7 +21,7 @@
         "payloadChars": 292,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 15,
+        "latencyMs": 22,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-9.html"
@@ -81,7 +81,7 @@
         "payloadChars": 251,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 0,
+        "latencyMs": 1,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://github.com/microsoft/vscode/issues/1"

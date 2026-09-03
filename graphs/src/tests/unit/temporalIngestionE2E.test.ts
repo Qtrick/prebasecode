@@ -38,7 +38,7 @@ function createE2ERepo(objectFormat: 'sha1' | 'sha256' = 'sha1'): { repoDir: str
 	fs.mkdirSync(repoDir, { recursive: true });
 
 	const formatFlag = objectFormat === 'sha256' ? '--object-format=sha256' : '';
-	execSync(`git init ${formatFlag}`, { cwd: repoDir, stdio: 'pipe' });
+	execSync(`git init -b main ${formatFlag}`.trim(), { cwd: repoDir, stdio: 'pipe' });
 	execSync('git config user.name "PreBase Tester"', { cwd: repoDir, stdio: 'pipe' });
 	execSync('git config user.email "tester@prebase.io"', { cwd: repoDir, stdio: 'pipe' });
 

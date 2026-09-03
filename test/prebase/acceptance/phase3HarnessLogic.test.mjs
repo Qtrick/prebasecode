@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { classifyHosts, lsofSelectionArgs, privacyFailures } from './prebase-privacy-runtime.mjs';
-import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER_METRICS_NAME, themesA11yFailures, selectedNodeWorldDragProven, labelDensityProven } from './prebase-core-ide-live.mjs';
+import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER_METRICS_NAME, themesA11yFailures, selectedNodeWorldDragProven, labelDensityProven, e6TypescriptProven, e6SuggestOnlyFalseGreen } from './prebase-core-ide-live.mjs';
 import {
 	nodeHitHasWorldCoords,
 	worldDragProven,
@@ -25,7 +25,7 @@ import { ACTIVE_SOAK_FINAL_MIN_DURATION_MS, activeSoakEvidenceTarget, activeSoak
 import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
 import { findGraphFrame, formatPhase3LockBlockMessage, recoverHungWorkbenchPage, waitForWorkbenchDriver, workbenchCommandWithTimeout, classifyProcessRole, redactCommandLine, p2OfflineOnboardingProven } from './workbenchHarness.mjs';
-import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
+import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, liveActivityMacExternalSkip, LIVE_ACTIVITY_MAC_EXTERNAL_REASON, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { temporalAcceptanceFailures } from '../../../graphs/scripts/acceptance/temporal-live.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
 import { liveActivityLiveFailures } from './prebase-magnus-live-activity-live.mjs';
@@ -145,7 +145,12 @@ function passingCodeGraph(overrides = {}) {
 
 function passingCore(overrides = {}) {
 	return {
+		c1_freshProfile: true,
+		c2_existingProfile: true,
+		c2_detail: { settingSurvivedRelaunch: true, settingId: 'prebase.magnus.projectGuidance.enabled' },
 		c3_folderOpen: true,
+		c3_workspaceIdentity: true,
+		c4_crashRecovery: true,
 		c5_reload: true,
 		e1_saveUndo: true,
 		e2_search: true,
@@ -153,7 +158,9 @@ function passingCore(overrides = {}) {
 		e4_terminal: true,
 		e5_debug: true,
 		e6_typescript: true,
+		e6_detail: { suggestSeen: true, langOk: true, hasTsDiagnostic: true, completionProven: true },
 		p1_settings: true,
+		p1_settingsPersisted: true,
 		p2_offline: true,
 		onboardingPersisted: true,
 		onboardingReopened: true,
@@ -162,6 +169,7 @@ function passingCore(overrides = {}) {
 		onboardingResolved: true,
 		p4_runtime: true,
 		p5_magnus: true,
+		p5_magnusActivated: true,
 		codeGraph: passingCodeGraph(),
 		themes: {
 			dark: appliedTheme('dark', 'monaco-workbench vs-dark'),
@@ -205,6 +213,16 @@ test('private and CGNAT addresses are expected, not unresolved', () => {
 	const classified = classifyHosts(['10.0.0.10', '100.64.1.2', '192.168.1.1', '::1', '13.107.42.14']);
 	assert.deepEqual(classified.expected, ['10.0.0.10', '100.64.1.2', '192.168.1.1', '::1']);
 	assert.deepEqual(classified.unresolved, ['13.107.42.14']);
+});
+
+test('Google 1e100.net PTR hostnames are expected infrastructure, not unexpected', () => {
+	const classified = classifyHosts([
+		'yudlszf-in-f100.1e100.net',
+		'sea09s40-in-f9.1e100.net',
+		'attacker.example',
+	]);
+	assert.deepEqual(classified.expected, ['yudlszf-in-f100.1e100.net', 'sea09s40-in-f9.1e100.net']);
+	assert.deepEqual(classified.unexpected, ['attacker.example']);
 });
 
 test('socket-only numeric IPs do not fail when CDP hostnames exist', () => {
@@ -383,25 +401,42 @@ test('Magnus stream live path installs smoke transport then asks the chat partic
 	assert.match(source, /workbenchCommand\(launched\.page, 'prebase\.test\.installMagnusSmokeTransport'\)/);
 	assert.match(source, /workbenchCommand\(launched\.page, 'workbench\.action\.chat\.open'/);
 	assert.match(source, /query: 'prebase-smoke-stream'/);
+	assert.match(source, /mode: 'ask'/);
+	assert.match(source, /modelSelector:\s*\{\s*vendor:\s*'magnus'\s*\}/);
+	assert.match(source, /chat\.mcp\.access': 'none'/);
+	assert.match(source, /chat\.editor\.defaultProvider': 'local'/);
+	assert.match(source, /pb-magnus-stream-ws-/);
+	assert.match(source, /workbench\.mcp\.skipAutostart/);
+	assert.match(source, /getByText\(\/\^Skip/);
+	assert.doesNotMatch(source, /getByRole\('button', \{ name: \/Skip/);
 	assert.match(source, /prebase\.test\.getDiagnostics/);
 	assert.match(source, /magnusSourceChunks/);
 	assert.match(source, /sourceChunksMax/);
 	assert.match(source, /completes > completesBeforeSecond/);
 	assert.match(source, /UI_STREAM_CHUNK_MARKER/);
 	assert.match(source, /readChatText\(launched\.page\)/);
+	assert.match(source, /interactive-session/);
+	assert.match(source, /chunks >= 4 && evidence\.uiTextAt/);
+	assert.match(source, /uiSample must be DOM chat text/);
+	assert.doesNotMatch(source, /blockOnResponse:\s*true/);
 	assert.doesNotMatch(source, /magnusStreamActive > 0 \|\| \/Smoke stream chunk/);
 	assert.doesNotMatch(source, /chunkCount = \(first\?\.text\.match/);
+	assert.doesNotMatch(source, /evidence\.uiSample = \(secondRes\?\.collected/);
 	assert.doesNotMatch(source, /streamGenerate\(/);
 	assert.doesNotMatch(source, /new MagnusSmokeTransportAdapter/);
+	assert.doesNotMatch(source, /launchPreBase\(repo, repo/);
 });
 
 test('Magnus stream cannot pass without install, progressive chunks, cancel, and a second request', () => {
 	const quit = { remaining: 'gone', terminationPath: 'workbench', usedSigkill: false };
+	const uiSample = 'Smoke stream chunk one. Smoke stream complete.';
 	assert.ok(magnusStreamFailures({
 		smokeInstalled: false,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample,
 		chunkCount: 3,
+		progressiveChunks: true,
 		completed: true,
 		cancelled: true,
 		secondRequestOk: true,
@@ -411,7 +446,9 @@ test('Magnus stream cannot pass without install, progressive chunks, cancel, and
 		smokeInstalled: true,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample,
 		chunkCount: 1,
+		progressiveChunks: true,
 		completed: true,
 		cancelled: true,
 		secondRequestOk: true,
@@ -421,7 +458,9 @@ test('Magnus stream cannot pass without install, progressive chunks, cancel, and
 		smokeInstalled: true,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample,
 		chunkCount: 3,
+		progressiveChunks: true,
 		completed: true,
 		cancelled: true,
 		secondRequestOk: false,
@@ -431,6 +470,19 @@ test('Magnus stream cannot pass without install, progressive chunks, cancel, and
 		smokeInstalled: true,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample: 'source-only collected without DOM marker',
+		chunkCount: 3,
+		progressiveChunks: true,
+		completed: true,
+		cancelled: true,
+		secondRequestOk: true,
+		quit,
+	}).some(item => /uiSample must be DOM chat text/.test(item)));
+	assert.ok(magnusStreamFailures({
+		smokeInstalled: true,
+		firstChunkAt: 10,
+		uiTextAt: 20,
+		uiSample,
 		chunkCount: 3,
 		completed: true,
 		cancelled: false,
@@ -441,12 +493,25 @@ test('Magnus stream cannot pass without install, progressive chunks, cancel, and
 		smokeInstalled: true,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample,
 		chunkCount: 3,
 		completed: true,
 		cancelled: true,
 		secondRequestOk: true,
 		quit,
 	}).some(item => /source chunk count did not increase/.test(item)));
+	assert.deepEqual(magnusStreamFailures({
+		smokeInstalled: true,
+		firstChunkAt: 10,
+		uiTextAt: 20,
+		uiSample,
+		chunkCount: 3,
+		progressiveChunks: true,
+		completed: true,
+		cancelled: true,
+		secondRequestOk: true,
+		quit,
+	}), []);
 });
 
 test('SIGKILL fails gates even when usedSigkill is omitted', () => {
@@ -649,6 +714,31 @@ test('core IDE rejects hardcoded theme/a11y-only evidence', () => {
 
 test('core IDE accepts real dark/light/hcDark/hcLight plus measured zoom and focus', () => {
 	assert.deepEqual(coreIdeFailures(passingCore()), []);
+});
+
+test('core IDE C3 requires workspace folderIdentity (not title/explorer OR)', () => {
+	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
+	assert.match(live, /evidence\.c3_folderOpen = Boolean\(folderIdentity\)/);
+	assert.match(live, /evidence\.c3_workspaceIdentity = Boolean\(folderIdentity\)/);
+	assert.doesNotMatch(live, /c3_folderOpen = Boolean\(\s*workspaceTitle\.includes/);
+	assert.doesNotMatch(live, /c3_workspaceIdentity = Boolean\(folderIdentity \|\| workspaceTitle/);
+	const contribution = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
+	const diagnosticsStart = contribution.indexOf("id: 'prebase.test.getDiagnostics'");
+	const diagnostics = contribution.slice(diagnosticsStart, contribution.indexOf("id: 'prebase.test.installMagnusSmokeTransport'"));
+	assert.match(diagnostics, /workspaceFolders:\s*workspaceContextService\.getWorkspace\(\)\.folders\.map/);
+	assert.match(diagnostics, /uri: folder\.uri\.toString\(\)/);
+	assert.ok(
+		diagnostics.indexOf('const workspaceContextService = accessor.get(IWorkspaceContextService)')
+			< diagnostics.indexOf('await'),
+		'workspaceContextService must be captured before any await',
+	);
+});
+
+test('Live Activity live product-truth requires painted renderedPeekBody in attentionPeek', () => {
+	const live = readFileSync(join(acceptanceDir, 'prebase-magnus-live-activity-live.mjs'), 'utf8');
+	assert.match(live, /renderedPeekBody/);
+	assert.match(live, /activePresentationState === 'attentionPeek'/);
+	assert.doesNotMatch(live, /renderedPeekBody \|\| renderedPendingMessage \|\| pendingMessage/);
 });
 
 test('200% zoom cannot pass on unchanged workbench zoomLevel', () => {
@@ -973,6 +1063,70 @@ test('core IDE fails when e5_debug, e6_typescript, or p2_offline is missing', ()
 	assert.ok(onboardingFail.some(item => /P2 onboarding was not resolved/.test(item)));
 });
 
+test('E6 rejects suggestSeen && (typescriptDiagnostic || suggestSeen) false-green tautology', () => {
+	const suggestSeen = true;
+	const typescriptDiagnostic = false;
+	const langOk = true;
+	// Classic false-green: OR with suggestSeen makes the diagnostic clause irrelevant.
+	const antiPatternPasses = Boolean(suggestSeen && (typescriptDiagnostic || suggestSeen));
+	assert.equal(antiPatternPasses, true, 'anti-pattern must be shown to greenwash suggest-only');
+
+	const detail = { suggestSeen, langOk, hasTsDiagnostic: typescriptDiagnostic };
+	assert.equal(e6TypescriptProven(detail), false, 'real E6 proof requires hasTsDiagnostic');
+	assert.equal(e6SuggestOnlyFalseGreen(detail), true);
+
+	assert.equal(e6TypescriptProven({ suggestSeen: true, langOk: true, hasTsDiagnostic: true }), true);
+	assert.equal(e6SuggestOnlyFalseGreen({ suggestSeen: true, langOk: true, hasTsDiagnostic: true }), false);
+
+	// coreIdeFailures must fail when e6_typescript is greenwashed but detail lacks diagnostic
+	const falseGreen = coreIdeFailures(passingCore({
+		e6_typescript: true,
+		e6_detail: { suggestSeen: true, langOk: true, hasTsDiagnostic: false, completionProven: false },
+	}));
+	assert.ok(falseGreen.some(item => /E6 TypeScript/.test(item) && /suggest-only|missing diagnostic/.test(item)));
+
+	const missingDetail = coreIdeFailures(passingCore({
+		e6_typescript: true,
+		e6_detail: undefined,
+	}));
+	assert.ok(missingDetail.some(item => /e6_detail/.test(item)));
+
+	const suggestOnlyFlag = coreIdeFailures(passingCore({
+		e6_typescript: suggestSeen && (typescriptDiagnostic || suggestSeen),
+		e6_detail: detail,
+	}));
+	assert.ok(suggestOnlyFlag.some(item => /E6 TypeScript/.test(item)));
+
+	const c1Fail = coreIdeFailures(passingCore({ c1_freshProfile: false }));
+	assert.ok(c1Fail.some(item => /C1 fresh profile/.test(item)));
+	const p1PersistFail = coreIdeFailures(passingCore({ p1_settingsPersisted: false }));
+	assert.ok(p1PersistFail.some(item => /P1 PreBase setting persistence/.test(item)));
+	const c2RelaunchFail = coreIdeFailures(passingCore({ c2_detail: { settingSurvivedRelaunch: false } }));
+	assert.ok(c2RelaunchFail.some(item => /C2 did not re-read persisted setting/.test(item)));
+});
+
+test('core-ide P1 persists projectGuidance via getDiagnostics and P5 proves Magnus schema without stream truthies', () => {
+	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
+	const contribution = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
+	assert.match(contribution, /projectGuidanceEnabled:\s*configurationService\.getValue\('prebase\.magnus\.projectGuidance\.enabled'\)/);
+	assert.match(live, /projectGuidanceEnabled:\s*targetSetting/);
+	assert.match(live, /afterDiag\?\.projectGuidanceEnabled/);
+	assert.match(live, /macOS-only registry/);
+	assert.match(live, /poison N2 layout matrix/);
+	assert.doesNotMatch(live, /prebase\.test\.getConfiguration/);
+	assert.doesNotMatch(live, /prebase\.test\.setConfiguration/);
+	assert.match(live, /magnusDiagSchema/);
+	assert.match(live, /'streamActive' in magnusStream/);
+	assert.match(live, /'smokeEnabled' in magnusStream/);
+	assert.doesNotMatch(live, /magnusStream\.streamActive === true/);
+	assert.match(live, /Agents\\s\*&\\s\*AI/);
+	assert.match(live, /zoomLevel:\s*0/);
+	assert.match(live, /userDataDir: persistedProfile/);
+	assert.match(live, /settingSurvivedRelaunch/);
+	assert.match(live, /afterRelaunchSetting/);
+	assert.doesNotMatch(live, /c2_existingProfile = Boolean\(evidence\.p1_settingsPersisted && launched\.sourceProfile\)/);
+});
+
 test('code graph screenshot is not a substitute for render metrics', () => {
 	const failures = codeGraphFailures({
 		codeGraph: passingCodeGraph({
@@ -1171,6 +1325,28 @@ test('load-quit never awaits an untimed workbenchCommand and does not scan the f
 	assert.doesNotMatch(source, /runtime-preview-active', join\(repo, 'test\/prebase\/fixtures\/desktop-electron'\)/);
 });
 
+test('runtime-preview live uses smoke-driver commands, not macOS-only Command Palette chords', () => {
+	const source = readFileSync(join(acceptanceDir, 'runtime-preview-live.mjs'), 'utf8');
+	assert.match(source, /workbenchCommandWithTimeout/);
+	assert.match(source, /waitForWorkbenchDriver/);
+	assert.match(source, /launchPreBase/);
+	assert.match(source, /prebase\.runtime\.open/);
+	assert.match(source, /workbench\.view\.prebase\.runtime/);
+	assert.doesNotMatch(source, /keyboard\.press\(['"]Shift\+Meta\+P['"]\)/);
+	assert.doesNotMatch(source, /keyboard\.press\(['"]Control\+Shift\+P['"]\)/);
+	assert.doesNotMatch(source, /quick-input-widget/);
+});
+
+test('runtime editor idle clear must not recurse through beginPreviewNavigation', () => {
+	const source = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts'), 'utf8');
+	assert.match(source, /_applyingSessionLoad/);
+	const idleBranch = source.slice(source.indexOf('if (!(session.running || session.previewConnected || session.serverRunning))'));
+	const idleBody = idleBranch.slice(0, idleBranch.indexOf('if (!force && this._loadedUrl === session.url)'));
+	const idleWithoutComments = idleBody.replace(/\/\/.*$/gm, '');
+	assert.doesNotMatch(idleWithoutComments, /beginPreviewNavigation/);
+	assert.match(idleWithoutComments, /_postPreviewCommand\('clear'\)/);
+});
+
 test('smoke diagnostics and transport stay off the Command Palette and require the smoke-test driver', () => {
 	const contribution = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
 	for (const id of ['prebase.test.getDiagnostics', 'prebase.test.installMagnusSmokeTransport', 'prebase.test.isSmokeDriver']) {
@@ -1251,6 +1427,14 @@ test('active soak protects canonical final evidence and final gate has explicit 
 	assert.match(gate, /evidence duration is below \$\{entry\.minDurationMs\}ms/);
 	assert.match(gate, /evidence producer fingerprint does not match current producer inputs/);
 	assert.doesNotMatch(gate, /plan stale due to code change: sourceHead/);
+});
+
+test('restart soak must not clobber product-path evidence files', () => {
+	const restart = readFileSync(join(acceptanceDir, 'prebase-restart-soak.mjs'), 'utf8');
+	const productPath = readFileSync(join(acceptanceDir, 'prebase-desktop-product-path.mjs'), 'utf8');
+	assert.match(restart, /runFramework\(framework, \{ writeEvidence: false \}\)/);
+	assert.match(productPath, /writeEvidence = options\.writeEvidence !== false/);
+	assert.match(productPath, /if \(writeEvidence\) \{\s*writeFileSync\(join\(evidenceDir, 'product-path\.json'\)/s);
 });
 
 test('every live final-gate producer has a deadline, log, and process-tree timeout path', () => {
@@ -1711,6 +1895,19 @@ test('lifecycle producer timeout covers 5 warm sequences instead of dying at 6 m
 	assert.match(diag, /const CYCLE_COUNT = 5;/);
 });
 
+test('load-quit producer timeout covers 10 launches and reuses one temporal fixture', () => {
+	const producer = PHASE3_PRODUCERS.find(item => item.id === 'load-quit');
+	assert.ok(producer);
+	assert.ok(producer.timeoutMs >= 20 * 60 * 1000);
+	const source = readFileSync(join(acceptanceDir, 'prebase-load-quit-live.mjs'), 'utf8');
+	assert.match(source, /function createTemporalQuitWorkspace/);
+	assert.match(source, /const temporalWorkspace = createTemporalQuitWorkspace\(\)/);
+	assert.match(source, /runTemporalQuit\(1, temporalWorkspace\)/);
+	assert.match(source, /runTemporalQuit\(2, temporalWorkspace\)/);
+	assert.match(source, /runTemporalQuit\(3, temporalWorkspace\)/);
+	assert.match(source, /tauri desktopStartForMagnus failed/);
+});
+
 test('Temporal canvas screenshots disable animations so idle RAF cannot flake stability', () => {
 	const live = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-live.mjs'), 'utf8');
 	const fixtures = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-fixtures.mjs'), 'utf8');
@@ -1755,17 +1952,31 @@ function canonicalScaleTemporalEvidence(fullMapOverrides = {}, evidenceOverrides
 			communityLabelsDrawn: 8,
 			labelCollisionCullCount: 15,
 			renderedLabelOverlapCount: 0,
+			totalLabelsDrawn: 24,
 			finiteCoordinateCount: 9680,
 			canvas: { distinctPixels: 200 },
 			transform: { x: 400, y: 290, k: 0.21 },
 			...fullMapOverrides,
 		},
+		zoomTiers: [
+			{
+				name: 'overview',
+				displayMode: 'state',
+				metrics: { renderedLabelOverlapCount: 0, totalLabelsDrawn: 24, communityLabelsDrawn: 8 },
+			},
+			{
+				name: 'medium',
+				displayMode: 'state',
+				metrics: { renderedLabelOverlapCount: 0, totalLabelsDrawn: 48, communityLabelsDrawn: 10 },
+			},
+		],
 		focusChanges: {
 			displayMode: 'changes',
 			visibleNodeCount: 8,
 			nodesDrawn: 8,
 			summary: { modifiedCount: 7 },
 			canvas: { distinctPixels: 100 },
+			renderedLabelOverlapCount: 0,
 		},
 		unexpectedError: false,
 		stuckIndexing: false,
@@ -1813,6 +2024,52 @@ test('temporal canonical-scale live-like overview metrics pass semantic gates', 
 		renderedLabelOverlapCount: 0,
 	});
 	assert.deepEqual(temporalAcceptanceFailures(evidence), []);
+});
+
+test('temporal-small Full Map overlap fails closed (not canonical-scale-only)', () => {
+	const small = {
+		scale: 'small',
+		fixture: {
+			commits: 10,
+			files: ['a', 'b', 'c', 'd'],
+			expectedModifiedPath: 'src/tally.js',
+			head: 'abc',
+		},
+		targetOpened: true,
+		repoLoaded: true,
+		fullMap: {
+			selectedCommitSha: 'abc',
+			renderedCommitSha: 'abc',
+			receivedNodeCount: 4,
+			visibleNodeCount: 4,
+			nodesDrawn: 4,
+			finiteCoordinateCount: 4,
+			canvas: { distinctPixels: 12 },
+			transform: { x: 0, y: 0, k: 1 },
+			renderedLabelOverlapCount: 2,
+		},
+		focusChanges: {
+			displayMode: 'changes',
+			visibleNodeCount: 1,
+			nodesDrawn: 1,
+			summary: { modifiedCount: 1 },
+			canvas: { distinctPixels: 8 },
+			renderedLabelOverlapCount: 0,
+		},
+		camera: { afterFocus: { k: 1 }, afterUserZoom: { k: 1.5 }, afterWait: { k: 1.5 } },
+		quit: { remaining: 'gone' },
+	};
+	assert.ok(temporalAcceptanceFailures(small).some(item => /rendered label overlaps/.test(item)));
+	const focusOverlap = {
+		...small,
+		fullMap: { ...small.fullMap, renderedLabelOverlapCount: 0 },
+		focusChanges: { ...small.focusChanges, renderedLabelOverlapCount: 2 },
+	};
+	assert.ok(temporalAcceptanceFailures(focusOverlap).some(item => /Focus Changes has rendered label overlaps/.test(item)));
+	const temporalSource = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-live.mjs'), 'utf8');
+	assert.match(temporalSource, /full\.renderedLabelOverlapCount > 0/);
+	assert.match(temporalSource, /focus\.renderedLabelOverlapCount/);
+	assert.match(temporalSource, /canonicalScale \? 'canonical-scale ' : large \? 'large ' : ''/);
 });
 
 test('temporal canonical-scale omitting leaf and aggregate drawn counts fails closed', () => {
@@ -1967,6 +2224,11 @@ test('computePlanKey is stable for identical validation state', async () => {
 test('classifyProcessRole and redactCommandLine correctly categorize processes and redact secrets', () => {
 	assert.equal(classifyProcessRole('Code Helper (Renderer)', '/path/to/PreBase --type=renderer --site-per-process'), 'renderer');
 	assert.equal(classifyProcessRole('Code Helper (GPU)', '/path/to/PreBase --type=gpu-process'), 'gpu');
+	assert.equal(
+		classifyProcessRole('prebase', '/workspace/.build/electron/prebase --type=renderer --gpu-preferences=ABC --ozone-platform=x11'),
+		'renderer',
+		'--gpu-preferences on a renderer must not classify as gpu',
+	);
 	assert.equal(classifyProcessRole('Code Helper (Plugin)', '/path/to/PreBase --type=utility --utility-sub-type=node.mojom.NodeService --extensionHost'), 'extensionHost');
 	assert.equal(classifyProcessRole('Code Helper (Network)', '/path/to/PreBase --type=utility --utility-sub-type=network.mojom.NetworkService'), 'networkService');
 	assert.equal(classifyProcessRole('node', 'node /path/to/node_modules/typescript/lib/tsserver.js'), 'tsserver');
@@ -1983,8 +2245,11 @@ test('classifyProcessRole and redactCommandLine correctly categorize processes a
 });
 
 test('liveActivityLiveFailures validates factual native diagnostics and handles non-mac', () => {
-	const nonMac = { platform: 'linux', nativePresent: false };
-	assert.deepEqual(liveActivityLiveFailures(nonMac), []);
+	const nonMacSkipped = { platform: 'linux', nativePresent: false, skipped: true, environmentSkip: true };
+	assert.deepEqual(liveActivityLiveFailures(nonMacSkipped), []);
+
+	const nonMacUnskipped = { platform: 'linux', nativePresent: false };
+	assert.ok(liveActivityLiveFailures(nonMacUnskipped).some(f => /macOS/i.test(f)));
 
 	const missingNative = { platform: 'darwin', nativePresent: false };
 	assert.ok(liveActivityLiveFailures(missingNative).some(f => /native AppKit module missing/.test(f)));
@@ -2000,14 +2265,75 @@ test('liveActivityLiveFailures validates factual native diagnostics and handles 
 			panelFrame: { x: 100, y: 1000, width: 300, height: 34 },
 		},
 		followUpSimulation: { ok: true },
+		questionContinuity: { ok: true },
+		approvalContinuity: { ok: true },
+		mode: 'alwaysWorking',
+		blurredDiagnostics: { visible: true, status: 'working', prebaseForeground: false },
 		nativeScreenshot: { captured: true },
 		quit: { remaining: 'gone' },
+		productTruth: {
+			peekBodyOk: true,
+			stickyEscapeOk: true,
+			stickyPeekRefused: true,
+			afterEscapePresentation: 'attentionCompact',
+		},
 	};
 	assert.deepEqual(liveActivityLiveFailures(validDarwin), []);
+
+	const missingTruth = { ...validDarwin, productTruth: undefined };
+	assert.ok(liveActivityLiveFailures(missingTruth).some(f => /product-truth scenarios missing/.test(f)));
+
+	const missingContinuity = { ...validDarwin, questionContinuity: undefined };
+	assert.ok(liveActivityLiveFailures(missingContinuity).some(f => /question continuity missing/.test(f)));
+
+	const weakSticky = {
+		...validDarwin,
+		productTruth: { peekBodyOk: true, stickyEscapeOk: false, stickyPeekRefused: true, afterEscapePresentation: 'compact' },
+	};
+	assert.ok(liveActivityLiveFailures(weakSticky).some(f => /sticky Escape|attentionCompact/.test(f)));
 
 	const invalidFrame = {
 		...validDarwin,
 		nativeDiagnostics: { panelCreated: true, panelVisible: true, panelFrame: { x: 0, y: 0, width: 0, height: 0 } },
 	};
 	assert.ok(liveActivityLiveFailures(invalidFrame).some(f => /frame invalid/.test(f)));
+
+	const blurInvisible = {
+		...validDarwin,
+		mode: 'alwaysWorking',
+		blurredDiagnostics: { visible: false, status: 'working', prebaseForeground: false },
+	};
+	assert.ok(liveActivityLiveFailures(blurInvisible).some(f => /remain visible after blur/.test(f)));
+
+	const blurStillFocused = {
+		...validDarwin,
+		mode: 'alwaysWorking',
+		blurredDiagnostics: { visible: true, status: 'working', prebaseForeground: true },
+	};
+	assert.ok(liveActivityLiveFailures(blurStillFocused).some(f => /prebaseForeground=true/.test(f)));
+
+	const blurVisible = {
+		...validDarwin,
+		mode: 'alwaysWorking',
+		blurredDiagnostics: { visible: true, status: 'working', prebaseForeground: false },
+	};
+	assert.deepEqual(liveActivityLiveFailures(blurVisible), []);
+});
+
+test('liveActivityMacExternalSkip mirrors hybrid EXTERNAL honesty for non-darwin', () => {
+	const identity = { sourceFingerprint: 'fp-live' };
+	const linuxSkip = {
+		platform: 'linux',
+		skipped: true,
+		environmentSkip: true,
+		sourceFingerprint: 'fp-live',
+		ok: false,
+	};
+	assert.equal(liveActivityMacExternalSkip(linuxSkip, identity, { darwin: false }), true);
+	assert.equal(liveActivityMacExternalSkip(linuxSkip, identity, { darwin: true }), false, 'darwin host must not EXTERNAL-skip');
+	assert.equal(liveActivityMacExternalSkip({ ...linuxSkip, skipped: false, environmentSkip: false }, identity, { darwin: false }), false);
+	assert.equal(liveActivityMacExternalSkip({ ...linuxSkip, platform: 'darwin' }, identity, { darwin: false }), false);
+	assert.equal(liveActivityMacExternalSkip({ ...linuxSkip, sourceFingerprint: 'other' }, identity, { darwin: false }), false);
+	assert.equal(liveActivityMacExternalSkip({ missing: true }, identity, { darwin: false }), false);
+	assert.match(LIVE_ACTIVITY_MAC_EXTERNAL_REASON, /macOS/);
 });

@@ -1,0 +1,51 @@
+[07:46:47] START magnus-streaming-smoke
+estimated 45s (timeout 3m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log
+[07:47:03] PASS magnus-streaming-smoke
+elapsed 16s
+[07:47:03] START magnus-live-activity
+estimated 45s (timeout 2m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log
+[07:47:03] PASS magnus-live-activity
+elapsed 0s
+[07:47:03] START core-ide
+estimated 2m0s (timeout 4m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log
+[07:49:20] FAIL core-ide
+elapsed 2m16s
+exit=1 timedOut=false leftoverPids=none
+full log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log
+--- log tail ---
+E5 STATUS: {
+  debugPaneSeen: true,
+  debugStarted: true,
+  debugToolbarSeen: true,
+  stoppedDiag: true
+}
+LAYOUT MODES STATUS: {
+  organicMode: 'organic',
+  sphereMode: 'sphere',
+  constellationMode: 'constellation',
+  clusteredMode: 'clustered'
+}
+{
+  "ok": false,
+  "failures": [
+    "Theme matrix incomplete",
+    "screen-reader auto mode was not proven",
+    "screen-reader on mode was not proven"
+  ]
+}
+
+--- end tail ---
+file:///workspace/test/prebase/acceptance/prebase-phase3-final-gate.mjs:746
+			throw new Error(`producer failed: ${entry.id} exit=${result.code} timedOut=${result.timedOut}`);
+			      ^
+
+Error: producer failed: core-ide exit=1 timedOut=false
+    at executeValidationPlan (file:///workspace/test/prebase/acceptance/prebase-phase3-final-gate.mjs:746:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async run (file:///workspace/test/prebase/acceptance/prebase-phase3-final-gate.mjs:871:19)
+    at async file:///workspace/test/prebase/acceptance/prebase-phase3-final-gate.mjs:948:2
+
+Node.js v24.17.0

@@ -5,7 +5,6 @@
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
 import {
-	countRenderedLabelOverlaps,
 	computeVisibleLabels,
 	computeVisibleCommunityGuideLabels,
 	computeVisibleRouteBadges,
@@ -32,7 +31,7 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		};
 	}
 
-	test('1. Selected and Hovered nodes have highest priority and bypass collision culling', () => {
+	test('1. Selected and Hovered nodes have highest priority (rank wins occupancy; no collision bypass)', () => {
 		const nodes = [
 			makeNode('n1', 'src/normal.ts', 'unchanged', 100, 100),
 			makeNode('n2', 'src/selected.ts', 'unchanged', 102, 102), // Very close to n1
@@ -43,6 +42,17 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		});
 
 		assert.ok(labels.some(l => l.entityId === 'n2' && l.isSelected));
+		assert.equal(labels.length, 1, 'overlapping lower-ranked label must be culled');
+	});
+
+	test('1b. Selected cannot bypass seeded occupancy (forceEmphasis collision bypass removed)', () => {
+		const nodes = [makeNode('n-selected', 'src/selected.ts', 'unchanged', 100, 100)];
+		const seed: LabelBox[] = [{ x: 50, y: 100, w: 120, h: 20 }];
+		const labels = computeVisibleLabels(nodes, 1.5, {
+			selectedNodeId: 'n-selected',
+			occupancySeed: seed,
+		});
+		assert.equal(labels.length, 0, 'selected must respect occupancy seed — no forceEmphasis bypass');
 	});
 
 	test('2. Changed nodes have priority over unchanged nodes', () => {
@@ -59,14 +69,14 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.equal(labels[0].isChanged, true);
 	});
 
-	test('2b. Entry nodes outrank changed nodes at the same screen slot', () => {
+	test('2b. Changed nodes outrank entry nodes at the same screen slot', () => {
 		const nodes = [
 			makeNode('n-modified', 'src/modified.ts', 'modified', 300, 300),
 			makeNode('n-entry', 'src/index.ts', 'unchanged', 300, 300, true),
 		];
 		const labels = computeVisibleLabels(nodes, 1.0);
 		assert.equal(labels.length, 1);
-		assert.equal(labels[0].entityId, 'n-entry');
+		assert.equal(labels[0].entityId, 'n-modified');
 	});
 
 	test('3. Screen-Space Collision Culling: Overlapping text boxes are culled for non-selected nodes', () => {
@@ -110,6 +120,25 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.ok(computeVisibleCommunityGuideLabels(guides, 1.0, []).length <= 24);
 	});
 
+	test('7b. unified layout keeps community landmarks at Fit minZoom (0.15)', () => {
+		const guides = Array.from({ length: 8 }, (_, i) => ({
+			id: `g${i}`,
+			label: `Module ${i}`,
+			bounds: { minX: i * 400, minY: 0, maxX: i * 400 + 180, maxY: 160 },
+			nodeCount: 40 - i,
+			nodeIds: [`n${i}`],
+		}));
+		const represented = new Set(guides.map(g => g.id));
+		const atMinZoom = computeTemporalLabelLayout([], guides, 0.15, {
+			representedGuideIds: represented,
+		});
+		assert.ok(atMinZoom.guideLabels.length >= 1, `Fit minZoom must draw community landmarks (got ${atMinZoom.guideLabels.length})`);
+		const belowMin = computeTemporalLabelLayout([], guides, 0.149, {
+			representedGuideIds: represented,
+		});
+		assert.equal(belowMin.guideLabels.length, 0, 'below MIN_ZOOM must still suppress landmarks');
+	});
+
 	test('8. community guide labels skip lower-priority guides on box collision', () => {
 		const sharedBounds = { minX: 100, minY: 100, maxX: 300, maxY: 300 };
 		const guides = [
@@ -123,21 +152,62 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.ok(placed.length >= 1, 'winning guide must seed shared occupancy');
 	});
 
-	test('9. unified layout reserves guide occupancy before placing node labels', () => {
+	test('9. unified ranking: guide (350) beats ordinary; selected (1000) beats guide; zero overlap', () => {
 		const guide = {
 			id: 'comm1',
 			label: 'Services Layer',
 			bounds: { minX: 90, minY: 90, maxX: 220, maxY: 220 },
 			nodeCount: 5,
 		};
-		// Place node so its label box sits under the guide's top-left occupancy slot.
-		const node = makeNode('n1', 'src/file.ts', 'modified', 100, 100);
-		const layout = computeTemporalLabelLayout([node], [guide], 0.8);
-		assert.ok(layout.guideLabels.some(g => g.guideId === 'comm1'));
-		assert.equal(layout.nodeLabels.length, 0, 'node label must yield to guide occupancy');
+		const ordinary = makeNode('n-ordinary', 'src/plain.ts', 'unchanged', 100, 100);
+		const ordinaryLayout = computeTemporalLabelLayout([ordinary], [guide], 0.8);
+		assert.ok(ordinaryLayout.guideLabels.some(g => g.guideId === 'comm1'), 'guide landmark must place');
+		assert.equal(ordinaryLayout.nodeLabels.length, 0, 'ordinary node (rank 100) must yield to guide (rank 350)');
+		assert.equal(ordinaryLayout.renderedLabelOverlapCount, 0);
 
-		const withSelected = computeTemporalLabelLayout([node], [guide], 0.8, { selectedNodeId: 'n1' });
-		assert.ok(withSelected.nodeLabels.some(l => l.entityId === 'n1'), 'selected nodes bypass occupancy culling');
+		const selected = makeNode('n-selected', 'src/selected.ts', 'unchanged', 100, 100);
+		const selectedLayout = computeTemporalLabelLayout([selected], [guide], 0.8, { selectedNodeId: 'n-selected' });
+		assert.ok(selectedLayout.nodeLabels.some(l => l.entityId === 'n-selected'), 'selected (rank 1000) must beat guide (rank 350)');
+		assert.equal(selectedLayout.guideLabels.length, 0, 'guide must yield to selected at the same slot');
+		assert.equal(selectedLayout.renderedLabelOverlapCount, 0, 'selected vs guide must never visibly overlap');
+		assert.ok(selectedLayout.labelCollisionCullCount >= 1);
+
+		const changed = makeNode('n-changed', 'src/changed.ts', 'modified', 100, 100);
+		const changedLayout = computeTemporalLabelLayout([changed], [guide], 0.8);
+		assert.ok(changedLayout.nodeLabels.some(l => l.entityId === 'n-changed'), 'changed (rank 600) outranks guide (350)');
+		assert.equal(changedLayout.guideLabels.length, 0, 'guide yields to changed file at shared occupancy');
+		assert.equal(changedLayout.renderedLabelOverlapCount, 0);
+	});
+
+	test('9b. global label budget caps guide+node+badge density', () => {
+		const guides = Array.from({ length: 20 }, (_, i) => ({
+			id: `g${i}`,
+			label: `Community ${i}`,
+			bounds: { minX: i * 400, minY: 0, maxX: i * 400 + 160, maxY: 140 },
+			nodeCount: 40 - i,
+		}));
+		const nodes = Array.from({ length: 40 }, (_, i) =>
+			makeNode(`n${i}`, `src/file${i}.ts`, 'modified', i * 80, 300),
+		);
+		const badges = Array.from({ length: 20 }, (_, i) => ({
+			id: `a${i}::b${i}`,
+			text: String(i + 1),
+			x: i * 90,
+			y: 500,
+			edgeCount: 10 + i,
+			changedEdgeCount: 0,
+		}));
+		const layout = computeTemporalLabelLayout(nodes, guides, 0.5, {
+			routeBadgeCandidates: badges,
+			maxTotalLabels: 12,
+			maxGuideLabels: 24,
+			maxNodeLabels: 150,
+			maxRouteBadges: 32,
+		});
+		const total = layout.nodeLabels.length + layout.guideLabels.length + layout.routeBadges.length;
+		assert.ok(total <= 12, `global budget must cap total labels (got ${total})`);
+		assert.ok(layout.labelCollisionCullCount >= 1, 'budget overflow must increment cull counter');
+		assert.equal(layout.renderedLabelOverlapCount, 0);
 	});
 
 	test('10. Screen-Space Legibility: community landmarks at low zoom (k=0.21) maintain readable screen-size fonts', () => {
@@ -162,7 +232,7 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.ok(landmark.subText?.includes('112 files'), 'subtext must explain node count clearly');
 	});
 
-	test('11. aggregate guide labels reserve shared occupancy before node labels are placed', () => {
+	test('11. aggregate guide labels beat ordinary node labels at shared occupancy', () => {
 		const guides = [
 			{
 				id: 'comm-a',
@@ -177,15 +247,16 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 				nodeCount: 35,
 			},
 		];
+		// Ordinary (unchanged) nodes — rank 100 yields to guide rank 350.
+		// Changed/selected would outrank guides; that is covered in test 9.
 		const nodes = [
-			makeNode('n-under-a', 'src/a.ts', 'modified', 40, 30),
-			makeNode('n-under-b', 'src/b.ts', 'modified', 240, 30),
+			makeNode('n-under-a', 'src/a.ts', 'unchanged', 40, 30),
+			makeNode('n-under-b', 'src/b.ts', 'unchanged', 240, 30),
 		];
 		const layout = computeTemporalLabelLayout(nodes, guides, 0.75);
 		assert.equal(layout.guideLabels.length, 2, 'both aggregate guide labels should be placed');
-		assert.equal(layout.nodeLabels.length, 0, 'node labels must yield to aggregate guide occupancy');
-		assert.ok(layout.labelCollisionCullCount >= 0);
-		assert.ok(layout.renderedLabelOverlapCount >= 0);
+		assert.equal(layout.nodeLabels.length, 0, 'ordinary node labels must yield to aggregate guide occupancy');
+		assert.equal(layout.renderedLabelOverlapCount, 0, 'guides and nodes must not visibly overlap');
 	});
 
 	test('7. Route badges share occupancy with guide labels and rank changed relationships', () => {
@@ -225,7 +296,7 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.equal(layout.renderedLabelOverlapCount, 0, 'rendered set must remain non-overlapping for culled candidates');
 	});
 
-	test('13. renderedLabelOverlapCount detects overlaps among labels that bypass culling', () => {
+	test('13. selected wins occupancy; hovered yields — zero visible overlap', () => {
 		const nodes = [
 			makeNode('n-selected', 'src/selected.ts', 'unchanged', 100, 100),
 			makeNode('n-hovered', 'src/hovered.ts', 'unchanged', 102, 102),
@@ -234,11 +305,11 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 			selectedNodeId: 'n-selected',
 			hoveredNodeId: 'n-hovered',
 		});
-		assert.equal(layout.nodeLabels.length, 2);
-		assert.ok(layout.renderedLabelOverlapCount >= 1, 'selected and hovered bypass must allow measurable rendered overlap');
+		assert.equal(layout.nodeLabels.length, 1, 'overlapping selected+hovered must place only the higher-ranked label');
+		assert.equal(layout.nodeLabels[0].entityId, 'n-selected');
+		assert.equal(layout.renderedLabelOverlapCount, 0, 'visible rendered overlap must remain zero');
+		assert.ok(layout.labelCollisionCullCount >= 1, 'lower-ranked hover label must be culled');
 		assert.equal(layout.compositeLabelOverlapCount, layout.labelCollisionCullCount + layout.renderedLabelOverlapCount);
-		const renderedBoxes = layout.nodeLabels.map(l => l.box);
-		assert.equal(countRenderedLabelOverlaps(renderedBoxes), layout.renderedLabelOverlapCount);
 	});
 
 	test('14. selected and hovered node labels beat route badge occupancy at the same slot', () => {
@@ -281,7 +352,7 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.ok(hoveredLayout.labelCollisionCullCount >= 1, 'yielding route badge must be recorded as culled');
 	});
 
-	test('15. entry and changed node labels outrank unchanged labels before route badges consume occupancy', () => {
+	test('15. changed node labels outrank entry and unchanged before route badges consume occupancy', () => {
 		const nodes = [
 			makeNode('n-plain', 'src/plain.ts', 'unchanged', 400, 400),
 			makeNode('n-changed', 'src/changed.ts', 'modified', 400, 400),
@@ -293,7 +364,7 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		const entryNode = makeNode('n-entry', 'src/index.ts', 'unchanged', 400, 400, true);
 		const withEntry = computeVisibleLabels([...nodes, entryNode], 1.0);
 		assert.equal(withEntry.length, 1);
-		assert.equal(withEntry[0].entityId, 'n-entry', 'entry/current node must win the shared slot over changed/plain');
+		assert.equal(withEntry[0].entityId, 'n-changed', 'changed outranks entry/plain at the shared slot');
 	});
 
 	test('4. Hoists the workbench font family once per pass into every visible label', () => {
@@ -418,7 +489,7 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		};
 		const searchNode = makeNode('n-search-target', 'src/db/connection.ts', 'unchanged', 160, 160);
 
-		// With filterQuery matching the node, the search match (rank 700) outranks the guide landmark (rank 500)
+		// With filterQuery matching the node, the search match (rank 800) outranks the guide landmark (rank 350)
 		const layout = computeTemporalLabelLayout([searchNode], [guide], 0.8, {
 			filterQuery: 'connection',
 		});

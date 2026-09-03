@@ -27,11 +27,16 @@ const nativeAddon = join(repo, 'native/prebase-live-activity/build/Release/preba
 
 export function liveActivityLiveFailures(evidence) {
 	const failures = [];
-	if (evidence.platform === 'darwin' && !evidence.nativePresent) {
-		failures.push('native AppKit module missing');
-	}
+	// Non-darwin without explicit environment skip must not greenwash AppKit proof.
 	if (evidence.platform !== 'darwin') {
+		if (evidence.skipped === true || evidence.environmentSkip === true) {
+			return failures;
+		}
+		failures.push('Live Activity AppKit path requires macOS (set skipped/environmentSkip when not runnable)');
 		return failures;
+	}
+	if (!evidence.nativePresent) {
+		failures.push('native AppKit module missing');
 	}
 	if (!evidence.diagnosticsAfterOpen) {
 		failures.push('live diagnostics unavailable after Magnus open');
@@ -48,9 +53,19 @@ export function liveActivityLiveFailures(evidence) {
 			failures.push(`expected active Magnus Live Activity status after smoke prompt, got ${status}`);
 		}
 	}
-	if (evidence.blurredDiagnostics && evidence.mode === 'alwaysWorking' && evidence.diagnosticsAfterOpen?.sessionId) {
-		if (evidence.blurredDiagnostics.visible !== true && !['working', 'waiting', 'completed', 'attention', 'failed'].includes(evidence.blurredDiagnostics.status)) {
-			failures.push('Live Activity lost session state after blur in alwaysWorking mode');
+	if (evidence.blurredDiagnostics === undefined || evidence.blurredDiagnostics === null) {
+		failures.push('blur diagnostics missing (alwaysWorking visibility after blur must be proven)');
+	} else if (evidence.mode === 'alwaysWorking' && evidence.diagnosticsAfterOpen?.sessionId) {
+		// alwaysWorking must keep the panel visible while a session is active after blur.
+		// Do not OR with a stale "active-looking" status string — that greenwashes visibility loss.
+		if (evidence.blurredDiagnostics.visible !== true) {
+			failures.push('Live Activity must remain visible after blur in alwaysWorking mode while a session is active');
+		}
+		if (!['working', 'waiting', 'completed', 'attention', 'failed'].includes(evidence.blurredDiagnostics.status)) {
+			failures.push(`Live Activity lost session status after blur in alwaysWorking mode (got ${evidence.blurredDiagnostics.status})`);
+		}
+		if (evidence.blurredDiagnostics.prebaseForeground === true) {
+			failures.push('blur diagnostics still report prebaseForeground=true (window blur was not proven)');
 		}
 	}
 	if (!evidence.nativeDiagnostics) {
@@ -68,14 +83,38 @@ export function liveActivityLiveFailures(evidence) {
 		}
 		failures.push(...notchPlacementFailures(evidence.nativeDiagnostics));
 	}
-	if (evidence.followUpSimulation && !evidence.followUpSimulation.ok) {
+	if (!evidence.followUpSimulation) {
+		failures.push('native follow-up simulation missing');
+	} else if (!evidence.followUpSimulation.ok) {
 		failures.push('native follow-up message simulation failed');
 	}
-	if (evidence.questionContinuity && !evidence.questionContinuity.ok) {
+	if (!evidence.questionContinuity) {
+		failures.push('question continuity missing');
+	} else if (!evidence.questionContinuity.ok) {
 		failures.push(`question continuity failed: ${evidence.questionContinuity.reason ?? 'unknown'}`);
 	}
-	if (evidence.approvalContinuity && !evidence.approvalContinuity.ok) {
+	if (!evidence.approvalContinuity) {
+		failures.push('approval continuity missing');
+	} else if (!evidence.approvalContinuity.ok) {
 		failures.push(`approval continuity failed: ${evidence.approvalContinuity.reason ?? 'unknown'}`);
+	}
+	// Product-truth scenarios are required on darwin — panel frame alone is not CURRENT_GREEN.
+	const truth = evidence.productTruth;
+	if (!truth) {
+		failures.push('Live Activity product-truth scenarios missing (sticky Escape / peek body / attentionCompact)');
+	} else {
+		if (!truth.peekBodyOk) {
+			failures.push(`attention peek body not proven: ${truth.peekBodyReason ?? 'missing renderedPeekBody'}`);
+		}
+		if (!truth.stickyEscapeOk) {
+			failures.push(`sticky Escape attentionCompact not proven: ${truth.stickyEscapeReason ?? 'userDismissedAttention/attentionCompact missing'}`);
+		}
+		if (!truth.stickyPeekRefused) {
+			failures.push('sticky Escape must refuse peek/hover reopen');
+		}
+		if (truth.afterEscapePresentation && truth.afterEscapePresentation !== 'attentionCompact') {
+			failures.push(`expected attentionCompact after Escape, got ${truth.afterEscapePresentation}`);
+		}
 	}
 	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured && evidence.nativeScreenshot.reason !== 'screencapture-unavailable') {
 		failures.push('native panel screenshot capture failed');
@@ -209,11 +248,19 @@ async function run() {
 
 	try {
 		if (platform !== 'darwin') {
-			evidence.skipped = 'Live Activity AppKit path is macOS-only';
-			evidence.ok = true;
-			evidence.failures = [];
+			evidence.skipped = true;
+			evidence.environmentSkip = true;
+			evidence.ok = false;
+			evidence.failures = ['Live Activity AppKit path is macOS-only'];
+			evidence.skipReason = 'Live Activity AppKit path is macOS-only';
 			writeFileSync(join(evidenceDir, 'live-activity.json'), JSON.stringify(evidence, null, 2) + '\n');
-			console.log(JSON.stringify({ ok: true, skipped: evidence.skipped, out: join(evidenceDir, 'live-activity.json') }));
+			console.log(JSON.stringify({
+				ok: false,
+				skipped: true,
+				environmentSkip: true,
+				failures: evidence.failures,
+				out: join(evidenceDir, 'live-activity.json'),
+			}));
 			process.exit(0);
 		}
 
@@ -327,9 +374,62 @@ async function run() {
 			interactionId: approvalSeed?.interactionId,
 		};
 
-		// Test native follow-up message simulation through native text field (after pending interactions)
-		const followUpSim = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'followUp', 'follow-up from native activity').catch(() => false);
-		evidence.followUpSimulation = { ok: Boolean(followUpSim) };
+		// Follow-up requires Interactive input — run before sticky Escape product-truth.
+		const followUpClick = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'click').catch(() => false);
+		const followUpSim = followUpClick
+			? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'followUp', 'follow-up from native activity').catch(() => false)
+			: false;
+		evidence.followUpSimulation = { ok: Boolean(followUpSim), clickOk: Boolean(followUpClick) };
+
+		// Product-truth: attention peek body → Escape sticky compact → peek refused.
+		const truthSeed = await workbenchCommandWithTimeout(launched.page, 15_000, 'prebase.test.seedMagnusLiveActivityPending', { kind: 'question' }).catch(() => ({ ok: false }));
+		let truthPending = Boolean(truthSeed?.ok);
+		const truthDeadline = Date.now() + 12_000;
+		while (Date.now() < truthDeadline) {
+			const diag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+			const native = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+			if (diag?.pendingKind === 'question' || diag?.status === 'attention' || native?.activePresentationState === 'attentionPeek') {
+				truthPending = true;
+				evidence.productTruthBefore = { diag, native };
+				break;
+			}
+			await new Promise(r => setTimeout(r, 400));
+		}
+		const peekNative = evidence.productTruthBefore?.native
+			?? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+		const peekBody = String(peekNative?.renderedPeekBody || '');
+		const escapeSim = truthPending
+			? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'escape').catch(() => false)
+			: false;
+		await new Promise(r => setTimeout(r, 200));
+		const afterEscape = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+		const peekWhileSticky = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'peek').catch(() => false);
+		await new Promise(r => setTimeout(r, 120));
+		const afterPeekRefuse = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+		evidence.productTruth = {
+			seedOk: Boolean(truthSeed?.ok),
+			// Painted peek body only — pendingMessage snapshot text alone is not product truth.
+			peekBodyOk: Boolean(peekBody.length > 0) && peekNative?.activePresentationState === 'attentionPeek',
+			peekBodyReason: peekNative?.activePresentationState !== 'attentionPeek'
+				? `presentation=${peekNative?.activePresentationState}`
+				: (peekBody.length ? undefined : 'empty-renderedPeekBody'),
+			peekBodySample: peekBody.slice(0, 96),
+			beforePresentation: peekNative?.activePresentationState,
+			escapeSim: Boolean(escapeSim),
+			stickyEscapeOk: Boolean(
+				afterEscape?.userDismissedAttention === true
+				&& afterEscape?.activePresentationState === 'attentionCompact',
+			),
+			stickyEscapeReason: afterEscape?.userDismissedAttention !== true
+				? 'userDismissedAttention-not-set'
+				: (afterEscape?.activePresentationState !== 'attentionCompact' ? `presentation=${afterEscape?.activePresentationState}` : undefined),
+			afterEscapePresentation: afterEscape?.activePresentationState,
+			stickyPeekRefused: peekWhileSticky === false
+				&& afterPeekRefuse?.activePresentationState === 'attentionCompact'
+				&& afterPeekRefuse?.userDismissedAttention === true,
+			peekWhileSticky,
+			afterPeekRefusePresentation: afterPeekRefuse?.activePresentationState,
+		};
 
 		// Capture native NSPanel screenshot using native panel bounds
 		const screenshotFile = join(screenshotDir, 'magnus-live-activity-native.png');
@@ -339,11 +439,20 @@ async function run() {
 			screenshotFile,
 		);
 
-		await launched.page.evaluate(() => {
-			window.dispatchEvent(new Event('blur'));
-		}).catch(() => undefined);
-		await new Promise(r => setTimeout(r, 800));
-		evidence.blurredDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+		// Steal window focus so IHostService.hasFocus / prebaseForeground flips false.
+		let focusThief;
+		try {
+			focusThief = await launched.browser.newPage();
+			await focusThief.goto('about:blank');
+			await focusThief.bringToFront();
+			await new Promise(r => setTimeout(r, 900));
+			// Republish so Live Activity diagnostics reflect the new focus state.
+			await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+			await new Promise(r => setTimeout(r, 400));
+			evidence.blurredDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+		} finally {
+			await focusThief?.close().catch(() => undefined);
+		}
 
 		evidence.workbenchDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
 	} catch (error) {

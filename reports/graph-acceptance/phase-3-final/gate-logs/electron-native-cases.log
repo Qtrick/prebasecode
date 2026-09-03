@@ -13,8 +13,8 @@
       "visible": true
     },
     "title": "PreBase Electron Fixture",
-    "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-    "duration": 120,
+    "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
+    "duration": 186,
     "framework": "electron",
     "backend": "cdp"
   },
@@ -30,8 +30,8 @@
       "visible": true
     },
     "title": "PreBase Electron Fixture",
-    "url": "file:///Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-electron/index.html",
-    "duration": 6,
+    "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
+    "duration": 10,
     "framework": "electron",
     "backend": "cdp"
   }

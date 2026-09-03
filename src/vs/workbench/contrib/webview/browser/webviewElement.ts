@@ -340,6 +340,14 @@ export class WebviewElement extends Disposable implements IWebviewElement, Webvi
 	override dispose(): void {
 		this._disposed = true;
 
+		// Tear down OOPIF / guest renderer before detach. Leaving a live vscode-webview
+		// iframe src can keep Chromium renderer processes alive after remove() (active-soak leak).
+		try {
+			if (this.element) {
+				this.element.src = 'about:blank';
+			}
+		} catch { /* element may already be detached */ }
+
 		this.element?.remove();
 		this._element = undefined;
 

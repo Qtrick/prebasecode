@@ -13,6 +13,7 @@ import {
 	dismissStartup,
 	gracefulWorkbenchQuit,
 	launchPreBase,
+	classifyProcessRole,
 	processTree,
 	summarizeProcessTree,
 	waitForWorkbenchDriver,
@@ -69,10 +70,16 @@ async function sample(page, pid, phase) {
 	const tree = processTree(pid);
 	const diagnostics = await workbenchCommandWithTimeout(page, 5_000, 'prebase.test.getDiagnostics').catch(() => undefined);
 	const inventory = diagnostics?.webContents;
+	const roles = {};
+	for (const row of tree) {
+		const role = classifyProcessRole(row.comm, row.command);
+		roles[role] = (roles[role] ?? 0) + 1;
+	}
 	return {
 		at: new Date().toISOString(),
 		phase,
 		processCount: tree.length,
+		roles,
 		cpuSum: Number(tree.reduce((sum, row) => sum + row.cpu, 0).toFixed(1)),
 		rssMb: Number((tree.reduce((sum, row) => sum + row.rssKb, 0) / 1024).toFixed(1)),
 		topProcesses: summarizeProcessTree(tree, 8),

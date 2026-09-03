@@ -100,18 +100,26 @@ async function runParserQuit(iteration) {
 	});
 }
 
-async function runTemporalQuit(iteration) {
+function createTemporalQuitWorkspace() {
+	// One shared fixture for all temporal quit iterations — building 40 commits once (~1m)
+	// instead of three times was the dominant false timeout under the old 4m gate budget.
 	const fixtureDir = mkdtempSync(join(tmpdir(), 'pb-temporal-quit-'));
-	execFileSync('git', ['init'], { cwd: fixtureDir });
-	execFileSync('git', ['config', 'user.email', 'quit@test.local'], { cwd: fixtureDir });
-	execFileSync('git', ['config', 'user.name', 'Quit Test'], { cwd: fixtureDir });
-	mkdirSync(join(fixtureDir, 'src'), { recursive: true });
-	for (let index = 0; index < 40; index++) {
-		const file = join(fixtureDir, `src/file-${index}.ts`);
-		writeFileSync(file, `export const v${index} = ${index};\n`);
-		execFileSync('git', ['add', '.'], { cwd: fixtureDir });
-		execFileSync('git', ['commit', '-m', `commit ${index}`], { cwd: fixtureDir });
-	}
+	execFileSync('bash', ['-lc', [
+		'set -euo pipefail',
+		'git init -q',
+		'git config user.email quit@test.local',
+		'git config user.name "Quit Test"',
+		'mkdir -p src',
+		'for index in $(seq 0 39); do',
+		'  printf "export const v%s = %s;\\n" "$index" "$index" > "src/file-${index}.ts"',
+		'  git add -A',
+		'  git commit -qm "commit $index"',
+		'done',
+	].join('\n')], { cwd: fixtureDir });
+	return fixtureDir;
+}
+
+async function runTemporalQuit(iteration, fixtureDir) {
 	return quitScenario(`temporal-sqlite-write-${iteration}`, fixtureDir, async (page, evidence) => {
 		evidence.fixture = fixtureDir;
 		await workbenchCommandWithTimeout(page, 8_000, 'git.refresh').catch(() => undefined);
@@ -155,17 +163,20 @@ async function runElectronTestLabQuit() {
 async function runTauriTestLabQuit() {
 	return quitScenario('tauri-test-lab-active', join(repo, 'test/prebase/fixtures/desktop-tauri'), async (page, evidence) => {
 		await workbenchCommandWithTimeout(page, 20_000, 'prebase.runtime.detectConfigurations');
-		const start = await workbenchCommandWithTimeout(page, 90_000, 'prebase.runtime.desktopStartForMagnus', {
+		const start = await workbenchCommandWithTimeout(page, 180_000, 'prebase.runtime.desktopStartForMagnus', {
 			framework: 'tauri',
 			mode: 'fullApp',
 			testing: true,
 		});
 		await confirmIfNeeded(page, 'Start');
 		evidence.start = start;
+		if (start && start.ok === false) {
+			throw new Error(`tauri desktopStartForMagnus failed: ${start.error ?? JSON.stringify(start)}`);
+		}
 		const session = await waitFor(async () => {
 			const current = await workbenchCommandWithTimeout(page, 8_000, 'prebase.runtime.desktopGetSessionForMagnus').catch(() => null);
 			return current?.ok && current.state === 'testing' ? current : undefined;
-		}, 180_000, 500);
+		}, 120_000, 500);
 		evidence.session = session;
 		evidence.childPid = session?.pid;
 		evidence.ownedPort = session?.webDriverPort;
@@ -274,9 +285,10 @@ async function run() {
 		results.push(await runParserQuit(1));
 		results.push(await runParserQuit(2));
 		results.push(await runParserQuit(3));
-		results.push(await runTemporalQuit(1));
-		results.push(await runTemporalQuit(2));
-		results.push(await runTemporalQuit(3));
+		const temporalWorkspace = createTemporalQuitWorkspace();
+		results.push(await runTemporalQuit(1, temporalWorkspace));
+		results.push(await runTemporalQuit(2, temporalWorkspace));
+		results.push(await runTemporalQuit(3, temporalWorkspace));
 		results.push(await runRuntimePreviewQuit());
 		results.push(await runElectronTestLabQuit());
 		results.push(await runTauriTestLabQuit());

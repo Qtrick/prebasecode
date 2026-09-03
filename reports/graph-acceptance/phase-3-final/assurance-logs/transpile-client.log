@@ -1,19 +1,19 @@
 
 > code-oss-dev@1.128.0 transpile-client
-> node build/next/index.ts transpile && npm run gulp -- copy-codicons && node -e "import('node:fs').then(fs=>{const s='node_modules/@vscode/codicons/dist/codicon.ttf';const d='out/vs/base/browser/ui/codicons/codicon/codicon.ttf';fs.mkdirSync('out/vs/base/browser/ui/codicons/codicon',{recursive:true});fs.copyFileSync(s,d);})"
+> node --experimental-strip-types build/next/index.ts transpile && npm run gulp -- copy-codicons && node -e "import('node:fs').then(fs=>{const s='node_modules/@vscode/codicons/dist/codicon.ttf';const d='out/vs/base/browser/ui/codicons/codicon/codicon.ttf';fs.mkdirSync('out/vs/base/browser/ui/codicons/codicon',{recursive:true});fs.copyFileSync(s,d);})"
 
 [clean] out
 [transpile] src → out
-[transpile] Found 7551 files
+[transpile] Found 7558 files
 [resources] Copying all non-TS files to out...
-[resources] Copied 1385 files
-[transpile] Done in 2670ms
+[resources] Copied 1386 files
+[transpile] Done in 4434ms
 
-✓ Total: 3170ms
+✓ Total: 4597ms
 
 > code-oss-dev@1.128.0 gulp
 > node --experimental-strip-types --max-old-space-size=8192 ./node_modules/gulp/bin/gulp.js copy-codicons
 
-[23:23:01] Using gulpfile ~/Prebasecode/gulpfile.mjs
-[23:23:01] Starting 'copy-codicons'...
-[23:23:01] Finished 'copy-codicons' after 3.39 ms
+[12:18:26] Using gulpfile /workspace/gulpfile.mjs
+[12:18:26] Starting 'copy-codicons'...
+[12:18:26] Finished 'copy-codicons' after 2.9 ms

@@ -26,6 +26,7 @@ function validEvidence() {
 			visibleNodeCount: 4,
 			nodesDrawn: 4,
 			finiteCoordinateCount: 4,
+			renderedLabelOverlapCount: 0,
 			canvas: { distinctPixels: 200 },
 			transform: { x: 400, y: 290, k: 1.2 },
 		},
@@ -33,6 +34,7 @@ function validEvidence() {
 			displayMode: 'changes',
 			visibleNodeCount: 2,
 			nodesDrawn: 2,
+			renderedLabelOverlapCount: 0,
 			summary: { modifiedCount: 1 },
 			canvas: { distinctPixels: 100 },
 		},
@@ -75,6 +77,20 @@ suite('Temporal Live Acceptance Evaluation', () => {
 				'Full Map drew zero nodes',
 			],
 		});
+	});
+
+	test('missing renderedLabelOverlapCount fails closed even when nodes are present', () => {
+		const evidence = validEvidence();
+		const fullMap = { ...evidence.fullMap } as Record<string, unknown>;
+		const focusChanges = { ...evidence.focusChanges } as Record<string, unknown>;
+		delete fullMap.renderedLabelOverlapCount;
+		delete focusChanges.renderedLabelOverlapCount;
+		evidence.fullMap = fullMap as typeof evidence.fullMap;
+		evidence.focusChanges = focusChanges as typeof evidence.focusChanges;
+		const result = evaluate(evidence);
+		assert.equal(result.status, 1, result.stderr);
+		assert.ok(result.output.failures.some((item: string) => /Full Map has rendered label overlaps/.test(item)));
+		assert.ok(result.output.failures.some((item: string) => /Focus Changes has rendered label overlaps/.test(item)));
 	});
 
 	test('representative rendered evidence passes without failures', () => {

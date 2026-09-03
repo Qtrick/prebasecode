@@ -235,10 +235,11 @@ export function redactCommandLine(command = '') {
 
 export function classifyProcessRole(comm = '', command = '') {
 	const text = `${comm} ${command}`.toLowerCase();
-	if (/--type=gpu-process|type=gpu-process|\bgpu\b/i.test(text)) return 'gpu';
-	if (/--type=renderer|type=renderer|helper \(renderer\)/i.test(text)) return 'renderer';
+	// Match Chromium process-type switches only — do not use bare \bgpu\b (matches --gpu-preferences on renderers).
+	if (/--type=gpu-process(?:\s|$)|[?\s]type=gpu-process(?:\s|$)/i.test(text)) return 'gpu';
+	if (/--type=renderer(?:\s|$)|[?\s]type=renderer(?:\s|$)|helper \(renderer\)/i.test(text)) return 'renderer';
 	if (/--utility-sub-type=network|network\s*service|networkservice/i.test(text)) return 'networkService';
-	if (/--type=utility|type=utility/i.test(text)) {
+	if (/--type=utility(?:\s|$)|[?\s]type=utility(?:\s|$)/i.test(text)) {
 		if (/extensionhost|extension-host/i.test(text)) return 'extensionHost';
 		if (/tsserver/i.test(text)) return 'tsserver';
 		return 'utility';
@@ -515,8 +516,8 @@ export async function waitForWorkbenchDriver(page, timeoutMs = 90_000) {
 	}
 }
 
-export async function launchPreBase(repo, workspace, extraArgs = []) {
-	const sourceProfile = mkdtempSync(join(tmpdir(), 'pb-phase3-profile-'));
+export async function launchPreBase(repo, workspace, extraArgs = [], options = {}) {
+	const sourceProfile = options.userDataDir || mkdtempSync(join(tmpdir(), 'pb-phase3-profile-'));
 	const launch = join(repo, '.agents/skills/launch/scripts/launch.sh');
 	const { stdout } = await execFileAsync(launch, [
 		'--repo', repo,
