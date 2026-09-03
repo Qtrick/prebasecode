@@ -470,38 +470,33 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		const reducedMotion = this.accessibilityService.isMotionReduced()
 			|| Boolean(this.configurationService.getValue<boolean>('prebase.graph.reduceMotion'));
 		const generation = ++this._publishGeneration;
-		const hideFirst = !visible || Boolean(snapshot.screenLocked);
 		void this._flushNative(generation, snapshot, {
 			visible,
 			pinned: this._pinned && visible,
 			reducedMotion,
 			display: this._display(),
-		}, hideFirst);
+		});
 	}
 
 	private async _flushNative(
 		generation: number,
 		snapshot: MagnusLiveActivitySnapshot,
 		presentation: { visible: boolean; pinned: boolean; reducedMotion: boolean; display: MagnusLiveActivityDisplay },
-		hideFirst: boolean,
 	): Promise<void> {
 		if (!this._main || generation !== this._publishGeneration) {
 			return;
 		}
-		// Lock/hide must apply presentation before a snapshot that could expand attention.
-		if (hideFirst) {
-			await this._main.setPresentation(presentation);
-			if (generation !== this._publishGeneration) {
-				return;
-			}
-			await this._main.setSnapshot(snapshot);
-			return;
-		}
-		await this._main.setSnapshot(snapshot);
+		// Presentation before snapshot:
+		// - hide/lock must not flash expanded attention
+		// - show/unlock must be visible before applySnapshotDict can expand attentionPeek (mayExpand)
+		await this._main.setPresentation(presentation);
 		if (generation !== this._publishGeneration) {
 			return;
 		}
-		await this._main.setPresentation(presentation);
+		await this._main.setSnapshot({
+			...snapshot,
+			userDismissedAttention: this._userDismissedAttention,
+		});
 	}
 
 	private async _handleCommand(command: LiveActivityCommand): Promise<void> {

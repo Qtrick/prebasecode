@@ -145,6 +145,13 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 	assert.match(native, /self\.screenLocked = \[snapshot\[@"screenLocked"\] boolValue\]/);
 	assert.match(native, /action == "interactive"[\s\S]{0,200}enterInteractiveSticky/);
 
+	assert.match(native, /payload\[@"userDismissedAttention"\]/);
+	assert.match(native, /\[snapshot\[@"userDismissedAttention"\] boolValue\]/);
+	assert.match(native, /attentionCompact is sticky Escape only/);
+	assert.match(native, /completedTransient|failedTransient/);
+	assert.match(native, /Sticky Escape: do not reopen peek/);
+	assert.match(native, /Attention peek is not hover-owned/);
+
 	const ts = readFileSync(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'), 'utf8');
 	assert.match(ts, /if \(snapshot\.screenLocked\) \{\s*return false;/);
 	assert.match(ts, /reason: 'screen-locked'/);
@@ -155,4 +162,12 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 	assert.match(ts, /return 'attentionPeek'/);
 	assert.match(ts, /return 'failedTransient'/);
 	assert.doesNotMatch(ts, /forceEmphasis/);
+
+	const contribution = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
+	assert.match(contribution, /Presentation before snapshot/);
+	assert.ok(
+		contribution.indexOf('setPresentation(presentation)') < contribution.indexOf('setSnapshot({'),
+		'unlock must present before snapshot so attentionPeek can expand',
+	);
+	assert.match(contribution, /userDismissedAttention: this\._userDismissedAttention/);
 });

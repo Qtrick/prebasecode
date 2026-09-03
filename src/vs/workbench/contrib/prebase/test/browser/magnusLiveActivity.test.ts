@@ -1793,7 +1793,14 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.match(publish, /hideDetails: userHideDetails/);
 		assert.match(publish, /userDismissedAttention: this\._userDismissedAttention/);
 		assert.match(publish, /_flushNative/);
-		assert.match(publish, /hideFirst/);
+		assert.match(publish, /Presentation before snapshot/);
+		assert.match(publish, /setPresentation\(presentation\)/);
+		assert.ok(
+			publish.indexOf('setPresentation(presentation)') < publish.indexOf('setSnapshot'),
+			'presentation must precede snapshot so unlock can expand attentionPeek',
+		);
+		assert.match(publish, /userDismissedAttention: this\._userDismissedAttention/);
+		assert.doesNotMatch(publish, /hideFirst/);
 		assert.match(contribution, /onDidLockScreen/);
 		assert.match(contribution, /this\._screenLocked = true/);
 		assert.match(contribution, /onDidUnlockScreen/);

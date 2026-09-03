@@ -2202,8 +2202,23 @@ test('liveActivityLiveFailures validates factual native diagnostics and handles 
 		followUpSimulation: { ok: true },
 		nativeScreenshot: { captured: true },
 		quit: { remaining: 'gone' },
+		productTruth: {
+			peekBodyOk: true,
+			stickyEscapeOk: true,
+			stickyPeekRefused: true,
+			afterEscapePresentation: 'attentionCompact',
+		},
 	};
 	assert.deepEqual(liveActivityLiveFailures(validDarwin), []);
+
+	const missingTruth = { ...validDarwin, productTruth: undefined };
+	assert.ok(liveActivityLiveFailures(missingTruth).some(f => /product-truth scenarios missing/.test(f)));
+
+	const weakSticky = {
+		...validDarwin,
+		productTruth: { peekBodyOk: true, stickyEscapeOk: false, stickyPeekRefused: true, afterEscapePresentation: 'compact' },
+	};
+	assert.ok(liveActivityLiveFailures(weakSticky).some(f => /sticky Escape|attentionCompact/.test(f)));
 
 	const invalidFrame = {
 		...validDarwin,

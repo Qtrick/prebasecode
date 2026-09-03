@@ -87,6 +87,24 @@ export function liveActivityLiveFailures(evidence) {
 	if (evidence.approvalContinuity && !evidence.approvalContinuity.ok) {
 		failures.push(`approval continuity failed: ${evidence.approvalContinuity.reason ?? 'unknown'}`);
 	}
+	// Product-truth scenarios are required on darwin — panel frame alone is not CURRENT_GREEN.
+	const truth = evidence.productTruth;
+	if (!truth) {
+		failures.push('Live Activity product-truth scenarios missing (sticky Escape / peek body / attentionCompact)');
+	} else {
+		if (!truth.peekBodyOk) {
+			failures.push(`attention peek body not proven: ${truth.peekBodyReason ?? 'missing renderedPeekBody'}`);
+		}
+		if (!truth.stickyEscapeOk) {
+			failures.push(`sticky Escape attentionCompact not proven: ${truth.stickyEscapeReason ?? 'userDismissedAttention/attentionCompact missing'}`);
+		}
+		if (!truth.stickyPeekRefused) {
+			failures.push('sticky Escape must refuse peek/hover reopen');
+		}
+		if (truth.afterEscapePresentation && truth.afterEscapePresentation !== 'attentionCompact') {
+			failures.push(`expected attentionCompact after Escape, got ${truth.afterEscapePresentation}`);
+		}
+	}
 	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured && evidence.nativeScreenshot.reason !== 'screencapture-unavailable') {
 		failures.push('native panel screenshot capture failed');
 	}
@@ -343,6 +361,53 @@ async function run() {
 			ok: Boolean(approvalSeed?.ok && approvalDenySim && approvalDiagAfter?.pendingKind !== 'approval'),
 			reason: !approvalSeed?.ok ? `seed-failed${approvalSeed?.invokeError ? `:${approvalSeed.invokeError}` : approvalSeed?.reason ? `:${approvalSeed.reason}` : ''}` : (!approvalDenySim ? 'native-deny-failed' : (approvalDiagAfter?.pendingKind === 'approval' ? 'pending-not-cleared' : undefined)),
 			interactionId: approvalSeed?.interactionId,
+		};
+
+		// Product-truth: attention peek body → Escape sticky compact → peek refused.
+		const truthSeed = await workbenchCommandWithTimeout(launched.page, 15_000, 'prebase.test.seedMagnusLiveActivityPending', { kind: 'question' }).catch(() => ({ ok: false }));
+		let truthPending = Boolean(truthSeed?.ok);
+		const truthDeadline = Date.now() + 12_000;
+		while (Date.now() < truthDeadline) {
+			const diag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+			const native = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+			if (diag?.pendingKind === 'question' || diag?.status === 'attention' || native?.activePresentationState === 'attentionPeek') {
+				truthPending = true;
+				evidence.productTruthBefore = { diag, native };
+				break;
+			}
+			await new Promise(r => setTimeout(r, 400));
+		}
+		const peekNative = evidence.productTruthBefore?.native
+			?? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+		const peekBody = String(peekNative?.renderedPeekBody || peekNative?.renderedPendingMessage || peekNative?.pendingMessage || '');
+		const escapeSim = truthPending
+			? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'escape').catch(() => false)
+			: false;
+		await new Promise(r => setTimeout(r, 200));
+		const afterEscape = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+		const peekWhileSticky = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'peek').catch(() => false);
+		await new Promise(r => setTimeout(r, 120));
+		const afterPeekRefuse = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+		evidence.productTruth = {
+			seedOk: Boolean(truthSeed?.ok),
+			peekBodyOk: Boolean(peekBody.length > 0),
+			peekBodyReason: peekBody.length ? undefined : 'empty-renderedPeekBody',
+			peekBodySample: peekBody.slice(0, 96),
+			beforePresentation: peekNative?.activePresentationState,
+			escapeSim: Boolean(escapeSim),
+			stickyEscapeOk: Boolean(
+				afterEscape?.userDismissedAttention === true
+				&& afterEscape?.activePresentationState === 'attentionCompact',
+			),
+			stickyEscapeReason: afterEscape?.userDismissedAttention !== true
+				? 'userDismissedAttention-not-set'
+				: (afterEscape?.activePresentationState !== 'attentionCompact' ? `presentation=${afterEscape?.activePresentationState}` : undefined),
+			afterEscapePresentation: afterEscape?.activePresentationState,
+			stickyPeekRefused: peekWhileSticky === false
+				&& afterPeekRefuse?.activePresentationState === 'attentionCompact'
+				&& afterPeekRefuse?.userDismissedAttention === true,
+			peekWhileSticky,
+			afterPeekRefusePresentation: afterPeekRefuse?.activePresentationState,
 		};
 
 		// Test native follow-up message simulation through native text field (after pending interactions)

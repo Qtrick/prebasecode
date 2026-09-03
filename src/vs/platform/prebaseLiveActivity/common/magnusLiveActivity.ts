@@ -94,6 +94,11 @@ export interface MagnusLiveActivitySnapshot {
 	readonly screenLocked?: boolean;
 	readonly hideDetails?: boolean;
 	readonly presentationLabel?: string;
+	/**
+	 * Sticky Escape/collapse dismiss for attention. Serialized so native can restore
+	 * attentionCompact across controller reload / snapshot republish.
+	 */
+	readonly userDismissedAttention?: boolean;
 }
 
 export const LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS = 180;

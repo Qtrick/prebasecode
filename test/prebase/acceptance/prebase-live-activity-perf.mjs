@@ -438,8 +438,18 @@ async function run() {
 		if (collapsedDiag.activePresentationState !== 'attentionCompact') {
 			throw new Error(`Expected attentionCompact after escape, got ${collapsedDiag.activePresentationState}`);
 		}
+		if (collapsedDiag.userDismissedAttention !== true) {
+			throw new Error('attentionCompact after Escape must set userDismissedAttention (sticky Escape product truth)');
+		}
 		if (collapsedDiag.localMonitorInstalled !== false) {
 			throw new Error('Collapsed mode must NOT keep local key monitor');
+		}
+		// Sticky Escape: hover/peek simulate must not reopen while attention remains.
+		const peekWhileSticky = native.simulateAction('peek');
+		await sleep(80);
+		const stickyDiag = native.getDiagnostics();
+		if (peekWhileSticky !== false || stickyDiag.activePresentationState !== 'attentionCompact') {
+			throw new Error(`sticky Escape must refuse peek reopen (peek=${peekWhileSticky}, state=${stickyDiag.activePresentationState})`);
 		}
 	} catch (err) {
 		test5b.ok = false;

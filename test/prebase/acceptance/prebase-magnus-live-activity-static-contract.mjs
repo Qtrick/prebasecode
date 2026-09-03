@@ -159,6 +159,23 @@ if (!native.includes('emit:@"dismissAttention"')) {
 	if (!/action == "interactive"[\s\S]{0,200}enterInteractiveSticky/.test(native)) {
 		failures.push('simulateAction("interactive") must enter sticky Interactive (not bare expandInteractive)');
 	}
+	if (!native.includes('attentionCompact is sticky Escape only')) {
+		failures.push('native attentionCompact must require userDismissedAttention (not any collapsed attention)');
+	}
+	if (!native.includes('payload[@"userDismissedAttention"]')) {
+		failures.push('SnapshotToDict must serialize userDismissedAttention for sticky restore');
+	}
+	if (!native.includes('Sticky Escape: do not reopen peek') || !native.includes('Attention peek is not hover-owned')) {
+		failures.push('hover/mouseExit must not defeat sticky Escape or dismiss attentionPeek');
+	}
+	if (!/@"completedTransient"|@"failedTransient"/.test(native)) {
+		failures.push('native diagnostics must emit completedTransient/failedTransient vocabulary');
+	}
+	const contributionSourceFlush = contributionSource;
+	if (!contributionSourceFlush.includes('Presentation before snapshot')
+		|| contributionSourceFlush.indexOf('setPresentation(presentation)') > contributionSourceFlush.indexOf('setSnapshot({')) {
+		failures.push('contribution must apply presentation before snapshot (unlock attentionPeek + hide safety)');
+	}
 }
 if (!native.includes('Delay control layout until frame animation completes to prevent visible popping')) {
 	failures.push('animated layout must delay control layout until frame settles');

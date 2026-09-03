@@ -1242,7 +1242,8 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)mouseExitedFromView:(NSEvent *)event {
-	if (self.pinned || !self.content.expanded) {
+	// Attention peek is not hover-owned — only Escape/resolve/sticky Interactive dismisses it.
+	if (self.pinned || !self.content.expanded || self.attentionPeek || self.content.attention) {
 		return;
 	}
 	[self.exitTimer invalidate];
@@ -1254,6 +1255,10 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)pointerInside:(BOOL)inside {
 	if (self.pinned || self.attentionPeek || self.content.peekOnly) {
+		return;
+	}
+	// Sticky Escape: attention stays compact until click; hover must not reopen peek.
+	if (self.content.attention && self.userDismissedAttention) {
 		return;
 	}
 	if (inside) {
@@ -1289,6 +1294,10 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)expandPeek {
 	if (!self.visible || self.screenLocked) {
+		return;
+	}
+	// Sticky Escape: do not reopen peek while attention remains dismissed.
+	if (self.content.attention && self.userDismissedAttention) {
 		return;
 	}
 	// Fullscreen policy: suppress hover Peek while PreBase is immersed (attention still allowed).
@@ -1616,14 +1625,49 @@ static NSString *JSString(Napi::Value value) {
 	CGPathRelease(diagPathCollapsed);
 	dict[@"pathTopologyCompatible"] = @(isTopologyCompatible);
 	dict[@"latestShortMessage"] = self.content.latestMessage ?: @"";
-	dict[@"activePresentationState"] = self.pinned
-		? (self.content.attention ? @"attentionInteractive" : @"pinned")
-		: (self.content.expanded
-			? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.content.attention ? @"attentionInteractive" : @"interactive")))
-			: (self.content.attention ? @"attentionCompact" : @"compact"));
-	dict[@"targetPresentationState"] = self.content.targetExpanded
-		? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.pinned ? (self.content.attention ? @"attentionInteractive" : @"pinned") : (self.content.attention ? @"attentionInteractive" : @"interactive"))))
-		: (self.content.attention ? @"attentionCompact" : @"compact");
+	NSString *activePresentation;
+	if (self.pinned) {
+		activePresentation = self.content.attention ? @"attentionInteractive" : @"pinned";
+	} else if (self.content.expanded) {
+		if (self.attentionPeek) {
+			activePresentation = @"attentionPeek";
+		} else if (self.content.peekOnly) {
+			activePresentation = @"peek";
+		} else {
+			activePresentation = self.content.attention ? @"attentionInteractive" : @"interactive";
+		}
+	} else if (self.content.attention) {
+		// attentionCompact is sticky Escape only — never a synonym for collapsed attention.
+		activePresentation = self.userDismissedAttention ? @"attentionCompact" : @"compact";
+	} else if ([self.content.status isEqualToString:@"failed"]) {
+		activePresentation = @"failedTransient";
+	} else if ([self.content.status isEqualToString:@"completed"]) {
+		activePresentation = @"completedTransient";
+	} else {
+		activePresentation = @"compact";
+	}
+	dict[@"activePresentationState"] = activePresentation;
+	NSString *targetPresentation;
+	if (self.content.targetExpanded) {
+		if (self.attentionPeek) {
+			targetPresentation = @"attentionPeek";
+		} else if (self.content.peekOnly) {
+			targetPresentation = @"peek";
+		} else if (self.pinned) {
+			targetPresentation = self.content.attention ? @"attentionInteractive" : @"pinned";
+		} else {
+			targetPresentation = self.content.attention ? @"attentionInteractive" : @"interactive";
+		}
+	} else if (self.content.attention) {
+		targetPresentation = self.userDismissedAttention ? @"attentionCompact" : @"compact";
+	} else if ([self.content.status isEqualToString:@"failed"]) {
+		targetPresentation = @"failedTransient";
+	} else if ([self.content.status isEqualToString:@"completed"]) {
+		targetPresentation = @"completedTransient";
+	} else {
+		targetPresentation = @"compact";
+	}
+	dict[@"targetPresentationState"] = targetPresentation;
 	// Factual sticky Escape/collapse dismiss — required for AppKit product-truth diagnostics.
 	dict[@"userDismissedAttention"] = @(self.userDismissedAttention);
 	dict[@"hoverDwellMs"] = @(180);
@@ -1695,6 +1739,14 @@ static NSString *JSString(Napi::Value value) {
 	NSString *status = snapshot[@"status"] ?: @"";
 	self.content.status = status;
 	self.content.attention = [status isEqualToString:@"attention"];
+	// Sticky Escape restore: OR with local flag while attention remains (stale republish must not clear).
+	if (self.content.attention) {
+		if ([snapshot[@"userDismissedAttention"] boolValue]) {
+			self.userDismissedAttention = YES;
+		}
+	} else {
+		self.userDismissedAttention = NO;
+	}
 	NSString *label = snapshot[@"presentationLabel"];
 	if (!label.length) {
 		label = snapshot[@"currentActivity"] ?: snapshot[@"taskTitle"] ?: @"Magnus";
@@ -1901,6 +1953,11 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 	} else {
 		payload[@"screenLocked"] = @NO;
 	}
+	if (snapshot.Get("userDismissedAttention").IsBoolean() && snapshot.Get("userDismissedAttention").As<Napi::Boolean>().Value()) {
+		payload[@"userDismissedAttention"] = @YES;
+	} else {
+		payload[@"userDismissedAttention"] = @NO;
+	}
 	NSMutableArray *actions = [NSMutableArray array];
 	if (snapshot.Get("recentActions").IsArray()) {
 		Napi::Array arr = snapshot.Get("recentActions").As<Napi::Array>();
@@ -2048,6 +2105,10 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 		return Napi::Boolean::New(env, false);
 	}
 	if (action == "peek" || action == "hover") {
+		// Match pointerInside: sticky Escape must not reopen peek.
+		if (controller.content.attention && controller.userDismissedAttention) {
+			return Napi::Boolean::New(env, false);
+		}
 		[controller expandPeek];
 		return Napi::Boolean::New(env, true);
 	}
