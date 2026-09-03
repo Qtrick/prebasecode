@@ -88,7 +88,7 @@
     ✔ stopManagedAppsOnExit true closes managed windows
     ✔ omitted production config defaults to stopping managed windows and keeping detached external apps
     ✔ POSIX owned-process termination budget is 3s+3s not 4s
-    ✔ kills the process group and releases the port after a cargo-style wrapper pid has already exited (45ms)
+    ✔ kills the process group and releases the port after a cargo-style wrapper pid has already exited (55ms)
     ✔ Windows taskkill helper is bounded without requiring win32
 
   electronDetector
@@ -137,10 +137,10 @@
     ✔ redacts secrets in fill values and failure text without masking ordinary labels
 
   desktopAutomationHost
-    ✔ retries until visible then returns (103ms)
+    ✔ retries until visible then returns (102ms)
     ✔ press and type without a native backend fail closed instead of synthesizing Enter or Tab
-    ✔ covered pointer targets never dispatch a native click (157ms)
-    ✔ check and uncheck re-resolve the locator after the native click (418ms)
+    ✔ covered pointer targets never dispatch a native click (154ms)
+    ✔ check and uncheck re-resolve the locator after the native click (412ms)
     ✔ fill and type on a readonly field fail closed without retrying or typing
     ✔ native Enter and Tab go to the input backend as named keys, not character text
     ✔ type deletes an existing selection before inserting native text
@@ -150,12 +150,12 @@
     ✔ retries transient stability, viewport, and coverage failures (155ms)
     ✔ does not retry permanent wrong-control failures
     ✔ does not silently click the first of two Save buttons
-    ✔ assertion retries until the condition matches (104ms)
+    ✔ assertion retries until the condition matches (103ms)
     ✔ retries title and count assertions on distinct page commands
-    ✔ assertion retries until timeout then reports actual (156ms)
+    ✔ assertion retries until timeout then reports actual (154ms)
     ✔ cancels an in-flight wait
     ✔ hidden assertion succeeds when the locator is absent
-    ✔ containsText retries until the substring appears (53ms)
+    ✔ containsText retries until the substring appears (51ms)
 
   desktopAutomationDom
     ✔ clicks a unique role, testId, and labelled control
@@ -197,10 +197,10 @@
 
   desktopWebDriver
     ✔ only treats HTTP success plus ready true as WebDriver ready
-    ✔ waitUntilReady accepts a W3C ready envelope and rejects 404, 500, and ready false (1260ms)
-    ✔ waitUntilReady does not treat HTTP 404 with a ready JSON body as ready (253ms)
-    ✔ waitUntilReady times out on a hung status request (335ms)
-    ✔ deleteSession is bound to 2s and swallows shutdown failures (2004ms)
+    ✔ waitUntilReady accepts a W3C ready envelope and rejects 404, 500, and ready false (1257ms)
+    ✔ waitUntilReady does not treat HTTP 404 with a ready JSON body as ready (251ms)
+    ✔ waitUntilReady times out on a hung status request (333ms)
+    ✔ deleteSession is bound to 2s and swallows shutdown failures (2002ms)
     ✔ only allows loopback URLs
     ✔ cancels an in-flight WebDriver ready wait without leaving the loop running
     ✔ newSession, execute, screenshot, and performActions fail closed on HTTP 200 protocol errors
@@ -218,10 +218,10 @@
     ✔ keeps fixture frontend payloads bounded and enables only the embedded WebDriver plugin
 
   desktopProductPathAcceptance
-    ✔ fails when Playwright connected directly to the fixture (171ms)
-    ✔ fails when the automation backend is not the PreBase product path (295ms)
-    ✔ fails when the session never reaches Testing (148ms)
-    ✔ passes a complete product-path evidence record (289ms)
+    ✔ fails when Playwright connected directly to the fixture (168ms)
+    ✔ fails when the automation backend is not the PreBase product path (294ms)
+    ✔ fails when the session never reaches Testing (143ms)
+    ✔ passes a complete product-path evidence record (294ms)
 
   PreBase desktop session lifecycle
     ✔ refuses to launch project code when the workspace is Restricted
@@ -242,9 +242,9 @@
     ✔ blocks arbitrary JavaScript on Tauri WebDriver and still allows test interact without the preview setting
     ✔ managed renderer click goes through owned pointer input rather than a synthetic page click
     ✔ keeps preview interact gated on the automation setting
-    ✔ failed assertions return bounded renderer console evidence with secrets redacted (53ms)
+    ✔ failed assertions return bounded renderer console evidence with secrets redacted (51ms)
     ✔ managed test restart keeps the test identity and prior evidence
-    ✔ records the actual managed inspect duration in test evidence (44ms)
+    ✔ records the actual managed inspect duration in test evidence (42ms)
     ✔ external test restart reconnects automation without replacing the test run
     ✔ starting a preview after a completed test clears stale test-run evidence
     ✔ a new test session after stop does not reuse the previous test-run identity or steps
@@ -273,9 +273,9 @@
     ✔ failed no-cors probe still navigates the iframe and does not claim disconnect
     ✔ stale webview and service probe results cannot change the current URL state
     ✔ webview rejects commands from the preview origin or without the active channel
-    ✔ live acceptance fails closed when the preview never connects (149ms)
+    ✔ live acceptance fails closed when the preview never connects (155ms)
     ✔ quit joins a bounded preview stop so a hung terminal cannot block shutdown
-    ✔ quit join is bounded to 800ms and swallows a rejected owned-preview stop (803ms)
+    ✔ quit join is bounded to 800ms and swallows a rejected owned-preview stop (802ms)
 
   Runtime Preview webview control protocol
     ✔ accepts host-created commands for each supported lifecycle operation
@@ -348,6 +348,11 @@
     ✔ working collapsed label includes diff and terminal counts when present
     ✔ answer accept requires pendingInteraction.interactionId (question id), not resolveId
 
+  Magnus Live Activity path topology compatibility (P0)
+    ✔ collapsed and expanded notched paths have compatible topology for CAShapeLayer interpolation
+    ✔ wing width variations maintain path topology compatibility
+    ✔ no-notch fallback uses consistent single-contour rounded rect
+
   Magnus Live Activity notch alignment (P0)
     ✔ collapsed panel top is flush with screen.frame.maxY, not a visibleFrame menu-bar gap
     ✔ notched wings bracket the housing and never overlap the camera exclusion band
@@ -409,118 +414,143 @@
     ✔ native separates compact and expanded content into dedicated layer-backed subviews
     ✔ native uses optical black fill to eliminate ghosting behind camera housing
     ✔ native integrates NSHapticFeedbackManager on user-initiated actions with exactly-once guard
+    ✔ native attention arrival must not trigger automatic haptic feedback
     ✔ native tracking model removes global mouse monitor when expanded to maximize resource efficiency
     ✔ native question options handle >4 options with tertiary delegate button
     ✔ interactive controls are placed strictly below the physical notch safe area
     ✔ retargetable animation handles spring group and honors reducedMotion setting
     ✔ completion hold timer auto-retracts and publishes when completed hold expires
+    ✔ native CAShapeLayer path topology is invariant in segment count and element types across all morph states
+    ✔ native coordinates shape morphing and window frame animation with delayed control layout to eliminate popping
+    ✔ native uses explicit targetExpanded state and generation guard against stale animation completions
+    ✔ native tracking area excludes continuous NSTrackingMouseMoved for peak energy efficiency
+    ✔ native attention peek keeps compact wings and hides interactive chrome
+    ✔ native attention peek collapses when attention resolves without pin or hover
+    ✔ native active-display mode relayouts when target screen changes
 
 
-  329 passing (7s)
+  340 passing (7s)
 
-✔ lsof selection uses AND semantics (0.858416ms)
-✔ numeric IPs are unresolved, not a telemetry-absent proof (0.583916ms)
-✔ private and CGNAT addresses are expected, not unresolved (0.50075ms)
-✔ socket-only numeric IPs do not fail when CDP hostnames exist (0.081167ms)
-✔ privacy cannot pass on unresolved numeric destinations (0.052541ms)
-✔ privacy AND claim without -a in lsofArgs fails the gate (0.04775ms)
-✔ privacy fails when process-tree coverage is missing (0.04325ms)
-✔ privacy process-tree + AND methodology can pass on a workbench quit (0.035041ms)
-✔ process-tree socket sampler uses lsof AND semantics (0.320292ms)
-✔ launchPreBase waits for the workbench page after CDP connect (0.162958ms)
-✔ workbenchCommandWithTimeout races evaluate against an explicit timer (0.12875ms)
-✔ recoverHungWorkbenchPage reloads after a hung evaluate so later commands can proceed (0.214708ms)
-✔ hung page.evaluate cannot block workbenchCommandWithTimeout for minutes (62.236208ms)
-✔ waitForWorkbenchDriver races whenWorkbenchRestored against an explicit timer (0.271959ms)
-✔ hung whenWorkbenchRestored cannot block waitForWorkbenchDriver forever (62.502375ms)
-✔ gracefulWorkbenchQuit records workbench|sigterm|sigkill and does not infer SIGKILL from elapsed time (0.301333ms)
-✔ high quit latency on a workbench path does not fail SIGKILL gates (0.366708ms)
-✔ privacy runtime source observes the process tree, not only the root pid (0.061792ms)
-✔ workbench quit path does not fail SIGKILL gates (0.2065ms)
-✔ sigterm fallback does not fail SIGKILL gates (0.044667ms)
-✔ Magnus stream live path installs smoke transport then asks the chat participant (0.081125ms)
-✔ Magnus stream cannot pass without install, progressive chunks, cancel, and a second request (0.089625ms)
-✔ SIGKILL fails gates even when usedSigkill is omitted (0.070375ms)
-✔ product marketplace and update CDNs are expected, telemetry hosts remain forbidden (0.045334ms)
-✔ privacy fails on forbidden hostnames even when CDP has other hostnames (0.042792ms)
-✔ privacy fails when CDP hostname identity is missing (0.036084ms)
-✔ CDP Network.requestWillBeSent is the hostname identity source (0.116459ms)
-✔ privacy fails on unexpected CDP hostnames (0.032ms)
-✔ privacy cannot pass after SIGKILL (0.022792ms)
-✔ Promise-returning Array.find would pick the wrong graph frame (0.087083ms)
-✔ findGraphFrame awaits canvas presence instead of treating a Promise as a hit (0.028959ms)
-✔ findGraphFrame matches graph-editor URLs even before canvas count is positive (0.024292ms)
-✔ visible canvas is not nodesDrawn (0.028ms)
-✔ wrong graph metrics global cannot satisfy nodesDrawn (0.040375ms)
-✔ blank canvas metrics cannot satisfy nodesDrawn (0.032667ms)
-✔ keyboard focus cannot pass merely because activeElement is not body (0.05475ms)
-✔ core IDE live records focus.tag from activeElement and rejects body-only focus (0.08225ms)
-✔ core IDE rejects hardcoded theme/a11y-only evidence (0.075916ms)
-✔ core IDE accepts real dark/light/hcDark/hcLight plus measured zoom and focus (0.034333ms)
-✔ 200% zoom cannot pass on unchanged workbench zoomLevel (0.027458ms)
-✔ 200% zoom cannot pass on innerWidth change with unchanged zoomLevel (0.024791ms)
-✔ a11y cannot pass on accessibilitySupport auto/on without Maps, Settings, and graph semantics (0.070375ms)
-✔ core IDE live inspects Maps aria-expanded, Settings status, and Code Graph region rather than only accessibilitySupport (0.16025ms)
-✔ organic then organic cannot satisfy layoutModes or Sphere vs Clustered (0.054541ms)
-✔ code graph fails when legacy radial normalization or semantic zoom or label density is missing (0.042083ms)
-✔ core IDE fails when e5_debug, e6_typescript, or p2_offline is missing (0.047458ms)
-✔ code graph screenshot is not a substitute for render metrics (0.029584ms)
-✔ core-ide live proves layouts via Maps data-network-layout chips and metrics, not screenshots (0.336667ms)
-✔ Runtime Preview and Desktop Test Lab keep Detect accessible name and primary/secondary hierarchy (0.152042ms)
-✔ Web Search settings put hosted hybrid first and hide local keys behind details (0.547875ms)
-✔ inert Settings sliders are hidden and Maps disclosures use Codicon twisties (0.545208ms)
-✔ active soak rejects one blocked sample and SIGKILL (0.047583ms)
-✔ load-quit rejects CPU>5 parser proof and SIGKILL (0.043833ms)
-✔ parser-active cannot pass on CPU>5 without parserActiveRequests (0.032583ms)
-✔ parser-active passes when parserActiveRequests is positive even if CPU is idle (0.026584ms)
-✔ SQLite active-write cannot pass on hasActiveWrite or indexingSeen without temporalActiveWrites (0.033792ms)
-✔ SQLite active-write passes when temporalActiveWrites is positive (0.020792ms)
-✔ load-quit live proves parser and temporal activity from diagnostics, not CPU or Indexing (0.074917ms)
-✔ load-quit never awaits an untimed workbenchCommand and does not scan the full repo (0.078458ms)
-✔ smoke diagnostics and transport stay off the Command Palette and require the smoke-test driver (0.847584ms)
-✔ final gate rejects stale ok:true evidence after a live rerun failure (0.109916ms)
-✔ active-soak final evidence rejects diagnostic, short, and stale-HEAD records (0.094333ms)
-✔ short soak writes diagnostic evidence and must not overwrite canonical final (0.115875ms)
-✔ active soak protects canonical final evidence and final gate has explicit bounded modes (0.141292ms)
-✔ every live final-gate producer has a deadline, log, and process-tree timeout path (0.106166ms)
-✔ final gate requires current successful assurance evidence instead of a prose reminder (0.089584ms)
-✔ active soak rejects quiescent renderer CPU runaway (0.052834ms)
-✔ active soak rejects active-phase process growth that plateaus in quiescence (0.054916ms)
-✔ active soak cannot pass when activity threw (0.038292ms)
-✔ final manifest requires every Phase 3 scenario (0.041791ms)
-✔ scenarioOk rejects missing evidence, ok:false, and omitted ok (0.038417ms)
-✔ final evidence requires the canonical sourceHead field, not the retired head alias (0.052792ms)
-✔ final evidence rejects a missing or mismatched scenario label even when its source head is current (0.026792ms)
-✔ shared Phase 3 metadata is bounded, current, and rejects an unlabelled scenario (96.410041ms)
-✔ final assurance has an authoritative, complete command matrix and records only bounded outcome data (0.354666ms)
-✔ assurance leaf coverage replaces nested assurance:quick and assurance:static reruns (0.139208ms)
-✔ final gate accepts only a complete current assurance matrix with passed bounded command records (0.184209ms)
-✔ every required Phase 3 evidence writer delegates current metadata to the shared contract (0.475417ms)
-✔ individual harnesses must not overwrite phase-3-final/manifest.json (0.917917ms)
-✔ lifecycle cycles reject monotonic WebContents growth and accept a stable warm baseline (0.197292ms)
-✔ smoke diagnostics expose redacted WebContents inventory and never write accessibilitySupport off (0.335625ms)
-✔ renderer CPU profile summary ranks leaf self-time and ignores idle (0.20625ms)
-✔ phase 3 lock block message names pid, scenario, and age immediately (0.059542ms)
-✔ Magnus, Edge, and workbench URL policy share the same private-host and userinfo guards (0.211125ms)
-✔ Firecrawl clients call v2 scrape/search only and never claim ZDR, Interact, or a web-search provider picker (0.333917ms)
-✔ Firecrawl HTTP fetch on Magnus client, connection-test, and edge providerFetch sends no-store/no-cache (0.216375ms)
-✔ final gate leftover PIDs after parent death SIGKILL only the owned tree (0.199208ms)
-✔ lifecycle producer timeout covers 5 warm sequences instead of dying at 6 minutes (0.049708ms)
-✔ Temporal canvas screenshots disable animations so idle RAF cannot flake stability (0.049042ms)
-✔ idle soak sleeps on the Node clock and surfaces CDP abort as a failure (0.053375ms)
-✔ gate keeps current ok evidence when a producer times out with no leftover PIDs (0.060042ms)
-✔ lifecycle opens Runtime explorer and retries layout/editor close (0.053708ms)
-✔ missing Firecrawl key is an external hybrid skip, not a stale repo-controlled artifact (740.017459ms)
-✔ producer fingerprint controls freshness; sourceHead is provenance only (0.072209ms)
-✔ assertPlanIdentity accepts matching product fingerprint when HEAD changed (72.093416ms)
-✔ computePlanKey is stable for identical validation state (1982.392709ms)
-✔ classifyProcessRole and redactCommandLine correctly categorize processes and redact secrets (0.493458ms)
-✔ liveActivityLiveFailures validates factual native diagnostics and handles non-mac (0.166042ms)
-ℹ tests 98
+✔ lsof selection uses AND semantics (0.876541ms)
+✔ numeric IPs are unresolved, not a telemetry-absent proof (0.5845ms)
+✔ private and CGNAT addresses are expected, not unresolved (0.498791ms)
+✔ socket-only numeric IPs do not fail when CDP hostnames exist (0.080584ms)
+✔ privacy cannot pass on unresolved numeric destinations (0.059667ms)
+✔ privacy AND claim without -a in lsofArgs fails the gate (0.048875ms)
+✔ privacy fails when process-tree coverage is missing (0.052625ms)
+✔ privacy process-tree + AND methodology can pass on a workbench quit (0.036875ms)
+✔ process-tree socket sampler uses lsof AND semantics (0.33175ms)
+✔ launchPreBase waits for the workbench page after CDP connect (0.17ms)
+✔ workbenchCommandWithTimeout races evaluate against an explicit timer (0.132292ms)
+✔ recoverHungWorkbenchPage reloads after a hung evaluate so later commands can proceed (0.218166ms)
+✔ hung page.evaluate cannot block workbenchCommandWithTimeout for minutes (60.925167ms)
+✔ waitForWorkbenchDriver races whenWorkbenchRestored against an explicit timer (0.333291ms)
+✔ hung whenWorkbenchRestored cannot block waitForWorkbenchDriver forever (61.585333ms)
+✔ gracefulWorkbenchQuit records workbench|sigterm|sigkill and does not infer SIGKILL from elapsed time (0.309417ms)
+✔ high quit latency on a workbench path does not fail SIGKILL gates (0.48775ms)
+✔ privacy runtime source observes the process tree, not only the root pid (0.08225ms)
+✔ workbench quit path does not fail SIGKILL gates (0.299375ms)
+✔ sigterm fallback does not fail SIGKILL gates (0.064333ms)
+✔ Magnus stream live path installs smoke transport then asks the chat participant (0.117292ms)
+✔ Magnus stream cannot pass without install, progressive chunks, cancel, and a second request (0.116667ms)
+✔ SIGKILL fails gates even when usedSigkill is omitted (0.112875ms)
+✔ product marketplace and update CDNs are expected, telemetry hosts remain forbidden (0.070208ms)
+✔ privacy fails on forbidden hostnames even when CDP has other hostnames (0.053833ms)
+✔ privacy fails when CDP hostname identity is missing (0.047792ms)
+✔ CDP Network.requestWillBeSent is the hostname identity source (0.145125ms)
+✔ privacy fails on unexpected CDP hostnames (0.046167ms)
+✔ privacy cannot pass after SIGKILL (0.03625ms)
+✔ Promise-returning Array.find would pick the wrong graph frame (0.121375ms)
+✔ findGraphFrame awaits canvas presence instead of treating a Promise as a hit (0.044875ms)
+✔ findGraphFrame matches graph-editor URLs even before canvas count is positive (0.041666ms)
+✔ visible canvas is not nodesDrawn (0.045667ms)
+✔ wrong graph metrics global cannot satisfy nodesDrawn (0.068417ms)
+✔ blank canvas metrics cannot satisfy nodesDrawn (0.057792ms)
+✔ keyboard focus cannot pass merely because activeElement is not body (0.094042ms)
+✔ core IDE live records focus.tag from activeElement and rejects body-only focus (0.132708ms)
+✔ core IDE rejects hardcoded theme/a11y-only evidence (0.110166ms)
+✔ core IDE accepts real dark/light/hcDark/hcLight plus measured zoom and focus (0.047833ms)
+✔ 200% zoom cannot pass on unchanged workbench zoomLevel (0.045917ms)
+✔ 200% zoom cannot pass on innerWidth change with unchanged zoomLevel (0.036666ms)
+✔ a11y cannot pass on accessibilitySupport auto/on without Maps, Settings, and graph semantics (0.096333ms)
+✔ core IDE live inspects Maps aria-expanded, Settings status, and Code Graph region rather than only accessibilitySupport (0.297833ms)
+✔ organic then organic cannot satisfy layoutModes or Sphere vs Clustered (0.099084ms)
+✔ code graph fails when legacy radial normalization or semantic zoom or label density is missing (0.056542ms)
+✔ code graph interaction proofs fail closed on missing world drag, shift pan, and camera rotation evidence (0.073958ms)
+✔ selected node world drag and semantic zoom helpers reject fallback-to-zero proofs (0.246375ms)
+✔ P2 offline onboarding cannot pass on workbench presence alone (0.131208ms)
+✔ Campaign XII proof helpers reject screen-only drag and accept yaw-only rotation (0.233583ms)
+✔ Campaign XIV canonical rotationProven accepts single-axis orbit (0.04175ms)
+✔ networkGraphAcceptance re-exports canonical math from graphs networkAcceptanceMath.mjs (0.20925ms)
+✔ codeGraphProof does not duplicate rotationProven after Campaign XIV consolidation (0.079667ms)
+✔ codeGraphFailures fails closed on Campaign XII shift pan and drag rotation fields (0.04775ms)
+✔ core-ide live must prove world drag, pitch rotation, shift pan, and strict semantic zoom when Campaign XII lands (0.249167ms)
+✔ dismissStartup reports onboarding visibility and dismissal for harness consumers (0.112625ms)
+✔ code graph fails when any of the two-stage drag fields fail closed (0.132ms)
+✔ core IDE fails when e5_debug, e6_typescript, or p2_offline is missing (0.087334ms)
+✔ code graph screenshot is not a substitute for render metrics (0.04975ms)
+✔ core-ide live proves layouts via Maps data-network-layout chips and metrics, not screenshots (0.545083ms)
+✔ Runtime Preview and Desktop Test Lab keep Detect accessible name and primary/secondary hierarchy (0.21125ms)
+✔ Web Search settings put hosted hybrid first and hide local keys behind details (0.795ms)
+✔ inert Settings sliders are hidden and Maps disclosures use Codicon twisties (0.767208ms)
+✔ active soak rejects one blocked sample and SIGKILL (0.060084ms)
+✔ load-quit rejects CPU>5 parser proof and SIGKILL (0.060166ms)
+✔ parser-active cannot pass on CPU>5 without parserActiveRequests (0.046083ms)
+✔ parser-active passes when parserActiveRequests is positive even if CPU is idle (0.037375ms)
+✔ SQLite active-write cannot pass on hasActiveWrite or indexingSeen without temporalActiveWrites (0.036542ms)
+✔ SQLite active-write passes when temporalActiveWrites is positive (0.031583ms)
+✔ load-quit live proves parser and temporal activity from diagnostics, not CPU or Indexing (0.115792ms)
+✔ load-quit never awaits an untimed workbenchCommand and does not scan the full repo (0.107875ms)
+✔ smoke diagnostics and transport stay off the Command Palette and require the smoke-test driver (1.0275ms)
+✔ final gate rejects stale ok:true evidence after a live rerun failure (0.126125ms)
+✔ active-soak final evidence rejects diagnostic, short, and stale-HEAD records (0.115125ms)
+✔ short soak writes diagnostic evidence and must not overwrite canonical final (0.1555ms)
+✔ active soak protects canonical final evidence and final gate has explicit bounded modes (0.186291ms)
+✔ every live final-gate producer has a deadline, log, and process-tree timeout path (0.153667ms)
+✔ final gate requires current successful assurance evidence instead of a prose reminder (0.117792ms)
+✔ active soak rejects quiescent renderer CPU runaway (0.067834ms)
+✔ active soak rejects active-phase process growth that plateaus in quiescence (0.069916ms)
+✔ active soak cannot pass when activity threw (0.04575ms)
+✔ final manifest requires every Phase 3 scenario (0.049791ms)
+✔ scenarioOk rejects missing evidence, ok:false, and omitted ok (0.049542ms)
+✔ final evidence requires the canonical sourceHead field, not the retired head alias (0.066542ms)
+✔ final evidence rejects a missing or mismatched scenario label even when its source head is current (0.03475ms)
+✔ shared Phase 3 metadata is bounded, current, and rejects an unlabelled scenario (106.928667ms)
+✔ final assurance has an authoritative, complete command matrix and records only bounded outcome data (0.314333ms)
+✔ assurance leaf coverage replaces nested assurance:quick and assurance:static reruns (0.1235ms)
+✔ final gate accepts only a complete current assurance matrix with passed bounded command records (0.156958ms)
+✔ every required Phase 3 evidence writer delegates current metadata to the shared contract (0.438542ms)
+✔ individual harnesses must not overwrite phase-3-final/manifest.json (0.895958ms)
+✔ lifecycle cycles reject monotonic WebContents growth and accept a stable warm baseline (0.204125ms)
+✔ smoke diagnostics expose redacted WebContents inventory and never write accessibilitySupport off (0.326459ms)
+✔ renderer CPU profile summary ranks leaf self-time and ignores idle (0.205375ms)
+✔ phase 3 lock block message names pid, scenario, and age immediately (0.055625ms)
+✔ Magnus, Edge, and workbench URL policy share the same private-host and userinfo guards (0.180667ms)
+✔ Firecrawl clients call v2 scrape/search only and never claim ZDR, Interact, or a web-search provider picker (0.328833ms)
+✔ Firecrawl HTTP fetch on Magnus client, connection-test, and edge providerFetch sends no-store/no-cache (0.205458ms)
+✔ final gate leftover PIDs after parent death SIGKILL only the owned tree (0.210292ms)
+✔ lifecycle producer timeout covers 5 warm sequences instead of dying at 6 minutes (0.050292ms)
+✔ Temporal canvas screenshots disable animations so idle RAF cannot flake stability (0.135542ms)
+✔ temporal canonical-scale acceptance requires 9000+ received nodes and 9680 module seed (0.323959ms)
+✔ temporal canonical-scale live-like overview metrics pass semantic gates (0.041ms)
+✔ temporal canonical-scale omitting leaf and aggregate drawn counts fails closed (0.04275ms)
+✔ temporal canonical-scale dot galaxy overview fails semantic gates (0.045792ms)
+✔ temporal canonical-scale semantic gates fail closed on omitted overview metrics (0.079625ms)
+✔ temporal canonical-scale producer is release-only with canonical-scale CLI wiring (0.03225ms)
+✔ idle soak sleeps on the Node clock and surfaces CDP abort as a failure (0.049875ms)
+✔ gate keeps current ok evidence when a producer times out with no leftover PIDs (0.064208ms)
+✔ lifecycle opens Runtime explorer and retries layout/editor close (0.054375ms)
+✔ missing Firecrawl key is an external hybrid skip, not a stale repo-controlled artifact (795.6425ms)
+✔ producer fingerprint controls freshness; sourceHead is provenance only (0.072958ms)
+✔ assertPlanIdentity accepts matching product fingerprint when HEAD changed (78.315125ms)
+✔ computePlanKey is stable for identical validation state (2347.600417ms)
+✔ classifyProcessRole and redactCommandLine correctly categorize processes and redact secrets (0.542625ms)
+✔ liveActivityLiveFailures validates factual native diagnostics and handles non-mac (0.170958ms)
+ℹ tests 115
 ℹ suites 0
-ℹ pass 98
+ℹ pass 115
 ℹ fail 0
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 3206.861291
+ℹ duration_ms 3652.219041

@@ -1805,45 +1805,6 @@ export class PreBaseMapsViewPane extends ViewPane {
 		return root.children;
 	}
 
-	private _appendTreeEntry(parent: HTMLElement, entry: ExplorerTreeNode, depth: number): void {
-		if (entry.type === 'file') {
-			this._appendFileRow(parent, entry.node, depth);
-			return;
-		}
-		const row = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
-		row.type = 'button';
-		const expanded = this._expandedDirs.has(entry.fullPath) || this._searchQuery.length > 0;
-		row.style.display = 'flex';
-		row.style.alignItems = 'center';
-		row.style.gap = '4px';
-		row.style.width = '100%';
-		row.style.textAlign = 'left';
-		row.style.padding = `3px 6px 3px ${6 + depth * 12}px`;
-		row.style.fontSize = '11px';
-		row.style.color = TEXT;
-		row.style.background = 'transparent';
-		row.style.border = 'none';
-		row.style.borderRadius = '4px';
-		row.style.cursor = 'pointer';
-		row.setAttribute('aria-expanded', String(expanded));
-		const twistie = DOM.append(row, DOM.$('span.codicon'));
-		twistie.classList.add(expanded ? 'codicon-chevron-down' : 'codicon-chevron-right');
-		twistie.setAttribute('aria-hidden', 'true');
-		DOM.append(row, DOM.$('span')).textContent = entry.name || '/';
-		this._explorerDisposables.add(DOM.addDisposableListener(row, 'click', () => {
-			if (this._expandedDirs.has(entry.fullPath)) {
-				this._expandedDirs.delete(entry.fullPath);
-			} else {
-				this._expandedDirs.add(entry.fullPath);
-			}
-			this._refreshExplorerList();
-		}));
-		if (expanded) {
-			for (const child of entry.children) {
-				this._appendTreeEntry(parent, child, depth + 1);
-			}
-		}
-	}
 
 	private _appendFileRow(parent: HTMLElement, node: GraphNode, depth: number): void {
 		const row = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;

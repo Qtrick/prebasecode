@@ -208,6 +208,25 @@ function countSessionTerminals(terminalChat: ITerminalChatService | undefined, s
 	return count > 0 ? count : undefined;
 }
 
+function extractLatestShortMessage(request: IChatRequestModel | undefined): string | undefined {
+	if (!request) {
+		return undefined;
+	}
+	const final = request.response?.entireResponse.getFinalResponse?.();
+	if (final && final.trim()) {
+		return redactLiveActivityText(final);
+	}
+	const markdown = request.response?.response.getMarkdown?.();
+	if (markdown && markdown.trim()) {
+		return redactLiveActivityText(markdown);
+	}
+	const str = request.response?.response.toString?.();
+	if (str && str.trim()) {
+		return redactLiveActivityText(str);
+	}
+	return undefined;
+}
+
 function extractSessionInput(
 	model: IChatModel | undefined,
 	deps: {
@@ -241,7 +260,7 @@ function extractSessionInput(
 		needsInput: Boolean(model.requestNeedsInput.get() || pending),
 		currentActivity: extractCurrentActivity(last),
 		recentActions: extractActions(last),
-		latestShortMessage: redactLiveActivityText(last?.response?.entireResponse.getFinalResponse?.() || last?.message.text),
+		latestShortMessage: extractLatestShortMessage(last),
 		completed,
 		failed: Boolean(failed || last?.response?.isCanceled),
 		pendingInteraction: pending,

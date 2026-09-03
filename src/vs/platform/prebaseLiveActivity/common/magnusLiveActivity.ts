@@ -136,7 +136,7 @@ export function computeLiveActivityExpandedHeight(args: {
 	h += 10; // Spacing before controls
 	const hasOptions = args.pendingKind === 'question' && Boolean(args.hasOptions);
 	const hasApproval = args.pendingKind === 'approval';
-	const showInput = !args.peekOnly;
+	const showInput = Boolean(args.pinned) && !args.peekOnly;
 
 	if (hasOptions) {
 		h += 30; // Options row
@@ -197,6 +197,9 @@ export interface MagnusLiveActivitySessionInput {
 }
 
 const SECRET_PATTERN = /\b(authorization|cookie|set-cookie|token|access[_-]?token|api[_-]?key|client[_-]?secret|secret|password|bearer)\b\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;&]+)/gi;
+const BEARER_HEADER_PATTERN = /\bbearer\s+[A-Za-z0-9_\-\.]{15,}\b/gi;
+const JWT_PATTERN = /\bey[A-Za-z0-9_-]{10,}\.ey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
+const TOKEN_PREFIX_PATTERN = /\b(ghp|gho|glpat|xox[baprs])-[A-Za-z0-9_-]{10,}\b|\bgithub_pat_[A-Za-z0-9_]{10,}\b/g;
 
 export function redactLiveActivityText(value: string | undefined): string {
 	if (!value) {
@@ -204,8 +207,13 @@ export function redactLiveActivityText(value: string | undefined): string {
 	}
 	return value
 		.replace(SECRET_PATTERN, '$1=[redacted]')
+		.replace(BEARER_HEADER_PATTERN, 'Bearer [redacted]')
+		.replace(JWT_PATTERN, '[redacted]')
+		.replace(TOKEN_PREFIX_PATTERN, '[redacted]')
 		.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[redacted]')
 		.replace(/\bAIza[A-Za-z0-9_-]{10,}\b/g, '[redacted]')
+		.replace(/\s+/g, ' ')
+		.trim()
 		.slice(0, LIVE_ACTIVITY_MAX_MESSAGE_CHARS);
 }
 
@@ -401,6 +409,9 @@ export function acceptLiveActivityCommand(
 ): LiveActivityCommandResult {
 	if (!snapshot.connected) {
 		return { ok: false, reason: 'disconnected' };
+	}
+	if (snapshot.screenLocked) {
+		return { ok: false, reason: 'screen-locked' };
 	}
 	if (command.revision !== undefined && command.revision !== snapshot.revision) {
 		const pending = snapshot.pendingInteraction;

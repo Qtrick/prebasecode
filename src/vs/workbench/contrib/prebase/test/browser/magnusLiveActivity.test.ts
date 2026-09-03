@@ -373,6 +373,8 @@ suite('Magnus Live Activity projection', () => {
 	test('redacts secrets and never keeps raw env-looking values', () => {
 		assert.ok(redactLiveActivityText('Authorization: Bearer sk-abc123456').includes('[redacted]'));
 		assert.ok(!redactLiveActivityText('AIzaSyDummyKeyValue0123456789').includes('AIzaSy'));
+		assert.ok(redactLiveActivityText('Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.e30.t-ID').includes('[redacted]'));
+		assert.ok(redactLiveActivityText('github_pat_11ABCD1234_xyz789012345678901234567890').includes('[redacted]'));
 	});
 
 	test('masks password and api_key assignments and truncates long copy', () => {
@@ -549,8 +551,14 @@ suite('Magnus Live Activity projection', () => {
 		const locked = buildMagnusLiveActivitySnapshot(input, { revision: 4, prebaseForeground: false, connected: true, screenLocked: true });
 		assert.strictEqual(locked.status, 'attention');
 		assert.strictEqual(locked.pendingInteraction, undefined);
-		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'approve', interactionId: 'tool-9', revision: 4 }), { ok: false, reason: 'no-pending-interaction' });
-		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'followUp', sessionId: 'sess-1', text: 'go', revision: 4 }), { ok: true });
+		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'approve', interactionId: 'tool-9', revision: 4 }), { ok: false, reason: 'screen-locked' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'followUp', sessionId: 'sess-1', text: 'go', revision: 4 }), { ok: false, reason: 'screen-locked' });
+
+		// When hideDetails is true (screen not locked), approvals fail with no-pending-interaction, while followUp is allowed
+		const hidden = buildMagnusLiveActivitySnapshot(input, { revision: 4, prebaseForeground: false, connected: true, hideDetails: true });
+		assert.strictEqual(hidden.pendingInteraction, undefined);
+		assert.deepStrictEqual(acceptLiveActivityCommand(hidden, { kind: 'approve', interactionId: 'tool-9', revision: 4 }), { ok: false, reason: 'no-pending-interaction' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(hidden, { kind: 'followUp', sessionId: 'sess-1', text: 'go', revision: 4 }), { ok: true });
 	});
 
 	test('follow-up with a matching resource but a different sessionId fails closed', () => {
@@ -2144,7 +2152,7 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		const attentionEnd = native.indexOf('[self.content updateShapeAndContentAnimated:YES duration:0.18 useTargetState:YES]', attentionStart);
 		const attentionBlock = native.slice(attentionStart, attentionEnd);
 		assert.match(attentionBlock, /self\.content\.peekOnly = YES/);
-		assert.match(attentionBlock, /self\.panel\.ignoresMouseEvents = YES/);
+		assert.match(attentionBlock, /self\.panel\.ignoresMouseEvents = NO/);
 		assert.match(attentionBlock, /BOOL wasAttentionPeek = self\.attentionPeek/);
 		assert.match(attentionBlock, /if \(wasAttentionPeek && !self\.pinned && !self\.hovering\) \{\s*\[self collapse\]/);
 	});

@@ -2,7 +2,7 @@
 > code-oss-dev@1.128.0 test:graphs
 > node graphs/scripts/run-unit-tests.mjs
 
-[graphs:unit-tests] Discovered 58 test files in graphs/src/tests/unit/
+[graphs:unit-tests] Discovered 62 test files in graphs/src/tests/unit/
 
 
   Architecture pick
@@ -47,7 +47,7 @@
     ✔ fails closed when version metadata is missing
 
 
-  4 passing (2ms)
+  4 passing (3ms)
 
 
 
@@ -58,7 +58,7 @@
     ✔ accepts cancellation through the narrow IPC channel rather than a ProxyChannel method argument
 
 
-  4 passing (7ms)
+  4 passing (9ms)
 
 
 
@@ -76,10 +76,10 @@
     ✔ indexes nodes by ID and by relative and file: paths
     ✔ indexes incoming and outgoing edges for instant traversal
     ✔ indexes nodes by architecture layer and collects unique languages
-    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (102ms)
+    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (106ms)
 
 
-  4 passing (104ms)
+  4 passing (110ms)
 
 
 
@@ -101,23 +101,23 @@
     ✔ visits a wide cyclic import topology once and preserves its breadth-first depths
 
 
-  3 passing (15ms)
+  3 passing (16ms)
 
 
 
   Production Git Bridge & Real Git Fixture E2E Tests
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ root commit diff with --root captures all initial files and blob OIDs (51ms)
+    ✔ root commit diff with --root captures all initial files and blob OIDs (62ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ divergent branches: exact tree diff vs review range (merge-base) diff (114ms)
+    ✔ divergent branches: exact tree diff vs review range (merge-base) diff (123ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ rename tracking captures old and new paths with similarity score (64ms)
+    ✔ rename tracking captures old and new paths with similarity score (71ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ comment-only commit invariant: exact tree diff detects blob change, canonical AST is identical (188ms)
+    ✔ comment-only commit invariant: exact tree diff detects blob change, canonical AST is identical (198ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
     ✔ annotated vs lightweight tags peeling and metadata
@@ -126,28 +126,28 @@ Switched to branch 'main'
     ✔ safely rejects option injection in refs
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ handles unborn repository gracefully without throwing or stalling (66ms)
+    ✔ handles unborn repository gracefully without throwing or stalling (64ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (102ms)
+    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (98ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (2114ms)
+    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (881ms)
 
 
-  9 passing (6s)
+  9 passing (5s)
 
 
 
   GitHistoryService & Node Adapter Unit Tests
-    ✔ isGitRepository and getRepositoryIdentity (40ms)
+    ✔ isGitRepository and getRepositoryIdentity (45ms)
     ✔ listBranches parses branch names and commits cleanly via %00
     ✔ listTags distinguishes lightweight from annotated tags and peels annotated tags
     ✔ resolveRef strictly resolves commits with --verify and throws UnknownRef for invalid refs
     ✔ log returns bounded commits with machine-stable timestamps and parent links
     ✔ listTree parses objectId, mode, and size using -l
-    ✔ diffCommitTrees captures rename and modifications with exact blob hashes (44ms)
-    ✔ diffCommitToParent for root commit correctly diffs against empty tree (54ms)
+    ✔ diffCommitTrees captures rename and modifications with exact blob hashes (46ms)
+    ✔ diffCommitToParent for root commit correctly diffs against empty tree (61ms)
     ✔ HEAD change observer notifies on event fire
 
 
@@ -168,18 +168,18 @@ Switched to branch 'main'
       ✔ acknowledges ping events with 200 OK
 
 
-  8 passing (5ms)
+  8 passing (4ms)
 
 
 
   GitTreeHistoricalAnalysis Integration Tests
-    ✔ analyzes historical commit 1 without checkout (55ms)
-    ✔ analyzes historical commit 2 without checkout (54ms)
-    ✔ diffs historical snapshots 1 and 2 yielding exact structural diff (98ms)
-    ✔ dirty working tree changes do NOT contaminate historical git analysis (47ms)
+    ✔ analyzes historical commit 1 without checkout (63ms)
+    ✔ analyzes historical commit 2 without checkout (57ms)
+    ✔ diffs historical snapshots 1 and 2 yielding exact structural diff (113ms)
+    ✔ dirty working tree changes do NOT contaminate historical git analysis (52ms)
 
 
-  4 passing (809ms)
+  4 passing (909ms)
 
 
 
@@ -193,7 +193,7 @@ Switched to branch 'main'
     ✔ 7. Maps/graph chrome uses vscode focus and button tokens, not a hardcoded teal
 
 
-  7 passing (8ms)
+  7 passing (10ms)
 
 
 
@@ -205,7 +205,7 @@ Switched to branch 'main'
     ✔ 3. File edit -> 0 AI calls on save, exactly 1 lazy AI call on next view
     ✔ 4. Unrelated file edit -> 0 extra AI calls for other nodes
     ✔ 5. Stale in-flight race protection: discards result if file changed during in-flight generation
-    ✔ 6. Persistence across restart and 500-node scale capacity (67ms)
+    ✔ 6. Persistence across restart and 500-node scale capacity (68ms)
     ✔ 7. Restart freshness: external edit while closed prevents stale peek and updates on view
     ✔ 8. Prompt semantic fingerprint: layer or imports change invalidates cache
     ✔ 9. Multi-root workspace: events in Folder B do not invalidate Folder A
@@ -214,7 +214,7 @@ Switched to branch 'main'
     ✔ 12. Explicit projectRoot isolates identical relative paths across workspace folders
 
 
-  14 passing (85ms)
+  14 passing (87ms)
 
 
 
@@ -224,14 +224,44 @@ Switched to branch 'main'
     ✔ rebuilds canonical network positions when a relayout advances without a rescan
     ✔ rotates only after the pointer crosses its drag threshold, then cleans up on release
     ✔ honors natural and inverted drag direction without exposing unbounded camera angles
-    ✔ dragging a picked node updates its world position without rotating the camera
+    ✔ unselected node + drag rotates the camera, does not move the node, and does not select on release
+    ✔ unselected node + single click selects the node
+    ✔ already-selected node + second click-hold-drag updates its world position without rotating camera
+    ✔ selected node A + subsequent drag on unselected node B rotates graph without dragging B
     ✔ pointer starting on empty canvas rotates the camera without dragging a node
     ✔ selection locks idle camera rotation even when a previously scheduled resume races selection
     ✔ closing a popup retains selection lock, while deselection resumes only after its idle delay
-    ✔ responsive stage resize shifts camera center by half delta while preserving zoom, pan, and rotation
+    ✔ selected node + small movement below threshold does not accidentally move node
+    ✔ Shift-key or middle-button pan overrides selected-node drag into viewport panning
+    ✔ vertical drag changes pitch as well as yaw during camera rotation
+    ✔ selection idle lock freezes both yaw and pitch while a node stays selected
+    ✔ pointer capture is acquired on the canvas host, not document
+    ✔ selected-node drag moves world XYZ while keeping screen projection stable under simultaneous zoom
+    ✔ reduced-motion setting preserves two-stage interaction semantics identically
 
 
-  10 passing (18ms)
+  19 passing (33ms)
+
+
+
+  PreBase graph editor network render metrics (Campaign XII)
+    ✔ nodeHits expose worldX/worldY/worldZ aligned with base3d, not screen coords alone
+    ✔ metrics expose live interactionState during node drag
+    ✔ world coords in nodeHits stay invariant when camera rotates but nodes do not
+
+  PreBase graph editor pointer capture lifecycle metrics (Campaign XVI)
+    ✔ pointerup preserves lastPointerCaptureId while clearing activePointerId and active capture flags
+    ✔ pointercancel releases capture without recording lostPointerCaptureObserved
+    ✔ lostpointercapture records lostPointerCaptureObserved and returns idle interactionState
+    ✔ window blur mid-drag force-releases capture and records blur termination
+    ✔ normal pointerdown acquires capture and pointerup releases with lifecycle proof
+    ✔ adversarial: setPointerCapture throw leaves acquisition unproven
+    ✔ adversarial: silent setPointerCapture failure leaves acquisition unproven
+    ✔ diagnostic break: missing last-gesture acquisition fails closed
+    ✔ diagnostic break: wrong pointer id hides stuck capture and fails closed when release proof is absent
+
+
+  12 passing (21ms)
 
 
 
@@ -259,94 +289,94 @@ Switched to branch 'main'
     ✔ reduced motion snaps Temporal interpolation without exploding layout
 
 
-  21 passing (58ms)
+  21 passing (63ms)
 
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
-    at Timeout._onTimeout (evalmachine.<anonymous>:1346:12)
+    at Timeout._onTimeout (evalmachine.<anonymous>:1727:12)
     at listOnTimeout (node:internal/timers:605:17)
     at process.processTimers (node:internal/timers:541:7)
 
@@ -358,7 +388,7 @@ Switched to branch 'main'
     ✔ 4. Details panel displays loading truth and rendered diff summary with renamedModifiedCount
 
 
-  4 passing (16ms)
+  4 passing (17ms)
 
 
 
@@ -392,7 +422,7 @@ Switched to branch 'main'
     ✔ 26. Temporal focus caps zoom at 3.2 for ≤4 nodes and 2.4 for 5+; Full Map caps at 2.4
 
 
-  27 passing (53ms)
+  27 passing (59ms)
 
 
 
@@ -414,7 +444,7 @@ Switched to branch 'main'
     ✔ prebaseSettingsEditor routes through graphSettingsUi and does not bind PreBaseGraphConfigKeys
 
 
-  5 passing (25ms)
+  5 passing (24ms)
 
 
 
@@ -442,12 +472,12 @@ Switched to branch 'main'
     ✔ 10. applyZoomAroundCenter anchors zoom at usable viewport center with insets
 
 
-  10 passing (3ms)
+  10 passing (4ms)
 
 
 
   Graph visual recovery contracts
-    ✔ organic ~280-node stress stays bounded and readable under production Fit View (93ms)
+    ✔ organic ~280-node stress stays bounded and readable under production Fit View (101ms)
     ✔ organic collision spacing expands locally without dropping isolates from the layout
     ✔ remaining network layouts keep disconnected components without dropping nodes (52ms)
     ✔ network screen-aware radii stay readable at Fit zooms; uncompensated vanishes at k=0.2
@@ -459,7 +489,7 @@ Switched to branch 'main'
     ✔ a 9679-dot Full Map blob is structurally ok but not visually good without node-level LOD
 
 
-  10 passing (188ms)
+  10 passing (191ms)
 
 
 
@@ -470,7 +500,7 @@ Switched to branch 'main'
     ✔ unresolved package imports stay cheap on a large file set
 
 
-  4 passing (17ms)
+  4 passing (15ms)
 
 
 
@@ -482,7 +512,7 @@ Switched to branch 'main'
     ✔ Identical structural state detection on comment-only change
 
 
-  5 passing (19ms)
+  5 passing (18ms)
 
 
 
@@ -492,7 +522,58 @@ Switched to branch 'main'
     ✔ does not let non-import topology change import-importance organization
 
 
-  3 passing (8ms)
+  3 passing (7ms)
+
+
+
+  MapsViewDataTruth (Unit - Canonical Catalog & Temporal Commit Truth)
+    ✔ 1. Sidebar language stats reflect full canonical catalog (~9.7k nodes), not capped 280 render snapshot
+    ✔ 2. Sidebar file search finds files present in full canonical dataset outside the 280-node render projection
+    ✔ 3. Temporal commit diff catalog strictly excludes removed diff ghosts and folders
+
+
+  3 passing (7ms)
+
+
+
+  NetworkAcceptanceMath (Unit - Live Acceptance Truth)
+    cameraRotationStable
+      ✔ passes when both yaw and pitch remain stable
+      ✔ fails on yaw-only drift
+      ✔ fails on pitch-only drift
+      ✔ fails when coordinates are missing
+    rotationProven
+      ✔ passes for yaw-only orbit above minDelta
+      ✔ passes for pitch-only orbit above minDelta
+      ✔ fails when neither axis exceeds minDelta
+      ✔ fails closed when rotation coordinates are missing or non-finite
+      ✔ uses strict greater-than at minDelta boundary
+      ✔ single-axis orbit passes rotationProven but fails cameraRotationStable
+    shiftPanProven
+      ✔ passes when transform moved with stable camera and node
+      ✔ fails when rotation occurs during pan
+      ✔ fails closed when transform or node world coordinates are missing or non-finite
+      ✔ passes with stable finite XYZ world coordinates within tolerance
+    pointerCaptureLifecycleProven
+      ✔ passes when capture is released after gesture with acquisition proof
+      ✔ fails closed when capture was never acquired
+      ✔ fails closed when release was not recorded on stale metrics
+      ✔ fails when pointer capture remains stuck on canvas or body
+      ✔ fails when stuck capture is checked against wrong pointer id (false negative on release)
+    semanticZoomProven
+      ✔ fails when k changes alone without semantic deltas
+      ✔ passes when zoom change is accompanied by LOD transition
+      ✔ passes when zoom change updates projected bounds
+    labelDensityProven
+      ✔ passes single-snapshot sanity when labels are drawn within node budget
+      ✔ fails when labels are absent or exceed node count
+      ✔ requires multi-zoom semantic progression when multiple samples are provided
+      ✔ fails when only LOD tier changes without labelsDrawn delta
+      ✔ edges alone must not prove label density at multiple zoom levels
+      ✔ label-specific LOD progression passes when label counts change across zoom
+
+
+  28 passing (8ms)
 
 
 
@@ -536,7 +617,7 @@ Switched to branch 'main'
     ✔ network runtime collision, link-distance, and force controls retain all nodes
 
 
-  11 passing (34ms)
+  11 passing (35ms)
 
 
 
@@ -573,7 +654,7 @@ Switched to branch 'main'
     ✔ 7. WorkbenchCanonicalParseService has @IUtilityProcessWorkerWorkbenchService decorator metadata
 
 
-  7 passing (2ms)
+  7 passing (3ms)
 
 
 
@@ -586,7 +667,7 @@ Switched to branch 'main'
     ✔ propagates OversizedBlob error code when reading content beyond limit
 
 
-  6 passing (2ms)
+  6 passing (3ms)
 
 
 
@@ -609,7 +690,7 @@ Switched to branch 'main'
     ✔ prepared statement callback errors finalize statements and roll back
 
 
-  6 passing (70ms)
+  6 passing (67ms)
 
 
 
@@ -625,7 +706,7 @@ Switched to branch 'main'
     ✔ rejects a future schema version without rewriting it
     ✔ rolls back a v1 migration when legacy parent topology is malformed
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-JX89IO',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-hVHiph',
   resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T',
   ext: '.db',
   isSymlink: false,
@@ -686,11 +767,11 @@ Switched to branch 'main'
     ✔ Electron-main store owner quarantines one corrupt derived cache and recreates it without touching siblings
     ✔ Electron-main store owner bounds DB, WAL, and SHM quarantine companions by generation
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu',
-  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu/nested',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-bqdYzS',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-bqdYzS/nested',
   ext: '.db',
   isSymlink: false,
-  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu/nested/store.db'
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-bqdYzS/nested/store.db'
 }
 [TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
     at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
@@ -710,11 +791,11 @@ Switched to branch 'main'
     at done (/Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:308:5)
     at /Users/qunyingfan/Prebasecode/node_modules/mocha/lib/runnable.js:369:11
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu',
-  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu',
+  storageRoot: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-bqdYzS',
+  resolvedParent: '/private/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-bqdYzS',
   ext: '.db',
   isSymlink: true,
-  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-cm2KPu/linked.db'
+  dbPath: '/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/prebase-sqlite-test-bqdYzS/linked.db'
 }
 [TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
     at TemporalStoreMainService._validateDbPath (file:///Users/qunyingfan/Prebasecode/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
@@ -738,7 +819,7 @@ Switched to branch 'main'
     ✔ blob analysis cache persists and retrieves entries
 
 
-  33 passing (260ms)
+  33 passing (269ms)
 
 
 
@@ -746,10 +827,10 @@ Switched to branch 'main'
     ✔ keeps metadata browsing cheap and indexes one isolated checkpoint from a 50,000-commit cold history
     ✔ does not start Git or parser work for a pre-cancelled cold-history selection
     ✔ reconciles an isolated child anchor after its parent segment is indexed
-    ✔ multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D) (39ms)
+    ✔ multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D) (38ms)
 
 
-  4 passing (115ms)
+  4 passing (116ms)
 
 
 
@@ -805,7 +886,7 @@ Switched to branch 'main'
     ✔ 8. A sparse single connected cluster is scaled into a compact disc
 
 
-  10 passing (17ms)
+  10 passing (16ms)
 
 
 
@@ -824,33 +905,47 @@ Switched to branch 'main'
 
 
   Temporal Graph E2E Ingestion & Reconstruction
-    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (395ms)
-    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (1180ms)
-    ✔ Handles branch merge commits and preserves multi-parent DAG relations (1007ms)
-    ✔ scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order (818ms)
-    ✔ exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs (618ms)
-    ✔ Ingests commits in a SHA-256 repository (242ms)
-    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (550ms)
-    ✔ Multi-root concurrent event routing and FIFO ingestion queue (502ms)
+    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (472ms)
+    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (1362ms)
+    ✔ Handles branch merge commits and preserves multi-parent DAG relations (1117ms)
+    ✔ scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order (883ms)
+    ✔ exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs (660ms)
+    ✔ Ingests commits in a SHA-256 repository (253ms)
+    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (593ms)
+    ✔ Multi-root concurrent event routing and FIFO ingestion queue (532ms)
 
 
-  8 passing (5s)
+  8 passing (6s)
 
 
 
   TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)
     ✔ 1. Selected and Hovered nodes have highest priority and bypass collision culling
     ✔ 2. Changed nodes have priority over unchanged nodes
+    ✔ 2b. Entry nodes outrank changed nodes at the same screen slot
     ✔ 3. Screen-Space Collision Culling: Overlapping text boxes are culled for non-selected nodes
     ✔ 5. shortenCommunityLabel keeps hierarchical leaf when it fits the budget
     ✔ 6. shortenCommunityLabel ellipsizes flat long names deterministically
     ✔ 7. community guide labels respect zoom-tier budgets and suppress below overview threshold
     ✔ 8. community guide labels skip lower-priority guides on box collision
     ✔ 9. unified layout reserves guide occupancy before placing node labels
+    ✔ 10. Screen-Space Legibility: community landmarks at low zoom (k=0.21) maintain readable screen-size fonts
+    ✔ 11. aggregate guide labels reserve shared occupancy before node labels are placed
+    ✔ 7. Route badges share occupancy with guide labels and rank changed relationships
+    ✔ 12. labelCollisionCullCount counts each rejected label candidate during layout
+    ✔ 13. renderedLabelOverlapCount detects overlaps among labels that bypass culling
+    ✔ 14. selected and hovered node labels beat route badge occupancy at the same slot
+    ✔ 15. entry and changed node labels outrank unchanged labels before route badges consume occupancy
     ✔ 4. Hoists the workbench font family once per pass into every visible label
+    ✔ 16. Search result query match outranks ordinary route badges at the same screen position
+    ✔ 17. Current editor file explicitly outranks ordinary route badges at the same screen position
+    ✔ 18. Changed files outrank ordinary route badges in Focus Changes / temporal mode
+    ✔ 19. Community landmark labels are clamped within guide bounds
+    ✔ 20. Landmark yields when conflicting with higher-priority semantic label (search match or active file)
+    ✔ 21. Ordinary labels yield to all important content (route badges and landmarks)
 
 
-  9 passing (9ms)
+  23 passing (11ms)
 
 
 
@@ -860,9 +955,21 @@ Switched to branch 'main'
     ✔ 3. Connected added node is placed in proximity to its neighbors
     ✔ 4. Phantom exiting nodes for removed entities maintain previous coordinates
     ✔ 5. Performance: 500-node snapshot layout executes in under 15ms
+    Bounded Local Relaxation & Spatial Grid Invariants
+      ✔ TEST A — Healthy Layout: Zero guide overlap preserves exact coordinates with zero displacement
+      ✔ TEST B — Local Guide Collision: Bounded relaxation reduces guide overlap
+      ✔ TEST C — Far-Away Community: Far-away unaffected community experiences zero movement
+      ✔ TEST C2 — Unrelated Changed Community: distant modified community stays anchored when overlap is elsewhere
+      ✔ TEST G2 — Quality Gate: relaxation reverts when overlap ratio would worsen
+      ✔ TEST D — Unchanged Affected Node: Movement is strictly bounded within unchanged budget (<= 12px)
+      ✔ TEST E — New / Changed Node: Movement is strictly bounded within changed budget (<= 36px)
+      ✔ TEST F — Renamed Identity: Renamed entity preserves identity and bounded movement
+      ✔ TEST G — Rollback / Stabler Retained: If relaxation does not improve quality, original positions are retained
+      ✔ TEST H — Determinism: Multiple runs with identical inputs produce identical coordinates
+      ✔ TEST I — Grid Cell Crossing: Spatial2DGrid handles cell boundaries correctly
 
 
-  5 passing (18ms)
+  16 passing (31ms)
 
 
 
@@ -874,7 +981,7 @@ Switched to branch 'main'
     ✔ 5. Sparse rank stagger stays permutation-invariant
 
 
-  5 passing (28ms)
+  5 passing (24ms)
 
 
 
@@ -895,11 +1002,11 @@ Switched to branch 'main'
 
 
   Temporal Live Acceptance Evaluation
-    ✔ zero received and drawn nodes with an unopened target fails closed (151ms)
-    ✔ representative rendered evidence passes without failures (148ms)
+    ✔ zero received and drawn nodes with an unopened target fails closed (153ms)
+    ✔ representative rendered evidence passes without failures (153ms)
 
 
-  2 passing (300ms)
+  2 passing (308ms)
 
 
 
@@ -929,7 +1036,7 @@ Switched to branch 'main'
       ✔ projectTemporalVisibleSet overview matches host for community aggregates
 
 
-  19 passing (5ms)
+  19 passing (7ms)
 
 
 
@@ -946,7 +1053,7 @@ Switched to branch 'main'
     ✔ empty or undefined inputs yield an empty projection without throwing
 
 
-  10 passing (12ms)
+  10 passing (13ms)
 
 
 
@@ -964,7 +1071,7 @@ Switched to branch 'main'
     ✔ active sequencer work rejects on disposal even if the inner task ignores cancellation
     ✔ countActiveWrites uses hasActiveWrite, not CPU or indexingSeen
     ✔ countActiveWrites includes in-flight ingest, not CPU
-    ✔ non-cooperative store write prevents close until hasActiveWrite clears (45ms)
+    ✔ non-cooperative store write prevents close until hasActiveWrite clears (43ms)
     ✔ disposal is idempotent, rejects new work, and closes the store exactly once
     ✔ reports repository failures as structured diagnostics instead of unregistered without context
     ✔ reports persisted cache corruption as failed instead of masking it as an unregistered repository
@@ -974,12 +1081,22 @@ Switched to branch 'main'
     ✔ derives incomplete status from persisted canonical coverage after runtime restart
 
 
-  21 passing (51ms)
+  21 passing (48ms)
+
+
+
+  TemporalScale97k (Unit & Performance - Canonical ~9.7k Node Scale Acceptance)
+    ✔ 1. 9.7k Initial Layout: Computes initial semantic layout on 9,680 nodes within performance budget (1165ms)
+    ✔ 2. 9.7k Incremental Commit: Preserves mental map and unchanged stability across adjacent commits (1407ms)
+    ✔ 3. 9.7k Multi-Tier Projection: overview/medium/detail tiers project mutated 9.7k graph within duration budget (232ms)
+
+
+  3 passing (3s)
 
 
 
   Temporal Service E2E Tests (Phase 3.5)
-    ✔ Full Phase 3.5 Lifecycle: DAG, Bounded Navigation, Relative Stepping, Renamed+Modified, Pinned Compare & Zero-byte Empty Tree (3881ms)
+    ✔ Full Phase 3.5 Lifecycle: DAG, Bounded Navigation, Relative Stepping, Renamed+Modified, Pinned Compare & Zero-byte Empty Tree (4115ms)
 
 
   1 passing (4s)
@@ -990,10 +1107,10 @@ Switched to branch 'main'
     ✔ stores only structural transitions across a long unchanged delta run
     ✔ records observed-at-anchor for cold checkpoints and replaces them with transitions upon reconciliation
     ✔ garbage collects obsolete provisional master entity and edge records upon reconciliation
-    ✔ proves sparse order-of-growth across 100 commits with 500 entities and 500 edges (268ms)
+    ✔ proves sparse order-of-growth across 100 commits with 500 entities and 500 edges (281ms)
 
 
-  4 passing (300ms)
+  4 passing (313ms)
 
 
 
@@ -1079,13 +1196,13 @@ Switched to branch 'main'
     ✔ selectCommitIndex and stepCommit: host-owned bounded navigation
     ✔ Non-Git workspace: availableRepositories only discovers genuine Git repositories
     ✔ Follow HEAD: setFollowHead(true) immediately resolves current HEAD commit, and historical navigation turns follow off
-    ✔ HEAD change event handling: followHead=true advances view, followHead=false preserves selection (65ms)
+    ✔ HEAD change event handling: followHead=true advances view, followHead=false preserves selection (63ms)
     ✔ Layer-specific retrySelection: re-executes the layer that actually failed
     ✔ partial lineage keeps reconstructed target nodes available to Full Map
     ✔ pauseActiveWork cancels in-flight history without throwing
     ✔ stale layout version discards poisoned positions; matching version preserves mental map
 
 
-  16 passing (270ms)
+  16 passing (274ms)
 
-[graphs:unit-tests] All 58 test files passed successfully.
+[graphs:unit-tests] All 62 test files passed successfully.

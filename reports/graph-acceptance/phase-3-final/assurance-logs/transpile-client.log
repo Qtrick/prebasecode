@@ -4,16 +4,16 @@
 
 [clean] out
 [transpile] src → out
-[transpile] Found 7551 files
+[transpile] Found 7558 files
 [resources] Copying all non-TS files to out...
-[resources] Copied 1385 files
-[transpile] Done in 2670ms
+[resources] Copied 1386 files
+[transpile] Done in 2866ms
 
-✓ Total: 3170ms
+✓ Total: 3410ms
 
 > code-oss-dev@1.128.0 gulp
 > node --experimental-strip-types --max-old-space-size=8192 ./node_modules/gulp/bin/gulp.js copy-codicons
 
-[23:23:01] Using gulpfile ~/Prebasecode/gulpfile.mjs
-[23:23:01] Starting 'copy-codicons'...
-[23:23:01] Finished 'copy-codicons' after 3.39 ms
+[15:23:23] Using gulpfile ~/Prebasecode/gulpfile.mjs
+[15:23:23] Starting 'copy-codicons'...
+[15:23:23] Finished 'copy-codicons' after 2.18 ms

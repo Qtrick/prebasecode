@@ -241,12 +241,14 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) PrebaseLiveActivityView *content;
 @property (nonatomic, strong) NSTextField *input;
 @property (nonatomic, strong) NSButton *openButton;
+@property (nonatomic, strong) NSButton *pinButton;
 @property (nonatomic, strong) NSButton *approveButton;
 @property (nonatomic, strong) NSButton *denyButton;
 @property (nonatomic, strong) NSMutableArray<NSButton *> *optionButtons;
 @property (nonatomic, copy) NSArray<NSDictionary *> *pendingOptions;
 @property (nonatomic, assign) BOOL visible;
 @property (nonatomic, assign) BOOL pinned;
+@property (nonatomic, assign) BOOL screenLocked;
 @property (nonatomic, assign) BOOL hovering;
 @property (nonatomic, assign) BOOL reducedMotion;
 @property (nonatomic, assign) BOOL ignoresMouse;
@@ -285,6 +287,9 @@ static NSString *JSString(Napi::Value value) {
 - (void)clearPendingInteraction;
 - (NSDictionary *)diagnosticsDict;
 - (void)performUserHaptic;
+- (void)togglePin:(id)sender;
+- (void)updatePinButtonState;
+- (BOOL)simulateClickPin;
 - (BOOL)simulateClickOptionIndex:(NSInteger)index;
 - (BOOL)simulateClickApprove;
 - (BOOL)simulateClickDeny;
@@ -297,6 +302,13 @@ static NSString *JSString(Napi::Value value) {
 - (void)expandPreview;
 - (void)collapse;
 - (void)layoutForScreen;
+@end
+
+@interface PrebaseFlippedView : NSView
+@end
+
+@implementation PrebaseFlippedView
+- (BOOL)isFlipped { return YES; }
 @end
 
 @implementation PrebaseLiveActivityView
@@ -315,7 +327,7 @@ static NSString *JSString(Napi::Value value) {
 		_shapeLayer.frame = self.bounds;
 		[self.layer addSublayer:_shapeLayer];
 
-		_compactContainer = [[NSView alloc] initWithFrame:self.bounds];
+		_compactContainer = [[PrebaseFlippedView alloc] initWithFrame:self.bounds];
 		_compactContainer.wantsLayer = YES;
 		[self addSubview:_compactContainer];
 
@@ -326,7 +338,7 @@ static NSString *JSString(Napi::Value value) {
 		_rightMetricsLabel.font = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
 		[_compactContainer addSubview:_rightMetricsLabel];
 
-		_expandedContainer = [[NSView alloc] initWithFrame:self.bounds];
+		_expandedContainer = [[PrebaseFlippedView alloc] initWithFrame:self.bounds];
 		_expandedContainer.wantsLayer = YES;
 		_expandedContainer.alphaValue = 0.0;
 		_expandedContainer.hidden = YES;
@@ -401,6 +413,7 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)mouseDown:(NSEvent *)event {
 	if (self.peekOnly || self.controller.attentionPeek) {
+		[self.controller performUserHaptic];
 		[self.controller expandInteractive];
 		return;
 	}
@@ -726,10 +739,13 @@ static NSString *JSString(Napi::Value value) {
 	[self.content.expandedContainer addSubview:self.input];
 
 	self.openButton = [self makeButton:@"Open in PreBase" action:@selector(openInPrebase:)];
+	self.pinButton = [self makeButton:@"Pin" action:@selector(togglePin:)];
+	self.pinButton.accessibilityLabel = @"Pin panel";
 	self.approveButton = [self makeButton:@"Approve" action:@selector(approve:)];
 	self.denyButton = [self makeButton:@"Deny" action:@selector(deny:)];
 	self.approveButton.hidden = YES;
 	self.denyButton.hidden = YES;
+	self.pinButton.hidden = YES;
 	self.optionButtons = [NSMutableArray array];
 	for (NSInteger i = 0; i < 4; i++) {
 		NSButton *button = [self makeButton:[NSString stringWithFormat:@"Option %ld", (long)(i + 1)] action:@selector(answerOption:)];
@@ -767,9 +783,16 @@ static NSString *JSString(Napi::Value value) {
 		if (frontScreen) {
 			return frontScreen;
 		}
-		// Deterministic fallback to built-in physical notch screen, never random cursor hopping
+		// Deterministic fallback to built-in physical notch screen
 		for (NSScreen *screen in [NSScreen screens]) {
 			if (IsBuiltinScreen(screen) && ScreenHasPhysicalNotch(screen)) {
+				return screen;
+			}
+		}
+		// Fallback to mouse location when PreBase is backgrounded
+		NSPoint p = [NSEvent mouseLocation];
+		for (NSScreen *screen in [NSScreen screens]) {
+			if (NSPointInRect(p, screen.frame)) {
 				return screen;
 			}
 		}
@@ -959,7 +982,7 @@ static NSString *JSString(Napi::Value value) {
 			context.allowsImplicitAnimation = YES;
 			[[self.panel animator] setFrame:win display:YES];
 		} completionHandler:^{
-			// Frame settled - ensure final control layout
+			// Delay control layout until frame animation completes to prevent visible popping
 			[self layoutControls:win];
 		}];
 		self.content.targetExpanded = expanded;
@@ -981,6 +1004,7 @@ static NSString *JSString(Napi::Value value) {
 	if (!showAttention) {
 		self.input.hidden = YES;
 		self.openButton.hidden = YES;
+		self.pinButton.hidden = YES;
 		self.approveButton.hidden = YES;
 		self.denyButton.hidden = YES;
 		return;
@@ -991,14 +1015,19 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat bodyHeight = effectiveH - bandH;
 	CGFloat bottomY = bodyHeight - 28;
 
+	[self updatePinButtonState];
+	self.pinButton.hidden = NO;
+
 	if (showInput) {
 		self.input.hidden = NO;
-		self.input.frame = NSMakeRect(14, bottomY, NSWidth(win) - 146, 24);
+		self.input.frame = NSMakeRect(14, bottomY, NSWidth(win) - 206, 24);
+		self.pinButton.frame = NSMakeRect(NSWidth(win) - 186, bottomY, 52, 22);
 		self.openButton.frame = NSMakeRect(NSWidth(win) - 128, bottomY, 114, 22);
 		self.openButton.hidden = NO;
 		bottomY -= 30;
 	} else {
 		self.input.hidden = YES;
+		self.pinButton.frame = NSMakeRect(NSWidth(win) - 186, bottomY, 52, 22);
 		self.openButton.frame = NSMakeRect(NSWidth(win) - 128, bottomY, 114, 22);
 		self.openButton.hidden = NO;
 	}
@@ -1072,6 +1101,12 @@ static NSString *JSString(Napi::Value value) {
 		if (!strong || gDisposed || !strong.visible) {
 			return;
 		}
+		if ([strong.displayMode isEqualToString:@"active"]) {
+			NSScreen *activeScreen = [strong targetScreen];
+			if (activeScreen && activeScreen != strong.layoutScreen) {
+				[strong layoutForScreen];
+			}
+		}
 		if (strong.pinned || strong.attentionPeek || strong.content.peekOnly || (strong.content.expanded && !strong.attentionPeek)) {
 			return;
 		}
@@ -1095,8 +1130,12 @@ static NSString *JSString(Napi::Value value) {
 			return event;
 		}
 		if (strong.pinned || strong.content.expanded || strong.content.peekOnly) {
+			BOOL wasPinned = strong.pinned;
 			strong.pinned = NO;
-			[strong emit:@"unpin" extras:nil];
+			[strong updatePinButtonState];
+			if (wasPinned) {
+				[strong emit:@"unpin" extras:nil];
+			}
 			[strong collapse];
 			return nil;
 		}
@@ -1120,7 +1159,10 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)removeMonitors {
 	[self removeGlobalMonitorOnly];
-	[self removeLocalKeyMonitor];
+	if (self.localMonitor) {
+		[NSEvent removeMonitor:self.localMonitor];
+		self.localMonitor = nil;
+	}
 }
 
 - (void)mouseEnteredInView:(NSEvent *)event {
@@ -1140,7 +1182,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)pointerInside:(BOOL)inside {
-	if (self.pinned || self.attentionPeek || self.content.peekOnly) {
+	if (self.screenLocked || self.pinned || self.attentionPeek || self.content.peekOnly) {
 		return;
 	}
 	if (inside) {
@@ -1175,7 +1217,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)expandPeek {
-	if (!self.visible) {
+	if (self.screenLocked || !self.visible) {
 		return;
 	}
 	self.attentionPeek = NO;
@@ -1190,7 +1232,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)expandInteractive {
-	if (!self.visible) {
+	if (self.screenLocked || !self.visible) {
 		return;
 	}
 	self.attentionPeek = NO;
@@ -1205,6 +1247,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)expandPreview {
+	self.panel.ignoresMouseEvents = NO;
 	[self expandInteractive];
 }
 
@@ -1407,6 +1450,8 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"interactionId"] = self.interactionId ?: @"";
 	dict[@"approvalControlsVisible"] = @(!self.approveButton.hidden);
 	dict[@"openInPreBaseVisible"] = @(!self.openButton.hidden);
+	dict[@"pinButtonVisible"] = @(!self.pinButton.hidden);
+	dict[@"pinButtonTitle"] = self.pinButton.title ?: @"";
 	NSInteger visibleOptions = 0;
 	NSMutableArray *optLabels = [NSMutableArray array];
 	for (NSButton *btn in self.optionButtons) {
@@ -1520,16 +1565,50 @@ static NSString *JSString(Napi::Value value) {
 	return YES;
 }
 
-- (void)mouseUp:(NSEvent *)event {
-	if (!self.pinned) {
-		[self performUserHaptic];
-		self.pinned = YES;
+- (void)togglePin:(id)sender {
+	if (self.screenLocked) {
+		return;
+	}
+	[self performUserHaptic];
+	self.pinned = !self.pinned;
+	[self updatePinButtonState];
+	[self emit:self.pinned ? @"pin" : @"unpin" extras:nil];
+	if (self.pinned) {
 		self.content.expanded = YES;
+		self.content.targetExpanded = YES;
 		self.panel.ignoresMouseEvents = NO;
+		self.ignoresMouse = NO;
 		[self removeGlobalMonitorOnly];
-		[self emit:@"pin" extras:nil];
-		[self layoutForScreen];
-		if (!self.input.hidden) {
+		[self installLocalKeyMonitor];
+	}
+	[self layoutForScreen];
+}
+
+- (void)updatePinButtonState {
+	if (self.pinned) {
+		self.pinButton.title = @"Unpin";
+		self.pinButton.accessibilityLabel = @"Unpin panel";
+		self.pinButton.state = NSControlStateValueOn;
+	} else {
+		self.pinButton.title = @"Pin";
+		self.pinButton.accessibilityLabel = @"Pin panel";
+		self.pinButton.state = NSControlStateValueOff;
+	}
+}
+
+- (BOOL)simulateClickPin {
+	if (self.pinButton.hidden || self.screenLocked) {
+		return NO;
+	}
+	[self togglePin:self.pinButton];
+	return YES;
+}
+
+- (void)mouseUp:(NSEvent *)event {
+	// Releasing the mouse on the Interactive surface should NOT pin.
+	// It focuses the input field if visible and not already focused.
+	if (self.content.expanded && !self.content.peekOnly) {
+		if (!self.input.hidden && [self.panel firstResponder] != self.input) {
 			[self.panel makeKeyAndOrderFront:nil];
 			[self.panel makeFirstResponder:self.input];
 		}
@@ -1537,6 +1616,35 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)applySnapshotDict:(NSDictionary *)snapshot {
+	BOOL screenLocked = [snapshot[@"screenLocked"] boolValue];
+	self.screenLocked = screenLocked;
+	if (screenLocked) {
+		self.attentionPeek = NO;
+		self.content.peekOnly = NO;
+		self.content.expanded = NO;
+		self.content.targetExpanded = NO;
+		self.pinned = NO;
+		[self updatePinButtonState];
+		self.ignoresMouse = YES;
+		if (self.panel) {
+			self.panel.ignoresMouseEvents = YES;
+		}
+		[self removeLocalKeyMonitor];
+		self.content.status = @"idle";
+		self.content.attention = NO;
+		self.content.statusLabel = @"Magnus";
+		self.content.activityLabel = @"";
+		self.content.latestMessage = @"";
+		self.content.metricsLabel = @"";
+		self.content.pendingTitle = @"";
+		self.content.actions = @[];
+		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
+		if (self.panel) {
+			[self layoutControls:self.panel.frame];
+		}
+		return;
+	}
+
 	self.sessionId = snapshot[@"sessionId"] ?: @"";
 	self.sessionResource = snapshot[@"sessionResource"] ?: @"";
 	self.revision = [snapshot[@"revision"] doubleValue];
@@ -1592,6 +1700,7 @@ static NSString *JSString(Napi::Value value) {
 - (void)setVisible:(BOOL)visible pinned:(BOOL)pinned reduced:(BOOL)reduced {
 	self.visible = visible;
 	self.pinned = pinned;
+	[self updatePinButtonState];
 	self.reducedMotion = reduced;
 	self.content.reducedMotion = reduced;
 	self.content.expanded = pinned || (visible && self.content.expanded);
@@ -1663,6 +1772,7 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 	payload[@"taskTitle"] = JSString(snapshot.Get("taskTitle"));
 	payload[@"presentationLabel"] = JSString(snapshot.Get("presentationLabel"));
 	payload[@"latestShortMessage"] = JSString(snapshot.Get("latestShortMessage"));
+	payload[@"screenLocked"] = @(snapshot.Get("screenLocked").IsBoolean() ? snapshot.Get("screenLocked").As<Napi::Boolean>().Value() : false);
 	NSMutableArray *actions = [NSMutableArray array];
 	if (snapshot.Get("recentActions").IsArray()) {
 		Napi::Array arr = snapshot.Get("recentActions").As<Napi::Array>();
@@ -1815,7 +1925,17 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 		[controller expandInteractive];
 		return Napi::Boolean::New(env, true);
 	}
-	if (action == "escape" || action == "collapse") {
+	if (action == "escape") {
+		BOOL wasPinned = controller.pinned;
+		controller.pinned = NO;
+		[controller updatePinButtonState];
+		if (wasPinned) {
+			[controller emit:@"unpin" extras:nil];
+		}
+		[controller collapse];
+		return Napi::Boolean::New(env, true);
+	}
+	if (action == "collapse") {
 		[controller collapse];
 		return Napi::Boolean::New(env, true);
 	}
@@ -1827,6 +1947,9 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 	}
 	if (action == "openInPrebase") {
 		return Napi::Boolean::New(env, [controller simulateClickOpenInPrebase]);
+	}
+	if (action == "pin") {
+		return Napi::Boolean::New(env, [controller simulateClickPin]);
 	}
 	if (action == "option" && info.Length() >= 2 && info[1].IsNumber()) {
 		NSInteger index = info[1].As<Napi::Number>().Int64Value();

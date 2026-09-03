@@ -26,6 +26,7 @@ export interface TemporalRenderNode {
 	readonly x: number;
 	readonly y: number;
 	readonly z?: number;
+	readonly degree?: number;
 	readonly changeKind: TemporalNodeChangeKind;
 	readonly oldPath?: string;
 	readonly isModified?: boolean;

@@ -536,6 +536,203 @@ async function run() {
 	}
 	results.tests.push(test7);
 
+	// Test 8: Click Peek to enter Interactive does NOT accidentally pin
+	const test8 = { name: 'click-peek-not-accidentally-pinned', ok: true, details: {} };
+	try {
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot({
+			revision: 201,
+			sessionId: 'test-session-pin-coupling',
+			status: 'working',
+			currentActivity: 'Compiling project',
+			prebaseForeground: false,
+		});
+		await sleep(50);
+		// Enter peek
+		const peekOk = native.simulateAction('peek');
+		if (!peekOk) {
+			throw new Error('Failed to simulate peek');
+		}
+		const diagPeek = native.getDiagnostics();
+		test8.details.diagPeek = { state: diagPeek.activePresentationState, pinned: diagPeek.pinned };
+		if (diagPeek.activePresentationState !== 'peek') {
+			throw new Error(`Expected peek state, got ${diagPeek.activePresentationState}`);
+		}
+		// Click peek to enter interactive
+		const clickOk = native.simulateAction('click');
+		if (!clickOk) {
+			throw new Error('Failed to simulate click on peek');
+		}
+		const diagInteractive = native.getDiagnostics();
+		test8.details.diagInteractive = {
+			state: diagInteractive.activePresentationState,
+			pinned: diagInteractive.pinned,
+			pinButtonVisible: diagInteractive.pinButtonVisible,
+			pinButtonTitle: diagInteractive.pinButtonTitle,
+		};
+		if (diagInteractive.activePresentationState !== 'interactive') {
+			throw new Error(`Expected interactive state after clicking peek, got ${diagInteractive.activePresentationState}`);
+		}
+		if (diagInteractive.pinned !== false) {
+			throw new Error('REGRESSION: clicking Peek accidentally set pinned=true! Peek->Interactive must NOT pin.');
+		}
+		if (diagInteractive.pinButtonVisible !== true) {
+			throw new Error('Expected explicit Pin affordance to be visible in Interactive mode');
+		}
+		if (diagInteractive.pinButtonTitle !== 'Pin') {
+			throw new Error(`Expected Pin button title to be 'Pin', got '${diagInteractive.pinButtonTitle}'`);
+		}
+	} catch (err) {
+		test8.ok = false;
+		test8.error = err.message;
+		results.failures.push(`click-peek-not-accidentally-pinned: ${err.message}`);
+	}
+	results.tests.push(test8);
+
+	// Test 9: Explicit Pin affordance toggles pinned state deliberately
+	const test9 = { name: 'explicit-pin-affordance-toggle', ok: true, details: {} };
+	try {
+		// Currently in interactive mode from Test 8. Click Pin button.
+		const pinClick1 = native.simulateAction('pin');
+		if (!pinClick1) {
+			throw new Error('simulateAction(pin) returned false');
+		}
+		const diagPinned = native.getDiagnostics();
+		test9.details.diagPinned = {
+			state: diagPinned.activePresentationState,
+			pinned: diagPinned.pinned,
+			pinButtonTitle: diagPinned.pinButtonTitle,
+		};
+		if (diagPinned.pinned !== true) {
+			throw new Error('Expected pinned=true after clicking Pin button');
+		}
+		if (diagPinned.pinButtonTitle !== 'Unpin') {
+			throw new Error(`Expected Pin button title 'Unpin' when pinned, got '${diagPinned.pinButtonTitle}'`);
+		}
+
+		// Click Pin button again to unpin
+		const pinClick2 = native.simulateAction('pin');
+		if (!pinClick2) {
+			throw new Error('simulateAction(pin) second toggle returned false');
+		}
+		const diagUnpinned = native.getDiagnostics();
+		test9.details.diagUnpinned = {
+			state: diagUnpinned.activePresentationState,
+			pinned: diagUnpinned.pinned,
+			pinButtonTitle: diagUnpinned.pinButtonTitle,
+		};
+		if (diagUnpinned.pinned !== false) {
+			throw new Error('Expected pinned=false after second Pin button click');
+		}
+		if (diagUnpinned.pinButtonTitle !== 'Pin') {
+			throw new Error(`Expected Pin button title 'Pin' after unpinning, got '${diagUnpinned.pinButtonTitle}'`);
+		}
+	} catch (err) {
+		test9.ok = false;
+		test9.error = err.message;
+		results.failures.push(`explicit-pin-affordance-toggle: ${err.message}`);
+	}
+	results.tests.push(test9);
+
+	// Test 10: Escape dismisses Interactive and unpins if pinned
+	const test10 = { name: 'escape-dismiss-and-unpin', ok: true, details: {} };
+	try {
+		// Re-pin
+		native.simulateAction('pin');
+		const diagBeforeEsc = native.getDiagnostics();
+		if (diagBeforeEsc.pinned !== true) {
+			throw new Error('Failed to setup pinned state for escape test');
+		}
+		// Escape
+		const escOk = native.simulateAction('escape');
+		if (!escOk) {
+			throw new Error('simulateAction(escape) failed');
+		}
+		const diagAfterEsc = native.getDiagnostics();
+		test10.details.diagAfterEsc = {
+			state: diagAfterEsc.activePresentationState,
+			pinned: diagAfterEsc.pinned,
+			expanded: diagAfterEsc.expanded,
+		};
+		if (diagAfterEsc.pinned !== false) {
+			throw new Error('Expected pinned=false after Escape');
+		}
+		if (diagAfterEsc.expanded !== false) {
+			throw new Error('Expected expanded=false after Escape');
+		}
+		if (diagAfterEsc.activePresentationState !== 'compact') {
+			throw new Error(`Expected compact state after Escape, got ${diagAfterEsc.activePresentationState}`);
+		}
+	} catch (err) {
+		test10.ok = false;
+		test10.error = err.message;
+		results.failures.push(`escape-dismiss-and-unpin: ${err.message}`);
+	}
+	results.tests.push(test10);
+
+	// Test 11: Screen-locked safety (status-only, refuses expansion, commands rejected)
+	const test11 = { name: 'screen-locked-safety', ok: true, details: {} };
+	try {
+		native.setSnapshot({
+			revision: 301,
+			sessionId: 'test-locked-session',
+			status: 'working',
+			currentActivity: 'Sensitive activity text',
+			latestShortMessage: 'Sensitive secret message',
+			screenLocked: true,
+			prebaseForeground: false,
+		});
+		await sleep(50);
+		const diagLocked = native.getDiagnostics();
+		test11.details.diagLocked = {
+			state: diagLocked.activePresentationState,
+			statusLabel: diagLocked.statusLabel,
+			activityLabel: diagLocked.activityLabel,
+			latestShortMessage: diagLocked.latestShortMessage,
+			expanded: diagLocked.expanded,
+		};
+		if (diagLocked.expanded !== false) {
+			throw new Error('Expected expanded=false when screenLocked=true');
+		}
+		if (diagLocked.statusLabel !== 'Magnus') {
+			throw new Error(`Expected status-safe label 'Magnus' when locked, got '${diagLocked.statusLabel}'`);
+		}
+		if (diagLocked.activityLabel !== '') {
+			throw new Error(`Expected blank activityLabel when locked, got '${diagLocked.activityLabel}'`);
+		}
+		if (diagLocked.latestShortMessage !== '') {
+			throw new Error(`Expected blank latestShortMessage when locked, got '${diagLocked.latestShortMessage}'`);
+		}
+
+		// Attempt hover peek while locked — must be rejected / remain compact
+		native.simulateAction('peek');
+		const diagAfterPeek = native.getDiagnostics();
+		if (diagAfterPeek.expanded !== false) {
+			throw new Error('REGRESSION: screen-locked notch expanded on peek!');
+		}
+
+		// Attempt click while locked — must be rejected
+		const clickResult = native.simulateAction('click');
+		if (clickResult !== false) {
+			throw new Error('Expected simulateAction(click) to return false while screen is locked');
+		}
+		const diagAfterClick = native.getDiagnostics();
+		if (diagAfterClick.expanded !== false) {
+			throw new Error('REGRESSION: screen-locked notch expanded on click!');
+		}
+
+		// Attempt pin while locked — must be rejected
+		const pinResult = native.simulateAction('pin');
+		if (pinResult !== false) {
+			throw new Error('Expected simulateAction(pin) to return false while screen is locked');
+		}
+	} catch (err) {
+		test11.ok = false;
+		test11.error = err.message;
+		results.failures.push(`screen-locked-safety: ${err.message}`);
+	}
+	results.tests.push(test11);
+
 	results.ok = results.failures.length === 0;
 	const out = join(evidenceDir, 'live-activity-perf.json');
 	writeFileSync(out, JSON.stringify(results, null, 2) + '\n');

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "2b34fc53c0701417b7a557489fa221d4ade0a863",
-  "sourceFingerprint": "4cb45b8efb433f289828e2e278dd0c2176746e19d93cf62c6c0358444d733141",
-  "productFingerprint": "4cb45b8efb433f289828e2e278dd0c2176746e19d93cf62c6c0358444d733141",
-  "generatedAt": "2026-09-03T02:34:28.684Z",
+  "sourceHead": "93a2aecd2af07779c88f9f58757fe254babe8b3e",
+  "sourceFingerprint": "aa17978acd3b399d04f23e4ade36ace682865fdf8c330b132d4b8fc68a555b84",
+  "productFingerprint": "aa17978acd3b399d04f23e4ade36ace682865fdf8c330b132d4b8fc68a555b84",
+  "generatedAt": "2026-09-03T19:20:48.142Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -67,6 +67,7 @@
           "latestShortMessage": "",
           "expanded": false,
           "statusLabel": "",
+          "pinButtonVisible": false,
           "collapsedHit": {
             "y": 948,
             "x": 591,
@@ -83,6 +84,7 @@
           },
           "openInPreBaseVisible": false,
           "lastNativeCommand": "",
+          "pinButtonTitle": "Pin",
           "hoverDwellMs": 180,
           "topAnchorDelta": 0,
           "pendingTitle": "",
@@ -121,7 +123,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 7972,
+        "durationRealCyclesMs": 7817,
         "cycleCount": 100,
         "diagAfterStress": {
           "requestedFrame": {
@@ -162,6 +164,7 @@
           "latestShortMessage": "",
           "expanded": true,
           "statusLabel": "",
+          "pinButtonVisible": true,
           "collapsedHit": {
             "y": 948,
             "x": 575.5,
@@ -178,6 +181,7 @@
           },
           "openInPreBaseVisible": true,
           "lastNativeCommand": "",
+          "pinButtonTitle": "Pin",
           "hoverDwellMs": 180,
           "topAnchorDelta": 0,
           "pendingTitle": "",
@@ -216,7 +220,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 357,
+        "durationRetargetMs": 355,
         "diagRetarget": {
           "requestedFrame": {
             "y": 866,
@@ -256,6 +260,7 @@
           "latestShortMessage": "",
           "expanded": true,
           "statusLabel": "",
+          "pinButtonVisible": true,
           "collapsedHit": {
             "y": 948,
             "x": 575.5,
@@ -272,6 +277,7 @@
           },
           "openInPreBaseVisible": true,
           "lastNativeCommand": "",
+          "pinButtonTitle": "Pin",
           "hoverDwellMs": 180,
           "topAnchorDelta": 0,
           "pendingTitle": "",
@@ -367,12 +373,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": 537,
-        "heapUsedMb": 6.48,
-        "rssDiffKb": 29680,
-        "rssMb": 100,
-        "cpuDeltaUserMs": 390198,
-        "cpuDeltaSystemMs": 84220
+        "heapDiffKb": 536,
+        "heapUsedMb": 6.6,
+        "rssDiffKb": 9408,
+        "rssMb": 80.05,
+        "cpuDeltaUserMs": 173633,
+        "cpuDeltaSystemMs": 43435
       }
     },
     {
@@ -383,6 +389,62 @@
         "pillElements": 10,
         "combinationsTested": 80,
         "invariant": true
+      }
+    },
+    {
+      "name": "click-peek-not-accidentally-pinned",
+      "ok": true,
+      "details": {
+        "diagPeek": {
+          "state": "peek",
+          "pinned": false
+        },
+        "diagInteractive": {
+          "state": "interactive",
+          "pinned": false,
+          "pinButtonVisible": true,
+          "pinButtonTitle": "Pin"
+        }
+      }
+    },
+    {
+      "name": "explicit-pin-affordance-toggle",
+      "ok": true,
+      "details": {
+        "diagPinned": {
+          "state": "pinned",
+          "pinned": true,
+          "pinButtonTitle": "Unpin"
+        },
+        "diagUnpinned": {
+          "state": "interactive",
+          "pinned": false,
+          "pinButtonTitle": "Pin"
+        }
+      }
+    },
+    {
+      "name": "escape-dismiss-and-unpin",
+      "ok": true,
+      "details": {
+        "diagAfterEsc": {
+          "state": "compact",
+          "pinned": false,
+          "expanded": false
+        }
+      }
+    },
+    {
+      "name": "screen-locked-safety",
+      "ok": true,
+      "details": {
+        "diagLocked": {
+          "state": "compact",
+          "statusLabel": "Magnus",
+          "activityLabel": "",
+          "latestShortMessage": "",
+          "expanded": false
+        }
       }
     }
   ],
