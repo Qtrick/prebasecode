@@ -3,5 +3,5 @@
   "framework": "tauri",
   "passed": 10,
   "cycles": 10,
-  "elapsedMs": 268046
+  "elapsedMs": 311639
 }

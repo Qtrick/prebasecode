@@ -200,6 +200,13 @@ suite('GraphEditorTemporalWebview (Unit - Phase 3.5 VM & Webview)', () => {
 		assert.equal(input.resource.scheme, 'prebase-graph');
 	});
 
+	test('1b. Network and Temporal inputs match so one editor pane reuses the webview', () => {
+		const network = new PreBaseGraphEditorInput('network');
+		const temporal = new PreBaseGraphEditorInput('temporal');
+		assert.ok(network.matches(temporal), 'switching Network ↔ Temporal must reuse the singleton graph editor');
+		assert.ok(temporal.matches(network));
+	});
+
 	test('2. Visual position interpolation function computes synchronized node & edge positions', () => {
 		function getVisualNodePosition(
 			node: { entityId: string; x: number; y: number },

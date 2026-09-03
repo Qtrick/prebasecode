@@ -1,158 +1,158 @@
 {
   "schemaVersion": 3,
   "scenario": "electron-restart-soak",
-  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "generatedAt": "2026-08-30T03:39:46.620Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:45:16.950Z",
   "producerId": "electron-restart-soak",
-  "producerFingerprint": "5134912de248c9dff6561e1ec57bc939137f316f3816bda7898e13a39e45df36",
+  "producerFingerprint": "af8660c2913ce14a927459612d089cbb4a15ac1d38f4837155777cb64eecef05",
   "ok": true,
   "framework": "electron",
   "cycles": 20,
   "passed": 20,
   "failed": 0,
-  "elapsedMs": 497803,
+  "elapsedMs": 522373,
   "results": [
     {
       "cycle": 1,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 315
+      "quitMs": 214
     },
     {
       "cycle": 2,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 314
+      "quitMs": 212
     },
     {
       "cycle": 3,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 422
+      "quitMs": 213
     },
     {
       "cycle": 4,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 420
+      "quitMs": 213
     },
     {
       "cycle": 5,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 316
+      "quitMs": 214
     },
     {
       "cycle": 6,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 316
+      "quitMs": 214
     },
     {
       "cycle": 7,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 317
+      "quitMs": 212
     },
     {
       "cycle": 8,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 314
+      "quitMs": 215
     },
     {
       "cycle": 9,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 420
+      "quitMs": 215
     },
     {
       "cycle": 10,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 420
+      "quitMs": 215
     },
     {
       "cycle": 11,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 418
+      "quitMs": 214
     },
     {
       "cycle": 12,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 421
+      "quitMs": 214
     },
     {
       "cycle": 13,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 418
+      "quitMs": 214
     },
     {
       "cycle": 14,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 423
+      "quitMs": 215
     },
     {
       "cycle": 15,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 315
+      "quitMs": 214
     },
     {
       "cycle": 16,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 316
+      "quitMs": 214
     },
     {
       "cycle": 17,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 418
+      "quitMs": 215
     },
     {
       "cycle": 18,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 422
+      "quitMs": 214
     },
     {
       "cycle": 19,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 420
+      "quitMs": 219
     },
     {
       "cycle": 20,
       "ok": true,
       "failures": [],
       "state": "testing",
-      "quitMs": 422
+      "quitMs": 214
     }
   ],
   "note": "Each cycle is a full PreBase product-path including restart/stop/child/port/Quit."

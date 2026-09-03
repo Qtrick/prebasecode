@@ -1,0 +1,96 @@
+[11:28:16] START parser-benchmark
+estimated 1m30s (timeout 25m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/parser-benchmark.log
+[11:28:28] PASS parser-benchmark
+elapsed 11s
+[11:28:28] START magnus-live-activity
+estimated 45s (timeout 2m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log
+[11:28:28] PASS magnus-live-activity
+elapsed 0s
+[11:28:28] START core-ide
+estimated 2m0s (timeout 4m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log
+[11:30:40] PASS core-ide
+elapsed 2m11s
+[11:30:40] START temporal-small
+estimated 1m30s (timeout 3m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log
+[11:31:02] PASS temporal-small
+elapsed 21s
+[11:31:02] START temporal-large
+estimated 2m30s (timeout 4m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-large.log
+[11:32:35] PASS temporal-large
+elapsed 1m32s
+[11:32:35] START hybrid-web-smoke
+estimated 1m0s (timeout 3m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/hybrid-web-smoke.log
+[11:32:35] PASS hybrid-web-smoke
+elapsed 0s
+[11:32:35] START load-quit
+estimated 12m0s (timeout 20m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log
+[11:35:30] PASS load-quit
+elapsed 2m54s
+[11:35:30] START lifecycle-cycles
+estimated 1m30s (timeout 25m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log
+[11:36:34] PASS lifecycle-cycles
+elapsed 1m3s
+[11:36:34] START electron-restart-soak
+estimated 15m0s (timeout 90m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/electron-restart-soak.log
+[11:45:17] PASS electron-restart-soak
+elapsed 8m42s
+[11:45:17] START tauri-restart-soak
+estimated 4m0s (timeout 60m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/tauri-restart-soak.log
+[11:50:29] PASS tauri-restart-soak
+elapsed 5m11s
+[11:50:29] START idle-soak
+estimated 15m0s (timeout 19m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/idle-soak.log
+[12:05:38] PASS idle-soak
+elapsed 15m9s
+[12:05:38] START active-soak
+estimated 12m0s (timeout 16m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/active-soak.log
+[12:17:47] FAIL active-soak
+elapsed 12m9s
+exit=1 timedOut=false leftoverPids=none
+full log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/active-soak.log
+--- log tail ---
+{
+  "ok": false,
+  "failures": [
+    "active-phase process growth unbounded: 10 → peak 57 (max Δ 18)",
+    "quiesce process count elevated vs baseline: 10 → 59 (max Δ 12)",
+    "quiesce RSS elevated vs baseline: 1826MB → 7249.8MB (max Δ 2800MB)"
+  ],
+  "samples": 36,
+  "durationMs": 720000,
+  "quit": {
+    "before": "317647       1  1.1 263336 prebase",
+    "remaining": "gone",
+    "leftoverPids": [],
+    "latencyMs": 970,
+    "terminationPath": "workbench",
+    "workbenchCompleted": true,
+    "usedSigterm": false,
+    "usedSigkill": false
+  }
+}
+
+--- end tail ---
+file:///workspace/test/prebase/acceptance/prebase-phase3-final-gate.mjs:746
+			throw new Error(`producer failed: ${entry.id} exit=${result.code} timedOut=${result.timedOut}`);
+			      ^
+
+Error: producer failed: active-soak exit=1 timedOut=false
+    at executeValidationPlan (file:///workspace/test/prebase/acceptance/prebase-phase3-final-gate.mjs:746:10)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async run (file:///workspace/test/prebase/acceptance/prebase-phase3-final-gate.mjs:871:19)
+    at async file:///workspace/test/prebase/acceptance/prebase-phase3-final-gate.mjs:948:2
+
+Node.js v24.17.0

@@ -3,7 +3,7 @@
   "failures": [],
   "classification": "warm-provisioning",
   "cold": 10,
-  "warm": 15,
+  "warm": 13,
   "cycles": [
     {
       "id": "cycle-1",
@@ -12,7 +12,7 @@
     },
     {
       "id": "cycle-2",
-      "processCount": 17,
+      "processCount": 19,
       "liveCount": 1
     },
     {
@@ -22,20 +22,20 @@
     },
     {
       "id": "cycle-4",
-      "processCount": 34,
+      "processCount": 23,
       "liveCount": 1
     },
     {
       "id": "cycle-5",
-      "processCount": 30,
+      "processCount": 23,
       "liveCount": 1
     }
   ],
   "quit": {
-    "before": "253623       1 16.4 318188 prebase",
+    "before": "291593       1 16.6 799012 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 779,
+    "latencyMs": 1125,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

@@ -3,16 +3,16 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "temporal-large",
-  "sourceHead": "0fff0672c605d91c88cf95e0a01e153c525474c6",
-  "sourceFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
-  "productFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
-  "generatedAt": "2026-09-03T11:01:38.567Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:32:12.597Z",
   "producerId": "temporal-large",
-  "producerFingerprint": "3532bd5ccceb3da25b01321af1ba97c2479a61670e1d8069d4c3eb151da2d509",
+  "producerFingerprint": "e33cdc029933b66891825e7f4b3bce287ae39320aa8360f9e243884561c22b5a",
   "scale": "large",
   "fixture": {
-    "dir": "/tmp/pb-temporal-large-caa1IS",
-    "head": "d676ef62704ec5366d828082c629599c3b073de2",
+    "dir": "/tmp/pb-temporal-large-uclPCZ",
+    "head": "774f0193a82f3cbdb47d448549fb42cf27ddb5c5",
     "commits": 50,
     "files": [
       "package.json",
@@ -358,25 +358,25 @@
     "expectedModuleFilesRemaining": 335,
     "expectedHeadFileCount": 336,
     "expectedModifiedPath": "src/cloud/mod-04.js\nsrc/core/mod-01.js\nsrc/desktop/mod-20.js\nsrc/host/mod-24.js\nsrc/layout/mod-20.js\nsrc/runtime/mod-08.js\nsrc/test/mod-16.js\nsrc/ui/mod-12.js",
-    "firstParentSummary": "d676ef62704ec5366d828082c629599c3b073de2 77f90be385676e4b553edd1b3d6f7ccd7234b625 feat: cross-community wave\n\n src/cloud/mod-04.js   | 1 +\n src/core/mod-01.js    | 1 +\n src/desktop/mod-20.js | 1 +\n src/host/mod-24.js    | 1 +\n src/layout/mod-20.js  | 1 +\n src/runtime/mod-08.js | 1 +\n src/test/mod-16.js    | 1 +\n src/ui/mod-12.js      | 1 +\n 8 files changed, 8 insertions(+)",
+    "firstParentSummary": "774f0193a82f3cbdb47d448549fb42cf27ddb5c5 e6975b57d3e8c79e29cd57c251298da88538d61e feat: cross-community wave\n\n src/cloud/mod-04.js   | 1 +\n src/core/mod-01.js    | 1 +\n src/desktop/mod-20.js | 1 +\n src/host/mod-24.js    | 1 +\n src/layout/mod-20.js  | 1 +\n src/runtime/mod-08.js | 1 +\n src/test/mod-16.js    | 1 +\n src/ui/mod-12.js      | 1 +\n 8 files changed, 8 insertions(+)",
     "scale": "large"
   },
-  "pid": 243434,
-  "cdpPort": 41079,
-  "sourceProfile": "/tmp/pb-temporal-profile-MtrGws",
+  "pid": 286212,
+  "cdpPort": 38729,
+  "sourceProfile": "/tmp/pb-temporal-profile-Lb9pQ8",
   "gitReady": {
     "ok": true,
     "count": 1
   },
   "fullMap": {
-    "sequenceId": 9,
+    "sequenceId": 7,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 2073.699999999255,
-    "renderEnd": 2074.199999999255,
-    "durationMs": 0.5,
-    "selectedCommitSha": "d676ef62704ec5366d828082c629599c3b073de2",
-    "renderedCommitSha": "d676ef62704ec5366d828082c629599c3b073de2",
+    "renderStart": 2085.89999999851,
+    "renderEnd": 2086.300000000745,
+    "durationMs": 0.4000000022351742,
+    "selectedCommitSha": "774f0193a82f3cbdb47d448549fb42cf27ddb5c5",
+    "renderedCommitSha": "774f0193a82f3cbdb47d448549fb42cf27ddb5c5",
     "isPartialLineage": true,
     "receivedNodeCount": 338,
     "visibleNodeCount": 338,
@@ -431,7 +431,7 @@
       "edgeModifiedCount": 0
     },
     "isAnimating": true,
-    "timestamp": 2074.199999999255,
+    "timestamp": 2086.300000000745,
     "viewportWidth": 796,
     "viewportHeight": 815,
     "labelCount": 8,
@@ -445,16 +445,16 @@
     },
     "screenUtilization": 0.11759646424185745
   },
-  "processBeforeInteractions": "243434       1 63.9 303412 prebase",
+  "processBeforeInteractions": "286212       1 64.7 304200 prebase",
   "focusChanges": {
     "sequenceId": 35,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 3673.599999997765,
-    "renderEnd": 3675.300000000745,
-    "durationMs": 1.7000000029802322,
-    "selectedCommitSha": "d676ef62704ec5366d828082c629599c3b073de2",
-    "renderedCommitSha": "d676ef62704ec5366d828082c629599c3b073de2",
+    "renderStart": 3736.199999999255,
+    "renderEnd": 3738.89999999851,
+    "durationMs": 2.699999999254942,
+    "selectedCommitSha": "774f0193a82f3cbdb47d448549fb42cf27ddb5c5",
+    "renderedCommitSha": "774f0193a82f3cbdb47d448549fb42cf27ddb5c5",
     "isPartialLineage": true,
     "receivedNodeCount": 338,
     "visibleNodeCount": 24,
@@ -486,16 +486,16 @@
     "labelOverlapCount": 0,
     "selectedNodeId": null,
     "transform": {
-      "x": 445.69246008452666,
-      "y": 401.03569540077143,
-      "k": 0.18180269342518812
+      "x": 445.491654444275,
+      "y": 400.94759116927696,
+      "k": 0.18166524670473766
     },
     "canvas": {
       "clientWidth": 796,
       "clientHeight": 815,
       "width": 783,
       "height": 802,
-      "distinctPixels": 10229
+      "distinctPixels": 10288
     },
     "summary": {
       "addedCount": 0,
@@ -509,19 +509,19 @@
       "edgeModifiedCount": 0
     },
     "isAnimating": false,
-    "timestamp": 3675.300000000745,
+    "timestamp": 3738.89999999851,
     "viewportWidth": 796,
     "viewportHeight": 815,
     "labelCount": 7,
     "projectedBounds": {
-      "minX": 445.69246008452666,
-      "minY": 401.03569540077143,
-      "maxX": 798.753290716242,
-      "maxY": 579.2023349574558,
-      "width": 353.0608306317153,
-      "height": 178.1666395566844
+      "minX": 445.491654444275,
+      "minY": 400.94759116927696,
+      "maxX": 798.2855635448756,
+      "maxY": 578.9795329399199,
+      "width": 352.79390910060056,
+      "height": 178.0319417706429
     },
-    "screenUtilization": 0.09696282293791722
+    "screenUtilization": 0.09681626642728304
   },
   "targetOpened": true,
   "repoLoaded": true,
@@ -559,7 +559,7 @@
     {
       "name": "manual-zoom",
       "displayMode": "changes",
-      "k": 0.2759326921421283,
+      "k": 0.2782153746177179,
       "metrics": {
         "receivedNodeCount": 338,
         "visibleNodeCount": 24,
@@ -573,48 +573,48 @@
     },
     {
       "name": "fit",
-      "k": 0.16002687820369838,
+      "k": 0.16006296173868692,
       "metrics": {
         "receivedNodeCount": 338,
         "visibleNodeCount": 24,
         "leafNodesDrawn": 24,
         "aggregateNodesDrawn": 0,
-        "totalLabelsDrawn": 9,
+        "totalLabelsDrawn": 12,
         "renderedLabelOverlapCount": 0,
         "projectionTier": "detail"
       }
     }
   ],
-  "processAfterInteractions": "243434       1 41.2 304720 prebase",
+  "processAfterInteractions": "286212       1 41.8 305412 prebase",
   "camera": {
     "afterFocus": {
-      "x": 413.6033341600255,
-      "y": 386.9564704578689,
-      "k": 0.15983844423917026
+      "x": 416.0234562400432,
+      "y": 388.0183081418875,
+      "k": 0.1614949606725302
     },
     "afterUserZoom": {
-      "x": 421.71587287631445,
-      "y": 370.5880006977271,
-      "k": 0.2759326921421283
+      "x": 425.05080523773916,
+      "y": 372.0512148406219,
+      "k": 0.2782153746177179
     },
     "afterWait": {
-      "x": 421.71587287631445,
-      "y": 370.5880006977271,
-      "k": 0.2759326921421283
+      "x": 425.05080523773916,
+      "y": 372.0512148406219,
+      "k": 0.2782153746177179
     },
     "afterFit": {
-      "x": 407.84684746670644,
-      "y": 383.6865035582687,
-      "k": 0.16002687820369838
+      "x": 407.9642928942307,
+      "y": 383.74602029179266,
+      "k": 0.16006296173868692
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1788433320742,
-    "quitMs": 301,
+    "startedAt": 1788435154867,
+    "quitMs": 202,
     "remaining": "gone",
-    "before": "243434       1 20.1 304928 prebase",
+    "before": "286212       1 20.5 305480 prebase",
     "after": "gone"
   }
 }

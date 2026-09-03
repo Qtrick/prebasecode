@@ -1,18 +1,18 @@
 {
   "schemaVersion": 3,
   "scenario": "assurance",
-  "sourceHead": "2da47a5f1e83a7561e672aa051b03466a2aee311",
-  "sourceFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
-  "productFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
-  "generatedAt": "2026-09-03T10:52:27.300Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T12:18:18.800Z",
   "producerId": "assurance",
-  "producerFingerprint": "992d8edda683bbec03e4b8d71007fa86c18c0ac763212a02a8247d737a0cc79f",
+  "producerFingerprint": "4afff2047c517628e90fcdf3b0c25a093b1d26997535e0b1750fb44b4d9f974f",
   "ok": true,
   "commands": [
     {
       "command": "verify:icons",
       "exitCode": 0,
-      "durationMs": 118,
+      "durationMs": 121,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
@@ -21,7 +21,7 @@
     {
       "command": "compile-magnus",
       "exitCode": 0,
-      "durationMs": 1602,
+      "durationMs": 1588,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 180000,
@@ -30,7 +30,7 @@
     {
       "command": "transpile-client",
       "exitCode": 0,
-      "durationMs": 6452,
+      "durationMs": 6348,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 240000,
@@ -39,7 +39,7 @@
     {
       "command": "typecheck-client",
       "exitCode": 0,
-      "durationMs": 9617,
+      "durationMs": 9985,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 360000,
@@ -48,7 +48,7 @@
     {
       "command": "typecheck:graphs",
       "exitCode": 0,
-      "durationMs": 291,
+      "durationMs": 299,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 180000,
@@ -57,7 +57,7 @@
     {
       "command": "test:graphs",
       "exitCode": 0,
-      "durationMs": 190166,
+      "durationMs": 190353,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 600000,
@@ -67,7 +67,7 @@
     {
       "command": "test:prebase-pure:compiled",
       "exitCode": 0,
-      "durationMs": 19448,
+      "durationMs": 19553,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 120000,
@@ -77,7 +77,7 @@
     {
       "command": "test:prebase-magnus",
       "exitCode": 0,
-      "durationMs": 4142,
+      "durationMs": 4178,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 180000,
@@ -87,7 +87,7 @@
     {
       "command": "verify:graphs-boundary",
       "exitCode": 0,
-      "durationMs": 289,
+      "durationMs": 292,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
@@ -96,7 +96,7 @@
     {
       "command": "verify:graphs-runtime-boundary",
       "exitCode": 0,
-      "durationMs": 487,
+      "durationMs": 498,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
@@ -105,7 +105,7 @@
     {
       "command": "node scripts/startup/verify-magnus-out.mjs",
       "exitCode": 0,
-      "durationMs": 26,
+      "durationMs": 27,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
@@ -114,7 +114,7 @@
     {
       "command": "verify:privacy",
       "exitCode": 0,
-      "durationMs": 107,
+      "durationMs": 100,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
@@ -123,7 +123,7 @@
     {
       "command": "verify:config-uniqueness",
       "exitCode": 0,
-      "durationMs": 102,
+      "durationMs": 106,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
@@ -132,7 +132,7 @@
     {
       "command": "verify:startup",
       "exitCode": 0,
-      "durationMs": 115,
+      "durationMs": 130,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
@@ -141,7 +141,7 @@
     {
       "command": "verify:dialog-routing",
       "exitCode": 0,
-      "durationMs": 93,
+      "durationMs": 101,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
@@ -150,7 +150,7 @@
     {
       "command": "verify:typescript",
       "exitCode": 0,
-      "durationMs": 347,
+      "durationMs": 341,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
@@ -159,7 +159,7 @@
     {
       "command": "verify:supabase-migrations",
       "exitCode": 0,
-      "durationMs": 95,
+      "durationMs": 103,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
@@ -168,7 +168,7 @@
     {
       "command": "verify:supabase-rls-static",
       "exitCode": 0,
-      "durationMs": 98,
+      "durationMs": 101,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,

@@ -1,5 +1,5 @@
 {
-  "runId": "2026-09-03T12-18-02-982Z",
+  "runId": "2026-09-03T11-27-45-403Z",
   "planKey": "8d36a1d6e5790d9369cc8938b86aae6e5d0cf2acabd4aed55636966a1997f5a5:release",
   "tier": "release",
   "onlyProducers": [],
@@ -14,9 +14,9 @@
     "geminiConfigured": false,
     "darwin": false
   },
-  "createdAt": "2026-09-03T12:18:03.902Z",
+  "createdAt": "2026-09-03T11:27:46.316Z",
   "reused": false,
-  "totalEstimatedDurationMs": 1200000,
+  "totalEstimatedDurationMs": 4605000,
   "changedPathCount": 0,
   "changedDomains": [],
   "unknownChangedPaths": [],
@@ -25,9 +25,9 @@
     {
       "id": "parser-benchmark",
       "expectedProducerFingerprint": "05d5db00398b63cf2418392da07912306e9ad88e000e8a77362d45adcdf5fee1",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 11594,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 90000,
       "timeoutMs": 1500000,
       "artifacts": [
         "parser-benchmark"
@@ -73,9 +73,9 @@
     {
       "id": "magnus-live-activity",
       "expectedProducerFingerprint": "30eb60bbbb0de2a0019fdb437ec644bf013b2526f69ea79eff1cc17d40f642f6",
-      "status": "EXTERNAL",
-      "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "estimatedDurationMs": 5000,
+      "status": "STALE",
+      "reason": "Live Activity AppKit path is macOS-only",
+      "estimatedDurationMs": 45000,
       "timeoutMs": 120000,
       "artifacts": [
         "magnus-live-activity"
@@ -89,9 +89,9 @@
     {
       "id": "core-ide",
       "expectedProducerFingerprint": "0a6ae0c1d39c2ee951e887759c596239488f4db55b8165ee40ba078358f82e75",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 131676,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
         "core-ide",
@@ -126,9 +126,9 @@
     {
       "id": "temporal-small",
       "expectedProducerFingerprint": "136f823c7ada2889d7ef690992a87845abcd7078f7d8425512a5f199fcb704c3",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 21949,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
         "temporal-small"
@@ -144,9 +144,9 @@
     {
       "id": "temporal-large",
       "expectedProducerFingerprint": "e33cdc029933b66891825e7f4b3bce287ae39320aa8360f9e243884561c22b5a",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 92935,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 150000,
       "timeoutMs": 240000,
       "artifacts": [
         "temporal-large"
@@ -164,7 +164,7 @@
       "expectedProducerFingerprint": "0bcfb7ea79ad1285d1ed30f7be6c16c57ce8f36d0f64f5c11a140a9a9224917e",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 300000,
+      "estimatedDurationMs": 253979,
       "timeoutMs": 600000,
       "artifacts": [
         "temporal-canonical-scale"
@@ -267,9 +267,9 @@
     {
       "id": "hybrid-web-smoke",
       "expectedProducerFingerprint": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
-      "status": "EXTERNAL",
-      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)",
-      "estimatedDurationMs": 5000,
+      "status": "STALE",
+      "reason": "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
+      "estimatedDurationMs": 60000,
       "timeoutMs": 180000,
       "artifacts": [
         "hybrid-web-smoke"
@@ -300,9 +300,9 @@
     {
       "id": "load-quit",
       "expectedProducerFingerprint": "f84aec23d00041b120fc982630dc1b7a4dbf23513643c40c23c2275b32a39d61",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 174932,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 720000,
       "timeoutMs": 1200000,
       "artifacts": [
         "load-quit"
@@ -323,9 +323,9 @@
     {
       "id": "lifecycle-cycles",
       "expectedProducerFingerprint": "af68692e4d53531d8768f1634b3ec55e2fc88cd81d123657085fadeb94292d92",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 63665,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 90000,
       "timeoutMs": 1500000,
       "artifacts": [
         "lifecycle-cycles"
@@ -341,9 +341,9 @@
     {
       "id": "electron-restart-soak",
       "expectedProducerFingerprint": "af8660c2913ce14a927459612d089cbb4a15ac1d38f4837155777cb64eecef05",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 522656,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 900000,
       "timeoutMs": 5400000,
       "artifacts": [
         "electron-restart-soak"
@@ -357,9 +357,9 @@
     {
       "id": "tauri-restart-soak",
       "expectedProducerFingerprint": "34ea9fd0fc4c49ca8777bf459580a9bd7132d231363b9e4ca167ff8a058bc527",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 311910,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 240000,
       "timeoutMs": 3600000,
       "artifacts": [
         "tauri-restart-soak"
@@ -373,9 +373,9 @@
     {
       "id": "idle-soak",
       "expectedProducerFingerprint": "868bc2be7f5ecaee5f6219ee73ad30ff4e2fc94cd0f9f6c8478f3e586f71f641",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 904536,
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 900000,
       "timeoutMs": 1140000,
       "artifacts": [
         "idle-soak"
@@ -390,7 +390,7 @@
       "id": "active-soak",
       "expectedProducerFingerprint": "08b97e44fadd900b12c9d329e5287cd53c567236ed5df83abf0c298a8634fdde",
       "status": "STALE",
-      "reason": "active-phase process growth unbounded: 10 → peak 57 (max Δ 18); quiesce process count elevated vs baseline: 10 → 59 (max Δ 12); quiesce RSS elevated vs baseline: 1826MB → 7249.8MB (max Δ 2800MB)",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 720000,
       "timeoutMs": 960000,
       "artifacts": [
@@ -423,18 +423,11 @@
         "graphs-common",
         "shared-workbench",
         "privacy"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-09-03T12:18:18.483Z",
-        "finishedAt": "2026-09-03T12:22:13.065Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 234546,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/assurance.log",
-        "leftoverPids": [],
-        "attempts": 1
-      }
+      ]
     }
   ]
 }
+[phase3-final-gate] validation plan 2026-09-03T11-27-45-403Z tier=release
+planKey 8d36a1d6e5790d9369cc8938b86aae6e5d0cf2acabd4aed55636966a1997f5a5:release
+producers 23; current-green 10; stale/missing 13; external 0; deferred-release 0
+estimated remaining 76m45s

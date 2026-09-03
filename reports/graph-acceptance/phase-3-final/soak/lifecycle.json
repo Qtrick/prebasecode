@@ -1,24 +1,24 @@
 {
   "schemaVersion": 3,
   "scenario": "lifecycle-cycles",
-  "sourceHead": "0fff0672c605d91c88cf95e0a01e153c525474c6",
-  "sourceFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
-  "productFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
-  "generatedAt": "2026-09-03T11:13:28.459Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:35:30.882Z",
   "producerId": "lifecycle-cycles",
-  "producerFingerprint": "c101b9d05281585501fd33a0463c9f40c5433687353845de7ec96a7fa71b0ab1",
+  "producerFingerprint": "af68692e4d53531d8768f1634b3ec55e2fc88cd81d123657085fadeb94292d92",
   "kind": "lifecycle",
   "cycleCount": 5,
   "cycles": [
     {
       "id": "cycle-1",
-      "at": "2026-09-03T11:13:53.223Z",
+      "at": "2026-09-03T11:35:55.504Z",
       "processCount": 15,
       "roles": {
         "main": 15
       },
-      "cpuSum": 192.8,
-      "rssMb": 2680,
+      "cpuSum": 197.6,
+      "rssMb": 2643.9,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -121,13 +121,14 @@
     },
     {
       "id": "cycle-2",
-      "at": "2026-09-03T11:14:01.220Z",
-      "processCount": 17,
+      "at": "2026-09-03T11:36:03.676Z",
+      "processCount": 19,
       "roles": {
-        "main": 17
+        "main": 17,
+        "other": 2
       },
-      "cpuSum": 189.1,
-      "rssMb": 2898.5,
+      "cpuSum": 190.8,
+      "rssMb": 2875.8,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -230,13 +231,13 @@
     },
     {
       "id": "cycle-3",
-      "at": "2026-09-03T11:14:09.049Z",
+      "at": "2026-09-03T11:36:11.534Z",
       "processCount": 19,
       "roles": {
         "main": 19
       },
-      "cpuSum": 190.3,
-      "rssMb": 3117.9,
+      "cpuSum": 187.4,
+      "rssMb": 3161.3,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -339,14 +340,14 @@
     },
     {
       "id": "cycle-4",
-      "at": "2026-09-03T11:14:16.884Z",
-      "processCount": 34,
+      "at": "2026-09-03T11:36:19.564Z",
+      "processCount": 23,
       "roles": {
         "main": 21,
-        "other": 13
+        "other": 2
       },
-      "cpuSum": 189,
-      "rssMb": 3351.5,
+      "cpuSum": 185.9,
+      "rssMb": 3393.5,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -449,14 +450,13 @@
     },
     {
       "id": "cycle-5",
-      "at": "2026-09-03T11:14:24.737Z",
-      "processCount": 30,
+      "at": "2026-09-03T11:36:33.126Z",
+      "processCount": 23,
       "roles": {
-        "main": 23,
-        "other": 7
+        "main": 23
       },
-      "cpuSum": 188.9,
-      "rssMb": 3569.4,
+      "cpuSum": 183.8,
+      "rssMb": 3568.9,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -558,16 +558,16 @@
       ]
     }
   ],
-  "prebasePid": 253623,
+  "prebasePid": 291593,
   "cold": {
     "id": "cold",
-    "at": "2026-09-03T11:13:36.679Z",
+    "at": "2026-09-03T11:35:39.090Z",
     "processCount": 10,
     "roles": {
       "main": 10
     },
-    "cpuSum": 175.8,
-    "rssMb": 1824.9,
+    "cpuSum": 182.4,
+    "rssMb": 1807.7,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -671,14 +671,13 @@
   "closedPrimarySidebar": true,
   "warm": {
     "id": "warm",
-    "at": "2026-09-03T11:13:45.307Z",
-    "processCount": 15,
+    "at": "2026-09-03T11:35:47.730Z",
+    "processCount": 13,
     "roles": {
-      "main": 13,
-      "other": 2
+      "main": 13
     },
-    "cpuSum": 199.8,
-    "rssMb": 2385.8,
+    "cpuSum": 201.5,
+    "rssMb": 2397.2,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -694,10 +693,10 @@
   },
   "classification": "warm-provisioning",
   "quit": {
-    "before": "253623       1 16.4 318188 prebase",
+    "before": "291593       1 16.6 799012 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 779,
+    "latencyMs": 1125,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

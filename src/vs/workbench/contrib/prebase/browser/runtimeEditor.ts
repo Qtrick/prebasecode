@@ -337,7 +337,10 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			title: localize('prebase.runtime.previewTitle', "PreBase Runtime Preview"),
 			// Session state lives in PreBaseRuntimeService; releasing an inactive
 			// iframe prevents hidden project scripts, timers, and renderer memory.
-			options: { retainContextWhenHidden: false },
+			options: {
+				retainContextWhenHidden: false,
+				disableServiceWorker: true,
+			},
 			contentOptions: {
 				allowScripts: true,
 				localResourceRoots: []

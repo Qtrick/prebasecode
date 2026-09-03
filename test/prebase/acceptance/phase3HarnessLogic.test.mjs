@@ -2216,6 +2216,11 @@ test('computePlanKey is stable for identical validation state', async () => {
 test('classifyProcessRole and redactCommandLine correctly categorize processes and redact secrets', () => {
 	assert.equal(classifyProcessRole('Code Helper (Renderer)', '/path/to/PreBase --type=renderer --site-per-process'), 'renderer');
 	assert.equal(classifyProcessRole('Code Helper (GPU)', '/path/to/PreBase --type=gpu-process'), 'gpu');
+	assert.equal(
+		classifyProcessRole('prebase', '/workspace/.build/electron/prebase --type=renderer --gpu-preferences=ABC --ozone-platform=x11'),
+		'renderer',
+		'--gpu-preferences on a renderer must not classify as gpu',
+	);
 	assert.equal(classifyProcessRole('Code Helper (Plugin)', '/path/to/PreBase --type=utility --utility-sub-type=node.mojom.NodeService --extensionHost'), 'extensionHost');
 	assert.equal(classifyProcessRole('Code Helper (Network)', '/path/to/PreBase --type=utility --utility-sub-type=network.mojom.NetworkService'), 'networkService');
 	assert.equal(classifyProcessRole('node', 'node /path/to/node_modules/typescript/lib/tsserver.js'), 'tsserver');
