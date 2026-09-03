@@ -121,7 +121,7 @@ async function run() {
 		await dismissStartup(page);
 		await waitForWorkbenchDriver(page);
 
-		// Prefer smoke-driver executeCommand — Shift+Meta+P is macOS-only and false-fails on Linux.
+		// Prefer smoke-driver executeCommand — platform Command Palette chords false-fail cross-OS.
 		await workbenchCommandWithTimeout(page, 15_000, 'workbench.view.prebase.runtime').catch(() => undefined);
 		const runtimeView = page.locator('.prebase-runtime-view');
 		if (!await runtimeView.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {

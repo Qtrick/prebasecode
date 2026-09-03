@@ -1331,8 +1331,8 @@ test('runtime-preview live uses smoke-driver commands, not macOS-only Command Pa
 	assert.match(source, /waitForWorkbenchDriver/);
 	assert.match(source, /prebase\.runtime\.open/);
 	assert.match(source, /workbench\.view\.prebase\.runtime/);
-	assert.doesNotMatch(source, /Shift\+Meta\+P/);
-	assert.doesNotMatch(source, /Shift\+Control\+P/);
+	assert.doesNotMatch(source, /keyboard\.press\(['"]Shift\+Meta\+P['"]\)/);
+	assert.doesNotMatch(source, /keyboard\.press\(['"]Control\+Shift\+P['"]\)/);
 	assert.doesNotMatch(source, /quick-input-widget/);
 });
 
