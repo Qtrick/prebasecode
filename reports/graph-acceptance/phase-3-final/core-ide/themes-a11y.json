@@ -1,13 +1,13 @@
 {
   "schemaVersion": 3,
   "scenario": "themes-a11y",
-  "sourceHead": "0aa34b287d86b71768cc6177c0f12aa595454a4a",
-  "sourceFingerprint": "b0bd3deb157c54615cdcccb1854cb69eccd5f947386b05cfd8a80c0a394a164f",
-  "productFingerprint": "b0bd3deb157c54615cdcccb1854cb69eccd5f947386b05cfd8a80c0a394a164f",
-  "generatedAt": "2026-09-03T05:43:10.203Z",
+  "sourceHead": "3fc0486790a2abdfeb022110ad9ab69a0e865c58",
+  "sourceFingerprint": "96bc373094e8358c973a67dd0174353e3d67600b4920aeb480f977e28f4ccba5",
+  "productFingerprint": "96bc373094e8358c973a67dd0174353e3d67600b4920aeb480f977e28f4ccba5",
+  "generatedAt": "2026-09-03T05:56:06.883Z",
   "producerId": "core-ide",
-  "producerFingerprint": "291165932f79a277fbf7e1f1cfe6c8661c44457aa80ce35ee40254f54f8b6cd8",
-  "ok": false,
+  "producerFingerprint": "5b375e986781a4ab9564f42b7319558de9d0e9d240c94e18e8fc324dfd19cdbb",
+  "ok": true,
   "failures": [],
   "themes": {
     "light": {
@@ -43,8 +43,8 @@
     "dark": {
       "query": "PreBase Dark",
       "settingsId": "PreBase Dark",
-      "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center vs-dark vscode-theme-defaults-themes-prebase_dark-json",
+      "applied": false,
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
       "colorTheme": "PreBase Dark",
       "colorThemeType": "dark",
       "pickerVisible": true,
@@ -92,10 +92,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "57930       1 48.8 287368 prebase",
+    "before": "64070       1 49.7 285304 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 379,
+    "latencyMs": 349,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

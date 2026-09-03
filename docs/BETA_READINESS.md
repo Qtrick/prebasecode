@@ -5,7 +5,7 @@ Canonical PreBase beta readiness tracker. Do not mark an item **Complete** witho
 Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`
 Severities: `Blocker` | `Critical` | `High` | `Medium` | `Low`
 
-Last audit: **2026-09-03** (campaign: Magnus Live Activity Escape sticky-dismiss + pending peek body + screen-lock command reject + Core IDE E6/detail/C2 honesty + temporal guide filter + Full Map zoom tiers; Linux cloud agent marks Live Activity live as **EXTERNAL** environment skip — not CURRENT_GREEN; macOS notch hardware / Phase 3 live producers still required — beta candidate claim still **forbidden**)
+Last audit: **2026-09-03** (campaign: Core IDE P1/P5/settings a11y false greens closed + CURRENT_GREEN evidence; temporal-small CURRENT_GREEN; Live Activity Linux **EXTERNAL**; sticky Escape / panel vocabulary / E6 truth retained; macOS notch hardware live + remaining Phase 3 producers still required — beta candidate claim still **forbidden**)
 
 ## Summary
 

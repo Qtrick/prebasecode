@@ -11,9 +11,6 @@ LAYOUT MODES STATUS: {
   clusteredMode: 'clustered'
 }
 {
-  "ok": false,
-  "failures": [
-    "C2 existing profile failed",
-    "P1 PreBase setting persistence failed"
-  ]
+  "ok": true,
+  "failures": []
 }

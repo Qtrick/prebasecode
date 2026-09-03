@@ -1,16 +1,16 @@
 {
   "schemaVersion": 3,
   "scenario": "temporal-quit",
-  "sourceHead": "93a2aecd2af07779c88f9f58757fe254babe8b3e",
-  "sourceFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
-  "productFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
-  "generatedAt": "2026-09-03T05:31:11.175Z",
+  "sourceHead": "3fc0486790a2abdfeb022110ad9ab69a0e865c58",
+  "sourceFingerprint": "96bc373094e8358c973a67dd0174353e3d67600b4920aeb480f977e28f4ccba5",
+  "productFingerprint": "96bc373094e8358c973a67dd0174353e3d67600b4920aeb480f977e28f4ccba5",
+  "generatedAt": "2026-09-03T05:56:52.275Z",
   "ok": true,
   "quit": {
-    "startedAt": 1788413470942,
-    "quitMs": 201,
+    "startedAt": 1788415012037,
+    "quitMs": 205,
     "remaining": "gone",
-    "before": "53377       1 19.8 292808 prebase",
+    "before": "64863       1 19.4 293564 prebase",
     "after": "gone"
   }
 }
