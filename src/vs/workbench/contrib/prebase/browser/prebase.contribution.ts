@@ -1230,6 +1230,7 @@ registerAction2(class extends Action2 {
 			zoomLevel: getZoomLevel(mainWindow),
 			accessibilitySupport: configurationService.getValue('editor.accessibilitySupport'),
 			liveActivityMode: configurationService.getValue('prebase.magnus.liveActivity.mode'),
+			networkLayoutMode: configurationService.getValue('prebase.graph.networkLayoutMode'),
 			debug: {
 				sessionsCount: debugSessionsCount,
 				activeSessionName: debugActiveSessionName,

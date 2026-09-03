@@ -550,16 +550,17 @@ async function run() {
 		await launched.page.keyboard.press(`${mod}+Comma`).catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.openSettings', 'prebase.').catch(() => undefined);
 		evidence.p1_settings = await seen('.settings-editor');
-		// Prove a real PreBase setting change + persistence via smoke getDiagnostics (allowlisted write + read-back).
-		// Use 12s budgets: bare getDiagnostics may collect WebContents/Magnus probes on the full path.
+		// Prove a real cross-platform PreBase setting change + persistence via smoke getDiagnostics.
+		// Do not use prebase.magnus.liveActivity.mode here: it is included:isMacintosh and returns null on Linux.
 		const beforeDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics').catch(() => null);
-		const beforeSetting = beforeDiag?.liveActivityMode ?? null;
-		const setDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics', { liveActivityMode: 'alwaysWorking' }).catch(() => null);
+		const beforeSetting = beforeDiag?.networkLayoutMode ?? null;
+		const setDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics', { networkLayoutMode: 'sphere' }).catch(() => null);
 		const afterDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics').catch(() => null);
-		const afterSetting = afterDiag?.liveActivityMode ?? setDiag?.liveActivityMode ?? null;
-		const settingChanged = afterSetting === 'alwaysWorking';
+		const afterSetting = afterDiag?.networkLayoutMode ?? setDiag?.networkLayoutMode ?? null;
+		const settingChanged = afterSetting === 'sphere' && beforeSetting !== 'sphere';
 		evidence.p1_settingsPersisted = Boolean(evidence.p1_settings && settingChanged);
 		evidence.p1_detail = {
+			settingId: 'prebase.graph.networkLayoutMode',
 			beforeSetting,
 			afterSetting,
 			settingChanged,
