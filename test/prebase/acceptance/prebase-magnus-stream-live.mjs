@@ -27,6 +27,9 @@ export function magnusStreamFailures(evidence) {
 	if (!evidence.smokeInstalled) failures.push('smoke transport was not installed');
 	if (!evidence.firstChunkAt) failures.push('source never emitted a first chunk');
 	if (!evidence.uiTextAt) failures.push('UI never showed streamed text');
+	if (evidence.uiTextAt && !UI_STREAM_CHUNK_MARKER.test(String(evidence.uiSample || ''))) {
+		failures.push('uiSample must be DOM chat text containing streamed chunk marker (not source-only collected)');
+	}
 	if (!(evidence.chunkCount > 1)) failures.push('stream did not produce multiple progressive chunks');
 	if (!evidence.progressiveChunks) failures.push('source chunk count did not increase while streaming');
 	if (!evidence.completed) failures.push('stream did not complete');
@@ -61,13 +64,14 @@ async function run() {
 		}, 20_000, 200);
 		evidence.smokeInstalled = Boolean(installed?.ok);
 		const startedAt = Date.now();
-		const streamPromise = workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
-			prompt: 'prebase-smoke-stream',
-		}).catch(err => ({ ok: false, error: String(err) }));
+		// Drive the visible chat path first so UI text proof cannot race a headless source-only stream.
 		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
 			query: 'prebase-smoke-stream',
 			isPartialQuery: false,
 		}).catch(() => undefined);
+		const streamPromise = workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
+			prompt: 'prebase-smoke-stream',
+		}).catch(err => ({ ok: false, error: String(err) }));
 
 		let sourceChunksMax = 0;
 		let sourceChunksSawIncrease = false;
@@ -87,19 +91,36 @@ async function run() {
 				const uiText = await readChatText(launched.page);
 				if (UI_STREAM_CHUNK_MARKER.test(uiText)) {
 					evidence.uiTextAt = Date.now() - startedAt;
+					evidence.uiSample = String(uiText).slice(0, 400);
 				}
 			}
-			if (chunks >= 4) {
+			// Require both progressive source chunks and DOM UI text — source-only must not pass.
+			if (chunks >= 4 && evidence.uiTextAt) {
 				return diagnostics;
 			}
 			return undefined;
-		}, 15_000, 100);
+		}, 25_000, 100);
 
 		const streamRes = await streamPromise;
 		evidence.completed = Boolean(first && streamRes?.ok);
 		evidence.chunkCount = sourceChunksMax;
 		evidence.progressiveChunks = sourceChunksSawIncrease || sourceChunksMax > 1;
 		evidence.duplicate = false;
+
+		if (!evidence.uiTextAt) {
+			const lateUi = await waitFor(async () => {
+				const uiText = await readChatText(launched.page);
+				if (UI_STREAM_CHUNK_MARKER.test(uiText)) {
+					evidence.uiTextAt = Date.now() - startedAt;
+					evidence.uiSample = String(uiText).slice(0, 400);
+					return true;
+				}
+				return undefined;
+			}, 8_000, 150);
+			if (!lateUi && !evidence.uiSample) {
+				evidence.uiSample = String(await readChatText(launched.page) || '').slice(0, 400);
+			}
+		}
 
 		const completesBeforeSecond = ((await readChatText(launched.page)) || '').match(/Smoke stream complete/gi)?.length ?? 0;
 
@@ -127,7 +148,9 @@ async function run() {
 		const text = await readChatText(launched.page);
 		const completes = (text.match(/Smoke stream complete/gi) ?? []).length;
 		evidence.secondRequestOk = Boolean((secondRes?.ok && (secondRes?.collected?.length ?? 0) > 0) || completes > completesBeforeSecond);
-		evidence.uiSample = (secondRes?.collected ?? []).join('').slice(0, 400);
+		if (!evidence.uiSample || !UI_STREAM_CHUNK_MARKER.test(String(evidence.uiSample))) {
+			evidence.uiSample = String(text || '').slice(0, 400);
+		}
 	} catch (error) {
 		evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);
 	} finally {

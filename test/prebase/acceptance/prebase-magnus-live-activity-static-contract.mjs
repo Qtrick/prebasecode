@@ -113,6 +113,12 @@ if (!contributionSource.includes('requireSmokeTestDriver') || !contributionSourc
 if (!native.includes('userDismissedAttention')) {
 	failures.push('native Escape/collapse must sticky-dismiss attention peek across snapshot republish');
 }
+if (!native.includes('dict[@"userDismissedAttention"]')) {
+	failures.push('native diagnostics must expose userDismissedAttention for AppKit product-truth proof');
+}
+if (!native.includes('attentionCompact')) {
+	failures.push('native activePresentationState must include attentionCompact for sticky Escape');
+}
 {
 	const applyStart = native.indexOf('- (void)applySnapshotDict:(NSDictionary *)snapshot {');
 	const stickyBranch = applyStart >= 0

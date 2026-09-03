@@ -1605,6 +1605,8 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"targetPresentationState"] = self.content.targetExpanded
 		? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.pinned ? (self.content.attention ? @"attentionInteractive" : @"pinned") : (self.content.attention ? @"attentionInteractive" : @"interactive"))))
 		: (self.content.attention ? @"attentionCompact" : @"compact");
+	// Factual sticky Escape/collapse dismiss — required for AppKit product-truth diagnostics.
+	dict[@"userDismissedAttention"] = @(self.userDismissedAttention);
 	dict[@"hoverDwellMs"] = @(180);
 	dict[@"exitGraceMs"] = @(250);
 	dict[@"prebaseFullscreen"] = @(self.prebaseFullscreen);

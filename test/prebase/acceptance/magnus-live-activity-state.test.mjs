@@ -117,6 +117,8 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 	assert.match(native, /- \(void\)enterInteractiveSticky/);
 	assert.match(native, /\[controller enterInteractiveSticky\]/);
 	assert.match(native, /userDismissedAttention/);
+	assert.match(native, /dict\[@"userDismissedAttention"\]/);
+	assert.match(native, /attentionCompact/);
 	assert.match(native, /pendingMessage\.length/);
 
 	const escapeMonitor = native.indexOf('- (void)installLocalKeyMonitor {');

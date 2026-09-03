@@ -396,19 +396,25 @@ test('Magnus stream live path installs smoke transport then asks the chat partic
 	assert.match(source, /completes > completesBeforeSecond/);
 	assert.match(source, /UI_STREAM_CHUNK_MARKER/);
 	assert.match(source, /readChatText\(launched\.page\)/);
+	assert.match(source, /chunks >= 4 && evidence\.uiTextAt/);
+	assert.match(source, /uiSample must be DOM chat text/);
 	assert.doesNotMatch(source, /magnusStreamActive > 0 \|\| \/Smoke stream chunk/);
 	assert.doesNotMatch(source, /chunkCount = \(first\?\.text\.match/);
+	assert.doesNotMatch(source, /evidence\.uiSample = \(secondRes\?\.collected/);
 	assert.doesNotMatch(source, /streamGenerate\(/);
 	assert.doesNotMatch(source, /new MagnusSmokeTransportAdapter/);
 });
 
 test('Magnus stream cannot pass without install, progressive chunks, cancel, and a second request', () => {
 	const quit = { remaining: 'gone', terminationPath: 'workbench', usedSigkill: false };
+	const uiSample = 'Smoke stream chunk one. Smoke stream complete.';
 	assert.ok(magnusStreamFailures({
 		smokeInstalled: false,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample,
 		chunkCount: 3,
+		progressiveChunks: true,
 		completed: true,
 		cancelled: true,
 		secondRequestOk: true,
@@ -418,7 +424,9 @@ test('Magnus stream cannot pass without install, progressive chunks, cancel, and
 		smokeInstalled: true,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample,
 		chunkCount: 1,
+		progressiveChunks: true,
 		completed: true,
 		cancelled: true,
 		secondRequestOk: true,
@@ -428,7 +436,9 @@ test('Magnus stream cannot pass without install, progressive chunks, cancel, and
 		smokeInstalled: true,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample,
 		chunkCount: 3,
+		progressiveChunks: true,
 		completed: true,
 		cancelled: true,
 		secondRequestOk: false,
@@ -438,6 +448,19 @@ test('Magnus stream cannot pass without install, progressive chunks, cancel, and
 		smokeInstalled: true,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample: 'source-only collected without DOM marker',
+		chunkCount: 3,
+		progressiveChunks: true,
+		completed: true,
+		cancelled: true,
+		secondRequestOk: true,
+		quit,
+	}).some(item => /uiSample must be DOM chat text/.test(item)));
+	assert.ok(magnusStreamFailures({
+		smokeInstalled: true,
+		firstChunkAt: 10,
+		uiTextAt: 20,
+		uiSample,
 		chunkCount: 3,
 		completed: true,
 		cancelled: false,
@@ -448,12 +471,25 @@ test('Magnus stream cannot pass without install, progressive chunks, cancel, and
 		smokeInstalled: true,
 		firstChunkAt: 10,
 		uiTextAt: 20,
+		uiSample,
 		chunkCount: 3,
 		completed: true,
 		cancelled: true,
 		secondRequestOk: true,
 		quit,
 	}).some(item => /source chunk count did not increase/.test(item)));
+	assert.deepEqual(magnusStreamFailures({
+		smokeInstalled: true,
+		firstChunkAt: 10,
+		uiTextAt: 20,
+		uiSample,
+		chunkCount: 3,
+		progressiveChunks: true,
+		completed: true,
+		cancelled: true,
+		secondRequestOk: true,
+		quit,
+	}), []);
 });
 
 test('SIGKILL fails gates even when usedSigkill is omitted', () => {
