@@ -5,7 +5,7 @@ Canonical PreBase beta readiness tracker. Do not mark an item **Complete** witho
 Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`
 Severities: `Blocker` | `Critical` | `High` | `Medium` | `Low`
 
-Last audit: **2026-09-03** (campaign: Live Activity sticky Escape + peek height parity; Core IDE / temporal-small / magnus-streaming-smoke **CURRENT_GREEN**; Live Activity Linux **EXTERNAL**; streaming false-red closed by isolating workspace MCP; macOS AppKit notch live + remaining Phase 3 producers still required — beta candidate claim still **forbidden**)
+Last audit: **2026-09-03** (campaign: Live Activity `attentionCompact` + dismissAttention renderer sync; C2 real dest-profile relaunch; temporal-small overlap gate; streaming CURRENT_GREEN; Live Activity Linux **EXTERNAL**; macOS AppKit notch live + remaining Phase 3 still required — beta candidate claim still **forbidden**)
 
 ## Summary
 

@@ -1053,13 +1053,16 @@ static NSString *JSString(Napi::Value value) {
 		[self layoutControls:win];
 	} else {
 		// Delay control layout until frame animation completes to prevent visible popping.
+		const NSUInteger generation = ++self.transitionGeneration;
 		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
 			context.duration = animDuration;
 			context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
 			context.allowsImplicitAnimation = YES;
 			[[self.panel animator] setFrame:win display:YES];
 		} completionHandler:^{
-			[self layoutControls:win];
+			if (generation == self.transitionGeneration) {
+				[self layoutControls:win];
+			}
 		}];
 		self.content.targetExpanded = expanded;
 		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES];
@@ -1342,6 +1345,7 @@ static NSString *JSString(Napi::Value value) {
 	}
 	if (self.content.attention) {
 		self.userDismissedAttention = YES;
+		[self emit:@"dismissAttention" extras:nil];
 	}
 	self.attentionPeek = NO;
 	self.content.peekOnly = NO;

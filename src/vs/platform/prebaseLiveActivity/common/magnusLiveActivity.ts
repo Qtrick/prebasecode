@@ -31,6 +31,7 @@ export type MagnusLiveActivityStatus =
  * - peek: hover dwell preview (alias: hoverPreview)
  * - interactive: sticky expanded composer surface (alias: pinned when user-pinned)
  * - attentionPeek: glanceable attention without full composer
+ * - attentionCompact: attention still active after sticky Escape (native activePresentationState)
  * - attentionInteractive: attention content while user remains interactive
  * - completedTransient / failedTransient: brief terminal summary
  */
@@ -44,6 +45,7 @@ export type MagnusLiveActivityPanelState =
 	| 'pinned' // sticky interactive
 	| 'attentionPeek'
 	| 'attention' // legacy alias of attentionPeek
+	| 'attentionCompact'
 	| 'attentionInteractive'
 	| 'completedTransient'
 	| 'failedTransient';
@@ -411,9 +413,9 @@ export function resolveLiveActivityPanelState(args: {
 		return attention ? 'attentionInteractive' : (args.pinned ? 'pinned' : 'interactive');
 	}
 	if (attention) {
-		// Mirror native setSnapshot: sticky Escape keeps compact until click, not republished peek.
+		// Mirror native activePresentationState: sticky Escape is attentionCompact, not peek and not plain compact.
 		if (args.userDismissedAttention) {
-			return 'compact';
+			return 'attentionCompact';
 		}
 		return 'attentionPeek';
 	}
@@ -448,7 +450,7 @@ export function canonicalizeLiveActivityPanelState(state: MagnusLiveActivityPane
 	}
 }
 
-export type LiveActivityCommandKind = 'followUp' | 'approve' | 'deny' | 'answer' | 'openInPrebase' | 'pin' | 'unpin';
+export type LiveActivityCommandKind = 'followUp' | 'approve' | 'deny' | 'answer' | 'openInPrebase' | 'pin' | 'unpin' | 'dismissAttention';
 
 export interface LiveActivityCommand {
 	readonly kind: LiveActivityCommandKind;
@@ -485,7 +487,7 @@ export function acceptLiveActivityCommand(
 			return { ok: false, reason: 'stale-revision' };
 		}
 	}
-	if (command.kind === 'openInPrebase' || command.kind === 'pin' || command.kind === 'unpin') {
+	if (command.kind === 'openInPrebase' || command.kind === 'pin' || command.kind === 'unpin' || command.kind === 'dismissAttention') {
 		if (command.sessionId && snapshot.sessionId && command.sessionId !== snapshot.sessionId) {
 			return { ok: false, reason: 'session-mismatch' };
 		}

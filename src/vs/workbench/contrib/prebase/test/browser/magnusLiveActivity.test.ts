@@ -308,6 +308,7 @@ suite('Magnus Live Activity projection', () => {
 		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'openInPrebase', sessionId: 'sess-other', revision: 1 }), { ok: false, reason: 'session-mismatch' });
 		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'pin', revision: 1 }), { ok: true });
 		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'unpin', sessionId: 'sess-1', revision: 1 }), { ok: true });
+		assert.deepStrictEqual(acceptLiveActivityCommand(snap, { kind: 'dismissAttention', revision: 1 }), { ok: true });
 	});
 
 	test('background mode hides when PreBase is focused', () => {
@@ -387,17 +388,17 @@ suite('Magnus Live Activity projection', () => {
 		assert.strictEqual(canonicalizeLiveActivityPanelState('collapsed'), 'compact');
 	});
 
-	test('sticky Escape keeps attention compact across snapshot republish until Interactive', () => {
+	test('sticky Escape keeps attentionCompact across snapshot republish until Interactive', () => {
 		const attention = buildMagnusLiveActivitySnapshot(session({
 			needsInput: true,
 			pendingInteraction: { kind: 'approval', interactionId: 'a', title: 'Approve', message: 'Confirm delete' },
 		}), { revision: 1, prebaseForeground: false, connected: true });
 		assert.strictEqual(resolveLiveActivityPanelState({
 			visible: true, hovering: false, pinned: false, snapshot: attention, now: 0, userDismissedAttention: true,
-		}), 'compact');
+		}), 'attentionCompact');
 		assert.strictEqual(resolveLiveActivityPanelState({
 			visible: true, hovering: true, pinned: false, snapshot: attention, now: 500, hoverSince: 0, openDelayMs: 150, userDismissedAttention: true,
-		}), 'compact');
+		}), 'attentionCompact');
 		assert.strictEqual(resolveLiveActivityPanelState({
 			visible: true, hovering: false, pinned: true, snapshot: attention, now: 0, userDismissedAttention: true,
 		}), 'attentionInteractive');
@@ -1675,6 +1676,7 @@ suite('Magnus Live Activity contribution contracts', () => {
 		const session = readSessionCommandDispatch(readSessionModule());
 
 		assert.match(handle, /acceptLiveActivityCommand\(snapshot, command\)/);
+		assert.match(handle, /command\.kind === 'dismissAttention'/);
 		assert.match(handle, /if \(!accepted\.ok\)/);
 		assert.ok(handle.indexOf('acceptLiveActivityCommand') < handle.indexOf('applyMagnusLiveActivitySessionCommand'), 'fail-closed accept must run before session dispatch');
 
@@ -1789,6 +1791,9 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.match(publish, /prebase\.magnus\.liveActivity\.hideDetails/);
 		assert.match(publish, /screenLocked: this\._screenLocked/);
 		assert.match(publish, /hideDetails: userHideDetails/);
+		assert.match(publish, /userDismissedAttention: this\._userDismissedAttention/);
+		assert.match(publish, /_flushNative/);
+		assert.match(publish, /hideFirst/);
 		assert.match(contribution, /onDidLockScreen/);
 		assert.match(contribution, /this\._screenLocked = true/);
 		assert.match(contribution, /onDidUnlockScreen/);
@@ -1889,10 +1894,11 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		const removeEnd = native.indexOf('\n- (', removeStart + 1);
 		const remove = native.slice(removeStart, removeEnd > removeStart ? removeEnd : native.length);
 		assert.match(remove, /removeGlobalMonitorOnly/);
+		assert.match(remove, /removeLocalKeyMonitor/);
 		assert.match(native, /\[NSEvent removeMonitor:self\.globalMonitor\]/);
 		assert.match(native, /self\.globalMonitor = nil/);
-		assert.match(remove, /\[NSEvent removeMonitor:self\.localMonitor\]/);
-		assert.match(remove, /self\.localMonitor = nil/);
+		assert.match(native, /\[NSEvent removeMonitor:self\.localMonitor\]/);
+		assert.match(native, /self\.localMonitor = nil/);
 
 		assert.match(native, /gDisposed = true/);
 		assert.match(native, /\[gController teardown\]/);
@@ -1907,7 +1913,8 @@ suite('Magnus Live Activity native and settings contracts', () => {
 	test('native Escape unpins, monitors stay off when hidden, and buttons have accessible names', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /event\.keyCode != 53/);
-		assert.match(native, /\[strong emit:@"unpin"/);
+		assert.match(native, /emit:@"dismissAttention"/, 'sticky Escape must notify renderer (unpinned attention has no unpin command)');
+		assert.match(native, /const NSUInteger generation = \+\+self\.transitionGeneration/);
 		assert.match(native, /addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown/);
 		assert.match(native, /\[self removeMonitors\]/);
 		assert.match(native, /controller\.displayMode = display/);
@@ -2074,7 +2081,14 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 			actionsCount: 3,
 			pinned: true,
 		});
-		assert.strictEqual(withInput > withActions, true);
+		assert.strictEqual(withInput, withActions, 'pin does not add height beyond the interactive input row already counted');
+		const peekCompact = computeLiveActivityExpandedHeight({
+			bandHeight: 34, peekOnly: true, hasActivity: true, actionsCount: 3,
+		});
+		const peekPinned = computeLiveActivityExpandedHeight({
+			bandHeight: 34, peekOnly: true, hasActivity: true, actionsCount: 3, pinned: true,
+		});
+		assert.ok(peekPinned > peekCompact, 'pinning a peek must size the full Interactive chrome');
 	});
 
 	test('computeLiveActivityWingWidth buckets widths stably to prevent single-second twitching', () => {
@@ -2198,6 +2212,8 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(native, /NSAnimationContext runAnimationGroup:/);
 		assert.match(native, /kCAMediaTimingFunctionEaseInEaseOut/);
 		assert.match(native, /\[\[self\.panel animator\] setFrame:win display:YES\]/);
+		assert.match(native, /const NSUInteger generation = \+\+self\.transitionGeneration/);
+		assert.match(native, /if \(generation == self\.transitionGeneration\)/);
 		assert.match(native, /if \(self\.reducedMotion\)/);
 		assert.match(native, /\[self\.panel setFrame:win display:YES animate:NO\]/);
 	});
@@ -2367,6 +2383,7 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		const collapse = native.slice(collapseStart, collapseEnd);
 		assert.match(collapse, /if \(self\.pinned\) \{\s*return;/);
 		assert.match(collapse, /userDismissedAttention = YES/);
+		assert.match(collapse, /emit:@"dismissAttention"/);
 		assert.match(collapse, /self\.attentionPeek = NO/);
 		assert.match(collapse, /self\.content\.peekOnly = NO/);
 		assert.match(collapse, /self\.content\.expanded = NO/);

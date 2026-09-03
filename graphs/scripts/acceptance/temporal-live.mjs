@@ -77,6 +77,9 @@ export function temporalAcceptanceFailures(evidence) {
 		if (canonicalScale && !(full.receivedNodeCount >= 9000)) {failures.push('canonical-scale Full Map received fewer than 9000 nodes');}
 		if ((large || canonicalScale) && full.screenFillRatio !== undefined && full.screenFillRatio < 0.08) {failures.push(`${large ? 'large' : 'canonical-scale'} Full Map leaves a huge empty canvas`);}
 		if ((large || canonicalScale) && full.maxCommunityOverlap !== undefined && full.maxCommunityOverlap > 0.85) {failures.push(`${large ? 'large' : 'canonical-scale'} Full Map communities overlap too much`);}
+		if (!Number.isFinite(full.renderedLabelOverlapCount) || full.renderedLabelOverlapCount > 0) {
+			failures.push(`${canonicalScale ? 'canonical-scale ' : large ? 'large ' : ''}Full Map has rendered label overlaps (${full.renderedLabelOverlapCount})`);
+		}
 		if (canonicalScale) {
 			const received = full.receivedNodeCount;
 			const leafDrawn = Number.isFinite(full.leafNodesDrawn) ? full.leafNodesDrawn : 0;
@@ -105,9 +108,6 @@ export function temporalAcceptanceFailures(evidence) {
 			}
 			if (!Number.isFinite(full.labelCollisionCullCount)) {
 				failures.push('canonical-scale Full Map labelCollisionCullCount is not finite');
-			}
-			if (!Number.isFinite(full.renderedLabelOverlapCount) || full.renderedLabelOverlapCount > 0) {
-				failures.push(`canonical-scale Full Map has rendered label overlaps (${full.renderedLabelOverlapCount})`);
 			}
 			if (!Number.isFinite(full.totalLabelsDrawn)) {
 				failures.push('canonical-scale Full Map totalLabelsDrawn is not finite');

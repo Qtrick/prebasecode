@@ -182,6 +182,7 @@ export function coreIdeFailures(evidence) {
 	const failures = [];
 	if (!evidence.c1_freshProfile) failures.push('C1 fresh profile failed');
 	if (!evidence.c2_existingProfile) failures.push('C2 existing profile failed');
+	if (!evidence.c2_detail?.settingSurvivedRelaunch) failures.push('C2 did not re-read persisted setting after profile relaunch');
 	if (!evidence.c3_folderOpen) failures.push('C3 folder workspace failed');
 	if (!evidence.c3_workspaceIdentity) failures.push('C3 workspace identity was not proven');
 	if (!evidence.c4_crashRecovery) failures.push('C4 crash recovery failed');
@@ -602,8 +603,32 @@ async function run() {
 			streamKeys: streamKeys.slice(0, 12),
 		};
 
-		// C2: prove cold relaunch into the same profile after setting persistence (not OR with C4).
-		evidence.c2_existingProfile = Boolean(evidence.p1_settingsPersisted && launched.sourceProfile);
+		// C2: graceful quit + relaunch into the same dest profile, then re-read the persisted setting.
+		const persistedProfile = launched.info?.userDataDir;
+		if (evidence.p1_settingsPersisted && persistedProfile) {
+			const c2OldPid = launched.info.pid;
+			await gracefulWorkbenchQuit(launched.page, c2OldPid);
+			await launched.browser?.close?.().catch?.(() => undefined);
+			const c2Relaunched = await launchPreBase(repo, gitWorkspace, [], { userDataDir: persistedProfile });
+			launched = c2Relaunched;
+			await dismissStartup(launched.page);
+			await waitForWorkbenchDriver(launched.page, 90_000);
+			const c2Diag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics').catch(() => null);
+			const survived = c2Diag?.projectGuidanceEnabled === targetSetting;
+			evidence.c2_existingProfile = Boolean(survived && launched.info?.pid && launched.info.pid !== c2OldPid);
+			evidence.c2_detail = {
+				settingId: 'prebase.magnus.projectGuidance.enabled',
+				targetSetting,
+				afterRelaunchSetting: c2Diag?.projectGuidanceEnabled,
+				oldPid: c2OldPid,
+				newPid: launched.info?.pid,
+				profile: persistedProfile,
+				settingSurvivedRelaunch: Boolean(survived),
+			};
+		} else {
+			evidence.c2_existingProfile = false;
+			evidence.c2_detail = { settingSurvivedRelaunch: false, reason: 'P1 did not persist or dest profile missing' };
+		}
 
 		// C4 deferred to end-of-run so crash does not abort remaining matrix
 		evidence.c4_crashRecovery = false;

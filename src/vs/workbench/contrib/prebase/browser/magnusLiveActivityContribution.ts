@@ -272,11 +272,14 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		/** Honest provenance: renderer projection never claims native hover/peek fidelity. */
 		panelStateSource?: 'renderer-projection';
 		screenLocked?: boolean;
+		userDismissedAttention?: boolean;
 	} = { backend: isMacintosh && !isWeb ? 'unavailable' : 'non-mac', revision: 0 };
 
 	private readonly _main: IMagnusLiveActivityMainService | undefined;
 	private _revision = 0;
 	private _pinned = false;
+	private _userDismissedAttention = false;
+	private _publishGeneration = 0;
 	private _screenLocked = false;
 	private _nativeConnected = false;
 	private _completionHoldUntil: number | undefined;
@@ -411,6 +414,9 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		});
 		const prevStatus = this._lastSnapshot?.status;
 		this._lastSnapshot = snapshot;
+		if (snapshot.status !== 'attention') {
+			this._userDismissedAttention = false;
+		}
 		const terminalStatus = snapshot.status === 'completed' || snapshot.status === 'failed';
 		if (terminalStatus && prevStatus !== snapshot.status) {
 			this._completionHoldUntil = Date.now() + LIVE_ACTIVITY_COMPLETED_HOLD_MS;
@@ -424,12 +430,13 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			this._completionHidden = true;
 		}
 		const visible = !this._completionHidden && shouldShowLiveActivity(this._mode(), snapshot);
-		// Renderer panelState is a projection from pin + snapshot only.
+		// Renderer panelState is a projection from pin + snapshot + sticky Escape.
 		// Native hover/peek/attentionCompact truth lives in native diagnostics.activePresentationState.
 		const panelState = canonicalizeLiveActivityPanelState(resolveLiveActivityPanelState({
 			visible,
 			hovering: false,
 			pinned: this._pinned && visible,
+			userDismissedAttention: this._userDismissedAttention,
 			snapshot,
 			now: Date.now(),
 		}));
@@ -458,16 +465,43 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			panelState,
 			panelStateSource: 'renderer-projection',
 			screenLocked: Boolean(snapshot.screenLocked),
+			userDismissedAttention: this._userDismissedAttention,
 		};
 		const reducedMotion = this.accessibilityService.isMotionReduced()
 			|| Boolean(this.configurationService.getValue<boolean>('prebase.graph.reduceMotion'));
-		void this._main.setSnapshot(snapshot);
-		void this._main.setPresentation({
+		const generation = ++this._publishGeneration;
+		const hideFirst = !visible || Boolean(snapshot.screenLocked);
+		void this._flushNative(generation, snapshot, {
 			visible,
 			pinned: this._pinned && visible,
 			reducedMotion,
 			display: this._display(),
-		});
+		}, hideFirst);
+	}
+
+	private async _flushNative(
+		generation: number,
+		snapshot: MagnusLiveActivitySnapshot,
+		presentation: { visible: boolean; pinned: boolean; reducedMotion: boolean; display: MagnusLiveActivityDisplay },
+		hideFirst: boolean,
+	): Promise<void> {
+		if (!this._main || generation !== this._publishGeneration) {
+			return;
+		}
+		// Lock/hide must apply presentation before a snapshot that could expand attention.
+		if (hideFirst) {
+			await this._main.setPresentation(presentation);
+			if (generation !== this._publishGeneration) {
+				return;
+			}
+			await this._main.setSnapshot(snapshot);
+			return;
+		}
+		await this._main.setSnapshot(snapshot);
+		if (generation !== this._publishGeneration) {
+			return;
+		}
+		await this._main.setPresentation(presentation);
 	}
 
 	private async _handleCommand(command: LiveActivityCommand): Promise<void> {
@@ -482,8 +516,15 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		}
 		if (command.kind === 'pin') {
 			this._pinned = true;
+			this._userDismissedAttention = false;
 			this._completionHidden = false;
 			this._completionTimer.cancel();
+			this._push.schedule();
+			return;
+		}
+		if (command.kind === 'dismissAttention') {
+			this._userDismissedAttention = true;
+			this._pinned = false;
 			this._push.schedule();
 			return;
 		}

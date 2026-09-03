@@ -147,6 +147,7 @@ function passingCore(overrides = {}) {
 	return {
 		c1_freshProfile: true,
 		c2_existingProfile: true,
+		c2_detail: { settingSurvivedRelaunch: true, settingId: 'prebase.magnus.projectGuidance.enabled' },
 		c3_folderOpen: true,
 		c3_workspaceIdentity: true,
 		c4_crashRecovery: true,
@@ -1065,6 +1066,8 @@ test('E6 rejects suggestSeen && (typescriptDiagnostic || suggestSeen) false-gree
 	assert.ok(c1Fail.some(item => /C1 fresh profile/.test(item)));
 	const p1PersistFail = coreIdeFailures(passingCore({ p1_settingsPersisted: false }));
 	assert.ok(p1PersistFail.some(item => /P1 PreBase setting persistence/.test(item)));
+	const c2RelaunchFail = coreIdeFailures(passingCore({ c2_detail: { settingSurvivedRelaunch: false } }));
+	assert.ok(c2RelaunchFail.some(item => /C2 did not re-read persisted setting/.test(item)));
 });
 
 test('core-ide P1 persists projectGuidance via getDiagnostics and P5 proves Magnus schema without stream truthies', () => {
@@ -1083,6 +1086,10 @@ test('core-ide P1 persists projectGuidance via getDiagnostics and P5 proves Magn
 	assert.doesNotMatch(live, /magnusStream\.streamActive === true/);
 	assert.match(live, /Agents\\s\*&\\s\*AI/);
 	assert.match(live, /zoomLevel:\s*0/);
+	assert.match(live, /userDataDir: persistedProfile/);
+	assert.match(live, /settingSurvivedRelaunch/);
+	assert.match(live, /afterRelaunchSetting/);
+	assert.doesNotMatch(live, /c2_existingProfile = Boolean\(evidence\.p1_settingsPersisted && launched\.sourceProfile\)/);
 });
 
 test('code graph screenshot is not a substitute for render metrics', () => {
@@ -1938,6 +1945,44 @@ test('temporal canonical-scale live-like overview metrics pass semantic gates', 
 		renderedLabelOverlapCount: 0,
 	});
 	assert.deepEqual(temporalAcceptanceFailures(evidence), []);
+});
+
+test('temporal-small Full Map overlap fails closed (not canonical-scale-only)', () => {
+	const small = {
+		scale: 'small',
+		fixture: {
+			commits: 10,
+			files: ['a', 'b', 'c', 'd'],
+			expectedModifiedPath: 'src/tally.js',
+			head: 'abc',
+		},
+		targetOpened: true,
+		repoLoaded: true,
+		fullMap: {
+			selectedCommitSha: 'abc',
+			renderedCommitSha: 'abc',
+			receivedNodeCount: 4,
+			visibleNodeCount: 4,
+			nodesDrawn: 4,
+			finiteCoordinateCount: 4,
+			canvas: { distinctPixels: 12 },
+			transform: { x: 0, y: 0, k: 1 },
+			renderedLabelOverlapCount: 2,
+		},
+		focusChanges: {
+			displayMode: 'changes',
+			visibleNodeCount: 1,
+			nodesDrawn: 1,
+			summary: { modifiedCount: 1 },
+			canvas: { distinctPixels: 8 },
+		},
+		camera: { afterFocus: { k: 1 }, afterUserZoom: { k: 1.5 }, afterWait: { k: 1.5 } },
+		quit: { remaining: 'gone' },
+	};
+	assert.ok(temporalAcceptanceFailures(small).some(item => /rendered label overlaps/.test(item)));
+	const temporalSource = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-live.mjs'), 'utf8');
+	assert.match(temporalSource, /full\.renderedLabelOverlapCount > 0/);
+	assert.match(temporalSource, /canonicalScale \? 'canonical-scale ' : large \? 'large ' : ''/);
 });
 
 test('temporal canonical-scale omitting leaf and aggregate drawn counts fails closed', () => {

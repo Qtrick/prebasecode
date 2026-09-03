@@ -116,8 +116,8 @@ if (!native.includes('userDismissedAttention')) {
 if (!native.includes('dict[@"userDismissedAttention"]')) {
 	failures.push('native diagnostics must expose userDismissedAttention for AppKit product-truth proof');
 }
-if (!native.includes('attentionCompact')) {
-	failures.push('native activePresentationState must include attentionCompact for sticky Escape');
+if (!native.includes('emit:@"dismissAttention"')) {
+	failures.push('native collapse must emit dismissAttention so renderer projection can stay attentionCompact');
 }
 {
 	const applyStart = native.indexOf('- (void)applySnapshotDict:(NSDictionary *)snapshot {');

@@ -51,7 +51,7 @@ assert.equal(resolveLiveActivityPanelState({
 }), 'attentionPeek');
 assert.equal(resolveLiveActivityPanelState({
 	visible: true, hovering: false, pinned: false, snapshot: attention, now: 0, userDismissedAttention: true,
-}), 'compact', 'sticky Escape must keep attention compact across republish');
+}), 'attentionCompact', 'sticky Escape must keep attentionCompact across republish');
 assert.equal(resolveLiveActivityPanelState({
 	visible: true, hovering: false, pinned: true, snapshot: attention, now: 0, userDismissedAttention: true,
 }), 'attentionInteractive', 'pinned Interactive wins over sticky Escape');
@@ -133,6 +133,7 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 	const collapse = native.slice(collapseStart, native.indexOf('- (void)emit:', collapseStart));
 	assert.match(collapse, /if \(self\.pinned\) \{\s*return;/);
 	assert.match(collapse, /userDismissedAttention = YES/);
+	assert.match(collapse, /emit:@"dismissAttention"/);
 	assert.match(collapse, /self\.attentionPeek = NO/);
 	assert.match(collapse, /self\.content\.peekOnly = NO/);
 	assert.match(collapse, /self\.content\.expanded = NO/);
@@ -143,6 +144,7 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 	assert.match(ts, /testState: hide \? undefined : input\.testState/);
 	assert.match(ts, /hasLatestMessage/);
 	assert.match(ts, /return attention \? 'attentionInteractive'/);
+	assert.match(ts, /return 'attentionCompact'/);
 	assert.match(ts, /return 'attentionPeek'/);
 	assert.match(ts, /return 'failedTransient'/);
 	assert.doesNotMatch(ts, /forceEmphasis/);

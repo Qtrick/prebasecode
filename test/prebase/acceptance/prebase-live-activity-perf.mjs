@@ -435,8 +435,8 @@ async function run() {
 			state: collapsedDiag.activePresentationState,
 			localMonitor: collapsedDiag.localMonitorInstalled,
 		};
-		if (collapsedDiag.activePresentationState !== 'attentionCompact' && collapsedDiag.activePresentationState !== 'compact') {
-			throw new Error(`Expected attentionCompact or compact state after escape, got ${collapsedDiag.activePresentationState}`);
+		if (collapsedDiag.activePresentationState !== 'attentionCompact') {
+			throw new Error(`Expected attentionCompact after escape, got ${collapsedDiag.activePresentationState}`);
 		}
 		if (collapsedDiag.localMonitorInstalled !== false) {
 			throw new Error('Collapsed mode must NOT keep local key monitor');
