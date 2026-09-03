@@ -1,35 +1,35 @@
 {
   "phase": "3-final",
-  "sourceHead": "53f884958c5faf2b755ff0b22d908ab4e06432e5",
-  "sourceFingerprint": "cd2e6e6b3e386c4ab205954b5188b46d90070352f132d5301b26a2a60025eb0f",
-  "productFingerprint": "cd2e6e6b3e386c4ab205954b5188b46d90070352f132d5301b26a2a60025eb0f",
+  "sourceHead": "f65acb33c9943aaf2f6d729a6b6f889af3eb5ce5",
+  "sourceFingerprint": "a8c47d7896a123e7053712a1f45e1e99a5fa84c61db61a388495bc3227581da3",
+  "productFingerprint": "a8c47d7896a123e7053712a1f45e1e99a5fa84c61db61a388495bc3227581da3",
   "producerFingerprints": {
-    "parser-benchmark": "f902f2641014884415b0b6bac2c0ee1df7682464301429cb501701b333313a13",
-    "magnus-streaming-smoke": "5c78d6fcdabbeafef94e674c1c5ac2e6c3989ecae5c5cf7a24242792d28f81ea",
-    "magnus-guidance-smoke": "bcf0fd07e1746bf791636cba339c56ceaafb1a65896ff79d39d88e7a84638e08",
-    "magnus-live-activity": "7aa7634f56b4de23a165e139dc67c64219ecb64f96dd839582703ae79c1fe1b5",
-    "core-ide": "68de050c3cc0b5e9753f0be07652dec45952766fc1f81264845d2fd7b57928e6",
+    "parser-benchmark": "1ed983eae16447244c6a82a9b1310c8ddab23c93482b170ac7f8f14c760ea678",
+    "magnus-streaming-smoke": "4b8981c34942319a3604045ff698dd530dcccd05c4ad06b07e84134d835f7c45",
+    "magnus-guidance-smoke": "baae1cb9ce1cc8f33b43520595996d7dc8fbbd9df7fd2f197e783d72cb5e11d8",
+    "magnus-live-activity": "b2b3a4f7a09de43fb026aa2438aa03f9371ae69e53d9b333633d5d700fb26f54",
+    "core-ide": "f52d12c9e6ea432669556849d08093f379a86f0babe0f5e0db8362eecf1d4bd1",
     "runtime-preview": "81102d868c288611b2d28d688c4e4ffe83e6be27f74fb46fe889aa8f50ac1b5c",
-    "temporal-small": "2c72abf361f30d590b5749ee132bfab2bf1bc0c11dac99b9e69a237dbff7f493",
-    "temporal-large": "f8c73256ea03c5a2ebbc11085490612df0fcec2cd69db214ce335f485ad0e8c3",
-    "temporal-canonical-scale": "77e6e6617ac96fb65356ce8787af8239c70f3675aeb434957a0269c663b9fae4",
-    "electron-product-path": "707e35fd84f1c359209d646f161d23f0128e5c687650963ad758a51e040a132e",
-    "electron-native-cases": "213704d0cb4f866b42d25d9b0a0a4e67061d6eb6297a20f123a4473cd65f38ee",
-    "tauri-product-path": "6389f2be1c1f171a6e6dfe66ad5efdbd54a1ec46781149a5bf84838ebf072671",
-    "magnus-electron-tools": "0e97d3f437e3f14cf7242438a06f6e6f51f66b693bc1e15d11ef193699ebc275",
-    "magnus-tauri-tools": "1ef0737c14d8926b8e1f59cbc751549c29a99d424efab84fa4596d51201eaa30",
+    "temporal-small": "cd0cba598a797615da744f89cbdca2990deaa05b8155fad64607842a588eb1db",
+    "temporal-large": "afd7dbf175b2b4900edf65df5d09a8b38407bb51ff8fb237b9d9b28ac1ec9dc6",
+    "temporal-canonical-scale": "3d731fae2410b9733a066e9f83c65c8d1d9e45c5946c59b71df51f3d424c29e8",
+    "electron-product-path": "326035b84c0ba4d2e5adc357bf3ba174d73b1ce03925676bed03c64a78600064",
+    "electron-native-cases": "ef0cd806f47ac57868d17b19f66cddcd3c5426556ac92155b05ef5ba9f28e166",
+    "tauri-product-path": "faf2efbed5b88cff6c3bd2a2b67eae955ce09ea2afc2492a9fd9f62b7180952f",
+    "magnus-electron-tools": "a9c7206ff6ce98b6da8dbece7143cd5bdf7217060092f853bc2de5439e681186",
+    "magnus-tauri-tools": "939b1774af475331a017e1937deb7ba98979f9efe4ce43dbe051921888b13997",
     "hybrid-web-smoke": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
-    "privacy": "ca714c98c86fe4a7c5f9d7e19563fd6a5d5b7f1b05d6b09a6e4625af0ea36d51",
-    "load-quit": "de2e57205a31f1eefb5a6c8344f30987e512047177c27d2e2c7f5a4d45f2ffbe",
-    "lifecycle-cycles": "cba95e5f9c4212b454e01f53a5791752ee1e0bef0188aeffb17f603fa20a1802",
-    "electron-restart-soak": "bcf546308b30cbdaafc213feef82ed937cdbc6c7256797189fc20f9379a5f46f",
-    "tauri-restart-soak": "ec4400d2b6c3539d03615bee2ed371ba83a92bf6a38b9e15574ef6706f9ab77f",
-    "idle-soak": "f3b6d7214def80663def2c75a6a2edc2520fd14d86ee6cbdff3d9fc573f18e17",
-    "active-soak": "383c59a3935da46a71b4a16bc88ba85e4471150499113afcbfac514b85af2b20",
-    "assurance": "a78c7361b51b570f988d245cc7d58e031f56914da3ddb8dd3521c9879dc4feb1"
+    "privacy": "ecaa6248952ba203786f2a588d60e6cf37fff5249a6da4642ed23aaf6207e354",
+    "load-quit": "76af148e70c5c359cc9f2132f1e33ed43ebd4946893d0d746dded017dbcb54e6",
+    "lifecycle-cycles": "4a0e12d39c485d7955b390fb39b1863e4d89d1b7157eefe2979b162bc867df8e",
+    "electron-restart-soak": "f75a18fd45a5dacae1a14d42f1c8b813a295d3c8b7250694922bd015bff8782d",
+    "tauri-restart-soak": "46e189970a5d177d7e9e37c5e595b8a1fe061b5e2a1811627067f2bbb9510a7c",
+    "idle-soak": "fabcb77ee7fc8e1e690c2743c427b924daaa0974a51f4707a9beb1a19cf4ed46",
+    "active-soak": "fc94080b269499972cf2007b95dd8bbdc06057b8e1f7930e78e6998c48ba9db8",
+    "assurance": "577e994e4d3f0d7bf627ccef513750f57a5398081d5f1507f84ffe56e2ef485d"
   },
-  "validationRunId": "2026-09-03T07-20-53-075Z",
-  "generatedAt": "2026-09-03T07:20:55.163Z",
+  "validationRunId": "2026-09-03T07-50-29-279Z",
+  "generatedAt": "2026-09-03T07:53:29.143Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -121,11 +121,21 @@
       "path": "temporal/live.json",
       "ok": true,
       "quit": {
-        "startedAt": 1788419833359,
-        "quitMs": 301,
+        "startedAt": 1788422007987,
+        "quitMs": 201,
         "remaining": "gone",
-        "before": "90317       1 20.7 295904 prebase",
+        "before": "105576       1 20.5 294764 prebase",
         "after": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 22482,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
+        "logTail": "",
+        "harnessPid": 105454,
+        "timeoutMs": 180000,
+        "leftoverPids": []
       }
     },
     {
@@ -191,14 +201,24 @@
       "path": "magnus/streaming-smoke.json",
       "ok": true,
       "quit": {
-        "before": "93332       1 26.1 283216 prebase",
+        "before": "103427       1 25.3 282668 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 331,
+        "latencyMs": 348,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 16183,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log",
+        "logTail": "",
+        "harnessPid": 103354,
+        "timeoutMs": 180000,
+        "leftoverPids": []
       }
     },
     {
@@ -222,7 +242,17 @@
       "path": "magnus/live-activity.json",
       "ok": true,
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "externalSkip": true
+      "externalSkip": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 297,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log",
+        "logTail": "",
+        "harnessPid": 103742,
+        "timeoutMs": 120000,
+        "leftoverPids": []
+      }
     },
     {
       "id": "hybrid-web-smoke",
@@ -280,34 +310,64 @@
       "path": "core-ide/live.json",
       "ok": true,
       "quit": {
-        "before": "92067       1 48.4 281748 prebase",
+        "before": "105157       1 50.3 281184 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 371,
+        "latencyMs": 375,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 138538,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "logTail": "",
+        "harnessPid": 103764,
+        "timeoutMs": 240000,
+        "leftoverPids": []
       }
     },
     {
       "id": "code-graph",
       "path": "core-ide/code-graph.json",
-      "ok": true
+      "ok": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 138538,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "logTail": "",
+        "harnessPid": 103764,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
     },
     {
       "id": "themes-a11y",
       "path": "core-ide/themes-a11y.json",
       "ok": true,
       "quit": {
-        "before": "92067       1 48.4 281748 prebase",
+        "before": "105157       1 50.3 281184 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 371,
+        "latencyMs": 375,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 138538,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "logTail": "",
+        "harnessPid": 103764,
+        "timeoutMs": 240000,
+        "leftoverPids": []
       }
     },
     {
@@ -356,9 +416,12 @@
   },
   "plannedProducers": [
     "parser-benchmark",
+    "magnus-streaming-smoke",
     "magnus-guidance-smoke",
     "magnus-live-activity",
+    "core-ide",
     "runtime-preview",
+    "temporal-small",
     "temporal-large",
     "temporal-canonical-scale",
     "electron-product-path",

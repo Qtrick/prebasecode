@@ -1,27 +1,27 @@
 {
-  "runId": "2026-09-03T07-20-53-075Z",
-  "planKey": "07101f17e8761b17b392460df2ed157b61823738da7ca579e0672976508f1b88:only",
+  "runId": "2026-09-03T07-50-29-279Z",
+  "planKey": "0fe90bd21a7ba0488bb89f2d6b8bd884a56c5322fe998f444c4ac235b4a3b011:only",
   "tier": "release",
   "onlyProducers": [
-    "magnus-streaming-smoke",
-    "magnus-live-activity",
     "core-ide",
-    "temporal-small"
+    "temporal-small",
+    "magnus-streaming-smoke",
+    "magnus-live-activity"
   ],
-  "plannedAtHead": "53f884958c5faf2b755ff0b22d908ab4e06432e5",
-  "currentHead": "53f884958c5faf2b755ff0b22d908ab4e06432e5",
-  "sourceHead": "53f884958c5faf2b755ff0b22d908ab4e06432e5",
-  "productFingerprint": "cd2e6e6b3e386c4ab205954b5188b46d90070352f132d5301b26a2a60025eb0f",
-  "sourceFingerprint": "cd2e6e6b3e386c4ab205954b5188b46d90070352f132d5301b26a2a60025eb0f",
+  "plannedAtHead": "f65acb33c9943aaf2f6d729a6b6f889af3eb5ce5",
+  "currentHead": "f65acb33c9943aaf2f6d729a6b6f889af3eb5ce5",
+  "sourceHead": "f65acb33c9943aaf2f6d729a6b6f889af3eb5ce5",
+  "productFingerprint": "a8c47d7896a123e7053712a1f45e1e99a5fa84c61db61a388495bc3227581da3",
+  "sourceFingerprint": "a8c47d7896a123e7053712a1f45e1e99a5fa84c61db61a388495bc3227581da3",
   "prerequisites": {
     "firecrawlConfigured": false,
     "linkupConfigured": false,
     "geminiConfigured": false,
     "darwin": false
   },
-  "createdAt": "2026-09-03T07:20:53.942Z",
+  "createdAt": "2026-09-03T07:50:30.113Z",
   "reused": false,
-  "totalEstimatedDurationMs": 0,
+  "totalEstimatedDurationMs": 231218,
   "changedPathCount": 0,
   "changedDomains": [],
   "unknownChangedPaths": [],
@@ -29,9 +29,9 @@
   "producers": [
     {
       "id": "parser-benchmark",
-      "expectedProducerFingerprint": "f902f2641014884415b0b6bac2c0ee1df7682464301429cb501701b333313a13",
+      "expectedProducerFingerprint": "1ed983eae16447244c6a82a9b1310c8ddab23c93482b170ac7f8f14c760ea678",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 90000,
       "timeoutMs": 1500000,
       "artifacts": [
@@ -43,10 +43,10 @@
     },
     {
       "id": "magnus-streaming-smoke",
-      "expectedProducerFingerprint": "5c78d6fcdabbeafef94e674c1c5ac2e6c3989ecae5c5cf7a24242792d28f81ea",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 45000,
+      "expectedProducerFingerprint": "4b8981c34942319a3604045ff698dd530dcccd05c4ad06b07e84134d835f7c45",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "estimatedDurationMs": 16218,
       "timeoutMs": 180000,
       "artifacts": [
         "magnus-streaming-smoke"
@@ -56,13 +56,24 @@
         "magnus-guidance",
         "shared-workbench",
         "launch-harness"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-09-03T07:50:30.555Z",
+        "finishedAt": "2026-09-03T07:50:46.771Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 16183,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "magnus-guidance-smoke",
-      "expectedProducerFingerprint": "bcf0fd07e1746bf791636cba339c56ceaafb1a65896ff79d39d88e7a84638e08",
+      "expectedProducerFingerprint": "baae1cb9ce1cc8f33b43520595996d7dc8fbbd9df7fd2f197e783d72cb5e11d8",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 10557,
       "timeoutMs": 180000,
       "artifacts": [
@@ -77,10 +88,10 @@
     },
     {
       "id": "magnus-live-activity",
-      "expectedProducerFingerprint": "7aa7634f56b4de23a165e139dc67c64219ecb64f96dd839582703ae79c1fe1b5",
-      "status": "EXTERNAL",
-      "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "estimatedDurationMs": 45000,
+      "expectedProducerFingerprint": "b2b3a4f7a09de43fb026aa2438aa03f9371ae69e53d9b333633d5d700fb26f54",
+      "status": "STALE",
+      "reason": "Live Activity AppKit path is macOS-only",
+      "estimatedDurationMs": 5000,
       "timeoutMs": 120000,
       "artifacts": [
         "magnus-live-activity"
@@ -89,13 +100,24 @@
         "live-activity",
         "magnus-core",
         "launch-harness"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-09-03T07:50:46.814Z",
+        "finishedAt": "2026-09-03T07:50:47.144Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 297,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "core-ide",
-      "expectedProducerFingerprint": "68de050c3cc0b5e9753f0be07652dec45952766fc1f81264845d2fd7b57928e6",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
+      "expectedProducerFingerprint": "f52d12c9e6ea432669556849d08093f379a86f0babe0f5e0db8362eecf1d4bd1",
+      "status": "STALE",
+      "reason": "Theme matrix incomplete; screen-reader auto mode was not proven; screen-reader on mode was not proven",
       "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -111,13 +133,24 @@
         "runtime-preview",
         "magnus-core",
         "launch-harness"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-09-03T07:50:47.193Z",
+        "finishedAt": "2026-09-03T07:53:05.767Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 138538,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "runtime-preview",
       "expectedProducerFingerprint": "81102d868c288611b2d28d688c4e4ffe83e6be27f74fb46fe889aa8f50ac1b5c",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 60000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -130,9 +163,9 @@
     },
     {
       "id": "temporal-small",
-      "expectedProducerFingerprint": "2c72abf361f30d590b5749ee132bfab2bf1bc0c11dac99b9e69a237dbff7f493",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
+      "expectedProducerFingerprint": "cd0cba598a797615da744f89cbdca2990deaa05b8155fad64607842a588eb1db",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -144,13 +177,24 @@
         "network-graph",
         "shared-workbench",
         "launch-harness"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-09-03T07:53:05.815Z",
+        "finishedAt": "2026-09-03T07:53:28.331Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 22482,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "temporal-large",
-      "expectedProducerFingerprint": "f8c73256ea03c5a2ebbc11085490612df0fcec2cd69db214ce335f485ad0e8c3",
+      "expectedProducerFingerprint": "afd7dbf175b2b4900edf65df5d09a8b38407bb51ff8fb237b9d9b28ac1ec9dc6",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 150000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -166,9 +210,9 @@
     },
     {
       "id": "temporal-canonical-scale",
-      "expectedProducerFingerprint": "77e6e6617ac96fb65356ce8787af8239c70f3675aeb434957a0269c663b9fae4",
+      "expectedProducerFingerprint": "3d731fae2410b9733a066e9f83c65c8d1d9e45c5946c59b71df51f3d424c29e8",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 300000,
       "timeoutMs": 600000,
       "artifacts": [
@@ -184,9 +228,9 @@
     },
     {
       "id": "electron-product-path",
-      "expectedProducerFingerprint": "707e35fd84f1c359209d646f161d23f0128e5c687650963ad758a51e040a132e",
+      "expectedProducerFingerprint": "326035b84c0ba4d2e5adc357bf3ba174d73b1ce03925676bed03c64a78600064",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 30000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -201,9 +245,9 @@
     },
     {
       "id": "electron-native-cases",
-      "expectedProducerFingerprint": "213704d0cb4f866b42d25d9b0a0a4e67061d6eb6297a20f123a4473cd65f38ee",
+      "expectedProducerFingerprint": "ef0cd806f47ac57868d17b19f66cddcd3c5426556ac92155b05ef5ba9f28e166",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 35000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -218,9 +262,9 @@
     },
     {
       "id": "tauri-product-path",
-      "expectedProducerFingerprint": "6389f2be1c1f171a6e6dfe66ad5efdbd54a1ec46781149a5bf84838ebf072671",
+      "expectedProducerFingerprint": "faf2efbed5b88cff6c3bd2a2b67eae955ce09ea2afc2492a9fd9f62b7180952f",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 30000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -235,9 +279,9 @@
     },
     {
       "id": "magnus-electron-tools",
-      "expectedProducerFingerprint": "0e97d3f437e3f14cf7242438a06f6e6f51f66b693bc1e15d11ef193699ebc275",
+      "expectedProducerFingerprint": "a9c7206ff6ce98b6da8dbece7143cd5bdf7217060092f853bc2de5439e681186",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 150000,
       "timeoutMs": 300000,
       "artifacts": [
@@ -253,9 +297,9 @@
     },
     {
       "id": "magnus-tauri-tools",
-      "expectedProducerFingerprint": "1ef0737c14d8926b8e1f59cbc751549c29a99d424efab84fa4596d51201eaa30",
+      "expectedProducerFingerprint": "939b1774af475331a017e1937deb7ba98979f9efe4ce43dbe051921888b13997",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 240000,
       "timeoutMs": 420000,
       "artifacts": [
@@ -273,7 +317,7 @@
       "id": "hybrid-web-smoke",
       "expectedProducerFingerprint": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 60000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -288,9 +332,9 @@
     },
     {
       "id": "privacy",
-      "expectedProducerFingerprint": "ca714c98c86fe4a7c5f9d7e19563fd6a5d5b7f1b05d6b09a6e4625af0ea36d51",
+      "expectedProducerFingerprint": "ecaa6248952ba203786f2a588d60e6cf37fff5249a6da4642ed23aaf6207e354",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -304,9 +348,9 @@
     },
     {
       "id": "load-quit",
-      "expectedProducerFingerprint": "de2e57205a31f1eefb5a6c8344f30987e512047177c27d2e2c7f5a4d45f2ffbe",
+      "expectedProducerFingerprint": "76af148e70c5c359cc9f2132f1e33ed43ebd4946893d0d746dded017dbcb54e6",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -327,9 +371,9 @@
     },
     {
       "id": "lifecycle-cycles",
-      "expectedProducerFingerprint": "cba95e5f9c4212b454e01f53a5791752ee1e0bef0188aeffb17f603fa20a1802",
+      "expectedProducerFingerprint": "4a0e12d39c485d7955b390fb39b1863e4d89d1b7157eefe2979b162bc867df8e",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 90000,
       "timeoutMs": 1500000,
       "artifacts": [
@@ -345,9 +389,9 @@
     },
     {
       "id": "electron-restart-soak",
-      "expectedProducerFingerprint": "bcf546308b30cbdaafc213feef82ed937cdbc6c7256797189fc20f9379a5f46f",
+      "expectedProducerFingerprint": "f75a18fd45a5dacae1a14d42f1c8b813a295d3c8b7250694922bd015bff8782d",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 900000,
       "timeoutMs": 5400000,
       "artifacts": [
@@ -361,9 +405,9 @@
     },
     {
       "id": "tauri-restart-soak",
-      "expectedProducerFingerprint": "ec4400d2b6c3539d03615bee2ed371ba83a92bf6a38b9e15574ef6706f9ab77f",
+      "expectedProducerFingerprint": "46e189970a5d177d7e9e37c5e595b8a1fe061b5e2a1811627067f2bbb9510a7c",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 240000,
       "timeoutMs": 3600000,
       "artifacts": [
@@ -377,9 +421,9 @@
     },
     {
       "id": "idle-soak",
-      "expectedProducerFingerprint": "f3b6d7214def80663def2c75a6a2edc2520fd14d86ee6cbdff3d9fc573f18e17",
+      "expectedProducerFingerprint": "fabcb77ee7fc8e1e690c2743c427b924daaa0974a51f4707a9beb1a19cf4ed46",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 900000,
       "timeoutMs": 1140000,
       "artifacts": [
@@ -393,9 +437,9 @@
     },
     {
       "id": "active-soak",
-      "expectedProducerFingerprint": "383c59a3935da46a71b4a16bc88ba85e4471150499113afcbfac514b85af2b20",
+      "expectedProducerFingerprint": "fc94080b269499972cf2007b95dd8bbdc06057b8e1f7930e78e6998c48ba9db8",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 720000,
       "timeoutMs": 960000,
       "artifacts": [
@@ -414,9 +458,9 @@
     },
     {
       "id": "assurance",
-      "expectedProducerFingerprint": "a78c7361b51b570f988d245cc7d58e031f56914da3ddb8dd3521c9879dc4feb1",
+      "expectedProducerFingerprint": "577e994e4d3f0d7bf627ccef513750f57a5398081d5f1507f84ffe56e2ef485d",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity)",
       "estimatedDurationMs": 480000,
       "timeoutMs": 480000,
       "artifacts": [
