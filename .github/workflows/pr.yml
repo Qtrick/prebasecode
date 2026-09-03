@@ -4,6 +4,7 @@ on:
   pull_request:
   push:
     branches: [main]
+  workflow_dispatch:
 
 jobs:
   prebase-assurance:
@@ -35,7 +36,7 @@ jobs:
   magnus-live-activity-macos:
     name: Magnus Live Activity (macOS AppKit)
     runs-on: macos-14
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - uses: actions/checkout@v4
 
@@ -43,16 +44,16 @@ jobs:
         with:
           node-version-file: .nvmrc
 
-      - name: Install node-gyp
-        run: npm install -g node-gyp
+      - name: Install node-gyp + node-addon-api (binding.gyp include path)
+        run: |
+          npm install -g node-gyp
+          npm install --no-save --ignore-scripts node-addon-api@8.3.1
 
       - name: Compile AppKit Live Activity addon
         run: node native/prebase-live-activity/build.mjs
 
       - name: Static + state product-truth contracts
-        run: |
-          node --test test/prebase/acceptance/magnus-live-activity-state.test.mjs
-          node test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs
+        run: npm run test:live-activity-contracts
 
       - name: Native napi perf / presentation product-truth
         run: node test/prebase/acceptance/prebase-live-activity-perf.mjs

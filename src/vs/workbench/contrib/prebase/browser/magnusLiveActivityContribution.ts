@@ -273,6 +273,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		panelStateSource?: 'renderer-projection';
 		screenLocked?: boolean;
 		userDismissedAttention?: boolean;
+		prebaseForeground?: boolean;
 	} = { backend: isMacintosh && !isWeb ? 'unavailable' : 'non-mac', revision: 0 };
 
 	private readonly _main: IMagnusLiveActivityMainService | undefined;
@@ -473,6 +474,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			panelStateSource: 'renderer-projection',
 			screenLocked: Boolean(snapshot.screenLocked),
 			userDismissedAttention: this._userDismissedAttention,
+			prebaseForeground: Boolean(snapshot.prebaseForeground),
 		};
 		const reducedMotion = this.accessibilityService.isMotionReduced()
 			|| Boolean(this.configurationService.getValue<boolean>('prebase.graph.reduceMotion'));

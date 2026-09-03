@@ -53,7 +53,9 @@ export function liveActivityLiveFailures(evidence) {
 			failures.push(`expected active Magnus Live Activity status after smoke prompt, got ${status}`);
 		}
 	}
-	if (evidence.blurredDiagnostics && evidence.mode === 'alwaysWorking' && evidence.diagnosticsAfterOpen?.sessionId) {
+	if (evidence.blurredDiagnostics === undefined || evidence.blurredDiagnostics === null) {
+		failures.push('blur diagnostics missing (alwaysWorking visibility after blur must be proven)');
+	} else if (evidence.mode === 'alwaysWorking' && evidence.diagnosticsAfterOpen?.sessionId) {
 		// alwaysWorking must keep the panel visible while a session is active after blur.
 		// Do not OR with a stale "active-looking" status string — that greenwashes visibility loss.
 		if (evidence.blurredDiagnostics.visible !== true) {
@@ -61,6 +63,9 @@ export function liveActivityLiveFailures(evidence) {
 		}
 		if (!['working', 'waiting', 'completed', 'attention', 'failed'].includes(evidence.blurredDiagnostics.status)) {
 			failures.push(`Live Activity lost session status after blur in alwaysWorking mode (got ${evidence.blurredDiagnostics.status})`);
+		}
+		if (evidence.blurredDiagnostics.prebaseForeground === true) {
+			failures.push('blur diagnostics still report prebaseForeground=true (window blur was not proven)');
 		}
 	}
 	if (!evidence.nativeDiagnostics) {
@@ -78,13 +83,19 @@ export function liveActivityLiveFailures(evidence) {
 		}
 		failures.push(...notchPlacementFailures(evidence.nativeDiagnostics));
 	}
-	if (evidence.followUpSimulation && !evidence.followUpSimulation.ok) {
+	if (!evidence.followUpSimulation) {
+		failures.push('native follow-up simulation missing');
+	} else if (!evidence.followUpSimulation.ok) {
 		failures.push('native follow-up message simulation failed');
 	}
-	if (evidence.questionContinuity && !evidence.questionContinuity.ok) {
+	if (!evidence.questionContinuity) {
+		failures.push('question continuity missing');
+	} else if (!evidence.questionContinuity.ok) {
 		failures.push(`question continuity failed: ${evidence.questionContinuity.reason ?? 'unknown'}`);
 	}
-	if (evidence.approvalContinuity && !evidence.approvalContinuity.ok) {
+	if (!evidence.approvalContinuity) {
+		failures.push('approval continuity missing');
+	} else if (!evidence.approvalContinuity.ok) {
 		failures.push(`approval continuity failed: ${evidence.approvalContinuity.reason ?? 'unknown'}`);
 	}
 	// Product-truth scenarios are required on darwin — panel frame alone is not CURRENT_GREEN.
@@ -363,6 +374,13 @@ async function run() {
 			interactionId: approvalSeed?.interactionId,
 		};
 
+		// Follow-up requires Interactive input — run before sticky Escape product-truth.
+		const followUpClick = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'click').catch(() => false);
+		const followUpSim = followUpClick
+			? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'followUp', 'follow-up from native activity').catch(() => false)
+			: false;
+		evidence.followUpSimulation = { ok: Boolean(followUpSim), clickOk: Boolean(followUpClick) };
+
 		// Product-truth: attention peek body → Escape sticky compact → peek refused.
 		const truthSeed = await workbenchCommandWithTimeout(launched.page, 15_000, 'prebase.test.seedMagnusLiveActivityPending', { kind: 'question' }).catch(() => ({ ok: false }));
 		let truthPending = Boolean(truthSeed?.ok);
@@ -413,10 +431,6 @@ async function run() {
 			afterPeekRefusePresentation: afterPeekRefuse?.activePresentationState,
 		};
 
-		// Test native follow-up message simulation through native text field (after pending interactions)
-		const followUpSim = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'followUp', 'follow-up from native activity').catch(() => false);
-		evidence.followUpSimulation = { ok: Boolean(followUpSim) };
-
 		// Capture native NSPanel screenshot using native panel bounds
 		const screenshotFile = join(screenshotDir, 'magnus-live-activity-native.png');
 		evidence.nativeScreenshot = captureNativePanelScreenshot(
@@ -425,11 +439,20 @@ async function run() {
 			screenshotFile,
 		);
 
-		await launched.page.evaluate(() => {
-			window.dispatchEvent(new Event('blur'));
-		}).catch(() => undefined);
-		await new Promise(r => setTimeout(r, 800));
-		evidence.blurredDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+		// Steal window focus so IHostService.hasFocus / prebaseForeground flips false.
+		let focusThief;
+		try {
+			focusThief = await launched.browser.newPage();
+			await focusThief.goto('about:blank');
+			await focusThief.bringToFront();
+			await new Promise(r => setTimeout(r, 900));
+			// Republish so Live Activity diagnostics reflect the new focus state.
+			await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+			await new Promise(r => setTimeout(r, 400));
+			evidence.blurredDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
+		} finally {
+			await focusThief?.close().catch(() => undefined);
+		}
 
 		evidence.workbenchDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
 	} catch (error) {

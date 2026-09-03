@@ -2207,6 +2207,10 @@ test('liveActivityLiveFailures validates factual native diagnostics and handles 
 			panelFrame: { x: 100, y: 1000, width: 300, height: 34 },
 		},
 		followUpSimulation: { ok: true },
+		questionContinuity: { ok: true },
+		approvalContinuity: { ok: true },
+		mode: 'alwaysWorking',
+		blurredDiagnostics: { visible: true, status: 'working', prebaseForeground: false },
 		nativeScreenshot: { captured: true },
 		quit: { remaining: 'gone' },
 		productTruth: {
@@ -2220,6 +2224,9 @@ test('liveActivityLiveFailures validates factual native diagnostics and handles 
 
 	const missingTruth = { ...validDarwin, productTruth: undefined };
 	assert.ok(liveActivityLiveFailures(missingTruth).some(f => /product-truth scenarios missing/.test(f)));
+
+	const missingContinuity = { ...validDarwin, questionContinuity: undefined };
+	assert.ok(liveActivityLiveFailures(missingContinuity).some(f => /question continuity missing/.test(f)));
 
 	const weakSticky = {
 		...validDarwin,
@@ -2236,14 +2243,21 @@ test('liveActivityLiveFailures validates factual native diagnostics and handles 
 	const blurInvisible = {
 		...validDarwin,
 		mode: 'alwaysWorking',
-		blurredDiagnostics: { visible: false, status: 'working' },
+		blurredDiagnostics: { visible: false, status: 'working', prebaseForeground: false },
 	};
 	assert.ok(liveActivityLiveFailures(blurInvisible).some(f => /remain visible after blur/.test(f)));
+
+	const blurStillFocused = {
+		...validDarwin,
+		mode: 'alwaysWorking',
+		blurredDiagnostics: { visible: true, status: 'working', prebaseForeground: true },
+	};
+	assert.ok(liveActivityLiveFailures(blurStillFocused).some(f => /prebaseForeground=true/.test(f)));
 
 	const blurVisible = {
 		...validDarwin,
 		mode: 'alwaysWorking',
-		blurredDiagnostics: { visible: true, status: 'working' },
+		blurredDiagnostics: { visible: true, status: 'working', prebaseForeground: false },
 	};
 	assert.deepEqual(liveActivityLiveFailures(blurVisible), []);
 });
