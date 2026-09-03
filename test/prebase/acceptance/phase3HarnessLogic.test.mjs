@@ -396,6 +396,8 @@ test('Magnus stream live path installs smoke transport then asks the chat partic
 	assert.match(source, /completes > completesBeforeSecond/);
 	assert.match(source, /UI_STREAM_CHUNK_MARKER/);
 	assert.match(source, /readChatText\(launched\.page\)/);
+	assert.match(source, /@Agent prebase-smoke-stream/);
+	assert.match(source, /interactive-session/);
 	assert.match(source, /chunks >= 4 && evidence\.uiTextAt/);
 	assert.match(source, /uiSample must be DOM chat text/);
 	assert.doesNotMatch(source, /magnusStreamActive > 0 \|\| \/Smoke stream chunk/);

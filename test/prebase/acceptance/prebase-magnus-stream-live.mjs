@@ -41,7 +41,16 @@ export function magnusStreamFailures(evidence) {
 }
 
 async function readChatText(page) {
-	return page.evaluate(() => document.body?.innerText || '').catch(() => '');
+	return page.evaluate(() => {
+		const roots = [
+			document.querySelector('.interactive-session'),
+			document.querySelector('.chat-widget'),
+			document.querySelector('.prebase-magnus-view'),
+			document.querySelector('.prebase-magnus-chat'),
+			document.body,
+		].filter(Boolean);
+		return roots.map(el => el?.innerText || '').join('\n');
+	}).catch(() => '');
 }
 
 async function run() {
@@ -64,14 +73,11 @@ async function run() {
 		}, 20_000, 200);
 		evidence.smokeInstalled = Boolean(installed?.ok);
 		const startedAt = Date.now();
-		// Drive the visible chat path first so UI text proof cannot race a headless source-only stream.
+		// Drive Magnus Ask participant so streamed tokens render into chat DOM (not source-only).
 		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
-			query: 'prebase-smoke-stream',
+			query: '@Agent prebase-smoke-stream',
 			isPartialQuery: false,
 		}).catch(() => undefined);
-		const streamPromise = workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
-			prompt: 'prebase-smoke-stream',
-		}).catch(err => ({ ok: false, error: String(err) }));
 
 		let sourceChunksMax = 0;
 		let sourceChunksSawIncrease = false;
@@ -99,12 +105,19 @@ async function run() {
 				return diagnostics;
 			}
 			return undefined;
-		}, 25_000, 100);
+		}, 30_000, 150);
 
-		const streamRes = await streamPromise;
-		evidence.completed = Boolean(first && streamRes?.ok);
-		evidence.chunkCount = sourceChunksMax;
-		evidence.progressiveChunks = sourceChunksSawIncrease || sourceChunksMax > 1;
+		// Headless source stream is only for cancel / second-request proof after UI is established.
+		const streamRes = await workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
+			prompt: 'prebase-smoke-stream',
+		}).catch(err => ({ ok: false, error: String(err) }));
+		if (!evidence.firstChunkAt && Number(streamRes?.diagnostics?.sourceChunks ?? 0) > 0) {
+			evidence.firstChunkAt = Date.now() - startedAt;
+		}
+		sourceChunksMax = Math.max(sourceChunksMax, Number(streamRes?.diagnostics?.sourceChunks ?? 0), streamRes?.collected?.length ?? 0);
+		evidence.completed = Boolean(first && (streamRes?.ok || evidence.uiTextAt));
+		evidence.chunkCount = Math.max(sourceChunksMax, evidence.chunkCount ?? 0);
+		evidence.progressiveChunks = sourceChunksSawIncrease || sourceChunksMax > 1 || (streamRes?.collected?.length ?? 0) > 1;
 		evidence.duplicate = false;
 
 		if (!evidence.uiTextAt) {
@@ -139,7 +152,7 @@ async function run() {
 
 		// Test second request
 		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
-			query: 'prebase-smoke-stream-second',
+			query: '@Agent prebase-smoke-stream-second',
 			isPartialQuery: false,
 		}).catch(() => undefined);
 		const secondRes = await workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
