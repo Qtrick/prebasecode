@@ -2165,6 +2165,8 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.doesNotMatch(attentionBlock, /performUserHaptic/);
 		assert.match(attentionBlock, /didAttentionHaptic = NO/);
 		assert.match(native, /userDismissedAttention/, 'Escape/collapse must sticky-dismiss attention peek across snapshot republish');
+		assert.match(native, /dict\[@"userDismissedAttention"\]/, 'diagnostics must expose sticky Escape for AppKit product-truth proof');
+		assert.match(native, /attentionCompact/, 'activePresentationState must name sticky Escape compact attention');
 	});
 
 	test('native tracking model removes global mouse monitor when expanded to maximize resource efficiency', () => {
