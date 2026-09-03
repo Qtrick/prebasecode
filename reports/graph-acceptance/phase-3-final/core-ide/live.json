@@ -1,16 +1,23 @@
 {
-  "ok": true,
-  "failures": [],
+  "ok": false,
+  "failures": [
+    "C2 existing profile failed",
+    "P1 PreBase setting persistence failed",
+    "P5 Magnus contribution activation was not proven",
+    "PreBase Settings web-search status live region was not proven"
+  ],
   "schemaVersion": 3,
   "scenario": "core-ide",
-  "sourceHead": "2b34fc53c0701417b7a557489fa221d4ade0a863",
-  "sourceFingerprint": "ccc0ea30c4b2a91a1700d576fe100589229c9180a4370be441896742ad6cb140",
-  "productFingerprint": "ccc0ea30c4b2a91a1700d576fe100589229c9180a4370be441896742ad6cb140",
-  "generatedAt": "2026-09-03T03:15:36.883Z",
+  "sourceHead": "93a2aecd2af07779c88f9f58757fe254babe8b3e",
+  "sourceFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
+  "productFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
+  "generatedAt": "2026-09-03T05:31:57.621Z",
   "producerId": "core-ide",
-  "producerFingerprint": "eb16c17b9ded217ab69d0b4a5d472202ccc88378a3ced2bde0b41cba8ad9c34b",
-  "prebasePid": 54744,
+  "producerFingerprint": "3544be4374353f280098152b6427d60dedbfc6872d4f82ec5b0dcaf6ba995aec",
+  "prebasePid": 54372,
+  "c1_freshProfile": true,
   "c3_folderOpen": true,
+  "c3_workspaceIdentity": true,
   "p2": {
     "offlineChoicePresented": true,
     "offlineChoiceActivated": true,
@@ -35,10 +42,36 @@
   "e4_terminal": true,
   "e5_debug": true,
   "e6_typescript": true,
+  "e6_detail": {
+    "suggestSeen": true,
+    "langOk": true,
+    "hasTsDiagnostic": true,
+    "markerCount": 5,
+    "completionProven": true
+  },
   "c5_reload": true,
   "p1_settings": true,
+  "p1_settingsPersisted": false,
+  "p1_detail": {
+    "beforeSetting": null,
+    "afterSetting": null,
+    "settingChanged": false
+  },
   "p4_runtime": true,
   "p5_magnus": true,
+  "p5_magnusActivated": false,
+  "p5_detail": {
+    "magnusVisible": true,
+    "streamKeys": [
+      "streamActive",
+      "pacingActive",
+      "sourceChunks",
+      "sourceCancelled",
+      "smokeEnabled"
+    ]
+  },
+  "c2_existingProfile": false,
+  "c4_crashRecovery": true,
   "codeGraph": {
     "opened": true,
     "frameFound": true,
@@ -49,36 +82,36 @@
       "selectedNodeId": "file:README.md",
       "networkLayoutMode": "organic",
       "networkIdleAutoRotate": true,
-      "viewportWidth": 792,
-      "viewportHeight": 546,
+      "viewportWidth": 796,
+      "viewportHeight": 570,
       "projectedBounds": {
-        "minX": 362.5929816029136,
-        "minY": 133.38280874311675,
-        "maxX": 538.386446562231,
-        "maxY": 439.54805332758383,
-        "width": 175.79346495931736,
-        "height": 306.1652445844671
+        "minX": 356.7735314680323,
+        "minY": 135.48017018423536,
+        "maxX": 546.8191074098689,
+        "maxY": 460.8809237334866,
+        "width": 190.04557594183666,
+        "height": 325.40075354925125
       },
-      "screenUtilization": 0.12446315072802278,
+      "screenUtilization": 0.13629765851224346,
       "labelCount": 6,
       "nodeHits": [
         {
           "id": "file:README.md",
-          "x": 362.5929816029136,
-          "y": 352.0976051648679,
-          "worldX": -91.37444854924811,
-          "worldY": 48.33986789364344,
-          "worldZ": -7.509334694054482,
+          "x": 356.7735314680323,
+          "y": 366.1216420007297,
+          "worldX": -93.83244308651395,
+          "worldY": 46.82261421627653,
+          "worldZ": -7.263069447098744,
           "world": {
-            "x": -91.37444854924811,
-            "y": 48.33986789364344,
-            "z": -7.509334694054482
+            "x": -93.83244308651395,
+            "y": 46.82261421627653,
+            "z": -7.263069447098744
           }
         },
         {
           "id": "file:src/debug.js",
-          "x": 533.5866079986874,
-          "y": 133.38280874311675,
+          "x": 541.7177045982088,
+          "y": 135.48017018423536,
           "worldX": 41.622495540417106,
           "worldY": -140.69137522343382,
           "worldZ": -0.5412223341361161,
@@ -90,8 +123,8 @@
         },
         {
           "id": "file:src/errors.ts",
-          "x": 526.1361234459561,
-          "y": 368.11498982057617,
+          "x": 533.799139834325,
+          "y": 384.95992196601026,
           "worldX": 44.1202690543295,
           "worldY": 57.88613070951509,
           "worldZ": -17.976002656219446,
@@ -103,8 +136,8 @@
         },
         {
           "id": "file:src/hello.ts",
-          "x": 459.11986559541333,
-          "y": 318.3349010459958,
+          "x": 462.57243735455074,
+          "y": 332.0522876325782,
           "worldX": -11.219001812948424,
           "worldY": 26.348278961622707,
           "worldZ": 10.123983948182932,
@@ -116,8 +149,8 @@
         },
         {
           "id": "file:src/js-check.js",
-          "x": 481.87385858143915,
-          "y": 439.54805332758383,
+          "x": 486.7560082599364,
+          "y": 460.8809237334866,
           "worldX": 10.956983311472797,
           "worldY": 147.6962237097981,
           "worldZ": 4.479140089132048,
@@ -129,8 +162,8 @@
         },
         {
           "id": "file:tsconfig.json",
-          "x": 538.386446562231,
-          "y": 162.9284906788287,
+          "x": 546.8191074098689,
+          "y": 166.8821248805051,
           "worldX": 47.47477650877518,
           "worldY": -113.9122022551078,
           "worldZ": 7.2575398618318046,
@@ -176,7 +209,7 @@
       "query": "PreBase Light",
       "settingsId": "PreBase Light",
       "applied": false,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe vs-dark vscode-theme-defaults-themes-prebase_dark-json",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center vs-dark vscode-theme-defaults-themes-prebase_dark-json",
       "colorTheme": "PreBase Light",
       "colorThemeType": "light",
       "pickerVisible": true,
@@ -186,7 +219,7 @@
       "query": "Default High Contrast",
       "settingsId": "Default High Contrast",
       "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe hc-black vscode-theme-defaults-themes-hc_black-json border",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-black vscode-theme-defaults-themes-hc_black-json",
       "colorTheme": "Default High Contrast",
       "colorThemeType": "hcDark",
       "pickerVisible": true,
@@ -196,7 +229,7 @@
       "query": "Default High Contrast Light",
       "settingsId": "Default High Contrast Light",
       "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe border hc-light vscode-theme-defaults-themes-hc_light-json",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
       "colorTheme": "Default High Contrast Light",
       "colorThemeType": "hcLight",
       "pickerVisible": true,
@@ -205,8 +238,8 @@
     "dark": {
       "query": "PreBase Dark",
       "settingsId": "PreBase Dark",
-      "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe vs-dark vscode-theme-defaults-themes-prebase_dark-json",
+      "applied": false,
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
       "colorTheme": "PreBase Dark",
       "colorThemeType": "dark",
       "pickerVisible": true,
@@ -226,11 +259,11 @@
     "zoom200": true,
     "beforeZoom": {
       "zoomLevel": 0,
-      "innerWidth": 1440
+      "innerWidth": 1444
     },
     "afterZoom": {
       "zoomLevel": 4,
-      "innerWidth": 1440
+      "innerWidth": 1444
     },
     "screenReaderAuto": "auto",
     "screenReaderOn": "on",
@@ -238,15 +271,22 @@
     "graphCanvasRole": "region",
     "mapsAriaExpanded": true,
     "mapsLayoutGroup": true,
-    "settingsStatusRole": "status",
+    "settingsStatusRole": "",
     "settingsStatusClaimsAvailable": false,
     "prebaseForcesAccessibilityOff": false
   },
+  "c4_detail": {
+    "oldPid": 54372,
+    "newPid": 55303,
+    "recoveredWorkbench": true,
+    "recoveredFile": true,
+    "profile": "/tmp/pb-phase3-profile-3eikf4"
+  },
   "quit": {
-    "before": "54744     1  14.4 219008 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "55303       1 50.5 287904 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 841,
+    "latencyMs": 353,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

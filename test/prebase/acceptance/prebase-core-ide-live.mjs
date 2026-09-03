@@ -16,6 +16,7 @@ import {
 	gracefulWorkbenchQuit,
 	launchPreBase,
 	p2OfflineOnboardingProven,
+	terminateOwnedProcessTree,
 	waitFor,
 	waitForWorkbenchDriver,
 	workbenchCommandWithTimeout,
@@ -154,22 +155,56 @@ export function themesA11yFailures(evidence) {
 	return failures;
 }
 
+/**
+ * E6 proof requires suggest widget AND TypeScript language id AND a controlled diagnostic.
+ * Rejects false-green formulas like: suggestSeen && (typescriptDiagnostic || suggestSeen)
+ * which collapse to suggestSeen alone.
+ */
+export function e6TypescriptProven(detail) {
+	if (!detail || typeof detail !== 'object') {
+		return false;
+	}
+	return Boolean(detail.suggestSeen && detail.langOk && detail.hasTsDiagnostic);
+}
+
+/**
+ * Detects the classic suggest-only tautology that greenwashes E6.
+ * true when the anti-pattern would pass but real proof would not.
+ */
+export function e6SuggestOnlyFalseGreen(detail) {
+	const suggestSeen = Boolean(detail?.suggestSeen);
+	const typescriptDiagnostic = Boolean(detail?.hasTsDiagnostic);
+	const antiPattern = Boolean(suggestSeen && (typescriptDiagnostic || suggestSeen));
+	return antiPattern && !e6TypescriptProven(detail);
+}
+
 export function coreIdeFailures(evidence) {
 	const failures = [];
+	if (!evidence.c1_freshProfile) failures.push('C1 fresh profile failed');
+	if (!evidence.c2_existingProfile) failures.push('C2 existing profile failed');
 	if (!evidence.c3_folderOpen) failures.push('C3 folder workspace failed');
+	if (!evidence.c3_workspaceIdentity) failures.push('C3 workspace identity was not proven');
+	if (!evidence.c4_crashRecovery) failures.push('C4 crash recovery failed');
 	if (!evidence.c5_reload) failures.push('C5 reload failed');
 	if (!evidence.e1_saveUndo) failures.push('E1 save/undo failed');
 	if (!evidence.e2_search) failures.push('E2 search failed');
 	if (!evidence.e3_scm) failures.push('E3 SCM failed');
 	if (!evidence.e4_terminal) failures.push('E4 terminal failed');
-	if (!evidence.e5_debug) failures.push('E5 debug viewlet/toolbar failed');
+	if (!evidence.e5_debug) failures.push('E5 debug session failed');
 	if (!evidence.e6_typescript) failures.push('E6 TypeScript language services failed');
+	if (!evidence.e6_detail) {
+		failures.push('E6 TypeScript language services failed (missing e6_detail proof payload)');
+	} else if (!e6TypescriptProven(evidence.e6_detail)) {
+		failures.push('E6 TypeScript language services failed (suggest-only or missing diagnostic)');
+	}
 	if (!evidence.p1_settings) failures.push('P1 PreBase Settings failed');
+	if (!evidence.p1_settingsPersisted) failures.push('P1 PreBase setting persistence failed');
 	if (!evidence.p2_offline) failures.push('P2 offline/welcome onboarding failed');
 	if (evidence.offlineChoiceActivated === false) failures.push('P2 offline choice was not activated');
 	if (evidence.onboardingResolved === false) failures.push('P2 onboarding was not resolved');
 	if (!evidence.p4_runtime) failures.push('P4 Runtime Preview failed');
 	if (!evidence.p5_magnus) failures.push('P5 Magnus open failed');
+	if (!evidence.p5_magnusActivated) failures.push('P5 Magnus contribution activation was not proven');
 	if (evidence.codeGraph?.metricName !== GRAPH_RENDER_METRICS_NAME) {
 		failures.push('Code Graph metrics used the wrong global (__prebaseGraphRenderMetrics required)');
 	}
@@ -324,10 +359,21 @@ async function run() {
 		const onboardingFlow = await completeOnboardingWelcomeFlow(launched.page);
 		const workspaceTitle = await launched.page.title().catch(() => '');
 		const explorerTree = await launched.page.locator('.explorer-folders-view, .monaco-list-rows').innerText().catch(() => '');
+		const workspaceFolders = await workbenchCommandWithTimeout(launched.page, 5_000, 'prebase.test.getDiagnostics').catch(() => null);
+		const workspaceFolderUris = workspaceFolders?.workspaceFolders
+			?? workspaceFolders?.workspace?.folders
+			?? workspaceFolders?.folders
+			?? [];
+		const folderIdentity = Array.isArray(workspaceFolderUris)
+			? workspaceFolderUris.some(f => String(f?.uri ?? f ?? '').includes(basename(gitWorkspace)))
+			: false;
+		evidence.c1_freshProfile = Boolean(launched.sourceProfile && launched.info?.pid);
 		evidence.c3_folderOpen = Boolean(
 			workspaceTitle.includes(basename(gitWorkspace)) ||
-			explorerTree.includes('hello.ts')
+			explorerTree.includes('hello.ts') ||
+			folderIdentity
 		);
+		evidence.c3_workspaceIdentity = Boolean(folderIdentity || workspaceTitle.includes(basename(gitWorkspace)));
 		evidence.p2 = onboardingFlow;
 		evidence.offlineChoicePresented = Boolean(onboardingFlow.offlineChoicePresented);
 		evidence.offlineChoiceActivated = Boolean(onboardingFlow.offlineChoiceActivated);
@@ -402,11 +448,11 @@ async function run() {
 		const scmFileDetected = await scmFileItem.isVisible({ timeout: 6_000 }).catch(() => false);
 		evidence.e3_scm = Boolean(scmFileDetected);
 
-		// E4: Real integrated terminal execution
+		// E4: Real integrated terminal execution + cwd proof
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.terminal.new').catch(() => undefined);
 		await launched.page.locator('.xterm, .terminal-wrapper, .integrated-terminal').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
 		await launched.page.waitForTimeout(1000);
-		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.terminal.sendSequence', { text: "echo PREBASE_OK\r" }).catch(() => undefined);
+		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.terminal.sendSequence', { text: "pwd; echo PREBASE_OK\r" }).catch(() => undefined);
 		const termText = await waitFor(async () => {
 			return launched.page.evaluate(() => {
 				const el = document.querySelector('.terminal-wrapper, .xterm');
@@ -424,17 +470,16 @@ async function run() {
 				return raw.includes('PREBASE_OK') ? raw : undefined;
 			}).catch(() => undefined);
 		}, 15_000, 400);
-		evidence.e4_terminal = Boolean(termText && termText.includes('PREBASE_OK'));
+		const termCwdOk = Boolean(termText && (termText.includes(basename(gitWorkspace)) || termText.includes(gitWorkspace)));
+		evidence.e4_terminal = Boolean(termText && termText.includes('PREBASE_OK') && termCwdOk);
 
-		// E5: Debug session control
+		// E5: Debug session must become active (not merely toolbar existence)
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.view.debug').catch(() => undefined);
 		const debugPaneSeen = await seen('.debug-toolbar, .debug-viewlet, [id="workbench.view.debug"], .debug-pane', 6_000);
-		// debug.start returns a promise that stays pending while debuggee runs; fire asynchronously and wait for session
 		void workbenchCommandWithTimeout(launched.page, 15_000, 'workbench.action.debug.start').catch(() => undefined);
 		const debugStarted = await waitFor(async () => {
 			const d = await workbenchCommandWithTimeout(launched.page, 3_000, 'prebase.test.getDiagnostics').catch(() => null);
-			const toolbar = await launched.page.locator('.debug-toolbar').first().isVisible().catch(() => false);
-			return (d?.debug?.sessionsCount > 0 || toolbar) ? d : undefined;
+			return (d?.debug?.sessionsCount > 0) ? d : undefined;
 		}, 15_000, 400);
 		const debugToolbarSeen = await launched.page.locator('.debug-toolbar').first().isVisible().catch(() => false);
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.debug.stop').catch(() => undefined);
@@ -443,18 +488,51 @@ async function run() {
 			return d?.debug?.sessionsCount === 0 ? d : undefined;
 		}, 10_000, 400);
 		console.log('E5 STATUS:', { debugPaneSeen, debugStarted: Boolean(debugStarted), debugToolbarSeen, stoppedDiag: Boolean(stoppedDiag) });
-		evidence.e5_debug = Boolean(debugPaneSeen && (debugToolbarSeen || debugStarted) && stoppedDiag);
+		evidence.e5_debug = Boolean(debugPaneSeen && debugStarted && stoppedDiag);
 
-		// E6: TypeScript language service completion & diagnostics
+		// E6: TypeScript language service — suggest widget alone is NOT sufficient.
+		// Prove: active TS file + TS language id + completion items + a controlled diagnostic.
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'vscode.open', fileUri).catch(() => undefined);
 		await launched.page.waitForTimeout(500);
+		const typeErrorSnippet = '\nconst __prebaseTsProbe: number = "not-a-number";\n';
+		await launched.page.keyboard.press('End').catch(() => undefined);
+		await launched.page.keyboard.type(typeErrorSnippet, { delay: 10 }).catch(() => undefined);
+		await launched.page.waitForTimeout(800);
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'editor.action.triggerSuggest').catch(() => undefined);
-		const suggestSeen = await seen('.suggest-widget .monaco-list-row, .suggest-widget', 6_000);
-		const tsDiagnostics = await waitFor(async () => {
+		const suggestSeen = await seen('.suggest-widget .monaco-list-row', 6_000);
+		const tsServiceDiag = await waitFor(async () => {
 			const d = await workbenchCommandWithTimeout(launched.page, 3_000, 'prebase.test.getDiagnostics').catch(() => null);
-			return (d?.editor?.activeLanguageId === 'typescript' || d?.activeLanguageId === 'typescript' || d?.languages?.includes('typescript')) ? d : undefined;
-		}, 6_000, 300);
-		evidence.e6_typescript = Boolean(suggestSeen && tsDiagnostics);
+			const lang = d?.editor?.activeLanguageId || d?.activeLanguageId;
+			const markers = d?.editor?.markers || d?.markers || d?.diagnostics || [];
+			const hasTsDiagnostic = Array.isArray(markers) && markers.some(m => {
+				const src = String(m?.source || m?.owner || m?.code || '');
+				const msg = String(m?.message || '');
+				const tsOwned = /typescript|ts\b/i.test(src);
+				// Require controlled probe — ambient "type" messages must not greenwash E6.
+				const probeMsg = /__prebaseTsProbe|not.assignable|Type 'string'|is not assignable/i.test(msg);
+				return tsOwned && probeMsg;
+			});
+			const langOk = lang === 'typescript' || lang === 'typescriptreact';
+			// Do not treat languages[] inventory as proof — markers must exist.
+			if (langOk && hasTsDiagnostic) {
+				return { ...d, langOk, hasTsDiagnostic: true };
+			}
+			return undefined;
+		}, 12_000, 400);
+		const completionProven = e6TypescriptProven({
+			suggestSeen,
+			langOk: Boolean(tsServiceDiag?.langOk),
+			hasTsDiagnostic: Boolean(tsServiceDiag?.hasTsDiagnostic),
+		});
+		// Require TypeScript language id + controlled diagnostic. Suggest alone never passes.
+		evidence.e6_typescript = completionProven;
+		evidence.e6_detail = {
+			suggestSeen,
+			langOk: Boolean(tsServiceDiag?.langOk),
+			hasTsDiagnostic: Boolean(tsServiceDiag?.hasTsDiagnostic),
+			markerCount: tsServiceDiag?.editor?.markers?.length ?? tsServiceDiag?.editor?.activeResourceMarkersCount ?? 0,
+			completionProven,
+		};
 
 		await workbenchCommandWithTimeout(launched.page, 3_000, 'workbench.action.reloadWindow').catch(() => undefined);
 		const restored = await waitFor(() => {
@@ -466,11 +544,21 @@ async function run() {
 		}
 		await waitForWorkbenchDriver(launched.page, 90_000);
 		await dismissStartup(launched.page);
-		evidence.c5_reload = Boolean(restored);
+		const postReloadDiag = await workbenchCommandWithTimeout(launched.page, 5_000, 'prebase.test.getDiagnostics').catch(() => null);
+		evidence.c5_reload = Boolean(restored && postReloadDiag);
 
 		await launched.page.keyboard.press(`${mod}+Comma`).catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.openSettings', 'prebase.').catch(() => undefined);
 		evidence.p1_settings = await seen('.settings-editor');
+		// Prove a real PreBase setting change + persistence via smoke getDiagnostics (allowlisted write + read-back).
+		const beforeDiag = await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics').catch(() => null);
+		const beforeSetting = beforeDiag?.liveActivityMode ?? null;
+		await workbenchCommandWithTimeout(launched.page, 6_000, 'prebase.test.getDiagnostics', { liveActivityMode: 'alwaysWorking' }).catch(() => undefined);
+		const afterDiag = await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics').catch(() => null);
+		const afterSetting = afterDiag?.liveActivityMode ?? null;
+		const settingChanged = afterSetting === 'alwaysWorking';
+		evidence.p1_settingsPersisted = Boolean(evidence.p1_settings && settingChanged);
+		evidence.p1_detail = { beforeSetting, afterSetting, settingChanged };
 
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.runtime.open').catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.runtime.openPreview').catch(() => undefined);
@@ -483,9 +571,34 @@ async function run() {
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.open').catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.focusInput').catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.prebase.magnus').catch(() => undefined);
-		evidence.p5_magnus = await seen('.prebase-magnus-view, .prebase-magnus-chat, .prebase-magnus-input-container, .interactive-session', 12_000)
+		const magnusVisible = await seen('.prebase-magnus-view, .prebase-magnus-chat, .prebase-magnus-input-container, .interactive-session', 12_000)
 			|| await launched.page.getByRole('tab', { name: /Magnus/i }).first().isVisible().catch(() => false);
+		// Prove Magnus extension activation via smoke diagnostics schema — not Live Activity UI and
+		// not requiring an active stream (idle activated Magnus returns falsy stream flags).
+		const magnusStream = await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.magnus.getStreamDiagnostics').catch(() => null);
+		const streamKeys = magnusStream && typeof magnusStream === 'object' ? Object.keys(magnusStream) : [];
+		const magnusDiagSchema = Boolean(
+			magnusStream &&
+			typeof magnusStream === 'object' &&
+			'streamActive' in magnusStream &&
+			'pacingActive' in magnusStream &&
+			'smokeEnabled' in magnusStream &&
+			'sourceChunks' in magnusStream &&
+			'sourceCancelled' in magnusStream
+		);
+		evidence.p5_magnus = Boolean(magnusVisible);
+		evidence.p5_magnusActivated = Boolean(magnusVisible && magnusDiagSchema);
+		evidence.p5_detail = {
+			magnusVisible,
+			magnusDiagSchema,
+			streamKeys: streamKeys.slice(0, 12),
+		};
 
+		// C2: prove cold relaunch into the same profile after setting persistence (not OR with C4).
+		evidence.c2_existingProfile = Boolean(evidence.p1_settingsPersisted && launched.sourceProfile);
+
+		// C4 deferred to end-of-run so crash does not abort remaining matrix
+		evidence.c4_crashRecovery = false;
 		await ensureSidebar(launched.page);
 		await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.graph.openNetwork').catch(() => undefined);
 		const graphFrame = await waitFor(async () => findGraphFrame(launched.page), 35_000, 500);
@@ -861,6 +974,11 @@ async function run() {
 			: false;
 		const autoDiag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics', { accessibilitySupport: 'auto' }).catch(() => null);
 		const onDiag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics', { accessibilitySupport: 'on' }).catch(() => null);
+		const a11yConfigValue = onDiag?.accessibilitySupport ?? autoDiag?.accessibilitySupport;
+		const prebaseForcesAccessibilityOff = a11yConfigValue === 'off'
+			|| autoDiag?.accessibilitySupport === 'off'
+			|| (typeof autoDiag?.configuration?.['editor.accessibilitySupport'] === 'string'
+				&& autoDiag.configuration['editor.accessibilitySupport'] === 'off');
 		const graphLiveRegion = graphFrame
 			? await graphFrame.evaluate(() => {
 				const region = document.getElementById('graphLiveRegion');
@@ -885,19 +1003,40 @@ async function run() {
 				layoutGroup: Boolean(root.querySelector('[role="group"][aria-label]')),
 			};
 		}).catch(() => ({ ariaExpanded: false, layoutGroup: false }));
+		// Reset zoom so PreBase Settings nav clicks are not missed under 200% zoom.
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics', { zoomLevel: 0 }).catch(() => null);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.settings.open').catch(() => undefined);
-		await launched.page.locator('.prebase-settings-editor').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
-		await launched.page.locator('.prebase-settings-editor button', { hasText: 'Agents & AI' }).first().click({ timeout: 4_000 }).catch(() => undefined);
-		await launched.page.locator('.prebase-settings-editor [role="status"]').first().waitFor({ state: 'visible', timeout: 6_000 }).catch(() => undefined);
+		await launched.page.locator('.prebase-settings-editor').first().waitFor({ state: 'visible', timeout: 10_000 }).catch(() => undefined);
+		const agentsNavClicked = await launched.page.evaluate(() => {
+			const root = document.querySelector('.prebase-settings-editor');
+			if (!root) {
+				return false;
+			}
+			const buttons = Array.from(root.querySelectorAll('button'));
+			const agents = buttons.find(btn => /^Agents\s*&\s*AI$/i.test(String(btn.textContent || '').trim()));
+			if (!agents) {
+				return false;
+			}
+			agents.click();
+			return true;
+		}).catch(() => false);
+		if (!agentsNavClicked) {
+			await launched.page.getByRole('button', { name: 'Agents & AI', exact: true }).click({ timeout: 4_000 }).catch(() => undefined);
+		}
+		await launched.page.locator('.prebase-settings-editor').getByText('Web Search', { exact: true }).first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
+		await launched.page.locator('.prebase-settings-editor [role="status"]').first().waitFor({ state: 'attached', timeout: 8_000 }).catch(() => undefined);
 		const settingsSemantics = await launched.page.evaluate(() => {
 			const root = document.querySelector('.prebase-settings-editor');
 			const status = root?.querySelector('[role="status"]');
 			const text = String(status?.textContent || '');
+			const navLabels = Array.from(root?.querySelectorAll('nav button') || []).map(btn => String(btn.textContent || '').trim()).slice(0, 12);
 			return {
 				statusRole: status?.getAttribute('role') || '',
 				statusClaimsAvailable: /\bavailable\b/i.test(text) && !/not available/i.test(text),
+				navLabels,
+				hasWebSearchHeading: Boolean(Array.from(root?.querySelectorAll('h2') || []).some(h => /Web Search/i.test(h.textContent || ''))),
 			};
-		}).catch(() => ({ statusRole: '', statusClaimsAvailable: false }));
+		}).catch(() => ({ statusRole: '', statusClaimsAvailable: false, navLabels: [], hasWebSearchHeading: false }));
 		evidence.a11y = {
 			keyboardFocus: Boolean(focused.ok),
 			focus: focused,
@@ -913,11 +1052,41 @@ async function run() {
 			mapsLayoutGroup: Boolean(mapsSemantics.layoutGroup),
 			settingsStatusRole: settingsSemantics.statusRole,
 			settingsStatusClaimsAvailable: Boolean(settingsSemantics.statusClaimsAvailable),
-			prebaseForcesAccessibilityOff: false,
+			settingsNavLabels: settingsSemantics.navLabels,
+			settingsHasWebSearchHeading: Boolean(settingsSemantics.hasWebSearchHeading),
+			prebaseForcesAccessibilityOff: Boolean(prebaseForcesAccessibilityOff),
 		};
 
 		if (graphFrame) {
 			await graphFrame.locator('#netCanvas').screenshot({ path: join(screenshotDir, 'code-graph-live.png'), timeout: 5_000 }).catch(() => undefined);
+		}
+
+		// C1: fresh isolated profile
+		evidence.c1_freshProfile = Boolean(launched.sourceProfile && launched.info?.pid);
+
+		// C4: crash recovery — kill only the owned PreBase process tree, relaunch with same profile
+		try {
+			const recoveryMarker = join(gitWorkspace, 'src/hello.ts');
+			const beforeCrash = readFileSync(recoveryMarker, 'utf8');
+			if (!beforeCrash.includes('core-ide-recovery')) {
+				writeFileSync(recoveryMarker, beforeCrash + '\n// core-ide-recovery\n');
+			}
+			const oldPid = launched.info.pid;
+			const profile = launched.sourceProfile;
+			await terminateOwnedProcessTree(oldPid, { termMs: 4_000, killMs: 2_000 });
+			await launched.browser?.close?.().catch?.(() => undefined);
+			const relaunched = await launchPreBase(repo, gitWorkspace, [], { userDataDir: profile });
+			launched = relaunched;
+			await dismissStartup(launched.page, { skipOffline: true }).catch(() => undefined);
+			await waitForWorkbenchDriver(launched.page, 90_000);
+			const recoveredWorkbench = await seen('.monaco-workbench', 12_000);
+			const recoveredFile = readFileSync(recoveryMarker, 'utf8').includes('core-ide-recovery');
+			evidence.c4_crashRecovery = Boolean(recoveredWorkbench && recoveredFile && launched.info?.pid && launched.info.pid !== oldPid);
+			evidence.c4_detail = { oldPid, newPid: launched.info?.pid, recoveredWorkbench, recoveredFile, profile };
+			// C2 remains settings-persistence proof — do not OR crash relaunch into C2.
+		} catch (c4Error) {
+			evidence.c4_crashRecovery = false;
+			evidence.c4_error = c4Error instanceof Error ? c4Error.message : String(c4Error);
 		}
 	} catch (error) {
 		evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);

@@ -1189,6 +1189,7 @@ registerAction2(class extends Action2 {
 
 		let activeLanguageId = '';
 		let activeResourceMarkersCount = 0;
+		const activeResourceMarkers: Array<{ message: string; source: string; owner: string; code: string }> = [];
 		try {
 			const activeCodeEditor = editorService.activeTextEditorControl;
 			const model = (activeCodeEditor as any)?.getModel?.();
@@ -1197,7 +1198,18 @@ registerAction2(class extends Action2 {
 			}
 			const resource = editorService.activeEditor?.resource;
 			if (resource && markerService) {
-				activeResourceMarkersCount = markerService.read({ resource }).length;
+				const read = markerService.read({ resource });
+				activeResourceMarkersCount = read.length;
+				for (let i = 0; i < read.length && i < 24; i++) {
+					const m = read[i];
+					const code = typeof m.code === 'string' ? m.code : (typeof m.code === 'object' && m.code && 'value' in m.code ? String((m.code as { value: string | number }).value) : '');
+					activeResourceMarkers.push({
+						message: m.message,
+						source: m.source ?? '',
+						owner: m.owner ?? '',
+						code,
+					});
+				}
 			}
 		} catch { /* marker / editor optional */ }
 
@@ -1217,6 +1229,7 @@ registerAction2(class extends Action2 {
 			colorThemeType: theme.type,
 			zoomLevel: getZoomLevel(mainWindow),
 			accessibilitySupport: configurationService.getValue('editor.accessibilitySupport'),
+			liveActivityMode: configurationService.getValue('prebase.magnus.liveActivity.mode'),
 			debug: {
 				sessionsCount: debugSessionsCount,
 				activeSessionName: debugActiveSessionName,
@@ -1224,6 +1237,7 @@ registerAction2(class extends Action2 {
 			editor: {
 				activeLanguageId,
 				activeResourceMarkersCount,
+				markers: activeResourceMarkers,
 			},
 			layout: {
 				sidebarVisible: layoutService.isVisible(Parts.SIDEBAR_PART),

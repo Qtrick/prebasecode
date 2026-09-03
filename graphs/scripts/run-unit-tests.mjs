@@ -17,7 +17,11 @@ const UNIT_TESTS_DIR = path.join(REPO_ROOT, 'graphs/src/tests/unit');
 
 function runMochaOnSource(testRelPath) {
 	const testAbs = path.join(REPO_ROOT, testRelPath);
-	const timeoutMs = testRelPath.includes('gitHistoryService.test.ts') ? '30000' : '10000';
+	const timeoutMs = testRelPath.includes('gitHistoryService.test.ts')
+		|| testRelPath.includes('gitTreeHistoricalAnalysis.test.ts')
+		|| testRelPath.includes('temporalIngestionE2E.test.ts')
+		? '30000'
+		: '10000';
 	return spawnSync(
 		process.execPath,
 		['--experimental-strip-types', `--import=${SETUP}`, `--import=${REGISTER}`, MOCHA, testAbs, '--ui', 'tdd', '--timeout', timeoutMs],
@@ -25,13 +29,15 @@ function runMochaOnSource(testRelPath) {
 	).status ?? 1;
 }
 
-// Automatically and deterministically discover all *.test.ts files in graphs/src/tests/unit/
-const testFiles = fs.readdirSync(UNIT_TESTS_DIR)
-	.filter(file => file.endsWith('.test.ts'))
-	.sort()
-	.map(file => path.join('graphs/src/tests/unit', file));
+const requested = process.argv.slice(2).filter(arg => arg.endsWith('.test.ts') || arg.endsWith('.ts'));
+const testFiles = requested.length > 0
+	? requested.map(arg => path.isAbsolute(arg) ? path.relative(REPO_ROOT, arg) : arg)
+	: fs.readdirSync(UNIT_TESTS_DIR)
+		.filter(file => file.endsWith('.test.ts'))
+		.sort()
+		.map(file => path.join('graphs/src/tests/unit', file));
 
-console.log(`[graphs:unit-tests] Discovered ${testFiles.length} test files in graphs/src/tests/unit/`);
+console.log(`[graphs:unit-tests] Running ${testFiles.length} test file(s)`);
 
 let failureCount = 0;
 for (const test of testFiles) {

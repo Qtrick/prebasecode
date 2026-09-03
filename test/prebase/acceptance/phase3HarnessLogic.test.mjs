@@ -4,7 +4,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import test from 'node:test';
 import { classifyHosts, lsofSelectionArgs, privacyFailures } from './prebase-privacy-runtime.mjs';
-import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER_METRICS_NAME, themesA11yFailures, selectedNodeWorldDragProven, labelDensityProven } from './prebase-core-ide-live.mjs';
+import { nodesDrawnFromMetrics, coreIdeFailures, codeGraphFailures, GRAPH_RENDER_METRICS_NAME, themesA11yFailures, selectedNodeWorldDragProven, labelDensityProven, e6TypescriptProven, e6SuggestOnlyFalseGreen } from './prebase-core-ide-live.mjs';
 import {
 	nodeHitHasWorldCoords,
 	worldDragProven,
@@ -145,7 +145,11 @@ function passingCodeGraph(overrides = {}) {
 
 function passingCore(overrides = {}) {
 	return {
+		c1_freshProfile: true,
+		c2_existingProfile: true,
 		c3_folderOpen: true,
+		c3_workspaceIdentity: true,
+		c4_crashRecovery: true,
 		c5_reload: true,
 		e1_saveUndo: true,
 		e2_search: true,
@@ -153,7 +157,9 @@ function passingCore(overrides = {}) {
 		e4_terminal: true,
 		e5_debug: true,
 		e6_typescript: true,
+		e6_detail: { suggestSeen: true, langOk: true, hasTsDiagnostic: true, completionProven: true },
 		p1_settings: true,
+		p1_settingsPersisted: true,
 		p2_offline: true,
 		onboardingPersisted: true,
 		onboardingReopened: true,
@@ -162,6 +168,7 @@ function passingCore(overrides = {}) {
 		onboardingResolved: true,
 		p4_runtime: true,
 		p5_magnus: true,
+		p5_magnusActivated: true,
 		codeGraph: passingCodeGraph(),
 		themes: {
 			dark: appliedTheme('dark', 'monaco-workbench vs-dark'),
@@ -973,6 +980,62 @@ test('core IDE fails when e5_debug, e6_typescript, or p2_offline is missing', ()
 	assert.ok(onboardingFail.some(item => /P2 onboarding was not resolved/.test(item)));
 });
 
+test('E6 rejects suggestSeen && (typescriptDiagnostic || suggestSeen) false-green tautology', () => {
+	const suggestSeen = true;
+	const typescriptDiagnostic = false;
+	const langOk = true;
+	// Classic false-green: OR with suggestSeen makes the diagnostic clause irrelevant.
+	const antiPatternPasses = Boolean(suggestSeen && (typescriptDiagnostic || suggestSeen));
+	assert.equal(antiPatternPasses, true, 'anti-pattern must be shown to greenwash suggest-only');
+
+	const detail = { suggestSeen, langOk, hasTsDiagnostic: typescriptDiagnostic };
+	assert.equal(e6TypescriptProven(detail), false, 'real E6 proof requires hasTsDiagnostic');
+	assert.equal(e6SuggestOnlyFalseGreen(detail), true);
+
+	assert.equal(e6TypescriptProven({ suggestSeen: true, langOk: true, hasTsDiagnostic: true }), true);
+	assert.equal(e6SuggestOnlyFalseGreen({ suggestSeen: true, langOk: true, hasTsDiagnostic: true }), false);
+
+	// coreIdeFailures must fail when e6_typescript is greenwashed but detail lacks diagnostic
+	const falseGreen = coreIdeFailures(passingCore({
+		e6_typescript: true,
+		e6_detail: { suggestSeen: true, langOk: true, hasTsDiagnostic: false, completionProven: false },
+	}));
+	assert.ok(falseGreen.some(item => /E6 TypeScript/.test(item) && /suggest-only|missing diagnostic/.test(item)));
+
+	const missingDetail = coreIdeFailures(passingCore({
+		e6_typescript: true,
+		e6_detail: undefined,
+	}));
+	assert.ok(missingDetail.some(item => /e6_detail/.test(item)));
+
+	const suggestOnlyFlag = coreIdeFailures(passingCore({
+		e6_typescript: suggestSeen && (typescriptDiagnostic || suggestSeen),
+		e6_detail: detail,
+	}));
+	assert.ok(suggestOnlyFlag.some(item => /E6 TypeScript/.test(item)));
+
+	const c1Fail = coreIdeFailures(passingCore({ c1_freshProfile: false }));
+	assert.ok(c1Fail.some(item => /C1 fresh profile/.test(item)));
+	const p1PersistFail = coreIdeFailures(passingCore({ p1_settingsPersisted: false }));
+	assert.ok(p1PersistFail.some(item => /P1 PreBase setting persistence/.test(item)));
+});
+
+test('core-ide P1 persists liveActivityMode via getDiagnostics and P5 proves Magnus schema without stream truthies', () => {
+	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
+	const contribution = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
+	assert.match(contribution, /liveActivityMode:\s*configurationService\.getValue\('prebase\.magnus\.liveActivity\.mode'\)/);
+	assert.match(live, /liveActivityMode:\s*'alwaysWorking'/);
+	assert.match(live, /afterDiag\?\.liveActivityMode/);
+	assert.doesNotMatch(live, /prebase\.test\.getConfiguration/);
+	assert.doesNotMatch(live, /prebase\.test\.setConfiguration/);
+	assert.match(live, /magnusDiagSchema/);
+	assert.match(live, /'streamActive' in magnusStream/);
+	assert.match(live, /'smokeEnabled' in magnusStream/);
+	assert.doesNotMatch(live, /magnusStream\.streamActive === true/);
+	assert.match(live, /Agents\\s\*&\\s\*AI/);
+	assert.match(live, /zoomLevel:\s*0/);
+});
+
 test('code graph screenshot is not a substitute for render metrics', () => {
 	const failures = codeGraphFailures({
 		codeGraph: passingCodeGraph({
@@ -1755,11 +1818,24 @@ function canonicalScaleTemporalEvidence(fullMapOverrides = {}, evidenceOverrides
 			communityLabelsDrawn: 8,
 			labelCollisionCullCount: 15,
 			renderedLabelOverlapCount: 0,
+			totalLabelsDrawn: 24,
 			finiteCoordinateCount: 9680,
 			canvas: { distinctPixels: 200 },
 			transform: { x: 400, y: 290, k: 0.21 },
 			...fullMapOverrides,
 		},
+		zoomTiers: [
+			{
+				name: 'overview',
+				displayMode: 'state',
+				metrics: { renderedLabelOverlapCount: 0, totalLabelsDrawn: 24, communityLabelsDrawn: 8 },
+			},
+			{
+				name: 'medium',
+				displayMode: 'state',
+				metrics: { renderedLabelOverlapCount: 0, totalLabelsDrawn: 48, communityLabelsDrawn: 10 },
+			},
+		],
 		focusChanges: {
 			displayMode: 'changes',
 			visibleNodeCount: 8,
@@ -1983,8 +2059,11 @@ test('classifyProcessRole and redactCommandLine correctly categorize processes a
 });
 
 test('liveActivityLiveFailures validates factual native diagnostics and handles non-mac', () => {
-	const nonMac = { platform: 'linux', nativePresent: false };
-	assert.deepEqual(liveActivityLiveFailures(nonMac), []);
+	const nonMacSkipped = { platform: 'linux', nativePresent: false, skipped: true, environmentSkip: true };
+	assert.deepEqual(liveActivityLiveFailures(nonMacSkipped), []);
+
+	const nonMacUnskipped = { platform: 'linux', nativePresent: false };
+	assert.ok(liveActivityLiveFailures(nonMacUnskipped).some(f => /macOS/i.test(f)));
 
 	const missingNative = { platform: 'darwin', nativePresent: false };
 	assert.ok(liveActivityLiveFailures(missingNative).some(f => /native AppKit module missing/.test(f)));

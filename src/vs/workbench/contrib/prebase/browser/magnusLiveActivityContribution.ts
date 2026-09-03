@@ -44,6 +44,8 @@ import {
 	LIVE_ACTIVITY_COMPLETED_HOLD_MS,
 	redactLiveActivityText,
 	selectPrimaryMagnusSession,
+	canonicalizeLiveActivityPanelState,
+	resolveLiveActivityPanelState,
 	shouldShowLiveActivity,
 	summarizeMagnusWorkspaceDiff,
 	type LiveActivityCommand,
@@ -266,6 +268,10 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		terminalCount?: number;
 		testState?: MagnusLiveActivitySnapshot['testState'];
 		presentationLabel?: string;
+		panelState?: string;
+		/** Honest provenance: renderer projection never claims native hover/peek fidelity. */
+		panelStateSource?: 'renderer-projection';
+		screenLocked?: boolean;
 	} = { backend: isMacintosh && !isWeb ? 'unavailable' : 'non-mac', revision: 0 };
 
 	private readonly _main: IMagnusLiveActivityMainService | undefined;
@@ -418,6 +424,15 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			this._completionHidden = true;
 		}
 		const visible = !this._completionHidden && shouldShowLiveActivity(this._mode(), snapshot);
+		// Renderer panelState is a projection from pin + snapshot only.
+		// Native hover/peek/attentionCompact truth lives in native diagnostics.activePresentationState.
+		const panelState = canonicalizeLiveActivityPanelState(resolveLiveActivityPanelState({
+			visible,
+			hovering: false,
+			pinned: this._pinned && visible,
+			snapshot,
+			now: Date.now(),
+		}));
 		if (visible && (snapshot.status === 'working' || snapshot.status === 'waiting' || snapshot.status === 'attention')) {
 			const delay = calculateNextElapsedBoundaryDelayMs(Date.now(), snapshot.startedAt);
 			if (delay !== undefined) {
@@ -440,6 +455,9 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			terminalCount: snapshot.terminalCount,
 			testState: snapshot.testState,
 			presentationLabel: snapshot.presentationLabel,
+			panelState,
+			panelStateSource: 'renderer-projection',
+			screenLocked: Boolean(snapshot.screenLocked),
 		};
 		const reducedMotion = this.accessibilityService.isMotionReduced()
 			|| Boolean(this.configurationService.getValue<boolean>('prebase.graph.reduceMotion'));

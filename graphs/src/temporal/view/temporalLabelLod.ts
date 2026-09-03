@@ -305,14 +305,21 @@ export function computeVisibleLabels(
 		);
 
 		let score = 0;
-		if (isSelected) {score += 1000;}
-		if (isHovered) {score += 900;}
-		if (isCurrentFile) {score += 850;}
-		if (isQueryMatch) {score += 800;}
-		if (isEntry) {score += 700;}
-		if (isChanged) {score += 500;}
+		if (isSelected) {
+			score = 1000;
+		} else if (isHovered) {
+			score = 900;
+		} else if (isCurrentFile) {
+			score = 850;
+		} else if (isQueryMatch) {
+			score = 800;
+		} else if (isChanged) {
+			score = 600;
+		} else if (isEntry) {
+			score = 150;
+		}
 
-		if (zoom >= 1.25) {
+		if (zoom >= 1.25 && score > 0) {
 			score += 100;
 		}
 
@@ -367,20 +374,19 @@ export function computeVisibleLabels(
 			h: boxHeight,
 		};
 
-		if (!item.isSelected && !item.isHovered) {
-			let collision = false;
-			for (let b = 0; b < placedBoxes.length; b++) {
-				if (boxesOverlap(box, placedBoxes[b])) {
-					collision = true;
-					break;
-				}
+		// Selected/hovered claim occupancy normally — they win by rank, not by bypassing collision.
+		let collision = false;
+		for (let b = 0; b < placedBoxes.length; b++) {
+			if (boxesOverlap(box, placedBoxes[b])) {
+				collision = true;
+				break;
 			}
-			if (collision) {
-				if (options?.overlapCount) {
-					options.overlapCount.count++;
-				}
-				continue;
+		}
+		if (collision) {
+			if (options?.overlapCount) {
+				options.overlapCount.count++;
 			}
+			continue;
 		}
 
 		placedBoxes.push(box);
@@ -479,7 +485,6 @@ type UnifiedLabelCandidate =
 		readonly tiebreaker: string;
 		readonly box: LabelBox;
 		readonly item: VisibleLabelItem;
-		readonly forceEmphasis: boolean;
 	}
 	| {
 		readonly kind: 'guide';
@@ -488,7 +493,6 @@ type UnifiedLabelCandidate =
 		readonly tiebreaker: string;
 		readonly box: LabelBox;
 		readonly item: CommunityGuideLabelItem;
-		readonly forceEmphasis: boolean;
 	}
 	| {
 		readonly kind: 'routeBadge';
@@ -497,7 +501,6 @@ type UnifiedLabelCandidate =
 		readonly tiebreaker: string;
 		readonly box: LabelBox;
 		readonly item: RouteBadgeLabelItem;
-		readonly forceEmphasis: boolean;
 	};
 
 function defaultMeasureWidth(text: string): number {
@@ -515,6 +518,8 @@ export function computeTemporalLabelLayout(
 		readonly filterQuery?: string;
 		readonly maxNodeLabels?: number;
 		readonly maxGuideLabels?: number;
+		readonly maxRouteBadges?: number;
+		readonly maxTotalLabels?: number;
 		readonly measureWidth?: (text: string, font: string) => number;
 		readonly visibleNodeIds?: ReadonlySet<string>;
 		readonly representedGuideIds?: ReadonlySet<string>;
@@ -527,11 +532,32 @@ export function computeTemporalLabelLayout(
 
 	// 1. Collect Guide Landmark Candidates
 	const guideCandidates: UnifiedLabelCandidate[] = [];
+	const visibleNodeIds = options?.visibleNodeIds;
+	const representedGuideIds = options?.representedGuideIds;
 	if (zoom >= 0.18 && guides && guides.length > 0) {
 		const validGuides = [];
 		for (let i = 0; i < guides.length; i++) {
 			const g = guides[i];
 			if (g && g.bounds && g.label) {
+				let visibleMembers = g.nodeCount ?? g.nodeIds?.length ?? 0;
+				if (visibleNodeIds && g.nodeIds?.length) {
+					let count = 0;
+					for (let n = 0; n < g.nodeIds.length; n++) {
+						if (visibleNodeIds.has(g.nodeIds[n]!)) {
+							count++;
+						}
+					}
+					visibleMembers = count;
+				}
+				if (visibleMembers <= 0) {
+					if (representedGuideIds?.has(g.id)) {
+						visibleMembers = g.nodeCount ?? g.nodeIds?.length ?? 1;
+					} else if (zoom < 0.5 && representedGuideIds) {
+						continue;
+					} else if (zoom < 0.5 && visibleNodeIds) {
+						continue;
+					}
+				}
 				validGuides.push(g);
 			}
 		}
@@ -587,7 +613,7 @@ export function computeTemporalLabelLayout(
 
 				guideCandidates.push({
 					kind: 'guide',
-					rank: 500,
+					rank: 350, // landmark after changed/search; before ordinary routes/files
 					secondaryRank: score,
 					tiebreaker: guide.id,
 					box,
@@ -606,7 +632,6 @@ export function computeTemporalLabelLayout(
 						badgeWidth: badgeW,
 						badgeHeight: badgeH,
 					},
-					forceEmphasis: false,
 				});
 			}
 		}
@@ -631,7 +656,7 @@ export function computeTemporalLabelLayout(
 
 			routeBadgeCandidates.push({
 				kind: 'routeBadge',
-				rank: isChanged ? 400 : 200,
+				rank: isChanged ? 550 : 200, // changed routes beat guides; ordinary routes yield
 				secondaryRank: cand.edgeCount,
 				tiebreaker: cand.id,
 				box: curBox,
@@ -644,7 +669,6 @@ export function computeTemporalLabelLayout(
 					box: curBox,
 					font: '',
 				},
-				forceEmphasis: false,
 			});
 		}
 	}
@@ -678,7 +702,7 @@ export function computeTemporalLabelLayout(
 					continue;
 				}
 			} else if (zoom < 0.45) {
-				const degree = node.degree || 0;
+				const degree = Number(node.meta?.['degree'] ?? 0);
 				if (!isSelected && !isHovered && !isCurrentFile && !isQueryMatch && !isChanged && degree < 2) {
 					continue;
 				}
@@ -690,11 +714,11 @@ export function computeTemporalLabelLayout(
 			} else if (isHovered) {
 				rank = 900;
 			} else if (isCurrentFile) {
-				rank = 800;
+				rank = 850;
 			} else if (isQueryMatch) {
-				rank = 700;
+				rank = 800;
 			} else if (isChanged) {
-				rank = 450;
+				rank = 600;
 			} else if (isEntry) {
 				rank = 150;
 			}
@@ -719,7 +743,7 @@ export function computeTemporalLabelLayout(
 			nodeCandidates.push({
 				kind: 'node',
 				rank,
-				secondaryRank: (isEntry ? 50 : 0) + (node.degree || 0),
+				secondaryRank: (isEntry ? 50 : 0) + Number(node.meta?.['degree'] ?? 0),
 				tiebreaker: node.entityId,
 				box,
 				item: {
@@ -733,7 +757,6 @@ export function computeTemporalLabelLayout(
 					isHovered,
 					isChanged,
 				},
-				forceEmphasis: isEmphasis,
 			});
 		}
 	}
@@ -755,21 +778,28 @@ export function computeTemporalLabelLayout(
 		return a.tiebreaker.localeCompare(b.tiebreaker);
 	});
 
-	// 5. Shared Single-Pass Occupancy Placement
+	// 5. Shared Single-Pass Occupancy Placement — higher rank claims first; zero visible overlap.
 	const placedBoxes: LabelBox[] = [];
 	const nodeLabels: VisibleLabelItem[] = [];
 	const guideLabels: CommunityGuideLabelItem[] = [];
 	const routeBadges: RouteBadgeLabelItem[] = [];
 	let labelCollisionCullCount = 0;
 
-	const maxNodeLabels = options?.maxNodeLabels;
+	const maxNodeLabels = options?.maxNodeLabels ?? (zoom < 0.35 ? 20 : (zoom < 0.65 ? 64 : 100));
 	const maxGuideLabels = options?.maxGuideLabels ?? (zoom < 0.35 ? 8 : (zoom < 0.65 ? 14 : 24));
-	const maxBadges = 32;
+	const maxBadges = options?.maxRouteBadges ?? (zoom < 0.35 ? 8 : 32);
+	// Global visual budget so guide+node+badge caps cannot explode density.
+	const globalBudget = options?.maxTotalLabels ?? (zoom < 0.35 ? 48 : (zoom < 0.65 ? 96 : 140));
+	let placedTotal = 0;
 
 	for (let i = 0; i < allCandidates.length; i++) {
 		const cand = allCandidates[i];
 
-		if (cand.kind === 'node' && maxNodeLabels && nodeLabels.length >= maxNodeLabels && !cand.forceEmphasis) {
+		if (placedTotal >= globalBudget) {
+			labelCollisionCullCount++;
+			continue;
+		}
+		if (cand.kind === 'node' && maxNodeLabels && nodeLabels.length >= maxNodeLabels) {
 			labelCollisionCullCount++;
 			continue;
 		}
@@ -782,21 +812,20 @@ export function computeTemporalLabelLayout(
 			continue;
 		}
 
-		if (!cand.forceEmphasis) {
-			let collision = false;
-			for (let b = 0; b < placedBoxes.length; b++) {
-				if (boxesOverlap(cand.box, placedBoxes[b])) {
-					collision = true;
-					break;
-				}
+		let collision = false;
+		for (let b = 0; b < placedBoxes.length; b++) {
+			if (boxesOverlap(cand.box, placedBoxes[b])) {
+				collision = true;
+				break;
 			}
-			if (collision) {
-				labelCollisionCullCount++;
-				continue;
-			}
+		}
+		if (collision) {
+			labelCollisionCullCount++;
+			continue;
 		}
 
 		placedBoxes.push(cand.box);
+		placedTotal++;
 		if (cand.kind === 'node') {
 			nodeLabels.push(cand.item);
 		} else if (cand.kind === 'guide') {

@@ -27,11 +27,16 @@ const nativeAddon = join(repo, 'native/prebase-live-activity/build/Release/preba
 
 export function liveActivityLiveFailures(evidence) {
 	const failures = [];
-	if (evidence.platform === 'darwin' && !evidence.nativePresent) {
-		failures.push('native AppKit module missing');
-	}
+	// Non-darwin without explicit environment skip must not greenwash AppKit proof.
 	if (evidence.platform !== 'darwin') {
+		if (evidence.skipped === true || evidence.environmentSkip === true) {
+			return failures;
+		}
+		failures.push('Live Activity AppKit path requires macOS (set skipped/environmentSkip when not runnable)');
 		return failures;
+	}
+	if (!evidence.nativePresent) {
+		failures.push('native AppKit module missing');
 	}
 	if (!evidence.diagnosticsAfterOpen) {
 		failures.push('live diagnostics unavailable after Magnus open');
@@ -209,11 +214,19 @@ async function run() {
 
 	try {
 		if (platform !== 'darwin') {
-			evidence.skipped = 'Live Activity AppKit path is macOS-only';
-			evidence.ok = true;
-			evidence.failures = [];
+			evidence.skipped = true;
+			evidence.environmentSkip = true;
+			evidence.ok = false;
+			evidence.failures = ['Live Activity AppKit path is macOS-only'];
+			evidence.skipReason = 'Live Activity AppKit path is macOS-only';
 			writeFileSync(join(evidenceDir, 'live-activity.json'), JSON.stringify(evidence, null, 2) + '\n');
-			console.log(JSON.stringify({ ok: true, skipped: evidence.skipped, out: join(evidenceDir, 'live-activity.json') }));
+			console.log(JSON.stringify({
+				ok: false,
+				skipped: true,
+				environmentSkip: true,
+				failures: evidence.failures,
+				out: join(evidenceDir, 'live-activity.json'),
+			}));
 			process.exit(0);
 		}
 

@@ -211,6 +211,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) NSTextField *latestMessageLabel;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *actionLabels;
 @property (nonatomic, strong) NSTextField *pendingInteractionTitle;
+@property (nonatomic, strong) NSTextField *pendingInteractionMessage;
 @property (nonatomic, strong) NSTextField *expandedMetricsLabel;
 
 @property (nonatomic, copy) NSString *statusLabel;
@@ -218,6 +219,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, copy) NSString *latestMessage;
 @property (nonatomic, copy) NSString *metricsLabel;
 @property (nonatomic, copy) NSString *pendingTitle;
+@property (nonatomic, copy) NSString *pendingMessage;
 @property (nonatomic, copy) NSArray<NSString *> *actions;
 @property (nonatomic, copy) NSString *status;
 @property (nonatomic, assign) BOOL expanded;
@@ -265,11 +267,15 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, copy) NSString *displayMode;
 @property (nonatomic, copy) NSString *lastNativeCommand;
 @property (nonatomic, weak) NSScreen *layoutScreen;
+@property (nonatomic, weak) NSScreen *lastFocusedWorkScreen;
+@property (nonatomic, assign) BOOL prebaseFullscreen;
 
 @property (nonatomic, assign) BOOL lastInside;
 @property (nonatomic, assign) BOOL didHoverHaptic;
 @property (nonatomic, assign) BOOL didAttentionHaptic;
 @property (nonatomic, assign) BOOL attentionPeek;
+/** User Escape/collapse while attention: stay compact until click or attention clears. */
+@property (nonatomic, assign) BOOL userDismissedAttention;
 @property (nonatomic, assign) NSUInteger hapticCount;
 @property (nonatomic, assign) NSUInteger redrawCount;
 @property (nonatomic, assign) NSUInteger animationCount;
@@ -283,6 +289,10 @@ static NSString *JSString(Napi::Value value) {
 - (void)mouseEnteredInView:(NSEvent *)event;
 - (void)mouseExitedFromView:(NSEvent *)event;
 - (void)clearPendingInteraction;
+- (void)expandPeek;
+- (void)expandInteractive;
+- (void)enterInteractiveSticky;
+- (void)collapse;
 - (NSDictionary *)diagnosticsDict;
 - (void)performUserHaptic;
 - (BOOL)simulateClickOptionIndex:(NSInteger)index;
@@ -356,6 +366,9 @@ static NSString *JSString(Napi::Value value) {
 		_pendingInteractionTitle = [self makeLabel:11 weight:NSFontWeightSemibold color:[NSColor colorWithCalibratedWhite:0.95 alpha:1.0]];
 		[_expandedContainer addSubview:_pendingInteractionTitle];
 
+		_pendingInteractionMessage = [self makeLabel:10 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.78 alpha:1.0]];
+		[_expandedContainer addSubview:_pendingInteractionMessage];
+
 		_expandedMetricsLabel = [self makeLabel:10 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.62 alpha:1.0]];
 		_expandedMetricsLabel.font = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
 		[_expandedContainer addSubview:_expandedMetricsLabel];
@@ -400,8 +413,9 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)mouseDown:(NSEvent *)event {
+	// Peek / Attention Peek → sticky Interactive must match simulateAction("click").
 	if (self.peekOnly || self.controller.attentionPeek) {
-		[self.controller expandInteractive];
+		[self.controller enterInteractiveSticky];
 		return;
 	}
 	[super mouseDown:event];
@@ -554,14 +568,23 @@ static NSString *JSString(Napi::Value value) {
 				self.actionLabels[i].hidden = YES;
 			}
 			self.pendingInteractionTitle.hidden = YES;
+			self.pendingInteractionMessage.hidden = YES;
 			self.expandedMetricsLabel.hidden = YES;
 			CGFloat bodyY = 6;
+			// Peek must still surface pending body text (truncated) — title alone is insufficient product truth.
+			NSString *peekBody = nil;
 			if (self.activityLabel.length) {
-				self.activityDescription.stringValue = self.activityLabel;
-				self.activityDescription.hidden = NO;
-				self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+				peekBody = self.activityLabel;
+			} else if (self.pendingMessage.length) {
+				peekBody = self.pendingMessage;
 			} else if (self.pendingTitle.length) {
-				self.activityDescription.stringValue = self.pendingTitle;
+				peekBody = self.pendingTitle;
+			}
+			if (peekBody.length) {
+				if (peekBody.length > 96) {
+					peekBody = [[peekBody substringToIndex:93] stringByAppendingString:@"…"];
+				}
+				self.activityDescription.stringValue = peekBody;
 				self.activityDescription.hidden = NO;
 				self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
 			} else {
@@ -574,7 +597,9 @@ static NSString *JSString(Napi::Value value) {
 		// Header row
 		self.headerTitle.frame = NSMakeRect(16, bodyY, 120, 18);
 
-		NSString *statusText = self.attention ? @"Attention" : (self.status.length ? [self.status capitalizedString] : @"Working");
+		NSString *statusText = self.statusLabel.length
+			? self.statusLabel
+			: (self.attention ? @"Attention" : (self.status.length ? [self.status capitalizedString] : @"Working"));
 		self.statusBadge.stringValue = statusText;
 		self.statusBadge.textColor = self.attention
 			? [NSColor colorWithCalibratedRed:0.98 green:0.65 blue:0.18 alpha:0.95]
@@ -594,9 +619,9 @@ static NSString *JSString(Napi::Value value) {
 			self.activityDescription.hidden = YES;
 		}
 
-		// Latest short response from Magnus
+		// Latest short response from Magnus (no decorative emoji — keep glanceable typography)
 		if (self.latestMessage.length) {
-			self.latestMessageLabel.stringValue = [NSString stringWithFormat:@"💬 %@", self.latestMessage];
+			self.latestMessageLabel.stringValue = self.latestMessage;
 			self.latestMessageLabel.hidden = NO;
 			self.latestMessageLabel.frame = NSMakeRect(16, bodyY, totalW - 32, 18);
 			bodyY += 20;
@@ -617,7 +642,7 @@ static NSString *JSString(Napi::Value value) {
 			}
 		}
 
-		// Pending title
+		// Pending interaction title + message from canonical snapshot
 		if (self.pendingTitle.length) {
 			bodyY += 2;
 			self.pendingInteractionTitle.stringValue = self.pendingTitle;
@@ -626,6 +651,14 @@ static NSString *JSString(Napi::Value value) {
 			bodyY += 18;
 		} else {
 			self.pendingInteractionTitle.hidden = YES;
+		}
+		if (self.pendingMessage.length && !self.peekOnly) {
+			self.pendingInteractionMessage.stringValue = self.pendingMessage;
+			self.pendingInteractionMessage.hidden = NO;
+			self.pendingInteractionMessage.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+			bodyY += 18;
+		} else {
+			self.pendingInteractionMessage.hidden = YES;
 		}
 
 		// Metrics line
@@ -672,8 +705,57 @@ static NSString *JSString(Napi::Value value) {
 		                                         selector:@selector(screenParametersChanged:)
 		                                             name:NSApplicationDidChangeScreenParametersNotification
 		                                           object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+		                                         selector:@selector(windowDidBecomeKey:)
+		                                             name:NSWindowDidBecomeKeyNotification
+		                                           object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+		                                         selector:@selector(windowDidEnterFullScreen:)
+		                                             name:NSWindowDidEnterFullScreenNotification
+		                                           object:nil];
+		[[NSNotificationCenter defaultCenter] addObserver:self
+		                                         selector:@selector(windowDidExitFullScreen:)
+		                                             name:NSWindowDidExitFullScreenNotification
+		                                           object:nil];
 	}
 	return self;
+}
+
+- (void)windowDidBecomeKey:(NSNotification *)notification {
+	NSWindow *window = notification.object;
+	if (![window isKindOfClass:[NSWindow class]] || window == self.panel) {
+		return;
+	}
+	if (window.screen) {
+		self.lastFocusedWorkScreen = window.screen;
+	}
+}
+
+- (void)windowDidEnterFullScreen:(NSNotification *)notification {
+	NSWindow *window = notification.object;
+	if (window == self.panel) {
+		return;
+	}
+	self.prebaseFullscreen = YES;
+	// Fullscreen policy: do not auto-expand Peek while immersed; Compact/attention only.
+	if (!self.pinned && self.content.peekOnly && !self.attentionPeek && !self.content.attention) {
+		[self collapse];
+	}
+}
+
+- (void)windowDidExitFullScreen:(NSNotification *)notification {
+	NSWindow *window = notification.object;
+	if (window == self.panel) {
+		return;
+	}
+	BOOL anyFullscreen = NO;
+	for (NSWindow *w in [NSApp windows]) {
+		if (w != self.panel && (w.styleMask & NSWindowStyleMaskFullScreen)) {
+			anyFullscreen = YES;
+			break;
+		}
+	}
+	self.prebaseFullscreen = anyFullscreen;
 }
 
 - (void)screenParametersChanged:(NSNotification *)notification {
@@ -755,19 +837,34 @@ static NSString *JSString(Napi::Value value) {
 
 - (NSScreen *)targetScreen {
 	if ([self.displayMode isEqualToString:@"active"]) {
-		// Prefer the screen containing the active/focused work window
+		// Follow focused work context — never retarget mid-morph, never follow bare cursor.
+		if (self.transitionInFlight && self.layoutScreen) {
+			return self.layoutScreen;
+		}
 		NSWindow *keyWin = [NSApp keyWindow];
 		NSWindow *mainWin = [NSApp mainWindow];
-		NSScreen *workScreen = keyWin.screen ?: mainWin.screen;
+		NSScreen *workScreen = nil;
+		if (keyWin && keyWin != self.panel) {
+			workScreen = keyWin.screen;
+		}
+		if (!workScreen && mainWin && mainWin != self.panel) {
+			workScreen = mainWin.screen;
+		}
 		if (workScreen) {
+			self.lastFocusedWorkScreen = workScreen;
 			return workScreen;
 		}
-		// When PreBase is backgrounded, [NSScreen mainScreen] represents the active user workspace display
+		if (self.lastFocusedWorkScreen) {
+			for (NSScreen *screen in [NSScreen screens]) {
+				if (screen == self.lastFocusedWorkScreen) {
+					return screen;
+				}
+			}
+		}
 		NSScreen *frontScreen = [NSScreen mainScreen];
 		if (frontScreen) {
 			return frontScreen;
 		}
-		// Deterministic fallback to built-in physical notch screen, never random cursor hopping
 		for (NSScreen *screen in [NSScreen screens]) {
 			if (IsBuiltinScreen(screen) && ScreenHasPhysicalNotch(screen)) {
 				return screen;
@@ -851,6 +948,9 @@ static NSString *JSString(Napi::Value value) {
 	}
 	if (self.content.pendingTitle.length) {
 		h += 20;
+	}
+	if (self.content.pendingMessage.length) {
+		h += 18;
 	}
 	if (self.content.metricsLabel.length) {
 		h += 18;
@@ -952,14 +1052,13 @@ static NSString *JSString(Napi::Value value) {
 		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
 		[self layoutControls:win];
 	} else {
-		[self layoutControls:win];
+		// Delay control layout until frame animation completes to prevent visible popping.
 		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
 			context.duration = animDuration;
 			context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
 			context.allowsImplicitAnimation = YES;
 			[[self.panel animator] setFrame:win display:YES];
 		} completionHandler:^{
-			// Frame settled - ensure final control layout
 			[self layoutControls:win];
 		}];
 		self.content.targetExpanded = expanded;
@@ -1095,8 +1194,15 @@ static NSString *JSString(Napi::Value value) {
 			return event;
 		}
 		if (strong.pinned || strong.content.expanded || strong.content.peekOnly) {
+			if (strong.content.attention) {
+				strong.userDismissedAttention = YES;
+			}
+			const BOOL wasPinned = strong.pinned;
 			strong.pinned = NO;
-			[strong emit:@"unpin" extras:nil];
+			// Only emit unpin when sticky Interactive was actually pinned (avoid spurious commands).
+			if (wasPinned) {
+				[strong emit:@"unpin" extras:nil];
+			}
 			[strong collapse];
 			return nil;
 		}
@@ -1178,6 +1284,10 @@ static NSString *JSString(Napi::Value value) {
 	if (!self.visible) {
 		return;
 	}
+	// Fullscreen policy: suppress hover Peek while PreBase is immersed (attention still allowed).
+	if (self.prebaseFullscreen && !self.content.attention) {
+		return;
+	}
 	self.attentionPeek = NO;
 	self.content.peekOnly = YES;
 	self.content.expanded = YES;
@@ -1204,6 +1314,24 @@ static NSString *JSString(Napi::Value value) {
 	[self layoutForScreen];
 }
 
+/** Peek/Attention click → sticky Interactive (same path for physical + simulated click). */
+- (void)enterInteractiveSticky {
+	if (!self.visible) {
+		return;
+	}
+	self.userDismissedAttention = NO;
+	[self expandInteractive];
+	if (!self.pinned) {
+		[self performUserHaptic];
+		self.pinned = YES;
+		[self emit:@"pin" extras:nil];
+	}
+	if (!self.input.hidden) {
+		[self.panel makeKeyAndOrderFront:nil];
+		[self.panel makeFirstResponder:self.input];
+	}
+}
+
 - (void)expandPreview {
 	[self expandInteractive];
 }
@@ -1211,6 +1339,9 @@ static NSString *JSString(Napi::Value value) {
 - (void)collapse {
 	if (self.pinned) {
 		return;
+	}
+	if (self.content.attention) {
+		self.userDismissedAttention = YES;
 	}
 	self.attentionPeek = NO;
 	self.content.peekOnly = NO;
@@ -1318,6 +1449,7 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingDestructive = NO;
 	self.pendingOptions = @[];
 	self.content.pendingTitle = @"";
+	self.content.pendingMessage = @"";
 	self.openButton.title = @"Open in PreBase";
 	if (self.panel) {
 		[self layoutControls:self.panel.frame];
@@ -1403,8 +1535,11 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"activityLabel"] = self.content.activityLabel ?: @"";
 	dict[@"metricsLabel"] = self.content.metricsLabel ?: @"";
 	dict[@"pendingTitle"] = self.content.pendingTitle ?: @"";
+	dict[@"pendingMessage"] = self.content.pendingMessage ?: @"";
 	dict[@"pendingKind"] = self.pendingKind ?: @"";
 	dict[@"interactionId"] = self.interactionId ?: @"";
+	dict[@"renderedLatestMessage"] = self.content.latestMessageLabel.hidden ? @"" : (self.content.latestMessageLabel.stringValue ?: @"");
+	dict[@"renderedPendingMessage"] = self.content.pendingInteractionMessage.hidden ? @"" : (self.content.pendingInteractionMessage.stringValue ?: @"");
 	dict[@"approvalControlsVisible"] = @(!self.approveButton.hidden);
 	dict[@"openInPreBaseVisible"] = @(!self.openButton.hidden);
 	NSInteger visibleOptions = 0;
@@ -1463,15 +1598,18 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"pathTopologyCompatible"] = @(isTopologyCompatible);
 	dict[@"latestShortMessage"] = self.content.latestMessage ?: @"";
 	dict[@"activePresentationState"] = self.pinned
-		? @"pinned"
+		? (self.content.attention ? @"attentionInteractive" : @"pinned")
 		: (self.content.expanded
-			? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.content.attention ? @"attention" : @"interactive")))
+			? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.content.attention ? @"attentionInteractive" : @"interactive")))
 			: (self.content.attention ? @"attentionCompact" : @"compact"));
 	dict[@"targetPresentationState"] = self.content.targetExpanded
-		? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.content.attention ? @"attention" : @"interactive")))
+		? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.pinned ? (self.content.attention ? @"attentionInteractive" : @"pinned") : (self.content.attention ? @"attentionInteractive" : @"interactive"))))
 		: (self.content.attention ? @"attentionCompact" : @"compact");
 	dict[@"hoverDwellMs"] = @(180);
 	dict[@"exitGraceMs"] = @(250);
+	dict[@"prebaseFullscreen"] = @(self.prebaseFullscreen);
+	dict[@"displayMode"] = self.displayMode ?: @"builtin";
+	dict[@"retainedWorkScreen"] = @(self.lastFocusedWorkScreen != nil);
 	return dict;
 }
 
@@ -1521,18 +1659,10 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)mouseUp:(NSEvent *)event {
-	if (!self.pinned) {
-		[self performUserHaptic];
-		self.pinned = YES;
-		self.content.expanded = YES;
-		self.panel.ignoresMouseEvents = NO;
-		[self removeGlobalMonitorOnly];
-		[self emit:@"pin" extras:nil];
-		[self layoutForScreen];
-		if (!self.input.hidden) {
-			[self.panel makeKeyAndOrderFront:nil];
-			[self.panel makeFirstResponder:self.input];
-		}
+	// Compact click (not already peek/interactive): enter sticky Interactive.
+	// Peek clicks are handled in mouseDown via enterInteractiveSticky.
+	if (!self.pinned && !self.content.peekOnly && !self.attentionPeek) {
+		[self enterInteractiveSticky];
 	}
 }
 
@@ -1552,6 +1682,7 @@ static NSString *JSString(Napi::Value value) {
 	self.content.actions = snapshot[@"recentActions"] ?: @[];
 	self.content.metricsLabel = snapshot[@"metricsLabel"] ?: @"";
 	self.content.pendingTitle = snapshot[@"pendingTitle"] ?: @"";
+	self.content.pendingMessage = snapshot[@"pendingMessage"] ?: @"";
 	self.content.latestMessage = snapshot[@"latestShortMessage"] ?: @"";
 	self.interactionId = snapshot[@"interactionId"] ?: @"";
 	self.pendingKind = snapshot[@"pendingKind"] ?: @"";
@@ -1559,27 +1690,56 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
 	self.lastNativeCommand = @"";
 
-	if (self.content.attention && !self.pinned) {
-		// Glanceable attention peek: compact wings + short body, clickable to expand interactive.
-		// Attention arrival is not user-initiated; do not haptic (Apple AppKit guidance).
-		self.attentionPeek = YES;
-		self.content.peekOnly = YES;
-		self.content.expanded = YES;
-		self.content.targetExpanded = YES;
-		self.ignoresMouse = NO;
-		self.didAttentionHaptic = NO;
-		if (self.panel) {
-			self.panel.ignoresMouseEvents = NO;
-			[self layoutForScreen];
+	const BOOL alreadyInteractive = self.pinned
+		|| (self.content.expanded && !self.content.peekOnly && !self.attentionPeek);
+
+	if (self.content.attention) {
+		if (alreadyInteractive) {
+			// Attention while Interactive/pinned: preserve Interactive; update content only.
+			self.userDismissedAttention = NO;
+			self.attentionPeek = NO;
+			self.content.peekOnly = NO;
+			self.content.expanded = YES;
+			self.content.targetExpanded = YES;
+			self.ignoresMouse = NO;
+			if (self.panel) {
+				self.panel.ignoresMouseEvents = NO;
+				[self layoutForScreen];
+			}
+		} else if (!self.pinned && self.userDismissedAttention) {
+			// Escape/collapse while attention: lasting compact until click (do not republish into peek).
+			self.attentionPeek = NO;
+			self.content.peekOnly = NO;
+			self.content.expanded = NO;
+			self.content.targetExpanded = NO;
+			self.ignoresMouse = YES;
+			if (self.panel) {
+				self.panel.ignoresMouseEvents = YES;
+				[self layoutForScreen];
+			}
+		} else if (!self.pinned) {
+			// Glanceable attention peek: compact wings + short body, clickable to expand.
+			// Attention arrival is not user-initiated; do not haptic (Apple AppKit guidance).
+			self.attentionPeek = YES;
+			self.content.peekOnly = YES;
+			self.content.expanded = YES;
+			self.content.targetExpanded = YES;
+			self.ignoresMouse = NO;
+			self.didAttentionHaptic = NO;
+			if (self.panel) {
+				self.panel.ignoresMouseEvents = NO;
+				[self layoutForScreen];
+			}
 		}
 	} else {
+		self.userDismissedAttention = NO;
 		BOOL wasAttentionPeek = self.attentionPeek;
 		self.attentionPeek = NO;
-		self.content.peekOnly = NO;
-		self.didAttentionHaptic = NO;
-		if (wasAttentionPeek && !self.pinned && !self.hovering) {
+		if (wasAttentionPeek && !self.pinned && !self.hovering && !alreadyInteractive) {
+			self.content.peekOnly = NO;
 			[self collapse];
-		} else if (!self.pinned) {
+		} else if (!self.pinned && !alreadyInteractive) {
+			self.content.peekOnly = NO;
 			self.content.targetExpanded = self.content.expanded;
 		}
 	}
@@ -1590,11 +1750,50 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)setVisible:(BOOL)visible pinned:(BOOL)pinned reduced:(BOOL)reduced {
+	const BOOL wasPinned = self.pinned;
 	self.visible = visible;
 	self.pinned = pinned;
 	self.reducedMotion = reduced;
 	self.content.reducedMotion = reduced;
-	self.content.expanded = pinned || (visible && self.content.expanded);
+	// Unpinning must not leave a stale Interactive surface.
+	if (pinned) {
+		self.content.expanded = YES;
+		self.content.peekOnly = NO;
+		self.attentionPeek = NO;
+	} else if (wasPinned && !pinned) {
+		// Downgrade sticky Interactive → peek/attentionPeek/compact. Never keep expanded+!peekOnly.
+		[self removeLocalKeyMonitor];
+		if (self.content.attention && self.userDismissedAttention) {
+			self.attentionPeek = NO;
+			self.content.peekOnly = NO;
+			self.content.expanded = NO;
+		} else if (self.content.attention) {
+			self.attentionPeek = YES;
+			self.content.peekOnly = YES;
+			self.content.expanded = YES;
+		} else if (self.hovering) {
+			self.attentionPeek = NO;
+			self.content.peekOnly = YES;
+			self.content.expanded = YES;
+		} else {
+			self.content.expanded = NO;
+			self.content.peekOnly = NO;
+			self.attentionPeek = NO;
+		}
+	} else if (!visible) {
+		self.content.expanded = NO;
+	} else {
+		// Keep legitimate peek/attention/hover expansion; never invent Interactive from visibility alone.
+		const BOOL peekSurface = self.hovering || self.attentionPeek || self.content.peekOnly;
+		if (self.content.expanded && !peekSurface) {
+			self.content.expanded = NO;
+			self.content.peekOnly = NO;
+			self.attentionPeek = NO;
+			[self removeLocalKeyMonitor];
+		} else {
+			self.content.expanded = self.content.expanded && peekSurface;
+		}
+	}
 	self.content.targetExpanded = self.content.expanded;
 	self.panel.animationBehavior = reduced ? NSWindowAnimationBehaviorNone : NSWindowAnimationBehaviorUtilityWindow;
 	if (!visible) {
@@ -1603,6 +1802,8 @@ static NSString *JSString(Napi::Value value) {
 		if (!pinned) {
 			self.content.expanded = NO;
 			self.content.targetExpanded = NO;
+			self.content.peekOnly = NO;
+			self.attentionPeek = NO;
 			self.hovering = NO;
 			self.didHoverHaptic = NO;
 			self.lastInside = NO;
@@ -1627,9 +1828,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)teardown {
-	[[NSNotificationCenter defaultCenter] removeObserver:self
-	                                                name:NSApplicationDidChangeScreenParametersNotification
-	                                              object:nil];
+	[[NSNotificationCenter defaultCenter] removeObserver:self];
 	[self.hoverTimer invalidate];
 	self.hoverTimer = nil;
 	[self.exitTimer invalidate];
@@ -1709,6 +1908,7 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 		payload[@"interactionId"] = JSString(pending.Get("interactionId"));
 		payload[@"pendingKind"] = JSString(pending.Get("kind"));
 		payload[@"pendingTitle"] = JSString(pending.Get("title"));
+		payload[@"pendingMessage"] = JSString(pending.Get("message"));
 		if (pending.Get("destructive").IsBoolean() && pending.Get("destructive").As<Napi::Boolean>().Value()) {
 			payload[@"destructive"] = @YES;
 		}
@@ -1736,6 +1936,7 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 		payload[@"interactionId"] = @"";
 		payload[@"pendingKind"] = @"";
 		payload[@"pendingTitle"] = @"";
+		payload[@"pendingMessage"] = @"";
 		payload[@"pendingOptions"] = @[];
 	}
 	return payload;
@@ -1801,8 +2002,8 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 	std::string action = info[0].As<Napi::String>().Utf8Value();
 	PrebaseLiveActivityController *controller = EnsureController();
 	if (action == "click") {
-		if (controller.content.peekOnly || controller.attentionPeek) {
-			[controller expandInteractive];
+		if (controller.content.peekOnly || controller.attentionPeek || (!controller.pinned && controller.visible)) {
+			[controller enterInteractiveSticky];
 			return Napi::Boolean::New(env, true);
 		}
 		return Napi::Boolean::New(env, false);
@@ -1816,6 +2017,14 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 		return Napi::Boolean::New(env, true);
 	}
 	if (action == "escape" || action == "collapse") {
+		// Match local Escape monitor: clear pin before collapse (collapse no-ops while pinned).
+		if (controller.content.attention) {
+			controller.userDismissedAttention = YES;
+		}
+		if (controller.pinned) {
+			controller.pinned = NO;
+			[controller emit:@"unpin" extras:nil];
+		}
 		[controller collapse];
 		return Napi::Boolean::New(env, true);
 	}

@@ -1,20 +1,22 @@
 {
   "schemaVersion": 3,
   "scenario": "themes-a11y",
-  "sourceHead": "2b34fc53c0701417b7a557489fa221d4ade0a863",
-  "sourceFingerprint": "ccc0ea30c4b2a91a1700d576fe100589229c9180a4370be441896742ad6cb140",
-  "productFingerprint": "ccc0ea30c4b2a91a1700d576fe100589229c9180a4370be441896742ad6cb140",
-  "generatedAt": "2026-09-03T03:17:28.982Z",
+  "sourceHead": "93a2aecd2af07779c88f9f58757fe254babe8b3e",
+  "sourceFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
+  "productFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
+  "generatedAt": "2026-09-03T05:34:20.601Z",
   "producerId": "core-ide",
-  "producerFingerprint": "eb16c17b9ded217ab69d0b4a5d472202ccc88378a3ced2bde0b41cba8ad9c34b",
-  "ok": true,
-  "failures": [],
+  "producerFingerprint": "3544be4374353f280098152b6427d60dedbfc6872d4f82ec5b0dcaf6ba995aec",
+  "ok": false,
+  "failures": [
+    "PreBase Settings web-search status live region was not proven"
+  ],
   "themes": {
     "light": {
       "query": "PreBase Light",
       "settingsId": "PreBase Light",
       "applied": false,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe vs-dark vscode-theme-defaults-themes-prebase_dark-json",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center vs-dark vscode-theme-defaults-themes-prebase_dark-json",
       "colorTheme": "PreBase Light",
       "colorThemeType": "light",
       "pickerVisible": true,
@@ -24,7 +26,7 @@
       "query": "Default High Contrast",
       "settingsId": "Default High Contrast",
       "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe hc-black vscode-theme-defaults-themes-hc_black-json border",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-black vscode-theme-defaults-themes-hc_black-json",
       "colorTheme": "Default High Contrast",
       "colorThemeType": "hcDark",
       "pickerVisible": true,
@@ -34,7 +36,7 @@
       "query": "Default High Contrast Light",
       "settingsId": "Default High Contrast Light",
       "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe border hc-light vscode-theme-defaults-themes-hc_light-json",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
       "colorTheme": "Default High Contrast Light",
       "colorThemeType": "hcLight",
       "pickerVisible": true,
@@ -43,8 +45,8 @@
     "dark": {
       "query": "PreBase Dark",
       "settingsId": "PreBase Dark",
-      "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe vs-dark vscode-theme-defaults-themes-prebase_dark-json",
+      "applied": false,
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
       "colorTheme": "PreBase Dark",
       "colorThemeType": "dark",
       "pickerVisible": true,
@@ -64,11 +66,11 @@
     "zoom200": true,
     "beforeZoom": {
       "zoomLevel": 0,
-      "innerWidth": 1440
+      "innerWidth": 1444
     },
     "afterZoom": {
       "zoomLevel": 4,
-      "innerWidth": 1440
+      "innerWidth": 1444
     },
     "screenReaderAuto": "auto",
     "screenReaderOn": "on",
@@ -76,15 +78,15 @@
     "graphCanvasRole": "region",
     "mapsAriaExpanded": true,
     "mapsLayoutGroup": true,
-    "settingsStatusRole": "status",
+    "settingsStatusRole": "",
     "settingsStatusClaimsAvailable": false,
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "54744     1  14.4 219008 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "55303       1 50.5 287904 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 841,
+    "latencyMs": 353,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

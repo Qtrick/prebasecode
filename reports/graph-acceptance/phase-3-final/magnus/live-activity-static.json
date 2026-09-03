@@ -1,9 +1,9 @@
 {
   "ok": true,
   "failures": [],
-  "platform": "darwin",
-  "architectureChosen": "native-appkit",
-  "nativePresent": true,
+  "platform": "linux",
+  "architectureChosen": "non-darwin",
+  "nativePresent": false,
   "testKind": "static-source-contract",
   "liveGui": "source-contracts-only",
   "notchGeometry": "NSScreen.safeAreaInsets + auxiliaryTopLeftArea/auxiliaryTopRightArea",
@@ -11,11 +11,11 @@
   "sessionIdentity": "IChatService sessionResource — follow-up uses chatService.sendRequest",
   "approvalContinuity": "IChatToolInvocation.confirmWith on the same toolCallId",
   "questionContinuity": "native answer → question.id + optionId → notifyQuestionCarouselAnswer",
-  "durationMs": 2,
+  "durationMs": 5,
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-static",
-  "sourceHead": "e9d63a6c4091b225e03b660cf201eca59dbb1106",
-  "sourceFingerprint": "4bba5924832ff69d14b5e245dfaff70c49a8361a3fb739a9adb26d4661494f0f",
-  "productFingerprint": "4bba5924832ff69d14b5e245dfaff70c49a8361a3fb739a9adb26d4661494f0f",
-  "generatedAt": "2026-09-01T03:21:31.164Z"
+  "sourceHead": "93a2aecd2af07779c88f9f58757fe254babe8b3e",
+  "sourceFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
+  "productFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
+  "generatedAt": "2026-09-03T05:31:31.609Z"
 }

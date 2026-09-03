@@ -17,8 +17,8 @@ const nativeAddon = join(repo, 'native/prebase-live-activity/build/Release/preba
 const started = Date.now();
 const failures = [];
 const platform = process.platform;
-const architectureChosen = 'native-appkit';
 const nativePresent = existsSync(nativeAddon);
+const architectureChosen = nativePresent ? 'native-appkit' : (platform === 'darwin' ? 'native-appkit-missing' : 'non-darwin');
 
 if (platform === 'darwin' && !nativePresent) {
 	failures.push('native AppKit module missing; run npm run compile:live-activity');
@@ -109,6 +109,15 @@ if (!/async simulateAction[\s\S]*enable-smoke-test-driver[\s\S]*return false/.te
 const contributionSource = readFileSync(contributionPath, 'utf8');
 if (!contributionSource.includes('requireSmokeTestDriver') || !contributionSource.includes('prebase.magnus.liveActivity.simulate')) {
 	failures.push('workbench simulate command must require smoke test driver');
+}
+if (!native.includes('userDismissedAttention')) {
+	failures.push('native Escape/collapse must sticky-dismiss attention peek across snapshot republish');
+}
+if (!native.includes('Delay control layout until frame animation completes to prevent visible popping')) {
+	failures.push('animated layout must delay control layout until frame settles');
+}
+if (!contributionSource.includes('panelStateSource') || !contributionSource.includes('renderer-projection')) {
+	failures.push('renderer diagnostics must label panelState as renderer-projection (not native hover truth)');
 }
 if (/topY - h - 8|NSMaxY\(frame\) - h - 8|pill: \{ x, y: 8/.test(native + magnusCommon)) {
 	failures.push('detached floating pill below menu bar must not return (no top offset gap)');

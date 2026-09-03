@@ -515,8 +515,8 @@ export async function waitForWorkbenchDriver(page, timeoutMs = 90_000) {
 	}
 }
 
-export async function launchPreBase(repo, workspace, extraArgs = []) {
-	const sourceProfile = mkdtempSync(join(tmpdir(), 'pb-phase3-profile-'));
+export async function launchPreBase(repo, workspace, extraArgs = [], options = {}) {
+	const sourceProfile = options.userDataDir || mkdtempSync(join(tmpdir(), 'pb-phase3-profile-'));
 	const launch = join(repo, '.agents/skills/launch/scripts/launch.sh');
 	const { stdout } = await execFileAsync(launch, [
 		'--repo', repo,

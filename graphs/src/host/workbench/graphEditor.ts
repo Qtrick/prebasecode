@@ -2530,6 +2530,7 @@ function drawTemporalFrame(ts) {
 	const labelLayout = computeTemporalLabelLayout(nodesToRender, temporalDiff.guides || [], transform.k, {
 		selectedNodeId: selectedNodeId,
 		hoveredNodeId: hoveredNodeId,
+		currentFileEntityId: temporalState && temporalState.currentFileEntityId,
 		filterQuery: filterValForLabels,
 		measureWidth: function (t, f) { return measureTextWidth(t, f); },
 		visibleNodeIds: visibleNodeIdSet,

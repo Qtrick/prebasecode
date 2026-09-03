@@ -13,6 +13,7 @@ import {
 	calculateNextElapsedBoundaryDelayMs,
 	collapsedStatusLabel,
 	computeLiveActivityExpandedHeight,
+	canonicalizeLiveActivityPanelState,
 	computeLiveActivityWingWidth,
 	deriveLiveActivityGeometry,
 	deriveMagnusTestStateFromInvocations,
@@ -334,10 +335,10 @@ suite('Magnus Live Activity projection', () => {
 
 	test('hover delay and exit grace do not open instantly', () => {
 		const snap = buildMagnusLiveActivitySnapshot(session(), { revision: 1, prebaseForeground: false, connected: true });
-		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: true, pinned: false, snapshot: snap, now: 100, hoverSince: 0, openDelayMs: 150 }), 'collapsed');
-		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: true, pinned: false, snapshot: snap, now: 160, hoverSince: 0, openDelayMs: 150 }), 'hoverPreview');
-		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: false, snapshot: snap, now: 200, lastInsideAt: 140, exitGraceMs: 100 }), 'hoverPreview');
-		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: false, snapshot: snap, now: 250, lastInsideAt: 140, exitGraceMs: 100 }), 'collapsed');
+		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: true, pinned: false, snapshot: snap, now: 100, hoverSince: 0, openDelayMs: 150 }), 'compact');
+		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: true, pinned: false, snapshot: snap, now: 160, hoverSince: 0, openDelayMs: 150 }), 'peek');
+		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: false, snapshot: snap, now: 200, lastInsideAt: 140, exitGraceMs: 100 }), 'peek');
+		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: false, snapshot: snap, now: 250, lastInsideAt: 140, exitGraceMs: 100 }), 'compact');
 		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: true, snapshot: snap, now: 400 }), 'pinned');
 	});
 
@@ -345,10 +346,10 @@ suite('Magnus Live Activity projection', () => {
 		const snap = buildMagnusLiveActivitySnapshot(session(), { revision: 1, prebaseForeground: false, connected: true });
 		const openDelay = LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS;
 		const exitGrace = LIVE_ACTIVITY_EXIT_GRACE_MS;
-		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: true, pinned: false, snapshot: snap, now: openDelay - 1, hoverSince: 0, openDelayMs: openDelay }), 'collapsed');
-		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: true, pinned: false, snapshot: snap, now: openDelay, hoverSince: 0, openDelayMs: openDelay }), 'hoverPreview');
-		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: false, snapshot: snap, now: exitGrace - 1, lastInsideAt: 0, exitGraceMs: exitGrace }), 'hoverPreview');
-		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: false, snapshot: snap, now: exitGrace, lastInsideAt: 0, exitGraceMs: exitGrace }), 'collapsed');
+		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: true, pinned: false, snapshot: snap, now: openDelay - 1, hoverSince: 0, openDelayMs: openDelay }), 'compact');
+		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: true, pinned: false, snapshot: snap, now: openDelay, hoverSince: 0, openDelayMs: openDelay }), 'peek');
+		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: false, snapshot: snap, now: exitGrace - 1, lastInsideAt: 0, exitGraceMs: exitGrace }), 'peek');
+		assert.strictEqual(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: false, snapshot: snap, now: exitGrace, lastInsideAt: 0, exitGraceMs: exitGrace }), 'compact');
 	});
 
 	test('attention and completed override hover; hidden wins over pinned', () => {
@@ -358,7 +359,7 @@ suite('Magnus Live Activity projection', () => {
 		}), { revision: 1, prebaseForeground: false, connected: true });
 		assert.strictEqual(resolveLiveActivityPanelState({
 			visible: true, hovering: true, pinned: false, snapshot: attention, now: 0, hoverSince: 0, openDelayMs: 150,
-		}), 'attention');
+		}), 'attentionPeek');
 
 		const completed = buildMagnusLiveActivitySnapshot(session({ isInProgress: false, completed: true }), { revision: 2, prebaseForeground: false, connected: true });
 		assert.strictEqual(resolveLiveActivityPanelState({
@@ -367,6 +368,86 @@ suite('Magnus Live Activity projection', () => {
 
 		assert.strictEqual(resolveLiveActivityPanelState({
 			visible: false, hovering: false, pinned: true, snapshot: attention, now: 0,
+		}), 'hidden');
+	});
+
+	test('attention while interactive/pinned stays attentionInteractive (never downgrades to peek)', () => {
+		const attention = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'a', title: 'Approve', message: 'Run rm?' },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: false, pinned: true, snapshot: attention, now: 0,
+		}), 'attentionInteractive');
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: false, pinned: false, interactive: true, snapshot: attention, now: 0,
+		}), 'attentionInteractive');
+		assert.strictEqual(canonicalizeLiveActivityPanelState('attention'), 'attentionPeek');
+		assert.strictEqual(canonicalizeLiveActivityPanelState('hoverPreview'), 'peek');
+		assert.strictEqual(canonicalizeLiveActivityPanelState('collapsed'), 'compact');
+	});
+
+	test('attention matrix: compact/peek → attentionPeek; never peek/compact while attention is active', () => {
+		const attention = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'a', title: 'Approve', message: 'Confirm delete' },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		assert.strictEqual(attention.status, 'attention');
+		// Compact (no hover)
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: false, pinned: false, snapshot: attention, now: 0,
+		}), 'attentionPeek');
+		// Would-be peek (hover past delay) must still be attentionPeek, not peek
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: true, pinned: false, snapshot: attention, now: 500, hoverSince: 0, openDelayMs: 150,
+		}), 'attentionPeek');
+		// Working without attention stays compact / peek
+		const working = buildMagnusLiveActivitySnapshot(session(), { revision: 2, prebaseForeground: false, connected: true });
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: false, pinned: false, snapshot: working, now: 0,
+		}), 'compact');
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: true, pinned: false, snapshot: working, now: 500, hoverSince: 0, openDelayMs: 150,
+		}), 'peek');
+		// Failed is its own transient state (not compact)
+		const failed = buildMagnusLiveActivitySnapshot(session({ failed: true, isInProgress: false }), {
+			revision: 3, prebaseForeground: false, connected: true,
+		});
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: false, pinned: false, snapshot: failed, now: 0,
+		}), 'failedTransient');
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: false, pinned: true, snapshot: failed, now: 0,
+		}), 'pinned');
+	});
+
+	test('screen lock hides Live Activity entirely', () => {
+		const working = buildMagnusLiveActivitySnapshot(session(), {
+			revision: 1, prebaseForeground: false, connected: true, screenLocked: true,
+		});
+		assert.strictEqual(shouldShowLiveActivity('alwaysWorking', working), false);
+		assert.strictEqual(shouldShowLiveActivity('background', working), false);
+		assert.ok(!working.pendingInteraction);
+		assert.ok(!working.latestShortMessage);
+	});
+
+	test('screen lock hides attention and attentionOnly mode (redaction alone is insufficient)', () => {
+		const attention = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'a', title: 'Approve', message: 'secret payload' },
+			latestShortMessage: 'do not show on lock screen',
+		}), { revision: 1, prebaseForeground: false, connected: true, screenLocked: true });
+		assert.strictEqual(attention.status, 'attention');
+		assert.strictEqual(attention.screenLocked, true);
+		assert.strictEqual(attention.pendingInteraction, undefined);
+		assert.strictEqual(attention.latestShortMessage, undefined);
+		assert.strictEqual(shouldShowLiveActivity('attentionOnly', attention), false);
+		assert.strictEqual(shouldShowLiveActivity('alwaysWorking', attention), false);
+		assert.strictEqual(shouldShowLiveActivity('background', attention), false);
+		// When locked, visible=false path yields hidden even if someone forgets shouldShow
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: shouldShowLiveActivity('alwaysWorking', attention),
+			hovering: false, pinned: true, snapshot: attention, now: 0,
 		}), 'hidden');
 	});
 
@@ -544,13 +625,21 @@ suite('Magnus Live Activity projection', () => {
 	test('screen lock and hideDetails strip pending interaction so approvals fail closed', () => {
 		const input = session({
 			needsInput: true,
+			testState: 'running',
 			pendingInteraction: { kind: 'approval', interactionId: 'tool-9', title: 'Delete?', message: 'secret' },
 		});
 		const locked = buildMagnusLiveActivitySnapshot(input, { revision: 4, prebaseForeground: false, connected: true, screenLocked: true });
 		assert.strictEqual(locked.status, 'attention');
 		assert.strictEqual(locked.pendingInteraction, undefined);
-		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'approve', interactionId: 'tool-9', revision: 4 }), { ok: false, reason: 'no-pending-interaction' });
-		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'followUp', sessionId: 'sess-1', text: 'go', revision: 4 }), { ok: true });
+		assert.strictEqual(locked.testState, undefined);
+		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'approve', interactionId: 'tool-9', revision: 4 }), { ok: false, reason: 'screen-locked' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'followUp', sessionId: 'sess-1', text: 'go', revision: 4 }), { ok: false, reason: 'screen-locked' });
+		assert.deepStrictEqual(acceptLiveActivityCommand(locked, { kind: 'pin', revision: 4 }), { ok: false, reason: 'screen-locked' });
+
+		const hidden = buildMagnusLiveActivitySnapshot(input, { revision: 5, prebaseForeground: false, connected: true, hideDetails: true });
+		assert.strictEqual(hidden.testState, undefined);
+		assert.strictEqual(hidden.pendingInteraction, undefined);
+		assert.deepStrictEqual(acceptLiveActivityCommand(hidden, { kind: 'followUp', sessionId: 'sess-1', text: 'go', revision: 5 }), { ok: true });
 	});
 
 	test('follow-up with a matching resource but a different sessionId fails closed', () => {
@@ -583,14 +672,15 @@ suite('Magnus Live Activity projection', () => {
 		assert.strictEqual(shouldShowLiveActivity('background', idle), false);
 	});
 
-	test('pin wins over attention; attention labels distinguish question vs approval', () => {
+	test('pinned+attention is attentionInteractive; labels distinguish question vs approval', () => {
 		const attention = buildMagnusLiveActivitySnapshot(session({
 			needsInput: true,
 			pendingInteraction: { kind: 'approval', interactionId: 'a', title: 'Approve', message: '' },
 		}), { revision: 1, prebaseForeground: false, connected: true });
+		// Product truth: attention must not be erased by pin — surface stays attentionInteractive.
 		assert.strictEqual(resolveLiveActivityPanelState({
 			visible: true, hovering: false, pinned: true, snapshot: attention, now: 0,
-		}), 'pinned');
+		}), 'attentionInteractive');
 		assert.strictEqual(collapsedStatusLabel(attention), 'Magnus needs approval');
 
 		const question = buildMagnusLiveActivitySnapshot(session({
@@ -1878,10 +1968,11 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.match(build, /NSWindowStyleMaskBorderless/);
 		assert.match(build, /ignoresMouseEvents = YES/);
 
-		const expandStart = native.indexOf('- (void)expandPreview {');
+		const expandStart = native.indexOf('- (void)expandInteractive {');
+		const stickyStart = native.indexOf('- (void)enterInteractiveSticky {');
 		const collapseStart = native.indexOf('- (void)collapse {');
 		const emitStart = native.indexOf('- (void)emit:');
-		const expand = native.slice(expandStart, collapseStart);
+		const expand = native.slice(expandStart, stickyStart > expandStart ? stickyStart : collapseStart);
 		const collapse = native.slice(collapseStart, emitStart);
 		assert.match(expand, /ignoresMouseEvents = NO/);
 		assert.match(collapse, /ignoresMouseEvents = YES/);
@@ -1895,7 +1986,8 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.ok(targetStart >= 0 && layoutStart > targetStart && controlsStart > layoutStart, 'must locate screen helpers');
 		const target = native.slice(targetStart, layoutStart);
 		assert.match(target, /\[self\.displayMode isEqualToString:@"active"\]/);
-		assert.match(target, /\[NSEvent mouseLocation\]/);
+		assert.match(target, /lastFocusedWorkScreen/);
+		assert.doesNotMatch(target, /\[NSEvent mouseLocation\]/);
 		assert.match(target, /ScreenHasPhysicalNotch/);
 		assert.match(target, /IsBuiltinScreen\(screen\)/);
 		assert.match(native, /CGDisplayIsBuiltin/);
@@ -2043,9 +2135,13 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 	test('native attention arrival must not trigger automatic haptic feedback', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
-		const attentionBlock = native.slice(native.indexOf('if (self.content.attention && !self.pinned)'), native.indexOf('} else {', native.indexOf('if (self.content.attention && !self.pinned)')));
+		const attentionMarker = 'Glanceable attention peek';
+		const attentionIdx = native.indexOf(attentionMarker);
+		assert.ok(attentionIdx > 0, 'attention peek branch must exist');
+		const attentionBlock = native.slice(attentionIdx, attentionIdx + 500);
 		assert.doesNotMatch(attentionBlock, /performUserHaptic/);
 		assert.match(attentionBlock, /didAttentionHaptic = NO/);
+		assert.match(native, /userDismissedAttention/, 'Escape/collapse must sticky-dismiss attention peek across snapshot republish');
 	});
 
 	test('native tracking model removes global mouse monitor when expanded to maximize resource efficiency', () => {
@@ -2135,28 +2231,130 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(peekBlock, /leftStatusLabel/);
 		assert.match(peekBlock, /headerTitle\.hidden = YES/);
 		assert.match(peekBlock, /actionLabels/);
+		assert.match(peekBlock, /pendingMessage/);
+		assert.match(peekBlock, /activityDescription/);
 		assert.doesNotMatch(peekBlock, /approve|deny|followUp|NSButton/i);
 	});
 
 	test('native attention peek collapses when attention resolves without pin or hover', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
-		const attentionStart = native.indexOf('if (self.content.attention && !self.pinned)');
+		const attentionStart = native.indexOf('const BOOL alreadyInteractive');
+		assert.ok(attentionStart > 0, 'must gate attention on alreadyInteractive');
 		const attentionEnd = native.indexOf('[self.content updateShapeAndContentAnimated:YES duration:0.18 useTargetState:YES]', attentionStart);
 		const attentionBlock = native.slice(attentionStart, attentionEnd);
+		assert.match(attentionBlock, /alreadyInteractive/);
+		assert.match(attentionBlock, /self\.attentionPeek = YES/);
 		assert.match(attentionBlock, /self\.content\.peekOnly = YES/);
-		assert.match(attentionBlock, /self\.panel\.ignoresMouseEvents = YES/);
 		assert.match(attentionBlock, /BOOL wasAttentionPeek = self\.attentionPeek/);
-		assert.match(attentionBlock, /if \(wasAttentionPeek && !self\.pinned && !self\.hovering\) \{\s*\[self collapse\]/);
+		assert.match(attentionBlock, /wasAttentionPeek && !self\.pinned && !self\.hovering && !alreadyInteractive/);
+		// Interactive must not be downgraded to peek on attention arrival
+		assert.match(attentionBlock, /if \(alreadyInteractive\)/);
+		assert.match(attentionBlock, /self\.content\.peekOnly = NO/);
+	});
+
+	test('native peek click and simulateAction click share enterInteractiveSticky', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /- \(void\)enterInteractiveSticky/);
+		assert.match(native, /\[self\.controller enterInteractiveSticky\]/);
+		assert.match(native, /\[controller enterInteractiveSticky\]/);
+		assert.match(native, /pendingMessage/);
+		assert.match(native, /renderedLatestMessage/);
+		assert.match(native, /renderedPendingMessage/);
+		assert.match(native, /prebaseFullscreen/);
+		assert.match(native, /lastFocusedWorkScreen/);
+	});
+
+	test('snapshot pendingInteraction.message serializes to native pendingMessage (not dropped)', () => {
+		const snap = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'tool-msg',
+				title: 'Delete obsolete.ts?',
+				message: 'This removes the unused helper and cannot be undone.',
+			},
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		assert.ok(snap.pendingInteraction, 'pendingInteraction must remain on unlocked snapshot');
+		assert.strictEqual(
+			snap.pendingInteraction?.message,
+			'This removes the unused helper and cannot be undone.',
+			'snapshot must preserve pending message text for native serialization',
+		);
+		assert.ok(
+			JSON.stringify(snap).includes('"message":"This removes the unused helper and cannot be undone."'),
+			'JSON snapshot contract must include pendingInteraction.message for the native bridge',
+		);
+
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(
+			native,
+			/payload\[@"pendingMessage"\] = JSString\(pending\.Get\("message"\)\)/,
+			'native bridge must map pendingInteraction.message → pendingMessage',
+		);
+		assert.match(
+			native,
+			/self\.content\.pendingMessage = snapshot\[@"pendingMessage"\]/,
+			'native controller must assign pendingMessage from the serialized snapshot',
+		);
+		assert.match(
+			native,
+			/dict\[@"pendingMessage"\] = self\.content\.pendingMessage/,
+			'diagnostics must expose pendingMessage so missing serialization is observable',
+		);
+		assert.match(native, /renderedPendingMessage/, 'renderedPendingMessage diagnostic required');
+	});
+
+	test('native unpin clears sticky interactive and does not leave stale expanded peek', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		// Escape while pinned: unpin first, then collapse (collapse no-ops while pinned).
+		const escapeMonitor = native.indexOf('- (void)installLocalKeyMonitor {');
+		assert.ok(escapeMonitor > 0);
+		const escapeBlock = native.slice(escapeMonitor, escapeMonitor + 900);
+		assert.match(escapeBlock, /userDismissedAttention = YES/);
+		assert.match(escapeBlock, /wasPinned/);
+		assert.match(escapeBlock, /strong\.pinned = NO/);
+		assert.match(escapeBlock, /emit:@"unpin"/);
+		assert.match(escapeBlock, /\[strong collapse\]/);
+
+		// Simulated escape must match the local monitor (clear pin before collapse).
+		const simEscape = native.indexOf('if (action == "escape" || action == "collapse")');
+		assert.ok(simEscape > 0, 'simulateAction must handle escape');
+		const simBlock = native.slice(simEscape, simEscape + 450);
+		assert.match(simBlock, /userDismissedAttention = YES/);
+		assert.match(simBlock, /controller\.pinned = NO/);
+		assert.match(simBlock, /emit:@"unpin"/);
+		assert.match(simBlock, /\[controller collapse\]/);
+
+		const setVisibleStart = native.indexOf('- (void)setVisible:(BOOL)visible pinned:(BOOL)pinned reduced:(BOOL)reduced {');
+		const teardownStart = native.indexOf('- (void)teardown {');
+		assert.ok(setVisibleStart > 0 && teardownStart > setVisibleStart);
+		const setVisible = native.slice(setVisibleStart, teardownStart);
+		assert.match(setVisible, /wasPinned && !pinned/);
+		assert.match(setVisible, /\[self removeLocalKeyMonitor\]/);
+		// Unpin while hovering/attention must downgrade to peek — never leave Interactive.
+		assert.match(setVisible, /self\.content\.peekOnly = YES/);
+		assert.doesNotMatch(setVisible, /keepExpanded = self\.hovering \|\| self\.attentionPeek \|\| self\.content\.peekOnly/);
+		assert.match(setVisible, /userDismissedAttention/);
+
+		const collapseStart = native.indexOf('- (void)collapse {');
+		assert.ok(collapseStart > 0);
+		const collapseEnd = native.indexOf('- (void)emit:', collapseStart);
+		const collapse = native.slice(collapseStart, collapseEnd);
+		assert.match(collapse, /if \(self\.pinned\) \{\s*return;/);
+		assert.match(collapse, /userDismissedAttention = YES/);
+		assert.match(collapse, /self\.attentionPeek = NO/);
+		assert.match(collapse, /self\.content\.peekOnly = NO/);
+		assert.match(collapse, /self\.content\.expanded = NO/);
 	});
 
 	test('native active-display mode relayouts when target screen changes', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
-		const monitorStart = native.indexOf('addGlobalMonitorForEventsMatchingMask:NSEventMaskMouseMoved');
-		const monitorEnd = native.indexOf('if (!self.localMonitor)', monitorStart);
-		const monitorBlock = native.slice(monitorStart, monitorEnd);
-		assert.match(monitorBlock, /\[strong\.displayMode isEqualToString:@"active"\]/);
-		assert.match(monitorBlock, /activeScreen != strong\.layoutScreen/);
-		assert.match(monitorBlock, /\[strong layoutForScreen\]/);
+		const targetStart = native.indexOf('- (NSScreen *)targetScreen {');
+		const targetEnd = native.indexOf('- (CGFloat)measureStringWidth:', targetStart);
+		const target = native.slice(targetStart, targetEnd);
+		assert.match(target, /lastFocusedWorkScreen/);
+		assert.match(target, /transitionInFlight && self\.layoutScreen/);
+		assert.doesNotMatch(target, /\[NSEvent mouseLocation\]/);
 		assert.match(native, /self\.layoutScreen = screen/);
 	});
 });
