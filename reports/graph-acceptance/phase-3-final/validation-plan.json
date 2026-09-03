@@ -1,14 +1,25 @@
 {
-  "runId": "2026-09-03T09-22-07-408Z",
+  "runId": "2026-09-03T09-29-37-262Z",
   "planKey": "2a0411ce35ddb63bd874a456fee55d39dd7edb7b182b0aec0fcecfc9ddc5ecc7:only",
   "tier": "release",
   "onlyProducers": [
-    "magnus-electron-tools",
-    "load-quit"
+    "core-ide",
+    "temporal-small",
+    "magnus-streaming-smoke",
+    "magnus-live-activity",
+    "privacy",
+    "runtime-preview",
+    "hybrid-web-smoke",
+    "magnus-guidance-smoke",
+    "parser-benchmark",
+    "electron-product-path",
+    "electron-native-cases",
+    "lifecycle-cycles",
+    "magnus-electron-tools"
   ],
-  "plannedAtHead": "46604a18305e3ad56a12bc7bc268d5b86ec70246",
-  "currentHead": "46604a18305e3ad56a12bc7bc268d5b86ec70246",
-  "sourceHead": "46604a18305e3ad56a12bc7bc268d5b86ec70246",
+  "plannedAtHead": "110b78184a2f51a4347e5fdc0a4330b03f157ed8",
+  "currentHead": "110b78184a2f51a4347e5fdc0a4330b03f157ed8",
+  "sourceHead": "110b78184a2f51a4347e5fdc0a4330b03f157ed8",
   "productFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
   "sourceFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
   "prerequisites": {
@@ -17,9 +28,9 @@
     "geminiConfigured": false,
     "darwin": false
   },
-  "createdAt": "2026-09-03T09:22:08.303Z",
+  "createdAt": "2026-09-03T09:29:38.136Z",
   "reused": false,
-  "totalEstimatedDurationMs": 270000,
+  "totalEstimatedDurationMs": 0,
   "changedPathCount": 0,
   "changedDomains": [],
   "unknownChangedPaths": [],
@@ -148,7 +159,7 @@
       "id": "temporal-large",
       "expectedProducerFingerprint": "0a9e7de5f7c6017272a6e7a119505b18116c51c237797daf5b9c5df4433f1422",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 150000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -166,7 +177,7 @@
       "id": "temporal-canonical-scale",
       "expectedProducerFingerprint": "d9177de125a586466d5fe903ce2b6b198dc54a87d9045015d1c2afe16b2573ef",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 300000,
       "timeoutMs": 600000,
       "artifacts": [
@@ -185,7 +196,7 @@
       "expectedProducerFingerprint": "a0e5783e30765633b62082e02d258f2cf34f20a52f32344039a329da08d52ec3",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 26405,
+      "estimatedDurationMs": 30000,
       "timeoutMs": 180000,
       "artifacts": [
         "electron-product-path"
@@ -202,7 +213,7 @@
       "expectedProducerFingerprint": "2648407d4fb2f2204ec659ea79f947217562a589be1f2af2b19e9dc4b7a7c7a6",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 34087,
+      "estimatedDurationMs": 35000,
       "timeoutMs": 240000,
       "artifacts": [
         "electron-native-cases"
@@ -218,7 +229,7 @@
       "id": "tauri-product-path",
       "expectedProducerFingerprint": "186f7ee49fa17d0dccff350f580ec8ac8a2c0a228a77106e430f2fb884028f56",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 30000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -234,9 +245,9 @@
     {
       "id": "magnus-electron-tools",
       "expectedProducerFingerprint": "646afc20b5ac61363ecb9c496aa5188ed55b6aa8128080fbc677f15a87337583",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
-      "estimatedDurationMs": 150000,
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 145960,
       "timeoutMs": 300000,
       "artifacts": [
         "magnus-electron-tools"
@@ -247,24 +258,13 @@
         "electron-test-lab",
         "desktop-runtime",
         "launch-harness"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-09-03T09:22:14.398Z",
-        "finishedAt": "2026-09-03T09:24:40.394Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 145960,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-electron-tools.log",
-        "leftoverPids": [],
-        "attempts": 1
-      }
+      ]
     },
     {
       "id": "magnus-tauri-tools",
       "expectedProducerFingerprint": "064413a29fb33199b9cda0220a1cafcff18559ee1235e16f79ff0601431e4a54",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 240000,
       "timeoutMs": 420000,
       "artifacts": [
@@ -314,8 +314,8 @@
     {
       "id": "load-quit",
       "expectedProducerFingerprint": "279694c616614c1b3dde60e240664a6df5c20d6bb06ed6d69c5886465c5c05ac",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "status": "SKIPPED",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -332,25 +332,14 @@
         "launch-harness",
         "load-quit-lab",
         "live-activity"
-      ],
-      "execution": {
-        "status": "FAILED",
-        "startedAt": "2026-09-03T09:24:40.447Z",
-        "finishedAt": "2026-09-03T09:28:40.605Z",
-        "exitCode": 1,
-        "timedOut": true,
-        "durationMs": 240125,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log",
-        "leftoverPids": [],
-        "attempts": 1
-      }
+      ]
     },
     {
       "id": "lifecycle-cycles",
       "expectedProducerFingerprint": "9e3708dcab5270ad992f17c267c7eb3fc1892cdffeb30d535edb932c189ab8c3",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 63377,
+      "estimatedDurationMs": 90000,
       "timeoutMs": 1500000,
       "artifacts": [
         "lifecycle-cycles"
@@ -367,7 +356,7 @@
       "id": "electron-restart-soak",
       "expectedProducerFingerprint": "547e5a7d8075b85563e211cc7d59466bea96e24ea4217e736650c7f25e95a57a",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 900000,
       "timeoutMs": 5400000,
       "artifacts": [
@@ -383,7 +372,7 @@
       "id": "tauri-restart-soak",
       "expectedProducerFingerprint": "c5bc3494a3bf49c44ca2a2370f4529144f2c2ce18a0088757ae378445afda1c4",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 240000,
       "timeoutMs": 3600000,
       "artifacts": [
@@ -399,7 +388,7 @@
       "id": "idle-soak",
       "expectedProducerFingerprint": "5b6ecc6bd2ae4a34dd412e3b200db1f5bd56f62501bdfe6a4aff2e2c13b9ffd0",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 900000,
       "timeoutMs": 1140000,
       "artifacts": [
@@ -415,7 +404,7 @@
       "id": "active-soak",
       "expectedProducerFingerprint": "e90ec68655dd26c96d3bcb3839ad9f8fdb1189a4dd359f0913c530f36fd9503d",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 720000,
       "timeoutMs": 960000,
       "artifacts": [
@@ -436,7 +425,7 @@
       "id": "assurance",
       "expectedProducerFingerprint": "59c77fe6140c1acdf90b9370a9590c42d59bb2a0558e01297d265636d4b21f5b",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
+      "reason": "excluded by --only-producer (selected: core-ide, temporal-small, magnus-streaming-smoke, magnus-live-activity, privacy, runtime-preview, hybrid-web-smoke, magnus-guidance-smoke, parser-benchmark, electron-product-path, electron-native-cases, lifecycle-cycles, magnus-electron-tools)",
       "estimatedDurationMs": 480000,
       "timeoutMs": 480000,
       "artifacts": [
