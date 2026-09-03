@@ -561,7 +561,8 @@ export async function launchPreBase(repo, workspace, extraArgs = [], options = {
 }
 
 export async function findGraphFrame(page) {
-	for (const frame of page.frames()) {
+	const frames = typeof page.frames === 'function' ? page.frames() : [];
+	for (const frame of frames) {
 		if (frame.url().includes('graph-editor')) {
 			return frame;
 		}
@@ -569,7 +570,34 @@ export async function findGraphFrame(page) {
 		if (count > 0) {
 			return frame;
 		}
+		const children = typeof frame.childFrames === 'function' ? frame.childFrames() : [];
+		for (const child of children) {
+			const childCount = await child.locator('#netCanvas').count().catch(() => 0);
+			if (childCount > 0) {
+				return child;
+			}
+		}
 	}
+	try {
+		if (typeof page.locator === 'function') {
+			for (const iframe of await page.locator('iframe').all()) {
+				const contentFrame = await iframe.contentFrame().catch(() => null);
+				if (contentFrame) {
+					const count = await contentFrame.locator('#netCanvas').count().catch(() => 0);
+					if (count > 0) {
+						return contentFrame;
+					}
+					const children = typeof contentFrame.childFrames === 'function' ? contentFrame.childFrames() : [];
+					for (const child of children) {
+						const childCount = await child.locator('#netCanvas').count().catch(() => 0);
+						if (childCount > 0) {
+							return child;
+						}
+					}
+				}
+			}
+		}
+	} catch { /* best effort nested iframe search */ }
 	return undefined;
 }
 

@@ -1,0 +1,56 @@
+{
+  "phase": "3-final",
+  "role": "code-reviewer-editor",
+  "generatedAt": "2026-09-03T17:53:00-04:00",
+  "iconsEdited": false,
+  "gitMutatingCommands": false,
+  "productionEdited": true,
+  "findingsFixed": [
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "simulateSubmitFollowUp: did not check whether self.input was hidden, allowing synthetic follow-up submissions in compact or peek-only states where user interaction is forbidden.",
+      "impact": "Violated fail-closed security contract for Magnus Live Activity user input when the panel is in peek presentation.",
+      "change": "Added || self.input.hidden to simulateSubmitFollowUp: precondition guard. Recompiled native addon with Apple Clang."
+    },
+    {
+      "file": "graphs/src/host/workbench/graphEditor.ts",
+      "rootCause": "PreBaseGraphEditor listened to onDidChangeViewState with _pushSnapshot() only, without updating _inputType or initializing temporalViewService when graphType switched dynamically.",
+      "impact": "Switching from Code Graph to Temporal via commands or Maps sidebar left the editor pane in network mode with uninitialized temporal view state, causing live acceptance failures.",
+      "change": "Updated onDidChangeViewState handler to detect graphType transitions, update _inputType, initialize temporalViewService, push temporal state/diff, and push updated snapshot."
+    },
+    {
+      "file": "graphs/src/host/workbench/graphEditorInput.ts",
+      "rootCause": "PreBaseGraphEditorInput had immutable resource URI and graphType properties despite matches() returning true to enforce single-pane reuse.",
+      "impact": "When switching between Code Graph and Temporal, the editor tab label and icon remained stuck on the initial mode without reflecting active view state.",
+      "change": "Implemented setGraphType() with reactive _resource mutation and _onDidChangeLabel firing while preserving matches() singleton reuse."
+    },
+    {
+      "file": "graphs/src/host/workbench/graphContribution.ts",
+      "rootCause": "openGraphEditor and openTemporalGraphEditor did not synchronize the active editor input's graphType, and prebase.temporal.open was not registered as a command alias.",
+      "impact": "Commands opening Temporal could fail to update existing editor tab titles, and calls to prebase.temporal.open threw command-not-found errors.",
+      "change": "Added activeEditor.setGraphType() synchronization to openGraphEditor and openTemporalGraphEditor, and registered prebase.temporal.open alias."
+    },
+    {
+      "file": "build/lib/builtInExtensions.ts",
+      "rootCause": "controlFilePath was hardcoded to ~/.vscode-oss-dev/extensions/control.json, and writeControlFile threw unhandled EPERM errors when executed in sandboxed or read-only home directory environments.",
+      "impact": "PreBase launches failed during pre-launch built-in extension synchronization under terminal sandbox or containerized execution.",
+      "change": "Added VSCODE_EXTENSIONS_CONTROL_PATH environment override and wrapped writeControlFile in a safe try/catch block matching readControlFile resilience."
+    },
+    {
+      "file": "test/prebase/acceptance/workbenchHarness.mjs",
+      "rootCause": "findGraphFrame only inspected top-level page.frames() and matched on nonexistent 'graph-editor' URL substrings, failing to discover #netCanvas inside nested iframe trees.",
+      "impact": "Live acceptance tests for visual recovery and Code Graph frames reported false-negative timeouts.",
+      "change": "Expanded findGraphFrame to search childFrames() and nested iframe contentFrames, reliably locating the active canvas frame."
+    }
+  ],
+  "findingsRejected": [
+    {
+      "topic": "Reverting PreBaseGraphEditorInput.matches to strict equality",
+      "why": "Strict equality causes VS Code to open separate editor panes for Network and Temporal, creating duplicate WebGL/Canvas contexts and OOPIF renderers that increase process count during active soak. Single-pane reuse with dynamic setGraphType is the correct Ponytail architecture."
+    },
+    {
+      "topic": "Shortening active-soak duration",
+      "why": "Explicitly forbidden by persistent user instructions. The active-soak test must run full duration without threshold dilution."
+    }
+  ]
+}

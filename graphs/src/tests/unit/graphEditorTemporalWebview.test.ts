@@ -207,6 +207,33 @@ suite('GraphEditorTemporalWebview (Unit - Phase 3.5 VM & Webview)', () => {
 		assert.ok(temporal.matches(network));
 	});
 
+	test('1c. setGraphType transitions graphType, updates resource, and fires onDidChangeLabel', () => {
+		const input = new PreBaseGraphEditorInput('network');
+		assert.equal(input.graphType, 'network');
+		assert.equal(input.resource.path, '/network');
+		assert.equal(input.getName(), 'Code Graph');
+		assert.equal(input.getIcon().id, 'prebase-network-editor-icon');
+
+		let labelFired = 0;
+		input.onDidChangeLabel(() => { labelFired++; });
+
+		input.setGraphType('temporal');
+		assert.equal(input.graphType, 'temporal');
+		assert.equal(input.resource.path, '/temporal');
+		assert.equal(input.getName(), 'Temporal Graph');
+		assert.equal(input.getIcon().id, 'history');
+		assert.equal(labelFired, 1, 'onDidChangeLabel must fire on graphType transition');
+
+		// Idempotent: setting the same type does not fire again
+		input.setGraphType('temporal');
+		assert.equal(labelFired, 1);
+
+		input.setGraphType('network');
+		assert.equal(input.graphType, 'network');
+		assert.equal(input.resource.path, '/network');
+		assert.equal(labelFired, 2);
+	});
+
 	test('2. Visual position interpolation function computes synchronized node & edge positions', () => {
 		function getVisualNodePosition(
 			node: { entityId: string; x: number; y: number },

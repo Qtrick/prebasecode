@@ -88,7 +88,21 @@ export class PreBaseGraphEditor extends EditorPane {
 	) {
 		super(PreBaseGraphEditor.ID, group, telemetryService, themeService, storageService);
 		this._register(this.graphService.onDidChangeSnapshot(() => this._pushSnapshot()));
-		this._register(this.graphService.onDidChangeViewState(() => this._pushSnapshot()));
+		this._register(this.graphService.onDidChangeViewState(viewState => {
+			const targetType = (viewState.graphType === 'temporal' ? 'temporal' : 'network') as PreBaseGraphType;
+			if (targetType !== this._inputType) {
+				this._inputType = targetType;
+				if (this._inputType === 'temporal') {
+					void this.temporalViewService.initialize();
+					this._pushTemporalState(this.temporalViewService.getState());
+					const diff = this.temporalViewService.getState().diff;
+					if (diff) {
+						this._pushTemporalDiff(diff);
+					}
+				}
+			}
+			this._pushSnapshot();
+		}));
 		this._register(this.graphService.onDidChangeDiagnostics(() => this._pushSnapshot()));
 		this._register(this.graphService.onDidRequestCameraAction(action => {
 			this._webview?.postMessage({ type: action === 'reset' ? 'resetView' : 'fitView' });

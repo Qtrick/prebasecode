@@ -1733,7 +1733,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateSubmitFollowUp:(NSString *)text {
-	if (!text.length || self.screenLocked) {
+	if (!text.length || self.screenLocked || self.input.hidden) {
 		return NO;
 	}
 	self.input.stringValue = text;

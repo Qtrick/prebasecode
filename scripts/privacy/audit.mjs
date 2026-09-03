@@ -74,6 +74,8 @@ function auditProductJson() {
 		/visualstudio\.com\/vortex/i,
 		/crash\.reports/i,
 		/nps\.survey/i,
+		/mai\.microsoft\.com/i,
+		/falcon-caas/i,
 	];
 
 	const urlInventory = [];

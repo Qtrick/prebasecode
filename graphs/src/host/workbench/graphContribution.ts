@@ -42,6 +42,10 @@ async function openGraphEditor(accessor: ServicesAccessor): Promise<void> {
 	const editorService = accessor.get(IEditorService);
 	const graphService = accessor.get(IPreBaseGraphService);
 	await graphService.setGraphType('network');
+	const activeEditor = editorService.activeEditor;
+	if (activeEditor instanceof PreBaseGraphEditorInput) {
+		activeEditor.setGraphType('network');
+	}
 	await editorService.openEditor(PreBaseGraphEditorInput.create('network'), { pinned: true, revealIfOpened: true, revealIfVisible: true });
 }
 
@@ -49,6 +53,10 @@ async function openTemporalGraphEditor(accessor: ServicesAccessor): Promise<void
 	const editorService = accessor.get(IEditorService);
 	const graphService = accessor.get(IPreBaseGraphService);
 	await graphService.setGraphType('temporal');
+	const activeEditor = editorService.activeEditor;
+	if (activeEditor instanceof PreBaseGraphEditorInput) {
+		activeEditor.setGraphType('temporal');
+	}
 	await editorService.openEditor(PreBaseGraphEditorInput.create('temporal'), { pinned: true, revealIfOpened: true, revealIfVisible: true });
 }
 
@@ -184,6 +192,13 @@ function registerGraphActions(): void {
 	registerAction2(class extends Action2 {
 		constructor() {
 			super({ id: PreBaseGraphCommandIds.openTemporal, title: localize2('prebase.graph.openTemporal', "Open Temporal Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
+		}
+		run(accessor: ServicesAccessor) { return openTemporalGraphEditor(accessor); }
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
+			super({ id: 'prebase.temporal.open', title: localize2('prebase.temporal.open', "Open Temporal Graph"), category: localize2('prebase.category', "PreBase"), f1: false });
 		}
 		run(accessor: ServicesAccessor) { return openTemporalGraphEditor(accessor); }
 	});

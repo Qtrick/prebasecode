@@ -38,7 +38,7 @@ const root = path.dirname(path.dirname(import.meta.dirname));
 const productjson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../../product.json'), 'utf8'));
 const builtInExtensions = productjson.builtInExtensions as IExtensionDefinition[] || [];
 const webBuiltInExtensions = productjson.webBuiltInExtensions as IExtensionDefinition[] || [];
-const controlFilePath = path.join(os.homedir(), '.vscode-oss-dev', 'extensions', 'control.json');
+const controlFilePath = process.env['VSCODE_EXTENSIONS_CONTROL_PATH'] || path.join(os.homedir(), '.vscode-oss-dev', 'extensions', 'control.json');
 const ENABLE_LOGGING = !process.env['VSCODE_BUILD_BUILTIN_EXTENSIONS_SILENCE_PLEASE'];
 
 function log(...messages: string[]): void {
@@ -165,8 +165,12 @@ function readControlFile(): IControlFile {
 }
 
 function writeControlFile(control: IControlFile): void {
-	fs.mkdirSync(path.dirname(controlFilePath), { recursive: true });
-	fs.writeFileSync(controlFilePath, JSON.stringify(control, null, 2));
+	try {
+		fs.mkdirSync(path.dirname(controlFilePath), { recursive: true });
+		fs.writeFileSync(controlFilePath, JSON.stringify(control, null, 2));
+	} catch {
+		// Sandboxed / read-only home environments
+	}
 }
 
 export function getBuiltInExtensions(): Promise<void> {

@@ -317,12 +317,21 @@ async function run() {
 			throw new Error('simulateAction option 1 must succeed');
 		}
 
-		// Follow up simulation
+		// Follow up simulation (click into interactive mode to make input available)
+		native.simulateAction('click');
 		const followUpSim = native.simulateAction('followUp', 'deploy with verbose logging');
 		test5.details.followUpSim = followUpSim;
 		if (followUpSim !== true) {
 			throw new Error('simulateAction followUp must succeed');
 		}
+		native.setSnapshot({
+			revision: 201,
+			sessionId: 'question-session',
+			status: 'idle',
+			prebaseForeground: false,
+		});
+		native.simulateAction('escape');
+		await sleep(50);
 	} catch (err) {
 		test5.ok = false;
 		test5.error = err.message;

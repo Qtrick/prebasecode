@@ -19,13 +19,24 @@ export class PreBaseGraphEditorInput extends EditorInput {
 		return new PreBaseGraphEditorInput(graphType === 'temporal' ? 'temporal' : 'network');
 	}
 
-	readonly resource: URI;
-	readonly graphType: PreBaseGraphType;
+	private _resource: URI;
+	override get resource(): URI { return this._resource; }
+	private _graphType: PreBaseGraphType;
+	get graphType(): PreBaseGraphType { return this._graphType; }
 
 	constructor(graphType: PreBaseGraphType) {
 		super();
-		this.graphType = graphType;
-		this.resource = URI.from({ scheme: PREBASE_GRAPH_SCHEME, path: `/${graphType}` });
+		this._graphType = graphType === 'temporal' ? 'temporal' : 'network';
+		this._resource = URI.from({ scheme: PREBASE_GRAPH_SCHEME, path: `/${this._graphType}` });
+	}
+
+	setGraphType(graphType: PreBaseGraphType): void {
+		const normalized: PreBaseGraphType = graphType === 'temporal' ? 'temporal' : 'network';
+		if (this._graphType !== normalized) {
+			this._graphType = normalized;
+			this._resource = URI.from({ scheme: PREBASE_GRAPH_SCHEME, path: `/${normalized}` });
+			this._onDidChangeLabel.fire();
+		}
 	}
 
 	override get typeId(): string {

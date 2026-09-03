@@ -1,5 +1,5 @@
 {
-  "at": "2026-09-03T12:22:07.551Z",
+  "at": "2026-09-03T21:41:07.313Z",
   "mode": "deterministic-fixtures",
   "note": "Compares LinkUp snippet-only envelopes with LinkUp+Firecrawl hybrid on the same ranked URLs. Not a live provider score.",
   "rows": [
@@ -21,7 +21,7 @@
         "payloadChars": 292,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 22,
+        "latencyMs": 11,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://www.typescriptlang.org/docs/handbook/release-notes/typescript-5-9.html"
@@ -51,7 +51,7 @@
         "payloadChars": 304,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 0,
+        "latencyMs": 1,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://code.visualstudio.com/api/extension-guides/language-model"
@@ -81,7 +81,7 @@
         "payloadChars": 251,
         "enriched": 1,
         "truncated": false,
-        "latencyMs": 1,
+        "latencyMs": 0,
         "containsVerifiedPhrase": true,
         "citationUrls": [
           "https://github.com/microsoft/vscode/issues/1"

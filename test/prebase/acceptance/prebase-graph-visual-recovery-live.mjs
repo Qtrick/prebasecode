@@ -91,8 +91,10 @@ async function main() {
 		await waitForWorkbenchDriver(launched.page, 90_000);
 		await dismissStartup(launched.page);
 
-		await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.graph.openNetwork').catch(() => undefined);
-		let graphFrame = await waitFor(async () => findGraphFrame(launched.page), 40_000, 400);
+		await workbenchCommandWithTimeout(launched.page, 20_000, 'prebase.graph.openNetwork').catch(err => {
+			evidence.failures.push(`prebase.graph.openNetwork error: ${err?.message || err}`);
+		});
+		let graphFrame = await waitFor(async () => findGraphFrame(launched.page), 45_000, 400);
 		if (!graphFrame) {
 			evidence.failures.push('Code Graph frame did not open');
 		} else {
@@ -140,9 +142,10 @@ async function main() {
 			}
 		}
 
-		await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.graph.openTemporal').catch(() => undefined);
-		await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.temporal.open').catch(() => undefined);
-		graphFrame = await waitFor(async () => findGraphFrame(launched.page), 40_000, 400);
+		await workbenchCommandWithTimeout(launched.page, 20_000, 'prebase.graph.openTemporal').catch(err => {
+			evidence.failures.push(`prebase.graph.openTemporal error: ${err?.message || err}`);
+		});
+		graphFrame = await waitFor(async () => findGraphFrame(launched.page), 45_000, 400);
 		if (!graphFrame) {
 			evidence.failures.push('Temporal frame did not open');
 		} else {

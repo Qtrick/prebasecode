@@ -1,0 +1,70 @@
+{
+  "phase": "3-final",
+  "role": "mandatory-test-writer",
+  "generatedAt": "2026-09-03T17:52:00-04:00",
+  "scope": {
+    "productionFilesInspected": [
+      "native/prebase-live-activity/src/live_activity.mm",
+      "graphs/src/host/workbench/graphEditor.ts",
+      "graphs/src/host/workbench/graphEditorInput.ts",
+      "graphs/src/host/workbench/graphContribution.ts",
+      "build/lib/builtInExtensions.ts",
+      "test/prebase/acceptance/workbenchHarness.mjs",
+      "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+      "test/prebase/acceptance/prebase-graph-visual-recovery-live.mjs"
+    ],
+    "uncommittedChangesInspected": true,
+    "productionEdited": true,
+    "iconsEdited": false
+  },
+  "behaviorsEnumerated": [
+    {
+      "id": "live-activity-hidden-input-fail-closed",
+      "behaviors": [
+        "simulateSubmitFollowUp fails closed (returns NO) when self.input is hidden",
+        "interactive mode unhides self.input and allows valid followUp text submission",
+        "Escape dismisses attention and resets peek state cleanly",
+        "stale attention snapshot republishing does not violate user dismissal"
+      ],
+      "testFile": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+      "coverage": "implemented"
+    },
+    {
+      "id": "graph-editor-reactive-switching",
+      "behaviors": [
+        "PreBaseGraphEditorInput.matches preserves singleton editor pane reuse across Network and Temporal modes",
+        "setGraphType mutates graphType and resource URI (prebase-graph:/network vs prebase-graph:/temporal) and triggers onDidChangeLabel",
+        "openGraphEditor and openTemporalGraphEditor synchronize active editor graphType and tab presentation",
+        "PreBaseGraphEditor dynamically syncs _inputType from graphService onDidChangeViewState and initializes temporalViewService",
+        "prebase.temporal.open registered as command alias for openTemporal"
+      ],
+      "testFile": "graphs/src/tests/unit/graphEditorTemporalWebview.test.ts",
+      "coverage": "implemented"
+    },
+    {
+      "id": "workbench-harness-frame-resolution",
+      "behaviors": [
+        "findGraphFrame traverses page.frames() and all frame.childFrames() recursively",
+        "findGraphFrame inspects iframe contentFrames for canvas presence",
+        "findGraphFrame preserves mockFrame contract and Promise await semantics"
+      ],
+      "testFile": "test/prebase/acceptance/phase3HarnessLogic.test.mjs",
+      "coverage": "implemented"
+    },
+    {
+      "id": "build-sandbox-resilience",
+      "behaviors": [
+        "builtInExtensions.ts respects VSCODE_EXTENSIONS_CONTROL_PATH override",
+        "writeControlFile catches EPERM safely in sandboxed / read-only home environments"
+      ],
+      "testFile": "build/lib/builtInExtensions.ts",
+      "coverage": "implemented"
+    }
+  ],
+  "verification": {
+    "testGraphs": "passed (62 test files)",
+    "phase3HarnessLogic": "passed (126 tests)",
+    "liveActivityContracts": "passed",
+    "liveActivityPerf": "passed (11/11 tests)"
+  }
+}
