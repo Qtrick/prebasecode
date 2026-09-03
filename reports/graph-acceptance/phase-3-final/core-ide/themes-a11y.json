@@ -1,12 +1,12 @@
 {
   "schemaVersion": 3,
   "scenario": "themes-a11y",
-  "sourceHead": "9c2beb0f01881d9990a8dab9e998b3db83859624",
-  "sourceFingerprint": "5e66a6f2aad0d6ff1f7232c6655a57777538cceeec1fcae8f0d1e64263b5fb8b",
-  "productFingerprint": "5e66a6f2aad0d6ff1f7232c6655a57777538cceeec1fcae8f0d1e64263b5fb8b",
-  "generatedAt": "2026-09-03T06:23:51.712Z",
+  "sourceHead": "53f884958c5faf2b755ff0b22d908ab4e06432e5",
+  "sourceFingerprint": "cd2e6e6b3e386c4ab205954b5188b46d90070352f132d5301b26a2a60025eb0f",
+  "productFingerprint": "cd2e6e6b3e386c4ab205954b5188b46d90070352f132d5301b26a2a60025eb0f",
+  "generatedAt": "2026-09-03T07:19:25.768Z",
   "producerId": "core-ide",
-  "producerFingerprint": "ca144c7a2bbfd1c10667441957ab4a14556cec8b78a5bacf40325f7c53006425",
+  "producerFingerprint": "68de050c3cc0b5e9753f0be07652dec45952766fc1f81264845d2fd7b57928e6",
   "ok": true,
   "failures": [],
   "themes": {
@@ -14,7 +14,7 @@
       "query": "PreBase Light",
       "settingsId": "PreBase Light",
       "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center vs vscode-theme-defaults-themes-prebase_light-json",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium nopanel panel-position-bottom panel-alignment-center vs vscode-theme-defaults-themes-prebase_light-json",
       "colorTheme": "PreBase Light",
       "colorThemeType": "light",
       "pickerVisible": true,
@@ -24,7 +24,7 @@
       "query": "Default High Contrast",
       "settingsId": "Default High Contrast",
       "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-black vscode-theme-defaults-themes-hc_black-json",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium nopanel panel-position-bottom panel-alignment-center hc-black vscode-theme-defaults-themes-hc_black-json",
       "colorTheme": "Default High Contrast",
       "colorThemeType": "hcDark",
       "pickerVisible": true,
@@ -34,7 +34,7 @@
       "query": "Default High Contrast Light",
       "settingsId": "Default High Contrast Light",
       "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium nopanel panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
       "colorTheme": "Default High Contrast Light",
       "colorThemeType": "hcLight",
       "pickerVisible": true,
@@ -43,8 +43,8 @@
     "dark": {
       "query": "PreBase Dark",
       "settingsId": "PreBase Dark",
-      "applied": false,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
+      "applied": true,
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium nopanel panel-position-bottom panel-alignment-center vs-dark vscode-theme-defaults-themes-prebase_dark-json",
       "colorTheme": "PreBase Dark",
       "colorThemeType": "dark",
       "pickerVisible": true,
@@ -64,11 +64,11 @@
     "zoom200": true,
     "beforeZoom": {
       "zoomLevel": 0,
-      "innerWidth": 1444
+      "innerWidth": 1448
     },
     "afterZoom": {
       "zoomLevel": 4,
-      "innerWidth": 1444
+      "innerWidth": 1448
     },
     "screenReaderAuto": "auto",
     "screenReaderOn": "on",
@@ -92,10 +92,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "73892       1 48.5 283788 prebase",
+    "before": "92067       1 48.4 281748 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 368,
+    "latencyMs": 371,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

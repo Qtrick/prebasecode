@@ -1,6 +1,6 @@
 {
-  "runId": "2026-09-03T06-49-41-335Z",
-  "planKey": "680530cdd32f6d37b214cbb4d76897fa13f8f90d60d59646a362f3bbd00841e7:only",
+  "runId": "2026-09-03T07-20-53-075Z",
+  "planKey": "07101f17e8761b17b392460df2ed157b61823738da7ca579e0672976508f1b88:only",
   "tier": "release",
   "onlyProducers": [
     "magnus-streaming-smoke",
@@ -8,18 +8,18 @@
     "core-ide",
     "temporal-small"
   ],
-  "plannedAtHead": "392efadb12c56ba1bd1fbfafff031cf959539366",
-  "currentHead": "392efadb12c56ba1bd1fbfafff031cf959539366",
-  "sourceHead": "392efadb12c56ba1bd1fbfafff031cf959539366",
-  "productFingerprint": "8f9aaac786dd32fd7e9d8f83a0036b8fecc59214e0640459bea2eaa9192cb74e",
-  "sourceFingerprint": "8f9aaac786dd32fd7e9d8f83a0036b8fecc59214e0640459bea2eaa9192cb74e",
+  "plannedAtHead": "53f884958c5faf2b755ff0b22d908ab4e06432e5",
+  "currentHead": "53f884958c5faf2b755ff0b22d908ab4e06432e5",
+  "sourceHead": "53f884958c5faf2b755ff0b22d908ab4e06432e5",
+  "productFingerprint": "cd2e6e6b3e386c4ab205954b5188b46d90070352f132d5301b26a2a60025eb0f",
+  "sourceFingerprint": "cd2e6e6b3e386c4ab205954b5188b46d90070352f132d5301b26a2a60025eb0f",
   "prerequisites": {
     "firecrawlConfigured": false,
     "linkupConfigured": false,
     "geminiConfigured": false,
     "darwin": false
   },
-  "createdAt": "2026-09-03T06:49:42.198Z",
+  "createdAt": "2026-09-03T07:20:53.942Z",
   "reused": false,
   "totalEstimatedDurationMs": 0,
   "changedPathCount": 0,
@@ -29,7 +29,7 @@
   "producers": [
     {
       "id": "parser-benchmark",
-      "expectedProducerFingerprint": "aa34d6958029dbdae9241ffad6296544c02e2b0862343729129476c0f189484f",
+      "expectedProducerFingerprint": "f902f2641014884415b0b6bac2c0ee1df7682464301429cb501701b333313a13",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 90000,
@@ -43,7 +43,7 @@
     },
     {
       "id": "magnus-streaming-smoke",
-      "expectedProducerFingerprint": "55771461319b9de67d2a0244537b48170ed319bf1df5a9a8bf733da34197f2a0",
+      "expectedProducerFingerprint": "5c78d6fcdabbeafef94e674c1c5ac2e6c3989ecae5c5cf7a24242792d28f81ea",
       "status": "CURRENT_GREEN",
       "reason": "current",
       "estimatedDurationMs": 45000,
@@ -60,7 +60,7 @@
     },
     {
       "id": "magnus-guidance-smoke",
-      "expectedProducerFingerprint": "38e17fe984336b1630dbfac3c901013a4a60b33c410bbd64bee7c7a507e01ef2",
+      "expectedProducerFingerprint": "bcf0fd07e1746bf791636cba339c56ceaafb1a65896ff79d39d88e7a84638e08",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 10557,
@@ -77,7 +77,7 @@
     },
     {
       "id": "magnus-live-activity",
-      "expectedProducerFingerprint": "ccbce1a4d4f91588c25fa1012cdf4b2203059b88c2ab8b49b119347c1f180903",
+      "expectedProducerFingerprint": "7aa7634f56b4de23a165e139dc67c64219ecb64f96dd839582703ae79c1fe1b5",
       "status": "EXTERNAL",
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
       "estimatedDurationMs": 45000,
@@ -93,7 +93,7 @@
     },
     {
       "id": "core-ide",
-      "expectedProducerFingerprint": "ca144c7a2bbfd1c10667441957ab4a14556cec8b78a5bacf40325f7c53006425",
+      "expectedProducerFingerprint": "68de050c3cc0b5e9753f0be07652dec45952766fc1f81264845d2fd7b57928e6",
       "status": "CURRENT_GREEN",
       "reason": "current",
       "estimatedDurationMs": 120000,
@@ -130,7 +130,7 @@
     },
     {
       "id": "temporal-small",
-      "expectedProducerFingerprint": "80c203e31d7dd3add01d44b5d7a48655470b5a76f6ac7821d43ff59b6afcedd3",
+      "expectedProducerFingerprint": "2c72abf361f30d590b5749ee132bfab2bf1bc0c11dac99b9e69a237dbff7f493",
       "status": "CURRENT_GREEN",
       "reason": "current",
       "estimatedDurationMs": 90000,
@@ -148,7 +148,7 @@
     },
     {
       "id": "temporal-large",
-      "expectedProducerFingerprint": "e69c6f23a69553dfa9813849814f09cb8e042c8c873edd2e30e2095233a392b0",
+      "expectedProducerFingerprint": "f8c73256ea03c5a2ebbc11085490612df0fcec2cd69db214ce335f485ad0e8c3",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 150000,
@@ -166,7 +166,7 @@
     },
     {
       "id": "temporal-canonical-scale",
-      "expectedProducerFingerprint": "3a7e4b7accf77d1c3bb6fb8234efc53abace8d3d0af8194549bd5f6d3d428b7a",
+      "expectedProducerFingerprint": "77e6e6617ac96fb65356ce8787af8239c70f3675aeb434957a0269c663b9fae4",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 300000,
@@ -184,7 +184,7 @@
     },
     {
       "id": "electron-product-path",
-      "expectedProducerFingerprint": "7066ed342a30f6f7cab882cc7e121d2abafb4d6ed596dbffb3fb0c0c0e614875",
+      "expectedProducerFingerprint": "707e35fd84f1c359209d646f161d23f0128e5c687650963ad758a51e040a132e",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 30000,
@@ -201,7 +201,7 @@
     },
     {
       "id": "electron-native-cases",
-      "expectedProducerFingerprint": "62031f7e48e3323a39219cd35cfcb62adc5296211eba784769caaa25d0a82d3c",
+      "expectedProducerFingerprint": "213704d0cb4f866b42d25d9b0a0a4e67061d6eb6297a20f123a4473cd65f38ee",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 35000,
@@ -218,7 +218,7 @@
     },
     {
       "id": "tauri-product-path",
-      "expectedProducerFingerprint": "5382db3e47234322ebe044f5c6c9936a228fb2e286e22d78ef9171af9f97f060",
+      "expectedProducerFingerprint": "6389f2be1c1f171a6e6dfe66ad5efdbd54a1ec46781149a5bf84838ebf072671",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 30000,
@@ -235,7 +235,7 @@
     },
     {
       "id": "magnus-electron-tools",
-      "expectedProducerFingerprint": "ff9834585dd2e21b6f1fe5c97603cb95dfe5f091192f0cfc2952c61ae3c65e08",
+      "expectedProducerFingerprint": "0e97d3f437e3f14cf7242438a06f6e6f51f66b693bc1e15d11ef193699ebc275",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 150000,
@@ -253,7 +253,7 @@
     },
     {
       "id": "magnus-tauri-tools",
-      "expectedProducerFingerprint": "457eff30ed9173715863812d297374c2b45a76bdf9a2038a76bb8fcbff6156ef",
+      "expectedProducerFingerprint": "1ef0737c14d8926b8e1f59cbc751549c29a99d424efab84fa4596d51201eaa30",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 240000,
@@ -288,7 +288,7 @@
     },
     {
       "id": "privacy",
-      "expectedProducerFingerprint": "72768af0fa450837599e06df6e1faa518a991ca77a3fa7951ea2dd6e6195d2fa",
+      "expectedProducerFingerprint": "ca714c98c86fe4a7c5f9d7e19563fd6a5d5b7f1b05d6b09a6e4625af0ea36d51",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 90000,
@@ -304,7 +304,7 @@
     },
     {
       "id": "load-quit",
-      "expectedProducerFingerprint": "c69ac1f196316125f11d1ef331400cdfe1074f3b0818630c3c2364afa315b8f9",
+      "expectedProducerFingerprint": "de2e57205a31f1eefb5a6c8344f30987e512047177c27d2e2c7f5a4d45f2ffbe",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 120000,
@@ -327,7 +327,7 @@
     },
     {
       "id": "lifecycle-cycles",
-      "expectedProducerFingerprint": "da922f939cc884bd240eb37580d819637206d22d1da9888f56461c61ec849aa9",
+      "expectedProducerFingerprint": "cba95e5f9c4212b454e01f53a5791752ee1e0bef0188aeffb17f603fa20a1802",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 90000,
@@ -345,7 +345,7 @@
     },
     {
       "id": "electron-restart-soak",
-      "expectedProducerFingerprint": "286b06567ea44d7c32ca9fd72d63dd173f68674e5992774405531322158a52a9",
+      "expectedProducerFingerprint": "bcf546308b30cbdaafc213feef82ed937cdbc6c7256797189fc20f9379a5f46f",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 900000,
@@ -361,7 +361,7 @@
     },
     {
       "id": "tauri-restart-soak",
-      "expectedProducerFingerprint": "02355e443c9af19dfd01a877dabded125ddbd4119030c2d0952a4be30c118730",
+      "expectedProducerFingerprint": "ec4400d2b6c3539d03615bee2ed371ba83a92bf6a38b9e15574ef6706f9ab77f",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 240000,
@@ -377,7 +377,7 @@
     },
     {
       "id": "idle-soak",
-      "expectedProducerFingerprint": "9fc37337465cc092ea8c05eecc2c189150c38651686d41c88be4fc7829c14c5b",
+      "expectedProducerFingerprint": "f3b6d7214def80663def2c75a6a2edc2520fd14d86ee6cbdff3d9fc573f18e17",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 900000,
@@ -393,7 +393,7 @@
     },
     {
       "id": "active-soak",
-      "expectedProducerFingerprint": "ad13e32958913dbcdc696ce40a502801c979ac90af82028bf335b197bc12faac",
+      "expectedProducerFingerprint": "383c59a3935da46a71b4a16bc88ba85e4471150499113afcbfac514b85af2b20",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 720000,
@@ -414,7 +414,7 @@
     },
     {
       "id": "assurance",
-      "expectedProducerFingerprint": "53f4af76504e84a9ce33ab7ebdc35d9594e1e717dfa9e2564ab7c3f3d68e532e",
+      "expectedProducerFingerprint": "a78c7361b51b570f988d245cc7d58e031f56914da3ddb8dd3521c9879dc4feb1",
       "status": "SKIPPED",
       "reason": "excluded by --only-producer (selected: magnus-streaming-smoke, magnus-live-activity, core-ide, temporal-small)",
       "estimatedDurationMs": 480000,
