@@ -4,8 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdtempSync } from 'node:fs';
 import {
 	acquirePhase3AcceptanceLock,
 	dismissStartup,
@@ -53,6 +55,13 @@ async function readChatText(page) {
 	}).catch(() => '');
 }
 
+async function dismissMcpAutostart(page) {
+	// Skip is a trusted markdown command link, not a button role.
+	await workbenchCommand(page, 'workbench.mcp.skipAutostart').catch(() => undefined);
+	await page.getByText(/^Skip\??$/i).first().click({ timeout: 1_500 }).catch(() => undefined);
+	await page.locator('a').filter({ hasText: /^Skip\??$/i }).first().click({ timeout: 1_500 }).catch(() => undefined);
+}
+
 async function run() {
 	const release = await acquirePhase3AcceptanceLock();
 	mkdirSync(evidenceDir, { recursive: true });
@@ -63,7 +72,20 @@ async function run() {
 		testKind: 'live-runtime',
 	};
 	try {
-		launched = await launchPreBase(repo, repo);
+		// Isolated workspace: PreBase repo .vscode/mcp.json would autostart
+		// component-explorer / vscode-automation-mcp and block chat on "Starting MCP…".
+		const workspace = mkdtempSync(join(tmpdir(), 'pb-magnus-stream-ws-'));
+		writeFileSync(join(workspace, 'readme.md'), '# Magnus stream smoke workspace\n');
+		const profile = mkdtempSync(join(tmpdir(), 'pb-magnus-stream-'));
+		mkdirSync(join(profile, 'User'), { recursive: true });
+		writeFileSync(join(profile, 'User/settings.json'), `${JSON.stringify({
+			'chat.mcp.access': 'none',
+			'chat.mcp.autostart': 'never',
+			'chat.editor.defaultProvider': 'local',
+			'chat.editor.localAgent.enabled': true,
+			'prebase.magnus.defaultMode': 'ask',
+		}, null, 2)}\n`);
+		launched = await launchPreBase(repo, workspace, [], { userDataDir: profile });
 		evidence.prebasePid = launched.info.pid;
 		await dismissStartup(launched.page);
 		await workbenchCommand(launched.page, 'prebase.magnus.open').catch(() => undefined);
@@ -73,18 +95,19 @@ async function run() {
 		}, 20_000, 200);
 		evidence.smokeInstalled = Boolean(installed?.ok);
 		const startedAt = Date.now();
-		// Ask mode avoids Agent MCP queue; do not blockOnResponse (can hang on MCP startup).
+		// Ask + local harness; do not blockOnResponse (MCP interstitial can hang the command).
 		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
 			query: 'prebase-smoke-stream',
 			isPartialQuery: false,
 			mode: 'ask',
+			modelSelector: { vendor: 'magnus' },
 		}).catch(() => undefined);
-		// If MCP startup interstitial appears, skip it so Ask can stream.
-		await launched.page.getByRole('button', { name: /Skip\??/i }).first().click({ timeout: 2_000 }).catch(() => undefined);
+		await dismissMcpAutostart(launched.page);
 
 		let sourceChunksMax = 0;
 		let sourceChunksSawIncrease = false;
 		const first = await waitFor(async () => {
+			await dismissMcpAutostart(launched.page);
 			const diagnostics = await workbenchCommand(launched.page, 'prebase.test.getDiagnostics').catch(() => null);
 			const chunks = Number(diagnostics?.magnusSourceChunks ?? 0);
 			if (chunks > sourceChunksMax) {
@@ -108,7 +131,7 @@ async function run() {
 				return diagnostics;
 			}
 			return undefined;
-		}, 30_000, 150);
+		}, 45_000, 200);
 
 		// Headless source stream is only for cancel / second-request proof after UI is established.
 		const streamRes = await workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
@@ -158,8 +181,9 @@ async function run() {
 			query: 'prebase-smoke-stream-second',
 			isPartialQuery: false,
 			mode: 'ask',
+			modelSelector: { vendor: 'magnus' },
 		}).catch(() => undefined);
-		await launched.page.getByRole('button', { name: /Skip\??/i }).first().click({ timeout: 2_000 }).catch(() => undefined);
+		await dismissMcpAutostart(launched.page);
 		const secondRes = await workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
 			prompt: 'prebase-smoke-stream-second',
 		}).catch(() => null);

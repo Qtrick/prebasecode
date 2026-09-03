@@ -391,7 +391,13 @@ test('Magnus stream live path installs smoke transport then asks the chat partic
 	assert.match(source, /workbenchCommand\(launched\.page, 'workbench\.action\.chat\.open'/);
 	assert.match(source, /query: 'prebase-smoke-stream'/);
 	assert.match(source, /mode: 'ask'/);
-	assert.match(source, /getByRole\('button', \{ name: \/Skip/);
+	assert.match(source, /modelSelector:\s*\{\s*vendor:\s*'magnus'\s*\}/);
+	assert.match(source, /chat\.mcp\.access': 'none'/);
+	assert.match(source, /chat\.editor\.defaultProvider': 'local'/);
+	assert.match(source, /pb-magnus-stream-ws-/);
+	assert.match(source, /workbench\.mcp\.skipAutostart/);
+	assert.match(source, /getByText\(\/\^Skip/);
+	assert.doesNotMatch(source, /getByRole\('button', \{ name: \/Skip/);
 	assert.match(source, /prebase\.test\.getDiagnostics/);
 	assert.match(source, /magnusSourceChunks/);
 	assert.match(source, /sourceChunksMax/);
@@ -407,6 +413,7 @@ test('Magnus stream live path installs smoke transport then asks the chat partic
 	assert.doesNotMatch(source, /evidence\.uiSample = \(secondRes\?\.collected/);
 	assert.doesNotMatch(source, /streamGenerate\(/);
 	assert.doesNotMatch(source, /new MagnusSmokeTransportAdapter/);
+	assert.doesNotMatch(source, /launchPreBase\(repo, repo/);
 });
 
 test('Magnus stream cannot pass without install, progressive chunks, cancel, and a second request', () => {
