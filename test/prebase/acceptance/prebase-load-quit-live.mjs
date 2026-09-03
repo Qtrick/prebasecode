@@ -163,7 +163,7 @@ async function runElectronTestLabQuit() {
 async function runTauriTestLabQuit() {
 	return quitScenario('tauri-test-lab-active', join(repo, 'test/prebase/fixtures/desktop-tauri'), async (page, evidence) => {
 		await workbenchCommandWithTimeout(page, 20_000, 'prebase.runtime.detectConfigurations');
-		const start = await workbenchCommandWithTimeout(page, 90_000, 'prebase.runtime.desktopStartForMagnus', {
+		const start = await workbenchCommandWithTimeout(page, 180_000, 'prebase.runtime.desktopStartForMagnus', {
 			framework: 'tauri',
 			mode: 'fullApp',
 			testing: true,

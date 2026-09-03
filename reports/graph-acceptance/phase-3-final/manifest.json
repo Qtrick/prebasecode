@@ -1,8 +1,8 @@
 {
   "phase": "3-final",
-  "sourceHead": "c8129bed337a841561e3321d8e7835994b2d114f",
-  "sourceFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
-  "productFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
+  "sourceHead": "a7abcfe69d0c36742e34b1836b706ec6f04372cd",
+  "sourceFingerprint": "26aa8800a389fe6a4de8a30ab465a47648612b4a62816d0ce984494e5ce7b099",
+  "productFingerprint": "26aa8800a389fe6a4de8a30ab465a47648612b4a62816d0ce984494e5ce7b099",
   "producerFingerprints": {
     "parser-benchmark": "1ed983eae16447244c6a82a9b1310c8ddab23c93482b170ac7f8f14c760ea678",
     "magnus-streaming-smoke": "7303e76634dd3c1e2b290c2ef3dcbbec6bf3290ea35a17e800b2a2f4eac363e5",
@@ -20,7 +20,7 @@
     "magnus-tauri-tools": "064413a29fb33199b9cda0220a1cafcff18559ee1235e16f79ff0601431e4a54",
     "hybrid-web-smoke": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
     "privacy": "9968001e04f42150f681cfbeb5e0ae5a6d0cc829753aea5bfa5e69946c1c6f03",
-    "load-quit": "279694c616614c1b3dde60e240664a6df5c20d6bb06ed6d69c5886465c5c05ac",
+    "load-quit": "ab708d1a63ca40228e4a64131206b9277a2f91f3126d3bf341728049e77d541f",
     "lifecycle-cycles": "9e3708dcab5270ad992f17c267c7eb3fc1892cdffeb30d535edb932c189ab8c3",
     "electron-restart-soak": "547e5a7d8075b85563e211cc7d59466bea96e24ea4217e736650c7f25e95a57a",
     "tauri-restart-soak": "c5bc3494a3bf49c44ca2a2370f4529144f2c2ce18a0088757ae378445afda1c4",
@@ -28,8 +28,8 @@
     "active-soak": "e90ec68655dd26c96d3bcb3839ad9f8fdb1189a4dd359f0913c530f36fd9503d",
     "assurance": "59c77fe6140c1acdf90b9370a9590c42d59bb2a0558e01297d265636d4b21f5b"
   },
-  "validationRunId": "2026-09-03T09-19-38-589Z",
-  "generatedAt": "2026-09-03T09:21:50.254Z",
+  "validationRunId": "2026-09-03T09-46-00-316Z",
+  "generatedAt": "2026-09-03T09:48:57.355Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -39,23 +39,15 @@
     {
       "id": "release-signing",
       "reason": "Release signing credentials are operator-owned (BETA-015)."
-    },
-    {
-      "id": "magnus-live-activity",
-      "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)"
-    },
-    {
-      "id": "hybrid-web-smoke",
-      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)"
     }
   ],
   "failures": [
     "tauri-product-path: evidence producer fingerprint does not match current producer inputs",
     "temporal-large: evidence producer fingerprint does not match current producer inputs",
     "temporal-canonical-scale: evidence producer fingerprint does not match current producer inputs",
-    "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
     "magnus-tauri-tools: evidence producer fingerprint does not match current producer inputs",
-    "load-quit: evidence producer fingerprint does not match current producer inputs",
+    "magnus-live-activity: Live Activity AppKit path is macOS-only",
+    "hybrid-web-smoke: local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
     "idle-soak: evidence producer fingerprint does not match current producer inputs",
     "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
     "tauri-restart-soak: evidence producer fingerprint does not match current producer inputs",
@@ -71,16 +63,6 @@
         "before": "137632       1 15.3 287332 prebase",
         "latencyMs": 212,
         "remaining": "gone"
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 26405,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/electron-product-path.log",
-        "logTail": "",
-        "harnessPid": 137559,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -102,16 +84,6 @@
         "before": "138097       1 17.3 285952 prebase",
         "latencyMs": 213,
         "remaining": "gone"
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 34087,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/electron-native-cases.log",
-        "logTail": "",
-        "harnessPid": 138033,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
@@ -170,13 +142,12 @@
     {
       "id": "magnus-electron-tools",
       "path": "magnus/electron-tools-live.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "35022     1   1.1 206640 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "149331       1 16.0 287264 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 593,
+        "latencyMs": 311,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -232,22 +203,29 @@
     {
       "id": "magnus-live-activity",
       "path": "magnus/live-activity.json",
-      "ok": true,
-      "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "externalSkip": true
+      "ok": false,
+      "reason": "Live Activity AppKit path is macOS-only"
     },
     {
       "id": "hybrid-web-smoke",
       "path": "magnus/hybrid-web-smoke.json",
-      "ok": true,
-      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)",
-      "externalSkip": true
+      "ok": false,
+      "reason": "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve"
     },
     {
       "id": "load-quit",
       "path": "shutdown/load-quit-matrix.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs"
+      "ok": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 174934,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log",
+        "logTail": "",
+        "harnessPid": 168066,
+        "timeoutMs": 1200000,
+        "leftoverPids": []
+      }
     },
     {
       "id": "idle-soak",
@@ -273,16 +251,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 63377,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log",
-        "logTail": "",
-        "harnessPid": 138569,
-        "timeoutMs": 1500000,
-        "leftoverPids": []
       }
     },
     {
@@ -378,14 +346,10 @@
     "magnus-live-activity",
     "temporal-large",
     "temporal-canonical-scale",
-    "electron-product-path",
-    "electron-native-cases",
     "tauri-product-path",
-    "magnus-electron-tools",
     "magnus-tauri-tools",
     "hybrid-web-smoke",
     "load-quit",
-    "lifecycle-cycles",
     "electron-restart-soak",
     "tauri-restart-soak",
     "idle-soak",
