@@ -375,6 +375,8 @@ async function run() {
 		evidence.c3_folderIdentity = folderIdentity;
 		evidence.c3_workspaceTitleHint = Boolean(workspaceTitle.includes(basename(gitWorkspace)));
 		evidence.c3_explorerHint = Boolean(explorerTree.includes('hello.ts'));
+		evidence.c3_diagnosticsHasWorkspaceFolders = Array.isArray(workspaceFolders?.workspaceFolders);
+		evidence.c3_workspaceFolderCount = Array.isArray(workspaceFolderUris) ? workspaceFolderUris.length : 0;
 		evidence.p2 = onboardingFlow;
 		evidence.offlineChoicePresented = Boolean(onboardingFlow.offlineChoicePresented);
 		evidence.offlineChoiceActivated = Boolean(onboardingFlow.offlineChoiceActivated);

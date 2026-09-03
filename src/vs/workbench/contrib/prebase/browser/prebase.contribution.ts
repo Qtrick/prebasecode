@@ -1236,6 +1236,10 @@ registerAction2(class extends Action2 {
 			liveActivityMode: configurationService.getValue('prebase.magnus.liveActivity.mode'),
 			networkLayoutMode: configurationService.getValue('prebase.graph.networkLayoutMode'),
 			projectGuidanceEnabled: configurationService.getValue('prebase.magnus.projectGuidance.enabled'),
+			workspaceFolders: accessor.get(IWorkspaceContextService).getWorkspace().folders.map(folder => ({
+				uri: folder.uri.toString(),
+				name: folder.name,
+			})),
 			debug: {
 				sessionsCount: debugSessionsCount,
 				activeSessionName: debugActiveSessionName,

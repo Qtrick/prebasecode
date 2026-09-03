@@ -712,6 +712,11 @@ test('core IDE C3 requires workspace folderIdentity (not title/explorer OR)', ()
 	assert.match(live, /evidence\.c3_workspaceIdentity = Boolean\(folderIdentity\)/);
 	assert.doesNotMatch(live, /c3_folderOpen = Boolean\(\s*workspaceTitle\.includes/);
 	assert.doesNotMatch(live, /c3_workspaceIdentity = Boolean\(folderIdentity \|\| workspaceTitle/);
+	const contribution = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
+	const diagnosticsStart = contribution.indexOf("id: 'prebase.test.getDiagnostics'");
+	const diagnostics = contribution.slice(diagnosticsStart, contribution.indexOf("id: 'prebase.test.installMagnusSmokeTransport'"));
+	assert.match(diagnostics, /workspaceFolders:\s*accessor\.get\(IWorkspaceContextService\)\.getWorkspace\(\)\.folders\.map/);
+	assert.match(diagnostics, /uri: folder\.uri\.toString\(\)/);
 });
 
 test('200% zoom cannot pass on unchanged workbench zoomLevel', () => {
