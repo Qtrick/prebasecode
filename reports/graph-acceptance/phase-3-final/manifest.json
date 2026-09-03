@@ -1,11 +1,11 @@
 {
   "phase": "3-final",
-  "sourceHead": "9c2beb0f01881d9990a8dab9e998b3db83859624",
-  "sourceFingerprint": "5e66a6f2aad0d6ff1f7232c6655a57777538cceeec1fcae8f0d1e64263b5fb8b",
-  "productFingerprint": "5e66a6f2aad0d6ff1f7232c6655a57777538cceeec1fcae8f0d1e64263b5fb8b",
+  "sourceHead": "392efadb12c56ba1bd1fbfafff031cf959539366",
+  "sourceFingerprint": "8f9aaac786dd32fd7e9d8f83a0036b8fecc59214e0640459bea2eaa9192cb74e",
+  "productFingerprint": "8f9aaac786dd32fd7e9d8f83a0036b8fecc59214e0640459bea2eaa9192cb74e",
   "producerFingerprints": {
     "parser-benchmark": "aa34d6958029dbdae9241ffad6296544c02e2b0862343729129476c0f189484f",
-    "magnus-streaming-smoke": "1f9583890f610c3f0b648cf8270ed827078feb5012f6e6d2a1e766b18888559a",
+    "magnus-streaming-smoke": "55771461319b9de67d2a0244537b48170ed319bf1df5a9a8bf733da34197f2a0",
     "magnus-guidance-smoke": "38e17fe984336b1630dbfac3c901013a4a60b33c410bbd64bee7c7a507e01ef2",
     "magnus-live-activity": "ccbce1a4d4f91588c25fa1012cdf4b2203059b88c2ab8b49b119347c1f180903",
     "core-ide": "ca144c7a2bbfd1c10667441957ab4a14556cec8b78a5bacf40325f7c53006425",
@@ -28,8 +28,8 @@
     "active-soak": "ad13e32958913dbcdc696ce40a502801c979ac90af82028bf335b197bc12faac",
     "assurance": "53f4af76504e84a9ce33ab7ebdc35d9594e1e717dfa9e2564ab7c3f3d68e532e"
   },
-  "validationRunId": "2026-09-03T06-21-41-517Z",
-  "generatedAt": "2026-09-03T06:24:14.570Z",
+  "validationRunId": "2026-09-03T06-49-41-335Z",
+  "generatedAt": "2026-09-03T06:49:53.644Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -54,7 +54,6 @@
     "temporal-canonical-scale: evidence producer fingerprint does not match current producer inputs",
     "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
     "magnus-tauri-tools: evidence producer fingerprint does not match current producer inputs",
-    "magnus-streaming-smoke: UI never showed streamed text; stream did not complete",
     "magnus-guidance-smoke: evidence producer fingerprint does not match current producer inputs",
     "hybrid-web-smoke: local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
     "load-quit: evidence producer fingerprint does not match current producer inputs",
@@ -127,16 +126,6 @@
         "remaining": "gone",
         "before": "74291       1 20.5 294192 prebase",
         "after": "gone"
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 21885,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
-        "logTail": "",
-        "harnessPid": 74169,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -200,13 +189,12 @@
     {
       "id": "magnus-streaming-smoke",
       "path": "magnus/streaming-smoke.json",
-      "ok": false,
-      "reason": "UI never showed streamed text; stream did not complete",
+      "ok": true,
       "quit": {
-        "before": "72096       1 10.1 239324 prebase",
+        "before": "80258       1 25.1 282212 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 342,
+        "latencyMs": 324,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -234,17 +222,7 @@
       "path": "magnus/live-activity.json",
       "ok": true,
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "externalSkip": true,
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 288,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log",
-        "logTail": "",
-        "harnessPid": 72743,
-        "timeoutMs": 120000,
-        "leftoverPids": []
-      }
+      "externalSkip": true
     },
     {
       "id": "hybrid-web-smoke",
@@ -310,32 +288,12 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 128681,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 72769,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
       "id": "code-graph",
       "path": "core-ide/code-graph.json",
-      "ok": true,
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 128681,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 72769,
-        "timeoutMs": 240000,
-        "leftoverPids": []
-      }
+      "ok": true
     },
     {
       "id": "themes-a11y",
@@ -350,16 +308,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 128681,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 72769,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
@@ -408,12 +356,9 @@
   },
   "plannedProducers": [
     "parser-benchmark",
-    "magnus-streaming-smoke",
     "magnus-guidance-smoke",
     "magnus-live-activity",
-    "core-ide",
     "runtime-preview",
-    "temporal-small",
     "temporal-large",
     "temporal-canonical-scale",
     "electron-product-path",
