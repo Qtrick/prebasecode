@@ -60,6 +60,9 @@ export function productPathAcceptanceFailures(evidence) {
 	if (!evidence.inspected) {
 		failures.push('Inspect did not return a semantic snapshot');
 	}
+	if (evidence.inspected && (!evidence.inspectTitle || /blank/i.test(String(evidence.assertActual?.url ?? '')))) {
+		failures.push('Inspect/assert saw a blank Tauri/Electron webview instead of the fixture UI');
+	}
 	if (!evidence.filled) {
 		failures.push('Fill Name did not succeed');
 	}

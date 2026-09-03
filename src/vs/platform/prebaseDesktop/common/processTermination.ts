@@ -35,6 +35,10 @@ export function resolveDesktopShutdownPolicy(stopManagedAppsOnExit = true, stopE
  * Merge process env with a caller overlay, then strip keys that must not leak into
  * PreBase-owned Electron/Tauri children. Overlay cannot re-inject stripped keys.
  * spawnExternal may set TAURI_WEBDRIVER_PORT afterward for an owned WebDriver session.
+ *
+ * Linux WebKitGTK otherwise inherits broken desktop proxy lookups ("Unspecified proxy
+ * lookup failure") and refuses local asset/dev URLs; pin an in-memory GSettings backend
+ * and clear proxy vars for owned children only.
  */
 export function sanitizeOwnedDesktopChildEnv(
 	processEnv: NodeJS.Dict<string>,
@@ -45,6 +49,15 @@ export function sanitizeOwnedDesktopChildEnv(
 	delete childEnv.TAURI_WEBDRIVER_PORT;
 	delete childEnv.CARGO_TARGET_DIR;
 	delete childEnv.CARGO_BUILD_TARGET_DIR;
+	if (process.platform === 'linux') {
+		childEnv.GSETTINGS_BACKEND = 'memory';
+		for (const key of [
+			'http_proxy', 'https_proxy', 'HTTP_PROXY', 'HTTPS_PROXY',
+			'all_proxy', 'ALL_PROXY', 'no_proxy', 'NO_PROXY',
+		]) {
+			delete childEnv[key];
+		}
+	}
 	return childEnv;
 }
 

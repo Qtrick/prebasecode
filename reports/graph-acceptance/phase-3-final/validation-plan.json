@@ -1,13 +1,15 @@
 {
-  "runId": "2026-09-03T09-46-00-316Z",
+  "runId": "2026-09-03T09-50-33-582Z",
   "planKey": "2e402f5a82faab00610e30f1ac195604e7014782ae547a6c6876052c78fc93c9:release",
   "tier": "release",
   "onlyProducers": [
-    "load-quit"
+    "tauri-product-path",
+    "temporal-large",
+    "magnus-tauri-tools"
   ],
-  "plannedAtHead": "a7abcfe69d0c36742e34b1836b706ec6f04372cd",
-  "currentHead": "a7abcfe69d0c36742e34b1836b706ec6f04372cd",
-  "sourceHead": "a7abcfe69d0c36742e34b1836b706ec6f04372cd",
+  "plannedAtHead": "d4043e2cca645278b25129c8568d3c2367849b4d",
+  "currentHead": "d4043e2cca645278b25129c8568d3c2367849b4d",
+  "sourceHead": "d4043e2cca645278b25129c8568d3c2367849b4d",
   "productFingerprint": "26aa8800a389fe6a4de8a30ab465a47648612b4a62816d0ce984494e5ce7b099",
   "sourceFingerprint": "26aa8800a389fe6a4de8a30ab465a47648612b4a62816d0ce984494e5ce7b099",
   "prerequisites": {
@@ -16,13 +18,11 @@
     "geminiConfigured": false,
     "darwin": false
   },
-  "createdAt": "2026-09-03T09:46:01.226Z",
+  "createdAt": "2026-09-03T09:50:34.464Z",
   "reused": false,
-  "totalEstimatedDurationMs": 720000,
-  "changedPathCount": 1,
-  "changedDomains": [
-    "load-quit-lab"
-  ],
+  "totalEstimatedDurationMs": 420000,
+  "changedPathCount": 0,
+  "changedDomains": [],
   "unknownChangedPaths": [],
   "deferredReleaseProducers": [],
   "producers": [
@@ -78,7 +78,7 @@
       "id": "magnus-live-activity",
       "expectedProducerFingerprint": "30eb60bbbb0de2a0019fdb437ec644bf013b2526f69ea79eff1cc17d40f642f6",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "reason": "excluded by --only-producer (selected: tauri-product-path, temporal-large, magnus-tauri-tools)",
       "estimatedDurationMs": 45000,
       "timeoutMs": 120000,
       "artifacts": [
@@ -148,8 +148,8 @@
     {
       "id": "temporal-large",
       "expectedProducerFingerprint": "0a9e7de5f7c6017272a6e7a119505b18116c51c237797daf5b9c5df4433f1422",
-      "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 150000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -161,13 +161,24 @@
         "network-graph",
         "shared-workbench",
         "launch-harness"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-09-03T09:50:34.895Z",
+        "finishedAt": "2026-09-03T09:52:00.202Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 85272,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-large.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "temporal-canonical-scale",
       "expectedProducerFingerprint": "d9177de125a586466d5fe903ce2b6b198dc54a87d9045015d1c2afe16b2573ef",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "reason": "excluded by --only-producer (selected: tauri-product-path, temporal-large, magnus-tauri-tools)",
       "estimatedDurationMs": 300000,
       "timeoutMs": 600000,
       "artifacts": [
@@ -218,8 +229,8 @@
     {
       "id": "tauri-product-path",
       "expectedProducerFingerprint": "186f7ee49fa17d0dccff350f580ec8ac8a2c0a228a77106e430f2fb884028f56",
-      "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 30000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -230,7 +241,18 @@
         "tauri-test-lab",
         "magnus-desktop-tools",
         "launch-harness"
-      ]
+      ],
+      "execution": {
+        "status": "FAILED",
+        "startedAt": "2026-09-03T09:52:00.246Z",
+        "finishedAt": "2026-09-03T09:53:40.702Z",
+        "exitCode": 1,
+        "timedOut": false,
+        "durationMs": 100423,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/tauri-product-path.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "magnus-electron-tools",
@@ -253,8 +275,8 @@
     {
       "id": "magnus-tauri-tools",
       "expectedProducerFingerprint": "064413a29fb33199b9cda0220a1cafcff18559ee1235e16f79ff0601431e4a54",
-      "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 240000,
       "timeoutMs": 420000,
       "artifacts": [
@@ -272,7 +294,7 @@
       "id": "hybrid-web-smoke",
       "expectedProducerFingerprint": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "reason": "excluded by --only-producer (selected: tauri-product-path, temporal-large, magnus-tauri-tools)",
       "estimatedDurationMs": 60000,
       "timeoutMs": 180000,
       "artifacts": [
@@ -304,9 +326,9 @@
     {
       "id": "load-quit",
       "expectedProducerFingerprint": "ab708d1a63ca40228e4a64131206b9277a2f91f3126d3bf341728049e77d541f",
-      "status": "STALE",
-      "reason": "tauri-test-lab-active: Error: workbench command timeout (90000ms): prebase.runtime.desktopStartForMagnus\n    at Timeout.<anonymous> (file:///workspace/test/prebase/acceptance/workbenchHarness.mjs:214:37)\n    at listOnTimeout (node:internal/timers:605:17)\n    at process.processTimers (node:internal/timers:541:7); tauri-test-lab-active: Test Lab not in testing",
-      "estimatedDurationMs": 720000,
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 174934,
       "timeoutMs": 1200000,
       "artifacts": [
         "load-quit"
@@ -322,18 +344,7 @@
         "launch-harness",
         "load-quit-lab",
         "live-activity"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-09-03T09:46:01.628Z",
-        "finishedAt": "2026-09-03T09:48:56.596Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 174934,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log",
-        "leftoverPids": [],
-        "attempts": 1
-      }
+      ]
     },
     {
       "id": "lifecycle-cycles",
@@ -357,7 +368,7 @@
       "id": "electron-restart-soak",
       "expectedProducerFingerprint": "547e5a7d8075b85563e211cc7d59466bea96e24ea4217e736650c7f25e95a57a",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "reason": "excluded by --only-producer (selected: tauri-product-path, temporal-large, magnus-tauri-tools)",
       "estimatedDurationMs": 900000,
       "timeoutMs": 5400000,
       "artifacts": [
@@ -373,7 +384,7 @@
       "id": "tauri-restart-soak",
       "expectedProducerFingerprint": "c5bc3494a3bf49c44ca2a2370f4529144f2c2ce18a0088757ae378445afda1c4",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "reason": "excluded by --only-producer (selected: tauri-product-path, temporal-large, magnus-tauri-tools)",
       "estimatedDurationMs": 240000,
       "timeoutMs": 3600000,
       "artifacts": [
@@ -389,7 +400,7 @@
       "id": "idle-soak",
       "expectedProducerFingerprint": "5b6ecc6bd2ae4a34dd412e3b200db1f5bd56f62501bdfe6a4aff2e2c13b9ffd0",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "reason": "excluded by --only-producer (selected: tauri-product-path, temporal-large, magnus-tauri-tools)",
       "estimatedDurationMs": 900000,
       "timeoutMs": 1140000,
       "artifacts": [
@@ -405,7 +416,7 @@
       "id": "active-soak",
       "expectedProducerFingerprint": "e90ec68655dd26c96d3bcb3839ad9f8fdb1189a4dd359f0913c530f36fd9503d",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "reason": "excluded by --only-producer (selected: tauri-product-path, temporal-large, magnus-tauri-tools)",
       "estimatedDurationMs": 720000,
       "timeoutMs": 960000,
       "artifacts": [
@@ -426,7 +437,7 @@
       "id": "assurance",
       "expectedProducerFingerprint": "59c77fe6140c1acdf90b9370a9590c42d59bb2a0558e01297d265636d4b21f5b",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: load-quit)",
+      "reason": "excluded by --only-producer (selected: tauri-product-path, temporal-large, magnus-tauri-tools)",
       "estimatedDurationMs": 480000,
       "timeoutMs": 480000,
       "artifacts": [
