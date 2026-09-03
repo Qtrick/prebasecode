@@ -1,6 +1,7 @@
 {
   "ok": false,
   "failures": [
-    "UI never showed streamed text"
+    "UI never showed streamed text",
+    "stream did not complete"
   ]
 }
