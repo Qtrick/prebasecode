@@ -175,18 +175,7 @@
         "network-graph",
         "shared-workbench",
         "launch-harness"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-09-03T11:22:37.553Z",
-        "finishedAt": "2026-09-03T11:26:51.570Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 253979,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-canonical-scale.log",
-        "leftoverPids": [],
-        "attempts": 1
-      }
+      ]
     },
     {
       "id": "electron-product-path",
@@ -438,3 +427,7 @@
     }
   ]
 }
+[phase3-final-gate] validation plan 2026-09-03T11-22-13-987Z tier=release
+planKey 8d36a1d6e5790d9369cc8938b86aae6e5d0cf2acabd4aed55636966a1997f5a5:release
+producers 23; current-green 9; stale/missing 14; external 0; deferred-release 0
+estimated remaining 81m45s

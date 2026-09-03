@@ -1,16 +1,16 @@
 {
   "schemaVersion": 3,
   "scenario": "temporal-canonical-scale-quit",
-  "sourceHead": "ce46edff112311f96498dc58e35dd58f08750188",
-  "sourceFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
-  "productFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
-  "generatedAt": "2026-09-03T10:14:26.796Z",
+  "sourceHead": "9471b0e1ee90e904cad5de59cbc72f83a06ecceb",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:26:51.441Z",
   "ok": true,
   "quit": {
-    "startedAt": 1788430466560,
-    "quitMs": 201,
+    "startedAt": 1788434811204,
+    "quitMs": 200,
     "remaining": "gone",
-    "before": "189146       1 24.7 255636 prebase",
+    "before": "272892       1 24.7 255672 prebase",
     "after": "gone"
   }
 }

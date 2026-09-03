@@ -1,20 +1,18 @@
 {
-  "ok": false,
-  "failures": [
-    "canonical-scale Full Map drew zero community labels"
-  ],
+  "ok": true,
+  "failures": [],
   "schemaVersion": 3,
   "scenario": "temporal-canonical-scale",
-  "sourceHead": "ce46edff112311f96498dc58e35dd58f08750188",
-  "sourceFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
-  "productFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
-  "generatedAt": "2026-09-03T10:13:21.148Z",
+  "sourceHead": "9471b0e1ee90e904cad5de59cbc72f83a06ecceb",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:25:46.549Z",
   "producerId": "temporal-canonical-scale",
-  "producerFingerprint": "3a3a35421d2b7b837ecc549f091e435b7c67b65d4367b7cae2907a445d08f916",
+  "producerFingerprint": "0bcfb7ea79ad1285d1ed30f7be6c16c57ce8f36d0f64f5c11a140a9a9224917e",
   "scale": "canonical-scale",
   "fixture": {
-    "dir": "/tmp/pb-temporal-canonical-XeQOcB",
-    "head": "25f2f33748b35686d4443ea8360844829d901c5e",
+    "dir": "/tmp/pb-temporal-canonical-eQPr6Q",
+    "head": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
     "commits": 104,
     "files": [
       "package.json",
@@ -9704,25 +9702,25 @@
     "expectedModuleFilesRemaining": 9679,
     "expectedHeadFileCount": 9680,
     "expectedModifiedPath": "src/module_00/file_1.ts\nsrc/module_08/file_92.ts\nsrc/module_17/file_8.ts\nsrc/module_28/file_72.ts\nsrc/module_39/file_136.ts\nsrc/module_51/file_24.ts",
-    "firstParentSummary": "25f2f33748b35686d4443ea8360844829d901c5e 988989bcfdc0c37de5c8753dd20d0568befe63a8 feat: cross-community wave\n\n src/module_00/file_1.ts   | 1 +\n src/module_08/file_92.ts  | 1 +\n src/module_17/file_8.ts   | 1 +\n src/module_28/file_72.ts  | 1 +\n src/module_39/file_136.ts | 1 +\n src/module_51/file_24.ts  | 1 +\n 6 files changed, 6 insertions(+)",
+    "firstParentSummary": "bf101e3a95124fcb8667c972d96e6976d82b7a00 de7841f94a7a17f21ae6c110a72d56a046036e8e feat: cross-community wave\n\n src/module_00/file_1.ts   | 1 +\n src/module_08/file_92.ts  | 1 +\n src/module_17/file_8.ts   | 1 +\n src/module_28/file_72.ts  | 1 +\n src/module_39/file_136.ts | 1 +\n src/module_51/file_24.ts  | 1 +\n 6 files changed, 6 insertions(+)",
     "scale": "canonical-scale"
   },
-  "pid": 189146,
-  "cdpPort": 36323,
-  "sourceProfile": "/tmp/pb-temporal-profile-3qEv8C",
+  "pid": 272892,
+  "cdpPort": 39379,
+  "sourceProfile": "/tmp/pb-temporal-profile-iLAr0G",
   "gitReady": {
     "ok": true,
     "count": 1
   },
   "fullMap": {
-    "sequenceId": 4,
+    "sequenceId": 15,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 44530.300000000745,
-    "renderEnd": 44536.39999999851,
-    "durationMs": 6.099999997764826,
-    "selectedCommitSha": "25f2f33748b35686d4443ea8360844829d901c5e",
-    "renderedCommitSha": "25f2f33748b35686d4443ea8360844829d901c5e",
+    "renderStart": 44205.20000000298,
+    "renderEnd": 44209.900000002235,
+    "durationMs": 4.699999999254942,
+    "selectedCommitSha": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
+    "renderedCommitSha": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
     "isPartialLineage": true,
     "receivedNodeCount": 9682,
     "visibleNodeCount": 9682,
@@ -9743,15 +9741,15 @@
     "leafEdgesDrawn": 0,
     "aggregateEdgesDrawn": 56,
     "labelsDrawn": 3,
-    "guideLabelsDrawn": 0,
+    "guideLabelsDrawn": 8,
     "fileLabelsDrawn": 3,
-    "communityLabelsDrawn": 0,
+    "communityLabelsDrawn": 8,
     "routeBadgesDrawn": 0,
-    "totalLabelsDrawn": 3,
-    "labelCollisionCullCount": 0,
+    "totalLabelsDrawn": 11,
+    "labelCollisionCullCount": 48,
     "renderedLabelOverlapCount": 0,
-    "compositeLabelOverlapCount": 0,
-    "labelOverlapCount": 0,
+    "compositeLabelOverlapCount": 48,
+    "labelOverlapCount": 48,
     "selectedNodeId": null,
     "transform": {
       "x": 532.425,
@@ -9777,7 +9775,7 @@
       "edgeModifiedCount": 0
     },
     "isAnimating": true,
-    "timestamp": 44536.39999999851,
+    "timestamp": 44209.900000002235,
     "viewportWidth": 796,
     "viewportHeight": 815,
     "labelCount": 3,
@@ -9791,16 +9789,16 @@
     },
     "screenUtilization": 1.7264702191941301
   },
-  "processBeforeInteractions": "189146       1 32.0 517756 prebase",
+  "processBeforeInteractions": "272892       1 32.0 517708 prebase",
   "focusChanges": {
     "sequenceId": 34,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 46348.599999997765,
-    "renderEnd": 46349.199999999255,
-    "durationMs": 0.6000000014901161,
-    "selectedCommitSha": "25f2f33748b35686d4443ea8360844829d901c5e",
-    "renderedCommitSha": "25f2f33748b35686d4443ea8360844829d901c5e",
+    "renderStart": 45955.400000002235,
+    "renderEnd": 45956.400000002235,
+    "durationMs": 1,
+    "selectedCommitSha": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
+    "renderedCommitSha": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
     "isPartialLineage": true,
     "receivedNodeCount": 9682,
     "visibleNodeCount": 22,
@@ -9821,19 +9819,19 @@
     "leafEdgesDrawn": 0,
     "aggregateEdgesDrawn": 0,
     "labelsDrawn": 4,
-    "guideLabelsDrawn": 0,
+    "guideLabelsDrawn": 6,
     "fileLabelsDrawn": 4,
-    "communityLabelsDrawn": 0,
+    "communityLabelsDrawn": 6,
     "routeBadgesDrawn": 0,
-    "totalLabelsDrawn": 4,
+    "totalLabelsDrawn": 10,
     "labelCollisionCullCount": 1,
     "renderedLabelOverlapCount": 0,
     "compositeLabelOverlapCount": 1,
     "labelOverlapCount": 1,
     "selectedNodeId": null,
     "transform": {
-      "x": 520.2099148367432,
-      "y": 347.891821809282,
+      "x": 520.3496960407989,
+      "y": 348.55591439760724,
       "k": 0.15
     },
     "canvas": {
@@ -9841,7 +9839,7 @@
       "clientHeight": 815,
       "width": 783,
       "height": 802,
-      "distinctPixels": 2160
+      "distinctPixels": 10002
     },
     "summary": {
       "addedCount": 0,
@@ -9855,19 +9853,19 @@
       "edgeModifiedCount": 0
     },
     "isAnimating": true,
-    "timestamp": 46349.199999999255,
+    "timestamp": 45956.400000002235,
     "viewportWidth": 796,
     "viewportHeight": 815,
     "labelCount": 4,
     "projectedBounds": {
-      "minX": 520.2099148367432,
-      "minY": 347.891821809282,
-      "maxX": 757.9599148367432,
-      "maxY": 563.291821809282,
+      "minX": 520.3496960407989,
+      "minY": 348.55591439760724,
+      "maxX": 758.0996960407989,
+      "maxY": 563.9559143976072,
       "width": 237.75,
-      "height": 215.40000000000003
+      "height": 215.39999999999998
     },
-    "screenUtilization": 0.07893971390695811
+    "screenUtilization": 0.07893971390695809
   },
   "targetOpened": true,
   "repoLoaded": true,
@@ -9881,8 +9879,8 @@
         "visibleNodeCount": 9682,
         "leafNodesDrawn": 3,
         "aggregateNodesDrawn": 56,
-        "communityLabelsDrawn": 0,
-        "totalLabelsDrawn": 3,
+        "communityLabelsDrawn": 8,
+        "totalLabelsDrawn": 11,
         "renderedLabelOverlapCount": 0,
         "projectionTier": "overview"
       }
@@ -9919,48 +9917,48 @@
     },
     {
       "name": "fit",
-      "k": 0.15410735503572087,
+      "k": 0.1540827405086597,
       "metrics": {
         "receivedNodeCount": 9682,
         "visibleNodeCount": 22,
         "leafNodesDrawn": 21,
         "aggregateNodesDrawn": 0,
-        "totalLabelsDrawn": 4,
+        "totalLabelsDrawn": 10,
         "renderedLabelOverlapCount": 0,
         "projectionTier": "detail"
       }
     }
   ],
-  "processAfterInteractions": "189146       1 30.0 519452 prebase",
+  "processAfterInteractions": "272892       1 30.0 521200 prebase",
   "camera": {
     "afterFocus": {
-      "x": 514.2292176640559,
-      "y": 319.4778680718735,
+      "x": 514.2802401776755,
+      "y": 319.7202731460136,
       "k": 0.15
     },
     "afterUserZoom": {
-      "x": 599.5639418768658,
-      "y": 250.80068034472785,
+      "x": 599.6357416185159,
+      "y": 251.14179685317174,
       "k": 0.26116516898883724
     },
     "afterWait": {
-      "x": 599.5639418768658,
-      "y": 250.80068034472785,
+      "x": 599.6357416185159,
+      "y": 251.14179685317174,
       "k": 0.26116516898883724
     },
     "afterFit": {
-      "x": 515.7650102014576,
-      "y": 309.25726822962014,
-      "k": 0.15410735503572087
+      "x": 515.7483802864392,
+      "y": 309.28323657257954,
+      "k": 0.1540827405086597
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1788430466560,
-    "quitMs": 201,
+    "startedAt": 1788434811204,
+    "quitMs": 200,
     "remaining": "gone",
-    "before": "189146       1 24.7 255636 prebase",
+    "before": "272892       1 24.7 255672 prebase",
     "after": "gone"
   }
 }
