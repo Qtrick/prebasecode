@@ -1429,6 +1429,14 @@ test('active soak protects canonical final evidence and final gate has explicit 
 	assert.doesNotMatch(gate, /plan stale due to code change: sourceHead/);
 });
 
+test('restart soak must not clobber product-path evidence files', () => {
+	const restart = readFileSync(join(acceptanceDir, 'prebase-restart-soak.mjs'), 'utf8');
+	const productPath = readFileSync(join(acceptanceDir, 'prebase-desktop-product-path.mjs'), 'utf8');
+	assert.match(restart, /runFramework\(framework, \{ writeEvidence: false \}\)/);
+	assert.match(productPath, /writeEvidence = options\.writeEvidence !== false/);
+	assert.match(productPath, /if \(writeEvidence\) \{\s*writeFileSync\(join\(evidenceDir, 'product-path\.json'\)/s);
+});
+
 test('every live final-gate producer has a deadline, log, and process-tree timeout path', () => {
 	assert.ok(PHASE3_PRODUCERS.length > 0);
 	assert.ok(PHASE3_PRODUCERS.every(item => Number.isFinite(item.timeoutMs) && item.timeoutMs > 0));
