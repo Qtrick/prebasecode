@@ -26,6 +26,7 @@ function validEvidence() {
 			visibleNodeCount: 4,
 			nodesDrawn: 4,
 			finiteCoordinateCount: 4,
+			renderedLabelOverlapCount: 0,
 			canvas: { distinctPixels: 200 },
 			transform: { x: 400, y: 290, k: 1.2 },
 		},
@@ -33,6 +34,7 @@ function validEvidence() {
 			displayMode: 'changes',
 			visibleNodeCount: 2,
 			nodesDrawn: 2,
+			renderedLabelOverlapCount: 0,
 			summary: { modifiedCount: 1 },
 			canvas: { distinctPixels: 100 },
 		},
@@ -73,6 +75,8 @@ suite('Temporal Live Acceptance Evaluation', () => {
 				'Full Map received zero nodes',
 				'Full Map exposed zero visible nodes',
 				'Full Map drew zero nodes',
+				'Full Map has rendered label overlaps (undefined)',
+				'Focus Changes has rendered label overlaps (undefined)',
 			],
 		});
 	});

@@ -36,7 +36,7 @@
     ✔ structural digest is invariant to node and edge ordering in input
 
 
-  14 passing (63ms)
+  14 passing (60ms)
 
 
 
@@ -58,7 +58,7 @@
     ✔ accepts cancellation through the narrow IPC channel rather than a ProxyChannel method argument
 
 
-  4 passing (13ms)
+  4 passing (12ms)
 
 
 
@@ -68,7 +68,7 @@
     ✔ prioritizes entry-connected edges and high-importance connections over arbitrary slicing
 
 
-  3 passing (6ms)
+  3 passing (5ms)
 
 
 
@@ -76,10 +76,10 @@
     ✔ indexes nodes by ID and by relative and file: paths
     ✔ indexes incoming and outgoing edges for instant traversal
     ✔ indexes nodes by architecture layer and collects unique languages
-    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (158ms)
+    ✔ allows Magnus to discover canonical nodes omitted from the 280-node render projection (166ms)
 
 
-  4 passing (163ms)
+  4 passing (171ms)
 
 
 
@@ -101,7 +101,7 @@
     ✔ visits a wide cyclic import topology once and preserves its breadth-first depths
 
 
-  3 passing (38ms)
+  3 passing (36ms)
 
 
 
@@ -117,7 +117,7 @@ Switched to branch 'main'
     ✔ rename tracking captures old and new paths with similarity score
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ comment-only commit invariant: exact tree diff detects blob change, canonical AST is identical (61ms)
+    ✔ comment-only commit invariant: exact tree diff detects blob change, canonical AST is identical (64ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
     ✔ annotated vs lightweight tags peeling and metadata
@@ -129,10 +129,10 @@ Switched to branch 'main'
     ✔ handles unborn repository gracefully without throwing or stalling
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (178ms)
+    ✔ Magnus node focus resolution: rendered vs canonical-only vs missing (183ms)
 Switched to a new branch 'feature'
 Switched to branch 'main'
-    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (29695ms)
+    ✔ performance evidence: measures execution timings and calculates blob reuse across commit history (29672ms)
 
 
   9 passing (2m)
@@ -168,7 +168,7 @@ Switched to branch 'main'
       ✔ acknowledges ping events with 200 OK
 
 
-  8 passing (6ms)
+  8 passing (7ms)
 
 
 
@@ -179,7 +179,7 @@ Switched to branch 'main'
     ✔ dirty working tree changes do NOT contaminate historical git analysis
 
 
-  4 passing (332ms)
+  4 passing (344ms)
 
 
 
@@ -205,7 +205,7 @@ Switched to branch 'main'
     ✔ 3. File edit -> 0 AI calls on save, exactly 1 lazy AI call on next view
     ✔ 4. Unrelated file edit -> 0 extra AI calls for other nodes
     ✔ 5. Stale in-flight race protection: discards result if file changed during in-flight generation
-    ✔ 6. Persistence across restart and 500-node scale capacity (106ms)
+    ✔ 6. Persistence across restart and 500-node scale capacity (107ms)
     ✔ 7. Restart freshness: external edit while closed prevents stale peek and updates on view
     ✔ 8. Prompt semantic fingerprint: layer or imports change invalidates cache
     ✔ 9. Multi-root workspace: events in Folder B do not invalidate Folder A
@@ -214,7 +214,7 @@ Switched to branch 'main'
     ✔ 12. Explicit projectRoot isolates identical relative paths across workspace folders
 
 
-  14 passing (126ms)
+  14 passing (129ms)
 
 
 
@@ -240,7 +240,7 @@ Switched to branch 'main'
     ✔ reduced-motion setting preserves two-stage interaction semantics identically
 
 
-  19 passing (95ms)
+  19 passing (96ms)
 
 
 
@@ -261,7 +261,7 @@ Switched to branch 'main'
     ✔ diagnostic break: wrong pointer id hides stuck capture and fails closed when release proof is absent
 
 
-  12 passing (57ms)
+  12 passing (59ms)
 
 
 
@@ -289,7 +289,7 @@ Switched to branch 'main'
     ✔ reduced motion snaps Temporal interpolation without exploding layout
 
 
-  21 passing (133ms)
+  21 passing (139ms)
 
 [PreBase Graph] Initial getSnapshot failed: Error: Request timed out: getSnapshot
     at Timeout._onTimeout (evalmachine.<anonymous>:1745:12)
@@ -388,7 +388,7 @@ Switched to branch 'main'
     ✔ 4. Details panel displays loading truth and rendered diff summary with renamedModifiedCount
 
 
-  4 passing (27ms)
+  4 passing (30ms)
 
 
 
@@ -422,7 +422,7 @@ Switched to branch 'main'
     ✔ 26. Temporal focus caps zoom at 3.2 for ≤4 nodes and 2.4 for 5+; Full Map caps at 2.4
 
 
-  27 passing (154ms)
+  27 passing (157ms)
 
 
 
@@ -432,19 +432,19 @@ Switched to branch 'main'
     ✔ respects workspace .gitignore patterns including .reference and custom directories
 
 
-  3 passing (12ms)
+  3 passing (11ms)
 
 
 
   Graph ownership boundary (Phase A)
-    ✔ compiled graph editor input normalizes a legacy Architecture restore to the Code Graph (39ms)
+    ✔ compiled graph editor input normalizes a legacy Architecture restore to the Code Graph (38ms)
     ✔ graphs/src/core has no flat shim .ts files
     ✔ graphSettingsUi.ts exports public Settings UI surface
     ✔ settings/ui.ts re-exports Settings UI helpers; settings/index.ts stays DOM-free
     ✔ prebaseSettingsEditor routes through graphSettingsUi and does not bind PreBaseGraphConfigKeys
 
 
-  5 passing (45ms)
+  5 passing (43ms)
 
 
 
@@ -472,14 +472,14 @@ Switched to branch 'main'
     ✔ 10. applyZoomAroundCenter anchors zoom at usable viewport center with insets
 
 
-  10 passing (8ms)
+  10 passing (5ms)
 
 
 
   Graph visual recovery contracts
-    ✔ organic ~280-node stress stays bounded and readable under production Fit View (157ms)
+    ✔ organic ~280-node stress stays bounded and readable under production Fit View (160ms)
     ✔ organic collision spacing expands locally without dropping isolates from the layout
-    ✔ remaining network layouts keep disconnected components without dropping nodes (81ms)
+    ✔ remaining network layouts keep disconnected components without dropping nodes (87ms)
     ✔ network screen-aware radii stay readable at Fit zooms; uncompensated vanishes at k=0.2
     ✔ network fit transform uses production clamps and rejects the old 0.6–1.4 helper band
     ✔ temporal deep community chain stays compact (not a tall vertical stripe)
@@ -489,7 +489,7 @@ Switched to branch 'main'
     ✔ a 9679-dot Full Map blob is structurally ok but not visually good without node-level LOD
 
 
-  10 passing (295ms)
+  10 passing (304ms)
 
 
 
@@ -500,7 +500,7 @@ Switched to branch 'main'
     ✔ unresolved package imports stay cheap on a large file set
 
 
-  4 passing (44ms)
+  4 passing (43ms)
 
 
 
@@ -512,7 +512,7 @@ Switched to branch 'main'
     ✔ Identical structural state detection on comment-only change
 
 
-  5 passing (27ms)
+  5 passing (28ms)
 
 
 
@@ -522,7 +522,7 @@ Switched to branch 'main'
     ✔ does not let non-import topology change import-importance organization
 
 
-  3 passing (11ms)
+  3 passing (10ms)
 
 
 
@@ -532,7 +532,7 @@ Switched to branch 'main'
     ✔ 3. Temporal commit diff catalog strictly excludes removed diff ghosts and folders
 
 
-  3 passing (16ms)
+  3 passing (19ms)
 
 
 
@@ -617,7 +617,7 @@ Switched to branch 'main'
     ✔ network runtime collision, link-distance, and force controls retain all nodes
 
 
-  11 passing (54ms)
+  11 passing (53ms)
 
 
 
@@ -630,7 +630,7 @@ Switched to branch 'main'
     ✔ 6. Label LOD Policy: Overview mode displays only high-importance nodes; deep zoom shows detail
 
 
-  6 passing (6ms)
+  6 passing (5ms)
 
 
 
@@ -640,7 +640,7 @@ Switched to branch 'main'
     ✔ serialized label font size matches module at low Fit zoom
 
 
-  3 passing (7ms)
+  3 passing (6ms)
 
 
 
@@ -677,7 +677,7 @@ Switched to branch 'main'
     ✔ computes hash over a 200KB payload efficiently without errors
 
 
-  3 passing (9ms)
+  3 passing (10ms)
 
 
 
@@ -690,7 +690,7 @@ Switched to branch 'main'
     ✔ prepared statement callback errors finalize statements and roll back
 
 
-  6 passing (124ms)
+  6 passing (121ms)
 
 
 
@@ -701,12 +701,12 @@ Switched to branch 'main'
     ✔ transactionally migrates a valid v1 database to the current schema
     ✔ transactionally migrates a valid v2 database to the current schema
     ✔ transactionally migrates a valid v3 database to the current schema
-    ✔ transactionally migrates a valid v4 database to v5: clears derived history, preserves repo identity, refs, and blob parse artifacts
+    ✔ transactionally migrates a valid v4 database to v5: clears derived history, preserves repo identity, refs, and blob parse artifacts (38ms)
     ✔ rolls back a v4 migration when an error is injected
     ✔ rejects a future schema version without rewriting it
     ✔ rolls back a v1 migration when legacy parent topology is malformed
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/tmp/prebase-sqlite-test-NbYviA',
+  storageRoot: '/tmp/prebase-sqlite-test-wIutcp',
   resolvedParent: '/tmp',
   ext: '.db',
   isSymlink: false,
@@ -767,11 +767,11 @@ Switched to branch 'main'
     ✔ Electron-main store owner quarantines one corrupt derived cache and recreates it without touching siblings
     ✔ Electron-main store owner bounds DB, WAL, and SHM quarantine companions by generation
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/tmp/prebase-sqlite-test-X22LO0',
-  resolvedParent: '/tmp/prebase-sqlite-test-X22LO0/nested',
+  storageRoot: '/tmp/prebase-sqlite-test-auUU07',
+  resolvedParent: '/tmp/prebase-sqlite-test-auUU07/nested',
   ext: '.db',
   isSymlink: false,
-  dbPath: '/tmp/prebase-sqlite-test-X22LO0/nested/store.db'
+  dbPath: '/tmp/prebase-sqlite-test-auUU07/nested/store.db'
 }
 [TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
     at TemporalStoreMainService._validateDbPath (file:///workspace/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
@@ -791,11 +791,11 @@ Switched to branch 'main'
     at done (/workspace/node_modules/mocha/lib/runnable.js:308:5)
     at /workspace/node_modules/mocha/lib/runnable.js:369:11
 [TemporalStoreMainService] validation mismatch: {
-  storageRoot: '/tmp/prebase-sqlite-test-X22LO0',
-  resolvedParent: '/tmp/prebase-sqlite-test-X22LO0',
+  storageRoot: '/tmp/prebase-sqlite-test-auUU07',
+  resolvedParent: '/tmp/prebase-sqlite-test-auUU07',
   ext: '.db',
   isSymlink: true,
-  dbPath: '/tmp/prebase-sqlite-test-X22LO0/linked.db'
+  dbPath: '/tmp/prebase-sqlite-test-auUU07/linked.db'
 }
 [TemporalStoreMainService] IPC operation failed: Temporal store path is outside the authorized cache directory Error: Temporal store path is outside the authorized cache directory
     at TemporalStoreMainService._validateDbPath (file:///workspace/graphs/src/temporal/persistence/node/temporalStoreMainService.ts:57:10)
@@ -819,18 +819,18 @@ Switched to branch 'main'
     ✔ blob analysis cache persists and retrieves entries
 
 
-  33 passing (562ms)
+  33 passing (582ms)
 
 
 
   Temporal bounded cold-history indexing
-    ✔ keeps metadata browsing cheap and indexes one isolated checkpoint from a 50,000-commit cold history (70ms)
+    ✔ keeps metadata browsing cheap and indexes one isolated checkpoint from a 50,000-commit cold history (69ms)
     ✔ does not start Git or parser work for a pre-cancelled cold-history selection
-    ✔ reconciles an isolated child anchor after its parent segment is indexed (62ms)
+    ✔ reconciles an isolated child anchor after its parent segment is indexed (61ms)
     ✔ multi-level reconciliation A -> B -> C -> D converges coverage and delta chain across out-of-order indexing (D, C, A, B, C, D) (82ms)
 
 
-  4 passing (243ms)
+  4 passing (244ms)
 
 
 
@@ -869,7 +869,7 @@ Switched to branch 'main'
     ✔ 6. Overview node aggregates reuse community guide IDs from temporalEdgeLod, not a second system
 
 
-  6 passing (5ms)
+  6 passing (6ms)
 
 
 
@@ -886,7 +886,7 @@ Switched to branch 'main'
     ✔ 8. A sparse single connected cluster is scaled into a compact disc
 
 
-  10 passing (22ms)
+  10 passing (23ms)
 
 
 
@@ -905,78 +905,160 @@ Switched to branch 'main'
 
 
   Temporal Graph E2E Ingestion & Reconstruction
-    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (184ms)
-    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (365ms)
-    1) Handles branch merge commits and preserves multi-parent DAG relations
-    2) scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order
-    3) exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs
-    ✔ Ingests commits in a SHA-256 repository (82ms)
-    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (177ms)
-    ✔ Multi-root concurrent event routing and FIFO ingestion queue (18229ms)
+    ✔ coordinates concurrent parent and child requests without duplicate analysis or deadlock (178ms)
+    ✔ Ingests linear commits, renames, and verifies deterministic reconstruction (SHA-1) (370ms)
+    ✔ Handles branch merge commits and preserves multi-parent DAG relations (11017ms)
+    ✔ scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order (332ms)
+    ✔ exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs (224ms)
+    ✔ Ingests commits in a SHA-256 repository (17981ms)
+    ✔ Two-tier parse cache persists across store restarts and serves L2 parse artifacts (190ms)
+    ✔ Multi-root concurrent event routing and FIFO ingestion queue (225ms)
 
 
-  5 passing (30s)
-  3 failing
+  8 passing (31s)
 
-  1) Temporal Graph E2E Ingestion & Reconstruction
-       Handles branch merge commits and preserves multi-parent DAG relations:
-     Error: Command failed: git checkout main
-error: pathspec 'main' did not match any file(s) known to git
 
-      at genericNodeError (node:internal/errors:985:15)
-      at wrappedFn (node:internal/errors:539:14)
-      at checkExecSyncError (node:child_process:925:11)
-      at execSync (node:child_process:997:15)
-      at Context.<anonymous> (file:///workspace/graphs/src/tests/unit/temporalIngestionE2E.test.ts:258:4)
 
-  2) Temporal Graph E2E Ingestion & Reconstruction
-       scopes entity, lineage, and edge history to the requested ref ancestry regardless of ingestion order:
-     Error: Command failed: git checkout main
-error: pathspec 'main' did not match any file(s) known to git
+  TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)
+    ✔ 1. Selected and Hovered nodes have highest priority (rank wins occupancy; no collision bypass)
+    ✔ 1b. Selected cannot bypass seeded occupancy (forceEmphasis collision bypass removed)
+    ✔ 2. Changed nodes have priority over unchanged nodes
+    ✔ 2b. Changed nodes outrank entry nodes at the same screen slot
+    ✔ 3. Screen-Space Collision Culling: Overlapping text boxes are culled for non-selected nodes
+    ✔ 5. shortenCommunityLabel keeps hierarchical leaf when it fits the budget
+    ✔ 6. shortenCommunityLabel ellipsizes flat long names deterministically
+    ✔ 7. community guide labels respect zoom-tier budgets and suppress below overview threshold
+    ✔ 8. community guide labels skip lower-priority guides on box collision
+    ✔ 9. unified ranking: guide (350) beats ordinary; selected (1000) beats guide; zero overlap
+    ✔ 9b. global label budget caps guide+node+badge density
+    ✔ 10. Screen-Space Legibility: community landmarks at low zoom (k=0.21) maintain readable screen-size fonts
+    ✔ 11. aggregate guide labels beat ordinary node labels at shared occupancy
+    ✔ 7. Route badges share occupancy with guide labels and rank changed relationships
+    ✔ 12. labelCollisionCullCount counts each rejected label candidate during layout
+    ✔ 13. selected wins occupancy; hovered yields — zero visible overlap
+    ✔ 14. selected and hovered node labels beat route badge occupancy at the same slot
+    ✔ 15. changed node labels outrank entry and unchanged before route badges consume occupancy
+    ✔ 4. Hoists the workbench font family once per pass into every visible label
+    ✔ 16. Search result query match outranks ordinary route badges at the same screen position
+    ✔ 17. Current editor file explicitly outranks ordinary route badges at the same screen position
+    ✔ 18. Changed files outrank ordinary route badges in Focus Changes / temporal mode
+    ✔ 19. Community landmark labels are clamped within guide bounds
+    ✔ 20. Landmark yields when conflicting with higher-priority semantic label (search match or active file)
+    ✔ 21. Ordinary labels yield to all important content (route badges and landmarks)
 
-      at genericNodeError (node:internal/errors:985:15)
-      at wrappedFn (node:internal/errors:539:14)
-      at checkExecSyncError (node:child_process:925:11)
-      at execSync (node:child_process:997:15)
-      at Context.<anonymous> (file:///workspace/graphs/src/tests/unit/temporalIngestionE2E.test.ts:318:4)
 
-  3) Temporal Graph E2E Ingestion & Reconstruction
-       exposes refs and advances a bounded first-parent timeline without reconstructing unindexed graphs:
+  25 passing (12ms)
+
+
+
+  TemporalLayoutEngine (Unit - Stable 2D Layout Invariants)
+    ✔ 1. Continuity Invariant: Unaffected surviving nodes experience ZERO displacement across commits
+    ✔ 2. Determinism: Initial layout is completely deterministic given same node set
+    ✔ 3. Connected added node is placed in proximity to its neighbors
+    ✔ 4. Phantom exiting nodes for removed entities maintain previous coordinates
+    ✔ 5. Performance: 500-node snapshot layout executes in under 15ms
+    Bounded Local Relaxation & Spatial Grid Invariants
+      ✔ TEST A — Healthy Layout: Zero guide overlap preserves exact coordinates with zero displacement
+      ✔ TEST B — Local Guide Collision: Bounded relaxation reduces guide overlap
+      ✔ TEST C — Far-Away Community: Far-away unaffected community experiences zero movement
+      ✔ TEST C2 — Unrelated Changed Community: distant modified community stays anchored when overlap is elsewhere
+      ✔ TEST G2 — Quality Gate: relaxation reverts when overlap ratio would worsen
+      ✔ TEST D — Unchanged Affected Node: Movement is strictly bounded within unchanged budget (<= 12px)
+      ✔ TEST E — New / Changed Node: Movement is strictly bounded within changed budget (<= 36px)
+      ✔ TEST F — Renamed Identity: Renamed entity preserves identity and bounded movement
+      ✔ TEST G — Rollback / Stabler Retained: If relaxation does not improve quality, original positions are retained
+      ✔ TEST H — Determinism: Multiple runs with identical inputs produce identical coordinates
+      ✔ TEST I — Grid Cell Crossing: Spatial2DGrid handles cell boundaries correctly
+
+
+  16 passing (45ms)
+
+
+
+  TemporalLayoutQuality (Unit - Mathematical Layout Metrics & Guide Enclosure)
+    ✔ 1. Realistic 280-Node Repository Layout: Zero node collisions, high community separation, and bounded coordinates
+    ✔ 2. Guide Persistence Across Multi-Commit Transitions: Guides present on every commit and strictly enclose final positions
+    ✔ 3. Permutation Invariance: Shuffled input nodes and edges produce identical layout coordinates
+    ✔ 4. Elongated community guides are padded AABBs that enclose every member, not giant circumcircles
+    ✔ 5. Sparse rank stagger stays permutation-invariant
+
+
+  5 passing (39ms)
+
+
+
+  TemporalLineageResolver & TemporalEdgeLineage
+    ✔ Case 1: Unchanged file preserves entity ID and records same-canonical-id event
+    ✔ Case 2: Modified in place preserves entity ID and records modified-in-place event
+    ✔ Case 3: Exact rename (R100) preserves entity ID at new path
+    ✔ Case 4: Rename + edit (R<100) preserves entity ID and records git-rename-edit event
+    ✔ Case 6: Forked copy preserves source entity and generates fresh entity ID for target
+    ✔ Case 7: Deleted file records terminated event
+    ✔ Case 8: Recreated file after deletion receives fresh entity ID
+    ✔ Case 11: Swapped paths correctly follows content/git evidence
+    ✔ TemporalEdgeLineageResolver binds edges across resolved entity IDs
+
+
+  9 passing (8ms)
+
+
+
+  Temporal Live Acceptance Evaluation
+    1) zero received and drawn nodes with an unopened target fails closed
+    2) representative rendered evidence passes without failures
+
+
+  0 passing (523ms)
+  2 failing
+
+  1) Temporal Live Acceptance Evaluation
+       zero received and drawn nodes with an unopened target fails closed:
 
       AssertionError [ERR_ASSERTION]: Expected values to be strictly deep-equal:
 + actual - expected
-... Skipped lines
 
   {
-    featurePage: [
-      'f62143a21de1654845c74a72ac3d12aaf63c697e'
+    failures: [
+      'Temporal Graph target did not open',
+      'Full Map received zero nodes',
+      'Full Map exposed zero visible nodes',
+      'Full Map drew zero nodes',
++     'Full Map has rendered label overlaps (undefined)',
++     'Focus Changes has rendered label overlaps (undefined)'
     ],
-    hasMore: [
-...
-      [
-+       'refs/heads/master',
--       'refs/heads/main',
-        'cd5f044b03708fe4182a1de9d5c34514d0d3b490',
-        'branch'
-      ],
-      [
-        'refs/tags/v1',
+    ok: false
+  }
 
       + expected - actual
 
-             "f62143a21de1654845c74a72ac3d12aaf63c697e"
-             "branch"
-           ]
-           [
-      -      "refs/heads/master"
-      +      "refs/heads/main"
-             "cd5f044b03708fe4182a1de9d5c34514d0d3b490"
-             "branch"
-           ]
-           [
+           "Temporal Graph target did not open"
+           "Full Map received zero nodes"
+           "Full Map exposed zero visible nodes"
+           "Full Map drew zero nodes"
+      -    "Full Map has rendered label overlaps (undefined)"
+      -    "Focus Changes has rendered label overlaps (undefined)"
+         ]
+         "ok": false
+       }
       
-      at Context.<anonymous> (file:///workspace/graphs/src/tests/unit/temporalIngestionE2E.test.ts:416:11)
+      at Context.<anonymous> (file:///workspace/graphs/src/tests/unit/temporalLiveAcceptance.test.ts:69:10)
+      at process.processImmediate (node:internal/timers:504:21)
+
+  2) Temporal Live Acceptance Evaluation
+       representative rendered evidence passes without failures:
+
+      AssertionError [ERR_ASSERTION]: Expected values to be strictly equal:
+
+1 !== 0
+
+      + expected - actual
+
+      -1
+      +0
+      
+      at Context.<anonymous> (file:///workspace/graphs/src/tests/unit/temporalLiveAcceptance.test.ts:83:10)
+      at process.processImmediate (node:internal/timers:504:21)
 
 
 
-[graphs:unit-tests] FAILED: graphs/src/tests/unit/temporalIngestionE2E.test.ts (exit code 3)
+[graphs:unit-tests] FAILED: graphs/src/tests/unit/temporalLiveAcceptance.test.ts (exit code 2)

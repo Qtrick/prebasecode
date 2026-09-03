@@ -6,13 +6,13 @@
 > code-oss-dev@1.128.0 gulp
 > node --experimental-strip-types --max-old-space-size=8192 ./node_modules/gulp/bin/gulp.js compile-extension:prebase-magnus
 
-[10:21:58] Using gulpfile /workspace/gulpfile.mjs
-[10:21:58] Starting 'compile-extension:prebase-magnus'...
-[10:21:58] Starting clean-extension-prebase-magnus ...
-[10:21:58] Finished clean-extension-prebase-magnus after 11 ms
-[10:21:58] Starting compile-extension:prebase-magnus ...
-(node:208211) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
+[10:35:29] Using gulpfile /workspace/gulpfile.mjs
+[10:35:29] Starting 'compile-extension:prebase-magnus'...
+[10:35:29] Starting clean-extension-prebase-magnus ...
+[10:35:29] Finished clean-extension-prebase-magnus after 11 ms
+[10:35:29] Starting compile-extension:prebase-magnus ...
+(node:220457) [DEP0190] DeprecationWarning: Passing args to a child process with shell option true can lead to security vulnerabilities, as the arguments are not escaped, only concatenated.
 (Use `node --trace-deprecation ...` to show where the warning was created)
-[10:21:58] Finished extensions /workspace/extensions/prebase-magnus/tsconfig.json with 0 errors.
-[10:21:58] Finished compile-extension:prebase-magnus after 422 ms
-[10:21:58] Finished 'compile-extension:prebase-magnus' after 434 ms
+[10:35:30] Finished extensions /workspace/extensions/prebase-magnus/tsconfig.json with 0 errors.
+[10:35:30] Finished compile-extension:prebase-magnus after 418 ms
+[10:35:30] Finished 'compile-extension:prebase-magnus' after 430 ms

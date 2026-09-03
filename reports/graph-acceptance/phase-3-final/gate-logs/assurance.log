@@ -18,9 +18,8 @@
 [phase3-assurance] verify:supabase-rls-static
 {
   "ok": false,
-  "sourceHead": "ce46edff112311f96498dc58e35dd58f08750188",
+  "sourceHead": "01f049df21ab25e995b2d9401d4a32d0f81ea2fc",
   "failed": [
-    "test:graphs",
-    "test:prebase-pure:compiled"
+    "test:graphs"
   ]
 }
