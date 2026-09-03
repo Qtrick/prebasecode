@@ -551,14 +551,22 @@ async function run() {
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.openSettings', 'prebase.').catch(() => undefined);
 		evidence.p1_settings = await seen('.settings-editor');
 		// Prove a real PreBase setting change + persistence via smoke getDiagnostics (allowlisted write + read-back).
-		const beforeDiag = await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics').catch(() => null);
+		// Use 12s budgets: bare getDiagnostics may collect WebContents/Magnus probes on the full path.
+		const beforeDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics').catch(() => null);
 		const beforeSetting = beforeDiag?.liveActivityMode ?? null;
-		await workbenchCommandWithTimeout(launched.page, 6_000, 'prebase.test.getDiagnostics', { liveActivityMode: 'alwaysWorking' }).catch(() => undefined);
-		const afterDiag = await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics').catch(() => null);
-		const afterSetting = afterDiag?.liveActivityMode ?? null;
+		const setDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics', { liveActivityMode: 'alwaysWorking' }).catch(() => null);
+		const afterDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics').catch(() => null);
+		const afterSetting = afterDiag?.liveActivityMode ?? setDiag?.liveActivityMode ?? null;
 		const settingChanged = afterSetting === 'alwaysWorking';
 		evidence.p1_settingsPersisted = Boolean(evidence.p1_settings && settingChanged);
-		evidence.p1_detail = { beforeSetting, afterSetting, settingChanged };
+		evidence.p1_detail = {
+			beforeSetting,
+			afterSetting,
+			settingChanged,
+			beforeKeys: beforeDiag && typeof beforeDiag === 'object' ? Object.keys(beforeDiag).slice(0, 16) : [],
+			setKeys: setDiag && typeof setDiag === 'object' ? Object.keys(setDiag).slice(0, 16) : [],
+			afterKeys: afterDiag && typeof afterDiag === 'object' ? Object.keys(afterDiag).slice(0, 16) : [],
+		};
 
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.runtime.open').catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.runtime.openPreview').catch(() => undefined);

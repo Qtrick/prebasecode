@@ -14,8 +14,6 @@ LAYOUT MODES STATUS: {
   "ok": false,
   "failures": [
     "C2 existing profile failed",
-    "P1 PreBase setting persistence failed",
-    "P5 Magnus contribution activation was not proven",
-    "PreBase Settings web-search status live region was not proven"
+    "P1 PreBase setting persistence failed"
   ]
 }

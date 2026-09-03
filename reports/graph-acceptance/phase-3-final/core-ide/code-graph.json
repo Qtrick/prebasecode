@@ -1,12 +1,12 @@
 {
   "schemaVersion": 3,
   "scenario": "code-graph",
-  "sourceHead": "93a2aecd2af07779c88f9f58757fe254babe8b3e",
-  "sourceFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
-  "productFingerprint": "38fb89c4ff72c33600465485ae9f3f057f69bef895193e3924611312064ce68a",
-  "generatedAt": "2026-09-03T05:34:20.550Z",
+  "sourceHead": "0aa34b287d86b71768cc6177c0f12aa595454a4a",
+  "sourceFingerprint": "b0bd3deb157c54615cdcccb1854cb69eccd5f947386b05cfd8a80c0a394a164f",
+  "productFingerprint": "b0bd3deb157c54615cdcccb1854cb69eccd5f947386b05cfd8a80c0a394a164f",
+  "generatedAt": "2026-09-03T05:43:10.154Z",
   "producerId": "core-ide",
-  "producerFingerprint": "3544be4374353f280098152b6427d60dedbfc6872d4f82ec5b0dcaf6ba995aec",
+  "producerFingerprint": "291165932f79a277fbf7e1f1cfe6c8661c44457aa80ce35ee40254f54f8b6cd8",
   "ok": true,
   "failures": [],
   "codeGraph": {

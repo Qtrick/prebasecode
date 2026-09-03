@@ -1246,7 +1246,7 @@ registerAction2(class extends Action2 {
 				editorCount: editorService.visibleEditors.length,
 			},
 		};
-		if (applyId || typeof zoom === 'number') {
+		if (applyId || typeof zoom === 'number' || liveActivityMode || a11yMode || typeof networkLayoutMode === 'string') {
 			return result;
 		}
 		if (nativeHost) {
