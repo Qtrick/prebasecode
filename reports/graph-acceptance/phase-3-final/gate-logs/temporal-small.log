@@ -3,16 +3,16 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "temporal-small",
-  "sourceHead": "b5eae2c3ce53f6acda3d86a39d4a624bdcc12f13",
-  "sourceFingerprint": "c4f9d20dfcf251db2a26fc1cddf39e6ac3f50cf22d1ddf13966ed8488d4a1a97",
-  "productFingerprint": "c4f9d20dfcf251db2a26fc1cddf39e6ac3f50cf22d1ddf13966ed8488d4a1a97",
-  "generatedAt": "2026-09-03T08:07:35.832Z",
+  "sourceHead": "8a6e1612aad7686fe148382e41d5f1b1d2382287",
+  "sourceFingerprint": "509bef047944fde9256f1dcb81652ce02e3eb98182ddaf3a568bbb621c028d9d",
+  "productFingerprint": "509bef047944fde9256f1dcb81652ce02e3eb98182ddaf3a568bbb621c028d9d",
+  "generatedAt": "2026-09-03T08:21:48.997Z",
   "producerId": "temporal-small",
-  "producerFingerprint": "83ec50b597859aecd6fd49c31b0aedfb9a4ccbd0f6f8f2359019cf9052102454",
+  "producerFingerprint": "278cae7930f350060ca2591a1deb099333c492d065bff42f9eb94c387defaefb",
   "scale": "small",
   "fixture": {
-    "dir": "/tmp/pb-temporal-PP0CM0",
-    "head": "b3d37bb7a9fc03336946c63eb2aa33ef6d5e5aeb",
+    "dir": "/tmp/pb-temporal-vWR2JC",
+    "head": "4fc8b04abd0492a3ebe93e3f11b203559f050de1",
     "commits": 10,
     "files": [
       "package.json",
@@ -21,24 +21,24 @@
       "src/tally.js"
     ],
     "expectedModifiedPath": "src/tally.js",
-    "firstParentSummary": "b3d37bb7a9fc03336946c63eb2aa33ef6d5e5aeb 3055f66392b7c75bb62db533104bc6338bd7d3a1 fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+    "firstParentSummary": "4fc8b04abd0492a3ebe93e3f11b203559f050de1 ad008a5dbeb28986081d4139d15d609e857f243d fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
   },
-  "pid": 110575,
-  "cdpPort": 38871,
-  "sourceProfile": "/tmp/pb-temporal-profile-6sfPm3",
+  "pid": 115442,
+  "cdpPort": 44429,
+  "sourceProfile": "/tmp/pb-temporal-profile-6gfDo4",
   "gitReady": {
     "ok": true,
     "count": 1
   },
   "fullMap": {
-    "sequenceId": 13,
+    "sequenceId": 1,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 454.09999999962747,
-    "renderEnd": 454.19999999925494,
-    "durationMs": 0.09999999962747097,
-    "selectedCommitSha": "b3d37bb7a9fc03336946c63eb2aa33ef6d5e5aeb",
-    "renderedCommitSha": "b3d37bb7a9fc03336946c63eb2aa33ef6d5e5aeb",
+    "renderStart": 240.40000000037253,
+    "renderEnd": 240.80000000074506,
+    "durationMs": 0.40000000037252903,
+    "selectedCommitSha": "4fc8b04abd0492a3ebe93e3f11b203559f050de1",
+    "renderedCommitSha": "4fc8b04abd0492a3ebe93e3f11b203559f050de1",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 4,
@@ -92,8 +92,8 @@
       "edgeRemovedCount": 0,
       "edgeModifiedCount": 0
     },
-    "isAnimating": false,
-    "timestamp": 454.19999999925494,
+    "isAnimating": true,
+    "timestamp": 240.80000000074506,
     "viewportWidth": 796,
     "viewportHeight": 815,
     "labelCount": 4,
@@ -107,16 +107,16 @@
     },
     "screenUtilization": 0.17543787358055188
   },
-  "processBeforeInteractions": "110575       1 73.4 292340 prebase",
+  "processBeforeInteractions": "115442       1 78.5 293112 prebase",
   "focusChanges": {
     "sequenceId": 28,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 1036.9000000003725,
-    "renderEnd": 1037,
-    "durationMs": 0.09999999962747097,
-    "selectedCommitSha": "b3d37bb7a9fc03336946c63eb2aa33ef6d5e5aeb",
-    "renderedCommitSha": "b3d37bb7a9fc03336946c63eb2aa33ef6d5e5aeb",
+    "renderStart": 773.3000000007451,
+    "renderEnd": 773.5,
+    "durationMs": 0.19999999925494194,
+    "selectedCommitSha": "4fc8b04abd0492a3ebe93e3f11b203559f050de1",
+    "renderedCommitSha": "4fc8b04abd0492a3ebe93e3f11b203559f050de1",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 2,
@@ -148,16 +148,16 @@
     "labelOverlapCount": 0,
     "selectedNodeId": null,
     "transform": {
-      "x": 489.1201588317967,
-      "y": 562.4662272552108,
-      "k": 2.816838284515324
+      "x": 489.5314352179311,
+      "y": 561.7462136603704,
+      "k": 2.8122732601648432
     },
     "canvas": {
       "clientWidth": 796,
       "clientHeight": 815,
       "width": 783,
       "height": 802,
-      "distinctPixels": 26151
+      "distinctPixels": 26133
     },
     "summary": {
       "addedCount": 0,
@@ -171,53 +171,53 @@
       "edgeModifiedCount": 0
     },
     "isAnimating": false,
-    "timestamp": 1037,
+    "timestamp": 773.5,
     "viewportWidth": 796,
     "viewportHeight": 815,
     "labelCount": 2,
     "projectedBounds": {
-      "minX": 579.258983936287,
-      "minY": 221.6287948288566,
-      "maxX": 596.160013643379,
-      "maxY": 401.90644503783733,
-      "width": 16.901029707091993,
-      "height": 180.27765020898073
+      "minX": 579.5241795432061,
+      "minY": 221.46114918042434,
+      "maxX": 596.3978191041952,
+      "maxY": 401.4466378309743,
+      "width": 16.87363956098909,
+      "height": 179.98548865054994
     },
-    "screenUtilization": 0.004696608690240655
+    "screenUtilization": 0.0046813981898724795
   },
   "targetOpened": true,
   "repoLoaded": true,
   "zoomTiers": [],
-  "processAfterInteractions": "110575       1 47.5 293384 prebase",
+  "processAfterInteractions": "115442       1 48.9 294196 prebase",
   "camera": {
     "afterFocus": {
-      "x": 462.2227493425919,
-      "y": 609.5550005257692,
-      "k": 3.115390142639585
+      "x": 456.46102278871194,
+      "y": 619.6419434877486,
+      "k": 3.1793432965429433
     },
     "afterUserZoom": {
-      "x": 465.8337628744555,
-      "y": 638.176933583223,
+      "x": 461.2792334539863,
+      "y": 641.9908904772293,
       "k": 3.5
     },
     "afterWait": {
-      "x": 465.8337628744555,
-      "y": 638.176933583223,
+      "x": 461.2792334539863,
+      "y": 641.9908904772293,
       "k": 3.5
     },
     "afterFit": {
-      "x": 455.0921820997004,
-      "y": 623.5693245470821,
-      "k": 3.2131438264774
+      "x": 454.8906479115909,
+      "y": 623.7307431512677,
+      "k": 3.2130545479624217
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1788422875183,
+    "startedAt": 1788423728196,
     "quitMs": 300,
     "remaining": "gone",
-    "before": "110575       1 19.8 292988 prebase",
+    "before": "115442       1 20.1 293676 prebase",
     "after": "gone"
   }
 }
