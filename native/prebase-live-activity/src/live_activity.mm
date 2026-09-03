@@ -208,12 +208,14 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) NSTextField *headerTitle;
 @property (nonatomic, strong) NSTextField *statusBadge;
 @property (nonatomic, strong) NSTextField *activityDescription;
+@property (nonatomic, strong) NSTextField *latestMessageLabel;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *actionLabels;
 @property (nonatomic, strong) NSTextField *pendingInteractionTitle;
 @property (nonatomic, strong) NSTextField *expandedMetricsLabel;
 
 @property (nonatomic, copy) NSString *statusLabel;
 @property (nonatomic, copy) NSString *activityLabel;
+@property (nonatomic, copy) NSString *latestMessage;
 @property (nonatomic, copy) NSString *metricsLabel;
 @property (nonatomic, copy) NSString *pendingTitle;
 @property (nonatomic, copy) NSArray<NSString *> *actions;
@@ -339,6 +341,10 @@ static NSString *JSString(Napi::Value value) {
 
 		_activityDescription = [self makeLabel:11 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.88 alpha:1.0]];
 		[_expandedContainer addSubview:_activityDescription];
+
+		_latestMessageLabel = [self makeLabel:11 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.86 alpha:1.0]];
+		_latestMessageLabel.hidden = YES;
+		[_expandedContainer addSubview:_latestMessageLabel];
 
 		_actionLabels = [NSMutableArray array];
 		for (NSInteger i = 0; i < 3; i++) {
@@ -588,6 +594,16 @@ static NSString *JSString(Napi::Value value) {
 			self.activityDescription.hidden = YES;
 		}
 
+		// Latest short response from Magnus
+		if (self.latestMessage.length) {
+			self.latestMessageLabel.stringValue = [NSString stringWithFormat:@"💬 %@", self.latestMessage];
+			self.latestMessageLabel.hidden = NO;
+			self.latestMessageLabel.frame = NSMakeRect(16, bodyY, totalW - 32, 18);
+			bodyY += 20;
+		} else {
+			self.latestMessageLabel.hidden = YES;
+		}
+
 		// Recent actions
 		for (NSInteger i = 0; i < 3; i++) {
 			NSTextField *bullet = self.actionLabels[i];
@@ -739,21 +755,25 @@ static NSString *JSString(Napi::Value value) {
 
 - (NSScreen *)targetScreen {
 	if ([self.displayMode isEqualToString:@"active"]) {
-		// Prefer the screen containing the active/focused work window rather than raw cursor location
+		// Prefer the screen containing the active/focused work window
 		NSWindow *keyWin = [NSApp keyWindow];
 		NSWindow *mainWin = [NSApp mainWindow];
 		NSScreen *workScreen = keyWin.screen ?: mainWin.screen;
 		if (workScreen) {
 			return workScreen;
 		}
-		// Fallback to mouse location only when PreBase has no focused window
-		NSPoint p = [NSEvent mouseLocation];
+		// When PreBase is backgrounded, [NSScreen mainScreen] represents the active user workspace display
+		NSScreen *frontScreen = [NSScreen mainScreen];
+		if (frontScreen) {
+			return frontScreen;
+		}
+		// Deterministic fallback to built-in physical notch screen, never random cursor hopping
 		for (NSScreen *screen in [NSScreen screens]) {
-			if (NSPointInRect(p, screen.frame)) {
+			if (IsBuiltinScreen(screen) && ScreenHasPhysicalNotch(screen)) {
 				return screen;
 			}
 		}
-		return [NSScreen mainScreen] ?: [NSScreen screens].firstObject;
+		return [NSScreen screens].firstObject;
 	}
 	NSScreen *builtin = nil;
 	for (NSScreen *screen in [NSScreen screens]) {
@@ -822,6 +842,9 @@ static NSString *JSString(Napi::Value value) {
 	h += 22; // Header
 	if (self.content.activityLabel.length) {
 		h += 18;
+	}
+	if (self.content.latestMessage.length) {
+		h += 20;
 	}
 	if (self.content.actions.count > 0) {
 		h += MIN((NSInteger)self.content.actions.count, 3) * 15;
@@ -1053,12 +1076,6 @@ static NSString *JSString(Napi::Value value) {
 		if (strong.pinned || strong.attentionPeek || strong.content.peekOnly || (strong.content.expanded && !strong.attentionPeek)) {
 			return;
 		}
-		if ([strong.displayMode isEqualToString:@"active"]) {
-			NSScreen *activeScreen = [strong targetScreen];
-			if (activeScreen && activeScreen != strong.layoutScreen) {
-				[strong layoutForScreen];
-			}
-		}
 		NSPoint p = [NSEvent mouseLocation];
 		NSScreen *screen = [strong targetScreen];
 		if (screen && !NSPointInRect(p, screen.frame)) {
@@ -1176,7 +1193,7 @@ static NSString *JSString(Napi::Value value) {
 	self.content.targetExpanded = YES;
 	self.panel.ignoresMouseEvents = NO;
 	self.ignoresMouse = NO;
-	[self installLocalKeyMonitor];
+	[self removeLocalKeyMonitor];
 	[self removeGlobalMonitorOnly];
 	[self layoutForScreen];
 }
@@ -1432,15 +1449,36 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"transitionInFlight"] = @(self.transitionInFlight);
 	dict[@"transitionGeneration"] = @(self.transitionGeneration);
 	dict[@"layerBacked"] = @(self.content.wantsLayer);
-	dict[@"pathTopologyCompatible"] = @YES;
+	CGFloat diagBandH = MAX(self.content.safeAreaTop, kCollapsedHeight);
+	CGFloat diagTotalW = NSWidth(self.content.bounds);
+	CGFloat diagCurrentH = NSHeight(self.content.bounds);
+	CGFloat diagLeftW = self.content.leftWingWidth > 0 ? self.content.leftWingWidth : kWingWidthMin;
+	CGFloat diagRightW = self.content.rightWingWidth > 0 ? self.content.rightWingWidth : kWingWidthMin;
+	CGFloat diagHousing = self.content.housingWidth > 0 ? self.content.housingWidth : kCameraHousingMin;
+	if (diagTotalW <= 0) { diagTotalW = diagLeftW + diagHousing + diagRightW; }
+	if (diagCurrentH <= 0) { diagCurrentH = diagBandH; }
+
+	CGPathRef diagPathCollapsed = CreateNotchedIslandPath(diagTotalW, diagBandH, diagLeftW, diagRightW, diagHousing, diagBandH, NO, self.content.notched);
+	CGPathRef diagCurrentPath = self.content.shapeLayer.path;
+	BOOL isTopologyCompatible = NO;
+	if (diagCurrentPath) {
+		isTopologyCompatible = ValidatePathTopology(diagPathCollapsed, diagCurrentPath);
+	} else {
+		CGPathRef diagPathExpanded = CreateNotchedIslandPath(diagTotalW, diagCurrentH, diagLeftW, diagRightW, diagHousing, diagBandH, self.content.expanded, self.content.notched);
+		isTopologyCompatible = ValidatePathTopology(diagPathCollapsed, diagPathExpanded);
+		CGPathRelease(diagPathExpanded);
+	}
+	CGPathRelease(diagPathCollapsed);
+	dict[@"pathTopologyCompatible"] = @(isTopologyCompatible);
+	dict[@"latestShortMessage"] = self.content.latestMessage ?: @"";
 	dict[@"activePresentationState"] = self.pinned
 		? @"pinned"
 		: (self.content.expanded
 			? (self.attentionPeek ? @"attentionPeek" : (self.content.attention ? @"attention" : @"interactive"))
-			: @"compact");
+			: (self.content.attention ? @"attentionCompact" : @"compact"));
 	dict[@"targetPresentationState"] = self.content.targetExpanded
 		? (self.attentionPeek ? @"attentionPeek" : (self.content.attention ? @"attention" : @"interactive"))
-		: @"compact";
+		: (self.content.attention ? @"attentionCompact" : @"compact");
 	dict[@"hoverDwellMs"] = @(180);
 	dict[@"exitGraceMs"] = @(250);
 	return dict;
@@ -1523,6 +1561,7 @@ static NSString *JSString(Napi::Value value) {
 	self.content.actions = snapshot[@"recentActions"] ?: @[];
 	self.content.metricsLabel = snapshot[@"metricsLabel"] ?: @"";
 	self.content.pendingTitle = snapshot[@"pendingTitle"] ?: @"";
+	self.content.latestMessage = snapshot[@"latestShortMessage"] ?: @"";
 	self.interactionId = snapshot[@"interactionId"] ?: @"";
 	self.pendingKind = snapshot[@"pendingKind"] ?: @"";
 	self.pendingDestructive = [snapshot[@"destructive"] boolValue];
@@ -1530,16 +1569,16 @@ static NSString *JSString(Napi::Value value) {
 	self.lastNativeCommand = @"";
 
 	if (self.content.attention && !self.pinned) {
-		// Glanceable attention peek: compact wings + short body, not full interactive panel.
+		// Glanceable attention peek: compact wings + short body, clickable to expand interactive.
 		// Attention arrival is not user-initiated; do not haptic (Apple AppKit guidance).
 		self.attentionPeek = YES;
 		self.content.peekOnly = YES;
 		self.content.expanded = YES;
 		self.content.targetExpanded = YES;
-		self.ignoresMouse = YES;
+		self.ignoresMouse = NO;
 		self.didAttentionHaptic = NO;
 		if (self.panel) {
-			self.panel.ignoresMouseEvents = YES;
+			self.panel.ignoresMouseEvents = NO;
 			[self layoutForScreen];
 		}
 	} else {
@@ -1632,6 +1671,7 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 	payload[@"currentActivity"] = JSString(snapshot.Get("currentActivity"));
 	payload[@"taskTitle"] = JSString(snapshot.Get("taskTitle"));
 	payload[@"presentationLabel"] = JSString(snapshot.Get("presentationLabel"));
+	payload[@"latestShortMessage"] = JSString(snapshot.Get("latestShortMessage"));
 	NSMutableArray *actions = [NSMutableArray array];
 	if (snapshot.Get("recentActions").IsArray()) {
 		Napi::Array arr = snapshot.Get("recentActions").As<Napi::Array>();
@@ -1769,6 +1809,25 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 	}
 	std::string action = info[0].As<Napi::String>().Utf8Value();
 	PrebaseLiveActivityController *controller = EnsureController();
+	if (action == "click") {
+		if (controller.content.peekOnly) {
+			[controller expandInteractive];
+			return Napi::Boolean::New(env, true);
+		}
+		return Napi::Boolean::New(env, false);
+	}
+	if (action == "peek") {
+		[controller expandPeek];
+		return Napi::Boolean::New(env, true);
+	}
+	if (action == "interactive") {
+		[controller expandInteractive];
+		return Napi::Boolean::New(env, true);
+	}
+	if (action == "escape" || action == "collapse") {
+		[controller collapse];
+		return Napi::Boolean::New(env, true);
+	}
 	if (action == "approve") {
 		return Napi::Boolean::New(env, [controller simulateClickApprove]);
 	}

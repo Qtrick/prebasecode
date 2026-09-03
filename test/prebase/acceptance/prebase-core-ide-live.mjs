@@ -311,8 +311,7 @@ async function run() {
 		const explorerTree = await launched.page.locator('.explorer-folders-view, .monaco-list-rows').innerText().catch(() => '');
 		evidence.c3_folderOpen = Boolean(
 			workspaceTitle.includes(basename(gitWorkspace)) ||
-			explorerTree.includes('hello.ts') ||
-			(existsSync(openFile) && readFileSync(openFile, 'utf8').length > 0)
+			explorerTree.includes('hello.ts')
 		);
 		evidence.p2 = onboardingFlow;
 		evidence.offlineChoicePresented = Boolean(onboardingFlow.offlineChoicePresented);
@@ -341,19 +340,33 @@ async function run() {
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'vscode.open', fileUri).catch(() => undefined);
 		await launched.page.locator('.monaco-editor textarea.inputarea').first().click({ timeout: 8_000 }).catch(() => undefined);
 		await launched.page.waitForTimeout(400);
-		await Promise.race([
-			launched.page.keyboard.type(' // core-ide', { delay: 20 }),
-			new Promise(resolve => setTimeout(resolve, 4_000)),
-		]);
-		if (!readFileSync(openFile, 'utf8').includes('core-ide')) {
-			await workbenchCommandWithTimeout(launched.page, 4_000, 'type', { text: ' // core-ide' }).catch(() => undefined);
-		}
+
+		// Type edit
+		await workbenchCommandWithTimeout(launched.page, 4_000, 'type', { text: ' // core-ide-verified' }).catch(() => undefined);
+		await launched.page.waitForTimeout(300);
+		const editorTextAfterType = await launched.page.locator('.monaco-editor .view-lines').innerText().catch(() => '');
+		const typedOk = editorTextAfterType.includes('core-ide-verified');
+
+		// Undo -> editor should revert
 		await workbenchCommandWithTimeout(launched.page, 5_000, 'undo').catch(() => undefined);
+		await launched.page.waitForTimeout(300);
+		const editorTextAfterUndo = await launched.page.locator('.monaco-editor .view-lines').innerText().catch(() => '');
+		const undoOk = !editorTextAfterUndo.includes('core-ide-verified');
+
+		// Redo -> editor should re-apply edit
 		await workbenchCommandWithTimeout(launched.page, 5_000, 'redo').catch(() => undefined);
+		await launched.page.waitForTimeout(300);
+		const editorTextAfterRedo = await launched.page.locator('.monaco-editor .view-lines').innerText().catch(() => '');
+		const redoOk = editorTextAfterRedo.includes('core-ide-verified');
+
+		// Save -> disk should reflect edit
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.files.save').catch(() => undefined);
 		await launched.page.keyboard.press(`${mod}+s`).catch(() => undefined);
+		await launched.page.waitForTimeout(400);
 		const afterHello = readFileSync(openFile, 'utf8');
-		evidence.e1_saveUndo = afterHello.includes('core-ide') || afterHello !== beforeHello;
+		const diskSaveOk = afterHello.includes('core-ide-verified');
+
+		evidence.e1_saveUndo = Boolean(typedOk && undoOk && redoOk && diskSaveOk);
 
 		// E2: Real workspace search query & match verification
 		await launched.page.keyboard.press(`${mod}+Shift+f`).catch(() => undefined);
@@ -364,14 +377,15 @@ async function run() {
 			await launched.page.keyboard.press('Enter').catch(() => undefined);
 		}
 		const searchResultFound = await seen('.search-view .monaco-list-row, .search-view .search-result', 6_000);
-		evidence.e2_search = Boolean(searchResultFound || await seen('.search-view, .search-widget, .search-widgets-container'));
+		const searchResultText = await launched.page.locator('.search-view .monaco-list-rows').innerText().catch(() => '');
+		evidence.e2_search = Boolean(searchResultFound && (searchResultText.includes('hello.ts') || searchResultText.includes('hello')));
 
 		// E3: Real Git SCM tracking of modified file
 		await launched.page.getByRole('tab', { name: /Source Control/i }).click({ timeout: 4_000 }).catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.scm').catch(() => undefined);
 		const scmFileItem = launched.page.locator('.scm-view [role="treeitem"], .scm-view .monaco-list-row').filter({ hasText: /hello\.ts/ }).first();
 		const scmFileDetected = await scmFileItem.isVisible({ timeout: 6_000 }).catch(() => false);
-		evidence.e3_scm = Boolean(scmFileDetected || await seen('.scm-view, .scm-viewlet, .scm-view.show-file-icons, [id="workbench.scm"]', 8_000));
+		evidence.e3_scm = Boolean(scmFileDetected);
 
 		// E4: Real integrated terminal execution
 		await launched.page.keyboard.press('Control+`').catch(() => undefined);
@@ -380,8 +394,8 @@ async function run() {
 		const termText = await waitFor(async () => {
 			const text = await launched.page.locator('.xterm, .terminal-wrapper, .integrated-terminal').innerText().catch(() => '');
 			return text.includes('PREBASE_OK') ? text : undefined;
-		}, 6_000, 300);
-		evidence.e4_terminal = Boolean(termText || await seen('.xterm, .xterm-screen, .terminal-wrapper, .pane-body.integrated-terminal, .integrated-terminal'));
+		}, 8_000, 300);
+		evidence.e4_terminal = Boolean(termText && termText.includes('PREBASE_OK'));
 
 		// E5: Debug session control
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.view.debug').catch(() => undefined);
@@ -389,14 +403,15 @@ async function run() {
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.debug.start').catch(() => undefined);
 		const debugToolbarSeen = await seen('.debug-toolbar', 4_000);
 		await workbenchCommandWithTimeout(launched.page, 4_000, 'workbench.action.debug.stop').catch(() => undefined);
-		evidence.e5_debug = Boolean(debugPaneSeen);
+		await launched.page.waitForTimeout(300);
+		evidence.e5_debug = Boolean(debugPaneSeen && debugToolbarSeen);
 
 		// E6: TypeScript language service completion & diagnostics
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'vscode.open', fileUri).catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'editor.action.triggerSuggest').catch(() => undefined);
 		const suggestSeen = await seen('.suggest-widget .monaco-list-row, .suggest-widget', 6_000);
 		const tsDiagnostics = await workbenchCommandWithTimeout(launched.page, 6_000, 'prebase.test.getDiagnostics').catch(() => null);
-		evidence.e6_typescript = Boolean(suggestSeen || tsDiagnostics?.languages?.includes('typescript') || tsDiagnostics?.activeLanguageId === 'typescript');
+		evidence.e6_typescript = Boolean(suggestSeen && (tsDiagnostics?.languages?.includes('typescript') || tsDiagnostics?.activeLanguageId === 'typescript' || suggestSeen));
 
 		await workbenchCommandWithTimeout(launched.page, 3_000, 'workbench.action.reloadWindow').catch(() => undefined);
 		const restored = await waitFor(() => {

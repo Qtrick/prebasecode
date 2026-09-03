@@ -421,8 +421,8 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 		};
 		if (this._session.networkCapture) {
 			this._pushNetwork(reachable
-				? localize('prebase.runtime.networkConnect', "GET {0}", validated.url)
-				: localize('prebase.runtime.networkUnreachable', "Unreachable {0}", validated.url));
+				? localize('prebase.runtime.networkConnect', "[probe] GET {0}", validated.url)
+				: localize('prebase.runtime.networkUnreachable', "[probe] Unreachable {0}", validated.url));
 		}
 		if (!reachable) {
 			this._log(localize(
@@ -1461,9 +1461,6 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 			running: true,
 			detectedUrls: [...new Set([validated.url, ...this._session.detectedUrls])]
 		};
-		if (this._session.networkCapture) {
-			this._pushNetwork(localize('prebase.runtime.networkDetected', "Detected {0}", validated.url));
-		}
 		this._log(localize('prebase.runtime.urlDetected', "Detected preview URL {0}", validated.url));
 		this._fire();
 		await this.openPreviewEditor();

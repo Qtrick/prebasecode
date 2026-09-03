@@ -1,27 +1,29 @@
 {
-  "runId": "2026-09-03T01-12-46-176Z",
-  "planKey": "f91ee259008b926fa34ba3c2e4e83d1894542522a3b4f8967bba2877ae6de2b2:release",
+  "runId": "2026-09-03T01-47-49-995Z",
+  "planKey": "d86ee87c5d55f1c84845534efdd011a17062d12dbb602f92e1f5caf3010bd2ae:release",
   "tier": "release",
   "onlyProducers": [],
-  "plannedAtHead": "34e24416a4d74dcdbcab859151ed036bf11659d0",
-  "currentHead": "34e24416a4d74dcdbcab859151ed036bf11659d0",
-  "sourceHead": "34e24416a4d74dcdbcab859151ed036bf11659d0",
-  "productFingerprint": "59d49e85463846770dc499e893b6a18b4be32305980594265e826765e5b68a0c",
-  "sourceFingerprint": "59d49e85463846770dc499e893b6a18b4be32305980594265e826765e5b68a0c",
+  "plannedAtHead": "3539d74c3c1f2b05a10d1690ddaea67931871cf5",
+  "currentHead": "3539d74c3c1f2b05a10d1690ddaea67931871cf5",
+  "sourceHead": "3539d74c3c1f2b05a10d1690ddaea67931871cf5",
+  "productFingerprint": "844aa4bc3ec8a5828a29700ce991b728bc316e88b969a37d7eee7951a4bf462b",
+  "sourceFingerprint": "844aa4bc3ec8a5828a29700ce991b728bc316e88b969a37d7eee7951a4bf462b",
   "prerequisites": {
     "firecrawlConfigured": false,
     "linkupConfigured": false,
     "geminiConfigured": false
   },
-  "createdAt": "2026-09-03T01:12:47.740Z",
+  "createdAt": "2026-09-03T01:47:51.570Z",
   "reused": false,
   "totalEstimatedDurationMs": 4995557,
-  "changedPathCount": 10,
+  "changedPathCount": 8,
   "changedDomains": [
-    "temporal",
-    "graphs-common",
+    "assurance-leaf",
     "network-graph",
+    "graphs-common",
     "live-activity",
+    "shared-workbench",
+    "validation-orchestration",
     "core-ide"
   ],
   "unknownChangedPaths": [],
@@ -29,7 +31,7 @@
   "producers": [
     {
       "id": "parser-benchmark",
-      "expectedProducerFingerprint": "fdfa9dbda8f31f31c663a2b1296ed4867d80255b815b0451ba740ef8f069520d",
+      "expectedProducerFingerprint": "e879cd2292a19268d2c7bf169930cc6503892e219933b558355d190a784dbb58",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
@@ -43,7 +45,7 @@
     },
     {
       "id": "magnus-streaming-smoke",
-      "expectedProducerFingerprint": "b0f93a9bc099da69b7c3c83dab2a9d276449fd9c6e7fc1681ae20156bc59dba6",
+      "expectedProducerFingerprint": "96ce621607bcd96adec875f7f644e548df87a3e14aa8cd1f1be53ef29aa494ff",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 45000,
@@ -60,7 +62,7 @@
     },
     {
       "id": "magnus-guidance-smoke",
-      "expectedProducerFingerprint": "d02064e91c88d879facd61492b19e4979652316b12ec36a09b33c7219d736516",
+      "expectedProducerFingerprint": "52841b226492b8aa4b64cb87a931e6c89961ad8a978ec82d8297675974866855",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 10557,
@@ -77,7 +79,7 @@
     },
     {
       "id": "magnus-live-activity",
-      "expectedProducerFingerprint": "d6c6f4054b9459803b3f814e4fb61e746f7333d0b903568786dad53f5004e045",
+      "expectedProducerFingerprint": "23b273719495b9420f4f41f3920dde7cf27d010ec1d6e9ad7cb7403a260b9de7",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 45000,
@@ -93,7 +95,7 @@
     },
     {
       "id": "core-ide",
-      "expectedProducerFingerprint": "019131566d9fadf5111bbe92f15a421b0e7d78ad7ba0c0bc1bafee10dd6599f9",
+      "expectedProducerFingerprint": "40c36c7a53395f91ebc9230859b775bbc7f32638db9d5ee4f2f325cc863325c4",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 120000,
@@ -130,7 +132,7 @@
     },
     {
       "id": "temporal-small",
-      "expectedProducerFingerprint": "9daa788f2c5befb061de91680cdb51a5997312d753e231f21d3a2f7e8660ccd8",
+      "expectedProducerFingerprint": "6fb9b36541521fded2bad2dc30238d11c3aff4d5ad572bb34efca884aa1ac6cf",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
@@ -148,7 +150,7 @@
     },
     {
       "id": "temporal-large",
-      "expectedProducerFingerprint": "e6287732697a587a914b5eb8a93c9a44767e6d79325ee5843f6c11f5eb3ee600",
+      "expectedProducerFingerprint": "e7874d83b76f22b8f19d2073f2c20525d64a462384abc4c226973d0825819fe7",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 150000,
@@ -166,7 +168,7 @@
     },
     {
       "id": "temporal-canonical-scale",
-      "expectedProducerFingerprint": "220ddd65944b6d8ed78913a351f1681f46839eb341ad08228eda996b7e0cc2cb",
+      "expectedProducerFingerprint": "d8fde1ae44922f72f7bf7209ab0a43276c30f33d8053d212ab8e956927754945",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 300000,
@@ -184,7 +186,7 @@
     },
     {
       "id": "electron-product-path",
-      "expectedProducerFingerprint": "cffa4d74b1357dab646499a16bd8da65c47dd46dc64aa0d857ff25c11103b08c",
+      "expectedProducerFingerprint": "ed6b50eb210316c8658303a8ddde58720b552bf32c18c98a6c77bd595535968b",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 30000,
@@ -201,7 +203,7 @@
     },
     {
       "id": "electron-native-cases",
-      "expectedProducerFingerprint": "aa1b1897c3918d0a8f94df88f9c1abcb6ddd75ae421b53160b28ca7067ea5e48",
+      "expectedProducerFingerprint": "2455c1f35ff5a2101a9445836c2d5cf5441974440dccd8bf2fa4be285a51ff85",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 35000,
@@ -218,7 +220,7 @@
     },
     {
       "id": "tauri-product-path",
-      "expectedProducerFingerprint": "a472186cdf0fa27cd078a6191c2b27eeeb042a1e35862306b9edbed5a85e44c8",
+      "expectedProducerFingerprint": "2ecb509f9e34201419b8fd42411cbf446eb74c987d4b368117d7d7a924c068c7",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 30000,
@@ -235,7 +237,7 @@
     },
     {
       "id": "magnus-electron-tools",
-      "expectedProducerFingerprint": "06bf33033ceb7b9432a7ddfb241d3bcc39a073c52dd443d434ad4f05658e4b1c",
+      "expectedProducerFingerprint": "3ca7621c1e0be7b0bc07f16fa43614c79ee41a38e3d62c746cdb4b80f51ecfe3",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 150000,
@@ -253,7 +255,7 @@
     },
     {
       "id": "magnus-tauri-tools",
-      "expectedProducerFingerprint": "536a66fa18b3672732cfc78999818e36bc8ae1c75af6a38b2134a866bdcb3325",
+      "expectedProducerFingerprint": "3498e75c39cd2e5006781796f300ea344f27bf709f06015d512355fb4a3c6401",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 240000,
@@ -288,7 +290,7 @@
     },
     {
       "id": "privacy",
-      "expectedProducerFingerprint": "329ba10697cf8251a2a394e3688149ad8361adb366ce5f52d3d0e59a34c58b70",
+      "expectedProducerFingerprint": "ac5b22f5ed4c98fcbcd95c9acd75404aba24531d1e340193f70806a297613626",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
@@ -304,7 +306,7 @@
     },
     {
       "id": "load-quit",
-      "expectedProducerFingerprint": "57ac0ebd520b5f0a3319674d86ab8b1ddf33cde1a13e3fb7245b983a122d38f1",
+      "expectedProducerFingerprint": "950e077897198360dec335c66f3c1a79e01a71cf456933e7936af73f9250b8af",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 120000,
@@ -327,7 +329,7 @@
     },
     {
       "id": "lifecycle-cycles",
-      "expectedProducerFingerprint": "a56e9c04bd5604a9871fe5886ac9453ce22e4cc5f64165467684d40d671e1a9f",
+      "expectedProducerFingerprint": "1d507c54b14aaca4281ebefdef659bed467f599316612c642711196d92081627",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 90000,
@@ -345,7 +347,7 @@
     },
     {
       "id": "electron-restart-soak",
-      "expectedProducerFingerprint": "867bb6f95d002ced87e6b7287425e182ae8d288ca1ea4f53988026e75afdbb14",
+      "expectedProducerFingerprint": "69375cc79c3edfdd59770e380d2c73aa1efe1423cfca06b5d6a961bf4b58a845",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 900000,
@@ -361,7 +363,7 @@
     },
     {
       "id": "tauri-restart-soak",
-      "expectedProducerFingerprint": "404a16c459793ade09f7a98c7c1a2d778059f337eeed01b163605da7014d983f",
+      "expectedProducerFingerprint": "c57b4aecf1449f7e151af7ebf7f4c8498496da4da7ecf0f0319c5669ad7d5fe4",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 240000,
@@ -377,7 +379,7 @@
     },
     {
       "id": "idle-soak",
-      "expectedProducerFingerprint": "3028905bed5538547557bf5f6536bdc3e6bdb2b91c061ce7f8b3c64139ee9c1d",
+      "expectedProducerFingerprint": "3c6793c54fa2fc5e693e23f95d7d3b1a271d47a535b0f6a3d33aeab4ce25682f",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 900000,
@@ -393,7 +395,7 @@
     },
     {
       "id": "active-soak",
-      "expectedProducerFingerprint": "eff327055da34140adf166a4126cab4c330133c922fa5bb71e002c76e6e01891",
+      "expectedProducerFingerprint": "6463eae32da9b7668eeabfeb64b880810d7e973b947c0d6b23ad1dd2f30af23d",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 720000,
@@ -414,7 +416,7 @@
     },
     {
       "id": "assurance",
-      "expectedProducerFingerprint": "5465efbc353ab3fe219e8937a08324dc2293017b38a535bc1ac0da358f9777da",
+      "expectedProducerFingerprint": "a479a3a2b3db9da2d2bd8e2306d887ab086ccf682c7e907d8196b4377782f075",
       "status": "STALE",
       "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 480000,

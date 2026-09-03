@@ -213,6 +213,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 		const section = DOM.append(this._scroll!, DOM.$('div'));
 		this._sectionLabel(section, localize('prebase.maps.graphMode', "Graph mode"));
 		const row = DOM.append(section, DOM.$('div'));
+		row.setAttribute('role', 'group');
+		row.setAttribute('aria-label', localize('prebase.maps.graphMode', "Graph Mode"));
 		this._segmentTrack(row);
 		this._modeNetBtn = this._segmentBtn(row, localize('prebase.maps.network', "Code Graph"), () => {
 			if (!this._hasOpenProject()) {
@@ -280,6 +282,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._filterSection = DOM.append(this._scroll!, DOM.$('div'));
 		this._sectionLabel(this._filterSection, localize('prebase.maps.filter', "Filter"));
 		const row = DOM.append(this._filterSection, DOM.$('div'));
+		row.setAttribute('role', 'group');
+		row.setAttribute('aria-label', localize('prebase.maps.filter', "Filter"));
 		row.style.display = 'flex';
 		row.style.flexWrap = 'wrap';
 		row.style.gap = '4px';
@@ -335,6 +339,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}));
 
 		const netActions = DOM.append(this._networkSection, DOM.$('div'));
+		netActions.setAttribute('role', 'group');
+		netActions.setAttribute('aria-label', localize('prebase.maps.viewActions', "View Actions"));
 		netActions.style.display = 'flex';
 		netActions.style.gap = '6px';
 		netActions.style.flexWrap = 'wrap';
@@ -346,7 +352,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 		});
 	}
 
-	private _disclosureHeader(parent: HTMLElement, label: string, expanded: boolean): HTMLButtonElement {
+	private _disclosureHeader(parent: HTMLElement, label: string, expanded: boolean, controlsId?: string): HTMLButtonElement {
 		const header = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
 		header.type = 'button';
 		header.style.all = 'unset';
@@ -360,6 +366,9 @@ export class PreBaseMapsViewPane extends ViewPane {
 		header.style.display = 'inline-flex';
 		header.style.alignItems = 'center';
 		header.style.gap = '4px';
+		if (controlsId) {
+			header.setAttribute('aria-controls', controlsId);
+		}
 		const twistie = DOM.append(header, DOM.$('span.codicon'));
 		twistie.setAttribute('aria-hidden', 'true');
 		DOM.append(header, DOM.$('span')).textContent = label;
@@ -378,9 +387,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 	private _renderDisplay(): void {
 		this._displaySection = DOM.append(this._scroll!, DOM.$('div'));
-		const header = this._disclosureHeader(this._displaySection, localize('prebase.maps.display', "Display"), false);
+		const displayBodyId = 'prebase-maps-display-body';
+		const header = this._disclosureHeader(this._displaySection, localize('prebase.maps.display', "Display"), false, displayBodyId);
 
 		this._displayBody = DOM.append(this._displaySection, DOM.$('div'));
+		this._displayBody.id = displayBodyId;
 		this._displayBody.style.display = 'none';
 		this._displayBody.style.paddingLeft = '2px';
 
@@ -421,9 +432,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._temporalSection.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
 		this._temporalSection.style.paddingTop = '8px';
 
-		const header = this._disclosureHeader(this._temporalSection, localize('prebase.maps.temporal', "Temporal & Compare"), this._temporalExpanded);
+		const temporalBodyId = 'prebase-maps-temporal-body';
+		const header = this._disclosureHeader(this._temporalSection, localize('prebase.maps.temporal', "Temporal & Compare"), this._temporalExpanded, temporalBodyId);
 
 		this._temporalBody = DOM.append(this._temporalSection, DOM.$('div'));
+		this._temporalBody.id = temporalBodyId;
 		this._temporalBody.style.display = this._temporalExpanded ? 'flex' : 'none';
 		this._temporalBody.style.flexDirection = 'column';
 		this._temporalBody.style.gap = '8px';
@@ -431,6 +444,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		// 1. Mode Toggles: Full Map vs Focus Changes
 		const modeRow = DOM.append(this._temporalBody, DOM.$('div'));
+		modeRow.setAttribute('role', 'group');
+		modeRow.setAttribute('aria-label', localize('prebase.maps.temporalMode', "Temporal Mode"));
 		this._segmentTrack(modeRow);
 		this._temporalModeStateBtn = this._segmentBtn(modeRow, localize('prebase.maps.fullMap', "Full Map"), () => {
 			this.temporalViewService.setDisplayMode('state');
@@ -605,9 +620,11 @@ export class PreBaseMapsViewPane extends ViewPane {
 		this._historySection.style.borderTop = `1px solid color-mix(in srgb, ${BORDER} 60%, transparent)`;
 		this._historySection.style.paddingTop = '8px';
 
-		const header = this._disclosureHeader(this._historySection, localize('prebase.maps.history', "History"), this._historyExpanded);
+		const historyBodyId = 'prebase-maps-history-body';
+		const header = this._disclosureHeader(this._historySection, localize('prebase.maps.history', "History"), this._historyExpanded, historyBodyId);
 
 		this._historyBody = DOM.append(this._historySection, DOM.$('div'));
+		this._historyBody.id = historyBodyId;
 		this._historyBody.style.display = this._historyExpanded ? 'flex' : 'none';
 		this._historyBody.style.flexDirection = 'column';
 		this._historyBody.style.width = 'calc(100% - 8px)';

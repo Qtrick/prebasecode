@@ -83,10 +83,11 @@ export const DOMAIN_PATHSPECS = {
 		'native/prebase-live-activity',
 		'test/prebase/acceptance/prebase-magnus-live-activity-live.mjs',
 		'test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs',
+		'test/prebase/acceptance/prebase-live-activity-perf.mjs',
 	],
 	'idle-soak-lab': ['test/prebase/acceptance/prebase-idle-soak.mjs'],
 	'active-soak-lab': ['test/prebase/acceptance/prebase-active-soak.mjs'],
-	'assurance-leaf': ['scripts/assurance', 'scripts/icons', 'scripts/privacy', 'scripts/startup', 'scripts/supabase', 'graphs/scripts/verify-boundary', 'graphs/scripts/verify-typescript-lanes.mjs', 'package.json', 'package-lock.json', 'product.json'],
+	'assurance-leaf': ['scripts/assurance', 'scripts/icons', 'scripts/privacy', 'scripts/startup', 'scripts/supabase', 'graphs/scripts/verify-boundary', 'graphs/scripts/verify-typescript-lanes.mjs', 'package.json', 'package-lock.json', 'product.json', 'docs/BETA_READINESS.md'],
 };
 
 /** Prefix → domain for changed-path classification (longest match wins). No broad test/prebase/ catch-all. */
@@ -100,6 +101,8 @@ export const PATH_PREFIX_DOMAINS = [
 	['native/prebase-live-activity/', 'live-activity'],
 	['test/prebase/acceptance/prebase-magnus-live-activity-live.mjs', 'live-activity'],
 	['test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs', 'live-activity'],
+	['test/prebase/acceptance/prebase-live-activity-perf.mjs', 'live-activity'],
+	['docs/BETA_READINESS.md', 'assurance-leaf'],
 	['graphs/src/host/workbench/', 'network-graph'],
 	['graphs/', 'graphs-common'],
 	['extensions/prebase-magnus/src/desktopTools.ts', 'magnus-desktop-tools'],

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "9d2003d2e72a95c197dbf539ebdf6da8b528a501",
-  "sourceFingerprint": "bc7475fcac62043d8d4fe0c6a5425acbbed459096591efaa644bf7749d25ee49",
-  "productFingerprint": "bc7475fcac62043d8d4fe0c6a5425acbbed459096591efaa644bf7749d25ee49",
-  "generatedAt": "2026-09-01T14:45:20.846Z",
+  "sourceHead": "3539d74c3c1f2b05a10d1690ddaea67931871cf5",
+  "sourceFingerprint": "a48073f3789b7b8c0103d9c594e6195ce6e94705576f71916b277599fcd7f101",
+  "productFingerprint": "a48073f3789b7b8c0103d9c594e6195ce6e94705576f71916b277599fcd7f101",
+  "generatedAt": "2026-09-03T01:45:53.002Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -54,7 +54,7 @@
           "accessibilityLabel": "Magnus live activity",
           "hapticCount": 0,
           "panelLevel": 2147483630,
-          "targetPresentationState": "collapsed",
+          "targetPresentationState": "compact",
           "pathTopologyCompatible": true,
           "animationCount": 1,
           "screenTopY": 982,
@@ -64,6 +64,7 @@
           "exitGraceMs": 250,
           "keyWindow": false,
           "pendingKind": "",
+          "latestShortMessage": "",
           "expanded": false,
           "statusLabel": "",
           "collapsedHit": {
@@ -86,7 +87,7 @@
           "topAnchorDelta": 0,
           "pendingTitle": "",
           "questionButtonCount": 0,
-          "activePresentationState": "collapsed",
+          "activePresentationState": "compact",
           "accessibilityRole": "AXGroup",
           "screenLocalizedName": "Built-in Retina Display",
           "approvalControlsVisible": false,
@@ -111,23 +112,23 @@
           "globalMonitorInstalled": true,
           "transitionInFlight": false,
           "activeInputControl": "none",
-          "localMonitorInstalled": true,
+          "localMonitorInstalled": false,
           "metricsLabel": ""
         }
       }
     },
     {
-      "name": "real-morph-cycles-10",
+      "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 4474,
-        "cycleCount": 10,
+        "durationRealCyclesMs": 7992,
+        "cycleCount": 100,
         "diagAfterStress": {
           "requestedFrame": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 874,
+            "x": 575.5,
+            "width": 360,
+            "height": 108
           },
           "panelFrame": {
             "y": 948,
@@ -148,39 +149,40 @@
           "accessibilityLabel": "Magnus live activity",
           "hapticCount": 0,
           "panelLevel": 2147483630,
-          "targetPresentationState": "collapsed",
+          "targetPresentationState": "interactive",
           "pathTopologyCompatible": true,
-          "animationCount": 31,
+          "animationCount": 301,
           "screenTopY": 982,
           "trackingAreaCount": 1,
-          "redrawCount": 32,
+          "redrawCount": 302,
           "layerBacked": true,
           "exitGraceMs": 250,
           "keyWindow": false,
           "pendingKind": "",
-          "expanded": false,
+          "latestShortMessage": "",
+          "expanded": true,
           "statusLabel": "",
           "collapsedHit": {
             "y": 948,
-            "x": 591,
-            "width": 309,
+            "x": 575.5,
+            "width": 360,
             "height": 34
           },
           "safeAreaTop": 32,
-          "transitionGeneration": 31,
+          "transitionGeneration": 301,
           "auxiliaryTopRightArea": {
             "y": 950,
             "x": 848,
             "width": 664,
             "height": 32
           },
-          "openInPreBaseVisible": false,
+          "openInPreBaseVisible": true,
           "lastNativeCommand": "",
           "hoverDwellMs": 180,
           "topAnchorDelta": 0,
           "pendingTitle": "",
           "questionButtonCount": 0,
-          "activePresentationState": "collapsed",
+          "activePresentationState": "interactive",
           "accessibilityRole": "AXGroup",
           "screenLocalizedName": "Built-in Retina Display",
           "approvalControlsVisible": false,
@@ -202,10 +204,10 @@
           "notchDetected": true,
           "activityLabel": "",
           "panelTopY": 982,
-          "globalMonitorInstalled": true,
+          "globalMonitorInstalled": false,
           "transitionInFlight": false,
           "activeInputControl": "none",
-          "localMonitorInstalled": true,
+          "localMonitorInstalled": false,
           "metricsLabel": ""
         }
       }
@@ -214,13 +216,13 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 355,
+        "durationRetargetMs": 357,
         "diagRetarget": {
           "requestedFrame": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 874,
+            "x": 575.5,
+            "width": 360,
+            "height": 108
           },
           "panelFrame": {
             "y": 948,
@@ -241,39 +243,40 @@
           "accessibilityLabel": "Magnus live activity",
           "hapticCount": 0,
           "panelLevel": 2147483630,
-          "targetPresentationState": "collapsed",
+          "targetPresentationState": "interactive",
           "pathTopologyCompatible": true,
-          "animationCount": 34,
+          "animationCount": 304,
           "screenTopY": 982,
           "trackingAreaCount": 1,
-          "redrawCount": 35,
+          "redrawCount": 305,
           "layerBacked": true,
           "exitGraceMs": 250,
           "keyWindow": false,
           "pendingKind": "",
-          "expanded": false,
+          "latestShortMessage": "",
+          "expanded": true,
           "statusLabel": "",
           "collapsedHit": {
             "y": 948,
-            "x": 591,
-            "width": 309,
+            "x": 575.5,
+            "width": 360,
             "height": 34
           },
           "safeAreaTop": 32,
-          "transitionGeneration": 34,
+          "transitionGeneration": 304,
           "auxiliaryTopRightArea": {
             "y": 950,
             "x": 848,
             "width": 664,
             "height": 32
           },
-          "openInPreBaseVisible": false,
+          "openInPreBaseVisible": true,
           "lastNativeCommand": "",
           "hoverDwellMs": 180,
           "topAnchorDelta": 0,
           "pendingTitle": "",
           "questionButtonCount": 0,
-          "activePresentationState": "collapsed",
+          "activePresentationState": "interactive",
           "accessibilityRole": "AXGroup",
           "screenLocalizedName": "Built-in Retina Display",
           "approvalControlsVisible": false,
@@ -295,10 +298,10 @@
           "notchDetected": true,
           "activityLabel": "",
           "panelTopY": 982,
-          "globalMonitorInstalled": true,
+          "globalMonitorInstalled": false,
           "transitionInFlight": false,
           "activeInputControl": "none",
-          "localMonitorInstalled": true,
+          "localMonitorInstalled": false,
           "metricsLabel": ""
         }
       }
@@ -312,15 +315,37 @@
       }
     },
     {
+      "name": "attention-peek-interactive",
+      "ok": true,
+      "details": {
+        "peekDiag": {
+          "state": "attentionPeek",
+          "topologyOk": true,
+          "localMonitor": false,
+          "message": "I found 3 items requiring your review."
+        },
+        "interactiveDiag": {
+          "clickResult": true,
+          "state": "attention",
+          "localMonitor": true
+        },
+        "dismissDiag": {
+          "escResult": true,
+          "state": "attentionCompact",
+          "localMonitor": false
+        }
+      }
+    },
+    {
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": 135,
-        "heapUsedMb": 6.04,
-        "rssDiffKb": 25856,
-        "rssMb": 95.8,
-        "cpuDeltaUserMs": 79782,
-        "cpuDeltaSystemMs": 21853
+        "heapDiffKb": 498,
+        "heapUsedMb": 6.39,
+        "rssDiffKb": 29296,
+        "rssMb": 99.61,
+        "cpuDeltaUserMs": 277962,
+        "cpuDeltaSystemMs": 77553
       }
     },
     {

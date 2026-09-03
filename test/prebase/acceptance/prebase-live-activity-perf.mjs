@@ -134,11 +134,11 @@ async function run() {
 	}
 	results.tests.push(test2);
 
-	// Test 3: REAL morphing cycles with proper animation wait time
-	const test3 = { name: 'real-morph-cycles-10', ok: true, details: {} };
+	// Test 3: REAL morphing cycles (100 cycles) with deterministic settling
+	const test3 = { name: 'real-morph-cycles-100', ok: true, details: {} };
 	try {
 		const startMorph = Date.now();
-		const cycleCount = 10; // Reduced from 100 to allow real animation completion
+		const cycleCount = 100;
 
 		for (let i = 0; i < cycleCount; i++) {
 			// Expand
@@ -159,8 +159,7 @@ async function run() {
 				display: 'builtin',
 			});
 
-			// Wait for expansion animation to complete (240ms)
-			await sleep(250);
+			await sleep(35);
 
 			// Collapse
 			native.setPresentation({
@@ -170,9 +169,11 @@ async function run() {
 				display: 'builtin',
 			});
 
-			// Wait for collapse animation to complete (180ms)
-			await sleep(190);
+			await sleep(35);
 		}
+
+		// Deterministic animation settling
+		await sleep(250);
 
 		test3.details.durationRealCyclesMs = Date.now() - startMorph;
 		test3.details.cycleCount = cycleCount;
@@ -186,7 +187,7 @@ async function run() {
 	} catch (err) {
 		test3.ok = false;
 		test3.error = err.message;
-		results.failures.push(`real-morph-cycles-10: ${err.message}`);
+		results.failures.push(`real-morph-cycles-100: ${err.message}`);
 	}
 	results.tests.push(test3);
 
@@ -286,6 +287,85 @@ async function run() {
 		results.failures.push(`user-simulation-actions: ${err.message}`);
 	}
 	results.tests.push(test5);
+
+	// Test 5b: Attention Peek Interactivity & Keyboard Isolation
+	const test5b = { name: 'attention-peek-interactive', ok: true, details: {} };
+	try {
+		// Set attention snapshot
+		native.setSnapshot({
+			revision: 200,
+			sessionId: 'attention-session',
+			status: 'attention',
+			presentationLabel: 'Question from Magnus',
+			pendingKind: 'approval',
+			pendingTitle: 'Allow file edits to live_activity.mm?',
+			latestShortMessage: 'I found 3 items requiring your review.',
+		});
+		native.setPresentation({
+			visible: true,
+			pinned: false,
+			reducedMotion: false,
+			display: 'builtin',
+		});
+		await sleep(200);
+
+		const peekDiag = native.getDiagnostics();
+		test5b.details.peekDiag = {
+			state: peekDiag.activePresentationState,
+			topologyOk: peekDiag.pathTopologyCompatible,
+			localMonitor: peekDiag.localMonitorInstalled,
+			message: peekDiag.latestShortMessage,
+		};
+
+		if (peekDiag.activePresentationState !== 'attentionPeek') {
+			throw new Error(`Expected attentionPeek state, got ${peekDiag.activePresentationState}`);
+		}
+		if (peekDiag.localMonitorInstalled !== false) {
+			throw new Error('Attention Peek must NOT install local key monitor (must not intercept editor typing)');
+		}
+		if (peekDiag.latestShortMessage !== 'I found 3 items requiring your review.') {
+			throw new Error(`latestShortMessage mismatch: ${peekDiag.latestShortMessage}`);
+		}
+
+		// Click to transition from peek to interactive
+		const clickResult = native.simulateAction('click');
+		await sleep(150);
+
+		const interactiveDiag = native.getDiagnostics();
+		test5b.details.interactiveDiag = {
+			clickResult,
+			state: interactiveDiag.activePresentationState,
+			localMonitor: interactiveDiag.localMonitorInstalled,
+		};
+
+		if (interactiveDiag.activePresentationState !== 'interactive' && interactiveDiag.activePresentationState !== 'attention') {
+			throw new Error(`Expected interactive or attention state after click, got ${interactiveDiag.activePresentationState}`);
+		}
+		if (interactiveDiag.localMonitorInstalled !== true) {
+			throw new Error('Interactive mode MUST install local key monitor for Escape dismiss');
+		}
+
+		// Test Escape dismissal
+		const escResult = native.simulateAction('escape');
+		await sleep(150);
+		const collapsedDiag = native.getDiagnostics();
+		test5b.details.dismissDiag = {
+			escResult,
+			state: collapsedDiag.activePresentationState,
+			localMonitor: collapsedDiag.localMonitorInstalled,
+		};
+		if (collapsedDiag.activePresentationState !== 'attentionCompact' && collapsedDiag.activePresentationState !== 'compact') {
+			throw new Error(`Expected attentionCompact or compact state after escape, got ${collapsedDiag.activePresentationState}`);
+		}
+		if (collapsedDiag.localMonitorInstalled !== false) {
+			throw new Error('Collapsed mode must NOT keep local key monitor');
+		}
+	} catch (err) {
+		test5b.ok = false;
+		test5b.error = err.message;
+		results.failures.push(`attention-peek-interactive: ${err.message}`);
+	}
+	results.tests.push(test5b);
 
 	// Clean up native panel
 	native.dispose();

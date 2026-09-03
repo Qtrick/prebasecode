@@ -732,13 +732,18 @@ export class PreBaseSettingsEditor extends EditorPane {
 
 		const hostedStatus = document.createElement('div');
 		hostedStatus.setAttribute('role', 'status');
-		const signedIn = this.accountService.state === 'signedIn';
-		const cloudConfigured = this.accountService.apiConfigured;
-		hostedStatus.textContent = !cloudConfigured
-			? localize('prebase.settings.ai.webSearchUnconfigured', "Cloud sign-in is not configured. Use local web search in the advanced section if you have developer keys.")
-			: signedIn
-				? localize('prebase.settings.ai.webSearchSignedIn', "Hosted web context will be used.")
-				: localize('prebase.settings.ai.webSearchSignedOut', "Sign in to use hosted web context.");
+		hostedStatus.setAttribute('aria-live', 'polite');
+		const updateHostedStatus = () => {
+			const signedIn = this.accountService.state === 'signedIn';
+			const cloudConfigured = this.accountService.apiConfigured;
+			hostedStatus.textContent = !cloudConfigured
+				? localize('prebase.settings.ai.webSearchUnconfigured', "Cloud sign-in is not configured. Use local web search in the advanced section if you have developer keys.")
+				: signedIn
+					? localize('prebase.settings.ai.webSearchSignedIn', "Hosted web context will be used.")
+					: localize('prebase.settings.ai.webSearchSignedOut', "Sign in to use hosted web context.");
+		};
+		updateHostedStatus();
+		this._renderDisposables.add(this.accountService.onDidChangeState(() => updateHostedStatus()));
 		Object.assign(hostedStatus.style, { fontSize: '12px', color: COLORS.textMuted, lineHeight: '1.45', padding: '10px 0', borderBottom: `1px solid color-mix(in srgb, ${COLORS.border} 55%, transparent)` });
 		webSearchCard.appendChild(hostedStatus);
 
