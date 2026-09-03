@@ -1101,7 +1101,7 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({ id: 'prebase.test.getDiagnostics', title: localize2('prebase.test.getDiagnostics', "Get PreBase Diagnostics (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
-	async run(accessor: ServicesAccessor, request?: { applyColorTheme?: string; zoomLevel?: number; accessibilitySupport?: 'auto' | 'on'; liveActivityMode?: string }) {
+	async run(accessor: ServicesAccessor, request?: { applyColorTheme?: string; zoomLevel?: number; accessibilitySupport?: 'auto' | 'on'; liveActivityMode?: string; networkLayoutMode?: string; projectGuidanceEnabled?: boolean }) {
 		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.getDiagnostics');
 		const themeService = accessor.get(IWorkbenchThemeService);
 		const configurationService = accessor.get(IConfigurationService);
@@ -1135,9 +1135,13 @@ registerAction2(class extends Action2 {
 		if (liveActivityMode === 'background' || liveActivityMode === 'alwaysWorking' || liveActivityMode === 'attentionOnly' || liveActivityMode === 'off') {
 			await configurationService.updateValue('prebase.magnus.liveActivity.mode', liveActivityMode);
 		}
-		const networkLayoutMode = (request as { networkLayoutMode?: string } | undefined)?.networkLayoutMode;
+		const networkLayoutMode = request?.networkLayoutMode;
 		if (typeof networkLayoutMode === 'string') {
 			await configurationService.updateValue('prebase.graph.networkLayoutMode', networkLayoutMode);
+		}
+		const projectGuidanceEnabled = request?.projectGuidanceEnabled;
+		if (typeof projectGuidanceEnabled === 'boolean') {
+			await configurationService.updateValue('prebase.magnus.projectGuidance.enabled', projectGuidanceEnabled);
 		}
 		let parserActiveRequests = 0;
 		let temporalActiveWrites = 0;
@@ -1231,6 +1235,7 @@ registerAction2(class extends Action2 {
 			accessibilitySupport: configurationService.getValue('editor.accessibilitySupport'),
 			liveActivityMode: configurationService.getValue('prebase.magnus.liveActivity.mode'),
 			networkLayoutMode: configurationService.getValue('prebase.graph.networkLayoutMode'),
+			projectGuidanceEnabled: configurationService.getValue('prebase.magnus.projectGuidance.enabled'),
 			debug: {
 				sessionsCount: debugSessionsCount,
 				activeSessionName: debugActiveSessionName,
@@ -1247,7 +1252,7 @@ registerAction2(class extends Action2 {
 				editorCount: editorService.visibleEditors.length,
 			},
 		};
-		if (applyId || typeof zoom === 'number' || liveActivityMode || a11yMode || typeof networkLayoutMode === 'string') {
+		if (applyId || typeof zoom === 'number' || liveActivityMode || a11yMode || typeof networkLayoutMode === 'string' || typeof projectGuidanceEnabled === 'boolean') {
 			return result;
 		}
 		if (nativeHost) {

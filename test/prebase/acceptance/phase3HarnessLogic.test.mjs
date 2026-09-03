@@ -1020,13 +1020,14 @@ test('E6 rejects suggestSeen && (typescriptDiagnostic || suggestSeen) false-gree
 	assert.ok(p1PersistFail.some(item => /P1 PreBase setting persistence/.test(item)));
 });
 
-test('core-ide P1 persists networkLayoutMode via getDiagnostics and P5 proves Magnus schema without stream truthies', () => {
+test('core-ide P1 persists projectGuidance via getDiagnostics and P5 proves Magnus schema without stream truthies', () => {
 	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
 	const contribution = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
-	assert.match(contribution, /networkLayoutMode:\s*configurationService\.getValue\('prebase\.graph\.networkLayoutMode'\)/);
-	assert.match(live, /networkLayoutMode:\s*'sphere'/);
-	assert.match(live, /afterDiag\?\.networkLayoutMode/);
-	assert.match(live, /included:isMacintosh/);
+	assert.match(contribution, /projectGuidanceEnabled:\s*configurationService\.getValue\('prebase\.magnus\.projectGuidance\.enabled'\)/);
+	assert.match(live, /projectGuidanceEnabled:\s*targetSetting/);
+	assert.match(live, /afterDiag\?\.projectGuidanceEnabled/);
+	assert.match(live, /macOS-only registry/);
+	assert.match(live, /poison N2 layout matrix/);
 	assert.doesNotMatch(live, /prebase\.test\.getConfiguration/);
 	assert.doesNotMatch(live, /prebase\.test\.setConfiguration/);
 	assert.match(live, /magnusDiagSchema/);

@@ -551,22 +551,21 @@ async function run() {
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.openSettings', 'prebase.').catch(() => undefined);
 		evidence.p1_settings = await seen('.settings-editor');
 		// Prove a real cross-platform PreBase setting change + persistence via smoke getDiagnostics.
-		// Do not use prebase.magnus.liveActivity.mode here: it is included:isMacintosh and returns null on Linux.
+		// Avoid liveActivity.mode (macOS-only registry) and networkLayoutMode (would poison N2 layout matrix).
 		const beforeDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics').catch(() => null);
-		const beforeSetting = beforeDiag?.networkLayoutMode ?? null;
-		const setDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics', { networkLayoutMode: 'sphere' }).catch(() => null);
+		const beforeSetting = beforeDiag?.projectGuidanceEnabled;
+		const targetSetting = beforeSetting === false;
+		const setDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics', { projectGuidanceEnabled: targetSetting }).catch(() => null);
 		const afterDiag = await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.test.getDiagnostics').catch(() => null);
-		const afterSetting = afterDiag?.networkLayoutMode ?? setDiag?.networkLayoutMode ?? null;
-		const settingChanged = afterSetting === 'sphere' && beforeSetting !== 'sphere';
+		const afterSetting = afterDiag?.projectGuidanceEnabled ?? setDiag?.projectGuidanceEnabled;
+		const settingChanged = afterSetting === targetSetting && beforeSetting !== afterSetting;
 		evidence.p1_settingsPersisted = Boolean(evidence.p1_settings && settingChanged);
 		evidence.p1_detail = {
-			settingId: 'prebase.graph.networkLayoutMode',
+			settingId: 'prebase.magnus.projectGuidance.enabled',
 			beforeSetting,
 			afterSetting,
+			targetSetting,
 			settingChanged,
-			beforeKeys: beforeDiag && typeof beforeDiag === 'object' ? Object.keys(beforeDiag).slice(0, 16) : [],
-			setKeys: setDiag && typeof setDiag === 'object' ? Object.keys(setDiag).slice(0, 16) : [],
-			afterKeys: afterDiag && typeof afterDiag === 'object' ? Object.keys(afterDiag).slice(0, 16) : [],
 		};
 
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.runtime.open').catch(() => undefined);
