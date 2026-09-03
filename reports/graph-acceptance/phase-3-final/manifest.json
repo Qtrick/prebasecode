@@ -1,35 +1,35 @@
 {
   "phase": "3-final",
-  "sourceHead": "77294e3a5896a8c1fa792c278d8a336a97348db9",
-  "sourceFingerprint": "4d764de343295f064a3d73fd611084dc54b08053c6e1341864fadcdae3413540",
-  "productFingerprint": "4d764de343295f064a3d73fd611084dc54b08053c6e1341864fadcdae3413540",
+  "sourceHead": "44eedca016d713e4e011fe3bc79292c91741c90b",
+  "sourceFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
+  "productFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
   "producerFingerprints": {
     "parser-benchmark": "1ed983eae16447244c6a82a9b1310c8ddab23c93482b170ac7f8f14c760ea678",
-    "magnus-streaming-smoke": "d618c32fc5a131c3ebeb10205db5b3bab3ddd6b43e5be0f58b3986f85f037e43",
-    "magnus-guidance-smoke": "81c80f7c23fd51a8251479f3f8f65cbf1d82bc7cf920c789339881aae7cdce15",
+    "magnus-streaming-smoke": "7303e76634dd3c1e2b290c2ef3dcbbec6bf3290ea35a17e800b2a2f4eac363e5",
+    "magnus-guidance-smoke": "cbdb1b2a48ebe002275e17a28d7bdf57dc161025c624c77d2941dab84c896a3d",
     "magnus-live-activity": "30eb60bbbb0de2a0019fdb437ec644bf013b2526f69ea79eff1cc17d40f642f6",
-    "core-ide": "642d3a7dd457a52684f9b3f01524a44bdcfaee1bbb7363f6019aa94b5043a244",
-    "runtime-preview": "81102d868c288611b2d28d688c4e4ffe83e6be27f74fb46fe889aa8f50ac1b5c",
-    "temporal-small": "4233a79a6e85e8a7be2dafa0ea01e132f2be2084b9aa7c83464c65bd2d608c9d",
-    "temporal-large": "1e78bfe641c30963f458d946828df9d57524c4f32ed694ec78b85b0348c2104f",
-    "temporal-canonical-scale": "5d87e572f31cd287a1e0878767d38ca05f6cd29ea9ea058eae7bc528100ee495",
-    "electron-product-path": "177838c517dc6ccb6c6ed7c21a53364ee0967ec23934f5a602545498f82a441b",
-    "electron-native-cases": "e61f05e4c5b41da1131471974ffae6af6e8e616189226d1080b72daf2f2e7f6a",
-    "tauri-product-path": "39237f579d4e8c3dccfee6bfb132e73479532042fbd27d1c154b0afa61f9a5d1",
-    "magnus-electron-tools": "1978ac916b55fc2b871b3c6f16024f4ac14abeb48eb1ee209ca5b1177e3b3aa3",
-    "magnus-tauri-tools": "cc80d82f53983c9cd9774caba66546f4f7cc7823be2bc9359ef9ec1d8471743e",
+    "core-ide": "76c70fd8a8a2c478117748916493fb09a560199f370d25a2bda284377fcafe87",
+    "runtime-preview": "435b04037c786e9f07a0a37a3be56990f1005460b7be8789a4170f1f5d803d92",
+    "temporal-small": "718d3ff8623e9e2dacdbb84a07f6413e73ce2fde6d721b53674c627ecab00cab",
+    "temporal-large": "0a9e7de5f7c6017272a6e7a119505b18116c51c237797daf5b9c5df4433f1422",
+    "temporal-canonical-scale": "d9177de125a586466d5fe903ce2b6b198dc54a87d9045015d1c2afe16b2573ef",
+    "electron-product-path": "a0e5783e30765633b62082e02d258f2cf34f20a52f32344039a329da08d52ec3",
+    "electron-native-cases": "2648407d4fb2f2204ec659ea79f947217562a589be1f2af2b19e9dc4b7a7c7a6",
+    "tauri-product-path": "186f7ee49fa17d0dccff350f580ec8ac8a2c0a228a77106e430f2fb884028f56",
+    "magnus-electron-tools": "646afc20b5ac61363ecb9c496aa5188ed55b6aa8128080fbc677f15a87337583",
+    "magnus-tauri-tools": "064413a29fb33199b9cda0220a1cafcff18559ee1235e16f79ff0601431e4a54",
     "hybrid-web-smoke": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
-    "privacy": "4b7f81efdb384be53e189ffb78869d589ecf572ffa4426e9c424f3c2a7b1fe22",
-    "load-quit": "e78dd1e5b16d32fde864cc5fcbf7eda5f7a717fe386fa0ea6c66f89acff4ad1a",
-    "lifecycle-cycles": "b7f25a7611fa6c60d1f56608dbf2666989cef66acb6d69a2332791cfaffa4f09",
-    "electron-restart-soak": "e1bf68be8d8b17a876f692d18e9060e7c3bb0bad33c2fd6c0a3b425258b22dea",
-    "tauri-restart-soak": "db99da267ac5794424d2bbbb0f1423e22071c9abb3dc3295f0b810ce883aa049",
-    "idle-soak": "86a66853f429d0500550d1e15332c16d7a25ffaffe0935974027cd7c800d363f",
-    "active-soak": "1215664e4bf2986e5a1a67454aeacaa29b5e9ec92c3e4771d58dc3f2bb6e0881",
-    "assurance": "2bd9372fd0e0909f840272609cb2f97135c4d9ba94814e2187b0f9a82d25bf1d"
+    "privacy": "9968001e04f42150f681cfbeb5e0ae5a6d0cc829753aea5bfa5e69946c1c6f03",
+    "load-quit": "279694c616614c1b3dde60e240664a6df5c20d6bb06ed6d69c5886465c5c05ac",
+    "lifecycle-cycles": "9e3708dcab5270ad992f17c267c7eb3fc1892cdffeb30d535edb932c189ab8c3",
+    "electron-restart-soak": "547e5a7d8075b85563e211cc7d59466bea96e24ea4217e736650c7f25e95a57a",
+    "tauri-restart-soak": "c5bc3494a3bf49c44ca2a2370f4529144f2c2ce18a0088757ae378445afda1c4",
+    "idle-soak": "5b6ecc6bd2ae4a34dd412e3b200db1f5bd56f62501bdfe6a4aff2e2c13b9ffd0",
+    "active-soak": "e90ec68655dd26c96d3bcb3839ad9f8fdb1189a4dd359f0913c530f36fd9503d",
+    "assurance": "59c77fe6140c1acdf90b9370a9590c42d59bb2a0558e01297d265636d4b21f5b"
   },
-  "validationRunId": "2026-09-03T08-55-53-200Z",
-  "generatedAt": "2026-09-03T08:55:55.462Z",
+  "validationRunId": "2026-09-03T09-15-31-296Z",
+  "generatedAt": "2026-09-03T09:19:12.490Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -53,7 +53,6 @@
     "electron-product-path: evidence producer fingerprint does not match current producer inputs",
     "tauri-product-path: evidence producer fingerprint does not match current producer inputs",
     "electron-native-cases: evidence producer fingerprint does not match current producer inputs",
-    "runtime-preview: Runtime Preview target did not open; Runtime Preview did not detect the dev script; Runtime Preview server did not start; Runtime Preview did not connect to the fixture; Runtime Preview inspection did not see fixture content; Runtime Preview did not restart cleanly; Runtime Preview stop retained the server port; Runtime Preview was not active for quit-under-load",
     "temporal-large: evidence producer fingerprint does not match current producer inputs",
     "temporal-canonical-scale: evidence producer fingerprint does not match current producer inputs",
     "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
@@ -103,13 +102,12 @@
     {
       "id": "runtime-preview",
       "path": "runtime-preview/live.json",
-      "ok": false,
-      "reason": "Runtime Preview target did not open; Runtime Preview did not detect the dev script; Runtime Preview server did not start; Runtime Preview did not connect to the fixture; Runtime Preview inspection did not see fixture content; Runtime Preview did not restart cleanly; Runtime Preview stop retained the server port; Runtime Preview was not active for quit-under-load",
+      "ok": true,
       "quit": {
-        "before": "126805       1 23.8 280344 prebase",
+        "before": "131878       1 33.6 296400 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 365,
+        "latencyMs": 436,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -121,11 +119,21 @@
       "path": "temporal/live.json",
       "ok": true,
       "quit": {
-        "startedAt": 1788425402249,
-        "quitMs": 303,
+        "startedAt": 1788427136855,
+        "quitMs": 201,
         "remaining": "gone",
-        "before": "121640       1 20.5 294612 prebase",
+        "before": "135837       1 20.1 293276 prebase",
         "after": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 21671,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
+        "logTail": "",
+        "harnessPid": 135715,
+        "timeoutMs": 180000,
+        "leftoverPids": []
       }
     },
     {
@@ -191,14 +199,24 @@
       "path": "magnus/streaming-smoke.json",
       "ok": true,
       "quit": {
-        "before": "119473       1 26.0 283232 prebase",
+        "before": "133428       1 25.3 282028 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 355,
+        "latencyMs": 315,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 16119,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log",
+        "logTail": "",
+        "harnessPid": 133355,
+        "timeoutMs": 180000,
+        "leftoverPids": []
       }
     },
     {
@@ -206,14 +224,24 @@
       "path": "magnus/project-guidance-smoke.json",
       "ok": true,
       "quit": {
-        "before": "126441       1 29.7 281660 prebase",
+        "before": "133773       1 29.7 280732 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 338,
+        "latencyMs": 308,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 16563,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-guidance-smoke.log",
+        "logTail": "",
+        "harnessPid": 133704,
+        "timeoutMs": 180000,
+        "leftoverPids": []
       }
     },
     {
@@ -221,7 +249,17 @@
       "path": "magnus/live-activity.json",
       "ok": true,
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "externalSkip": true
+      "externalSkip": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 300,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log",
+        "logTail": "",
+        "harnessPid": 134043,
+        "timeoutMs": 120000,
+        "leftoverPids": []
+      }
     },
     {
       "id": "hybrid-web-smoke",
@@ -232,10 +270,10 @@
       "rerun": {
         "code": 0,
         "timedOut": false,
-        "elapsedMs": 176,
+        "elapsedMs": 187,
         "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/hybrid-web-smoke.log",
         "logTail": "",
-        "harnessPid": 127373,
+        "harnessPid": 136138,
         "timeoutMs": 180000,
         "leftoverPids": []
       }
@@ -290,34 +328,64 @@
       "path": "core-ide/live.json",
       "ok": true,
       "quit": {
-        "before": "121206       1 50.6 280516 prebase",
+        "before": "135428       1 48.5 281720 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 400,
+        "latencyMs": 347,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 140965,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "logTail": "",
+        "harnessPid": 134065,
+        "timeoutMs": 240000,
+        "leftoverPids": []
       }
     },
     {
       "id": "code-graph",
       "path": "core-ide/code-graph.json",
-      "ok": true
+      "ok": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 140965,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "logTail": "",
+        "harnessPid": 134065,
+        "timeoutMs": 240000,
+        "leftoverPids": []
+      }
     },
     {
       "id": "themes-a11y",
       "path": "core-ide/themes-a11y.json",
       "ok": true,
       "quit": {
-        "before": "121206       1 50.6 280516 prebase",
+        "before": "135428       1 48.5 281720 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 400,
+        "latencyMs": 347,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 140965,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
+        "logTail": "",
+        "harnessPid": 134065,
+        "timeoutMs": 240000,
+        "leftoverPids": []
       }
     },
     {
@@ -325,14 +393,24 @@
       "path": "privacy/runtime-observation.json",
       "ok": true,
       "quit": {
-        "before": "123698       1 34.4 281416 prebase",
+        "before": "136229       1 35.0 283208 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 353,
+        "latencyMs": 325,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 14120,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/privacy.log",
+        "logTail": "",
+        "harnessPid": 136160,
+        "timeoutMs": 180000,
+        "leftoverPids": []
       }
     },
     {
@@ -363,8 +441,11 @@
     "reason": "evidence producer fingerprint does not match current producer inputs"
   },
   "plannedProducers": [
+    "magnus-streaming-smoke",
+    "magnus-guidance-smoke",
     "magnus-live-activity",
-    "runtime-preview",
+    "core-ide",
+    "temporal-small",
     "temporal-large",
     "temporal-canonical-scale",
     "electron-product-path",
@@ -373,6 +454,7 @@
     "magnus-electron-tools",
     "magnus-tauri-tools",
     "hybrid-web-smoke",
+    "privacy",
     "load-quit",
     "lifecycle-cycles",
     "electron-restart-soak",

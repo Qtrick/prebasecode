@@ -1,5 +1,5 @@
 {"skipped":true,"linkupConfigured":false,"firecrawlConfigured":false}
-(node:127373) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/secretResolver.ts is not specified and it doesn't parse as CommonJS.
+(node:136138) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/secretResolver.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
 To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)

@@ -3,12 +3,12 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "privacy",
-  "sourceHead": "0fc0b5fafffea070a814e26afe5df8f8e0784470",
-  "sourceFingerprint": "4d764de343295f064a3d73fd611084dc54b08053c6e1341864fadcdae3413540",
-  "productFingerprint": "4d764de343295f064a3d73fd611084dc54b08053c6e1341864fadcdae3413540",
-  "generatedAt": "2026-09-03T08:52:39.948Z",
+  "sourceHead": "44eedca016d713e4e011fe3bc79292c91741c90b",
+  "sourceFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
+  "productFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
+  "generatedAt": "2026-09-03T09:18:57.828Z",
   "producerId": "privacy",
-  "producerFingerprint": "4b7f81efdb384be53e189ffb78869d589ecf572ffa4426e9c424f3c2a7b1fe22",
+  "producerFingerprint": "9968001e04f42150f681cfbeb5e0ae5a6d0cc829753aea5bfa5e69946c1c6f03",
   "observations": [
     {
       "phase": "startup",
@@ -17,45 +17,51 @@
       ],
       "sockets": [
         {
-          "pid": 123698,
+          "pid": 136229,
           "host": "localhost",
-          "port": 45025,
+          "port": 33011,
           "role": "main"
         },
         {
-          "pid": 123698,
+          "pid": 136229,
           "host": "localhost",
-          "port": 37309,
+          "port": 45863,
           "role": "main"
         },
         {
-          "pid": 123698,
+          "pid": 136229,
           "host": "localhost",
-          "port": 39870,
+          "port": 53628,
           "role": "main"
         },
         {
-          "pid": 123751,
-          "host": "sea09s40-in-f9.1e100.net",
+          "pid": 136283,
+          "host": "sea09s41-in-f9.1e100.net",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 123751,
-          "host": "pnseaa-an-in-f14.1e100.net",
+          "pid": 136283,
+          "host": "pnseab-aa-in-f14.1e100.net",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 123751,
-          "host": "cdn-185-199-110-133.github.com",
+          "pid": 136283,
+          "host": "cdn-185-199-108-133.github.com",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 123870,
+          "pid": 136368,
           "host": "localhost",
-          "port": 45461,
+          "port": 5879,
+          "role": "main"
+        },
+        {
+          "pid": 136397,
+          "host": "localhost",
+          "port": 39129,
           "role": "main"
         }
       ]
@@ -68,51 +74,57 @@
       ],
       "sockets": [
         {
-          "pid": 123698,
+          "pid": 136229,
           "host": "localhost",
-          "port": 45025,
+          "port": 33011,
           "role": "main"
         },
         {
-          "pid": 123698,
+          "pid": 136229,
           "host": "localhost",
-          "port": 37309,
+          "port": 45863,
           "role": "main"
         },
         {
-          "pid": 123698,
+          "pid": 136229,
           "host": "localhost",
-          "port": 39870,
+          "port": 53628,
           "role": "main"
         },
         {
-          "pid": 123751,
+          "pid": 136283,
+          "host": "sea09s41-in-f9.1e100.net",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 136283,
           "host": "151.101.1.242",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 123751,
-          "host": "sea09s40-in-f9.1e100.net",
+          "pid": 136283,
+          "host": "pnseab-aa-in-f14.1e100.net",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 123751,
-          "host": "pnseaa-an-in-f14.1e100.net",
+          "pid": 136283,
+          "host": "cdn-185-199-108-133.github.com",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 123751,
-          "host": "cdn-185-199-110-133.github.com",
-          "port": 443,
-          "role": "main"
-        },
-        {
-          "pid": 123870,
+          "pid": 136368,
           "host": "localhost",
-          "port": 45461,
+          "port": 5879,
+          "role": "main"
+        },
+        {
+          "pid": 136397,
+          "host": "localhost",
+          "port": 39129,
           "role": "main"
         }
       ]
@@ -123,7 +135,62 @@
         "localhost",
         "open-vsx.org"
       ],
-      "sockets": []
+      "sockets": [
+        {
+          "pid": 136229,
+          "host": "localhost",
+          "port": 33011,
+          "role": "main"
+        },
+        {
+          "pid": 136229,
+          "host": "localhost",
+          "port": 45863,
+          "role": "main"
+        },
+        {
+          "pid": 136229,
+          "host": "localhost",
+          "port": 53628,
+          "role": "main"
+        },
+        {
+          "pid": 136283,
+          "host": "sea09s41-in-f9.1e100.net",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 136283,
+          "host": "151.101.1.242",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 136283,
+          "host": "pnseab-aa-in-f14.1e100.net",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 136283,
+          "host": "cdn-185-199-108-133.github.com",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 136368,
+          "host": "localhost",
+          "port": 5879,
+          "role": "main"
+        },
+        {
+          "pid": 136397,
+          "host": "localhost",
+          "port": 39129,
+          "role": "main"
+        }
+      ]
     },
     {
       "phase": "magnus-ui",
@@ -131,64 +198,15 @@
         "localhost",
         "open-vsx.org"
       ],
-      "sockets": [
-        {
-          "pid": 123698,
-          "host": "localhost",
-          "port": 45025,
-          "role": "main"
-        },
-        {
-          "pid": 123698,
-          "host": "localhost",
-          "port": 37309,
-          "role": "main"
-        },
-        {
-          "pid": 123698,
-          "host": "localhost",
-          "port": 39870,
-          "role": "main"
-        },
-        {
-          "pid": 123751,
-          "host": "151.101.1.242",
-          "port": 443,
-          "role": "main"
-        },
-        {
-          "pid": 123751,
-          "host": "sea09s40-in-f9.1e100.net",
-          "port": 443,
-          "role": "main"
-        },
-        {
-          "pid": 123751,
-          "host": "pnseaa-an-in-f14.1e100.net",
-          "port": 443,
-          "role": "main"
-        },
-        {
-          "pid": 123751,
-          "host": "cdn-185-199-110-133.github.com",
-          "port": 443,
-          "role": "main"
-        },
-        {
-          "pid": 123870,
-          "host": "localhost",
-          "port": 45461,
-          "role": "main"
-        }
-      ]
+      "sockets": []
     }
   ],
-  "prebasePid": 123698,
+  "prebasePid": 136229,
   "quit": {
-    "before": "123698       1 34.4 281416 prebase",
+    "before": "136229       1 35.0 283208 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 353,
+    "latencyMs": 325,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
@@ -241,6 +259,20 @@
     {
       "host": "open-vsx.org",
       "origin": "https://open-vsx.org",
+      "url": "https://open-vsx.org/vscode/gallery/vscode/ms-vscode/vscode-github-issue-notebooks/latest",
+      "source": "cdp",
+      "type": "Fetch"
+    },
+    {
+      "host": "open-vsx.org",
+      "origin": "https://open-vsx.org",
+      "url": "https://open-vsx.org/vscode/gallery/vscode/ms-vscode/extension-test-runner/latest",
+      "source": "cdp",
+      "type": "Fetch"
+    },
+    {
+      "host": "open-vsx.org",
+      "origin": "https://open-vsx.org",
       "url": "https://open-vsx.org/vscode/gallery/vscode/github/vscode-pull-request-github/latest",
       "source": "cdp",
       "type": "Other"
@@ -248,20 +280,6 @@
     {
       "host": "open-vsx.org",
       "origin": "https://open-vsx.org",
-      "url": "https://open-vsx.org/vscode/gallery/vscode/ms-vscode/vscode-github-issue-notebooks/latest",
-      "source": "cdp",
-      "type": "Fetch"
-    },
-    {
-      "host": "open-vsx.org",
-      "origin": "https://open-vsx.org",
-      "url": "https://open-vsx.org/vscode/gallery/vscode/ms-vscode/extension-test-runner/latest",
-      "source": "cdp",
-      "type": "Fetch"
-    },
-    {
-      "host": "open-vsx.org",
-      "origin": "https://open-vsx.org",
       "url": "https://open-vsx.org/vscode/gallery/vscode/typescriptteam/native-preview/latest",
       "source": "cdp",
       "type": "Fetch"
@@ -320,14 +338,14 @@
       "origin": "https://open-vsx.org",
       "url": "https://open-vsx.org/vscode/gallery/extensionquery",
       "source": "cdp",
-      "type": "Fetch"
+      "type": "Other"
     },
     {
       "host": "open-vsx.org",
       "origin": "https://open-vsx.org",
       "url": "https://open-vsx.org/vscode/gallery/extensionquery",
       "source": "cdp",
-      "type": "Other"
+      "type": "Fetch"
     }
   ],
   "cdpHosts": [
@@ -337,24 +355,24 @@
   "allHosts": [
     "localhost",
     "open-vsx.org",
-    "sea09s40-in-f9.1e100.net",
-    "pnseaa-an-in-f14.1e100.net",
-    "cdn-185-199-110-133.github.com",
+    "sea09s41-in-f9.1e100.net",
+    "pnseab-aa-in-f14.1e100.net",
+    "cdn-185-199-108-133.github.com",
     "151.101.1.242"
   ],
   "socketHosts": [
     "localhost",
-    "sea09s40-in-f9.1e100.net",
-    "pnseaa-an-in-f14.1e100.net",
-    "cdn-185-199-110-133.github.com",
+    "sea09s41-in-f9.1e100.net",
+    "pnseab-aa-in-f14.1e100.net",
+    "cdn-185-199-108-133.github.com",
     "151.101.1.242"
   ],
   "expectedHosts": [
     "localhost",
     "open-vsx.org",
-    "sea09s40-in-f9.1e100.net",
-    "pnseaa-an-in-f14.1e100.net",
-    "cdn-185-199-110-133.github.com"
+    "sea09s41-in-f9.1e100.net",
+    "pnseab-aa-in-f14.1e100.net",
+    "cdn-185-199-108-133.github.com"
   ],
   "unexpectedHosts": [],
   "forbiddenHosts": [],
@@ -374,17 +392,17 @@
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "sea09s40-in-f9.1e100.net",
+      "host": "sea09s41-in-f9.1e100.net",
       "kind": "expected",
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "pnseaa-an-in-f14.1e100.net",
+      "host": "pnseab-aa-in-f14.1e100.net",
       "kind": "expected",
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "cdn-185-199-110-133.github.com",
+      "host": "cdn-185-199-108-133.github.com",
       "kind": "expected",
       "why": "loopback, private, or product infrastructure"
     },
