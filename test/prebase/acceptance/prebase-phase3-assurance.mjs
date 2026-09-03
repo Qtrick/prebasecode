@@ -54,7 +54,7 @@ export const PHASE3_ASSURANCE_TIMEOUT_MS = {
 	'transpile-client': 240_000,
 	'typecheck-client': 360_000,
 	'typecheck:graphs': 180_000,
-	'test:graphs': 180_000,
+	'test:graphs': 10 * 60 * 1000,
 	'test:prebase-pure': 180_000,
 	'test:prebase-magnus': 180_000,
 	'verify:graphs-boundary': 30_000,

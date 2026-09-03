@@ -81,12 +81,16 @@ suite('Temporal Live Acceptance Evaluation', () => {
 
 	test('missing renderedLabelOverlapCount fails closed even when nodes are present', () => {
 		const evidence = validEvidence();
-		delete evidence.fullMap.renderedLabelOverlapCount;
-		delete evidence.focusChanges.renderedLabelOverlapCount;
+		const fullMap = { ...evidence.fullMap } as Record<string, unknown>;
+		const focusChanges = { ...evidence.focusChanges } as Record<string, unknown>;
+		delete fullMap.renderedLabelOverlapCount;
+		delete focusChanges.renderedLabelOverlapCount;
+		evidence.fullMap = fullMap as typeof evidence.fullMap;
+		evidence.focusChanges = focusChanges as typeof evidence.focusChanges;
 		const result = evaluate(evidence);
 		assert.equal(result.status, 1, result.stderr);
-		assert.ok(result.output.failures.some(item => /Full Map has rendered label overlaps/.test(item)));
-		assert.ok(result.output.failures.some(item => /Focus Changes has rendered label overlaps/.test(item)));
+		assert.ok(result.output.failures.some((item: string) => /Full Map has rendered label overlaps/.test(item)));
+		assert.ok(result.output.failures.some((item: string) => /Focus Changes has rendered label overlaps/.test(item)));
 	});
 
 	test('representative rendered evidence passes without failures', () => {
