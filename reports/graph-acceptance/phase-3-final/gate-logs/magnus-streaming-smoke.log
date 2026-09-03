@@ -1,4 +1,6 @@
 {
-  "ok": true,
-  "failures": []
+  "ok": false,
+  "failures": [
+    "UI never showed streamed text"
+  ]
 }

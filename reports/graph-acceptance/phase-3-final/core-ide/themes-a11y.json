@@ -1,12 +1,12 @@
 {
   "schemaVersion": 3,
   "scenario": "themes-a11y",
-  "sourceHead": "3fc0486790a2abdfeb022110ad9ab69a0e865c58",
-  "sourceFingerprint": "96bc373094e8358c973a67dd0174353e3d67600b4920aeb480f977e28f4ccba5",
-  "productFingerprint": "96bc373094e8358c973a67dd0174353e3d67600b4920aeb480f977e28f4ccba5",
-  "generatedAt": "2026-09-03T05:56:06.883Z",
+  "sourceHead": "59dde8a83e804557a1d02e136a8321b280843b74",
+  "sourceFingerprint": "758a237e1c6cc826b0b40f50453a2a6f368061a64b9b4dde3d756cf667560528",
+  "productFingerprint": "758a237e1c6cc826b0b40f50453a2a6f368061a64b9b4dde3d756cf667560528",
+  "generatedAt": "2026-09-03T06:10:09.263Z",
   "producerId": "core-ide",
-  "producerFingerprint": "5b375e986781a4ab9564f42b7319558de9d0e9d240c94e18e8fc324dfd19cdbb",
+  "producerFingerprint": "22f8eee219009e4504eeef20bdce9c172e6d27786c38941c604ae8a53a5e0195",
   "ok": true,
   "failures": [],
   "themes": {
@@ -43,8 +43,8 @@
     "dark": {
       "query": "PreBase Dark",
       "settingsId": "PreBase Dark",
-      "applied": false,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center hc-light vscode-theme-defaults-themes-hc_light-json",
+      "applied": true,
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench linux chromium panel-position-bottom panel-alignment-center vs-dark vscode-theme-defaults-themes-prebase_dark-json",
       "colorTheme": "PreBase Dark",
       "colorThemeType": "dark",
       "pickerVisible": true,
@@ -92,10 +92,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "64070       1 49.7 285304 prebase",
+    "before": "69012       1 47.8 286344 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 349,
+    "latencyMs": 353,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
