@@ -3791,6 +3791,16 @@ function onPointerUp(e, terminationReason) {
 	pointerCaptureActive = false;
 	activePointerId = null;
 	activePointerHost = null;
+	if (typeof window !== 'undefined' && window.__prebaseRecordRenderMetrics) {
+		try {
+			const metrics = window.__prebaseGraphRenderMetrics || (window.__prebaseGraphRenderMetrics = {});
+			metrics.lastGestureCaptureReleased = gestureReleased;
+			metrics.pointerCaptureReleased = gestureReleased;
+			metrics.pointerCaptureActive = false;
+			metrics.pointerCaptureHeld = captureStillHeld;
+			metrics.lastGestureTerminationReason = terminationReason || '';
+		} catch {}
+	}
 	const wasAborted = terminationReason && terminationReason !== 'pointerup';
 	const wasMoved = moved || wasAborted;
 	dragging = false; panning = false; rotating = false; draggingNode = false;

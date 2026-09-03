@@ -4,7 +4,7 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { mkdirSync, writeFileSync, readFileSync, cpSync, mkdtempSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -275,6 +275,21 @@ async function ensureSidebar(page) {
 function prepareGitWorkspace(source) {
 	const dir = mkdtempSync(join(tmpdir(), 'prebase-core-ide-'));
 	cpSync(source, dir, { recursive: true });
+	const vscodeDir = join(dir, '.vscode');
+	mkdirSync(vscodeDir, { recursive: true });
+	writeFileSync(join(dir, 'src/debug.js'), 'const timer = setInterval(() => {}, 1000);\n');
+	writeFileSync(join(vscodeDir, 'launch.json'), JSON.stringify({
+		version: '0.2.0',
+		configurations: [
+			{
+				type: 'node',
+				request: 'launch',
+				name: 'Launch Program',
+				program: '${workspaceFolder}/src/debug.js',
+				stopOnEntry: false,
+			},
+		],
+	}, null, 2));
 	execSync('git init && git add -A && git -c user.email=core-ide@prebase.test -c user.name=CoreIDE commit --no-gpg-sign -m init', {
 		cwd: dir,
 		stdio: 'ignore',
@@ -335,33 +350,33 @@ async function run() {
 
 		const beforeHello = readFileSync(openFile, 'utf8');
 		await workbenchCommandWithTimeout(launched.page, 5_000, 'workbench.view.explorer').catch(() => undefined);
-		await launched.page.getByRole('treeitem', { name: /hello\.ts/ }).first().click({ timeout: 8_000 }).catch(() => undefined);
 		const fileUri = `file://${openFile}`;
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'vscode.open', fileUri).catch(() => undefined);
-		await launched.page.locator('.monaco-editor textarea.inputarea').first().click({ timeout: 8_000 }).catch(() => undefined);
+		await launched.page.locator('.monaco-editor').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
+		const inputArea = launched.page.locator('.monaco-editor textarea.inputarea').first();
+		await inputArea.focus({ timeout: 8_000 }).catch(() => undefined);
 		await launched.page.waitForTimeout(400);
 
-		// Type edit
-		await workbenchCommandWithTimeout(launched.page, 4_000, 'type', { text: ' // core-ide-verified' }).catch(() => undefined);
-		await launched.page.waitForTimeout(300);
-		const editorTextAfterType = await launched.page.locator('.monaco-editor .view-lines').innerText().catch(() => '');
+		// Type edit via real keyboard typing
+		await launched.page.keyboard.type(' // core-ide-verified', { delay: 15 }).catch(() => undefined);
+		await launched.page.waitForTimeout(400);
+		const editorTextAfterType = await launched.page.locator('.monaco-editor .view-lines').first().innerText().catch(() => '');
 		const typedOk = editorTextAfterType.includes('core-ide-verified');
 
 		// Undo -> editor should revert
 		await workbenchCommandWithTimeout(launched.page, 5_000, 'undo').catch(() => undefined);
-		await launched.page.waitForTimeout(300);
-		const editorTextAfterUndo = await launched.page.locator('.monaco-editor .view-lines').innerText().catch(() => '');
+		await launched.page.waitForTimeout(400);
+		const editorTextAfterUndo = await launched.page.locator('.monaco-editor .view-lines').first().innerText().catch(() => '');
 		const undoOk = !editorTextAfterUndo.includes('core-ide-verified');
 
 		// Redo -> editor should re-apply edit
 		await workbenchCommandWithTimeout(launched.page, 5_000, 'redo').catch(() => undefined);
-		await launched.page.waitForTimeout(300);
-		const editorTextAfterRedo = await launched.page.locator('.monaco-editor .view-lines').innerText().catch(() => '');
+		await launched.page.waitForTimeout(400);
+		const editorTextAfterRedo = await launched.page.locator('.monaco-editor .view-lines').first().innerText().catch(() => '');
 		const redoOk = editorTextAfterRedo.includes('core-ide-verified');
 
 		// Save -> disk should reflect edit
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.files.save').catch(() => undefined);
-		await launched.page.keyboard.press(`${mod}+s`).catch(() => undefined);
 		await launched.page.waitForTimeout(400);
 		const afterHello = readFileSync(openFile, 'utf8');
 		const diskSaveOk = afterHello.includes('core-ide-verified');
@@ -388,30 +403,58 @@ async function run() {
 		evidence.e3_scm = Boolean(scmFileDetected);
 
 		// E4: Real integrated terminal execution
-		await launched.page.keyboard.press('Control+`').catch(() => undefined);
-		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.terminal.toggleTerminal').catch(() => undefined);
-		await workbenchCommandWithTimeout(launched.page, 4_000, 'workbench.action.terminal.sendSequence', { text: "echo PREBASE_OK\r" }).catch(() => undefined);
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.terminal.new').catch(() => undefined);
+		await launched.page.locator('.xterm, .terminal-wrapper, .integrated-terminal').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
+		await launched.page.waitForTimeout(1000);
+		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.terminal.sendSequence', { text: "echo PREBASE_OK\r" }).catch(() => undefined);
 		const termText = await waitFor(async () => {
-			const text = await launched.page.locator('.xterm, .terminal-wrapper, .integrated-terminal').innerText().catch(() => '');
-			return text.includes('PREBASE_OK') ? text : undefined;
-		}, 8_000, 300);
+			return launched.page.evaluate(() => {
+				const el = document.querySelector('.terminal-wrapper, .xterm');
+				const xterm = el ? el.xterm : null;
+				if (xterm && xterm.buffer && xterm.buffer.active) {
+					const lines = [];
+					for (let i = 0; i < xterm.buffer.active.length; i++) {
+						const line = xterm.buffer.active.getLine(i)?.translateToString(true);
+						if (line) lines.push(line);
+					}
+					const full = lines.join('\n');
+					if (full.includes('PREBASE_OK')) return full;
+				}
+				const raw = (el?.innerText || '') + (document.querySelector('.terminal-view')?.innerText || '');
+				return raw.includes('PREBASE_OK') ? raw : undefined;
+			}).catch(() => undefined);
+		}, 15_000, 400);
 		evidence.e4_terminal = Boolean(termText && termText.includes('PREBASE_OK'));
 
 		// E5: Debug session control
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.view.debug').catch(() => undefined);
 		const debugPaneSeen = await seen('.debug-toolbar, .debug-viewlet, [id="workbench.view.debug"], .debug-pane', 6_000);
-		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.debug.start').catch(() => undefined);
-		const debugToolbarSeen = await seen('.debug-toolbar', 4_000);
-		await workbenchCommandWithTimeout(launched.page, 4_000, 'workbench.action.debug.stop').catch(() => undefined);
-		await launched.page.waitForTimeout(300);
-		evidence.e5_debug = Boolean(debugPaneSeen && debugToolbarSeen);
+		// debug.start returns a promise that stays pending while debuggee runs; fire asynchronously and wait for session
+		void workbenchCommandWithTimeout(launched.page, 15_000, 'workbench.action.debug.start').catch(() => undefined);
+		const debugStarted = await waitFor(async () => {
+			const d = await workbenchCommandWithTimeout(launched.page, 3_000, 'prebase.test.getDiagnostics').catch(() => null);
+			const toolbar = await launched.page.locator('.debug-toolbar').first().isVisible().catch(() => false);
+			return (d?.debug?.sessionsCount > 0 || toolbar) ? d : undefined;
+		}, 15_000, 400);
+		const debugToolbarSeen = await launched.page.locator('.debug-toolbar').first().isVisible().catch(() => false);
+		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.debug.stop').catch(() => undefined);
+		const stoppedDiag = await waitFor(async () => {
+			const d = await workbenchCommandWithTimeout(launched.page, 3_000, 'prebase.test.getDiagnostics').catch(() => null);
+			return d?.debug?.sessionsCount === 0 ? d : undefined;
+		}, 10_000, 400);
+		console.log('E5 STATUS:', { debugPaneSeen, debugStarted: Boolean(debugStarted), debugToolbarSeen, stoppedDiag: Boolean(stoppedDiag) });
+		evidence.e5_debug = Boolean(debugPaneSeen && (debugToolbarSeen || debugStarted) && stoppedDiag);
 
 		// E6: TypeScript language service completion & diagnostics
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'vscode.open', fileUri).catch(() => undefined);
+		await launched.page.waitForTimeout(500);
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'editor.action.triggerSuggest').catch(() => undefined);
 		const suggestSeen = await seen('.suggest-widget .monaco-list-row, .suggest-widget', 6_000);
-		const tsDiagnostics = await workbenchCommandWithTimeout(launched.page, 6_000, 'prebase.test.getDiagnostics').catch(() => null);
-		evidence.e6_typescript = Boolean(suggestSeen && (tsDiagnostics?.languages?.includes('typescript') || tsDiagnostics?.activeLanguageId === 'typescript' || suggestSeen));
+		const tsDiagnostics = await waitFor(async () => {
+			const d = await workbenchCommandWithTimeout(launched.page, 3_000, 'prebase.test.getDiagnostics').catch(() => null);
+			return (d?.editor?.activeLanguageId === 'typescript' || d?.activeLanguageId === 'typescript' || d?.languages?.includes('typescript')) ? d : undefined;
+		}, 6_000, 300);
+		evidence.e6_typescript = Boolean(suggestSeen && tsDiagnostics);
 
 		await workbenchCommandWithTimeout(launched.page, 3_000, 'workbench.action.reloadWindow').catch(() => undefined);
 		const restored = await waitFor(() => {
@@ -444,8 +487,8 @@ async function run() {
 			|| await launched.page.getByRole('tab', { name: /Magnus/i }).first().isVisible().catch(() => false);
 
 		await ensureSidebar(launched.page);
-		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.graph.open').catch(() => undefined);
-		const graphFrame = await findGraphFrame(launched.page);
+		await workbenchCommandWithTimeout(launched.page, 12_000, 'prebase.graph.openNetwork').catch(() => undefined);
+		const graphFrame = await waitFor(async () => findGraphFrame(launched.page), 35_000, 500);
 		let organicMode = null;
 		let sphereMode = null;
 		let constellationMode = null;
@@ -487,22 +530,30 @@ async function run() {
 				return nodesDrawnFromMetrics(current) ? current : undefined;
 			}, 15_000, 250);
 			metrics = await readGraphMetrics(graphFrame);
+
+			// Ensure Maps sidebar view is visible for layout chips & idle toggle
+			await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.prebase.maps').catch(() => undefined);
+			await launched.page.locator('.prebase-maps-view').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
+
 			const clickLayout = async mode => {
-				await launched.page.locator(`.prebase-maps-view button[data-network-layout="${mode}"]`).first().click({ timeout: 3_000 }).catch(() => undefined);
-				await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics', { networkLayoutMode: mode }).catch(() => undefined);
+				const button = launched.page.locator(`.prebase-maps-view button[data-network-layout="${mode}"]`).first();
+				await button.waitFor({ state: 'visible', timeout: 5_000 }).catch(() => undefined);
+				await button.scrollIntoViewIfNeeded().catch(() => undefined);
+				await button.click({ timeout: 4_000 }).catch(() => undefined);
 				return waitFor(async () => {
 					const current = await readGraphMetrics(graphFrame);
 					return current?.networkLayoutMode === mode ? current : undefined;
-				}, 6_000, 200);
+				}, 10_000, 200);
 			};
-			const organicMetrics = await clickLayout('organic').catch(() => undefined);
-			organicMode = organicMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 			const sphereMetrics = await clickLayout('sphere').catch(() => undefined);
 			sphereMode = sphereMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 			const constellationMetrics = await clickLayout('constellation').catch(() => undefined);
 			constellationMode = constellationMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
 			const clusteredMetrics = await clickLayout('clustered').catch(() => undefined);
 			clusteredMode = clusteredMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
+			const organicMetrics = await clickLayout('organic').catch(() => undefined);
+			organicMode = organicMetrics?.networkLayoutMode || (await readGraphMetrics(graphFrame))?.networkLayoutMode;
+			console.log('LAYOUT MODES STATUS:', { organicMode, sphereMode, constellationMode, clusteredMode });
 
 			await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.test.getDiagnostics', { networkLayoutMode: 'radial' }).catch(() => undefined);
 			await workbenchCommandWithTimeout(launched.page, 4_000, 'prebase.graph.rescanWorkspace').catch(() => undefined);
@@ -510,15 +561,15 @@ async function run() {
 			const radialMetrics = await readGraphMetrics(graphFrame);
 			legacyRadialNormalized = radialMetrics?.networkLayoutMode === 'organic';
 
-			const idle = launched.page.locator('.prebase-maps-view label', { hasText: 'Idle auto-rotate' }).locator('input[type="checkbox"]');
-			if (await idle.first().count()) {
-				await idle.first().scrollIntoViewIfNeeded().catch(() => undefined);
-				await idle.first().check({ timeout: 2_000 }).catch(() => idle.first().click({ timeout: 2_000 }).catch(() => undefined));
+			const idle = launched.page.locator('.prebase-maps-view label', { hasText: 'Idle auto-rotate' }).locator('input[type="checkbox"]').first();
+			if (await idle.count()) {
+				await idle.scrollIntoViewIfNeeded().catch(() => undefined);
+				await idle.check({ timeout: 4_000 }).catch(() => idle.click({ timeout: 4_000 }).catch(() => undefined));
 			}
 			await waitFor(async () => {
 				const current = await readGraphMetrics(graphFrame);
 				return current?.networkIdleAutoRotate ? current : undefined;
-			}, 8_000, 250);
+			}, 10_000, 250);
 
 			rotationBeforeGesture = rotationFromMetrics(await readGraphMetrics(graphFrame));
 			await canvasGesture(graphFrame);

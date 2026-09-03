@@ -176,6 +176,13 @@ function registerGraphActions(): void {
 
 	registerAction2(class extends Action2 {
 		constructor() {
+			super({ id: 'prebase.graph.open', title: localize2('prebase.graph.open', "Open Code Graph"), category: localize2('prebase.category', "PreBase"), f1: false });
+		}
+		run(accessor: ServicesAccessor) { return openGraphEditor(accessor); }
+	});
+
+	registerAction2(class extends Action2 {
+		constructor() {
 			super({ id: PreBaseGraphCommandIds.openTemporal, title: localize2('prebase.graph.openTemporal', "Open Temporal Graph"), category: localize2('prebase.category', "PreBase"), f1: true });
 		}
 		run(accessor: ServicesAccessor) { return openTemporalGraphEditor(accessor); }

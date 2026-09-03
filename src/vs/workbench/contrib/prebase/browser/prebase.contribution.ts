@@ -58,6 +58,8 @@ import { IPreBaseAccountService, PreBaseAccountContext, PreBaseAccountService } 
 import { PreBaseCloudConfigKeys } from '../common/cloud/cloudConfiguration.js';
 import { prebaseRuntimeViewIcon } from './prebaseIcons.js';
 import { ContextKeyExpr } from '../../../../platform/contextkey/common/contextkey.js';
+import { IDebugService } from '../../debug/common/debug.js';
+import { IMarkerService } from '../../../../platform/markers/common/markers.js';
 import { PreBaseRuntimeViewPane } from './prebaseRuntimeView.js';
 import { PreBaseRuntimeEditor } from './runtimeEditor.js';
 import { PreBaseRuntimeEditorInput } from './runtimeEditorInput.js';
@@ -1101,16 +1103,29 @@ registerAction2(class extends Action2 {
 	}
 	async run(accessor: ServicesAccessor, request?: { applyColorTheme?: string; zoomLevel?: number; accessibilitySupport?: 'auto' | 'on'; liveActivityMode?: string }) {
 		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.getDiagnostics');
-		const allowedThemes = new Set(['PreBase Dark', 'PreBase Light', 'Default High Contrast', 'Default High Contrast Light', 'Dark Modern', 'Light Modern']);
-		const applyId = typeof request?.applyColorTheme === 'string' ? request.applyColorTheme : '';
-		const zoom = request?.zoomLevel;
 		const themeService = accessor.get(IWorkbenchThemeService);
 		const configurationService = accessor.get(IConfigurationService);
 		const commandService = accessor.get(ICommandService);
 		const layoutService = accessor.get(IWorkbenchLayoutService);
 		const editorService = accessor.get(IEditorService);
+		const accountService = accessor.get(IPreBaseAccountService);
+		let debugService: IDebugService | undefined;
+		try { debugService = accessor.get(IDebugService); } catch { /* optional */ }
+		let markerService: IMarkerService | undefined;
+		try { markerService = accessor.get(IMarkerService); } catch { /* optional */ }
 		let nativeHost: INativeHostService | undefined;
 		try { nativeHost = accessor.get(INativeHostService); } catch { /* web workbench */ }
+		let canonicalParseService: IPreBaseCanonicalParseService | undefined;
+		try { canonicalParseService = accessor.get(IPreBaseCanonicalParseService); } catch { /* optional */ }
+		let temporalGraphService: IPreBaseTemporalGraphService | undefined;
+		try { temporalGraphService = accessor.get(IPreBaseTemporalGraphService); } catch { /* optional */ }
+		let runtimeService: IPreBaseRuntimeService | undefined;
+		try { runtimeService = accessor.get(IPreBaseRuntimeService); } catch { /* optional */ }
+		const desktopRuntime = getDesktopRuntimeService(accessor);
+
+		const allowedThemes = new Set(['PreBase Dark', 'PreBase Light', 'Default High Contrast', 'Default High Contrast Light', 'Dark Modern', 'Light Modern']);
+		const applyId = typeof request?.applyColorTheme === 'string' ? request.applyColorTheme : '';
+		const zoom = request?.zoomLevel;
 		const a11yMode = request?.accessibilitySupport;
 		if (a11yMode === 'auto' || a11yMode === 'on') {
 			// Isolated smoke profiles only; never write 'off' and never a user's real profile.
@@ -1129,17 +1144,25 @@ registerAction2(class extends Action2 {
 		let runtimePreviewServerRunning = false;
 		let runtimePreviewStatus = '';
 		let desktopSessionState: Record<string, unknown> | null = null;
-		try { parserActiveRequests = accessor.get(IPreBaseCanonicalParseService).getActiveRequestCount(); } catch { /* optional */ }
-		try { temporalActiveWrites = accessor.get(IPreBaseTemporalGraphService).getActiveWriteCount(); } catch { /* optional */ }
-		try {
-			const runtimeState = accessor.get(IPreBaseRuntimeService).getStateForMagnus();
-			runtimePreviewServerRunning = Boolean(runtimeState.serverRunning);
-			runtimePreviewStatus = typeof runtimeState.previewStatus === 'string' ? runtimeState.previewStatus.slice(0, 120) : '';
-		} catch { /* optional */ }
-		try {
-			const session = getDesktopRuntimeService(accessor)?.getSession();
-			desktopSessionState = session ? { state: session.state, pid: session.pid, framework: session.profile.framework } : null;
-		} catch { /* optional */ }
+		if (canonicalParseService) {
+			try { parserActiveRequests = canonicalParseService.getActiveRequestCount(); } catch { /* optional */ }
+		}
+		if (temporalGraphService) {
+			try { temporalActiveWrites = temporalGraphService.getActiveWriteCount(); } catch { /* optional */ }
+		}
+		if (runtimeService) {
+			try {
+				const runtimeState = runtimeService.getStateForMagnus();
+				runtimePreviewServerRunning = Boolean(runtimeState.serverRunning);
+				runtimePreviewStatus = typeof runtimeState.previewStatus === 'string' ? runtimeState.previewStatus.slice(0, 120) : '';
+			} catch { /* optional */ }
+		}
+		if (desktopRuntime) {
+			try {
+				const session = desktopRuntime.getSession();
+				desktopSessionState = session ? { state: session.state, pid: session.pid, framework: session.profile.framework } : null;
+			} catch { /* optional */ }
+		}
 		if (typeof zoom === 'number' && Number.isFinite(zoom) && zoom >= 0 && zoom <= 8) {
 			// ponytail: do not await configuration listeners; they can deadlock inside executeCommand.
 			setZoomLevel(zoom, mainWindow);
@@ -1153,7 +1176,31 @@ registerAction2(class extends Action2 {
 			}
 		}
 		const theme = themeService.getColorTheme();
-		const accountService = accessor.get(IPreBaseAccountService);
+
+		let debugSessionsCount = 0;
+		let debugActiveSessionName = '';
+		if (debugService) {
+			try {
+				const sessions = debugService.getModel().getSessions();
+				debugSessionsCount = sessions.length;
+				debugActiveSessionName = debugService.getViewModel().focusedSession?.name ?? (sessions[0]?.name ?? '');
+			} catch { /* debug optional */ }
+		}
+
+		let activeLanguageId = '';
+		let activeResourceMarkersCount = 0;
+		try {
+			const activeCodeEditor = editorService.activeTextEditorControl;
+			const model = (activeCodeEditor as any)?.getModel?.();
+			if (model && typeof model.getLanguageId === 'function') {
+				activeLanguageId = model.getLanguageId();
+			}
+			const resource = editorService.activeEditor?.resource;
+			if (resource && markerService) {
+				activeResourceMarkersCount = markerService.read({ resource }).length;
+			}
+		} catch { /* marker / editor optional */ }
+
 		const result: Record<string, unknown> = {
 			parserActiveRequests,
 			temporalActiveWrites,
@@ -1170,6 +1217,14 @@ registerAction2(class extends Action2 {
 			colorThemeType: theme.type,
 			zoomLevel: getZoomLevel(mainWindow),
 			accessibilitySupport: configurationService.getValue('editor.accessibilitySupport'),
+			debug: {
+				sessionsCount: debugSessionsCount,
+				activeSessionName: debugActiveSessionName,
+			},
+			editor: {
+				activeLanguageId,
+				activeResourceMarkersCount,
+			},
 			layout: {
 				sidebarVisible: layoutService.isVisible(Parts.SIDEBAR_PART),
 				panelVisible: layoutService.isVisible(Parts.PANEL_PART),

@@ -1637,26 +1637,118 @@ export class PreBaseMapsViewPane extends ViewPane {
 			return true;
 		});
 
+		const visibleItems: Array<
+			| { readonly kind: 'file'; readonly node: GraphNode; readonly depth: number }
+			| { readonly kind: 'dir'; readonly entry: ExplorerDirNode; readonly depth: number; readonly expanded: boolean }
+		> = [];
+
 		const mode = this._getExplorerViewMode();
 		if (mode === 'flat') {
-			filteredNodes
+			const sorted = filteredNodes
 				.slice()
-				.sort((a: GraphNode, b: GraphNode) => (a.path || a.label).localeCompare(b.path || b.label))
-				.forEach((node: GraphNode) => this._appendFileRow(this._explorerList!, node, 0));
-			if (filteredNodes.length === 0) {
-				this._appendEmptyExplorer();
+				.sort((a: GraphNode, b: GraphNode) => (a.path || a.label).localeCompare(b.path || b.label));
+			for (const node of sorted) {
+				visibleItems.push({ kind: 'file', node, depth: 0 });
+			}
+		} else {
+			const tree = this._buildTree(filteredNodes);
+			const flatten = (entries: ExplorerTreeNode[], depth: number) => {
+				for (const entry of entries) {
+					if (entry.type === 'file') {
+						visibleItems.push({ kind: 'file', node: entry.node, depth });
+					} else {
+						const expanded = this._expandedDirs.has(entry.fullPath) || this._searchQuery.length > 0;
+						visibleItems.push({ kind: 'dir', entry, depth, expanded });
+						if (expanded) {
+							flatten(entry.children, depth + 1);
+						}
+					}
+				}
+			};
+			flatten(tree, 0);
+		}
+
+		if (visibleItems.length === 0) {
+			this._appendEmptyExplorer();
+			return;
+		}
+
+		if (visibleItems.length <= 60) {
+			for (const item of visibleItems) {
+				if (item.kind === 'file') {
+					this._appendFileRow(this._explorerList!, item.node, item.depth);
+				} else {
+					this._appendDirRow(this._explorerList!, item.entry, item.depth, item.expanded);
+				}
 			}
 			return;
 		}
 
-		const tree = this._buildTree(filteredNodes);
-		if (tree.length === 0) {
-			this._appendEmptyExplorer();
-			return;
-		}
-		for (const entry of tree) {
-			this._appendTreeEntry(this._explorerList!, entry, 0);
-		}
+		// Virtualized windowing for large catalogs (e.g. 9.7k nodes)
+		const ROW_HEIGHT = 22;
+		const totalHeight = visibleItems.length * ROW_HEIGHT;
+		const container = this._explorerList!;
+		const viewport = DOM.append(container, DOM.$('div'));
+		viewport.style.position = 'relative';
+		viewport.style.height = `${totalHeight}px`;
+
+		const renderSlice = () => {
+			DOM.clearNode(viewport);
+			const scrollTop = container.scrollTop;
+			const viewHeight = container.clientHeight || 240;
+			const startIndex = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - 5);
+			const endIndex = Math.min(visibleItems.length, Math.ceil((scrollTop + viewHeight) / ROW_HEIGHT) + 5);
+
+			const windowContainer = DOM.append(viewport, DOM.$('div'));
+			windowContainer.style.position = 'absolute';
+			windowContainer.style.top = `${startIndex * ROW_HEIGHT}px`;
+			windowContainer.style.left = '0';
+			windowContainer.style.right = '0';
+
+			for (let i = startIndex; i < endIndex; i++) {
+				const item = visibleItems[i];
+				if (item.kind === 'file') {
+					this._appendFileRow(windowContainer, item.node, item.depth);
+				} else {
+					this._appendDirRow(windowContainer, item.entry, item.depth, item.expanded);
+				}
+			}
+		};
+
+		renderSlice();
+		this._explorerDisposables.add(DOM.addDisposableListener(container, 'scroll', () => {
+			renderSlice();
+		}));
+	}
+
+	private _appendDirRow(parent: HTMLElement, entry: ExplorerDirNode, depth: number, expanded: boolean): void {
+		const row = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
+		row.type = 'button';
+		row.style.display = 'flex';
+		row.style.alignItems = 'center';
+		row.style.gap = '4px';
+		row.style.width = '100%';
+		row.style.textAlign = 'left';
+		row.style.padding = `3px 6px 3px ${6 + depth * 12}px`;
+		row.style.fontSize = '11px';
+		row.style.color = TEXT;
+		row.style.background = 'transparent';
+		row.style.border = 'none';
+		row.style.borderRadius = '4px';
+		row.style.cursor = 'pointer';
+		row.setAttribute('aria-expanded', String(expanded));
+		const twistie = DOM.append(row, DOM.$('span.codicon'));
+		twistie.classList.add(expanded ? 'codicon-chevron-down' : 'codicon-chevron-right');
+		twistie.setAttribute('aria-hidden', 'true');
+		DOM.append(row, DOM.$('span')).textContent = entry.name || '/';
+		this._explorerDisposables.add(DOM.addDisposableListener(row, 'click', () => {
+			if (this._expandedDirs.has(entry.fullPath)) {
+				this._expandedDirs.delete(entry.fullPath);
+			} else {
+				this._expandedDirs.add(entry.fullPath);
+			}
+			this._refreshExplorerList();
+		}));
 	}
 
 	private _appendEmptyExplorer(): void {

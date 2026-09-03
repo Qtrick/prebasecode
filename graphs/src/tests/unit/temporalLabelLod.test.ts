@@ -257,11 +257,12 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 			selectedNodeId: 'n-selected',
 			routeBadgeCandidates: [badgeAtSelected],
 		});
-		assert.ok(selectedLayout.routeBadges.length >= 1, 'route badge seeds occupancy first');
+		assert.equal(selectedLayout.routeBadges.length, 0, 'route badge must yield to selected node label');
 		assert.ok(
 			selectedLayout.nodeLabels.some(l => l.entityId === 'n-selected'),
-			'selected node label must bypass route badge occupancy',
+			'selected node label must beat route badge occupancy',
 		);
+		assert.ok(selectedLayout.labelCollisionCullCount >= 1, 'yielding route badge must be recorded as culled');
 
 		const badgeAtHovered = {
 			id: 'hov::peer',
@@ -275,7 +276,9 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 			hoveredNodeId: 'n-hovered',
 			routeBadgeCandidates: [badgeAtHovered],
 		});
-		assert.ok(hoveredLayout.nodeLabels.some(l => l.entityId === 'n-hovered'), 'hovered node label must bypass route badge occupancy');
+		assert.equal(hoveredLayout.routeBadges.length, 0, 'route badge must yield to hovered node label');
+		assert.ok(hoveredLayout.nodeLabels.some(l => l.entityId === 'n-hovered'), 'hovered node label must beat route badge occupancy');
+		assert.ok(hoveredLayout.labelCollisionCullCount >= 1, 'yielding route badge must be recorded as culled');
 	});
 
 	test('15. entry and changed node labels outrank unchanged labels before route badges consume occupancy', () => {
@@ -404,5 +407,45 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		// Card x must be >= bounds.minX and card x + badgeWidth must be <= bounds.maxX (or clamped at bounds.minX + pad)
 		assert.ok(card.x >= narrowGuide.bounds.minX, `card.x (${card.x}) must be >= minX (${narrowGuide.bounds.minX})`);
 		assert.ok(card.badgeWidth > 0);
+	});
+
+	test('20. Landmark yields when conflicting with higher-priority semantic label (search match or active file)', () => {
+		const guide = {
+			id: 'comm-conflicting',
+			label: 'Database Infrastructure',
+			bounds: { minX: 150, minY: 150, maxX: 350, maxY: 350 },
+			nodeCount: 15,
+		};
+		const searchNode = makeNode('n-search-target', 'src/db/connection.ts', 'unchanged', 160, 160);
+
+		// With filterQuery matching the node, the search match (rank 700) outranks the guide landmark (rank 500)
+		const layout = computeTemporalLabelLayout([searchNode], [guide], 0.8, {
+			filterQuery: 'connection',
+		});
+
+		assert.ok(layout.nodeLabels.some(l => l.entityId === 'n-search-target'), 'search match must be rendered');
+		assert.equal(layout.guideLabels.length, 0, 'conflicting landmark must yield to search match');
+		assert.ok(layout.labelCollisionCullCount >= 1, 'yielding landmark must be culled');
+	});
+
+	test('21. Ordinary labels yield to all important content (route badges and landmarks)', () => {
+		const shared = { x: 500, y: 500 };
+		const ordinaryNode = makeNode('n-plain-bg', 'src/plain.ts', 'unchanged', shared.x, shared.y);
+		const badge = {
+			id: 'badge::important',
+			text: '20',
+			x: shared.x,
+			y: shared.y + 12,
+			edgeCount: 20,
+			changedEdgeCount: 0,
+		};
+
+		const layout = computeTemporalLabelLayout([ordinaryNode], [], 0.8, {
+			routeBadgeCandidates: [badge],
+		});
+
+		assert.equal(layout.routeBadges.length, 1, 'route badge must be placed over ordinary background node');
+		assert.equal(layout.nodeLabels.length, 0, 'ordinary background node must yield to route badge');
+		assert.ok(layout.labelCollisionCullCount >= 1, 'yielding ordinary node must be culled');
 	});
 });

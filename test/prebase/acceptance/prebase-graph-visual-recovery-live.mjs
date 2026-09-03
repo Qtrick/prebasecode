@@ -172,7 +172,7 @@ async function main() {
 				evidence.failures.push(`Temporal Full Map utilization ${full.screenUtilization} too low`);
 			}
 			const received = Number(full?.receivedNodeCount || 0);
-			const leavesDrawn = Number(full?.leafNodesDrawn ?? full?.nodesDrawn || 0);
+			const leavesDrawn = Number((full?.leafNodesDrawn ?? full?.nodesDrawn) || 0);
 			if (received > 500 && leavesDrawn >= received * 0.35) {
 				evidence.failures.push(`Temporal overview still draws ${leavesDrawn} leaves of ${received} (node-level LOD required; a ${received}-dot blob is not visually good)`);
 			}

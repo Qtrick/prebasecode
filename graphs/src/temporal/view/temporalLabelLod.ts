@@ -471,6 +471,39 @@ export function computeVisibleRouteBadges(
 	return out;
 }
 
+type UnifiedLabelCandidate =
+	| {
+		readonly kind: 'node';
+		readonly rank: number;
+		readonly secondaryRank: number;
+		readonly tiebreaker: string;
+		readonly box: LabelBox;
+		readonly item: VisibleLabelItem;
+		readonly forceEmphasis: boolean;
+	}
+	| {
+		readonly kind: 'guide';
+		readonly rank: number;
+		readonly secondaryRank: number;
+		readonly tiebreaker: string;
+		readonly box: LabelBox;
+		readonly item: CommunityGuideLabelItem;
+		readonly forceEmphasis: boolean;
+	}
+	| {
+		readonly kind: 'routeBadge';
+		readonly rank: number;
+		readonly secondaryRank: number;
+		readonly tiebreaker: string;
+		readonly box: LabelBox;
+		readonly item: RouteBadgeLabelItem;
+		readonly forceEmphasis: boolean;
+	};
+
+function defaultMeasureWidth(text: string): number {
+	return text.length * 7.0;
+}
+
 export function computeTemporalLabelLayout(
 	nodes: readonly TemporalRenderNode[],
 	guides: readonly TemporalCommunityGuideInput[],
@@ -489,73 +522,289 @@ export function computeTemporalLabelLayout(
 	},
 ): TemporalLabelLayout {
 	const measureWidth = options?.measureWidth;
-	const placedBoxes: LabelBox[] = [];
-	const overlapCount = { count: 0 };
-
 	const filterQuery = (options?.filterQuery || '').toLowerCase().trim();
 	const currentFileId = options?.currentFileEntityId;
 
-	function isSemanticPriority(n: TemporalRenderNode): boolean {
-		if (filterQuery && (
-			(n.label && n.label.toLowerCase().includes(filterQuery)) ||
-			(n.path && n.path.toLowerCase().includes(filterQuery))
-		)) {
-			return true;
+	// 1. Collect Guide Landmark Candidates
+	const guideCandidates: UnifiedLabelCandidate[] = [];
+	if (zoom >= 0.18 && guides && guides.length > 0) {
+		const validGuides = [];
+		for (let i = 0; i < guides.length; i++) {
+			const g = guides[i];
+			if (g && g.bounds && g.label) {
+				validGuides.push(g);
+			}
 		}
-		if (currentFileId && n.entityId === currentFileId) {
-			return true;
+		if (validGuides.length > 0) {
+			const family = (typeof document !== 'undefined' && document.body && typeof getComputedStyle === 'function')
+				? (getComputedStyle(document.body).fontFamily || 'sans-serif')
+				: 'sans-serif';
+
+			const safeZoom = Math.max(0.001, Number.isFinite(zoom) ? zoom : 1);
+			const screenFontPx = safeZoom < 0.35 ? 11 : (safeZoom < 0.65 ? 12 : 11);
+			const worldFontPx = Math.max(10, Math.round(screenFontPx / safeZoom));
+			const subScreenFontPx = safeZoom < 0.35 ? 8.5 : 9.5;
+			const subWorldFontPx = Math.max(8, Math.round(subScreenFontPx / safeZoom));
+
+			const font = `600 ${worldFontPx}px ${family}`;
+			const subFont = `400 ${subWorldFontPx}px ${family}`;
+			const measureWidthFn = measureWidth || defaultMeasureWidth;
+
+			for (let i = 0; i < validGuides.length; i++) {
+				const guide = validGuides[i];
+				const bounds = guide.bounds!;
+				const gw = Math.max(8, bounds.maxX - bounds.minX);
+
+				const text = shortenCommunityLabel(guide.label!, 24);
+				const count = guide.nodeCount ?? guide.nodeIds?.length ?? 0;
+				const layerStr = String(guide.layerId || 'module').toUpperCase();
+				const subText = safeZoom < 0.35
+					? `${count} files`
+					: `${count} files · ${layerStr}`;
+
+				const titleW = measureWidthFn(text, font);
+				const subW = measureWidthFn(subText, subFont);
+				const pad = Math.max(4, Math.round(8 / Math.max(0.35, safeZoom)));
+				const badgeW = Math.min(Math.max(20, gw - pad * 2), Math.max(titleW, subW) + Math.round(24 / Math.max(0.35, safeZoom)));
+				const badgeH = Math.round(worldFontPx + subWorldFontPx + 8 / Math.max(0.35, safeZoom));
+
+				const minCandidateX = bounds.minX + pad;
+				const maxCandidateX = Math.max(minCandidateX, bounds.maxX - badgeW - pad);
+				const cardX = Math.min(maxCandidateX, minCandidateX);
+				const cardY = bounds.minY + pad;
+
+				const box: LabelBox = {
+					x: cardX,
+					y: cardY,
+					w: badgeW,
+					h: badgeH,
+				};
+
+				const w = (bounds.maxX - bounds.minX);
+				const h = (bounds.maxY - bounds.minY);
+				const area = Math.max(1, w * h);
+				const score = count * 1000 + area;
+
+				guideCandidates.push({
+					kind: 'guide',
+					rank: 500,
+					secondaryRank: score,
+					tiebreaker: guide.id,
+					box,
+					item: {
+						guideId: guide.id,
+						text,
+						subText,
+						layerId: guide.layerId,
+						color: guide.color,
+						x: cardX,
+						y: cardY,
+						box,
+						font,
+						subFont,
+						isCard: true,
+						badgeWidth: badgeW,
+						badgeHeight: badgeH,
+					},
+					forceEmphasis: false,
+				});
+			}
 		}
-		if (n.changeKind && n.changeKind !== 'unchanged') {
-			return true;
-		}
-		return false;
 	}
 
-	const semanticNodes = nodes.filter(function (n) { return isSemanticPriority(n); });
-	const otherNodes = nodes.filter(function (n) { return !isSemanticPriority(n); });
+	// 2. Collect Route Badge Candidates
+	const routeBadgeCandidates: UnifiedLabelCandidate[] = [];
+	const rawRouteBadges = options?.routeBadgeCandidates;
+	if (rawRouteBadges && rawRouteBadges.length > 0 && zoom >= 0.38) {
+		const badgeW = Math.max(16, Math.round(18 / Math.max(0.38, zoom)));
+		const badgeH = Math.max(10, Math.round(12 / Math.max(0.38, zoom)));
 
-	// 1. Community guide landmark labels reserve shared occupancy first
-	const guideLabels = computeVisibleCommunityGuideLabels(guides, zoom, placedBoxes, {
-		maxLabels: options?.maxGuideLabels,
-		measureWidth,
-		visibleNodeIds: options?.visibleNodeIds,
-		representedGuideIds: options?.representedGuideIds,
-		overlapCount,
-	});
+		for (let i = 0; i < rawRouteBadges.length; i++) {
+			const cand = rawRouteBadges[i];
+			const isChanged = cand.changedEdgeCount > 0;
+			const curBox: LabelBox = {
+				x: cand.x - badgeW / 2,
+				y: cand.y - badgeH / 2,
+				w: badgeW,
+				h: badgeH,
+			};
 
-	// 2. High semantic priority file nodes (searched, active editor, changed)
-	// These claim occupancy BEFORE route badges, so route badges yield to search results & active files!
-	const semanticNodeLabels = computeVisibleLabels(semanticNodes, zoom, {
-		selectedNodeId: options?.selectedNodeId,
-		hoveredNodeId: options?.hoveredNodeId,
-		currentFileEntityId: options?.currentFileEntityId,
-		filterQuery: options?.filterQuery,
-		maxLabels: options?.maxNodeLabels,
-		measureWidth,
-		occupancySeed: placedBoxes,
-		overlapCount,
-	});
-	for (let i = 0; i < semanticNodeLabels.length; i++) {
-		placedBoxes.push(semanticNodeLabels[i].box);
+			routeBadgeCandidates.push({
+				kind: 'routeBadge',
+				rank: isChanged ? 400 : 200,
+				secondaryRank: cand.edgeCount,
+				tiebreaker: cand.id,
+				box: curBox,
+				item: {
+					id: cand.id,
+					text: cand.text,
+					x: cand.x,
+					y: cand.y,
+					isChanged,
+					box: curBox,
+					font: '',
+				},
+				forceEmphasis: false,
+			});
+		}
 	}
 
-	// 3. Aggregate route badges (yield to guide labels and high-priority file nodes)
-	const routeBadges = computeVisibleRouteBadges(options?.routeBadgeCandidates || [], zoom, placedBoxes, {
-		overlapCount,
+	// 3. Collect Node Label Candidates
+	const nodeCandidates: UnifiedLabelCandidate[] = [];
+	if (nodes && nodes.length > 0) {
+		const family = (typeof document !== 'undefined' && document.body && typeof getComputedStyle === 'function')
+			? (getComputedStyle(document.body).fontFamily || 'sans-serif')
+			: 'sans-serif';
+
+		const safeZoom = Math.max(0.001, Number.isFinite(zoom) ? zoom : 1);
+		const fontNormal = `${Math.round(10 / safeZoom)}px ${family}`;
+		const fontEmphasis = `bold ${Math.round(11 / safeZoom)}px ${family}`;
+		const measureWidthFn = measureWidth || defaultMeasureWidth;
+
+		for (let i = 0; i < nodes.length; i++) {
+			const node = nodes[i];
+			const isSelected = Boolean(options?.selectedNodeId && node.entityId === options.selectedNodeId);
+			const isHovered = Boolean(options?.hoveredNodeId && node.entityId === options.hoveredNodeId);
+			const isCurrentFile = Boolean(currentFileId && node.entityId === currentFileId);
+			const isQueryMatch = Boolean(filterQuery && (
+				(node.label && node.label.toLowerCase().includes(filterQuery)) ||
+				(node.path && node.path.toLowerCase().includes(filterQuery))
+			));
+			const isChanged = Boolean(node.changeKind && node.changeKind !== 'unchanged');
+			const isEntry = Boolean(node.meta?.isEntry);
+
+			if (zoom < 0.25) {
+				if (!isSelected && !isHovered && !isCurrentFile && !isQueryMatch && !isChanged) {
+					continue;
+				}
+			} else if (zoom < 0.45) {
+				const degree = node.degree || 0;
+				if (!isSelected && !isHovered && !isCurrentFile && !isQueryMatch && !isChanged && degree < 2) {
+					continue;
+				}
+			}
+
+			let rank = 100;
+			if (isSelected) {
+				rank = 1000;
+			} else if (isHovered) {
+				rank = 900;
+			} else if (isCurrentFile) {
+				rank = 800;
+			} else if (isQueryMatch) {
+				rank = 700;
+			} else if (isChanged) {
+				rank = 450;
+			} else if (isEntry) {
+				rank = 150;
+			}
+
+			const isEmphasis = isSelected || isHovered;
+			const font = isEmphasis ? fontEmphasis : fontNormal;
+			const text = node.label || (node.path ? node.path.split('/').pop() || node.path : node.entityId);
+			const textWidth = measureWidthFn(text, font);
+			const r = isChanged ? 7.0 : 4.0;
+			const labelY = (node.y || 0) + r + 10;
+			const boxTop = labelY - 7;
+			const boxHeight = 14;
+			const boxWidth = textWidth + 6;
+
+			const box: LabelBox = {
+				x: (node.x || 0) - boxWidth / 2,
+				y: boxTop,
+				w: boxWidth,
+				h: boxHeight,
+			};
+
+			nodeCandidates.push({
+				kind: 'node',
+				rank,
+				secondaryRank: (isEntry ? 50 : 0) + (node.degree || 0),
+				tiebreaker: node.entityId,
+				box,
+				item: {
+					entityId: node.entityId,
+					text,
+					x: node.x || 0,
+					y: labelY,
+					box,
+					font,
+					isSelected,
+					isHovered,
+					isChanged,
+				},
+				forceEmphasis: isEmphasis,
+			});
+		}
+	}
+
+	// 4. Unified Priority Ranking
+	const allCandidates: UnifiedLabelCandidate[] = [
+		...guideCandidates,
+		...routeBadgeCandidates,
+		...nodeCandidates,
+	];
+
+	allCandidates.sort(function (a, b) {
+		if (b.rank !== a.rank) {
+			return b.rank - a.rank;
+		}
+		if (b.secondaryRank !== a.secondaryRank) {
+			return b.secondaryRank - a.secondaryRank;
+		}
+		return a.tiebreaker.localeCompare(b.tiebreaker);
 	});
 
-	const remainingNodeLabels = computeVisibleLabels(otherNodes, zoom, {
-		selectedNodeId: options?.selectedNodeId,
-		hoveredNodeId: options?.hoveredNodeId,
-		currentFileEntityId: options?.currentFileEntityId,
-		filterQuery: options?.filterQuery,
-		maxLabels: options?.maxNodeLabels ? Math.max(0, options.maxNodeLabels - semanticNodeLabels.length) : undefined,
-		measureWidth,
-		occupancySeed: placedBoxes,
-		overlapCount,
-	});
+	// 5. Shared Single-Pass Occupancy Placement
+	const placedBoxes: LabelBox[] = [];
+	const nodeLabels: VisibleLabelItem[] = [];
+	const guideLabels: CommunityGuideLabelItem[] = [];
+	const routeBadges: RouteBadgeLabelItem[] = [];
+	let labelCollisionCullCount = 0;
 
-	const nodeLabels = [...semanticNodeLabels, ...remainingNodeLabels];
+	const maxNodeLabels = options?.maxNodeLabels;
+	const maxGuideLabels = options?.maxGuideLabels ?? (zoom < 0.35 ? 8 : (zoom < 0.65 ? 14 : 24));
+	const maxBadges = 32;
+
+	for (let i = 0; i < allCandidates.length; i++) {
+		const cand = allCandidates[i];
+
+		if (cand.kind === 'node' && maxNodeLabels && nodeLabels.length >= maxNodeLabels && !cand.forceEmphasis) {
+			labelCollisionCullCount++;
+			continue;
+		}
+		if (cand.kind === 'guide' && guideLabels.length >= maxGuideLabels) {
+			labelCollisionCullCount++;
+			continue;
+		}
+		if (cand.kind === 'routeBadge' && routeBadges.length >= maxBadges) {
+			labelCollisionCullCount++;
+			continue;
+		}
+
+		if (!cand.forceEmphasis) {
+			let collision = false;
+			for (let b = 0; b < placedBoxes.length; b++) {
+				if (boxesOverlap(cand.box, placedBoxes[b])) {
+					collision = true;
+					break;
+				}
+			}
+			if (collision) {
+				labelCollisionCullCount++;
+				continue;
+			}
+		}
+
+		placedBoxes.push(cand.box);
+		if (cand.kind === 'node') {
+			nodeLabels.push(cand.item);
+		} else if (cand.kind === 'guide') {
+			guideLabels.push(cand.item);
+		} else if (cand.kind === 'routeBadge') {
+			routeBadges.push(cand.item);
+		}
+	}
 
 	const renderedBoxes: LabelBox[] = [];
 	for (let gi = 0; gi < guideLabels.length; gi++) {
@@ -568,12 +817,13 @@ export function computeTemporalLabelLayout(
 		renderedBoxes.push(nodeLabels[ni].box);
 	}
 	const renderedLabelOverlapCount = countRenderedLabelOverlaps(renderedBoxes);
+
 	return {
 		nodeLabels,
 		guideLabels,
 		routeBadges,
-		labelCollisionCullCount: overlapCount.count,
+		labelCollisionCullCount,
 		renderedLabelOverlapCount,
-		compositeLabelOverlapCount: overlapCount.count + renderedLabelOverlapCount,
+		compositeLabelOverlapCount: labelCollisionCullCount + renderedLabelOverlapCount,
 	};
 }

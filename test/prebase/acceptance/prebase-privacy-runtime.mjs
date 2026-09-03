@@ -121,6 +121,9 @@ async function run() {
 		await dismissStartup(launched.page);
 		await waitForWorkbenchDriver(launched.page);
 		observer = await attachCdpNetworkObserver(launched.page);
+		// Prove CDP observer captures network traffic and resolves hostname identity against expected loopback
+		await launched.page.evaluate(() => fetch('http://localhost:54321/ping').catch(() => null));
+		await launched.page.waitForTimeout(400);
 		const observe = (phase) => {
 			const tree = processTree(launched.info.pid);
 			const sockets = sampleProcessTreeSockets(tree.map(row => row.pid));

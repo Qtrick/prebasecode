@@ -367,6 +367,102 @@ async function run() {
 	}
 	results.tests.push(test5b);
 
+	// Test 5c: Normal hover peek -> deliberate click -> interactive -> escape
+	const test5c = { name: 'hover-peek-interactive', ok: true, details: {} };
+	try {
+		native.setPresentation({
+			visible: true,
+			pinned: false,
+			reducedMotion: false,
+			display: 'builtin',
+		});
+		native.setSnapshot({
+			revision: 101,
+			sessionId: 'test-session-normal',
+			sessionResource: 'chat-session-resource-normal',
+			status: 'working',
+			currentActivity: 'Compiling project targets',
+			recentActions: [],
+			latestShortMessage: 'Compiling 42 files...',
+		});
+		await sleep(200);
+
+		const compactDiag = native.getDiagnostics();
+		test5c.details.compactDiag = {
+			state: compactDiag.activePresentationState,
+			localMonitor: compactDiag.localMonitorInstalled,
+		};
+		if (compactDiag.activePresentationState !== 'compact') {
+			throw new Error(`Expected compact state initially, got ${compactDiag.activePresentationState}`);
+		}
+		if (compactDiag.localMonitorInstalled !== false) {
+			throw new Error('Compact mode must NOT install local key monitor');
+		}
+
+		// Simulate hover dwell -> peek
+		const peekSimResult = native.simulateAction('peek');
+		await sleep(150);
+		const hoverPeekDiag = native.getDiagnostics();
+		test5c.details.hoverPeekDiag = {
+			peekSimResult,
+			state: hoverPeekDiag.activePresentationState,
+			localMonitor: hoverPeekDiag.localMonitorInstalled,
+			requestedHeight: hoverPeekDiag.requestedFrame?.height,
+		};
+		if (hoverPeekDiag.activePresentationState !== 'peek') {
+			throw new Error(`Expected peek state on hover, got ${hoverPeekDiag.activePresentationState}`);
+		}
+		if (hoverPeekDiag.localMonitorInstalled !== false) {
+			throw new Error('Peek mode must NOT install local key monitor');
+		}
+		const safeTop = hoverPeekDiag.safeAreaTop || 32;
+		const bandH = Math.max(safeTop, 34);
+		if (hoverPeekDiag.requestedFrame && hoverPeekDiag.requestedFrame.height > bandH + 56 + 10) {
+			throw new Error(`Peek height (${hoverPeekDiag.requestedFrame.height}) exceeded glanceable peek ceiling (${bandH + 56 + 10})`);
+		}
+
+		// Click to transition from peek to interactive
+		const clickResult = native.simulateAction('click');
+		await sleep(300);
+		const interactiveDiag = native.getDiagnostics();
+		test5c.details.interactiveDiag = {
+			clickResult,
+			state: interactiveDiag.activePresentationState,
+			localMonitor: interactiveDiag.localMonitorInstalled,
+			inputControl: interactiveDiag.activeInputControl,
+		};
+		if (interactiveDiag.activePresentationState !== 'interactive') {
+			throw new Error(`Expected interactive state after click, got ${interactiveDiag.activePresentationState}`);
+		}
+		if (interactiveDiag.localMonitorInstalled !== true) {
+			throw new Error('Interactive mode MUST install local key monitor for Escape dismiss');
+		}
+		if (interactiveDiag.activeInputControl !== 'input-ready') {
+			throw new Error(`Expected input-ready control in interactive mode, got ${interactiveDiag.activeInputControl}`);
+		}
+
+		// Test Escape dismissal
+		const escResult = native.simulateAction('escape');
+		await sleep(150);
+		const collapsedDiag = native.getDiagnostics();
+		test5c.details.dismissDiag = {
+			escResult,
+			state: collapsedDiag.activePresentationState,
+			localMonitor: collapsedDiag.localMonitorInstalled,
+		};
+		if (collapsedDiag.activePresentationState !== 'compact') {
+			throw new Error(`Expected compact state after escape, got ${collapsedDiag.activePresentationState}`);
+		}
+		if (collapsedDiag.localMonitorInstalled !== false) {
+			throw new Error('Collapsed mode must NOT keep local key monitor');
+		}
+	} catch (err) {
+		test5c.ok = false;
+		test5c.error = err.message;
+		results.failures.push(`hover-peek-interactive: ${err.message}`);
+	}
+	results.tests.push(test5c);
+
 	// Clean up native panel
 	native.dispose();
 

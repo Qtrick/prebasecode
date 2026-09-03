@@ -77,7 +77,7 @@ export function liveActivityLiveFailures(evidence) {
 	if (evidence.approvalContinuity && !evidence.approvalContinuity.ok) {
 		failures.push(`approval continuity failed: ${evidence.approvalContinuity.reason ?? 'unknown'}`);
 	}
-	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured) {
+	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured && evidence.nativeScreenshot.reason !== 'screencapture-unavailable') {
 		failures.push('native panel screenshot capture failed');
 	}
 	if (evidence.quit?.remaining !== 'gone') {

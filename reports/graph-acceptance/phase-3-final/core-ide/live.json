@@ -3,14 +3,31 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "core-ide",
-  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
-  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "generatedAt": "2026-08-31T18:31:48.676Z",
+  "sourceHead": "2b34fc53c0701417b7a557489fa221d4ade0a863",
+  "sourceFingerprint": "ccc0ea30c4b2a91a1700d576fe100589229c9180a4370be441896742ad6cb140",
+  "productFingerprint": "ccc0ea30c4b2a91a1700d576fe100589229c9180a4370be441896742ad6cb140",
+  "generatedAt": "2026-09-03T03:15:36.883Z",
   "producerId": "core-ide",
-  "producerFingerprint": "3cc630b83ea66c7bbc817a1eb70418fc5fca4d8e3d165f81585b803aa13118f1",
-  "prebasePid": 82777,
+  "producerFingerprint": "eb16c17b9ded217ab69d0b4a5d472202ccc88378a3ced2bde0b41cba8ad9c34b",
+  "prebasePid": 54744,
   "c3_folderOpen": true,
+  "p2": {
+    "offlineChoicePresented": true,
+    "offlineChoiceActivated": true,
+    "onboardingPresented": true,
+    "onboardingCompleted": true,
+    "onboardingPersisted": true,
+    "onboardingReopened": true,
+    "onboardingReturnSessionCorrect": true,
+    "onboardingDismissed": true,
+    "onboardingVisible": false
+  },
+  "offlineChoicePresented": true,
+  "offlineChoiceActivated": true,
+  "onboardingResolved": true,
+  "onboardingPersisted": true,
+  "onboardingReopened": true,
+  "onboardingReturnSessionCorrect": true,
   "p2_offline": true,
   "e1_saveUndo": true,
   "e2_search": true,
@@ -27,48 +44,101 @@
     "frameFound": true,
     "metricName": "__prebaseGraphRenderMetrics",
     "metrics": {
-      "nodesDrawn": 5,
-      "receivedNodeCount": 5,
+      "nodesDrawn": 6,
+      "receivedNodeCount": 6,
       "selectedNodeId": "file:README.md",
       "networkLayoutMode": "organic",
       "networkIdleAutoRotate": true,
       "viewportWidth": 792,
-      "viewportHeight": 544,
+      "viewportHeight": 546,
       "projectedBounds": {
-        "minX": 323.99951283034045,
-        "minY": 81.42657820778749,
-        "maxX": 491.67479556623374,
-        "maxY": 419.3966345851833,
-        "width": 167.6752827358933,
-        "height": 337.9700563773958
+        "minX": 362.5929816029136,
+        "minY": 133.38280874311675,
+        "maxX": 538.386446562231,
+        "maxY": 439.54805332758383,
+        "width": 175.79346495931736,
+        "height": 306.1652445844671
       },
-      "screenUtilization": 0.13152950636731664,
-      "labelCount": 5,
+      "screenUtilization": 0.12446315072802278,
+      "labelCount": 6,
       "nodeHits": [
         {
           "id": "file:README.md",
-          "x": 323.99951283034045,
-          "y": 295.22829615971045
+          "x": 362.5929816029136,
+          "y": 352.0976051648679,
+          "worldX": -91.37444854924811,
+          "worldY": 48.33986789364344,
+          "worldZ": -7.509334694054482,
+          "world": {
+            "x": -91.37444854924811,
+            "y": 48.33986789364344,
+            "z": -7.509334694054482
+          }
+        },
+        {
+          "id": "file:src/debug.js",
+          "x": 533.5866079986874,
+          "y": 133.38280874311675,
+          "worldX": 41.622495540417106,
+          "worldY": -140.69137522343382,
+          "worldZ": -0.5412223341361161,
+          "world": {
+            "x": 41.622495540417106,
+            "y": -140.69137522343382,
+            "z": -0.5412223341361161
+          }
         },
         {
           "id": "file:src/errors.ts",
-          "x": 491.67479556623374,
-          "y": 324.384853405781
+          "x": 526.1361234459561,
+          "y": 368.11498982057617,
+          "worldX": 44.1202690543295,
+          "worldY": 57.88613070951509,
+          "worldZ": -17.976002656219446,
+          "world": {
+            "x": 44.1202690543295,
+            "y": 57.88613070951509,
+            "z": -17.976002656219446
+          }
         },
         {
           "id": "file:src/hello.ts",
-          "x": 432.03317555832575,
-          "y": 274.89352915053786
+          "x": 459.11986559541333,
+          "y": 318.3349010459958,
+          "worldX": -11.219001812948424,
+          "worldY": 26.348278961622707,
+          "worldZ": 10.123983948182932,
+          "world": {
+            "x": -11.219001812948424,
+            "y": 26.348278961622707,
+            "z": 10.123983948182932
+          }
         },
         {
           "id": "file:src/js-check.js",
-          "x": 469.2472742580369,
-          "y": 419.3966345851833
+          "x": 481.87385858143915,
+          "y": 439.54805332758383,
+          "worldX": 10.956983311472797,
+          "worldY": 147.6962237097981,
+          "worldZ": 4.479140089132048,
+          "world": {
+            "x": 10.956983311472797,
+            "y": 147.6962237097981,
+            "z": 4.479140089132048
+          }
         },
         {
           "id": "file:tsconfig.json",
-          "x": 483.8540552723057,
-          "y": 81.42657820778749
+          "x": 538.386446562231,
+          "y": 162.9284906788287,
+          "worldX": 47.47477650877518,
+          "worldY": -113.9122022551078,
+          "worldZ": 7.2575398618318046,
+          "world": {
+            "x": 47.47477650877518,
+            "y": -113.9122022551078,
+            "z": 7.2575398618318046
+          }
         }
       ]
     },
@@ -78,19 +148,35 @@
     "legacyRadialNormalized": true,
     "rotate": true,
     "drag": true,
+    "worldDrag": true,
+    "unselectedDragRotated": true,
+    "unselectedWorldInvariant": true,
+    "unselectedWorldDisplacement": 0,
+    "unselectedNodeSelectedFromDrag": false,
+    "backgroundDragRotated": true,
+    "shiftPan": true,
+    "pointerCaptureOnCanvas": true,
     "idleRotateArmed": true,
     "semanticZoom": true,
     "pick": true,
     "sphereVsClustered": true,
     "labelDensity": true,
-    "selectionLock": true
+    "selectionLock": true,
+    "unselectedNodeDragRotatedCamera": true,
+    "unselectedNodeStayedUnselected": true,
+    "unselectedNodeWorldPositionStable": true,
+    "selectedNodeDragMovedNode": true,
+    "selectedNodeDragCameraStable": true,
+    "backgroundDragRotatedCamera": true,
+    "shiftPanChangedViewport": true,
+    "noStuckPointerCapture": true
   },
   "themes": {
     "light": {
       "query": "PreBase Light",
       "settingsId": "PreBase Light",
-      "applied": true,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe vs vscode-theme-defaults-themes-prebase_light-json",
+      "applied": false,
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe vs-dark vscode-theme-defaults-themes-prebase_dark-json",
       "colorTheme": "PreBase Light",
       "colorThemeType": "light",
       "pickerVisible": true,
@@ -119,8 +205,8 @@
     "dark": {
       "query": "PreBase Dark",
       "settingsId": "PreBase Dark",
-      "applied": false,
-      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe hc-light vscode-theme-defaults-themes-hc_light-json border",
+      "applied": true,
+      "workbenchClass": "agent-status-enabled unified-agents-bar file-icons-enabled monaco-enable-motion monaco-workbench mac chromium panel-position-bottom panel-alignment-center macos-tahoe vs-dark vscode-theme-defaults-themes-prebase_dark-json",
       "colorTheme": "PreBase Dark",
       "colorThemeType": "dark",
       "pickerVisible": true,
@@ -157,10 +243,10 @@
     "prebaseForcesAccessibilityOff": false
   },
   "quit": {
-    "before": "82777     1  13.2 227072 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "54744     1  14.4 219008 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 669,
+    "latencyMs": 841,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

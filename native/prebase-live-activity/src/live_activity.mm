@@ -400,7 +400,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)mouseDown:(NSEvent *)event {
-	if (self.peekOnly) {
+	if (self.peekOnly || self.controller.attentionPeek) {
 		[self.controller expandInteractive];
 		return;
 	}
@@ -825,7 +825,7 @@ static NSString *JSString(Napi::Value value) {
 	if (!expanded) {
 		return bandH;
 	}
-	if (self.attentionPeek && !self.pinned) {
+	if ((self.content.peekOnly || self.attentionPeek) && !self.pinned) {
 		CGFloat h = bandH + 8;
 		if (self.content.pendingTitle.length) {
 			h += 20;
@@ -859,7 +859,7 @@ static NSString *JSString(Napi::Value value) {
 
 	BOOL hasOptions = ([self.pendingKind isEqualToString:@"question"] && self.pendingOptions.count > 0);
 	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
-	BOOL showInput = self.pinned;
+	BOOL showInput = (self.content.expanded || self.pinned) && !self.content.peekOnly;
 
 	if (hasOptions) {
 		h += 30; // Options row
@@ -952,24 +952,23 @@ static NSString *JSString(Napi::Value value) {
 		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
 		[self layoutControls:win];
 	} else {
-		// Delay control layout until frame animation completes to prevent visible popping
+		[self layoutControls:win];
 		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
 			context.duration = animDuration;
 			context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
 			context.allowsImplicitAnimation = YES;
 			[[self.panel animator] setFrame:win display:YES];
 		} completionHandler:^{
-			// Frame settled - now layout controls at final geometry
+			// Frame settled - ensure final control layout
 			[self layoutControls:win];
 		}];
 		self.content.targetExpanded = expanded;
 		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES];
-		// Don't call layoutControls here - wait for animation completion
 	}
 }
 
 - (void)layoutControls:(NSRect)win {
-	BOOL showInput = self.pinned;
+	BOOL showInput = (self.content.expanded || self.pinned) && !self.content.peekOnly;
 	BOOL approval = [self.pendingKind isEqualToString:@"approval"];
 	BOOL question = [self.pendingKind isEqualToString:@"question"];
 	BOOL showAttention = (self.content.expanded || self.pinned) && !self.content.peekOnly;
@@ -1077,14 +1076,6 @@ static NSString *JSString(Napi::Value value) {
 			return;
 		}
 		NSPoint p = [NSEvent mouseLocation];
-		NSScreen *screen = [strong targetScreen];
-		if (screen && !NSPointInRect(p, screen.frame)) {
-			if (strong.lastInside) {
-				strong.lastInside = NO;
-				[strong pointerInside:NO];
-			}
-			return;
-		}
 		BOOL inside = NSPointInRect(p, strong.collapsedHit);
 		if (inside != strong.lastInside) {
 			strong.lastInside = inside;
@@ -1474,10 +1465,10 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"activePresentationState"] = self.pinned
 		? @"pinned"
 		: (self.content.expanded
-			? (self.attentionPeek ? @"attentionPeek" : (self.content.attention ? @"attention" : @"interactive"))
+			? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.content.attention ? @"attention" : @"interactive")))
 			: (self.content.attention ? @"attentionCompact" : @"compact"));
 	dict[@"targetPresentationState"] = self.content.targetExpanded
-		? (self.attentionPeek ? @"attentionPeek" : (self.content.attention ? @"attention" : @"interactive"))
+		? (self.attentionPeek ? @"attentionPeek" : (self.content.peekOnly ? @"peek" : (self.content.attention ? @"attention" : @"interactive")))
 		: (self.content.attention ? @"attentionCompact" : @"compact");
 	dict[@"hoverDwellMs"] = @(180);
 	dict[@"exitGraceMs"] = @(250);
@@ -1497,7 +1488,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateClickApprove {
-	if (self.approveButton.hidden) {
+	if (self.approveButton.hidden && (![self.pendingKind isEqualToString:@"approval"] || !self.interactionId.length)) {
 		return NO;
 	}
 	[self approve:self.approveButton];
@@ -1505,7 +1496,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateClickDeny {
-	if (self.denyButton.hidden) {
+	if (self.denyButton.hidden && (![self.pendingKind isEqualToString:@"approval"] || !self.interactionId.length)) {
 		return NO;
 	}
 	[self deny:self.denyButton];
@@ -1810,13 +1801,13 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 	std::string action = info[0].As<Napi::String>().Utf8Value();
 	PrebaseLiveActivityController *controller = EnsureController();
 	if (action == "click") {
-		if (controller.content.peekOnly) {
+		if (controller.content.peekOnly || controller.attentionPeek) {
 			[controller expandInteractive];
 			return Napi::Boolean::New(env, true);
 		}
 		return Napi::Boolean::New(env, false);
 	}
-	if (action == "peek") {
+	if (action == "peek" || action == "hover") {
 		[controller expandPeek];
 		return Napi::Boolean::New(env, true);
 	}

@@ -105,7 +105,20 @@ export function computeLiveActivityExpandedHeight(args: {
 	pendingKind?: 'approval' | 'question' | string;
 	hasOptions?: boolean;
 	pinned?: boolean;
+	peekOnly?: boolean;
 }): number {
+	if (args.peekOnly && !args.pinned) {
+		let h = args.bandHeight + 8;
+		if (args.hasPendingTitle) {
+			h += 20;
+		} else if (args.hasActivity) {
+			h += 18;
+		} else {
+			h += 16;
+		}
+		h += 8;
+		return Math.min(args.bandHeight + 56, h);
+	}
 	let h = args.bandHeight + 8; // Top padding below notch band
 	h += 22; // Header
 	if (args.hasActivity) {
@@ -123,7 +136,7 @@ export function computeLiveActivityExpandedHeight(args: {
 	h += 10; // Spacing before controls
 	const hasOptions = args.pendingKind === 'question' && Boolean(args.hasOptions);
 	const hasApproval = args.pendingKind === 'approval';
-	const showInput = Boolean(args.pinned);
+	const showInput = !args.peekOnly;
 
 	if (hasOptions) {
 		h += 30; // Options row
