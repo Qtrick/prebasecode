@@ -1,6 +1,6 @@
 {
   "phase": "3-final",
-  "sourceHead": "0fc0b5fafffea070a814e26afe5df8f8e0784470",
+  "sourceHead": "77294e3a5896a8c1fa792c278d8a336a97348db9",
   "sourceFingerprint": "4d764de343295f064a3d73fd611084dc54b08053c6e1341864fadcdae3413540",
   "productFingerprint": "4d764de343295f064a3d73fd611084dc54b08053c6e1341864fadcdae3413540",
   "producerFingerprints": {
@@ -26,10 +26,10 @@
     "tauri-restart-soak": "db99da267ac5794424d2bbbb0f1423e22071c9abb3dc3295f0b810ce883aa049",
     "idle-soak": "86a66853f429d0500550d1e15332c16d7a25ffaffe0935974027cd7c800d363f",
     "active-soak": "1215664e4bf2986e5a1a67454aeacaa29b5e9ec92c3e4771d58dc3f2bb6e0881",
-    "assurance": "fdfd18f6b97bc0c034a3a6022406042f1e39547870e9e41e6d3faedfc4935031"
+    "assurance": "2bd9372fd0e0909f840272609cb2f97135c4d9ba94814e2187b0f9a82d25bf1d"
   },
-  "validationRunId": "2026-09-03T08-53-24-958Z",
-  "generatedAt": "2026-09-03T08:53:37.796Z",
+  "validationRunId": "2026-09-03T08-55-53-200Z",
+  "generatedAt": "2026-09-03T08:55:55.462Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -43,25 +43,26 @@
     {
       "id": "magnus-live-activity",
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)"
+    },
+    {
+      "id": "hybrid-web-smoke",
+      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)"
     }
   ],
   "failures": [
     "electron-product-path: evidence producer fingerprint does not match current producer inputs",
     "tauri-product-path: evidence producer fingerprint does not match current producer inputs",
     "electron-native-cases: evidence producer fingerprint does not match current producer inputs",
-    "runtime-preview: evidence producer fingerprint does not match current producer inputs",
+    "runtime-preview: Runtime Preview target did not open; Runtime Preview did not detect the dev script; Runtime Preview server did not start; Runtime Preview did not connect to the fixture; Runtime Preview inspection did not see fixture content; Runtime Preview did not restart cleanly; Runtime Preview stop retained the server port; Runtime Preview was not active for quit-under-load",
     "temporal-large: evidence producer fingerprint does not match current producer inputs",
     "temporal-canonical-scale: evidence producer fingerprint does not match current producer inputs",
     "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
     "magnus-tauri-tools: evidence producer fingerprint does not match current producer inputs",
-    "magnus-guidance-smoke: evidence producer fingerprint does not match current producer inputs",
-    "hybrid-web-smoke: local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
     "load-quit: evidence producer fingerprint does not match current producer inputs",
     "idle-soak: evidence producer fingerprint does not match current producer inputs",
     "lifecycle-cycles: evidence producer fingerprint does not match current producer inputs",
     "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
     "tauri-restart-soak: evidence producer fingerprint does not match current producer inputs",
-    "parser-benchmark: evidence producer fingerprint does not match current producer inputs",
     "active-soak: evidence producer fingerprint does not match current producer inputs",
     "assurance: evidence producer fingerprint does not match current producer inputs"
   ],
@@ -103,12 +104,12 @@
       "id": "runtime-preview",
       "path": "runtime-preview/live.json",
       "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "reason": "Runtime Preview target did not open; Runtime Preview did not detect the dev script; Runtime Preview server did not start; Runtime Preview did not connect to the fixture; Runtime Preview inspection did not see fixture content; Runtime Preview did not restart cleanly; Runtime Preview stop retained the server port; Runtime Preview was not active for quit-under-load",
       "quit": {
-        "before": "90153     1   0.8 213840 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "126805       1 23.8 280344 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 966,
+        "latencyMs": 365,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -203,13 +204,12 @@
     {
       "id": "magnus-guidance-smoke",
       "path": "magnus/project-guidance-smoke.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "80167     1  14.9 278032 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "126441       1 29.7 281660 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 552,
+        "latencyMs": 338,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -221,23 +221,24 @@
       "path": "magnus/live-activity.json",
       "ok": true,
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "externalSkip": true,
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 315,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log",
-        "logTail": "",
-        "harnessPid": 125196,
-        "timeoutMs": 120000,
-        "leftoverPids": []
-      }
+      "externalSkip": true
     },
     {
       "id": "hybrid-web-smoke",
       "path": "magnus/hybrid-web-smoke.json",
-      "ok": false,
-      "reason": "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve"
+      "ok": true,
+      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)",
+      "externalSkip": true,
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 176,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/hybrid-web-smoke.log",
+        "logTail": "",
+        "harnessPid": 127373,
+        "timeoutMs": 180000,
+        "leftoverPids": []
+      }
     },
     {
       "id": "load-quit",
@@ -337,8 +338,7 @@
     {
       "id": "parser-benchmark",
       "path": "performance/parser-batch.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs"
+      "ok": true
     },
     {
       "id": "active-soak",
@@ -363,8 +363,6 @@
     "reason": "evidence producer fingerprint does not match current producer inputs"
   },
   "plannedProducers": [
-    "parser-benchmark",
-    "magnus-guidance-smoke",
     "magnus-live-activity",
     "runtime-preview",
     "temporal-large",
