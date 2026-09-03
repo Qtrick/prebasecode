@@ -25,7 +25,7 @@ import { ACTIVE_SOAK_FINAL_MIN_DURATION_MS, activeSoakEvidenceTarget, activeSoak
 import { summarizeCpuProfile } from './prebase-renderer-cpu-diag.mjs';
 import { loadQuitFailures } from './prebase-load-quit-live.mjs';
 import { findGraphFrame, formatPhase3LockBlockMessage, recoverHungWorkbenchPage, waitForWorkbenchDriver, workbenchCommandWithTimeout, classifyProcessRole, redactCommandLine, p2OfflineOnboardingProven } from './workbenchHarness.mjs';
-import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
+import { PHASE3_PRODUCERS, PHASE3_REQUIRED_EVIDENCE, activeSoakProducerTimeoutMs, classifyRequiredEvidence, hybridFirecrawlExternalSkip, liveActivityMacExternalSkip, LIVE_ACTIVITY_MAC_EXTERNAL_REASON, producerForArtifact, scenarioOk } from './prebase-phase3-final-gate.mjs';
 import { temporalAcceptanceFailures } from '../../../graphs/scripts/acceptance/temporal-live.mjs';
 import { magnusStreamFailures } from './prebase-magnus-stream-live.mjs';
 import { liveActivityLiveFailures } from './prebase-magnus-live-activity-live.mjs';
@@ -2091,4 +2091,36 @@ test('liveActivityLiveFailures validates factual native diagnostics and handles 
 		nativeDiagnostics: { panelCreated: true, panelVisible: true, panelFrame: { x: 0, y: 0, width: 0, height: 0 } },
 	};
 	assert.ok(liveActivityLiveFailures(invalidFrame).some(f => /frame invalid/.test(f)));
+
+	const blurInvisible = {
+		...validDarwin,
+		mode: 'alwaysWorking',
+		blurredDiagnostics: { visible: false, status: 'working' },
+	};
+	assert.ok(liveActivityLiveFailures(blurInvisible).some(f => /remain visible after blur/.test(f)));
+
+	const blurVisible = {
+		...validDarwin,
+		mode: 'alwaysWorking',
+		blurredDiagnostics: { visible: true, status: 'working' },
+	};
+	assert.deepEqual(liveActivityLiveFailures(blurVisible), []);
+});
+
+test('liveActivityMacExternalSkip mirrors hybrid EXTERNAL honesty for non-darwin', () => {
+	const identity = { sourceFingerprint: 'fp-live' };
+	const linuxSkip = {
+		platform: 'linux',
+		skipped: true,
+		environmentSkip: true,
+		sourceFingerprint: 'fp-live',
+		ok: false,
+	};
+	assert.equal(liveActivityMacExternalSkip(linuxSkip, identity, { darwin: false }), true);
+	assert.equal(liveActivityMacExternalSkip(linuxSkip, identity, { darwin: true }), false, 'darwin host must not EXTERNAL-skip');
+	assert.equal(liveActivityMacExternalSkip({ ...linuxSkip, skipped: false, environmentSkip: false }, identity, { darwin: false }), false);
+	assert.equal(liveActivityMacExternalSkip({ ...linuxSkip, platform: 'darwin' }, identity, { darwin: false }), false);
+	assert.equal(liveActivityMacExternalSkip({ ...linuxSkip, sourceFingerprint: 'other' }, identity, { darwin: false }), false);
+	assert.equal(liveActivityMacExternalSkip({ missing: true }, identity, { darwin: false }), false);
+	assert.match(LIVE_ACTIVITY_MAC_EXTERNAL_REASON, /macOS/);
 });

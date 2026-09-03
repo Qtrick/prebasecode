@@ -387,6 +387,22 @@ suite('Magnus Live Activity projection', () => {
 		assert.strictEqual(canonicalizeLiveActivityPanelState('collapsed'), 'compact');
 	});
 
+	test('sticky Escape keeps attention compact across snapshot republish until Interactive', () => {
+		const attention = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'a', title: 'Approve', message: 'Confirm delete' },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: false, pinned: false, snapshot: attention, now: 0, userDismissedAttention: true,
+		}), 'compact');
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: true, pinned: false, snapshot: attention, now: 500, hoverSince: 0, openDelayMs: 150, userDismissedAttention: true,
+		}), 'compact');
+		assert.strictEqual(resolveLiveActivityPanelState({
+			visible: true, hovering: false, pinned: true, snapshot: attention, now: 0, userDismissedAttention: true,
+		}), 'attentionInteractive');
+	});
+
 	test('attention matrix: compact/peek → attentionPeek; never peek/compact while attention is active', () => {
 		const attention = buildMagnusLiveActivitySnapshot(session({
 			needsInput: true,
@@ -2030,6 +2046,13 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 		const withActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true });
 		assert.strictEqual(withActivity, minimal + 18);
+
+		const peekTitle = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingTitle: true, hasPendingMessage: true, hasActivity: true });
+		const peekActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasActivity: true, hasPendingMessage: true });
+		const peekFallback = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingMessage: true });
+		assert.strictEqual(peekTitle, 34 + 8 + 20 + 8);
+		assert.strictEqual(peekActivity, 34 + 8 + 18 + 8);
+		assert.strictEqual(peekFallback, 34 + 8 + 16 + 8, 'pendingMessage alone must not inflate peek height');
 
 		const withActions = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true, actionsCount: 3 });
 		assert.strictEqual(withActions, withActivity + 45);

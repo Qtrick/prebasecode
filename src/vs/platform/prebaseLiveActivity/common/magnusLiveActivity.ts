@@ -129,9 +129,13 @@ export function computeLiveActivityExpandedHeight(args: {
 	peekOnly?: boolean;
 }): number {
 	if (args.peekOnly && !args.pinned) {
+		// Match native computeTargetContentHeight peek path: title → activity → fallback.
+		// Do not size peek from pendingMessage alone (body text is truncated into the title/activity line).
 		let h = args.bandHeight + 8;
-		if (args.hasPendingTitle || args.hasPendingMessage || args.hasActivity) {
+		if (args.hasPendingTitle) {
 			h += 20;
+		} else if (args.hasActivity) {
+			h += 18;
 		} else {
 			h += 16;
 		}
@@ -386,6 +390,11 @@ export function resolveLiveActivityPanelState(args: {
 	pinned: boolean;
 	/** True when the panel is already in Interactive (expanded, not peek-only). */
 	interactive?: boolean;
+	/**
+	 * Native Escape/collapse sticky-dismiss for attention: keep compact across
+	 * attention snapshot republish until the user clicks Interactive or attention clears.
+	 */
+	userDismissedAttention?: boolean;
 	snapshot: MagnusLiveActivitySnapshot;
 	now: number;
 	hoverSince?: number;
@@ -402,6 +411,10 @@ export function resolveLiveActivityPanelState(args: {
 		return attention ? 'attentionInteractive' : (args.pinned ? 'pinned' : 'interactive');
 	}
 	if (attention) {
+		// Mirror native setSnapshot: sticky Escape keeps compact until click, not republished peek.
+		if (args.userDismissedAttention) {
+			return 'compact';
+		}
 		return 'attentionPeek';
 	}
 	if (args.snapshot.status === 'failed') {

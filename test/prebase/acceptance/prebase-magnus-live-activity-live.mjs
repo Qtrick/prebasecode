@@ -54,8 +54,13 @@ export function liveActivityLiveFailures(evidence) {
 		}
 	}
 	if (evidence.blurredDiagnostics && evidence.mode === 'alwaysWorking' && evidence.diagnosticsAfterOpen?.sessionId) {
-		if (evidence.blurredDiagnostics.visible !== true && !['working', 'waiting', 'completed', 'attention', 'failed'].includes(evidence.blurredDiagnostics.status)) {
-			failures.push('Live Activity lost session state after blur in alwaysWorking mode');
+		// alwaysWorking must keep the panel visible while a session is active after blur.
+		// Do not OR with a stale "active-looking" status string — that greenwashes visibility loss.
+		if (evidence.blurredDiagnostics.visible !== true) {
+			failures.push('Live Activity must remain visible after blur in alwaysWorking mode while a session is active');
+		}
+		if (!['working', 'waiting', 'completed', 'attention', 'failed'].includes(evidence.blurredDiagnostics.status)) {
+			failures.push(`Live Activity lost session status after blur in alwaysWorking mode (got ${evidence.blurredDiagnostics.status})`);
 		}
 	}
 	if (!evidence.nativeDiagnostics) {

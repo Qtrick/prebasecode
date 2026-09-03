@@ -113,6 +113,27 @@ if (!contributionSource.includes('requireSmokeTestDriver') || !contributionSourc
 if (!native.includes('userDismissedAttention')) {
 	failures.push('native Escape/collapse must sticky-dismiss attention peek across snapshot republish');
 }
+{
+	const applyStart = native.indexOf('- (void)applySnapshotDict:(NSDictionary *)snapshot {');
+	const stickyBranch = applyStart >= 0
+		? native.slice(applyStart, applyStart + 4500)
+		: '';
+	if (!/else if \(!self\.pinned && self\.userDismissedAttention\)/.test(stickyBranch)
+		|| !/lasting compact until click/.test(stickyBranch)
+		|| !/self\.attentionPeek = NO/.test(stickyBranch)
+		|| !/self\.content\.peekOnly = NO/.test(stickyBranch)
+		|| !/self\.content\.expanded = NO/.test(stickyBranch)) {
+		failures.push('applySnapshotDict must keep sticky Escape attention dismiss as lasting compact (not republished peek)');
+	}
+	const peekBodyStart = native.indexOf('NSString *peekBody = nil;');
+	const peekBody = peekBodyStart >= 0 ? native.slice(peekBodyStart, peekBodyStart + 700) : '';
+	if (!/activityLabel\.length/.test(peekBody)
+		|| !/pendingMessage\.length/.test(peekBody)
+		|| !/pendingTitle\.length/.test(peekBody)
+		|| !/substringToIndex:93/.test(peekBody)) {
+		failures.push('peek body must prefer activity → pendingMessage → pendingTitle with truncated body');
+	}
+}
 if (!native.includes('Delay control layout until frame animation completes to prevent visible popping')) {
 	failures.push('animated layout must delay control layout until frame settles');
 }

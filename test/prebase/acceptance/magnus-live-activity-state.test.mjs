@@ -22,6 +22,7 @@ import assert from 'node:assert/strict';
 import {
 	buildMagnusLiveActivitySnapshot,
 	canonicalizeLiveActivityPanelState,
+	computeLiveActivityExpandedHeight,
 	resolveLiveActivityPanelState,
 	shouldShowLiveActivity,
 } from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
@@ -48,10 +49,23 @@ assert.equal(resolveLiveActivityPanelState({ visible: true, hovering: false, pin
 assert.equal(resolveLiveActivityPanelState({
 	visible: true, hovering: true, pinned: false, snapshot: attention, now: 500, hoverSince: 0, openDelayMs: 150,
 }), 'attentionPeek');
+assert.equal(resolveLiveActivityPanelState({
+	visible: true, hovering: false, pinned: false, snapshot: attention, now: 0, userDismissedAttention: true,
+}), 'compact', 'sticky Escape must keep attention compact across republish');
+assert.equal(resolveLiveActivityPanelState({
+	visible: true, hovering: false, pinned: true, snapshot: attention, now: 0, userDismissedAttention: true,
+}), 'attentionInteractive', 'pinned Interactive wins over sticky Escape');
 assert.equal(resolveLiveActivityPanelState({ visible: true, hovering: false, pinned: true, snapshot: attention, now: 0 }), 'attentionInteractive');
 assert.equal(resolveLiveActivityPanelState({
 	visible: true, hovering: false, pinned: false, interactive: true, snapshot: attention, now: 0,
 }), 'attentionInteractive');
+
+const peekTitle = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingTitle: true, hasPendingMessage: true, hasActivity: true });
+const peekActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasActivity: true, hasPendingMessage: true });
+const peekFallback = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingMessage: true });
+assert.equal(peekTitle, 34 + 8 + 20 + 8);
+assert.equal(peekActivity, 34 + 8 + 18 + 8);
+assert.equal(peekFallback, 34 + 8 + 16 + 8, 'pendingMessage alone must not inflate peek height');
 
 const working = buildMagnusLiveActivitySnapshot({ ...session, needsInput: false, pendingInteraction: undefined }, {
 	revision: 2, prebaseForeground: false, connected: true,
