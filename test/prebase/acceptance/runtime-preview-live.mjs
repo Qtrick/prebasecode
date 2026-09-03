@@ -14,6 +14,8 @@ import {
 	gracefulWorkbenchQuit,
 	portOwners,
 	waitFor,
+	waitForWorkbenchDriver,
+	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
 import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 const scriptPath = fileURLToPath(import.meta.url);
@@ -59,21 +61,6 @@ function processSnapshot(pid) {
 	} catch {
 		return 'gone';
 	}
-}
-
-async function executeWorkbenchCommand(page, commandId, visibleName) {
-	await page.keyboard.press('Escape').catch(() => undefined);
-	await page.keyboard.press('Shift+Meta+P');
-	const palette = page.locator('.quick-input-widget');
-	await palette.waitFor({ state: 'visible', timeout: 8_000 });
-	await palette.locator('input').fill(commandId);
-	const row = palette.locator('.monaco-list-row').filter({ hasText: visibleName }).first();
-	if (await row.waitFor({ state: 'visible', timeout: 4_000 }).then(() => true, () => false)) {
-		await row.click();
-	} else {
-		await page.keyboard.press('Enter');
-	}
-	await palette.waitFor({ state: 'hidden', timeout: 5_000 }).catch(() => undefined);
 }
 
 async function confirmStartIfNeeded(page) {
@@ -132,8 +119,10 @@ async function run() {
 		page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
 		if (!page) throw new Error('Workbench page not found');
 		await dismissStartup(page);
+		await waitForWorkbenchDriver(page);
 
-		await executeWorkbenchCommand(page, 'workbench.view.prebase.runtime', 'Runtime Preview');
+		// Prefer smoke-driver executeCommand — Shift+Meta+P is macOS-only and false-fails on Linux.
+		await workbenchCommandWithTimeout(page, 15_000, 'workbench.view.prebase.runtime').catch(() => undefined);
 		const runtimeView = page.locator('.prebase-runtime-view');
 		if (!await runtimeView.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
 			const activity = page.getByRole('tab', { name: /Runtime Preview/i }).or(page.getByRole('button', { name: /Runtime Preview/i }));
@@ -141,7 +130,7 @@ async function run() {
 				await activity.first().click();
 			}
 		}
-		await executeWorkbenchCommand(page, 'prebase.runtime.open', 'Open Runtime Preview');
+		await workbenchCommandWithTimeout(page, 15_000, 'prebase.runtime.open').catch(() => undefined);
 		await runtimeView.waitFor({ state: 'visible', timeout: 20_000 });
 		evidence.targetOpened = await page.getByRole('tab', { name: /Runtime Preview/ }).count() > 0 || await runtimeView.isVisible();
 
@@ -154,7 +143,7 @@ async function run() {
 		await confirmStartIfNeeded(page);
 		evidence.serverStarted = Boolean(await waitFor(() => portOwners(port).length > 0, 60_000));
 		if (!evidence.serverStarted) {
-			await executeWorkbenchCommand(page, 'prebase.runtime.start', 'Start Runtime Preview');
+			await workbenchCommandWithTimeout(page, 15_000, 'prebase.runtime.start').catch(() => undefined);
 			await confirmStartIfNeeded(page);
 			evidence.serverStarted = Boolean(await waitFor(() => portOwners(port).length > 0, 30_000));
 		}

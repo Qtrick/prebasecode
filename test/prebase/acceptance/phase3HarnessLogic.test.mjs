@@ -1325,6 +1325,17 @@ test('load-quit never awaits an untimed workbenchCommand and does not scan the f
 	assert.doesNotMatch(source, /runtime-preview-active', join\(repo, 'test\/prebase\/fixtures\/desktop-electron'\)/);
 });
 
+test('runtime-preview live uses smoke-driver commands, not macOS-only Command Palette chords', () => {
+	const source = readFileSync(join(acceptanceDir, 'runtime-preview-live.mjs'), 'utf8');
+	assert.match(source, /workbenchCommandWithTimeout/);
+	assert.match(source, /waitForWorkbenchDriver/);
+	assert.match(source, /prebase\.runtime\.open/);
+	assert.match(source, /workbench\.view\.prebase\.runtime/);
+	assert.doesNotMatch(source, /Shift\+Meta\+P/);
+	assert.doesNotMatch(source, /Shift\+Control\+P/);
+	assert.doesNotMatch(source, /quick-input-widget/);
+});
+
 test('smoke diagnostics and transport stay off the Command Palette and require the smoke-test driver', () => {
 	const contribution = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/prebase.contribution.ts'), 'utf8');
 	for (const id of ['prebase.test.getDiagnostics', 'prebase.test.installMagnusSmokeTransport', 'prebase.test.isSmokeDriver']) {
