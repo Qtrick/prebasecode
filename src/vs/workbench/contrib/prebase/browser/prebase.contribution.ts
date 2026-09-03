@@ -1109,6 +1109,7 @@ registerAction2(class extends Action2 {
 		const layoutService = accessor.get(IWorkbenchLayoutService);
 		const editorService = accessor.get(IEditorService);
 		const accountService = accessor.get(IPreBaseAccountService);
+		const workspaceContextService = accessor.get(IWorkspaceContextService);
 		let debugService: IDebugService | undefined;
 		try { debugService = accessor.get(IDebugService); } catch { /* optional */ }
 		let markerService: IMarkerService | undefined;
@@ -1236,7 +1237,7 @@ registerAction2(class extends Action2 {
 			liveActivityMode: configurationService.getValue('prebase.magnus.liveActivity.mode'),
 			networkLayoutMode: configurationService.getValue('prebase.graph.networkLayoutMode'),
 			projectGuidanceEnabled: configurationService.getValue('prebase.magnus.projectGuidance.enabled'),
-			workspaceFolders: accessor.get(IWorkspaceContextService).getWorkspace().folders.map(folder => ({
+			workspaceFolders: workspaceContextService.getWorkspace().folders.map(folder => ({
 				uri: folder.uri.toString(),
 				name: folder.name,
 			})),
