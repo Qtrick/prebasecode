@@ -1887,6 +1887,19 @@ test('lifecycle producer timeout covers 5 warm sequences instead of dying at 6 m
 	assert.match(diag, /const CYCLE_COUNT = 5;/);
 });
 
+test('load-quit producer timeout covers 10 launches and reuses one temporal fixture', () => {
+	const producer = PHASE3_PRODUCERS.find(item => item.id === 'load-quit');
+	assert.ok(producer);
+	assert.ok(producer.timeoutMs >= 20 * 60 * 1000);
+	const source = readFileSync(join(acceptanceDir, 'prebase-load-quit-live.mjs'), 'utf8');
+	assert.match(source, /function createTemporalQuitWorkspace/);
+	assert.match(source, /const temporalWorkspace = createTemporalQuitWorkspace\(\)/);
+	assert.match(source, /runTemporalQuit\(1, temporalWorkspace\)/);
+	assert.match(source, /runTemporalQuit\(2, temporalWorkspace\)/);
+	assert.match(source, /runTemporalQuit\(3, temporalWorkspace\)/);
+	assert.match(source, /tauri desktopStartForMagnus failed/);
+});
+
 test('Temporal canvas screenshots disable animations so idle RAF cannot flake stability', () => {
 	const live = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-live.mjs'), 'utf8');
 	const fixtures = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-fixtures.mjs'), 'utf8');

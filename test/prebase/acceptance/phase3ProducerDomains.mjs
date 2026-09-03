@@ -261,7 +261,7 @@ export const PRODUCER_ESTIMATED_DURATION_MS = {
 	'magnus-tauri-tools': 240_000,
 	'hybrid-web-smoke': 60_000,
 	'privacy': 90_000,
-	'load-quit': 120_000,
+	'load-quit': 12 * 60 * 1000,
 	'lifecycle-cycles': 90_000,
 	'electron-restart-soak': 15 * 60 * 1000,
 	'tauri-restart-soak': 4 * 60 * 1000,

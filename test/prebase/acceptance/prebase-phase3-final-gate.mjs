@@ -163,7 +163,7 @@ export const PHASE3_PRODUCERS = [
 	{ id: 'magnus-tauri-tools', artifacts: ['magnus-tauri-tools'], command: ['node', 'test/prebase/acceptance/prebase-magnus-tools-live.mjs', '--tauri'], timeoutMs: 420_000 },
 	{ id: 'hybrid-web-smoke', artifacts: ['hybrid-web-smoke'], command: ['node', 'test/prebase/acceptance/prebase-hybrid-web-smoke.mjs'], timeoutMs: 180_000 },
 	{ id: 'privacy', artifacts: ['privacy'], command: ['node', 'test/prebase/acceptance/prebase-privacy-runtime.mjs'], timeoutMs: 180_000 },
-	{ id: 'load-quit', artifacts: ['load-quit'], command: ['node', 'test/prebase/acceptance/prebase-load-quit-live.mjs'], timeoutMs: 240_000 },
+	{ id: 'load-quit', artifacts: ['load-quit'], command: ['node', 'test/prebase/acceptance/prebase-load-quit-live.mjs'], timeoutMs: 20 * 60 * 1000 },
 	{ id: 'lifecycle-cycles', artifacts: ['lifecycle-cycles'], command: ['node', 'test/prebase/acceptance/prebase-process-leak-diag.mjs'], timeoutMs: 25 * 60 * 1000 },
 	{ id: 'electron-restart-soak', artifacts: ['electron-restart-soak'], command: ['node', 'test/prebase/acceptance/prebase-restart-soak.mjs'], timeoutMs: 90 * 60 * 1000 },
 	{ id: 'tauri-restart-soak', artifacts: ['tauri-restart-soak'], command: ['node', 'test/prebase/acceptance/prebase-restart-soak.mjs', '--tauri'], timeoutMs: 60 * 60 * 1000 },
