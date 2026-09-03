@@ -1,25 +1,25 @@
 {
   "schemaVersion": 3,
   "scenario": "lifecycle-cycles",
-  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
-  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "generatedAt": "2026-08-31T18:45:34.637Z",
+  "sourceHead": "c8129bed337a841561e3321d8e7835994b2d114f",
+  "sourceFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
+  "productFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
+  "generatedAt": "2026-09-03T09:20:46.334Z",
   "producerId": "lifecycle-cycles",
-  "producerFingerprint": "5f0456fd7b6009994d2bb212c46040a4ac2db104321999567461e2a40c2f222a",
+  "producerFingerprint": "9e3708dcab5270ad992f17c267c7eb3fc1892cdffeb30d535edb932c189ab8c3",
   "kind": "lifecycle",
   "cycleCount": 5,
   "cycles": [
     {
       "id": "cycle-1",
-      "at": "2026-08-31T18:45:58.558Z",
-      "processCount": 30,
+      "at": "2026-09-03T09:21:11.167Z",
+      "processCount": 28,
       "roles": {
-        "main": 12,
-        "other": 18
+        "main": 15,
+        "other": 13
       },
-      "cpuSum": 142.8,
-      "rssMb": 2091.6,
+      "cpuSum": 192,
+      "rssMb": 2640.2,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -122,14 +122,15 @@
     },
     {
       "id": "cycle-2",
-      "at": "2026-08-31T18:46:06.173Z",
-      "processCount": 39,
+      "at": "2026-09-03T09:21:19.220Z",
+      "processCount": 25,
       "roles": {
-        "main": 14,
-        "other": 25
+        "main": 17,
+        "other": 7,
+        "git": 1
       },
-      "cpuSum": 148.7,
-      "rssMb": 2385.5,
+      "cpuSum": 187.5,
+      "rssMb": 2865,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -232,14 +233,14 @@
     },
     {
       "id": "cycle-3",
-      "at": "2026-08-31T18:46:13.660Z",
-      "processCount": 24,
+      "at": "2026-09-03T09:21:27.094Z",
+      "processCount": 30,
       "roles": {
-        "main": 16,
-        "other": 8
+        "main": 19,
+        "other": 11
       },
-      "cpuSum": 179.5,
-      "rssMb": 2521.6,
+      "cpuSum": 185.4,
+      "rssMb": 3337.4,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -342,13 +343,13 @@
     },
     {
       "id": "cycle-4",
-      "at": "2026-08-31T18:46:24.119Z",
-      "processCount": 18,
+      "at": "2026-09-03T09:21:35.130Z",
+      "processCount": 21,
       "roles": {
-        "main": 18
+        "main": 21
       },
-      "cpuSum": 125.1,
-      "rssMb": 2867.1,
+      "cpuSum": 182.7,
+      "rssMb": 3380.4,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -451,13 +452,13 @@
     },
     {
       "id": "cycle-5",
-      "at": "2026-08-31T18:46:31.395Z",
-      "processCount": 20,
+      "at": "2026-09-03T09:21:48.314Z",
+      "processCount": 23,
       "roles": {
-        "main": 20
+        "main": 23
       },
-      "cpuSum": 1.6,
-      "rssMb": 3006.7,
+      "cpuSum": 181.6,
+      "rssMb": 3598.4,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -559,16 +560,16 @@
       ]
     }
   ],
-  "prebasePid": 50579,
+  "prebasePid": 138638,
   "cold": {
     "id": "cold",
-    "at": "2026-08-31T18:45:43.028Z",
-    "processCount": 7,
+    "at": "2026-09-03T09:20:54.488Z",
+    "processCount": 10,
     "roles": {
-      "main": 7
+      "main": 10
     },
-    "cpuSum": 50.5,
-    "rssMb": 1522.7,
+    "cpuSum": 172.9,
+    "rssMb": 1832.2,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -672,14 +673,14 @@
   "closedPrimarySidebar": true,
   "warm": {
     "id": "warm",
-    "at": "2026-08-31T18:45:51.117Z",
-    "processCount": 28,
+    "at": "2026-09-03T09:21:03.126Z",
+    "processCount": 31,
     "roles": {
-      "main": 10,
+      "main": 13,
       "other": 18
     },
-    "cpuSum": 151.1,
-    "rssMb": 1890.8,
+    "cpuSum": 196.5,
+    "rssMb": 2388.6,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -695,10 +696,10 @@
   },
   "classification": "warm-provisioning",
   "quit": {
-    "before": "50579     1   0.1 725232 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "138638       1 16.3 798060 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 674,
+    "latencyMs": 1113,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

@@ -2,40 +2,40 @@
   "ok": true,
   "failures": [],
   "classification": "warm-provisioning",
-  "cold": 7,
-  "warm": 10,
+  "cold": 10,
+  "warm": 31,
   "cycles": [
     {
       "id": "cycle-1",
-      "processCount": 33,
+      "processCount": 28,
       "liveCount": 1
     },
     {
       "id": "cycle-2",
-      "processCount": 45,
+      "processCount": 25,
       "liveCount": 1
     },
     {
       "id": "cycle-3",
-      "processCount": 47,
+      "processCount": 30,
       "liveCount": 1
     },
     {
       "id": "cycle-4",
-      "processCount": 18,
+      "processCount": 21,
       "liveCount": 1
     },
     {
       "id": "cycle-5",
-      "processCount": 20,
+      "processCount": 23,
       "liveCount": 1
     }
   ],
   "quit": {
-    "before": "51814     1 129.8 1087184 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "138638       1 16.3 798060 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 2052,
+    "latencyMs": 1113,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

@@ -1,6 +1,6 @@
 {
   "phase": "3-final",
-  "sourceHead": "44eedca016d713e4e011fe3bc79292c91741c90b",
+  "sourceHead": "c8129bed337a841561e3321d8e7835994b2d114f",
   "sourceFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
   "productFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
   "producerFingerprints": {
@@ -28,8 +28,8 @@
     "active-soak": "e90ec68655dd26c96d3bcb3839ad9f8fdb1189a4dd359f0913c530f36fd9503d",
     "assurance": "59c77fe6140c1acdf90b9370a9590c42d59bb2a0558e01297d265636d4b21f5b"
   },
-  "validationRunId": "2026-09-03T09-15-31-296Z",
-  "generatedAt": "2026-09-03T09:19:12.490Z",
+  "validationRunId": "2026-09-03T09-19-38-589Z",
+  "generatedAt": "2026-09-03T09:21:50.254Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -50,16 +50,13 @@
     }
   ],
   "failures": [
-    "electron-product-path: evidence producer fingerprint does not match current producer inputs",
     "tauri-product-path: evidence producer fingerprint does not match current producer inputs",
-    "electron-native-cases: evidence producer fingerprint does not match current producer inputs",
     "temporal-large: evidence producer fingerprint does not match current producer inputs",
     "temporal-canonical-scale: evidence producer fingerprint does not match current producer inputs",
     "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
     "magnus-tauri-tools: evidence producer fingerprint does not match current producer inputs",
     "load-quit: evidence producer fingerprint does not match current producer inputs",
     "idle-soak: evidence producer fingerprint does not match current producer inputs",
-    "lifecycle-cycles: evidence producer fingerprint does not match current producer inputs",
     "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
     "tauri-restart-soak: evidence producer fingerprint does not match current producer inputs",
     "active-soak: evidence producer fingerprint does not match current producer inputs",
@@ -69,12 +66,21 @@
     {
       "id": "electron-product-path",
       "path": "electron/product-path.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "3832     1  25.6 246720 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
-        "latencyMs": 419,
+        "before": "137632       1 15.3 287332 prebase",
+        "latencyMs": 212,
         "remaining": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 26405,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/electron-product-path.log",
+        "logTail": "",
+        "harnessPid": 137559,
+        "timeoutMs": 180000,
+        "leftoverPids": []
       }
     },
     {
@@ -91,12 +97,21 @@
     {
       "id": "electron-native-cases",
       "path": "electron/native-cases.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "4763     1  29.9 261216 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
-        "latencyMs": 421,
+        "before": "138097       1 17.3 285952 prebase",
+        "latencyMs": 213,
         "remaining": "gone"
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 34087,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/electron-native-cases.log",
+        "logTail": "",
+        "harnessPid": 138033,
+        "timeoutMs": 240000,
+        "leftoverPids": []
       }
     },
     {
@@ -124,16 +139,6 @@
         "remaining": "gone",
         "before": "135837       1 20.1 293276 prebase",
         "after": "gone"
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 21671,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
-        "logTail": "",
-        "harnessPid": 135715,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -207,16 +212,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 16119,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log",
-        "logTail": "",
-        "harnessPid": 133355,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -232,16 +227,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 16563,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-guidance-smoke.log",
-        "logTail": "",
-        "harnessPid": 133704,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -249,34 +234,14 @@
       "path": "magnus/live-activity.json",
       "ok": true,
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "externalSkip": true,
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 300,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log",
-        "logTail": "",
-        "harnessPid": 134043,
-        "timeoutMs": 120000,
-        "leftoverPids": []
-      }
+      "externalSkip": true
     },
     {
       "id": "hybrid-web-smoke",
       "path": "magnus/hybrid-web-smoke.json",
       "ok": true,
       "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)",
-      "externalSkip": true,
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 187,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/hybrid-web-smoke.log",
-        "logTail": "",
-        "harnessPid": 136138,
-        "timeoutMs": 180000,
-        "leftoverPids": []
-      }
+      "externalSkip": true
     },
     {
       "id": "load-quit",
@@ -298,17 +263,26 @@
     {
       "id": "lifecycle-cycles",
       "path": "soak/lifecycle.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "50579     1   0.1 725232 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "138638       1 16.3 798060 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 674,
+        "latencyMs": 1113,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 63377,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log",
+        "logTail": "",
+        "harnessPid": 138569,
+        "timeoutMs": 1500000,
+        "leftoverPids": []
       }
     },
     {
@@ -336,32 +310,12 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 140965,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 134065,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
       "id": "code-graph",
       "path": "core-ide/code-graph.json",
-      "ok": true,
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 140965,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 134065,
-        "timeoutMs": 240000,
-        "leftoverPids": []
-      }
+      "ok": true
     },
     {
       "id": "themes-a11y",
@@ -376,16 +330,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 140965,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 134065,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
@@ -401,16 +345,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 14120,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/privacy.log",
-        "logTail": "",
-        "harnessPid": 136160,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -441,11 +375,7 @@
     "reason": "evidence producer fingerprint does not match current producer inputs"
   },
   "plannedProducers": [
-    "magnus-streaming-smoke",
-    "magnus-guidance-smoke",
     "magnus-live-activity",
-    "core-ide",
-    "temporal-small",
     "temporal-large",
     "temporal-canonical-scale",
     "electron-product-path",
@@ -454,7 +384,6 @@
     "magnus-electron-tools",
     "magnus-tauri-tools",
     "hybrid-web-smoke",
-    "privacy",
     "load-quit",
     "lifecycle-cycles",
     "electron-restart-soak",
