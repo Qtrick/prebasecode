@@ -1,25 +1,24 @@
 {
   "schemaVersion": 3,
   "scenario": "lifecycle-cycles",
-  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
-  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "generatedAt": "2026-08-31T18:45:34.637Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:35:30.882Z",
   "producerId": "lifecycle-cycles",
-  "producerFingerprint": "5f0456fd7b6009994d2bb212c46040a4ac2db104321999567461e2a40c2f222a",
+  "producerFingerprint": "af68692e4d53531d8768f1634b3ec55e2fc88cd81d123657085fadeb94292d92",
   "kind": "lifecycle",
   "cycleCount": 5,
   "cycles": [
     {
       "id": "cycle-1",
-      "at": "2026-08-31T18:45:58.558Z",
-      "processCount": 30,
+      "at": "2026-09-03T11:35:55.504Z",
+      "processCount": 15,
       "roles": {
-        "main": 12,
-        "other": 18
+        "main": 15
       },
-      "cpuSum": 142.8,
-      "rssMb": 2091.6,
+      "cpuSum": 197.6,
+      "rssMb": 2643.9,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -122,14 +121,14 @@
     },
     {
       "id": "cycle-2",
-      "at": "2026-08-31T18:46:06.173Z",
-      "processCount": 39,
+      "at": "2026-09-03T11:36:03.676Z",
+      "processCount": 19,
       "roles": {
-        "main": 14,
-        "other": 25
+        "main": 17,
+        "other": 2
       },
-      "cpuSum": 148.7,
-      "rssMb": 2385.5,
+      "cpuSum": 190.8,
+      "rssMb": 2875.8,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -232,14 +231,13 @@
     },
     {
       "id": "cycle-3",
-      "at": "2026-08-31T18:46:13.660Z",
-      "processCount": 24,
+      "at": "2026-09-03T11:36:11.534Z",
+      "processCount": 19,
       "roles": {
-        "main": 16,
-        "other": 8
+        "main": 19
       },
-      "cpuSum": 179.5,
-      "rssMb": 2521.6,
+      "cpuSum": 187.4,
+      "rssMb": 3161.3,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -342,13 +340,14 @@
     },
     {
       "id": "cycle-4",
-      "at": "2026-08-31T18:46:24.119Z",
-      "processCount": 18,
+      "at": "2026-09-03T11:36:19.564Z",
+      "processCount": 23,
       "roles": {
-        "main": 18
+        "main": 21,
+        "other": 2
       },
-      "cpuSum": 125.1,
-      "rssMb": 2867.1,
+      "cpuSum": 185.9,
+      "rssMb": 3393.5,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -451,13 +450,13 @@
     },
     {
       "id": "cycle-5",
-      "at": "2026-08-31T18:46:31.395Z",
-      "processCount": 20,
+      "at": "2026-09-03T11:36:33.126Z",
+      "processCount": 23,
       "roles": {
-        "main": 20
+        "main": 23
       },
-      "cpuSum": 1.6,
-      "rssMb": 3006.7,
+      "cpuSum": 183.8,
+      "rssMb": 3568.9,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -559,16 +558,16 @@
       ]
     }
   ],
-  "prebasePid": 50579,
+  "prebasePid": 291593,
   "cold": {
     "id": "cold",
-    "at": "2026-08-31T18:45:43.028Z",
-    "processCount": 7,
+    "at": "2026-09-03T11:35:39.090Z",
+    "processCount": 10,
     "roles": {
-      "main": 7
+      "main": 10
     },
-    "cpuSum": 50.5,
-    "rssMb": 1522.7,
+    "cpuSum": 182.4,
+    "rssMb": 1807.7,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -672,14 +671,13 @@
   "closedPrimarySidebar": true,
   "warm": {
     "id": "warm",
-    "at": "2026-08-31T18:45:51.117Z",
-    "processCount": 28,
+    "at": "2026-09-03T11:35:47.730Z",
+    "processCount": 13,
     "roles": {
-      "main": 10,
-      "other": 18
+      "main": 13
     },
-    "cpuSum": 151.1,
-    "rssMb": 1890.8,
+    "cpuSum": 201.5,
+    "rssMb": 2397.2,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -695,10 +693,10 @@
   },
   "classification": "warm-provisioning",
   "quit": {
-    "before": "50579     1   0.1 725232 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "291593       1 16.6 799012 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 674,
+    "latencyMs": 1125,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

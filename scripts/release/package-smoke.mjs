@@ -59,5 +59,6 @@ if (missing.length > 0) {
 }
 
 console.log(`package-smoke: gulp task discovery OK (${platform}/${arch})`);
+console.log('package-smoke: Darwin Live Activity addon is fail-closed at package time (gulpfile.vscode.ts + verifyPreBaseDesktopPackage)');
 console.log('package-smoke: full unsigned desktop package — Needs Verification (not run in Phase J; see docs/PACKAGING.md)');
 console.log('package-smoke: optional hygiene task check-package-json may fail without extensions/copilot checkout');

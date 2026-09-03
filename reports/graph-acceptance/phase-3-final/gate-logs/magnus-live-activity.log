@@ -1,0 +1,1 @@
+{"ok":false,"skipped":true,"environmentSkip":true,"failures":["Live Activity AppKit path is macOS-only"],"out":"/workspace/reports/graph-acceptance/phase-3-final/magnus/live-activity.json"}

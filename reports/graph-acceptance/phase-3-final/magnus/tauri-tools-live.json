@@ -3,12 +3,12 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "magnus-tauri-tools",
-  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
-  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "generatedAt": "2026-08-31T18:40:58.702Z",
+  "sourceHead": "0fff0672c605d91c88cf95e0a01e153c525474c6",
+  "sourceFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
+  "productFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
+  "generatedAt": "2026-09-03T11:06:05.897Z",
   "producerId": "magnus-tauri-tools",
-  "producerFingerprint": "c20a99999d53c20ba5a464f2edf91c076d17a5c7c95e042178c5ebb88cd34d56",
+  "producerFingerprint": "50cb248a8fe9eca2d5d0cd5b6e39c7c9e8bbd0aebc271c8bd14ef9fa9caf2a01",
   "framework": "tauri",
   "invokeToolPath": true,
   "tools": {
@@ -16,13 +16,13 @@
       "ok": true,
       "toolId": "prebase_desktop_start_session",
       "isError": false,
-      "content": "{\n  \"ok\": true,\n  \"sessionId\": \"e3626d50-09d7-4638-9ef6-d18b80e3b25b\",\n  \"framework\": \"tauri\",\n  \"mode\": \"fullApp\",\n  \"state\": \"testing\",\n  \"purpose\": \"test\",\n  \"backend\": \"webdriver\",\n  \"ownedByPreBase\": true,\n  \"setupRequired\": false,\n  \"pid\": 38973,\n  \"webDriverPort\": 55949,\n  \"rendererUrl\": \"http://localhost:1420\",\n  \"limitations\": [\n    \"Renderer mode tests the web frontend only. The Tauri Rust backend and invoke() commands are not executed.\",\n    \"Full-app mode provides webview UI automation and renderer console capture. Tauri backend APIs, backend logs, native OS dialogs, and menus are not controllable.\",\n    \"Native operating-system UI outside the webview is unsupported.\"\n  ],\n  \"test\": {\n    \"id\": \"e3626d50-09d7-4638-9ef6-d18b80e3b25b\",\n    \"framework\": \"tauri\",\n    \"mode\": \"fullApp\",\n    \"backend\": \"webdriver\",\n    \"passedSteps\": 0,\n    \"failedSteps\": 0,\n    \"duration\": 2059,\n    \"screenshotCount\": 0,\n    \"cleanup\": \"pending\"\n  }\n}"
+      "content": "{\n  \"ok\": true,\n  \"sessionId\": \"c31102bb-4285-400f-bbbd-346262a44232\",\n  \"framework\": \"tauri\",\n  \"mode\": \"fullApp\",\n  \"state\": \"testing\",\n  \"purpose\": \"test\",\n  \"backend\": \"webdriver\",\n  \"ownedByPreBase\": true,\n  \"setupRequired\": false,\n  \"pid\": 247020,\n  \"webDriverPort\": 36839,\n  \"rendererUrl\": \"http://127.0.0.1:1430\",\n  \"limitations\": [\n    \"Renderer mode tests the web frontend only. The Tauri Rust backend and invoke() commands are not executed.\",\n    \"Full-app mode provides webview UI automation and renderer console capture. Tauri backend APIs, backend logs, native OS dialogs, and menus are not controllable.\",\n    \"Native operating-system UI outside the webview is unsupported.\"\n  ],\n  \"test\": {\n    \"id\": \"c31102bb-4285-400f-bbbd-346262a44232\",\n    \"framework\": \"tauri\",\n    \"mode\": \"fullApp\",\n    \"backend\": \"webdriver\",\n    \"passedSteps\": 0,\n    \"failedSteps\": 0,\n    \"duration\": 3013,\n    \"screenshotCount\": 0,\n    \"cleanup\": \"pending\"\n  }\n}"
     },
     "session": {
       "ok": true,
       "toolId": "prebase_desktop_get_session",
       "isError": false,
-      "content": "{\n  \"ok\": true,\n  \"sessionId\": \"e3626d50-09d7-4638-9ef6-d18b80e3b25b\",\n  \"framework\": \"tauri\",\n  \"mode\": \"fullApp\",\n  \"state\": \"testing\",\n  \"purpose\": \"test\",\n  \"backend\": \"webdriver\",\n  \"ownedByPreBase\": true,\n  \"setupRequired\": false,\n  \"pid\": 38973,\n  \"webDriverPort\": 55949,\n  \"rendererUrl\": \"http://localhost:1420\",\n  \"limitations\": [\n    \"Renderer mode tests the web frontend only. The Tauri Rust backend and invoke() commands are not executed.\",\n    \"Full-app mode provides webview UI automation and renderer console capture. Tauri backend APIs, backend logs, native OS dialogs, and menus are not controllable.\",\n    \"Native operating-system UI outside the webview is unsupported.\"\n  ],\n  \"test\": {\n    \"id\": \"e3626d50-09d7-4638-9ef6-d18b80e3b25b\",\n    \"framework\": \"tauri\",\n    \"mode\": \"fullApp\",\n    \"backend\": \"webdriver\",\n    \"passedSteps\": 0,\n    \"failedSteps\": 0,\n    \"duration\": 10073,\n    \"screenshotCount\": 0,\n    \"cleanup\": \"pending\"\n  }\n}"
+      "content": "{\n  \"ok\": true,\n  \"sessionId\": \"c31102bb-4285-400f-bbbd-346262a44232\",\n  \"framework\": \"tauri\",\n  \"mode\": \"fullApp\",\n  \"state\": \"testing\",\n  \"purpose\": \"test\",\n  \"backend\": \"webdriver\",\n  \"ownedByPreBase\": true,\n  \"setupRequired\": false,\n  \"pid\": 247020,\n  \"webDriverPort\": 36839,\n  \"rendererUrl\": \"http://127.0.0.1:1430\",\n  \"limitations\": [\n    \"Renderer mode tests the web frontend only. The Tauri Rust backend and invoke() commands are not executed.\",\n    \"Full-app mode provides webview UI automation and renderer console capture. Tauri backend APIs, backend logs, native OS dialogs, and menus are not controllable.\",\n    \"Native operating-system UI outside the webview is unsupported.\"\n  ],\n  \"test\": {\n    \"id\": \"c31102bb-4285-400f-bbbd-346262a44232\",\n    \"framework\": \"tauri\",\n    \"mode\": \"fullApp\",\n    \"backend\": \"webdriver\",\n    \"passedSteps\": 0,\n    \"failedSteps\": 0,\n    \"duration\": 11018,\n    \"screenshotCount\": 0,\n    \"cleanup\": \"pending\"\n  }\n}"
     },
     "inspect": {
       "ok": true,
@@ -34,13 +34,13 @@
       "ok": true,
       "toolId": "prebase_desktop_interact",
       "isError": false,
-      "content": "{\n  \"ok\": true,\n  \"action\": \"fill\",\n  \"locator\": \"role=textbox name=Name\",\n  \"match\": {\n    \"checked\": false,\n    \"enabled\": true,\n    \"name\": \"Name\",\n    \"role\": \"textbox\",\n    \"tag\": \"input\",\n    \"value\": \"Ada\",\n    \"visible\": true\n  },\n  \"title\": \"PreBase Tauri Fixture\",\n  \"url\": \"http://127.0.0.1:1430/\",\n  \"duration\": 9,\n  \"framework\": \"tauri\",\n  \"backend\": \"webdriver\"\n}"
+      "content": "{\n  \"ok\": true,\n  \"action\": \"fill\",\n  \"locator\": \"role=textbox name=Name\",\n  \"match\": {\n    \"checked\": false,\n    \"enabled\": true,\n    \"name\": \"Name\",\n    \"role\": \"textbox\",\n    \"tag\": \"input\",\n    \"value\": \"Ada\",\n    \"visible\": true\n  },\n  \"title\": \"PreBase Tauri Fixture\",\n  \"url\": \"http://127.0.0.1:1430/\",\n  \"duration\": 10,\n  \"framework\": \"tauri\",\n  \"backend\": \"webdriver\"\n}"
     },
     "interactClick": {
       "ok": true,
       "toolId": "prebase_desktop_interact",
       "isError": false,
-      "content": "{\n  \"ok\": true,\n  \"action\": \"click\",\n  \"locator\": \"role=button name=Greet\",\n  \"match\": {\n    \"checked\": null,\n    \"enabled\": true,\n    \"name\": \"Greet\",\n    \"role\": \"button\",\n    \"tag\": \"button\",\n    \"value\": null,\n    \"visible\": true\n  },\n  \"title\": \"PreBase Tauri Fixture\",\n  \"url\": \"http://127.0.0.1:1430/\",\n  \"duration\": 62,\n  \"framework\": \"tauri\",\n  \"backend\": \"webdriver\"\n}"
+      "content": "{\n  \"ok\": true,\n  \"action\": \"click\",\n  \"locator\": \"role=button name=Greet\",\n  \"match\": {\n    \"checked\": null,\n    \"enabled\": true,\n    \"name\": \"Greet\",\n    \"role\": \"button\",\n    \"tag\": \"button\",\n    \"value\": null,\n    \"visible\": true\n  },\n  \"title\": \"PreBase Tauri Fixture\",\n  \"url\": \"http://127.0.0.1:1430/\",\n  \"duration\": 70,\n  \"framework\": \"tauri\",\n  \"backend\": \"webdriver\"\n}"
     },
     "assert": {
       "ok": true,
@@ -58,13 +58,13 @@
       "ok": true,
       "toolId": "prebase_desktop_get_process_output",
       "isError": false,
-      "content": "{\n  \"ok\": true,\n  \"pid\": 38973,\n  \"entries\": [\n    {\n      \"stream\": \"stdout\",\n      \"timestamp\": 1788201667895,\n      \"text\": \"\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stdout\",\n      \"timestamp\": 1788201667895,\n      \"text\": \"> tauri\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stdout\",\n      \"timestamp\": 1788201667895,\n      \"text\": \"> tauri dev --features prebase-testing\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stdout\",\n      \"timestamp\": 1788201667895,\n      \"text\": \"\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788201668140,\n      \"text\": \"     Running DevCommand (`cargo  run --no-default-features --features prebase-testing --color always --`)\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788201668161,\n      \"text\": \"        Info Watching /Users/qunyingfan/Prebasecode/test/prebase/fixtures/desktop-tauri/src-tauri for changes...\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788201668611,\n      \"text\": \"\\u001b[1m\\u001b[92m    Finished\\u001b[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.45s\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788201668618,\n      \"text\": \"\\u001b[1m\\u001b[92m     Running\\u001b[0m `target/debug/prebase-desktop-tauri-fixture`\",\n      \"truncated\": false\n    }\n  ],\n  \"truncated\": false,\n  \"droppedCount\": 0,\n  \"limitation\": \"Output is bounded and redacted in the Electron main process.\",\n  \"toolOutputTruncated\": false\n}"
+      "content": "{\n  \"ok\": true,\n  \"pid\": 247020,\n  \"entries\": [\n    {\n      \"stream\": \"stdout\",\n      \"timestamp\": 1788433574341,\n      \"text\": \"> tauri\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stdout\",\n      \"timestamp\": 1788433574341,\n      \"text\": \"> tauri dev --features prebase-testing\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stdout\",\n      \"timestamp\": 1788433574341,\n      \"text\": \"\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788433574409,\n      \"text\": \"     Running BeforeDevCommand (`python3 -m http.server 1430 --bind 127.0.0.1 --directory web`)\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788433576416,\n      \"text\": \"     Running DevCommand (`cargo  run --no-default-features --features prebase-testing --color always --`)\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788433576431,\n      \"text\": \"        Info Watching /workspace/test/prebase/fixtures/desktop-tauri/src-tauri for changes...\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788433576596,\n      \"text\": \"\\u001b[1m\\u001b[92m    Finished\\u001b[0m `dev` profile [unoptimized + debuginfo] target(s) in 0.17s\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788433576605,\n      \"text\": \"\\u001b[1m\\u001b[92m     Running\\u001b[0m `target/debug/prebase-desktop-tauri-fixture`\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788433576708,\n      \"text\": \"libEGL warning: DRI3 error: Could not get DRI3 device\",\n      \"truncated\": false\n    },\n    {\n      \"stream\": \"stderr\",\n      \"timestamp\": 1788433576708,\n      \"text\": \"libEGL warning: Ensure your X server supports DRI3 to get accelerated rendering\",\n      \"truncated\": false\n    }\n  ],\n  \"truncated\": true,\n  \"droppedCount\": 1,\n  \"limitation\": \"Output is bounded and redacted in the Electron main process.\",\n  \"toolOutputTruncated\": false\n}"
     },
     "restart": {
       "ok": true,
       "toolId": "prebase_desktop_restart_session",
       "isError": false,
-      "content": "{\n  \"ok\": true,\n  \"session\": {\n    \"ok\": true,\n    \"sessionId\": \"b67917f8-f215-49c2-ba81-28773749c986\",\n    \"framework\": \"tauri\",\n    \"mode\": \"fullApp\",\n    \"state\": \"testing\",\n    \"purpose\": \"test\",\n    \"backend\": \"webdriver\",\n    \"ownedByPreBase\": true,\n    \"setupRequired\": false,\n    \"pid\": 39423,\n    \"webDriverPort\": 55983,\n    \"rendererUrl\": \"http://localhost:1420\",\n    \"limitations\": [\n      \"Renderer mode tests the web frontend only. The Tauri Rust backend and invoke() commands are not executed.\",\n      \"Full-app mode provides webview UI automation and renderer console capture. Tauri backend APIs, backend logs, native OS dialogs, and menus are not controllable.\",\n      \"Native operating-system UI outside the webview is unsupported.\"\n    ],\n    \"test\": {\n      \"id\": \"e3626d50-09d7-4638-9ef6-d18b80e3b25b\",\n      \"framework\": \"tauri\",\n      \"mode\": \"fullApp\",\n      \"backend\": \"webdriver\",\n      \"passedSteps\": 7,\n      \"failedSteps\": 0,\n      \"duration\": 12079,\n      \"screenshotCount\": 0,\n      \"cleanup\": \"pending\"\n    }\n  }\n}"
+      "content": "{\n  \"ok\": true,\n  \"session\": {\n    \"ok\": true,\n    \"sessionId\": \"73c8de06-3026-44db-ba2c-3a6120907cc8\",\n    \"framework\": \"tauri\",\n    \"mode\": \"fullApp\",\n    \"state\": \"testing\",\n    \"purpose\": \"test\",\n    \"backend\": \"webdriver\",\n    \"ownedByPreBase\": true,\n    \"setupRequired\": false,\n    \"pid\": 247171,\n    \"webDriverPort\": 40941,\n    \"rendererUrl\": \"http://127.0.0.1:1430\",\n    \"limitations\": [\n      \"Renderer mode tests the web frontend only. The Tauri Rust backend and invoke() commands are not executed.\",\n      \"Full-app mode provides webview UI automation and renderer console capture. Tauri backend APIs, backend logs, native OS dialogs, and menus are not controllable.\",\n      \"Native operating-system UI outside the webview is unsupported.\"\n    ],\n    \"test\": {\n      \"id\": \"c31102bb-4285-400f-bbbd-346262a44232\",\n      \"framework\": \"tauri\",\n      \"mode\": \"fullApp\",\n      \"backend\": \"webdriver\",\n      \"passedSteps\": 7,\n      \"failedSteps\": 0,\n      \"duration\": 14272,\n      \"screenshotCount\": 0,\n      \"cleanup\": \"pending\"\n    }\n  }\n}"
     },
     "stop": {
       "ok": true,
@@ -73,14 +73,14 @@
       "content": "{\n  \"ok\": true\n}"
     }
   },
-  "prebasePid": 38811,
+  "prebasePid": 246812,
   "firstInvokeActivatedLazyPath": true,
   "expectedGreeting": "Hello, Ada",
   "quit": {
-    "before": "38811     1   2.9 184304 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "246812       1 13.0 284408 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 664,
+    "latencyMs": 319,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

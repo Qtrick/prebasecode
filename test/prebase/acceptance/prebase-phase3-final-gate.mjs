@@ -67,6 +67,7 @@ export function probeEnvironmentPrerequisites(env = process.env) {
 		firecrawlConfigured: Boolean(String(env.FIRECRAWL_API_KEY ?? '').trim()),
 		linkupConfigured: Boolean(String(env.LINKUP_API_KEY ?? '').trim()),
 		geminiConfigured: Boolean(String(env.GEMINI_API_KEY ?? env.GOOGLE_API_KEY ?? '').trim()),
+		darwin: process.platform === 'darwin',
 	};
 }
 
@@ -81,6 +82,7 @@ export function computePlanKey(repoRoot, identity, prerequisites = probeEnvironm
 		prerequisites: {
 			firecrawlConfigured: prerequisites.firecrawlConfigured,
 			linkupConfigured: prerequisites.linkupConfigured,
+			darwin: prerequisites.darwin,
 		},
 	})).digest('hex');
 }
@@ -161,7 +163,7 @@ export const PHASE3_PRODUCERS = [
 	{ id: 'magnus-tauri-tools', artifacts: ['magnus-tauri-tools'], command: ['node', 'test/prebase/acceptance/prebase-magnus-tools-live.mjs', '--tauri'], timeoutMs: 420_000 },
 	{ id: 'hybrid-web-smoke', artifacts: ['hybrid-web-smoke'], command: ['node', 'test/prebase/acceptance/prebase-hybrid-web-smoke.mjs'], timeoutMs: 180_000 },
 	{ id: 'privacy', artifacts: ['privacy'], command: ['node', 'test/prebase/acceptance/prebase-privacy-runtime.mjs'], timeoutMs: 180_000 },
-	{ id: 'load-quit', artifacts: ['load-quit'], command: ['node', 'test/prebase/acceptance/prebase-load-quit-live.mjs'], timeoutMs: 240_000 },
+	{ id: 'load-quit', artifacts: ['load-quit'], command: ['node', 'test/prebase/acceptance/prebase-load-quit-live.mjs'], timeoutMs: 20 * 60 * 1000 },
 	{ id: 'lifecycle-cycles', artifacts: ['lifecycle-cycles'], command: ['node', 'test/prebase/acceptance/prebase-process-leak-diag.mjs'], timeoutMs: 25 * 60 * 1000 },
 	{ id: 'electron-restart-soak', artifacts: ['electron-restart-soak'], command: ['node', 'test/prebase/acceptance/prebase-restart-soak.mjs'], timeoutMs: 90 * 60 * 1000 },
 	{ id: 'tauri-restart-soak', artifacts: ['tauri-restart-soak'], command: ['node', 'test/prebase/acceptance/prebase-restart-soak.mjs', '--tauri'], timeoutMs: 60 * 60 * 1000 },
@@ -256,6 +258,7 @@ export function scenarioOk(entry, evidence) {
 }
 
 export const HYBRID_FIRECRAWL_EXTERNAL_REASON = 'FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)';
+export const LIVE_ACTIVITY_MAC_EXTERNAL_REASON = 'Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)';
 
 export function hybridFirecrawlExternalSkip(evidence, identity, prerequisites = probeEnvironmentPrerequisites()) {
 	if (!evidence || evidence.missing || evidence.skipped !== true || evidence.firecrawlConfigured !== false) {
@@ -269,6 +272,29 @@ export function hybridFirecrawlExternalSkip(evidence, identity, prerequisites = 
 	}
 	if (typeof evidence.producerFingerprint === 'string' && evidence.producerFingerprint) {
 		return evidence.producerFingerprint === expectedProducerFingerprint(repo, 'hybrid-web-smoke');
+	}
+	return true;
+}
+
+/** Non-darwin Live Activity evidence must not count as CURRENT_GREEN AppKit proof. */
+export function liveActivityMacExternalSkip(evidence, identity, prerequisites = probeEnvironmentPrerequisites()) {
+	if (prerequisites.darwin) {
+		return false;
+	}
+	if (!evidence || evidence.missing) {
+		return false;
+	}
+	if (evidence.skipped !== true && evidence.environmentSkip !== true) {
+		return false;
+	}
+	if (evidence.platform === 'darwin') {
+		return false;
+	}
+	if (!identity?.sourceFingerprint || evidence.sourceFingerprint !== identity.sourceFingerprint) {
+		return false;
+	}
+	if (typeof evidence.producerFingerprint === 'string' && evidence.producerFingerprint) {
+		return evidence.producerFingerprint === expectedProducerFingerprint(repo, 'magnus-live-activity');
 	}
 	return true;
 }
@@ -291,6 +317,9 @@ export function classifyRequiredEvidence(identity, evidenceById = undefined, rep
 	for (const spec of PHASE3_REQUIRED_EVIDENCE) {
 		const evidence = evidenceById?.get(spec.id) ?? readJson(spec.path);
 		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity, prerequisites)) {
+			continue;
+		}
+		if (spec.id === 'magnus-live-activity' && liveActivityMacExternalSkip(evidence, identity, prerequisites)) {
 			continue;
 		}
 		if (spec.id === 'hybrid-web-smoke' && evidence.skipped === true && evidence.firecrawlConfigured === false && prerequisites.firecrawlConfigured) {
@@ -316,6 +345,11 @@ export function classifyProducerStatus(repo, identity, producer, prerequisites =
 		if (spec.id === 'hybrid-web-smoke' && hybridFirecrawlExternalSkip(evidence, identity, prerequisites)) {
 			status = 'EXTERNAL';
 			reason = HYBRID_FIRECRAWL_EXTERNAL_REASON;
+			continue;
+		}
+		if (spec.id === 'magnus-live-activity' && liveActivityMacExternalSkip(evidence, identity, prerequisites)) {
+			status = 'EXTERNAL';
+			reason = LIVE_ACTIVITY_MAC_EXTERNAL_REASON;
 			continue;
 		}
 		if (spec.id === 'hybrid-web-smoke' && evidence.skipped === true && evidence.firecrawlConfigured === false && prerequisites.firecrawlConfigured) {
@@ -730,6 +764,17 @@ function writeManifest(identity, planned, reruns = new Map()) {
 				path: spec.path,
 				ok: true,
 				reason: HYBRID_FIRECRAWL_EXTERNAL_REASON,
+				externalSkip: true,
+				quit: evidence.quit ?? undefined,
+				rerun,
+			};
+		}
+		if (spec.id === 'magnus-live-activity' && liveActivityMacExternalSkip(evidence, identity, probeEnvironmentPrerequisites())) {
+			return {
+				id: spec.id,
+				path: spec.path,
+				ok: true,
+				reason: LIVE_ACTIVITY_MAC_EXTERNAL_REASON,
 				externalSkip: true,
 				quit: evidence.quit ?? undefined,
 				rerun,

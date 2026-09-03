@@ -17,8 +17,8 @@ const nativeAddon = join(repo, 'native/prebase-live-activity/build/Release/preba
 const started = Date.now();
 const failures = [];
 const platform = process.platform;
-const architectureChosen = 'native-appkit';
 const nativePresent = existsSync(nativeAddon);
+const architectureChosen = nativePresent ? 'native-appkit' : (platform === 'darwin' ? 'native-appkit-missing' : 'non-darwin');
 
 if (platform === 'darwin' && !nativePresent) {
 	failures.push('native AppKit module missing; run npm run compile:live-activity');
@@ -109,6 +109,91 @@ if (!/async simulateAction[\s\S]*enable-smoke-test-driver[\s\S]*return false/.te
 const contributionSource = readFileSync(contributionPath, 'utf8');
 if (!contributionSource.includes('requireSmokeTestDriver') || !contributionSource.includes('prebase.magnus.liveActivity.simulate')) {
 	failures.push('workbench simulate command must require smoke test driver');
+}
+if (!native.includes('userDismissedAttention')) {
+	failures.push('native Escape/collapse must sticky-dismiss attention peek across snapshot republish');
+}
+if (!native.includes('dict[@"userDismissedAttention"]')) {
+	failures.push('native diagnostics must expose userDismissedAttention for AppKit product-truth proof');
+}
+if (!native.includes('emit:@"dismissAttention"')) {
+	failures.push('native collapse must emit dismissAttention so renderer projection can stay attentionCompact');
+}
+{
+	const applyStart = native.indexOf('- (void)applySnapshotDict:(NSDictionary *)snapshot {');
+	const stickyBranch = applyStart >= 0
+		? native.slice(applyStart, applyStart + 4500)
+		: '';
+	if (!/else if \(!self\.pinned && self\.userDismissedAttention\)/.test(stickyBranch)
+		|| !/lasting compact until click/.test(stickyBranch)
+		|| !/self\.attentionPeek = NO/.test(stickyBranch)
+		|| !/self\.content\.peekOnly = NO/.test(stickyBranch)
+		|| !/self\.content\.expanded = NO/.test(stickyBranch)) {
+		failures.push('applySnapshotDict must keep sticky Escape attention dismiss as lasting compact (not republished peek)');
+	}
+	const peekBodyStart = native.indexOf('NSString *peekBody = nil;');
+	const peekBody = peekBodyStart >= 0 ? native.slice(peekBodyStart, peekBodyStart + 700) : '';
+	if (!/pendingMessage\.length/.test(peekBody)
+		|| !/pendingTitle\.length/.test(peekBody)
+		|| !/activityLabel\.length/.test(peekBody)
+		|| !/substringToIndex:93/.test(peekBody)
+		|| peekBody.indexOf('pendingMessage.length') < 0
+		|| peekBody.indexOf('pendingMessage.length') > peekBody.indexOf('activityLabel.length')) {
+		failures.push('peek body must prefer pendingMessage → pendingTitle → activityLabel with truncated body');
+	}
+	if (!native.includes('renderedPeekBody')) {
+		failures.push('native diagnostics must expose renderedPeekBody for AppKit peek product-truth proof');
+	}
+	if (!native.includes('payload[@"screenLocked"]') || !native.includes('self.screenLocked = [snapshot[@"screenLocked"] boolValue]')) {
+		failures.push('native SnapshotToDict/applySnapshotDict must serialize and honor screenLocked');
+	}
+	{
+		const escapeStart = native.indexOf('- (void)installLocalKeyMonitor {');
+		const escapeBlock = escapeStart >= 0 ? native.slice(escapeStart, escapeStart + 1200) : '';
+		const dismissAt = escapeBlock.indexOf('emit:@"dismissAttention"');
+		const unpinAt = escapeBlock.indexOf('emit:@"unpin"');
+		if (dismissAt < 0 || unpinAt < 0 || dismissAt > unpinAt || !native.includes('collapseEmittingDismiss')) {
+			failures.push('Escape must emit dismissAttention before unpin to avoid renderer race');
+		}
+	}
+	if (!/action == "interactive"[\s\S]{0,200}enterInteractiveSticky/.test(native)) {
+		failures.push('simulateAction("interactive") must enter sticky Interactive (not bare expandInteractive)');
+	}
+	if (!native.includes('attentionCompact is sticky Escape only')) {
+		failures.push('native attentionCompact must require userDismissedAttention (not any collapsed attention)');
+	}
+	if (!native.includes('payload[@"userDismissedAttention"]')) {
+		failures.push('SnapshotToDict must serialize userDismissedAttention for sticky restore');
+	}
+	if (!native.includes('Sticky Escape: do not reopen peek') || !native.includes('Attention peek is not hover-owned')) {
+		failures.push('hover/mouseExit must not defeat sticky Escape or dismiss attentionPeek');
+	}
+	if (!/@"completedTransient"|@"failedTransient"/.test(native)) {
+		failures.push('native diagnostics must emit completedTransient/failedTransient vocabulary');
+	}
+	if (!native.includes('Screen lock is a hard hide') || !native.includes('Snapshot lock must hide immediately')) {
+		failures.push('native must orderOut on screenLocked (setVisible + applySnapshotDict)');
+	}
+	if (!/simulateSubmitFollowUp[\s\S]{0,200}self\.input\.hidden/.test(native)) {
+		failures.push('simulateSubmitFollowUp must fail closed when Interactive input is hidden');
+	}
+	if (!/expandPeek\][\s\S]{0,200}peekOnly == YES/.test(native)) {
+		failures.push('simulateAction peek/hover must return whether expandPeek actually peeked');
+	}
+	const contributionSourceFlush = contributionSource;
+	if (!contributionSourceFlush.includes('Presentation before snapshot')
+		|| contributionSourceFlush.indexOf('setPresentation(presentation)') > contributionSourceFlush.indexOf('setSnapshot({')) {
+		failures.push('contribution must apply presentation before snapshot (unlock attentionPeek + hide safety)');
+	}
+	if (!contributionSource.includes('getSystemIdleState(1)') || !contributionSource.includes("state === 'locked'")) {
+		failures.push('contribution must cold-query getSystemIdleState for lock at startup');
+	}
+}
+if (!native.includes('Delay control layout until frame animation completes to prevent visible popping')) {
+	failures.push('animated layout must delay control layout until frame settles');
+}
+if (!contributionSource.includes('panelStateSource') || !contributionSource.includes('renderer-projection')) {
+	failures.push('renderer diagnostics must label panelState as renderer-projection (not native hover truth)');
 }
 if (/topY - h - 8|NSMaxY\(frame\) - h - 8|pill: \{ x, y: 8/.test(native + magnusCommon)) {
 	failures.push('detached floating pill below menu bar must not return (no top offset gap)');

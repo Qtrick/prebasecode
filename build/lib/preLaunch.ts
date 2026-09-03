@@ -104,6 +104,15 @@ async function ensureCompiled() {
 		console.log(`[preLaunch] Magnus extension out/ is missing or stale (${magnusOutput.errors.join('; ')}) — running compile-magnus`);
 		await runProcess(npm, ['run', 'compile-magnus']);
 	}
+
+	// Darwin Live Activity AppKit addon — required for notch product truth in local launches.
+	if (process.platform === 'darwin') {
+		const liveActivityNode = 'native/prebase-live-activity/build/Release/prebase_live_activity.node';
+		if (!(await exists(liveActivityNode))) {
+			console.log('[preLaunch] Live Activity AppKit addon missing — running compile:live-activity');
+			await runProcess(npm, ['run', 'compile:live-activity']);
+		}
+	}
 }
 
 async function main() {

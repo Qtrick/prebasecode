@@ -60,6 +60,14 @@ export function productPathAcceptanceFailures(evidence) {
 	if (!evidence.inspected) {
 		failures.push('Inspect did not return a semantic snapshot');
 	}
+	// Only treat an explicit empty title or about:blank assert URL as blank-webview proof.
+	// Missing inspectTitle on incomplete failure fixtures must not inflate unrelated failure lists.
+	const assertUrl = evidence.assertActual && typeof evidence.assertActual === 'object'
+		? evidence.assertActual.url
+		: undefined;
+	if (evidence.inspectTitle === '' || assertUrl === 'about:blank') {
+		failures.push('Inspect/assert saw a blank Tauri/Electron webview instead of the fixture UI');
+	}
 	if (!evidence.filled) {
 		failures.push('Fill Name did not succeed');
 	}
@@ -103,7 +111,8 @@ async function confirmIfNeeded(page, name) {
 	}
 }
 
-export async function runFramework(framework) {
+export async function runFramework(framework, options = {}) {
+	const writeEvidence = options.writeEvidence !== false;
 	const fixture = join(repo, `test/prebase/fixtures/desktop-${framework}`);
 	const evidenceDir = join(evidenceRoot, framework);
 	const screenshotDir = join(evidenceRoot, 'screenshots');
@@ -272,7 +281,9 @@ export async function runFramework(framework) {
 	}
 	const failures = productPathAcceptanceFailures(evidence);
 	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
-	writeFileSync(join(evidenceDir, 'product-path.json'), JSON.stringify(result, null, 2));
+	if (writeEvidence) {
+		writeFileSync(join(evidenceDir, 'product-path.json'), JSON.stringify(result, null, 2));
+	}
 	return result;
 }
 

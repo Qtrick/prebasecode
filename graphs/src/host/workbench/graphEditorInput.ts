@@ -51,9 +51,8 @@ export class PreBaseGraphEditorInput extends EditorInput {
 	}
 
 	override matches(other: EditorInput | IUntypedEditorInput): boolean {
-		if (other instanceof PreBaseGraphEditorInput) {
-			return other.graphType === this.graphType;
-		}
-		return false;
+		// One Code Graph editor pane: switching Network ↔ Temporal must reuse the
+		// same webview instead of stacking editors that leak Chromium renderers.
+		return other instanceof PreBaseGraphEditorInput;
 	}
 }

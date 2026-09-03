@@ -21,13 +21,34 @@ export type MagnusLiveActivityStatus =
 	| 'failed'
 	| 'disconnected';
 
+/**
+ * Canonical Live Activity presentation states (one source of truth).
+ * Native AppKit booleans must resolve to one of these semantics.
+ *
+ * Mapping:
+ * - hidden: not shown
+ * - compact: collapsed wings / pill (alias: collapsed)
+ * - peek: hover dwell preview (alias: hoverPreview)
+ * - interactive: sticky expanded composer surface (alias: pinned when user-pinned)
+ * - attentionPeek: glanceable attention without full composer
+ * - attentionCompact: attention still active after sticky Escape (native activePresentationState)
+ * - attentionInteractive: attention content while user remains interactive
+ * - completedTransient / failedTransient: brief terminal summary
+ */
 export type MagnusLiveActivityPanelState =
 	| 'hidden'
-	| 'collapsed'
-	| 'hoverPreview'
-	| 'pinned'
-	| 'attention'
-	| 'completedTransient';
+	| 'compact'
+	| 'collapsed' // legacy alias of compact
+	| 'peek'
+	| 'hoverPreview' // legacy alias of peek
+	| 'interactive'
+	| 'pinned' // sticky interactive
+	| 'attentionPeek'
+	| 'attention' // legacy alias of attentionPeek
+	| 'attentionCompact'
+	| 'attentionInteractive'
+	| 'completedTransient'
+	| 'failedTransient';
 
 export interface MagnusLiveActivityAction {
 	readonly id: string;
@@ -73,6 +94,11 @@ export interface MagnusLiveActivitySnapshot {
 	readonly screenLocked?: boolean;
 	readonly hideDetails?: boolean;
 	readonly presentationLabel?: string;
+	/**
+	 * Sticky Escape/collapse dismiss for attention. Serialized so native can restore
+	 * attentionCompact across controller reload / snapshot republish.
+	 */
+	readonly userDismissedAttention?: boolean;
 }
 
 export const LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS = 180;
@@ -101,6 +127,8 @@ export function computeLiveActivityExpandedHeight(args: {
 	hasActivity?: boolean;
 	actionsCount?: number;
 	hasPendingTitle?: boolean;
+	hasPendingMessage?: boolean;
+	hasLatestMessage?: boolean;
 	hasMetrics?: boolean;
 	pendingKind?: 'approval' | 'question' | string;
 	hasOptions?: boolean;
@@ -108,6 +136,8 @@ export function computeLiveActivityExpandedHeight(args: {
 	peekOnly?: boolean;
 }): number {
 	if (args.peekOnly && !args.pinned) {
+		// Match native computeTargetContentHeight peek path: title → activity → fallback.
+		// Do not size peek from pendingMessage alone (body text is truncated into the title/activity line).
 		let h = args.bandHeight + 8;
 		if (args.hasPendingTitle) {
 			h += 20;
@@ -124,11 +154,17 @@ export function computeLiveActivityExpandedHeight(args: {
 	if (args.hasActivity) {
 		h += 18;
 	}
+	if (args.hasLatestMessage) {
+		h += 20;
+	}
 	if (args.actionsCount && args.actionsCount > 0) {
 		h += Math.min(args.actionsCount, 3) * 15;
 	}
 	if (args.hasPendingTitle) {
 		h += 20;
+	}
+	if (args.hasPendingMessage) {
+		h += 18;
 	}
 	if (args.hasMetrics) {
 		h += 18;
@@ -136,7 +172,7 @@ export function computeLiveActivityExpandedHeight(args: {
 	h += 10; // Spacing before controls
 	const hasOptions = args.pendingKind === 'question' && Boolean(args.hasOptions);
 	const hasApproval = args.pendingKind === 'approval';
-	const showInput = Boolean(args.pinned) && !args.peekOnly;
+	const showInput = !args.peekOnly;
 
 	if (hasOptions) {
 		h += 30; // Options row
@@ -314,7 +350,7 @@ export function buildMagnusLiveActivitySnapshot(
 		latestShortMessage: hide ? undefined : redactLiveActivityText(input.latestShortMessage),
 		workspaceDiff: hide ? undefined : input.workspaceDiff,
 		terminalCount: hide ? undefined : input.terminalCount,
-		testState: input.testState,
+		testState: hide ? undefined : input.testState,
 		pendingInteraction: hide ? undefined : input.pendingInteraction && {
 			...input.pendingInteraction,
 			title: redactLiveActivityText(input.pendingInteraction.title),
@@ -336,6 +372,10 @@ export function shouldShowLiveActivity(
 	if (mode === 'off' || !snapshot.connected) {
 		return false;
 	}
+	// Lock screen: hide entirely — redacting text alone is insufficient privacy.
+	if (snapshot.screenLocked) {
+		return false;
+	}
 	if (snapshot.status === 'idle' && !snapshot.sessionId) {
 		return false;
 	}
@@ -353,10 +393,23 @@ export function shouldShowLiveActivity(
 	return !snapshot.prebaseForeground;
 }
 
+/**
+ * Pure resolver for Live Activity presentation.
+ * Production diagnostics and native semantic transitions must agree with this model.
+ *
+ * Attention must NEVER downgrade an active Interactive/pinned surface to Peek.
+ */
 export function resolveLiveActivityPanelState(args: {
 	visible: boolean;
 	hovering: boolean;
 	pinned: boolean;
+	/** True when the panel is already in Interactive (expanded, not peek-only). */
+	interactive?: boolean;
+	/**
+	 * Native Escape/collapse sticky-dismiss for attention: keep compact across
+	 * attention snapshot republish until the user clicks Interactive or attention clears.
+	 */
+	userDismissedAttention?: boolean;
 	snapshot: MagnusLiveActivitySnapshot;
 	now: number;
 	hoverSince?: number;
@@ -367,27 +420,50 @@ export function resolveLiveActivityPanelState(args: {
 	if (!args.visible) {
 		return 'hidden';
 	}
-	if (args.pinned) {
-		return 'pinned';
+	const attention = args.snapshot.status === 'attention';
+	const interactive = Boolean(args.pinned || args.interactive);
+	if (interactive) {
+		return attention ? 'attentionInteractive' : (args.pinned ? 'pinned' : 'interactive');
 	}
-	if (args.snapshot.status === 'attention') {
-		return 'attention';
+	if (attention) {
+		// Mirror native activePresentationState: sticky Escape is attentionCompact, not peek and not plain compact.
+		if (args.userDismissedAttention) {
+			return 'attentionCompact';
+		}
+		return 'attentionPeek';
 	}
-	if (args.snapshot.status === 'completed' || args.snapshot.status === 'failed') {
+	if (args.snapshot.status === 'failed') {
+		return 'failedTransient';
+	}
+	if (args.snapshot.status === 'completed') {
 		return 'completedTransient';
 	}
 	const openDelay = args.openDelayMs ?? LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS;
 	const exitGrace = args.exitGraceMs ?? LIVE_ACTIVITY_EXIT_GRACE_MS;
 	if (args.hovering && args.hoverSince !== undefined && args.now - args.hoverSince >= openDelay) {
-		return 'hoverPreview';
+		return 'peek';
 	}
 	if (!args.hovering && args.lastInsideAt !== undefined && args.now - args.lastInsideAt < exitGrace) {
-		return 'hoverPreview';
+		return 'peek';
 	}
-	return 'collapsed';
+	return 'compact';
 }
 
-export type LiveActivityCommandKind = 'followUp' | 'approve' | 'deny' | 'answer' | 'openInPrebase' | 'pin' | 'unpin';
+/** Normalize legacy panel-state aliases to the canonical vocabulary. */
+export function canonicalizeLiveActivityPanelState(state: MagnusLiveActivityPanelState): MagnusLiveActivityPanelState {
+	switch (state) {
+		case 'collapsed':
+			return 'compact';
+		case 'hoverPreview':
+			return 'peek';
+		case 'attention':
+			return 'attentionPeek';
+		default:
+			return state;
+	}
+}
+
+export type LiveActivityCommandKind = 'followUp' | 'approve' | 'deny' | 'answer' | 'openInPrebase' | 'pin' | 'unpin' | 'dismissAttention';
 
 export interface LiveActivityCommand {
 	readonly kind: LiveActivityCommandKind;
@@ -410,6 +486,7 @@ export function acceptLiveActivityCommand(
 	if (!snapshot.connected) {
 		return { ok: false, reason: 'disconnected' };
 	}
+	// Lock screen: reject all commands — panel is hidden and must not mutate session state.
 	if (snapshot.screenLocked) {
 		return { ok: false, reason: 'screen-locked' };
 	}
@@ -423,7 +500,7 @@ export function acceptLiveActivityCommand(
 			return { ok: false, reason: 'stale-revision' };
 		}
 	}
-	if (command.kind === 'openInPrebase' || command.kind === 'pin' || command.kind === 'unpin') {
+	if (command.kind === 'openInPrebase' || command.kind === 'pin' || command.kind === 'unpin' || command.kind === 'dismissAttention') {
 		if (command.sessionId && snapshot.sessionId && command.sessionId !== snapshot.sessionId) {
 			return { ok: false, reason: 'session-mismatch' };
 		}

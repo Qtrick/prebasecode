@@ -3,16 +3,16 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "temporal-small",
-  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
-  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "generatedAt": "2026-08-31T18:34:08.115Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:30:42.524Z",
   "producerId": "temporal-small",
-  "producerFingerprint": "8c124221cb4377f6d77e9fd295d4dfa5e0517b3adb6ba8fec25eaac491fee001",
+  "producerFingerprint": "136f823c7ada2889d7ef690992a87845abcd7078f7d8425512a5f199fcb704c3",
   "scale": "small",
   "fixture": {
-    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-e53GC9",
-    "head": "d712dec80b864ed780ec316961ece8819b863ecd",
+    "dir": "/tmp/pb-temporal-pjxWcW",
+    "head": "cca3c72fed50517a5f63aad021caaa96a5c596a8",
     "commits": 10,
     "files": [
       "package.json",
@@ -21,19 +21,24 @@
       "src/tally.js"
     ],
     "expectedModifiedPath": "src/tally.js",
-    "firstParentSummary": "d712dec80b864ed780ec316961ece8819b863ecd 9377fe8e132a5a8e877dcfffd91bda2035f1bfcc fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+    "firstParentSummary": "cca3c72fed50517a5f63aad021caaa96a5c596a8 f5973ce31f9cb74bfaa15db125a1717f6f9af7d5 fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
   },
-  "pid": 99904,
-  "cdpPort": 54609,
+  "pid": 285580,
+  "cdpPort": 32811,
+  "sourceProfile": "/tmp/pb-temporal-profile-UUkFtA",
+  "gitReady": {
+    "ok": true,
+    "count": 1
+  },
   "fullMap": {
-    "sequenceId": 15,
+    "sequenceId": 10,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 989.1999999880791,
-    "renderEnd": 989.3999999761581,
-    "durationMs": 0.19999998807907104,
-    "selectedCommitSha": "d712dec80b864ed780ec316961ece8819b863ecd",
-    "renderedCommitSha": "d712dec80b864ed780ec316961ece8819b863ecd",
+    "renderStart": 439,
+    "renderEnd": 439.1000000014901,
+    "durationMs": 0.10000000149011612,
+    "selectedCommitSha": "cca3c72fed50517a5f63aad021caaa96a5c596a8",
+    "renderedCommitSha": "cca3c72fed50517a5f63aad021caaa96a5c596a8",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 4,
@@ -51,21 +56,30 @@
     "structuralOk": true,
     "humanVisualReviewRequired": true,
     "edgesDrawn": 2,
+    "leafEdgesDrawn": 2,
+    "aggregateEdgesDrawn": 0,
     "labelsDrawn": 4,
     "guideLabelsDrawn": 2,
+    "fileLabelsDrawn": 4,
+    "communityLabelsDrawn": 2,
+    "routeBadgesDrawn": 0,
+    "totalLabelsDrawn": 6,
+    "labelCollisionCullCount": 0,
+    "renderedLabelOverlapCount": 0,
+    "compositeLabelOverlapCount": 0,
     "labelOverlapCount": 0,
     "selectedNodeId": null,
     "transform": {
-      "x": 308.15999999999997,
-      "y": 382.64,
-      "k": 2.4
+      "x": 567.2770270270271,
+      "y": 425.63851351351354,
+      "k": 1.9493243243243243
     },
     "canvas": {
-      "clientWidth": 552,
-      "clientHeight": 708,
-      "width": 1104,
-      "height": 1416,
-      "distinctPixels": 285584
+      "clientWidth": 796,
+      "clientHeight": 815,
+      "width": 783,
+      "height": 802,
+      "distinctPixels": 59473
     },
     "summary": {
       "addedCount": 0,
@@ -78,30 +92,31 @@
       "edgeRemovedCount": 0,
       "edgeModifiedCount": 0
     },
-    "isAnimating": true,
-    "timestamp": 989.3999999761581,
-    "viewportWidth": 552,
-    "viewportHeight": 708,
+    "isAnimating": false,
+    "timestamp": 439.1000000014901,
+    "viewportWidth": 796,
+    "viewportHeight": 815,
     "labelCount": 4,
     "projectedBounds": {
-      "minX": 164.15999999999997,
-      "minY": 135.44,
-      "maxX": 380.15999999999997,
-      "maxY": 560.24,
-      "width": 216,
-      "height": 424.8
+      "minX": 360.6486486486487,
+      "minY": 189.7702702702703,
+      "maxX": 641.3513513513515,
+      "maxY": 595.2297297297298,
+      "width": 280.70270270270277,
+      "height": 405.4594594594595
     },
-    "screenUtilization": 0.23478260869565218
+    "screenUtilization": 0.17543787358055188
   },
+  "processBeforeInteractions": "285580       1 75.3 294196 prebase",
   "focusChanges": {
-    "sequenceId": 57,
+    "sequenceId": 11,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 1439.3999999761581,
-    "renderEnd": 1439.5999999642372,
-    "durationMs": 0.19999998807907104,
-    "selectedCommitSha": "d712dec80b864ed780ec316961ece8819b863ecd",
-    "renderedCommitSha": "d712dec80b864ed780ec316961ece8819b863ecd",
+    "renderStart": 814.6999999992549,
+    "renderEnd": 815.4000000022352,
+    "durationMs": 0.7000000029802322,
+    "selectedCommitSha": "cca3c72fed50517a5f63aad021caaa96a5c596a8",
+    "renderedCommitSha": "cca3c72fed50517a5f63aad021caaa96a5c596a8",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 2,
@@ -119,21 +134,30 @@
     "structuralOk": true,
     "humanVisualReviewRequired": true,
     "edgesDrawn": 1,
+    "leafEdgesDrawn": 1,
+    "aggregateEdgesDrawn": 0,
     "labelsDrawn": 2,
     "guideLabelsDrawn": 2,
+    "fileLabelsDrawn": 2,
+    "communityLabelsDrawn": 2,
+    "routeBadgesDrawn": 0,
+    "totalLabelsDrawn": 4,
+    "labelCollisionCullCount": 0,
+    "renderedLabelOverlapCount": 0,
+    "compositeLabelOverlapCount": 0,
     "labelOverlapCount": 0,
     "selectedNodeId": null,
     "transform": {
-      "x": 223.73922988987695,
-      "y": 530.6691057227315,
-      "k": 2.932287327302163
+      "x": 567.2770270270271,
+      "y": 425.63851351351354,
+      "k": 1.9493243243243243
     },
     "canvas": {
-      "clientWidth": 552,
-      "clientHeight": 708,
-      "width": 1104,
-      "height": 1416,
-      "distinctPixels": 62601
+      "clientWidth": 796,
+      "clientHeight": 815,
+      "width": 783,
+      "height": 802,
+      "distinctPixels": 13793
     },
     "summary": {
       "addedCount": 0,
@@ -146,47 +170,54 @@
       "edgeRemovedCount": 0,
       "edgeModifiedCount": 0
     },
-    "isAnimating": false,
-    "timestamp": 1439.5999999642372,
-    "viewportWidth": 552,
-    "viewportHeight": 708,
+    "isAnimating": true,
+    "timestamp": 815.4000000022352,
+    "viewportWidth": 796,
+    "viewportHeight": 815,
     "labelCount": 2,
     "projectedBounds": {
-      "minX": 299.97870039973316,
-      "minY": 228.64351101060873,
-      "maxX": 311.7078497089418,
-      "maxY": 363.5287280665082,
-      "width": 11.729149309208651,
-      "height": 134.8852170558995
+      "minX": 629.6554054054054,
+      "minY": 189.7702702702703,
+      "maxX": 641.3513513513515,
+      "maxY": 314.5270270270271,
+      "width": 11.69594594594605,
+      "height": 124.7567567567568
     },
-    "screenUtilization": 0.00404816806490436
+    "screenUtilization": 0.002249203507442993
   },
   "targetOpened": true,
   "repoLoaded": true,
+  "zoomTiers": [],
+  "processAfterInteractions": "285580       1 50.1 295540 prebase",
   "camera": {
     "afterFocus": {
-      "x": 195.58257987736877,
-      "y": 580.0408861040589,
-      "k": 3.109819799007763
+      "x": 483.35087349385424,
+      "y": 572.5664032338886,
+      "k": 2.880875338283757
     },
     "afterUserZoom": {
-      "x": 179.41820568169288,
-      "y": 617.8019627193182,
+      "x": 492.80489077822205,
+      "y": 615.5913468603909,
       "k": 3.5
     },
     "afterWait": {
-      "x": 179.41820568169288,
-      "y": 617.8019627193182,
+      "x": 492.80489077822205,
+      "y": 615.5913468603909,
       "k": 3.5
+    },
+    "afterFit": {
+      "x": 455.9813070066053,
+      "y": 622.6357538894904,
+      "k": 3.2108465720890846
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1788201253210,
-    "quitMs": 506,
+    "startedAt": 1788435061846,
+    "quitMs": 200,
     "remaining": "gone",
-    "before": "99904     1   3.6 288624 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "285580       1 20.9 295012 prebase",
     "after": "gone"
   }
 }

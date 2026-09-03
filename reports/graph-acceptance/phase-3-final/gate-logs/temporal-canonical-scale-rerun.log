@@ -1,0 +1,28 @@
+[11:22:37] START temporal-canonical-scale
+estimated 5m0s (timeout 10m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-canonical-scale.log
+[11:26:51] PASS temporal-canonical-scale
+elapsed 4m13s
+{
+  "ok": false,
+  "failures": [
+    "temporal-small: evidence producer fingerprint does not match current producer inputs",
+    "temporal-large: evidence producer fingerprint does not match current producer inputs",
+    "magnus-live-activity: Live Activity AppKit path is macOS-only",
+    "hybrid-web-smoke: local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
+    "load-quit: evidence producer fingerprint does not match current producer inputs",
+    "idle-soak: evidence producer fingerprint does not match current producer inputs",
+    "lifecycle-cycles: evidence producer fingerprint does not match current producer inputs",
+    "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
+    "tauri-restart-soak: evidence producer fingerprint does not match current producer inputs",
+    "core-ide: evidence producer fingerprint does not match current producer inputs",
+    "code-graph: evidence producer fingerprint does not match current producer inputs",
+    "themes-a11y: evidence producer fingerprint does not match current producer inputs",
+    "parser-benchmark: evidence producer fingerprint does not match current producer inputs",
+    "active-soak: evidence producer fingerprint does not match current producer inputs",
+    "assurance: evidence producer fingerprint does not match current producer inputs"
+  ],
+  "sourceHead": "9471b0e1ee90e904cad5de59cbc72f83a06ecceb",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "validationRunId": "2026-09-03T11-22-13-987Z"
+}

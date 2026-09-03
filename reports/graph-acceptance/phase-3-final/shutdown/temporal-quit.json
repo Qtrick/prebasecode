@@ -1,16 +1,16 @@
 {
   "schemaVersion": 3,
   "scenario": "temporal-quit",
-  "sourceHead": "7d3d943a115cc04e67bdc20f9ad662b6fb3206d8",
-  "sourceFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "productFingerprint": "0d2ea9dea447cbfbbedd592e9c03de14954825a24b65b7925a661573b4eb84cf",
-  "generatedAt": "2026-08-31T18:34:13.824Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:31:02.079Z",
   "ok": true,
   "quit": {
-    "startedAt": 1788201253210,
-    "quitMs": 506,
+    "startedAt": 1788435061846,
+    "quitMs": 200,
     "remaining": "gone",
-    "before": "99904     1   3.6 288624 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "285580       1 20.9 295012 prebase",
     "after": "gone"
   }
 }

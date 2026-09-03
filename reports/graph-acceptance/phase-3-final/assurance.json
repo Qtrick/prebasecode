@@ -1,178 +1,178 @@
 {
   "schemaVersion": 3,
   "scenario": "assurance",
-  "sourceHead": "93a2aecd2af07779c88f9f58757fe254babe8b3e",
-  "sourceFingerprint": "aa17978acd3b399d04f23e4ade36ace682865fdf8c330b132d4b8fc68a555b84",
-  "productFingerprint": "aa17978acd3b399d04f23e4ade36ace682865fdf8c330b132d4b8fc68a555b84",
-  "generatedAt": "2026-09-03T19:23:15.894Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T12:18:18.800Z",
   "producerId": "assurance",
-  "producerFingerprint": "d087f2700c2c8dfc1e1245f69dec0c85690d4dcbae9077d93a8cc02beb6fa20c",
+  "producerFingerprint": "4afff2047c517628e90fcdf3b0c25a093b1d26997535e0b1750fb44b4d9f974f",
   "ok": true,
   "commands": [
     {
       "command": "verify:icons",
       "exitCode": 0,
-      "durationMs": 135,
+      "durationMs": 121,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-icons.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-icons.log"
     },
     {
       "command": "compile-magnus",
       "exitCode": 0,
-      "durationMs": 2287,
+      "durationMs": 1588,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 180000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/compile-magnus.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/compile-magnus.log"
     },
     {
       "command": "transpile-client",
       "exitCode": 0,
-      "durationMs": 5215,
+      "durationMs": 6348,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 240000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/transpile-client.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/transpile-client.log"
     },
     {
       "command": "typecheck-client",
       "exitCode": 0,
-      "durationMs": 8197,
+      "durationMs": 9985,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 360000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/typecheck-client.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/typecheck-client.log"
     },
     {
       "command": "typecheck:graphs",
       "exitCode": 0,
-      "durationMs": 274,
+      "durationMs": 299,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 180000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/typecheck-graphs.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/typecheck-graphs.log"
     },
     {
       "command": "test:graphs",
       "exitCode": 0,
-      "durationMs": 48640,
+      "durationMs": 190353,
       "passed": true,
       "timedOut": false,
-      "timeoutMs": 180000,
-      "testCount": 6,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/test-graphs.log"
+      "timeoutMs": 600000,
+      "testCount": 7,
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/test-graphs.log"
     },
     {
       "command": "test:prebase-pure:compiled",
       "exitCode": 0,
-      "durationMs": 20341,
+      "durationMs": 19553,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 120000,
-      "testCount": 340,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/test-prebase-pure-compiled.log"
+      "testCount": 349,
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/test-prebase-pure-compiled.log"
     },
     {
       "command": "test:prebase-magnus",
       "exitCode": 0,
-      "durationMs": 2623,
+      "durationMs": 4178,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 180000,
       "testCount": 271,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/test-prebase-magnus.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/test-prebase-magnus.log"
     },
     {
       "command": "verify:graphs-boundary",
       "exitCode": 0,
-      "durationMs": 543,
+      "durationMs": 292,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-graphs-boundary.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-graphs-boundary.log"
     },
     {
       "command": "verify:graphs-runtime-boundary",
       "exitCode": 0,
-      "durationMs": 356,
+      "durationMs": 498,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-graphs-runtime-boundary.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-graphs-runtime-boundary.log"
     },
     {
       "command": "node scripts/startup/verify-magnus-out.mjs",
       "exitCode": 0,
-      "durationMs": 25,
+      "durationMs": 27,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/node.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/node.log"
     },
     {
       "command": "verify:privacy",
       "exitCode": 0,
-      "durationMs": 106,
+      "durationMs": 100,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-privacy.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-privacy.log"
     },
     {
       "command": "verify:config-uniqueness",
       "exitCode": 0,
-      "durationMs": 104,
+      "durationMs": 106,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-config-uniqueness.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-config-uniqueness.log"
     },
     {
       "command": "verify:startup",
       "exitCode": 0,
-      "durationMs": 113,
+      "durationMs": 130,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-startup.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-startup.log"
     },
     {
       "command": "verify:dialog-routing",
       "exitCode": 0,
-      "durationMs": 111,
+      "durationMs": 101,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 30000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-dialog-routing.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-dialog-routing.log"
     },
     {
       "command": "verify:typescript",
       "exitCode": 0,
-      "durationMs": 315,
+      "durationMs": 341,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-typescript.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-typescript.log"
     },
     {
       "command": "verify:supabase-migrations",
       "exitCode": 0,
-      "durationMs": 109,
+      "durationMs": 103,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-supabase-migrations.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-supabase-migrations.log"
     },
     {
       "command": "verify:supabase-rls-static",
       "exitCode": 0,
-      "durationMs": 105,
+      "durationMs": 101,
       "passed": true,
       "timedOut": false,
       "timeoutMs": 60000,
-      "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/assurance-logs/verify-supabase-rls-static.log"
+      "log": "/workspace/reports/graph-acceptance/phase-3-final/assurance-logs/verify-supabase-rls-static.log"
     }
   ]
 }

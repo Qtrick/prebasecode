@@ -1,9 +1,9 @@
 {
   "ok": true,
   "failures": [],
-  "platform": "darwin",
-  "architectureChosen": "native-appkit",
-  "nativePresent": true,
+  "platform": "linux",
+  "architectureChosen": "non-darwin",
+  "nativePresent": false,
   "testKind": "static-source-contract",
   "liveGui": "source-contracts-only",
   "notchGeometry": "NSScreen.safeAreaInsets + auxiliaryTopLeftArea/auxiliaryTopRightArea",
@@ -14,8 +14,8 @@
   "durationMs": 2,
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-static",
-  "sourceHead": "e9d63a6c4091b225e03b660cf201eca59dbb1106",
-  "sourceFingerprint": "4bba5924832ff69d14b5e245dfaff70c49a8361a3fb739a9adb26d4661494f0f",
-  "productFingerprint": "4bba5924832ff69d14b5e245dfaff70c49a8361a3fb739a9adb26d4661494f0f",
-  "generatedAt": "2026-09-01T03:21:31.164Z"
+  "sourceHead": "0fc0b5fafffea070a814e26afe5df8f8e0784470",
+  "sourceFingerprint": "27f3eb8213dece389597c9875fd81d3ae407d72b5703297b0713568cf973a8bd",
+  "productFingerprint": "27f3eb8213dece389597c9875fd81d3ae407d72b5703297b0713568cf973a8bd",
+  "generatedAt": "2026-09-03T08:52:14.295Z"
 }

@@ -205,7 +205,12 @@ export class PreBaseGraphEditor extends EditorPane {
 		const generation = ++this._webviewGeneration;
 		const webview = this._webviewDisposables.add(this.webviewService.createWebviewElement({
 			title: localize('prebase.graph.webviewTitle', "PreBase Graph"),
-			options: { retainContextWhenHidden: false },
+			options: {
+				retainContextWhenHidden: false,
+				// Graph canvases must not leave vscode-webview service-worker renderers
+				// alive after editor close (Phase 3 active-soak process growth).
+				disableServiceWorker: true,
+			},
 			contentOptions: {
 				allowScripts: true,
 				localResourceRoots: []
@@ -2530,6 +2535,7 @@ function drawTemporalFrame(ts) {
 	const labelLayout = computeTemporalLabelLayout(nodesToRender, temporalDiff.guides || [], transform.k, {
 		selectedNodeId: selectedNodeId,
 		hoveredNodeId: hoveredNodeId,
+		currentFileEntityId: temporalState && temporalState.currentFileEntityId,
 		filterQuery: filterValForLabels,
 		measureWidth: function (t, f) { return measureTextWidth(t, f); },
 		visibleNodeIds: visibleNodeIdSet,

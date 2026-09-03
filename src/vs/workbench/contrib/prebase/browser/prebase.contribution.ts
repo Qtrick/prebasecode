@@ -1101,7 +1101,7 @@ registerAction2(class extends Action2 {
 	constructor() {
 		super({ id: 'prebase.test.getDiagnostics', title: localize2('prebase.test.getDiagnostics', "Get PreBase Diagnostics (Smoke Test)"), category: localize2('prebase.category', "PreBase"), f1: false });
 	}
-	async run(accessor: ServicesAccessor, request?: { applyColorTheme?: string; zoomLevel?: number; accessibilitySupport?: 'auto' | 'on'; liveActivityMode?: string }) {
+	async run(accessor: ServicesAccessor, request?: { applyColorTheme?: string; zoomLevel?: number; accessibilitySupport?: 'auto' | 'on'; liveActivityMode?: string; networkLayoutMode?: string; projectGuidanceEnabled?: boolean }) {
 		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.getDiagnostics');
 		const themeService = accessor.get(IWorkbenchThemeService);
 		const configurationService = accessor.get(IConfigurationService);
@@ -1109,6 +1109,7 @@ registerAction2(class extends Action2 {
 		const layoutService = accessor.get(IWorkbenchLayoutService);
 		const editorService = accessor.get(IEditorService);
 		const accountService = accessor.get(IPreBaseAccountService);
+		const workspaceContextService = accessor.get(IWorkspaceContextService);
 		let debugService: IDebugService | undefined;
 		try { debugService = accessor.get(IDebugService); } catch { /* optional */ }
 		let markerService: IMarkerService | undefined;
@@ -1135,9 +1136,13 @@ registerAction2(class extends Action2 {
 		if (liveActivityMode === 'background' || liveActivityMode === 'alwaysWorking' || liveActivityMode === 'attentionOnly' || liveActivityMode === 'off') {
 			await configurationService.updateValue('prebase.magnus.liveActivity.mode', liveActivityMode);
 		}
-		const networkLayoutMode = (request as { networkLayoutMode?: string } | undefined)?.networkLayoutMode;
+		const networkLayoutMode = request?.networkLayoutMode;
 		if (typeof networkLayoutMode === 'string') {
 			await configurationService.updateValue('prebase.graph.networkLayoutMode', networkLayoutMode);
+		}
+		const projectGuidanceEnabled = request?.projectGuidanceEnabled;
+		if (typeof projectGuidanceEnabled === 'boolean') {
+			await configurationService.updateValue('prebase.magnus.projectGuidance.enabled', projectGuidanceEnabled);
 		}
 		let parserActiveRequests = 0;
 		let temporalActiveWrites = 0;
@@ -1189,6 +1194,7 @@ registerAction2(class extends Action2 {
 
 		let activeLanguageId = '';
 		let activeResourceMarkersCount = 0;
+		const activeResourceMarkers: Array<{ message: string; source: string; owner: string; code: string }> = [];
 		try {
 			const activeCodeEditor = editorService.activeTextEditorControl;
 			const model = (activeCodeEditor as any)?.getModel?.();
@@ -1197,7 +1203,18 @@ registerAction2(class extends Action2 {
 			}
 			const resource = editorService.activeEditor?.resource;
 			if (resource && markerService) {
-				activeResourceMarkersCount = markerService.read({ resource }).length;
+				const read = markerService.read({ resource });
+				activeResourceMarkersCount = read.length;
+				for (let i = 0; i < read.length && i < 24; i++) {
+					const m = read[i];
+					const code = typeof m.code === 'string' ? m.code : (typeof m.code === 'object' && m.code && 'value' in m.code ? String((m.code as { value: string | number }).value) : '');
+					activeResourceMarkers.push({
+						message: m.message,
+						source: m.source ?? '',
+						owner: m.owner ?? '',
+						code,
+					});
+				}
 			}
 		} catch { /* marker / editor optional */ }
 
@@ -1217,6 +1234,13 @@ registerAction2(class extends Action2 {
 			colorThemeType: theme.type,
 			zoomLevel: getZoomLevel(mainWindow),
 			accessibilitySupport: configurationService.getValue('editor.accessibilitySupport'),
+			liveActivityMode: configurationService.getValue('prebase.magnus.liveActivity.mode'),
+			networkLayoutMode: configurationService.getValue('prebase.graph.networkLayoutMode'),
+			projectGuidanceEnabled: configurationService.getValue('prebase.magnus.projectGuidance.enabled'),
+			workspaceFolders: workspaceContextService.getWorkspace().folders.map(folder => ({
+				uri: folder.uri.toString(),
+				name: folder.name,
+			})),
 			debug: {
 				sessionsCount: debugSessionsCount,
 				activeSessionName: debugActiveSessionName,
@@ -1224,6 +1248,7 @@ registerAction2(class extends Action2 {
 			editor: {
 				activeLanguageId,
 				activeResourceMarkersCount,
+				markers: activeResourceMarkers,
 			},
 			layout: {
 				sidebarVisible: layoutService.isVisible(Parts.SIDEBAR_PART),
@@ -1232,7 +1257,7 @@ registerAction2(class extends Action2 {
 				editorCount: editorService.visibleEditors.length,
 			},
 		};
-		if (applyId || typeof zoom === 'number') {
+		if (applyId || typeof zoom === 'number' || liveActivityMode || a11yMode || typeof networkLayoutMode === 'string' || typeof projectGuidanceEnabled === 'boolean') {
 			return result;
 		}
 		if (nativeHost) {
