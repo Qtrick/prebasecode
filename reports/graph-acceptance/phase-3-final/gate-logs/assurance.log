@@ -17,9 +17,7 @@
 [phase3-assurance] verify:supabase-migrations
 [phase3-assurance] verify:supabase-rls-static
 {
-  "ok": false,
-  "sourceHead": "01f049df21ab25e995b2d9401d4a32d0f81ea2fc",
-  "failed": [
-    "test:graphs"
-  ]
+  "ok": true,
+  "sourceHead": "2da47a5f1e83a7561e672aa051b03466a2aee311",
+  "failed": []
 }

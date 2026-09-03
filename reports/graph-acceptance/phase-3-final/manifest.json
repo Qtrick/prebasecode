@@ -1,18 +1,18 @@
 {
   "phase": "3-final",
-  "sourceHead": "01f049df21ab25e995b2d9401d4a32d0f81ea2fc",
-  "sourceFingerprint": "abc58972a073a07b2eb7c848157ee6263d83b02b63eb20947c9ea87d2184d661",
-  "productFingerprint": "abc58972a073a07b2eb7c848157ee6263d83b02b63eb20947c9ea87d2184d661",
+  "sourceHead": "2da47a5f1e83a7561e672aa051b03466a2aee311",
+  "sourceFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
+  "productFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
   "producerFingerprints": {
-    "parser-benchmark": "19b7f126b7c20b0ac2d6c54be85745e51e8f50f5151e07bee7d7dd5693e3ba17",
+    "parser-benchmark": "6f312c8653269c2bac8817fbf25f288a3b74bfa7609fe1847d4139b857807d20",
     "magnus-streaming-smoke": "b1b3fbf3fb805f79a2a830b5e432526802ed5e2d69afd011742bbd9a78b409dd",
     "magnus-guidance-smoke": "7b84f62df73c78dbb4cb287306e4e213baa6e1a6117f988133df9bddd51ec2b2",
     "magnus-live-activity": "30eb60bbbb0de2a0019fdb437ec644bf013b2526f69ea79eff1cc17d40f642f6",
-    "core-ide": "7ee90ac8adfc12900df734622761a62c2f4ff141310a5829ddf699c7ccbe7aab",
+    "core-ide": "d528fd6a5e76869846855240ee8a4552340c3487d953d69c09b57915ed9f228b",
     "runtime-preview": "435b04037c786e9f07a0a37a3be56990f1005460b7be8789a4170f1f5d803d92",
-    "temporal-small": "406cd03c8419e044a1d0b44812f881f50c65c0fe03f2392fd49082afc66fa58f",
-    "temporal-large": "de2c8e49e453603fbcddc6e4ef5f653d9fbef991520abac6dd431d923a220d95",
-    "temporal-canonical-scale": "082c605dbe0701c31df61a3a0f54cadeb4851ba10a24a11f10e9c0dd1ee9f872",
+    "temporal-small": "230cf434ac3f490b067df5b084ed8e0b936148bbb495bcfe0c915eae3dabf922",
+    "temporal-large": "3532bd5ccceb3da25b01321af1ba97c2479a61670e1d8069d4c3eb151da2d509",
+    "temporal-canonical-scale": "6affffa7a8c8265d2b4209f049e4abf302621ace8d15cb2d81708528321c177c",
     "electron-product-path": "50c22cb2e8ed2247d6b1bf5b626cf37756388e42b1df3b1944e49d916d83654b",
     "electron-native-cases": "49de7d484b361872616fd657ed56eee1779436113c078e20f05b0764e88fb65e",
     "tauri-product-path": "766d16897d7e8a4d01cda630c49a2c60afd27afe564c90d8de386c2545e59652",
@@ -20,16 +20,16 @@
     "magnus-tauri-tools": "50cb248a8fe9eca2d5d0cd5b6e39c7c9e8bbd0aebc271c8bd14ef9fa9caf2a01",
     "hybrid-web-smoke": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
     "privacy": "6c032cef581ab3cd459a54c1eb5344780bbd1f1592c39b3526a38051d08b268b",
-    "load-quit": "112ae174d50736f6d31517fcbf5ae9c7f31eeb0d3ccf3e3c92b9777457cdcdfc",
-    "lifecycle-cycles": "da0bdfee512c1c55999742e6a465079dc941af6e6564b9d02a4d015cb8bd3008",
+    "load-quit": "e74267d1ce5b3b51ff7c80bfd036bc675561b26ebd3a12cb8ea0e6f1a86f39bf",
+    "lifecycle-cycles": "c101b9d05281585501fd33a0463c9f40c5433687353845de7ec96a7fa71b0ab1",
     "electron-restart-soak": "af8660c2913ce14a927459612d089cbb4a15ac1d38f4837155777cb64eecef05",
     "tauri-restart-soak": "34ea9fd0fc4c49ca8777bf459580a9bd7132d231363b9e4ca167ff8a058bc527",
     "idle-soak": "868bc2be7f5ecaee5f6219ee73ad30ff4e2fc94cd0f9f6c8478f3e586f71f641",
-    "active-soak": "47f55c7d6237299512b68c660ca78b3291655af344855cd79d94804ac43223be",
-    "assurance": "a177b33a6f12b7aefef6aac4217390be7dc0b4c234d8f6210e72011f55eee286"
+    "active-soak": "a78d455b82af4f4ca00547b0c51b82fb12c68bcb0f8fdd0adc74af53c2c4bd0d",
+    "assurance": "992d8edda683bbec03e4b8d71007fa86c18c0ac763212a02a8247d737a0cc79f"
   },
-  "validationRunId": "2026-09-03T10-32-30-523Z",
-  "generatedAt": "2026-09-03T10:35:26.174Z",
+  "validationRunId": "2026-09-03T10-52-25-748Z",
+  "generatedAt": "2026-09-03T10:56:21.703Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -54,6 +54,7 @@
     "magnus-guidance-smoke: evidence producer fingerprint does not match current producer inputs",
     "magnus-live-activity: Live Activity AppKit path is macOS-only",
     "hybrid-web-smoke: local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
+    "load-quit: evidence producer fingerprint does not match current producer inputs",
     "idle-soak: evidence producer fingerprint does not match current producer inputs",
     "lifecycle-cycles: evidence producer fingerprint does not match current producer inputs",
     "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
@@ -63,8 +64,7 @@
     "themes-a11y: evidence producer fingerprint does not match current producer inputs",
     "privacy: evidence producer fingerprint does not match current producer inputs",
     "parser-benchmark: evidence producer fingerprint does not match current producer inputs",
-    "active-soak: evidence producer fingerprint does not match current producer inputs",
-    "assurance: ok:false"
+    "active-soak: evidence producer fingerprint does not match current producer inputs"
   ],
   "scenarios": [
     {
@@ -233,17 +233,8 @@
     {
       "id": "load-quit",
       "path": "shutdown/load-quit-matrix.json",
-      "ok": true,
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 173605,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log",
-        "logTail": "",
-        "harnessPid": 215423,
-        "timeoutMs": 1200000,
-        "leftoverPids": []
-      }
+      "ok": false,
+      "reason": "evidence producer fingerprint does not match current producer inputs"
     },
     {
       "id": "idle-soak",
@@ -363,8 +354,7 @@
   ],
   "assurance": {
     "path": "assurance.json",
-    "ok": false,
-    "reason": "ok:false"
+    "ok": true
   },
   "plannedProducers": [
     "parser-benchmark",
