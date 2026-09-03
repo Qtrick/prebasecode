@@ -8,7 +8,6 @@ import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { chromium } from 'playwright-core';
 import {
 	acquirePhase3AcceptanceLock,
 	dismissStartup,
@@ -17,6 +16,7 @@ import {
 	waitFor,
 	waitForWorkbenchDriver,
 	workbenchCommandWithTimeout,
+	launchPreBase,
 } from './workbenchHarness.mjs';
 import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 const scriptPath = fileURLToPath(import.meta.url);
@@ -56,14 +56,6 @@ function createFixture(port) {
 	return dir;
 }
 
-function processSnapshot(pid) {
-	try {
-		return execFileSync('ps', ['-o', 'pid=,ppid=,pcpu=,rss=,comm=', '-p', String(pid)], { encoding: 'utf8' }).trim() || 'gone';
-	} catch {
-		return 'gone';
-	}
-}
-
 async function confirmStartIfNeeded(page) {
 	const prompt = page.getByText('Start preview server?');
 	if (!await prompt.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
@@ -99,29 +91,10 @@ async function run() {
 		mkdirSync(screenshotDir, { recursive: true });
 		const port = allocatePort();
 		const fixture = createFixture(port);
-		const launch = join(repo, '.agents/skills/launch/scripts/launch.sh');
-		const { execFile } = await import('node:child_process');
-		const { promisify } = await import('node:util');
-		const execFileAsync = promisify(execFile);
-		const { stdout } = await execFileAsync(launch, ['--repo', repo, '--', '--enable-smoke-test-driver', '--skip-release-notes', '--skip-welcome', fixture], {
-			cwd: repo,
-			env: {
-				...process.env,
-				HTTP_PROXY: '',
-				HTTPS_PROXY: '',
-				ALL_PROXY: '',
-				VSCODE_SKIP_PRELAUNCH: process.env.VSCODE_SKIP_PRELAUNCH ?? '1',
-			},
-			maxBuffer: 10 * 1024 * 1024,
-		});
-		const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
-		let browser;
-		let page;
+		const launched = await launchPreBase(repo, fixture);
+		const { info, browser, page } = launched;
 		let evidence = { ...phase3EvidenceMetadata(repo, 'runtime-preview'), fixture, port, pid: info.pid, cdpPort: info.cdpPort, logFile: info.logFile };
 		try {
-			browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
-			page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
-			if (!page) throw new Error('Workbench page not found');
 			await dismissStartup(page);
 			await waitForWorkbenchDriver(page);
 

@@ -1329,11 +1329,22 @@ test('runtime-preview live uses smoke-driver commands, not macOS-only Command Pa
 	const source = readFileSync(join(acceptanceDir, 'runtime-preview-live.mjs'), 'utf8');
 	assert.match(source, /workbenchCommandWithTimeout/);
 	assert.match(source, /waitForWorkbenchDriver/);
+	assert.match(source, /launchPreBase/);
 	assert.match(source, /prebase\.runtime\.open/);
 	assert.match(source, /workbench\.view\.prebase\.runtime/);
 	assert.doesNotMatch(source, /keyboard\.press\(['"]Shift\+Meta\+P['"]\)/);
 	assert.doesNotMatch(source, /keyboard\.press\(['"]Control\+Shift\+P['"]\)/);
 	assert.doesNotMatch(source, /quick-input-widget/);
+});
+
+test('runtime editor idle clear must not recurse through beginPreviewNavigation', () => {
+	const source = readFileSync(join(repoRoot, 'src/vs/workbench/contrib/prebase/browser/runtimeEditor.ts'), 'utf8');
+	assert.match(source, /_applyingSessionLoad/);
+	const idleBranch = source.slice(source.indexOf('if (!(session.running || session.previewConnected || session.serverRunning))'));
+	const idleBody = idleBranch.slice(0, idleBranch.indexOf('if (!force && this._loadedUrl === session.url)'));
+	const idleWithoutComments = idleBody.replace(/\/\/.*$/gm, '');
+	assert.doesNotMatch(idleWithoutComments, /beginPreviewNavigation/);
+	assert.match(idleWithoutComments, /_postPreviewCommand\('clear'\)/);
 });
 
 test('smoke diagnostics and transport stay off the Command Palette and require the smoke-test driver', () => {
