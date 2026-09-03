@@ -4,7 +4,9 @@
 	"version": "0.0.0",
 	"identifier": "com.prebase.desktop-tauri-fixture",
 	"build": {
-		"frontendDist": "../web"
+		"frontendDist": "../web",
+		"devUrl": "http://127.0.0.1:1430",
+		"beforeDevCommand": "python3 -m http.server 1430 --bind 127.0.0.1 --directory web"
 	},
 	"app": {
 		"withGlobalTauri": true,

@@ -52,7 +52,7 @@ suite('smokeTestGuard', () => {
 		);
 		assert.match(diagnostics, /getActiveRequestCount\(\)/);
 		assert.match(diagnostics, /getActiveWriteCount\(\)/);
-		assert.match(diagnostics, /if \(applyId \|\| typeof zoom === 'number'\) \{\s*return result;/);
+		assert.match(diagnostics, /if \(applyId \|\| typeof zoom === 'number' \|\| liveActivityMode \|\| a11yMode \|\| typeof networkLayoutMode === 'string' \|\| typeof projectGuidanceEnabled === 'boolean'\) \{\s*return result;/);
 		assert.match(diagnostics, /colorTheme: theme\.settingsId/);
 		assert.match(diagnostics, /colorThemeType: theme\.type/);
 		assert.match(diagnostics, /zoomLevel: getZoomLevel\(mainWindow\)/);

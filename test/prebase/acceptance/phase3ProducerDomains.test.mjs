@@ -104,9 +104,14 @@ describe('phase3 producer domains', () => {
 	test('live-activity files schedule magnus-live-activity without electron restart soak', () => {
 		const domains = domainsForPath('native/prebase-live-activity/src/live_activity.mm');
 		assert.deepEqual(domains, ['live-activity']);
+		assert.ok(
+			domainsForPath('src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts').includes('live-activity'),
+			'session dispatch must fingerprint live-activity',
+		);
 		const { producers, unknown } = producersForCommitTier([
 			'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts',
 			'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts',
+			'src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts',
 			'native/prebase-live-activity/src/live_activity.mm',
 		]);
 		assert.equal(unknown.length, 0);

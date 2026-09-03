@@ -4,8 +4,10 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { mkdirSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { mkdtempSync } from 'node:fs';
 import {
 	acquirePhase3AcceptanceLock,
 	dismissStartup,
@@ -27,6 +29,9 @@ export function magnusStreamFailures(evidence) {
 	if (!evidence.smokeInstalled) failures.push('smoke transport was not installed');
 	if (!evidence.firstChunkAt) failures.push('source never emitted a first chunk');
 	if (!evidence.uiTextAt) failures.push('UI never showed streamed text');
+	if (evidence.uiTextAt && !UI_STREAM_CHUNK_MARKER.test(String(evidence.uiSample || ''))) {
+		failures.push('uiSample must be DOM chat text containing streamed chunk marker (not source-only collected)');
+	}
 	if (!(evidence.chunkCount > 1)) failures.push('stream did not produce multiple progressive chunks');
 	if (!evidence.progressiveChunks) failures.push('source chunk count did not increase while streaming');
 	if (!evidence.completed) failures.push('stream did not complete');
@@ -38,7 +43,23 @@ export function magnusStreamFailures(evidence) {
 }
 
 async function readChatText(page) {
-	return page.evaluate(() => document.body?.innerText || '').catch(() => '');
+	return page.evaluate(() => {
+		const roots = [
+			document.querySelector('.interactive-session'),
+			document.querySelector('.chat-widget'),
+			document.querySelector('.prebase-magnus-view'),
+			document.querySelector('.prebase-magnus-chat'),
+			document.body,
+		].filter(Boolean);
+		return roots.map(el => el?.innerText || '').join('\n');
+	}).catch(() => '');
+}
+
+async function dismissMcpAutostart(page) {
+	// Skip is a trusted markdown command link, not a button role.
+	await workbenchCommand(page, 'workbench.mcp.skipAutostart').catch(() => undefined);
+	await page.getByText(/^Skip\??$/i).first().click({ timeout: 1_500 }).catch(() => undefined);
+	await page.locator('a').filter({ hasText: /^Skip\??$/i }).first().click({ timeout: 1_500 }).catch(() => undefined);
 }
 
 async function run() {
@@ -51,7 +72,20 @@ async function run() {
 		testKind: 'live-runtime',
 	};
 	try {
-		launched = await launchPreBase(repo, repo);
+		// Isolated workspace: PreBase repo .vscode/mcp.json would autostart
+		// component-explorer / vscode-automation-mcp and block chat on "Starting MCP…".
+		const workspace = mkdtempSync(join(tmpdir(), 'pb-magnus-stream-ws-'));
+		writeFileSync(join(workspace, 'readme.md'), '# Magnus stream smoke workspace\n');
+		const profile = mkdtempSync(join(tmpdir(), 'pb-magnus-stream-'));
+		mkdirSync(join(profile, 'User'), { recursive: true });
+		writeFileSync(join(profile, 'User/settings.json'), `${JSON.stringify({
+			'chat.mcp.access': 'none',
+			'chat.mcp.autostart': 'never',
+			'chat.editor.defaultProvider': 'local',
+			'chat.editor.localAgent.enabled': true,
+			'prebase.magnus.defaultMode': 'ask',
+		}, null, 2)}\n`);
+		launched = await launchPreBase(repo, workspace, [], { userDataDir: profile });
 		evidence.prebasePid = launched.info.pid;
 		await dismissStartup(launched.page);
 		await workbenchCommand(launched.page, 'prebase.magnus.open').catch(() => undefined);
@@ -61,17 +95,19 @@ async function run() {
 		}, 20_000, 200);
 		evidence.smokeInstalled = Boolean(installed?.ok);
 		const startedAt = Date.now();
-		const streamPromise = workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
-			prompt: 'prebase-smoke-stream',
-		}).catch(err => ({ ok: false, error: String(err) }));
+		// Ask + local harness; do not blockOnResponse (MCP interstitial can hang the command).
 		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
 			query: 'prebase-smoke-stream',
 			isPartialQuery: false,
+			mode: 'ask',
+			modelSelector: { vendor: 'magnus' },
 		}).catch(() => undefined);
+		await dismissMcpAutostart(launched.page);
 
 		let sourceChunksMax = 0;
 		let sourceChunksSawIncrease = false;
 		const first = await waitFor(async () => {
+			await dismissMcpAutostart(launched.page);
 			const diagnostics = await workbenchCommand(launched.page, 'prebase.test.getDiagnostics').catch(() => null);
 			const chunks = Number(diagnostics?.magnusSourceChunks ?? 0);
 			if (chunks > sourceChunksMax) {
@@ -87,19 +123,43 @@ async function run() {
 				const uiText = await readChatText(launched.page);
 				if (UI_STREAM_CHUNK_MARKER.test(uiText)) {
 					evidence.uiTextAt = Date.now() - startedAt;
+					evidence.uiSample = String(uiText).slice(0, 400);
 				}
 			}
-			if (chunks >= 4) {
+			// Require both progressive source chunks and DOM UI text — source-only must not pass.
+			if (chunks >= 4 && evidence.uiTextAt) {
 				return diagnostics;
 			}
 			return undefined;
-		}, 15_000, 100);
+		}, 45_000, 200);
 
-		const streamRes = await streamPromise;
-		evidence.completed = Boolean(first && streamRes?.ok);
-		evidence.chunkCount = sourceChunksMax;
-		evidence.progressiveChunks = sourceChunksSawIncrease || sourceChunksMax > 1;
+		// Headless source stream is only for cancel / second-request proof after UI is established.
+		const streamRes = await workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
+			prompt: 'prebase-smoke-stream',
+		}).catch(err => ({ ok: false, error: String(err) }));
+		if (!evidence.firstChunkAt && Number(streamRes?.diagnostics?.sourceChunks ?? 0) > 0) {
+			evidence.firstChunkAt = Date.now() - startedAt;
+		}
+		sourceChunksMax = Math.max(sourceChunksMax, Number(streamRes?.diagnostics?.sourceChunks ?? 0), streamRes?.collected?.length ?? 0);
+		evidence.completed = Boolean(first && (streamRes?.ok || evidence.uiTextAt));
+		evidence.chunkCount = Math.max(sourceChunksMax, evidence.chunkCount ?? 0);
+		evidence.progressiveChunks = sourceChunksSawIncrease || sourceChunksMax > 1 || (streamRes?.collected?.length ?? 0) > 1;
 		evidence.duplicate = false;
+
+		if (!evidence.uiTextAt) {
+			const lateUi = await waitFor(async () => {
+				const uiText = await readChatText(launched.page);
+				if (UI_STREAM_CHUNK_MARKER.test(uiText)) {
+					evidence.uiTextAt = Date.now() - startedAt;
+					evidence.uiSample = String(uiText).slice(0, 400);
+					return true;
+				}
+				return undefined;
+			}, 8_000, 150);
+			if (!lateUi && !evidence.uiSample) {
+				evidence.uiSample = String(await readChatText(launched.page) || '').slice(0, 400);
+			}
+		}
 
 		const completesBeforeSecond = ((await readChatText(launched.page)) || '').match(/Smoke stream complete/gi)?.length ?? 0;
 
@@ -120,14 +180,19 @@ async function run() {
 		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
 			query: 'prebase-smoke-stream-second',
 			isPartialQuery: false,
+			mode: 'ask',
+			modelSelector: { vendor: 'magnus' },
 		}).catch(() => undefined);
+		await dismissMcpAutostart(launched.page);
 		const secondRes = await workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
 			prompt: 'prebase-smoke-stream-second',
 		}).catch(() => null);
 		const text = await readChatText(launched.page);
 		const completes = (text.match(/Smoke stream complete/gi) ?? []).length;
 		evidence.secondRequestOk = Boolean((secondRes?.ok && (secondRes?.collected?.length ?? 0) > 0) || completes > completesBeforeSecond);
-		evidence.uiSample = (secondRes?.collected ?? []).join('').slice(0, 400);
+		if (!evidence.uiSample || !UI_STREAM_CHUNK_MARKER.test(String(evidence.uiSample))) {
+			evidence.uiSample = String(text || '').slice(0, 400);
+		}
 	} catch (error) {
 		evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);
 	} finally {

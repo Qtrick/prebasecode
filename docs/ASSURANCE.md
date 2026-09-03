@@ -69,7 +69,7 @@ Record findings in [BETA_READINESS.md](BETA_READINESS.md) under BETA-014.
 
 ## CI
 
-Pull requests run the **PreBase assurance (fast)** job in [`.github/workflows/pr.yml`](../.github/workflows/pr.yml) on `ubuntu-latest`: `npm ci` (Electron download skipped), then `npm run transpile-client` (populates `out/` for `verify:startup`), then `assurance:quick` + `assurance:privacy`. Optional GUI launch is **not** run in CI (`PREBASE_STARTUP_LAUNCH` unset).
+Pull requests run the **PreBase assurance (fast)** job in [`.github/workflows/pr.yml`](../.github/workflows/pr.yml) on `ubuntu-latest`: `npm ci` (Electron download skipped), then `npm run transpile-client` (populates `out/` for `verify:startup`), then `assurance:quick` + `assurance:privacy`. `assurance:quick` includes Linux-readable Live Activity product-truth contracts (`test:live-activity-contracts`). A parallel **`magnus-live-activity-macos`** job compiles the AppKit addon and runs static/perf contracts on `macos-14`. Optional GUI launch is **not** run in CI (`PREBASE_STARTUP_LAUNCH` unset). Full PreBase+notch live producer remains a Darwin host requirement.
 
 Full upstream compile/hygiene remains in the existing **Compile & Hygiene** job.
 

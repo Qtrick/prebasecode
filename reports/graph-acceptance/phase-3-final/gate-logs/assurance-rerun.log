@@ -1,0 +1,14 @@
+[12:18:18] START assurance
+estimated 8m0s (timeout 8m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/assurance.log
+[12:22:13] PASS assurance
+elapsed 3m54s
+{
+  "ok": false,
+  "failures": [
+    "active-soak: active-phase process growth unbounded: 10 → peak 57 (max Δ 18); quiesce process count elevated vs baseline: 10 → 59 (max Δ 12); quiesce RSS elevated vs baseline: 1826MB → 7249.8MB (max Δ 2800MB)"
+  ],
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "validationRunId": "2026-09-03T12-18-02-982Z"
+}

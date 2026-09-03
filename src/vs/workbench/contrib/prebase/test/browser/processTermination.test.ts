@@ -107,4 +107,21 @@ suite('sanitizeOwnedDesktopChildEnv', () => {
 		assert.strictEqual(childEnv.KEEP, 'overlaid');
 		assert.strictEqual(childEnv.PATH, '/usr/bin');
 	});
+
+	test('Linux owned children pin GSETTINGS_BACKEND=memory and strip proxy vars', () => {
+		if (process.platform !== 'linux') {
+			return;
+		}
+		const childEnv = sanitizeOwnedDesktopChildEnv({
+			PATH: '/usr/bin',
+			http_proxy: 'http://127.0.0.1:9',
+			HTTPS_PROXY: 'http://127.0.0.1:9',
+			GSETTINGS_BACKEND: 'dconf',
+		}, {
+			http_proxy: 'http://evil:9',
+		});
+		assert.strictEqual(childEnv.GSETTINGS_BACKEND, 'memory');
+		assert.strictEqual(childEnv.http_proxy, undefined);
+		assert.strictEqual(childEnv.HTTPS_PROXY, undefined);
+	});
 });

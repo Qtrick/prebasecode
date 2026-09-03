@@ -1,0 +1,59 @@
+name: PreBase PR Assurance
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  prebase-assurance:
+    name: PreBase assurance (fast)
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install dependencies
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: '1'
+          PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+        run: npm ci
+
+      - name: Transpile client (startup gate needs out/)
+        run: npm run transpile-client
+
+      - name: Assurance quick + privacy
+        run: |
+          npm run assurance:quick
+          npm run assurance:privacy
+
+  magnus-live-activity-macos:
+    name: Magnus Live Activity (macOS AppKit)
+    runs-on: macos-14
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install node-gyp + node-addon-api (binding.gyp include path)
+        run: |
+          npm install -g node-gyp
+          npm install --no-save --ignore-scripts node-addon-api@8.3.1
+
+      - name: Compile AppKit Live Activity addon
+        run: node native/prebase-live-activity/build.mjs
+
+      - name: Static + state product-truth contracts
+        run: npm run test:live-activity-contracts
+
+      - name: Native napi perf / presentation product-truth
+        run: node test/prebase/acceptance/prebase-live-activity-perf.mjs

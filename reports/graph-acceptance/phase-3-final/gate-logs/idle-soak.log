@@ -4,8 +4,8 @@
   "samples": 30,
   "durationMs": 900000,
   "quit": {
-    "before": "42099     1   0.0 130544 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
-    "latencyMs": 427,
+    "before": "317205       1  0.5 233748 prebase",
+    "latencyMs": 215,
     "remaining": "gone"
   }
 }

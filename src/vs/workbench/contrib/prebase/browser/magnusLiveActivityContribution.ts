@@ -44,6 +44,8 @@ import {
 	LIVE_ACTIVITY_COMPLETED_HOLD_MS,
 	redactLiveActivityText,
 	selectPrimaryMagnusSession,
+	canonicalizeLiveActivityPanelState,
+	resolveLiveActivityPanelState,
 	shouldShowLiveActivity,
 	summarizeMagnusWorkspaceDiff,
 	type LiveActivityCommand,
@@ -266,11 +268,19 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		terminalCount?: number;
 		testState?: MagnusLiveActivitySnapshot['testState'];
 		presentationLabel?: string;
+		panelState?: string;
+		/** Honest provenance: renderer projection never claims native hover/peek fidelity. */
+		panelStateSource?: 'renderer-projection';
+		screenLocked?: boolean;
+		userDismissedAttention?: boolean;
+		prebaseForeground?: boolean;
 	} = { backend: isMacintosh && !isWeb ? 'unavailable' : 'non-mac', revision: 0 };
 
 	private readonly _main: IMagnusLiveActivityMainService | undefined;
 	private _revision = 0;
 	private _pinned = false;
+	private _userDismissedAttention = false;
+	private _publishGeneration = 0;
 	private _screenLocked = false;
 	private _nativeConnected = false;
 	private _completionHoldUntil: number | undefined;
@@ -333,6 +343,13 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 				this._screenLocked = false;
 				this._push.schedule();
 			}));
+			// Cold start: do not wait for the next lock event — query current idle/lock state.
+			void this.nativeHostService.getSystemIdleState(1).then(state => {
+				if (state === 'locked' && MagnusLiveActivityContribution.instance === this) {
+					this._screenLocked = true;
+					this._push.schedule();
+				}
+			});
 		}
 		this._register(this._main.onDidCommand(command => void this._handleCommand(command)));
 		void this._main.getNativeBackend().then(backend => {
@@ -405,6 +422,9 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		});
 		const prevStatus = this._lastSnapshot?.status;
 		this._lastSnapshot = snapshot;
+		if (snapshot.status !== 'attention') {
+			this._userDismissedAttention = false;
+		}
 		const terminalStatus = snapshot.status === 'completed' || snapshot.status === 'failed';
 		if (terminalStatus && prevStatus !== snapshot.status) {
 			this._completionHoldUntil = Date.now() + LIVE_ACTIVITY_COMPLETED_HOLD_MS;
@@ -418,6 +438,16 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			this._completionHidden = true;
 		}
 		const visible = !this._completionHidden && shouldShowLiveActivity(this._mode(), snapshot);
+		// Renderer panelState is a projection from pin + snapshot + sticky Escape.
+		// Native hover/peek/attentionCompact truth lives in native diagnostics.activePresentationState.
+		const panelState = canonicalizeLiveActivityPanelState(resolveLiveActivityPanelState({
+			visible,
+			hovering: false,
+			pinned: this._pinned && visible,
+			userDismissedAttention: this._userDismissedAttention,
+			snapshot,
+			now: Date.now(),
+		}));
 		if (visible && (snapshot.status === 'working' || snapshot.status === 'waiting' || snapshot.status === 'attention')) {
 			const delay = calculateNextElapsedBoundaryDelayMs(Date.now(), snapshot.startedAt);
 			if (delay !== undefined) {
@@ -440,15 +470,41 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 			terminalCount: snapshot.terminalCount,
 			testState: snapshot.testState,
 			presentationLabel: snapshot.presentationLabel,
+			panelState,
+			panelStateSource: 'renderer-projection',
+			screenLocked: Boolean(snapshot.screenLocked),
+			userDismissedAttention: this._userDismissedAttention,
+			prebaseForeground: Boolean(snapshot.prebaseForeground),
 		};
 		const reducedMotion = this.accessibilityService.isMotionReduced()
 			|| Boolean(this.configurationService.getValue<boolean>('prebase.graph.reduceMotion'));
-		void this._main.setSnapshot(snapshot);
-		void this._main.setPresentation({
+		const generation = ++this._publishGeneration;
+		void this._flushNative(generation, snapshot, {
 			visible,
 			pinned: this._pinned && visible,
 			reducedMotion,
 			display: this._display(),
+		});
+	}
+
+	private async _flushNative(
+		generation: number,
+		snapshot: MagnusLiveActivitySnapshot,
+		presentation: { visible: boolean; pinned: boolean; reducedMotion: boolean; display: MagnusLiveActivityDisplay },
+	): Promise<void> {
+		if (!this._main || generation !== this._publishGeneration) {
+			return;
+		}
+		// Presentation before snapshot:
+		// - hide/lock must not flash expanded attention
+		// - show/unlock must be visible before applySnapshotDict can expand attentionPeek (mayExpand)
+		await this._main.setPresentation(presentation);
+		if (generation !== this._publishGeneration) {
+			return;
+		}
+		await this._main.setSnapshot({
+			...snapshot,
+			userDismissedAttention: this._userDismissedAttention,
 		});
 	}
 
@@ -464,8 +520,15 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		}
 		if (command.kind === 'pin') {
 			this._pinned = true;
+			this._userDismissedAttention = false;
 			this._completionHidden = false;
 			this._completionTimer.cancel();
+			this._push.schedule();
+			return;
+		}
+		if (command.kind === 'dismissAttention') {
+			this._userDismissedAttention = true;
+			this._pinned = false;
 			this._push.schedule();
 			return;
 		}

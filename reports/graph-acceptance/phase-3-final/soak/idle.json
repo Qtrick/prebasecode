@@ -1,1941 +1,2361 @@
 {
   "schemaVersion": 3,
   "scenario": "idle-soak",
-  "sourceHead": "a5664becce62c5c8f42fd12a194f81ef395d41a1",
-  "sourceFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "productFingerprint": "60f14491a76a59123cf82efb57ec89a29e7f2b5ca3e0d0581720b9a8b87e35a1",
-  "generatedAt": "2026-08-30T03:44:18.246Z",
+  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
+  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
+  "generatedAt": "2026-09-03T11:50:31.744Z",
   "producerId": "idle-soak",
-  "producerFingerprint": "be1b74cefd0fa436431f772c72446826c46af7c8d80a13c0a911fffa4d187e67",
+  "producerFingerprint": "868bc2be7f5ecaee5f6219ee73ad30ff4e2fc94cd0f9f6c8478f3e586f71f641",
   "kind": "idle",
   "durationMs": 900000,
   "intervalMs": 30000,
-  "prebasePid": 42099,
+  "prebasePid": 317205,
   "samples": [
     {
-      "at": "2026-08-30T03:44:22.356Z",
-      "processCount": 8,
-      "cpuSum": 15,
-      "rssMb": 1669.5,
+      "at": "2026-09-03T11:50:37.904Z",
+      "processCount": 10,
+      "cpuSum": 258.1,
+      "rssMb": 1927.7,
       "processes": [
         {
-          "pid": 42099,
+          "pid": 317205,
           "ppid": 1,
-          "cpu": 2.2,
-          "rssMb": 254.3,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+          "cpu": 55.1,
+          "rssMb": 278.7,
+          "comm": "prebase"
         },
         {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 1.9,
-          "rssMb": 96.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 56.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 44.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 11.2,
+          "rssMb": 170.6,
+          "comm": "prebase"
         },
         {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 9.5,
-          "rssMb": 681.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 1.1,
-          "rssMb": 166.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 91.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0.3,
-          "rssMb": 248.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 85.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:44:52.384Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 1529.3,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 219.1,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 90.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 47.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 620.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 120.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 91.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 254.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 85.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:45:22.409Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 1390.6,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 219.8,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 81.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 47.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 539.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 102.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 84.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 230,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 85.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:45:52.436Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 1251,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 219.2,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 79.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 47.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 446.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 102,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 83.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 202.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 68.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:46:22.462Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 1160.9,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 214.1,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 78.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 47.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 412.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 101.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 83.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 154.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 68.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:46:52.490Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 1160.9,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 214.1,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 78.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 47.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 412.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 101.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 83.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 154.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 68.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:47:22.518Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 1159.9,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 214.1,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 78.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 47.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 411.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 101.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 83.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 154.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 68.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:47:52.546Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 1159.9,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 214.1,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 78.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 47.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 411.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 101.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 83.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 154.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 68.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:48:22.574Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 919.8,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 173.3,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 69.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 234,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 97.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 78,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 152.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 68.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:48:52.601Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 919.8,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 173.4,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 69.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 234,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 97.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 78,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 152.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 68.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:49:22.628Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 845.5,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 166.4,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 66.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 228.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 80.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 123.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 68.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:49:52.656Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 803.7,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 161.1,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 65.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 223,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 80.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 96.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 67.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:50:22.681Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 755.3,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 158.7,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 203.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 79.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 81.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:50:52.709Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 755.3,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 158.7,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 203.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 79.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 81.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:51:22.737Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 740.3,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 156,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 193,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 79.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 79.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:51:52.766Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 697.6,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 156.5,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 45.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 165.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 70,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 75.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:52:22.796Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 717.9,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 155.5,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 63.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 45.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 188.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 70.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 63.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 75.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:52:52.828Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 708.4,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 152.8,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 178.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 70.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 75.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:53:22.857Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 703,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 153.3,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 171.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 71.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 63.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 75.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:53:52.885Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 703.2,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 153.3,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 171.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 71.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 75.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:54:22.912Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 709,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 153,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 65.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 168.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 79,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 76.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:54:52.941Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 709.4,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 153.2,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 65.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 168.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 79,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 76.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:55:22.968Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 714.7,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 152.3,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 65.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 177.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 77.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 76.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:55:52.994Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 712.9,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 150.2,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 65.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 177.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 77.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 76.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:56:23.022Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 718.6,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 152.5,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 65.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 46.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 180.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 77.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 76.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 56,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:56:53.068Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 689,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
-          "cpu": 0,
-          "rssMb": 151.1,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
-        },
-        {
-          "pid": 42114,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 62.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 44.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 165.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
-        },
-        {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 69.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 63.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
-        },
-        {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 75,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 57.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        }
-      ]
-    },
-    {
-      "at": "2026-08-30T03:57:23.093Z",
-      "processCount": 8,
-      "cpuSum": 0.1,
-      "rssMb": 696.7,
-      "processes": [
-        {
-          "pid": 42099,
-          "ppid": 1,
+          "pid": 317228,
+          "ppid": 317205,
           "cpu": 0.1,
-          "rssMb": 151.6,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+          "rssMb": 56.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42114,
-          "ppid": 42099,
+          "pid": 317230,
+          "ppid": 317228,
           "cpu": 0,
-          "rssMb": 64.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "rssMb": 13.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 45.5,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 89.9,
+          "rssMb": 747.6,
+          "comm": "prebase"
         },
         {
-          "pid": 42133,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 167.9,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 80.8,
+          "comm": "prebase"
         },
         {
-          "pid": 42233,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 70.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 21.5,
+          "rssMb": 178.4,
+          "comm": "prebase"
         },
         {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 64.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 51.7,
+          "rssMb": 129.5,
+          "comm": "prebase"
         },
         {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 75.7,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
-        },
-        {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 57.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 28.1,
+          "rssMb": 216.3,
+          "comm": "prebase"
         }
       ]
     },
     {
-      "at": "2026-08-30T03:57:53.126Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 598.1,
+      "at": "2026-09-03T11:51:07.917Z",
+      "processCount": 10,
+      "cpuSum": 46.4,
+      "rssMb": 1535.5,
       "processes": [
         {
-          "pid": 42099,
+          "pid": 317205,
           "ppid": 1,
-          "cpu": 0,
-          "rssMb": 131,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+          "cpu": 11.7,
+          "rssMb": 231.4,
+          "comm": "prebase"
         },
         {
-          "pid": 42114,
-          "ppid": 42099,
+          "pid": 317227,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 60.3,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "rssMb": 56.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 44.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 2.6,
+          "rssMb": 148.7,
+          "comm": "prebase"
         },
         {
-          "pid": 42133,
-          "ppid": 42099,
+          "pid": 317228,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 104.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
+          "rssMb": 56.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42233,
-          "ppid": 42099,
+          "pid": 317230,
+          "ppid": 317228,
           "cpu": 0,
-          "rssMb": 66,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "rssMb": 13.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 62.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 18.5,
+          "rssMb": 463.8,
+          "comm": "prebase"
         },
         {
-          "pid": 42235,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 74,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 82.9,
+          "comm": "prebase"
         },
         {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 54.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 3.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 6.8,
+          "rssMb": 129.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 3.6,
+          "rssMb": 216.6,
+          "comm": "prebase"
         }
       ]
     },
     {
-      "at": "2026-08-30T03:58:23.153Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 629.6,
+      "at": "2026-09-03T11:51:37.928Z",
+      "processCount": 10,
+      "cpuSum": 25.8,
+      "rssMb": 1519.6,
       "processes": [
         {
-          "pid": 42099,
+          "pid": 317205,
           "ppid": 1,
-          "cpu": 0,
-          "rssMb": 133.9,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+          "cpu": 6.6,
+          "rssMb": 230,
+          "comm": "prebase"
         },
         {
-          "pid": 42114,
-          "ppid": 42099,
+          "pid": 317227,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 59.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "rssMb": 56.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 43.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 1.4,
+          "rssMb": 148.2,
+          "comm": "prebase"
         },
         {
-          "pid": 42133,
-          "ppid": 42099,
+          "pid": 317228,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 145.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
+          "rssMb": 56.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42233,
-          "ppid": 42099,
+          "pid": 317230,
+          "ppid": 317228,
           "cpu": 0,
-          "rssMb": 65.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "rssMb": 13.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 59.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 10.7,
+          "rssMb": 453.2,
+          "comm": "prebase"
         },
         {
-          "pid": 42235,
-          "ppid": 42099,
+          "pid": 317259,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 70.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
+          "rssMb": 82.6,
+          "comm": "prebase"
         },
         {
-          "pid": 42254,
-          "ppid": 42235,
-          "cpu": 0,
-          "rssMb": 52.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 1.6,
+          "rssMb": 135.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 3.6,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 1.9,
+          "rssMb": 215.5,
+          "comm": "prebase"
         }
       ]
     },
     {
-      "at": "2026-08-30T03:58:53.179Z",
-      "processCount": 8,
-      "cpuSum": 0,
-      "rssMb": 628.2,
+      "at": "2026-09-03T11:52:07.935Z",
+      "processCount": 10,
+      "cpuSum": 17.9,
+      "rssMb": 1516.8,
       "processes": [
         {
-          "pid": 42099,
+          "pid": 317205,
           "ppid": 1,
-          "cpu": 0,
-          "rssMb": 134.4,
-          "comm": "./.build/electron/PreBase.app/Contents/MacOS/PreBase"
+          "cpu": 4.6,
+          "rssMb": 227.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42114,
-          "ppid": 42099,
+          "pid": 317227,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 59.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "rssMb": 56.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42115,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 43.6,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 1,
+          "rssMb": 148.2,
+          "comm": "prebase"
         },
         {
-          "pid": 42133,
-          "ppid": 42099,
+          "pid": 317228,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 143.8,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Renderer).app/Contents/MacOS/PreBase Helper (Renderer)"
+          "rssMb": 56.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42233,
-          "ppid": 42099,
+          "pid": 317230,
+          "ppid": 317228,
           "cpu": 0,
-          "rssMb": 65.4,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "rssMb": 13.3,
+          "comm": "prebase"
         },
         {
-          "pid": 42234,
-          "ppid": 42099,
-          "cpu": 0,
-          "rssMb": 59.2,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper.app/Contents/MacOS/PreBase Helper"
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 7.4,
+          "rssMb": 452.9,
+          "comm": "prebase"
         },
         {
-          "pid": 42235,
-          "ppid": 42099,
+          "pid": 317259,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 70.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
+          "rssMb": 82.6,
+          "comm": "prebase"
         },
         {
-          "pid": 42254,
-          "ppid": 42235,
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 1.1,
+          "rssMb": 135.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 2.5,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 1.3,
+          "rssMb": 215.5,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:52:37.947Z",
+      "processCount": 10,
+      "cpuSum": 13.6,
+      "rssMb": 1471.3,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 3.5,
+          "rssMb": 227.4,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
           "cpu": 0,
-          "rssMb": 52.1,
-          "comm": "/Users/qunyingfan/Prebasecode/.build/electron/PreBase.app/Contents/Frameworks/PreBase Helper (Plugin).app/Contents/MacOS/PreBase Helper (Plugin)"
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.7,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 5.7,
+          "rssMb": 446.2,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.8,
+          "rssMb": 135.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 1.9,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 1,
+          "rssMb": 176.5,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:53:07.956Z",
+      "processCount": 10,
+      "cpuSum": 11,
+      "rssMb": 1471.3,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 2.8,
+          "rssMb": 227.4,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.6,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 4.6,
+          "rssMb": 446.2,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.7,
+          "rssMb": 135.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 1.5,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.8,
+          "rssMb": 176.5,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:53:37.964Z",
+      "processCount": 10,
+      "cpuSum": 9.2,
+      "rssMb": 1472.1,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 2.4,
+          "rssMb": 227.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.5,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 3.8,
+          "rssMb": 446.8,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.5,
+          "rssMb": 135.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 1.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.7,
+          "rssMb": 176.5,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:54:07.978Z",
+      "processCount": 10,
+      "cpuSum": 7.9,
+      "rssMb": 1470.8,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 2,
+          "rssMb": 227.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.4,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 3.3,
+          "rssMb": 446.8,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.5,
+          "rssMb": 135.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 1.1,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.6,
+          "rssMb": 175.2,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:54:38.015Z",
+      "processCount": 10,
+      "cpuSum": 6.9,
+      "rssMb": 1470.9,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 1.8,
+          "rssMb": 227.6,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.4,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 2.9,
+          "rssMb": 446.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 135.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.9,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.5,
+          "rssMb": 175.2,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:55:08.053Z",
+      "processCount": 10,
+      "cpuSum": 6.2,
+      "rssMb": 1470.9,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 1.6,
+          "rssMb": 227.6,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.3,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 2.6,
+          "rssMb": 446.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 135.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.8,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.5,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:55:38.081Z",
+      "processCount": 10,
+      "cpuSum": 5.5,
+      "rssMb": 1467.4,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 1.4,
+          "rssMb": 227.6,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.3,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 2.3,
+          "rssMb": 442.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 136.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.8,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:56:08.117Z",
+      "processCount": 10,
+      "cpuSum": 5.1,
+      "rssMb": 1466.4,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 1.3,
+          "rssMb": 227.6,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.3,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 2.1,
+          "rssMb": 441.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 136.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.7,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:56:38.154Z",
+      "processCount": 10,
+      "cpuSum": 4.5,
+      "rssMb": 1460.6,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 1.2,
+          "rssMb": 227.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.2,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.9,
+          "rssMb": 435.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 136.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.6,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:57:08.190Z",
+      "processCount": 10,
+      "cpuSum": 4.2,
+      "rssMb": 1460.6,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 1.1,
+          "rssMb": 227.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.2,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.8,
+          "rssMb": 435.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 136.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.6,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:57:38.226Z",
+      "processCount": 10,
+      "cpuSum": 3.9,
+      "rssMb": 1461.8,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 1,
+          "rssMb": 227.8,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.2,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.7,
+          "rssMb": 436.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 136.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.5,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:58:08.238Z",
+      "processCount": 10,
+      "cpuSum": 3.8,
+      "rssMb": 1458.9,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 1,
+          "rssMb": 227.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.2,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.6,
+          "rssMb": 434.1,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 136.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.5,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:58:38.244Z",
+      "processCount": 10,
+      "cpuSum": 3.5,
+      "rssMb": 1456.1,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.9,
+          "rssMb": 227.8,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.2,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.5,
+          "rssMb": 431.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 136.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.5,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:59:08.272Z",
+      "processCount": 10,
+      "cpuSum": 3.2,
+      "rssMb": 1456.1,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.9,
+          "rssMb": 227.8,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.4,
+          "rssMb": 431.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 136.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T11:59:38.307Z",
+      "processCount": 10,
+      "cpuSum": 3,
+      "rssMb": 1454.8,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.8,
+          "rssMb": 227.8,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.3,
+          "rssMb": 430,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 136.2,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:00:08.344Z",
+      "processCount": 10,
+      "cpuSum": 2.8,
+      "rssMb": 1454,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.8,
+          "rssMb": 227.8,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.2,
+          "rssMb": 429.2,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.2,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:00:38.368Z",
+      "processCount": 10,
+      "cpuSum": 2.7,
+      "rssMb": 1456,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.7,
+          "rssMb": 227.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.2,
+          "rssMb": 430.6,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:01:08.405Z",
+      "processCount": 10,
+      "cpuSum": 2.6,
+      "rssMb": 1456,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.7,
+          "rssMb": 227.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.1,
+          "rssMb": 430.6,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.4,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:01:38.442Z",
+      "processCount": 10,
+      "cpuSum": 2.5,
+      "rssMb": 1456.5,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.7,
+          "rssMb": 228,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1.1,
+          "rssMb": 431.1,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:02:08.479Z",
+      "processCount": 10,
+      "cpuSum": 2.3,
+      "rssMb": 1456.5,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.6,
+          "rssMb": 228,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1,
+          "rssMb": 431.1,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:02:38.491Z",
+      "processCount": 10,
+      "cpuSum": 2.3,
+      "rssMb": 1455.8,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.6,
+          "rssMb": 228.1,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 1,
+          "rssMb": 430.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.2,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:03:08.528Z",
+      "processCount": 10,
+      "cpuSum": 2.1,
+      "rssMb": 1455.8,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.6,
+          "rssMb": 228.1,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 0.9,
+          "rssMb": 430.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:03:38.564Z",
+      "processCount": 10,
+      "cpuSum": 2.1,
+      "rssMb": 1456.4,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.6,
+          "rssMb": 228.1,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 0.9,
+          "rssMb": 430.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:04:08.600Z",
+      "processCount": 10,
+      "cpuSum": 2,
+      "rssMb": 1456.4,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.5,
+          "rssMb": 228.1,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 0.9,
+          "rssMb": 430.9,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:04:38.620Z",
+      "processCount": 10,
+      "cpuSum": 1.9,
+      "rssMb": 1457.1,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.5,
+          "rssMb": 228.2,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 0.8,
+          "rssMb": 431.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 175.1,
+          "comm": "prebase"
+        }
+      ]
+    },
+    {
+      "at": "2026-09-03T12:05:08.657Z",
+      "processCount": 10,
+      "cpuSum": 1.9,
+      "rssMb": 1457.1,
+      "processes": [
+        {
+          "pid": 317205,
+          "ppid": 1,
+          "cpu": 0.5,
+          "rssMb": 228.2,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317227,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317254,
+          "ppid": 317227,
+          "cpu": 0.1,
+          "rssMb": 148.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317228,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 56.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317230,
+          "ppid": 317228,
+          "cpu": 0,
+          "rssMb": 13.3,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317302,
+          "ppid": 317230,
+          "cpu": 0.8,
+          "rssMb": 431.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317259,
+          "ppid": 317205,
+          "cpu": 0,
+          "rssMb": 82.5,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317348,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 136.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317349,
+          "ppid": 317205,
+          "cpu": 0.3,
+          "rssMb": 128.7,
+          "comm": "prebase"
+        },
+        {
+          "pid": 317377,
+          "ppid": 317205,
+          "cpu": 0.1,
+          "rssMb": 175.1,
+          "comm": "prebase"
         }
       ]
     }
   ],
   "quit": {
-    "before": "42099     1   0.0 130544 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
-    "latencyMs": 427,
+    "before": "317205       1  0.5 233748 prebase",
+    "latencyMs": 215,
     "remaining": "gone"
   },
   "remaining": "gone",

@@ -1,0 +1,47 @@
+[08:05:01] START magnus-streaming-smoke
+estimated 45s (timeout 3m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log
+[08:05:18] PASS magnus-streaming-smoke
+elapsed 16s
+[08:05:18] START magnus-live-activity
+estimated 45s (timeout 2m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log
+[08:05:18] PASS magnus-live-activity
+elapsed 0s
+[08:05:18] START core-ide
+estimated 2m0s (timeout 4m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log
+[08:07:33] PASS core-ide
+elapsed 2m15s
+[08:07:33] START temporal-small
+estimated 1m30s (timeout 3m0s)
+log: /workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log
+[08:07:55] PASS temporal-small
+elapsed 21s
+{
+  "ok": false,
+  "failures": [
+    "electron-product-path: evidence producer fingerprint does not match current producer inputs",
+    "tauri-product-path: evidence producer fingerprint does not match current producer inputs",
+    "electron-native-cases: evidence producer fingerprint does not match current producer inputs",
+    "runtime-preview: evidence producer fingerprint does not match current producer inputs",
+    "temporal-large: evidence producer fingerprint does not match current producer inputs",
+    "temporal-canonical-scale: evidence producer fingerprint does not match current producer inputs",
+    "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
+    "magnus-tauri-tools: evidence producer fingerprint does not match current producer inputs",
+    "magnus-guidance-smoke: evidence producer fingerprint does not match current producer inputs",
+    "hybrid-web-smoke: local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
+    "load-quit: evidence producer fingerprint does not match current producer inputs",
+    "idle-soak: evidence producer fingerprint does not match current producer inputs",
+    "lifecycle-cycles: evidence producer fingerprint does not match current producer inputs",
+    "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
+    "tauri-restart-soak: evidence producer fingerprint does not match current producer inputs",
+    "privacy: unexpected hosts: yudlszf-in-f100.1e100.net, sea09s40-in-f9.1e100.net",
+    "parser-benchmark: evidence producer fingerprint does not match current producer inputs",
+    "active-soak: evidence producer fingerprint does not match current producer inputs",
+    "assurance: evidence producer fingerprint does not match current producer inputs"
+  ],
+  "sourceHead": "b5eae2c3ce53f6acda3d86a39d4a624bdcc12f13",
+  "productFingerprint": "c4f9d20dfcf251db2a26fc1cddf39e6ac3f50cf22d1ddf13966ed8488d4a1a97",
+  "validationRunId": "2026-09-03T08-05-00-481Z"
+}

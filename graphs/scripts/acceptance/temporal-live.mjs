@@ -4,7 +4,8 @@
  *--------------------------------------------------------------------------------------------*/
 
 import { execFile, execFileSync } from 'node:child_process';
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
@@ -76,6 +77,9 @@ export function temporalAcceptanceFailures(evidence) {
 		if (canonicalScale && !(full.receivedNodeCount >= 9000)) {failures.push('canonical-scale Full Map received fewer than 9000 nodes');}
 		if ((large || canonicalScale) && full.screenFillRatio !== undefined && full.screenFillRatio < 0.08) {failures.push(`${large ? 'large' : 'canonical-scale'} Full Map leaves a huge empty canvas`);}
 		if ((large || canonicalScale) && full.maxCommunityOverlap !== undefined && full.maxCommunityOverlap > 0.85) {failures.push(`${large ? 'large' : 'canonical-scale'} Full Map communities overlap too much`);}
+		if (!Number.isFinite(full.renderedLabelOverlapCount) || full.renderedLabelOverlapCount > 0) {
+			failures.push(`${canonicalScale ? 'canonical-scale ' : large ? 'large ' : ''}Full Map has rendered label overlaps (${full.renderedLabelOverlapCount})`);
+		}
 		if (canonicalScale) {
 			const received = full.receivedNodeCount;
 			const leafDrawn = Number.isFinite(full.leafNodesDrawn) ? full.leafNodesDrawn : 0;
@@ -105,8 +109,26 @@ export function temporalAcceptanceFailures(evidence) {
 			if (!Number.isFinite(full.labelCollisionCullCount)) {
 				failures.push('canonical-scale Full Map labelCollisionCullCount is not finite');
 			}
-			if (!Number.isFinite(full.renderedLabelOverlapCount) || full.renderedLabelOverlapCount > 0) {
-				failures.push(`canonical-scale Full Map has rendered label overlaps (${full.renderedLabelOverlapCount})`);
+			if (!Number.isFinite(full.totalLabelsDrawn)) {
+				failures.push('canonical-scale Full Map totalLabelsDrawn is not finite');
+			} else if (full.totalLabelsDrawn > 160) {
+				failures.push(`canonical-scale Full Map total label budget exceeded (${full.totalLabelsDrawn} > 160)`);
+			}
+		}
+	}
+
+	if ((canonicalScale || large) && (!Array.isArray(evidence.zoomTiers) || evidence.zoomTiers.length < 2)) {
+		failures.push(`${canonicalScale ? 'canonical-scale' : 'large'} live evidence must capture multiple zoom tiers`);
+	}
+	if ((canonicalScale || large) && Array.isArray(evidence.zoomTiers)) {
+		for (const tier of evidence.zoomTiers) {
+			if (!Number.isFinite(tier?.metrics?.renderedLabelOverlapCount)) {
+				failures.push(`${tier?.name || 'unknown'} zoom tier missing renderedLabelOverlapCount`);
+			} else if (tier.metrics.renderedLabelOverlapCount > 0) {
+				failures.push(`${tier.name} zoom tier has rendered label overlaps (${tier.metrics.renderedLabelOverlapCount})`);
+			}
+			if (tier?.displayMode === 'state' && !Number.isFinite(tier?.metrics?.totalLabelsDrawn) && !Number.isFinite(tier?.metrics?.communityLabelsDrawn)) {
+				failures.push(`${tier?.name || 'unknown'} Full Map zoom tier missing label budget metrics`);
 			}
 		}
 	}
@@ -121,6 +143,9 @@ export function temporalAcceptanceFailures(evidence) {
 		if (!(focus.nodesDrawn > 0)) {failures.push('Focus Changes drew zero changed nodes');}
 		if (!(focus.canvas?.distinctPixels > 0)) {failures.push('Focus Changes canvas is blank');}
 		if ((large || canonicalScale) && !(focus.visibleNodeCount >= 4)) {failures.push(`${large ? 'large' : 'canonical-scale'} Focus Changes did not keep a focused set visible`);}
+		if (!Number.isFinite(focus.renderedLabelOverlapCount) || focus.renderedLabelOverlapCount > 0) {
+			failures.push(`Focus Changes has rendered label overlaps (${focus.renderedLabelOverlapCount})`);
+		}
 	}
 
 	if (evidence.unexpectedError) {failures.push('Workbench exposed an unexpected Error state');}
@@ -163,6 +188,60 @@ async function dismissAuth(page) {
 	await offline.click();
 	await page.getByRole('dialog', { name: 'Sign in to PreBase' }).waitFor({ state: 'hidden', timeout: 5_000 });
 	return true;
+}
+
+async function waitForWorkbenchReady(page, timeoutMs = 90_000) {
+	await page.waitForFunction(
+		() => window.driver && typeof window.driver.executeCommand === 'function' && typeof window.driver.whenWorkbenchRestored === 'function',
+		null,
+		{ timeout: timeoutMs },
+	).catch(() => undefined);
+	await page.evaluate(() => window.driver?.whenWorkbenchRestored?.()).catch(() => undefined);
+	await page.locator('.monaco-workbench').waitFor({ state: 'visible', timeout: timeoutMs }).catch(() => undefined);
+}
+
+async function dismissNotificationToasts(page) {
+	for (let i = 0; i < 6; i++) {
+		const clear = page.locator('.notification-toast .codicon-notifications-clear, .notifications-clear-all, .monaco-action-bar .action-label[aria-label*="Clear"]').first();
+		if (await clear.isVisible().catch(() => false)) {
+			await clear.click({ timeout: 1_000 }).catch(() => undefined);
+		}
+		await page.keyboard.press('Escape').catch(() => undefined);
+		const toasts = await page.locator('.notification-toast').count().catch(() => 0);
+		if (!toasts) {
+			break;
+		}
+	}
+}
+
+/** Wait until the built-in Git extension sees the fixture workspace repository. */
+async function waitForGitRepository(page, timeoutMs = 60_000) {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		const state = await page.evaluate(async () => {
+			try {
+				if (!window.driver?.executeCommand) {
+					return { ok: false, reason: 'no-driver' };
+				}
+				const repositories = await window.driver.executeCommand('git.api.getRepositories').catch(() => null);
+				if (Array.isArray(repositories) && repositories.length > 0) {
+					return { ok: true, count: repositories.length };
+				}
+				const scm = await window.driver.executeCommand('prebase.test.getDiagnostics').catch(() => null);
+				if (scm?.git?.repositories > 0 || scm?.scm?.repositories > 0) {
+					return { ok: true, count: scm?.git?.repositories || scm?.scm?.repositories };
+				}
+				return { ok: false, reason: 'no-repo' };
+			} catch (error) {
+				return { ok: false, reason: String(error) };
+			}
+		}).catch(error => ({ ok: false, reason: String(error) }));
+		if (state?.ok) {
+			return state;
+		}
+		await page.waitForTimeout(500);
+	}
+	return { ok: false, reason: 'timeout' };
 }
 
 async function findGraphFrame(page, timeoutMs = 60_000) {
@@ -259,14 +338,31 @@ async function run() {
 		: scale === 'large'
 			? 'temporal-large'
 			: 'temporal-small';
-	const { stdout } = await execFileAsync(join(repo, '.agents/skills/launch/scripts/launch.sh'), ['--', fixture.dir], {
+	const sourceProfile = mkdtempSync(join(tmpdir(), 'pb-temporal-profile-'));
+	const { stdout } = await execFileAsync(join(repo, '.agents/skills/launch/scripts/launch.sh'), [
+		'--repo', repo,
+		'--source-user-data-dir', sourceProfile,
+		'--',
+		'--enable-smoke-test-driver',
+		'--disable-workspace-trust',
+		'--skip-release-notes',
+		'--skip-welcome',
+		fixture.dir,
+	], {
 		cwd: repo,
+		env: {
+			...process.env,
+			HTTP_PROXY: '',
+			HTTPS_PROXY: '',
+			ALL_PROXY: '',
+			CODE_OSS_DEV_AUTHED_USER_DATA_DIR: sourceProfile,
+		},
 		maxBuffer: 10 * 1024 * 1024,
 	});
 	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
 	let browser;
 	let quit;
-	let evidence = { ...phase3EvidenceMetadata(repo, producerId), scale, fixture, pid: info.pid, cdpPort: info.cdpPort };
+	let evidence = { ...phase3EvidenceMetadata(repo, producerId), scale, fixture, pid: info.pid, cdpPort: info.cdpPort, sourceProfile };
 	const metricTimeout = scale === 'canonical-scale' ? 360_000 : scale === 'large' ? 180_000 : 45_000;
 	const graphFrameTimeout = scale === 'canonical-scale' ? 240_000 : scale === 'large' ? 120_000 : 60_000;
 	const minReceivedNodes = scale === 'canonical-scale' ? 9000 : scale === 'large' ? 250 : 1;
@@ -274,7 +370,15 @@ async function run() {
 		browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
 		const page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
 		if (!page) {throw new Error('Workbench page not found');}
+		page.setDefaultTimeout(12_000);
+		await waitForWorkbenchReady(page);
 		await dismissAuth(page);
+		await dismissNotificationToasts(page);
+		const gitReady = await waitForGitRepository(page, scale === 'canonical-scale' ? 120_000 : 60_000);
+		evidence.gitReady = gitReady;
+		if (!gitReady.ok) {
+			throw new Error(`Git repository was not available before Temporal open (${gitReady.reason})`);
+		}
 		await page.getByRole('tab', { name: 'PreBase Maps', exact: true }).click();
 		await page.getByRole('button', { name: 'Temporal', exact: true }).click();
 		const frame = await findGraphFrame(page, graphFrameTimeout);
@@ -293,8 +397,64 @@ async function run() {
 		, metricTimeout);
 		evidence.fullMap = fullMap;
 		const fullMapShotPrefix = scale === 'canonical-scale' ? 'temporal-canonical-scale' : scale === 'large' ? 'temporal-large' : 'temporal';
+		const memBefore = processSnapshot(info.pid);
+		evidence.processBeforeInteractions = memBefore;
 		await page.screenshot({ path: join(screenshotDir, `${fullMapShotPrefix}-full-map.png`) });
 		await canvasShot(`${fullMapShotPrefix}-full-map-canvas.png`);
+
+		// Capture additional zoom-tier screenshots for readability evidence (not a single hairball shot).
+		const zoomTiers = [];
+		const captureZoomTier = scale === 'canonical-scale' || scale === 'large';
+		if (captureZoomTier) {
+			const overviewK = fullMap?.transform?.k;
+			zoomTiers.push({
+				name: 'overview',
+				displayMode: 'state',
+				k: overviewK,
+				metrics: {
+					receivedNodeCount: fullMap.receivedNodeCount,
+					visibleNodeCount: fullMap.visibleNodeCount,
+					leafNodesDrawn: fullMap.leafNodesDrawn,
+					aggregateNodesDrawn: fullMap.aggregateNodesDrawn,
+					communityLabelsDrawn: fullMap.communityLabelsDrawn,
+					totalLabelsDrawn: fullMap.totalLabelsDrawn,
+					renderedLabelOverlapCount: fullMap.renderedLabelOverlapCount,
+					projectionTier: fullMap.projectionTier,
+				},
+			});
+			await canvasShot(`${fullMapShotPrefix}-zoom-overview.png`);
+
+			// Force a second Full Map zoom tier (medium) before Focus Changes — label LOD must be proven in state mode.
+			const canvas = frame.locator('#netCanvas');
+			const box = await canvas.boundingBox();
+			if (box) {
+				await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+				await page.mouse.wheel(0, -900);
+				await page.waitForTimeout(500);
+			}
+			const mediumMap = await readMetrics(frame);
+			if (mediumMap?.displayMode === 'state') {
+				zoomTiers.push({
+					name: 'medium-state',
+					displayMode: 'state',
+					k: mediumMap.transform?.k,
+					metrics: {
+						receivedNodeCount: mediumMap.receivedNodeCount,
+						visibleNodeCount: mediumMap.visibleNodeCount,
+						leafNodesDrawn: mediumMap.leafNodesDrawn,
+						aggregateNodesDrawn: mediumMap.aggregateNodesDrawn,
+						communityLabelsDrawn: mediumMap.communityLabelsDrawn,
+						totalLabelsDrawn: mediumMap.totalLabelsDrawn,
+						renderedLabelOverlapCount: mediumMap.renderedLabelOverlapCount,
+						projectionTier: mediumMap.projectionTier,
+					},
+				});
+				await canvasShot(`${fullMapShotPrefix}-zoom-medium-state.png`);
+				// Return toward overview before Focus Changes interactions.
+				await page.mouse.wheel(0, 900);
+				await page.waitForTimeout(300);
+			}
+		}
 
 		await page.getByRole('button', { name: 'Focus Changes', exact: true }).click();
 		const focusChanges = await waitForMetrics(page, frame, metrics =>
@@ -315,6 +475,24 @@ async function run() {
 			await page.waitForTimeout(400);
 		}
 		const afterUserZoom = await readMetrics(frame);
+		if (captureZoomTier && afterUserZoom) {
+			zoomTiers.push({
+				name: 'manual-zoom',
+				displayMode: afterUserZoom.displayMode,
+				k: afterUserZoom.transform?.k,
+				metrics: {
+					receivedNodeCount: afterUserZoom.receivedNodeCount,
+					visibleNodeCount: afterUserZoom.visibleNodeCount,
+					leafNodesDrawn: afterUserZoom.leafNodesDrawn,
+					aggregateNodesDrawn: afterUserZoom.aggregateNodesDrawn,
+					communityLabelsDrawn: afterUserZoom.communityLabelsDrawn,
+					totalLabelsDrawn: afterUserZoom.totalLabelsDrawn,
+					renderedLabelOverlapCount: afterUserZoom.renderedLabelOverlapCount,
+					projectionTier: afterUserZoom.projectionTier,
+				},
+			});
+			await canvasShot(`${fullMapShotPrefix}-zoom-manual.png`);
+		}
 		if (afterUserZoom?.transform && afterFocus?.transform && Math.abs((afterUserZoom.transform.k || 0) - (afterFocus.transform.k || 0)) < 0.01) {
 			await page.mouse.wheel(0, -800);
 			await page.waitForTimeout(400);
@@ -323,23 +501,52 @@ async function run() {
 		const afterWait = await readMetrics(frame);
 
 		await frame.locator('#temporalFitBtn').click();
+		await page.waitForTimeout(500);
+		const afterFit = await readMetrics(frame);
+		if (captureZoomTier && afterFit) {
+			zoomTiers.push({
+				name: 'fit',
+				k: afterFit.transform?.k,
+				metrics: {
+					receivedNodeCount: afterFit.receivedNodeCount,
+					visibleNodeCount: afterFit.visibleNodeCount,
+					leafNodesDrawn: afterFit.leafNodesDrawn,
+					aggregateNodesDrawn: afterFit.aggregateNodesDrawn,
+					totalLabelsDrawn: afterFit.totalLabelsDrawn,
+					renderedLabelOverlapCount: afterFit.renderedLabelOverlapCount,
+					projectionTier: afterFit.projectionTier,
+				},
+			});
+			await canvasShot(`${fullMapShotPrefix}-zoom-fit.png`);
+		}
 		await frame.locator('#temporalCenterLockBtn').click();
 		await frame.locator('#temporalFitBtn').click();
 
+		await dismissNotificationToasts(page);
+		const processAfter = processSnapshot(info.pid);
 		const workbenchText = await page.locator('.monaco-workbench').innerText().catch(() => '');
+		const toastText = await page.locator('.notification-toast, .notifications-list-container').innerText().catch(() => '');
+		const productError = /\bError\b/.test(workbenchText)
+			&& !/error\.ts/.test(workbenchText)
+			&& !/Activating extension/.test(workbenchText)
+			&& !/Could not locate the bindings file/.test(workbenchText + toastText);
 		evidence = {
 			...evidence,
 			targetOpened: await page.getByRole('tab', { name: /Temporal Graph/ }).count() > 0,
 			repoLoaded: workbenchText.includes(fixture.dir.split('/').at(-1)),
 			fullMap,
 			focusChanges,
+			zoomTiers,
+			processAfterInteractions: processAfter,
 			camera: {
 				afterFocus: afterFocus?.transform,
 				afterUserZoom: afterUserZoom?.transform,
 				afterWait: afterWait?.transform,
+				afterFit: afterFit?.transform,
 			},
 			stuckIndexing: /Indexing/.test(workbenchText) && !fullMap?.nodesDrawn,
-			unexpectedError: /\bError\b/.test(workbenchText) && !/error\.ts/.test(workbenchText),
+			unexpectedError: productError,
+			workbenchErrorSnippet: productError ? workbenchText.slice(0, 500) : undefined,
 		};
 	} catch (error) {
 		evidence = { ...evidence, error: error instanceof Error ? error.stack ?? error.message : String(error) };

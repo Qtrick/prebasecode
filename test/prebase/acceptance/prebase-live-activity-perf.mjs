@@ -134,34 +134,27 @@ async function run() {
 	}
 	results.tests.push(test2);
 
-	// Test 3: REAL morphing cycles (100 cycles) with deterministic settling
+	// Test 3: REAL semantic state-machine cycles (Compact → Peek → Interactive → Compact)
 	const test3 = { name: 'real-morph-cycles-100', ok: true, details: {} };
 	try {
 		const startMorph = Date.now();
 		const cycleCount = 100;
+		let localMonitorLeaks = 0;
+		let staleExpanded = 0;
 
 		for (let i = 0; i < cycleCount; i++) {
-			// Expand
 			native.setSnapshot({
-				revision: 10 + i * 2,
+				revision: 10 + i * 4,
 				sessionId: 'stress-session',
+				sessionResource: 'vscode-chat://local/stress-session',
 				status: 'working',
+				presentationLabel: `Step ${i}`,
+				currentActivity: `Real cycle ${i}`,
+				latestShortMessage: `msg-${i}`,
+				recentActions: [{ id: `a${i}`, label: `action ${i}`, at: Date.now() }],
+				connected: true,
 				prebaseForeground: false,
-				leftMetricsText: `${i}s`,
-				rightMetricsText: `${i} files`,
-				headerTitle: `Step ${i}`,
-				activityDescription: `Real cycle ${i}`,
 			});
-			native.setPresentation({
-				visible: true,
-				pinned: true,
-				reducedMotion: false,
-				display: 'builtin',
-			});
-
-			await sleep(35);
-
-			// Collapse
 			native.setPresentation({
 				visible: true,
 				pinned: false,
@@ -169,20 +162,69 @@ async function run() {
 				display: 'builtin',
 			});
 
-			await sleep(35);
+			// Compact → Peek
+			const peekOk = native.simulateAction('peek');
+			if (!peekOk) {
+				throw new Error(`cycle ${i}: peek failed`);
+			}
+			await sleep(20);
+			let diag = native.getDiagnostics();
+			if (diag.localMonitorInstalled) {
+				localMonitorLeaks++;
+			}
+			if (!(diag.activePresentationState === 'peek' || diag.activePresentationState === 'attentionPeek')) {
+				throw new Error(`cycle ${i}: expected peek, got ${diag.activePresentationState}`);
+			}
+
+			// Peek → Interactive (sticky) via click — must match physical path
+			const clickOk = native.simulateAction('click');
+			if (!clickOk) {
+				throw new Error(`cycle ${i}: click→interactive failed`);
+			}
+			await sleep(25);
+			diag = native.getDiagnostics();
+			if (!(diag.activePresentationState === 'interactive' || diag.activePresentationState === 'pinned' || diag.activePresentationState === 'attentionInteractive')) {
+				throw new Error(`cycle ${i}: expected interactive/pinned, got ${diag.activePresentationState}`);
+			}
+			if (!diag.localMonitorInstalled && diag.pinned) {
+				// local key monitor required only while interactive/pinned
+			} else if (diag.pinned && !diag.localMonitorInstalled) {
+				throw new Error(`cycle ${i}: local key monitor missing while pinned`);
+			}
+
+			// Interactive → Compact via unpin (not mid-attention)
+			native.setPresentation({
+				visible: true,
+				pinned: false,
+				reducedMotion: false,
+				display: 'builtin',
+			});
+			await sleep(25);
+			diag = native.getDiagnostics();
+			if (diag.expanded && !diag.hovered && diag.activePresentationState !== 'compact' && diag.activePresentationState !== 'peek') {
+				staleExpanded++;
+			}
+			if (diag.localMonitorInstalled && (diag.activePresentationState === 'compact' || diag.activePresentationState === 'peek')) {
+				localMonitorLeaks++;
+			}
 		}
 
-		// Deterministic animation settling
 		await sleep(250);
-
+		const diagAfterStress = native.getDiagnostics();
 		test3.details.durationRealCyclesMs = Date.now() - startMorph;
 		test3.details.cycleCount = cycleCount;
-
-		const diagAfterStress = native.getDiagnostics();
+		test3.details.localMonitorLeaks = localMonitorLeaks;
+		test3.details.staleExpanded = staleExpanded;
 		test3.details.diagAfterStress = diagAfterStress;
 
 		if (diagAfterStress.panelCreated !== true) {
 			throw new Error('Panel must remain created after stress cycles');
+		}
+		if (localMonitorLeaks > 0) {
+			throw new Error(`local key monitor leaked on ${localMonitorLeaks} compact/peek observations`);
+		}
+		if (staleExpanded > cycleCount * 0.1) {
+			throw new Error(`too many stale expanded states after unpin: ${staleExpanded}`);
 		}
 	} catch (err) {
 		test3.ok = false;
@@ -338,11 +380,50 @@ async function run() {
 			localMonitor: interactiveDiag.localMonitorInstalled,
 		};
 
-		if (interactiveDiag.activePresentationState !== 'interactive' && interactiveDiag.activePresentationState !== 'attention') {
-			throw new Error(`Expected interactive or attention state after click, got ${interactiveDiag.activePresentationState}`);
+		if (interactiveDiag.activePresentationState !== 'interactive'
+			&& interactiveDiag.activePresentationState !== 'pinned'
+			&& interactiveDiag.activePresentationState !== 'attentionInteractive') {
+			throw new Error(`Expected interactive/pinned/attentionInteractive after click, got ${interactiveDiag.activePresentationState}`);
 		}
 		if (interactiveDiag.localMonitorInstalled !== true) {
 			throw new Error('Interactive mode MUST install local key monitor for Escape dismiss');
+		}
+
+		// Attention while Interactive: snapshot update must NOT downgrade to peek
+		native.setSnapshot({
+			revision: 201,
+			sessionId: 'attention-session',
+			sessionResource: 'vscode-chat://local/attention-session',
+			status: 'attention',
+			presentationLabel: 'Still needs approval',
+			connected: true,
+			prebaseForeground: false,
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'appr-1',
+				title: 'Allow file edits?',
+				message: 'Edit live_activity.mm?',
+				destructive: false,
+			},
+			latestShortMessage: 'Waiting on your decision.',
+		});
+		await sleep(120);
+		const whileInteractive = native.getDiagnostics();
+		test5b.details.attentionWhileInteractive = {
+			state: whileInteractive.activePresentationState,
+			pendingMessage: whileInteractive.pendingMessage,
+			renderedPendingMessage: whileInteractive.renderedPendingMessage,
+			localMonitor: whileInteractive.localMonitorInstalled,
+		};
+		if (whileInteractive.activePresentationState === 'attentionPeek' || whileInteractive.activePresentationState === 'peek') {
+			throw new Error('Attention while Interactive must not downgrade to Peek');
+		}
+		const pendingMsg = String(whileInteractive.pendingMessage || whileInteractive.renderedPendingMessage || '');
+		if (!pendingMsg.includes('Edit live_activity')) {
+			throw new Error(`pending interaction message not propagated: ${JSON.stringify({
+				pendingMessage: whileInteractive.pendingMessage,
+				renderedPendingMessage: whileInteractive.renderedPendingMessage,
+			})}`);
 		}
 
 		// Test Escape dismissal
@@ -354,11 +435,21 @@ async function run() {
 			state: collapsedDiag.activePresentationState,
 			localMonitor: collapsedDiag.localMonitorInstalled,
 		};
-		if (collapsedDiag.activePresentationState !== 'attentionCompact' && collapsedDiag.activePresentationState !== 'compact') {
-			throw new Error(`Expected attentionCompact or compact state after escape, got ${collapsedDiag.activePresentationState}`);
+		if (collapsedDiag.activePresentationState !== 'attentionCompact') {
+			throw new Error(`Expected attentionCompact after escape, got ${collapsedDiag.activePresentationState}`);
+		}
+		if (collapsedDiag.userDismissedAttention !== true) {
+			throw new Error('attentionCompact after Escape must set userDismissedAttention (sticky Escape product truth)');
 		}
 		if (collapsedDiag.localMonitorInstalled !== false) {
 			throw new Error('Collapsed mode must NOT keep local key monitor');
+		}
+		// Sticky Escape: hover/peek simulate must not reopen while attention remains.
+		const peekWhileSticky = native.simulateAction('peek');
+		await sleep(80);
+		const stickyDiag = native.getDiagnostics();
+		if (peekWhileSticky !== false || stickyDiag.activePresentationState !== 'attentionCompact') {
+			throw new Error(`sticky Escape must refuse peek reopen (peek=${peekWhileSticky}, state=${stickyDiag.activePresentationState})`);
 		}
 	} catch (err) {
 		test5b.ok = false;

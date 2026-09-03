@@ -280,7 +280,8 @@ async function main(arch: string = process.arch): Promise<void> {
 	}
 }
 
-if (import.meta.main) {
+const isMain = typeof process.argv[1] === 'string' && /(?:^|[\\/])electron\.ts$/.test(process.argv[1]);
+if (isMain) {
 	main(process.argv[2]).catch(err => {
 		console.error(err);
 		process.exit(1);

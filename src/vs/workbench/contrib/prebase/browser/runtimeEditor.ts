@@ -46,6 +46,8 @@ export class PreBaseRuntimeEditor extends EditorPane {
 	private _responsiveSyncTimer: number | undefined;
 	private _targetWindow: Window | undefined;
 	private _webviewControlChannel: string | undefined;
+	/** Prevents beginPreviewNavigation → onDidChangeSession → _loadUrl recursion. */
+	private _applyingSessionLoad = false;
 
 	constructor(
 		group: IEditorGroup,
@@ -59,7 +61,15 @@ export class PreBaseRuntimeEditor extends EditorPane {
 		super(PreBaseRuntimeEditor.ID, group, telemetryService, themeService, storageService);
 		this._register(this.runtimeService.onDidChangeSession(() => {
 			this._renderSession();
-			this._loadUrl(false);
+			if (this._applyingSessionLoad) {
+				return;
+			}
+			this._applyingSessionLoad = true;
+			try {
+				this._loadUrl(false);
+			} finally {
+				this._applyingSessionLoad = false;
+			}
 		}));
 		this._register(this.runtimeService.onDidRequestNavigation(action => {
 			if (!this._previewWebview || !this._webviewReady) {
@@ -327,7 +337,10 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			title: localize('prebase.runtime.previewTitle', "PreBase Runtime Preview"),
 			// Session state lives in PreBaseRuntimeService; releasing an inactive
 			// iframe prevents hidden project scripts, timers, and renderer memory.
-			options: { retainContextWhenHidden: false },
+			options: {
+				retainContextWhenHidden: false,
+				disableServiceWorker: true,
+			},
 			contentOptions: {
 				allowScripts: true,
 				localResourceRoots: []
@@ -365,9 +378,11 @@ export class PreBaseRuntimeEditor extends EditorPane {
 			return;
 		}
 		if (!(session.running || session.previewConnected || session.serverRunning)) {
-			this.runtimeService.beginPreviewNavigation();
-			this._postPreviewCommand('clear');
-			this._loadedUrl = undefined;
+			// Do not call beginPreviewNavigation here — it fires onDidChangeSession and would recurse.
+			if (this._loadedUrl !== undefined) {
+				this._postPreviewCommand('clear');
+				this._loadedUrl = undefined;
+			}
 			return;
 		}
 		if (!force && this._loadedUrl === session.url) {
@@ -380,9 +395,10 @@ export class PreBaseRuntimeEditor extends EditorPane {
 
 		const validated = validatePreviewUrl(session.url);
 		if (!validated.ok) {
-			this.runtimeService.beginPreviewNavigation();
-			this._postPreviewCommand('clear', { reason: validated.reason });
-			this._loadedUrl = undefined;
+			if (this._loadedUrl !== undefined) {
+				this._postPreviewCommand('clear', { reason: validated.reason });
+				this._loadedUrl = undefined;
+			}
 			return;
 		}
 

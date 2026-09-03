@@ -20,7 +20,7 @@ async function run() {
 	const startedAt = Date.now();
 	const results = [];
 	for (let cycle = 1; cycle <= cycles; cycle++) {
-		const result = await runFramework(framework);
+		const result = await runFramework(framework, { writeEvidence: false });
 		results.push({ cycle, ok: result.ok, failures: result.failures, state: result.state, quitMs: result.quit?.latencyMs });
 		if (!result.ok) {
 			break;
