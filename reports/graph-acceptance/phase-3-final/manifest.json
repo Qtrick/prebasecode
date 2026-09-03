@@ -1,6 +1,6 @@
 {
   "phase": "3-final",
-  "sourceHead": "7fb44f2481cd7482aa36bd8b7c4fdf912348d3c0",
+  "sourceHead": "ce46edff112311f96498dc58e35dd58f08750188",
   "sourceFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
   "productFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
   "producerFingerprints": {
@@ -29,7 +29,7 @@
     "assurance": "467bd89dace08c784c6ca535caf0574635de73f5f55c739a848e1e4f717be5b3"
   },
   "validationRunId": "2026-09-03T10-05-25-026Z",
-  "generatedAt": "2026-09-03T10:10:17.934Z",
+  "generatedAt": "2026-09-03T10:21:56.348Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -43,20 +43,18 @@
     {
       "id": "magnus-live-activity",
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)"
+    },
+    {
+      "id": "hybrid-web-smoke",
+      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)"
     }
   ],
   "failures": [
-    "electron-product-path: evidence producer fingerprint does not match current producer inputs",
-    "electron-native-cases: evidence producer fingerprint does not match current producer inputs",
-    "temporal-canonical-scale: evidence producer fingerprint does not match current producer inputs",
-    "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
-    "hybrid-web-smoke: local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve",
-    "load-quit: evidence producer fingerprint does not match current producer inputs",
+    "temporal-canonical-scale: canonical-scale Full Map drew zero community labels",
+    "load-quit: temporal-sqlite-write-1: Error: Command failed: /workspace/.agents/skills/launch/scripts/launch.sh --repo /workspace --source-user-data-dir /tmp/pb-phase3-profile-FbrO8v -- --enable-smoke-test-driver --disable-workspace-trust --skip-release-notes --skip-welcome /tmp/pb-temporal-quit-Z1WBBR\n[launch.sh] slim copy: /tmp/pb-phase3-profile-FbrO8v -> /tmp/pb/20260903-101942-203587/user-data\n[launch.sh] automation mode: ensured files.simpleDialog.enable=true (trustMode: trusted) in /tmp/pb/20260903-101942-203587/user-data/User/settings.json\n[launch.sh] launching: /workspace/scripts/code.sh --user-data-dir=/tmp/pb/20260903-101942-203587/user-data --extensions-dir=/tmp/pb/20260903-101942-203587/user-data/extensions --shared-data-dir=/tmp/pb/20260903-101942-203587/shared-data --remote-debugging-port=34035 --inspect-extensions=43029 --inspect=40293 --inspect-agenthost=36185 --enable-smoke-test-driver --disable-workspace-trust --skip-release-notes --skip-welcome /tmp/pb-temporal-quit-Z1WBBR\n[launch.sh] logs: /tmp/pb/20260903-101942-203587/code.log\n[launch.sh] running pre-launch (ensures electron + compiled output + built-ins)...\n[launch.sh] waiting for CDP on port 34035 (timeout 90s)...\n[launch.sh] code.sh (PID 203643) exited before CDP came up. Log tail:\n[10:19:42] Synchronizing built-in extensions...\n[10:19:42] You can manage built-in extensions with the --builtin flag\n[10:19:42] [github] ms-vscode.js-debug-companion@1.1.3 ✔︎\n[10:19:42] [github] ms-vscode.js-debug@1.117.0 ✔︎\n[10:19:42] [github] ms-vscode.vscode-js-profile-table@1.0.10 ✔︎\n[203643:0903/101942.935447:ERROR:electron/shell/common/node_bindings.cc:509] Most NODE_OPTIONs are not supported in packaged apps. See documentation for more details.\nDebugger listening on ws://127.0.0.1:40293/505762c3-c6d3-414a-9b07-25c68fd8ae54\nFor help, see: https://nodejs.org/learn/getting-started/debugging\n[203643:0903/101943.060278:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n\nDevTools listening on ws://127.0.0.1:34035/devtools/browser/ed6f7a22-9fcb-4b7e-914e-a2a4b84be1d7\nReceived signal 11 SI_KERNEL000000000000\n Possibly a General Protection Fault, can be due to a non-canonical address dereference. See \"Intel 64 and IA-32 Architectures Software Developer’s Manual\", Volume 1, Section 3.3.7.1.\n#0 0x55f18d37f8e3 (/workspace/.build/electron/prebase+0x8ba68e2)\n#1 0x55f18d386a52 (/workspace/.build/electron/prebase+0x8bada51)\n#2 0x7faae6340330 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4532f)\n#3 0x7faae682f183 (/usr/lib/x86_64-linux-gnu/libexpat.so.1.9.1+0x20182)\n#4 0x7faae681513b (/usr/lib/x86_64-linux-gnu/libexpat.so.1.9.1+0x613a)\n#5 0x7faae681f061 (/usr/lib/x86_64-linux-gnu/libexpat.so.1.9.1+0x10060)\n#6 0x7faae5dfc6c9 (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x2f6c8)\n#7 0x7faae5dfd22d (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x3022c)\n#8 0x7faae5dfd479 (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x30478)\n#9 0x7faae5de43cd (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x173cc)\n#10 0x7faae5ddf1c1 (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x121c0)\n#11 0x7faae5de46bd (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x176bc)\n#12 0x7faae5a06225 (/usr/lib/x86_64-linux-gnu/libpangoft2-1.0.so.0.5200.1+0xc224)\n#13 0x7faae7912e62 (/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.8000.0+0x8be61)\n#14 0x7faae6397aa4 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x9caa3)\n#15 0x7faae6424c6c (/usr/lib/x86_64-linux-gnu/libc.so.6+0x129c6b)\n  r8: 0000000000000000  r9: fffffffc00000000 r10: 00002164000d0e00 r11: 0000000000000293\n r12: 0000216000090380 r13: 0000000000000045 r14: 00007faae6830e58 r15: 0000000000000016\n  di: 00007faae6830e58  si: 0000000000382d46  bp: 00007fa9d8a67b00  bx: 400c090000000000\n  dx: 0000000000000000  ax: 0000000000000016  cx: 00002164014404f0  sp: 00007fa9d8a67ad0\n  ip: 00007faae6343806 efl: 0000000000010206 cgf: 002b000000000033 erf: 0000000000000000\n trp: 000000000000000d msk: 0000000000000000 cr2: 0000000000000000\n[end of stack trace]\n[203692:0100/000000.109757:WARNING:sandbox/policy/linux/sandbox_linux.cc:404] InitializeSandbox() called with multiple threads in process gpu-process.\n\n    at genericNodeError (node:internal/errors:985:15)\n    at wrappedFn (node:internal/errors:539:14)\n    at ChildProcess.exithandler (node:child_process:417:12)\n    at ChildProcess.emit (node:events:509:28)\n    at maybeClose (node:internal/child_process:1124:16)\n    at ChildProcess._handle.onexit (node:internal/child_process:306:5); temporal-sqlite-write-1: temporalActiveWrites was not > 0 before Quit",
     "idle-soak: evidence producer fingerprint does not match current producer inputs",
-    "lifecycle-cycles: evidence producer fingerprint does not match current producer inputs",
     "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
     "tauri-restart-soak: evidence producer fingerprint does not match current producer inputs",
-    "privacy: evidence producer fingerprint does not match current producer inputs",
     "active-soak: evidence producer fingerprint does not match current producer inputs",
     "assurance: evidence producer fingerprint does not match current producer inputs"
   ],
@@ -64,11 +62,10 @@
     {
       "id": "electron-product-path",
       "path": "electron/product-path.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "137632       1 15.3 287332 prebase",
-        "latencyMs": 212,
+        "before": "199342       1 15.7 286092 prebase",
+        "latencyMs": 214,
         "remaining": "gone"
       }
     },
@@ -85,11 +82,10 @@
     {
       "id": "electron-native-cases",
       "path": "electron/native-cases.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "138097       1 17.3 285952 prebase",
-        "latencyMs": 213,
+        "before": "199946       1 17.1 284612 prebase",
+        "latencyMs": 214,
         "remaining": "gone"
       }
     },
@@ -130,41 +126,30 @@
         "remaining": "gone",
         "before": "183230       1 20.4 302672 prebase",
         "after": "gone"
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 91720,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-large.log",
-        "logTail": "",
-        "harnessPid": 182904,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
       "id": "temporal-canonical-scale",
       "path": "temporal/canonical-scale-live.json",
       "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "reason": "canonical-scale Full Map drew zero community labels",
       "quit": {
-        "startedAt": 1788380544008,
-        "quitMs": 402,
+        "startedAt": 1788430466560,
+        "quitMs": 201,
         "remaining": "gone",
-        "before": "59766     1   7.6 336368 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "189146       1 24.7 255636 prebase",
         "after": "gone"
       }
     },
     {
       "id": "magnus-electron-tools",
       "path": "magnus/electron-tools-live.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "149331       1 16.0 287264 prebase",
+        "before": "200489       1 15.9 287440 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 311,
+        "latencyMs": 314,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -226,14 +211,15 @@
     {
       "id": "hybrid-web-smoke",
       "path": "magnus/hybrid-web-smoke.json",
-      "ok": false,
-      "reason": "local hybrid skipped: both LINKUP_API_KEY and FIRECRAWL_API_KEY must resolve"
+      "ok": true,
+      "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)",
+      "externalSkip": true
     },
     {
       "id": "load-quit",
       "path": "shutdown/load-quit-matrix.json",
       "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs"
+      "reason": "temporal-sqlite-write-1: Error: Command failed: /workspace/.agents/skills/launch/scripts/launch.sh --repo /workspace --source-user-data-dir /tmp/pb-phase3-profile-FbrO8v -- --enable-smoke-test-driver --disable-workspace-trust --skip-release-notes --skip-welcome /tmp/pb-temporal-quit-Z1WBBR\n[launch.sh] slim copy: /tmp/pb-phase3-profile-FbrO8v -> /tmp/pb/20260903-101942-203587/user-data\n[launch.sh] automation mode: ensured files.simpleDialog.enable=true (trustMode: trusted) in /tmp/pb/20260903-101942-203587/user-data/User/settings.json\n[launch.sh] launching: /workspace/scripts/code.sh --user-data-dir=/tmp/pb/20260903-101942-203587/user-data --extensions-dir=/tmp/pb/20260903-101942-203587/user-data/extensions --shared-data-dir=/tmp/pb/20260903-101942-203587/shared-data --remote-debugging-port=34035 --inspect-extensions=43029 --inspect=40293 --inspect-agenthost=36185 --enable-smoke-test-driver --disable-workspace-trust --skip-release-notes --skip-welcome /tmp/pb-temporal-quit-Z1WBBR\n[launch.sh] logs: /tmp/pb/20260903-101942-203587/code.log\n[launch.sh] running pre-launch (ensures electron + compiled output + built-ins)...\n[launch.sh] waiting for CDP on port 34035 (timeout 90s)...\n[launch.sh] code.sh (PID 203643) exited before CDP came up. Log tail:\n[10:19:42] Synchronizing built-in extensions...\n[10:19:42] You can manage built-in extensions with the --builtin flag\n[10:19:42] [github] ms-vscode.js-debug-companion@1.1.3 ✔︎\n[10:19:42] [github] ms-vscode.js-debug@1.117.0 ✔︎\n[10:19:42] [github] ms-vscode.vscode-js-profile-table@1.0.10 ✔︎\n[203643:0903/101942.935447:ERROR:electron/shell/common/node_bindings.cc:509] Most NODE_OPTIONs are not supported in packaged apps. See documentation for more details.\nDebugger listening on ws://127.0.0.1:40293/505762c3-c6d3-414a-9b07-25c68fd8ae54\nFor help, see: https://nodejs.org/learn/getting-started/debugging\n[203643:0903/101943.060278:ERROR:dbus/bus.cc:405] Failed to connect to the bus: Could not parse server address: Unknown address type (examples of valid types are \"tcp\" and on UNIX \"unix\")\n\nDevTools listening on ws://127.0.0.1:34035/devtools/browser/ed6f7a22-9fcb-4b7e-914e-a2a4b84be1d7\nReceived signal 11 SI_KERNEL000000000000\n Possibly a General Protection Fault, can be due to a non-canonical address dereference. See \"Intel 64 and IA-32 Architectures Software Developer’s Manual\", Volume 1, Section 3.3.7.1.\n#0 0x55f18d37f8e3 (/workspace/.build/electron/prebase+0x8ba68e2)\n#1 0x55f18d386a52 (/workspace/.build/electron/prebase+0x8bada51)\n#2 0x7faae6340330 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x4532f)\n#3 0x7faae682f183 (/usr/lib/x86_64-linux-gnu/libexpat.so.1.9.1+0x20182)\n#4 0x7faae681513b (/usr/lib/x86_64-linux-gnu/libexpat.so.1.9.1+0x613a)\n#5 0x7faae681f061 (/usr/lib/x86_64-linux-gnu/libexpat.so.1.9.1+0x10060)\n#6 0x7faae5dfc6c9 (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x2f6c8)\n#7 0x7faae5dfd22d (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x3022c)\n#8 0x7faae5dfd479 (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x30478)\n#9 0x7faae5de43cd (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x173cc)\n#10 0x7faae5ddf1c1 (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x121c0)\n#11 0x7faae5de46bd (/usr/lib/x86_64-linux-gnu/libfontconfig.so.1.12.1+0x176bc)\n#12 0x7faae5a06225 (/usr/lib/x86_64-linux-gnu/libpangoft2-1.0.so.0.5200.1+0xc224)\n#13 0x7faae7912e62 (/usr/lib/x86_64-linux-gnu/libglib-2.0.so.0.8000.0+0x8be61)\n#14 0x7faae6397aa4 (/usr/lib/x86_64-linux-gnu/libc.so.6+0x9caa3)\n#15 0x7faae6424c6c (/usr/lib/x86_64-linux-gnu/libc.so.6+0x129c6b)\n  r8: 0000000000000000  r9: fffffffc00000000 r10: 00002164000d0e00 r11: 0000000000000293\n r12: 0000216000090380 r13: 0000000000000045 r14: 00007faae6830e58 r15: 0000000000000016\n  di: 00007faae6830e58  si: 0000000000382d46  bp: 00007fa9d8a67b00  bx: 400c090000000000\n  dx: 0000000000000000  ax: 0000000000000016  cx: 00002164014404f0  sp: 00007fa9d8a67ad0\n  ip: 00007faae6343806 efl: 0000000000010206 cgf: 002b000000000033 erf: 0000000000000000\n trp: 000000000000000d msk: 0000000000000000 cr2: 0000000000000000\n[end of stack trace]\n[203692:0100/000000.109757:WARNING:sandbox/policy/linux/sandbox_linux.cc:404] InitializeSandbox() called with multiple threads in process gpu-process.\n\n    at genericNodeError (node:internal/errors:985:15)\n    at wrappedFn (node:internal/errors:539:14)\n    at ChildProcess.exithandler (node:child_process:417:12)\n    at ChildProcess.emit (node:events:509:28)\n    at maybeClose (node:internal/child_process:1124:16)\n    at ChildProcess._handle.onexit (node:internal/child_process:306:5); temporal-sqlite-write-1: temporalActiveWrites was not > 0 before Quit"
     },
     {
       "id": "idle-soak",
@@ -249,17 +235,26 @@
     {
       "id": "lifecycle-cycles",
       "path": "soak/lifecycle.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "138638       1 16.3 798060 prebase",
+        "before": "206637       1 10.3 255020 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 1113,
+        "latencyMs": 480,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
+      },
+      "rerun": {
+        "code": 0,
+        "timedOut": false,
+        "elapsedMs": 53989,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log",
+        "logTail": "",
+        "harnessPid": 206564,
+        "timeoutMs": 1500000,
+        "leftoverPids": []
       }
     },
     {
@@ -312,13 +307,12 @@
     {
       "id": "privacy",
       "path": "privacy/runtime-observation.json",
-      "ok": false,
-      "reason": "evidence producer fingerprint does not match current producer inputs",
+      "ok": true,
       "quit": {
-        "before": "136229       1 35.0 283208 prebase",
+        "before": "201291       1 35.0 283684 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 325,
+        "latencyMs": 359,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,

@@ -14,7 +14,7 @@
     },
     "title": "PreBase Electron Fixture",
     "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-    "duration": 243,
+    "duration": 238,
     "framework": "electron",
     "backend": "cdp"
   },
@@ -31,7 +31,7 @@
     },
     "title": "PreBase Electron Fixture",
     "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-    "duration": 11,
+    "duration": 10,
     "framework": "electron",
     "backend": "cdp"
   }

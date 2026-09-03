@@ -2297,8 +2297,8 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(attentionBlock, /self\.content\.peekOnly = YES/);
 		assert.match(attentionBlock, /BOOL wasAttentionPeek = self\.attentionPeek/);
 		assert.match(attentionBlock, /wasAttentionPeek && !self\.pinned && !self\.hovering && !alreadyInteractive/);
-		// Interactive must not be downgraded to peek on attention arrival
-		assert.match(attentionBlock, /if \(alreadyInteractive\)/);
+		// Interactive must not be downgraded to peek on attention arrival (sticky + mayExpand gate)
+		assert.match(attentionBlock, /if \(alreadyInteractive && mayExpand\)/);
 		assert.match(attentionBlock, /self\.content\.peekOnly = NO/);
 	});
 

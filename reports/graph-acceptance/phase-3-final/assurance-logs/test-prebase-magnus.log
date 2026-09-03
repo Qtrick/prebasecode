@@ -6,451 +6,451 @@
 [PreBase SecretResolver] Notice: PreBase root .env has group/world readable permissions.
 [PreBase SecretResolver] Notice: PreBase root .env has group/world readable permissions.
 ▶ Magnus Activation & Tool/Command Contracts
-  ✔ ensures exact parity between manifest languageModelTools and runtime registrations (3.318584ms)
-  ✔ ensures all manifest contributed commands have handlers registered in extension source (2.668667ms)
-  ✔ does not restore onStartupFinished and relies on generated onLanguageModelTool events (1.123166ms)
-  ✔ declares start, interact, and assert schemas with bounded desktop locators (0.538583ms)
-  ✔ deactivate cancels in-flight chat requests through magnusRequestShutdown (0.408875ms)
-✔ Magnus Activation & Tool/Command Contracts (8.720458ms)
+  ✔ ensures exact parity between manifest languageModelTools and runtime registrations (4.272735ms)
+  ✔ ensures all manifest contributed commands have handlers registered in extension source (4.118049ms)
+  ✔ does not restore onStartupFinished and relies on generated onLanguageModelTool events (0.935203ms)
+  ✔ declares start, interact, and assert schemas with bounded desktop locators (0.289982ms)
+  ✔ deactivate cancels in-flight chat requests through magnusRequestShutdown (0.531849ms)
+✔ Magnus Activation & Tool/Command Contracts (10.92736ms)
 ▶ Root Resolution & Workspace Isolation
-  ✔ resolves authentic PreBase source root from extension path (0.62875ms)
-  ✔ strictly isolates arbitrary user workspace directories from being identified as PreBase root (0.742625ms)
-  ✔ strictly rejects fake PreBase roots missing critical markers (0.472083ms)
-  ✔ disables source development in packaged mode (0.056875ms)
-✔ Root Resolution & Workspace Isolation (2.0335ms)
+  ✔ resolves authentic PreBase source root from extension path (0.831833ms)
+  ✔ strictly isolates arbitrary user workspace directories from being identified as PreBase root (0.74477ms)
+  ✔ strictly rejects fake PreBase roots missing critical markers (0.388219ms)
+  ✔ disables source development in packaged mode (0.134375ms)
+✔ Root Resolution & Workspace Isolation (2.338166ms)
 ▶ Root .env Freshness & Hot Reload
-  ✔ detects added, changed, and removed keys without restarting or recreating resolver (4.939166ms)
-✔ Root .env Freshness & Hot Reload (4.997583ms)
+  ✔ detects added, changed, and removed keys without restarting or recreating resolver (4.193514ms)
+✔ Root .env Freshness & Hot Reload (4.586383ms)
 ▶ Model Fallback Integrity
-  ✔ does not contain shut-down gemini-2.0 models in fallback models list (0.074208ms)
-✔ Model Fallback Integrity (0.115084ms)
+  ✔ does not contain shut-down gemini-2.0 models in fallback models list (0.433917ms)
+✔ Model Fallback Integrity (0.499516ms)
 ▶ Execution Mode & Fallback Distinction
-  ✔ correctly resolves LinkUp local credential vs cloud fallback (0.819667ms)
-✔ Execution Mode & Fallback Distinction (0.851375ms)
+  ✔ correctly resolves LinkUp local credential vs cloud fallback (0.751851ms)
+✔ Execution Mode & Fallback Distinction (0.876335ms)
 ▶ Context Attachment Bounding
-  ✔ safely bounds large graph selection strings (0.047459ms)
-  ✔ safely serializes and bounds object context (0.120917ms)
-✔ Context Attachment Bounding (0.201667ms)
+  ✔ safely bounds large graph selection strings (0.093718ms)
+  ✔ safely serializes and bounds object context (0.275935ms)
+✔ Context Attachment Bounding (0.434051ms)
 ▶ MagnusRuntimeState CoreReady Computation
-  ✔ correctly computes coreReady=true only when all core subsystems are registered with no errors (0.05025ms)
-✔ MagnusRuntimeState CoreReady Computation (0.070417ms)
-(node:74391) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/activation.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ correctly computes coreReady=true only when all core subsystems are registered with no errors (0.097809ms)
+✔ MagnusRuntimeState CoreReady Computation (0.136343ms)
+(node:210534) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/activation.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ PreBaseAIService & Provider Resolution
-  ✔ resolves execution modes and updates provider status cleanly (0.713583ms)
-  ✔ reads and writes configuration via PreBaseAIConfigProvider (0.1245ms)
-  ✔ works with VsCodeWorkspaceConfigProvider adapter pattern (0.100791ms)
-  ✔ discovers and caches models with TTL and handles auto model resolution (0.239708ms)
-  ✔ builds model options correctly from both NormalizedAIModel and legacy formats (0.750834ms)
-  ✔ generates text and stream candidates cleanly (0.2815ms)
-  ✔ generates structured architectural file descriptions with dynamic cache identity (0.1885ms)
-  ✔ handles unconfigured description requests gracefully with clear status (0.083041ms)
-  ✔ tests provider connectivity with connection ping (0.129125ms)
-  ✔ retries describeFile automatically on token starvation / MAX_TOKENS (0.178708ms)
-  ✔ resolves description context with low reasoning effort and v7 cache identity (0.100917ms)
-(node:74392) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/aiService.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ resolves execution modes and updates provider status cleanly (1.166221ms)
+  ✔ reads and writes configuration via PreBaseAIConfigProvider (0.205528ms)
+  ✔ works with VsCodeWorkspaceConfigProvider adapter pattern (0.175895ms)
+  ✔ discovers and caches models with TTL and handles auto model resolution (0.3939ms)
+  ✔ builds model options correctly from both NormalizedAIModel and legacy formats (1.246843ms)
+  ✔ generates text and stream candidates cleanly (0.533155ms)
+  ✔ generates structured architectural file descriptions with dynamic cache identity (0.492401ms)
+  ✔ handles unconfigured description requests gracefully with clear status (0.648613ms)
+  ✔ tests provider connectivity with connection ping (0.514487ms)
+  ✔ retries describeFile automatically on token starvation / MAX_TOKENS (0.564535ms)
+  ✔ resolves description context with low reasoning effort and v7 cache identity (0.272779ms)
+(node:210535) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/aiService.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ installSmokeTransport routes streamCandidate through the smoke adapter, not the product catalog (885.608208ms)
-✔ PreBaseAIService & Provider Resolution (889.229125ms)
+  ✔ installSmokeTransport routes streamCandidate through the smoke adapter, not the product catalog (883.021166ms)
+✔ PreBaseAIService & Provider Resolution (890.329042ms)
 ▶ Gemini client cancellation transport
-  ✔ sends non-stream credentials only in x-goog-api-key and never in the URL or Authorization header (6.86325ms)
-  ✔ sends SSE credentials only in x-goog-api-key and never in the URL or Authorization header (1.339375ms)
-  ✔ rejects an oversized unterminated SSE frame without falling back to a second request (2.487791ms)
-  ✔ falls back to a bounded non-stream request when the SSE endpoint declines the request (0.160875ms)
-  ✔ does not start a request when cancellation has already been requested (0.104167ms)
-  ✔ aborts an in-flight content request without retrying alternative authentication (0.128875ms)
-  ✔ aborts an in-flight SSE stream on Quit without falling back to a second request (0.236833ms)
-  ✔ concatenates multiple text parts across non-stream response (0.091209ms)
-  ✔ rejects an oversized non-stream response body (0.17375ms)
-✔ Gemini client cancellation transport (15.340792ms)
+  ✔ sends non-stream credentials only in x-goog-api-key and never in the URL or Authorization header (7.797865ms)
+  ✔ sends SSE credentials only in x-goog-api-key and never in the URL or Authorization header (4.489241ms)
+  ✔ rejects an oversized unterminated SSE frame without falling back to a second request (1.541885ms)
+  ✔ falls back to a bounded non-stream request when the SSE endpoint declines the request (0.25729ms)
+  ✔ does not start a request when cancellation has already been requested (4.806092ms)
+  ✔ aborts an in-flight content request without retrying alternative authentication (0.311333ms)
+  ✔ aborts an in-flight SSE stream on Quit without falling back to a second request (0.510435ms)
+  ✔ concatenates multiple text parts across non-stream response (2.047618ms)
+  ✔ rejects an oversized non-stream response body (1.061764ms)
+✔ Gemini client cancellation transport (23.876658ms)
 ▶ classifyGeminiError
-  ✔ classifies authentication errors safely without key logging (2.298708ms)
-  ✔ classifies rate limit errors as retryable (3.326666ms)
-  ✔ classifies model unavailable errors (5.527292ms)
-  ✔ classifies network failures as retryable (4.009334ms)
-  ✔ classifies cancellation requests (4.506292ms)
-✔ classifyGeminiError (20.138416ms)
-(node:74393) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/geminiClient.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ classifies authentication errors safely without key logging (1.217082ms)
+  ✔ classifies rate limit errors as retryable (0.42866ms)
+  ✔ classifies model unavailable errors (0.907338ms)
+  ✔ classifies network failures as retryable (0.391185ms)
+  ✔ classifies cancellation requests (0.449433ms)
+✔ classifyGeminiError (3.585204ms)
+(node:210536) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/geminiClient.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ hybrid quality vs LinkUp-only snippets
-  ✔ hybrid enrichment improves citations and stays inside the 16k tool budget (27.46125ms)
-✔ hybrid quality vs LinkUp-only snippets (27.831125ms)
-(node:74394) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/hybridQualityBenchmark.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ hybrid enrichment improves citations and stays inside the 16k tool budget (24.192472ms)
+✔ hybrid quality vs LinkUp-only snippets (24.858081ms)
+(node:210558) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/hybridQualityBenchmark.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-(node:74395) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/hybridWebContext.test.ts is not specified and it doesn't parse as CommonJS.
+(node:210564) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/hybridWebContext.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ hybrid web context
-  ✔ does not silently become LinkUp-only when Firecrawl is unavailable (267.693167ms)
-  ✔ does not run local hybrid with only one provider key (0.177875ms)
-  ✔ fetch may be Firecrawl-only but search never becomes Firecrawl-only (0.51225ms)
-  ✔ fetch/cite keep www on the source URL; cache and search dedupe are www-insensitive (0.452083ms)
-  ✔ counts every retry attempt when fetching one known URL (252.262833ms)
-  ✔ LinkUp discovers and Firecrawl enriches without duplicate scrapes (0.41325ms)
-  ✔ returns partial enrichment when one scrape fails and another succeeds (0.25925ms)
-  ✔ a scrape timeout is not treated as user cancellation (0.220542ms)
-  ✔ rejects private URL fetch (0.062417ms)
-  ✔ reuses in-memory search results for the identical query in one run (0.177834ms)
-  ✔ does not let maxResults bypass the depth scrape budget (0.187875ms)
-  ✔ deep Firecrawl search does not scrape a duplicate of a LinkUp URL (0.316917ms)
-  ✔ cancelled Firecrawl search does not fall back to LinkUp-only results (0.184416ms)
-  ✔ counts every attempted Firecrawl scrape in operations, including failed enrichments (0.124458ms)
-  ✔ counts a retryable Firecrawl request for every provider attempt (252.509292ms)
-  ✔ failed deep Firecrawl search still enriches LinkUp results (0.247542ms)
-  ✔ Firecrawl 429 on every scrape fails closed instead of returning LinkUp-only results (252.653875ms)
-  ✔ cancelled scrape does not return LinkUp-only results or cache them (0.266209ms)
-  ✔ cancelled fetch does not cache a failed scrape for the next call (0.177541ms)
-  ✔ treats prompt-injection page text as source data and keeps URLs when clipping (0.1805ms)
-  ✔ search enrichment scrapes may cache; fetch never writes provider cache (0.22225ms)
-✔ hybrid web context (1030.214125ms)
+  ✔ does not silently become LinkUp-only when Firecrawl is unavailable (267.710935ms)
+  ✔ does not run local hybrid with only one provider key (0.255141ms)
+  ✔ fetch may be Firecrawl-only but search never becomes Firecrawl-only (0.616565ms)
+  ✔ fetch/cite keep www on the source URL; cache and search dedupe are www-insensitive (0.709693ms)
+  ✔ counts every retry attempt when fetching one known URL (250.59104ms)
+  ✔ LinkUp discovers and Firecrawl enriches without duplicate scrapes (0.770946ms)
+  ✔ returns partial enrichment when one scrape fails and another succeeds (0.609479ms)
+  ✔ a scrape timeout is not treated as user cancellation (0.570928ms)
+  ✔ rejects private URL fetch (0.17876ms)
+  ✔ reuses in-memory search results for the identical query in one run (0.423522ms)
+  ✔ does not let maxResults bypass the depth scrape budget (0.407559ms)
+  ✔ deep Firecrawl search does not scrape a duplicate of a LinkUp URL (0.671578ms)
+  ✔ cancelled Firecrawl search does not fall back to LinkUp-only results (0.401656ms)
+  ✔ counts every attempted Firecrawl scrape in operations, including failed enrichments (0.366547ms)
+  ✔ counts a retryable Firecrawl request for every provider attempt (250.587748ms)
+  ✔ failed deep Firecrawl search still enriches LinkUp results (0.541696ms)
+  ✔ Firecrawl 429 on every scrape fails closed instead of returning LinkUp-only results (251.141946ms)
+  ✔ cancelled scrape does not return LinkUp-only results or cache them (0.466361ms)
+  ✔ cancelled fetch does not cache a failed scrape for the next call (0.404206ms)
+  ✔ treats prompt-injection page text as source data and keeps URLs when clipping (1.056417ms)
+  ✔ search enrichment scrapes may cache; fetch never writes provider cache (1.219853ms)
+✔ hybrid web context (1031.117438ms)
 ▶ local Firecrawl client
-  ✔ sends scrape to v2/scrape with markdown/main-content and never puts the key in the URL (16.570417ms)
-  ✔ can disable Firecrawl provider caching for explicit user fetches (0.12925ms)
-  ✔ Firecrawl Search stays compact and does not request markdown scrapeOptions (0.137417ms)
-  ✔ cancels in-flight scrape without retrying (0.274917ms)
-  ✔ rejects private destinations before calling Firecrawl (0.078875ms)
-  ✔ rejects a private URL returned in scrape metadata (0.0985ms)
-(node:74396) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/localFirecrawlClient.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ sends scrape to v2/scrape with markdown/main-content and never puts the key in the URL (15.306342ms)
+  ✔ can disable Firecrawl provider caching for explicit user fetches (0.235184ms)
+  ✔ Firecrawl Search stays compact and does not request markdown scrapeOptions (0.252569ms)
+  ✔ cancels in-flight scrape without retrying (0.499252ms)
+  ✔ rejects private destinations before calling Firecrawl (0.162784ms)
+  ✔ rejects a private URL returned in scrape metadata (0.214525ms)
+(node:210576) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/localFirecrawlClient.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ retries a retryable scrape at most once (250.736291ms)
-  ✔ Firecrawl Search drops private hits and does not retry a 429 (0.256666ms)
-  ✔ cancels in-flight search without retrying (0.198583ms)
-  ✔ aborts a hung scrape on timeout without a nested retry storm (32.614292ms)
-  ✔ uses only v2 scrape/search endpoints and never sends ZDR or Interact fields (0.273083ms)
-✔ local Firecrawl client (302.02925ms)
+  ✔ retries a retryable scrape at most once (250.894078ms)
+  ✔ Firecrawl Search drops private hits and does not retry a 429 (0.601979ms)
+  ✔ cancels in-flight search without retrying (0.355891ms)
+  ✔ aborts a hung scrape on timeout without a nested retry storm (31.242538ms)
+  ✔ uses only v2 scrape/search endpoints and never sends ZDR or Interact fields (0.431203ms)
+✔ local Firecrawl client (301.219705ms)
 ▶ Local LinkUp search client
-  ✔ sends credentials in Authorization Bearer and never in URL (2.4785ms)
-  ✔ validates input boundaries and rejects invalid queries (0.260167ms)
-  ✔ filters out invalid or non-http URLs (0.295875ms)
-  ✔ handles rate limit HTTP 429 and auth HTTP 401 cleanly (0.118125ms)
-✔ Local LinkUp search client (3.595208ms)
-(node:74397) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/localLinkupClient.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ sends credentials in Authorization Bearer and never in URL (6.460702ms)
+  ✔ validates input boundaries and rejects invalid queries (0.524141ms)
+  ✔ filters out invalid or non-http URLs (0.486445ms)
+  ✔ handles rate limit HTTP 429 and auth HTTP 401 cleanly (0.29577ms)
+✔ Local LinkUp search client (8.661028ms)
+(node:210585) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/localLinkupClient.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ GeminiModelPolicy & Model Curation Layer
-  ✔ classifies stable Flash and Pro models as consumer selectable (2.731708ms)
-  ✔ hides all preview models from consumer selector (0.199ms)
-  ✔ hides experimental, latest aliases, and flash-lite models from consumer picker (0.074ms)
-  ✔ hides specialized non-coding models (media, audio, embeddings, robotics, gemma) (0.123667ms)
-  ✔ curates a 50-model raw provider catalog dump down to Auto + 2-4 stable models (0.317166ms)
-  ✔ resolves Auto dynamically using version hierarchy (0.087833ms)
-  ✔ routes workload profiles to appropriate model classes (0.30325ms)
-  ✔ safely migrates obsolete, preview, or invalid saved model selections (0.401042ms)
-  ✔ formats safe diagnostics without sensitive leakage (0.200792ms)
-  ✔ demonstrates future provider extensibility via provider-agnostic IModelPolicy interface (0.126167ms)
-  ✔ fails closed for unrecognized models with unknown release channel (0.05075ms)
-  ✔ synthesizes accurate reasoning metadata for Flash, Pro, and Auto models (0.378208ms)
-  ✔ resolves supported reasoning effort safely defending against unsupported model efforts (0.051ms)
-  ✔ creates navigation configuration schema for models with thinking support (0.086458ms)
-✔ GeminiModelPolicy & Model Curation Layer (5.833833ms)
-(node:74398) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/modelPolicy.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ classifies stable Flash and Pro models as consumer selectable (2.019479ms)
+  ✔ hides all preview models from consumer selector (0.256961ms)
+  ✔ hides experimental, latest aliases, and flash-lite models from consumer picker (0.107931ms)
+  ✔ hides specialized non-coding models (media, audio, embeddings, robotics, gemma) (0.179278ms)
+  ✔ curates a 50-model raw provider catalog dump down to Auto + 2-4 stable models (0.506983ms)
+  ✔ resolves Auto dynamically using version hierarchy (0.141708ms)
+  ✔ routes workload profiles to appropriate model classes (0.195503ms)
+  ✔ safely migrates obsolete, preview, or invalid saved model selections (0.304394ms)
+  ✔ formats safe diagnostics without sensitive leakage (0.283285ms)
+  ✔ demonstrates future provider extensibility via provider-agnostic IModelPolicy interface (0.217367ms)
+  ✔ fails closed for unrecognized models with unknown release channel (0.079559ms)
+  ✔ synthesizes accurate reasoning metadata for Flash, Pro, and Auto models (0.609449ms)
+  ✔ resolves supported reasoning effort safely defending against unsupported model efforts (0.083742ms)
+  ✔ creates navigation configuration schema for models with thinking support (0.137289ms)
+✔ GeminiModelPolicy & Model Curation Layer (6.057996ms)
+(node:210593) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/modelPolicy.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus Models & Providers
-  ✔ defines Gemini as the primary provider with standard capabilities (0.334542ms)
-  ✔ contains active Gemini models and auto (0.298208ms)
-  ✔ resolveApiModel resolves auto to gemini-2.5-flash (0.075834ms)
-  ✔ resolveModelInfo migrates retired models safely to auto/gemini-2.5-flash (0.052375ms)
-  ✔ getModelOption falls back to auto option on unknown model id (0.044083ms)
-  ✔ resolveModelOrFallback returns known model or falls back to auto (0.045083ms)
-  ✔ resolveAutoModelFromDiscovered selects flash 3.x over 2.5 and 2.5 over pro (0.51225ms)
-  ✔ formatContextWindowLabel formats token counts cleanly (0.059625ms)
-  ✔ buildMagnusLanguageModelInformation includes purpose descriptions and imageInput capability (3.116291ms)
-✔ Magnus Models & Providers (5.105709ms)
-(node:74399) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/models.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ defines Gemini as the primary provider with standard capabilities (0.572582ms)
+  ✔ contains active Gemini models and auto (0.471799ms)
+  ✔ resolveApiModel resolves auto to gemini-2.5-flash (0.127448ms)
+  ✔ resolveModelInfo migrates retired models safely to auto/gemini-2.5-flash (0.100291ms)
+  ✔ getModelOption falls back to auto option on unknown model id (0.073569ms)
+  ✔ resolveModelOrFallback returns known model or falls back to auto (0.082646ms)
+  ✔ resolveAutoModelFromDiscovered selects flash 3.x over 2.5 and 2.5 over pro (0.744242ms)
+  ✔ formatContextWindowLabel formats token counts cleanly (0.136867ms)
+  ✔ buildMagnusLanguageModelInformation includes purpose descriptions and imageInput capability (2.091165ms)
+✔ Magnus Models & Providers (5.270311ms)
+(node:210601) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/models.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus mode capability boundary
-  ✔ recognizes only declared modes and keeps the Ask default (0.75125ms)
-  ✔ maps participant ids to the least-privileged matching mode (0.422958ms)
-  ✔ fails closed for unknown tools in every mode (0.086875ms)
-  ✔ accounts for every registered Magnus tool in the fail-closed capability registry (0.779875ms)
-  ✔ allows Test mode the dedicated Runtime Preview and bounded test-execution surfaces (3.784542ms)
-  ✔ keeps environment mutation and arbitrary runtime evaluation restricted to Edit and Agent modes (0.175583ms)
-  ✔ keeps Ask and Plan from launching or clicking while allowing read-only desktop asserts (0.092709ms)
-✔ Magnus mode capability boundary (7.3205ms)
-(node:74400) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/modes.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ recognizes only declared modes and keeps the Ask default (0.621278ms)
+  ✔ maps participant ids to the least-privileged matching mode (0.163161ms)
+  ✔ fails closed for unknown tools in every mode (0.092573ms)
+  ✔ accounts for every registered Magnus tool in the fail-closed capability registry (0.547758ms)
+  ✔ allows Test mode the dedicated Runtime Preview and bounded test-execution surfaces (1.149176ms)
+  ✔ keeps environment mutation and arbitrary runtime evaluation restricted to Edit and Agent modes (0.222132ms)
+  ✔ keeps Ask and Plan from launching or clicking while allowing read-only desktop asserts (0.085751ms)
+✔ Magnus mode capability boundary (3.74065ms)
+(node:210609) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/modes.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus process output formatter
-  ✔ returns JSON-safe process output when unexpected values contain cycles and bigints (1.837583ms)
-  ✔ retains only the newest bounded output entries and marks tool truncation (1.285708ms)
-  ✔ truncates an oversized entry and preserves explicit upstream truncation (0.24575ms)
-✔ Magnus process output formatter (4.255583ms)
-(node:74401) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/processOutputFormatter.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ returns JSON-safe process output when unexpected values contain cycles and bigints (0.754929ms)
+  ✔ retains only the newest bounded output entries and marks tool truncation (0.645482ms)
+  ✔ truncates an oversized entry and preserves explicit upstream truncation (0.124309ms)
+✔ Magnus process output formatter (2.288094ms)
+(node:210617) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/processOutputFormatter.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ projectGuidanceDelta
-  ✔ returns newly applicable bodies and avoids repeating seen sources (0.737292ms)
-  ✔ formatGetForPathsResult includes guidance bodies for newly applied sources (0.202958ms)
-  ✔ seedSessionFromSnapshot prevents duplicated delta bodies on subsequent turns (0.079917ms)
-  ✔ path rule becomes newly applied in the same turn after target registration (0.1055ms)
-  ✔ formatGetForPathsResult scrubs secrets in full always/path bodies when delta is empty (0.079709ms)
-✔ projectGuidanceDelta (1.638625ms)
-(node:74402) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/projectGuidanceDelta.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ returns newly applicable bodies and avoids repeating seen sources (1.275366ms)
+  ✔ formatGetForPathsResult includes guidance bodies for newly applied sources (0.351031ms)
+  ✔ seedSessionFromSnapshot prevents duplicated delta bodies on subsequent turns (0.162665ms)
+  ✔ path rule becomes newly applied in the same turn after target registration (0.19937ms)
+  ✔ formatGetForPathsResult scrubs secrets in full always/path bodies when delta is empty (0.140769ms)
+✔ projectGuidanceDelta (2.864929ms)
+(node:210623) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/projectGuidanceDelta.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ projectGuidanceDiscovery globs and imports
-  ✔ globMatches supports brace expansion, question marks, and character classes (0.602083ms)
-  ✔ stripCodeRegionsForImports ignores fenced and inline code (0.123625ms)
-  ✔ windsurfRuleMode maps trigger frontmatter to activation modes (0.058667ms)
-  ✔ kiroSteeringMode maps inclusion frontmatter to activation modes (0.046084ms)
-  ✔ cursorRuleMode distinguishes always, path, intelligent, and manual rules (0.046959ms)
-  ✔ parseFrontmatter supports nested maps, lists, and rejects YAML tags (0.599291ms)
-  ✔ matchesAnyGlob refuses path activation without a target path (0.060875ms)
-  ✔ globMatches tolerates malformed patterns without throwing (0.052542ms)
-  ✔ resolveMarkdownImports expands claude source-relative imports and skips fenced imports (0.42175ms)
-  ✔ resolveMarkdownImports reports clear diagnostics for absolute imports (0.187208ms)
-  ✔ expandKiroFileRefs blocks absolute and outside-workspace paths (0.219458ms)
-  ✔ GUIDANCE_WATCH_PATTERNS covers kiro, opencode, gemini skills, and extra skill roots (0.064333ms)
-  ✔ skillScopePrefix strips nested skill roots to package scope (0.048ms)
-  ✔ viewProjectGuidance Quick Pick summary includes provenance labels (0.144583ms)
-  ✔ chatParticipant injects guidance delta in the same tool turn (0.104416ms)
-  ✔ parseTomlCommand parses basic and multiline TOML commands with argument hints (0.517ms)
-  ✔ discoverHookDeclarations discovers hooks without executing them (0.309125ms)
-  ✔ GUIDANCE_WATCH_PATTERNS contains GitHub agents, Gemini commands, Cline workflows, and hook patterns (0.039917ms)
-✔ projectGuidanceDiscovery globs and imports (4.247334ms)
-(node:74403) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/projectGuidanceDiscovery.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ globMatches supports brace expansion, question marks, and character classes (7.83612ms)
+  ✔ stripCodeRegionsForImports ignores fenced and inline code (0.253642ms)
+  ✔ windsurfRuleMode maps trigger frontmatter to activation modes (0.114655ms)
+  ✔ kiroSteeringMode maps inclusion frontmatter to activation modes (0.158057ms)
+  ✔ cursorRuleMode distinguishes always, path, intelligent, and manual rules (0.101435ms)
+  ✔ parseFrontmatter supports nested maps, lists, and rejects YAML tags (2.754653ms)
+  ✔ matchesAnyGlob refuses path activation without a target path (2.399223ms)
+  ✔ globMatches tolerates malformed patterns without throwing (0.185357ms)
+  ✔ resolveMarkdownImports expands claude source-relative imports and skips fenced imports (0.700652ms)
+  ✔ resolveMarkdownImports reports clear diagnostics for absolute imports (0.421022ms)
+  ✔ expandKiroFileRefs blocks absolute and outside-workspace paths (0.4562ms)
+  ✔ GUIDANCE_WATCH_PATTERNS covers kiro, opencode, gemini skills, and extra skill roots (0.11584ms)
+  ✔ skillScopePrefix strips nested skill roots to package scope (0.101482ms)
+  ✔ viewProjectGuidance Quick Pick summary includes provenance labels (0.298549ms)
+  ✔ chatParticipant injects guidance delta in the same tool turn (0.144187ms)
+  ✔ parseTomlCommand parses basic and multiline TOML commands with argument hints (0.400184ms)
+  ✔ discoverHookDeclarations discovers hooks without executing them (0.499513ms)
+  ✔ GUIDANCE_WATCH_PATTERNS contains GitHub agents, Gemini commands, Cline workflows, and hook patterns (0.08596ms)
+✔ projectGuidanceDiscovery globs and imports (18.464667ms)
+(node:210633) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/projectGuidanceDiscovery.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ projectGuidanceJit
-  ✔ registerGuidanceTargetsFromToolCalls adds targets after workspace read_file (1.405333ms)
-  ✔ resolveGuidanceTarget picks the workspace root that contains the file (1.456541ms)
-  ✔ registerGuidanceTargetsFromToolCalls ignores non-workspace tools (0.071167ms)
-  ✔ registerGuidanceTargetsFromToolCalls is a no-op without an active guidance session (0.468958ms)
-  ✔ registerGuidanceTargetsFromToolCalls covers workspace search/list/definition tools (1.035875ms)
-  ✔ extractMutationPathStrings collects rename from/to and apply batch file paths (0.108792ms)
-  ✔ registerMutationTargetsFromToolCall registers both rename paths (0.136833ms)
-  ✔ preflightMutationGuidance defers when path-specific guidance newly applies (135.9655ms)
-  ✔ preflightMutationGuidance allows reissue after guidance is loaded (94.35425ms)
-  ✔ preflightMutationGuidance defers apply batch when any path triggers new guidance (75.417917ms)
-  ✔ preflightMutationGuidance is a no-op when disabled (39.427208ms)
-✔ projectGuidanceJit (350.459875ms)
-(node:74404) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/projectGuidanceJit.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ registerGuidanceTargetsFromToolCalls adds targets after workspace read_file (2.130076ms)
+  ✔ resolveGuidanceTarget picks the workspace root that contains the file (0.853873ms)
+  ✔ registerGuidanceTargetsFromToolCalls ignores non-workspace tools (0.166669ms)
+  ✔ registerGuidanceTargetsFromToolCalls is a no-op without an active guidance session (0.347316ms)
+  ✔ registerGuidanceTargetsFromToolCalls covers workspace search/list/definition tools (0.738042ms)
+  ✔ extractMutationPathStrings collects rename from/to and apply batch file paths (0.246499ms)
+  ✔ registerMutationTargetsFromToolCall registers both rename paths (0.287916ms)
+  ✔ preflightMutationGuidance defers when path-specific guidance newly applies (62.935638ms)
+  ✔ preflightMutationGuidance allows reissue after guidance is loaded (61.526586ms)
+  ✔ preflightMutationGuidance defers apply batch when any path triggers new guidance (44.470103ms)
+  ✔ preflightMutationGuidance is a no-op when disabled (22.716542ms)
+✔ projectGuidanceJit (197.611813ms)
+(node:210639) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/projectGuidanceJit.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ projectGuidanceService
-  ✔ nestedPathCatalogName keeps OpenCode slashes and Gemini colons (0.607084ms)
-  ✔ discovers AGENTS.md and always-on Cursor rules without dumping skill bodies (13.171042ms)
-  ✔ path-scoped Cursor globs apply only to matching targets (13.683ms)
-  ✔ scrubs inline secret patterns from guidance prompt output (0.126ms)
-  ✔ malicious repo guidance cannot disable secret protection semantics in formatter output (2.630875ms)
-  ✔ conflicting indentation guidance in the same scope is surfaced (4.027666ms)
-  ✔ skill bodies stay out of the prompt until explicitly activated (16.106166ms)
-  ✔ untrusted workspaces disable project guidance (0.567166ms)
-  ✔ equivalent guidance is deduplicated with diagnostics (3.127125ms)
-  ✔ guidanceTargetPathsFromReferences extracts relative paths from chat references (0.418916ms)
-  ✔ activated intelligent/manual rules appear in snapshot and prompt (107.833166ms)
-  ✔ cache invalidates all snapshots for a workspace root (2.703209ms)
-  ✔ nested AGENTS.override and OpenCode skills in cross-ecosystem fixture (134.048916ms)
-  ✔ intelligent and manual Cursor rules stay on-demand until activate_rule (72.843459ms)
-  ✔ ecosystem fixture covers Claude imports, GitHub, Windsurf triggers, and Cline paths (26.624958ms)
-  ✔ prebase_project_guidance activation path loads skill bodies through session state (56.7505ms)
-  ✔ getCombinedSnapshot keeps path rules distinct per workspace root (6.131542ms)
-  ✔ duplicate skill names receive stable distinct IDs (6.492375ms)
-  ✔ windsurf trigger semantics classify rules into always, path, intelligent, and manual (6.85825ms)
-  ✔ claude fixture expands source-relative imports into guidance text (2.248792ms)
-  ✔ github copilot instructions are discovered as always-applicable guidance (1.728958ms)
-  ✔ gemini root guidance is discovered as always-applicable (1.985458ms)
-  ✔ loads nested .claude/CLAUDE.md root guidance (2.034125ms)
-  ✔ cline rules are discovered from .cline/rules (2.808334ms)
-  ✔ kiro steering modes map to always, path, intelligent, and manual (9.98625ms)
-  ✔ opencode local instructions load and remote URLs stay diagnostic-only (1.876292ms)
-  ✔ claudeMdExcludes skip CLAUDE.md and matched rules before loading (3.095375ms)
-  ✔ extra skill roots include devin and codeium (6.611291ms)
-  ✔ github instructions without applyTo are manual not always (2.528ms)
-  ✔ playbooks and agent profiles catalog; activate_rule loads playbook body (8.856416ms)
-  ✔ skill metadata parses nested frontmatter and hides model-non-invocable skills from prompt catalog (3.885ms)
-  ✔ path-scoped rules stay inactive when no target paths are provided (3.725917ms)
-  ✔ nested AGENTS and CLAUDE guidance do not leak outside their ancestor scope (42.671292ms)
-  ✔ scrubs PEM, Bearer, and AWS key material from guidance text (0.101708ms)
-  ✔ dynamic shell command markers are not executed while parsing guidance (1.229791ms)
-  ✔ skill allowed-tools remain advisory and never escalate PreBase permissions (11.976583ms)
-  ✔ triggers user-only skills are hidden from model auto catalog without disable-model-invocation (4.319667ms)
-  ✔ ambiguous duplicate skill names refuse activation until an id is provided (20.388083ms)
-  ✔ remote OpenCode URLs are never read and tilde paths stay diagnostic-only (2.5485ms)
-  ✔ Devin rules follow Windsurf trigger activation semantics (7.814375ms)
-  ✔ manual GitHub instructions require activate_rule and stay out of always/path buckets (5.778416ms)
-  ✔ skill metadata exposes pathGlobs and gates activation by target paths (12.326083ms)
-  ✔ skill metadata accepts legacy globs frontmatter as pathGlobs (4.3255ms)
-  ✔ nested alwaysApply Cursor rules stay scoped to their package container (59.182875ms)
-  ✔ Project Guidance V2 interoperability: GitHub agents, OpenCode agents/commands, Gemini commands, Cline workflows, Continue rules, and hook diagnostics (103.47425ms)
-✔ projectGuidanceService (803.337458ms)
-(node:74405) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/projectGuidanceService.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ nestedPathCatalogName keeps OpenCode slashes and Gemini colons (1.007159ms)
+  ✔ discovers AGENTS.md and always-on Cursor rules without dumping skill bodies (15.167912ms)
+  ✔ path-scoped Cursor globs apply only to matching targets (9.783349ms)
+  ✔ scrubs inline secret patterns from guidance prompt output (0.195718ms)
+  ✔ malicious repo guidance cannot disable secret protection semantics in formatter output (2.012254ms)
+  ✔ conflicting indentation guidance in the same scope is surfaced (2.495615ms)
+  ✔ skill bodies stay out of the prompt until explicitly activated (6.20352ms)
+  ✔ untrusted workspaces disable project guidance (0.424336ms)
+  ✔ equivalent guidance is deduplicated with diagnostics (5.554886ms)
+  ✔ guidanceTargetPathsFromReferences extracts relative paths from chat references (0.774568ms)
+  ✔ activated intelligent/manual rules appear in snapshot and prompt (65.987378ms)
+  ✔ cache invalidates all snapshots for a workspace root (3.045426ms)
+  ✔ nested AGENTS.override and OpenCode skills in cross-ecosystem fixture (73.623511ms)
+  ✔ intelligent and manual Cursor rules stay on-demand until activate_rule (38.134762ms)
+  ✔ ecosystem fixture covers Claude imports, GitHub, Windsurf triggers, and Cline paths (17.148598ms)
+  ✔ prebase_project_guidance activation path loads skill bodies through session state (36.78571ms)
+  ✔ getCombinedSnapshot keeps path rules distinct per workspace root (3.529196ms)
+  ✔ duplicate skill names receive stable distinct IDs (4.539624ms)
+  ✔ windsurf trigger semantics classify rules into always, path, intelligent, and manual (5.2196ms)
+  ✔ claude fixture expands source-relative imports into guidance text (1.953401ms)
+  ✔ github copilot instructions are discovered as always-applicable guidance (1.248506ms)
+  ✔ gemini root guidance is discovered as always-applicable (1.784702ms)
+  ✔ loads nested .claude/CLAUDE.md root guidance (2.481917ms)
+  ✔ cline rules are discovered from .cline/rules (1.697407ms)
+  ✔ kiro steering modes map to always, path, intelligent, and manual (6.953348ms)
+  ✔ opencode local instructions load and remote URLs stay diagnostic-only (1.53617ms)
+  ✔ claudeMdExcludes skip CLAUDE.md and matched rules before loading (5.368142ms)
+  ✔ extra skill roots include devin and codeium (3.508514ms)
+  ✔ github instructions without applyTo are manual not always (1.646632ms)
+  ✔ playbooks and agent profiles catalog; activate_rule loads playbook body (12.591665ms)
+  ✔ skill metadata parses nested frontmatter and hides model-non-invocable skills from prompt catalog (2.568314ms)
+  ✔ path-scoped rules stay inactive when no target paths are provided (3.357218ms)
+  ✔ nested AGENTS and CLAUDE guidance do not leak outside their ancestor scope (24.868222ms)
+  ✔ scrubs PEM, Bearer, and AWS key material from guidance text (0.169474ms)
+  ✔ dynamic shell command markers are not executed while parsing guidance (2.154864ms)
+  ✔ skill allowed-tools remain advisory and never escalate PreBase permissions (10.14901ms)
+  ✔ triggers user-only skills are hidden from model auto catalog without disable-model-invocation (2.700386ms)
+  ✔ ambiguous duplicate skill names refuse activation until an id is provided (10.807108ms)
+  ✔ remote OpenCode URLs are never read and tilde paths stay diagnostic-only (2.399677ms)
+  ✔ Devin rules follow Windsurf trigger activation semantics (6.611362ms)
+  ✔ manual GitHub instructions require activate_rule and stay out of always/path buckets (3.18619ms)
+  ✔ skill metadata exposes pathGlobs and gates activation by target paths (7.419225ms)
+  ✔ skill metadata accepts legacy globs frontmatter as pathGlobs (3.107543ms)
+  ✔ nested alwaysApply Cursor rules stay scoped to their package container (33.540761ms)
+  ✔ Project Guidance V2 interoperability: GitHub agents, OpenCode agents/commands, Gemini commands, Cline workflows, Continue rules, and hook diagnostics (64.006987ms)
+✔ projectGuidanceService (511.744886ms)
+(node:210641) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/projectGuidanceService.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ projectGuidanceSession
-  ✔ tracks targets, activated skills, and activated rules for a chat request (0.752833ms)
-(node:74406) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/projectGuidanceSession.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ tracks targets, activated skills, and activated rules for a chat request (1.162385ms)
+(node:210657) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/projectGuidanceSession.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ AsyncLocalStorage isolates concurrent sessions (7.663083ms)
-  ✔ cancellation of one async scope does not clear another session store (0.170708ms)
-  ✔ hasSeenSource treats content hash changes as unseen (0.081875ms)
-✔ projectGuidanceSession (10.765125ms)
+  ✔ AsyncLocalStorage isolates concurrent sessions (5.84365ms)
+  ✔ cancellation of one async scope does not clear another session store (0.296517ms)
+  ✔ hasSeenSource treats content hash changes as unseen (0.206782ms)
+✔ projectGuidanceSession (8.396107ms)
 ▶ ProjectSafetyService Unit Tests
-  ✔ identifies sensitive credential and secret paths (1.056375ms)
-  ✔ permits standard non-sensitive project paths (0.214541ms)
-  ✔ rejects read/write actions on sensitive paths (0.49025ms)
-  ✔ allows read action on standard project paths (1.118541ms)
-  ✔ rejects explicit sensitiveFileRead and sensitiveFileWrite categories (0.073958ms)
-  ✔ validates workspaceRead and workspaceWrite categories (0.066583ms)
-  ✔ handles trusted network URLs without prompt (0.057208ms)
-✔ ProjectSafetyService Unit Tests (4.274541ms)
-(node:74407) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/projectSafetyService.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ identifies sensitive credential and secret paths (0.674979ms)
+  ✔ permits standard non-sensitive project paths (0.135144ms)
+  ✔ rejects read/write actions on sensitive paths (0.349959ms)
+  ✔ allows read action on standard project paths (0.12345ms)
+  ✔ rejects explicit sensitiveFileRead and sensitiveFileWrite categories (0.984576ms)
+  ✔ validates workspaceRead and workspaceWrite categories (0.186991ms)
+  ✔ handles trusted network URLs without prompt (0.105281ms)
+✔ ProjectSafetyService Unit Tests (3.442096ms)
+(node:210665) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/projectSafetyService.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus Request Assembler & Context Budget
-  ✔ isSensitiveFile identifies private keys, tokens, and env files (0.717958ms)
-  ✔ resolveNativeReferences skips sensitive files and reads bounded content via host (0.841416ms)
-  ✔ buildSystemPrompt includes mode instructions and attached context (0.099ms)
-  ✔ buildSystemPrompt keeps PreBase safety rules when project guidance tries to override them (0.051041ms)
-  ✔ assembleChatRequest forwards project guidance into the system instruction (0.139459ms)
-  ✔ extractConversationHistory converts request and response turns into AIContentMessage[] (0.097ms)
-  ✔ extractConversationHistory respects maxTurns and maxChars limits (0.086458ms)
-  ✔ processToolResultData handles text and extracts multimodal image data (0.0975ms)
-  ✔ processToolResultData applies head/tail compaction when exceeding maxChars (0.065834ms)
-  ✔ filterToolDeclarations prioritizes referenced tools (0.110917ms)
-  ✔ assembleChatRequest constructs full request tuple with bounded defaults (0.065083ms)
-  ✔ consumeWebToolBudget caps search, deep search, and fetch independently (0.14975ms)
-✔ Magnus Request Assembler & Context Budget (3.064917ms)
-(node:74408) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/requestAssembler.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ isSensitiveFile identifies private keys, tokens, and env files (1.262878ms)
+  ✔ resolveNativeReferences skips sensitive files and reads bounded content via host (2.091953ms)
+  ✔ buildSystemPrompt includes mode instructions and attached context (0.158509ms)
+  ✔ buildSystemPrompt keeps PreBase safety rules when project guidance tries to override them (0.090546ms)
+  ✔ assembleChatRequest forwards project guidance into the system instruction (0.241961ms)
+  ✔ extractConversationHistory converts request and response turns into AIContentMessage[] (0.177519ms)
+  ✔ extractConversationHistory respects maxTurns and maxChars limits (0.148708ms)
+  ✔ processToolResultData handles text and extracts multimodal image data (0.248678ms)
+  ✔ processToolResultData applies head/tail compaction when exceeding maxChars (0.123686ms)
+  ✔ filterToolDeclarations prioritizes referenced tools (0.21547ms)
+  ✔ assembleChatRequest constructs full request tuple with bounded defaults (0.540703ms)
+  ✔ consumeWebToolBudget caps search, deep search, and fetch independently (0.319934ms)
+✔ Magnus Request Assembler & Context Budget (6.684888ms)
+(node:210673) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/requestAssembler.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ MagnusSecretStorage & Precedence
-  ✔ getProviderSecretKey formats scoped keys correctly (0.348416ms)
-  ✔ stores and retrieves provider-scoped keys in packaged mode (0.194167ms)
-  ✔ automatically and idempotently migrates legacy un-scoped key to scoped gemini key (0.075125ms)
-  ✔ getGeminiKeyOrMessage returns clear guidance when unconfigured (0.093541ms)
-  ✔ rejects empty API keys (0.19875ms)
-  ✔ clearing provider key also cleans legacy key (0.083292ms)
-  ✔ parseAllowlistedEnv handles quotes, whitespace, comments, and filters variables (0.145875ms)
-  ✔ isPreBaseSourceRoot strictly rejects arbitrary workspace folders (0.125209ms)
-  ✔ PreBaseSecretResolver respects allowAmbientRootDiscovery: false (0.054084ms)
-✔ MagnusSecretStorage & Precedence (1.802709ms)
-(node:74409) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/secretStorage.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ getProviderSecretKey formats scoped keys correctly (0.633856ms)
+  ✔ stores and retrieves provider-scoped keys in packaged mode (0.398979ms)
+  ✔ automatically and idempotently migrates legacy un-scoped key to scoped gemini key (0.140971ms)
+  ✔ getGeminiKeyOrMessage returns clear guidance when unconfigured (0.162732ms)
+  ✔ rejects empty API keys (0.396643ms)
+  ✔ clearing provider key also cleans legacy key (0.171471ms)
+  ✔ parseAllowlistedEnv handles quotes, whitespace, comments, and filters variables (0.247826ms)
+  ✔ isPreBaseSourceRoot strictly rejects arbitrary workspace folders (0.200636ms)
+  ✔ PreBaseSecretResolver respects allowAmbientRootDiscovery: false (0.18417ms)
+✔ MagnusSecretStorage & Precedence (3.465872ms)
+(node:210681) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/secretStorage.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus smoke transport
-  ✔ smoke model uses NormalizedAIModel fields, is hidden, and is not product-selectable (0.539541ms)
-  ✔ installSmokeTransport and stream diagnostics stay behind the smoke-test driver (0.99275ms)
-(node:74410) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/smokeTransport.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ smoke model uses NormalizedAIModel fields, is hidden, and is not product-selectable (0.977238ms)
+  ✔ installSmokeTransport and stream diagnostics stay behind the smoke-test driver (2.657146ms)
+(node:210689) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/smokeTransport.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ smoke transport streams progressive chunks then completes (887.774917ms)
-  ✔ smoke transport reports streamActive while chunks are in flight (888.078583ms)
-  ✔ smoke transport cancel before the first chunk emits nothing (0.2145ms)
-  ✔ smoke transport cancellation stops further source chunks (222.449125ms)
-✔ Magnus smoke transport (2000.780958ms)
+  ✔ smoke transport streams progressive chunks then completes (882.696827ms)
+  ✔ smoke transport reports streamActive while chunks are in flight (882.093984ms)
+  ✔ smoke transport cancel before the first chunk emits nothing (0.417814ms)
+  ✔ smoke transport cancellation stops further source chunks (220.448578ms)
+✔ Magnus smoke transport (1990.409377ms)
 ▶ streamPace Unit Tests
-  ✔ paces text in nominal chunks with injected sleep ticks (0.754667ms)
-  ✔ preserves UTF-16 surrogate pairs and avoids splitting high and low surrogates (0.09925ms)
-  ✔ adaptively catches up when backlog is large and source finishes (0.25625ms)
-  ✔ immediately terminates on cancellation without yielding further (0.104917ms)
-  ✔ propagates upstream source errors faithfully (0.272708ms)
-(node:74411) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/streamPace.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ paces text in nominal chunks with injected sleep ticks (1.39258ms)
+  ✔ preserves UTF-16 surrogate pairs and avoids splitting high and low surrogates (1.28105ms)
+  ✔ adaptively catches up when backlog is large and source finishes (1.572843ms)
+  ✔ immediately terminates on cancellation without yielding further (0.382261ms)
+  ✔ propagates upstream source errors faithfully (0.509588ms)
+(node:210697) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/streamPace.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
-  ✔ cancellation stops a yield-paused source via return() and does not hang on a blocked source await (103.713833ms)
-  ✔ no-op sleepFn parks on a delayed source instead of busy-polling (42.37375ms)
-  ✔ createLivePacedSink cancel wakes a blocked waiter and settles (0.374416ms)
-✔ streamPace Unit Tests (149.154333ms)
+  ✔ cancellation stops a yield-paused source via return() and does not hang on a blocked source await (99.938496ms)
+  ✔ no-op sleepFn parks on a delayed source instead of busy-polling (39.692989ms)
+  ✔ createLivePacedSink cancel wakes a blocked waiter and settles (0.646211ms)
+✔ streamPace Unit Tests (146.460901ms)
 ▶ Magnus taskRunModel
-  ✔ formats durations from timestamps (0.288292ms)
-  ✔ run header labels depend on status (0.101333ms)
-  ✔ migrates legacy turns once (0.1215ms)
-  ✔ migrates user-only legacy turns without work groups (0.048167ms)
-✔ Magnus taskRunModel (0.975ms)
-(node:74412) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/taskRunModel.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ formats durations from timestamps (0.485645ms)
+  ✔ run header labels depend on status (0.185545ms)
+  ✔ migrates legacy turns once (0.228159ms)
+  ✔ migrates user-only legacy turns without work groups (0.109622ms)
+✔ Magnus taskRunModel (1.724788ms)
+(node:210705) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/taskRunModel.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ MagnusToolActivityDescriptor & Privacy Sanitization
-  ✔ sanitizes paths cleanly (0.358041ms)
-  ✔ bounds query length and masks sensitive tokens in queries (0.268917ms)
-  ✔ formats informative invocation messages for workspace and edit tools (0.178459ms)
-  ✔ formats informative invocation messages for graph tools (0.0765ms)
-  ✔ formats informative invocation messages for terminal, desktop, web search, and runtime tools (0.223334ms)
-  ✔ generates confirmation messages for destructive operations (0.061459ms)
-✔ MagnusToolActivityDescriptor & Privacy Sanitization (2.133125ms)
-(node:74413) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/toolActivity.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ sanitizes paths cleanly (0.667187ms)
+  ✔ bounds query length and masks sensitive tokens in queries (0.503072ms)
+  ✔ formats informative invocation messages for workspace and edit tools (0.358101ms)
+  ✔ formats informative invocation messages for graph tools (0.111991ms)
+  ✔ formats informative invocation messages for terminal, desktop, web search, and runtime tools (0.391532ms)
+  ✔ generates confirmation messages for destructive operations (0.122455ms)
+✔ MagnusToolActivityDescriptor & Privacy Sanitization (3.838983ms)
+(node:210713) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/toolActivity.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Gemini Protocol & Schema Serialization
-  ✔ serializes function declarations using parametersJsonSchema without dropping additionalProperties (0.631875ms)
-  ✔ serializes multi-turn function calls and responses preserving IDs and thought signatures (0.072875ms)
-  ✔ parses raw Gemini candidates preserving functionCall IDs and thought signatures (0.094417ms)
-  ✔ parses thought_signature snake_case variant from Gemini API (0.047625ms)
-  ✔ validates schema serialization matrix for all contributing Magnus tools (0.40425ms)
-✔ Gemini Protocol & Schema Serialization (1.658958ms)
+  ✔ serializes function declarations using parametersJsonSchema without dropping additionalProperties (1.07755ms)
+  ✔ serializes multi-turn function calls and responses preserving IDs and thought signatures (0.150804ms)
+  ✔ parses raw Gemini candidates preserving functionCall IDs and thought signatures (0.172698ms)
+  ✔ parses thought_signature snake_case variant from Gemini API (0.081279ms)
+  ✔ validates schema serialization matrix for all contributing Magnus tools (0.696807ms)
+✔ Gemini Protocol & Schema Serialization (2.904349ms)
 ▶ DirectGeminiTransport
-  ✔ sends credentials strictly via x-goog-api-key header and never in URL (10.0475ms)
-  ✔ handles streaming SSE chunks and bounds accumulation (0.572125ms)
-  ✔ classifies direct HTTP errors with safe messages (0.142625ms)
-  ✔ discovers models across multiple pages and filters out specialized modalities (0.417666ms)
-✔ DirectGeminiTransport (11.307041ms)
+  ✔ sends credentials strictly via x-goog-api-key header and never in URL (16.906861ms)
+  ✔ handles streaming SSE chunks and bounds accumulation (1.077184ms)
+  ✔ classifies direct HTTP errors with safe messages (0.279371ms)
+  ✔ discovers models across multiple pages and filters out specialized modalities (0.938797ms)
+✔ DirectGeminiTransport (19.455615ms)
 ▶ HostedGeminiTransport
-  ✔ dispatches to gatewayClient or edge function endpoint with Bearer auth (0.607208ms)
-  ✔ classifies hosted errors accurately (0.082417ms)
-  ✔ serializes reasoning effort accurately for Gemini 3.x vs Gemini 2.5 vs default (0.127709ms)
-  ✔ filters thought parts from visible answer text and captures usageMetadata in generate and streamGenerate (0.28425ms)
-✔ HostedGeminiTransport (1.167417ms)
-(node:74414) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/transports.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ dispatches to gatewayClient or edge function endpoint with Bearer auth (1.402665ms)
+  ✔ classifies hosted errors accurately (0.201479ms)
+  ✔ serializes reasoning effort accurately for Gemini 3.x vs Gemini 2.5 vs default (0.284731ms)
+  ✔ filters thought parts from visible answer text and captures usageMetadata in generate and streamGenerate (0.677546ms)
+✔ HostedGeminiTransport (2.76703ms)
+(node:210721) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/transports.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ webContextCore URL policy
-  ✔ accepts public http(s) and rejects private/localhost destinations (1.495833ms)
-  ✔ canonicalizes scheme/host casing without rewriting www to apex (0.160042ms)
-  ✔ dedupes www/non-www duplicates from LinkUp and Firecrawl without mutating the kept source URL (0.714667ms)
-  ✔ preserves functional query parameters including generic ref while stripping known tracking families from the dedupe key only (0.198959ms)
-✔ webContextCore URL policy (3.038542ms)
+  ✔ accepts public http(s) and rejects private/localhost destinations (1.246437ms)
+  ✔ canonicalizes scheme/host casing without rewriting www to apex (1.223718ms)
+  ✔ dedupes www/non-www duplicates from LinkUp and Firecrawl without mutating the kept source URL (1.106853ms)
+  ✔ preserves functional query parameters including generic ref while stripping known tracking families from the dedupe key only (0.373981ms)
+✔ webContextCore URL policy (4.894204ms)
 ▶ webContextCore routing and budget
-  ✔ uses Firecrawl search categories only in deep mode when the query earns them (0.320833ms)
-  ✔ model-facing web payload budget is 14k characters (0.041917ms)
-  ✔ fresh queries disable Firecrawl cache age (0.147667ms)
-  ✔ bounds search payload under the 14k tool budget and keeps URL/title when clipping (0.217208ms)
-  ✔ keeps valid JSON when clipping excerpts that contain quotes and escapes (0.075541ms)
-  ✔ drops a source instead of emitting a tiny remnant when the payload is already full (0.083083ms)
-  ✔ drops provider internals from the Magnus-facing payload (0.123042ms)
-✔ webContextCore routing and budget (1.143333ms)
-(node:74415) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/webContextCore.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ uses Firecrawl search categories only in deep mode when the query earns them (0.75457ms)
+  ✔ model-facing web payload budget is 14k characters (0.095619ms)
+  ✔ fresh queries disable Firecrawl cache age (0.399179ms)
+  ✔ bounds search payload under the 14k tool budget and keeps URL/title when clipping (0.456502ms)
+  ✔ keeps valid JSON when clipping excerpts that contain quotes and escapes (0.237993ms)
+  ✔ drops a source instead of emitting a tiny remnant when the payload is already full (0.194036ms)
+  ✔ drops provider internals from the Magnus-facing payload (0.27149ms)
+✔ webContextCore routing and budget (2.773938ms)
+(node:210730) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/webContextCore.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ▶ Magnus web-context payload boundary
-  ✔ does not forward credentialed or private gateway sources to the model (0.702291ms)
-✔ Magnus web-context payload boundary (1.034834ms)
-(node:74416) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///Users/qunyingfan/Prebasecode/extensions/prebase-magnus/src/webContextPayload.test.ts is not specified and it doesn't parse as CommonJS.
+  ✔ does not forward credentialed or private gateway sources to the model (1.460791ms)
+✔ Magnus web-context payload boundary (2.916106ms)
+(node:210731) [MODULE_TYPELESS_PACKAGE_JSON] Warning: Module type of file:///workspace/extensions/prebase-magnus/src/webContextPayload.test.ts is not specified and it doesn't parse as CommonJS.
 Reparsing as ES module because module syntax was detected. This incurs a performance overhead.
-To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode/extensions/prebase-magnus/package.json.
+To eliminate this warning, add "type": "module" to /workspace/extensions/prebase-magnus/package.json.
 (Use `node --trace-warnings ...` to show where the warning was created)
 ℹ tests 271
 ℹ suites 36
@@ -459,4 +459,4 @@ To eliminate this warning, add "type": "module" to /Users/qunyingfan/Prebasecode
 ℹ cancelled 0
 ℹ skipped 0
 ℹ todo 0
-ℹ duration_ms 2497.545292
+ℹ duration_ms 4176.278541

@@ -1,25 +1,24 @@
 {
   "schemaVersion": 3,
   "scenario": "lifecycle-cycles",
-  "sourceHead": "c8129bed337a841561e3321d8e7835994b2d114f",
-  "sourceFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
-  "productFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
-  "generatedAt": "2026-09-03T09:20:46.334Z",
+  "sourceHead": "ce46edff112311f96498dc58e35dd58f08750188",
+  "sourceFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
+  "productFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
+  "generatedAt": "2026-09-03T10:21:01.768Z",
   "producerId": "lifecycle-cycles",
-  "producerFingerprint": "9e3708dcab5270ad992f17c267c7eb3fc1892cdffeb30d535edb932c189ab8c3",
+  "producerFingerprint": "4ad5219ec301563a9732cbc6ae95ab1cff72caa73f8772cdd68754e090f80c62",
   "kind": "lifecycle",
   "cycleCount": 5,
   "cycles": [
     {
       "id": "cycle-1",
-      "at": "2026-09-03T09:21:11.167Z",
-      "processCount": 28,
+      "at": "2026-09-03T10:21:25.512Z",
+      "processCount": 15,
       "roles": {
-        "main": 15,
-        "other": 13
+        "main": 15
       },
-      "cpuSum": 192,
-      "rssMb": 2640.2,
+      "cpuSum": 95.3,
+      "rssMb": 2584.9,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -122,15 +121,13 @@
     },
     {
       "id": "cycle-2",
-      "at": "2026-09-03T09:21:19.220Z",
-      "processCount": 25,
+      "at": "2026-09-03T10:21:32.885Z",
+      "processCount": 17,
       "roles": {
-        "main": 17,
-        "other": 7,
-        "git": 1
+        "main": 17
       },
-      "cpuSum": 187.5,
-      "rssMb": 2865,
+      "cpuSum": 78.2,
+      "rssMb": 2810.7,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -233,14 +230,13 @@
     },
     {
       "id": "cycle-3",
-      "at": "2026-09-03T09:21:27.094Z",
-      "processCount": 30,
+      "at": "2026-09-03T10:21:40.253Z",
+      "processCount": 19,
       "roles": {
-        "main": 19,
-        "other": 11
+        "main": 19
       },
-      "cpuSum": 185.4,
-      "rssMb": 3337.4,
+      "cpuSum": 69,
+      "rssMb": 2996.4,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -343,13 +339,13 @@
     },
     {
       "id": "cycle-4",
-      "at": "2026-09-03T09:21:35.130Z",
+      "at": "2026-09-03T10:21:47.583Z",
       "processCount": 21,
       "roles": {
         "main": 21
       },
-      "cpuSum": 182.7,
-      "rssMb": 3380.4,
+      "cpuSum": 62.2,
+      "rssMb": 3201.9,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -452,13 +448,13 @@
     },
     {
       "id": "cycle-5",
-      "at": "2026-09-03T09:21:48.314Z",
+      "at": "2026-09-03T10:21:54.982Z",
       "processCount": 23,
       "roles": {
         "main": 23
       },
-      "cpuSum": 181.6,
-      "rssMb": 3598.4,
+      "cpuSum": 58,
+      "rssMb": 3400.6,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -560,16 +556,16 @@
       ]
     }
   ],
-  "prebasePid": 138638,
+  "prebasePid": 206637,
   "cold": {
     "id": "cold",
-    "at": "2026-09-03T09:20:54.488Z",
+    "at": "2026-09-03T10:21:09.964Z",
     "processCount": 10,
     "roles": {
       "main": 10
     },
-    "cpuSum": 172.9,
-    "rssMb": 1832.2,
+    "cpuSum": 176.3,
+    "rssMb": 1843.1,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -673,14 +669,13 @@
   "closedPrimarySidebar": true,
   "warm": {
     "id": "warm",
-    "at": "2026-09-03T09:21:03.126Z",
-    "processCount": 31,
+    "at": "2026-09-03T10:21:18.162Z",
+    "processCount": 13,
     "roles": {
-      "main": 13,
-      "other": 18
+      "main": 13
     },
-    "cpuSum": 196.5,
-    "rssMb": 2388.6,
+    "cpuSum": 130.7,
+    "rssMb": 2595.2,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -696,10 +691,10 @@
   },
   "classification": "warm-provisioning",
   "quit": {
-    "before": "138638       1 16.3 798060 prebase",
+    "before": "206637       1 10.3 255020 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 1113,
+    "latencyMs": 480,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

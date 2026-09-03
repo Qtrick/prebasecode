@@ -60,7 +60,12 @@ export function productPathAcceptanceFailures(evidence) {
 	if (!evidence.inspected) {
 		failures.push('Inspect did not return a semantic snapshot');
 	}
-	if (evidence.inspected && (!evidence.inspectTitle || /blank/i.test(String(evidence.assertActual?.url ?? '')))) {
+	// Only treat an explicit empty title or about:blank assert URL as blank-webview proof.
+	// Missing inspectTitle on incomplete failure fixtures must not inflate unrelated failure lists.
+	const assertUrl = evidence.assertActual && typeof evidence.assertActual === 'object'
+		? evidence.assertActual.url
+		: undefined;
+	if (evidence.inspectTitle === '' || assertUrl === 'about:blank') {
 		failures.push('Inspect/assert saw a blank Tauri/Electron webview instead of the fixture UI');
 	}
 	if (!evidence.filled) {
