@@ -10,6 +10,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import {
+	acquirePhase3AcceptanceLock,
 	dismissStartup,
 	gracefulWorkbenchQuit,
 	portOwners,
@@ -92,120 +93,126 @@ export function runtimePreviewAcceptanceFailures(evidence) {
 }
 
 async function run() {
-	mkdirSync(evidenceDir, { recursive: true });
-	mkdirSync(screenshotDir, { recursive: true });
-	const port = allocatePort();
-	const fixture = createFixture(port);
-	const launch = join(repo, '.agents/skills/launch/scripts/launch.sh');
-	const { execFile } = await import('node:child_process');
-	const { promisify } = await import('node:util');
-	const execFileAsync = promisify(execFile);
-	const { stdout } = await execFileAsync(launch, ['--repo', repo, '--', '--enable-smoke-test-driver', '--skip-release-notes', '--skip-welcome', fixture], {
-		cwd: repo,
-		env: {
-			...process.env,
-			HTTP_PROXY: '',
-			HTTPS_PROXY: '',
-			ALL_PROXY: '',
-		},
-		maxBuffer: 10 * 1024 * 1024,
-	});
-	const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
-	let browser;
-	let page;
-	let evidence = { ...phase3EvidenceMetadata(repo, 'runtime-preview'), fixture, port, pid: info.pid, cdpPort: info.cdpPort, logFile: info.logFile };
+	const release = await acquirePhase3AcceptanceLock('runtime-preview');
 	try {
-		browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
-		page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
-		if (!page) throw new Error('Workbench page not found');
-		await dismissStartup(page);
-		await waitForWorkbenchDriver(page);
+		mkdirSync(evidenceDir, { recursive: true });
+		mkdirSync(screenshotDir, { recursive: true });
+		const port = allocatePort();
+		const fixture = createFixture(port);
+		const launch = join(repo, '.agents/skills/launch/scripts/launch.sh');
+		const { execFile } = await import('node:child_process');
+		const { promisify } = await import('node:util');
+		const execFileAsync = promisify(execFile);
+		const { stdout } = await execFileAsync(launch, ['--repo', repo, '--', '--enable-smoke-test-driver', '--skip-release-notes', '--skip-welcome', fixture], {
+			cwd: repo,
+			env: {
+				...process.env,
+				HTTP_PROXY: '',
+				HTTPS_PROXY: '',
+				ALL_PROXY: '',
+				VSCODE_SKIP_PRELAUNCH: process.env.VSCODE_SKIP_PRELAUNCH ?? '1',
+			},
+			maxBuffer: 10 * 1024 * 1024,
+		});
+		const info = JSON.parse(stdout.trim().split('\n').findLast(line => line.startsWith('{')));
+		let browser;
+		let page;
+		let evidence = { ...phase3EvidenceMetadata(repo, 'runtime-preview'), fixture, port, pid: info.pid, cdpPort: info.cdpPort, logFile: info.logFile };
+		try {
+			browser = await chromium.connectOverCDP(`http://127.0.0.1:${info.cdpPort}`);
+			page = browser.contexts().flatMap(context => context.pages()).find(candidate => candidate.url().includes('workbench'));
+			if (!page) throw new Error('Workbench page not found');
+			await dismissStartup(page);
+			await waitForWorkbenchDriver(page);
 
-		// Prefer smoke-driver executeCommand — platform Command Palette chords false-fail cross-OS.
-		await workbenchCommandWithTimeout(page, 15_000, 'workbench.view.prebase.runtime').catch(() => undefined);
-		const runtimeView = page.locator('.prebase-runtime-view');
-		if (!await runtimeView.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
-			const activity = page.getByRole('tab', { name: /Runtime Preview/i }).or(page.getByRole('button', { name: /Runtime Preview/i }));
-			if (await activity.first().waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) {
-				await activity.first().click();
+			// Prefer smoke-driver executeCommand — platform Command Palette chords false-fail cross-OS.
+			await workbenchCommandWithTimeout(page, 15_000, 'workbench.view.prebase.runtime').catch(() => undefined);
+			const runtimeView = page.locator('.prebase-runtime-view');
+			if (!await runtimeView.waitFor({ state: 'visible', timeout: 8_000 }).then(() => true, () => false)) {
+				const activity = page.getByRole('tab', { name: /Runtime Preview/i }).or(page.getByRole('button', { name: /Runtime Preview/i }));
+				if (await activity.first().waitFor({ state: 'visible', timeout: 5_000 }).then(() => true, () => false)) {
+					await activity.first().click();
+				}
 			}
-		}
-		await workbenchCommandWithTimeout(page, 15_000, 'prebase.runtime.open').catch(() => undefined);
-		await runtimeView.waitFor({ state: 'visible', timeout: 20_000 });
-		evidence.targetOpened = await page.getByRole('tab', { name: /Runtime Preview/ }).count() > 0 || await runtimeView.isVisible();
+			await workbenchCommandWithTimeout(page, 15_000, 'prebase.runtime.open').catch(() => undefined);
+			await runtimeView.waitFor({ state: 'visible', timeout: 20_000 });
+			evidence.targetOpened = await page.getByRole('tab', { name: /Runtime Preview/ }).count() > 0 || await runtimeView.isVisible();
 
-		await runtimeView.getByRole('button', { name: 'Detect Configurations', exact: true }).click();
-		const scriptSelect = runtimeView.locator('select').first();
-		await waitFor(async () => (await scriptSelect.locator('option').allTextContents()).some(value => /dev/i.test(value)));
-		evidence.detectedScript = (await scriptSelect.locator('option').allTextContents()).some(value => /dev/i.test(value));
+			await runtimeView.getByRole('button', { name: 'Detect Configurations', exact: true }).click();
+			const scriptSelect = runtimeView.locator('select').first();
+			await waitFor(async () => (await scriptSelect.locator('option').allTextContents()).some(value => /dev/i.test(value)));
+			evidence.detectedScript = (await scriptSelect.locator('option').allTextContents()).some(value => /dev/i.test(value));
 
-		await runtimeView.getByRole('button', { name: 'Start', exact: true }).click();
-		await confirmStartIfNeeded(page);
-		evidence.serverStarted = Boolean(await waitFor(() => portOwners(port).length > 0, 60_000));
-		if (!evidence.serverStarted) {
-			await workbenchCommandWithTimeout(page, 15_000, 'prebase.runtime.start').catch(() => undefined);
+			await runtimeView.getByRole('button', { name: 'Start', exact: true }).click();
 			await confirmStartIfNeeded(page);
-			evidence.serverStarted = Boolean(await waitFor(() => portOwners(port).length > 0, 30_000));
-		}
-		if (evidence.serverStarted) {
-			const urlInput = runtimeView.getByPlaceholder('http://localhost:5173');
-			await urlInput.fill(`http://127.0.0.1:${port}`);
-			await runtimeView.getByRole('button', { name: 'Connect', exact: true }).click();
-			evidence.previewConnected = Boolean(await waitFor(async () => {
-				const status = `${await runtimeView.innerText()} ${await page.locator('.prebase-runtime-editor').innerText().catch(() => '')}`;
-				const connected = /\bStatus:\s*connected\b/i.test(status) || /\bConnected\b/.test(status);
-				if (!connected) return false;
+			evidence.serverStarted = Boolean(await waitFor(() => portOwners(port).length > 0, 60_000));
+			if (!evidence.serverStarted) {
+				await workbenchCommandWithTimeout(page, 15_000, 'prebase.runtime.start').catch(() => undefined);
+				await confirmStartIfNeeded(page);
+				evidence.serverStarted = Boolean(await waitFor(() => portOwners(port).length > 0, 30_000));
+			}
+			if (evidence.serverStarted) {
+				const urlInput = runtimeView.getByPlaceholder('http://localhost:5173');
+				await urlInput.fill(`http://127.0.0.1:${port}`);
+				await runtimeView.getByRole('button', { name: 'Connect', exact: true }).click();
+				evidence.previewConnected = Boolean(await waitFor(async () => {
+					const status = `${await runtimeView.innerText()} ${await page.locator('.prebase-runtime-editor').innerText().catch(() => '')}`;
+					const connected = /\bStatus:\s*connected\b/i.test(status) || /\bConnected\b/.test(status);
+					if (!connected) return false;
+					for (const frame of page.frames()) {
+						if (await frame.getByRole('heading', { name: 'Runtime Ready', exact: true }).count().catch(() => 0)) return true;
+					}
+					return false;
+				}, 20_000));
+			}
+
+			await runtimeView.getByRole('button', { name: 'Inspect', exact: true }).click();
+			evidence.inspected = Boolean(await waitFor(async () => {
 				for (const frame of page.frames()) {
 					if (await frame.getByRole('heading', { name: 'Runtime Ready', exact: true }).count().catch(() => 0)) return true;
 				}
 				return false;
-			}, 20_000));
-		}
+			}));
+			await page.screenshot({ path: join(screenshotDir, 'runtime-preview-live.png') });
 
-		await runtimeView.getByRole('button', { name: 'Inspect', exact: true }).click();
-		evidence.inspected = Boolean(await waitFor(async () => {
-			for (const frame of page.frames()) {
-				if (await frame.getByRole('heading', { name: 'Runtime Ready', exact: true }).count().catch(() => 0)) return true;
+			const restartOwnersBefore = portOwners(port);
+			await runtimeView.getByRole('button', { name: 'Restart', exact: true }).click();
+			await confirmStartIfNeeded(page);
+			evidence.restarted = Boolean(await waitFor(() => {
+				const owners = portOwners(port);
+				return owners.length > 0 && owners.some(pid => !restartOwnersBefore.includes(pid));
+			}));
+			await page.waitForTimeout(1_000);
+			await runtimeView.getByRole('button', { name: 'Stop', exact: true }).click();
+			evidence.stopped = Boolean(await waitFor(() => portOwners(port).length === 0, 15_000));
+			evidence.portAfterStop = portOwners(port);
+
+			await page.waitForTimeout(1_000);
+			await runtimeView.getByRole('button', { name: 'Start', exact: true }).click();
+			await confirmStartIfNeeded(page);
+			evidence.startedBeforeQuit = Boolean(await waitFor(() => portOwners(port).length > 0));
+		} catch (error) {
+			evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);
+		} finally {
+			if (page && info?.pid) {
+				evidence.quit = await gracefulWorkbenchQuit(page, info.pid);
 			}
-			return false;
-		}));
-		await page.screenshot({ path: join(screenshotDir, 'runtime-preview-live.png') });
-
-		const restartOwnersBefore = portOwners(port);
-		await runtimeView.getByRole('button', { name: 'Restart', exact: true }).click();
-		await confirmStartIfNeeded(page);
-		evidence.restarted = Boolean(await waitFor(() => {
-			const owners = portOwners(port);
-			return owners.length > 0 && owners.some(pid => !restartOwnersBefore.includes(pid));
-		}));
-		await page.waitForTimeout(1_000);
-		await runtimeView.getByRole('button', { name: 'Stop', exact: true }).click();
-		evidence.stopped = Boolean(await waitFor(() => portOwners(port).length === 0, 15_000));
-		evidence.portAfterStop = portOwners(port);
-
-		await page.waitForTimeout(1_000);
-		await runtimeView.getByRole('button', { name: 'Start', exact: true }).click();
-		await confirmStartIfNeeded(page);
-		evidence.startedBeforeQuit = Boolean(await waitFor(() => portOwners(port).length > 0));
-	} catch (error) {
-		evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);
+			if (browser) {
+				try { await browser.close(); } catch { /* already disconnected */ }
+			}
+			await waitFor(() => portOwners(port).length === 0, 8_000);
+			evidence.portAfterQuit = portOwners(port);
+			evidence.gracefulQuitMs = evidence.quit?.latencyMs;
+			evidence.quitRequiredSigkill = evidence.quit?.latencyMs > 6_000;
+		}
+		const failures = runtimePreviewAcceptanceFailures(evidence);
+		const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
+		writeFileSync(join(evidenceDir, 'live.json'), JSON.stringify(result, null, 2));
+		console.log(JSON.stringify(result, null, 2));
+		if (!result.ok) process.exitCode = 1;
 	} finally {
-		if (page && info?.pid) {
-			evidence.quit = await gracefulWorkbenchQuit(page, info.pid);
-		}
-		if (browser) {
-			try { await browser.close(); } catch { /* already disconnected */ }
-		}
-		await waitFor(() => portOwners(port).length === 0, 8_000);
-		evidence.portAfterQuit = portOwners(port);
-		evidence.gracefulQuitMs = evidence.quit?.latencyMs;
-		evidence.quitRequiredSigkill = evidence.quit?.latencyMs > 6_000;
+		await release?.();
 	}
-	const failures = runtimePreviewAcceptanceFailures(evidence);
-	const result = { ok: failures.length === 0 && !evidence.error, failures, ...evidence };
-	writeFileSync(join(evidenceDir, 'live.json'), JSON.stringify(result, null, 2));
-	console.log(JSON.stringify(result, null, 2));
-	if (!result.ok) process.exitCode = 1;
 }
 
 if (resolve(process.argv[1] ?? '') === scriptPath) {
