@@ -73,13 +73,14 @@ async function run() {
 		}, 20_000, 200);
 		evidence.smokeInstalled = Boolean(installed?.ok);
 		const startedAt = Date.now();
-		// Drive Magnus in Ask mode so smoke stream renders to chat DOM (Agent mode queues MCP startup).
+		// Ask mode avoids Agent MCP queue; do not blockOnResponse (can hang on MCP startup).
 		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
-			query: '@Agent prebase-smoke-stream',
+			query: 'prebase-smoke-stream',
 			isPartialQuery: false,
 			mode: 'ask',
-			blockOnResponse: true,
 		}).catch(() => undefined);
+		// If MCP startup interstitial appears, skip it so Ask can stream.
+		await launched.page.getByRole('button', { name: /Skip\??/i }).first().click({ timeout: 2_000 }).catch(() => undefined);
 
 		let sourceChunksMax = 0;
 		let sourceChunksSawIncrease = false;
@@ -154,11 +155,11 @@ async function run() {
 
 		// Test second request
 		await workbenchCommand(launched.page, 'workbench.action.chat.open', {
-			query: '@Agent prebase-smoke-stream-second',
+			query: 'prebase-smoke-stream-second',
 			isPartialQuery: false,
 			mode: 'ask',
-			blockOnResponse: true,
 		}).catch(() => undefined);
+		await launched.page.getByRole('button', { name: /Skip\??/i }).first().click({ timeout: 2_000 }).catch(() => undefined);
 		const secondRes = await workbenchCommand(launched.page, 'prebase.test.runMagnusSmokeStream', {
 			prompt: 'prebase-smoke-stream-second',
 		}).catch(() => null);
