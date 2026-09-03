@@ -5,7 +5,7 @@ Canonical PreBase beta readiness tracker. Do not mark an item **Complete** witho
 Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`
 Severities: `Blocker` | `Critical` | `High` | `Medium` | `Low`
 
-Last audit: **2026-09-03** (campaign: peek-body/screenLocked/Escape-dismiss-order product truth; C3 workspaceFolders identity; Focus Changes overlap gate; campaign producers CURRENT_GREEN/EXTERNAL on Linux; macOS AppKit notch live + remaining Phase 3 still required — beta candidate claim still **forbidden**)
+Last audit: **2026-09-03** (campaign: unlock peek restore + sticky Escape + honest attentionCompact vocabulary; C3/Focus false greens closed; campaign CURRENT_GREEN/EXTERNAL on Linux; **macOS AppKit notch live still required** — beta candidate claim still **forbidden**)
 
 ## Summary
 

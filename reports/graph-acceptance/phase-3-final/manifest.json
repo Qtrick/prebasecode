@@ -1,35 +1,35 @@
 {
   "phase": "3-final",
-  "sourceHead": "f65acb33c9943aaf2f6d729a6b6f889af3eb5ce5",
-  "sourceFingerprint": "a8c47d7896a123e7053712a1f45e1e99a5fa84c61db61a388495bc3227581da3",
-  "productFingerprint": "a8c47d7896a123e7053712a1f45e1e99a5fa84c61db61a388495bc3227581da3",
+  "sourceHead": "b5eae2c3ce53f6acda3d86a39d4a624bdcc12f13",
+  "sourceFingerprint": "c4f9d20dfcf251db2a26fc1cddf39e6ac3f50cf22d1ddf13966ed8488d4a1a97",
+  "productFingerprint": "c4f9d20dfcf251db2a26fc1cddf39e6ac3f50cf22d1ddf13966ed8488d4a1a97",
   "producerFingerprints": {
     "parser-benchmark": "1ed983eae16447244c6a82a9b1310c8ddab23c93482b170ac7f8f14c760ea678",
-    "magnus-streaming-smoke": "4b8981c34942319a3604045ff698dd530dcccd05c4ad06b07e84134d835f7c45",
-    "magnus-guidance-smoke": "baae1cb9ce1cc8f33b43520595996d7dc8fbbd9df7fd2f197e783d72cb5e11d8",
-    "magnus-live-activity": "b2b3a4f7a09de43fb026aa2438aa03f9371ae69e53d9b333633d5d700fb26f54",
-    "core-ide": "f52d12c9e6ea432669556849d08093f379a86f0babe0f5e0db8362eecf1d4bd1",
+    "magnus-streaming-smoke": "27ddbccead996e4bfe8f716a45c169945001f2dad3eda0ccb001e2a4dd544b30",
+    "magnus-guidance-smoke": "163e4db3734230a8be3a2edcd760abb42872442139d2387394218f67da1cbaa2",
+    "magnus-live-activity": "eda4bcc89b5c44f64ea15a96d48be212bb4b5216117f30d32c8858d5ad53c4a7",
+    "core-ide": "7b551ddabfae040e4532c9e58b02543303bc7c2facf0317b3508ca1cf914f3fe",
     "runtime-preview": "81102d868c288611b2d28d688c4e4ffe83e6be27f74fb46fe889aa8f50ac1b5c",
-    "temporal-small": "cd0cba598a797615da744f89cbdca2990deaa05b8155fad64607842a588eb1db",
-    "temporal-large": "afd7dbf175b2b4900edf65df5d09a8b38407bb51ff8fb237b9d9b28ac1ec9dc6",
-    "temporal-canonical-scale": "3d731fae2410b9733a066e9f83c65c8d1d9e45c5946c59b71df51f3d424c29e8",
-    "electron-product-path": "326035b84c0ba4d2e5adc357bf3ba174d73b1ce03925676bed03c64a78600064",
-    "electron-native-cases": "ef0cd806f47ac57868d17b19f66cddcd3c5426556ac92155b05ef5ba9f28e166",
-    "tauri-product-path": "faf2efbed5b88cff6c3bd2a2b67eae955ce09ea2afc2492a9fd9f62b7180952f",
-    "magnus-electron-tools": "a9c7206ff6ce98b6da8dbece7143cd5bdf7217060092f853bc2de5439e681186",
-    "magnus-tauri-tools": "939b1774af475331a017e1937deb7ba98979f9efe4ce43dbe051921888b13997",
+    "temporal-small": "83ec50b597859aecd6fd49c31b0aedfb9a4ccbd0f6f8f2359019cf9052102454",
+    "temporal-large": "8dfbe64d7ddd6235db62770b0277b3212008b68c7c9e5d0fdd1e86ac2476f93f",
+    "temporal-canonical-scale": "de54613995fb1201fdf1aafea8d6131eca8527ee4daeec9783a59b6ba75a39cf",
+    "electron-product-path": "d7e13fa6a42eda45fbea7e46e69d936ee93c81a2ee73f5c1689d456542930e17",
+    "electron-native-cases": "9464744eaee7945ff263171a4d515f27e8096c9fb6e7d942f8840993f1c5cf2a",
+    "tauri-product-path": "dcfadc2fcc9eb80d5376651bc0d4d7d6488e5fb4e134eb47814220f0441172ef",
+    "magnus-electron-tools": "ed95cac03402a7b56c8c4cfccb1d12fe872a1716daced66d18299f55541d7dd3",
+    "magnus-tauri-tools": "6615cb7b8c6da7907f2e48ff8032f5e545b0b4ef1f9b30ccc8b3119b1be07190",
     "hybrid-web-smoke": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
-    "privacy": "ecaa6248952ba203786f2a588d60e6cf37fff5249a6da4642ed23aaf6207e354",
-    "load-quit": "76af148e70c5c359cc9f2132f1e33ed43ebd4946893d0d746dded017dbcb54e6",
-    "lifecycle-cycles": "4a0e12d39c485d7955b390fb39b1863e4d89d1b7157eefe2979b162bc867df8e",
-    "electron-restart-soak": "f75a18fd45a5dacae1a14d42f1c8b813a295d3c8b7250694922bd015bff8782d",
-    "tauri-restart-soak": "46e189970a5d177d7e9e37c5e595b8a1fe061b5e2a1811627067f2bbb9510a7c",
-    "idle-soak": "fabcb77ee7fc8e1e690c2743c427b924daaa0974a51f4707a9beb1a19cf4ed46",
-    "active-soak": "fc94080b269499972cf2007b95dd8bbdc06057b8e1f7930e78e6998c48ba9db8",
-    "assurance": "577e994e4d3f0d7bf627ccef513750f57a5398081d5f1507f84ffe56e2ef485d"
+    "privacy": "37cbc7026ab8c1331d4e817a76c4254a9d6dbf299ba7e94d8c642470c22050e9",
+    "load-quit": "87bc579f56ada7a4f0645c0c8cd0053e6eae670828d60550980b7de5b0d98fa5",
+    "lifecycle-cycles": "2761118300dd9bd75f7f6b973f910b89ac6e00763523a76c3857a37f70e7d665",
+    "electron-restart-soak": "60992c2740901e702aec405e433363c5efaac01f6d0806b5dd7598fc4d93f156",
+    "tauri-restart-soak": "fd398c47d9caec9b015b3f710a037a40f7ffe8811c2492c4c5284269ae804e5a",
+    "idle-soak": "80955b5e6c11759daaf936b17ffb4e3e70782ff36e91d4619faa538d08f04ead",
+    "active-soak": "28b1b82c77467d48fb664a4088886a44a01d38a0d06424ca4e5b390c817d8289",
+    "assurance": "ffd34c9bdadaa21feaa66d35cad094bec8dffb71d2c1adf4c0053bb767f3a5bd"
   },
-  "validationRunId": "2026-09-03T07-50-29-279Z",
-  "generatedAt": "2026-09-03T07:53:29.143Z",
+  "validationRunId": "2026-09-03T08-05-00-481Z",
+  "generatedAt": "2026-09-03T08:07:56.353Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -121,19 +121,19 @@
       "path": "temporal/live.json",
       "ok": true,
       "quit": {
-        "startedAt": 1788422007987,
-        "quitMs": 201,
+        "startedAt": 1788422875183,
+        "quitMs": 300,
         "remaining": "gone",
-        "before": "105576       1 20.5 294764 prebase",
+        "before": "110575       1 19.8 292988 prebase",
         "after": "gone"
       },
       "rerun": {
         "code": 0,
         "timedOut": false,
-        "elapsedMs": 22482,
+        "elapsedMs": 21940,
         "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
         "logTail": "",
-        "harnessPid": 105454,
+        "harnessPid": 110453,
         "timeoutMs": 180000,
         "leftoverPids": []
       }
@@ -201,10 +201,10 @@
       "path": "magnus/streaming-smoke.json",
       "ok": true,
       "quit": {
-        "before": "103427       1 25.3 282668 prebase",
+        "before": "108453       1 25.7 282720 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 348,
+        "latencyMs": 341,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -213,10 +213,10 @@
       "rerun": {
         "code": 0,
         "timedOut": false,
-        "elapsedMs": 16183,
+        "elapsedMs": 16221,
         "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log",
         "logTail": "",
-        "harnessPid": 103354,
+        "harnessPid": 108356,
         "timeoutMs": 180000,
         "leftoverPids": []
       }
@@ -246,10 +246,10 @@
       "rerun": {
         "code": 0,
         "timedOut": false,
-        "elapsedMs": 297,
+        "elapsedMs": 313,
         "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log",
         "logTail": "",
-        "harnessPid": 103742,
+        "harnessPid": 108754,
         "timeoutMs": 120000,
         "leftoverPids": []
       }
@@ -310,10 +310,10 @@
       "path": "core-ide/live.json",
       "ok": true,
       "quit": {
-        "before": "105157       1 50.3 281184 prebase",
+        "before": "110156       1 51.7 279204 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 375,
+        "latencyMs": 372,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -322,10 +322,10 @@
       "rerun": {
         "code": 0,
         "timedOut": false,
-        "elapsedMs": 138538,
+        "elapsedMs": 135021,
         "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
         "logTail": "",
-        "harnessPid": 103764,
+        "harnessPid": 108776,
         "timeoutMs": 240000,
         "leftoverPids": []
       }
@@ -337,10 +337,10 @@
       "rerun": {
         "code": 0,
         "timedOut": false,
-        "elapsedMs": 138538,
+        "elapsedMs": 135021,
         "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
         "logTail": "",
-        "harnessPid": 103764,
+        "harnessPid": 108776,
         "timeoutMs": 240000,
         "leftoverPids": []
       }
@@ -350,10 +350,10 @@
       "path": "core-ide/themes-a11y.json",
       "ok": true,
       "quit": {
-        "before": "105157       1 50.3 281184 prebase",
+        "before": "110156       1 51.7 279204 prebase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 375,
+        "latencyMs": 372,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
@@ -362,10 +362,10 @@
       "rerun": {
         "code": 0,
         "timedOut": false,
-        "elapsedMs": 138538,
+        "elapsedMs": 135021,
         "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
         "logTail": "",
-        "harnessPid": 103764,
+        "harnessPid": 108776,
         "timeoutMs": 240000,
         "leftoverPids": []
       }
