@@ -120,6 +120,25 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 		assert.ok(computeVisibleCommunityGuideLabels(guides, 1.0, []).length <= 24);
 	});
 
+	test('7b. unified layout keeps community landmarks at Fit minZoom (0.15)', () => {
+		const guides = Array.from({ length: 8 }, (_, i) => ({
+			id: `g${i}`,
+			label: `Module ${i}`,
+			bounds: { minX: i * 400, minY: 0, maxX: i * 400 + 180, maxY: 160 },
+			nodeCount: 40 - i,
+			nodeIds: [`n${i}`],
+		}));
+		const represented = new Set(guides.map(g => g.id));
+		const atMinZoom = computeTemporalLabelLayout([], guides, 0.15, {
+			representedGuideIds: represented,
+		});
+		assert.ok(atMinZoom.guideLabels.length >= 1, `Fit minZoom must draw community landmarks (got ${atMinZoom.guideLabels.length})`);
+		const belowMin = computeTemporalLabelLayout([], guides, 0.149, {
+			representedGuideIds: represented,
+		});
+		assert.equal(belowMin.guideLabels.length, 0, 'below MIN_ZOOM must still suppress landmarks');
+	});
+
 	test('8. community guide labels skip lower-priority guides on box collision', () => {
 		const sharedBounds = { minX: 100, minY: 100, maxX: 300, maxY: 300 };
 		const guides = [

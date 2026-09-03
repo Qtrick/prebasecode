@@ -3,12 +3,12 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "privacy",
-  "sourceHead": "ce46edff112311f96498dc58e35dd58f08750188",
-  "sourceFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
-  "productFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
-  "generatedAt": "2026-09-03T10:18:00.405Z",
+  "sourceHead": "0fff0672c605d91c88cf95e0a01e153c525474c6",
+  "sourceFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
+  "productFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
+  "generatedAt": "2026-09-03T11:10:17.537Z",
   "producerId": "privacy",
-  "producerFingerprint": "3d4a78212dcc83c835e2fbcd2c6fa9562423529ab9ca37661f2a6bc4f677b378",
+  "producerFingerprint": "6c032cef581ab3cd459a54c1eb5344780bbd1f1592c39b3526a38051d08b268b",
   "observations": [
     {
       "phase": "startup",
@@ -17,51 +17,51 @@
       ],
       "sockets": [
         {
-          "pid": 201291,
+          "pid": 247743,
           "host": "localhost",
-          "port": 35901,
+          "port": 43809,
           "role": "main"
         },
         {
-          "pid": 201291,
+          "pid": 247743,
           "host": "localhost",
-          "port": 38485,
+          "port": 45295,
           "role": "main"
         },
         {
-          "pid": 201291,
+          "pid": 247743,
           "host": "localhost",
-          "port": 56384,
+          "port": 39870,
           "role": "main"
         },
         {
-          "pid": 201345,
-          "host": "yudlsqd-in-f138.1e100.net",
+          "pid": 247797,
+          "host": "sea09s41-in-f9.1e100.net",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 201345,
-          "host": "sea09s41-in-f6.1e100.net",
+          "pid": 247797,
+          "host": "pnseab-ad-in-f14.1e100.net",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 201345,
-          "host": "cdn-185-199-109-133.github.com",
+          "pid": 247797,
+          "host": "cdn-185-199-111-133.github.com",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 201431,
+          "pid": 247922,
           "host": "localhost",
           "port": 5879,
           "role": "main"
         },
         {
-          "pid": 201460,
+          "pid": 247951,
           "host": "localhost",
-          "port": 44043,
+          "port": 45847,
           "role": "main"
         }
       ]
@@ -72,7 +72,68 @@
         "localhost",
         "open-vsx.org"
       ],
-      "sockets": []
+      "sockets": [
+        {
+          "pid": 247743,
+          "host": "localhost",
+          "port": 43809,
+          "role": "main"
+        },
+        {
+          "pid": 247743,
+          "host": "localhost",
+          "port": 45295,
+          "role": "main"
+        },
+        {
+          "pid": 247743,
+          "host": "localhost",
+          "port": 39870,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "sea09s41-in-f9.1e100.net",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "pnseab-ad-in-f14.1e100.net",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "151.101.1.242",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "cdn-185-199-111-133.github.com",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "151.101.1.242",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247922,
+          "host": "localhost",
+          "port": 5879,
+          "role": "main"
+        },
+        {
+          "pid": 247951,
+          "host": "localhost",
+          "port": 45847,
+          "role": "main"
+        }
+      ]
     },
     {
       "phase": "runtime-preview-view",
@@ -82,57 +143,63 @@
       ],
       "sockets": [
         {
-          "pid": 201291,
+          "pid": 247743,
           "host": "localhost",
-          "port": 35901,
+          "port": 43809,
           "role": "main"
         },
         {
-          "pid": 201291,
+          "pid": 247743,
           "host": "localhost",
-          "port": 38485,
+          "port": 45295,
           "role": "main"
         },
         {
-          "pid": 201291,
+          "pid": 247743,
           "host": "localhost",
-          "port": 56384,
+          "port": 39870,
           "role": "main"
         },
         {
-          "pid": 201345,
-          "host": "yudlsqd-in-f138.1e100.net",
+          "pid": 247797,
+          "host": "sea09s41-in-f9.1e100.net",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 201345,
-          "host": "sea09s41-in-f6.1e100.net",
+          "pid": 247797,
+          "host": "pnseab-ad-in-f14.1e100.net",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 201345,
-          "host": "cdn-185-199-109-133.github.com",
+          "pid": 247797,
+          "host": "151.101.1.242",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 201345,
-          "host": "151.101.129.242",
+          "pid": 247797,
+          "host": "cdn-185-199-111-133.github.com",
           "port": 443,
           "role": "main"
         },
         {
-          "pid": 201431,
+          "pid": 247797,
+          "host": "151.101.1.242",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247922,
           "host": "localhost",
           "port": 5879,
           "role": "main"
         },
         {
-          "pid": 201460,
+          "pid": 247951,
           "host": "localhost",
-          "port": 44043,
+          "port": 45847,
           "role": "main"
         }
       ]
@@ -143,15 +210,76 @@
         "localhost",
         "open-vsx.org"
       ],
-      "sockets": []
+      "sockets": [
+        {
+          "pid": 247743,
+          "host": "localhost",
+          "port": 43809,
+          "role": "main"
+        },
+        {
+          "pid": 247743,
+          "host": "localhost",
+          "port": 45295,
+          "role": "main"
+        },
+        {
+          "pid": 247743,
+          "host": "localhost",
+          "port": 39870,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "sea09s41-in-f9.1e100.net",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "pnseab-ad-in-f14.1e100.net",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "151.101.1.242",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "cdn-185-199-111-133.github.com",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247797,
+          "host": "151.101.1.242",
+          "port": 443,
+          "role": "main"
+        },
+        {
+          "pid": 247922,
+          "host": "localhost",
+          "port": 5879,
+          "role": "main"
+        },
+        {
+          "pid": 247951,
+          "host": "localhost",
+          "port": 45847,
+          "role": "main"
+        }
+      ]
     }
   ],
-  "prebasePid": 201291,
+  "prebasePid": 247743,
   "quit": {
-    "before": "201291       1 35.0 283684 prebase",
+    "before": "247743       1 33.9 284032 prebase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 359,
+    "latencyMs": 333,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
@@ -179,6 +307,20 @@
       "url": "http://localhost:54321/ping",
       "source": "cdp",
       "type": "Fetch"
+    },
+    {
+      "host": "open-vsx.org",
+      "origin": "https://open-vsx.org",
+      "url": "https://open-vsx.org/vscode/gallery/vscode/dbaeumer/vscode-eslint/latest",
+      "source": "cdp",
+      "type": "Other"
+    },
+    {
+      "host": "open-vsx.org",
+      "origin": "https://open-vsx.org",
+      "url": "https://open-vsx.org/vscode/gallery/vscode/github/vscode-pull-request-github/latest",
+      "source": "cdp",
+      "type": "Other"
     },
     {
       "host": "open-vsx.org",
@@ -225,16 +367,9 @@
     {
       "host": "open-vsx.org",
       "origin": "https://open-vsx.org",
-      "url": "https://open-vsx.org/vscode/gallery/vscode/dbaeumer/vscode-eslint/latest",
+      "url": "https://open-vsx.org/vscode/gallery/vscode/connor4312/esbuild-problem-matchers/latest",
       "source": "cdp",
-      "type": "Other"
-    },
-    {
-      "host": "open-vsx.org",
-      "origin": "https://open-vsx.org",
-      "url": "https://open-vsx.org/vscode/gallery/vscode/github/vscode-pull-request-github/latest",
-      "source": "cdp",
-      "type": "Other"
+      "type": "Fetch"
     },
     {
       "host": "open-vsx.org",
@@ -242,13 +377,6 @@
       "url": "https://open-vsx.org/vscode/gallery/vscode/ms-vscode/vscode-github-issue-notebooks/latest",
       "source": "cdp",
       "type": "Other"
-    },
-    {
-      "host": "open-vsx.org",
-      "origin": "https://open-vsx.org",
-      "url": "https://open-vsx.org/vscode/gallery/vscode/connor4312/esbuild-problem-matchers/latest",
-      "source": "cdp",
-      "type": "Fetch"
     },
     {
       "host": "open-vsx.org",
@@ -300,30 +428,30 @@
   "allHosts": [
     "localhost",
     "open-vsx.org",
-    "yudlsqd-in-f138.1e100.net",
-    "sea09s41-in-f6.1e100.net",
-    "cdn-185-199-109-133.github.com",
-    "151.101.129.242"
+    "sea09s41-in-f9.1e100.net",
+    "pnseab-ad-in-f14.1e100.net",
+    "cdn-185-199-111-133.github.com",
+    "151.101.1.242"
   ],
   "socketHosts": [
     "localhost",
-    "yudlsqd-in-f138.1e100.net",
-    "sea09s41-in-f6.1e100.net",
-    "cdn-185-199-109-133.github.com",
-    "151.101.129.242"
+    "sea09s41-in-f9.1e100.net",
+    "pnseab-ad-in-f14.1e100.net",
+    "cdn-185-199-111-133.github.com",
+    "151.101.1.242"
   ],
   "expectedHosts": [
     "localhost",
     "open-vsx.org",
-    "yudlsqd-in-f138.1e100.net",
-    "sea09s41-in-f6.1e100.net",
-    "cdn-185-199-109-133.github.com"
+    "sea09s41-in-f9.1e100.net",
+    "pnseab-ad-in-f14.1e100.net",
+    "cdn-185-199-111-133.github.com"
   ],
   "unexpectedHosts": [],
   "forbiddenHosts": [],
   "unresolvedNumericHosts": [],
   "socketUnresolvedHosts": [
-    "151.101.129.242"
+    "151.101.1.242"
   ],
   "classifications": [
     {
@@ -337,22 +465,22 @@
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "yudlsqd-in-f138.1e100.net",
+      "host": "sea09s41-in-f9.1e100.net",
       "kind": "expected",
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "sea09s41-in-f6.1e100.net",
+      "host": "pnseab-ad-in-f14.1e100.net",
       "kind": "expected",
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "cdn-185-199-109-133.github.com",
+      "host": "cdn-185-199-111-133.github.com",
       "kind": "expected",
       "why": "loopback, private, or product infrastructure"
     },
     {
-      "host": "151.101.129.242",
+      "host": "151.101.1.242",
       "kind": "socket-numeric",
       "why": "process-tree socket numeric; hostname identity comes from CDP"
     }

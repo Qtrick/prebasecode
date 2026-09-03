@@ -1,65 +1,65 @@
-{"scenario":"parser-active-1","quitMs":354,"remaining":"gone","parserActiveRequests":32}
-{"scenario":"parser-active-2","quitMs":364,"remaining":"gone","parserActiveRequests":32}
-{"scenario":"parser-active-3","quitMs":341,"remaining":"gone","parserActiveRequests":32}
-{"scenario":"temporal-sqlite-write-1","quitMs":377,"remaining":"gone","temporalActiveWrites":1}
-{"scenario":"temporal-sqlite-write-2","quitMs":389,"remaining":"gone","temporalActiveWrites":1}
-{"scenario":"temporal-sqlite-write-3","quitMs":393,"remaining":"gone","temporalActiveWrites":1}
-{"scenario":"runtime-preview-active","quitMs":505,"remaining":"gone","runtimePreviewServerRunning":true}
-{"scenario":"electron-test-lab-active","quitMs":422,"remaining":"gone"}
-{"scenario":"tauri-test-lab-active","quitMs":421,"remaining":"gone"}
-{"scenario":"magnus-stream-active","quitMs":394,"remaining":"gone"}
+{"scenario":"parser-active-1","quitMs":349,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"parser-active-2","quitMs":352,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"parser-active-3","quitMs":347,"remaining":"gone","parserActiveRequests":32}
+{"scenario":"temporal-sqlite-write-1","quitMs":378,"remaining":"gone","temporalActiveWrites":1}
+{"scenario":"temporal-sqlite-write-2","quitMs":369,"remaining":"gone","temporalActiveWrites":1}
+{"scenario":"temporal-sqlite-write-3","quitMs":378,"remaining":"gone","temporalActiveWrites":1}
+{"scenario":"runtime-preview-active","quitMs":543,"remaining":"gone","runtimePreviewServerRunning":true}
+{"scenario":"electron-test-lab-active","quitMs":483,"remaining":"gone"}
+{"scenario":"tauri-test-lab-active","quitMs":465,"remaining":"gone"}
+{"scenario":"magnus-stream-active","quitMs":446,"remaining":"gone"}
 {
   "ok": true,
   "failures": [],
   "scenarios": [
     {
       "scenario": "parser-active-1",
-      "quitMs": 354,
+      "quitMs": 349,
       "remaining": "gone"
     },
     {
       "scenario": "parser-active-2",
-      "quitMs": 364,
+      "quitMs": 352,
       "remaining": "gone"
     },
     {
       "scenario": "parser-active-3",
-      "quitMs": 341,
+      "quitMs": 347,
       "remaining": "gone"
     },
     {
       "scenario": "temporal-sqlite-write-1",
-      "quitMs": 377,
+      "quitMs": 378,
       "remaining": "gone"
     },
     {
       "scenario": "temporal-sqlite-write-2",
-      "quitMs": 389,
+      "quitMs": 369,
       "remaining": "gone"
     },
     {
       "scenario": "temporal-sqlite-write-3",
-      "quitMs": 393,
+      "quitMs": 378,
       "remaining": "gone"
     },
     {
       "scenario": "runtime-preview-active",
-      "quitMs": 505,
+      "quitMs": 543,
       "remaining": "gone"
     },
     {
       "scenario": "electron-test-lab-active",
-      "quitMs": 422,
+      "quitMs": 483,
       "remaining": "gone"
     },
     {
       "scenario": "tauri-test-lab-active",
-      "quitMs": 421,
+      "quitMs": 465,
       "remaining": "gone"
     },
     {
       "scenario": "magnus-stream-active",
-      "quitMs": 394,
+      "quitMs": 446,
       "remaining": "gone"
     }
   ]

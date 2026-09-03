@@ -531,10 +531,13 @@ export function computeTemporalLabelLayout(
 	const currentFileId = options?.currentFileEntityId;
 
 	// 1. Collect Guide Landmark Candidates
+	// Gate at MIN_ZOOM (0.15): large Full Map Fit clamps to minZoom and must still show
+	// community landmarks. A higher gate (e.g. 0.18) created a Fit-only false red where
+	// overview aggregates drew but communityLabelsDrawn stayed 0.
 	const guideCandidates: UnifiedLabelCandidate[] = [];
 	const visibleNodeIds = options?.visibleNodeIds;
 	const representedGuideIds = options?.representedGuideIds;
-	if (zoom >= 0.18 && guides && guides.length > 0) {
+	if (zoom >= 0.15 && guides && guides.length > 0) {
 		const validGuides = [];
 		for (let i = 0; i < guides.length; i++) {
 			const g = guides[i];

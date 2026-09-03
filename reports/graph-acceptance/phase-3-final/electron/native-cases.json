@@ -3,12 +3,12 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "electron-native-cases",
-  "sourceHead": "ce46edff112311f96498dc58e35dd58f08750188",
-  "sourceFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
-  "productFingerprint": "181ca095a217d4042d07593076fccfc73f3dca9ade1bdf0218d6ae0d0fc3237a",
-  "generatedAt": "2026-09-03T10:14:57.558Z",
+  "sourceHead": "0fff0672c605d91c88cf95e0a01e153c525474c6",
+  "sourceFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
+  "productFingerprint": "91e32f68b2e948119d46310a50bbf1633b5b4de38067e2de47e27df833bfe401",
+  "generatedAt": "2026-09-03T11:02:32.808Z",
   "producerId": "electron-native-cases",
-  "producerFingerprint": "3dc82773d7298266b3412128b4dceac28cb5c508238a79ea168fb24d0116f0e7",
+  "producerFingerprint": "49de7d484b361872616fd657ed56eee1779436113c078e20f05b0764e88fb65e",
   "productPath": true,
   "bypassedPreBase": false,
   "cases": {
@@ -25,7 +25,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 89,
+      "duration": 91,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -47,7 +47,7 @@
       "reason": "role=button name=Disabled is disabled.",
       "title": "PreBase Electron Fixture",
       "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 8019,
+      "duration": 8041,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -76,7 +76,7 @@
       "title": "PreBase Electron Fixture",
       "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
       "console": [],
-      "duration": 8,
+      "duration": 7,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -93,7 +93,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 67,
+      "duration": 66,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -110,7 +110,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 238,
+      "duration": 186,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -214,7 +214,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 10,
+      "duration": 9,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -232,7 +232,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 9,
+      "duration": 8,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -268,7 +268,7 @@
       },
       "title": "PreBase Electron Fixture",
       "url": "file:///workspace/test/prebase/fixtures/desktop-electron/index.html",
-      "duration": 27,
+      "duration": 8,
       "framework": "electron",
       "backend": "cdp"
     },
@@ -295,8 +295,8 @@
   "stopped": true,
   "childAfterStop": "gone",
   "quit": {
-    "before": "199946       1 17.1 284612 prebase",
-    "latencyMs": 214,
+    "before": "244899       1 17.1 286444 prebase",
+    "latencyMs": 216,
     "remaining": "gone"
   }
 }
