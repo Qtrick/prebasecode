@@ -80,6 +80,7 @@ export const DOMAIN_PATHSPECS = {
 	'live-activity': [
 		'src/vs/platform/prebaseLiveActivity',
 		'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts',
+		'src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts',
 		'native/prebase-live-activity',
 		'test/prebase/acceptance/prebase-magnus-live-activity-live.mjs',
 		'test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs',
@@ -99,6 +100,7 @@ export const PATH_PREFIX_DOMAINS = [
 	['graphs/scripts/acceptance/', 'temporal'],
 	['src/vs/platform/prebaseLiveActivity/', 'live-activity'],
 	['src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts', 'live-activity'],
+	['src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts', 'live-activity'],
 	['native/prebase-live-activity/', 'live-activity'],
 	['test/prebase/acceptance/prebase-magnus-live-activity-live.mjs', 'live-activity'],
 	['test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs', 'live-activity'],

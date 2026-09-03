@@ -276,6 +276,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL attentionPeek;
 /** User Escape/collapse while attention: stay compact until click or attention clears. */
 @property (nonatomic, assign) BOOL userDismissedAttention;
+/** Screen lock from snapshot — hide/refuse peek+expand until unlock. */
+@property (nonatomic, assign) BOOL screenLocked;
 @property (nonatomic, assign) NSUInteger hapticCount;
 @property (nonatomic, assign) NSUInteger redrawCount;
 @property (nonatomic, assign) NSUInteger animationCount;
@@ -293,6 +295,7 @@ static NSString *JSString(Napi::Value value) {
 - (void)expandInteractive;
 - (void)enterInteractiveSticky;
 - (void)collapse;
+- (void)collapseEmittingDismiss:(BOOL)emitDismiss;
 - (NSDictionary *)diagnosticsDict;
 - (void)performUserHaptic;
 - (BOOL)simulateClickOptionIndex:(NSInteger)index;
@@ -300,12 +303,9 @@ static NSString *JSString(Napi::Value value) {
 - (BOOL)simulateClickDeny;
 - (BOOL)simulateSubmitFollowUp:(NSString *)text;
 - (BOOL)simulateClickOpenInPrebase;
-- (void)expandPeek;
-- (void)expandInteractive;
 - (void)installLocalKeyMonitor;
 - (void)removeLocalKeyMonitor;
 - (void)expandPreview;
-- (void)collapse;
 - (void)layoutForScreen;
 @end
 
@@ -570,15 +570,16 @@ static NSString *JSString(Napi::Value value) {
 			self.pendingInteractionTitle.hidden = YES;
 			self.pendingInteractionMessage.hidden = YES;
 			self.expandedMetricsLabel.hidden = YES;
+			self.latestMessageLabel.hidden = YES;
 			CGFloat bodyY = 6;
-			// Peek must still surface pending body text (truncated) — title alone is insufficient product truth.
+			// Attention peek prefers pending body text over activity; title is last resort.
 			NSString *peekBody = nil;
-			if (self.activityLabel.length) {
-				peekBody = self.activityLabel;
-			} else if (self.pendingMessage.length) {
+			if (self.pendingMessage.length) {
 				peekBody = self.pendingMessage;
 			} else if (self.pendingTitle.length) {
 				peekBody = self.pendingTitle;
+			} else if (self.activityLabel.length) {
+				peekBody = self.activityLabel;
 			}
 			if (peekBody.length) {
 				if (peekBody.length > 96) {
@@ -1197,8 +1198,11 @@ static NSString *JSString(Napi::Value value) {
 			return event;
 		}
 		if (strong.pinned || strong.content.expanded || strong.content.peekOnly) {
-			if (strong.content.attention) {
+			// Emit dismissAttention before unpin so renderer sticky Escape wins the race.
+			const BOOL attentionDismiss = strong.content.attention;
+			if (attentionDismiss) {
 				strong.userDismissedAttention = YES;
+				[strong emit:@"dismissAttention" extras:nil];
 			}
 			const BOOL wasPinned = strong.pinned;
 			strong.pinned = NO;
@@ -1206,7 +1210,7 @@ static NSString *JSString(Napi::Value value) {
 			if (wasPinned) {
 				[strong emit:@"unpin" extras:nil];
 			}
-			[strong collapse];
+			[strong collapseEmittingDismiss:!attentionDismiss];
 			return nil;
 		}
 		return event;
@@ -1284,7 +1288,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)expandPeek {
-	if (!self.visible) {
+	if (!self.visible || self.screenLocked) {
 		return;
 	}
 	// Fullscreen policy: suppress hover Peek while PreBase is immersed (attention still allowed).
@@ -1303,7 +1307,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)expandInteractive {
-	if (!self.visible) {
+	if (!self.visible || self.screenLocked) {
 		return;
 	}
 	self.attentionPeek = NO;
@@ -1319,7 +1323,7 @@ static NSString *JSString(Napi::Value value) {
 
 /** Peek/Attention click → sticky Interactive (same path for physical + simulated click). */
 - (void)enterInteractiveSticky {
-	if (!self.visible) {
+	if (!self.visible || self.screenLocked) {
 		return;
 	}
 	self.userDismissedAttention = NO;
@@ -1340,12 +1344,18 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)collapse {
+	[self collapseEmittingDismiss:YES];
+}
+
+- (void)collapseEmittingDismiss:(BOOL)emitDismiss {
 	if (self.pinned) {
 		return;
 	}
 	if (self.content.attention) {
 		self.userDismissedAttention = YES;
-		[self emit:@"dismissAttention" extras:nil];
+		if (emitDismiss) {
+			[self emit:@"dismissAttention" extras:nil];
+		}
 	}
 	self.attentionPeek = NO;
 	self.content.peekOnly = NO;
@@ -1544,6 +1554,11 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"interactionId"] = self.interactionId ?: @"";
 	dict[@"renderedLatestMessage"] = self.content.latestMessageLabel.hidden ? @"" : (self.content.latestMessageLabel.stringValue ?: @"");
 	dict[@"renderedPendingMessage"] = self.content.pendingInteractionMessage.hidden ? @"" : (self.content.pendingInteractionMessage.stringValue ?: @"");
+	// Peek body is painted into activityDescription while pendingInteractionMessage stays hidden.
+	dict[@"renderedPeekBody"] = (self.content.peekOnly && !self.content.activityDescription.hidden)
+		? (self.content.activityDescription.stringValue ?: @"")
+		: @"";
+	dict[@"screenLocked"] = @(self.screenLocked);
 	dict[@"approvalControlsVisible"] = @(!self.approveButton.hidden);
 	dict[@"openInPreBaseVisible"] = @(!self.openButton.hidden);
 	NSInteger visibleOptions = 0;
@@ -1676,6 +1691,7 @@ static NSString *JSString(Napi::Value value) {
 	self.sessionId = snapshot[@"sessionId"] ?: @"";
 	self.sessionResource = snapshot[@"sessionResource"] ?: @"";
 	self.revision = [snapshot[@"revision"] doubleValue];
+	self.screenLocked = [snapshot[@"screenLocked"] boolValue];
 	NSString *status = snapshot[@"status"] ?: @"";
 	self.content.status = status;
 	self.content.attention = [status isEqualToString:@"attention"];
@@ -1698,9 +1714,11 @@ static NSString *JSString(Napi::Value value) {
 
 	const BOOL alreadyInteractive = self.pinned
 		|| (self.content.expanded && !self.content.peekOnly && !self.attentionPeek);
+	// Lock / hidden: never expand peek from a snapshot republish (privacy + race with presentation).
+	const BOOL mayExpand = self.visible && !self.screenLocked;
 
 	if (self.content.attention) {
-		if (alreadyInteractive) {
+		if (alreadyInteractive && mayExpand) {
 			// Attention while Interactive/pinned: preserve Interactive; update content only.
 			self.userDismissedAttention = NO;
 			self.attentionPeek = NO;
@@ -1723,7 +1741,7 @@ static NSString *JSString(Napi::Value value) {
 				self.panel.ignoresMouseEvents = YES;
 				[self layoutForScreen];
 			}
-		} else if (!self.pinned) {
+		} else if (!self.pinned && mayExpand) {
 			// Glanceable attention peek: compact wings + short body, clickable to expand.
 			// Attention arrival is not user-initiated; do not haptic (Apple AppKit guidance).
 			self.attentionPeek = YES;
@@ -1734,6 +1752,16 @@ static NSString *JSString(Napi::Value value) {
 			self.didAttentionHaptic = NO;
 			if (self.panel) {
 				self.panel.ignoresMouseEvents = NO;
+				[self layoutForScreen];
+			}
+		} else if (!mayExpand) {
+			self.attentionPeek = NO;
+			self.content.peekOnly = NO;
+			self.content.expanded = NO;
+			self.content.targetExpanded = NO;
+			self.ignoresMouse = YES;
+			if (self.panel) {
+				self.panel.ignoresMouseEvents = YES;
 				[self layoutForScreen];
 			}
 		}
@@ -1868,6 +1896,11 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 	payload[@"taskTitle"] = JSString(snapshot.Get("taskTitle"));
 	payload[@"presentationLabel"] = JSString(snapshot.Get("presentationLabel"));
 	payload[@"latestShortMessage"] = JSString(snapshot.Get("latestShortMessage"));
+	if (snapshot.Get("screenLocked").IsBoolean() && snapshot.Get("screenLocked").As<Napi::Boolean>().Value()) {
+		payload[@"screenLocked"] = @YES;
+	} else {
+		payload[@"screenLocked"] = @NO;
+	}
 	NSMutableArray *actions = [NSMutableArray array];
 	if (snapshot.Get("recentActions").IsArray()) {
 		Napi::Array arr = snapshot.Get("recentActions").As<Napi::Array>();
@@ -2019,19 +2052,22 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 		return Napi::Boolean::New(env, true);
 	}
 	if (action == "interactive") {
-		[controller expandInteractive];
+		// Sticky Interactive must match physical click / simulateAction("click").
+		[controller enterInteractiveSticky];
 		return Napi::Boolean::New(env, true);
 	}
 	if (action == "escape" || action == "collapse") {
-		// Match local Escape monitor: clear pin before collapse (collapse no-ops while pinned).
-		if (controller.content.attention) {
+		// Match local Escape monitor: dismissAttention before unpin (renderer race).
+		const BOOL attentionDismiss = controller.content.attention;
+		if (attentionDismiss) {
 			controller.userDismissedAttention = YES;
+			[controller emit:@"dismissAttention" extras:nil];
 		}
 		if (controller.pinned) {
 			controller.pinned = NO;
 			[controller emit:@"unpin" extras:nil];
 		}
-		[controller collapse];
+		[controller collapseEmittingDismiss:!attentionDismiss];
 		return Napi::Boolean::New(env, true);
 	}
 	if (action == "approve") {

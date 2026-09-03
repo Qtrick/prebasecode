@@ -133,11 +133,31 @@ if (!native.includes('emit:@"dismissAttention"')) {
 	}
 	const peekBodyStart = native.indexOf('NSString *peekBody = nil;');
 	const peekBody = peekBodyStart >= 0 ? native.slice(peekBodyStart, peekBodyStart + 700) : '';
-	if (!/activityLabel\.length/.test(peekBody)
-		|| !/pendingMessage\.length/.test(peekBody)
+	if (!/pendingMessage\.length/.test(peekBody)
 		|| !/pendingTitle\.length/.test(peekBody)
-		|| !/substringToIndex:93/.test(peekBody)) {
-		failures.push('peek body must prefer activity → pendingMessage → pendingTitle with truncated body');
+		|| !/activityLabel\.length/.test(peekBody)
+		|| !/substringToIndex:93/.test(peekBody)
+		|| peekBody.indexOf('pendingMessage.length') < 0
+		|| peekBody.indexOf('pendingMessage.length') > peekBody.indexOf('activityLabel.length')) {
+		failures.push('peek body must prefer pendingMessage → pendingTitle → activityLabel with truncated body');
+	}
+	if (!native.includes('renderedPeekBody')) {
+		failures.push('native diagnostics must expose renderedPeekBody for AppKit peek product-truth proof');
+	}
+	if (!native.includes('payload[@"screenLocked"]') || !native.includes('self.screenLocked = [snapshot[@"screenLocked"] boolValue]')) {
+		failures.push('native SnapshotToDict/applySnapshotDict must serialize and honor screenLocked');
+	}
+	{
+		const escapeStart = native.indexOf('- (void)installLocalKeyMonitor {');
+		const escapeBlock = escapeStart >= 0 ? native.slice(escapeStart, escapeStart + 1200) : '';
+		const dismissAt = escapeBlock.indexOf('emit:@"dismissAttention"');
+		const unpinAt = escapeBlock.indexOf('emit:@"unpin"');
+		if (dismissAt < 0 || unpinAt < 0 || dismissAt > unpinAt || !native.includes('collapseEmittingDismiss')) {
+			failures.push('Escape must emit dismissAttention before unpin to avoid renderer race');
+		}
+	}
+	if (!/action == "interactive"[\s\S]{0,200}enterInteractiveSticky/.test(native)) {
+		failures.push('simulateAction("interactive") must enter sticky Interactive (not bare expandInteractive)');
 	}
 }
 if (!native.includes('Delay control layout until frame animation completes to prevent visible popping')) {

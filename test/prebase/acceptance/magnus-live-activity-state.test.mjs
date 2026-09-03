@@ -123,13 +123,16 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 
 	const escapeMonitor = native.indexOf('- (void)installLocalKeyMonitor {');
 	assert.ok(escapeMonitor > 0);
-	const escapeBlock = native.slice(escapeMonitor, escapeMonitor + 900);
+	const escapeBlock = native.slice(escapeMonitor, escapeMonitor + 1400);
 	assert.match(escapeBlock, /userDismissedAttention = YES/);
 	assert.match(escapeBlock, /wasPinned/);
 	assert.match(escapeBlock, /emit:@"unpin"/);
-	assert.match(escapeBlock, /\[strong collapse\]/);
+	assert.match(escapeBlock, /collapseEmittingDismiss/);
+	const dismissAt = escapeBlock.indexOf('emit:@"dismissAttention"');
+	const unpinAt = escapeBlock.indexOf('emit:@"unpin"');
+	assert.ok(dismissAt >= 0 && unpinAt > dismissAt, 'Escape must emit dismissAttention before unpin');
 
-	const collapseStart = native.indexOf('- (void)collapse {');
+	const collapseStart = native.indexOf('- (void)collapseEmittingDismiss:(BOOL)emitDismiss {');
 	const collapse = native.slice(collapseStart, native.indexOf('- (void)emit:', collapseStart));
 	assert.match(collapse, /if \(self\.pinned\) \{\s*return;/);
 	assert.match(collapse, /userDismissedAttention = YES/);
@@ -137,6 +140,10 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 	assert.match(collapse, /self\.attentionPeek = NO/);
 	assert.match(collapse, /self\.content\.peekOnly = NO/);
 	assert.match(collapse, /self\.content\.expanded = NO/);
+	assert.match(native, /renderedPeekBody/);
+	assert.match(native, /payload\[@"screenLocked"\]/);
+	assert.match(native, /self\.screenLocked = \[snapshot\[@"screenLocked"\] boolValue\]/);
+	assert.match(native, /action == "interactive"[\s\S]{0,200}enterInteractiveSticky/);
 
 	const ts = readFileSync(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'), 'utf8');
 	assert.match(ts, /if \(snapshot\.screenLocked\) \{\s*return false;/);

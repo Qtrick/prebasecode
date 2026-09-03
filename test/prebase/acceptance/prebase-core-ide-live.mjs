@@ -369,12 +369,12 @@ async function run() {
 			? workspaceFolderUris.some(f => String(f?.uri ?? f ?? '').includes(basename(gitWorkspace)))
 			: false;
 		evidence.c1_freshProfile = Boolean(launched.sourceProfile && launched.info?.pid);
-		evidence.c3_folderOpen = Boolean(
-			workspaceTitle.includes(basename(gitWorkspace)) ||
-			explorerTree.includes('hello.ts') ||
-			folderIdentity
-		);
-		evidence.c3_workspaceIdentity = Boolean(folderIdentity || workspaceTitle.includes(basename(gitWorkspace)));
+		// Require folderIdentity (workspace URI) — title/explorer text alone is a false-green OR.
+		evidence.c3_folderOpen = Boolean(folderIdentity);
+		evidence.c3_workspaceIdentity = Boolean(folderIdentity);
+		evidence.c3_folderIdentity = folderIdentity;
+		evidence.c3_workspaceTitleHint = Boolean(workspaceTitle.includes(basename(gitWorkspace)));
+		evidence.c3_explorerHint = Boolean(explorerTree.includes('hello.ts'));
 		evidence.p2 = onboardingFlow;
 		evidence.offlineChoicePresented = Boolean(onboardingFlow.offlineChoicePresented);
 		evidence.offlineChoiceActivated = Boolean(onboardingFlow.offlineChoiceActivated);

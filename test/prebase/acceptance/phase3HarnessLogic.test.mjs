@@ -706,6 +706,14 @@ test('core IDE accepts real dark/light/hcDark/hcLight plus measured zoom and foc
 	assert.deepEqual(coreIdeFailures(passingCore()), []);
 });
 
+test('core IDE C3 requires workspace folderIdentity (not title/explorer OR)', () => {
+	const live = readFileSync(join(acceptanceDir, 'prebase-core-ide-live.mjs'), 'utf8');
+	assert.match(live, /evidence\.c3_folderOpen = Boolean\(folderIdentity\)/);
+	assert.match(live, /evidence\.c3_workspaceIdentity = Boolean\(folderIdentity\)/);
+	assert.doesNotMatch(live, /c3_folderOpen = Boolean\(\s*workspaceTitle\.includes/);
+	assert.doesNotMatch(live, /c3_workspaceIdentity = Boolean\(folderIdentity \|\| workspaceTitle/);
+});
+
 test('200% zoom cannot pass on unchanged workbench zoomLevel', () => {
 	const failures = themesA11yFailures(passingCore({
 		a11y: {
@@ -1898,6 +1906,7 @@ function canonicalScaleTemporalEvidence(fullMapOverrides = {}, evidenceOverrides
 			nodesDrawn: 8,
 			summary: { modifiedCount: 7 },
 			canvas: { distinctPixels: 100 },
+			renderedLabelOverlapCount: 0,
 		},
 		unexpectedError: false,
 		stuckIndexing: false,
@@ -1975,13 +1984,21 @@ test('temporal-small Full Map overlap fails closed (not canonical-scale-only)', 
 			nodesDrawn: 1,
 			summary: { modifiedCount: 1 },
 			canvas: { distinctPixels: 8 },
+			renderedLabelOverlapCount: 0,
 		},
 		camera: { afterFocus: { k: 1 }, afterUserZoom: { k: 1.5 }, afterWait: { k: 1.5 } },
 		quit: { remaining: 'gone' },
 	};
 	assert.ok(temporalAcceptanceFailures(small).some(item => /rendered label overlaps/.test(item)));
+	const focusOverlap = {
+		...small,
+		fullMap: { ...small.fullMap, renderedLabelOverlapCount: 0 },
+		focusChanges: { ...small.focusChanges, renderedLabelOverlapCount: 2 },
+	};
+	assert.ok(temporalAcceptanceFailures(focusOverlap).some(item => /Focus Changes has rendered label overlaps/.test(item)));
 	const temporalSource = readFileSync(join(repoRoot, 'graphs/scripts/acceptance/temporal-live.mjs'), 'utf8');
 	assert.match(temporalSource, /full\.renderedLabelOverlapCount > 0/);
+	assert.match(temporalSource, /focus\.renderedLabelOverlapCount/);
 	assert.match(temporalSource, /canonicalScale \? 'canonical-scale ' : large \? 'large ' : ''/);
 });
 

@@ -143,6 +143,9 @@ export function temporalAcceptanceFailures(evidence) {
 		if (!(focus.nodesDrawn > 0)) {failures.push('Focus Changes drew zero changed nodes');}
 		if (!(focus.canvas?.distinctPixels > 0)) {failures.push('Focus Changes canvas is blank');}
 		if ((large || canonicalScale) && !(focus.visibleNodeCount >= 4)) {failures.push(`${large ? 'large' : 'canonical-scale'} Focus Changes did not keep a focused set visible`);}
+		if (!Number.isFinite(focus.renderedLabelOverlapCount) || focus.renderedLabelOverlapCount > 0) {
+			failures.push(`Focus Changes has rendered label overlaps (${focus.renderedLabelOverlapCount})`);
+		}
 	}
 
 	if (evidence.unexpectedError) {failures.push('Workbench exposed an unexpected Error state');}

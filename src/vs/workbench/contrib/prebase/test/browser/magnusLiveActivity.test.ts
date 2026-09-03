@@ -2347,24 +2347,31 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 	test('native unpin clears sticky interactive and does not leave stale expanded peek', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
-		// Escape while pinned: unpin first, then collapse (collapse no-ops while pinned).
+		// Escape while pinned: dismissAttention before unpin (renderer race), then collapse.
 		const escapeMonitor = native.indexOf('- (void)installLocalKeyMonitor {');
 		assert.ok(escapeMonitor > 0);
-		const escapeBlock = native.slice(escapeMonitor, escapeMonitor + 900);
+		const escapeBlock = native.slice(escapeMonitor, escapeMonitor + 1200);
 		assert.match(escapeBlock, /userDismissedAttention = YES/);
 		assert.match(escapeBlock, /wasPinned/);
 		assert.match(escapeBlock, /strong\.pinned = NO/);
 		assert.match(escapeBlock, /emit:@"unpin"/);
-		assert.match(escapeBlock, /\[strong collapse\]/);
+		assert.match(escapeBlock, /collapseEmittingDismiss/);
+		const dismissAt = escapeBlock.indexOf('emit:@"dismissAttention"');
+		const unpinAt = escapeBlock.indexOf('emit:@"unpin"');
+		assert.ok(dismissAt >= 0 && unpinAt > dismissAt, 'Escape must emit dismissAttention before unpin');
 
-		// Simulated escape must match the local monitor (clear pin before collapse).
+		// Simulated escape must match the local monitor (dismissAttention before unpin).
 		const simEscape = native.indexOf('if (action == "escape" || action == "collapse")');
 		assert.ok(simEscape > 0, 'simulateAction must handle escape');
-		const simBlock = native.slice(simEscape, simEscape + 450);
+		const simBlock = native.slice(simEscape, simEscape + 650);
 		assert.match(simBlock, /userDismissedAttention = YES/);
 		assert.match(simBlock, /controller\.pinned = NO/);
 		assert.match(simBlock, /emit:@"unpin"/);
-		assert.match(simBlock, /\[controller collapse\]/);
+		assert.match(simBlock, /collapseEmittingDismiss/);
+		const simDismiss = simBlock.indexOf('emit:@"dismissAttention"');
+		const simUnpin = simBlock.indexOf('emit:@"unpin"');
+		assert.ok(simDismiss >= 0 && simUnpin > simDismiss);
+		assert.match(native, /action == "interactive"[\s\S]{0,200}enterInteractiveSticky/);
 
 		const setVisibleStart = native.indexOf('- (void)setVisible:(BOOL)visible pinned:(BOOL)pinned reduced:(BOOL)reduced {');
 		const teardownStart = native.indexOf('- (void)teardown {');
@@ -2377,7 +2384,7 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.doesNotMatch(setVisible, /keepExpanded = self\.hovering \|\| self\.attentionPeek \|\| self\.content\.peekOnly/);
 		assert.match(setVisible, /userDismissedAttention/);
 
-		const collapseStart = native.indexOf('- (void)collapse {');
+		const collapseStart = native.indexOf('- (void)collapseEmittingDismiss:(BOOL)emitDismiss {');
 		assert.ok(collapseStart > 0);
 		const collapseEnd = native.indexOf('- (void)emit:', collapseStart);
 		const collapse = native.slice(collapseStart, collapseEnd);
@@ -2387,6 +2394,10 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(collapse, /self\.attentionPeek = NO/);
 		assert.match(collapse, /self\.content\.peekOnly = NO/);
 		assert.match(collapse, /self\.content\.expanded = NO/);
+		assert.match(native, /renderedPeekBody/);
+		assert.match(native, /payload\[@"screenLocked"\]/);
+		assert.match(native, /self\.screenLocked = \[snapshot\[@"screenLocked"\] boolValue\]/);
+		assert.match(native, /action == "interactive"[\s\S]{0,200}enterInteractiveSticky/);
 	});
 
 	test('native active-display mode relayouts when target screen changes', () => {
