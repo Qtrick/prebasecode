@@ -1,15 +1,14 @@
 {
-  "runId": "2026-09-03T09-19-38-589Z",
+  "runId": "2026-09-03T09-22-07-408Z",
   "planKey": "2a0411ce35ddb63bd874a456fee55d39dd7edb7b182b0aec0fcecfc9ddc5ecc7:only",
   "tier": "release",
   "onlyProducers": [
-    "electron-product-path",
-    "electron-native-cases",
-    "lifecycle-cycles"
+    "magnus-electron-tools",
+    "load-quit"
   ],
-  "plannedAtHead": "c8129bed337a841561e3321d8e7835994b2d114f",
-  "currentHead": "c8129bed337a841561e3321d8e7835994b2d114f",
-  "sourceHead": "c8129bed337a841561e3321d8e7835994b2d114f",
+  "plannedAtHead": "46604a18305e3ad56a12bc7bc268d5b86ec70246",
+  "currentHead": "46604a18305e3ad56a12bc7bc268d5b86ec70246",
+  "sourceHead": "46604a18305e3ad56a12bc7bc268d5b86ec70246",
   "productFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
   "sourceFingerprint": "1753dd5f44526b29f803f618441b5ed4c6e7317f277efe1e2ea3f2e26de1c035",
   "prerequisites": {
@@ -18,9 +17,9 @@
     "geminiConfigured": false,
     "darwin": false
   },
-  "createdAt": "2026-09-03T09:19:39.425Z",
+  "createdAt": "2026-09-03T09:22:08.303Z",
   "reused": false,
-  "totalEstimatedDurationMs": 155000,
+  "totalEstimatedDurationMs": 270000,
   "changedPathCount": 0,
   "changedDomains": [],
   "unknownChangedPaths": [],
@@ -45,7 +44,7 @@
       "expectedProducerFingerprint": "7303e76634dd3c1e2b290c2ef3dcbbec6bf3290ea35a17e800b2a2f4eac363e5",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 16119,
+      "estimatedDurationMs": 45000,
       "timeoutMs": 180000,
       "artifacts": [
         "magnus-streaming-smoke"
@@ -62,7 +61,7 @@
       "expectedProducerFingerprint": "cbdb1b2a48ebe002275e17a28d7bdf57dc161025c624c77d2941dab84c896a3d",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 16280,
+      "estimatedDurationMs": 15996,
       "timeoutMs": 180000,
       "artifacts": [
         "magnus-guidance-smoke"
@@ -79,7 +78,7 @@
       "expectedProducerFingerprint": "30eb60bbbb0de2a0019fdb437ec644bf013b2526f69ea79eff1cc17d40f642f6",
       "status": "EXTERNAL",
       "reason": "Live Activity AppKit path requires macOS (environment skip; not CURRENT_GREEN)",
-      "estimatedDurationMs": 5000,
+      "estimatedDurationMs": 45000,
       "timeoutMs": 120000,
       "artifacts": [
         "magnus-live-activity"
@@ -95,7 +94,7 @@
       "expectedProducerFingerprint": "76c70fd8a8a2c478117748916493fb09a560199f370d25a2bda284377fcafe87",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 140965,
+      "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
         "core-ide",
@@ -132,7 +131,7 @@
       "expectedProducerFingerprint": "718d3ff8623e9e2dacdbb84a07f6413e73ce2fde6d721b53674c627ecab00cab",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 21671,
+      "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
         "temporal-small"
@@ -149,7 +148,7 @@
       "id": "temporal-large",
       "expectedProducerFingerprint": "0a9e7de5f7c6017272a6e7a119505b18116c51c237797daf5b9c5df4433f1422",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 150000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -167,7 +166,7 @@
       "id": "temporal-canonical-scale",
       "expectedProducerFingerprint": "d9177de125a586466d5fe903ce2b6b198dc54a87d9045015d1c2afe16b2573ef",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 300000,
       "timeoutMs": 600000,
       "artifacts": [
@@ -184,9 +183,9 @@
     {
       "id": "electron-product-path",
       "expectedProducerFingerprint": "a0e5783e30765633b62082e02d258f2cf34f20a52f32344039a329da08d52ec3",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
-      "estimatedDurationMs": 30000,
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 26405,
       "timeoutMs": 180000,
       "artifacts": [
         "electron-product-path"
@@ -196,25 +195,14 @@
         "electron-test-lab",
         "magnus-desktop-tools",
         "launch-harness"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-09-03T09:19:45.379Z",
-        "finishedAt": "2026-09-03T09:20:11.818Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 26405,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/electron-product-path.log",
-        "leftoverPids": [],
-        "attempts": 1
-      }
+      ]
     },
     {
       "id": "electron-native-cases",
       "expectedProducerFingerprint": "2648407d4fb2f2204ec659ea79f947217562a589be1f2af2b19e9dc4b7a7c7a6",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
-      "estimatedDurationMs": 35000,
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 34087,
       "timeoutMs": 240000,
       "artifacts": [
         "electron-native-cases"
@@ -224,24 +212,13 @@
         "desktop-runtime",
         "magnus-desktop-tools",
         "launch-harness"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-09-03T09:20:11.862Z",
-        "finishedAt": "2026-09-03T09:20:45.984Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 34087,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/electron-native-cases.log",
-        "leftoverPids": [],
-        "attempts": 1
-      }
+      ]
     },
     {
       "id": "tauri-product-path",
       "expectedProducerFingerprint": "186f7ee49fa17d0dccff350f580ec8ac8a2c0a228a77106e430f2fb884028f56",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 30000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -257,8 +234,8 @@
     {
       "id": "magnus-electron-tools",
       "expectedProducerFingerprint": "646afc20b5ac61363ecb9c496aa5188ed55b6aa8128080fbc677f15a87337583",
-      "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 150000,
       "timeoutMs": 300000,
       "artifacts": [
@@ -270,13 +247,24 @@
         "electron-test-lab",
         "desktop-runtime",
         "launch-harness"
-      ]
+      ],
+      "execution": {
+        "status": "COMPLETE",
+        "startedAt": "2026-09-03T09:22:14.398Z",
+        "finishedAt": "2026-09-03T09:24:40.394Z",
+        "exitCode": 0,
+        "timedOut": false,
+        "durationMs": 145960,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/magnus-electron-tools.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "magnus-tauri-tools",
       "expectedProducerFingerprint": "064413a29fb33199b9cda0220a1cafcff18559ee1235e16f79ff0601431e4a54",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 240000,
       "timeoutMs": 420000,
       "artifacts": [
@@ -295,7 +283,7 @@
       "expectedProducerFingerprint": "15cb9101a75bb82b924c0769278755c139d8c15d9ecb2559b7e793dfce2a365a",
       "status": "EXTERNAL",
       "reason": "FIRECRAWL_API_KEY unresolved (operator-owned; BETA-040 local enrichment)",
-      "estimatedDurationMs": 5000,
+      "estimatedDurationMs": 60000,
       "timeoutMs": 180000,
       "artifacts": [
         "hybrid-web-smoke"
@@ -312,7 +300,7 @@
       "expectedProducerFingerprint": "9968001e04f42150f681cfbeb5e0ae5a6d0cc829753aea5bfa5e69946c1c6f03",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 14120,
+      "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
         "privacy"
@@ -326,8 +314,8 @@
     {
       "id": "load-quit",
       "expectedProducerFingerprint": "279694c616614c1b3dde60e240664a6df5c20d6bb06ed6d69c5886465c5c05ac",
-      "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "status": "STALE",
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
@@ -344,14 +332,25 @@
         "launch-harness",
         "load-quit-lab",
         "live-activity"
-      ]
+      ],
+      "execution": {
+        "status": "FAILED",
+        "startedAt": "2026-09-03T09:24:40.447Z",
+        "finishedAt": "2026-09-03T09:28:40.605Z",
+        "exitCode": 1,
+        "timedOut": true,
+        "durationMs": 240125,
+        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/load-quit.log",
+        "leftoverPids": [],
+        "attempts": 1
+      }
     },
     {
       "id": "lifecycle-cycles",
       "expectedProducerFingerprint": "9e3708dcab5270ad992f17c267c7eb3fc1892cdffeb30d535edb932c189ab8c3",
-      "status": "STALE",
-      "reason": "evidence producer fingerprint does not match current producer inputs",
-      "estimatedDurationMs": 90000,
+      "status": "CURRENT_GREEN",
+      "reason": "current",
+      "estimatedDurationMs": 63377,
       "timeoutMs": 1500000,
       "artifacts": [
         "lifecycle-cycles"
@@ -362,24 +361,13 @@
         "launch-harness",
         "lifecycle-lab",
         "live-activity"
-      ],
-      "execution": {
-        "status": "COMPLETE",
-        "startedAt": "2026-09-03T09:20:46.033Z",
-        "finishedAt": "2026-09-03T09:21:49.444Z",
-        "exitCode": 0,
-        "timedOut": false,
-        "durationMs": 63377,
-        "log": "/workspace/reports/graph-acceptance/phase-3-final/gate-logs/lifecycle-cycles.log",
-        "leftoverPids": [],
-        "attempts": 1
-      }
+      ]
     },
     {
       "id": "electron-restart-soak",
       "expectedProducerFingerprint": "547e5a7d8075b85563e211cc7d59466bea96e24ea4217e736650c7f25e95a57a",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 900000,
       "timeoutMs": 5400000,
       "artifacts": [
@@ -395,7 +383,7 @@
       "id": "tauri-restart-soak",
       "expectedProducerFingerprint": "c5bc3494a3bf49c44ca2a2370f4529144f2c2ce18a0088757ae378445afda1c4",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 240000,
       "timeoutMs": 3600000,
       "artifacts": [
@@ -411,7 +399,7 @@
       "id": "idle-soak",
       "expectedProducerFingerprint": "5b6ecc6bd2ae4a34dd412e3b200db1f5bd56f62501bdfe6a4aff2e2c13b9ffd0",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 900000,
       "timeoutMs": 1140000,
       "artifacts": [
@@ -427,7 +415,7 @@
       "id": "active-soak",
       "expectedProducerFingerprint": "e90ec68655dd26c96d3bcb3839ad9f8fdb1189a4dd359f0913c530f36fd9503d",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 720000,
       "timeoutMs": 960000,
       "artifacts": [
@@ -448,7 +436,7 @@
       "id": "assurance",
       "expectedProducerFingerprint": "59c77fe6140c1acdf90b9370a9590c42d59bb2a0558e01297d265636d4b21f5b",
       "status": "SKIPPED",
-      "reason": "excluded by --only-producer (selected: electron-product-path, electron-native-cases, lifecycle-cycles)",
+      "reason": "excluded by --only-producer (selected: magnus-electron-tools, load-quit)",
       "estimatedDurationMs": 480000,
       "timeoutMs": 480000,
       "artifacts": [
