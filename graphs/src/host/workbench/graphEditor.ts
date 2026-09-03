@@ -1034,6 +1034,7 @@ const netCanvas = document.getElementById('netCanvas');
 const ctx = netCanvas ? netCanvas.getContext('2d', { alpha: true }) : null;
 const status = document.getElementById('status');
 const legend = document.getElementById('legend');
+let legendUserCollapsed = false;
 const empty = document.getElementById('empty');
 const idleToggle = document.getElementById('idleToggle');
 const idleToggleWrap = document.getElementById('idleToggleWrap');
@@ -1367,6 +1368,10 @@ function getUsableInsets() {
 	if (isTemporal()) {
 		top = 48;
 		bottom = 68;
+		if (legend && legend.style.display !== 'none' && !legendUserCollapsed && legend.offsetHeight > 0) {
+			left = Math.max(left, Math.min(220, (legend.offsetWidth || 180) + 16));
+			bottom = Math.max(bottom, 78);
+		}
 		// Commit-details inspector occupies the right side when visible
 		// (~340px panel + 12px offsets); Fit View / Center Lock / zoom-around-center
 		// must not center content underneath it.
@@ -1842,6 +1847,7 @@ function fitView(animate) {
 			insets: insets,
 			minZoom: MIN_ZOOM,
 			maxZoom: largeOverview ? 0.48 : (isFocusMode && targetNodes.length <= 4 ? 3.2 : 2.4),
+			guides: temporalDiff.guides,
 		});
 		if (shouldAnimate && animMs > 0) {
 			animateViewportTo(targetTransform, animMs);
@@ -1887,31 +1893,59 @@ function updateLegend(s, network) {
 			legend.style.display = 'none';
 			return;
 		}
-		let html = '<div class="header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; border-bottom:1px solid var(--vscode-widget-border, #3c3c3c); padding-bottom:4px;">';
-		html += '<span class="title" style="margin:0; font-weight:700;">Temporal Legend</span>';
-		html += '<button id="legendCloseBtn" type="button" title="Close legend" aria-label="Close legend" style="border:0; background:transparent; color:var(--vscode-foreground, #ccc); cursor:pointer; width:22px; height:22px; display:flex; align-items:center; justify-content:center;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:14px; height:14px; fill:currentColor; pointer-events:none;"><path d="M13.85 2.15l-.7-.7L8 6.59 2.85 1.45l-.7.7L7.29 7.3 1.45 13.15l.7.7L7.3 8.71l5.85 5.85.7-.7L8.71 8l5.14-5.85z"/></svg></button></div>';
-		html += '<div class="title spaced" style="margin-top:4px; font-weight:700; text-transform:uppercase; font-size:10px; opacity:0.75;">Git Changes</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-addedResourceForeground, #3fb950)"></span>Added (+)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-deletedResourceForeground, #f85149); border:1px dashed #f85149;"></span>Removed (-)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-modifiedResourceForeground, #d29922)"></span>Modified (~)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-gitDecoration-renamedResourceForeground, #58a6ff)"></span>Renamed (⇄)</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:var(--vscode-descriptionForeground, #8b949e)"></span>Unchanged (•)</div>';
-		html += '<div class="title spaced" style="margin-top:8px; font-weight:700; text-transform:uppercase; font-size:10px; opacity:0.75;">Architecture Regions</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#f59e0b"></span>Entry Root</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#818cf8"></span>Frontend / UI</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#38bdf8"></span>API / Backend</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#34d399"></span>Services / Logic</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#fb923c"></span>Database / Data</div>';
-		html += '<div class="row"><span class="swatch circle" style="background:#71717a"></span>Utils / Config</div>';
+		if (legendUserCollapsed) {
+			legend.innerHTML = '<button id="legendExpandBtn" type="button" title="Expand legend" aria-label="Expand legend" style="border:0; background:transparent; color:var(--vscode-foreground, #ccc); cursor:pointer; font-size:10px; font-weight:600; display:flex; align-items:center; gap:4px; padding:2px 4px;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:12px; height:12px; fill:currentColor; pointer-events:none;"><path d="M1 3h14v10H1V3zm1 1v8h12V4H2z"/></svg>Legend ▾</button>';
+			legend.style.display = 'block';
+			legend.style.padding = '3px 6px';
+			legend.style.minWidth = 'auto';
+			legend.style.maxWidth = '90px';
+			legend.style.fontSize = '10px';
+			legend.style.bottom = '76px';
+			const expBtn = document.getElementById('legendExpandBtn');
+			if (expBtn) expBtn.onclick = function() { legendUserCollapsed = false; updateLegend(s, network); };
+			return;
+		}
+		let html = '<div class="header" style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; border-bottom:1px solid var(--vscode-widget-border, #3c3c3c); padding-bottom:3px;">';
+		html += '<span class="title" style="margin:0; font-weight:700; font-size:10px; letter-spacing:0.02em;">Temporal Legend</span>';
+		html += '<div style="display:flex; align-items:center; gap:2px;">';
+		html += '<button id="legendCollapseBtn" type="button" title="Minimize legend" aria-label="Minimize legend" style="border:0; background:transparent; color:var(--vscode-foreground, #ccc); cursor:pointer; width:18px; height:18px; display:flex; align-items:center; justify-content:center; font-size:11px;">–</button>';
+		html += '<button id="legendCloseBtn" type="button" title="Close legend" aria-label="Close legend" style="border:0; background:transparent; color:var(--vscode-foreground, #ccc); cursor:pointer; width:18px; height:18px; display:flex; align-items:center; justify-content:center;"><svg viewBox="0 0 16 16" aria-hidden="true" style="width:11px; height:11px; fill:currentColor; pointer-events:none;"><path d="M13.85 2.15l-.7-.7L8 6.59 2.85 1.45l-.7.7L7.29 7.3 1.45 13.15l.7.7L7.3 8.71l5.85 5.85.7-.7L8.71 8l5.14-5.85z"/></svg></button>';
+		html += '</div></div>';
+
+		html += '<div style="display:grid; grid-template-columns:1fr 1fr; gap:4px 10px;">';
+		// Left column: Git Changes
+		html += '<div>';
+		html += '<div class="title spaced" style="margin-top:2px; font-weight:700; text-transform:uppercase; font-size:9px; opacity:0.75;">Git Changes</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:var(--vscode-gitDecoration-addedResourceForeground, #3fb950); width:8px; height:8px;"></span>Added (+)</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:var(--vscode-gitDecoration-deletedResourceForeground, #f85149); border:1px dashed #f85149; width:8px; height:8px;"></span>Removed (-)</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:var(--vscode-gitDecoration-modifiedResourceForeground, #d29922); width:8px; height:8px;"></span>Modified (~)</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:var(--vscode-gitDecoration-renamedResourceForeground, #58a6ff); width:8px; height:8px;"></span>Renamed (⇄)</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:var(--vscode-descriptionForeground, #8b949e); width:8px; height:8px;"></span>Unchanged (•)</div>';
+		html += '</div>';
+
+		// Right column: Architecture Regions
+		html += '<div>';
+		html += '<div class="title spaced" style="margin-top:2px; font-weight:700; text-transform:uppercase; font-size:9px; opacity:0.75;">Regions</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:#f59e0b; width:8px; height:8px;"></span>Entry Root</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:#818cf8; width:8px; height:8px;"></span>Frontend</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:#38bdf8; width:8px; height:8px;"></span>API / Backend</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:#34d399; width:8px; height:8px;"></span>Services</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:#fb923c; width:8px; height:8px;"></span>Data</div>';
+		html += '<div class="row" style="margin:2px 0;"><span class="swatch circle" style="background:#71717a; width:8px; height:8px;"></span>Utils</div>';
+		html += '</div>';
+		html += '</div>';
+
 		legend.innerHTML = html;
 		legend.style.display = 'block';
-		legend.style.padding = '8px 12px';
-		legend.style.minWidth = '140px';
-		legend.style.maxWidth = '200px';
-		legend.style.fontSize = '10px';
-		legend.style.bottom = '80px';
+		legend.style.padding = '6px 10px';
+		legend.style.minWidth = '180px';
+		legend.style.maxWidth = '240px';
+		legend.style.fontSize = '9.5px';
+		legend.style.bottom = '76px';
 		const closeBtn = document.getElementById('legendCloseBtn');
 		if (closeBtn) closeBtn.onclick = function() { legend.style.display = 'none'; };
+		const collapseBtn = document.getElementById('legendCollapseBtn');
+		if (collapseBtn) collapseBtn.onclick = function() { legendUserCollapsed = true; updateLegend(s, network); };
 		return;
 	}
 	if (!settings.showLegend || !s || !(s.nodes || []).length) {
@@ -2550,10 +2584,19 @@ function drawTemporalFrame(ts) {
 					const pending = pendingAggEdges[a];
 					const agg = pending.agg;
 					const route = pending.route;
-					const strokeWidth = Math.min(4.0, 1.2 + Math.log2(1 + agg.edgeCount) * 0.5) / Math.max(0.35, Math.sqrt(transform.k));
+					const isChangedRoute = agg.changedEdgeCount > 0;
+					const isDominantRoute = agg.edgeCount >= 8;
+					const isMinorRoute = agg.edgeCount < 3;
+
+					// Visual hierarchy: changed & dominant routes stand out; thin 1-2 edge background routes are softly muted
+					const edgeAlpha = isChangedRoute
+						? aggAlpha
+						: (isDominantRoute ? aggAlpha * 0.55 : (isMinorRoute ? aggAlpha * 0.15 : aggAlpha * 0.30));
+
+					const strokeWidth = Math.min(4.0, (isChangedRoute ? 1.8 : 1.0) + Math.log2(1 + agg.edgeCount) * 0.45) / Math.max(0.35, Math.sqrt(transform.k));
 
 					ctx.save();
-					ctx.globalAlpha = aggAlpha;
+					ctx.globalAlpha = edgeAlpha;
 					ctx.beginPath();
 					ctx.moveTo(route.x1, route.y1);
 					if (typeof ctx.quadraticCurveTo === 'function') {
@@ -2561,9 +2604,9 @@ function drawTemporalFrame(ts) {
 					} else {
 						ctx.lineTo(route.x2, route.y2);
 					}
-					ctx.strokeStyle = agg.changedEdgeCount > 0
+					ctx.strokeStyle = isChangedRoute
 						? theme.accent
-						: (theme.isHighContrast ? 'rgba(255, 255, 255, 0.22)' : 'rgba(99, 102, 241, 0.20)');
+						: (theme.isHighContrast ? 'rgba(255, 255, 255, 0.28)' : 'rgba(129, 140, 248, 0.30)');
 					ctx.lineWidth = strokeWidth;
 					ctx.stroke();
 					edgesDrawn++;
@@ -2943,6 +2986,11 @@ function drawTemporalFrame(ts) {
 				}
 			}
 			recordProjectedUtilization(metrics, screenPoints, w, h);
+			if (window.__prebaseRecordRenderMetrics) {
+				try {
+					document.documentElement.dataset.prebaseGraphMetrics = JSON.stringify(metrics);
+				} catch {}
+			}
 		} catch {}
 	}
 

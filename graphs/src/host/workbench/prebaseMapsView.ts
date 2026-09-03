@@ -1473,14 +1473,46 @@ export class PreBaseMapsViewPane extends ViewPane {
 		btn.setAttribute('aria-disabled', enabled ? 'false' : 'true');
 	}
 
+	private _getViewedCatalog(): { readonly nodes: readonly GraphNode[]; readonly isTemporal: boolean } {
+		const isTemporal = this._getActiveGraphType() === 'temporal';
+		if (isTemporal) {
+			const temporalState = this.temporalViewService.getState();
+			const diff = temporalState.diff;
+			if (diff?.nodes && diff.nodes.length > 0) {
+				// Temporal viewed commit files: exclude folders and removed diff ghosts
+				const nodes: GraphNode[] = [];
+				for (let i = 0; i < diff.nodes.length; i++) {
+					const tn = diff.nodes[i];
+					if (tn.kind === 'folder' || tn.changeKind === 'removed' || !tn.path) {
+						continue;
+					}
+					nodes.push({
+						id: tn.entityId || tn.canonicalNodeId,
+						label: tn.label || tn.path.split(/[/\\]/).pop() || tn.entityId,
+						path: tn.path,
+						kind: tn.kind || 'file',
+						meta: tn.meta,
+					});
+				}
+				return { nodes, isTemporal: true };
+			}
+		}
+
+		// Network mode (or Temporal before diff is computed):
+		// Use the full canonical codebase snapshot, NOT the capped ~280 interactive render projection!
+		const canonical = this.graphService.getCanonicalSnapshot();
+		const snapshot = canonical ?? this.graphService.getSnapshot();
+		return { nodes: (snapshot?.nodes as GraphNode[]) ?? [], isTemporal: false };
+	}
+
 	private _refreshLanguages(): void {
 		if (!this._langSection) {
 			return;
 		}
 		DOM.clearNode(this._langSection);
-		const snapshot = this.graphService.getSnapshot();
-		const stats = computeLanguageStats(snapshot?.nodes);
-		if (!snapshot || stats.length === 0) {
+		const { nodes } = this._getViewedCatalog();
+		const stats = computeLanguageStats(nodes);
+		if (stats.length === 0) {
 			return;
 		}
 
@@ -1551,8 +1583,8 @@ export class PreBaseMapsViewPane extends ViewPane {
 		}
 		this._explorerDisposables.clear();
 		DOM.clearNode(this._explorerList);
-		const snapshot = this.graphService.getSnapshot();
-		if (!snapshot) {
+		const { nodes } = this._getViewedCatalog();
+		if (!nodes || nodes.length === 0) {
 			const empty = DOM.append(this._explorerList, DOM.$('div'));
 			empty.textContent = localize('prebase.maps.explorerEmpty', "Scan a workspace to browse files.");
 			empty.style.fontSize = '11px';
@@ -1563,7 +1595,7 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		const filter = this._getFilter();
 		const query = this._searchQuery;
-		const nodes = (snapshot.nodes ?? []).filter((n: GraphNode) => {
+		const filteredNodes = nodes.filter((n: GraphNode) => {
 			if (!n || n.kind === 'folder') {
 				return false;
 			}
@@ -1590,17 +1622,17 @@ export class PreBaseMapsViewPane extends ViewPane {
 
 		const mode = this._getExplorerViewMode();
 		if (mode === 'flat') {
-			nodes
+			filteredNodes
 				.slice()
 				.sort((a: GraphNode, b: GraphNode) => (a.path || a.label).localeCompare(b.path || b.label))
 				.forEach((node: GraphNode) => this._appendFileRow(this._explorerList!, node, 0));
-			if (nodes.length === 0) {
+			if (filteredNodes.length === 0) {
 				this._appendEmptyExplorer();
 			}
 			return;
 		}
 
-		const tree = this._buildTree(nodes);
+		const tree = this._buildTree(filteredNodes);
 		if (tree.length === 0) {
 			this._appendEmptyExplorer();
 			return;
@@ -1707,7 +1739,10 @@ export class PreBaseMapsViewPane extends ViewPane {
 	private _appendFileRow(parent: HTMLElement, node: GraphNode, depth: number): void {
 		const row = DOM.append(parent, DOM.$('button')) as HTMLButtonElement;
 		row.type = 'button';
-		const selected = this.graphService.getSelectedNodeId() === node.id;
+		const isTemporal = this._getActiveGraphType() === 'temporal';
+		const selected = isTemporal
+			? (this.temporalViewService.getState().selectedEntityId === node.id || (node.meta as any)?.entityId === this.temporalViewService.getState().selectedEntityId)
+			: (this.graphService.getSelectedNodeId() === node.id);
 		row.textContent = node.label || (node.path?.split(/[/\\]/).pop() ?? node.id);
 		row.title = node.path || node.label;
 		row.style.display = 'block';
@@ -1725,8 +1760,14 @@ export class PreBaseMapsViewPane extends ViewPane {
 		row.style.textOverflow = 'ellipsis';
 		row.style.whiteSpace = 'nowrap';
 		this._explorerDisposables.add(DOM.addDisposableListener(row, 'click', () => {
-			this.graphService.setSelectedNodeId(node.id);
-			void this._openNode(node);
+			if (isTemporal) {
+				const entityId = (node.meta as any)?.entityId || node.id;
+				this.temporalViewService.selectEntity(entityId);
+				void this.temporalViewService.openHistoricalFile(entityId);
+			} else {
+				this.graphService.setSelectedNodeId(node.id);
+				void this._openNode(node);
+			}
 			this._refreshExplorerList();
 		}));
 	}

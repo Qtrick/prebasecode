@@ -185,11 +185,9 @@ async function installMetricsBridge(frame) {
 		document.documentElement.appendChild(script);
 	}, `
 		window.__prebaseRecordRenderMetrics = true;
-		window.__prebaseAcceptanceTimer = setInterval(function () {
-			if (window.__prebaseGraphRenderMetrics) {
-				document.documentElement.dataset.prebaseGraphMetrics = JSON.stringify(window.__prebaseGraphRenderMetrics);
-			}
-		}, 50);
+		if (window.__prebaseGraphRenderMetrics) {
+			document.documentElement.dataset.prebaseGraphMetrics = JSON.stringify(window.__prebaseGraphRenderMetrics);
+		}
 		dirty = true;
 		kickRaf();
 	`);

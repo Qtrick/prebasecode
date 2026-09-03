@@ -288,6 +288,10 @@ static NSString *JSString(Napi::Value value) {
 - (BOOL)simulateClickDeny;
 - (BOOL)simulateSubmitFollowUp:(NSString *)text;
 - (BOOL)simulateClickOpenInPrebase;
+- (void)expandPeek;
+- (void)expandInteractive;
+- (void)installLocalKeyMonitor;
+- (void)removeLocalKeyMonitor;
 - (void)expandPreview;
 - (void)collapse;
 - (void)layoutForScreen;
@@ -387,6 +391,14 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)mouseExited:(NSEvent *)event {
 	[self.controller mouseExitedFromView:event];
+}
+
+- (void)mouseDown:(NSEvent *)event {
+	if (self.peekOnly) {
+		[self.controller expandInteractive];
+		return;
+	}
+	[super mouseDown:event];
 }
 
 - (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState {
@@ -727,6 +739,14 @@ static NSString *JSString(Napi::Value value) {
 
 - (NSScreen *)targetScreen {
 	if ([self.displayMode isEqualToString:@"active"]) {
+		// Prefer the screen containing the active/focused work window rather than raw cursor location
+		NSWindow *keyWin = [NSApp keyWindow];
+		NSWindow *mainWin = [NSApp mainWindow];
+		NSScreen *workScreen = keyWin.screen ?: mainWin.screen;
+		if (workScreen) {
+			return workScreen;
+		}
+		// Fallback to mouse location only when PreBase has no focused window
 		NSPoint p = [NSEvent mouseLocation];
 		for (NSScreen *screen in [NSScreen screens]) {
 			if (NSPointInRect(p, screen.frame)) {
@@ -1054,21 +1074,32 @@ static NSString *JSString(Napi::Value value) {
 			[strong pointerInside:inside];
 		}
 	}];
+}
 
-	if (!self.localMonitor) {
-		self.localMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event) {
-			PrebaseLiveActivityController *strong = weakSelf;
-			if (!strong || gDisposed || event.keyCode != 53) {
-				return event;
-			}
-			if (strong.pinned || strong.content.expanded) {
-				strong.pinned = NO;
-				[strong emit:@"unpin" extras:nil];
-				[strong collapse];
-				return nil;
-			}
+- (void)installLocalKeyMonitor {
+	if (self.localMonitor) {
+		return;
+	}
+	__weak PrebaseLiveActivityController *weakSelf = self;
+	self.localMonitor = [NSEvent addLocalMonitorForEventsMatchingMask:NSEventMaskKeyDown handler:^NSEvent *(NSEvent *event) {
+		PrebaseLiveActivityController *strong = weakSelf;
+		if (!strong || gDisposed || event.keyCode != 53) {
 			return event;
-		}];
+		}
+		if (strong.pinned || strong.content.expanded || strong.content.peekOnly) {
+			strong.pinned = NO;
+			[strong emit:@"unpin" extras:nil];
+			[strong collapse];
+			return nil;
+		}
+		return event;
+	}];
+}
+
+- (void)removeLocalKeyMonitor {
+	if (self.localMonitor) {
+		[NSEvent removeMonitor:self.localMonitor];
+		self.localMonitor = nil;
 	}
 }
 
@@ -1081,10 +1112,7 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)removeMonitors {
 	[self removeGlobalMonitorOnly];
-	if (self.localMonitor) {
-		[NSEvent removeMonitor:self.localMonitor];
-		self.localMonitor = nil;
-	}
+	[self removeLocalKeyMonitor];
 }
 
 - (void)mouseEnteredInView:(NSEvent *)event {
@@ -1119,7 +1147,7 @@ static NSString *JSString(Napi::Value value) {
 					weakSelf.didHoverHaptic = YES;
 					[weakSelf performUserHaptic];
 				}
-				[weakSelf expandPreview];
+				[weakSelf expandPeek];
 			}];
 		}
 	} else {
@@ -1138,7 +1166,22 @@ static NSString *JSString(Napi::Value value) {
 	}
 }
 
-- (void)expandPreview {
+- (void)expandPeek {
+	if (!self.visible) {
+		return;
+	}
+	self.attentionPeek = NO;
+	self.content.peekOnly = YES;
+	self.content.expanded = YES;
+	self.content.targetExpanded = YES;
+	self.panel.ignoresMouseEvents = NO;
+	self.ignoresMouse = NO;
+	[self installLocalKeyMonitor];
+	[self removeGlobalMonitorOnly];
+	[self layoutForScreen];
+}
+
+- (void)expandInteractive {
 	if (!self.visible) {
 		return;
 	}
@@ -1148,9 +1191,13 @@ static NSString *JSString(Napi::Value value) {
 	self.content.targetExpanded = YES;
 	self.panel.ignoresMouseEvents = NO;
 	self.ignoresMouse = NO;
-	// Expanded panel receives its own mouse events via NSTrackingArea; release global monitor for efficiency
+	[self installLocalKeyMonitor];
 	[self removeGlobalMonitorOnly];
 	[self layoutForScreen];
+}
+
+- (void)expandPreview {
+	[self expandInteractive];
 }
 
 - (void)collapse {
@@ -1167,6 +1214,7 @@ static NSString *JSString(Napi::Value value) {
 	self.didAttentionHaptic = NO;
 	self.lastInside = NO;
 	self.input.hidden = YES;
+	[self removeLocalKeyMonitor];
 	[self.panel makeFirstResponder:nil];
 	[self layoutForScreen];
 	// Restore global acquisition monitor for collapsed mode

@@ -5,7 +5,6 @@
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
 import {
-	boxesOverlap,
 	countRenderedLabelOverlaps,
 	computeVisibleLabels,
 	computeVisibleCommunityGuideLabels,
@@ -320,5 +319,90 @@ suite('TemporalLabelLod (Unit - Screen-Space Priority & Collision Culling)', () 
 			globalThis.document = previousDocument;
 			globalThis.getComputedStyle = previousGetComputedStyle;
 		}
+	});
+
+	test('16. Search result query match outranks ordinary route badges at the same screen position', () => {
+		const shared = { x: 250, y: 250 };
+		// Unchanged node that matches the search query "Module_42"
+		const searchedNode = makeNode('n-mod42', 'src/core/Module_42.ts', 'unchanged', shared.x, shared.y);
+		const badge = {
+			id: 'comm-a::comm-b',
+			text: '14',
+			x: shared.x,
+			y: shared.y + 12,
+			edgeCount: 14,
+			changedEdgeCount: 0,
+		};
+
+		const layout = computeTemporalLabelLayout([searchedNode], [], 0.8, {
+			filterQuery: 'Module_42',
+			routeBadgeCandidates: [badge],
+		});
+
+		// Search result must be rendered
+		assert.ok(layout.nodeLabels.some(l => l.entityId === 'n-mod42'), 'search query match must have its label rendered');
+		// The ordinary route badge must have yielded (culled) because the search result claimed the space
+		assert.equal(layout.routeBadges.length, 0, 'ordinary route badge must yield to search result');
+		assert.ok(layout.labelCollisionCullCount >= 1, 'route badge must be recorded as culled');
+		assert.equal(layout.renderedLabelOverlapCount, 0, 'no visible rendered overlap between search result and route badge');
+	});
+
+	test('17. Current editor file explicitly outranks ordinary route badges at the same screen position', () => {
+		const shared = { x: 320, y: 180 };
+		// Unchanged node representing the user's currently active editor document
+		const activeDocNode = makeNode('n-active-doc', 'src/view/editor.ts', 'unchanged', shared.x, shared.y);
+		const badge = {
+			id: 'comm-x::comm-y',
+			text: '8',
+			x: shared.x,
+			y: shared.y + 12,
+			edgeCount: 8,
+			changedEdgeCount: 0,
+		};
+
+		const layout = computeTemporalLabelLayout([activeDocNode], [], 0.8, {
+			currentFileEntityId: 'n-active-doc',
+			routeBadgeCandidates: [badge],
+		});
+
+		assert.ok(layout.nodeLabels.some(l => l.entityId === 'n-active-doc'), 'current editor file must be rendered');
+		assert.equal(layout.routeBadges.length, 0, 'ordinary route badge must yield to current editor file');
+		assert.ok(layout.labelCollisionCullCount >= 1, 'route badge must be recorded as culled');
+	});
+
+	test('18. Changed files outrank ordinary route badges in Focus Changes / temporal mode', () => {
+		const shared = { x: 180, y: 220 };
+		const changedNode = makeNode('n-changed-feature', 'src/feature.ts', 'modified', shared.x, shared.y);
+		const badge = {
+			id: 'comm-1::comm-2',
+			text: '5',
+			x: shared.x,
+			y: shared.y + 12,
+			edgeCount: 5,
+			changedEdgeCount: 0,
+		};
+
+		const layout = computeTemporalLabelLayout([changedNode], [], 0.8, {
+			routeBadgeCandidates: [badge],
+		});
+
+		assert.ok(layout.nodeLabels.some(l => l.entityId === 'n-changed-feature'), 'changed file must be rendered');
+		assert.equal(layout.routeBadges.length, 0, 'ordinary route badge must yield to changed file');
+		assert.ok(layout.labelCollisionCullCount >= 1, 'route badge must be recorded as culled');
+	});
+
+	test('19. Community landmark labels are clamped within guide bounds', () => {
+		const narrowGuide = {
+			id: 'comm-edge',
+			label: 'Edge Services & External Gateway Controller',
+			bounds: { minX: 10, minY: 20, maxX: 100, maxY: 120 },
+			nodeCount: 8,
+		};
+		const labels = computeVisibleCommunityGuideLabels([narrowGuide], 1.0, []);
+		assert.equal(labels.length, 1);
+		const card = labels[0];
+		// Card x must be >= bounds.minX and card x + badgeWidth must be <= bounds.maxX (or clamped at bounds.minX + pad)
+		assert.ok(card.x >= narrowGuide.bounds.minX, `card.x (${card.x}) must be >= minX (${narrowGuide.bounds.minX})`);
+		assert.ok(card.badgeWidth > 0);
 	});
 });

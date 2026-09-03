@@ -451,6 +451,15 @@ export function computeTemporalFitTransform(
 		readonly insets?: ViewportInsets;
 		readonly minZoom?: number;
 		readonly maxZoom?: number;
+		readonly guides?: readonly {
+			readonly bounds?: {
+				readonly minX: number;
+				readonly minY: number;
+				readonly maxX: number;
+				readonly maxY: number;
+			};
+			readonly nodeIds?: readonly string[];
+		}[];
 	},
 ): { readonly x: number; readonly y: number; readonly k: number } {
 	if (!visibleNodes || visibleNodes.length === 0) {
@@ -491,6 +500,35 @@ export function computeTemporalFitTransform(
 		minY = Math.min(minY, ny - r);
 		maxX = Math.max(maxX, nx + r);
 		maxY = Math.max(maxY, ny + r);
+	}
+
+	if (options?.guides && options.guides.length > 0) {
+		const visibleEntityIds = new Set();
+		for (let v = 0; v < visibleNodes.length; v++) {
+			visibleEntityIds.add(visibleNodes[v].entityId);
+		}
+		for (let g = 0; g < options.guides.length; g++) {
+			const guide = options.guides[g];
+			if (guide.nodeIds && guide.nodeIds.length > 0) {
+				let hasVisible = false;
+				for (let nid = 0; nid < guide.nodeIds.length; nid++) {
+					if (visibleEntityIds.has(guide.nodeIds[nid])) {
+						hasVisible = true;
+						break;
+					}
+				}
+				if (!hasVisible) {
+					continue;
+				}
+			}
+			const b = guide?.bounds;
+			if (b && Number.isFinite(b.minX) && Number.isFinite(b.maxX) && Number.isFinite(b.minY) && Number.isFinite(b.maxY)) {
+				minX = Math.min(minX, b.minX - 20);
+				minY = Math.min(minY, b.minY - 20);
+				maxX = Math.max(maxX, b.maxX + 20);
+				maxY = Math.max(maxY, b.maxY + 20);
+			}
+		}
 	}
 
 	if (!Number.isFinite(minX)) {

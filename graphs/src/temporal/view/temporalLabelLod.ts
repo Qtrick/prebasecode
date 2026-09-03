@@ -210,7 +210,9 @@ export function computeVisibleCommunityGuideLabels(
 		const badgeW = Math.min(Math.max(20, gw - pad * 2), Math.max(titleW, subW) + Math.round(24 / Math.max(0.35, safeZoom)));
 		const badgeH = Math.round(worldFontPx + subWorldFontPx + 8 / Math.max(0.35, safeZoom));
 
-		const cardX = bounds.minX + pad;
+		const minCandidateX = bounds.minX + pad;
+		const maxCandidateX = Math.max(minCandidateX, bounds.maxX - badgeW - pad);
+		const cardX = Math.min(maxCandidateX, minCandidateX);
 		const cardY = bounds.minY + pad;
 
 		const box: LabelBox = {
@@ -259,6 +261,7 @@ export function computeVisibleLabels(
 	options?: {
 		readonly selectedNodeId?: string;
 		readonly hoveredNodeId?: string;
+		readonly currentFileEntityId?: string;
 		readonly filterQuery?: string;
 		readonly maxLabels?: number;
 		readonly measureWidth?: (text: string, font: string) => number;
@@ -272,6 +275,7 @@ export function computeVisibleLabels(
 
 	const selectedId = options?.selectedNodeId;
 	const hoveredId = options?.hoveredNodeId;
+	const currentFileId = options?.currentFileEntityId;
 	const filterQuery = (options?.filterQuery || '').toLowerCase().trim();
 	const maxLabels = options?.maxLabels ?? 150;
 	const measureWidth = options?.measureWidth || function (text: string): number {
@@ -292,6 +296,7 @@ export function computeVisibleLabels(
 		const node = nodes[i];
 		const isSelected = selectedId === node.entityId;
 		const isHovered = hoveredId === node.entityId;
+		const isCurrentFile = Boolean(currentFileId && currentFileId === node.entityId);
 		const isChanged = Boolean(node.changeKind && node.changeKind !== 'unchanged');
 		const isEntry = Boolean(node.meta?.isEntry);
 		const isQueryMatch = filterQuery && (
@@ -302,6 +307,7 @@ export function computeVisibleLabels(
 		let score = 0;
 		if (isSelected) {score += 1000;}
 		if (isHovered) {score += 900;}
+		if (isCurrentFile) {score += 850;}
 		if (isQueryMatch) {score += 800;}
 		if (isEntry) {score += 700;}
 		if (isChanged) {score += 500;}
@@ -329,34 +335,42 @@ export function computeVisibleLabels(
 	const visibleLabels: VisibleLabelItem[] = [];
 	const placedBoxes: LabelBox[] = options?.occupancySeed ? [...options.occupancySeed] : [];
 
-	const family = (typeof document !== 'undefined' && document.body && typeof getComputedStyle === 'function')
+	const cachedFontFamily = (typeof document !== 'undefined' && document.body && typeof getComputedStyle === 'function')
 		? (getComputedStyle(document.body).fontFamily || 'sans-serif')
 		: 'sans-serif';
+	const fontNormal = `10px ${cachedFontFamily}`;
+	const fontEmphasis = `bold 11px ${cachedFontFamily}`;
 
-	for (let i = 0; i < scored.length && visibleLabels.length < maxLabels; i++) {
+	for (let i = 0; i < scored.length; i++) {
+		if (visibleLabels.length >= maxLabels) {
+			break;
+		}
+
 		const item = scored[i];
 		const node = item.node;
-		const labelText = node.label || node.path || '';
-		if (!labelText) {continue;}
 
-		const font = (item.isSelected || item.isHovered)
-			? `bold 11px ${family}`
-			: `10px ${family}`;
+		const isEmphasis = item.isSelected || item.isHovered;
+		const font = isEmphasis ? fontEmphasis : fontNormal;
 
-		const textW = measureWidth(labelText, font);
+		const text = node.label || (node.path ? node.path.split('/').pop() || node.path : node.entityId);
+		const textWidth = measureWidth(text, font);
 		const r = item.isChanged ? 7.0 : 4.0;
 		const labelY = (node.y || 0) + r + 10;
-		const boxW = textW + 6;
-		const boxH = 14;
-		const boxLeft = (node.x || 0) - boxW / 2;
 		const boxTop = labelY - 7;
+		const boxHeight = 14;
+		const boxWidth = textWidth + 6;
 
-		const curBox = { x: boxLeft, y: boxTop, w: boxW, h: boxH };
+		const box: LabelBox = {
+			x: (node.x || 0) - boxWidth / 2,
+			y: boxTop,
+			w: boxWidth,
+			h: boxHeight,
+		};
 
 		if (!item.isSelected && !item.isHovered) {
 			let collision = false;
 			for (let b = 0; b < placedBoxes.length; b++) {
-				if (boxesOverlap(curBox, placedBoxes[b])) {
+				if (boxesOverlap(box, placedBoxes[b])) {
 					collision = true;
 					break;
 				}
@@ -369,76 +383,65 @@ export function computeVisibleLabels(
 			}
 		}
 
-		placedBoxes.push(curBox);
+		placedBoxes.push(box);
 		visibleLabels.push({
 			entityId: node.entityId,
-			text: labelText,
+			text,
 			x: node.x || 0,
 			y: labelY,
-			box: curBox,
+			box,
+			font,
 			isSelected: item.isSelected,
 			isHovered: item.isHovered,
 			isChanged: item.isChanged,
-			font,
 		});
 	}
 
 	return visibleLabels;
 }
 
-/** Ranked aggregate route count badges sharing the same occupancy grid as file/guide labels. */
 export function computeVisibleRouteBadges(
 	candidates: readonly AggregateRouteBadgeCandidate[],
 	zoom: number,
 	placedBoxes: LabelBox[],
 	options?: {
 		readonly maxBadges?: number;
-		readonly minZoom?: number;
 		readonly overlapCount?: { count: number };
 	},
 ): RouteBadgeLabelItem[] {
-	const minZoom = options?.minZoom ?? 0.38;
-	if (!candidates.length || zoom < minZoom) {
+	if (!candidates || candidates.length === 0 || zoom < 0.38) {
 		return [];
 	}
-	const safeZoom = Math.max(0.001, Number.isFinite(zoom) ? zoom : 1);
-	const maxBadges = options?.maxBadges ?? (safeZoom < 0.45 ? 6 : safeZoom < 0.65 ? 10 : 16);
-	const badgeW = 18 / safeZoom;
-	const badgeH = 12 / safeZoom;
-	const family = (typeof document !== 'undefined' && document.body && typeof getComputedStyle === 'function')
-		? (getComputedStyle(document.body).fontFamily || 'sans-serif')
-		: 'sans-serif';
-	const font = `600 ${Math.max(8, Math.round(9 / safeZoom))}px ${family}`;
 
-	interface ScoredRoute {
-		readonly candidate: AggregateRouteBadgeCandidate;
-		readonly score: number;
-	}
-
-	const scored: ScoredRoute[] = [];
-	for (let i = 0; i < candidates.length; i++) {
-		const candidate = candidates[i];
-		if (!candidate.text || !Number.isFinite(candidate.x) || !Number.isFinite(candidate.y)) {
-			continue;
+	const maxBadges = options?.maxBadges ?? 32;
+	const out: RouteBadgeLabelItem[] = [];
+	const sorted = candidates.slice().sort(function (a, b) {
+		const aChanged = a.changedEdgeCount > 0 ? 1 : 0;
+		const bChanged = b.changedEdgeCount > 0 ? 1 : 0;
+		if (bChanged !== aChanged) {
+			return bChanged - aChanged;
 		}
-		const score = (candidate.changedEdgeCount > 0 ? 10000 : 0)
-			+ candidate.edgeCount * 10
-			+ Math.log2(1 + candidate.edgeCount);
-		scored.push({ candidate, score });
-	}
-	scored.sort(function (a, b) {
-		if (b.score !== a.score) {
-			return b.score - a.score;
+		if (b.edgeCount !== a.edgeCount) {
+			return b.edgeCount - a.edgeCount;
 		}
-		return (a.candidate.id || '').localeCompare(b.candidate.id || '');
+		return a.id.localeCompare(b.id);
 	});
 
-	const out: RouteBadgeLabelItem[] = [];
-	for (let i = 0; i < scored.length && out.length < maxBadges; i++) {
-		const candidate = scored[i].candidate;
-		const boxLeft = candidate.x - badgeW / 2;
-		const boxTop = candidate.y - badgeH / 2;
-		const curBox = { x: boxLeft, y: boxTop, w: badgeW, h: badgeH };
+	const badgeW = Math.max(16, Math.round(18 / Math.max(0.38, zoom)));
+	const badgeH = Math.max(10, Math.round(12 / Math.max(0.38, zoom)));
+
+	for (let i = 0; i < sorted.length; i++) {
+		if (out.length >= maxBadges) {
+			break;
+		}
+		const candidate = sorted[i];
+		const curBox: LabelBox = {
+			x: candidate.x - badgeW / 2,
+			y: candidate.y - badgeH / 2,
+			w: badgeW,
+			h: badgeH,
+		};
+
 		let collision = false;
 		for (let b = 0; b < placedBoxes.length; b++) {
 			if (boxesOverlap(curBox, placedBoxes[b])) {
@@ -452,17 +455,19 @@ export function computeVisibleRouteBadges(
 			}
 			continue;
 		}
+
 		placedBoxes.push(curBox);
 		out.push({
 			id: candidate.id,
 			text: candidate.text,
 			x: candidate.x,
 			y: candidate.y,
-			box: curBox,
-			font,
 			isChanged: candidate.changedEdgeCount > 0,
+			box: curBox,
+			font: '',
 		});
 	}
+
 	return out;
 }
 
@@ -473,6 +478,7 @@ export function computeTemporalLabelLayout(
 	options?: {
 		readonly selectedNodeId?: string;
 		readonly hoveredNodeId?: string;
+		readonly currentFileEntityId?: string;
 		readonly filterQuery?: string;
 		readonly maxNodeLabels?: number;
 		readonly maxGuideLabels?: number;
@@ -485,6 +491,30 @@ export function computeTemporalLabelLayout(
 	const measureWidth = options?.measureWidth;
 	const placedBoxes: LabelBox[] = [];
 	const overlapCount = { count: 0 };
+
+	const filterQuery = (options?.filterQuery || '').toLowerCase().trim();
+	const currentFileId = options?.currentFileEntityId;
+
+	function isSemanticPriority(n: TemporalRenderNode): boolean {
+		if (filterQuery && (
+			(n.label && n.label.toLowerCase().includes(filterQuery)) ||
+			(n.path && n.path.toLowerCase().includes(filterQuery))
+		)) {
+			return true;
+		}
+		if (currentFileId && n.entityId === currentFileId) {
+			return true;
+		}
+		if (n.changeKind && n.changeKind !== 'unchanged') {
+			return true;
+		}
+		return false;
+	}
+
+	const semanticNodes = nodes.filter(function (n) { return isSemanticPriority(n); });
+	const otherNodes = nodes.filter(function (n) { return !isSemanticPriority(n); });
+
+	// 1. Community guide landmark labels reserve shared occupancy first
 	const guideLabels = computeVisibleCommunityGuideLabels(guides, zoom, placedBoxes, {
 		maxLabels: options?.maxGuideLabels,
 		measureWidth,
@@ -492,18 +522,41 @@ export function computeTemporalLabelLayout(
 		representedGuideIds: options?.representedGuideIds,
 		overlapCount,
 	});
-	const routeBadges = computeVisibleRouteBadges(options?.routeBadgeCandidates || [], zoom, placedBoxes, {
-		overlapCount,
-	});
-	const nodeLabels = computeVisibleLabels(nodes, zoom, {
+
+	// 2. High semantic priority file nodes (searched, active editor, changed)
+	// These claim occupancy BEFORE route badges, so route badges yield to search results & active files!
+	const semanticNodeLabels = computeVisibleLabels(semanticNodes, zoom, {
 		selectedNodeId: options?.selectedNodeId,
 		hoveredNodeId: options?.hoveredNodeId,
+		currentFileEntityId: options?.currentFileEntityId,
 		filterQuery: options?.filterQuery,
 		maxLabels: options?.maxNodeLabels,
 		measureWidth,
 		occupancySeed: placedBoxes,
 		overlapCount,
 	});
+	for (let i = 0; i < semanticNodeLabels.length; i++) {
+		placedBoxes.push(semanticNodeLabels[i].box);
+	}
+
+	// 3. Aggregate route badges (yield to guide labels and high-priority file nodes)
+	const routeBadges = computeVisibleRouteBadges(options?.routeBadgeCandidates || [], zoom, placedBoxes, {
+		overlapCount,
+	});
+
+	const remainingNodeLabels = computeVisibleLabels(otherNodes, zoom, {
+		selectedNodeId: options?.selectedNodeId,
+		hoveredNodeId: options?.hoveredNodeId,
+		currentFileEntityId: options?.currentFileEntityId,
+		filterQuery: options?.filterQuery,
+		maxLabels: options?.maxNodeLabels ? Math.max(0, options.maxNodeLabels - semanticNodeLabels.length) : undefined,
+		measureWidth,
+		occupancySeed: placedBoxes,
+		overlapCount,
+	});
+
+	const nodeLabels = [...semanticNodeLabels, ...remainingNodeLabels];
+
 	const renderedBoxes: LabelBox[] = [];
 	for (let gi = 0; gi < guideLabels.length; gi++) {
 		renderedBoxes.push(guideLabels[gi].box);

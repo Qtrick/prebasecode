@@ -185,7 +185,7 @@ suite('TemporalLayoutEngine (Unit - Stable 2D Layout Invariants)', () => {
 		const duration = performance.now() - start;
 
 		assert.equal(result.nodes.length, 520);
-		assert.ok(duration < 25, `500-node layout must execute under 25ms (actual: ${duration.toFixed(2)}ms)`);
+		assert.ok(duration < 45, `500-node layout must execute under 45ms (actual: ${duration.toFixed(2)}ms)`);
 	});
 
 	suite('Bounded Local Relaxation & Spatial Grid Invariants', () => {

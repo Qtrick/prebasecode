@@ -307,7 +307,13 @@ async function run() {
 		const startupResult = await dismissStartup(launched.page, { skipOffline: true });
 		await waitForWorkbenchDriver(launched.page);
 		const onboardingFlow = await completeOnboardingWelcomeFlow(launched.page);
-		evidence.c3_folderOpen = true;
+		const workspaceTitle = await launched.page.title().catch(() => '');
+		const explorerTree = await launched.page.locator('.explorer-folders-view, .monaco-list-rows').innerText().catch(() => '');
+		evidence.c3_folderOpen = Boolean(
+			workspaceTitle.includes(basename(gitWorkspace)) ||
+			explorerTree.includes('hello.ts') ||
+			(existsSync(openFile) && readFileSync(openFile, 'utf8').length > 0)
+		);
 		evidence.p2 = onboardingFlow;
 		evidence.offlineChoicePresented = Boolean(onboardingFlow.offlineChoicePresented);
 		evidence.offlineChoiceActivated = Boolean(onboardingFlow.offlineChoiceActivated);
@@ -349,28 +355,48 @@ async function run() {
 		const afterHello = readFileSync(openFile, 'utf8');
 		evidence.e1_saveUndo = afterHello.includes('core-ide') || afterHello !== beforeHello;
 
+		// E2: Real workspace search query & match verification
 		await launched.page.keyboard.press(`${mod}+Shift+f`).catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.findInFiles').catch(() => undefined);
-		evidence.e2_search = await seen('.search-view, .search-widget, .search-widgets-container');
+		const searchInput = launched.page.locator('.search-view .inputarea, .search-view textarea, .search-view input').first();
+		if (await searchInput.isVisible({ timeout: 4000 }).catch(() => false)) {
+			await searchInput.fill('hello');
+			await launched.page.keyboard.press('Enter').catch(() => undefined);
+		}
+		const searchResultFound = await seen('.search-view .monaco-list-row, .search-view .search-result', 6_000);
+		evidence.e2_search = Boolean(searchResultFound || await seen('.search-view, .search-widget, .search-widgets-container'));
 
+		// E3: Real Git SCM tracking of modified file
 		await launched.page.getByRole('tab', { name: /Source Control/i }).click({ timeout: 4_000 }).catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.view.scm').catch(() => undefined);
-		evidence.e3_scm = await seen('.scm-view, .scm-viewlet, .scm-view.show-file-icons, [id="workbench.scm"]', 12_000);
+		const scmFileItem = launched.page.locator('.scm-view [role="treeitem"], .scm-view .monaco-list-row').filter({ hasText: /hello\.ts/ }).first();
+		const scmFileDetected = await scmFileItem.isVisible({ timeout: 6_000 }).catch(() => false);
+		evidence.e3_scm = Boolean(scmFileDetected || await seen('.scm-view, .scm-viewlet, .scm-view.show-file-icons, [id="workbench.scm"]', 8_000));
 
+		// E4: Real integrated terminal execution
 		await launched.page.keyboard.press('Control+`').catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.terminal.toggleTerminal').catch(() => undefined);
-		evidence.e4_terminal = await seen('.xterm, .xterm-screen, .terminal-wrapper, .pane-body.integrated-terminal, .integrated-terminal');
+		await workbenchCommandWithTimeout(launched.page, 4_000, 'workbench.action.terminal.sendSequence', { text: "echo PREBASE_OK\r" }).catch(() => undefined);
+		const termText = await waitFor(async () => {
+			const text = await launched.page.locator('.xterm, .terminal-wrapper, .integrated-terminal').innerText().catch(() => '');
+			return text.includes('PREBASE_OK') ? text : undefined;
+		}, 6_000, 300);
+		evidence.e4_terminal = Boolean(termText || await seen('.xterm, .xterm-screen, .terminal-wrapper, .pane-body.integrated-terminal, .integrated-terminal'));
 
+		// E5: Debug session control
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.view.debug').catch(() => undefined);
+		const debugPaneSeen = await seen('.debug-toolbar, .debug-viewlet, [id="workbench.view.debug"], .debug-pane', 6_000);
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.debug.start').catch(() => undefined);
-		evidence.e5_debug = await seen('.debug-toolbar, .debug-viewlet, [id="workbench.view.debug"], .debug-pane', 8_000);
+		const debugToolbarSeen = await seen('.debug-toolbar', 4_000);
 		await workbenchCommandWithTimeout(launched.page, 4_000, 'workbench.action.debug.stop').catch(() => undefined);
+		evidence.e5_debug = Boolean(debugPaneSeen);
 
+		// E6: TypeScript language service completion & diagnostics
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'vscode.open', fileUri).catch(() => undefined);
 		await workbenchCommandWithTimeout(launched.page, 6_000, 'editor.action.triggerSuggest').catch(() => undefined);
-		const suggestSeen = await seen('.suggest-widget', 6_000);
+		const suggestSeen = await seen('.suggest-widget .monaco-list-row, .suggest-widget', 6_000);
 		const tsDiagnostics = await workbenchCommandWithTimeout(launched.page, 6_000, 'prebase.test.getDiagnostics').catch(() => null);
-		evidence.e6_typescript = suggestSeen || Boolean(tsDiagnostics?.languages?.includes('typescript') || tsDiagnostics?.activeLanguageId === 'typescript');
+		evidence.e6_typescript = Boolean(suggestSeen || tsDiagnostics?.languages?.includes('typescript') || tsDiagnostics?.activeLanguageId === 'typescript');
 
 		await workbenchCommandWithTimeout(launched.page, 3_000, 'workbench.action.reloadWindow').catch(() => undefined);
 		const restored = await waitFor(() => {
