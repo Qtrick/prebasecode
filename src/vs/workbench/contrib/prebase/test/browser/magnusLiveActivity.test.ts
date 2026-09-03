@@ -1805,6 +1805,8 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.match(contribution, /this\._screenLocked = true/);
 		assert.match(contribution, /onDidUnlockScreen/);
 		assert.match(contribution, /this\._screenLocked = false/);
+		assert.match(contribution, /getSystemIdleState\(1\)/);
+		assert.match(contribution, /state === 'locked'/);
 	});
 
 	test('observes IChatService models and looks up approvals on the same sessionResource', () => {

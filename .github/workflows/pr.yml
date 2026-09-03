@@ -31,3 +31,28 @@ jobs:
         run: |
           npm run assurance:quick
           npm run assurance:privacy
+
+  magnus-live-activity-macos:
+    name: Magnus Live Activity (macOS AppKit)
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+
+      - name: Install node-gyp
+        run: npm install -g node-gyp
+
+      - name: Compile AppKit Live Activity addon
+        run: node native/prebase-live-activity/build.mjs
+
+      - name: Static + state product-truth contracts
+        run: |
+          node --test test/prebase/acceptance/magnus-live-activity-state.test.mjs
+          node test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs
+
+      - name: Native napi perf / presentation product-truth
+        run: node test/prebase/acceptance/prebase-live-activity-perf.mjs

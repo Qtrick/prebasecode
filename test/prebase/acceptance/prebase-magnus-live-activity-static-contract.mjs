@@ -171,10 +171,22 @@ if (!native.includes('emit:@"dismissAttention"')) {
 	if (!/@"completedTransient"|@"failedTransient"/.test(native)) {
 		failures.push('native diagnostics must emit completedTransient/failedTransient vocabulary');
 	}
+	if (!native.includes('Screen lock is a hard hide') || !native.includes('Snapshot lock must hide immediately')) {
+		failures.push('native must orderOut on screenLocked (setVisible + applySnapshotDict)');
+	}
+	if (!/simulateSubmitFollowUp[\s\S]{0,200}self\.input\.hidden/.test(native)) {
+		failures.push('simulateSubmitFollowUp must fail closed when Interactive input is hidden');
+	}
+	if (!/expandPeek\][\s\S]{0,200}peekOnly == YES/.test(native)) {
+		failures.push('simulateAction peek/hover must return whether expandPeek actually peeked');
+	}
 	const contributionSourceFlush = contributionSource;
 	if (!contributionSourceFlush.includes('Presentation before snapshot')
 		|| contributionSourceFlush.indexOf('setPresentation(presentation)') > contributionSourceFlush.indexOf('setSnapshot({')) {
 		failures.push('contribution must apply presentation before snapshot (unlock attentionPeek + hide safety)');
+	}
+	if (!contributionSource.includes('getSystemIdleState(1)') || !contributionSource.includes("state === 'locked'")) {
+		failures.push('contribution must cold-query getSystemIdleState for lock at startup');
 	}
 }
 if (!native.includes('Delay control layout until frame animation completes to prevent visible popping')) {

@@ -724,6 +724,13 @@ test('core IDE C3 requires workspace folderIdentity (not title/explorer OR)', ()
 	);
 });
 
+test('Live Activity live product-truth requires painted renderedPeekBody in attentionPeek', () => {
+	const live = readFileSync(join(acceptanceDir, 'prebase-magnus-live-activity-live.mjs'), 'utf8');
+	assert.match(live, /renderedPeekBody/);
+	assert.match(live, /activePresentationState === 'attentionPeek'/);
+	assert.doesNotMatch(live, /renderedPeekBody \|\| renderedPendingMessage \|\| pendingMessage/);
+});
+
 test('200% zoom cannot pass on unchanged workbench zoomLevel', () => {
 	const failures = themesA11yFailures(passingCore({
 		a11y: {

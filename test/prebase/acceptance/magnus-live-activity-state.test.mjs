@@ -170,4 +170,9 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 		'unlock must present before snapshot so attentionPeek can expand',
 	);
 	assert.match(contribution, /userDismissedAttention: this\._userDismissedAttention/);
+	assert.match(contribution, /getSystemIdleState\(1\)/);
+	assert.match(native, /Screen lock is a hard hide/);
+	assert.match(native, /Snapshot lock must hide immediately/);
+	assert.match(native, /peekOnly == YES/);
+	assert.match(native, /simulateSubmitFollowUp[\s\S]{0,200}self\.input\.hidden/);
 });

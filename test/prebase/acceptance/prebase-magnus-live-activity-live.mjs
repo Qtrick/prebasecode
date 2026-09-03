@@ -379,7 +379,7 @@ async function run() {
 		}
 		const peekNative = evidence.productTruthBefore?.native
 			?? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
-		const peekBody = String(peekNative?.renderedPeekBody || peekNative?.renderedPendingMessage || peekNative?.pendingMessage || '');
+		const peekBody = String(peekNative?.renderedPeekBody || '');
 		const escapeSim = truthPending
 			? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'escape').catch(() => false)
 			: false;
@@ -390,8 +390,11 @@ async function run() {
 		const afterPeekRefuse = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
 		evidence.productTruth = {
 			seedOk: Boolean(truthSeed?.ok),
-			peekBodyOk: Boolean(peekBody.length > 0),
-			peekBodyReason: peekBody.length ? undefined : 'empty-renderedPeekBody',
+			// Painted peek body only — pendingMessage snapshot text alone is not product truth.
+			peekBodyOk: Boolean(peekBody.length > 0) && peekNative?.activePresentationState === 'attentionPeek',
+			peekBodyReason: peekNative?.activePresentationState !== 'attentionPeek'
+				? `presentation=${peekNative?.activePresentationState}`
+				: (peekBody.length ? undefined : 'empty-renderedPeekBody'),
 			peekBodySample: peekBody.slice(0, 96),
 			beforePresentation: peekNative?.activePresentationState,
 			escapeSim: Boolean(escapeSim),

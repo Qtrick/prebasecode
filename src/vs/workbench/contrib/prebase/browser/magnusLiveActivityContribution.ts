@@ -342,6 +342,13 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 				this._screenLocked = false;
 				this._push.schedule();
 			}));
+			// Cold start: do not wait for the next lock event — query current idle/lock state.
+			void this.nativeHostService.getSystemIdleState(1).then(state => {
+				if (state === 'locked' && MagnusLiveActivityContribution.instance === this) {
+					this._screenLocked = true;
+					this._push.schedule();
+				}
+			});
 		}
 		this._register(this._main.onDidCommand(command => void this._handleCommand(command)));
 		void this._main.getNativeBackend().then(backend => {

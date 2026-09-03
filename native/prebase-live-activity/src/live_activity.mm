@@ -1707,7 +1707,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateSubmitFollowUp:(NSString *)text {
-	if (!text.length) {
+	if (!text.length || self.input.hidden || self.content.peekOnly || !self.content.expanded) {
 		return NO;
 	}
 	self.input.stringValue = text;
@@ -1833,9 +1833,19 @@ static NSString *JSString(Napi::Value value) {
 	if (self.panel) {
 		[self layoutControls:self.panel.frame];
 	}
+	// Snapshot lock must hide immediately even if presentation update races behind.
+	if (self.screenLocked && self.panel) {
+		[self.panel orderOut:nil];
+		self.panel.ignoresMouseEvents = YES;
+		self.visible = NO;
+	}
 }
 
 - (void)setVisible:(BOOL)visible pinned:(BOOL)pinned reduced:(BOOL)reduced {
+	// Screen lock is a hard hide — never orderFront while locked even if JS races visible:true.
+	if (self.screenLocked) {
+		visible = NO;
+	}
 	const BOOL wasPinned = self.pinned;
 	self.visible = visible;
 	self.pinned = pinned;
@@ -2110,7 +2120,8 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 			return Napi::Boolean::New(env, false);
 		}
 		[controller expandPeek];
-		return Napi::Boolean::New(env, true);
+		// Fail closed when expandPeek no-ops (lock / hidden / fullscreen policy).
+		return Napi::Boolean::New(env, controller.content.peekOnly == YES);
 	}
 	if (action == "interactive") {
 		// Sticky Interactive must match physical click / simulateAction("click").
