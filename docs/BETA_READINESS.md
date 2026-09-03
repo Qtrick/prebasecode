@@ -5,7 +5,7 @@ Canonical PreBase beta readiness tracker. Do not mark an item **Complete** witho
 Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`
 Severities: `Blocker` | `Critical` | `High` | `Medium` | `Low`
 
-Last audit: **2026-09-03** (campaign: Core IDE P1/P5/settings a11y false greens closed + CURRENT_GREEN evidence; temporal-small CURRENT_GREEN; Live Activity Linux **EXTERNAL**; sticky Escape / panel vocabulary / E6 truth retained; macOS notch hardware live + remaining Phase 3 producers still required — beta candidate claim still **forbidden**)
+Last audit: **2026-09-03** (campaign: Live Activity sticky Escape modeled in TS + peek height parity + EXTERNAL honesty tests; Core IDE + temporal-small CURRENT_GREEN; Live Activity Linux **EXTERNAL**; macOS AppKit notch live + remaining Phase 3 still required — beta candidate claim still **forbidden**)
 
 ## Summary
 
