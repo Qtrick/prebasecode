@@ -22,6 +22,14 @@ async function sleep(ms) {
 	return new Promise(r => setTimeout(r, ms));
 }
 
+async function drainMain(native, iterations = 4) {
+	for (let i = 0; i < iterations; i++) {
+		// getDiagnostics pumps CFRunLoop when on the main thread.
+		native.getDiagnostics();
+		await new Promise(r => setImmediate(r));
+	}
+}
+
 function getCpuUsage() {
 	const usage = process.cpuUsage();
 	return {
@@ -39,6 +47,192 @@ function getMemoryUsage() {
 		external: usage.external,
 		arrayBuffers: usage.arrayBuffers
 	};
+}
+
+function captureFrame(diag) {
+	const preferred = diag?.requestedFrame;
+	const fallback = diag?.panelFrame;
+	const hasPreferred = preferred
+		&& Number(preferred.width) > 0
+		&& Number(preferred.height) > 0;
+	const frame = hasPreferred ? preferred : fallback;
+	if (!frame) {
+		return null;
+	}
+	return {
+		x: Number(frame.x) || 0,
+		y: Number(frame.y) || 0,
+		width: Number(frame.width) || 0,
+		height: Number(frame.height) || 0,
+	};
+}
+
+function framesEqualWithin(a, b, tol = 1) {
+	if (!a || !b) {
+		return a === b;
+	}
+	return Math.abs(a.x - b.x) <= tol
+		&& Math.abs(a.y - b.y) <= tol
+		&& Math.abs(a.width - b.width) <= tol
+		&& Math.abs(a.height - b.height) <= tol;
+}
+
+function captureStabilityBaseline(diag) {
+	return {
+		animationCount: Number(diag.animationCount) || 0,
+		transitionGeneration: Number(diag.transitionGeneration) || 0,
+		transitionInFlight: !!diag.transitionInFlight,
+		redrawCount: Number(diag.redrawCount) || 0,
+		activePresentationState: diag.activePresentationState,
+		targetPresentationState: diag.targetPresentationState,
+		frame: captureFrame(diag),
+		geometryTransitionCount: typeof diag.geometryTransitionCount === 'number' ? diag.geometryTransitionCount : undefined,
+		contentOnlyUpdateCount: typeof diag.contentOnlyUpdateCount === 'number' ? diag.contentOnlyUpdateCount : undefined,
+		contentRefreshCount: typeof diag.contentRefreshCount === 'number' ? diag.contentRefreshCount : undefined,
+		orderFrontCount: typeof diag.orderFrontCount === 'number' ? diag.orderFrontCount : undefined,
+		lastRenderedRevision: typeof diag.lastRenderedRevision === 'number' ? diag.lastRenderedRevision : undefined,
+		revision: typeof diag.revision === 'number' ? diag.revision : undefined,
+		lastTransitionReason: diag.lastTransitionReason,
+	};
+}
+
+function contentSnapshot(revision, extras = {}) {
+	const status = extras.status || 'working';
+	const snap = {
+		revision,
+		sessionId: extras.sessionId || 'content-stability-session',
+		sessionResource: extras.sessionResource || 'vscode-chat://local/content-stability',
+		status,
+		presentationLabel: extras.presentationLabel ?? `Label ${revision}`,
+		currentActivity: extras.currentActivity ?? `Activity ${revision}`,
+		latestShortMessage: extras.latestShortMessage ?? `msg-${revision}`,
+		connected: true,
+		prebaseForeground: false,
+		workspaceDiff: extras.workspaceDiff || {
+			additions: revision % 50,
+			deletions: (revision + 3) % 40,
+			files: (revision % 7) + 1,
+		},
+	};
+	if (extras.pendingInteraction) {
+		snap.pendingInteraction = extras.pendingInteraction;
+	}
+	if (extras.pendingKind) {
+		snap.pendingKind = extras.pendingKind;
+	}
+	if (extras.pendingTitle) {
+		snap.pendingTitle = extras.pendingTitle;
+	}
+	if (typeof extras.userDismissedAttention === 'boolean') {
+		snap.userDismissedAttention = extras.userDismissedAttention;
+	}
+	return snap;
+}
+
+async function applyContentStorm(native, {
+	startRevision,
+	count,
+	batchSize = 25,
+	status = 'working',
+	sessionId,
+	pendingInteraction,
+	labelPrefix = 'Label',
+} = {}) {
+	let revision = startRevision;
+	const lastApplied = { revision: startRevision - 1, label: null, message: null };
+	for (let i = 0; i < count; i++) {
+		revision = startRevision + i;
+		const label = `${labelPrefix} ${revision}`;
+		const message = `msg-${revision}`;
+		native.setSnapshot(contentSnapshot(revision, {
+			status,
+			sessionId,
+			presentationLabel: label,
+			currentActivity: `Activity ${revision}`,
+			latestShortMessage: message,
+			pendingInteraction,
+			workspaceDiff: {
+				additions: revision % 50,
+				deletions: (revision + 3) % 40,
+				files: (revision % 7) + 1,
+			},
+		}));
+		lastApplied.revision = revision;
+		lastApplied.label = label;
+		lastApplied.message = message;
+		if ((i + 1) % batchSize === 0) {
+			await drainMain(native, 1);
+		}
+	}
+	await drainMain(native, 3);
+	return lastApplied;
+}
+
+function assertContentOnlyStable(diag, baseline, {
+	expectedState,
+	expectedTarget,
+	lastApplied,
+	allowRedrawGrowth = true,
+} = {}) {
+	if (diag.activePresentationState !== expectedState) {
+		throw new Error(`expected activePresentationState=${expectedState}, got ${diag.activePresentationState}`);
+	}
+	if (diag.targetPresentationState !== expectedTarget) {
+		throw new Error(`expected targetPresentationState=${expectedTarget}, got ${diag.targetPresentationState}`);
+	}
+	if (diag.transitionInFlight !== false) {
+		throw new Error('transitionInFlight must be false after content-only settle');
+	}
+	if ((Number(diag.animationCount) || 0) !== baseline.animationCount) {
+		throw new Error(`content-only updates must not increase animationCount (baseline=${baseline.animationCount}, after=${diag.animationCount})`);
+	}
+	if ((Number(diag.transitionGeneration) || 0) !== baseline.transitionGeneration) {
+		throw new Error(`content-only updates must not increase transitionGeneration (baseline=${baseline.transitionGeneration}, after=${diag.transitionGeneration})`);
+	}
+	const afterFrame = captureFrame(diag);
+	if (!framesEqualWithin(baseline.frame, afterFrame, 1)) {
+		throw new Error(`panel/requested frame drifted after content-only updates: baseline=${JSON.stringify(baseline.frame)} after=${JSON.stringify(afterFrame)}`);
+	}
+	if (typeof baseline.geometryTransitionCount === 'number'
+		&& typeof diag.geometryTransitionCount === 'number'
+		&& diag.geometryTransitionCount !== baseline.geometryTransitionCount) {
+		throw new Error(`geometryTransitionCount must not rise for content-only updates (${baseline.geometryTransitionCount} → ${diag.geometryTransitionCount})`);
+	}
+	if (typeof baseline.orderFrontCount === 'number'
+		&& typeof diag.orderFrontCount === 'number'
+		&& diag.orderFrontCount !== baseline.orderFrontCount) {
+		throw new Error(`orderFrontCount must not rise for content-only updates (${baseline.orderFrontCount} → ${diag.orderFrontCount})`);
+	}
+	if (typeof diag.contentOnlyUpdateCount === 'number' && lastApplied) {
+		if (diag.contentOnlyUpdateCount < (baseline.contentOnlyUpdateCount || 0)) {
+			throw new Error('contentOnlyUpdateCount must not decrease');
+		}
+	}
+	if (typeof diag.contentRefreshCount === 'number' && lastApplied) {
+		if (diag.contentRefreshCount < (baseline.contentRefreshCount || 0)) {
+			throw new Error('contentRefreshCount must not decrease');
+		}
+	}
+	if (lastApplied) {
+		const renderedRevision = typeof diag.lastRenderedRevision === 'number'
+			? diag.lastRenderedRevision
+			: (typeof diag.revision === 'number' ? diag.revision : undefined);
+		if (typeof renderedRevision !== 'number') {
+			throw new Error('diagnostics must expose lastRenderedRevision (or revision) for content-only assertions');
+		}
+		if (renderedRevision !== lastApplied.revision) {
+			throw new Error(`rendered revision must equal last applied (${lastApplied.revision}), got ${renderedRevision}`);
+		}
+		if (diag.statusLabel && lastApplied.label && diag.statusLabel !== lastApplied.label) {
+			throw new Error(`statusLabel not updated to latest content (expected ${lastApplied.label}, got ${diag.statusLabel})`);
+		}
+		if (diag.latestShortMessage && lastApplied.message && diag.latestShortMessage !== lastApplied.message) {
+			throw new Error(`latestShortMessage not updated to latest content (expected ${lastApplied.message}, got ${diag.latestShortMessage})`);
+		}
+	}
+	if (!allowRedrawGrowth && (Number(diag.redrawCount) || 0) !== baseline.redrawCount) {
+		throw new Error(`unexpected redrawCount change (${baseline.redrawCount} → ${diag.redrawCount})`);
+	}
 }
 
 async function run() {
@@ -286,7 +480,14 @@ async function run() {
 	// Test 5: Simulation of user actions
 	const test5 = { name: 'user-simulation-actions', ok: true, details: {} };
 	try {
+		native.dispose();
 		// Seed pending question with canonical pendingInteraction schema
+		native.setPresentation({
+			visible: true,
+			pinned: false,
+			reducedMotion: false,
+			display: 'builtin',
+		});
 		native.setSnapshot({
 			revision: 200,
 			sessionId: 'question-session',
@@ -302,12 +503,6 @@ async function run() {
 					{ id: 'prod', label: 'Production' },
 				],
 			},
-		});
-		native.setPresentation({
-			visible: true,
-			pinned: false,
-			reducedMotion: false,
-			display: 'builtin',
 		});
 		await sleep(80);
 
@@ -342,7 +537,14 @@ async function run() {
 	// Test 5b: Attention Peek Interactivity & Keyboard Isolation
 	const test5b = { name: 'attention-peek-interactive', ok: true, details: {} };
 	try {
-		// Set attention snapshot
+		native.dispose();
+		// Presentation before snapshot — matches contribution flush order.
+		native.setPresentation({
+			visible: true,
+			pinned: false,
+			reducedMotion: false,
+			display: 'builtin',
+		});
 		native.setSnapshot({
 			revision: 200,
 			sessionId: 'attention-session',
@@ -351,12 +553,6 @@ async function run() {
 			pendingKind: 'approval',
 			pendingTitle: 'Allow file edits to live_activity.mm?',
 			latestShortMessage: 'I found 3 items requiring your review.',
-		});
-		native.setPresentation({
-			visible: true,
-			pinned: false,
-			reducedMotion: false,
-			display: 'builtin',
 		});
 		await sleep(200);
 
@@ -470,6 +666,7 @@ async function run() {
 	// Test 5c: Normal hover peek -> deliberate click -> interactive -> escape
 	const test5c = { name: 'hover-peek-interactive', ok: true, details: {} };
 	try {
+		native.dispose();
 		native.setPresentation({
 			visible: true,
 			pinned: false,
@@ -832,6 +1029,792 @@ async function run() {
 		results.failures.push(`screen-locked-safety: ${err.message}`);
 	}
 	results.tests.push(test11);
+
+	// -------------------------------------------------------------------------
+	// Content-update stability / notch flicker regressions (TDD against native fix)
+	// -------------------------------------------------------------------------
+
+	// Test 12: content-only snapshots must not morph / retarget presentation
+	const test12 = { name: 'content-update-stability', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setSnapshot(contentSnapshot(1000, {
+			presentationLabel: 'Baseline compact',
+			currentActivity: 'Settling',
+			latestShortMessage: 'ready',
+		}));
+		native.setPresentation({
+			visible: true,
+			pinned: false,
+			reducedMotion: false,
+			display: 'builtin',
+		});
+		await sleep(120);
+		await drainMain(native, 4);
+
+		const baselineDiag = native.getDiagnostics();
+		const baseline = captureStabilityBaseline(baselineDiag);
+		test12.details.baseline = {
+			...baseline,
+			statusLabel: baselineDiag.statusLabel,
+			metricsLabel: baselineDiag.metricsLabel,
+		};
+
+		if (baseline.activePresentationState !== 'compact') {
+			throw new Error(`setup expected compact, got ${baseline.activePresentationState}`);
+		}
+		if (baseline.targetPresentationState !== 'compact') {
+			throw new Error(`setup expected target compact, got ${baseline.targetPresentationState}`);
+		}
+
+		const storm1 = await applyContentStorm(native, {
+			startRevision: 1001,
+			count: 100,
+			batchSize: 20,
+			labelPrefix: 'StormA',
+		});
+		// Sample mid-storm: content-only must not need an in-flight geometry transition.
+		const midStormSample = native.getDiagnostics();
+		test12.details.midStormSample = {
+			transitionInFlight: midStormSample.transitionInFlight,
+			animationCount: midStormSample.animationCount,
+			transitionGeneration: midStormSample.transitionGeneration,
+		};
+		if (midStormSample.transitionInFlight === true) {
+			throw new Error('content-only updates must not require transitionInFlight=true');
+		}
+		await sleep(80);
+		await drainMain(native, 4);
+
+		const midDiag = native.getDiagnostics();
+		test12.details.afterFirstStorm = {
+			animationCount: midDiag.animationCount,
+			transitionGeneration: midDiag.transitionGeneration,
+			transitionInFlight: midDiag.transitionInFlight,
+			activePresentationState: midDiag.activePresentationState,
+			targetPresentationState: midDiag.targetPresentationState,
+			frame: captureFrame(midDiag),
+			lastRenderedRevision: midDiag.lastRenderedRevision,
+			revision: midDiag.revision,
+			geometryTransitionCount: midDiag.geometryTransitionCount,
+			contentOnlyUpdateCount: midDiag.contentOnlyUpdateCount,
+			contentRefreshCount: midDiag.contentRefreshCount,
+			statusLabel: midDiag.statusLabel,
+			latestShortMessage: midDiag.latestShortMessage,
+			metricsLabel: midDiag.metricsLabel,
+			lastApplied: storm1,
+		};
+		assertContentOnlyStable(midDiag, baseline, {
+			expectedState: 'compact',
+			expectedTarget: 'compact',
+			lastApplied: storm1,
+		});
+
+		const midBaseline = captureStabilityBaseline(midDiag);
+		const storm2 = await applyContentStorm(native, {
+			startRevision: storm1.revision + 1,
+			count: 160,
+			batchSize: 40,
+			labelPrefix: 'StormB',
+		});
+		await sleep(80);
+		await drainMain(native, 4);
+
+		const afterDiag = native.getDiagnostics();
+		test12.details.afterHighFrequencyStorm = {
+			animationCount: afterDiag.animationCount,
+			transitionGeneration: afterDiag.transitionGeneration,
+			transitionInFlight: afterDiag.transitionInFlight,
+			activePresentationState: afterDiag.activePresentationState,
+			targetPresentationState: afterDiag.targetPresentationState,
+			frame: captureFrame(afterDiag),
+			lastRenderedRevision: afterDiag.lastRenderedRevision,
+			revision: afterDiag.revision,
+			geometryTransitionCount: afterDiag.geometryTransitionCount,
+			contentOnlyUpdateCount: afterDiag.contentOnlyUpdateCount,
+			contentRefreshCount: afterDiag.contentRefreshCount,
+			statusLabel: afterDiag.statusLabel,
+			latestShortMessage: afterDiag.latestShortMessage,
+			metricsLabel: afterDiag.metricsLabel,
+			lastApplied: storm2,
+			redrawDelta: (Number(afterDiag.redrawCount) || 0) - baseline.redrawCount,
+		};
+		assertContentOnlyStable(afterDiag, midBaseline, {
+			expectedState: 'compact',
+			expectedTarget: 'compact',
+			lastApplied: storm2,
+		});
+		assertContentOnlyStable(afterDiag, baseline, {
+			expectedState: 'compact',
+			expectedTarget: 'compact',
+			lastApplied: storm2,
+		});
+
+		if (typeof afterDiag.lastTransitionReason === 'string'
+			&& /content|refresh|text|metrics/i.test(afterDiag.lastTransitionReason)
+			&& /geometry|morph|presentation|expand|collapse/i.test(afterDiag.lastTransitionReason)) {
+			throw new Error(`lastTransitionReason must not claim geometry morph for content-only: ${afterDiag.lastTransitionReason}`);
+		}
+	} catch (err) {
+		test12.ok = false;
+		test12.error = err.message;
+		results.failures.push(`content-update-stability: ${err.message}`);
+	}
+	results.tests.push(test12);
+
+	// Test 13: content-only while Peek must remain peek / non-interactive
+	const test13 = { name: 'content-only-in-peek', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setSnapshot(contentSnapshot(2000));
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		await sleep(100);
+		const peekOk = native.simulateAction('peek');
+		if (!peekOk) {
+			throw new Error('simulateAction(peek) failed');
+		}
+		await sleep(120);
+		await drainMain(native, 3);
+
+		const baselineDiag = native.getDiagnostics();
+		const baseline = captureStabilityBaseline(baselineDiag);
+		test13.details.baseline = {
+			state: baselineDiag.activePresentationState,
+			expanded: baselineDiag.expanded,
+			peekOnly: baselineDiag.peekOnly,
+			localMonitorInstalled: baselineDiag.localMonitorInstalled,
+			animationCount: baseline.animationCount,
+			frame: baseline.frame,
+		};
+		if (baselineDiag.activePresentationState !== 'peek') {
+			throw new Error(`expected peek before content storm, got ${baselineDiag.activePresentationState}`);
+		}
+		if (baselineDiag.localMonitorInstalled === true) {
+			throw new Error('peek must not install local key monitor');
+		}
+
+		const storm = await applyContentStorm(native, {
+			startRevision: 2001,
+			count: 100,
+			batchSize: 25,
+			labelPrefix: 'PeekStorm',
+		});
+		await sleep(80);
+		await drainMain(native, 4);
+		const after = native.getDiagnostics();
+		test13.details.after = {
+			state: after.activePresentationState,
+			target: after.targetPresentationState,
+			expanded: after.expanded,
+			peekOnly: after.peekOnly,
+			localMonitorInstalled: after.localMonitorInstalled,
+			animationCount: after.animationCount,
+			transitionGeneration: after.transitionGeneration,
+			frame: captureFrame(after),
+			lastApplied: storm,
+		};
+
+		if (after.activePresentationState !== 'peek') {
+			throw new Error(`content-only must remain peek, got ${after.activePresentationState}`);
+		}
+		if (after.targetPresentationState !== 'peek') {
+			throw new Error(`target must remain peek, got ${after.targetPresentationState}`);
+		}
+		if (after.peekOnly !== undefined && after.peekOnly !== true) {
+			throw new Error(`peekOnly must stay true for content-only peek updates, got ${after.peekOnly}`);
+		}
+		if (after.expanded !== true) {
+			throw new Error('peek must stay expanded');
+		}
+		if (after.localMonitorInstalled === true) {
+			throw new Error('content-only peek must remain non-interactive (no local monitor)');
+		}
+		assertContentOnlyStable(after, baseline, {
+			expectedState: 'peek',
+			expectedTarget: 'peek',
+			lastApplied: storm,
+		});
+	} catch (err) {
+		test13.ok = false;
+		test13.error = err.message;
+		results.failures.push(`content-only-in-peek: ${err.message}`);
+	}
+	results.tests.push(test13);
+
+	// Test 14: content-only while Interactive must not replay entrance morph
+	const test14 = { name: 'content-only-in-interactive', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setSnapshot(contentSnapshot(3000));
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		await sleep(100);
+		if (!native.simulateAction('peek')) {
+			throw new Error('peek failed');
+		}
+		await sleep(80);
+		if (!native.simulateAction('click')) {
+			throw new Error('click→interactive failed');
+		}
+		await sleep(180);
+		await drainMain(native, 4);
+
+		const baselineDiag = native.getDiagnostics();
+		const baseline = captureStabilityBaseline(baselineDiag);
+		test14.details.baseline = {
+			state: baselineDiag.activePresentationState,
+			animationCount: baseline.animationCount,
+			localMonitorInstalled: baselineDiag.localMonitorInstalled,
+			frame: baseline.frame,
+		};
+		if (baselineDiag.activePresentationState !== 'interactive') {
+			throw new Error(`expected interactive before content storm, got ${baselineDiag.activePresentationState}`);
+		}
+
+		const storm = await applyContentStorm(native, {
+			startRevision: 3001,
+			count: 120,
+			batchSize: 30,
+			labelPrefix: 'InteractiveStorm',
+		});
+		await sleep(80);
+		await drainMain(native, 4);
+		const after = native.getDiagnostics();
+		test14.details.after = {
+			state: after.activePresentationState,
+			animationCount: after.animationCount,
+			transitionGeneration: after.transitionGeneration,
+			frame: captureFrame(after),
+			lastApplied: storm,
+		};
+		assertContentOnlyStable(after, baseline, {
+			expectedState: 'interactive',
+			expectedTarget: 'interactive',
+			lastApplied: storm,
+		});
+	} catch (err) {
+		test14.ok = false;
+		test14.error = err.message;
+		results.failures.push(`content-only-in-interactive: ${err.message}`);
+	}
+	results.tests.push(test14);
+
+	// Test 15: content-only while pinned must not geometry-transition
+	const test15 = { name: 'content-only-while-pinned', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setSnapshot(contentSnapshot(4000));
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		await sleep(80);
+		native.simulateAction('peek');
+		await sleep(60);
+		native.simulateAction('click');
+		await sleep(120);
+		if (!native.simulateAction('pin')) {
+			throw new Error('pin failed');
+		}
+		await sleep(150);
+		await drainMain(native, 4);
+
+		const baselineDiag = native.getDiagnostics();
+		const baseline = captureStabilityBaseline(baselineDiag);
+		test15.details.baseline = {
+			state: baselineDiag.activePresentationState,
+			pinned: baselineDiag.pinned,
+			animationCount: baseline.animationCount,
+			frame: baseline.frame,
+		};
+		if (baselineDiag.pinned !== true) {
+			throw new Error('expected pinned=true before content storm');
+		}
+		if (!(baselineDiag.activePresentationState === 'pinned' || baselineDiag.activePresentationState === 'attentionInteractive')) {
+			throw new Error(`expected pinned presentation, got ${baselineDiag.activePresentationState}`);
+		}
+
+		const expectedState = baselineDiag.activePresentationState;
+		const storm = await applyContentStorm(native, {
+			startRevision: 4001,
+			count: 100,
+			batchSize: 25,
+			labelPrefix: 'PinnedStorm',
+		});
+		await sleep(80);
+		await drainMain(native, 4);
+		const after = native.getDiagnostics();
+		test15.details.after = {
+			state: after.activePresentationState,
+			pinned: after.pinned,
+			animationCount: after.animationCount,
+			transitionGeneration: after.transitionGeneration,
+			geometryTransitionCount: after.geometryTransitionCount,
+			frame: captureFrame(after),
+			lastApplied: storm,
+		};
+		if (after.pinned !== true) {
+			throw new Error('content-only updates must keep pinned=true');
+		}
+		assertContentOnlyStable(after, baseline, {
+			expectedState,
+			expectedTarget: expectedState === 'pinned' ? 'pinned' : after.targetPresentationState,
+			lastApplied: storm,
+		});
+		if (expectedState === 'pinned' && after.targetPresentationState !== 'pinned') {
+			throw new Error(`target must remain pinned, got ${after.targetPresentationState}`);
+		}
+	} catch (err) {
+		test15.ok = false;
+		test15.error = err.message;
+		results.failures.push(`content-only-while-pinned: ${err.message}`);
+	}
+	results.tests.push(test15);
+
+	// Test 16: real presentation transitions must still animate (no global animation kill)
+	const test16 = { name: 'presentation-transitions-still-animate', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(5000, { status: 'working' }));
+		await sleep(120);
+		await drainMain(native, 3);
+
+		let diag = native.getDiagnostics();
+		const hasScreen = !!(diag.screenFrame && Number(diag.screenFrame.width) > 0);
+		const anim0 = Number(diag.animationCount) || 0;
+		const gen0 = Number(diag.transitionGeneration) || 0;
+		test16.details.start = { animationCount: anim0, transitionGeneration: gen0, state: diag.activePresentationState, hasScreen };
+
+		if (!native.simulateAction('peek')) {
+			throw new Error('compact→peek failed');
+		}
+		await sleep(150);
+		diag = native.getDiagnostics();
+		const animAfterPeek = Number(diag.animationCount) || 0;
+		const genAfterPeek = Number(diag.transitionGeneration) || 0;
+		test16.details.afterPeek = { animationCount: animAfterPeek, transitionGeneration: genAfterPeek, state: diag.activePresentationState };
+		if (diag.activePresentationState !== 'peek') {
+			throw new Error(`expected peek, got ${diag.activePresentationState}`);
+		}
+		if (hasScreen && !(animAfterPeek > anim0 || genAfterPeek > gen0)) {
+			throw new Error(`compact→peek must animate when screen geometry is available (anim ${anim0}→${animAfterPeek}, gen ${gen0}→${genAfterPeek})`);
+		}
+
+		if (!native.simulateAction('click')) {
+			throw new Error('peek→interactive failed');
+		}
+		await sleep(180);
+		diag = native.getDiagnostics();
+		const animAfterInteractive = Number(diag.animationCount) || 0;
+		const genAfterInteractive = Number(diag.transitionGeneration) || 0;
+		test16.details.afterInteractive = {
+			animationCount: animAfterInteractive,
+			transitionGeneration: genAfterInteractive,
+			state: diag.activePresentationState,
+		};
+		if (diag.activePresentationState !== 'interactive') {
+			throw new Error(`expected interactive, got ${diag.activePresentationState}`);
+		}
+		if (hasScreen && !(animAfterInteractive > animAfterPeek || genAfterInteractive > genAfterPeek)) {
+			throw new Error(`peek→interactive must animate when screen geometry is available (anim ${animAfterPeek}→${animAfterInteractive})`);
+		}
+
+		if (!native.simulateAction('escape')) {
+			throw new Error('interactive→compact escape failed');
+		}
+		await sleep(180);
+		diag = native.getDiagnostics();
+		const animAfterCompact = Number(diag.animationCount) || 0;
+		const genAfterCompact = Number(diag.transitionGeneration) || 0;
+		test16.details.afterCompact = {
+			animationCount: animAfterCompact,
+			transitionGeneration: genAfterCompact,
+			state: diag.activePresentationState,
+		};
+		if (diag.activePresentationState !== 'compact') {
+			throw new Error(`expected compact after escape, got ${diag.activePresentationState}`);
+		}
+		if (hasScreen && !(animAfterCompact > animAfterInteractive || genAfterCompact > genAfterInteractive)) {
+			throw new Error(`interactive→compact must animate when screen geometry is available (anim ${animAfterInteractive}→${animAfterCompact})`);
+		}
+
+		// Presentation-class attention arrival must still morph even when layoutForScreen
+		// is a no-op (headless / missing NSScreen). This proves animation is not globally disabled.
+		const animBeforeAttention = Number(diag.animationCount) || 0;
+		native.setSnapshot(contentSnapshot(5100, {
+			status: 'attention',
+			presentationLabel: 'Needs approval',
+			latestShortMessage: 'Please review',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'attn-anim-1',
+				title: 'Allow edits?',
+				message: 'Edit live_activity.mm?',
+				destructive: false,
+			},
+		}));
+		await sleep(200);
+		await drainMain(native, 3);
+		diag = native.getDiagnostics();
+		const animAfterAttention = Number(diag.animationCount) || 0;
+		test16.details.afterAttentionPeek = {
+			animationCount: animAfterAttention,
+			state: diag.activePresentationState,
+		};
+		if (diag.activePresentationState !== 'attentionPeek') {
+			throw new Error(`expected attentionPeek, got ${diag.activePresentationState}`);
+		}
+		if (!(animAfterAttention > animBeforeAttention)) {
+			throw new Error(`compact→attentionPeek must increase animationCount (${animBeforeAttention} → ${animAfterAttention}) — animation must remain enabled for real presentation changes`);
+		}
+	} catch (err) {
+		test16.ok = false;
+		test16.error = err.message;
+		results.failures.push(`presentation-transitions-still-animate: ${err.message}`);
+	}
+	results.tests.push(test16);
+
+	// Test 17: stale lower revisions must not rewind rendered content (TDD monotonic revision)
+	const test17 = { name: 'snapshot-revision-ordering', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setSnapshot(contentSnapshot(6000, {
+			presentationLabel: 'rev-6000',
+			latestShortMessage: 'base-6000',
+		}));
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		await sleep(100);
+
+		const n = 40;
+		for (let i = 1; i <= n; i++) {
+			const rev = 6000 + i;
+			native.setSnapshot(contentSnapshot(rev, {
+				presentationLabel: `rev-${rev}`,
+				currentActivity: `Activity ${rev}`,
+				latestShortMessage: `msg-${rev}`,
+			}));
+			if (i % 10 === 0) {
+				await drainMain(native, 1);
+			}
+		}
+		// Out-of-order / stale lower revision after the high-water mark.
+		native.setSnapshot(contentSnapshot(6010, {
+			presentationLabel: 'STALE-6010',
+			currentActivity: 'STALE activity',
+			latestShortMessage: 'STALE message',
+		}));
+		await sleep(100);
+		await drainMain(native, 4);
+
+		const diag = native.getDiagnostics();
+		const highWater = 6000 + n;
+		const renderedRevision = typeof diag.lastRenderedRevision === 'number'
+			? diag.lastRenderedRevision
+			: (typeof diag.revision === 'number' ? diag.revision : undefined);
+		test17.details = {
+			highWater,
+			renderedRevision,
+			statusLabel: diag.statusLabel,
+			latestShortMessage: diag.latestShortMessage,
+			lastTransitionReason: diag.lastTransitionReason,
+		};
+
+		if (typeof renderedRevision === 'number') {
+			if (renderedRevision < highWater) {
+				throw new Error(`rendered revision went backwards (highWater=${highWater}, rendered=${renderedRevision})`);
+			}
+			if (renderedRevision === 6010) {
+				throw new Error('stale revision 6010 must not become the rendered revision after higher revisions');
+			}
+		} else {
+			// TODO(native): expose lastRenderedRevision in getDiagnostics.
+			// Until then, assert via rendered labels that stale content did not win.
+		}
+		if (diag.statusLabel === 'STALE-6010' || diag.latestShortMessage === 'STALE message') {
+			throw new Error('stale lower revision must not rewind rendered labels after higher revisions were applied');
+		}
+		if (diag.statusLabel !== `rev-${highWater}`) {
+			throw new Error(`expected statusLabel rev-${highWater} after monotonic apply, got ${diag.statusLabel}`);
+		}
+		if (diag.latestShortMessage !== `msg-${highWater}`) {
+			throw new Error(`expected latestShortMessage msg-${highWater}, got ${diag.latestShortMessage}`);
+		}
+	} catch (err) {
+		test17.ok = false;
+		test17.error = err.message;
+		results.failures.push(`snapshot-revision-ordering: ${err.message}`);
+	}
+	results.tests.push(test17);
+
+	// Test 18: question/approval text refresh must not replay attention entrance
+	const test18 = { name: 'question-approval-content-updates', ok: true, details: {} };
+	try {
+		native.dispose();
+		const interactionId = 'q-stable-1';
+		// Presentation must be visible before attention snapshot so mayExpand can enter attentionPeek.
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		await sleep(40);
+		native.setSnapshot(contentSnapshot(7000, {
+			status: 'attention',
+			presentationLabel: 'Question from Magnus',
+			latestShortMessage: 'Need a choice',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId,
+				title: 'Choose lane',
+				message: 'Initial pending message',
+				options: [
+					{ id: 'dev', label: 'Development' },
+					{ id: 'staging', label: 'Staging' },
+				],
+			},
+		}));
+		await sleep(220);
+		await drainMain(native, 4);
+
+		const afterEntrance = native.getDiagnostics();
+		const entranceBaseline = captureStabilityBaseline(afterEntrance);
+		test18.details.afterEntrance = {
+			state: afterEntrance.activePresentationState,
+			interactionId: afterEntrance.interactionId,
+			animationCount: entranceBaseline.animationCount,
+			pendingMessage: afterEntrance.pendingMessage,
+		};
+		if (afterEntrance.activePresentationState !== 'attentionPeek') {
+			throw new Error(`expected attentionPeek after seed, got ${afterEntrance.activePresentationState}`);
+		}
+		if (afterEntrance.interactionId !== interactionId) {
+			throw new Error(`interactionId mismatch after seed: ${afterEntrance.interactionId}`);
+		}
+
+		for (let i = 0; i < 40; i++) {
+			native.setSnapshot(contentSnapshot(7001 + i, {
+				status: 'attention',
+				presentationLabel: 'Question from Magnus',
+				latestShortMessage: `Need a choice ${i}`,
+				pendingInteraction: {
+					kind: 'question',
+					interactionId,
+					title: 'Choose lane',
+					message: `Updated pending message ${i}`,
+					options: [
+						{ id: 'dev', label: 'Development' },
+						{ id: 'staging', label: 'Staging' },
+					],
+				},
+			}));
+			if ((i + 1) % 10 === 0) {
+				await drainMain(native, 1);
+			}
+		}
+		await sleep(100);
+		await drainMain(native, 4);
+
+		const after = native.getDiagnostics();
+		test18.details.afterContent = {
+			state: after.activePresentationState,
+			interactionId: after.interactionId,
+			animationCount: after.animationCount,
+			pendingMessage: after.pendingMessage,
+			renderedPendingMessage: after.renderedPendingMessage,
+			renderedPeekBody: after.renderedPeekBody,
+			transitionGeneration: after.transitionGeneration,
+			frame: captureFrame(after),
+		};
+		if (after.interactionId !== interactionId) {
+			throw new Error(`interactionId must stay stable across content-only attention updates (got ${after.interactionId})`);
+		}
+		if (after.activePresentationState !== 'attentionPeek') {
+			throw new Error(`attention content refresh must not leave attentionPeek (got ${after.activePresentationState})`);
+		}
+		assertContentOnlyStable(after, entranceBaseline, {
+			expectedState: 'attentionPeek',
+			expectedTarget: 'attentionPeek',
+		});
+		const pendingText = String(after.pendingMessage || after.renderedPendingMessage || after.renderedPeekBody || '');
+		if (!pendingText.includes('Updated pending message')) {
+			throw new Error(`pending message text not refreshed: ${pendingText}`);
+		}
+	} catch (err) {
+		test18.ok = false;
+		test18.error = err.message;
+		results.failures.push(`question-approval-content-updates: ${err.message}`);
+	}
+	results.tests.push(test18);
+
+	// Test 19: reduced motion — content non-animated; state changes immediate
+	const test19 = { name: 'reduced-motion-content-and-state', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setSnapshot(contentSnapshot(8000));
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
+		await sleep(100);
+		await drainMain(native, 3);
+
+		const baselineDiag = native.getDiagnostics();
+		const baseline = captureStabilityBaseline(baselineDiag);
+		test19.details.baseline = baseline;
+
+		const storm = await applyContentStorm(native, {
+			startRevision: 8001,
+			count: 80,
+			batchSize: 20,
+			labelPrefix: 'RM',
+		});
+		await sleep(40);
+		await drainMain(native, 3);
+		const afterContent = native.getDiagnostics();
+		test19.details.afterContent = {
+			animationCount: afterContent.animationCount,
+			transitionGeneration: afterContent.transitionGeneration,
+			transitionInFlight: afterContent.transitionInFlight,
+			state: afterContent.activePresentationState,
+			lastApplied: storm,
+		};
+		assertContentOnlyStable(afterContent, baseline, {
+			expectedState: 'compact',
+			expectedTarget: 'compact',
+			lastApplied: storm,
+		});
+
+		const beforePeekAnim = Number(afterContent.animationCount) || 0;
+		if (!native.simulateAction('peek')) {
+			throw new Error('reduced-motion peek failed');
+		}
+		await sleep(30);
+		await drainMain(native, 2);
+		const afterPeek = native.getDiagnostics();
+		test19.details.afterPeek = {
+			state: afterPeek.activePresentationState,
+			animationCount: afterPeek.animationCount,
+			transitionInFlight: afterPeek.transitionInFlight,
+		};
+		if (afterPeek.activePresentationState !== 'peek') {
+			throw new Error(`reduced-motion peek must apply immediately, got ${afterPeek.activePresentationState}`);
+		}
+		if (afterPeek.transitionInFlight !== false) {
+			throw new Error('reduced-motion state change must not leave transitionInFlight');
+		}
+		// Reduced motion: state change is immediate and must not schedule geometry morph animations.
+		if ((Number(afterPeek.animationCount) || 0) !== beforePeekAnim) {
+			throw new Error(`reduced-motion state change must not increase animationCount (${beforePeekAnim} → ${afterPeek.animationCount})`);
+		}
+	} catch (err) {
+		test19.ok = false;
+		test19.error = err.message;
+		results.failures.push(`reduced-motion-content-and-state: ${err.message}`);
+	}
+	results.tests.push(test19);
+
+	// Test 20: monitors must not leak across compact/peek/interactive/pinned/collapse cycles
+	const test20 = { name: 'monitor-leaks-after-presentation-cycles', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(9000));
+		await sleep(80);
+
+		let localLeaksOnGlanceable = 0;
+		let localMissingInteractive = 0;
+		let globalMissingAfterCollapse = 0;
+		const observations = [];
+
+		for (let i = 0; i < 12; i++) {
+			native.setSnapshot(contentSnapshot(9001 + i * 5, {
+				presentationLabel: `Cycle ${i}`,
+				latestShortMessage: `cycle-${i}`,
+			}));
+			native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+
+			if (!native.simulateAction('peek')) {
+				throw new Error(`cycle ${i}: peek failed`);
+			}
+			await sleep(25);
+			let diag = native.getDiagnostics();
+			// Peek intentionally removes the global hover monitor; local must stay off.
+			if (diag.localMonitorInstalled) {
+				localLeaksOnGlanceable++;
+			}
+
+			if (!native.simulateAction('click')) {
+				throw new Error(`cycle ${i}: click failed`);
+			}
+			await sleep(35);
+			diag = native.getDiagnostics();
+			if (!diag.localMonitorInstalled) {
+				localMissingInteractive++;
+			}
+
+			if (!native.simulateAction('pin')) {
+				throw new Error(`cycle ${i}: pin failed`);
+			}
+			await sleep(30);
+			diag = native.getDiagnostics();
+			if (diag.pinned !== true) {
+				throw new Error(`cycle ${i}: expected pinned`);
+			}
+			if (!diag.localMonitorInstalled) {
+				localMissingInteractive++;
+			}
+
+			if (!native.simulateAction('escape')) {
+				throw new Error(`cycle ${i}: escape failed`);
+			}
+			await sleep(40);
+			diag = native.getDiagnostics();
+			observations.push({
+				i,
+				state: diag.activePresentationState,
+				local: diag.localMonitorInstalled,
+				global: diag.globalMonitorInstalled,
+				pinned: diag.pinned,
+			});
+			if (diag.localMonitorInstalled) {
+				localLeaksOnGlanceable++;
+			}
+			if (!diag.globalMonitorInstalled) {
+				globalMissingAfterCollapse++;
+			}
+			if (diag.pinned === true) {
+				throw new Error(`cycle ${i}: escape must unpin`);
+			}
+			if (diag.activePresentationState !== 'compact' && diag.activePresentationState !== 'peek') {
+				throw new Error(`cycle ${i}: expected compact/peek after escape, got ${diag.activePresentationState}`);
+			}
+		}
+
+		await sleep(120);
+		const finalDiag = native.getDiagnostics();
+		test20.details = {
+			localLeaksOnGlanceable,
+			localMissingInteractive,
+			globalMissingAfterCollapse,
+			finalState: finalDiag.activePresentationState,
+			finalLocal: finalDiag.localMonitorInstalled,
+			finalGlobal: finalDiag.globalMonitorInstalled,
+			sample: observations.slice(0, 3),
+		};
+		if (localLeaksOnGlanceable > 0) {
+			throw new Error(`local key monitor leaked on ${localLeaksOnGlanceable} peek/compact observations`);
+		}
+		if (localMissingInteractive > 0) {
+			throw new Error(`local key monitor missing on ${localMissingInteractive} interactive/pinned observations`);
+		}
+		if (globalMissingAfterCollapse > 0) {
+			throw new Error(`global monitor not restored after collapse on ${globalMissingAfterCollapse} cycles`);
+		}
+		if (finalDiag.localMonitorInstalled === true
+			&& (finalDiag.activePresentationState === 'compact' || finalDiag.activePresentationState === 'peek')) {
+			throw new Error('final compact/peek must not retain local key monitor');
+		}
+		if (finalDiag.globalMonitorInstalled !== true) {
+			throw new Error('global monitor must be restored after collapse while presentation remains visible');
+		}
+	} catch (err) {
+		test20.ok = false;
+		test20.error = err.message;
+		results.failures.push(`monitor-leaks-after-presentation-cycles: ${err.message}`);
+	}
+	results.tests.push(test20);
+
+	native.dispose();
 
 	results.ok = results.failures.length === 0;
 	const out = join(evidenceDir, 'live-activity-perf.json');

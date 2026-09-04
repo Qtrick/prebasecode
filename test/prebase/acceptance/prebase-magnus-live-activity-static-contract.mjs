@@ -189,8 +189,10 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		failures.push('contribution must cold-query getSystemIdleState for lock at startup');
 	}
 }
-if (!native.includes('Delay control layout until frame animation completes to prevent visible popping')) {
-	failures.push('animated layout must delay control layout until frame settles');
+if (!native.includes('Pre-position controls before/during the frame morph')
+	|| !native.includes('refreshContentOnly')
+	|| !native.includes('Identical geometry: content refresh only')) {
+	failures.push('animated layout must pre-position controls and separate content-only refreshes from geometry morphs');
 }
 if (!contributionSource.includes('panelStateSource') || !contributionSource.includes('renderer-projection')) {
 	failures.push('renderer diagnostics must label panelState as renderer-projection (not native hover truth)');

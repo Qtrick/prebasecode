@@ -8,6 +8,9 @@ static const CGFloat kCollapsedHeight = 34;
 static const CGFloat kPeekBodyHeight = 56;
 static const CGFloat kWingWidthMin = 52;
 static const CGFloat kWingWidthMax = 148;
+/** Fixed compact/peek wing widths — content text must not resize the notch island. */
+static const CGFloat kStableCompactLeftWing = 64;
+static const CGFloat kStableCompactRightWing = 64;
 static const CGFloat kPillWidth = 228;
 static const CGFloat kPillHeight = 30;
 static const CGFloat kNotchMinSafeTop = 8;
@@ -281,9 +284,18 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) NSUInteger hapticCount;
 @property (nonatomic, assign) NSUInteger redrawCount;
 @property (nonatomic, assign) NSUInteger animationCount;
+@property (nonatomic, assign) NSUInteger geometryTransitionCount;
+@property (nonatomic, assign) NSUInteger contentOnlyUpdateCount;
+@property (nonatomic, assign) NSUInteger orderFrontCount;
+@property (nonatomic, assign) double lastRenderedRevision;
+@property (nonatomic, copy) NSString *lastTransitionReason;
 @property (nonatomic, assign) BOOL transitionInFlight;
 @property (nonatomic, assign) NSUInteger transitionGeneration;
+/** Invalidates in-flight window-frame completion handlers without counting as a morph. */
+@property (nonatomic, assign) NSUInteger layoutCompletionGeneration;
 @property (nonatomic, assign) NSTimeInterval transitionEndTime;
+/** Real presentation change — morph shape even when window frame cannot change (no NSScreen). */
+@property (nonatomic, assign) BOOL pendingPresentationMorph;
 
 - (void)applySnapshotDict:(NSDictionary *)snapshot;
 - (void)teardown;
@@ -310,6 +322,9 @@ static NSString *JSString(Napi::Value value) {
 - (void)removeLocalKeyMonitor;
 - (void)expandPreview;
 - (void)layoutForScreen;
+- (void)refreshContentOnly;
+- (BOOL)framesEffectivelyEqual:(NSRect)a to:(NSRect)b;
+- (BOOL)isGlanceableSurface;
 @end
 
 @interface PrebaseFlippedView : NSView
@@ -709,8 +724,14 @@ static NSString *JSString(Napi::Value value) {
 		self.hapticCount = 0;
 		self.redrawCount = 0;
 		self.animationCount = 0;
+		self.geometryTransitionCount = 0;
+		self.contentOnlyUpdateCount = 0;
+		self.orderFrontCount = 0;
+		self.lastRenderedRevision = 0;
+		self.lastTransitionReason = @"";
 		self.transitionInFlight = NO;
 		self.transitionGeneration = 0;
+		self.layoutCompletionGeneration = 0;
 		[self buildPanel];
 		[[NSNotificationCenter defaultCenter] addObserver:self
 		                                         selector:@selector(screenParametersChanged:)
@@ -913,16 +934,45 @@ static NSString *JSString(Napi::Value value) {
 	return [str sizeWithAttributes:attrs].width;
 }
 
+- (BOOL)isGlanceableSurface {
+	return self.content.peekOnly || self.attentionPeek || !(self.content.expanded || self.pinned);
+}
+
+- (BOOL)framesEffectivelyEqual:(NSRect)a to:(NSRect)b {
+	const CGFloat tol = 0.5;
+	return fabs(a.origin.x - b.origin.x) <= tol
+		&& fabs(a.origin.y - b.origin.y) <= tol
+		&& fabs(a.size.width - b.size.width) <= tol
+		&& fabs(a.size.height - b.size.height) <= tol;
+}
+
+- (void)refreshContentOnly {
+	// Invalidate in-flight frame completion blocks without bumping morph generation.
+	self.layoutCompletionGeneration++;
+	self.contentOnlyUpdateCount++;
+	self.lastTransitionReason = @"content";
+	[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
+	if (self.panel) {
+		[self layoutControls:self.panel.frame];
+	}
+}
+
 - (CGFloat)computeLeftWingWidth {
+	// Compact + peek: fixed wings so status/metrics text never resizes the island.
+	if ([self isGlanceableSurface]) {
+		return kStableCompactLeftWing;
+	}
 	NSString *label = self.content.statusLabel.length ? self.content.statusLabel : @"Magnus";
 	CGFloat textW = [self measureStringWidth:label font:[NSFont systemFontOfSize:11 weight:NSFontWeightMedium]];
 	CGFloat raw = textW + 28;
-	// Stable width buckets (step by 8pt) to prevent 1-second typography jitter
 	CGFloat bucketed = ceil(raw / 8.0) * 8.0;
 	return MIN(kWingWidthMax, MAX(kWingWidthMin, bucketed));
 }
 
 - (CGFloat)computeRightWingWidth {
+	if ([self isGlanceableSurface]) {
+		return kStableCompactRightWing;
+	}
 	if (!self.content.metricsLabel.length) {
 		return kWingWidthMin;
 	}
@@ -937,19 +987,11 @@ static NSString *JSString(Napi::Value value) {
 	if (!expanded) {
 		return bandH;
 	}
+	// Peek / attentionPeek: fixed body height — message length must not reflow geometry.
 	if ((self.content.peekOnly || self.attentionPeek) && !self.pinned) {
-		CGFloat h = bandH + 8;
-		if (self.content.pendingTitle.length) {
-			h += 20;
-		} else if (self.content.activityLabel.length) {
-			h += 18;
-		} else {
-			h += 16;
-		}
-		h += 8;
-		return MIN(bandH + kPeekBodyHeight, h);
+		return bandH + kPeekBodyHeight;
 	}
-	// Content-aware expanded sizing
+	// Content-aware expanded sizing (only consulted on real presentation layout)
 	CGFloat h = bandH + 8; // Top padding below notch band
 	h += 22; // Header
 	if (self.content.activityLabel.length) {
@@ -993,8 +1035,25 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)layoutForScreen {
+	BOOL forceMorph = self.pendingPresentationMorph;
+	self.pendingPresentationMorph = NO;
+
 	NSScreen *screen = [self targetScreen];
+	BOOL expanded = self.content.expanded || self.pinned;
+	self.content.targetExpanded = expanded;
+
 	if (!screen) {
+		// Headless / no NSScreen: morph on real presentation changes; otherwise content only.
+		if (forceMorph) {
+			self.geometryTransitionCount++;
+			self.lastTransitionReason = @"geometry";
+			[self.content updateShapeAndContentAnimated:!self.reducedMotion duration:0.18 useTargetState:YES];
+			if (self.panel) {
+				[self layoutControls:self.panel.frame];
+			}
+		} else if (self.panel) {
+			[self refreshContentOnly];
+		}
 		return;
 	}
 	NSRect frame = screen.frame;
@@ -1006,7 +1065,6 @@ static NSString *JSString(Napi::Value value) {
 	self.content.safeAreaTop = insets.top;
 	self.panel.hasShadow = !notched;
 	CGFloat topY = NSMaxY(frame);
-	BOOL expanded = self.content.expanded || self.pinned;
 	CGFloat bandH = MAX(insets.top, kCollapsedHeight);
 
 	NSRect win;
@@ -1055,33 +1113,47 @@ static NSString *JSString(Napi::Value value) {
 
 	NSTimeInterval animDuration = (win.size.height > self.panel.frame.size.height) ? 0.24 : 0.18;
 	BOOL isFirstLayout = !self.panel.isVisible || NSEqualRects(self.panel.frame, NSMakeRect(0, 0, 280, 36));
+	BOOL frameUnchanged = !isFirstLayout && [self framesEffectivelyEqual:win to:self.panel.frame];
+
+	// Identical geometry: content refresh only.
+	if (frameUnchanged && !forceMorph) {
+		[self refreshContentOnly];
+		return;
+	}
+
+	self.geometryTransitionCount++;
+	self.layoutCompletionGeneration++;
+	self.lastTransitionReason = isFirstLayout ? @"firstLayout" : @"geometry";
+
+	// Pre-position controls before/during the frame morph so the expanding
+	// surface is never an empty black rectangle.
+	[self layoutControls:win];
 
 	if (self.reducedMotion) {
 		[self.panel setFrame:win display:YES animate:NO];
-		self.content.targetExpanded = expanded;
 		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
-		[self layoutControls:win];
-	} else if (isFirstLayout) {
-		[self.panel setFrame:win display:YES animate:NO];
-		self.content.targetExpanded = expanded;
-		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
-		[self layoutControls:win];
+	} else if (isFirstLayout || (frameUnchanged && forceMorph)) {
+		// First layout / same-frame morph: snap the window, animate shape only when forced.
+		if (!frameUnchanged || isFirstLayout) {
+			[self.panel setFrame:win display:YES animate:NO];
+		}
+		[self.content updateShapeAndContentAnimated:forceMorph duration:forceMorph ? animDuration : 0 useTargetState:YES];
 	} else {
-		// Delay control layout until frame animation completes to prevent visible popping.
-		const NSUInteger generation = ++self.transitionGeneration;
+		// Shape morph uses transitionGeneration; frame completion uses
+		// layoutCompletionGeneration (already bumped above) so content-only
+		// refreshes can invalidate layout without looking like a morph.
+		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES];
+		const NSUInteger generation = self.layoutCompletionGeneration;
 		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
 			context.duration = animDuration;
 			context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
 			context.allowsImplicitAnimation = YES;
 			[[self.panel animator] setFrame:win display:YES];
 		} completionHandler:^{
-			// Delay control layout until frame animation completes to prevent visible popping
-			if (generation == self.transitionGeneration) {
+			if (generation == self.layoutCompletionGeneration) {
 				[self layoutControls:win];
 			}
 		}];
-		self.content.targetExpanded = expanded;
-		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES];
 	}
 }
 
@@ -1349,6 +1421,7 @@ static NSString *JSString(Napi::Value value) {
 	self.ignoresMouse = NO;
 	[self removeLocalKeyMonitor];
 	[self removeGlobalMonitorOnly];
+	self.pendingPresentationMorph = YES;
 	[self layoutForScreen];
 }
 
@@ -1371,6 +1444,7 @@ static NSString *JSString(Napi::Value value) {
 	self.pinButton.hidden = NO;
 	self.openButton.hidden = NO;
 	self.input.hidden = NO;
+	self.pendingPresentationMorph = YES;
 	[self layoutForScreen];
 }
 
@@ -1415,6 +1489,7 @@ static NSString *JSString(Napi::Value value) {
 	self.input.hidden = YES;
 	[self removeLocalKeyMonitor];
 	[self.panel makeFirstResponder:nil];
+	self.pendingPresentationMorph = YES;
 	[self layoutForScreen];
 	// Restore global acquisition monitor for collapsed mode
 	if (self.visible) {
@@ -1511,10 +1586,7 @@ static NSString *JSString(Napi::Value value) {
 	self.content.pendingTitle = @"";
 	self.content.pendingMessage = @"";
 	self.openButton.title = @"Open in PreBase";
-	if (self.panel) {
-		[self layoutControls:self.panel.frame];
-	}
-	[self.content updateShapeAndContentAnimated:YES duration:0.18 useTargetState:NO];
+	[self refreshContentOnly];
 }
 
 - (NSDictionary *)diagnosticsDict {
@@ -1635,6 +1707,14 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"hapticCount"] = @(self.hapticCount);
 	dict[@"redrawCount"] = @(self.redrawCount);
 	dict[@"animationCount"] = @(self.animationCount);
+	dict[@"geometryTransitionCount"] = @(self.geometryTransitionCount);
+	dict[@"contentOnlyUpdateCount"] = @(self.contentOnlyUpdateCount);
+	dict[@"contentRefreshCount"] = @(self.contentOnlyUpdateCount);
+	dict[@"orderFrontCount"] = @(self.orderFrontCount);
+	dict[@"lastRenderedRevision"] = @(self.lastRenderedRevision);
+	dict[@"revision"] = @(self.revision);
+	dict[@"lastTransitionReason"] = self.lastTransitionReason ?: @"";
+	dict[@"peekOnly"] = @(self.content.peekOnly);
 	NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
 	if (self.transitionInFlight && now >= self.transitionEndTime) {
 		self.transitionInFlight = NO;
@@ -1777,6 +1857,7 @@ static NSString *JSString(Napi::Value value) {
 		[self removeGlobalMonitorOnly];
 		[self installLocalKeyMonitor];
 	}
+	self.pendingPresentationMorph = YES;
 	[self layoutForScreen];
 }
 
@@ -1818,9 +1899,8 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)applySnapshotDict:(NSDictionary *)snapshot {
-	BOOL screenLocked = [snapshot[@"screenLocked"] boolValue];
-	self.screenLocked = screenLocked;
-	if (screenLocked) {
+	self.screenLocked = [snapshot[@"screenLocked"] boolValue];
+	if (self.screenLocked) {
 		self.attentionPeek = NO;
 		self.content.peekOnly = NO;
 		self.content.expanded = NO;
@@ -1843,14 +1923,28 @@ static NSString *JSString(Napi::Value value) {
 		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
 		if (self.panel) {
 			[self layoutControls:self.panel.frame];
+			// Snapshot lock must hide immediately even if presentation update races behind.
+			[self.panel orderOut:nil];
+			self.panel.ignoresMouseEvents = YES;
+			self.visible = NO;
 		}
 		return;
 	}
 
+	const double incomingRevision = [snapshot[@"revision"] doubleValue];
+	// Monotonic revision: never paint an older snapshot over a newer one.
+	if (incomingRevision > 0 && self.lastRenderedRevision > 0 && incomingRevision < self.lastRenderedRevision) {
+		return;
+	}
+
+	const BOOL alreadyInteractive = self.pinned
+		|| (self.content.expanded && !self.content.peekOnly && !self.attentionPeek);
+	const BOOL wasAttentionPeek = self.attentionPeek;
+	const BOOL mayExpand = self.visible && !self.screenLocked;
+
 	self.sessionId = snapshot[@"sessionId"] ?: @"";
 	self.sessionResource = snapshot[@"sessionResource"] ?: @"";
-	self.revision = [snapshot[@"revision"] doubleValue];
-	self.screenLocked = [snapshot[@"screenLocked"] boolValue];
+	self.revision = incomingRevision;
 	NSString *status = snapshot[@"status"] ?: @"";
 	self.content.status = status;
 	self.content.attention = [status isEqualToString:@"attention"];
@@ -1879,15 +1973,13 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
 	self.lastNativeCommand = @"";
 
-	const BOOL alreadyInteractive = self.pinned
-		|| (self.content.expanded && !self.content.peekOnly && !self.attentionPeek);
-	// Lock / hidden: never expand peek from a snapshot republish (privacy + race with presentation).
-	const BOOL mayExpand = self.visible && !self.screenLocked;
+	BOOL needsGeometry = NO;
 
 	if (self.content.attention) {
 		if (alreadyInteractive && mayExpand) {
 			// Attention while Interactive/pinned: preserve Interactive; update content only.
 			self.userDismissedAttention = NO;
+			const BOOL alreadyCorrect = !self.attentionPeek && !self.content.peekOnly && self.content.expanded;
 			self.attentionPeek = NO;
 			self.content.peekOnly = NO;
 			self.content.expanded = YES;
@@ -1895,10 +1987,11 @@ static NSString *JSString(Napi::Value value) {
 			self.ignoresMouse = NO;
 			if (self.panel) {
 				self.panel.ignoresMouseEvents = NO;
-				[self layoutForScreen];
 			}
+			needsGeometry = !alreadyCorrect;
 		} else if (!self.pinned && self.userDismissedAttention) {
 			// Escape/collapse while attention: lasting compact until click (do not republish into peek).
+			const BOOL alreadyCompact = !self.attentionPeek && !self.content.peekOnly && !self.content.expanded;
 			self.attentionPeek = NO;
 			self.content.peekOnly = NO;
 			self.content.expanded = NO;
@@ -1906,11 +1999,10 @@ static NSString *JSString(Napi::Value value) {
 			self.ignoresMouse = YES;
 			if (self.panel) {
 				self.panel.ignoresMouseEvents = YES;
-				[self layoutForScreen];
 			}
+			needsGeometry = !alreadyCompact;
 		} else if (!self.pinned && mayExpand) {
-			// Glanceable attention peek: compact wings + short body, clickable to expand.
-			// Attention arrival is not user-initiated; do not haptic (Apple AppKit guidance).
+			const BOOL alreadyAttentionPeek = self.attentionPeek && self.content.peekOnly && self.content.expanded;
 			self.attentionPeek = YES;
 			self.content.peekOnly = YES;
 			self.content.expanded = YES;
@@ -1919,9 +2011,10 @@ static NSString *JSString(Napi::Value value) {
 			self.didAttentionHaptic = NO;
 			if (self.panel) {
 				self.panel.ignoresMouseEvents = NO;
-				[self layoutForScreen];
 			}
+			needsGeometry = !alreadyAttentionPeek;
 		} else if (!mayExpand) {
+			const BOOL alreadyCompact = !self.attentionPeek && !self.content.peekOnly && !self.content.expanded;
 			self.attentionPeek = NO;
 			self.content.peekOnly = NO;
 			self.content.expanded = NO;
@@ -1929,30 +2022,32 @@ static NSString *JSString(Napi::Value value) {
 			self.ignoresMouse = YES;
 			if (self.panel) {
 				self.panel.ignoresMouseEvents = YES;
-				[self layoutForScreen];
 			}
+			needsGeometry = !alreadyCompact;
 		}
 	} else {
 		self.userDismissedAttention = NO;
-		BOOL wasAttentionPeek = self.attentionPeek;
 		self.attentionPeek = NO;
 		if (wasAttentionPeek && !self.pinned && !self.hovering && !alreadyInteractive) {
 			self.content.peekOnly = NO;
 			[self collapse];
-		} else if (!self.pinned && !alreadyInteractive) {
-			self.content.peekOnly = NO;
-			self.content.targetExpanded = self.content.expanded;
+			self.lastRenderedRevision = incomingRevision > 0 ? incomingRevision : self.lastRenderedRevision;
+			return;
+		}
+		// Content must never convert Peek → Interactive or collapse Interactive.
+		// Preserve peekOnly / expanded / hover ownership across content revisions.
+		if (self.content.expanded || self.pinned) {
+			self.content.targetExpanded = YES;
 		}
 	}
-	[self.content updateShapeAndContentAnimated:YES duration:0.18 useTargetState:YES];
-	if (self.panel) {
-		[self layoutControls:self.panel.frame];
-	}
-	// Snapshot lock must hide immediately even if presentation update races behind.
-	if (self.screenLocked && self.panel) {
-		[self.panel orderOut:nil];
-		self.panel.ignoresMouseEvents = YES;
-		self.visible = NO;
+
+	self.lastRenderedRevision = incomingRevision > 0 ? incomingRevision : self.lastRenderedRevision;
+
+	if (needsGeometry && self.panel) {
+		self.pendingPresentationMorph = YES;
+		[self layoutForScreen];
+	} else {
+		[self refreshContentOnly];
 	}
 }
 
@@ -1961,7 +2056,32 @@ static NSString *JSString(Napi::Value value) {
 	if (self.screenLocked) {
 		visible = NO;
 	}
+
+	// Pending attention stored while hidden/locked must still promote on the next show,
+	// even when visible/pinned/reduced look unchanged at the call site.
+	const BOOL pendingAttentionPromotion = visible
+		&& self.content.attention
+		&& !self.userDismissedAttention
+		&& !pinned
+		&& !self.attentionPeek
+		&& !(self.content.expanded && !self.content.peekOnly);
+
+	// Idempotent presentation republish: content flushes must not re-layout or reorder.
+	if (visible
+		&& self.visible
+		&& self.panel.isVisible
+		&& self.pinned == pinned
+		&& self.reducedMotion == reduced
+		&& !self.screenLocked
+		&& !pendingAttentionPromotion) {
+		return;
+	}
+
 	const BOOL wasPinned = self.pinned;
+	const BOOL wasVisible = self.visible && self.panel.isVisible;
+	const BOOL wasExpanded = self.content.expanded;
+	const BOOL wasPeekOnly = self.content.peekOnly;
+	const BOOL wasAttentionPeek = self.attentionPeek;
 	self.visible = visible;
 	self.pinned = pinned;
 	[self updatePinButtonState];
@@ -1995,22 +2115,30 @@ static NSString *JSString(Napi::Value value) {
 	} else if (!visible) {
 		self.content.expanded = NO;
 	} else {
-		// Keep legitimate peek/attention/hover expansion, and preserve active unpinned Interactive mode;
-		// never invent Interactive from visibility alone.
-		const BOOL isInteractive = self.content.expanded && !self.content.peekOnly;
-		const BOOL peekSurface = self.hovering || self.attentionPeek || self.content.peekOnly;
-		const BOOL activeInteraction = isInteractive && (self.hovering || self.panel.firstResponder == self.input.currentEditor || self.input.stringValue.length > 0 || self.exitTimer != nil);
-		if (self.content.expanded && !peekSurface && !activeInteraction) {
-			self.content.expanded = NO;
-			self.content.peekOnly = NO;
-			self.attentionPeek = NO;
-			[self removeLocalKeyMonitor];
+		// Becoming / staying visible: promote pending attention into attentionPeek when appropriate.
+		const BOOL isInteractive = self.content.expanded && !self.content.peekOnly && !self.attentionPeek;
+		if (self.content.attention && !self.userDismissedAttention && !isInteractive && !self.pinned) {
+			self.attentionPeek = YES;
+			self.content.peekOnly = YES;
+			self.content.expanded = YES;
 		} else {
-			self.content.expanded = self.content.expanded && (peekSurface || activeInteraction);
+			// Keep legitimate peek/attention/hover expansion, and preserve active unpinned Interactive mode;
+			// never invent Interactive from visibility alone.
+			const BOOL peekSurface = self.hovering || self.attentionPeek || self.content.peekOnly;
+			const BOOL activeInteraction = isInteractive && (self.hovering || self.panel.firstResponder == self.input.currentEditor || self.input.stringValue.length > 0 || self.exitTimer != nil);
+			if (self.content.expanded && !peekSurface && !activeInteraction) {
+				self.content.expanded = NO;
+				self.content.peekOnly = NO;
+				self.attentionPeek = NO;
+				[self removeLocalKeyMonitor];
+			} else {
+				self.content.expanded = self.content.expanded && (peekSurface || activeInteraction);
+			}
 		}
 	}
 	self.content.targetExpanded = self.content.expanded;
-	self.panel.animationBehavior = reduced ? NSWindowAnimationBehaviorNone : NSWindowAnimationBehaviorUtilityWindow;
+	// Own explicit geometry animation — disable AppKit orderFront/orderOut automatic animation.
+	self.panel.animationBehavior = NSWindowAnimationBehaviorNone;
 	if (!visible) {
 		[self.panel orderOut:nil];
 		self.panel.ignoresMouseEvents = YES;
@@ -2035,10 +2163,25 @@ static NSString *JSString(Napi::Value value) {
 	} else {
 		[self removeGlobalMonitorOnly];
 	}
+	// Morph only when presentation mode actually changed — not on every show/republish.
+	const BOOL presentationChanged = wasPinned != self.pinned
+		|| wasExpanded != self.content.expanded
+		|| wasPeekOnly != self.content.peekOnly
+		|| wasAttentionPeek != self.attentionPeek;
+	if (presentationChanged) {
+		self.pendingPresentationMorph = YES;
+	}
 	[self layoutForScreen];
-	[self.panel orderFrontRegardless];
+	if (!wasVisible || !self.panel.isVisible) {
+		self.orderFrontCount++;
+		self.lastTransitionReason = @"orderFront";
+		[self.panel orderFrontRegardless];
+	}
 	if (!self.pinned && !self.content.expanded) {
 		self.panel.ignoresMouseEvents = YES;
+	} else {
+		self.panel.ignoresMouseEvents = NO;
+		self.ignoresMouse = NO;
 	}
 }
 

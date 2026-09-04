@@ -36,7 +36,7 @@ async function syncDarwinAppIcon() {
 	if (process.platform !== 'darwin') {
 		return;
 	}
-	const { DarwinIconError, syncDevelopmentAdaptiveIcon } = await import('./prebaseDarwinIcon.ts');
+	const { DarwinIconError, DarwinIconErrorCode, syncDevelopmentAdaptiveIcon } = await import('./prebaseDarwinIcon.ts');
 	try {
 		const result = await syncDevelopmentAdaptiveIcon(rootDir);
 		if (!result) {
@@ -46,6 +46,26 @@ async function syncDarwinAppIcon() {
 		console.log(`[preLaunch] adaptive icon synced → ${result.appPath}`);
 	} catch (err) {
 		if (err instanceof DarwinIconError) {
+			// actool needs CoreSimulator; agent/CI sandboxes often lack it. If the
+			// development .app already has a non-empty Assets.car, continue launch
+			// without rewriting frozen icon bytes. Packaging still fail-closes.
+			if (err.code === DarwinIconErrorCode.ACTOOL_FAILED || err.code === DarwinIconErrorCode.ACTOOL_UNAVAILABLE) {
+				const electronDir = path.join(rootDir, '.build', 'electron');
+				try {
+					const entries = await fs.readdir(electronDir);
+					const appName = entries.find((e) => e.endsWith('.app'));
+					if (appName) {
+						const car = path.join(electronDir, appName, 'Contents', 'Resources', 'Assets.car');
+						const st = await fs.stat(car);
+						if (st.size > 0) {
+							console.warn(`[preLaunch] adaptive icon sync skipped (${err.code}); using existing Assets.car`);
+							return;
+						}
+					}
+				} catch {
+					/* fall through to fail-closed */
+				}
+			}
 			console.error(`[preLaunch] adaptive icon sync failed (${err.code}):`, err.message);
 			throw err;
 		}

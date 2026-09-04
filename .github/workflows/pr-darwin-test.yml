@@ -186,7 +186,13 @@ jobs:
       - name: Compile Copilot Chat extension for smoke tests
         if: ${{ inputs.smoke_tests }}
         working-directory: extensions/copilot
-        run: npm run compile
+        # PreBase ships without a checkout of extensions/copilot/package.json; skip when absent.
+        run: |
+          if [ -f package.json ]; then
+            npm run compile
+          else
+            echo "extensions/copilot not present — skipping Copilot compile (PreBase uses Magnus)"
+          fi
 
       - name: Diagnostics before smoke test run
         if: ${{ inputs.smoke_tests && always() }}

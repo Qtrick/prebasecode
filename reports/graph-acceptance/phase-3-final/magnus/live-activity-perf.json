@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "1bc5f31b0a72c17d414cfc5215ffc0952cb17c42",
-  "sourceFingerprint": "61367231fcb34333001cdfbd37520bf9dc8256eefaef8514cb461d6f96deac66",
-  "productFingerprint": "61367231fcb34333001cdfbd37520bf9dc8256eefaef8514cb461d6f96deac66",
-  "generatedAt": "2026-09-04T00:46:23.818Z",
+  "sourceHead": "9b22f7af095669e75c5e41be13d8170732b6c673",
+  "sourceFingerprint": "f4809a9329b2d35cda11e2adf7caab6beca6cd6f2310908439a0abea8ebfaff5",
+  "productFingerprint": "f4809a9329b2d35cda11e2adf7caab6beca6cd6f2310908439a0abea8ebfaff5",
+  "generatedAt": "2026-09-04T04:14:07.692Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -34,7 +34,9 @@
           "renderedPeekBody": "",
           "transitionInFlight": false,
           "panelVisible": true,
-          "animationCount": 1,
+          "peekOnly": false,
+          "revision": 1,
+          "animationCount": 0,
           "activityLabel": "",
           "renderedLatestMessage": "",
           "hovered": false,
@@ -42,36 +44,24 @@
           "interactionId": "",
           "latestShortMessage": "",
           "localMonitorInstalled": false,
-          "auxiliaryTopLeftArea": {
-            "y": 950,
-            "x": 0,
-            "width": 663,
-            "height": 32
-          },
           "pendingMessage": "",
           "pathTopologyCompatible": true,
-          "panelLevel": 2147483630,
+          "panelLevel": 3,
           "requestedFrame": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
           },
           "keyWindow": false,
-          "notchGeometry": {
-            "trailingX": 848,
-            "centerX": 755.5,
-            "width": 185,
-            "leadingX": 663,
-            "height": 34
-          },
-          "topAnchorDelta": 0,
-          "transitionGeneration": 1,
+          "topAnchorDelta": -36,
+          "transitionGeneration": 0,
           "statusLabel": "",
           "layerBacked": true,
           "displayMode": "builtin",
-          "screenTopY": 982,
+          "screenTopY": 0,
           "prebaseFullscreen": false,
+          "contentRefreshCount": 2,
           "openInPreBaseVisible": false,
           "pinButtonTitle": "Pin",
           "renderedPendingMessage": "",
@@ -79,17 +69,19 @@
           "exitGraceMs": 250,
           "hoverDwellMs": 180,
           "userDismissedAttention": false,
-          "safeAreaTop": 32,
           "panelFrame": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 0,
+            "x": 0,
+            "width": 280,
+            "height": 36
           },
+          "orderFrontCount": 1,
+          "contentOnlyUpdateCount": 2,
           "expanded": false,
-          "panelTopY": 982,
+          "panelTopY": 36,
           "metricsLabel": "",
-          "notchDetected": true,
+          "geometryTransitionCount": 0,
+          "notchDetected": false,
           "questionButtonLabels": [],
           "redrawCount": 2,
           "panelCreated": true,
@@ -98,32 +90,21 @@
           "approvalControlsVisible": false,
           "accessibilityLabel": "Magnus live activity",
           "activePresentationState": "compact",
-          "screenLocalizedName": "Built-in Retina Display",
           "retainedWorkScreen": false,
+          "lastRenderedRevision": 1,
           "lastNativeCommand": "",
           "globalMonitorInstalled": true,
           "pendingKind": "",
-          "screenFrame": {
-            "y": 0,
-            "x": 0,
-            "width": 1512,
-            "height": 982
-          },
           "questionButtonCount": 0,
           "pinned": false,
           "collapsedHit": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
           },
           "screenLocked": false,
-          "auxiliaryTopRightArea": {
-            "y": 950,
-            "x": 848,
-            "width": 664,
-            "height": 32
-          },
+          "lastTransitionReason": "orderFront",
           "pendingTitle": ""
         }
       }
@@ -132,7 +113,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 8828,
+        "durationRealCyclesMs": 8118,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -142,44 +123,34 @@
           "renderedPeekBody": "",
           "transitionInFlight": false,
           "panelVisible": true,
-          "animationCount": 501,
+          "peekOnly": false,
+          "revision": 406,
+          "animationCount": 200,
           "activityLabel": "Real cycle 99",
           "renderedLatestMessage": "msg-99",
-          "hovered": false,
+          "hovered": true,
           "accessibilityRole": "AXGroup",
           "interactionId": "",
           "latestShortMessage": "msg-99",
-          "localMonitorInstalled": false,
-          "auxiliaryTopLeftArea": {
-            "y": 950,
-            "x": 0,
-            "width": 663,
-            "height": 32
-          },
+          "localMonitorInstalled": true,
           "pendingMessage": "",
           "pathTopologyCompatible": true,
-          "panelLevel": 2147483630,
+          "panelLevel": 3,
           "requestedFrame": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
           },
           "keyWindow": false,
-          "notchGeometry": {
-            "trailingX": 848,
-            "centerX": 755.5,
-            "width": 185,
-            "leadingX": 663,
-            "height": 34
-          },
-          "topAnchorDelta": 0,
-          "transitionGeneration": 901,
+          "topAnchorDelta": -36,
+          "transitionGeneration": 200,
           "statusLabel": "Step 99",
           "layerBacked": true,
           "displayMode": "builtin",
-          "screenTopY": 982,
+          "screenTopY": 0,
           "prebaseFullscreen": false,
+          "contentRefreshCount": 102,
           "openInPreBaseVisible": true,
           "pinButtonTitle": "Pin",
           "renderedPendingMessage": "",
@@ -187,51 +158,42 @@
           "exitGraceMs": 250,
           "hoverDwellMs": 180,
           "userDismissedAttention": false,
-          "safeAreaTop": 32,
           "panelFrame": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 0,
+            "x": 0,
+            "width": 280,
+            "height": 36
           },
-          "expanded": false,
-          "panelTopY": 982,
+          "orderFrontCount": 1,
+          "contentOnlyUpdateCount": 102,
+          "expanded": true,
+          "panelTopY": 36,
           "metricsLabel": "",
-          "notchDetected": true,
+          "geometryTransitionCount": 200,
+          "notchDetected": false,
           "questionButtonLabels": [],
-          "redrawCount": 502,
+          "redrawCount": 302,
           "panelCreated": true,
-          "targetPresentationState": "compact",
+          "targetPresentationState": "interactive",
           "trackingAreaCount": 1,
           "approvalControlsVisible": false,
           "accessibilityLabel": "Step 99",
-          "activePresentationState": "compact",
-          "screenLocalizedName": "Built-in Retina Display",
+          "activePresentationState": "interactive",
           "retainedWorkScreen": false,
+          "lastRenderedRevision": 406,
           "lastNativeCommand": "",
-          "globalMonitorInstalled": true,
+          "globalMonitorInstalled": false,
           "pendingKind": "",
-          "screenFrame": {
-            "y": 0,
-            "x": 0,
-            "width": 1512,
-            "height": 982
-          },
           "questionButtonCount": 0,
           "pinned": false,
           "collapsedHit": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
           },
           "screenLocked": false,
-          "auxiliaryTopRightArea": {
-            "y": 950,
-            "x": 848,
-            "width": 664,
-            "height": 32
-          },
+          "lastTransitionReason": "geometry",
           "pendingTitle": ""
         }
       }
@@ -244,47 +206,37 @@
         "diagRetarget": {
           "hapticCount": 100,
           "pinButtonVisible": false,
-          "renderedPeekBody": "",
+          "renderedPeekBody": "Real cycle 99",
           "transitionInFlight": false,
           "panelVisible": true,
-          "animationCount": 504,
-          "activityLabel": "",
+          "peekOnly": true,
+          "revision": 406,
+          "animationCount": 202,
+          "activityLabel": "Real cycle 99",
           "renderedLatestMessage": "",
-          "hovered": false,
+          "hovered": true,
           "accessibilityRole": "AXGroup",
           "interactionId": "",
-          "latestShortMessage": "",
+          "latestShortMessage": "msg-99",
           "localMonitorInstalled": false,
-          "auxiliaryTopLeftArea": {
-            "y": 950,
-            "x": 0,
-            "width": 663,
-            "height": 32
-          },
           "pendingMessage": "",
           "pathTopologyCompatible": true,
-          "panelLevel": 2147483630,
+          "panelLevel": 3,
           "requestedFrame": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
           },
           "keyWindow": false,
-          "notchGeometry": {
-            "trailingX": 848,
-            "centerX": 755.5,
-            "width": 185,
-            "leadingX": 663,
-            "height": 34
-          },
-          "topAnchorDelta": 0,
-          "transitionGeneration": 906,
-          "statusLabel": "",
+          "topAnchorDelta": -36,
+          "transitionGeneration": 202,
+          "statusLabel": "Step 99",
           "layerBacked": true,
           "displayMode": "builtin",
-          "screenTopY": 982,
+          "screenTopY": 0,
           "prebaseFullscreen": false,
+          "contentRefreshCount": 102,
           "openInPreBaseVisible": false,
           "pinButtonTitle": "Pin",
           "renderedPendingMessage": "",
@@ -292,51 +244,42 @@
           "exitGraceMs": 250,
           "hoverDwellMs": 180,
           "userDismissedAttention": false,
-          "safeAreaTop": 32,
           "panelFrame": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
-          },
-          "expanded": false,
-          "panelTopY": 982,
-          "metricsLabel": "",
-          "notchDetected": true,
-          "questionButtonLabels": [],
-          "redrawCount": 505,
-          "panelCreated": true,
-          "targetPresentationState": "compact",
-          "trackingAreaCount": 1,
-          "approvalControlsVisible": false,
-          "accessibilityLabel": "Magnus live activity",
-          "activePresentationState": "compact",
-          "screenLocalizedName": "Built-in Retina Display",
-          "retainedWorkScreen": false,
-          "lastNativeCommand": "",
-          "globalMonitorInstalled": true,
-          "pendingKind": "",
-          "screenFrame": {
             "y": 0,
             "x": 0,
-            "width": 1512,
-            "height": 982
+            "width": 280,
+            "height": 36
           },
+          "orderFrontCount": 1,
+          "contentOnlyUpdateCount": 102,
+          "expanded": true,
+          "panelTopY": 36,
+          "metricsLabel": "",
+          "geometryTransitionCount": 202,
+          "notchDetected": false,
+          "questionButtonLabels": [],
+          "redrawCount": 304,
+          "panelCreated": true,
+          "targetPresentationState": "peek",
+          "trackingAreaCount": 1,
+          "approvalControlsVisible": false,
+          "accessibilityLabel": "Step 99",
+          "activePresentationState": "peek",
+          "retainedWorkScreen": false,
+          "lastRenderedRevision": 406,
+          "lastNativeCommand": "",
+          "globalMonitorInstalled": false,
+          "pendingKind": "",
           "questionButtonCount": 0,
           "pinned": false,
           "collapsedHit": {
-            "y": 948,
-            "x": 591,
-            "width": 309,
-            "height": 34
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
           },
           "screenLocked": false,
-          "auxiliaryTopRightArea": {
-            "y": 950,
-            "x": 848,
-            "width": 664,
-            "height": 32
-          },
+          "lastTransitionReason": "geometry",
           "pendingTitle": ""
         }
       }
@@ -389,7 +332,7 @@
           "peekSimResult": true,
           "state": "peek",
           "localMonitor": false,
-          "requestedHeight": 68
+          "requestedHeight": 0
         },
         "interactiveDiag": {
           "clickResult": true,
@@ -408,12 +351,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -360,
-        "heapUsedMb": 5.82,
-        "rssDiffKb": 30912,
-        "rssMb": 101.06,
-        "cpuDeltaUserMs": 641584,
-        "cpuDeltaSystemMs": 175917
+        "heapDiffKb": -498,
+        "heapUsedMb": 5.77,
+        "rssDiffKb": 6768,
+        "rssMb": 78.17,
+        "cpuDeltaUserMs": 278503,
+        "cpuDeltaSystemMs": 49554
       }
     },
     {
@@ -480,6 +423,347 @@
           "latestShortMessage": "",
           "expanded": false
         }
+      }
+    },
+    {
+      "name": "content-update-stability",
+      "ok": true,
+      "details": {
+        "baseline": {
+          "animationCount": 0,
+          "transitionGeneration": 0,
+          "transitionInFlight": false,
+          "redrawCount": 2,
+          "activePresentationState": "compact",
+          "targetPresentationState": "compact",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          },
+          "geometryTransitionCount": 0,
+          "contentOnlyUpdateCount": 2,
+          "contentRefreshCount": 2,
+          "orderFrontCount": 1,
+          "lastRenderedRevision": 1000,
+          "revision": 1000,
+          "lastTransitionReason": "orderFront",
+          "statusLabel": "Baseline compact",
+          "metricsLabel": "+0 −3 · 7 files"
+        },
+        "midStormSample": {
+          "transitionInFlight": false,
+          "animationCount": 0,
+          "transitionGeneration": 0
+        },
+        "afterFirstStorm": {
+          "animationCount": 0,
+          "transitionGeneration": 0,
+          "transitionInFlight": false,
+          "activePresentationState": "compact",
+          "targetPresentationState": "compact",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          },
+          "lastRenderedRevision": 1100,
+          "revision": 1100,
+          "geometryTransitionCount": 0,
+          "contentOnlyUpdateCount": 102,
+          "contentRefreshCount": 102,
+          "statusLabel": "StormA 1100",
+          "latestShortMessage": "msg-1100",
+          "metricsLabel": "+0 −23 · 2 files",
+          "lastApplied": {
+            "revision": 1100,
+            "label": "StormA 1100",
+            "message": "msg-1100"
+          }
+        },
+        "afterHighFrequencyStorm": {
+          "animationCount": 0,
+          "transitionGeneration": 0,
+          "transitionInFlight": false,
+          "activePresentationState": "compact",
+          "targetPresentationState": "compact",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          },
+          "lastRenderedRevision": 1260,
+          "revision": 1260,
+          "geometryTransitionCount": 0,
+          "contentOnlyUpdateCount": 262,
+          "contentRefreshCount": 262,
+          "statusLabel": "StormB 1260",
+          "latestShortMessage": "msg-1260",
+          "metricsLabel": "+10 −23 · 1 file",
+          "lastApplied": {
+            "revision": 1260,
+            "label": "StormB 1260",
+            "message": "msg-1260"
+          },
+          "redrawDelta": 260
+        }
+      }
+    },
+    {
+      "name": "content-only-in-peek",
+      "ok": true,
+      "details": {
+        "baseline": {
+          "state": "peek",
+          "expanded": true,
+          "peekOnly": true,
+          "localMonitorInstalled": false,
+          "animationCount": 1,
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          }
+        },
+        "after": {
+          "state": "peek",
+          "target": "peek",
+          "expanded": true,
+          "peekOnly": true,
+          "localMonitorInstalled": false,
+          "animationCount": 1,
+          "transitionGeneration": 1,
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          },
+          "lastApplied": {
+            "revision": 2100,
+            "label": "PeekStorm 2100",
+            "message": "msg-2100"
+          }
+        }
+      }
+    },
+    {
+      "name": "content-only-in-interactive",
+      "ok": true,
+      "details": {
+        "baseline": {
+          "state": "interactive",
+          "animationCount": 2,
+          "localMonitorInstalled": true,
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          }
+        },
+        "after": {
+          "state": "interactive",
+          "animationCount": 2,
+          "transitionGeneration": 2,
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          },
+          "lastApplied": {
+            "revision": 3120,
+            "label": "InteractiveStorm 3120",
+            "message": "msg-3120"
+          }
+        }
+      }
+    },
+    {
+      "name": "content-only-while-pinned",
+      "ok": true,
+      "details": {
+        "baseline": {
+          "state": "pinned",
+          "pinned": true,
+          "animationCount": 3,
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          }
+        },
+        "after": {
+          "state": "pinned",
+          "pinned": true,
+          "animationCount": 3,
+          "transitionGeneration": 3,
+          "geometryTransitionCount": 3,
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          },
+          "lastApplied": {
+            "revision": 4100,
+            "label": "PinnedStorm 4100",
+            "message": "msg-4100"
+          }
+        }
+      }
+    },
+    {
+      "name": "presentation-transitions-still-animate",
+      "ok": true,
+      "details": {
+        "start": {
+          "animationCount": 0,
+          "transitionGeneration": 0,
+          "state": "compact",
+          "hasScreen": false
+        },
+        "afterPeek": {
+          "animationCount": 1,
+          "transitionGeneration": 1,
+          "state": "peek"
+        },
+        "afterInteractive": {
+          "animationCount": 2,
+          "transitionGeneration": 2,
+          "state": "interactive"
+        },
+        "afterCompact": {
+          "animationCount": 3,
+          "transitionGeneration": 3,
+          "state": "compact"
+        },
+        "afterAttentionPeek": {
+          "animationCount": 4,
+          "state": "attentionPeek"
+        }
+      }
+    },
+    {
+      "name": "snapshot-revision-ordering",
+      "ok": true,
+      "details": {
+        "highWater": 6040,
+        "renderedRevision": 6040,
+        "statusLabel": "rev-6040",
+        "latestShortMessage": "msg-6040",
+        "lastTransitionReason": "content"
+      }
+    },
+    {
+      "name": "question-approval-content-updates",
+      "ok": true,
+      "details": {
+        "afterEntrance": {
+          "state": "attentionPeek",
+          "interactionId": "q-stable-1",
+          "animationCount": 1,
+          "pendingMessage": "Initial pending message"
+        },
+        "afterContent": {
+          "state": "attentionPeek",
+          "interactionId": "q-stable-1",
+          "animationCount": 1,
+          "pendingMessage": "Updated pending message 39",
+          "renderedPendingMessage": "",
+          "renderedPeekBody": "Updated pending message 39",
+          "transitionGeneration": 1,
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          }
+        }
+      }
+    },
+    {
+      "name": "reduced-motion-content-and-state",
+      "ok": true,
+      "details": {
+        "baseline": {
+          "animationCount": 0,
+          "transitionGeneration": 0,
+          "transitionInFlight": false,
+          "redrawCount": 2,
+          "activePresentationState": "compact",
+          "targetPresentationState": "compact",
+          "frame": {
+            "x": 0,
+            "y": 0,
+            "width": 280,
+            "height": 36
+          },
+          "geometryTransitionCount": 0,
+          "contentOnlyUpdateCount": 2,
+          "contentRefreshCount": 2,
+          "orderFrontCount": 1,
+          "lastRenderedRevision": 8000,
+          "revision": 8000,
+          "lastTransitionReason": "orderFront"
+        },
+        "afterContent": {
+          "animationCount": 0,
+          "transitionGeneration": 0,
+          "transitionInFlight": false,
+          "state": "compact",
+          "lastApplied": {
+            "revision": 8080,
+            "label": "RM 8080",
+            "message": "msg-8080"
+          }
+        },
+        "afterPeek": {
+          "state": "peek",
+          "animationCount": 0,
+          "transitionInFlight": false
+        }
+      }
+    },
+    {
+      "name": "monitor-leaks-after-presentation-cycles",
+      "ok": true,
+      "details": {
+        "localLeaksOnGlanceable": 0,
+        "localMissingInteractive": 0,
+        "globalMissingAfterCollapse": 0,
+        "finalState": "compact",
+        "finalLocal": false,
+        "finalGlobal": true,
+        "sample": [
+          {
+            "i": 0,
+            "state": "compact",
+            "local": false,
+            "global": true,
+            "pinned": false
+          },
+          {
+            "i": 1,
+            "state": "compact",
+            "local": false,
+            "global": true,
+            "pinned": false
+          },
+          {
+            "i": 2,
+            "state": "compact",
+            "local": false,
+            "global": true,
+            "pinned": false
+          }
+        ]
       }
     }
   ],

@@ -1,0 +1,187 @@
+{
+  "before": {
+    "state": "compact",
+    "anim": 0,
+    "gen": 0,
+    "geo": 0,
+    "content": 2,
+    "frame": {
+      "y": 0,
+      "x": 0,
+      "width": 0,
+      "height": 0
+    },
+    "reason": "content",
+    "rev": 1
+  },
+  "samples": [
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 3,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 10
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 8,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 15
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 13,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 20
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 18,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 25
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 23,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 30
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 28,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 35
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 33,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 40
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 38,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 45
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 43,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 50
+    },
+    {
+      "state": "compact",
+      "anim": 0,
+      "gen": 0,
+      "geo": 0,
+      "content": 48,
+      "frame": {
+        "y": 0,
+        "x": 0,
+        "width": 0,
+        "height": 0
+      },
+      "reason": "content",
+      "rev": 55
+    }
+  ],
+  "after": {
+    "state": "compact",
+    "anim": 0,
+    "gen": 0,
+    "geo": 0,
+    "content": 52,
+    "frame": {
+      "y": 0,
+      "x": 0,
+      "width": 0,
+      "height": 0
+    },
+    "reason": "content",
+    "rev": 59
+  },
+  "animDelta": 0,
+  "geoDelta": 0,
+  "contentDelta": 50
+}
