@@ -20,12 +20,45 @@ export type ImageInfoWithScale = {
 	height: number;
 };
 
+const ALLOWED_WEB_IMAGE_EXTENSIONS = new Set([
+	'.png',
+	'.jpg',
+	'.jpeg',
+	'.gif',
+	'.svg',
+	'.webp',
+	'.bmp',
+	'.ico',
+	'.avif'
+]);
+
+const ALLOWED_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg|gif|svg\+xml|webp|bmp|x-icon|avif);base64,/i;
+
+function isAllowedImageFormat(fileOrUrl: string): boolean {
+	if (ALLOWED_DATA_URL_PATTERN.test(fileOrUrl)) {
+		return true;
+	}
+	let pathname = fileOrUrl;
+	try {
+		if (reUrl.test(fileOrUrl)) {
+			pathname = new URL(fileOrUrl).pathname;
+		}
+	} catch {
+		return false;
+	}
+	const ext = path.extname(pathname).toLowerCase();
+	return ALLOWED_WEB_IMAGE_EXTENSIONS.has(ext);
+}
+
 /**
  * Get size of given image file. Supports files from local filesystem,
  * as well as URLs
  */
 export function getImageSize(file: string): Promise<ImageInfoWithScale | undefined> {
 	file = file.replace(/^file:\/\//, '');
+	if (!isAllowedImageFormat(file)) {
+		return Promise.resolve(undefined);
+	}
 	return reUrl.test(file) ? getImageSizeFromURL(file) : getImageSizeFromFile(file);
 }
 

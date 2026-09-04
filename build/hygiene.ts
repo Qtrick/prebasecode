@@ -23,6 +23,19 @@ const copyrightHeaderLines = [
 	' *--------------------------------------------------------------------------------------------*/',
 ];
 
+const prebaseCopyrightHeaderLines = [
+	'/*---------------------------------------------------------------------------------------------',
+	' *  Copyright (c) PreBase. All rights reserved.',
+	' *--------------------------------------------------------------------------------------------*/',
+];
+
+const prebaseMitCopyrightHeaderLines = [
+	'/*---------------------------------------------------------------------------------------------',
+	' *  Copyright (c) PreBase. All rights reserved.',
+	' *  Licensed under the MIT License. See License.txt in the project root for license information.',
+	' *--------------------------------------------------------------------------------------------*/',
+];
+
 interface VinylFileWithLines extends VinylFile {
 	__lines: string[];
 }
@@ -32,8 +45,12 @@ interface VinylFileWithLines extends VinylFile {
  * Returns an error message if mismatched, or undefined if OK.
  */
 export function checkCopilotEnginesVersion(repoRoot: string): string | undefined {
+	const copilotPkgPath = path.join(repoRoot, 'extensions/copilot/package.json');
+	if (!fs.existsSync(copilotPkgPath)) {
+		return undefined;
+	}
 	const rootPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'package.json'), 'utf8'));
-	const copilotPkg = JSON.parse(fs.readFileSync(path.join(repoRoot, 'extensions/copilot/package.json'), 'utf8'));
+	const copilotPkg = JSON.parse(fs.readFileSync(copilotPkgPath, 'utf8'));
 	const expected = `^${rootPkg.version}`;
 	const actual = copilotPkg?.engines?.vscode;
 	if (actual !== expected) {
@@ -89,8 +106,8 @@ export function hygiene(some: NodeJS.ReadWriteStream | string[] | undefined, run
 	const productJson = es.through(function (file: VinylFile) {
 		const product = JSON.parse(file.contents!.toString('utf8'));
 
-		if (product.extensionsGallery) {
-			console.error(`product.json: Contains 'extensionsGallery'`);
+		if (product.extensionsGallery?.serviceUrl && !product.extensionsGallery.serviceUrl.includes('open-vsx.org')) {
+			console.error(`product.json: Contains non-OpenVSX 'extensionsGallery': ${product.extensionsGallery.serviceUrl}`);
 			errorCount++;
 		}
 
@@ -158,13 +175,23 @@ export function hygiene(some: NodeJS.ReadWriteStream | string[] | undefined, run
 
 	const copyrights = es.through(function (file: VinylFileWithLines) {
 		const lines = file.__lines;
+		const offset = lines[0]?.startsWith('#!') ? 1 : 0;
 
-		for (let i = 0; i < copyrightHeaderLines.length; i++) {
-			if (lines[i] !== copyrightHeaderLines[i]) {
-				console.error(file.relative + ': Missing or bad copyright statement');
-				errorCount++;
-				break;
+		const matchesHeader = (header: string[]) => {
+			if (lines.length < header.length + offset) {
+				return false;
 			}
+			for (let i = 0; i < header.length; i++) {
+				if (lines[i + offset] !== header[i]) {
+					return false;
+				}
+			}
+			return true;
+		};
+
+		if (!matchesHeader(copyrightHeaderLines) && !matchesHeader(prebaseCopyrightHeaderLines) && !matchesHeader(prebaseMitCopyrightHeaderLines)) {
+			console.error(file.relative + ': Missing or bad copyright statement');
+			errorCount++;
 		}
 
 		this.emit('data', file);

@@ -21,7 +21,7 @@ function asPlainText(value: unknown): string {
 	if (typeof value === 'string') {
 		return value;
 	}
-	if (typeof value === 'object' && value !== null && 'value' in value && typeof (value as { value: unknown }).value === 'string') {
+	if (typeof value === 'object' && value !== null && typeof (value as Record<string, unknown>).value === 'string') {
 		return (value as { value: string }).value;
 	}
 	return String(value);
@@ -107,7 +107,12 @@ export async function applyMagnusLiveActivitySessionCommand(
 	}
 	const sessionResource = URI.parse(snapshot.sessionResource);
 	if (command.kind === 'followUp') {
-		await deps.chatService.sendRequest(sessionResource, (command.text ?? '').trim());
+		const text = (command.text ?? '').trim();
+		if (!text) {
+			deps.logService.info('[MagnusLiveActivity] followUp ignored: empty text');
+			return;
+		}
+		await deps.chatService.sendRequest(sessionResource, text);
 		return;
 	}
 	const model = deps.chatService.getSession(sessionResource);

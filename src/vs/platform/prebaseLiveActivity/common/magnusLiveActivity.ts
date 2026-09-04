@@ -235,17 +235,21 @@ export interface MagnusLiveActivitySessionInput {
 const SECRET_PATTERN = /\b(authorization|cookie|set-cookie|token|access[_-]?token|api[_-]?key|client[_-]?secret|secret|password|bearer)\b\s*[:=]\s*(?:"[^"]*"|'[^']*'|[^\s,;&]+)/gi;
 const BEARER_HEADER_PATTERN = /\bbearer\s+[A-Za-z0-9_\-\.]{15,}\b/gi;
 const JWT_PATTERN = /\bey[A-Za-z0-9_-]{10,}\.ey[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{10,}\b/g;
-const TOKEN_PREFIX_PATTERN = /\b(ghp|gho|glpat|xox[baprs])-[A-Za-z0-9_-]{10,}\b|\bgithub_pat_[A-Za-z0-9_]{10,}\b/g;
+const TOKEN_PREFIX_PATTERN = /\b(gh[pousr]|glpat|xox[baprs])[-_][A-Za-z0-9_-]{10,}\b|\bgithub_pat_[A-Za-z0-9_]{10,}\b|\bsbp_[A-Za-z0-9_-]{20,}\b/g;
+const AWS_KEY_PATTERN = /\b(AKIA|ASIA|AROA)[0-9A-Z]{16}\b/g;
+const PEM_PATTERN = /-----BEGIN [A-Z\s]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z\s]+ PRIVATE KEY-----/g;
 
 export function redactLiveActivityText(value: string | undefined): string {
 	if (!value) {
 		return '';
 	}
 	return value
+		.replace(PEM_PATTERN, '[redacted]')
 		.replace(SECRET_PATTERN, '$1=[redacted]')
 		.replace(BEARER_HEADER_PATTERN, 'Bearer [redacted]')
 		.replace(JWT_PATTERN, '[redacted]')
 		.replace(TOKEN_PREFIX_PATTERN, '[redacted]')
+		.replace(AWS_KEY_PATTERN, '[redacted]')
 		.replace(/\bsk-[A-Za-z0-9_-]{8,}\b/g, '[redacted]')
 		.replace(/\bAIza[A-Za-z0-9_-]{10,}\b/g, '[redacted]')
 		.replace(/\s+/g, ' ')
@@ -730,7 +734,7 @@ export function formatDiffMetric(diff: MagnusLiveActivityDiffSummary | undefined
 	}
 	const parts: string[] = [];
 	if (diff.additions !== undefined || diff.deletions !== undefined) {
-		parts.push(`+${diff.additions ?? 0} −${diff.deletions ?? 0}`);
+		parts.push(`+${diff.additions ?? 0} -${diff.deletions ?? 0}`);
 	}
 	if (diff.files > 0) {
 		parts.push(`${diff.files} file${diff.files === 1 ? '' : 's'}`);

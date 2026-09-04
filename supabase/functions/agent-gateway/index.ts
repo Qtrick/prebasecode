@@ -305,10 +305,19 @@ Deno.serve(async (req) => {
 
 	// Execute Gemini generation
 	try {
+		const isGemini3 = model.includes("gemini-3.") || model.includes("gemini-3-");
+		const rawGenConfig = body.generationConfig ?? (isGemini3
+			? { maxOutputTokens: 2048 }
+			: { maxOutputTokens: 2048, temperature: 0.2 });
+		const generationConfig = { ...rawGenConfig };
+		if (isGemini3 && "temperature" in generationConfig) {
+			delete generationConfig.temperature;
+		}
+
 		const geminiPayload = {
 			contents: body.contents ?? [{ role: "user", parts: [{ text: "Hello" }] }],
 			systemInstruction: body.systemInstruction,
-			generationConfig: body.generationConfig ?? { maxOutputTokens: 2048, temperature: 0.2 },
+			generationConfig,
 			tools: body.tools,
 		};
 

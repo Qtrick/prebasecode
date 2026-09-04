@@ -441,9 +441,9 @@ export class GeminiModelPolicy implements IModelPolicy {
 				// Highest quality stable Pro model
 				const proModels = classified.filter(m => m.id !== 'auto' && m.tier === 'pro' && m.releaseChannel === 'stable');
 				const pro31 = proModels.find(m => m.id === 'gemini-3.1-pro');
-				if (pro31) {return pro31.id;}
+				if (pro31) { return pro31.id; }
 				const pro25 = proModels.find(m => m.id === 'gemini-2.5-pro');
-				if (pro25) {return pro25.id;}
+				if (pro25) { return pro25.id; }
 				return proModels[0]?.id || this.resolveAuto(catalog);
 			}
 

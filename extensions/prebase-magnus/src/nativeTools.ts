@@ -441,9 +441,9 @@ async function packageManagerFor(folder: vscode.WorkspaceFolder): Promise<'npm' 
 	const packageUri = vscode.Uri.joinPath(folder.uri, 'package.json');
 	const raw = Buffer.from(await vscode.workspace.fs.readFile(packageUri)).toString('utf8');
 	const parsed = JSON.parse(raw) as { packageManager?: string };
-	if (parsed.packageManager?.startsWith('pnpm@')) {return 'pnpm';}
-	if (parsed.packageManager?.startsWith('yarn@')) {return 'yarn';}
-	if (parsed.packageManager?.startsWith('bun@')) {return 'bun';}
+	if (parsed.packageManager?.startsWith('pnpm@')) { return 'pnpm'; }
+	if (parsed.packageManager?.startsWith('yarn@')) { return 'yarn'; }
+	if (parsed.packageManager?.startsWith('bun@')) { return 'bun'; }
 	for (const [name, manager] of [['bun.lock', 'bun'], ['bun.lockb', 'bun'], ['pnpm-lock.yaml', 'pnpm'], ['yarn.lock', 'yarn']] as const) {
 		try {
 			await vscode.workspace.fs.stat(vscode.Uri.joinPath(folder.uri, name));
@@ -608,7 +608,7 @@ class DeclaredNodeVersionTool implements vscode.LanguageModelTool<{ action: 'use
 		const parsed = packageJson ? JSON.parse(packageJson) as { volta?: { node?: string } } : undefined;
 		const declared = (await textFile(folder, '.nvmrc')) ?? (await textFile(folder, '.node-version')) ?? parsed?.volta?.node;
 		if (!declared || declared.replace(/^v/, '') !== options.input.version.replace(/^v/, '')) {
-			throw new Error('The requested Node version does not exactly match this project’s declared .nvmrc, .node-version, or Volta version.');
+			throw new Error('The requested Node version does not exactly match this project\'s declared .nvmrc, .node-version, or Volta version.');
 		}
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
@@ -950,7 +950,7 @@ class ProjectGuidanceTool implements vscode.LanguageModelTool<ProjectGuidanceToo
 			const match = playbook
 				? snapshot.activatedRules.find(item => item.source.path === playbook.path)
 				: snapshot.activatedRules.find(item => item.source.path === path)
-					?? [...snapshot.alwaysApplicable, ...snapshot.pathApplicable].find(item => item.source.path === path);
+				?? [...snapshot.alwaysApplicable, ...snapshot.pathApplicable].find(item => item.source.path === path);
 			return result(JSON.stringify({
 				ok: Boolean(match),
 				path: playbook?.path ?? path,

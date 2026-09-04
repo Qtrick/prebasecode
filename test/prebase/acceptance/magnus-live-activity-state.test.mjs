@@ -175,4 +175,50 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 	assert.match(native, /Snapshot lock must hide immediately/);
 	assert.match(native, /peekOnly == YES/);
 	assert.match(native, /simulateSubmitFollowUp[\s\S]{0,200}self\.input\.hidden/);
+	assert.match(native, /const BOOL activeInteraction = isInteractive && \(self\.hovering \|\| self\.panel\.firstResponder == self\.input\.currentEditor \|\| self\.input\.stringValue\.length > 0 \|\| self\.exitTimer != nil\);/);
+	assert.match(native, /if \(self\.content\.expanded && !peekSurface && !activeInteraction\) \{/);
+	assert.match(native, /self\.content\.expanded = self\.content\.expanded && \(peekSurface \|\| activeInteraction\);/);
+});
+
+test('privacy: redactLiveActivityText redacts sensitive tokens while preserving normal text', () => {
+	const script = `
+import assert from 'node:assert/strict';
+import { redactLiveActivityText } from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
+
+// Preserves normal filenames and activities
+assert.equal(redactLiveActivityText('Reading src/vs/workbench/file.ts'), 'Reading src/vs/workbench/file.ts');
+assert.equal(redactLiveActivityText('Running npm test'), 'Running npm test');
+
+// Redacts AWS access keys
+assert.equal(redactLiveActivityText('AWS key AKIAIOSFODNN7EXAMPLE used'), 'AWS key [redacted] used');
+
+// Redacts PEM private keys
+const pem = '-----BEGIN RSA PRIVATE KEY-----\\nMIIEowIBAAKCAQEA0\\n-----END RSA PRIVATE KEY-----';
+assert.equal(redactLiveActivityText('Key: ' + pem), 'Key: [redacted]');
+
+// Redacts Supabase access tokens
+assert.equal(redactLiveActivityText('Token sbp_abcdef0123456789abcdef0123456789abcdef01'), 'Token [redacted]');
+
+// Redacts GitHub PATs (ghp_ and github_pat_)
+assert.equal(redactLiveActivityText('PAT ghp_1234567890abcdefghijklmnopqrstuvwxyz'), 'PAT [redacted]');
+assert.equal(redactLiveActivityText('PAT github_pat_1234567890abcdefghijklmnopqrstuvwxyz'), 'PAT [redacted]');
+
+// Redacts Bearer and JWT tokens
+assert.equal(redactLiveActivityText('Bearer secret_token_1234567890_abc'), 'Bearer [redacted]');
+assert.equal(redactLiveActivityText('eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c'), '[redacted]');
+
+// Redacts Gemini and OpenAI API keys
+assert.equal(redactLiveActivityText('Key AIzaSyD1234567890abcdefghij'), 'Key [redacted]');
+assert.equal(redactLiveActivityText('Key sk-proj-1234567890abcdefghijkl'), 'Key [redacted]');
+
+// Redacts generic secret assignments
+assert.equal(redactLiveActivityText('api_key=supersecret12345'), 'api_key=[redacted]');
+assert.equal(redactLiveActivityText('password: "supersecret12345"'), 'password=[redacted]');
+`;
+
+	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.equal(result.status, 0, result.stderr || result.stdout);
 });

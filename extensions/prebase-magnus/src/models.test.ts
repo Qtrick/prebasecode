@@ -81,7 +81,15 @@ suite('Magnus Models & Providers', () => {
 	}
 
 	test('resolveAutoModelFromDiscovered selects flash 3.x over 2.5 and 2.5 over pro', () => {
-		// Case 1: 3.x flash available
+		// Case 1a: 3.8 flash available
+		const with38 = [
+			makeMockDiscoveredModel('gemini-3.8-flash'),
+			makeMockDiscoveredModel('gemini-3.7-flash'),
+			makeMockDiscoveredModel('gemini-2.5-flash'),
+		];
+		assert.strictEqual(resolveAutoModelFromDiscovered(with38), 'gemini-3.8-flash');
+
+		// Case 1b: 3.7 flash available
 		const with3x = [
 			makeMockDiscoveredModel('gemini-3.7-flash'),
 			makeMockDiscoveredModel('gemini-2.5-flash'),
@@ -104,7 +112,7 @@ suite('Magnus Models & Providers', () => {
 
 		// Case 4: empty / offline fallback
 		assert.strictEqual(resolveAutoModelFromDiscovered([]), 'gemini-2.5-flash');
-		assert.strictEqual(resolveAutoModelFromDiscovered(undefined), 'gemini-3.7-flash');
+		assert.strictEqual(resolveAutoModelFromDiscovered(undefined), 'gemini-3.8-flash');
 	});
 
 	test('formatContextWindowLabel formats token counts cleanly', () => {

@@ -1267,11 +1267,17 @@ static NSString *JSString(Napi::Value value) {
 - (void)mouseEnteredInView:(NSEvent *)event {
 	[self.exitTimer invalidate];
 	self.exitTimer = nil;
+	self.hovering = YES;
 }
 
 - (void)mouseExitedFromView:(NSEvent *)event {
+	self.hovering = NO;
 	// Attention peek is not hover-owned — only Escape/resolve/sticky Interactive dismisses it.
 	if (self.pinned || !self.content.expanded || self.attentionPeek || self.content.attention) {
+		return;
+	}
+	// Active input interaction keeps interactive panel alive even if cursor leaves bounds
+	if (self.panel.firstResponder == self.input.currentEditor || self.input.stringValue.length > 0) {
 		return;
 	}
 	[self.exitTimer invalidate];
@@ -1309,6 +1315,9 @@ static NSString *JSString(Napi::Value value) {
 		self.hoverTimer = nil;
 		self.hovering = NO;
 		if (self.content.expanded) {
+			if (self.panel.firstResponder == self.input.currentEditor || self.input.stringValue.length > 0) {
+				return;
+			}
 			__weak PrebaseLiveActivityController *weakSelf = self;
 			[self.exitTimer invalidate];
 			self.exitTimer = [NSTimer scheduledTimerWithTimeInterval:kExitGraceInterval repeats:NO block:^(NSTimer *timer) {
@@ -1351,6 +1360,10 @@ static NSString *JSString(Napi::Value value) {
 	self.content.peekOnly = NO;
 	self.content.expanded = YES;
 	self.content.targetExpanded = YES;
+	self.hovering = YES;
+	self.lastInside = YES;
+	[self.exitTimer invalidate];
+	self.exitTimer = nil;
 	self.panel.ignoresMouseEvents = NO;
 	self.ignoresMouse = NO;
 	[self installLocalKeyMonitor];
@@ -1982,15 +1995,18 @@ static NSString *JSString(Napi::Value value) {
 	} else if (!visible) {
 		self.content.expanded = NO;
 	} else {
-		// Keep legitimate peek/attention/hover expansion; never invent Interactive from visibility alone.
+		// Keep legitimate peek/attention/hover expansion, and preserve active unpinned Interactive mode;
+		// never invent Interactive from visibility alone.
+		const BOOL isInteractive = self.content.expanded && !self.content.peekOnly;
 		const BOOL peekSurface = self.hovering || self.attentionPeek || self.content.peekOnly;
-		if (self.content.expanded && !peekSurface) {
+		const BOOL activeInteraction = isInteractive && (self.hovering || self.panel.firstResponder == self.input.currentEditor || self.input.stringValue.length > 0 || self.exitTimer != nil);
+		if (self.content.expanded && !peekSurface && !activeInteraction) {
 			self.content.expanded = NO;
 			self.content.peekOnly = NO;
 			self.attentionPeek = NO;
 			[self removeLocalKeyMonitor];
 		} else {
-			self.content.expanded = self.content.expanded && peekSurface;
+			self.content.expanded = self.content.expanded && (peekSurface || activeInteraction);
 		}
 	}
 	self.content.targetExpanded = self.content.expanded;

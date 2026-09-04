@@ -2892,10 +2892,11 @@ export default defineConfig(
 			'local/code-no-new-javascript-files': 'error',
 		},
 	},
-	// PreBase-owned graph package (`graphs/`) — PreBase copyright header
+	// PreBase-owned graph package (`graphs/` and `src/vs/workbench/contrib/prebase/graphs/`) — PreBase copyright header
 	{
 		files: [
 			'graphs/**/*.{ts,tsx,mts,cts}',
+			'src/vs/workbench/contrib/prebase/graphs/**/*.{ts,tsx,mts,cts}',
 		],
 		rules: {
 			'header/header': [
@@ -2904,6 +2905,24 @@ export default defineConfig(
 				[
 					'---------------------------------------------------------------------------------------------',
 					' *  Copyright (c) PreBase. All rights reserved.',
+					' *--------------------------------------------------------------------------------------------'
+				]
+			]
+		}
+	},
+	// PreBase Live Activity platform service (`src/vs/platform/prebaseLiveActivity/`)
+	{
+		files: [
+			'src/vs/platform/prebaseLiveActivity/**/*.{ts,tsx,mts,cts}',
+		],
+		rules: {
+			'header/header': [
+				2,
+				'block',
+				[
+					'---------------------------------------------------------------------------------------------',
+					' *  Copyright (c) PreBase. All rights reserved.',
+					' *  Licensed under the MIT License. See License.txt in the project root for license information.',
 					' *--------------------------------------------------------------------------------------------'
 				]
 			]

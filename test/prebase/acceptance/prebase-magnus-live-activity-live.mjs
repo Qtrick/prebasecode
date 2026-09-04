@@ -381,6 +381,10 @@ async function run() {
 			: false;
 		evidence.followUpSimulation = { ok: Boolean(followUpSim), clickOk: Boolean(followUpClick) };
 
+		// Reset to compact baseline so product-truth verifies fresh attention arrival into peek.
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'collapse').catch(() => false);
+		await new Promise(r => setTimeout(r, 200));
+
 		// Product-truth: attention peek body → Escape sticky compact → peek refused.
 		const truthSeed = await workbenchCommandWithTimeout(launched.page, 15_000, 'prebase.test.seedMagnusLiveActivityPending', { kind: 'question' }).catch(() => ({ ok: false }));
 		let truthPending = Boolean(truthSeed?.ok);

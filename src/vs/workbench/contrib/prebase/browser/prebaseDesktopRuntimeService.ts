@@ -329,7 +329,7 @@ export class PreBaseDesktopRuntimeService extends Disposable implements IPreBase
 					this._updateSession({ state: 'error', errorMessage: 'External launch unsupported' });
 					return this._session;
 				}
-					const command = options.command ?? this._buildExternalCommand(profile, tauriWebDriver);
+				const command = options.command ?? this._buildExternalCommand(profile, tauriWebDriver);
 				this._lastRequest = { ...this._lastRequest!, command };
 				if (isTauriProfile(profile)) {
 					const spawnCwd = command.command === 'cargo'

@@ -539,7 +539,7 @@ export class PreBaseSettingsEditor extends EditorPane {
 				if (!result) {
 					this.notificationService.info(localize(
 						'prebase.settings.themeMissing',
-						"Theme “{0}” is not available yet. Use the full theme picker, or ensure built-in theme extensions are built.",
+						"Theme \"{0}\" is not available yet. Use the full theme picker, or ensure built-in theme extensions are built.",
 						id
 					));
 				}
@@ -927,21 +927,21 @@ export class PreBaseSettingsEditor extends EditorPane {
 		const meta = DOM.append(gallery, DOM.$('p'));
 		meta.textContent = localize(
 			'prebase.settings.extMetaNote',
-			"Icons and READMEs come from Open VSX package metadata when published. If a listing has no icon or README, PreBase shows the default icon or “No README available” — content is never invented. Install, uninstall, enable, and disable use the real workbench extension management path; details open in the editor, not inside this sidebar."
+			"Icons and READMEs come from Open VSX package metadata when published. If a listing has no icon or README, PreBase shows the default icon or \"No README available\" — content is never invented. Install, uninstall, enable, and disable use the real workbench extension management path; details open in the editor, not inside this sidebar."
 		);
 		Object.assign(meta.style, { fontSize: '11px', color: COLORS.textMuted, padding: '4px 0 8px', lineHeight: '1.45', margin: '0' });
 
 		const host = DOM.append(gallery, DOM.$('p'));
 		host.textContent = localize(
 			'prebase.settings.extHostNote',
-			"PreBase runs a real Extension Host (not V1.1’s partial shim). There is no “Needs host” badge: installed extensions either activate, stay disabled, need a reload, or fail for a concrete enablement/API reason. Extension code does not run in the renderer, and AI provider keys are not exposed to extensions."
+			"PreBase runs a real Extension Host (not V1.1's partial shim). There is no \"Needs host\" badge: installed extensions either activate, stay disabled, need a reload, or fail for a concrete enablement/API reason. Extension code does not run in the renderer, and AI provider keys are not exposed to extensions."
 		);
 		Object.assign(host.style, { fontSize: '11px', color: COLORS.textMuted, padding: '0 0 12px', lineHeight: '1.45', margin: '0' });
 
 		const note = DOM.append(gallery, DOM.$('p'));
 		note.textContent = localize(
 			'prebase.settings.apiKeyNote',
-			"API keys and secrets are never shown in this UI. Configure Gemini credentials securely via Agents Provider Settings, or import from .env using “Agents: Import Provider Key from .env…”."
+			"API keys and secrets are never shown in this UI. Configure Gemini credentials securely via Agents Provider Settings, or import from .env using \"Agents: Import Provider Key from .env…\"."
 		);
 		Object.assign(note.style, { fontSize: '11px', color: COLORS.textMuted, padding: '0 0 12px', lineHeight: '1.45', margin: '0' });
 

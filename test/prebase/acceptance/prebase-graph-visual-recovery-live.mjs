@@ -19,6 +19,7 @@ import {
 	waitForWorkbenchDriver,
 	workbenchCommandWithTimeout,
 } from './workbenchHarness.mjs';
+import { phase3EvidenceMetadata } from './phase3Evidence.mjs';
 
 const scriptPath = fileURLToPath(import.meta.url);
 const repo = resolve(dirname(scriptPath), '../../..');
@@ -33,7 +34,25 @@ async function enableGraphMetrics(frame) {
 }
 
 async function readGraphMetrics(frame) {
-	return frame.evaluate(() => window.__prebaseGraphRenderMetrics || null).catch(() => null);
+	return frame.evaluate(() => {
+		const metrics = window.__prebaseGraphRenderMetrics || null;
+		const canvas = document.getElementById('netCanvas');
+		let distinctPixels = 0;
+		try {
+			const context = canvas?.getContext?.('2d');
+			if (context && canvas?.width && canvas?.height) {
+				const pixels = context.getImageData(0, 0, canvas.width, canvas.height).data;
+				for (let i = 4; i < pixels.length; i += 4) {
+					if (pixels[i] !== pixels[0] || pixels[i + 1] !== pixels[1] || pixels[i + 2] !== pixels[2] || pixels[i + 3] !== pixels[3]) {
+						distinctPixels++;
+					}
+				}
+			}
+		} catch {
+			distinctPixels = 0;
+		}
+		return metrics ? { ...metrics, canvas: { ...(metrics.canvas || {}), distinctPixels } } : null;
+	}).catch(() => null);
 }
 
 async function fitAndWait(frame, page) {
@@ -53,11 +72,12 @@ function summarize(metrics, mode) {
 	const radii = hits.map(h => Number(h.radius ?? h.r ?? 0)).filter(r => r > 0).sort((a, b) => a - b);
 	const medianHit = radii.length ? radii[Math.floor(radii.length / 2)] : null;
 	const p10Hit = radii.length ? radii[Math.floor(radii.length * 0.1)] : null;
+	const distinctPixels = Number(metrics.canvas?.distinctPixels ?? 0);
 	return {
 		mode,
-		structuralOk: nodes > 0 && k > 0,
+		structuralOk: nodes > 0 && k > 0 && distinctPixels > 0,
 		humanVisualReviewRequired: true,
-		ok: nodes > 0 && k > 0,
+		ok: nodes > 0 && k > 0 && distinctPixels > 0,
 		nodesDrawn: nodes,
 		receivedNodeCount: metrics.receivedNodeCount,
 		leafNodesDrawn: metrics.leafNodesDrawn,
@@ -73,6 +93,7 @@ function summarize(metrics, mode) {
 		networkLayoutMode: metrics.networkLayoutMode,
 		displayMode: metrics.displayMode,
 		projectedBounds: metrics.projectedBounds,
+		distinctPixels,
 	};
 }
 
@@ -80,6 +101,7 @@ async function main() {
 	const releaseLock = await acquirePhase3AcceptanceLock('visual-recovery');
 	let launched;
 	const evidence = {
+		...phase3EvidenceMetadata(repo, 'visual-recovery'),
 		workspace: repo,
 		startedAt: new Date().toISOString(),
 		network: {},
@@ -142,6 +164,12 @@ async function main() {
 			}
 		}
 
+		let baselineSeq = 0;
+		if (graphFrame) {
+			const m = await readGraphMetrics(graphFrame);
+			baselineSeq = Number(m?.sequenceId ?? 0);
+		}
+
 		await workbenchCommandWithTimeout(launched.page, 20_000, 'prebase.graph.openTemporal').catch(err => {
 			evidence.failures.push(`prebase.graph.openTemporal error: ${err?.message || err}`);
 		});
@@ -150,10 +178,16 @@ async function main() {
 			evidence.failures.push('Temporal frame did not open');
 		} else {
 			await enableGraphMetrics(graphFrame);
-			await waitFor(async () => {
+			const freshTemporalMetrics = await waitFor(async () => {
 				const m = await readGraphMetrics(graphFrame);
-				return (m?.nodesDrawn > 0 || m?.visibleNodeCount > 0) ? m : undefined;
+				const hasNewSeq = typeof m?.sequenceId === 'number' && m.sequenceId > baselineSeq;
+				const isTemporal = m?.mode === 'temporal' || m?.displayMode === 'state' || m?.displayMode === 'changes';
+				const hasNodes = (m?.nodesDrawn > 0 || m?.visibleNodeCount > 0);
+				return (hasNewSeq && isTemporal && hasNodes) ? m : undefined;
 			}, 120_000, 500);
+			if (!freshTemporalMetrics) {
+				evidence.failures.push('Temporal did not produce fresh render metrics (stale Network metrics rejected)');
+			}
 
 			for (const mode of ['state', 'changes']) {
 				const btn = graphFrame.locator(mode === 'state' ? '#modeState, button:has-text("Full Map")' : '#modeChanges, button:has-text("Focus")').first();
@@ -161,6 +195,9 @@ async function main() {
 				await launched.page.waitForTimeout(400);
 				const metrics = await fitAndWait(graphFrame, launched.page);
 				evidence.temporal[mode] = summarize(metrics, mode);
+				if ((metrics?.canvas?.distinctPixels ?? 0) === 0) {
+					evidence.failures.push(`Temporal ${mode} canvas is visually blank (distinctPixels === 0)`);
+				}
 				await graphFrame.locator('#netCanvas').screenshot({
 					path: join(screenshotDir, `temporal-${mode}.png`),
 					timeout: 5_000,

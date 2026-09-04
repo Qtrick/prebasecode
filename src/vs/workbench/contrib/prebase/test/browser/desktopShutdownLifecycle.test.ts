@@ -19,7 +19,7 @@ class MockChildProcessTarget implements IProcessTerminationTarget {
 	constructor(
 		readonly pid: number,
 		private readonly _gracefulExit: boolean = true,
-	) {}
+	) { }
 
 	isExited(): boolean {
 		return this._isDead;

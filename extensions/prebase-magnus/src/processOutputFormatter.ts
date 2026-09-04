@@ -41,7 +41,7 @@ export function formatProcessOutputForTool(value: unknown): unknown {
 	if (!value || typeof value !== 'object') {
 		return jsonSafe(value ?? { ok: false });
 	}
-	const output = value as { entries?: unknown; truncated?: unknown; [key: string]: unknown };
+	const output = value as { entries?: unknown; truncated?: unknown;[key: string]: unknown };
 	if (!Array.isArray(output.entries)) {
 		return jsonSafe(output);
 	}
@@ -51,7 +51,7 @@ export function formatProcessOutputForTool(value: unknown): unknown {
 		if (!safeEntry || typeof safeEntry !== 'object' || Array.isArray(safeEntry)) {
 			return safeEntry;
 		}
-		const outputEntry = safeEntry as { text?: unknown; truncated?: unknown; [key: string]: unknown };
+		const outputEntry = safeEntry as { text?: unknown; truncated?: unknown;[key: string]: unknown };
 		if (typeof outputEntry.text !== 'string' || outputEntry.text.length <= MAX_PROCESS_OUTPUT_TOOL_ENTRY_CHARACTERS) {
 			return outputEntry;
 		}

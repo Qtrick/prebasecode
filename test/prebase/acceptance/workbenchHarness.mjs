@@ -121,7 +121,6 @@ export async function completeOnboardingWelcomeFlow(page) {
 	}
 	const diag = await workbenchCommandWithTimeout(page, 6_000, 'prebase.test.getDiagnostics').catch(() => null);
 	result.onboardingPersisted = Boolean(diag?.onboardingComplete);
-	await page.keyboard.press(process.platform === 'darwin' ? 'Meta+R' : 'Control+R').catch(() => undefined);
 	await workbenchCommandWithTimeout(page, 4_000, 'workbench.action.reloadWindow').catch(() => undefined);
 	await waitForWorkbenchDriver(page, 90_000);
 	const afterReload = await workbenchCommandWithTimeout(page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);

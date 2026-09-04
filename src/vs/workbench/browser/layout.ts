@@ -3013,7 +3013,7 @@ class LayoutStateModel extends Disposable {
 		// Resolve panel position before size defaults so left/right use width, top/bottom use height.
 		LayoutStateKeys.PANEL_POSITION.defaultValue = positionFromString(this.configurationService.getValue(WorkbenchLayoutSettings.PANEL_POSITION) ?? 'bottom');
 		const panelPositionForSize = (this.stateCache.get(LayoutStateKeys.PANEL_POSITION.name) ?? LayoutStateKeys.PANEL_POSITION.defaultValue) as Position;
-		// Fresh bottom/top panel: compact (~27% height, clamped 180–270) so Terminal doesn't dominate.
+		// Fresh bottom/top panel: compact (~27% height, clamped 180-270) so Terminal doesn't dominate.
 		// Only applied when no stored workbench.panel.size exists (InitializationStateKey).
 		LayoutStateKeys.PANEL_SIZE.defaultValue = isHorizontal(panelPositionForSize)
 			? Math.max(180, Math.min(270, Math.round(mainContainerDimension.height * 0.27)))

@@ -1,26 +1,26 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity",
-  "sourceHead": "1bc5f31b0a72c17d414cfc5215ffc0952cb17c42",
-  "sourceFingerprint": "61367231fcb34333001cdfbd37520bf9dc8256eefaef8514cb461d6f96deac66",
-  "productFingerprint": "61367231fcb34333001cdfbd37520bf9dc8256eefaef8514cb461d6f96deac66",
-  "generatedAt": "2026-09-04T00:24:19.634Z",
+  "sourceHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
+  "sourceFingerprint": "ed1a814964371bbd9d27d8f10437141d62d3b2747de576347f7d3c0b31daf8c1",
+  "productFingerprint": "ed1a814964371bbd9d27d8f10437141d62d3b2747de576347f7d3c0b31daf8c1",
+  "generatedAt": "2026-09-04T03:07:17.625Z",
   "producerId": "magnus-live-activity",
-  "producerFingerprint": "70710e356dddd0e90bafdebac991e6b219e7168a2ddd14ae2c116fa0eec47ef8",
+  "producerFingerprint": "3a3b9f1c091f7e199a48729c78e91f79277b0e94d2f17b0f8c1650869c26022d",
   "kind": "magnus-live-activity-live",
   "testKind": "live-runtime",
   "liveGui": "native-appkit-panel",
   "platform": "darwin",
   "nativePresent": true,
   "mode": "alwaysWorking",
-  "prebasePid": 90021,
-  "launchMs": 4048,
+  "prebasePid": 1906,
+  "launchMs": 2925,
   "smokeTransportInstalled": true,
   "diagnosticsAfterOpen": {
     "backend": "native-appkit",
     "revision": 3,
-    "sessionId": "2d5bb5f2-c193-4f39-87b2-4d483abe4f02",
-    "sessionResource": "vscode-chat-session://local/MmQ1YmI1ZjItYzE5My00ZjM5LTg3YjItNGQ0ODNhYmU0ZjAy",
+    "sessionId": "4d0ce89a-2cc8-4ad8-b349-e6574b598c45",
+    "sessionResource": "vscode-chat-session://local/NGQwY2U4OWEtMmNjOC00YWQ4LWIzNDktZTY1NzRiNTk4YzQ1",
     "status": "waiting",
     "visible": true,
     "presentationLabel": "5s",
@@ -229,9 +229,9 @@
   "questionSeed": {
     "ok": true,
     "kind": "question",
-    "interactionId": "smoke-la-question-1788481469924:0",
+    "interactionId": "smoke-la-question-1788491246793:0",
     "optionId": "Option A",
-    "sessionId": "2d5bb5f2-c193-4f39-87b2-4d483abe4f02",
+    "sessionId": "4d0ce89a-2cc8-4ad8-b349-e6574b598c45",
     "revision": 5,
     "liveActivityPendingKind": "question",
     "liveActivityStatus": "attention"
@@ -239,8 +239,8 @@
   "questionDiagnosticsBefore": {
     "backend": "native-appkit",
     "revision": 6,
-    "sessionId": "2d5bb5f2-c193-4f39-87b2-4d483abe4f02",
-    "sessionResource": "vscode-chat-session://local/MmQ1YmI1ZjItYzE5My00ZjM5LTg3YjItNGQ0ODNhYmU0ZjAy",
+    "sessionId": "4d0ce89a-2cc8-4ad8-b349-e6574b598c45",
+    "sessionResource": "vscode-chat-session://local/NGQwY2U4OWEtMmNjOC00YWQ4LWIzNDktZTY1NzRiNTk4YzQ1",
     "status": "attention",
     "visible": true,
     "pendingKind": "question",
@@ -261,7 +261,7 @@
       "renderedLatestMessage": "",
       "hovered": false,
       "accessibilityRole": "AXGroup",
-      "interactionId": "smoke-la-question-1788481469924:0",
+      "interactionId": "smoke-la-question-1788491246793:0",
       "latestShortMessage": "Asked a question (Smoke)",
       "localMonitorInstalled": false,
       "auxiliaryTopLeftArea": {
@@ -303,10 +303,10 @@
       "userDismissedAttention": false,
       "safeAreaTop": 32,
       "panelFrame": {
-        "y": 927,
-        "x": 546,
-        "width": 354,
-        "height": 55
+        "y": 929,
+        "x": 552,
+        "width": 348,
+        "height": 53
       },
       "expanded": true,
       "panelTopY": 982,
@@ -351,15 +351,15 @@
   },
   "questionContinuity": {
     "ok": true,
-    "interactionId": "smoke-la-question-1788481469924:0",
+    "interactionId": "smoke-la-question-1788491246793:0",
     "liveActivityPendingKind": "question",
     "liveActivityStatus": "attention"
   },
   "approvalSeed": {
     "ok": true,
     "kind": "approval",
-    "interactionId": "smoke-la-approval-1788481470156",
-    "sessionId": "2d5bb5f2-c193-4f39-87b2-4d483abe4f02",
+    "interactionId": "smoke-la-approval-1788491247020",
+    "sessionId": "4d0ce89a-2cc8-4ad8-b349-e6574b598c45",
     "revision": 9,
     "liveActivityPendingKind": "approval",
     "liveActivityStatus": "attention"
@@ -367,8 +367,8 @@
   "approvalDiagnosticsBefore": {
     "backend": "native-appkit",
     "revision": 10,
-    "sessionId": "2d5bb5f2-c193-4f39-87b2-4d483abe4f02",
-    "sessionResource": "vscode-chat-session://local/MmQ1YmI1ZjItYzE5My00ZjM5LTg3YjItNGQ0ODNhYmU0ZjAy",
+    "sessionId": "4d0ce89a-2cc8-4ad8-b349-e6574b598c45",
+    "sessionResource": "vscode-chat-session://local/NGQwY2U4OWEtMmNjOC00YWQ4LWIzNDktZTY1NzRiNTk4YzQ1",
     "status": "attention",
     "visible": true,
     "pendingKind": "approval",
@@ -389,7 +389,7 @@
       "renderedLatestMessage": "",
       "hovered": false,
       "accessibilityRole": "AXGroup",
-      "interactionId": "smoke-la-approval-1788481470156",
+      "interactionId": "smoke-la-approval-1788491247020",
       "latestShortMessage": "Analyzing your answers... Deleting package.json",
       "localMonitorInstalled": false,
       "auxiliaryTopLeftArea": {
@@ -431,10 +431,10 @@
       "userDismissedAttention": false,
       "safeAreaTop": 32,
       "panelFrame": {
-        "y": 942,
+        "y": 941,
         "x": 596,
         "width": 304,
-        "height": 40
+        "height": 41
       },
       "expanded": true,
       "panelTopY": 982,
@@ -479,7 +479,7 @@
   },
   "approvalContinuity": {
     "ok": true,
-    "interactionId": "smoke-la-approval-1788481470156"
+    "interactionId": "smoke-la-approval-1788491247020"
   },
   "followUpSimulation": {
     "ok": true,
@@ -489,8 +489,8 @@
     "diag": {
       "backend": "native-appkit",
       "revision": 14,
-      "sessionId": "2d5bb5f2-c193-4f39-87b2-4d483abe4f02",
-      "sessionResource": "vscode-chat-session://local/MmQ1YmI1ZjItYzE5My00ZjM5LTg3YjItNGQ0ODNhYmU0ZjAy",
+      "sessionId": "4d0ce89a-2cc8-4ad8-b349-e6574b598c45",
+      "sessionResource": "vscode-chat-session://local/NGQwY2U4OWEtMmNjOC00YWQ4LWIzNDktZTY1NzRiNTk4YzQ1",
       "status": "attention",
       "visible": true,
       "pendingKind": "question",
@@ -509,9 +509,9 @@
         "animationCount": 37,
         "activityLabel": "Asking a question (Smoke)",
         "renderedLatestMessage": "",
-        "hovered": false,
+        "hovered": true,
         "accessibilityRole": "AXGroup",
-        "interactionId": "smoke-la-question-1788481470398:0",
+        "interactionId": "smoke-la-question-1788491247495:0",
         "latestShortMessage": "Analyzing your answers... Deleting package.json Asked a question (Smoke)",
         "localMonitorInstalled": false,
         "auxiliaryTopLeftArea": {
@@ -553,10 +553,10 @@
         "userDismissedAttention": false,
         "safeAreaTop": 32,
         "panelFrame": {
-          "y": 907,
-          "x": 552,
-          "width": 353,
-          "height": 75
+          "y": 948,
+          "x": 611,
+          "width": 289,
+          "height": 34
         },
         "expanded": true,
         "panelTopY": 982,
@@ -608,9 +608,9 @@
       "animationCount": 39,
       "activityLabel": "Asking a question (Smoke)",
       "renderedLatestMessage": "",
-      "hovered": false,
+      "hovered": true,
       "accessibilityRole": "AXGroup",
-      "interactionId": "smoke-la-question-1788481470398:0",
+      "interactionId": "smoke-la-question-1788491247495:0",
       "latestShortMessage": "Analyzing your answers... Deleting package.json Asked a question (Smoke)",
       "localMonitorInstalled": false,
       "auxiliaryTopLeftArea": {
@@ -652,10 +652,10 @@
       "userDismissedAttention": false,
       "safeAreaTop": 32,
       "panelFrame": {
-        "y": 907,
-        "x": 552,
-        "width": 353,
-        "height": 75
+        "y": 948,
+        "x": 611,
+        "width": 289,
+        "height": 34
       },
       "expanded": true,
       "panelTopY": 982,
@@ -713,7 +713,7 @@
   "nativeScreenshot": {
     "captured": true,
     "format": "png",
-    "sizeBytes": 48219,
+    "sizeBytes": 58528,
     "rect": {
       "x": 516,
       "y": 0,
@@ -724,9 +724,9 @@
   },
   "blurredDiagnostics": {
     "backend": "native-appkit",
-    "revision": 17,
-    "sessionId": "2d5bb5f2-c193-4f39-87b2-4d483abe4f02",
-    "sessionResource": "vscode-chat-session://local/MmQ1YmI1ZjItYzE5My00ZjM5LTg3YjItNGQ0ODNhYmU0ZjAy",
+    "revision": 18,
+    "sessionId": "4d0ce89a-2cc8-4ad8-b349-e6574b598c45",
+    "sessionResource": "vscode-chat-session://local/NGQwY2U4OWEtMmNjOC00YWQ4LWIzNDktZTY1NzRiNTk4YzQ1",
     "status": "attention",
     "visible": true,
     "pendingKind": "question",
@@ -742,12 +742,12 @@
       "renderedPeekBody": "",
       "transitionInFlight": true,
       "panelVisible": true,
-      "animationCount": 47,
+      "animationCount": 50,
       "activityLabel": "Asking a question (Smoke)",
       "renderedLatestMessage": "",
-      "hovered": false,
+      "hovered": true,
       "accessibilityRole": "AXGroup",
-      "interactionId": "smoke-la-question-1788481470398:0",
+      "interactionId": "smoke-la-question-1788491247495:0",
       "latestShortMessage": "Analyzing your answers... Deleting package.json Asked a question (Smoke)",
       "localMonitorInstalled": false,
       "auxiliaryTopLeftArea": {
@@ -774,7 +774,7 @@
         "height": 34
       },
       "topAnchorDelta": 0,
-      "transitionGeneration": 76,
+      "transitionGeneration": 81,
       "statusLabel": "Magnus needs an answer",
       "layerBacked": true,
       "displayMode": "builtin",
@@ -799,7 +799,7 @@
       "metricsLabel": "",
       "notchDetected": true,
       "questionButtonLabels": [],
-      "redrawCount": 48,
+      "redrawCount": 51,
       "panelCreated": true,
       "targetPresentationState": "attentionCompact",
       "trackingAreaCount": 1,
@@ -836,7 +836,7 @@
     }
   },
   "workbenchDiagnostics": {
-    "parserActiveRequests": 4,
+    "parserActiveRequests": 3,
     "temporalActiveWrites": 2,
     "runtimePreviewServerRunning": false,
     "runtimePreviewStatus": "stopped",
@@ -892,16 +892,16 @@
     }
   },
   "quit": {
-    "before": "90021     1  14.0 240432 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "1906     1  16.0 309984 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 1241,
+    "latencyMs": 2370,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
     "usedSigkill": false
   },
-  "durationMs": 14523,
+  "durationMs": 16724,
   "ok": true,
   "failures": []
 }

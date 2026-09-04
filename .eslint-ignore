@@ -63,3 +63,6 @@ src/vs/base/common/signals-core/**
 
 # Local scratch clones (not product source)
 **/.tmp/**
+
+# Graph subsystem (symlinked into workbench, verified by npm run verify:graphs-boundary and npm run typecheck:graphs)
+src/vs/workbench/contrib/prebase/graphs/**

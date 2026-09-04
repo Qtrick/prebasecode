@@ -535,7 +535,7 @@ export class PreBaseHomeEditor extends EditorPane {
 		if (card.missing && (card.resource.scheme === Schemas.file || card.resource.scheme === Schemas.vscodeUserData)) {
 			this.notificationService.notify({
 				severity: Severity.Error,
-				message: localize('prebase.home.missingOpen', "Could not open “{0}”. The folder or workspace is no longer available.", card.name),
+				message: localize('prebase.home.missingOpen', "Could not open \"{0}\". The folder or workspace is no longer available.", card.name),
 			});
 			return;
 		}

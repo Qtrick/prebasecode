@@ -784,8 +784,8 @@ suite('Magnus Live Activity projection', () => {
 			completed: true,
 			workspaceDiff: { files: 2, additions: 8, deletions: 3, attributedToMagnus: true },
 		}), { revision: 6, prebaseForeground: false, connected: true });
-		assert.strictEqual(collapsedStatusLabel(snap), 'Finished · +8 −3 · 2 files');
-		assert.strictEqual(formatDiffMetric(snap.workspaceDiff), '+8 −3 · 2 files');
+		assert.strictEqual(collapsedStatusLabel(snap), 'Finished · +8 -3 · 2 files');
+		assert.strictEqual(formatDiffMetric(snap.workspaceDiff), '+8 -3 · 2 files');
 	});
 
 	test('working collapsed label includes diff and terminal counts when present', () => {
@@ -795,7 +795,7 @@ suite('Magnus Live Activity projection', () => {
 			workspaceDiff: { files: 1, additions: 2, deletions: 0, attributedToMagnus: true },
 			terminalCount: 2,
 		}), { revision: 1, prebaseForeground: false, connected: true });
-		assert.strictEqual(collapsedStatusLabel(snap, 1_000 + 45_000), 'Editing graph · 45s · +2 −0 · 1 file · 2 tasks');
+		assert.strictEqual(collapsedStatusLabel(snap, 1_000 + 45_000), 'Editing graph · 45s · +2 -0 · 1 file · 2 tasks');
 		const oneTask = buildMagnusLiveActivitySnapshot(session({
 			currentActivity: undefined,
 			startedAt: undefined,
@@ -1681,7 +1681,7 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.ok(handle.indexOf('acceptLiveActivityCommand') < handle.indexOf('applyMagnusLiveActivitySessionCommand'), 'fail-closed accept must run before session dispatch');
 
 		assert.match(session, /const sessionResource = URI\.parse\(snapshot\.sessionResource\)/);
-		assert.match(session, /deps\.chatService\.sendRequest\(sessionResource, \(command\.text \?\? ''\)\.trim\(\)\)/);
+		assert.match(session, /deps\.chatService\.sendRequest\(sessionResource,\s*(text|\(command\.text \?\? ''\)\.trim\(\))\)/);
 		assert.strictEqual((session.match(/sendRequest\(/g) || []).length, 1, 'follow-up must have exactly one sendRequest');
 		assert.ok(session.indexOf("command.kind === 'followUp'") < session.indexOf('deps.chatService.sendRequest'), 'sendRequest is the follow-up path');
 

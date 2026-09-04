@@ -1,18 +1,24 @@
 {
-  "ok": true,
-  "failures": [],
+  "ok": false,
+  "failures": [
+    "Temporal Graph target did not open",
+    "Temporal fixture repository did not load",
+    "Full Map metrics are missing",
+    "canonical-scale live evidence must capture multiple zoom tiers",
+    "Focus Changes metrics are missing"
+  ],
   "schemaVersion": 3,
   "scenario": "temporal-canonical-scale",
-  "sourceHead": "9471b0e1ee90e904cad5de59cbc72f83a06ecceb",
-  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
-  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
-  "generatedAt": "2026-09-03T11:25:46.549Z",
+  "sourceHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
+  "sourceFingerprint": "974786f5dfad44425cca934efbf058d13a5f16baf7e3b78f9a777ab4cb14208a",
+  "productFingerprint": "974786f5dfad44425cca934efbf058d13a5f16baf7e3b78f9a777ab4cb14208a",
+  "generatedAt": "2026-09-04T02:53:56.618Z",
   "producerId": "temporal-canonical-scale",
-  "producerFingerprint": "0bcfb7ea79ad1285d1ed30f7be6c16c57ce8f36d0f64f5c11a140a9a9224917e",
+  "producerFingerprint": "c1956bf0854affc96a7ae3671ffda27d6b93d44a794dd15af36ca28681dd2fb2",
   "scale": "canonical-scale",
   "fixture": {
-    "dir": "/tmp/pb-temporal-canonical-eQPr6Q",
-    "head": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-canonical-MiGbR6",
+    "head": "e930c24471d0c3b45984a10db4e0a6886350b2a1",
     "commits": 104,
     "files": [
       "package.json",
@@ -9702,263 +9708,23 @@
     "expectedModuleFilesRemaining": 9679,
     "expectedHeadFileCount": 9680,
     "expectedModifiedPath": "src/module_00/file_1.ts\nsrc/module_08/file_92.ts\nsrc/module_17/file_8.ts\nsrc/module_28/file_72.ts\nsrc/module_39/file_136.ts\nsrc/module_51/file_24.ts",
-    "firstParentSummary": "bf101e3a95124fcb8667c972d96e6976d82b7a00 de7841f94a7a17f21ae6c110a72d56a046036e8e feat: cross-community wave\n\n src/module_00/file_1.ts   | 1 +\n src/module_08/file_92.ts  | 1 +\n src/module_17/file_8.ts   | 1 +\n src/module_28/file_72.ts  | 1 +\n src/module_39/file_136.ts | 1 +\n src/module_51/file_24.ts  | 1 +\n 6 files changed, 6 insertions(+)",
+    "firstParentSummary": "e930c24471d0c3b45984a10db4e0a6886350b2a1 2afa3cb9378901f72e994ed6b12719b83ac3314f feat: cross-community wave\n\n src/module_00/file_1.ts   | 1 +\n src/module_08/file_92.ts  | 1 +\n src/module_17/file_8.ts   | 1 +\n src/module_28/file_72.ts  | 1 +\n src/module_39/file_136.ts | 1 +\n src/module_51/file_24.ts  | 1 +\n 6 files changed, 6 insertions(+)",
     "scale": "canonical-scale"
   },
-  "pid": 272892,
-  "cdpPort": 39379,
-  "sourceProfile": "/tmp/pb-temporal-profile-iLAr0G",
+  "pid": 7700,
+  "cdpPort": 60673,
+  "sourceProfile": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-profile-fADbmk",
   "gitReady": {
     "ok": true,
     "count": 1
   },
-  "fullMap": {
-    "sequenceId": 15,
-    "mode": "temporal",
-    "displayMode": "state",
-    "renderStart": 44205.20000000298,
-    "renderEnd": 44209.900000002235,
-    "durationMs": 4.699999999254942,
-    "selectedCommitSha": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
-    "renderedCommitSha": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
-    "isPartialLineage": true,
-    "receivedNodeCount": 9682,
-    "visibleNodeCount": 9682,
-    "finiteCoordinateCount": 9682,
-    "nodesDrawn": 59,
-    "leafNodesDrawn": 3,
-    "aggregateNodesDrawn": 56,
-    "receivedLeafNodeCount": 9682,
-    "communitiesRepresented": 56,
-    "visibleChangedNodeCount": 3,
-    "visibleChangedAggregateCount": 6,
-    "culledLeafCount": 3,
-    "projectionTier": "overview",
-    "lodTier": "aggregate",
-    "structuralOk": true,
-    "humanVisualReviewRequired": true,
-    "edgesDrawn": 56,
-    "leafEdgesDrawn": 0,
-    "aggregateEdgesDrawn": 56,
-    "labelsDrawn": 3,
-    "guideLabelsDrawn": 8,
-    "fileLabelsDrawn": 3,
-    "communityLabelsDrawn": 8,
-    "routeBadgesDrawn": 0,
-    "totalLabelsDrawn": 11,
-    "labelCollisionCullCount": 48,
-    "renderedLabelOverlapCount": 0,
-    "compositeLabelOverlapCount": 48,
-    "labelOverlapCount": 48,
-    "selectedNodeId": null,
-    "transform": {
-      "x": 532.425,
-      "y": 405.925,
-      "k": 0.15
-    },
-    "canvas": {
-      "clientWidth": 796,
-      "clientHeight": 815,
-      "width": 783,
-      "height": 802,
-      "distinctPixels": 458628
-    },
-    "summary": {
-      "addedCount": 0,
-      "removedCount": 0,
-      "modifiedCount": 6,
-      "renamedCount": 0,
-      "renamedModifiedCount": 0,
-      "unchangedCount": 9676,
-      "edgeAddedCount": 0,
-      "edgeRemovedCount": 0,
-      "edgeModifiedCount": 0
-    },
-    "isAnimating": true,
-    "timestamp": 44209.900000002235,
-    "viewportWidth": 796,
-    "viewportHeight": 815,
-    "labelCount": 3,
-    "projectedBounds": {
-      "minX": -362.32500000000005,
-      "minY": 79.375,
-      "maxX": 1426.5749999999998,
-      "maxY": 705.475,
-      "width": 1788.8999999999999,
-      "height": 626.1
-    },
-    "screenUtilization": 1.7264702191941301
-  },
-  "processBeforeInteractions": "272892       1 32.0 517708 prebase",
-  "focusChanges": {
-    "sequenceId": 34,
-    "mode": "temporal",
-    "displayMode": "changes",
-    "renderStart": 45955.400000002235,
-    "renderEnd": 45956.400000002235,
-    "durationMs": 1,
-    "selectedCommitSha": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
-    "renderedCommitSha": "bf101e3a95124fcb8667c972d96e6976d82b7a00",
-    "isPartialLineage": true,
-    "receivedNodeCount": 9682,
-    "visibleNodeCount": 22,
-    "finiteCoordinateCount": 9682,
-    "nodesDrawn": 21,
-    "leafNodesDrawn": 21,
-    "aggregateNodesDrawn": 0,
-    "receivedLeafNodeCount": 22,
-    "communitiesRepresented": 0,
-    "visibleChangedNodeCount": 5,
-    "visibleChangedAggregateCount": 0,
-    "culledLeafCount": 1,
-    "projectionTier": "detail",
-    "lodTier": "full",
-    "structuralOk": true,
-    "humanVisualReviewRequired": true,
-    "edgesDrawn": 0,
-    "leafEdgesDrawn": 0,
-    "aggregateEdgesDrawn": 0,
-    "labelsDrawn": 4,
-    "guideLabelsDrawn": 6,
-    "fileLabelsDrawn": 4,
-    "communityLabelsDrawn": 6,
-    "routeBadgesDrawn": 0,
-    "totalLabelsDrawn": 10,
-    "labelCollisionCullCount": 1,
-    "renderedLabelOverlapCount": 0,
-    "compositeLabelOverlapCount": 1,
-    "labelOverlapCount": 1,
-    "selectedNodeId": null,
-    "transform": {
-      "x": 520.3496960407989,
-      "y": 348.55591439760724,
-      "k": 0.15
-    },
-    "canvas": {
-      "clientWidth": 796,
-      "clientHeight": 815,
-      "width": 783,
-      "height": 802,
-      "distinctPixels": 10002
-    },
-    "summary": {
-      "addedCount": 0,
-      "removedCount": 0,
-      "modifiedCount": 6,
-      "renamedCount": 0,
-      "renamedModifiedCount": 0,
-      "unchangedCount": 9676,
-      "edgeAddedCount": 0,
-      "edgeRemovedCount": 0,
-      "edgeModifiedCount": 0
-    },
-    "isAnimating": true,
-    "timestamp": 45956.400000002235,
-    "viewportWidth": 796,
-    "viewportHeight": 815,
-    "labelCount": 4,
-    "projectedBounds": {
-      "minX": 520.3496960407989,
-      "minY": 348.55591439760724,
-      "maxX": 758.0996960407989,
-      "maxY": 563.9559143976072,
-      "width": 237.75,
-      "height": 215.39999999999998
-    },
-    "screenUtilization": 0.07893971390695809
-  },
-  "targetOpened": true,
-  "repoLoaded": true,
-  "zoomTiers": [
-    {
-      "name": "overview",
-      "displayMode": "state",
-      "k": 0.15,
-      "metrics": {
-        "receivedNodeCount": 9682,
-        "visibleNodeCount": 9682,
-        "leafNodesDrawn": 3,
-        "aggregateNodesDrawn": 56,
-        "communityLabelsDrawn": 8,
-        "totalLabelsDrawn": 11,
-        "renderedLabelOverlapCount": 0,
-        "projectionTier": "overview"
-      }
-    },
-    {
-      "name": "medium-state",
-      "displayMode": "state",
-      "k": 0.26116516898883724,
-      "metrics": {
-        "receivedNodeCount": 9682,
-        "visibleNodeCount": 9682,
-        "leafNodesDrawn": 3,
-        "aggregateNodesDrawn": 56,
-        "communityLabelsDrawn": 8,
-        "totalLabelsDrawn": 11,
-        "renderedLabelOverlapCount": 0,
-        "projectionTier": "overview"
-      }
-    },
-    {
-      "name": "manual-zoom",
-      "displayMode": "changes",
-      "k": 0.26116516898883724,
-      "metrics": {
-        "receivedNodeCount": 9682,
-        "visibleNodeCount": 22,
-        "leafNodesDrawn": 12,
-        "aggregateNodesDrawn": 0,
-        "communityLabelsDrawn": 4,
-        "totalLabelsDrawn": 7,
-        "renderedLabelOverlapCount": 0,
-        "projectionTier": "detail"
-      }
-    },
-    {
-      "name": "fit",
-      "k": 0.1540827405086597,
-      "metrics": {
-        "receivedNodeCount": 9682,
-        "visibleNodeCount": 22,
-        "leafNodesDrawn": 21,
-        "aggregateNodesDrawn": 0,
-        "totalLabelsDrawn": 10,
-        "renderedLabelOverlapCount": 0,
-        "projectionTier": "detail"
-      }
-    }
-  ],
-  "processAfterInteractions": "272892       1 30.0 521200 prebase",
-  "camera": {
-    "afterFocus": {
-      "x": 514.2802401776755,
-      "y": 319.7202731460136,
-      "k": 0.15
-    },
-    "afterUserZoom": {
-      "x": 599.6357416185159,
-      "y": 251.14179685317174,
-      "k": 0.26116516898883724
-    },
-    "afterWait": {
-      "x": 599.6357416185159,
-      "y": 251.14179685317174,
-      "k": 0.26116516898883724
-    },
-    "afterFit": {
-      "x": 515.7483802864392,
-      "y": 309.28323657257954,
-      "k": 0.1540827405086597
-    }
-  },
-  "stuckIndexing": false,
-  "unexpectedError": false,
+  "processBeforeInteractions": "7700     1   0.1 163920 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+  "error": "TypeError: Cannot read properties of undefined (reading 'receivedNodeCount')\n    at run (file:///Users/qunyingfan/Prebasecode/graphs/scripts/acceptance/temporal-live.mjs:415:33)\n    at async file:///Users/qunyingfan/Prebasecode/graphs/scripts/acceptance/temporal-live.mjs:589:3",
   "quit": {
-    "startedAt": 1788434811204,
-    "quitMs": 200,
+    "startedAt": 1788490799606,
+    "quitMs": 404,
     "remaining": "gone",
-    "before": "272892       1 24.7 255672 prebase",
+    "before": "7700     1  18.5 180688 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "after": "gone"
   }
 }

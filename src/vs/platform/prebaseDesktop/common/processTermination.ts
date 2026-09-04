@@ -66,7 +66,7 @@ export const POSIX_OWNED_PROCESS_TERMINATION_BUDGET_MS = 6_000;
 
 /**
  * Requests a graceful process-tree shutdown, then escalates only if it remains alive.
- * Default budget is 3s SIGTERM + 3s SIGKILL ≈ 6s, not 4s.
+ * Default budget is 3s SIGTERM + 3s SIGKILL ~ 6s, not 4s.
  * The caller owns the platform-specific process-group signaling implementation.
  */
 export async function terminateOwnedProcess(target: IProcessTerminationTarget, gracefulTimeoutMs = 3_000, forceTimeoutMs = 3_000): Promise<boolean> {

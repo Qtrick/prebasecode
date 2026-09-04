@@ -131,10 +131,12 @@ export class WorkspaceIntelligence {
 		if (token.isCancellationRequested) {
 			throw new Error('Cancelled');
 		}
-		return { definitions: (locations ?? []).filter(location => {
-			const uri = isLocationLink(location) ? location.targetUri : location.uri;
-			return isUnderWorkspace(uri) && !isSecretPath(uri);
-		}).slice(0, 100).map(locationJson) };
+		return {
+			definitions: (locations ?? []).filter(location => {
+				const uri = isLocationLink(location) ? location.targetUri : location.uri;
+				return isUnderWorkspace(uri) && !isSecretPath(uri);
+			}).slice(0, 100).map(locationJson)
+		};
 	}
 
 	async getReferences(path: string, at: WorkspacePosition, token: vscode.CancellationToken): Promise<Record<string, unknown>> {

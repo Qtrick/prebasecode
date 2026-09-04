@@ -27,7 +27,7 @@ export class MagnusLanguageModelProvider implements vscode.LanguageModelChatProv
 	readonly onDidChangeLanguageModelChatInformation = this._onDidChange.event;
 	private _isDiscovering = false;
 
-	constructor(private readonly aiService: PreBaseAIService) {}
+	constructor(private readonly aiService: PreBaseAIService) { }
 
 	notifyChanged(): void {
 		this._onDidChange.fire();

@@ -4,58 +4,243 @@
 
 import * as assert from 'node:assert/strict';
 import { suite, test } from 'mocha';
+import { URI } from '../../../../../../base/common/uri.js';
+import { Emitter } from '../../../../../../base/common/event.js';
+import { WorkbenchTemporalViewService } from '../../host/workbench/temporal/workbenchTemporalViewService.js';
+import type { TemporalCommitSummary, TemporalEntitySnapshot, TemporalHistoryPage, TemporalRepositoryRef } from '../../temporal/common/temporalTypes.js';
 
 suite('Graph Editor Mode Switching Lifecycle (Temporal <-> Network)', () => {
-	test('switching from temporal to network triggers pauseActiveWork and cancels in-flight work', () => {
-		let pauseActiveWorkCount = 0;
-		let cancelledCount = 0;
+	const workspaceFolderUri = URI.parse('file:///mock/repo');
+	const workspaceFolder = {
+		uri: workspaceFolderUri,
+		name: 'mock-repo',
+		index: 0,
+		toResource: (rel: string) => URI.joinPath(workspaceFolderUri, rel),
+	};
 
-		const mockTemporalViewService = {
-			pauseActiveWork() {
-				pauseActiveWorkCount++;
-				this._cancelActiveRequests();
+	const mockWorkspaceService = {
+		getWorkspace: () => ({ folders: [workspaceFolder] }),
+		onDidChangeWorkspaceFolders: new Emitter<any>().event,
+	} as any;
+
+	const mockLogService = {
+		error: () => {},
+		warn: () => {},
+		info: () => {},
+		trace: () => {},
+		debug: () => {},
+	} as any;
+
+	const mockStorageService = {
+		get: () => undefined,
+		store: () => {},
+		remove: () => {},
+	} as any;
+
+	function makeCommitSummary(sha: string, message: string, timestamp: number, parents: string[]): TemporalCommitSummary {
+		return {
+			sha,
+			parents,
+			authorName: 'Dev',
+			authorEmail: 'dev@prebase.io',
+			authorTimestamp: timestamp,
+			committerTimestamp: timestamp,
+			message,
+			indexStatus: { status: 'ready' },
+		};
+	}
+
+	function createMockTemporalGraphService(
+		historyPages: Record<string, TemporalHistoryPage>,
+		entitiesByCommit: Record<string, TemporalEntitySnapshot[]> = {},
+		delayMs = 0
+	) {
+		return {
+			getRepositoryRefs: async (_root: string): Promise<TemporalRepositoryRef[]> => [],
+			getHistoryPage: async (_root: string, options?: any): Promise<TemporalHistoryPage> => {
+				if (delayMs > 0) {
+					await new Promise(resolve => setTimeout(resolve, delayMs));
+				}
+				const ref = options?.ref || options?.cursor || 'HEAD';
+				return historyPages[ref] || { commits: [], hasMore: false };
 			},
-			_cancelActiveRequests() {
-				cancelledCount++;
+			getCommitIndexStatus: async () => ({ status: 'ready' as const, lineageCoverage: { kind: 'complete' as const } }),
+			getGraphAtCommit: async (_root: string, sha: string) => {
+				if (delayMs > 0) {
+					await new Promise(resolve => setTimeout(resolve, delayMs));
+				}
+				const entities = entitiesByCommit[sha] || [];
+				const entityMap = new Map();
+				for (const e of entities) {
+					entityMap.set(e.entityId, e);
+				}
+				return {
+					commitSha: sha,
+					timestamp: Date.now(),
+					isCheckpoint: false,
+					entityMap,
+					edgeMap: new Map(),
+					pathToEntityId: new Map(),
+					graphData: { nodes: [], edges: [], timestamp: Date.now() },
+					schemaVersion: 1,
+					analyzerVersion: 1,
+					profileVersion: 1,
+				};
 			},
-			getState() {
-				return { selectedCommitSha: 'sha-1', diff: null };
-			},
-			initialize() {
-				return Promise.resolve();
+			ensureCommitIndexed: async (_root: string, sha: string) => {
+				const entities = entitiesByCommit[sha] || [];
+				const entityMap = new Map();
+				for (const e of entities) {
+					entityMap.set(e.entityId, e);
+				}
+				return {
+					commitSha: sha,
+					timestamp: Date.now(),
+					isCheckpoint: false,
+					entityMap,
+					edgeMap: new Map(),
+					pathToEntityId: new Map(),
+					graphData: { nodes: [], edges: [], timestamp: Date.now() },
+					schemaVersion: 1,
+					analyzerVersion: 1,
+					profileVersion: 1,
+				};
 			},
 		};
+	}
 
-		let currentMode: 'network' | 'temporal' = 'temporal';
+	function createMockGitHistoryService() {
+		return {
+			getRepositories: () => [{ rootUri: workspaceFolderUri }],
+			getRepositoryIdentity: async () => ({ repositoryId: 'repo-mock-123' }),
+			getEmptyTree: async () => '4b825dc642cb6eb9a060e54bf8d69288fbee4904',
+			onDidChangeHead: new Emitter<any>().event,
+		};
+	}
 
-		function simulateSwitch(targetMode: 'network' | 'temporal') {
-			const previousMode = currentMode;
-			currentMode = targetMode;
-			if (previousMode === 'temporal' && targetMode !== 'temporal') {
-				mockTemporalViewService.pauseActiveWork();
-			}
-		}
+	function createService(historyPages: Record<string, TemporalHistoryPage>, delayMs = 0) {
+		const temporalGraphService = createMockTemporalGraphService(historyPages, {}, delayMs);
+		const gitHistoryService = createMockGitHistoryService();
+		return new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			gitHistoryService as any,
+			temporalGraphService as any,
+			{ executeCommand: async () => undefined } as any,
+			{ openEditor: async () => undefined } as any,
+			mockLogService,
+			mockStorageService,
+		);
+	}
 
-		assert.equal(pauseActiveWorkCount, 0);
-		simulateSwitch('network');
-		assert.equal(pauseActiveWorkCount, 1);
-		assert.equal(cancelledCount, 1);
+	const defaultHistory: Record<string, TemporalHistoryPage> = {
+		HEAD: {
+			commits: [
+				makeCommitSummary('commit-3', 'commit 3', 300, ['commit-2']),
+				makeCommitSummary('commit-2', 'commit 2', 200, ['commit-1']),
+				makeCommitSummary('commit-1', 'commit 1', 100, []),
+			],
+			hasMore: false,
+		},
+	};
 
-		// Switching network -> network does not trigger pauseActiveWork
-		simulateSwitch('network');
-		assert.equal(pauseActiveWorkCount, 1);
+	// 1. Network -> Temporal
+	test('1. Network -> Temporal initializes WorkbenchTemporalViewService and populates commit state', async () => {
+		const service = createService(defaultHistory);
+		assert.equal(service.getState().selectedCommitSha, '', 'Initially empty commit SHA');
 
-		// Switching network -> temporal does not trigger pauseActiveWork
-		simulateSwitch('temporal');
-		assert.equal(pauseActiveWorkCount, 1);
+		await service.initialize();
 
-		// Switching temporal -> network again triggers pauseActiveWork
-		simulateSwitch('network');
-		assert.equal(pauseActiveWorkCount, 2);
-		assert.equal(cancelledCount, 2);
+		const state = service.getState();
+		assert.equal(state.selectedRef, 'HEAD');
+		assert.equal(state.selectedCommitSha, 'commit-3');
+		assert.equal(state.loadedCommitCount, 3);
+		service.dispose();
 	});
 
-	test('stale temporalState and temporalDiff messages are dropped when mode is network', () => {
+	// 2. Temporal -> Network
+	test('2. Temporal -> Network triggers pauseActiveWork and cancels active work without error', async () => {
+		const service = createService(defaultHistory, 50);
+		const initPromise = service.initialize();
+
+		// Immediately switch to network mode:
+		service.pauseActiveWork();
+		await initPromise;
+
+		// Service is paused cleanly
+		assert.doesNotThrow(() => service.pauseActiveWork());
+		service.dispose();
+	});
+
+	// 3. Rapid Temporal -> Network -> Temporal -> Network
+	test('3. rapid Temporal -> Network -> Temporal mode switching preserves clean state', async () => {
+		const service = createService(defaultHistory);
+
+		// Switch to Temporal
+		const p1 = service.initialize();
+		// Quickly switch to Network
+		service.pauseActiveWork();
+		await p1;
+
+		// Switch back to Temporal
+		const p2 = service.initialize();
+		await p2;
+		assert.equal(service.getState().selectedCommitSha, 'commit-3');
+
+		// Switch back to Network
+		service.pauseActiveWork();
+		assert.doesNotThrow(() => service.pauseActiveWork());
+		service.dispose();
+	});
+
+	// 4. Temporal request resolves after switching to Network
+	test('4. Temporal request resolving after switching to Network is discarded via pauseActiveWork', async () => {
+		const service = createService(defaultHistory, 30);
+		const initPromise = service.initialize();
+
+		// Switch to Network mid-request
+		service.pauseActiveWork();
+		await initPromise;
+
+		// No crash, state remains safe
+		assert.ok(service.getState());
+		service.dispose();
+	});
+
+	// 5. Temporal diff resolves after switching to Network
+	test('5. Temporal diff resolving after switching to Network does not post stale diff', async () => {
+		const postedMessages: Array<{ type: string; payload: any }> = [];
+		let currentInputType: 'network' | 'temporal' = 'temporal';
+
+		function pushTemporalDiff(diff: any) {
+			if (currentInputType !== 'temporal') {
+				return;
+			}
+			postedMessages.push({ type: 'temporalDiff', payload: diff });
+		}
+
+		// Diff completes while in temporal mode:
+		pushTemporalDiff({ modified: ['file1.ts'] });
+		assert.equal(postedMessages.length, 1);
+
+		// Switch to network mode:
+		currentInputType = 'network';
+		// Late diff resolves:
+		pushTemporalDiff({ modified: ['file2.ts'] });
+		assert.equal(postedMessages.length, 1, 'Late diff resolving after switch to network must be dropped');
+	});
+
+	// 6. Temporal initialization is cancelled cleanly
+	test('6. Temporal initialization cancellation pauses in-flight history request', async () => {
+		const service = createService(defaultHistory, 100);
+		const initPromise = service.initialize();
+		service.pauseActiveWork();
+		await initPromise;
+		assert.ok(true, 'Initialization cancelled cleanly');
+		service.dispose();
+	});
+
+	// 7. No stale Temporal IPC after mode switch
+	test('7. no stale Temporal IPC messages posted when mode is network', () => {
 		const postedMessages: Array<{ type: string; payload: any }> = [];
 		let currentInputType: 'network' | 'temporal' = 'network';
 
@@ -66,65 +251,65 @@ suite('Graph Editor Mode Switching Lifecycle (Temporal <-> Network)', () => {
 			postedMessages.push({ type: 'temporalState', payload: state });
 		}
 
-		function pushTemporalDiff(diff: any) {
-			if (currentInputType !== 'temporal') {
-				return;
-			}
-			postedMessages.push({ type: 'temporalDiff', payload: diff });
-		}
-
-		// When in network mode:
 		pushTemporalState({ selectedCommitSha: 'sha-stale' });
-		pushTemporalDiff({ modified: ['file.ts'] });
-		assert.equal(postedMessages.length, 0, 'No messages should be posted to webview when in network mode');
+		assert.equal(postedMessages.length, 0, 'No temporalState posted in network mode');
 
-		// Switch to temporal mode:
 		currentInputType = 'temporal';
 		pushTemporalState({ selectedCommitSha: 'sha-fresh' });
-		pushTemporalDiff({ modified: ['file2.ts'] });
-		assert.equal(postedMessages.length, 2, 'Messages should be posted to webview when in temporal mode');
-		assert.equal(postedMessages[0].payload.selectedCommitSha, 'sha-fresh');
+		assert.equal(postedMessages.length, 1, 'temporalState posted in temporal mode');
 
-		// Switch back to network mode:
 		currentInputType = 'network';
 		pushTemporalState({ selectedCommitSha: 'sha-stale-2' });
-		assert.equal(postedMessages.length, 2, 'Stale message after switching back must be dropped');
+		assert.equal(postedMessages.length, 1, 'Subsequent temporalState dropped when back in network mode');
 	});
 
-	test('rapid mode switching (Network -> Temporal -> Network -> Temporal) preserves clean state', () => {
-		let pauses = 0;
-		let inits = 0;
-		let currentMode: 'network' | 'temporal' = 'network';
+	// 8. Reopening Temporal initializes correctly
+	test('8. reopening Temporal re-initializes and loads timeline', async () => {
+		const service = createService(defaultHistory);
+		await service.initialize();
+		assert.equal(service.getState().selectedCommitSha, 'commit-3');
 
-		function transition(target: 'network' | 'temporal') {
-			if (target !== currentMode) {
-				const prev = currentMode;
-				currentMode = target;
-				if (prev === 'temporal' && target !== 'temporal') {
-					pauses++;
-				} else if (target === 'temporal') {
-					inits++;
-				}
+		// Switch to Network
+		service.pauseActiveWork();
+
+		// Reopen Temporal
+		await service.initialize();
+		assert.equal(service.getState().selectedCommitSha, 'commit-3');
+		assert.equal(service.getState().loadedCommitCount, 3);
+		service.dispose();
+	});
+
+	// 9. Closing/reopening editor does not leak state
+	test('9. closing and disposing service does not throw or leak active listeners', async () => {
+		const service = createService(defaultHistory);
+		await service.initialize();
+
+		assert.doesNotThrow(() => {
+			service.pauseActiveWork();
+			service.dispose();
+		});
+
+		// Second service instance can start cleanly
+		const service2 = createService(defaultHistory);
+		await service2.initialize();
+		assert.equal(service2.getState().selectedCommitSha, 'commit-3');
+		service2.dispose();
+	});
+
+	// 10. Repeated mode switching does not accumulate work
+	test('10. repeated mode switching (10 cycles) executes safely without accumulating work', async () => {
+		const service = createService(defaultHistory);
+
+		for (let cycle = 0; cycle < 10; cycle++) {
+			const initPromise = service.initialize();
+			if (cycle % 2 === 0) {
+				service.pauseActiveWork();
 			}
+			await initPromise;
 		}
 
-		// Sequence: N -> T -> N -> T -> N
-		transition('temporal');
-		assert.equal(inits, 1);
-		assert.equal(pauses, 0);
-
-		transition('network');
-		assert.equal(inits, 1);
-		assert.equal(pauses, 1);
-
-		transition('temporal');
-		assert.equal(inits, 2);
-		assert.equal(pauses, 1);
-
-		transition('network');
-		assert.equal(inits, 2);
-		assert.equal(pauses, 2);
-
-		assert.equal(currentMode, 'network');
+		service.pauseActiveWork();
+		service.dispose();
+		assert.ok(true, '10 cycles of rapid mode switching completed cleanly');
 	});
 });

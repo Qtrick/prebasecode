@@ -26,8 +26,10 @@ export const all = Object.freeze<string[]>([
 	'!out*/**',
 	'!extensions/**/out*/**',
 	'!test/**/out/**',
+	'!test/**/target/**',
 	'!**/node_modules/**',
 	'!**/*.js.map',
+	'!src/vs/workbench/contrib/prebase/graphs/**',
 ]);
 
 export const unicodeFilter = Object.freeze<string[]>([
@@ -39,7 +41,7 @@ export const unicodeFilter = Object.freeze<string[]>([
 	'!LICENSES.chromium.html',
 	'!**/LICENSE',
 
-	'!**/*.{dll,exe,png,bmp,jpg,scpt,cur,ttf,woff,eot,template,ico,icns,opus,wasm}',
+	'!**/*.{dll,exe,png,bmp,jpg,scpt,cur,ttf,woff,woff2,eot,template,ico,icns,opus,wasm}',
 	'!**/test/**',
 	'!**/*.test.ts',
 	'!**/*.{d.ts,json,md}',
@@ -48,10 +50,11 @@ export const unicodeFilter = Object.freeze<string[]>([
 	'!**/*.provisionprofile',
 
 	'!build/win32/**',
+	'!scripts/assurance/**',
 	'!extensions/markdown-language-features/notebook-out/*.js',
-	'!extensions/markdown-language-features/markdown-editor-out/*.js',
+	'!extensions/markdown-language-features/markdown-editor-out/**',
 	'!extensions/markdown-math/notebook-out/**',
-	'!extensions/mermaid-markdown-features/chat-webview-out/**',
+	'!extensions/mermaid-markdown-features/**',
 	'!extensions/ipynb/notebook-out/**',
 	'!extensions/notebook-renderers/renderer-out/**',
 	'!extensions/php-language-features/src/features/phpGlobalFunctions.ts',
@@ -118,6 +121,7 @@ export const indentationFilter = Object.freeze<string[]>([
 	'!extensions/vscode-api-tests/testWorkspace/**',
 	'!extensions/vscode-api-tests/testWorkspace2/**',
 	'!build/monaco/**',
+	'!build/themes/**',
 	'!build/win32/**',
 	'!build/checker/**',
 	'!src/vs/workbench/contrib/terminal/common/scripts/psreadline/**',
@@ -140,11 +144,15 @@ export const indentationFilter = Object.freeze<string[]>([
 	// extensions/copilot has its own code style
 	'!extensions/copilot/**',
 
+	// PreBase acceptance tests
+	'!test/prebase/**',
+	'!**/*.test.ts',
+
 	// except specific file types
 	'!src/vs/*/**/*.d.ts',
 	'!src/typings/**/*.d.ts',
 	'!extensions/**/*.d.ts',
-	'!**/*.{svg,exe,png,bmp,jpg,scpt,bat,cmd,cur,ttf,woff,eot,md,ps1,psm1,template,yaml,yml,d.ts.recipe,ico,icns,plist,opus,admx,adml,wasm}',
+	'!**/*.{svg,exe,png,bmp,jpg,scpt,bat,cmd,cur,ttf,woff,woff2,eot,md,ps1,psm1,template,yaml,yml,d.ts.recipe,ico,icns,plist,opus,admx,adml,wasm}',
 	'!build/{lib,download,linux,darwin}/**/*.js',
 	'!build/**/*.sh',
 	'!build/azure-pipelines/**/*.js',
@@ -225,6 +233,15 @@ export const copyrightFilter = Object.freeze<string[]>([
 
 	// extensions/copilot has its own code style
 	'!extensions/copilot/**',
+
+	// PreBase acceptance tests and generated cloud types
+	'!test/prebase/**',
+	'!src/vs/workbench/contrib/prebase/common/cloud/generated/**',
+	'!src/vs/workbench/contrib/prebase/graphs/**',
+	'!scripts/**',
+	'!extensions/markdown-language-features/markdown-editor-out/**',
+	'!**/*.sha256',
+	'!**/*.tsbuildinfo',
 ]);
 
 export const tsFormattingFilter = Object.freeze<string[]>([
@@ -248,6 +265,9 @@ export const tsFormattingFilter = Object.freeze<string[]>([
 
 	// extensions/copilot has its own code style
 	'!extensions/copilot/**',
+
+	// PreBase graph subsystem has its own compiler and boundary gates
+	'!src/vs/workbench/contrib/prebase/graphs/**',
 ]);
 
 export const eslintFilter = Object.freeze<string[]>([

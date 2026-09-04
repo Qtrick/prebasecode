@@ -1,2 +1,39 @@
-
-[phase3-final-gate] timed out after 180000ms; terminating owned process tree pid=129941
+{
+  "ok": true,
+  "failures": [],
+  "schemaVersion": 3,
+  "scenario": "runtime-preview",
+  "sourceHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
+  "sourceFingerprint": "974786f5dfad44425cca934efbf058d13a5f16baf7e3b78f9a777ab4cb14208a",
+  "productFingerprint": "974786f5dfad44425cca934efbf058d13a5f16baf7e3b78f9a777ab4cb14208a",
+  "generatedAt": "2026-09-04T02:52:37.402Z",
+  "producerId": "runtime-preview",
+  "producerFingerprint": "7dc8b2418fc9e36713c9bb62caf10e3e7b8213c56e6fdeaa9e44c647c1fce3cb",
+  "fixture": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-runtime-LSq4xe",
+  "port": 60550,
+  "pid": 90207,
+  "cdpPort": 60551,
+  "logFile": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb/20260903-225234-90028/code.log",
+  "targetOpened": true,
+  "detectedScript": true,
+  "serverStarted": true,
+  "previewConnected": true,
+  "inspected": true,
+  "restarted": true,
+  "stopped": true,
+  "portAfterStop": [],
+  "startedBeforeQuit": true,
+  "quit": {
+    "before": "90207     1   0.6 276048 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "remaining": "gone",
+    "leftoverPids": [],
+    "latencyMs": 617,
+    "terminationPath": "workbench",
+    "workbenchCompleted": true,
+    "usedSigterm": false,
+    "usedSigkill": false
+  },
+  "portAfterQuit": [],
+  "gracefulQuitMs": 617,
+  "quitRequiredSigkill": false
+}

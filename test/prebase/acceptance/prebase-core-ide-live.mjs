@@ -452,27 +452,68 @@ async function run() {
 		evidence.e3_scm = Boolean(scmFileDetected);
 
 		// E4: Real integrated terminal execution + cwd proof
-		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.terminal.new').catch(() => undefined);
-		await launched.page.locator('.xterm, .terminal-wrapper, .integrated-terminal').first().waitFor({ state: 'visible', timeout: 8_000 }).catch(() => undefined);
-		await launched.page.waitForTimeout(1000);
-		await workbenchCommandWithTimeout(launched.page, 6_000, 'workbench.action.terminal.sendSequence', { text: "pwd; echo PREBASE_OK\r" }).catch(() => undefined);
-		const termText = await waitFor(async () => {
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.terminal.focus').catch(() => undefined);
+		const termWrapper = launched.page.locator('.terminal-wrapper').first();
+		if (!(await termWrapper.isVisible().catch(() => false))) {
+			await workbenchCommandWithTimeout(launched.page, 8_000, 'workbench.action.terminal.new').catch(() => undefined);
+		}
+		await termWrapper.waitFor({ state: 'visible', timeout: 15_000 }).catch(() => undefined);
+		await termWrapper.click().catch(() => undefined);
+		// Wait for shell process to initialize and output initial prompt
+		await waitFor(async () => {
 			return launched.page.evaluate(() => {
-				const el = document.querySelector('.terminal-wrapper, .xterm');
-				const xterm = el ? el.xterm : null;
-				if (xterm && xterm.buffer && xterm.buffer.active) {
-					const lines = [];
-					for (let i = 0; i < xterm.buffer.active.length; i++) {
-						const line = xterm.buffer.active.getLine(i)?.translateToString(true);
-						if (line) lines.push(line);
+				const elements = Array.from(document.querySelectorAll('.terminal-wrapper'));
+				for (const el of elements) {
+					const xterm = el.xterm || el.querySelector?.('.terminal-wrapper')?.xterm;
+					if (xterm?.buffer?.active) {
+						for (let i = 0; i < xterm.buffer.active.length; i++) {
+							const line = xterm.buffer.active.getLine(i)?.translateToString(true);
+							if (line && line.trim().length > 0) return true;
+						}
 					}
-					const full = lines.join('\n');
-					if (full.includes('PREBASE_OK')) return full;
 				}
-				const raw = (el?.innerText || '') + (document.querySelector('.terminal-view')?.innerText || '');
+				return false;
+			}).catch(() => false);
+		}, 15_000, 300);
+
+		const sendTerminalCommand = async () => {
+			await launched.page.evaluate(() => {
+				const elements = Array.from(document.querySelectorAll('.terminal-wrapper'));
+				for (const el of elements) {
+					const xterm = el.xterm || el.querySelector?.('.terminal-wrapper')?.xterm;
+					if (xterm && typeof xterm.input === 'function') {
+						xterm.input('pwd; echo PREBASE_OK\r');
+					}
+				}
+			}).catch(() => undefined);
+			await workbenchCommandWithTimeout(launched.page, 4_000, 'workbench.action.terminal.sendSequence', { text: "pwd; echo PREBASE_OK\r" }).catch(() => undefined);
+		};
+		await sendTerminalCommand();
+
+		let sendTries = 0;
+		const termText = await waitFor(async () => {
+			const res = await launched.page.evaluate(() => {
+				const elements = Array.from(document.querySelectorAll('.terminal-wrapper, .terminal-view, .xterm, .integrated-terminal'));
+				for (const el of elements) {
+					const xterm = el.xterm || el.querySelector?.('.terminal-wrapper')?.xterm;
+					if (xterm && xterm.buffer && xterm.buffer.active) {
+						const lines = [];
+						for (let i = 0; i < xterm.buffer.active.length; i++) {
+							const line = xterm.buffer.active.getLine(i)?.translateToString(true);
+							if (line) lines.push(line);
+						}
+						const full = lines.join('\n');
+						if (full.includes('PREBASE_OK')) return full;
+					}
+				}
+				const raw = elements.map(e => e.innerText || e.textContent || '').join('\n');
 				return raw.includes('PREBASE_OK') ? raw : undefined;
 			}).catch(() => undefined);
-		}, 15_000, 400);
+			if (!res && ++sendTries % 6 === 0) {
+				await sendTerminalCommand();
+			}
+			return res;
+		}, 25_000, 500);
 		const termCwdOk = Boolean(termText && (termText.includes(basename(gitWorkspace)) || termText.includes(gitWorkspace)));
 		evidence.e4_terminal = Boolean(termText && termText.includes('PREBASE_OK') && termCwdOk);
 

@@ -893,9 +893,9 @@ export class SqliteTemporalStore implements ITemporalStore {
 		return new Promise((resolve, reject) => {
 			db.get(
 				`SELECT graph_states.snapshot_json
-				 FROM commits
-				 INNER JOIN graph_states ON graph_states.state_id = commits.canonical_state_id
-				 WHERE commits.commit_sha = ?;`,
+				FROM commits
+				INNER JOIN graph_states ON graph_states.state_id = commits.canonical_state_id
+				WHERE commits.commit_sha = ?;`,
 				[commitSha],
 				(error, row: { snapshot_json?: string } | undefined) => {
 					if (error) {
@@ -957,8 +957,8 @@ export class SqliteTemporalStore implements ITemporalStore {
 		return new Promise((resolve, reject) => {
 			db.all(
 				`SELECT commits.commit_sha, commits.lineage_coverage, commits.lineage_anchor_sha, graph_states.snapshot_json
-				 FROM commits LEFT JOIN graph_states ON graph_states.state_id = commits.canonical_state_id
-				 WHERE commits.commit_sha IN (${placeholders});`,
+				FROM commits LEFT JOIN graph_states ON graph_states.state_id = commits.canonical_state_id
+				WHERE commits.commit_sha IN (${placeholders});`,
 				commitShas,
 				(error, rows: Array<{ commit_sha: string; lineage_coverage?: string; lineage_anchor_sha?: string; snapshot_json?: string }>) => {
 					if (error) {return reject(error);}

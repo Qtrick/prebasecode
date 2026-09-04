@@ -1342,7 +1342,7 @@ export class PreBaseRuntimeService extends Disposable implements IPreBaseRuntime
 					type: 'GET',
 					url,
 					timeout: 2000,
-				followRedirects: 0,
+					followRedirects: 0,
 					callSite: 'PreBaseRuntimeService._waitForUrl',
 				}, token);
 				const status = context.res.statusCode ?? 0;

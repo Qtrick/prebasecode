@@ -3,7 +3,7 @@
  *  Licensed under the MIT License. See License.txt in the project root for license information.
  *--------------------------------------------------------------------------------------------*/
 
-import { ensureNoDisposablesAreLeakedInTestSuite } from "../../../../../../base/test/common/utils.js";
+import { ensureNoDisposablesAreLeakedInTestSuite } from '../../../../../../base/test/common/utils.js';
 import assert from 'assert';
 import { CancellationToken } from '../../../../../../base/common/cancellation.js';
 import { Event } from '../../../../../../base/common/event.js';
@@ -29,7 +29,7 @@ suite('PreBaseCloudService session concurrency', () => {
 			getValue: (key: string) => key === 'prebase.cloud.url' ? 'https://example.supabase.co' : 'sb_publishable_test',
 			onDidChangeConfiguration: Event.None,
 		}) as IConfigurationService;
-		const logService = Object.assign(Object.create(null), { warn: () => {} }) as ILogService;
+		const logService = Object.assign(Object.create(null), { warn: () => { } }) as ILogService;
 		const service = new PreBaseCloudService(
 			configuration,
 			Object.create(null) as IProductService,

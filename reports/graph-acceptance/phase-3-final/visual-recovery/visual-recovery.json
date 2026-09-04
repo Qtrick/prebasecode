@@ -1,6 +1,12 @@
 {
+  "schemaVersion": 3,
+  "scenario": "visual-recovery",
+  "sourceHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
+  "sourceFingerprint": "8e68d40f0be2444fd654082aaa909854b6f93fdebc88eae1a92f056783367b1b",
+  "productFingerprint": "8e68d40f0be2444fd654082aaa909854b6f93fdebc88eae1a92f056783367b1b",
+  "generatedAt": "2026-09-04T02:10:31.058Z",
   "workspace": "/Users/qunyingfan/Prebasecode",
-  "startedAt": "2026-09-04T00:20:34.901Z",
+  "startedAt": "2026-09-04T02:10:31.058Z",
   "network": {
     "organic": {
       "mode": "organic",
@@ -25,7 +31,8 @@
         "maxY": 646.2787563102893,
         "width": 540.6269779748111,
         "height": 557.4204687366406
-      }
+      },
+      "distinctPixels": 141849
     },
     "sphere": {
       "mode": "sphere",
@@ -37,20 +44,21 @@
       "projectionTier": "high",
       "edgesDrawn": 420,
       "labelsDrawn": 1,
-      "transformK": 0.9920903874424862,
-      "screenUtilization": 0.5523269216438508,
+      "transformK": 0.9919833366964782,
+      "screenUtilization": 0.5522077312561128,
       "medianHitRadius": null,
       "p10HitRadius": null,
       "lodTier": "high",
       "networkLayoutMode": "sphere",
       "projectedBounds": {
-        "minX": 91.70238220899591,
-        "minY": 86.52901103339849,
-        "maxX": 697.0972512604947,
-        "maxY": 649.414581449053,
-        "width": 605.3948690514987,
-        "height": 562.8855704156545
-      }
+        "minX": 91.75778970510953,
+        "minY": 86.55250792105716,
+        "maxX": 697.0873340914551,
+        "maxY": 649.3773406045525,
+        "width": 605.3295443863456,
+        "height": 562.8248326834953
+      },
+      "distinctPixels": 399263
     },
     "constellation": {
       "mode": "constellation",
@@ -62,20 +70,21 @@
       "projectionTier": "high",
       "edgesDrawn": 420,
       "labelsDrawn": 1,
-      "transformK": 1.0406725184805696,
-      "screenUtilization": 0.5141825435132483,
+      "transformK": 1.0407361802582056,
+      "screenUtilization": 0.5142454543240769,
       "medianHitRadius": null,
       "p10HitRadius": null,
       "lodTier": "high",
       "networkLayoutMode": "constellation",
       "projectedBounds": {
-        "minX": 91.82565186659775,
-        "minY": 106.51815341584864,
-        "maxX": 701.1307069200006,
-        "maxY": 627.1673304992024,
-        "width": 609.3050550534028,
-        "height": 520.6491770833538
-      }
+        "minX": 91.79078312737425,
+        "minY": 106.52023104432806,
+        "maxX": 701.1331116190955,
+        "maxY": 627.2012581588389,
+        "width": 609.3423284917212,
+        "height": 520.6810271145108
+      },
+      "distinctPixels": 237829
     },
     "clustered": {
       "mode": "clustered",
@@ -87,20 +96,21 @@
       "projectionTier": "high",
       "edgesDrawn": 420,
       "labelsDrawn": 1,
-      "transformK": 1.0478863740796494,
-      "screenUtilization": 0.336684367220779,
+      "transformK": 1.0478833668349867,
+      "screenUtilization": 0.33668243477688325,
       "medianHitRadius": null,
       "p10HitRadius": null,
       "lodTier": "high",
       "networkLayoutMode": "clustered",
       "projectedBounds": {
-        "minX": 88.47285706464396,
-        "minY": 197.50370393534877,
-        "maxX": 699.3509478184911,
-        "maxY": 537.544513745913,
-        "width": 610.8780907538471,
-        "height": 340.04080981056427
-      }
+        "minX": 88.44177645438674,
+        "minY": 197.51082299852413,
+        "maxX": 699.3181140984279,
+        "maxY": 537.55065695337,
+        "width": 610.8763376440412,
+        "height": 340.03983395484585
+      },
+      "distinctPixels": 157352
     }
   },
   "temporal": {
@@ -109,54 +119,62 @@
       "structuralOk": true,
       "humanVisualReviewRequired": true,
       "ok": true,
-      "nodesDrawn": 280,
-      "receivedNodeCount": 280,
-      "projectionTier": "high",
-      "edgesDrawn": 420,
-      "labelsDrawn": 1,
-      "transformK": 1.0480493893656317,
-      "screenUtilization": 0.33678912851715065,
+      "nodesDrawn": 275,
+      "receivedNodeCount": 9798,
+      "leafNodesDrawn": 275,
+      "aggregateNodesDrawn": 0,
+      "projectionTier": "detail",
+      "edgesDrawn": 44591,
+      "labelsDrawn": 100,
+      "transformK": 1.048078841180964,
+      "screenUtilization": 1.448388141226104,
       "medianHitRadius": null,
       "p10HitRadius": null,
-      "lodTier": "high",
+      "lodTier": "full",
       "networkLayoutMode": "clustered",
+      "displayMode": "state",
       "projectedBounds": {
-        "minX": 90.15765997821711,
-        "minY": 197.11779715036326,
-        "maxX": 701.1307824732223,
-        "maxY": 537.2115056828005,
-        "width": 610.9731224950052,
-        "height": 340.0937085324373
-      }
+        "minX": -80.34334897575246,
+        "minY": -76.97462644094901,
+        "maxX": 875.5045541812867,
+        "maxY": 857.911699892471,
+        "width": 955.8479031570391,
+        "height": 934.88632633342
+      },
+      "distinctPixels": 2440218
     },
     "changes": {
       "mode": "changes",
       "structuralOk": true,
       "humanVisualReviewRequired": true,
       "ok": true,
-      "nodesDrawn": 280,
-      "receivedNodeCount": 280,
-      "projectionTier": "high",
-      "edgesDrawn": 420,
-      "labelsDrawn": 1,
-      "transformK": 1.0480493893656317,
-      "screenUtilization": 0.33678912851715065,
+      "nodesDrawn": 54,
+      "receivedNodeCount": 9798,
+      "leafNodesDrawn": 54,
+      "aggregateNodesDrawn": 0,
+      "projectionTier": "detail",
+      "edgesDrawn": 0,
+      "labelsDrawn": 10,
+      "transformK": 0.15000000000000002,
+      "screenUtilization": 0.47996265608589117,
       "medianHitRadius": null,
       "p10HitRadius": null,
-      "lodTier": "high",
+      "lodTier": "full",
       "networkLayoutMode": "clustered",
+      "displayMode": "changes",
       "projectedBounds": {
-        "minX": 90.15765997821711,
-        "minY": 197.11779715036326,
-        "maxX": 701.1307824732223,
-        "maxY": 537.2115056828005,
-        "width": 610.9731224950052,
-        "height": 340.0937085324373
-      }
+        "minX": 220.61499999999998,
+        "minY": 244.69,
+        "maxX": 802.6150000000001,
+        "maxY": 753.49,
+        "width": 582.0000000000001,
+        "height": 508.8
+      },
+      "distinctPixels": 34878
     }
   },
   "failures": [],
-  "finishedAt": "2026-09-04T00:21:51.345Z",
+  "finishedAt": "2026-09-04T02:12:31.910Z",
   "ok": true,
   "humanVisualReviewRequired": true
 }

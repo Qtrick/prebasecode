@@ -5,13 +5,13 @@
 
 ## Why
 
-`supabase/functions/agent-gateway/index.ts` is explicitly gated behind `PREBASE_HOSTED_MAGNUS_ENABLED=true` (defaults to **false / off**). When disabled, it returns **`501 not_implemented`** immediately on generation and model discovery, preventing any unauthorized provider spend or quota bypass. In the client, the "PreBase Hosted" execution mode is hidden from normal users unless the feature gate is enabled.
+`supabase/functions/agent-gateway/index.ts` is explicitly gated behind `PREBASE_HOSTED_MAGNUS_ENABLED=true` (defaults to **false / off**). When disabled, it returns **`501 hosted_disabled`** immediately on generation and model discovery, preventing any unauthorized provider spend or quota bypass. In the client, the "PreBase Hosted" execution mode is hidden from normal users unless the feature gate is enabled.
 
 ## Confirmed this pass (2026-09-04)
 
 | Check | Result |
 |---|---|
-| Gateway when disabled | Returns `501` + `error: "not_implemented"` (no provider call, no quota deduction) |
+| Gateway when disabled | Returns `501` + `error: "hosted_disabled"` (no provider call, no quota deduction) |
 | Gateway `/health` & `/providers` | Reports `enabled: false, configured: false, modelsAvailable: false` |
 | Client “PreBase Hosted” mode | Gated behind `PREBASE_HOSTED_MAGNUS_ENABLED=true`; hidden in settings dropdown and mode picker by default |
 | Streaming quota settlement | Hardened with `TransformStream`: output units settled only on stream completion, voided on client abort |

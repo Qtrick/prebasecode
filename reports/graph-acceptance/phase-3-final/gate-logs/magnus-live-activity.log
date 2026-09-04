@@ -1,1 +1,29 @@
-{"ok":false,"skipped":true,"environmentSkip":true,"failures":["Live Activity AppKit path is macOS-only"],"out":"/workspace/reports/graph-acceptance/phase-3-final/magnus/live-activity.json"}
+{
+  "ok": true,
+  "failures": [],
+  "out": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/magnus/live-activity.json",
+  "backend": "native-appkit",
+  "status": "waiting",
+  "nativePanelCreated": true,
+  "nativePanelVisible": true,
+  "nativePanelFrame": {
+    "y": 948,
+    "x": 591,
+    "width": 309,
+    "height": 34
+  },
+  "nativeScreenshot": {
+    "captured": true,
+    "format": "png",
+    "sizeBytes": 58528,
+    "rect": {
+      "x": 516,
+      "y": 0,
+      "width": 480,
+      "height": 106
+    },
+    "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-native.png"
+  },
+  "durationMs": 16724,
+  "liveGui": "native-appkit-panel"
+}

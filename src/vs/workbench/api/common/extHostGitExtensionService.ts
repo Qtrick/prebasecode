@@ -593,12 +593,14 @@ export class ExtHostGitExtensionService extends Disposable implements IExtHostGi
 					objectType: item.type === 'blob' ? 'blob' : item.type === 'tree' ? 'tree' : item.type === 'commit' ? 'commit' : 'tag',
 					size: parseInt(item.size, 10) || undefined,
 				}));
-				return { success: true, data: {
-					entries,
-					isTruncated: inventory.isTruncated,
-					returnedCount: entries.length,
-					discoveredAtLeast: Math.max(entries.length, inventory.discoveredAtLeast || entries.length),
-				} };
+				return {
+					success: true, data: {
+						entries,
+						isTruncated: inventory.isTruncated,
+						returnedCount: entries.length,
+						discoveredAtLeast: Math.max(entries.length, inventory.discoveredAtLeast || entries.length),
+					}
+				};
 			}
 			return { success: false, error: { code: 'NotSupported', message: 'Producer-bounded tree inventory is not available on repository' } };
 		} catch (err) {

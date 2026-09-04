@@ -772,7 +772,7 @@ export function computeScatterLayout(
 		.map((n) => n.id)
 		.sort((a, b) => a.localeCompare(b));
 
-	// Cap placement attempts — O(n²) overlap checks freeze the UI on large graphs.
+	// Cap placement attempts — O(n^2) overlap checks freeze the UI on large graphs.
 	const maxAttempts = nodeCount > 500 ? 18 : nodeCount > 250 ? 36 : nodeCount > 120 ? 64 : 140;
 	let spiral = 0;
 	for (const id of otherIds) {

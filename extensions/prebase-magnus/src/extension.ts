@@ -218,12 +218,12 @@ export function activate(context: vscode.ExtensionContext): void {
 				pushSection('Agent Profiles', (snapshot.agentProfileCatalog ?? [])
 					.filter(item => item.userInvocable !== false)
 					.map(item => ({
-					label: item.name,
-					description: provenance(item.ecosystem, item.modelInvocable === false ? 'Catalog only (manual profile)' : 'Catalog only (activate_agent_profile)'),
-					detail: item.description,
-					relPath: item.path,
-					openable: true,
-				})));
+						label: item.name,
+						description: provenance(item.ecosystem, item.modelInvocable === false ? 'Catalog only (manual profile)' : 'Catalog only (activate_agent_profile)'),
+						detail: item.description,
+						relPath: item.path,
+						openable: true,
+					})));
 				const hiddenManualProfiles = (snapshot.agentProfileCatalog ?? []).filter(item => item.userInvocable === false);
 				if (hiddenManualProfiles.length) {
 					pushSection('Not Manually Invocable', hiddenManualProfiles.map(item => ({
