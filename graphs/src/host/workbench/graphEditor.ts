@@ -90,20 +90,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		this._register(this.graphService.onDidChangeSnapshot(() => this._pushSnapshot()));
 		this._register(this.graphService.onDidChangeViewState(viewState => {
 			const targetType = (viewState.graphType === 'temporal' ? 'temporal' : 'network') as PreBaseGraphType;
-			if (targetType !== this._inputType) {
-				const previousType = this._inputType;
-				this._inputType = targetType;
-				if (this._inputType === 'temporal') {
-					void this.temporalViewService.initialize();
-					this._pushTemporalState(this.temporalViewService.getState());
-					const diff = this.temporalViewService.getState().diff;
-					if (diff) {
-						this._pushTemporalDiff(diff);
-					}
-				} else if (previousType === 'temporal') {
-					this.temporalViewService.pauseActiveWork();
-				}
-			}
+			this._transitionGraphType(targetType);
 			this._pushSnapshot();
 		}));
 		this._register(this.graphService.onDidChangeDiagnostics(() => this._pushSnapshot()));
@@ -131,15 +118,12 @@ export class PreBaseGraphEditor extends EditorPane {
 		if (token.isCancellationRequested || !(input instanceof PreBaseGraphEditorInput) || !this._container) {
 			return;
 		}
-		const previousType = this._inputType;
-		this._inputType = input.graphType === 'temporal' ? 'temporal' : 'network';
-		if (previousType === 'temporal' && this._inputType !== 'temporal') {
-			this.temporalViewService.pauseActiveWork();
-		}
+		this._transitionGraphType((input.graphType === 'temporal' ? 'temporal' : 'network') as PreBaseGraphType);
 		this._ensureWebview();
 		this._pushSnapshot();
 
 		if (this._inputType === 'temporal') {
+			// clearInput pauses without resetting _inputType; re-init even when already temporal.
 			void this.temporalViewService.initialize();
 			this._pushTemporalState(this.temporalViewService.getState());
 			const diff = this.temporalViewService.getState().diff;
@@ -271,6 +255,29 @@ export class PreBaseGraphEditor extends EditorPane {
 			networkEdgeOpacity,
 			layoutAnimationDuration
 		};
+	}
+
+	/**
+	 * Single authoritative Network ↔ Temporal transition.
+	 * Callers that also update graphService must invoke this first so the
+	 * subsequent onDidChangeViewState event is idempotent.
+	 */
+	private _transitionGraphType(targetType: PreBaseGraphType): void {
+		if (targetType === this._inputType) {
+			return;
+		}
+		const previousType = this._inputType;
+		this._inputType = targetType;
+		if (targetType === 'temporal') {
+			void this.temporalViewService.initialize();
+			this._pushTemporalState(this.temporalViewService.getState());
+			const diff = this.temporalViewService.getState().diff;
+			if (diff) {
+				this._pushTemporalDiff(diff);
+			}
+		} else if (previousType === 'temporal') {
+			this.temporalViewService.pauseActiveWork();
+		}
 	}
 
 	private _pushSnapshot(): void {
@@ -542,11 +549,9 @@ export class PreBaseGraphEditor extends EditorPane {
 			case 'switchGraphMode': {
 				const mode = (message.payload as { mode?: PreBaseGraphType } | undefined)?.mode;
 				if (mode && mode !== this._inputType) {
-					const previousType = this._inputType;
-					this._inputType = mode;
-					if (previousType === 'temporal' && mode !== 'temporal') {
-						this.temporalViewService.pauseActiveWork();
-					}
+					// Authoritative local transition first so setGraphType's view-state
+					// event is idempotent and never skips Temporal initialize.
+					this._transitionGraphType(mode);
 					await this.graphService.setGraphType(mode);
 					this._pushSnapshot();
 				}
@@ -730,8 +735,21 @@ export class PreBaseGraphEditor extends EditorPane {
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'nonce-${nonce}' 'unsafe-inline'; style-src-elem 'nonce-${nonce}'; style-src-attr 'unsafe-inline'; script-src 'nonce-${nonce}';">
 <style nonce="${nonce}">
 html, body { margin:0; height:100%; background:var(--vscode-editor-background, #1B1C1E); color:var(--vscode-foreground, #f4f4f5); font-family: var(--vscode-font-family, ui-sans-serif, system-ui, sans-serif); overflow:hidden; }
-#stage { position:absolute; inset:0; }
-#archSvg, #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; }
+#stage {
+	position:absolute; inset:0;
+	background-color: var(--vscode-editor-background, #1B1C1E);
+	/* Subtle theme-aware spatial grid (viewport-fixed; never counts as graph content). */
+	background-image:
+		linear-gradient(to right, color-mix(in srgb, var(--vscode-foreground, #cccccc) 5%, transparent) 1px, transparent 1px),
+		linear-gradient(to bottom, color-mix(in srgb, var(--vscode-foreground, #cccccc) 5%, transparent) 1px, transparent 1px),
+		linear-gradient(to right, color-mix(in srgb, var(--vscode-foreground, #cccccc) 9%, transparent) 1px, transparent 1px),
+		linear-gradient(to bottom, color-mix(in srgb, var(--vscode-foreground, #cccccc) 9%, transparent) 1px, transparent 1px);
+	background-size: 36px 36px, 36px 36px, 180px 180px, 180px 180px;
+	background-position: 0 0, 0 0, 0 0, 0 0;
+	pointer-events: none;
+}
+#stage > * { pointer-events: auto; }
+#archSvg, #netCanvas { position:absolute; inset:0; width:100%; height:100%; display:none; touch-action:none; background: transparent; }
 #archSvg { cursor:grab; }
 #archSvg.dragging { cursor:grabbing; }
 /* Base cursor is managed by updateCanvasCursor() (state-driven); CSS provides the
@@ -837,7 +855,10 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 #temporalDetailsPanel .entity-item { display:flex; align-items:center; justify-content:space-between; padding:4px 6px; border-radius:3px; cursor:pointer; font-size:11px; margin-bottom:2px; }
 #temporalDetailsPanel .entity-item:hover { background:var(--vscode-list-hoverBackground, rgba(255,255,255,0.06)); }
 
-#empty { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; }
+#empty { position:absolute; inset:0; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:10px; z-index:2; text-align:center; padding:24px; color:var(--vscode-descriptionForeground, #a1a1aa); font-size:14px; line-height:1.5; pointer-events:none; }
+#empty .empty-title { font-size:14px; font-weight:600; color:var(--vscode-foreground, #f4f4f5); }
+#empty .empty-desc { font-size:12px; max-width:360px; }
+#empty button { pointer-events:auto; background:var(--vscode-button-background, #2dd4bf); color:var(--vscode-button-foreground, #1B1C1E); border:0; border-radius:4px; padding:6px 14px; font-weight:600; font-size:12px; cursor:pointer; }
 #popup { position:absolute; z-index:10; width:min(340px, calc(100% - 24px)); max-height:min(420px, calc(100% - 32px)); overflow:auto; display:none; background:color-mix(in srgb, var(--vscode-editorWidget-background, #202122) 96%, transparent); border:1px solid var(--vscode-widget-border, #3C3C3C); border-radius:8px; padding:12px; box-shadow:0 10px 30px rgba(0,0,0,0.35); backdrop-filter:blur(10px); font-size:11.5px; color:var(--vscode-foreground, #f4f4f5); }
 #popup .popup-header { display:flex; justify-content:space-between; align-items:flex-start; gap:8px; margin-bottom:8px; border-bottom:1px solid var(--vscode-widget-border, rgba(255,255,255,0.08)); padding-bottom:8px; }
 #popup .popup-header-main { flex:1; min-width:0; }
@@ -872,7 +893,7 @@ html, body { margin:0; height:100%; background:var(--vscode-editor-background, #
 </head>
 <body>
 <div id="stage">
-	<div id="empty">Preparing graph…</div>
+	<div id="empty" role="status" aria-live="polite"><span class="empty-title">Preparing graph…</span></div>
 	<div id="noChangesCard" class="no-changes-card">
 		<div class="title">No structural graph changes in this commit</div>
 		<div class="desc">Only non-graph modifications (comments, text, or documentation) occurred in this revision.</div>
@@ -2438,10 +2459,15 @@ function drawTemporalFrame(ts) {
 	let routeBadgesDrawn = 0;
 	const w = netCanvas.clientWidth || 800;
 	const h = netCanvas.clientHeight || 600;
-	const theme = getComputedThemeColors();
 
-	ctx.fillStyle = theme.bg || '#1B1C1E';
-	ctx.fillRect(0, 0, w, h);
+	// Transparent clear so the stage grid remains visible; never treat grid as graph content.
+	ctx.clearRect(0, 0, w, h);
+
+	if (!temporalDiff) {
+		if (noChangesCard) noChangesCard.style.display = 'none';
+		isAnimatingTemporal = false;
+		return;
+	}
 
 	const prefersReduced = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 	const isReduced = settings.reduceMotion || prefersReduced;
@@ -2455,8 +2481,15 @@ function drawTemporalFrame(ts) {
 
 	const filterVal = (temporalFilterInput && temporalFilterInput.value) ? temporalFilterInput.value.toLowerCase().trim() : '';
 
-	// 1. Calculate Focus+Context visible elements, then node-level LOD projection
+	// 1. Focus+Context visibility first — empty-changes short-circuits before projection work.
 	const visibleData = computeTemporalVisibleElements(temporalDiff, displayMode, temporalContextFilterMode);
+	if (visibleData.hasZeroChanges && displayMode === 'changes') {
+		if (noChangesCard) noChangesCard.style.display = 'flex';
+		isAnimatingTemporal = false;
+		return;
+	}
+	if (noChangesCard) noChangesCard.style.display = 'none';
+
 	const kNow = Math.max(0.001, transform.k);
 	const worldViewport = {
 		minX: (0 - transform.x) / kNow,
@@ -2464,7 +2497,7 @@ function drawTemporalFrame(ts) {
 		maxX: (w - transform.x) / kNow,
 		maxY: (h - transform.y) / kNow,
 	};
-	const temporalProjection = projectTemporalVisibleSet(visibleData.nodes, temporalDiff && temporalDiff.guides, {
+	const temporalProjection = projectTemporalVisibleSet(visibleData.nodes, temporalDiff.guides, {
 		zoom: transform.k,
 		displayMode: displayMode,
 		selectedEntityId: selectedNodeId,
@@ -2487,13 +2520,7 @@ function drawTemporalFrame(ts) {
 		}
 	}
 
-	if (visibleData.hasZeroChanges && displayMode === 'changes') {
-		if (noChangesCard) noChangesCard.style.display = 'flex';
-		return;
-	} else {
-		if (noChangesCard) noChangesCard.style.display = 'none';
-	}
-
+	const theme = getComputedThemeColors();
 	const directContextSet = visibleData.directContextSet;
 	const nodesToRender = projectedLeaves.slice();
 	nodesToRender.sort(function (a, b) {
@@ -3468,14 +3495,79 @@ function nodeColor(node, entryId) {
 	return fileType(node.path || node.label).color;
 }
 
+function syncTemporalCanvasOverlay() {
+	if (!empty) return;
+	const canFitTemporal = hasRenderableTemporalNodes(temporalDiff);
+	if (canFitTemporal) {
+		empty.style.display = 'none';
+		if (typeof empty.replaceChildren === 'function') {
+			empty.replaceChildren();
+		} else {
+			empty.textContent = '';
+		}
+		return;
+	}
+	const err = temporalState && (temporalState.selectionError || temporalState.historyError);
+	const loading = !temporalState
+		|| temporalState.isLoadingHistory
+		|| temporalState.isLoadingSelection
+		|| (temporalState.selectedCommitSha && temporalState.selectedCommitSha !== temporalState.renderedCommitSha);
+	empty.style.display = 'flex';
+	if (typeof empty.replaceChildren === 'function') {
+		empty.replaceChildren();
+	} else {
+		empty.textContent = '';
+	}
+	const title = document.createElement('span');
+	title.className = 'empty-title';
+	if (err) {
+		title.textContent = 'Temporal map unavailable';
+		empty.appendChild(title);
+		const desc = document.createElement('span');
+		desc.className = 'empty-desc';
+		desc.textContent = String(err);
+		empty.appendChild(desc);
+		const retry = document.createElement('button');
+		retry.type = 'button';
+		retry.textContent = 'Retry';
+		retry.onclick = function () {
+			request('retryTemporalSelection', {});
+		};
+		empty.appendChild(retry);
+		return;
+	}
+	if (loading) {
+		title.textContent = 'Building temporal map…';
+		empty.appendChild(title);
+		const desc = document.createElement('span');
+		desc.className = 'empty-desc';
+		desc.textContent = temporalState && temporalState.selectedCommitSha
+			? 'Loading structural graph for ' + String(temporalState.selectedCommitSha).slice(0, 7) + '…'
+			: 'Indexing history and preparing the time-aware graph.';
+		empty.appendChild(desc);
+		return;
+	}
+	title.textContent = 'No temporal graph yet';
+	empty.appendChild(title);
+	const desc = document.createElement('span');
+	desc.className = 'empty-desc';
+	desc.textContent = 'Select a commit on the timeline once history is ready.';
+	empty.appendChild(desc);
+}
+
 function render(first) {
+	try {
+		document.documentElement.dataset.prebaseGraphMode = graphType || 'network';
+		document.documentElement.dataset.prebaseGraphDisplayMode = displayMode || '';
+	} catch {}
+
 	if (isTemporal()) {
 		if (archSvg) archSvg.style.display = 'none';
 		if (netCanvas) netCanvas.style.display = 'block';
-		if (empty) empty.style.display = 'none';
 		resizeCanvas();
 		updateLegend(null, false);
 		updateTemporalUI(temporalState, temporalDiff);
+		syncTemporalCanvasOverlay();
 		const canFitTemporal = hasRenderableTemporalNodes(temporalDiff);
 		if (canFitTemporal && (first || !hasFittedTemporalView) && !userAdjustedViewport) {
 			fitView(false);
@@ -3501,7 +3593,15 @@ function render(first) {
 		if (netCanvas) netCanvas.style.display = 'none';
 		if (empty) {
 			empty.style.display = 'flex';
-			empty.textContent = (diagnostics && diagnostics.message) || 'Preparing Code Graph…';
+			if (typeof empty.replaceChildren === 'function') {
+				empty.replaceChildren();
+			} else {
+				empty.textContent = '';
+			}
+			const title = document.createElement('span');
+			title.className = 'empty-title';
+			title.textContent = (diagnostics && diagnostics.message) || 'Preparing Code Graph…';
+			empty.appendChild(title);
 		}
 		if (status) {
 			status.style.display = 'block';

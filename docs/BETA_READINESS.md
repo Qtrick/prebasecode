@@ -5,15 +5,16 @@ Canonical PreBase beta readiness tracker. Do not mark an item **Complete** witho
 Statuses: `Not Started` | `In Progress` | `Blocked` | `Needs Verification` | `Complete` | `Deferred After Beta`
 Severities: `Blocker` | `Critical` | `High` | `Medium` | `Low`
 
-Last audit: **2026-09-04** (HEAD `9b22f7af` + uncommitted Live Activity flicker fix)
+Last audit: **2026-09-04** (HEAD `8065d29c` + uncommitted Magnus content-during-morph + Temporal lifecycle/grid)
 
 ### CURRENT STATUS (authoritative)
 
-- **Magnus notch flicker (content vs presentation):** Fixed in `native/prebase-live-activity` — content-only snapshots no longer morph geometry. Direct AppKit perf suite **22/22 PASS** including `content-update-stability` (100+ content updates → 0 animation/geometry delta). Morph stress ≈201 animations / 100 real state cycles (was ~501). Static live-activity contracts **PASS**.
-- **Live Electron GUI acceptance from this agent session:** **NOT RUN / EXTERNAL env** — PreBase aborts at AppKit `RegisterApplication` (SIGABRT) when launched under Cursor’s agent process; not a product regression of the flicker fix. Re-run `prebase-magnus-live-activity-live.mjs` from a normal Terminal session for CURRENT_GREEN live GUI evidence.
-- **Phase 3 manifest / active soak / privacy runtime producers:** Still **STALE** vs current HEAD (many producers still cite older `sourceHead` such as `49f0bc5` / `1bc5f31`). Do not treat historical “CURRENT_GREEN” soak claims as fresh until regenerated.
-- **Icons:** `verify:icons` 101/101 OK (frozen).
-- **Hosted Magnus:** remains disabled (`PREBASE_HOSTED_MAGNUS_ENABLED=false`).
+- **Magnus notch flicker (content during morph):** Fixed in `native/prebase-live-activity` — `refreshContentOnly` now calls `refreshContentSubviewsPreservingPresentation` and does **not** snap shape path / cancel `morphPath` / clear `transitionInFlight` / snap container alphas. Direct AppKit perf suite **PASS** including new `content-during-morph` (content storm mid-peek and mid-interactive morph → contentOnlyUpdateCount↑, animationCount/geometryTransitionCount/transitionGeneration unchanged, morph stays in flight). Static live-activity contracts **PASS**.
+- **Temporal Graph lifecycle / blank canvas:** Fixed generation-scoped `initialize()` (`_initGeneration`), single `_transitionGraphType()` ownership, null-`temporalDiff` render safety, intentional loading/error/empty overlay (`Building temporal map…`), theme-aware stage CSS grid (transparent canvas). Unit: `test:graphs` **63/63 files PASS** (incl. mode-switching 13 + Temporal webview). Acceptance harness Temporal frame locator now requires `dataset.prebaseGraphMode==='temporal'` + toolbar/scrubber (rejects Network-only `#netCanvas`).
+- **Live Electron GUI / Temporal live acceptance / Phase 3 Temporal evidence:** **NOT regenerated this session** — Temporal live/canonical-scale producers and live Electron Magnus GUI remain **Needs Verification / EXTERNAL** under Cursor AppKit `RegisterApplication` SIGABRT. Re-run Temporal `temporal-live.mjs` + `prebase-magnus-live-activity-live.mjs` from a normal Terminal for CURRENT_GREEN live evidence.
+- **Phase 3 manifest / active soak / privacy runtime producers:** Still **STALE** vs current HEAD for many non-Magnus-direct producers. Do not treat historical CURRENT_GREEN soak/privacy Temporal reports as fresh.
+- **Icons:** frozen; do not modify without explicit authorization.
+- **Hosted Magnus:** remains disabled.
 - **Signing/notarization / RLS runtime / OAuth live / hybrid web live:** external where credentials absent.
 
 ### HISTORICAL CHECKPOINT (do not treat as current freshness)

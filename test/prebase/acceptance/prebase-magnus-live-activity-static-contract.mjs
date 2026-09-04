@@ -191,6 +191,7 @@ if (!native.includes('emit:@"dismissAttention"')) {
 }
 if (!native.includes('Pre-position controls before/during the frame morph')
 	|| !native.includes('refreshContentOnly')
+	|| !native.includes('refreshContentSubviewsPreservingPresentation')
 	|| !native.includes('Identical geometry: content refresh only')) {
 	failures.push('animated layout must pre-position controls and separate content-only refreshes from geometry morphs');
 }

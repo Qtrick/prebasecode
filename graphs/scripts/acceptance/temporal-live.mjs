@@ -58,13 +58,32 @@ export function temporalAcceptanceFailures(evidence) {
 	}
 	if (!evidence.targetOpened) {failures.push('Temporal Graph target did not open');}
 	if (!evidence.repoLoaded) {failures.push('Temporal fixture repository did not load');}
+	if (evidence.frameMode && evidence.frameMode !== 'temporal') {
+		failures.push(`Temporal frame locator resolved non-temporal mode (${evidence.frameMode})`);
+	}
+	if (evidence.temporalChrome) {
+		if (!evidence.temporalChrome.hasTemporalToolbar) {
+			failures.push('Temporal frame missing #temporalToolbar');
+		}
+		if (!evidence.temporalChrome.hasTemporalScrubberBar) {
+			failures.push('Temporal frame missing #temporalScrubberBar');
+		}
+		if (evidence.temporalChrome.prebaseGraphMode !== 'temporal') {
+			failures.push(`Temporal frame dataset.prebaseGraphMode must be temporal (got ${evidence.temporalChrome.prebaseGraphMode || 'missing'})`);
+		}
+		if (evidence.temporalChrome.networkOnlyCanvas) {
+			failures.push('Temporal frame must not be Network-only (#netCanvas without Temporal chrome)');
+		}
+	}
 
 	const full = evidence.fullMap;
 	if (!full) {
 		failures.push('Full Map metrics are missing');
 	} else {
+		if (full.mode && full.mode !== 'temporal') {failures.push('Full Map metrics are not from Temporal mode');}
 		if (full.selectedCommitSha !== evidence.fixture?.head) {failures.push('Full Map selected SHA does not equal fixture HEAD');}
 		if (full.renderedCommitSha !== evidence.fixture?.head) {failures.push('Full Map rendered SHA does not equal fixture HEAD');}
+		if (full.selectedCommitSha !== full.renderedCommitSha) {failures.push('Full Map selectedCommitSha !== renderedCommitSha');}
 		if (!(full.receivedNodeCount > 0)) {failures.push('Full Map received zero nodes');}
 		if (!(full.visibleNodeCount > 0)) {failures.push('Full Map exposed zero visible nodes');}
 		if (!(full.nodesDrawn > 0)) {failures.push('Full Map drew zero nodes');}
@@ -244,11 +263,34 @@ async function waitForGitRepository(page, timeoutMs = 60_000) {
 	return { ok: false, reason: 'timeout' };
 }
 
+/**
+ * Locate the Temporal Graph webview frame.
+ * Must NOT accept a Network-only graph that merely has #netCanvas.
+ */
+async function isTemporalGraphFrame(frame) {
+	try {
+		return await frame.evaluate(() => {
+			const mode = document.documentElement?.dataset?.prebaseGraphMode;
+			const hasCanvas = !!document.getElementById('netCanvas');
+			const hasToolbar = !!document.getElementById('temporalToolbar');
+			const hasScrubber = !!document.getElementById('temporalScrubberBar');
+			return mode === 'temporal' && hasCanvas && hasToolbar && hasScrubber;
+		});
+	} catch {
+		return false;
+	}
+}
+
 async function findGraphFrame(page, timeoutMs = 60_000) {
 	const deadline = Date.now() + timeoutMs;
 	while (Date.now() < deadline) {
 		for (const frame of page.frames()) {
-			if (frame !== page.mainFrame() && await frame.locator('#netCanvas').count()) {return frame;}
+			if (frame === page.mainFrame()) {
+				continue;
+			}
+			if (await isTemporalGraphFrame(frame)) {
+				return frame;
+			}
 		}
 		await page.waitForTimeout(250);
 	}
@@ -383,15 +425,29 @@ async function run() {
 		await page.getByRole('button', { name: 'Temporal', exact: true }).click();
 		const frame = await findGraphFrame(page, graphFrameTimeout);
 		if (!frame) {throw new Error('Temporal Graph webview did not open');}
+		evidence.frameMode = await frame.evaluate(() => document.documentElement?.dataset?.prebaseGraphMode || null);
+		if (evidence.frameMode !== 'temporal') {
+			throw new Error(`Temporal frame locator rejected: mode=${evidence.frameMode}`);
+		}
+		evidence.temporalChrome = await frame.evaluate(() => ({
+			hasTemporalToolbar: !!document.getElementById('temporalToolbar'),
+			hasTemporalScrubberBar: !!document.getElementById('temporalScrubberBar'),
+			prebaseGraphMode: document.documentElement?.dataset?.prebaseGraphMode || null,
+			networkOnlyCanvas: !!document.getElementById('netCanvas')
+				&& !document.getElementById('temporalToolbar'),
+		}));
 		await installMetricsBridge(frame);
-		const canvasShot = (name) => frame.locator('#netCanvas').screenshot({
+		const canvasShot = (name) => frame.locator('#stage').screenshot({
 			path: join(screenshotDir, name),
 			animations: 'disabled',
 			timeout: 8_000,
 		});
 		const fullMap = await waitForMetrics(page, frame, metrics =>
+			metrics.mode === 'temporal' &&
 			metrics.displayMode === 'state' &&
+			metrics.selectedCommitSha === fixture.head &&
 			metrics.renderedCommitSha === fixture.head &&
+			metrics.selectedCommitSha === metrics.renderedCommitSha &&
 			metrics.nodesDrawn > 0 &&
 			metrics.receivedNodeCount >= minReceivedNodes
 		, metricTimeout);
@@ -458,7 +514,9 @@ async function run() {
 
 		await page.getByRole('button', { name: 'Focus Changes', exact: true }).click();
 		const focusChanges = await waitForMetrics(page, frame, metrics =>
+			metrics.mode === 'temporal' &&
 			metrics.displayMode === 'changes' &&
+			metrics.selectedCommitSha === metrics.renderedCommitSha &&
 			metrics.summary?.modifiedCount >= 1 &&
 			metrics.nodesDrawn > 0
 		, metricTimeout);

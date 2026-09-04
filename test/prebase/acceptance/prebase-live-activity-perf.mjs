@@ -1162,6 +1162,141 @@ async function run() {
 	}
 	results.tests.push(test12);
 
+	// Test 12b: content updates DURING an in-flight peek morph must not cancel/snap geometry
+	const test12b = { name: 'content-during-morph', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setSnapshot(contentSnapshot(1500, {
+			presentationLabel: 'Morph baseline',
+			currentActivity: 'Settling',
+		}));
+		native.setPresentation({
+			visible: true,
+			pinned: false,
+			reducedMotion: false,
+			display: 'builtin',
+		});
+		await sleep(80);
+		await drainMain(native, 3);
+
+		const beforePeek = captureStabilityBaseline(native.getDiagnostics());
+		if (beforePeek.activePresentationState !== 'compact') {
+			throw new Error(`expected compact before morph, got ${beforePeek.activePresentationState}`);
+		}
+
+		const peekOk = native.simulateAction('peek');
+		if (!peekOk) {
+			throw new Error('simulateAction(peek) failed to start morph');
+		}
+		// Do NOT wait for morph to finish — content must arrive mid-transition.
+		await drainMain(native, 1);
+		const midMorphBefore = native.getDiagnostics();
+		test12b.details.midMorphBefore = captureStabilityBaseline(midMorphBefore);
+		if (midMorphBefore.transitionInFlight !== true
+			&& !((Number(midMorphBefore.animationCount) || 0) > (beforePeek.animationCount || 0))) {
+			throw new Error('expected peek morph to be in flight (transitionInFlight or animationCount bump) before content storm');
+		}
+
+		// Immediate content snapshots (minimal drain) while morph should still be active.
+		const contentStart = Number(midMorphBefore.contentOnlyUpdateCount) || 0;
+		let sawInFlightDuringContent = midMorphBefore.transitionInFlight === true;
+		for (let i = 0; i < 12; i++) {
+			native.setSnapshot(contentSnapshot(1501 + i, {
+				presentationLabel: `DuringMorph ${1501 + i}`,
+				latestShortMessage: `msg-${1501 + i}`,
+			}));
+			if (i === 0 || i === 5) {
+				const inFlightSample = native.getDiagnostics();
+				if (inFlightSample.transitionInFlight === true) {
+					sawInFlightDuringContent = true;
+				}
+				await drainMain(native, 1);
+			}
+		}
+		test12b.details.sawInFlightDuringContent = sawInFlightDuringContent;
+		await drainMain(native, 2);
+		const midMorphAfter = native.getDiagnostics();
+		test12b.details.midMorphAfter = {
+			...captureStabilityBaseline(midMorphAfter),
+			lastAppliedRevision: 1512,
+		};
+
+		const animDelta = (Number(midMorphAfter.animationCount) || 0) - (Number(midMorphBefore.animationCount) || 0);
+		const geoDelta = (Number(midMorphAfter.geometryTransitionCount) || 0) - (Number(midMorphBefore.geometryTransitionCount) || 0);
+		const genDelta = (Number(midMorphAfter.transitionGeneration) || 0) - (Number(midMorphBefore.transitionGeneration) || 0);
+		const contentDelta = (Number(midMorphAfter.contentOnlyUpdateCount) || 0) - contentStart;
+
+		if (contentDelta < 1) {
+			throw new Error(`content-during-morph expected contentOnlyUpdateCount to rise, delta=${contentDelta}`);
+		}
+		if (animDelta !== 0) {
+			throw new Error(`content-during-morph must not increase animationCount (delta=${animDelta})`);
+		}
+		if (geoDelta !== 0) {
+			throw new Error(`content-during-morph must not increase geometryTransitionCount (delta=${geoDelta})`);
+		}
+		if (genDelta !== 0) {
+			throw new Error(`content-during-morph must not bump transitionGeneration (delta=${genDelta})`);
+		}
+		// Content must not start a new geometry morph. Natural morph completion via
+		// transitionEndTime is allowed; a content-driven generation bump is not (checked above).
+
+		// Let morph settle, then verify final peek.
+		await sleep(220);
+		await drainMain(native, 4);
+		const settled = native.getDiagnostics();
+		test12b.details.settled = captureStabilityBaseline(settled);
+		if (settled.activePresentationState !== 'peek') {
+			throw new Error(`after content-during-morph expected peek, got ${settled.activePresentationState}`);
+		}
+		if (settled.peekOnly !== undefined && settled.peekOnly !== true) {
+			throw new Error(`peekOnly must remain true, got ${settled.peekOnly}`);
+		}
+
+		// Interactive morph + immediate content storm
+		if (!native.simulateAction('click')) {
+			throw new Error('click→interactive failed');
+		}
+		await drainMain(native, 1);
+		const interactiveMid = native.getDiagnostics();
+		const interactiveStorm = await applyContentStorm(native, {
+			startRevision: 1600,
+			count: 30,
+			batchSize: 10,
+			labelPrefix: 'InteractiveMorph',
+		});
+		const interactiveAfter = native.getDiagnostics();
+		test12b.details.interactiveDuring = {
+			before: captureStabilityBaseline(interactiveMid),
+			after: captureStabilityBaseline(interactiveAfter),
+			lastApplied: interactiveStorm,
+		};
+		const iAnim = (Number(interactiveAfter.animationCount) || 0) - (Number(interactiveMid.animationCount) || 0);
+		const iGeo = (Number(interactiveAfter.geometryTransitionCount) || 0) - (Number(interactiveMid.geometryTransitionCount) || 0);
+		const iGen = (Number(interactiveAfter.transitionGeneration) || 0) - (Number(interactiveMid.transitionGeneration) || 0);
+		const iContent = (Number(interactiveAfter.contentOnlyUpdateCount) || 0) - (Number(interactiveMid.contentOnlyUpdateCount) || 0);
+		if (iContent < 1) {
+			throw new Error(`interactive morph content storm expected contentOnlyUpdateCount rise, delta=${iContent}`);
+		}
+		if (iAnim !== 0 || iGeo !== 0 || iGen !== 0) {
+			throw new Error(`interactive morph content storm must not bump anim/geo/gen (Δa=${iAnim} Δg=${iGeo} Δgen=${iGen})`);
+		}
+		await sleep(220);
+		await drainMain(native, 4);
+		const interactiveSettled = native.getDiagnostics();
+		if (interactiveSettled.activePresentationState !== 'interactive') {
+			throw new Error(`expected interactive after morph+content, got ${interactiveSettled.activePresentationState}`);
+		}
+		if (interactiveSettled.localMonitorInstalled !== true) {
+			throw new Error('interactive must keep local key monitor after content-during-morph');
+		}
+	} catch (err) {
+		test12b.ok = false;
+		test12b.error = err.message;
+		results.failures.push(`content-during-morph: ${err.message}`);
+	}
+	results.tests.push(test12b);
+
 	// Test 13: content-only while Peek must remain peek / non-interactive
 	const test13 = { name: 'content-only-in-peek', ok: true, details: {} };
 	try {

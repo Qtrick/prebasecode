@@ -1,34 +1,91 @@
 ---
 name: pen-design
 description: >
-  Create high-quality visual designs — websites, app screens, dashboards, slides, marketing materials, social media graphics — using the pen.dev CLI tool. Use this skill whenever the user wants to create, generate, or visualize any kind of UI design, mockup, wireframe, layout, webpage, app screen, presentation slide, poster, banner, or marketing asset. Also use it when the user says things like "design me a...", "make a visual for...", "create a mockup of...", "what would X look like?", or wants to turn an idea into a visual. Even if the user doesn't mention "pen.dev" or "design tool" explicitly — if they want something visual created, this is the skill to use. Prefer combining pen.dev with other available UI skills (ui-ux-pro-max, design, design-system, ui-styling, frontend-design, design-taste-frontend, brand, slides, banner-design) for direction, tokens, and polish — pen.dev is additive, not exclusive.
+  Create high-quality visual designs — websites, app screens, dashboards, slides, marketing materials, social media graphics — using the pen.dev CLI tool. Use this skill whenever the user wants to create, generate, or visualize any kind of UI design, mockup, wireframe, layout, webpage, app screen, presentation slide, poster, banner, or marketing asset. Also use it when the user says things like "design me a...", "make a visual for...", "create a mockup of...", "what would X look like?", or wants to turn an idea into a visual. During new UI implementation, the agent decides whether a pen.dev canvas under .pen/ (and optional human review) is useful — skip it for small or pattern-following work. Prefer combining pen.dev with other available UI skills (ui-ux-pro-max, design, design-system, ui-styling, frontend-design, design-taste-frontend, brand, slides, banner-design) — pen.dev is additive and optional, not exclusive or mandatory.
 ---
 
 # pen.dev Design
 
 Create professional visual designs from natural language descriptions using the pen.dev CLI. pen.dev is a headless design tool that generates `.pen` files (a structured JSON design format) and can export them as images.
 
+## Optional canvas review (agent decides)
+
+When implementing **new UI**, decide whether pen.dev helps:
+
+- **Use it** for novel screens, brand-sensitive layouts, multi-section surfaces, or when a visual mockup would clarify direction — store under `.pen/canvases/<slug>/`, export a preview, update `manifest.json` / `meta.json`, show the image, and optionally ask the human to review before or during implementation.
+- **Skip it** for small tweaks, bug fixes, wiring existing patterns, or when a mockup would add little value.
+
+pen.dev is **not required** for every UI change. If `.pen/README.md` exists and you do create a canvas, follow its storage rules. If the folder is missing and you need a canvas, create the standard layout (see below).
+
+## Project `.pen/` canvas store
+
+Official pen.dev uses `.pen` as a **file extension**, not a required folder. Apps may also keep local docs in `~/.pencil/documents/` — do **not** use that for the repo.
+
+**Project convention (all agents):** store canvases in workspace `.pen/`:
+
+```
+.pen/
+  README.md
+  manifest.json
+  canvases/<slug>/design.pen
+  canvases/<slug>/meta.json
+  previews/<slug>.png          # gitignored — regenerate
+  archive/                     # gitignored
+  bin/gc.sh
+```
+
+**Storage (save disk):**
+
+- Commit `design.pen`, `meta.json`, `manifest.json` (JSON is small).
+- Do **not** commit PNG/PDF exports; regenerate with `--export`.
+- One live canvas per slug; prefer overwrite in place with `--in`/`--out` (git history is durable). Optional throwaway copies may go under `archive/` (gitignored; not durable).
+- Run `.pen/bin/gc.sh` to clear regenerable preview/archive **media** only (keeps `.pen`/`.json`).
+
+**CLI paths example:**
+
+```bash
+slug="settings-privacy"
+mkdir -p ".pen/canvases/$slug" ".pen/previews"
+pen --workspace . \
+  --out ".pen/canvases/$slug/design.pen" \
+  --prompt "<user's exact request>" \
+  --export ".pen/previews/$slug.png" \
+  --export-scale 2
+```
+
+Then write/update `.pen/canvases/$slug/meta.json` and `.pen/manifest.json`.
+
+### meta.json shape
+
+```json
+{
+  "slug": "settings-privacy",
+  "title": "Settings — Privacy",
+  "status": "review",
+  "prompt": "exact user prompt",
+  "pen": ".pen/canvases/settings-privacy/design.pen",
+  "preview": ".pen/previews/settings-privacy.png",
+  "createdAt": "ISO-8601",
+  "updatedAt": "ISO-8601",
+  "approvedAt": null,
+  "implementedAt": null
+}
+```
+
+Statuses: `draft` → `review` → `approved` → `implemented` (or `rejected`).
+
 ## Use alongside other UI tools
 
-pen.dev is **one tool in the UI toolkit**, not a replacement for the others. For strong UI, combine tools:
+pen.dev is **one tool in the UI toolkit**, not a replacement for the others:
 
 | Role | Skills / tools |
 |------|----------------|
-| Visual mockup / exploration | **pen.dev** (this skill) |
+| Visual mockup / exploration | **pen.dev** (this skill) + `.pen/` store |
 | Direction, anti-slop, layout intelligence | `ui-ux-pro-max`, `design`, `design-taste-frontend`, `frontend-design` |
 | Tokens, components, brand | `design-system`, `ui-styling`, `brand` |
 | Specialized surfaces | `slides`, `banner-design` |
 
-**Recommended loop**
-
-1. Infer design direction with taste / UX skills (do not invent a conflicting brief for pen.dev).
-2. Generate or iterate a visual with **pen.dev** (`--prompt` = the user's words; show the exported image).
-3. Implement with `design-system` / `ui-styling` / frontend skills, using the mockup as reference.
-4. Fine-tune: re-run pen.dev for visual QA variants, and keep applying UX/taste/system skills until the UI is solid.
-
-If other UI skills are available in this environment, **load and use them together** with pen.dev when doing UI work. Skipping them after a pen.dev run produces weaker results.
-
-Also load the `ui-ensemble` skill when doing broader UI implementation or polish.
+When a canvas exists: implement with taste/system/styling skills using that `.pen` + preview as a visual reference. Also load `ui-ensemble`.
 
 ## Setup
 
@@ -85,103 +142,53 @@ This skill stays in sync with the **pen.dev CLI npm package** (`@pen.dev/cli`). 
 - Latest version on the registry: `npm view @pen.dev/cli version`
 - Installed CLI: `pen version`, or `npm list -g @pen.dev/cli` (global) / `npm list @pen.dev/cli` (project)
 
-**Upgrade the CLI**, then refresh your copied skill file (agents do not auto-update skill files you placed in config folders):
+**Upgrade the CLI**, then refresh copied skill files if they are not symlinked to `~/.agents/skills/pen-design`.
 
-```bash
-npm install -g @pen.dev/cli
-```
-
-**Where to copy the skill from after installing**
-
-- From a dependency tree: `node_modules/@pen.dev/cli/SKILL.md` (path is the same for global and local installs; resolve from your project root or global `node_modules` prefix).
-
-**Fetch the same file without cloning the repo** (mirrors the npm tarball; optional third-party CDNs):
-
-- `https://unpkg.com/@pen.dev/cli@latest/SKILL.md`
-- `https://cdn.jsdelivr.net/npm/@pen.dev/cli@latest/SKILL.md`
-
-Use `@latest` for the newest publish, or pin (e.g. `@0.2.4`) for a reproducible snapshot.
-
-**Typical skill locations** (confirm with your tool’s current docs — layouts change):
-
-| Environment | Where to put `SKILL.md` |
-|-------------|-------------------------|
-| **Cursor** | `~/.cursor/skills/pen-design/SKILL.md` or project `.cursor/skills/pen-design/` |
-| **OpenCode** | `~/.config/opencode/skills/pen-design/SKILL.md` or `.opencode/skills/pen-design/` |
-| **Windsurf / Devin Cascade** | `~/.codeium/windsurf/skills/pen-design/SKILL.md` or `.windsurf/skills/pen-design/` |
-| **Antigravity** | `~/.gemini/config/skills/pen-design/SKILL.md` or `.agents/skills/pen-design/` |
-| **Cross-agent** | `~/.agents/skills/pen-design/SKILL.md` |
-| **Claude Code** | `~/.claude/skills/pen-design/SKILL.md` |
-
-**When to check for an update**
-
-- **Early in the session**, before the first pen.dev design run (compare `npm view @pen.dev/cli version` to the installed CLI), so you aren’t following stale instructions.
-- **Again** if the user says they upgraded the CLI, or if behavior doesn’t match this doc (flags, auth, timing).
-- **Not** before every single command — once per session is enough unless something changed or errors suggest a version mismatch.
+**When to check for an update:** once early in the session before the first pen.dev run; again if the user upgraded the CLI or flags look wrong.
 
 ## Creating a Design
 
-The core command:
-
 ```bash
-pen --out <output.pen> --prompt "<design description>" --export <output.png> --export-scale 2
+pen --workspace . --out <output.pen> --prompt "<design description>" --export <output.png> --export-scale 2
 ```
+
+For project UI work, prefer paths under `.pen/` (see above).
 
 Key flags:
 - `--out, -o` — where to save the `.pen` file (required)
 - `--prompt, -p` — what to design (required)
-- `--prompt-file, -f` — attach an image or text file to send with the prompt (repeatable). Same idea as attaching reference images in the pen.dev editor chat; not for loading the prompt text from a file.
+- `--prompt-file, -f` — attach an image or text file to send with the prompt (repeatable)
 - `--export, -e` — export an image of the result
 - `--export-scale` — image resolution multiplier (use 2 for crisp output)
 - `--export-type` — format: `png` (default), `jpeg`, `webp`, `pdf`
 - `--in, -i` — start from an existing `.pen` file (for iteration)
+- `--workspace, -w` — workspace folder for agent context (use project root)
 - `--model, -m` — Claude model to use (defaults to Opus)
 
 ### Passing the Prompt
 
-Pass the user's request directly as the prompt — do not expand, or add detail beyond what the user actually said. The pen.dev CLI has its own AI designer agent that handles creative decisions like layout structure, color palettes, typography, spacing, and content. Adding your own design specifics on top of the user's request will conflict with the CLI agent's own judgment and produce worse results.
-
-If the user says "make me a landing page for a coffee shop", the prompt should be exactly that — not a paragraph with hero sections, color palettes, and font choices you invented.
-
-(Design direction from other UI skills should guide **implementation and critique**, not rewrite the pen.dev `--prompt` unless the user asked for that rewrite.)
+Pass the user's request directly as the prompt — do not expand, or add detail beyond what the user actually said. The pen.dev CLI has its own AI designer agent that handles creative decisions. Adding your own design specifics on top of the user's request will conflict with the CLI agent and produce worse results.
 
 ### Timing Expectations
 
-Design generation is not instant — the CLI runs an AI agent that plans the layout, creates each element, and validates the result visually. Expect:
+- **Simple:** 1-2 minutes · **Medium:** 2-3 minutes · **Complex:** 3-5+ minutes
 
-- **Simple designs** (a card, a single component): 1-2 minutes
-- **Medium designs** (an app screen, a landing page section): 2-3 minutes
-- **Complex designs** (full landing page, detailed dashboard): 3-5+ minutes
-
-Let the user know upfront that generation will take a few minutes so they're not left wondering. Use a generous timeout (at least 600000ms / 10 minutes) when running the command.
+Tell the user upfront. Use a generous timeout (at least 600000ms / 10 minutes).
 
 ### Showing the Result
 
-After the command completes, read the exported image to show it to the user:
-
-```bash
-# The command exports to the path you specified
-pen --out design.pen --prompt "..." --export design.png --export-scale 2
-```
-
-Then use the Read tool on the exported PNG — it will render visually since you're a multimodal model.
-
-Always show the image to the user after creating it. This is the whole point — they want to see the visual.
+After the command completes, read the exported PNG and show it. Always show the image when you created a canvas. Optionally ask for human feedback when that review would help — not as a mandatory stop for every UI task.
 
 ## Iterating on a Design
 
-When the user wants changes to an existing design, use the `--in` flag to load the previous `.pen` file:
-
 ```bash
-pen --in design.pen --out design-v2.pen --prompt "Make the header larger and change the accent color to green" --export design-v2.png --export-scale 2
+pen --workspace . --in .pen/canvases/<slug>/design.pen --out .pen/canvases/<slug>/design.pen \
+  --prompt "Make the header larger and change the accent color to green" \
+  --export .pen/previews/<slug>.png --export-scale 2
 ```
 
-The agent will read the existing design and apply modifications rather than starting from scratch.
-
-For quick successive iterations, keep a consistent naming pattern:
-- `design.pen` → `design-v2.pen` → `design-v3.pen`
-- Or use a single file: `--in design.pen --out design.pen` (overwrites)
+Update status in meta/manifest as you go (`draft` / `review` / `approved` / `implemented`) when tracking a canvas; no mandatory approval gate.
 
 ## Working Directory
 
-Save design files in the user's current working directory or a subdirectory like `designs/`. Don't use temp directories — the user will want to find and iterate on these files later.
+Prefer `.pen/canvases/` for UI canvases. Do not use temp directories for work the user will review. Do not use `~/.pencil/documents/` for project canvases.

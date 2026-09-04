@@ -1,0 +1,11 @@
+# Canvas sources are small JSON — keep them.
+# Preview/archive binaries are regenerable and eat disk.
+/previews/
+/archive/
+*.png
+*.jpeg
+*.jpg
+*.webp
+*.pdf
+.DS_Store
+*.tmp

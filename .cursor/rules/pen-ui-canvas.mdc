@@ -1,0 +1,14 @@
+---
+description: >
+  Optional pen.dev canvas for UI work under .pen/. Agent decides whether a canvas (and optional human review) helps for a new UI — not required for every change. Use with ui-ensemble and other UI skills when creating or changing UI, screens, pages, dashboards, mockups, or visual design.
+alwaysApply: false
+---
+
+# Optional pen.dev UI canvas
+
+For **new UI**, the agent decides:
+
+- **Use pen-design** → `.pen/canvases/<slug>/` + preview when the UI is novel, brand-sensitive, multi-section, or hard to judge from code. Optionally pause for human review of that canvas.
+- **Skip pen.dev** for small tweaks, bug fixes, or clear existing patterns.
+
+If a canvas is used, follow `.pen/README.md` (commit `design.pen` / `meta.json` / `manifest.json`; do not commit PNG exports). Combine with **ui-ensemble** and other UI skills. pen.dev is additive, not mandatory.

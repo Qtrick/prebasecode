@@ -239,6 +239,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
 
 - (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState;
+/// Text/label refresh that never cancels or snaps an in-flight geometry morph.
+- (void)refreshContentSubviewsPreservingPresentation;
 @end
 
 @interface PrebaseLiveActivityController : NSObject
@@ -446,6 +448,142 @@ static NSString *JSString(Napi::Value value) {
 	[super mouseDown:event];
 }
 
+- (void)refreshContentSubviewsPreservingPresentation {
+	// Content-only path: update labels/text without touching shape path, morph
+	// animation, transitionInFlight, or container alpha/hidden (those belong to geometry).
+	NSRect bounds = self.bounds;
+	CGFloat bandH = MAX(self.safeAreaTop, kCollapsedHeight);
+	BOOL isExpanded = self.targetExpanded;
+	CGFloat totalW = NSWidth(bounds);
+	CGFloat currentH = NSHeight(bounds);
+	CGFloat leftW = self.leftWingWidth > 0 ? self.leftWingWidth : kWingWidthMin;
+	CGFloat rightW = self.rightWingWidth > 0 ? self.rightWingWidth : kWingWidthMin;
+	CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
+
+	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
+	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
+
+	// Compact and Peek share the collapsed wing chrome; Peek additionally shows one body line.
+	if (!isExpanded || self.peekOnly) {
+		NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
+		self.leftStatusLabel.stringValue = label;
+		CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
+		self.leftStatusLabel.frame = NSMakeRect(14, MAX(4, (bandH - 18) / 2.0), maxLabelWidth, 18);
+		if (self.notched && self.metricsLabel.length) {
+			self.rightMetricsLabel.stringValue = self.metricsLabel;
+			self.rightMetricsLabel.hidden = NO;
+			CGFloat metricsX = leftW + housing + 8;
+			CGFloat metricsW = MAX(20, rightW - 16);
+			self.rightMetricsLabel.frame = NSMakeRect(metricsX, MAX(4, (bandH - 18) / 2.0), metricsW, 18);
+		} else {
+			self.rightMetricsLabel.hidden = YES;
+		}
+		if (!isExpanded) {
+			return;
+		}
+		self.headerTitle.hidden = YES;
+		self.statusBadge.hidden = YES;
+		for (NSInteger i = 0; i < 3; i++) {
+			self.actionLabels[i].hidden = YES;
+		}
+		self.pendingInteractionTitle.hidden = YES;
+		self.pendingInteractionMessage.hidden = YES;
+		self.expandedMetricsLabel.hidden = YES;
+		self.latestMessageLabel.hidden = YES;
+		CGFloat bodyY = 6;
+		NSString *peekBody = nil;
+		if (self.pendingMessage.length) {
+			peekBody = self.pendingMessage;
+		} else if (self.pendingTitle.length) {
+			peekBody = self.pendingTitle;
+		} else if (self.activityLabel.length) {
+			peekBody = self.activityLabel;
+		}
+		if (peekBody.length) {
+			if (peekBody.length > 96) {
+				peekBody = [[peekBody substringToIndex:93] stringByAppendingString:@"…"];
+			}
+			self.activityDescription.stringValue = peekBody;
+			self.activityDescription.hidden = NO;
+			self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+		} else {
+			self.activityDescription.hidden = YES;
+		}
+		return;
+	}
+
+	self.headerTitle.hidden = NO;
+	self.statusBadge.hidden = NO;
+	CGFloat bodyY = 6;
+	self.headerTitle.frame = NSMakeRect(16, bodyY, 120, 18);
+	NSString *statusText = self.statusLabel.length
+		? self.statusLabel
+		: (self.attention ? @"Attention" : (self.status.length ? [self.status capitalizedString] : @"Working"));
+	self.statusBadge.stringValue = statusText;
+	self.statusBadge.textColor = self.attention
+		? [NSColor colorWithCalibratedRed:0.98 green:0.65 blue:0.18 alpha:0.95]
+		: [NSColor colorWithCalibratedWhite:0.65 alpha:1.0];
+	self.statusBadge.frame = NSMakeRect(totalW - 116, bodyY + 1, 100, 16);
+	self.statusBadge.alignment = NSTextAlignmentRight;
+	bodyY += 22;
+
+	if (self.activityLabel.length) {
+		self.activityDescription.stringValue = self.activityLabel;
+		self.activityDescription.hidden = NO;
+		self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+		bodyY += 18;
+	} else {
+		self.activityDescription.hidden = YES;
+	}
+
+	if (self.latestMessage.length) {
+		self.latestMessageLabel.stringValue = self.latestMessage;
+		self.latestMessageLabel.hidden = NO;
+		self.latestMessageLabel.frame = NSMakeRect(16, bodyY, totalW - 32, 18);
+		bodyY += 20;
+	} else {
+		self.latestMessageLabel.hidden = YES;
+	}
+
+	for (NSInteger i = 0; i < 3; i++) {
+		NSTextField *bullet = self.actionLabels[i];
+		if (i < (NSInteger)self.actions.count) {
+			bullet.stringValue = [NSString stringWithFormat:@"•  %@", self.actions[i]];
+			bullet.hidden = NO;
+			bullet.frame = NSMakeRect(18, bodyY, totalW - 36, 15);
+			bodyY += 15;
+		} else {
+			bullet.hidden = YES;
+		}
+	}
+
+	if (self.pendingTitle.length) {
+		bodyY += 2;
+		self.pendingInteractionTitle.stringValue = self.pendingTitle;
+		self.pendingInteractionTitle.hidden = NO;
+		self.pendingInteractionTitle.frame = NSMakeRect(16, bodyY, totalW - 32, 18);
+		bodyY += 18;
+	} else {
+		self.pendingInteractionTitle.hidden = YES;
+	}
+	if (self.pendingMessage.length) {
+		self.pendingInteractionMessage.stringValue = self.pendingMessage;
+		self.pendingInteractionMessage.hidden = NO;
+		self.pendingInteractionMessage.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+		bodyY += 18;
+	} else {
+		self.pendingInteractionMessage.hidden = YES;
+	}
+
+	if (self.metricsLabel.length) {
+		self.expandedMetricsLabel.stringValue = self.metricsLabel;
+		self.expandedMetricsLabel.hidden = NO;
+		self.expandedMetricsLabel.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+	} else {
+		self.expandedMetricsLabel.hidden = YES;
+	}
+}
+
 - (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState {
 	self.controller.redrawCount++;
 	NSRect bounds = self.bounds;
@@ -518,12 +656,11 @@ static NSString *JSString(Napi::Value value) {
 	}
 	CGPathRelease(targetPath);
 
-	// Update Content Subviews
+	// Presentation alpha/hidden belongs only to intentional geometry transitions.
 	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 
 	if (!isExpanded) {
-		// Collapsed content layout
 		if (animated && !self.reducedMotion) {
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
 				ctx.duration = duration * 0.7;
@@ -538,30 +675,12 @@ static NSString *JSString(Napi::Value value) {
 			self.compactContainer.alphaValue = 1.0;
 			self.compactContainer.hidden = NO;
 		}
-
-		NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
-		self.leftStatusLabel.stringValue = label;
-		CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
-		self.leftStatusLabel.frame = NSMakeRect(14, MAX(4, (bandH - 18) / 2.0), maxLabelWidth, 18);
-
-		if (self.notched && self.metricsLabel.length) {
-			self.rightMetricsLabel.stringValue = self.metricsLabel;
-			self.rightMetricsLabel.hidden = NO;
-			CGFloat metricsX = leftW + housing + 8;
-			CGFloat metricsW = MAX(20, rightW - 16);
-			self.rightMetricsLabel.frame = NSMakeRect(metricsX, MAX(4, (bandH - 18) / 2.0), metricsW, 18);
-		} else {
-			self.rightMetricsLabel.hidden = YES;
-		}
 	} else {
-		// Expanded content layout
 		self.expandedContainer.hidden = NO;
 		BOOL keepCompactWings = self.peekOnly;
 		if (animated && !self.reducedMotion) {
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
 				ctx.duration = duration;
-				// Peek keeps compact leading/trailing wings (Live Activity);
-				// Interactive fades them for the detailed widget surface.
 				self.compactContainer.animator.alphaValue = keepCompactWings ? 1.0 : 0.0;
 				self.expandedContainer.animator.alphaValue = 1.0;
 			}];
@@ -570,132 +689,9 @@ static NSString *JSString(Napi::Value value) {
 			self.expandedContainer.alphaValue = 1.0;
 			self.expandedContainer.hidden = NO;
 		}
-
-		if (self.peekOnly) {
-			// Sapphire-style Live Activity peek: compact wings stay readable;
-			// body is a single glance reason — not a cropped Interactive panel.
-			NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
-			self.leftStatusLabel.stringValue = label;
-			CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
-			self.leftStatusLabel.frame = NSMakeRect(14, MAX(4, (bandH - 18) / 2.0), maxLabelWidth, 18);
-			if (self.notched && self.metricsLabel.length) {
-				self.rightMetricsLabel.stringValue = self.metricsLabel;
-				self.rightMetricsLabel.hidden = NO;
-				CGFloat metricsX = leftW + housing + 8;
-				CGFloat metricsW = MAX(20, rightW - 16);
-				self.rightMetricsLabel.frame = NSMakeRect(metricsX, MAX(4, (bandH - 18) / 2.0), metricsW, 18);
-			} else {
-				self.rightMetricsLabel.hidden = YES;
-			}
-			self.headerTitle.hidden = YES;
-			self.statusBadge.hidden = YES;
-			for (NSInteger i = 0; i < 3; i++) {
-				self.actionLabels[i].hidden = YES;
-			}
-			self.pendingInteractionTitle.hidden = YES;
-			self.pendingInteractionMessage.hidden = YES;
-			self.expandedMetricsLabel.hidden = YES;
-			self.latestMessageLabel.hidden = YES;
-			CGFloat bodyY = 6;
-			// Attention peek prefers pending body text over activity; title is last resort.
-			NSString *peekBody = nil;
-			if (self.pendingMessage.length) {
-				peekBody = self.pendingMessage;
-			} else if (self.pendingTitle.length) {
-				peekBody = self.pendingTitle;
-			} else if (self.activityLabel.length) {
-				peekBody = self.activityLabel;
-			}
-			if (peekBody.length) {
-				if (peekBody.length > 96) {
-					peekBody = [[peekBody substringToIndex:93] stringByAppendingString:@"…"];
-				}
-				self.activityDescription.stringValue = peekBody;
-				self.activityDescription.hidden = NO;
-				self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
-			} else {
-				self.activityDescription.hidden = YES;
-			}
-			return;
-		}
-
-		CGFloat bodyY = 6;
-		// Header row
-		self.headerTitle.frame = NSMakeRect(16, bodyY, 120, 18);
-
-		NSString *statusText = self.statusLabel.length
-			? self.statusLabel
-			: (self.attention ? @"Attention" : (self.status.length ? [self.status capitalizedString] : @"Working"));
-		self.statusBadge.stringValue = statusText;
-		self.statusBadge.textColor = self.attention
-			? [NSColor colorWithCalibratedRed:0.98 green:0.65 blue:0.18 alpha:0.95]
-			: [NSColor colorWithCalibratedWhite:0.65 alpha:1.0];
-		self.statusBadge.frame = NSMakeRect(totalW - 116, bodyY + 1, 100, 16);
-		self.statusBadge.alignment = NSTextAlignmentRight;
-
-		bodyY += 22;
-
-		// Current activity
-		if (self.activityLabel.length) {
-			self.activityDescription.stringValue = self.activityLabel;
-			self.activityDescription.hidden = NO;
-			self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
-			bodyY += 18;
-		} else {
-			self.activityDescription.hidden = YES;
-		}
-
-		// Latest short response from Magnus (no decorative emoji — keep glanceable typography)
-		if (self.latestMessage.length) {
-			self.latestMessageLabel.stringValue = self.latestMessage;
-			self.latestMessageLabel.hidden = NO;
-			self.latestMessageLabel.frame = NSMakeRect(16, bodyY, totalW - 32, 18);
-			bodyY += 20;
-		} else {
-			self.latestMessageLabel.hidden = YES;
-		}
-
-		// Recent actions
-		for (NSInteger i = 0; i < 3; i++) {
-			NSTextField *bullet = self.actionLabels[i];
-			if (i < (NSInteger)self.actions.count) {
-				bullet.stringValue = [NSString stringWithFormat:@"•  %@", self.actions[i]];
-				bullet.hidden = NO;
-				bullet.frame = NSMakeRect(18, bodyY, totalW - 36, 15);
-				bodyY += 15;
-			} else {
-				bullet.hidden = YES;
-			}
-		}
-
-		// Pending interaction title + message from canonical snapshot
-		if (self.pendingTitle.length) {
-			bodyY += 2;
-			self.pendingInteractionTitle.stringValue = self.pendingTitle;
-			self.pendingInteractionTitle.hidden = NO;
-			self.pendingInteractionTitle.frame = NSMakeRect(16, bodyY, totalW - 32, 18);
-			bodyY += 18;
-		} else {
-			self.pendingInteractionTitle.hidden = YES;
-		}
-		if (self.pendingMessage.length && !self.peekOnly) {
-			self.pendingInteractionMessage.stringValue = self.pendingMessage;
-			self.pendingInteractionMessage.hidden = NO;
-			self.pendingInteractionMessage.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
-			bodyY += 18;
-		} else {
-			self.pendingInteractionMessage.hidden = YES;
-		}
-
-		// Metrics line
-		if (self.metricsLabel.length) {
-			self.expandedMetricsLabel.stringValue = self.metricsLabel;
-			self.expandedMetricsLabel.hidden = NO;
-			self.expandedMetricsLabel.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
-		} else {
-			self.expandedMetricsLabel.hidden = YES;
-		}
 	}
+
+	[self refreshContentSubviewsPreservingPresentation];
 }
 
 - (NSString *)accessibilityLabel {
@@ -951,8 +947,10 @@ static NSString *JSString(Napi::Value value) {
 	self.layoutCompletionGeneration++;
 	self.contentOnlyUpdateCount++;
 	self.lastTransitionReason = @"content";
-	[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
-	if (self.panel) {
+	// Never snap shape/alpha or cancel morphPath — content updates must not interrupt geometry.
+	[self.content refreshContentSubviewsPreservingPresentation];
+	// Controls follow stable geometry only; mid-morph panel frames are transient.
+	if (self.panel && !self.transitionInFlight) {
 		[self layoutControls:self.panel.frame];
 	}
 }

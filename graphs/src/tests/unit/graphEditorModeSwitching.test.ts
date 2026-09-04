@@ -312,4 +312,156 @@ suite('Graph Editor Mode Switching Lifecycle (Temporal <-> Network)', () => {
 		service.dispose();
 		assert.ok(true, '10 cycles of rapid mode switching completed cleanly');
 	});
+
+	test('11. obsolete initialize after pause does not overwrite a newer initialize', async () => {
+		let resolveRefs: (() => void) | undefined;
+		const refsGate = new Promise<void>(resolve => { resolveRefs = resolve; });
+		let resolveHistory: (() => void) | undefined;
+		const historyGate = new Promise<void>(resolve => { resolveHistory = resolve; });
+		let historyCalls = 0;
+		let refsCalls = 0;
+
+		const temporalGraphService = {
+			getRepositoryRefs: async () => {
+				refsCalls++;
+				if (refsCalls === 1) {
+					await refsGate;
+				}
+				return [];
+			},
+			getHistoryPage: async () => {
+				historyCalls++;
+				if (historyCalls === 1) {
+					await historyGate;
+				}
+				return defaultHistory.HEAD;
+			},
+			getCommitIndexStatus: async () => ({ status: 'ready' as const, lineageCoverage: { kind: 'complete' as const } }),
+			getGraphAtCommit: async (_root: string, sha: string) => ({
+				commitSha: sha,
+				timestamp: Date.now(),
+				isCheckpoint: false,
+				entityMap: new Map(),
+				edgeMap: new Map(),
+				pathToEntityId: new Map(),
+				graphData: { nodes: [], edges: [], timestamp: Date.now() },
+				schemaVersion: 1,
+				analyzerVersion: 1,
+				profileVersion: 1,
+			}),
+			ensureCommitIndexed: async (_root: string, sha: string) => ({
+				commitSha: sha,
+				timestamp: Date.now(),
+				isCheckpoint: false,
+				entityMap: new Map(),
+				edgeMap: new Map(),
+				pathToEntityId: new Map(),
+				graphData: { nodes: [], edges: [], timestamp: Date.now() },
+				schemaVersion: 1,
+				analyzerVersion: 1,
+				profileVersion: 1,
+			}),
+		};
+
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			temporalGraphService as any,
+			{ executeCommand: async () => undefined } as any,
+			{ openEditor: async () => undefined } as any,
+			mockLogService,
+			mockStorageService,
+		);
+
+		const obsolete = service.initialize();
+		await new Promise(resolve => setImmediate(resolve));
+		assert.equal(refsCalls, 1, 'obsolete init must be blocked in getRepositoryRefs');
+
+		service.pauseActiveWork();
+		const newer = service.initialize();
+		assert.notEqual(obsolete, newer, 'post-pause initialize must not reuse the obsolete promise');
+		const newerPromiseSlot = (service as any)._initPromise;
+		assert.ok(newerPromiseSlot, 'newer initialize must install its own promise');
+		assert.equal(newer, newerPromiseSlot, 'initialize return value must match installed promise');
+
+		assert.ok(resolveRefs, 'refs gate must be armed');
+		resolveRefs();
+		await obsolete;
+		assert.equal(
+			(service as any)._initPromise,
+			newerPromiseSlot,
+			'obsolete finally must not clear the newer init promise',
+		);
+		assert.equal(service.getState().selectedCommitSha, '', 'obsolete init must not commit selection');
+
+		assert.ok(resolveHistory, 'history gate must be armed');
+		resolveHistory();
+		await newer;
+		assert.equal(service.getState().selectedCommitSha, 'commit-3');
+		assert.equal(service.getState().selectedRef, 'HEAD');
+		assert.equal(service.getState().isLoadingHistory, false);
+		assert.ok(historyCalls > 0, 'newer init must load history');
+		service.dispose();
+	});
+
+	test('12. selectedCommitSha advances while renderedCommitSha stays stale during loading', async () => {
+		const entity = (sha: string, hash: string): TemporalEntitySnapshot => ({
+			entityId: 'e1',
+			commitSha: sha,
+			path: 'a.ts',
+			contentHash: hash,
+			nodeData: { id: 'e1', label: 'a.ts', path: 'a.ts' } as any,
+		});
+		const entitiesByCommit: Record<string, TemporalEntitySnapshot[]> = {
+			'commit-3': [entity('commit-3', 'h1')],
+			'commit-2': [entity('commit-2', 'h0')],
+			'commit-1': [entity('commit-1', 'h0')],
+		};
+		const temporalGraphService = createMockTemporalGraphService(defaultHistory, entitiesByCommit, 0);
+		const service = new WorkbenchTemporalViewService(
+			mockWorkspaceService,
+			createMockGitHistoryService() as any,
+			temporalGraphService as any,
+			{ executeCommand: async () => undefined } as any,
+			{ openEditor: async () => undefined } as any,
+			mockLogService,
+			mockStorageService,
+		);
+		await service.initialize();
+		assert.equal(service.getState().selectedCommitSha, 'commit-3');
+		assert.equal(service.getState().renderedCommitSha, 'commit-3');
+
+		// Non-immediate selection: selection/loading flags flip before reconstruct runs (scrub debounce).
+		await service.selectCommit('commit-2', { immediate: false });
+		const mid = service.getState();
+		assert.equal(mid.selectedCommitSha, 'commit-2', 'selection must advance immediately');
+		assert.equal(mid.isLoadingSelection, true);
+		assert.equal(mid.renderedCommitSha, 'commit-3', 'rendered SHA must stay stale while loading');
+		assert.notEqual(mid.selectedCommitSha, mid.renderedCommitSha);
+
+		await new Promise(resolve => setTimeout(resolve, 180));
+		const after = service.getState();
+		assert.equal(after.selectedCommitSha, 'commit-2');
+		assert.equal(after.renderedCommitSha, 'commit-2');
+		assert.equal(after.isLoadingSelection, false);
+		service.dispose();
+	});
+
+	test('13. rapid Network-Temporal initialize/pause under delayed IO preserves final Temporal truth', async () => {
+		const service = createService(defaultHistory, 25);
+		const ops: Promise<void>[] = [];
+		for (let i = 0; i < 8; i++) {
+			ops.push(service.initialize());
+			if (i % 2 === 0) {
+				service.pauseActiveWork();
+			}
+		}
+		await Promise.all(ops);
+		await service.initialize();
+		assert.equal(service.getState().selectedCommitSha, 'commit-3');
+		assert.equal(service.getState().loadedCommitCount, 3);
+		assert.equal(service.getState().renderedCommitSha, 'commit-3');
+		service.pauseActiveWork();
+		service.dispose();
+	});
 });

@@ -1,14 +1,13 @@
 ---
 trigger: model_decision
 description: >
-  Use when creating, refining, or implementing any UI, UX, mockup, visual design, landing page, app screen, dashboard, styling, banner, or slide. Prefer combining pen.dev with other UI skills rather than a single tool.
+  Use when creating, refining, or implementing any UI, UX, mockup, visual design, landing page, app screen, dashboard, styling, banner, or slide. Combine UI skills; optionally use pen.dev under .pen/ when a canvas review would help — agent decides, not mandatory.
 ---
 
-# UI Ensemble
+# UI Ensemble + optional pen.dev
 
-When doing UI or visual work:
-
-1. Load **pen-design** (pen.dev) for mockups when a visual helps.
-2. Also use other available UI skills together via **ui-ensemble**: ui-ux-pro-max, design, design-system, ui-styling, design-taste-frontend, frontend-design, brand, slides, banner-design.
-3. pen.dev is additive — combine tools for fine-tuning; do not treat any one skill as exclusive.
-4. Keep `pen --prompt` as the user's words; use other skills for implementation direction and polish.
+1. Use the full UI skill stack as needed (`ui-ensemble`, ui-ux-pro-max, design, design-system, ui-styling, taste, brand, etc.).
+2. **Agent decides** whether to mock in **pen-design** under `.pen/canvases/<slug>/` and whether to ask the human to review that canvas. Skip pen.dev for small/obvious UI work.
+3. If a canvas is used: store in `.pen/` (not `~/.pencil/documents/`), show the preview, update manifest/meta. Commit canvas JSON (`design.pen`, `meta.json`, `manifest.json`); do not commit preview PNGs.
+4. Keep `pen --prompt` as the user's words. pen.dev is additive, not exclusive.
+5. Follow `.pen/README.md` when present.

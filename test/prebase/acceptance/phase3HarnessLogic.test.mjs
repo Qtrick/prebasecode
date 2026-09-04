@@ -2026,6 +2026,57 @@ test('temporal canonical-scale live-like overview metrics pass semantic gates', 
 	assert.deepEqual(temporalAcceptanceFailures(evidence), []);
 });
 
+test('temporal acceptance rejects Network-only frame chrome and loading SHA mismatch', () => {
+	const base = {
+		scale: 'small',
+		fixture: {
+			commits: 10,
+			files: ['a', 'b', 'c', 'd'],
+			expectedModifiedPath: 'src/tally.js',
+			head: 'abc',
+		},
+		targetOpened: true,
+		repoLoaded: true,
+		frameMode: 'network',
+		temporalChrome: {
+			hasTemporalToolbar: false,
+			hasTemporalScrubberBar: false,
+			prebaseGraphMode: 'network',
+			networkOnlyCanvas: true,
+		},
+		fullMap: {
+			mode: 'network',
+			selectedCommitSha: 'abc',
+			renderedCommitSha: 'loading',
+			receivedNodeCount: 4,
+			visibleNodeCount: 4,
+			nodesDrawn: 4,
+			finiteCoordinateCount: 4,
+			canvas: { distinctPixels: 12 },
+			transform: { x: 0, y: 0, k: 1 },
+			renderedLabelOverlapCount: 0,
+		},
+		focusChanges: {
+			displayMode: 'changes',
+			visibleNodeCount: 1,
+			nodesDrawn: 1,
+			summary: { modifiedCount: 1 },
+			canvas: { distinctPixels: 8 },
+			renderedLabelOverlapCount: 0,
+		},
+		camera: { afterFocus: { k: 1 }, afterUserZoom: { k: 1.5 }, afterWait: { k: 1.5 } },
+		unexpectedError: false,
+		stuckIndexing: false,
+		quit: { remaining: 'gone' },
+	};
+	const failures = temporalAcceptanceFailures(base);
+	assert.ok(failures.some(item => /non-temporal mode/.test(item)), failures.join('; '));
+	assert.ok(failures.some(item => /#temporalToolbar/.test(item)), failures.join('; '));
+	assert.ok(failures.some(item => /Network-only/.test(item)), failures.join('; '));
+	assert.ok(failures.some(item => /selectedCommitSha !== renderedCommitSha/.test(item)), failures.join('; '));
+	assert.ok(failures.some(item => /not from Temporal mode/.test(item)), failures.join('; '));
+});
+
 test('temporal-small Full Map overlap fails closed (not canonical-scale-only)', () => {
 	const small = {
 		scale: 'small',

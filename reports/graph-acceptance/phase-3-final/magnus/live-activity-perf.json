@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "9b22f7af095669e75c5e41be13d8170732b6c673",
-  "sourceFingerprint": "f4809a9329b2d35cda11e2adf7caab6beca6cd6f2310908439a0abea8ebfaff5",
-  "productFingerprint": "f4809a9329b2d35cda11e2adf7caab6beca6cd6f2310908439a0abea8ebfaff5",
-  "generatedAt": "2026-09-04T04:14:07.692Z",
+  "sourceHead": "8065d29c06bb53af12662f935124ed9e2baa0030",
+  "sourceFingerprint": "d13b1bb871a1830cb87595c535677778dfa020e52e94cf7d7d2a5fc12196c6ef",
+  "productFingerprint": "d13b1bb871a1830cb87595c535677778dfa020e52e94cf7d7d2a5fc12196c6ef",
+  "generatedAt": "2026-09-04T05:02:49.216Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -34,8 +34,8 @@
           "renderedPeekBody": "",
           "transitionInFlight": false,
           "panelVisible": true,
-          "peekOnly": false,
           "revision": 1,
+          "peekOnly": false,
           "animationCount": 0,
           "activityLabel": "",
           "renderedLatestMessage": "",
@@ -44,24 +44,37 @@
           "interactionId": "",
           "latestShortMessage": "",
           "localMonitorInstalled": false,
-          "pendingMessage": "",
-          "pathTopologyCompatible": true,
-          "panelLevel": 3,
-          "requestedFrame": {
-            "y": 0,
+          "auxiliaryTopLeftArea": {
+            "y": 950,
             "x": 0,
-            "width": 0,
-            "height": 0
+            "width": 663,
+            "height": 32
           },
+          "pendingMessage": "",
           "keyWindow": false,
-          "topAnchorDelta": -36,
+          "panelLevel": 2147483630,
+          "requestedFrame": {
+            "y": 948,
+            "x": 599,
+            "width": 313,
+            "height": 34
+          },
+          "pathTopologyCompatible": true,
+          "notchGeometry": {
+            "trailingX": 848,
+            "centerX": 755.5,
+            "width": 185,
+            "leadingX": 663,
+            "height": 34
+          },
+          "topAnchorDelta": 0,
           "transitionGeneration": 0,
           "statusLabel": "",
           "layerBacked": true,
           "displayMode": "builtin",
-          "screenTopY": 0,
+          "screenTopY": 982,
           "prebaseFullscreen": false,
-          "contentRefreshCount": 2,
+          "contentRefreshCount": 1,
           "openInPreBaseVisible": false,
           "pinButtonTitle": "Pin",
           "renderedPendingMessage": "",
@@ -69,41 +82,55 @@
           "exitGraceMs": 250,
           "hoverDwellMs": 180,
           "userDismissedAttention": false,
+          "safeAreaTop": 32,
           "panelFrame": {
-            "y": 0,
-            "x": 0,
-            "width": 280,
-            "height": 36
+            "y": 948,
+            "x": 599,
+            "width": 313,
+            "height": 34
           },
           "orderFrontCount": 1,
-          "contentOnlyUpdateCount": 2,
+          "contentOnlyUpdateCount": 1,
           "expanded": false,
-          "panelTopY": 36,
+          "panelTopY": 982,
           "metricsLabel": "",
-          "geometryTransitionCount": 0,
-          "notchDetected": false,
+          "geometryTransitionCount": 1,
+          "notchDetected": true,
           "questionButtonLabels": [],
-          "redrawCount": 2,
+          "redrawCount": 1,
           "panelCreated": true,
           "targetPresentationState": "compact",
           "trackingAreaCount": 1,
           "approvalControlsVisible": false,
           "accessibilityLabel": "Magnus live activity",
+          "screenLocalizedName": "Built-in Retina Display",
           "activePresentationState": "compact",
           "retainedWorkScreen": false,
           "lastRenderedRevision": 1,
           "lastNativeCommand": "",
           "globalMonitorInstalled": true,
           "pendingKind": "",
+          "screenFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 1512,
+            "height": 982
+          },
           "questionButtonCount": 0,
           "pinned": false,
           "collapsedHit": {
-            "y": 0,
-            "x": 0,
-            "width": 0,
-            "height": 0
+            "y": 948,
+            "x": 599,
+            "width": 313,
+            "height": 34
           },
           "screenLocked": false,
+          "auxiliaryTopRightArea": {
+            "y": 950,
+            "x": 848,
+            "width": 664,
+            "height": 32
+          },
           "lastTransitionReason": "orderFront",
           "pendingTitle": ""
         }
@@ -113,7 +140,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 8118,
+        "durationRealCyclesMs": 8614,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -123,8 +150,8 @@
           "renderedPeekBody": "",
           "transitionInFlight": false,
           "panelVisible": true,
-          "peekOnly": false,
           "revision": 406,
+          "peekOnly": false,
           "animationCount": 200,
           "activityLabel": "Real cycle 99",
           "renderedLatestMessage": "msg-99",
@@ -133,24 +160,37 @@
           "interactionId": "",
           "latestShortMessage": "msg-99",
           "localMonitorInstalled": true,
-          "pendingMessage": "",
-          "pathTopologyCompatible": true,
-          "panelLevel": 3,
-          "requestedFrame": {
-            "y": 0,
+          "auxiliaryTopLeftArea": {
+            "y": 950,
             "x": 0,
-            "width": 0,
-            "height": 0
+            "width": 663,
+            "height": 32
           },
+          "pendingMessage": "",
           "keyWindow": false,
-          "topAnchorDelta": -36,
+          "panelLevel": 2147483630,
+          "requestedFrame": {
+            "y": 813,
+            "x": 575.5,
+            "width": 360,
+            "height": 169
+          },
+          "pathTopologyCompatible": true,
+          "notchGeometry": {
+            "trailingX": 848,
+            "centerX": 755.5,
+            "width": 185,
+            "leadingX": 663,
+            "height": 34
+          },
+          "topAnchorDelta": 0,
           "transitionGeneration": 200,
           "statusLabel": "Step 99",
           "layerBacked": true,
           "displayMode": "builtin",
-          "screenTopY": 0,
+          "screenTopY": 982,
           "prebaseFullscreen": false,
-          "contentRefreshCount": 102,
+          "contentRefreshCount": 101,
           "openInPreBaseVisible": true,
           "pinButtonTitle": "Pin",
           "renderedPendingMessage": "",
@@ -158,41 +198,55 @@
           "exitGraceMs": 250,
           "hoverDwellMs": 180,
           "userDismissedAttention": false,
+          "safeAreaTop": 32,
           "panelFrame": {
-            "y": 0,
-            "x": 0,
-            "width": 280,
-            "height": 36
+            "y": 813,
+            "x": 575,
+            "width": 360,
+            "height": 169
           },
           "orderFrontCount": 1,
-          "contentOnlyUpdateCount": 102,
+          "contentOnlyUpdateCount": 101,
           "expanded": true,
-          "panelTopY": 36,
+          "panelTopY": 982,
           "metricsLabel": "",
-          "geometryTransitionCount": 200,
-          "notchDetected": false,
+          "geometryTransitionCount": 201,
+          "notchDetected": true,
           "questionButtonLabels": [],
-          "redrawCount": 302,
+          "redrawCount": 201,
           "panelCreated": true,
           "targetPresentationState": "interactive",
           "trackingAreaCount": 1,
           "approvalControlsVisible": false,
           "accessibilityLabel": "Step 99",
+          "screenLocalizedName": "Built-in Retina Display",
           "activePresentationState": "interactive",
           "retainedWorkScreen": false,
           "lastRenderedRevision": 406,
           "lastNativeCommand": "",
           "globalMonitorInstalled": false,
           "pendingKind": "",
+          "screenFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 1512,
+            "height": 982
+          },
           "questionButtonCount": 0,
           "pinned": false,
           "collapsedHit": {
-            "y": 0,
-            "x": 0,
-            "width": 0,
-            "height": 0
+            "y": 948,
+            "x": 575.5,
+            "width": 360,
+            "height": 34
           },
           "screenLocked": false,
+          "auxiliaryTopRightArea": {
+            "y": 950,
+            "x": 848,
+            "width": 664,
+            "height": 32
+          },
           "lastTransitionReason": "geometry",
           "pendingTitle": ""
         }
@@ -202,15 +256,15 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 354,
+        "durationRetargetMs": 357,
         "diagRetarget": {
           "hapticCount": 100,
           "pinButtonVisible": false,
           "renderedPeekBody": "Real cycle 99",
           "transitionInFlight": false,
           "panelVisible": true,
-          "peekOnly": true,
           "revision": 406,
+          "peekOnly": true,
           "animationCount": 202,
           "activityLabel": "Real cycle 99",
           "renderedLatestMessage": "",
@@ -219,24 +273,37 @@
           "interactionId": "",
           "latestShortMessage": "msg-99",
           "localMonitorInstalled": false,
-          "pendingMessage": "",
-          "pathTopologyCompatible": true,
-          "panelLevel": 3,
-          "requestedFrame": {
-            "y": 0,
+          "auxiliaryTopLeftArea": {
+            "y": 950,
             "x": 0,
-            "width": 0,
-            "height": 0
+            "width": 663,
+            "height": 32
           },
+          "pendingMessage": "",
           "keyWindow": false,
-          "topAnchorDelta": -36,
+          "panelLevel": 2147483630,
+          "requestedFrame": {
+            "y": 892,
+            "x": 575.5,
+            "width": 360,
+            "height": 90
+          },
+          "pathTopologyCompatible": true,
+          "notchGeometry": {
+            "trailingX": 848,
+            "centerX": 755.5,
+            "width": 185,
+            "leadingX": 663,
+            "height": 34
+          },
+          "topAnchorDelta": 0,
           "transitionGeneration": 202,
           "statusLabel": "Step 99",
           "layerBacked": true,
           "displayMode": "builtin",
-          "screenTopY": 0,
+          "screenTopY": 982,
           "prebaseFullscreen": false,
-          "contentRefreshCount": 102,
+          "contentRefreshCount": 101,
           "openInPreBaseVisible": false,
           "pinButtonTitle": "Pin",
           "renderedPendingMessage": "",
@@ -244,41 +311,55 @@
           "exitGraceMs": 250,
           "hoverDwellMs": 180,
           "userDismissedAttention": false,
+          "safeAreaTop": 32,
           "panelFrame": {
-            "y": 0,
-            "x": 0,
-            "width": 280,
-            "height": 36
+            "y": 813,
+            "x": 575,
+            "width": 360,
+            "height": 169
           },
           "orderFrontCount": 1,
-          "contentOnlyUpdateCount": 102,
+          "contentOnlyUpdateCount": 101,
           "expanded": true,
-          "panelTopY": 36,
+          "panelTopY": 982,
           "metricsLabel": "",
-          "geometryTransitionCount": 202,
-          "notchDetected": false,
+          "geometryTransitionCount": 203,
+          "notchDetected": true,
           "questionButtonLabels": [],
-          "redrawCount": 304,
+          "redrawCount": 203,
           "panelCreated": true,
           "targetPresentationState": "peek",
           "trackingAreaCount": 1,
           "approvalControlsVisible": false,
           "accessibilityLabel": "Step 99",
+          "screenLocalizedName": "Built-in Retina Display",
           "activePresentationState": "peek",
           "retainedWorkScreen": false,
           "lastRenderedRevision": 406,
           "lastNativeCommand": "",
           "globalMonitorInstalled": false,
           "pendingKind": "",
+          "screenFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 1512,
+            "height": 982
+          },
           "questionButtonCount": 0,
           "pinned": false,
           "collapsedHit": {
-            "y": 0,
-            "x": 0,
-            "width": 0,
-            "height": 0
+            "y": 948,
+            "x": 575.5,
+            "width": 360,
+            "height": 34
           },
           "screenLocked": false,
+          "auxiliaryTopRightArea": {
+            "y": 950,
+            "x": 848,
+            "width": 664,
+            "height": 32
+          },
           "lastTransitionReason": "geometry",
           "pendingTitle": ""
         }
@@ -332,7 +413,7 @@
           "peekSimResult": true,
           "state": "peek",
           "localMonitor": false,
-          "requestedHeight": 0
+          "requestedHeight": 90
         },
         "interactiveDiag": {
           "clickResult": true,
@@ -351,12 +432,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -498,
-        "heapUsedMb": 5.77,
-        "rssDiffKb": 6768,
-        "rssMb": 78.17,
-        "cpuDeltaUserMs": 278503,
-        "cpuDeltaSystemMs": 49554
+        "heapDiffKb": -358,
+        "heapUsedMb": 5.87,
+        "rssDiffKb": 31984,
+        "rssMb": 102.88,
+        "cpuDeltaUserMs": 588154,
+        "cpuDeltaSystemMs": 124914
       }
     },
     {
@@ -433,18 +514,18 @@
           "animationCount": 0,
           "transitionGeneration": 0,
           "transitionInFlight": false,
-          "redrawCount": 2,
+          "redrawCount": 1,
           "activePresentationState": "compact",
           "targetPresentationState": "compact",
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 599,
+            "y": 948,
+            "width": 313,
+            "height": 34
           },
-          "geometryTransitionCount": 0,
-          "contentOnlyUpdateCount": 2,
-          "contentRefreshCount": 2,
+          "geometryTransitionCount": 1,
+          "contentOnlyUpdateCount": 1,
+          "contentRefreshCount": 1,
           "orderFrontCount": 1,
           "lastRenderedRevision": 1000,
           "revision": 1000,
@@ -464,16 +545,16 @@
           "activePresentationState": "compact",
           "targetPresentationState": "compact",
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 599,
+            "y": 948,
+            "width": 313,
+            "height": 34
           },
           "lastRenderedRevision": 1100,
           "revision": 1100,
-          "geometryTransitionCount": 0,
-          "contentOnlyUpdateCount": 102,
-          "contentRefreshCount": 102,
+          "geometryTransitionCount": 1,
+          "contentOnlyUpdateCount": 101,
+          "contentRefreshCount": 101,
           "statusLabel": "StormA 1100",
           "latestShortMessage": "msg-1100",
           "metricsLabel": "+0 −23 · 2 files",
@@ -490,16 +571,16 @@
           "activePresentationState": "compact",
           "targetPresentationState": "compact",
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 599,
+            "y": 948,
+            "width": 313,
+            "height": 34
           },
           "lastRenderedRevision": 1260,
           "revision": 1260,
-          "geometryTransitionCount": 0,
-          "contentOnlyUpdateCount": 262,
-          "contentRefreshCount": 262,
+          "geometryTransitionCount": 1,
+          "contentOnlyUpdateCount": 261,
+          "contentRefreshCount": 261,
           "statusLabel": "StormB 1260",
           "latestShortMessage": "msg-1260",
           "metricsLabel": "+10 −23 · 1 file",
@@ -508,7 +589,127 @@
             "label": "StormB 1260",
             "message": "msg-1260"
           },
-          "redrawDelta": 260
+          "redrawDelta": 0
+        }
+      }
+    },
+    {
+      "name": "content-during-morph",
+      "ok": true,
+      "details": {
+        "midMorphBefore": {
+          "animationCount": 1,
+          "transitionGeneration": 1,
+          "transitionInFlight": true,
+          "redrawCount": 2,
+          "activePresentationState": "peek",
+          "targetPresentationState": "peek",
+          "frame": {
+            "x": 575.5,
+            "y": 892,
+            "width": 360,
+            "height": 90
+          },
+          "geometryTransitionCount": 2,
+          "contentOnlyUpdateCount": 1,
+          "contentRefreshCount": 1,
+          "orderFrontCount": 1,
+          "lastRenderedRevision": 1500,
+          "revision": 1500,
+          "lastTransitionReason": "geometry"
+        },
+        "sawInFlightDuringContent": true,
+        "midMorphAfter": {
+          "animationCount": 1,
+          "transitionGeneration": 1,
+          "transitionInFlight": true,
+          "redrawCount": 2,
+          "activePresentationState": "peek",
+          "targetPresentationState": "peek",
+          "frame": {
+            "x": 575.5,
+            "y": 892,
+            "width": 360,
+            "height": 90
+          },
+          "geometryTransitionCount": 2,
+          "contentOnlyUpdateCount": 13,
+          "contentRefreshCount": 13,
+          "orderFrontCount": 1,
+          "lastRenderedRevision": 1512,
+          "revision": 1512,
+          "lastTransitionReason": "content",
+          "lastAppliedRevision": 1512
+        },
+        "settled": {
+          "animationCount": 1,
+          "transitionGeneration": 1,
+          "transitionInFlight": false,
+          "redrawCount": 2,
+          "activePresentationState": "peek",
+          "targetPresentationState": "peek",
+          "frame": {
+            "x": 575.5,
+            "y": 892,
+            "width": 360,
+            "height": 90
+          },
+          "geometryTransitionCount": 2,
+          "contentOnlyUpdateCount": 13,
+          "contentRefreshCount": 13,
+          "orderFrontCount": 1,
+          "lastRenderedRevision": 1512,
+          "revision": 1512,
+          "lastTransitionReason": "content"
+        },
+        "interactiveDuring": {
+          "before": {
+            "animationCount": 2,
+            "transitionGeneration": 2,
+            "transitionInFlight": true,
+            "redrawCount": 3,
+            "activePresentationState": "interactive",
+            "targetPresentationState": "interactive",
+            "frame": {
+              "x": 535,
+              "y": 810,
+              "width": 417,
+              "height": 172
+            },
+            "geometryTransitionCount": 3,
+            "contentOnlyUpdateCount": 13,
+            "contentRefreshCount": 13,
+            "orderFrontCount": 1,
+            "lastRenderedRevision": 1512,
+            "revision": 1512,
+            "lastTransitionReason": "geometry"
+          },
+          "after": {
+            "animationCount": 2,
+            "transitionGeneration": 2,
+            "transitionInFlight": true,
+            "redrawCount": 3,
+            "activePresentationState": "interactive",
+            "targetPresentationState": "interactive",
+            "frame": {
+              "x": 535,
+              "y": 810,
+              "width": 417,
+              "height": 172
+            },
+            "geometryTransitionCount": 3,
+            "contentOnlyUpdateCount": 43,
+            "contentRefreshCount": 43,
+            "orderFrontCount": 1,
+            "lastRenderedRevision": 1629,
+            "revision": 1629,
+            "lastTransitionReason": "content"
+          },
+          "lastApplied": {
+            "revision": 1629,
+            "label": "InteractiveMorph 1629",
+            "message": "msg-1629"
+          }
         }
       }
     },
@@ -523,10 +724,10 @@
           "localMonitorInstalled": false,
           "animationCount": 1,
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 575.5,
+            "y": 892,
+            "width": 360,
+            "height": 90
           }
         },
         "after": {
@@ -538,10 +739,10 @@
           "animationCount": 1,
           "transitionGeneration": 1,
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 575.5,
+            "y": 892,
+            "width": 360,
+            "height": 90
           },
           "lastApplied": {
             "revision": 2100,
@@ -560,10 +761,10 @@
           "animationCount": 2,
           "localMonitorInstalled": true,
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 567,
+            "y": 810,
+            "width": 377,
+            "height": 172
           }
         },
         "after": {
@@ -571,10 +772,10 @@
           "animationCount": 2,
           "transitionGeneration": 2,
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 567,
+            "y": 810,
+            "width": 377,
+            "height": 172
           },
           "lastApplied": {
             "revision": 3120,
@@ -593,10 +794,10 @@
           "pinned": true,
           "animationCount": 3,
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 567,
+            "y": 810,
+            "width": 377,
+            "height": 172
           }
         },
         "after": {
@@ -604,12 +805,12 @@
           "pinned": true,
           "animationCount": 3,
           "transitionGeneration": 3,
-          "geometryTransitionCount": 3,
+          "geometryTransitionCount": 4,
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 567,
+            "y": 810,
+            "width": 377,
+            "height": 172
           },
           "lastApplied": {
             "revision": 4100,
@@ -627,7 +828,7 @@
           "animationCount": 0,
           "transitionGeneration": 0,
           "state": "compact",
-          "hasScreen": false
+          "hasScreen": true
         },
         "afterPeek": {
           "animationCount": 1,
@@ -680,10 +881,10 @@
           "renderedPeekBody": "Updated pending message 39",
           "transitionGeneration": 1,
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 575.5,
+            "y": 892,
+            "width": 360,
+            "height": 90
           }
         }
       }
@@ -696,18 +897,18 @@
           "animationCount": 0,
           "transitionGeneration": 0,
           "transitionInFlight": false,
-          "redrawCount": 2,
+          "redrawCount": 1,
           "activePresentationState": "compact",
           "targetPresentationState": "compact",
           "frame": {
-            "x": 0,
-            "y": 0,
-            "width": 280,
-            "height": 36
+            "x": 599,
+            "y": 948,
+            "width": 313,
+            "height": 34
           },
-          "geometryTransitionCount": 0,
-          "contentOnlyUpdateCount": 2,
-          "contentRefreshCount": 2,
+          "geometryTransitionCount": 1,
+          "contentOnlyUpdateCount": 1,
+          "contentRefreshCount": 1,
           "orderFrontCount": 1,
           "lastRenderedRevision": 8000,
           "revision": 8000,

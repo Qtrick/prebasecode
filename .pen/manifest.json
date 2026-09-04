@@ -1,0 +1,5 @@
+{
+  "version": 1,
+  "description": "PreBase pen.dev UI canvas registry. Optional — agents decide when a canvas review helps; not required for every UI change.",
+  "canvases": []
+}

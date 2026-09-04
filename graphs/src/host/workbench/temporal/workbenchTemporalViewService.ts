@@ -163,6 +163,9 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		}
 		this._historyGenerationToken++;
 		this._generationToken++;
+		// Drop in-flight initialize handle so a post-pause initialize() starts fresh.
+		// Do not key reuse off _generationToken: selectCommit also bumps that token.
+		this._initPromise = undefined;
 		this._historyCts?.cancel();
 		this._historyCts?.dispose();
 		this._historyCts = undefined;
@@ -281,16 +284,20 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		return undefined;
 	}
 
-	async initialize(): Promise<void> {
+	initialize(): Promise<void> {
+		const gen = this._generationToken;
+		// Reuse an in-flight init. pauseActiveWork() clears _initPromise so the next
+		// call starts fresh instead of awaiting an obsolete post-pause promise.
 		if (this._initPromise) {
 			return this._initPromise;
 		}
-		this._initPromise = this._doInitialize();
-		try {
-			await this._initPromise;
-		} finally {
-			this._initPromise = undefined;
-		}
+		const promise = this._doInitialize(gen).finally(() => {
+			if (this._initPromise === promise) {
+				this._initPromise = undefined;
+			}
+		});
+		this._initPromise = promise;
+		return promise;
 	}
 
 	pauseActiveWork(): void {
@@ -340,8 +347,11 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		await this.initialize();
 	}
 
-	private async _doInitialize(): Promise<void> {
+	private async _doInitialize(initGen: number): Promise<void> {
 		this._updateAvailableRepositories();
+		if (this._generationToken !== initGen) {
+			return;
+		}
 		if (this._availableRepositories.length === 0) {
 			this._isLoadingHistory = false;
 			this._historyError = 'No Git repository available in workspace';
@@ -385,6 +395,9 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		try {
 			if (this._gitHistoryService?.getRepositoryIdentity) {
 				const identity = await this._gitHistoryService.getRepositoryIdentity(root);
+				if (this._generationToken !== initGen) {
+					return;
+				}
 				if (identity?.repositoryId) {
 					this._activeRepositoryId = identity.repositoryId;
 				}
@@ -392,12 +405,21 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		} catch {
 			// ignore identity lookup failure
 		}
+		if (this._generationToken !== initGen) {
+			return;
+		}
 
 		// 6. Load refs for that exact root
 		try {
 			const refs = await this._temporalGraphService.getRepositoryRefs(root);
+			if (this._generationToken !== initGen) {
+				return;
+			}
 			this._repositoryRefs = refs || [];
 		} catch (err) {
+			if (this._generationToken !== initGen) {
+				return;
+			}
 			this._logService.warn('[WorkbenchTemporalViewService] Failed to load repository refs:', err);
 			this._repositoryRefs = [];
 		}
@@ -416,12 +438,21 @@ export class WorkbenchTemporalViewService extends Disposable implements IPreBase
 		if (this._comparisonSelection.mode === 'pinned' && this._comparisonSelection.baseSha) {
 			try {
 				const resolved = await this._gitHistoryService.resolveRef(root, this._comparisonSelection.baseSha);
+				if (this._generationToken !== initGen) {
+					return;
+				}
 				if (!resolved) {
 					this._comparisonSelection = { mode: 'first-parent' };
 				}
 			} catch {
+				if (this._generationToken !== initGen) {
+					return;
+				}
 				this._comparisonSelection = { mode: 'first-parent' };
 			}
+		}
+		if (this._generationToken !== initGen) {
+			return;
 		}
 
 		// 9. Load history for selected ref (with optional persisted commit restoration only if followHead is false or ref is not HEAD)

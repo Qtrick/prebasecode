@@ -32,6 +32,7 @@ class FakeElement {
 	readonly classList = new FakeClassList();
 	readonly listeners = new Map<string, Listener[]>();
 	readonly attributes = new Map<string, string>();
+	readonly dataset: Record<string, string> = {};
 	readonly clientWidth = 800;
 	readonly clientHeight = 600;
 	checked = false;
@@ -90,6 +91,12 @@ class FakeElement {
 		this.firstChild = this.children[0] || null;
 		return child;
 	}
+	replaceChildren(...nodes: FakeElement[]): void {
+		this.children = nodes.slice();
+		this.firstChild = this.children[0] || null;
+		this.innerHTML = '';
+		this.textContent = '';
+	}
 }
 
 interface CanvasDrawCall {
@@ -107,7 +114,7 @@ function createProductionWebviewHarness(initialType: 'network' | 'temporal' = 'n
 
 	const elements = new Map<string, FakeElement>();
 	for (const id of [
-		'archSvg', 'netCanvas', 'status', 'legend', 'empty', 'idleToggle', 'idleToggleWrap',
+		'archSvg', 'netCanvas', 'status', 'legend', 'empty', 'idleToggle', 'idleToggleWrap', 'noChangesCard',
 		'toolbar', 'temporalToolbar', 'temporalBreadcrumbTarget', 'temporalBreadcrumbBase', 'temporalRepoWrap', 'temporalRepoSelect', 'temporalScrubberBar', 'temporalRefSelect', 'temporalCompareSelect',
 		'temporalFollowHead', 'temporalFilterInput', 'temporalScrubber', 'temporalPrevBtn', 'temporalNextBtn',
 		'temporalPlayBtn', 'temporalCommitSha', 'temporalCommitMessage', 'temporalCommitAuthor', 'temporalCommitStatus',
@@ -1105,5 +1112,56 @@ suite('Production Graph Webview Runtime Test Suite', () => {
 		assert.ok(Number.isFinite(runtime.transform.k) && runtime.transform.k > 0);
 		const xs = runtime.nodes.map((n: any) => n.x);
 		assert.ok(Math.max(...xs) - Math.min(...xs) < 4000, 'reduced motion must not explode node extent');
+	});
+
+	test('null temporalDiff: drawTemporalFrame clears canvas and does not throw on .guides', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		harness.drawCalls.length = 0;
+		assert.doesNotThrow(() => {
+			vm.runInContext('temporalDiff = null; dirty = true; drawTemporalFrame(performance.now());', harness.context);
+		});
+		assert.ok(
+			harness.drawCalls.some(c => c.type === 'clearRect'),
+			'null temporalDiff must clearRect so stage CSS grid shows through',
+		);
+		assert.ok(
+			!harness.drawCalls.some(c => c.type === 'arc' || c.type === 'fillText'),
+			'null temporalDiff must not draw nodes/labels',
+		);
+	});
+
+	test('loading truth: selectedCommitSha !== renderedCommitSha shows Building temporal map overlay', () => {
+		const harness = createProductionWebviewHarness('temporal');
+		harness.triggerMessage({
+			type: 'temporalState',
+			payload: {
+				mode: 'temporal',
+				selectedRef: 'HEAD',
+				selectedCommitSha: 'sha_loading_target',
+				renderedCommitSha: 'sha_previous_render',
+				isLoadingSelection: true,
+				pagedTimeline: [
+					{ sha: 'sha_loading_target', shortSha: 'sha_loa', message: 'loading' },
+					{ sha: 'sha_previous_render', shortSha: 'sha_pre', message: 'previous' },
+				],
+				loadedCommitCount: 2,
+			},
+		});
+		vm.runInContext('temporalDiff = null; syncTemporalCanvasOverlay();', harness.context);
+		const empty = harness.elements.get('empty')!;
+		assert.equal(empty.style.display, 'flex');
+		assert.ok(
+			empty.children.some(c => c.textContent.includes('Building temporal map')),
+			'loading overlay title must surface while selection is ahead of render',
+		);
+		assert.ok(
+			empty.children.some(c => c.textContent.includes('sha_loa')),
+			'loading overlay must cite selected short SHA',
+		);
+		vm.runInContext('render(false);', harness.context);
+		assert.equal(
+			vm.runInContext('document.documentElement.dataset.prebaseGraphMode', harness.context),
+			'temporal',
+		);
 	});
 });
