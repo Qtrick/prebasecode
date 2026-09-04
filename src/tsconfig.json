@@ -11,6 +11,7 @@
 		"isolatedModules": false,
 		"skipLibCheck": true,
 		"preserveSymlinks": true,
+		"rootDir": ".",
 		"outDir": "../out/vs",
 		"types": [
 			"@webgpu/types",

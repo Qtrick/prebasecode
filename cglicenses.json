@@ -27,6 +27,14 @@
 		]
 	},
 	{
+		// Reason: The license at https://github.com/microsoft/TypeScript/blob/master/LICENSE.txt
+		// does not include a clear Copyright statement.
+		"name": "@typescript/typescript6",
+		"prependLicenseText": [
+			"Copyright (c) Microsoft Corporation. All rights reserved."
+		]
+	},
+	{
 		"name": "tunnel-agent",
 		"prependLicenseText": [
 			"Copyright (c) tunnel-agent authors"

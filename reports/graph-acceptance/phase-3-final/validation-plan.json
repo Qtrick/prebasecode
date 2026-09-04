@@ -1,58 +1,36 @@
 {
-  "runId": "2026-09-04T03-10-16-223Z",
-  "planKey": "45402b585d2f32861e9ac772395d7cedaf00a9a25b4a4d82d6a725080bc81094:commit",
+  "runId": "2026-09-04T15-25-58-959Z",
+  "planKey": "9fe0d933ddf4a3f2c67114801ffdc324cccfa2a1962c9482a663bf9b09ee1ab0:commit",
   "tier": "commit",
   "onlyProducers": [],
-  "plannedAtHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
-  "currentHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
-  "sourceHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
-  "productFingerprint": "ed1a814964371bbd9d27d8f10437141d62d3b2747de576347f7d3c0b31daf8c1",
-  "sourceFingerprint": "ed1a814964371bbd9d27d8f10437141d62d3b2747de576347f7d3c0b31daf8c1",
+  "plannedAtHead": "ddcc2c57fbac8a945c18aaefb30ae02d5aeabaf8",
+  "currentHead": "ddcc2c57fbac8a945c18aaefb30ae02d5aeabaf8",
+  "sourceHead": "ddcc2c57fbac8a945c18aaefb30ae02d5aeabaf8",
+  "productFingerprint": "a5ed963b74072e39b2cd2475d2f78e5d13b928e4b2e0c9f88807869e94fc025e",
+  "sourceFingerprint": "a5ed963b74072e39b2cd2475d2f78e5d13b928e4b2e0c9f88807869e94fc025e",
   "prerequisites": {
     "firecrawlConfigured": false,
     "linkupConfigured": false,
     "geminiConfigured": false,
     "darwin": true
   },
-  "createdAt": "2026-09-04T03:10:18.079Z",
+  "createdAt": "2026-09-04T15:26:00.516Z",
   "reused": false,
   "totalEstimatedDurationMs": 0,
-  "changedPathCount": 43,
+  "changedPathCount": 8,
   "changedDomains": [
-    "magnus-core",
-    "magnus-guidance",
-    "magnus-desktop-tools",
-    "graphs-common",
-    "temporal",
-    "live-activity",
-    "assurance-leaf",
-    "shared-workbench",
-    "cloud-auth",
-    "core-ide",
-    "launch-harness"
+    "live-activity"
   ],
   "unknownChangedPaths": [
-    ".eslint-allowed-javascript-files",
-    ".eslint-ignore",
-    "build/azure-pipelines/product-build-template.yml",
-    "build/azure-pipelines/product-build.yml",
-    "build/filters.ts",
-    "build/hygiene.ts",
-    "docs/HOSTED_MAGNUS.md",
-    "docs/TECHNOLOGY_VERSIONS.md",
-    "eslint.config.js",
+    ".github/workflows/pr-darwin-test.yml",
+    ".github/workflows/pr-linux-test.yml",
+    ".github/workflows/pr-win32-test.yml",
+    "cglicenses.json",
     "extensions/emmet/src/imageSizeHelper.ts",
-    "extensions/prebase-magnus/src/geminiAdapter.ts",
-    "extensions/prebase-magnus/src/languageModelProvider.ts",
-    "extensions/prebase-magnus/src/modelPolicy.ts",
-    "extensions/prebase-magnus/src/models.test.ts",
-    "extensions/prebase-magnus/src/processOutputFormatter.ts",
-    "extensions/prebase-magnus/src/workspaceIntelligence.ts",
-    "src/vs/platform/prebaseDesktop/common/processTermination.ts",
-    "src/vs/workbench/api/common/extHostGitExtensionService.ts",
-    "src/vs/workbench/browser/layout.ts"
+    "src/tsconfig.json"
   ],
   "deferredReleaseProducers": [
+    "parser-benchmark",
     "temporal-large",
     "temporal-canonical-scale",
     "load-quit",
@@ -60,14 +38,15 @@
     "electron-restart-soak",
     "tauri-restart-soak",
     "idle-soak",
-    "active-soak"
+    "active-soak",
+    "assurance"
   ],
   "producers": [
     {
       "id": "parser-benchmark",
-      "expectedProducerFingerprint": "b0893a779193616727e1dfb365461a03e4edfe3d17a61761a7cdaf84a35821f1",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
+      "expectedProducerFingerprint": "212884f46aa7974050ea70084fb1c7feec5e92c33477cae8a7b3ba51641542e3",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 90000,
       "timeoutMs": 1500000,
       "artifacts": [
@@ -82,7 +61,7 @@
       "expectedProducerFingerprint": "7a991cc495fe0e03df13091073d7c4555fba071e5de43293b4a4202c9efe4f1d",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 19608,
+      "estimatedDurationMs": 45000,
       "timeoutMs": 180000,
       "artifacts": [
         "magnus-streaming-smoke"
@@ -99,7 +78,7 @@
       "expectedProducerFingerprint": "ed751fd13b200bee6c624171a3ce2a29552684eb2a42d9ea15d4a8290ea0bc68",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 12428,
+      "estimatedDurationMs": 12055,
       "timeoutMs": 180000,
       "artifacts": [
         "magnus-guidance-smoke"
@@ -113,10 +92,10 @@
     },
     {
       "id": "magnus-live-activity",
-      "expectedProducerFingerprint": "3a3b9f1c091f7e199a48729c78e91f79277b0e94d2f17b0f8c1650869c26022d",
+      "expectedProducerFingerprint": "86391ebd531248a042fd288673cd7d82fc74e15ef314e1f3ab7a3411c1269ba6",
       "status": "CURRENT_GREEN",
       "reason": "current",
-      "estimatedDurationMs": 16888,
+      "estimatedDurationMs": 45000,
       "timeoutMs": 120000,
       "artifacts": [
         "magnus-live-activity"
@@ -129,10 +108,10 @@
     },
     {
       "id": "core-ide",
-      "expectedProducerFingerprint": "99c4ef321a2eefcb9976cf20ab1450d2c6c58e35665bdaecbcdfb5d0888dfead",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 115340,
+      "expectedProducerFingerprint": "9d6812833260984e5f862723d4ee384851bded8f5dc8c2c880d51e0ef98d4fe5",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
+      "estimatedDurationMs": 120000,
       "timeoutMs": 240000,
       "artifacts": [
         "core-ide",
@@ -166,10 +145,10 @@
     },
     {
       "id": "temporal-small",
-      "expectedProducerFingerprint": "cc04120e3c823af9d58822ae35f648d0fd49e16d5e476c9878e71c773c660275",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
-      "estimatedDurationMs": 21225,
+      "expectedProducerFingerprint": "42c10b7f425dc0a6ae3080ffc5ddde07501520581cace36d642da90f58ccb29b",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
+      "estimatedDurationMs": 90000,
       "timeoutMs": 180000,
       "artifacts": [
         "temporal-small"
@@ -184,7 +163,7 @@
     },
     {
       "id": "temporal-large",
-      "expectedProducerFingerprint": "c76f3d7dc332bca6d56a22766d2420d3047779dd77fbedadd545c1c0f471f290",
+      "expectedProducerFingerprint": "c432024a835429244baa1528c9f7a8247e4a4ae7758580bd45b653b7d5083bd1",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 150000,
@@ -202,7 +181,7 @@
     },
     {
       "id": "temporal-canonical-scale",
-      "expectedProducerFingerprint": "f79f7b341bbee5043a46f0c1e71eb3f67c5b044d351c7f2d6f87d95d73e2e852",
+      "expectedProducerFingerprint": "a3a67fdd76692d6fc9c86775c7e20966ce545913347ecb6bc08e2d37cab7160d",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 300000,
@@ -340,7 +319,7 @@
     },
     {
       "id": "load-quit",
-      "expectedProducerFingerprint": "36593458c077f57348e60c99fd5951a5b67e58194edb03cc432a084696be2ee6",
+      "expectedProducerFingerprint": "083369da1db7bcb71dfb29a7df028fe3401fd2b91865edb69f39b8beed6d7c66",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 720000,
@@ -363,7 +342,7 @@
     },
     {
       "id": "lifecycle-cycles",
-      "expectedProducerFingerprint": "85f33d6ee1663f6b974fda981d9a82d71a0dde704b1c786b28f7503512d2fb36",
+      "expectedProducerFingerprint": "6ae06632f9da500eed006a63185488636c60f9a403f339f7b6c2a00184993cff",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 90000,
@@ -429,7 +408,7 @@
     },
     {
       "id": "active-soak",
-      "expectedProducerFingerprint": "be7ff8276c24a5adb81a674eb4a24011949bdef8fcd30ce7f8284fb43d7eba21",
+      "expectedProducerFingerprint": "eca558daff409039452f6f84b02411176257e36de8d3026022ca6e76e9976044",
       "status": "DEFERRED_RELEASE",
       "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 600000,
@@ -450,9 +429,9 @@
     },
     {
       "id": "assurance",
-      "expectedProducerFingerprint": "ec35bb36ea59fc6b3f9cab4ec82b61fc51c7ea42bea878fdfc5c9ad470a5cb58",
-      "status": "CURRENT_GREEN",
-      "reason": "current",
+      "expectedProducerFingerprint": "19840bd366d998cd85a244f081dabbf337abf2c652270e4fd958025ce6b99ba9",
+      "status": "DEFERRED_RELEASE",
+      "reason": "commit-tier excludes release-only / unaffected producer",
       "estimatedDurationMs": 480000,
       "timeoutMs": 480000,
       "artifacts": [

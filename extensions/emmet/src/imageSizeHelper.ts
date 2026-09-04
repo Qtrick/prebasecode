@@ -25,14 +25,26 @@ const ALLOWED_WEB_IMAGE_EXTENSIONS = new Set([
 	'.jpg',
 	'.jpeg',
 	'.gif',
-	'.svg',
-	'.webp',
-	'.bmp',
-	'.ico',
-	'.avif'
+	'.webp'
 ]);
 
-const ALLOWED_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg|gif|svg\+xml|webp|bmp|x-icon|avif);base64,/i;
+const ALLOWED_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg|gif|webp);base64,/i;
+
+function isPrivateOrLocalHost(hostname: string): boolean {
+	const host = hostname.toLowerCase();
+	if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0' || host === '169.254.169.254') {
+		return true;
+	}
+	const ipv4Match = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
+	if (ipv4Match) {
+		const b0 = parseInt(ipv4Match[1], 10);
+		const b1 = parseInt(ipv4Match[2], 10);
+		if (b0 === 10 || b0 === 127 || (b0 === 169 && b1 === 254) || (b0 === 192 && b1 === 168) || (b0 === 172 && b1 >= 16 && b1 <= 31)) {
+			return true;
+		}
+	}
+	return false;
+}
 
 function isAllowedImageFormat(fileOrUrl: string): boolean {
 	if (ALLOWED_DATA_URL_PATTERN.test(fileOrUrl)) {
@@ -41,7 +53,11 @@ function isAllowedImageFormat(fileOrUrl: string): boolean {
 	let pathname = fileOrUrl;
 	try {
 		if (reUrl.test(fileOrUrl)) {
-			pathname = new URL(fileOrUrl).pathname;
+			const parsed = new URL(fileOrUrl);
+			if (isPrivateOrLocalHost(parsed.hostname)) {
+				return false;
+			}
+			pathname = parsed.pathname;
 		}
 	} catch {
 		return false;
@@ -89,8 +105,11 @@ function getImageSizeFromFile(file: string): Promise<ImageInfoWithScale | undefi
 	});
 }
 
+const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const REQUEST_TIMEOUT_MS = 5000;
+
 /**
- * Get image size from given remove URL
+ * Get image size from given remote URL
  */
 function getImageSizeFromURL(urlStr: string): Promise<ImageInfoWithScale | undefined> {
 	return new Promise((resolve, reject) => {
@@ -102,7 +121,7 @@ function getImageSizeFromURL(urlStr: string): Promise<ImageInfoWithScale | undef
 		}
 		const urlPath: string = url.pathname;
 
-		getTransport(url, resp => {
+		const req = getTransport(url, resp => {
 			const chunks: Buffer[] = [];
 			let bufSize = 0;
 
@@ -119,6 +138,12 @@ function getImageSizeFromURL(urlStr: string): Promise<ImageInfoWithScale | undef
 
 			const onData = (chunk: Buffer) => {
 				bufSize += chunk.length;
+				if (bufSize > MAX_IMAGE_BYTES) {
+					resp.removeListener('data', onData);
+					resp.destroy();
+					reject(new Error('Image exceeds size limit of 5MB'));
+					return;
+				}
 				chunks.push(chunk);
 				trySize(chunks);
 			};
@@ -130,7 +155,14 @@ function getImageSizeFromURL(urlStr: string): Promise<ImageInfoWithScale | undef
 					resp.removeListener('data', onData);
 					reject(err);
 				});
-		}).once('error', reject);
+		});
+
+		req.setTimeout(REQUEST_TIMEOUT_MS, () => {
+			req.destroy();
+			reject(new Error('Image fetch timed out'));
+		});
+
+		req.once('error', reject);
 	});
 }
 

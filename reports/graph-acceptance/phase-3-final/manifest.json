@@ -1,18 +1,18 @@
 {
   "phase": "3-final",
-  "sourceHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
-  "sourceFingerprint": "ed1a814964371bbd9d27d8f10437141d62d3b2747de576347f7d3c0b31daf8c1",
-  "productFingerprint": "ed1a814964371bbd9d27d8f10437141d62d3b2747de576347f7d3c0b31daf8c1",
+  "sourceHead": "ddcc2c57fbac8a945c18aaefb30ae02d5aeabaf8",
+  "sourceFingerprint": "a5ed963b74072e39b2cd2475d2f78e5d13b928e4b2e0c9f88807869e94fc025e",
+  "productFingerprint": "a5ed963b74072e39b2cd2475d2f78e5d13b928e4b2e0c9f88807869e94fc025e",
   "producerFingerprints": {
-    "parser-benchmark": "b0893a779193616727e1dfb365461a03e4edfe3d17a61761a7cdaf84a35821f1",
+    "parser-benchmark": "212884f46aa7974050ea70084fb1c7feec5e92c33477cae8a7b3ba51641542e3",
     "magnus-streaming-smoke": "7a991cc495fe0e03df13091073d7c4555fba071e5de43293b4a4202c9efe4f1d",
     "magnus-guidance-smoke": "ed751fd13b200bee6c624171a3ce2a29552684eb2a42d9ea15d4a8290ea0bc68",
-    "magnus-live-activity": "3a3b9f1c091f7e199a48729c78e91f79277b0e94d2f17b0f8c1650869c26022d",
-    "core-ide": "99c4ef321a2eefcb9976cf20ab1450d2c6c58e35665bdaecbcdfb5d0888dfead",
+    "magnus-live-activity": "86391ebd531248a042fd288673cd7d82fc74e15ef314e1f3ab7a3411c1269ba6",
+    "core-ide": "9d6812833260984e5f862723d4ee384851bded8f5dc8c2c880d51e0ef98d4fe5",
     "runtime-preview": "03b2838e787c0dcc3d219cb132fd9f14ad5fb2edbe56f4a7473aed108f399b8c",
-    "temporal-small": "cc04120e3c823af9d58822ae35f648d0fd49e16d5e476c9878e71c773c660275",
-    "temporal-large": "c76f3d7dc332bca6d56a22766d2420d3047779dd77fbedadd545c1c0f471f290",
-    "temporal-canonical-scale": "f79f7b341bbee5043a46f0c1e71eb3f67c5b044d351c7f2d6f87d95d73e2e852",
+    "temporal-small": "42c10b7f425dc0a6ae3080ffc5ddde07501520581cace36d642da90f58ccb29b",
+    "temporal-large": "c432024a835429244baa1528c9f7a8247e4a4ae7758580bd45b653b7d5083bd1",
+    "temporal-canonical-scale": "a3a67fdd76692d6fc9c86775c7e20966ce545913347ecb6bc08e2d37cab7160d",
     "electron-product-path": "3ea7fcdac363e9a711296783aff919851e7b03e2c63fda9d37a1f56cc8172413",
     "electron-native-cases": "06c49cba14f745ea440e921ed0ff3531d0c012782ccaf75b9748e5d6dc4b468e",
     "tauri-product-path": "80678b2424e1f07ea29f8c8134eae20f4f7394ebd51c7075a7f03c96e65259a3",
@@ -20,16 +20,16 @@
     "magnus-tauri-tools": "7029a1adfc593cbff214861b0c535786da218bbd41a9237cda1c6bba2756c4cc",
     "hybrid-web-smoke": "8ca8e0c9e7a4ec32768004fbd0f9f8f539d44c3f2260348420a455c27fbf9521",
     "privacy": "dc649fec4c3161d4de5e226d626b90ff74df9c1754c3e6a380e916848f79ddbe",
-    "load-quit": "36593458c077f57348e60c99fd5951a5b67e58194edb03cc432a084696be2ee6",
-    "lifecycle-cycles": "85f33d6ee1663f6b974fda981d9a82d71a0dde704b1c786b28f7503512d2fb36",
+    "load-quit": "083369da1db7bcb71dfb29a7df028fe3401fd2b91865edb69f39b8beed6d7c66",
+    "lifecycle-cycles": "6ae06632f9da500eed006a63185488636c60f9a403f339f7b6c2a00184993cff",
     "electron-restart-soak": "4efaec2ead71d3ecd7f4543f535249bb723189f2f9fa39954495859c453cdedd",
     "tauri-restart-soak": "de0ce262248d397475170c4b89186060350f3bddebc19893b09b3eb491a6749a",
     "idle-soak": "0dc30f22a48233577048d9a99c3b31cfc9ecd5e06ce577cd882df4eaf61186f0",
-    "active-soak": "be7ff8276c24a5adb81a674eb4a24011949bdef8fcd30ce7f8284fb43d7eba21",
-    "assurance": "ec35bb36ea59fc6b3f9cab4ec82b61fc51c7ea42bea878fdfc5c9ad470a5cb58"
+    "active-soak": "eca558daff409039452f6f84b02411176257e36de8d3026022ca6e76e9976044",
+    "assurance": "19840bd366d998cd85a244f081dabbf337abf2c652270e4fd958025ce6b99ba9"
   },
-  "validationRunId": "2026-09-04T03-06-35-090Z",
-  "generatedAt": "2026-09-04T03:09:52.854Z",
+  "validationRunId": "2026-09-04T15-25-10-881Z",
+  "generatedAt": "2026-09-04T15:25:19.995Z",
   "overallRepositoryControlledGate": false,
   "externalBlockers": [
     {
@@ -46,6 +46,7 @@
     "tauri-product-path: evidence producer fingerprint does not match current producer inputs",
     "electron-native-cases: evidence producer fingerprint does not match current producer inputs",
     "runtime-preview: evidence producer fingerprint does not match current producer inputs",
+    "temporal-small: evidence producer fingerprint does not match current producer inputs",
     "temporal-large: evidence producer fingerprint does not match current producer inputs",
     "temporal-canonical-scale: Temporal Graph target did not open; Temporal fixture repository did not load; Full Map metrics are missing; canonical-scale live evidence must capture multiple zoom tiers; Focus Changes metrics are missing",
     "magnus-electron-tools: evidence producer fingerprint does not match current producer inputs",
@@ -56,8 +57,13 @@
     "lifecycle-cycles: evidence producer fingerprint does not match current producer inputs",
     "electron-restart-soak: evidence producer fingerprint does not match current producer inputs",
     "tauri-restart-soak: evidence producer fingerprint does not match current producer inputs",
+    "core-ide: evidence producer fingerprint does not match current producer inputs",
+    "code-graph: evidence producer fingerprint does not match current producer inputs",
+    "themes-a11y: evidence producer fingerprint does not match current producer inputs",
     "privacy: evidence producer fingerprint does not match current producer inputs",
-    "active-soak: evidence producer fingerprint does not match current producer inputs"
+    "parser-benchmark: evidence producer fingerprint does not match current producer inputs",
+    "active-soak: evidence producer fingerprint does not match current producer inputs",
+    "assurance: evidence producer fingerprint does not match current producer inputs"
   ],
   "scenarios": [
     {
@@ -112,23 +118,14 @@
     {
       "id": "temporal-small",
       "path": "temporal/live.json",
-      "ok": true,
+      "ok": false,
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "quit": {
         "startedAt": 1788491390728,
         "quitMs": 404,
         "remaining": "gone",
         "before": "13982     1   0.3 276384 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "after": "gone"
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 21225,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/temporal-small.log",
-        "logTail": "",
-        "harnessPid": 13322,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -202,16 +199,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 19608,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-streaming-smoke.log",
-        "logTail": "",
-        "harnessPid": 98815,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -227,16 +214,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 12801,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-guidance-smoke.log",
-        "logTail": "",
-        "harnessPid": 249,
-        "timeoutMs": 180000,
-        "leftoverPids": []
       }
     },
     {
@@ -244,24 +221,14 @@
       "path": "magnus/live-activity.json",
       "ok": true,
       "quit": {
-        "before": "1906     1  16.0 309984 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+        "before": "93396     1  13.3 291904 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
         "leftoverPids": [],
-        "latencyMs": 2370,
+        "latencyMs": 1116,
         "terminationPath": "workbench",
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 16888,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/magnus-live-activity.log",
-        "logTail": "",
-        "harnessPid": 1625,
-        "timeoutMs": 120000,
-        "leftoverPids": []
       }
     },
     {
@@ -318,7 +285,8 @@
     {
       "id": "core-ide",
       "path": "core-ide/live.json",
-      "ok": true,
+      "ok": false,
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "quit": {
         "before": "12302     1   1.2 285152 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
@@ -328,37 +296,19 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 115340,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 4881,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
       "id": "code-graph",
       "path": "core-ide/code-graph.json",
-      "ok": true,
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 115340,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 4881,
-        "timeoutMs": 240000,
-        "leftoverPids": []
-      }
+      "ok": false,
+      "reason": "evidence producer fingerprint does not match current producer inputs"
     },
     {
       "id": "themes-a11y",
       "path": "core-ide/themes-a11y.json",
-      "ok": true,
+      "ok": false,
+      "reason": "evidence producer fingerprint does not match current producer inputs",
       "quit": {
         "before": "12302     1   1.2 285152 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
         "remaining": "gone",
@@ -368,16 +318,6 @@
         "workbenchCompleted": true,
         "usedSigterm": false,
         "usedSigkill": false
-      },
-      "rerun": {
-        "code": 0,
-        "timedOut": false,
-        "elapsedMs": 115340,
-        "log": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/gate-logs/core-ide.log",
-        "logTail": "",
-        "harnessPid": 4881,
-        "timeoutMs": 240000,
-        "leftoverPids": []
       }
     },
     {
@@ -399,7 +339,8 @@
     {
       "id": "parser-benchmark",
       "path": "performance/parser-batch.json",
-      "ok": true
+      "ok": false,
+      "reason": "evidence producer fingerprint does not match current producer inputs"
     },
     {
       "id": "active-soak",
@@ -420,29 +361,8 @@
   ],
   "assurance": {
     "path": "assurance.json",
-    "ok": true
+    "ok": false,
+    "reason": "evidence producer fingerprint does not match current producer inputs"
   },
-  "plannedProducers": [
-    "magnus-streaming-smoke",
-    "magnus-guidance-smoke",
-    "magnus-live-activity",
-    "core-ide",
-    "runtime-preview",
-    "temporal-small",
-    "temporal-large",
-    "temporal-canonical-scale",
-    "electron-product-path",
-    "electron-native-cases",
-    "tauri-product-path",
-    "magnus-electron-tools",
-    "magnus-tauri-tools",
-    "hybrid-web-smoke",
-    "privacy",
-    "load-quit",
-    "lifecycle-cycles",
-    "electron-restart-soak",
-    "tauri-restart-soak",
-    "idle-soak",
-    "active-soak"
-  ]
+  "plannedProducers": []
 }

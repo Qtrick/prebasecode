@@ -7,7 +7,6 @@
 static const CGFloat kCollapsedHeight = 34;
 static const CGFloat kPeekBodyHeight = 56;
 static const CGFloat kWingWidthMin = 52;
-static const CGFloat kWingWidthMax = 148;
 /** Fixed compact/peek wing widths — content text must not resize the notch island. */
 static const CGFloat kStableCompactLeftWing = 64;
 static const CGFloat kStableCompactRightWing = 64;
@@ -279,11 +278,12 @@ static NSString *JSString(Napi::Value value) {
 
 @property (nonatomic, assign) BOOL lastInside;
 @property (nonatomic, assign) BOOL didHoverHaptic;
-@property (nonatomic, assign) BOOL didAttentionHaptic;
 @property (nonatomic, assign) BOOL attentionPeek;
 /** User Escape/collapse while attention: stay compact until click or attention clears. */
 @property (nonatomic, assign) BOOL userDismissedAttention;
 @property (nonatomic, assign) NSUInteger hapticCount;
+@property (nonatomic, assign) NSUInteger hoverHapticCount;
+@property (nonatomic, copy) NSString *lastHapticReason;
 @property (nonatomic, assign) NSUInteger redrawCount;
 @property (nonatomic, assign) NSUInteger animationCount;
 @property (nonatomic, assign) NSUInteger geometryTransitionCount;
@@ -312,6 +312,7 @@ static NSString *JSString(Napi::Value value) {
 - (void)collapseEmittingDismiss:(BOOL)emitDismiss;
 - (NSDictionary *)diagnosticsDict;
 - (void)performUserHaptic;
+- (void)performUserHapticWithReason:(NSString *)reason;
 - (void)togglePin:(id)sender;
 - (void)updatePinButtonState;
 - (BOOL)simulateClickPin;
@@ -716,8 +717,9 @@ static NSString *JSString(Napi::Value value) {
 		self.ignoresMouse = YES;
 		self.displayMode = @"builtin";
 		self.didHoverHaptic = NO;
-		self.didAttentionHaptic = NO;
 		self.hapticCount = 0;
+		self.hoverHapticCount = 0;
+		self.lastHapticReason = @"none";
 		self.redrawCount = 0;
 		self.animationCount = 0;
 		self.geometryTransitionCount = 0;
@@ -943,8 +945,6 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)refreshContentOnly {
-	// Invalidate in-flight frame completion blocks without bumping morph generation.
-	self.layoutCompletionGeneration++;
 	self.contentOnlyUpdateCount++;
 	self.lastTransitionReason = @"content";
 	// Never snap shape/alpha or cancel morphPath — content updates must not interrupt geometry.
@@ -956,28 +956,11 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (CGFloat)computeLeftWingWidth {
-	// Compact + peek: fixed wings so status/metrics text never resizes the island.
-	if ([self isGlanceableSurface]) {
-		return kStableCompactLeftWing;
-	}
-	NSString *label = self.content.statusLabel.length ? self.content.statusLabel : @"Magnus";
-	CGFloat textW = [self measureStringWidth:label font:[NSFont systemFontOfSize:11 weight:NSFontWeightMedium]];
-	CGFloat raw = textW + 28;
-	CGFloat bucketed = ceil(raw / 8.0) * 8.0;
-	return MIN(kWingWidthMax, MAX(kWingWidthMin, bucketed));
+	return kStableCompactLeftWing;
 }
 
 - (CGFloat)computeRightWingWidth {
-	if ([self isGlanceableSurface]) {
-		return kStableCompactRightWing;
-	}
-	if (!self.content.metricsLabel.length) {
-		return kWingWidthMin;
-	}
-	CGFloat textW = [self measureStringWidth:self.content.metricsLabel font:[NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular]];
-	CGFloat raw = textW + 26;
-	CGFloat bucketed = ceil(raw / 8.0) * 8.0;
-	return MIN(kWingWidthMax, MAX(kWingWidthMin, bucketed));
+	return kStableCompactRightWing;
 }
 
 - (CGFloat)computeTargetContentHeight:(CGFloat)bandH {
@@ -1105,13 +1088,13 @@ static NSString *JSString(Napi::Value value) {
 		win = NSMakeRect(NSMidX(frame) - w / 2.0, topY - h, w, h);
 		self.collapsedHit = NSMakeRect(NSMidX(frame) - kPillWidth / 2.0, topY - kPillHeight, kPillWidth, kPillHeight);
 	}
+	BOOL isFirstLayout = !self.panel.isVisible || NSEqualRects(self.panel.frame, NSMakeRect(0, 0, 280, 36));
+	BOOL frameUnchanged = !isFirstLayout && [self framesEffectivelyEqual:win to:self.lastRequestedFrame];
 	self.lastRequestedFrame = win;
 	self.layoutScreen = screen;
 	self.panel.level = LiveActivityWindowLevel();
 
 	NSTimeInterval animDuration = (win.size.height > self.panel.frame.size.height) ? 0.24 : 0.18;
-	BOOL isFirstLayout = !self.panel.isVisible || NSEqualRects(self.panel.frame, NSMakeRect(0, 0, 280, 36));
-	BOOL frameUnchanged = !isFirstLayout && [self framesEffectivelyEqual:win to:self.panel.frame];
 
 	// Identical geometry: content refresh only.
 	if (frameUnchanged && !forceMorph) {
@@ -1138,8 +1121,8 @@ static NSString *JSString(Napi::Value value) {
 		[self.content updateShapeAndContentAnimated:forceMorph duration:forceMorph ? animDuration : 0 useTargetState:YES];
 	} else {
 		// Shape morph uses transitionGeneration; frame completion uses
-		// layoutCompletionGeneration (already bumped above) so content-only
-		// refreshes can invalidate layout without looking like a morph.
+		// layoutCompletionGeneration (bumped only on genuine geometry changes)
+		// so content-only updates do not cancel control finalization.
 		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES];
 		const NSUInteger generation = self.layoutCompletionGeneration;
 		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
@@ -1149,7 +1132,7 @@ static NSString *JSString(Napi::Value value) {
 			[[self.panel animator] setFrame:win display:YES];
 		} completionHandler:^{
 			if (generation == self.layoutCompletionGeneration) {
-				[self layoutControls:win];
+				[self layoutControls:self.panel ? self.panel.frame : win];
 			}
 		}];
 	}
@@ -1249,7 +1232,15 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)performUserHaptic {
+	[self performUserHapticWithReason:@"hover"];
+}
+
+- (void)performUserHapticWithReason:(NSString *)reason {
 	self.hapticCount++;
+	if ([reason isEqualToString:@"hover"]) {
+		self.hoverHapticCount++;
+	}
+	self.lastHapticReason = reason ?: @"unknown";
 	id<NSHapticFeedbackPerformer> performer = [NSHapticFeedbackManager defaultPerformer];
 	if (performer) {
 		[performer performFeedbackPattern:NSHapticFeedbackPatternGeneric performanceTime:NSHapticFeedbackPerformanceTimeNow];
@@ -1358,14 +1349,15 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)pointerInside:(BOOL)inside {
-	if (self.screenLocked || self.pinned || self.attentionPeek || self.content.peekOnly) {
-		return;
-	}
-	// Sticky Escape: attention stays compact until click; hover must not reopen peek.
-	if (self.content.attention && self.userDismissedAttention) {
-		return;
-	}
+	self.lastInside = inside;
 	if (inside) {
+		if (self.screenLocked || self.pinned || self.attentionPeek || self.content.peekOnly) {
+			return;
+		}
+		// Sticky Escape: attention stays compact until click; hover must not reopen peek.
+		if (self.content.attention && self.userDismissedAttention) {
+			return;
+		}
 		[self.exitTimer invalidate];
 		self.exitTimer = nil;
 		if (!self.hovering) {
@@ -1373,17 +1365,22 @@ static NSString *JSString(Napi::Value value) {
 			[self.hoverTimer invalidate];
 			__weak PrebaseLiveActivityController *weakSelf = self;
 			self.hoverTimer = [NSTimer scheduledTimerWithTimeInterval:kHoverDwellInterval repeats:NO block:^(NSTimer *timer) {
-				if (!weakSelf.didHoverHaptic) {
-					weakSelf.didHoverHaptic = YES;
-					[weakSelf performUserHaptic];
+				PrebaseLiveActivityController *strong = weakSelf;
+				if (!strong || gDisposed || strong.screenLocked || !strong.visible || !strong.hovering || !strong.lastInside) {
+					return;
 				}
-				[weakSelf expandPeek];
+				if (!strong.didHoverHaptic) {
+					strong.didHoverHaptic = YES;
+					[strong performUserHapticWithReason:@"hover"];
+				}
+				[strong expandPeek];
 			}];
 		}
 	} else {
 		[self.hoverTimer invalidate];
 		self.hoverTimer = nil;
 		self.hovering = NO;
+		self.didHoverHaptic = NO;
 		if (self.content.expanded) {
 			if (self.panel.firstResponder == self.input.currentEditor || self.input.stringValue.length > 0) {
 				return;
@@ -1393,8 +1390,6 @@ static NSString *JSString(Napi::Value value) {
 			self.exitTimer = [NSTimer scheduledTimerWithTimeInterval:kExitGraceInterval repeats:NO block:^(NSTimer *timer) {
 				[weakSelf collapse];
 			}];
-		} else {
-			self.didHoverHaptic = NO;
 		}
 	}
 }
@@ -1452,7 +1447,6 @@ static NSString *JSString(Napi::Value value) {
 		return;
 	}
 	self.userDismissedAttention = NO;
-	[self performUserHaptic];
 	[self expandInteractive];
 }
 
@@ -1482,8 +1476,12 @@ static NSString *JSString(Napi::Value value) {
 	self.panel.ignoresMouseEvents = YES;
 	self.ignoresMouse = YES;
 	self.didHoverHaptic = NO;
-	self.didAttentionHaptic = NO;
+	self.hovering = NO;
 	self.lastInside = NO;
+	[self.hoverTimer invalidate];
+	self.hoverTimer = nil;
+	[self.exitTimer invalidate];
+	self.exitTimer = nil;
 	self.input.hidden = YES;
 	[self removeLocalKeyMonitor];
 	[self.panel makeFirstResponder:nil];
@@ -1528,26 +1526,22 @@ static NSString *JSString(Napi::Value value) {
 	if (text.length == 0) {
 		return;
 	}
-	[self performUserHaptic];
 	[self emit:@"followUp" extras:@{ @"text": text }];
 	self.input.stringValue = @"";
 }
 
 - (void)openInPrebase:(id)sender {
-	[self performUserHaptic];
 	self.pinned = NO;
 	[self emit:@"openInPrebase" extras:nil];
 	[self collapse];
 }
 
 - (void)approve:(id)sender {
-	[self performUserHaptic];
 	[self emit:@"approve" extras:@{ @"interactionId": self.interactionId ?: @"" }];
 	[self clearPendingInteraction];
 }
 
 - (void)deny:(id)sender {
-	[self performUserHaptic];
 	[self emit:@"deny" extras:@{ @"interactionId": self.interactionId ?: @"" }];
 	[self clearPendingInteraction];
 }
@@ -1567,7 +1561,6 @@ static NSString *JSString(Napi::Value value) {
 	if (optionId.length == 0) {
 		return;
 	}
-	[self performUserHaptic];
 	NSString *interactionId = self.interactionId ?: @"";
 	[self emit:@"answer" extras:@{
 		@"interactionId": interactionId,
@@ -1703,6 +1696,8 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"localMonitorInstalled"] = @(self.localMonitor != nil);
 	dict[@"trackingAreaCount"] = @(self.content.trackingAreas.count);
 	dict[@"hapticCount"] = @(self.hapticCount);
+	dict[@"hoverHapticCount"] = @(self.hoverHapticCount);
+	dict[@"lastHapticReason"] = self.lastHapticReason ?: @"none";
 	dict[@"redrawCount"] = @(self.redrawCount);
 	dict[@"animationCount"] = @(self.animationCount);
 	dict[@"geometryTransitionCount"] = @(self.geometryTransitionCount);
@@ -1843,7 +1838,6 @@ static NSString *JSString(Napi::Value value) {
 	if (self.screenLocked) {
 		return;
 	}
-	[self performUserHaptic];
 	self.pinned = !self.pinned;
 	[self updatePinButtonState];
 	[self emit:self.pinned ? @"pin" : @"unpin" extras:nil];
@@ -2006,7 +2000,6 @@ static NSString *JSString(Napi::Value value) {
 			self.content.expanded = YES;
 			self.content.targetExpanded = YES;
 			self.ignoresMouse = NO;
-			self.didAttentionHaptic = NO;
 			if (self.panel) {
 				self.panel.ignoresMouseEvents = NO;
 			}
@@ -2041,8 +2034,10 @@ static NSString *JSString(Napi::Value value) {
 
 	self.lastRenderedRevision = incomingRevision > 0 ? incomingRevision : self.lastRenderedRevision;
 
-	if (needsGeometry && self.panel) {
-		self.pendingPresentationMorph = YES;
+	if (self.panel) {
+		if (needsGeometry) {
+			self.pendingPresentationMorph = YES;
+		}
 		[self layoutForScreen];
 	} else {
 		[self refreshContentOnly];
@@ -2426,6 +2421,11 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 	if (action == "followUp" && info.Length() >= 2 && info[1].IsString()) {
 		NSString *text = [NSString stringWithUTF8String:info[1].As<Napi::String>().Utf8Value().c_str()];
 		return Napi::Boolean::New(env, [controller simulateSubmitFollowUp:text]);
+	}
+	if (action == "pointerInside" && info.Length() >= 2 && info[1].IsBoolean()) {
+		BOOL inside = info[1].As<Napi::Boolean>().Value();
+		[controller pointerInside:inside];
+		return Napi::Boolean::New(env, true);
 	}
 	return Napi::Boolean::New(env, false);
 }

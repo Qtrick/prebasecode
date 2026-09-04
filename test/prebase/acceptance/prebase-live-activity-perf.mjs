@@ -420,6 +420,9 @@ async function run() {
 		if (staleExpanded > cycleCount * 0.1) {
 			throw new Error(`too many stale expanded states after unpin: ${staleExpanded}`);
 		}
+		if (diagAfterStress.hapticCount !== 0) {
+			throw new Error(`Expected zero haptics during click/morph stress cycles under hover-only policy, got ${diagAfterStress.hapticCount}`);
+		}
 	} catch (err) {
 		test3.ok = false;
 		test3.error = err.message;
@@ -1948,6 +1951,258 @@ async function run() {
 		results.failures.push(`monitor-leaks-after-presentation-cycles: ${err.message}`);
 	}
 	results.tests.push(test20);
+
+	// Test 21: Hover-Only Haptic Policy — verify zero haptics from clicks, actions, content storms, and exactly 1 on hover dwell
+	const test21 = { name: 'hover-only-haptic-policy', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		await sleep(40);
+		await drainMain(native, 2);
+
+		let diag = native.getDiagnostics();
+		if (diag.hapticCount !== 0) {
+			throw new Error(`baseline hapticCount must be 0, got ${diag.hapticCount}`);
+		}
+
+		// 1. Content storm while compact must NOT produce haptics
+		for (let i = 0; i < 20; i++) {
+			native.setSnapshot(contentSnapshot(9000 + i, { presentationLabel: `Compact ${i}` }));
+		}
+		await sleep(50);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 0) {
+			throw new Error(`content storm while compact emitted haptic (count=${diag.hapticCount})`);
+		}
+
+		// 2. Click → interactive must NOT produce haptics
+		native.simulateAction('click');
+		await sleep(50);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 0) {
+			throw new Error(`click->interactive emitted haptic (count=${diag.hapticCount})`);
+		}
+
+		// 3. Follow-up submission must NOT produce haptics
+		native.simulateAction('followUp', 'hello magnus');
+		await sleep(30);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 0) {
+			throw new Error(`follow-up submission emitted haptic (count=${diag.hapticCount})`);
+		}
+
+		// 4. Question option answer must NOT produce haptics
+		native.setSnapshot(contentSnapshot(9100, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'haptic-q',
+				title: 'Question',
+				message: 'Pick one',
+				options: [{ id: 'opt1', label: 'Option 1' }]
+			}
+		}));
+		await sleep(50);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 0) {
+			throw new Error(`attention arrival emitted haptic (count=${diag.hapticCount})`);
+		}
+		native.simulateAction('option', 0);
+		await sleep(30);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 0) {
+			throw new Error(`answering question option emitted haptic (count=${diag.hapticCount})`);
+		}
+
+		// 5. Pin and unpin must NOT produce haptics
+		native.simulateAction('pin');
+		await sleep(30);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 0) {
+			throw new Error(`pin emitted haptic (count=${diag.hapticCount})`);
+		}
+		native.simulateAction('escape');
+		await sleep(50);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 0) {
+			throw new Error(`unpin/escape emitted haptic (count=${diag.hapticCount})`);
+		}
+
+		// Clear attention state so sticky Escape policy does not block hover acquisition
+		native.setSnapshot(contentSnapshot(9150, { status: 'working' }));
+		await sleep(40);
+		await drainMain(native, 2);
+
+		// 6. Genuine hover acquisition: pointer inside for >= 180ms produces exactly 1 haptic
+		native.simulateAction('pointerInside', true);
+		for (let i = 0; i < 6; i++) {
+			await sleep(40);
+			await drainMain(native, 1);
+		}
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 1 || diag.hoverHapticCount !== 1) {
+			throw new Error(`hover acquisition expected exactly 1 haptic, got hapticCount=${diag.hapticCount}, hoverHapticCount=${diag.hoverHapticCount}`);
+		}
+		if (diag.lastHapticReason !== 'hover') {
+			throw new Error(`expected lastHapticReason 'hover', got '${diag.lastHapticReason}'`);
+		}
+
+		// 7. Content update while hovering must NOT produce additional haptics
+		for (let i = 0; i < 10; i++) {
+			native.setSnapshot(contentSnapshot(9200 + i, { status: 'working', latestShortMessage: `msg-${i}` }));
+		}
+		await sleep(50);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 1) {
+			throw new Error(`content updates while hovering produced extra haptics (count=${diag.hapticCount})`);
+		}
+
+		// 8. Pointer exit before hover dwell must NOT produce haptic
+		native.simulateAction('pointerInside', false);
+		for (let i = 0; i < 8; i++) {
+			await sleep(40); // 320ms > 250ms exit grace interval
+			await drainMain(native, 1);
+		}
+		// Quick enter then exit before 180ms dwell
+		native.simulateAction('pointerInside', true);
+		await sleep(50); // only 50ms < 180ms
+		await drainMain(native, 1);
+		native.simulateAction('pointerInside', false);
+		for (let i = 0; i < 8; i++) {
+			await sleep(40); // 320ms > 250ms
+			await drainMain(native, 1);
+		}
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 1) {
+			throw new Error(`pointer exit before dwell threshold produced unexpected haptic (count=${diag.hapticCount})`);
+		}
+
+		const beforeStep9 = native.getDiagnostics();
+		if (beforeStep9.activePresentationState !== 'compact') {
+			throw new Error(`expected compact before step 9, got state=${beforeStep9.activePresentationState}, peekOnly=${beforeStep9.peekOnly}, expanded=${beforeStep9.expanded}, hovering=${beforeStep9.hovered}`);
+		}
+
+		// 9. Re-enter after exit produces a new hover acquisition haptic
+		native.simulateAction('pointerInside', true);
+		for (let i = 0; i < 6; i++) {
+			await sleep(40);
+			await drainMain(native, 1);
+		}
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== 2 || diag.hoverHapticCount !== 2) {
+			throw new Error(`re-enter hover acquisition expected 2 total haptics, got ${diag.hapticCount}`);
+		}
+
+		// 10. Pointer jitter does NOT produce a haptic storm
+		for (let i = 0; i < 20; i++) {
+			native.simulateAction('pointerInside', i % 2 === 0);
+			await sleep(10);
+			await drainMain(native, 1);
+		}
+		native.simulateAction('pointerInside', false);
+		for (let i = 0; i < 5; i++) {
+			await sleep(40);
+			await drainMain(native, 1);
+		}
+		diag = native.getDiagnostics();
+		if (diag.hapticCount > 3) {
+			throw new Error(`pointer jitter created a haptic storm (count=${diag.hapticCount})`);
+		}
+
+		test21.details = {
+			finalHapticCount: diag.hapticCount,
+			finalHoverHapticCount: diag.hoverHapticCount,
+			lastHapticReason: diag.lastHapticReason
+		};
+	} catch (err) {
+		test21.ok = false;
+		test21.error = err.message;
+		results.failures.push(`hover-only-haptic-policy: ${err.message}`);
+	}
+	results.tests.push(test21);
+
+	// Test 22: Mid-Morph Content Preservation & Interactive Content Growth
+	const test22 = { name: 'mid-morph-content-and-interactive-growth', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(9499, {
+			status: 'working',
+			presentationLabel: 'MorphContent Seed',
+			latestShortMessage: 'msg-morph-seed'
+		}));
+		await sleep(40);
+
+		// 1. Initiate expansion to interactive
+		native.simulateAction('click');
+		await sleep(20); // Mid-flight of 240ms morph
+		let midMorphDiag = native.getDiagnostics();
+		const midGen = midMorphDiag.transitionGeneration;
+
+		// 2. Inject rapid content snapshots mid-morph
+		for (let i = 0; i < 15; i++) {
+			native.setSnapshot(contentSnapshot(9500 + i, {
+				status: 'working',
+				presentationLabel: `MorphContent ${i}`,
+				latestShortMessage: `msg-morph-${i}`
+			}));
+		}
+		await sleep(250); // Settle past transition duration
+		await drainMain(native, 4);
+
+		let settledDiag = native.getDiagnostics();
+		if (settledDiag.activePresentationState !== 'interactive') {
+			throw new Error(`expected interactive after settle, got ${settledDiag.activePresentationState}`);
+		}
+		// Content updates mid-morph must not bump geometry transition generation
+		if (settledDiag.transitionGeneration !== midGen) {
+			throw new Error(`transitionGeneration bumped during mid-morph content updates (expected ${midGen}, got ${settledDiag.transitionGeneration})`);
+		}
+		test22.details.midMorphSettled = {
+			state: settledDiag.activePresentationState,
+			frame: captureFrame(settledDiag),
+			transitionGeneration: settledDiag.transitionGeneration
+		};
+
+		// 3. Interactive content growth: add pending question with 3 options to grow content height
+		const preGrowthHeight = captureFrame(settledDiag).height;
+		native.setSnapshot(contentSnapshot(9600, {
+			status: 'working',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'growth-q',
+				title: 'Deploy to Production?',
+				message: 'Select deployment environment',
+				options: [
+					{ id: 'dev', label: 'Development' },
+					{ id: 'staging', label: 'Staging' },
+					{ id: 'prod', label: 'Production' }
+				]
+			}
+		}));
+		await sleep(250);
+		await drainMain(native, 4);
+
+		let growthDiag = native.getDiagnostics();
+		const postGrowthHeight = captureFrame(growthDiag).height;
+		test22.details.contentGrowth = {
+			preGrowthHeight,
+			postGrowthHeight,
+			questionButtonCount: growthDiag.questionButtonCount
+		};
+		if (postGrowthHeight <= preGrowthHeight) {
+			throw new Error(`interactive panel height must grow when options are added (pre=${preGrowthHeight}, post=${postGrowthHeight})`);
+		}
+		if (growthDiag.questionButtonCount < 3) {
+			throw new Error(`expected at least 3 question buttons visible, got ${growthDiag.questionButtonCount}`);
+		}
+	} catch (err) {
+		test22.ok = false;
+		test22.error = err.message;
+		results.failures.push(`mid-morph-content-and-interactive-growth: ${err.message}`);
+	}
+	results.tests.push(test22);
 
 	native.dispose();
 
