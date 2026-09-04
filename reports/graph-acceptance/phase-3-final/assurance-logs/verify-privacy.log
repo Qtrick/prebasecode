@@ -7,5 +7,5 @@ privacy: product.json strings scanned: 233
 privacy: enableTelemetry=false OK
 privacy: session adapter + cloud SecretStorage + Magnus patterns OK
 privacy: graph + runtime webview CSP static checks OK
-privacy: PASS (1 warning(s))
 privacy: WARNING Runtime network observation (no unexpected telemetry uploads) requires GUI launch — see docs/ASSURANCE.md#runtime-network-observation (Needs Verification).
+privacy: PASS (1 warning(s))

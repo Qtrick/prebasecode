@@ -173,6 +173,50 @@ describe('Gemini Protocol & Schema Serialization', () => {
 			assert.deepEqual(decl.parametersJsonSchema, original.inputSchema);
 		}
 	});
+
+	it('serializes generation parameters compatibility for Gemini 2.5 vs Gemini 3.x and 3.8', () => {
+		// Gemini 2.5 sends temperature and thinkingBudget
+		const req25: AIGenerateRequest = {
+			modelId: 'gemini-2.5-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			maxOutputTokens: 2048,
+			temperature: 0.7,
+			reasoningEffort: 'medium',
+		};
+		const payload25 = serializeGeminiRequest(req25);
+		const cfg25 = payload25.generationConfig as Record<string, unknown>;
+		assert.equal(cfg25.maxOutputTokens, 2048);
+		assert.equal(cfg25.temperature, 0.7);
+		assert.deepEqual(cfg25.thinkingConfig, { thinkingBudget: 8192 });
+
+		// Gemini 3.8 Flash drops deprecated temperature/topP/topK and uses thinkingLevel
+		const req38: AIGenerateRequest = {
+			modelId: 'gemini-3.8-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			maxOutputTokens: 4096,
+			temperature: 0.5,
+			reasoningEffort: 'high',
+		};
+		const payload38 = serializeGeminiRequest(req38);
+		const cfg38 = payload38.generationConfig as Record<string, unknown>;
+		assert.equal(cfg38.maxOutputTokens, 4096);
+		assert.equal(cfg38.temperature, undefined, 'Gemini 3.8 must NOT serialize temperature');
+		assert.equal(cfg38.topP, undefined, 'Gemini 3.8 must NOT serialize topP');
+		assert.equal(cfg38.topK, undefined, 'Gemini 3.8 must NOT serialize topK');
+		assert.deepEqual(cfg38.thinkingConfig, { thinkingLevel: 'HIGH' });
+
+		// Gemini 3.7 Flash normalizes minimal reasoning effort to LOW
+		const req37Minimal: AIGenerateRequest = {
+			modelId: 'gemini-3.7-flash',
+			contents: [{ role: 'user', parts: [{ text: 'Hello' }] }],
+			temperature: 0.2,
+			reasoningEffort: 'minimal',
+		};
+		const payload37 = serializeGeminiRequest(req37Minimal);
+		const cfg37 = payload37.generationConfig as Record<string, unknown>;
+		assert.equal(cfg37.temperature, undefined);
+		assert.deepEqual(cfg37.thinkingConfig, { thinkingLevel: 'LOW' });
+	});
 });
 
 describe('DirectGeminiTransport', () => {

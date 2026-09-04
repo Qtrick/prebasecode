@@ -60,11 +60,24 @@ export const DEFAULT_MAGNUS_MODELS: readonly MagnusModelOption[] = [
 	{
 		id: 'auto',
 		name: 'Auto',
-		apiModel: 'gemini-2.5-flash',
+		apiModel: 'gemini-3.8-flash',
 		maxInputTokens: 1_000_000,
 		maxOutputTokens: 65_536,
-		description: 'Balanced quality and speed, recommended for most tasks.',
+		description: 'Balanced quality, thinking reasoning, and speed, recommended for most tasks.',
 		isAuto: true,
+		reasoning: {
+			supported: true,
+			supportedEfforts: ['default', 'low', 'medium', 'high'],
+			defaultEffort: 'default',
+		},
+	},
+	{
+		id: 'gemini-3.8-flash',
+		name: 'Gemini 3.8 Flash',
+		apiModel: 'gemini-3.8-flash',
+		maxInputTokens: 1_000_000,
+		maxOutputTokens: 65_536,
+		description: 'Next-generation flagship Flash model — ultra-fast with advanced thinking capabilities.',
 		reasoning: {
 			supported: true,
 			supportedEfforts: ['default', 'low', 'medium', 'high'],

@@ -38,7 +38,12 @@ const root = path.dirname(path.dirname(import.meta.dirname));
 const productjson = JSON.parse(fs.readFileSync(path.join(import.meta.dirname, '../../product.json'), 'utf8'));
 const builtInExtensions = productjson.builtInExtensions as IExtensionDefinition[] || [];
 const webBuiltInExtensions = productjson.webBuiltInExtensions as IExtensionDefinition[] || [];
-const controlFilePath = process.env['VSCODE_EXTENSIONS_CONTROL_PATH'] || path.join(os.homedir(), '.vscode-oss-dev', 'extensions', 'control.json');
+export function getControlFilePath(customEnv?: NodeJS.ProcessEnv): string {
+	const env = customEnv || process.env;
+	return env['VSCODE_EXTENSIONS_CONTROL_PATH'] || path.join(os.homedir(), '.vscode-oss-dev', 'extensions', 'control.json');
+}
+
+export const controlFilePath = getControlFilePath();
 const ENABLE_LOGGING = !process.env['VSCODE_BUILD_BUILTIN_EXTENSIONS_SILENCE_PLEASE'];
 
 function log(...messages: string[]): void {
@@ -152,22 +157,22 @@ function syncExtension(extension: IExtensionDefinition, controlState: 'disabled'
 	}
 }
 
-interface IControlFile {
+export interface IControlFile {
 	[name: string]: 'disabled' | 'marketplace';
 }
 
-function readControlFile(): IControlFile {
+export function readControlFile(filePath: string = getControlFilePath()): IControlFile {
 	try {
-		return JSON.parse(fs.readFileSync(controlFilePath, 'utf8'));
+		return JSON.parse(fs.readFileSync(filePath, 'utf8'));
 	} catch (err) {
 		return {};
 	}
 }
 
-function writeControlFile(control: IControlFile): void {
+export function writeControlFile(control: IControlFile, filePath: string = getControlFilePath()): void {
 	try {
-		fs.mkdirSync(path.dirname(controlFilePath), { recursive: true });
-		fs.writeFileSync(controlFilePath, JSON.stringify(control, null, 2));
+		fs.mkdirSync(path.dirname(filePath), { recursive: true });
+		fs.writeFileSync(filePath, JSON.stringify(control, null, 2));
 	} catch {
 		// Sandboxed / read-only home environments
 	}

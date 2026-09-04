@@ -11,11 +11,15 @@ const MAX_BODY_BYTES = 65_536; // 64 KiB
 const MAX_OUTPUT_BYTES = 1_048_576; // 1 MiB
 
 const ALLOWED_MODELS = new Set([
+	"gemini-3.8-flash",
+	"gemini-3.7-flash",
 	"gemini-2.5-flash",
 	"gemini-2.5-pro",
-	"gemini-2.0-flash",
-	"gemini-2.0-flash-lite",
 ]);
+
+function isHostedEnabled(): boolean {
+	return Deno.env.get("PREBASE_HOSTED_MAGNUS_ENABLED") === "true";
+}
 
 const DESKTOP_ORIGIN_EXACT = new Set(["null"]);
 
@@ -136,15 +140,17 @@ Deno.serve(async (req) => {
 	// Health and provider status endpoint
 	if (req.method === "GET") {
 		if (url.pathname.endsWith("/health") || url.pathname.endsWith("/providers")) {
+			const enabled = isHostedEnabled();
 			return json(req, requestId, 200, {
 				status: "ok",
 				service: "agent-gateway",
+				enabled,
 				providers: [
 					{
 						id: "gemini",
 						displayName: "Google Gemini",
-						configured: !!geminiApiKey,
-						modelsAvailable: !!geminiApiKey,
+						configured: enabled && !!geminiApiKey,
+						modelsAvailable: enabled && !!geminiApiKey,
 					},
 				],
 			});
@@ -152,6 +158,13 @@ Deno.serve(async (req) => {
 
 		// Authenticated models discovery endpoint
 		if (url.pathname.endsWith("/models")) {
+			if (!isHostedEnabled()) {
+				return json(req, requestId, 501, {
+					error: "hosted_disabled",
+					message: "Hosted Magnus is disabled for public beta.",
+				});
+			}
+
 			const auth = await requireUser(req, requestId);
 			if ("error" in auth && auth.error) {
 				return auth.error;
@@ -215,6 +228,13 @@ Deno.serve(async (req) => {
 
 	if (req.method !== "POST") {
 		return json(req, requestId, 405, { error: "method_not_allowed" });
+	}
+
+	if (!isHostedEnabled()) {
+		return json(req, requestId, 501, {
+			error: "hosted_disabled",
+			message: "Hosted Magnus is disabled for public beta.",
+		});
 	}
 
 	const contentLength = req.headers.get("Content-Length");
@@ -311,13 +331,38 @@ Deno.serve(async (req) => {
 				});
 			}
 
-			// Settle usage record
-			await admin.from("agent_usage").update({
-				output_units: 500,
-				status: "recorded",
-			}).eq("request_id", requestId);
+			let streamedBytes = 0;
+			let streamFinished = false;
+			const transform = new TransformStream<Uint8Array, Uint8Array>({
+				transform(chunk, controller) {
+					streamedBytes += chunk.byteLength;
+					controller.enqueue(chunk);
+				},
+				async flush() {
+					streamFinished = true;
+					const estimatedUnits = Math.max(1, Math.ceil(streamedBytes / 16));
+					try {
+						await admin.from("agent_usage").update({
+							output_units: estimatedUnits,
+							status: "recorded",
+						}).eq("request_id", requestId);
+					} catch {
+						// Stream completed, settlement logging is best effort
+					}
+				},
+			});
 
-			return new Response(geminiRes.body, {
+			req.signal.addEventListener("abort", async () => {
+				if (!streamFinished) {
+					try {
+						await admin.from("agent_usage").update({ status: "voided" }).eq("request_id", requestId);
+					} catch {
+						// Abort voiding is best effort
+					}
+				}
+			});
+
+			return new Response(geminiRes.body.pipeThrough(transform), {
 				status: 200,
 				headers: {
 					...corsHeaders(req),

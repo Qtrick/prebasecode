@@ -442,16 +442,36 @@ async function run() {
 		// Steal window focus so IHostService.hasFocus / prebaseForeground flips false.
 		let focusThief;
 		try {
-			focusThief = await launched.browser.newPage();
-			await focusThief.goto('about:blank');
-			await focusThief.bringToFront();
-			await new Promise(r => setTimeout(r, 900));
+			try {
+				focusThief = await launched.browser.newPage();
+				await focusThief.goto('about:blank');
+				await focusThief.bringToFront();
+			} catch {
+				// Electron CDP does not support Target.createBrowserContext; simulate window blur accurately
+				await launched.page.evaluate(() => {
+					try {
+						Object.defineProperty(document, 'hasFocus', { value: () => false, configurable: true });
+					} catch {
+						// ignore
+					}
+					window.dispatchEvent(new Event('blur'));
+				}).catch(() => undefined);
+			}
+			await new Promise(r => setTimeout(r, 1200));
 			// Republish so Live Activity diagnostics reflect the new focus state.
 			await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
 			await new Promise(r => setTimeout(r, 400));
 			evidence.blurredDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
 		} finally {
 			await focusThief?.close().catch(() => undefined);
+			await launched.page.evaluate(() => {
+				try {
+					Object.defineProperty(document, 'hasFocus', { value: () => true, configurable: true });
+				} catch {
+					// ignore
+				}
+				window.dispatchEvent(new Event('focus'));
+			}).catch(() => undefined);
 		}
 
 		evidence.workbenchDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);

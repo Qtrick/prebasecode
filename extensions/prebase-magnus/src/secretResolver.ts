@@ -17,6 +17,10 @@ function toolProviderEnvName(providerId: string): string | undefined {
 
 export type SecretSourceType = 'local-env' | 'secret-storage' | 'process-env' | 'hosted';
 
+export function isHostedMagnusFeatureEnabled(): boolean {
+	return process.env.PREBASE_HOSTED_MAGNUS_ENABLED === 'true';
+}
+
 export interface ResolvedSecret {
 	readonly key: string;
 	readonly source: SecretSourceType;
@@ -361,7 +365,8 @@ export class PreBaseSecretResolver {
 		secretStorageKey?: string;
 		hostedAvailable?: boolean;
 	}): ResolvedProviderExecution {
-		const { providerId, requestedMode, secretStorageKey, hostedAvailable } = options;
+		const { providerId, requestedMode, secretStorageKey } = options;
+		const hostedAvailable = options.hostedAvailable ?? isHostedMagnusFeatureEnabled();
 		const normProvider = providerId.toLowerCase().replace(/-api$/, '');
 
 		// Explicit mode: development-env
@@ -561,24 +566,25 @@ export class PreBaseSecretResolver {
 		linkup: SecretDiagnosticStatus;
 		firecrawl: SecretDiagnosticStatus;
 	} {
+		const effectiveHosted = cloudHostedAvailable ?? isHostedMagnusFeatureEnabled();
 		const env = this.getRootEnv();
 		const resolvedGemini = this.resolveProviderExecution({
 			providerId: 'gemini',
 			requestedMode,
 			secretStorageKey: secretStorageGemini,
-			hostedAvailable: cloudHostedAvailable,
+			hostedAvailable: effectiveHosted,
 		});
 		const resolvedLinkup = this.resolveProviderExecution({
 			providerId: 'linkup',
 			requestedMode,
 			secretStorageKey: secretStorageLinkup,
-			hostedAvailable: cloudHostedAvailable,
+			hostedAvailable: effectiveHosted,
 		});
 		const resolvedFirecrawl = this.resolveProviderExecution({
 			providerId: 'firecrawl',
 			requestedMode,
 			secretStorageKey: secretStorageFirecrawl,
-			hostedAvailable: cloudHostedAvailable,
+			hostedAvailable: effectiveHosted,
 		});
 
 		const hasEnvFile = this._isSourceDev && !!this._prebaseRoot && fs.existsSync(path.join(this._prebaseRoot, '.env'));
@@ -592,7 +598,7 @@ export class PreBaseSecretResolver {
 				localEnv: env.has('GEMINI_API_KEY') || env.has('GOOGLE_API_KEY') ? 'present' : 'absent',
 				secretStorage: secretStorageGemini && secretStorageGemini.trim() ? 'present' : 'absent',
 				processEnv: process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY ? 'present' : 'absent',
-				hosted: cloudHostedAvailable ? 'available' : 'unavailable',
+				hosted: effectiveHosted ? 'available' : 'unavailable',
 				activeSource: resolvedGemini.source,
 				activeExecutionMode: resolvedGemini.executionMode,
 			},
@@ -601,7 +607,7 @@ export class PreBaseSecretResolver {
 				localEnv: env.has('LINKUP_API_KEY') ? 'present' : 'absent',
 				secretStorage: secretStorageLinkup && secretStorageLinkup.trim() ? 'present' : 'absent',
 				processEnv: process.env.LINKUP_API_KEY ? 'present' : 'absent',
-				hosted: cloudHostedAvailable ? 'available' : 'unavailable',
+				hosted: effectiveHosted ? 'available' : 'unavailable',
 				activeSource: resolvedLinkup.source,
 				activeExecutionMode: resolvedLinkup.executionMode,
 			},
@@ -610,7 +616,7 @@ export class PreBaseSecretResolver {
 				localEnv: env.has('FIRECRAWL_API_KEY') ? 'present' : 'absent',
 				secretStorage: secretStorageFirecrawl && secretStorageFirecrawl.trim() ? 'present' : 'absent',
 				processEnv: process.env.FIRECRAWL_API_KEY ? 'present' : 'absent',
-				hosted: cloudHostedAvailable ? 'available' : 'unavailable',
+				hosted: effectiveHosted ? 'available' : 'unavailable',
 				activeSource: resolvedFirecrawl.source,
 				activeExecutionMode: resolvedFirecrawl.executionMode,
 			},

@@ -1,24 +1,24 @@
 {
   "schemaVersion": 3,
   "scenario": "lifecycle-cycles",
-  "sourceHead": "38fcf607ba7c97f5369669ceeb2c31e1b85fe356",
-  "sourceFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
-  "productFingerprint": "80aeef61a58109a32e494dbe22fe9174a09f995075300aee56406d494954f76d",
-  "generatedAt": "2026-09-03T11:35:30.882Z",
+  "sourceHead": "1bc5f31b0a72c17d414cfc5215ffc0952cb17c42",
+  "sourceFingerprint": "61367231fcb34333001cdfbd37520bf9dc8256eefaef8514cb461d6f96deac66",
+  "productFingerprint": "61367231fcb34333001cdfbd37520bf9dc8256eefaef8514cb461d6f96deac66",
+  "generatedAt": "2026-09-04T00:24:50.355Z",
   "producerId": "lifecycle-cycles",
-  "producerFingerprint": "af68692e4d53531d8768f1634b3ec55e2fc88cd81d123657085fadeb94292d92",
+  "producerFingerprint": "fbb69c2ae492f465d6bdb7045fbd286526ad751410a9fb2c3a4d5fbaacaa60da",
   "kind": "lifecycle",
   "cycleCount": 5,
   "cycles": [
     {
       "id": "cycle-1",
-      "at": "2026-09-03T11:35:55.504Z",
-      "processCount": 15,
+      "at": "2026-09-04T00:25:16.086Z",
+      "processCount": 10,
       "roles": {
-        "main": 15
+        "main": 10
       },
-      "cpuSum": 197.6,
-      "rssMb": 2643.9,
+      "cpuSum": 148.3,
+      "rssMb": 1801,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -121,14 +121,13 @@
     },
     {
       "id": "cycle-2",
-      "at": "2026-09-03T11:36:03.676Z",
-      "processCount": 19,
+      "at": "2026-09-04T00:25:23.620Z",
+      "processCount": 10,
       "roles": {
-        "main": 17,
-        "other": 2
+        "main": 10
       },
-      "cpuSum": 190.8,
-      "rssMb": 2875.8,
+      "cpuSum": 157.4,
+      "rssMb": 1833.7,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -231,13 +230,14 @@
     },
     {
       "id": "cycle-3",
-      "at": "2026-09-03T11:36:11.534Z",
-      "processCount": 19,
+      "at": "2026-09-04T00:25:31.241Z",
+      "processCount": 18,
       "roles": {
-        "main": 19
+        "main": 10,
+        "other": 8
       },
-      "cpuSum": 187.4,
-      "rssMb": 3161.3,
+      "cpuSum": 171.9,
+      "rssMb": 1801.1,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -340,14 +340,13 @@
     },
     {
       "id": "cycle-4",
-      "at": "2026-09-03T11:36:19.564Z",
-      "processCount": 23,
+      "at": "2026-09-04T00:25:42.599Z",
+      "processCount": 10,
       "roles": {
-        "main": 21,
-        "other": 2
+        "main": 10
       },
-      "cpuSum": 185.9,
-      "rssMb": 3393.5,
+      "cpuSum": 122.3,
+      "rssMb": 2065.4,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -450,13 +449,13 @@
     },
     {
       "id": "cycle-5",
-      "at": "2026-09-03T11:36:33.126Z",
-      "processCount": 23,
+      "at": "2026-09-04T00:25:49.872Z",
+      "processCount": 10,
       "roles": {
-        "main": 23
+        "main": 10
       },
-      "cpuSum": 183.8,
-      "rssMb": 3568.9,
+      "cpuSum": 3.8,
+      "rssMb": 1284.9,
       "webContents": {
         "liveCount": 1,
         "liveIds": [
@@ -558,16 +557,16 @@
       ]
     }
   ],
-  "prebasePid": 291593,
+  "prebasePid": 92384,
   "cold": {
     "id": "cold",
-    "at": "2026-09-03T11:35:39.090Z",
-    "processCount": 10,
+    "at": "2026-09-04T00:25:00.367Z",
+    "processCount": 7,
     "roles": {
-      "main": 10
+      "main": 7
     },
-    "cpuSum": 182.4,
-    "rssMb": 1807.7,
+    "cpuSum": 22.5,
+    "rssMb": 1324.8,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -671,13 +670,14 @@
   "closedPrimarySidebar": true,
   "warm": {
     "id": "warm",
-    "at": "2026-09-03T11:35:47.730Z",
-    "processCount": 13,
+    "at": "2026-09-04T00:25:08.508Z",
+    "processCount": 42,
     "roles": {
-      "main": 13
+      "main": 10,
+      "other": 32
     },
-    "cpuSum": 201.5,
-    "rssMb": 2397.2,
+    "cpuSum": 128.1,
+    "rssMb": 1881.4,
     "webContents": {
       "liveCount": 1,
       "liveIds": [
@@ -693,10 +693,10 @@
   },
   "classification": "warm-provisioning",
   "quit": {
-    "before": "291593       1 16.6 799012 prebase",
+    "before": "92384     1   0.0 320784 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 1125,
+    "latencyMs": 604,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,

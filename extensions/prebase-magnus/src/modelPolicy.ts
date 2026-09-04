@@ -90,7 +90,7 @@ export function resolveSupportedReasoningEffort(
 	if (norm.startsWith('gemini-3.6-flash')) {
 		return requestedEffort;
 	}
-	// Gemini 3.7 Flash and 2.5 models do not support Minimal
+	// Gemini 3.8 Flash, 3.7 Flash and 2.5 models do not support Minimal -> map to low
 	if (requestedEffort === 'minimal') {
 		return 'low';
 	}
@@ -207,8 +207,8 @@ export class GeminiModelPolicy implements IModelPolicy {
 					supportedEfforts: ['default', 'minimal', 'low', 'medium', 'high'],
 					defaultEffort: 'default',
 				};
-			} else if (rawId.startsWith('gemini-3.7-flash') || isFlash) {
-				// Gemini 3.7 Flash and other consumer Flash models do not support Minimal
+			} else if (rawId.startsWith('gemini-3.8-flash') || rawId.startsWith('gemini-3.7-flash') || isFlash) {
+				// Gemini 3.8 Flash, 3.7 Flash and other consumer Flash models do not support Minimal
 				reasoning = {
 					supported: true,
 					supportedEfforts: ['default', 'low', 'medium', 'high'],
@@ -276,7 +276,7 @@ export class GeminiModelPolicy implements IModelPolicy {
 			hiddenReason = 'Internal auxiliary model (Flash-Lite hidden from consumer reasoning selector)';
 		} else if (releaseChannel === 'stable' && (isFlash || isPro)) {
 			// Determine if recommended
-			const isFlagship = /gemini-(3\.7-flash|2\.5-pro|2\.5-flash|3\.6-flash)/i.test(rawId);
+			const isFlagship = /gemini-(3\.8-flash|3\.7-flash|2\.5-pro|2\.5-flash|3\.6-flash)/i.test(rawId);
 			visibility = isFlagship ? 'recommended' : 'consumer';
 		}
 
@@ -318,14 +318,15 @@ export class GeminiModelPolicy implements IModelPolicy {
 		}
 
 		// Sort models in a curated intentional order:
-		// 1. Highest version stable Flash models (e.g. gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash)
+		// 1. Highest version stable Flash models (e.g. gemini-3.8-flash, gemini-3.7-flash, gemini-3.6-flash, gemini-3.5-flash)
 		// 2. Stable Pro models (e.g. gemini-3.1-pro if stable, gemini-2.5-pro)
 		// 3. Proven fallback Flash models (e.g. gemini-2.5-flash)
 		unique.sort((a, b) => {
 			const score = (m: NormalizedAIModel) => {
 				let s = 0;
 				if (m.visibility === 'recommended') { s += 100; }
-				if (m.id.startsWith('gemini-3.7-flash')) { s += 90; }
+				if (m.id.startsWith('gemini-3.8-flash')) { s += 95; }
+				else if (m.id.startsWith('gemini-3.7-flash')) { s += 90; }
 				else if (m.id.startsWith('gemini-3.6-flash')) { s += 80; }
 				else if (m.id.startsWith('gemini-3.5-flash')) { s += 70; }
 				else if (m.id.startsWith('gemini-3.1-pro')) { s += 65; }
@@ -395,21 +396,24 @@ export class GeminiModelPolicy implements IModelPolicy {
 			return 'gemini-2.5-flash';
 		}
 
-		// Flash hierarchy: 3.7-flash > 3.6-flash > 3.5-flash > 2.5-flash > 2.5-pro > first eligible
+		// Flash hierarchy: 3.8-flash > 3.7-flash > 3.6-flash > 3.5-flash > 2.5-flash > 2.5-pro > first eligible
+		const flash38 = eligible.find(m => m.id === 'gemini-3.8-flash' || m.id.startsWith('gemini-3.8-flash'));
+		if (flash38) { return flash38.id; }
+
 		const flash37 = eligible.find(m => m.id === 'gemini-3.7-flash' || m.id.startsWith('gemini-3.7-flash'));
-		if (flash37) {return flash37.id;}
+		if (flash37) { return flash37.id; }
 
 		const flash36 = eligible.find(m => m.id === 'gemini-3.6-flash' || m.id.startsWith('gemini-3.6-flash'));
-		if (flash36) {return flash36.id;}
+		if (flash36) { return flash36.id; }
 
 		const flash35 = eligible.find(m => m.id === 'gemini-3.5-flash' || m.id.startsWith('gemini-3.5-flash'));
-		if (flash35) {return flash35.id;}
+		if (flash35) { return flash35.id; }
 
 		const flash25 = eligible.find(m => m.id === 'gemini-2.5-flash');
-		if (flash25) {return flash25.id;}
+		if (flash25) { return flash25.id; }
 
 		const pro25 = eligible.find(m => m.id === 'gemini-2.5-pro');
-		if (pro25) {return pro25.id;}
+		if (pro25) { return pro25.id; }
 
 		return eligible[0].id;
 	}
@@ -421,13 +425,15 @@ export class GeminiModelPolicy implements IModelPolicy {
 			case 'description': {
 				// Fast stable description-compatible model (Flash / Flash-Lite stable only)
 				const eligible = classified.filter(m => m.id !== 'auto' && m.descriptionEligible && m.releaseChannel === 'stable');
-				// Prefer 3.7-flash > 3.6-flash > 3.5-flash > 2.5-flash
-				const flash37 = eligible.find(m => m.id === 'gemini-3.7-flash');
-				if (flash37) {return flash37.id;}
-				const flash36 = eligible.find(m => m.id === 'gemini-3.6-flash');
-				if (flash36) {return flash36.id;}
+				// Prefer 3.8-flash > 3.7-flash > 3.6-flash > 3.5-flash > 2.5-flash
+				const flash38 = eligible.find(m => m.id === 'gemini-3.8-flash' || m.id.startsWith('gemini-3.8-flash'));
+				if (flash38) { return flash38.id; }
+				const flash37 = eligible.find(m => m.id === 'gemini-3.7-flash' || m.id.startsWith('gemini-3.7-flash'));
+				if (flash37) { return flash37.id; }
+				const flash36 = eligible.find(m => m.id === 'gemini-3.6-flash' || m.id.startsWith('gemini-3.6-flash'));
+				if (flash36) { return flash36.id; }
 				const flash25 = eligible.find(m => m.id === 'gemini-2.5-flash');
-				if (flash25) {return flash25.id;}
+				if (flash25) { return flash25.id; }
 				return eligible[0]?.id || 'gemini-2.5-flash';
 			}
 

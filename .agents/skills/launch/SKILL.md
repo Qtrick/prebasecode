@@ -37,7 +37,10 @@ The launcher script lives next to this SKILL.md at `scripts/launch.sh`. Resolve 
 
 ```bash
 # LAUNCH=<dir-of-this-SKILL.md>/scripts/launch.sh
-"$LAUNCH"                                    # default: workbench (automation mode, simple dialogs)
+"$LAUNCH"                                    # default: workbench (CDP enabled, inspectors off)
+"$LAUNCH" --debug-all                        # enable all Node inspectors (main, extensions, agenthost)
+"$LAUNCH" --debug-main                       # enable main process Node inspector
+"$LAUNCH" --debug-extensions                 # enable extension host Node inspector
 "$LAUNCH" --native-dialogs                   # manual inspection mode (preserves OS native dialogs)
 "$LAUNCH" --agents                           # Agents window
 "$LAUNCH" -- <workspace-path>                # forward extra args to code.sh

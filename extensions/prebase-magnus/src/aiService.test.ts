@@ -322,7 +322,7 @@ describe('PreBaseAIService & Provider Resolution', () => {
 		assert.equal(resolveApiModel('unknown-retired-model', normalized), 'gemini-2.5-flash');
 
 		const info = resolveModelInfo('auto');
-		assert.equal(info.apiModel, 'gemini-2.5-flash');
+		assert.equal(info.apiModel, 'gemini-3.8-flash');
 	});
 
 	it('generates text and stream candidates cleanly', async () => {

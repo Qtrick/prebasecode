@@ -659,12 +659,15 @@ export class PreBaseSettingsEditor extends EditorPane {
 
 		const execSelect = document.createElement('select');
 		this._selectStyle(execSelect);
+		const isHostedEnabled = Boolean((globalThis as any).process?.env?.PREBASE_HOSTED_MAGNUS_ENABLED === 'true');
 		const modes = [
 			{ id: 'auto', label: 'Automatic (Recommended)' },
 			{ id: 'development-env', label: 'Development Environment (Root .env)' },
 			{ id: 'byok', label: 'Bring Your Own Key (BYOK)' },
-			{ id: 'hosted', label: 'PreBase Hosted (Not available in this build)' },
 		];
+		if (isHostedEnabled) {
+			modes.push({ id: 'hosted', label: 'PreBase Hosted' });
+		}
 		for (const m of modes) {
 			const opt = document.createElement('option');
 			opt.value = m.id;
@@ -679,7 +682,9 @@ export class PreBaseSettingsEditor extends EditorPane {
 		this._row(
 			execCard,
 			localize('prebase.settings.ai.execMode', "Execution mode"),
-			localize('prebase.settings.ai.execModeHint', "Automatic uses PreBase root .env in source dev, BYOK key if configured, or PreBase Cloud when signed in."),
+			isHostedEnabled
+				? localize('prebase.settings.ai.execModeHint', "Automatic uses PreBase root .env in source dev, BYOK key if configured, or PreBase Cloud when signed in.")
+				: localize('prebase.settings.ai.execModeHint', "Automatic uses PreBase root .env in source dev or BYOK key if configured."),
 			execSelect
 		);
 
@@ -687,6 +692,8 @@ export class PreBaseSettingsEditor extends EditorPane {
 		this._selectStyle(modelSelect);
 		const staticFallbackModels = [
 			{ id: 'auto', label: 'Auto (Recommended)' },
+			{ id: 'gemini-3.8-flash', label: 'Gemini 3.8 Flash' },
+			{ id: 'gemini-3.7-flash', label: 'Gemini 3.7 Flash' },
 			{ id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash' },
 			{ id: 'gemini-2.5-pro', label: 'Gemini 2.5 Pro' },
 		];

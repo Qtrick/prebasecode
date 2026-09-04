@@ -28,11 +28,11 @@ suite('Magnus Models & Providers', () => {
 
 	test('contains active Gemini models and auto', () => {
 		const modelIds = MAGNUS_MODELS.map(m => m.id);
-		assert.deepStrictEqual(modelIds, ['auto', 'gemini-3.7-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']);
+		assert.deepStrictEqual(modelIds, ['auto', 'gemini-3.8-flash', 'gemini-3.7-flash', 'gemini-2.5-flash', 'gemini-2.5-pro']);
 	});
 
-	test('resolveApiModel resolves auto to gemini-2.5-flash', () => {
-		assert.strictEqual(resolveApiModel('auto'), 'gemini-2.5-flash');
+	test('resolveApiModel resolves auto to gemini-3.8-flash', () => {
+		assert.strictEqual(resolveApiModel('auto'), 'gemini-3.8-flash');
 		assert.strictEqual(resolveApiModel('gemini-2.5-pro'), 'gemini-2.5-pro');
 		assert.strictEqual(resolveApiModel('gemini-2.5-flash'), 'gemini-2.5-flash');
 	});

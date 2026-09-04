@@ -91,6 +91,7 @@ export class PreBaseGraphEditor extends EditorPane {
 		this._register(this.graphService.onDidChangeViewState(viewState => {
 			const targetType = (viewState.graphType === 'temporal' ? 'temporal' : 'network') as PreBaseGraphType;
 			if (targetType !== this._inputType) {
+				const previousType = this._inputType;
 				this._inputType = targetType;
 				if (this._inputType === 'temporal') {
 					void this.temporalViewService.initialize();
@@ -99,6 +100,8 @@ export class PreBaseGraphEditor extends EditorPane {
 					if (diff) {
 						this._pushTemporalDiff(diff);
 					}
+				} else if (previousType === 'temporal') {
+					this.temporalViewService.pauseActiveWork();
 				}
 			}
 			this._pushSnapshot();
@@ -128,7 +131,11 @@ export class PreBaseGraphEditor extends EditorPane {
 		if (token.isCancellationRequested || !(input instanceof PreBaseGraphEditorInput) || !this._container) {
 			return;
 		}
+		const previousType = this._inputType;
 		this._inputType = input.graphType === 'temporal' ? 'temporal' : 'network';
+		if (previousType === 'temporal' && this._inputType !== 'temporal') {
+			this.temporalViewService.pauseActiveWork();
+		}
 		this._ensureWebview();
 		this._pushSnapshot();
 
@@ -283,6 +290,9 @@ export class PreBaseGraphEditor extends EditorPane {
 	}
 
 	private _pushTemporalState(state: ITemporalViewState): void {
+		if (this._inputType !== 'temporal') {
+			return;
+		}
 		this._webview?.postMessage({
 			type: 'temporalState',
 			payload: state
@@ -290,6 +300,9 @@ export class PreBaseGraphEditor extends EditorPane {
 	}
 
 	private _pushTemporalDiff(diff: TemporalStructuralDiff): void {
+		if (this._inputType !== 'temporal') {
+			return;
+		}
 		this._webview?.postMessage({
 			type: 'temporalDiff',
 			payload: diff
@@ -528,8 +541,12 @@ export class PreBaseGraphEditor extends EditorPane {
 			}
 			case 'switchGraphMode': {
 				const mode = (message.payload as { mode?: PreBaseGraphType } | undefined)?.mode;
-				if (mode) {
+				if (mode && mode !== this._inputType) {
+					const previousType = this._inputType;
 					this._inputType = mode;
+					if (previousType === 'temporal' && mode !== 'temporal') {
+						this.temporalViewService.pauseActiveWork();
+					}
 					await this.graphService.setGraphType(mode);
 					this._pushSnapshot();
 				}

@@ -220,19 +220,28 @@ export function serializeGeminiRequest(request: AIGenerateRequest): Record<strin
 		};
 	}
 
+	const rawModel = (request.modelId || '').toLowerCase().replace(/^models\//, '');
+	const isGemini3 = /gemini-3/i.test(rawModel);
+
 	const genConfig: Record<string, unknown> = {};
 	if (request.maxOutputTokens !== undefined) {
 		genConfig.maxOutputTokens = request.maxOutputTokens;
 	}
-	if (request.temperature !== undefined) {
-		genConfig.temperature = request.temperature;
+	// For Gemini 3.x models, sampling parameters (temperature, topP, topK) are deprecated and rejected with thinking mode
+	if (!isGemini3) {
+		if (request.temperature !== undefined) {
+			genConfig.temperature = request.temperature;
+		}
+		if ((request as { topP?: number }).topP !== undefined) {
+			genConfig.topP = (request as { topP?: number }).topP;
+		}
+		if ((request as { topK?: number }).topK !== undefined) {
+			genConfig.topK = (request as { topK?: number }).topK;
+		}
 	}
 
 	// Translate normalized reasoning effort to Gemini wire format
 	if (request.reasoningEffort && request.reasoningEffort !== 'default') {
-		const rawModel = (request.modelId || '').toLowerCase().replace(/^models\//, '');
-		const isGemini3 = /gemini-3/i.test(rawModel);
-
 		if (isGemini3) {
 			if (rawModel.startsWith('gemini-3.6-flash')) {
 				const levelMap: Record<string, string> = {
@@ -245,7 +254,7 @@ export function serializeGeminiRequest(request: AIGenerateRequest): Record<strin
 					thinkingLevel: levelMap[request.reasoningEffort] || 'MEDIUM',
 				};
 			} else {
-				// Gemini 3.7 Flash and other 3.x models: minimal is unsupported -> normalize to LOW
+				// Gemini 3.8 Flash, 3.7 Flash and other 3.x models: minimal is unsupported -> normalize to LOW
 				const levelMap: Record<string, string> = {
 					minimal: 'LOW',
 					low: 'LOW',

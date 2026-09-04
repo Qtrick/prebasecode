@@ -37,6 +37,15 @@ EXTRA_ARGS=()
 CLONE_EXTENSIONS=0
 FULL=0
 NATIVE_DIALOGS=0
+DEBUG_MAIN=0
+DEBUG_EXTENSIONS=0
+DEBUG_AGENTHOST=0
+
+if [[ "${PREBASE_DEBUG_ALL:-0}" == "1" ]]; then
+	DEBUG_MAIN=1
+	DEBUG_EXTENSIONS=1
+	DEBUG_AGENTHOST=1
+fi
 
 TRUST_MODE="trusted"
 
@@ -48,6 +57,10 @@ while [[ $# -gt 0 ]]; do
 		--clone-extensions|--copy-extensions) CLONE_EXTENSIONS=1; shift ;;
 		--full) FULL=1; shift ;;
 		--native-dialogs) NATIVE_DIALOGS=1; shift ;;
+		--debug-all|--debug) DEBUG_MAIN=1; DEBUG_EXTENSIONS=1; DEBUG_AGENTHOST=1; shift ;;
+		--debug-main) DEBUG_MAIN=1; shift ;;
+		--debug-extensions) DEBUG_EXTENSIONS=1; shift ;;
+		--debug-agenthost) DEBUG_AGENTHOST=1; shift ;;
 		--untrusted) TRUST_MODE="untrusted"; shift ;;
 		--trust-mode) TRUST_MODE="$2"; shift 2 ;;
 		--) shift; EXTRA_ARGS=("$@"); break ;;
@@ -89,9 +102,19 @@ pick_port() {
 }
 
 CDP_PORT=$(pick_port)
-EXTHOST_PORT=$(pick_port)
-MAIN_PORT=$(pick_port)
-AGENTHOST_PORT=$(pick_port)
+EXTHOST_PORT=""
+MAIN_PORT=""
+AGENTHOST_PORT=""
+
+if [[ "$DEBUG_EXTENSIONS" == "1" ]]; then
+	EXTHOST_PORT=$(pick_port)
+fi
+if [[ "$DEBUG_MAIN" == "1" ]]; then
+	MAIN_PORT=$(pick_port)
+fi
+if [[ "$DEBUG_AGENTHOST" == "1" ]]; then
+	AGENTHOST_PORT=$(pick_port)
+fi
 
 STAMP=$(date +%Y%m%d-%H%M%S)-$$
 # Keep path short to stay safely under macOS 103-char UNIX socket path limit
@@ -265,10 +288,16 @@ ARGS=(
 	"--extensions-dir=$EXT_DIR"
 	"--shared-data-dir=$SHARED_DATA_DIR"
 	"--remote-debugging-port=$CDP_PORT"
-	"--inspect-extensions=$EXTHOST_PORT"
-	"--inspect=$MAIN_PORT"
-	"--inspect-agenthost=$AGENTHOST_PORT"
 )
+if [[ -n "$EXTHOST_PORT" ]]; then
+	ARGS+=("--inspect-extensions=$EXTHOST_PORT")
+fi
+if [[ -n "$MAIN_PORT" ]]; then
+	ARGS+=("--inspect=$MAIN_PORT")
+fi
+if [[ -n "$AGENTHOST_PORT" ]]; then
+	ARGS+=("--inspect-agenthost=$AGENTHOST_PORT")
+fi
 if [[ "$AGENTS" == "1" ]]; then
 	ARGS=("--agents" "${ARGS[@]}")
 fi
@@ -279,6 +308,12 @@ fi
 LOG_FILE="$RUN_DIR/code.log"
 echo "[launch.sh] launching: $CODE_SH ${ARGS[*]}" >&2
 echo "[launch.sh] logs: $LOG_FILE" >&2
+echo "[launch.sh] CDP enabled on port $CDP_PORT" >&2
+if [[ -n "$MAIN_PORT" || -n "$EXTHOST_PORT" || -n "$AGENTHOST_PORT" ]]; then
+	echo "[launch.sh] debug inspectors: main=${MAIN_PORT:-off} extHost=${EXTHOST_PORT:-off} agentHost=${AGENTHOST_PORT:-off}" >&2
+else
+	echo "[launch.sh] debug inspectors: off (pass --debug-all or --debug-main/--debug-extensions to enable)" >&2
+fi
 
 # Run pre-launch (electron download, compile-if-missing, built-in extensions) in the
 # foreground so any errors surface synchronously. Then skip code.sh's own pre-launch.
@@ -324,18 +359,19 @@ if [[ "$READY" != "1" ]]; then
 fi
 
 node -e '
+	const p = (v) => v && v.length > 0 ? Number(v) : null;
 	console.log(JSON.stringify({
 		pid: '"$PID"',
 		cdpPort: '"$CDP_PORT"',
-		extHostPort: '"$EXTHOST_PORT"',
-		mainPort: '"$MAIN_PORT"',
-		agentHostPort: '"$AGENTHOST_PORT"',
-		userDataDir: process.argv[1],
-		extensionsDir: process.argv[2],
-		sharedDataDir: process.argv[3],
-		runDir: process.argv[4],
-		logFile: process.argv[5],
-		repo: process.argv[6],
+		extHostPort: p(process.argv[1]),
+		mainPort: p(process.argv[2]),
+		agentHostPort: p(process.argv[3]),
+		userDataDir: process.argv[4],
+		extensionsDir: process.argv[5],
+		sharedDataDir: process.argv[6],
+		runDir: process.argv[7],
+		logFile: process.argv[8],
+		repo: process.argv[9],
 		agents: '"$AGENTS"' === 1,
 	}));
-' "$DEST_UDD" "$EXT_DIR" "$SHARED_DATA_DIR" "$RUN_DIR" "$LOG_FILE" "$REPO"
+' "$EXTHOST_PORT" "$MAIN_PORT" "$AGENTHOST_PORT" "$DEST_UDD" "$EXT_DIR" "$SHARED_DATA_DIR" "$RUN_DIR" "$LOG_FILE" "$REPO"

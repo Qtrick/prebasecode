@@ -863,11 +863,14 @@ export function activate(context: vscode.ExtensionContext): void {
 
 			vscode.commands.registerCommand('prebase.magnus.selectExecutionMode', async () => {
 				const current = aiService.getExecutionMode();
+				const isHostedEnabled = process.env.PREBASE_HOSTED_MAGNUS_ENABLED === 'true';
 				const modes: Array<{ label: string; id: PreBaseAIExecutionMode; detail: string }> = [
 					{
 						label: 'Automatic (Recommended)',
 						id: 'auto',
-						detail: 'Uses PreBase root .env in source development, BYOK if configured, or PreBase Hosted when signed in.',
+						detail: isHostedEnabled
+							? 'Uses PreBase root .env in source development, BYOK if configured, or PreBase Hosted when signed in.'
+							: 'Uses PreBase root .env in source development or BYOK if configured.',
 					},
 					{
 						label: 'Development Environment (.env)',
@@ -879,12 +882,14 @@ export function activate(context: vscode.ExtensionContext): void {
 						id: 'byok',
 						detail: 'Uses API key stored in secure OS SecretStorage.',
 					},
-					{
+				];
+				if (isHostedEnabled) {
+					modes.push({
 						label: 'PreBase Hosted',
 						id: 'hosted',
 						detail: 'Routes model requests through PreBase authenticated cloud gateway.',
-					},
-				];
+					});
+				}
 
 				const picked = await vscode.window.showQuickPick(
 					modes.map(m => ({

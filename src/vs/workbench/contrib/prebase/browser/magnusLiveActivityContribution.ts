@@ -578,6 +578,10 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		});
 	}
 
+	public refresh(): void {
+		this._publish();
+	}
+
 	override dispose(): void {
 		if (MagnusLiveActivityContribution.instance === this) {
 			MagnusLiveActivityContribution.instance = undefined;
@@ -599,6 +603,7 @@ registerAction2(class extends Action2 {
 		});
 	}
 	async run() {
+		MagnusLiveActivityContribution.instance?.refresh();
 		const native = await MagnusLiveActivityContribution.instance?.getNativeDiagnostics();
 		return {
 			...MagnusLiveActivityContribution.diagnostics,

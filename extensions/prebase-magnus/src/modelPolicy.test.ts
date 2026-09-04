@@ -54,6 +54,12 @@ suite('GeminiModelPolicy & Model Curation Layer', () => {
 		assert.strictEqual(pro25.consumerSelectable, true);
 		assert.strictEqual(pro25.autoEligible, true);
 
+		const flash38 = policy.classify(makeRawModel('gemini-3.8-flash', 'Gemini 3.8 Flash'));
+		assert.strictEqual(flash38.releaseChannel, 'stable');
+		assert.strictEqual(flash38.tier, 'flash');
+		assert.strictEqual(flash38.consumerSelectable, true);
+		assert.strictEqual(flash38.autoEligible, true);
+
 		const flash37 = policy.classify(makeRawModel('gemini-3.7-flash', 'Gemini 3.7 Flash'));
 		assert.strictEqual(flash37.releaseChannel, 'stable');
 		assert.strictEqual(flash37.tier, 'flash');
@@ -158,6 +164,16 @@ suite('GeminiModelPolicy & Model Curation Layer', () => {
 	});
 
 	test('resolves Auto dynamically using version hierarchy', () => {
+		// Frontier available: gemini-3.8-flash
+		const catalogWith38 = [
+			makeRawModel('gemini-3.8-flash', 'Gemini 3.8 Flash'),
+			makeRawModel('gemini-3.7-flash', 'Gemini 3.7 Flash'),
+			makeRawModel('gemini-3.6-flash', 'Gemini 3.6 Flash'),
+			makeRawModel('gemini-2.5-flash', 'Gemini 2.5 Flash'),
+			makeRawModel('gemini-2.5-pro', 'Gemini 2.5 Pro'),
+		];
+		assert.strictEqual(policy.resolveAuto(catalogWith38), 'gemini-3.8-flash');
+
 		// Frontier available: gemini-3.7-flash
 		const catalogWith37 = [
 			makeRawModel('gemini-3.7-flash', 'Gemini 3.7 Flash'),
