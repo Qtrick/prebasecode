@@ -29,26 +29,96 @@ const ALLOWED_WEB_IMAGE_EXTENSIONS = new Set([
 ]);
 
 const ALLOWED_DATA_URL_PATTERN = /^data:image\/(png|jpeg|jpg|gif|webp);base64,/i;
+export const MAX_DATA_URL_BYTES = 5 * 1024 * 1024;
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+export const REQUEST_TIMEOUT_MS = 5000;
 
-function isPrivateOrLocalHost(hostname: string): boolean {
-	const host = hostname.toLowerCase();
-	if (host === 'localhost' || host === '127.0.0.1' || host === '::1' || host === '0.0.0.0' || host === '169.254.169.254') {
+export function isValidImageMagicBytes(buffer: Buffer): boolean {
+	if (!buffer || buffer.length < 4) {
+		return false;
+	}
+	// PNG: 89 50 4E 47 0D 0A 1A 0A
+	if (buffer.length >= 8 &&
+		buffer[0] === 0x89 && buffer[1] === 0x50 && buffer[2] === 0x4E && buffer[3] === 0x47 &&
+		buffer[4] === 0x0D && buffer[5] === 0x0A && buffer[6] === 0x1A && buffer[7] === 0x0A) {
 		return true;
 	}
+	// JPEG: FF D8 FF
+	if (buffer[0] === 0xFF && buffer[1] === 0xD8 && buffer[2] === 0xFF) {
+		return true;
+	}
+	// GIF: GIF87a or GIF89a
+	if (buffer.length >= 6 &&
+		buffer[0] === 0x47 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x38 &&
+		(buffer[4] === 0x37 || buffer[4] === 0x39) && buffer[5] === 0x61) {
+		return true;
+	}
+	// WebP: RIFF....WEBP
+	if (buffer.length >= 12 &&
+		buffer[0] === 0x52 && buffer[1] === 0x49 && buffer[2] === 0x46 && buffer[3] === 0x46 &&
+		buffer[8] === 0x57 && buffer[9] === 0x45 && buffer[10] === 0x42 && buffer[11] === 0x50) {
+		return true;
+	}
+	return false;
+}
+
+export function isPrivateOrLocalHost(hostname: string): boolean {
+	let host = (hostname || '').toLowerCase().trim();
+	if (host.startsWith('[') && host.endsWith(']')) {
+		host = host.slice(1, -1);
+	}
+	if (!host || host === 'localhost' || host === '0.0.0.0' || host === '127.0.0.1' || host === '::1' || host === '::' || host === '169.254.169.254') {
+		return true;
+	}
+
+	// Hex representations e.g. 0x7f000001
+	if (/^0x[0-9a-f]+$/i.test(host)) {
+		const num = parseInt(host, 16);
+		const b0 = (num >>> 24) & 0xff;
+		const b1 = (num >>> 16) & 0xff;
+		if (b0 === 10 || b0 === 127 || (b0 === 169 && b1 === 254) || (b0 === 192 && b1 === 168) || (b0 === 172 && b1 >= 16 && b1 <= 31) || b0 === 0) {
+			return true;
+		}
+	}
+
+	// Pure integer representation e.g. 2130706433 (127.0.0.1)
+	if (/^\d+$/.test(host)) {
+		const num = parseInt(host, 10);
+		const b0 = (num >>> 24) & 0xff;
+		const b1 = (num >>> 16) & 0xff;
+		if (b0 === 10 || b0 === 127 || (b0 === 169 && b1 === 254) || (b0 === 192 && b1 === 168) || (b0 === 172 && b1 >= 16 && b1 <= 31) || b0 === 0) {
+			return true;
+		}
+	}
+
+	// Standard dotted IPv4
 	const ipv4Match = host.match(/^(\d+)\.(\d+)\.(\d+)\.(\d+)$/);
 	if (ipv4Match) {
 		const b0 = parseInt(ipv4Match[1], 10);
 		const b1 = parseInt(ipv4Match[2], 10);
-		if (b0 === 10 || b0 === 127 || (b0 === 169 && b1 === 254) || (b0 === 192 && b1 === 168) || (b0 === 172 && b1 >= 16 && b1 <= 31)) {
+		if (b0 === 0 || b0 === 10 || b0 === 127 || (b0 === 169 && b1 === 254) || (b0 === 192 && b1 === 168) || (b0 === 172 && b1 >= 16 && b1 <= 31)) {
 			return true;
 		}
 	}
+
+	// IPv6 loopback, link-local (fe80::/10), unique local (fc00::/7, fd00::/8)
+	if (host === '::1' || host.startsWith('fe80:') || host.startsWith('fc00:') || host.startsWith('fd')) {
+		return true;
+	}
+
+	// IPv4-mapped IPv6 (::ffff:127.0.0.1)
+	if (host.startsWith('::ffff:')) {
+		const mappedIpv4 = host.slice(7);
+		return isPrivateOrLocalHost(mappedIpv4);
+	}
+
 	return false;
 }
 
 function isAllowedImageFormat(fileOrUrl: string): boolean {
 	if (ALLOWED_DATA_URL_PATTERN.test(fileOrUrl)) {
-		return true;
+		// Cap data URL length to prevent memory exhaustion
+		return fileOrUrl.length <= MAX_DATA_URL_BYTES;
 	}
 	let pathname = fileOrUrl;
 	try {
@@ -79,19 +149,24 @@ export function getImageSize(file: string): Promise<ImageInfoWithScale | undefin
 }
 
 /**
- * Get image size from file on local file system
+ * Get image size from file on local file system or data URL
  */
 function getImageSizeFromFile(file: string): Promise<ImageInfoWithScale | undefined> {
 	return new Promise((resolve, reject) => {
 		const isDataUrl = file.match(/^data:.+?;base64,/);
 
 		if (isDataUrl) {
-			// NB should use sync version of `sizeOf()` for buffers
+			if (file.length > MAX_DATA_URL_BYTES) {
+				return resolve(undefined);
+			}
 			try {
 				const data = Buffer.from(file.slice(isDataUrl[0].length), 'base64');
+				if (!isValidImageMagicBytes(data)) {
+					return resolve(undefined);
+				}
 				return resolve(sizeForFileName('', imageSize(data)));
-			} catch (err) {
-				return reject(err);
+			} catch {
+				return resolve(undefined);
 			}
 		}
 
@@ -105,36 +180,38 @@ function getImageSizeFromFile(file: string): Promise<ImageInfoWithScale | undefi
 	});
 }
 
-const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
-const REQUEST_TIMEOUT_MS = 5000;
-
 /**
  * Get image size from given remote URL
  */
 function getImageSizeFromURL(urlStr: string): Promise<ImageInfoWithScale | undefined> {
 	return new Promise((resolve, reject) => {
-		const url = new URL(urlStr);
-		const getTransport = url.protocol === 'https:' ? https.get : http.get;
+		let url: URL;
+		try {
+			url = new URL(urlStr);
+		} catch {
+			return reject(new Error('Invalid URL'));
+		}
 
+		if (isPrivateOrLocalHost(url.hostname)) {
+			return reject(new Error('Access to private or local network is forbidden'));
+		}
+
+		const getTransport = url.protocol === 'https:' ? https.get : http.get;
 		if (!url.pathname) {
-			return reject('Given url doesnt have pathname property');
+			return reject(new Error('Given url does not have pathname property'));
 		}
 		const urlPath: string = url.pathname;
 
 		const req = getTransport(url, resp => {
+			// Require 200 OK status. Disallow redirects to unverified targets.
+			if (resp.statusCode !== 200) {
+				resp.destroy();
+				return reject(new Error(`Unexpected HTTP status ${resp.statusCode}`));
+			}
+
 			const chunks: Buffer[] = [];
 			let bufSize = 0;
-
-			const trySize = (chunks: Buffer[]) => {
-				try {
-					const size: ISizeCalculationResult = imageSize(Buffer.concat(chunks, bufSize));
-					resp.removeListener('data', onData);
-					resp.destroy(); // no need to read further
-					resolve(sizeForFileName(path.basename(urlPath), size));
-				} catch (err) {
-					// might not have enough data, skip error
-				}
-			};
+			let resolved = false;
 
 			const onData = (chunk: Buffer) => {
 				bufSize += chunk.length;
@@ -145,12 +222,46 @@ function getImageSizeFromURL(urlStr: string): Promise<ImageInfoWithScale | undef
 					return;
 				}
 				chunks.push(chunk);
-				trySize(chunks);
+
+				// Only attempt parse once we have enough header bytes for magic validation (min 16 bytes)
+				if (bufSize >= 16 && !resolved) {
+					const combined = Buffer.concat(chunks, bufSize);
+					if (!isValidImageMagicBytes(combined)) {
+						resp.removeListener('data', onData);
+						resp.destroy();
+						reject(new Error('Payload does not match supported image magic bytes'));
+						return;
+					}
+					try {
+						const size: ISizeCalculationResult = imageSize(combined);
+						if (size && size.width && size.height) {
+							resolved = true;
+							resp.removeListener('data', onData);
+							resp.destroy();
+							resolve(sizeForFileName(path.basename(urlPath), size));
+						}
+					} catch {
+						// Need more chunks for full dimension header
+					}
+				}
 			};
 
 			resp
 				.on('data', onData)
-				.on('end', () => trySize(chunks))
+				.on('end', () => {
+					if (!resolved) {
+						try {
+							const combined = Buffer.concat(chunks, bufSize);
+							if (!isValidImageMagicBytes(combined)) {
+								return reject(new Error('Payload is not a valid image format'));
+							}
+							const size: ISizeCalculationResult = imageSize(combined);
+							resolve(sizeForFileName(path.basename(urlPath), size));
+						} catch (err) {
+							reject(err);
+						}
+					}
+				})
 				.once('error', err => {
 					resp.removeListener('data', onData);
 					reject(err);
@@ -168,7 +279,7 @@ function getImageSizeFromURL(urlStr: string): Promise<ImageInfoWithScale | undef
 
 /**
  * Returns size object for given file name. If file name contains `@Nx` token,
- * the final dimentions will be downscaled by N
+ * the final dimensions will be downscaled by N
  */
 function sizeForFileName(fileName: string, size?: ISizeCalculationResult): ImageInfoWithScale | undefined {
 	const m = fileName.match(/@(\d+)x\./);
@@ -185,3 +296,4 @@ function sizeForFileName(fileName: string, size?: ISizeCalculationResult): Image
 		height: Math.floor(size.height / scale)
 	};
 }
+

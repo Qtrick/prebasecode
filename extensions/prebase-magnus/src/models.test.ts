@@ -37,13 +37,13 @@ suite('Magnus Models & Providers', () => {
 		assert.strictEqual(resolveApiModel('gemini-2.5-flash'), 'gemini-2.5-flash');
 	});
 
-	test('resolveModelInfo migrates retired models safely to auto/gemini-2.5-flash', () => {
+	test('resolveModelInfo migrates retired models safely to auto/gemini-3.8-flash', () => {
 		const retired = resolveModelInfo('gemini-2.0-flash');
-		assert.strictEqual(retired.apiModel, 'gemini-2.5-flash');
+		assert.strictEqual(retired.apiModel, 'gemini-3.8-flash');
 		assert.strictEqual(retired.resolvedModelId, 'auto');
 
 		const old15 = resolveModelInfo('gemini-1.5-pro');
-		assert.strictEqual(old15.apiModel, 'gemini-2.5-flash');
+		assert.strictEqual(old15.apiModel, 'gemini-3.8-flash');
 		assert.strictEqual(old15.resolvedModelId, 'auto');
 	});
 

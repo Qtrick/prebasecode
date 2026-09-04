@@ -460,7 +460,7 @@ async function run() {
 
 		// Capture additional zoom-tier screenshots for readability evidence (not a single hairball shot).
 		const zoomTiers = [];
-		const captureZoomTier = scale === 'canonical-scale' || scale === 'large';
+		const captureZoomTier = (scale === 'canonical-scale' || scale === 'large') && fullMap;
 		if (captureZoomTier) {
 			const overviewK = fullMap?.transform?.k;
 			zoomTiers.push({

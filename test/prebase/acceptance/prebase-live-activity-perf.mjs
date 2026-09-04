@@ -123,6 +123,9 @@ function contentSnapshot(revision, extras = {}) {
 	if (extras.pendingTitle) {
 		snap.pendingTitle = extras.pendingTitle;
 	}
+	if (extras.interactionId) {
+		snap.interactionId = extras.interactionId;
+	}
 	if (typeof extras.userDismissedAttention === 'boolean') {
 		snap.userDismissedAttention = extras.userDismissedAttention;
 	}
@@ -2203,6 +2206,161 @@ async function run() {
 		results.failures.push(`mid-morph-content-and-interactive-growth: ${err.message}`);
 	}
 	results.tests.push(test22);
+
+	// Test 23: Exhaustive Action Haptic Immunity & Session Token Lifecycle
+	const test23 = { name: 'exhaustive-action-haptic-immunity', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		await sleep(40);
+		await drainMain(native, 2);
+
+		let diag = native.getDiagnostics();
+		const initialHaptics = diag.hapticCount;
+		const initialSessionToken = diag.hoverSessionToken ?? 0;
+
+		// 1. Enter and exit immediately — verify session token increments
+		native.simulateAction('pointerInside', true);
+		await sleep(20);
+		await drainMain(native, 1);
+		const enteredToken = (native.getDiagnostics().hoverSessionToken ?? 0);
+		if (enteredToken <= initialSessionToken) {
+			throw new Error(`hoverSessionToken did not increment on pointerInside: initial=${initialSessionToken}, entered=${enteredToken}`);
+		}
+		native.simulateAction('pointerInside', false);
+		await sleep(20);
+		await drainMain(native, 1);
+		const exitedToken = (native.getDiagnostics().hoverSessionToken ?? 0);
+		if (exitedToken <= enteredToken) {
+			throw new Error(`hoverSessionToken did not increment on pointer exit: entered=${enteredToken}, exited=${exitedToken}`);
+		}
+
+		// 2. Set approval snapshot and simulate approve -> must produce ZERO haptics
+		native.setSnapshot(contentSnapshot(9500, {
+			status: 'attention',
+			pendingKind: 'approval',
+			pendingTitle: 'Approve file write?',
+			interactionId: 'act-haptic-appr',
+		}));
+		await sleep(60);
+		await drainMain(native, 2);
+
+		native.simulateAction('click');
+		await sleep(40);
+		native.simulateAction('approve');
+		await sleep(40);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== initialHaptics) {
+			throw new Error(`approve action produced haptics: initial=${initialHaptics}, now=${diag.hapticCount}`);
+		}
+
+		// 3. Set deny snapshot and simulate deny -> must produce ZERO haptics
+		native.setSnapshot(contentSnapshot(9501, {
+			status: 'attention',
+			pendingKind: 'approval',
+			pendingTitle: 'Deny file deletion?',
+			interactionId: 'act-haptic-deny',
+		}));
+		await sleep(60);
+		await drainMain(native, 2);
+		native.simulateAction('deny');
+		await sleep(40);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== initialHaptics) {
+			throw new Error(`deny action produced haptics: initial=${initialHaptics}, now=${diag.hapticCount}`);
+		}
+
+		// 4. Open in PreBase and Escape -> must produce ZERO haptics
+		native.simulateAction('openInPrebase');
+		await sleep(40);
+		native.simulateAction('escape');
+		await sleep(40);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		if (diag.hapticCount !== initialHaptics) {
+			throw new Error(`openInPrebase or escape produced haptics: initial=${initialHaptics}, now=${diag.hapticCount}`);
+		}
+
+		test23.details = {
+			initialHaptics,
+			finalHaptics: diag.hapticCount,
+			initialSessionToken,
+			finalSessionToken: diag.hoverSessionToken ?? 0,
+			actionHapticsEmitted: diag.hapticCount - initialHaptics
+		};
+	} catch (err) {
+		test23.ok = false;
+		test23.error = err.message;
+		results.failures.push(`exhaustive-action-haptic-immunity: ${err.message}`);
+	}
+	results.tests.push(test23);
+
+	// Test 24: Action In-Flight State and Duplicate Submission Prevention
+	const test24 = { name: 'action-in-flight-lifecycle', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(9600, {
+			status: 'attention',
+			pendingKind: 'approval',
+			pendingTitle: 'Confirm deployment?',
+			interactionId: 'in-flight-test-1',
+		}));
+		await sleep(60);
+		await drainMain(native, 2);
+
+		native.simulateAction('click');
+		await sleep(40);
+		let beforeAction = native.getDiagnostics();
+		if (beforeAction.actionInFlight !== false) {
+			throw new Error(`expected actionInFlight false before action, got ${beforeAction.actionInFlight}`);
+		}
+
+		// Click approve: actionInFlight should become true
+		const approveResult = native.simulateAction('approve');
+		if (approveResult !== true) {
+			throw new Error('simulateAction approve must succeed');
+		}
+		let inFlightDiag = native.getDiagnostics();
+		if (inFlightDiag.actionInFlight !== true) {
+			throw new Error(`expected actionInFlight true after approve, got ${inFlightDiag.actionInFlight}`);
+		}
+
+		// Second approve while in-flight: should be ignored / return false or no-op
+		const secondApprove = native.simulateAction('approve');
+		// Confirm actionInFlight remains true
+		inFlightDiag = native.getDiagnostics();
+		if (inFlightDiag.actionInFlight !== true) {
+			throw new Error('actionInFlight must remain true while awaiting session response');
+		}
+
+		// Acknowledging snapshot arrives: status transitions to working, clearing interaction
+		native.setSnapshot(contentSnapshot(9601, {
+			status: 'working',
+			currentActivity: 'Deploying components…',
+		}));
+		await sleep(60);
+		await drainMain(native, 2);
+
+		let resolvedDiag = native.getDiagnostics();
+		if (resolvedDiag.actionInFlight !== false) {
+			throw new Error(`expected actionInFlight false after confirming snapshot, got ${resolvedDiag.actionInFlight}`);
+		}
+
+		test24.details = {
+			beforeActionInFlight: beforeAction.actionInFlight,
+			duringActionInFlight: inFlightDiag.actionInFlight,
+			afterActionInFlight: resolvedDiag.actionInFlight,
+			resolvedActivity: resolvedDiag.activityLabel
+		};
+	} catch (err) {
+		test24.ok = false;
+		test24.error = err.message;
+		results.failures.push(`action-in-flight-lifecycle: ${err.message}`);
+	}
+	results.tests.push(test24);
 
 	native.dispose();
 

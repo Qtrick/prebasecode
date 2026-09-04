@@ -381,6 +381,16 @@ async function run() {
 			: false;
 		evidence.followUpSimulation = { ok: Boolean(followUpSim), clickOk: Boolean(followUpClick) };
 
+		// Capture interactive presentation screenshot while expanded
+		const interactiveNative = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+		if (interactiveNative?.panelFrame) {
+			evidence.interactiveScreenshot = captureNativePanelScreenshot(
+				interactiveNative.panelFrame,
+				interactiveNative.screenFrame,
+				join(screenshotDir, 'magnus-live-activity-interactive.png'),
+			);
+		}
+
 		// Reset to compact baseline so product-truth verifies fresh attention arrival into peek.
 		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'collapse').catch(() => false);
 		await new Promise(r => setTimeout(r, 200));
@@ -389,7 +399,7 @@ async function run() {
 		const truthSeed = await workbenchCommandWithTimeout(launched.page, 15_000, 'prebase.test.seedMagnusLiveActivityPending', { kind: 'question' }).catch(() => ({ ok: false }));
 		let truthPending = Boolean(truthSeed?.ok);
 		const truthDeadline = Date.now() + 12_000;
-		while (Date.now() < truthDeadline) {
+		while (!truthPending && Date.now() < truthDeadline) {
 			const diag = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.diagnostics').catch(() => null);
 			const native = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
 			if (diag?.pendingKind === 'question' || diag?.status === 'attention' || native?.activePresentationState === 'attentionPeek') {
@@ -402,6 +412,15 @@ async function run() {
 		const peekNative = evidence.productTruthBefore?.native
 			?? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
 		const peekBody = String(peekNative?.renderedPeekBody || '');
+
+		if (peekNative?.panelFrame) {
+			evidence.peekScreenshot = captureNativePanelScreenshot(
+				peekNative.panelFrame,
+				peekNative.screenFrame,
+				join(screenshotDir, 'magnus-live-activity-peek.png'),
+			);
+		}
+
 		const escapeSim = truthPending
 			? await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'escape').catch(() => false)
 			: false;

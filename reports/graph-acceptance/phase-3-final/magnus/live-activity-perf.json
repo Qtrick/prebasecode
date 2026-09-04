@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "ddcc2c57fbac8a945c18aaefb30ae02d5aeabaf8",
-  "sourceFingerprint": "a5ed963b74072e39b2cd2475d2f78e5d13b928e4b2e0c9f88807869e94fc025e",
-  "productFingerprint": "a5ed963b74072e39b2cd2475d2f78e5d13b928e4b2e0c9f88807869e94fc025e",
-  "generatedAt": "2026-09-04T15:25:30.266Z",
+  "sourceHead": "cd7225dfce3d30cf7d0a25a892d4beba1655f438",
+  "sourceFingerprint": "e476ae226180189926449c2f692ece1ebd532115198abf80cd131f88e7e15494",
+  "productFingerprint": "e476ae226180189926449c2f692ece1ebd532115198abf80cd131f88e7e15494",
+  "generatedAt": "2026-09-04T18:46:24.391Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -41,6 +41,7 @@
           "renderedLatestMessage": "",
           "hovered": false,
           "accessibilityRole": "AXGroup",
+          "actionInFlight": false,
           "interactionId": "",
           "latestShortMessage": "",
           "localMonitorInstalled": false,
@@ -120,6 +121,7 @@
           },
           "questionButtonCount": 0,
           "pinned": false,
+          "hoverSessionToken": 0,
           "collapsedHit": {
             "y": 948,
             "x": 599,
@@ -142,7 +144,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9260,
+        "durationRealCyclesMs": 8967,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -159,6 +161,7 @@
           "renderedLatestMessage": "msg-99",
           "hovered": true,
           "accessibilityRole": "AXGroup",
+          "actionInFlight": false,
           "interactionId": "",
           "latestShortMessage": "msg-99",
           "localMonitorInstalled": true,
@@ -187,7 +190,7 @@
           },
           "pathTopologyCompatible": true,
           "topAnchorDelta": 0,
-          "transitionGeneration": 200,
+          "transitionGeneration": 400,
           "statusLabel": "Step 99",
           "layerBacked": true,
           "displayMode": "builtin",
@@ -238,6 +241,7 @@
           },
           "questionButtonCount": 0,
           "pinned": false,
+          "hoverSessionToken": 0,
           "collapsedHit": {
             "y": 948,
             "x": 575.5,
@@ -260,7 +264,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 356,
+        "durationRetargetMs": 353,
         "diagRetarget": {
           "hapticCount": 0,
           "pinButtonVisible": false,
@@ -274,6 +278,7 @@
           "renderedLatestMessage": "",
           "hovered": true,
           "accessibilityRole": "AXGroup",
+          "actionInFlight": false,
           "interactionId": "",
           "latestShortMessage": "msg-99",
           "localMonitorInstalled": false,
@@ -302,7 +307,7 @@
           },
           "pathTopologyCompatible": true,
           "topAnchorDelta": 0,
-          "transitionGeneration": 202,
+          "transitionGeneration": 403,
           "statusLabel": "Step 99",
           "layerBacked": true,
           "displayMode": "builtin",
@@ -353,6 +358,7 @@
           },
           "questionButtonCount": 0,
           "pinned": false,
+          "hoverSessionToken": 0,
           "collapsedHit": {
             "y": 948,
             "x": 575.5,
@@ -438,12 +444,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -343,
-        "heapUsedMb": 5.82,
-        "rssDiffKb": 31536,
-        "rssMb": 102.39,
-        "cpuDeltaUserMs": 927659,
-        "cpuDeltaSystemMs": 221336
+        "heapDiffKb": -353,
+        "heapUsedMb": 5.87,
+        "rssDiffKb": 30816,
+        "rssMb": 101.7,
+        "cpuDeltaUserMs": 761714,
+        "cpuDeltaSystemMs": 197921
       }
     },
     {
@@ -605,7 +611,7 @@
       "details": {
         "midMorphBefore": {
           "animationCount": 1,
-          "transitionGeneration": 1,
+          "transitionGeneration": 2,
           "transitionInFlight": true,
           "redrawCount": 3,
           "activePresentationState": "peek",
@@ -627,7 +633,7 @@
         "sawInFlightDuringContent": true,
         "midMorphAfter": {
           "animationCount": 1,
-          "transitionGeneration": 1,
+          "transitionGeneration": 2,
           "transitionInFlight": true,
           "redrawCount": 3,
           "activePresentationState": "peek",
@@ -649,7 +655,7 @@
         },
         "settled": {
           "animationCount": 1,
-          "transitionGeneration": 1,
+          "transitionGeneration": 2,
           "transitionInFlight": false,
           "redrawCount": 3,
           "activePresentationState": "peek",
@@ -671,7 +677,7 @@
         "interactiveDuring": {
           "before": {
             "animationCount": 2,
-            "transitionGeneration": 2,
+            "transitionGeneration": 4,
             "transitionInFlight": true,
             "redrawCount": 4,
             "activePresentationState": "interactive",
@@ -692,7 +698,7 @@
           },
           "after": {
             "animationCount": 2,
-            "transitionGeneration": 2,
+            "transitionGeneration": 4,
             "transitionInFlight": true,
             "redrawCount": 4,
             "activePresentationState": "interactive",
@@ -743,7 +749,7 @@
           "peekOnly": true,
           "localMonitorInstalled": false,
           "animationCount": 1,
-          "transitionGeneration": 1,
+          "transitionGeneration": 2,
           "frame": {
             "x": 575.5,
             "y": 892,
@@ -776,7 +782,7 @@
         "after": {
           "state": "interactive",
           "animationCount": 2,
-          "transitionGeneration": 2,
+          "transitionGeneration": 4,
           "frame": {
             "x": 575.5,
             "y": 810,
@@ -810,7 +816,7 @@
           "state": "pinned",
           "pinned": true,
           "animationCount": 3,
-          "transitionGeneration": 3,
+          "transitionGeneration": 5,
           "geometryTransitionCount": 5,
           "frame": {
             "x": 575.5,
@@ -838,17 +844,17 @@
         },
         "afterPeek": {
           "animationCount": 1,
-          "transitionGeneration": 1,
+          "transitionGeneration": 2,
           "state": "peek"
         },
         "afterInteractive": {
           "animationCount": 2,
-          "transitionGeneration": 2,
+          "transitionGeneration": 4,
           "state": "interactive"
         },
         "afterCompact": {
           "animationCount": 3,
-          "transitionGeneration": 3,
+          "transitionGeneration": 6,
           "state": "compact"
         },
         "afterAttentionPeek": {
@@ -885,7 +891,7 @@
           "pendingMessage": "Updated pending message 39",
           "renderedPendingMessage": "",
           "renderedPeekBody": "Updated pending message 39",
-          "transitionGeneration": 1,
+          "transitionGeneration": 2,
           "frame": {
             "x": 575.5,
             "y": 892,
@@ -994,13 +1000,34 @@
             "width": 360,
             "height": 172
           },
-          "transitionGeneration": 1
+          "transitionGeneration": 2
         },
         "contentGrowth": {
           "preGrowthHeight": 172,
           "postGrowthHeight": 220,
           "questionButtonCount": 3
         }
+      }
+    },
+    {
+      "name": "exhaustive-action-haptic-immunity",
+      "ok": true,
+      "details": {
+        "initialHaptics": 0,
+        "finalHaptics": 0,
+        "initialSessionToken": 0,
+        "finalSessionToken": 4,
+        "actionHapticsEmitted": 0
+      }
+    },
+    {
+      "name": "action-in-flight-lifecycle",
+      "ok": true,
+      "details": {
+        "beforeActionInFlight": false,
+        "duringActionInFlight": true,
+        "afterActionInFlight": false,
+        "resolvedActivity": "Deploying components…"
       }
     }
   ],

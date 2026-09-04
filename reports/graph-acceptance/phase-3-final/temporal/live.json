@@ -3,16 +3,16 @@
   "failures": [],
   "schemaVersion": 3,
   "scenario": "temporal-small",
-  "sourceHead": "49f0bc5ffaa2dd7ceb1d16ed8fb53d931c580b30",
-  "sourceFingerprint": "ed1a814964371bbd9d27d8f10437141d62d3b2747de576347f7d3c0b31daf8c1",
-  "productFingerprint": "ed1a814964371bbd9d27d8f10437141d62d3b2747de576347f7d3c0b31daf8c1",
-  "generatedAt": "2026-09-04T03:09:33.284Z",
+  "sourceHead": "cd7225dfce3d30cf7d0a25a892d4beba1655f438",
+  "sourceFingerprint": "e476ae226180189926449c2f692ece1ebd532115198abf80cd131f88e7e15494",
+  "productFingerprint": "e476ae226180189926449c2f692ece1ebd532115198abf80cd131f88e7e15494",
+  "generatedAt": "2026-09-04T18:37:25.461Z",
   "producerId": "temporal-small",
-  "producerFingerprint": "cc04120e3c823af9d58822ae35f648d0fd49e16d5e476c9878e71c773c660275",
+  "producerFingerprint": "b8d5f65a3aa227a9f10b55835ba172ca4025178f8d3110ff7bf0b214d940b28f",
   "scale": "small",
   "fixture": {
-    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-u3awpa",
-    "head": "e845dfcf87663a3dced6b10423a8d5aa3c3595f5",
+    "dir": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-qbtIoN",
+    "head": "78daf997b00cc7a897441dab698c84d2be8a76c6",
     "commits": 10,
     "files": [
       "package.json",
@@ -21,24 +21,31 @@
       "src/tally.js"
     ],
     "expectedModifiedPath": "src/tally.js",
-    "firstParentSummary": "e845dfcf87663a3dced6b10423a8d5aa3c3595f5 e957cfc3d9debc0bd4ba9ac473abc6d9ac12301c fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
+    "firstParentSummary": "78daf997b00cc7a897441dab698c84d2be8a76c6 e4be046669f85bf3d822a6b4301b25ba63417e81 fix: double tally\n\n src/tally.js | 2 +-\n 1 file changed, 1 insertion(+), 1 deletion(-)"
   },
-  "pid": 13982,
-  "cdpPort": 61665,
-  "sourceProfile": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-profile-8fqMhz",
+  "pid": 41868,
+  "cdpPort": 65354,
+  "sourceProfile": "/var/folders/3d/yr4tb1f91bd1fq80fk24jsxr0000gn/T/pb-temporal-profile-PYknI0",
   "gitReady": {
     "ok": true,
     "count": 1
   },
+  "frameMode": "temporal",
+  "temporalChrome": {
+    "hasTemporalToolbar": true,
+    "hasTemporalScrubberBar": true,
+    "prebaseGraphMode": "temporal",
+    "networkOnlyCanvas": false
+  },
   "fullMap": {
-    "sequenceId": 14,
+    "sequenceId": 8,
     "mode": "temporal",
     "displayMode": "state",
-    "renderStart": 382.60000002384186,
-    "renderEnd": 382.60000002384186,
-    "durationMs": 0,
-    "selectedCommitSha": "e845dfcf87663a3dced6b10423a8d5aa3c3595f5",
-    "renderedCommitSha": "e845dfcf87663a3dced6b10423a8d5aa3c3595f5",
+    "renderStart": 406.7999999523163,
+    "renderEnd": 406.89999997615814,
+    "durationMs": 0.10000002384185791,
+    "selectedCommitSha": "78daf997b00cc7a897441dab698c84d2be8a76c6",
+    "renderedCommitSha": "78daf997b00cc7a897441dab698c84d2be8a76c6",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 4,
@@ -70,16 +77,16 @@
     "labelOverlapCount": 0,
     "selectedNodeId": null,
     "transform": {
-      "x": 561.1418918918919,
-      "y": 405.57094594594594,
-      "k": 1.8277027027027026
+      "x": 560.6824324324324,
+      "y": 403.3412162162162,
+      "k": 1.8141891891891893
     },
     "canvas": {
       "clientWidth": 792,
-      "clientHeight": 779,
+      "clientHeight": 775,
       "width": 1584,
-      "height": 1558,
-      "distinctPixels": 215152
+      "height": 1550,
+      "distinctPixels": 212494
     },
     "summary": {
       "addedCount": 0,
@@ -93,30 +100,30 @@
       "edgeModifiedCount": 0
     },
     "isAnimating": false,
-    "timestamp": 382.60000002384186,
+    "timestamp": 406.89999997615814,
     "viewportWidth": 792,
-    "viewportHeight": 779,
+    "viewportHeight": 775,
     "labelCount": 4,
     "projectedBounds": {
-      "minX": 367.4054054054054,
-      "minY": 184.4189189189189,
-      "maxX": 630.5945945945946,
-      "maxY": 564.581081081081,
-      "width": 263.18918918918916,
-      "height": 380.16216216216213
+      "minX": 368.37837837837833,
+      "minY": 183.8243243243243,
+      "maxX": 629.6216216216216,
+      "maxY": 561.1756756756756,
+      "width": 261.2432432432432,
+      "height": 377.35135135135135
     },
-    "screenUtilization": 0.16217141119129114
+    "screenUtilization": 0.16060686032787164
   },
-  "processBeforeInteractions": "13982     1   6.8 276624 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+  "processBeforeInteractions": "41868     1   4.8 282352 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
   "focusChanges": {
-    "sequenceId": 15,
+    "sequenceId": 39,
     "mode": "temporal",
     "displayMode": "changes",
-    "renderStart": 795.1000000238419,
-    "renderEnd": 795.4000000953674,
-    "durationMs": 0.30000007152557373,
-    "selectedCommitSha": "e845dfcf87663a3dced6b10423a8d5aa3c3595f5",
-    "renderedCommitSha": "e845dfcf87663a3dced6b10423a8d5aa3c3595f5",
+    "renderStart": 1132.7999999523163,
+    "renderEnd": 1132.8999999761581,
+    "durationMs": 0.10000002384185791,
+    "selectedCommitSha": "78daf997b00cc7a897441dab698c84d2be8a76c6",
+    "renderedCommitSha": "78daf997b00cc7a897441dab698c84d2be8a76c6",
     "isPartialLineage": true,
     "receivedNodeCount": 4,
     "visibleNodeCount": 2,
@@ -148,16 +155,16 @@
     "labelOverlapCount": 0,
     "selectedNodeId": null,
     "transform": {
-      "x": 561.1418918918919,
-      "y": 405.57094594594594,
-      "k": 1.8277027027027026
+      "x": 485.29512739054377,
+      "y": 538.0039020114267,
+      "k": 2.699265635195437
     },
     "canvas": {
       "clientWidth": 792,
-      "clientHeight": 779,
+      "clientHeight": 775,
       "width": 1584,
-      "height": 1558,
-      "distinctPixels": 50208
+      "height": 1550,
+      "distinctPixels": 99172
     },
     "summary": {
       "addedCount": 0,
@@ -170,54 +177,54 @@
       "edgeRemovedCount": 0,
       "edgeModifiedCount": 0
     },
-    "isAnimating": true,
-    "timestamp": 795.4000000953674,
+    "isAnimating": false,
+    "timestamp": 1132.8999999761581,
     "viewportWidth": 792,
-    "viewportHeight": 779,
+    "viewportHeight": 775,
     "labelCount": 2,
     "projectedBounds": {
-      "minX": 619.6283783783783,
-      "minY": 184.4189189189189,
-      "maxX": 630.5945945945946,
-      "maxY": 301.3918918918919,
-      "width": 10.966216216216253,
-      "height": 116.97297297297297
+      "minX": 571.6716277167977,
+      "minY": 211.3927601527788,
+      "maxX": 587.8672215279704,
+      "maxY": 384.1457608052868,
+      "width": 16.19559381117267,
+      "height": 172.75300065250798
     },
-    "screenUtilization": 0.002079120656298611
+    "screenUtilization": 0.004558223245730314
   },
   "targetOpened": true,
   "repoLoaded": true,
   "zoomTiers": [],
-  "processAfterInteractions": "13982     1   1.5 279712 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+  "processAfterInteractions": "41868     1   5.4 287248 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
   "camera": {
     "afterFocus": {
-      "x": 503.3472565090671,
-      "y": 508.7762669397534,
-      "k": 2.5056589551221866
+      "x": 461.72505524170134,
+      "y": 580.1066037618923,
+      "k": 2.975987500740528
     },
     "afterUserZoom": {
-      "x": 529.7882552108205,
-      "y": 569.4815398129134,
+      "x": 470.9255846965384,
+      "y": 616.0388269088152,
       "k": 3.5
     },
     "afterWait": {
-      "x": 529.7882552108205,
-      "y": 569.4815398129134,
+      "x": 470.9255846965384,
+      "y": 616.0388269088152,
       "k": 3.5
     },
     "afterFit": {
-      "x": 457.0886431543008,
-      "y": 595.3259931427966,
-      "k": 3.0959727048311443
+      "x": 455.2248067123915,
+      "y": 593.5906553862856,
+      "k": 3.074906287085545
     }
   },
   "stuckIndexing": false,
   "unexpectedError": false,
   "quit": {
-    "startedAt": 1788491390728,
-    "quitMs": 404,
+    "startedAt": 1788547063288,
+    "quitMs": 405,
     "remaining": "gone",
-    "before": "13982     1   0.3 276384 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "41868     1   0.0 262256 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "after": "gone"
   }
 }

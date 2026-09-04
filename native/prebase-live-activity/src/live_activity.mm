@@ -7,6 +7,7 @@
 static const CGFloat kCollapsedHeight = 34;
 static const CGFloat kPeekBodyHeight = 56;
 static const CGFloat kWingWidthMin = 52;
+static const CGFloat kWingWidthMax = 148;
 /** Fixed compact/peek wing widths — content text must not resize the notch island. */
 static const CGFloat kStableCompactLeftWing = 64;
 static const CGFloat kStableCompactRightWing = 64;
@@ -129,30 +130,37 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	CGFloat effShoulderR = isExpanded ? MIN(kShoulderRadius, (currentH - bandH) * 0.5) : 0.0;
 	CGFloat effBottomR = MIN(kBottomCornerRadius, currentH * 0.5);
 	CGFloat kBottom = effBottomR * (1.0 - kKappa);
-	CGFloat kShoulder = effShoulderR * (1.0 - kKappa);
 
-	// 0. Move to top-left of left wing (0, 0)
-	CGPathMoveToPoint(path, NULL, 0, 0);
+	// Geometry anchors: notch negative space and compact wings
+	CGFloat notchLeft = (totalW - housingW) * 0.5;
+	CGFloat notchRight = notchLeft + housingW;
+	CGFloat wingLeftX = isExpanded ? MAX(0.0, notchLeft - leftW) : 0.0;
+	CGFloat wingRightX = isExpanded ? MIN(totalW, notchRight + rightW) : totalW;
 
-	// 1. Line across top of left wing to notch start (leftW, 0)
-	CGPathAddLineToPoint(path, NULL, leftW, 0);
+	// 0. Move to top-left of left wing (wingLeftX, 0)
+	CGPathMoveToPoint(path, NULL, wingLeftX, 0);
 
-	// 2. Line down into camera housing cutout (leftW, bandH)
-	CGPathAddLineToPoint(path, NULL, leftW, bandH);
+	// 1. Line across top of left wing to notch start (notchLeft, 0)
+	CGPathAddLineToPoint(path, NULL, notchLeft, 0);
 
-	// 3. Line across bottom of camera housing cutout (leftW + housingW, bandH)
-	CGPathAddLineToPoint(path, NULL, leftW + housingW, bandH);
+	// 2. Line down into camera housing cutout (notchLeft, bandH)
+	CGPathAddLineToPoint(path, NULL, notchLeft, bandH);
 
-	// 4. Line up from camera housing cutout to notch end (leftW + housingW, 0)
-	CGPathAddLineToPoint(path, NULL, leftW + housingW, 0);
+	// 3. Line across bottom of camera housing cutout (notchRight, bandH)
+	CGPathAddLineToPoint(path, NULL, notchRight, bandH);
 
-	// 5. Line across top of right wing to top-right corner (totalW, 0)
-	CGPathAddLineToPoint(path, NULL, totalW, 0);
+	// 4. Line up from camera housing cutout to notch end (notchRight, 0)
+	CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-	// 6. Right shoulder curve from (totalW, 0) down into body (totalW, bandH + effShoulderR)
+	// 5. Line across top of right wing to right wing end (wingRightX, 0)
+	CGPathAddLineToPoint(path, NULL, wingRightX, 0);
+
+	// 6. Right organic shoulder S-curve: from (wingRightX, 0) down and outward to (totalW, bandH + effShoulderR)
+	// Tangents: vertical at (wingRightX, 0) and vertical at (totalW, bandH + effShoulderR).
+	// In collapsed mode: wingRightX == totalW, effShoulderR == 0 -> degenerates cleanly into a vertical line.
 	CGPathAddCurveToPoint(path, NULL,
-		totalW, bandH * 0.5,
-		totalW, bandH + kShoulder,
+		wingRightX, bandH * 0.4,
+		totalW, bandH + effShoulderR * 0.6,
 		totalW, bandH + effShoulderR);
 
 	// 7. Line down right side to bottom-right corner start (totalW, currentH - effBottomR)
@@ -176,11 +184,13 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	// 11. Line up left side to left shoulder start (0, bandH + effShoulderR)
 	CGPathAddLineToPoint(path, NULL, 0, bandH + effShoulderR);
 
-	// 12. Left shoulder curve from (0, bandH + effShoulderR) up to (0, 0)
+	// 12. Left organic shoulder S-curve: from (0, bandH + effShoulderR) up and inward to (wingLeftX, 0)
+	// Tangents: vertical at (0, bandH + effShoulderR) and vertical at (wingLeftX, 0).
+	// In collapsed mode: wingLeftX == 0, effShoulderR == 0 -> degenerates cleanly into a vertical line.
 	CGPathAddCurveToPoint(path, NULL,
-		0, bandH + kShoulder,
-		0, bandH * 0.5,
-		0, 0);
+		0, bandH + effShoulderR * 0.6,
+		wingLeftX, bandH * 0.4,
+		wingLeftX, 0);
 
 	// 13. Close subpath
 	CGPathCloseSubpath(path);
@@ -238,6 +248,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
 
 - (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState;
+- (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState targetSize:(NSSize)targetSize;
 /// Text/label refresh that never cancels or snaps an in-flight geometry morph.
 - (void)refreshContentSubviewsPreservingPresentation;
 @end
@@ -256,6 +267,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL pinned;
 @property (nonatomic, assign) BOOL screenLocked;
 @property (nonatomic, assign) BOOL hovering;
+@property (nonatomic, assign) NSUInteger hoverSessionToken;
+@property (nonatomic, assign) BOOL actionInFlight;
 @property (nonatomic, assign) BOOL reducedMotion;
 @property (nonatomic, assign) BOOL ignoresMouse;
 @property (nonatomic, copy) NSString *sessionId;
@@ -278,6 +291,7 @@ static NSString *JSString(Napi::Value value) {
 
 @property (nonatomic, assign) BOOL lastInside;
 @property (nonatomic, assign) BOOL didHoverHaptic;
+@property (nonatomic, assign) BOOL didAttentionHaptic;
 @property (nonatomic, assign) BOOL attentionPeek;
 /** User Escape/collapse while attention: stay compact until click or attention clears. */
 @property (nonatomic, assign) BOOL userDismissedAttention;
@@ -357,51 +371,59 @@ static NSString *JSString(Napi::Value value) {
 		_compactContainer.wantsLayer = YES;
 		[self addSubview:_compactContainer];
 
-		_leftStatusLabel = [self makeLabel:11 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.94 alpha:1.0]];
+		_leftStatusLabel = [self makeLabel:11.5 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.94 alpha:1.0]];
 		[_compactContainer addSubview:_leftStatusLabel];
 
-		_rightMetricsLabel = [self makeLabel:10 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.75 alpha:1.0]];
-		_rightMetricsLabel.font = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
+		_rightMetricsLabel = [self makeLabel:10.5 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.75 alpha:1.0]];
+		_rightMetricsLabel.font = [NSFont monospacedDigitSystemFontOfSize:10.5 weight:NSFontWeightRegular];
 		[_compactContainer addSubview:_rightMetricsLabel];
 
 		_expandedContainer = [[PrebaseFlippedView alloc] initWithFrame:self.bounds];
 		_expandedContainer.wantsLayer = YES;
+		_expandedContainer.layer.masksToBounds = YES;
 		_expandedContainer.alphaValue = 0.0;
 		_expandedContainer.hidden = YES;
 		[self addSubview:_expandedContainer];
 
-		_headerTitle = [self makeLabel:12 weight:NSFontWeightSemibold color:[NSColor colorWithCalibratedWhite:0.96 alpha:1.0]];
+		_headerTitle = [self makeLabel:13 weight:NSFontWeightSemibold color:[NSColor colorWithCalibratedWhite:0.98 alpha:1.0]];
 		_headerTitle.stringValue = @"Magnus";
 		[_expandedContainer addSubview:_headerTitle];
 
-		_statusBadge = [self makeLabel:10 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.65 alpha:1.0]];
+		_statusBadge = [self makeLabel:11 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.65 alpha:1.0]];
 		[_expandedContainer addSubview:_statusBadge];
 
-		_activityDescription = [self makeLabel:11 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.88 alpha:1.0]];
+		_activityDescription = [self makeLabel:12 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.90 alpha:1.0]];
 		[_expandedContainer addSubview:_activityDescription];
 
-		_latestMessageLabel = [self makeLabel:11 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.86 alpha:1.0]];
+		_latestMessageLabel = [self makeLabel:11.5 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.85 alpha:1.0]];
 		_latestMessageLabel.hidden = YES;
 		[_expandedContainer addSubview:_latestMessageLabel];
 
 		_actionLabels = [NSMutableArray array];
 		for (NSInteger i = 0; i < 3; i++) {
-			NSTextField *bullet = [self makeLabel:10 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.72 alpha:1.0]];
+			NSTextField *bullet = [self makeLabel:11 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.75 alpha:1.0]];
 			[_actionLabels addObject:bullet];
 			[_expandedContainer addSubview:bullet];
 		}
 
-		_pendingInteractionTitle = [self makeLabel:11 weight:NSFontWeightSemibold color:[NSColor colorWithCalibratedWhite:0.95 alpha:1.0]];
+		_pendingInteractionTitle = [self makeLabel:12 weight:NSFontWeightSemibold color:[NSColor colorWithCalibratedWhite:0.96 alpha:1.0]];
 		[_expandedContainer addSubview:_pendingInteractionTitle];
 
-		_pendingInteractionMessage = [self makeLabel:10 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.78 alpha:1.0]];
+		_pendingInteractionMessage = [self makeLabel:11 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.80 alpha:1.0]];
 		[_expandedContainer addSubview:_pendingInteractionMessage];
 
-		_expandedMetricsLabel = [self makeLabel:10 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.62 alpha:1.0]];
-		_expandedMetricsLabel.font = [NSFont monospacedDigitSystemFontOfSize:10 weight:NSFontWeightRegular];
+		_expandedMetricsLabel = [self makeLabel:10.5 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.65 alpha:1.0]];
+		_expandedMetricsLabel.font = [NSFont monospacedDigitSystemFontOfSize:10.5 weight:NSFontWeightRegular];
 		[_expandedContainer addSubview:_expandedMetricsLabel];
 	}
 	return self;
+}
+
+- (void)setFrameSize:(NSSize)newSize {
+	[super setFrameSize:newSize];
+	if (!self.controller.transitionInFlight) {
+		self.shapeLayer.frame = self.bounds;
+	}
 }
 
 - (NSTextField *)makeLabel:(CGFloat)size weight:(NSFontWeight)weight color:(NSColor *)color {
@@ -464,8 +486,8 @@ static NSString *JSString(Napi::Value value) {
 	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 
-	// Compact and Peek share the collapsed wing chrome; Peek additionally shows one body line.
-	if (!isExpanded || self.peekOnly) {
+	// Compact state: only collapsed wing chrome
+	if (!isExpanded) {
 		NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
 		self.leftStatusLabel.stringValue = label;
 		CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
@@ -479,8 +501,23 @@ static NSString *JSString(Napi::Value value) {
 		} else {
 			self.rightMetricsLabel.hidden = YES;
 		}
-		if (!isExpanded) {
-			return;
+		return;
+	}
+
+	// Attention Peek / Peek: keeps compact wings and shows one glanceable activity/pending line
+	if (self.peekOnly) {
+		NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
+		self.leftStatusLabel.stringValue = label;
+		CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
+		self.leftStatusLabel.frame = NSMakeRect(14, MAX(4, (bandH - 18) / 2.0), maxLabelWidth, 18);
+		if (self.notched && self.metricsLabel.length) {
+			self.rightMetricsLabel.stringValue = self.metricsLabel;
+			self.rightMetricsLabel.hidden = NO;
+			CGFloat metricsX = leftW + housing + 8;
+			CGFloat metricsW = MAX(20, rightW - 16);
+			self.rightMetricsLabel.frame = NSMakeRect(metricsX, MAX(4, (bandH - 18) / 2.0), metricsW, 18);
+		} else {
+			self.rightMetricsLabel.hidden = YES;
 		}
 		self.headerTitle.hidden = YES;
 		self.statusBadge.hidden = YES;
@@ -586,20 +623,21 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState {
+	[self updateShapeAndContentAnimated:animated duration:duration useTargetState:useTargetState targetSize:NSZeroSize];
+}
+
+- (void)updateShapeAndContentAnimated:(BOOL)animated duration:(NSTimeInterval)duration useTargetState:(BOOL)useTargetState targetSize:(NSSize)targetSize {
 	self.controller.redrawCount++;
 	NSRect bounds = self.bounds;
 	CGFloat bandH = MAX(self.safeAreaTop, kCollapsedHeight);
+	CGFloat totalW = (targetSize.width > 0) ? targetSize.width : NSWidth(bounds);
+	CGFloat currentH = (targetSize.height > 0) ? targetSize.height : NSHeight(bounds);
 	// Use explicit semantic target state when available, otherwise infer from bounds for compatibility
-	BOOL isExpanded = useTargetState ? self.targetExpanded : (bounds.size.height > bandH + 2.0);
+	BOOL isExpanded = useTargetState ? self.targetExpanded : (currentH > bandH + 2.0);
 
-	CGFloat totalW = NSWidth(bounds);
-	CGFloat currentH = NSHeight(bounds);
 	CGFloat leftW = self.leftWingWidth > 0 ? self.leftWingWidth : kWingWidthMin;
 	CGFloat rightW = self.rightWingWidth > 0 ? self.rightWingWidth : kWingWidthMin;
 	CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
-
-	// Synchronize shape layer geometry to content view bounds
-	self.shapeLayer.frame = bounds;
 
 	CGColorRef fill = self.attention
 		? [NSColor colorWithCalibratedWhite:0.07 alpha:0.99].CGColor
@@ -615,6 +653,7 @@ static NSString *JSString(Napi::Value value) {
 	}
 
 	CGPathRef targetPath = CreateNotchedIslandPath(totalW, currentH, leftW, rightW, housing, bandH, isExpanded, self.notched);
+	CGRect targetFrame = CGRectMake(0, 0, totalW, currentH);
 
 	if (animated && !self.reducedMotion) {
 		self.controller.animationCount++;
@@ -622,12 +661,13 @@ static NSString *JSString(Napi::Value value) {
 		self.controller.transitionEndTime = [NSDate timeIntervalSinceReferenceDate] + duration;
 		const NSUInteger currentGeneration = ++self.controller.transitionGeneration;
 
-		// Presentation-layer aware retargeting: sample current in-flight path to avoid jumps
+		// Presentation-layer aware retargeting: sample current in-flight path & frame to avoid jumps
 		CAShapeLayer *presentation = (CAShapeLayer *)[self.shapeLayer presentationLayer];
 		CGPathRef fromPath = presentation && presentation.path ? presentation.path : self.shapeLayer.path;
 		if (!fromPath) {
 			fromPath = targetPath;
 		}
+		CGRect fromFrame = presentation ? presentation.frame : self.shapeLayer.frame;
 
 		[CATransaction begin];
 		[CATransaction setAnimationDuration:duration];
@@ -648,11 +688,22 @@ static NSString *JSString(Napi::Value value) {
 		pathAnimation.removedOnCompletion = YES;
 		[self.shapeLayer addAnimation:pathAnimation forKey:@"morphPath"];
 
+		CABasicAnimation *frameAnimation = [CABasicAnimation animationWithKeyPath:@"frame"];
+		frameAnimation.fromValue = [NSValue valueWithRect:NSRectFromCGRect(fromFrame)];
+		frameAnimation.toValue = [NSValue valueWithRect:NSRectFromCGRect(targetFrame)];
+		frameAnimation.duration = duration;
+		frameAnimation.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
+		frameAnimation.removedOnCompletion = YES;
+		[self.shapeLayer addAnimation:frameAnimation forKey:@"morphFrame"];
+
 		self.shapeLayer.path = targetPath;
+		self.shapeLayer.frame = targetFrame;
 		[CATransaction commit];
 	} else {
 		self.shapeLayer.path = targetPath;
+		self.shapeLayer.frame = targetFrame;
 		[self.shapeLayer removeAnimationForKey:@"morphPath"];
+		[self.shapeLayer removeAnimationForKey:@"morphFrame"];
 		self.controller.transitionInFlight = NO;
 	}
 	CGPathRelease(targetPath);
@@ -825,11 +876,16 @@ static NSString *JSString(Napi::Value value) {
 	self.content.accessibilityRole = NSAccessibilityGroupRole;
 
 	self.input = [[NSTextField alloc] initWithFrame:NSMakeRect(14, 0, 200, 24)];
-	self.input.placeholderString = @"Message Magnus...";
-	self.input.font = [NSFont systemFontOfSize:11];
+	self.input.placeholderString = @"Message Magnus…";
+	self.input.font = [NSFont systemFontOfSize:11.5 weight:NSFontWeightRegular];
 	self.input.focusRingType = NSFocusRingTypeNone;
-	self.input.bordered = YES;
-	self.input.backgroundColor = [NSColor colorWithCalibratedWhite:0.12 alpha:0.9];
+	self.input.bordered = NO;
+	self.input.wantsLayer = YES;
+	self.input.layer.cornerRadius = 12.0;
+	self.input.layer.masksToBounds = YES;
+	self.input.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.10 alpha:0.95].CGColor;
+	self.input.layer.borderWidth = 0.75;
+	self.input.layer.borderColor = [NSColor colorWithCalibratedWhite:0.22 alpha:0.6].CGColor;
 	self.input.textColor = [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
 	self.input.hidden = YES;
 	self.input.target = self;
@@ -841,7 +897,15 @@ static NSString *JSString(Napi::Value value) {
 	self.pinButton = [self makeButton:@"Pin" action:@selector(togglePin:)];
 	self.pinButton.accessibilityLabel = @"Pin panel";
 	self.approveButton = [self makeButton:@"Approve" action:@selector(approve:)];
+	self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.13 green:0.48 blue:0.28 alpha:0.90].CGColor;
+	self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.22 green:0.62 blue:0.38 alpha:0.5].CGColor;
+	self.approveButton.contentTintColor = [NSColor whiteColor];
+
 	self.denyButton = [self makeButton:@"Deny" action:@selector(deny:)];
+	self.denyButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.45 green:0.15 blue:0.15 alpha:0.85].CGColor;
+	self.denyButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.60 green:0.22 blue:0.22 alpha:0.4].CGColor;
+	self.denyButton.contentTintColor = [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
+
 	self.approveButton.hidden = YES;
 	self.denyButton.hidden = YES;
 	self.pinButton.hidden = YES;
@@ -857,8 +921,16 @@ static NSString *JSString(Napi::Value value) {
 - (NSButton *)makeButton:(NSString *)title action:(SEL)action {
 	NSButton *button = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, 88, 22)];
 	button.title = title;
-	button.bezelStyle = NSBezelStyleRounded;
-	button.font = [NSFont systemFontOfSize:11];
+	button.bezelStyle = NSBezelStyleInline;
+	button.bordered = NO;
+	button.wantsLayer = YES;
+	button.layer.cornerRadius = 11.0;
+	button.layer.masksToBounds = YES;
+	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.15 alpha:0.85].CGColor;
+	button.layer.borderWidth = 0.5;
+	button.layer.borderColor = [NSColor colorWithCalibratedWhite:0.28 alpha:0.4].CGColor;
+	button.font = [NSFont systemFontOfSize:11 weight:NSFontWeightMedium];
+	button.contentTintColor = [NSColor colorWithCalibratedWhite:0.92 alpha:1.0];
 	button.target = self;
 	button.action = action;
 	button.hidden = YES;
@@ -1028,7 +1100,7 @@ static NSString *JSString(Napi::Value value) {
 		if (forceMorph) {
 			self.geometryTransitionCount++;
 			self.lastTransitionReason = @"geometry";
-			[self.content updateShapeAndContentAnimated:!self.reducedMotion duration:0.18 useTargetState:YES];
+			[self.content updateShapeAndContentAnimated:!self.reducedMotion duration:0.18 useTargetState:YES targetSize:self.panel ? self.panel.frame.size : NSZeroSize];
 			if (self.panel) {
 				[self layoutControls:self.panel.frame];
 			}
@@ -1066,8 +1138,6 @@ static NSString *JSString(Napi::Value value) {
 				totalW = minExpandedW;
 				CGFloat notchCenterX = NSMaxX(auxLeft) + housing / 2.0;
 				CGFloat winX = notchCenterX - totalW / 2.0;
-				self.content.leftWingWidth = NSMaxX(auxLeft) - winX;
-				self.content.rightWingWidth = totalW - (self.content.leftWingWidth + housing);
 				win = NSMakeRect(winX, topY - height, totalW, height);
 				self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
 			} else {
@@ -1112,26 +1182,28 @@ static NSString *JSString(Napi::Value value) {
 
 	if (self.reducedMotion) {
 		[self.panel setFrame:win display:YES animate:NO];
-		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES];
+		[self.content updateShapeAndContentAnimated:NO duration:0 useTargetState:YES targetSize:win.size];
 	} else if (isFirstLayout || (frameUnchanged && forceMorph)) {
 		// First layout / same-frame morph: snap the window, animate shape only when forced.
 		if (!frameUnchanged || isFirstLayout) {
 			[self.panel setFrame:win display:YES animate:NO];
 		}
-		[self.content updateShapeAndContentAnimated:forceMorph duration:forceMorph ? animDuration : 0 useTargetState:YES];
+		[self.content updateShapeAndContentAnimated:forceMorph duration:forceMorph ? animDuration : 0 useTargetState:YES targetSize:win.size];
 	} else {
 		// Shape morph uses transitionGeneration; frame completion uses
 		// layoutCompletionGeneration (bumped only on genuine geometry changes)
 		// so content-only updates do not cancel control finalization.
-		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES];
-		const NSUInteger generation = self.layoutCompletionGeneration;
+		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES targetSize:win.size];
+		const NSUInteger generation = ++self.transitionGeneration;
+		self.layoutCompletionGeneration = generation;
 		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
 			context.duration = animDuration;
 			context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
 			context.allowsImplicitAnimation = YES;
 			[[self.panel animator] setFrame:win display:YES];
 		} completionHandler:^{
-			if (generation == self.layoutCompletionGeneration) {
+			// Delay control layout until frame animation completes to prevent visible popping
+			if (generation == self.transitionGeneration) {
 				[self layoutControls:self.panel ? self.panel.frame : win];
 			}
 		}];
@@ -1159,8 +1231,16 @@ static NSString *JSString(Napi::Value value) {
 	}
 
 	CGFloat bandH = MAX(self.content.safeAreaTop, kCollapsedHeight);
-	CGFloat effectiveH = MAX(win.size.height, [self computeTargetContentHeight:bandH]);
+	CGFloat effectiveH = win.size.height;
 	CGFloat bodyHeight = effectiveH - bandH;
+	if (bodyHeight < 36.0) {
+		self.input.hidden = YES;
+		self.openButton.hidden = YES;
+		self.pinButton.hidden = YES;
+		self.approveButton.hidden = YES;
+		self.denyButton.hidden = YES;
+		return;
+	}
 	CGFloat bottomY = bodyHeight - 28;
 
 	[self updatePinButtonState];
@@ -1182,8 +1262,9 @@ static NSString *JSString(Napi::Value value) {
 
 	if (!self.approveButton.hidden) {
 		NSString *approveTitle = self.pendingDestructive ? @"Approve (destructive)" : @"Approve";
-		self.approveButton.title = approveTitle;
+		self.approveButton.title = self.actionInFlight ? @"Applying…" : approveTitle;
 		self.approveButton.accessibilityLabel = approveTitle;
+		self.denyButton.title = self.actionInFlight ? @"Dismissing…" : @"Deny";
 		self.denyButton.frame = NSMakeRect(14, bottomY, 68, 22);
 		self.approveButton.frame = NSMakeRect(86, bottomY, self.pendingDestructive ? 144 : 78, 22);
 	}
@@ -1362,11 +1443,15 @@ static NSString *JSString(Napi::Value value) {
 		self.exitTimer = nil;
 		if (!self.hovering) {
 			self.hovering = YES;
+			const NSUInteger sessionToken = ++self.hoverSessionToken;
 			[self.hoverTimer invalidate];
 			__weak PrebaseLiveActivityController *weakSelf = self;
 			self.hoverTimer = [NSTimer scheduledTimerWithTimeInterval:kHoverDwellInterval repeats:NO block:^(NSTimer *timer) {
 				PrebaseLiveActivityController *strong = weakSelf;
 				if (!strong || gDisposed || strong.screenLocked || !strong.visible || !strong.hovering || !strong.lastInside) {
+					return;
+				}
+				if (strong.hoverSessionToken != sessionToken) {
 					return;
 				}
 				if (!strong.didHoverHaptic) {
@@ -1377,6 +1462,7 @@ static NSString *JSString(Napi::Value value) {
 			}];
 		}
 	} else {
+		self.hoverSessionToken++;
 		[self.hoverTimer invalidate];
 		self.hoverTimer = nil;
 		self.hovering = NO;
@@ -1469,6 +1555,7 @@ static NSString *JSString(Napi::Value value) {
 			[self emit:@"dismissAttention" extras:nil];
 		}
 	}
+	self.hoverSessionToken++;
 	self.attentionPeek = NO;
 	self.content.peekOnly = NO;
 	self.content.expanded = NO;
@@ -1537,13 +1624,25 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)approve:(id)sender {
+	if (self.actionInFlight) {
+		return;
+	}
+	self.actionInFlight = YES;
+	self.approveButton.title = @"Applying…";
+	self.approveButton.enabled = NO;
+	self.denyButton.enabled = NO;
 	[self emit:@"approve" extras:@{ @"interactionId": self.interactionId ?: @"" }];
-	[self clearPendingInteraction];
 }
 
 - (void)deny:(id)sender {
+	if (self.actionInFlight) {
+		return;
+	}
+	self.actionInFlight = YES;
+	self.denyButton.title = @"Dismissing…";
+	self.approveButton.enabled = NO;
+	self.denyButton.enabled = NO;
 	[self emit:@"deny" extras:@{ @"interactionId": self.interactionId ?: @"" }];
-	[self clearPendingInteraction];
 }
 
 - (void)answerOption:(id)sender {
@@ -1551,6 +1650,9 @@ static NSString *JSString(Napi::Value value) {
 	if (button.tag == 3 && self.pendingOptions.count > 4) {
 		// Tertiary "More in PreBase..." delegate
 		[self openInPrebase:sender];
+		return;
+	}
+	if (self.actionInFlight) {
 		return;
 	}
 	if (button.tag < 0 || button.tag >= (NSInteger)self.pendingOptions.count) {
@@ -1561,6 +1663,10 @@ static NSString *JSString(Napi::Value value) {
 	if (optionId.length == 0) {
 		return;
 	}
+	self.actionInFlight = YES;
+	for (NSButton *btn in self.optionButtons) {
+		btn.enabled = NO;
+	}
 	NSString *interactionId = self.interactionId ?: @"";
 	[self emit:@"answer" extras:@{
 		@"interactionId": interactionId,
@@ -1570,6 +1676,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)clearPendingInteraction {
+	self.actionInFlight = NO;
 	self.interactionId = @"";
 	self.pendingKind = @"";
 	self.pendingDestructive = NO;
@@ -1577,6 +1684,11 @@ static NSString *JSString(Napi::Value value) {
 	self.content.pendingTitle = @"";
 	self.content.pendingMessage = @"";
 	self.openButton.title = @"Open in PreBase";
+	self.approveButton.enabled = YES;
+	self.denyButton.enabled = YES;
+	for (NSButton *btn in self.optionButtons) {
+		btn.enabled = YES;
+	}
 	[self refreshContentOnly];
 }
 
@@ -1714,6 +1826,8 @@ static NSString *JSString(Napi::Value value) {
 	}
 	dict[@"transitionInFlight"] = @(self.transitionInFlight);
 	dict[@"transitionGeneration"] = @(self.transitionGeneration);
+	dict[@"actionInFlight"] = @(self.actionInFlight);
+	dict[@"hoverSessionToken"] = @(self.hoverSessionToken);
 	dict[@"layerBacked"] = @(self.content.wantsLayer);
 	CGFloat diagBandH = MAX(self.content.safeAreaTop, kCollapsedHeight);
 	CGFloat diagTotalW = NSWidth(self.content.bounds);
@@ -1959,7 +2073,20 @@ static NSString *JSString(Napi::Value value) {
 	self.content.pendingTitle = snapshot[@"pendingTitle"] ?: @"";
 	self.content.pendingMessage = snapshot[@"pendingMessage"] ?: @"";
 	self.content.latestMessage = snapshot[@"latestShortMessage"] ?: @"";
-	self.interactionId = snapshot[@"interactionId"] ?: @"";
+
+	NSString *incomingInteractionId = snapshot[@"interactionId"] ?: @"";
+	if (self.actionInFlight) {
+		// Clear in-flight state when snapshot confirms interaction transitioned, resolved, or status returned to working/idle
+		if (incomingInteractionId.length == 0 || ![incomingInteractionId isEqualToString:self.interactionId] || [status isEqualToString:@"idle"] || [status isEqualToString:@"working"]) {
+			self.actionInFlight = NO;
+			self.approveButton.enabled = YES;
+			self.denyButton.enabled = YES;
+			for (NSButton *btn in self.optionButtons) {
+				btn.enabled = YES;
+			}
+		}
+	}
+	self.interactionId = incomingInteractionId;
 	self.pendingKind = snapshot[@"pendingKind"] ?: @"";
 	self.pendingDestructive = [snapshot[@"destructive"] boolValue];
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
@@ -1994,6 +2121,8 @@ static NSString *JSString(Napi::Value value) {
 			}
 			needsGeometry = !alreadyCompact;
 		} else if (!self.pinned && mayExpand) {
+			// Glanceable attention peek: compact wings + short body, not full interactive panel.
+			self.didAttentionHaptic = NO;
 			const BOOL alreadyAttentionPeek = self.attentionPeek && self.content.peekOnly && self.content.expanded;
 			self.attentionPeek = YES;
 			self.content.peekOnly = YES;
@@ -2130,8 +2259,8 @@ static NSString *JSString(Napi::Value value) {
 		}
 	}
 	self.content.targetExpanded = self.content.expanded;
-	// Own explicit geometry animation — disable AppKit orderFront/orderOut automatic animation.
-	self.panel.animationBehavior = NSWindowAnimationBehaviorNone;
+	// Honor reduced motion for window animation behavior per contract
+	self.panel.animationBehavior = reduced ? NSWindowAnimationBehaviorNone : NSWindowAnimationBehaviorUtilityWindow;
 	if (!visible) {
 		[self.panel orderOut:nil];
 		self.panel.ignoresMouseEvents = YES;
@@ -2294,10 +2423,13 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 		}
 		payload[@"pendingOptions"] = options;
 	} else {
-		payload[@"interactionId"] = @"";
-		payload[@"pendingKind"] = @"";
-		payload[@"pendingTitle"] = @"";
-		payload[@"pendingMessage"] = @"";
+		payload[@"interactionId"] = JSString(snapshot.Get("interactionId"));
+		payload[@"pendingKind"] = JSString(snapshot.Get("pendingKind"));
+		payload[@"pendingTitle"] = JSString(snapshot.Get("pendingTitle"));
+		payload[@"pendingMessage"] = JSString(snapshot.Get("pendingMessage"));
+		if (snapshot.Get("destructive").IsBoolean() && snapshot.Get("destructive").As<Napi::Boolean>().Value()) {
+			payload[@"destructive"] = @YES;
+		}
 		payload[@"pendingOptions"] = @[];
 	}
 	return payload;

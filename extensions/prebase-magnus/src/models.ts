@@ -52,7 +52,7 @@ export interface MagnusModelOption {
 
 /**
  * Default fallback models when live discovery is not yet available or offline.
- * Auto resolves to Gemini 2.5 Flash as the balanced, fast default.
+ * Auto resolves to Gemini 3.8 Flash as the balanced, fast default.
  */
 import { defaultGeminiModelPolicy } from './modelPolicy';
 
@@ -210,7 +210,9 @@ function toNormalizedModel(m: DiscoveredModelInput): import('./aiTypes').Normali
 		},
 		reasoning: {
 			supported: true,
-			supportedEfforts: ['default', 'minimal', 'low', 'medium', 'high'],
+			supportedEfforts: ((typeof m.id === 'string' && m.id.startsWith('gemini-3.6-flash')) || (typeof m.name === 'string' && m.name.includes('gemini-3.6-flash')))
+				? ['default', 'minimal', 'low', 'medium', 'high']
+				: ['default', 'low', 'medium', 'high'],
 			defaultEffort: 'default',
 		},
 	};
@@ -249,7 +251,7 @@ export function buildModelOptions(discovered?: DiscoveredModelInput[]): MagnusMo
 export function resolveApiModel(modelId: string, discovered?: DiscoveredModelInput[]): string {
 	const options = buildModelOptions(discovered ?? globalGeminiModelCache.get());
 	const found = options.find(m => m.id === modelId);
-	return found?.apiModel || 'gemini-2.5-flash';
+	return found?.apiModel || options[0]?.apiModel || DEFAULT_MAGNUS_MODELS[0].apiModel;
 }
 
 export function resolveModelInfo(modelId: string, discovered?: DiscoveredGeminiModel[]): { apiModel: string; resolvedModelId: string } {
@@ -258,7 +260,7 @@ export function resolveModelInfo(modelId: string, discovered?: DiscoveredGeminiM
 	if (found) {
 		return { apiModel: found.apiModel, resolvedModelId: found.id };
 	}
-	return { apiModel: 'gemini-2.5-flash', resolvedModelId: 'auto' };
+	return { apiModel: options[0]?.apiModel || DEFAULT_MAGNUS_MODELS[0].apiModel, resolvedModelId: 'auto' };
 }
 
 export function resolveModelOrFallback(modelId: string, discovered?: DiscoveredModelInput[]): string {
