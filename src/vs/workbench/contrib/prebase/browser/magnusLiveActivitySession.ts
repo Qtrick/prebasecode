@@ -58,7 +58,7 @@ export function extractPending(
 			const options = first.options
 				?.map(option => ({
 					id: option.value || option.id,
-					label: option.label || option.value || option.id,
+					label: redactLiveActivityText(option.label || option.value || option.id) || (option.value || option.id),
 				}))
 				.filter(option => Boolean(option.id));
 			return {

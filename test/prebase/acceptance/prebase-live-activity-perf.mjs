@@ -140,20 +140,191 @@ function layoutContainmentOk(diag) {
 			viewport,
 		};
 	}
-	const textMaxY = Number(diag.contentViewport?.height);
+	// Text blocks live in the scroll document (document-local Y). Prefer document height
+	// over contentViewport (container-local text band) when the scroll host is active.
+	const scrollDocH = Number(diag.contentDocumentHeight);
+	const textMaxY = (Number.isFinite(scrollDocH) && scrollDocH > 0)
+		? scrollDocH
+		: Number(diag.contentViewport?.height);
+	const scrollHostActive = diag.contentScrollEnabled === true && Number.isFinite(scrollDocH) && scrollDocH > 0;
 	for (const { key, f } of frames) {
+		// Controls are laid out in expanded-container space; text may be document-local.
+		if (controlKeys.has(key)) {
+			if (f.x < -1 || f.y < -1 || (f.x + f.width) > viewport.maxX + 2 || (f.y + f.height) > viewport.maxY + 2) {
+				return { ok: false, reason: `${key}-overflow`, frame: f, viewport };
+			}
+			if (f.y < -1) {
+				return { ok: false, reason: `${key}-negative-y`, frame: f };
+			}
+			continue;
+		}
+		if (textKeys.has(key)) {
+			if (f.x < -1 || f.y < -1) {
+				return { ok: false, reason: `${key}-negative-origin`, frame: f };
+			}
+			if (!scrollHostActive && ((f.x + f.width) > viewport.maxX + 2 || (f.y + f.height) > viewport.maxY + 2)) {
+				return { ok: false, reason: `${key}-overflow`, frame: f, viewport };
+			}
+			if (Number.isFinite(textMaxY) && textMaxY > 0 && (f.y + f.height) > textMaxY + 2) {
+				return { ok: false, reason: `${key}-into-footer`, frame: f, textMaxY };
+			}
+			continue;
+		}
 		if (f.x < -1 || f.y < -1 || (f.x + f.width) > viewport.maxX + 2 || (f.y + f.height) > viewport.maxY + 2) {
 			return { ok: false, reason: `${key}-overflow`, frame: f, viewport };
 		}
-		// Text blocks must stay above the reserved footer; controls may occupy it.
-		if (textKeys.has(key) && Number.isFinite(textMaxY) && textMaxY > 0 && (f.y + f.height) > textMaxY + 2) {
-			return { ok: false, reason: `${key}-into-footer`, frame: f, textMaxY };
+	}
+	return { ok: true, frameCount: frames.length, viewport, textMaxY, scrollHostActive };
+}
+
+function frameBottom(f) {
+	return Number(f.y) + Number(f.height);
+}
+
+function framesIntersect(a, b, tol = 1) {
+	if (!isValidDiagFrame(a) || !isValidDiagFrame(b)) {
+		return false;
+	}
+	return !(frameBottom(a) <= b.y + tol
+		|| frameBottom(b) <= a.y + tol
+		|| (a.x + a.width) <= b.x + tol
+		|| (b.x + b.width) <= a.x + tol);
+}
+
+/** Map scroll-document frames into expanded-container space (scroll offset ≈ top). */
+function documentFrameInContainer(diag, docFrame) {
+	const scroll = diag?.contentScrollFrame;
+	if (!isValidDiagFrame(scroll) || !isValidDiagFrame(docFrame)) {
+		return null;
+	}
+	return {
+		x: Number(docFrame.x),
+		y: Number(scroll.y) + Number(docFrame.y),
+		width: Number(docFrame.width),
+		height: Number(docFrame.height),
+	};
+}
+
+/**
+ * Visible text must not paint under footer controls. Document frames are scroll-local;
+ * clamp to the scroll host bottom (what can actually paint).
+ */
+function assertTextDoesNotPaintUnderControls(diag, { requireApprove = false } = {}) {
+	const scroll = diag.contentScrollFrame;
+	const approve = diag.approveButtonFrame;
+	const composer = diag.composerFrame;
+	const viewportH = Number(diag.contentViewport?.height) || Number(diag.bodyBounds?.height) || 0;
+	if (viewportH < 24) {
+		return { skipped: true, reason: 'viewport-too-shallow' };
+	}
+	if (!isValidDiagFrame(scroll)) {
+		throw new Error('interactive settle must expose contentScrollFrame for footer no-overlap');
+	}
+	const scrollBottom = frameBottom(scroll);
+	if (isValidDiagFrame(composer) && scrollBottom > composer.y + 1.5) {
+		throw new Error(`content scroll must end above composer (scrollBottom=${scrollBottom}, composer.y=${composer.y})`);
+	}
+	if (isValidDiagFrame(approve)) {
+		if (scrollBottom > approve.y + 1.5) {
+			throw new Error(`content scroll must end above Approve (scrollBottom=${scrollBottom}, approve.y=${approve.y})`);
 		}
-		if (controlKeys.has(key) && f.y < -1) {
-			return { ok: false, reason: `${key}-negative-y`, frame: f };
+		if (isValidDiagFrame(diag.pendingMessageFrame)) {
+			const converted = documentFrameInContainer(diag, diag.pendingMessageFrame);
+			const visibleBottom = Math.min(frameBottom(converted), scrollBottom);
+			if (!(visibleBottom < approve.y - 0.5)) {
+				throw new Error(`pendingMessage must sit above Approve (visibleBottom=${visibleBottom}, approve.y=${approve.y})`);
+			}
+		}
+	} else if (requireApprove) {
+		throw new Error('expected approveButtonFrame after interactive approval settle');
+	}
+	for (const key of ['activityFrame', 'latestMessageFrame']) {
+		const raw = diag[key];
+		if (!isValidDiagFrame(raw) || !isValidDiagFrame(composer)) {
+			continue;
+		}
+		const converted = documentFrameInContainer(diag, raw);
+		if (!converted) {
+			continue;
+		}
+		const visible = {
+			...converted,
+			height: Math.min(converted.height, Math.max(0, scrollBottom - converted.y)),
+		};
+		if (visible.height > 0.5 && framesIntersect(visible, composer, 1)) {
+			throw new Error(`${key} must not intersect composerFrame`);
 		}
 	}
-	return { ok: true, frameCount: frames.length, viewport };
+	return { skipped: false, scrollBottom, approveY: approve?.y, composerY: composer?.y };
+}
+
+/**
+ * ≥3 question options must form a 2-col grid (no lone chip row above a fuller row).
+ * Option tops sit below document content and above the composer.
+ */
+function assertTwoColOptionLayout(diag) {
+	const frames = (diag.optionButtonFrames || []).filter(isValidDiagFrame);
+	const viewportH = Number(diag.contentViewport?.height) || Number(diag.bodyBounds?.height) || 0;
+	if (viewportH < 24 || frames.length < 3) {
+		return { skipped: true, reason: frames.length < 3 ? 'fewer-than-3-options' : 'viewport-too-shallow', count: frames.length };
+	}
+	const tol = 3;
+	const sorted = [...frames].sort((a, b) => a.y - b.y || a.x - b.x);
+	const rows = [];
+	for (const f of sorted) {
+		const row = rows.find(r => Math.abs(r[0].y - f.y) <= tol);
+		if (row) {
+			row.push(f);
+		} else {
+			rows.push([f]);
+		}
+	}
+	for (const row of rows) {
+		if (row.length > 2) {
+			throw new Error(`option row must be at most 2-wide, got ${row.length}`);
+		}
+	}
+	// Topmost row must not be a single orphan above a fuller row (legacy 1-then-wrap).
+	if (rows[0].length === 1 && rows.some(r => r.length >= 2)) {
+		throw new Error('2-col options must not leave a single orphan chip above a fuller row');
+	}
+	if (rows.length >= 2 && rows[0].length < 2) {
+		throw new Error(`expected top option row to be 2-wide for ≥3 options, got ${rows[0].length}`);
+	}
+	const optionTop = Math.min(...frames.map(f => f.y));
+	const optionBottom = Math.max(...frames.map(f => frameBottom(f)));
+	const composer = diag.composerFrame;
+	if (isValidDiagFrame(composer) && !(optionBottom < composer.y - 0.5)) {
+		throw new Error(`option chips must sit above composer (optionBottom=${optionBottom}, composer.y=${composer.y})`);
+	}
+	const scroll = diag.contentScrollFrame;
+	if (isValidDiagFrame(scroll) && !(frameBottom(scroll) <= optionTop + 1.5)) {
+		throw new Error(`content scroll must end at/above option row (scrollBottom=${frameBottom(scroll)}, optionTop=${optionTop})`);
+	}
+	// Header is container-local; pending/activity/latest are scroll-document-local.
+	for (const key of ['headerFrame', 'pendingTitleFrame', 'pendingMessageFrame', 'activityFrame', 'latestMessageFrame']) {
+		const raw = diag[key];
+		if (!isValidDiagFrame(raw)) {
+			continue;
+		}
+		const converted = key === 'headerFrame' ? raw : documentFrameInContainer(diag, raw);
+		if (!converted) {
+			continue;
+		}
+		const visibleBottom = isValidDiagFrame(scroll)
+			? Math.min(frameBottom(converted), frameBottom(scroll))
+			: frameBottom(converted);
+		if (visibleBottom > optionTop + 1.5) {
+			throw new Error(`${key} must stay above option chips (visibleBottom=${visibleBottom}, optionTop=${optionTop})`);
+		}
+	}
+	return {
+		skipped: false,
+		rows: rows.map(r => r.length),
+		optionTop,
+		optionBottom,
+		count: frames.length,
+	};
 }
 
 async function awaitCommands(predicate, { timeoutMs = 400 } = {}) {
@@ -217,12 +388,14 @@ function contentSnapshot(revision, extras = {}) {
 		latestShortMessage: extras.latestShortMessage ?? `msg-${revision}`,
 		connected: true,
 		prebaseForeground: false,
-		workspaceDiff: extras.workspaceDiff || {
+	};
+	if (extras.workspaceDiff !== null) {
+		snap.workspaceDiff = extras.workspaceDiff || {
 			additions: revision % 50,
 			deletions: (revision + 3) % 40,
 			files: (revision % 7) + 1,
-		},
-	};
+		};
+	}
 	if (extras.pendingInteraction) {
 		snap.pendingInteraction = extras.pendingInteraction;
 	}
@@ -335,8 +508,14 @@ function assertContentOnlyStable(diag, baseline, {
 		if (renderedRevision !== lastApplied.revision) {
 			throw new Error(`rendered revision must equal last applied (${lastApplied.revision}), got ${renderedRevision}`);
 		}
-		if (diag.statusLabel && lastApplied.label && diag.statusLabel !== lastApplied.label) {
-			throw new Error(`statusLabel not updated to latest content (expected ${lastApplied.label}, got ${diag.statusLabel})`);
+		// Compact wing statusLabel is a fixed token (Working/Question/…) — never storm presentationLabel prose.
+		const compactTokens = new Set(['Working', 'Testing', 'Waiting', 'Question', 'Approve', 'Done', 'Failed', 'Offline', 'Magnus']);
+		if (diag.statusLabel && !compactTokens.has(diag.statusLabel)) {
+			throw new Error(`statusLabel must stay a compact wing token, got ${JSON.stringify(diag.statusLabel)}`);
+		}
+		const expectedActivity = `Activity ${lastApplied.revision}`;
+		if (diag.activityLabel && diag.activityLabel !== expectedActivity) {
+			throw new Error(`activityLabel not updated to latest content (expected ${expectedActivity}, got ${diag.activityLabel})`);
 		}
 		if (diag.latestShortMessage && lastApplied.message && diag.latestShortMessage !== lastApplied.message) {
 			throw new Error(`latestShortMessage not updated to latest content (expected ${lastApplied.message}, got ${diag.latestShortMessage})`);
@@ -454,10 +633,12 @@ async function run() {
 				sessionId: 'stress-session',
 				sessionResource: 'vscode-chat://local/stress-session',
 				status: 'working',
-				presentationLabel: `Step ${i}`,
-				currentActivity: `Real cycle ${i}`,
-				latestShortMessage: `msg-${i}`,
-				recentActions: [{ id: `a${i}`, label: `action ${i}`, at: Date.now() }],
+				presentationLabel: 'Working',
+				currentActivity: i % 2 === 0 ? 'Running graph interaction tests' : 'Validating Temporal layout recovery',
+				latestShortMessage: i % 2 === 0
+					? 'Finished the graph interaction pass and checking remaining cases.'
+					: 'Fit View metrics look stable on the large fixture.',
+				recentActions: [{ id: `a${i}`, label: i % 2 === 0 ? 'Edited graphEditor.ts' : 'Ran interaction suites', at: Date.now() }],
 				connected: true,
 				prebaseForeground: false,
 			});
@@ -1777,11 +1958,14 @@ async function run() {
 			// TODO(native): expose lastRenderedRevision in getDiagnostics.
 			// Until then, assert via rendered labels that stale content did not win.
 		}
-		if (diag.statusLabel === 'STALE-6010' || diag.latestShortMessage === 'STALE message') {
+		if (diag.statusLabel === 'STALE-6010' || diag.latestShortMessage === 'STALE message' || diag.activityLabel === 'STALE activity') {
 			throw new Error('stale lower revision must not rewind rendered labels after higher revisions were applied');
 		}
-		if (diag.statusLabel !== `rev-${highWater}`) {
-			throw new Error(`expected statusLabel rev-${highWater} after monotonic apply, got ${diag.statusLabel}`);
+		if (diag.statusLabel !== 'Working') {
+			throw new Error(`expected compact wing statusLabel Working after monotonic apply, got ${diag.statusLabel}`);
+		}
+		if (diag.activityLabel !== `Activity ${highWater}`) {
+			throw new Error(`expected activityLabel Activity ${highWater} after monotonic apply, got ${diag.activityLabel}`);
 		}
 		if (diag.latestShortMessage !== `msg-${highWater}`) {
 			throw new Error(`expected latestShortMessage msg-${highWater}, got ${diag.latestShortMessage}`);
@@ -2793,13 +2977,14 @@ async function run() {
 			prevHeight = frame?.height || prevHeight;
 		}
 
-		// Content-only retarget: long text refresh must not restart geometry morph.
+		// Content-only retarget: once already at max-clamped long height, equivalent long
+		// refresh must not restart geometry morph (scroll absorbs text churn).
 		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
 		native.setSnapshot(contentSnapshot(9989, {
 			status: 'working',
 			presentationLabel: 'Working',
-			currentActivity: 'Baseline before retarget',
-			latestShortMessage: 'ready',
+			currentActivity: longText('baseline-activity', 40),
+			latestShortMessage: longText('baseline-msg', 55),
 		}));
 		await sleep(120);
 		await drainMain(native, 3);
@@ -2807,8 +2992,8 @@ async function run() {
 		native.setSnapshot(contentSnapshot(9990, {
 			status: 'working',
 			presentationLabel: 'Working',
-			currentActivity: longText('retarget-activity', 30),
-			latestShortMessage: longText('retarget-msg', 40),
+			currentActivity: longText('retarget-activity', 40),
+			latestShortMessage: longText('retarget-msg', 55),
 		}));
 		await sleep(80);
 		await drainMain(native, 3);
@@ -2817,7 +3002,7 @@ async function run() {
 			expectedState: baseline.activePresentationState,
 			expectedTarget: baseline.targetPresentationState,
 		});
-		test27.details = { heights, retarget: { baselineAnim: baseline.animationCount, afterAnim: afterRetarget.animationCount, state: afterRetarget.activePresentationState } };
+		test27.details = { heights, retarget: { baselineAnim: baseline.animationCount, afterAnim: afterRetarget.animationCount, state: afterRetarget.activePresentationState, baselineH: baseline.frame?.height, afterH: captureFrame(afterRetarget)?.height } };
 	} catch (err) {
 		test27.ok = false;
 		test27.error = err.message;
@@ -3079,6 +3264,444 @@ async function run() {
 		results.failures.push(`shape-aware-hit-testing-diagnostic: ${err.message}`);
 	}
 	results.tests.push(test29);
+
+	// Test 30: Populated-first-paint — expanded interactive never blank after settle
+	const test30 = { name: 'content-populated-no-blank-expansion', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(12_000, {
+			status: 'working',
+			presentationLabel: 'Working',
+			currentActivity: 'Running graph interaction tests',
+			latestShortMessage: 'Validating populated-first-paint after interactive expand',
+		}));
+		await sleep(80);
+		await drainMain(native, 2);
+		await settleInteractive(native);
+		await sleep(120);
+		await drainMain(native, 4);
+		const diag = native.getDiagnostics();
+		if (diag.expanded !== true) {
+			throw new Error(`expected expanded=true after settle, got ${diag.expanded}`);
+		}
+		if (diag.peekOnly === true) {
+			throw new Error('interactive settle must not remain peekOnly');
+		}
+		if (diag.contentPopulated !== true) {
+			throw new Error(`expanded interactive with known content must report contentPopulated=true, got ${diag.contentPopulated}`);
+		}
+		if (!(Number(diag.expandedContentAlpha) > 0.9)) {
+			throw new Error(`expandedContentAlpha must be near 1 after settle, got ${diag.expandedContentAlpha}`);
+		}
+		if (!diag.contentSafeViewport || typeof diag.contentSafeViewport.width !== 'number') {
+			throw new Error('contentSafeViewport diagnostic must exist alongside contentViewport');
+		}
+		if (!diag.contentViewport || typeof diag.contentViewport.width !== 'number') {
+			throw new Error('contentViewport diagnostic must exist');
+		}
+		if ((Number(diag.contentSafeViewport.width) || 0) > (Number(diag.contentViewport.width) || 0) + 1) {
+			throw new Error('contentSafeViewport must not be wider than contentViewport');
+		}
+		test30.details = {
+			contentPopulated: diag.contentPopulated,
+			expandedContentAlpha: diag.expandedContentAlpha,
+			contentViewport: diag.contentViewport,
+			contentSafeViewport: diag.contentSafeViewport,
+			state: diag.activePresentationState,
+		};
+	} catch (err) {
+		test30.ok = false;
+		test30.error = err.message;
+		results.failures.push(`content-populated-no-blank-expansion: ${err.message}`);
+	}
+	results.tests.push(test30);
+
+	// Test 31: Natural expanded width + measured height model (no 320pt min, no max slab for short)
+	const test31 = { name: 'natural-expanded-width-and-height-model', ok: true, details: {} };
+	try {
+		native.dispose();
+		const EXPANDED_HEIGHT_MIN = 72;
+		const EXPANDED_HEIGHT_MAX = 164;
+		const EXPANDED_WIDTH_PAD = 28;
+
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(12_100, {
+			status: 'working',
+			presentationLabel: 'Working',
+			currentActivity: 'Short task',
+			latestShortMessage: 'Compact body',
+			workspaceDiff: null,
+		}));
+		await sleep(100);
+		await drainMain(native, 3);
+		const compactDiag = native.getDiagnostics();
+		const compactFrame = captureFrame(compactDiag);
+		const compactW = compactFrame?.width || 0;
+
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 3);
+		const shortDiag = native.getDiagnostics();
+		const shortFrame = captureFrame(shortDiag);
+		if (!shortFrame || shortFrame.height <= 0) {
+			throw new Error('short working interactive must expose a panel/requested frame');
+		}
+		if (shortFrame.height > EXPANDED_HEIGHT_MAX) {
+			throw new Error(`height must clamp to max ${EXPANDED_HEIGHT_MAX}, got ${shortFrame.height}`);
+		}
+		if (shortFrame.height < EXPANDED_HEIGHT_MIN) {
+			throw new Error(`height must be at least min ${EXPANDED_HEIGHT_MIN}, got ${shortFrame.height}`);
+		}
+		// Working interactive must keep natural notch/pill span — no forced jump to a 320 floor.
+		if (compactW > 0 && Math.abs(shortFrame.width - compactW) > 1.5) {
+			throw new Error(`working expanded width (${shortFrame.width}) must match natural compact span (${compactW}), not a fixed min`);
+		}
+		// contentScrollEnabled means the interactive scroll *host* is visible (always on in Interactive).
+		// Overflow is proven via document height vs scroll frame, not the host flag alone.
+		const shortDocH = Number(shortDiag.contentDocumentHeight) || 0;
+		const shortScrollH = Number(shortDiag.contentScrollFrame?.height) || Number(shortDiag.contentViewport?.height) || 0;
+		// Allow a few points of document/scroll slack (header/padding measurement); real overflow is much larger.
+		if (shortDocH > 0 && shortScrollH > 0 && shortDocH > shortScrollH + 12) {
+			throw new Error(`short content must not overflow scroll host (doc=${shortDocH}, scroll=${shortScrollH})`);
+		}
+		if (shortDiag.contentPopulated !== true) {
+			throw new Error('short interactive must report contentPopulated');
+		}
+
+		// Approval (no option pad) should also keep natural width.
+		native.setSnapshot(contentSnapshot(12_105, {
+			status: 'attention',
+			presentationLabel: 'Approval needed',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'width-appr',
+				title: 'Approve?',
+				message: 'Continue',
+			},
+		}));
+		await sleep(100);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(120);
+		await drainMain(native, 3);
+		const approvalFrame = captureFrame(native.getDiagnostics());
+		if (approvalFrame && compactW > 0 && Math.abs(approvalFrame.width - compactW) > 1.5) {
+			throw new Error(`approval expanded width (${approvalFrame.width}) must stay on natural span (${compactW})`);
+		}
+
+		// Question with >2 options may pad past natural width by kExpandedWidthPad.
+		native.setSnapshot(contentSnapshot(12_110, {
+			status: 'attention',
+			presentationLabel: 'Needs input',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'width-q',
+				title: 'Pick layout',
+				message: 'Choose one',
+				options: [
+					{ id: 'a', label: 'Organic' },
+					{ id: 'b', label: 'Sphere' },
+					{ id: 'c', label: 'Constellation' },
+					{ id: 'd', label: 'Clustered' },
+				],
+			},
+		}));
+		await sleep(120);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 3);
+		const questionDiag = native.getDiagnostics();
+		const questionFrame = captureFrame(questionDiag);
+		if (!questionFrame) {
+			throw new Error('question interactive must expose a frame');
+		}
+		if (compactW > 0 && questionFrame.width + 0.5 < compactW + EXPANDED_WIDTH_PAD) {
+			// Allow equality when headless/synthetic already wider than natural+pad needs.
+			if (questionFrame.width + 0.5 < compactW) {
+				throw new Error(`question (>2 options) must not shrink below natural width (${questionFrame.width} < ${compactW})`);
+			}
+		}
+		if (compactW > 0 && questionFrame.width >= compactW + EXPANDED_WIDTH_PAD - 0.5) {
+			// Pad applied — good.
+		} else if (compactW > 0 && Math.abs(questionFrame.width - compactW) <= 1.5) {
+			// Some headless paths already use a wide synthetic base; pad may be absorbed.
+		} else if (compactW > 0) {
+			throw new Error(`question width ${questionFrame.width} unexpected vs natural ${compactW} (pad=${EXPANDED_WIDTH_PAD})`);
+		}
+
+		// Long content clamps to max and may enable scroll.
+		native.setSnapshot(contentSnapshot(12_121, {
+			status: 'working',
+			presentationLabel: 'Working',
+			currentActivity: longText('long-activity', 48),
+			latestShortMessage: longText('long-message', 70),
+		}));
+		await sleep(150);
+		await drainMain(native, 4);
+		native.simulateAction('interactive');
+		await sleep(180);
+		await drainMain(native, 4);
+		const longDiag = native.getDiagnostics();
+		const longFrame = captureFrame(longDiag);
+		if (!longFrame) {
+			throw new Error('long interactive must expose a frame');
+		}
+		if (longFrame.height > EXPANDED_HEIGHT_MAX + 0.5) {
+			throw new Error(`long content must clamp height to ${EXPANDED_HEIGHT_MAX}, got ${longFrame.height}`);
+		}
+		if (longFrame.height < shortFrame.height - 0.5) {
+			throw new Error(`long content height (${longFrame.height}) must be >= short (${shortFrame.height})`);
+		}
+		if (Math.abs(longFrame.height - EXPANDED_HEIGHT_MAX) <= 1.5
+			&& shortFrame.height >= EXPANDED_HEIGHT_MAX - 1.5) {
+			throw new Error(`short working height (${shortFrame.height}) must stay below max-clamped long slab (${longFrame.height})`);
+		}
+		if (Math.abs(longFrame.height - EXPANDED_HEIGHT_MAX) <= 1.5) {
+			const docH = Number(longDiag.contentDocumentHeight) || 0;
+			const scrollH = Number(longDiag.contentScrollFrame?.height) || Number(longDiag.contentViewport?.height) || 0;
+			if (!(docH > scrollH + 1) && longDiag.contentScrollEnabled !== true) {
+				throw new Error(`long content at max height must overflow scroll host or keep scroll host (doc=${docH}, scroll=${scrollH}, host=${longDiag.contentScrollEnabled})`);
+			}
+			if (!(docH > scrollH + 1)) {
+				// Host is visible but content may still fit when measurement is conservative; require clamp proof only.
+				if (longFrame.height < EXPANDED_HEIGHT_MAX - 0.5) {
+					throw new Error(`expected long content to clamp at max when documenting overflow, got ${longFrame.height}`);
+				}
+			}
+		}
+
+		test31.details = {
+			compactWidth: compactW,
+			shortHeight: shortFrame.height,
+			shortWidth: shortFrame.width,
+			approvalWidth: approvalFrame?.width,
+			questionWidth: questionFrame.width,
+			longHeight: longFrame.height,
+			longScroll: longDiag.contentScrollEnabled,
+			pad: EXPANDED_WIDTH_PAD,
+			contentSafeViewport: shortDiag.contentSafeViewport,
+		};
+	} catch (err) {
+		test31.ok = false;
+		test31.error = err.message;
+		results.failures.push(`natural-expanded-width-and-height-model: ${err.message}`);
+	}
+	results.tests.push(test31);
+
+	// Test 32: Approve/Deny keep titles while in-flight; a11y uses "(in progress)"; alpha dims
+	const test32 = { name: 'action-in-flight-keeps-approve-deny-titles', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(12_200, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'title-appr',
+				title: 'Approve write?',
+				message: 'Write live_activity.mm',
+			},
+		}));
+		await sleep(100);
+		await drainMain(native, 2);
+		native.simulateAction('interactive');
+		await sleep(120);
+		await drainMain(native, 3);
+
+		const before = native.getDiagnostics();
+		if (before.approvalControlsVisible === true) {
+			if (before.approveButtonTitle && before.approveButtonTitle !== 'Approve') {
+				throw new Error(`pre-flight approve title must be Approve, got ${before.approveButtonTitle}`);
+			}
+			if (before.denyButtonTitle && before.denyButtonTitle !== 'Deny') {
+				throw new Error(`pre-flight deny title must be Deny, got ${before.denyButtonTitle}`);
+			}
+		}
+
+		if (native.simulateAction('approve') !== true) {
+			throw new Error('approve must succeed');
+		}
+		await sleep(40);
+		await drainMain(native, 2);
+		const inFlight = native.getDiagnostics();
+		if (inFlight.actionInFlight !== true) {
+			throw new Error('expected actionInFlight after approve');
+		}
+		if (inFlight.approveButtonTitle !== 'Approve') {
+			throw new Error(`in-flight approve title must stay "Approve" (not Applying…), got ${JSON.stringify(inFlight.approveButtonTitle)}`);
+		}
+		if (inFlight.denyButtonTitle !== 'Deny') {
+			throw new Error(`in-flight deny title must stay "Deny" (not Dismissing…), got ${JSON.stringify(inFlight.denyButtonTitle)}`);
+		}
+		if (!String(inFlight.approveButtonAccessibilityLabel || '').includes('(in progress)')) {
+			throw new Error(`approve a11y must include "(in progress)", got ${inFlight.approveButtonAccessibilityLabel}`);
+		}
+		if (!String(inFlight.denyButtonAccessibilityLabel || '').includes('(in progress)')) {
+			throw new Error(`deny a11y must include "(in progress)", got ${inFlight.denyButtonAccessibilityLabel}`);
+		}
+		const approveAlpha = Number(inFlight.approveButtonAlpha);
+		const denyAlpha = Number(inFlight.denyButtonAlpha);
+		if (!(approveAlpha > 0.4 && approveAlpha < 0.75)) {
+			throw new Error(`approve alpha must dim while in-flight, got ${approveAlpha}`);
+		}
+		if (!(denyAlpha > 0.4 && denyAlpha < 0.75)) {
+			throw new Error(`deny alpha must dim while in-flight, got ${denyAlpha}`);
+		}
+		if (/Applying|Dismissing/.test(String(inFlight.approveButtonTitle) + String(inFlight.denyButtonTitle))) {
+			throw new Error('titles must not morph to Applying…/Dismissing…');
+		}
+
+		test32.details = {
+			approveButtonTitle: inFlight.approveButtonTitle,
+			denyButtonTitle: inFlight.denyButtonTitle,
+			approveButtonAccessibilityLabel: inFlight.approveButtonAccessibilityLabel,
+			denyButtonAccessibilityLabel: inFlight.denyButtonAccessibilityLabel,
+			approveButtonAlpha: approveAlpha,
+			denyButtonAlpha: denyAlpha,
+		};
+	} catch (err) {
+		test32.ok = false;
+		test32.error = err.message;
+		results.failures.push(`action-in-flight-keeps-approve-deny-titles: ${err.message}`);
+	}
+	results.tests.push(test32);
+
+	// Test 33: Interactive approval/question settle — no text/control overlap + 2-col options + geometry constants
+	const test33 = { name: 'interactive-layout-no-overlap-and-two-col-options', ok: true, details: {} };
+	try {
+		const EXPANDED_HEIGHT_MIN = 72;
+		const EXPANDED_HEIGHT_MAX = 164;
+		const EXPANDED_WIDTH_PAD = 28;
+		const STABLE_WING = 64;
+
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(13_000, {
+			status: 'attention',
+			presentationLabel: 'Approval needed',
+			currentActivity: 'Preparing write',
+			latestShortMessage: 'Review the pending file mutation before continuing',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'layout-appr',
+				title: 'Approve write to live_activity.mm?',
+				message: 'Magnus wants to update native layout geometry so document text never paints under Deny/Approve.',
+			},
+		}));
+		await sleep(120);
+		await drainMain(native, 3);
+		await settleInteractive(native);
+		await sleep(120);
+		await drainMain(native, 4);
+		const approvalDiag = native.getDiagnostics();
+		if (approvalDiag.contentPopulated !== true) {
+			throw new Error(`approval interactive must report contentPopulated=true, got ${approvalDiag.contentPopulated}`);
+		}
+		const approvalOverlap = assertTextDoesNotPaintUnderControls(approvalDiag, { requireApprove: true });
+		const approvalContainment = layoutContainmentOk(approvalDiag);
+		if (!approvalContainment.ok && !approvalContainment.headlessShallow) {
+			throw new Error(`approval layout containment failed: ${approvalContainment.reason}`);
+		}
+		const approvalFrame = captureFrame(approvalDiag);
+		if (approvalFrame) {
+			if (approvalFrame.height > EXPANDED_HEIGHT_MAX + 0.5) {
+				throw new Error(`approval height must clamp to ${EXPANDED_HEIGHT_MAX}, got ${approvalFrame.height}`);
+			}
+			if (approvalFrame.height < EXPANDED_HEIGHT_MIN - 0.5) {
+				throw new Error(`approval height must be >= ${EXPANDED_HEIGHT_MIN}, got ${approvalFrame.height}`);
+			}
+		}
+
+		native.setSnapshot(contentSnapshot(13_010, {
+			status: 'attention',
+			presentationLabel: 'Needs input',
+			currentActivity: 'Waiting on deployment lane',
+			latestShortMessage: 'Pick one option to continue the Magnus run',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'layout-q3',
+				title: 'Which deployment lane should Magnus use for this change?',
+				message: 'Choose a lane. Options must lay out as a 2-column grid without an orphan chip above a fuller row.',
+				options: [
+					{ id: 'dev', label: 'Development' },
+					{ id: 'staging', label: 'Staging' },
+					{ id: 'prod', label: 'Production' },
+				],
+			},
+		}));
+		await sleep(120);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 4);
+		const questionDiag = native.getDiagnostics();
+		if (questionDiag.contentPopulated !== true) {
+			throw new Error(`question interactive must report contentPopulated=true, got ${questionDiag.contentPopulated}`);
+		}
+		const questionOverlap = assertTextDoesNotPaintUnderControls(questionDiag);
+		const optionLayout = assertTwoColOptionLayout(questionDiag);
+		if (optionLayout.skipped && optionLayout.reason === 'fewer-than-3-options'
+			&& (Number(questionDiag.contentViewport?.height) || 0) >= 24) {
+			throw new Error(`expected ≥3 option frames for 2-col regression, got ${optionLayout.count}`);
+		}
+
+		// 4 options: still 2×2, no orphan-above-fuller-row pattern.
+		native.setSnapshot(contentSnapshot(13_020, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'layout-q4',
+				title: 'Pick layout',
+				message: 'Four options',
+				options: [
+					{ id: 'a', label: 'Organic' },
+					{ id: 'b', label: 'Sphere' },
+					{ id: 'c', label: 'Constellation' },
+					{ id: 'd', label: 'Clustered' },
+				],
+			},
+		}));
+		await sleep(120);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 4);
+		const question4Diag = native.getDiagnostics();
+		if (question4Diag.contentPopulated !== true) {
+			throw new Error('4-option question must report contentPopulated');
+		}
+		const option4Layout = assertTwoColOptionLayout(question4Diag);
+
+		test33.details = {
+			constants: { EXPANDED_HEIGHT_MIN, EXPANDED_HEIGHT_MAX, EXPANDED_WIDTH_PAD, STABLE_WING },
+			approval: {
+				contentPopulated: approvalDiag.contentPopulated,
+				overlap: approvalOverlap,
+				approveButtonFrame: approvalDiag.approveButtonFrame,
+				pendingMessageFrame: approvalDiag.pendingMessageFrame,
+				composerFrame: approvalDiag.composerFrame,
+				height: approvalFrame?.height,
+			},
+			question3: {
+				contentPopulated: questionDiag.contentPopulated,
+				overlap: questionOverlap,
+				optionLayout,
+				optionButtonFrames: questionDiag.optionButtonFrames,
+			},
+			question4: {
+				contentPopulated: question4Diag.contentPopulated,
+				optionLayout: option4Layout,
+			},
+		};
+	} catch (err) {
+		test33.ok = false;
+		test33.error = err.message;
+		results.failures.push(`interactive-layout-no-overlap-and-two-col-options: ${err.message}`);
+	}
+	results.tests.push(test33);
 
 	native.dispose();
 

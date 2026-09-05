@@ -150,12 +150,79 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		failures.push('native diagnostics must expose shapeAwareHitTesting=YES');
 	}
 	if (!native.includes('dict[@"contentViewport"]')
+		|| !native.includes('dict[@"contentSafeViewport"]')
+		|| !native.includes('dict[@"contentPopulated"]')
 		|| !native.includes('dict[@"headerFrame"]')
 		|| !native.includes('dict[@"activityFrame"]')
 		|| !native.includes('dict[@"composerFrame"]')
 		|| !native.includes('dict[@"approveButtonFrame"]')
 		|| !native.includes('dict[@"optionButtonFrames"]')) {
-		failures.push('native diagnostics must expose layout containment frames (contentViewport + control frames)');
+		failures.push('native diagnostics must expose layout containment frames (contentViewport + contentSafeViewport + contentPopulated + control frames)');
+	}
+	if (!native.includes('refreshContentSubviewsPreservingPresentationWithSize:')
+		|| !native.includes('populated first paint')) {
+		failures.push('native must stage expanded content at target size before morph (no blank black expansion)');
+	}
+	if (!native.includes('computeExpandedWidth:') || !native.includes('kExpandedWidthPad')) {
+		failures.push('native must prefer natural notch width and only pad for option rows (kExpandedWidthPad)');
+	}
+	{
+		const widthFnStart = native.indexOf('- (CGFloat)computeExpandedWidth:(CGFloat)naturalW {');
+		const widthFn = widthFnStart >= 0 ? native.slice(widthFnStart, widthFnStart + 350) : '';
+		if (!/pendingOptions\.count > 2/.test(widthFn)
+			|| !/kExpandedWidthPad/.test(widthFn)
+			|| !/return naturalW;/.test(widthFn)
+			|| /320/.test(widthFn)) {
+			failures.push('computeExpandedWidth must return naturalW unless question has >2 options; must not force 320pt');
+		}
+		if (!/kExpandedHeightMin = 72/.test(native)
+			|| !/kExpandedHeightMax = 164/.test(native)
+			|| !/kExpandedWidthPad = 28/.test(native)
+			|| !/kStableCompactLeftWing = 64/.test(native)
+			|| !/kStableCompactRightWing = 64/.test(native)) {
+			failures.push('native geometry constants must stay at min=72 max=164 pad=28 stable wings=64');
+		}
+		if (!/LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72/.test(magnusCommon)
+			|| !/LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 164/.test(magnusCommon)
+			|| !/LIVE_ACTIVITY_EXPANDED_WIDTH_PAD = 28/.test(magnusCommon)
+			|| !/LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 64/.test(magnusCommon)) {
+			failures.push('TS magnusLiveActivity geometry constants must stay aligned with native (72/164/28/64)');
+		}
+		if (/MAX\(320/.test(native) || /kExpandedMinWidth\s*=\s*320/.test(native)) {
+			failures.push('native must not force a fixed 320pt expanded min width');
+		}
+		{
+			const stackFnStart = native.indexOf('- (CGFloat)computeControlsStackHeight {');
+			const stackFn = stackFnStart >= 0 ? native.slice(stackFnStart, stackFnStart + 900) : '';
+			if (!/Must match layoutControls/.test(stackFn)
+				|| !/kControlHeight \+ 7/.test(stackFn)
+				|| !/perRow = \(maxDirect >= 3\) \? 2/.test(stackFn)) {
+				failures.push('computeControlsStackHeight must match layoutControls (composer + approval + 2-col option rows)');
+			}
+			if (!native.includes('computeControlsStackHeight] + 10')) {
+				failures.push('scroll footerReserve must use max(reservedFooterHeight, computeControlsStackHeight+10)');
+			}
+			const layoutStart = native.indexOf('- (void)layoutControls:(NSRect)win {');
+			const layoutBlock = layoutStart >= 0 ? native.slice(layoutStart, layoutStart + 5200) : '';
+			if (!/perRow = \(maxDirect >= 3\) \? 2/.test(layoutBlock)
+				|| !/Prefer 2-column grids/.test(layoutBlock)) {
+				failures.push('layoutControls must use 2-column option grids when ≥3 options');
+			}
+			if (!native.includes('Magnus needs an answer')
+				|| !native.includes('Magnus needs approval')) {
+				failures.push('peek long titles must use short intentional copy (Magnus needs an answer/approval)');
+			}
+		}
+	}
+	if (!native.includes('dict[@"expandedContentAlpha"]')
+		|| !native.includes('dict[@"contentScrollEnabled"]')
+		|| !native.includes('dict[@"approveButtonTitle"]')
+		|| !native.includes('dict[@"denyButtonTitle"]')
+		|| !native.includes('Approve (in progress)')
+		|| !native.includes('Deny (in progress)')
+		|| native.includes('@"Applying…"')
+		|| native.includes('@"Dismissing…"')) {
+		failures.push('native must expose populated/scroll/action-title diagnostics and keep Approve/Deny titles (not Applying/Dismissing)');
 	}
 	if (!native.includes('beginActionInFlight') || !native.includes('kActionInFlightTimeout') || !native.includes('endActionInFlightRestoring')) {
 		failures.push('native action lifecycle must use in-flight + timeout recovery without optimistic clear');

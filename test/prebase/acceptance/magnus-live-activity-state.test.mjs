@@ -63,9 +63,9 @@ assert.equal(resolveLiveActivityPanelState({
 const peekTitle = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingTitle: true, hasPendingMessage: true, hasActivity: true });
 const peekActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasActivity: true, hasPendingMessage: true });
 const peekFallback = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingMessage: true });
-assert.equal(peekTitle, 34 + 8 + 20 + 8);
-assert.equal(peekActivity, 34 + 8 + 18 + 8);
-assert.equal(peekFallback, 34 + 8 + 16 + 8, 'pendingMessage alone must not inflate peek height');
+assert.equal(peekTitle, 34 + 44);
+assert.equal(peekActivity, 34 + 44);
+assert.equal(peekFallback, 34 + 44, 'pendingMessage alone must not inflate peek height');
 
 const working = buildMagnusLiveActivitySnapshot({ ...session, needsInput: false, pendingInteraction: undefined }, {
 	revision: 2, prebaseForeground: false, connected: true,
@@ -247,6 +247,8 @@ assert.ok(medium > short);
 assert.ok(longH >= medium);
 assert.ok(longPending > longH || longPending > medium);
 assert.ok(longOptions > medium);
+assert.ok(short < 164 - 20, 'short working content must leave headroom below expanded max');
+assert.ok(longOptions <= 164);
 `;
 
 	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
@@ -254,6 +256,56 @@ assert.ok(longOptions > medium);
 		encoding: 'utf8',
 	});
 	assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+test('TS Live Activity geometry constants stay aligned with native notch polish', () => {
+	const script = `
+import assert from 'node:assert/strict';
+import {
+	LIVE_ACTIVITY_CAMERA_HOUSING_MIN,
+	LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX,
+	LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN,
+	LIVE_ACTIVITY_EXPANDED_MIN_WIDTH,
+	LIVE_ACTIVITY_EXPANDED_WIDTH_PAD,
+	LIVE_ACTIVITY_WING_WIDTH,
+	LIVE_ACTIVITY_WING_WIDTH_DEFAULT,
+	computeLiveActivityWingWidth,
+} from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
+
+assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, 72);
+assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 164);
+assert.equal(LIVE_ACTIVITY_EXPANDED_WIDTH_PAD, 28);
+assert.equal(LIVE_ACTIVITY_WING_WIDTH_DEFAULT, 64);
+assert.equal(LIVE_ACTIVITY_WING_WIDTH, 64);
+assert.equal(LIVE_ACTIVITY_CAMERA_HOUSING_MIN, 24);
+assert.equal(LIVE_ACTIVITY_EXPANDED_MIN_WIDTH, 152);
+assert.equal(computeLiveActivityWingWidth(10), 64);
+assert.equal(computeLiveActivityWingWidth(200), 64);
+`;
+
+	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+test('native source keeps natural expanded width + truthful Approve/Deny in-flight titles', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	assert.match(native, /kExpandedHeightMin = 72/);
+	assert.match(native, /kExpandedHeightMax = 164/);
+	assert.match(native, /kExpandedWidthPad = 28/);
+	assert.match(native, /kStableCompactLeftWing = 64/);
+	assert.match(native, /computeExpandedWidth:/);
+	assert.match(native, /pendingOptions\.count > 2/);
+	assert.match(native, /contentPopulated/);
+	assert.match(native, /contentSafeViewport/);
+	assert.match(native, /Approve \(in progress\)/);
+	assert.match(native, /Deny \(in progress\)/);
+	assert.doesNotMatch(native, /@"Applying…"/);
+	assert.doesNotMatch(native, /@"Dismissing…"/);
+	assert.doesNotMatch(native, /kExpandedMinWidth = 320/);
+	assert.doesNotMatch(native, /MAX\(280\.0/);
 });
 
 test('privacy: redactLiveActivityText redacts sensitive tokens while preserving normal text', () => {

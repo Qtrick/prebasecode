@@ -107,20 +107,30 @@ export const LIVE_ACTIVITY_COMPLETED_HOLD_MS = 8_000;
 export const LIVE_ACTIVITY_MAX_ACTIONS = 4;
 export const LIVE_ACTIVITY_MAX_MESSAGE_CHARS = 160;
 
-/** Dynamic geometry metrics matching native/prebase-live-activity/src/live_activity.mm */
+/** Geometry metrics matching native/prebase-live-activity/src/live_activity.mm (authoritative). */
 export const LIVE_ACTIVITY_COLLAPSED_HEIGHT = 34;
 export const LIVE_ACTIVITY_WING_WIDTH_MIN = 52;
-export const LIVE_ACTIVITY_WING_WIDTH_MAX = 148;
-export const LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 124;
+/** Stable compact/peek wing — content must not resize the island. */
+export const LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 64;
 export const LIVE_ACTIVITY_WING_WIDTH = LIVE_ACTIVITY_WING_WIDTH_DEFAULT;
-export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 96;
-export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 220;
-export const LIVE_ACTIVITY_EXPANDED_HEIGHT = 200;
+/** @deprecated Wings are fixed; retained for older callers that clamp text budgets. */
+export const LIVE_ACTIVITY_WING_WIDTH_MAX = LIVE_ACTIVITY_WING_WIDTH_DEFAULT;
+export const LIVE_ACTIVITY_CAMERA_HOUSING_MIN = 24;
+/** Overflow guard — natural height is measured; this is not the default slab. */
+export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72;
+export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 164;
+export const LIVE_ACTIVITY_EXPANDED_HEIGHT = 128;
+/** Fixed peek body band below the notch (matches native kPeekBodyHeight). */
+export const LIVE_ACTIVITY_PEEK_BODY_HEIGHT = 44;
+/** Pad past natural notch span only when option chips need horizontal room. */
+export const LIVE_ACTIVITY_EXPANDED_WIDTH_PAD = 28;
+export const LIVE_ACTIVITY_EXPANDED_MIN_WIDTH = LIVE_ACTIVITY_WING_WIDTH_DEFAULT * 2 + LIVE_ACTIVITY_CAMERA_HOUSING_MIN;
 export const LIVE_ACTIVITY_PILL_WIDTH = 228;
 export const LIVE_ACTIVITY_PILL_HEIGHT = 30;
 export const LIVE_ACTIVITY_NOTCH_MIN_SAFE_TOP = 8;
 export const LIVE_ACTIVITY_NOTCH_MIN_AUX_WIDTH = 40;
-export const LIVE_ACTIVITY_CAMERA_HOUSING_MIN = 24;
+/** Compact wing copy budget (~44pt usable at 11pt system font). */
+export const LIVE_ACTIVITY_COMPACT_LABEL_MAX_CHARS = 9;
 
 /** Deterministic populated Magnus content for visual acceptance (not production copy). */
 export function createMagnusLiveActivityVisualFixture(
@@ -137,11 +147,11 @@ export function createMagnusLiveActivityVisualFixture(
 		screenLocked: false,
 		hideDetails: false,
 		recentActions: [
-			{ id: 'a1', label: 'Updated graphEditor.ts', at: Date.now() - 40_000 },
-			{ id: 'a2', label: 'Running 63 graph test suites', at: Date.now() - 25_000 },
-			{ id: 'a3', label: 'Verified Temporal layout recovery', at: Date.now() - 10_000 },
+			{ id: 'a1', label: 'Edited graphEditor.ts', at: Date.now() - 40_000 },
+			{ id: 'a2', label: 'Ran graph interaction suites', at: Date.now() - 25_000 },
+			{ id: 'a3', label: 'Checked Temporal layout recovery', at: Date.now() - 10_000 },
 		] as const,
-		taskTitle: 'Refactoring the graph renderer',
+		taskTitle: 'Improve graph renderer',
 		workspaceDiff: { files: 4, additions: 86, deletions: 31, attributedToMagnus: true },
 		terminalCount: 1,
 	};
@@ -246,65 +256,54 @@ export function computeLiveActivityExpandedHeight(args: {
 	peekOnly?: boolean;
 }): number {
 	if (args.peekOnly && !args.pinned) {
-		// Match native computeTargetContentHeight peek path: title → activity → fallback.
-		// Do not size peek from pendingMessage alone (body text is truncated into the title/activity line).
-		let h = args.bandHeight + 8;
-		if (args.hasPendingTitle) {
-			h += 20;
-		} else if (args.hasActivity) {
-			h += 18;
-		} else {
-			h += 16;
-		}
-		h += 8;
-		return Math.min(args.bandHeight + 56, h);
+		// Native peek uses a fixed body band — message length must not reflow geometry.
+		return args.bandHeight + LIVE_ACTIVITY_PEEK_BODY_HEIGHT;
 	}
-	// Match native computeTargetContentHeight interactive path (content viewport + reserved footer).
-	let h = args.bandHeight + 8; // Top padding below notch band
-	h += 18 + 5; // Header row + gap
-	if (args.hasActivity) {
-		h += 28; // up to 2 lines
-	}
-	if (args.hasLatestMessage) {
-		h += 28;
-	}
-	if (args.actionsCount && args.actionsCount > 0) {
-		h += Math.min(args.actionsCount, 3) * 16;
-	}
+	// Mirror native estimate budgets (native still measures for layout; this is for tests/contracts).
+	let h = args.bandHeight + 5;
+	h += 15 + 3; // Header row + gap
 	if (args.hasPendingTitle) {
-		h += 28;
+		h += 24;
 	}
 	if (args.hasPendingMessage) {
-		h += 36; // up to 3 lines
+		h += 32;
+	}
+	if (args.hasActivity) {
+		h += 24;
+	}
+	if (args.hasLatestMessage) {
+		h += 22;
+	}
+	if (args.actionsCount && args.actionsCount > 0) {
+		h += Math.min(args.actionsCount, 3) * 14;
 	}
 	if (args.hasMetrics && !args.hasPendingTitle) {
-		h += 16;
+		h += 12;
 	}
-	h += 5; // Spacing before controls
+	h += 3;
 	const hasOptions = args.pendingKind === 'question' && Boolean(args.hasOptions);
 	const hasApproval = args.pendingKind === 'approval';
 	const showInput = !args.peekOnly;
 
 	if (hasOptions) {
 		const opts = Math.min(Math.max(args.optionsCount ?? 4, 1), 4);
-		h += opts > 2 ? 56 : 30;
+		h += opts > 2 ? 52 : 28;
 	}
 	if (hasApproval) {
-		h += 30;
+		h += 28;
 	}
 	if (showInput) {
-		h += 34; // Composer footer
-	} else if (!hasOptions && !hasApproval) {
 		h += 30;
+	} else if (!hasOptions && !hasApproval) {
+		h += 28;
 	}
-	h += 10; // Bottom corner inset
+	h += 7;
 	return Math.min(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, Math.max(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, h));
 }
 
-export function computeLiveActivityWingWidth(rawTextWidth: number): number {
-	const raw = rawTextWidth + 28;
-	const bucketed = Math.ceil(raw / 8) * 8;
-	return Math.min(LIVE_ACTIVITY_WING_WIDTH_MAX, Math.max(LIVE_ACTIVITY_WING_WIDTH_MIN, bucketed));
+/** Wings are fixed for visual stability; text never drives island width. */
+export function computeLiveActivityWingWidth(_rawTextWidth?: number): number {
+	return LIVE_ACTIVITY_WING_WIDTH;
 }
 
 export function calculateNextElapsedBoundaryDelayMs(now: number, startedAt: number | undefined): number | undefined {
@@ -411,13 +410,13 @@ export function buildMagnusLiveActivitySnapshot(
 			sessionResource: input?.sessionResource,
 			startedAt: input?.startedAt,
 			status: 'disconnected',
-			taskTitle: input?.title,
+			taskTitle: options.screenLocked || options.hideDetails ? undefined : redactLiveActivityText(input?.title),
 			recentActions: [],
 			connected: false,
 			prebaseForeground: options.prebaseForeground,
 			screenLocked: options.screenLocked,
 			hideDetails: options.hideDetails,
-			presentationLabel: 'Magnus status unavailable',
+			presentationLabel: 'Offline',
 		};
 	}
 	if (!input) {
@@ -460,7 +459,7 @@ export function buildMagnusLiveActivitySnapshot(
 		sessionResource: input.sessionResource,
 		startedAt: input.startedAt,
 		status,
-		taskTitle: hide ? undefined : input.title,
+		taskTitle: hide ? undefined : redactLiveActivityText(input.title),
 		currentActivity: hide ? undefined : redactLiveActivityText(input.currentActivity),
 		recentActions: hide ? [] : actions,
 		latestShortMessage: hide ? undefined : redactLiveActivityText(input.latestShortMessage),
@@ -471,6 +470,10 @@ export function buildMagnusLiveActivitySnapshot(
 			...input.pendingInteraction,
 			title: redactLiveActivityText(input.pendingInteraction.title),
 			message: redactLiveActivityText(input.pendingInteraction.message),
+			options: input.pendingInteraction.options?.map(option => ({
+				...option,
+				label: redactLiveActivityText(option.label) || option.id,
+			})),
 		},
 		connected: true,
 		prebaseForeground: options.prebaseForeground,
@@ -478,7 +481,8 @@ export function buildMagnusLiveActivitySnapshot(
 		hideDetails: options.hideDetails,
 		presentationLabel: '',
 	};
-	return { ...snapshot, presentationLabel: collapsedStatusLabel(snapshot) };
+	// Compact wing uses intentional short tokens — never arbitrary agent prose.
+	return { ...snapshot, presentationLabel: compactWingLabel(snapshot) };
 }
 
 export function shouldShowLiveActivity(
@@ -733,6 +737,54 @@ export function deriveLiveActivityGeometry(screen: LiveActivityScreenMetrics): L
 	};
 }
 
+/**
+ * Glanceable compact-wing token. Must fit ~44pt without ugly truncation.
+ * Longer prose belongs in the expanded body, not the wing.
+ */
+export function compactWingLabel(snapshot: MagnusLiveActivitySnapshot): string {
+	switch (snapshot.status) {
+		case 'disconnected':
+			return 'Offline';
+		case 'attention':
+			return snapshot.pendingInteraction?.kind === 'question' ? 'Question' : 'Approve';
+		case 'failed':
+			return 'Failed';
+		case 'completed':
+			return 'Done';
+		case 'waiting':
+			return 'Waiting';
+		case 'working':
+			return snapshot.testState === 'running' ? 'Testing' : 'Working';
+		case 'idle':
+		default:
+			return 'Magnus';
+	}
+}
+
+/** Compact right-wing metric — elapsed preferred, else a short diff/file cue. */
+export function compactMetricsLabel(snapshot: MagnusLiveActivitySnapshot, now = Date.now()): string {
+	if (snapshot.status === 'working' || snapshot.status === 'waiting' || snapshot.status === 'attention') {
+		if (snapshot.startedAt) {
+			const elapsed = formatCompactElapsed(now - snapshot.startedAt);
+			if (elapsed) {
+				return elapsed;
+			}
+		}
+	}
+	const diff = snapshot.workspaceDiff;
+	if (diff?.additions !== undefined || diff?.deletions !== undefined) {
+		return `+${diff.additions ?? 0}`;
+	}
+	if (diff?.files && diff.files > 0) {
+		return `${diff.files}f`;
+	}
+	return '';
+}
+
+/**
+ * Expanded / accessibility status line (may be longer than the wing token).
+ * Not used for compact wing chrome.
+ */
 export function collapsedStatusLabel(snapshot: MagnusLiveActivitySnapshot, now = Date.now()): string {
 	if (snapshot.status === 'disconnected') {
 		return 'Magnus status unavailable';
@@ -761,7 +813,7 @@ export function collapsedStatusLabel(snapshot: MagnusLiveActivitySnapshot, now =
 	if (glance) {
 		return glance;
 	}
-	return snapshot.taskTitle || 'Magnus';
+	return redactLiveActivityText(snapshot.taskTitle) || 'Magnus';
 }
 
 export function formatElapsed(ms: number): string {
@@ -773,6 +825,23 @@ export function formatElapsed(ms: number): string {
 	const minutes = Math.floor((totalSec % 3600) / 60);
 	if (hours > 0) {
 		return `${hours}h ${minutes}m`;
+	}
+	if (minutes > 0) {
+		return `${minutes}m`;
+	}
+	return `${Math.max(1, totalSec)}s`;
+}
+
+/** Compact wing elapsed — matches native FormatCompactElapsed (single token, fits ~44pt). */
+export function formatCompactElapsed(ms: number): string {
+	if (!Number.isFinite(ms) || ms < 0) {
+		return '';
+	}
+	const totalSec = Math.floor(ms / 1000);
+	const hours = Math.floor(totalSec / 3600);
+	const minutes = Math.floor((totalSec % 3600) / 60);
+	if (hours > 0) {
+		return `${hours}h`;
 	}
 	if (minutes > 0) {
 		return `${minutes}m`;

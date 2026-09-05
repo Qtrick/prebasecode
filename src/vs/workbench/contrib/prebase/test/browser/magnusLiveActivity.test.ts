@@ -22,15 +22,25 @@ import {
 	isMagnusParticipantId,
 	selectPrimaryMagnusSession,
 	summarizeMagnusWorkspaceDiff,
+	LIVE_ACTIVITY_CAMERA_HOUSING_MIN,
 	LIVE_ACTIVITY_COMPLETED_HOLD_MS,
 	LIVE_ACTIVITY_EXPANDED_HEIGHT,
+	LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX,
+	LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN,
+	LIVE_ACTIVITY_EXPANDED_MIN_WIDTH,
+	LIVE_ACTIVITY_EXPANDED_WIDTH_PAD,
 	LIVE_ACTIVITY_EXIT_GRACE_MS,
 	LIVE_ACTIVITY_HOVER_OPEN_DELAY_MS,
 	LIVE_ACTIVITY_MAX_ACTIONS,
 	LIVE_ACTIVITY_MAX_MESSAGE_CHARS,
+	LIVE_ACTIVITY_PEEK_BODY_HEIGHT,
 	LIVE_ACTIVITY_PILL_HEIGHT,
 	LIVE_ACTIVITY_PILL_WIDTH,
 	LIVE_ACTIVITY_WING_WIDTH,
+	LIVE_ACTIVITY_WING_WIDTH_DEFAULT,
+	compactMetricsLabel,
+	compactWingLabel,
+	formatCompactElapsed,
 	redactLiveActivityText,
 	resolveLiveActivityPanelState,
 	shouldShowLiveActivity,
@@ -106,7 +116,8 @@ function layoutLiveActivityPanelFrame(screen: LiveActivityScreenLayout, expanded
 			},
 		};
 	}
-	const width = expanded ? 320 : geo.pill.width;
+	// Non-notch expanded mirrors native: pill + 40, not a fixed 320pt min.
+	const width = expanded ? LIVE_ACTIVITY_PILL_WIDTH + 40 : geo.pill.width;
 	const height = expanded ? LIVE_ACTIVITY_EXPANDED_HEIGHT : geo.pill.height;
 	return {
 		geo,
@@ -251,6 +262,33 @@ suite('Magnus Live Activity projection', () => {
 			pendingInteraction: { kind: 'approval', interactionId: 'tool-safe', title: 'Run?', message: 'Safe op' },
 		}), { revision: 2, prebaseForeground: false, connected: true });
 		assert.strictEqual(safe.pendingInteraction?.destructive, undefined);
+	});
+
+	test('compact wing labels stay short tokens (never agent prose)', () => {
+		const question = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			currentActivity: 'Please choose a very long layout strategy for acceptance',
+			pendingInteraction: { kind: 'question', interactionId: 'q', title: 'Which layout?', message: 'Pick one', options: [{ id: 'a', label: 'A' }] },
+		}), { revision: 1, prebaseForeground: false, connected: true });
+		assert.strictEqual(question.presentationLabel, 'Question');
+		assert.strictEqual(compactWingLabel(question), 'Question');
+
+		const approval = buildMagnusLiveActivitySnapshot(session({
+			needsInput: true,
+			pendingInteraction: { kind: 'approval', interactionId: 'a', title: 'Run?', message: 'Go' },
+		}), { revision: 2, prebaseForeground: false, connected: true });
+		assert.strictEqual(approval.presentationLabel, 'Approve');
+
+		const offline = buildMagnusLiveActivitySnapshot(session(), { revision: 3, prebaseForeground: false, connected: false });
+		assert.strictEqual(offline.presentationLabel, 'Offline');
+		assert.strictEqual(collapsedStatusLabel(offline), 'Magnus status unavailable');
+
+		const started = Date.now() - 95 * 60_000;
+		const working = buildMagnusLiveActivitySnapshot(session({ startedAt: started, isInProgress: true, currentActivity: 'Working' }), {
+			revision: 4, prebaseForeground: false, connected: true,
+		});
+		assert.strictEqual(formatCompactElapsed(95 * 60_000), '1h');
+		assert.strictEqual(compactMetricsLabel({ ...working, startedAt: started }, started + 95 * 60_000), '1h');
 	});
 
 	test('follow-up is accepted only for the canonical session', () => {
@@ -532,7 +570,7 @@ suite('Magnus Live Activity projection', () => {
 		assert.strictEqual(notched.pill.y, 0, 'top anchor uses screen.frame.maxY (y=0 in screen-relative coords)');
 		assert.strictEqual(notched.pill.height, 32);
 		assert.strictEqual(notched.cameraHousingWidth, 272);
-		assert.strictEqual(notched.pill.width, 124 + 272 + 124);
+		assert.strictEqual(notched.pill.width, LIVE_ACTIVITY_WING_WIDTH + 272 + LIVE_ACTIVITY_WING_WIDTH);
 		assert.ok(notched.hit.width < 200, 'collapsed hit target must stay small');
 		const pill = deriveLiveActivityGeometry({
 			width: 1920, height: 1080, scaleFactor: 1,
@@ -2062,23 +2100,37 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 	ensureNoDisposablesAreLeakedInTestSuite();
 
+	test('TS geometry constants stay aligned with native height/width/wing model', () => {
+		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, 72);
+		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 164);
+		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_WIDTH_PAD, 28);
+		assert.strictEqual(LIVE_ACTIVITY_WING_WIDTH_DEFAULT, 64);
+		assert.strictEqual(LIVE_ACTIVITY_WING_WIDTH, 64);
+		assert.strictEqual(LIVE_ACTIVITY_CAMERA_HOUSING_MIN, 24);
+		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_MIN_WIDTH, 64 * 2 + 24);
+		assert.ok(LIVE_ACTIVITY_EXPANDED_HEIGHT >= LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN);
+		assert.ok(LIVE_ACTIVITY_EXPANDED_HEIGHT <= LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX);
+	});
+
 	test('computeLiveActivityExpandedHeight dynamically sizes based on content elements', () => {
 		const minimal = computeLiveActivityExpandedHeight({ bandHeight: 34 });
-		assert.strictEqual(minimal >= 96, true);
-		assert.strictEqual(minimal <= 220, true);
+		assert.ok(minimal >= LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN);
+		assert.ok(minimal <= LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX);
+		assert.ok(minimal < LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 'short content must not slam to max slab');
 
 		const withActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true });
-		assert.strictEqual(withActivity > minimal, true);
+		assert.ok(withActivity > minimal);
 
+		// Peek uses fixed body band — message length must not reflow geometry.
 		const peekTitle = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingTitle: true, hasPendingMessage: true, hasActivity: true });
 		const peekActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasActivity: true, hasPendingMessage: true });
 		const peekFallback = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingMessage: true });
-		assert.strictEqual(peekTitle, 34 + 8 + 20 + 8);
-		assert.strictEqual(peekActivity, 34 + 8 + 18 + 8);
-		assert.strictEqual(peekFallback, 34 + 8 + 16 + 8, 'pendingMessage alone must not inflate peek height');
+		assert.strictEqual(peekTitle, 34 + LIVE_ACTIVITY_PEEK_BODY_HEIGHT);
+		assert.strictEqual(peekActivity, 34 + LIVE_ACTIVITY_PEEK_BODY_HEIGHT);
+		assert.strictEqual(peekFallback, 34 + LIVE_ACTIVITY_PEEK_BODY_HEIGHT, 'pendingMessage alone must not inflate peek height');
 
 		const withActions = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true, actionsCount: 3 });
-		assert.strictEqual(withActions > withActivity, true);
+		assert.ok(withActions > withActivity);
 
 		const withQuestion = computeLiveActivityExpandedHeight({
 			bandHeight: 34,
@@ -2087,9 +2139,10 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 			hasPendingTitle: true,
 			pendingKind: 'question',
 			hasOptions: true,
+			optionsCount: 4,
 		});
-		assert.strictEqual(withQuestion > withActions, true);
-		assert.strictEqual(withQuestion <= 220, true);
+		assert.ok(withQuestion > withActions);
+		assert.ok(withQuestion <= LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX);
 
 		const withInput = computeLiveActivityExpandedHeight({
 			bandHeight: 34,
@@ -2107,15 +2160,13 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.ok(peekPinned > peekCompact, 'pinning a peek must size the full Interactive chrome');
 	});
 
-	test('computeLiveActivityWingWidth buckets widths stably to prevent single-second twitching', () => {
+	test('computeLiveActivityWingWidth is stable fixed wing (content never resizes island)', () => {
 		const w1 = computeLiveActivityWingWidth(10);
 		const w2 = computeLiveActivityWingWidth(12);
-		assert.strictEqual(w1, w2, 'small differences must bucket to identical width');
-		assert.strictEqual(w1 >= 52, true);
-		assert.strictEqual(w1 <= 148, true);
-
 		const wLong = computeLiveActivityWingWidth(150);
-		assert.strictEqual(wLong, 148, 'must clamp to max wing width');
+		assert.strictEqual(w1, LIVE_ACTIVITY_WING_WIDTH_DEFAULT);
+		assert.strictEqual(w2, LIVE_ACTIVITY_WING_WIDTH_DEFAULT);
+		assert.strictEqual(wLong, LIVE_ACTIVITY_WING_WIDTH_DEFAULT, 'long text must not widen wings');
 	});
 
 	test('calculateNextElapsedBoundaryDelayMs schedules next boundary without 1Hz timer', () => {
@@ -2133,24 +2184,32 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.strictEqual(calculateNextElapsedBoundaryDelayMs(now, now + 5000), undefined);
 	});
 
-	test('native wing widths scale dynamically between min and max based on measured content', () => {
+	test('native wing widths are fixed stable compact wings (not content-driven)', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /computeLeftWingWidth/);
 		assert.match(native, /computeRightWingWidth/);
-		assert.match(native, /measureStringWidth/);
+		assert.match(native, /kStableCompactLeftWing = 64/);
+		assert.match(native, /kStableCompactRightWing = 64/);
 		assert.match(native, /kWingWidthMin = 52/);
-		assert.match(native, /kWingWidthMax = 148/);
+		assert.doesNotMatch(native, /kWingWidthMax = 148/);
 		assert.doesNotMatch(native, /const CGFloat kWingWidth = 124;/);
+		assert.match(native, /return kStableCompactLeftWing/);
+		assert.match(native, /return kStableCompactRightWing/);
 	});
 
-	test('native expanded height scales dynamically from content rather than a fixed 200pt slab', () => {
+	test('native expanded height clamps to measured min/max rather than a fixed slab', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /computeTargetContentHeight:/);
-		assert.match(native, /recentActions/);
+		assert.match(native, /kExpandedHeightMin = 72/);
+		assert.match(native, /kExpandedHeightMax = 164/);
+		assert.match(native, /kExpandedWidthPad = 28/);
+		assert.match(native, /computeExpandedWidth:/);
 		assert.match(native, /pendingTitle/);
 		assert.match(native, /pendingOptions/);
 		assert.match(native, /metricsLabel/);
 		assert.doesNotMatch(native, /const CGFloat kExpandedHeight = 200;/);
+		assert.doesNotMatch(native, /MAX\(320/);
+		assert.doesNotMatch(native, /kExpandedMinWidth = 320/);
 	});
 
 	test('native uses CAShapeLayer for continuous background morphology and presentation-layer retargeting', () => {
@@ -2479,14 +2538,16 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 			hasPendingMessage: true,
 			pendingKind: 'question',
 			hasOptions: true,
+			optionsCount: 4,
 		});
 		assert.ok(short > empty);
 		assert.ok(medium > short);
 		assert.ok(long >= medium);
 		assert.ok(longPending > long);
 		assert.ok(longOptions > medium);
-		assert.ok(longOptions <= 220);
-		assert.ok(longPending <= 220);
+		assert.ok(longOptions <= LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX);
+		assert.ok(longPending <= LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX);
+		assert.ok(short < LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX - 20, 'short working content must leave headroom below max');
 	});
 
 	test('native action lifecycle uses in-flight + timeout without optimistic pending clear', () => {
@@ -2496,9 +2557,18 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(native, /endActionInFlightRestoring:/);
 		assert.match(native, /dict\[@"actionInFlight"\]/);
 		assert.match(native, /dict\[@"actionInFlightTimeoutMs"\]/);
-		assert.match(native, /@"Applying…"/);
-		assert.match(native, /@"Dismissing…"/);
+		assert.match(native, /Approve \(in progress\)/);
+		assert.match(native, /Deny \(in progress\)/);
+		assert.match(native, /keep truthful action titles/);
+		assert.match(native, /self\.approveButton\.title = approveTitle/);
+		assert.match(native, /self\.denyButton\.title = @"Deny"/);
+		assert.doesNotMatch(native, /@"Applying…"/);
+		assert.doesNotMatch(native, /@"Dismissing…"/);
 		assert.match(native, /lastNativeCommand = @"actionTimeout"/);
+		assert.match(native, /dict\[@"approveButtonTitle"\]/);
+		assert.match(native, /dict\[@"denyButtonTitle"\]/);
+		assert.match(native, /dict\[@"approveButtonAccessibilityLabel"\]/);
+		assert.match(native, /dict\[@"approveButtonAlpha"\]/);
 
 		for (const method of ['approve:', 'deny:', 'answerOption:']) {
 			const marker = method === 'answerOption:'
@@ -2512,14 +2582,20 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		}
 	});
 
-	test('native diagnostics expose layout frames and shape-aware hit testing', () => {
+	test('native diagnostics expose layout frames, safe viewport, populated-first-paint, and shape-aware hit testing', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /dict\[@"shapeAwareHitTesting"\] = @YES/);
 		assert.match(native, /- \(NSView \*\)hitTest:\(NSPoint\)point/);
 		assert.match(native, /CGPathContainsPoint/);
 		assert.match(native, /Shape-aware hit testing/);
+		assert.match(native, /refreshContentSubviewsPreservingPresentationWithSize:/);
+		assert.match(native, /no blank fade-in/);
+		assert.match(native, /dict\[@"contentPopulated"\]/);
+		assert.match(native, /dict\[@"expandedContentAlpha"\]/);
+		assert.match(native, /dict\[@"contentScrollEnabled"\]/);
 		for (const key of [
 			'contentViewport',
+			'contentSafeViewport',
 			'headerFrame',
 			'activityFrame',
 			'composerFrame',
