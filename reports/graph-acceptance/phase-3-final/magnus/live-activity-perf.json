@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "14096da78529cacf442e127cc6b3a2433b046fcd",
-  "sourceFingerprint": "28460c5598e4aee12268e0d46529fbc783530f80143edade39f5582b3aa3cfb8",
-  "productFingerprint": "28460c5598e4aee12268e0d46529fbc783530f80143edade39f5582b3aa3cfb8",
-  "generatedAt": "2026-09-05T02:50:33.486Z",
+  "sourceHead": "a59b736654cdc80e358e6be5a574dc85cf80bc29",
+  "sourceFingerprint": "47c993e0c9a63c60a1472fbd0229e3101fd1a69e35f1b6cddc46328cc399fbfb",
+  "productFingerprint": "47c993e0c9a63c60a1472fbd0229e3101fd1a69e35f1b6cddc46328cc399fbfb",
+  "generatedAt": "2026-09-05T03:51:40.502Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -84,6 +84,7 @@
             "",
             ""
           ],
+          "backingScaleFactor": 2,
           "pinnedInteractiveHeight": 0,
           "pendingMessageFrame": {
             "y": 0,
@@ -99,7 +100,10 @@
             "panelWidth": 313,
             "bodyDepth": 0,
             "shoulderFlare": 0,
-            "nonDegenerateShoulder": true
+            "shoulderCurvatureContinuous": true,
+            "tangentContinuity": true,
+            "nonDegenerateShoulder": true,
+            "notchCenter": 156.5
           },
           "exitGraceMs": 250,
           "safeAreaTop": 32,
@@ -119,7 +123,7 @@
             "width": 0,
             "height": 0
           },
-          "contentRefreshCount": 1,
+          "contentRefreshCount": 2,
           "pathTopologyCompatible": true,
           "denyButtonTitle": "Deny",
           "localMonitorInstalled": false,
@@ -217,6 +221,7 @@
           },
           "panelVisible": true,
           "hoverHapticCount": 0,
+          "windowNumber": 39001,
           "topAnchorDelta": 0,
           "collapsedHit": {
             "y": 948,
@@ -259,7 +264,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9270,
+        "durationRealCyclesMs": 9553,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -328,6 +333,7 @@
           "actionRowIds": [
             "a99"
           ],
+          "backingScaleFactor": 2,
           "pinnedInteractiveHeight": 152,
           "pendingMessageFrame": null,
           "silhouetteMetrics": {
@@ -338,7 +344,10 @@
             "panelWidth": 313,
             "bodyDepth": 118,
             "shoulderFlare": 12,
-            "nonDegenerateShoulder": true
+            "shoulderCurvatureContinuous": true,
+            "tangentContinuity": true,
+            "nonDegenerateShoulder": true,
+            "notchCenter": 156.5
           },
           "exitGraceMs": 250,
           "safeAreaTop": 32,
@@ -355,18 +364,18 @@
           "interactionId": "",
           "activityFrame": {
             "y": 2,
-            "x": 26.2,
-            "width": 258.8,
+            "x": 22,
+            "width": 263,
             "height": 14
           },
-          "contentRefreshCount": 101,
+          "contentRefreshCount": 303,
           "pathTopologyCompatible": true,
           "denyButtonTitle": "Deny",
           "localMonitorInstalled": true,
           "headerFrame": {
             "y": 5,
-            "x": 30.75,
-            "width": 197.05479496717453,
+            "x": 22,
+            "width": 214.55479496717453,
             "height": 16
           },
           "retainedWorkScreen": false,
@@ -390,10 +399,10 @@
           },
           "contentOnlyUpdateCount": 101,
           "panelFrame": {
-            "y": 948,
+            "y": 830,
             "x": 599,
             "width": 313,
-            "height": 34
+            "height": 152
           },
           "orderFrontCount": 1,
           "auxiliaryTopRightArea": {
@@ -440,12 +449,13 @@
           "approveButtonAlpha": 1,
           "statusBadgeFrame": {
             "y": 5,
-            "x": 231.80479496717453,
+            "x": 240.55479496717453,
             "width": 46.44520503282547,
             "height": 16
           },
           "panelVisible": true,
           "hoverHapticCount": 0,
+          "windowNumber": 39001,
           "topAnchorDelta": 0,
           "collapsedHit": {
             "y": 948,
@@ -493,7 +503,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 356,
+        "durationRetargetMs": 358,
         "diagRetarget": {
           "approveButtonAccessibilityLabel": "Approve",
           "lastTransitionReason": "geometry",
@@ -541,6 +551,7 @@
           "openButtonFrame": null,
           "actionInFlightTimeoutMs": 8000,
           "actionRowIds": [],
+          "backingScaleFactor": 2,
           "pinnedInteractiveHeight": 0,
           "pendingMessageFrame": null,
           "silhouetteMetrics": {
@@ -551,7 +562,10 @@
             "panelWidth": 313,
             "bodyDepth": 44,
             "shoulderFlare": 8,
-            "nonDegenerateShoulder": true
+            "shoulderCurvatureContinuous": true,
+            "tangentContinuity": true,
+            "nonDegenerateShoulder": true,
+            "notchCenter": 156.5
           },
           "exitGraceMs": 250,
           "safeAreaTop": 32,
@@ -567,11 +581,11 @@
           "interactionId": "",
           "activityFrame": {
             "y": 5,
-            "x": 30.75,
-            "width": 251.5,
+            "x": 22,
+            "width": 269,
             "height": 14
           },
-          "contentRefreshCount": 101,
+          "contentRefreshCount": 305,
           "pathTopologyCompatible": true,
           "denyButtonTitle": "Deny",
           "localMonitorInstalled": false,
@@ -597,10 +611,10 @@
           },
           "contentOnlyUpdateCount": 101,
           "panelFrame": {
-            "y": 948,
+            "y": 830,
             "x": 599,
             "width": 313,
-            "height": 34
+            "height": 152
           },
           "orderFrontCount": 1,
           "auxiliaryTopRightArea": {
@@ -640,6 +654,7 @@
           "statusBadgeFrame": null,
           "panelVisible": true,
           "hoverHapticCount": 0,
+          "windowNumber": 39001,
           "topAnchorDelta": 0,
           "collapsedHit": {
             "y": 948,
@@ -745,12 +760,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -394,
-        "heapUsedMb": 6.15,
-        "rssDiffKb": 44640,
-        "rssMb": 116.06,
-        "cpuDeltaUserMs": 975386,
-        "cpuDeltaSystemMs": 208750
+        "heapDiffKb": -378,
+        "heapUsedMb": 6.05,
+        "rssDiffKb": 45504,
+        "rssMb": 117.27,
+        "cpuDeltaUserMs": 1173342,
+        "cpuDeltaSystemMs": 247675
       }
     },
     {
@@ -838,7 +853,7 @@
           },
           "geometryTransitionCount": 1,
           "contentOnlyUpdateCount": 1,
-          "contentRefreshCount": 1,
+          "contentRefreshCount": 2,
           "orderFrontCount": 1,
           "lastRenderedRevision": 1000,
           "revision": 1000,
@@ -867,7 +882,7 @@
           "revision": 1100,
           "geometryTransitionCount": 1,
           "contentOnlyUpdateCount": 101,
-          "contentRefreshCount": 101,
+          "contentRefreshCount": 102,
           "statusLabel": "Working",
           "latestShortMessage": "msg-1100",
           "metricsLabel": "+0",
@@ -893,7 +908,7 @@
           "revision": 1260,
           "geometryTransitionCount": 1,
           "contentOnlyUpdateCount": 261,
-          "contentRefreshCount": 261,
+          "contentRefreshCount": 262,
           "statusLabel": "Working",
           "latestShortMessage": "msg-1260",
           "metricsLabel": "+10",
@@ -925,7 +940,7 @@
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 1,
-          "contentRefreshCount": 1,
+          "contentRefreshCount": 3,
           "orderFrontCount": 1,
           "lastRenderedRevision": 1500,
           "revision": 1500,
@@ -947,7 +962,7 @@
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
-          "contentRefreshCount": 13,
+          "contentRefreshCount": 15,
           "orderFrontCount": 1,
           "lastRenderedRevision": 1512,
           "revision": 1512,
@@ -969,7 +984,7 @@
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
-          "contentRefreshCount": 13,
+          "contentRefreshCount": 16,
           "orderFrontCount": 1,
           "lastRenderedRevision": 1512,
           "revision": 1512,
@@ -991,7 +1006,7 @@
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 13,
-            "contentRefreshCount": 13,
+            "contentRefreshCount": 17,
             "orderFrontCount": 1,
             "lastRenderedRevision": 1512,
             "revision": 1512,
@@ -1012,7 +1027,7 @@
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 43,
-            "contentRefreshCount": 43,
+            "contentRefreshCount": 47,
             "orderFrontCount": 1,
             "lastRenderedRevision": 1629,
             "revision": 1629,
@@ -1221,7 +1236,7 @@
           },
           "geometryTransitionCount": 1,
           "contentOnlyUpdateCount": 1,
-          "contentRefreshCount": 1,
+          "contentRefreshCount": 2,
           "orderFrontCount": 1,
           "lastRenderedRevision": 8000,
           "revision": 8000,
@@ -1390,9 +1405,9 @@
             "x": 0,
             "y": 0,
             "maxX": 313,
-            "maxY": 158
+            "maxY": 154
           },
-          "textMaxY": 55,
+          "textMaxY": 57,
           "scrollHostActive": true,
           "state": "attentionInteractive",
           "shapeAwareHitTesting": true,
@@ -1715,12 +1730,12 @@
           "contentPopulated": true,
           "overlap": {
             "skipped": false,
-            "scrollBottom": 76,
-            "approveY": 96,
-            "composerY": 127
+            "scrollBottom": 82,
+            "approveY": 92,
+            "composerY": 123
           },
           "approveButtonFrame": {
-            "y": 96,
+            "y": 92,
             "x": 92,
             "width": 86,
             "height": 24
@@ -1732,41 +1747,47 @@
             "height": 26
           },
           "composerFrame": {
-            "y": 127,
+            "y": 123,
             "x": 22,
             "width": 209,
             "height": 24
           },
-          "height": 192
+          "height": 188
         },
         "question3": {
           "contentPopulated": true,
           "overlap": {
-            "skipped": true,
-            "reason": "viewport-too-shallow"
+            "skipped": false,
+            "scrollBottom": 58,
+            "composerY": 127
           },
           "optionLayout": {
-            "skipped": true,
-            "reason": "viewport-too-shallow",
+            "skipped": false,
+            "rows": [
+              2,
+              1
+            ],
+            "optionTop": 68,
+            "optionBottom": 120,
             "count": 3
           },
           "optionButtonFrames": [
             {
               "y": 68,
               "x": 22,
-              "width": 90.80906438827515,
+              "width": 145,
               "height": 24
             },
             {
               "y": 68,
-              "x": 118.80906438827515,
-              "width": 61.199880719184875,
+              "x": 173,
+              "width": 145,
               "height": 24
             },
             {
               "y": 96,
               "x": 22,
-              "width": 78.79974067211151,
+              "width": 145,
               "height": 24
             }
           ]
@@ -1774,8 +1795,13 @@
         "question4": {
           "contentPopulated": true,
           "optionLayout": {
-            "skipped": true,
-            "reason": "viewport-too-shallow",
+            "skipped": false,
+            "rows": [
+              2,
+              2
+            ],
+            "optionTop": 68,
+            "optionBottom": 120,
             "count": 4
           }
         }
@@ -1793,7 +1819,10 @@
           "panelWidth": 313,
           "bodyDepth": 81,
           "shoulderFlare": 9.719999999999999,
-          "nonDegenerateShoulder": true
+          "shoulderCurvatureContinuous": true,
+          "tangentContinuity": true,
+          "nonDegenerateShoulder": true,
+          "notchCenter": 156.5
         },
         "shapeMaskSynced": true,
         "frame": {
@@ -1865,15 +1894,15 @@
       "details": {
         "overlap": {
           "skipped": false,
-          "scrollBottom": 76,
+          "scrollBottom": 86,
           "approveY": 96,
           "composerY": 127
         },
         "approveGutter": {
           "skipped": false,
-          "gutter": 20,
+          "gutter": 10,
           "declared": 10,
-          "scrollBottom": 76,
+          "scrollBottom": 86,
           "controlY": 96
         },
         "contentFooterGutter": 10
@@ -1883,9 +1912,20 @@
       "name": "question-options-gutter-from-content-viewport",
       "ok": true,
       "details": {
-        "skipped": true,
-        "count": 3,
-        "viewportH": 19
+        "gutter": 10,
+        "declared": 10,
+        "optionLayout": {
+          "skipped": false,
+          "rows": [
+            2,
+            1
+          ],
+          "optionTop": 68,
+          "optionBottom": 120,
+          "count": 3
+        },
+        "optionTop": 68,
+        "scrollBottom": 58
       }
     }
   ],

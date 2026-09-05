@@ -1,17 +1,18 @@
 {
   "phase": "3-final",
   "role": "mandatory-test-writer",
-  "generatedAt": "2026-09-03T17:52:00-04:00",
+  "generatedAt": "2026-09-04T23:59:00-04:00",
   "scope": {
     "productionFilesInspected": [
       "native/prebase-live-activity/src/live_activity.mm",
-      "graphs/src/host/workbench/graphEditor.ts",
-      "graphs/src/host/workbench/graphEditorInput.ts",
-      "graphs/src/host/workbench/graphContribution.ts",
-      "build/lib/builtInExtensions.ts",
-      "test/prebase/acceptance/workbenchHarness.mjs",
+      "src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts",
+      "src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts",
+      "src/vs/workbench/contrib/prebase/browser/magnusLiveActivitySession.ts",
+      "src/vs/workbench/contrib/prebase/test/browser/magnusLiveActivity.test.ts",
+      "test/prebase/acceptance/magnus-live-activity-state.test.mjs",
       "test/prebase/acceptance/prebase-live-activity-perf.mjs",
-      "test/prebase/acceptance/prebase-graph-visual-recovery-live.mjs"
+      "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs",
+      "test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs"
     ],
     "uncommittedChangesInspected": true,
     "productionEdited": true,
@@ -19,52 +20,118 @@
   },
   "behaviorsEnumerated": [
     {
-      "id": "live-activity-hidden-input-fail-closed",
+      "id": "notch-silhouette-and-c1-shoulder-continuity",
       "behaviors": [
-        "simulateSubmitFollowUp fails closed (returns NO) when self.input is hidden",
-        "interactive mode unhides self.input and allows valid followUp text submission",
-        "Escape dismisses attention and resets peek state cleanly",
-        "stale attention snapshot republishing does not violate user dismissal"
+        "CreateNotchedIslandPath Curve 6 and Curve 12 have horizontal tangency at y=0 and vertical tangency at y=shoulderBottomY",
+        "Path elements remain strictly 14 (1 MoveTo, 8 LineTo, 4 CurveTo, 1 CloseSubpath) for CAShapeLayer interpolation",
+        "No vertical cliffs or 90-degree kinks at wing transition; smooth continuous shoulder flare",
+        "Path bounding box equals panel frame without clipping or degenerate shoulders",
+        "silhouetteMetrics diagnostics expose shoulderCurvatureContinuous: true, tangentContinuity: true, and nonDegenerateShoulder: true"
       ],
-      "testFile": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
-      "coverage": "implemented"
+      "testFiles": [
+        "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+        "test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs"
+      ],
+      "coverage": "implemented-and-verified"
     },
     {
-      "id": "graph-editor-reactive-switching",
+      "id": "true-black-fill-across-all-states",
       "behaviors": [
-        "PreBaseGraphEditorInput.matches preserves singleton editor pane reuse across Network and Temporal modes",
-        "setGraphType mutates graphType and resource URI (prebase-graph:/network vs prebase-graph:/temporal) and triggers onDidChangeLabel",
-        "openGraphEditor and openTemporalGraphEditor synchronize active editor graphType and tab presentation",
-        "PreBaseGraphEditor dynamically syncs _inputType from graphService onDidChangeViewState and initializes temporalViewService",
-        "prebase.temporal.open registered as command alias for openTemporal"
+        "Normal, working, interactive, pinned, and attention states use true black calibratedWhite 0.0 alpha 1.0",
+        "Eliminated legacy calibratedWhite 0.02 in attention state that produced visible gray mismatch against camera housing",
+        "Seamless visual blend with MacBook Pro hardware camera housing"
       ],
-      "testFile": "graphs/src/tests/unit/graphEditorTemporalWebview.test.ts",
-      "coverage": "implemented"
+      "testFiles": [
+        "src/vs/workbench/contrib/prebase/test/browser/magnusLiveActivity.test.ts",
+        "test/prebase/acceptance/prebase-live-activity-perf.mjs"
+      ],
+      "coverage": "implemented-and-verified"
     },
     {
-      "id": "workbench-harness-frame-resolution",
+      "id": "consistent-horizontal-alignment-grid",
       "behaviors": [
-        "findGraphFrame traverses page.frames() and all frame.childFrames() recursively",
-        "findGraphFrame inspects iframe contentFrames for canvas presence",
-        "findGraphFrame preserves mockFrame contract and Promise await semantics"
+        "Eliminated Y-dependent flare offsets in ContentSafeInsetX",
+        "Header title, status badge, activity description, latest message, action rows, option buttons, and composer all align to consistent safeInset (22pt when notched)",
+        "No jagged staircase of horizontal insets across stacked content"
       ],
-      "testFile": "test/prebase/acceptance/phase3HarnessLogic.test.mjs",
-      "coverage": "implemented"
+      "testFiles": [
+        "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+        "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs"
+      ],
+      "coverage": "implemented-and-verified"
     },
     {
-      "id": "build-sandbox-resilience",
+      "id": "content-containment-and-non-shallow-viewport",
       "behaviors": [
-        "builtInExtensions.ts respects VSCODE_EXTENSIONS_CONTROL_PATH override",
-        "writeControlFile catches EPERM safely in sandboxed / read-only home environments"
+        "Eliminated duplicate kContentFooterGutter compounding in computeControlsStackHeight and caller reservedFooterHeight",
+        "Scroll viewport for question options expands to >= 33pt rather than cramped 19pt",
+        "Removed false-green test skip on shallow viewport in assertTwoColOptionLayout and Test 39 (tests now fail if viewport < 24pt)",
+        "Zero text painting underneath Deny, Approve, question options, or composer controls"
       ],
-      "testFile": "build/lib/builtInExtensions.ts",
-      "coverage": "implemented"
+      "testFiles": [
+        "test/prebase/acceptance/prebase-live-activity-perf.mjs"
+      ],
+      "coverage": "implemented-and-verified"
+    },
+    {
+      "id": "two-column-equal-width-question-grid",
+      "behaviors": [
+        "Question options with >= 3 items render in a symmetric 2-column grid",
+        "Option buttons in the same row share identical column width colW = floor((usableW - gap) / 2.0)",
+        "Eliminated asymmetric intrinsic text width variation (e.g. 90.8pt vs 61.2pt)",
+        "Consistent horizontal and vertical gutters between options and composer"
+      ],
+      "testFiles": [
+        "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+        "test/prebase/acceptance/prebase-magnus-live-activity-static-contract.mjs"
+      ],
+      "coverage": "implemented-and-verified"
+    },
+    {
+      "id": "compact-wing-token-legibility",
+      "behaviors": [
+        "Left wing status label uses 10.5pt semibold font and 54pt usable width",
+        "Semantic tokens ('Question', 'Approve', 'Waiting', 'Testing', 'Working', 'Done', 'Failed') render without truncation",
+        "Eliminated unsightly 'Ques...' truncation in compact and attention-peek presentation"
+      ],
+      "testFiles": [
+        "src/vs/workbench/contrib/prebase/test/browser/magnusLiveActivity.test.ts",
+        "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs"
+      ],
+      "coverage": "implemented-and-verified"
+    },
+    {
+      "id": "action-log-stability-and-controlled-eviction",
+      "behaviors": [
+        "Stable action row IDs (a1, a2, a3) preserved across updates",
+        "Action row positions do not jump when only labels or statuses change",
+        "Content storm test (100 rapid updates) verified animDelta=0, geoDelta=0, composerStable=true, scrollStable=true",
+        "Controlled oldest-item eviction when action count exceeds visible capacity"
+      ],
+      "testFiles": [
+        "test/prebase/acceptance/prebase-live-activity-perf.mjs"
+      ],
+      "coverage": "implemented-and-verified"
+    },
+    {
+      "id": "truthful-diagnostics-and-window-capture",
+      "behaviors": [
+        "contentRefreshCount tracks actual subview refreshes distinctly from contentOnlyUpdateCount",
+        "Exposed windowNumber and backingScaleFactor in native diagnosticsDict",
+        "captureNativePanelScreenshot uses screencapture -l with window ID for exact NSPanel window capture",
+        "readPngDimensions inspects PNG IHDR header and rejects full-display fallbacks as panel captures"
+      ],
+      "testFiles": [
+        "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs"
+      ],
+      "coverage": "implemented-and-verified"
     }
   ],
   "verification": {
-    "testGraphs": "passed (62 test files)",
-    "phase3HarnessLogic": "passed (126 tests)",
-    "liveActivityContracts": "passed",
-    "liveActivityPerf": "passed (11/11 tests)"
+    "magnusLiveActivityUnitMocha": "passed (126/126 tests in 25ms)",
+    "liveActivityContractsState": "passed (8/8 tests in 332ms)",
+    "liveActivityStaticContract": "passed (0 failures)",
+    "liveActivityPerf": "passed (42/42 tests with 0 failures and 0 skipped question tests)",
+    "liveAppKitWorkbenchAcceptance": "passed (native-appkit-panel verified, exact 626x68 panel-window screenshot captured)"
   }
 }

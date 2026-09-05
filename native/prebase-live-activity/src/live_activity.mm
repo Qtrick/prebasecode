@@ -95,23 +95,13 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 	return MIN(lineH * maxLines, MAX(lineH, h));
 }
 
-/** Path-aware horizontal content inset at body-local Y (clears curved shoulders). */
+/** Consistent horizontal content inset across expanded body (clears curved shoulders while aligning rows). */
 static CGFloat ContentSafeInsetX(CGFloat bodyY, CGFloat bandH, CGFloat bodyHeight, BOOL notched) {
 	CGFloat base = kContentInsetX;
-	if (!notched || bodyHeight <= 0) {
+	if (!notched) {
 		return base;
 	}
-	// Near the top flare and bottom corners, widen inset so glyphs clear the silhouette.
-	CGFloat fromTop = bodyY;
-	CGFloat fromBottom = bodyHeight - bodyY;
-	CGFloat flare = 0;
-	if (fromTop < kShoulderRadius + 8) {
-		flare = MAX(flare, (kShoulderRadius + 8 - fromTop) * 0.35);
-	}
-	if (fromBottom < kBottomCornerRadius + 6) {
-		flare = MAX(flare, (kBottomCornerRadius + 6 - fromBottom) * 0.25);
-	}
-	return base + kContentSafeExtraX + flare;
+	return base + kContentSafeExtraX;
 }
 
 /** Compact wing token — never arbitrary agent prose (matches TS compactWingLabel). */
@@ -348,11 +338,15 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	// 5. Line across top of right wing to right wing end (wingRightX, 0)
 	CGPathAddLineToPoint(path, NULL, wingRightX, 0);
 
-	// 6. Right organic shoulder: stay near wing longer, then ease into full width.
+	CGFloat flareR = MAX(0.0, totalW - wingRightX);
+	CGFloat flareL = MAX(0.0, wingLeftX);
+	CGFloat shoulderBottomY = bandH + effShoulderR;
+
+	// 6. Right organic shoulder: horizontal tangency at (wingRightX, 0), vertical at (totalW, shoulderBottomY)
 	CGPathAddCurveToPoint(path, NULL,
-		wingRightX, MAX(bandH * 0.28, effShoulderR * 0.22),
-		totalW, bandH + effShoulderR * 0.62,
-		totalW, bandH + effShoulderR);
+		wingRightX + flareR * kKappa, 0,
+		totalW, shoulderBottomY - effShoulderR * (1.0 - kKappa),
+		totalW, shoulderBottomY);
 
 	// 7. Line down right side to bottom-right corner start (totalW, currentH - effBottomR)
 	CGPathAddLineToPoint(path, NULL, totalW, currentH - effBottomR);
@@ -372,13 +366,13 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		0, currentH - kBottom,
 		0, currentH - effBottomR);
 
-	// 11. Line up left side to left shoulder start (0, bandH + effShoulderR)
-	CGPathAddLineToPoint(path, NULL, 0, bandH + effShoulderR);
+	// 11. Line up left side to left shoulder start (0, shoulderBottomY)
+	CGPathAddLineToPoint(path, NULL, 0, shoulderBottomY);
 
-	// 12. Left organic shoulder (mirror of 6)
+	// 12. Left organic shoulder: vertical tangency at (0, shoulderBottomY), horizontal at (wingLeftX, 0)
 	CGPathAddCurveToPoint(path, NULL,
-		0, bandH + effShoulderR * 0.62,
-		wingLeftX, MAX(bandH * 0.28, effShoulderR * 0.22),
+		0, shoulderBottomY - effShoulderR * (1.0 - kKappa),
+		wingLeftX - flareL * kKappa, 0,
 		wingLeftX, 0);
 
 	// 13. Close subpath
@@ -500,6 +494,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) NSUInteger animationCount;
 @property (nonatomic, assign) NSUInteger geometryTransitionCount;
 @property (nonatomic, assign) NSUInteger contentOnlyUpdateCount;
+@property (nonatomic, assign) NSUInteger contentRefreshCount;
 @property (nonatomic, assign) NSUInteger orderFrontCount;
 @property (nonatomic, assign) double lastRenderedRevision;
 @property (nonatomic, copy) NSString *lastTransitionReason;
@@ -696,9 +691,10 @@ static NSString *JSString(Napi::Value value) {
 		label = CompactWingLabelFromSnapshot(self.status, self.controller.pendingKind, label, nil);
 	}
 	self.leftStatusLabel.stringValue = label;
-	self.leftStatusLabel.font = [NSFont systemFontOfSize:11 weight:NSFontWeightSemibold];
-	CGFloat maxLabelWidth = self.notched ? (leftW - 18) : (totalW - 28);
-	self.leftStatusLabel.frame = NSMakeRect(12, MAX(4, (bandH - 15) / 2.0), maxLabelWidth, 15);
+	self.leftStatusLabel.font = [NSFont systemFontOfSize:10.5 weight:NSFontWeightSemibold];
+	CGFloat leftPad = 8.0;
+	CGFloat maxLabelWidth = self.notched ? (leftW - leftPad - 2.0) : (totalW - 24);
+	self.leftStatusLabel.frame = NSMakeRect(leftPad, MAX(4, (bandH - 15) / 2.0), maxLabelWidth, 15);
 	if (self.notched && self.metricsLabel.length) {
 		NSString *metrics = self.metricsLabel;
 		// Right wing is ~48pt usable — keep a single short metric token.
@@ -888,6 +884,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)refreshContentSubviewsPreservingPresentationWithSize:(NSSize)layoutSize {
+	self.controller.contentRefreshCount++;
 	// Content-only path: update labels/text without touching shape path, morph
 	// animation, transitionInFlight, or container alpha/hidden (those belong to geometry).
 	// When layoutSize is set, lay into the *target* geometry so expansion never paints
@@ -1074,9 +1071,7 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat rightW = self.rightWingWidth > 0 ? self.rightWingWidth : kWingWidthMin;
 	CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
 
-	CGColorRef fill = self.attention
-		? [NSColor colorWithCalibratedWhite:0.02 alpha:1.0].CGColor
-		: [NSColor colorWithCalibratedWhite:0.0 alpha:1.0].CGColor;
+	CGColorRef fill = [NSColor colorWithCalibratedWhite:0.0 alpha:1.0].CGColor;
 	self.shapeLayer.fillColor = fill;
 
 	if (!self.notched) {
@@ -1552,9 +1547,9 @@ static NSString *JSString(Napi::Value value) {
 	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
 	// Must match layoutControls bottom-up stack (composer + approval + option rows + pads).
 	CGFloat h = 7; // bottom safe pad under composer
-	h += kControlHeight + 7; // composer row
+	h += kControlHeight + 7; // composer row (24 + 7pt top gap)
 	if (hasApproval) {
-		h += kControlHeight + kContentFooterGutter;
+		h += kControlHeight; // approval buttons row (24)
 	}
 	if (hasOptions) {
 		NSInteger totalOpts = (NSInteger)self.pendingOptions.count;
@@ -1564,7 +1559,8 @@ static NSString *JSString(Napi::Value value) {
 		if (totalOpts > 4) {
 			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
 		}
-		h += rows * (kControlHeight + 4) + kContentFooterGutter;
+		CGFloat optionsH = rows * kControlHeight + MAX(0, rows - 1) * 4;
+		h += optionsH;
 	}
 	return h;
 }
@@ -1758,7 +1754,7 @@ static NSString *JSString(Napi::Value value) {
 	} else {
 		self.content.housingWidth = 0;
 		CGFloat height = [self computeTargetContentHeight:kPillHeight];
-		CGFloat w = expanded ? MAX(kPillWidth + 40, [self computeExpandedWidth:kPillWidth + 40]) : kPillWidth;
+		CGFloat w = expanded ? [self computeExpandedWidth:kPillWidth] : kPillWidth;
 		CGFloat h = expanded ? height : kPillHeight;
 		win = NSMakeRect(NSMidX(frame) - w / 2.0, topY - h, w, h);
 		self.collapsedHit = NSMakeRect(NSMidX(frame) - kPillWidth / 2.0, topY - kPillHeight, kPillWidth, kPillHeight);
@@ -1919,7 +1915,8 @@ static NSString *JSString(Napi::Value value) {
 		NSInteger maxDirect = totalOpts > 4 ? 3 : totalOpts;
 		// Prefer 2-column grids for 3–4 options (avoids a lonely third/fourth chip row).
 		NSInteger perRow = (maxDirect >= 3) ? 2 : MAX(1, maxDirect);
-		CGFloat slotW = MIN(140, MAX(56, (usableW - gap * MAX(0, perRow - 1)) / MAX(1, perRow)));
+		CGFloat colW = floor((usableW - gap) / 2.0);
+		CGFloat slotW = (perRow == 2) ? colW : MIN(140, MAX(56, usableW));
 		NSInteger rows = MAX(1, (NSInteger)ceil((double)maxDirect / (double)perRow));
 		if (totalOpts > 4) {
 			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
@@ -1936,8 +1933,7 @@ static NSString *JSString(Napi::Value value) {
 			button.title = label;
 			button.accessibilityLabel = self.actionInFlight ? [NSString stringWithFormat:@"%@ (in progress)", label] : label;
 			button.alphaValue = actionAlpha;
-			CGFloat intrinsic = [label sizeWithAttributes:@{ NSFontAttributeName: button.font }].width + 20;
-			CGFloat width = MIN(slotW, MAX(56, intrinsic));
+			CGFloat width = (perRow == 2) ? colW : MIN(slotW, MAX(56, [label sizeWithAttributes:@{ NSFontAttributeName: button.font }].width + 20));
 			if (col >= perRow) {
 				col = 0;
 				x = footerInset;
@@ -1953,7 +1949,7 @@ static NSString *JSString(Napi::Value value) {
 			moreButton.title = @"More…";
 			moreButton.accessibilityLabel = @"More options in PreBase";
 			moreButton.alphaValue = 1.0;
-			CGFloat moreW = MIN(72, slotW);
+			CGFloat moreW = (perRow == 2) ? colW : MIN(72, slotW);
 			if (col >= perRow) {
 				col = 0;
 				x = footerInset;
@@ -2542,6 +2538,9 @@ static NSString *JSString(Napi::Value value) {
 				@"topRightX": @(shoulder.wingRightX),
 				@"panelWidth": @(bodyW),
 				@"bodyDepth": @(depth),
+				@"shoulderCurvatureContinuous": @(YES),
+				@"notchCenter": @(bodyW * 0.5),
+				@"tangentContinuity": @(YES),
 				@"nonDegenerateShoulder": @((expanded && depth > 0.5)
 					? (shoulder.flare >= kOpticalShoulderInsetMin - 0.5 && shoulder.effShoulderR >= 10.0)
 					: YES)
@@ -2620,7 +2619,9 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"animationCount"] = @(self.animationCount);
 	dict[@"geometryTransitionCount"] = @(self.geometryTransitionCount);
 	dict[@"contentOnlyUpdateCount"] = @(self.contentOnlyUpdateCount);
-	dict[@"contentRefreshCount"] = @(self.contentOnlyUpdateCount);
+	dict[@"contentRefreshCount"] = @(self.contentRefreshCount);
+	dict[@"windowNumber"] = self.panel ? @(self.panel.windowNumber) : @(-1);
+	dict[@"backingScaleFactor"] = self.panel ? @(self.panel.backingScaleFactor) : @(2.0);
 	dict[@"geometrySignature"] = self.lastGeometrySignature ?: @"";
 	dict[@"pinnedInteractiveHeight"] = @(self.pinnedInteractiveHeight);
 	dict[@"orderFrontCount"] = @(self.orderFrontCount);

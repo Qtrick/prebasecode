@@ -199,69 +199,117 @@ function isPngValid(filePath) {
 	}
 }
 
-function captureNativePanelScreenshot(panelFrame, screenFrame, outPath) {
-	if (!panelFrame || !screenFrame || process.platform !== 'darwin') {
-		return { captured: false, reason: 'unsupported platform or missing geometry' };
-	}
+function readPngDimensions(filePath) {
 	try {
-		const screenH = screenFrame.height || 1080;
+		const buf = readFileSync(filePath);
+		if (buf.length >= 24 && buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4e && buf[3] === 0x47) {
+			const width = buf.readUInt32BE(16);
+			const height = buf.readUInt32BE(20);
+			return { width, height };
+		}
+	} catch {
+		// ignore
+	}
+	return null;
+}
+
+function captureNativePanelScreenshot(panelFrame, screenFrame, outPath, windowNumber, backingScale = 2.0) {
+	if (!panelFrame || !screenFrame || process.platform !== 'darwin') {
+		return { captured: false, isPanelCapture: false, reason: 'unsupported platform or missing geometry' };
+	}
+	const screenH = screenFrame.height || 1080;
+	const screenW = screenFrame.width || 1920;
+	const winNum = typeof windowNumber === 'number' && windowNumber > 0 ? windowNumber : null;
+
+	// Attempt 1: Window ID capture via screencapture -l <windowid> -o (captures exact NSPanel without shadow/desktop)
+	if (winNum) {
+		try {
+			execSync(`screencapture -l ${winNum} -o -x "${outPath}"`, { timeout: 6000, stdio: 'pipe' });
+			const stat = statSync(outPath);
+			if (stat.size > 0 && isPngValid(outPath)) {
+				const dims = readPngDimensions(outPath);
+				if (dims && dims.width > 0 && dims.height > 0) {
+					const isFullDesktop = dims.width >= (screenW * 0.95) && dims.height >= (screenH * 0.95);
+					if (!isFullDesktop) {
+						return {
+							captured: true,
+							isPanelCapture: true,
+							classification: 'panel-window',
+							format: 'png',
+							sizeBytes: stat.size,
+							dimensions: dims,
+							windowNumber: winNum,
+							outPath,
+						};
+					}
+				}
+			}
+		} catch {
+			// window capture might fail in sandboxed background or need TCC, fall through to rect
+		}
+	}
+
+	// Attempt 2: Bounded rect capture around the panel
+	try {
 		const contextPadTop = 72;
 		const captureX = Math.max(0, Math.round(Math.min(panelFrame.x, screenFrame.x + screenFrame.width / 2 - 240)));
 		const captureY = Math.max(0, Math.round(screenH - (panelFrame.y + panelFrame.height + contextPadTop)));
 		const captureW = Math.max(10, Math.round(Math.min(screenFrame.width, Math.max(panelFrame.width + 80, 480))));
 		const captureH = Math.max(10, Math.round(panelFrame.height + contextPadTop));
 		const rectArg = `-R${captureX},${captureY},${captureW},${captureH}`;
-		try {
-			execSync(`screencapture -x ${rectArg} "${outPath}"`, { timeout: 5000, stdio: 'pipe' });
-			const stat = statSync(outPath);
-			if (stat.size > 0 && isPngValid(outPath)) {
+		execSync(`screencapture -x ${rectArg} "${outPath}"`, { timeout: 5000, stdio: 'pipe' });
+		const stat = statSync(outPath);
+		if (stat.size > 0 && isPngValid(outPath)) {
+			const dims = readPngDimensions(outPath);
+			const isFullDesktop = dims && dims.width >= (screenW * 0.95) && dims.height >= (screenH * 0.95);
+			if (!isFullDesktop) {
 				return {
 					captured: true,
+					isPanelCapture: true,
+					classification: 'panel-rect',
 					format: 'png',
 					sizeBytes: stat.size,
+					dimensions: dims,
 					rect: { x: captureX, y: captureY, width: captureW, height: captureH },
 					outPath,
 				};
 			}
+		}
+	} catch (rectErr) {
+		// continue to evaluation
+	}
+
+	// Fallback check: full display capture.
+	// NOTE: Per specification, full-display capture is explicitly NOT classified as a panel capture!
+	try {
+		execSync(`screencapture -x "${outPath}"`, { timeout: 8000, stdio: 'pipe' });
+		const stat = statSync(outPath);
+		if (stat.size > 0 && isPngValid(outPath)) {
+			const dims = readPngDimensions(outPath);
 			return {
-				captured: false,
-				reason: 'invalid-png-magic-bytes',
-				rect: { x: captureX, y: captureY, width: captureW, height: captureH },
-			};
-		} catch (captureErr) {
-			// Rect capture can fail on Retina / multi-display coordinate spaces.
-			// Fall back to a full-display capture so visual acceptance still has real pixels.
-			try {
-				execSync(`screencapture -x "${outPath}"`, { timeout: 8000, stdio: 'pipe' });
-				const stat = statSync(outPath);
-				if (stat.size > 0 && isPngValid(outPath)) {
-					return {
-						captured: true,
-						format: 'png',
-						sizeBytes: stat.size,
-						rect: { x: captureX, y: captureY, width: captureW, height: captureH },
-						fallback: 'full-display',
-						outPath,
-					};
-				}
-			} catch {
-				// continue to svg geometry artifact below
-			}
-			// Screencapture CLI is unavailable or blocked by macOS TCC permissions in background terminal;
-			// Write geometry artifact to .svg extension without faking .png format
-			const svgPath = outPath.replace(/\.png$/, '.svg');
-			writeFileSync(svgPath, `<svg xmlns="http://www.w3.org/2000/svg" width="${captureW}" height="${captureH}"><rect width="100%" height="100%" fill="#0a0a0a"/><text x="20" y="40" fill="#fff" font-family="sans-serif" font-size="14">Magnus Live Activity Panel: ${panelFrame.width}x${panelFrame.height}</text></svg>\n`);
-			return {
-				captured: false,
-				reason: 'screencapture-unavailable',
-				svgGeometryArtifact: svgPath,
-				error: captureErr instanceof Error ? captureErr.message : String(captureErr),
-				rect: { x: captureX, y: captureY, width: captureW, height: captureH },
+				captured: false, // NOT classified as a panel capture
+				isPanelCapture: false,
+				classification: 'full-desktop',
+				format: 'png',
+				sizeBytes: stat.size,
+				dimensions: dims,
+				reason: 'full-display-is-not-panel-capture',
+				outPath,
 			};
 		}
-	} catch (err) {
-		return { captured: false, error: err instanceof Error ? err.message : String(err) };
+	} catch {
+		// continue to svg geometry artifact
 	}
+
+	const svgPath = outPath.replace(/\.png$/, '.svg');
+	writeFileSync(svgPath, `<svg xmlns="http://www.w3.org/2000/svg" width="${panelFrame.width}" height="${panelFrame.height}"><rect width="100%" height="100%" fill="#000000"/><text x="20" y="40" fill="#fff" font-family="sans-serif" font-size="14">Magnus Live Activity Panel: ${panelFrame.width}x${panelFrame.height}</text></svg>\n`);
+	return {
+		captured: false,
+		isPanelCapture: false,
+		classification: 'unavailable',
+		reason: 'screencapture-unavailable',
+		svgGeometryArtifact: svgPath,
+	};
 }
 
 async function run() {
@@ -424,6 +472,8 @@ async function run() {
 				interactiveNative.panelFrame,
 				interactiveNative.screenFrame,
 				join(screenshotDir, 'magnus-live-activity-interactive.png'),
+				interactiveNative.windowNumber,
+				interactiveNative.backingScaleFactor,
 			);
 		}
 
@@ -454,6 +504,8 @@ async function run() {
 				peekNative.panelFrame,
 				peekNative.screenFrame,
 				join(screenshotDir, 'magnus-live-activity-peek.png'),
+				peekNative.windowNumber,
+				peekNative.backingScaleFactor,
 			);
 		}
 
@@ -496,6 +548,8 @@ async function run() {
 			evidence.nativeDiagnostics?.panelFrame,
 			evidence.nativeDiagnostics?.screenFrame,
 			screenshotFile,
+			evidence.nativeDiagnostics?.windowNumber,
+			evidence.nativeDiagnostics?.backingScaleFactor,
 		);
 
 		// Populated visual fixtures — empty black panels are not visual proof.
@@ -517,7 +571,7 @@ async function run() {
 			}
 			const native = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
 			const screenshot = native?.panelFrame
-				? captureNativePanelScreenshot(native.panelFrame, native.screenFrame, join(screenshotDir, `${fileBase}.png`))
+				? captureNativePanelScreenshot(native.panelFrame, native.screenFrame, join(screenshotDir, `${fileBase}.png`), native.windowNumber, native.backingScaleFactor)
 				: { captured: false, reason: 'no-panel-frame' };
 			return { seed, native, screenshot };
 		}

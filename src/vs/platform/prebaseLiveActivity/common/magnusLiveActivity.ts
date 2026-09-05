@@ -263,23 +263,26 @@ export function computeLiveActivityExpandedHeight(args: {
 	// Mirror native estimate budgets (native still measures for layout; this is for tests/contracts).
 	let h = args.bandHeight + 5;
 	h += 15 + 3; // Header row + gap
+	const hasPending = Boolean(args.hasPendingTitle || args.hasPendingMessage || args.pendingKind === 'approval' || args.pendingKind === 'question');
 	if (args.hasPendingTitle) {
 		h += 24;
 	}
 	if (args.hasPendingMessage) {
 		h += 32;
 	}
-	if (args.hasActivity) {
-		h += 24;
-	}
-	if (args.hasLatestMessage) {
-		h += 22;
-	}
-	if (args.actionsCount && args.actionsCount > 0) {
-		h += Math.min(args.actionsCount, 3) * 14;
-	}
-	if (args.hasMetrics && !args.hasPendingTitle) {
-		h += 12;
+	if (!hasPending) {
+		if (args.hasActivity) {
+			h += 24;
+		}
+		if (args.hasLatestMessage) {
+			h += 22;
+		}
+		if (args.actionsCount && args.actionsCount > 0) {
+			h += Math.min(args.actionsCount, 3) * 14;
+		}
+		if (args.hasMetrics) {
+			h += 12;
+		}
 	}
 	h += 3;
 	const hasOptions = args.pendingKind === 'question' && Boolean(args.hasOptions);
