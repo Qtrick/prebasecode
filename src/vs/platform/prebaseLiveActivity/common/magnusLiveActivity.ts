@@ -54,6 +54,7 @@ export interface MagnusLiveActivityAction {
 	readonly id: string;
 	readonly label: string;
 	readonly at: number;
+	readonly status?: 'running' | 'passed' | 'failed' | 'other';
 }
 
 export interface MagnusLiveActivityPendingInteraction {
@@ -118,7 +119,7 @@ export const LIVE_ACTIVITY_WING_WIDTH_MAX = LIVE_ACTIVITY_WING_WIDTH_DEFAULT;
 export const LIVE_ACTIVITY_CAMERA_HOUSING_MIN = 24;
 /** Overflow guard — natural height is measured; this is not the default slab. */
 export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72;
-export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 164;
+export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 192;
 export const LIVE_ACTIVITY_EXPANDED_HEIGHT = 128;
 /** Fixed peek body band below the notch (matches native kPeekBodyHeight). */
 export const LIVE_ACTIVITY_PEEK_BODY_HEIGHT = 44;
@@ -451,6 +452,7 @@ export function buildMagnusLiveActivitySnapshot(
 		id: action.id,
 		label: redactLiveActivityText(action.label),
 		at: action.at,
+		...(action.status ? { status: action.status } : {}),
 	}));
 
 	const snapshot: MagnusLiveActivitySnapshot = {

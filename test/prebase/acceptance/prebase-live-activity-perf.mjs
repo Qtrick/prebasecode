@@ -411,7 +411,43 @@ function contentSnapshot(revision, extras = {}) {
 	if (typeof extras.userDismissedAttention === 'boolean') {
 		snap.userDismissedAttention = extras.userDismissedAttention;
 	}
+	if (Array.isArray(extras.recentActions)) {
+		snap.recentActions = extras.recentActions;
+	}
 	return snap;
+}
+
+function framesClose(a, b, tol = 0.5) {
+	if (!isValidDiagFrame(a) || !isValidDiagFrame(b)) {
+		return false;
+	}
+	return Math.abs(a.x - b.x) <= tol
+		&& Math.abs(a.y - b.y) <= tol
+		&& Math.abs(a.width - b.width) <= tol
+		&& Math.abs(a.height - b.height) <= tol;
+}
+
+/** Meaningful footer gutter (not a 1px coincidence) between scroll host and controls. */
+function assertMeaningfulContentControlGutter(diag, controlFrame, { label = 'control', minGutter = 6 } = {}) {
+	const scroll = diag.contentScrollFrame;
+	const viewport = diag.contentViewport;
+	if (!isValidDiagFrame(scroll) || !isValidDiagFrame(controlFrame)) {
+		return { skipped: true, reason: 'missing-frames' };
+	}
+	const viewportH = Number(viewport?.height) || Number(diag.bodyBounds?.height) || 0;
+	if (viewportH < 24) {
+		return { skipped: true, reason: 'viewport-too-shallow' };
+	}
+	const scrollBottom = frameBottom(scroll);
+	const gutter = Number(controlFrame.y) - scrollBottom;
+	const declared = Number(diag.contentFooterGutter);
+	if (!(gutter >= minGutter - 0.5)) {
+		throw new Error(`${label} must keep meaningful gutter from content scroll (gutter=${gutter}, min=${minGutter}, scrollBottom=${scrollBottom}, control.y=${controlFrame.y})`);
+	}
+	if (Number.isFinite(declared) && declared >= minGutter - 0.5 && gutter + 1.5 < declared) {
+		throw new Error(`${label} gutter (${gutter}) must honor contentFooterGutter=${declared}`);
+	}
+	return { skipped: false, gutter, declared, scrollBottom, controlY: controlFrame.y };
 }
 
 async function applyContentStorm(native, {
@@ -3322,7 +3358,7 @@ async function run() {
 	try {
 		native.dispose();
 		const EXPANDED_HEIGHT_MIN = 72;
-		const EXPANDED_HEIGHT_MAX = 164;
+		const EXPANDED_HEIGHT_MAX = 192;
 		const EXPANDED_WIDTH_PAD = 28;
 
 		native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
@@ -3573,7 +3609,7 @@ async function run() {
 	const test33 = { name: 'interactive-layout-no-overlap-and-two-col-options', ok: true, details: {} };
 	try {
 		const EXPANDED_HEIGHT_MIN = 72;
-		const EXPANDED_HEIGHT_MAX = 164;
+		const EXPANDED_HEIGHT_MAX = 192;
 		const EXPANDED_WIDTH_PAD = 28;
 		const STABLE_WING = 64;
 
@@ -3702,6 +3738,442 @@ async function run() {
 		results.failures.push(`interactive-layout-no-overlap-and-two-col-options: ${err.message}`);
 	}
 	results.tests.push(test33);
+
+	// Test 34: Silhouette curvature metrics for natural-width interactive (optical shoulder, non-degenerate)
+	const test34 = { name: 'silhouette-metrics-natural-width-interactive', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(14_000, {
+			status: 'working',
+			presentationLabel: 'Working',
+			currentActivity: 'Validating optical shoulder curvature',
+			latestShortMessage: 'Natural-width interactive must expose non-degenerate silhouette metrics',
+			workspaceDiff: null,
+		}));
+		await sleep(100);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 4);
+		const diag = native.getDiagnostics();
+		const sm = diag.silhouetteMetrics;
+		if (!sm || typeof sm !== 'object') {
+			throw new Error('interactive diagnostics must expose silhouetteMetrics');
+		}
+		const optical = Number(sm.opticalTopInset);
+		const effR = Number(sm.effShoulderR);
+		const flare = Number(sm.shoulderFlare);
+		const depth = Number(sm.bodyDepth);
+		if (!(depth > 0.5)) {
+			throw new Error(`expanded interactive bodyDepth must be > 0.5, got ${depth}`);
+		}
+		if (sm.nonDegenerateShoulder !== true) {
+			throw new Error(`natural-width interactive must report nonDegenerateShoulder=true (flare=${flare}, optical=${optical}, effR=${effR})`);
+		}
+		// Natural span: optical inset within [8,12] OR real lateral flare with effR >= 10.
+		if (optical > 0) {
+			if (!(optical >= 7.5 && optical <= 12.5)) {
+				throw new Error(`opticalTopInset must be in [8,12] when applied, got ${optical}`);
+			}
+			if (!(Math.abs(flare - optical) <= 0.5)) {
+				throw new Error(`shoulderFlare must equal opticalTopInset when optical is applied (flare=${flare}, optical=${optical})`);
+			}
+		} else if (!(flare >= 7.5)) {
+			throw new Error(`without optical inset, shoulderFlare must still be non-degenerate (>=8), got ${flare}`);
+		}
+		if (!(effR >= 10)) {
+			throw new Error(`effShoulderR must be >= 10 for expanded interactive, got ${effR}`);
+		}
+		if (diag.shapeMaskSynced !== true && diag.shapeMaskSynced !== undefined) {
+			throw new Error(`shapeMaskSynced should be true when path exists, got ${diag.shapeMaskSynced}`);
+		}
+		test34.details = { silhouetteMetrics: sm, shapeMaskSynced: diag.shapeMaskSynced, frame: captureFrame(diag) };
+	} catch (err) {
+		test34.ok = false;
+		test34.error = err.message;
+		results.failures.push(`silhouette-metrics-natural-width-interactive: ${err.message}`);
+	}
+	results.tests.push(test34);
+
+	// Test 35: contentViewport must equal contentScrollFrame when scroll host is active
+	const test35 = { name: 'content-viewport-equals-scroll-frame', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(14_100, {
+			status: 'working',
+			currentActivity: 'Scroll host viewport identity',
+			latestShortMessage: 'contentViewport must be the actual contentScrollFrame, not a footer heuristic',
+		}));
+		await sleep(80);
+		await drainMain(native, 2);
+		await settleInteractive(native);
+		await sleep(100);
+		await drainMain(native, 4);
+		const diag = native.getDiagnostics();
+		if (diag.contentScrollEnabled !== true) {
+			throw new Error(`interactive must enable content scroll host, got contentScrollEnabled=${diag.contentScrollEnabled}`);
+		}
+		if (!isValidDiagFrame(diag.contentViewport) || !isValidDiagFrame(diag.contentScrollFrame)) {
+			throw new Error('both contentViewport and contentScrollFrame must be present when scroll is active');
+		}
+		if (!framesClose(diag.contentViewport, diag.contentScrollFrame, 0.5)) {
+			throw new Error(`contentViewport must equal contentScrollFrame within 0.5pt (viewport=${JSON.stringify(diag.contentViewport)} scroll=${JSON.stringify(diag.contentScrollFrame)})`);
+		}
+		const gutter = Number(diag.contentFooterGutter);
+		if (!(gutter >= 8)) {
+			throw new Error(`contentFooterGutter must be meaningful (>=8), got ${gutter}`);
+		}
+		test35.details = {
+			contentViewport: diag.contentViewport,
+			contentScrollFrame: diag.contentScrollFrame,
+			contentFooterGutter: gutter,
+			footerTopY: diag.footerTopY,
+		};
+	} catch (err) {
+		test35.ok = false;
+		test35.error = err.message;
+		results.failures.push(`content-viewport-equals-scroll-frame: ${err.message}`);
+	}
+	results.tests.push(test35);
+
+	// Test 36: Action identity stability — label update keeps ids/frames; new id evicts oldest slot
+	const test36 = { name: 'action-row-id-stability-and-controlled-eviction', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		const actionsABC = [
+			{ id: 'A', label: 'Read graphEditor.ts', at: 1000 },
+			{ id: 'B', label: 'Edit layout.ts', at: 2000 },
+			{ id: 'C', label: 'Run suites', at: 3000 },
+		];
+		native.setSnapshot(contentSnapshot(14_200, {
+			status: 'working',
+			currentActivity: 'Working with action ledger',
+			latestShortMessage: 'Stable action rows',
+			recentActions: actionsABC,
+			workspaceDiff: null,
+		}));
+		await sleep(100);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 4);
+		const before = native.getDiagnostics();
+		const idsBefore = Array.isArray(before.actionRowIds) ? before.actionRowIds.slice() : [];
+		const framesBefore = (before.actionFrames || []).filter(isValidDiagFrame).map(f => ({ ...f }));
+		if (idsBefore.length < 3) {
+			const vp = Number(before.contentViewport?.height) || 0;
+			if (vp >= 24) {
+				throw new Error(`expected actionRowIds [A,B,C], got ${JSON.stringify(idsBefore)}`);
+			}
+			test36.details = { skipped: true, reason: 'viewport-too-shallow', idsBefore };
+		} else {
+			if (idsBefore.join(',') !== 'A,B,C') {
+				throw new Error(`actionRowIds must preserve order A,B,C got ${JSON.stringify(idsBefore)}`);
+			}
+			// Update only C's label — ids and frames must stay stable.
+			native.setSnapshot(contentSnapshot(14_201, {
+				status: 'working',
+				currentActivity: 'Working with action ledger',
+				latestShortMessage: 'Stable action rows',
+				recentActions: [
+					{ id: 'A', label: 'Read graphEditor.ts', at: 1000 },
+					{ id: 'B', label: 'Edit layout.ts', at: 2000 },
+					{ id: 'C', label: 'Run suites (updated)', at: 3000 },
+				],
+				workspaceDiff: null,
+			}));
+			await sleep(80);
+			await drainMain(native, 3);
+			const afterLabel = native.getDiagnostics();
+			const idsAfterLabel = Array.isArray(afterLabel.actionRowIds) ? afterLabel.actionRowIds.slice() : [];
+			const framesAfterLabel = (afterLabel.actionFrames || []).filter(isValidDiagFrame);
+			if (idsAfterLabel.join(',') !== idsBefore.join(',')) {
+				throw new Error(`label-only update must keep actionRowIds stable (${idsBefore} → ${idsAfterLabel})`);
+			}
+			if (framesBefore.length !== framesAfterLabel.length) {
+				throw new Error(`label-only update must keep action frame count (${framesBefore.length} → ${framesAfterLabel.length})`);
+			}
+			for (let i = 0; i < framesBefore.length; i++) {
+				if (!framesEqualWithin(framesBefore[i], framesAfterLabel[i], 1.5)) {
+					throw new Error(`action frame[${i}] drifted after label-only update: ${JSON.stringify(framesBefore[i])} → ${JSON.stringify(framesAfterLabel[i])}`);
+				}
+			}
+			const geoBefore = before.geometrySignature;
+			const geoAfter = afterLabel.geometrySignature;
+			if (geoBefore && geoAfter && geoBefore !== geoAfter) {
+				throw new Error(`label-only action update must not change geometrySignature (${geoBefore} → ${geoAfter})`);
+			}
+
+			// Add D — controlled eviction of oldest (A) while keeping B,C,D.
+			native.setSnapshot(contentSnapshot(14_202, {
+				status: 'working',
+				currentActivity: 'Working with action ledger',
+				latestShortMessage: 'Eviction',
+				recentActions: [
+					{ id: 'A', label: 'Read graphEditor.ts', at: 1000 },
+					{ id: 'B', label: 'Edit layout.ts', at: 2000 },
+					{ id: 'C', label: 'Run suites (updated)', at: 3000 },
+					{ id: 'D', label: 'Ship polish', at: 4000 },
+				],
+				workspaceDiff: null,
+			}));
+			await sleep(80);
+			await drainMain(native, 3);
+			const afterEvict = native.getDiagnostics();
+			const idsAfterEvict = Array.isArray(afterEvict.actionRowIds) ? afterEvict.actionRowIds.slice() : [];
+			if (idsAfterEvict.includes('A') && idsAfterEvict.length >= 3 && idsAfterEvict.join(',') === 'A,B,C') {
+				throw new Error('adding D must evict A from the visible 3-slot row (got A,B,C still)');
+			}
+			if (!idsAfterEvict.includes('D')) {
+				throw new Error(`adding D must appear in actionRowIds, got ${JSON.stringify(idsAfterEvict)}`);
+			}
+			if (!idsAfterEvict.includes('B') || !idsAfterEvict.includes('C')) {
+				throw new Error(`eviction must keep remaining stable ids B and C, got ${JSON.stringify(idsAfterEvict)}`);
+			}
+			if (idsAfterEvict.length > 3) {
+				throw new Error(`action row slots must stay <= 3, got ${idsAfterEvict.length}`);
+			}
+			test36.details = {
+				idsBefore,
+				idsAfterLabel,
+				idsAfterEvict,
+				framesStable: true,
+				geometrySignature: geoAfter,
+			};
+		}
+	} catch (err) {
+		test36.ok = false;
+		test36.error = err.message;
+		results.failures.push(`action-row-id-stability-and-controlled-eviction: ${err.message}`);
+	}
+	results.tests.push(test36);
+
+	// Test 37: Content-only storm with MANY varying-length strings — geo/anim stable, footer frames fixed
+	const test37 = { name: 'content-storm-varying-length-geometry-stable', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(15_000, {
+			status: 'working',
+			currentActivity: 'Baseline activity',
+			latestShortMessage: 'short',
+			recentActions: [
+				{ id: 'A', label: 'Step A', at: 1 },
+				{ id: 'B', label: 'Step B', at: 2 },
+			],
+		}));
+		await sleep(100);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 4);
+		const baselineDiag = native.getDiagnostics();
+		const baseline = captureStabilityBaseline(baselineDiag);
+		const composerBefore = isValidDiagFrame(baselineDiag.composerFrame) ? { ...baselineDiag.composerFrame } : null;
+		const openBefore = isValidDiagFrame(baselineDiag.openButtonFrame) ? { ...baselineDiag.openButtonFrame } : null;
+		const pinBefore = isValidDiagFrame(baselineDiag.pinButtonFrame) ? { ...baselineDiag.pinButtonFrame } : null;
+		const scrollBefore = isValidDiagFrame(baselineDiag.contentScrollFrame) ? { ...baselineDiag.contentScrollFrame } : null;
+		const geoSigBefore = baselineDiag.geometrySignature;
+		const lengths = [12, 40, 80, 120, 160, 8, 95, 55, 140, 30];
+		let revision = 15_001;
+		for (let i = 0; i < 100; i++) {
+			const len = lengths[i % lengths.length] + (i % 7);
+			const filler = 'x'.repeat(Math.max(1, len));
+			native.setSnapshot(contentSnapshot(revision, {
+				status: 'working',
+				presentationLabel: `L${i}`,
+				currentActivity: `Activity ${i}: ${filler.slice(0, Math.min(len, 90))}`,
+				latestShortMessage: `msg-${i}-${filler}`,
+				recentActions: [
+					{ id: 'A', label: `Step A ${i % 3}`, at: 1 },
+					{ id: 'B', label: `Step B ${filler.slice(0, 20)}`, at: 2 },
+				],
+			}));
+			revision++;
+			if ((i + 1) % 20 === 0) {
+				await drainMain(native, 1);
+			}
+		}
+		await drainMain(native, 4);
+		const after = native.getDiagnostics();
+		const animDelta = (Number(after.animationCount) || 0) - baseline.animationCount;
+		const geoDelta = (Number(after.geometryTransitionCount) || 0) - (baseline.geometryTransitionCount || 0);
+		if (animDelta !== 0) {
+			throw new Error(`varying-length content storm must keep animDelta=0, got ${animDelta}`);
+		}
+		if (geoDelta !== 0) {
+			throw new Error(`varying-length content storm must keep geoDelta=0, got ${geoDelta}`);
+		}
+		assertContentOnlyStable(after, baseline, {
+			expectedState: baseline.activePresentationState,
+			expectedTarget: baseline.targetPresentationState,
+		});
+		if (geoSigBefore && after.geometrySignature && geoSigBefore !== after.geometrySignature) {
+			throw new Error(`geometrySignature must stay pinned across content-only text updates (${geoSigBefore} → ${after.geometrySignature})`);
+		}
+		if (composerBefore && isValidDiagFrame(after.composerFrame) && !framesEqualWithin(composerBefore, after.composerFrame, 1.5)) {
+			throw new Error(`composerFrame must not move during content-only storm`);
+		}
+		if (openBefore && isValidDiagFrame(after.openButtonFrame) && !framesEqualWithin(openBefore, after.openButtonFrame, 1.5)) {
+			throw new Error(`openButtonFrame must not move during content-only storm`);
+		}
+		if (pinBefore && isValidDiagFrame(after.pinButtonFrame) && !framesEqualWithin(pinBefore, after.pinButtonFrame, 1.5)) {
+			throw new Error(`pinButtonFrame must not move during content-only storm`);
+		}
+		if (scrollBefore && isValidDiagFrame(after.contentScrollFrame) && !framesEqualWithin(scrollBefore, after.contentScrollFrame, 1.5)) {
+			throw new Error(`contentScrollFrame must stay fixed across content-only length variation`);
+		}
+		if (after.contentScrollEnabled === true && isValidDiagFrame(after.contentViewport) && isValidDiagFrame(after.contentScrollFrame)) {
+			if (!framesClose(after.contentViewport, after.contentScrollFrame, 0.5)) {
+				throw new Error('after storm, contentViewport must still equal contentScrollFrame');
+			}
+		}
+		test37.details = {
+			animDelta,
+			geoDelta,
+			geometrySignature: after.geometrySignature,
+			updates: 100,
+			composerStable: !!composerBefore,
+			scrollStable: !!scrollBefore,
+		};
+	} catch (err) {
+		test37.ok = false;
+		test37.error = err.message;
+		results.failures.push(`content-storm-varying-length-geometry-stable: ${err.message}`);
+	}
+	results.tests.push(test37);
+
+	// Test 38: Approval pending must not paint under Approve/Deny — meaningful gutter + activity/actions hidden
+	const test38 = { name: 'approval-pending-gutter-and-no-activity-under-controls', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(16_000, {
+			status: 'attention',
+			presentationLabel: 'Approval needed',
+			currentActivity: 'THIS ACTIVITY MUST NOT RENDER UNDER APPROVE',
+			latestShortMessage: 'THIS LATEST MESSAGE MUST NOT RENDER UNDER DENY',
+			recentActions: [
+				{ id: 'A', label: 'Hidden under pending', at: 1 },
+				{ id: 'B', label: 'Also hidden', at: 2 },
+				{ id: 'C', label: 'Still hidden', at: 3 },
+			],
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'gutter-appr',
+				title: 'Approve destructive write?',
+				message: 'This removes unused helpers and cannot be undone. Pending copy must keep a real gutter above Approve/Deny.',
+			},
+		}));
+		await sleep(120);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 4);
+		const diag = native.getDiagnostics();
+		const overlap = assertTextDoesNotPaintUnderControls(diag, { requireApprove: true });
+		if (overlap.skipped && overlap.reason === 'viewport-too-shallow') {
+			test38.details = { skipped: true, reason: overlap.reason };
+		} else {
+			const approveGutter = assertMeaningfulContentControlGutter(diag, diag.approveButtonFrame, { label: 'approve', minGutter: 6 });
+			const deny = diag.denyButtonFrame;
+			if (isValidDiagFrame(deny)) {
+				assertMeaningfulContentControlGutter(diag, deny, { label: 'deny', minGutter: 6 });
+			}
+			// Pending primary: activity/action log must not paint (frames null/hidden).
+			if (isValidDiagFrame(diag.activityFrame)) {
+				throw new Error('approval pending must hide activityFrame so text cannot paint under Approve/Deny');
+			}
+			const actionFrames = (diag.actionFrames || []).filter(isValidDiagFrame);
+			if (actionFrames.length > 0) {
+				throw new Error(`approval pending must hide action log rows, got ${actionFrames.length} frames`);
+			}
+			if (Array.isArray(diag.actionRowIds) && diag.actionRowIds.filter(Boolean).length > 0) {
+				throw new Error(`approval pending must clear actionRowIds, got ${JSON.stringify(diag.actionRowIds)}`);
+			}
+			if (isValidDiagFrame(diag.pendingMessageFrame) && isValidDiagFrame(diag.approveButtonFrame)) {
+				const converted = documentFrameInContainer(diag, diag.pendingMessageFrame);
+				const scrollBottom = frameBottom(diag.contentScrollFrame);
+				const visibleBottom = Math.min(frameBottom(converted), scrollBottom);
+				const gap = diag.approveButtonFrame.y - visibleBottom;
+				if (!(gap >= 6 - 0.5)) {
+					throw new Error(`pendingMessage→Approve gap must be meaningful (>=6), got ${gap}`);
+				}
+			}
+			test38.details = { overlap, approveGutter, contentFooterGutter: diag.contentFooterGutter };
+		}
+	} catch (err) {
+		test38.ok = false;
+		test38.error = err.message;
+		results.failures.push(`approval-pending-gutter-and-no-activity-under-controls: ${err.message}`);
+	}
+	results.tests.push(test38);
+
+	// Test 39: Question options must keep gutter from content viewport/scroll
+	const test39 = { name: 'question-options-gutter-from-content-viewport', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(16_100, {
+			status: 'attention',
+			presentationLabel: 'Needs input',
+			currentActivity: 'Should be hidden under question pending',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'gutter-q',
+				title: 'Which deployment lane?',
+				message: 'Options must sit below the content viewport with a real gutter, not flush-1px.',
+				options: [
+					{ id: 'dev', label: 'Development' },
+					{ id: 'staging', label: 'Staging' },
+					{ id: 'prod', label: 'Production' },
+				],
+			},
+		}));
+		await sleep(120);
+		await drainMain(native, 3);
+		native.simulateAction('interactive');
+		await sleep(150);
+		await drainMain(native, 4);
+		const diag = native.getDiagnostics();
+		const frames = (diag.optionButtonFrames || []).filter(isValidDiagFrame);
+		const viewportH = Number(diag.contentViewport?.height) || 0;
+		if (frames.length < 3 || viewportH < 24) {
+			if (viewportH >= 24 && frames.length < 3) {
+				throw new Error(`expected ≥3 option frames, got ${frames.length}`);
+			}
+			test39.details = { skipped: true, count: frames.length, viewportH };
+		} else {
+			const optionTop = Math.min(...frames.map(f => f.y));
+			const scroll = diag.contentScrollFrame;
+			const viewport = diag.contentViewport;
+			if (!framesClose(viewport, scroll, 0.5)) {
+				throw new Error('question interactive contentViewport must equal contentScrollFrame');
+			}
+			const scrollBottom = frameBottom(scroll);
+			const gutter = optionTop - scrollBottom;
+			const declared = Number(diag.contentFooterGutter) || 10;
+			if (gutter < -0.5) {
+				throw new Error(`option chips overlap content scroll host (gutter=${gutter}, optionTop=${optionTop}, scrollBottom=${scrollBottom}) — footerReserve/min-scroll must leave room for option rows`);
+			}
+			if (!(gutter >= Math.min(6, declared - 2) - 0.5)) {
+				throw new Error(`option chips must keep gutter from content viewport (gutter=${gutter}, declared=${declared}, optionTop=${optionTop}, scrollBottom=${scrollBottom})`);
+			}
+			const optionLayout = assertTwoColOptionLayout(diag);
+			if (isValidDiagFrame(diag.activityFrame)) {
+				throw new Error('question pending must hide activityFrame (pending is primary)');
+			}
+			test39.details = { gutter, declared, optionLayout, optionTop, scrollBottom };
+		}
+	} catch (err) {
+		test39.ok = false;
+		test39.error = err.message;
+		results.failures.push(`question-options-gutter-from-content-viewport: ${err.message}`);
+	}
+	results.tests.push(test39);
 
 	native.dispose();
 

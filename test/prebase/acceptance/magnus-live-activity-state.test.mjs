@@ -247,8 +247,8 @@ assert.ok(medium > short);
 assert.ok(longH >= medium);
 assert.ok(longPending > longH || longPending > medium);
 assert.ok(longOptions > medium);
-assert.ok(short < 164 - 20, 'short working content must leave headroom below expanded max');
-assert.ok(longOptions <= 164);
+assert.ok(short < 192 - 20, 'short working content must leave headroom below expanded max');
+assert.ok(longOptions <= 192);
 `;
 
 	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
@@ -273,7 +273,7 @@ import {
 } from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
 
 assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, 72);
-assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 164);
+assert.equal(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 192);
 assert.equal(LIVE_ACTIVITY_EXPANDED_WIDTH_PAD, 28);
 assert.equal(LIVE_ACTIVITY_WING_WIDTH_DEFAULT, 64);
 assert.equal(LIVE_ACTIVITY_WING_WIDTH, 64);
@@ -293,7 +293,7 @@ assert.equal(computeLiveActivityWingWidth(200), 64);
 test('native source keeps natural expanded width + truthful Approve/Deny in-flight titles', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	assert.match(native, /kExpandedHeightMin = 72/);
-	assert.match(native, /kExpandedHeightMax = 164/);
+	assert.match(native, /kExpandedHeightMax = 192/);
 	assert.match(native, /kExpandedWidthPad = 28/);
 	assert.match(native, /kStableCompactLeftWing = 64/);
 	assert.match(native, /computeExpandedWidth:/);
@@ -349,4 +349,80 @@ assert.equal(redactLiveActivityText('password: "supersecret12345"'), 'password=[
 		encoding: 'utf8',
 	});
 	assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+test('bridge preserves recentActions id/at/status and caps to max actions', () => {
+	const script = `
+import assert from 'node:assert/strict';
+import {
+	LIVE_ACTIVITY_MAX_ACTIONS,
+	buildMagnusLiveActivitySnapshot,
+} from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
+
+const session = {
+	sessionId: 'sess-actions',
+	sessionResource: 'vscode-chat://local/sess-actions',
+	startedAt: 1000,
+	title: 'Action identity',
+	isInProgress: true,
+	currentActivity: 'Working',
+	recentActions: [
+		{ id: 'A', label: 'Read file', at: 1100, status: 'passed' },
+		{ id: 'B', label: 'Edit file', at: 1200, status: 'running' },
+		{ id: 'C', label: 'Run test', at: 1300 },
+		{ id: 'D', label: 'Ship', at: 1400, status: 'other' },
+		{ id: 'E', label: 'Extra', at: 1500, status: 'failed' },
+	],
+};
+
+const snap = buildMagnusLiveActivitySnapshot(session, { revision: 9, prebaseForeground: false, connected: true });
+assert.equal(snap.recentActions.length, LIVE_ACTIVITY_MAX_ACTIONS);
+assert.deepEqual(
+	snap.recentActions.map(a => ({ id: a.id, at: a.at, status: a.status })),
+	[
+		{ id: 'B', at: 1200, status: 'running' },
+		{ id: 'C', at: 1300, status: undefined },
+		{ id: 'D', at: 1400, status: 'other' },
+		{ id: 'E', at: 1500, status: 'failed' },
+	],
+);
+assert.ok(snap.recentActions.every(a => typeof a.id === 'string' && a.id.length > 0));
+assert.ok(snap.recentActions.every(a => typeof a.label === 'string' && a.label.length > 0));
+`;
+
+	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+});
+
+test('native notch polish contracts: optical shoulder, true viewport, action id reconcile, footer gutter', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	assert.match(native, /kOpticalShoulderInsetMin = 8/);
+	assert.match(native, /kOpticalShoulderInsetMax = 12/);
+	assert.match(native, /kContentFooterGutter = 10/);
+	assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
+	assert.match(native, /shapeMaskLayer/);
+	assert.match(native, /dict\[@"contentViewport"\] = RectDict\(scrollFrame\)/);
+	assert.match(native, /dict\[@"contentScrollFrame"\] = RectDict\(scrollFrame\)/);
+	assert.match(native, /dict\[@"silhouetteMetrics"\]/);
+	assert.match(native, /nonDegenerateShoulder/);
+	assert.match(native, /opticalTopInset/);
+	assert.match(native, /effShoulderR/);
+	assert.match(native, /dict\[@"actionRowIds"\]/);
+	assert.match(native, /dict\[@"geometrySignature"\]/);
+	assert.match(native, /reconcileActionRowsIntoDocument/);
+	assert.match(native, /@"id": actionId/);
+	assert.match(native, /Approval\/question: pending is primary/);
+	assert.match(native, /Same semantic layout: reuse pinned height/);
+
+	const contribution = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
+	assert.match(contribution, /_actionLedger/);
+	assert.match(contribution, /existing\?\.at \?\? Date\.now\(\)/);
+	assert.match(contribution, /store\.set\(id, \{ id, label: redactLiveActivityText\(label\), at, status \}\)/);
+
+	const ts = readFileSync(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'), 'utf8');
+	assert.match(ts, /readonly status\?: 'running' \| 'passed' \| 'failed' \| 'other'/);
+	assert.match(ts, /\.\.\.\(action\.status \? \{ status: action\.status \} : \{\}\)/);
 });

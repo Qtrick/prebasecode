@@ -229,6 +229,24 @@ function captureNativePanelScreenshot(panelFrame, screenFrame, outPath) {
 				rect: { x: captureX, y: captureY, width: captureW, height: captureH },
 			};
 		} catch (captureErr) {
+			// Rect capture can fail on Retina / multi-display coordinate spaces.
+			// Fall back to a full-display capture so visual acceptance still has real pixels.
+			try {
+				execSync(`screencapture -x "${outPath}"`, { timeout: 8000, stdio: 'pipe' });
+				const stat = statSync(outPath);
+				if (stat.size > 0 && isPngValid(outPath)) {
+					return {
+						captured: true,
+						format: 'png',
+						sizeBytes: stat.size,
+						rect: { x: captureX, y: captureY, width: captureW, height: captureH },
+						fallback: 'full-display',
+						outPath,
+					};
+				}
+			} catch {
+				// continue to svg geometry artifact below
+			}
 			// Screencapture CLI is unavailable or blocked by macOS TCC permissions in background terminal;
 			// Write geometry artifact to .svg extension without faking .png format
 			const svgPath = outPath.replace(/\.png$/, '.svg');

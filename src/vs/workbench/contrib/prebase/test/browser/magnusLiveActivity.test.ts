@@ -547,6 +547,28 @@ suite('Magnus Live Activity projection', () => {
 		assert.ok(!snap.pendingInteraction?.message.includes('hunter2'));
 	});
 
+	test('snapshot preserves action identity fields including optional status', () => {
+		const snap = buildMagnusLiveActivitySnapshot(session({
+			recentActions: [
+				{ id: 'A', label: 'Read graphEditor.ts', at: 1_100, status: 'passed' },
+				{ id: 'B', label: 'Edit layout.ts', at: 1_200, status: 'running' },
+				{ id: 'C', label: 'token=should-redact', at: 1_300, status: 'failed' },
+			],
+		}), { revision: 7, prebaseForeground: false, connected: true });
+		assert.strictEqual(snap.recentActions.length, 3);
+		assert.deepStrictEqual(
+			snap.recentActions.map(a => ({ id: a.id, at: a.at, status: a.status })),
+			[
+				{ id: 'A', at: 1_100, status: 'passed' },
+				{ id: 'B', at: 1_200, status: 'running' },
+				{ id: 'C', at: 1_300, status: 'failed' },
+			],
+		);
+		assert.ok(snap.recentActions.every(a => typeof a.id === 'string' && a.id.length > 0));
+		assert.ok(!snap.recentActions[2].label.includes('token=should-redact'));
+		assert.match(snap.recentActions[2].label, /\[redacted\]/);
+	});
+
 	test('screen lock hides details while keeping session identity', () => {
 		const snap = buildMagnusLiveActivitySnapshot(session({
 			latestShortMessage: 'token=abc123xyz',
@@ -914,7 +936,7 @@ suite('Magnus Live Activity path topology compatibility (P0)', () => {
 		// geometric parameter variation only (body depth, shoulder radius).
 		//
 		// Collapsed state: body depth = 0, shoulder radius = 0
-		// Expanded state: body depth > 0, shoulder radius = 12
+		// Expanded state: body depth > 0, optical shoulder inset + effShoulderR >= 10
 		//
 		// Both paths share this topology:
 		// 1. Move to top-left
@@ -1733,6 +1755,20 @@ suite('Magnus Live Activity contribution contracts', () => {
 		assert.strictEqual((session.match(/sendRequest\(/g) || []).length, 1, 'sendRequest is the only message path');
 	});
 
+	test('contribution action ledger preserves stable at timestamps and ids across label updates', () => {
+		const contribution = readRepo('src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts');
+		assert.match(contribution, /_actionLedger/);
+		assert.match(contribution, /actionLedger/);
+		const extractStart = contribution.indexOf('function extractActions(');
+		assert.ok(extractStart > 0, 'extractActions must exist');
+		const extract = contribution.slice(extractStart, extractStart + 1600);
+		assert.match(extract, /existing\?\.at \?\? Date\.now\(\)/);
+		assert.match(extract, /store\.set\(id, \{ id, label: redactLiveActivityText\(label\), at, status \}\)/);
+		assert.match(extract, /LIVE_ACTIVITY_MAX_ACTIONS/);
+		assert.match(extract, /sort\(\(a, b\) => a\.at - b\.at\)/);
+		assert.match(extract, /toolCallId/);
+	});
+
 	test('approvals confirm the same tool invocation and do not invoke tools', () => {
 		const session = readSessionCommandDispatch(readSessionModule());
 		assert.match(session, /IChatToolInvocation\.confirmWith\(/);
@@ -2102,7 +2138,7 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 	test('TS geometry constants stay aligned with native height/width/wing model', () => {
 		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, 72);
-		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 164);
+		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, 192);
 		assert.strictEqual(LIVE_ACTIVITY_EXPANDED_WIDTH_PAD, 28);
 		assert.strictEqual(LIVE_ACTIVITY_WING_WIDTH_DEFAULT, 64);
 		assert.strictEqual(LIVE_ACTIVITY_WING_WIDTH, 64);
@@ -2201,7 +2237,7 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /computeTargetContentHeight:/);
 		assert.match(native, /kExpandedHeightMin = 72/);
-		assert.match(native, /kExpandedHeightMax = 164/);
+		assert.match(native, /kExpandedHeightMax = 192/);
 		assert.match(native, /kExpandedWidthPad = 28/);
 		assert.match(native, /computeExpandedWidth:/);
 		assert.match(native, /pendingTitle/);
@@ -2231,9 +2267,38 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(native, /statusBadge/);
 	});
 
-	test('native uses optical black fill to eliminate ghosting behind camera housing', () => {
+	test('native uses true black fill to merge with physical camera housing', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
-		assert.match(native, /colorWithCalibratedWhite:0\.035 alpha:0\.99/);
+		assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
+		assert.match(native, /kOpticalShoulderInsetMin/);
+		assert.match(native, /kOpticalShoulderInsetMax/);
+		assert.match(native, /shapeMaskLayer/);
+		assert.match(native, /geometrySignature/);
+		assert.match(native, /actionRowIds/);
+		assert.match(native, /kContentFooterGutter/);
+		assert.match(native, /reconcileActionRowsIntoDocument/);
+		assert.match(native, /nonDegenerateShoulder/);
+		assert.match(native, /opticalTopInset/);
+		assert.match(native, /effShoulderR/);
+	});
+
+	test('native contentViewport diagnostics equal the real scroll frame and pending hides action log', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /Authoritative viewport = actual scroll host/);
+		assert.match(native, /dict\[@"contentViewport"\] = RectDict\(scrollFrame\)/);
+		assert.match(native, /dict\[@"contentScrollFrame"\] = RectDict\(scrollFrame\)/);
+		assert.match(native, /dict\[@"contentFooterGutter"\] = @\(kContentFooterGutter\)/);
+		assert.match(native, /dict\[@"silhouetteMetrics"\]/);
+		assert.match(native, /dict\[@"actionRowIds"\]/);
+		assert.match(native, /dict\[@"geometrySignature"\]/);
+		// Pending primary: do not fight with activity/action log under Approve/Deny.
+		assert.match(native, /Approval\/question: pending is primary/);
+		assert.match(native, /if \(!hasPending\) \{/);
+		assert.match(native, /Reconcile action rows by stable id/);
+		assert.match(native, /Preserve visible slot order when ids still present/);
+		// Geometry signature pins interactive height across content-only text updates.
+		assert.match(native, /Same semantic layout: reuse pinned height/);
+		assert.match(native, /pinnedInteractiveHeight/);
 	});
 
 	test('native integrates NSHapticFeedbackManager on user-initiated actions with exactly-once guard', () => {
@@ -2596,6 +2661,11 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		for (const key of [
 			'contentViewport',
 			'contentSafeViewport',
+			'contentScrollFrame',
+			'contentFooterGutter',
+			'silhouetteMetrics',
+			'actionRowIds',
+			'geometrySignature',
 			'headerFrame',
 			'activityFrame',
 			'composerFrame',

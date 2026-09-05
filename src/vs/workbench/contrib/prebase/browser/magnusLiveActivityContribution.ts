@@ -43,6 +43,7 @@ import {
 	deriveMagnusTestStateFromInvocations,
 	isMagnusParticipantId,
 	LIVE_ACTIVITY_COMPLETED_HOLD_MS,
+	LIVE_ACTIVITY_MAX_ACTIONS,
 	redactLiveActivityText,
 	selectPrimaryMagnusSession,
 	canonicalizeLiveActivityPanelState,
@@ -113,19 +114,35 @@ function toolInvocationState(invocation: IChatToolInvocation): 'running' | 'pass
 	return 'other';
 }
 
-function extractActions(request: IChatRequestModel | undefined): MagnusLiveActivityAction[] {
+function extractActions(request: IChatRequestModel | undefined, ledger?: Map<string, MagnusLiveActivityAction>): MagnusLiveActivityAction[] {
 	const parts = request?.response?.entireResponse.value ?? [];
-	const actions: MagnusLiveActivityAction[] = [];
+	const store = ledger ?? new Map<string, MagnusLiveActivityAction>();
+	let fallbackIndex = 0;
 	for (const part of parts) {
 		if (part.kind === 'toolInvocation') {
 			const invocation = part as IChatToolInvocation;
 			const label = asPlainText(invocation.pastTenseMessage) || asPlainText(invocation.invocationMessage);
-			if (label) {
-				actions.push({ id: invocation.toolCallId, label: redactLiveActivityText(label), at: Date.now() });
+			if (!label) {
+				continue;
 			}
+			const id = invocation.toolCallId || `tool-${fallbackIndex++}`;
+			const status = toolInvocationState(invocation);
+			const existing = store.get(id);
+			const at = existing?.at ?? Date.now();
+			store.set(id, { id, label: redactLiveActivityText(label), at, status });
 		}
 	}
-	return actions.slice(-4);
+	// Session ledger: keep bounded recent history, update in place, preserve chronological order.
+	const ordered = [...store.values()]
+		.sort((a, b) => a.at - b.at)
+		.slice(-LIVE_ACTIVITY_MAX_ACTIONS);
+	if (ledger) {
+		ledger.clear();
+		for (const action of ordered) {
+			ledger.set(action.id, action);
+		}
+	}
+	return ordered;
 }
 
 function extractCurrentActivity(request: IChatRequestModel | undefined): string | undefined {
@@ -235,6 +252,7 @@ function extractSessionInput(
 	deps: {
 		terminalChat?: ITerminalChatService;
 		risk?: { isDestructive(toolId: string, parameters: unknown): boolean };
+		actionLedger?: Map<string, MagnusLiveActivityAction>;
 	} = {},
 ): MagnusLiveActivitySessionInput | undefined {
 	if (!model) {
@@ -262,7 +280,7 @@ function extractSessionInput(
 		isInProgress: model.requestInProgress.get() || model.hasActiveRequest.get(),
 		needsInput: Boolean(model.requestNeedsInput.get() || pending),
 		currentActivity: extractCurrentActivity(last),
-		recentActions: extractActions(last),
+		recentActions: extractActions(last, deps.actionLedger),
 		latestShortMessage: extractLatestShortMessage(last),
 		completed,
 		failed: Boolean(failed || last?.response?.isCanceled),
@@ -307,6 +325,8 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	private _completionHidden = false;
 	private _visualFixtureHoldUntil = 0;
 	private _lastSnapshot: MagnusLiveActivitySnapshot | undefined;
+	private _actionLedgerSessionId: string | undefined;
+	private readonly _actionLedger = new Map<string, MagnusLiveActivityAction>();
 	private readonly _modelListeners = this._register(new DisposableStore());
 	private readonly _push: RunOnceScheduler;
 	private readonly _completionTimer: RunOnceScheduler;
@@ -491,9 +511,15 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		const model = selectPrimaryMagnusModel(this.chatService.chatModels.get());
 		this._revision += 1;
 		const userHideDetails = Boolean(this.configurationService.getValue<boolean>('prebase.magnus.liveActivity.hideDetails'));
+		const sessionId = model?.sessionId;
+		if (sessionId !== this._actionLedgerSessionId) {
+			this._actionLedger.clear();
+			this._actionLedgerSessionId = sessionId;
+		}
 		const snapshot = buildMagnusLiveActivitySnapshot(extractSessionInput(model, {
 			terminalChat: this.terminalChatService,
 			risk: { isDestructive: (toolId, parameters) => this._isDestructive(toolId, parameters) },
+			actionLedger: this._actionLedger,
 		}), {
 			revision: this._revision,
 			prebaseForeground: this.hostService.hasFocus,

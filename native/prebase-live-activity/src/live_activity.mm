@@ -21,20 +21,26 @@ static const CGFloat kBootstrapPanelHeight = kCollapsedHeight;
 static const CGFloat kPillCornerRadius = 16;
 static const CGFloat kShoulderRadius = 22;
 static const CGFloat kBottomCornerRadius = 18;
+/** Minimum optical top inset for expanded natural-width shoulders (no panel widen). */
+static const CGFloat kOpticalShoulderInsetMin = 8;
+static const CGFloat kOpticalShoulderInsetMax = 12;
 /** Extra horizontal inset so text clears curved shoulders (path-aware safe region). */
 static const CGFloat kContentSafeExtraX = 6;
+/** Mandatory gutter between scroll content and footer controls (pt). */
+static const CGFloat kContentFooterGutter = 10;
 
 /** Content layout tokens — measured stacking with reserved footer. */
 static const CGFloat kContentInsetX = 16;
 static const CGFloat kContentInsetTop = 5;
-static const CGFloat kContentGap = 3;
-static const CGFloat kHeaderRowHeight = 15;
+static const CGFloat kContentGap = 4;
+static const CGFloat kHeaderRowHeight = 16;
 static const CGFloat kFooterReserved = 30;
-static const CGFloat kControlHeight = 22;
-static const CGFloat kIconControlSize = 22;
+static const CGFloat kControlHeight = 24;
+static const CGFloat kIconControlSize = 24;
 static const CGFloat kComposerCornerRadius = 7;
+static const CGFloat kActionRowHeight = 15;
 /** Max is an overflow guard; natural height is content-measured (never the default). */
-static const CGFloat kExpandedHeightMax = 164;
+static const CGFloat kExpandedHeightMax = 192;
 static const CGFloat kExpandedHeightMin = 72;
 /** Only widen past the natural notch span when option rows need horizontal room. */
 static const CGFloat kExpandedWidthPad = 28;
@@ -239,6 +245,46 @@ static BOOL ValidatePathTopology(CGPathRef path1, CGPathRef path2) {
 	return YES;
 }
 
+/** Shared shoulder metrics for path construction + diagnostics (single source of truth). */
+typedef struct {
+	CGFloat wingLeftX;
+	CGFloat wingRightX;
+	CGFloat flare;
+	CGFloat opticalInset;
+	CGFloat effShoulderR;
+} SilhouetteShoulderMetrics;
+
+static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
+	CGFloat totalW,
+	CGFloat depth,
+	CGFloat leftW,
+	CGFloat rightW,
+	CGFloat housingW,
+	BOOL isExpanded)
+{
+	SilhouetteShoulderMetrics metrics = {};
+	CGFloat notchLeft = (totalW - housingW) * 0.5;
+	CGFloat notchRight = notchLeft + housingW;
+	CGFloat naturalLeft = MAX(0.0, notchLeft - leftW);
+	CGFloat naturalRight = MIN(totalW, notchRight + rightW);
+	metrics.wingLeftX = (!isExpanded) ? 0.0 : naturalLeft;
+	metrics.wingRightX = (!isExpanded) ? totalW : naturalRight;
+	CGFloat flareL = MAX(0.0, metrics.wingLeftX);
+	CGFloat flareR = MAX(0.0, totalW - metrics.wingRightX);
+	metrics.flare = MAX(flareL, flareR);
+	if (isExpanded && depth > 0.5) {
+		if (metrics.flare < 0.5) {
+			// Optical shoulder within natural width — no panel widen, no square top corners.
+			metrics.opticalInset = MIN(kOpticalShoulderInsetMax, MAX(kOpticalShoulderInsetMin, depth * 0.12));
+			metrics.wingLeftX = metrics.opticalInset;
+			metrics.wingRightX = totalW - metrics.opticalInset;
+			metrics.flare = metrics.opticalInset;
+		}
+		metrics.effShoulderR = MIN(kShoulderRadius, MAX(10.0, metrics.flare * 0.85 + depth * 0.18));
+	}
+	return metrics;
+}
+
 static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
                                         CGFloat currentH,
                                         CGFloat leftW,
@@ -270,30 +316,19 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	// TOPOLOGY-COMPATIBLE SINGLE CONTINUOUS CONTOUR
 	// Exactly 1 subpath, 14 elements (1 MoveTo, 8 LineTo, 4 CurveTo, 1 CloseSubpath)
-	// Prefer matching top span to totalW (no flare) — forced widening creates shoulder kinks.
-	// When a flare is required, use long vertical-tangent S-curves (Dynamic Island continuity).
+	// Expanded natural width keeps panel span, but insets the TOP edge so shoulders have
+	// real lateral curvature (physical notch corners are never perfectly vertical).
+	// Option-pad widenings add extra flare; collapsed/peek keep full-width top span.
 	CGFloat depth = MAX(0.0, currentH - bandH);
 	CGFloat effBottomR = MIN(kBottomCornerRadius, currentH * 0.42);
 	CGFloat kBottom = effBottomR * (1.0 - kKappa);
 
-	// Geometry anchors: notch negative space and compact wings
 	CGFloat notchLeft = (totalW - housingW) * 0.5;
 	CGFloat notchRight = notchLeft + housingW;
-	CGFloat naturalLeft = MAX(0.0, notchLeft - leftW);
-	CGFloat naturalRight = MIN(totalW, notchRight + rightW);
-	// Collapsed/peek: top span == totalW. Expanded: keep natural notch span at y=0 when possible.
-	CGFloat wingLeftX = (!isExpanded) ? 0.0 : naturalLeft;
-	CGFloat wingRightX = (!isExpanded) ? totalW : naturalRight;
-	CGFloat flareL = MAX(0.0, wingLeftX - 0.0);
-	CGFloat flareR = MAX(0.0, totalW - wingRightX);
-	CGFloat flare = MAX(flareL, flareR);
-	CGFloat effShoulderR = 0.0;
-	if (isExpanded && depth > 0.5) {
-		// Soft continuous shoulder — scale with flare so tiny widenings don't look polygonal.
-		effShoulderR = flare > 0.5
-			? MIN(kShoulderRadius, MAX(10.0, flare * 0.85 + depth * 0.18))
-			: MIN(8.0, depth * 0.22);
-	}
+	SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(totalW, depth, leftW, rightW, housingW, isExpanded);
+	CGFloat wingLeftX = shoulder.wingLeftX;
+	CGFloat wingRightX = shoulder.wingRightX;
+	CGFloat effShoulderR = shoulder.effShoulderR;
 
 	// 0. Move to top-left of left wing (wingLeftX, 0)
 	CGPathMoveToPoint(path, NULL, wingLeftX, 0);
@@ -365,6 +400,7 @@ static NSString *JSString(Napi::Value value) {
 
 @interface PrebaseLiveActivityView : NSView
 @property (nonatomic, strong) CAShapeLayer *shapeLayer;
+@property (nonatomic, strong) CAShapeLayer *shapeMaskLayer;
 @property (nonatomic, strong) NSView *compactContainer;
 @property (nonatomic, strong) NSView *expandedContainer;
 @property (nonatomic, strong) NSScrollView *contentScrollView;
@@ -378,6 +414,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) NSTextField *activityDescription;
 @property (nonatomic, strong) NSTextField *latestMessageLabel;
 @property (nonatomic, strong) NSMutableArray<NSTextField *> *actionLabels;
+@property (nonatomic, strong) NSMutableArray<NSString *> *actionRowIds;
 @property (nonatomic, strong) NSTextField *pendingInteractionTitle;
 @property (nonatomic, strong) NSTextField *pendingInteractionMessage;
 @property (nonatomic, strong) NSTextField *expandedMetricsLabel;
@@ -388,7 +425,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, copy) NSString *metricsLabel;
 @property (nonatomic, copy) NSString *pendingTitle;
 @property (nonatomic, copy) NSString *pendingMessage;
-@property (nonatomic, copy) NSArray<NSString *> *actions;
+/** Stable action rows: @{ @"id": NSString, @"label": NSString, @"at": NSNumber? } */
+@property (nonatomic, copy) NSArray<NSDictionary *> *actions;
 @property (nonatomic, copy) NSString *status;
 @property (nonatomic, assign) BOOL expanded;
 @property (nonatomic, assign) BOOL targetExpanded;  // Explicit semantic target state
@@ -465,6 +503,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) NSUInteger orderFrontCount;
 @property (nonatomic, assign) double lastRenderedRevision;
 @property (nonatomic, copy) NSString *lastTransitionReason;
+@property (nonatomic, copy) NSString *lastGeometrySignature;
+@property (nonatomic, assign) CGFloat pinnedInteractiveHeight;
 @property (nonatomic, assign) BOOL transitionInFlight;
 @property (nonatomic, assign) NSUInteger transitionGeneration;
 /** Invalidates in-flight window-frame completion handlers without counting as a morph. */
@@ -525,12 +565,19 @@ static NSString *JSString(Napi::Value value) {
 		self.layerContentsRedrawPolicy = NSViewLayerContentsRedrawNever;
 
 		_shapeLayer = [CAShapeLayer layer];
-		_shapeLayer.fillColor = [NSColor colorWithCalibratedWhite:0.035 alpha:0.99].CGColor;
+		// True black merges with the physical camera housing (Sapphire-compatible baseline).
+		_shapeLayer.fillColor = [NSColor colorWithCalibratedWhite:0.0 alpha:1.0].CGColor;
 		_shapeLayer.strokeColor = nil;
 		_shapeLayer.lineWidth = 0;
 		// Explicitly synchronize shape layer geometry to content view bounds
 		_shapeLayer.frame = self.bounds;
 		[self.layer addSublayer:_shapeLayer];
+
+		// Silhouette mask — rectangular masksToBounds is not enough for curved shoulders.
+		_shapeMaskLayer = [CAShapeLayer layer];
+		_shapeMaskLayer.fillColor = [NSColor blackColor].CGColor;
+		_shapeMaskLayer.frame = self.bounds;
+		self.layer.mask = _shapeMaskLayer;
 
 		_compactContainer = [[PrebaseFlippedView alloc] initWithFrame:self.bounds];
 		_compactContainer.wantsLayer = YES;
@@ -572,7 +619,7 @@ static NSString *JSString(Napi::Value value) {
 		[_expandedContainer addSubview:_contentScrollView];
 
 		_activityDescription = [self makeLabel:11.5 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.90 alpha:1.0]];
-		[self configureLabel:_activityDescription lines:3 truncating:YES];
+		[self configureLabel:_activityDescription lines:2 truncating:YES];
 		[_contentDocumentView addSubview:_activityDescription];
 
 		_latestMessageLabel = [self makeLabel:11 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.78 alpha:1.0]];
@@ -581,9 +628,12 @@ static NSString *JSString(Napi::Value value) {
 		[_contentDocumentView addSubview:_latestMessageLabel];
 
 		_actionLabels = [NSMutableArray array];
+		_actionRowIds = [NSMutableArray array];
 		for (NSInteger i = 0; i < 3; i++) {
-			NSTextField *bullet = [self makeLabel:10.5 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.70 alpha:1.0]];
+			NSTextField *bullet = [self makeLabel:11.5 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.78 alpha:1.0]];
+			[self configureLabel:bullet lines:1 truncating:YES];
 			[_actionLabels addObject:bullet];
+			[_actionRowIds addObject:@""];
 			[_contentDocumentView addSubview:bullet];
 		}
 
@@ -606,6 +656,7 @@ static NSString *JSString(Napi::Value value) {
 	[super setFrameSize:newSize];
 	if (!self.controller.transitionInFlight) {
 		self.shapeLayer.frame = self.bounds;
+		self.shapeMaskLayer.frame = self.bounds;
 	}
 }
 
@@ -690,14 +741,84 @@ static NSString *JSString(Napi::Value value) {
 	field.stringValue = text;
 	field.hidden = NO;
 	[self configureLabel:field lines:lines truncating:!allowOverflow];
-	CGFloat insetX = ContentSafeInsetX(*y, 0, contentMaxY + 40, self.notched);
-	field.frame = NSMakeRect(insetX + indent, *y, MAX(24, fieldW - (insetX - kContentInsetX)), need);
-	*y += need + kContentGap;
+	// Document Y ≈ body-local content Y for inset purposes (header already consumed above scroll).
+	CGFloat bodyHeight = MAX(40, NSHeight(self.expandedContainer.bounds));
+	CGFloat insetX = ContentSafeInsetX(*y + kHeaderRowHeight, self.safeAreaTop, bodyHeight, self.notched);
+	field.frame = NSMakeRect(insetX + indent, *y, MAX(24, fieldW - (insetX - kContentInsetX)), MAX(need, lines == 1 ? kActionRowHeight : need));
+	*y += MAX(need, lines == 1 ? kActionRowHeight : need) + kContentGap;
 	return YES;
 }
 
 - (BOOL)placeContentBlock:(NSTextField *)field text:(NSString *)text lines:(NSInteger)lines indent:(CGFloat)indent contentW:(CGFloat)contentW y:(CGFloat *)y contentMaxY:(CGFloat)contentMaxY {
 	return [self placeContentBlock:field text:text lines:lines indent:indent contentW:contentW y:y contentMaxY:contentMaxY allowOverflow:NO];
+}
+
+/** Reconcile action rows by stable id — update labels in place, never reshuffle existing rows. */
+- (void)reconcileActionRowsIntoDocument:(CGFloat *)docY contentW:(CGFloat)docContentW ok:(BOOL *)ok {
+	if (!ok || !*ok) {
+		return;
+	}
+	NSArray<NSDictionary *> *incoming = self.actions ?: @[];
+	NSInteger slotCount = MIN(3, (NSInteger)self.actionLabels.count);
+	NSMutableArray<NSString *> *prevIds = [self.actionRowIds mutableCopy] ?: [NSMutableArray array];
+	while ((NSInteger)prevIds.count < slotCount) {
+		[prevIds addObject:@""];
+	}
+
+	NSMutableArray<NSDictionary *> *ordered = [NSMutableArray array];
+	NSMutableSet *used = [NSMutableSet set];
+	// Preserve visible slot order when ids still present.
+	for (NSInteger i = 0; i < slotCount; i++) {
+		NSString *prev = prevIds[i];
+		if (prev.length == 0) {
+			continue;
+		}
+		for (NSDictionary *item in incoming) {
+			NSString *aid = [item[@"id"] isKindOfClass:[NSString class]] ? item[@"id"] : @"";
+			if (aid.length && [aid isEqualToString:prev] && ![used containsObject:aid]) {
+				[ordered addObject:item];
+				[used addObject:aid];
+				break;
+			}
+		}
+	}
+	// Append new actions (newest last), then take the trailing slotCount.
+	for (NSDictionary *item in incoming) {
+		NSString *aid = [item[@"id"] isKindOfClass:[NSString class]] ? item[@"id"] : @"";
+		NSString *label = [item[@"label"] isKindOfClass:[NSString class]] ? item[@"label"] : @"";
+		if (label.length == 0) {
+			continue;
+		}
+		if (aid.length && [used containsObject:aid]) {
+			continue;
+		}
+		if (aid.length) {
+			[used addObject:aid];
+		}
+		[ordered addObject:item];
+	}
+	while ((NSInteger)ordered.count > slotCount) {
+		[ordered removeObjectAtIndex:0];
+	}
+
+	for (NSInteger i = 0; i < slotCount; i++) {
+		if (i >= (NSInteger)ordered.count) {
+			self.actionLabels[i].hidden = YES;
+			self.actionLabels[i].accessibilityLabel = @"";
+			self.actionRowIds[i] = @"";
+			continue;
+		}
+		NSDictionary *item = ordered[i];
+		NSString *aid = [item[@"id"] isKindOfClass:[NSString class]] ? item[@"id"] : [NSString stringWithFormat:@"idx-%ld", (long)i];
+		NSString *label = [item[@"label"] isKindOfClass:[NSString class]] ? item[@"label"] : @"";
+		self.actionRowIds[i] = aid;
+		self.actionLabels[i].accessibilityLabel = label;
+		NSString *bullet = [NSString stringWithFormat:@"•  %@", label];
+		*ok = [self placeContentBlock:self.actionLabels[i] text:bullet lines:1 indent:2 contentW:docContentW y:docY contentMaxY:10000 allowOverflow:YES];
+		if (!*ok) {
+			break;
+		}
+	}
 }
 
 - (BOOL)isFlipped { return YES; }
@@ -850,11 +971,9 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat bodyHeight = MAX(0, currentH - bandH);
 	// Always trust the live control-stack measurement so the scroll viewport
 	// never paints under Deny/Approve/composer (sibling overlap clips glyphs).
-	// Do NOT shrink footer by a %-of-body cap — that reintroduces button overlap
-	// when option rows + composer are dense.
 	CGFloat measuredFooter = self.controller
-		? [self.controller computeControlsStackHeight] + 10
-		: kFooterReserved + 10;
+		? [self.controller computeControlsStackHeight] + kContentFooterGutter
+		: kFooterReserved + kContentFooterGutter;
 	CGFloat footerReserve = MAX(self.reservedFooterHeight, measuredFooter);
 	if (footerReserve > bodyHeight - 28) {
 		footerReserve = MAX(measuredFooter, MIN(footerReserve, MAX(0, bodyHeight - 28)));
@@ -886,7 +1005,9 @@ static NSString *JSString(Napi::Value value) {
 	y += kHeaderRowHeight + kContentGap;
 
 	CGFloat scrollTop = y;
-	CGFloat scrollHeight = MAX(24, bodyHeight - footerReserve - scrollTop);
+	// Never force a minimum scroll height that invades the footer/option stack.
+	CGFloat availableScroll = bodyHeight - footerReserve - scrollTop;
+	CGFloat scrollHeight = MAX(0, availableScroll);
 	self.contentScrollView.frame = NSMakeRect(0, scrollTop, totalW, scrollHeight);
 
 	self.activityDescription.hidden = YES;
@@ -894,8 +1015,9 @@ static NSString *JSString(Napi::Value value) {
 	self.pendingInteractionTitle.hidden = YES;
 	self.pendingInteractionMessage.hidden = YES;
 	self.expandedMetricsLabel.hidden = YES;
-	for (NSTextField *bullet in self.actionLabels) {
-		bullet.hidden = YES;
+	// Hide labels only — keep actionRowIds so reconcile can preserve slot identity.
+	for (NSInteger i = 0; i < (NSInteger)self.actionLabels.count; i++) {
+		self.actionLabels[i].hidden = YES;
 	}
 
 	// Document-local stacking with overflow allowed (scroll handles excess).
@@ -908,21 +1030,26 @@ static NSString *JSString(Napi::Value value) {
 		ok = [self placeContentBlock:self.pendingInteractionTitle text:self.pendingTitle lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
 	}
 	if (ok && self.pendingMessage.length) {
-		ok = [self placeContentBlock:self.pendingInteractionMessage text:self.pendingMessage lines:4 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+		ok = [self placeContentBlock:self.pendingInteractionMessage text:self.pendingMessage lines:3 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
 	}
-	if (ok && self.activityLabel.length) {
-		ok = [self placeContentBlock:self.activityDescription text:self.activityLabel lines:3 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
-	}
-	if (ok && self.latestMessage.length) {
-		ok = [self placeContentBlock:self.latestMessageLabel text:self.latestMessage lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
-	}
-	NSInteger actionCount = MIN((NSInteger)self.actions.count, 3);
-	for (NSInteger i = 0; ok && i < actionCount; i++) {
-		NSString *bullet = [NSString stringWithFormat:@"•  %@", self.actions[i]];
-		ok = [self placeContentBlock:self.actionLabels[i] text:bullet lines:1 indent:2 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
-	}
-	if (ok && self.metricsLabel.length && !hasPending) {
-		[self placeContentBlock:self.expandedMetricsLabel text:self.metricsLabel lines:1 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+	// Approval/question: pending is primary — do not fight with activity/action log.
+	if (!hasPending) {
+		if (ok && self.activityLabel.length) {
+			ok = [self placeContentBlock:self.activityDescription text:self.activityLabel lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+		}
+		// Notch summarizes — only show latestShortMessage when there is no current activity.
+		if (ok && self.latestMessage.length && self.activityLabel.length == 0) {
+			ok = [self placeContentBlock:self.latestMessageLabel text:self.latestMessage lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+		}
+		[self reconcileActionRowsIntoDocument:&docY contentW:docContentW ok:&ok];
+		if (ok && self.metricsLabel.length) {
+			[self placeContentBlock:self.expandedMetricsLabel text:self.metricsLabel lines:1 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+		}
+	} else {
+		// Pending owns the scroll document — clear action identity so diagnostics stay truthful.
+		for (NSInteger i = 0; i < (NSInteger)self.actionRowIds.count; i++) {
+			self.actionRowIds[i] = @"";
+		}
 	}
 
 	CGFloat docH = MAX(scrollHeight, docY + 4);
@@ -948,8 +1075,8 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
 
 	CGColorRef fill = self.attention
-		? [NSColor colorWithCalibratedWhite:0.07 alpha:0.99].CGColor
-		: [NSColor colorWithCalibratedWhite:0.035 alpha:0.99].CGColor;
+		? [NSColor colorWithCalibratedWhite:0.02 alpha:1.0].CGColor
+		: [NSColor colorWithCalibratedWhite:0.0 alpha:1.0].CGColor;
 	self.shapeLayer.fillColor = fill;
 
 	if (!self.notched) {
@@ -965,7 +1092,7 @@ static NSString *JSString(Napi::Value value) {
 	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 	if (self.controller) {
-		self.reservedFooterHeight = [self.controller computeControlsStackHeight] + 10;
+		self.reservedFooterHeight = [self.controller computeControlsStackHeight] + kContentFooterGutter;
 	}
 	if (isExpanded) {
 		self.expandedContainer.hidden = NO;
@@ -1020,11 +1147,25 @@ static NSString *JSString(Napi::Value value) {
 		self.shapeLayer.path = targetPath;
 		self.shapeLayer.frame = targetFrame;
 		[CATransaction commit];
+
+		// Mask jumps to the target silhouette — keep it out of the CATransaction so
+		// completion (and transitionInFlight) cannot stall on a second layer.
+		[CATransaction begin];
+		[CATransaction setDisableActions:YES];
+		self.shapeMaskLayer.path = targetPath;
+		self.shapeMaskLayer.frame = targetFrame;
+		[self.shapeMaskLayer removeAnimationForKey:@"morphPath"];
+		[self.shapeMaskLayer removeAnimationForKey:@"morphFrame"];
+		[CATransaction commit];
 	} else {
 		self.shapeLayer.path = targetPath;
 		self.shapeLayer.frame = targetFrame;
+		self.shapeMaskLayer.path = targetPath;
+		self.shapeMaskLayer.frame = targetFrame;
 		[self.shapeLayer removeAnimationForKey:@"morphPath"];
 		[self.shapeLayer removeAnimationForKey:@"morphFrame"];
+		[self.shapeMaskLayer removeAnimationForKey:@"morphPath"];
+		[self.shapeMaskLayer removeAnimationForKey:@"morphFrame"];
 		self.controller.transitionInFlight = NO;
 	}
 	CGPathRelease(targetPath);
@@ -1353,7 +1494,7 @@ static NSString *JSString(Napi::Value value) {
 	self.contentOnlyUpdateCount++;
 	self.lastTransitionReason = @"content";
 	// Never snap shape/alpha or cancel morphPath — content updates must not interrupt geometry.
-	self.content.reservedFooterHeight = [self computeControlsStackHeight] + 8;
+	self.content.reservedFooterHeight = [self computeControlsStackHeight] + kContentFooterGutter;
 	// Always refresh control chrome. Mid-morph, target lastRequestedFrame so pending
 	// options/approvals are not deferred until a stale completion handler runs.
 	if (self.panel) {
@@ -1372,6 +1513,14 @@ static NSString *JSString(Napi::Value value) {
 		[self layoutControls:layoutWin];
 		[self.content refreshContentSubviewsPreservingPresentation];
 		[self layoutControls:layoutWin];
+		// If the panel has reached the requested frame (or the morph budget elapsed),
+		// clear transitionInFlight so content-only settle diagnostics stay truthful.
+		NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+		if (self.transitionInFlight
+			&& (now >= self.transitionEndTime
+				|| [self framesEffectivelyEqual:self.panel.frame to:self.lastRequestedFrame])) {
+			self.transitionInFlight = NO;
+		}
 	} else {
 		[self.content refreshContentSubviewsPreservingPresentation];
 	}
@@ -1405,7 +1554,7 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat h = 7; // bottom safe pad under composer
 	h += kControlHeight + 7; // composer row
 	if (hasApproval) {
-		h += kControlHeight + 6;
+		h += kControlHeight + kContentFooterGutter;
 	}
 	if (hasOptions) {
 		NSInteger totalOpts = (NSInteger)self.pendingOptions.count;
@@ -1415,21 +1564,55 @@ static NSString *JSString(Napi::Value value) {
 		if (totalOpts > 4) {
 			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
 		}
-		h += rows * (kControlHeight + 4) + 4;
+		h += rows * (kControlHeight + 4) + kContentFooterGutter;
 	}
 	return h;
+}
+
+/** Geometry signature — excludes activity/message/action label text. */
+- (NSString *)geometrySignatureForBandH:(CGFloat)bandH {
+	BOOL expanded = self.content.expanded || self.pinned;
+	BOOL peek = self.content.peekOnly || self.attentionPeek;
+	NSInteger optionCount = [self.pendingKind isEqualToString:@"question"] ? (NSInteger)self.pendingOptions.count : 0;
+	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
+	return [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;kind=%@;opts=%ld;appr=%d;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
+		expanded ? 1 : 0,
+		peek ? 1 : 0,
+		self.pinned ? 1 : 0,
+		self.content.attention ? 1 : 0,
+		self.pendingKind ?: @"",
+		(long)optionCount,
+		hasApproval ? 1 : 0,
+		bandH,
+		self.content.notched ? 1 : 0,
+		self.content.housingWidth,
+		self.content.leftWingWidth,
+		self.content.rightWingWidth];
 }
 
 - (CGFloat)computeTargetContentHeight:(CGFloat)bandH {
 	BOOL expanded = self.content.expanded || self.pinned;
 	if (!expanded) {
+		self.pinnedInteractiveHeight = 0;
+		self.lastGeometrySignature = [self geometrySignatureForBandH:bandH];
 		return bandH;
 	}
 	// Peek / attentionPeek: fixed body height — message length must not reflow geometry.
 	if ((self.content.peekOnly || self.attentionPeek) && !self.pinned) {
+		self.pinnedInteractiveHeight = 0;
+		self.lastGeometrySignature = [self geometrySignatureForBandH:bandH];
 		return bandH + kPeekBodyHeight;
 	}
-	// Measured natural height: estimate with MeasureTextHeight against expanded content width.
+
+	NSString *signature = [self geometrySignatureForBandH:bandH];
+	// Same semantic layout: reuse pinned height so text/elapsed/action labels cannot morph geometry.
+	if (self.pinnedInteractiveHeight >= kExpandedHeightMin
+		&& self.lastGeometrySignature.length
+		&& [self.lastGeometrySignature isEqualToString:signature]) {
+		return self.pinnedInteractiveHeight;
+	}
+
+	// Measured natural height for a NEW geometry signature only.
 	CGFloat naturalW = MAX(kStableCompactLeftWing + kCameraHousingMin + kStableCompactRightWing,
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
@@ -1444,34 +1627,34 @@ static NSString *JSString(Napi::Value value) {
 	NSFont *pendingMsgFont = self.content.pendingInteractionMessage.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
 	NSFont *activityFont = self.content.activityDescription.font ?: [NSFont systemFontOfSize:11.5 weight:NSFontWeightMedium];
 	NSFont *messageFont = self.content.latestMessageLabel.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
-	NSFont *actionFont = (self.content.actionLabels.count > 0 && self.content.actionLabels[0].font)
-		? self.content.actionLabels[0].font
-		: [NSFont systemFontOfSize:10.5 weight:NSFontWeightRegular];
 
+	BOOL hasPending = self.content.pendingTitle.length > 0 || self.content.pendingMessage.length > 0;
 	if (self.content.pendingTitle.length) {
 		h += MeasureTextHeight(self.content.pendingTitle, pendingTitleFont, contentW, 2) + kContentGap;
 	}
 	if (self.content.pendingMessage.length) {
-		h += MeasureTextHeight(self.content.pendingMessage, pendingMsgFont, contentW, 4) + kContentGap;
+		h += MeasureTextHeight(self.content.pendingMessage, pendingMsgFont, contentW, 3) + kContentGap;
 	}
-	if (self.content.activityLabel.length) {
-		h += MeasureTextHeight(self.content.activityLabel, activityFont, contentW, 3) + kContentGap;
-	}
-	if (self.content.latestMessage.length) {
-		h += MeasureTextHeight(self.content.latestMessage, messageFont, contentW, 2) + kContentGap;
-	}
-	NSInteger actionCount = MIN((NSInteger)self.content.actions.count, 3);
-	for (NSInteger i = 0; i < actionCount; i++) {
-		NSString *bullet = [NSString stringWithFormat:@"•  %@", self.content.actions[i]];
-		h += MeasureTextHeight(bullet, actionFont, contentW - 2, 1) + kContentGap;
-	}
-	if (self.content.metricsLabel.length && !self.content.pendingTitle.length) {
-		h += 14 + kContentGap;
+	if (!hasPending) {
+		// Working surface: activity OR latest message (not both) + fixed action-row budget.
+		if (self.content.activityLabel.length) {
+			h += MeasureTextHeight(self.content.activityLabel, activityFont, contentW, 2) + kContentGap;
+		} else if (self.content.latestMessage.length) {
+			h += MeasureTextHeight(self.content.latestMessage, messageFont, contentW, 2) + kContentGap;
+		}
+		NSInteger actionCount = MIN((NSInteger)self.content.actions.count, 3);
+		h += actionCount * (kActionRowHeight + kContentGap);
+		if (self.content.metricsLabel.length) {
+			h += 14 + kContentGap;
+		}
 	}
 	h += [self computeControlsStackHeight];
+	h += kContentFooterGutter;
 	h += 8; // Bottom corner inset
-	// Natural height clamped: max is overflow guard (scroll handles excess content).
-	return MIN(kExpandedHeightMax, MAX(kExpandedHeightMin, h));
+	CGFloat target = MIN(kExpandedHeightMax, MAX(kExpandedHeightMin, h));
+	self.pinnedInteractiveHeight = target;
+	self.lastGeometrySignature = signature;
+	return target;
 }
 
 - (void)layoutForScreen {
@@ -1512,6 +1695,8 @@ static NSString *JSString(Napi::Value value) {
 			if (self.panel) {
 				[self refreshContentOnly];
 			}
+			// Target geometry unchanged — drop stale morph flag so content settles are observable.
+			self.transitionInFlight = NO;
 			return;
 		}
 		if (forceMorph || !frameUnchanged) {
@@ -1590,6 +1775,8 @@ static NSString *JSString(Napi::Value value) {
 	// Identical geometry: content refresh only.
 	if (frameUnchanged && !forceMorph) {
 		[self refreshContentOnly];
+		// Target geometry unchanged — drop stale morph flag so content settles are observable.
+		self.transitionInFlight = NO;
 		return;
 	}
 
@@ -1625,7 +1812,10 @@ static NSString *JSString(Napi::Value value) {
 		} completionHandler:^{
 			// Delay control layout until frame animation completes to prevent visible popping
 			if (generation == self.transitionGeneration) {
-				[self layoutControls:self.panel ? self.panel.frame : win];
+				NSRect settled = self.panel ? self.panel.frame : win;
+				[self layoutControls:settled];
+				[self.content refreshContentSubviewsPreservingPresentation];
+				[self layoutControls:settled];
 			}
 		}];
 	}
@@ -1721,7 +1911,7 @@ static NSString *JSString(Napi::Value value) {
 		}
 		self.denyButton.frame = NSMakeRect(footerInset, bottomY, denyW, kControlHeight);
 		self.approveButton.frame = NSMakeRect(footerInset + denyW + gap, bottomY, approveW, kControlHeight);
-		bottomY -= (kControlHeight + 6);
+		bottomY -= (kControlHeight + kContentFooterGutter);
 	}
 
 	if (question && showAttention) {
@@ -2311,21 +2501,51 @@ static NSString *JSString(Napi::Value value) {
 			bodyH = MAX(bodyH, MAX(0, NSHeight(pf) - bandH));
 		}
 		NSRect expandedLocal = NSMakeRect(0, 0, bodyW, bodyH);
-		CGFloat footerReserve = MIN(MAX(0, self.content.reservedFooterHeight), MAX(0, bodyH * 0.55));
-		CGFloat textHeight = MAX(0, bodyH - footerReserve);
 		dict[@"bodyBounds"] = RectDict(expandedLocal);
-		dict[@"contentViewport"] = RectDict(NSMakeRect(0, 0, bodyW, textHeight));
-		{
-			// Silhouette-aware safe content region (not just rectangular viewport).
+		// Authoritative viewport = actual scroll host when interactive; never a parallel heuristic.
+		if (self.content.contentScrollView && !self.content.contentScrollView.hidden) {
+			NSRect scrollFrame = self.content.contentScrollView.frame;
+			dict[@"contentViewport"] = RectDict(scrollFrame);
+			dict[@"contentScrollFrame"] = RectDict(scrollFrame);
+			dict[@"contentDocumentHeight"] = @(NSHeight(self.content.contentDocumentView.frame));
+			dict[@"contentScrollOffset"] = @(self.content.contentScrollView.documentVisibleRect.origin.y);
 			CGFloat safeInset = kContentInsetX + kContentSafeExtraX;
-			CGFloat safeW = MAX(0, bodyW - safeInset * 2);
-			CGFloat safeH = MAX(0, textHeight - kContentInsetTop);
-			dict[@"contentSafeViewport"] = RectDict(NSMakeRect(safeInset, kContentInsetTop, safeW, safeH));
-			dict[@"contentScrollEnabled"] = @(self.content.contentScrollView != nil && !self.content.contentScrollView.hidden);
-			if (self.content.contentScrollView && !self.content.contentScrollView.hidden) {
-				dict[@"contentScrollFrame"] = RectDict(self.content.contentScrollView.frame);
-				dict[@"contentDocumentHeight"] = @(NSHeight(self.content.contentDocumentView.frame));
-			}
+			dict[@"contentSafeViewport"] = RectDict(NSMakeRect(
+				safeInset,
+				NSMinY(scrollFrame),
+				MAX(0, bodyW - safeInset * 2),
+				MAX(0, NSHeight(scrollFrame))));
+			dict[@"footerTopY"] = @(NSMaxY(scrollFrame) + kContentFooterGutter);
+		} else {
+			CGFloat footerReserve = MAX(0, self.content.reservedFooterHeight);
+			CGFloat textHeight = MAX(0, bodyH - footerReserve);
+			dict[@"contentViewport"] = RectDict(NSMakeRect(0, 0, bodyW, textHeight));
+			CGFloat safeInset = kContentInsetX + kContentSafeExtraX;
+			dict[@"contentSafeViewport"] = RectDict(NSMakeRect(safeInset, kContentInsetTop, MAX(0, bodyW - safeInset * 2), MAX(0, textHeight - kContentInsetTop)));
+			dict[@"footerTopY"] = @(textHeight);
+		}
+		dict[@"contentScrollEnabled"] = @(self.content.contentScrollView != nil && !self.content.contentScrollView.hidden);
+		dict[@"contentFooterGutter"] = @(kContentFooterGutter);
+		{
+			// Silhouette curvature metrics — same helper as CreateNotchedIslandPath.
+			CGFloat leftW = self.content.leftWingWidth > 0 ? self.content.leftWingWidth : kWingWidthMin;
+			CGFloat rightW = self.content.rightWingWidth > 0 ? self.content.rightWingWidth : kWingWidthMin;
+			CGFloat housing = self.content.housingWidth > 0 ? self.content.housingWidth : kCameraHousingMin;
+			CGFloat depth = MAX(0, bodyH);
+			BOOL expanded = self.content.targetExpanded;
+			SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(bodyW, depth, leftW, rightW, housing, expanded);
+			dict[@"silhouetteMetrics"] = @{
+				@"opticalTopInset": @(shoulder.opticalInset),
+				@"shoulderFlare": @(shoulder.flare),
+				@"effShoulderR": @(shoulder.effShoulderR),
+				@"topLeftX": @(shoulder.wingLeftX),
+				@"topRightX": @(shoulder.wingRightX),
+				@"panelWidth": @(bodyW),
+				@"bodyDepth": @(depth),
+				@"nonDegenerateShoulder": @((expanded && depth > 0.5)
+					? (shoulder.flare >= kOpticalShoulderInsetMin - 0.5 && shoulder.effShoulderR >= 10.0)
+					: YES)
+			};
 		}
 		dict[@"headerFrame"] = self.content.headerTitle.hidden ? [NSNull null] : RectDict(self.content.headerTitle.frame);
 		dict[@"statusBadgeFrame"] = self.content.statusBadge.hidden ? [NSNull null] : RectDict(self.content.statusBadge.frame);
@@ -2339,12 +2559,17 @@ static NSString *JSString(Napi::Value value) {
 		dict[@"approveButtonFrame"] = self.approveButton.hidden ? [NSNull null] : RectDict(self.approveButton.frame);
 		dict[@"denyButtonFrame"] = self.denyButton.hidden ? [NSNull null] : RectDict(self.denyButton.frame);
 		NSMutableArray *actionFrames = [NSMutableArray array];
-		for (NSTextField *lbl in self.content.actionLabels) {
+		NSMutableArray *actionIds = [NSMutableArray array];
+		for (NSInteger i = 0; i < (NSInteger)self.content.actionLabels.count; i++) {
+			NSTextField *lbl = self.content.actionLabels[i];
 			if (!lbl.hidden) {
 				[actionFrames addObject:RectDict(lbl.frame)];
+				NSString *aid = (i < (NSInteger)self.content.actionRowIds.count) ? self.content.actionRowIds[i] : @"";
+				[actionIds addObject:aid ?: @""];
 			}
 		}
 		dict[@"actionFrames"] = actionFrames;
+		dict[@"actionRowIds"] = actionIds;
 		NSMutableArray *optionFrames = [NSMutableArray array];
 		for (NSButton *btn in self.optionButtons) {
 			if (!btn.hidden) {
@@ -2361,6 +2586,8 @@ static NSString *JSString(Napi::Value value) {
 				@"width": @(pb.size.width),
 				@"height": @(pb.size.height)
 			};
+			dict[@"shapeMaskSynced"] = @(self.content.shapeMaskLayer.path != nil
+				&& CGPathEqualToPath(self.content.shapeMaskLayer.path, self.content.shapeLayer.path));
 		}
 	}
 	NSInteger visibleOptions = 0;
@@ -2394,6 +2621,8 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"geometryTransitionCount"] = @(self.geometryTransitionCount);
 	dict[@"contentOnlyUpdateCount"] = @(self.contentOnlyUpdateCount);
 	dict[@"contentRefreshCount"] = @(self.contentOnlyUpdateCount);
+	dict[@"geometrySignature"] = self.lastGeometrySignature ?: @"";
+	dict[@"pinnedInteractiveHeight"] = @(self.pinnedInteractiveHeight);
 	dict[@"orderFrontCount"] = @(self.orderFrontCount);
 	dict[@"lastRenderedRevision"] = @(self.lastRenderedRevision);
 	dict[@"revision"] = @(self.revision);
@@ -2936,7 +3165,36 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 		for (uint32_t i = 0; i < arr.Length() && i < 4; i++) {
 			Napi::Value item = arr.Get(i);
 			if (item.IsObject()) {
-				[actions addObject:JSString(item.As<Napi::Object>().Get("label"))];
+				Napi::Object obj = item.As<Napi::Object>();
+				NSString *actionId = JSString(obj.Get("id"));
+				NSString *label = JSString(obj.Get("label"));
+				if (label.length == 0) {
+					continue;
+				}
+				if (actionId.length == 0) {
+					actionId = [NSString stringWithFormat:@"action-%u", i];
+				}
+				NSMutableDictionary *entry = [NSMutableDictionary dictionaryWithDictionary:@{
+					@"id": actionId,
+					@"label": label
+				}];
+				if (obj.Get("at").IsNumber()) {
+					entry[@"at"] = @(obj.Get("at").As<Napi::Number>().DoubleValue());
+				}
+				NSString *status = JSString(obj.Get("status"));
+				if (status.length) {
+					entry[@"status"] = status;
+				}
+				[actions addObject:entry];
+			} else if (item.IsString()) {
+				// Legacy string-only bridge — synthesize a stable index id.
+				NSString *label = JSString(item);
+				if (label.length) {
+					[actions addObject:@{
+						@"id": [NSString stringWithFormat:@"legacy-%u", i],
+						@"label": label
+					}];
+				}
 			}
 		}
 	}

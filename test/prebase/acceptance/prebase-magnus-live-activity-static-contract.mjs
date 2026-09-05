@@ -156,8 +156,42 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		|| !native.includes('dict[@"activityFrame"]')
 		|| !native.includes('dict[@"composerFrame"]')
 		|| !native.includes('dict[@"approveButtonFrame"]')
-		|| !native.includes('dict[@"optionButtonFrames"]')) {
-		failures.push('native diagnostics must expose layout containment frames (contentViewport + contentSafeViewport + contentPopulated + control frames)');
+		|| !native.includes('dict[@"optionButtonFrames"]')
+		|| !native.includes('dict[@"silhouetteMetrics"]')
+		|| !native.includes('dict[@"actionRowIds"]')
+		|| !native.includes('dict[@"geometrySignature"]')) {
+		failures.push('native diagnostics must expose layout containment frames (contentViewport + contentSafeViewport + contentPopulated + control frames + silhouetteMetrics + actionRowIds + geometrySignature)');
+	}
+	if (!native.includes('kOpticalShoulderInsetMin') || !native.includes('shapeMaskLayer') || !native.includes('colorWithCalibratedWhite:0.0 alpha:1.0')) {
+		failures.push('native must use optical shoulder inset + true-black fill + synchronized shape mask');
+	}
+	if (!native.includes('kContentFooterGutter') || !native.includes('dict[@"contentFooterGutter"]')) {
+		failures.push('native must expose contentFooterGutter diagnostic from kContentFooterGutter');
+	}
+	if (!native.includes('dict[@"contentViewport"] = RectDict(scrollFrame)')
+		|| !native.includes('dict[@"contentScrollFrame"] = RectDict(scrollFrame)')) {
+		failures.push('contentViewport must equal contentScrollFrame (actual scroll host, not a footer heuristic)');
+	}
+	if (!native.includes('Approval/question: pending is primary')
+		|| !native.includes('if (!hasPending) {')) {
+		failures.push('pending approval/question must hide activity/action log so text cannot paint under Deny/Approve');
+	}
+	if (!native.includes('reconcileActionRowsIntoDocument')
+		|| !native.includes('Preserve visible slot order when ids still present')) {
+		failures.push('native must reconcile action rows by stable id without reshuffling');
+	}
+	if (!native.includes('Same semantic layout: reuse pinned height')
+		|| !native.includes('pinnedInteractiveHeight')) {
+		failures.push('geometrySignature must pin interactive height so content-only text updates do not resize');
+	}
+	if (!native.includes('@"id": actionId') || !contribution.includes('actionLedger') || !contribution.includes('_actionLedger')) {
+		failures.push('action identity must survive TS ledger → NAPI bridge (id+label)');
+	}
+	if (!contribution.includes('existing?.at ?? Date.now()')) {
+		failures.push('action ledger must preserve stable at timestamps across label/status updates');
+	}
+	if (!/status\?:\s*'running'\s*\|\s*'passed'\s*\|\s*'failed'\s*\|\s*'other'/.test(magnusCommon)) {
+		failures.push('MagnusLiveActivityAction must expose optional status for bridge identity');
 	}
 	if (!native.includes('refreshContentSubviewsPreservingPresentationWithSize:')
 		|| !native.includes('populated first paint')) {
@@ -176,17 +210,17 @@ if (!native.includes('emit:@"dismissAttention"')) {
 			failures.push('computeExpandedWidth must return naturalW unless question has >2 options; must not force 320pt');
 		}
 		if (!/kExpandedHeightMin = 72/.test(native)
-			|| !/kExpandedHeightMax = 164/.test(native)
+			|| !/kExpandedHeightMax = 192/.test(native)
 			|| !/kExpandedWidthPad = 28/.test(native)
 			|| !/kStableCompactLeftWing = 64/.test(native)
 			|| !/kStableCompactRightWing = 64/.test(native)) {
-			failures.push('native geometry constants must stay at min=72 max=164 pad=28 stable wings=64');
+			failures.push('native geometry constants must stay at min=72 max=192 pad=28 stable wings=64');
 		}
 		if (!/LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72/.test(magnusCommon)
-			|| !/LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 164/.test(magnusCommon)
+			|| !/LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 192/.test(magnusCommon)
 			|| !/LIVE_ACTIVITY_EXPANDED_WIDTH_PAD = 28/.test(magnusCommon)
 			|| !/LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 64/.test(magnusCommon)) {
-			failures.push('TS magnusLiveActivity geometry constants must stay aligned with native (72/164/28/64)');
+			failures.push('TS magnusLiveActivity geometry constants must stay aligned with native (72/192/28/64)');
 		}
 		if (/MAX\(320/.test(native) || /kExpandedMinWidth\s*=\s*320/.test(native)) {
 			failures.push('native must not force a fixed 320pt expanded min width');
@@ -199,8 +233,9 @@ if (!native.includes('emit:@"dismissAttention"')) {
 				|| !/perRow = \(maxDirect >= 3\) \? 2/.test(stackFn)) {
 				failures.push('computeControlsStackHeight must match layoutControls (composer + approval + 2-col option rows)');
 			}
-			if (!native.includes('computeControlsStackHeight] + 10')) {
-				failures.push('scroll footerReserve must use max(reservedFooterHeight, computeControlsStackHeight+10)');
+			if (!native.includes('computeControlsStackHeight] + kContentFooterGutter')
+				&& !native.includes('computeControlsStackHeight] + 10')) {
+				failures.push('scroll footerReserve must use max(reservedFooterHeight, computeControlsStackHeight+kContentFooterGutter)');
 			}
 			const layoutStart = native.indexOf('- (void)layoutControls:(NSRect)win {');
 			const layoutBlock = layoutStart >= 0 ? native.slice(layoutStart, layoutStart + 5200) : '';
