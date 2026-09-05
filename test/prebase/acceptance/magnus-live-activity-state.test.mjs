@@ -493,3 +493,14 @@ test('native shape mask follows the same presentation-aware morph as the visible
 	assert.doesNotMatch(native, /Mask jumps to the target silhouette/,
 		'the mask cannot snap to target geometry while the visible shape is mid-morph');
 });
+
+test('native panel frame settles to lastRequestedFrame and resets scroll on new interactions', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	assert.match(native, /\[CATransaction setCompletionBlock:\^\{[\s\S]*?\[self\.controller\.panel setFrame:self\.controller\.lastRequestedFrame display:YES\]/,
+		'CATransaction completion block must synchronize the panel frame to lastRequestedFrame');
+	assert.match(native, /if \(!self\.transitionInFlight && self\.panel && !NSEqualRects\(self\.lastRequestedFrame, NSZeroRect\)\)[\s\S]*?\[self\.panel setFrame:self\.lastRequestedFrame display:YES\]/,
+		'settled diagnostics must guarantee panel frame matches lastRequestedFrame');
+	assert.match(native, /scrollToPoint:NSZeroPoint/,
+		'new pending interactions must reset scroll view to the top');
+});

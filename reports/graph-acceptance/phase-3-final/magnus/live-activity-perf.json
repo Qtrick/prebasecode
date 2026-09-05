@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "8034b0be1c61400b173d3371df3f5cd931080a27",
-  "sourceFingerprint": "a36976e8aa450bff36fc6787b469f462e72312516ad0b145193145d44f94a2b9",
-  "productFingerprint": "a36976e8aa450bff36fc6787b469f462e72312516ad0b145193145d44f94a2b9",
-  "generatedAt": "2026-09-05T17:52:07.208Z",
+  "sourceHead": "533356a733fdcde0369d5a76242bbf1221773c1c",
+  "sourceFingerprint": "3c479b085079c6b5535b75116929f58f19ee06f02873451335ac63265cc838ef",
+  "productFingerprint": "3c479b085079c6b5535b75116929f58f19ee06f02873451335ac63265cc838ef",
+  "generatedAt": "2026-09-05T19:37:51.967Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -226,7 +226,7 @@
           },
           "panelVisible": true,
           "hoverHapticCount": 0,
-          "windowNumber": 39517,
+          "windowNumber": 40763,
           "topAnchorDelta": 0,
           "collapsedHit": {
             "y": 948,
@@ -270,7 +270,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9714,
+        "durationRealCyclesMs": 9734,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -346,7 +346,7 @@
           },
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 39517,
+          "windowNumber": 40763,
           "openButtonFrame": {
             "y": 87,
             "x": 267,
@@ -439,7 +439,7 @@
           "hoverDwellMs": 180,
           "lastNativeCommand": "",
           "pinnedInteractiveHeight": 152,
-          "transitionGeneration": 400,
+          "transitionGeneration": 200,
           "requestedFrame": {
             "y": 830,
             "x": 599,
@@ -486,7 +486,7 @@
           "actionRowIds": [
             "a99"
           ],
-          "contentRefreshCount": 302,
+          "contentRefreshCount": 303,
           "pendingTitleFrame": null,
           "geometryTransitionCount": 201,
           "pinButtonVisible": true,
@@ -515,7 +515,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 360,
+        "durationRetargetMs": 357,
         "diagRetarget": {
           "approveButtonAccessibilityLabel": "Approve",
           "lastTransitionReason": "geometry",
@@ -601,7 +601,7 @@
             "width": 269,
             "height": 14
           },
-          "contentRefreshCount": 304,
+          "contentRefreshCount": 305,
           "pathTopologyCompatible": true,
           "denyButtonTitle": "Deny",
           "localMonitorInstalled": false,
@@ -627,10 +627,10 @@
           },
           "contentOnlyUpdateCount": 101,
           "panelFrame": {
-            "y": 830,
+            "y": 904,
             "x": 599,
             "width": 313,
-            "height": 152
+            "height": 78
           },
           "orderFrontCount": 1,
           "auxiliaryTopRightArea": {
@@ -659,7 +659,7 @@
           "screenLocalizedName": "Built-in Retina Display",
           "pendingContentFullyVisible": true,
           "targetPresentationState": "peek",
-          "transitionGeneration": 403,
+          "transitionGeneration": 201,
           "actionInFlight": false,
           "requestedFrame": {
             "y": 904,
@@ -671,7 +671,7 @@
           "statusBadgeFrame": null,
           "panelVisible": true,
           "hoverHapticCount": 0,
-          "windowNumber": 39517,
+          "windowNumber": 40763,
           "topAnchorDelta": 0,
           "collapsedHit": {
             "y": 948,
@@ -778,12 +778,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -330,
-        "heapUsedMb": 6.15,
-        "rssDiffKb": 46512,
-        "rssMb": 117.89,
-        "cpuDeltaUserMs": 1316841,
-        "cpuDeltaSystemMs": 273244
+        "heapDiffKb": -242,
+        "heapUsedMb": 6.16,
+        "rssDiffKb": 46304,
+        "rssMb": 116.89,
+        "cpuDeltaUserMs": 1707894,
+        "cpuDeltaSystemMs": 261963
       }
     },
     {
@@ -945,7 +945,7 @@
       "details": {
         "midMorphBefore": {
           "animationCount": 1,
-          "transitionGeneration": 2,
+          "transitionGeneration": 1,
           "transitionInFlight": true,
           "redrawCount": 2,
           "activePresentationState": "peek",
@@ -967,7 +967,7 @@
         "sawInFlightDuringContent": true,
         "midMorphAfter": {
           "animationCount": 1,
-          "transitionGeneration": 2,
+          "transitionGeneration": 1,
           "transitionInFlight": false,
           "redrawCount": 2,
           "activePresentationState": "peek",
@@ -989,7 +989,7 @@
         },
         "settled": {
           "animationCount": 1,
-          "transitionGeneration": 2,
+          "transitionGeneration": 1,
           "transitionInFlight": false,
           "redrawCount": 2,
           "activePresentationState": "peek",
@@ -1011,7 +1011,7 @@
         "interactiveDuring": {
           "before": {
             "animationCount": 2,
-            "transitionGeneration": 4,
+            "transitionGeneration": 2,
             "transitionInFlight": true,
             "redrawCount": 3,
             "activePresentationState": "interactive",
@@ -1032,7 +1032,7 @@
           },
           "after": {
             "animationCount": 2,
-            "transitionGeneration": 4,
+            "transitionGeneration": 2,
             "transitionInFlight": false,
             "redrawCount": 3,
             "activePresentationState": "interactive",
@@ -1083,7 +1083,7 @@
           "peekOnly": true,
           "localMonitorInstalled": false,
           "animationCount": 1,
-          "transitionGeneration": 2,
+          "transitionGeneration": 1,
           "frame": {
             "x": 599,
             "y": 904,
@@ -1116,7 +1116,7 @@
         "after": {
           "state": "interactive",
           "animationCount": 2,
-          "transitionGeneration": 4,
+          "transitionGeneration": 2,
           "frame": {
             "x": 599,
             "y": 831,
@@ -1150,7 +1150,7 @@
           "state": "pinned",
           "pinned": true,
           "animationCount": 3,
-          "transitionGeneration": 5,
+          "transitionGeneration": 2,
           "geometryTransitionCount": 4,
           "frame": {
             "x": 599,
@@ -1178,17 +1178,17 @@
         },
         "afterPeek": {
           "animationCount": 1,
-          "transitionGeneration": 2,
+          "transitionGeneration": 1,
           "state": "peek"
         },
         "afterInteractive": {
           "animationCount": 2,
-          "transitionGeneration": 4,
+          "transitionGeneration": 2,
           "state": "interactive"
         },
         "afterCompact": {
           "animationCount": 3,
-          "transitionGeneration": 6,
+          "transitionGeneration": 3,
           "state": "compact"
         },
         "afterAttentionPeek": {
@@ -1225,7 +1225,7 @@
           "pendingMessage": "Updated pending message 39",
           "renderedPendingMessage": "",
           "renderedPeekBody": "Choose lane",
-          "transitionGeneration": 2,
+          "transitionGeneration": 1,
           "frame": {
             "x": 599,
             "y": 904,
@@ -1334,11 +1334,11 @@
             "width": 313,
             "height": 151
           },
-          "transitionGeneration": 2
+          "transitionGeneration": 1
         },
         "contentGrowth": {
           "preGrowthHeight": 151,
-          "postGrowthHeight": 192,
+          "postGrowthHeight": 172,
           "questionButtonCount": 3
         }
       }
@@ -1350,7 +1350,7 @@
         "initialHaptics": 0,
         "finalHaptics": 0,
         "initialSessionToken": 0,
-        "finalSessionToken": 3,
+        "finalSessionToken": 4,
         "actionHapticsEmitted": 0
       }
     },
@@ -1402,7 +1402,7 @@
         },
         "question": {
           "ok": true,
-          "frameCount": 11,
+          "frameCount": 10,
           "viewport": {
             "x": 0,
             "y": 0,
@@ -1626,7 +1626,7 @@
             "height": 192,
             "containment": {
               "ok": true,
-              "frameCount": 11,
+              "frameCount": 10,
               "viewport": {
                 "x": 0,
                 "y": 0,
@@ -1776,8 +1776,7 @@
           "contentPopulated": true,
           "overlap": {
             "skipped": false,
-            "scrollBottom": 58,
-            "composerY": 127
+            "scrollBottom": 89
           },
           "optionLayout": {
             "skipped": false,
@@ -1785,25 +1784,25 @@
               2,
               1
             ],
-            "optionTop": 68,
-            "optionBottom": 120,
+            "optionTop": 99,
+            "optionBottom": 151,
             "count": 3
           },
           "optionButtonFrames": [
             {
-              "y": 68,
+              "y": 99,
               "x": 22,
               "width": 145,
               "height": 24
             },
             {
-              "y": 68,
+              "y": 99,
               "x": 173,
               "width": 145,
               "height": 24
             },
             {
-              "y": 96,
+              "y": 127,
               "x": 22,
               "width": 145,
               "height": 24
@@ -1818,8 +1817,8 @@
               2,
               2
             ],
-            "optionTop": 68,
-            "optionBottom": 120,
+            "optionTop": 79,
+            "optionBottom": 131,
             "count": 4
           }
         }
@@ -1938,12 +1937,12 @@
             2,
             1
           ],
-          "optionTop": 68,
-          "optionBottom": 120,
+          "optionTop": 92,
+          "optionBottom": 144,
           "count": 3
         },
-        "optionTop": 68,
-        "scrollBottom": 58
+        "optionTop": 92,
+        "scrollBottom": 82
       }
     }
   ],

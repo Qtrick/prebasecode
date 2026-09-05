@@ -238,7 +238,7 @@ if (!native.includes('emit:@"dismissAttention"')) {
 				failures.push('scroll footerReserve must use max(reservedFooterHeight, computeControlsStackHeight+kContentFooterGutter)');
 			}
 			const layoutStart = native.indexOf('- (void)layoutControls:(NSRect)win {');
-			const layoutBlock = layoutStart >= 0 ? native.slice(layoutStart, layoutStart + 5200) : '';
+			const layoutBlock = layoutStart >= 0 ? native.slice(layoutStart, layoutStart + 8000) : '';
 			if (!/perRow = \(maxDirect >= 3\) \? 2/.test(layoutBlock)
 				|| !/Prefer 2-column grids/.test(layoutBlock)) {
 				failures.push('layoutControls must use 2-column option grids when ≥3 options');

@@ -132,6 +132,32 @@ export function liveActivityLiveFailures(evidence) {
 			if (shot?.seed && shot.seed.ok === false) {
 				failures.push(`visual fixture seed failed: ${key}`);
 			}
+			if (shot?.native) {
+				if (shot.native.questionContentHealthy === false) {
+					failures.push(`visual fixture questionContentHealthy is false: ${key}`);
+				}
+				if (key === 'question') {
+					if (shot.native.pendingContentFullyVisible === false) {
+						failures.push('question visual fixture pendingContentFullyVisible is false');
+					}
+					if (shot.native.pendingMessageFullyVisible === false) {
+						failures.push('question visual fixture pendingMessageFullyVisible is false');
+					}
+				}
+				if (shot.native.shapeMaskSynced === false) {
+					failures.push(`visual fixture shapeMaskSynced is false: ${key}`);
+				}
+				if (shot.native.panelFrame && shot.native.requestedFrame) {
+					const dh = Math.abs(shot.native.panelFrame.height - shot.native.requestedFrame.height);
+					const dw = Math.abs(shot.native.panelFrame.width - shot.native.requestedFrame.width);
+					if (dh > 2) {
+						failures.push(`visual fixture ${key} panelFrame height (${shot.native.panelFrame.height}) differs from requestedFrame (${shot.native.requestedFrame.height})`);
+					}
+					if (dw > 2) {
+						failures.push(`visual fixture ${key} panelFrame width (${shot.native.panelFrame.width}) differs from requestedFrame (${shot.native.requestedFrame.width})`);
+					}
+				}
+			}
 		}
 		if (visual.layoutContainment && visual.layoutContainment.ok === false) {
 			failures.push(`layout containment failed: ${visual.layoutContainment.reason ?? 'overflow'}`);

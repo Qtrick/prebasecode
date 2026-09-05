@@ -650,8 +650,12 @@ static NSString *JSString(Napi::Value value) {
 - (void)setFrameSize:(NSSize)newSize {
 	[super setFrameSize:newSize];
 	if (!self.controller.transitionInFlight) {
-		self.shapeLayer.frame = self.bounds;
-		self.shapeMaskLayer.frame = self.bounds;
+		if (NSEqualRects(self.controller.lastRequestedFrame, NSZeroRect)
+			|| [self.controller framesEffectivelyEqual:NSMakeRect(0, 0, newSize.width, newSize.height)
+												    to:NSMakeRect(0, 0, self.controller.lastRequestedFrame.size.width, self.controller.lastRequestedFrame.size.height)]) {
+			self.shapeLayer.frame = self.bounds;
+			self.shapeMaskLayer.frame = self.bounds;
+		}
 	}
 }
 
@@ -1100,7 +1104,7 @@ static NSString *JSString(Napi::Value value) {
 		self.controller.animationCount++;
 		self.controller.transitionInFlight = YES;
 		self.controller.transitionEndTime = [NSDate timeIntervalSinceReferenceDate] + duration;
-		const NSUInteger currentGeneration = ++self.controller.transitionGeneration;
+		const NSUInteger currentGeneration = self.controller.transitionGeneration;
 
 		// Presentation-layer aware retargeting: sample current in-flight path & frame to avoid jumps
 		CAShapeLayer *presentation = (CAShapeLayer *)[self.shapeLayer presentationLayer];
@@ -1118,6 +1122,11 @@ static NSString *JSString(Napi::Value value) {
 			// This prevents stale animation completions from incorrectly marking newer transitions as finished
 			if (currentGeneration == self.controller.transitionGeneration) {
 				self.controller.transitionInFlight = NO;
+				self.shapeLayer.frame = targetFrame;
+				self.shapeMaskLayer.frame = targetFrame;
+				if (self.controller.panel && !NSEqualRects(self.controller.lastRequestedFrame, NSZeroRect)) {
+					[self.controller.panel setFrame:self.controller.lastRequestedFrame display:YES];
+				}
 			}
 		}];
 
@@ -1381,11 +1390,11 @@ static NSString *JSString(Napi::Value value) {
 	button.bezelStyle = NSBezelStyleInline;
 	button.bordered = NO;
 	button.wantsLayer = YES;
-	button.layer.cornerRadius = kIconControlSize * 0.42;
+	button.layer.cornerRadius = 6.0;
 	button.layer.masksToBounds = YES;
-	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.11 alpha:0.72].CGColor;
+	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.14 alpha:0.80].CGColor;
 	button.layer.borderWidth = 0.5;
-	button.layer.borderColor = [NSColor colorWithCalibratedWhite:0.30 alpha:0.28].CGColor;
+	button.layer.borderColor = [NSColor colorWithCalibratedWhite:0.32 alpha:0.35].CGColor;
 	button.target = self;
 	button.action = action;
 	button.hidden = YES;
@@ -1402,13 +1411,18 @@ static NSString *JSString(Napi::Value value) {
 	button.bezelStyle = NSBezelStyleInline;
 	button.bordered = NO;
 	button.wantsLayer = YES;
-	button.layer.cornerRadius = 11.0;
+	button.layer.cornerRadius = 8.0;
 	button.layer.masksToBounds = YES;
-	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.15 alpha:0.85].CGColor;
+	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.16 alpha:0.88].CGColor;
 	button.layer.borderWidth = 0.5;
-	button.layer.borderColor = [NSColor colorWithCalibratedWhite:0.28 alpha:0.4].CGColor;
+	button.layer.borderColor = [NSColor colorWithCalibratedWhite:0.32 alpha:0.40].CGColor;
 	button.font = [NSFont systemFontOfSize:11 weight:NSFontWeightMedium];
 	button.contentTintColor = [NSColor colorWithCalibratedWhite:0.92 alpha:1.0];
+	NSDictionary *attrs = @{
+		NSFontAttributeName: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+		NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0],
+	};
+	button.attributedTitle = [[NSAttributedString alloc] initWithString:title attributes:attrs];
 	button.target = self;
 	button.action = action;
 	button.hidden = YES;
@@ -1524,6 +1538,9 @@ static NSString *JSString(Napi::Value value) {
 			&& (now >= self.transitionEndTime
 				|| [self framesEffectivelyEqual:self.panel.frame to:self.lastRequestedFrame])) {
 			self.transitionInFlight = NO;
+			if (![self framesEffectivelyEqual:self.panel.frame to:self.lastRequestedFrame]) {
+				[self.panel setFrame:self.lastRequestedFrame display:YES];
+			}
 		}
 	} else {
 		[self.content refreshContentSubviewsPreservingPresentation];
@@ -1556,9 +1573,9 @@ static NSString *JSString(Napi::Value value) {
 	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
 	// Must match layoutControls bottom-up stack (composer + approval + option rows + pads).
 	CGFloat h = 7; // bottom safe pad under composer
-	h += kControlHeight + 7; // composer row (24 + 7pt top gap)
+	h += hasOptions ? 0 : (kControlHeight + 7); // composer row
 	if (hasApproval) {
-		h += kControlHeight; // approval buttons row (24)
+		h += kControlHeight; // approval buttons row
 	}
 	if (hasOptions) {
 		NSInteger totalOpts = (NSInteger)self.pendingOptions.count;
@@ -1806,9 +1823,11 @@ static NSString *JSString(Napi::Value value) {
 		// Shape morph uses transitionGeneration; frame completion uses
 		// layoutCompletionGeneration (bumped only on genuine geometry changes)
 		// so content-only updates do not cancel control finalization.
-		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES targetSize:win.size];
 		const NSUInteger generation = ++self.transitionGeneration;
 		self.layoutCompletionGeneration = generation;
+		self.transitionInFlight = YES;
+		self.transitionEndTime = [NSDate timeIntervalSinceReferenceDate] + animDuration;
+		[self.content updateShapeAndContentAnimated:YES duration:animDuration useTargetState:YES targetSize:win.size];
 		[NSAnimationContext runAnimationGroup:^(NSAnimationContext *context) {
 			context.duration = animDuration;
 			context.timingFunction = [CAMediaTimingFunction functionWithName:kCAMediaTimingFunctionEaseInEaseOut];
@@ -1817,6 +1836,12 @@ static NSString *JSString(Napi::Value value) {
 		} completionHandler:^{
 			// Delay control layout until frame animation completes to prevent visible popping
 			if (generation == self.transitionGeneration) {
+				if (self.panel) {
+					[self.panel setFrame:win display:YES];
+				}
+				self.transitionInFlight = NO;
+				self.content.shapeLayer.frame = CGRectMake(0, 0, win.size.width, win.size.height);
+				self.content.shapeMaskLayer.frame = CGRectMake(0, 0, win.size.width, win.size.height);
 				NSRect settled = self.panel ? self.panel.frame : win;
 				[self layoutControls:settled];
 				[self.content refreshContentSubviewsPreservingPresentation];
@@ -1831,6 +1856,10 @@ static NSString *JSString(Napi::Value value) {
 	BOOL approval = [self.pendingKind isEqualToString:@"approval"];
 	BOOL question = [self.pendingKind isEqualToString:@"question"];
 	BOOL showAttention = (self.content.expanded || self.pinned) && !self.content.peekOnly;
+	BOOL hasOptions = (question && self.pendingOptions.count > 0);
+	if (hasOptions) {
+		showInput = NO;
+	}
 	self.approveButton.hidden = !(approval && showAttention);
 	self.denyButton.hidden = self.approveButton.hidden;
 	for (NSButton *button in self.optionButtons) {
@@ -1875,7 +1904,16 @@ static NSString *JSString(Napi::Value value) {
 	self.openButton.hidden = NO;
 
 	// Footer composer row: [ composer ........ ] [pin] [open]
-	if (showInput) {
+	if (hasOptions) {
+		self.input.hidden = YES;
+		// Options own the footer; place pin/open in header row next to statusBadge
+		CGFloat headerInset = ContentSafeInsetX(self.content.notched);
+		CGFloat topY = kContentInsetTop + (kHeaderRowHeight - kIconControlSize) * 0.5;
+		CGFloat statusW = NSWidth(self.content.statusBadge.frame);
+		CGFloat rightEdge = NSWidth(win) - headerInset - statusW - 8;
+		self.openButton.frame = NSMakeRect(rightEdge - kIconControlSize, topY, kIconControlSize, kIconControlSize);
+		self.pinButton.frame = NSMakeRect(rightEdge - kIconControlSize * 2 - gap, topY, kIconControlSize, kIconControlSize);
+	} else if (showInput) {
 		self.input.hidden = NO;
 		CGFloat trailing = kIconControlSize * 2 + gap * 2;
 		CGFloat composerW = MAX(72, usableW - trailing);
@@ -1904,9 +1942,31 @@ static NSString *JSString(Napi::Value value) {
 	if (!self.approveButton.hidden) {
 		NSString *approveTitle = self.pendingDestructive ? @"Approve (destructive)" : @"Approve";
 		self.approveButton.title = approveTitle;
+		NSDictionary *apprAttrs = @{
+			NSFontAttributeName: self.approveButton.font ?: [NSFont systemFontOfSize:11.5 weight:NSFontWeightSemibold],
+			NSForegroundColorAttributeName: [NSColor whiteColor],
+		};
+		self.approveButton.attributedTitle = [[NSAttributedString alloc] initWithString:approveTitle attributes:apprAttrs];
 		self.approveButton.accessibilityLabel = self.actionInFlight ? @"Approve (in progress)" : approveTitle;
+
+		if (self.pendingDestructive) {
+			self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.72 green:0.20 blue:0.20 alpha:0.95].CGColor;
+			self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.88 green:0.35 blue:0.35 alpha:0.55].CGColor;
+		} else {
+			self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.16 green:0.54 blue:0.32 alpha:0.95].CGColor;
+			self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.30 green:0.72 blue:0.46 alpha:0.55].CGColor;
+		}
+
 		self.denyButton.title = @"Deny";
+		NSDictionary *denyAttrs = @{
+			NSFontAttributeName: self.denyButton.font ?: [NSFont systemFontOfSize:11.5 weight:NSFontWeightMedium],
+			NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0],
+		};
+		self.denyButton.attributedTitle = [[NSAttributedString alloc] initWithString:@"Deny" attributes:denyAttrs];
 		self.denyButton.accessibilityLabel = self.actionInFlight ? @"Deny (in progress)" : @"Deny";
+		self.denyButton.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.18 alpha:0.90].CGColor;
+		self.denyButton.layer.borderColor = [NSColor colorWithCalibratedWhite:0.36 alpha:0.45].CGColor;
+
 		CGFloat denyW = 64;
 		CGFloat approveW = self.pendingDestructive ? 168 : 86;
 		// Keep Deny/Approve inside the safe footer width (natural notch span can be < 156pt).
@@ -1940,6 +2000,11 @@ static NSString *JSString(Napi::Value value) {
 			NSButton *button = self.optionButtons[i];
 			NSString *label = option[@"label"] ?: option[@"id"] ?: @"Option";
 			button.title = label;
+			NSDictionary *titleAttrs = @{
+				NSFontAttributeName: button.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0],
+			};
+			button.attributedTitle = [[NSAttributedString alloc] initWithString:label attributes:titleAttrs];
 			button.accessibilityLabel = self.actionInFlight ? [NSString stringWithFormat:@"%@ (in progress)", label] : label;
 			button.alphaValue = actionAlpha;
 			CGFloat width = (perRow == 2) ? colW : MIN(slotW, MAX(56, [label sizeWithAttributes:@{ NSFontAttributeName: button.font }].width + 20));
@@ -1956,6 +2021,11 @@ static NSString *JSString(Napi::Value value) {
 		if (totalOpts > 4 && self.optionButtons.count >= 4) {
 			NSButton *moreButton = self.optionButtons[3];
 			moreButton.title = @"More…";
+			NSDictionary *moreAttrs = @{
+				NSFontAttributeName: moreButton.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0],
+			};
+			moreButton.attributedTitle = [[NSAttributedString alloc] initWithString:@"More…" attributes:moreAttrs];
 			moreButton.accessibilityLabel = @"More options in PreBase";
 			moreButton.alphaValue = 1.0;
 			CGFloat moreW = (perRow == 2) ? colW : MIN(72, slotW);
@@ -2376,6 +2446,17 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (NSDictionary *)diagnosticsDict {
+	NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
+	if (self.transitionInFlight && now >= self.transitionEndTime) {
+		self.transitionInFlight = NO;
+	}
+	if (!self.transitionInFlight && self.panel && !NSEqualRects(self.lastRequestedFrame, NSZeroRect)) {
+		if (![self framesEffectivelyEqual:self.panel.frame to:self.lastRequestedFrame]) {
+			[self.panel setFrame:self.lastRequestedFrame display:YES];
+			self.content.shapeLayer.frame = CGRectMake(0, 0, self.lastRequestedFrame.size.width, self.lastRequestedFrame.size.height);
+			self.content.shapeMaskLayer.frame = CGRectMake(0, 0, self.lastRequestedFrame.size.width, self.lastRequestedFrame.size.height);
+		}
+	}
 	NSMutableDictionary *dict = [NSMutableDictionary dictionary];
 	dict[@"panelCreated"] = @(self.panel != nil);
 	dict[@"panelVisible"] = @(self.panel != nil && self.panel.isVisible);
@@ -2683,10 +2764,7 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"revision"] = @(self.revision);
 	dict[@"lastTransitionReason"] = self.lastTransitionReason ?: @"";
 	dict[@"peekOnly"] = @(self.content.peekOnly);
-	NSTimeInterval now = [NSDate timeIntervalSinceReferenceDate];
-	if (self.transitionInFlight && now >= self.transitionEndTime) {
-		self.transitionInFlight = NO;
-	}
+
 	dict[@"transitionInFlight"] = @(self.transitionInFlight);
 	dict[@"transitionGeneration"] = @(self.transitionGeneration);
 	dict[@"actionInFlight"] = @(self.actionInFlight);
@@ -2796,7 +2874,11 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateSubmitFollowUp:(NSString *)text {
-	if (!text.length || self.screenLocked || self.input.hidden) {
+	if (!text.length || self.screenLocked) {
+		return NO;
+	}
+	BOOL isInteractive = (self.content.expanded || self.pinned) && !self.content.peekOnly;
+	if (self.input.hidden && !isInteractive) {
 		return NO;
 	}
 	self.input.stringValue = text;
@@ -2939,6 +3021,10 @@ static NSString *JSString(Napi::Value value) {
 		if (incomingInteractionId.length == 0 || ![incomingInteractionId isEqualToString:self.interactionId] || [status isEqualToString:@"idle"] || [status isEqualToString:@"working"] || [status isEqualToString:@"completed"] || [status isEqualToString:@"failed"]) {
 			[self endActionInFlightRestoring:YES];
 		}
+	}
+	if (![incomingInteractionId isEqualToString:self.interactionId] && self.content.contentScrollView) {
+		[self.content.contentScrollView.contentView scrollToPoint:NSZeroPoint];
+		[self.content.contentScrollView reflectScrolledClipView:self.content.contentScrollView.contentView];
 	}
 	self.interactionId = incomingInteractionId;
 	self.pendingKind = snapshot[@"pendingKind"] ?: @"";

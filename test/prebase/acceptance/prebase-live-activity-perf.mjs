@@ -802,6 +802,20 @@ async function run() {
 		if (diagRetarget.transitionInFlight !== false) {
 			throw new Error('Transition should not be in flight after wait');
 		}
+		const panelH = diagRetarget.panelFrame?.height;
+		const reqH = diagRetarget.requestedFrame?.height;
+		if (typeof panelH === 'number' && typeof reqH === 'number' && Math.abs(panelH - reqH) > 2) {
+			throw new Error(`panelFrame.height (${panelH}) must match requestedFrame.height (${reqH}) after settle`);
+		}
+		const panelW = diagRetarget.panelFrame?.width;
+		const reqW = diagRetarget.requestedFrame?.width;
+		if (typeof panelW === 'number' && typeof reqW === 'number' && Math.abs(panelW - reqW) > 2) {
+			throw new Error(`panelFrame.width (${panelW}) must match requestedFrame.width (${reqW}) after settle`);
+		}
+		const pathH = diagRetarget.pathBounds?.height;
+		if (typeof pathH === 'number' && typeof reqH === 'number' && Math.abs(pathH - reqH) > 2) {
+			throw new Error(`pathBounds.height (${pathH}) must match requestedFrame.height (${reqH}) after settle`);
+		}
 	} catch (err) {
 		test4.ok = false;
 		test4.error = err.message;
