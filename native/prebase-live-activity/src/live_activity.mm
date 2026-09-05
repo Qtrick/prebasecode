@@ -96,7 +96,7 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 }
 
 /** Consistent horizontal content inset across expanded body (clears curved shoulders while aligning rows). */
-static CGFloat ContentSafeInsetX(CGFloat bodyY, CGFloat bandH, CGFloat bodyHeight, BOOL notched) {
+static CGFloat ContentSafeInsetX(BOOL notched) {
 	CGFloat base = kContentInsetX;
 	if (!notched) {
 		return base;
@@ -737,9 +737,7 @@ static NSString *JSString(Napi::Value value) {
 	field.stringValue = text;
 	field.hidden = NO;
 	[self configureLabel:field lines:lines truncating:!allowOverflow];
-	// Document Y ≈ body-local content Y for inset purposes (header already consumed above scroll).
-	CGFloat bodyHeight = MAX(40, NSHeight(self.expandedContainer.bounds));
-	CGFloat insetX = ContentSafeInsetX(*y + kHeaderRowHeight, self.safeAreaTop, bodyHeight, self.notched);
+	CGFloat insetX = ContentSafeInsetX(self.notched);
 	field.frame = NSMakeRect(insetX + indent, *y, MAX(24, fieldW - (insetX - kContentInsetX)), MAX(need, lines == 1 ? kActionRowHeight : need));
 	*y += MAX(need, lines == 1 ? kActionRowHeight : need) + kContentGap;
 	return YES;
@@ -943,7 +941,7 @@ static NSString *JSString(Napi::Value value) {
 			[self configureLabel:self.activityDescription lines:2 truncating:NO];
 			self.activityDescription.stringValue = peekBody;
 			self.activityDescription.hidden = NO;
-			CGFloat peekInset = ContentSafeInsetX(kContentInsetTop, bandH, MAX(0, currentH - bandH), self.notched);
+			CGFloat peekInset = ContentSafeInsetX(self.notched);
 			CGFloat peekW = MAX(40, totalW - peekInset * 2);
 			CGFloat peekH = MeasureTextHeight(peekBody, self.activityDescription.font, peekW, 2);
 			self.activityDescription.frame = NSMakeRect(peekInset, kContentInsetTop, peekW, MIN(peekH, MAX(14, currentH - bandH - kContentInsetTop - 4)));
@@ -992,7 +990,7 @@ static NSString *JSString(Napi::Value value) {
 		? [NSColor colorWithCalibratedRed:0.98 green:0.72 blue:0.28 alpha:0.95]
 		: [NSColor colorWithCalibratedWhite:0.58 alpha:1.0];
 	self.statusBadge.alignment = NSTextAlignmentRight;
-	CGFloat headerInset = ContentSafeInsetX(y, bandH, bodyHeight, self.notched);
+	CGFloat headerInset = ContentSafeInsetX(self.notched);
 	CGFloat headerW = MAX(40, totalW - headerInset * 2);
 	CGFloat statusW = MIN(headerW * 0.40, MAX(44, [statusText sizeWithAttributes:@{ NSFontAttributeName: self.statusBadge.font }].width + 4));
 	CGFloat titleW = MAX(48, headerW - statusW - 8);
@@ -1139,18 +1137,29 @@ static NSString *JSString(Napi::Value value) {
 		frameAnimation.removedOnCompletion = YES;
 		[self.shapeLayer addAnimation:frameAnimation forKey:@"morphFrame"];
 
+		// Keep the clipping mask in the exact same transaction/timeline as the
+		// visible silhouette. A separate transaction can begin a frame later,
+		// exposing or clipping content while the shape is still mid-morph.
+		CABasicAnimation *maskPathAnimation = [CABasicAnimation animationWithKeyPath:@"path"];
+		maskPathAnimation.fromValue = (__bridge id)fromPath;
+		maskPathAnimation.toValue = (__bridge id)targetPath;
+		maskPathAnimation.duration = duration;
+		maskPathAnimation.timingFunction = pathAnimation.timingFunction;
+		maskPathAnimation.removedOnCompletion = YES;
+		[self.shapeMaskLayer addAnimation:maskPathAnimation forKey:@"morphPath"];
+
+		CABasicAnimation *maskFrameAnimation = [CABasicAnimation animationWithKeyPath:@"frame"];
+		maskFrameAnimation.fromValue = [NSValue valueWithRect:NSRectFromCGRect(fromFrame)];
+		maskFrameAnimation.toValue = [NSValue valueWithRect:NSRectFromCGRect(targetFrame)];
+		maskFrameAnimation.duration = duration;
+		maskFrameAnimation.timingFunction = frameAnimation.timingFunction;
+		maskFrameAnimation.removedOnCompletion = YES;
+		[self.shapeMaskLayer addAnimation:maskFrameAnimation forKey:@"morphFrame"];
+
 		self.shapeLayer.path = targetPath;
 		self.shapeLayer.frame = targetFrame;
-		[CATransaction commit];
-
-		// Mask jumps to the target silhouette — keep it out of the CATransaction so
-		// completion (and transitionInFlight) cannot stall on a second layer.
-		[CATransaction begin];
-		[CATransaction setDisableActions:YES];
 		self.shapeMaskLayer.path = targetPath;
 		self.shapeMaskLayer.frame = targetFrame;
-		[self.shapeMaskLayer removeAnimationForKey:@"morphPath"];
-		[self.shapeMaskLayer removeAnimationForKey:@"morphFrame"];
 		[CATransaction commit];
 	} else {
 		self.shapeLayer.path = targetPath;
@@ -1857,7 +1866,7 @@ static NSString *JSString(Napi::Value value) {
 
 	const CGFloat gap = 6;
 	// Path-aware footer inset: bottom corners eat horizontal space.
-	CGFloat footerInset = ContentSafeInsetX(MAX(0, bodyHeight - kControlHeight - 4), bandH, bodyHeight, self.content.notched);
+	CGFloat footerInset = ContentSafeInsetX(self.content.notched);
 	CGFloat bottomY = bodyHeight - kControlHeight - 7;
 	CGFloat usableW = NSWidth(win) - footerInset * 2;
 
@@ -2512,6 +2521,45 @@ static NSString *JSString(Napi::Value value) {
 				MAX(0, bodyW - safeInset * 2),
 				MAX(0, NSHeight(scrollFrame))));
 			dict[@"footerTopY"] = @(NSMaxY(scrollFrame) + kContentFooterGutter);
+			// Pending frames are document-local, whereas the scroll host is body-local.
+			// Export comparable coordinates so diagnostics cannot label clipped question copy healthy.
+			const CGFloat actualVisibleViewportTop = NSMinY(scrollFrame);
+			const CGFloat actualVisibleViewportBottom = NSMaxY(scrollFrame);
+			const CGFloat scrollOffsetY = self.content.contentScrollView.documentVisibleRect.origin.y;
+			CGFloat pendingMessageTop = 0;
+			CGFloat pendingMessageBottom = 0;
+			CGFloat pendingContentTop = CGFLOAT_MAX;
+			CGFloat pendingContentBottom = 0;
+			BOOL hasPendingContent = NO;
+			BOOL hasPendingMessage = NO;
+			for (NSTextField *pendingField in @[self.content.pendingInteractionTitle, self.content.pendingInteractionMessage]) {
+				if (pendingField.hidden) {
+					continue;
+				}
+				CGFloat pendingFieldTop = actualVisibleViewportTop + NSMinY(pendingField.frame) - scrollOffsetY;
+				CGFloat pendingFieldBottom = actualVisibleViewportTop + NSMaxY(pendingField.frame) - scrollOffsetY;
+				pendingContentTop = MIN(pendingContentTop, pendingFieldTop);
+				pendingContentBottom = MAX(pendingContentBottom, pendingFieldBottom);
+				hasPendingContent = YES;
+				if (pendingField == self.content.pendingInteractionMessage) {
+					pendingMessageTop = pendingFieldTop;
+					pendingMessageBottom = pendingFieldBottom;
+					hasPendingMessage = YES;
+				}
+			}
+			BOOL pendingContentFullyVisible = !hasPendingContent
+				|| (pendingContentTop >= actualVisibleViewportTop - 0.5
+					&& pendingContentBottom <= actualVisibleViewportBottom + 0.5);
+			BOOL pendingMessageFullyVisible = !hasPendingMessage
+				|| (pendingMessageTop >= actualVisibleViewportTop - 0.5
+					&& pendingMessageBottom <= actualVisibleViewportBottom + 0.5);
+			dict[@"actualVisibleViewportTop"] = @(actualVisibleViewportTop);
+			dict[@"actualVisibleViewportBottom"] = @(actualVisibleViewportBottom);
+			dict[@"pendingMessageBottom"] = @(pendingMessageBottom);
+			dict[@"pendingMessageFullyVisible"] = @(pendingMessageFullyVisible);
+			dict[@"pendingContentFullyVisible"] = @(pendingContentFullyVisible);
+			dict[@"questionContentHealthy"] = @(![self.pendingKind isEqualToString:@"question"]
+				|| pendingContentFullyVisible);
 		} else {
 			CGFloat footerReserve = MAX(0, self.content.reservedFooterHeight);
 			CGFloat textHeight = MAX(0, bodyH - footerReserve);
@@ -2519,6 +2567,12 @@ static NSString *JSString(Napi::Value value) {
 			CGFloat safeInset = kContentInsetX + kContentSafeExtraX;
 			dict[@"contentSafeViewport"] = RectDict(NSMakeRect(safeInset, kContentInsetTop, MAX(0, bodyW - safeInset * 2), MAX(0, textHeight - kContentInsetTop)));
 			dict[@"footerTopY"] = @(textHeight);
+			dict[@"actualVisibleViewportTop"] = @(0);
+			dict[@"actualVisibleViewportBottom"] = @(textHeight);
+			dict[@"pendingMessageBottom"] = @(0);
+			dict[@"pendingMessageFullyVisible"] = @YES;
+			dict[@"pendingContentFullyVisible"] = @YES;
+			dict[@"questionContentHealthy"] = @YES;
 		}
 		dict[@"contentScrollEnabled"] = @(self.content.contentScrollView != nil && !self.content.contentScrollView.hidden);
 		dict[@"contentFooterGutter"] = @(kContentFooterGutter);
@@ -3520,4 +3574,3 @@ Napi::Object Init(Napi::Env env, Napi::Object exports) {
 }
 
 NODE_API_MODULE(prebase_live_activity, Init)
-

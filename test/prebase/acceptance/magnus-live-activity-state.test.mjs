@@ -243,7 +243,7 @@ const longOptions = computeLiveActivityExpandedHeight({
 	bandHeight: 34, hasPendingTitle: true, hasPendingMessage: true, pendingKind: 'question', hasOptions: true, hasActivity: true,
 });
 assert.ok(short > empty);
-assert.ok(medium > short);
+assert.equal(medium, short, 'current activity is primary; latest message must not add a second working text block');
 assert.ok(longH >= medium);
 assert.ok(longPending > longH || longPending > medium);
 assert.ok(longOptions > medium);
@@ -425,4 +425,71 @@ test('native notch polish contracts: optical shoulder, true viewport, action id 
 	const ts = readFileSync(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'), 'utf8');
 	assert.match(ts, /readonly status\?: 'running' \| 'passed' \| 'failed' \| 'other'/);
 	assert.match(ts, /\.\.\.\(action\.status \? \{ status: action\.status \} : \{\}\)/);
+});
+
+test('working height has one primary text block, matching the native activity-or-message hierarchy', () => {
+	const script = `
+import assert from 'node:assert/strict';
+import { computeLiveActivityExpandedHeight } from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
+
+const activityOnly = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true });
+const messageOnly = computeLiveActivityExpandedHeight({ bandHeight: 34, hasLatestMessage: true });
+const both = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true, hasLatestMessage: true });
+
+assert.equal(both, activityOnly, 'working activity is primary; a latest message must not consume a second semantic height block');
+assert.ok(messageOnly <= activityOnly, 'latest message is the fallback primary block when activity is absent');
+`;
+
+	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.equal(result.status, 0, result.stderr || result.stdout);
+
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+	assert.match(native, /if \(self\.content\.activityLabel\.length\) \{[\s\S]{0,500}\} else if \(self\.content\.latestMessage\.length\) \{/,
+		'native natural-height measurement must use activity OR latest message');
+});
+
+test('native layout treats the scroll host as the actual viewport and fails shallow question containment', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	// This must be a direct comparison against the real scroll frame. A min(messageBottom,
+	// viewportBottom) calculation only hides clipping and is not a containment check.
+	assert.match(native, /const CGFloat scrollOffsetY = self\.content\.contentScrollView\.documentVisibleRect\.origin\.y;/,
+		'pending document coordinates must be converted into the scroll host coordinate space');
+	assert.match(native, /const CGFloat actualVisibleViewportBottom = NSMaxY\(scrollFrame\);/);
+	assert.match(native, /const CGFloat actualVisibleViewportTop = NSMinY\(scrollFrame\);/);
+	assert.match(native, /pendingFieldTop = actualVisibleViewportTop \+ NSMinY\(pendingField\.frame\) - scrollOffsetY;/);
+	assert.match(native, /pendingFieldBottom = actualVisibleViewportTop \+ NSMaxY\(pendingField\.frame\) - scrollOffsetY;/);
+	assert.match(native, /pendingContentTop >= actualVisibleViewportTop - 0\.5/,
+		'containment must detect a question title or message clipped above the viewport');
+	assert.match(native, /pendingContentBottom <= actualVisibleViewportBottom \+ 0\.5/,
+		'containment must detect a question title or message clipped below the viewport');
+	assert.match(native, /dict\[@"pendingMessageFullyVisible"\]/,
+		'diagnostics must expose the pending-message containment result, not just frame coordinates');
+	assert.match(native, /dict\[@"pendingContentFullyVisible"\]/,
+		'diagnostics must expose containment for the complete question, including its title');
+	assert.match(native, /dict\[@"questionContentHealthy"\]/,
+		'a shallow question viewport must be reported unhealthy rather than skipped');
+	assert.doesNotMatch(native, /MIN\(pendingMessageBottom\s*,\s*actualVisibleViewportBottom\)/,
+		'clamping a message bottom to the viewport is not valid containment');
+});
+
+test('native shape mask follows the same presentation-aware morph as the visible silhouette', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	assert.match(native, /CABasicAnimation \*maskPathAnimation = \[CABasicAnimation animationWithKeyPath:@"path"\]/);
+	assert.match(native, /maskPathAnimation\.fromValue = \(__bridge id\)fromPath;/,
+		'the mask must start from the visible layer\'s presentation-aware path');
+	assert.match(native, /maskPathAnimation\.toValue = \(__bridge id\)targetPath;/);
+	assert.match(native, /maskPathAnimation\.duration = duration;/);
+	assert.match(native, /\[self\.shapeMaskLayer addAnimation:maskPathAnimation forKey:@"morphPath"\]/);
+	assert.match(native, /CABasicAnimation \*maskFrameAnimation = \[CABasicAnimation animationWithKeyPath:@"frame"\]/);
+	assert.match(native, /maskFrameAnimation\.fromValue = \[NSValue valueWithRect:NSRectFromCGRect\(fromFrame\)\];/);
+	assert.match(native, /maskFrameAnimation\.toValue = \[NSValue valueWithRect:NSRectFromCGRect\(targetFrame\)\];/);
+	assert.match(native, /maskFrameAnimation\.duration = duration;/);
+	assert.match(native, /\[self\.shapeMaskLayer addAnimation:maskFrameAnimation forKey:@"morphFrame"\]/);
+	assert.doesNotMatch(native, /Mask jumps to the target silhouette/,
+		'the mask cannot snap to target geometry while the visible shape is mid-morph');
 });

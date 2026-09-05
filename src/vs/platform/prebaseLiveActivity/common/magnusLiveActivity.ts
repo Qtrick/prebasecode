@@ -271,10 +271,10 @@ export function computeLiveActivityExpandedHeight(args: {
 		h += 32;
 	}
 	if (!hasPending) {
+		// Native renders current activity OR the latest short message, never both.
 		if (args.hasActivity) {
 			h += 24;
-		}
-		if (args.hasLatestMessage) {
+		} else if (args.hasLatestMessage) {
 			h += 22;
 		}
 		if (args.actionsCount && args.actionsCount > 0) {
