@@ -113,7 +113,7 @@ export const LIVE_ACTIVITY_WING_WIDTH_MIN = 52;
 export const LIVE_ACTIVITY_WING_WIDTH_MAX = 148;
 export const LIVE_ACTIVITY_WING_WIDTH_DEFAULT = 124;
 export const LIVE_ACTIVITY_WING_WIDTH = LIVE_ACTIVITY_WING_WIDTH_DEFAULT;
-export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 86;
+export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 96;
 export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 220;
 export const LIVE_ACTIVITY_EXPANDED_HEIGHT = 200;
 export const LIVE_ACTIVITY_PILL_WIDTH = 228;
@@ -121,6 +121,114 @@ export const LIVE_ACTIVITY_PILL_HEIGHT = 30;
 export const LIVE_ACTIVITY_NOTCH_MIN_SAFE_TOP = 8;
 export const LIVE_ACTIVITY_NOTCH_MIN_AUX_WIDTH = 40;
 export const LIVE_ACTIVITY_CAMERA_HOUSING_MIN = 24;
+
+/** Deterministic populated Magnus content for visual acceptance (not production copy). */
+export function createMagnusLiveActivityVisualFixture(
+	variant: 'working' | 'question' | 'approval' | 'long' | 'completed' | 'failed' | 'waiting',
+	options: { revision: number; sessionId?: string; sessionResource?: string },
+): MagnusLiveActivitySnapshot {
+	const base = {
+		revision: options.revision,
+		sessionId: options.sessionId ?? 'visual-fixture-session',
+		sessionResource: options.sessionResource ?? 'inmemory://magnus-visual-fixture',
+		startedAt: Date.now() - 95_000,
+		connected: true,
+		prebaseForeground: true,
+		screenLocked: false,
+		hideDetails: false,
+		recentActions: [
+			{ id: 'a1', label: 'Updated graphEditor.ts', at: Date.now() - 40_000 },
+			{ id: 'a2', label: 'Running 63 graph test suites', at: Date.now() - 25_000 },
+			{ id: 'a3', label: 'Verified Temporal layout recovery', at: Date.now() - 10_000 },
+		] as const,
+		taskTitle: 'Refactoring the graph renderer',
+		workspaceDiff: { files: 4, additions: 86, deletions: 31, attributedToMagnus: true },
+		terminalCount: 1,
+	};
+
+	switch (variant) {
+		case 'waiting':
+			return {
+				...base,
+				status: 'waiting',
+				currentActivity: 'Waiting for input',
+				latestShortMessage: 'Magnus needs a layout choice before continuing acceptance.',
+				presentationLabel: 'Waiting',
+			};
+		case 'completed':
+			return {
+				...base,
+				status: 'completed',
+				currentActivity: 'Graph acceptance pass complete',
+				latestShortMessage: 'All graph interaction suites passed.',
+				testState: 'passed',
+				presentationLabel: 'Completed',
+			};
+		case 'failed':
+			return {
+				...base,
+				status: 'failed',
+				currentActivity: 'Graph acceptance failed',
+				latestShortMessage: 'Temporal layout recovery timed out on the large fixture.',
+				testState: 'failed',
+				presentationLabel: 'Failed',
+			};
+		case 'question':
+			return {
+				...base,
+				status: 'attention',
+				currentActivity: 'Awaiting layout decision',
+				latestShortMessage: 'Choose how Magnus should finish the remaining acceptance cases.',
+				presentationLabel: 'Needs input',
+				pendingInteraction: {
+					kind: 'question',
+					interactionId: 'visual-question-1',
+					title: 'Which layout should Magnus use for the remaining graph acceptance?',
+					message: 'This choice affects Fit View metrics and Temporal Full Map readability checks.',
+					options: [
+						{ id: 'organic', label: 'Organic' },
+						{ id: 'sphere', label: 'Sphere' },
+						{ id: 'constellation', label: 'Constellation' },
+						{ id: 'clustered', label: 'Clustered' },
+					],
+				},
+			};
+		case 'approval':
+			return {
+				...base,
+				status: 'attention',
+				currentActivity: 'Awaiting approval',
+				latestShortMessage: 'Magnus is ready to run the graph acceptance suite.',
+				presentationLabel: 'Approval needed',
+				pendingInteraction: {
+					kind: 'approval',
+					interactionId: 'visual-approval-1',
+					title: 'Run the graph acceptance suite?',
+					message: 'This will execute the repository\'s graph acceptance tests and update the local evidence artifacts.',
+					destructive: false,
+				},
+			};
+		case 'long':
+			return {
+				...base,
+				status: 'working',
+				currentActivity: 'Validating long-form graph interaction recovery across Temporal Full Map, Network Fit View, and multi-layout acceptance while preserving viewport readability and idle rotation constraints for large projects',
+				latestShortMessage: 'Magnus finished the graph interaction pass and is validating the remaining acceptance cases against organic, sphere, constellation, and clustered layouts with deliberately long diagnostic commentary that must remain inside the island content viewport without pushing footer controls outside the silhouette.',
+				presentationLabel: 'Working',
+				testState: 'running',
+			};
+		case 'working':
+		default:
+			return {
+				...base,
+				status: 'working',
+				currentActivity: 'Running graph interaction tests',
+				latestShortMessage: 'Magnus finished the graph interaction pass and is validating the remaining acceptance cases.',
+				presentationLabel: 'Working',
+				testState: 'running',
+			};
+	}
+}
 
 export function computeLiveActivityExpandedHeight(args: {
 	bandHeight: number;
@@ -132,6 +240,8 @@ export function computeLiveActivityExpandedHeight(args: {
 	hasMetrics?: boolean;
 	pendingKind?: 'approval' | 'question' | string;
 	hasOptions?: boolean;
+	/** When known, matches native one-vs-two option row sizing; otherwise assumes two rows. */
+	optionsCount?: number;
 	pinned?: boolean;
 	peekOnly?: boolean;
 }): number {
@@ -149,41 +259,43 @@ export function computeLiveActivityExpandedHeight(args: {
 		h += 8;
 		return Math.min(args.bandHeight + 56, h);
 	}
+	// Match native computeTargetContentHeight interactive path (content viewport + reserved footer).
 	let h = args.bandHeight + 8; // Top padding below notch band
-	h += 22; // Header
+	h += 18 + 5; // Header row + gap
 	if (args.hasActivity) {
-		h += 18;
+		h += 28; // up to 2 lines
 	}
 	if (args.hasLatestMessage) {
-		h += 20;
+		h += 28;
 	}
 	if (args.actionsCount && args.actionsCount > 0) {
-		h += Math.min(args.actionsCount, 3) * 15;
+		h += Math.min(args.actionsCount, 3) * 16;
 	}
 	if (args.hasPendingTitle) {
-		h += 20;
+		h += 28;
 	}
 	if (args.hasPendingMessage) {
-		h += 18;
+		h += 36; // up to 3 lines
 	}
-	if (args.hasMetrics) {
-		h += 18;
+	if (args.hasMetrics && !args.hasPendingTitle) {
+		h += 16;
 	}
-	h += 10; // Spacing before controls
+	h += 5; // Spacing before controls
 	const hasOptions = args.pendingKind === 'question' && Boolean(args.hasOptions);
 	const hasApproval = args.pendingKind === 'approval';
 	const showInput = !args.peekOnly;
 
 	if (hasOptions) {
-		h += 30; // Options row
+		const opts = Math.min(Math.max(args.optionsCount ?? 4, 1), 4);
+		h += opts > 2 ? 56 : 30;
 	}
 	if (hasApproval) {
-		h += 28; // Approval buttons row
+		h += 30;
 	}
 	if (showInput) {
-		h += 32; // Follow-up message row
+		h += 34; // Composer footer
 	} else if (!hasOptions && !hasApproval) {
-		h += 24; // Open in PreBase row
+		h += 30;
 	}
 	h += 10; // Bottom corner inset
 	return Math.min(LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX, Math.max(LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN, h));

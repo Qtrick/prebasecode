@@ -39,6 +39,7 @@ import {
 	acceptLiveActivityCommand,
 	buildMagnusLiveActivitySnapshot,
 	calculateNextElapsedBoundaryDelayMs,
+	createMagnusLiveActivityVisualFixture,
 	deriveMagnusTestStateFromInvocations,
 	isMagnusParticipantId,
 	LIVE_ACTIVITY_COMPLETED_HOLD_MS,
@@ -304,6 +305,7 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 	private _nativeConnected = false;
 	private _completionHoldUntil: number | undefined;
 	private _completionHidden = false;
+	private _visualFixtureHoldUntil = 0;
 	private _lastSnapshot: MagnusLiveActivitySnapshot | undefined;
 	private readonly _modelListeners = this._register(new DisposableStore());
 	private readonly _push: RunOnceScheduler;
@@ -393,6 +395,63 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 		this._publish();
 	}
 
+	/**
+	 * Smoke/visual acceptance only: publish a deterministic populated Magnus snapshot
+	 * so native screenshots prove realistic content (not an empty island).
+	 */
+	async publishVisualFixtureForSmoke(
+		variant: 'working' | 'question' | 'approval' | 'long' | 'completed' | 'failed' | 'waiting',
+		presentation?: { pinned?: boolean; reducedMotion?: boolean },
+	): Promise<{ ok: boolean; revision: number; status: string }> {
+		if (!this._main) {
+			return { ok: false, revision: 0, status: 'unavailable' };
+		}
+		// Hold off model-driven republishes so screenshots capture the fixture, not a racing chat update.
+		this._visualFixtureHoldUntil = Date.now() + 4_000;
+		this._push.cancel();
+		this._revision += 1;
+		const snapshot = createMagnusLiveActivityVisualFixture(variant, {
+			revision: this._revision,
+			sessionId: this._lastSnapshot?.sessionId ?? 'visual-fixture-session',
+			sessionResource: this._lastSnapshot?.sessionResource ?? 'inmemory://magnus-visual-fixture',
+		});
+		this._lastSnapshot = snapshot;
+		this._pinned = Boolean(presentation?.pinned);
+		this._userDismissedAttention = false;
+		this._completionHidden = false;
+		const reducedMotion = presentation?.reducedMotion ?? this.accessibilityService.isMotionReduced();
+		await this._main.setPresentation({
+			visible: true,
+			pinned: this._pinned,
+			reducedMotion,
+			display: this._display(),
+		});
+		await this._main.setSnapshot({
+			...snapshot,
+			userDismissedAttention: false,
+		});
+		if (!this._pinned) {
+			// Clear sticky pin from a prior fixture without Escape-dismissing attention.
+			await this._main.simulateAction('unpin').catch(() => false);
+			await this._main.setPresentation({
+				visible: true,
+				pinned: false,
+				reducedMotion,
+				display: this._display(),
+			});
+			await this._main.setSnapshot({
+				...snapshot,
+				userDismissedAttention: false,
+			});
+		}
+		return { ok: true, revision: snapshot.revision, status: snapshot.status };
+	}
+
+	releaseVisualFixtureHoldForSmoke(): void {
+		this._visualFixtureHoldUntil = 0;
+		this._push.schedule();
+	}
+
 	private _isDestructive(toolId: string, parameters: unknown): boolean {
 		const tool = this.toolsService.getTool(toolId);
 		if (!tool) {
@@ -424,6 +483,9 @@ export class MagnusLiveActivityContribution extends Disposable implements IWorkb
 
 	private _publish(): void {
 		if (!this._main) {
+			return;
+		}
+		if (Date.now() < this._visualFixtureHoldUntil) {
 			return;
 		}
 		const model = selectPrimaryMagnusModel(this.chatService.chatModels.get());
@@ -636,6 +698,62 @@ registerAction2(class extends Action2 {
 	async run(accessor: ServicesAccessor, action: string, extras?: unknown) {
 		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.magnus.liveActivity.simulate');
 		return MagnusLiveActivityContribution.instance?.simulateAction(action, extras);
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.test.seedMagnusLiveActivityVisualFixture',
+			title: localize2('prebase.test.seedMagnusLiveActivityVisualFixture', "Seed Magnus Live Activity Visual Fixture (Smoke Test)"),
+			f1: false,
+		});
+	}
+	async run(accessor: ServicesAccessor, options?: {
+		variant?: 'working' | 'question' | 'approval' | 'long' | 'completed' | 'failed' | 'waiting';
+		pinned?: boolean;
+		reducedMotion?: boolean;
+	}) {
+		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.seedMagnusLiveActivityVisualFixture');
+		const instance = MagnusLiveActivityContribution.instance;
+		if (!instance) {
+			return { ok: false, reason: 'no-contribution' };
+		}
+		const variant = options?.variant ?? 'working';
+		const published = await instance.publishVisualFixtureForSmoke(variant, {
+			pinned: options?.pinned,
+			reducedMotion: options?.reducedMotion,
+		});
+		// publishVisualFixtureForSmoke already applies pinned presentation — do not toggle pin again.
+		if (options?.pinned) {
+			await instance.simulateAction('interactive');
+			await new Promise(resolve => setTimeout(resolve, 100));
+		}
+		const native = await instance.getNativeDiagnostics();
+		return {
+			...published,
+			variant,
+			nativePresentation: native?.activePresentationState,
+			panelVisible: native?.panelVisible,
+			pendingKind: native?.pendingKind,
+			activityLabel: native?.activityLabel,
+			composerVisible: native?.composerFrame != null,
+		};
+	}
+});
+
+registerAction2(class extends Action2 {
+	constructor() {
+		super({
+			id: 'prebase.test.releaseMagnusLiveActivityVisualFixture',
+			title: localize2('prebase.test.releaseMagnusLiveActivityVisualFixture', "Release Magnus Live Activity Visual Fixture Hold (Smoke Test)"),
+			f1: false,
+		});
+	}
+	async run(accessor: ServicesAccessor) {
+		requireSmokeTestDriver(accessor.get(IWorkbenchEnvironmentService).enableSmokeTestDriver, 'prebase.test.releaseMagnusLiveActivityVisualFixture');
+		MagnusLiveActivityContribution.instance?.releaseVisualFixtureHoldForSmoke();
+		return { ok: true };
 	}
 });
 

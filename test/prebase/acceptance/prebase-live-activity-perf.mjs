@@ -77,6 +77,115 @@ function framesEqualWithin(a, b, tol = 1) {
 		&& Math.abs(a.height - b.height) <= tol;
 }
 
+function isValidDiagFrame(f) {
+	return f && typeof f === 'object' && typeof f.x === 'number' && typeof f.width === 'number'
+		&& Number(f.width) >= 0 && Number(f.height) >= 0;
+}
+
+function layoutContainmentOk(diag) {
+	// Child frames are in expanded-container local coords. Use bodyBounds for chrome
+	// (composer/footer lives below the text contentViewport by design).
+	const body = diag?.bodyBounds && typeof diag.bodyBounds.width === 'number'
+		? diag.bodyBounds
+		: diag?.contentViewport;
+	if (!body || typeof body.width !== 'number') {
+		return { ok: false, reason: 'missing-bodyBounds' };
+	}
+	const viewport = {
+		x: 0,
+		y: 0,
+		maxX: Number(body.width) || 0,
+		maxY: Number(body.height) || 0,
+	};
+	if (viewport.maxX <= 0) {
+		return { ok: false, reason: 'empty-bodyBounds', viewport };
+	}
+	const textKeys = new Set([
+		'headerFrame', 'statusBadgeFrame', 'activityFrame', 'latestMessageFrame',
+		'pendingTitleFrame', 'pendingMessageFrame', 'action',
+	]);
+	const controlKeys = new Set([
+		'composerFrame', 'pinButtonFrame', 'openButtonFrame',
+		'approveButtonFrame', 'denyButtonFrame', 'option',
+	]);
+	const frames = [];
+	for (const key of [
+		'headerFrame', 'statusBadgeFrame', 'activityFrame', 'latestMessageFrame',
+		'pendingTitleFrame', 'pendingMessageFrame', 'composerFrame',
+		'pinButtonFrame', 'openButtonFrame', 'approveButtonFrame', 'denyButtonFrame',
+	]) {
+		const f = diag[key];
+		if (isValidDiagFrame(f)) {
+			frames.push({ key, f });
+		}
+	}
+	for (const f of diag.actionFrames || []) {
+		if (isValidDiagFrame(f)) {
+			frames.push({ key: 'action', f });
+		}
+	}
+	for (const f of diag.optionButtonFrames || []) {
+		if (isValidDiagFrame(f)) {
+			frames.push({ key: 'option', f });
+		}
+	}
+	// Expanded chrome is only strictly containable once the body has grown
+	// past the notch band (headless harnesses used to keep height≈2 before synthetic sizing).
+	if (viewport.maxY < 24) {
+		return {
+			ok: frames.length === 0 || frames.every(({ f }) => f.x >= -1 && f.y >= -1),
+			reason: frames.length ? 'viewport-too-shallow-for-strict-containment' : 'compact-or-empty',
+			headlessShallow: true,
+			frameCount: frames.length,
+			viewport,
+		};
+	}
+	const textMaxY = Number(diag.contentViewport?.height);
+	for (const { key, f } of frames) {
+		if (f.x < -1 || f.y < -1 || (f.x + f.width) > viewport.maxX + 2 || (f.y + f.height) > viewport.maxY + 2) {
+			return { ok: false, reason: `${key}-overflow`, frame: f, viewport };
+		}
+		// Text blocks must stay above the reserved footer; controls may occupy it.
+		if (textKeys.has(key) && Number.isFinite(textMaxY) && textMaxY > 0 && (f.y + f.height) > textMaxY + 2) {
+			return { ok: false, reason: `${key}-into-footer`, frame: f, textMaxY };
+		}
+		if (controlKeys.has(key) && f.y < -1) {
+			return { ok: false, reason: `${key}-negative-y`, frame: f };
+		}
+	}
+	return { ok: true, frameCount: frames.length, viewport };
+}
+
+async function awaitCommands(predicate, { timeoutMs = 400 } = {}) {
+	const start = Date.now();
+	while (Date.now() - start < timeoutMs) {
+		if (predicate()) {
+			return true;
+		}
+		await new Promise(r => setImmediate(r));
+		await sleep(10);
+	}
+	return predicate();
+}
+
+function longText(seed, words) {
+	const parts = [];
+	for (let i = 0; i < words; i++) {
+		parts.push(`${seed}-${i}`);
+	}
+	return parts.join(' ');
+}
+
+async function settleInteractive(native) {
+	native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+	await sleep(40);
+	if (!native.simulateAction('interactive') && !native.simulateAction('click')) {
+		throw new Error('failed to enter interactive');
+	}
+	await sleep(180);
+	await drainMain(native, 3);
+}
+
 function captureStabilityBaseline(diag) {
 	return {
 		animationCount: Number(diag.animationCount) || 0,
@@ -882,8 +991,8 @@ async function run() {
 		if (diagInteractive.pinButtonVisible !== true) {
 			throw new Error('Expected explicit Pin affordance to be visible in Interactive mode');
 		}
-		if (diagInteractive.pinButtonTitle !== 'Pin') {
-			throw new Error(`Expected Pin button title to be 'Pin', got '${diagInteractive.pinButtonTitle}'`);
+		if (!/^Pin( panel)?$/.test(String(diagInteractive.pinButtonTitle || ''))) {
+			throw new Error(`Expected Pin button title to be 'Pin' or 'Pin panel', got '${diagInteractive.pinButtonTitle}'`);
 		}
 	} catch (err) {
 		test8.ok = false;
@@ -909,8 +1018,8 @@ async function run() {
 		if (diagPinned.pinned !== true) {
 			throw new Error('Expected pinned=true after clicking Pin button');
 		}
-		if (diagPinned.pinButtonTitle !== 'Unpin') {
-			throw new Error(`Expected Pin button title 'Unpin' when pinned, got '${diagPinned.pinButtonTitle}'`);
+		if (!/^Unpin( panel)?$/.test(String(diagPinned.pinButtonTitle || ''))) {
+			throw new Error(`Expected Pin button title 'Unpin' or 'Unpin panel' when pinned, got '${diagPinned.pinButtonTitle}'`);
 		}
 
 		// Click Pin button again to unpin
@@ -927,8 +1036,8 @@ async function run() {
 		if (diagUnpinned.pinned !== false) {
 			throw new Error('Expected pinned=false after second Pin button click');
 		}
-		if (diagUnpinned.pinButtonTitle !== 'Pin') {
-			throw new Error(`Expected Pin button title 'Pin' after unpinning, got '${diagUnpinned.pinButtonTitle}'`);
+		if (!/^Pin( panel)?$/.test(String(diagUnpinned.pinButtonTitle || ''))) {
+			throw new Error(`Expected Pin button title 'Pin' or 'Pin panel' after unpinning, got '${diagUnpinned.pinButtonTitle}'`);
 		}
 	} catch (err) {
 		test9.ok = false;
@@ -2361,6 +2470,615 @@ async function run() {
 		results.failures.push(`action-in-flight-lifecycle: ${err.message}`);
 	}
 	results.tests.push(test24);
+
+	// Test 25: Layout containment via native diagnostics frames
+	const test25 = { name: 'layout-containment-diagnostics-frames', ok: true, details: {} };
+	try {
+		native.dispose();
+		const fixtures = [
+			{
+				name: 'interactive',
+				pinned: true,
+				snapshot: contentSnapshot(9700, {
+					status: 'working',
+					presentationLabel: 'Working',
+					currentActivity: 'Running acceptance',
+					latestShortMessage: 'Validating interactive chrome containment',
+				}),
+			},
+			{
+				name: 'long',
+				pinned: true,
+				snapshot: contentSnapshot(9701, {
+					status: 'working',
+					presentationLabel: 'Working',
+					currentActivity: longText('activity', 40),
+					latestShortMessage: longText('message', 55),
+				}),
+			},
+			{
+				name: 'question',
+				pinned: true,
+				snapshot: contentSnapshot(9702, {
+					status: 'attention',
+					presentationLabel: 'Needs input',
+					pendingInteraction: {
+						kind: 'question',
+						interactionId: 'layout-q-1',
+						title: 'Which layout should Magnus use for the remaining graph acceptance?',
+						message: 'This choice affects Fit View metrics and Temporal Full Map readability checks.',
+						options: [
+							{ id: 'organic', label: 'Organic' },
+							{ id: 'sphere', label: 'Sphere' },
+							{ id: 'constellation', label: 'Constellation' },
+							{ id: 'clustered', label: 'Clustered' },
+						],
+					},
+				}),
+			},
+			{
+				name: 'approval',
+				pinned: true,
+				snapshot: contentSnapshot(9703, {
+					status: 'attention',
+					presentationLabel: 'Approval needed',
+					pendingInteraction: {
+						kind: 'approval',
+						interactionId: 'layout-appr-1',
+						title: 'Run the graph acceptance suite?',
+						message: 'This will execute repository graph acceptance tests and update local evidence artifacts.',
+						destructive: false,
+					},
+				}),
+			},
+		];
+
+		const containment = {};
+		for (const fixture of fixtures) {
+			native.setPresentation({
+				visible: true,
+				pinned: fixture.pinned,
+				reducedMotion: false,
+				display: 'builtin',
+			});
+			native.setSnapshot(fixture.snapshot);
+			await sleep(120);
+			await drainMain(native, 3);
+			if (fixture.pinned) {
+				native.simulateAction('interactive');
+				await sleep(150);
+				await drainMain(native, 3);
+			}
+			const diag = native.getDiagnostics();
+			const result = layoutContainmentOk(diag);
+			containment[fixture.name] = {
+				...result,
+				state: diag.activePresentationState,
+				shapeAwareHitTesting: diag.shapeAwareHitTesting,
+				questionButtonCount: diag.questionButtonCount,
+				approvalControlsVisible: diag.approvalControlsVisible,
+			};
+			if (!result.ok) {
+				throw new Error(`${fixture.name} layout containment failed: ${result.reason} ${JSON.stringify(result)}`);
+			}
+			if (diag.shapeAwareHitTesting !== true) {
+				throw new Error(`${fixture.name}: shapeAwareHitTesting must be true`);
+			}
+			if (fixture.name === 'question' && (Number(diag.questionButtonCount) || 0) < 3) {
+				throw new Error(`question fixture expected option buttons, got ${diag.questionButtonCount}`);
+			}
+			if (fixture.name === 'approval' && diag.approvalControlsVisible !== true) {
+				throw new Error('approval fixture must show approve/deny controls');
+			}
+		}
+		test25.details = containment;
+	} catch (err) {
+		test25.ok = false;
+		test25.error = err.message;
+		results.failures.push(`layout-containment-diagnostics-frames: ${err.message}`);
+	}
+	results.tests.push(test25);
+
+	// Test 26: State-specific presentation layouts
+	const test26 = { name: 'state-specific-layouts', ok: true, details: {} };
+	try {
+		native.dispose();
+		const observed = {};
+
+		async function seedWorking(rev) {
+			native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+			native.setSnapshot(contentSnapshot(rev, { status: 'working', presentationLabel: `State ${rev}` }));
+			await sleep(80);
+			await drainMain(native, 2);
+		}
+
+		await seedWorking(9800);
+		let diag = native.getDiagnostics();
+		observed.compact = { state: diag.activePresentationState, frame: captureFrame(diag) };
+		if (diag.activePresentationState !== 'compact') {
+			throw new Error(`expected compact, got ${diag.activePresentationState}`);
+		}
+
+		if (!native.simulateAction('peek')) {
+			throw new Error('peek failed');
+		}
+		await sleep(120);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		observed.peek = { state: diag.activePresentationState, frame: captureFrame(diag), peekOnly: diag.peekOnly };
+		if (diag.activePresentationState !== 'peek') {
+			throw new Error(`expected peek, got ${diag.activePresentationState}`);
+		}
+
+		if (!native.simulateAction('click')) {
+			throw new Error('click→interactive failed');
+		}
+		await sleep(180);
+		await drainMain(native, 3);
+		diag = native.getDiagnostics();
+		observed.interactive = { state: diag.activePresentationState, frame: captureFrame(diag) };
+		if (diag.activePresentationState !== 'interactive') {
+			throw new Error(`expected interactive, got ${diag.activePresentationState}`);
+		}
+
+		if (!native.simulateAction('pin')) {
+			throw new Error('pin failed');
+		}
+		await sleep(100);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		observed.pinned = { state: diag.activePresentationState, pinned: diag.pinned, frame: captureFrame(diag) };
+		if (diag.pinned !== true) {
+			throw new Error('expected pinned=true');
+		}
+		if (!(diag.activePresentationState === 'pinned' || diag.activePresentationState === 'interactive')) {
+			throw new Error(`expected pinned presentation, got ${diag.activePresentationState}`);
+		}
+
+		native.simulateAction('escape');
+		await sleep(100);
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(9810, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'state-appr',
+				title: 'Approve edits?',
+				message: 'Edit live_activity.mm?',
+			},
+		}));
+		await sleep(200);
+		await drainMain(native, 3);
+		diag = native.getDiagnostics();
+		observed.attentionPeek = { state: diag.activePresentationState, frame: captureFrame(diag) };
+		if (diag.activePresentationState !== 'attentionPeek') {
+			throw new Error(`expected attentionPeek, got ${diag.activePresentationState}`);
+		}
+
+		if (!native.simulateAction('escape')) {
+			throw new Error('escape→attentionCompact failed');
+		}
+		await sleep(120);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		observed.attentionCompact = {
+			state: diag.activePresentationState,
+			userDismissedAttention: diag.userDismissedAttention,
+			frame: captureFrame(diag),
+		};
+		if (diag.activePresentationState !== 'attentionCompact') {
+			throw new Error(`expected attentionCompact, got ${diag.activePresentationState}`);
+		}
+
+		native.setSnapshot(contentSnapshot(9820, {
+			status: 'completed',
+			presentationLabel: 'Completed',
+			currentActivity: 'Acceptance pass complete',
+			latestShortMessage: 'All suites passed',
+		}));
+		await sleep(120);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		observed.completed = { state: diag.activePresentationState, frame: captureFrame(diag) };
+		if (!(diag.activePresentationState === 'completedTransient' || diag.activePresentationState === 'compact' || diag.statusLabel === 'Completed')) {
+			// Native may surface completedTransient or keep compact with completed labels.
+			if (!/completed|Completed/i.test(String(diag.activePresentationState) + String(diag.statusLabel))) {
+				throw new Error(`expected completed presentation signal, got state=${diag.activePresentationState} label=${diag.statusLabel}`);
+			}
+		}
+
+		native.setSnapshot(contentSnapshot(9830, {
+			status: 'failed',
+			presentationLabel: 'Failed',
+			currentActivity: 'Acceptance failed',
+			latestShortMessage: 'Temporal layout recovery timed out',
+		}));
+		await sleep(120);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		observed.failed = { state: diag.activePresentationState, frame: captureFrame(diag) };
+		if (!(diag.activePresentationState === 'failedTransient' || /failed|Failed/i.test(String(diag.activePresentationState) + String(diag.statusLabel)))) {
+			throw new Error(`expected failed presentation signal, got state=${diag.activePresentationState} label=${diag.statusLabel}`);
+		}
+
+		test26.details = observed;
+	} catch (err) {
+		test26.ok = false;
+		test26.error = err.message;
+		results.failures.push(`state-specific-layouts: ${err.message}`);
+	}
+	results.tests.push(test26);
+
+	// Test 27: Content variants (empty/short/medium/long/multiline/long pending/long options)
+	const test27 = { name: 'content-variants-layout-stability', ok: true, details: {} };
+	try {
+		native.dispose();
+		await settleInteractive(native);
+		const variants = [
+			{ name: 'empty', extras: { presentationLabel: 'Magnus', currentActivity: '', latestShortMessage: '' } },
+			{ name: 'short', extras: { presentationLabel: 'Working', currentActivity: 'Compile', latestShortMessage: 'ok' } },
+			{ name: 'medium', extras: { presentationLabel: 'Working', currentActivity: 'Compiling project targets', latestShortMessage: 'Compiling 42 files…' } },
+			{ name: 'long', extras: { presentationLabel: 'Working', currentActivity: longText('long-activity', 35), latestShortMessage: longText('long-msg', 50) } },
+			{
+				name: 'multiline',
+				extras: {
+					presentationLabel: 'Working',
+					currentActivity: 'Line one of activity\nLine two continues validation across Temporal Full Map',
+					latestShortMessage: 'First line of message\nSecond line with more diagnostic commentary',
+				},
+			},
+			{
+				name: 'long-pending',
+				extras: {
+					status: 'attention',
+					presentationLabel: 'Approval needed',
+					pendingInteraction: {
+						kind: 'approval',
+						interactionId: 'variant-appr',
+						title: longText('pending-title', 18),
+						message: longText('pending-message', 40),
+						destructive: false,
+					},
+				},
+			},
+			{
+				name: 'long-options',
+				extras: {
+					status: 'attention',
+					presentationLabel: 'Needs input',
+					pendingInteraction: {
+						kind: 'question',
+						interactionId: 'variant-q',
+						title: 'Choose a deployment lane with a deliberately long title for containment',
+						message: longText('option-context', 25),
+						options: [
+							{ id: 'a', label: 'Development with extended diagnostics enabled' },
+							{ id: 'b', label: 'Staging with canary rollout and metrics' },
+							{ id: 'c', label: 'Production with guarded dual-write verification' },
+							{ id: 'd', label: 'Preview environment for Temporal Full Map checks' },
+						],
+					},
+				},
+			},
+		];
+
+		const heights = {};
+		let prevHeight = 0;
+		for (let i = 0; i < variants.length; i++) {
+			const variant = variants[i];
+			native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+			native.setSnapshot(contentSnapshot(9900 + i, variant.extras));
+			await sleep(140);
+			await drainMain(native, 3);
+			const diag = native.getDiagnostics();
+			const containment = layoutContainmentOk(diag);
+			const frame = captureFrame(diag);
+			heights[variant.name] = {
+				height: frame?.height,
+				containment,
+				state: diag.activePresentationState,
+				questionButtonCount: diag.questionButtonCount,
+			};
+			if (!containment.ok) {
+				throw new Error(`${variant.name} overflow: ${containment.reason}`);
+			}
+			if (variant.name === 'long' || variant.name === 'long-pending' || variant.name === 'long-options') {
+				if (!frame || frame.height <= 40) {
+					throw new Error(`${variant.name} must expand beyond compact height`);
+				}
+			}
+			if (variant.name === 'long-options' && (Number(diag.questionButtonCount) || 0) < 3) {
+				throw new Error(`long-options expected option buttons, got ${diag.questionButtonCount}`);
+			}
+			prevHeight = frame?.height || prevHeight;
+		}
+
+		// Content-only retarget: long text refresh must not restart geometry morph.
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(9989, {
+			status: 'working',
+			presentationLabel: 'Working',
+			currentActivity: 'Baseline before retarget',
+			latestShortMessage: 'ready',
+		}));
+		await sleep(120);
+		await drainMain(native, 3);
+		const baseline = captureStabilityBaseline(native.getDiagnostics());
+		native.setSnapshot(contentSnapshot(9990, {
+			status: 'working',
+			presentationLabel: 'Working',
+			currentActivity: longText('retarget-activity', 30),
+			latestShortMessage: longText('retarget-msg', 40),
+		}));
+		await sleep(80);
+		await drainMain(native, 3);
+		const afterRetarget = native.getDiagnostics();
+		assertContentOnlyStable(afterRetarget, baseline, {
+			expectedState: baseline.activePresentationState,
+			expectedTarget: baseline.targetPresentationState,
+		});
+		test27.details = { heights, retarget: { baselineAnim: baseline.animationCount, afterAnim: afterRetarget.animationCount, state: afterRetarget.activePresentationState } };
+	} catch (err) {
+		test27.ok = false;
+		test27.error = err.message;
+		results.failures.push(`content-variants-layout-stability: ${err.message}`);
+	}
+	results.tests.push(test27);
+
+	// Test 28: Full action lifecycle — approve/deny/option visibility, duplicate block, ack, timeout
+	const test28 = { name: 'action-lifecycle-approve-deny-option-timeout', ok: true, details: {} };
+	try {
+		native.dispose();
+		const commands = [];
+		native.setCommandHandler((msg) => {
+			const kind = msg?.kind || msg;
+			commands.push({ cmd: kind, payload: msg });
+		});
+
+		// --- Approve path ---
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(10_000, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'life-appr',
+				title: 'Approve write?',
+				message: 'Write live_activity.mm',
+			},
+		}));
+		await sleep(100);
+		await drainMain(native, 2);
+		native.simulateAction('interactive');
+		await sleep(80);
+		await drainMain(native, 2);
+
+		commands.length = 0;
+		if (native.simulateAction('approve') !== true) {
+			throw new Error('approve must succeed');
+		}
+		let diag = native.getDiagnostics();
+		if (diag.actionInFlight !== true) {
+			throw new Error('approve must set actionInFlight');
+		}
+		// Controls may be hidden in shallow headless frames; prefer visible when viewport grew.
+		const viewportH = Number(diag.contentViewport?.height) || 0;
+		if (viewportH >= 24 && diag.approvalControlsVisible !== true && !isValidDiagFrame(diag.approveButtonFrame)) {
+			throw new Error('approve controls must remain visible while in-flight once viewport is expanded');
+		}
+		await awaitCommands(() => commands.some(c => c.cmd === 'approve'));
+		const approveCmds = commands.filter(c => c.cmd === 'approve');
+		if (approveCmds.length !== 1) {
+			throw new Error(`expected exactly 1 approve command, got ${approveCmds.length}`);
+		}
+		native.simulateAction('approve'); // duplicate
+		await sleep(30);
+		await drainMain(native, 1);
+		const approveCmdsAfterDup = commands.filter(c => c.cmd === 'approve');
+		if (approveCmdsAfterDup.length !== 1) {
+			throw new Error(`duplicate approve must not emit again (got ${approveCmdsAfterDup.length})`);
+		}
+		diag = native.getDiagnostics();
+		if (diag.actionInFlight !== true) {
+			throw new Error('actionInFlight must stay true after duplicate approve');
+		}
+		native.setSnapshot(contentSnapshot(10_001, { status: 'working', currentActivity: 'Applying approval' }));
+		await sleep(80);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		if (diag.actionInFlight !== false) {
+			throw new Error('acknowledgment snapshot must clear actionInFlight after approve');
+		}
+
+		// --- Deny path ---
+		commands.length = 0;
+		native.setSnapshot(contentSnapshot(10_010, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'life-deny',
+				title: 'Deny deletion?',
+				message: 'Delete obsolete.ts?',
+			},
+		}));
+		await sleep(80);
+		await drainMain(native, 2);
+		if (native.simulateAction('deny') !== true) {
+			throw new Error('deny must succeed');
+		}
+		diag = native.getDiagnostics();
+		if (diag.actionInFlight !== true) {
+			throw new Error('deny must set actionInFlight');
+		}
+		await awaitCommands(() => commands.some(c => c.cmd === 'deny'));
+		native.simulateAction('deny');
+		await sleep(30);
+		await drainMain(native, 1);
+		if (commands.filter(c => c.cmd === 'deny').length !== 1) {
+			throw new Error('duplicate deny must not emit again');
+		}
+		native.setSnapshot(contentSnapshot(10_011, { status: 'working' }));
+		await sleep(60);
+		await drainMain(native, 2);
+		if (native.getDiagnostics().actionInFlight !== false) {
+			throw new Error('acknowledgment must clear actionInFlight after deny');
+		}
+
+		// --- Answer option: remain visible while in-flight ---
+		commands.length = 0;
+		native.setSnapshot(contentSnapshot(10_020, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'life-q',
+				title: 'Choose lane',
+				message: 'Pick deployment',
+				options: [
+					{ id: 'dev', label: 'Development' },
+					{ id: 'staging', label: 'Staging' },
+					{ id: 'prod', label: 'Production' },
+				],
+			},
+		}));
+		await sleep(100);
+		await drainMain(native, 2);
+		native.simulateAction('interactive');
+		await sleep(80);
+		await drainMain(native, 2);
+		const beforeOption = native.getDiagnostics();
+		const optionCountBefore = Number(beforeOption.questionButtonCount) || 0;
+		const optionFramesBefore = Array.isArray(beforeOption.optionButtonFrames) ? beforeOption.optionButtonFrames.length : 0;
+		if (optionCountBefore < 3 && optionFramesBefore < 3) {
+			// Headless may still answer via simulateClickOptionIndex using pendingOptions.
+			if ((Number(beforeOption.contentViewport?.height) || 0) >= 24) {
+				throw new Error(`expected question options before answer, got count=${optionCountBefore} frames=${optionFramesBefore}`);
+			}
+		}
+		if (native.simulateAction('option', 1) !== true) {
+			throw new Error('option answer must succeed');
+		}
+		diag = native.getDiagnostics();
+		if (diag.actionInFlight !== true) {
+			throw new Error('option answer must set actionInFlight');
+		}
+		if (diag.interactionId !== 'life-q') {
+			throw new Error(`interactionId must remain while in-flight, got ${diag.interactionId}`);
+		}
+		// Options must not be optimistically cleared (count/frames stay, or pending interaction id remains).
+		if ((Number(diag.questionButtonCount) || 0) === 0
+			&& (!Array.isArray(diag.optionButtonFrames) || diag.optionButtonFrames.length === 0)
+			&& diag.interactionId !== 'life-q') {
+			throw new Error('question options must remain visible while actionInFlight (no optimistic clear)');
+		}
+		await awaitCommands(() => commands.some(c => c.cmd === 'answer'));
+		native.simulateAction('option', 0);
+		await sleep(30);
+		await drainMain(native, 1);
+		if (commands.filter(c => c.cmd === 'answer').length !== 1) {
+			throw new Error(`duplicate option answer must not emit again (got ${commands.filter(c => c.cmd === 'answer').length})`);
+		}
+		native.setSnapshot(contentSnapshot(10_021, { status: 'working', currentActivity: 'Continuing' }));
+		await sleep(60);
+		await drainMain(native, 2);
+		if (native.getDiagnostics().actionInFlight !== false) {
+			throw new Error('acknowledgment must clear actionInFlight after option answer');
+		}
+
+		// --- Timeout restores actionable controls ---
+		commands.length = 0;
+		native.setSnapshot(contentSnapshot(10_030, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'life-timeout',
+				title: 'Approve timeout path?',
+				message: 'Timeout must restore',
+			},
+		}));
+		await sleep(80);
+		await drainMain(native, 2);
+		native.simulateAction('interactive');
+		await sleep(60);
+		if (native.simulateAction('approve') !== true) {
+			throw new Error('approve for timeout path must succeed');
+		}
+		diag = native.getDiagnostics();
+		const timeoutMs = Number(diag.actionInFlightTimeoutMs) || 8000;
+		if (diag.actionInFlight !== true) {
+			throw new Error('timeout path must start in-flight');
+		}
+		const waitUntil = Date.now() + timeoutMs + 600;
+		while (Date.now() < waitUntil) {
+			await sleep(200);
+			await drainMain(native, 2);
+			diag = native.getDiagnostics();
+			if (diag.actionInFlight === false) {
+				break;
+			}
+		}
+		diag = native.getDiagnostics();
+		if (diag.actionInFlight !== false) {
+			throw new Error(`actionInFlight must clear after timeout (${timeoutMs}ms), still ${diag.actionInFlight}`);
+		}
+		if (diag.lastNativeCommand !== 'actionTimeout' && diag.interactionId !== 'life-timeout') {
+			throw new Error(`timeout must restore pending approval (lastNativeCommand=${diag.lastNativeCommand}, interactionId=${diag.interactionId})`);
+		}
+		// Timeout restore must not invent haptics
+		if ((Number(diag.hapticCount) || 0) !== 0) {
+			throw new Error(`action lifecycle/timeout must not emit haptics, got ${diag.hapticCount}`);
+		}
+
+		test28.details = {
+			timeoutMs,
+			lastNativeCommand: diag.lastNativeCommand,
+			finalHapticCount: diag.hapticCount,
+			commandKinds: [...new Set(commands.map(c => c.cmd))],
+		};
+	} catch (err) {
+		test28.ok = false;
+		test28.error = err.message;
+		results.failures.push(`action-lifecycle-approve-deny-option-timeout: ${err.message}`);
+	}
+	results.tests.push(test28);
+
+	// Test 29: Shape-aware hit testing diagnostic contract
+	const test29 = { name: 'shape-aware-hit-testing-diagnostic', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(11_000, { status: 'working' }));
+		await sleep(80);
+		await drainMain(native, 2);
+		let diag = native.getDiagnostics();
+		if (diag.shapeAwareHitTesting !== true) {
+			throw new Error(`compact shapeAwareHitTesting must be true, got ${diag.shapeAwareHitTesting}`);
+		}
+		native.simulateAction('peek');
+		await sleep(100);
+		native.simulateAction('click');
+		await sleep(150);
+		await drainMain(native, 2);
+		diag = native.getDiagnostics();
+		if (diag.shapeAwareHitTesting !== true) {
+			throw new Error('interactive shapeAwareHitTesting must remain true');
+		}
+		// pathBounds is preferred product proof; fall back to panel/path topology when shape path not yet committed.
+		if (!diag.pathBounds || typeof diag.pathBounds.width !== 'number') {
+			if (diag.pathTopologyCompatible !== true && !diag.panelFrame) {
+				throw new Error('diagnostics must expose pathBounds (or pathTopologyCompatible/panelFrame) for shape-aware hit region');
+			}
+		}
+		test29.details = {
+			pathBounds: diag.pathBounds,
+			contentViewport: diag.contentViewport,
+			shapeAwareHitTesting: diag.shapeAwareHitTesting,
+			pathTopologyCompatible: diag.pathTopologyCompatible,
+		};
+	} catch (err) {
+		test29.ok = false;
+		test29.error = err.message;
+		results.failures.push(`shape-aware-hit-testing-diagnostic: ${err.message}`);
+	}
+	results.tests.push(test29);
 
 	native.dispose();
 

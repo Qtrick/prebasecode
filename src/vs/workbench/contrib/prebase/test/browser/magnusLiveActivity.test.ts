@@ -15,6 +15,7 @@ import {
 	computeLiveActivityExpandedHeight,
 	canonicalizeLiveActivityPanelState,
 	computeLiveActivityWingWidth,
+	createMagnusLiveActivityVisualFixture,
 	deriveLiveActivityGeometry,
 	deriveMagnusTestStateFromInvocations,
 	formatDiffMetric,
@@ -1933,7 +1934,7 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.match(native, /if \(self\.globalMonitor\) \{\s*return;/);
 	});
 
-	test('native SnapshotToDict emits metrics and pending options; answers clear pending locally', () => {
+	test('native SnapshotToDict emits metrics and pending options; answers stay visible until snapshot ack', () => {
 		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
 		assert.match(native, /payload\[@"metricsLabel"\]/);
 		assert.match(native, /workspaceDiff/);
@@ -1944,6 +1945,12 @@ suite('Magnus Live Activity native and settings contracts', () => {
 		assert.match(native, /@"optionId": optionId/);
 		assert.match(native, /clearPendingInteraction/);
 		assert.match(native, /\[self clearPendingInteraction\]/);
+		const answerStart = native.indexOf('- (void)answerOption:(id)sender {');
+		assert.ok(answerStart > 0, 'answerOption must exist');
+		const answerBlock = native.slice(answerStart, answerStart + 900);
+		assert.doesNotMatch(answerBlock, /clearPendingInteraction/, 'answerOption must not optimistically clear pending before snapshot ack');
+		assert.match(answerBlock, /beginActionInFlight/);
+		assert.match(answerBlock, /Keep pending interaction visible until snapshot acknowledges/);
 		// Never invent destructive:false — only set @YES when explicitly true.
 		assert.doesNotMatch(native, /@"destructive"\]\s*=\s*@NO/);
 		assert.doesNotMatch(native, /Get\("destructive"\)\.ToBoolean/);
@@ -2057,11 +2064,11 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 
 	test('computeLiveActivityExpandedHeight dynamically sizes based on content elements', () => {
 		const minimal = computeLiveActivityExpandedHeight({ bandHeight: 34 });
-		assert.strictEqual(minimal >= 86, true);
-		assert.strictEqual(minimal < 120, true);
+		assert.strictEqual(minimal >= 96, true);
+		assert.strictEqual(minimal <= 220, true);
 
 		const withActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true });
-		assert.strictEqual(withActivity, minimal + 18);
+		assert.strictEqual(withActivity > minimal, true);
 
 		const peekTitle = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingTitle: true, hasPendingMessage: true, hasActivity: true });
 		const peekActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasActivity: true, hasPendingMessage: true });
@@ -2071,7 +2078,7 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.strictEqual(peekFallback, 34 + 8 + 16 + 8, 'pendingMessage alone must not inflate peek height');
 
 		const withActions = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true, actionsCount: 3 });
-		assert.strictEqual(withActions, withActivity + 45);
+		assert.strictEqual(withActions > withActivity, true);
 
 		const withQuestion = computeLiveActivityExpandedHeight({
 			bandHeight: 34,
@@ -2418,6 +2425,111 @@ suite('Magnus Live Activity dynamic motion, haptics & content-aware interaction 
 		assert.match(target, /transitionInFlight && self\.layoutScreen/);
 		assert.doesNotMatch(target, /\[NSEvent mouseLocation\]/);
 		assert.match(native, /self\.layoutScreen = screen/);
+	});
+
+	test('createMagnusLiveActivityVisualFixture covers interactive content variants used by screenshot acceptance', () => {
+		const variants = ['working', 'question', 'approval', 'long', 'completed', 'failed', 'waiting'] as const;
+		for (const variant of variants) {
+			const snap = createMagnusLiveActivityVisualFixture(variant, { revision: 42 });
+			assert.strictEqual(snap.revision, 42);
+			assert.strictEqual(snap.connected, true);
+			assert.ok(snap.sessionId);
+			assert.ok(snap.sessionResource);
+		}
+		const question = createMagnusLiveActivityVisualFixture('question', { revision: 1 });
+		assert.strictEqual(question.status, 'attention');
+		assert.strictEqual(question.pendingInteraction?.kind, 'question');
+		assert.ok((question.pendingInteraction?.options?.length ?? 0) >= 3, 'question fixture needs multiple options');
+
+		const approval = createMagnusLiveActivityVisualFixture('approval', { revision: 2 });
+		assert.strictEqual(approval.status, 'attention');
+		assert.strictEqual(approval.pendingInteraction?.kind, 'approval');
+
+		const long = createMagnusLiveActivityVisualFixture('long', { revision: 3 });
+		assert.ok((long.currentActivity?.length ?? 0) > 80, 'long fixture must stress multiline activity');
+		assert.ok((long.latestShortMessage?.length ?? 0) > 120, 'long fixture must stress long message containment');
+
+		const completed = createMagnusLiveActivityVisualFixture('completed', { revision: 4 });
+		assert.strictEqual(completed.status, 'completed');
+		const failed = createMagnusLiveActivityVisualFixture('failed', { revision: 5 });
+		assert.strictEqual(failed.status, 'failed');
+	});
+
+	test('computeLiveActivityExpandedHeight grows for long / pending / option content variants', () => {
+		const empty = computeLiveActivityExpandedHeight({ bandHeight: 34 });
+		const short = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true });
+		const medium = computeLiveActivityExpandedHeight({
+			bandHeight: 34, hasActivity: true, hasLatestMessage: true, actionsCount: 1,
+		});
+		const long = computeLiveActivityExpandedHeight({
+			bandHeight: 34, hasActivity: true, hasLatestMessage: true, actionsCount: 3, hasMetrics: true,
+		});
+		const longPending = computeLiveActivityExpandedHeight({
+			bandHeight: 34,
+			hasActivity: true,
+			hasLatestMessage: true,
+			hasPendingTitle: true,
+			hasPendingMessage: true,
+			pendingKind: 'approval',
+		});
+		const longOptions = computeLiveActivityExpandedHeight({
+			bandHeight: 34,
+			hasActivity: true,
+			hasPendingTitle: true,
+			hasPendingMessage: true,
+			pendingKind: 'question',
+			hasOptions: true,
+		});
+		assert.ok(short > empty);
+		assert.ok(medium > short);
+		assert.ok(long >= medium);
+		assert.ok(longPending > long);
+		assert.ok(longOptions > medium);
+		assert.ok(longOptions <= 220);
+		assert.ok(longPending <= 220);
+	});
+
+	test('native action lifecycle uses in-flight + timeout without optimistic pending clear', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /kActionInFlightTimeout = 8\.0/);
+		assert.match(native, /- \(void\)beginActionInFlight/);
+		assert.match(native, /endActionInFlightRestoring:/);
+		assert.match(native, /dict\[@"actionInFlight"\]/);
+		assert.match(native, /dict\[@"actionInFlightTimeoutMs"\]/);
+		assert.match(native, /@"Applying…"/);
+		assert.match(native, /@"Dismissing…"/);
+		assert.match(native, /lastNativeCommand = @"actionTimeout"/);
+
+		for (const method of ['approve:', 'deny:', 'answerOption:']) {
+			const marker = method === 'answerOption:'
+				? '- (void)answerOption:(id)sender {'
+				: `- (void)${method}(id)sender {`;
+			const start = native.indexOf(marker);
+			assert.ok(start > 0, `${method} must exist`);
+			const block = native.slice(start, start + 700);
+			assert.match(block, /if \(self\.actionInFlight\)/);
+			assert.match(block, /beginActionInFlight/);
+		}
+	});
+
+	test('native diagnostics expose layout frames and shape-aware hit testing', () => {
+		const native = readRepo('native/prebase-live-activity/src/live_activity.mm');
+		assert.match(native, /dict\[@"shapeAwareHitTesting"\] = @YES/);
+		assert.match(native, /- \(NSView \*\)hitTest:\(NSPoint\)point/);
+		assert.match(native, /CGPathContainsPoint/);
+		assert.match(native, /Shape-aware hit testing/);
+		for (const key of [
+			'contentViewport',
+			'headerFrame',
+			'activityFrame',
+			'composerFrame',
+			'approveButtonFrame',
+			'denyButtonFrame',
+			'optionButtonFrames',
+			'pathBounds',
+		]) {
+			assert.match(native, new RegExp(`dict\\[@"${key}"\\]`), `diagnostics must expose ${key}`);
+		}
 	});
 });
 

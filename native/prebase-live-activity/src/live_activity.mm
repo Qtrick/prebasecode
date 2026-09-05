@@ -7,7 +7,6 @@
 static const CGFloat kCollapsedHeight = 34;
 static const CGFloat kPeekBodyHeight = 56;
 static const CGFloat kWingWidthMin = 52;
-static const CGFloat kWingWidthMax = 148;
 /** Fixed compact/peek wing widths — content text must not resize the notch island. */
 static const CGFloat kStableCompactLeftWing = 64;
 static const CGFloat kStableCompactRightWing = 64;
@@ -20,8 +19,67 @@ static const CGFloat kPillCornerRadius = 16;
 static const CGFloat kShoulderRadius = 12;
 static const CGFloat kBottomCornerRadius = 16;
 
+/** Content layout tokens — single source for measured stacking (not brittle per-control Y hacks). */
+static const CGFloat kContentInsetX = 16;
+static const CGFloat kContentInsetTop = 8;
+static const CGFloat kContentGap = 5;
+static const CGFloat kHeaderRowHeight = 18;
+static const CGFloat kFooterReserved = 34;
+static const CGFloat kControlHeight = 24;
+static const CGFloat kIconControlSize = 26;
+static const CGFloat kComposerCornerRadius = 11;
+static const CGFloat kExpandedHeightMax = 220;
+static const CGFloat kExpandedHeightMin = 96;
+static const NSTimeInterval kActionInFlightTimeout = 8.0;
+
 static const NSTimeInterval kHoverDwellInterval = 0.18; // 180ms intentional acquisition
 static const NSTimeInterval kExitGraceInterval = 0.25;  // 250ms hysteresis for movement into body
+
+static NSDictionary *RectDict(NSRect r) {
+	return @{
+		@"x": @(r.origin.x),
+		@"y": @(r.origin.y),
+		@"width": @(r.size.width),
+		@"height": @(r.size.height)
+	};
+}
+
+static void ApplySystemSymbol(NSButton *button, NSString *symbolName, NSString *accessibilityLabel) {
+	if (!button) {
+		return;
+	}
+	button.accessibilityLabel = accessibilityLabel;
+	if (@available(macOS 11.0, *)) {
+		NSImage *image = [NSImage imageWithSystemSymbolName:symbolName accessibilityDescription:accessibilityLabel];
+		if (image) {
+			NSImageSymbolConfiguration *config = [NSImageSymbolConfiguration configurationWithPointSize:11 weight:NSFontWeightMedium];
+			button.image = [image imageWithSymbolConfiguration:config];
+			button.imagePosition = NSImageOnly;
+			button.contentTintColor = [NSColor colorWithCalibratedWhite:0.88 alpha:1.0];
+			button.title = @"";
+			return;
+		}
+	}
+	button.image = nil;
+	button.imagePosition = NSNoImage;
+	// Compact glyph fallback — full label stays on accessibilityLabel.
+	button.title = @"•";
+}
+
+static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NSInteger maxLines) {
+	if (!text.length || width <= 1 || maxLines <= 0) {
+		return 0;
+	}
+	CGFloat lineH = ceil(font.ascender - font.descender + font.leading);
+	if (lineH < 12) {
+		lineH = font.pointSize + 4;
+	}
+	NSRect bounds = [text boundingRectWithSize:NSMakeSize(width, lineH * maxLines + 2)
+		options:(NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading)
+		attributes:@{ NSFontAttributeName: font }];
+	CGFloat h = ceil(NSHeight(bounds));
+	return MIN(lineH * maxLines, MAX(lineH, h));
+}
 
 static NSInteger LiveActivityWindowLevel(void) {
 	// Borderless panels at normal status/menu levels are clamped below the notch band.
@@ -244,6 +302,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL reducedMotion;
 @property (nonatomic, assign) BOOL attention;
 @property (nonatomic, assign) BOOL peekOnly;
+/** Vertical space reserved for footer controls inside expandedContainer (set by controller). */
+@property (nonatomic, assign) CGFloat reservedFooterHeight;
 @property (nonatomic, strong) NSTrackingArea *trackingArea;
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
 
@@ -269,6 +329,7 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL hovering;
 @property (nonatomic, assign) NSUInteger hoverSessionToken;
 @property (nonatomic, assign) BOOL actionInFlight;
+@property (nonatomic, strong) NSTimer *actionInFlightTimer;
 @property (nonatomic, assign) BOOL reducedMotion;
 @property (nonatomic, assign) BOOL ignoresMouse;
 @property (nonatomic, copy) NSString *sessionId;
@@ -319,6 +380,8 @@ static NSString *JSString(Napi::Value value) {
 - (void)mouseEnteredInView:(NSEvent *)event;
 - (void)mouseExitedFromView:(NSEvent *)event;
 - (void)clearPendingInteraction;
+- (void)beginActionInFlight;
+- (void)endActionInFlightRestoring:(BOOL)restore;
 - (void)expandPeek;
 - (void)expandInteractive;
 - (void)enterInteractiveSticky;
@@ -340,6 +403,7 @@ static NSString *JSString(Napi::Value value) {
 - (void)expandPreview;
 - (void)layoutForScreen;
 - (void)refreshContentOnly;
+- (CGFloat)computeControlsStackHeight;
 - (BOOL)framesEffectivelyEqual:(NSRect)a to:(NSRect)b;
 - (BOOL)isGlanceableSurface;
 @end
@@ -393,9 +457,11 @@ static NSString *JSString(Napi::Value value) {
 		[_expandedContainer addSubview:_statusBadge];
 
 		_activityDescription = [self makeLabel:12 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.90 alpha:1.0]];
+		[self configureLabel:_activityDescription lines:2 truncating:YES];
 		[_expandedContainer addSubview:_activityDescription];
 
 		_latestMessageLabel = [self makeLabel:11.5 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.85 alpha:1.0]];
+		[self configureLabel:_latestMessageLabel lines:2 truncating:YES];
 		_latestMessageLabel.hidden = YES;
 		[_expandedContainer addSubview:_latestMessageLabel];
 
@@ -407,9 +473,11 @@ static NSString *JSString(Napi::Value value) {
 		}
 
 		_pendingInteractionTitle = [self makeLabel:12 weight:NSFontWeightSemibold color:[NSColor colorWithCalibratedWhite:0.96 alpha:1.0]];
+		[self configureLabel:_pendingInteractionTitle lines:2 truncating:YES];
 		[_expandedContainer addSubview:_pendingInteractionTitle];
 
 		_pendingInteractionMessage = [self makeLabel:11 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.80 alpha:1.0]];
+		[self configureLabel:_pendingInteractionMessage lines:3 truncating:YES];
 		[_expandedContainer addSubview:_pendingInteractionMessage];
 
 		_expandedMetricsLabel = [self makeLabel:10.5 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.65 alpha:1.0]];
@@ -436,11 +504,93 @@ static NSString *JSString(Napi::Value value) {
 	tf.font = [NSFont systemFontOfSize:size weight:weight];
 	tf.textColor = color;
 	tf.lineBreakMode = NSLineBreakByTruncatingTail;
+	tf.maximumNumberOfLines = 1;
+	tf.cell.wraps = NO;
+	tf.cell.scrollable = NO;
 	return tf;
+}
+
+- (void)configureLabel:(NSTextField *)tf lines:(NSInteger)lines truncating:(BOOL)truncating {
+	tf.maximumNumberOfLines = MAX(1, lines);
+	tf.usesSingleLineMode = lines <= 1;
+	tf.cell.wraps = lines > 1;
+	tf.cell.scrollable = NO;
+	if (lines > 1) {
+		tf.lineBreakMode = truncating ? NSLineBreakByTruncatingTail : NSLineBreakByWordWrapping;
+	} else {
+		tf.lineBreakMode = NSLineBreakByTruncatingTail;
+	}
+}
+
+- (void)layoutCompactWingChrome:(CGFloat)bandH totalW:(CGFloat)totalW leftW:(CGFloat)leftW rightW:(CGFloat)rightW housing:(CGFloat)housing {
+	NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
+	self.leftStatusLabel.stringValue = label;
+	CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
+	self.leftStatusLabel.frame = NSMakeRect(14, MAX(4, (bandH - 16) / 2.0), maxLabelWidth, 16);
+	if (self.notched && self.metricsLabel.length) {
+		self.rightMetricsLabel.stringValue = self.metricsLabel;
+		self.rightMetricsLabel.hidden = NO;
+		CGFloat metricsX = leftW + housing + 8;
+		CGFloat metricsW = MAX(20, rightW - 16);
+		self.rightMetricsLabel.frame = NSMakeRect(metricsX, MAX(4, (bandH - 16) / 2.0), metricsW, 16);
+	} else {
+		self.rightMetricsLabel.hidden = YES;
+	}
+}
+
+- (BOOL)placeContentBlock:(NSTextField *)field text:(NSString *)text lines:(NSInteger)lines indent:(CGFloat)indent contentW:(CGFloat)contentW y:(CGFloat *)y contentMaxY:(CGFloat)contentMaxY {
+	if (!field || !text.length) {
+		return YES;
+	}
+	CGFloat avail = contentMaxY - *y;
+	if (avail < 12) {
+		return NO;
+	}
+	CGFloat fieldW = contentW - indent;
+	CGFloat need = MeasureTextHeight(text, field.font, fieldW, lines);
+	need = MIN(need, avail);
+	if (need < 11) {
+		return NO;
+	}
+	field.stringValue = text;
+	field.hidden = NO;
+	field.frame = NSMakeRect(kContentInsetX + indent, *y, fieldW, need);
+	*y += need + kContentGap;
+	return YES;
 }
 
 - (BOOL)isFlipped { return YES; }
 - (BOOL)acceptsFirstMouse:(NSEvent *)event { return YES; }
+
+- (NSView *)hitTest:(NSPoint)point {
+	// Shape-aware hit testing: transparent panel regions must not steal menu-bar clicks.
+	NSView *hit = [super hitTest:point];
+	if (!hit) {
+		return nil;
+	}
+	CAShapeLayer *shape = self.shapeLayer;
+	if (!shape) {
+		return hit;
+	}
+	NSPoint local = [self convertPoint:point fromView:self.superview];
+	CAShapeLayer *presentation = (CAShapeLayer *)shape.presentationLayer;
+	CGPathRef path = (presentation && presentation.path) ? presentation.path : shape.path;
+	if (!path) {
+		return hit;
+	}
+	CGPoint cgLocal = NSPointToCGPoint(local);
+	CGRect pathBounds = CGPathGetPathBoundingBox(path);
+	// Inflate slightly for shoulder hover acquisition near edges.
+	pathBounds = CGRectInset(pathBounds, -2.0, -2.0);
+	if (!CGRectContainsPoint(pathBounds, cgLocal)) {
+		return nil;
+	}
+	if (!CGPathContainsPoint(path, NULL, cgLocal, false)) {
+		// Notch cutout and exterior shoulders: pass through.
+		return nil;
+	}
+	return hit;
+}
 
 - (void)updateTrackingAreas {
 	[super updateTrackingAreas];
@@ -482,43 +632,20 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat leftW = self.leftWingWidth > 0 ? self.leftWingWidth : kWingWidthMin;
 	CGFloat rightW = self.rightWingWidth > 0 ? self.rightWingWidth : kWingWidthMin;
 	CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
+	CGFloat contentW = MAX(40, totalW - (kContentInsetX * 2));
 
 	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 
 	// Compact state: only collapsed wing chrome
 	if (!isExpanded) {
-		NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
-		self.leftStatusLabel.stringValue = label;
-		CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
-		self.leftStatusLabel.frame = NSMakeRect(14, MAX(4, (bandH - 18) / 2.0), maxLabelWidth, 18);
-		if (self.notched && self.metricsLabel.length) {
-			self.rightMetricsLabel.stringValue = self.metricsLabel;
-			self.rightMetricsLabel.hidden = NO;
-			CGFloat metricsX = leftW + housing + 8;
-			CGFloat metricsW = MAX(20, rightW - 16);
-			self.rightMetricsLabel.frame = NSMakeRect(metricsX, MAX(4, (bandH - 18) / 2.0), metricsW, 18);
-		} else {
-			self.rightMetricsLabel.hidden = YES;
-		}
+		[self layoutCompactWingChrome:bandH totalW:totalW leftW:leftW rightW:rightW housing:housing];
 		return;
 	}
 
 	// Attention Peek / Peek: keeps compact wings and shows one glanceable activity/pending line
 	if (self.peekOnly) {
-		NSString *label = self.statusLabel.length ? self.statusLabel : @"Magnus";
-		self.leftStatusLabel.stringValue = label;
-		CGFloat maxLabelWidth = self.notched ? (leftW - 20) : (totalW - 28);
-		self.leftStatusLabel.frame = NSMakeRect(14, MAX(4, (bandH - 18) / 2.0), maxLabelWidth, 18);
-		if (self.notched && self.metricsLabel.length) {
-			self.rightMetricsLabel.stringValue = self.metricsLabel;
-			self.rightMetricsLabel.hidden = NO;
-			CGFloat metricsX = leftW + housing + 8;
-			CGFloat metricsW = MAX(20, rightW - 16);
-			self.rightMetricsLabel.frame = NSMakeRect(metricsX, MAX(4, (bandH - 18) / 2.0), metricsW, 18);
-		} else {
-			self.rightMetricsLabel.hidden = YES;
-		}
+		[self layoutCompactWingChrome:bandH totalW:totalW leftW:leftW rightW:rightW housing:housing];
 		self.headerTitle.hidden = YES;
 		self.statusBadge.hidden = YES;
 		for (NSInteger i = 0; i < 3; i++) {
@@ -528,97 +655,86 @@ static NSString *JSString(Napi::Value value) {
 		self.pendingInteractionMessage.hidden = YES;
 		self.expandedMetricsLabel.hidden = YES;
 		self.latestMessageLabel.hidden = YES;
-		CGFloat bodyY = 6;
 		NSString *peekBody = nil;
-		if (self.pendingMessage.length) {
-			peekBody = self.pendingMessage;
-		} else if (self.pendingTitle.length) {
+		if (self.pendingTitle.length) {
 			peekBody = self.pendingTitle;
+		} else if (self.pendingMessage.length) {
+			peekBody = self.pendingMessage;
 		} else if (self.activityLabel.length) {
 			peekBody = self.activityLabel;
+		} else if (self.latestMessage.length) {
+			peekBody = self.latestMessage;
 		}
 		if (peekBody.length) {
-			if (peekBody.length > 96) {
-				peekBody = [[peekBody substringToIndex:93] stringByAppendingString:@"…"];
-			}
+			[self configureLabel:self.activityDescription lines:2 truncating:YES];
 			self.activityDescription.stringValue = peekBody;
 			self.activityDescription.hidden = NO;
-			self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
+			CGFloat peekH = MeasureTextHeight(peekBody, self.activityDescription.font, contentW, 2);
+			self.activityDescription.frame = NSMakeRect(kContentInsetX, kContentInsetTop, contentW, peekH);
 		} else {
 			self.activityDescription.hidden = YES;
 		}
 		return;
 	}
 
+	// Interactive: HEADER → CONTENT VIEWPORT → (controls laid out separately in footer)
 	self.headerTitle.hidden = NO;
 	self.statusBadge.hidden = NO;
-	CGFloat bodyY = 6;
-	self.headerTitle.frame = NSMakeRect(16, bodyY, 120, 18);
+
+	CGFloat bodyHeight = MAX(0, currentH - bandH);
+	CGFloat footerReserve = self.reservedFooterHeight > 0
+		? self.reservedFooterHeight
+		: MIN(kFooterReserved + 8, MAX(0, bodyHeight * 0.42));
+	CGFloat contentMaxY = MAX(kContentInsetTop + kHeaderRowHeight, bodyHeight - footerReserve);
+	CGFloat y = kContentInsetTop;
+
+	// Header: leading identity + trailing status (measured, no collision)
 	NSString *statusText = self.statusLabel.length
 		? self.statusLabel
 		: (self.attention ? @"Attention" : (self.status.length ? [self.status capitalizedString] : @"Working"));
 	self.statusBadge.stringValue = statusText;
 	self.statusBadge.textColor = self.attention
-		? [NSColor colorWithCalibratedRed:0.98 green:0.65 blue:0.18 alpha:0.95]
-		: [NSColor colorWithCalibratedWhite:0.65 alpha:1.0];
-	self.statusBadge.frame = NSMakeRect(totalW - 116, bodyY + 1, 100, 16);
+		? [NSColor colorWithCalibratedRed:0.98 green:0.72 blue:0.28 alpha:0.95]
+		: [NSColor colorWithCalibratedWhite:0.62 alpha:1.0];
 	self.statusBadge.alignment = NSTextAlignmentRight;
-	bodyY += 22;
+	CGFloat statusW = MIN(contentW * 0.42, MAX(48, [statusText sizeWithAttributes:@{ NSFontAttributeName: self.statusBadge.font }].width + 4));
+	CGFloat titleW = MAX(48, contentW - statusW - 10);
+	self.headerTitle.stringValue = @"Magnus";
+	self.headerTitle.frame = NSMakeRect(kContentInsetX, y, titleW, kHeaderRowHeight);
+	self.statusBadge.frame = NSMakeRect(kContentInsetX + titleW + 6, y + 1, statusW, 15);
+	y += kHeaderRowHeight + kContentGap;
 
-	if (self.activityLabel.length) {
-		self.activityDescription.stringValue = self.activityLabel;
-		self.activityDescription.hidden = NO;
-		self.activityDescription.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
-		bodyY += 18;
-	} else {
-		self.activityDescription.hidden = YES;
+	self.activityDescription.hidden = YES;
+	self.latestMessageLabel.hidden = YES;
+	self.pendingInteractionTitle.hidden = YES;
+	self.pendingInteractionMessage.hidden = YES;
+	self.expandedMetricsLabel.hidden = YES;
+	for (NSTextField *bullet in self.actionLabels) {
+		bullet.hidden = YES;
 	}
 
-	if (self.latestMessage.length) {
-		self.latestMessageLabel.stringValue = self.latestMessage;
-		self.latestMessageLabel.hidden = NO;
-		self.latestMessageLabel.frame = NSMakeRect(16, bodyY, totalW - 32, 18);
-		bodyY += 20;
-	} else {
-		self.latestMessageLabel.hidden = YES;
+	// Priority stack: pending first, then activity → message → actions → metrics.
+	BOOL hasPending = self.pendingTitle.length > 0 || self.pendingMessage.length > 0;
+	BOOL ok = YES;
+	if (ok && self.pendingTitle.length) {
+		ok = [self placeContentBlock:self.pendingInteractionTitle text:self.pendingTitle lines:2 indent:0 contentW:contentW y:&y contentMaxY:contentMaxY];
 	}
-
-	for (NSInteger i = 0; i < 3; i++) {
-		NSTextField *bullet = self.actionLabels[i];
-		if (i < (NSInteger)self.actions.count) {
-			bullet.stringValue = [NSString stringWithFormat:@"•  %@", self.actions[i]];
-			bullet.hidden = NO;
-			bullet.frame = NSMakeRect(18, bodyY, totalW - 36, 15);
-			bodyY += 15;
-		} else {
-			bullet.hidden = YES;
-		}
+	if (ok && self.pendingMessage.length) {
+		ok = [self placeContentBlock:self.pendingInteractionMessage text:self.pendingMessage lines:3 indent:0 contentW:contentW y:&y contentMaxY:contentMaxY];
 	}
-
-	if (self.pendingTitle.length) {
-		bodyY += 2;
-		self.pendingInteractionTitle.stringValue = self.pendingTitle;
-		self.pendingInteractionTitle.hidden = NO;
-		self.pendingInteractionTitle.frame = NSMakeRect(16, bodyY, totalW - 32, 18);
-		bodyY += 18;
-	} else {
-		self.pendingInteractionTitle.hidden = YES;
+	if (ok && self.activityLabel.length) {
+		ok = [self placeContentBlock:self.activityDescription text:self.activityLabel lines:2 indent:0 contentW:contentW y:&y contentMaxY:contentMaxY];
 	}
-	if (self.pendingMessage.length) {
-		self.pendingInteractionMessage.stringValue = self.pendingMessage;
-		self.pendingInteractionMessage.hidden = NO;
-		self.pendingInteractionMessage.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
-		bodyY += 18;
-	} else {
-		self.pendingInteractionMessage.hidden = YES;
+	if (ok && self.latestMessage.length) {
+		ok = [self placeContentBlock:self.latestMessageLabel text:self.latestMessage lines:2 indent:0 contentW:contentW y:&y contentMaxY:contentMaxY];
 	}
-
-	if (self.metricsLabel.length) {
-		self.expandedMetricsLabel.stringValue = self.metricsLabel;
-		self.expandedMetricsLabel.hidden = NO;
-		self.expandedMetricsLabel.frame = NSMakeRect(16, bodyY, totalW - 32, 16);
-	} else {
-		self.expandedMetricsLabel.hidden = YES;
+	NSInteger actionCount = MIN((NSInteger)self.actions.count, 3);
+	for (NSInteger i = 0; ok && i < actionCount; i++) {
+		NSString *bullet = [NSString stringWithFormat:@"•  %@", self.actions[i]];
+		ok = [self placeContentBlock:self.actionLabels[i] text:bullet lines:1 indent:2 contentW:contentW y:&y contentMaxY:contentMaxY];
+	}
+	if (ok && self.metricsLabel.length && !hasPending) {
+		[self placeContentBlock:self.expandedMetricsLabel text:self.metricsLabel lines:1 indent:0 contentW:contentW y:&y contentMaxY:contentMaxY];
 	}
 }
 
@@ -743,6 +859,9 @@ static NSString *JSString(Napi::Value value) {
 		}
 	}
 
+	if (self.controller) {
+		self.reservedFooterHeight = [self.controller computeControlsStackHeight] + 8;
+	}
 	[self refreshContentSubviewsPreservingPresentation];
 }
 
@@ -877,15 +996,15 @@ static NSString *JSString(Napi::Value value) {
 
 	self.input = [[NSTextField alloc] initWithFrame:NSMakeRect(14, 0, 200, 24)];
 	self.input.placeholderString = @"Message Magnus…";
-	self.input.font = [NSFont systemFontOfSize:11.5 weight:NSFontWeightRegular];
+	self.input.font = [NSFont systemFontOfSize:12 weight:NSFontWeightRegular];
 	self.input.focusRingType = NSFocusRingTypeNone;
 	self.input.bordered = NO;
 	self.input.wantsLayer = YES;
-	self.input.layer.cornerRadius = 12.0;
+	self.input.layer.cornerRadius = kComposerCornerRadius;
 	self.input.layer.masksToBounds = YES;
-	self.input.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.10 alpha:0.95].CGColor;
-	self.input.layer.borderWidth = 0.75;
-	self.input.layer.borderColor = [NSColor colorWithCalibratedWhite:0.22 alpha:0.6].CGColor;
+	self.input.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.12 alpha:0.96].CGColor;
+	self.input.layer.borderWidth = 0.5;
+	self.input.layer.borderColor = [NSColor colorWithCalibratedWhite:0.28 alpha:0.55].CGColor;
 	self.input.textColor = [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
 	self.input.hidden = YES;
 	self.input.target = self;
@@ -893,18 +1012,19 @@ static NSString *JSString(Napi::Value value) {
 	self.input.accessibilityLabel = @"Message Magnus";
 	[self.content.expandedContainer addSubview:self.input];
 
-	self.openButton = [self makeButton:@"Open in PreBase" action:@selector(openInPrebase:)];
-	self.pinButton = [self makeButton:@"Pin" action:@selector(togglePin:)];
-	self.pinButton.accessibilityLabel = @"Pin panel";
+	self.openButton = [self makeIconButton:@"arrow.up.right.square" accessibilityLabel:@"Open in PreBase" action:@selector(openInPrebase:)];
+	self.pinButton = [self makeIconButton:@"pin" accessibilityLabel:@"Pin panel" action:@selector(togglePin:)];
 	self.approveButton = [self makeButton:@"Approve" action:@selector(approve:)];
-	self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.13 green:0.48 blue:0.28 alpha:0.90].CGColor;
-	self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.22 green:0.62 blue:0.38 alpha:0.5].CGColor;
+	self.approveButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.16 green:0.52 blue:0.32 alpha:0.92].CGColor;
+	self.approveButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.28 green:0.68 blue:0.42 alpha:0.45].CGColor;
 	self.approveButton.contentTintColor = [NSColor whiteColor];
+	self.approveButton.font = [NSFont systemFontOfSize:11.5 weight:NSFontWeightSemibold];
 
 	self.denyButton = [self makeButton:@"Deny" action:@selector(deny:)];
-	self.denyButton.layer.backgroundColor = [NSColor colorWithCalibratedRed:0.45 green:0.15 blue:0.15 alpha:0.85].CGColor;
-	self.denyButton.layer.borderColor = [NSColor colorWithCalibratedRed:0.60 green:0.22 blue:0.22 alpha:0.4].CGColor;
-	self.denyButton.contentTintColor = [NSColor colorWithCalibratedWhite:0.95 alpha:1.0];
+	self.denyButton.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.16 alpha:0.9].CGColor;
+	self.denyButton.layer.borderColor = [NSColor colorWithCalibratedWhite:0.32 alpha:0.45].CGColor;
+	self.denyButton.contentTintColor = [NSColor colorWithCalibratedWhite:0.92 alpha:1.0];
+	self.denyButton.font = [NSFont systemFontOfSize:11.5 weight:NSFontWeightMedium];
 
 	self.approveButton.hidden = YES;
 	self.denyButton.hidden = YES;
@@ -916,6 +1036,26 @@ static NSString *JSString(Napi::Value value) {
 		button.hidden = YES;
 		[self.optionButtons addObject:button];
 	}
+}
+
+- (NSButton *)makeIconButton:(NSString *)symbolName accessibilityLabel:(NSString *)label action:(SEL)action {
+	NSButton *button = [[NSButton alloc] initWithFrame:NSMakeRect(0, 0, kIconControlSize, kIconControlSize)];
+	button.bezelStyle = NSBezelStyleInline;
+	button.bordered = NO;
+	button.wantsLayer = YES;
+	button.layer.cornerRadius = kIconControlSize * 0.5;
+	button.layer.masksToBounds = YES;
+	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.14 alpha:0.88].CGColor;
+	button.layer.borderWidth = 0.5;
+	button.layer.borderColor = [NSColor colorWithCalibratedWhite:0.28 alpha:0.4].CGColor;
+	button.target = self;
+	button.action = action;
+	button.hidden = YES;
+	button.accessibilityRole = NSAccessibilityButtonRole;
+	button.imageScaling = NSImageScaleProportionallyDown;
+	ApplySystemSymbol(button, symbolName, label);
+	[self.content.expandedContainer addSubview:button];
+	return button;
 }
 
 - (NSButton *)makeButton:(NSString *)title action:(SEL)action {
@@ -1020,10 +1160,27 @@ static NSString *JSString(Napi::Value value) {
 	self.contentOnlyUpdateCount++;
 	self.lastTransitionReason = @"content";
 	// Never snap shape/alpha or cancel morphPath — content updates must not interrupt geometry.
-	[self.content refreshContentSubviewsPreservingPresentation];
-	// Controls follow stable geometry only; mid-morph panel frames are transient.
-	if (self.panel && !self.transitionInFlight) {
-		[self layoutControls:self.panel.frame];
+	self.content.reservedFooterHeight = [self computeControlsStackHeight] + 8;
+	// Always refresh control chrome. Mid-morph, target lastRequestedFrame so pending
+	// options/approvals are not deferred until a stale completion handler runs.
+	if (self.panel) {
+		NSRect layoutWin = self.panel.frame;
+		if (self.transitionInFlight && !NSEqualRects(self.lastRequestedFrame, NSZeroRect)) {
+			layoutWin = self.lastRequestedFrame;
+		} else if (!NSEqualRects(self.lastRequestedFrame, NSZeroRect)
+			&& NSHeight(self.lastRequestedFrame) >= NSHeight(layoutWin)) {
+			layoutWin = self.lastRequestedFrame;
+		}
+		// Size the content view to the target geometry BEFORE measuring text, otherwise
+		// interactive content is laid out against a stale compact bounds and disappears.
+		if (NSHeight(layoutWin) > 0 && NSWidth(layoutWin) > 0) {
+			[self.content setFrameSize:layoutWin.size];
+		}
+		[self layoutControls:layoutWin];
+		[self.content refreshContentSubviewsPreservingPresentation];
+		[self layoutControls:layoutWin];
+	} else {
+		[self.content refreshContentSubviewsPreservingPresentation];
 	}
 }
 
@@ -1035,6 +1192,31 @@ static NSString *JSString(Napi::Value value) {
 	return kStableCompactRightWing;
 }
 
+/** Footer control stack height inside expandedContainer (options / approval / composer). */
+- (CGFloat)computeControlsStackHeight {
+	BOOL expanded = self.content.expanded || self.pinned;
+	if (!expanded || self.content.peekOnly) {
+		return 0;
+	}
+	BOOL hasOptions = ([self.pendingKind isEqualToString:@"question"] && self.pendingOptions.count > 0);
+	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
+	BOOL showInput = YES;
+	CGFloat h = 0;
+	if (hasOptions) {
+		NSInteger opts = MIN((NSInteger)self.pendingOptions.count, 4);
+		h += (opts > 2 ? 56 : 30);
+	}
+	if (hasApproval) {
+		h += 30;
+	}
+	if (showInput) {
+		h += kFooterReserved;
+	} else if (!hasOptions && !hasApproval) {
+		h += 30;
+	}
+	return h;
+}
+
 - (CGFloat)computeTargetContentHeight:(CGFloat)bandH {
 	BOOL expanded = self.content.expanded || self.pinned;
 	if (!expanded) {
@@ -1044,47 +1226,31 @@ static NSString *JSString(Napi::Value value) {
 	if ((self.content.peekOnly || self.attentionPeek) && !self.pinned) {
 		return bandH + kPeekBodyHeight;
 	}
-	// Content-aware expanded sizing (only consulted on real presentation layout)
-	CGFloat h = bandH + 8; // Top padding below notch band
-	h += 22; // Header
+	// Content-aware expanded sizing with reserved footer — clamp, never grow unbounded.
+	CGFloat h = bandH + kContentInsetTop;
+	h += kHeaderRowHeight + kContentGap;
 	if (self.content.activityLabel.length) {
-		h += 18;
+		h += 28; // up to 2 lines
 	}
 	if (self.content.latestMessage.length) {
-		h += 20;
+		h += 28;
 	}
 	if (self.content.actions.count > 0) {
-		h += MIN((NSInteger)self.content.actions.count, 3) * 15;
+		h += MIN((NSInteger)self.content.actions.count, 3) * 16;
 	}
 	if (self.content.pendingTitle.length) {
-		h += 20;
+		h += 28;
 	}
 	if (self.content.pendingMessage.length) {
-		h += 18;
+		h += 36; // up to 3 lines
 	}
-	if (self.content.metricsLabel.length) {
-		h += 18;
+	if (self.content.metricsLabel.length && !self.content.pendingTitle.length) {
+		h += 16;
 	}
-	h += 10; // Spacing before controls
-
-	BOOL hasOptions = ([self.pendingKind isEqualToString:@"question"] && self.pendingOptions.count > 0);
-	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
-	BOOL showInput = (self.content.expanded || self.pinned) && !self.content.peekOnly;
-
-	if (hasOptions) {
-		h += 30; // Options row
-	}
-	if (hasApproval) {
-		h += 28; // Approval buttons row
-	}
-	if (showInput) {
-		h += 32; // Follow-up message row
-	} else if (!hasOptions && !hasApproval) {
-		h += 24; // Open in PreBase row
-	}
-
+	h += kContentGap;
+	h += [self computeControlsStackHeight];
 	h += 10; // Bottom corner inset
-	return MIN(220.0, MAX(86.0, h));
+	return MIN(kExpandedHeightMax, MAX(kExpandedHeightMin, h));
 }
 
 - (void)layoutForScreen {
@@ -1096,16 +1262,50 @@ static NSString *JSString(Napi::Value value) {
 	self.content.targetExpanded = expanded;
 
 	if (!screen) {
-		// Headless / no NSScreen: morph on real presentation changes; otherwise content only.
-		if (forceMorph) {
-			self.geometryTransitionCount++;
-			self.lastTransitionReason = @"geometry";
-			[self.content updateShapeAndContentAnimated:!self.reducedMotion duration:0.18 useTargetState:YES targetSize:self.panel ? self.panel.frame.size : NSZeroSize];
+		// Headless / no NSScreen: size a synthetic panel so interactive/pending chrome
+		// and layout diagnostics remain meaningful in Node smoke harnesses.
+		if (self.content.safeAreaTop <= 0) {
+			self.content.safeAreaTop = kCollapsedHeight;
+		}
+		if (self.content.leftWingWidth <= 0) {
+			self.content.leftWingWidth = kWingWidthMin;
+		}
+		if (self.content.rightWingWidth <= 0) {
+			self.content.rightWingWidth = kWingWidthMin;
+		}
+		if (self.content.housingWidth <= 0) {
+			self.content.housingWidth = kCameraHousingMin;
+		}
+		CGFloat bandH = MAX(self.content.safeAreaTop, kCollapsedHeight);
+		CGFloat height = expanded ? [self computeTargetContentHeight:bandH] : bandH;
+		CGFloat width = MAX(280.0, self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
+		if (expanded) {
+			width = MAX(width, 360.0);
+		}
+		NSRect win = self.panel ? self.panel.frame : NSMakeRect(0, 0, width, height);
+		win.size.width = width;
+		win.size.height = height;
+		BOOL isFirstLayout = !self.panel.isVisible || NSEqualRects(self.panel.frame, NSMakeRect(0, 0, 280, 36));
+		BOOL frameUnchanged = !isFirstLayout && [self framesEffectivelyEqual:win to:self.lastRequestedFrame];
+		self.lastRequestedFrame = win;
+		if (frameUnchanged && !forceMorph) {
 			if (self.panel) {
-				[self layoutControls:self.panel.frame];
+				[self refreshContentOnly];
 			}
-		} else if (self.panel) {
-			[self refreshContentOnly];
+			return;
+		}
+		if (forceMorph || !frameUnchanged) {
+			self.geometryTransitionCount++;
+			self.lastTransitionReason = isFirstLayout ? @"firstLayout" : @"geometry";
+		}
+		if (self.panel) {
+			[self.panel setFrame:win display:YES];
+			[self.panel.contentView setFrameSize:win.size];
+			[self layoutControls:win];
+			[self.content updateShapeAndContentAnimated:(forceMorph && !self.reducedMotion)
+											  duration:(forceMorph && !self.reducedMotion) ? 0.18 : 0
+										useTargetState:YES
+											targetSize:win.size];
 		}
 		return;
 	}
@@ -1233,6 +1433,12 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat bandH = MAX(self.content.safeAreaTop, kCollapsedHeight);
 	CGFloat effectiveH = win.size.height;
 	CGFloat bodyHeight = effectiveH - bandH;
+	// Keep the expanded container synchronized with the geometry we lay into so
+	// diagnostics and hit-testing match control frames (avoids panel/path desync).
+	if (self.content.expandedContainer) {
+		self.content.expandedContainer.frame = NSMakeRect(0, bandH, NSWidth(win), MAX(0, bodyHeight));
+		self.content.compactContainer.frame = NSMakeRect(0, 0, NSWidth(win), bandH);
+	}
 	if (bodyHeight < 36.0) {
 		self.input.hidden = YES;
 		self.openButton.hidden = YES;
@@ -1241,23 +1447,37 @@ static NSString *JSString(Napi::Value value) {
 		self.denyButton.hidden = YES;
 		return;
 	}
-	CGFloat bottomY = bodyHeight - 28;
+
+	const CGFloat inset = kContentInsetX;
+	const CGFloat gap = 6;
+	CGFloat bottomY = bodyHeight - kControlHeight - 8;
+	CGFloat usableW = NSWidth(win) - inset * 2;
 
 	[self updatePinButtonState];
 	self.pinButton.hidden = NO;
+	self.openButton.hidden = NO;
 
+	// Footer composer row: [ composer ........ ] [pin] [open]
 	if (showInput) {
 		self.input.hidden = NO;
-		self.input.frame = NSMakeRect(14, bottomY, NSWidth(win) - 206, 24);
-		self.pinButton.frame = NSMakeRect(NSWidth(win) - 186, bottomY, 52, 22);
-		self.openButton.frame = NSMakeRect(NSWidth(win) - 128, bottomY, 114, 22);
-		self.openButton.hidden = NO;
-		bottomY -= 30;
+		CGFloat trailing = kIconControlSize * 2 + gap * 2;
+		CGFloat composerW = MAX(72, usableW - trailing);
+		self.input.frame = NSMakeRect(inset, bottomY, composerW, kControlHeight);
+		self.pinButton.frame = NSMakeRect(inset + composerW + gap, bottomY + 1, kIconControlSize, kIconControlSize);
+		self.openButton.frame = NSMakeRect(inset + composerW + gap + kIconControlSize + gap, bottomY + 1, kIconControlSize, kIconControlSize);
+		bottomY -= (kControlHeight + 8);
 	} else {
 		self.input.hidden = YES;
-		self.pinButton.frame = NSMakeRect(NSWidth(win) - 186, bottomY, 52, 22);
-		self.openButton.frame = NSMakeRect(NSWidth(win) - 128, bottomY, 114, 22);
-		self.openButton.hidden = NO;
+		self.pinButton.frame = NSMakeRect(NSWidth(win) - inset - kIconControlSize * 2 - gap, bottomY + 1, kIconControlSize, kIconControlSize);
+		self.openButton.frame = NSMakeRect(NSWidth(win) - inset - kIconControlSize, bottomY + 1, kIconControlSize, kIconControlSize);
+		bottomY -= (kControlHeight + 6);
+	}
+
+	BOOL controlsEnabled = !self.actionInFlight;
+	self.approveButton.enabled = controlsEnabled;
+	self.denyButton.enabled = controlsEnabled;
+	for (NSButton *btn in self.optionButtons) {
+		btn.enabled = controlsEnabled;
 	}
 
 	if (!self.approveButton.hidden) {
@@ -1265,49 +1485,60 @@ static NSString *JSString(Napi::Value value) {
 		self.approveButton.title = self.actionInFlight ? @"Applying…" : approveTitle;
 		self.approveButton.accessibilityLabel = approveTitle;
 		self.denyButton.title = self.actionInFlight ? @"Dismissing…" : @"Deny";
-		self.denyButton.frame = NSMakeRect(14, bottomY, 68, 22);
-		self.approveButton.frame = NSMakeRect(86, bottomY, self.pendingDestructive ? 144 : 78, 22);
+		self.denyButton.accessibilityLabel = @"Deny";
+		// Deny secondary, Approve primary — intrinsic-ish widths with clamps
+		CGFloat denyW = 64;
+		CGFloat approveW = self.pendingDestructive ? MIN(168, usableW - denyW - gap) : 86;
+		self.denyButton.frame = NSMakeRect(inset, bottomY, denyW, kControlHeight);
+		self.approveButton.frame = NSMakeRect(inset + denyW + gap, bottomY, approveW, kControlHeight);
+		bottomY -= (kControlHeight + 6);
 	}
 
 	if (question && showAttention) {
 		NSInteger totalOpts = (NSInteger)self.pendingOptions.count;
-		CGFloat x = 14;
-		if (totalOpts <= 4) {
-			for (NSInteger i = 0; i < totalOpts && i < (NSInteger)self.optionButtons.count; i++) {
-				NSDictionary *option = self.pendingOptions[i];
-				NSButton *button = self.optionButtons[i];
-				NSString *label = option[@"label"] ?: option[@"id"] ?: @"Option";
+		CGFloat x = inset;
+		// Options sit above the composer: reserve at least one row even on short panels.
+		CGFloat rowY = MAX(0, bottomY);
+		NSInteger maxDirect = totalOpts > 4 ? 3 : totalOpts;
+		NSInteger perRow = MAX(1, (NSInteger)floor((usableW + gap) / (72 + gap)));
+		CGFloat slotW = MIN(140, MAX(56, (usableW - gap * MAX(0, perRow - 1)) / MAX(1, perRow)));
+		for (NSInteger i = 0; i < maxDirect && i < (NSInteger)self.optionButtons.count; i++) {
+			NSDictionary *option = self.pendingOptions[i];
+			NSButton *button = self.optionButtons[i];
+			NSString *label = option[@"label"] ?: option[@"id"] ?: @"Option";
+			if (self.actionInFlight) {
+				button.title = @"…";
+			} else {
 				button.title = label;
-				button.accessibilityLabel = label;
-				button.hidden = NO;
-				CGFloat width = MIN(130, MAX(64, label.length * 7.0 + 16.0));
-				if (x + width > NSWidth(win) - 134) {
-					x = 14;
-					bottomY -= 26;
-				}
-				button.frame = NSMakeRect(x, bottomY, width, 22);
-				x += width + 6;
 			}
-		} else {
-			// >4 options: Show first 3 options directly + 4th button "More in PreBase..."
-			for (NSInteger i = 0; i < 3 && i < (NSInteger)self.optionButtons.count; i++) {
-				NSDictionary *option = self.pendingOptions[i];
-				NSButton *button = self.optionButtons[i];
-				NSString *label = option[@"label"] ?: option[@"id"] ?: @"Option";
-				button.title = label;
-				button.accessibilityLabel = label;
-				button.hidden = NO;
-				CGFloat width = MIN(100, MAX(56, label.length * 6.5 + 14.0));
-				button.frame = NSMakeRect(x, bottomY, width, 22);
-				x += width + 6;
+			button.accessibilityLabel = label;
+			CGFloat intrinsic = [label sizeWithAttributes:@{ NSFontAttributeName: button.font }].width + 20;
+			CGFloat width = MIN(slotW, MAX(56, intrinsic));
+			if (x + width > inset + usableW + 0.5) {
+				x = inset;
+				rowY -= (kControlHeight + 4);
 			}
-			if (self.optionButtons.count >= 4) {
-				NSButton *moreButton = self.optionButtons[3];
-				moreButton.title = @"More in PreBase…";
-				moreButton.accessibilityLabel = @"More options in PreBase";
-				moreButton.hidden = NO;
-				moreButton.frame = NSMakeRect(x, bottomY, 118, 22);
+			if (rowY < 0) {
+				// Compress onto the last visible row rather than dropping options entirely.
+				rowY = 0;
+				x = inset;
+				width = MIN(width, MAX(48, (usableW - gap * (maxDirect - i - 1)) / MAX(1, (maxDirect - i))));
 			}
+			button.hidden = NO;
+			button.frame = NSMakeRect(x, rowY, width, kControlHeight);
+			x += width + gap;
+		}
+		if (totalOpts > 4 && self.optionButtons.count >= 4) {
+			NSButton *moreButton = self.optionButtons[3];
+			moreButton.title = @"More…";
+			moreButton.accessibilityLabel = @"More options in PreBase";
+			CGFloat moreW = MIN(72, slotW);
+			if (x + moreW > inset + usableW + 0.5) {
+				x = inset;
+				rowY = MAX(0, rowY - (kControlHeight + 4));
+			}
+			moreButton.hidden = NO;
+			moreButton.frame = NSMakeRect(x, MAX(0, rowY), moreW, kControlHeight);
 		}
 	}
 }
@@ -1627,10 +1858,8 @@ static NSString *JSString(Napi::Value value) {
 	if (self.actionInFlight) {
 		return;
 	}
-	self.actionInFlight = YES;
-	self.approveButton.title = @"Applying…";
-	self.approveButton.enabled = NO;
-	self.denyButton.enabled = NO;
+	[self beginActionInFlight];
+	[self layoutControls:self.panel ? self.panel.frame : self.lastRequestedFrame];
 	[self emit:@"approve" extras:@{ @"interactionId": self.interactionId ?: @"" }];
 }
 
@@ -1638,17 +1867,15 @@ static NSString *JSString(Napi::Value value) {
 	if (self.actionInFlight) {
 		return;
 	}
-	self.actionInFlight = YES;
-	self.denyButton.title = @"Dismissing…";
-	self.approveButton.enabled = NO;
-	self.denyButton.enabled = NO;
+	[self beginActionInFlight];
+	[self layoutControls:self.panel ? self.panel.frame : self.lastRequestedFrame];
 	[self emit:@"deny" extras:@{ @"interactionId": self.interactionId ?: @"" }];
 }
 
 - (void)answerOption:(id)sender {
 	NSButton *button = (NSButton *)sender;
 	if (button.tag == 3 && self.pendingOptions.count > 4) {
-		// Tertiary "More in PreBase..." delegate
+		// Tertiary "More…" delegates to Open in PreBase
 		[self openInPrebase:sender];
 		return;
 	}
@@ -1663,32 +1890,61 @@ static NSString *JSString(Napi::Value value) {
 	if (optionId.length == 0) {
 		return;
 	}
-	self.actionInFlight = YES;
-	for (NSButton *btn in self.optionButtons) {
-		btn.enabled = NO;
-	}
+	[self beginActionInFlight];
+	[self layoutControls:self.panel ? self.panel.frame : self.lastRequestedFrame];
 	NSString *interactionId = self.interactionId ?: @"";
 	[self emit:@"answer" extras:@{
 		@"interactionId": interactionId,
 		@"optionId": optionId
 	}];
-	[self clearPendingInteraction];
+	// Keep pending interaction visible until snapshot acknowledges resolution.
+}
+
+- (void)beginActionInFlight {
+	self.actionInFlight = YES;
+	self.approveButton.enabled = NO;
+	self.denyButton.enabled = NO;
+	for (NSButton *btn in self.optionButtons) {
+		btn.enabled = NO;
+	}
+	[self.actionInFlightTimer invalidate];
+	self.actionInFlightTimer = nil;
+	__weak PrebaseLiveActivityController *weakSelf = self;
+	NSTimer *timer = [NSTimer timerWithTimeInterval:kActionInFlightTimeout repeats:NO block:^(NSTimer *t) {
+		PrebaseLiveActivityController *strong = weakSelf;
+		if (!strong || !strong.actionInFlight) {
+			return;
+		}
+		// Truthful failure path: restore actionable controls without claiming success.
+		[strong endActionInFlightRestoring:YES];
+		strong.lastNativeCommand = @"actionTimeout";
+		[strong layoutControls:strong.panel ? strong.panel.frame : strong.lastRequestedFrame];
+	}];
+	[[NSRunLoop mainRunLoop] addTimer:timer forMode:NSRunLoopCommonModes];
+	self.actionInFlightTimer = timer;
+}
+
+- (void)endActionInFlightRestoring:(BOOL)restore {
+	[self.actionInFlightTimer invalidate];
+	self.actionInFlightTimer = nil;
+	self.actionInFlight = NO;
+	if (restore) {
+		self.approveButton.enabled = YES;
+		self.denyButton.enabled = YES;
+		for (NSButton *btn in self.optionButtons) {
+			btn.enabled = YES;
+		}
+	}
 }
 
 - (void)clearPendingInteraction {
-	self.actionInFlight = NO;
+	[self endActionInFlightRestoring:YES];
 	self.interactionId = @"";
 	self.pendingKind = @"";
 	self.pendingDestructive = NO;
 	self.pendingOptions = @[];
 	self.content.pendingTitle = @"";
 	self.content.pendingMessage = @"";
-	self.openButton.title = @"Open in PreBase";
-	self.approveButton.enabled = YES;
-	self.denyButton.enabled = YES;
-	for (NSButton *btn in self.optionButtons) {
-		btn.enabled = YES;
-	}
 	[self refreshContentOnly];
 }
 
@@ -1783,7 +2039,65 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"approvalControlsVisible"] = @(!self.approveButton.hidden);
 	dict[@"openInPreBaseVisible"] = @(!self.openButton.hidden);
 	dict[@"pinButtonVisible"] = @(!self.pinButton.hidden);
-	dict[@"pinButtonTitle"] = self.pinButton.title ?: @"";
+	dict[@"pinButtonTitle"] = self.pinButton.accessibilityLabel ?: self.pinButton.title ?: @"";
+	dict[@"openButtonTitle"] = self.openButton.accessibilityLabel ?: self.openButton.title ?: @"";
+	dict[@"shapeAwareHitTesting"] = @YES;
+	dict[@"actionInFlightTimeoutMs"] = @(kActionInFlightTimeout * 1000.0);
+	dict[@"reservedFooterHeight"] = @(self.content.reservedFooterHeight);
+	// Layout geometry frames for containment verification (no sensitive text).
+	// Child frames are in expandedContainer local coordinates (flipped, origin top-left).
+	{
+		CGFloat bandH = MAX(self.content.safeAreaTop, kCollapsedHeight);
+		// Prefer the authoritative panel/target size over a possibly stale container bounds
+		// mid-morph or immediately after a content-only refresh.
+		CGFloat bodyW = NSWidth(self.content.expandedContainer.bounds);
+		CGFloat bodyH = NSHeight(self.content.expandedContainer.bounds);
+		if (self.panel) {
+			NSRect pf = NSEqualRects(self.lastRequestedFrame, NSZeroRect) ? self.panel.frame : self.lastRequestedFrame;
+			bodyW = MAX(bodyW, NSWidth(pf));
+			bodyH = MAX(bodyH, MAX(0, NSHeight(pf) - bandH));
+		}
+		NSRect expandedLocal = NSMakeRect(0, 0, bodyW, bodyH);
+		CGFloat footerReserve = MIN(MAX(0, self.content.reservedFooterHeight), MAX(0, bodyH * 0.55));
+		CGFloat textHeight = MAX(0, bodyH - footerReserve);
+		dict[@"bodyBounds"] = RectDict(expandedLocal);
+		dict[@"contentViewport"] = RectDict(NSMakeRect(0, 0, bodyW, textHeight));
+		dict[@"headerFrame"] = self.content.headerTitle.hidden ? [NSNull null] : RectDict(self.content.headerTitle.frame);
+		dict[@"statusBadgeFrame"] = self.content.statusBadge.hidden ? [NSNull null] : RectDict(self.content.statusBadge.frame);
+		dict[@"activityFrame"] = self.content.activityDescription.hidden ? [NSNull null] : RectDict(self.content.activityDescription.frame);
+		dict[@"latestMessageFrame"] = self.content.latestMessageLabel.hidden ? [NSNull null] : RectDict(self.content.latestMessageLabel.frame);
+		dict[@"pendingTitleFrame"] = self.content.pendingInteractionTitle.hidden ? [NSNull null] : RectDict(self.content.pendingInteractionTitle.frame);
+		dict[@"pendingMessageFrame"] = self.content.pendingInteractionMessage.hidden ? [NSNull null] : RectDict(self.content.pendingInteractionMessage.frame);
+		dict[@"composerFrame"] = self.input.hidden ? [NSNull null] : RectDict(self.input.frame);
+		dict[@"pinButtonFrame"] = self.pinButton.hidden ? [NSNull null] : RectDict(self.pinButton.frame);
+		dict[@"openButtonFrame"] = self.openButton.hidden ? [NSNull null] : RectDict(self.openButton.frame);
+		dict[@"approveButtonFrame"] = self.approveButton.hidden ? [NSNull null] : RectDict(self.approveButton.frame);
+		dict[@"denyButtonFrame"] = self.denyButton.hidden ? [NSNull null] : RectDict(self.denyButton.frame);
+		NSMutableArray *actionFrames = [NSMutableArray array];
+		for (NSTextField *lbl in self.content.actionLabels) {
+			if (!lbl.hidden) {
+				[actionFrames addObject:RectDict(lbl.frame)];
+			}
+		}
+		dict[@"actionFrames"] = actionFrames;
+		NSMutableArray *optionFrames = [NSMutableArray array];
+		for (NSButton *btn in self.optionButtons) {
+			if (!btn.hidden) {
+				[optionFrames addObject:RectDict(btn.frame)];
+			}
+		}
+		dict[@"optionButtonFrames"] = optionFrames;
+		dict[@"bandHeight"] = @(bandH);
+		if (self.content.shapeLayer.path) {
+			CGRect pb = CGPathGetPathBoundingBox(self.content.shapeLayer.path);
+			dict[@"pathBounds"] = @{
+				@"x": @(pb.origin.x),
+				@"y": @(pb.origin.y),
+				@"width": @(pb.size.width),
+				@"height": @(pb.size.height)
+			};
+		}
+	}
 	NSInteger visibleOptions = 0;
 	NSMutableArray *optLabels = [NSMutableArray array];
 	for (NSButton *btn in self.optionButtons) {
@@ -1968,15 +2282,10 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)updatePinButtonState {
-	if (self.pinned) {
-		self.pinButton.title = @"Unpin";
-		self.pinButton.accessibilityLabel = @"Unpin panel";
-		self.pinButton.state = NSControlStateValueOn;
-	} else {
-		self.pinButton.title = @"Pin";
-		self.pinButton.accessibilityLabel = @"Pin panel";
-		self.pinButton.state = NSControlStateValueOff;
-	}
+	NSString *symbol = self.pinned ? @"pin.fill" : @"pin";
+	NSString *label = self.pinned ? @"Unpin panel" : @"Pin panel";
+	self.pinButton.state = self.pinned ? NSControlStateValueOn : NSControlStateValueOff;
+	ApplySystemSymbol(self.pinButton, symbol, label);
 }
 
 - (BOOL)simulateClickPin {
@@ -2077,13 +2386,8 @@ static NSString *JSString(Napi::Value value) {
 	NSString *incomingInteractionId = snapshot[@"interactionId"] ?: @"";
 	if (self.actionInFlight) {
 		// Clear in-flight state when snapshot confirms interaction transitioned, resolved, or status returned to working/idle
-		if (incomingInteractionId.length == 0 || ![incomingInteractionId isEqualToString:self.interactionId] || [status isEqualToString:@"idle"] || [status isEqualToString:@"working"]) {
-			self.actionInFlight = NO;
-			self.approveButton.enabled = YES;
-			self.denyButton.enabled = YES;
-			for (NSButton *btn in self.optionButtons) {
-				btn.enabled = YES;
-			}
+		if (incomingInteractionId.length == 0 || ![incomingInteractionId isEqualToString:self.interactionId] || [status isEqualToString:@"idle"] || [status isEqualToString:@"working"] || [status isEqualToString:@"completed"] || [status isEqualToString:@"failed"]) {
+			[self endActionInFlightRestoring:YES];
 		}
 	}
 	self.interactionId = incomingInteractionId;
@@ -2309,6 +2613,9 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)teardown {
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
+	[self.actionInFlightTimer invalidate];
+	self.actionInFlightTimer = nil;
+	self.actionInFlight = NO;
 	[self.hoverTimer invalidate];
 	self.hoverTimer = nil;
 	[self.exitTimer invalidate];
@@ -2326,6 +2633,11 @@ static NSString *JSString(Napi::Value value) {
 static PrebaseLiveActivityController *gController;
 
 static PrebaseLiveActivityController *EnsureController() {
+	// Node/smoke harnesses may load the addon without an AppKit run loop owner.
+	// Touching NSApp ensures NSScreen.screens is populated for layout diagnostics.
+	if (NSApp == nil) {
+		[NSApplication sharedApplication];
+	}
 	if (!gController) {
 		gController = [PrebaseLiveActivityController new];
 	}
@@ -2436,6 +2748,9 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 }
 
 static Napi::Value DictToJs(Napi::Env env, id value) {
+	if ([value isKindOfClass:[NSNull class]] || value == nil) {
+		return env.Null();
+	}
 	if ([value isKindOfClass:[NSDictionary class]]) {
 		Napi::Object obj = Napi::Object::New(env);
 		NSDictionary *dict = (NSDictionary *)value;

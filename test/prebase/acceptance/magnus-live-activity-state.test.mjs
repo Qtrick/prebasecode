@@ -165,9 +165,21 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 
 	const contribution = readFileSync(resolve(repoRoot, 'src/vs/workbench/contrib/prebase/browser/magnusLiveActivityContribution.ts'), 'utf8');
 	assert.match(contribution, /Presentation before snapshot/);
+	const flushMarker = contribution.indexOf('Presentation before snapshot');
+	assert.ok(flushMarker >= 0);
+	const flushRegion = contribution.slice(flushMarker, flushMarker + 700);
 	assert.ok(
-		contribution.indexOf('setPresentation(presentation)') < contribution.indexOf('setSnapshot({'),
+		flushRegion.indexOf('setPresentation(presentation)') >= 0
+		&& flushRegion.indexOf('setPresentation(presentation)') < flushRegion.indexOf('setSnapshot({'),
 		'unlock must present before snapshot so attentionPeek can expand',
+	);
+	const fixtureSeed = contribution.indexOf('publishVisualFixtureForSmoke');
+	assert.ok(fixtureSeed >= 0);
+	const fixtureRegion = contribution.slice(fixtureSeed, fixtureSeed + 1800);
+	assert.ok(
+		fixtureRegion.indexOf('setPresentation({') >= 0
+		&& fixtureRegion.indexOf('setPresentation({') < fixtureRegion.indexOf('setSnapshot({'),
+		'visual fixture seed must also apply presentation before snapshot',
 	);
 	assert.match(contribution, /userDismissedAttention: this\._userDismissedAttention/);
 	assert.match(contribution, /getSystemIdleState\(1\)/);
@@ -178,6 +190,70 @@ test('native pendingMessage bridge + unpin/collapse source contracts (Linux-read
 	assert.match(native, /const BOOL activeInteraction = isInteractive && \(self\.hovering \|\| self\.panel\.firstResponder == self\.input\.currentEditor \|\| self\.input\.stringValue\.length > 0 \|\| self\.exitTimer != nil\);/);
 	assert.match(native, /if \(self\.content\.expanded && !peekSurface && !activeInteraction\) \{/);
 	assert.match(native, /self\.content\.expanded = self\.content\.expanded && \(peekSurface \|\| activeInteraction\);/);
+});
+
+test('visual fixtures and height variants cover populated Live Activity layouts', () => {
+	const script = `
+import assert from 'node:assert/strict';
+import {
+	computeLiveActivityExpandedHeight,
+	createMagnusLiveActivityVisualFixture,
+	resolveLiveActivityPanelState,
+} from ${JSON.stringify(resolve(repoRoot, 'src/vs/platform/prebaseLiveActivity/common/magnusLiveActivity.ts'))};
+
+const working = createMagnusLiveActivityVisualFixture('working', { revision: 1 });
+const question = createMagnusLiveActivityVisualFixture('question', { revision: 2 });
+const approval = createMagnusLiveActivityVisualFixture('approval', { revision: 3 });
+const long = createMagnusLiveActivityVisualFixture('long', { revision: 4 });
+const completed = createMagnusLiveActivityVisualFixture('completed', { revision: 5 });
+const failed = createMagnusLiveActivityVisualFixture('failed', { revision: 6 });
+
+assert.equal(working.status, 'working');
+assert.equal(question.status, 'attention');
+assert.equal(question.pendingInteraction?.kind, 'question');
+assert.ok((question.pendingInteraction?.options?.length ?? 0) >= 3);
+assert.equal(approval.pendingInteraction?.kind, 'approval');
+assert.ok((long.latestShortMessage?.length ?? 0) > 120);
+assert.equal(completed.status, 'completed');
+assert.equal(failed.status, 'failed');
+
+assert.equal(resolveLiveActivityPanelState({
+	visible: true, hovering: false, pinned: false, snapshot: question, now: 0,
+}), 'attentionPeek');
+assert.equal(resolveLiveActivityPanelState({
+	visible: true, hovering: false, pinned: true, snapshot: approval, now: 0,
+}), 'attentionInteractive');
+assert.equal(resolveLiveActivityPanelState({
+	visible: true, hovering: false, pinned: false, snapshot: completed, now: 0,
+}), 'completedTransient');
+assert.equal(resolveLiveActivityPanelState({
+	visible: true, hovering: false, pinned: false, snapshot: failed, now: 0,
+}), 'failedTransient');
+
+const empty = computeLiveActivityExpandedHeight({ bandHeight: 34 });
+const short = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true });
+const medium = computeLiveActivityExpandedHeight({ bandHeight: 34, hasActivity: true, hasLatestMessage: true });
+const longH = computeLiveActivityExpandedHeight({
+	bandHeight: 34, hasActivity: true, hasLatestMessage: true, actionsCount: 3, hasMetrics: true,
+});
+const longPending = computeLiveActivityExpandedHeight({
+	bandHeight: 34, hasPendingTitle: true, hasPendingMessage: true, pendingKind: 'approval', hasActivity: true,
+});
+const longOptions = computeLiveActivityExpandedHeight({
+	bandHeight: 34, hasPendingTitle: true, hasPendingMessage: true, pendingKind: 'question', hasOptions: true, hasActivity: true,
+});
+assert.ok(short > empty);
+assert.ok(medium > short);
+assert.ok(longH >= medium);
+assert.ok(longPending > longH || longPending > medium);
+assert.ok(longOptions > medium);
+`;
+
+	const result = spawnSync(process.execPath, ['--experimental-strip-types', '--input-type=module', '-e', script], {
+		cwd: repoRoot,
+		encoding: 'utf8',
+	});
+	assert.equal(result.status, 0, result.stderr || result.stdout);
 });
 
 test('privacy: redactLiveActivityText redacts sensitive tokens while preserving normal text', () => {

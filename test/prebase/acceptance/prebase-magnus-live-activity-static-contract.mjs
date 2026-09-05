@@ -132,17 +132,58 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		failures.push('applySnapshotDict must keep sticky Escape attention dismiss as lasting compact (not republished peek)');
 	}
 	const peekBodyStart = native.indexOf('NSString *peekBody = nil;');
-	const peekBody = peekBodyStart >= 0 ? native.slice(peekBodyStart, peekBodyStart + 700) : '';
-	if (!/pendingMessage\.length/.test(peekBody)
-		|| !/pendingTitle\.length/.test(peekBody)
+	const peekBody = peekBodyStart >= 0 ? native.slice(peekBodyStart, peekBodyStart + 900) : '';
+	if (!/pendingTitle\.length/.test(peekBody)
+		|| !/pendingMessage\.length/.test(peekBody)
 		|| !/activityLabel\.length/.test(peekBody)
-		|| !/substringToIndex:93/.test(peekBody)
-		|| peekBody.indexOf('pendingMessage.length') < 0
-		|| peekBody.indexOf('pendingMessage.length') > peekBody.indexOf('activityLabel.length')) {
-		failures.push('peek body must prefer pendingMessage → pendingTitle → activityLabel with truncated body');
+		|| !/configureLabel:self\.activityDescription lines:2/.test(peekBody)
+		|| peekBody.indexOf('pendingTitle.length') > peekBody.indexOf('activityLabel.length')) {
+		failures.push('peek body must prefer pendingTitle → pendingMessage → activityLabel with measured 2-line clamp');
 	}
 	if (!native.includes('renderedPeekBody')) {
 		failures.push('native diagnostics must expose renderedPeekBody for AppKit peek product-truth proof');
+	}
+	if (!native.includes('hitTest:') || !native.includes('CGPathContainsPoint') || !native.includes('shapeAwareHitTesting')) {
+		failures.push('native must implement shape-aware hit testing so transparent panel regions pass clicks through');
+	}
+	if (!native.includes('dict[@"shapeAwareHitTesting"] = @YES')) {
+		failures.push('native diagnostics must expose shapeAwareHitTesting=YES');
+	}
+	if (!native.includes('dict[@"contentViewport"]')
+		|| !native.includes('dict[@"headerFrame"]')
+		|| !native.includes('dict[@"activityFrame"]')
+		|| !native.includes('dict[@"composerFrame"]')
+		|| !native.includes('dict[@"approveButtonFrame"]')
+		|| !native.includes('dict[@"optionButtonFrames"]')) {
+		failures.push('native diagnostics must expose layout containment frames (contentViewport + control frames)');
+	}
+	if (!native.includes('beginActionInFlight') || !native.includes('kActionInFlightTimeout') || !native.includes('endActionInFlightRestoring')) {
+		failures.push('native action lifecycle must use in-flight + timeout recovery without optimistic clear');
+	}
+	if (!native.includes('dict[@"actionInFlight"]') || !native.includes('dict[@"actionInFlightTimeoutMs"]')) {
+		failures.push('native diagnostics must expose actionInFlight and actionInFlightTimeoutMs');
+	}
+	{
+		const answerStart = native.indexOf('- (void)answerOption:(id)sender {');
+		const answerBlock = answerStart >= 0 ? native.slice(answerStart, answerStart + 900) : '';
+		if (/clearPendingInteraction/.test(answerBlock)) {
+			failures.push('answerOption must not optimistically clearPendingInteraction before snapshot acknowledgment');
+		}
+		if (!/beginActionInFlight/.test(answerBlock)) {
+			failures.push('answerOption must beginActionInFlight so options stay visible while awaiting acknowledgment');
+		}
+	}
+	for (const method of ['approve:', 'deny:']) {
+		const marker = `- (void)${method}(id)sender {`;
+		const start = native.indexOf(marker);
+		const block = start >= 0 ? native.slice(start, start + 500) : '';
+		if (!/if \(self\.actionInFlight\)/.test(block) || !/beginActionInFlight/.test(block)) {
+			failures.push(`${method} must guard duplicates with actionInFlight and beginActionInFlight`);
+		}
+	}
+	if (!contributionSource.includes('prebase.test.seedMagnusLiveActivityVisualFixture')
+		|| !magnusCommon.includes('createMagnusLiveActivityVisualFixture')) {
+		failures.push('visual fixture seed command and createMagnusLiveActivityVisualFixture must exist for populated screenshot acceptance');
 	}
 	if (!native.includes('payload[@"screenLocked"]') || !native.includes('self.screenLocked = [snapshot[@"screenLocked"] boolValue]')) {
 		failures.push('native SnapshotToDict/applySnapshotDict must serialize and honor screenLocked');
@@ -181,8 +222,11 @@ if (!native.includes('emit:@"dismissAttention"')) {
 		failures.push('simulateAction peek/hover must return whether expandPeek actually peeked');
 	}
 	const contributionSourceFlush = contributionSource;
+	const flushMarker = contributionSourceFlush.indexOf('Presentation before snapshot');
+	const flushRegion = flushMarker >= 0 ? contributionSourceFlush.slice(flushMarker, flushMarker + 700) : '';
 	if (!contributionSourceFlush.includes('Presentation before snapshot')
-		|| contributionSourceFlush.indexOf('setPresentation(presentation)') > contributionSourceFlush.indexOf('setSnapshot({')) {
+		|| flushRegion.indexOf('setPresentation(presentation)') < 0
+		|| flushRegion.indexOf('setPresentation(presentation)') > flushRegion.indexOf('setSnapshot({')) {
 		failures.push('contribution must apply presentation before snapshot (unlock attentionPeek + hide safety)');
 	}
 	if (!contributionSource.includes('getSystemIdleState(1)') || !contributionSource.includes("state === 'locked'")) {

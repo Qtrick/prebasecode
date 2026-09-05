@@ -119,6 +119,24 @@ export function liveActivityLiveFailures(evidence) {
 	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured && evidence.nativeScreenshot.reason !== 'screencapture-unavailable') {
 		failures.push('native panel screenshot capture failed');
 	}
+	const visual = evidence.visualFixtures;
+	if (!visual) {
+		failures.push('populated Magnus visual fixtures missing (empty island screenshots are insufficient)');
+	} else {
+		const required = ['workingInteractive', 'question', 'approval', 'long', 'attentionPeek', 'completed'];
+		for (const key of required) {
+			const shot = visual[key];
+			if (!shot?.screenshot?.captured && shot?.screenshot?.reason !== 'screencapture-unavailable') {
+				failures.push(`visual fixture screenshot missing or failed: ${key}`);
+			}
+			if (shot?.seed && shot.seed.ok === false) {
+				failures.push(`visual fixture seed failed: ${key}`);
+			}
+		}
+		if (visual.layoutContainment && visual.layoutContainment.ok === false) {
+			failures.push(`layout containment failed: ${visual.layoutContainment.reason ?? 'overflow'}`);
+		}
+	}
 	if (evidence.quit?.remaining !== 'gone') {
 		failures.push('PreBase did not quit cleanly after Live Activity live acceptance');
 	}
@@ -461,6 +479,82 @@ async function run() {
 			evidence.nativeDiagnostics?.screenFrame,
 			screenshotFile,
 		);
+
+		// Populated visual fixtures — empty black panels are not visual proof.
+		async function captureVisualFixture(variant, fileBase, opts = {}) {
+			const seed = await workbenchCommandWithTimeout(
+				launched.page,
+				12_000,
+				'prebase.test.seedMagnusLiveActivityVisualFixture',
+				{ variant, pinned: opts.pinned === true, reducedMotion: opts.reducedMotion === true },
+			).catch(error => ({ ok: false, error: String(error) }));
+			await new Promise(r => setTimeout(r, 280));
+			if (opts.interactive) {
+				await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'interactive').catch(() => false);
+				await new Promise(r => setTimeout(r, 200));
+			}
+			if (opts.inFlightApprove) {
+				await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.simulate', 'approve').catch(() => false);
+				await new Promise(r => setTimeout(r, 80));
+			}
+			const native = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.magnus.liveActivity.nativeDiagnostics').catch(() => null);
+			const screenshot = native?.panelFrame
+				? captureNativePanelScreenshot(native.panelFrame, native.screenFrame, join(screenshotDir, `${fileBase}.png`))
+				: { captured: false, reason: 'no-panel-frame' };
+			return { seed, native, screenshot };
+		}
+
+		function layoutContainmentOk(native) {
+			const body = native?.bodyBounds && typeof native.bodyBounds.width === 'number'
+				? native.bodyBounds
+				: native?.contentViewport;
+			if (!body || typeof body.width !== 'number') {
+				return { ok: false, reason: 'missing-bodyBounds' };
+			}
+			const viewport = {
+				x: 0,
+				y: 0,
+				maxX: body.width,
+				maxY: body.height,
+			};
+			const frames = [];
+			for (const key of ['headerFrame', 'statusBadgeFrame', 'activityFrame', 'latestMessageFrame', 'pendingTitleFrame', 'pendingMessageFrame', 'composerFrame', 'pinButtonFrame', 'openButtonFrame', 'approveButtonFrame', 'denyButtonFrame']) {
+				const f = native[key];
+				if (f && typeof f.x === 'number') {
+					frames.push({ key, f });
+				}
+			}
+			for (const f of native.actionFrames || []) {
+				frames.push({ key: 'action', f });
+			}
+			for (const f of native.optionButtonFrames || []) {
+				frames.push({ key: 'option', f });
+			}
+			for (const { key, f } of frames) {
+				if (f.x < -1 || f.y < -1 || (f.x + f.width) > viewport.maxX + 2 || (f.y + f.height) > viewport.maxY + 2) {
+					return { ok: false, reason: `${key}-overflow`, frame: f, viewport };
+				}
+			}
+			return { ok: true, frameCount: frames.length };
+		}
+
+		evidence.visualFixtures = {
+			workingInteractive: await captureVisualFixture('working', 'magnus-live-activity-working-interactive', { pinned: true }),
+			question: await captureVisualFixture('question', 'magnus-live-activity-question', { pinned: true }),
+			approval: await captureVisualFixture('approval', 'magnus-live-activity-approval', { pinned: true }),
+			long: await captureVisualFixture('long', 'magnus-live-activity-long-content', { pinned: true }),
+			attentionPeek: await captureVisualFixture('question', 'magnus-live-activity-attention-peek', { pinned: false }),
+			completed: await captureVisualFixture('completed', 'magnus-live-activity-completed', { pinned: true }),
+			failed: await captureVisualFixture('failed', 'magnus-live-activity-failed', { pinned: true }),
+			inFlight: await captureVisualFixture('approval', 'magnus-live-activity-in-flight', { pinned: true, inFlightApprove: true }),
+		};
+		evidence.visualFixtures.layoutContainment = layoutContainmentOk(
+			evidence.visualFixtures.long?.native
+			?? evidence.visualFixtures.workingInteractive?.native,
+		);
+
+		await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.releaseMagnusLiveActivityVisualFixture').catch(() => null);
+		await new Promise(r => setTimeout(r, 200));
 
 		// Steal window focus so IHostService.hasFocus / prebaseForeground flips false.
 		let focusThief;
