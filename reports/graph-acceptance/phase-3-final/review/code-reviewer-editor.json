@@ -35,6 +35,18 @@
       "rootCause": "Harness only captured isolated panel screenshots and did not validate desktop context or assert interactive subtree exclusion during peek.",
       "impact": "Failed to catch notch housing detachment, wallpaper bleed, and partial glyph leakage in desktop context.",
       "change": "Implemented captureDesktopContextScreenshot centered on the physical notch, verified both isolated panel and desktop-context captures for all visual fixtures, and added strict gates failing attentionPeek if any interactive subviews are visible."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "Stale 192pt max height persisted across transitions because interactionChanged in applySnapshotDict: excluded completed and failed transitions, and geometrySignatureForBandH: lacked status and actionCount. Furthermore, composer input row was unconditionally created on completed, failed, and approval states.",
+      "impact": "Completed and failed states remained giant 192pt black slabs with unnecessary composers, and short working content inherited max height from prior interactions.",
+      "change": "Overhauled geometry signature to include status and actionCount (preserving streaming jitter-free stability). Redesigned computeTargetContentHeight with a 86pt compact pill envelope for completed/failed, 118pt cap for short working, and 163pt cap for approval. Strictly suppressed composer in layoutControls for completed, failed, and approval, relocating [pin] and [open] to the header row."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "High-window-level panel lacked NSWorkspace awareness when user switched to other applications or entered fullscreen spaces, leading to potential misbehavior.",
+      "impact": "Magnus could attempt hover expansion or remain intrusive when PreBase was backgrounded or another application occupied the screen.",
+      "change": "Added NSWorkspace notifications for didActivateApplicationNotification, didDeactivateApplicationNotification, and activeSpaceDidChangeNotification, feeding into an authoritative recomputeEnvironmentState method tracking 'available', 'backgrounded', 'fullscreenSuppressed', and 'screenLocked'. Suppressed hover peek expansion when unavailable."
     }
   ],
   "findingsRejected": [

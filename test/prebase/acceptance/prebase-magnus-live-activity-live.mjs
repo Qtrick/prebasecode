@@ -173,6 +173,27 @@ export function liveActivityLiveFailures(evidence) {
 				if (shot.native.shapeMaskSynced === false) {
 					failures.push(`visual fixture shapeMaskSynced is false: ${key}`);
 				}
+				if (key === 'completed' || key === 'failed') {
+					if (shot.native.panelFrame && shot.native.panelFrame.height > 100) {
+						failures.push(`visual fixture ${key} panelFrame height (${shot.native.panelFrame.height}pt) exceeds compact limit 100pt`);
+					}
+					if (shot.native.composerVisible === true) {
+						failures.push(`visual fixture ${key} must NOT have composer visible`);
+					}
+				}
+				if (key === 'approval') {
+					if (shot.native.panelFrame && shot.native.panelFrame.height > 165) {
+						failures.push(`visual fixture approval panelFrame height (${shot.native.panelFrame.height}pt) exceeds limit 165pt`);
+					}
+					if (shot.native.composerVisible === true) {
+						failures.push('visual fixture approval must NOT have composer visible (Approve/Deny is primary)');
+					}
+				}
+				if (key === 'workingInteractive') {
+					if (shot.native.panelFrame && shot.native.panelFrame.height > 145) {
+						failures.push(`visual fixture workingInteractive panelFrame height (${shot.native.panelFrame.height}pt) exceeds limit 145pt (stale max height?)`);
+					}
+				}
 				if (shot.native.panelFrame && shot.native.requestedFrame) {
 					const dh = Math.abs(shot.native.panelFrame.height - shot.native.requestedFrame.height);
 					const dw = Math.abs(shot.native.panelFrame.width - shot.native.requestedFrame.width);

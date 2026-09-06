@@ -512,7 +512,10 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL pendingPresentationMorph;
 /** True after the first layoutForScreen pass — replaces comparing against bootstrap frame size. */
 @property (nonatomic, assign) BOOL hasLaidOutOnce;
+@property (nonatomic, copy) NSString *environmentState;
+@property (nonatomic, copy) NSString *simulatedEnvironmentState;
 
+- (void)recomputeEnvironmentState;
 - (void)applySnapshotDict:(NSDictionary *)snapshot;
 - (void)teardown;
 - (void)mouseUp:(NSEvent *)event;
@@ -1020,10 +1023,14 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat headerInset = ContentSafeInsetX(self.notched);
 	CGFloat headerW = MAX(40, totalW - headerInset * 2);
 	CGFloat statusW = MIN(headerW * 0.40, MAX(44, [statusText sizeWithAttributes:@{ NSFontAttributeName: self.statusBadge.font }].width + 4));
-	CGFloat titleW = MAX(48, headerW - statusW - 8);
+	BOOL hasOptions = ([self.controller.pendingKind isEqualToString:@"question"] && self.controller.pendingOptions.count > 0);
+	BOOL hasApproval = [self.controller.pendingKind isEqualToString:@"approval"];
+	BOOL isCompletedOrFailed = [self.status isEqualToString:@"completed"] || [self.status isEqualToString:@"failed"];
+	BOOL buttonsInHeader = hasOptions || hasApproval || isCompletedOrFailed;
+	CGFloat titleW = MAX(48, headerW - statusW - 8 - (buttonsInHeader ? 52 : 0));
 	self.headerTitle.stringValue = @"Magnus";
 	self.headerTitle.frame = NSMakeRect(headerInset, y, titleW, kHeaderRowHeight);
-	self.statusBadge.frame = NSMakeRect(headerInset + titleW + 4, y, statusW, kHeaderRowHeight);
+	self.statusBadge.frame = NSMakeRect(totalW - headerInset - statusW, y, statusW, kHeaderRowHeight);
 	y += kHeaderRowHeight + kContentGap;
 
 	CGFloat scrollTop = y;
@@ -1340,6 +1347,28 @@ static NSString *JSString(Napi::Value value) {
 		                                         selector:@selector(windowDidExitFullScreen:)
 		                                             name:NSWindowDidExitFullScreenNotification
 		                                           object:nil];
+		self.environmentState = @"available";
+		[[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
+		                                                       selector:@selector(workspaceAppChanged:)
+		                                                           name:NSWorkspaceDidActivateApplicationNotification
+		                                                         object:nil];
+		[[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
+		                                                       selector:@selector(workspaceAppChanged:)
+		                                                           name:NSWorkspaceDidDeactivateApplicationNotification
+		                                                         object:nil];
+		[[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
+		                                                       selector:@selector(workspaceSpaceChanged:)
+		                                                           name:NSWorkspaceActiveSpaceDidChangeNotification
+		                                                         object:nil];
+		[[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
+		                                                       selector:@selector(workspaceScreensSlept:)
+		                                                           name:NSWorkspaceScreensDidSleepNotification
+		                                                         object:nil];
+		[[[NSWorkspace sharedWorkspace] notificationCenter] addObserver:self
+		                                                       selector:@selector(workspaceScreensWoke:)
+		                                                           name:NSWorkspaceScreensDidWakeNotification
+		                                                         object:nil];
+		[self recomputeEnvironmentState];
 	}
 	return self;
 }
@@ -1382,8 +1411,106 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)screenParametersChanged:(NSNotification *)notification {
+	[self recomputeEnvironmentState];
 	if (self.visible && !gDisposed) {
 		[self layoutForScreen];
+	}
+}
+
+- (void)workspaceAppChanged:(NSNotification *)notification {
+	[self recomputeEnvironmentState];
+}
+
+- (void)workspaceSpaceChanged:(NSNotification *)notification {
+	[self recomputeEnvironmentState];
+}
+
+- (void)workspaceScreensSlept:(NSNotification *)notification {
+	self.screenLocked = YES;
+	[self recomputeEnvironmentState];
+}
+
+- (void)workspaceScreensWoke:(NSNotification *)notification {
+	self.screenLocked = NO;
+	[self recomputeEnvironmentState];
+}
+
+- (void)recomputeEnvironmentState {
+	if (self.simulatedEnvironmentState.length > 0) {
+		self.environmentState = self.simulatedEnvironmentState;
+		if ([self.environmentState isEqualToString:@"fullscreenSuppressed"] || [self.environmentState isEqualToString:@"screenLocked"]) {
+			if (self.content.expanded && !self.pinned) {
+				[self collapse];
+			}
+			if (self.panel && [self.environmentState isEqualToString:@"fullscreenSuppressed"]) {
+				[self.panel orderOut:nil];
+			}
+		} else if ([self.environmentState isEqualToString:@"available"] && self.visible) {
+			if (self.panel && !self.panel.isVisible) {
+				[self.panel orderFront:nil];
+			}
+		}
+		return;
+	}
+
+	if (self.screenLocked) {
+		self.environmentState = @"screenLocked";
+		return;
+	}
+
+	NSScreen *screen = [self targetScreen];
+	if (!screen) {
+		self.environmentState = @"available";
+		return;
+	}
+
+	BOOL isPrebaseFrontmost = YES;
+	if (NSApp && [NSApp isRunning] && [NSBundle mainBundle].bundleIdentifier.length > 0) {
+		isPrebaseFrontmost = [NSApp isActive];
+	}
+	pid_t myPid = [[NSProcessInfo processInfo] processIdentifier];
+
+	BOOL otherAppFullscreen = NO;
+	CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+	if (windowList) {
+		NSArray *windows = (__bridge NSArray *)windowList;
+		NSRect sFrame = screen.frame;
+		for (NSDictionary *info in windows) {
+			pid_t winPid = [info[(id)kCGWindowOwnerPID] intValue];
+			if (winPid == myPid) {
+				continue;
+			}
+			NSInteger layer = [info[(id)kCGWindowLayer] integerValue];
+			if (layer != 0) {
+				continue;
+			}
+			NSDictionary *boundsDict = info[(id)kCGWindowBounds];
+			if (boundsDict) {
+				CGRect winBounds;
+				if (CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)boundsDict, &winBounds)) {
+					if (fabs(winBounds.size.width - sFrame.size.width) < 2.0 &&
+						fabs(winBounds.size.height - sFrame.size.height) < 2.0) {
+						otherAppFullscreen = YES;
+						break;
+					}
+				}
+			}
+		}
+		CFRelease(windowList);
+	}
+
+	if (otherAppFullscreen) {
+		self.environmentState = @"fullscreenSuppressed";
+		if (self.panel && self.panel.isVisible && !self.pinned) {
+			[self.panel orderOut:nil];
+		}
+	} else if (!isPrebaseFrontmost) {
+		self.environmentState = @"backgrounded";
+	} else {
+		self.environmentState = @"available";
+		if (self.visible && self.panel && !self.panel.isVisible) {
+			[self.panel orderFront:nil];
+		}
 	}
 }
 
@@ -1647,14 +1774,8 @@ static NSString *JSString(Napi::Value value) {
 	if (!expanded || self.content.peekOnly) {
 		return 0;
 	}
-	BOOL hasOptions = ([self.pendingKind isEqualToString:@"question"] && self.pendingOptions.count > 0);
-	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
 	// Must match layoutControls bottom-up stack (composer + approval + option rows + pads).
-	CGFloat h = 7; // bottom safe pad under composer
-	h += hasOptions ? 0 : (kControlHeight + 7); // composer row
-	if (hasApproval) {
-		h += kControlHeight; // approval buttons row
-	}
+	BOOL hasOptions = ([self.pendingKind isEqualToString:@"question"] && self.pendingOptions.count > 0);
 	if (hasOptions) {
 		NSInteger totalOpts = (NSInteger)self.pendingOptions.count;
 		NSInteger maxDirect = totalOpts > 4 ? 3 : totalOpts;
@@ -1663,26 +1784,36 @@ static NSString *JSString(Napi::Value value) {
 		if (totalOpts > 4) {
 			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
 		}
-		CGFloat optionsH = rows * kControlHeight + MAX(0, rows - 1) * 4;
-		h += optionsH;
+		return rows * kControlHeight + MAX(0, rows - 1) * 4 + 7;
 	}
-	return h;
+	if ([self.pendingKind isEqualToString:@"approval"]) {
+		return kControlHeight + 7;
+	}
+	if ([self.content.status isEqualToString:@"completed"] || [self.content.status isEqualToString:@"failed"]) {
+		return 0;
+	}
+	return kControlHeight + 7;
 }
 
-/** Geometry signature — excludes activity/message/action label text. */
+/** Geometry signature — incorporates status and action count; text length stays pinned. */
 - (NSString *)geometrySignatureForBandH:(CGFloat)bandH {
 	BOOL expanded = self.content.expanded || self.pinned;
 	BOOL peek = self.content.peekOnly || self.attentionPeek;
 	NSInteger optionCount = [self.pendingKind isEqualToString:@"question"] ? (NSInteger)self.pendingOptions.count : 0;
 	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
-	NSString *base = [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;kind=%@;opts=%ld;appr=%d;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
+	NSInteger actionCount = MIN((NSInteger)self.content.actions.count, 3);
+	NSString *status = self.content.status ?: @"";
+
+	NSString *base = [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;st=%@;kind=%@;opts=%ld;appr=%d;acts=%ld;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
 		expanded ? 1 : 0,
 		peek ? 1 : 0,
 		self.pinned ? 1 : 0,
 		self.content.attention ? 1 : 0,
+		status,
 		self.pendingKind ?: @"",
 		(long)optionCount,
 		hasApproval ? 1 : 0,
+		(long)actionCount,
 		bandH,
 		self.content.notched ? 1 : 0,
 		self.content.housingWidth,
@@ -1715,6 +1846,25 @@ static NSString *JSString(Napi::Value value) {
 		&& self.lastGeometrySignature.length
 		&& [self.lastGeometrySignature isEqualToString:signature]) {
 		return self.pinnedInteractiveHeight;
+	}
+
+	// Completed / failed: compact pill layout
+	BOOL isCompletedOrFailed = [self.content.status isEqualToString:@"completed"] || [self.content.status isEqualToString:@"failed"];
+	if (isCompletedOrFailed) {
+		CGFloat compactH = bandH + kContentInsetTop + kHeaderRowHeight + kContentGap;
+		if (self.content.latestMessage.length) {
+			compactH += 16 + kContentGap;
+		} else if (self.content.activityLabel.length) {
+			compactH += 16 + kContentGap;
+		} else {
+			compactH += 16 + kContentGap;
+		}
+		compactH += 10; // bottom corner pad
+		// Strictly bounded between 82pt and 94pt
+		CGFloat target = MIN(94.0, MAX(82.0, compactH));
+		self.pinnedInteractiveHeight = target;
+		self.lastGeometrySignature = signature;
+		return target;
 	}
 
 	// Measured natural height for a NEW geometry signature only.
@@ -1753,6 +1903,16 @@ static NSString *JSString(Napi::Value value) {
 	h += [self computeControlsStackHeight];
 	h += kContentFooterGutter;
 	h += 8; // Bottom corner inset
+
+	// For short working state (no actions, short activity), enforce tight compactness
+	if (!hasPending && self.content.actions.count == 0 && self.content.activityLabel.length <= 80) {
+		h = MIN(118.0, h);
+	}
+	// For approval state, cap to a balanced, compact height (<= 163pt, strictly within 165pt ceiling)
+	if ([self.pendingKind isEqualToString:@"approval"]) {
+		h = MIN(163.0, h);
+	}
+
 	CGFloat target = MIN(kExpandedHeightMax, MAX(kExpandedHeightMin, h));
 	self.pinnedInteractiveHeight = target;
 	self.lastGeometrySignature = signature;
@@ -1932,14 +2092,13 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)layoutControls:(NSRect)win {
-	BOOL showInput = (self.content.expanded || self.pinned) && !self.content.peekOnly;
+	BOOL isCompletedOrFailed = [self.content.status isEqualToString:@"completed"] || [self.content.status isEqualToString:@"failed"];
 	BOOL approval = [self.pendingKind isEqualToString:@"approval"];
 	BOOL question = [self.pendingKind isEqualToString:@"question"];
 	BOOL showAttention = (self.content.expanded || self.pinned) && !self.content.peekOnly;
 	BOOL hasOptions = (question && self.pendingOptions.count > 0);
-	if (hasOptions) {
-		showInput = NO;
-	}
+	BOOL showInput = showAttention && !isCompletedOrFailed && !approval && !hasOptions;
+
 	self.approveButton.hidden = !(approval && showAttention);
 	self.denyButton.hidden = self.approveButton.hidden;
 	for (NSButton *button in self.optionButtons) {
@@ -1983,10 +2142,10 @@ static NSString *JSString(Napi::Value value) {
 	self.pinButton.hidden = NO;
 	self.openButton.hidden = NO;
 
-	// Footer composer row: [ composer ........ ] [pin] [open]
-	if (hasOptions) {
+	BOOL buttonsInHeader = hasOptions || approval || isCompletedOrFailed;
+	if (buttonsInHeader) {
 		self.input.hidden = YES;
-		// Options own the footer; place pin/open in header row next to statusBadge
+		// Header placement: statusBadge is right-aligned, place [pin] [open] to its left
 		CGFloat headerInset = ContentSafeInsetX(self.content.notched);
 		CGFloat topY = kContentInsetTop + (kHeaderRowHeight - kIconControlSize) * 0.5;
 		CGFloat statusW = NSWidth(self.content.statusBadge.frame);
@@ -2243,6 +2402,12 @@ static NSString *JSString(Napi::Value value) {
 		if (self.screenLocked || self.pinned || self.attentionPeek || self.content.peekOnly) {
 			return;
 		}
+		if ([self.environmentState isEqualToString:@"fullscreenSuppressed"] || [self.environmentState isEqualToString:@"screenLocked"]) {
+			return;
+		}
+		if ([self.environmentState isEqualToString:@"backgrounded"] && !self.content.attention) {
+			return;
+		}
 		// Sticky Escape: attention stays compact until click; hover must not reopen peek.
 		if (self.content.attention && self.userDismissedAttention) {
 			return;
@@ -2257,6 +2422,12 @@ static NSString *JSString(Napi::Value value) {
 			self.hoverTimer = [NSTimer scheduledTimerWithTimeInterval:kHoverDwellInterval repeats:NO block:^(NSTimer *timer) {
 				PrebaseLiveActivityController *strong = weakSelf;
 				if (!strong || gDisposed || strong.screenLocked || !strong.visible || !strong.hovering || !strong.lastInside) {
+					return;
+				}
+				if ([strong.environmentState isEqualToString:@"fullscreenSuppressed"] || [strong.environmentState isEqualToString:@"screenLocked"]) {
+					return;
+				}
+				if ([strong.environmentState isEqualToString:@"backgrounded"] && !strong.content.attention) {
 					return;
 				}
 				if (strong.hoverSessionToken != sessionToken) {
@@ -2298,6 +2469,13 @@ static NSString *JSString(Napi::Value value) {
 	}
 	// Fullscreen policy: suppress hover Peek while PreBase is immersed (attention still allowed).
 	if (self.prebaseFullscreen && !self.content.attention) {
+		return;
+	}
+	// Environment policy: suppress peek when fullscreen suppressed or backgrounded without attention
+	if ([self.environmentState isEqualToString:@"fullscreenSuppressed"] || [self.environmentState isEqualToString:@"screenLocked"]) {
+		return;
+	}
+	if ([self.environmentState isEqualToString:@"backgrounded"] && !self.content.attention) {
 		return;
 	}
 	self.attentionPeek = NO;
@@ -2633,6 +2811,7 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"contentScrollViewVisible"] = @(self.content.contentScrollView != nil && !self.content.contentScrollView.hidden);
 	dict[@"composerVisible"] = @(!self.input.hidden);
 	dict[@"screenLocked"] = @(self.screenLocked);
+	dict[@"environmentState"] = self.environmentState ?: @"available";
 	dict[@"approvalControlsVisible"] = @(!self.approveButton.hidden);
 	dict[@"openInPreBaseVisible"] = @(!self.openButton.hidden);
 	dict[@"pinButtonVisible"] = @(!self.pinButton.hidden);
@@ -3121,7 +3300,7 @@ static NSString *JSString(Napi::Value value) {
 	NSString *incomingPendingKind = snapshot[@"pendingKind"] ?: @"";
 	BOOL interactionChanged = ![incomingInteractionId isEqualToString:self.interactionId]
 		|| ![incomingPendingKind isEqualToString:self.pendingKind]
-		|| (![status isEqualToString:self.content.status] && ([status isEqualToString:@"attention"] || [status isEqualToString:@"working"]));
+		|| ![status isEqualToString:self.content.status];
 	if (interactionChanged && self.content.contentScrollView) {
 		[self.content.contentScrollView.contentView scrollToPoint:NSZeroPoint];
 		[self.content.contentScrollView reflectScrolledClipView:self.content.contentScrollView.contentView];
@@ -3353,6 +3532,7 @@ static NSString *JSString(Napi::Value value) {
 
 - (void)teardown {
 	[[NSNotificationCenter defaultCenter] removeObserver:self];
+	[[[NSWorkspace sharedWorkspace] notificationCenter] removeObserver:self];
 	[self.actionInFlightTimer invalidate];
 	self.actionInFlightTimer = nil;
 	self.actionInFlight = NO;
@@ -3592,6 +3772,12 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 		if (controller.content.attention && controller.userDismissedAttention) {
 			return Napi::Boolean::New(env, false);
 		}
+		if ([controller.environmentState isEqualToString:@"fullscreenSuppressed"] || [controller.environmentState isEqualToString:@"screenLocked"]) {
+			return Napi::Boolean::New(env, false);
+		}
+		if ([controller.environmentState isEqualToString:@"backgrounded"] && !controller.content.attention) {
+			return Napi::Boolean::New(env, false);
+		}
 		[controller expandPeek];
 		// Fail closed when expandPeek no-ops (lock / hidden / fullscreen policy).
 		return Napi::Boolean::New(env, controller.content.peekOnly == YES);
@@ -3640,6 +3826,12 @@ static Napi::Value SimulateAction(const Napi::CallbackInfo &info) {
 	if (action == "pointerInside" && info.Length() >= 2 && info[1].IsBoolean()) {
 		BOOL inside = info[1].As<Napi::Boolean>().Value();
 		[controller pointerInside:inside];
+		return Napi::Boolean::New(env, true);
+	}
+	if (action == "simulateEnvironment" && info.Length() >= 2 && info[1].IsString()) {
+		std::string envVal = info[1].As<Napi::String>().Utf8Value();
+		controller.simulatedEnvironmentState = [NSString stringWithUTF8String:envVal.c_str()];
+		[controller recomputeEnvironmentState];
 		return Napi::Boolean::New(env, true);
 	}
 	return Napi::Boolean::New(env, false);

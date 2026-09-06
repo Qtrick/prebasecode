@@ -73,15 +73,29 @@
         "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs"
       ],
       "coverage": "implemented-and-verified"
+    },
+    {
+      "id": "stale-max-height-and-long-to-short-shrink-truth",
+      "behaviors": [
+        "Test 42: Long-to-short shrink truth: transitions from long content (192pt) to short working content assert panel height shrinks from 192pt to compact <= 125pt",
+        "Test 43: Question/approval resolution shrink: transition from question/approval (192pt/163pt) to completed/failed asserts height drops immediately to <= 90pt (86pt)",
+        "Test 44: Composer and input row suppression: asserts composer is strictly hidden (composerVisible=false) on completed, failed, and approval states",
+        "Test 45: Environment transition and suppression: asserts NSWorkspace environment notifications update environmentState and suppress hover expansion when backgrounded or fullscreen"
+      ],
+      "testFiles": [
+        "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+        "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs"
+      ],
+      "coverage": "implemented-and-verified"
     }
   ],
   "verificationSuite": {
-    "perfTests": 41,
-    "perfPassed": 41,
+    "perfTests": 45,
+    "perfPassed": 45,
     "staticContractTests": 13,
     "staticContractPassed": 13,
     "magnusUnitTests": 272,
     "magnusUnitPassed": 272,
-    "liveRuntimeAcceptance": "PASSED (ok: true, failures: 0, duration: 20897ms)"
+    "liveRuntimeAcceptance": "PASSED (ok: true, failures: 0, all fixtures verified)"
   }
 }

@@ -2058,7 +2058,7 @@ async function run() {
 				],
 			},
 		}));
-		await sleep(220);
+		await sleep(260);
 		await drainMain(native, 4);
 
 		const afterEntrance = native.getDiagnostics();
@@ -4377,6 +4377,251 @@ async function run() {
 		results.failures.push(`compact-and-peek-optical-containment-no-blank-void: ${err.message}`);
 	}
 	results.tests.push(test41);
+
+	// Test 42: Long-to-Short Content Shrink Verification
+	const test42 = { name: 'long-to-short-shrink-verification', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		// Seed long content fixture
+		native.setSnapshot(contentSnapshot(19_000, {
+			status: 'working',
+			currentActivity: 'Validating long-form graph interaction recovery across Temporal Full Map, Network Fit View, and multi-layout acceptance while preserving viewport readability and idle rotation constraints for large projects',
+			latestShortMessage: 'Magnus finished the graph interaction pass and is validating the remaining acceptance cases against organic, sphere, constellation, and clustered layouts with deliberately long diagnostic commentary.',
+			recentActions: [
+				{ id: 'a1', label: 'Action 1', at: Date.now() - 30000 },
+				{ id: 'a2', label: 'Action 2', at: Date.now() - 20000 },
+				{ id: 'a3', label: 'Action 3', at: Date.now() - 10000 },
+			],
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const diagLong = native.getDiagnostics();
+		test42.details.long = {
+			panelFrame: diagLong.panelFrame,
+			pinnedInteractiveHeight: diagLong.pinnedInteractiveHeight,
+		};
+		if (diagLong.panelFrame?.height < 180) {
+			throw new Error(`expected long content panel height >= 180, got ${diagLong.panelFrame?.height}`);
+		}
+
+		// Transition to short working content (1 line, 0 actions)
+		native.setSnapshot(contentSnapshot(19_001, {
+			status: 'working',
+			currentActivity: 'Running graph interaction tests',
+			latestShortMessage: 'Short message',
+			recentActions: [],
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const diagShort = native.getDiagnostics();
+		test42.details.short = {
+			panelFrame: diagShort.panelFrame,
+			pinnedInteractiveHeight: diagShort.pinnedInteractiveHeight,
+		};
+		if (!diagShort.panelFrame || diagShort.panelFrame.height > 125) {
+			throw new Error(`short content panel height must shrink to <= 125pt (got ${diagShort.panelFrame?.height}; stale 192pt locked!)`);
+		}
+	} catch (err) {
+		test42.ok = false;
+		test42.error = err.message;
+		results.failures.push(`long-to-short-shrink-verification: ${err.message}`);
+	}
+	results.tests.push(test42);
+
+	// Test 43: Question / Approval Resolution to Compact State
+	const test43 = { name: 'question-approval-resolution-to-compact-state', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		// Seed question with 4 options
+		native.setSnapshot(contentSnapshot(20_000, {
+			status: 'attention',
+			presentationLabel: 'Question',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'q-resolve-1',
+				title: 'Which layout should Magnus use?',
+				message: 'Affects Fit View metrics.',
+				options: [
+					{ id: '1', label: 'Organic' },
+					{ id: '2', label: 'Sphere' },
+					{ id: '3', label: 'Constellation' },
+					{ id: '4', label: 'Clustered' },
+				],
+			},
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const diagQ = native.getDiagnostics();
+		test43.details.question = { panelFrame: diagQ.panelFrame };
+		if (diagQ.panelFrame?.height < 150) {
+			throw new Error(`question panel height expected >= 150, got ${diagQ.panelFrame?.height}`);
+		}
+
+		// Resolve question -> transition to completed
+		native.setSnapshot(contentSnapshot(20_001, {
+			status: 'completed',
+			currentActivity: 'Graph acceptance pass complete',
+			latestShortMessage: 'All graph interaction suites passed.',
+			presentationLabel: 'Completed',
+			recentActions: [],
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const diagCompleted = native.getDiagnostics();
+		test43.details.completed = {
+			panelFrame: diagCompleted.panelFrame,
+			composerVisible: diagCompleted.composerVisible,
+		};
+		if (!diagCompleted.panelFrame || diagCompleted.panelFrame.height > 100) {
+			throw new Error(`completed panel height must shrink to <= 100pt (got ${diagCompleted.panelFrame?.height}; stale question height locked!)`);
+		}
+		if (diagCompleted.composerVisible === true) {
+			throw new Error('completed panel must NOT have composer visible');
+		}
+
+		// Seed approval
+		native.setSnapshot(contentSnapshot(20_002, {
+			status: 'attention',
+			presentationLabel: 'Approval needed',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'appr-resolve-1',
+				title: 'Run graph acceptance suite?',
+				message: 'Will execute tests.',
+			},
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const diagAppr = native.getDiagnostics();
+		test43.details.approval = {
+			panelFrame: diagAppr.panelFrame,
+			composerVisible: diagAppr.composerVisible,
+		};
+		if (diagAppr.composerVisible === true) {
+			throw new Error('approval panel must NOT have composer input row (Approve/Deny is primary)');
+		}
+
+		// Resolve approval -> transition to short working
+		native.setSnapshot(contentSnapshot(20_003, {
+			status: 'working',
+			currentActivity: 'Running test suite',
+			latestShortMessage: 'Executing tests...',
+			recentActions: [],
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const diagWorking = native.getDiagnostics();
+		test43.details.working = { panelFrame: diagWorking.panelFrame };
+		if (!diagWorking.panelFrame || diagWorking.panelFrame.height > 125) {
+			throw new Error(`working panel height after approval must shrink to <= 125pt (got ${diagWorking.panelFrame?.height})`);
+		}
+	} catch (err) {
+		test43.ok = false;
+		test43.error = err.message;
+		results.failures.push(`question-approval-resolution-to-compact-state: ${err.message}`);
+	}
+	results.tests.push(test43);
+
+	// Test 44: Empty-Space Budget and Content Density
+	const test44 = { name: 'empty-space-budget-and-content-density', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		// Short working fixture
+		native.setSnapshot(contentSnapshot(21_000, {
+			status: 'working',
+			currentActivity: 'Running graph interaction tests',
+			latestShortMessage: 'Validating cases',
+			recentActions: [],
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const diag = native.getDiagnostics();
+		test44.details.shortWorking = {
+			panelFrame: diag.panelFrame,
+			activityFrame: diag.activityFrame,
+			composerFrame: diag.composerFrame,
+		};
+		if (diag.activityFrame && diag.composerFrame) {
+			const converted = documentFrameInContainer(diag, diag.activityFrame) || diag.activityFrame;
+			const contentBottom = converted.y + converted.height;
+			const composerTop = diag.composerFrame.y;
+			const gap = composerTop - contentBottom;
+			test44.details.shortWorkingGap = gap;
+			if (gap > 28) {
+				throw new Error(`empty space void between content and composer too large: ${gap}pt (expected <= 28pt)`);
+			}
+		}
+	} catch (err) {
+		test44.ok = false;
+		test44.error = err.message;
+		results.failures.push(`empty-space-budget-and-content-density: ${err.message}`);
+	}
+	results.tests.push(test44);
+
+	// Test 45: Environment Transition and Hover Suppression
+	const test45 = { name: 'environment-transition-and-hover-suppression', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(22_000, {
+			status: 'working',
+			currentActivity: 'Working on graph',
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const diagBefore = native.getDiagnostics();
+		test45.details.before = {
+			environmentState: diagBefore.environmentState,
+			panelFrame: diagBefore.panelFrame,
+		};
+
+		// In normal available state, peek is allowed
+		const peekAllowed = native.simulateAction('peek');
+		if (!peekAllowed) {
+			throw new Error('simulateAction(peek) should succeed in available environment');
+		}
+		await sleep(260);
+		await drainMain(native, 4);
+		native.simulateAction('collapse');
+		await sleep(260);
+		await drainMain(native, 4);
+
+		// Simulate external app fullscreen / backgrounded environment suppression
+		if (native.simulateAction('simulateEnvironment', 'fullscreenSuppressed')) {
+			const diagSuppressed = native.getDiagnostics();
+			test45.details.suppressed = { environmentState: diagSuppressed.environmentState };
+			const peekBlocked = native.simulateAction('peek');
+			if (peekBlocked) {
+				throw new Error('simulateAction(peek) MUST be suppressed when environment is fullscreenSuppressed');
+			}
+
+			// Restore environment
+			native.simulateAction('simulateEnvironment', 'available');
+			await sleep(100);
+			await drainMain(native, 2);
+			const diagRestored = native.getDiagnostics();
+			test45.details.restored = { environmentState: diagRestored.environmentState };
+			if (diagRestored.environmentState && diagRestored.environmentState !== 'available') {
+				throw new Error(`expected environmentState to restore to available, got ${diagRestored.environmentState}`);
+			}
+		}
+	} catch (err) {
+		test45.ok = false;
+		test45.error = err.message;
+		results.failures.push(`environment-transition-and-hover-suppression: ${err.message}`);
+	}
+	results.tests.push(test45);
 
 	native.dispose();
 

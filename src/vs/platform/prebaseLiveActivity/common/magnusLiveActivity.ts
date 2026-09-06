@@ -235,6 +235,7 @@ export function createMagnusLiveActivityVisualFixture(
 				status: 'working',
 				currentActivity: 'Running graph interaction tests',
 				latestShortMessage: 'Magnus finished the graph interaction pass and is validating the remaining acceptance cases.',
+				recentActions: [],
 				presentationLabel: 'Working',
 				testState: 'running',
 			};
