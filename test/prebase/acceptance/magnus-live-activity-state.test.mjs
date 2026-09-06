@@ -63,9 +63,9 @@ assert.equal(resolveLiveActivityPanelState({
 const peekTitle = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingTitle: true, hasPendingMessage: true, hasActivity: true });
 const peekActivity = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasActivity: true, hasPendingMessage: true });
 const peekFallback = computeLiveActivityExpandedHeight({ bandHeight: 34, peekOnly: true, hasPendingMessage: true });
-assert.equal(peekTitle, 34 + 44);
-assert.equal(peekActivity, 34 + 44);
-assert.equal(peekFallback, 34 + 44, 'pendingMessage alone must not inflate peek height');
+assert.equal(peekTitle, 34 + 32);
+assert.equal(peekActivity, 34 + 32);
+assert.equal(peekFallback, 34 + 32, 'pendingMessage alone must not inflate peek height');
 
 const working = buildMagnusLiveActivitySnapshot({ ...session, needsInput: false, pendingInteraction: undefined }, {
 	revision: 2, prebaseForeground: false, connected: true,
@@ -401,7 +401,7 @@ test('native notch polish contracts: optical shoulder, true viewport, action id 
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
 	assert.match(native, /kOpticalShoulderInsetMin = 8/);
 	assert.match(native, /kOpticalShoulderInsetMax = 12/);
-	assert.match(native, /kContentFooterGutter = 10/);
+	assert.match(native, /kContentFooterGutter = 8/);
 	assert.match(native, /colorWithCalibratedWhite:0\.0 alpha:1\.0/);
 	assert.match(native, /shapeMaskLayer/);
 	assert.match(native, /dict\[@"contentViewport"\] = RectDict\(scrollFrame\)/);
@@ -503,4 +503,15 @@ test('native panel frame settles to lastRequestedFrame and resets scroll on new 
 		'settled diagnostics must guarantee panel frame matches lastRequestedFrame');
 	assert.match(native, /scrollToPoint:NSZeroPoint/,
 		'new pending interactions must reset scroll view to the top');
+});
+
+test('diagnostics enforce truthful transitionInFlight, compact peek height, and scroll reset on kind/status transitions', () => {
+	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
+
+	assert.match(native, /dict\[@"transitionInFlight"\] = @\(self\.transitionInFlight \|\| !effectivelySettled\);/,
+		'diagnostics must never report transitionInFlight=false if panel frame has not settled to requestedFrame');
+	assert.match(native, /BOOL interactionChanged = !\[incomingInteractionId isEqualToString:self\.interactionId\][\s\S]*?!\[incomingPendingKind isEqualToString:self\.pendingKind\]/,
+		'interactionChanged must detect pendingKind transitions even when interactionId is empty');
+	assert.match(native, /kPeekBodyHeight = 32;/,
+		'peek body height must be 32pt to eliminate empty black slab');
 });

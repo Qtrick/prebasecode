@@ -122,7 +122,7 @@ if (!native.includes('emit:@"dismissAttention"')) {
 {
 	const applyStart = native.indexOf('- (void)applySnapshotDict:(NSDictionary *)snapshot {');
 	const stickyBranch = applyStart >= 0
-		? native.slice(applyStart, applyStart + 4500)
+		? native.slice(applyStart, applyStart + 12000)
 		: '';
 	if (!/else if \(!self\.pinned && self\.userDismissedAttention\)/.test(stickyBranch)
 		|| !/lasting compact until click/.test(stickyBranch)

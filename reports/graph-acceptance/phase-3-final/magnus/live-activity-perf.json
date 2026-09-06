@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "533356a733fdcde0369d5a76242bbf1221773c1c",
-  "sourceFingerprint": "3c479b085079c6b5535b75116929f58f19ee06f02873451335ac63265cc838ef",
-  "productFingerprint": "3c479b085079c6b5535b75116929f58f19ee06f02873451335ac63265cc838ef",
-  "generatedAt": "2026-09-05T19:37:51.967Z",
+  "sourceHead": "478117e1056421166158ff21bfbcf4c11a5b51f8",
+  "sourceFingerprint": "526388c73f3b26b7d5fb1338ed05778b24ccee43f41ccad9456276451da7ad48",
+  "productFingerprint": "526388c73f3b26b7d5fb1338ed05778b24ccee43f41ccad9456276451da7ad48",
+  "generatedAt": "2026-09-05T23:08:13.703Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -179,7 +179,7 @@
           "pinButtonVisible": false,
           "denyButtonFrame": null,
           "contentSafeViewport": {
-            "y": 5,
+            "y": 4,
             "x": 22,
             "width": 269,
             "height": 0
@@ -226,7 +226,7 @@
           },
           "panelVisible": true,
           "hoverHapticCount": 0,
-          "windowNumber": 40763,
+          "windowNumber": 42075,
           "topAnchorDelta": 0,
           "collapsedHit": {
             "y": 948,
@@ -236,8 +236,8 @@
           },
           "activityLabel": "",
           "keyWindow": false,
-          "contentFooterGutter": 10,
-          "reservedFooterHeight": 10,
+          "contentFooterGutter": 8,
+          "reservedFooterHeight": 8,
           "approvalControlsVisible": false,
           "latestShortMessage": "",
           "screenLocked": false,
@@ -270,7 +270,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9734,
+        "durationRealCyclesMs": 9472,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -280,19 +280,19 @@
           "pendingKind": "",
           "activePresentationState": "interactive",
           "keyWindow": false,
-          "actualVisibleViewportTop": 25,
+          "actualVisibleViewportTop": 23,
           "safeAreaTop": 32,
           "denyButtonAlpha": 1,
           "openButtonTitle": "Open in PreBase",
-          "actualVisibleViewportBottom": 70,
+          "actualVisibleViewportBottom": 67,
           "contentScrollOffset": 0,
           "trackingAreaCount": 1,
           "denyButtonFrame": null,
           "contentSafeViewport": {
-            "y": 25,
+            "y": 23,
             "x": 22,
             "width": 269,
-            "height": 45
+            "height": 44
           },
           "notchGeometry": {
             "trailingX": 848,
@@ -309,7 +309,7 @@
             "y": 0,
             "x": 0,
             "width": 313,
-            "height": 118
+            "height": 113
           },
           "expanded": true,
           "hovered": true,
@@ -317,8 +317,8 @@
           "activityFrame": {
             "y": 2,
             "x": 22,
-            "width": 263,
-            "height": 14
+            "width": 269,
+            "height": 15
           },
           "transitionInFlight": false,
           "metricsLabel": "",
@@ -329,7 +329,7 @@
             "topRightX": 301,
             "effShoulderR": 22,
             "panelWidth": 313,
-            "bodyDepth": 118,
+            "bodyDepth": 113,
             "shoulderFlare": 12,
             "shoulderCurvatureContinuous": true,
             "tangentContinuity": true,
@@ -339,25 +339,25 @@
           "lastHapticReason": "none",
           "approveButtonTitle": "Approve",
           "statusBadgeFrame": {
-            "y": 5,
+            "y": 4,
             "x": 240.55479496717453,
             "width": 46.44520503282547,
             "height": 16
           },
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 40763,
+          "windowNumber": 42075,
           "openButtonFrame": {
-            "y": 87,
+            "y": 82,
             "x": 267,
             "width": 24,
             "height": 24
           },
           "contentScrollFrame": {
-            "y": 25,
+            "y": 23,
             "x": 0,
             "width": 313,
-            "height": 45
+            "height": 44
           },
           "lastTransitionReason": "geometry",
           "globalMonitorInstalled": false,
@@ -374,7 +374,7 @@
           "displayMode": "builtin",
           "shapeMaskSynced": true,
           "composerFrame": {
-            "y": 87,
+            "y": 82,
             "x": 22,
             "width": 209,
             "height": 24
@@ -383,20 +383,20 @@
           "pendingMessageFullyVisible": true,
           "accessibilityRole": "AXGroup",
           "panelFrame": {
-            "y": 830,
+            "y": 835,
             "x": 599,
             "width": 313,
-            "height": 152
+            "height": 147
           },
           "peekOnly": false,
           "pathBounds": {
             "y": 0,
             "x": 0,
             "width": 313,
-            "height": 152
+            "height": 147
           },
           "pinned": false,
-          "reservedFooterHeight": 48,
+          "reservedFooterHeight": 46,
           "panelCreated": true,
           "hapticCount": 0,
           "activityLabel": "Validating Temporal layout recovery",
@@ -410,7 +410,7 @@
             {
               "y": 20,
               "x": 24,
-              "width": 261,
+              "width": 267,
               "height": 15
             }
           ],
@@ -438,20 +438,20 @@
           "topAnchorDelta": 0,
           "hoverDwellMs": 180,
           "lastNativeCommand": "",
-          "pinnedInteractiveHeight": 152,
+          "pinnedInteractiveHeight": 147,
           "transitionGeneration": 200,
           "requestedFrame": {
-            "y": 830,
+            "y": 835,
             "x": 599,
             "width": 313,
-            "height": 152
+            "height": 147
           },
           "pendingMessageBottom": 0,
           "activeInputControl": "input-ready",
           "pendingTitle": "",
           "userDismissedAttention": false,
           "statusLabel": "Working",
-          "footerTopY": 80,
+          "footerTopY": 75,
           "actionInFlight": false,
           "approvalControlsVisible": false,
           "screenTopY": 982,
@@ -459,7 +459,7 @@
           "redrawCount": 201,
           "shapeAwareHitTesting": true,
           "questionContentHealthy": true,
-          "contentDocumentHeight": 45,
+          "contentDocumentHeight": 44,
           "approveButtonFrame": null,
           "layerBacked": true,
           "accessibilityLabel": "Working",
@@ -467,7 +467,7 @@
           "orderFrontCount": 1,
           "panelTopY": 982,
           "pinButtonFrame": {
-            "y": 87,
+            "y": 82,
             "x": 237,
             "width": 24,
             "height": 24
@@ -479,29 +479,29 @@
           "contentPopulated": true,
           "targetPresentationState": "interactive",
           "screenLocked": false,
-          "contentFooterGutter": 10,
+          "contentFooterGutter": 8,
           "panelLevel": 2147483630,
           "expandedContentAlpha": 1,
           "denyButtonTitle": "Deny",
           "actionRowIds": [
             "a99"
           ],
-          "contentRefreshCount": 303,
+          "contentRefreshCount": 302,
           "pendingTitleFrame": null,
           "geometryTransitionCount": 201,
           "pinButtonVisible": true,
           "headerFrame": {
-            "y": 5,
+            "y": 4,
             "x": 22,
             "width": 214.55479496717453,
             "height": 16
           },
           "pathTopologyCompatible": true,
           "contentViewport": {
-            "y": 25,
+            "y": 23,
             "x": 0,
             "width": 313,
-            "height": 45
+            "height": 44
           },
           "contentOnlyUpdateCount": 101,
           "openInPreBaseVisible": true,
@@ -515,7 +515,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 357,
+        "durationRetargetMs": 356,
         "diagRetarget": {
           "approveButtonAccessibilityLabel": "Approve",
           "lastTransitionReason": "geometry",
@@ -525,7 +525,7 @@
           "questionButtonLabels": [],
           "hoverDwellMs": 180,
           "redrawCount": 203,
-          "footerTopY": 34,
+          "footerTopY": 24,
           "pendingTitleFrame": null,
           "lastHapticReason": "none",
           "screenFrame": {
@@ -573,9 +573,9 @@
             "opticalTopInset": 8,
             "topLeftX": 8,
             "topRightX": 305,
-            "effShoulderR": 14.719999999999999,
+            "effShoulderR": 12.559999999999999,
             "panelWidth": 313,
-            "bodyDepth": 44,
+            "bodyDepth": 32,
             "shoulderFlare": 8,
             "shoulderCurvatureContinuous": true,
             "tangentContinuity": true,
@@ -594,14 +594,14 @@
           "lastRenderedRevision": 406,
           "peekOnly": true,
           "interactionId": "",
-          "actualVisibleViewportBottom": 34,
+          "actualVisibleViewportBottom": 24,
           "activityFrame": {
-            "y": 5,
+            "y": 8,
             "x": 22,
             "width": 269,
-            "height": 14
+            "height": 15
           },
-          "contentRefreshCount": 305,
+          "contentRefreshCount": 304,
           "pathTopologyCompatible": true,
           "denyButtonTitle": "Deny",
           "localMonitorInstalled": false,
@@ -612,7 +612,7 @@
             "y": 0,
             "x": 0,
             "width": 313,
-            "height": 78
+            "height": 66
           },
           "activeInputControl": "none",
           "denyButtonAccessibilityLabel": "Deny",
@@ -623,14 +623,14 @@
             "y": 0,
             "x": 0,
             "width": 313,
-            "height": 34
+            "height": 24
           },
           "contentOnlyUpdateCount": 101,
           "panelFrame": {
-            "y": 904,
+            "y": 916,
             "x": 599,
             "width": 313,
-            "height": 78
+            "height": 66
           },
           "orderFrontCount": 1,
           "auxiliaryTopRightArea": {
@@ -648,10 +648,10 @@
           "pinButtonVisible": false,
           "denyButtonFrame": null,
           "contentSafeViewport": {
-            "y": 5,
+            "y": 4,
             "x": 22,
             "width": 269,
-            "height": 29
+            "height": 20
           },
           "notchDetected": true,
           "actionFrames": [],
@@ -662,16 +662,16 @@
           "transitionGeneration": 201,
           "actionInFlight": false,
           "requestedFrame": {
-            "y": 904,
+            "y": 916,
             "x": 599,
             "width": 313,
-            "height": 78
+            "height": 66
           },
           "approveButtonAlpha": 1,
           "statusBadgeFrame": null,
           "panelVisible": true,
           "hoverHapticCount": 0,
-          "windowNumber": 40763,
+          "windowNumber": 42075,
           "topAnchorDelta": 0,
           "collapsedHit": {
             "y": 948,
@@ -681,8 +681,8 @@
           },
           "activityLabel": "Validating Temporal layout recovery",
           "keyWindow": false,
-          "contentFooterGutter": 10,
-          "reservedFooterHeight": 10,
+          "contentFooterGutter": 8,
+          "reservedFooterHeight": 8,
           "approvalControlsVisible": false,
           "latestShortMessage": "Fit View metrics look stable on the large fixture.",
           "screenLocked": false,
@@ -703,7 +703,7 @@
             "y": 0,
             "x": 0,
             "width": 313,
-            "height": 44
+            "height": 32
           },
           "expanded": true,
           "composerFrame": null,
@@ -759,7 +759,7 @@
           "peekSimResult": true,
           "state": "peek",
           "localMonitor": false,
-          "requestedHeight": 78
+          "requestedHeight": 66
         },
         "interactiveDiag": {
           "clickResult": true,
@@ -778,12 +778,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -242,
-        "heapUsedMb": 6.16,
-        "rssDiffKb": 46304,
-        "rssMb": 116.89,
-        "cpuDeltaUserMs": 1707894,
-        "cpuDeltaSystemMs": 261963
+        "heapDiffKb": -352,
+        "heapUsedMb": 6.11,
+        "rssDiffKb": 46416,
+        "rssMb": 117.25,
+        "cpuDeltaUserMs": 1211433,
+        "cpuDeltaSystemMs": 218692
       }
     },
     {
@@ -952,9 +952,9 @@
           "targetPresentationState": "peek",
           "frame": {
             "x": 599,
-            "y": 904,
+            "y": 916,
             "width": 313,
-            "height": 78
+            "height": 66
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 1,
@@ -974,9 +974,9 @@
           "targetPresentationState": "peek",
           "frame": {
             "x": 599,
-            "y": 904,
+            "y": 916,
             "width": 313,
-            "height": 78
+            "height": 66
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
@@ -996,9 +996,9 @@
           "targetPresentationState": "peek",
           "frame": {
             "x": 599,
-            "y": 904,
+            "y": 916,
             "width": 313,
-            "height": 78
+            "height": 66
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
@@ -1018,9 +1018,9 @@
             "targetPresentationState": "interactive",
             "frame": {
               "x": 599,
-              "y": 831,
+              "y": 836,
               "width": 313,
-              "height": 151
+              "height": 146
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 13,
@@ -1039,9 +1039,9 @@
             "targetPresentationState": "interactive",
             "frame": {
               "x": 599,
-              "y": 831,
+              "y": 836,
               "width": 313,
-              "height": 151
+              "height": 146
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 43,
@@ -1071,9 +1071,9 @@
           "animationCount": 1,
           "frame": {
             "x": 599,
-            "y": 904,
+            "y": 916,
             "width": 313,
-            "height": 78
+            "height": 66
           }
         },
         "after": {
@@ -1086,9 +1086,9 @@
           "transitionGeneration": 1,
           "frame": {
             "x": 599,
-            "y": 904,
+            "y": 916,
             "width": 313,
-            "height": 78
+            "height": 66
           },
           "lastApplied": {
             "revision": 2100,
@@ -1108,9 +1108,9 @@
           "localMonitorInstalled": true,
           "frame": {
             "x": 599,
-            "y": 831,
+            "y": 836,
             "width": 313,
-            "height": 151
+            "height": 146
           }
         },
         "after": {
@@ -1119,9 +1119,9 @@
           "transitionGeneration": 2,
           "frame": {
             "x": 599,
-            "y": 831,
+            "y": 836,
             "width": 313,
-            "height": 151
+            "height": 146
           },
           "lastApplied": {
             "revision": 3120,
@@ -1141,9 +1141,9 @@
           "animationCount": 3,
           "frame": {
             "x": 599,
-            "y": 831,
+            "y": 836,
             "width": 313,
-            "height": 151
+            "height": 146
           }
         },
         "after": {
@@ -1154,9 +1154,9 @@
           "geometryTransitionCount": 4,
           "frame": {
             "x": 599,
-            "y": 831,
+            "y": 836,
             "width": 313,
-            "height": 151
+            "height": 146
           },
           "lastApplied": {
             "revision": 4100,
@@ -1228,9 +1228,9 @@
           "transitionGeneration": 1,
           "frame": {
             "x": 599,
-            "y": 904,
+            "y": 916,
             "width": 313,
-            "height": 78
+            "height": 66
           }
         }
       }
@@ -1330,15 +1330,15 @@
           "state": "interactive",
           "frame": {
             "x": 599,
-            "y": 831,
+            "y": 836,
             "width": 313,
-            "height": 151
+            "height": 146
           },
           "transitionGeneration": 1
         },
         "contentGrowth": {
-          "preGrowthHeight": 151,
-          "postGrowthHeight": 172,
+          "preGrowthHeight": 146,
+          "postGrowthHeight": 170,
           "questionButtonCount": 3
         }
       }
@@ -1375,7 +1375,7 @@
             "x": 0,
             "y": 0,
             "maxX": 313,
-            "maxY": 81
+            "maxY": 112
           },
           "textMaxY": 43,
           "scrollHostActive": true,
@@ -1391,7 +1391,7 @@
             "x": 0,
             "y": 0,
             "maxX": 313,
-            "maxY": 81
+            "maxY": 112
           },
           "textMaxY": 55,
           "scrollHostActive": true,
@@ -1409,7 +1409,7 @@
             "maxX": 341,
             "maxY": 158
           },
-          "textMaxY": 70,
+          "textMaxY": 72,
           "scrollHostActive": true,
           "state": "attentionInteractive",
           "shapeAwareHitTesting": true,
@@ -1423,9 +1423,9 @@
             "x": 0,
             "y": 0,
             "maxX": 313,
-            "maxY": 154
+            "maxY": 152
           },
-          "textMaxY": 57,
+          "textMaxY": 59,
           "scrollHostActive": true,
           "state": "attentionInteractive",
           "shapeAwareHitTesting": true,
@@ -1451,9 +1451,9 @@
           "state": "peek",
           "frame": {
             "x": 599,
-            "y": 904,
+            "y": 916,
             "width": 313,
-            "height": 78
+            "height": 66
           },
           "peekOnly": true
         },
@@ -1461,9 +1461,9 @@
           "state": "interactive",
           "frame": {
             "x": 599,
-            "y": 831,
+            "y": 836,
             "width": 313,
-            "height": 151
+            "height": 146
           }
         },
         "pinned": {
@@ -1471,18 +1471,18 @@
           "pinned": true,
           "frame": {
             "x": 599,
-            "y": 831,
+            "y": 836,
             "width": 313,
-            "height": 151
+            "height": 146
           }
         },
         "attentionPeek": {
           "state": "attentionPeek",
           "frame": {
             "x": 599,
-            "y": 904,
+            "y": 916,
             "width": 313,
-            "height": 78
+            "height": 66
           }
         },
         "attentionCompact": {
@@ -1521,7 +1521,7 @@
       "details": {
         "heights": {
           "empty": {
-            "height": 115,
+            "height": 128,
             "containment": {
               "ok": true,
               "frameCount": 5,
@@ -1529,7 +1529,7 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 313,
-                "maxY": 81
+                "maxY": 94
               },
               "textMaxY": 25,
               "scrollHostActive": true
@@ -1538,7 +1538,7 @@
             "questionButtonCount": 0
           },
           "short": {
-            "height": 115,
+            "height": 128,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1546,16 +1546,16 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 313,
-                "maxY": 81
+                "maxY": 94
               },
-              "textMaxY": 43,
+              "textMaxY": 42,
               "scrollHostActive": true
             },
             "state": "pinned",
             "questionButtonCount": 0
           },
           "medium": {
-            "height": 115,
+            "height": 128,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1563,16 +1563,16 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 313,
-                "maxY": 81
+                "maxY": 94
               },
-              "textMaxY": 43,
+              "textMaxY": 42,
               "scrollHostActive": true
             },
             "state": "pinned",
             "questionButtonCount": 0
           },
           "long": {
-            "height": 115,
+            "height": 128,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1580,7 +1580,7 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 313,
-                "maxY": 81
+                "maxY": 94
               },
               "textMaxY": 55,
               "scrollHostActive": true
@@ -1589,7 +1589,7 @@
             "questionButtonCount": 0
           },
           "multiline": {
-            "height": 115,
+            "height": 128,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1597,7 +1597,7 @@
                 "x": 0,
                 "y": 0,
                 "maxX": 313,
-                "maxY": 81
+                "maxY": 94
               },
               "textMaxY": 55,
               "scrollHostActive": true
@@ -1616,7 +1616,7 @@
                 "maxX": 313,
                 "maxY": 158
               },
-              "textMaxY": 83,
+              "textMaxY": 85,
               "scrollHostActive": true
             },
             "state": "attentionInteractive",
@@ -1633,7 +1633,7 @@
                 "maxX": 341,
                 "maxY": 158
               },
-              "textMaxY": 83,
+              "textMaxY": 85,
               "scrollHostActive": true
             },
             "state": "attentionInteractive",
@@ -1641,11 +1641,11 @@
           }
         },
         "retarget": {
-          "baselineAnim": 5,
-          "afterAnim": 5,
+          "baselineAnim": 6,
+          "afterAnim": 6,
           "state": "pinned",
-          "baselineH": 163,
-          "afterH": 163
+          "baselineH": 159,
+          "afterH": 159
         }
       }
     },
@@ -1669,13 +1669,13 @@
           "y": 0,
           "x": 0,
           "width": 313,
-          "height": 151
+          "height": 146
         },
         "contentViewport": {
-          "y": 25,
+          "y": 23,
           "x": 0,
           "width": 313,
-          "height": 44
+          "height": 43
         },
         "shapeAwareHitTesting": true,
         "pathTopologyCompatible": true
@@ -1688,16 +1688,16 @@
         "contentPopulated": true,
         "expandedContentAlpha": 1,
         "contentViewport": {
-          "y": 25,
+          "y": 23,
           "x": 0,
           "width": 313,
-          "height": 44
+          "height": 43
         },
         "contentSafeViewport": {
-          "y": 25,
+          "y": 23,
           "x": 22,
           "width": 269,
-          "height": 44
+          "height": 43
         },
         "state": "interactive"
       }
@@ -1707,15 +1707,15 @@
       "ok": true,
       "details": {
         "compactWidth": 313,
-        "shortHeight": 133,
+        "shortHeight": 129,
         "shortWidth": 313,
         "approvalWidth": 313,
         "questionWidth": 341,
-        "longHeight": 163,
+        "longHeight": 159,
         "longScroll": true,
         "pad": 28,
         "contentSafeViewport": {
-          "y": 25,
+          "y": 23,
           "x": 22,
           "width": 269,
           "height": 26
@@ -1749,34 +1749,34 @@
           "overlap": {
             "skipped": false,
             "scrollBottom": 82,
-            "approveY": 92,
-            "composerY": 123
+            "approveY": 90,
+            "composerY": 121
           },
           "approveButtonFrame": {
-            "y": 92,
+            "y": 90,
             "x": 92,
             "width": 86,
             "height": 24
           },
           "pendingMessageFrame": {
-            "y": 21,
+            "y": 22,
             "x": 22,
-            "width": 263,
-            "height": 26
+            "width": 269,
+            "height": 28
           },
           "composerFrame": {
-            "y": 123,
+            "y": 121,
             "x": 22,
             "width": 209,
             "height": 24
           },
-          "height": 188
+          "height": 186
         },
         "question3": {
           "contentPopulated": true,
           "overlap": {
             "skipped": false,
-            "scrollBottom": 89
+            "scrollBottom": 91
           },
           "optionLayout": {
             "skipped": false,
@@ -1817,8 +1817,8 @@
               2,
               2
             ],
-            "optionTop": 79,
-            "optionBottom": 131,
+            "optionTop": 77,
+            "optionBottom": 129,
             "count": 4
           }
         }
@@ -1829,13 +1829,13 @@
       "ok": true,
       "details": {
         "silhouetteMetrics": {
-          "opticalTopInset": 9.719999999999999,
-          "topLeftX": 9.719999999999999,
-          "topRightX": 303.28,
+          "opticalTopInset": 11.4,
+          "topLeftX": 11.4,
+          "topRightX": 301.6,
           "effShoulderR": 22,
           "panelWidth": 313,
-          "bodyDepth": 81,
-          "shoulderFlare": 9.719999999999999,
+          "bodyDepth": 95,
+          "shoulderFlare": 11.4,
           "shoulderCurvatureContinuous": true,
           "tangentContinuity": true,
           "nonDegenerateShoulder": true,
@@ -1844,9 +1844,9 @@
         "shapeMaskSynced": true,
         "frame": {
           "x": 599,
-          "y": 867,
+          "y": 853,
           "width": 313,
-          "height": 115
+          "height": 129
         }
       }
     },
@@ -1855,19 +1855,19 @@
       "ok": true,
       "details": {
         "contentViewport": {
-          "y": 25,
+          "y": 23,
           "x": 0,
           "width": 313,
-          "height": 44
+          "height": 43
         },
         "contentScrollFrame": {
-          "y": 25,
+          "y": 23,
           "x": 0,
           "width": 313,
-          "height": 44
+          "height": 43
         },
-        "contentFooterGutter": 10,
-        "footerTopY": 79
+        "contentFooterGutter": 8,
+        "footerTopY": 74
       }
     },
     {
@@ -1911,38 +1911,122 @@
       "details": {
         "overlap": {
           "skipped": false,
-          "scrollBottom": 86,
+          "scrollBottom": 88,
           "approveY": 96,
           "composerY": 127
         },
         "approveGutter": {
           "skipped": false,
-          "gutter": 10,
-          "declared": 10,
-          "scrollBottom": 86,
+          "gutter": 8,
+          "declared": 8,
+          "scrollBottom": 88,
           "controlY": 96
         },
-        "contentFooterGutter": 10
+        "contentFooterGutter": 8
       }
     },
     {
       "name": "question-options-gutter-from-content-viewport",
       "ok": true,
       "details": {
-        "gutter": 10,
-        "declared": 10,
+        "gutter": 8,
+        "declared": 8,
         "optionLayout": {
           "skipped": false,
           "rows": [
             2,
             1
           ],
-          "optionTop": 92,
-          "optionBottom": 144,
+          "optionTop": 90,
+          "optionBottom": 142,
           "count": 3
         },
-        "optionTop": 92,
+        "optionTop": 90,
         "scrollBottom": 82
+      }
+    },
+    {
+      "name": "question-and-approval-containment-and-scroll-reset",
+      "ok": true,
+      "details": {
+        "questionDiag": {
+          "questionContentHealthy": true,
+          "pendingContentFullyVisible": true,
+          "pendingMessageFullyVisible": true,
+          "scrollOffset": 0,
+          "optionButtonCount": 4,
+          "panelFrame": {
+            "y": 799,
+            "x": 585,
+            "width": 341,
+            "height": 183
+          },
+          "requestedFrame": {
+            "y": 799,
+            "x": 585,
+            "width": 341,
+            "height": 183
+          }
+        },
+        "approvalDiag": {
+          "pendingContentFullyVisible": true,
+          "pendingMessageFullyVisible": true,
+          "approveButtonFrame": {
+            "y": 90,
+            "x": 92,
+            "width": 86,
+            "height": 24
+          },
+          "denyButtonFrame": {
+            "y": 90,
+            "x": 22,
+            "width": 64,
+            "height": 24
+          }
+        }
+      }
+    },
+    {
+      "name": "compact-and-peek-optical-containment-no-blank-void",
+      "ok": true,
+      "details": {
+        "compact": {
+          "panelFrame": {
+            "y": 948,
+            "x": 599,
+            "width": 313,
+            "height": 34
+          },
+          "peekOnly": false,
+          "expanded": false
+        },
+        "peek": {
+          "panelFrame": {
+            "y": 916,
+            "x": 599,
+            "width": 313,
+            "height": 66
+          },
+          "requestedFrame": {
+            "y": 916,
+            "x": 599,
+            "width": 313,
+            "height": 66
+          },
+          "pathBounds": {
+            "y": 0,
+            "x": 0,
+            "width": 313,
+            "height": 66
+          },
+          "activityFrame": {
+            "y": 8,
+            "x": 22,
+            "width": 269,
+            "height": 15
+          },
+          "transitionInFlight": false
+        }
       }
     }
   ],

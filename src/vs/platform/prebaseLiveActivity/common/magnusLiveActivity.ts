@@ -122,7 +122,7 @@ export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MIN = 72;
 export const LIVE_ACTIVITY_EXPANDED_HEIGHT_MAX = 192;
 export const LIVE_ACTIVITY_EXPANDED_HEIGHT = 128;
 /** Fixed peek body band below the notch (matches native kPeekBodyHeight). */
-export const LIVE_ACTIVITY_PEEK_BODY_HEIGHT = 44;
+export const LIVE_ACTIVITY_PEEK_BODY_HEIGHT = 32;
 /** Pad past natural notch span only when option chips need horizontal room. */
 export const LIVE_ACTIVITY_EXPANDED_WIDTH_PAD = 28;
 export const LIVE_ACTIVITY_EXPANDED_MIN_WIDTH = LIVE_ACTIVITY_WING_WIDTH_DEFAULT * 2 + LIVE_ACTIVITY_CAMERA_HOUSING_MIN;
@@ -287,7 +287,7 @@ export function computeLiveActivityExpandedHeight(args: {
 	h += 3;
 	const hasOptions = args.pendingKind === 'question' && Boolean(args.hasOptions);
 	const hasApproval = args.pendingKind === 'approval';
-	const showInput = !args.peekOnly;
+	const showInput = !args.peekOnly && !hasOptions;
 
 	if (hasOptions) {
 		const opts = Math.min(Math.max(args.optionsCount ?? 4, 1), 4);

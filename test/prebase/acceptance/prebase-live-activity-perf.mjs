@@ -4189,6 +4189,176 @@ async function run() {
 	}
 	results.tests.push(test39);
 
+	// Test 40: Question & Approval Content Containment & Scroll Reset Acceptance
+	const test40 = { name: 'question-and-approval-containment-and-scroll-reset', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		// First, working state with actions
+		native.setSnapshot(contentSnapshot(17_000, {
+			status: 'working',
+			currentActivity: 'Compiling tests',
+			recentActions: [
+				{ id: 'a1', label: 'Running build', at: Date.now() - 5000, status: 'passed' },
+				{ id: 'a2', label: 'Typechecking client', at: Date.now() - 2000, status: 'running' },
+			],
+		}));
+		await sleep(80);
+		await drainMain(native, 3);
+
+		// Now transition to question interaction
+		native.setSnapshot(contentSnapshot(17_001, {
+			status: 'attention',
+			presentationLabel: 'Question',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'q-contain-1',
+				title: 'Select execution target',
+				message: 'This choice affects Fit View metrics and Temporal Full graph analysis.',
+				options: [
+					{ id: 'dev', label: 'Development sandbox' },
+					{ id: 'staging', label: 'Staging cluster' },
+					{ id: 'prod', label: 'Production cluster' },
+					{ id: 'canary', label: 'Canary deployment' },
+				],
+			},
+		}));
+		await sleep(150);
+		await drainMain(native, 4);
+
+		const diagQ = native.getDiagnostics();
+		test40.details.questionDiag = {
+			questionContentHealthy: diagQ.questionContentHealthy,
+			pendingContentFullyVisible: diagQ.pendingContentFullyVisible,
+			pendingMessageFullyVisible: diagQ.pendingMessageFullyVisible,
+			scrollOffset: diagQ.contentScrollOffset,
+			optionButtonCount: diagQ.questionButtonCount,
+			panelFrame: diagQ.panelFrame,
+			requestedFrame: diagQ.requestedFrame,
+		};
+
+		if (diagQ.questionContentHealthy !== true) {
+			throw new Error('questionContentHealthy must be true for 4-option question fixture');
+		}
+		if (diagQ.pendingContentFullyVisible !== true) {
+			throw new Error('pendingContentFullyVisible must be true for 4-option question fixture');
+		}
+		if (diagQ.pendingMessageFullyVisible !== true) {
+			throw new Error('pendingMessageFullyVisible must be true for 4-option question fixture');
+		}
+		if (diagQ.contentScrollOffset !== 0) {
+			throw new Error(`contentScrollOffset must be 0 after transitioning to question, got ${diagQ.contentScrollOffset}`);
+		}
+		if (diagQ.questionButtonCount !== 4) {
+			throw new Error(`expected 4 question options, got ${diagQ.questionButtonCount}`);
+		}
+		if (diagQ.panelFrame && diagQ.requestedFrame) {
+			const dh = Math.abs(diagQ.panelFrame.height - diagQ.requestedFrame.height);
+			if (dh > 2) {
+				throw new Error(`panelFrame.height (${diagQ.panelFrame.height}) differs from requestedFrame (${diagQ.requestedFrame.height})`);
+			}
+		}
+
+		// Transition to approval
+		native.setSnapshot(contentSnapshot(17_002, {
+			status: 'attention',
+			presentationLabel: 'Approve',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'appr-contain-1',
+				title: 'Terminal command execution',
+				message: 'Magnus requested to run npm run build to verify the changes.',
+			},
+		}));
+		await sleep(150);
+		await drainMain(native, 4);
+
+		const diagAppr = native.getDiagnostics();
+		test40.details.approvalDiag = {
+			pendingContentFullyVisible: diagAppr.pendingContentFullyVisible,
+			pendingMessageFullyVisible: diagAppr.pendingMessageFullyVisible,
+			approveButtonFrame: diagAppr.approveButtonFrame,
+			denyButtonFrame: diagAppr.denyButtonFrame,
+		};
+		if (diagAppr.pendingContentFullyVisible !== true) {
+			throw new Error('pendingContentFullyVisible must be true for approval fixture');
+		}
+		if (diagAppr.pendingMessageFullyVisible !== true) {
+			throw new Error('pendingMessageFullyVisible must be true for approval fixture');
+		}
+		if (!diagAppr.approveButtonFrame || !diagAppr.denyButtonFrame) {
+			throw new Error('approval controls must be visible for approval interaction');
+		}
+	} catch (err) {
+		test40.ok = false;
+		test40.error = err.message;
+		results.failures.push(`question-and-approval-containment-and-scroll-reset: ${err.message}`);
+	}
+	results.tests.push(test40);
+
+	// Test 41: Compact and Peek Optical Containment & No Blank Void
+	const test41 = { name: 'compact-and-peek-optical-containment-no-blank-void', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(18_000, {
+			status: 'working',
+			currentActivity: 'Optimizing graph layout',
+		}));
+		await sleep(80);
+		await drainMain(native, 3);
+
+		// Compact state
+		const diagCompact = native.getDiagnostics();
+		test41.details.compact = {
+			panelFrame: diagCompact.panelFrame,
+			peekOnly: diagCompact.peekOnly,
+			expanded: diagCompact.expanded,
+		};
+		if (diagCompact.panelFrame?.height !== 34) {
+			throw new Error(`compact panelFrame height must be 34, got ${diagCompact.panelFrame?.height}`);
+		}
+
+		// Peek preview (hover)
+		native.simulateAction('peek');
+		await sleep(250);
+		await drainMain(native, 4);
+
+		const diagPeek = native.getDiagnostics();
+		test41.details.peek = {
+			panelFrame: diagPeek.panelFrame,
+			requestedFrame: diagPeek.requestedFrame,
+			pathBounds: diagPeek.pathBounds,
+			activityFrame: diagPeek.activityFrame,
+			transitionInFlight: diagPeek.transitionInFlight,
+		};
+		if (diagPeek.transitionInFlight !== false) {
+			throw new Error('transitionInFlight must be false after peek settles');
+		}
+		if (diagPeek.panelFrame?.height !== 66) {
+			throw new Error(`peek panelFrame height must be 66 (34+32), got ${diagPeek.panelFrame?.height}`);
+		}
+		if (diagPeek.requestedFrame?.height !== 66) {
+			throw new Error(`peek requestedFrame height must be 66, got ${diagPeek.requestedFrame?.height}`);
+		}
+		if (diagPeek.pathBounds?.height !== 66) {
+			throw new Error(`peek pathBounds height must be 66, got ${diagPeek.pathBounds?.height}`);
+		}
+		if (diagPeek.activityFrame) {
+			const textY = diagPeek.activityFrame.y;
+			if (textY < 4 || textY > 14) {
+				throw new Error(`peek activityFrame.y must be centered within 32pt body (expected 4..14), got ${textY}`);
+			}
+		} else {
+			throw new Error('peek activityFrame must be visible');
+		}
+	} catch (err) {
+		test41.ok = false;
+		test41.error = err.message;
+		results.failures.push(`compact-and-peek-optical-containment-no-blank-void: ${err.message}`);
+	}
+	results.tests.push(test41);
+
 	native.dispose();
 
 	results.ok = results.failures.length === 0;

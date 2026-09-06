@@ -136,12 +136,12 @@ export function liveActivityLiveFailures(evidence) {
 				if (shot.native.questionContentHealthy === false) {
 					failures.push(`visual fixture questionContentHealthy is false: ${key}`);
 				}
-				if (key === 'question') {
+				if (key === 'question' || key === 'approval') {
 					if (shot.native.pendingContentFullyVisible === false) {
-						failures.push('question visual fixture pendingContentFullyVisible is false');
+						failures.push(`${key} visual fixture pendingContentFullyVisible is false`);
 					}
 					if (shot.native.pendingMessageFullyVisible === false) {
-						failures.push('question visual fixture pendingMessageFullyVisible is false');
+						failures.push(`${key} visual fixture pendingMessageFullyVisible is false`);
 					}
 				}
 				if (shot.native.shapeMaskSynced === false) {

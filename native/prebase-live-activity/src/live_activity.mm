@@ -5,7 +5,7 @@
 
 // Dynamic geometry metrics — native is authoritative for production silhouette/layout.
 static const CGFloat kCollapsedHeight = 34;
-static const CGFloat kPeekBodyHeight = 44;
+static const CGFloat kPeekBodyHeight = 32;
 static const CGFloat kWingWidthMin = 52;
 /** Fixed compact/peek wing widths — content text must not resize the notch island. */
 static const CGFloat kStableCompactLeftWing = 64;
@@ -27,12 +27,12 @@ static const CGFloat kOpticalShoulderInsetMax = 12;
 /** Extra horizontal inset so text clears curved shoulders (path-aware safe region). */
 static const CGFloat kContentSafeExtraX = 6;
 /** Mandatory gutter between scroll content and footer controls (pt). */
-static const CGFloat kContentFooterGutter = 10;
+static const CGFloat kContentFooterGutter = 8;
 
 /** Content layout tokens — measured stacking with reserved footer. */
 static const CGFloat kContentInsetX = 16;
-static const CGFloat kContentInsetTop = 5;
-static const CGFloat kContentGap = 4;
+static const CGFloat kContentInsetTop = 4;
+static const CGFloat kContentGap = 3;
 static const CGFloat kHeaderRowHeight = 16;
 static const CGFloat kFooterReserved = 30;
 static const CGFloat kControlHeight = 24;
@@ -88,11 +88,11 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 	if (lineH < 12) {
 		lineH = font.pointSize + 4;
 	}
-	NSRect bounds = [text boundingRectWithSize:NSMakeSize(width, lineH * maxLines + 2)
+	NSRect bounds = [text boundingRectWithSize:NSMakeSize(width, lineH * maxLines + 4)
 		options:(NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading)
 		attributes:@{ NSFontAttributeName: font }];
-	CGFloat h = ceil(NSHeight(bounds));
-	return MIN(lineH * maxLines, MAX(lineH, h));
+	CGFloat h = ceil(NSHeight(bounds)) + (maxLines > 1 ? 2 : 0);
+	return MIN(lineH * maxLines + 2, MAX(lineH, h));
 }
 
 /** Consistent horizontal content inset across expanded body (clears curved shoulders while aligning rows). */
@@ -742,7 +742,7 @@ static NSString *JSString(Napi::Value value) {
 	field.hidden = NO;
 	[self configureLabel:field lines:lines truncating:!allowOverflow];
 	CGFloat insetX = ContentSafeInsetX(self.notched);
-	field.frame = NSMakeRect(insetX + indent, *y, MAX(24, fieldW - (insetX - kContentInsetX)), MAX(need, lines == 1 ? kActionRowHeight : need));
+	field.frame = NSMakeRect(insetX + indent, *y, fieldW, MAX(need, lines == 1 ? kActionRowHeight : need));
 	*y += MAX(need, lines == 1 ? kActionRowHeight : need) + kContentGap;
 	return YES;
 }
@@ -948,7 +948,9 @@ static NSString *JSString(Napi::Value value) {
 			CGFloat peekInset = ContentSafeInsetX(self.notched);
 			CGFloat peekW = MAX(40, totalW - peekInset * 2);
 			CGFloat peekH = MeasureTextHeight(peekBody, self.activityDescription.font, peekW, 2);
-			self.activityDescription.frame = NSMakeRect(peekInset, kContentInsetTop, peekW, MIN(peekH, MAX(14, currentH - bandH - kContentInsetTop - 4)));
+			CGFloat bodyH = MAX(0, currentH - bandH);
+			CGFloat textY = MAX(kContentInsetTop, floor((bodyH - peekH) / 2.0));
+			self.activityDescription.frame = NSMakeRect(peekInset, textY, peekW, MIN(peekH, MAX(14, bodyH - textY - 2)));
 			// Peek body lives on expandedContainer (not scroll) for density.
 			if (self.activityDescription.superview != self.expandedContainer) {
 				[self.expandedContainer addSubview:self.activityDescription];
@@ -1121,11 +1123,15 @@ static NSString *JSString(Napi::Value value) {
 			// Only mark transition complete if this completion block matches the current generation
 			// This prevents stale animation completions from incorrectly marking newer transitions as finished
 			if (currentGeneration == self.controller.transitionGeneration) {
-				self.controller.transitionInFlight = NO;
 				self.shapeLayer.frame = targetFrame;
 				self.shapeMaskLayer.frame = targetFrame;
 				if (self.controller.panel && !NSEqualRects(self.controller.lastRequestedFrame, NSZeroRect)) {
 					[self.controller.panel setFrame:self.controller.lastRequestedFrame display:YES];
+					if ([self.controller framesEffectivelyEqual:self.controller.panel.frame to:self.controller.lastRequestedFrame]) {
+						self.controller.transitionInFlight = NO;
+					}
+				} else {
+					self.controller.transitionInFlight = NO;
 				}
 			}
 		}];
@@ -1537,10 +1543,12 @@ static NSString *JSString(Napi::Value value) {
 		if (self.transitionInFlight
 			&& (now >= self.transitionEndTime
 				|| [self framesEffectivelyEqual:self.panel.frame to:self.lastRequestedFrame])) {
-			self.transitionInFlight = NO;
 			if (![self framesEffectivelyEqual:self.panel.frame to:self.lastRequestedFrame]) {
 				[self.panel setFrame:self.lastRequestedFrame display:YES];
+				self.content.shapeLayer.frame = CGRectMake(0, 0, self.lastRequestedFrame.size.width, self.lastRequestedFrame.size.height);
+				self.content.shapeMaskLayer.frame = CGRectMake(0, 0, self.lastRequestedFrame.size.width, self.lastRequestedFrame.size.height);
 			}
+			self.transitionInFlight = NO;
 		}
 	} else {
 		[self.content refreshContentSubviewsPreservingPresentation];
@@ -1597,7 +1605,7 @@ static NSString *JSString(Napi::Value value) {
 	BOOL peek = self.content.peekOnly || self.attentionPeek;
 	NSInteger optionCount = [self.pendingKind isEqualToString:@"question"] ? (NSInteger)self.pendingOptions.count : 0;
 	BOOL hasApproval = [self.pendingKind isEqualToString:@"approval"];
-	return [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;kind=%@;opts=%ld;appr=%d;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
+	NSString *base = [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;kind=%@;opts=%ld;appr=%d;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
 		expanded ? 1 : 0,
 		peek ? 1 : 0,
 		self.pinned ? 1 : 0,
@@ -1610,6 +1618,11 @@ static NSString *JSString(Napi::Value value) {
 		self.content.housingWidth,
 		self.content.leftWingWidth,
 		self.content.rightWingWidth];
+	BOOL hasPending = self.content.pendingTitle.length > 0 || self.content.pendingMessage.length > 0;
+	if (hasPending) {
+		return [NSString stringWithFormat:@"%@;pt=%lu;pm=%lu", base, (unsigned long)self.content.pendingTitle.length, (unsigned long)self.content.pendingMessage.length];
+	}
+	return base;
 }
 
 - (CGFloat)computeTargetContentHeight:(CGFloat)bandH {
@@ -1638,9 +1651,6 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat naturalW = MAX(kStableCompactLeftWing + kCameraHousingMin + kStableCompactRightWing,
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
-	if (self.panel && NSWidth(self.lastRequestedFrame) > 0) {
-		totalW = MAX(totalW, NSWidth(self.lastRequestedFrame));
-	}
 	CGFloat contentW = MAX(40, totalW - (kContentInsetX + kContentSafeExtraX) * 2);
 	CGFloat h = bandH + kContentInsetTop;
 	h += kHeaderRowHeight + kContentGap;
@@ -2765,7 +2775,10 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"lastTransitionReason"] = self.lastTransitionReason ?: @"";
 	dict[@"peekOnly"] = @(self.content.peekOnly);
 
-	dict[@"transitionInFlight"] = @(self.transitionInFlight);
+	BOOL effectivelySettled = !self.panel
+		|| NSEqualRects(self.lastRequestedFrame, NSZeroRect)
+		|| [self framesEffectivelyEqual:self.panel.frame to:self.lastRequestedFrame];
+	dict[@"transitionInFlight"] = @(self.transitionInFlight || !effectivelySettled);
 	dict[@"transitionGeneration"] = @(self.transitionGeneration);
 	dict[@"actionInFlight"] = @(self.actionInFlight);
 	dict[@"hoverSessionToken"] = @(self.hoverSessionToken);
@@ -3022,12 +3035,20 @@ static NSString *JSString(Napi::Value value) {
 			[self endActionInFlightRestoring:YES];
 		}
 	}
-	if (![incomingInteractionId isEqualToString:self.interactionId] && self.content.contentScrollView) {
+	NSString *incomingPendingKind = snapshot[@"pendingKind"] ?: @"";
+	BOOL interactionChanged = ![incomingInteractionId isEqualToString:self.interactionId]
+		|| ![incomingPendingKind isEqualToString:self.pendingKind]
+		|| (![status isEqualToString:self.content.status] && ([status isEqualToString:@"attention"] || [status isEqualToString:@"working"]));
+	if (interactionChanged && self.content.contentScrollView) {
 		[self.content.contentScrollView.contentView scrollToPoint:NSZeroPoint];
 		[self.content.contentScrollView reflectScrolledClipView:self.content.contentScrollView.contentView];
 	}
+	if (interactionChanged) {
+		self.pinnedInteractiveHeight = 0;
+		self.lastGeometrySignature = @"";
+	}
 	self.interactionId = incomingInteractionId;
-	self.pendingKind = snapshot[@"pendingKind"] ?: @"";
+	self.pendingKind = incomingPendingKind;
 	self.pendingDestructive = [snapshot[@"destructive"] boolValue];
 	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
 	self.lastNativeCommand = @"";
