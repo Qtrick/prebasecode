@@ -413,6 +413,15 @@ function contentSnapshot(revision, extras = {}) {
 	if (extras.pendingTitle) {
 		snap.pendingTitle = extras.pendingTitle;
 	}
+	if (extras.pendingMessage) {
+		snap.pendingMessage = extras.pendingMessage;
+	}
+	if (Array.isArray(extras.pendingOptions)) {
+		snap.pendingOptions = extras.pendingOptions;
+	}
+	if (typeof extras.destructive === 'boolean') {
+		snap.destructive = extras.destructive;
+	}
 	if (extras.interactionId) {
 		snap.interactionId = extras.interactionId;
 	}
@@ -4622,6 +4631,319 @@ async function run() {
 		results.failures.push(`environment-transition-and-hover-suppression: ${err.message}`);
 	}
 	results.tests.push(test45);
+
+	// Test 46: Systematic Semantic State Transition Matrix & Pinned Height Invalidation
+	const test46 = { name: 'systematic-semantic-transition-matrix-and-invalidation', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		let rev = 30_000;
+
+		const checkState = async (desc, snap, expected) => {
+			rev++;
+			native.setSnapshot(contentSnapshot(rev, snap));
+			await sleep(260);
+			await drainMain(native, 4);
+			const diag = native.getDiagnostics();
+			const h = diag.panelFrame ? diag.panelFrame.height : 0;
+			const details = { desc, height: h, status: diag.renderedStatus, kind: diag.pendingKind };
+			if (expected.minH && h < expected.minH) {
+				throw new Error(`${desc}: height ${h} < min expected ${expected.minH}`);
+			}
+			if (expected.maxH && h > expected.maxH) {
+				throw new Error(`${desc}: height ${h} > max expected ${expected.maxH}`);
+			}
+			if (expected.composer !== undefined && diag.composerVisible !== expected.composer) {
+				throw new Error(`${desc}: composerVisible ${diag.composerVisible} !== expected ${expected.composer}`);
+			}
+			if (expected.approval !== undefined && diag.approvalControlsVisible !== expected.approval) {
+				throw new Error(`${desc}: approvalControlsVisible ${diag.approvalControlsVisible} !== expected ${expected.approval}`);
+			}
+			return details;
+		};
+
+		const steps = [];
+		// 1. Working Long (tall)
+		steps.push(await checkState('working-long', {
+			status: 'working',
+			currentActivity: 'Compiling large binary with 3 recent actions',
+			recentActions: [
+				{ id: 'act-1', label: 'Compiling core', at: Date.now() - 3000, status: 'passed' },
+				{ id: 'act-2', label: 'Linking dependencies', at: Date.now() - 2000, status: 'passed' },
+				{ id: 'act-3', label: 'Optimizing symbol tables', at: Date.now() - 1000, status: 'running' }
+			]
+		}, { minH: 160, composer: true, approval: false }));
+
+		// 2. Working Short (must shrink!)
+		steps.push(await checkState('working-short', {
+			status: 'working',
+			currentActivity: 'Quick check',
+			recentActions: []
+		}, { maxH: 125, composer: true, approval: false }));
+
+		// 3. Working -> Completed (must shrink to compact status card <= 94pt, no composer)
+		steps.push(await checkState('working-to-completed', {
+			status: 'completed',
+			currentActivity: 'All tests passed',
+			latestShortMessage: 'Build finished in 4.2s',
+			recentActions: []
+		}, { minH: 82, maxH: 94, composer: false, approval: false }));
+
+		// 4. Completed -> Working (must expand back to interactive working height)
+		steps.push(await checkState('completed-to-working', {
+			status: 'working',
+			currentActivity: 'Analyzing changes',
+			recentActions: []
+		}, { minH: 110, maxH: 125, composer: true, approval: false }));
+
+		// 5. Working -> Question with 2 options (single row: compact ~124pt)
+		steps.push(await checkState('working-to-question-2-opts', {
+			status: 'attention',
+			pendingKind: 'question',
+			interactionId: 'q-trans-1',
+			pendingTitle: 'Select deployment target',
+			pendingOptions: [
+				{ id: 'opt-staging', label: 'Staging' },
+				{ id: 'opt-prod', label: 'Production' }
+			]
+		}, { minH: 120, maxH: 135, composer: false, approval: false }));
+
+		// 5b. Question with 4 options (2 rows: expands to ~156-170pt)
+		steps.push(await checkState('question-4-opts-expand', {
+			status: 'attention',
+			pendingKind: 'question',
+			interactionId: 'q-trans-1b',
+			pendingTitle: 'Select region',
+			pendingOptions: [
+				{ id: 'us-east', label: 'US East' },
+				{ id: 'us-west', label: 'US West' },
+				{ id: 'eu-central', label: 'EU Central' },
+				{ id: 'ap-south', label: 'AP South' }
+			]
+		}, { minH: 145, composer: false, approval: false }));
+
+		// 6. Question -> Completed (must shrink back down to compact status card <= 94pt)
+		steps.push(await checkState('question-to-completed', {
+			status: 'completed',
+			currentActivity: 'Deployed successfully',
+			latestShortMessage: 'Done',
+			recentActions: []
+		}, { minH: 82, maxH: 94, composer: false, approval: false }));
+
+		// 7. Completed -> Working (recover)
+		steps.push(await checkState('completed-to-working-2', {
+			status: 'working',
+			currentActivity: 'Indexing files',
+			recentActions: []
+		}, { minH: 110, maxH: 125, composer: true, approval: false }));
+
+		// 8. Working -> Approval (must expand to focused approval card)
+		steps.push(await checkState('working-to-approval', {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'appr-trans-1',
+			pendingTitle: 'Approve file write?',
+			pendingMessage: 'Write to live_activity.mm'
+		}, { minH: 130, maxH: 165, composer: false, approval: true }));
+
+		// 9. Approval -> Failed (must shrink to compact status card <= 94pt)
+		steps.push(await checkState('approval-to-failed', {
+			status: 'failed',
+			currentActivity: 'Operation cancelled by user',
+			latestShortMessage: 'Denied',
+			recentActions: []
+		}, { minH: 82, maxH: 94, composer: false, approval: false }));
+
+		// 10. Failed -> Working (recover)
+		steps.push(await checkState('failed-to-working', {
+			status: 'working',
+			currentActivity: 'Ready for next command',
+			recentActions: []
+		}, { minH: 110, maxH: 125, composer: true, approval: false }));
+
+		// 11. Approval -> Question direct transition
+		steps.push(await checkState('working-to-approval-2', {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'appr-trans-2',
+			pendingTitle: 'Approve execution?'
+		}, { minH: 120, maxH: 135, composer: false, approval: true }));
+
+		steps.push(await checkState('approval-to-question-direct', {
+			status: 'attention',
+			pendingKind: 'question',
+			interactionId: 'q-trans-2',
+			pendingTitle: 'Choose runner',
+			pendingOptions: [
+				{ id: 'opt-local', label: 'Local' },
+				{ id: 'opt-remote', label: 'Remote' }
+			]
+		}, { minH: 120, maxH: 135, composer: false, approval: false }));
+
+		test46.details.steps = steps;
+	} catch (err) {
+		test46.ok = false;
+		test46.error = err.message;
+		results.failures.push(`systematic-semantic-transition-matrix-and-invalidation: ${err.message}`);
+	}
+	results.tests.push(test46);
+
+	// Test 47: Streaming Text Stability vs Semantic Invalidation
+	const test47 = { name: 'streaming-text-stability-vs-semantic-invalidation', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(31_000, {
+			status: 'working',
+			currentActivity: 'Streaming test start',
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const baselineDiag = native.getDiagnostics();
+		const baseSig = baselineDiag.geometrySignature;
+		const baseAnim = baselineDiag.animationCount;
+		const baseFrame = baselineDiag.panelFrame;
+
+		// Stream 30 character-by-character updates to currentActivity
+		let streamedActivity = 'Streaming test start';
+		for (let i = 0; i < 30; i++) {
+			streamedActivity += ` chunk_${i}`;
+			native.setSnapshot(contentSnapshot(31_001 + i, {
+				status: 'working',
+				currentActivity: streamedActivity,
+			}));
+			await drainMain(native, 1);
+		}
+		await sleep(100);
+		await drainMain(native, 2);
+
+		const postStreamDiag = native.getDiagnostics();
+		test47.details.streaming = {
+			baseSig,
+			postStreamSig: postStreamDiag.geometrySignature,
+			animDelta: postStreamDiag.animationCount - baseAnim,
+			frameEqual: framesEqualWithin(baseFrame, postStreamDiag.panelFrame, 1.0)
+		};
+
+		if (postStreamDiag.geometrySignature !== baseSig) {
+			throw new Error(`geometry signature mutated during activity streaming: ${postStreamDiag.geometrySignature} vs ${baseSig}`);
+		}
+		if (postStreamDiag.animationCount > baseAnim) {
+			throw new Error(`unnecessary animation triggered during streaming: +${postStreamDiag.animationCount - baseAnim}`);
+		}
+		if (!framesEqualWithin(baseFrame, postStreamDiag.panelFrame, 1.0)) {
+			throw new Error(`panel frame drifted during streaming: ${JSON.stringify(postStreamDiag.panelFrame)} vs ${JSON.stringify(baseFrame)}`);
+		}
+
+		// Now trigger a semantic status change to completed: MUST invalidate signature and morph
+		native.setSnapshot(contentSnapshot(32_000, {
+			status: 'completed',
+			currentActivity: 'Done',
+			latestShortMessage: 'Finished'
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const postSemanticDiag = native.getDiagnostics();
+		test47.details.semanticTransition = {
+			postSemanticSig: postSemanticDiag.geometrySignature,
+			postSemanticH: postSemanticDiag.panelFrame ? postSemanticDiag.panelFrame.height : 0
+		};
+
+		if (postSemanticDiag.geometrySignature === baseSig) {
+			throw new Error(`geometry signature must change when status changes from working to completed`);
+		}
+		if (postSemanticDiag.panelFrame.height > 94) {
+			throw new Error(`completed state height ${postSemanticDiag.panelFrame.height} must be <= 94pt`);
+		}
+	} catch (err) {
+		test47.ok = false;
+		test47.error = err.message;
+		results.failures.push(`streaming-text-stability-vs-semantic-invalidation: ${err.message}`);
+	}
+	results.tests.push(test47);
+
+	// Test 48: Strict Content Containment & Subview Isolation
+	const test48 = { name: 'strict-content-containment-and-subview-isolation', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+
+		// Test Approval containment and isolation
+		native.setSnapshot(contentSnapshot(33_000, {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'appr-contain-1',
+			pendingTitle: 'Approve database migration?',
+			pendingMessage: 'This will alter 14 tables in production database.'
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const apprDiag = native.getDiagnostics();
+		test48.details.approval = {
+			composerVisible: apprDiag.composerVisible,
+			approvalVisible: apprDiag.approvalControlsVisible,
+			pinVisible: apprDiag.pinButtonVisible,
+			openVisible: apprDiag.openInPreBaseVisible,
+			approveFrame: apprDiag.approveButtonFrame,
+			denyFrame: apprDiag.denyButtonFrame,
+			panelFrame: apprDiag.panelFrame
+		};
+
+		if (apprDiag.composerVisible !== false) {
+			throw new Error('Approval card must NOT show composer input');
+		}
+		if (apprDiag.approvalControlsVisible !== true) {
+			throw new Error('Approval card must show Deny/Approve buttons');
+		}
+		if (apprDiag.pinButtonVisible !== false) {
+			throw new Error('Approval card must NOT show pin button');
+		}
+		if (apprDiag.openInPreBaseVisible !== false) {
+			throw new Error('Approval card must NOT show open button');
+		}
+		if (!isValidDiagFrame(apprDiag.approveButtonFrame) || !isValidDiagFrame(apprDiag.denyButtonFrame)) {
+			throw new Error('Approval buttons must have valid frames');
+		}
+		// Check that buttons are inside the panel frame
+		const winW = apprDiag.panelFrame.width;
+		const winH = apprDiag.panelFrame.height;
+		if (apprDiag.approveButtonFrame.x + apprDiag.approveButtonFrame.width > winW + 0.5) {
+			throw new Error(`approve button escapes right window edge: ${apprDiag.approveButtonFrame.x + apprDiag.approveButtonFrame.width} > ${winW}`);
+		}
+		if (apprDiag.denyButtonFrame.x < 0) {
+			throw new Error(`deny button escapes left window edge: ${apprDiag.denyButtonFrame.x} < 0`);
+		}
+
+		// Test Completed containment and isolation
+		native.setSnapshot(contentSnapshot(33_001, {
+			status: 'completed',
+			currentActivity: 'Migration completed',
+			latestShortMessage: 'Success'
+		}));
+		await sleep(260);
+		await drainMain(native, 4);
+
+		const compDiag = native.getDiagnostics();
+		test48.details.completed = {
+			composerVisible: compDiag.composerVisible,
+			approvalVisible: compDiag.approvalControlsVisible,
+			pinVisible: compDiag.pinButtonVisible,
+			openVisible: compDiag.openInPreBaseVisible,
+			panelFrame: compDiag.panelFrame
+		};
+
+		if (compDiag.composerVisible !== false || compDiag.approvalControlsVisible !== false || compDiag.pinButtonVisible !== false || compDiag.openInPreBaseVisible !== false) {
+			throw new Error('Completed status card must have all interaction controls hidden');
+		}
+	} catch (err) {
+		test48.ok = false;
+		test48.error = err.message;
+		results.failures.push(`strict-content-containment-and-subview-isolation: ${err.message}`);
+	}
+	results.tests.push(test48);
 
 	native.dispose();
 

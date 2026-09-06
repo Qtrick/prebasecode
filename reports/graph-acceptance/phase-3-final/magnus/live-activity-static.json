@@ -14,8 +14,8 @@
   "durationMs": 3,
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-static",
-  "sourceHead": "83150f4aefa228bab4390ce5ea7928fae7e14e02",
-  "sourceFingerprint": "5dd7004c8363dceccb42c2aeca5dd720fed7f98b15f87b5836a2dc60232fa9a9",
-  "productFingerprint": "5dd7004c8363dceccb42c2aeca5dd720fed7f98b15f87b5836a2dc60232fa9a9",
-  "generatedAt": "2026-09-06T19:53:28.009Z"
+  "sourceHead": "f280c16e80de508e1915231d3ebb357bee9fbc0f",
+  "sourceFingerprint": "2aa51a85a92de14085ee8351d1b24d7685d5cb194f3aef8b8f9d5befb48e13f7",
+  "productFingerprint": "2aa51a85a92de14085ee8351d1b24d7685d5cb194f3aef8b8f9d5befb48e13f7",
+  "generatedAt": "2026-09-06T20:22:49.619Z"
 }

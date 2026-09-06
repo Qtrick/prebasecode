@@ -1023,11 +1023,7 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat headerInset = ContentSafeInsetX(self.notched);
 	CGFloat headerW = MAX(40, totalW - headerInset * 2);
 	CGFloat statusW = MIN(headerW * 0.40, MAX(44, [statusText sizeWithAttributes:@{ NSFontAttributeName: self.statusBadge.font }].width + 4));
-	BOOL hasOptions = ([self.controller.pendingKind isEqualToString:@"question"] && self.controller.pendingOptions.count > 0);
-	BOOL hasApproval = [self.controller.pendingKind isEqualToString:@"approval"];
-	BOOL isCompletedOrFailed = [self.status isEqualToString:@"completed"] || [self.status isEqualToString:@"failed"];
-	BOOL buttonsInHeader = hasOptions || hasApproval || isCompletedOrFailed;
-	CGFloat titleW = MAX(48, headerW - statusW - 8 - (buttonsInHeader ? 52 : 0));
+	CGFloat titleW = MAX(48, headerW - statusW - 8);
 	self.headerTitle.stringValue = @"Magnus";
 	self.headerTitle.frame = NSMakeRect(headerInset, y, titleW, kHeaderRowHeight);
 	self.statusBadge.frame = NSMakeRect(totalW - headerInset - statusW, y, statusW, kHeaderRowHeight);
@@ -1124,11 +1120,15 @@ static NSString *JSString(Napi::Value value) {
 	}
 	if (isExpanded) {
 		if (self.peekOnly) {
+			self.compactContainer.hidden = NO;
+			self.compactContainer.alphaValue = 1.0;
 			self.expandedContainer.hidden = YES;
 			self.expandedContainer.alphaValue = 0.0;
 			self.peekContainer.hidden = NO;
 			self.peekContainer.alphaValue = 1.0;
 		} else {
+			self.compactContainer.hidden = YES;
+			self.compactContainer.alphaValue = 0.0;
 			self.peekContainer.hidden = YES;
 			self.peekContainer.alphaValue = 0.0;
 			self.expandedContainer.hidden = NO;
@@ -1795,7 +1795,7 @@ static NSString *JSString(Napi::Value value) {
 	return kControlHeight + 7;
 }
 
-/** Geometry signature — incorporates status and action count; text length stays pinned. */
+/** Geometry signature — incorporates semantic state (status, kind, interactionId, options, actions); raw character counts are excluded so streaming text never morphs geometry. */
 - (NSString *)geometrySignatureForBandH:(CGFloat)bandH {
 	BOOL expanded = self.content.expanded || self.pinned;
 	BOOL peek = self.content.peekOnly || self.attentionPeek;
@@ -1804,26 +1804,23 @@ static NSString *JSString(Napi::Value value) {
 	NSInteger actionCount = MIN((NSInteger)self.content.actions.count, 3);
 	NSString *status = self.content.status ?: @"";
 
-	NSString *base = [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;st=%@;kind=%@;opts=%ld;appr=%d;acts=%ld;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
+	return [NSString stringWithFormat:@"e=%d;p=%d;pin=%d;att=%d;st=%@;kind=%@;id=%@;opts=%ld;appr=%d;dest=%d;acts=%ld;band=%.1f;notch=%d;h=%.1f;lw=%.1f;rw=%.1f",
 		expanded ? 1 : 0,
 		peek ? 1 : 0,
 		self.pinned ? 1 : 0,
 		self.content.attention ? 1 : 0,
 		status,
 		self.pendingKind ?: @"",
+		self.interactionId ?: @"",
 		(long)optionCount,
 		hasApproval ? 1 : 0,
+		self.pendingDestructive ? 1 : 0,
 		(long)actionCount,
 		bandH,
 		self.content.notched ? 1 : 0,
 		self.content.housingWidth,
 		self.content.leftWingWidth,
 		self.content.rightWingWidth];
-	BOOL hasPending = self.content.pendingTitle.length > 0 || self.content.pendingMessage.length > 0;
-	if (hasPending) {
-		return [NSString stringWithFormat:@"%@;pt=%lu;pm=%lu", base, (unsigned long)self.content.pendingTitle.length, (unsigned long)self.content.pendingMessage.length];
-	}
-	return base;
 }
 
 - (CGFloat)computeTargetContentHeight:(CGFloat)bandH {
@@ -2097,7 +2094,6 @@ static NSString *JSString(Napi::Value value) {
 	BOOL question = [self.pendingKind isEqualToString:@"question"];
 	BOOL showAttention = (self.content.expanded || self.pinned) && !self.content.peekOnly;
 	BOOL hasOptions = (question && self.pendingOptions.count > 0);
-	BOOL showInput = showAttention && !isCompletedOrFailed && !approval && !hasOptions;
 
 	self.approveButton.hidden = !(approval && showAttention);
 	self.denyButton.hidden = self.approveButton.hidden;
@@ -2138,35 +2134,6 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat bottomY = bodyHeight - kControlHeight - 7;
 	CGFloat usableW = NSWidth(win) - footerInset * 2;
 
-	[self updatePinButtonState];
-	self.pinButton.hidden = NO;
-	self.openButton.hidden = NO;
-
-	BOOL buttonsInHeader = hasOptions || approval || isCompletedOrFailed;
-	if (buttonsInHeader) {
-		self.input.hidden = YES;
-		// Header placement: statusBadge is right-aligned, place [pin] [open] to its left
-		CGFloat headerInset = ContentSafeInsetX(self.content.notched);
-		CGFloat topY = kContentInsetTop + (kHeaderRowHeight - kIconControlSize) * 0.5;
-		CGFloat statusW = NSWidth(self.content.statusBadge.frame);
-		CGFloat rightEdge = NSWidth(win) - headerInset - statusW - 8;
-		self.openButton.frame = NSMakeRect(rightEdge - kIconControlSize, topY, kIconControlSize, kIconControlSize);
-		self.pinButton.frame = NSMakeRect(rightEdge - kIconControlSize * 2 - gap, topY, kIconControlSize, kIconControlSize);
-	} else if (showInput) {
-		self.input.hidden = NO;
-		CGFloat trailing = kIconControlSize * 2 + gap * 2;
-		CGFloat composerW = MAX(72, usableW - trailing);
-		self.input.frame = NSMakeRect(footerInset, bottomY, composerW, kControlHeight);
-		self.pinButton.frame = NSMakeRect(footerInset + composerW + gap, bottomY + (kControlHeight - kIconControlSize) * 0.5, kIconControlSize, kIconControlSize);
-		self.openButton.frame = NSMakeRect(footerInset + composerW + gap + kIconControlSize + gap, bottomY + (kControlHeight - kIconControlSize) * 0.5, kIconControlSize, kIconControlSize);
-		bottomY -= (kControlHeight + 7);
-	} else {
-		self.input.hidden = YES;
-		self.pinButton.frame = NSMakeRect(NSWidth(win) - footerInset - kIconControlSize * 2 - gap, bottomY + (kControlHeight - kIconControlSize) * 0.5, kIconControlSize, kIconControlSize);
-		self.openButton.frame = NSMakeRect(NSWidth(win) - footerInset - kIconControlSize, bottomY + (kControlHeight - kIconControlSize) * 0.5, kIconControlSize, kIconControlSize);
-		bottomY -= (kControlHeight + 6);
-	}
-
 	BOOL controlsEnabled = !self.actionInFlight;
 	self.approveButton.enabled = controlsEnabled;
 	self.denyButton.enabled = controlsEnabled;
@@ -2178,7 +2145,14 @@ static NSString *JSString(Napi::Value value) {
 	self.approveButton.alphaValue = actionAlpha;
 	self.denyButton.alphaValue = actionAlpha;
 
-	if (!self.approveButton.hidden) {
+	if (approval) {
+		// Focused Approval card: NO composer, NO pin/open header buttons, NO option buttons.
+		self.input.hidden = YES;
+		self.pinButton.hidden = YES;
+		self.openButton.hidden = YES;
+		self.approveButton.hidden = NO;
+		self.denyButton.hidden = NO;
+
 		NSString *approveTitle = self.pendingDestructive ? @"Approve (destructive)" : @"Approve";
 		self.approveButton.title = approveTitle;
 		NSDictionary *apprAttrs = @{
@@ -2215,68 +2189,110 @@ static NSString *JSString(Napi::Value value) {
 		}
 		self.denyButton.frame = NSMakeRect(footerInset, bottomY, denyW, kControlHeight);
 		self.approveButton.frame = NSMakeRect(footerInset + denyW + gap, bottomY, approveW, kControlHeight);
-		bottomY -= (kControlHeight + kContentFooterGutter);
+		return;
 	}
 
-	if (question && showAttention) {
-		NSInteger totalOpts = (NSInteger)self.pendingOptions.count;
-		NSInteger maxDirect = totalOpts > 4 ? 3 : totalOpts;
-		// Prefer 2-column grids for 3–4 options (avoids a lonely third/fourth chip row).
-		NSInteger perRow = (maxDirect >= 3) ? 2 : MAX(1, maxDirect);
-		CGFloat colW = floor((usableW - gap) / 2.0);
-		CGFloat slotW = (perRow == 2) ? colW : MIN(140, MAX(56, usableW));
-		NSInteger rows = MAX(1, (NSInteger)ceil((double)maxDirect / (double)perRow));
-		if (totalOpts > 4) {
-			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
-		}
-		// Layout top→bottom so wrapped chips do not appear orphaned above the first row.
-		CGFloat optionsTop = MAX(0, bottomY - (rows - 1) * (kControlHeight + 4));
-		CGFloat x = footerInset;
-		CGFloat rowY = optionsTop;
-		NSInteger col = 0;
-		for (NSInteger i = 0; i < maxDirect && i < (NSInteger)self.optionButtons.count; i++) {
-			NSDictionary *option = self.pendingOptions[i];
-			NSButton *button = self.optionButtons[i];
-			NSString *label = option[@"label"] ?: option[@"id"] ?: @"Option";
-			button.title = label;
-			NSDictionary *titleAttrs = @{
-				NSFontAttributeName: button.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
-				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0],
-			};
-			button.attributedTitle = [[NSAttributedString alloc] initWithString:label attributes:titleAttrs];
-			button.accessibilityLabel = self.actionInFlight ? [NSString stringWithFormat:@"%@ (in progress)", label] : label;
-			button.alphaValue = actionAlpha;
-			CGFloat width = (perRow == 2) ? colW : MIN(slotW, MAX(56, [label sizeWithAttributes:@{ NSFontAttributeName: button.font }].width + 20));
-			if (col >= perRow) {
-				col = 0;
-				x = footerInset;
-				rowY += (kControlHeight + 4);
+	if (question) {
+		self.approveButton.hidden = YES;
+		self.denyButton.hidden = YES;
+		if (hasOptions) {
+			// Question with predefined choices: show options, hide composer and pin/open.
+			self.input.hidden = YES;
+			self.pinButton.hidden = YES;
+			self.openButton.hidden = YES;
+
+			NSInteger totalOpts = (NSInteger)self.pendingOptions.count;
+			NSInteger maxDirect = totalOpts > 4 ? 3 : totalOpts;
+			// Prefer 2-column grids for 3–4 options (avoids a lonely third/fourth chip row).
+			NSInteger perRow = (maxDirect >= 3) ? 2 : MAX(1, maxDirect);
+			CGFloat colW = floor((usableW - gap) / 2.0);
+			CGFloat slotW = (perRow == 2) ? colW : MIN(140, MAX(56, usableW));
+			NSInteger rows = MAX(1, (NSInteger)ceil((double)maxDirect / (double)perRow));
+			if (totalOpts > 4) {
+				rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
 			}
-			button.hidden = NO;
-			button.frame = NSMakeRect(x, rowY, width, kControlHeight);
-			x += width + gap;
-			col++;
-		}
-		if (totalOpts > 4 && self.optionButtons.count >= 4) {
-			NSButton *moreButton = self.optionButtons[3];
-			moreButton.title = @"More…";
-			NSDictionary *moreAttrs = @{
-				NSFontAttributeName: moreButton.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
-				NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0],
-			};
-			moreButton.attributedTitle = [[NSAttributedString alloc] initWithString:@"More…" attributes:moreAttrs];
-			moreButton.accessibilityLabel = @"More options in PreBase";
-			moreButton.alphaValue = 1.0;
-			CGFloat moreW = (perRow == 2) ? colW : MIN(72, slotW);
-			if (col >= perRow) {
-				col = 0;
-				x = footerInset;
-				rowY += (kControlHeight + 4);
+			// Layout top→bottom so wrapped chips do not appear orphaned above the first row.
+			CGFloat optionsTop = MAX(0, bottomY - (rows - 1) * (kControlHeight + 4));
+			CGFloat x = footerInset;
+			CGFloat rowY = optionsTop;
+			NSInteger col = 0;
+			for (NSInteger i = 0; i < maxDirect && i < (NSInteger)self.optionButtons.count; i++) {
+				NSDictionary *option = self.pendingOptions[i];
+				NSButton *button = self.optionButtons[i];
+				NSString *label = option[@"label"] ?: option[@"id"] ?: @"Option";
+				button.title = label;
+				NSDictionary *titleAttrs = @{
+					NSFontAttributeName: button.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+					NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0],
+				};
+				button.attributedTitle = [[NSAttributedString alloc] initWithString:label attributes:titleAttrs];
+				button.accessibilityLabel = self.actionInFlight ? [NSString stringWithFormat:@"%@ (in progress)", label] : label;
+				button.alphaValue = actionAlpha;
+				CGFloat width = (perRow == 2) ? colW : MIN(slotW, MAX(56, [label sizeWithAttributes:@{ NSFontAttributeName: button.font }].width + 20));
+				if (col >= perRow) {
+					col = 0;
+					x = footerInset;
+					rowY += (kControlHeight + 4);
+				}
+				button.hidden = NO;
+				button.frame = NSMakeRect(x, rowY, width, kControlHeight);
+				x += width + gap;
+				col++;
 			}
-			moreButton.hidden = NO;
-			moreButton.frame = NSMakeRect(x, rowY, moreW, kControlHeight);
+			if (totalOpts > 4 && self.optionButtons.count >= 4) {
+				NSButton *moreButton = self.optionButtons[3];
+				moreButton.title = @"More…";
+				NSDictionary *moreAttrs = @{
+					NSFontAttributeName: moreButton.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
+					NSForegroundColorAttributeName: [NSColor colorWithCalibratedWhite:0.92 alpha:1.0],
+				};
+				moreButton.attributedTitle = [[NSAttributedString alloc] initWithString:@"More…" attributes:moreAttrs];
+				moreButton.accessibilityLabel = @"More options in PreBase";
+				moreButton.alphaValue = 1.0;
+				CGFloat moreW = (perRow == 2) ? colW : MIN(72, slotW);
+				if (col >= perRow) {
+					col = 0;
+					x = footerInset;
+					rowY += (kControlHeight + 4);
+				}
+				moreButton.hidden = NO;
+				moreButton.frame = NSMakeRect(x, rowY, moreW, kControlHeight);
+			}
+			return;
+		} else {
+			// Freeform text question: show full-width input composer
+			self.approveButton.hidden = YES;
+			self.denyButton.hidden = YES;
+			self.pinButton.hidden = YES;
+			self.openButton.hidden = YES;
+			self.input.hidden = NO;
+			self.input.frame = NSMakeRect(footerInset, bottomY, usableW, kControlHeight);
+			return;
 		}
 	}
+
+	if (isCompletedOrFailed) {
+		self.input.hidden = YES;
+		self.pinButton.hidden = YES;
+		self.openButton.hidden = YES;
+		self.approveButton.hidden = YES;
+		self.denyButton.hidden = YES;
+		return;
+	}
+
+	// Working interactive state: Show composer + pin + open cleanly in footer
+	self.approveButton.hidden = YES;
+	self.denyButton.hidden = YES;
+	[self updatePinButtonState];
+	self.pinButton.hidden = NO;
+	self.openButton.hidden = NO;
+	self.input.hidden = NO;
+
+	CGFloat trailing = kIconControlSize * 2 + gap * 2;
+	CGFloat composerW = MAX(72, usableW - trailing);
+	self.input.frame = NSMakeRect(footerInset, bottomY, composerW, kControlHeight);
+	self.pinButton.frame = NSMakeRect(footerInset + composerW + gap, bottomY + (kControlHeight - kIconControlSize) * 0.5, kIconControlSize, kIconControlSize);
+	self.openButton.frame = NSMakeRect(footerInset + composerW + gap + kIconControlSize + gap, bottomY + (kControlHeight - kIconControlSize) * 0.5, kIconControlSize, kIconControlSize);
 }
 
 - (void)performUserHaptic {
@@ -3266,8 +3282,8 @@ static NSString *JSString(Napi::Value value) {
 	self.sessionId = snapshot[@"sessionId"] ?: @"";
 	self.sessionResource = snapshot[@"sessionResource"] ?: @"";
 	self.revision = incomingRevision;
+	NSString *previousStatus = self.content.status ?: @"";
 	NSString *status = snapshot[@"status"] ?: @"";
-	self.content.status = status;
 	self.content.attention = [status isEqualToString:@"attention"];
 	// Sticky Escape restore: OR with local flag while attention remains (stale republish must not clear).
 	if (self.content.attention) {
@@ -3298,9 +3314,19 @@ static NSString *JSString(Napi::Value value) {
 		}
 	}
 	NSString *incomingPendingKind = snapshot[@"pendingKind"] ?: @"";
+	NSArray *incomingOptions = snapshot[@"pendingOptions"] ?: @[];
+	BOOL incomingDestructive = [snapshot[@"destructive"] boolValue];
 	BOOL interactionChanged = ![incomingInteractionId isEqualToString:self.interactionId]
 		|| ![incomingPendingKind isEqualToString:self.pendingKind]
-		|| ![status isEqualToString:self.content.status];
+		|| ![status isEqualToString:previousStatus]
+		|| (incomingOptions.count != self.pendingOptions.count)
+		|| (incomingDestructive != self.pendingDestructive)
+		|| [status isEqualToString:@"completed"]
+		|| [status isEqualToString:@"failed"]
+		|| [previousStatus isEqualToString:@"completed"]
+		|| [previousStatus isEqualToString:@"failed"];
+	self.content.status = status;
+	BOOL needsGeometry = NO;
 	if (interactionChanged && self.content.contentScrollView) {
 		[self.content.contentScrollView.contentView scrollToPoint:NSZeroPoint];
 		[self.content.contentScrollView reflectScrolledClipView:self.content.contentScrollView.contentView];
@@ -3308,14 +3334,13 @@ static NSString *JSString(Napi::Value value) {
 	if (interactionChanged) {
 		self.pinnedInteractiveHeight = 0;
 		self.lastGeometrySignature = @"";
+		needsGeometry = YES;
 	}
 	self.interactionId = incomingInteractionId;
 	self.pendingKind = incomingPendingKind;
-	self.pendingDestructive = [snapshot[@"destructive"] boolValue];
-	self.pendingOptions = snapshot[@"pendingOptions"] ?: @[];
+	self.pendingDestructive = incomingDestructive;
+	self.pendingOptions = incomingOptions;
 	self.lastNativeCommand = @"";
-
-	BOOL needsGeometry = NO;
 
 	if (self.content.attention) {
 		if (alreadyInteractive && mayExpand) {
@@ -3690,7 +3715,26 @@ static NSMutableDictionary *SnapshotToDict(Napi::Object snapshot) {
 		if (snapshot.Get("destructive").IsBoolean() && snapshot.Get("destructive").As<Napi::Boolean>().Value()) {
 			payload[@"destructive"] = @YES;
 		}
-		payload[@"pendingOptions"] = @[];
+		NSMutableArray *options = [NSMutableArray array];
+		if (snapshot.Get("pendingOptions").IsArray()) {
+			Napi::Array arr = snapshot.Get("pendingOptions").As<Napi::Array>();
+			for (uint32_t i = 0; i < arr.Length(); i++) {
+				Napi::Value item = arr.Get(i);
+				if (!item.IsObject()) {
+					continue;
+				}
+				Napi::Object option = item.As<Napi::Object>();
+				NSString *optionId = JSString(option.Get("id"));
+				if (optionId.length == 0) {
+					continue;
+				}
+				[options addObject:@{
+					@"id": optionId,
+					@"label": JSString(option.Get("label"))
+				}];
+			}
+		}
+		payload[@"pendingOptions"] = options;
 	}
 	return payload;
 }
