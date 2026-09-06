@@ -65,6 +65,42 @@
       "rootCause": "Suite had 48 tests but lacked adversarial regression coverage for single-subtree visibility invariance, unbroken URL/identifier token containment, rapid multi-state transition stress loops, approval button baseline and balance, and action in-flight timeout lifecycle.",
       "impact": "Subtle rendering regressions could occur while diagnostics remained superficially green.",
       "change": "Added adversarial tests 49 through 53 (53/53 total tests passing) verifying settled subtree visibility isolation, extreme unbroken token layout containment, 3x rapid stress loops across all 8 states, symmetrical approval button balance with shared baseline, and action in-flight timeout truthful restoration."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "Presentation state decisions were distributed across loose booleans (expanded, targetExpanded, peekOnly, attentionPeek, pinned, attention) without a single authoritative model.",
+      "impact": "Potential contradictory state combinations and fragile control visibility logic across transitions.",
+      "change": "Introduced PrebasePresentationState enum and canonicalPresentationState/canonicalTargetPresentationState resolver methods on PrebaseLiveActivityController. Wired layoutControls, computeControlsStackHeight, isGlanceableSurface, and diagnosticsDict strictly to the authoritative canonical state."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "CreateNotchedIslandPath calculated shoulderBottomY = bandH + effShoulderR (y=52pt), creating an hourglass pinch down the upper third of expanded cards.",
+      "impact": "The expanded notch panel had an awkward, pinched waistline rather than continuous, vertical side edges.",
+      "change": "Re-engineered shoulder geometry: set effShoulderR = isExpanded ? shoulder.effShoulderR : 0.0 and shoulderBottomY = isExpanded ? effShoulderR : 0.0, confining the shoulder curve to a true organic C1 fillet along the top edge while maintaining the 14-element topology invariant for Core Animation."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "NSScrollView overlay vertical scroller drew a thumb at totalW - 15, protruding through the bottom-right curved notch mask in completed, failed, and working states.",
+      "impact": "Visible scrollbar thumb bleeding outside the curved silhouette in captured frames.",
+      "change": "Disabled overlay scroller with _contentScrollView.hasVerticalScroller = NO while maintaining smooth mousewheel/trackpad elastic scrolling via NSScrollElasticityAllowed."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "reconcileActionRowsIntoDocument only checked exact string equality between action labels and activityLabel, duplicating activity text when activityLabel was a compound sentence containing the action.",
+      "impact": "magnus-live-activity-interactive.png duplicated text between activityLabel and bullet action rows.",
+      "change": "Added bidirectional case-insensitive substring deduplication so redundant bullet action rows matching currentActivity are excluded."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "_peekLabel used default left alignment, pushing short glanceable text toward the left shoulder away from the hardware camera housing.",
+      "impact": "Peek text looked lopsided and detached from the physical notch center.",
+      "change": "Set _peekLabel.alignment = NSTextAlignmentCenter, centering glanceable peek text directly beneath the hardware camera housing."
+    },
+    {
+      "file": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+      "rootCause": "Lack of automated verification for canonical state matrix, CJK/Unicode/deep POSIX path containment, action-activity deduplication, and rapid interrupted morph retargeting.",
+      "impact": "Regression risks for multi-state transition chains and edge-case text containment.",
+      "change": "Added Tests 54 through 57 (57/57 tests PASS): Test 54 (Canonical Presentation State Matrix & Single-Subtree Isolation), Test 55 (Adversarial CJK, Unicode, Deep Path Containment & Optical Safe-Zone), Test 56 (Action-Activity Deduplication & Footer Baseline Alignment), and Test 57 (Rapid Interrupted Morph Presentation-Layer Retargeting)."
     }
   ],
   "findingsRejected": [

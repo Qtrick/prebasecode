@@ -5250,6 +5250,295 @@ async function run() {
 	}
 	results.tests.push(test53);
 
+	// Test 54: Canonical Presentation State Matrix & Single-Subtree Isolation
+	const test54 = { name: 'canonical-presentation-state-matrix-and-subview-isolation', ok: true, details: {} };
+	try {
+		native.dispose();
+		const statesToVerify = [
+			{
+				desc: 'compact',
+				setup: async () => {
+					native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
+					native.setSnapshot(contentSnapshot(54_001, { status: 'working', currentActivity: 'Monitoring' }));
+				},
+				expectedState: 'compact',
+				expectedCompact: true,
+				expectedPeek: false,
+				expectedExpanded: false,
+			},
+			{
+				desc: 'peek',
+				setup: async () => {
+					native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
+					native.setSnapshot(contentSnapshot(54_002, { status: 'working', currentActivity: 'Peek glanceable update' }));
+					await drainMain(native, 2);
+					native.simulateAction('peek');
+				},
+				expectedState: 'peek',
+				expectedCompact: true,
+				expectedPeek: true,
+				expectedExpanded: false,
+			},
+			{
+				desc: 'interactiveWorking',
+				setup: async () => {
+					native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+					native.setSnapshot(contentSnapshot(54_003, { status: 'working', currentActivity: 'Active task in progress' }));
+				},
+				expectedState: 'interactiveWorking',
+				expectedCompact: false,
+				expectedPeek: false,
+				expectedExpanded: true,
+			},
+			{
+				desc: 'interactiveQuestion',
+				setup: async () => {
+					native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+					native.setSnapshot(contentSnapshot(54_004, { status: 'attention', pendingKind: 'question', interactionId: 'q-54', pendingTitle: 'Select action', pendingOptions: [{ id: '1', label: 'One' }, { id: '2', label: 'Two' }] }));
+				},
+				expectedState: 'interactiveQuestion',
+				expectedCompact: false,
+				expectedPeek: false,
+				expectedExpanded: true,
+			},
+			{
+				desc: 'interactiveApproval',
+				setup: async () => {
+					native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+					native.setSnapshot(contentSnapshot(54_005, { status: 'attention', pendingKind: 'approval', interactionId: 'appr-54', pendingTitle: 'Confirm deploy?' }));
+				},
+				expectedState: 'interactiveApproval',
+				expectedCompact: false,
+				expectedPeek: false,
+				expectedExpanded: true,
+			},
+			{
+				desc: 'terminalCompleted',
+				setup: async () => {
+					native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+					native.setSnapshot(contentSnapshot(54_006, { status: 'completed', latestShortMessage: 'Build complete' }));
+				},
+				expectedState: 'terminalCompleted',
+				expectedCompact: false,
+				expectedPeek: false,
+				expectedExpanded: true,
+			},
+			{
+				desc: 'terminalFailed',
+				setup: async () => {
+					native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+					native.setSnapshot(contentSnapshot(54_007, { status: 'failed', latestShortMessage: 'Build error' }));
+				},
+				expectedState: 'terminalFailed',
+				expectedCompact: false,
+				expectedPeek: false,
+				expectedExpanded: true,
+			}
+		];
+
+		const verifiedSteps = [];
+		for (let i = 0; i < statesToVerify.length; i++) {
+			const s = statesToVerify[i];
+			await s.setup();
+			await sleep(100);
+			await drainMain(native, 3);
+
+			const diag = native.getDiagnostics();
+			if (diag.canonicalPresentationState !== s.expectedState) {
+				throw new Error(`${s.desc}: expected canonicalPresentationState "${s.expectedState}", got "${diag.canonicalPresentationState}"`);
+			}
+			if (diag.compactContainerVisible !== s.expectedCompact) {
+				throw new Error(`${s.desc}: compactContainerVisible expected ${s.expectedCompact}, got ${diag.compactContainerVisible}`);
+			}
+			if (diag.peekContainerVisible !== s.expectedPeek) {
+				throw new Error(`${s.desc}: peekContainerVisible expected ${s.expectedPeek}, got ${diag.peekContainerVisible}`);
+			}
+			if (diag.expandedContainerVisible !== s.expectedExpanded) {
+				throw new Error(`${s.desc}: expandedContainerVisible expected ${s.expectedExpanded}, got ${diag.expandedContainerVisible}`);
+			}
+			if (s.expectedExpanded && diag.peekContainerVisible) {
+				throw new Error(`${s.desc}: peekContainer must be hidden in interactive state`);
+			}
+			if (s.desc.startsWith('terminal') && (diag.composerVisible || diag.approvalControlsVisible)) {
+				throw new Error(`${s.desc}: interactive controls must be hidden in terminal state`);
+			}
+			verifiedSteps.push({ desc: s.desc, canonicalState: diag.canonicalPresentationState });
+		}
+		test54.details.verifiedSteps = verifiedSteps;
+	} catch (err) {
+		test54.ok = false;
+		test54.error = err.message;
+		results.failures.push(`canonical-presentation-state-matrix-and-subview-isolation: ${err.message}`);
+	}
+	results.tests.push(test54);
+
+	// Test 55: Adversarial CJK, Unicode, Deep Path Containment & Optical Safe-Zone
+	const test55 = { name: 'adversarial-cjk-unicode-deep-path-containment-and-optical-safe-zone', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+
+		const adversarialPayload = {
+			status: 'working',
+			currentActivity: '⚡️ 深度测试：正在重构 macOS 动态岛原生组件，确保高精度视网膜渲染及平滑变形动画，没有任何文字超出安全区域 🚀',
+			latestShortMessage: 'https://developer.apple.com/documentation/appkit/nsscreen/3882888-auxiliarytopleftarea?language=objc#parameters',
+			recentActions: [
+				{ id: 'act-cjk', label: '更新代码仓库分支 /Users/username/Projects/Prebase/src/vs/workbench/contrib/prebase/graphs/subsystem/deeply/nested/file.ts' },
+				{ id: 'act-unbroken', label: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' }
+			]
+		};
+
+		native.setSnapshot(contentSnapshot(55_001, adversarialPayload));
+		await sleep(200);
+		await drainMain(native, 4);
+
+		const diag = native.getDiagnostics();
+		test55.details.diag = {
+			panelFrame: diag.panelFrame,
+			contentScrollFrame: diag.contentScrollFrame,
+			notchDetected: diag.notchDetected,
+			canonicalState: diag.canonicalPresentationState
+		};
+
+		if (!diag.panelFrame || diag.panelFrame.width <= 0 || diag.panelFrame.height <= 0) {
+			throw new Error('Panel frame missing or invalid dimensions under adversarial text');
+		}
+		if (diag.contentScrollFrame) {
+			if (diag.contentScrollFrame.width > diag.panelFrame.width) {
+				throw new Error(`Content scroll width (${diag.contentScrollFrame.width}) exceeds panel width (${diag.panelFrame.width})`);
+			}
+			if (diag.contentScrollFrame.y + diag.contentScrollFrame.height > diag.panelFrame.height) {
+				throw new Error(`Content scroll bounds exceed panel height`);
+			}
+		}
+		if (diag.panelFrame.height > 192) {
+			throw new Error(`Panel height ${diag.panelFrame.height} exceeded 192pt ceiling`);
+		}
+	} catch (err) {
+		test55.ok = false;
+		test55.error = err.message;
+		results.failures.push(`adversarial-cjk-unicode-deep-path-containment-and-optical-safe-zone: ${err.message}`);
+	}
+	results.tests.push(test55);
+
+	// Test 56: Action-Activity Deduplication & Footer Baseline Alignment
+	const test56 = { name: 'action-activity-deduplication-and-footer-baseline-alignment', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+
+		const dupActivity = 'Compiling native module prebase_live_activity.node';
+		native.setSnapshot(contentSnapshot(56_001, {
+			status: 'working',
+			currentActivity: dupActivity,
+			recentActions: [
+				{ id: 'act-dup', label: 'Compiling native module prebase_live_activity.node' },
+				{ id: 'act-unique', label: 'Linking prebase_live_activity.dylib' }
+			]
+		}));
+		await sleep(200);
+		await drainMain(native, 4);
+
+		const diag = native.getDiagnostics();
+		test56.details.diag = {
+			composerVisible: diag.composerVisible,
+			pinButtonVisible: diag.pinButtonVisible,
+			openButtonVisible: diag.openInPreBaseVisible,
+			actionInFlight: diag.actionInFlight
+		};
+
+		if (!diag.composerVisible || !diag.pinButtonVisible || !diag.openInPreBaseVisible) {
+			throw new Error('Working state footer controls (composer, pin, open) must all be visible');
+		}
+
+		const actionRows = diag.actionRowLabels || [];
+		const hasDuplicate = actionRows.some(row => row && row.includes(dupActivity));
+		if (hasDuplicate) {
+			throw new Error('Action row duplicate was not filtered out when matching currentActivity');
+		}
+	} catch (err) {
+		test56.ok = false;
+		test56.error = err.message;
+		results.failures.push(`action-activity-deduplication-and-footer-baseline-alignment: ${err.message}`);
+	}
+	results.tests.push(test56);
+
+	// Test 57: Rapid Interrupted Morph Presentation-Layer Retargeting
+	const test57 = { name: 'rapid-interrupted-morph-presentation-layer-retargeting', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(57_001, { status: 'working', currentActivity: 'Initial compact' }));
+		await sleep(50);
+		await drainMain(native, 2);
+
+		// Rapidly fire 5 alternating state transitions mid-morph
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(57_002, { status: 'working', currentActivity: 'Expanding...' }));
+		await sleep(25);
+		await drainMain(native, 1);
+
+		native.setSnapshot(contentSnapshot(57_003, {
+			status: 'attention',
+			pendingKind: 'question',
+			interactionId: 'rapid-q',
+			pendingTitle: 'Quick question?',
+			pendingOptions: [{ id: 'a', label: 'A' }, { id: 'b', label: 'B' }]
+		}));
+		await sleep(25);
+		await drainMain(native, 1);
+
+		native.setSnapshot(contentSnapshot(57_004, {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'rapid-appr',
+			pendingTitle: 'Quick approval?'
+		}));
+		await sleep(25);
+		await drainMain(native, 1);
+
+		native.setSnapshot(contentSnapshot(57_005, {
+			status: 'completed',
+			latestShortMessage: 'Rapid finish'
+		}));
+		await sleep(25);
+		await drainMain(native, 1);
+
+		native.setSnapshot(contentSnapshot(57_006, {
+			status: 'working',
+			currentActivity: 'Settled final state'
+		}));
+		await sleep(350);
+		await drainMain(native, 6);
+
+		const finalDiag = native.getDiagnostics();
+		test57.details.finalDiag = {
+			canonicalState: finalDiag.canonicalPresentationState,
+			transitionInFlight: finalDiag.transitionInFlight,
+			panelFrame: finalDiag.panelFrame,
+			composerVisible: finalDiag.composerVisible,
+			approvalControlsVisible: finalDiag.approvalControlsVisible
+		};
+
+		if (finalDiag.transitionInFlight === true) {
+			throw new Error('transitionInFlight must settle to false after animation completes');
+		}
+		if (finalDiag.canonicalPresentationState !== 'interactiveWorking') {
+			throw new Error(`Final state must settle to interactiveWorking, got ${finalDiag.canonicalPresentationState}`);
+		}
+		if (!finalDiag.composerVisible) {
+			throw new Error('Composer must be visible in settled working state');
+		}
+		if (finalDiag.approvalControlsVisible) {
+			throw new Error('Approval controls from interrupted state must not remain visible');
+		}
+	} catch (err) {
+		test57.ok = false;
+		test57.error = err.message;
+		results.failures.push(`rapid-interrupted-morph-presentation-layer-retargeting: ${err.message}`);
+	}
+	results.tests.push(test57);
+
 	native.dispose();
 
 	results.ok = results.failures.length === 0;

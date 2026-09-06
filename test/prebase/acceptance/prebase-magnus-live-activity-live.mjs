@@ -415,9 +415,9 @@ function captureDesktopContextScreenshot(panelFrame, screenFrame, outPath) {
 			};
 		}
 	} catch (err) {
-		return { captured: false, isDesktopContext: false, error: String(err) };
+		return { captured: false, isDesktopContext: false, reason: 'screencapture-unavailable', error: String(err) };
 	}
-	return { captured: false, isDesktopContext: false, reason: 'capture-failed' };
+	return { captured: false, isDesktopContext: false, reason: 'screencapture-unavailable' };
 }
 
 async function run() {

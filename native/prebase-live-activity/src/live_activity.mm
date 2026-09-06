@@ -275,6 +275,35 @@ static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
 	return metrics;
 }
 
+typedef NS_ENUM(NSInteger, PrebasePresentationState) {
+	PrebasePresentationStateHidden = 0,
+	PrebasePresentationStateCompact,
+	PrebasePresentationStateAttentionCompact,
+	PrebasePresentationStatePeek,
+	PrebasePresentationStateAttentionPeek,
+	PrebasePresentationStateInteractiveWorking,
+	PrebasePresentationStateInteractiveQuestion,
+	PrebasePresentationStateInteractiveApproval,
+	PrebasePresentationStateTerminalCompleted,
+	PrebasePresentationStateTerminalFailed
+};
+
+static NSString *StringFromPrebasePresentationState(PrebasePresentationState state) {
+	switch (state) {
+		case PrebasePresentationStateHidden: return @"hidden";
+		case PrebasePresentationStateCompact: return @"compact";
+		case PrebasePresentationStateAttentionCompact: return @"attentionCompact";
+		case PrebasePresentationStatePeek: return @"peek";
+		case PrebasePresentationStateAttentionPeek: return @"attentionPeek";
+		case PrebasePresentationStateInteractiveWorking: return @"interactiveWorking";
+		case PrebasePresentationStateInteractiveQuestion: return @"interactiveQuestion";
+		case PrebasePresentationStateInteractiveApproval: return @"interactiveApproval";
+		case PrebasePresentationStateTerminalCompleted: return @"terminalCompleted";
+		case PrebasePresentationStateTerminalFailed: return @"terminalFailed";
+	}
+	return @"unknown";
+}
+
 static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
                                         CGFloat currentH,
                                         CGFloat leftW,
@@ -306,9 +335,8 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	// TOPOLOGY-COMPATIBLE SINGLE CONTINUOUS CONTOUR
 	// Exactly 1 subpath, 14 elements (1 MoveTo, 8 LineTo, 4 CurveTo, 1 CloseSubpath)
-	// Expanded natural width keeps panel span, but insets the TOP edge so shoulders have
-	// real lateral curvature (physical notch corners are never perfectly vertical).
-	// Option-pad widenings add extra flare; collapsed/peek keep full-width top span.
+	// Expanded natural width keeps panel span with organic C1 continuous fillets at top
+	// shoulders (transitioning smoothly from horizontal y=0 to vertical sides).
 	CGFloat depth = MAX(0.0, currentH - bandH);
 	CGFloat effBottomR = MIN(kBottomCornerRadius, currentH * 0.42);
 	CGFloat kBottom = effBottomR * (1.0 - kKappa);
@@ -319,7 +347,8 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(totalW, depth, leftW, rightW, housingW, isExpanded);
 	CGFloat wingLeftX = shoulder.wingLeftX;
 	CGFloat wingRightX = shoulder.wingRightX;
-	CGFloat effShoulderR = shoulder.effShoulderR;
+	CGFloat effShoulderR = isExpanded ? shoulder.effShoulderR : 0.0;
+	CGFloat shoulderBottomY = isExpanded ? effShoulderR : 0.0;
 
 	// 0. Move to top-left of left wing (wingLeftX, 0)
 	CGPathMoveToPoint(path, NULL, wingLeftX, 0);
@@ -341,7 +370,6 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	CGFloat flareR = MAX(0.0, totalW - wingRightX);
 	CGFloat flareL = MAX(0.0, wingLeftX);
-	CGFloat shoulderBottomY = bandH + effShoulderR;
 
 	// 6. Right organic shoulder: horizontal tangency at (wingRightX, 0), vertical at (totalW, shoulderBottomY)
 	CGPathAddCurveToPoint(path, NULL,
@@ -548,6 +576,8 @@ static NSString *JSString(Napi::Value value) {
 - (CGFloat)computeControlsStackHeight;
 - (BOOL)framesEffectivelyEqual:(NSRect)a to:(NSRect)b;
 - (BOOL)isGlanceableSurface;
+- (PrebasePresentationState)canonicalPresentationState;
+- (PrebasePresentationState)canonicalTargetPresentationState;
 @end
 
 @interface PrebaseFlippedView : NSView
@@ -599,6 +629,7 @@ static NSString *JSString(Napi::Value value) {
 		[self addSubview:_peekContainer];
 
 		_peekLabel = [self makeLabel:11.5 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.94 alpha:1.0]];
+		_peekLabel.alignment = NSTextAlignmentCenter;
 		[self configureLabel:_peekLabel lines:1 truncating:YES];
 		[_peekContainer addSubview:_peekLabel];
 
@@ -622,10 +653,9 @@ static NSString *JSString(Napi::Value value) {
 		_contentScrollView = [[NSScrollView alloc] initWithFrame:NSZeroRect];
 		_contentScrollView.drawsBackground = NO;
 		_contentScrollView.borderType = NSNoBorder;
-		_contentScrollView.hasVerticalScroller = YES;
+		_contentScrollView.hasVerticalScroller = NO;
 		_contentScrollView.hasHorizontalScroller = NO;
 		_contentScrollView.autohidesScrollers = YES;
-		_contentScrollView.scrollerStyle = NSScrollerStyleOverlay;
 		_contentScrollView.verticalScrollElasticity = NSScrollElasticityAllowed;
 		_contentScrollView.documentView = _contentDocumentView;
 		[_expandedContainer addSubview:_contentScrollView];
@@ -790,6 +820,14 @@ static NSString *JSString(Napi::Value value) {
 		}
 		for (NSDictionary *item in incoming) {
 			NSString *aid = [item[@"id"] isKindOfClass:[NSString class]] ? item[@"id"] : @"";
+			NSString *label = [item[@"label"] isKindOfClass:[NSString class]] ? item[@"label"] : @"";
+			if (self.activityLabel.length && label.length) {
+				if ([label isEqualToString:self.activityLabel] ||
+					[self.activityLabel rangeOfString:label options:NSCaseInsensitiveSearch].location != NSNotFound ||
+					[label rangeOfString:self.activityLabel options:NSCaseInsensitiveSearch].location != NSNotFound) {
+					continue;
+				}
+			}
 			if (aid.length && [aid isEqualToString:prev] && ![used containsObject:aid]) {
 				[ordered addObject:item];
 				[used addObject:aid];
@@ -804,8 +842,12 @@ static NSString *JSString(Napi::Value value) {
 		if (label.length == 0) {
 			continue;
 		}
-		if (self.activityLabel.length && [label isEqualToString:self.activityLabel]) {
-			continue;
+		if (self.activityLabel.length) {
+			if ([label isEqualToString:self.activityLabel] ||
+				[self.activityLabel rangeOfString:label options:NSCaseInsensitiveSearch].location != NSNotFound ||
+				[label rangeOfString:self.activityLabel options:NSCaseInsensitiveSearch].location != NSNotFound) {
+				continue;
+			}
 		}
 		if (aid.length && [used containsObject:aid]) {
 			continue;
@@ -1726,8 +1768,84 @@ static NSString *JSString(Napi::Value value) {
 	return [str sizeWithAttributes:attrs].width;
 }
 
+- (PrebasePresentationState)canonicalPresentationState {
+	if (!self.visible) {
+		return PrebasePresentationStateHidden;
+	}
+	BOOL isExpanded = (self.content.expanded || self.pinned);
+	BOOL isPeek = (self.content.peekOnly || self.attentionPeek);
+
+	if (isExpanded && !self.content.peekOnly) {
+		if ([self.content.status isEqualToString:@"completed"]) {
+			return PrebasePresentationStateTerminalCompleted;
+		}
+		if ([self.content.status isEqualToString:@"failed"]) {
+			return PrebasePresentationStateTerminalFailed;
+		}
+		if ([self.pendingKind isEqualToString:@"approval"]) {
+			return PrebasePresentationStateInteractiveApproval;
+		}
+		if ([self.pendingKind isEqualToString:@"question"]) {
+			return PrebasePresentationStateInteractiveQuestion;
+		}
+		return PrebasePresentationStateInteractiveWorking;
+	}
+
+	if (isPeek) {
+		if (self.attentionPeek || self.content.attention) {
+			return PrebasePresentationStateAttentionPeek;
+		}
+		return PrebasePresentationStatePeek;
+	}
+
+	if (self.content.attention) {
+		return PrebasePresentationStateAttentionCompact;
+	}
+	return PrebasePresentationStateCompact;
+}
+
+- (PrebasePresentationState)canonicalTargetPresentationState {
+	if (!self.visible) {
+		return PrebasePresentationStateHidden;
+	}
+	BOOL isExpanded = (self.content.targetExpanded || self.pinned);
+	BOOL isPeek = (self.content.peekOnly || self.attentionPeek);
+
+	if (isExpanded && !self.content.peekOnly) {
+		if ([self.content.status isEqualToString:@"completed"]) {
+			return PrebasePresentationStateTerminalCompleted;
+		}
+		if ([self.content.status isEqualToString:@"failed"]) {
+			return PrebasePresentationStateTerminalFailed;
+		}
+		if ([self.pendingKind isEqualToString:@"approval"]) {
+			return PrebasePresentationStateInteractiveApproval;
+		}
+		if ([self.pendingKind isEqualToString:@"question"]) {
+			return PrebasePresentationStateInteractiveQuestion;
+		}
+		return PrebasePresentationStateInteractiveWorking;
+	}
+
+	if (isPeek) {
+		if (self.attentionPeek || self.content.attention) {
+			return PrebasePresentationStateAttentionPeek;
+		}
+		return PrebasePresentationStatePeek;
+	}
+
+	if (self.content.attention) {
+		return PrebasePresentationStateAttentionCompact;
+	}
+	return PrebasePresentationStateCompact;
+}
+
 - (BOOL)isGlanceableSurface {
-	return self.content.peekOnly || self.attentionPeek || !(self.content.expanded || self.pinned);
+	PrebasePresentationState state = [self canonicalPresentationState];
+	return (state == PrebasePresentationStateCompact ||
+	        state == PrebasePresentationStateAttentionCompact ||
+	        state == PrebasePresentationStatePeek ||
+	        state == PrebasePresentationStateAttentionPeek);
 }
 
 - (BOOL)framesEffectivelyEqual:(NSRect)a to:(NSRect)b {
@@ -1797,12 +1915,15 @@ static NSString *JSString(Napi::Value value) {
 
 /** Footer control stack height inside expandedContainer (options / approval / composer). */
 - (CGFloat)computeControlsStackHeight {
-	BOOL expanded = self.content.expanded || self.pinned;
-	if (!expanded || self.content.peekOnly) {
+	PrebasePresentationState st = [self canonicalPresentationState];
+	if (st < PrebasePresentationStateInteractiveWorking || st > PrebasePresentationStateInteractiveApproval) {
 		return 0;
 	}
 	// Must match layoutControls bottom-up stack (composer + approval + option rows + pads).
-	BOOL hasOptions = ([self.pendingKind isEqualToString:@"question"] && self.pendingOptions.count > 0);
+	if (st == PrebasePresentationStateInteractiveApproval) {
+		return kControlHeight + 7;
+	}
+	BOOL hasOptions = (st == PrebasePresentationStateInteractiveQuestion && self.pendingOptions.count > 0);
 	if (hasOptions) {
 		NSInteger totalOpts = (NSInteger)self.pendingOptions.count;
 		NSInteger maxDirect = totalOpts > 4 ? 3 : totalOpts;
@@ -1812,12 +1933,6 @@ static NSString *JSString(Napi::Value value) {
 			rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
 		}
 		return rows * kControlHeight + MAX(0, rows - 1) * 4 + 7;
-	}
-	if ([self.pendingKind isEqualToString:@"approval"]) {
-		return kControlHeight + 7;
-	}
-	if ([self.content.status isEqualToString:@"completed"] || [self.content.status isEqualToString:@"failed"]) {
-		return 0;
 	}
 	return kControlHeight + 7;
 }
@@ -2116,13 +2231,12 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)layoutControls:(NSRect)win {
-	BOOL isCompletedOrFailed = [self.content.status isEqualToString:@"completed"] || [self.content.status isEqualToString:@"failed"];
-	BOOL approval = [self.pendingKind isEqualToString:@"approval"];
-	BOOL question = [self.pendingKind isEqualToString:@"question"];
-	BOOL showAttention = (self.content.expanded || self.pinned) && !self.content.peekOnly;
-	BOOL hasOptions = (question && self.pendingOptions.count > 0);
+	PrebasePresentationState state = [self canonicalPresentationState];
+	BOOL showAttention = (state == PrebasePresentationStateInteractiveWorking ||
+	                      state == PrebasePresentationStateInteractiveQuestion ||
+	                      state == PrebasePresentationStateInteractiveApproval);
 
-	self.approveButton.hidden = !(approval && showAttention);
+	self.approveButton.hidden = (state != PrebasePresentationStateInteractiveApproval);
 	self.denyButton.hidden = self.approveButton.hidden;
 	for (NSButton *button in self.optionButtons) {
 		button.hidden = YES;
@@ -2172,7 +2286,7 @@ static NSString *JSString(Napi::Value value) {
 	self.approveButton.alphaValue = actionAlpha;
 	self.denyButton.alphaValue = actionAlpha;
 
-	if (approval) {
+	if (state == PrebasePresentationStateInteractiveApproval) {
 		// Focused Approval card: NO composer, NO pin/open header buttons, NO option buttons.
 		self.input.hidden = YES;
 		self.pinButton.hidden = YES;
@@ -2216,7 +2330,8 @@ static NSString *JSString(Napi::Value value) {
 		return;
 	}
 
-	if (question) {
+	if (state == PrebasePresentationStateInteractiveQuestion) {
+		BOOL hasOptions = (self.pendingOptions.count > 0);
 		self.approveButton.hidden = YES;
 		self.denyButton.hidden = YES;
 		if (hasOptions) {
@@ -2307,7 +2422,7 @@ static NSString *JSString(Napi::Value value) {
 		}
 	}
 
-	if (isCompletedOrFailed) {
+	if (state == PrebasePresentationStateTerminalCompleted || state == PrebasePresentationStateTerminalFailed) {
 		self.input.hidden = YES;
 		self.pinButton.hidden = YES;
 		self.openButton.hidden = YES;
@@ -2833,6 +2948,8 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"notchDetected"] = @(self.content.notched);
 	dict[@"panelLevel"] = @(self.panel.level);
 	dict[@"expanded"] = @(self.content.expanded);
+	dict[@"canonicalPresentationState"] = StringFromPrebasePresentationState([self canonicalPresentationState]);
+	dict[@"canonicalTargetPresentationState"] = StringFromPrebasePresentationState([self canonicalTargetPresentationState]);
 	dict[@"hovered"] = @(self.hovering);
 	dict[@"pinned"] = @(self.pinned);
 	dict[@"keyWindow"] = @(self.panel != nil && self.panel.isKeyWindow);
