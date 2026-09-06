@@ -1,26 +1,26 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity",
-  "sourceHead": "f280c16e80de508e1915231d3ebb357bee9fbc0f",
-  "sourceFingerprint": "e5a2dd9f09d473e09ed6dd8af3703685599433e4aa52d09b51263376b20480de",
-  "productFingerprint": "e5a2dd9f09d473e09ed6dd8af3703685599433e4aa52d09b51263376b20480de",
-  "generatedAt": "2026-09-06T20:25:08.378Z",
+  "sourceHead": "8303943fbb5db08358b708a491f150cfcee057a5",
+  "sourceFingerprint": "24a4d827bbaef24cae66145b0d0dd0369dbf278db9916b9214fa8e728a479ec4",
+  "productFingerprint": "24a4d827bbaef24cae66145b0d0dd0369dbf278db9916b9214fa8e728a479ec4",
+  "generatedAt": "2026-09-06T20:46:07.902Z",
   "producerId": "magnus-live-activity",
-  "producerFingerprint": "93b606088eb340ca471f43f871257141b9c12c4efc933ccb89b3fb68acb06375",
+  "producerFingerprint": "1702fd3bced63220101b7d69ca1fb56b8b7f33434a6196c453798e3dde698fbe",
   "kind": "magnus-live-activity-live",
   "testKind": "live-runtime",
   "liveGui": "native-appkit-panel",
   "platform": "darwin",
   "nativePresent": true,
   "mode": "alwaysWorking",
-  "prebasePid": 98522,
-  "launchMs": 3663,
+  "prebasePid": 5212,
+  "launchMs": 4100,
   "smokeTransportInstalled": true,
   "diagnosticsAfterOpen": {
     "backend": "native-appkit",
     "revision": 3,
-    "sessionId": "af9db298-7de7-44df-b33f-95f7186bb1c5",
-    "sessionResource": "vscode-chat-session://local/YWY5ZGIyOTgtN2RlNy00NGRmLWIzM2YtOTVmNzE4NmJiMWM1",
+    "sessionId": "768f48ec-d9da-4716-89cb-6c871f55b5a6",
+    "sessionResource": "vscode-chat-session://local/NzY4ZjQ4ZWMtZDlkYS00NzE2LTg5Y2ItNmM4NzFmNTViNWE2",
     "status": "waiting",
     "visible": true,
     "presentationLabel": "Waiting",
@@ -109,7 +109,7 @@
       },
       "questionButtonLabels": [],
       "prebaseFullscreen": false,
-      "windowNumber": 45084,
+      "windowNumber": 45424,
       "openButtonFrame": null,
       "displayMode": "builtin",
       "lastTransitionReason": "orderFront",
@@ -359,7 +359,7 @@
     },
     "questionButtonLabels": [],
     "prebaseFullscreen": false,
-    "windowNumber": 45084,
+    "windowNumber": 45424,
     "openButtonFrame": null,
     "displayMode": "builtin",
     "lastTransitionReason": "geometry",
@@ -531,9 +531,9 @@
   "questionSeed": {
     "ok": true,
     "kind": "question",
-    "interactionId": "smoke-la-question-1788726318297:0",
+    "interactionId": "smoke-la-question-1788727578243:0",
     "optionId": "Option A",
-    "sessionId": "af9db298-7de7-44df-b33f-95f7186bb1c5",
+    "sessionId": "768f48ec-d9da-4716-89cb-6c871f55b5a6",
     "revision": 5,
     "liveActivityPendingKind": "question",
     "liveActivityStatus": "attention"
@@ -541,8 +541,8 @@
   "questionDiagnosticsBefore": {
     "backend": "native-appkit",
     "revision": 6,
-    "sessionId": "af9db298-7de7-44df-b33f-95f7186bb1c5",
-    "sessionResource": "vscode-chat-session://local/YWY5ZGIyOTgtN2RlNy00NGRmLWIzM2YtOTVmNzE4NmJiMWM1",
+    "sessionId": "768f48ec-d9da-4716-89cb-6c871f55b5a6",
+    "sessionResource": "vscode-chat-session://local/NzY4ZjQ4ZWMtZDlkYS00NzE2LTg5Y2ItNmM4NzFmNTViNWE2",
     "status": "attention",
     "visible": true,
     "pendingKind": "question",
@@ -617,7 +617,7 @@
       "statusBadgeFrame": null,
       "questionButtonLabels": [],
       "prebaseFullscreen": false,
-      "windowNumber": 45084,
+      "windowNumber": 45424,
       "openButtonFrame": null,
       "displayMode": "builtin",
       "lastTransitionReason": "content",
@@ -705,7 +705,7 @@
       "actionInFlight": false,
       "approvalControlsVisible": false,
       "screenTopY": 982,
-      "geometrySignature": "e=1;p=1;pin=0;att=1;st=attention;kind=question;id=smoke-la-question-1788726318297:0;opts=2;appr=0;dest=0;acts=1;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+      "geometrySignature": "e=1;p=1;pin=0;att=1;st=attention;kind=question;id=smoke-la-question-1788727578243:0;opts=2;appr=0;dest=0;acts=1;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
       "approveDenyVisible": false,
       "redrawCount": 3,
       "shapeAwareHitTesting": true,
@@ -713,7 +713,7 @@
       "approveButtonFrame": null,
       "layerBacked": true,
       "accessibilityLabel": "Question",
-      "interactionId": "smoke-la-question-1788726318297:0",
+      "interactionId": "smoke-la-question-1788727578243:0",
       "orderFrontCount": 1,
       "panelTopY": 982,
       "pinButtonFrame": null,
@@ -734,8 +734,8 @@
       "expandedContainerAlpha": 0,
       "peekLabelFrame": {
         "y": 8,
-        "x": 26,
-        "width": 261,
+        "x": 28,
+        "width": 257,
         "height": 16
       },
       "contentRefreshCount": 6,
@@ -761,15 +761,15 @@
   },
   "questionContinuity": {
     "ok": true,
-    "interactionId": "smoke-la-question-1788726318297:0",
+    "interactionId": "smoke-la-question-1788727578243:0",
     "liveActivityPendingKind": "question",
     "liveActivityStatus": "attention"
   },
   "approvalSeed": {
     "ok": true,
     "kind": "approval",
-    "interactionId": "smoke-la-approval-1788726318531",
-    "sessionId": "af9db298-7de7-44df-b33f-95f7186bb1c5",
+    "interactionId": "smoke-la-approval-1788727578475",
+    "sessionId": "768f48ec-d9da-4716-89cb-6c871f55b5a6",
     "revision": 9,
     "liveActivityPendingKind": "approval",
     "liveActivityStatus": "attention"
@@ -777,8 +777,8 @@
   "approvalDiagnosticsBefore": {
     "backend": "native-appkit",
     "revision": 10,
-    "sessionId": "af9db298-7de7-44df-b33f-95f7186bb1c5",
-    "sessionResource": "vscode-chat-session://local/YWY5ZGIyOTgtN2RlNy00NGRmLWIzM2YtOTVmNzE4NmJiMWM1",
+    "sessionId": "768f48ec-d9da-4716-89cb-6c871f55b5a6",
+    "sessionResource": "vscode-chat-session://local/NzY4ZjQ4ZWMtZDlkYS00NzE2LTg5Y2ItNmM4NzFmNTViNWE2",
     "status": "attention",
     "visible": true,
     "pendingKind": "approval",
@@ -831,7 +831,7 @@
       "bandHeight": 34,
       "activityFrame": null,
       "transitionInFlight": false,
-      "metricsLabel": "5s",
+      "metricsLabel": "6s",
       "interactiveContentVisible": false,
       "panelVisible": true,
       "silhouetteMetrics": {
@@ -853,7 +853,7 @@
       "statusBadgeFrame": null,
       "questionButtonLabels": [],
       "prebaseFullscreen": false,
-      "windowNumber": 45084,
+      "windowNumber": 45424,
       "openButtonFrame": null,
       "displayMode": "builtin",
       "lastTransitionReason": "content",
@@ -941,7 +941,7 @@
       "actionInFlight": false,
       "approvalControlsVisible": false,
       "screenTopY": 982,
-      "geometrySignature": "e=1;p=1;pin=0;att=1;st=attention;kind=approval;id=smoke-la-approval-1788726318531;opts=0;appr=1;dest=0;acts=2;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+      "geometrySignature": "e=1;p=1;pin=0;att=1;st=attention;kind=approval;id=smoke-la-approval-1788727578475;opts=0;appr=1;dest=0;acts=2;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
       "approveDenyVisible": false,
       "redrawCount": 5,
       "shapeAwareHitTesting": true,
@@ -949,7 +949,7 @@
       "approveButtonFrame": null,
       "layerBacked": true,
       "accessibilityLabel": "Approve",
-      "interactionId": "smoke-la-approval-1788726318531",
+      "interactionId": "smoke-la-approval-1788727578475",
       "orderFrontCount": 1,
       "panelTopY": 982,
       "pinButtonFrame": null,
@@ -970,8 +970,8 @@
       "expandedContainerAlpha": 0,
       "peekLabelFrame": {
         "y": 8,
-        "x": 26,
-        "width": 261,
+        "x": 28,
+        "width": 257,
         "height": 16
       },
       "contentRefreshCount": 10,
@@ -997,7 +997,7 @@
   },
   "approvalContinuity": {
     "ok": true,
-    "interactionId": "smoke-la-approval-1788726318531"
+    "interactionId": "smoke-la-approval-1788727578475"
   },
   "followUpSimulation": {
     "ok": true,
@@ -1008,19 +1008,19 @@
     "isPanelCapture": true,
     "classification": "panel-window",
     "format": "png",
-    "sizeBytes": 30479,
+    "sizeBytes": 25277,
     "dimensions": {
       "width": 626,
-      "height": 226
+      "height": 206
     },
-    "windowNumber": 45084,
+    "windowNumber": 45424,
     "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-interactive.png"
   },
   "interactiveContextScreenshot": {
     "captured": true,
     "isDesktopContext": true,
     "format": "png",
-    "sizeBytes": 343205,
+    "sizeBytes": 280345,
     "dimensions": {
       "width": 1600,
       "height": 720
@@ -1038,19 +1038,19 @@
     "isPanelCapture": true,
     "classification": "panel-window",
     "format": "png",
-    "sizeBytes": 11583,
+    "sizeBytes": 11461,
     "dimensions": {
       "width": 626,
       "height": 110
     },
-    "windowNumber": 45084,
+    "windowNumber": 45424,
     "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-peek.png"
   },
   "peekContextScreenshot": {
     "captured": true,
     "isDesktopContext": true,
     "format": "png",
-    "sizeBytes": 340998,
+    "sizeBytes": 282501,
     "dimensions": {
       "width": 1600,
       "height": 720
@@ -1080,12 +1080,12 @@
     "isPanelCapture": true,
     "classification": "panel-window",
     "format": "png",
-    "sizeBytes": 8427,
+    "sizeBytes": 8298,
     "dimensions": {
       "width": 626,
       "height": 68
     },
-    "windowNumber": 45084,
+    "windowNumber": 45424,
     "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-native.png"
   },
   "visualFixtures": {
@@ -1177,7 +1177,7 @@
         },
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "openButtonFrame": {
           "y": 53,
           "x": 267,
@@ -1311,7 +1311,7 @@
         "panelLevel": 2147483630,
         "expandedContentAlpha": 1,
         "denyButtonTitle": "Deny",
-        "compactContainerVisible": true,
+        "compactContainerVisible": false,
         "actionRowIds": [],
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
@@ -1350,14 +1350,14 @@
           "width": 626,
           "height": 236
         },
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-working-interactive.png"
       },
       "contextScreenshot": {
         "captured": true,
         "isDesktopContext": true,
         "format": "png",
-        "sizeBytes": 343374,
+        "sizeBytes": 287291,
         "dimensions": {
           "width": 1600,
           "height": 720
@@ -1464,7 +1464,7 @@
           "Clustered"
         ],
         "prebaseFullscreen": false,
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 23,
@@ -1535,7 +1535,7 @@
           {
             "y": 99,
             "x": 173,
-            "width": 145,
+            "width": 146,
             "height": 24
           },
           {
@@ -1547,7 +1547,7 @@
           {
             "y": 127,
             "x": 173,
-            "width": 145,
+            "width": 146,
             "height": 24
           }
         ],
@@ -1608,7 +1608,7 @@
         "panelLevel": 2147483630,
         "expandedContentAlpha": 1,
         "denyButtonTitle": "Deny",
-        "compactContainerVisible": true,
+        "compactContainerVisible": false,
         "actionRowIds": [],
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
@@ -1652,14 +1652,14 @@
           "width": 682,
           "height": 384
         },
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-question.png"
       },
       "contextScreenshot": {
         "captured": true,
         "isDesktopContext": true,
         "format": "png",
-        "sizeBytes": 373798,
+        "sizeBytes": 350023,
         "dimensions": {
           "width": 1600,
           "height": 784
@@ -1701,7 +1701,7 @@
         "denyButtonFrame": {
           "y": 98,
           "x": 22,
-          "width": 64,
+          "width": 109,
           "height": 24
         },
         "contentSafeViewport": {
@@ -1766,7 +1766,7 @@
         },
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 23,
@@ -1868,8 +1868,8 @@
         "contentDocumentHeight": 70,
         "approveButtonFrame": {
           "y": 98,
-          "x": 92,
-          "width": 86,
+          "x": 139,
+          "width": 152,
           "height": 24
         },
         "layerBacked": true,
@@ -1890,7 +1890,7 @@
         "panelLevel": 2147483630,
         "expandedContentAlpha": 1,
         "denyButtonTitle": "Deny",
-        "compactContainerVisible": true,
+        "compactContainerVisible": false,
         "actionRowIds": [],
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
@@ -1929,19 +1929,19 @@
         "isPanelCapture": true,
         "classification": "panel-window",
         "format": "png",
-        "sizeBytes": 39195,
+        "sizeBytes": 39219,
         "dimensions": {
           "width": 626,
           "height": 326
         },
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-approval.png"
       },
       "contextScreenshot": {
         "captured": true,
         "isDesktopContext": true,
         "format": "png",
-        "sizeBytes": 349158,
+        "sizeBytes": 301581,
         "dimensions": {
           "width": 1600,
           "height": 726
@@ -2043,7 +2043,7 @@
         },
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "openButtonFrame": {
           "y": 127,
           "x": 267,
@@ -2196,7 +2196,7 @@
         "panelLevel": 2147483630,
         "expandedContentAlpha": 1,
         "denyButtonTitle": "Deny",
-        "compactContainerVisible": true,
+        "compactContainerVisible": false,
         "actionRowIds": [
           "a1",
           "a2",
@@ -2239,14 +2239,14 @@
           "width": 626,
           "height": 384
         },
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-long-content.png"
       },
       "contextScreenshot": {
         "captured": true,
         "isDesktopContext": true,
         "format": "png",
-        "sizeBytes": 375147,
+        "sizeBytes": 343145,
         "dimensions": {
           "width": 1600,
           "height": 784
@@ -2337,7 +2337,7 @@
         "statusBadgeFrame": null,
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "openButtonFrame": null,
         "displayMode": "builtin",
         "lastTransitionReason": "content",
@@ -2454,8 +2454,8 @@
         "expandedContainerAlpha": 0,
         "peekLabelFrame": {
           "y": 8,
-          "x": 26,
-          "width": 289,
+          "x": 28,
+          "width": 285,
           "height": 16
         },
         "contentRefreshCount": 39,
@@ -2483,19 +2483,19 @@
         "isPanelCapture": true,
         "classification": "panel-window",
         "format": "png",
-        "sizeBytes": 14227,
+        "sizeBytes": 14226,
         "dimensions": {
           "width": 682,
           "height": 132
         },
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-attention-peek.png"
       },
       "contextScreenshot": {
         "captured": true,
         "isDesktopContext": true,
         "format": "png",
-        "sizeBytes": 340981,
+        "sizeBytes": 277169,
         "dimensions": {
           "width": 1600,
           "height": 720
@@ -2597,7 +2597,7 @@
         },
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 23,
@@ -2735,7 +2735,7 @@
         "panelLevel": 2147483630,
         "expandedContentAlpha": 1,
         "denyButtonTitle": "Deny",
-        "compactContainerVisible": true,
+        "compactContainerVisible": false,
         "actionRowIds": [
           "a1",
           "a2",
@@ -2778,14 +2778,14 @@
           "width": 626,
           "height": 172
         },
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-completed.png"
       },
       "contextScreenshot": {
         "captured": true,
         "isDesktopContext": true,
         "format": "png",
-        "sizeBytes": 342669,
+        "sizeBytes": 278959,
         "dimensions": {
           "width": 1600,
           "height": 720
@@ -2887,7 +2887,7 @@
         },
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 23,
@@ -3025,7 +3025,7 @@
         "panelLevel": 2147483630,
         "expandedContentAlpha": 1,
         "denyButtonTitle": "Deny",
-        "compactContainerVisible": true,
+        "compactContainerVisible": false,
         "actionRowIds": [
           "a1",
           "a2",
@@ -3068,14 +3068,14 @@
           "width": 626,
           "height": 172
         },
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-failed.png"
       },
       "contextScreenshot": {
         "captured": true,
         "isDesktopContext": true,
         "format": "png",
-        "sizeBytes": 341672,
+        "sizeBytes": 277623,
         "dimensions": {
           "width": 1600,
           "height": 720
@@ -3117,7 +3117,7 @@
         "denyButtonFrame": {
           "y": 98,
           "x": 22,
-          "width": 64,
+          "width": 109,
           "height": 24
         },
         "contentSafeViewport": {
@@ -3182,7 +3182,7 @@
         },
         "questionButtonLabels": [],
         "prebaseFullscreen": false,
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "openButtonFrame": null,
         "contentScrollFrame": {
           "y": 23,
@@ -3284,8 +3284,8 @@
         "contentDocumentHeight": 70,
         "approveButtonFrame": {
           "y": 98,
-          "x": 92,
-          "width": 86,
+          "x": 139,
+          "width": 152,
           "height": 24
         },
         "layerBacked": true,
@@ -3306,7 +3306,7 @@
         "panelLevel": 2147483630,
         "expandedContentAlpha": 1,
         "denyButtonTitle": "Deny",
-        "compactContainerVisible": true,
+        "compactContainerVisible": false,
         "actionRowIds": [],
         "expandedContainerAlpha": 1,
         "peekLabelFrame": null,
@@ -3345,19 +3345,19 @@
         "isPanelCapture": true,
         "classification": "panel-window",
         "format": "png",
-        "sizeBytes": 38105,
+        "sizeBytes": 38122,
         "dimensions": {
           "width": 626,
           "height": 326
         },
-        "windowNumber": 45084,
+        "windowNumber": 45424,
         "outPath": "/Users/qunyingfan/Prebasecode/reports/graph-acceptance/phase-3-final/screenshots/magnus-live-activity-in-flight.png"
       },
       "contextScreenshot": {
         "captured": true,
         "isDesktopContext": true,
         "format": "png",
-        "sizeBytes": 344168,
+        "sizeBytes": 285213,
         "dimensions": {
           "width": 1600,
           "height": 726
@@ -3379,8 +3379,8 @@
   "blurredDiagnostics": {
     "backend": "native-appkit",
     "revision": 26,
-    "sessionId": "af9db298-7de7-44df-b33f-95f7186bb1c5",
-    "sessionResource": "vscode-chat-session://local/YWY5ZGIyOTgtN2RlNy00NGRmLWIzM2YtOTVmNzE4NmJiMWM1",
+    "sessionId": "768f48ec-d9da-4716-89cb-6c871f55b5a6",
+    "sessionResource": "vscode-chat-session://local/NzY4ZjQ4ZWMtZDlkYS00NzE2LTg5Y2ItNmM4NzFmNTViNWE2",
     "status": "attention",
     "visible": true,
     "pendingKind": "question",
@@ -3469,7 +3469,7 @@
         "Option B"
       ],
       "prebaseFullscreen": false,
-      "windowNumber": 45084,
+      "windowNumber": 45424,
       "openButtonFrame": null,
       "contentScrollFrame": {
         "y": 23,
@@ -3540,7 +3540,7 @@
         {
           "y": 77,
           "x": 159,
-          "width": 131,
+          "width": 132,
           "height": 24
         }
       ],
@@ -3576,7 +3576,7 @@
       "approvalControlsVisible": false,
       "actionInFlight": false,
       "screenTopY": 982,
-      "geometrySignature": "e=1;p=0;pin=1;att=1;st=attention;kind=question;id=smoke-la-question-1788726319324:0;opts=2;appr=0;dest=0;acts=3;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+      "geometrySignature": "e=1;p=0;pin=1;att=1;st=attention;kind=question;id=smoke-la-question-1788727579298:0;opts=2;appr=0;dest=0;acts=3;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
       "approveDenyVisible": false,
       "redrawCount": 29,
       "shapeAwareHitTesting": true,
@@ -3585,7 +3585,7 @@
       "approveButtonFrame": null,
       "layerBacked": true,
       "accessibilityLabel": "Question",
-      "interactionId": "smoke-la-question-1788726319324:0",
+      "interactionId": "smoke-la-question-1788727579298:0",
       "orderFrontCount": 1,
       "panelTopY": 982,
       "pinButtonFrame": null,
@@ -3601,7 +3601,7 @@
       "panelLevel": 2147483630,
       "expandedContentAlpha": 1,
       "denyButtonTitle": "Deny",
-      "compactContainerVisible": true,
+      "compactContainerVisible": false,
       "actionRowIds": [],
       "expandedContainerAlpha": 1,
       "peekLabelFrame": null,
@@ -3637,7 +3637,7 @@
     }
   },
   "workbenchDiagnostics": {
-    "parserActiveRequests": 4,
+    "parserActiveRequests": 0,
     "temporalActiveWrites": 1,
     "runtimePreviewServerRunning": false,
     "runtimePreviewStatus": "stopped",
@@ -3693,16 +3693,16 @@
     }
   },
   "quit": {
-    "before": "98522     1  11.0 266640 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
+    "before": "5212     1  20.6 275232 ./.build/electron/PreBase.app/Contents/MacOS/PreBase",
     "remaining": "gone",
     "leftoverPids": [],
-    "latencyMs": 659,
+    "latencyMs": 739,
     "terminationPath": "workbench",
     "workbenchCompleted": true,
     "usedSigterm": false,
     "usedSigkill": false
   },
-  "durationMs": 20987,
+  "durationMs": 21773,
   "ok": true,
   "failures": []
 }

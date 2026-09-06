@@ -1,7 +1,7 @@
 {
   "phase": "3-final",
   "role": "code-reviewer-editor",
-  "generatedAt": "2026-09-06T15:25:00-04:00",
+  "generatedAt": "2026-09-06T16:47:00-04:00",
   "iconsEdited": false,
   "gitMutatingCommands": false,
   "productionEdited": true,
@@ -16,7 +16,7 @@
       "file": "native/prebase-live-activity/src/live_activity.mm",
       "rootCause": "updateShapeAndContentAnimated and refreshContentSubviewsPreservingPresentationWithSize treated attention peek as expanded geometry and set expandedContainer.alphaValue = 1.0 with cramped body height 32pt. Bottom 18pt rounded corner clipping mask cut through activityDescription and leaked text/bullet fragments.",
       "impact": "magnus-live-activity-peek.png and user desktop screenshots had partial white glyph fragments and separators bleeding out of the bottom curve during peek.",
-      "change": "Partitioned presentation subtrees: introduced dedicated peekContainer with centered peekLabel (y=8, h=16, safe inset 26pt). During peekOnly, expandedContainer is strictly hidden (hidden=YES, alpha=0.0) while peekContainer is visible (hidden=NO, alpha=1.0). Interactive scroll view, options, approve/deny, and composer are completely excluded from painting."
+      "change": "Partitioned presentation subtrees: introduced dedicated peekContainer with centered peekLabel (y=8, h=16, safe inset 28pt). During peekOnly, expandedContainer is strictly hidden (hidden=YES, alpha=0.0) while peekContainer is visible (hidden=NO, alpha=1.0). Interactive scroll view, options, approve/deny, and composer are completely excluded from painting."
     },
     {
       "file": "native/prebase-live-activity/src/live_activity.mm",
@@ -47,6 +47,24 @@
       "rootCause": "High-window-level panel lacked NSWorkspace awareness when user switched to other applications or entered fullscreen spaces, leading to potential misbehavior.",
       "impact": "Magnus could attempt hover expansion or remain intrusive when PreBase was backgrounded or another application occupied the screen.",
       "change": "Added NSWorkspace notifications for didActivateApplicationNotification, didDeactivateApplicationNotification, and activeSpaceDidChangeNotification, feeding into an authoritative recomputeEnvironmentState method tracking 'available', 'backgrounded', 'fullscreenSuppressed', and 'screenLocked'. Suppressed hover peek expansion when unavailable."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "Fixed 64pt Deny button and 86pt Approve button in approval states occupied only 156pt on a 269pt usable footer width, creating an awkward 113pt empty black hole on the right, while expandInteractive prematurely unhid pinButton, openButton, and input before layoutControls ran.",
+      "impact": "Approval cards looked lopsided, unpolished, and leaked misplaced header/composer controls into the focused decision card.",
+      "change": "Re-engineered approval button sizing in layoutControls: to dynamically span usableW using a balanced 0.42/0.58 ratio (0.36/0.64 destructive) with 8pt gap, baseline alignment, and symmetrical margins. Removed unconditional unhiding in expandInteractive, guaranteeing pure focused hierarchy in approval and question cards."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "Question option button layout left an awkward orphan mass for 3 options, dumped a flat list for >4 options with button 3 answering option 3 instead of delegating to PreBase, and collapsed into tiny chip widths for 1 option.",
+      "impact": "Question cards looked unbalanced and clicking 'More…' erroneously submitted option 3 to the agent.",
+      "change": "Restructured option button layout: 1 option spans full usable width; 2 options form a balanced 50/50 row; 3 options place option 2 as a balanced full-width row under options 0 and 1; 4 options form a 2x2 grid; >4 options form a 2x2 grid with slot 3 wired directly to openInPrebase with tag=-1. Added action deduplication in reconcileActionRowsIntoDocument:."
+    },
+    {
+      "file": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+      "rootCause": "Suite had 48 tests but lacked adversarial regression coverage for single-subtree visibility invariance, unbroken URL/identifier token containment, rapid multi-state transition stress loops, approval button baseline and balance, and action in-flight timeout lifecycle.",
+      "impact": "Subtle rendering regressions could occur while diagnostics remained superficially green.",
+      "change": "Added adversarial tests 49 through 53 (53/53 total tests passing) verifying settled subtree visibility isolation, extreme unbroken token layout containment, 3x rapid stress loops across all 8 states, symmetrical approval button balance with shared baseline, and action in-flight timeout truthful restoration."
     }
   ],
   "findingsRejected": [

@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "f280c16e80de508e1915231d3ebb357bee9fbc0f",
-  "sourceFingerprint": "e5a2dd9f09d473e09ed6dd8af3703685599433e4aa52d09b51263376b20480de",
-  "productFingerprint": "e5a2dd9f09d473e09ed6dd8af3703685599433e4aa52d09b51263376b20480de",
-  "generatedAt": "2026-09-06T20:23:56.263Z",
+  "sourceHead": "8303943fbb5db08358b708a491f150cfcee057a5",
+  "sourceFingerprint": "24a4d827bbaef24cae66145b0d0dd0369dbf278db9916b9214fa8e728a479ec4",
+  "productFingerprint": "24a4d827bbaef24cae66145b0d0dd0369dbf278db9916b9214fa8e728a479ec4",
+  "generatedAt": "2026-09-06T20:44:47.019Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -108,7 +108,7 @@
           },
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 45031,
+          "windowNumber": 45347,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "lastTransitionReason": "orderFront",
@@ -283,7 +283,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9661,
+        "durationRealCyclesMs": 9523,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -363,7 +363,7 @@
           },
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 45031,
+          "windowNumber": 45347,
           "openButtonFrame": {
             "y": 75,
             "x": 267,
@@ -502,13 +502,13 @@
           "targetPresentationState": "interactive",
           "contentFooterGutter": 8,
           "panelLevel": 2147483630,
-          "expandedContentAlpha": 1,
+          "expandedContentAlpha": 0,
           "denyButtonTitle": "Deny",
-          "compactContainerVisible": true,
+          "compactContainerVisible": false,
           "actionRowIds": [
             "a99"
           ],
-          "expandedContainerAlpha": 1,
+          "expandedContainerAlpha": 0,
           "peekLabelFrame": null,
           "contentRefreshCount": 302,
           "pendingTitleFrame": null,
@@ -541,7 +541,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 357,
+        "durationRetargetMs": 359,
         "diagRetarget": {
           "renderedPendingMessage": "",
           "animationCount": 203,
@@ -607,7 +607,7 @@
           "statusBadgeFrame": null,
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 45031,
+          "windowNumber": 45347,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "lastTransitionReason": "geometry",
@@ -724,8 +724,8 @@
           "expandedContainerAlpha": 0,
           "peekLabelFrame": {
             "y": 8,
-            "x": 26,
-            "width": 261,
+            "x": 28,
+            "width": 257,
             "height": 16
           },
           "contentRefreshCount": 304,
@@ -818,11 +818,11 @@
       "ok": true,
       "details": {
         "heapDiffKb": -317,
-        "heapUsedMb": 6.21,
-        "rssDiffKb": 45824,
-        "rssMb": 117.19,
-        "cpuDeltaUserMs": 1341913,
-        "cpuDeltaSystemMs": 250748
+        "heapUsedMb": 6.28,
+        "rssDiffKb": 45648,
+        "rssMb": 117.25,
+        "cpuDeltaUserMs": 1104595,
+        "cpuDeltaSystemMs": 204925
       }
     },
     {
@@ -1012,9 +1012,9 @@
           "targetPresentationState": "peek",
           "frame": {
             "x": 599,
-            "y": 947,
+            "y": 948,
             "width": 313,
-            "height": 35,
+            "height": 34,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1099,9 +1099,9 @@
             "targetPresentationState": "interactive",
             "frame": {
               "x": 599,
-              "y": 916,
+              "y": 915,
               "width": 313,
-              "height": 66,
+              "height": 67,
               "isActual": true,
               "requested": {
                 "x": 599,
@@ -1650,9 +1650,9 @@
           "pinned": true,
           "frame": {
             "x": 599,
-            "y": 896,
+            "y": 895,
             "width": 313,
-            "height": 86,
+            "height": 87,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1735,7 +1735,7 @@
       "details": {
         "heights": {
           "empty": {
-            "height": 37,
+            "height": 36,
             "containment": {
               "ok": true,
               "frameCount": 5,
@@ -1820,7 +1820,7 @@
             "questionButtonCount": 0
           },
           "long-pending": {
-            "height": 119,
+            "height": 118,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1837,7 +1837,7 @@
             "questionButtonCount": 0
           },
           "long-options": {
-            "height": 122,
+            "height": 120,
             "containment": {
               "ok": true,
               "frameCount": 8,
@@ -1967,8 +1967,8 @@
           },
           "approveButtonFrame": {
             "y": 90,
-            "x": 92,
-            "width": 86,
+            "x": 139,
+            "width": 152,
             "height": 24
           },
           "pendingMessageFrame": {
@@ -2006,13 +2006,13 @@
             {
               "y": 99,
               "x": 173,
-              "width": 145,
+              "width": 146,
               "height": 24
             },
             {
               "y": 127,
               "x": 22,
-              "width": 145,
+              "width": 297,
               "height": 24
             }
           ]
@@ -2187,14 +2187,14 @@
           "pendingMessageFullyVisible": true,
           "approveButtonFrame": {
             "y": 90,
-            "x": 92,
-            "width": 86,
+            "x": 139,
+            "width": 152,
             "height": 24
           },
           "denyButtonFrame": {
             "y": 90,
             "x": 22,
-            "width": 64,
+            "width": 109,
             "height": 24
           }
         }
@@ -2235,8 +2235,8 @@
           },
           "peekLabelFrame": {
             "y": 8,
-            "x": 26,
-            "width": 261,
+            "x": 28,
+            "width": 257,
             "height": 16
           },
           "activityFrame": null,
@@ -2459,14 +2459,14 @@
           "openVisible": false,
           "approveFrame": {
             "y": 77,
-            "x": 92,
-            "width": 86,
+            "x": 139,
+            "width": 152,
             "height": 24
           },
           "denyFrame": {
             "y": 77,
             "x": 22,
-            "width": 64,
+            "width": 109,
             "height": 24
           },
           "panelFrame": {
@@ -2487,6 +2487,110 @@
             "width": 313,
             "height": 86
           }
+        }
+      }
+    },
+    {
+      "name": "strict-single-visible-subtree-settled-invariant",
+      "ok": true,
+      "details": {
+        "compact": {
+          "compactVisible": true,
+          "peekVisible": false,
+          "expandedVisible": false,
+          "expandedAlpha": 0
+        },
+        "peek": {
+          "compactVisible": true,
+          "peekVisible": true,
+          "expandedVisible": false,
+          "composerVisible": false,
+          "approvalVisible": false
+        },
+        "working": {
+          "compactVisible": false,
+          "peekVisible": false,
+          "expandedVisible": true,
+          "composerVisible": true
+        }
+      }
+    },
+    {
+      "name": "adversarial-unbroken-tokens-and-deep-path-containment",
+      "ok": true,
+      "details": {
+        "panelFrame": {
+          "y": 812,
+          "x": 599,
+          "width": 313,
+          "height": 170
+        },
+        "bodyBounds": {
+          "y": 0,
+          "x": 0,
+          "width": 313,
+          "height": 136
+        },
+        "activityFrame": {
+          "y": 2,
+          "x": 22,
+          "width": 269,
+          "height": 28
+        },
+        "containmentOk": true
+      }
+    },
+    {
+      "name": "rapid-semantic-transition-stress-and-stale-control-purge",
+      "ok": true,
+      "details": {
+        "finalStatus": "Working",
+        "composerVisible": true,
+        "approvalVisible": false,
+        "panelFrame": {
+          "y": 864,
+          "x": 599,
+          "width": 313,
+          "height": 118
+        }
+      }
+    },
+    {
+      "name": "approval-decision-grid-balance-and-pure-hierarchy",
+      "ok": true,
+      "details": {
+        "panelW": 313,
+        "denyFrame": {
+          "y": 77,
+          "x": 22,
+          "width": 109,
+          "height": 24
+        },
+        "approveFrame": {
+          "y": 77,
+          "x": 139,
+          "width": 152,
+          "height": 24
+        },
+        "composerVisible": false,
+        "pinVisible": false,
+        "openVisible": false
+      }
+    },
+    {
+      "name": "action-in-flight-timeout-truthful-restoration-lifecycle",
+      "ok": true,
+      "details": {
+        "clickResult": true,
+        "inFlight": {
+          "actionInFlight": true,
+          "approveTitle": "Approve",
+          "denyTitle": "Deny"
+        },
+        "postConfirm": {
+          "actionInFlight": false,
+          "approvalVisible": false,
+          "composerVisible": true
         }
       }
     }

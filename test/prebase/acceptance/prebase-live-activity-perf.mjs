@@ -4945,6 +4945,311 @@ async function run() {
 	}
 	results.tests.push(test48);
 
+	// Test 49: Strict Single Visible Subtree Settled Invariant
+	const test49 = { name: 'strict-single-visible-subtree-settled-invariant', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
+
+		// 1. Settled Compact
+		native.setSnapshot(contentSnapshot(49_001, {
+			status: 'working',
+			currentActivity: 'Indexing workspace',
+		}));
+		await sleep(150);
+		await drainMain(native, 4);
+
+		const compactDiag = native.getDiagnostics();
+		test49.details.compact = {
+			compactVisible: compactDiag.compactContainerVisible,
+			peekVisible: compactDiag.peekContainerVisible,
+			expandedVisible: compactDiag.expandedContainerVisible,
+			expandedAlpha: compactDiag.expandedContentAlpha
+		};
+		if (compactDiag.compactContainerVisible !== true) {
+			throw new Error('Settled compact state must have compactContainerVisible === true');
+		}
+		if (compactDiag.peekContainerVisible === true) {
+			throw new Error('Settled compact state must have peekContainerVisible === false');
+		}
+		if (compactDiag.expandedContainerVisible === true || compactDiag.expandedContentAlpha > 0.01) {
+			throw new Error('Settled compact state must have expandedContainer hidden and alpha 0');
+		}
+
+		// 2. Settled Peek
+		native.simulateAction('peek');
+		await sleep(200);
+		await drainMain(native, 4);
+
+		const peekDiag = native.getDiagnostics();
+		test49.details.peek = {
+			compactVisible: peekDiag.compactContainerVisible,
+			peekVisible: peekDiag.peekContainerVisible,
+			expandedVisible: peekDiag.expandedContainerVisible,
+			composerVisible: peekDiag.composerVisible,
+			approvalVisible: peekDiag.approvalControlsVisible
+		};
+		if (peekDiag.peekContainerVisible !== true) {
+			throw new Error('Settled peek state must have peekContainerVisible === true');
+		}
+		if (peekDiag.expandedContainerVisible === true) {
+			throw new Error('Settled peek state must have expandedContainerVisible === false');
+		}
+		if (peekDiag.composerVisible === true || peekDiag.approvalControlsVisible === true) {
+			throw new Error('Settled peek state must NOT show expanded controls');
+		}
+
+		// 3. Settled Interactive Working
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+		await sleep(200);
+		await drainMain(native, 4);
+
+		const workingDiag = native.getDiagnostics();
+		test49.details.working = {
+			compactVisible: workingDiag.compactContainerVisible,
+			peekVisible: workingDiag.peekContainerVisible,
+			expandedVisible: workingDiag.expandedContainerVisible,
+			composerVisible: workingDiag.composerVisible
+		};
+		if (workingDiag.compactContainerVisible === true) {
+			throw new Error('Settled interactive working state must have compactContainerVisible === false');
+		}
+		if (workingDiag.peekContainerVisible === true) {
+			throw new Error('Settled interactive working state must have peekContainerVisible === false');
+		}
+		if (workingDiag.expandedContainerVisible !== true) {
+			throw new Error('Settled interactive working state must have expandedContainerVisible === true');
+		}
+	} catch (err) {
+		test49.ok = false;
+		test49.error = err.message;
+		results.failures.push(`strict-single-visible-subtree-settled-invariant: ${err.message}`);
+	}
+	results.tests.push(test49);
+
+	// Test 50: Adversarial Unbroken Tokens & Deep Path Containment
+	const test50 = { name: 'adversarial-unbroken-tokens-and-deep-path-containment', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+
+		const longUrl = 'https://prebase.internal/repo/deep/subsystem/controller/long-continuous-identifier-with-no-spaces-0123456789-abcdefghijklmnopqrstuvwxyz';
+		const longMessage = 'error_in_PrebaseLiveActivityController_refreshContentSubviewsPreservingPresentationWithSize_symbol_resolution_failure_unbroken_token';
+
+		native.setSnapshot(contentSnapshot(50_001, {
+			status: 'working',
+			currentActivity: longUrl,
+			latestShortMessage: longMessage,
+			recentActions: [
+				{ id: 'act-1', label: 'very_long_snake_case_action_identifier_in_pipeline_execution_without_breaks' }
+			]
+		}));
+		await sleep(200);
+		await drainMain(native, 4);
+
+		const diag = native.getDiagnostics();
+		const containment = layoutContainmentOk(diag);
+		test50.details = {
+			panelFrame: diag.panelFrame,
+			bodyBounds: diag.bodyBounds,
+			activityFrame: diag.activityFrame,
+			containmentOk: containment.ok,
+			reason: containment.reason
+		};
+
+		if (!containment.ok) {
+			throw new Error(`Unbroken token layout containment failed: ${containment.reason}`);
+		}
+		if (diag.activityFrame && diag.activityFrame.x < 0) {
+			throw new Error('Activity label escaped left bound with negative x');
+		}
+		if (diag.activityFrame && diag.activityFrame.x + diag.activityFrame.width > diag.panelFrame.width + 1) {
+			throw new Error('Activity label escaped right panel bound');
+		}
+	} catch (err) {
+		test50.ok = false;
+		test50.error = err.message;
+		results.failures.push(`adversarial-unbroken-tokens-and-deep-path-containment: ${err.message}`);
+	}
+	results.tests.push(test50);
+
+	// Test 51: Rapid Semantic Transition Stress & Stale Control Purge
+	const test51 = { name: 'rapid-semantic-transition-stress-and-stale-control-purge', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+
+		const transitions = [
+			{ status: 'working', currentActivity: 'Step 1: Planning' },
+			{ status: 'attention', pendingKind: 'approval', interactionId: 'rapid-appr', pendingTitle: 'Approve execution?' },
+			{ status: 'working', currentActivity: 'Step 2: Executing' },
+			{ status: 'attention', pendingKind: 'question', interactionId: 'rapid-quest', pendingTitle: 'Choose target:', pendingOptions: [{ id: 'opt1', label: 'Dev' }, { id: 'opt2', label: 'Prod' }] },
+			{ status: 'completed', currentActivity: 'Step 3: Done', latestShortMessage: 'Completed successfully' },
+			{ status: 'working', currentActivity: 'Step 4: Next task' },
+			{ status: 'failed', currentActivity: 'Step 5: Failed', latestShortMessage: 'Terminated with error' },
+			{ status: 'working', currentActivity: 'Step 6: Recovered' }
+		];
+
+		// Run through 3 full stress loops rapidly
+		for (let loop = 0; loop < 3; loop++) {
+			for (let i = 0; i < transitions.length; i++) {
+				const t = transitions[i];
+				native.setSnapshot(contentSnapshot(51_000 + loop * 100 + i, t));
+				await sleep(50);
+				await drainMain(native, 1);
+			}
+		}
+		await sleep(200);
+		await drainMain(native, 4);
+
+		const finalDiag = native.getDiagnostics();
+		test51.details = {
+			finalStatus: finalDiag.statusLabel,
+			composerVisible: finalDiag.composerVisible,
+			approvalVisible: finalDiag.approvalControlsVisible,
+			optionCount: finalDiag.optionButtonCount,
+			panelFrame: finalDiag.panelFrame
+		};
+
+		if (!finalDiag.statusLabel || finalDiag.statusLabel.toLowerCase() !== 'working') {
+			throw new Error(`Expected final status 'working', got '${finalDiag.statusLabel}'`);
+		}
+		if (finalDiag.approvalControlsVisible === true) {
+			throw new Error('Stale approval buttons remained visible in working state');
+		}
+		if (finalDiag.optionButtonCount > 0) {
+			throw new Error('Stale option buttons remained visible in working state');
+		}
+		if (finalDiag.composerVisible !== true) {
+			throw new Error('Composer input should be visible in settled interactive working state');
+		}
+	} catch (err) {
+		test51.ok = false;
+		test51.error = err.message;
+		results.failures.push(`rapid-semantic-transition-stress-and-stale-control-purge: ${err.message}`);
+	}
+	results.tests.push(test51);
+
+	// Test 52: Approval Decision Grid Balance & Pure Hierarchy
+	const test52 = { name: 'approval-decision-grid-balance-and-pure-hierarchy', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+
+		native.setSnapshot(contentSnapshot(52_001, {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'appr-grid-1',
+			pendingTitle: 'Deploy production release?',
+			pendingMessage: 'Requires confirmation of all preflight assertions.'
+		}));
+		await sleep(200);
+		await drainMain(native, 4);
+
+		const diag = native.getDiagnostics();
+		const approveFrame = diag.approveButtonFrame;
+		const denyFrame = diag.denyButtonFrame;
+		const panelFrame = diag.panelFrame;
+
+		test52.details = {
+			panelW: panelFrame.width,
+			denyFrame,
+			approveFrame,
+			composerVisible: diag.composerVisible,
+			pinVisible: diag.pinButtonVisible,
+			openVisible: diag.openInPreBaseVisible
+		};
+
+		if (diag.composerVisible === true) {
+			throw new Error('Approval state must NOT show composer');
+		}
+		if (diag.pinButtonVisible === true || diag.openInPreBaseVisible === true) {
+			throw new Error('Approval state must NOT show header pin/open utility buttons');
+		}
+		if (!isValidDiagFrame(denyFrame) || !isValidDiagFrame(approveFrame)) {
+			throw new Error('Deny and Approve buttons must have valid frames');
+		}
+		// Baseline alignment check: exact same y coordinate and height
+		if (Math.abs(denyFrame.y - approveFrame.y) > 0.5) {
+			throw new Error(`Deny (${denyFrame.y}) and Approve (${approveFrame.y}) must share common baseline`);
+		}
+		if (Math.abs(denyFrame.height - approveFrame.height) > 0.5) {
+			throw new Error(`Deny (${denyFrame.height}) and Approve (${approveFrame.height}) must have equal height`);
+		}
+		// Symmetrical balance: buttons must span across usable width (no huge 100pt+ blank void on right)
+		const rightMargin = panelFrame.width - (approveFrame.x + approveFrame.width);
+		const leftMargin = denyFrame.x;
+		// Right margin and left margin should both be reasonable safe insets (e.g. within 5pt of each other)
+		if (Math.abs(rightMargin - leftMargin) > 5.0) {
+			throw new Error(`Asymmetrical approval button placement: left margin ${leftMargin} vs right margin ${rightMargin}`);
+		}
+	} catch (err) {
+		test52.ok = false;
+		test52.error = err.message;
+		results.failures.push(`approval-decision-grid-balance-and-pure-hierarchy: ${err.message}`);
+	}
+	results.tests.push(test52);
+
+	// Test 53: Action In-Flight Timeout & Truthful Restoration Lifecycle
+	const test53 = { name: 'action-in-flight-timeout-truthful-restoration-lifecycle', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: true, display: 'builtin' });
+
+		native.setSnapshot(contentSnapshot(53_001, {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'timeout-test-1',
+			pendingTitle: 'Approve timeout path?',
+			pendingMessage: 'Timeout must restore truthful controls without ghosting.'
+		}));
+		await sleep(200);
+		await drainMain(native, 4);
+
+		// Simulate user clicking approve
+		const clickResult = native.simulateAction('approve');
+		test53.details.clickResult = clickResult;
+		await drainMain(native, 2);
+
+		const inFlightDiag = native.getDiagnostics();
+		test53.details.inFlight = {
+			actionInFlight: inFlightDiag.actionInFlight,
+			approveTitle: inFlightDiag.approveButtonTitle,
+			denyTitle: inFlightDiag.denyButtonTitle
+		};
+
+		if (inFlightDiag.actionInFlight !== true) {
+			throw new Error('Action must be marked in-flight after simulateAction');
+		}
+
+		// Snapshot confirms state transitions back to working (acknowledging interaction completion)
+		native.setSnapshot(contentSnapshot(53_002, {
+			status: 'working',
+			currentActivity: 'Applying approved changes',
+		}));
+		await sleep(200);
+		await drainMain(native, 4);
+
+		const postConfirmDiag = native.getDiagnostics();
+		test53.details.postConfirm = {
+			actionInFlight: postConfirmDiag.actionInFlight,
+			approvalVisible: postConfirmDiag.approvalControlsVisible,
+			composerVisible: postConfirmDiag.composerVisible
+		};
+
+		if (postConfirmDiag.actionInFlight === true) {
+			throw new Error('actionInFlight must be reset once snapshot transitions to working');
+		}
+		if (postConfirmDiag.approvalControlsVisible === true) {
+			throw new Error('Approval buttons must be hidden once working state resumes');
+		}
+	} catch (err) {
+		test53.ok = false;
+		test53.error = err.message;
+		results.failures.push(`action-in-flight-timeout-truthful-restoration-lifecycle: ${err.message}`);
+	}
+	results.tests.push(test53);
+
 	native.dispose();
 
 	results.ok = results.failures.length === 0;

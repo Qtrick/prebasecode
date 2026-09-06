@@ -804,6 +804,9 @@ static NSString *JSString(Napi::Value value) {
 		if (label.length == 0) {
 			continue;
 		}
+		if (self.activityLabel.length && [label isEqualToString:self.activityLabel]) {
+			continue;
+		}
 		if (aid.length && [used containsObject:aid]) {
 			continue;
 		}
@@ -928,8 +931,12 @@ static NSString *JSString(Napi::Value value) {
 	if (!isExpanded) {
 		self.contentScrollView.hidden = YES;
 		self.peekContainer.hidden = YES;
+		self.peekContainer.alphaValue = 0.0;
 		self.peekLabel.hidden = YES;
 		self.expandedContainer.hidden = YES;
+		self.expandedContainer.alphaValue = 0.0;
+		self.compactContainer.hidden = NO;
+		self.compactContainer.alphaValue = 1.0;
 		[self layoutCompactWingChrome:bandH totalW:totalW leftW:leftW rightW:rightW housing:housing];
 		return;
 	}
@@ -938,7 +945,11 @@ static NSString *JSString(Napi::Value value) {
 	if (self.peekOnly) {
 		self.contentScrollView.hidden = YES;
 		self.expandedContainer.hidden = YES;
+		self.expandedContainer.alphaValue = 0.0;
 		self.peekContainer.hidden = NO;
+		self.peekContainer.alphaValue = 1.0;
+		self.compactContainer.hidden = NO;
+		self.compactContainer.alphaValue = 1.0;
 		[self layoutCompactWingChrome:bandH totalW:totalW leftW:leftW rightW:rightW housing:housing];
 		self.headerTitle.hidden = YES;
 		self.statusBadge.hidden = YES;
@@ -969,11 +980,11 @@ static NSString *JSString(Napi::Value value) {
 			// configureLabel:self.activityDescription lines:2 (used for peek measurement)
 			self.peekLabel.stringValue = peekBody;
 			self.peekLabel.hidden = NO;
-			CGFloat peekInset = ContentSafeInsetX(self.notched) + 4;
+			CGFloat peekInset = ContentSafeInsetX(self.notched) + 6;
 			CGFloat peekW = MAX(40, totalW - peekInset * 2);
 			CGFloat bodyH = MAX(0, currentH - bandH);
 			CGFloat labelH = 16;
-			CGFloat textY = MAX(4, floor((bodyH - labelH) / 2.0));
+			CGFloat textY = MAX(6, floor((bodyH - labelH) / 2.0));
 			self.peekLabel.frame = NSMakeRect(peekInset, textY, peekW, labelH);
 			self.activityDescription.stringValue = peekBody;
 		} else {
@@ -984,8 +995,12 @@ static NSString *JSString(Napi::Value value) {
 
 	// Interactive: HEADER → scrollable CONTENT → (controls laid out separately in footer)
 	self.peekContainer.hidden = YES;
+	self.peekContainer.alphaValue = 0.0;
 	self.peekLabel.hidden = YES;
+	self.compactContainer.hidden = YES;
+	self.compactContainer.alphaValue = 0.0;
 	self.expandedContainer.hidden = NO;
+	self.expandedContainer.alphaValue = 1.0;
 	self.headerTitle.hidden = NO;
 	self.statusBadge.hidden = NO;
 	self.contentScrollView.hidden = NO;
@@ -1236,14 +1251,19 @@ static NSString *JSString(Napi::Value value) {
 
 	if (!isExpanded) {
 		if (animated && !self.reducedMotion) {
+			self.compactContainer.alphaValue = 0.0;
+			self.compactContainer.hidden = YES;
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
 				ctx.duration = duration * 0.55;
 				self.expandedContainer.animator.alphaValue = 0.0;
 				self.peekContainer.animator.alphaValue = 0.0;
-				self.compactContainer.animator.alphaValue = 1.0;
 			} completionHandler:^{
 				self.expandedContainer.hidden = YES;
+				self.expandedContainer.alphaValue = 0.0;
 				self.peekContainer.hidden = YES;
+				self.peekContainer.alphaValue = 0.0;
+				self.compactContainer.hidden = NO;
+				self.compactContainer.alphaValue = 1.0;
 			}];
 		} else {
 			self.expandedContainer.alphaValue = 0.0;
@@ -1255,6 +1275,7 @@ static NSString *JSString(Napi::Value value) {
 		}
 	} else if (self.peekOnly) {
 		self.compactContainer.hidden = NO;
+		self.compactContainer.alphaValue = 1.0;
 		self.peekContainer.hidden = NO;
 		if (animated && !self.reducedMotion) {
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
@@ -1264,6 +1285,7 @@ static NSString *JSString(Napi::Value value) {
 				self.compactContainer.animator.alphaValue = 1.0;
 			} completionHandler:^{
 				self.expandedContainer.hidden = YES;
+				self.expandedContainer.alphaValue = 0.0;
 			}];
 		} else {
 			self.expandedContainer.alphaValue = 0.0;
@@ -1274,19 +1296,24 @@ static NSString *JSString(Napi::Value value) {
 			self.compactContainer.hidden = NO;
 		}
 	} else {
-		self.compactContainer.hidden = NO;
+		self.compactContainer.hidden = YES;
+		self.compactContainer.alphaValue = 0.0;
+		self.peekContainer.hidden = YES;
+		self.peekContainer.alphaValue = 0.0;
 		self.expandedContainer.hidden = NO;
 		if (animated && !self.reducedMotion) {
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
 				ctx.duration = duration * 0.45;
-				self.compactContainer.animator.alphaValue = 0.0;
-				self.peekContainer.animator.alphaValue = 0.0;
 				self.expandedContainer.animator.alphaValue = 1.0;
 			} completionHandler:^{
+				self.compactContainer.hidden = YES;
+				self.compactContainer.alphaValue = 0.0;
 				self.peekContainer.hidden = YES;
+				self.peekContainer.alphaValue = 0.0;
 			}];
 		} else {
 			self.compactContainer.alphaValue = 0.0;
+			self.compactContainer.hidden = YES;
 			self.peekContainer.alphaValue = 0.0;
 			self.peekContainer.hidden = YES;
 			self.expandedContainer.alphaValue = 1.0;
@@ -2180,15 +2207,12 @@ static NSString *JSString(Napi::Value value) {
 		self.denyButton.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.18 alpha:0.90].CGColor;
 		self.denyButton.layer.borderColor = [NSColor colorWithCalibratedWhite:0.36 alpha:0.45].CGColor;
 
-		CGFloat denyW = 64;
-		CGFloat approveW = self.pendingDestructive ? 168 : 86;
-		// Keep Deny/Approve inside the safe footer width (natural notch span can be < 156pt).
-		approveW = MIN(approveW, MAX(48, usableW - denyW - gap));
-		if (denyW + gap + approveW > usableW + 0.5) {
-			denyW = MAX(40, usableW - gap - approveW);
-		}
+		CGFloat apprGap = 8;
+		CGFloat denyRatio = self.pendingDestructive ? 0.36 : 0.42;
+		CGFloat denyW = floor((usableW - apprGap) * denyRatio);
+		CGFloat approveW = usableW - apprGap - denyW;
 		self.denyButton.frame = NSMakeRect(footerInset, bottomY, denyW, kControlHeight);
-		self.approveButton.frame = NSMakeRect(footerInset + denyW + gap, bottomY, approveW, kControlHeight);
+		self.approveButton.frame = NSMakeRect(footerInset + denyW + apprGap, bottomY, approveW, kControlHeight);
 		return;
 	}
 
@@ -2206,19 +2230,18 @@ static NSString *JSString(Napi::Value value) {
 			// Prefer 2-column grids for 3–4 options (avoids a lonely third/fourth chip row).
 			NSInteger perRow = (maxDirect >= 3) ? 2 : MAX(1, maxDirect);
 			CGFloat colW = floor((usableW - gap) / 2.0);
-			CGFloat slotW = (perRow == 2) ? colW : MIN(140, MAX(56, usableW));
-			NSInteger rows = MAX(1, (NSInteger)ceil((double)maxDirect / (double)perRow));
-			if (totalOpts > 4) {
-				rows = MAX(rows, (NSInteger)ceil((double)(maxDirect + 1) / (double)perRow));
-			}
-			// Layout top→bottom so wrapped chips do not appear orphaned above the first row.
+			NSInteger rows = (totalOpts == 1) ? 1 : ((totalOpts == 2) ? 1 : 2);
 			CGFloat optionsTop = MAX(0, bottomY - (rows - 1) * (kControlHeight + 4));
 			CGFloat x = footerInset;
 			CGFloat rowY = optionsTop;
 			NSInteger col = 0;
+
 			for (NSInteger i = 0; i < maxDirect && i < (NSInteger)self.optionButtons.count; i++) {
 				NSDictionary *option = self.pendingOptions[i];
 				NSButton *button = self.optionButtons[i];
+				button.target = self;
+				button.action = @selector(answerOption:);
+				button.tag = i;
 				NSString *label = option[@"label"] ?: option[@"id"] ?: @"Option";
 				button.title = label;
 				NSDictionary *titleAttrs = @{
@@ -2228,8 +2251,17 @@ static NSString *JSString(Napi::Value value) {
 				button.attributedTitle = [[NSAttributedString alloc] initWithString:label attributes:titleAttrs];
 				button.accessibilityLabel = self.actionInFlight ? [NSString stringWithFormat:@"%@ (in progress)", label] : label;
 				button.alphaValue = actionAlpha;
-				CGFloat width = (perRow == 2) ? colW : MIN(slotW, MAX(56, [label sizeWithAttributes:@{ NSFontAttributeName: button.font }].width + 20));
-				if (col >= perRow) {
+
+				CGFloat width = colW;
+				if (totalOpts == 1) {
+					width = usableW;
+				} else if (totalOpts == 3 && i == 2) {
+					width = usableW; // 3rd option spans balanced full width on row 2
+				} else if (col == 1) {
+					width = usableW - colW - gap;
+				}
+
+				if (col >= perRow || (totalOpts == 3 && i == 2)) {
 					col = 0;
 					x = footerInset;
 					rowY += (kControlHeight + 4);
@@ -2239,8 +2271,12 @@ static NSString *JSString(Napi::Value value) {
 				x += width + gap;
 				col++;
 			}
+
 			if (totalOpts > 4 && self.optionButtons.count >= 4) {
 				NSButton *moreButton = self.optionButtons[3];
+				moreButton.target = self;
+				moreButton.action = @selector(openInPrebase:);
+				moreButton.tag = -1;
 				moreButton.title = @"More…";
 				NSDictionary *moreAttrs = @{
 					NSFontAttributeName: moreButton.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightMedium],
@@ -2249,7 +2285,7 @@ static NSString *JSString(Napi::Value value) {
 				moreButton.attributedTitle = [[NSAttributedString alloc] initWithString:@"More…" attributes:moreAttrs];
 				moreButton.accessibilityLabel = @"More options in PreBase";
 				moreButton.alphaValue = 1.0;
-				CGFloat moreW = (perRow == 2) ? colW : MIN(72, slotW);
+				CGFloat moreW = usableW - colW - gap;
 				if (col >= perRow) {
 					col = 0;
 					x = footerInset;
@@ -2522,9 +2558,6 @@ static NSString *JSString(Napi::Value value) {
 	self.ignoresMouse = NO;
 	[self installLocalKeyMonitor];
 	[self removeGlobalMonitorOnly];
-	self.pinButton.hidden = NO;
-	self.openButton.hidden = NO;
-	self.input.hidden = NO;
 	self.pendingPresentationMorph = YES;
 	[self layoutForScreen];
 }
