@@ -50,12 +50,13 @@ function getMemoryUsage() {
 }
 
 function captureFrame(diag) {
-	const preferred = diag?.requestedFrame;
-	const fallback = diag?.panelFrame;
-	const hasPreferred = preferred
-		&& Number(preferred.width) > 0
-		&& Number(preferred.height) > 0;
-	const frame = hasPreferred ? preferred : fallback;
+	// Rule: Actual native panelFrame is authoritative; requestedFrame is the target.
+	const actual = diag?.panelFrame;
+	const requested = diag?.requestedFrame;
+	const hasActual = actual
+		&& Number(actual.width) > 0
+		&& Number(actual.height) > 0;
+	const frame = hasActual ? actual : requested;
 	if (!frame) {
 		return null;
 	}
@@ -64,6 +65,13 @@ function captureFrame(diag) {
 		y: Number(frame.y) || 0,
 		width: Number(frame.width) || 0,
 		height: Number(frame.height) || 0,
+		isActual: !!hasActual,
+		requested: requested ? {
+			x: Number(requested.x) || 0,
+			y: Number(requested.y) || 0,
+			width: Number(requested.width) || 0,
+			height: Number(requested.height) || 0,
+		} : null,
 	};
 }
 
@@ -1654,8 +1662,8 @@ async function run() {
 		if (!peekOk) {
 			throw new Error('simulateAction(peek) failed');
 		}
-		await sleep(120);
-		await drainMain(native, 3);
+		await sleep(260);
+		await drainMain(native, 4);
 
 		const baselineDiag = native.getDiagnostics();
 		const baseline = captureStabilityBaseline(baselineDiag);
@@ -1736,7 +1744,7 @@ async function run() {
 		if (!native.simulateAction('click')) {
 			throw new Error('click→interactive failed');
 		}
-		await sleep(180);
+		await sleep(280);
 		await drainMain(native, 4);
 
 		const baselineDiag = native.getDiagnostics();
@@ -3036,8 +3044,8 @@ async function run() {
 			currentActivity: longText('baseline-activity', 40),
 			latestShortMessage: longText('baseline-msg', 55),
 		}));
-		await sleep(120);
-		await drainMain(native, 3);
+		await sleep(260);
+		await drainMain(native, 4);
 		const baseline = captureStabilityBaseline(native.getDiagnostics());
 		native.setSnapshot(contentSnapshot(9990, {
 			status: 'working',
@@ -4329,7 +4337,11 @@ async function run() {
 			panelFrame: diagPeek.panelFrame,
 			requestedFrame: diagPeek.requestedFrame,
 			pathBounds: diagPeek.pathBounds,
+			peekLabelFrame: diagPeek.peekLabelFrame,
 			activityFrame: diagPeek.activityFrame,
+			peekContainerVisible: diagPeek.peekContainerVisible,
+			expandedContainerVisible: diagPeek.expandedContainerVisible,
+			interactiveContentVisible: diagPeek.interactiveContentVisible,
 			transitionInFlight: diagPeek.transitionInFlight,
 		};
 		if (diagPeek.transitionInFlight !== false) {
@@ -4344,13 +4356,20 @@ async function run() {
 		if (diagPeek.pathBounds?.height !== 66) {
 			throw new Error(`peek pathBounds height must be 66, got ${diagPeek.pathBounds?.height}`);
 		}
-		if (diagPeek.activityFrame) {
-			const textY = diagPeek.activityFrame.y;
+		if (diagPeek.expandedContainerVisible === true) {
+			throw new Error('expandedContainer must NOT be visible during peek (must prevent content bleed)');
+		}
+		if (diagPeek.interactiveContentVisible === true) {
+			throw new Error('interactive content subtree must NOT be visible during peek');
+		}
+		const peekFrame = diagPeek.peekLabelFrame || diagPeek.activityFrame;
+		if (peekFrame) {
+			const textY = peekFrame.y;
 			if (textY < 4 || textY > 14) {
-				throw new Error(`peek activityFrame.y must be centered within 32pt body (expected 4..14), got ${textY}`);
+				throw new Error(`peek text frame.y must be centered within 32pt body (expected 4..14), got ${textY}`);
 			}
 		} else {
-			throw new Error('peek activityFrame must be visible');
+			throw new Error('peek text frame must be visible');
 		}
 	} catch (err) {
 		test41.ok = false;

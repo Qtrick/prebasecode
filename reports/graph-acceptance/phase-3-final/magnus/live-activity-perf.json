@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "478117e1056421166158ff21bfbcf4c11a5b51f8",
-  "sourceFingerprint": "526388c73f3b26b7d5fb1338ed05778b24ccee43f41ccad9456276451da7ad48",
-  "productFingerprint": "526388c73f3b26b7d5fb1338ed05778b24ccee43f41ccad9456276451da7ad48",
-  "generatedAt": "2026-09-05T23:08:13.703Z",
+  "sourceHead": "fa73c487896a1c4f0f405a55e0d42f97a83f119b",
+  "sourceFingerprint": "46e2deb37d9150a5c2839391b740014733d7388bbc8b14f1792d552ca01afb85",
+  "productFingerprint": "46e2deb37d9150a5c2839391b740014733d7388bbc8b14f1792d552ca01afb85",
+  "generatedAt": "2026-09-06T19:20:37.593Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -29,162 +29,122 @@
       "ok": true,
       "details": {
         "diagCollapsed": {
-          "approveButtonAccessibilityLabel": "Approve",
-          "lastTransitionReason": "orderFront",
-          "questionContentHealthy": true,
-          "renderedPeekBody": "",
-          "renderedLatestMessage": "",
-          "questionButtonLabels": [],
-          "hoverDwellMs": 180,
-          "redrawCount": 1,
-          "footerTopY": 0,
-          "pendingTitleFrame": {
-            "y": 0,
-            "x": 0,
-            "width": 0,
-            "height": 0
-          },
-          "lastHapticReason": "none",
-          "screenFrame": {
-            "y": 0,
-            "x": 0,
-            "width": 1512,
-            "height": 982
-          },
-          "displayMode": "builtin",
-          "hovered": false,
-          "optionButtonFrames": [],
-          "trackingAreaCount": 1,
-          "lastNativeCommand": "",
-          "actualVisibleViewportTop": 0,
-          "hoverSessionToken": 0,
-          "openButtonTitle": "Open in PreBase",
-          "pinButtonFrame": null,
-          "pinned": false,
-          "panelTopY": 982,
-          "accessibilityLabel": "Working",
+          "renderedPendingMessage": "",
           "animationCount": 0,
           "pendingKind": "",
-          "pendingMessageBottom": 0,
-          "metricsLabel": "",
-          "approveButtonFrame": null,
-          "notchGeometry": {
-            "trailingX": 848,
-            "centerX": 755.5,
-            "width": 185,
-            "leadingX": 663,
-            "height": 34
+          "activePresentationState": "compact",
+          "keyWindow": false,
+          "actualVisibleViewportTop": 0,
+          "safeAreaTop": 0,
+          "denyButtonAlpha": 1,
+          "openButtonTitle": "Open in PreBase",
+          "actualVisibleViewportBottom": 0,
+          "trackingAreaCount": 1,
+          "denyButtonFrame": null,
+          "contentSafeViewport": {
+            "y": 4,
+            "x": 22,
+            "width": 184,
+            "height": 0
           },
-          "pendingTitle": "",
-          "pinButtonTitle": "Pin panel",
-          "geometryTransitionCount": 1,
-          "transitionInFlight": false,
-          "approveButtonTitle": "Approve",
-          "openButtonFrame": null,
-          "actionInFlightTimeoutMs": 8000,
-          "actionRowIds": [
-            "",
-            "",
-            ""
-          ],
+          "peekContainerVisible": false,
+          "localMonitorInstalled": false,
+          "pendingMessage": "",
           "backingScaleFactor": 2,
-          "pinnedInteractiveHeight": 0,
           "pendingMessageFrame": {
             "y": 0,
             "x": 0,
             "width": 0,
             "height": 0
           },
-          "silhouetteMetrics": {
-            "opticalTopInset": 0,
-            "topLeftX": 0,
-            "topRightX": 313,
-            "effShoulderR": 0,
-            "panelWidth": 313,
-            "bodyDepth": 0,
-            "shoulderFlare": 0,
-            "shoulderCurvatureContinuous": true,
-            "tangentContinuity": true,
-            "nonDegenerateShoulder": true,
-            "notchCenter": 156.5
+          "bodyBounds": {
+            "y": 0,
+            "x": 0,
+            "width": 228,
+            "height": 0
           },
-          "exitGraceMs": 250,
-          "safeAreaTop": 32,
-          "contentPopulated": true,
-          "layerBacked": true,
-          "denyButtonAlpha": 1,
+          "expanded": false,
+          "hovered": false,
           "bandHeight": 34,
-          "shapeAwareHitTesting": true,
-          "hapticCount": 0,
-          "questionButtonCount": 0,
-          "lastRenderedRevision": 1,
-          "peekOnly": false,
-          "interactionId": "",
-          "actualVisibleViewportBottom": 0,
           "activityFrame": {
             "y": 0,
             "x": 0,
             "width": 0,
             "height": 0
           },
-          "contentRefreshCount": 2,
-          "pathTopologyCompatible": true,
-          "denyButtonTitle": "Deny",
-          "localMonitorInstalled": false,
-          "headerFrame": {
+          "transitionInFlight": false,
+          "metricsLabel": "",
+          "interactiveContentVisible": false,
+          "panelVisible": true,
+          "silhouetteMetrics": {
+            "opticalTopInset": 0,
+            "topLeftX": 0,
+            "topRightX": 228,
+            "effShoulderR": 0,
+            "panelWidth": 228,
+            "bodyDepth": 0,
+            "shoulderFlare": 0,
+            "shoulderCurvatureContinuous": true,
+            "tangentContinuity": true,
+            "nonDegenerateShoulder": true,
+            "notchCenter": 114
+          },
+          "lastHapticReason": "none",
+          "composerVisible": false,
+          "approveButtonTitle": "Approve",
+          "statusBadgeFrame": {
             "y": 0,
             "x": 0,
             "width": 0,
             "height": 0
           },
-          "retainedWorkScreen": false,
-          "expandedContentAlpha": 0,
+          "questionButtonLabels": [],
+          "prebaseFullscreen": false,
+          "windowNumber": 43701,
+          "openButtonFrame": null,
+          "displayMode": "builtin",
+          "lastTransitionReason": "orderFront",
+          "globalMonitorInstalled": true,
+          "hoverSessionToken": 0,
+          "approveButtonAlpha": 1,
+          "renderedPeekBody": "",
+          "revision": 1,
+          "collapsedHit": {
+            "y": 948,
+            "x": 642,
+            "width": 228,
+            "height": 34
+          },
+          "shapeMaskSynced": true,
+          "composerFrame": null,
+          "screenLocalizedName": "Built-in Retina Display",
+          "pendingMessageFullyVisible": true,
+          "accessibilityRole": "AXGroup",
+          "expandedContainerVisible": false,
+          "panelFrame": {
+            "y": 948,
+            "x": 642,
+            "width": 228,
+            "height": 34
+          },
+          "peekOnly": false,
           "pathBounds": {
             "y": 0,
             "x": 0,
-            "width": 313,
+            "width": 228,
             "height": 34
           },
-          "activeInputControl": "none",
-          "denyButtonAccessibilityLabel": "Deny",
-          "statusLabel": "Working",
-          "openInPreBaseVisible": false,
-          "globalMonitorInstalled": true,
-          "contentViewport": {
+          "pinned": false,
+          "reservedFooterHeight": 8,
+          "panelCreated": true,
+          "hapticCount": 0,
+          "activityLabel": "",
+          "auxiliaryTopRightArea": {
             "y": 0,
             "x": 0,
-            "width": 313,
+            "width": 0,
             "height": 0
           },
-          "contentOnlyUpdateCount": 1,
-          "panelFrame": {
-            "y": 948,
-            "x": 599,
-            "width": 313,
-            "height": 34
-          },
-          "orderFrontCount": 1,
-          "auxiliaryTopRightArea": {
-            "y": 950,
-            "x": 848,
-            "width": 664,
-            "height": 32
-          },
-          "auxiliaryTopLeftArea": {
-            "y": 950,
-            "x": 0,
-            "width": 663,
-            "height": 32
-          },
-          "pinButtonVisible": false,
-          "denyButtonFrame": null,
-          "contentSafeViewport": {
-            "y": 4,
-            "x": 22,
-            "width": 269,
-            "height": 0
-          },
-          "notchDetected": true,
           "actionFrames": [
             {
               "y": 0,
@@ -205,64 +165,109 @@
               "height": 0
             }
           ],
-          "revision": 1,
-          "screenLocalizedName": "Built-in Retina Display",
-          "pendingContentFullyVisible": true,
-          "targetPresentationState": "compact",
-          "transitionGeneration": 0,
-          "actionInFlight": false,
-          "requestedFrame": {
-            "y": 948,
-            "x": 599,
-            "width": 313,
-            "height": 34
-          },
-          "approveButtonAlpha": 1,
-          "statusBadgeFrame": {
+          "auxiliaryTopLeftArea": {
             "y": 0,
             "x": 0,
             "width": 0,
             "height": 0
           },
-          "panelVisible": true,
+          "actionInFlightTimeoutMs": 8000,
+          "exitGraceMs": 250,
+          "denyButtonAccessibilityLabel": "Deny",
+          "optionButtonFrames": [],
           "hoverHapticCount": 0,
-          "windowNumber": 42075,
-          "topAnchorDelta": 0,
-          "collapsedHit": {
-            "y": 948,
-            "x": 599,
-            "width": 313,
-            "height": 34
-          },
-          "activityLabel": "",
-          "keyWindow": false,
-          "contentFooterGutter": 8,
-          "reservedFooterHeight": 8,
-          "approvalControlsVisible": false,
-          "latestShortMessage": "",
-          "screenLocked": false,
-          "pendingMessage": "",
-          "panelCreated": true,
-          "shapeMaskSynced": true,
-          "prebaseFullscreen": false,
-          "geometrySignature": "e=0;p=0;pin=0;att=0;kind=;opts=0;appr=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
-          "accessibilityRole": "AXGroup",
-          "renderedPendingMessage": "",
-          "contentScrollEnabled": false,
-          "latestMessageFrame": null,
-          "pendingMessageFullyVisible": true,
-          "activePresentationState": "compact",
-          "screenTopY": 982,
-          "panelLevel": 2147483630,
-          "bodyBounds": {
+          "screenFrame": {
             "y": 0,
             "x": 0,
-            "width": 313,
+            "width": 1512,
+            "height": 982
+          },
+          "latestMessageFrame": null,
+          "renderedLatestMessage": "",
+          "latestShortMessage": "",
+          "questionButtonCount": 0,
+          "topAnchorDelta": 0,
+          "pinnedInteractiveHeight": 0,
+          "lastNativeCommand": "",
+          "transitionGeneration": 0,
+          "requestedFrame": {
+            "y": 948,
+            "x": 642,
+            "width": 228,
+            "height": 34
+          },
+          "hoverDwellMs": 180,
+          "pendingMessageBottom": 0,
+          "contentScrollViewVisible": false,
+          "activeInputControl": "none",
+          "pendingTitle": "",
+          "userDismissedAttention": false,
+          "statusLabel": "Working",
+          "footerTopY": 0,
+          "actionInFlight": false,
+          "approvalControlsVisible": false,
+          "screenTopY": 982,
+          "geometrySignature": "e=0;p=0;pin=0;att=0;kind=;opts=0;appr=0;band=34.0;notch=0;h=0.0;lw=0.0;rw=0.0",
+          "approveDenyVisible": false,
+          "redrawCount": 1,
+          "shapeAwareHitTesting": true,
+          "questionContentHealthy": true,
+          "approveButtonFrame": null,
+          "layerBacked": true,
+          "accessibilityLabel": "Working",
+          "interactionId": "",
+          "orderFrontCount": 1,
+          "panelTopY": 982,
+          "pinButtonFrame": null,
+          "pinButtonTitle": "Pin panel",
+          "optionButtonsVisible": false,
+          "approveButtonAccessibilityLabel": "Approve",
+          "lastRenderedRevision": 1,
+          "contentScrollEnabled": false,
+          "contentPopulated": true,
+          "screenLocked": false,
+          "targetPresentationState": "compact",
+          "contentFooterGutter": 8,
+          "panelLevel": 2147483630,
+          "expandedContentAlpha": 0,
+          "denyButtonTitle": "Deny",
+          "compactContainerVisible": true,
+          "actionRowIds": [
+            "",
+            "",
+            ""
+          ],
+          "expandedContainerAlpha": 0,
+          "peekLabelFrame": null,
+          "contentRefreshCount": 2,
+          "pendingTitleFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 0,
             "height": 0
           },
-          "expanded": false,
-          "composerFrame": null,
-          "userDismissedAttention": false
+          "geometryTransitionCount": 1,
+          "peekContainerAlpha": 0,
+          "peekLabelVisible": false,
+          "pinButtonVisible": false,
+          "headerFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 0,
+            "height": 0
+          },
+          "contentOnlyUpdateCount": 1,
+          "contentViewport": {
+            "y": 0,
+            "x": 0,
+            "width": 228,
+            "height": 0
+          },
+          "pathTopologyCompatible": true,
+          "openInPreBaseVisible": false,
+          "pendingContentFullyVisible": true,
+          "retainedWorkScreen": false,
+          "notchDetected": false
         }
       }
     },
@@ -270,7 +275,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9472,
+        "durationRealCyclesMs": 10283,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -294,6 +299,7 @@
             "width": 269,
             "height": 44
           },
+          "peekContainerVisible": false,
           "notchGeometry": {
             "trailingX": 848,
             "centerX": 755.5,
@@ -302,9 +308,9 @@
             "height": 34
           },
           "localMonitorInstalled": true,
-          "pendingMessage": "",
           "backingScaleFactor": 2,
           "pendingMessageFrame": null,
+          "pendingMessage": "",
           "bodyBounds": {
             "y": 0,
             "x": 0,
@@ -322,6 +328,7 @@
           },
           "transitionInFlight": false,
           "metricsLabel": "",
+          "interactiveContentVisible": false,
           "panelVisible": true,
           "silhouetteMetrics": {
             "opticalTopInset": 12,
@@ -337,6 +344,7 @@
             "notchCenter": 156.5
           },
           "lastHapticReason": "none",
+          "composerVisible": true,
           "approveButtonTitle": "Approve",
           "statusBadgeFrame": {
             "y": 4,
@@ -346,7 +354,7 @@
           },
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 42075,
+          "windowNumber": 43701,
           "openButtonFrame": {
             "y": 82,
             "x": 267,
@@ -361,16 +369,16 @@
           },
           "lastTransitionReason": "geometry",
           "globalMonitorInstalled": false,
-          "hoverSessionToken": 0,
-          "approveButtonAlpha": 1,
-          "renderedPeekBody": "",
-          "revision": 406,
           "collapsedHit": {
             "y": 948,
             "x": 599,
             "width": 313,
             "height": 34
           },
+          "approveButtonAlpha": 1,
+          "renderedPeekBody": "",
+          "revision": 406,
+          "hoverSessionToken": 0,
           "displayMode": "builtin",
           "shapeMaskSynced": true,
           "composerFrame": {
@@ -382,6 +390,7 @@
           "screenLocalizedName": "Built-in Retina Display",
           "pendingMessageFullyVisible": true,
           "accessibilityRole": "AXGroup",
+          "expandedContainerVisible": false,
           "panelFrame": {
             "y": 835,
             "x": 599,
@@ -436,26 +445,28 @@
           "latestShortMessage": "Fit View metrics look stable on the large fixture.",
           "questionButtonCount": 0,
           "topAnchorDelta": 0,
-          "hoverDwellMs": 180,
-          "lastNativeCommand": "",
           "pinnedInteractiveHeight": 147,
-          "transitionGeneration": 200,
+          "lastNativeCommand": "",
           "requestedFrame": {
             "y": 835,
             "x": 599,
             "width": 313,
             "height": 147
           },
+          "transitionGeneration": 200,
+          "hoverDwellMs": 180,
           "pendingMessageBottom": 0,
+          "contentScrollViewVisible": true,
           "activeInputControl": "input-ready",
           "pendingTitle": "",
           "userDismissedAttention": false,
           "statusLabel": "Working",
           "footerTopY": 75,
-          "actionInFlight": false,
           "approvalControlsVisible": false,
+          "actionInFlight": false,
           "screenTopY": 982,
           "geometrySignature": "e=1;p=0;pin=0;att=0;kind=;opts=0;appr=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+          "approveDenyVisible": false,
           "redrawCount": 201,
           "shapeAwareHitTesting": true,
           "questionContentHealthy": true,
@@ -473,22 +484,28 @@
             "height": 24
           },
           "pinButtonTitle": "Pin panel",
+          "optionButtonsVisible": false,
           "approveButtonAccessibilityLabel": "Approve",
           "lastRenderedRevision": 406,
           "contentScrollEnabled": true,
           "contentPopulated": true,
-          "targetPresentationState": "interactive",
           "screenLocked": false,
+          "targetPresentationState": "interactive",
           "contentFooterGutter": 8,
           "panelLevel": 2147483630,
           "expandedContentAlpha": 1,
           "denyButtonTitle": "Deny",
+          "compactContainerVisible": true,
           "actionRowIds": [
             "a99"
           ],
+          "expandedContainerAlpha": 1,
+          "peekLabelFrame": null,
           "contentRefreshCount": 302,
           "pendingTitleFrame": null,
           "geometryTransitionCount": 201,
+          "peekContainerAlpha": 0,
+          "peekLabelVisible": false,
           "pinButtonVisible": true,
           "headerFrame": {
             "y": 4,
@@ -496,14 +513,14 @@
             "width": 214.55479496717453,
             "height": 16
           },
-          "pathTopologyCompatible": true,
+          "contentOnlyUpdateCount": 101,
           "contentViewport": {
             "y": 23,
             "x": 0,
             "width": 313,
             "height": 44
           },
-          "contentOnlyUpdateCount": 101,
+          "pathTopologyCompatible": true,
           "openInPreBaseVisible": true,
           "pendingContentFullyVisible": true,
           "retainedWorkScreen": false,
@@ -515,42 +532,27 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 356,
+        "durationRetargetMs": 360,
         "diagRetarget": {
-          "approveButtonAccessibilityLabel": "Approve",
-          "lastTransitionReason": "geometry",
-          "questionContentHealthy": true,
-          "renderedPeekBody": "Validating Temporal layout recovery",
-          "renderedLatestMessage": "",
-          "questionButtonLabels": [],
-          "hoverDwellMs": 180,
-          "redrawCount": 203,
-          "footerTopY": 24,
-          "pendingTitleFrame": null,
-          "lastHapticReason": "none",
-          "screenFrame": {
-            "y": 0,
-            "x": 0,
-            "width": 1512,
-            "height": 982
-          },
-          "displayMode": "builtin",
-          "hovered": true,
-          "optionButtonFrames": [],
-          "trackingAreaCount": 1,
-          "lastNativeCommand": "",
-          "actualVisibleViewportTop": 0,
-          "hoverSessionToken": 0,
-          "openButtonTitle": "Open in PreBase",
-          "pinButtonFrame": null,
-          "pinned": false,
-          "panelTopY": 982,
-          "accessibilityLabel": "Working",
+          "renderedPendingMessage": "",
           "animationCount": 202,
           "pendingKind": "",
-          "pendingMessageBottom": 0,
-          "metricsLabel": "",
-          "approveButtonFrame": null,
+          "activePresentationState": "peek",
+          "keyWindow": false,
+          "actualVisibleViewportTop": 0,
+          "safeAreaTop": 32,
+          "denyButtonAlpha": 1,
+          "openButtonTitle": "Open in PreBase",
+          "actualVisibleViewportBottom": 24,
+          "trackingAreaCount": 1,
+          "denyButtonFrame": null,
+          "contentSafeViewport": {
+            "y": 4,
+            "x": 22,
+            "width": 269,
+            "height": 20
+          },
+          "peekContainerVisible": true,
           "notchGeometry": {
             "trailingX": 848,
             "centerX": 755.5,
@@ -558,17 +560,24 @@
             "leadingX": 663,
             "height": 34
           },
-          "pendingTitle": "",
-          "pinButtonTitle": "Pin panel",
-          "geometryTransitionCount": 203,
-          "transitionInFlight": false,
-          "approveButtonTitle": "Approve",
-          "openButtonFrame": null,
-          "actionInFlightTimeoutMs": 8000,
-          "actionRowIds": [],
+          "localMonitorInstalled": false,
           "backingScaleFactor": 2,
-          "pinnedInteractiveHeight": 0,
           "pendingMessageFrame": null,
+          "pendingMessage": "",
+          "bodyBounds": {
+            "y": 0,
+            "x": 0,
+            "width": 313,
+            "height": 32
+          },
+          "expanded": true,
+          "hovered": true,
+          "bandHeight": 34,
+          "activityFrame": null,
+          "transitionInFlight": false,
+          "metricsLabel": "",
+          "interactiveContentVisible": false,
+          "panelVisible": true,
           "silhouetteMetrics": {
             "opticalTopInset": 8,
             "topLeftX": 8,
@@ -582,132 +591,152 @@
             "nonDegenerateShoulder": true,
             "notchCenter": 156.5
           },
-          "exitGraceMs": 250,
-          "safeAreaTop": 32,
-          "contentPopulated": true,
-          "layerBacked": true,
-          "denyButtonAlpha": 1,
-          "bandHeight": 34,
-          "shapeAwareHitTesting": true,
-          "hapticCount": 0,
-          "questionButtonCount": 0,
-          "lastRenderedRevision": 406,
-          "peekOnly": true,
-          "interactionId": "",
-          "actualVisibleViewportBottom": 24,
-          "activityFrame": {
-            "y": 8,
-            "x": 22,
-            "width": 269,
-            "height": 15
-          },
-          "contentRefreshCount": 304,
-          "pathTopologyCompatible": true,
-          "denyButtonTitle": "Deny",
-          "localMonitorInstalled": false,
-          "headerFrame": null,
-          "retainedWorkScreen": false,
-          "expandedContentAlpha": 1,
-          "pathBounds": {
-            "y": 0,
-            "x": 0,
-            "width": 313,
-            "height": 66
-          },
-          "activeInputControl": "none",
-          "denyButtonAccessibilityLabel": "Deny",
-          "statusLabel": "Working",
-          "openInPreBaseVisible": false,
-          "globalMonitorInstalled": false,
-          "contentViewport": {
-            "y": 0,
-            "x": 0,
-            "width": 313,
-            "height": 24
-          },
-          "contentOnlyUpdateCount": 101,
-          "panelFrame": {
-            "y": 916,
-            "x": 599,
-            "width": 313,
-            "height": 66
-          },
-          "orderFrontCount": 1,
-          "auxiliaryTopRightArea": {
-            "y": 950,
-            "x": 848,
-            "width": 664,
-            "height": 32
-          },
-          "auxiliaryTopLeftArea": {
-            "y": 950,
-            "x": 0,
-            "width": 663,
-            "height": 32
-          },
-          "pinButtonVisible": false,
-          "denyButtonFrame": null,
-          "contentSafeViewport": {
-            "y": 4,
-            "x": 22,
-            "width": 269,
-            "height": 20
-          },
-          "notchDetected": true,
-          "actionFrames": [],
-          "revision": 406,
-          "screenLocalizedName": "Built-in Retina Display",
-          "pendingContentFullyVisible": true,
-          "targetPresentationState": "peek",
-          "transitionGeneration": 201,
-          "actionInFlight": false,
-          "requestedFrame": {
-            "y": 916,
-            "x": 599,
-            "width": 313,
-            "height": 66
-          },
-          "approveButtonAlpha": 1,
+          "lastHapticReason": "none",
+          "composerVisible": false,
+          "approveButtonTitle": "Approve",
           "statusBadgeFrame": null,
-          "panelVisible": true,
-          "hoverHapticCount": 0,
-          "windowNumber": 42075,
-          "topAnchorDelta": 0,
+          "questionButtonLabels": [],
+          "prebaseFullscreen": false,
+          "windowNumber": 43701,
+          "openButtonFrame": null,
+          "displayMode": "builtin",
+          "lastTransitionReason": "geometry",
+          "globalMonitorInstalled": false,
+          "hoverSessionToken": 0,
+          "approveButtonAlpha": 1,
+          "renderedPeekBody": "Validating Temporal layout recovery",
+          "revision": 406,
           "collapsedHit": {
             "y": 948,
             "x": 599,
             "width": 313,
             "height": 34
           },
-          "activityLabel": "Validating Temporal layout recovery",
-          "keyWindow": false,
-          "contentFooterGutter": 8,
-          "reservedFooterHeight": 8,
-          "approvalControlsVisible": false,
-          "latestShortMessage": "Fit View metrics look stable on the large fixture.",
-          "screenLocked": false,
-          "pendingMessage": "",
-          "panelCreated": true,
           "shapeMaskSynced": true,
-          "prebaseFullscreen": false,
-          "geometrySignature": "e=1;p=1;pin=0;att=0;kind=;opts=0;appr=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
-          "accessibilityRole": "AXGroup",
-          "renderedPendingMessage": "",
-          "contentScrollEnabled": false,
-          "latestMessageFrame": null,
+          "composerFrame": null,
+          "screenLocalizedName": "Built-in Retina Display",
           "pendingMessageFullyVisible": true,
-          "activePresentationState": "peek",
-          "screenTopY": 982,
-          "panelLevel": 2147483630,
-          "bodyBounds": {
+          "accessibilityRole": "AXGroup",
+          "expandedContainerVisible": false,
+          "panelFrame": {
+            "y": 916,
+            "x": 599,
+            "width": 313,
+            "height": 66
+          },
+          "peekOnly": true,
+          "pathBounds": {
             "y": 0,
             "x": 0,
             "width": 313,
+            "height": 66
+          },
+          "pinned": false,
+          "reservedFooterHeight": 8,
+          "panelCreated": true,
+          "hapticCount": 0,
+          "activityLabel": "Validating Temporal layout recovery",
+          "auxiliaryTopRightArea": {
+            "y": 950,
+            "x": 848,
+            "width": 664,
             "height": 32
           },
-          "expanded": true,
-          "composerFrame": null,
-          "userDismissedAttention": false
+          "actionFrames": [],
+          "auxiliaryTopLeftArea": {
+            "y": 950,
+            "x": 0,
+            "width": 663,
+            "height": 32
+          },
+          "actionInFlightTimeoutMs": 8000,
+          "exitGraceMs": 250,
+          "denyButtonAccessibilityLabel": "Deny",
+          "optionButtonFrames": [],
+          "hoverHapticCount": 0,
+          "screenFrame": {
+            "y": 0,
+            "x": 0,
+            "width": 1512,
+            "height": 982
+          },
+          "latestMessageFrame": null,
+          "renderedLatestMessage": "",
+          "latestShortMessage": "Fit View metrics look stable on the large fixture.",
+          "questionButtonCount": 0,
+          "topAnchorDelta": 0,
+          "pinnedInteractiveHeight": 0,
+          "lastNativeCommand": "",
+          "transitionGeneration": 201,
+          "requestedFrame": {
+            "y": 916,
+            "x": 599,
+            "width": 313,
+            "height": 66
+          },
+          "hoverDwellMs": 180,
+          "pendingMessageBottom": 0,
+          "contentScrollViewVisible": false,
+          "activeInputControl": "none",
+          "pendingTitle": "",
+          "userDismissedAttention": false,
+          "statusLabel": "Working",
+          "footerTopY": 24,
+          "actionInFlight": false,
+          "approvalControlsVisible": false,
+          "screenTopY": 982,
+          "geometrySignature": "e=1;p=1;pin=0;att=0;kind=;opts=0;appr=0;band=34.0;notch=1;h=185.0;lw=64.0;rw=64.0",
+          "approveDenyVisible": false,
+          "redrawCount": 203,
+          "shapeAwareHitTesting": true,
+          "questionContentHealthy": true,
+          "approveButtonFrame": null,
+          "layerBacked": true,
+          "accessibilityLabel": "Working",
+          "interactionId": "",
+          "orderFrontCount": 1,
+          "panelTopY": 982,
+          "pinButtonFrame": null,
+          "pinButtonTitle": "Pin panel",
+          "optionButtonsVisible": false,
+          "approveButtonAccessibilityLabel": "Approve",
+          "lastRenderedRevision": 406,
+          "contentScrollEnabled": false,
+          "contentPopulated": true,
+          "screenLocked": false,
+          "targetPresentationState": "peek",
+          "contentFooterGutter": 8,
+          "panelLevel": 2147483630,
+          "expandedContentAlpha": 0,
+          "denyButtonTitle": "Deny",
+          "compactContainerVisible": true,
+          "actionRowIds": [],
+          "expandedContainerAlpha": 0,
+          "peekLabelFrame": {
+            "y": 8,
+            "x": 26,
+            "width": 261,
+            "height": 16
+          },
+          "contentRefreshCount": 304,
+          "pendingTitleFrame": null,
+          "geometryTransitionCount": 203,
+          "peekContainerAlpha": 1,
+          "peekLabelVisible": true,
+          "pinButtonVisible": false,
+          "headerFrame": null,
+          "contentOnlyUpdateCount": 101,
+          "contentViewport": {
+            "y": 0,
+            "x": 0,
+            "width": 313,
+            "height": 24
+          },
+          "pathTopologyCompatible": true,
+          "openInPreBaseVisible": false,
+          "pendingContentFullyVisible": true,
+          "retainedWorkScreen": false,
+          "notchDetected": true
         }
       }
     },
@@ -778,12 +807,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -352,
-        "heapUsedMb": 6.11,
-        "rssDiffKb": 46416,
-        "rssMb": 117.25,
-        "cpuDeltaUserMs": 1211433,
-        "cpuDeltaSystemMs": 218692
+        "heapDiffKb": -379,
+        "heapUsedMb": 6.12,
+        "rssDiffKb": 25264,
+        "rssMb": 96.41,
+        "cpuDeltaUserMs": 1384116,
+        "cpuDeltaSystemMs": 286697
       }
     },
     {
@@ -867,7 +896,14 @@
             "x": 599,
             "y": 948,
             "width": 313,
-            "height": 34
+            "height": 34,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 948,
+              "width": 313,
+              "height": 34
+            }
           },
           "geometryTransitionCount": 1,
           "contentOnlyUpdateCount": 1,
@@ -894,7 +930,14 @@
             "x": 599,
             "y": 948,
             "width": 313,
-            "height": 34
+            "height": 34,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 948,
+              "width": 313,
+              "height": 34
+            }
           },
           "lastRenderedRevision": 1100,
           "revision": 1100,
@@ -920,7 +963,14 @@
             "x": 599,
             "y": 948,
             "width": 313,
-            "height": 34
+            "height": 34,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 948,
+              "width": 313,
+              "height": 34
+            }
           },
           "lastRenderedRevision": 1260,
           "revision": 1260,
@@ -952,9 +1002,16 @@
           "targetPresentationState": "peek",
           "frame": {
             "x": 599,
-            "y": 916,
+            "y": 947,
             "width": 313,
-            "height": 66
+            "height": 35,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 916,
+              "width": 313,
+              "height": 66
+            }
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 1,
@@ -976,7 +1033,14 @@
             "x": 599,
             "y": 916,
             "width": 313,
-            "height": 66
+            "height": 66,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 916,
+              "width": 313,
+              "height": 66
+            }
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
@@ -998,7 +1062,14 @@
             "x": 599,
             "y": 916,
             "width": 313,
-            "height": 66
+            "height": 66,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 916,
+              "width": 313,
+              "height": 66
+            }
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
@@ -1018,9 +1089,16 @@
             "targetPresentationState": "interactive",
             "frame": {
               "x": 599,
-              "y": 836,
+              "y": 915,
               "width": 313,
-              "height": 146
+              "height": 67,
+              "isActual": true,
+              "requested": {
+                "x": 599,
+                "y": 836,
+                "width": 313,
+                "height": 146
+              }
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 13,
@@ -1041,7 +1119,14 @@
               "x": 599,
               "y": 836,
               "width": 313,
-              "height": 146
+              "height": 146,
+              "isActual": true,
+              "requested": {
+                "x": 599,
+                "y": 836,
+                "width": 313,
+                "height": 146
+              }
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 43,
@@ -1073,7 +1158,14 @@
             "x": 599,
             "y": 916,
             "width": 313,
-            "height": 66
+            "height": 66,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 916,
+              "width": 313,
+              "height": 66
+            }
           }
         },
         "after": {
@@ -1088,7 +1180,14 @@
             "x": 599,
             "y": 916,
             "width": 313,
-            "height": 66
+            "height": 66,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 916,
+              "width": 313,
+              "height": 66
+            }
           },
           "lastApplied": {
             "revision": 2100,
@@ -1110,7 +1209,14 @@
             "x": 599,
             "y": 836,
             "width": 313,
-            "height": 146
+            "height": 146,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 836,
+              "width": 313,
+              "height": 146
+            }
           }
         },
         "after": {
@@ -1121,7 +1227,14 @@
             "x": 599,
             "y": 836,
             "width": 313,
-            "height": 146
+            "height": 146,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 836,
+              "width": 313,
+              "height": 146
+            }
           },
           "lastApplied": {
             "revision": 3120,
@@ -1143,7 +1256,14 @@
             "x": 599,
             "y": 836,
             "width": 313,
-            "height": 146
+            "height": 146,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 836,
+              "width": 313,
+              "height": 146
+            }
           }
         },
         "after": {
@@ -1156,7 +1276,14 @@
             "x": 599,
             "y": 836,
             "width": 313,
-            "height": 146
+            "height": 146,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 836,
+              "width": 313,
+              "height": 146
+            }
           },
           "lastApplied": {
             "revision": 4100,
@@ -1230,7 +1357,14 @@
             "x": 599,
             "y": 916,
             "width": 313,
-            "height": 66
+            "height": 66,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 916,
+              "width": 313,
+              "height": 66
+            }
           }
         }
       }
@@ -1250,7 +1384,14 @@
             "x": 599,
             "y": 948,
             "width": 313,
-            "height": 34
+            "height": 34,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 948,
+              "width": 313,
+              "height": 34
+            }
           },
           "geometryTransitionCount": 1,
           "contentOnlyUpdateCount": 1,
@@ -1332,7 +1473,14 @@
             "x": 599,
             "y": 836,
             "width": 313,
-            "height": 146
+            "height": 146,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 836,
+              "width": 313,
+              "height": 146
+            }
           },
           "transitionGeneration": 1
         },
@@ -1444,16 +1592,30 @@
             "x": 599,
             "y": 948,
             "width": 313,
-            "height": 34
+            "height": 34,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 948,
+              "width": 313,
+              "height": 34
+            }
           }
         },
         "peek": {
           "state": "peek",
           "frame": {
             "x": 599,
-            "y": 916,
+            "y": 947,
             "width": 313,
-            "height": 66
+            "height": 35,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 916,
+              "width": 313,
+              "height": 66
+            }
           },
           "peekOnly": true
         },
@@ -1461,9 +1623,16 @@
           "state": "interactive",
           "frame": {
             "x": 599,
-            "y": 836,
+            "y": 946,
             "width": 313,
-            "height": 146
+            "height": 36,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 836,
+              "width": 313,
+              "height": 146
+            }
           }
         },
         "pinned": {
@@ -1471,9 +1640,16 @@
           "pinned": true,
           "frame": {
             "x": 599,
-            "y": 836,
+            "y": 881,
             "width": 313,
-            "height": 146
+            "height": 101,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 836,
+              "width": 313,
+              "height": 146
+            }
           }
         },
         "attentionPeek": {
@@ -1482,7 +1658,14 @@
             "x": 599,
             "y": 916,
             "width": 313,
-            "height": 66
+            "height": 66,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 916,
+              "width": 313,
+              "height": 66
+            }
           }
         },
         "attentionCompact": {
@@ -1490,9 +1673,16 @@
           "userDismissedAttention": true,
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 916,
             "width": 313,
-            "height": 34
+            "height": 66,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 948,
+              "width": 313,
+              "height": 34
+            }
           }
         },
         "completed": {
@@ -1501,7 +1691,14 @@
             "x": 599,
             "y": 948,
             "width": 313,
-            "height": 34
+            "height": 34,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 948,
+              "width": 313,
+              "height": 34
+            }
           }
         },
         "failed": {
@@ -1510,7 +1707,14 @@
             "x": 599,
             "y": 948,
             "width": 313,
-            "height": 34
+            "height": 34,
+            "isActual": true,
+            "requested": {
+              "x": 599,
+              "y": 948,
+              "width": 313,
+              "height": 34
+            }
           }
         }
       }
@@ -1521,7 +1725,7 @@
       "details": {
         "heights": {
           "empty": {
-            "height": 128,
+            "height": 36,
             "containment": {
               "ok": true,
               "frameCount": 5,
@@ -1606,7 +1810,7 @@
             "questionButtonCount": 0
           },
           "long-pending": {
-            "height": 192,
+            "height": 129,
             "containment": {
               "ok": true,
               "frameCount": 9,
@@ -1623,7 +1827,7 @@
             "questionButtonCount": 0
           },
           "long-options": {
-            "height": 192,
+            "height": 130,
             "containment": {
               "ok": true,
               "frameCount": 10,
@@ -1846,7 +2050,14 @@
           "x": 599,
           "y": 853,
           "width": 313,
-          "height": 129
+          "height": 129,
+          "isActual": true,
+          "requested": {
+            "x": 599,
+            "y": 853,
+            "width": 313,
+            "height": 129
+          }
         }
       }
     },
@@ -2019,12 +2230,16 @@
             "width": 313,
             "height": 66
           },
-          "activityFrame": {
+          "peekLabelFrame": {
             "y": 8,
-            "x": 22,
-            "width": 269,
-            "height": 15
+            "x": 26,
+            "width": 261,
+            "height": 16
           },
+          "activityFrame": null,
+          "peekContainerVisible": true,
+          "expandedContainerVisible": false,
+          "interactiveContentVisible": false,
           "transitionInFlight": false
         }
       }

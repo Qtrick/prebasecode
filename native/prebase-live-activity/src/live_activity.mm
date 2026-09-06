@@ -11,7 +11,7 @@ static const CGFloat kWingWidthMin = 52;
 static const CGFloat kStableCompactLeftWing = 64;
 static const CGFloat kStableCompactRightWing = 64;
 static const CGFloat kPillWidth = 228;
-static const CGFloat kPillHeight = 30;
+static const CGFloat kPillHeight = 34;
 static const CGFloat kNotchMinSafeTop = 8;
 static const CGFloat kNotchMinAuxWidth = 40;
 static const CGFloat kCameraHousingMin = 24;
@@ -315,6 +315,7 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	CGFloat notchLeft = (totalW - housingW) * 0.5;
 	CGFloat notchRight = notchLeft + housingW;
+	CGFloat notchCenter = (notchLeft + notchRight) * 0.5;
 	SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(totalW, depth, leftW, rightW, housingW, isExpanded);
 	CGFloat wingLeftX = shoulder.wingLeftX;
 	CGFloat wingRightX = shoulder.wingRightX;
@@ -326,16 +327,16 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	// 1. Line across top of left wing to notch start (notchLeft, 0)
 	CGPathAddLineToPoint(path, NULL, notchLeft, 0);
 
-	// 2. Line down into camera housing cutout (notchLeft, bandH)
-	CGPathAddLineToPoint(path, NULL, notchLeft, bandH);
+	// 2. Continuous solid notch span: center anchor (notchCenter, 0)
+	CGPathAddLineToPoint(path, NULL, notchCenter, 0);
 
-	// 3. Line across bottom of camera housing cutout (notchRight, bandH)
-	CGPathAddLineToPoint(path, NULL, notchRight, bandH);
-
-	// 4. Line up from camera housing cutout to notch end (notchRight, 0)
+	// 3. Continuous solid notch span: right anchor (notchRight, 0)
 	CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-	// 5. Line across top of right wing to right wing end (wingRightX, 0)
+	// 4. Line across top of right wing to right wing end (wingRightX, 0)
+	CGPathAddLineToPoint(path, NULL, wingRightX, 0);
+
+	// 5. Right wing end anchor (wingRightX, 0)
 	CGPathAddLineToPoint(path, NULL, wingRightX, 0);
 
 	CGFloat flareR = MAX(0.0, totalW - wingRightX);
@@ -396,6 +397,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, strong) CAShapeLayer *shapeLayer;
 @property (nonatomic, strong) CAShapeLayer *shapeMaskLayer;
 @property (nonatomic, strong) NSView *compactContainer;
+@property (nonatomic, strong) NSView *peekContainer;
+@property (nonatomic, strong) NSTextField *peekLabel;
 @property (nonatomic, strong) NSView *expandedContainer;
 @property (nonatomic, strong) NSScrollView *contentScrollView;
 @property (nonatomic, strong) NSView *contentDocumentView;
@@ -584,6 +587,17 @@ static NSString *JSString(Napi::Value value) {
 		_rightMetricsLabel = [self makeLabel:10.5 weight:NSFontWeightRegular color:[NSColor colorWithCalibratedWhite:0.75 alpha:1.0]];
 		_rightMetricsLabel.font = [NSFont monospacedDigitSystemFontOfSize:10.5 weight:NSFontWeightRegular];
 		[_compactContainer addSubview:_rightMetricsLabel];
+
+		_peekContainer = [[PrebaseFlippedView alloc] initWithFrame:self.bounds];
+		_peekContainer.wantsLayer = YES;
+		_peekContainer.layer.masksToBounds = YES;
+		_peekContainer.alphaValue = 0.0;
+		_peekContainer.hidden = YES;
+		[self addSubview:_peekContainer];
+
+		_peekLabel = [self makeLabel:11.5 weight:NSFontWeightMedium color:[NSColor colorWithCalibratedWhite:0.94 alpha:1.0]];
+		[self configureLabel:_peekLabel lines:1 truncating:YES];
+		[_peekContainer addSubview:_peekLabel];
 
 		_expandedContainer = [[PrebaseFlippedView alloc] initWithFrame:self.bounds];
 		_expandedContainer.wantsLayer = YES;
@@ -904,18 +918,24 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
 
 	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
+	self.peekContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 
 	// Compact state: only collapsed wing chrome
 	if (!isExpanded) {
 		self.contentScrollView.hidden = YES;
+		self.peekContainer.hidden = YES;
+		self.peekLabel.hidden = YES;
+		self.expandedContainer.hidden = YES;
 		[self layoutCompactWingChrome:bandH totalW:totalW leftW:leftW rightW:rightW housing:housing];
 		return;
 	}
 
-	// Attention Peek / Peek: keeps compact wings and shows one glanceable activity/pending line
+	// Attention Peek / Peek: keeps compact wings and shows one glanceable activity/pending line in peekContainer
 	if (self.peekOnly) {
 		self.contentScrollView.hidden = YES;
+		self.expandedContainer.hidden = YES;
+		self.peekContainer.hidden = NO;
 		[self layoutCompactWingChrome:bandH totalW:totalW leftW:leftW rightW:rightW housing:housing];
 		self.headerTitle.hidden = YES;
 		self.statusBadge.hidden = YES;
@@ -926,6 +946,7 @@ static NSString *JSString(Napi::Value value) {
 		self.pendingInteractionMessage.hidden = YES;
 		self.expandedMetricsLabel.hidden = YES;
 		self.latestMessageLabel.hidden = YES;
+		self.activityDescription.hidden = YES;
 		NSString *peekBody = nil;
 		if (self.pendingTitle.length) {
 			// Peek is glanceable — prefer a short intentional line when the title is long.
@@ -942,26 +963,26 @@ static NSString *JSString(Napi::Value value) {
 			peekBody = self.latestMessage;
 		}
 		if (peekBody.length) {
-			[self configureLabel:self.activityDescription lines:2 truncating:NO];
-			self.activityDescription.stringValue = peekBody;
-			self.activityDescription.hidden = NO;
-			CGFloat peekInset = ContentSafeInsetX(self.notched);
+			// configureLabel:self.activityDescription lines:2 (used for peek measurement)
+			self.peekLabel.stringValue = peekBody;
+			self.peekLabel.hidden = NO;
+			CGFloat peekInset = ContentSafeInsetX(self.notched) + 4;
 			CGFloat peekW = MAX(40, totalW - peekInset * 2);
-			CGFloat peekH = MeasureTextHeight(peekBody, self.activityDescription.font, peekW, 2);
 			CGFloat bodyH = MAX(0, currentH - bandH);
-			CGFloat textY = MAX(kContentInsetTop, floor((bodyH - peekH) / 2.0));
-			self.activityDescription.frame = NSMakeRect(peekInset, textY, peekW, MIN(peekH, MAX(14, bodyH - textY - 2)));
-			// Peek body lives on expandedContainer (not scroll) for density.
-			if (self.activityDescription.superview != self.expandedContainer) {
-				[self.expandedContainer addSubview:self.activityDescription];
-			}
+			CGFloat labelH = 16;
+			CGFloat textY = MAX(4, floor((bodyH - labelH) / 2.0));
+			self.peekLabel.frame = NSMakeRect(peekInset, textY, peekW, labelH);
+			self.activityDescription.stringValue = peekBody;
 		} else {
-			self.activityDescription.hidden = YES;
+			self.peekLabel.hidden = YES;
 		}
 		return;
 	}
 
 	// Interactive: HEADER → scrollable CONTENT → (controls laid out separately in footer)
+	self.peekContainer.hidden = YES;
+	self.peekLabel.hidden = YES;
+	self.expandedContainer.hidden = NO;
 	self.headerTitle.hidden = NO;
 	self.statusBadge.hidden = NO;
 	self.contentScrollView.hidden = NO;
@@ -1089,13 +1110,30 @@ static NSString *JSString(Napi::Value value) {
 	// Stage content into the *target* silhouette before morphing so expansion never
 	// reveals an empty black panel while bounds are still collapsed.
 	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
+	self.peekContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 	if (self.controller) {
 		self.reservedFooterHeight = [self.controller computeControlsStackHeight] + kContentFooterGutter;
 	}
 	if (isExpanded) {
-		self.expandedContainer.hidden = NO;
-		self.expandedContainer.alphaValue = 1.0; // populated first paint — no blank fade-in
+		if (self.peekOnly) {
+			self.expandedContainer.hidden = YES;
+			self.expandedContainer.alphaValue = 0.0;
+			self.peekContainer.hidden = NO;
+			self.peekContainer.alphaValue = 1.0;
+		} else {
+			self.peekContainer.hidden = YES;
+			self.peekContainer.alphaValue = 0.0;
+			self.expandedContainer.hidden = NO;
+			self.expandedContainer.alphaValue = 1.0; // populated first paint — no blank fade-in
+		}
+	} else {
+		self.expandedContainer.hidden = YES;
+		self.expandedContainer.alphaValue = 0.0;
+		self.peekContainer.hidden = YES;
+		self.peekContainer.alphaValue = 0.0;
+		self.compactContainer.hidden = NO;
+		self.compactContainer.alphaValue = 1.0;
 	}
 	[self refreshContentSubviewsPreservingPresentationWithSize:NSMakeSize(totalW, currentH)];
 
@@ -1194,6 +1232,28 @@ static NSString *JSString(Napi::Value value) {
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
 				ctx.duration = duration * 0.55;
 				self.expandedContainer.animator.alphaValue = 0.0;
+				self.peekContainer.animator.alphaValue = 0.0;
+				self.compactContainer.animator.alphaValue = 1.0;
+			} completionHandler:^{
+				self.expandedContainer.hidden = YES;
+				self.peekContainer.hidden = YES;
+			}];
+		} else {
+			self.expandedContainer.alphaValue = 0.0;
+			self.expandedContainer.hidden = YES;
+			self.peekContainer.alphaValue = 0.0;
+			self.peekContainer.hidden = YES;
+			self.compactContainer.alphaValue = 1.0;
+			self.compactContainer.hidden = NO;
+		}
+	} else if (self.peekOnly) {
+		self.compactContainer.hidden = NO;
+		self.peekContainer.hidden = NO;
+		if (animated && !self.reducedMotion) {
+			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
+				ctx.duration = duration * 0.55;
+				self.expandedContainer.animator.alphaValue = 0.0;
+				self.peekContainer.animator.alphaValue = 1.0;
 				self.compactContainer.animator.alphaValue = 1.0;
 			} completionHandler:^{
 				self.expandedContainer.hidden = YES;
@@ -1201,19 +1261,29 @@ static NSString *JSString(Napi::Value value) {
 		} else {
 			self.expandedContainer.alphaValue = 0.0;
 			self.expandedContainer.hidden = YES;
+			self.peekContainer.alphaValue = 1.0;
+			self.peekContainer.hidden = NO;
 			self.compactContainer.alphaValue = 1.0;
 			self.compactContainer.hidden = NO;
 		}
 	} else {
-		BOOL keepCompactWings = self.peekOnly;
 		self.compactContainer.hidden = NO;
+		self.expandedContainer.hidden = NO;
 		if (animated && !self.reducedMotion) {
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
 				ctx.duration = duration * 0.45;
-				self.compactContainer.animator.alphaValue = keepCompactWings ? 1.0 : 0.0;
+				self.compactContainer.animator.alphaValue = 0.0;
+				self.peekContainer.animator.alphaValue = 0.0;
+				self.expandedContainer.animator.alphaValue = 1.0;
+			} completionHandler:^{
+				self.peekContainer.hidden = YES;
 			}];
 		} else {
-			self.compactContainer.alphaValue = keepCompactWings ? 1.0 : 0.0;
+			self.compactContainer.alphaValue = 0.0;
+			self.peekContainer.alphaValue = 0.0;
+			self.peekContainer.hidden = YES;
+			self.expandedContainer.alphaValue = 1.0;
+			self.expandedContainer.hidden = NO;
 		}
 	}
 }
@@ -2549,10 +2619,19 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"interactionId"] = self.interactionId ?: @"";
 	dict[@"renderedLatestMessage"] = self.content.latestMessageLabel.hidden ? @"" : (self.content.latestMessageLabel.stringValue ?: @"");
 	dict[@"renderedPendingMessage"] = self.content.pendingInteractionMessage.hidden ? @"" : (self.content.pendingInteractionMessage.stringValue ?: @"");
-	// Peek body is painted into activityDescription while pendingInteractionMessage stays hidden.
-	dict[@"renderedPeekBody"] = (self.content.peekOnly && !self.content.activityDescription.hidden)
-		? (self.content.activityDescription.stringValue ?: @"")
+	// Peek body is painted into peekLabel while expandedContainer stays hidden.
+	dict[@"renderedPeekBody"] = (self.content.peekOnly && !self.content.peekLabel.hidden)
+		? (self.content.peekLabel.stringValue ?: @"")
 		: @"";
+	dict[@"peekOnly"] = @(self.content.peekOnly);
+	dict[@"compactContainerVisible"] = @(!self.content.compactContainer.hidden);
+	dict[@"peekContainerVisible"] = @(!self.content.peekContainer.hidden);
+	dict[@"peekContainerAlpha"] = @(self.content.peekContainer.alphaValue);
+	dict[@"expandedContainerVisible"] = @(!self.content.expandedContainer.hidden);
+	dict[@"expandedContainerAlpha"] = @(self.content.expandedContainer.alphaValue);
+	dict[@"interactiveContentVisible"] = @(!self.content.expandedContainer.hidden && !self.content.peekOnly);
+	dict[@"contentScrollViewVisible"] = @(self.content.contentScrollView != nil && !self.content.contentScrollView.hidden);
+	dict[@"composerVisible"] = @(!self.input.hidden);
 	dict[@"screenLocked"] = @(self.screenLocked);
 	dict[@"approvalControlsVisible"] = @(!self.approveButton.hidden);
 	dict[@"openInPreBaseVisible"] = @(!self.openButton.hidden);
@@ -2744,6 +2823,10 @@ static NSString *JSString(Napi::Value value) {
 	}
 	dict[@"questionButtonCount"] = @(visibleOptions);
 	dict[@"questionButtonLabels"] = optLabels;
+	dict[@"optionButtonsVisible"] = @(visibleOptions > 0);
+	dict[@"approveDenyVisible"] = @(!self.approveButton.hidden || !self.denyButton.hidden);
+	dict[@"peekLabelVisible"] = @(!self.content.peekLabel.hidden);
+	dict[@"peekLabelFrame"] = self.content.peekLabel.hidden ? [NSNull null] : RectDict(self.content.peekLabel.frame);
 	dict[@"accessibilityRole"] = self.content.accessibilityRole ?: @"";
 	dict[@"accessibilityLabel"] = self.content.accessibilityLabel ?: @"";
 	dict[@"lastNativeCommand"] = self.lastNativeCommand ?: @"";

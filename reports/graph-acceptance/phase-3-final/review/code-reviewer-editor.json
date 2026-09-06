@@ -1,68 +1,50 @@
 {
   "phase": "3-final",
   "role": "code-reviewer-editor",
-  "generatedAt": "2026-09-04T23:59:00-04:00",
+  "generatedAt": "2026-09-06T15:25:00-04:00",
   "iconsEdited": false,
   "gitMutatingCommands": false,
   "productionEdited": true,
   "findingsFixed": [
     {
       "file": "native/prebase-live-activity/src/live_activity.mm",
-      "rootCause": "CreateNotchedIslandPath used vertical tangents for Curve 6 and Curve 12 at y=0 (x = wingRightX, wingLeftX), creating abrupt 90-degree kinks at the top shoulders.",
-      "impact": "Top shoulders of expanded notch appeared visibly sharp and rectangular rather than seamlessly curving out from the MacBook notch housing.",
-      "change": "Constructed C1 continuous cubic Bezier fillets with horizontal tangency at (wingRightX, 0) and vertical tangency at (totalW, shoulderBottomY) for Curve 6, and symmetrical horizontal/vertical tangency for Curve 12 while preserving invariant 14-element path topology."
+      "rootCause": "CreateNotchedIslandPath carved out a rectangular camera housing void down to bandH along y=0 ((notchLeft, 0) -> (notchLeft, bandH) -> (notchRight, bandH) -> (notchRight, 0)), leaving an empty hole showing the desktop wallpaper and sharp 90-degree corners.",
+      "impact": "The notch appeared as a disconnected rectangular cutout with sharp edges and wallpaper visible through the camera housing, rather than a seamless MacBook notch shape.",
+      "change": "Constructed solid, continuous jet-black geometry along y=0 ((notchLeft, 0) -> (notchCenter, 0) -> (notchRight, 0) -> (wingRightX, 0)), filling the empty void and removing sharp 90-degree corners while preserving the invariant 14-element path topology for CAShapeLayer morphing."
     },
     {
       "file": "native/prebase-live-activity/src/live_activity.mm",
-      "rootCause": "updateShapeAndContentAnimated used calibratedWhite 0.02 for attention state while using 0.0 for normal state.",
-      "impact": "The attention and approval states had a visibly dark gray fill that clashed with the jet-black physical MacBook camera housing.",
-      "change": "Enforced true black calibratedWhite 0.0 alpha 1.0 unconditionally across all states (normal, working, attention, approval, question, in-flight)."
+      "rootCause": "updateShapeAndContentAnimated and refreshContentSubviewsPreservingPresentationWithSize treated attention peek as expanded geometry and set expandedContainer.alphaValue = 1.0 with cramped body height 32pt. Bottom 18pt rounded corner clipping mask cut through activityDescription and leaked text/bullet fragments.",
+      "impact": "magnus-live-activity-peek.png and user desktop screenshots had partial white glyph fragments and separators bleeding out of the bottom curve during peek.",
+      "change": "Partitioned presentation subtrees: introduced dedicated peekContainer with centered peekLabel (y=8, h=16, safe inset 26pt). During peekOnly, expandedContainer is strictly hidden (hidden=YES, alpha=0.0) while peekContainer is visible (hidden=NO, alpha=1.0). Interactive scroll view, options, approve/deny, and composer are completely excluded from painting."
     },
     {
       "file": "native/prebase-live-activity/src/live_activity.mm",
-      "rootCause": "ContentSafeInsetX applied a Y-dependent flare computation based on distance from top and bottom corners.",
-      "impact": "Header, pending message, activity, action rows, and footer controls had differing left margins (30pt, 25pt, 22pt, 27pt), creating an unsightly jagged alignment staircase.",
-      "change": "Standardized ContentSafeInsetX to a constant 22pt safe inset across all body rows, creating a unified horizontal content grid."
+      "rootCause": "diagnosticsDict lacked presentation-state visibility booleans, preventing the test harness from catching subtree bleed during peek.",
+      "impact": "False-green acceptance when peekOnly was true but expandedContainer was still painted.",
+      "change": "Exposed semantic booleans: compactContainerVisible, peekContainerVisible, expandedContainerVisible, interactiveContentVisible, contentScrollViewVisible, composerVisible, optionButtonsVisible, approveDenyVisible, and peekLabelFrame."
     },
     {
-      "file": "native/prebase-live-activity/src/live_activity.mm",
-      "rootCause": "computeControlsStackHeight added kContentFooterGutter (10pt) internally, and callers (refreshContentSubviewsPreservingPresentationWithSize, updateShapeAndContentAnimated, layoutForScreen) added kContentFooterGutter again.",
-      "impact": "Footer reserve inflated by 24pt, crushing available scroll height to 19pt for question states and causing test39 to skip.",
-      "change": "Cleaned up computeControlsStackHeight to measure physical controls height only; callers add kContentFooterGutter once. Available scroll viewport expanded to >= 33pt."
-    },
-    {
-      "file": "native/prebase-live-activity/src/live_activity.mm",
-      "rootCause": "layoutControls used MIN(slotW, MAX(56, intrinsic)) for question option button widths in 2-column mode.",
-      "impact": "Options with different text lengths had mismatched widths (e.g. 90.8pt vs 61.2pt), creating an asymmetrical, ragged grid.",
-      "change": "Enforced equal column width colW = floor((usableW - gap) / 2.0) across all options in each row for 2-column grids."
-    },
-    {
-      "file": "native/prebase-live-activity/src/live_activity.mm",
-      "rootCause": "layoutCompactWingChrome used an 11pt semibold font within a 46pt frame in the left wing.",
-      "impact": "The word 'Question' truncated to 'Ques...' in compact and attention-peek presentations.",
-      "change": "Adjusted font to 10.5pt semibold and widened frame to 54pt (8pt margin), allowing 'Question' (46.5pt text width) and 'Approve' to fit completely with no truncation."
-    },
-    {
-      "file": "native/prebase-live-activity/src/live_activity.mm",
-      "rootCause": "diagnosticsDict populated contentRefreshCount with contentOnlyUpdateCount, which masked distinct view redraw operations and lacked native window identification.",
-      "impact": "Redundant/misleading diagnostics and lack of windowNumber hindered targeted window screenshot capture.",
-      "change": "Added independent contentRefreshCount incremented on each subview paint, and exposed windowNumber and backingScaleFactor in diagnosticsDict."
+      "file": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+      "rootCause": "captureFrame helper prioritized requestedFrame over actual panelFrame.",
+      "impact": "Mid-animation panel frames were masked because requestedFrame was returned instead of actual NSPanel geometry.",
+      "change": "Made actual panelFrame authoritative in captureFrame, verified settlement to requestedFrame within tolerance, and adjusted test settle times to match physical animation durations."
     },
     {
       "file": "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs",
-      "rootCause": "captureNativePanelScreenshot did not utilize native windowNumber and fell back to full-display screenshots marked captured: true.",
-      "impact": "False-green visual acceptance where entire desktop screenshots were accepted as panel captures.",
-      "change": "Integrated screencapture -l <windowNumber> -o -x for exact NSPanel window capture, added readPngDimensions to inspect PNG IHDR header, and explicitly rejected full-desktop captures as panel captures."
+      "rootCause": "Harness only captured isolated panel screenshots and did not validate desktop context or assert interactive subtree exclusion during peek.",
+      "impact": "Failed to catch notch housing detachment, wallpaper bleed, and partial glyph leakage in desktop context.",
+      "change": "Implemented captureDesktopContextScreenshot centered on the physical notch, verified both isolated panel and desktop-context captures for all visual fixtures, and added strict gates failing attentionPeek if any interactive subviews are visible."
     }
   ],
   "findingsRejected": [
     {
-      "topic": "Allowing question options tests to skip when viewport is shallow",
-      "why": "Explicitly rejected per task requirement. A shallow viewport indicates a product layout failure and must fail the test."
+      "topic": "Switching to a fixed static window envelope (NotchKit style)",
+      "why": "Evaluated and rejected per Ponytail simplicity and macOS constraints: a static 480x240 envelope creates a transparent window that breaks screencapture -l (captures a giant transparent box), pollutes macOS Accessibility AXUIElement bounds, and complicates multi-display handling. Retaining the single animated NSPanel with isolated subtrees is vastly simpler and robust."
     },
     {
-      "topic": "Switching away from native AppKit NSPanel to a webview/HTML overlay",
-      "why": "Violates Ponytail simplicity and native macOS performance/security boundaries. The native AppKit panel provides 0% idle CPU and seamless integration with macOS window server."
+      "topic": "Windows/Linux live activity support",
+      "why": "Explicitly rejected per platform constraint: Magnus Dynamic Island is macOS-only (native AppKit). Cross-platform parity is out of scope."
     }
   ]
 }

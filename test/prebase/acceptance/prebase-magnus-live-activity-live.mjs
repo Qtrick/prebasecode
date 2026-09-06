@@ -129,6 +129,9 @@ export function liveActivityLiveFailures(evidence) {
 			if (!shot?.screenshot?.captured && shot?.screenshot?.reason !== 'screencapture-unavailable') {
 				failures.push(`visual fixture screenshot missing or failed: ${key}`);
 			}
+			if (!shot?.contextScreenshot?.captured && shot?.contextScreenshot?.reason !== 'screencapture-unavailable') {
+				failures.push(`visual fixture desktop context screenshot missing or failed: ${key}`);
+			}
 			if (shot?.seed && shot.seed.ok === false) {
 				failures.push(`visual fixture seed failed: ${key}`);
 			}
@@ -142,6 +145,29 @@ export function liveActivityLiveFailures(evidence) {
 					}
 					if (shot.native.pendingMessageFullyVisible === false) {
 						failures.push(`${key} visual fixture pendingMessageFullyVisible is false`);
+					}
+				}
+				if (key === 'attentionPeek') {
+					if (shot.native.peekContainerVisible === false) {
+						failures.push('visual fixture attentionPeek: peekContainerVisible must be true');
+					}
+					if (shot.native.expandedContainerVisible === true) {
+						failures.push('visual fixture attentionPeek: expandedContainerVisible must be false (no content bleed)');
+					}
+					if (shot.native.interactiveContentVisible === true) {
+						failures.push('visual fixture attentionPeek: interactiveContentVisible must be false');
+					}
+					if (shot.native.contentScrollViewVisible === true) {
+						failures.push('visual fixture attentionPeek: contentScrollViewVisible must be false');
+					}
+					if (shot.native.composerVisible === true) {
+						failures.push('visual fixture attentionPeek: composerVisible must be false');
+					}
+					if (shot.native.optionButtonsVisible === true) {
+						failures.push('visual fixture attentionPeek: optionButtonsVisible must be false');
+					}
+					if (shot.native.approveDenyVisible === true) {
+						failures.push('visual fixture attentionPeek: approveDenyVisible must be false');
 					}
 				}
 				if (shot.native.shapeMaskSynced === false) {
@@ -338,6 +364,41 @@ function captureNativePanelScreenshot(panelFrame, screenFrame, outPath, windowNu
 	};
 }
 
+function captureDesktopContextScreenshot(panelFrame, screenFrame, outPath) {
+	if (!panelFrame || !screenFrame || process.platform !== 'darwin') {
+		return { captured: false, isDesktopContext: false, reason: 'unsupported platform or missing geometry' };
+	}
+	const screenH = screenFrame.height || 1080;
+	const screenW = screenFrame.width || 1920;
+	// Capture a generous rectangle centered horizontally at the panel / screen top,
+	// spanning the physical notch, the entire Magnus surface, and surrounding workbench context.
+	const contextW = Math.min(screenW, Math.max(Math.round(panelFrame.width + 360), 800));
+	const contextH = Math.min(screenH, Math.max(Math.round(panelFrame.height + 200), 360));
+	const centerX = panelFrame.x + panelFrame.width / 2;
+	const captureX = Math.max(0, Math.round(centerX - contextW / 2));
+	const captureY = 0; // top of screen (at notch)
+	const rectArg = `-R${captureX},${captureY},${contextW},${contextH}`;
+	try {
+		execSync(`screencapture -x ${rectArg} "${outPath}"`, { timeout: 6000, stdio: 'pipe' });
+		const stat = statSync(outPath);
+		if (stat.size > 0 && isPngValid(outPath)) {
+			const dims = readPngDimensions(outPath);
+			return {
+				captured: true,
+				isDesktopContext: true,
+				format: 'png',
+				sizeBytes: stat.size,
+				dimensions: dims,
+				rect: { x: captureX, y: captureY, width: contextW, height: contextH },
+				outPath,
+			};
+		}
+	} catch (err) {
+		return { captured: false, isDesktopContext: false, error: String(err) };
+	}
+	return { captured: false, isDesktopContext: false, reason: 'capture-failed' };
+}
+
 async function run() {
 	const release = await acquirePhase3AcceptanceLock('magnus-live-activity');
 	mkdirSync(evidenceDir, { recursive: true });
@@ -501,6 +562,11 @@ async function run() {
 				interactiveNative.windowNumber,
 				interactiveNative.backingScaleFactor,
 			);
+			evidence.interactiveContextScreenshot = captureDesktopContextScreenshot(
+				interactiveNative.panelFrame,
+				interactiveNative.screenFrame,
+				join(screenshotDir, 'magnus-live-activity-interactive-context.png'),
+			);
 		}
 
 		// Reset to compact baseline so product-truth verifies fresh attention arrival into peek.
@@ -532,6 +598,11 @@ async function run() {
 				join(screenshotDir, 'magnus-live-activity-peek.png'),
 				peekNative.windowNumber,
 				peekNative.backingScaleFactor,
+			);
+			evidence.peekContextScreenshot = captureDesktopContextScreenshot(
+				peekNative.panelFrame,
+				peekNative.screenFrame,
+				join(screenshotDir, 'magnus-live-activity-peek-context.png'),
 			);
 		}
 
@@ -599,7 +670,10 @@ async function run() {
 			const screenshot = native?.panelFrame
 				? captureNativePanelScreenshot(native.panelFrame, native.screenFrame, join(screenshotDir, `${fileBase}.png`), native.windowNumber, native.backingScaleFactor)
 				: { captured: false, reason: 'no-panel-frame' };
-			return { seed, native, screenshot };
+			const contextScreenshot = native?.panelFrame
+				? captureDesktopContextScreenshot(native.panelFrame, native.screenFrame, join(screenshotDir, `${fileBase}-context.png`))
+				: { captured: false, reason: 'no-panel-frame' };
+			return { seed, native, screenshot, contextScreenshot };
 		}
 
 		function layoutContainmentOk(native) {
