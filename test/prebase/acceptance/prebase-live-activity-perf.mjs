@@ -6233,6 +6233,164 @@ async function run() {
 	}
 	results.tests.push(test66);
 
+	// Test 67: Visual Silhouette Curvature and Bezel Attachment
+	const test67 = { name: 'visual-silhouette-curvature-and-bezel-attachment', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(67_001, { status: 'working', currentActivity: 'Silhouette curvature verification' }));
+		await sleep(350);
+		await drainMain(native, 5);
+
+		const diag = native.getDiagnostics();
+		test67.details.diag = {
+			panelFrame: diag.panelFrame,
+			safeAreaTop: diag.safeAreaTop,
+			screenTopY: diag.screenTopY,
+			topAnchorDelta: diag.topAnchorDelta,
+			shoulderMetrics: diag.shoulderMetrics,
+			notched: diag.notched,
+		};
+
+		// 1. Must be bezel-attached: panelTopY == screenTopY
+		const panelTopY = diag.panelFrame.y + diag.panelFrame.height;
+		if (Math.abs(panelTopY - diag.screenTopY) > 1.0) {
+			throw new Error(`Expanded panel must be attached to top bezel: panelTopY=${panelTopY} vs screenTopY=${diag.screenTopY}`);
+		}
+
+		// 2. Topology invariance check
+		const topo = native.validatePathTopology({ isNotched: true });
+		if (!topo.compatible || topo.collapsedElements !== 14 || topo.expandedElements !== 14) {
+			throw new Error(`Notched topology must be 14 elements (got ${topo.collapsedElements}/${topo.expandedElements})`);
+		}
+
+		// 3. Shoulder curvature: effShoulderR must be >= 10.0 and <= 12.5 (smooth organic concave fillet)
+		const shoulder = diag.shoulderMetrics;
+		if (shoulder && (shoulder.effShoulderR < 10.0 || shoulder.effShoulderR > 12.5)) {
+			throw new Error(`effShoulderR (${shoulder.effShoulderR}) out of organic concave bounds [10.0, 12.5]`);
+		}
+	} catch (err) {
+		test67.ok = false;
+		test67.error = err.message;
+		results.failures.push(`visual-silhouette-curvature-and-bezel-attachment: ${err.message}`);
+	}
+	results.tests.push(test67);
+
+	// Test 68: Adversarial Word Wrap and Unbroken Containment
+	const test68 = { name: 'adversarial-word-wrap-and-unbroken-containment', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+
+		// Natural English prose with 7-10 letter words that should wrap naturally at word boundaries
+		const naturalProse = 'Validating natural sentence line breaking without splitting words awkwardly across boundaries.';
+		native.setSnapshot(contentSnapshot(68_001, {
+			status: 'working',
+			currentActivity: naturalProse,
+			latestShortMessage: 'Word wrapping conformance test running.'
+		}));
+		await sleep(300);
+		await drainMain(native, 4);
+
+		let diag = native.getDiagnostics();
+		test68.details.natural = {
+			activityFrame: diag.activityFrame,
+			activityLabel: diag.activityLabel,
+		};
+
+		// Adversarial 500+ character unbroken token (URL/hash/path)
+		const unbrokenToken = 'https://github.com/PreBase/prebase/commit/' + 'a'.repeat(240) + '/blob/main/' + 'b'.repeat(240) + '.ts';
+		native.setSnapshot(contentSnapshot(68_002, {
+			status: 'working',
+			currentActivity: unbrokenToken,
+			latestShortMessage: 'Unbroken token containment check.'
+		}));
+		await sleep(300);
+		await drainMain(native, 4);
+
+		diag = native.getDiagnostics();
+		test68.details.unbroken = {
+			activityFrame: diag.activityFrame,
+			panelFrame: diag.panelFrame,
+		};
+
+		// Verify unbroken token is contained within panel width - 18pt safe margin
+		if (diag.activityFrame) {
+			const rightEdge = diag.activityFrame.x + diag.activityFrame.width;
+			if (rightEdge > diag.panelFrame.width - 18) {
+				throw new Error(`Unbroken token right edge (${rightEdge}) escaped panel boundary (${diag.panelFrame.width - 18})`);
+			}
+			if (diag.activityFrame.x < 18) {
+				throw new Error(`Unbroken token left edge (${diag.activityFrame.x}) encroached left margin (<18)`);
+			}
+		}
+	} catch (err) {
+		test68.ok = false;
+		test68.error = err.message;
+		results.failures.push(`adversarial-word-wrap-and-unbroken-containment: ${err.message}`);
+	}
+	results.tests.push(test68);
+
+	// Test 69: Working State Hierarchy and Empty Space Budget
+	const test69 = { name: 'working-state-hierarchy-and-empty-space-budget', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+
+		// Short working state: single-line activity, no action rows
+		native.setSnapshot(contentSnapshot(69_001, {
+			status: 'working',
+			currentActivity: 'Running graph interaction tests',
+			recentActions: [],
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+
+		let diag = native.getDiagnostics();
+		test69.details.shortWorking = {
+			panelFrame: diag.panelFrame,
+			activityFrame: diag.activityFrame,
+			composerFrame: diag.composerFrame,
+		};
+
+		// 1. Short working state panel height must be tightly bounded <= 118pt
+		if (diag.panelFrame.height > 118) {
+			throw new Error(`Short working state height (${diag.panelFrame.height}) exceeds 118pt ceiling`);
+		}
+
+		// 2. Empty black gap between activity and composer must be <= 20pt (no giant 60-80pt void)
+		if (diag.activityFrame && diag.composerFrame && diag.contentScrollFrame) {
+			const textBottomInExpanded = diag.contentScrollFrame.y + diag.activityFrame.y + diag.activityFrame.height;
+			const composerTopInExpanded = diag.composerFrame.y;
+			const gap = Math.max(0, composerTopInExpanded - textBottomInExpanded);
+			test69.details.gap = gap;
+			if (gap > 20) {
+				throw new Error(`Empty space gap between activity and composer (${gap}pt) exceeds 20pt budget`);
+			}
+		}
+
+		// 3. Raw developer ID test: "Activity 1629" with human message
+		native.setSnapshot(contentSnapshot(69_002, {
+			status: 'working',
+			currentActivity: 'Activity 1629',
+			latestShortMessage: 'Validating graph layout constraints',
+			recentActions: [],
+		}));
+		await sleep(300);
+		await drainMain(native, 4);
+
+		diag = native.getDiagnostics();
+		test69.details.rawIdHandling = {
+			activityLabel: diag.activityLabel,
+			renderedActivityText: diag.renderedActivityText,
+		};
+	} catch (err) {
+		test69.ok = false;
+		test69.error = err.message;
+		results.failures.push(`working-state-hierarchy-and-empty-space-budget: ${err.message}`);
+	}
+	results.tests.push(test69);
+
 	native.dispose();
 
 	results.ok = results.failures.length === 0;

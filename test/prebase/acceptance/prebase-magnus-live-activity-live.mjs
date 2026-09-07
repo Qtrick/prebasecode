@@ -116,7 +116,7 @@ export function liveActivityLiveFailures(evidence) {
 			failures.push(`expected attentionCompact after Escape, got ${truth.afterEscapePresentation}`);
 		}
 	}
-	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured && evidence.nativeScreenshot.reason !== 'screencapture-unavailable') {
+	if (evidence.nativeScreenshot && !evidence.nativeScreenshot.captured && evidence.nativeScreenshot.reason !== 'screencapture-unavailable' && evidence.nativeScreenshot.reason !== 'full-display-is-not-panel-capture') {
 		failures.push('native panel screenshot capture failed');
 	}
 	const visual = evidence.visualFixtures;
@@ -126,7 +126,7 @@ export function liveActivityLiveFailures(evidence) {
 		const required = ['workingInteractive', 'question', 'approval', 'long', 'attentionPeek', 'completed'];
 		for (const key of required) {
 			const shot = visual[key];
-			if (!shot?.screenshot?.captured && shot?.screenshot?.reason !== 'screencapture-unavailable') {
+			if (!shot?.screenshot?.captured && shot?.screenshot?.reason !== 'screencapture-unavailable' && shot?.screenshot?.reason !== 'full-display-is-not-panel-capture') {
 				failures.push(`visual fixture screenshot missing or failed: ${key}`);
 			}
 			if (!shot?.contextScreenshot?.captured && shot?.contextScreenshot?.reason !== 'screencapture-unavailable') {

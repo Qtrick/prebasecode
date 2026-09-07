@@ -79,6 +79,14 @@ static void ApplySystemSymbol(NSButton *button, NSString *symbolName, NSString *
 	button.title = @"•";
 }
 
+static BOOL IsRawActivityId(NSString *label) {
+	if (!label.length) {
+		return NO;
+	}
+	NSRange r = [label rangeOfString:@"^(activity[ -]?\\d+|task[ -]?\\d+)$" options:NSRegularExpressionSearch | NSCaseInsensitiveSearch];
+	return r.location != NSNotFound;
+}
+
 static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NSInteger maxLines) {
 	if (!text.length || width <= 1 || maxLines <= 0) {
 		return 0;
@@ -88,7 +96,7 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 		lineH = font.pointSize + 4;
 	}
 	NSMutableParagraphStyle *style = [[NSMutableParagraphStyle alloc] init];
-	style.lineBreakMode = (maxLines > 1) ? NSLineBreakByCharWrapping : NSLineBreakByTruncatingTail;
+	style.lineBreakMode = (maxLines > 1) ? NSLineBreakByWordWrapping : NSLineBreakByTruncatingTail;
 	NSDictionary *attrs = @{
 		NSFontAttributeName: font,
 		NSParagraphStyleAttributeName: style
@@ -377,8 +385,8 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	// 6. Right organic concave shoulder: horizontal tangency at (totalW, 0), vertical at (totalW - effShoulderR, effShoulderR)
 	CGPathAddCurveToPoint(path, NULL,
-		totalW - effShoulderR * kKappa, 0,
-		totalW - effShoulderR, effShoulderR * kKappa,
+		totalW - (2.0 / 3.0) * effShoulderR, 0,
+		totalW - effShoulderR, effShoulderR / 3.0,
 		totalW - effShoulderR, effShoulderR);
 
 	// 7. Line down right vertical wall to bottom-right corner start (totalW - effShoulderR, currentH - effBottomR)
@@ -404,8 +412,8 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	// 12. Left organic concave shoulder: vertical tangency at (effShoulderR, effShoulderR), horizontal at (0, 0)
 	CGPathAddCurveToPoint(path, NULL,
-		effShoulderR, effShoulderR * kKappa,
-		effShoulderR * kKappa, 0,
+		effShoulderR, effShoulderR / 3.0,
+		(2.0 / 3.0) * effShoulderR, 0,
 		0, 0);
 
 	// 13. Close subpath
@@ -732,8 +740,8 @@ static NSString *JSString(Napi::Value value) {
 	tf.cell.wraps = lines > 1;
 	tf.cell.scrollable = NO;
 	if (lines > 1) {
-		// Scrollable documents wrap fully with char-wrapping so unbroken URLs/paths/tokens cannot escape
-		tf.lineBreakMode = truncating ? NSLineBreakByTruncatingTail : NSLineBreakByCharWrapping;
+		// Scrollable documents wrap naturally by word (AppKit wraps unbreakable tokens automatically)
+		tf.lineBreakMode = truncating ? NSLineBreakByTruncatingTail : NSLineBreakByWordWrapping;
 	} else {
 		tf.lineBreakMode = NSLineBreakByTruncatingTail;
 	}
@@ -1129,11 +1137,17 @@ static NSString *JSString(Napi::Value value) {
 	}
 	// Approval/question: pending is primary — do not fight with activity/action log.
 	if (!hasPending) {
-		if (ok && self.activityLabel.length) {
-			ok = [self placeContentBlock:self.activityDescription text:self.activityLabel lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+		NSString *displayActivity = self.activityLabel;
+		if (IsRawActivityId(displayActivity)) {
+			if (self.latestMessage.length) {
+				displayActivity = self.latestMessage;
+			} else {
+				displayActivity = [NSString stringWithFormat:@"Working on %@", displayActivity];
+			}
 		}
-		// Notch summarizes — only show latestShortMessage when there is no current activity.
-		if (ok && self.latestMessage.length && self.activityLabel.length == 0) {
+		if (ok && displayActivity.length) {
+			ok = [self placeContentBlock:self.activityDescription text:displayActivity lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
+		} else if (ok && self.latestMessage.length) {
 			ok = [self placeContentBlock:self.latestMessageLabel text:self.latestMessage lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
 		}
 		[self reconcileActionRowsIntoDocument:&docY contentW:docContentW ok:&ok];
@@ -1698,7 +1712,7 @@ static NSString *JSString(Napi::Value value) {
 	button.bezelStyle = NSBezelStyleInline;
 	button.bordered = NO;
 	button.wantsLayer = YES;
-	button.layer.cornerRadius = 6.0;
+	button.layer.cornerRadius = 7.0;
 	button.layer.masksToBounds = YES;
 	button.layer.backgroundColor = [NSColor colorWithCalibratedWhite:0.14 alpha:0.80].CGColor;
 	button.layer.borderWidth = 0.5;
@@ -2052,7 +2066,6 @@ static NSString *JSString(Napi::Value value) {
 	NSFont *pendingTitleFont = self.content.pendingInteractionTitle.font ?: [NSFont systemFontOfSize:12 weight:NSFontWeightSemibold];
 	NSFont *pendingMsgFont = self.content.pendingInteractionMessage.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
 	NSFont *activityFont = self.content.activityDescription.font ?: [NSFont systemFontOfSize:11.5 weight:NSFontWeightMedium];
-	NSFont *messageFont = self.content.latestMessageLabel.font ?: [NSFont systemFontOfSize:11 weight:NSFontWeightRegular];
 
 	BOOL hasPending = self.content.pendingTitle.length > 0 || self.content.pendingMessage.length > 0;
 	if (self.content.pendingTitle.length) {
@@ -2064,9 +2077,15 @@ static NSString *JSString(Napi::Value value) {
 	if (!hasPending) {
 		// Working surface: activity OR latest message (not both) + fixed action-row budget.
 		if (self.content.activityLabel.length) {
-			h += MeasureTextHeight(self.content.activityLabel, activityFont, contentW, 2) + kContentGap;
+			NSString *primaryText = self.content.activityLabel;
+			if (IsRawActivityId(primaryText) && self.content.latestMessage.length) {
+				primaryText = self.content.latestMessage;
+			} else if (IsRawActivityId(primaryText)) {
+				primaryText = [NSString stringWithFormat:@"Working on %@", primaryText];
+			}
+			h += MeasureTextHeight(primaryText, activityFont, contentW, 2) + kContentGap;
 		} else if (self.content.latestMessage.length) {
-			h += MeasureTextHeight(self.content.latestMessage, messageFont, contentW, 2) + kContentGap;
+			h += MeasureTextHeight(self.content.latestMessage, activityFont, contentW, 2) + kContentGap;
 		}
 		NSInteger actionCount = MIN((NSInteger)self.content.actions.count, 3);
 		h += actionCount * (kActionRowHeight + kContentGap);

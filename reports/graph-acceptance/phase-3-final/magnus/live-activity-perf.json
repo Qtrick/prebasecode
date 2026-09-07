@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "4ef9f20b2f8fdc8e6dd8a97e9efee9e29408ff61",
-  "sourceFingerprint": "108234c2e67ef1d37eb09ee0d9450af15b30e451185f232f26ef44ba0dbb100a",
-  "productFingerprint": "108234c2e67ef1d37eb09ee0d9450af15b30e451185f232f26ef44ba0dbb100a",
-  "generatedAt": "2026-09-07T04:18:56.542Z",
+  "sourceHead": "316f62230e3be9af10a0a89e158619bfcbb4acd9",
+  "sourceFingerprint": "c2fa6c126f5efac593e8c7cb27841ee31e87358bd9566b8da928f5ef83e80aab",
+  "productFingerprint": "c2fa6c126f5efac593e8c7cb27841ee31e87358bd9566b8da928f5ef83e80aab",
+  "generatedAt": "2026-09-07T05:05:49.011Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -109,7 +109,7 @@
           "semanticContentSubtree": "compactContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 47106,
+          "windowNumber": 47677,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -289,7 +289,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9534,
+        "durationRealCyclesMs": 9444,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -370,7 +370,7 @@
           "semanticContentSubtree": "expandedContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 47106,
+          "windowNumber": 47677,
           "openButtonFrame": {
             "y": 75,
             "x": 267,
@@ -392,7 +392,7 @@
           "globalMonitorInstalled": false,
           "lastTransitionReason": "geometry",
           "approveButtonAlpha": 1,
-          "inactiveSubtreesSuppressed": false,
+          "inactiveSubtreesSuppressed": true,
           "renderedPeekBody": "",
           "revision": 406,
           "hoverSessionToken": 0,
@@ -515,7 +515,7 @@
           "panelLevel": 2147483630,
           "expandedContentAlpha": 1,
           "denyButtonTitle": "Deny",
-          "compactContainerVisible": true,
+          "compactContainerVisible": false,
           "actionRowIds": [
             "a99"
           ],
@@ -553,7 +553,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 367,
+        "durationRetargetMs": 357,
         "diagRetarget": {
           "renderedPendingMessage": "",
           "animationCount": 203,
@@ -620,7 +620,7 @@
           "semanticContentSubtree": "peekContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 47106,
+          "windowNumber": 47677,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -835,12 +835,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -312,
-        "heapUsedMb": 6.42,
-        "rssDiffKb": 45168,
-        "rssMb": 117.92,
-        "cpuDeltaUserMs": 1278717,
-        "cpuDeltaSystemMs": 242294
+        "heapDiffKb": -282,
+        "heapUsedMb": 6.44,
+        "rssDiffKb": 44544,
+        "rssMb": 116.48,
+        "cpuDeltaUserMs": 1366074,
+        "cpuDeltaSystemMs": 243181
       }
     },
     {
@@ -1030,9 +1030,9 @@
           "targetPresentationState": "peek",
           "frame": {
             "x": 599,
-            "y": 947,
+            "y": 948,
             "width": 313,
-            "height": 35,
+            "height": 34,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1101,7 +1101,7 @@
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
-          "contentRefreshCount": 16,
+          "contentRefreshCount": 15,
           "orderFrontCount": 1,
           "lastRenderedRevision": 1512,
           "revision": 1512,
@@ -1130,7 +1130,7 @@
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 13,
-            "contentRefreshCount": 17,
+            "contentRefreshCount": 16,
             "orderFrontCount": 1,
             "lastRenderedRevision": 1512,
             "revision": 1512,
@@ -1158,7 +1158,7 @@
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 43,
-            "contentRefreshCount": 47,
+            "contentRefreshCount": 46,
             "orderFrontCount": 1,
             "lastRenderedRevision": 1629,
             "revision": 1629,
@@ -1634,9 +1634,9 @@
           "state": "peek",
           "frame": {
             "x": 599,
-            "y": 947,
+            "y": 948,
             "width": 313,
-            "height": 35,
+            "height": 34,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1651,9 +1651,9 @@
           "state": "interactive",
           "frame": {
             "x": 599,
-            "y": 945,
+            "y": 948,
             "width": 313,
-            "height": 37,
+            "height": 34,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1668,9 +1668,9 @@
           "pinned": true,
           "frame": {
             "x": 599,
-            "y": 895,
+            "y": 948,
             "width": 313,
-            "height": 87,
+            "height": 34,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1684,9 +1684,9 @@
           "state": "attentionPeek",
           "frame": {
             "x": 599,
-            "y": 916,
+            "y": 948,
             "width": 313,
-            "height": 66,
+            "height": 34,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1701,9 +1701,9 @@
           "userDismissedAttention": true,
           "frame": {
             "x": 599,
-            "y": 917,
+            "y": 948,
             "width": 313,
-            "height": 65,
+            "height": 34,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1717,9 +1717,9 @@
           "state": "completedTransient",
           "frame": {
             "x": 599,
-            "y": 947,
+            "y": 948,
             "width": 313,
-            "height": 35,
+            "height": 34,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1753,7 +1753,7 @@
       "details": {
         "heights": {
           "empty": {
-            "height": 36,
+            "height": 34,
             "containment": {
               "ok": true,
               "frameCount": 5,
@@ -1838,7 +1838,7 @@
             "questionButtonCount": 0
           },
           "long-pending": {
-            "height": 119,
+            "height": 118,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1855,7 +1855,7 @@
             "questionButtonCount": 0
           },
           "long-options": {
-            "height": 121,
+            "height": 118,
             "containment": {
               "ok": true,
               "frameCount": 8,
@@ -2893,6 +2893,82 @@
             "width": 313,
             "height": 124
           }
+        }
+      }
+    },
+    {
+      "name": "visual-silhouette-curvature-and-bezel-attachment",
+      "ok": true,
+      "details": {
+        "diag": {
+          "panelFrame": {
+            "y": 864,
+            "x": 599,
+            "width": 313,
+            "height": 118
+          },
+          "safeAreaTop": 32,
+          "screenTopY": 982,
+          "topAnchorDelta": 0
+        }
+      }
+    },
+    {
+      "name": "adversarial-word-wrap-and-unbroken-containment",
+      "ok": true,
+      "details": {
+        "natural": {
+          "activityFrame": {
+            "y": 2,
+            "x": 22,
+            "width": 269,
+            "height": 28
+          },
+          "activityLabel": "Validating natural sentence line breaking without splitting words awkwardly across boundaries."
+        },
+        "unbroken": {
+          "activityFrame": {
+            "y": 2,
+            "x": 22,
+            "width": 269,
+            "height": 28
+          },
+          "panelFrame": {
+            "y": 830,
+            "x": 599,
+            "width": 313,
+            "height": 152
+          }
+        }
+      }
+    },
+    {
+      "name": "working-state-hierarchy-and-empty-space-budget",
+      "ok": true,
+      "details": {
+        "shortWorking": {
+          "panelFrame": {
+            "y": 864,
+            "x": 599,
+            "width": 313,
+            "height": 118
+          },
+          "activityFrame": {
+            "y": 2,
+            "x": 22,
+            "width": 269,
+            "height": 15
+          },
+          "composerFrame": {
+            "y": 53,
+            "x": 22,
+            "width": 209,
+            "height": 24
+          }
+        },
+        "gap": 13,
+        "rawIdHandling": {
+          "activityLabel": "Activity 1629"
         }
       }
     }

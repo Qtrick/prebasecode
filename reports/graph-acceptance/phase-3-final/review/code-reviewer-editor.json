@@ -173,6 +173,36 @@
       "rootCause": "Coverage gap: suite lacked automated tests for canonical authority invariance, character-wrapping text containment, bezel-attachment shoulder geometry, intermediate expansion crossfades, and safe-zone clearances.",
       "impact": "No regression protection for visual recovery fixes.",
       "change": "Added Tests 62 through 66 (66/66 total tests PASS): Test 62 (Canonical Presentation Authority Invariance), Test 63 (Adversarial Unbroken Tokens & Character Wrapping), Test 64 (Concave Top Shoulder Geometry & Bezel Attachment Invariants), Test 65 (Intermediate Transition Crossfade & Zero-Void Morph), and Test 66 (Safe-Zone Corner Clearance & Footer Geometry)."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-GEO-02: Prior top shoulder cubic control points either produced convex card corners or clung to y=0 causing sharp needle-like horns at the wing tips.",
+      "impact": "The live screenshot visibly read as a floating rounded black card detached from the physical MacBook notch.",
+      "change": "Converted quadratic bezier concave fillets to exact cubic bezier control points: Right shoulder uses CP1=(totalW - (2.0/3.0)*R, 0), CP2=(totalW - R, R/3.0), End=(totalW - R, R); Left shoulder uses CP1=(R, R/3.0), CP2=((2.0/3.0)*R, 0), End=(0, 0). Produces true horizontal tangency at y=0 and smooth vertical tangency into the side edges, physically merging with the display bezel."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-WRAP-02: NSLineBreakByCharWrapping split standard English words mid-word across lines (e.g., 'remainin' / 'g').",
+      "impact": "Unnatural and unpolished typography in glanceable agent status messages.",
+      "change": "Switched multiline labels in configureLabel:lines:truncating: and MeasureTextHeight to NSLineBreakByWordWrapping, restoring natural word breaking while preserving unbroken token containment."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-HIER-01: Uninformative developer task IDs like 'Activity 1629' took primary label prominence, pushing meaningful agent messages into subordination, while content height calculation left a 60-80pt empty black void.",
+      "impact": "Weak working state hierarchy, confusing product communication, and excessive empty dead space.",
+      "change": "Added IsRawActivityId helper. When activityLabel is an uninformative task ID and latestMessage exists, latestMessage is elevated to primary status and the raw ID is subordinated. Tightened computeTargetContentHeight and layout to hug content with <=20pt gap to composer."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-RAD-01: Icon buttons had 6.0pt corner radius while composer input field had 7.0pt corner radius.",
+      "impact": "Subtle optical dissonance in footer control styling.",
+      "change": "Aligned icon button layer corner radius to 7.0pt, establishing unified control curvature."
+    },
+    {
+      "file": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+      "rootCause": "Coverage gap: suite lacked automated regression tests for true bezel attachment silhouette curvature, natural word wrapping without mid-word breakage, and working state hierarchy/empty space budget.",
+      "impact": "Floating-card geometry and typographic regressions could slip through.",
+      "change": "Added Tests 67 through 69 (69/69 total tests PASS): Test 67 (Visual Silhouette Curvature & Bezel Attachment Invariance), Test 68 (Adversarial Word Wrapping & Unbroken Containment), and Test 69 (Working State Hierarchy & Empty Space Budget)."
     }
   ],
   "findingsRejected": [
