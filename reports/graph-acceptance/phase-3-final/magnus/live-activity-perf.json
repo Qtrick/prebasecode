@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "43486e3dac6d2027b111fb4810543b3f8db034f6",
-  "sourceFingerprint": "a6ee09663b6301cbf1dd352fa402ae9594fca3582ecf50a1d53d2ec695d70139",
-  "productFingerprint": "a6ee09663b6301cbf1dd352fa402ae9594fca3582ecf50a1d53d2ec695d70139",
-  "generatedAt": "2026-09-07T03:19:40.747Z",
+  "sourceHead": "4ef9f20b2f8fdc8e6dd8a97e9efee9e29408ff61",
+  "sourceFingerprint": "108234c2e67ef1d37eb09ee0d9450af15b30e451185f232f26ef44ba0dbb100a",
+  "productFingerprint": "108234c2e67ef1d37eb09ee0d9450af15b30e451185f232f26ef44ba0dbb100a",
+  "generatedAt": "2026-09-07T04:18:56.542Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -109,7 +109,7 @@
           "semanticContentSubtree": "compactContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 46779,
+          "windowNumber": 47106,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -289,7 +289,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 9461,
+        "durationRealCyclesMs": 9534,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -349,7 +349,7 @@
             "opticalTopInset": 12,
             "topLeftX": 12,
             "topRightX": 301,
-            "effShoulderR": 22,
+            "effShoulderR": 12,
             "panelWidth": 313,
             "bodyDepth": 106,
             "shoulderFlare": 12,
@@ -370,7 +370,7 @@
           "semanticContentSubtree": "expandedContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 46779,
+          "windowNumber": 47106,
           "openButtonFrame": {
             "y": 75,
             "x": 267,
@@ -392,7 +392,7 @@
           "globalMonitorInstalled": false,
           "lastTransitionReason": "geometry",
           "approveButtonAlpha": 1,
-          "inactiveSubtreesSuppressed": true,
+          "inactiveSubtreesSuppressed": false,
           "renderedPeekBody": "",
           "revision": 406,
           "hoverSessionToken": 0,
@@ -515,7 +515,7 @@
           "panelLevel": 2147483630,
           "expandedContentAlpha": 1,
           "denyButtonTitle": "Deny",
-          "compactContainerVisible": false,
+          "compactContainerVisible": true,
           "actionRowIds": [
             "a99"
           ],
@@ -553,7 +553,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 361,
+        "durationRetargetMs": 367,
         "diagRetarget": {
           "renderedPendingMessage": "",
           "animationCount": 203,
@@ -601,13 +601,13 @@
           "interactiveContentVisible": false,
           "transitionInFlight": false,
           "silhouetteMetrics": {
-            "opticalTopInset": 8,
-            "topLeftX": 8,
-            "topRightX": 305,
-            "effShoulderR": 12.559999999999999,
+            "opticalTopInset": 10.5,
+            "topLeftX": 10.5,
+            "topRightX": 302.5,
+            "effShoulderR": 10.5,
             "panelWidth": 313,
             "bodyDepth": 32,
-            "shoulderFlare": 8,
+            "shoulderFlare": 10.5,
             "shoulderCurvatureContinuous": true,
             "tangentContinuity": true,
             "nonDegenerateShoulder": true,
@@ -620,7 +620,7 @@
           "semanticContentSubtree": "peekContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 46779,
+          "windowNumber": 47106,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -835,12 +835,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": -218,
-        "heapUsedMb": 6.46,
-        "rssDiffKb": 26048,
-        "rssMb": 98.38,
-        "cpuDeltaUserMs": 1372325,
-        "cpuDeltaSystemMs": 228157
+        "heapDiffKb": -312,
+        "heapUsedMb": 6.42,
+        "rssDiffKb": 45168,
+        "rssMb": 117.92,
+        "cpuDeltaUserMs": 1278717,
+        "cpuDeltaSystemMs": 242294
       }
     },
     {
@@ -1030,9 +1030,9 @@
           "targetPresentationState": "peek",
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 947,
             "width": 313,
-            "height": 34,
+            "height": 35,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1101,7 +1101,7 @@
           },
           "geometryTransitionCount": 2,
           "contentOnlyUpdateCount": 13,
-          "contentRefreshCount": 15,
+          "contentRefreshCount": 16,
           "orderFrontCount": 1,
           "lastRenderedRevision": 1512,
           "revision": 1512,
@@ -1130,7 +1130,7 @@
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 13,
-            "contentRefreshCount": 16,
+            "contentRefreshCount": 17,
             "orderFrontCount": 1,
             "lastRenderedRevision": 1512,
             "revision": 1512,
@@ -1158,7 +1158,7 @@
             },
             "geometryTransitionCount": 3,
             "contentOnlyUpdateCount": 43,
-            "contentRefreshCount": 46,
+            "contentRefreshCount": 47,
             "orderFrontCount": 1,
             "lastRenderedRevision": 1629,
             "revision": 1629,
@@ -1634,9 +1634,9 @@
           "state": "peek",
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 947,
             "width": 313,
-            "height": 34,
+            "height": 35,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1651,9 +1651,9 @@
           "state": "interactive",
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 945,
             "width": 313,
-            "height": 34,
+            "height": 37,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1668,9 +1668,9 @@
           "pinned": true,
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 895,
             "width": 313,
-            "height": 34,
+            "height": 87,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1684,9 +1684,9 @@
           "state": "attentionPeek",
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 916,
             "width": 313,
-            "height": 34,
+            "height": 66,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1701,9 +1701,9 @@
           "userDismissedAttention": true,
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 917,
             "width": 313,
-            "height": 34,
+            "height": 65,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1717,9 +1717,9 @@
           "state": "completedTransient",
           "frame": {
             "x": 599,
-            "y": 948,
+            "y": 947,
             "width": 313,
-            "height": 34,
+            "height": 35,
             "isActual": true,
             "requested": {
               "x": 599,
@@ -1753,7 +1753,7 @@
       "details": {
         "heights": {
           "empty": {
-            "height": 34,
+            "height": 36,
             "containment": {
               "ok": true,
               "frameCount": 5,
@@ -1838,7 +1838,7 @@
             "questionButtonCount": 0
           },
           "long-pending": {
-            "height": 118,
+            "height": 119,
             "containment": {
               "ok": true,
               "frameCount": 6,
@@ -1855,7 +1855,7 @@
             "questionButtonCount": 0
           },
           "long-options": {
-            "height": 118,
+            "height": 121,
             "containment": {
               "ok": true,
               "frameCount": 8,
@@ -2058,7 +2058,7 @@
           "opticalTopInset": 10.08,
           "topLeftX": 10.08,
           "topRightX": 302.92,
-          "effShoulderR": 22,
+          "effShoulderR": 10.08,
           "panelWidth": 313,
           "bodyDepth": 84,
           "shoulderFlare": 10.08,
@@ -2793,6 +2793,107 @@
       "details": {
         "inFlightTitle": "Approve",
         "inFlightA11y": "Approve (in progress)"
+      }
+    },
+    {
+      "name": "canonical-presentation-authority-invariance",
+      "ok": true,
+      "details": {
+        "statesVerified": [
+          "compact",
+          "attentionPeek",
+          "attentionCompact",
+          "interactiveWorking",
+          "interactiveQuestion",
+          "interactiveApproval",
+          "terminalFailed"
+        ]
+      }
+    },
+    {
+      "name": "adversarial-unbroken-tokens-and-character-wrapping",
+      "ok": true,
+      "details": {
+        "panelFrame": {
+          "y": 830,
+          "x": 599,
+          "width": 313,
+          "height": 152
+        },
+        "bodyBounds": {
+          "y": 0,
+          "x": 0,
+          "width": 313,
+          "height": 118
+        },
+        "contentScrollFrame": {
+          "y": 23,
+          "x": 0,
+          "width": 313,
+          "height": 56
+        },
+        "contentSafeViewport": {
+          "y": 23,
+          "x": 22,
+          "width": 269,
+          "height": 56
+        }
+      }
+    },
+    {
+      "name": "concave-top-shoulder-geometry-and-bezel-attachment-invariants",
+      "ok": true,
+      "details": {
+        "compactDelta": 0,
+        "expandedTopY": 982,
+        "screenTopY": 982
+      }
+    },
+    {
+      "name": "intermediate-transition-crossfade-and-zero-void-morph",
+      "ok": true,
+      "details": {
+        "early": {
+          "inFlight": true,
+          "compactVisible": true,
+          "expandedVisible": true
+        },
+        "mid": {
+          "inFlight": true,
+          "compactVisible": true,
+          "expandedVisible": true
+        },
+        "settled": {
+          "inFlight": false,
+          "compactVisible": false,
+          "expandedVisible": true
+        }
+      }
+    },
+    {
+      "name": "safe-zone-corner-clearance-and-footer-geometry",
+      "ok": true,
+      "details": {
+        "approval": {
+          "approveFrame": {
+            "y": 59,
+            "x": 139,
+            "width": 152,
+            "height": 24
+          },
+          "denyFrame": {
+            "y": 59,
+            "x": 22,
+            "width": 109,
+            "height": 24
+          },
+          "panelFrame": {
+            "y": 858,
+            "x": 599,
+            "width": 313,
+            "height": 124
+          }
+        }
       }
     }
   ],

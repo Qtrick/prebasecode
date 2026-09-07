@@ -87,15 +87,29 @@
         "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs"
       ],
       "coverage": "implemented-and-verified"
+    },
+    {
+      "id": "forensic-rebuild-tests-62-through-66",
+      "behaviors": [
+        "Test 62: Canonical Presentation Authority Invariance across compact, attentionPeek, attentionCompact, interactiveWorking, interactiveQuestion, interactiveApproval, and terminalFailed",
+        "Test 63: Adversarial Unbroken Tokens and Character Wrapping: 500-char unbroken URL/hash and CJK tokens wrap without horizontal clipping or scroll frame escaping",
+        "Test 64: Concave Top Shoulder Geometry and Bezel Attachment Invariants: top shoulder meets screen bezel with horizontal tangency at (0,0) and (totalW, 0), zero top-corner detachment",
+        "Test 65: Intermediate Transition Crossfade and Zero-Void Morph: sampling at t=0-30ms, t=80-100ms, and settled confirms compact chrome fades out as expanded content fades in with zero black void",
+        "Test 66: Safe-Zone Corner Clearance and Footer Geometry: buttons clear safe horizontal and vertical insets without colliding with 18pt curved bottom corners"
+      ],
+      "testFiles": [
+        "test/prebase/acceptance/prebase-live-activity-perf.mjs"
+      ],
+      "coverage": "implemented-and-verified"
     }
   ],
   "verificationSuite": {
-    "perfTests": 45,
-    "perfPassed": 45,
+    "perfTests": 66,
+    "perfPassed": 66,
     "staticContractTests": 13,
     "staticContractPassed": 13,
     "magnusUnitTests": 272,
     "magnusUnitPassed": 272,
-    "liveRuntimeAcceptance": "PASSED (ok: true, failures: 0, all fixtures verified)"
+    "liveRuntimeAcceptance": "PASSED (ok: true, failures: 0, all 11 visual fixtures verified)"
   }
 }

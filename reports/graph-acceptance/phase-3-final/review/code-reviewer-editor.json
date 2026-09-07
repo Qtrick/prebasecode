@@ -142,7 +142,37 @@
       "file": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
       "rootCause": "Test suite ended at Test 57 without automated sampling of intermediate animation frames, explicit subtree suppression matrix, 200+ char unbroken tokens and safe zones, or interaction isolation under inactive states.",
       "impact": "Transitions and hit-testing edge cases lacked rigorous programmatic and frame-level regression gates.",
-      "change": "Added Tests 58 through 61: Test 58 (Intermediate Transition Frame Sampling Matrix & Collapse Crossfade across 8 transitions), Test 59 (Authoritative Semantic Subtree Ownership & Suppression Matrix across all 5 states), Test 60 (Adversarial Visual Text Containment & Safe Zones with 200+ char unbroken tokens, deep POSIX paths, long URLs, CJK, and emoji), and Test 61 (Hit-Testing & Interaction Isolation Under Inactive States). All 61+ tests passing."
+      "change": "Added Tests 58 through 61: Test 58 (Intermediate Transition Frame Sampling Matrix & Collapse Crossfade across 8 transitions), Test 59 (Authoritative Semantic Subtree Ownership & Suppression Matrix across all 5 states), Test 60 (Adversarial Visual Text Containment & Safe Zones with 200+ char unbroken tokens, deep POSIX paths, long URLs, CJK, and emoji), and Test 61 (Hit-Testing & Interaction Isolation Under Inactive States)."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-GEO-01: ComputeSilhouetteShoulderMetrics and CreateNotchedIslandPath rounded off top corners with convex arcs during expansion ((0, 16) -> (16, 0) and (totalW - 16, 0) -> (totalW, 16)), producing a floating rounded rectangle detached from the screen bezel rather than a hardware-attached notch.",
+      "impact": "The expanded panel read visually like a generic floating black modal card suspended near the menu bar.",
+      "change": "Reconstructed top edge geometry: top edge line spans full totalW at y=0. Top shoulders use organic concave cubic Bézier fillets ((0, 0) -> (effShoulderR, effShoulderR) and (totalW, 0) -> (totalW - effShoulderR, effShoulderR)) that meet the screen bezel with exact horizontal tangency at y=0, preserving the 14-element invariant path topology for Core Animation morphing."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-TXT-01: Multiline labels in configureLabel:lines:truncating: and MeasureTextHeight used NSLineBreakByWordWrapping, which failed on unbroken URLs, deep POSIX paths, hashes, and long continuous tokens, causing text glyphs to leak horizontally past the safe silhouette margins.",
+      "impact": "Unbroken tokens and deep paths escaped the content boundaries and collided with curved silhouette corners.",
+      "change": "Switched multiline labels to NSLineBreakByCharWrapping, ensuring that unbroken URLs, paths, and identifiers wrap character-by-character within contentW."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-CAN-01: refreshContentSubviewsPreservingPresentationWithSize, updateShapeAndContentAnimated, computeTargetContentHeight, and layoutControls branched on independent mutable booleans (targetExpanded, peekOnly, pinned) rather than the authoritative PrebasePresentationState.",
+      "impact": "Potential semantic and layout divergence between the canonical presentation resolver and actual subview hierarchy.",
+      "change": "Refactored layout and rendering pipelines to query canonicalTargetPresentationState and canonicalPresentationState as the single semantic authority for container visibility, control staging, and height derivation."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-VOID-01: When expanding from compact to interactive, compactContainer was immediately hidden on frame 0 while expandedContainer was staged at alpha 0.0, creating an empty black void during the initial 0-50ms of expansion.",
+      "impact": "Expansion transitions felt abrupt and visually disconnected from the physical notch.",
+      "change": "Coordinated crossfade: compactContainer remains visible at t=0 and smoothly animates to alpha 0.0 over the transition duration, while expandedContainer crossfades to alpha 1.0 simultaneously alongside the CAShapeLayer path morph."
+    },
+    {
+      "file": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+      "rootCause": "Coverage gap: suite lacked automated tests for canonical authority invariance, character-wrapping text containment, bezel-attachment shoulder geometry, intermediate expansion crossfades, and safe-zone clearances.",
+      "impact": "No regression protection for visual recovery fixes.",
+      "change": "Added Tests 62 through 66 (66/66 total tests PASS): Test 62 (Canonical Presentation Authority Invariance), Test 63 (Adversarial Unbroken Tokens & Character Wrapping), Test 64 (Concave Top Shoulder Geometry & Bezel Attachment Invariants), Test 65 (Intermediate Transition Crossfade & Zero-Void Morph), and Test 66 (Safe-Zone Corner Clearance & Footer Geometry)."
     }
   ],
   "findingsRejected": [

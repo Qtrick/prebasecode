@@ -19,7 +19,6 @@ static const CGFloat kCameraHousingMin = 24;
 static const CGFloat kBootstrapPanelWidth = kStableCompactLeftWing + kCameraHousingMin + kStableCompactRightWing;
 static const CGFloat kBootstrapPanelHeight = kCollapsedHeight;
 static const CGFloat kPillCornerRadius = 16;
-static const CGFloat kShoulderRadius = 22;
 static const CGFloat kBottomCornerRadius = 18;
 /** Minimum optical top inset for expanded natural-width shoulders (no panel widen). */
 static const CGFloat kOpticalShoulderInsetMin = 8;
@@ -88,9 +87,15 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 	if (lineH < 12) {
 		lineH = font.pointSize + 4;
 	}
+	NSMutableParagraphStyle *style = [[NSMutableParagraphStyle alloc] init];
+	style.lineBreakMode = (maxLines > 1) ? NSLineBreakByCharWrapping : NSLineBreakByTruncatingTail;
+	NSDictionary *attrs = @{
+		NSFontAttributeName: font,
+		NSParagraphStyleAttributeName: style
+	};
 	NSRect bounds = [text boundingRectWithSize:NSMakeSize(width, lineH * maxLines + 4)
 		options:(NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading)
-		attributes:@{ NSFontAttributeName: font }];
+		attributes:attrs];
 	CGFloat h = ceil(NSHeight(bounds)) + (maxLines > 1 ? 2 : 0);
 	return MIN(lineH * maxLines + 2, MAX(lineH, h));
 }
@@ -253,25 +258,18 @@ static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
 	BOOL isExpanded)
 {
 	SilhouetteShoulderMetrics metrics = {};
-	CGFloat notchLeft = (totalW - housingW) * 0.5;
-	CGFloat notchRight = notchLeft + housingW;
-	CGFloat naturalLeft = MAX(0.0, notchLeft - leftW);
-	CGFloat naturalRight = MIN(totalW, notchRight + rightW);
-	metrics.wingLeftX = (!isExpanded) ? 0.0 : naturalLeft;
-	metrics.wingRightX = (!isExpanded) ? totalW : naturalRight;
-	CGFloat flareL = MAX(0.0, metrics.wingLeftX);
-	CGFloat flareR = MAX(0.0, totalW - metrics.wingRightX);
-	metrics.flare = MAX(flareL, flareR);
+	CGFloat effR = 0.0;
 	if (isExpanded && depth > 0.5) {
-		if (metrics.flare < 0.5) {
-			// Optical shoulder within natural width — no panel widen, no square top corners.
-			metrics.opticalInset = MIN(kOpticalShoulderInsetMax, MAX(kOpticalShoulderInsetMin, depth * 0.12));
-			metrics.wingLeftX = metrics.opticalInset;
-			metrics.wingRightX = totalW - metrics.opticalInset;
-			metrics.flare = metrics.opticalInset;
+		effR = MIN(kOpticalShoulderInsetMax, MAX(kOpticalShoulderInsetMin, depth * 0.12));
+		if (effR < 10.0) {
+			effR = 10.5;
 		}
-		metrics.effShoulderR = MIN(kShoulderRadius, MAX(10.0, metrics.flare * 0.85 + depth * 0.18));
 	}
+	metrics.effShoulderR = effR;
+	metrics.opticalInset = effR;
+	metrics.flare = effR;
+	metrics.wingLeftX = effR;
+	metrics.wingRightX = totalW - effR;
 	return metrics;
 }
 
@@ -302,6 +300,18 @@ static NSString *StringFromPrebasePresentationState(PrebasePresentationState sta
 		case PrebasePresentationStateTerminalFailed: return @"terminalFailed";
 	}
 	return @"unknown";
+}
+
+static inline BOOL PrebasePresentationStateIsExpanded(PrebasePresentationState state) {
+	return (state >= PrebasePresentationStateInteractiveWorking && state <= PrebasePresentationStateTerminalFailed);
+}
+
+static inline BOOL PrebasePresentationStateIsPeek(PrebasePresentationState state) {
+	return (state == PrebasePresentationStatePeek || state == PrebasePresentationStateAttentionPeek);
+}
+
+static inline BOOL PrebasePresentationStateIsCompact(PrebasePresentationState state) {
+	return (state == PrebasePresentationStateCompact || state == PrebasePresentationStateAttentionCompact);
 }
 
 static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
@@ -335,8 +345,8 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	// TOPOLOGY-COMPATIBLE SINGLE CONTINUOUS CONTOUR
 	// Exactly 1 subpath, 14 elements (1 MoveTo, 8 LineTo, 4 CurveTo, 1 CloseSubpath)
-	// Expanded natural width keeps panel span with organic C1 continuous fillets at top
-	// shoulders (transitioning smoothly from horizontal y=0 to vertical sides).
+	// Organic concave fillets flare outwards to meet the display bezel along y=0 with horizontal
+	// tangency, anchoring physically to the hardware camera housing without convex card cutoffs.
 	CGFloat depth = MAX(0.0, currentH - bandH);
 	CGFloat effBottomR = MIN(kBottomCornerRadius, currentH * 0.42);
 	CGFloat kBottom = effBottomR * (1.0 - kKappa);
@@ -345,15 +355,12 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	CGFloat notchRight = notchLeft + housingW;
 	CGFloat notchCenter = (notchLeft + notchRight) * 0.5;
 	SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(totalW, depth, leftW, rightW, housingW, isExpanded);
-	CGFloat wingLeftX = shoulder.wingLeftX;
-	CGFloat wingRightX = shoulder.wingRightX;
 	CGFloat effShoulderR = isExpanded ? shoulder.effShoulderR : 0.0;
-	CGFloat shoulderBottomY = isExpanded ? effShoulderR : 0.0;
 
-	// 0. Move to top-left of left wing (wingLeftX, 0)
-	CGPathMoveToPoint(path, NULL, wingLeftX, 0);
+	// 0. Move to top-left of top bezel line (0, 0)
+	CGPathMoveToPoint(path, NULL, 0, 0);
 
-	// 1. Line across top of left wing to notch start (notchLeft, 0)
+	// 1. Line across top bezel to notch start (notchLeft, 0)
 	CGPathAddLineToPoint(path, NULL, notchLeft, 0);
 
 	// 2. Continuous solid notch span: center anchor (notchCenter, 0)
@@ -362,47 +369,44 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 	// 3. Continuous solid notch span: right anchor (notchRight, 0)
 	CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-	// 4. Line across top of right wing to right wing end (wingRightX, 0)
-	CGPathAddLineToPoint(path, NULL, wingRightX, 0);
+	// 4. Line across top bezel to right corner start (totalW, 0)
+	CGPathAddLineToPoint(path, NULL, totalW, 0);
 
-	// 5. Right wing end anchor (wingRightX, 0)
-	CGPathAddLineToPoint(path, NULL, wingRightX, 0);
+	// 5. Right bezel end anchor (totalW, 0)
+	CGPathAddLineToPoint(path, NULL, totalW, 0);
 
-	CGFloat flareR = MAX(0.0, totalW - wingRightX);
-	CGFloat flareL = MAX(0.0, wingLeftX);
-
-	// 6. Right organic shoulder: horizontal tangency at (wingRightX, 0), vertical at (totalW, shoulderBottomY)
+	// 6. Right organic concave shoulder: horizontal tangency at (totalW, 0), vertical at (totalW - effShoulderR, effShoulderR)
 	CGPathAddCurveToPoint(path, NULL,
-		wingRightX + flareR * kKappa, 0,
-		totalW, shoulderBottomY - effShoulderR * (1.0 - kKappa),
-		totalW, shoulderBottomY);
+		totalW - effShoulderR * kKappa, 0,
+		totalW - effShoulderR, effShoulderR * kKappa,
+		totalW - effShoulderR, effShoulderR);
 
-	// 7. Line down right side to bottom-right corner start (totalW, currentH - effBottomR)
-	CGPathAddLineToPoint(path, NULL, totalW, currentH - effBottomR);
+	// 7. Line down right vertical wall to bottom-right corner start (totalW - effShoulderR, currentH - effBottomR)
+	CGPathAddLineToPoint(path, NULL, totalW - effShoulderR, currentH - effBottomR);
 
-	// 8. Bottom-right corner curve to (totalW - effBottomR, currentH)
+	// 8. Bottom-right corner curve to (totalW - effShoulderR - effBottomR, currentH)
 	CGPathAddCurveToPoint(path, NULL,
-		totalW, currentH - kBottom,
-		totalW - kBottom, currentH,
-		totalW - effBottomR, currentH);
+		totalW - effShoulderR, currentH - kBottom,
+		totalW - effShoulderR - kBottom, currentH,
+		totalW - effShoulderR - effBottomR, currentH);
 
-	// 9. Line across bottom edge to bottom-left corner start (effBottomR, currentH)
-	CGPathAddLineToPoint(path, NULL, effBottomR, currentH);
+	// 9. Line across bottom edge to bottom-left corner start (effShoulderR + effBottomR, currentH)
+	CGPathAddLineToPoint(path, NULL, effShoulderR + effBottomR, currentH);
 
-	// 10. Bottom-left corner curve to (0, currentH - effBottomR)
+	// 10. Bottom-left corner curve to (effShoulderR, currentH - effBottomR)
 	CGPathAddCurveToPoint(path, NULL,
-		kBottom, currentH,
-		0, currentH - kBottom,
-		0, currentH - effBottomR);
+		effShoulderR + kBottom, currentH,
+		effShoulderR, currentH - kBottom,
+		effShoulderR, currentH - effBottomR);
 
-	// 11. Line up left side to left shoulder start (0, shoulderBottomY)
-	CGPathAddLineToPoint(path, NULL, 0, shoulderBottomY);
+	// 11. Line up left vertical wall to left shoulder start (effShoulderR, effShoulderR)
+	CGPathAddLineToPoint(path, NULL, effShoulderR, effShoulderR);
 
-	// 12. Left organic shoulder: vertical tangency at (0, shoulderBottomY), horizontal at (wingLeftX, 0)
+	// 12. Left organic concave shoulder: vertical tangency at (effShoulderR, effShoulderR), horizontal at (0, 0)
 	CGPathAddCurveToPoint(path, NULL,
-		0, shoulderBottomY - effShoulderR * (1.0 - kKappa),
-		wingLeftX - flareL * kKappa, 0,
-		wingLeftX, 0);
+		effShoulderR, effShoulderR * kKappa,
+		effShoulderR * kKappa, 0,
+		0, 0);
 
 	// 13. Close subpath
 	CGPathCloseSubpath(path);
@@ -728,8 +732,8 @@ static NSString *JSString(Napi::Value value) {
 	tf.cell.wraps = lines > 1;
 	tf.cell.scrollable = NO;
 	if (lines > 1) {
-		// Scrollable documents wrap fully; only truncate when the block must fit a fixed band.
-		tf.lineBreakMode = truncating ? NSLineBreakByTruncatingTail : NSLineBreakByWordWrapping;
+		// Scrollable documents wrap fully with char-wrapping so unbroken URLs/paths/tokens cannot escape
+		tf.lineBreakMode = truncating ? NSLineBreakByTruncatingTail : NSLineBreakByCharWrapping;
 	} else {
 		tf.lineBreakMode = NSLineBreakByTruncatingTail;
 	}
@@ -958,7 +962,12 @@ static NSString *JSString(Napi::Value value) {
 		bounds.size = layoutSize;
 	}
 	CGFloat bandH = MAX(self.safeAreaTop, kCollapsedHeight);
-	BOOL isExpanded = self.targetExpanded;
+	PrebasePresentationState state = self.controller ? [self.controller canonicalTargetPresentationState] : (self.targetExpanded ? PrebasePresentationStateInteractiveWorking : PrebasePresentationStateCompact);
+	if (!self.controller && self.peekOnly) {
+		state = PrebasePresentationStatePeek;
+	}
+	BOOL isExpanded = PrebasePresentationStateIsExpanded(state);
+	BOOL isPeek = PrebasePresentationStateIsPeek(state);
 	CGFloat totalW = NSWidth(bounds);
 	CGFloat currentH = NSHeight(bounds);
 	CGFloat leftW = self.leftWingWidth > 0 ? self.leftWingWidth : kWingWidthMin;
@@ -970,7 +979,7 @@ static NSString *JSString(Napi::Value value) {
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 
 	// Compact state: only collapsed wing chrome
-	if (!isExpanded) {
+	if (!isExpanded && !isPeek) {
 		self.contentScrollView.hidden = YES;
 		self.peekContainer.hidden = YES;
 		self.peekContainer.alphaValue = 0.0;
@@ -986,7 +995,7 @@ static NSString *JSString(Napi::Value value) {
 	}
 
 	// Attention Peek / Peek: keeps compact wings and shows one glanceable activity/pending line in peekContainer
-	if (self.peekOnly) {
+	if (isPeek) {
 		self.contentScrollView.hidden = YES;
 		self.expandedContainer.hidden = YES;
 		self.expandedContainer.alphaValue = 0.0;
@@ -1041,8 +1050,10 @@ static NSString *JSString(Napi::Value value) {
 	self.peekContainer.hidden = YES;
 	self.peekContainer.alphaValue = 0.0;
 	self.peekLabel.hidden = YES;
-	self.compactContainer.hidden = YES;
-	self.compactContainer.alphaValue = 0.0;
+	if (!(self.controller && self.controller.transitionInFlight && !self.reducedMotion)) {
+		self.compactContainer.hidden = YES;
+		self.compactContainer.alphaValue = 0.0;
+	}
 	self.expandedContainer.hidden = NO;
 	self.expandedContainer.alphaValue = 1.0;
 	self.headerTitle.hidden = NO;
@@ -1151,8 +1162,13 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat bandH = MAX(self.safeAreaTop, kCollapsedHeight);
 	CGFloat totalW = (targetSize.width > 0) ? targetSize.width : NSWidth(bounds);
 	CGFloat currentH = (targetSize.height > 0) ? targetSize.height : NSHeight(bounds);
-	// Use explicit semantic target state when available, otherwise infer from bounds for compatibility
-	BOOL isExpanded = useTargetState ? self.targetExpanded : (currentH > bandH + 2.0);
+	// Use canonical presentation state as single semantic authority
+	PrebasePresentationState targetState = self.controller ? [self.controller canonicalTargetPresentationState] : (useTargetState ? (self.targetExpanded ? PrebasePresentationStateInteractiveWorking : PrebasePresentationStateCompact) : (currentH > bandH + 2.0 ? PrebasePresentationStateInteractiveWorking : PrebasePresentationStateCompact));
+	if (!self.controller && self.peekOnly) {
+		targetState = PrebasePresentationStatePeek;
+	}
+	BOOL isExpanded = PrebasePresentationStateIsExpanded(targetState);
+	BOOL isPeek = PrebasePresentationStateIsPeek(targetState);
 
 	CGFloat leftW = self.leftWingWidth > 0 ? self.leftWingWidth : kWingWidthMin;
 	CGFloat rightW = self.rightWingWidth > 0 ? self.rightWingWidth : kWingWidthMin;
@@ -1182,21 +1198,19 @@ static NSString *JSString(Napi::Value value) {
 		}
 	}
 	if (isExpanded) {
-		if (self.peekOnly) {
-			self.compactContainer.hidden = NO;
-			self.compactContainer.alphaValue = 1.0;
-			self.expandedContainer.hidden = YES;
-			self.expandedContainer.alphaValue = 0.0;
-			self.peekContainer.hidden = NO;
-			self.peekContainer.alphaValue = 1.0;
-		} else {
-			self.compactContainer.hidden = YES;
-			self.compactContainer.alphaValue = 0.0;
-			self.peekContainer.hidden = YES;
-			self.peekContainer.alphaValue = 0.0;
-			self.expandedContainer.hidden = NO;
-			self.expandedContainer.alphaValue = 1.0; // populated first paint — no blank fade-in
-		}
+		self.compactContainer.hidden = (animated && !self.reducedMotion) ? NO : YES;
+		self.compactContainer.alphaValue = (animated && !self.reducedMotion) ? 1.0 : 0.0;
+		self.peekContainer.hidden = YES;
+		self.peekContainer.alphaValue = 0.0;
+		self.expandedContainer.hidden = NO;
+		self.expandedContainer.alphaValue = (animated && !self.reducedMotion) ? 0.0 : 1.0; // populated first paint — staged before morph
+	} else if (isPeek) {
+		self.compactContainer.hidden = NO;
+		self.compactContainer.alphaValue = 1.0;
+		self.expandedContainer.hidden = YES;
+		self.expandedContainer.alphaValue = 0.0;
+		self.peekContainer.hidden = NO;
+		self.peekContainer.alphaValue = 1.0;
 	} else {
 		if (!animated || self.reducedMotion) {
 			self.expandedContainer.hidden = YES;
@@ -1303,7 +1317,7 @@ static NSString *JSString(Napi::Value value) {
 	CGPathRelease(targetPath);
 
 	const NSUInteger currentGen = self.controller ? self.controller.transitionGeneration : 0;
-	if (!isExpanded) {
+	if (!isExpanded && !isPeek) {
 		if (animated && !self.reducedMotion) {
 			self.compactContainer.hidden = NO;
 			self.compactContainer.alphaValue = 0.0;
@@ -1330,7 +1344,7 @@ static NSString *JSString(Napi::Value value) {
 			self.compactContainer.alphaValue = 1.0;
 			self.compactContainer.hidden = NO;
 		}
-	} else if (self.peekOnly) {
+	} else if (isPeek) {
 		self.compactContainer.hidden = NO;
 		self.compactContainer.alphaValue = 1.0;
 		self.peekContainer.hidden = NO;
@@ -1355,14 +1369,15 @@ static NSString *JSString(Napi::Value value) {
 			self.compactContainer.hidden = NO;
 		}
 	} else {
-		self.compactContainer.hidden = YES;
-		self.compactContainer.alphaValue = 0.0;
-		self.peekContainer.hidden = YES;
-		self.peekContainer.alphaValue = 0.0;
-		self.expandedContainer.hidden = NO;
+		// Expanded Interactive: crossfade compact wing chrome and expanded content alongside shape morph
 		if (animated && !self.reducedMotion) {
+			self.compactContainer.hidden = NO;
+			self.compactContainer.alphaValue = 1.0;
+			self.expandedContainer.hidden = NO;
+			self.expandedContainer.alphaValue = 0.0;
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
-				ctx.duration = duration * 0.45;
+				ctx.duration = duration;
+				self.compactContainer.animator.alphaValue = 0.0;
 				self.expandedContainer.animator.alphaValue = 1.0;
 			} completionHandler:^{
 				if (!self.controller || currentGen == self.controller.transitionGeneration) {
@@ -1370,6 +1385,8 @@ static NSString *JSString(Napi::Value value) {
 					self.compactContainer.alphaValue = 0.0;
 					self.peekContainer.hidden = YES;
 					self.peekContainer.alphaValue = 0.0;
+					self.expandedContainer.hidden = NO;
+					self.expandedContainer.alphaValue = 1.0;
 				}
 			}];
 		} else {
@@ -1934,7 +1951,7 @@ static NSString *JSString(Napi::Value value) {
 
 /** Footer control stack height inside expandedContainer (options / approval / composer). */
 - (CGFloat)computeControlsStackHeight {
-	PrebasePresentationState st = [self canonicalPresentationState];
+	PrebasePresentationState st = self.transitionInFlight ? [self canonicalTargetPresentationState] : [self canonicalPresentationState];
 	if (st < PrebasePresentationStateInteractiveWorking || st > PrebasePresentationStateInteractiveApproval) {
 		return 0;
 	}
@@ -1985,14 +2002,14 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (CGFloat)computeTargetContentHeight:(CGFloat)bandH {
-	BOOL expanded = self.content.expanded || self.pinned;
-	if (!expanded) {
+	PrebasePresentationState state = [self canonicalTargetPresentationState];
+	if (PrebasePresentationStateIsCompact(state) || state == PrebasePresentationStateHidden) {
 		self.pinnedInteractiveHeight = 0;
 		self.lastGeometrySignature = [self geometrySignatureForBandH:bandH];
 		return bandH;
 	}
 	// Peek / attentionPeek: fixed body height — message length must not reflow geometry.
-	if ((self.content.peekOnly || self.attentionPeek) && !self.pinned) {
+	if (PrebasePresentationStateIsPeek(state)) {
 		self.pinnedInteractiveHeight = 0;
 		self.lastGeometrySignature = [self geometrySignatureForBandH:bandH];
 		return bandH + kPeekBodyHeight;
@@ -2007,8 +2024,7 @@ static NSString *JSString(Napi::Value value) {
 	}
 
 	// Completed / failed: compact pill layout
-	BOOL isCompletedOrFailed = [self.content.status isEqualToString:@"completed"] || [self.content.status isEqualToString:@"failed"];
-	if (isCompletedOrFailed) {
+	if (state == PrebasePresentationStateTerminalCompleted || state == PrebasePresentationStateTerminalFailed) {
 		CGFloat compactH = bandH + kContentInsetTop + kHeaderRowHeight + kContentGap;
 		if (self.content.latestMessage.length) {
 			compactH += 16 + kContentGap;
@@ -2249,7 +2265,7 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (void)layoutControls:(NSRect)win {
-	PrebasePresentationState state = [self canonicalPresentationState];
+	PrebasePresentationState state = self.transitionInFlight ? [self canonicalTargetPresentationState] : [self canonicalPresentationState];
 	BOOL showAttention = (state == PrebasePresentationStateInteractiveWorking ||
 	                      state == PrebasePresentationStateInteractiveQuestion ||
 	                      state == PrebasePresentationStateInteractiveApproval);
@@ -2278,7 +2294,7 @@ static NSString *JSString(Napi::Value value) {
 		self.content.expandedContainer.frame = NSMakeRect(0, bandH, NSWidth(win), MAX(0, bodyHeight));
 		self.content.compactContainer.frame = NSMakeRect(0, 0, NSWidth(win), bandH);
 	}
-	if (bodyHeight < 36.0) {
+	if (bodyHeight < 36.0 && !self.transitionInFlight) {
 		self.input.hidden = YES;
 		self.openButton.hidden = YES;
 		self.pinButton.hidden = YES;

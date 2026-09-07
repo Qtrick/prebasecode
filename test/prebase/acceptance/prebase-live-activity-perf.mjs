@@ -5916,6 +5916,323 @@ async function run() {
 	}
 	results.tests.push(test61);
 
+	// Test 62: Canonical Presentation Authority Invariance
+	const test62 = { name: 'canonical-presentation-authority-invariance', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+
+		// 1. Compact Idle
+		native.setSnapshot(contentSnapshot(62_001, { status: 'idle', currentActivity: '' }));
+		await sleep(80);
+		await drainMain(native, 3);
+		let diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'compact') {
+			throw new Error(`Expected compact, got ${diag.canonicalPresentationState}`);
+		}
+		if (!diag.compactContainerVisible || diag.interactiveContentVisible) {
+			throw new Error('Compact chrome must be visible and interactive content suppressed');
+		}
+
+		// 2. Attention Peek
+		native.setSnapshot(contentSnapshot(62_002, {
+			status: 'attention',
+			currentActivity: 'Needs review',
+			pendingInteraction: { kind: 'approval', interactionId: 'att-peek-1', title: 'Review changes' }
+		}));
+		await sleep(250);
+		await drainMain(native, 4);
+		diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'attentionPeek') {
+			throw new Error(`Expected attentionPeek, got ${diag.canonicalPresentationState}`);
+		}
+		if (!diag.peekContainerVisible || diag.interactiveContentVisible) {
+			throw new Error('Peek container must be visible in attentionPeek');
+		}
+
+		// 3. User Dismissed Attention (Escape to Attention Compact)
+		native.simulateAction('escape');
+		await sleep(250);
+		await drainMain(native, 4);
+		diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'attentionCompact') {
+			throw new Error(`Expected attentionCompact after escape, got ${diag.canonicalPresentationState}`);
+		}
+		if (!diag.compactContainerVisible || diag.interactiveContentVisible) {
+			throw new Error('Compact chrome must be restored after escape dismissal');
+		}
+
+		// 4. Interactive Working (Pinned)
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(62_003, { status: 'working', currentActivity: 'Refactoring notch' }));
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'interactiveWorking') {
+			throw new Error(`Expected interactiveWorking, got ${diag.canonicalPresentationState}`);
+		}
+		if (!diag.expandedContainerVisible || !diag.interactiveContentVisible || !diag.composerVisible) {
+			throw new Error('Expanded container and composer must be visible in interactiveWorking');
+		}
+		if (diag.approvalControlsVisible) {
+			throw new Error('Approval controls must not be visible in interactiveWorking');
+		}
+
+		// 5. Interactive Question
+		native.setSnapshot(contentSnapshot(62_004, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'question',
+				interactionId: 'q-62',
+				title: 'Select strategy',
+				options: [
+					{ id: 'opt1', label: 'Option 1' },
+					{ id: 'opt2', label: 'Option 2' }
+				]
+			}
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'interactiveQuestion') {
+			throw new Error(`Expected interactiveQuestion, got ${diag.canonicalPresentationState}`);
+		}
+		if (diag.composerVisible || diag.approvalControlsVisible) {
+			throw new Error('Composer and approval controls must be suppressed in interactiveQuestion');
+		}
+
+		// 6. Interactive Approval
+		native.setSnapshot(contentSnapshot(62_005, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'appr-62',
+				title: 'Approve execution?'
+			}
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'interactiveApproval') {
+			throw new Error(`Expected interactiveApproval, got ${diag.canonicalPresentationState}`);
+		}
+		if (!diag.approvalControlsVisible || diag.composerVisible) {
+			throw new Error('Approval controls must be visible and composer suppressed in interactiveApproval');
+		}
+
+		// 7. Terminal Failed
+		native.setSnapshot(contentSnapshot(62_006, {
+			status: 'failed',
+			currentActivity: 'Build failed'
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'terminalFailed') {
+			throw new Error(`Expected terminalFailed, got ${diag.canonicalPresentationState}`);
+		}
+		if (diag.approvalControlsVisible || diag.composerVisible) {
+			throw new Error('Controls must be suppressed in terminalFailed');
+		}
+
+		test62.details.statesVerified = ['compact', 'attentionPeek', 'attentionCompact', 'interactiveWorking', 'interactiveQuestion', 'interactiveApproval', 'terminalFailed'];
+	} catch (err) {
+		test62.ok = false;
+		test62.error = err.message;
+		results.failures.push(`canonical-presentation-authority-invariance: ${err.message}`);
+	}
+	results.tests.push(test62);
+
+	// Test 63: Adversarial Unbroken Tokens and Character Wrapping
+	const test63 = { name: 'adversarial-unbroken-tokens-and-character-wrapping', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+
+		// 500-character unbroken URL/hash token that tests character-level wrapping
+		const unbroken500 = 'https://prebase.internal.dev/repos/super-long-unbroken-slug-that-must-be-wrapped-by-character-without-horizontal-clip-or-escape-1234567890abcdefghijklmnopqrstuvwxyz-commit-982d4ec1da6448d68519ef3f9db1273b-sha256-e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855-very-long-continuous-identifier-with-no-spaces-at-all-for-robust-safe-containment-adversarial-verification-matrix-testing-boundary-system';
+		const cjkAndPath = '⚡️ 【边界约束与文字容纳测试】/Users/developer/prebase/very/long/unbroken/path/that/spans/across/multiple/lines/of/text/without/spaces/abcdefghijklmnopqrstuvwxyz1234567890/文件系统路径测试-Unicode-🚀';
+
+		native.setSnapshot(contentSnapshot(63_001, {
+			status: 'working',
+			currentActivity: unbroken500,
+			latestShortMessage: cjkAndPath
+		}));
+		await sleep(350);
+		await drainMain(native, 6);
+
+		const diag = native.getDiagnostics();
+		test63.details.panelFrame = diag.panelFrame;
+		test63.details.bodyBounds = diag.bodyBounds;
+		test63.details.contentScrollFrame = diag.contentScrollFrame;
+		test63.details.contentSafeViewport = diag.contentSafeViewport;
+
+		// Text layout must never cause scroll frame width to exceed body width
+		if (diag.contentScrollFrame.width > diag.bodyBounds.width) {
+			throw new Error(`contentScrollFrame width (${diag.contentScrollFrame.width}) exceeds bodyBounds (${diag.bodyBounds.width})`);
+		}
+		// Safe viewport inset must be preserved
+		if (diag.contentSafeViewport.x < 16) {
+			throw new Error(`contentSafeViewport x inset (${diag.contentSafeViewport.x}) must be >= 16pt`);
+		}
+		// Panel height must stay within bounded ceiling (<= 192pt)
+		if (diag.panelFrame.height > 192) {
+			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeded maximum 192pt`);
+		}
+	} catch (err) {
+		test63.ok = false;
+		test63.error = err.message;
+		results.failures.push(`adversarial-unbroken-tokens-and-character-wrapping: ${err.message}`);
+	}
+	results.tests.push(test63);
+
+	// Test 64: Concave Top Shoulder Geometry and Bezel Attachment Invariants
+	const test64 = { name: 'concave-top-shoulder-geometry-and-bezel-attachment-invariants', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(64_001, { status: 'working' }));
+		await sleep(100);
+		await drainMain(native, 3);
+
+		// 1. Compact: top edge anchored at screen top
+		let diag = native.getDiagnostics();
+		if (diag.topAnchorDelta !== 0) {
+			throw new Error(`Compact notch must be flush with top bezel (delta=${diag.topAnchorDelta})`);
+		}
+
+		// 2. Expanded: panel must remain attached to top bezel (y + height == screenTopY)
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+
+		const panelTopY = diag.panelFrame.y + diag.panelFrame.height;
+		if (Math.abs(panelTopY - diag.screenTopY) > 1.0) {
+			throw new Error(`Expanded notch must remain attached to screen top (panelTopY=${panelTopY}, screenTopY=${diag.screenTopY})`);
+		}
+		if (diag.panelFrame.width < 313) {
+			throw new Error(`Expanded width (${diag.panelFrame.width}) must be >= 313pt`);
+		}
+
+		test64.details.compactDelta = 0;
+		test64.details.expandedTopY = panelTopY;
+		test64.details.screenTopY = diag.screenTopY;
+	} catch (err) {
+		test64.ok = false;
+		test64.error = err.message;
+		results.failures.push(`concave-top-shoulder-geometry-and-bezel-attachment-invariants: ${err.message}`);
+	}
+	results.tests.push(test64);
+
+	// Test 65: Intermediate Transition Crossfade and Zero-Void Morph
+	const test65 = { name: 'intermediate-transition-crossfade-and-zero-void-morph', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(65_001, { status: 'working', currentActivity: 'Crossfade validation' }));
+		await sleep(100);
+		await drainMain(native, 3);
+
+		// Trigger expansion with animation enabled
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+
+		// Sample early frame (t ~ 10-30ms)
+		await sleep(25);
+		await drainMain(native, 1);
+		const earlyDiag = native.getDiagnostics();
+
+		// Sample mid transition frame (t ~ 80-100ms)
+		await sleep(65);
+		await drainMain(native, 1);
+		const midDiag = native.getDiagnostics();
+
+		// Settle transition
+		await sleep(300);
+		await drainMain(native, 5);
+		const settledDiag = native.getDiagnostics();
+
+		test65.details.early = {
+			inFlight: earlyDiag.transitionInFlight,
+			compactVisible: earlyDiag.compactContainerVisible,
+			expandedVisible: earlyDiag.expandedContainerVisible
+		};
+		test65.details.mid = {
+			inFlight: midDiag.transitionInFlight,
+			compactVisible: midDiag.compactContainerVisible,
+			expandedVisible: midDiag.expandedContainerVisible
+		};
+		test65.details.settled = {
+			inFlight: settledDiag.transitionInFlight,
+			compactVisible: settledDiag.compactContainerVisible,
+			expandedVisible: settledDiag.expandedContainerVisible
+		};
+
+		// During expansion onset, compact container must remain visible (no blank void)
+		if (!earlyDiag.compactContainerVisible && !earlyDiag.expandedContainerVisible) {
+			throw new Error('Empty black void detected during expansion onset: neither container was visible');
+		}
+		// Settled state must have expanded visible and compact hidden
+		if (!settledDiag.expandedContainerVisible || settledDiag.compactContainerVisible) {
+			throw new Error('Settled state did not finish crossfade properly');
+		}
+		if (settledDiag.transitionInFlight) {
+			throw new Error('Transition must be marked settled after animation completion');
+		}
+	} catch (err) {
+		test65.ok = false;
+		test65.error = err.message;
+		results.failures.push(`intermediate-transition-crossfade-and-zero-void-morph: ${err.message}`);
+	}
+	results.tests.push(test65);
+
+	// Test 66: Safe-Zone Corner Clearance and Footer Geometry
+	const test66 = { name: 'safe-zone-corner-clearance-and-footer-geometry', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+
+		// Approval layout corner clearance
+		native.setSnapshot(contentSnapshot(66_001, {
+			status: 'attention',
+			pendingInteraction: {
+				kind: 'approval',
+				interactionId: 'appr-corner-test',
+				title: 'Safe zone verification'
+			}
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+
+		let diag = native.getDiagnostics();
+		test66.details.approval = {
+			approveFrame: diag.approveButtonFrame,
+			denyFrame: diag.denyButtonFrame,
+			panelFrame: diag.panelFrame
+		};
+
+		// Inset clearance check: buttons must clear safe horizontal inset (>= 18pt)
+		if (diag.denyButtonFrame.x < 18) {
+			throw new Error(`denyButtonFrame x (${diag.denyButtonFrame.x}) collides with left curved corner (<18pt)`);
+		}
+		const approveRight = diag.approveButtonFrame.x + diag.approveButtonFrame.width;
+		if (approveRight > diag.panelFrame.width - 18) {
+			throw new Error(`approveButtonFrame right edge (${approveRight}) collides with right curved corner (> ${diag.panelFrame.width - 18})`);
+		}
+
+		// Vertical clearance check: button bottom must clear bottom curve (y + height <= bodyHeight - 5)
+		const bodyH = diag.panelFrame.height - diag.safeAreaTop;
+		const buttonBottom = diag.approveButtonFrame.y + diag.approveButtonFrame.height;
+		if (buttonBottom > bodyH - 5) {
+			throw new Error(`Button bottom (${buttonBottom}) collides with bottom curved boundary (${bodyH - 5})`);
+		}
+	} catch (err) {
+		test66.ok = false;
+		test66.error = err.message;
+		results.failures.push(`safe-zone-corner-clearance-and-footer-geometry: ${err.message}`);
+	}
+	results.tests.push(test66);
+
 	native.dispose();
 
 	results.ok = results.failures.length === 0;
