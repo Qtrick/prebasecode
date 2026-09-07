@@ -5539,6 +5539,383 @@ async function run() {
 	}
 	results.tests.push(test57);
 
+	// Test 58: Intermediate Transition Frame Sampling Matrix and Collapse Crossfade
+	const test58 = { name: 'intermediate-transition-frame-sampling-matrix-and-collapse-crossfade', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(58_001, { status: 'working', currentActivity: 'Initial compact' }));
+		await sleep(50);
+		await drainMain(native, 2);
+
+		const transitions = [
+			{
+				name: 'compact -> peek',
+				trigger: () => {
+					native.simulateAction('peek');
+				},
+				expectedTarget: 'peek',
+				midMorphCheck: (diag) => {
+					if (diag.transitionInFlight !== true) throw new Error('transitionInFlight must be true mid-morph');
+				}
+			},
+			{
+				name: 'peek -> interactiveWorking',
+				trigger: () => {
+					native.simulateAction('click');
+				},
+				expectedTarget: 'interactiveWorking',
+				midMorphCheck: (diag) => {
+					if (diag.transitionInFlight !== true) throw new Error('transitionInFlight must be true mid-morph');
+				}
+			},
+			{
+				name: 'interactiveWorking -> interactiveQuestion',
+				trigger: () => {
+					native.setSnapshot(contentSnapshot(58_002, {
+						status: 'attention',
+						pendingKind: 'question',
+						interactionId: 'q-trans',
+						pendingTitle: 'Proceed with architecture change?',
+						pendingOptions: [{ id: 'yes', label: 'Yes' }, { id: 'no', label: 'No' }]
+					}));
+				},
+				expectedTarget: 'interactiveQuestion',
+				midMorphCheck: (diag) => {
+					if (diag.transitionInFlight !== true) throw new Error('transitionInFlight must be true mid-morph');
+				}
+			},
+			{
+				name: 'interactiveQuestion -> interactiveApproval',
+				trigger: () => {
+					native.setSnapshot(contentSnapshot(58_003, {
+						status: 'attention',
+						pendingKind: 'approval',
+						interactionId: 'appr-trans',
+						pendingTitle: 'Approve git commit?',
+						pendingMessage: 'Target files: 3 modified'
+					}));
+				},
+				expectedTarget: 'interactiveApproval',
+				midMorphCheck: (diag) => {
+					if (diag.transitionInFlight !== true) throw new Error('transitionInFlight must be true mid-morph');
+				}
+			},
+			{
+				name: 'interactiveApproval -> terminalCompleted',
+				trigger: () => {
+					native.setSnapshot(contentSnapshot(58_004, {
+						status: 'completed',
+						latestShortMessage: 'Commit completed successfully'
+					}));
+				},
+				expectedTarget: 'terminalCompleted',
+				midMorphCheck: (diag) => {
+					if (diag.transitionInFlight !== true) throw new Error('transitionInFlight must be true mid-morph');
+				}
+			},
+			{
+				name: 'terminalCompleted -> compact (collapse)',
+				trigger: () => {
+					native.simulateAction('escape');
+				},
+				expectedTarget: 'compact',
+				midMorphCheck: (diag) => {
+					if (diag.transitionInFlight !== true) throw new Error('transitionInFlight must be true mid-collapse');
+					// Critical check: during collapse, expandedContainer must remain visible for smooth crossfade
+					// (DEF-01 fix: no empty black void mid-animation!)
+					if (diag.expandedContainerVisible !== true) {
+						throw new Error('DEF-01 violation: expandedContainer must remain visible mid-collapse for smooth crossfade');
+					}
+				}
+			},
+			{
+				name: 'compact -> interactiveWorking',
+				trigger: () => {
+					native.setSnapshot(contentSnapshot(58_005, { status: 'working', currentActivity: 'Back to working' }));
+					native.simulateAction('click');
+				},
+				expectedTarget: 'interactiveWorking',
+				midMorphCheck: () => {}
+			},
+			{
+				name: 'interactive collapse -> compact',
+				trigger: () => {
+					native.simulateAction('escape');
+				},
+				expectedTarget: 'compact',
+				midMorphCheck: (diag) => {
+					if (diag.transitionInFlight !== true) throw new Error('transitionInFlight must be true mid-collapse');
+					if (diag.expandedContainerVisible !== true) {
+						throw new Error('DEF-01 violation: expandedContainerVisible must be true during collapse crossfade');
+					}
+				}
+			}
+		];
+
+		const stepDetails = [];
+		for (const step of transitions) {
+			step.trigger();
+			// Sample intermediate animation frame at ~35ms
+			await sleep(35);
+			await drainMain(native, 1);
+			const midDiag = native.getDiagnostics();
+			step.midMorphCheck(midDiag);
+
+			// Let animation settle
+			await sleep(320);
+			await drainMain(native, 5);
+			const settledDiag = native.getDiagnostics();
+			if (settledDiag.transitionInFlight === true) {
+				throw new Error(`transition must settle to false for ${step.name}`);
+			}
+			if (settledDiag.canonicalPresentationState !== step.expectedTarget) {
+				throw new Error(`State did not settle to ${step.expectedTarget} for ${step.name}, got ${settledDiag.canonicalPresentationState}`);
+			}
+			stepDetails.push({ name: step.name, settled: settledDiag.canonicalPresentationState });
+		}
+		test58.details.transitions = stepDetails;
+	} catch (err) {
+		test58.ok = false;
+		test58.error = err.message;
+		results.failures.push(`intermediate-transition-frame-sampling-matrix-and-collapse-crossfade: ${err.message}`);
+	}
+	results.tests.push(test58);
+
+	// Test 59: Authoritative Semantic Subtree Ownership and Suppression Matrix
+	const test59 = { name: 'authoritative-semantic-subtree-ownership-and-suppression-matrix', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+
+		// 1. Compact state
+		native.setSnapshot(contentSnapshot(59_001, { status: 'working', currentActivity: 'Working quiet' }));
+		await sleep(100);
+		await drainMain(native, 3);
+		let diag = native.getDiagnostics();
+		if (diag.semanticContentSubtree !== 'compactContainer') {
+			throw new Error(`Compact state semantic content owner must be compactContainer, got ${diag.semanticContentSubtree}`);
+		}
+		if (diag.supportingChromeSubtree !== null) {
+			throw new Error(`Compact state supportingChromeSubtree must be null, got ${diag.supportingChromeSubtree}`);
+		}
+		if (!diag.inactiveSubtreesSuppressed) {
+			throw new Error('Compact state inactive subtrees must be suppressed');
+		}
+		if (!diag.inactiveInteractiveSubtreeSuppressed) {
+			throw new Error('Compact state inactive interactive subtrees must be suppressed');
+		}
+
+		// 2. Peek state
+		native.simulateAction('peek');
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+		if (diag.semanticContentSubtree !== 'peekContainer') {
+			throw new Error(`Peek state semantic content owner must be peekContainer, got ${diag.semanticContentSubtree}`);
+		}
+		if (diag.supportingChromeSubtree !== 'compactContainer') {
+			throw new Error(`Peek state supportingChromeSubtree must be compactContainer, got ${diag.supportingChromeSubtree}`);
+		}
+		if (!diag.inactiveSubtreesSuppressed) {
+			throw new Error('Peek state inactive subtrees must be suppressed');
+		}
+		if (!diag.inactiveInteractiveSubtreeSuppressed) {
+			throw new Error('Peek state inactive interactive subtrees must be suppressed');
+		}
+
+		// 3. Interactive Working state
+		native.simulateAction('click');
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+		if (diag.semanticContentSubtree !== 'expandedContainer') {
+			throw new Error(`InteractiveWorking state semantic content owner must be expandedContainer, got ${diag.semanticContentSubtree}`);
+		}
+		if (diag.approvalControlsVisible) {
+			throw new Error('Approval controls must not be visible in InteractiveWorking state');
+		}
+		if (!diag.inactiveInteractiveSubtreeSuppressed) {
+			throw new Error('Inactive interactive subtrees (approval) must be suppressed in InteractiveWorking');
+		}
+
+		// 4. Interactive Approval state
+		native.setSnapshot(contentSnapshot(59_002, {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'appr-subtrees',
+			pendingTitle: 'Approve change?'
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'interactiveApproval') {
+			throw new Error(`State must be interactiveApproval, got ${diag.canonicalPresentationState}`);
+		}
+		if (!diag.approvalControlsVisible) {
+			throw new Error('Approval controls must be visible in interactiveApproval');
+		}
+		if (diag.composerVisible) {
+			throw new Error('Composer must not be visible in interactiveApproval');
+		}
+		if (!diag.inactiveInteractiveSubtreeSuppressed) {
+			throw new Error('Composer must be suppressed in interactiveApproval');
+		}
+
+		// 5. Terminal Completed state
+		native.setSnapshot(contentSnapshot(59_003, {
+			status: 'completed',
+			latestShortMessage: 'All tasks completed'
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+		diag = native.getDiagnostics();
+		if (diag.canonicalPresentationState !== 'terminalCompleted') {
+			throw new Error(`State must be terminalCompleted, got ${diag.canonicalPresentationState}`);
+		}
+		if (diag.approvalControlsVisible) {
+			throw new Error('Approval controls must not be visible in terminalCompleted');
+		}
+		if (diag.composerVisible) {
+			throw new Error('Composer must not be visible in terminalCompleted');
+		}
+		if (!diag.inactiveInteractiveSubtreeSuppressed) {
+			throw new Error('Inactive interactive controls must be suppressed in terminalCompleted');
+		}
+
+		test59.details.statesVerified = ['compact', 'peek', 'interactiveWorking', 'interactiveApproval', 'terminalCompleted'];
+	} catch (err) {
+		test59.ok = false;
+		test59.error = err.message;
+		results.failures.push(`authoritative-semantic-subtree-ownership-and-suppression-matrix: ${err.message}`);
+	}
+	results.tests.push(test59);
+
+	// Test 60: Adversarial Visual Text Containment and Safe Zones
+	const test60 = { name: 'adversarial-visual-text-containment-and-safe-zones', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+
+		const longUrl = 'https://prebase.internal.dev/workspace/repo/src/very/long/unbroken/path/that/must/not/overflow/the/content/viewport/or/silhouette/at/all/under/any/circumstances/when/rendered/inside/the/native/panel/bounds/12345678901234567890';
+		const cjkAndEmoji = '🚀 【系统架构深度分析】/Users/prebase/Development/Projects/Deeply/Nested/Workspace/src/core/presentation/state/manager.ts (100% 完了) ⚡️ 这是一个非常长的测试字符串用于验证文字裁剪与安全区边界';
+
+		native.setSnapshot(contentSnapshot(60_001, {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'adv-approval',
+			pendingTitle: `Execute command: ${longUrl}`,
+			pendingMessage: `Target files and description: ${cjkAndEmoji}\nAdditional line for multi-line scroll testing.`
+		}));
+		await sleep(350);
+		await drainMain(native, 6);
+
+		const diag = native.getDiagnostics();
+		test60.details.diag = {
+			panelFrame: diag.panelFrame,
+			bodyBounds: diag.bodyBounds,
+			contentScrollFrame: diag.contentScrollFrame,
+			contentSafeViewport: diag.contentSafeViewport,
+			contentDocumentHeight: diag.contentDocumentHeight,
+			canonicalState: diag.canonicalPresentationState
+		};
+
+		if (diag.canonicalPresentationState !== 'interactiveApproval') {
+			throw new Error(`Expected interactiveApproval, got ${diag.canonicalPresentationState}`);
+		}
+		if (diag.bodyBounds.width > diag.panelFrame.width) {
+			throw new Error(`bodyBounds width (${diag.bodyBounds.width}) exceeds panelFrame width (${diag.panelFrame.width})`);
+		}
+		if (diag.contentScrollFrame.width > diag.bodyBounds.width) {
+			throw new Error(`contentScrollFrame width (${diag.contentScrollFrame.width}) exceeds bodyBounds width (${diag.bodyBounds.width})`);
+		}
+		if (diag.contentSafeViewport.x < 16) {
+			throw new Error(`contentSafeViewport x inset (${diag.contentSafeViewport.x}) must respect safe margin >= 16pt`);
+		}
+		if (diag.panelFrame.height > 192) {
+			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeds max allowed height of 192pt`);
+		}
+		if (!diag.approvalControlsVisible) {
+			throw new Error('Approval controls must remain visible in approval state');
+		}
+	} catch (err) {
+		test60.ok = false;
+		test60.error = err.message;
+		results.failures.push(`adversarial-visual-text-containment-and-safe-zones: ${err.message}`);
+	}
+	results.tests.push(test60);
+
+	// Test 61: Hit-Testing and Interaction Isolation Under Inactive States
+	const test61 = { name: 'hit-testing-and-interaction-isolation-under-inactive-states', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: false, reducedMotion: false, display: 'builtin' });
+
+		// In compact state: all interactive actions must be rejected
+		native.setSnapshot(contentSnapshot(61_001, { status: 'working', currentActivity: 'Working' }));
+		await sleep(100);
+		await drainMain(native, 3);
+
+		if (native.simulateAction('approve') !== false) {
+			throw new Error('simulateAction(approve) must return false when compact');
+		}
+		if (native.simulateAction('deny') !== false) {
+			throw new Error('simulateAction(deny) must return false when compact');
+		}
+		if (native.simulateAction('option', 0) !== false) {
+			throw new Error('simulateAction(option, 0) must return false when compact');
+		}
+		if (native.simulateAction('followUp', 'test') !== false) {
+			throw new Error('simulateAction(followUp) must return false when compact');
+		}
+
+		// In peek state: click actions must still be rejected
+		native.simulateAction('peek');
+		await sleep(350);
+		await drainMain(native, 5);
+		if (native.simulateAction('approve') !== false) {
+			throw new Error('simulateAction(approve) must return false in peek');
+		}
+		if (native.simulateAction('option', 0) !== false) {
+			throw new Error('simulateAction(option, 0) must return false in peek');
+		}
+
+		// In interactiveApproval state: click approve must succeed, second click must be rejected while in flight
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+		native.setSnapshot(contentSnapshot(61_002, {
+			status: 'attention',
+			pendingKind: 'approval',
+			interactionId: 'hit-appr',
+			pendingTitle: 'Needs approval'
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+
+		const firstClick = native.simulateAction('approve');
+		if (!firstClick) {
+			throw new Error('simulateAction(approve) must return true when interactiveApproval is active');
+		}
+
+		// While in-flight: duplicate click must be rejected
+		const secondClick = native.simulateAction('approve');
+		if (secondClick !== false) {
+			throw new Error('simulateAction(approve) must return false while action is in flight');
+		}
+
+		// Verify action in flight title stability
+		const inFlightDiag = native.getDiagnostics();
+		test61.details.inFlightTitle = inFlightDiag.approveButtonTitle;
+		test61.details.inFlightA11y = inFlightDiag.approveButtonAccessibilityLabel;
+		if (!inFlightDiag.approveButtonAccessibilityLabel.includes('in progress')) {
+			throw new Error(`Accessibility label must include 'in progress', got ${inFlightDiag.approveButtonAccessibilityLabel}`);
+		}
+	} catch (err) {
+		test61.ok = false;
+		test61.error = err.message;
+		results.failures.push(`hit-testing-and-interaction-isolation-under-inactive-states: ${err.message}`);
+	}
+	results.tests.push(test61);
+
 	native.dispose();
 
 	results.ok = results.failures.length === 0;

@@ -975,10 +975,12 @@ static NSString *JSString(Napi::Value value) {
 		self.peekContainer.hidden = YES;
 		self.peekContainer.alphaValue = 0.0;
 		self.peekLabel.hidden = YES;
-		self.expandedContainer.hidden = YES;
-		self.expandedContainer.alphaValue = 0.0;
-		self.compactContainer.hidden = NO;
-		self.compactContainer.alphaValue = 1.0;
+		if (!(self.controller && self.controller.transitionInFlight && !self.reducedMotion)) {
+			self.expandedContainer.hidden = YES;
+			self.expandedContainer.alphaValue = 0.0;
+			self.compactContainer.hidden = NO;
+			self.compactContainer.alphaValue = 1.0;
+		}
 		[self layoutCompactWingChrome:bandH totalW:totalW leftW:leftW rightW:rightW housing:housing];
 		return;
 	}
@@ -1174,6 +1176,10 @@ static NSString *JSString(Napi::Value value) {
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 	if (self.controller) {
 		self.reservedFooterHeight = [self.controller computeControlsStackHeight] + kContentFooterGutter;
+		if (animated && !self.reducedMotion) {
+			self.controller.transitionInFlight = YES;
+			self.controller.transitionEndTime = [NSDate timeIntervalSinceReferenceDate] + duration;
+		}
 	}
 	if (isExpanded) {
 		if (self.peekOnly) {
@@ -1192,12 +1198,17 @@ static NSString *JSString(Napi::Value value) {
 			self.expandedContainer.alphaValue = 1.0; // populated first paint — no blank fade-in
 		}
 	} else {
-		self.expandedContainer.hidden = YES;
-		self.expandedContainer.alphaValue = 0.0;
-		self.peekContainer.hidden = YES;
-		self.peekContainer.alphaValue = 0.0;
-		self.compactContainer.hidden = NO;
-		self.compactContainer.alphaValue = 1.0;
+		if (!animated || self.reducedMotion) {
+			self.expandedContainer.hidden = YES;
+			self.expandedContainer.alphaValue = 0.0;
+			self.peekContainer.hidden = YES;
+			self.peekContainer.alphaValue = 0.0;
+			self.compactContainer.hidden = NO;
+			self.compactContainer.alphaValue = 1.0;
+		} else {
+			self.compactContainer.hidden = NO;
+			self.compactContainer.alphaValue = 0.0;
+		}
 	}
 	[self refreshContentSubviewsPreservingPresentationWithSize:NSMakeSize(totalW, currentH)];
 
@@ -1291,21 +1302,25 @@ static NSString *JSString(Napi::Value value) {
 	}
 	CGPathRelease(targetPath);
 
+	const NSUInteger currentGen = self.controller ? self.controller.transitionGeneration : 0;
 	if (!isExpanded) {
 		if (animated && !self.reducedMotion) {
+			self.compactContainer.hidden = NO;
 			self.compactContainer.alphaValue = 0.0;
-			self.compactContainer.hidden = YES;
 			[NSAnimationContext runAnimationGroup:^(NSAnimationContext *ctx) {
-				ctx.duration = duration * 0.55;
+				ctx.duration = duration;
 				self.expandedContainer.animator.alphaValue = 0.0;
 				self.peekContainer.animator.alphaValue = 0.0;
+				self.compactContainer.animator.alphaValue = 1.0;
 			} completionHandler:^{
-				self.expandedContainer.hidden = YES;
-				self.expandedContainer.alphaValue = 0.0;
-				self.peekContainer.hidden = YES;
-				self.peekContainer.alphaValue = 0.0;
-				self.compactContainer.hidden = NO;
-				self.compactContainer.alphaValue = 1.0;
+				if (!self.controller || currentGen == self.controller.transitionGeneration) {
+					self.expandedContainer.hidden = YES;
+					self.expandedContainer.alphaValue = 0.0;
+					self.peekContainer.hidden = YES;
+					self.peekContainer.alphaValue = 0.0;
+					self.compactContainer.hidden = NO;
+					self.compactContainer.alphaValue = 1.0;
+				}
 			}];
 		} else {
 			self.expandedContainer.alphaValue = 0.0;
@@ -1326,8 +1341,10 @@ static NSString *JSString(Napi::Value value) {
 				self.peekContainer.animator.alphaValue = 1.0;
 				self.compactContainer.animator.alphaValue = 1.0;
 			} completionHandler:^{
-				self.expandedContainer.hidden = YES;
-				self.expandedContainer.alphaValue = 0.0;
+				if (!self.controller || currentGen == self.controller.transitionGeneration) {
+					self.expandedContainer.hidden = YES;
+					self.expandedContainer.alphaValue = 0.0;
+				}
 			}];
 		} else {
 			self.expandedContainer.alphaValue = 0.0;
@@ -1348,10 +1365,12 @@ static NSString *JSString(Napi::Value value) {
 				ctx.duration = duration * 0.45;
 				self.expandedContainer.animator.alphaValue = 1.0;
 			} completionHandler:^{
-				self.compactContainer.hidden = YES;
-				self.compactContainer.alphaValue = 0.0;
-				self.peekContainer.hidden = YES;
-				self.peekContainer.alphaValue = 0.0;
+				if (!self.controller || currentGen == self.controller.transitionGeneration) {
+					self.compactContainer.hidden = YES;
+					self.compactContainer.alphaValue = 0.0;
+					self.peekContainer.hidden = YES;
+					self.peekContainer.alphaValue = 0.0;
+				}
 			}];
 		} else {
 			self.compactContainer.alphaValue = 0.0;
@@ -1798,7 +1817,7 @@ static NSString *JSString(Napi::Value value) {
 		return PrebasePresentationStatePeek;
 	}
 
-	if (self.content.attention) {
+	if (self.content.attention && self.userDismissedAttention) {
 		return PrebasePresentationStateAttentionCompact;
 	}
 	return PrebasePresentationStateCompact;
@@ -1834,7 +1853,7 @@ static NSString *JSString(Napi::Value value) {
 		return PrebasePresentationStatePeek;
 	}
 
-	if (self.content.attention) {
+	if (self.content.attention && self.userDismissedAttention) {
 		return PrebasePresentationStateAttentionCompact;
 	}
 	return PrebasePresentationStateCompact;
@@ -2222,7 +2241,6 @@ static NSString *JSString(Napi::Value value) {
 				self.content.shapeLayer.frame = CGRectMake(0, 0, win.size.width, win.size.height);
 				self.content.shapeMaskLayer.frame = CGRectMake(0, 0, win.size.width, win.size.height);
 				NSRect settled = self.panel ? self.panel.frame : win;
-				[self layoutControls:settled];
 				[self.content refreshContentSubviewsPreservingPresentation];
 				[self layoutControls:settled];
 			}
@@ -2420,15 +2438,6 @@ static NSString *JSString(Napi::Value value) {
 			self.input.frame = NSMakeRect(footerInset, bottomY, usableW, kControlHeight);
 			return;
 		}
-	}
-
-	if (state == PrebasePresentationStateTerminalCompleted || state == PrebasePresentationStateTerminalFailed) {
-		self.input.hidden = YES;
-		self.pinButton.hidden = YES;
-		self.openButton.hidden = YES;
-		self.approveButton.hidden = YES;
-		self.denyButton.hidden = YES;
-		return;
 	}
 
 	// Working interactive state: Show composer + pin + open cleanly in footer
@@ -2948,8 +2957,39 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"notchDetected"] = @(self.content.notched);
 	dict[@"panelLevel"] = @(self.panel.level);
 	dict[@"expanded"] = @(self.content.expanded);
-	dict[@"canonicalPresentationState"] = StringFromPrebasePresentationState([self canonicalPresentationState]);
+	PrebasePresentationState canonicalState = [self canonicalPresentationState];
+	dict[@"canonicalPresentationState"] = StringFromPrebasePresentationState(canonicalState);
 	dict[@"canonicalTargetPresentationState"] = StringFromPrebasePresentationState([self canonicalTargetPresentationState]);
+	NSString *semanticOwner = @"compactContainer";
+	NSString *supportingChrome = nil;
+	BOOL inactiveSuppressed = YES;
+	if (canonicalState == PrebasePresentationStatePeek || canonicalState == PrebasePresentationStateAttentionPeek) {
+		semanticOwner = @"peekContainer";
+		supportingChrome = @"compactContainer";
+		inactiveSuppressed = self.content.expandedContainer.hidden;
+	} else if (canonicalState >= PrebasePresentationStateInteractiveWorking && canonicalState <= PrebasePresentationStateTerminalFailed) {
+		semanticOwner = @"expandedContainer";
+		supportingChrome = nil;
+		inactiveSuppressed = (self.content.compactContainer.hidden && self.content.peekContainer.hidden);
+	} else {
+		semanticOwner = @"compactContainer";
+		supportingChrome = nil;
+		inactiveSuppressed = (self.content.peekContainer.hidden && self.content.expandedContainer.hidden);
+	}
+	dict[@"semanticContentSubtree"] = semanticOwner;
+	dict[@"supportingChromeSubtree"] = supportingChrome ?: [NSNull null];
+	BOOL inactiveInteractiveSuppressed = YES;
+	if (canonicalState == PrebasePresentationStatePeek || canonicalState == PrebasePresentationStateAttentionPeek || canonicalState == PrebasePresentationStateCompact || canonicalState == PrebasePresentationStateAttentionCompact) {
+		inactiveInteractiveSuppressed = self.content.expandedContainer.hidden;
+	} else if (canonicalState == PrebasePresentationStateInteractiveWorking || canonicalState == PrebasePresentationStateInteractiveQuestion) {
+		inactiveInteractiveSuppressed = (self.approveButton.hidden && self.denyButton.hidden);
+	} else if (canonicalState == PrebasePresentationStateInteractiveApproval) {
+		inactiveInteractiveSuppressed = self.input.hidden;
+	} else if (canonicalState == PrebasePresentationStateTerminalCompleted || canonicalState == PrebasePresentationStateTerminalFailed) {
+		inactiveInteractiveSuppressed = (self.approveButton.hidden && self.denyButton.hidden && self.input.hidden);
+	}
+	dict[@"inactiveInteractiveSubtreeSuppressed"] = @(inactiveInteractiveSuppressed);
+	dict[@"inactiveSubtreesSuppressed"] = @(inactiveSuppressed);
 	dict[@"hovered"] = @(self.hovering);
 	dict[@"pinned"] = @(self.pinned);
 	dict[@"keyWindow"] = @(self.panel != nil && self.panel.isKeyWindow);
@@ -3287,6 +3327,9 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateClickOptionIndex:(NSInteger)index {
+	if (self.actionInFlight) {
+		return NO;
+	}
 	if (index < 0 || index >= (NSInteger)self.optionButtons.count) {
 		return NO;
 	}
@@ -3299,6 +3342,9 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateClickApprove {
+	if (self.actionInFlight) {
+		return NO;
+	}
 	if (self.approveButton.hidden && (![self.pendingKind isEqualToString:@"approval"] || !self.interactionId.length)) {
 		return NO;
 	}
@@ -3307,6 +3353,9 @@ static NSString *JSString(Napi::Value value) {
 }
 
 - (BOOL)simulateClickDeny {
+	if (self.actionInFlight) {
+		return NO;
+	}
 	if (self.denyButton.hidden && (![self.pendingKind isEqualToString:@"approval"] || !self.interactionId.length)) {
 		return NO;
 	}

@@ -101,6 +101,48 @@
       "rootCause": "Lack of automated verification for canonical state matrix, CJK/Unicode/deep POSIX path containment, action-activity deduplication, and rapid interrupted morph retargeting.",
       "impact": "Regression risks for multi-state transition chains and edge-case text containment.",
       "change": "Added Tests 54 through 57 (57/57 tests PASS): Test 54 (Canonical Presentation State Matrix & Single-Subtree Isolation), Test 55 (Adversarial CJK, Unicode, Deep Path Containment & Optical Safe-Zone), Test 56 (Action-Activity Deduplication & Footer Baseline Alignment), and Test 57 (Rapid Interrupted Morph Presentation-Layer Retargeting)."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-01: During collapse from interactive/peek to compact, updateShapeAndContentAnimated immediately hid expandedContainer or set duration=0 in NSAnimationContext, dropping the panel into an empty black void mid-flight rather than crossfading smoothly.",
+      "impact": "Collapses looked abrupt and technically unpolished with content instantly vanishing while the silhouette shrunk.",
+      "change": "Set transitionInFlight = YES ahead of refreshContentSubviewsPreservingPresentationWithSize, matched animation context duration to frame morph duration, and crossfaded expandedContainer/peekContainer to alpha=0.0 while compactContainer crossfaded to alpha=1.0."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-02: canonicalPresentationState and canonicalTargetPresentationState fell through to PrebasePresentationStateAttentionCompact whenever content.attention was true, even when userDismissedAttention was false and the notch was collapsed.",
+      "impact": "Fragmented state authority between semantic resolver and renderer, creating ambiguity in diagnostics.",
+      "change": "Strictly scoped PrebasePresentationStateAttentionCompact to (self.content.attention && self.userDismissedAttention). Regular collapsed state without attention or prior to dismissal resolves truthfully to PrebasePresentationStateCompact."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-03: Subtree ownership invariants were conceptually muddy and diagnosticsDict lacked explicit authoritative semantic content subtree identifiers.",
+      "impact": "Ambiguity in tests regarding whether compact wing chrome and peek/interactive containers could co-exist legitimately.",
+      "change": "Formalized subtree policy: peek has authoritative semantic content peekContainer and supporting hardware chrome compactContainer; interactive has authoritative semantic content expandedContainer and suppressed inactive subtrees. Exposed semanticContentSubtree, supportingChromeSubtree, inactiveInteractiveSubtreeSuppressed, inactiveSubtreesSuppressed, and restored expanded boolean in diagnosticsDict."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-04: simulateClickOptionIndex, simulateClickApprove, and simulateClickDeny did not check actionInFlight before accepting simulated clicks.",
+      "impact": "Rapid repeated user/test clicks could trigger concurrent actions while a previous action was still in-flight.",
+      "change": "Added strict if (self.actionInFlight) return NO; guard to all simulated action click handlers in native bridge."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-05: NSAnimationContext completion blocks in updateShapeAndContentAnimated lacked transition generation checks, allowing stale collapse completion blocks from earlier steps to run asynchronously and erroneously hide newly expanded containers.",
+      "impact": "Interrupted or rapid sequential transitions experienced sudden container disappearance mid-flight.",
+      "change": "Captured currentGen = self.controller.transitionGeneration and guarded all container visibility completions with if (!self.controller || currentGen == self.controller.transitionGeneration)."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-06: Ponytail audit revealed duplicate calls to layoutControls inside redundant frame completion blocks.",
+      "impact": "Unnecessary layout passes and redundant layer recalculation during frame morph animations.",
+      "change": "Consolidated layout passes into layoutControls:win, eliminated redundant secondary invocations, and streamlined the animation pipeline."
+    },
+    {
+      "file": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
+      "rootCause": "Test suite ended at Test 57 without automated sampling of intermediate animation frames, explicit subtree suppression matrix, 200+ char unbroken tokens and safe zones, or interaction isolation under inactive states.",
+      "impact": "Transitions and hit-testing edge cases lacked rigorous programmatic and frame-level regression gates.",
+      "change": "Added Tests 58 through 61: Test 58 (Intermediate Transition Frame Sampling Matrix & Collapse Crossfade across 8 transitions), Test 59 (Authoritative Semantic Subtree Ownership & Suppression Matrix across all 5 states), Test 60 (Adversarial Visual Text Containment & Safe Zones with 200+ char unbroken tokens, deep POSIX paths, long URLs, CJK, and emoji), and Test 61 (Hit-Testing & Interaction Isolation Under Inactive States). All 61+ tests passing."
     }
   ],
   "findingsRejected": [
