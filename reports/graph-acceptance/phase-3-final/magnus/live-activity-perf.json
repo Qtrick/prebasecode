@@ -1,10 +1,10 @@
 {
   "schemaVersion": 3,
   "scenario": "magnus-live-activity-perf",
-  "sourceHead": "f0666fbf9270d1c74b8f2ccb6a8082b0678f4276",
+  "sourceHead": "40d5c28a4c612fe521a7e552647cfdd97948987f",
   "sourceFingerprint": "744bdf9b5f4ac5fcd88a94f8165c936d487b883d63aac178b14273a835271059",
   "productFingerprint": "744bdf9b5f4ac5fcd88a94f8165c936d487b883d63aac178b14273a835271059",
-  "generatedAt": "2026-09-08T18:29:54.195Z",
+  "generatedAt": "2026-09-08T20:32:58.586Z",
   "platform": "darwin",
   "arch": "arm64",
   "tests": [
@@ -111,7 +111,7 @@
           "semanticContentSubtree": "compactContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 51650,
+          "windowNumber": 54575,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -310,7 +310,7 @@
       "name": "real-morph-cycles-100",
       "ok": true,
       "details": {
-        "durationRealCyclesMs": 8925,
+        "durationRealCyclesMs": 9488,
         "cycleCount": 100,
         "localMonitorLeaks": 0,
         "staleExpanded": 0,
@@ -393,7 +393,7 @@
           "semanticContentSubtree": "expandedContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 51650,
+          "windowNumber": 54575,
           "openButtonFrame": {
             "y": 81,
             "x": 287.48,
@@ -595,7 +595,7 @@
       "name": "mid-flight-retargeting",
       "ok": true,
       "details": {
-        "durationRetargetMs": 354,
+        "durationRetargetMs": 357,
         "diagRetarget": {
           "renderedPendingMessage": "",
           "animationCount": 203,
@@ -664,7 +664,7 @@
           "semanticContentSubtree": "peekContainer",
           "questionButtonLabels": [],
           "prebaseFullscreen": false,
-          "windowNumber": 51650,
+          "windowNumber": 54575,
           "openButtonFrame": null,
           "displayMode": "builtin",
           "collapsedHit": {
@@ -898,12 +898,12 @@
       "name": "memory-stability",
       "ok": true,
       "details": {
-        "heapDiffKb": 32,
-        "heapUsedMb": 6.74,
-        "rssDiffKb": 27648,
-        "rssMb": 100.28,
-        "cpuDeltaUserMs": 697157,
-        "cpuDeltaSystemMs": 155987
+        "heapDiffKb": -34,
+        "heapUsedMb": 6.71,
+        "rssDiffKb": 46176,
+        "rssMb": 118.16,
+        "cpuDeltaUserMs": 1035901,
+        "cpuDeltaSystemMs": 189060
       }
     },
     {
@@ -1731,9 +1731,9 @@
           "pinned": true,
           "frame": {
             "x": 589,
-            "y": 885,
+            "y": 884,
             "width": 333,
-            "height": 97,
+            "height": 98,
             "isActual": true,
             "requested": {
               "x": 581,
@@ -1780,9 +1780,9 @@
           "state": "completedTransient",
           "frame": {
             "x": 599,
-            "y": 944,
+            "y": 946,
             "width": 313,
-            "height": 38,
+            "height": 36,
             "isActual": true,
             "requested": {
               "x": 599,

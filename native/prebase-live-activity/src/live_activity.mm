@@ -86,6 +86,22 @@ static void ApplySystemSymbol(NSButton *button, NSString *symbolName, NSString *
 	button.title = @"•";
 }
 
+static BOOL IsSingleRawActivityToken(NSString *token) {
+	if (!token.length) {
+		return NO;
+	}
+	NSString *t = [token stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+	if (!t.length) {
+		return NO;
+	}
+	NSRange r = [t rangeOfString:@"^(activity|task|job|run|session)[ -_#]?\\d+$" options:NSRegularExpressionSearch | NSCaseInsensitiveSearch];
+	if (r.location != NSNotFound) {
+		return YES;
+	}
+	NSRange rNum = [t rangeOfString:@"^#?\\d+$" options:NSRegularExpressionSearch];
+	return rNum.location != NSNotFound;
+}
+
 static BOOL IsRawActivityId(NSString *label) {
 	if (!label.length) {
 		return NO;
@@ -94,17 +110,21 @@ static BOOL IsRawActivityId(NSString *label) {
 	if (!trimmed.length) {
 		return NO;
 	}
-	// Matches "Activity 1629", "activity-1629", "task 42", "task_482", "Task #42", "run 1", "job-99", etc.
-	NSRange r = [trimmed rangeOfString:@"^(activity|task|job|run|session)[ -_#]?\\d+$" options:NSRegularExpressionSearch | NSCaseInsensitiveSearch];
-	if (r.location != NSNotFound) {
+	// Single ID: "activity-1629", "task 42", "#482", etc.
+	if (IsSingleRawActivityToken(trimmed)) {
 		return YES;
 	}
-	// Pure numeric IDs (e.g. "1629", "#482")
-	NSRange rNum = [trimmed rangeOfString:@"^#?\\d+$" options:NSRegularExpressionSearch];
-	if (rNum.location != NSNotFound) {
-		return YES;
+	// Concatenated raw IDs: "activity-0 activity-1 activity-2" — every token is a raw ID.
+	NSArray *tokens = [trimmed componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceCharacterSet]];
+	if (tokens.count < 2) {
+		return NO;
 	}
-	return NO;
+	for (NSString *tok in tokens) {
+		if (!IsSingleRawActivityToken(tok)) {
+			return NO;
+		}
+	}
+	return YES;
 }
 
 static NSString *ResolveHumanReadableActivity(NSString *activityLabel, NSString *latestMessage) {
@@ -468,23 +488,21 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	if (isExpanded && depth > 0.5) {
 		// EXPANDED GEOMETRY: Top edge = camera housing width only.
-		// Organic concave shoulders extend from (notchLeft, 0) leftward to (effShoulderR, effShoulderR)
-		// and from (notchRight, 0) rightward to (totalW - effShoulderR, effShoulderR).
+		// Organic concave shoulders extend from housing edges outward to full body walls (x=0, x=totalW).
+		// Body walls span full width — the panel emerges from the notch at full width, not a narrow slab.
 		// The kKappa-derived cubic bezier achieves C1 tangency at both endpoints.
 
-		// 0. MoveTo: left shoulder bottom (effShoulderR, effShoulderR)
-		CGPathMoveToPoint(path, NULL, effShoulderR, effShoulderR);
+		// 0. MoveTo: left shoulder bottom (0, effShoulderR) — full body width
+		CGPathMoveToPoint(path, NULL, 0, effShoulderR);
 
 		// 1. LineTo: noop — needed to keep 8 LineTo elements for morph topology
-		//    (repeated point, visually invisible)
-		CGPathAddLineToPoint(path, NULL, effShoulderR, effShoulderR);
+		CGPathAddLineToPoint(path, NULL, 0, effShoulderR);
 
-		// 2. Left concave organic shoulder: from (effShoulderR, effShoulderR) curving up to (notchLeft, 0)
-		//    Gentler C1 tangent: use 0.45*R as the vertical CP offset (was /3.0) for a
-		//    more gradual arc entry that reads as organic rather than sharply "bitten".
+		// 2. Left concave organic shoulder: from (0, effShoulderR) curving up to (notchLeft, 0)
+		//    Gentler C1 tangent: use 0.45*R as the vertical CP offset for organic arc entry.
 		CGPathAddCurveToPoint(path, NULL,
-			effShoulderR, effShoulderR * 0.45,
-			notchLeft + (2.0 / 3.0) * (effShoulderR - notchLeft), 0,
+			0, effShoulderR * 0.45,
+			notchLeft + (2.0 / 3.0) * (-notchLeft), 0,
 			notchLeft, 0);
 
 		// 3. LineTo: camera housing center (notchCenter, 0) — housing solid top fill
@@ -496,40 +514,40 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 		// 5. LineTo: noop — keeps element count; right shoulder starts from notchRight,0
 		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-		// 6. Right concave organic shoulder: from (notchRight, 0) curving down to (totalW - effShoulderR, effShoulderR)
-		//    Matching gentler C1 tangent for symmetry.
+		// 6. Right concave organic shoulder: from (notchRight, 0) curving down to (totalW, effShoulderR)
+		//    Matching gentler C1 tangent for symmetry — body at full width.
 		CGPathAddCurveToPoint(path, NULL,
-			notchRight + (2.0 / 3.0) * (totalW - effShoulderR - notchRight), 0,
-			totalW - effShoulderR, effShoulderR * 0.45,
-			totalW - effShoulderR, effShoulderR);
+			notchRight + (2.0 / 3.0) * (totalW - notchRight), 0,
+			totalW, effShoulderR * 0.45,
+			totalW, effShoulderR);
 
-		// 7. LineTo: down right wall to bottom-right corner start (totalW - effShoulderR, currentH - effBottomR)
-		CGPathAddLineToPoint(path, NULL, totalW - effShoulderR, currentH - effBottomR);
+		// 7. LineTo: down right wall to bottom-right corner start (totalW, currentH - effBottomR)
+		CGPathAddLineToPoint(path, NULL, totalW, currentH - effBottomR);
 
 		// 8. CurveTo: bottom-right corner
 		CGPathAddCurveToPoint(path, NULL,
-			totalW - effShoulderR, currentH - kBottom,
-			totalW - effShoulderR - kBottom, currentH,
-			totalW - effShoulderR - effBottomR, currentH);
+			totalW, currentH - kBottom,
+			totalW - kBottom, currentH,
+			totalW - effBottomR, currentH);
 
 		// 9. LineTo: across bottom to bottom-left corner start
-		CGPathAddLineToPoint(path, NULL, effShoulderR + effBottomR, currentH);
+		CGPathAddLineToPoint(path, NULL, effBottomR, currentH);
 
 		// 10. CurveTo: bottom-left corner
 		CGPathAddCurveToPoint(path, NULL,
-			effShoulderR + kBottom, currentH,
-			effShoulderR, currentH - kBottom,
-			effShoulderR, currentH - effBottomR);
+			kBottom, currentH,
+			0, currentH - kBottom,
+			0, currentH - effBottomR);
 
-		// 11. LineTo: up left wall to left shoulder bottom (effShoulderR, effShoulderR)
-		CGPathAddLineToPoint(path, NULL, effShoulderR, effShoulderR);
+		// 11. LineTo: up left wall to left shoulder bottom (0, effShoulderR)
+		CGPathAddLineToPoint(path, NULL, 0, effShoulderR);
 
 		// 12. CurveTo: noop — topology slot (left shoulder was already drawn in element 2).
-		//     Self-loop keeps element types: CurveTo(effShoulderR, effShoulderR, ...)
+		//     Self-loop keeps element types: CurveTo(0, effShoulderR, ...)
 		CGPathAddCurveToPoint(path, NULL,
-			effShoulderR, effShoulderR,
-			effShoulderR, effShoulderR,
-			effShoulderR, effShoulderR);
+			0, effShoulderR,
+			0, effShoulderR,
+			0, effShoulderR);
 
 		// 13. Close
 		CGPathCloseSubpath(path);
@@ -2257,9 +2275,8 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat naturalW = MAX(kStableCompactLeftWing + kCameraHousingMin + kStableCompactRightWing,
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
-	// Path-aware safe inset: use the minimum shoulder radius for height estimation
-	// (the actual radius depends on the final height, which we're computing here).
-	CGFloat sideInset = MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX;
+	// Path-aware safe inset: body is full width, content inset is kContentInsetX + safe extra.
+	CGFloat sideInset = kContentInsetX + kContentSafeExtraX;
 	CGFloat contentW = MAX(40, totalW - sideInset * 2);
 	CGFloat h = bandH + kContentInsetTop;
 	h += kHeaderRowHeight + kContentGap;
@@ -2535,13 +2552,15 @@ static NSString *JSString(Napi::Value value) {
 	}
 
 	const CGFloat gap = 6;
-	// Path-aware footer inset: bottom corners eat horizontal space.
+	// Path-aware footer inset: bottom corners eat horizontal + vertical space.
 	CGFloat fLeftW = self.content.leftWingWidth > 0 ? self.content.leftWingWidth : kWingWidthMin;
 	CGFloat fRightW = self.content.rightWingWidth > 0 ? self.content.rightWingWidth : kWingWidthMin;
 	CGFloat fHousing = self.content.housingWidth > 0 ? self.content.housingWidth : kCameraHousingMin;
 	SilhouetteShoulderMetrics fShoulder = ComputeSilhouetteShoulderMetrics(NSWidth(win), bodyHeight, fLeftW, fRightW, fHousing, YES);
 	CGFloat footerInset = ContentSafeInsetX(self.content.notched, fShoulder.effShoulderR);
-	CGFloat bottomY = bodyHeight - kControlHeight - 7;
+	// Bottom corner radius clips vertical space — buttons must clear it by 5pt.
+	CGFloat effBottomR = MIN(kBottomCornerRadius, bodyHeight * 0.40);
+	CGFloat bottomY = bodyHeight - kControlHeight - effBottomR - 5;
 	CGFloat usableW = NSWidth(win) - footerInset * 2;
 
 	BOOL controlsEnabled = !self.actionInFlight;
