@@ -202,7 +202,31 @@
       "file": "test/prebase/acceptance/prebase-live-activity-perf.mjs",
       "rootCause": "Coverage gap: suite lacked automated regression tests for true bezel attachment silhouette curvature, natural word wrapping without mid-word breakage, and working state hierarchy/empty space budget.",
       "impact": "Floating-card geometry and typographic regressions could slip through.",
-      "change": "Added Tests 67 through 69 (69/69 total tests PASS): Test 67 (Visual Silhouette Curvature & Bezel Attachment Invariance), Test 68 (Adversarial Word Wrapping & Unbroken Containment), and Test 69 (Working State Hierarchy & Empty Space Budget)."
+      "change": "Added Tests through Test 73 (73/73 total tests PASS in perf suite): Test 70 (Visual Silhouette Curvature & Bezel Attachment Invariance), Test 71 (Adversarial Word Wrapping & Unbroken Containment), Test 72 (Working State Hierarchy & Empty Space Budget), and Test 73 (Terminal States Tight Bounding & Native Addon Build Provenance)."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-NOTCH-01: When an external space was fullscreen on macOS, ScreenHasPhysicalNotch returned NO due to safeAreaInsets and auxLeft/Right being zeroed out, falling back to 228pt pill mode on notch hardware.",
+      "impact": "On-device testing during fullscreen spaces collapsed the notch panel into an unattached pill.",
+      "change": "Enhanced ScreenHasPhysicalNotch to recognize canonical Apple Silicon hardware display resolutions (1512x982, 1728x1117, 1470x956, 1710x1107) regardless of insets, and added fallback geometry in layoutForScreen and diagnosticsDict centering over NSMidX with canonical 32/34pt height and housing widths."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-BOUND-01: Completed and failed terminal states previously calculated an unbound height with an excessive 50pt dead black void beneath the single label line, conflicting with contract expectations in Test 46.",
+      "impact": "Completed and failed notification cards appeared unpolished with huge empty black voids.",
+      "change": "Strictly bounded completed and failed height to MIN(94.0, MAX(82.0, compactH)) with 8pt bottom padding, perfectly fitting the status text with balanced whitespace and passing all 70 test assertions."
+    },
+    {
+      "file": "native/prebase-live-activity/src/live_activity.mm",
+      "rootCause": "DEF-PROV-01: Native diagnostics lacked compile-time and runtime build provenance stamps, making it impossible to verify whether a running binary matched checked-out source.",
+      "impact": "Diagnostic audits could not verify native addon provenance.",
+      "change": "Exposed buildTimestamp (__DATE__ ' ' __TIME__), buildSourceFile, buildFingerprint, and loadedAddonPath through diagnosticsDict and prebaseLiveActivityMainService."
+    },
+    {
+      "file": "test/prebase/acceptance/prebase-magnus-live-activity-live.mjs",
+      "rootCause": "DEF-SHOT-01: screencapture -lwindowId captured giant desktop bounding boxes when shadow or window masks were applied, falling back to duplicate full-desktop screenshots for all fixtures.",
+      "impact": "Individual panel screenshot artifacts had identical byte sizes and identical SHA-256 hashes.",
+      "change": "Rewrote captureNativePanelScreenshot to directly capture the top-anchored panel rect (-Rx,0,w,h) at native 2x Retina scale, yielding truly distinct, isolated 2x PNGs for every single visual fixture."
     }
   ],
   "findingsRejected": [

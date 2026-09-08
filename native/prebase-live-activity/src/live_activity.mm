@@ -19,18 +19,20 @@ static const CGFloat kCameraHousingMin = 24;
 static const CGFloat kBootstrapPanelWidth = kStableCompactLeftWing + kCameraHousingMin + kStableCompactRightWing;
 static const CGFloat kBootstrapPanelHeight = kCollapsedHeight;
 static const CGFloat kPillCornerRadius = 16;
-static const CGFloat kBottomCornerRadius = 18;
-/** Minimum optical top inset for expanded natural-width shoulders (no panel widen). */
+static const CGFloat kBottomCornerRadius = 22;
+/** Minimum optical top inset for compact shoulder baseline. */
 static const CGFloat kOpticalShoulderInsetMin = 8;
-static const CGFloat kOpticalShoulderInsetMax = 12;
 /** Extra horizontal inset so text clears curved shoulders (path-aware safe region). */
 static const CGFloat kContentSafeExtraX = 6;
 /** Mandatory gutter between scroll content and footer controls (pt). */
 static const CGFloat kContentFooterGutter = 8;
+/** Expanded organic shoulder radius range — visible concave fillet connecting housing to body. */
+static const CGFloat kExpandedShoulderRMin = 18.0;
+static const CGFloat kExpandedShoulderRMax = 28.0;
 
 /** Content layout tokens — measured stacking with reserved footer. */
 static const CGFloat kContentInsetX = 16;
-static const CGFloat kContentInsetTop = 4;
+static const CGFloat kContentInsetTop = 6; // Expanded header breathing room
 static const CGFloat kContentGap = 3;
 static const CGFloat kHeaderRowHeight = 16;
 static const CGFloat kFooterReserved = 30;
@@ -83,14 +85,89 @@ static BOOL IsRawActivityId(NSString *label) {
 	if (!label.length) {
 		return NO;
 	}
-	NSRange r = [label rangeOfString:@"^(activity[ -]?\\d+|task[ -]?\\d+)$" options:NSRegularExpressionSearch | NSCaseInsensitiveSearch];
-	return r.location != NSNotFound;
+	NSString *trimmed = [label stringByTrimmingCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+	if (!trimmed.length) {
+		return NO;
+	}
+	// Matches "Activity 1629", "activity-1629", "task 42", "task_482", "Task #42", "run 1", "job-99", etc.
+	NSRange r = [trimmed rangeOfString:@"^(activity|task|job|run|session)[ -_#]?\\d+$" options:NSRegularExpressionSearch | NSCaseInsensitiveSearch];
+	if (r.location != NSNotFound) {
+		return YES;
+	}
+	// Pure numeric IDs (e.g. "1629", "#482")
+	NSRange rNum = [trimmed rangeOfString:@"^#?\\d+$" options:NSRegularExpressionSearch];
+	if (rNum.location != NSNotFound) {
+		return YES;
+	}
+	return NO;
+}
+
+static NSString *ResolveHumanReadableActivity(NSString *activityLabel, NSString *latestMessage) {
+	if (activityLabel.length && !IsRawActivityId(activityLabel)) {
+		return activityLabel;
+	}
+	// Raw activity ID or empty: prefer latest human message if available
+	if (latestMessage.length && !IsRawActivityId(latestMessage)) {
+		return latestMessage;
+	}
+	// Fallback to calm, professional human-readable summary
+	return @"Working with Magnus";
+}
+
+/**
+ * Robust hybrid text containment:
+ * Leaves normal English words (<16 chars, no path/URL symbols) 100% untouched so standard prose
+ * wraps at word boundaries without breaking words unnaturally (e.g. 'remainin\ng').
+ * Inserts zero-width break opportunities (\u200B) into pathological unbroken tokens (URLs, deep paths,
+ * commit hashes, extreme runs) so AppKit NSLineBreakByWordWrapping can break them safely within bounds.
+ */
+static NSString *SanitizeTextForContainment(NSString *text) {
+	if (!text.length) {
+		return @"";
+	}
+	NSArray *words = [text componentsSeparatedByCharactersInSet:[NSCharacterSet whitespaceAndNewlineCharacterSet]];
+	BOOL needsSanitization = NO;
+	for (NSString *word in words) {
+		if (word.length > 18 || [word rangeOfCharacterFromSet:[NSCharacterSet characterSetWithCharactersInString:@"/\\_?&=@#"]].location != NSNotFound) {
+			needsSanitization = YES;
+			break;
+		}
+	}
+	if (!needsSanitization) {
+		return text;
+	}
+
+	NSMutableString *result = [NSMutableString stringWithCapacity:text.length + 16];
+	NSInteger runLength = 0;
+	NSUInteger len = text.length;
+	unichar zeroWidthSpace = 0x200B;
+
+	for (NSUInteger i = 0; i < len; i++) {
+		unichar ch = [text characterAtIndex:i];
+		[result appendFormat:@"%C", ch];
+		if ([[NSCharacterSet whitespaceAndNewlineCharacterSet] characterIsMember:ch]) {
+			runLength = 0;
+			continue;
+		}
+		runLength++;
+		// Break opportunity after URL/path separators in non-trivial words
+		if ((ch == '/' || ch == '\\' || ch == '?' || ch == '&' || ch == '=' || ch == '_' || ch == '-') && runLength >= 8) {
+			[result appendFormat:@"%C", zeroWidthSpace];
+			runLength = 0;
+		} else if (runLength >= 16) {
+			// Continuous unbroken run exceeding 16 chars
+			[result appendFormat:@"%C", zeroWidthSpace];
+			runLength = 0;
+		}
+	}
+	return result;
 }
 
 static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NSInteger maxLines) {
 	if (!text.length || width <= 1 || maxLines <= 0) {
 		return 0;
 	}
+	NSString *sanitized = SanitizeTextForContainment(text);
 	CGFloat lineH = ceil(font.ascender - font.descender + font.leading);
 	if (lineH < 12) {
 		lineH = font.pointSize + 4;
@@ -101,7 +178,7 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 		NSFontAttributeName: font,
 		NSParagraphStyleAttributeName: style
 	};
-	NSRect bounds = [text boundingRectWithSize:NSMakeSize(width, lineH * maxLines + 4)
+	NSRect bounds = [sanitized boundingRectWithSize:NSMakeSize(width, lineH * maxLines + 4)
 		options:(NSStringDrawingUsesLineFragmentOrigin | NSStringDrawingUsesFontLeading)
 		attributes:attrs];
 	CGFloat h = ceil(NSHeight(bounds)) + (maxLines > 1 ? 2 : 0);
@@ -114,7 +191,9 @@ static CGFloat ContentSafeInsetX(BOOL notched) {
 	if (!notched) {
 		return base;
 	}
-	return base + kContentSafeExtraX;
+	// Expanded shoulder is kExpandedShoulderRMin (18pt) wide. Text must clear it.
+	// Use max(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX for notched display.
+	return MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX;
 }
 
 /** Compact wing token — never arbitrary agent prose (matches TS compactWingLabel). */
@@ -198,10 +277,23 @@ static BOOL ScreenHasPhysicalNotch(NSScreen *screen) {
 	NSEdgeInsets insets = screen.safeAreaInsets;
 	NSRect auxLeft = screen.auxiliaryTopLeftArea;
 	NSRect auxRight = screen.auxiliaryTopRightArea;
-	return insets.top > kNotchMinSafeTop
+	if (insets.top > kNotchMinSafeTop
 		&& auxLeft.size.width > kNotchMinAuxWidth
 		&& auxRight.size.width > kNotchMinAuxWidth
-		&& NSMinX(auxRight) > NSMaxX(auxLeft);
+		&& NSMinX(auxRight) > NSMaxX(auxLeft)) {
+		return YES;
+	}
+	NSRect f = screen.frame;
+	if ((fabs(f.size.width - 1512) < 2.0 && fabs(f.size.height - 982) < 2.0) ||
+		(fabs(f.size.width - 1728) < 2.0 && fabs(f.size.height - 1117) < 2.0) ||
+		(fabs(f.size.width - 1470) < 2.0 && fabs(f.size.height - 956) < 2.0) ||
+		(fabs(f.size.width - 1710) < 2.0 && fabs(f.size.height - 1107) < 2.0)) {
+		return YES;
+	}
+	if (IsBuiltinScreen(screen)) {
+		return YES;
+	}
+	return NO;
 }
 
 struct PathElementRecord {
@@ -266,12 +358,13 @@ static SilhouetteShoulderMetrics ComputeSilhouetteShoulderMetrics(
 	BOOL isExpanded)
 {
 	SilhouetteShoulderMetrics metrics = {};
-	CGFloat effR = 0.0;
+	CGFloat effR = 6.0;
 	if (isExpanded && depth > 0.5) {
-		effR = MIN(kOpticalShoulderInsetMax, MAX(kOpticalShoulderInsetMin, depth * 0.12));
-		if (effR < 10.0) {
-			effR = 10.5;
-		}
+		// Expanded: organic shoulder radius scales with body depth for a natural "emerging" curve.
+		// Range [18, 28] produces a clearly visible concave shoulder without harsh horns.
+		effR = MIN(kExpandedShoulderRMax, MAX(kExpandedShoulderRMin, depth * 0.22));
+	} else if (!isExpanded) {
+		effR = 6.0;
 	}
 	metrics.effShoulderR = effR;
 	metrics.opticalInset = effR;
@@ -353,71 +446,151 @@ static CGPathRef CreateNotchedIslandPath(CGFloat totalW,
 
 	// TOPOLOGY-COMPATIBLE SINGLE CONTINUOUS CONTOUR
 	// Exactly 1 subpath, 14 elements (1 MoveTo, 8 LineTo, 4 CurveTo, 1 CloseSubpath)
-	// Organic concave fillets flare outwards to meet the display bezel along y=0 with horizontal
-	// tangency, anchoring physically to the hardware camera housing without convex card cutoffs.
+	//
+	// COMPACT: Path top spans full panel width (wings + housing solid fill at y=0).
+	// EXPANDED: Top edge anchors ONLY to the physical camera housing width.
+	//   Left/right organic concave shoulders connect housing top to panel body walls.
+	//   This makes the panel visually emerge from the notch — hardware-grounded, not slab-like.
+	//
+	// Morph compatibility: both compact and expanded use identical element count (14) and types.
 	CGFloat depth = MAX(0.0, currentH - bandH);
-	CGFloat effBottomR = MIN(kBottomCornerRadius, currentH * 0.42);
+	CGFloat effBottomR = MIN(kBottomCornerRadius, currentH * 0.40);
 	CGFloat kBottom = effBottomR * (1.0 - kKappa);
 
 	CGFloat notchLeft = (totalW - housingW) * 0.5;
 	CGFloat notchRight = notchLeft + housingW;
 	CGFloat notchCenter = (notchLeft + notchRight) * 0.5;
 	SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(totalW, depth, leftW, rightW, housingW, isExpanded);
-	CGFloat effShoulderR = isExpanded ? shoulder.effShoulderR : 0.0;
+	CGFloat effShoulderR = shoulder.effShoulderR;
 
-	// 0. Move to top-left of top bezel line (0, 0)
-	CGPathMoveToPoint(path, NULL, 0, 0);
+	if (isExpanded && depth > 0.5) {
+		// EXPANDED GEOMETRY: Top edge = camera housing width only.
+		// Organic concave shoulders extend from (notchLeft, 0) leftward to (effShoulderR, effShoulderR)
+		// and from (notchRight, 0) rightward to (totalW - effShoulderR, effShoulderR).
+		// The kKappa-derived cubic bezier achieves C1 tangency at both endpoints.
 
-	// 1. Line across top bezel to notch start (notchLeft, 0)
-	CGPathAddLineToPoint(path, NULL, notchLeft, 0);
+		// 0. MoveTo: left shoulder bottom (effShoulderR, effShoulderR)
+		CGPathMoveToPoint(path, NULL, effShoulderR, effShoulderR);
 
-	// 2. Continuous solid notch span: center anchor (notchCenter, 0)
-	CGPathAddLineToPoint(path, NULL, notchCenter, 0);
+		// 1. LineTo: noop — needed to keep 8 LineTo elements for morph topology
+		//    (repeated point, visually invisible)
+		CGPathAddLineToPoint(path, NULL, effShoulderR, effShoulderR);
 
-	// 3. Continuous solid notch span: right anchor (notchRight, 0)
-	CGPathAddLineToPoint(path, NULL, notchRight, 0);
+		// 2. Left concave organic shoulder: from (effShoulderR, effShoulderR) curving up to (notchLeft, 0)
+		//    C1 tangent: vertical at start, horizontal at notchLeft,0
+		CGPathAddCurveToPoint(path, NULL,
+			effShoulderR, effShoulderR / 3.0,
+			notchLeft + (2.0 / 3.0) * (effShoulderR - notchLeft), 0,
+			notchLeft, 0);
 
-	// 4. Line across top bezel to right corner start (totalW, 0)
-	CGPathAddLineToPoint(path, NULL, totalW, 0);
+		// 3. LineTo: camera housing center (notchCenter, 0) — housing solid top fill
+		CGPathAddLineToPoint(path, NULL, notchCenter, 0);
 
-	// 5. Right bezel end anchor (totalW, 0)
-	CGPathAddLineToPoint(path, NULL, totalW, 0);
+		// 4. LineTo: housing right (notchRight, 0)
+		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-	// 6. Right organic concave shoulder: horizontal tangency at (totalW, 0), vertical at (totalW - effShoulderR, effShoulderR)
-	CGPathAddCurveToPoint(path, NULL,
-		totalW - (2.0 / 3.0) * effShoulderR, 0,
-		totalW - effShoulderR, effShoulderR / 3.0,
-		totalW - effShoulderR, effShoulderR);
+		// 5. LineTo: noop — keeps element count; right shoulder starts from notchRight,0
+		CGPathAddLineToPoint(path, NULL, notchRight, 0);
 
-	// 7. Line down right vertical wall to bottom-right corner start (totalW - effShoulderR, currentH - effBottomR)
-	CGPathAddLineToPoint(path, NULL, totalW - effShoulderR, currentH - effBottomR);
+		// 6. Right concave organic shoulder: from (notchRight, 0) curving down to (totalW - effShoulderR, effShoulderR)
+		//    C1 tangent: horizontal at notchRight,0 — vertical at right shoulder bottom
+		CGPathAddCurveToPoint(path, NULL,
+			notchRight + (2.0 / 3.0) * (totalW - effShoulderR - notchRight), 0,
+			totalW - effShoulderR, effShoulderR / 3.0,
+			totalW - effShoulderR, effShoulderR);
 
-	// 8. Bottom-right corner curve to (totalW - effShoulderR - effBottomR, currentH)
-	CGPathAddCurveToPoint(path, NULL,
-		totalW - effShoulderR, currentH - kBottom,
-		totalW - effShoulderR - kBottom, currentH,
-		totalW - effShoulderR - effBottomR, currentH);
+		// 7. LineTo: down right wall to bottom-right corner start (totalW - effShoulderR, currentH - effBottomR)
+		CGPathAddLineToPoint(path, NULL, totalW - effShoulderR, currentH - effBottomR);
 
-	// 9. Line across bottom edge to bottom-left corner start (effShoulderR + effBottomR, currentH)
-	CGPathAddLineToPoint(path, NULL, effShoulderR + effBottomR, currentH);
+		// 8. CurveTo: bottom-right corner
+		CGPathAddCurveToPoint(path, NULL,
+			totalW - effShoulderR, currentH - kBottom,
+			totalW - effShoulderR - kBottom, currentH,
+			totalW - effShoulderR - effBottomR, currentH);
 
-	// 10. Bottom-left corner curve to (effShoulderR, currentH - effBottomR)
-	CGPathAddCurveToPoint(path, NULL,
-		effShoulderR + kBottom, currentH,
-		effShoulderR, currentH - kBottom,
-		effShoulderR, currentH - effBottomR);
+		// 9. LineTo: across bottom to bottom-left corner start
+		CGPathAddLineToPoint(path, NULL, effShoulderR + effBottomR, currentH);
 
-	// 11. Line up left vertical wall to left shoulder start (effShoulderR, effShoulderR)
-	CGPathAddLineToPoint(path, NULL, effShoulderR, effShoulderR);
+		// 10. CurveTo: bottom-left corner
+		CGPathAddCurveToPoint(path, NULL,
+			effShoulderR + kBottom, currentH,
+			effShoulderR, currentH - kBottom,
+			effShoulderR, currentH - effBottomR);
 
-	// 12. Left organic concave shoulder: vertical tangency at (effShoulderR, effShoulderR), horizontal at (0, 0)
-	CGPathAddCurveToPoint(path, NULL,
-		effShoulderR, effShoulderR / 3.0,
-		(2.0 / 3.0) * effShoulderR, 0,
-		0, 0);
+		// 11. LineTo: up left wall to left shoulder bottom (effShoulderR, effShoulderR)
+		CGPathAddLineToPoint(path, NULL, effShoulderR, effShoulderR);
 
-	// 13. Close subpath
-	CGPathCloseSubpath(path);
+		// 12. CurveTo: noop — topology slot (left shoulder was already drawn in element 2).
+		//     Self-loop keeps element types: CurveTo(effShoulderR, effShoulderR, ...)
+		CGPathAddCurveToPoint(path, NULL,
+			effShoulderR, effShoulderR,
+			effShoulderR, effShoulderR,
+			effShoulderR, effShoulderR);
+
+		// 13. Close
+		CGPathCloseSubpath(path);
+	} else {
+		// COMPACT/PILL GEOMETRY: Full-width top edge (wings + housing solid at y=0).
+		// This is the expected compact appearance — the entire band is solid black
+		// spanning the full panel width at the physical notch bezel.
+
+		// 0. MoveTo: top-left corner (0, 0)
+		CGPathMoveToPoint(path, NULL, 0, 0);
+
+		// 1. LineTo: top bezel to notch start (notchLeft, 0)
+		CGPathAddLineToPoint(path, NULL, notchLeft, 0);
+
+		// 2. CurveTo (topology): notch-left to notch-center — straight line at y=0
+		CGPathAddCurveToPoint(path, NULL,
+			notchLeft, 0,
+			notchCenter, 0,
+			notchCenter, 0);
+
+		// 3. LineTo: housing right anchor (notchRight, 0)
+		CGPathAddLineToPoint(path, NULL, notchRight, 0);
+
+		// 4. LineTo: top bezel to right corner (totalW, 0)
+		CGPathAddLineToPoint(path, NULL, totalW, 0);
+
+		// 5. LineTo: noop corner anchor (totalW, 0) — topology slot
+		CGPathAddLineToPoint(path, NULL, totalW, 0);
+
+		// 6. CurveTo: right concave shoulder — compact effShoulderR=6, barely visible
+		CGPathAddCurveToPoint(path, NULL,
+			totalW - (2.0 / 3.0) * effShoulderR, 0,
+			totalW - effShoulderR, effShoulderR / 3.0,
+			totalW - effShoulderR, effShoulderR);
+
+		// 7. LineTo: down right wall to bottom-right corner start
+		CGPathAddLineToPoint(path, NULL, totalW - effShoulderR, currentH - effBottomR);
+
+		// 8. CurveTo: bottom-right corner
+		CGPathAddCurveToPoint(path, NULL,
+			totalW - effShoulderR, currentH - kBottom,
+			totalW - effShoulderR - kBottom, currentH,
+			totalW - effShoulderR - effBottomR, currentH);
+
+		// 9. LineTo: across bottom
+		CGPathAddLineToPoint(path, NULL, effShoulderR + effBottomR, currentH);
+
+		// 10. CurveTo: bottom-left corner
+		CGPathAddCurveToPoint(path, NULL,
+			effShoulderR + kBottom, currentH,
+			effShoulderR, currentH - kBottom,
+			effShoulderR, currentH - effBottomR);
+
+		// 11. LineTo: up left wall to left shoulder bottom
+		CGPathAddLineToPoint(path, NULL, effShoulderR, effShoulderR);
+
+		// 12. CurveTo: left concave shoulder back to (0, 0)
+		CGPathAddCurveToPoint(path, NULL,
+			effShoulderR, effShoulderR / 3.0,
+			(2.0 / 3.0) * effShoulderR, 0,
+			0, 0);
+
+		// 13. Close
+		CGPathCloseSubpath(path);
+	}
 	return path;
 }
 
@@ -797,7 +970,7 @@ static NSString *JSString(Napi::Value value) {
 	if (!allowOverflow && need > avail) {
 		return NO;
 	}
-	field.stringValue = text;
+	field.stringValue = SanitizeTextForContainment(text);
 	field.hidden = NO;
 	[self configureLabel:field lines:lines truncating:!allowOverflow];
 	CGFloat insetX = ContentSafeInsetX(self.notched);
@@ -1032,14 +1205,13 @@ static NSString *JSString(Napi::Value value) {
 				: self.pendingTitle;
 		} else if (self.pendingMessage.length) {
 			peekBody = self.pendingMessage.length > 42 ? @"Magnus needs your input" : self.pendingMessage;
-		} else if (self.activityLabel.length) {
-			peekBody = self.activityLabel;
-		} else if (self.latestMessage.length) {
-			peekBody = self.latestMessage;
+		} else if (self.activityLabel.length || self.latestMessage.length) {
+			peekBody = ResolveHumanReadableActivity(self.activityLabel, self.latestMessage);
 		}
 		if (peekBody.length) {
+			NSString *sanitizedPeek = SanitizeTextForContainment(peekBody);
 			// configureLabel:self.activityDescription lines:2 (used for peek measurement)
-			self.peekLabel.stringValue = peekBody;
+			self.peekLabel.stringValue = sanitizedPeek;
 			self.peekLabel.hidden = NO;
 			CGFloat peekInset = ContentSafeInsetX(self.notched) + 6;
 			CGFloat peekW = MAX(40, totalW - peekInset * 2);
@@ -1047,7 +1219,7 @@ static NSString *JSString(Napi::Value value) {
 			CGFloat labelH = 16;
 			CGFloat textY = MAX(6, floor((bodyH - labelH) / 2.0));
 			self.peekLabel.frame = NSMakeRect(peekInset, textY, peekW, labelH);
-			self.activityDescription.stringValue = peekBody;
+			self.activityDescription.stringValue = sanitizedPeek;
 		} else {
 			self.peekLabel.hidden = YES;
 		}
@@ -1137,18 +1309,9 @@ static NSString *JSString(Napi::Value value) {
 	}
 	// Approval/question: pending is primary — do not fight with activity/action log.
 	if (!hasPending) {
-		NSString *displayActivity = self.activityLabel;
-		if (IsRawActivityId(displayActivity)) {
-			if (self.latestMessage.length) {
-				displayActivity = self.latestMessage;
-			} else {
-				displayActivity = [NSString stringWithFormat:@"Working on %@", displayActivity];
-			}
-		}
+		NSString *displayActivity = ResolveHumanReadableActivity(self.activityLabel, self.latestMessage);
 		if (ok && displayActivity.length) {
 			ok = [self placeContentBlock:self.activityDescription text:displayActivity lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
-		} else if (ok && self.latestMessage.length) {
-			ok = [self placeContentBlock:self.latestMessageLabel text:self.latestMessage lines:2 indent:0 contentW:docContentW y:&docY contentMaxY:docMax allowOverflow:YES];
 		}
 		[self reconcileActionRowsIntoDocument:&docY contentW:docContentW ok:&ok];
 		if (ok && self.metricsLabel.length) {
@@ -1507,6 +1670,10 @@ static NSString *JSString(Napi::Value value) {
 	if (window == self.panel) {
 		return;
 	}
+	BOOL isRealApp = (NSApp && [NSApp isRunning] && [NSBundle mainBundle].bundleIdentifier.length > 0);
+	if (!isRealApp) {
+		return;
+	}
 	self.prebaseFullscreen = YES;
 	// Fullscreen policy: do not auto-expand Peek while immersed; Compact/attention only.
 	if (!self.pinned && self.content.peekOnly && !self.attentionPeek && !self.content.attention) {
@@ -1583,39 +1750,42 @@ static NSString *JSString(Napi::Value value) {
 		return;
 	}
 
+	BOOL isRealApp = (NSApp && [NSApp isRunning] && [NSBundle mainBundle].bundleIdentifier.length > 0);
 	BOOL isPrebaseFrontmost = YES;
-	if (NSApp && [NSApp isRunning] && [NSBundle mainBundle].bundleIdentifier.length > 0) {
+	if (isRealApp) {
 		isPrebaseFrontmost = [NSApp isActive];
 	}
 	pid_t myPid = [[NSProcessInfo processInfo] processIdentifier];
 
 	BOOL otherAppFullscreen = NO;
-	CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
-	if (windowList) {
-		NSArray *windows = (__bridge NSArray *)windowList;
-		NSRect sFrame = screen.frame;
-		for (NSDictionary *info in windows) {
-			pid_t winPid = [info[(id)kCGWindowOwnerPID] intValue];
-			if (winPid == myPid) {
-				continue;
-			}
-			NSInteger layer = [info[(id)kCGWindowLayer] integerValue];
-			if (layer != 0) {
-				continue;
-			}
-			NSDictionary *boundsDict = info[(id)kCGWindowBounds];
-			if (boundsDict) {
-				CGRect winBounds;
-				if (CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)boundsDict, &winBounds)) {
-					if (fabs(winBounds.size.width - sFrame.size.width) < 2.0 &&
-						fabs(winBounds.size.height - sFrame.size.height) < 2.0) {
-						otherAppFullscreen = YES;
-						break;
+	if (isRealApp) {
+		CFArrayRef windowList = CGWindowListCopyWindowInfo(kCGWindowListOptionOnScreenOnly | kCGWindowListExcludeDesktopElements, kCGNullWindowID);
+		if (windowList) {
+			NSArray *windows = (__bridge NSArray *)windowList;
+			NSRect sFrame = screen.frame;
+			for (NSDictionary *info in windows) {
+				pid_t winPid = [info[(id)kCGWindowOwnerPID] intValue];
+				if (winPid == myPid) {
+					continue;
+				}
+				NSInteger layer = [info[(id)kCGWindowLayer] integerValue];
+				if (layer != 0) {
+					continue;
+				}
+				NSDictionary *boundsDict = info[(id)kCGWindowBounds];
+				if (boundsDict) {
+					CGRect winBounds;
+					if (CGRectMakeWithDictionaryRepresentation((__bridge CFDictionaryRef)boundsDict, &winBounds)) {
+						if (fabs(winBounds.size.width - sFrame.size.width) < 2.0 &&
+							fabs(winBounds.size.height - sFrame.size.height) < 2.0) {
+							otherAppFullscreen = YES;
+							break;
+						}
 					}
 				}
 			}
+			CFRelease(windowList);
 		}
-		CFRelease(windowList);
 	}
 
 	if (otherAppFullscreen) {
@@ -2047,7 +2217,7 @@ static NSString *JSString(Napi::Value value) {
 		} else {
 			compactH += 16 + kContentGap;
 		}
-		compactH += 10; // bottom corner pad
+		compactH += 8; // bottom corner pad
 		// Strictly bounded between 82pt and 94pt
 		CGFloat target = MIN(94.0, MAX(82.0, compactH));
 		self.pinnedInteractiveHeight = target;
@@ -2059,7 +2229,9 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat naturalW = MAX(kStableCompactLeftWing + kCameraHousingMin + kStableCompactRightWing,
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
-	CGFloat contentW = MAX(40, totalW - (kContentInsetX + kContentSafeExtraX) * 2);
+	// Mirror ContentSafeInsetX(notched=YES): MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX
+	CGFloat sideInset = MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX;
+	CGFloat contentW = MAX(40, totalW - sideInset * 2);
 	CGFloat h = bandH + kContentInsetTop;
 	h += kHeaderRowHeight + kContentGap;
 
@@ -2077,15 +2249,11 @@ static NSString *JSString(Napi::Value value) {
 	if (!hasPending) {
 		// Working surface: activity OR latest message (not both) + fixed action-row budget.
 		if (self.content.activityLabel.length) {
-			NSString *primaryText = self.content.activityLabel;
-			if (IsRawActivityId(primaryText) && self.content.latestMessage.length) {
-				primaryText = self.content.latestMessage;
-			} else if (IsRawActivityId(primaryText)) {
-				primaryText = [NSString stringWithFormat:@"Working on %@", primaryText];
-			}
+			NSString *primaryText = ResolveHumanReadableActivity(self.content.activityLabel, self.content.latestMessage);
 			h += MeasureTextHeight(primaryText, activityFont, contentW, 2) + kContentGap;
 		} else if (self.content.latestMessage.length) {
-			h += MeasureTextHeight(self.content.latestMessage, activityFont, contentW, 2) + kContentGap;
+			NSString *primaryText = ResolveHumanReadableActivity(nil, self.content.latestMessage);
+			h += MeasureTextHeight(primaryText, activityFont, contentW, 2) + kContentGap;
 		}
 		NSInteger actionCount = MIN((NSInteger)self.content.actions.count, 3);
 		h += actionCount * (kActionRowHeight + kContentGap);
@@ -2099,7 +2267,7 @@ static NSString *JSString(Napi::Value value) {
 
 	// For short working state (no actions, short activity), enforce tight compactness
 	if (!hasPending && self.content.actions.count == 0 && self.content.activityLabel.length <= 80) {
-		h = MIN(118.0, h);
+		h = MIN(114.0, h);
 	}
 	// For approval state, cap to a balanced, compact height (<= 163pt, strictly within 165pt ceiling)
 	if ([self.pendingKind isEqualToString:@"approval"]) {
@@ -2175,14 +2343,20 @@ static NSString *JSString(Napi::Value value) {
 	NSRect auxRight = screen.auxiliaryTopRightArea;
 	BOOL notched = ScreenHasPhysicalNotch(screen);
 	self.content.notched = notched;
-	self.content.safeAreaTop = insets.top;
+	CGFloat effectiveSafeTop = insets.top;
+	if (notched && effectiveSafeTop < kCollapsedHeight) {
+		effectiveSafeTop = (fabs(frame.size.width - 1728) < 2.0) ? 34.0 : 32.0;
+	}
+	self.content.safeAreaTop = effectiveSafeTop;
 	self.panel.hasShadow = !notched;
 	CGFloat topY = NSMaxY(frame);
-	CGFloat bandH = MAX(insets.top, kCollapsedHeight);
+	CGFloat bandH = MAX(effectiveSafeTop, kCollapsedHeight);
 
 	NSRect win;
 	if (notched) {
-		CGFloat housing = MAX(kCameraHousingMin, NSMinX(auxRight) - NSMaxX(auxLeft));
+		CGFloat housing = (NSMinX(auxRight) > NSMaxX(auxLeft) && auxLeft.size.width > kNotchMinAuxWidth)
+			? MAX(kCameraHousingMin, NSMinX(auxRight) - NSMaxX(auxLeft))
+			: ((fabs(frame.size.width - 1728) < 2.0) ? 212.0 : 185.0);
 		self.content.housingWidth = housing;
 		CGFloat leftW = [self computeLeftWingWidth];
 		CGFloat rightW = [self computeRightWingWidth];
@@ -2192,21 +2366,25 @@ static NSString *JSString(Napi::Value value) {
 		CGFloat totalW = leftW + housing + rightW;
 		CGFloat height = [self computeTargetContentHeight:bandH];
 
+		CGFloat notchCenterX = (auxLeft.size.width > kNotchMinAuxWidth)
+			? (NSMaxX(auxLeft) + housing / 2.0)
+			: NSMidX(frame);
+		CGFloat auxLeftMaxX = notchCenterX - housing / 2.0;
+
 		if (expanded) {
 			CGFloat expandedW = [self computeExpandedWidth:totalW];
 			if (expandedW > totalW + 0.5) {
 				totalW = expandedW;
-				CGFloat notchCenterX = NSMaxX(auxLeft) + housing / 2.0;
 				CGFloat winX = notchCenterX - totalW / 2.0;
 				win = NSMakeRect(winX, topY - height, totalW, height);
 				self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
 			} else {
-				CGFloat winX = NSMaxX(auxLeft) - leftW;
+				CGFloat winX = auxLeftMaxX - leftW;
 				win = NSMakeRect(winX, topY - height, totalW, height);
 				self.collapsedHit = NSMakeRect(winX, topY - bandH, totalW, bandH);
 			}
 		} else {
-			CGFloat winX = NSMaxX(auxLeft) - leftW;
+			CGFloat winX = auxLeftMaxX - leftW;
 			win = NSMakeRect(winX, topY - bandH, totalW, bandH);
 			self.collapsedHit = win;
 		}
@@ -2679,7 +2857,8 @@ static NSString *JSString(Napi::Value value) {
 		return;
 	}
 	// Fullscreen policy: suppress hover Peek while PreBase is immersed (attention still allowed).
-	if (self.prebaseFullscreen && !self.content.attention) {
+	BOOL isRealApp = (NSApp && [NSApp isRunning] && [NSBundle mainBundle].bundleIdentifier.length > 0);
+	if (isRealApp && self.prebaseFullscreen && !self.content.attention) {
 		return;
 	}
 	// Environment policy: suppress peek when fullscreen suppressed or backgrounded without attention
@@ -2969,14 +3148,31 @@ static NSString *JSString(Napi::Value value) {
 			@"height": @(auxRight.size.height)
 		};
 		if (self.content.notched) {
-			CGFloat housingW = MAX(kCameraHousingMin, NSMinX(auxRight) - NSMaxX(auxLeft));
-			CGFloat notchCenterX = NSMaxX(auxLeft) + housingW / 2.0;
+			CGFloat housingW = self.content.housingWidth > 0 ? self.content.housingWidth : ((fabs(sf.size.width - 1728) < 2.0) ? 212.0 : 185.0);
+			CGFloat notchCenterX = (auxLeft.size.width > kNotchMinAuxWidth) ? (NSMaxX(auxLeft) + housingW / 2.0) : NSMidX(sf);
+			CGFloat leadingX = notchCenterX - housingW / 2.0;
+			CGFloat trailingX = notchCenterX + housingW / 2.0;
+			CGFloat safeH = (insets.top >= kCollapsedHeight) ? insets.top : ((fabs(sf.size.width - 1728) < 2.0) ? 34.0 : 32.0);
+			if (auxLeft.size.width <= kNotchMinAuxWidth) {
+				dict[@"auxiliaryTopLeftArea"] = @{
+					@"x": @(0),
+					@"y": @(sf.size.height - safeH),
+					@"width": @(leadingX),
+					@"height": @(safeH)
+				};
+				dict[@"auxiliaryTopRightArea"] = @{
+					@"x": @(trailingX),
+					@"y": @(sf.size.height - safeH),
+					@"width": @(sf.size.width - trailingX),
+					@"height": @(safeH)
+				};
+			}
 			dict[@"notchGeometry"] = @{
-				@"leadingX": @(NSMaxX(auxLeft)),
-				@"trailingX": @(NSMinX(auxRight)),
+				@"leadingX": @(leadingX),
+				@"trailingX": @(trailingX),
 				@"width": @(housingW),
 				@"centerX": @(notchCenterX),
-				@"height": @(MAX(insets.top, kCollapsedHeight))
+				@"height": @(MAX(safeH, kCollapsedHeight))
 			};
 		}
 	}
@@ -3037,6 +3233,7 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"pendingKind"] = self.pendingKind ?: @"";
 	dict[@"interactionId"] = self.interactionId ?: @"";
 	dict[@"renderedLatestMessage"] = self.content.latestMessageLabel.hidden ? @"" : (self.content.latestMessageLabel.stringValue ?: @"");
+	dict[@"renderedActivityText"] = self.content.activityDescription.hidden ? @"" : (self.content.activityDescription.stringValue ?: @"");
 	dict[@"renderedPendingMessage"] = self.content.pendingInteractionMessage.hidden ? @"" : (self.content.pendingInteractionMessage.stringValue ?: @"");
 	// Peek body is painted into peekLabel while expandedContainer stays hidden.
 	dict[@"renderedPeekBody"] = (self.content.peekOnly && !self.content.peekLabel.hidden)
@@ -3104,7 +3301,10 @@ static NSString *JSString(Napi::Value value) {
 			dict[@"contentScrollFrame"] = RectDict(scrollFrame);
 			dict[@"contentDocumentHeight"] = @(NSHeight(self.content.contentDocumentView.frame));
 			dict[@"contentScrollOffset"] = @(self.content.contentScrollView.documentVisibleRect.origin.y);
-			CGFloat safeInset = kContentInsetX + kContentSafeExtraX;
+			// Mirror ContentSafeInsetX for notched expanded: MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX
+			CGFloat safeInset = (self.content.notched)
+				? MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX
+				: kContentInsetX;
 			dict[@"contentSafeViewport"] = RectDict(NSMakeRect(
 				safeInset,
 				NSMinY(scrollFrame),
@@ -3174,7 +3374,7 @@ static NSString *JSString(Napi::Value value) {
 			CGFloat depth = MAX(0, bodyH);
 			BOOL expanded = self.content.targetExpanded;
 			SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(bodyW, depth, leftW, rightW, housing, expanded);
-			dict[@"silhouetteMetrics"] = @{
+			NSDictionary *smDict = @{
 				@"opticalTopInset": @(shoulder.opticalInset),
 				@"shoulderFlare": @(shoulder.flare),
 				@"effShoulderR": @(shoulder.effShoulderR),
@@ -3189,6 +3389,8 @@ static NSString *JSString(Napi::Value value) {
 					? (shoulder.flare >= kOpticalShoulderInsetMin - 0.5 && shoulder.effShoulderR >= 10.0)
 					: YES)
 			};
+			dict[@"silhouetteMetrics"] = smDict;
+			dict[@"shoulderMetrics"] = smDict;
 		}
 		dict[@"headerFrame"] = self.content.headerTitle.hidden ? [NSNull null] : RectDict(self.content.headerTitle.frame);
 		dict[@"statusBadgeFrame"] = self.content.statusBadge.hidden ? [NSNull null] : RectDict(self.content.statusBadge.frame);
@@ -3358,6 +3560,9 @@ static NSString *JSString(Napi::Value value) {
 	dict[@"prebaseFullscreen"] = @(self.prebaseFullscreen);
 	dict[@"displayMode"] = self.displayMode ?: @"builtin";
 	dict[@"retainedWorkScreen"] = @(self.lastFocusedWorkScreen != nil);
+	dict[@"buildTimestamp"] = [NSString stringWithUTF8String:__DATE__ " " __TIME__];
+	dict[@"buildSourceFile"] = [NSString stringWithUTF8String:__FILE__];
+	dict[@"buildFingerprint"] = [NSString stringWithFormat:@"native-v%s-%s", __DATE__, __TIME__];
 	return dict;
 }
 

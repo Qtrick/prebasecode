@@ -287,14 +287,43 @@ function readPngDimensions(filePath) {
 }
 
 function captureNativePanelScreenshot(panelFrame, screenFrame, outPath, windowNumber, backingScale = 2.0) {
-	if (!panelFrame || !screenFrame || process.platform !== 'darwin') {
+	if (!panelFrame || process.platform !== 'darwin') {
 		return { captured: false, isPanelCapture: false, reason: 'unsupported platform or missing geometry' };
 	}
-	const screenH = screenFrame.height || 1080;
-	const screenW = screenFrame.width || 1920;
+	const screenW = (screenFrame && screenFrame.width) ? screenFrame.width : 1512;
+	const screenH = (screenFrame && screenFrame.height) ? screenFrame.height : 982;
 	const winNum = typeof windowNumber === 'number' && windowNumber > 0 ? windowNumber : null;
 
-	// Attempt 1: Window ID capture via screencapture -l <windowid> -o (captures exact NSPanel without shadow/desktop)
+	// Attempt 1: Bounded rect capture around the exact panel frame anchored at top of display (y=0)
+	try {
+		const captureX = Math.max(0, Math.round(panelFrame.x ?? ((screenW - (panelFrame.width || 300)) / 2)));
+		const captureY = 0; // Anchored to top bezel
+		const captureW = Math.max(10, Math.round(panelFrame.width || 300));
+		const captureH = Math.max(10, Math.round(panelFrame.height || 34));
+		const rectArg = `-R${captureX},${captureY},${captureW},${captureH}`;
+		execSync(`screencapture -x ${rectArg} "${outPath}"`, { timeout: 6000, stdio: 'pipe' });
+		const stat = statSync(outPath);
+		if (stat.size > 0 && isPngValid(outPath)) {
+			const dims = readPngDimensions(outPath);
+			const isFullDesktop = dims && dims.width >= (screenW * 0.95) && dims.height >= (screenH * 0.95);
+			if (!isFullDesktop) {
+				return {
+					captured: true,
+					isPanelCapture: true,
+					classification: 'panel-rect',
+					format: 'png',
+					sizeBytes: stat.size,
+					dimensions: dims,
+					rect: { x: captureX, y: captureY, width: captureW, height: captureH },
+					outPath,
+				};
+			}
+		}
+	} catch {
+		// continue to window or fallback capture
+	}
+
+	// Attempt 2: Window ID capture via screencapture -l <windowid> -o (captures exact NSPanel without shadow/desktop)
 	if (winNum) {
 		try {
 			execSync(`screencapture -l ${winNum} -o -x "${outPath}"`, { timeout: 6000, stdio: 'pipe' });
@@ -318,38 +347,8 @@ function captureNativePanelScreenshot(panelFrame, screenFrame, outPath, windowNu
 				}
 			}
 		} catch {
-			// window capture might fail in sandboxed background or need TCC, fall through to rect
+			// fall through
 		}
-	}
-
-	// Attempt 2: Bounded rect capture around the panel
-	try {
-		const contextPadTop = 72;
-		const captureX = Math.max(0, Math.round(Math.min(panelFrame.x, screenFrame.x + screenFrame.width / 2 - 240)));
-		const captureY = Math.max(0, Math.round(screenH - (panelFrame.y + panelFrame.height + contextPadTop)));
-		const captureW = Math.max(10, Math.round(Math.min(screenFrame.width, Math.max(panelFrame.width + 80, 480))));
-		const captureH = Math.max(10, Math.round(panelFrame.height + contextPadTop));
-		const rectArg = `-R${captureX},${captureY},${captureW},${captureH}`;
-		execSync(`screencapture -x ${rectArg} "${outPath}"`, { timeout: 5000, stdio: 'pipe' });
-		const stat = statSync(outPath);
-		if (stat.size > 0 && isPngValid(outPath)) {
-			const dims = readPngDimensions(outPath);
-			const isFullDesktop = dims && dims.width >= (screenW * 0.95) && dims.height >= (screenH * 0.95);
-			if (!isFullDesktop) {
-				return {
-					captured: true,
-					isPanelCapture: true,
-					classification: 'panel-rect',
-					format: 'png',
-					sizeBytes: stat.size,
-					dimensions: dims,
-					rect: { x: captureX, y: captureY, width: captureW, height: captureH },
-					outPath,
-				};
-			}
-		}
-	} catch (rectErr) {
-		// continue to evaluation
 	}
 
 	// Fallback check: full display capture.
@@ -785,6 +784,14 @@ async function run() {
 		}
 
 		evidence.workbenchDiagnostics = await workbenchCommandWithTimeout(launched.page, 8_000, 'prebase.test.getDiagnostics').catch(() => null);
+		const nativeProvenanceDiag = evidence.blurredDiagnostics?.native ?? evidence.diagnosticsAfterOpen?.native;
+		evidence.nativeAddonProvenance = {
+			buildTimestamp: nativeProvenanceDiag?.buildTimestamp,
+			buildSourceFile: nativeProvenanceDiag?.buildSourceFile,
+			buildFingerprint: nativeProvenanceDiag?.buildFingerprint,
+			loadedAddonPath: nativeProvenanceDiag?.loadedAddonPath ?? evidence.blurredDiagnostics?.loadedAddonPath ?? evidence.diagnosticsAfterOpen?.loadedAddonPath,
+			loadedAddonTimestamp: nativeProvenanceDiag?.loadedAddonTimestamp ?? evidence.blurredDiagnostics?.loadedAddonTimestamp ?? evidence.diagnosticsAfterOpen?.loadedAddonTimestamp,
+		};
 	} catch (error) {
 		evidence.error = error instanceof Error ? error.stack ?? error.message : String(error);
 	} finally {

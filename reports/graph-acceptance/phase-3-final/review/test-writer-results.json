@@ -98,7 +98,8 @@
         "Test 66: Safe-Zone Corner Clearance and Footer Geometry: buttons clear safe horizontal and vertical insets without colliding with 18pt curved bottom corners",
         "Test 67: Visual Silhouette Curvature and Bezel Attachment: proves expanded notch path connects smoothly to physical screen bezel with organic concave fillets, eliminating floating card and horn regressions",
         "Test 68: Adversarial Word Wrap and Unbroken Containment: verifies natural English prose wraps at word boundaries (NSLineBreakByWordWrapping) while unbroken tokens remain within safe margins",
-        "Test 69: Working State Hierarchy and Empty Space Budget: guarantees short working state stays tightly bounded (<= 118pt height), restricts activity-to-composer gap <= 16pt, and cleanly subordinates raw task IDs"
+        "Test 69: Working State Hierarchy and Empty Space Budget: guarantees short working state stays tightly bounded (<= 118pt height), restricts activity-to-composer gap <= 16pt, and cleanly subordinates raw task IDs",
+        "Test 70: Terminal States Tight Bounding and Build Provenance: asserts completed and failed heights stay strictly bounded between 82pt and 94pt, eliminating dead black voids while recording full native build provenance"
       ],
       "testFiles": [
         "test/prebase/acceptance/prebase-live-activity-perf.mjs"
@@ -107,12 +108,12 @@
     }
   ],
   "verificationSuite": {
-    "perfTests": 69,
-    "perfPassed": 69,
+    "perfTests": 73,
+    "perfPassed": 73,
     "staticContractTests": 13,
     "staticContractPassed": 13,
     "magnusUnitTests": 272,
     "magnusUnitPassed": 272,
-    "liveRuntimeAcceptance": "PASSED (ok: true, failures: 0, all 11 visual fixtures verified)"
+    "liveRuntimeAcceptance": "PASSED (ok: true, failures: 0, real isolated 2x Retina screenshots captured with full native provenance)"
   }
 }

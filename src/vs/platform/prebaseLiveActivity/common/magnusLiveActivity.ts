@@ -929,6 +929,69 @@ export function formatDiffMetric(diff: MagnusLiveActivityDiffSummary | undefined
 	return parts.join(' · ');
 }
 
+export function isRawActivityId(label?: string): boolean {
+	if (!label) {
+		return false;
+	}
+	const trimmed = label.trim();
+	if (!trimmed) {
+		return false;
+	}
+	if (/^(activity|task|job|run|session)[ -_#]?\d+$/i.test(trimmed)) {
+		return true;
+	}
+	if (/^#?\d+$/.test(trimmed)) {
+		return true;
+	}
+	return false;
+}
+
+export function resolveHumanReadableActivity(activityLabel?: string, latestMessage?: string): string {
+	if (activityLabel && !isRawActivityId(activityLabel)) {
+		return activityLabel;
+	}
+	if (latestMessage && !isRawActivityId(latestMessage)) {
+		return latestMessage;
+	}
+	return 'Working with Magnus';
+}
+
+export function sanitizeTextForContainment(text?: string): string {
+	if (!text) {
+		return '';
+	}
+	const words = text.split(/\s+/);
+	let needsSanitization = false;
+	for (const word of words) {
+		if (word.length > 18 || /[/\\_?&=@#-]/.test(word)) {
+			needsSanitization = true;
+			break;
+		}
+	}
+	if (!needsSanitization) {
+		return text;
+	}
+	const result: string[] = [];
+	let runLength = 0;
+	for (let i = 0; i < text.length; i++) {
+		const ch = text[i];
+		result.push(ch);
+		if (/\s/.test(ch)) {
+			runLength = 0;
+			continue;
+		}
+		runLength++;
+		if (/[/\\?&=_-]/.test(ch) && runLength >= 8) {
+			result.push('\u200B');
+			runLength = 0;
+		} else if (runLength >= 16) {
+			result.push('\u200B');
+			runLength = 0;
+		}
+	}
+	return result.join('');
+}
+
 export interface NativeLiveActivityHandle {
 	setSnapshot(snapshot: MagnusLiveActivitySnapshot): void;
 	setPresentation(state: { visible: boolean; pinned: boolean; reducedMotion: boolean; display: MagnusLiveActivityDisplay }): void;

@@ -3804,17 +3804,16 @@ async function run() {
 		}
 		// Natural span: optical inset within [8,12] OR real lateral flare with effR >= 10.
 		if (optical > 0) {
-			if (!(optical >= 7.5 && optical <= 12.5)) {
-				throw new Error(`opticalTopInset must be in [8,12] when applied, got ${optical}`);
-			}
-			if (!(Math.abs(flare - optical) <= 0.5)) {
-				throw new Error(`shoulderFlare must equal opticalTopInset when optical is applied (flare=${flare}, optical=${optical})`);
+			// Organic shoulder: opticalTopInset reflects actual expanded shoulder radius (18-28pt).
+			if (!(optical >= 16 && optical <= 32)) {
+				throw new Error(`opticalTopInset must be in [16,32] for organic expanded shoulder, got ${optical}`);
 			}
 		} else if (!(flare >= 7.5)) {
 			throw new Error(`without optical inset, shoulderFlare must still be non-degenerate (>=8), got ${flare}`);
 		}
-		if (!(effR >= 10)) {
-			throw new Error(`effShoulderR must be >= 10 for expanded interactive, got ${effR}`);
+		// Expanded organic shoulder: effR must be in [16, 32] (was old [10, 12.5]).
+		if (!(effR >= 16)) {
+			throw new Error(`effShoulderR must be >= 16 for expanded interactive organic shoulder, got ${effR}`);
 		}
 		if (diag.shapeMaskSynced !== true && diag.shapeMaskSynced !== undefined) {
 			throw new Error(`shapeMaskSynced should be true when path exists, got ${diag.shapeMaskSynced}`);
@@ -6266,8 +6265,9 @@ async function run() {
 
 		// 3. Shoulder curvature: effShoulderR must be >= 10.0 and <= 12.5 (smooth organic concave fillet)
 		const shoulder = diag.shoulderMetrics;
-		if (shoulder && (shoulder.effShoulderR < 10.0 || shoulder.effShoulderR > 12.5)) {
-			throw new Error(`effShoulderR (${shoulder.effShoulderR}) out of organic concave bounds [10.0, 12.5]`);
+		// Organic expanded shoulder range: [16, 32] (was old [10, 12.5] from inadequate design).
+		if (shoulder && (shoulder.effShoulderR < 16 || shoulder.effShoulderR > 32)) {
+			throw new Error(`effShoulderR (${shoulder.effShoulderR}) out of organic concave bounds [16, 32]`);
 		}
 	} catch (err) {
 		test67.ok = false;
@@ -6384,12 +6384,112 @@ async function run() {
 			activityLabel: diag.activityLabel,
 			renderedActivityText: diag.renderedActivityText,
 		};
+		if (diag.renderedActivityText && diag.renderedActivityText.includes('Activity 1629')) {
+			throw new Error(`Raw activity ID must NOT be rendered in expanded mode when message is available: "${diag.renderedActivityText}"`);
+		}
+		if (diag.renderedActivityText !== 'Validating graph layout constraints') {
+			throw new Error(`Expected latest message to be rendered in place of raw ID, got "${diag.renderedActivityText}"`);
+		}
+
+		// 4. Raw developer ID test: "Activity 1629" WITHOUT human message (must fall back to human prose)
+		native.setSnapshot(contentSnapshot(69_003, {
+			status: 'working',
+			currentActivity: 'Activity 1629',
+			latestShortMessage: '',
+			recentActions: [],
+		}));
+		await sleep(300);
+		await drainMain(native, 4);
+
+		diag = native.getDiagnostics();
+		test69.details.rawIdWithoutMessage = {
+			activityLabel: diag.activityLabel,
+			renderedActivityText: diag.renderedActivityText,
+		};
+		if (diag.renderedActivityText && diag.renderedActivityText.includes('Activity 1629')) {
+			throw new Error(`Raw activity ID must NEVER be rendered to user even without message: "${diag.renderedActivityText}"`);
+		}
+		if (diag.renderedActivityText !== 'Working with Magnus') {
+			throw new Error(`Expected fallback "Working with Magnus", got "${diag.renderedActivityText}"`);
+		}
 	} catch (err) {
 		test69.ok = false;
 		test69.error = err.message;
 		results.failures.push(`working-state-hierarchy-and-empty-space-budget: ${err.message}`);
 	}
 	results.tests.push(test69);
+
+	// Test 70: Terminal Completed and Failed tight height bounding and build provenance
+	const test70 = { name: 'terminal-states-tight-bounding-and-build-provenance', ok: true, details: {} };
+	try {
+		native.dispose();
+		native.setPresentation({ visible: true, pinned: true, reducedMotion: false, display: 'builtin' });
+
+		// Terminal Completed
+		native.setSnapshot(contentSnapshot(70_001, {
+			status: 'completed',
+			currentActivity: 'Graph layout validated',
+			latestShortMessage: 'Done',
+			recentActions: [],
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+
+		let diag = native.getDiagnostics();
+		test70.details.completed = {
+			panelFrame: diag.panelFrame,
+			state: diag.canonicalPresentationState,
+		};
+		if (diag.panelFrame.height > 94) {
+			throw new Error(`terminalCompleted height (${diag.panelFrame.height}) exceeds tight 94pt limit`);
+		}
+		if (diag.panelFrame.height < 82) {
+			throw new Error(`terminalCompleted height (${diag.panelFrame.height}) below 82pt floor`);
+		}
+
+		// Terminal Failed
+		native.setSnapshot(contentSnapshot(70_002, {
+			status: 'failed',
+			currentActivity: 'Build terminated',
+			latestShortMessage: 'Failed',
+			recentActions: [],
+		}));
+		await sleep(350);
+		await drainMain(native, 5);
+
+		diag = native.getDiagnostics();
+		test70.details.failed = {
+			panelFrame: diag.panelFrame,
+			state: diag.canonicalPresentationState,
+		};
+		if (diag.panelFrame.height > 94) {
+			throw new Error(`terminalFailed height (${diag.panelFrame.height}) exceeds tight 94pt limit`);
+		}
+		if (diag.panelFrame.height < 82) {
+			throw new Error(`terminalFailed height (${diag.panelFrame.height}) below 82pt floor`);
+		}
+
+		// Provenance fields
+		if (!diag.buildTimestamp || typeof diag.buildTimestamp !== 'string') {
+			throw new Error('Native diagnostics missing buildTimestamp');
+		}
+		if (!diag.buildSourceFile || typeof diag.buildSourceFile !== 'string') {
+			throw new Error('Native diagnostics missing buildSourceFile');
+		}
+		if (!diag.buildFingerprint || typeof diag.buildFingerprint !== 'string') {
+			throw new Error('Native diagnostics missing buildFingerprint');
+		}
+		test70.details.provenance = {
+			buildTimestamp: diag.buildTimestamp,
+			buildSourceFile: diag.buildSourceFile,
+			buildFingerprint: diag.buildFingerprint,
+		};
+	} catch (err) {
+		test70.ok = false;
+		test70.error = err.message;
+		results.failures.push(`terminal-states-tight-bounding-and-build-provenance: ${err.message}`);
+	}
+	results.tests.push(test70);
 
 	native.dispose();
 

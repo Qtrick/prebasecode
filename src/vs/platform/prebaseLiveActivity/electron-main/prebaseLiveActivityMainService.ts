@@ -25,7 +25,12 @@ interface NativeAddon {
 	dispose(): void;
 }
 
-function loadNativeAddon(): NativeAddon | undefined {
+interface LoadedAddonResult {
+	addon: NativeAddon;
+	path: string;
+}
+
+function loadNativeAddon(): LoadedAddonResult | undefined {
 	if (!isMacintosh) {
 		return undefined;
 	}
@@ -34,7 +39,10 @@ function loadNativeAddon(): NativeAddon | undefined {
 		return undefined;
 	}
 	const nodeRequire = createRequire(join(app.getAppPath(), 'package.json'));
-	return nodeRequire(candidate) as NativeAddon;
+	return {
+		addon: nodeRequire(candidate) as NativeAddon,
+		path: candidate,
+	};
 }
 
 export class MagnusLiveActivityMainService extends Disposable implements IMagnusLiveActivityMainService {
@@ -44,6 +52,8 @@ export class MagnusLiveActivityMainService extends Disposable implements IMagnus
 	readonly onDidCommand = this._onDidCommand.event;
 
 	private _native: NativeAddon | undefined;
+	private _addonPath: string | undefined;
+	private _addonLoadedAt: string | undefined;
 	private _backend: 'native-appkit' | 'unavailable' = 'unavailable';
 
 	constructor(
@@ -63,13 +73,15 @@ export class MagnusLiveActivityMainService extends Disposable implements IMagnus
 			return;
 		}
 		try {
-			const addon = loadNativeAddon();
-			if (!addon) {
+			const loaded = loadNativeAddon();
+			if (!loaded) {
 				this.logService.info('[MagnusLiveActivity] native AppKit module not built; Live Activity UI unavailable until compile:live-activity');
 				return;
 			}
-			addon.setCommandHandler((command) => this._onDidCommand.fire(command));
-			this._native = addon;
+			loaded.addon.setCommandHandler((command) => this._onDidCommand.fire(command));
+			this._native = loaded.addon;
+			this._addonPath = loaded.path;
+			this._addonLoadedAt = new Date().toISOString();
 			this._backend = 'native-appkit';
 			this._register({ dispose: () => this._teardown() });
 			this.logService.info('[MagnusLiveActivity] native AppKit panel loaded');
@@ -95,7 +107,15 @@ export class MagnusLiveActivityMainService extends Disposable implements IMagnus
 			return undefined;
 		}
 		try {
-			return this._native.getDiagnostics();
+			const diag = this._native.getDiagnostics();
+			if (diag && typeof diag === 'object') {
+				return {
+					...diag,
+					loadedAddonPath: this._addonPath,
+					loadedAddonTimestamp: this._addonLoadedAt,
+				};
+			}
+			return diag;
 		} catch (err) {
 			this.logService.warn('[MagnusLiveActivity] getNativeDiagnostics error', err);
 			return undefined;
