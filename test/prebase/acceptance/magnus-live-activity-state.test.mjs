@@ -576,21 +576,27 @@ test('status badge content safe inset: wider safe zone prevents right-edge clipp
 	// kContentInsetX must be 14 (was 16; MAX(14,18)+8=26 is the effective safe inset for notched)
 	assert.match(native, /kContentInsetX = 14/,
 		'base content inset must be 14pt so notched effective safe inset = MAX(14,18)+8 = 26pt');
-	// ContentSafeInsetX for notched must yield MAX(14,18)+8=26
+	// ContentSafeInsetX for notched must use the dynamic effShoulderR (not fixed kExpandedShoulderRMin)
 	const contentSafeStart = native.indexOf('static CGFloat ContentSafeInsetX');
 	const contentSafeFn = contentSafeStart >= 0 ? native.slice(contentSafeStart, contentSafeStart + 300) : '';
-	assert.match(native, /MAX\(kContentInsetX, kExpandedShoulderRMin\) \+ kContentSafeExtraX/,
-		'ContentSafeInsetX must compute MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX');
+	assert.match(contentSafeFn, /MAX\(kContentInsetX, effShoulderR\) \+ kContentSafeExtraX/,
+		'ContentSafeInsetX must compute MAX(kContentInsetX, effShoulderR) + kContentSafeExtraX');
 });
 
-test('long activity label triggers WIDE width bucket (forensic: long content was clipping right)', () => {
+test('width buckets are purely semantic — no streaming-induced width churn', () => {
 	const native = readFileSync(resolve(repoRoot, 'native/prebase-live-activity/src/live_activity.mm'), 'utf8');
-	// Long activity label > 60 chars triggers WIDE bucket in computeExpandedWidth
-	assert.match(native, /activityLabel\.length > 60/,
-		'activity label > 60 chars must trigger WIDE bucket to prevent right-edge clipping');
-	// Long pendingTitle+pendingMessage > 80 chars combined also triggers WIDE
-	assert.match(native, /pendingTitle\.length \+ self\.content\.pendingMessage\.length > 80/,
-		'combined pending title+message > 80 chars must trigger WIDE bucket');
+	// Width bucket is determined by semantic state alone: approval/question → WIDE, working → STANDARD
+	// Raw character counts must NOT trigger width changes (prevents streaming churn).
+	assert.match(native, /kExpandedWidthWidePad/,
+		'WIDE bucket constant must exist for approval/question');
+	assert.match(native, /kExpandedWidthStandardPad/,
+		'STANDARD bucket constant must exist for working/terminal');
+	assert.match(native, /return naturalW;/,
+		'COMPACT bucket must return naturalW without padding');
+	assert.doesNotMatch(native, /activityLabel\.length > 60/,
+		'width must not depend on raw activity label length (causes streaming churn)');
+	assert.doesNotMatch(native, /pendingTitle\.length \+ self\.content\.pendingMessage\.length > 80/,
+		'width must not depend on raw pending content length (causes streaming churn)');
 });
 
 test('premium control dimensions contract: 28pt controls, 10pt composer radius, 32pt shoulder max', () => {

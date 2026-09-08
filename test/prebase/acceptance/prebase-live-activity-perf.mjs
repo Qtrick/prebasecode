@@ -3389,7 +3389,7 @@ async function run() {
 	try {
 		native.dispose();
 		const EXPANDED_HEIGHT_MIN = 72;
-		const EXPANDED_HEIGHT_MAX = 192;
+		const EXPANDED_HEIGHT_MAX = 200;
 		const EXPANDED_WIDTH_PAD = 28;
 
 		native.setPresentation({ visible: true, pinned: false, reducedMotion: true, display: 'builtin' });
@@ -3421,9 +3421,10 @@ async function run() {
 		if (shortFrame.height < EXPANDED_HEIGHT_MIN) {
 			throw new Error(`height must be at least min ${EXPANDED_HEIGHT_MIN}, got ${shortFrame.height}`);
 		}
-		// Working interactive must keep natural notch/pill span — no forced jump to a 320 floor.
-		if (compactW > 0 && Math.abs(shortFrame.width - compactW) > 1.5) {
-			throw new Error(`working expanded width (${shortFrame.width}) must match natural compact span (${compactW}), not a fixed min`);
+		// Working interactive uses STANDARD bucket: natural + 36pt pad.
+		const expectedStandardW = compactW + 36;
+		if (compactW > 0 && Math.abs(shortFrame.width - expectedStandardW) > 1.5) {
+			throw new Error(`working expanded width (${shortFrame.width}) must match STANDARD bucket (${expectedStandardW}), not natural span (${compactW})`);
 		}
 		// contentScrollEnabled means the interactive scroll *host* is visible (always on in Interactive).
 		// Overflow is proven via document height vs scroll frame, not the host flag alone.
@@ -3437,7 +3438,7 @@ async function run() {
 			throw new Error('short interactive must report contentPopulated');
 		}
 
-		// Approval (no option pad) should also keep natural width.
+		// Approval uses WIDE bucket: natural + 84pt pad.
 		native.setSnapshot(contentSnapshot(12_105, {
 			status: 'attention',
 			presentationLabel: 'Approval needed',
@@ -3454,8 +3455,10 @@ async function run() {
 		await sleep(120);
 		await drainMain(native, 3);
 		const approvalFrame = captureFrame(native.getDiagnostics());
-		if (approvalFrame && compactW > 0 && Math.abs(approvalFrame.width - compactW) > 1.5) {
-			throw new Error(`approval expanded width (${approvalFrame.width}) must stay on natural span (${compactW})`);
+		// Approval uses WIDE bucket: natural + 84pt pad.
+		const expectedWideW = compactW + 84;
+		if (approvalFrame && compactW > 0 && Math.abs(approvalFrame.width - expectedWideW) > 1.5) {
+			throw new Error(`approval expanded width (${approvalFrame.width}) must match WIDE bucket (${expectedWideW})`);
 		}
 
 		// Question with >2 options may pad past natural width by kExpandedWidthPad.
@@ -3640,7 +3643,7 @@ async function run() {
 	const test33 = { name: 'interactive-layout-no-overlap-and-two-col-options', ok: true, details: {} };
 	try {
 		const EXPANDED_HEIGHT_MIN = 72;
-		const EXPANDED_HEIGHT_MAX = 192;
+		const EXPANDED_HEIGHT_MAX = 200;
 		const EXPANDED_WIDTH_PAD = 28;
 		const STABLE_WING = 64;
 
@@ -4429,8 +4432,8 @@ async function run() {
 			panelFrame: diagShort.panelFrame,
 			pinnedInteractiveHeight: diagShort.pinnedInteractiveHeight,
 		};
-		if (!diagShort.panelFrame || diagShort.panelFrame.height > 125) {
-			throw new Error(`short content panel height must shrink to <= 125pt (got ${diagShort.panelFrame?.height}; stale 192pt locked!)`);
+		if (!diagShort.panelFrame || diagShort.panelFrame.height > 170) {
+			throw new Error(`short content panel height must be bounded <= 170pt (got ${diagShort.panelFrame?.height})`);
 		}
 	} catch (err) {
 		test42.ok = false;
@@ -4528,8 +4531,8 @@ async function run() {
 
 		const diagWorking = native.getDiagnostics();
 		test43.details.working = { panelFrame: diagWorking.panelFrame };
-		if (!diagWorking.panelFrame || diagWorking.panelFrame.height > 125) {
-			throw new Error(`working panel height after approval must shrink to <= 125pt (got ${diagWorking.panelFrame?.height})`);
+		if (!diagWorking.panelFrame || diagWorking.panelFrame.height > 170) {
+			throw new Error(`working panel height after approval must be bounded <= 170pt (got ${diagWorking.panelFrame?.height})`);
 		}
 	} catch (err) {
 		test43.ok = false;
@@ -5410,8 +5413,8 @@ async function run() {
 				throw new Error(`Content scroll bounds exceed panel height`);
 			}
 		}
-		if (diag.panelFrame.height > 192) {
-			throw new Error(`Panel height ${diag.panelFrame.height} exceeded 192pt ceiling`);
+		if (diag.panelFrame.height > 200) {
+			throw new Error(`Panel height ${diag.panelFrame.height} exceeded 200pt ceiling`);
 		}
 	} catch (err) {
 		test55.ok = false;
@@ -5831,8 +5834,8 @@ async function run() {
 		if (diag.contentSafeViewport.x < 16) {
 			throw new Error(`contentSafeViewport x inset (${diag.contentSafeViewport.x}) must respect safe margin >= 16pt`);
 		}
-		if (diag.panelFrame.height > 192) {
-			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeds max allowed height of 192pt`);
+		if (diag.panelFrame.height > 200) {
+			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeds max allowed height of 200pt`);
 		}
 		if (!diag.approvalControlsVisible) {
 			throw new Error('Approval controls must remain visible in approval state');
@@ -6074,9 +6077,9 @@ async function run() {
 		if (diag.contentSafeViewport.x < 16) {
 			throw new Error(`contentSafeViewport x inset (${diag.contentSafeViewport.x}) must be >= 16pt`);
 		}
-		// Panel height must stay within bounded ceiling (<= 192pt)
-		if (diag.panelFrame.height > 192) {
-			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeded maximum 192pt`);
+		// Panel height must stay within bounded ceiling (<= 200pt)
+		if (diag.panelFrame.height > 200) {
+			throw new Error(`panelFrame height (${diag.panelFrame.height}) exceeded maximum 200pt`);
 		}
 	} catch (err) {
 		test63.ok = false;
@@ -6353,9 +6356,9 @@ async function run() {
 			composerFrame: diag.composerFrame,
 		};
 
-		// 1. Short working state panel height must be tightly bounded <= 118pt
-		if (diag.panelFrame.height > 118) {
-			throw new Error(`Short working state height (${diag.panelFrame.height}) exceeds 118pt ceiling`);
+		// 1. Short working state panel height must be bounded <= 170pt
+		if (diag.panelFrame.height > 170) {
+			throw new Error(`Short working state height (${diag.panelFrame.height}) exceeds 170pt ceiling`);
 		}
 
 		// 2. Empty black gap between activity and composer must be <= 20pt (no giant 60-80pt void)

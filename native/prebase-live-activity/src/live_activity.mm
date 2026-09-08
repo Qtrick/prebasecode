@@ -46,7 +46,7 @@ static const CGFloat kExpandedHeightMin = 72;
 /** Width pad constants for semantic state buckets (COMPACT / STANDARD / WIDE). */
 static const CGFloat kExpandedWidthPad = 28;       // legacy alias — kept for static contract
 static const CGFloat kExpandedWidthStandardPad = 36; // working, terminal
-static const CGFloat kExpandedWidthWidePad = 84;    // approval, question, long content
+static const CGFloat kExpandedWidthWidePad = 84;    // approval, question
 /** Minimum usable scroll viewport in working interactive state (pt). */
 static const CGFloat kContentMinScrollHeight = 40;
 static const NSTimeInterval kActionInFlightTimeout = 8.0;
@@ -190,15 +190,13 @@ static CGFloat MeasureTextHeight(NSString *text, NSFont *font, CGFloat width, NS
 	return MIN(lineH * maxLines + 2, MAX(lineH, h));
 }
 
-/** Consistent horizontal content inset across expanded body (clears curved shoulders while aligning rows). */
-static CGFloat ContentSafeInsetX(BOOL notched) {
-	CGFloat base = kContentInsetX;
+/** Path-aware horizontal content inset — uses the ACTUAL shoulder radius, not a fixed minimum. */
+static CGFloat ContentSafeInsetX(BOOL notched, CGFloat effShoulderR) {
 	if (!notched) {
-		return base;
+		return kContentInsetX;
 	}
-	// Expanded shoulder is kExpandedShoulderRMin (18pt) wide. Text must clear it.
-	// Use max(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX for notched display.
-	return MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX;
+	// Content must clear the actual curved shoulder region at the current geometry.
+	return MAX(kContentInsetX, effShoulderR) + kContentSafeExtraX;
 }
 
 /** Compact wing token — never arbitrary agent prose (matches TS compactWingLabel). */
@@ -656,6 +654,8 @@ static NSString *JSString(Napi::Value value) {
 @property (nonatomic, assign) BOOL peekOnly;
 /** Vertical space reserved for footer controls inside expandedContainer (set by controller). */
 @property (nonatomic, assign) CGFloat reservedFooterHeight;
+/** Cached effective shoulder radius for the current layout — drives ContentSafeInsetX. */
+@property (nonatomic, assign) CGFloat cachedEffShoulderR;
 @property (nonatomic, strong) NSTrackingArea *trackingArea;
 @property (nonatomic, weak) PrebaseLiveActivityController *controller;
 
@@ -979,7 +979,7 @@ static NSString *JSString(Napi::Value value) {
 	field.stringValue = SanitizeTextForContainment(text);
 	field.hidden = NO;
 	[self configureLabel:field lines:lines truncating:!allowOverflow];
-	CGFloat insetX = ContentSafeInsetX(self.notched);
+	CGFloat insetX = ContentSafeInsetX(self.notched, self.cachedEffShoulderR);
 	field.frame = NSMakeRect(insetX + indent, *y, fieldW, MAX(need, lines == 1 ? kActionRowHeight : need));
 	*y += MAX(need, lines == 1 ? kActionRowHeight : need) + kContentGap;
 	return YES;
@@ -1161,6 +1161,10 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat rightW = self.rightWingWidth > 0 ? self.rightWingWidth : kWingWidthMin;
 	CGFloat housing = self.housingWidth > 0 ? self.housingWidth : kCameraHousingMin;
 
+	// Cache the actual shoulder radius for path-aware content safe insets.
+	SilhouetteShoulderMetrics shoulder = ComputeSilhouetteShoulderMetrics(totalW, MAX(0, currentH - bandH), leftW, rightW, housing, isExpanded);
+	self.cachedEffShoulderR = shoulder.effShoulderR;
+
 	self.compactContainer.frame = NSMakeRect(0, 0, totalW, bandH);
 	self.peekContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
 	self.expandedContainer.frame = NSMakeRect(0, bandH, totalW, MAX(0, currentH - bandH));
@@ -1219,7 +1223,7 @@ static NSString *JSString(Napi::Value value) {
 			// configureLabel:self.activityDescription lines:2 (used for peek measurement)
 			self.peekLabel.stringValue = sanitizedPeek;
 			self.peekLabel.hidden = NO;
-			CGFloat peekInset = ContentSafeInsetX(self.notched) + 6;
+			CGFloat peekInset = ContentSafeInsetX(self.notched, self.cachedEffShoulderR) + 6;
 			CGFloat peekW = MAX(40, totalW - peekInset * 2);
 			CGFloat bodyH = MAX(0, currentH - bandH);
 			CGFloat labelH = 16;
@@ -1276,7 +1280,7 @@ static NSString *JSString(Napi::Value value) {
 		? [NSColor colorWithCalibratedRed:0.98 green:0.72 blue:0.28 alpha:0.95]
 		: [NSColor colorWithCalibratedWhite:0.58 alpha:1.0];
 	self.statusBadge.alignment = NSTextAlignmentRight;
-	CGFloat headerInset = ContentSafeInsetX(self.notched);
+	CGFloat headerInset = ContentSafeInsetX(self.notched, self.cachedEffShoulderR);
 	CGFloat headerW = MAX(40, totalW - headerInset * 2);
 	CGFloat statusW = MIN(headerW * 0.40, MAX(44, [statusText sizeWithAttributes:@{ NSFontAttributeName: self.statusBadge.font }].width + 4));
 	CGFloat titleW = MAX(48, headerW - statusW - 8);
@@ -2138,16 +2142,15 @@ static NSString *JSString(Napi::Value value) {
  * streaming text updates. Three buckets:
  *   COMPACT  — notch natural span (compact / peek)
  *   STANDARD — natural + kExpandedWidthStandardPad (working, terminal)
- *   WIDE     — natural + kExpandedWidthWidePad (approval, question, long content)
+ *   WIDE     — natural + kExpandedWidthWidePad (approval, question)
+ * Bucket is latched per semantic state — streaming text never shifts width.
  * The legacy kExpandedWidthPad alias is preserved for the static contract check.
  */
 - (CGFloat)computeExpandedWidth:(CGFloat)naturalW {
 	PrebasePresentationState st = [self canonicalTargetPresentationState];
-	// WIDE bucket: approval, question, or long content requiring horizontal room
+	// WIDE bucket: approval, question — needs horizontal room for options/buttons
 	if (st == PrebasePresentationStateInteractiveApproval
-			|| st == PrebasePresentationStateInteractiveQuestion
-			|| (self.content.pendingTitle.length + self.content.pendingMessage.length > 80)
-			|| self.content.activityLabel.length > 60) {
+			|| st == PrebasePresentationStateInteractiveQuestion) {
 		return naturalW + kExpandedWidthWidePad;
 	}
 	// STANDARD bucket: working interactive, terminal states
@@ -2254,7 +2257,8 @@ static NSString *JSString(Napi::Value value) {
 	CGFloat naturalW = MAX(kStableCompactLeftWing + kCameraHousingMin + kStableCompactRightWing,
 		self.content.leftWingWidth + self.content.housingWidth + self.content.rightWingWidth);
 	CGFloat totalW = [self computeExpandedWidth:naturalW];
-	// Mirror ContentSafeInsetX(notched=YES): MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX
+	// Path-aware safe inset: use the minimum shoulder radius for height estimation
+	// (the actual radius depends on the final height, which we're computing here).
 	CGFloat sideInset = MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX;
 	CGFloat contentW = MAX(40, totalW - sideInset * 2);
 	CGFloat h = bandH + kContentInsetTop;
@@ -2532,7 +2536,11 @@ static NSString *JSString(Napi::Value value) {
 
 	const CGFloat gap = 6;
 	// Path-aware footer inset: bottom corners eat horizontal space.
-	CGFloat footerInset = ContentSafeInsetX(self.content.notched);
+	CGFloat fLeftW = self.content.leftWingWidth > 0 ? self.content.leftWingWidth : kWingWidthMin;
+	CGFloat fRightW = self.content.rightWingWidth > 0 ? self.content.rightWingWidth : kWingWidthMin;
+	CGFloat fHousing = self.content.housingWidth > 0 ? self.content.housingWidth : kCameraHousingMin;
+	SilhouetteShoulderMetrics fShoulder = ComputeSilhouetteShoulderMetrics(NSWidth(win), bodyHeight, fLeftW, fRightW, fHousing, YES);
+	CGFloat footerInset = ContentSafeInsetX(self.content.notched, fShoulder.effShoulderR);
 	CGFloat bottomY = bodyHeight - kControlHeight - 7;
 	CGFloat usableW = NSWidth(win) - footerInset * 2;
 
@@ -3331,9 +3339,9 @@ static NSString *JSString(Napi::Value value) {
 			dict[@"contentScrollFrame"] = RectDict(scrollFrame);
 			dict[@"contentDocumentHeight"] = @(NSHeight(self.content.contentDocumentView.frame));
 			dict[@"contentScrollOffset"] = @(self.content.contentScrollView.documentVisibleRect.origin.y);
-			// Mirror ContentSafeInsetX for notched expanded: MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX
+			// Path-aware safe inset: use the cached actual shoulder radius from layout.
 			CGFloat safeInset = (self.content.notched)
-				? MAX(kContentInsetX, kExpandedShoulderRMin) + kContentSafeExtraX
+				? MAX(kContentInsetX, self.content.cachedEffShoulderR) + kContentSafeExtraX
 				: kContentInsetX;
 			dict[@"contentSafeViewport"] = RectDict(NSMakeRect(
 				safeInset,
@@ -3384,7 +3392,9 @@ static NSString *JSString(Napi::Value value) {
 			CGFloat footerReserve = MAX(0, self.content.reservedFooterHeight);
 			CGFloat textHeight = MAX(0, bodyH - footerReserve);
 			dict[@"contentViewport"] = RectDict(NSMakeRect(0, 0, bodyW, textHeight));
-			CGFloat safeInset = kContentInsetX + kContentSafeExtraX;
+			CGFloat safeInset = self.content.notched
+				? MAX(kContentInsetX, self.content.cachedEffShoulderR) + kContentSafeExtraX
+				: kContentInsetX;
 			dict[@"contentSafeViewport"] = RectDict(NSMakeRect(safeInset, kContentInsetTop, MAX(0, bodyW - safeInset * 2), MAX(0, textHeight - kContentInsetTop)));
 			dict[@"footerTopY"] = @(textHeight);
 			dict[@"actualVisibleViewportTop"] = @(0);
@@ -3408,6 +3418,8 @@ static NSString *JSString(Napi::Value value) {
 				@"opticalTopInset": @(shoulder.opticalInset),
 				@"shoulderFlare": @(shoulder.flare),
 				@"effShoulderR": @(shoulder.effShoulderR),
+				@"cachedEffShoulderR": @(self.content.cachedEffShoulderR),
+				@"contentSafeInsetX": @(ContentSafeInsetX(self.content.notched, shoulder.effShoulderR)),
 				@"topLeftX": @(shoulder.wingLeftX),
 				@"topRightX": @(shoulder.wingRightX),
 				@"panelWidth": @(bodyW),
